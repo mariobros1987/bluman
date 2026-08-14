@@ -15,6 +15,7 @@ import {
 } from './adapters/appErrors.js';
 
 import { signJwt, verifyJwt } from './util/jwt.js';
+import { hashPassword, verifyPassword } from './util/password.js';
 
 export function buildServer(app: AppPort): FastifyInstance {
   const server = Fastify({ logger: false });
@@ -57,38 +58,60 @@ export function buildServer(app: AppPort): FastifyInstance {
 
   // ─── AUTH ENDPOINTS & RBAC PERMISSIONS (§2bis, §23) ───────────────
   server.post<{
-    Body: { email: string; password?: string };
+    Body: { email?: string; password?: string };
   }>('/auth/login', async (req, reply) => {
-    const { email, password } = req.body;
-    
-    // Utente demo per quick-start se non presente in DB
-    let userRole: 'super_admin' | 'advisor' | 'collaboratore_interno' = 'advisor';
-    let userName = 'Joe Disabato';
-    let tenantId = '00000000-0000-0000-0000-000000000001';
+    const { email, password } = req.body || {};
 
-    if (email.includes('admin')) {
-      userRole = 'super_admin';
-      userName = 'Super Admin Studio';
-    } else if (email.includes('operator')) {
-      userRole = 'collaboratore_interno';
-      userName = 'Elena Rossi (Operatore)';
+    if (!email || !password) {
+      return reply.code(400).send({ errore: 'Email e password sono obbligatorie' });
     }
 
+    // Utenti registrati nello studio (in DB o seed)
+    const validUsers: Record<string, { passHash: string; name: string; role: 'super_admin' | 'advisor' | 'collaboratore_interno' }> = {
+      'joe@bluecode.advisory': {
+        passHash: hashPassword('password123'),
+        name: 'Joe Disabato',
+        role: 'advisor',
+      },
+      'admin@bluecode.advisory': {
+        passHash: hashPassword('admin2026!'),
+        name: 'Super Admin Studio',
+        role: 'super_admin',
+      },
+      'operator@bluecode.advisory': {
+        passHash: hashPassword('operator123'),
+        name: 'Elena Rossi (Operatore)',
+        role: 'collaboratore_interno',
+      },
+    };
+
+    const targetUser = validUsers[email.toLowerCase().trim()];
+    if (!targetUser) {
+      return reply.code(401).send({ errore: 'Credenziali non valide. Utente non registrato nello studio.' });
+    }
+
+    const isMatch = verifyPassword(password, targetUser.passHash);
+    if (!isMatch) {
+      return reply.code(401).send({ errore: 'Credenziali non valide. Password errata.' });
+    }
+
+    const tenantId = '00000000-0000-0000-0000-000000000001';
+
     const token = signJwt({
-      userId: `usr-${Date.now()}`,
+      userId: `usr-${email}`,
       tenantId,
       email,
-      ruolo: userRole,
+      ruolo: targetUser.role,
     });
 
     return {
       ok: true,
       token,
       user: {
-        id: `usr-${Date.now()}`,
-        nome: userName,
+        id: `usr-${email}`,
+        nome: targetUser.name,
         email,
-        ruolo: userRole,
+        ruolo: targetUser.role,
         tenantId,
       },
     };

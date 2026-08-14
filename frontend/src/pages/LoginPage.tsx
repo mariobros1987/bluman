@@ -53,21 +53,21 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
         <div style={{ background: 'var(--card2)', padding: 4, borderRadius: 12, display: 'flex', gap: 4 }}>
           <button
             type="button"
-            onClick={() => { setSelectedRole('advisor'); setEmail('joe@bluecode.advisory'); }}
+            onClick={() => { setSelectedRole('advisor'); setEmail('joe@bluecode.advisory'); setPassword('password123'); }}
             style={roleBtnStyle(selectedRole === 'advisor')}
           >
             👨‍💼 Advisor
           </button>
           <button
             type="button"
-            onClick={() => { setSelectedRole('collaboratore_interno'); setEmail('operator@bluecode.advisory'); }}
+            onClick={() => { setSelectedRole('collaboratore_interno'); setEmail('operator@bluecode.advisory'); setPassword('operator123'); }}
             style={roleBtnStyle(selectedRole === 'collaboratore_interno')}
           >
             👷 Operatore
           </button>
           <button
             type="button"
-            onClick={() => { setSelectedRole('super_admin'); setEmail('admin@bluecode.advisory'); }}
+            onClick={() => { setSelectedRole('super_admin'); setEmail('admin@bluecode.advisory'); setPassword('admin2026!'); }}
             style={roleBtnStyle(selectedRole === 'super_admin')}
           >
             👑 SuperAdmin

@@ -14,15 +14,13 @@ export async function loginApi(email: string, password?: string) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
     });
-    if (!res.ok) throw new Error('Credenziali non valide');
-    return await res.json();
-  } catch (err) {
-    console.warn('Login API fallback', err);
-    return {
-      ok: true,
-      token: 'jwt_mock_token_123',
-      user: { id: 'usr-01', nome: 'Joe Disabato', email, ruolo: email.includes('admin') ? 'super_admin' : 'advisor' },
-    };
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.errore || 'Credenziali non valide');
+    }
+    return data;
+  } catch (err: any) {
+    throw new Error(err.message || 'Errore di connessione durante il login');
   }
 }
 
