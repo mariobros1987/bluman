@@ -37,6 +37,22 @@ export function buildServer(app: AppPort): FastifyInstance {
     return reply.code(500).send({ errore: err instanceof Error ? err.message : 'Errore interno' });
   });
 
+  // ─── MULTI-TENANT CONTEXT MIDDLEWARE (§14, §23) ───────────────────
+  server.addHook('onRequest', async (req) => {
+    let tenantId = '00000000-0000-0000-0000-000000000001'; // Default Studio Tenant
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.split(' ')[1];
+      const payload = verifyJwt(token);
+      if (payload && payload.tenantId) {
+        tenantId = payload.tenantId;
+      }
+    } else if (req.headers['x-tenant-id']) {
+      tenantId = req.headers['x-tenant-id'] as string;
+    }
+    (req as any).tenantId = tenantId;
+  });
+
   server.get('/health', async () => ({ stato: 'ok' }));
 
   // ─── AUTH ENDPOINTS & RBAC PERMISSIONS (§2bis, §23) ───────────────
@@ -277,13 +293,14 @@ export function buildServer(app: AppPort): FastifyInstance {
 
   server.post<{
     Params: { id: string };
-    Body: { oreAggiunte: number; completa?: boolean };
-  }>('/microvoci/:id/consuntiva', async (req) => {
-    return app.consuntivaMicrovoce({
-      microvoceId: req.params.id,
-      oreAggiunte: req.body.oreAggiunte || 0,
-      completa: req.body.completa || false,
-    });
+    Body: { oreAggiunte?: number; ore?: number };
+  }>('/microvoci/:id/consuntiva', async (req, reply) => {
+    const ore = req.body?.oreAggiunte ?? req.body?.ore;
+    if (ore === undefined || typeof ore !== 'number') {
+      return reply.code(400).send({ errore: 'Il campo ore (o oreAggiunte) è obbligatorio' });
+    }
+    await app.consuntivaMicrovoce(req.params.id, ore);
+    return { ok: true, oreConsuntivate: ore };
   });
 
   server.post<{
