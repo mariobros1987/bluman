@@ -261,6 +261,37 @@ export function buildServer(app: AppPort): FastifyInstance {
     return { ok: true, sent, magicUrl, magicToken };
   });
 
+  server.get('/tenant/info', async (req) => {
+    const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
+    let tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
+    if (!tenant) {
+      tenant = await prisma.tenant.create({
+        data: {
+          id: tenantId,
+          ragioneSociale: 'Bluecode Ltd',
+          piano: 'enterprise',
+          stato: 'attivo',
+        },
+      });
+    }
+    return tenant;
+  });
+
+  server.patch<{ Body: any }>('/tenant/info', async (req, reply) => {
+    const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
+    const updated = await prisma.tenant.upsert({
+      where: { id: tenantId },
+      update: req.body,
+      create: {
+        id: tenantId,
+        ragioneSociale: req.body.ragioneSociale || 'Bluecode Ltd',
+        piano: 'enterprise',
+        ...req.body,
+      },
+    });
+    return reply.send(updated);
+  });
+
   server.get('/tenant/utenti', async () => {
     return (app as any).listaUtenti();
   });

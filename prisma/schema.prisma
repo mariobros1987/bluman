@@ -29,8 +29,17 @@ model Tenant {
   logoUrl           String?  @map("logo_url")
   coloreTemaFattura String?  @map("colore_tema_fattura")
   notePieFattura    String?  @map("note_pie_fattura")
+  titoloIntestazione String? @map("titolo_intestazione")
   iban              String?  @map("iban")
-  piano             String
+  email             String?  @map("email")
+  pec               String?  @map("pec")
+  telefono          String?  @map("telefono")
+  waPhoneId         String?  @map("wa_phone_id")
+  waAccessToken     String?  @map("wa_access_token")
+  waVerifyToken     String?  @map("wa_verify_token")
+  tgBotToken        String?  @map("tg_bot_token")
+  tgBotUsername     String?  @map("tg_bot_username")
+  piano             String   @default("enterprise")
   stato             String   @default("attivo") // attivo|sospeso|trial
   createdAt         DateTime @default(now()) @map("created_at")
 

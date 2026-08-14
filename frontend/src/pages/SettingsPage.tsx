@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { fetchUtentiTenant, creaUtenteTenantApi, uploadFileApi } from '../api/client';
+import { fetchUtentiTenant, creaUtenteTenantApi, uploadFileApi, fetchTenantInfoApi, updateTenantInfoApi } from '../api/client';
 import styles from './Settings.module.css';
 
 type Tab = 'company' | 'users' | 'sdi' | 'invoice_design' | 'channels';
@@ -49,9 +49,31 @@ export function SettingsPage() {
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserRole, setNewUserRole] = useState<'super_admin' | 'advisor' | 'operator'>('advisor');
   const [submittingUser, setSubmittingUser] = useState(false);
-
-  const loadUsers = async () => {
+  
+  const loadTenantData = async () => {
     setLoadingUsers(true);
+    const dbTenant = await fetchTenantInfoApi();
+    if (dbTenant) {
+      if (dbTenant.ragioneSociale) setRagioneSociale(dbTenant.ragioneSociale);
+      if (dbTenant.piva) setPIva(dbTenant.piva);
+      if (dbTenant.codiceFiscale) setCodFisc(dbTenant.codiceFiscale);
+      if (dbTenant.sedeLegale) setSedeLegale(dbTenant.sedeLegale);
+      if (dbTenant.sedeOperativa) setSedeOperativa(dbTenant.sedeOperativa);
+      if (dbTenant.email) setEmail(dbTenant.email);
+      if (dbTenant.pec) setPec(dbTenant.pec);
+      if (dbTenant.telefono) setTelefono(dbTenant.telefono);
+      if (dbTenant.iban) setIban(dbTenant.iban);
+      if (dbTenant.logoUrl) setLogoUrl(dbTenant.logoUrl);
+      if (dbTenant.coloreTemaFattura) setColoreTemaFattura(dbTenant.coloreTemaFattura);
+      if (dbTenant.notePieFattura) setNotePieDiPagina(dbTenant.notePieFattura);
+      if (dbTenant.titoloIntestazione) setTitoloIntestazione(dbTenant.titoloIntestazione);
+      if (dbTenant.waPhoneId) setWaPhoneId(dbTenant.waPhoneId);
+      if (dbTenant.waAccessToken) setWaAccessToken(dbTenant.waAccessToken);
+      if (dbTenant.waVerifyToken) setWaVerifyToken(dbTenant.waVerifyToken);
+      if (dbTenant.tgBotToken) setTgBotToken(dbTenant.tgBotToken);
+      if (dbTenant.tgBotUsername) setTgBotUsername(dbTenant.tgBotUsername);
+    }
+
     const dbUsers = await fetchUtentiTenant();
     if (dbUsers && Array.isArray(dbUsers) && dbUsers.length > 0) {
       setUsers(dbUsers);
@@ -65,11 +87,34 @@ export function SettingsPage() {
   };
 
   useEffect(() => {
-    loadUsers();
+    loadTenantData();
   }, []);
 
-  const handleSaveCompany = (e: React.FormEvent) => {
+  const handleSaveCompany = async (e: React.FormEvent) => {
     e.preventDefault();
+    const dataToSave = {
+      ragioneSociale,
+      piva: pIva,
+      codiceFiscale: codFisc,
+      sedeLegale,
+      sedeOperativa,
+      email,
+      pec,
+      telefono,
+      iban,
+      logoUrl,
+      coloreTemaFattura,
+      notePieFattura: notePieDiPagina,
+      titoloIntestazione,
+      waPhoneId,
+      waAccessToken,
+      waVerifyToken,
+      tgBotToken,
+      tgBotUsername,
+    };
+
+    await updateTenantInfoApi(dataToSave);
+    localStorage.setItem('bluman_tenant_info', JSON.stringify(dataToSave));
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
   };
@@ -86,14 +131,18 @@ export function SettingsPage() {
         });
         const base64Data = await base64Promise;
         const uploadRes = await uploadFileApi(file.name, base64Data);
+        let finalLogoUrl = '';
         if (uploadRes && uploadRes.url) {
-          setLogoUrl(uploadRes.url);
+          finalLogoUrl = uploadRes.url;
         } else {
-          setLogoUrl(URL.createObjectURL(file));
+          finalLogoUrl = base64Data;
         }
+        setLogoUrl(finalLogoUrl);
+        await updateTenantInfoApi({ logoUrl: finalLogoUrl });
+        localStorage.setItem('bluman_logo_url', finalLogoUrl);
+        alert('✓ Logo caricato e salvato permanentemente su Supabase PostgreSQL!');
       } catch (err) {
         console.error(err);
-        setLogoUrl(URL.createObjectURL(file));
       } finally {
         setUploadingLogo(false);
       }

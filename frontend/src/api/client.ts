@@ -278,3 +278,29 @@ export async function assegnaAccessoProgettoApi(progettoId: string, userId: stri
   if (!res.ok) throw new Error('Errore assegnazione accesso');
   return await res.json();
 }
+
+export async function fetchTenantInfoApi() {
+  try {
+    const res = await fetch(`${API_BASE}/tenant/info`, { headers: getAuthHeaders() });
+    if (!res.ok) throw new Error('Errore recupero info tenant');
+    return await res.json();
+  } catch (err) {
+    console.warn('Backend API offline, uso fallback locale', err);
+    return null;
+  }
+}
+
+export async function updateTenantInfoApi(input: any) {
+  try {
+    const res = await fetch(`${API_BASE}/tenant/info`, {
+      method: 'PATCH',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(input),
+    });
+    if (!res.ok) throw new Error('Errore aggiornamento info tenant');
+    return await res.json();
+  } catch (err) {
+    console.warn('Backend API offline, aggiornamento locale', err);
+    return null;
+  }
+}
