@@ -2,11 +2,20 @@ import React, { useState, useEffect } from 'react';
 import { fetchUtentiTenant, creaUtenteTenantApi, uploadFileApi } from '../api/client';
 import styles from './Settings.module.css';
 
-type Tab = 'company' | 'users' | 'sdi' | 'invoice_design';
+type Tab = 'company' | 'users' | 'sdi' | 'invoice_design' | 'channels';
 
 export function SettingsPage() {
   const [tab, setTab] = useState<Tab>('company');
   const [saved, setSaved] = useState(false);
+
+  // Configuratore Canali Omnichannel
+  const [waPhoneId, setWaPhoneId] = useState('102938475610293');
+  const [waAccessToken, setWaAccessToken] = useState('EAAG3891029384...');
+  const [waVerifyToken, setWaVerifyToken] = useState('bluman_wa_secure_token_2026');
+  const [tgBotToken, setTgBotToken] = useState('7182930412:AAHj39201982736192');
+  const [tgBotUsername, setTgBotUsername] = useState('@BluManStudioBot');
+  const [emailInboundParseUrl, setEmailInboundParseUrl] = useState('https://api.bluecode.advisory/webhooks/communications/email');
+  const [signalCliEndpoint, setSignalCliEndpoint] = useState('http://localhost:8080/v1/receive/+35679001122');
 
   // Form dati azienda (Sede Legale & Operativa)
   const [ragioneSociale, setRagioneSociale] = useState('Bluecode Ltd');
@@ -129,6 +138,9 @@ export function SettingsPage() {
         </button>
         <button className={`${styles.tab} ${tab === 'invoice_design' ? styles.tabActive : ''}`} onClick={() => setTab('invoice_design')}>
           🎨 Personalizzazione Modello Fattura PDF
+        </button>
+        <button className={`${styles.tab} ${tab === 'channels' ? styles.tabActive : ''}`} onClick={() => setTab('channels')}>
+          💬 Integratore Canali Omnichannel
         </button>
         <button className={`${styles.tab} ${tab === 'users' ? styles.tabActive : ''}`} onClick={() => setTab('users')}>
           👥 Gestione Team ({users.length})
@@ -406,6 +418,98 @@ export function SettingsPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* TAB 3: Configurazione Canali Omnichannel (WhatsApp, Telegram, Email, Signal) */}
+      {tab === 'channels' && (
+        <form onSubmit={handleSaveCompany} className={styles.sectionBox}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span>💬 Integratore Canali Omnichannel & Credenziali Webhook</span>
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
+            Inserisci i token ed i parametri di connessione per la sincronizzazione automatica delle conversazioni sui Progetti dei Clienti.
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20, marginTop: 16 }}>
+            {/* 🟢 WHATSAPP BUSINESS API */}
+            <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 16 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#34d399', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span>🟢 WhatsApp Business API (Meta Cloud Official Integration)</span>
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 12 }}>
+                Ricezione webhook messaggi e risposte dirette da cellulare. (Primi 1.000 messaggi/mese GRATUITI).
+              </div>
+              <div className={styles.grid2}>
+                <div className={styles.field}>
+                  <label>WhatsApp Phone Number ID (Meta *):</label>
+                  <input type="text" value={waPhoneId} onChange={e => setWaPhoneId(e.target.value)} style={{ fontSize: 12 }} />
+                </div>
+                <div className={styles.field}>
+                  <label>Webhook Verify Token (Secret *):</label>
+                  <input type="text" value={waVerifyToken} onChange={e => setWaVerifyToken(e.target.value)} style={{ fontSize: 12 }} />
+                </div>
+              </div>
+              <div className={styles.field} style={{ marginTop: 10 }}>
+                <label>Meta System User Access Token (Permanent *):</label>
+                <input type="password" value={waAccessToken} onChange={e => setWaAccessToken(e.target.value)} style={{ fontSize: 12 }} />
+              </div>
+            </div>
+
+            {/* ✈️ TELEGRAM BOT API */}
+            <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 16 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#38bdf8', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span>✈️ Telegram Bot API (100% GRATUITO)</span>
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 12 }}>
+                Crea un bot con @BotFather ed incolla il Token per ricevere messaggi ed allegati dai clienti.
+              </div>
+              <div className={styles.grid2}>
+                <div className={styles.field}>
+                  <label>Bot Username Telegram *:</label>
+                  <input type="text" value={tgBotUsername} onChange={e => setTgBotUsername(e.target.value)} style={{ fontSize: 12 }} />
+                </div>
+                <div className={styles.field}>
+                  <label>Bot Access Token (@BotFather *):</label>
+                  <input type="password" value={tgBotToken} onChange={e => setTgBotToken(e.target.value)} style={{ fontSize: 12 }} />
+                </div>
+              </div>
+            </div>
+
+            {/* ✉️ EMAIL INBOUND PARSE */}
+            <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 16 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#818cf8', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span>✉️ Email Inbound Webhook Parse (SendGrid / SMTP)</span>
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 12 }}>
+                Tutte le email inviate all'indirizzo dello studio vengono catturate dal webhook ed collegate al Progetto del Cliente.
+              </div>
+              <div className={styles.field}>
+                <label>Webhook URL Inbound Parse Endpoint:</label>
+                <input type="text" value={emailInboundParseUrl} onChange={e => setEmailInboundParseUrl(e.target.value)} style={{ fontSize: 12 }} readOnly />
+              </div>
+            </div>
+
+            {/* 🔒 SIGNAL END-TO-END */}
+            <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 16 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#a5b4fc', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span>🔒 Signal End-to-End Encrypted Daemon</span>
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 12 }}>
+                Connessione al container Docker `signal-cli-rest-api` per clienti VIP ad altissima riservatezza.
+              </div>
+              <div className={styles.field}>
+                <label>Signal REST Daemon API Endpoint:</label>
+                <input type="text" value={signalCliEndpoint} onChange={e => setSignalCliEndpoint(e.target.value)} style={{ fontSize: 12 }} />
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
+            <button type="submit" className={styles.saveBtn}>
+              💾 Salva Credenziali Canali
+            </button>
+          </div>
+        </form>
       )}
 
       {/* TAB 3: Gestione Team & Accessi */}
