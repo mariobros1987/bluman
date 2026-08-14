@@ -15,9 +15,11 @@ const TITLES: Record<string, string> = {
 interface AppLayoutProps {
   children: React.ReactNode;
   alertCount?: number;
+  user?: any;
+  onLogout?: () => void;
 }
 
-export function AppLayout({ children, alertCount = 2 }: AppLayoutProps) {
+export function AppLayout({ children, alertCount = 2, user, onLogout }: AppLayoutProps) {
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const title = TITLES[location.pathname] || (location.pathname.startsWith('/projects/') ? 'Dettaglio Progetto' : 'BluMan');
@@ -25,7 +27,7 @@ export function AppLayout({ children, alertCount = 2 }: AppLayoutProps) {
   return (
     <div className={styles.app}>
       <div className={`${styles.sidebarWrapper} ${mobileOpen ? styles.sidebarMobileOpen : ''}`}>
-        <Sidebar alertCount={alertCount} />
+        <Sidebar alertCount={alertCount} user={user} onLogout={onLogout} />
       </div>
 
       {mobileOpen && (
@@ -42,6 +44,11 @@ export function AppLayout({ children, alertCount = 2 }: AppLayoutProps) {
             <div className={styles.topbarTitle}>{title}</div>
           </div>
           <div className={styles.topbarRight}>
+            {user && (
+              <div style={{ fontSize: 11, color: 'var(--muted)', background: 'var(--card2)', padding: '4px 10px', borderRadius: 20, border: '1px solid var(--border)' }}>
+                👤 {user.nome || user.name} ({user.ruolo || 'advisor'})
+              </div>
+            )}
             {alertCount > 0 && (
               <div className={styles.alertPill}>
                 ⚠ {alertCount} ritard{alertCount === 1 ? 'o' : 'i'}

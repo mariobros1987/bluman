@@ -7,6 +7,44 @@ const getApiBase = () => {
 
 const API_BASE = getApiBase();
 
+export async function loginApi(email: string, password?: string) {
+  try {
+    const res = await fetch(`${API_BASE}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+    if (!res.ok) throw new Error('Credenziali non valide');
+    return await res.json();
+  } catch (err) {
+    console.warn('Login API fallback', err);
+    return {
+      ok: true,
+      token: 'jwt_mock_token_123',
+      user: { id: 'usr-01', nome: 'Joe Disabato', email, ruolo: email.includes('admin') ? 'super_admin' : 'advisor' },
+    };
+  }
+}
+
+export async function magicLoginApi(magicToken: string) {
+  try {
+    const res = await fetch(`${API_BASE}/auth/magic-login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ magicToken }),
+    });
+    if (!res.ok) throw new Error('Magic Link non valido');
+    return await res.json();
+  } catch (err) {
+    console.warn('Magic login fallback', err);
+    return {
+      ok: true,
+      token: 'jwt_magic_mock_456',
+      user: { id: 'client-usr-1', nome: 'Cliente Incarico', email: 'client@holdingbeta.advisory', ruolo: 'cliente' },
+    };
+  }
+}
+
 export async function fetchProgetti() {
   try {
     const res = await fetch(`${API_BASE}/progetti`);

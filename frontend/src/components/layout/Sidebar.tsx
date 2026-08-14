@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
 import styles from './Sidebar.module.css';
 
 const NAV = [
@@ -13,9 +13,14 @@ const NAV = [
 
 interface SidebarProps {
   alertCount?: number;
+  user?: any;
+  onLogout?: () => void;
 }
 
-export function Sidebar({ alertCount = 0 }: SidebarProps) {
+export function Sidebar({ alertCount = 0, user, onLogout }: SidebarProps) {
+  const userName = user?.nome || user?.name || 'Joe Disabato';
+  const initials = userName.substring(0, 2).toUpperCase();
+
   return (
     <aside className={styles.sidebar}>
       {/* Logo */}
@@ -47,13 +52,25 @@ export function Sidebar({ alertCount = 0 }: SidebarProps) {
         ))}
       </nav>
 
-      {/* User */}
-      <div className={styles.user}>
-        <div className={styles.avatar} style={{ background: '#6366f1' }}>JD</div>
-        <div>
-          <div className={styles.userName}>Joe Disabato</div>
-          <div className={styles.userRole}>Bluecode Ltd, Malta</div>
+      {/* User Footer & Logout */}
+      <div className={styles.user} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+          <div className={styles.avatar} style={{ background: '#6366f1' }}>{initials}</div>
+          <div style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            <div className={styles.userName} style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{userName}</div>
+            <div className={styles.userRole} style={{ fontSize: 10, color: 'var(--muted)' }}>{user?.ruolo || 'advisor'}</div>
+          </div>
         </div>
+
+        {onLogout && (
+          <button
+            onClick={onLogout}
+            title="Disconnetti utente (Logout)"
+            style={{ background: 'var(--card2)', border: '1px solid var(--border)', color: 'var(--muted)', width: 28, height: 28, borderRadius: 6, cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          >
+            🚪
+          </button>
+        )}
       </div>
     </aside>
   );

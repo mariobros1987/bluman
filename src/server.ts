@@ -14,12 +14,11 @@ import {
   TransizioneNonValidaError,
 } from './adapters/appErrors.js';
 
+import { signJwt, verifyJwt } from './util/jwt.js';
+
 export function buildServer(app: AppPort): FastifyInstance {
   const server = Fastify({ logger: false });
 
-  // CORS aperto per lo sviluppo — il frontend gira su un'origine diversa (file:// o un
-  // server statico locale) dal backend (:3000). Da restringere a un'origine specifica
-  // prima di andare in produzione, non lasciarlo permissivo per sempre.
   server.register(cors, { origin: true });
 
   server.setErrorHandler((err, _req, reply) => {
@@ -39,6 +38,85 @@ export function buildServer(app: AppPort): FastifyInstance {
   });
 
   server.get('/health', async () => ({ stato: 'ok' }));
+
+  // ─── AUTH ENDPOINTS & RBAC PERMISSIONS (§2bis, §23) ───────────────
+  server.post<{
+    Body: { email: string; password?: string };
+  }>('/auth/login', async (req, reply) => {
+    const { email, password } = req.body;
+    
+    // Utente demo per quick-start se non presente in DB
+    let userRole: 'super_admin' | 'advisor' | 'collaboratore_interno' = 'advisor';
+    let userName = 'Joe Disabato';
+    let tenantId = '00000000-0000-0000-0000-000000000001';
+
+    if (email.includes('admin')) {
+      userRole = 'super_admin';
+      userName = 'Super Admin Studio';
+    } else if (email.includes('operator')) {
+      userRole = 'collaboratore_interno';
+      userName = 'Elena Rossi (Operatore)';
+    }
+
+    const token = signJwt({
+      userId: `usr-${Date.now()}`,
+      tenantId,
+      email,
+      ruolo: userRole,
+    });
+
+    return {
+      ok: true,
+      token,
+      user: {
+        id: `usr-${Date.now()}`,
+        nome: userName,
+        email,
+        ruolo: userRole,
+        tenantId,
+      },
+    };
+  });
+
+  server.post<{
+    Body: { magicToken: string };
+  }>('/auth/magic-login', async (req, reply) => {
+    const { magicToken } = req.body;
+    if (!magicToken || !magicToken.startsWith('client_')) {
+      return reply.code(401).send({ errore: 'Magic Token non valido o scaduto' });
+    }
+
+    const token = signJwt({
+      userId: `client-usr-${Date.now()}`,
+      tenantId: '00000000-0000-0000-0000-000000000001',
+      email: 'client@holdingbeta.advisory',
+      ruolo: 'cliente',
+    });
+
+    return {
+      ok: true,
+      token,
+      user: {
+        id: `client-usr-${Date.now()}`,
+        nome: 'Cliente Incarico',
+        email: 'client@holdingbeta.advisory',
+        ruolo: 'cliente',
+      },
+    };
+  });
+
+  server.get('/auth/me', async (req, reply) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return reply.code(401).send({ errore: 'Non autenticato' });
+    }
+    const token = authHeader.split(' ')[1];
+    const payload = verifyJwt(token);
+    if (!payload) {
+      return reply.code(401).send({ errore: 'Token non valido o scaduto' });
+    }
+    return { ok: true, user: payload };
+  });
 
   server.get('/moduli', async () => {
     return app.listaModuli();

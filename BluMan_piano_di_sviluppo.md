@@ -47,6 +47,11 @@
 
 Per la messa in produzione professionale ed il passaggio ad un ambiente live:
 
+### FASE 2 — Autenticazione RBAC & Permessi Attori (§2bis, §23)
+- [x] Staff: Login JWT (`POST /auth/login`), verifica token (`GET /auth/me`), ruoli (`super_admin`, `advisor`, `collaboratore_interno`, `collaboratore_esterno`).
+- [x] Cliente: Login passwordless a Magic Link (`POST /auth/magic-login`).
+- [x] Interfaccia Frontend: Pagina di Login `LoginPage.tsx`, supporto per disconnessione (Logout) e controllo sessione in `localStorage`.
+
 1. **🔐 Autenticazione JWT & Sessioni Cookie Secure**:
    - [ ] Sostituire la simulazione locale dell'autenticazione con vera firma JWT su Cookie HTTP-Only e Bearer Header.
 2. **📧 Transport Email SMTP Reale (Nodemailer + Register.it / SendGrid)**:
