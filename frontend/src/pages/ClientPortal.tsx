@@ -232,8 +232,9 @@ export function ClientPortal() {
                   <button
                     onClick={async () => {
                       const htmlContent = `
-                        <div style="border-bottom:2px solid #0f172a;padding-bottom:15px;display:flex;justify-content:space-between;">
+                        <div style="border-bottom:2px solid #0f172a;padding-bottom:15px;display:flex;justify-content:space-between;align-items:flex-start;">
                           <div>
+                            <img src="${window.location.origin}/logo.png" style="max-height:55px;max-width:220px;object-fit:contain;margin-bottom:8px;display:block;" />
                             <div style="font-size:20px;font-weight:800;color:#1e1b4b;">BLUECODE LTD — ADVISORY</div>
                             <div style="font-size:11px;color:#475569;margin-top:2px;">Level 4, Valuation Centre, Sliema, Malta</div>
                           </div>

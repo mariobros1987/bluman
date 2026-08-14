@@ -69,20 +69,27 @@ export async function downloadRealPdf(
   }
 
   try {
-    // 1. Attendi il caricamento completo di tutte le immagini (incluse immagini logo in Base64 / URL)
+    // 1. Converti tutte le immagini (incluso il logo) in Base64 Data URL sincroni per html2canvas
     const images = Array.from(container.querySelectorAll('img'));
     await Promise.all(
-      images.map(
-        (img) =>
-          new Promise<void>((resolve) => {
-            if (img.complete && img.naturalHeight !== 0) {
-              resolve();
-            } else {
-              img.onload = () => resolve();
-              img.onerror = () => resolve(); // Non bloccare il PDF se un'immagine remota fallisce
-            }
-          })
-      )
+      images.map(async (img) => {
+        try {
+          const src = img.getAttribute('src');
+          if (!src || src.startsWith('data:')) return;
+
+          const res = await fetch(src, { mode: 'cors' });
+          if (!res.ok) return;
+          const blob = await res.blob();
+          const dataUrl = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.readAsDataURL(blob);
+          });
+          img.setAttribute('src', dataUrl);
+        } catch (err) {
+          console.warn('Pre-caricamento immagine Base64 per PDF:', err);
+        }
+      })
     );
 
     // Attendi render finale del DOM
