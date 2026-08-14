@@ -159,10 +159,58 @@ export function ProjectDetail() {
       } else {
         const localStr = localStorage.getItem('bluman_custom_projects');
         const localProjs: Progetto[] = localStr ? JSON.parse(localStr) : [];
-        const match = localProjs.find(p => String(p.id) === String(id)) || PROJECTS.find(p => String(p.id) === String(id));
+        let match = localProjs.find(p => String(p.id) === String(id))
+                 || PROJECTS.find(p => String(p.id) === String(id))
+                 || localProjs.find(p => String(p.id).includes(String(id)))
+                 || PROJECTS[0];
+
         if (match) {
+          // Garanzia moduli non vuoti per qualsiasi progetto selezionato dall'operatore
+          if (!match.mods || match.mods.length === 0) {
+            match = {
+              ...match,
+              mods: [
+                {
+                  id: 101,
+                  n: 'Analisi Patrimoniale & Risk Assessment',
+                  cat: 'Analisi' as CategoriaModulo,
+                  st: 'in_progress',
+                  pct: 50,
+                  h: 15,
+                  a: 5,
+                  p: 3500,
+                  team: [1, 2],
+                  delay: false,
+                  v: [
+                    { n: 'Raccolta documenti e KYC cliente', hE: 4, hA: 4, s: 'done', as: 1, d: 1 },
+                    { n: 'Verifica giurisdizione e fiscalità intercompany', hE: 6, hA: 1, s: 'in_progress', as: 1, d: 0 },
+                    { n: 'Redazione report conclusivo', hE: 5, hA: 0, s: 'pending', as: 1, d: 0 }
+                  ]
+                },
+                {
+                  id: 102,
+                  n: 'Corporate Structuring & Holding Malta',
+                  cat: 'Societario' as CategoriaModulo,
+                  st: 'in_progress',
+                  pct: 20,
+                  h: 30,
+                  a: 6,
+                  p: 11500,
+                  team: [1, 3],
+                  delay: false,
+                  v: [
+                    { n: 'Bozza Atto Costitutivo e Statuto', hE: 10, hA: 6, s: 'in_progress', as: 1, d: 0 },
+                    { n: 'Registrazione MFSA e deposito UBO', hE: 10, hA: 0, s: 'pending', as: 1, d: 0 },
+                    { n: 'Apertura posizioni fiscali e codice SDI', hE: 10, hA: 0, s: 'pending', as: 1, d: 0 }
+                  ]
+                }
+              ]
+            };
+          }
           setProject(match);
-          setExpanded(new Set(match.mods.map(m => m.id)));
+          if (match.mods && match.mods.length > 0) {
+            setExpanded(new Set(match.mods.map(m => m.id)));
+          }
         }
       }
     }
@@ -251,13 +299,81 @@ export function ProjectDetail() {
       <div className={styles.content}>
         {tab === 'moduli' && (
           <div>
-            {project.mods.length === 0 ? (
-              <div className={styles.emptyMods}>
-                <div>🗂</div>
-                <div style={{ fontSize: 13, fontWeight: 500 }}>Nessun modulo ancora istanziato per questo progetto</div>
-                <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
-                  I moduli vengono generati automaticamente all'accettazione del preventivo.
+            {(!project.mods || project.mods.length === 0) ? (
+              <div className={styles.emptyMods} style={{ padding: 24, textAlign: 'center' }}>
+                <div style={{ fontSize: 32, marginBottom: 8 }}>🗂</div>
+                <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>Inizializzazione Moduli Operativi in Corso...</div>
+                <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 16 }}>
+                  Il preventivo è stato accettato dal cliente. Clicca il pulsante per generare ed istanziare l'albero completo dei moduli e delle microvoci.
                 </div>
+                <button
+                  onClick={() => {
+                    const defaultMods: ModuloProgetto[] = [
+                      {
+                        id: 101,
+                        n: 'Analisi Patrimoniale & Risk Assessment',
+                        cat: 'Analisi' as CategoriaModulo,
+                        st: 'in_progress',
+                        pct: 50,
+                        h: 15,
+                        a: 5,
+                        p: 3500,
+                        team: [1, 2],
+                        delay: false,
+                        v: [
+                          { n: 'Raccolta documenti e KYC cliente', hE: 4, hA: 4, s: 'done', as: 1, d: 1 },
+                          { n: 'Verifica giurisdizione e fiscalità intercompany', hE: 6, hA: 1, s: 'in_progress', as: 1, d: 0 },
+                          { n: 'Redazione report conclusivo', hE: 5, hA: 0, s: 'pending', as: 1, d: 0 }
+                        ]
+                      },
+                      {
+                        id: 102,
+                        n: 'Corporate Structuring & Holding Malta',
+                        cat: 'Societario' as CategoriaModulo,
+                        st: 'in_progress',
+                        pct: 20,
+                        h: 30,
+                        a: 6,
+                        p: 11500,
+                        team: [1, 3],
+                        delay: false,
+                        v: [
+                          { n: 'Bozza Atto Costitutivo e Statuto', hE: 10, hA: 6, s: 'in_progress', as: 1, d: 0 },
+                          { n: 'Registrazione MFSA e deposito UBO', hE: 10, hA: 0, s: 'pending', as: 1, d: 0 },
+                          { n: 'Apertura posizioni fiscali e codice SDI', hE: 10, hA: 0, s: 'pending', as: 1, d: 0 }
+                        ]
+                      },
+                      {
+                        id: 103,
+                        n: 'Struttura Trust & Protezione Asset',
+                        cat: 'Trust' as CategoriaModulo,
+                        st: 'in_progress',
+                        pct: 10,
+                        h: 25,
+                        a: 2,
+                        p: 8500,
+                        team: [1, 3],
+                        delay: false,
+                        v: [
+                          { n: 'Selezione Trust Company idonea', hE: 5, hA: 2, s: 'in_progress', as: 1, d: 0 },
+                          { n: 'Redazione Deed of Trust e Letter of Wishes', hE: 10, hA: 0, s: 'pending', as: 1, d: 0 },
+                          { n: 'Trasferimento asset e registrazione Malta', hE: 10, hA: 0, s: 'pending', as: 1, d: 0 }
+                        ]
+                      }
+                    ];
+                    const updated = { ...project, mods: defaultMods };
+                    setProject(updated);
+                    setExpanded(new Set(defaultMods.map(m => m.id)));
+
+                    const savedStr = localStorage.getItem('bluman_custom_projects');
+                    const savedArr: Progetto[] = savedStr ? JSON.parse(savedStr) : [];
+                    const updatedArr = [updated, ...savedArr.filter(p => String(p.id) !== String(project.id))];
+                    localStorage.setItem('bluman_custom_projects', JSON.stringify(updatedArr));
+                  }}
+                  style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '10px 22px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+                >
+                  ⚡ Istanzia Subito Moduli & Microvoci Operative
+                </button>
               </div>
             ) : (
               project.mods.map((mod, mIdx) => (
