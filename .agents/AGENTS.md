@@ -34,3 +34,17 @@ Questo file serve come indice rapido per l'IA ed i collaboratori per identificar
 - **`Cliente`**: Dati ERP, Partita IVA, Codice Fiscale, Sede Legale, Codice SDI, IBAN, Rischio AML, UBO, Fonte Patrimonio, Data KYC.
 - **`Fattura`**: `tipoDocumento` (`fattura` | `nota_credito`), `serie` (`FT` | `NC`), `numeroProgressivoSerie`, `causaNotaCredito`.
 - **`PassaggioProgetto`**: `noteOperatoreJson`, `richiedeFirmaCliente`, `documentoAllegatoUrl`.
+
+---
+
+## 🚨 REGOLE TASSATIVE DI SVILUPPO (MANDATORY AGENT & DEV RULES)
+
+1. **Sincronizzazione Schema Database (Prisma & Supabase)**:
+   - Ogni nuova funzionalità, campo form o dato aggiunto nell'interfaccia React o nelle API Fastify **DEVE essere istantaneamente mappato** in `prisma/schema.prisma` ed allineato a Supabase PostgreSQL. NESSUN dato deve essere mantenuto solo in RAM o volatilizzato.
+   - Eseguire sempre `npx prisma generate` ad ogni variazione dello schema.
+
+2. **Aggiornamento Documentazione Markdown (`.md`)**:
+   - Dopo ogni modifica importante, refactoring o cambio codice, tutti i file di documentazione (`README.md`, `BluMan_piano_di_sviluppo.md`, `ISTRUZIONI_INSTALLAZIONE.md`, `.agents/AGENTS.md`) **DEVONO essere tassativamente aggiornati ed allineati**.
+
+3. **Aggiornamento Mappa Grafo (Graphify)**:
+   - Dopo modifiche strutturali ai moduli o ai servizi, eseguire `graphify update . --code-only` per mantenere la mappa delle dipendenze di codice e la documentazione architettonica sempre sincronizzate.

@@ -31,6 +31,17 @@ Piattaforma ERP per studi di consulenza societaria, wealth protection ed advisor
 
 ---
 
+## 🚨 REGOLE TASSATIVE DI SVILUPPO (MANDATORY DEV RULES)
+
+1. **Sincronizzazione Schema Database (Prisma & Supabase)**:
+   - Ad ogni cambio codice o nuova funzionalità, lo schema `prisma/schema.prisma` ed il database Supabase DEVONO essere istantaneamente aggiornati. Nessun dato viene perso o gestito solo volatile.
+2. **Allineamento Documentazione Markdown (`.md`)**:
+   - Tutti i file `.md` (`README.md`, `BluMan_piano_di_sviluppo.md`, `ISTRUZIONI_INSTALLAZIONE.md`, `.agents/AGENTS.md`) DEVONO essere tassativamente aggiornati dopo ogni modifica importante.
+3. **Mappa Grafo (Graphify)**:
+   - Mantenere aggiornato il grafo con `graphify update . --code-only`.
+
+---
+
 ## ⚙️ Guida Avvio Rapido Locale
 
 ```bash
