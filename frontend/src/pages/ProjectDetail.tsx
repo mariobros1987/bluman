@@ -88,10 +88,12 @@ export function ProjectDetail() {
           setExpanded(new Set(mapped.mods.map(m => m.id)));
         }
       } else {
-        const mockMatch = PROJECTS.find(p => String(p.id) === String(id));
-        if (mockMatch) {
-          setProject(mockMatch);
-          setExpanded(new Set(mockMatch.mods.map(m => m.id)));
+        const localStr = localStorage.getItem('bluman_custom_projects');
+        const localProjs: Progetto[] = localStr ? JSON.parse(localStr) : [];
+        const match = localProjs.find(p => String(p.id) === String(id)) || PROJECTS.find(p => String(p.id) === String(id));
+        if (match) {
+          setProject(match);
+          setExpanded(new Set(match.mods.map(m => m.id)));
         }
       }
     }

@@ -16,9 +16,23 @@ export function Projects() {
   const [wizardOpen, setWizardOpen] = useState(false);
 
   const loadProjects = async () => {
+    let combined: Progetto[] = [];
+
+    // 1. Carica progetti salvati localmente
+    const localStr = localStorage.getItem('bluman_custom_projects');
+    if (localStr) {
+      try {
+        const localProjs = JSON.parse(localStr);
+        if (Array.isArray(localProjs)) combined.push(...localProjs);
+      } catch (err) {
+        console.warn('Errore parsing custom projects:', err);
+      }
+    }
+
+    // 2. Carica progetti remoti da API Supabase/DB
     const remote = await fetchProgetti();
     if (remote && Array.isArray(remote)) {
-      const dbProjs: Progetto[] = remote.map((rp: any, idx: number) => ({
+      const dbProjs: Progetto[] = remote.map((rp: any) => ({
         id: rp.id,
         n: rp.nome,
         cl: rp.cliente?.nome || rp.clienteId || 'Cliente',
@@ -46,10 +60,20 @@ export function Projects() {
         })),
       }));
 
-      const existingIds = new Set(dbProjs.map(p => String(p.id)));
-      const filteredMock = PROJECTS.filter(p => !existingIds.has(String(p.id)));
-      setProjectList([...dbProjs, ...filteredMock]);
+      const existingIds = new Set(combined.map(p => String(p.id)));
+      for (const dp of dbProjs) {
+        if (!existingIds.has(String(dp.id))) {
+          combined.push(dp);
+        }
+      }
     }
+
+    // 3. Aggiungi progetti di default mock se non presenti
+    const existingIds = new Set(combined.map(p => String(p.id)));
+    const mockToAppend = PROJECTS.filter(p => !existingIds.has(String(p.id)));
+    combined.push(...mockToAppend);
+
+    setProjectList(combined);
   };
 
   useEffect(() => {
@@ -57,13 +81,10 @@ export function Projects() {
   }, []);
 
   const currentUserStr = localStorage.getItem('bluman_user');
-  const currentUser = currentUserStr ? JSON.parse(currentUserStr) : { ruolo: 'super_admin' };
+  const currentUser = currentUserStr ? JSON.parse(currentUserStr) : { ruolo: 'advisor' };
 
-  const isStaff = ['super_admin', 'advisor', 'collaboratore_interno', 'collaboratore_esterno', 'operator'].includes(currentUser.ruolo);
-
-  // Tutti gli utenti dello studio vedono i progetti dello studio. Per i clienti, mostra i loro.
+  // Mostra TUTTI i progetti dello studio per il team, o filtra per cliente
   const visibleProjects = projectList.filter(p => {
-    if (isStaff) return true;
     if (currentUser.ruolo === 'cliente') {
       return p.cl?.toLowerCase().includes((currentUser.nome || '').toLowerCase());
     }
