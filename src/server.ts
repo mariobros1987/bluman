@@ -195,8 +195,16 @@ export function buildServer(app: AppPort): FastifyInstance {
     if (!fs.existsSync(filePath)) {
       return reply.code(404).send({ errore: 'File non trovato' });
     }
+    const ext = path.extname(req.params.filename).toLowerCase();
+    let mimeType = 'application/octet-stream';
+    if (ext === '.png') mimeType = 'image/png';
+    else if (ext === '.jpg' || ext === '.jpeg') mimeType = 'image/jpeg';
+    else if (ext === '.webp') mimeType = 'image/webp';
+    else if (ext === '.svg') mimeType = 'image/svg+xml';
+    else if (ext === '.pdf') mimeType = 'application/pdf';
+
     const fileStream = fs.createReadStream(filePath);
-    return reply.type('application/pdf').send(fileStream);
+    return reply.type(mimeType).send(fileStream);
   });
 
   // Aggiornamento Prezzo & Ore Articolo (§Admin)

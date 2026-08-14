@@ -459,6 +459,32 @@
       "id": "src_services_istanziazioneport_esecuzioneport"
     },
     {
+      "label": "CatBadgeProps",
+      "file_type": "code",
+      "source_file": "frontend/src/components/ui/CatBadge.tsx",
+      "source_location": "L5",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 12,
+      "norm_label": "catbadgeprops",
+      "community_name": "ClientPortal.tsx",
+      "id": "frontend_src_components_ui_catbadge_catbadgeprops"
+    },
+    {
+      "label": "ModuloProposta",
+      "file_type": "code",
+      "source_file": "frontend/src/pages/ClientPortal.tsx",
+      "source_location": "L8",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 12,
+      "norm_label": "moduloproposta",
+      "community_name": "ClientPortal.tsx",
+      "id": "frontend_src_pages_clientportal_moduloproposta"
+    },
+    {
       "label": "PortalTab",
       "file_type": "code",
       "source_file": "frontend/src/pages/ClientPortal.tsx",
@@ -470,6 +496,19 @@
       "norm_label": "portaltab",
       "community_name": "ClientPortal.tsx",
       "id": "frontend_src_pages_clientportal_portaltab"
+    },
+    {
+      "label": "CategoriaModulo",
+      "file_type": "code",
+      "source_file": "frontend/src/types/index.ts",
+      "source_location": "L7",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 12,
+      "norm_label": "categoriamodulo",
+      "community_name": "ClientPortal.tsx",
+      "id": "frontend_src_types_index_categoriamodulo"
     },
     {
       "label": "InMemoryApp",
@@ -550,45 +589,6 @@
       "id": "frontend_src_components_newprojectwizard_newprojectwizardprops"
     },
     {
-      "label": "CatBadgeProps",
-      "file_type": "code",
-      "source_file": "frontend/src/components/ui/CatBadge.tsx",
-      "source_location": "L5",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "community": 16,
-      "norm_label": "catbadgeprops",
-      "community_name": "NewProjectWizard.tsx",
-      "id": "frontend_src_components_ui_catbadge_catbadgeprops"
-    },
-    {
-      "label": "ModuloProposta",
-      "file_type": "code",
-      "source_file": "frontend/src/pages/ClientPortal.tsx",
-      "source_location": "L8",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "community": 16,
-      "norm_label": "moduloproposta",
-      "community_name": "NewProjectWizard.tsx",
-      "id": "frontend_src_pages_clientportal_moduloproposta"
-    },
-    {
-      "label": "CategoriaModulo",
-      "file_type": "code",
-      "source_file": "frontend/src/types/index.ts",
-      "source_location": "L7",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "community": 16,
-      "norm_label": "categoriamodulo",
-      "community_name": "NewProjectWizard.tsx",
-      "id": "frontend_src_types_index_categoriamodulo"
-    },
-    {
       "label": "Tab",
       "file_type": "code",
       "source_file": "frontend/src/pages/SettingsPage.tsx",
@@ -600,6 +600,45 @@
       "norm_label": "tab",
       "community_name": "client.ts",
       "id": "frontend_src_pages_settingspage_tab"
+    },
+    {
+      "label": "AvatarGroupProps",
+      "file_type": "code",
+      "source_file": "frontend/src/components/ui/Avatar.tsx",
+      "source_location": "L30",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 18,
+      "norm_label": "avatargroupprops",
+      "community_name": "ProjectDetail.tsx",
+      "id": "frontend_src_components_ui_avatar_avatargroupprops"
+    },
+    {
+      "label": "AvatarProps",
+      "file_type": "code",
+      "source_file": "frontend/src/components/ui/Avatar.tsx",
+      "source_location": "L4",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 18,
+      "norm_label": "avatarprops",
+      "community_name": "ProjectDetail.tsx",
+      "id": "frontend_src_components_ui_avatar_avatarprops"
+    },
+    {
+      "label": "Tab",
+      "file_type": "code",
+      "source_file": "frontend/src/pages/ProjectDetail.tsx",
+      "source_location": "L15",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 18,
+      "norm_label": "tab",
+      "community_name": "ProjectDetail.tsx",
+      "id": "frontend_src_pages_projectdetail_tab"
     },
     {
       "label": "AppLayoutProps",
@@ -901,32 +940,6 @@
       "id": "src_services_appport_preventivo"
     },
     {
-      "label": "AvatarGroupProps",
-      "file_type": "code",
-      "source_file": "frontend/src/components/ui/Avatar.tsx",
-      "source_location": "L30",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "community": 4,
-      "norm_label": "avatargroupprops",
-      "community_name": "ProjectDetail.tsx",
-      "id": "frontend_src_components_ui_avatar_avatargroupprops"
-    },
-    {
-      "label": "AvatarProps",
-      "file_type": "code",
-      "source_file": "frontend/src/components/ui/Avatar.tsx",
-      "source_location": "L4",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "community": 4,
-      "norm_label": "avatarprops",
-      "community_name": "ProjectDetail.tsx",
-      "id": "frontend_src_components_ui_avatar_avatarprops"
-    },
-    {
       "label": "BadgeProps",
       "file_type": "code",
       "source_file": "frontend/src/components/ui/Badge.tsx",
@@ -936,7 +949,7 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "badgeprops",
-      "community_name": "ProjectDetail.tsx",
+      "community_name": "App.tsx",
       "id": "frontend_src_components_ui_badge_badgeprops"
     },
     {
@@ -949,7 +962,7 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "progressbarprops",
-      "community_name": "ProjectDetail.tsx",
+      "community_name": "App.tsx",
       "id": "frontend_src_components_ui_progressbar_progressbarprops"
     },
     {
@@ -962,21 +975,8 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "kpicardprops",
-      "community_name": "ProjectDetail.tsx",
+      "community_name": "App.tsx",
       "id": "frontend_src_pages_dashboard_kpicardprops"
-    },
-    {
-      "label": "Tab",
-      "file_type": "code",
-      "source_file": "frontend/src/pages/ProjectDetail.tsx",
-      "source_location": "L15",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "community": 4,
-      "norm_label": "tab",
-      "community_name": "ProjectDetail.tsx",
-      "id": "frontend_src_pages_projectdetail_tab"
     },
     {
       "label": "Progetto",
@@ -988,7 +988,7 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "progetto",
-      "community_name": "ProjectDetail.tsx",
+      "community_name": "App.tsx",
       "id": "frontend_src_types_index_progetto"
     },
     {
@@ -1943,112 +1943,28 @@
       "id": "src_services_istanziazioneport_esecuzioneport_getpassaggidellamicrovoce"
     },
     {
-      "label": "creaClienteApi()",
+      "label": "CatBadge()",
       "file_type": "code",
-      "source_file": "frontend/src/api/client.ts",
-      "source_location": "L127",
+      "source_file": "frontend/src/components/ui/CatBadge.tsx",
+      "source_location": "L9",
       "_callable": true,
       "_origin": "ast",
       "community": 12,
-      "norm_label": "creaclienteapi()",
+      "norm_label": "catbadge()",
       "community_name": "ClientPortal.tsx",
-      "id": "frontend_src_api_client_creaclienteapi"
+      "id": "frontend_src_components_ui_catbadge_catbadge"
     },
     {
-      "label": "creaPreventivoEAccettaApi()",
+      "label": "catCls()",
       "file_type": "code",
-      "source_file": "frontend/src/api/client.ts",
-      "source_location": "L147",
+      "source_file": "frontend/src/utils/index.ts",
+      "source_location": "L10",
       "_callable": true,
       "_origin": "ast",
       "community": 12,
-      "norm_label": "creapreventivoeaccettaapi()",
+      "norm_label": "catcls()",
       "community_name": "ClientPortal.tsx",
-      "id": "frontend_src_api_client_creapreventivoeaccettaapi"
-    },
-    {
-      "label": "creaProgettoApi()",
-      "file_type": "code",
-      "source_file": "frontend/src/api/client.ts",
-      "source_location": "L137",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 12,
-      "norm_label": "creaprogettoapi()",
-      "community_name": "ClientPortal.tsx",
-      "id": "frontend_src_api_client_creaprogettoapi"
-    },
-    {
-      "label": "fetchClienti()",
-      "file_type": "code",
-      "source_file": "frontend/src/api/client.ts",
-      "source_location": "L116",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 12,
-      "norm_label": "fetchclienti()",
-      "community_name": "ClientPortal.tsx",
-      "id": "frontend_src_api_client_fetchclienti"
-    },
-    {
-      "label": "fetchModuliLibreria()",
-      "file_type": "code",
-      "source_file": "frontend/src/api/client.ts",
-      "source_location": "L32",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 12,
-      "norm_label": "fetchmodulilibreria()",
-      "community_name": "ClientPortal.tsx",
-      "id": "frontend_src_api_client_fetchmodulilibreria"
-    },
-    {
-      "label": "NewProjectWizard()",
-      "file_type": "code",
-      "source_file": "frontend/src/components/NewProjectWizard.tsx",
-      "source_location": "L13",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 12,
-      "norm_label": "newprojectwizard()",
-      "community_name": "ClientPortal.tsx",
-      "id": "frontend_src_components_newprojectwizard_newprojectwizard"
-    },
-    {
-      "label": "ClientPortal()",
-      "file_type": "code",
-      "source_file": "frontend/src/pages/ClientPortal.tsx",
-      "source_location": "L19",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 12,
-      "norm_label": "clientportal()",
-      "community_name": "ClientPortal.tsx",
-      "id": "frontend_src_pages_clientportal_clientportal"
-    },
-    {
-      "label": "tabBtnStyle()",
-      "file_type": "code",
-      "source_file": "frontend/src/pages/ClientPortal.tsx",
-      "source_location": "L479",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 12,
-      "norm_label": "tabbtnstyle()",
-      "community_name": "ClientPortal.tsx",
-      "id": "frontend_src_pages_clientportal_tabbtnstyle"
-    },
-    {
-      "label": "ClientsPage()",
-      "file_type": "code",
-      "source_file": "frontend/src/pages/ClientsPage.tsx",
-      "source_location": "L8",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 12,
-      "norm_label": "clientspage()",
-      "community_name": "ClientPortal.tsx",
-      "id": "frontend_src_pages_clientspage_clientspage"
+      "id": "frontend_src_utils_index_catcls"
     },
     {
       "label": ".accettaPreventivoEIstanzia()",
@@ -2303,28 +2219,148 @@
       "id": "frontend_src_components_passaggiomodal_tabbtnstyle"
     },
     {
-      "label": "CatBadge()",
+      "label": "creaClienteApi()",
       "file_type": "code",
-      "source_file": "frontend/src/components/ui/CatBadge.tsx",
-      "source_location": "L9",
+      "source_file": "frontend/src/api/client.ts",
+      "source_location": "L127",
       "_callable": true,
       "_origin": "ast",
       "community": 16,
-      "norm_label": "catbadge()",
+      "norm_label": "creaclienteapi()",
       "community_name": "NewProjectWizard.tsx",
-      "id": "frontend_src_components_ui_catbadge_catbadge"
+      "id": "frontend_src_api_client_creaclienteapi"
     },
     {
-      "label": "catCls()",
+      "label": "creaPreventivoEAccettaApi()",
       "file_type": "code",
-      "source_file": "frontend/src/utils/index.ts",
-      "source_location": "L10",
+      "source_file": "frontend/src/api/client.ts",
+      "source_location": "L147",
       "_callable": true,
       "_origin": "ast",
       "community": 16,
-      "norm_label": "catcls()",
+      "norm_label": "creapreventivoeaccettaapi()",
       "community_name": "NewProjectWizard.tsx",
-      "id": "frontend_src_utils_index_catcls"
+      "id": "frontend_src_api_client_creapreventivoeaccettaapi"
+    },
+    {
+      "label": "creaProgettoApi()",
+      "file_type": "code",
+      "source_file": "frontend/src/api/client.ts",
+      "source_location": "L137",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 16,
+      "norm_label": "creaprogettoapi()",
+      "community_name": "NewProjectWizard.tsx",
+      "id": "frontend_src_api_client_creaprogettoapi"
+    },
+    {
+      "label": "fetchClienti()",
+      "file_type": "code",
+      "source_file": "frontend/src/api/client.ts",
+      "source_location": "L116",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 16,
+      "norm_label": "fetchclienti()",
+      "community_name": "NewProjectWizard.tsx",
+      "id": "frontend_src_api_client_fetchclienti"
+    },
+    {
+      "label": "fetchModuliLibreria()",
+      "file_type": "code",
+      "source_file": "frontend/src/api/client.ts",
+      "source_location": "L32",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 16,
+      "norm_label": "fetchmodulilibreria()",
+      "community_name": "NewProjectWizard.tsx",
+      "id": "frontend_src_api_client_fetchmodulilibreria"
+    },
+    {
+      "label": "NewProjectWizard()",
+      "file_type": "code",
+      "source_file": "frontend/src/components/NewProjectWizard.tsx",
+      "source_location": "L13",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 16,
+      "norm_label": "newprojectwizard()",
+      "community_name": "NewProjectWizard.tsx",
+      "id": "frontend_src_components_newprojectwizard_newprojectwizard"
+    },
+    {
+      "label": "ClientPortal()",
+      "file_type": "code",
+      "source_file": "frontend/src/pages/ClientPortal.tsx",
+      "source_location": "L19",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 16,
+      "norm_label": "clientportal()",
+      "community_name": "NewProjectWizard.tsx",
+      "id": "frontend_src_pages_clientportal_clientportal"
+    },
+    {
+      "label": "tabBtnStyle()",
+      "file_type": "code",
+      "source_file": "frontend/src/pages/ClientPortal.tsx",
+      "source_location": "L479",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 16,
+      "norm_label": "tabbtnstyle()",
+      "community_name": "NewProjectWizard.tsx",
+      "id": "frontend_src_pages_clientportal_tabbtnstyle"
+    },
+    {
+      "label": "AnagraficaErpModal()",
+      "file_type": "code",
+      "source_file": "frontend/src/pages/ClientsPage.tsx",
+      "source_location": "L239",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 16,
+      "norm_label": "anagraficaerpmodal()",
+      "community_name": "NewProjectWizard.tsx",
+      "id": "frontend_src_pages_clientspage_anagraficaerpmodal"
+    },
+    {
+      "label": "ClientsPage()",
+      "file_type": "code",
+      "source_file": "frontend/src/pages/ClientsPage.tsx",
+      "source_location": "L8",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 16,
+      "norm_label": "clientspage()",
+      "community_name": "NewProjectWizard.tsx",
+      "id": "frontend_src_pages_clientspage_clientspage"
+    },
+    {
+      "label": "MagicLinkExplainModal()",
+      "file_type": "code",
+      "source_file": "frontend/src/pages/ClientsPage.tsx",
+      "source_location": "L471",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 16,
+      "norm_label": "magiclinkexplainmodal()",
+      "community_name": "NewProjectWizard.tsx",
+      "id": "frontend_src_pages_clientspage_magiclinkexplainmodal"
+    },
+    {
+      "label": "tabBtn()",
+      "file_type": "code",
+      "source_file": "frontend/src/pages/ClientsPage.tsx",
+      "source_location": "L460",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 16,
+      "norm_label": "tabbtn()",
+      "community_name": "NewProjectWizard.tsx",
+      "id": "frontend_src_pages_clientspage_tabbtn"
     },
     {
       "label": "creaUtenteTenantApi()",
@@ -2423,64 +2459,136 @@
       "id": "frontend_src_pages_settingspage_settingspage"
     },
     {
-      "label": "App()",
+      "label": "assegnaAccessoProgettoApi()",
       "file_type": "code",
-      "source_file": "frontend/src/App.tsx",
-      "source_location": "L24",
+      "source_file": "frontend/src/api/client.ts",
+      "source_location": "L236",
       "_callable": true,
       "_origin": "ast",
       "community": 18,
-      "norm_label": "app()",
-      "community_name": "App.tsx",
-      "id": "frontend_src_app_app"
+      "norm_label": "assegnaaccessoprogettoapi()",
+      "community_name": "ProjectDetail.tsx",
+      "id": "frontend_src_api_client_assegnaaccessoprogettoapi"
     },
     {
-      "label": "MainLayoutWrapper()",
+      "label": "consuntivaMicrovoceApi()",
       "file_type": "code",
-      "source_file": "frontend/src/App.tsx",
-      "source_location": "L15",
+      "source_file": "frontend/src/api/client.ts",
+      "source_location": "L190",
       "_callable": true,
       "_origin": "ast",
       "community": 18,
-      "norm_label": "mainlayoutwrapper()",
-      "community_name": "App.tsx",
-      "id": "frontend_src_app_mainlayoutwrapper"
+      "norm_label": "consuntivamicrovoceapi()",
+      "community_name": "ProjectDetail.tsx",
+      "id": "frontend_src_api_client_consuntivamicrovoceapi"
     },
     {
-      "label": "AnagraficaErpModal()",
+      "label": "emettiFatturaApi()",
       "file_type": "code",
-      "source_file": "frontend/src/pages/ClientsPage.tsx",
-      "source_location": "L239",
+      "source_file": "frontend/src/api/client.ts",
+      "source_location": "L167",
       "_callable": true,
       "_origin": "ast",
       "community": 18,
-      "norm_label": "anagraficaerpmodal()",
-      "community_name": "App.tsx",
-      "id": "frontend_src_pages_clientspage_anagraficaerpmodal"
+      "norm_label": "emettifatturaapi()",
+      "community_name": "ProjectDetail.tsx",
+      "id": "frontend_src_api_client_emettifatturaapi"
     },
     {
-      "label": "MagicLinkExplainModal()",
+      "label": "fetchProgettoDettaglio()",
       "file_type": "code",
-      "source_file": "frontend/src/pages/ClientsPage.tsx",
-      "source_location": "L471",
+      "source_file": "frontend/src/api/client.ts",
+      "source_location": "L21",
       "_callable": true,
       "_origin": "ast",
       "community": 18,
-      "norm_label": "magiclinkexplainmodal()",
-      "community_name": "App.tsx",
-      "id": "frontend_src_pages_clientspage_magiclinkexplainmodal"
+      "norm_label": "fetchprogettodettaglio()",
+      "community_name": "ProjectDetail.tsx",
+      "id": "frontend_src_api_client_fetchprogettodettaglio"
     },
     {
-      "label": "tabBtn()",
+      "label": "Avatar()",
       "file_type": "code",
-      "source_file": "frontend/src/pages/ClientsPage.tsx",
-      "source_location": "L460",
+      "source_file": "frontend/src/components/ui/Avatar.tsx",
+      "source_location": "L10",
       "_callable": true,
       "_origin": "ast",
       "community": 18,
-      "norm_label": "tabbtn()",
-      "community_name": "App.tsx",
-      "id": "frontend_src_pages_clientspage_tabbtn"
+      "norm_label": "avatar()",
+      "community_name": "ProjectDetail.tsx",
+      "id": "frontend_src_components_ui_avatar_avatar"
+    },
+    {
+      "label": "AvatarGroup()",
+      "file_type": "code",
+      "source_file": "frontend/src/components/ui/Avatar.tsx",
+      "source_location": "L35",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 18,
+      "norm_label": "avatargroup()",
+      "community_name": "ProjectDetail.tsx",
+      "id": "frontend_src_components_ui_avatar_avatargroup"
+    },
+    {
+      "label": "FatturazioneTab()",
+      "file_type": "code",
+      "source_file": "frontend/src/pages/ProjectDetail.tsx",
+      "source_location": "L473",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 18,
+      "norm_label": "fatturazionetab()",
+      "community_name": "ProjectDetail.tsx",
+      "id": "frontend_src_pages_projectdetail_fatturazionetab"
+    },
+    {
+      "label": "GrafoModuliProgettoView()",
+      "file_type": "code",
+      "source_file": "frontend/src/pages/ProjectDetail.tsx",
+      "source_location": "L760",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 18,
+      "norm_label": "grafomoduliprogettoview()",
+      "community_name": "ProjectDetail.tsx",
+      "id": "frontend_src_pages_projectdetail_grafomoduliprogettoview"
+    },
+    {
+      "label": "ModuloBlock()",
+      "file_type": "code",
+      "source_file": "frontend/src/pages/ProjectDetail.tsx",
+      "source_location": "L300",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 18,
+      "norm_label": "moduloblock()",
+      "community_name": "ProjectDetail.tsx",
+      "id": "frontend_src_pages_projectdetail_moduloblock"
+    },
+    {
+      "label": "PlaceholderTab()",
+      "file_type": "code",
+      "source_file": "frontend/src/pages/ProjectDetail.tsx",
+      "source_location": "L747",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 18,
+      "norm_label": "placeholdertab()",
+      "community_name": "ProjectDetail.tsx",
+      "id": "frontend_src_pages_projectdetail_placeholdertab"
+    },
+    {
+      "label": "ProjectDetail()",
+      "file_type": "code",
+      "source_file": "frontend/src/pages/ProjectDetail.tsx",
+      "source_location": "L17",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 18,
+      "norm_label": "projectdetail()",
+      "community_name": "ProjectDetail.tsx",
+      "id": "frontend_src_pages_projectdetail_projectdetail"
     },
     {
       "label": "AppLayout()",
@@ -3143,42 +3251,6 @@
       "id": "src_adapters_prisma_prismaistanziazioneport_prismaistanziazioneport_getpassaggio"
     },
     {
-      "label": "assegnaAccessoProgettoApi()",
-      "file_type": "code",
-      "source_file": "frontend/src/api/client.ts",
-      "source_location": "L236",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 4,
-      "norm_label": "assegnaaccessoprogettoapi()",
-      "community_name": "ProjectDetail.tsx",
-      "id": "frontend_src_api_client_assegnaaccessoprogettoapi"
-    },
-    {
-      "label": "consuntivaMicrovoceApi()",
-      "file_type": "code",
-      "source_file": "frontend/src/api/client.ts",
-      "source_location": "L190",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 4,
-      "norm_label": "consuntivamicrovoceapi()",
-      "community_name": "ProjectDetail.tsx",
-      "id": "frontend_src_api_client_consuntivamicrovoceapi"
-    },
-    {
-      "label": "emettiFatturaApi()",
-      "file_type": "code",
-      "source_file": "frontend/src/api/client.ts",
-      "source_location": "L167",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 4,
-      "norm_label": "emettifatturaapi()",
-      "community_name": "ProjectDetail.tsx",
-      "id": "frontend_src_api_client_emettifatturaapi"
-    },
-    {
       "label": "fetchProgetti()",
       "file_type": "code",
       "source_file": "frontend/src/api/client.ts",
@@ -3187,44 +3259,32 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "fetchprogetti()",
-      "community_name": "ProjectDetail.tsx",
+      "community_name": "App.tsx",
       "id": "frontend_src_api_client_fetchprogetti"
     },
     {
-      "label": "fetchProgettoDettaglio()",
+      "label": "App()",
       "file_type": "code",
-      "source_file": "frontend/src/api/client.ts",
-      "source_location": "L21",
+      "source_file": "frontend/src/App.tsx",
+      "source_location": "L24",
       "_callable": true,
       "_origin": "ast",
       "community": 4,
-      "norm_label": "fetchprogettodettaglio()",
-      "community_name": "ProjectDetail.tsx",
-      "id": "frontend_src_api_client_fetchprogettodettaglio"
+      "norm_label": "app()",
+      "community_name": "App.tsx",
+      "id": "frontend_src_app_app"
     },
     {
-      "label": "Avatar()",
+      "label": "MainLayoutWrapper()",
       "file_type": "code",
-      "source_file": "frontend/src/components/ui/Avatar.tsx",
-      "source_location": "L10",
+      "source_file": "frontend/src/App.tsx",
+      "source_location": "L15",
       "_callable": true,
       "_origin": "ast",
       "community": 4,
-      "norm_label": "avatar()",
-      "community_name": "ProjectDetail.tsx",
-      "id": "frontend_src_components_ui_avatar_avatar"
-    },
-    {
-      "label": "AvatarGroup()",
-      "file_type": "code",
-      "source_file": "frontend/src/components/ui/Avatar.tsx",
-      "source_location": "L35",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 4,
-      "norm_label": "avatargroup()",
-      "community_name": "ProjectDetail.tsx",
-      "id": "frontend_src_components_ui_avatar_avatargroup"
+      "norm_label": "mainlayoutwrapper()",
+      "community_name": "App.tsx",
+      "id": "frontend_src_app_mainlayoutwrapper"
     },
     {
       "label": "Badge()",
@@ -3235,7 +3295,7 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "badge()",
-      "community_name": "ProjectDetail.tsx",
+      "community_name": "App.tsx",
       "id": "frontend_src_components_ui_badge_badge"
     },
     {
@@ -3247,7 +3307,7 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "progressbar()",
-      "community_name": "ProjectDetail.tsx",
+      "community_name": "App.tsx",
       "id": "frontend_src_components_ui_progressbar_progressbar"
     },
     {
@@ -3259,7 +3319,7 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "dashboard()",
-      "community_name": "ProjectDetail.tsx",
+      "community_name": "App.tsx",
       "id": "frontend_src_pages_dashboard_dashboard"
     },
     {
@@ -3271,68 +3331,8 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "kpicard()",
-      "community_name": "ProjectDetail.tsx",
+      "community_name": "App.tsx",
       "id": "frontend_src_pages_dashboard_kpicard"
-    },
-    {
-      "label": "FatturazioneTab()",
-      "file_type": "code",
-      "source_file": "frontend/src/pages/ProjectDetail.tsx",
-      "source_location": "L473",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 4,
-      "norm_label": "fatturazionetab()",
-      "community_name": "ProjectDetail.tsx",
-      "id": "frontend_src_pages_projectdetail_fatturazionetab"
-    },
-    {
-      "label": "GrafoModuliProgettoView()",
-      "file_type": "code",
-      "source_file": "frontend/src/pages/ProjectDetail.tsx",
-      "source_location": "L760",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 4,
-      "norm_label": "grafomoduliprogettoview()",
-      "community_name": "ProjectDetail.tsx",
-      "id": "frontend_src_pages_projectdetail_grafomoduliprogettoview"
-    },
-    {
-      "label": "ModuloBlock()",
-      "file_type": "code",
-      "source_file": "frontend/src/pages/ProjectDetail.tsx",
-      "source_location": "L300",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 4,
-      "norm_label": "moduloblock()",
-      "community_name": "ProjectDetail.tsx",
-      "id": "frontend_src_pages_projectdetail_moduloblock"
-    },
-    {
-      "label": "PlaceholderTab()",
-      "file_type": "code",
-      "source_file": "frontend/src/pages/ProjectDetail.tsx",
-      "source_location": "L747",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 4,
-      "norm_label": "placeholdertab()",
-      "community_name": "ProjectDetail.tsx",
-      "id": "frontend_src_pages_projectdetail_placeholdertab"
-    },
-    {
-      "label": "ProjectDetail()",
-      "file_type": "code",
-      "source_file": "frontend/src/pages/ProjectDetail.tsx",
-      "source_location": "L17",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 4,
-      "norm_label": "projectdetail()",
-      "community_name": "ProjectDetail.tsx",
-      "id": "frontend_src_pages_projectdetail_projectdetail"
     },
     {
       "label": "Projects()",
@@ -3343,7 +3343,7 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "projects()",
-      "community_name": "ProjectDetail.tsx",
+      "community_name": "App.tsx",
       "id": "frontend_src_pages_projects_projects"
     },
     {
@@ -3355,7 +3355,7 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "fmt()",
-      "community_name": "ProjectDetail.tsx",
+      "community_name": "App.tsx",
       "id": "frontend_src_utils_index_fmt"
     },
     {
@@ -3367,7 +3367,7 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "progresscolor()",
-      "community_name": "ProjectDetail.tsx",
+      "community_name": "App.tsx",
       "id": "frontend_src_utils_index_progresscolor"
     },
     {
@@ -3379,7 +3379,7 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "statoconfig()",
-      "community_name": "ProjectDetail.tsx",
+      "community_name": "App.tsx",
       "id": "frontend_src_utils_index_statoconfig"
     },
     {
@@ -4445,6 +4445,17 @@
       "id": "supabase_supabase_js"
     },
     {
+      "label": "CatBadge.tsx",
+      "file_type": "code",
+      "source_file": "frontend/src/components/ui/CatBadge.tsx",
+      "source_location": "L1",
+      "_origin": "ast",
+      "community": 12,
+      "norm_label": "catbadge.tsx",
+      "community_name": "ClientPortal.tsx",
+      "id": "frontend_src_components_ui_catbadge"
+    },
+    {
       "label": "ClientPortal.tsx",
       "file_type": "code",
       "source_file": "frontend/src/pages/ClientPortal.tsx",
@@ -4863,15 +4874,15 @@
       "id": "frontend_src_components_newprojectwizard_wizstyle"
     },
     {
-      "label": "CatBadge.tsx",
+      "label": "ClientsPage.tsx",
       "file_type": "code",
-      "source_file": "frontend/src/components/ui/CatBadge.tsx",
+      "source_file": "frontend/src/pages/ClientsPage.tsx",
       "source_location": "L1",
       "_origin": "ast",
       "community": 16,
-      "norm_label": "catbadge.tsx",
+      "norm_label": "clientspage.tsx",
       "community_name": "NewProjectWizard.tsx",
-      "id": "frontend_src_components_ui_catbadge"
+      "id": "frontend_src_pages_clientspage"
     },
     {
       "label": "MLIB",
@@ -4918,48 +4929,37 @@
       "id": "frontend_src_pages_settingspage"
     },
     {
-      "label": "App.tsx",
+      "label": "Avatar.tsx",
       "file_type": "code",
-      "source_file": "frontend/src/App.tsx",
+      "source_file": "frontend/src/components/ui/Avatar.tsx",
       "source_location": "L1",
       "_origin": "ast",
       "community": 18,
-      "norm_label": "app.tsx",
-      "community_name": "App.tsx",
-      "id": "frontend_src_app"
+      "norm_label": "avatar.tsx",
+      "community_name": "ProjectDetail.tsx",
+      "id": "frontend_src_components_ui_avatar"
     },
     {
-      "label": "main.tsx",
+      "label": "ProjectDetail.tsx",
       "file_type": "code",
-      "source_file": "frontend/src/main.tsx",
+      "source_file": "frontend/src/pages/ProjectDetail.tsx",
       "source_location": "L1",
       "_origin": "ast",
       "community": 18,
-      "norm_label": "main.tsx",
-      "community_name": "App.tsx",
-      "id": "frontend_src_main"
+      "norm_label": "projectdetail.tsx",
+      "community_name": "ProjectDetail.tsx",
+      "id": "frontend_src_pages_projectdetail"
     },
     {
-      "label": "ClientsPage.tsx",
+      "label": "TEAM",
       "file_type": "code",
-      "source_file": "frontend/src/pages/ClientsPage.tsx",
-      "source_location": "L1",
+      "source_file": "frontend/src/store/mockData.ts",
+      "source_location": "L6",
       "_origin": "ast",
       "community": 18,
-      "norm_label": "clientspage.tsx",
-      "community_name": "App.tsx",
-      "id": "frontend_src_pages_clientspage"
-    },
-    {
-      "label": "react",
-      "file_type": "concept",
-      "source_file": "frontend/.oxlintrc.json",
-      "source_location": "L3",
-      "_origin": "ast",
-      "community": 18,
-      "norm_label": "react",
-      "community_name": "App.tsx",
-      "id": "ref_react"
+      "norm_label": "team",
+      "community_name": "ProjectDetail.tsx",
+      "id": "frontend_src_store_mockdata_team"
     },
     {
       "label": "AppLayout.tsx",
@@ -5325,15 +5325,15 @@
       "id": "frontend_vite_config"
     },
     {
-      "label": "Avatar.tsx",
+      "label": "App.tsx",
       "file_type": "code",
-      "source_file": "frontend/src/components/ui/Avatar.tsx",
+      "source_file": "frontend/src/App.tsx",
       "source_location": "L1",
       "_origin": "ast",
       "community": 4,
-      "norm_label": "avatar.tsx",
-      "community_name": "ProjectDetail.tsx",
-      "id": "frontend_src_components_ui_avatar"
+      "norm_label": "app.tsx",
+      "community_name": "App.tsx",
+      "id": "frontend_src_app"
     },
     {
       "label": "Badge.tsx",
@@ -5343,7 +5343,7 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "badge.tsx",
-      "community_name": "ProjectDetail.tsx",
+      "community_name": "App.tsx",
       "id": "frontend_src_components_ui_badge"
     },
     {
@@ -5354,8 +5354,19 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "progressbar.tsx",
-      "community_name": "ProjectDetail.tsx",
+      "community_name": "App.tsx",
       "id": "frontend_src_components_ui_progressbar"
+    },
+    {
+      "label": "main.tsx",
+      "file_type": "code",
+      "source_file": "frontend/src/main.tsx",
+      "source_location": "L1",
+      "_origin": "ast",
+      "community": 4,
+      "norm_label": "main.tsx",
+      "community_name": "App.tsx",
+      "id": "frontend_src_main"
     },
     {
       "label": "Dashboard.tsx",
@@ -5365,19 +5376,8 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "dashboard.tsx",
-      "community_name": "ProjectDetail.tsx",
+      "community_name": "App.tsx",
       "id": "frontend_src_pages_dashboard"
-    },
-    {
-      "label": "ProjectDetail.tsx",
-      "file_type": "code",
-      "source_file": "frontend/src/pages/ProjectDetail.tsx",
-      "source_location": "L1",
-      "_origin": "ast",
-      "community": 4,
-      "norm_label": "projectdetail.tsx",
-      "community_name": "ProjectDetail.tsx",
-      "id": "frontend_src_pages_projectdetail"
     },
     {
       "label": "Projects.tsx",
@@ -5387,19 +5387,19 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "projects.tsx",
-      "community_name": "ProjectDetail.tsx",
+      "community_name": "App.tsx",
       "id": "frontend_src_pages_projects"
     },
     {
-      "label": "TEAM",
-      "file_type": "code",
-      "source_file": "frontend/src/store/mockData.ts",
-      "source_location": "L6",
+      "label": "react",
+      "file_type": "concept",
+      "source_file": "frontend/.oxlintrc.json",
+      "source_location": "L3",
       "_origin": "ast",
       "community": 4,
-      "norm_label": "team",
-      "community_name": "ProjectDetail.tsx",
-      "id": "frontend_src_store_mockdata_team"
+      "norm_label": "react",
+      "community_name": "App.tsx",
+      "id": "ref_react"
     },
     {
       "label": ".oxlintrc.json",

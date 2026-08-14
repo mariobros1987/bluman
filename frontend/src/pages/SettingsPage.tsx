@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { fetchUtentiTenant, creaUtenteTenantApi, uploadFileApi, fetchTenantInfoApi, updateTenantInfoApi } from '../api/client';
+import { getFormattedLogoUrl } from '../utils';
 import styles from './Settings.module.css';
 
 type Tab = 'company' | 'users' | 'sdi' | 'invoice_design' | 'channels';
@@ -305,13 +306,16 @@ export function SettingsPage() {
                 style={{ background: 'var(--card)', padding: 8, borderRadius: 8, fontSize: 11, border: '1px solid var(--border)' }}
               />
               {uploadingLogo && <div style={{ fontSize: 10, color: 'var(--muted)' }}>Upload logo in corso...</div>}
-              {logoUrl ? (
-                <div style={{ marginTop: 6, background: '#fff', padding: 8, borderRadius: 8, textAlign: 'center' }}>
-                  <img src={logoUrl} alt="Logo Studio" style={{ maxHeight: 50, objectFit: 'contain' }} />
-                </div>
-              ) : (
-                <div style={{ fontSize: 10, color: 'var(--muted)' }}>Nessun logo caricato. Verrà usata l'intestazione testuale di default.</div>
-              )}
+              <div style={{ marginTop: 6, background: '#0f172a', padding: 12, borderRadius: 8, textAlign: 'center', border: '1px solid #1e293b' }}>
+                <img
+                  src={getFormattedLogoUrl(logoUrl)}
+                  alt="Logo Studio"
+                  style={{ maxHeight: 60, maxWidth: 220, objectFit: 'contain' }}
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = '/logo.png';
+                  }}
+                />
+              </div>
             </div>
 
             {/* Colore Tema */}

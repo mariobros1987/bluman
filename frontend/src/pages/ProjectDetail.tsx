@@ -5,7 +5,7 @@ import { CatBadge } from '../components/ui/CatBadge';
 import { ProgressBar } from '../components/ui/ProgressBar';
 import { AvatarGroup, Avatar } from '../components/ui/Avatar';
 import { PassaggioModal } from '../components/PassaggioModal';
-import { fmt, progressColor } from '../utils';
+import { fmt, progressColor, getFormattedLogoUrl } from '../utils';
 import { downloadRealPdf } from '../utils/pdfGenerator';
 import type { SignatureData } from '../utils/pdfGenerator';
 import { DigitalSignatureModal } from '../components/DigitalSignatureModal';
@@ -606,13 +606,14 @@ function FatturazioneTab({ project, rawDbProject, onRefresh }: { project: Proget
             {/* Header Documento Stampa */}
             <div style={{ borderBottom: '2px solid #0f172a', paddingBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
-                {(localStorage.getItem('bluman_logo_url') || (JSON.parse(localStorage.getItem('bluman_tenant_info') || '{}').logoUrl)) && (
-                  <img
-                    src={localStorage.getItem('bluman_logo_url') || (JSON.parse(localStorage.getItem('bluman_tenant_info') || '{}').logoUrl)}
-                    alt="Logo Studio"
-                    style={{ maxHeight: 60, maxWidth: 220, objectFit: 'contain', marginBottom: 8, display: 'block' }}
-                  />
-                )}
+                <img
+                  src={getFormattedLogoUrl(localStorage.getItem('bluman_logo_url') || (JSON.parse(localStorage.getItem('bluman_tenant_info') || '{}').logoUrl))}
+                  alt="Logo Studio"
+                  style={{ maxHeight: 60, maxWidth: 220, objectFit: 'contain', marginBottom: 8, display: 'block' }}
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = '/logo.png';
+                  }}
+                />
                 <div style={{ fontSize: 20, fontWeight: 800, color: '#1e1b4b' }}>
                   {JSON.parse(localStorage.getItem('bluman_tenant_info') || '{}').ragioneSociale || 'BLUECODE LTD'}
                 </div>
@@ -683,8 +684,9 @@ function FatturazioneTab({ project, rawDbProject, onRefresh }: { project: Proget
               </button>
               <button
                 onClick={async () => {
-                  const logoUrl = localStorage.getItem('bluman_logo_url') || (JSON.parse(localStorage.getItem('bluman_tenant_info') || '{}').logoUrl);
-                  const logoHtml = logoUrl ? `<img src="${logoUrl}" style="max-height:60px;max-width:220px;object-fit:contain;margin-bottom:8px;display:block;" />` : '';
+                  const rawLogoUrl = localStorage.getItem('bluman_logo_url') || (JSON.parse(localStorage.getItem('bluman_tenant_info') || '{}').logoUrl);
+                  const logoUrl = getFormattedLogoUrl(rawLogoUrl);
+                  const logoHtml = `<img src="${logoUrl}" style="max-height:60px;max-width:220px;object-fit:contain;margin-bottom:8px;display:block;" />`;
                   const htmlContent = `
                     <div style="border-bottom:2px solid #0f172a;padding-bottom:15px;display:flex;justify-content:space-between;align-items:flex-start;">
                       <div>

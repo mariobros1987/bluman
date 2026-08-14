@@ -50,7 +50,7 @@ export async function uploadDocumento(filename: string, contentBase64: string): 
 
   return {
     ok: true,
-    url: `/uploads/${safeFilename}`,
+    url: `http://127.0.0.1:3000/uploads/${safeFilename}`,
     name: filename,
     size: sizeKb,
   };

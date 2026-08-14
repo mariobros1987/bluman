@@ -107,7 +107,7 @@ export async function uploadFileApi(filename: string, contentBase64: string) {
     return await res.json();
   } catch (err) {
     console.warn('Upload API fallback local simulation', err);
-    return { ok: true, url: `/uploads/${filename}`, name: filename, size: '450 KB' };
+    return { ok: true, url: `${API_BASE}/uploads/${filename}`, name: filename, size: '450 KB' };
   }
 }
 

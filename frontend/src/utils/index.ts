@@ -6,6 +6,13 @@ import { ARTICOLI, MLIB } from '../store/mockData';
 // ─── Formatters ───────────────────────────────────────────────────
 export const fmt = (n: number) => '€ ' + n.toLocaleString('it-IT');
 
+export function getFormattedLogoUrl(url?: string | null): string {
+  if (!url || url.trim() === '') return '/logo.png';
+  if (url.startsWith('data:') || url.startsWith('http://') || url.startsWith('https://')) return url;
+  if (url.startsWith('/uploads')) return `http://127.0.0.1:3000${url}`;
+  return url;
+}
+
 // ─── Category color class ─────────────────────────────────────────
 export function catCls(cat: CategoriaModulo | string): string {
   const map: Record<string, string> = {

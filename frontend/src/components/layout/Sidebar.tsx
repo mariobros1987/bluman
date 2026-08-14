@@ -1,5 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
+import { getFormattedLogoUrl } from '../../utils';
 import styles from './Sidebar.module.css';
 
 const NAV = [
@@ -30,12 +31,15 @@ export function Sidebar({ alertCount = 0, user, onLogout }: SidebarProps) {
   return (
     <aside className={styles.sidebar}>
       {/* Logo */}
-      <div className={styles.logo}>
-        <div className={styles.logoIcon}>🛡</div>
-        <div>
-          <div className={styles.logoText}>Bluecode</div>
-          <div className={styles.logoSub}>Advisory Platform</div>
-        </div>
+      <div className={styles.logo} style={{ background: '#0f172a', padding: '10px 14px', borderRadius: 10, border: '1px solid #1e293b', marginBottom: 16 }}>
+        <img
+          src={getFormattedLogoUrl(localStorage.getItem('bluman_logo_url'))}
+          alt="BLUECODE"
+          style={{ height: 38, maxWidth: 170, objectFit: 'contain', display: 'block' }}
+          onError={(e) => {
+            (e.target as HTMLImageElement).src = '/logo.png';
+          }}
+        />
       </div>
 
       {/* Navigation */}
