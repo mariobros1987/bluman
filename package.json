@@ -1,0 +1,29 @@
+{
+  "name": "bluman-api",
+  "version": "0.1.0",
+  "description": "BluMan (Bluecode Advisory Platform) — backend API. Fase 1 (schema) + Fase 5 (motore di calcolo stati) del piano di sviluppo.",
+  "type": "module",
+  "dependencies": {
+    "@fastify/cors": "^11.3.0",
+    "@prisma/client": "^5.20.0",
+    "dotenv": "^16.4.5",
+    "fastify": "^5.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.0",
+    "prisma": "^5.20.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "bootstrap": "tsx src/adapters/prisma/bootstrap.ts",
+    "dev": "tsx watch src/index.ts",
+    "start:db": "tsx watch src/adapters/prisma/index.ts",
+    "seed": "tsx src/adapters/prisma/seed.ts"
+  }
+}

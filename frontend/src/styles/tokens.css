@@ -1,0 +1,95 @@
+/* BluMan Advisory Platform — Design System
+   Fedele ai token del prototipo BluMan_platform.html */
+
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap');
+
+/* ─── Tokens ─────────────────────────────────────────────────── */
+:root {
+  /* Backgrounds */
+  --bg:        #0f1117;
+  --sidebar:   #161822;
+  --card:      #1e2030;
+  --card2:     #252840;
+
+  /* Borders & text */
+  --border:    #2a2d3e;
+  --text:      #e2e4f0;
+  --muted:     #7b7f9e;
+  --hint:      #4a4d64;
+
+  /* Brand */
+  --indigo:    #6366f1;
+  --indigo-d:  #4f52d3;
+  --indigo-l:  #818cf8;
+
+  /* Status */
+  --green:     #10b981;
+  --amber:     #f59e0b;
+  --red:       #ef4444;
+  --purple:    #a78bfa;
+
+  /* Category colors */
+  --cat-analisi:     #818cf8;
+  --cat-societario:  #60b8f4;
+  --cat-trust:       #a78bfa;
+  --cat-banking:     #34d399;
+  --cat-fiscale:     #f59e0b;
+  --cat-legale:      #94a3b8;
+  --cat-ip:          #f472b6;
+  --cat-compliance:  #fb923c;
+
+  /* Typography */
+  --font: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+
+  /* Spacing */
+  --radius-sm:  6px;
+  --radius:     8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
+  /* Shadows */
+  --shadow-sm:  0 1px 3px rgba(0,0,0,.4);
+  --shadow:     0 4px 16px rgba(0,0,0,.5);
+  --shadow-lg:  0 24px 60px rgba(0,0,0,.6);
+
+  /* Transitions */
+  --t: .15s ease;
+}
+
+/* ─── Reset ──────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { font-size: 14px; -webkit-font-smoothing: antialiased; }
+
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  height: 100vh;
+  overflow: hidden;
+}
+
+#root { height: 100vh; display: flex; }
+
+a { color: inherit; text-decoration: none; }
+
+button { cursor: pointer; font-family: var(--font); }
+
+input, textarea, select {
+  font-family: var(--font);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 9px 12px;
+  font-size: 13px;
+  color: var(--text);
+  outline: none;
+  width: 100%;
+  transition: border-color var(--t);
+}
+input:focus, textarea:focus, select:focus { border-color: var(--indigo); }
+
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: var(--hint); }

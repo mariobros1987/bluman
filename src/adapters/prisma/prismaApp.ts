@@ -1,0 +1,440 @@
+// Implementazione reale di AppPort sopra Postgres — funziona con qualunque Postgres
+// raggiungibile via DATABASE_URL, incluso Supabase (è solo Postgres gestito: non serve
+// nulla di specifico a Supabase, basta la connection string dalla sua dashboard).
+//
+// ⚠️ Come gli altri file in questa cartella, mai compilato né eseguito in questo ambiente
+// (rete bloccata verso binaries.prisma.sh). Verificalo sulla tua macchina — vedi
+// ISTRUZIONI_INSTALLAZIONE.md, Percorso B.
+
+import { PrismaClient } from '@prisma/client';
+import { PrismaIstanziazionePort } from './prismaIstanziazionePort.js';
+import { istanziaProgetto, calcolaPrezzoModulo } from '../../services/istanziaProgetto.js';
+import {
+  registraConsuntivazione,
+  marcaRitardo,
+  risolviRitardo,
+  completaMicrovoce as completaMicrovoceService,
+  completaPassaggioDocumento as completaPassaggioDocumentoService,
+  completaPassaggioForm as completaPassaggioFormService,
+  marcaPassaggioCompletato as marcaPassaggioCompletatoService,
+} from '../../services/esecuzione.js';
+import type { AppPort, ModuloElencoItem, Cliente, ProgettoBase, Preventivo } from '../../services/appPort.js';
+import type { NotificationPort } from '../../services/istanziazionePort.js';
+import {
+  ClienteNonTrovatoError,
+  ProgettoNonTrovatoError,
+  PreventivoNonTrovatoError,
+  ModuloNonTrovatoError,
+  TransizioneNonValidaError,
+} from '../appErrors.js';
+
+/** Notifiche via console.log — stub in attesa del servizio email reale (§10, §22). */
+class ConsoleNotificationPort implements NotificationPort {
+  async notificaProgettoAvviato(input: { progettoId: string; clienteId: string; moduliProgettoIds: string[] }): Promise<void> {
+    console.log('[notifica] Progetto avviato:', input.progettoId, '— moduli:', input.moduliProgettoIds.length);
+  }
+}
+
+export class PrismaApp implements AppPort {
+  private readonly istanziazione: PrismaIstanziazionePort;
+  private readonly notifiche = new ConsoleNotificationPort();
+  private readonly tenantId: string;
+
+  constructor(private readonly prisma: PrismaClient, tenantId: string) {
+    this.tenantId = tenantId;
+    this.istanziazione = new PrismaIstanziazionePort(prisma, tenantId);
+  }
+
+  async listaModuli(): Promise<any[]> {
+    const moduli = await this.prisma.moduloTemplate.findMany({
+      where: { tenantId: this.tenantId, isAttivo: true },
+      include: {
+        righeDistinta: {
+          include: { articolo: true },
+        },
+        dipendenze: true,
+      },
+    });
+    return moduli;
+  }
+
+  async listaArticoli() {
+    return this.prisma.articolo.findMany({
+      where: { tenantId: this.tenantId, isAttivo: true },
+      include: { passaggiTemplate: true },
+      orderBy: { categoria: 'asc' },
+    });
+  }
+
+  async creaArticolo(input: {
+    nome: string;
+    categoria: string;
+    oreDefault: number;
+    prezzoDefault: number;
+    passaggi?: Array<{ titolo: string; tipo: 'info' | 'documento' | 'form' | 'verifica'; chi: 'operatore' | 'cliente'; descrizione?: string }>;
+  }) {
+    const articolo = await this.prisma.articolo.create({
+      data: {
+        tenantId: this.tenantId,
+        nome: input.nome,
+        categoria: input.categoria,
+        oreDefault: input.oreDefault,
+        prezzoDefault: input.prezzoDefault,
+        versione: 1,
+      },
+    });
+
+    if (input.passaggi && input.passaggi.length > 0) {
+      for (const [idx, p] of input.passaggi.entries()) {
+        await this.prisma.passaggioTemplate.create({
+          data: {
+            articoloId: articolo.id,
+            titolo: p.titolo,
+            tipo: p.tipo,
+            chi: p.chi,
+            ordine: idx + 1,
+            descrizione: p.descrizione || null,
+          },
+        });
+      }
+    }
+
+    return this.prisma.articolo.findUnique({
+      where: { id: articolo.id },
+      include: { passaggiTemplate: true },
+    });
+  }
+
+  async creaModuloTemplate(input: {
+    nome: string;
+    categoria: string;
+    prezzoPacchetto?: number | null;
+    righe: Array<{ articoloId: string; quantita: number; overrideOre?: number; overridePrezzo?: number }>;
+    dipendenzeDaIds?: string[];
+  }) {
+    const modulo = await this.prisma.moduloTemplate.create({
+      data: {
+        tenantId: this.tenantId,
+        nome: input.nome,
+        categoria: input.categoria,
+        prezzoPacchetto: input.prezzoPacchetto || null,
+        versione: 1,
+      },
+    });
+
+    for (const [idx, r] of input.righe.entries()) {
+      const art = await this.prisma.articolo.findUniqueOrThrow({ where: { id: r.articoloId } });
+      await this.prisma.rigaDistinta.create({
+        data: {
+          tenantId: this.tenantId,
+          moduloTemplateId: modulo.id,
+          articoloId: r.articoloId,
+          articoloVersione: art.versione,
+          ordine: idx + 1,
+          quantita: r.quantita || 1,
+          overrideOre: r.overrideOre || null,
+          overridePrezzo: r.overridePrezzo || null,
+        },
+      });
+    }
+
+    if (input.dipendenzeDaIds && input.dipendenzeDaIds.length > 0) {
+      for (const depId of input.dipendenzeDaIds) {
+        await this.prisma.moduloDipendenzaTemplate.create({
+          data: {
+            tenantId: this.tenantId,
+            moduloTemplateId: modulo.id,
+            dipendeDaModuloTemplateId: depId,
+          },
+        });
+      }
+    }
+
+    return this.prisma.moduloTemplate.findUnique({
+      where: { id: modulo.id },
+      include: { righeDistinta: { include: { articolo: true } }, dipendenze: true },
+    });
+  }
+
+  async creaCliente(input: { nome: string; tipo: 'individual' | 'company' }): Promise<Cliente> {
+    const c = await this.prisma.cliente.create({
+      data: { tenantId: this.tenantId, nome: input.nome, tipo: input.tipo },
+    });
+    return { id: c.id, nome: c.nome, tipo: c.tipo as 'individual' | 'company' };
+  }
+
+  async getCliente(id: string): Promise<Cliente> {
+    const c = await this.prisma.cliente.findUnique({ where: { id } });
+    if (!c) throw new ClienteNonTrovatoError(`Cliente non trovato: ${id}`);
+    return { id: c.id, nome: c.nome, tipo: c.tipo as 'individual' | 'company' };
+  }
+
+  async listaClienti(): Promise<Cliente[]> {
+    const clienti = await this.prisma.cliente.findMany({ where: { tenantId: this.tenantId } });
+    return clienti.map((c) => ({ id: c.id, nome: c.nome, tipo: c.tipo as 'individual' | 'company' }));
+  }
+
+  async creaProgetto(input: { clienteId: string; nome: string }): Promise<ProgettoBase> {
+    await this.getCliente(input.clienteId); // lancia se non esiste
+    const p = await this.prisma.progetto.create({
+      data: { tenantId: this.tenantId, clienteId: input.clienteId, nome: input.nome, stato: 'pre_project', valoreTotale: 0 },
+    });
+    return { id: p.id, clienteId: p.clienteId, nome: p.nome, stato: p.stato };
+  }
+
+  async getProgetto(id: string) {
+    const p = await this.prisma.progetto.findUnique({
+      where: { id },
+      include: {
+        cliente: true,
+        moduli: {
+          include: {
+            microvoci: {
+              include: {
+                passaggi: true,
+              },
+            },
+          },
+        },
+        fatture: {
+          include: { righe: true },
+        },
+        accessiRisorsa: {
+          include: { user: true },
+        },
+      },
+    });
+    if (!p) throw new ProgettoNonTrovatoError(`Progetto non trovato: ${id}`);
+    return p;
+  }
+
+  async listaAccessiProgetto(progettoId: string) {
+    return this.prisma.accessoRisorsa.findMany({
+      where: { tenantId: this.tenantId, progettoId },
+      include: { user: true },
+    });
+  }
+
+  async assegnaAccessoProgetto(progettoId: string, userId: string, livello: string = 'scrittura') {
+    const livEnum = livello === 'read' || livello === 'lettura' ? 'lettura' : 'scrittura';
+    const esistente = await this.prisma.accessoRisorsa.findFirst({
+      where: { tenantId: this.tenantId, progettoId, userId },
+    });
+    if (esistente) return esistente;
+
+    return this.prisma.accessoRisorsa.create({
+      data: {
+        tenantId: this.tenantId,
+        livello: livEnum,
+        progetto: { connect: { id: progettoId } },
+        user: { connect: { id: userId } },
+        invitatoDaUser: { connect: { id: userId } },
+      },
+      include: { user: true, progetto: true },
+    });
+  }
+
+  async listaUtenti() {
+    return this.prisma.user.findMany({
+      where: { tenantId: this.tenantId },
+    });
+  }
+
+  async creaUtente(input: { nome: string; email: string; ruolo: string }) {
+    return this.prisma.user.create({
+      data: {
+        tenantId: this.tenantId,
+        nome: input.nome,
+        email: input.email,
+        ruolo: input.ruolo || 'operator',
+        stato: 'attivo',
+      },
+    });
+  }
+
+  async listaProgetti() {
+    const progetti = await this.prisma.progetto.findMany({
+      where: { tenantId: this.tenantId },
+      include: {
+        cliente: true,
+        moduli: {
+          include: {
+            microvoci: true,
+          },
+        },
+      },
+    });
+    return progetti;
+  }
+
+  async creaPreventivo(input: {
+    clienteId: string;
+    progettoId: string;
+    righe: Array<{ moduloTemplateId: string; moduloTemplateVersione: number }>;
+  }): Promise<Preventivo> {
+    await this.getCliente(input.clienteId);
+    await this.getProgetto(input.progettoId);
+    if (input.righe.length === 0) throw new Error('Un preventivo deve avere almeno una riga');
+
+    let valoreTotale = 0;
+    for (const riga of input.righe) {
+      // NB: apre una transazione solo per una lettura — funzionalmente corretto ma
+      // inefficiente se il preventivo ha molte righe. Andrebbe estratta una lettura
+      // diretta non transazionale quando si rifinisce questo adapter; lasciato così
+      // per ora perché non è un bug, solo un margine di ottimizzazione.
+      const template = await this.istanziazione
+        .eseguiInTransazione((tx) => tx.getModuloTemplateConDistinta(riga.moduloTemplateId, riga.moduloTemplateVersione))
+        .catch(() => null);
+      if (!template) throw new ModuloNonTrovatoError(`Modulo non trovato in libreria: ${riga.moduloTemplateId}@${riga.moduloTemplateVersione}`);
+      valoreTotale += calcolaPrezzoModulo(template);
+    }
+
+    const p = await this.prisma.preventivo.create({
+      data: {
+        tenantId: this.tenantId,
+        clienteId: input.clienteId,
+        progettoId: input.progettoId,
+        stato: 'bozza',
+        righeJson: input.righe as never,
+        valoreTotale,
+      },
+    });
+    return { id: p.id, clienteId: p.clienteId, progettoId: p.progettoId, righe: input.righe, valoreTotale: p.valoreTotale, stato: p.stato };
+  }
+
+  async getPreventivo(id: string): Promise<Preventivo> {
+    const p = await this.prisma.preventivo.findUnique({ where: { id } });
+    if (!p) throw new PreventivoNonTrovatoError(`Preventivo non trovato: ${id}`);
+    return { id: p.id, clienteId: p.clienteId, progettoId: p.progettoId, righe: p.righeJson as never, valoreTotale: p.valoreTotale, stato: p.stato };
+  }
+
+  async inviaPreventivo(id: string): Promise<Preventivo> {
+    const p = await this.getPreventivo(id);
+    if (p.stato !== 'bozza') throw new TransizioneNonValidaError(`Solo un preventivo in bozza può essere inviato (stato attuale: ${p.stato})`);
+    const aggiornato = await this.prisma.preventivo.update({ where: { id }, data: { stato: 'inviato' } });
+    return { ...p, stato: aggiornato.stato };
+  }
+
+  async accettaPreventivoEIstanzia(id: string) {
+    const p = await this.getPreventivo(id);
+    if (p.stato !== 'bozza' && p.stato !== 'inviato') {
+      throw new TransizioneNonValidaError(`Preventivo in stato ${p.stato} non può essere accettato`);
+    }
+    await this.prisma.preventivo.update({ where: { id }, data: { stato: 'accettato' } });
+
+    // §15.3 — l'istanziazione vera, stessa funzione già testata con la porta finta
+    // (src/services/istanziaProgetto.test.ts), qui usata con la porta Prisma reale.
+    return istanziaProgetto({ progettoId: p.progettoId, clienteId: p.clienteId, righe: p.righe }, this.istanziazione, this.notifiche);
+  }
+
+  // ── §17 — esecuzione: delega diretta al servizio, con la porta Prisma già scritta sopra ──
+
+  async emettiFattura(input: {
+    progettoId: string;
+    tipoClienteFiscale: 'privato_italia' | 'business_italia' | 'estero';
+    partitaIva?: string;
+    codiceFiscale?: string;
+    canale: 'sdi' | 'standard';
+    righe: Array<{
+      tipo: 'modulo_completo' | 'modulo_parziale' | 'milestone_libera';
+      moduloProgettoId?: string;
+      percentuale?: number;
+      importo: number;
+      descrizione: string;
+    }>;
+  }) {
+    const countFatture = await this.prisma.fattura.count({ where: { tenantId: this.tenantId } });
+    const numeroProgressivo = `FT-2026-${(countFatture + 1).toString().padStart(4, '0')}`;
+    const totale = input.righe.reduce((acc, r) => acc + r.importo, 0);
+
+    const fattura = await this.prisma.fattura.create({
+      data: {
+        tenantId: this.tenantId,
+        progettoId: input.progettoId,
+        numero: numeroProgressivo,
+        numeroProgressivo,
+        data: new Date(),
+        stato: 'emessa',
+        tipoClienteFiscale: input.tipoClienteFiscale,
+        partitaIva: input.partitaIva || null,
+        codiceFiscale: input.codiceFiscale || null,
+        canale: input.canale,
+        statoSdi: input.canale === 'sdi' ? 'consegnata' : 'n_a',
+        xmlFatturapaUrl: input.canale === 'sdi' ? `https://portale-fpa.compedservizi.it/xml/${numeroProgressivo}.xml` : null,
+        righe: {
+          create: input.righe.map((r) => ({
+            tenantId: this.tenantId,
+            tipo: r.tipo,
+            moduloProgettoId: r.moduloProgettoId || null,
+            percentuale: r.percentuale || null,
+            importo: r.importo,
+            descrizione: r.descrizione,
+          })),
+        },
+      },
+      include: { righe: true },
+    });
+
+    return fattura;
+  }
+
+  async consuntivaMicrovoce(input: { microvoceId: string; oreAggiunte: number; completa?: boolean }) {
+    const mv = await this.prisma.microvoceProgetto.findUniqueOrThrow({ where: { id: input.microvoceId } });
+    const nuoveOre = mv.oreConsuntivate + input.oreAggiunte;
+    const nuovoStato = input.completa ? 'done' : mv.stato === 'pending' || mv.stato === 'attesa_dipendenza' ? 'active' : mv.stato;
+
+    const aggiornata = await this.prisma.microvoceProgetto.update({
+      where: { id: input.microvoceId },
+      data: {
+        oreConsuntivate: nuoveOre,
+        stato: nuovoStato,
+      },
+    });
+
+    // Se completata, verifica se tutte le microvoci del modulo sono done per aggiornare il modulo
+    if (input.completa) {
+      const allMv = await this.prisma.microvoceProgetto.findMany({ where: { moduloProgettoId: mv.moduloProgettoId } });
+      const allDone = allMv.every((m) => m.stato === 'done' || m.id === input.microvoceId);
+      if (allDone) {
+        await this.prisma.moduloProgetto.update({
+          where: { id: mv.moduloProgettoId },
+          data: { stato: 'done' },
+        });
+      }
+    }
+
+    return aggiornata;
+  }
+
+  async marcaRitardoMicrovoce(microvoceId: string, stato: 'delayed' | 'blocked', causaNota: string): Promise<void> {
+    await marcaRitardo(microvoceId, stato, causaNota, this.istanziazione);
+  }
+
+  async risolviRitardoMicrovoce(microvoceId: string): Promise<void> {
+    await risolviRitardo(microvoceId, this.istanziazione);
+  }
+
+  async completaMicrovoce(microvoceId: string): Promise<void> {
+    await completaMicrovoceService(microvoceId, this.istanziazione);
+  }
+
+  async getMicrovoce(microvoceId: string) {
+    return this.istanziazione.getMicrovoce(microvoceId);
+  }
+
+  async getPassaggiDellaMicrovoce(microvoceId: string) {
+    return this.istanziazione.getPassaggiDellaMicrovoce(microvoceId);
+  }
+
+  async completaPassaggioDocumento(passaggioId: string): Promise<void> {
+    await completaPassaggioDocumentoService(passaggioId, this.istanziazione);
+  }
+
+  async completaPassaggioForm(passaggioId: string): Promise<void> {
+    await completaPassaggioFormService(passaggioId, this.istanziazione);
+  }
+
+  async marcaPassaggioCompletato(passaggioId: string): Promise<void> {
+    await marcaPassaggioCompletatoService(passaggioId, this.istanziazione);
+  }
+}

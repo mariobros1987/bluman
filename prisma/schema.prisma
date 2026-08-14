@@ -1,0 +1,606 @@
+// BluMan — Schema database
+// Fonte: BluMan_specifica_di_sviluppo_v2.3.docx §14, con estensioni §19 (accesso_risorsa a 3 FK),
+// §26 (campi SDI su fattura) e §28 (sicurezza upload su documento) incluse fin dall'inizio —
+// vedi piano di sviluppo, Fase 1: evitare una migrazione dolorosa a metà sviluppo.
+//
+// Row-Level Security su tenant_id: da attivare via migrazione SQL manuale dopo il primo
+// `prisma migrate dev` — Prisma non genera RLS nativamente. Vedi § "Note operative" a fondo file.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────────
+// FONDAMENTA — §2bis, §14
+// ─────────────────────────────────────────────────────────────────
+
+model Tenant {
+  id                String   @id @default(uuid())
+  ragioneSociale    String   @map("ragione_sociale")
+  piva              String?  @map("piva")
+  codiceFiscale     String?  @map("codice_fiscale")
+  sedeLegale        String?  @map("sede_legale")
+  sedeOperativa     String?  @map("sede_operativa")
+  logoUrl           String?  @map("logo_url")
+  coloreTemaFattura String?  @map("colore_tema_fattura")
+  notePieFattura    String?  @map("note_pie_fattura")
+  iban              String?  @map("iban")
+  piano             String
+  stato             String   @default("attivo") // attivo|sospeso|trial
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  users    User[]
+  clienti  Cliente[]
+  articoli Articolo[]
+  moduli   ModuloTemplate[]
+
+  @@map("tenant")
+}
+
+enum RuoloUtente {
+  super_admin
+  advisor
+  collaboratore_interno
+  collaboratore_esterno
+  cliente
+}
+
+enum StatoUtente {
+  attivo
+  invitato
+  disattivato
+}
+
+model User {
+  id           String      @id @default(uuid())
+  tenantId     String?     @map("tenant_id") // nullable SOLO se ruolo=super_admin — vedi §2bis
+  tenant       Tenant?     @relation(fields: [tenantId], references: [id])
+  nome         String
+  email        String      @unique
+  ruolo        RuoloUtente
+  stato        StatoUtente @default(invitato)
+  // §23 — nullable perché il cliente è passwordless (accesso solo a magic link);
+  // solo advisor/collaboratore_interno/collaboratore_esterno/super_admin ne hanno una
+  passwordHash String?     @map("password_hash")
+  // §23 — obbligatorio per ruolo=super_admin prima di poter fare qualunque azione oltre al login
+  totpSecret   String?     @map("totp_secret")
+  createdAt    DateTime    @default(now()) @map("created_at")
+
+  microvociAssegnate MicrovoceProgetto[] @relation("RisorsaAssegnata")
+  eventiCreati       EventoCalendario[]
+  accessiRicevuti    AccessoRisorsa[]    @relation("AccessoUtente")
+  accessiInvitati    AccessoRisorsa[]    @relation("AccessoInvitatoDa")
+  notificheRicevute  Notifica[]
+  documentiCaricati  Documento[]
+
+  @@map("user")
+}
+
+model Cliente {
+  id              String   @id @default(uuid())
+  tenantId        String   @map("tenant_id")
+  tenant          Tenant   @relation(fields: [tenantId], references: [id])
+  nome            String
+  tipo            String // individual|company — §2
+  piva            String?  @map("piva")
+  codiceFiscale   String?  @map("codice_fiscale")
+  giurisdizione   String?  @map("giurisdizione")
+  sedeLegale      String?  @map("sede_legale")
+  sdiCode         String?  @map("sdi_code")
+  iban            String?  @map("iban")
+  rischioAml      String?  @map("rischio_aml")
+  ubo             String?  @map("ubo")
+  fontePatrimonio String?  @map("fonte_patrimonio")
+  dataKyc         String?  @map("data_kyc")
+  referentiJson   Json?    @map("referenti_json")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  progetti   Progetto[]
+  preventivi Preventivo[]
+
+  @@map("cliente")
+}
+
+// ─────────────────────────────────────────────────────────────────
+// LIBRERIA — DISTINTA BASE (§3bis, §30)
+// Solo creazione in MVP: niente endpoint di modifica contenuto,
+// versionamento vero e ripubblicazione rimandati a V2 (§30).
+// ─────────────────────────────────────────────────────────────────
+
+model Articolo {
+  id               String   @id @default(uuid())
+  tenantId         String   @map("tenant_id")
+  tenant           Tenant   @relation(fields: [tenantId], references: [id])
+  nome             String
+  categoria        String
+  versione         Int      @default(1)
+  oreDefault       Int      @map("ore_default")
+  prezzoDefault    Int      @map("prezzo_default") // in centesimi, mai float per denaro
+  isUltimaVersione Boolean  @default(true) @map("is_ultima_versione")
+  isAttivo         Boolean  @default(true) @map("is_attivo") // §30: disattiva, non elimina
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  righeDistinta      RigaDistinta[]
+  passaggiTemplate   PassaggioTemplate[]
+  microvociProgetto  MicrovoceProgetto[]
+
+  @@map("articolo")
+}
+
+model ModuloTemplate {
+  id               String   @id @default(uuid())
+  tenantId         String   @map("tenant_id")
+  tenant           Tenant   @relation(fields: [tenantId], references: [id])
+  nome             String
+  categoria        String
+  versione         Int      @default(1)
+  prezzoPacchetto  Int?     @map("prezzo_pacchetto") // override della somma righe, §3bis/§7
+  isUltimaVersione Boolean  @default(true) @map("is_ultima_versione")
+  isAttivo         Boolean  @default(true) @map("is_attivo")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  righeDistinta RigaDistinta[]
+  dipendenze    ModuloDipendenzaTemplate[] @relation("ModuloDipendente")
+  dipendenzeDi  ModuloDipendenzaTemplate[] @relation("ModuloDaCuiDipende")
+  moduliProgetto ModuloProgetto[]
+
+  @@map("modulo_template")
+}
+
+model RigaDistinta {
+  id               String         @id @default(uuid())
+  tenantId         String         @map("tenant_id")
+  moduloTemplateId String         @map("modulo_template_id")
+  moduloTemplate   ModuloTemplate @relation(fields: [moduloTemplateId], references: [id])
+  articoloId       String         @map("articolo_id")
+  articolo         Articolo       @relation(fields: [articoloId], references: [id])
+  articoloVersione Int            @map("articolo_versione") // pinned alla pubblicazione, §3bis
+  ordine           Int
+  quantita         Int            @default(1)
+  overrideOre      Int?           @map("override_ore")
+  overridePrezzo   Int?           @map("override_prezzo")
+  obbligatorio     Boolean        @default(true)
+
+  microvociGenerate MicrovoceProgetto[]
+
+  @@map("riga_distinta")
+}
+
+enum TipoPassaggio {
+  info
+  documento
+  form
+  verifica
+}
+
+enum ChiPassaggio {
+  operatore
+  cliente
+}
+
+model PassaggioTemplate {
+  id            String        @id @default(uuid())
+  articoloId    String        @map("articolo_id")
+  articolo      Articolo      @relation(fields: [articoloId], references: [id])
+  titolo        String
+  tipo          TipoPassaggio
+  chi           ChiPassaggio
+  ordine        Int
+  descrizione   String?
+  campiFormJson Json?         @map("campi_form_json")
+
+  @@map("passaggio_template")
+}
+
+model ModuloDipendenzaTemplate {
+  id                       String         @id @default(uuid())
+  tenantId                 String         @map("tenant_id")
+  moduloTemplateId         String         @map("modulo_template_id")
+  moduloTemplate           ModuloTemplate @relation("ModuloDipendente", fields: [moduloTemplateId], references: [id])
+  dipendeDaModuloTemplateId String        @map("dipende_da_modulo_template_id")
+  dipendeDaModuloTemplate   ModuloTemplate @relation("ModuloDaCuiDipende", fields: [dipendeDaModuloTemplateId], references: [id])
+  // Verifica anti-ciclo: applicativa, non esprimibile come vincolo DB semplice — §7ter, §30
+
+  @@map("modulo_dipendenza_template")
+}
+
+// ─────────────────────────────────────────────────────────────────
+// PRE-PROGETTO — §15
+// ─────────────────────────────────────────────────────────────────
+
+enum StatoPreventivo {
+  bozza
+  inviato
+  accettato
+  rifiutato
+}
+
+model Preventivo {
+  id           String          @id @default(uuid())
+  tenantId     String          @map("tenant_id")
+  clienteId    String          @map("cliente_id")
+  cliente      Cliente         @relation(fields: [clienteId], references: [id])
+  // §15.2 richiede progetto_id nel body di creazione ma §14 non lo includeva nello schema
+  // originale — incoerenza trovata implementando l'adapter Prisma, corretta qui.
+  progettoId   String          @map("progetto_id")
+  progetto     Progetto        @relation(fields: [progettoId], references: [id])
+  stato        StatoPreventivo @default(bozza)
+  righeJson    Json            @map("righe_json") // [{moduloTemplateId, moduloTemplateVersione}]
+  valoreTotale Int             @map("valore_totale")
+  createdAt    DateTime        @default(now()) @map("created_at")
+
+  engagementLetter EngagementLetter?
+
+  @@map("preventivo")
+}
+
+model EngagementLetter {
+  id           String     @id @default(uuid())
+  tenantId     String     @map("tenant_id")
+  preventivoId String     @unique @map("preventivo_id")
+  preventivo   Preventivo @relation(fields: [preventivoId], references: [id])
+  statoFirma   String     @default("in_attesa") @map("stato_firma") // in_attesa|completata
+  linkFirma    String?    @map("link_firma")
+  firmatoAt    DateTime?  @map("firmato_at")
+
+  @@map("engagement_letter")
+}
+
+// ─────────────────────────────────────────────────────────────────
+// PROGETTO ATTIVO — §14, §15.3, §16
+// ─────────────────────────────────────────────────────────────────
+
+enum StatoProgetto {
+  pre_project
+  in_progress
+  completed
+}
+
+model Progetto {
+  id            String        @id @default(uuid())
+  tenantId      String        @map("tenant_id")
+  clienteId     String        @map("cliente_id")
+  cliente       Cliente       @relation(fields: [clienteId], references: [id])
+  nome          String
+  stato         StatoProgetto @default(pre_project)
+  dataInizio    DateTime?     @map("data_inizio")
+  dataScadenza  DateTime?     @map("data_scadenza")
+  valoreTotale  Int           @map("valore_totale")
+  createdAt     DateTime      @default(now()) @map("created_at")
+
+  moduli         ModuloProgetto[]
+  preventivi     Preventivo[]
+  fatture        Fattura[]
+  eventi         EventoCalendario[]
+  accessiRisorsa AccessoRisorsa[] @relation("AccessoProgetto")
+
+  @@map("progetto")
+}
+
+enum StatoModulo {
+  pending
+  attesa_dipendenza
+  in_progress
+  delayed
+  blocked
+  done
+}
+
+model ModuloProgetto {
+  id                     String         @id @default(uuid())
+  tenantId               String         @map("tenant_id")
+  progettoId             String         @map("progetto_id")
+  progetto               Progetto       @relation(fields: [progettoId], references: [id])
+  moduloTemplateId       String         @map("modulo_template_id")
+  moduloTemplate         ModuloTemplate @relation(fields: [moduloTemplateId], references: [id])
+  moduloTemplateVersione Int            @map("modulo_template_versione") // congelata alla creazione, §15.3
+  nome                   String
+  categoria              String
+  prezzo                 Int
+  orePreventivate        Int            @map("ore_preventivate")
+  oreConsuntivate        Int            @default(0) @map("ore_consuntivate")
+  stato                  StatoModulo    @default(pending)
+  // stato calcolato da calcolaStatoModulo (§16.2) — mai scritto manualmente
+  // salvo eccezione esplicita e tracciata (§16.6)
+
+  microvoci        MicrovoceProgetto[]
+  dipendenze       ModuloProgettoDipendenza[] @relation("ModuloProgettoDipendente")
+  dipendenzeDi     ModuloProgettoDipendenza[] @relation("ModuloProgettoDaCuiDipende")
+  fattureRiga      FatturaRiga[]
+  accessiRisorsa   AccessoRisorsa[]           @relation("AccessoModulo")
+
+  @@map("modulo_progetto")
+}
+
+enum StatoMicrovoce {
+  pending
+  attesa_dipendenza
+  active
+  delayed
+  blocked
+  done
+}
+
+model MicrovoceProgetto {
+  id               String            @id @default(uuid())
+  tenantId         String            @map("tenant_id")
+  moduloProgettoId String            @map("modulo_progetto_id")
+  moduloProgetto   ModuloProgetto    @relation(fields: [moduloProgettoId], references: [id])
+  articoloId       String            @map("articolo_id")
+  articolo         Articolo          @relation(fields: [articoloId], references: [id])
+  articoloVersione Int               @map("articolo_versione") // congelata, §15.3
+  rigaDistintaId   String            @map("riga_distinta_id") // traccia la riga di origine — utile con quantità > 1
+  rigaDistinta     RigaDistinta      @relation(fields: [rigaDistintaId], references: [id])
+  nome             String // denormalizzato da articolo.nome
+  orePreventivate  Int               @map("ore_preventivate")
+  oreConsuntivate  Int               @default(0) @map("ore_consuntivate")
+  stato            StatoMicrovoce    @default(pending)
+  segnaleRischio   Boolean           @default(false) @map("segnale_rischio") // calcolato, §16.1 — non è uno stato
+  oreExtra         Int               @default(0) @map("ore_extra")
+  causaNota        String?           @map("causa_nota") // obbligatoria quando stato passa a delayed/blocked, §7bis
+  risorsaId        String?           @map("risorsa_id")
+  risorsa          User?             @relation("RisorsaAssegnata", fields: [risorsaId], references: [id])
+  ordine           Int
+
+  passaggi       PassaggioProgetto[]
+  documenti      Documento[]
+  accessiRisorsa AccessoRisorsa[]    @relation("AccessoMicrovoce")
+
+  @@map("microvoce_progetto")
+}
+
+model PassaggioProgetto {
+  id                  String            @id @default(uuid())
+  tenantId            String            @map("tenant_id")
+  microvoceProgettoId String            @map("microvoce_progetto_id")
+  microvoceProgetto   MicrovoceProgetto @relation(fields: [microvoceProgettoId], references: [id])
+  titolo              String
+  tipo                TipoPassaggio
+  chi                 ChiPassaggio
+  ordine              Int // liberamente riordinabile per questa istanza, mai sul template
+  descrizione         String?
+  campiFormJson       Json?             @map("campi_form_json")
+  stato               String            @default("pending") // pending|done
+  documentoId         String?           @unique @map("documento_id")
+  documento           Documento?        @relation(fields: [documentoId], references: [id])
+  risposteFormJson    Json?             @map("risposte_form_json")
+  noteOperatoreJson   Json?             @map("note_operatore_json")
+  richiedeFirmaCliente Boolean          @default(false) @map("richiede_firma_cliente")
+  documentoAllegatoUrl String?          @map("documento_allegato_url")
+
+  @@map("passaggio_progetto")
+}
+
+model ModelloDocumentoInBianco {
+  id            String   @id @default(uuid())
+  tenantId      String   @map("tenant_id")
+  nome          String
+  categoria     String
+  fileUrl       String   @map("file_url")
+  richiedeFirma Boolean  @default(true) @map("richiede_firma")
+  descrizione   String?
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@map("modello_documento_in_bianco")
+}
+
+model FormMaster {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  nome      String
+  campiJson Json     @map("campi_json")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("form_master")
+}
+
+model ModuloProgettoDipendenza {
+  id                      String         @id @default(uuid())
+  tenantId                String         @map("tenant_id")
+  moduloProgettoId        String         @map("modulo_progetto_id")
+  moduloProgetto          ModuloProgetto @relation("ModuloProgettoDipendente", fields: [moduloProgettoId], references: [id])
+  dipendeDaModuloProgettoId String       @map("dipende_da_modulo_progetto_id")
+  dipendeDaModuloProgetto   ModuloProgetto @relation("ModuloProgettoDaCuiDipende", fields: [dipendeDaModuloProgettoId], references: [id])
+  // copia congelata delle dipendenze del template al momento dell'istanziazione, §15.3
+
+  @@map("modulo_progetto_dipendenza")
+}
+
+enum StatoScansione {
+  in_corso
+  pulito
+  infetto
+}
+
+model Documento {
+  id                  String            @id @default(uuid())
+  tenantId            String            @map("tenant_id")
+  microvoceProgettoId String            @map("microvoce_progetto_id")
+  microvoceProgetto   MicrovoceProgetto @relation(fields: [microvoceProgettoId], references: [id])
+  tipo                String // template_vuoto|compilato|firmato
+  fileUrl             String            @map("file_url")
+  versione             Int              @default(1)
+  caricatoDa          String            @map("caricato_da")
+  caricatoDaUser       User             @relation(fields: [caricatoDa], references: [id])
+  createdAt           DateTime          @default(now()) @map("created_at")
+  // Sicurezza upload — §28, incluso fin dallo schema iniziale (Fase 1 del piano)
+  statoScansione      StatoScansione    @default(in_corso) @map("stato_scansione")
+  scansionatoAt       DateTime?         @map("scansionato_at")
+
+  passaggioProgetto PassaggioProgetto?
+
+  @@map("documento")
+}
+
+// ─────────────────────────────────────────────────────────────────
+// FATTURAZIONE & NOTE DI CREDITO — §12, §18, §26 (SDI)
+// ─────────────────────────────────────────────────────────────────
+
+enum TipoDocumentoFiscale {
+  fattura
+  nota_credito
+}
+
+enum StatoFattura {
+  bozza
+  emessa
+  incassata
+  annullata
+}
+
+enum TipoClienteFiscale {
+  privato_italia
+  business_italia
+  estero
+}
+
+enum CanaleFattura {
+  sdi
+  standard
+}
+
+enum StatoSdi {
+  n_a
+  inviata
+  consegnata
+  scartata
+  mancata_consegna
+}
+
+model Fattura {
+  id                     String               @id @default(uuid())
+  tenantId               String               @map("tenant_id")
+  progettoId             String               @map("progetto_id")
+  progetto               Progetto             @relation(fields: [progettoId], references: [id])
+  tipoDocumento          TipoDocumentoFiscale @default(fattura) @map("tipo_documento")
+  serie                  String               @default("FT") // "FT" per Fatture, "NC" per Note di Credito (Numerazione Distinta!)
+  numeroProgressivoSerie Int                  @default(1) @map("numero_progressivo_serie")
+  numero                 String?              // es. "FT-2026/001" o "NC-2026/001"
+  data                   DateTime?
+  stato                  StatoFattura         @default(bozza)
+  fatturaRiferimentoId   String?              @map("fattura_riferimento_id") // ID fattura rettificata se trattasi di Nota di Credito
+  causaNotaCredito       String?              @map("causa_nota_credito")
+  // Campi SDI — §26, presenti dallo schema iniziale per evitare migrazione dolorosa a metà sviluppo
+  tipoClienteFiscale     TipoClienteFiscale   @map("tipo_cliente_fiscale")
+  partitaIva             String?              @map("partita_iva")
+  codiceFiscale          String?              @map("codice_fiscale")
+  numeroProgressivo      String?              @unique @map("numero_progressivo")
+  // generato in transazione con lock — mai concorrente/ottimistico, §26
+  canale                 CanaleFattura
+  statoSdi               StatoSdi             @default(n_a) @map("stato_sdi")
+  righe FatturaRiga[]
+
+  @@map("fattura")
+}
+
+enum TipoFatturaRiga {
+  modulo_completo
+  modulo_parziale
+  milestone_libera
+}
+
+model FatturaRiga {
+  id               String          @id @default(uuid())
+  tenantId         String          @map("tenant_id")
+  fatturaId        String          @map("fattura_id")
+  fattura          Fattura         @relation(fields: [fatturaId], references: [id])
+  tipo             TipoFatturaRiga
+  moduloProgettoId String?         @map("modulo_progetto_id") // nullable, null se milestone_libera
+  moduloProgetto   ModuloProgetto? @relation(fields: [moduloProgettoId], references: [id])
+  percentuale      Int? // usato solo se tipo=modulo_parziale
+  importo          Int
+  descrizione      String
+
+  @@map("fattura_riga")
+}
+
+// ─────────────────────────────────────────────────────────────────
+// TRASVERSALI — §19, §20, §21
+// ─────────────────────────────────────────────────────────────────
+
+model EventoCalendario {
+  id          String    @id @default(uuid())
+  tenantId    String    @map("tenant_id")
+  userId      String    @map("user_id")
+  user        User      @relation(fields: [userId], references: [id])
+  progettoId  String?   @map("progetto_id")
+  progetto    Progetto? @relation(fields: [progettoId], references: [id])
+  titolo      String
+  dataInizio  DateTime  @map("data_inizio")
+  dataFine    DateTime  @map("data_fine")
+
+  @@map("evento_calendario")
+}
+
+enum LivelloAccesso {
+  lettura
+  scrittura
+}
+
+model AccessoRisorsa {
+  id                String          @id @default(uuid())
+  tenantId          String          @map("tenant_id")
+  userId            String          @map("user_id")
+  user              User            @relation("AccessoUtente", fields: [userId], references: [id])
+  // §19 + fix trovato disegnando lo schema ER: 3 FK nullable con vincolo "esattamente una
+  // valorizzata", NON un riferimento polimorfico tipo_risorsa+risorsa_id (non verificabile a
+  // livello di database — su una tabella di permessi l'integrità reale conta più della compattezza)
+  progettoId        String?         @map("progetto_id")
+  progetto          Progetto?       @relation("AccessoProgetto", fields: [progettoId], references: [id])
+  moduloProgettoId  String?         @map("modulo_progetto_id")
+  moduloProgetto    ModuloProgetto? @relation("AccessoModulo", fields: [moduloProgettoId], references: [id])
+  microvoceProgettoId String?       @map("microvoce_progetto_id")
+  microvoceProgetto MicrovoceProgetto? @relation("AccessoMicrovoce", fields: [microvoceProgettoId], references: [id])
+  livello           LivelloAccesso
+  invitatoDa        String          @map("invitato_da")
+  invitatoDaUser    User            @relation("AccessoInvitatoDa", fields: [invitatoDa], references: [id])
+  createdAt         DateTime        @default(now()) @map("created_at")
+
+  // Vincolo "esattamente una risorsa valorizzata" — Prisma non esprime CHECK multi-colonna
+  // nativamente: va aggiunto con una migrazione SQL manuale dopo `prisma migrate dev`.
+  // Vedi Note operative a fondo file.
+
+  @@map("accesso_risorsa")
+}
+
+model Notifica {
+  id               String    @id @default(uuid())
+  tenantId         String    @map("tenant_id")
+  destinatarioId   String    @map("destinatario_id")
+  destinatarioUser User      @relation(fields: [destinatarioId], references: [id])
+  destinatarioTipo String    @map("destinatario_tipo") // user|cliente
+  canale           String    @default("email")
+  oggetto          String
+  corpo            String
+  statoLettura      String   @default("non_letta") @map("stato_lettura")
+  inviataAt        DateTime? @map("inviata_at")
+
+  @@map("notifica")
+}
+
+// ─────────────────────────────────────────────────────────────────
+// NOTE OPERATIVE — da fare a mano dopo `prisma migrate dev`, Prisma non le genera:
+//
+// 1. Row-Level Security su tenant_id (§14):
+//      ALTER TABLE cliente ENABLE ROW LEVEL SECURITY;
+//      CREATE POLICY tenant_isolation ON cliente
+//        USING (tenant_id = current_setting('app.current_tenant_id')::uuid);
+//      -- ripetere per ogni tabella con tenant_id; il super_admin usa un ruolo DB
+//      -- separato che bypassa la policy (§2bis).
+//
+// 2. CHECK "esattamente una risorsa valorizzata" su accesso_risorsa (§19):
+//      ALTER TABLE accesso_risorsa ADD CONSTRAINT chk_una_risorsa CHECK (
+//        (progetto_id IS NOT NULL)::int +
+//        (modulo_progetto_id IS NOT NULL)::int +
+//        (microvoce_progetto_id IS NOT NULL)::int = 1
+//      );
+//
+// 3. Verifica anti-ciclo su modulo_dipendenza_template / modulo_progetto_dipendenza (§7ter):
+//      applicativa, non un vincolo SQL — va implementata nel service layer
+//      prima dell'INSERT (percorso DFS sul grafo esistente + candidato).
+// ─────────────────────────────────────────────────────────────────

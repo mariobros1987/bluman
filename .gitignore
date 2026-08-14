@@ -1,0 +1,22 @@
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Node
+node_modules/
+frontend/node_modules/
+dist/
+frontend/dist/
+build/
+uploads/
+
+# TypeScript
+*.tsbuildinfo
+
+# Supabase local
+supabase/.temp/
+supabase/functions/.deploy/
+
+# OS
+.DS_Store
