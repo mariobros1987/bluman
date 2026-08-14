@@ -32,6 +32,7 @@ export function verifyJwt(token: string): JwtPayload | null {
     if (parts.length !== 3) return null;
 
     const [base64Header, base64Payload, signature] = parts;
+    if (!base64Header || !base64Payload || !signature) return null;
 
     const expectedSignature = crypto
       .createHmac('sha256', JWT_SECRET)

@@ -52,15 +52,22 @@ export function Projects() {
     }
   };
 
+  useEffect(() => {
+    loadProjects();
+  }, []);
+
   const currentUserStr = localStorage.getItem('bluman_user');
   const currentUser = currentUserStr ? JSON.parse(currentUserStr) : { ruolo: 'super_admin' };
 
-  const isSuperAdminOrAdvisor = currentUser.ruolo === 'super_admin' || currentUser.ruolo === 'advisor';
+  const isStaff = ['super_admin', 'advisor', 'collaboratore_interno', 'collaboratore_esterno', 'operator'].includes(currentUser.ruolo);
 
-  // SuperAdmin e Advisor vedono TUTTI i processi. Gli operatori vedono solo i propri assegnati.
+  // Tutti gli utenti dello studio vedono i progetti dello studio. Per i clienti, mostra i loro.
   const visibleProjects = projectList.filter(p => {
-    if (isSuperAdminOrAdvisor) return true;
-    return p.mods?.some(m => m.team?.includes(1) || m.team?.includes(2));
+    if (isStaff) return true;
+    if (currentUser.ruolo === 'cliente') {
+      return p.cl?.toLowerCase().includes((currentUser.nome || '').toLowerCase());
+    }
+    return true;
   });
 
   return (

@@ -36,14 +36,6 @@ export function ProjectDetail() {
   const loadDetail = async () => {
     setLoading(true);
     if (id) {
-      const mockMatch = PROJECTS.find(p => String(p.id) === String(id));
-      if (mockMatch) {
-        setProject(mockMatch);
-        setExpanded(new Set(mockMatch.mods.map(m => m.id)));
-        setLoading(false);
-        return;
-      }
-
       const dbRes = await fetchProgettoDettaglio(id);
       if (dbRes && dbRes.id) {
         setRawDbProject(dbRes);
@@ -90,6 +82,12 @@ export function ProjectDetail() {
         setProject(mapped);
         if (mapped.mods.length > 0) {
           setExpanded(new Set(mapped.mods.map(m => m.id)));
+        }
+      } else {
+        const mockMatch = PROJECTS.find(p => String(p.id) === String(id));
+        if (mockMatch) {
+          setProject(mockMatch);
+          setExpanded(new Set(mockMatch.mods.map(m => m.id)));
         }
       }
     }

@@ -16,6 +16,8 @@ import {
 
 import { signJwt, verifyJwt } from './util/jwt.js';
 import { hashPassword, verifyPassword } from './util/password.js';
+import { sendMagicLinkEmail } from './services/emailService.js';
+import { uploadDocumento } from './services/storageService.js';
 
 export function buildServer(app: AppPort): FastifyInstance {
   const server = Fastify({ logger: false });
@@ -44,9 +46,11 @@ export function buildServer(app: AppPort): FastifyInstance {
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.split(' ')[1];
-      const payload = verifyJwt(token);
-      if (payload && payload.tenantId) {
-        tenantId = payload.tenantId;
+      if (token) {
+        const payload = verifyJwt(token);
+        if (payload && payload.tenantId) {
+          tenantId = payload.tenantId;
+        }
       }
     } else if (req.headers['x-tenant-id']) {
       tenantId = req.headers['x-tenant-id'] as string;
@@ -150,6 +154,9 @@ export function buildServer(app: AppPort): FastifyInstance {
       return reply.code(401).send({ errore: 'Non autenticato' });
     }
     const token = authHeader.split(' ')[1];
+    if (!token) {
+      return reply.code(401).send({ errore: 'Non autenticato' });
+    }
     const payload = verifyJwt(token);
     if (!payload) {
       return reply.code(401).send({ errore: 'Token non valido o scaduto' });
@@ -170,17 +177,7 @@ export function buildServer(app: AppPort): FastifyInstance {
     Body: { filename: string; contentBase64: string };
   }>('/upload', async (req) => {
     const { filename, contentBase64 } = req.body;
-    const fs = await import('fs');
-    const path = await import('path');
-    const uploadsDir = path.join(process.cwd(), 'uploads');
-    if (!fs.existsSync(uploadsDir)) {
-      fs.mkdirSync(uploadsDir, { recursive: true });
-    }
-    const cleanBase64 = contentBase64.replace(/^data:[^;]+;base64,/, '');
-    const safeFilename = `${Date.now()}_${filename.replace(/[^a-zA-Z0-9_.-]/g, '_')}`;
-    const filePath = path.join(uploadsDir, safeFilename);
-    fs.writeFileSync(filePath, Buffer.from(cleanBase64, 'base64'));
-    return { ok: true, url: `/uploads/${safeFilename}`, name: filename, size: `${Math.round(cleanBase64.length * 0.75 / 1024)} KB` };
+    return uploadDocumento(filename, contentBase64);
   });
 
   server.get<{ Params: { filename: string } }>('/uploads/:filename', async (req, reply) => {
@@ -254,6 +251,16 @@ export function buildServer(app: AppPort): FastifyInstance {
     return app.listaClienti();
   });
 
+  server.post<{ Params: { id: string }; Body: { email?: string } }>('/clienti/:id/magic-link', async (req, reply) => {
+    const cliente = await app.getCliente(req.params.id);
+    const toEmail = req.body?.email || (cliente as any).email || 'client@holdingbeta.advisory';
+    const magicToken = `client_${cliente.id.substring(0, 8)}_${Date.now()}`;
+    const magicUrl = `http://localhost:5173/portal?magic_token=${magicToken}`;
+
+    const sent = await sendMagicLinkEmail(toEmail, cliente.nome, magicUrl);
+    return { ok: true, sent, magicUrl, magicToken };
+  });
+
   server.get('/tenant/utenti', async () => {
     return (app as any).listaUtenti();
   });
@@ -322,7 +329,7 @@ export function buildServer(app: AppPort): FastifyInstance {
     if (ore === undefined || typeof ore !== 'number') {
       return reply.code(400).send({ errore: 'Il campo ore (o oreAggiunte) è obbligatorio' });
     }
-    await app.consuntivaMicrovoce(req.params.id, ore);
+    await app.consuntivaMicrovoce({ microvoceId: req.params.id, oreAggiunte: ore });
     return { ok: true, oreConsuntivate: ore };
   });
 

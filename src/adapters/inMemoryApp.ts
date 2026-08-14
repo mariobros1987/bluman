@@ -193,8 +193,11 @@ export class InMemoryApp implements AppPort {
 
   // ── §17 — Esecuzione: deleghe dirette al motore già testato in esecuzione.ts ──────────
 
-  async consuntivaMicrovoce(microvoceId: string, ore: number): Promise<void> {
-    await registraConsuntivazione(microvoceId, ore, this.port);
+  async consuntivaMicrovoce(input: { microvoceId: string; oreAggiunte: number; completa?: boolean }): Promise<void> {
+    await registraConsuntivazione(input.microvoceId, input.oreAggiunte, this.port);
+    if (input.completa) {
+      await completaMicrovoceService(input.microvoceId, this.port);
+    }
   }
 
   async marcaRitardoMicrovoce(microvoceId: string, stato: 'delayed' | 'blocked', causaNota: string): Promise<void> {
@@ -227,5 +230,21 @@ export class InMemoryApp implements AppPort {
 
   async marcaPassaggioCompletato(passaggioId: string): Promise<void> {
     await marcaPassaggioCompletatoService(passaggioId, this.port);
+  }
+
+  listaArticoli(): unknown[] {
+    return [];
+  }
+
+  creaArticolo(input: any): unknown {
+    return { id: randomUUID(), ...input };
+  }
+
+  creaModuloTemplate(input: any): unknown {
+    return { id: randomUUID(), ...input };
+  }
+
+  emettiFattura(input: any): unknown {
+    return { id: randomUUID(), ...input, stato: 'emessa' };
   }
 }

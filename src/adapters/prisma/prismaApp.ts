@@ -246,7 +246,7 @@ export class PrismaApp implements AppPort {
         tenantId: this.tenantId,
         nome: input.nome,
         email: input.email,
-        ruolo: input.ruolo || 'operator',
+        ruolo: (input.ruolo as any) || 'collaboratore_interno',
         stato: 'attivo',
       },
     });
@@ -360,7 +360,6 @@ export class PrismaApp implements AppPort {
         codiceFiscale: input.codiceFiscale || null,
         canale: input.canale,
         statoSdi: input.canale === 'sdi' ? 'consegnata' : 'n_a',
-        xmlFatturapaUrl: input.canale === 'sdi' ? `https://portale-fpa.compedservizi.it/xml/${numeroProgressivo}.xml` : null,
         righe: {
           create: input.righe.map((r) => ({
             tenantId: this.tenantId,

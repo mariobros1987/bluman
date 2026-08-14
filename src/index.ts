@@ -1,6 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { PrismaApp } from './adapters/prisma/prismaApp.js';
-import { InMemoryApp } from './adapters/inMemoryApp.ts';
+import { InMemoryApp } from './adapters/inMemoryApp.js';
 import { buildServer } from './server.js';
 import dotenv from 'dotenv';
 
@@ -15,7 +15,7 @@ async function start() {
     app = new PrismaApp(prisma, TENANT_ID);
   } catch (e) {
     console.warn('⚠️ Supabase Prisma offline, uso InMemoryApp fallback per sviluppo locale.');
-    app = new InMemoryApp(TENANT_ID);
+    app = new InMemoryApp();
   }
 
   const server = buildServer(app);

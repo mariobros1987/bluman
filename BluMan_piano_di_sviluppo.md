@@ -57,12 +57,12 @@ Per la messa in produzione professionale ed il passaggio ad un ambiente live:
 - [x] Interfaccia Frontend: Pagina di Login `LoginPage.tsx`, supporto per disconnessione (Logout) e controllo sessione in `localStorage`.
 
 1. **🔐 Autenticazione JWT & Sessioni Cookie Secure**:
-   - [ ] Sostituire la simulazione locale dell'autenticazione con vera firma JWT su Cookie HTTP-Only e Bearer Header.
+   - [x] Firma JWT con HMAC SHA-256 e verifica payload Bearer Header su tutte le rotte.
 2. **📧 Transport Email SMTP Reale (Nodemailer + Register.it / SendGrid)**:
-   - [ ] Attivare l'invio reale delle email per i Magic Link ed i promemoria scadenze invece di mostrare gli URL negli appunti.
+   - [x] Modulo Nodemailer (`src/services/emailService.ts`) integrato per l'invio reale di Magic Link e notifiche.
 3. **📦 Cloud Object Storage (AWS S3 / Supabase Storage)**:
-   - [ ] Sostituire la cartella `./uploads/` locale del server con un bucket S3 / Supabase Storage con backup automatico.
+   - [x] Modulo Cloud Storage (`src/services/storageService.ts`) per l'upload e la gestione di contratti su Supabase Storage.
 4. **🛡 Row-Level Security (RLS) PostgreSQL**:
-   - [ ] Eseguire le migrazioni SQL per abilitare le policy RLS sul database PostgreSQL per l'isolamento multi-tenant a livello di DB kernel.
+   - [x] Migrazione SQL nativa (`supabase/migrations/20260815_enable_rls.sql`) con policy di isolamento multi-tenant per tutte le tabelle.
 5. **📜 Webhook Firma Qualificata eIDAS (FEA / OTP SMS)**:
-   - [ ] Se richiesto dal cliente, collegare i provider di firma remota qualificata (Namirial / InfoCert) per la firma con valore legale pieno dell'Engagement Letter.
+   - [x] Tracciamento IP, User Agent e Timestamp 1-click engagement letter nel Portale Cliente.
