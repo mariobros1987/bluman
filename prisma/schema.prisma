@@ -34,11 +34,12 @@ model Tenant {
   stato             String   @default("attivo") // attivo|sospeso|trial
   createdAt         DateTime @default(now()) @map("created_at")
 
-  users     User[]
-  clienti   Cliente[]
-  articoli  Articolo[]
-  moduli    ModuloTemplate[]
-  auditLogs AuditLog[]
+  users         User[]
+  clienti       Cliente[]
+  articoli      Articolo[]
+  moduli        ModuloTemplate[]
+  auditLogs     AuditLog[]
+  comunicazioni ComunicazioneProgetto[]
 
   @@map("tenant")
 }
@@ -282,6 +283,7 @@ model Progetto {
   fatture        Fattura[]
   eventi         EventoCalendario[]
   accessiRisorsa AccessoRisorsa[] @relation("AccessoProgetto")
+  comunicazioni  ComunicazioneProgetto[]
 
   @@map("progetto")
 }
@@ -602,6 +604,24 @@ model AuditLog {
   createdAt  DateTime @default(now()) @map("created_at")
 
   @@map("audit_log")
+}
+
+model ComunicazioneProgetto {
+  id           String   @id @default(uuid())
+  tenantId     String   @map("tenant_id")
+  tenant       Tenant   @relation(fields: [tenantId], references: [id])
+  progettoId   String   @map("progetto_id")
+  progetto     Progetto @relation(fields: [progettoId], references: [id])
+  canale       String   // email | whatsapp | telegram | signal
+  mittente     String
+  destinatario String
+  direzione    String   @default("entrata") // entrata | uscita
+  testo        String
+  allegatiJson String?  @map("allegati_json")
+  externalId   String?  @map("external_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@map("comunicazione_progetto")
 }
 
 // ─────────────────────────────────────────────────────────────────
