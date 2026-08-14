@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { CatBadge } from '../components/ui/CatBadge';
 import { fmt } from '../utils';
-import { downloadRealPdf, SignatureData } from '../utils/pdfGenerator';
+import { downloadRealPdf } from '../utils/pdfGenerator';
+import type { SignatureData } from '../utils/pdfGenerator';
 import { DigitalSignatureModal } from '../components/DigitalSignatureModal';
 import { fetchModuliLibreria, fetchProgetti, creaPreventivoEAccettaApi, fetchClienti, creaProgettoApi, creaClienteApi } from '../api/client';
 import type { CategoriaModulo } from '../types';
@@ -261,7 +262,7 @@ export function ClientPortal() {
                     }}
                     style={{ background: 'var(--card2)', border: '1px solid var(--border)', color: 'var(--text)', padding: '10px 18px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
                   >
-                    📥 Scarica VERO File PDF A4 (.pdf)
+                    📥 Esporta Engagement Letter PDF (A4)
                   </button>
                 </div>
               </div>

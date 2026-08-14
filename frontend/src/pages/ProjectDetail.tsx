@@ -6,7 +6,8 @@ import { ProgressBar } from '../components/ui/ProgressBar';
 import { AvatarGroup, Avatar } from '../components/ui/Avatar';
 import { PassaggioModal } from '../components/PassaggioModal';
 import { fmt, progressColor } from '../utils';
-import { downloadRealPdf, SignatureData } from '../utils/pdfGenerator';
+import { downloadRealPdf } from '../utils/pdfGenerator';
+import type { SignatureData } from '../utils/pdfGenerator';
 import { DigitalSignatureModal } from '../components/DigitalSignatureModal';
 import { PROJECTS } from '../store/mockData';
 import { fetchProgettoDettaglio, emettiFatturaApi, consuntivaMicrovoceApi, fetchAccessiProgetto, assegnaAccessoProgettoApi } from '../api/client';
@@ -718,7 +719,7 @@ function FatturazioneTab({ project, rawDbProject, onRefresh }: { project: Proget
                 }}
                 style={{ background: '#4338ca', color: '#fff', border: 'none', padding: '8px 20px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 12px rgba(67,56,202,.3)' }}
               >
-                📥 Scarica VERO File PDF A4 (.pdf)
+                📥 Esporta Documento PDF Ufficiale (A4)
               </button>
             </div>
           </div>
