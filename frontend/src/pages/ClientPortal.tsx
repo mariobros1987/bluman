@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { CatBadge } from '../components/ui/CatBadge';
+import { generateAndDownloadPdf } from '../utils/pdfGenerator';
 import { fmt } from '../utils';
 import { fetchModuliLibreria, fetchProgetti, creaPreventivoEAccettaApi, fetchClienti, creaProgettoApi, creaClienteApi } from '../api/client';
 import type { CategoriaModulo } from '../types';
@@ -219,12 +220,36 @@ export function ClientPortal() {
                 <p style={{ fontSize: 13, color: 'var(--muted)', maxWidth: 480, lineHeight: 1.6, marginBottom: 20 }}>
                   La proposta d'ordine per <strong>{clientName}</strong> è stata verificata e registrata con marca temporale. Il progetto è in lavorazione ed i moduli sono accessibili nella scheda "Avanzamento Live Lavori".
                 </p>
-                <button
-                  onClick={() => setActiveTab('avanzamento')}
-                  style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '10px 22px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
-                >
-                  Vai all'Avanzamento Live Lavori →
-                </button>
+                <div style={{ display: 'flex', gap: 10, marginBottom: 20 }}>
+                  <button
+                    onClick={() => setActiveTab('avanzamento')}
+                    style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '10px 22px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+                  >
+                    Vai all'Avanzamento Live Lavori →
+                  </button>
+                  <button
+                    onClick={() => {
+                      const htmlContent = `
+                        <div style="border-bottom:2px solid #0f172a;padding-bottom:15px;display:flex;justify-content:space-between;">
+                          <div>
+                            <div style="font-size:20px;font-weight:800;color:#1e1b4b;">BLUECODE LTD — ADVISORY</div>
+                            <div style="font-size:11px;color:#475569;margin-top:2px;">Level 4, Valuation Centre, Sliema, Malta</div>
+                          </div>
+                          <div style="text-align:right;">
+                            <div style="font-size:16px;font-weight:800;color:#4338ca;">ENGAGEMENT LETTER & PROPOSTA D'ORDINE</div>
+                            <div style="font-size:12px;font-weight:700;margin-top:2px;">Cliente: ${clientName}</div>
+                            <div style="font-size:10px;color:#166534;margin-top:2px;">✓ FIRMATA DIGITALMENTE (1-Click eIDAS)</div>
+                          </div>
+                        </div>
+                        <p style="margin-top:20px;">Si attesta la stipula ed accettazione dell'Engagement Letter professionale per l'avvio delle attività di consulenza patrimoniale e corporate structuring.</p>
+                      `;
+                      generateAndDownloadPdf(`Engagement_Letter_${clientName.replace(/\s+/g, '_')}`, htmlContent);
+                    }}
+                    style={{ background: 'var(--card2)', border: '1px solid var(--border)', color: 'var(--text)', padding: '10px 18px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+                  >
+                    🖨 Scarica Engagement Letter PDF
+                  </button>
+                </div>
               </div>
             ) : (
               <div>

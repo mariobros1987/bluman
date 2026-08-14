@@ -6,6 +6,7 @@ import { ProgressBar } from '../components/ui/ProgressBar';
 import { AvatarGroup, Avatar } from '../components/ui/Avatar';
 import { PassaggioModal } from '../components/PassaggioModal';
 import { fmt, progressColor } from '../utils';
+import { generateAndDownloadPdf } from '../utils/pdfGenerator';
 import { PROJECTS } from '../store/mockData';
 import { fetchProgettoDettaglio, emettiFatturaApi, consuntivaMicrovoceApi, fetchAccessiProgetto, assegnaAccessoProgettoApi } from '../api/client';
 import { TEAM } from '../store/mockData';
@@ -667,8 +668,49 @@ function FatturazioneTab({ project, rawDbProject, onRefresh }: { project: Proget
               <button onClick={() => setPreviewFattura(null)} style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569', padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
                 Chiudi
               </button>
-              <button onClick={() => window.print()} style={{ background: '#4338ca', color: '#fff', border: 'none', padding: '8px 20px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 12px rgba(67,56,202,.3)' }}>
-                🖨 Stampa / Esporta PDF
+              <button
+                onClick={() => {
+                  const htmlContent = `
+                    <div style="border-bottom:2px solid #0f172a;padding-bottom:15px;display:flex;justify-content:space-between;">
+                      <div>
+                        <div style="font-size:20px;font-weight:800;color:#1e1b4b;">BLUECODE LTD</div>
+                        <div style="font-size:11px;color:#475569;margin-top:2px;">Level 4, Valuation Centre, Tower Road, Sliema SLM 1600, Malta<br/>VAT: MT-29837102 · Reg. C-99881</div>
+                      </div>
+                      <div style="text-align:right;">
+                        <div style="font-size:16px;font-weight:800;color:#4338ca;">DOCUMENTO FISCALE DI VENDITA</div>
+                        <div style="font-size:13px;font-weight:700;margin-top:2px;">${previewFattura.numero}</div>
+                        <div style="font-size:11px;color:#64748b;margin-top:2px;">Data Emissione: ${new Date().toLocaleDateString('it-IT')}</div>
+                      </div>
+                    </div>
+                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px;display:flex;justify-content:space-between;margin-top:20px;">
+                      <div>
+                        <div style="font-size:10px;color:#64748b;text-transform:uppercase;font-weight:700;">Cliente Destinatario:</div>
+                        <div style="font-size:13px;font-weight:700;margin-top:2px;">${project.cl}</div>
+                        <div style="font-size:11px;color:#475569;">P.IVA / CF: IT01234567890</div>
+                      </div>
+                      <div style="text-align:right;">
+                        <div style="font-size:10px;color:#64748b;text-transform:uppercase;font-weight:700;">Canale SDI Comped:</div>
+                        <div style="font-size:11px;font-weight:600;color:#166534;margin-top:2px;">✓ Tracciato XML Accettato</div>
+                      </div>
+                    </div>
+                    <table style="width:100%;margin-top:20px;">
+                      <thead>
+                        <tr><th>Descrizione Prestazione</th><th style="text-align:right;">Totale €</th></tr>
+                      </thead>
+                      <tbody>
+                        <tr><td><strong>${previewFattura.desc}</strong><br/><small style="color:#64748b">Riferimento Incarico: ${project.n}</small></td><td style="text-align:right;font-weight:700;">${fmt(previewFattura.importo)}</td></tr>
+                      </tbody>
+                    </table>
+                    <div style="display:flex;justify-content:space-between;border-top:2px solid #0f172a;padding-top:15px;margin-top:30px;">
+                      <div style="font-size:10px;color:#64748b;">Esente IVA / Ritenuta d'acconto ai sensi delle vigenti disposizioni fiscali UE.</div>
+                      <div style="text-align:right;"><div style="font-size:11px;color:#64748b;">Totale Documento:</div><div style="font-size:22px;font-weight:800;color:#4338ca;">${fmt(previewFattura.importo)}</div></div>
+                    </div>
+                  `;
+                  generateAndDownloadPdf(`BluMan_Fattura_${previewFattura.numero}`, htmlContent);
+                }}
+                style={{ background: '#4338ca', color: '#fff', border: 'none', padding: '8px 20px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 12px rgba(67,56,202,.3)' }}
+              >
+                🖨 Scarica PDF / Stampa Vettoriale
               </button>
             </div>
           </div>
