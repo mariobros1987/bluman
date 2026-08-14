@@ -430,6 +430,21 @@ export function SettingsPage() {
             Inserisci i token ed i parametri di connessione per la sincronizzazione automatica delle conversazioni sui Progetti dei Clienti.
           </div>
 
+          {/* BOX GUIDA INTERATTIVA PASSO-PASSO */}
+          <div style={{ background: '#1a1f3d', border: '1px solid #2d3260', borderRadius: 12, padding: 16, marginTop: 14 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#818cf8', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span>📖 Guida Passo-Passo: Come Funziona l'Associazione Automatica ai Progetti</span>
+            </div>
+            <div style={{ fontSize: 11.5, color: '#cbd5e1', lineHeight: 1.6 }}>
+              <strong>1. Associazione per Numero di Telefono (WhatsApp / Signal):</strong><br />
+              Quando il cliente invia un messaggio o un file da cellulare (es. <code>+39 335 1234567</code>), BluMan cerca il numero nell'anagrafica <strong>Clienti ERP</strong> ed associa la chat al Progetto in corso.<br /><br />
+              <strong>2. Associazione per Indirizzo Email (Email Inbound):</strong><br />
+              Tutte le email ricevute da <code>client@holdingbeta.advisory</code> vengono collegate al progetto. Includendo <code>[INC-2026-089]</code> nell'oggetto si forza l'assegnazione ad uno specifico incarico.<br /><br />
+              <strong>3. Associazione Telegram:</strong><br />
+              L'associazione avviene tramite l'handle registrato in anagrafica (es. <code>@RobertoRossi</code>) o codice incarico.
+            </div>
+          </div>
+
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20, marginTop: 16 }}>
             {/* 🟢 WHATSAPP BUSINESS API */}
             <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 16 }}>

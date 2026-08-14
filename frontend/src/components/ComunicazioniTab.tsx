@@ -143,6 +143,21 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente }: Comu
         </div>
       </div>
 
+      {/* Info Banner Regole di Associazione Automatica */}
+      <div style={{ background: '#0d2d22', border: '1px solid #1a5c3c', borderRadius: 12, padding: 14, fontSize: 11.5, color: '#34d399', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+        <div>
+          <strong>🔗 Associazione Automatica Attiva:</strong> I messaggi inviati da <code>{emailCliente}</code> ed dal cellulare registrato in anagrafica <code>+39 335 1234567</code> confluiscono automaticamente in questa scheda ed i file allegati vengono archiviati nel Vault.
+        </div>
+        <a
+          href="/GUIDA_CONFIGURAZIONE_CANALI.md"
+          target="_blank"
+          rel="noreferrer"
+          style={{ color: '#6ee7b7', textDecoration: 'underline', fontWeight: 600, fontSize: 11 }}
+        >
+          📖 Apri Guida Completa Setup API →
+        </a>
+      </div>
+
       {/* Timeline Chat Comunicazioni */}
       <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 16, padding: 20, display: 'flex', flexDirection: 'column', gap: 14, maxHeight: 520, overflowY: 'auto' }}>
         {messaggiFiltrati.map(m => {
