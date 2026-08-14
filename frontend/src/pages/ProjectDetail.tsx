@@ -48,8 +48,26 @@ export function ProjectDetail() {
     name: string;
   } | null>(null);
 
-  const handleScheduleDeadlineConfirm = (date: string, operatorId: number, priority: string, sendEmail: boolean) => {
+  const handleScheduleDeadlineConfirm = (
+    date: string,
+    operatorId: number,
+    priority: string,
+    sendEmail: boolean,
+    activityType?: string,
+    time?: string,
+    notes?: string,
+    locationUrl?: string
+  ) => {
     if (!project || !calendarModalTarget) return;
+
+    const typeIcon = activityType === 'video' ? '📹 Video Call'
+                   : activityType === 'riunione' ? '🤝 Riunione Studio'
+                   : activityType === 'call' ? '📞 Call'
+                   : activityType === 'fiscale' ? '⚖️ Adempimento Fiscale'
+                   : '📄 Scadenza Documento';
+
+    const noteText = notes ? ` · Note: ${notes}` : '';
+    const linkText = locationUrl ? ` · Link: ${locationUrl}` : '';
 
     const newMods = project.mods.map(m => {
       if (m.id === calendarModalTarget.modId) {
@@ -58,7 +76,7 @@ export function ProjectDetail() {
             return {
               ...mv,
               as: operatorId,
-              vn: `📅 Scadenza: ${date} (${priority.toUpperCase()})`,
+              vn: `${typeIcon}: ${date} ore ${time || '10:30'} (${priority.toUpperCase()})${noteText}${linkText}`,
             };
           }
           return mv;
@@ -80,11 +98,14 @@ export function ProjectDetail() {
     const eventsArr = eventsStr ? JSON.parse(eventsStr) : [];
     const newEvent = {
       id: `ev-${Date.now()}`,
-      title: `${calendarModalTarget.name} (${project.cl})`,
+      title: `${typeIcon} - ${calendarModalTarget.name} (${project.cl})`,
       date,
+      time,
       opId: operatorId,
       priority,
       sendEmail,
+      notes,
+      locationUrl,
     };
     localStorage.setItem('bluman_calendar_events', JSON.stringify([newEvent, ...eventsArr]));
 
@@ -732,8 +753,8 @@ export function ProjectDetail() {
           onClose={() => setCalendarModalTarget(null)}
           microvoceName={calendarModalTarget.name}
           projectName={project.n}
-          onSchedule={(dt, opId, prio, sendE) => {
-            handleScheduleDeadlineConfirm(dt, opId, prio, sendE);
+          onSchedule={(dt, opId, prio, sendE, actType, tm, nts, loc) => {
+            handleScheduleDeadlineConfirm(dt, opId, prio, sendE, actType, tm, nts, loc);
           }}
         />
       )}

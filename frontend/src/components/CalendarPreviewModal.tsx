@@ -8,7 +8,16 @@ interface CalendarPreviewModalProps {
   microvoceName: string;
   projectName: string;
   initialDate?: string;
-  onSchedule: (date: string, operatorId: number, priority: string, sendEmail: boolean) => void;
+  onSchedule: (
+    date: string,
+    operatorId: number,
+    priority: string,
+    sendEmail: boolean,
+    activityType?: string,
+    time?: string,
+    notes?: string,
+    locationUrl?: string
+  ) => void;
 }
 
 export function CalendarPreviewModal({
@@ -22,6 +31,10 @@ export function CalendarPreviewModal({
   const [selectedDate, setSelectedDate] = useState<string>(initialDate);
   const [operatorId, setOperatorId] = useState<number>(1);
   const [priority, setPriority] = useState<string>('alta');
+  const [activityType, setActivityType] = useState<string>('doc');
+  const [time, setTime] = useState<string>('10:30');
+  const [notes, setNotes] = useState<string>('');
+  const [locationUrl, setLocationUrl] = useState<string>('');
   const [sendEmail, setSendEmail] = useState<boolean>(true);
   const [confirmed, setConfirmed] = useState(false);
 
@@ -29,7 +42,7 @@ export function CalendarPreviewModal({
 
   const handleConfirm = (e: React.FormEvent) => {
     e.preventDefault();
-    onSchedule(selectedDate, operatorId, priority, sendEmail);
+    onSchedule(selectedDate, operatorId, priority, sendEmail, activityType, time, notes, locationUrl);
     setConfirmed(true);
     setTimeout(() => {
       setConfirmed(false);
@@ -45,7 +58,7 @@ export function CalendarPreviewModal({
     <div style={{
       position: 'fixed',
       inset: 0,
-      background: 'rgba(15,23,42,0.8)',
+      background: 'rgba(15,23,42,0.85)',
       backdropFilter: 'blur(6px)',
       display: 'flex',
       alignItems: 'center',
@@ -57,8 +70,10 @@ export function CalendarPreviewModal({
         background: 'var(--card)',
         border: '1px solid var(--border)',
         borderRadius: 20,
-        maxWidth: 580,
+        maxWidth: 680,
         width: '100%',
+        maxHeight: '92vh',
+        overflowY: 'auto',
         padding: 26,
         boxShadow: '0 25px 60px rgba(0,0,0,0.6)',
         color: 'var(--text)',
@@ -67,16 +82,17 @@ export function CalendarPreviewModal({
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid var(--border)', paddingBottom: 16, marginBottom: 18 }}>
           <div>
             <div style={{ fontSize: 10, textTransform: 'uppercase', color: 'var(--indigo-l)', fontWeight: 800, letterSpacing: '1px', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span>📅 PROGRAMMAZIONE SCADENZARIO STUDIO</span>
+              <span>📅 PIANIFICAZIONE SCADENZARIO STUDIO & EVENTI</span>
             </div>
-            <h3 style={{ fontSize: 17, fontWeight: 800, margin: '4px 0 0 0', background: 'linear-gradient(90deg, #fff, #94a3b8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-              Pianifica Scadenza Attività
+            <h3 style={{ fontSize: 18, fontWeight: 800, margin: '4px 0 0 0', background: 'linear-gradient(90deg, #fff, #94a3b8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+              Programma Scadenza / Riunione
             </h3>
             <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
-              Microvoce: <strong style={{ color: 'var(--indigo-l)' }}>{microvoceName}</strong> ({projectName})
+              Attività: <strong style={{ color: 'var(--indigo-l)' }}>{microvoceName}</strong> ({projectName})
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
             style={{ background: 'var(--card2)', border: '1px solid var(--border)', color: 'var(--muted)', width: 32, height: 32, borderRadius: 8, cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           >
@@ -86,15 +102,16 @@ export function CalendarPreviewModal({
 
         {confirmed && (
           <div style={{ background: '#0d2d22', border: '1px solid #1a5c3c', color: '#34d399', padding: '12px 16px', borderRadius: 10, fontSize: 12, fontWeight: 700, marginBottom: 16 }}>
-            ✓ Scadenza inserita nel Calendario Condiviso Studio e notificata all'operatore!
+            ✓ Attività pianificata con successo nel Calendario Condiviso Studio e notificato all'operatore!
           </div>
         )}
 
         <form onSubmit={handleConfirm}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 20, marginBottom: 20 }}>
+          {/* Section 1: Top Grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 20, marginBottom: 18 }}>
             {/* Left Column: Mini Calendar Picker */}
             <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 14, padding: 14 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                 <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>🗓 Agosto 2026</span>
                 <span style={{ fontSize: 10, color: 'var(--indigo-l)', fontWeight: 700 }}>{selectedDate}</span>
               </div>
@@ -158,11 +175,46 @@ export function CalendarPreviewModal({
               </div>
             </div>
 
-            {/* Right Column: Operator, Priority, Reminders */}
+            {/* Right Column: Activity Type & Time */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
                 <label style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>
-                  Operatore Incaricato Scadenza:
+                  📌 Tipo di Attività / Evento:
+                </label>
+                <select
+                  value={activityType}
+                  onChange={e => setActivityType(e.target.value)}
+                  style={{ width: '100%', background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 10px', fontSize: 11.5, color: 'var(--text)' }}
+                >
+                  <option value="doc">📄 Scadenza Presentazione Documento / Atto</option>
+                  <option value="video">📹 Video Call / Meet / Zoom col Cliente</option>
+                  <option value="riunione">🤝 Riunione in Presenza in Studio</option>
+                  <option value="call">📞 Chiamata Telefonica di Allineamento</option>
+                  <option value="fiscale">⚖️ Adempimento Fiscale / Deposito MFSA</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>
+                  ⏰ Ora Appuntamento / Scadenza:
+                </label>
+                <select
+                  value={time}
+                  onChange={e => setTime(e.target.value)}
+                  style={{ width: '100%', background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 10px', fontSize: 11.5, color: 'var(--text)' }}
+                >
+                  <option value="09:00">09:00 — Mattino presto</option>
+                  <option value="10:30">10:30 — Mattinata</option>
+                  <option value="12:00">12:00 — Metà giornata</option>
+                  <option value="15:00">15:00 — Pomeriggio</option>
+                  <option value="17:00">17:00 — Tardo pomeriggio</option>
+                  <option value="18:30">18:30 — Chiusura studio</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>
+                  👤 Operatore Responsabile:
                 </label>
                 <select
                   value={operatorId}
@@ -177,7 +229,7 @@ export function CalendarPreviewModal({
 
               <div>
                 <label style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>
-                  Livello di Priorità Scadenza:
+                  Livello di Priorità:
                 </label>
                 <select
                   value={priority}
@@ -185,28 +237,74 @@ export function CalendarPreviewModal({
                   style={{ width: '100%', background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 10px', fontSize: 11.5, color: 'var(--text)' }}
                 >
                   <option value="alta">🔴 Alta Priorità (Scadenza Legale / AML / SDI)</option>
-                  <option value="media">🟡 Priorità Media (Consegna Bozza / Documento)</option>
+                  <option value="media">🟡 Priorità Media (Bozza / Documento)</option>
                   <option value="normale">🟢 Priorità Normale (Verifica Ordinaria)</option>
                 </select>
               </div>
+            </div>
+          </div>
 
-              <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 10, padding: 10 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <input
-                    type="checkbox"
-                    id="chkEmail"
-                    checked={sendEmail}
-                    onChange={e => setSendEmail(e.target.checked)}
-                  />
-                  <label htmlFor="chkEmail" style={{ fontSize: 10.5, color: 'var(--text)', cursor: 'pointer', fontWeight: 600 }}>
-                    ✉️ Invia Notifica Email & Reminder SMTP 24h prima
-                  </label>
-                </div>
-              </div>
+          {/* Section 2: Notes & Video Call Link */}
+          <div style={{ marginBottom: 18 }}>
+            <label style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>
+              📝 Note Operative & Istruzioni per il Team / Cliente:
+            </label>
+            <textarea
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              placeholder="Inserisci dettagli, ordine del giorno della riunione o istruzioni sui documenti da preparare..."
+              rows={3}
+              style={{
+                width: '100%',
+                background: 'var(--card2)',
+                border: '1px solid var(--border)',
+                borderRadius: 10,
+                color: 'var(--text)',
+                padding: '10px 12px',
+                fontSize: 12,
+                resize: 'vertical',
+                boxSizing: 'border-box',
+              }}
+            />
+          </div>
 
-              <div style={{ background: 'rgba(99,102,241,0.06)', border: '1px dashed var(--indigo)', borderRadius: 10, padding: 10, fontSize: 10.5, color: 'var(--indigo-l)' }}>
-                ℹ️ La scadenza verrà integrata automaticamente nella pagina <strong>📅 Calendario Studio</strong> con filtro per operatore.
-              </div>
+          {/* Section 3: Optional Link / Location */}
+          {(activityType === 'video' || activityType === 'riunione') && (
+            <div style={{ marginBottom: 18 }}>
+              <label style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>
+                📍 Link Google Meet / Zoom o Luogo Riunione:
+              </label>
+              <input
+                type="text"
+                value={locationUrl}
+                onChange={e => setLocationUrl(e.target.value)}
+                placeholder={activityType === 'video' ? 'https://meet.google.com/abc-defg-hij' : 'Sala Riunioni Studio BluCode, Via Roma 15'}
+                style={{
+                  width: '100%',
+                  background: 'var(--card2)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 8,
+                  color: 'var(--text)',
+                  padding: '8px 12px',
+                  fontSize: 12,
+                  boxSizing: 'border-box',
+                }}
+              />
+            </div>
+          )}
+
+          {/* Section 4: Email Reminder Checkbox */}
+          <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 10, padding: 12, marginBottom: 20 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <input
+                type="checkbox"
+                id="chkEmail"
+                checked={sendEmail}
+                onChange={e => setSendEmail(e.target.checked)}
+              />
+              <label htmlFor="chkEmail" style={{ fontSize: 11, color: 'var(--text)', cursor: 'pointer', fontWeight: 600 }}>
+                ✉️ Invia Notifica Email & Reminder SMTP all'Operatore ed al Cliente (24h prima)
+              </label>
             </div>
           </div>
 
@@ -221,9 +319,9 @@ export function CalendarPreviewModal({
             </button>
             <button
               type="submit"
-              style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '8px 22px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 14px rgba(99,102,241,0.4)' }}
+              style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '8px 24px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 14px rgba(99,102,241,0.4)' }}
             >
-              ✓ Salva Scadenza in Calendario
+              ✓ Salva Attività in Scadenzario
             </button>
           </div>
         </form>
