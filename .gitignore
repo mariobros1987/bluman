@@ -10,6 +10,7 @@ dist/
 frontend/dist/
 build/
 uploads/
+*.zip
 
 # TypeScript
 *.tsbuildinfo

@@ -13,8 +13,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": "proceduraincompletaerror",
-      "id": "src_services_esecuzione_proceduraincompletaerror",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_services_esecuzione_proceduraincompletaerror"
     },
     {
       "label": "DbState",
@@ -26,8 +26,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": "dbstate",
-      "id": "src_services_fakeistanziazioneport_dbstate",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_services_fakeistanziazioneport_dbstate"
     },
     {
       "label": "FakeIstanziazionePort",
@@ -39,8 +39,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": "fakeistanziazioneport",
-      "id": "src_services_fakeistanziazioneport_fakeistanziazioneport",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_services_fakeistanziazioneport_fakeistanziazioneport"
     },
     {
       "label": "FakeNotificationPort",
@@ -52,8 +52,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": "fakenotificationport",
-      "id": "src_services_fakeistanziazioneport_fakenotificationport",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_services_fakeistanziazioneport_fakenotificationport"
     },
     {
       "label": "MicrovoceStored",
@@ -65,8 +65,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": "microvocestored",
-      "id": "src_services_fakeistanziazioneport_microvocestored",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_services_fakeistanziazioneport_microvocestored"
     },
     {
       "label": "ModuloStored",
@@ -78,8 +78,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": "modulostored",
-      "id": "src_services_fakeistanziazioneport_modulostored",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_services_fakeistanziazioneport_modulostored"
     },
     {
       "label": "PassaggioStored",
@@ -91,8 +91,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": "passaggiostored",
-      "id": "src_services_fakeistanziazioneport_passaggiostored",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_services_fakeistanziazioneport_passaggiostored"
     },
     {
       "label": "IstanziaProgettoInput",
@@ -104,8 +104,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": "istanziaprogettoinput",
-      "id": "src_services_istanziaprogetto_istanziaprogettoinput",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_services_istanziaprogetto_istanziaprogettoinput"
     },
     {
       "label": "IstanziaProgettoRisultato",
@@ -117,8 +117,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": "istanziaprogettorisultato",
-      "id": "src_services_istanziaprogetto_istanziaprogettorisultato",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_services_istanziaprogetto_istanziaprogettorisultato"
     },
     {
       "label": "ModuloCreatoInfo",
@@ -130,8 +130,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": "modulocreatoinfo",
-      "id": "src_services_istanziaprogetto_modulocreatoinfo",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_services_istanziaprogetto_modulocreatoinfo"
     },
     {
       "label": "RigaPreventivoAccettato",
@@ -143,8 +143,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": "rigapreventivoaccettato",
-      "id": "src_services_istanziaprogetto_rigapreventivoaccettato",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_services_istanziaprogetto_rigapreventivoaccettato"
     },
     {
       "label": "IstanziazionePort",
@@ -156,8 +156,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": "istanziazioneport",
-      "id": "src_services_istanziazioneport_istanziazioneport",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_services_istanziazioneport_istanziazioneport"
     },
     {
       "label": "IstanziazioneTransazione",
@@ -169,8 +169,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": "istanziazionetransazione",
-      "id": "src_services_istanziazioneport_istanziazionetransazione",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_services_istanziazioneport_istanziazionetransazione"
     },
     {
       "label": "MicrovoceRecord",
@@ -182,8 +182,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": "microvocerecord",
-      "id": "src_services_istanziazioneport_microvocerecord",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_services_istanziazioneport_microvocerecord"
     },
     {
       "label": "ModuloConDipendenzeRuntime",
@@ -195,8 +195,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": "modulocondipendenzeruntime",
-      "id": "src_services_istanziazioneport_modulocondipendenzeruntime",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_services_istanziazioneport_modulocondipendenzeruntime"
     },
     {
       "label": "ModuloRecord",
@@ -208,8 +208,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": "modulorecord",
-      "id": "src_services_istanziazioneport_modulorecord",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_services_istanziazioneport_modulorecord"
     },
     {
       "label": "ModuloTemplateConDistinta",
@@ -221,8 +221,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": "modulotemplatecondistinta",
-      "id": "src_services_istanziazioneport_modulotemplatecondistinta",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_services_istanziazioneport_modulotemplatecondistinta"
     },
     {
       "label": "NotificationPort",
@@ -234,8 +234,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": "notificationport",
-      "id": "src_services_istanziazioneport_notificationport",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_services_istanziazioneport_notificationport"
     },
     {
       "label": "NuovaMicrovoceProgettoInput",
@@ -247,8 +247,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": "nuovamicrovoceprogettoinput",
-      "id": "src_services_istanziazioneport_nuovamicrovoceprogettoinput",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_services_istanziazioneport_nuovamicrovoceprogettoinput"
     },
     {
       "label": "NuovoModuloProgettoInput",
@@ -260,8 +260,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": "nuovomoduloprogettoinput",
-      "id": "src_services_istanziazioneport_nuovomoduloprogettoinput",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_services_istanziazioneport_nuovomoduloprogettoinput"
     },
     {
       "label": "NuovoPassaggioProgettoInput",
@@ -273,8 +273,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": "nuovopassaggioprogettoinput",
-      "id": "src_services_istanziazioneport_nuovopassaggioprogettoinput",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_services_istanziazioneport_nuovopassaggioprogettoinput"
     },
     {
       "label": "PassaggioRecord",
@@ -286,8 +286,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": "passaggiorecord",
-      "id": "src_services_istanziazioneport_passaggiorecord",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_services_istanziazioneport_passaggiorecord"
     },
     {
       "label": "PassaggioTemplateInput",
@@ -299,8 +299,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": "passaggiotemplateinput",
-      "id": "src_services_istanziazioneport_passaggiotemplateinput",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_services_istanziazioneport_passaggiotemplateinput"
     },
     {
       "label": "RigaDistintaConArticolo",
@@ -312,8 +312,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": "rigadistintaconarticolo",
-      "id": "src_services_istanziazioneport_rigadistintaconarticolo",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_services_istanziazioneport_rigadistintaconarticolo"
     },
     {
       "label": "StatoMicrovoceIniziale",
@@ -325,8 +325,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": "statomicrovoceiniziale",
-      "id": "src_services_istanziazioneport_statomicrovoceiniziale",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_services_istanziazioneport_statomicrovoceiniziale"
     },
     {
       "label": "ModuloConDipendenze",
@@ -338,8 +338,8 @@
       "_origin": "ast",
       "community": 1,
       "norm_label": "modulocondipendenze",
-      "id": "src_domain_stateengine_modulocondipendenze",
-      "community_name": "esecuzione.ts"
+      "community_name": "esecuzione.ts",
+      "id": "src_domain_stateengine_modulocondipendenze"
     },
     {
       "label": "RisultatoConsuntivazione",
@@ -351,8 +351,8 @@
       "_origin": "ast",
       "community": 1,
       "norm_label": "risultatoconsuntivazione",
-      "id": "src_domain_stateengine_risultatoconsuntivazione",
-      "community_name": "esecuzione.ts"
+      "community_name": "esecuzione.ts",
+      "id": "src_domain_stateengine_risultatoconsuntivazione"
     },
     {
       "label": "SegnaleRischio",
@@ -364,8 +364,8 @@
       "_origin": "ast",
       "community": 1,
       "norm_label": "segnalerischio",
-      "id": "src_domain_stateengine_segnalerischio",
-      "community_name": "esecuzione.ts"
+      "community_name": "esecuzione.ts",
+      "id": "src_domain_stateengine_segnalerischio"
     },
     {
       "label": "MicrovoceInput",
@@ -377,8 +377,8 @@
       "_origin": "ast",
       "community": 1,
       "norm_label": "microvoceinput",
-      "id": "src_domain_types_microvoceinput",
-      "community_name": "esecuzione.ts"
+      "community_name": "esecuzione.ts",
+      "id": "src_domain_types_microvoceinput"
     },
     {
       "label": "ModuloInput",
@@ -390,8 +390,8 @@
       "_origin": "ast",
       "community": 1,
       "norm_label": "moduloinput",
-      "id": "src_domain_types_moduloinput",
-      "community_name": "esecuzione.ts"
+      "community_name": "esecuzione.ts",
+      "id": "src_domain_types_moduloinput"
     },
     {
       "label": "ProgettoInput",
@@ -403,8 +403,8 @@
       "_origin": "ast",
       "community": 1,
       "norm_label": "progettoinput",
-      "id": "src_domain_types_progettoinput",
-      "community_name": "esecuzione.ts"
+      "community_name": "esecuzione.ts",
+      "id": "src_domain_types_progettoinput"
     },
     {
       "label": "StatoMicrovoce",
@@ -416,8 +416,8 @@
       "_origin": "ast",
       "community": 1,
       "norm_label": "statomicrovoce",
-      "id": "src_domain_types_statomicrovoce",
-      "community_name": "esecuzione.ts"
+      "community_name": "esecuzione.ts",
+      "id": "src_domain_types_statomicrovoce"
     },
     {
       "label": "StatoModulo",
@@ -429,8 +429,8 @@
       "_origin": "ast",
       "community": 1,
       "norm_label": "statomodulo",
-      "id": "src_domain_types_statomodulo",
-      "community_name": "esecuzione.ts"
+      "community_name": "esecuzione.ts",
+      "id": "src_domain_types_statomodulo"
     },
     {
       "label": "StatoProgetto",
@@ -442,8 +442,8 @@
       "_origin": "ast",
       "community": 1,
       "norm_label": "statoprogetto",
-      "id": "src_domain_types_statoprogetto",
-      "community_name": "esecuzione.ts"
+      "community_name": "esecuzione.ts",
+      "id": "src_domain_types_statoprogetto"
     },
     {
       "label": "EsecuzionePort",
@@ -455,8 +455,8 @@
       "_origin": "ast",
       "community": 1,
       "norm_label": "esecuzioneport",
-      "id": "src_services_istanziazioneport_esecuzioneport",
-      "community_name": "esecuzione.ts"
+      "community_name": "esecuzione.ts",
+      "id": "src_services_istanziazioneport_esecuzioneport"
     },
     {
       "label": "PortalTab",
@@ -468,8 +468,8 @@
       "_origin": "ast",
       "community": 12,
       "norm_label": "portaltab",
-      "id": "frontend_src_pages_clientportal_portaltab",
-      "community_name": "ClientPortal.tsx"
+      "community_name": "ClientPortal.tsx",
+      "id": "frontend_src_pages_clientportal_portaltab"
     },
     {
       "label": "InMemoryApp",
@@ -481,8 +481,8 @@
       "_origin": "ast",
       "community": 13,
       "norm_label": "inmemoryapp",
-      "id": "src_adapters_inmemoryapp_inmemoryapp",
-      "community_name": "InMemoryApp"
+      "community_name": "InMemoryApp",
+      "id": "src_adapters_inmemoryapp_inmemoryapp"
     },
     {
       "label": "DocumentoEntry",
@@ -494,8 +494,8 @@
       "_origin": "ast",
       "community": 15,
       "norm_label": "documentoentry",
-      "id": "frontend_src_components_passaggiomodal_documentoentry",
-      "community_name": "PassaggioModal.tsx"
+      "community_name": "PassaggioModal.tsx",
+      "id": "frontend_src_components_passaggiomodal_documentoentry"
     },
     {
       "label": "NoteEntry",
@@ -507,8 +507,8 @@
       "_origin": "ast",
       "community": 15,
       "norm_label": "noteentry",
-      "id": "frontend_src_components_passaggiomodal_noteentry",
-      "community_name": "PassaggioModal.tsx"
+      "community_name": "PassaggioModal.tsx",
+      "id": "frontend_src_components_passaggiomodal_noteentry"
     },
     {
       "label": "PassaggioModalProps",
@@ -520,8 +520,8 @@
       "_origin": "ast",
       "community": 15,
       "norm_label": "passaggiomodalprops",
-      "id": "frontend_src_components_passaggiomodal_passaggiomodalprops",
-      "community_name": "PassaggioModal.tsx"
+      "community_name": "PassaggioModal.tsx",
+      "id": "frontend_src_components_passaggiomodal_passaggiomodalprops"
     },
     {
       "label": "Passaggio",
@@ -533,8 +533,8 @@
       "_origin": "ast",
       "community": 15,
       "norm_label": "passaggio",
-      "id": "frontend_src_types_index_passaggio",
-      "community_name": "PassaggioModal.tsx"
+      "community_name": "PassaggioModal.tsx",
+      "id": "frontend_src_types_index_passaggio"
     },
     {
       "label": "NewProjectWizardProps",
@@ -546,8 +546,8 @@
       "_origin": "ast",
       "community": 16,
       "norm_label": "newprojectwizardprops",
-      "id": "frontend_src_components_newprojectwizard_newprojectwizardprops",
-      "community_name": "NewProjectWizard.tsx"
+      "community_name": "NewProjectWizard.tsx",
+      "id": "frontend_src_components_newprojectwizard_newprojectwizardprops"
     },
     {
       "label": "CatBadgeProps",
@@ -559,8 +559,8 @@
       "_origin": "ast",
       "community": 16,
       "norm_label": "catbadgeprops",
-      "id": "frontend_src_components_ui_catbadge_catbadgeprops",
-      "community_name": "NewProjectWizard.tsx"
+      "community_name": "NewProjectWizard.tsx",
+      "id": "frontend_src_components_ui_catbadge_catbadgeprops"
     },
     {
       "label": "ModuloProposta",
@@ -572,8 +572,8 @@
       "_origin": "ast",
       "community": 16,
       "norm_label": "moduloproposta",
-      "id": "frontend_src_pages_clientportal_moduloproposta",
-      "community_name": "NewProjectWizard.tsx"
+      "community_name": "NewProjectWizard.tsx",
+      "id": "frontend_src_pages_clientportal_moduloproposta"
     },
     {
       "label": "CategoriaModulo",
@@ -585,8 +585,8 @@
       "_origin": "ast",
       "community": 16,
       "norm_label": "categoriamodulo",
-      "id": "frontend_src_types_index_categoriamodulo",
-      "community_name": "NewProjectWizard.tsx"
+      "community_name": "NewProjectWizard.tsx",
+      "id": "frontend_src_types_index_categoriamodulo"
     },
     {
       "label": "Tab",
@@ -598,8 +598,8 @@
       "_origin": "ast",
       "community": 17,
       "norm_label": "tab",
-      "id": "frontend_src_pages_settingspage_tab",
-      "community_name": "client.ts"
+      "community_name": "client.ts",
+      "id": "frontend_src_pages_settingspage_tab"
     },
     {
       "label": "AppLayoutProps",
@@ -611,8 +611,8 @@
       "_origin": "ast",
       "community": 19,
       "norm_label": "applayoutprops",
-      "id": "frontend_src_components_layout_applayout_applayoutprops",
-      "community_name": "AppLayout.tsx"
+      "community_name": "AppLayout.tsx",
+      "id": "frontend_src_components_layout_applayout_applayoutprops"
     },
     {
       "label": "SidebarProps",
@@ -624,8 +624,8 @@
       "_origin": "ast",
       "community": 19,
       "norm_label": "sidebarprops",
-      "id": "frontend_src_components_layout_sidebar_sidebarprops",
-      "community_name": "AppLayout.tsx"
+      "community_name": "AppLayout.tsx",
+      "id": "frontend_src_components_layout_sidebar_sidebarprops"
     },
     {
       "label": "ClienteNonTrovatoError",
@@ -637,8 +637,8 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "clientenontrovatoerror",
-      "id": "src_adapters_apperrors_clientenontrovatoerror",
-      "community_name": "inMemoryApp.ts"
+      "community_name": "inMemoryApp.ts",
+      "id": "src_adapters_apperrors_clientenontrovatoerror"
     },
     {
       "label": "ModuloNonTrovatoError",
@@ -650,8 +650,8 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "modulonontrovatoerror",
-      "id": "src_adapters_apperrors_modulonontrovatoerror",
-      "community_name": "inMemoryApp.ts"
+      "community_name": "inMemoryApp.ts",
+      "id": "src_adapters_apperrors_modulonontrovatoerror"
     },
     {
       "label": "PreventivoNonTrovatoError",
@@ -663,8 +663,8 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "preventivonontrovatoerror",
-      "id": "src_adapters_apperrors_preventivonontrovatoerror",
-      "community_name": "inMemoryApp.ts"
+      "community_name": "inMemoryApp.ts",
+      "id": "src_adapters_apperrors_preventivonontrovatoerror"
     },
     {
       "label": "ProgettoNonTrovatoError",
@@ -676,8 +676,8 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "progettonontrovatoerror",
-      "id": "src_adapters_apperrors_progettonontrovatoerror",
-      "community_name": "inMemoryApp.ts"
+      "community_name": "inMemoryApp.ts",
+      "id": "src_adapters_apperrors_progettonontrovatoerror"
     },
     {
       "label": "TransizioneNonValidaError",
@@ -689,8 +689,8 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "transizionenonvalidaerror",
-      "id": "src_adapters_apperrors_transizionenonvalidaerror",
-      "community_name": "inMemoryApp.ts"
+      "community_name": "inMemoryApp.ts",
+      "id": "src_adapters_apperrors_transizionenonvalidaerror"
     },
     {
       "label": "Cliente",
@@ -702,8 +702,8 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "cliente",
-      "id": "src_adapters_inmemoryapp_cliente",
-      "community_name": "inMemoryApp.ts"
+      "community_name": "inMemoryApp.ts",
+      "id": "src_adapters_inmemoryapp_cliente"
     },
     {
       "label": "Preventivo",
@@ -715,8 +715,8 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "preventivo",
-      "id": "src_adapters_inmemoryapp_preventivo",
-      "community_name": "inMemoryApp.ts"
+      "community_name": "inMemoryApp.ts",
+      "id": "src_adapters_inmemoryapp_preventivo"
     },
     {
       "label": "Progetto",
@@ -728,8 +728,8 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "progetto",
-      "id": "src_adapters_inmemoryapp_progetto",
-      "community_name": "inMemoryApp.ts"
+      "community_name": "inMemoryApp.ts",
+      "id": "src_adapters_inmemoryapp_progetto"
     },
     {
       "label": "RigaPreventivoInput",
@@ -741,8 +741,8 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "rigapreventivoinput",
-      "id": "src_adapters_inmemoryapp_rigapreventivoinput",
-      "community_name": "inMemoryApp.ts"
+      "community_name": "inMemoryApp.ts",
+      "id": "src_adapters_inmemoryapp_rigapreventivoinput"
     },
     {
       "label": "StatoPreventivo",
@@ -754,8 +754,8 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "statopreventivo",
-      "id": "src_adapters_inmemoryapp_statopreventivo",
-      "community_name": "inMemoryApp.ts"
+      "community_name": "inMemoryApp.ts",
+      "id": "src_adapters_inmemoryapp_statopreventivo"
     },
     {
       "label": "ConsoleNotificationPort",
@@ -767,8 +767,8 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "consolenotificationport",
-      "id": "src_adapters_prisma_prismaapp_consolenotificationport",
-      "community_name": "inMemoryApp.ts"
+      "community_name": "inMemoryApp.ts",
+      "id": "src_adapters_prisma_prismaapp_consolenotificationport"
     },
     {
       "label": "ArticoloInput",
@@ -780,8 +780,8 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "articoloinput",
-      "id": "src_services_appport_articoloinput",
-      "community_name": "inMemoryApp.ts"
+      "community_name": "inMemoryApp.ts",
+      "id": "src_services_appport_articoloinput"
     },
     {
       "label": "EmettiFatturaInput",
@@ -793,8 +793,8 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "emettifatturainput",
-      "id": "src_services_appport_emettifatturainput",
-      "community_name": "inMemoryApp.ts"
+      "community_name": "inMemoryApp.ts",
+      "id": "src_services_appport_emettifatturainput"
     },
     {
       "label": "ModuloElencoItem",
@@ -806,8 +806,8 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "moduloelencoitem",
-      "id": "src_services_appport_moduloelencoitem",
-      "community_name": "inMemoryApp.ts"
+      "community_name": "inMemoryApp.ts",
+      "id": "src_services_appport_moduloelencoitem"
     },
     {
       "label": "ModuloTemplateInput",
@@ -819,8 +819,8 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "modulotemplateinput",
-      "id": "src_services_appport_modulotemplateinput",
-      "community_name": "inMemoryApp.ts"
+      "community_name": "inMemoryApp.ts",
+      "id": "src_services_appport_modulotemplateinput"
     },
     {
       "label": "ProgettoBase",
@@ -832,8 +832,8 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "progettobase",
-      "id": "src_services_appport_progettobase",
-      "community_name": "inMemoryApp.ts"
+      "community_name": "inMemoryApp.ts",
+      "id": "src_services_appport_progettobase"
     },
     {
       "label": "RigaPreventivoInput",
@@ -845,8 +845,8 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "rigapreventivoinput",
-      "id": "src_services_appport_rigapreventivoinput",
-      "community_name": "inMemoryApp.ts"
+      "community_name": "inMemoryApp.ts",
+      "id": "src_services_appport_rigapreventivoinput"
     },
     {
       "label": "PrismaApp",
@@ -858,8 +858,8 @@
       "_origin": "ast",
       "community": 3,
       "norm_label": "prismaapp",
-      "id": "src_adapters_prisma_prismaapp_prismaapp",
-      "community_name": "PrismaApp"
+      "community_name": "PrismaApp",
+      "id": "src_adapters_prisma_prismaapp_prismaapp"
     },
     {
       "label": "PrismaIstanziazionePort",
@@ -871,8 +871,8 @@
       "_origin": "ast",
       "community": 3,
       "norm_label": "prismaistanziazioneport",
-      "id": "src_adapters_prisma_prismaistanziazioneport_prismaistanziazioneport",
-      "community_name": "PrismaApp"
+      "community_name": "PrismaApp",
+      "id": "src_adapters_prisma_prismaistanziazioneport_prismaistanziazioneport"
     },
     {
       "label": "Cliente",
@@ -884,8 +884,8 @@
       "_origin": "ast",
       "community": 3,
       "norm_label": "cliente",
-      "id": "src_services_appport_cliente",
-      "community_name": "PrismaApp"
+      "community_name": "PrismaApp",
+      "id": "src_services_appport_cliente"
     },
     {
       "label": "Preventivo",
@@ -897,8 +897,8 @@
       "_origin": "ast",
       "community": 3,
       "norm_label": "preventivo",
-      "id": "src_services_appport_preventivo",
-      "community_name": "PrismaApp"
+      "community_name": "PrismaApp",
+      "id": "src_services_appport_preventivo"
     },
     {
       "label": "AvatarGroupProps",
@@ -910,8 +910,8 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "avatargroupprops",
-      "id": "frontend_src_components_ui_avatar_avatargroupprops",
-      "community_name": "ProjectDetail.tsx"
+      "community_name": "ProjectDetail.tsx",
+      "id": "frontend_src_components_ui_avatar_avatargroupprops"
     },
     {
       "label": "AvatarProps",
@@ -923,8 +923,8 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "avatarprops",
-      "id": "frontend_src_components_ui_avatar_avatarprops",
-      "community_name": "ProjectDetail.tsx"
+      "community_name": "ProjectDetail.tsx",
+      "id": "frontend_src_components_ui_avatar_avatarprops"
     },
     {
       "label": "BadgeProps",
@@ -936,8 +936,8 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "badgeprops",
-      "id": "frontend_src_components_ui_badge_badgeprops",
-      "community_name": "ProjectDetail.tsx"
+      "community_name": "ProjectDetail.tsx",
+      "id": "frontend_src_components_ui_badge_badgeprops"
     },
     {
       "label": "ProgressBarProps",
@@ -949,8 +949,8 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "progressbarprops",
-      "id": "frontend_src_components_ui_progressbar_progressbarprops",
-      "community_name": "ProjectDetail.tsx"
+      "community_name": "ProjectDetail.tsx",
+      "id": "frontend_src_components_ui_progressbar_progressbarprops"
     },
     {
       "label": "KpiCardProps",
@@ -962,8 +962,8 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "kpicardprops",
-      "id": "frontend_src_pages_dashboard_kpicardprops",
-      "community_name": "ProjectDetail.tsx"
+      "community_name": "ProjectDetail.tsx",
+      "id": "frontend_src_pages_dashboard_kpicardprops"
     },
     {
       "label": "Tab",
@@ -975,8 +975,8 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "tab",
-      "id": "frontend_src_pages_projectdetail_tab",
-      "community_name": "ProjectDetail.tsx"
+      "community_name": "ProjectDetail.tsx",
+      "id": "frontend_src_pages_projectdetail_tab"
     },
     {
       "label": "Progetto",
@@ -988,8 +988,8 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "progetto",
-      "id": "frontend_src_types_index_progetto",
-      "community_name": "ProjectDetail.tsx"
+      "community_name": "ProjectDetail.tsx",
+      "id": "frontend_src_types_index_progetto"
     },
     {
       "label": "SubTab",
@@ -1001,8 +1001,8 @@
       "_origin": "ast",
       "community": 6,
       "norm_label": "subtab",
-      "id": "frontend_src_pages_library_subtab",
-      "community_name": "utils/index.ts"
+      "community_name": "utils/index.ts",
+      "id": "frontend_src_pages_library_subtab"
     },
     {
       "label": "Articolo",
@@ -1014,8 +1014,8 @@
       "_origin": "ast",
       "community": 6,
       "norm_label": "articolo",
-      "id": "frontend_src_types_index_articolo",
-      "community_name": "utils/index.ts"
+      "community_name": "utils/index.ts",
+      "id": "frontend_src_types_index_articolo"
     },
     {
       "label": "FatturaRiga",
@@ -1027,8 +1027,8 @@
       "_origin": "ast",
       "community": 6,
       "norm_label": "fatturariga",
-      "id": "frontend_src_types_index_fatturariga",
-      "community_name": "utils/index.ts"
+      "community_name": "utils/index.ts",
+      "id": "frontend_src_types_index_fatturariga"
     },
     {
       "label": "MicroVoce",
@@ -1040,8 +1040,8 @@
       "_origin": "ast",
       "community": 6,
       "norm_label": "microvoce",
-      "id": "frontend_src_types_index_microvoce",
-      "community_name": "utils/index.ts"
+      "community_name": "utils/index.ts",
+      "id": "frontend_src_types_index_microvoce"
     },
     {
       "label": "ModuloProgetto",
@@ -1053,8 +1053,8 @@
       "_origin": "ast",
       "community": 6,
       "norm_label": "moduloprogetto",
-      "id": "frontend_src_types_index_moduloprogetto",
-      "community_name": "utils/index.ts"
+      "community_name": "utils/index.ts",
+      "id": "frontend_src_types_index_moduloprogetto"
     },
     {
       "label": "ModuloTemplate",
@@ -1066,8 +1066,8 @@
       "_origin": "ast",
       "community": 6,
       "norm_label": "modulotemplate",
-      "id": "frontend_src_types_index_modulotemplate",
-      "community_name": "utils/index.ts"
+      "community_name": "utils/index.ts",
+      "id": "frontend_src_types_index_modulotemplate"
     },
     {
       "label": "RigaDistinta",
@@ -1079,8 +1079,8 @@
       "_origin": "ast",
       "community": 6,
       "norm_label": "rigadistinta",
-      "id": "frontend_src_types_index_rigadistinta",
-      "community_name": "utils/index.ts"
+      "community_name": "utils/index.ts",
+      "id": "frontend_src_types_index_rigadistinta"
     },
     {
       "label": "StatoMicrovoce",
@@ -1092,8 +1092,8 @@
       "_origin": "ast",
       "community": 6,
       "norm_label": "statomicrovoce",
-      "id": "frontend_src_types_index_statomicrovoce",
-      "community_name": "utils/index.ts"
+      "community_name": "utils/index.ts",
+      "id": "frontend_src_types_index_statomicrovoce"
     },
     {
       "label": "StatoModulo",
@@ -1105,8 +1105,8 @@
       "_origin": "ast",
       "community": 6,
       "norm_label": "statomodulo",
-      "id": "frontend_src_types_index_statomodulo",
-      "community_name": "utils/index.ts"
+      "community_name": "utils/index.ts",
+      "id": "frontend_src_types_index_statomodulo"
     },
     {
       "label": "StatoProgetto",
@@ -1118,8 +1118,8 @@
       "_origin": "ast",
       "community": 6,
       "norm_label": "statoprogetto",
-      "id": "frontend_src_types_index_statoprogetto",
-      "community_name": "utils/index.ts"
+      "community_name": "utils/index.ts",
+      "id": "frontend_src_types_index_statoprogetto"
     },
     {
       "label": "TeamMember",
@@ -1131,8 +1131,8 @@
       "_origin": "ast",
       "community": 6,
       "norm_label": "teammember",
-      "id": "frontend_src_types_index_teammember",
-      "community_name": "utils/index.ts"
+      "community_name": "utils/index.ts",
+      "id": "frontend_src_types_index_teammember"
     },
     {
       "label": "TipoCliente",
@@ -1144,8 +1144,8 @@
       "_origin": "ast",
       "community": 6,
       "norm_label": "tipocliente",
-      "id": "frontend_src_types_index_tipocliente",
-      "community_name": "utils/index.ts"
+      "community_name": "utils/index.ts",
+      "id": "frontend_src_types_index_tipocliente"
     },
     {
       "label": "ResolvedRiga",
@@ -1157,8 +1157,8 @@
       "_origin": "ast",
       "community": 6,
       "norm_label": "resolvedriga",
-      "id": "frontend_src_utils_index_resolvedriga",
-      "community_name": "utils/index.ts"
+      "community_name": "utils/index.ts",
+      "id": "frontend_src_utils_index_resolvedriga"
     },
     {
       "label": "StatusConfig",
@@ -1170,8 +1170,8 @@
       "_origin": "ast",
       "community": 6,
       "norm_label": "statusconfig",
-      "id": "frontend_src_utils_index_statusconfig",
-      "community_name": "utils/index.ts"
+      "community_name": "utils/index.ts",
+      "id": "frontend_src_utils_index_statusconfig"
     },
     {
       "label": "AppPort",
@@ -1183,8 +1183,8 @@
       "_origin": "ast",
       "community": 7,
       "norm_label": "appport",
-      "id": "src_services_appport_appport",
-      "community_name": "AppPort"
+      "community_name": "AppPort",
+      "id": "src_services_appport_appport"
     },
     {
       "label": ".eseguiInTransazione()",
@@ -1195,8 +1195,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": ".eseguiintransazione()",
-      "id": "src_adapters_prisma_prismaistanziazioneport_prismaistanziazioneport_eseguiintransazione",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_adapters_prisma_prismaistanziazioneport_prismaistanziazioneport_eseguiintransazione"
     },
     {
       "label": "main()",
@@ -1207,8 +1207,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": "main()",
-      "id": "src_adapters_prisma_seed_main",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_adapters_prisma_seed_main"
     },
     {
       "label": "seedModulo()",
@@ -1219,8 +1219,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": "seedmodulo()",
-      "id": "src_adapters_prisma_seed_seedmodulo",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_adapters_prisma_seed_seedmodulo"
     },
     {
       "label": "setupProgettoConDueModuli()",
@@ -1231,8 +1231,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": "setupprogettoconduemoduli()",
-      "id": "src_services_esecuzione_test_setupprogettoconduemoduli",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_services_esecuzione_test_setupprogettoconduemoduli"
     },
     {
       "label": "templateDipendente()",
@@ -1243,8 +1243,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": "templatedipendente()",
-      "id": "src_services_esecuzione_test_templatedipendente",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_services_esecuzione_test_templatedipendente"
     },
     {
       "label": "templateRadice()",
@@ -1255,8 +1255,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": "templateradice()",
-      "id": "src_services_esecuzione_test_templateradice",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_services_esecuzione_test_templateradice"
     },
     {
       "label": "clonaDb()",
@@ -1267,8 +1267,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": "clonadb()",
-      "id": "src_services_fakeistanziazioneport_clonadb",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_services_fakeistanziazioneport_clonadb"
     },
     {
       "label": "dbVuoto()",
@@ -1279,8 +1279,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": "dbvuoto()",
-      "id": "src_services_fakeistanziazioneport_dbvuoto",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_services_fakeistanziazioneport_dbvuoto"
     },
     {
       "label": ".aggiornaMicrovoce()",
@@ -1291,8 +1291,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": ".aggiornamicrovoce()",
-      "id": "src_services_fakeistanziazioneport_fakeistanziazioneport_aggiornamicrovoce",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_services_fakeistanziazioneport_fakeistanziazioneport_aggiornamicrovoce"
     },
     {
       "label": ".aggiornaModulo()",
@@ -1303,8 +1303,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": ".aggiornamodulo()",
-      "id": "src_services_fakeistanziazioneport_fakeistanziazioneport_aggiornamodulo",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_services_fakeistanziazioneport_fakeistanziazioneport_aggiornamodulo"
     },
     {
       "label": ".aggiornaPassaggio()",
@@ -1315,8 +1315,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": ".aggiornapassaggio()",
-      "id": "src_services_fakeistanziazioneport_fakeistanziazioneport_aggiornapassaggio",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_services_fakeistanziazioneport_fakeistanziazioneport_aggiornapassaggio"
     },
     {
       "label": ".creaTransazione()",
@@ -1327,8 +1327,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": ".creatransazione()",
-      "id": "src_services_fakeistanziazioneport_fakeistanziazioneport_creatransazione",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_services_fakeistanziazioneport_fakeistanziazioneport_creatransazione"
     },
     {
       "label": ".eseguiInTransazione()",
@@ -1339,8 +1339,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": ".eseguiintransazione()",
-      "id": "src_services_fakeistanziazioneport_fakeistanziazioneport_eseguiintransazione",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_services_fakeistanziazioneport_fakeistanziazioneport_eseguiintransazione"
     },
     {
       "label": ".getMicrovoce()",
@@ -1351,8 +1351,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": ".getmicrovoce()",
-      "id": "src_services_fakeistanziazioneport_fakeistanziazioneport_getmicrovoce",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_services_fakeistanziazioneport_fakeistanziazioneport_getmicrovoce"
     },
     {
       "label": ".getMicrovociDelModulo()",
@@ -1363,8 +1363,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": ".getmicrovocidelmodulo()",
-      "id": "src_services_fakeistanziazioneport_fakeistanziazioneport_getmicrovocidelmodulo",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_services_fakeistanziazioneport_fakeistanziazioneport_getmicrovocidelmodulo"
     },
     {
       "label": ".getModuliDelProgettoConDipendenze()",
@@ -1375,8 +1375,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": ".getmodulidelprogettocondipendenze()",
-      "id": "src_services_fakeistanziazioneport_fakeistanziazioneport_getmodulidelprogettocondipendenze",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_services_fakeistanziazioneport_fakeistanziazioneport_getmodulidelprogettocondipendenze"
     },
     {
       "label": ".getModulo()",
@@ -1387,8 +1387,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": ".getmodulo()",
-      "id": "src_services_fakeistanziazioneport_fakeistanziazioneport_getmodulo",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_services_fakeistanziazioneport_fakeistanziazioneport_getmodulo"
     },
     {
       "label": ".getPassaggiDellaMicrovoce()",
@@ -1399,8 +1399,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": ".getpassaggidellamicrovoce()",
-      "id": "src_services_fakeistanziazioneport_fakeistanziazioneport_getpassaggidellamicrovoce",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_services_fakeistanziazioneport_fakeistanziazioneport_getpassaggidellamicrovoce"
     },
     {
       "label": ".getPassaggio()",
@@ -1411,8 +1411,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": ".getpassaggio()",
-      "id": "src_services_fakeistanziazioneport_fakeistanziazioneport_getpassaggio",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_services_fakeistanziazioneport_fakeistanziazioneport_getpassaggio"
     },
     {
       "label": ".registraTemplate()",
@@ -1423,8 +1423,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": ".registratemplate()",
-      "id": "src_services_fakeistanziazioneport_fakeistanziazioneport_registratemplate",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_services_fakeistanziazioneport_fakeistanziazioneport_registratemplate"
     },
     {
       "label": ".snapshot()",
@@ -1435,8 +1435,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": ".snapshot()",
-      "id": "src_services_fakeistanziazioneport_fakeistanziazioneport_snapshot",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_services_fakeistanziazioneport_fakeistanziazioneport_snapshot"
     },
     {
       "label": ".notificaProgettoAvviato()",
@@ -1447,8 +1447,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": ".notificaprogettoavviato()",
-      "id": "src_services_fakeistanziazioneport_fakenotificationport_notificaprogettoavviato",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_services_fakeistanziazioneport_fakenotificationport_notificaprogettoavviato"
     },
     {
       "label": "nuovoId()",
@@ -1459,8 +1459,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": "nuovoid()",
-      "id": "src_services_fakeistanziazioneport_nuovoid",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_services_fakeistanziazioneport_nuovoid"
     },
     {
       "label": "calcolaOreModulo()",
@@ -1471,8 +1471,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": "calcolaoremodulo()",
-      "id": "src_services_istanziaprogetto_calcolaoremodulo",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_services_istanziaprogetto_calcolaoremodulo"
     },
     {
       "label": "istanziaProgetto()",
@@ -1483,8 +1483,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": "istanziaprogetto()",
-      "id": "src_services_istanziaprogetto_istanziaprogetto",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_services_istanziaprogetto_istanziaprogetto"
     },
     {
       "label": "templateSemplice()",
@@ -1495,8 +1495,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": "templatesemplice()",
-      "id": "src_services_istanziaprogetto_test_templatesemplice",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_services_istanziaprogetto_test_templatesemplice"
     },
     {
       "label": ".eseguiInTransazione()",
@@ -1507,8 +1507,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": ".eseguiintransazione()",
-      "id": "src_services_istanziazioneport_istanziazioneport_eseguiintransazione",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_services_istanziazioneport_istanziazioneport_eseguiintransazione"
     },
     {
       "label": ".aggiornaStatoProgetto()",
@@ -1519,8 +1519,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": ".aggiornastatoprogetto()",
-      "id": "src_services_istanziazioneport_istanziazionetransazione_aggiornastatoprogetto",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_services_istanziazioneport_istanziazionetransazione_aggiornastatoprogetto"
     },
     {
       "label": ".creaMicrovoceProgetto()",
@@ -1531,8 +1531,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": ".creamicrovoceprogetto()",
-      "id": "src_services_istanziazioneport_istanziazionetransazione_creamicrovoceprogetto",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_services_istanziazioneport_istanziazionetransazione_creamicrovoceprogetto"
     },
     {
       "label": ".creaModuloProgetto()",
@@ -1543,8 +1543,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": ".creamoduloprogetto()",
-      "id": "src_services_istanziazioneport_istanziazionetransazione_creamoduloprogetto",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_services_istanziazioneport_istanziazionetransazione_creamoduloprogetto"
     },
     {
       "label": ".creaModuloProgettoDipendenza()",
@@ -1555,8 +1555,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": ".creamoduloprogettodipendenza()",
-      "id": "src_services_istanziazioneport_istanziazionetransazione_creamoduloprogettodipendenza",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_services_istanziazioneport_istanziazionetransazione_creamoduloprogettodipendenza"
     },
     {
       "label": ".creaPassaggioProgetto()",
@@ -1567,8 +1567,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": ".creapassaggioprogetto()",
-      "id": "src_services_istanziazioneport_istanziazionetransazione_creapassaggioprogetto",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_services_istanziazioneport_istanziazionetransazione_creapassaggioprogetto"
     },
     {
       "label": ".getModuloTemplateConDistinta()",
@@ -1579,8 +1579,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": ".getmodulotemplatecondistinta()",
-      "id": "src_services_istanziazioneport_istanziazionetransazione_getmodulotemplatecondistinta",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_services_istanziazioneport_istanziazionetransazione_getmodulotemplatecondistinta"
     },
     {
       "label": ".impostaStatoMicrovoceIniziale()",
@@ -1591,8 +1591,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": ".impostastatomicrovoceiniziale()",
-      "id": "src_services_istanziazioneport_istanziazionetransazione_impostastatomicrovoceiniziale",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_services_istanziazioneport_istanziazionetransazione_impostastatomicrovoceiniziale"
     },
     {
       "label": ".notificaProgettoAvviato()",
@@ -1603,8 +1603,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": ".notificaprogettoavviato()",
-      "id": "src_services_istanziazioneport_notificationport_notificaprogettoavviato",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_services_istanziazioneport_notificationport_notificaprogettoavviato"
     },
     {
       "label": ".consuntivaMicrovoce()",
@@ -1615,8 +1615,8 @@
       "_origin": "ast",
       "community": 1,
       "norm_label": ".consuntivamicrovoce()",
-      "id": "src_adapters_inmemoryapp_inmemoryapp_consuntivamicrovoce",
-      "community_name": "esecuzione.ts"
+      "community_name": "esecuzione.ts",
+      "id": "src_adapters_inmemoryapp_inmemoryapp_consuntivamicrovoce"
     },
     {
       "label": ".marcaRitardoMicrovoce()",
@@ -1627,8 +1627,8 @@
       "_origin": "ast",
       "community": 1,
       "norm_label": ".marcaritardomicrovoce()",
-      "id": "src_adapters_inmemoryapp_inmemoryapp_marcaritardomicrovoce",
-      "community_name": "esecuzione.ts"
+      "community_name": "esecuzione.ts",
+      "id": "src_adapters_inmemoryapp_inmemoryapp_marcaritardomicrovoce"
     },
     {
       "label": ".risolviRitardoMicrovoce()",
@@ -1639,8 +1639,8 @@
       "_origin": "ast",
       "community": 1,
       "norm_label": ".risolviritardomicrovoce()",
-      "id": "src_adapters_inmemoryapp_inmemoryapp_risolviritardomicrovoce",
-      "community_name": "esecuzione.ts"
+      "community_name": "esecuzione.ts",
+      "id": "src_adapters_inmemoryapp_inmemoryapp_risolviritardomicrovoce"
     },
     {
       "label": ".marcaRitardoMicrovoce()",
@@ -1651,8 +1651,8 @@
       "_origin": "ast",
       "community": 1,
       "norm_label": ".marcaritardomicrovoce()",
-      "id": "src_adapters_prisma_prismaapp_prismaapp_marcaritardomicrovoce",
-      "community_name": "esecuzione.ts"
+      "community_name": "esecuzione.ts",
+      "id": "src_adapters_prisma_prismaapp_prismaapp_marcaritardomicrovoce"
     },
     {
       "label": ".risolviRitardoMicrovoce()",
@@ -1663,8 +1663,8 @@
       "_origin": "ast",
       "community": 1,
       "norm_label": ".risolviritardomicrovoce()",
-      "id": "src_adapters_prisma_prismaapp_prismaapp_risolviritardomicrovoce",
-      "community_name": "esecuzione.ts"
+      "community_name": "esecuzione.ts",
+      "id": "src_adapters_prisma_prismaapp_prismaapp_risolviritardomicrovoce"
     },
     {
       "label": "calcolaPercentualeMicrovoce()",
@@ -1675,8 +1675,8 @@
       "_origin": "ast",
       "community": 1,
       "norm_label": "calcolapercentualemicrovoce()",
-      "id": "src_domain_stateengine_calcolapercentualemicrovoce",
-      "community_name": "esecuzione.ts"
+      "community_name": "esecuzione.ts",
+      "id": "src_domain_stateengine_calcolapercentualemicrovoce"
     },
     {
       "label": "calcolaPercentualeModulo()",
@@ -1687,8 +1687,8 @@
       "_origin": "ast",
       "community": 1,
       "norm_label": "calcolapercentualemodulo()",
-      "id": "src_domain_stateengine_calcolapercentualemodulo",
-      "community_name": "esecuzione.ts"
+      "community_name": "esecuzione.ts",
+      "id": "src_domain_stateengine_calcolapercentualemodulo"
     },
     {
       "label": "calcolaPercentualeProgetto()",
@@ -1699,8 +1699,8 @@
       "_origin": "ast",
       "community": 1,
       "norm_label": "calcolapercentualeprogetto()",
-      "id": "src_domain_stateengine_calcolapercentualeprogetto",
-      "community_name": "esecuzione.ts"
+      "community_name": "esecuzione.ts",
+      "id": "src_domain_stateengine_calcolapercentualeprogetto"
     },
     {
       "label": "calcolaStatoModulo()",
@@ -1711,8 +1711,8 @@
       "_origin": "ast",
       "community": 1,
       "norm_label": "calcolastatomodulo()",
-      "id": "src_domain_stateengine_calcolastatomodulo",
-      "community_name": "esecuzione.ts"
+      "community_name": "esecuzione.ts",
+      "id": "src_domain_stateengine_calcolastatomodulo"
     },
     {
       "label": "calcolaStatoProgetto()",
@@ -1723,8 +1723,8 @@
       "_origin": "ast",
       "community": 1,
       "norm_label": "calcolastatoprogetto()",
-      "id": "src_domain_stateengine_calcolastatoprogetto",
-      "community_name": "esecuzione.ts"
+      "community_name": "esecuzione.ts",
+      "id": "src_domain_stateengine_calcolastatoprogetto"
     },
     {
       "label": "marcaRitardoManuale()",
@@ -1735,8 +1735,8 @@
       "_origin": "ast",
       "community": 1,
       "norm_label": "marcaritardomanuale()",
-      "id": "src_domain_stateengine_marcaritardomanuale",
-      "community_name": "esecuzione.ts"
+      "community_name": "esecuzione.ts",
+      "id": "src_domain_stateengine_marcaritardomanuale"
     },
     {
       "label": "registraConsuntivazione()",
@@ -1747,8 +1747,8 @@
       "_origin": "ast",
       "community": 1,
       "norm_label": "registraconsuntivazione()",
-      "id": "src_domain_stateengine_registraconsuntivazione",
-      "community_name": "esecuzione.ts"
+      "community_name": "esecuzione.ts",
+      "id": "src_domain_stateengine_registraconsuntivazione"
     },
     {
       "label": "risolviDipendenze()",
@@ -1759,8 +1759,8 @@
       "_origin": "ast",
       "community": 1,
       "norm_label": "risolvidipendenze()",
-      "id": "src_domain_stateengine_risolvidipendenze",
-      "community_name": "esecuzione.ts"
+      "community_name": "esecuzione.ts",
+      "id": "src_domain_stateengine_risolvidipendenze"
     },
     {
       "label": "risolviRitardoManuale()",
@@ -1771,8 +1771,8 @@
       "_origin": "ast",
       "community": 1,
       "norm_label": "risolviritardomanuale()",
-      "id": "src_domain_stateengine_risolviritardomanuale",
-      "community_name": "esecuzione.ts"
+      "community_name": "esecuzione.ts",
+      "id": "src_domain_stateengine_risolviritardomanuale"
     },
     {
       "label": "mv()",
@@ -1783,8 +1783,8 @@
       "_origin": "ast",
       "community": 1,
       "norm_label": "mv()",
-      "id": "src_domain_stateengine_test_mv",
-      "community_name": "esecuzione.ts"
+      "community_name": "esecuzione.ts",
+      "id": "src_domain_stateengine_test_mv"
     },
     {
       "label": "valutaSegnaleRischio()",
@@ -1795,8 +1795,8 @@
       "_origin": "ast",
       "community": 1,
       "norm_label": "valutasegnalerischio()",
-      "id": "src_domain_stateengine_valutasegnalerischio",
-      "community_name": "esecuzione.ts"
+      "community_name": "esecuzione.ts",
+      "id": "src_domain_stateengine_valutasegnalerischio"
     },
     {
       "label": "completaMicrovoce()",
@@ -1807,8 +1807,8 @@
       "_origin": "ast",
       "community": 1,
       "norm_label": "completamicrovoce()",
-      "id": "src_services_esecuzione_completamicrovoce",
-      "community_name": "esecuzione.ts"
+      "community_name": "esecuzione.ts",
+      "id": "src_services_esecuzione_completamicrovoce"
     },
     {
       "label": "marcaRitardo()",
@@ -1819,8 +1819,8 @@
       "_origin": "ast",
       "community": 1,
       "norm_label": "marcaritardo()",
-      "id": "src_services_esecuzione_marcaritardo",
-      "community_name": "esecuzione.ts"
+      "community_name": "esecuzione.ts",
+      "id": "src_services_esecuzione_marcaritardo"
     },
     {
       "label": "registraConsuntivazione()",
@@ -1831,8 +1831,8 @@
       "_origin": "ast",
       "community": 1,
       "norm_label": "registraconsuntivazione()",
-      "id": "src_services_esecuzione_registraconsuntivazione",
-      "community_name": "esecuzione.ts"
+      "community_name": "esecuzione.ts",
+      "id": "src_services_esecuzione_registraconsuntivazione"
     },
     {
       "label": "ricalcolaModuloECascata()",
@@ -1843,8 +1843,8 @@
       "_origin": "ast",
       "community": 1,
       "norm_label": "ricalcolamoduloecascata()",
-      "id": "src_services_esecuzione_ricalcolamoduloecascata",
-      "community_name": "esecuzione.ts"
+      "community_name": "esecuzione.ts",
+      "id": "src_services_esecuzione_ricalcolamoduloecascata"
     },
     {
       "label": "risolviRitardo()",
@@ -1855,8 +1855,8 @@
       "_origin": "ast",
       "community": 1,
       "norm_label": "risolviritardo()",
-      "id": "src_services_esecuzione_risolviritardo",
-      "community_name": "esecuzione.ts"
+      "community_name": "esecuzione.ts",
+      "id": "src_services_esecuzione_risolviritardo"
     },
     {
       "label": ".aggiornaMicrovoce()",
@@ -1867,8 +1867,8 @@
       "_origin": "ast",
       "community": 1,
       "norm_label": ".aggiornamicrovoce()",
-      "id": "src_services_istanziazioneport_esecuzioneport_aggiornamicrovoce",
-      "community_name": "esecuzione.ts"
+      "community_name": "esecuzione.ts",
+      "id": "src_services_istanziazioneport_esecuzioneport_aggiornamicrovoce"
     },
     {
       "label": ".aggiornaModulo()",
@@ -1879,8 +1879,8 @@
       "_origin": "ast",
       "community": 1,
       "norm_label": ".aggiornamodulo()",
-      "id": "src_services_istanziazioneport_esecuzioneport_aggiornamodulo",
-      "community_name": "esecuzione.ts"
+      "community_name": "esecuzione.ts",
+      "id": "src_services_istanziazioneport_esecuzioneport_aggiornamodulo"
     },
     {
       "label": ".getMicrovoce()",
@@ -1891,8 +1891,8 @@
       "_origin": "ast",
       "community": 1,
       "norm_label": ".getmicrovoce()",
-      "id": "src_services_istanziazioneport_esecuzioneport_getmicrovoce",
-      "community_name": "esecuzione.ts"
+      "community_name": "esecuzione.ts",
+      "id": "src_services_istanziazioneport_esecuzioneport_getmicrovoce"
     },
     {
       "label": ".getMicrovociDelModulo()",
@@ -1903,8 +1903,8 @@
       "_origin": "ast",
       "community": 1,
       "norm_label": ".getmicrovocidelmodulo()",
-      "id": "src_services_istanziazioneport_esecuzioneport_getmicrovocidelmodulo",
-      "community_name": "esecuzione.ts"
+      "community_name": "esecuzione.ts",
+      "id": "src_services_istanziazioneport_esecuzioneport_getmicrovocidelmodulo"
     },
     {
       "label": ".getModuliDelProgettoConDipendenze()",
@@ -1915,8 +1915,8 @@
       "_origin": "ast",
       "community": 1,
       "norm_label": ".getmodulidelprogettocondipendenze()",
-      "id": "src_services_istanziazioneport_esecuzioneport_getmodulidelprogettocondipendenze",
-      "community_name": "esecuzione.ts"
+      "community_name": "esecuzione.ts",
+      "id": "src_services_istanziazioneport_esecuzioneport_getmodulidelprogettocondipendenze"
     },
     {
       "label": ".getModulo()",
@@ -1927,8 +1927,8 @@
       "_origin": "ast",
       "community": 1,
       "norm_label": ".getmodulo()",
-      "id": "src_services_istanziazioneport_esecuzioneport_getmodulo",
-      "community_name": "esecuzione.ts"
+      "community_name": "esecuzione.ts",
+      "id": "src_services_istanziazioneport_esecuzioneport_getmodulo"
     },
     {
       "label": ".getPassaggiDellaMicrovoce()",
@@ -1939,8 +1939,8 @@
       "_origin": "ast",
       "community": 1,
       "norm_label": ".getpassaggidellamicrovoce()",
-      "id": "src_services_istanziazioneport_esecuzioneport_getpassaggidellamicrovoce",
-      "community_name": "esecuzione.ts"
+      "community_name": "esecuzione.ts",
+      "id": "src_services_istanziazioneport_esecuzioneport_getpassaggidellamicrovoce"
     },
     {
       "label": "creaClienteApi()",
@@ -1951,8 +1951,8 @@
       "_origin": "ast",
       "community": 12,
       "norm_label": "creaclienteapi()",
-      "id": "frontend_src_api_client_creaclienteapi",
-      "community_name": "ClientPortal.tsx"
+      "community_name": "ClientPortal.tsx",
+      "id": "frontend_src_api_client_creaclienteapi"
     },
     {
       "label": "creaPreventivoEAccettaApi()",
@@ -1963,8 +1963,8 @@
       "_origin": "ast",
       "community": 12,
       "norm_label": "creapreventivoeaccettaapi()",
-      "id": "frontend_src_api_client_creapreventivoeaccettaapi",
-      "community_name": "ClientPortal.tsx"
+      "community_name": "ClientPortal.tsx",
+      "id": "frontend_src_api_client_creapreventivoeaccettaapi"
     },
     {
       "label": "creaProgettoApi()",
@@ -1975,8 +1975,8 @@
       "_origin": "ast",
       "community": 12,
       "norm_label": "creaprogettoapi()",
-      "id": "frontend_src_api_client_creaprogettoapi",
-      "community_name": "ClientPortal.tsx"
+      "community_name": "ClientPortal.tsx",
+      "id": "frontend_src_api_client_creaprogettoapi"
     },
     {
       "label": "fetchClienti()",
@@ -1987,8 +1987,8 @@
       "_origin": "ast",
       "community": 12,
       "norm_label": "fetchclienti()",
-      "id": "frontend_src_api_client_fetchclienti",
-      "community_name": "ClientPortal.tsx"
+      "community_name": "ClientPortal.tsx",
+      "id": "frontend_src_api_client_fetchclienti"
     },
     {
       "label": "fetchModuliLibreria()",
@@ -1999,8 +1999,8 @@
       "_origin": "ast",
       "community": 12,
       "norm_label": "fetchmodulilibreria()",
-      "id": "frontend_src_api_client_fetchmodulilibreria",
-      "community_name": "ClientPortal.tsx"
+      "community_name": "ClientPortal.tsx",
+      "id": "frontend_src_api_client_fetchmodulilibreria"
     },
     {
       "label": "NewProjectWizard()",
@@ -2011,8 +2011,8 @@
       "_origin": "ast",
       "community": 12,
       "norm_label": "newprojectwizard()",
-      "id": "frontend_src_components_newprojectwizard_newprojectwizard",
-      "community_name": "ClientPortal.tsx"
+      "community_name": "ClientPortal.tsx",
+      "id": "frontend_src_components_newprojectwizard_newprojectwizard"
     },
     {
       "label": "ClientPortal()",
@@ -2023,8 +2023,8 @@
       "_origin": "ast",
       "community": 12,
       "norm_label": "clientportal()",
-      "id": "frontend_src_pages_clientportal_clientportal",
-      "community_name": "ClientPortal.tsx"
+      "community_name": "ClientPortal.tsx",
+      "id": "frontend_src_pages_clientportal_clientportal"
     },
     {
       "label": "tabBtnStyle()",
@@ -2035,8 +2035,8 @@
       "_origin": "ast",
       "community": 12,
       "norm_label": "tabbtnstyle()",
-      "id": "frontend_src_pages_clientportal_tabbtnstyle",
-      "community_name": "ClientPortal.tsx"
+      "community_name": "ClientPortal.tsx",
+      "id": "frontend_src_pages_clientportal_tabbtnstyle"
     },
     {
       "label": "ClientsPage()",
@@ -2047,8 +2047,8 @@
       "_origin": "ast",
       "community": 12,
       "norm_label": "clientspage()",
-      "id": "frontend_src_pages_clientspage_clientspage",
-      "community_name": "ClientPortal.tsx"
+      "community_name": "ClientPortal.tsx",
+      "id": "frontend_src_pages_clientspage_clientspage"
     },
     {
       "label": ".accettaPreventivoEIstanzia()",
@@ -2059,8 +2059,8 @@
       "_origin": "ast",
       "community": 13,
       "norm_label": ".accettapreventivoeistanzia()",
-      "id": "src_adapters_inmemoryapp_inmemoryapp_accettapreventivoeistanzia",
-      "community_name": "InMemoryApp"
+      "community_name": "InMemoryApp",
+      "id": "src_adapters_inmemoryapp_inmemoryapp_accettapreventivoeistanzia"
     },
     {
       "label": ".completaMicrovoce()",
@@ -2071,8 +2071,8 @@
       "_origin": "ast",
       "community": 13,
       "norm_label": ".completamicrovoce()",
-      "id": "src_adapters_inmemoryapp_inmemoryapp_completamicrovoce",
-      "community_name": "InMemoryApp"
+      "community_name": "InMemoryApp",
+      "id": "src_adapters_inmemoryapp_inmemoryapp_completamicrovoce"
     },
     {
       "label": ".completaPassaggioDocumento()",
@@ -2083,8 +2083,8 @@
       "_origin": "ast",
       "community": 13,
       "norm_label": ".completapassaggiodocumento()",
-      "id": "src_adapters_inmemoryapp_inmemoryapp_completapassaggiodocumento",
-      "community_name": "InMemoryApp"
+      "community_name": "InMemoryApp",
+      "id": "src_adapters_inmemoryapp_inmemoryapp_completapassaggiodocumento"
     },
     {
       "label": ".completaPassaggioForm()",
@@ -2095,8 +2095,8 @@
       "_origin": "ast",
       "community": 13,
       "norm_label": ".completapassaggioform()",
-      "id": "src_adapters_inmemoryapp_inmemoryapp_completapassaggioform",
-      "community_name": "InMemoryApp"
+      "community_name": "InMemoryApp",
+      "id": "src_adapters_inmemoryapp_inmemoryapp_completapassaggioform"
     },
     {
       "label": ".creaCliente()",
@@ -2107,8 +2107,8 @@
       "_origin": "ast",
       "community": 13,
       "norm_label": ".creacliente()",
-      "id": "src_adapters_inmemoryapp_inmemoryapp_creacliente",
-      "community_name": "InMemoryApp"
+      "community_name": "InMemoryApp",
+      "id": "src_adapters_inmemoryapp_inmemoryapp_creacliente"
     },
     {
       "label": ".creaPreventivo()",
@@ -2119,8 +2119,8 @@
       "_origin": "ast",
       "community": 13,
       "norm_label": ".creapreventivo()",
-      "id": "src_adapters_inmemoryapp_inmemoryapp_creapreventivo",
-      "community_name": "InMemoryApp"
+      "community_name": "InMemoryApp",
+      "id": "src_adapters_inmemoryapp_inmemoryapp_creapreventivo"
     },
     {
       "label": ".creaProgetto()",
@@ -2131,8 +2131,8 @@
       "_origin": "ast",
       "community": 13,
       "norm_label": ".creaprogetto()",
-      "id": "src_adapters_inmemoryapp_inmemoryapp_creaprogetto",
-      "community_name": "InMemoryApp"
+      "community_name": "InMemoryApp",
+      "id": "src_adapters_inmemoryapp_inmemoryapp_creaprogetto"
     },
     {
       "label": ".getCliente()",
@@ -2143,8 +2143,8 @@
       "_origin": "ast",
       "community": 13,
       "norm_label": ".getcliente()",
-      "id": "src_adapters_inmemoryapp_inmemoryapp_getcliente",
-      "community_name": "InMemoryApp"
+      "community_name": "InMemoryApp",
+      "id": "src_adapters_inmemoryapp_inmemoryapp_getcliente"
     },
     {
       "label": ".getMicrovoce()",
@@ -2155,8 +2155,8 @@
       "_origin": "ast",
       "community": 13,
       "norm_label": ".getmicrovoce()",
-      "id": "src_adapters_inmemoryapp_inmemoryapp_getmicrovoce",
-      "community_name": "InMemoryApp"
+      "community_name": "InMemoryApp",
+      "id": "src_adapters_inmemoryapp_inmemoryapp_getmicrovoce"
     },
     {
       "label": ".getPassaggiDellaMicrovoce()",
@@ -2167,8 +2167,8 @@
       "_origin": "ast",
       "community": 13,
       "norm_label": ".getpassaggidellamicrovoce()",
-      "id": "src_adapters_inmemoryapp_inmemoryapp_getpassaggidellamicrovoce",
-      "community_name": "InMemoryApp"
+      "community_name": "InMemoryApp",
+      "id": "src_adapters_inmemoryapp_inmemoryapp_getpassaggidellamicrovoce"
     },
     {
       "label": ".getPreventivo()",
@@ -2179,8 +2179,8 @@
       "_origin": "ast",
       "community": 13,
       "norm_label": ".getpreventivo()",
-      "id": "src_adapters_inmemoryapp_inmemoryapp_getpreventivo",
-      "community_name": "InMemoryApp"
+      "community_name": "InMemoryApp",
+      "id": "src_adapters_inmemoryapp_inmemoryapp_getpreventivo"
     },
     {
       "label": ".getProgetto()",
@@ -2191,8 +2191,8 @@
       "_origin": "ast",
       "community": 13,
       "norm_label": ".getprogetto()",
-      "id": "src_adapters_inmemoryapp_inmemoryapp_getprogetto",
-      "community_name": "InMemoryApp"
+      "community_name": "InMemoryApp",
+      "id": "src_adapters_inmemoryapp_inmemoryapp_getprogetto"
     },
     {
       "label": ".inviaPreventivo()",
@@ -2203,8 +2203,8 @@
       "_origin": "ast",
       "community": 13,
       "norm_label": ".inviapreventivo()",
-      "id": "src_adapters_inmemoryapp_inmemoryapp_inviapreventivo",
-      "community_name": "InMemoryApp"
+      "community_name": "InMemoryApp",
+      "id": "src_adapters_inmemoryapp_inmemoryapp_inviapreventivo"
     },
     {
       "label": ".listaClienti()",
@@ -2215,8 +2215,8 @@
       "_origin": "ast",
       "community": 13,
       "norm_label": ".listaclienti()",
-      "id": "src_adapters_inmemoryapp_inmemoryapp_listaclienti",
-      "community_name": "InMemoryApp"
+      "community_name": "InMemoryApp",
+      "id": "src_adapters_inmemoryapp_inmemoryapp_listaclienti"
     },
     {
       "label": ".listaModuli()",
@@ -2227,8 +2227,8 @@
       "_origin": "ast",
       "community": 13,
       "norm_label": ".listamoduli()",
-      "id": "src_adapters_inmemoryapp_inmemoryapp_listamoduli",
-      "community_name": "InMemoryApp"
+      "community_name": "InMemoryApp",
+      "id": "src_adapters_inmemoryapp_inmemoryapp_listamoduli"
     },
     {
       "label": ".listaProgetti()",
@@ -2239,8 +2239,8 @@
       "_origin": "ast",
       "community": 13,
       "norm_label": ".listaprogetti()",
-      "id": "src_adapters_inmemoryapp_inmemoryapp_listaprogetti",
-      "community_name": "InMemoryApp"
+      "community_name": "InMemoryApp",
+      "id": "src_adapters_inmemoryapp_inmemoryapp_listaprogetti"
     },
     {
       "label": ".marcaPassaggioCompletato()",
@@ -2251,8 +2251,8 @@
       "_origin": "ast",
       "community": 13,
       "norm_label": ".marcapassaggiocompletato()",
-      "id": "src_adapters_inmemoryapp_inmemoryapp_marcapassaggiocompletato",
-      "community_name": "InMemoryApp"
+      "community_name": "InMemoryApp",
+      "id": "src_adapters_inmemoryapp_inmemoryapp_marcapassaggiocompletato"
     },
     {
       "label": ".notificheInviate()",
@@ -2263,8 +2263,8 @@
       "_origin": "ast",
       "community": 13,
       "norm_label": ".notificheinviate()",
-      "id": "src_adapters_inmemoryapp_inmemoryapp_notificheinviate",
-      "community_name": "InMemoryApp"
+      "community_name": "InMemoryApp",
+      "id": "src_adapters_inmemoryapp_inmemoryapp_notificheinviate"
     },
     {
       "label": "getDefaultPassaggi()",
@@ -2275,8 +2275,8 @@
       "_origin": "ast",
       "community": 15,
       "norm_label": "getdefaultpassaggi()",
-      "id": "frontend_src_components_passaggiomodal_getdefaultpassaggi",
-      "community_name": "PassaggioModal.tsx"
+      "community_name": "PassaggioModal.tsx",
+      "id": "frontend_src_components_passaggiomodal_getdefaultpassaggi"
     },
     {
       "label": "PassaggioModal()",
@@ -2287,8 +2287,8 @@
       "_origin": "ast",
       "community": 15,
       "norm_label": "passaggiomodal()",
-      "id": "frontend_src_components_passaggiomodal_passaggiomodal",
-      "community_name": "PassaggioModal.tsx"
+      "community_name": "PassaggioModal.tsx",
+      "id": "frontend_src_components_passaggiomodal_passaggiomodal"
     },
     {
       "label": "tabBtnStyle()",
@@ -2299,8 +2299,8 @@
       "_origin": "ast",
       "community": 15,
       "norm_label": "tabbtnstyle()",
-      "id": "frontend_src_components_passaggiomodal_tabbtnstyle",
-      "community_name": "PassaggioModal.tsx"
+      "community_name": "PassaggioModal.tsx",
+      "id": "frontend_src_components_passaggiomodal_tabbtnstyle"
     },
     {
       "label": "CatBadge()",
@@ -2311,8 +2311,8 @@
       "_origin": "ast",
       "community": 16,
       "norm_label": "catbadge()",
-      "id": "frontend_src_components_ui_catbadge_catbadge",
-      "community_name": "NewProjectWizard.tsx"
+      "community_name": "NewProjectWizard.tsx",
+      "id": "frontend_src_components_ui_catbadge_catbadge"
     },
     {
       "label": "catCls()",
@@ -2323,8 +2323,8 @@
       "_origin": "ast",
       "community": 16,
       "norm_label": "catcls()",
-      "id": "frontend_src_utils_index_catcls",
-      "community_name": "NewProjectWizard.tsx"
+      "community_name": "NewProjectWizard.tsx",
+      "id": "frontend_src_utils_index_catcls"
     },
     {
       "label": "creaUtenteTenantApi()",
@@ -2335,8 +2335,8 @@
       "_origin": "ast",
       "community": 17,
       "norm_label": "creautentetenantapi()",
-      "id": "frontend_src_api_client_creautentetenantapi",
-      "community_name": "client.ts"
+      "community_name": "client.ts",
+      "id": "frontend_src_api_client_creautentetenantapi"
     },
     {
       "label": "fetchAccessiProgetto()",
@@ -2347,8 +2347,8 @@
       "_origin": "ast",
       "community": 17,
       "norm_label": "fetchaccessiprogetto()",
-      "id": "frontend_src_api_client_fetchaccessiprogetto",
-      "community_name": "client.ts"
+      "community_name": "client.ts",
+      "id": "frontend_src_api_client_fetchaccessiprogetto"
     },
     {
       "label": "fetchUtentiTenant()",
@@ -2359,8 +2359,8 @@
       "_origin": "ast",
       "community": 17,
       "norm_label": "fetchutentitenant()",
-      "id": "frontend_src_api_client_fetchutentitenant",
-      "community_name": "client.ts"
+      "community_name": "client.ts",
+      "id": "frontend_src_api_client_fetchutentitenant"
     },
     {
       "label": "getApiBase()",
@@ -2371,8 +2371,8 @@
       "_origin": "ast",
       "community": 17,
       "norm_label": "getapibase()",
-      "id": "frontend_src_api_client_getapibase",
-      "community_name": "client.ts"
+      "community_name": "client.ts",
+      "id": "frontend_src_api_client_getapibase"
     },
     {
       "label": "updateArticoloPrezzoApi()",
@@ -2383,8 +2383,8 @@
       "_origin": "ast",
       "community": 17,
       "norm_label": "updatearticoloprezzoapi()",
-      "id": "frontend_src_api_client_updatearticoloprezzoapi",
-      "community_name": "client.ts"
+      "community_name": "client.ts",
+      "id": "frontend_src_api_client_updatearticoloprezzoapi"
     },
     {
       "label": "uploadFileApi()",
@@ -2395,8 +2395,8 @@
       "_origin": "ast",
       "community": 17,
       "norm_label": "uploadfileapi()",
-      "id": "frontend_src_api_client_uploadfileapi",
-      "community_name": "client.ts"
+      "community_name": "client.ts",
+      "id": "frontend_src_api_client_uploadfileapi"
     },
     {
       "label": "ArticoliCatalogView()",
@@ -2407,8 +2407,8 @@
       "_origin": "ast",
       "community": 17,
       "norm_label": "articolicatalogview()",
-      "id": "frontend_src_pages_library_articolicatalogview",
-      "community_name": "client.ts"
+      "community_name": "client.ts",
+      "id": "frontend_src_pages_library_articolicatalogview"
     },
     {
       "label": "SettingsPage()",
@@ -2419,8 +2419,8 @@
       "_origin": "ast",
       "community": 17,
       "norm_label": "settingspage()",
-      "id": "frontend_src_pages_settingspage_settingspage",
-      "community_name": "client.ts"
+      "community_name": "client.ts",
+      "id": "frontend_src_pages_settingspage_settingspage"
     },
     {
       "label": "App()",
@@ -2431,8 +2431,8 @@
       "_origin": "ast",
       "community": 18,
       "norm_label": "app()",
-      "id": "frontend_src_app_app",
-      "community_name": "App.tsx"
+      "community_name": "App.tsx",
+      "id": "frontend_src_app_app"
     },
     {
       "label": "MainLayoutWrapper()",
@@ -2443,8 +2443,8 @@
       "_origin": "ast",
       "community": 18,
       "norm_label": "mainlayoutwrapper()",
-      "id": "frontend_src_app_mainlayoutwrapper",
-      "community_name": "App.tsx"
+      "community_name": "App.tsx",
+      "id": "frontend_src_app_mainlayoutwrapper"
     },
     {
       "label": "AnagraficaErpModal()",
@@ -2455,8 +2455,8 @@
       "_origin": "ast",
       "community": 18,
       "norm_label": "anagraficaerpmodal()",
-      "id": "frontend_src_pages_clientspage_anagraficaerpmodal",
-      "community_name": "App.tsx"
+      "community_name": "App.tsx",
+      "id": "frontend_src_pages_clientspage_anagraficaerpmodal"
     },
     {
       "label": "MagicLinkExplainModal()",
@@ -2467,8 +2467,8 @@
       "_origin": "ast",
       "community": 18,
       "norm_label": "magiclinkexplainmodal()",
-      "id": "frontend_src_pages_clientspage_magiclinkexplainmodal",
-      "community_name": "App.tsx"
+      "community_name": "App.tsx",
+      "id": "frontend_src_pages_clientspage_magiclinkexplainmodal"
     },
     {
       "label": "tabBtn()",
@@ -2479,8 +2479,8 @@
       "_origin": "ast",
       "community": 18,
       "norm_label": "tabbtn()",
-      "id": "frontend_src_pages_clientspage_tabbtn",
-      "community_name": "App.tsx"
+      "community_name": "App.tsx",
+      "id": "frontend_src_pages_clientspage_tabbtn"
     },
     {
       "label": "AppLayout()",
@@ -2491,8 +2491,8 @@
       "_origin": "ast",
       "community": 19,
       "norm_label": "applayout()",
-      "id": "frontend_src_components_layout_applayout_applayout",
-      "community_name": "AppLayout.tsx"
+      "community_name": "AppLayout.tsx",
+      "id": "frontend_src_components_layout_applayout_applayout"
     },
     {
       "label": "Sidebar()",
@@ -2503,8 +2503,8 @@
       "_origin": "ast",
       "community": 19,
       "norm_label": "sidebar()",
-      "id": "frontend_src_components_layout_sidebar_sidebar",
-      "community_name": "AppLayout.tsx"
+      "community_name": "AppLayout.tsx",
+      "id": "frontend_src_components_layout_sidebar_sidebar"
     },
     {
       "label": ".notificaProgettoAvviato()",
@@ -2515,8 +2515,8 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": ".notificaprogettoavviato()",
-      "id": "src_adapters_prisma_prismaapp_consolenotificationport_notificaprogettoavviato",
-      "community_name": "inMemoryApp.ts"
+      "community_name": "inMemoryApp.ts",
+      "id": "src_adapters_prisma_prismaapp_consolenotificationport_notificaprogettoavviato"
     },
     {
       "label": "completaPassaggioDocumento()",
@@ -2527,8 +2527,8 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "completapassaggiodocumento()",
-      "id": "src_services_esecuzione_completapassaggiodocumento",
-      "community_name": "inMemoryApp.ts"
+      "community_name": "inMemoryApp.ts",
+      "id": "src_services_esecuzione_completapassaggiodocumento"
     },
     {
       "label": "completaPassaggioForm()",
@@ -2539,8 +2539,8 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "completapassaggioform()",
-      "id": "src_services_esecuzione_completapassaggioform",
-      "community_name": "inMemoryApp.ts"
+      "community_name": "inMemoryApp.ts",
+      "id": "src_services_esecuzione_completapassaggioform"
     },
     {
       "label": "marcaPassaggioCompletato()",
@@ -2551,8 +2551,8 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "marcapassaggiocompletato()",
-      "id": "src_services_esecuzione_marcapassaggiocompletato",
-      "community_name": "inMemoryApp.ts"
+      "community_name": "inMemoryApp.ts",
+      "id": "src_services_esecuzione_marcapassaggiocompletato"
     },
     {
       "label": "calcolaPrezzoModulo()",
@@ -2563,8 +2563,8 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "calcolaprezzomodulo()",
-      "id": "src_services_istanziaprogetto_calcolaprezzomodulo",
-      "community_name": "inMemoryApp.ts"
+      "community_name": "inMemoryApp.ts",
+      "id": "src_services_istanziaprogetto_calcolaprezzomodulo"
     },
     {
       "label": ".aggiornaPassaggio()",
@@ -2575,8 +2575,8 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": ".aggiornapassaggio()",
-      "id": "src_services_istanziazioneport_esecuzioneport_aggiornapassaggio",
-      "community_name": "inMemoryApp.ts"
+      "community_name": "inMemoryApp.ts",
+      "id": "src_services_istanziazioneport_esecuzioneport_aggiornapassaggio"
     },
     {
       "label": ".getPassaggio()",
@@ -2587,8 +2587,8 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": ".getpassaggio()",
-      "id": "src_services_istanziazioneport_esecuzioneport_getpassaggio",
-      "community_name": "inMemoryApp.ts"
+      "community_name": "inMemoryApp.ts",
+      "id": "src_services_istanziazioneport_esecuzioneport_getpassaggio"
     },
     {
       "label": "main()",
@@ -2599,8 +2599,8 @@
       "_origin": "ast",
       "community": 20,
       "norm_label": "main()",
-      "id": "src_adapters_prisma_bootstrap_main",
-      "community_name": "bootstrap.ts"
+      "community_name": "bootstrap.ts",
+      "id": "src_adapters_prisma_bootstrap_main"
     },
     {
       "label": "generaPasswordTemporanea()",
@@ -2611,8 +2611,8 @@
       "_origin": "ast",
       "community": 20,
       "norm_label": "generapasswordtemporanea()",
-      "id": "src_util_password_generapasswordtemporanea",
-      "community_name": "bootstrap.ts"
+      "community_name": "bootstrap.ts",
+      "id": "src_util_password_generapasswordtemporanea"
     },
     {
       "label": "hashPassword()",
@@ -2623,8 +2623,8 @@
       "_origin": "ast",
       "community": 20,
       "norm_label": "hashpassword()",
-      "id": "src_util_password_hashpassword",
-      "community_name": "bootstrap.ts"
+      "community_name": "bootstrap.ts",
+      "id": "src_util_password_hashpassword"
     },
     {
       "label": "verifyPassword()",
@@ -2635,8 +2635,8 @@
       "_origin": "ast",
       "community": 20,
       "norm_label": "verifypassword()",
-      "id": "src_util_password_verifypassword",
-      "community_name": "bootstrap.ts"
+      "community_name": "bootstrap.ts",
+      "id": "src_util_password_verifypassword"
     },
     {
       "label": "Calendar()",
@@ -2647,8 +2647,8 @@
       "_origin": "ast",
       "community": 21,
       "norm_label": "calendar()",
-      "id": "frontend_src_pages_placeholders_calendar",
-      "community_name": "Placeholders.tsx"
+      "community_name": "Placeholders.tsx",
+      "id": "frontend_src_pages_placeholders_calendar"
     },
     {
       "label": "Clients()",
@@ -2659,8 +2659,8 @@
       "_origin": "ast",
       "community": 21,
       "norm_label": "clients()",
-      "id": "frontend_src_pages_placeholders_clients",
-      "community_name": "Placeholders.tsx"
+      "community_name": "Placeholders.tsx",
+      "id": "frontend_src_pages_placeholders_clients"
     },
     {
       "label": "PlaceholderPage()",
@@ -2671,8 +2671,8 @@
       "_origin": "ast",
       "community": 21,
       "norm_label": "placeholderpage()",
-      "id": "frontend_src_pages_placeholders_placeholderpage",
-      "community_name": "Placeholders.tsx"
+      "community_name": "Placeholders.tsx",
+      "id": "frontend_src_pages_placeholders_placeholderpage"
     },
     {
       "label": "Settings()",
@@ -2683,8 +2683,8 @@
       "_origin": "ast",
       "community": 21,
       "norm_label": "settings()",
-      "id": "frontend_src_pages_placeholders_settings",
-      "community_name": "Placeholders.tsx"
+      "community_name": "Placeholders.tsx",
+      "id": "frontend_src_pages_placeholders_settings"
     },
     {
       "label": "main()",
@@ -2695,8 +2695,8 @@
       "_origin": "ast",
       "community": 23,
       "norm_label": "main()",
-      "id": "src_adapters_prisma_seedfull_main",
-      "community_name": "seedFull.ts"
+      "community_name": "seedFull.ts",
+      "id": "src_adapters_prisma_seedfull_main"
     },
     {
       "label": ".accettaPreventivoEIstanzia()",
@@ -2707,8 +2707,8 @@
       "_origin": "ast",
       "community": 3,
       "norm_label": ".accettapreventivoeistanzia()",
-      "id": "src_adapters_prisma_prismaapp_prismaapp_accettapreventivoeistanzia",
-      "community_name": "PrismaApp"
+      "community_name": "PrismaApp",
+      "id": "src_adapters_prisma_prismaapp_prismaapp_accettapreventivoeistanzia"
     },
     {
       "label": ".assegnaAccessoProgetto()",
@@ -2719,8 +2719,8 @@
       "_origin": "ast",
       "community": 3,
       "norm_label": ".assegnaaccessoprogetto()",
-      "id": "src_adapters_prisma_prismaapp_prismaapp_assegnaaccessoprogetto",
-      "community_name": "PrismaApp"
+      "community_name": "PrismaApp",
+      "id": "src_adapters_prisma_prismaapp_prismaapp_assegnaaccessoprogetto"
     },
     {
       "label": ".completaMicrovoce()",
@@ -2731,8 +2731,8 @@
       "_origin": "ast",
       "community": 3,
       "norm_label": ".completamicrovoce()",
-      "id": "src_adapters_prisma_prismaapp_prismaapp_completamicrovoce",
-      "community_name": "PrismaApp"
+      "community_name": "PrismaApp",
+      "id": "src_adapters_prisma_prismaapp_prismaapp_completamicrovoce"
     },
     {
       "label": ".completaPassaggioDocumento()",
@@ -2743,8 +2743,8 @@
       "_origin": "ast",
       "community": 3,
       "norm_label": ".completapassaggiodocumento()",
-      "id": "src_adapters_prisma_prismaapp_prismaapp_completapassaggiodocumento",
-      "community_name": "PrismaApp"
+      "community_name": "PrismaApp",
+      "id": "src_adapters_prisma_prismaapp_prismaapp_completapassaggiodocumento"
     },
     {
       "label": ".completaPassaggioForm()",
@@ -2755,8 +2755,8 @@
       "_origin": "ast",
       "community": 3,
       "norm_label": ".completapassaggioform()",
-      "id": "src_adapters_prisma_prismaapp_prismaapp_completapassaggioform",
-      "community_name": "PrismaApp"
+      "community_name": "PrismaApp",
+      "id": "src_adapters_prisma_prismaapp_prismaapp_completapassaggioform"
     },
     {
       "label": ".constructor()",
@@ -2767,8 +2767,8 @@
       "_origin": "ast",
       "community": 3,
       "norm_label": ".constructor()",
-      "id": "src_adapters_prisma_prismaapp_prismaapp_constructor",
-      "community_name": "PrismaApp"
+      "community_name": "PrismaApp",
+      "id": "src_adapters_prisma_prismaapp_prismaapp_constructor"
     },
     {
       "label": ".consuntivaMicrovoce()",
@@ -2779,8 +2779,8 @@
       "_origin": "ast",
       "community": 3,
       "norm_label": ".consuntivamicrovoce()",
-      "id": "src_adapters_prisma_prismaapp_prismaapp_consuntivamicrovoce",
-      "community_name": "PrismaApp"
+      "community_name": "PrismaApp",
+      "id": "src_adapters_prisma_prismaapp_prismaapp_consuntivamicrovoce"
     },
     {
       "label": ".creaArticolo()",
@@ -2791,8 +2791,8 @@
       "_origin": "ast",
       "community": 3,
       "norm_label": ".creaarticolo()",
-      "id": "src_adapters_prisma_prismaapp_prismaapp_creaarticolo",
-      "community_name": "PrismaApp"
+      "community_name": "PrismaApp",
+      "id": "src_adapters_prisma_prismaapp_prismaapp_creaarticolo"
     },
     {
       "label": ".creaCliente()",
@@ -2803,8 +2803,8 @@
       "_origin": "ast",
       "community": 3,
       "norm_label": ".creacliente()",
-      "id": "src_adapters_prisma_prismaapp_prismaapp_creacliente",
-      "community_name": "PrismaApp"
+      "community_name": "PrismaApp",
+      "id": "src_adapters_prisma_prismaapp_prismaapp_creacliente"
     },
     {
       "label": ".creaModuloTemplate()",
@@ -2815,8 +2815,8 @@
       "_origin": "ast",
       "community": 3,
       "norm_label": ".creamodulotemplate()",
-      "id": "src_adapters_prisma_prismaapp_prismaapp_creamodulotemplate",
-      "community_name": "PrismaApp"
+      "community_name": "PrismaApp",
+      "id": "src_adapters_prisma_prismaapp_prismaapp_creamodulotemplate"
     },
     {
       "label": ".creaPreventivo()",
@@ -2827,8 +2827,8 @@
       "_origin": "ast",
       "community": 3,
       "norm_label": ".creapreventivo()",
-      "id": "src_adapters_prisma_prismaapp_prismaapp_creapreventivo",
-      "community_name": "PrismaApp"
+      "community_name": "PrismaApp",
+      "id": "src_adapters_prisma_prismaapp_prismaapp_creapreventivo"
     },
     {
       "label": ".creaProgetto()",
@@ -2839,8 +2839,8 @@
       "_origin": "ast",
       "community": 3,
       "norm_label": ".creaprogetto()",
-      "id": "src_adapters_prisma_prismaapp_prismaapp_creaprogetto",
-      "community_name": "PrismaApp"
+      "community_name": "PrismaApp",
+      "id": "src_adapters_prisma_prismaapp_prismaapp_creaprogetto"
     },
     {
       "label": ".creaUtente()",
@@ -2851,8 +2851,8 @@
       "_origin": "ast",
       "community": 3,
       "norm_label": ".creautente()",
-      "id": "src_adapters_prisma_prismaapp_prismaapp_creautente",
-      "community_name": "PrismaApp"
+      "community_name": "PrismaApp",
+      "id": "src_adapters_prisma_prismaapp_prismaapp_creautente"
     },
     {
       "label": ".emettiFattura()",
@@ -2863,8 +2863,8 @@
       "_origin": "ast",
       "community": 3,
       "norm_label": ".emettifattura()",
-      "id": "src_adapters_prisma_prismaapp_prismaapp_emettifattura",
-      "community_name": "PrismaApp"
+      "community_name": "PrismaApp",
+      "id": "src_adapters_prisma_prismaapp_prismaapp_emettifattura"
     },
     {
       "label": ".getCliente()",
@@ -2875,8 +2875,8 @@
       "_origin": "ast",
       "community": 3,
       "norm_label": ".getcliente()",
-      "id": "src_adapters_prisma_prismaapp_prismaapp_getcliente",
-      "community_name": "PrismaApp"
+      "community_name": "PrismaApp",
+      "id": "src_adapters_prisma_prismaapp_prismaapp_getcliente"
     },
     {
       "label": ".getMicrovoce()",
@@ -2887,8 +2887,8 @@
       "_origin": "ast",
       "community": 3,
       "norm_label": ".getmicrovoce()",
-      "id": "src_adapters_prisma_prismaapp_prismaapp_getmicrovoce",
-      "community_name": "PrismaApp"
+      "community_name": "PrismaApp",
+      "id": "src_adapters_prisma_prismaapp_prismaapp_getmicrovoce"
     },
     {
       "label": ".getPassaggiDellaMicrovoce()",
@@ -2899,8 +2899,8 @@
       "_origin": "ast",
       "community": 3,
       "norm_label": ".getpassaggidellamicrovoce()",
-      "id": "src_adapters_prisma_prismaapp_prismaapp_getpassaggidellamicrovoce",
-      "community_name": "PrismaApp"
+      "community_name": "PrismaApp",
+      "id": "src_adapters_prisma_prismaapp_prismaapp_getpassaggidellamicrovoce"
     },
     {
       "label": ".getPreventivo()",
@@ -2911,8 +2911,8 @@
       "_origin": "ast",
       "community": 3,
       "norm_label": ".getpreventivo()",
-      "id": "src_adapters_prisma_prismaapp_prismaapp_getpreventivo",
-      "community_name": "PrismaApp"
+      "community_name": "PrismaApp",
+      "id": "src_adapters_prisma_prismaapp_prismaapp_getpreventivo"
     },
     {
       "label": ".getProgetto()",
@@ -2923,8 +2923,8 @@
       "_origin": "ast",
       "community": 3,
       "norm_label": ".getprogetto()",
-      "id": "src_adapters_prisma_prismaapp_prismaapp_getprogetto",
-      "community_name": "PrismaApp"
+      "community_name": "PrismaApp",
+      "id": "src_adapters_prisma_prismaapp_prismaapp_getprogetto"
     },
     {
       "label": ".inviaPreventivo()",
@@ -2935,8 +2935,8 @@
       "_origin": "ast",
       "community": 3,
       "norm_label": ".inviapreventivo()",
-      "id": "src_adapters_prisma_prismaapp_prismaapp_inviapreventivo",
-      "community_name": "PrismaApp"
+      "community_name": "PrismaApp",
+      "id": "src_adapters_prisma_prismaapp_prismaapp_inviapreventivo"
     },
     {
       "label": ".listaAccessiProgetto()",
@@ -2947,8 +2947,8 @@
       "_origin": "ast",
       "community": 3,
       "norm_label": ".listaaccessiprogetto()",
-      "id": "src_adapters_prisma_prismaapp_prismaapp_listaaccessiprogetto",
-      "community_name": "PrismaApp"
+      "community_name": "PrismaApp",
+      "id": "src_adapters_prisma_prismaapp_prismaapp_listaaccessiprogetto"
     },
     {
       "label": ".listaArticoli()",
@@ -2959,8 +2959,8 @@
       "_origin": "ast",
       "community": 3,
       "norm_label": ".listaarticoli()",
-      "id": "src_adapters_prisma_prismaapp_prismaapp_listaarticoli",
-      "community_name": "PrismaApp"
+      "community_name": "PrismaApp",
+      "id": "src_adapters_prisma_prismaapp_prismaapp_listaarticoli"
     },
     {
       "label": ".listaClienti()",
@@ -2971,8 +2971,8 @@
       "_origin": "ast",
       "community": 3,
       "norm_label": ".listaclienti()",
-      "id": "src_adapters_prisma_prismaapp_prismaapp_listaclienti",
-      "community_name": "PrismaApp"
+      "community_name": "PrismaApp",
+      "id": "src_adapters_prisma_prismaapp_prismaapp_listaclienti"
     },
     {
       "label": ".listaModuli()",
@@ -2983,8 +2983,8 @@
       "_origin": "ast",
       "community": 3,
       "norm_label": ".listamoduli()",
-      "id": "src_adapters_prisma_prismaapp_prismaapp_listamoduli",
-      "community_name": "PrismaApp"
+      "community_name": "PrismaApp",
+      "id": "src_adapters_prisma_prismaapp_prismaapp_listamoduli"
     },
     {
       "label": ".listaProgetti()",
@@ -2995,8 +2995,8 @@
       "_origin": "ast",
       "community": 3,
       "norm_label": ".listaprogetti()",
-      "id": "src_adapters_prisma_prismaapp_prismaapp_listaprogetti",
-      "community_name": "PrismaApp"
+      "community_name": "PrismaApp",
+      "id": "src_adapters_prisma_prismaapp_prismaapp_listaprogetti"
     },
     {
       "label": ".listaUtenti()",
@@ -3007,8 +3007,8 @@
       "_origin": "ast",
       "community": 3,
       "norm_label": ".listautenti()",
-      "id": "src_adapters_prisma_prismaapp_prismaapp_listautenti",
-      "community_name": "PrismaApp"
+      "community_name": "PrismaApp",
+      "id": "src_adapters_prisma_prismaapp_prismaapp_listautenti"
     },
     {
       "label": ".marcaPassaggioCompletato()",
@@ -3019,8 +3019,8 @@
       "_origin": "ast",
       "community": 3,
       "norm_label": ".marcapassaggiocompletato()",
-      "id": "src_adapters_prisma_prismaapp_prismaapp_marcapassaggiocompletato",
-      "community_name": "PrismaApp"
+      "community_name": "PrismaApp",
+      "id": "src_adapters_prisma_prismaapp_prismaapp_marcapassaggiocompletato"
     },
     {
       "label": ".aggiornaMicrovoce()",
@@ -3031,8 +3031,8 @@
       "_origin": "ast",
       "community": 3,
       "norm_label": ".aggiornamicrovoce()",
-      "id": "src_adapters_prisma_prismaistanziazioneport_prismaistanziazioneport_aggiornamicrovoce",
-      "community_name": "PrismaApp"
+      "community_name": "PrismaApp",
+      "id": "src_adapters_prisma_prismaistanziazioneport_prismaistanziazioneport_aggiornamicrovoce"
     },
     {
       "label": ".aggiornaModulo()",
@@ -3043,8 +3043,8 @@
       "_origin": "ast",
       "community": 3,
       "norm_label": ".aggiornamodulo()",
-      "id": "src_adapters_prisma_prismaistanziazioneport_prismaistanziazioneport_aggiornamodulo",
-      "community_name": "PrismaApp"
+      "community_name": "PrismaApp",
+      "id": "src_adapters_prisma_prismaistanziazioneport_prismaistanziazioneport_aggiornamodulo"
     },
     {
       "label": ".aggiornaPassaggio()",
@@ -3055,8 +3055,8 @@
       "_origin": "ast",
       "community": 3,
       "norm_label": ".aggiornapassaggio()",
-      "id": "src_adapters_prisma_prismaistanziazioneport_prismaistanziazioneport_aggiornapassaggio",
-      "community_name": "PrismaApp"
+      "community_name": "PrismaApp",
+      "id": "src_adapters_prisma_prismaistanziazioneport_prismaistanziazioneport_aggiornapassaggio"
     },
     {
       "label": ".constructor()",
@@ -3067,8 +3067,8 @@
       "_origin": "ast",
       "community": 3,
       "norm_label": ".constructor()",
-      "id": "src_adapters_prisma_prismaistanziazioneport_prismaistanziazioneport_constructor",
-      "community_name": "PrismaApp"
+      "community_name": "PrismaApp",
+      "id": "src_adapters_prisma_prismaistanziazioneport_prismaistanziazioneport_constructor"
     },
     {
       "label": ".getMicrovoce()",
@@ -3079,8 +3079,8 @@
       "_origin": "ast",
       "community": 3,
       "norm_label": ".getmicrovoce()",
-      "id": "src_adapters_prisma_prismaistanziazioneport_prismaistanziazioneport_getmicrovoce",
-      "community_name": "PrismaApp"
+      "community_name": "PrismaApp",
+      "id": "src_adapters_prisma_prismaistanziazioneport_prismaistanziazioneport_getmicrovoce"
     },
     {
       "label": ".getMicrovociDelModulo()",
@@ -3091,8 +3091,8 @@
       "_origin": "ast",
       "community": 3,
       "norm_label": ".getmicrovocidelmodulo()",
-      "id": "src_adapters_prisma_prismaistanziazioneport_prismaistanziazioneport_getmicrovocidelmodulo",
-      "community_name": "PrismaApp"
+      "community_name": "PrismaApp",
+      "id": "src_adapters_prisma_prismaistanziazioneport_prismaistanziazioneport_getmicrovocidelmodulo"
     },
     {
       "label": ".getModuliDelProgettoConDipendenze()",
@@ -3103,8 +3103,8 @@
       "_origin": "ast",
       "community": 3,
       "norm_label": ".getmodulidelprogettocondipendenze()",
-      "id": "src_adapters_prisma_prismaistanziazioneport_prismaistanziazioneport_getmodulidelprogettocondipendenze",
-      "community_name": "PrismaApp"
+      "community_name": "PrismaApp",
+      "id": "src_adapters_prisma_prismaistanziazioneport_prismaistanziazioneport_getmodulidelprogettocondipendenze"
     },
     {
       "label": ".getModulo()",
@@ -3115,8 +3115,8 @@
       "_origin": "ast",
       "community": 3,
       "norm_label": ".getmodulo()",
-      "id": "src_adapters_prisma_prismaistanziazioneport_prismaistanziazioneport_getmodulo",
-      "community_name": "PrismaApp"
+      "community_name": "PrismaApp",
+      "id": "src_adapters_prisma_prismaistanziazioneport_prismaistanziazioneport_getmodulo"
     },
     {
       "label": ".getPassaggiDellaMicrovoce()",
@@ -3127,8 +3127,8 @@
       "_origin": "ast",
       "community": 3,
       "norm_label": ".getpassaggidellamicrovoce()",
-      "id": "src_adapters_prisma_prismaistanziazioneport_prismaistanziazioneport_getpassaggidellamicrovoce",
-      "community_name": "PrismaApp"
+      "community_name": "PrismaApp",
+      "id": "src_adapters_prisma_prismaistanziazioneport_prismaistanziazioneport_getpassaggidellamicrovoce"
     },
     {
       "label": ".getPassaggio()",
@@ -3139,8 +3139,8 @@
       "_origin": "ast",
       "community": 3,
       "norm_label": ".getpassaggio()",
-      "id": "src_adapters_prisma_prismaistanziazioneport_prismaistanziazioneport_getpassaggio",
-      "community_name": "PrismaApp"
+      "community_name": "PrismaApp",
+      "id": "src_adapters_prisma_prismaistanziazioneport_prismaistanziazioneport_getpassaggio"
     },
     {
       "label": "assegnaAccessoProgettoApi()",
@@ -3151,8 +3151,8 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "assegnaaccessoprogettoapi()",
-      "id": "frontend_src_api_client_assegnaaccessoprogettoapi",
-      "community_name": "ProjectDetail.tsx"
+      "community_name": "ProjectDetail.tsx",
+      "id": "frontend_src_api_client_assegnaaccessoprogettoapi"
     },
     {
       "label": "consuntivaMicrovoceApi()",
@@ -3163,8 +3163,8 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "consuntivamicrovoceapi()",
-      "id": "frontend_src_api_client_consuntivamicrovoceapi",
-      "community_name": "ProjectDetail.tsx"
+      "community_name": "ProjectDetail.tsx",
+      "id": "frontend_src_api_client_consuntivamicrovoceapi"
     },
     {
       "label": "emettiFatturaApi()",
@@ -3175,8 +3175,8 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "emettifatturaapi()",
-      "id": "frontend_src_api_client_emettifatturaapi",
-      "community_name": "ProjectDetail.tsx"
+      "community_name": "ProjectDetail.tsx",
+      "id": "frontend_src_api_client_emettifatturaapi"
     },
     {
       "label": "fetchProgetti()",
@@ -3187,8 +3187,8 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "fetchprogetti()",
-      "id": "frontend_src_api_client_fetchprogetti",
-      "community_name": "ProjectDetail.tsx"
+      "community_name": "ProjectDetail.tsx",
+      "id": "frontend_src_api_client_fetchprogetti"
     },
     {
       "label": "fetchProgettoDettaglio()",
@@ -3199,8 +3199,8 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "fetchprogettodettaglio()",
-      "id": "frontend_src_api_client_fetchprogettodettaglio",
-      "community_name": "ProjectDetail.tsx"
+      "community_name": "ProjectDetail.tsx",
+      "id": "frontend_src_api_client_fetchprogettodettaglio"
     },
     {
       "label": "Avatar()",
@@ -3211,8 +3211,8 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "avatar()",
-      "id": "frontend_src_components_ui_avatar_avatar",
-      "community_name": "ProjectDetail.tsx"
+      "community_name": "ProjectDetail.tsx",
+      "id": "frontend_src_components_ui_avatar_avatar"
     },
     {
       "label": "AvatarGroup()",
@@ -3223,8 +3223,8 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "avatargroup()",
-      "id": "frontend_src_components_ui_avatar_avatargroup",
-      "community_name": "ProjectDetail.tsx"
+      "community_name": "ProjectDetail.tsx",
+      "id": "frontend_src_components_ui_avatar_avatargroup"
     },
     {
       "label": "Badge()",
@@ -3235,8 +3235,8 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "badge()",
-      "id": "frontend_src_components_ui_badge_badge",
-      "community_name": "ProjectDetail.tsx"
+      "community_name": "ProjectDetail.tsx",
+      "id": "frontend_src_components_ui_badge_badge"
     },
     {
       "label": "ProgressBar()",
@@ -3247,8 +3247,8 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "progressbar()",
-      "id": "frontend_src_components_ui_progressbar_progressbar",
-      "community_name": "ProjectDetail.tsx"
+      "community_name": "ProjectDetail.tsx",
+      "id": "frontend_src_components_ui_progressbar_progressbar"
     },
     {
       "label": "Dashboard()",
@@ -3259,8 +3259,8 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "dashboard()",
-      "id": "frontend_src_pages_dashboard_dashboard",
-      "community_name": "ProjectDetail.tsx"
+      "community_name": "ProjectDetail.tsx",
+      "id": "frontend_src_pages_dashboard_dashboard"
     },
     {
       "label": "KpiCard()",
@@ -3271,8 +3271,8 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "kpicard()",
-      "id": "frontend_src_pages_dashboard_kpicard",
-      "community_name": "ProjectDetail.tsx"
+      "community_name": "ProjectDetail.tsx",
+      "id": "frontend_src_pages_dashboard_kpicard"
     },
     {
       "label": "FatturazioneTab()",
@@ -3283,8 +3283,8 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "fatturazionetab()",
-      "id": "frontend_src_pages_projectdetail_fatturazionetab",
-      "community_name": "ProjectDetail.tsx"
+      "community_name": "ProjectDetail.tsx",
+      "id": "frontend_src_pages_projectdetail_fatturazionetab"
     },
     {
       "label": "GrafoModuliProgettoView()",
@@ -3295,8 +3295,8 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "grafomoduliprogettoview()",
-      "id": "frontend_src_pages_projectdetail_grafomoduliprogettoview",
-      "community_name": "ProjectDetail.tsx"
+      "community_name": "ProjectDetail.tsx",
+      "id": "frontend_src_pages_projectdetail_grafomoduliprogettoview"
     },
     {
       "label": "ModuloBlock()",
@@ -3307,8 +3307,8 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "moduloblock()",
-      "id": "frontend_src_pages_projectdetail_moduloblock",
-      "community_name": "ProjectDetail.tsx"
+      "community_name": "ProjectDetail.tsx",
+      "id": "frontend_src_pages_projectdetail_moduloblock"
     },
     {
       "label": "PlaceholderTab()",
@@ -3319,8 +3319,8 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "placeholdertab()",
-      "id": "frontend_src_pages_projectdetail_placeholdertab",
-      "community_name": "ProjectDetail.tsx"
+      "community_name": "ProjectDetail.tsx",
+      "id": "frontend_src_pages_projectdetail_placeholdertab"
     },
     {
       "label": "ProjectDetail()",
@@ -3331,8 +3331,8 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "projectdetail()",
-      "id": "frontend_src_pages_projectdetail_projectdetail",
-      "community_name": "ProjectDetail.tsx"
+      "community_name": "ProjectDetail.tsx",
+      "id": "frontend_src_pages_projectdetail_projectdetail"
     },
     {
       "label": "Projects()",
@@ -3343,8 +3343,8 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "projects()",
-      "id": "frontend_src_pages_projects_projects",
-      "community_name": "ProjectDetail.tsx"
+      "community_name": "ProjectDetail.tsx",
+      "id": "frontend_src_pages_projects_projects"
     },
     {
       "label": "fmt()",
@@ -3355,8 +3355,8 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "fmt()",
-      "id": "frontend_src_utils_index_fmt",
-      "community_name": "ProjectDetail.tsx"
+      "community_name": "ProjectDetail.tsx",
+      "id": "frontend_src_utils_index_fmt"
     },
     {
       "label": "progressColor()",
@@ -3367,8 +3367,8 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "progresscolor()",
-      "id": "frontend_src_utils_index_progresscolor",
-      "community_name": "ProjectDetail.tsx"
+      "community_name": "ProjectDetail.tsx",
+      "id": "frontend_src_utils_index_progresscolor"
     },
     {
       "label": "statoConfig()",
@@ -3379,8 +3379,8 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "statoconfig()",
-      "id": "frontend_src_utils_index_statoconfig",
-      "community_name": "ProjectDetail.tsx"
+      "community_name": "ProjectDetail.tsx",
+      "id": "frontend_src_utils_index_statoconfig"
     },
     {
       "label": "creaArticoloApi()",
@@ -3391,8 +3391,8 @@
       "_origin": "ast",
       "community": 6,
       "norm_label": "creaarticoloapi()",
-      "id": "frontend_src_api_client_creaarticoloapi",
-      "community_name": "utils/index.ts"
+      "community_name": "utils/index.ts",
+      "id": "frontend_src_api_client_creaarticoloapi"
     },
     {
       "label": "creaModuloTemplateApi()",
@@ -3403,8 +3403,8 @@
       "_origin": "ast",
       "community": 6,
       "norm_label": "creamodulotemplateapi()",
-      "id": "frontend_src_api_client_creamodulotemplateapi",
-      "community_name": "utils/index.ts"
+      "community_name": "utils/index.ts",
+      "id": "frontend_src_api_client_creamodulotemplateapi"
     },
     {
       "label": "fetchArticoli()",
@@ -3415,8 +3415,8 @@
       "_origin": "ast",
       "community": 6,
       "norm_label": "fetcharticoli()",
-      "id": "frontend_src_api_client_fetcharticoli",
-      "community_name": "utils/index.ts"
+      "community_name": "utils/index.ts",
+      "id": "frontend_src_api_client_fetcharticoli"
     },
     {
       "label": "CreaModuloForm()",
@@ -3427,8 +3427,8 @@
       "_origin": "ast",
       "community": 6,
       "norm_label": "creamoduloform()",
-      "id": "frontend_src_pages_library_creamoduloform",
-      "community_name": "utils/index.ts"
+      "community_name": "utils/index.ts",
+      "id": "frontend_src_pages_library_creamoduloform"
     },
     {
       "label": "Library()",
@@ -3439,8 +3439,8 @@
       "_origin": "ast",
       "community": 6,
       "norm_label": "library()",
-      "id": "frontend_src_pages_library_library",
-      "community_name": "utils/index.ts"
+      "community_name": "utils/index.ts",
+      "id": "frontend_src_pages_library_library"
     },
     {
       "label": "LibreriaDocumentiEForm()",
@@ -3451,8 +3451,8 @@
       "_origin": "ast",
       "community": 6,
       "norm_label": "libreriadocumentieform()",
-      "id": "frontend_src_pages_library_libreriadocumentieform",
-      "community_name": "utils/index.ts"
+      "community_name": "utils/index.ts",
+      "id": "frontend_src_pages_library_libreriadocumentieform"
     },
     {
       "label": "NuovoArticoloModal()",
@@ -3463,8 +3463,8 @@
       "_origin": "ast",
       "community": 6,
       "norm_label": "nuovoarticolomodal()",
-      "id": "frontend_src_pages_library_nuovoarticolomodal",
-      "community_name": "utils/index.ts"
+      "community_name": "utils/index.ts",
+      "id": "frontend_src_pages_library_nuovoarticolomodal"
     },
     {
       "label": "levelOf()",
@@ -3475,8 +3475,8 @@
       "_origin": "ast",
       "community": 6,
       "norm_label": "levelof()",
-      "id": "frontend_src_utils_index_levelof",
-      "community_name": "utils/index.ts"
+      "community_name": "utils/index.ts",
+      "id": "frontend_src_utils_index_levelof"
     },
     {
       "label": "moduloH()",
@@ -3487,8 +3487,8 @@
       "_origin": "ast",
       "community": 6,
       "norm_label": "moduloh()",
-      "id": "frontend_src_utils_index_moduloh",
-      "community_name": "utils/index.ts"
+      "community_name": "utils/index.ts",
+      "id": "frontend_src_utils_index_moduloh"
     },
     {
       "label": "moduloP()",
@@ -3499,8 +3499,8 @@
       "_origin": "ast",
       "community": 6,
       "norm_label": "modulop()",
-      "id": "frontend_src_utils_index_modulop",
-      "community_name": "utils/index.ts"
+      "community_name": "utils/index.ts",
+      "id": "frontend_src_utils_index_modulop"
     },
     {
       "label": "resolveRighe()",
@@ -3511,8 +3511,8 @@
       "_origin": "ast",
       "community": 6,
       "norm_label": "resolverighe()",
-      "id": "frontend_src_utils_index_resolverighe",
-      "community_name": "utils/index.ts"
+      "community_name": "utils/index.ts",
+      "id": "frontend_src_utils_index_resolverighe"
     },
     {
       "label": ".registraModuloTemplate()",
@@ -3523,8 +3523,8 @@
       "_origin": "ast",
       "community": 7,
       "norm_label": ".registramodulotemplate()",
-      "id": "src_adapters_inmemoryapp_inmemoryapp_registramodulotemplate",
-      "community_name": "AppPort"
+      "community_name": "AppPort",
+      "id": "src_adapters_inmemoryapp_inmemoryapp_registramodulotemplate"
     },
     {
       "label": "buildServer()",
@@ -3535,8 +3535,8 @@
       "_origin": "ast",
       "community": 7,
       "norm_label": "buildserver()",
-      "id": "src_server_buildserver",
-      "community_name": "AppPort"
+      "community_name": "AppPort",
+      "id": "src_server_buildserver"
     },
     {
       "label": "nuovoServer()",
@@ -3547,8 +3547,8 @@
       "_origin": "ast",
       "community": 7,
       "norm_label": "nuovoserver()",
-      "id": "src_server_test_nuovoserver",
-      "community_name": "AppPort"
+      "community_name": "AppPort",
+      "id": "src_server_test_nuovoserver"
     },
     {
       "label": "progettoAvviato()",
@@ -3559,8 +3559,8 @@
       "_origin": "ast",
       "community": 7,
       "norm_label": "progettoavviato()",
-      "id": "src_server_test_progettoavviato",
-      "community_name": "AppPort"
+      "community_name": "AppPort",
+      "id": "src_server_test_progettoavviato"
     },
     {
       "label": ".accettaPreventivoEIstanzia()",
@@ -3571,8 +3571,8 @@
       "_origin": "ast",
       "community": 7,
       "norm_label": ".accettapreventivoeistanzia()",
-      "id": "src_services_appport_appport_accettapreventivoeistanzia",
-      "community_name": "AppPort"
+      "community_name": "AppPort",
+      "id": "src_services_appport_appport_accettapreventivoeistanzia"
     },
     {
       "label": ".completaMicrovoce()",
@@ -3583,8 +3583,8 @@
       "_origin": "ast",
       "community": 7,
       "norm_label": ".completamicrovoce()",
-      "id": "src_services_appport_appport_completamicrovoce",
-      "community_name": "AppPort"
+      "community_name": "AppPort",
+      "id": "src_services_appport_appport_completamicrovoce"
     },
     {
       "label": ".completaPassaggioDocumento()",
@@ -3595,8 +3595,8 @@
       "_origin": "ast",
       "community": 7,
       "norm_label": ".completapassaggiodocumento()",
-      "id": "src_services_appport_appport_completapassaggiodocumento",
-      "community_name": "AppPort"
+      "community_name": "AppPort",
+      "id": "src_services_appport_appport_completapassaggiodocumento"
     },
     {
       "label": ".completaPassaggioForm()",
@@ -3607,8 +3607,8 @@
       "_origin": "ast",
       "community": 7,
       "norm_label": ".completapassaggioform()",
-      "id": "src_services_appport_appport_completapassaggioform",
-      "community_name": "AppPort"
+      "community_name": "AppPort",
+      "id": "src_services_appport_appport_completapassaggioform"
     },
     {
       "label": ".consuntivaMicrovoce()",
@@ -3619,8 +3619,8 @@
       "_origin": "ast",
       "community": 7,
       "norm_label": ".consuntivamicrovoce()",
-      "id": "src_services_appport_appport_consuntivamicrovoce",
-      "community_name": "AppPort"
+      "community_name": "AppPort",
+      "id": "src_services_appport_appport_consuntivamicrovoce"
     },
     {
       "label": ".creaArticolo()",
@@ -3631,8 +3631,8 @@
       "_origin": "ast",
       "community": 7,
       "norm_label": ".creaarticolo()",
-      "id": "src_services_appport_appport_creaarticolo",
-      "community_name": "AppPort"
+      "community_name": "AppPort",
+      "id": "src_services_appport_appport_creaarticolo"
     },
     {
       "label": ".creaCliente()",
@@ -3643,8 +3643,8 @@
       "_origin": "ast",
       "community": 7,
       "norm_label": ".creacliente()",
-      "id": "src_services_appport_appport_creacliente",
-      "community_name": "AppPort"
+      "community_name": "AppPort",
+      "id": "src_services_appport_appport_creacliente"
     },
     {
       "label": ".creaModuloTemplate()",
@@ -3655,8 +3655,8 @@
       "_origin": "ast",
       "community": 7,
       "norm_label": ".creamodulotemplate()",
-      "id": "src_services_appport_appport_creamodulotemplate",
-      "community_name": "AppPort"
+      "community_name": "AppPort",
+      "id": "src_services_appport_appport_creamodulotemplate"
     },
     {
       "label": ".creaPreventivo()",
@@ -3667,8 +3667,8 @@
       "_origin": "ast",
       "community": 7,
       "norm_label": ".creapreventivo()",
-      "id": "src_services_appport_appport_creapreventivo",
-      "community_name": "AppPort"
+      "community_name": "AppPort",
+      "id": "src_services_appport_appport_creapreventivo"
     },
     {
       "label": ".creaProgetto()",
@@ -3679,8 +3679,8 @@
       "_origin": "ast",
       "community": 7,
       "norm_label": ".creaprogetto()",
-      "id": "src_services_appport_appport_creaprogetto",
-      "community_name": "AppPort"
+      "community_name": "AppPort",
+      "id": "src_services_appport_appport_creaprogetto"
     },
     {
       "label": ".emettiFattura()",
@@ -3691,8 +3691,8 @@
       "_origin": "ast",
       "community": 7,
       "norm_label": ".emettifattura()",
-      "id": "src_services_appport_appport_emettifattura",
-      "community_name": "AppPort"
+      "community_name": "AppPort",
+      "id": "src_services_appport_appport_emettifattura"
     },
     {
       "label": ".getCliente()",
@@ -3703,8 +3703,8 @@
       "_origin": "ast",
       "community": 7,
       "norm_label": ".getcliente()",
-      "id": "src_services_appport_appport_getcliente",
-      "community_name": "AppPort"
+      "community_name": "AppPort",
+      "id": "src_services_appport_appport_getcliente"
     },
     {
       "label": ".getMicrovoce()",
@@ -3715,8 +3715,8 @@
       "_origin": "ast",
       "community": 7,
       "norm_label": ".getmicrovoce()",
-      "id": "src_services_appport_appport_getmicrovoce",
-      "community_name": "AppPort"
+      "community_name": "AppPort",
+      "id": "src_services_appport_appport_getmicrovoce"
     },
     {
       "label": ".getPassaggiDellaMicrovoce()",
@@ -3727,8 +3727,8 @@
       "_origin": "ast",
       "community": 7,
       "norm_label": ".getpassaggidellamicrovoce()",
-      "id": "src_services_appport_appport_getpassaggidellamicrovoce",
-      "community_name": "AppPort"
+      "community_name": "AppPort",
+      "id": "src_services_appport_appport_getpassaggidellamicrovoce"
     },
     {
       "label": ".getPreventivo()",
@@ -3739,8 +3739,8 @@
       "_origin": "ast",
       "community": 7,
       "norm_label": ".getpreventivo()",
-      "id": "src_services_appport_appport_getpreventivo",
-      "community_name": "AppPort"
+      "community_name": "AppPort",
+      "id": "src_services_appport_appport_getpreventivo"
     },
     {
       "label": ".getProgetto()",
@@ -3751,8 +3751,8 @@
       "_origin": "ast",
       "community": 7,
       "norm_label": ".getprogetto()",
-      "id": "src_services_appport_appport_getprogetto",
-      "community_name": "AppPort"
+      "community_name": "AppPort",
+      "id": "src_services_appport_appport_getprogetto"
     },
     {
       "label": ".inviaPreventivo()",
@@ -3763,8 +3763,8 @@
       "_origin": "ast",
       "community": 7,
       "norm_label": ".inviapreventivo()",
-      "id": "src_services_appport_appport_inviapreventivo",
-      "community_name": "AppPort"
+      "community_name": "AppPort",
+      "id": "src_services_appport_appport_inviapreventivo"
     },
     {
       "label": ".listaArticoli()",
@@ -3775,8 +3775,8 @@
       "_origin": "ast",
       "community": 7,
       "norm_label": ".listaarticoli()",
-      "id": "src_services_appport_appport_listaarticoli",
-      "community_name": "AppPort"
+      "community_name": "AppPort",
+      "id": "src_services_appport_appport_listaarticoli"
     },
     {
       "label": ".listaClienti()",
@@ -3787,8 +3787,8 @@
       "_origin": "ast",
       "community": 7,
       "norm_label": ".listaclienti()",
-      "id": "src_services_appport_appport_listaclienti",
-      "community_name": "AppPort"
+      "community_name": "AppPort",
+      "id": "src_services_appport_appport_listaclienti"
     },
     {
       "label": ".listaModuli()",
@@ -3799,8 +3799,8 @@
       "_origin": "ast",
       "community": 7,
       "norm_label": ".listamoduli()",
-      "id": "src_services_appport_appport_listamoduli",
-      "community_name": "AppPort"
+      "community_name": "AppPort",
+      "id": "src_services_appport_appport_listamoduli"
     },
     {
       "label": ".listaProgetti()",
@@ -3811,8 +3811,8 @@
       "_origin": "ast",
       "community": 7,
       "norm_label": ".listaprogetti()",
-      "id": "src_services_appport_appport_listaprogetti",
-      "community_name": "AppPort"
+      "community_name": "AppPort",
+      "id": "src_services_appport_appport_listaprogetti"
     },
     {
       "label": ".marcaPassaggioCompletato()",
@@ -3823,8 +3823,8 @@
       "_origin": "ast",
       "community": 7,
       "norm_label": ".marcapassaggiocompletato()",
-      "id": "src_services_appport_appport_marcapassaggiocompletato",
-      "community_name": "AppPort"
+      "community_name": "AppPort",
+      "id": "src_services_appport_appport_marcapassaggiocompletato"
     },
     {
       "label": ".marcaRitardoMicrovoce()",
@@ -3835,8 +3835,8 @@
       "_origin": "ast",
       "community": 7,
       "norm_label": ".marcaritardomicrovoce()",
-      "id": "src_services_appport_appport_marcaritardomicrovoce",
-      "community_name": "AppPort"
+      "community_name": "AppPort",
+      "id": "src_services_appport_appport_marcaritardomicrovoce"
     },
     {
       "label": ".risolviRitardoMicrovoce()",
@@ -3847,8 +3847,8 @@
       "_origin": "ast",
       "community": 7,
       "norm_label": ".risolviritardomicrovoce()",
-      "id": "src_services_appport_appport_risolviritardomicrovoce",
-      "community_name": "AppPort"
+      "community_name": "AppPort",
+      "id": "src_services_appport_appport_risolviritardomicrovoce"
     },
     {
       "label": "prismaIstanziazionePort.ts",
@@ -3858,8 +3858,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": "prismaistanziazioneport.ts",
-      "id": "src_adapters_prisma_prismaistanziazioneport",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_adapters_prisma_prismaistanziazioneport"
     },
     {
       "label": "seed.ts",
@@ -3869,8 +3869,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": "seed.ts",
-      "id": "src_adapters_prisma_seed",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_adapters_prisma_seed"
     },
     {
       "label": "prisma",
@@ -3880,8 +3880,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": "prisma",
-      "id": "src_adapters_prisma_seed_prisma",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_adapters_prisma_seed_prisma"
     },
     {
       "label": "seedData.ts",
@@ -3891,8 +3891,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": "seeddata.ts",
-      "id": "src_scripts_seeddata",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_scripts_seeddata"
     },
     {
       "label": "moduloAnalisiPatrimoniale",
@@ -3902,8 +3902,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": "moduloanalisipatrimoniale",
-      "id": "src_scripts_seeddata_moduloanalisipatrimoniale",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_scripts_seeddata_moduloanalisipatrimoniale"
     },
     {
       "label": "moduloCorporateStructuring",
@@ -3913,8 +3913,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": "modulocorporatestructuring",
-      "id": "src_scripts_seeddata_modulocorporatestructuring",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_scripts_seeddata_modulocorporatestructuring"
     },
     {
       "label": "esecuzione.test.ts",
@@ -3924,8 +3924,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": "esecuzione.test.ts",
-      "id": "src_services_esecuzione_test",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_services_esecuzione_test"
     },
     {
       "label": "fakeIstanziazionePort.ts",
@@ -3935,8 +3935,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": "fakeistanziazioneport.ts",
-      "id": "src_services_fakeistanziazioneport",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_services_fakeistanziazioneport"
     },
     {
       "label": "istanziaProgetto.ts",
@@ -3946,8 +3946,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": "istanziaprogetto.ts",
-      "id": "src_services_istanziaprogetto",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_services_istanziaprogetto"
     },
     {
       "label": "istanziaProgetto.test.ts",
@@ -3957,8 +3957,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": "istanziaprogetto.test.ts",
-      "id": "src_services_istanziaprogetto_test",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_services_istanziaprogetto_test"
     },
     {
       "label": "istanziazionePort.ts",
@@ -3968,8 +3968,8 @@
       "_origin": "ast",
       "community": 0,
       "norm_label": "istanziazioneport.ts",
-      "id": "src_services_istanziazioneport",
-      "community_name": "istanziazionePort.ts"
+      "community_name": "istanziazionePort.ts",
+      "id": "src_services_istanziazioneport"
     },
     {
       "label": "stateEngine.ts",
@@ -3979,8 +3979,8 @@
       "_origin": "ast",
       "community": 1,
       "norm_label": "stateengine.ts",
-      "id": "src_domain_stateengine",
-      "community_name": "esecuzione.ts"
+      "community_name": "esecuzione.ts",
+      "id": "src_domain_stateengine"
     },
     {
       "label": "stateEngine.test.ts",
@@ -3990,8 +3990,8 @@
       "_origin": "ast",
       "community": 1,
       "norm_label": "stateengine.test.ts",
-      "id": "src_domain_stateengine_test",
-      "community_name": "esecuzione.ts"
+      "community_name": "esecuzione.ts",
+      "id": "src_domain_stateengine_test"
     },
     {
       "label": "types.ts",
@@ -4001,8 +4001,8 @@
       "_origin": "ast",
       "community": 1,
       "norm_label": "types.ts",
-      "id": "src_domain_types",
-      "community_name": "esecuzione.ts"
+      "community_name": "esecuzione.ts",
+      "id": "src_domain_types"
     },
     {
       "label": "esecuzione.ts",
@@ -4012,8 +4012,8 @@
       "_origin": "ast",
       "community": 1,
       "norm_label": "esecuzione.ts",
-      "id": "src_services_esecuzione",
-      "community_name": "esecuzione.ts"
+      "community_name": "esecuzione.ts",
+      "id": "src_services_esecuzione"
     },
     {
       "label": "tsconfig.node.json",
@@ -4023,8 +4023,8 @@
       "_origin": "ast",
       "community": 10,
       "norm_label": "tsconfig.node.json",
-      "id": "frontend_tsconfig_node",
-      "community_name": "compilerOptions"
+      "community_name": "compilerOptions",
+      "id": "frontend_tsconfig_node"
     },
     {
       "label": "compilerOptions",
@@ -4034,8 +4034,8 @@
       "_origin": "ast",
       "community": 10,
       "norm_label": "compileroptions",
-      "id": "frontend_tsconfig_node_compileroptions",
-      "community_name": "compilerOptions"
+      "community_name": "compilerOptions",
+      "id": "frontend_tsconfig_node_compileroptions"
     },
     {
       "label": "allowImportingTsExtensions",
@@ -4045,8 +4045,8 @@
       "_origin": "ast",
       "community": 10,
       "norm_label": "allowimportingtsextensions",
-      "id": "frontend_tsconfig_node_compileroptions_allowimportingtsextensions",
-      "community_name": "compilerOptions"
+      "community_name": "compilerOptions",
+      "id": "frontend_tsconfig_node_compileroptions_allowimportingtsextensions"
     },
     {
       "label": "erasableSyntaxOnly",
@@ -4056,8 +4056,8 @@
       "_origin": "ast",
       "community": 10,
       "norm_label": "erasablesyntaxonly",
-      "id": "frontend_tsconfig_node_compileroptions_erasablesyntaxonly",
-      "community_name": "compilerOptions"
+      "community_name": "compilerOptions",
+      "id": "frontend_tsconfig_node_compileroptions_erasablesyntaxonly"
     },
     {
       "label": "lib",
@@ -4067,8 +4067,8 @@
       "_origin": "ast",
       "community": 10,
       "norm_label": "lib",
-      "id": "frontend_tsconfig_node_compileroptions_lib",
-      "community_name": "compilerOptions"
+      "community_name": "compilerOptions",
+      "id": "frontend_tsconfig_node_compileroptions_lib"
     },
     {
       "label": "module",
@@ -4078,8 +4078,8 @@
       "_origin": "ast",
       "community": 10,
       "norm_label": "module",
-      "id": "frontend_tsconfig_node_compileroptions_module",
-      "community_name": "compilerOptions"
+      "community_name": "compilerOptions",
+      "id": "frontend_tsconfig_node_compileroptions_module"
     },
     {
       "label": "moduleDetection",
@@ -4089,8 +4089,8 @@
       "_origin": "ast",
       "community": 10,
       "norm_label": "moduledetection",
-      "id": "frontend_tsconfig_node_compileroptions_moduledetection",
-      "community_name": "compilerOptions"
+      "community_name": "compilerOptions",
+      "id": "frontend_tsconfig_node_compileroptions_moduledetection"
     },
     {
       "label": "noEmit",
@@ -4100,8 +4100,8 @@
       "_origin": "ast",
       "community": 10,
       "norm_label": "noemit",
-      "id": "frontend_tsconfig_node_compileroptions_noemit",
-      "community_name": "compilerOptions"
+      "community_name": "compilerOptions",
+      "id": "frontend_tsconfig_node_compileroptions_noemit"
     },
     {
       "label": "noFallthroughCasesInSwitch",
@@ -4111,8 +4111,8 @@
       "_origin": "ast",
       "community": 10,
       "norm_label": "nofallthroughcasesinswitch",
-      "id": "frontend_tsconfig_node_compileroptions_nofallthroughcasesinswitch",
-      "community_name": "compilerOptions"
+      "community_name": "compilerOptions",
+      "id": "frontend_tsconfig_node_compileroptions_nofallthroughcasesinswitch"
     },
     {
       "label": "noUnusedLocals",
@@ -4122,8 +4122,8 @@
       "_origin": "ast",
       "community": 10,
       "norm_label": "nounusedlocals",
-      "id": "frontend_tsconfig_node_compileroptions_nounusedlocals",
-      "community_name": "compilerOptions"
+      "community_name": "compilerOptions",
+      "id": "frontend_tsconfig_node_compileroptions_nounusedlocals"
     },
     {
       "label": "noUnusedParameters",
@@ -4133,8 +4133,8 @@
       "_origin": "ast",
       "community": 10,
       "norm_label": "nounusedparameters",
-      "id": "frontend_tsconfig_node_compileroptions_nounusedparameters",
-      "community_name": "compilerOptions"
+      "community_name": "compilerOptions",
+      "id": "frontend_tsconfig_node_compileroptions_nounusedparameters"
     },
     {
       "label": "skipLibCheck",
@@ -4144,8 +4144,8 @@
       "_origin": "ast",
       "community": 10,
       "norm_label": "skiplibcheck",
-      "id": "frontend_tsconfig_node_compileroptions_skiplibcheck",
-      "community_name": "compilerOptions"
+      "community_name": "compilerOptions",
+      "id": "frontend_tsconfig_node_compileroptions_skiplibcheck"
     },
     {
       "label": "target",
@@ -4155,8 +4155,8 @@
       "_origin": "ast",
       "community": 10,
       "norm_label": "target",
-      "id": "frontend_tsconfig_node_compileroptions_target",
-      "community_name": "compilerOptions"
+      "community_name": "compilerOptions",
+      "id": "frontend_tsconfig_node_compileroptions_target"
     },
     {
       "label": "tsBuildInfoFile",
@@ -4166,8 +4166,8 @@
       "_origin": "ast",
       "community": 10,
       "norm_label": "tsbuildinfofile",
-      "id": "frontend_tsconfig_node_compileroptions_tsbuildinfofile",
-      "community_name": "compilerOptions"
+      "community_name": "compilerOptions",
+      "id": "frontend_tsconfig_node_compileroptions_tsbuildinfofile"
     },
     {
       "label": "types",
@@ -4177,8 +4177,8 @@
       "_origin": "ast",
       "community": 10,
       "norm_label": "types",
-      "id": "frontend_tsconfig_node_compileroptions_types",
-      "community_name": "compilerOptions"
+      "community_name": "compilerOptions",
+      "id": "frontend_tsconfig_node_compileroptions_types"
     },
     {
       "label": "verbatimModuleSyntax",
@@ -4188,8 +4188,8 @@
       "_origin": "ast",
       "community": 10,
       "norm_label": "verbatimmodulesyntax",
-      "id": "frontend_tsconfig_node_compileroptions_verbatimmodulesyntax",
-      "community_name": "compilerOptions"
+      "community_name": "compilerOptions",
+      "id": "frontend_tsconfig_node_compileroptions_verbatimmodulesyntax"
     },
     {
       "label": "include",
@@ -4199,8 +4199,8 @@
       "_origin": "ast",
       "community": 10,
       "norm_label": "include",
-      "id": "frontend_tsconfig_node_include",
-      "community_name": "compilerOptions"
+      "community_name": "compilerOptions",
+      "id": "frontend_tsconfig_node_include"
     },
     {
       "label": "ES2023",
@@ -4210,8 +4210,8 @@
       "_origin": "ast",
       "community": 10,
       "norm_label": "es2023",
-      "id": "frontend_tsconfig_node_json_ref_es2023",
-      "community_name": "compilerOptions"
+      "community_name": "compilerOptions",
+      "id": "frontend_tsconfig_node_json_ref_es2023"
     },
     {
       "label": "node",
@@ -4221,8 +4221,8 @@
       "_origin": "ast",
       "community": 10,
       "norm_label": "node",
-      "id": "frontend_tsconfig_node_json_ref_node",
-      "community_name": "compilerOptions"
+      "community_name": "compilerOptions",
+      "id": "frontend_tsconfig_node_json_ref_node"
     },
     {
       "label": "vite.config.ts",
@@ -4232,8 +4232,8 @@
       "_origin": "ast",
       "community": 10,
       "norm_label": "vite.config.ts",
-      "id": "ref_vite_config_ts",
-      "community_name": "compilerOptions"
+      "community_name": "compilerOptions",
+      "id": "ref_vite_config_ts"
     },
     {
       "label": "frontend/package.json",
@@ -4243,8 +4243,8 @@
       "_origin": "ast",
       "community": 11,
       "norm_label": "frontend/package.json",
-      "id": "frontend_package",
-      "community_name": "frontend/package.json"
+      "community_name": "frontend/package.json",
+      "id": "frontend_package"
     },
     {
       "label": "dependencies",
@@ -4254,8 +4254,8 @@
       "_origin": "ast",
       "community": 11,
       "norm_label": "dependencies",
-      "id": "frontend_package_dependencies",
-      "community_name": "frontend/package.json"
+      "community_name": "frontend/package.json",
+      "id": "frontend_package_dependencies"
     },
     {
       "label": "react",
@@ -4265,8 +4265,8 @@
       "_origin": "ast",
       "community": 11,
       "norm_label": "react",
-      "id": "frontend_package_dependencies_react",
-      "community_name": "frontend/package.json"
+      "community_name": "frontend/package.json",
+      "id": "frontend_package_dependencies_react"
     },
     {
       "label": "react-dom",
@@ -4276,8 +4276,8 @@
       "_origin": "ast",
       "community": 11,
       "norm_label": "react-dom",
-      "id": "frontend_package_dependencies_react_dom",
-      "community_name": "frontend/package.json"
+      "community_name": "frontend/package.json",
+      "id": "frontend_package_dependencies_react_dom"
     },
     {
       "label": "react-router-dom",
@@ -4287,8 +4287,8 @@
       "_origin": "ast",
       "community": 11,
       "norm_label": "react-router-dom",
-      "id": "frontend_package_dependencies_react_router_dom",
-      "community_name": "frontend/package.json"
+      "community_name": "frontend/package.json",
+      "id": "frontend_package_dependencies_react_router_dom"
     },
     {
       "label": "@supabase/supabase-js",
@@ -4298,8 +4298,8 @@
       "_origin": "ast",
       "community": 11,
       "norm_label": "@supabase/supabase-js",
-      "id": "frontend_package_dependencies_supabase_supabase_js",
-      "community_name": "frontend/package.json"
+      "community_name": "frontend/package.json",
+      "id": "frontend_package_dependencies_supabase_supabase_js"
     },
     {
       "label": "name",
@@ -4309,8 +4309,8 @@
       "_origin": "ast",
       "community": 11,
       "norm_label": "name",
-      "id": "frontend_package_name",
-      "community_name": "frontend/package.json"
+      "community_name": "frontend/package.json",
+      "id": "frontend_package_name"
     },
     {
       "label": "private",
@@ -4320,8 +4320,8 @@
       "_origin": "ast",
       "community": 11,
       "norm_label": "private",
-      "id": "frontend_package_private",
-      "community_name": "frontend/package.json"
+      "community_name": "frontend/package.json",
+      "id": "frontend_package_private"
     },
     {
       "label": "scripts",
@@ -4331,8 +4331,8 @@
       "_origin": "ast",
       "community": 11,
       "norm_label": "scripts",
-      "id": "frontend_package_scripts",
-      "community_name": "frontend/package.json"
+      "community_name": "frontend/package.json",
+      "id": "frontend_package_scripts"
     },
     {
       "label": "build",
@@ -4342,8 +4342,8 @@
       "_origin": "ast",
       "community": 11,
       "norm_label": "build",
-      "id": "frontend_package_scripts_build",
-      "community_name": "frontend/package.json"
+      "community_name": "frontend/package.json",
+      "id": "frontend_package_scripts_build"
     },
     {
       "label": "dev",
@@ -4353,8 +4353,8 @@
       "_origin": "ast",
       "community": 11,
       "norm_label": "dev",
-      "id": "frontend_package_scripts_dev",
-      "community_name": "frontend/package.json"
+      "community_name": "frontend/package.json",
+      "id": "frontend_package_scripts_dev"
     },
     {
       "label": "lint",
@@ -4364,8 +4364,8 @@
       "_origin": "ast",
       "community": 11,
       "norm_label": "lint",
-      "id": "frontend_package_scripts_lint",
-      "community_name": "frontend/package.json"
+      "community_name": "frontend/package.json",
+      "id": "frontend_package_scripts_lint"
     },
     {
       "label": "preview",
@@ -4375,8 +4375,8 @@
       "_origin": "ast",
       "community": 11,
       "norm_label": "preview",
-      "id": "frontend_package_scripts_preview",
-      "community_name": "frontend/package.json"
+      "community_name": "frontend/package.json",
+      "id": "frontend_package_scripts_preview"
     },
     {
       "label": "type",
@@ -4386,8 +4386,8 @@
       "_origin": "ast",
       "community": 11,
       "norm_label": "type",
-      "id": "frontend_package_type",
-      "community_name": "frontend/package.json"
+      "community_name": "frontend/package.json",
+      "id": "frontend_package_type"
     },
     {
       "label": "version",
@@ -4397,8 +4397,8 @@
       "_origin": "ast",
       "community": 11,
       "norm_label": "version",
-      "id": "frontend_package_version",
-      "community_name": "frontend/package.json"
+      "community_name": "frontend/package.json",
+      "id": "frontend_package_version"
     },
     {
       "label": "react",
@@ -4408,8 +4408,8 @@
       "_origin": "ast",
       "community": 11,
       "norm_label": "react",
-      "id": "react",
-      "community_name": "frontend/package.json"
+      "community_name": "frontend/package.json",
+      "id": "react"
     },
     {
       "label": "react-dom",
@@ -4419,8 +4419,8 @@
       "_origin": "ast",
       "community": 11,
       "norm_label": "react-dom",
-      "id": "react_dom",
-      "community_name": "frontend/package.json"
+      "community_name": "frontend/package.json",
+      "id": "react_dom"
     },
     {
       "label": "react-router-dom",
@@ -4430,8 +4430,8 @@
       "_origin": "ast",
       "community": 11,
       "norm_label": "react-router-dom",
-      "id": "react_router_dom",
-      "community_name": "frontend/package.json"
+      "community_name": "frontend/package.json",
+      "id": "react_router_dom"
     },
     {
       "label": "@supabase/supabase-js",
@@ -4441,8 +4441,8 @@
       "_origin": "ast",
       "community": 11,
       "norm_label": "@supabase/supabase-js",
-      "id": "supabase_supabase_js",
-      "community_name": "frontend/package.json"
+      "community_name": "frontend/package.json",
+      "id": "supabase_supabase_js"
     },
     {
       "label": "ClientPortal.tsx",
@@ -4452,8 +4452,8 @@
       "_origin": "ast",
       "community": 12,
       "norm_label": "clientportal.tsx",
-      "id": "frontend_src_pages_clientportal",
-      "community_name": "ClientPortal.tsx"
+      "community_name": "ClientPortal.tsx",
+      "id": "frontend_src_pages_clientportal"
     },
     {
       "label": "bodyStyle",
@@ -4463,8 +4463,8 @@
       "_origin": "ast",
       "community": 12,
       "norm_label": "bodystyle",
-      "id": "frontend_src_pages_clientportal_bodystyle",
-      "community_name": "ClientPortal.tsx"
+      "community_name": "ClientPortal.tsx",
+      "id": "frontend_src_pages_clientportal_bodystyle"
     },
     {
       "label": "containerStyle",
@@ -4474,8 +4474,8 @@
       "_origin": "ast",
       "community": 12,
       "norm_label": "containerstyle",
-      "id": "frontend_src_pages_clientportal_containerstyle",
-      "community_name": "ClientPortal.tsx"
+      "community_name": "ClientPortal.tsx",
+      "id": "frontend_src_pages_clientportal_containerstyle"
     },
     {
       "label": "docBoxStyle",
@@ -4485,8 +4485,8 @@
       "_origin": "ast",
       "community": 12,
       "norm_label": "docboxstyle",
-      "id": "frontend_src_pages_clientportal_docboxstyle",
-      "community_name": "ClientPortal.tsx"
+      "community_name": "ClientPortal.tsx",
+      "id": "frontend_src_pages_clientportal_docboxstyle"
     },
     {
       "label": "heroBannerStyle",
@@ -4496,8 +4496,8 @@
       "_origin": "ast",
       "community": 12,
       "norm_label": "herobannerstyle",
-      "id": "frontend_src_pages_clientportal_herobannerstyle",
-      "community_name": "ClientPortal.tsx"
+      "community_name": "ClientPortal.tsx",
+      "id": "frontend_src_pages_clientportal_herobannerstyle"
     },
     {
       "label": "modRowStyle",
@@ -4507,8 +4507,8 @@
       "_origin": "ast",
       "community": 12,
       "norm_label": "modrowstyle",
-      "id": "frontend_src_pages_clientportal_modrowstyle",
-      "community_name": "ClientPortal.tsx"
+      "community_name": "ClientPortal.tsx",
+      "id": "frontend_src_pages_clientportal_modrowstyle"
     },
     {
       "label": "successBoxStyle",
@@ -4518,8 +4518,8 @@
       "_origin": "ast",
       "community": 12,
       "norm_label": "successboxstyle",
-      "id": "frontend_src_pages_clientportal_successboxstyle",
-      "community_name": "ClientPortal.tsx"
+      "community_name": "ClientPortal.tsx",
+      "id": "frontend_src_pages_clientportal_successboxstyle"
     },
     {
       "label": "tabsBarStyle",
@@ -4529,8 +4529,8 @@
       "_origin": "ast",
       "community": 12,
       "norm_label": "tabsbarstyle",
-      "id": "frontend_src_pages_clientportal_tabsbarstyle",
-      "community_name": "ClientPortal.tsx"
+      "community_name": "ClientPortal.tsx",
+      "id": "frontend_src_pages_clientportal_tabsbarstyle"
     },
     {
       "label": "topNavStyle",
@@ -4540,8 +4540,8 @@
       "_origin": "ast",
       "community": 12,
       "norm_label": "topnavstyle",
-      "id": "frontend_src_pages_clientportal_topnavstyle",
-      "community_name": "ClientPortal.tsx"
+      "community_name": "ClientPortal.tsx",
+      "id": "frontend_src_pages_clientportal_topnavstyle"
     },
     {
       "label": "tsconfig.json",
@@ -4551,8 +4551,8 @@
       "_origin": "ast",
       "community": 14,
       "norm_label": "tsconfig.json",
-      "id": "tsconfig",
-      "community_name": "compilerOptions"
+      "community_name": "compilerOptions",
+      "id": "tsconfig"
     },
     {
       "label": "compilerOptions",
@@ -4562,8 +4562,8 @@
       "_origin": "ast",
       "community": 14,
       "norm_label": "compileroptions",
-      "id": "tsconfig_compileroptions",
-      "community_name": "compilerOptions"
+      "community_name": "compilerOptions",
+      "id": "tsconfig_compileroptions"
     },
     {
       "label": "esModuleInterop",
@@ -4573,8 +4573,8 @@
       "_origin": "ast",
       "community": 14,
       "norm_label": "esmoduleinterop",
-      "id": "tsconfig_compileroptions_esmoduleinterop",
-      "community_name": "compilerOptions"
+      "community_name": "compilerOptions",
+      "id": "tsconfig_compileroptions_esmoduleinterop"
     },
     {
       "label": "module",
@@ -4584,8 +4584,8 @@
       "_origin": "ast",
       "community": 14,
       "norm_label": "module",
-      "id": "tsconfig_compileroptions_module",
-      "community_name": "compilerOptions"
+      "community_name": "compilerOptions",
+      "id": "tsconfig_compileroptions_module"
     },
     {
       "label": "moduleResolution",
@@ -4595,8 +4595,8 @@
       "_origin": "ast",
       "community": 14,
       "norm_label": "moduleresolution",
-      "id": "tsconfig_compileroptions_moduleresolution",
-      "community_name": "compilerOptions"
+      "community_name": "compilerOptions",
+      "id": "tsconfig_compileroptions_moduleresolution"
     },
     {
       "label": "noUncheckedIndexedAccess",
@@ -4606,8 +4606,8 @@
       "_origin": "ast",
       "community": 14,
       "norm_label": "nouncheckedindexedaccess",
-      "id": "tsconfig_compileroptions_nouncheckedindexedaccess",
-      "community_name": "compilerOptions"
+      "community_name": "compilerOptions",
+      "id": "tsconfig_compileroptions_nouncheckedindexedaccess"
     },
     {
       "label": "outDir",
@@ -4617,8 +4617,8 @@
       "_origin": "ast",
       "community": 14,
       "norm_label": "outdir",
-      "id": "tsconfig_compileroptions_outdir",
-      "community_name": "compilerOptions"
+      "community_name": "compilerOptions",
+      "id": "tsconfig_compileroptions_outdir"
     },
     {
       "label": "rootDir",
@@ -4628,8 +4628,8 @@
       "_origin": "ast",
       "community": 14,
       "norm_label": "rootdir",
-      "id": "tsconfig_compileroptions_rootdir",
-      "community_name": "compilerOptions"
+      "community_name": "compilerOptions",
+      "id": "tsconfig_compileroptions_rootdir"
     },
     {
       "label": "skipLibCheck",
@@ -4639,8 +4639,8 @@
       "_origin": "ast",
       "community": 14,
       "norm_label": "skiplibcheck",
-      "id": "tsconfig_compileroptions_skiplibcheck",
-      "community_name": "compilerOptions"
+      "community_name": "compilerOptions",
+      "id": "tsconfig_compileroptions_skiplibcheck"
     },
     {
       "label": "strict",
@@ -4650,8 +4650,8 @@
       "_origin": "ast",
       "community": 14,
       "norm_label": "strict",
-      "id": "tsconfig_compileroptions_strict",
-      "community_name": "compilerOptions"
+      "community_name": "compilerOptions",
+      "id": "tsconfig_compileroptions_strict"
     },
     {
       "label": "target",
@@ -4661,8 +4661,8 @@
       "_origin": "ast",
       "community": 14,
       "norm_label": "target",
-      "id": "tsconfig_compileroptions_target",
-      "community_name": "compilerOptions"
+      "community_name": "compilerOptions",
+      "id": "tsconfig_compileroptions_target"
     },
     {
       "label": "types",
@@ -4672,8 +4672,8 @@
       "_origin": "ast",
       "community": 14,
       "norm_label": "types",
-      "id": "tsconfig_compileroptions_types",
-      "community_name": "compilerOptions"
+      "community_name": "compilerOptions",
+      "id": "tsconfig_compileroptions_types"
     },
     {
       "label": "exclude",
@@ -4683,8 +4683,8 @@
       "_origin": "ast",
       "community": 14,
       "norm_label": "exclude",
-      "id": "tsconfig_exclude",
-      "community_name": "compilerOptions"
+      "community_name": "compilerOptions",
+      "id": "tsconfig_exclude"
     },
     {
       "label": "include",
@@ -4694,8 +4694,8 @@
       "_origin": "ast",
       "community": 14,
       "norm_label": "include",
-      "id": "tsconfig_include",
-      "community_name": "compilerOptions"
+      "community_name": "compilerOptions",
+      "id": "tsconfig_include"
     },
     {
       "label": "src/adapters/prisma",
@@ -4705,8 +4705,8 @@
       "_origin": "ast",
       "community": 14,
       "norm_label": "src/adapters/prisma",
-      "id": "ref_src_adapters_prisma",
-      "community_name": "compilerOptions"
+      "community_name": "compilerOptions",
+      "id": "ref_src_adapters_prisma"
     },
     {
       "label": "node",
@@ -4716,8 +4716,8 @@
       "_origin": "ast",
       "community": 14,
       "norm_label": "node",
-      "id": "tsconfig_json_ref_node",
-      "community_name": "compilerOptions"
+      "community_name": "compilerOptions",
+      "id": "tsconfig_json_ref_node"
     },
     {
       "label": "src",
@@ -4727,8 +4727,8 @@
       "_origin": "ast",
       "community": 14,
       "norm_label": "src",
-      "id": "tsconfig_json_ref_src",
-      "community_name": "compilerOptions"
+      "community_name": "compilerOptions",
+      "id": "tsconfig_json_ref_src"
     },
     {
       "label": "PassaggioModal.tsx",
@@ -4738,8 +4738,8 @@
       "_origin": "ast",
       "community": 15,
       "norm_label": "passaggiomodal.tsx",
-      "id": "frontend_src_components_passaggiomodal",
-      "community_name": "PassaggioModal.tsx"
+      "community_name": "PassaggioModal.tsx",
+      "id": "frontend_src_components_passaggiomodal"
     },
     {
       "label": "closeBtnStyle",
@@ -4749,8 +4749,8 @@
       "_origin": "ast",
       "community": 15,
       "norm_label": "closebtnstyle",
-      "id": "frontend_src_components_passaggiomodal_closebtnstyle",
-      "community_name": "PassaggioModal.tsx"
+      "community_name": "PassaggioModal.tsx",
+      "id": "frontend_src_components_passaggiomodal_closebtnstyle"
     },
     {
       "label": "headStyle",
@@ -4760,8 +4760,8 @@
       "_origin": "ast",
       "community": 15,
       "norm_label": "headstyle",
-      "id": "frontend_src_components_passaggiomodal_headstyle",
-      "community_name": "PassaggioModal.tsx"
+      "community_name": "PassaggioModal.tsx",
+      "id": "frontend_src_components_passaggiomodal_headstyle"
     },
     {
       "label": "modalStyle",
@@ -4771,8 +4771,8 @@
       "_origin": "ast",
       "community": 15,
       "norm_label": "modalstyle",
-      "id": "frontend_src_components_passaggiomodal_modalstyle",
-      "community_name": "PassaggioModal.tsx"
+      "community_name": "PassaggioModal.tsx",
+      "id": "frontend_src_components_passaggiomodal_modalstyle"
     },
     {
       "label": "overlayStyle",
@@ -4782,8 +4782,8 @@
       "_origin": "ast",
       "community": 15,
       "norm_label": "overlaystyle",
-      "id": "frontend_src_components_passaggiomodal_overlaystyle",
-      "community_name": "PassaggioModal.tsx"
+      "community_name": "PassaggioModal.tsx",
+      "id": "frontend_src_components_passaggiomodal_overlaystyle"
     },
     {
       "label": "TYPE_COLOR",
@@ -4793,8 +4793,8 @@
       "_origin": "ast",
       "community": 15,
       "norm_label": "type_color",
-      "id": "frontend_src_components_passaggiomodal_type_color",
-      "community_name": "PassaggioModal.tsx"
+      "community_name": "PassaggioModal.tsx",
+      "id": "frontend_src_components_passaggiomodal_type_color"
     },
     {
       "label": "TYPE_LABEL",
@@ -4804,8 +4804,8 @@
       "_origin": "ast",
       "community": 15,
       "norm_label": "type_label",
-      "id": "frontend_src_components_passaggiomodal_type_label",
-      "community_name": "PassaggioModal.tsx"
+      "community_name": "PassaggioModal.tsx",
+      "id": "frontend_src_components_passaggiomodal_type_label"
     },
     {
       "label": "NewProjectWizard.tsx",
@@ -4815,8 +4815,8 @@
       "_origin": "ast",
       "community": 16,
       "norm_label": "newprojectwizard.tsx",
-      "id": "frontend_src_components_newprojectwizard",
-      "community_name": "NewProjectWizard.tsx"
+      "community_name": "NewProjectWizard.tsx",
+      "id": "frontend_src_components_newprojectwizard"
     },
     {
       "label": "closeBtnStyle",
@@ -4826,8 +4826,8 @@
       "_origin": "ast",
       "community": 16,
       "norm_label": "closebtnstyle",
-      "id": "frontend_src_components_newprojectwizard_closebtnstyle",
-      "community_name": "NewProjectWizard.tsx"
+      "community_name": "NewProjectWizard.tsx",
+      "id": "frontend_src_components_newprojectwizard_closebtnstyle"
     },
     {
       "label": "labelStyle",
@@ -4837,8 +4837,8 @@
       "_origin": "ast",
       "community": 16,
       "norm_label": "labelstyle",
-      "id": "frontend_src_components_newprojectwizard_labelstyle",
-      "community_name": "NewProjectWizard.tsx"
+      "community_name": "NewProjectWizard.tsx",
+      "id": "frontend_src_components_newprojectwizard_labelstyle"
     },
     {
       "label": "overlayStyle",
@@ -4848,8 +4848,8 @@
       "_origin": "ast",
       "community": 16,
       "norm_label": "overlaystyle",
-      "id": "frontend_src_components_newprojectwizard_overlaystyle",
-      "community_name": "NewProjectWizard.tsx"
+      "community_name": "NewProjectWizard.tsx",
+      "id": "frontend_src_components_newprojectwizard_overlaystyle"
     },
     {
       "label": "wizStyle",
@@ -4859,8 +4859,8 @@
       "_origin": "ast",
       "community": 16,
       "norm_label": "wizstyle",
-      "id": "frontend_src_components_newprojectwizard_wizstyle",
-      "community_name": "NewProjectWizard.tsx"
+      "community_name": "NewProjectWizard.tsx",
+      "id": "frontend_src_components_newprojectwizard_wizstyle"
     },
     {
       "label": "CatBadge.tsx",
@@ -4870,8 +4870,8 @@
       "_origin": "ast",
       "community": 16,
       "norm_label": "catbadge.tsx",
-      "id": "frontend_src_components_ui_catbadge",
-      "community_name": "NewProjectWizard.tsx"
+      "community_name": "NewProjectWizard.tsx",
+      "id": "frontend_src_components_ui_catbadge"
     },
     {
       "label": "MLIB",
@@ -4881,8 +4881,8 @@
       "_origin": "ast",
       "community": 16,
       "norm_label": "mlib",
-      "id": "frontend_src_store_mockdata_mlib",
-      "community_name": "NewProjectWizard.tsx"
+      "community_name": "NewProjectWizard.tsx",
+      "id": "frontend_src_store_mockdata_mlib"
     },
     {
       "label": "client.ts",
@@ -4892,8 +4892,8 @@
       "_origin": "ast",
       "community": 17,
       "norm_label": "client.ts",
-      "id": "frontend_src_api_client",
-      "community_name": "client.ts"
+      "community_name": "client.ts",
+      "id": "frontend_src_api_client"
     },
     {
       "label": "API_BASE",
@@ -4903,8 +4903,8 @@
       "_origin": "ast",
       "community": 17,
       "norm_label": "api_base",
-      "id": "frontend_src_api_client_api_base",
-      "community_name": "client.ts"
+      "community_name": "client.ts",
+      "id": "frontend_src_api_client_api_base"
     },
     {
       "label": "SettingsPage.tsx",
@@ -4914,8 +4914,8 @@
       "_origin": "ast",
       "community": 17,
       "norm_label": "settingspage.tsx",
-      "id": "frontend_src_pages_settingspage",
-      "community_name": "client.ts"
+      "community_name": "client.ts",
+      "id": "frontend_src_pages_settingspage"
     },
     {
       "label": "App.tsx",
@@ -4925,8 +4925,8 @@
       "_origin": "ast",
       "community": 18,
       "norm_label": "app.tsx",
-      "id": "frontend_src_app",
-      "community_name": "App.tsx"
+      "community_name": "App.tsx",
+      "id": "frontend_src_app"
     },
     {
       "label": "main.tsx",
@@ -4936,8 +4936,8 @@
       "_origin": "ast",
       "community": 18,
       "norm_label": "main.tsx",
-      "id": "frontend_src_main",
-      "community_name": "App.tsx"
+      "community_name": "App.tsx",
+      "id": "frontend_src_main"
     },
     {
       "label": "ClientsPage.tsx",
@@ -4947,8 +4947,8 @@
       "_origin": "ast",
       "community": 18,
       "norm_label": "clientspage.tsx",
-      "id": "frontend_src_pages_clientspage",
-      "community_name": "App.tsx"
+      "community_name": "App.tsx",
+      "id": "frontend_src_pages_clientspage"
     },
     {
       "label": "react",
@@ -4958,8 +4958,8 @@
       "_origin": "ast",
       "community": 18,
       "norm_label": "react",
-      "id": "ref_react",
-      "community_name": "App.tsx"
+      "community_name": "App.tsx",
+      "id": "ref_react"
     },
     {
       "label": "AppLayout.tsx",
@@ -4969,8 +4969,8 @@
       "_origin": "ast",
       "community": 19,
       "norm_label": "applayout.tsx",
-      "id": "frontend_src_components_layout_applayout",
-      "community_name": "AppLayout.tsx"
+      "community_name": "AppLayout.tsx",
+      "id": "frontend_src_components_layout_applayout"
     },
     {
       "label": "TITLES",
@@ -4980,8 +4980,8 @@
       "_origin": "ast",
       "community": 19,
       "norm_label": "titles",
-      "id": "frontend_src_components_layout_applayout_titles",
-      "community_name": "AppLayout.tsx"
+      "community_name": "AppLayout.tsx",
+      "id": "frontend_src_components_layout_applayout_titles"
     },
     {
       "label": "Sidebar.tsx",
@@ -4991,8 +4991,8 @@
       "_origin": "ast",
       "community": 19,
       "norm_label": "sidebar.tsx",
-      "id": "frontend_src_components_layout_sidebar",
-      "community_name": "AppLayout.tsx"
+      "community_name": "AppLayout.tsx",
+      "id": "frontend_src_components_layout_sidebar"
     },
     {
       "label": "NAV",
@@ -5002,8 +5002,8 @@
       "_origin": "ast",
       "community": 19,
       "norm_label": "nav",
-      "id": "frontend_src_components_layout_sidebar_nav",
-      "community_name": "AppLayout.tsx"
+      "community_name": "AppLayout.tsx",
+      "id": "frontend_src_components_layout_sidebar_nav"
     },
     {
       "label": "fs",
@@ -5013,8 +5013,8 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "fs",
-      "id": "fs",
-      "community_name": "inMemoryApp.ts"
+      "community_name": "inMemoryApp.ts",
+      "id": "fs"
     },
     {
       "label": "path",
@@ -5024,8 +5024,8 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "path",
-      "id": "path",
-      "community_name": "inMemoryApp.ts"
+      "community_name": "inMemoryApp.ts",
+      "id": "path"
     },
     {
       "label": "appErrors.ts",
@@ -5035,8 +5035,8 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "apperrors.ts",
-      "id": "src_adapters_apperrors",
-      "community_name": "inMemoryApp.ts"
+      "community_name": "inMemoryApp.ts",
+      "id": "src_adapters_apperrors"
     },
     {
       "label": "inMemoryApp.ts",
@@ -5046,8 +5046,8 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "inmemoryapp.ts",
-      "id": "src_adapters_inmemoryapp",
-      "community_name": "inMemoryApp.ts"
+      "community_name": "inMemoryApp.ts",
+      "id": "src_adapters_inmemoryapp"
     },
     {
       "label": "prisma/index.ts",
@@ -5057,8 +5057,8 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "prisma/index.ts",
-      "id": "src_adapters_prisma_index",
-      "community_name": "inMemoryApp.ts"
+      "community_name": "inMemoryApp.ts",
+      "id": "src_adapters_prisma_index"
     },
     {
       "label": "app",
@@ -5068,8 +5068,8 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "app",
-      "id": "src_adapters_prisma_index_app",
-      "community_name": "inMemoryApp.ts"
+      "community_name": "inMemoryApp.ts",
+      "id": "src_adapters_prisma_index_app"
     },
     {
       "label": "porta",
@@ -5079,8 +5079,8 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "porta",
-      "id": "src_adapters_prisma_index_porta",
-      "community_name": "inMemoryApp.ts"
+      "community_name": "inMemoryApp.ts",
+      "id": "src_adapters_prisma_index_porta"
     },
     {
       "label": "prisma",
@@ -5090,8 +5090,8 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "prisma",
-      "id": "src_adapters_prisma_index_prisma",
-      "community_name": "inMemoryApp.ts"
+      "community_name": "inMemoryApp.ts",
+      "id": "src_adapters_prisma_index_prisma"
     },
     {
       "label": "server",
@@ -5101,8 +5101,8 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "server",
-      "id": "src_adapters_prisma_index_server",
-      "community_name": "inMemoryApp.ts"
+      "community_name": "inMemoryApp.ts",
+      "id": "src_adapters_prisma_index_server"
     },
     {
       "label": "prismaApp.ts",
@@ -5112,8 +5112,8 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "prismaapp.ts",
-      "id": "src_adapters_prisma_prismaapp",
-      "community_name": "inMemoryApp.ts"
+      "community_name": "inMemoryApp.ts",
+      "id": "src_adapters_prisma_prismaapp"
     },
     {
       "label": "src/index.ts",
@@ -5123,8 +5123,8 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "src/index.ts",
-      "id": "src_index",
-      "community_name": "inMemoryApp.ts"
+      "community_name": "inMemoryApp.ts",
+      "id": "src_index"
     },
     {
       "label": "app",
@@ -5134,8 +5134,8 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "app",
-      "id": "src_index_app",
-      "community_name": "inMemoryApp.ts"
+      "community_name": "inMemoryApp.ts",
+      "id": "src_index_app"
     },
     {
       "label": "porta",
@@ -5145,8 +5145,8 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "porta",
-      "id": "src_index_porta",
-      "community_name": "inMemoryApp.ts"
+      "community_name": "inMemoryApp.ts",
+      "id": "src_index_porta"
     },
     {
       "label": "prisma",
@@ -5156,8 +5156,8 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "prisma",
-      "id": "src_index_prisma",
-      "community_name": "inMemoryApp.ts"
+      "community_name": "inMemoryApp.ts",
+      "id": "src_index_prisma"
     },
     {
       "label": "server",
@@ -5167,8 +5167,8 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "server",
-      "id": "src_index_server",
-      "community_name": "inMemoryApp.ts"
+      "community_name": "inMemoryApp.ts",
+      "id": "src_index_server"
     },
     {
       "label": "server.ts",
@@ -5178,8 +5178,8 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "server.ts",
-      "id": "src_server",
-      "community_name": "inMemoryApp.ts"
+      "community_name": "inMemoryApp.ts",
+      "id": "src_server"
     },
     {
       "label": "appPort.ts",
@@ -5189,8 +5189,8 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "appport.ts",
-      "id": "src_services_appport",
-      "community_name": "inMemoryApp.ts"
+      "community_name": "inMemoryApp.ts",
+      "id": "src_services_appport"
     },
     {
       "label": "bootstrap.ts",
@@ -5200,8 +5200,8 @@
       "_origin": "ast",
       "community": 20,
       "norm_label": "bootstrap.ts",
-      "id": "src_adapters_prisma_bootstrap",
-      "community_name": "bootstrap.ts"
+      "community_name": "bootstrap.ts",
+      "id": "src_adapters_prisma_bootstrap"
     },
     {
       "label": "prisma",
@@ -5211,8 +5211,8 @@
       "_origin": "ast",
       "community": 20,
       "norm_label": "prisma",
-      "id": "src_adapters_prisma_bootstrap_prisma",
-      "community_name": "bootstrap.ts"
+      "community_name": "bootstrap.ts",
+      "id": "src_adapters_prisma_bootstrap_prisma"
     },
     {
       "label": "password.ts",
@@ -5222,8 +5222,8 @@
       "_origin": "ast",
       "community": 20,
       "norm_label": "password.ts",
-      "id": "src_util_password",
-      "community_name": "bootstrap.ts"
+      "community_name": "bootstrap.ts",
+      "id": "src_util_password"
     },
     {
       "label": "password.test.ts",
@@ -5233,8 +5233,8 @@
       "_origin": "ast",
       "community": 20,
       "norm_label": "password.test.ts",
-      "id": "src_util_password_test",
-      "community_name": "bootstrap.ts"
+      "community_name": "bootstrap.ts",
+      "id": "src_util_password_test"
     },
     {
       "label": "Placeholders.tsx",
@@ -5244,8 +5244,8 @@
       "_origin": "ast",
       "community": 21,
       "norm_label": "placeholders.tsx",
-      "id": "frontend_src_pages_placeholders",
-      "community_name": "Placeholders.tsx"
+      "community_name": "Placeholders.tsx",
+      "id": "frontend_src_pages_placeholders"
     },
     {
       "label": "PLACEHOLDER",
@@ -5255,8 +5255,8 @@
       "_origin": "ast",
       "community": 21,
       "norm_label": "placeholder",
-      "id": "frontend_src_pages_placeholders_placeholder",
-      "community_name": "Placeholders.tsx"
+      "community_name": "Placeholders.tsx",
+      "id": "frontend_src_pages_placeholders_placeholder"
     },
     {
       "label": "frontend/tsconfig.json",
@@ -5266,8 +5266,8 @@
       "_origin": "ast",
       "community": 22,
       "norm_label": "frontend/tsconfig.json",
-      "id": "frontend_tsconfig",
-      "community_name": "frontend/tsconfig.json"
+      "community_name": "frontend/tsconfig.json",
+      "id": "frontend_tsconfig"
     },
     {
       "label": "files",
@@ -5277,8 +5277,8 @@
       "_origin": "ast",
       "community": 22,
       "norm_label": "files",
-      "id": "frontend_tsconfig_files",
-      "community_name": "frontend/tsconfig.json"
+      "community_name": "frontend/tsconfig.json",
+      "id": "frontend_tsconfig_files"
     },
     {
       "label": "references",
@@ -5288,8 +5288,8 @@
       "_origin": "ast",
       "community": 22,
       "norm_label": "references",
-      "id": "frontend_tsconfig_references",
-      "community_name": "frontend/tsconfig.json"
+      "community_name": "frontend/tsconfig.json",
+      "id": "frontend_tsconfig_references"
     },
     {
       "label": "seedFull.ts",
@@ -5299,8 +5299,8 @@
       "_origin": "ast",
       "community": 23,
       "norm_label": "seedfull.ts",
-      "id": "src_adapters_prisma_seedfull",
-      "community_name": "seedFull.ts"
+      "community_name": "seedFull.ts",
+      "id": "src_adapters_prisma_seedfull"
     },
     {
       "label": "prisma",
@@ -5310,8 +5310,8 @@
       "_origin": "ast",
       "community": 23,
       "norm_label": "prisma",
-      "id": "src_adapters_prisma_seedfull_prisma",
-      "community_name": "seedFull.ts"
+      "community_name": "seedFull.ts",
+      "id": "src_adapters_prisma_seedfull_prisma"
     },
     {
       "label": "vite.config.ts",
@@ -5321,8 +5321,8 @@
       "_origin": "ast",
       "community": 24,
       "norm_label": "vite.config.ts",
-      "id": "frontend_vite_config",
-      "community_name": "vite.config.ts"
+      "community_name": "vite.config.ts",
+      "id": "frontend_vite_config"
     },
     {
       "label": "Avatar.tsx",
@@ -5332,8 +5332,8 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "avatar.tsx",
-      "id": "frontend_src_components_ui_avatar",
-      "community_name": "ProjectDetail.tsx"
+      "community_name": "ProjectDetail.tsx",
+      "id": "frontend_src_components_ui_avatar"
     },
     {
       "label": "Badge.tsx",
@@ -5343,8 +5343,8 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "badge.tsx",
-      "id": "frontend_src_components_ui_badge",
-      "community_name": "ProjectDetail.tsx"
+      "community_name": "ProjectDetail.tsx",
+      "id": "frontend_src_components_ui_badge"
     },
     {
       "label": "ProgressBar.tsx",
@@ -5354,8 +5354,8 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "progressbar.tsx",
-      "id": "frontend_src_components_ui_progressbar",
-      "community_name": "ProjectDetail.tsx"
+      "community_name": "ProjectDetail.tsx",
+      "id": "frontend_src_components_ui_progressbar"
     },
     {
       "label": "Dashboard.tsx",
@@ -5365,8 +5365,8 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "dashboard.tsx",
-      "id": "frontend_src_pages_dashboard",
-      "community_name": "ProjectDetail.tsx"
+      "community_name": "ProjectDetail.tsx",
+      "id": "frontend_src_pages_dashboard"
     },
     {
       "label": "ProjectDetail.tsx",
@@ -5376,8 +5376,8 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "projectdetail.tsx",
-      "id": "frontend_src_pages_projectdetail",
-      "community_name": "ProjectDetail.tsx"
+      "community_name": "ProjectDetail.tsx",
+      "id": "frontend_src_pages_projectdetail"
     },
     {
       "label": "Projects.tsx",
@@ -5387,8 +5387,8 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "projects.tsx",
-      "id": "frontend_src_pages_projects",
-      "community_name": "ProjectDetail.tsx"
+      "community_name": "ProjectDetail.tsx",
+      "id": "frontend_src_pages_projects"
     },
     {
       "label": "TEAM",
@@ -5398,8 +5398,8 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "team",
-      "id": "frontend_src_store_mockdata_team",
-      "community_name": "ProjectDetail.tsx"
+      "community_name": "ProjectDetail.tsx",
+      "id": "frontend_src_store_mockdata_team"
     },
     {
       "label": ".oxlintrc.json",
@@ -5409,8 +5409,8 @@
       "_origin": "ast",
       "community": 5,
       "norm_label": ".oxlintrc.json",
-      "id": "frontend_oxlintrc",
-      "community_name": "devDependencies"
+      "community_name": "devDependencies",
+      "id": "frontend_oxlintrc"
     },
     {
       "label": "plugins",
@@ -5420,8 +5420,8 @@
       "_origin": "ast",
       "community": 5,
       "norm_label": "plugins",
-      "id": "frontend_oxlintrc_plugins",
-      "community_name": "devDependencies"
+      "community_name": "devDependencies",
+      "id": "frontend_oxlintrc_plugins"
     },
     {
       "label": "rules",
@@ -5431,8 +5431,8 @@
       "_origin": "ast",
       "community": 5,
       "norm_label": "rules",
-      "id": "frontend_oxlintrc_rules",
-      "community_name": "devDependencies"
+      "community_name": "devDependencies",
+      "id": "frontend_oxlintrc_rules"
     },
     {
       "label": "react/only-export-components",
@@ -5442,8 +5442,8 @@
       "_origin": "ast",
       "community": 5,
       "norm_label": "react/only-export-components",
-      "id": "frontend_oxlintrc_rules_react_only_export_components",
-      "community_name": "devDependencies"
+      "community_name": "devDependencies",
+      "id": "frontend_oxlintrc_rules_react_only_export_components"
     },
     {
       "label": "react/rules-of-hooks",
@@ -5453,8 +5453,8 @@
       "_origin": "ast",
       "community": 5,
       "norm_label": "react/rules-of-hooks",
-      "id": "frontend_oxlintrc_rules_react_rules_of_hooks",
-      "community_name": "devDependencies"
+      "community_name": "devDependencies",
+      "id": "frontend_oxlintrc_rules_react_rules_of_hooks"
     },
     {
       "label": "$schema",
@@ -5464,8 +5464,8 @@
       "_origin": "ast",
       "community": 5,
       "norm_label": "$schema",
-      "id": "frontend_oxlintrc_schema",
-      "community_name": "devDependencies"
+      "community_name": "devDependencies",
+      "id": "frontend_oxlintrc_schema"
     },
     {
       "label": "devDependencies",
@@ -5475,8 +5475,8 @@
       "_origin": "ast",
       "community": 5,
       "norm_label": "devdependencies",
-      "id": "frontend_package_devdependencies",
-      "community_name": "devDependencies"
+      "community_name": "devDependencies",
+      "id": "frontend_package_devdependencies"
     },
     {
       "label": "oxlint",
@@ -5486,8 +5486,8 @@
       "_origin": "ast",
       "community": 5,
       "norm_label": "oxlint",
-      "id": "frontend_package_devdependencies_oxlint",
-      "community_name": "devDependencies"
+      "community_name": "devDependencies",
+      "id": "frontend_package_devdependencies_oxlint"
     },
     {
       "label": "@types/node",
@@ -5497,8 +5497,8 @@
       "_origin": "ast",
       "community": 5,
       "norm_label": "@types/node",
-      "id": "frontend_package_devdependencies_types_node",
-      "community_name": "devDependencies"
+      "community_name": "devDependencies",
+      "id": "frontend_package_devdependencies_types_node"
     },
     {
       "label": "@types/react",
@@ -5508,8 +5508,8 @@
       "_origin": "ast",
       "community": 5,
       "norm_label": "@types/react",
-      "id": "frontend_package_devdependencies_types_react",
-      "community_name": "devDependencies"
+      "community_name": "devDependencies",
+      "id": "frontend_package_devdependencies_types_react"
     },
     {
       "label": "@types/react-dom",
@@ -5519,8 +5519,8 @@
       "_origin": "ast",
       "community": 5,
       "norm_label": "@types/react-dom",
-      "id": "frontend_package_devdependencies_types_react_dom",
-      "community_name": "devDependencies"
+      "community_name": "devDependencies",
+      "id": "frontend_package_devdependencies_types_react_dom"
     },
     {
       "label": "typescript",
@@ -5530,8 +5530,8 @@
       "_origin": "ast",
       "community": 5,
       "norm_label": "typescript",
-      "id": "frontend_package_devdependencies_typescript",
-      "community_name": "devDependencies"
+      "community_name": "devDependencies",
+      "id": "frontend_package_devdependencies_typescript"
     },
     {
       "label": "vite",
@@ -5541,8 +5541,8 @@
       "_origin": "ast",
       "community": 5,
       "norm_label": "vite",
-      "id": "frontend_package_devdependencies_vite",
-      "community_name": "devDependencies"
+      "community_name": "devDependencies",
+      "id": "frontend_package_devdependencies_vite"
     },
     {
       "label": "@vitejs/plugin-react",
@@ -5552,8 +5552,8 @@
       "_origin": "ast",
       "community": 5,
       "norm_label": "@vitejs/plugin-react",
-      "id": "frontend_package_devdependencies_vitejs_plugin_react",
-      "community_name": "devDependencies"
+      "community_name": "devDependencies",
+      "id": "frontend_package_devdependencies_vitejs_plugin_react"
     },
     {
       "label": "devDependencies",
@@ -5563,8 +5563,8 @@
       "_origin": "ast",
       "community": 5,
       "norm_label": "devdependencies",
-      "id": "package_devdependencies",
-      "community_name": "devDependencies"
+      "community_name": "devDependencies",
+      "id": "package_devdependencies"
     },
     {
       "label": "prisma",
@@ -5574,8 +5574,8 @@
       "_origin": "ast",
       "community": 5,
       "norm_label": "prisma",
-      "id": "package_devdependencies_prisma",
-      "community_name": "devDependencies"
+      "community_name": "devDependencies",
+      "id": "package_devdependencies_prisma"
     },
     {
       "label": "tsx",
@@ -5585,8 +5585,8 @@
       "_origin": "ast",
       "community": 5,
       "norm_label": "tsx",
-      "id": "package_devdependencies_tsx",
-      "community_name": "devDependencies"
+      "community_name": "devDependencies",
+      "id": "package_devdependencies_tsx"
     },
     {
       "label": "@types/node",
@@ -5596,8 +5596,8 @@
       "_origin": "ast",
       "community": 5,
       "norm_label": "@types/node",
-      "id": "package_devdependencies_types_node",
-      "community_name": "devDependencies"
+      "community_name": "devDependencies",
+      "id": "package_devdependencies_types_node"
     },
     {
       "label": "typescript",
@@ -5607,8 +5607,8 @@
       "_origin": "ast",
       "community": 5,
       "norm_label": "typescript",
-      "id": "package_devdependencies_typescript",
-      "community_name": "devDependencies"
+      "community_name": "devDependencies",
+      "id": "package_devdependencies_typescript"
     },
     {
       "label": "vitest",
@@ -5618,8 +5618,8 @@
       "_origin": "ast",
       "community": 5,
       "norm_label": "vitest",
-      "id": "package_devdependencies_vitest",
-      "community_name": "devDependencies"
+      "community_name": "devDependencies",
+      "id": "package_devdependencies_vitest"
     },
     {
       "label": "oxlint",
@@ -5629,8 +5629,8 @@
       "_origin": "ast",
       "community": 5,
       "norm_label": "oxlint",
-      "id": "oxlint",
-      "community_name": "devDependencies"
+      "community_name": "devDependencies",
+      "id": "oxlint"
     },
     {
       "label": "@types/node",
@@ -5640,8 +5640,8 @@
       "_origin": "ast",
       "community": 5,
       "norm_label": "@types/node",
-      "id": "package_json_types_node",
-      "community_name": "devDependencies"
+      "community_name": "devDependencies",
+      "id": "package_json_types_node"
     },
     {
       "label": "prisma",
@@ -5651,8 +5651,8 @@
       "_origin": "ast",
       "community": 5,
       "norm_label": "prisma",
-      "id": "prisma",
-      "community_name": "devDependencies"
+      "community_name": "devDependencies",
+      "id": "prisma"
     },
     {
       "label": "oxc",
@@ -5662,8 +5662,8 @@
       "_origin": "ast",
       "community": 5,
       "norm_label": "oxc",
-      "id": "ref_oxc",
-      "community_name": "devDependencies"
+      "community_name": "devDependencies",
+      "id": "ref_oxc"
     },
     {
       "label": "typescript",
@@ -5673,8 +5673,8 @@
       "_origin": "ast",
       "community": 5,
       "norm_label": "typescript",
-      "id": "ref_typescript",
-      "community_name": "devDependencies"
+      "community_name": "devDependencies",
+      "id": "ref_typescript"
     },
     {
       "label": "warn",
@@ -5684,8 +5684,8 @@
       "_origin": "ast",
       "community": 5,
       "norm_label": "warn",
-      "id": "ref_warn",
-      "community_name": "devDependencies"
+      "community_name": "devDependencies",
+      "id": "ref_warn"
     },
     {
       "label": "tsx",
@@ -5695,8 +5695,8 @@
       "_origin": "ast",
       "community": 5,
       "norm_label": "tsx",
-      "id": "tsx",
-      "community_name": "devDependencies"
+      "community_name": "devDependencies",
+      "id": "tsx"
     },
     {
       "label": "@types/react",
@@ -5706,8 +5706,8 @@
       "_origin": "ast",
       "community": 5,
       "norm_label": "@types/react",
-      "id": "types_react",
-      "community_name": "devDependencies"
+      "community_name": "devDependencies",
+      "id": "types_react"
     },
     {
       "label": "@types/react-dom",
@@ -5717,8 +5717,8 @@
       "_origin": "ast",
       "community": 5,
       "norm_label": "@types/react-dom",
-      "id": "types_react_dom",
-      "community_name": "devDependencies"
+      "community_name": "devDependencies",
+      "id": "types_react_dom"
     },
     {
       "label": "vite",
@@ -5728,8 +5728,8 @@
       "_origin": "ast",
       "community": 5,
       "norm_label": "vite",
-      "id": "vite",
-      "community_name": "devDependencies"
+      "community_name": "devDependencies",
+      "id": "vite"
     },
     {
       "label": "@vitejs/plugin-react",
@@ -5739,8 +5739,8 @@
       "_origin": "ast",
       "community": 5,
       "norm_label": "@vitejs/plugin-react",
-      "id": "vitejs_plugin_react",
-      "community_name": "devDependencies"
+      "community_name": "devDependencies",
+      "id": "vitejs_plugin_react"
     },
     {
       "label": "vitest",
@@ -5750,8 +5750,8 @@
       "_origin": "ast",
       "community": 5,
       "norm_label": "vitest",
-      "id": "vitest",
-      "community_name": "devDependencies"
+      "community_name": "devDependencies",
+      "id": "vitest"
     },
     {
       "label": "Library.tsx",
@@ -5761,8 +5761,8 @@
       "_origin": "ast",
       "community": 6,
       "norm_label": "library.tsx",
-      "id": "frontend_src_pages_library",
-      "community_name": "utils/index.ts"
+      "community_name": "utils/index.ts",
+      "id": "frontend_src_pages_library"
     },
     {
       "label": "mockData.ts",
@@ -5772,8 +5772,8 @@
       "_origin": "ast",
       "community": 6,
       "norm_label": "mockdata.ts",
-      "id": "frontend_src_store_mockdata",
-      "community_name": "utils/index.ts"
+      "community_name": "utils/index.ts",
+      "id": "frontend_src_store_mockdata"
     },
     {
       "label": "ARTICOLI",
@@ -5783,8 +5783,8 @@
       "_origin": "ast",
       "community": 6,
       "norm_label": "articoli",
-      "id": "frontend_src_store_mockdata_articoli",
-      "community_name": "utils/index.ts"
+      "community_name": "utils/index.ts",
+      "id": "frontend_src_store_mockdata_articoli"
     },
     {
       "label": "PROJECTS",
@@ -5794,8 +5794,8 @@
       "_origin": "ast",
       "community": 6,
       "norm_label": "projects",
-      "id": "frontend_src_store_mockdata_projects",
-      "community_name": "utils/index.ts"
+      "community_name": "utils/index.ts",
+      "id": "frontend_src_store_mockdata_projects"
     },
     {
       "label": "types/index.ts",
@@ -5805,8 +5805,8 @@
       "_origin": "ast",
       "community": 6,
       "norm_label": "types/index.ts",
-      "id": "frontend_src_types_index",
-      "community_name": "utils/index.ts"
+      "community_name": "utils/index.ts",
+      "id": "frontend_src_types_index"
     },
     {
       "label": "utils/index.ts",
@@ -5816,8 +5816,8 @@
       "_origin": "ast",
       "community": 6,
       "norm_label": "utils/index.ts",
-      "id": "frontend_src_utils_index",
-      "community_name": "utils/index.ts"
+      "community_name": "utils/index.ts",
+      "id": "frontend_src_utils_index"
     },
     {
       "label": "lvlCache",
@@ -5827,8 +5827,8 @@
       "_origin": "ast",
       "community": 6,
       "norm_label": "lvlcache",
-      "id": "frontend_src_utils_index_lvlcache",
-      "community_name": "utils/index.ts"
+      "community_name": "utils/index.ts",
+      "id": "frontend_src_utils_index_lvlcache"
     },
     {
       "label": "server.test.ts",
@@ -5838,8 +5838,8 @@
       "_origin": "ast",
       "community": 7,
       "norm_label": "server.test.ts",
-      "id": "src_server_test",
-      "community_name": "AppPort"
+      "community_name": "AppPort",
+      "id": "src_server_test"
     },
     {
       "label": "templateAnalisi",
@@ -5849,8 +5849,8 @@
       "_origin": "ast",
       "community": 7,
       "norm_label": "templateanalisi",
-      "id": "src_server_test_templateanalisi",
-      "community_name": "AppPort"
+      "community_name": "AppPort",
+      "id": "src_server_test_templateanalisi"
     },
     {
       "label": "tsconfig.app.json",
@@ -5860,8 +5860,8 @@
       "_origin": "ast",
       "community": 8,
       "norm_label": "tsconfig.app.json",
-      "id": "frontend_tsconfig_app",
-      "community_name": "compilerOptions"
+      "community_name": "compilerOptions",
+      "id": "frontend_tsconfig_app"
     },
     {
       "label": "compilerOptions",
@@ -5871,8 +5871,8 @@
       "_origin": "ast",
       "community": 8,
       "norm_label": "compileroptions",
-      "id": "frontend_tsconfig_app_compileroptions",
-      "community_name": "compilerOptions"
+      "community_name": "compilerOptions",
+      "id": "frontend_tsconfig_app_compileroptions"
     },
     {
       "label": "allowArbitraryExtensions",
@@ -5882,8 +5882,8 @@
       "_origin": "ast",
       "community": 8,
       "norm_label": "allowarbitraryextensions",
-      "id": "frontend_tsconfig_app_compileroptions_allowarbitraryextensions",
-      "community_name": "compilerOptions"
+      "community_name": "compilerOptions",
+      "id": "frontend_tsconfig_app_compileroptions_allowarbitraryextensions"
     },
     {
       "label": "allowImportingTsExtensions",
@@ -5893,8 +5893,8 @@
       "_origin": "ast",
       "community": 8,
       "norm_label": "allowimportingtsextensions",
-      "id": "frontend_tsconfig_app_compileroptions_allowimportingtsextensions",
-      "community_name": "compilerOptions"
+      "community_name": "compilerOptions",
+      "id": "frontend_tsconfig_app_compileroptions_allowimportingtsextensions"
     },
     {
       "label": "erasableSyntaxOnly",
@@ -5904,8 +5904,8 @@
       "_origin": "ast",
       "community": 8,
       "norm_label": "erasablesyntaxonly",
-      "id": "frontend_tsconfig_app_compileroptions_erasablesyntaxonly",
-      "community_name": "compilerOptions"
+      "community_name": "compilerOptions",
+      "id": "frontend_tsconfig_app_compileroptions_erasablesyntaxonly"
     },
     {
       "label": "jsx",
@@ -5915,8 +5915,8 @@
       "_origin": "ast",
       "community": 8,
       "norm_label": "jsx",
-      "id": "frontend_tsconfig_app_compileroptions_jsx",
-      "community_name": "compilerOptions"
+      "community_name": "compilerOptions",
+      "id": "frontend_tsconfig_app_compileroptions_jsx"
     },
     {
       "label": "lib",
@@ -5926,8 +5926,8 @@
       "_origin": "ast",
       "community": 8,
       "norm_label": "lib",
-      "id": "frontend_tsconfig_app_compileroptions_lib",
-      "community_name": "compilerOptions"
+      "community_name": "compilerOptions",
+      "id": "frontend_tsconfig_app_compileroptions_lib"
     },
     {
       "label": "module",
@@ -5937,8 +5937,8 @@
       "_origin": "ast",
       "community": 8,
       "norm_label": "module",
-      "id": "frontend_tsconfig_app_compileroptions_module",
-      "community_name": "compilerOptions"
+      "community_name": "compilerOptions",
+      "id": "frontend_tsconfig_app_compileroptions_module"
     },
     {
       "label": "moduleDetection",
@@ -5948,8 +5948,8 @@
       "_origin": "ast",
       "community": 8,
       "norm_label": "moduledetection",
-      "id": "frontend_tsconfig_app_compileroptions_moduledetection",
-      "community_name": "compilerOptions"
+      "community_name": "compilerOptions",
+      "id": "frontend_tsconfig_app_compileroptions_moduledetection"
     },
     {
       "label": "moduleResolution",
@@ -5959,8 +5959,8 @@
       "_origin": "ast",
       "community": 8,
       "norm_label": "moduleresolution",
-      "id": "frontend_tsconfig_app_compileroptions_moduleresolution",
-      "community_name": "compilerOptions"
+      "community_name": "compilerOptions",
+      "id": "frontend_tsconfig_app_compileroptions_moduleresolution"
     },
     {
       "label": "noEmit",
@@ -5970,8 +5970,8 @@
       "_origin": "ast",
       "community": 8,
       "norm_label": "noemit",
-      "id": "frontend_tsconfig_app_compileroptions_noemit",
-      "community_name": "compilerOptions"
+      "community_name": "compilerOptions",
+      "id": "frontend_tsconfig_app_compileroptions_noemit"
     },
     {
       "label": "noFallthroughCasesInSwitch",
@@ -5981,8 +5981,8 @@
       "_origin": "ast",
       "community": 8,
       "norm_label": "nofallthroughcasesinswitch",
-      "id": "frontend_tsconfig_app_compileroptions_nofallthroughcasesinswitch",
-      "community_name": "compilerOptions"
+      "community_name": "compilerOptions",
+      "id": "frontend_tsconfig_app_compileroptions_nofallthroughcasesinswitch"
     },
     {
       "label": "noUnusedLocals",
@@ -5992,8 +5992,8 @@
       "_origin": "ast",
       "community": 8,
       "norm_label": "nounusedlocals",
-      "id": "frontend_tsconfig_app_compileroptions_nounusedlocals",
-      "community_name": "compilerOptions"
+      "community_name": "compilerOptions",
+      "id": "frontend_tsconfig_app_compileroptions_nounusedlocals"
     },
     {
       "label": "noUnusedParameters",
@@ -6003,8 +6003,8 @@
       "_origin": "ast",
       "community": 8,
       "norm_label": "nounusedparameters",
-      "id": "frontend_tsconfig_app_compileroptions_nounusedparameters",
-      "community_name": "compilerOptions"
+      "community_name": "compilerOptions",
+      "id": "frontend_tsconfig_app_compileroptions_nounusedparameters"
     },
     {
       "label": "skipLibCheck",
@@ -6014,8 +6014,8 @@
       "_origin": "ast",
       "community": 8,
       "norm_label": "skiplibcheck",
-      "id": "frontend_tsconfig_app_compileroptions_skiplibcheck",
-      "community_name": "compilerOptions"
+      "community_name": "compilerOptions",
+      "id": "frontend_tsconfig_app_compileroptions_skiplibcheck"
     },
     {
       "label": "target",
@@ -6025,8 +6025,8 @@
       "_origin": "ast",
       "community": 8,
       "norm_label": "target",
-      "id": "frontend_tsconfig_app_compileroptions_target",
-      "community_name": "compilerOptions"
+      "community_name": "compilerOptions",
+      "id": "frontend_tsconfig_app_compileroptions_target"
     },
     {
       "label": "tsBuildInfoFile",
@@ -6036,8 +6036,8 @@
       "_origin": "ast",
       "community": 8,
       "norm_label": "tsbuildinfofile",
-      "id": "frontend_tsconfig_app_compileroptions_tsbuildinfofile",
-      "community_name": "compilerOptions"
+      "community_name": "compilerOptions",
+      "id": "frontend_tsconfig_app_compileroptions_tsbuildinfofile"
     },
     {
       "label": "types",
@@ -6047,8 +6047,8 @@
       "_origin": "ast",
       "community": 8,
       "norm_label": "types",
-      "id": "frontend_tsconfig_app_compileroptions_types",
-      "community_name": "compilerOptions"
+      "community_name": "compilerOptions",
+      "id": "frontend_tsconfig_app_compileroptions_types"
     },
     {
       "label": "verbatimModuleSyntax",
@@ -6058,8 +6058,8 @@
       "_origin": "ast",
       "community": 8,
       "norm_label": "verbatimmodulesyntax",
-      "id": "frontend_tsconfig_app_compileroptions_verbatimmodulesyntax",
-      "community_name": "compilerOptions"
+      "community_name": "compilerOptions",
+      "id": "frontend_tsconfig_app_compileroptions_verbatimmodulesyntax"
     },
     {
       "label": "include",
@@ -6069,8 +6069,8 @@
       "_origin": "ast",
       "community": 8,
       "norm_label": "include",
-      "id": "frontend_tsconfig_app_include",
-      "community_name": "compilerOptions"
+      "community_name": "compilerOptions",
+      "id": "frontend_tsconfig_app_include"
     },
     {
       "label": "ES2023",
@@ -6080,8 +6080,8 @@
       "_origin": "ast",
       "community": 8,
       "norm_label": "es2023",
-      "id": "frontend_tsconfig_app_json_ref_es2023",
-      "community_name": "compilerOptions"
+      "community_name": "compilerOptions",
+      "id": "frontend_tsconfig_app_json_ref_es2023"
     },
     {
       "label": "src",
@@ -6091,8 +6091,8 @@
       "_origin": "ast",
       "community": 8,
       "norm_label": "src",
-      "id": "frontend_tsconfig_app_json_ref_src",
-      "community_name": "compilerOptions"
+      "community_name": "compilerOptions",
+      "id": "frontend_tsconfig_app_json_ref_src"
     },
     {
       "label": "DOM",
@@ -6102,8 +6102,8 @@
       "_origin": "ast",
       "community": 8,
       "norm_label": "dom",
-      "id": "ref_dom",
-      "community_name": "compilerOptions"
+      "community_name": "compilerOptions",
+      "id": "ref_dom"
     },
     {
       "label": "vite/client",
@@ -6113,8 +6113,8 @@
       "_origin": "ast",
       "community": 8,
       "norm_label": "vite/client",
-      "id": "ref_vite_client",
-      "community_name": "compilerOptions"
+      "community_name": "compilerOptions",
+      "id": "ref_vite_client"
     },
     {
       "label": "package.json",
@@ -6124,8 +6124,8 @@
       "_origin": "ast",
       "community": 9,
       "norm_label": "package.json",
-      "id": "package",
-      "community_name": "scripts"
+      "community_name": "scripts",
+      "id": "package"
     },
     {
       "label": "dependencies",
@@ -6135,8 +6135,8 @@
       "_origin": "ast",
       "community": 9,
       "norm_label": "dependencies",
-      "id": "package_dependencies",
-      "community_name": "scripts"
+      "community_name": "scripts",
+      "id": "package_dependencies"
     },
     {
       "label": "dotenv",
@@ -6146,8 +6146,8 @@
       "_origin": "ast",
       "community": 9,
       "norm_label": "dotenv",
-      "id": "package_dependencies_dotenv",
-      "community_name": "scripts"
+      "community_name": "scripts",
+      "id": "package_dependencies_dotenv"
     },
     {
       "label": "fastify",
@@ -6157,8 +6157,8 @@
       "_origin": "ast",
       "community": 9,
       "norm_label": "fastify",
-      "id": "package_dependencies_fastify",
-      "community_name": "scripts"
+      "community_name": "scripts",
+      "id": "package_dependencies_fastify"
     },
     {
       "label": "@fastify/cors",
@@ -6168,8 +6168,8 @@
       "_origin": "ast",
       "community": 9,
       "norm_label": "@fastify/cors",
-      "id": "package_dependencies_fastify_cors",
-      "community_name": "scripts"
+      "community_name": "scripts",
+      "id": "package_dependencies_fastify_cors"
     },
     {
       "label": "@prisma/client",
@@ -6179,8 +6179,8 @@
       "_origin": "ast",
       "community": 9,
       "norm_label": "@prisma/client",
-      "id": "package_dependencies_prisma_client",
-      "community_name": "scripts"
+      "community_name": "scripts",
+      "id": "package_dependencies_prisma_client"
     },
     {
       "label": "description",
@@ -6190,8 +6190,8 @@
       "_origin": "ast",
       "community": 9,
       "norm_label": "description",
-      "id": "package_description",
-      "community_name": "scripts"
+      "community_name": "scripts",
+      "id": "package_description"
     },
     {
       "label": "name",
@@ -6201,8 +6201,8 @@
       "_origin": "ast",
       "community": 9,
       "norm_label": "name",
-      "id": "package_name",
-      "community_name": "scripts"
+      "community_name": "scripts",
+      "id": "package_name"
     },
     {
       "label": "scripts",
@@ -6212,8 +6212,8 @@
       "_origin": "ast",
       "community": 9,
       "norm_label": "scripts",
-      "id": "package_scripts",
-      "community_name": "scripts"
+      "community_name": "scripts",
+      "id": "package_scripts"
     },
     {
       "label": "bootstrap",
@@ -6223,8 +6223,8 @@
       "_origin": "ast",
       "community": 9,
       "norm_label": "bootstrap",
-      "id": "package_scripts_bootstrap",
-      "community_name": "scripts"
+      "community_name": "scripts",
+      "id": "package_scripts_bootstrap"
     },
     {
       "label": "dev",
@@ -6234,8 +6234,8 @@
       "_origin": "ast",
       "community": 9,
       "norm_label": "dev",
-      "id": "package_scripts_dev",
-      "community_name": "scripts"
+      "community_name": "scripts",
+      "id": "package_scripts_dev"
     },
     {
       "label": "prisma:generate",
@@ -6245,8 +6245,8 @@
       "_origin": "ast",
       "community": 9,
       "norm_label": "prisma:generate",
-      "id": "package_scripts_prisma_generate",
-      "community_name": "scripts"
+      "community_name": "scripts",
+      "id": "package_scripts_prisma_generate"
     },
     {
       "label": "prisma:migrate",
@@ -6256,8 +6256,8 @@
       "_origin": "ast",
       "community": 9,
       "norm_label": "prisma:migrate",
-      "id": "package_scripts_prisma_migrate",
-      "community_name": "scripts"
+      "community_name": "scripts",
+      "id": "package_scripts_prisma_migrate"
     },
     {
       "label": "seed",
@@ -6267,8 +6267,8 @@
       "_origin": "ast",
       "community": 9,
       "norm_label": "seed",
-      "id": "package_scripts_seed",
-      "community_name": "scripts"
+      "community_name": "scripts",
+      "id": "package_scripts_seed"
     },
     {
       "label": "start:db",
@@ -6278,8 +6278,8 @@
       "_origin": "ast",
       "community": 9,
       "norm_label": "start:db",
-      "id": "package_scripts_start_db",
-      "community_name": "scripts"
+      "community_name": "scripts",
+      "id": "package_scripts_start_db"
     },
     {
       "label": "test",
@@ -6289,8 +6289,8 @@
       "_origin": "ast",
       "community": 9,
       "norm_label": "test",
-      "id": "package_scripts_test",
-      "community_name": "scripts"
+      "community_name": "scripts",
+      "id": "package_scripts_test"
     },
     {
       "label": "test:watch",
@@ -6300,8 +6300,8 @@
       "_origin": "ast",
       "community": 9,
       "norm_label": "test:watch",
-      "id": "package_scripts_test_watch",
-      "community_name": "scripts"
+      "community_name": "scripts",
+      "id": "package_scripts_test_watch"
     },
     {
       "label": "type",
@@ -6311,8 +6311,8 @@
       "_origin": "ast",
       "community": 9,
       "norm_label": "type",
-      "id": "package_type",
-      "community_name": "scripts"
+      "community_name": "scripts",
+      "id": "package_type"
     },
     {
       "label": "version",
@@ -6322,8 +6322,8 @@
       "_origin": "ast",
       "community": 9,
       "norm_label": "version",
-      "id": "package_version",
-      "community_name": "scripts"
+      "community_name": "scripts",
+      "id": "package_version"
     },
     {
       "label": "dotenv",
@@ -6333,8 +6333,8 @@
       "_origin": "ast",
       "community": 9,
       "norm_label": "dotenv",
-      "id": "dotenv",
-      "community_name": "scripts"
+      "community_name": "scripts",
+      "id": "dotenv"
     },
     {
       "label": "fastify",
@@ -6344,8 +6344,8 @@
       "_origin": "ast",
       "community": 9,
       "norm_label": "fastify",
-      "id": "fastify",
-      "community_name": "scripts"
+      "community_name": "scripts",
+      "id": "fastify"
     },
     {
       "label": "@fastify/cors",
@@ -6355,8 +6355,8 @@
       "_origin": "ast",
       "community": 9,
       "norm_label": "@fastify/cors",
-      "id": "fastify_cors",
-      "community_name": "scripts"
+      "community_name": "scripts",
+      "id": "fastify_cors"
     },
     {
       "label": "@prisma/client",
@@ -6366,8 +6366,8 @@
       "_origin": "ast",
       "community": 9,
       "norm_label": "@prisma/client",
-      "id": "prisma_client",
-      "community_name": "scripts"
+      "community_name": "scripts",
+      "id": "prisma_client"
     }
   ],
   "links": [
