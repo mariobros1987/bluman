@@ -307,7 +307,7 @@ export function PassaggioModal({ project, mid, vidx, onClose }: PassaggioModalPr
                       </div>
                     </div>
                   </div>
-                  <div style={{ textAlign: 'right' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     {d.richiedeFirma ? (
                       <span style={{ background: d.firmato ? '#0d2d22' : '#200f40', color: d.firmato ? '#34d399' : '#a78bfa', padding: '3px 8px', borderRadius: 12, fontSize: 10, fontWeight: 700 }}>
                         {d.firmato ? '✓ Firmato' : '✍️ Richiede Firma Cliente'}
@@ -315,6 +315,26 @@ export function PassaggioModal({ project, mid, vidx, onClose }: PassaggioModalPr
                     ) : (
                       <span style={{ color: 'var(--muted)', fontSize: 10 }}>Informativo</span>
                     )}
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // Prima conferma
+                        const c1 = confirm(`⚠️ PRIMA CONFERMA: Sei sicuro di voler eliminare il documento "${d.nome}"?`);
+                        if (!c1) return;
+
+                        // Seconda conferma (Doppia Conferma di sicurezza)
+                        const c2 = confirm(`🔴 SECONDA CONFERMA DEFINITIVA: Questa operazione è irreversibile e cancellerà definitivamente il file "${d.nome}". Procedere?`);
+                        if (c2) {
+                          setDocuments(prev => prev.filter(doc => doc.id !== d.id));
+                          alert(`✓ Documento "${d.nome}" eliminato con successo. Azione registrata nel Log Audit Studio.`);
+                        }
+                      }}
+                      title="Elimina documento con doppia conferma di sicurezza"
+                      style={{ background: 'var(--card2)', border: '1px solid var(--border)', color: 'var(--red)', padding: '4px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer', fontWeight: 600 }}
+                    >
+                      🗑 Elimina
+                    </button>
                   </div>
                 </div>
               ))}

@@ -18,7 +18,7 @@
 - esecuzione.ts
 - inMemoryApp.ts
 - PrismaApp
-- App.tsx
+- ProjectDetail.tsx
 - devDependencies
 - utils/index.ts
 - AppPort
@@ -32,7 +32,7 @@
 - PassaggioModal.tsx
 - NewProjectWizard.tsx
 - client.ts
-- ProjectDetail.tsx
+- App.tsx
 - AppLayout.tsx
 - bootstrap.ts
 - Placeholders.tsx
@@ -56,12 +56,12 @@
   src/services/fakeIstanziazionePort.ts → src/domain/types.ts
 - `PassaggioModalProps` --references--> `Progetto`  [EXTRACTED]
   frontend/src/components/PassaggioModal.tsx → frontend/src/types/index.ts
-- `GrafoModuliProgettoView()` --calls--> `fmt()`  [EXTRACTED]
-  frontend/src/pages/ProjectDetail.tsx → frontend/src/utils/index.ts
 - `FakeIstanziazionePort` --implements--> `EsecuzionePort`  [EXTRACTED]
   src/services/fakeIstanziazionePort.ts → src/services/istanziazionePort.ts
 - `ModuloStored` --references--> `StatoModulo`  [EXTRACTED]
   src/services/fakeIstanziazionePort.ts → src/domain/types.ts
+- `PrismaIstanziazionePort` --implements--> `IstanziazionePort`  [EXTRACTED]
+  src/adapters/prisma/prismaIstanziazionePort.ts → src/services/istanziazionePort.ts
 
 ## Import Cycles
 - None detected.
@@ -84,9 +84,9 @@ Nodes (29): ClienteNonTrovatoError, ModuloNonTrovatoError, PreventivoNonTrovatoE
 Cohesion: 0.06
 Nodes (4): PrismaApp, PrismaIstanziazionePort, Cliente, Preventivo
 
-### Community 4 - "App.tsx"
-Cohesion: 0.20
-Nodes (14): fetchProgetti(), App(), Badge(), BadgeProps, ProgressBar(), ProgressBarProps, Dashboard(), KpiCardProps (+6 more)
+### Community 4 - "ProjectDetail.tsx"
+Cohesion: 0.13
+Nodes (26): assegnaAccessoProgettoApi(), consuntivaMicrovoceApi(), emettiFatturaApi(), fetchProgetti(), fetchProgettoDettaglio(), Avatar(), AvatarGroup(), AvatarGroupProps (+18 more)
 
 ### Community 5 - "devDependencies"
 Cohesion: 0.06
@@ -117,8 +117,8 @@ Cohesion: 0.11
 Nodes (18): dependencies, react, react-dom, react-router-dom, @supabase/supabase-js, name, private, scripts (+10 more)
 
 ### Community 12 - "ClientPortal.tsx"
-Cohesion: 0.17
-Nodes (14): CatBadge(), CatBadgeProps, bodyStyle, containerStyle, docBoxStyle, heroBannerStyle, modRowStyle, ModuloProposta (+6 more)
+Cohesion: 0.16
+Nodes (18): creaClienteApi(), creaPreventivoEAccettaApi(), creaProgettoApi(), fetchClienti(), fetchModuliLibreria(), NewProjectWizard(), bodyStyle, ClientPortal() (+10 more)
 
 ### Community 14 - "compilerOptions"
 Cohesion: 0.12
@@ -129,16 +129,16 @@ Cohesion: 0.16
 Nodes (13): closeBtnStyle, DocumentoEntry, getDefaultPassaggi(), headStyle, modalStyle, NoteEntry, overlayStyle, PassaggioModal() (+5 more)
 
 ### Community 16 - "NewProjectWizard.tsx"
-Cohesion: 0.16
-Nodes (17): creaClienteApi(), creaPreventivoEAccettaApi(), creaProgettoApi(), fetchClienti(), fetchModuliLibreria(), closeBtnStyle, labelStyle, NewProjectWizard() (+9 more)
+Cohesion: 0.21
+Nodes (11): closeBtnStyle, labelStyle, NewProjectWizardProps, overlayStyle, wizStyle, CatBadge(), CatBadgeProps, ModuloProposta (+3 more)
 
 ### Community 17 - "client.ts"
 Cohesion: 0.26
 Nodes (9): API_BASE, creaUtenteTenantApi(), fetchAccessiProgetto(), fetchUtentiTenant(), updateArticoloPrezzoApi(), uploadFileApi(), ArticoliCatalogView(), SettingsPage() (+1 more)
 
-### Community 18 - "ProjectDetail.tsx"
-Cohesion: 0.17
-Nodes (14): assegnaAccessoProgettoApi(), consuntivaMicrovoceApi(), emettiFatturaApi(), fetchProgettoDettaglio(), Avatar(), AvatarGroup(), AvatarGroupProps, AvatarProps (+6 more)
+### Community 18 - "App.tsx"
+Cohesion: 0.33
+Nodes (4): App(), AnagraficaErpModal(), tabBtn(), react
 
 ### Community 19 - "AppLayout.tsx"
 Cohesion: 0.29
@@ -156,7 +156,7 @@ Nodes (5): main(), prisma, generaPasswordTemporanea(), hashPassword(), verifyPas
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `react` connect `App.tsx` to `devDependencies`, `utils/index.ts`, `ClientPortal.tsx`, `PassaggioModal.tsx`, `NewProjectWizard.tsx`, `client.ts`, `ProjectDetail.tsx`, `AppLayout.tsx`, `Placeholders.tsx`?**
+- **Why does `react` connect `App.tsx` to `ProjectDetail.tsx`, `devDependencies`, `utils/index.ts`, `ClientPortal.tsx`, `PassaggioModal.tsx`, `NewProjectWizard.tsx`, `client.ts`, `AppLayout.tsx`, `Placeholders.tsx`?**
   _High betweenness centrality (0.087) - this node is a cross-community bridge._
 - **Why does `plugins` connect `devDependencies` to `App.tsx`?**
   _High betweenness centrality (0.077) - this node is a cross-community bridge._

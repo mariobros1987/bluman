@@ -34,10 +34,11 @@ model Tenant {
   stato             String   @default("attivo") // attivo|sospeso|trial
   createdAt         DateTime @default(now()) @map("created_at")
 
-  users    User[]
-  clienti  Cliente[]
-  articoli Articolo[]
-  moduli   ModuloTemplate[]
+  users     User[]
+  clienti   Cliente[]
+  articoli  Articolo[]
+  moduli    ModuloTemplate[]
+  auditLogs AuditLog[]
 
   @@map("tenant")
 }
@@ -584,6 +585,23 @@ model Notifica {
   inviataAt        DateTime? @map("inviata_at")
 
   @@map("notifica")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  tenantId   String   @map("tenant_id")
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
+  userId     String   @map("user_id")
+  userEmail  String   @map("user_email")
+  userNome   String   @map("user_nome")
+  ruolo      String   @map("ruolo")
+  azione     String   // es. "DOCUMENTO_CARICATO", "DOCUMENTO_ELIMINATO", "FATTURA_EMESSA"
+  entita     String   // es. "Fascicolo_KYC.pdf", "Progetto #1"
+  dettagli   String   @map("dettagli")
+  ipAddress  String?  @map("ip_address")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@map("audit_log")
 }
 
 // ─────────────────────────────────────────────────────────────────
