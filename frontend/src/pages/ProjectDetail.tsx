@@ -11,6 +11,7 @@ import type { SignatureData } from '../utils/pdfGenerator';
 import { DigitalSignatureModal } from '../components/DigitalSignatureModal';
 import { ComunicazioniTab } from '../components/ComunicazioniTab';
 import { AssignOperatorModal } from '../components/AssignOperatorModal';
+import { CalendarPreviewModal } from '../components/CalendarPreviewModal';
 import { PROJECTS } from '../store/mockData';
 import { fetchProgettoDettaglio, emettiFatturaApi, consuntivaMicrovoceApi, fetchAccessiProgetto, assegnaAccessoProgettoApi, salvaProgettoDettaglioApi } from '../api/client';
 import { TEAM } from '../store/mockData';
@@ -40,6 +41,55 @@ export function ProjectDetail() {
     name: string;
     currentAssigned: number[];
   } | null>(null);
+
+  const [calendarModalTarget, setCalendarModalTarget] = useState<{
+    modId: number;
+    mvIdx: number;
+    name: string;
+  } | null>(null);
+
+  const handleScheduleDeadlineConfirm = (date: string, operatorId: number, priority: string, sendEmail: boolean) => {
+    if (!project || !calendarModalTarget) return;
+
+    const newMods = project.mods.map(m => {
+      if (m.id === calendarModalTarget.modId) {
+        const newV = m.v.map((mv, idx) => {
+          if (idx === calendarModalTarget.mvIdx) {
+            return {
+              ...mv,
+              as: operatorId,
+              vn: `📅 Scadenza: ${date} (${priority.toUpperCase()})`,
+            };
+          }
+          return mv;
+        });
+        return { ...m, v: newV };
+      }
+      return m;
+    });
+
+    const updatedProject = { ...project, mods: newMods };
+    setProject(updatedProject);
+
+    const savedStr = localStorage.getItem('bluman_custom_projects');
+    const savedArr: Progetto[] = savedStr ? JSON.parse(savedStr) : [];
+    const updatedArr = [updatedProject, ...savedArr.filter(p => String(p.id) !== String(project.id))];
+    localStorage.setItem('bluman_custom_projects', JSON.stringify(updatedArr));
+
+    const eventsStr = localStorage.getItem('bluman_calendar_events');
+    const eventsArr = eventsStr ? JSON.parse(eventsStr) : [];
+    const newEvent = {
+      id: `ev-${Date.now()}`,
+      title: `${calendarModalTarget.name} (${project.cl})`,
+      date,
+      opId: operatorId,
+      priority,
+      sendEmail,
+    };
+    localStorage.setItem('bluman_calendar_events', JSON.stringify([newEvent, ...eventsArr]));
+
+    salvaProgettoDettaglioApi(String(project.id), updatedProject).catch(() => {});
+  };
 
   const handleAssignOperatorConfirm = (operatorId: number, roleLevel: string) => {
     if (!project || !assignModalTarget) return;
@@ -514,6 +564,7 @@ export function ProjectDetail() {
                   onToggleMv={(vidx) => handleToggleMicrovoce(mod.id, vidx)}
                   onOpenAssignMod={() => setAssignModalTarget({ modId: mod.id, name: `Modulo: ${mod.n}`, currentAssigned: mod.team || [1] })}
                   onOpenAssignMv={(vidx) => setAssignModalTarget({ modId: mod.id, mvIdx: vidx, name: `Microvoce: ${mod.v[vidx]?.n || 'Microvoce'}`, currentAssigned: [mod.v[vidx]?.as || 1] })}
+                  onOpenCalendarMv={(vidx) => setCalendarModalTarget({ modId: mod.id, mvIdx: vidx, name: mod.v[vidx]?.n || 'Microvoce' })}
                 />
               ))
             )}
@@ -674,18 +725,31 @@ export function ProjectDetail() {
           }}
         />
       )}
+
+      {calendarModalTarget && (
+        <CalendarPreviewModal
+          isOpen={!!calendarModalTarget}
+          onClose={() => setCalendarModalTarget(null)}
+          microvoceName={calendarModalTarget.name}
+          projectName={project.n}
+          onSchedule={(dt, opId, prio, sendE) => {
+            handleScheduleDeadlineConfirm(dt, opId, prio, sendE);
+          }}
+        />
+      )}
     </div>
   );
 }
 
 // ─── Modulo Block ─────────────────────────────────────────────────
-function ModuloBlock({ mod, open, onToggle, onOpenProc, rawDbModulo, onRefresh, onToggleMv, onOpenAssignMod, onOpenAssignMv }: {
+function ModuloBlock({ mod, open, onToggle, onOpenProc, rawDbModulo, onRefresh, onToggleMv, onOpenAssignMod, onOpenAssignMv, onOpenCalendarMv }: {
   mod: ModuloProgetto; open: boolean;
   onToggle: () => void; onOpenProc: (vidx: number) => void;
   rawDbModulo?: any; onRefresh: () => void;
   onToggleMv: (vidx: number) => void;
   onOpenAssignMod: () => void;
   onOpenAssignMv: (vidx: number) => void;
+  onOpenCalendarMv: (vidx: number) => void;
 }) {
   const color = mod.st === 'blocked' ? 'var(--red)'
     : mod.delay ? 'var(--amber)'
@@ -841,12 +905,9 @@ function ModuloBlock({ mod, open, onToggle, onOpenProc, rawDbModulo, onRefresh, 
                           <button
                             onClick={e => {
                               e.stopPropagation();
-                              const dt = prompt(`Programma data di scadenza in Calendario per "${v.n}":`, '2026-08-25');
-                              if (dt) {
-                                alert(`✓ Scadenza del "${v.n}" impostata al ${dt} ed integrata nello Scadenzario Studio!`);
-                              }
+                              onOpenCalendarMv(i);
                             }}
-                            title="Imposta data di scadenza nel Calendario Studio"
+                            title="Apri Anteprima Calendario & Pianifica Scadenza Studio"
                             style={{ background: 'var(--card2)', border: '1px solid var(--border)', color: 'var(--muted)', padding: '3px 6px', borderRadius: 6, fontSize: 10, cursor: 'pointer' }}
                           >
                             📅
