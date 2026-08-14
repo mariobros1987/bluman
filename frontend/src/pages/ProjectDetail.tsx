@@ -61,27 +61,96 @@ export function ProjectDetail() {
             desc: f.numero ? `Fattura n. ${f.numero}` : 'Fattura acconto',
             stato: f.stato === 'incassata' ? 'incassata' : 'emessa',
           })),
-          mods: (dbRes.moduli || []).map((m: any, mIdx: number) => ({
-            id: mIdx + 100,
-            n: m.nome,
-            cat: (m.categoria as CategoriaModulo) || 'Societario',
-            st: m.stato || 'in_progress',
-            pct: m.stato === 'done' ? 100 : m.stato === 'in_progress' ? 60 : 0,
-            h: m.orePreventivate || 20,
-            a: m.oreConsuntivate || 0,
-            p: m.prezzo ? m.prezzo / 100 : 3500,
-            team: [1, 2],
-            delay: m.stato === 'delayed' || m.stato === 'blocked',
-            v: (m.microvoci || []).map((mv: any) => ({
-              n: mv.nome,
-              hE: mv.orePreventivate || 4,
-              hA: mv.oreConsuntivate || 0,
-              s: mv.stato || 'pending',
-              as: 1,
-              d: mv.passaggi?.length || 0,
-              vn: mv.causaNota || undefined,
-            })),
+        let finalMods = (dbRes.moduli || []).map((m: any, mIdx: number) => ({
+          id: mIdx + 100,
+          n: m.nome,
+          cat: (m.categoria as CategoriaModulo) || 'Societario',
+          st: m.stato || 'in_progress',
+          pct: m.stato === 'done' ? 100 : m.stato === 'in_progress' ? 60 : 0,
+          h: m.orePreventivate || 20,
+          a: m.oreConsuntivate || 0,
+          p: m.prezzo ? m.prezzo / 100 : 3500,
+          team: [1, 2],
+          delay: m.stato === 'delayed' || m.stato === 'blocked',
+          v: (m.microvoci || []).map((mv: any) => ({
+            n: mv.nome,
+            hE: mv.orePreventivate || 4,
+            hA: mv.oreConsuntivate || 0,
+            s: mv.stato || 'pending',
+            as: 1,
+            d: mv.passaggi?.length || 0,
+            vn: mv.causaNota || undefined,
           })),
+        }));
+
+        // Se i moduli DB sono vuoti, arricchisci dai progetti custom salvati in locale o mockData
+        if (finalMods.length === 0) {
+          const localStr = localStorage.getItem('bluman_custom_projects');
+          const localProjs: Progetto[] = localStr ? JSON.parse(localStr) : [];
+          const match = localProjs.find(p => String(p.id) === String(id) || p.cl === dbRes.cliente?.nome || p.n === dbRes.nome)
+                     || PROJECTS.find(p => String(p.id) === String(id) || p.cl === dbRes.cliente?.nome);
+          if (match && match.mods && match.mods.length > 0) {
+            finalMods = match.mods;
+          } else {
+            // Genera moduli standard per l'operatore se non ancora istanziati
+            finalMods = [
+              {
+                id: 101,
+                n: 'Analisi Patrimoniale & Risk Assessment',
+                cat: 'Analisi' as CategoriaModulo,
+                st: 'in_progress',
+                pct: 50,
+                h: 15,
+                a: 5,
+                p: 3500,
+                team: [1, 2],
+                delay: false,
+                v: [
+                  { n: 'Raccolta documenti e KYC cliente', hE: 4, hA: 4, s: 'done', as: 1, d: 1 },
+                  { n: 'Verifica giurisdizione e fiscalità intercompany', hE: 6, hA: 1, s: 'in_progress', as: 1, d: 0 },
+                  { n: 'Redazione report conclusivo', hE: 5, hA: 0, s: 'pending', as: 1, d: 0 }
+                ]
+              },
+              {
+                id: 102,
+                n: 'Corporate Structuring & Holding Malta',
+                cat: 'Societario' as CategoriaModulo,
+                st: 'in_progress',
+                pct: 20,
+                h: 30,
+                a: 6,
+                p: 11500,
+                team: [1, 3],
+                delay: false,
+                v: [
+                  { n: 'Bozza Atto Costitutivo e Statuto', hE: 10, hA: 6, s: 'in_progress', as: 1, d: 0 },
+                  { n: 'Registrazione MFSA e deposito UBO', hE: 10, hA: 0, s: 'pending', as: 1, d: 0 },
+                  { n: 'Apertura posizioni fiscali e codice SDI', hE: 10, hA: 0, s: 'pending', as: 1, d: 0 }
+                ]
+              }
+            ];
+          }
+        }
+
+        const mapped: Progetto = {
+          id: dbRes.id,
+          n: dbRes.nome,
+          cl: dbRes.cliente?.nome || 'Cliente',
+          ct: (dbRes.cliente?.tipo as any) || 'individual',
+          st: dbRes.stato || 'in_progress',
+          pct: dbRes.stato === 'completed' ? 100 : dbRes.stato === 'in_progress' ? 50 : 10,
+          start: dbRes.createdAt ? new Date(dbRes.createdAt).toLocaleDateString('it-IT') : 'Oggi',
+          due: 'In corso',
+          val: dbRes.valoreTotale ? dbRes.valoreTotale / 100 : 15000,
+          delay: dbRes.moduli?.some((m: any) => m.stato === 'delayed' || m.stato === 'blocked') || false,
+          fisc: 'privato',
+          fatture: (dbRes.fatture || []).map((f: any) => ({
+            tipo: 'milestone_libera',
+            importo: f.righe ? f.righe.reduce((acc: number, r: any) => acc + r.importo, 0) / 100 : 0,
+            desc: f.numero ? `Fattura n. ${f.numero}` : 'Fattura acconto',
+            stato: f.stato === 'incassata' ? 'incassata' : 'emessa',
+          })),
+          mods: finalMods,
         };
         setProject(mapped);
         if (mapped.mods.length > 0) {

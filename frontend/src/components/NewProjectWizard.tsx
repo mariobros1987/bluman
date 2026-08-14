@@ -122,7 +122,7 @@ export function NewProjectWizard({ onClose, onProjectCreated }: NewProjectWizard
           p: moduloP(m),
           team: [1],
           delay: false,
-          v: m.sub.map((s, sIdx) => ({
+          v: (m.sub || []).map((s, sIdx) => ({
             id: sIdx + 1,
             n: s.title,
             h: 2,

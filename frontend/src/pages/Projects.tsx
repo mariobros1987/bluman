@@ -32,20 +32,8 @@ export function Projects() {
     // 2. Carica progetti remoti da API Supabase/DB
     const remote = await fetchProgetti();
     if (remote && Array.isArray(remote)) {
-      const dbProjs: Progetto[] = remote.map((rp: any) => ({
-        id: rp.id,
-        n: rp.nome,
-        cl: rp.cliente?.nome || rp.clienteId || 'Cliente',
-        ct: (rp.cliente?.tipo as any) || 'individual',
-        st: rp.stato || 'in_progress',
-        pct: rp.stato === 'completed' ? 100 : rp.stato === 'in_progress' ? 45 : 10,
-        start: rp.createdAt ? new Date(rp.createdAt).toLocaleDateString('it-IT') : 'Oggi',
-        due: 'In corso',
-        val: rp.valoreTotale ? rp.valoreTotale / 100 : 12000,
-        delay: false,
-        fisc: 'privato',
-        fatture: [],
-        mods: (rp.moduli || []).map((m: any, mIdx: number) => ({
+      const dbProjs: Progetto[] = remote.map((rp: any) => {
+        let rpMods = (rp.moduli || []).map((m: any, mIdx: number) => ({
           id: mIdx + 100,
           n: m.nome,
           cat: m.categoria || 'Societario',
@@ -57,8 +45,32 @@ export function Projects() {
           team: [1, 2],
           delay: false,
           v: [],
-        })),
-      }));
+        }));
+
+        if (rpMods.length === 0) {
+          const match = combined.find(p => p.cl === rp.cliente?.nome || p.n === rp.nome)
+                     || PROJECTS.find(p => p.cl === rp.cliente?.nome || p.n === rp.nome);
+          if (match && match.mods && match.mods.length > 0) {
+            rpMods = match.mods;
+          }
+        }
+
+        return {
+          id: rp.id,
+          n: rp.nome,
+          cl: rp.cliente?.nome || rp.clienteId || 'Cliente',
+          ct: (rp.cliente?.tipo as any) || 'individual',
+          st: rp.stato || 'in_progress',
+          pct: rp.stato === 'completed' ? 100 : rp.stato === 'in_progress' ? 45 : 10,
+          start: rp.createdAt ? new Date(rp.createdAt).toLocaleDateString('it-IT') : 'Oggi',
+          due: 'In corso',
+          val: rp.valoreTotale ? rp.valoreTotale / 100 : 12000,
+          delay: false,
+          fisc: 'privato',
+          fatture: [],
+          mods: rpMods,
+        };
+      });
 
       const existingIds = new Set(combined.map(p => String(p.id)));
       for (const dp of dbProjs) {

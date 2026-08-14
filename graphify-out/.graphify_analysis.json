@@ -204,40 +204,28 @@
       "src_services_appport_preventivo"
     ],
     "4": [
-      "frontend_src_api_client_assegnaaccessoprogettoapi",
-      "frontend_src_api_client_consuntivamicrovoceapi",
-      "frontend_src_api_client_emettifatturaapi",
       "frontend_src_api_client_fetchprogetti",
-      "frontend_src_api_client_fetchprogettodettaglio",
-      "frontend_src_components_ui_avatar",
-      "frontend_src_components_ui_avatar_avatar",
-      "frontend_src_components_ui_avatar_avatargroup",
-      "frontend_src_components_ui_avatar_avatargroupprops",
-      "frontend_src_components_ui_avatar_avatarprops",
+      "frontend_src_app",
+      "frontend_src_app_app",
+      "frontend_src_app_mainlayoutwrapper",
       "frontend_src_components_ui_badge",
       "frontend_src_components_ui_badge_badge",
       "frontend_src_components_ui_badge_badgeprops",
       "frontend_src_components_ui_progressbar",
       "frontend_src_components_ui_progressbar_progressbar",
       "frontend_src_components_ui_progressbar_progressbarprops",
+      "frontend_src_main",
       "frontend_src_pages_dashboard",
       "frontend_src_pages_dashboard_dashboard",
       "frontend_src_pages_dashboard_kpicard",
       "frontend_src_pages_dashboard_kpicardprops",
-      "frontend_src_pages_projectdetail",
-      "frontend_src_pages_projectdetail_fatturazionetab",
-      "frontend_src_pages_projectdetail_grafomoduliprogettoview",
-      "frontend_src_pages_projectdetail_moduloblock",
-      "frontend_src_pages_projectdetail_placeholdertab",
-      "frontend_src_pages_projectdetail_projectdetail",
-      "frontend_src_pages_projectdetail_tab",
       "frontend_src_pages_projects",
       "frontend_src_pages_projects_projects",
-      "frontend_src_store_mockdata_team",
       "frontend_src_types_index_progetto",
       "frontend_src_utils_index_fmt",
       "frontend_src_utils_index_progresscolor",
-      "frontend_src_utils_index_statoconfig"
+      "frontend_src_utils_index_statoconfig",
+      "ref_react"
     ],
     "5": [
       "frontend_oxlintrc",
@@ -435,25 +423,22 @@
       "supabase_supabase_js"
     ],
     "12": [
-      "frontend_src_api_client_creaclienteapi",
-      "frontend_src_api_client_creapreventivoeaccettaapi",
-      "frontend_src_api_client_creaprogettoapi",
-      "frontend_src_api_client_fetchclienti",
-      "frontend_src_api_client_fetchmodulilibreria",
-      "frontend_src_components_newprojectwizard_newprojectwizard",
+      "frontend_src_components_ui_catbadge",
+      "frontend_src_components_ui_catbadge_catbadge",
+      "frontend_src_components_ui_catbadge_catbadgeprops",
       "frontend_src_pages_clientportal",
       "frontend_src_pages_clientportal_bodystyle",
-      "frontend_src_pages_clientportal_clientportal",
       "frontend_src_pages_clientportal_containerstyle",
       "frontend_src_pages_clientportal_docboxstyle",
       "frontend_src_pages_clientportal_herobannerstyle",
       "frontend_src_pages_clientportal_modrowstyle",
+      "frontend_src_pages_clientportal_moduloproposta",
       "frontend_src_pages_clientportal_portaltab",
       "frontend_src_pages_clientportal_successboxstyle",
-      "frontend_src_pages_clientportal_tabbtnstyle",
       "frontend_src_pages_clientportal_tabsbarstyle",
       "frontend_src_pages_clientportal_topnavstyle",
-      "frontend_src_pages_clientspage_clientspage"
+      "frontend_src_types_index_categoriamodulo",
+      "frontend_src_utils_index_catcls"
     ],
     "13": [
       "src_adapters_inmemoryapp_inmemoryapp",
@@ -512,19 +497,26 @@
       "frontend_src_types_index_passaggio"
     ],
     "16": [
+      "frontend_src_api_client_creaclienteapi",
+      "frontend_src_api_client_creapreventivoeaccettaapi",
+      "frontend_src_api_client_creaprogettoapi",
+      "frontend_src_api_client_fetchclienti",
+      "frontend_src_api_client_fetchmodulilibreria",
       "frontend_src_components_newprojectwizard",
       "frontend_src_components_newprojectwizard_closebtnstyle",
       "frontend_src_components_newprojectwizard_labelstyle",
+      "frontend_src_components_newprojectwizard_newprojectwizard",
       "frontend_src_components_newprojectwizard_newprojectwizardprops",
       "frontend_src_components_newprojectwizard_overlaystyle",
       "frontend_src_components_newprojectwizard_wizstyle",
-      "frontend_src_components_ui_catbadge",
-      "frontend_src_components_ui_catbadge_catbadge",
-      "frontend_src_components_ui_catbadge_catbadgeprops",
-      "frontend_src_pages_clientportal_moduloproposta",
-      "frontend_src_store_mockdata_mlib",
-      "frontend_src_types_index_categoriamodulo",
-      "frontend_src_utils_index_catcls"
+      "frontend_src_pages_clientportal_clientportal",
+      "frontend_src_pages_clientportal_tabbtnstyle",
+      "frontend_src_pages_clientspage",
+      "frontend_src_pages_clientspage_anagraficaerpmodal",
+      "frontend_src_pages_clientspage_clientspage",
+      "frontend_src_pages_clientspage_magiclinkexplainmodal",
+      "frontend_src_pages_clientspage_tabbtn",
+      "frontend_src_store_mockdata_mlib"
     ],
     "17": [
       "frontend_src_api_client",
@@ -541,15 +533,23 @@
       "frontend_src_pages_settingspage_tab"
     ],
     "18": [
-      "frontend_src_app",
-      "frontend_src_app_app",
-      "frontend_src_app_mainlayoutwrapper",
-      "frontend_src_main",
-      "frontend_src_pages_clientspage",
-      "frontend_src_pages_clientspage_anagraficaerpmodal",
-      "frontend_src_pages_clientspage_magiclinkexplainmodal",
-      "frontend_src_pages_clientspage_tabbtn",
-      "ref_react"
+      "frontend_src_api_client_assegnaaccessoprogettoapi",
+      "frontend_src_api_client_consuntivamicrovoceapi",
+      "frontend_src_api_client_emettifatturaapi",
+      "frontend_src_api_client_fetchprogettodettaglio",
+      "frontend_src_components_ui_avatar",
+      "frontend_src_components_ui_avatar_avatar",
+      "frontend_src_components_ui_avatar_avatargroup",
+      "frontend_src_components_ui_avatar_avatargroupprops",
+      "frontend_src_components_ui_avatar_avatarprops",
+      "frontend_src_pages_projectdetail",
+      "frontend_src_pages_projectdetail_fatturazionetab",
+      "frontend_src_pages_projectdetail_grafomoduliprogettoview",
+      "frontend_src_pages_projectdetail_moduloblock",
+      "frontend_src_pages_projectdetail_placeholdertab",
+      "frontend_src_pages_projectdetail_projectdetail",
+      "frontend_src_pages_projectdetail_tab",
+      "frontend_src_store_mockdata_team"
     ],
     "19": [
       "frontend_src_components_layout_applayout",
@@ -598,7 +598,7 @@
     "1": 0.10452961672473868,
     "2": 0.09268292682926829,
     "3": 0.05975609756097561,
-    "4": 0.1265597147950089,
+    "4": 0.19913419913419914,
     "5": 0.06451612903225806,
     "6": 0.11895161290322581,
     "7": 0.11612903225806452,
@@ -606,13 +606,13 @@
     "9": 0.08695652173913043,
     "10": 0.1,
     "11": 0.10526315789473684,
-    "12": 0.16374269005847952,
+    "12": 0.16666666666666666,
     "13": 0.13450292397660818,
     "14": 0.11764705882352941,
     "15": 0.16483516483516483,
-    "16": 0.20512820512820512,
+    "16": 0.15789473684210525,
     "17": 0.25757575757575757,
-    "18": 0.3333333333333333,
+    "18": 0.16911764705882354,
     "19": 0.2857142857142857,
     "20": 0.5,
     "21": 0.3333333333333333,
@@ -696,6 +696,17 @@
       "why": "bridges separate communities; peripheral node `PassaggioModalProps` unexpectedly reaches hub `Progetto`"
     },
     {
+      "source": "GrafoModuliProgettoView()",
+      "target": "fmt()",
+      "source_files": [
+        "frontend/src/pages/ProjectDetail.tsx",
+        "frontend/src/utils/index.ts"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "why": "bridges separate communities; peripheral node `GrafoModuliProgettoView()` unexpectedly reaches hub `fmt()`"
+    },
+    {
       "source": "FakeIstanziazionePort",
       "target": "EsecuzionePort",
       "source_files": [
@@ -716,23 +727,12 @@
       "confidence": "EXTRACTED",
       "relation": "references",
       "why": "bridges separate communities"
-    },
-    {
-      "source": "PrismaIstanziazionePort",
-      "target": "IstanziazionePort",
-      "source_files": [
-        "src/adapters/prisma/prismaIstanziazionePort.ts",
-        "src/services/istanziazionePort.ts"
-      ],
-      "confidence": "EXTRACTED",
-      "relation": "implements",
-      "why": "bridges separate communities"
     }
   ],
   "questions": [
     {
       "type": "bridge_node",
-      "question": "Why does `react` connect `App.tsx` to `ProjectDetail.tsx`, `devDependencies`, `utils/index.ts`, `ClientPortal.tsx`, `PassaggioModal.tsx`, `NewProjectWizard.tsx`, `client.ts`, `AppLayout.tsx`, `Placeholders.tsx`?",
+      "question": "Why does `react` connect `App.tsx` to `devDependencies`, `utils/index.ts`, `ClientPortal.tsx`, `PassaggioModal.tsx`, `NewProjectWizard.tsx`, `client.ts`, `ProjectDetail.tsx`, `AppLayout.tsx`, `Placeholders.tsx`?",
       "why": "High betweenness centrality (0.087) - this node is a cross-community bridge."
     },
     {
