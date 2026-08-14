@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { CatBadge } from '../components/ui/CatBadge';
-import { generateAndDownloadPdf } from '../utils/pdfGenerator';
 import { fmt } from '../utils';
+import { downloadRealPdf, SignatureData } from '../utils/pdfGenerator';
+import { DigitalSignatureModal } from '../components/DigitalSignatureModal';
 import { fetchModuliLibreria, fetchProgetti, creaPreventivoEAccettaApi, fetchClienti, creaProgettoApi, creaClienteApi } from '../api/client';
 import type { CategoriaModulo } from '../types';
 
@@ -228,7 +229,7 @@ export function ClientPortal() {
                     Vai all'Avanzamento Live Lavori →
                   </button>
                   <button
-                    onClick={() => {
+                    onClick={async () => {
                       const htmlContent = `
                         <div style="border-bottom:2px solid #0f172a;padding-bottom:15px;display:flex;justify-content:space-between;">
                           <div>
@@ -241,13 +242,26 @@ export function ClientPortal() {
                             <div style="font-size:10px;color:#166534;margin-top:2px;">✓ FIRMATA DIGITALMENTE (1-Click eIDAS)</div>
                           </div>
                         </div>
-                        <p style="margin-top:20px;">Si attesta la stipula ed accettazione dell'Engagement Letter professionale per l'avvio delle attività di consulenza patrimoniale e corporate structuring.</p>
+                        <p style="margin-top:20px;line-height:1.6;">Si attesta la stipula ed accettazione dell'Engagement Letter professionale per l'avvio delle attività di consulenza patrimoniale e corporate structuring.</p>
                       `;
-                      generateAndDownloadPdf(`Engagement_Letter_${clientName.replace(/\s+/g, '_')}`, htmlContent);
+                      await downloadRealPdf(`Engagement_Letter_${clientName.replace(/\s+/g, '_')}`, htmlContent, [
+                        {
+                          signerName: clientName,
+                          signerRole: 'Cliente Incarico (Legale Rappresentante)',
+                          timestamp: new Date().toLocaleString('it-IT'),
+                          ipAddress: '2.234.190.44',
+                        },
+                        {
+                          signerName: 'Joe Disabato',
+                          signerRole: 'Senior Advisor (Bluecode Ltd)',
+                          timestamp: new Date().toLocaleString('it-IT'),
+                          ipAddress: '83.211.12.94',
+                        }
+                      ]);
                     }}
                     style={{ background: 'var(--card2)', border: '1px solid var(--border)', color: 'var(--text)', padding: '10px 18px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
                   >
-                    🖨 Scarica Engagement Letter PDF
+                    📥 Scarica VERO File PDF A4 (.pdf)
                   </button>
                 </div>
               </div>

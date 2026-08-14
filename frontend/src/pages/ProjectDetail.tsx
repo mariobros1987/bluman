@@ -6,7 +6,8 @@ import { ProgressBar } from '../components/ui/ProgressBar';
 import { AvatarGroup, Avatar } from '../components/ui/Avatar';
 import { PassaggioModal } from '../components/PassaggioModal';
 import { fmt, progressColor } from '../utils';
-import { generateAndDownloadPdf } from '../utils/pdfGenerator';
+import { downloadRealPdf, SignatureData } from '../utils/pdfGenerator';
+import { DigitalSignatureModal } from '../components/DigitalSignatureModal';
 import { PROJECTS } from '../store/mockData';
 import { fetchProgettoDettaglio, emettiFatturaApi, consuntivaMicrovoceApi, fetchAccessiProgetto, assegnaAccessoProgettoApi } from '../api/client';
 import { TEAM } from '../store/mockData';
@@ -669,7 +670,7 @@ function FatturazioneTab({ project, rawDbProject, onRefresh }: { project: Proget
                 Chiudi
               </button>
               <button
-                onClick={() => {
+                onClick={async () => {
                   const htmlContent = `
                     <div style="border-bottom:2px solid #0f172a;padding-bottom:15px;display:flex;justify-content:space-between;">
                       <div>
@@ -706,11 +707,18 @@ function FatturazioneTab({ project, rawDbProject, onRefresh }: { project: Proget
                       <div style="text-align:right;"><div style="font-size:11px;color:#64748b;">Totale Documento:</div><div style="font-size:22px;font-weight:800;color:#4338ca;">${fmt(previewFattura.importo)}</div></div>
                     </div>
                   `;
-                  generateAndDownloadPdf(`BluMan_Fattura_${previewFattura.numero}`, htmlContent);
+                  await downloadRealPdf(`BluMan_Fattura_${previewFattura.numero}`, htmlContent, [
+                    {
+                      signerName: 'Joe Disabato',
+                      signerRole: 'Senior Advisor (Studio Erogante)',
+                      timestamp: new Date().toLocaleString('it-IT'),
+                      ipAddress: '83.211.12.94',
+                    }
+                  ]);
                 }}
                 style={{ background: '#4338ca', color: '#fff', border: 'none', padding: '8px 20px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 12px rgba(67,56,202,.3)' }}
               >
-                🖨 Scarica PDF / Stampa Vettoriale
+                📥 Scarica VERO File PDF A4 (.pdf)
               </button>
             </div>
           </div>
