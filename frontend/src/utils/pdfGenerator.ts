@@ -10,28 +10,32 @@ export interface SignatureData {
 }
 
 /**
- * Genera un VERO file binary .pdf scaricabile direttamente su foglio A4
+ * Genera e scarica direttamente un VERO file binary .pdf A4
  */
 export async function downloadRealPdf(
   fileName: string,
   elementOrHtml: HTMLElement | string,
   signatures: SignatureData[] = []
 ) {
-  // Crea container temporaneo A4 per il rendering preciso
   let container: HTMLDivElement;
   let isTemp = false;
 
   if (typeof elementOrHtml === 'string') {
     isTemp = true;
     container = document.createElement('div');
-    container.style.position = 'absolute';
-    container.style.left = '-9999px';
-    container.style.top = '-9999px';
-    container.style.width = '794px'; // Larghezza A4 a 96 DPI
-    container.style.padding = '32px';
+    // Posizionamento rendering visibile per html2canvas dietro il layer della pagina
+    container.style.position = 'fixed';
+    container.style.top = '0';
+    container.style.left = '0';
+    container.style.width = '794px'; // 210mm a 96 DPI
+    container.style.minHeight = '1123px'; // 297mm a 96 DPI
+    container.style.zIndex = '-9999';
+    container.style.opacity = '1';
     container.style.background = '#ffffff';
     container.style.color = '#0f172a';
     container.style.fontFamily = 'Helvetica, Arial, sans-serif';
+    container.style.padding = '40px';
+    container.style.boxSizing = 'border-box';
 
     // Aggiungi sezioni firme se presenti
     let signaturesHtml = '';
@@ -65,33 +69,38 @@ export async function downloadRealPdf(
   }
 
   try {
+    // Attendi render DOM
+    await new Promise(resolve => setTimeout(resolve, 100));
+
     const canvas = await html2canvas(container, {
-      scale: 2, // Alta risoluzione 300 DPI
+      scale: 2,
       useCORS: true,
+      allowTaint: true,
       logging: false,
       backgroundColor: '#ffffff',
+      windowWidth: 794,
     });
 
-    const imgData = canvas.toDataURL('image/png');
+    const imgData = canvas.toDataURL('image/jpeg', 0.98);
     const pdf = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
       format: 'a4',
     });
 
-    const imgWidth = 210; // A4 larghezza in mm
-    const pageHeight = 297; // A4 altezza in mm
+    const imgWidth = 210;
+    const pageHeight = 297;
     const imgHeight = (canvas.height * imgWidth) / canvas.width;
     let heightLeft = imgHeight;
     let position = 0;
 
-    pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+    pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
     heightLeft -= pageHeight;
 
-    while (heightLeft >= 0) {
+    while (heightLeft > 5) { // margine minimo tolleranza
       position = heightLeft - imgHeight;
       pdf.addPage();
-      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
       heightLeft -= pageHeight;
     }
 

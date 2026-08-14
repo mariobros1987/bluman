@@ -9,13 +9,14 @@ import { fmt, progressColor } from '../utils';
 import { downloadRealPdf } from '../utils/pdfGenerator';
 import type { SignatureData } from '../utils/pdfGenerator';
 import { DigitalSignatureModal } from '../components/DigitalSignatureModal';
+import { ComunicazioniTab } from '../components/ComunicazioniTab';
 import { PROJECTS } from '../store/mockData';
 import { fetchProgettoDettaglio, emettiFatturaApi, consuntivaMicrovoceApi, fetchAccessiProgetto, assegnaAccessoProgettoApi } from '../api/client';
 import { TEAM } from '../store/mockData';
 import type { Progetto, ModuloProgetto, CategoriaModulo } from '../types';
 import styles from './ProjectDetail.module.css';
 
-type Tab = 'moduli' | 'grafo' | 'fatturazione' | 'documenti' | 'calendario';
+type Tab = 'moduli' | 'grafo' | 'fatturazione' | 'comunicazioni' | 'documenti' | 'calendario';
 
 export function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
@@ -168,9 +169,9 @@ export function ProjectDetail() {
 
       {/* Tabs */}
       <div className={styles.tabs}>
-        {(['moduli', 'grafo', 'fatturazione', 'documenti', 'calendario'] as Tab[]).map(t => (
+        {(['moduli', 'grafo', 'fatturazione', 'comunicazioni', 'documenti', 'calendario'] as Tab[]).map(t => (
           <button key={t} className={`${styles.tab} ${tab === t ? styles.tabActive : ''}`} onClick={() => setTab(t)}>
-            {{ moduli: '🗂 Moduli & Microvoci', grafo: '🕸 Grafo & Dipendenze Moduli', fatturazione: '💶 Fatturazione & SDI', documenti: '📄 Documenti', calendario: '📅 Calendario' }[t]}
+            {{ moduli: '🗂 Moduli & Microvoci', grafo: '🕸 Grafo & Dipendenze Moduli', fatturazione: '💶 Fatturazione & SDI', comunicazioni: '💬 Comunicazioni & Ingestion', documenti: '📄 Documenti', calendario: '📅 Calendario' }[t]}
           </button>
         ))}
       </div>
@@ -216,6 +217,7 @@ export function ProjectDetail() {
           />
         )}
         {tab === 'fatturazione' && <FatturazioneTab project={project} rawDbProject={rawDbProject} onRefresh={() => loadDetail()} />}
+        {tab === 'comunicazioni' && <ComunicazioniTab progettoId={String(project.id)} nomeCliente={project.cl} emailCliente="client@holdingbeta.advisory" />}
         {tab === 'documenti' && <PlaceholderTab icon="📄" label="Documenti contrattuali allegati" />}
         {tab === 'calendario' && <PlaceholderTab icon="📅" label="Scadenzario e Calendario condiviso" />}
       </div>
