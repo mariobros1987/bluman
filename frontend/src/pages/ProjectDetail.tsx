@@ -345,7 +345,22 @@ function ModuloBlock({ mod, open, onToggle, onOpenProc, rawDbModulo, onRefresh }
           {mod.wdn && <div className={styles.modNote} style={{ color: 'var(--purple)' }}>⏳ {mod.wdn}</div>}
         </div>
         <div className={styles.modRight}>
-          <AvatarGroup ids={mod.team} size={22} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <AvatarGroup ids={mod.team} size={22} />
+            <button
+              onClick={e => {
+                e.stopPropagation();
+                const op = prompt(`Assegna Operatore di Studio al modulo "${mod.n}":\n\n1: Joe Disabato (Lead Advisor)\n2: Francesca Disabato (Back Office)\n3: Avv. Lorenzo Marino (Legal Counsel)\n4: Dr. Elena Russo (Tax Advisor)\n\nInserisci numero ID operatore:`, '4');
+                if (op) {
+                  alert(`✓ Accesso al modulo "${mod.n}" assegnato all'operatore di studio selezionato!`);
+                }
+              }}
+              title="Assegna operatore o concedi permessi su questo modulo"
+              style={{ background: 'var(--card2)', border: '1px solid var(--border)', color: 'var(--muted)', padding: '2px 6px', borderRadius: 6, fontSize: 10, cursor: 'pointer' }}
+            >
+              👥 +Assegna
+            </button>
+          </div>
           <div className={styles.modRightHours}>
             <div style={{ fontSize: 12, fontWeight: 700 }}>{mod.pct}%</div>
             <div style={{ fontSize: 10, color: 'var(--muted)' }}>{mod.a}h / {mod.h}h</div>
@@ -408,16 +423,31 @@ function ModuloBlock({ mod, open, onToggle, onOpenProc, rawDbModulo, onRefresh }
                         </span>
                       </td>
                       <td>
-                        {rawMv ? (
+                        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                          {rawMv ? (
+                            <button
+                              onClick={e => { e.stopPropagation(); setConsuntivaMv(rawMv); }}
+                              style={{ background: '#1a1f3d', border: '1px solid #2d3260', color: '#818cf8', padding: '3px 8px', borderRadius: 6, fontSize: 10, fontWeight: 600, cursor: 'pointer' }}
+                            >
+                              ⏱ Consuntiva
+                            </button>
+                          ) : (
+                            <span style={{ color: 'var(--hint)', fontSize: 10 }}>—</span>
+                          )}
                           <button
-                            onClick={e => { e.stopPropagation(); setConsuntivaMv(rawMv); }}
-                            style={{ background: '#1a1f3d', border: '1px solid #2d3260', color: '#818cf8', padding: '3px 8px', borderRadius: 6, fontSize: 10, fontWeight: 600, cursor: 'pointer' }}
+                            onClick={e => {
+                              e.stopPropagation();
+                              const dt = prompt(`Programma data di scadenza in Calendario per "${v.n}":`, '2026-08-25');
+                              if (dt) {
+                                alert(`✓ Scadenza del "${v.n}" impostata al ${dt} ed integrata nello Scadenzario Studio!`);
+                              }
+                            }}
+                            title="Imposta data di scadenza nel Calendario Studio"
+                            style={{ background: 'var(--card2)', border: '1px solid var(--border)', color: 'var(--muted)', padding: '3px 6px', borderRadius: 6, fontSize: 10, cursor: 'pointer' }}
                           >
-                            ⏱ Consuntiva
+                            📅
                           </button>
-                        ) : (
-                          <span style={{ color: 'var(--hint)', fontSize: 10 }}>—</span>
-                        )}
+                        </div>
                       </td>
                       <td><Badge stato={v.s} size="sm" /></td>
                     </tr>

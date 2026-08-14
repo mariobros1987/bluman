@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { PROJECTS, CLIENTS } from '../store/mockData';
+import { PROJECTS } from '../store/mockData';
 import { CatBadge } from '../components/ui/CatBadge';
 import { Avatar } from '../components/ui/Avatar';
 
@@ -479,8 +479,13 @@ export function CalendarPage() {
             </div>
 
             <div>
-              <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Cliente Associato (opzionale)</label>
-              <input type="text" value={formCliente} onChange={e => setFormCliente(e.target.value)} placeholder="Ragione sociale cliente" style={{ width: '100%', fontSize: 12 }} />
+              <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Cliente Associato (dall'Anagrafica ERP) *</label>
+              <select value={formCliente} onChange={e => setFormCliente(e.target.value)} style={{ padding: 8, fontSize: 12 }}>
+                <option value="Holding Beta S.r.l.">Holding Beta S.r.l. (P.IVA 01234567890)</option>
+                <option value="Gamma Real Estate S.r.l.">Gamma Real Estate S.r.l. (P.IVA 09876543210)</option>
+                <option value="Delta Tech Kft (Ungheria)">Delta Tech Kft (HU12345678)</option>
+                <option value="Famiglia Conti (Wealth)">Famiglia Conti (Wealth Privato)</option>
+              </select>
             </div>
 
             <div>

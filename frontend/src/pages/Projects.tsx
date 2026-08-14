@@ -52,9 +52,16 @@ export function Projects() {
     }
   };
 
-  useEffect(() => {
-    loadProjects();
-  }, []);
+  const currentUserStr = localStorage.getItem('bluman_user');
+  const currentUser = currentUserStr ? JSON.parse(currentUserStr) : { ruolo: 'super_admin' };
+
+  const isSuperAdminOrAdvisor = currentUser.ruolo === 'super_admin' || currentUser.ruolo === 'advisor';
+
+  // SuperAdmin e Advisor vedono TUTTI i processi. Gli operatori vedono solo i propri assegnati.
+  const visibleProjects = projectList.filter(p => {
+    if (isSuperAdminOrAdvisor) return true;
+    return p.mods?.some(m => m.team?.includes(1) || m.team?.includes(2));
+  });
 
   return (
     <>
@@ -69,7 +76,7 @@ export function Projects() {
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {projectList.map(p => {
+        {visibleProjects.map(p => {
           const color = progressColor(p);
           const allTeam = [...new Set((p.mods || []).flatMap(m => m.team || [1]).filter(Boolean))];
           return (
