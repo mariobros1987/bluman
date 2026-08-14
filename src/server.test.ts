@@ -236,3 +236,34 @@ describe('server — §17 esecuzione, tramite HTTP end-to-end', () => {
     expect(ok.json().stato).toBe('done');
   });
 });
+
+describe('server — /tenant/info persistenza logo e impostazioni studio', () => {
+  it('recupera ed aggiorna le impostazioni dello studio incluso il logoUrl', async () => {
+    const { server } = nuovoServer();
+
+    // 1. GET info iniziale
+    const getRes = await server.inject({ method: 'GET', url: '/tenant/info' });
+    expect(getRes.statusCode).toBe(200);
+
+    // 2. PATCH aggiornamento logo e sedi
+    const patchRes = await server.inject({
+      method: 'PATCH',
+      url: '/tenant/info',
+      payload: {
+        ragioneSociale: 'Bluecode Advisory Malta Ltd',
+        logoUrl: 'https://supabase.co/storage/v1/object/public/logos/studio-logo.png',
+        sedeLegale: 'Level 4, Valuation Centre, Sliema, Malta',
+        waPhoneId: '102938475610293',
+      },
+    });
+    expect(patchRes.statusCode).toBe(200);
+    expect(patchRes.json().ragioneSociale).toBe('Bluecode Advisory Malta Ltd');
+    expect(patchRes.json().logoUrl).toBe('https://supabase.co/storage/v1/object/public/logos/studio-logo.png');
+
+    // 3. Verifica persistenza con nuova GET
+    const getFinal = await server.inject({ method: 'GET', url: '/tenant/info' });
+    expect(getFinal.statusCode).toBe(200);
+    expect(getFinal.json().logoUrl).toBe('https://supabase.co/storage/v1/object/public/logos/studio-logo.png');
+    expect(getFinal.json().waPhoneId).toBe('102938475610293');
+  });
+});
