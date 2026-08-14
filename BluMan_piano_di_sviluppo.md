@@ -40,8 +40,13 @@
 - [x] **Impostazioni Studio (`/settings`)**:
   - Sede Legale e Sede Operativa disaccoppiate.
   - Configuratore Layout Fattura PDF (Logo studio, colore tema, note legali ed anteprima live).
+- [x] **Super Admin & Multi-Tenant Studio (`/admin/tenants`)**:
+  - [x] Dashboard metrica globale per SuperAdmin (Fatturato globale, tenant attivi, contratti Enterprise).
+  - [x] Modal registrazione nuovo Tenant / Studio professionale con isolamento `tenant_id`.
+  - [x] Mappatura RBAC nella Sidebar per ruolo `super_admin`.
 - [x] **Calendario Condiviso & Scadenzario Studio (`/calendar`)**:
-  - [x] Vista Mese ed Inserimento Scadenze Attività.
+  - [x] Vista Mese ed Inserimento Scadenze Attività con menu a tendina clienti dall'Anagrafica ERP.
+  - [x] Programmazione scadenze 1-Click direttamente dalle microvoci di progetto (`ProjectDetail.tsx`).
   - [x] Scadenzario Cronologico Filtrabile (Microvoci, Compliance KYC, Emissione Fatture, Firma Contratti e Promemoria).
   - [x] Drawer Modal Dettagli Evento ed Azione `✓ Marca Come Completato`.
 

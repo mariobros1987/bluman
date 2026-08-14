@@ -32,10 +32,16 @@ Questo file serve come indice rapido per l'IA ed i collaboratori per identificar
 | 👑 **Super Admin** | `admin@bluecode.advisory` | `admin2026!` | JWT Access Token |
 | 👷 **Operatore Studio** | `operator@bluecode.advisory` | `operator123` | JWT Access Token |
 | 🔑 **Cliente Incarico** | `client@holdingbeta.advisory` | *Passwordless* | Magic Link `/portal` |
+
+- **Autenticazione RBAC**: `POST /auth/login`, `POST /auth/magic-login`, `GET /auth/me` (Token JWT 15 min + Magic Link).
 - **Progetti**: `GET /progetti`, `GET /progetti/:id`
 - **Clienti**: `GET /clienti`, `POST /clienti`
 - **Fatturazione**: `POST /progetti/:id/fatture` (gestisce sia Fatture `FT` che Note di Credito `NC` con numerazione distinta).
 - **Upload Documenti**: `POST /upload` (riceve base64 e salva in `./uploads/`), `GET /uploads/:filename`
+- **Servizi Integrati**:
+  - `src/services/emailService.ts`: Invio email transazionali SMTP Nodemailer (Magic Link & notifica scadenze).
+  - `src/services/storageService.ts`: Archiviazione Cloud S3/Supabase Storage con Presigned URL.
+  - `src/adapters/prisma/applyRls.ts`: Applicazione automatica delle policy RLS PostgreSQL (`supabase/migrations/20260815_enable_rls.sql`).
 - **Articoli & Listino**: `GET /articoli`, `POST /articoli`, `PATCH /articoli/:id` (Modifica Prezzo & Ore Admin)
 
 ---
