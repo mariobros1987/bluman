@@ -1,8 +1,7 @@
 // API Client per integrare il React Frontend con il backend Fastify + Supabase DB
 
 const getApiBase = () => {
-  const host = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
-  return `http://${host}:3000`;
+  return 'http://127.0.0.1:3000';
 };
 
 const API_BASE = getApiBase();
