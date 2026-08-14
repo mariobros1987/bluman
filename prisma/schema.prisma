@@ -387,6 +387,8 @@ model PassaggioProgetto {
   noteOperatoreJson   Json?             @map("note_operatore_json")
   richiedeFirmaCliente Boolean          @default(false) @map("richiede_firma_cliente")
   documentoAllegatoUrl String?          @map("documento_allegato_url")
+  formMasterId         String?          @map("form_master_id")
+  linkIstruzioni       String?          @map("link_istruzioni")
 
   @@map("passaggio_progetto")
 }
