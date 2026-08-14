@@ -71,7 +71,7 @@ Per accedere direttamente al **Portale Cliente Passwordless**, apri:
 
 ---
 
-## 4. Connessione a Supabase PostgreSQL (Produzione)
+## 4. Connessione a Supabase PostgreSQL via CLI (Produzione)
 
 1. Duplica `.env.example` in `.env`:
    ```bash
@@ -79,10 +79,17 @@ Per accedere direttamente al **Portale Cliente Passwordless**, apri:
    ```
 2. Incolla la tua stringa `DATABASE_URL` di Supabase PostgreSQL:
    ```env
-   DATABASE_URL="postgresql://postgres:[PASSWORD]@db.cfdtjdrfeidbemhunilt.supabase.co:5432/postgres"
+   DATABASE_URL="postgresql://postgres:BluMan2026Dev!@db.cfdtjdrfeidbemhunilt.supabase.co:5432/postgres"
+   DIRECT_URL="postgresql://postgres:BluMan2026Dev!@db.cfdtjdrfeidbemhunilt.supabase.co:5432/postgres"
    ```
-3. Genera il Prisma Client ed avvia col DB reale:
+3. Collega la CLI Supabase e sincronizza lo schema Prisma:
    ```bash
+   # Collegamento CLI Supabase
+   npx supabase link --project-ref cfdtjdrfeidbemhunilt
+
+   # Genera Prisma Client & Applica lo Schema DB
    npx prisma generate
-   npm run start:db
+   npx prisma db push
+   npx tsx src/adapters/prisma/seedFull.ts # Popola i dati sul DB reale Supabase
+   npm run start:db                        # Server in ascolto col DB Supabase reale
    ```

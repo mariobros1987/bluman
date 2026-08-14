@@ -62,3 +62,28 @@ npx tsx src/index.ts
 # 4. Avvia Frontend React (Porta 5173)
 cd frontend && npm run dev
 ```
+
+---
+
+## ⚡ Connessione Diretta a Supabase tramite CLI & Prisma (IMPORTANTISSIMO)
+
+### 1. Configurazione Variabile `.env` Database URL:
+Nel file `.env` sul nuovo PC, inserire la stringa di connessione ufficiale Supabase:
+```env
+DATABASE_URL="postgresql://postgres:BluMan2026Dev!@db.cfdtjdrfeidbemhunilt.supabase.co:5432/postgres"
+DIRECT_URL="postgresql://postgres:BluMan2026Dev!@db.cfdtjdrfeidbemhunilt.supabase.co:5432/postgres"
+```
+
+### 2. Collegamento Supabase CLI & Migrazioni Prisma:
+Per collegarsi ed allineare il database Supabase dal terminale:
+
+```bash
+# A. Collegamento tramite Supabase CLI
+npx supabase link --project-ref cfdtjdrfeidbemhunilt
+
+# B. Generazione Prisma Client & Allineamento Schema DB
+npx prisma generate
+npx prisma db push             # Sincronizza lo schema Prisma con Supabase
+npx tsx src/adapters/prisma/seedFull.ts # Popola i dati di seed sul DB reale Supabase
+```
+
