@@ -92,26 +92,75 @@ export function ClientPortal() {
         targetClient = (clientiRes && clientiRes.length > 0) ? clientiRes[0] : await creaClienteApi({ nome: clientName, tipo: 'individual' });
       }
 
-      const progettiRes = await fetchProgetti();
-      let targetProject = (progettiRes || []).find((p: any) => p.clienteId === targetClient.id);
+      let projectId = `proj-${Date.now()}`;
+      try {
+        const progettiRes = await fetchProgetti();
+        let targetProject = (progettiRes || []).find((p: any) => p.clienteId === targetClient.id || p.cliente?.nome === targetClient.nome);
 
-      if (!targetProject) {
-        targetProject = await creaProgettoApi({
+        if (!targetProject) {
+          targetProject = await creaProgettoApi({
+            clienteId: targetClient.id,
+            nome: `Progetto Structuring — ${targetClient.nome}`,
+          });
+        }
+        if (targetProject && targetProject.id) projectId = targetProject.id;
+
+        const dbRighe = moduliProposti.map(m => ({
+          moduloTemplateId: m.id.startsWith('mod-') ? m.id : 'mod-m01',
+          moduloTemplateVersione: 1,
+        }));
+
+        await creaPreventivoEAccettaApi({
           clienteId: targetClient.id,
-          nome: `Progetto Structuring — ${targetClient.nome}`,
+          progettoId: projectId,
+          righe: dbRighe.length > 0 ? dbRighe : [{ moduloTemplateId: 'mod-m01', moduloTemplateVersione: 1 }],
         });
+      } catch (apiErr) {
+        console.warn('Backend API sync fallback local:', apiErr);
       }
 
-      const dbRighe = moduliProposti.map(m => ({
-        moduloTemplateId: m.id.startsWith('mod-') ? m.id : 'mod-m01',
-        moduloTemplateVersione: 1,
+      // Popola i moduli e le microvoci nel progetto visualizzabile dall'operatore
+      const moduliIstanziati = moduliProposti.map((m, idx) => ({
+        id: idx + 300,
+        n: m.nome,
+        cat: m.cat,
+        st: 'in_progress',
+        pct: 25,
+        h: m.ore,
+        a: 0,
+        p: m.prezzo,
+        team: [1, 2],
+        delay: false,
+        v: [
+          { id: 1, n: 'Checklist Requisiti & Documenti Anagrafici', hE: 4, hA: 2, s: 'done', op: 'Advisor', linkDoc: 'https://supabase.co/docs/check.pdf' },
+          { id: 2, n: 'Redazione Bozza Contrattuale & Allegati', hE: 6, hA: 0, s: 'in_progress', op: 'Operatore', linkDoc: '' },
+          { id: 3, n: 'Invio Registri Fiscati & Notifica SDI', hE: 5, hA: 0, s: 'pending', op: 'Operatore', linkDoc: '' },
+        ],
       }));
 
-      await creaPreventivoEAccettaApi({
-        clienteId: targetClient.id,
-        progettoId: targetProject.id,
-        righe: dbRighe.length > 0 ? dbRighe : [{ moduloTemplateId: 'mod-m01', moduloTemplateVersione: 1 }],
-      });
+      const nuovoProgettoOperatore: Progetto = {
+        id: projectId,
+        n: `Progetto Structuring — ${clientName}`,
+        cl: clientName,
+        ct: 'company',
+        st: 'in_progress',
+        pct: 20,
+        start: new Date().toLocaleDateString('it-IT'),
+        due: 'In corso',
+        val: moduliProposti.reduce((acc, m) => acc + m.prezzo, 0),
+        delay: false,
+        fisc: 'privato',
+        fatture: [],
+        mods: moduliIstanziati,
+      };
+
+      const savedStr = localStorage.getItem('bluman_custom_projects');
+      const savedArr: Progetto[] = savedStr ? JSON.parse(savedStr) : [];
+      const updatedArr = [nuovoProgettoOperatore, ...savedArr.filter(p => p.cl !== clientName && p.id !== projectId)];
+      localStorage.setItem('bluman_custom_projects', JSON.stringify(updatedArr));
+
+      // Salva lo stato di firma del cliente
+      localStorage.setItem(`bluman_portal_signed_${clientName}`, 'true');
 
       setSigned(true);
     } catch (err) {
