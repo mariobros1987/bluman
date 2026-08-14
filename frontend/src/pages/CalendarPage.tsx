@@ -102,6 +102,35 @@ export function CalendarPage() {
   const [formCliente, setFormCliente] = useState('Holding Beta S.r.l.');
   const [formNote, setFormNote] = useState('');
 
+  React.useEffect(() => {
+    const savedStr = localStorage.getItem('bluman_calendar_events');
+    if (savedStr) {
+      try {
+        const savedArr = JSON.parse(savedStr);
+        if (Array.isArray(savedArr) && savedArr.length > 0) {
+          const mapped: EventoStudio[] = savedArr.map((se: any) => ({
+            id: se.id || `ev-${Math.random()}`,
+            titolo: se.title || 'Scadenza Pianificata',
+            data: se.date || '2026-08-25',
+            ora: se.time || '10:30',
+            categoria: 'microvoce',
+            priorita: (se.priority as any) || 'alta',
+            operatoreNome: 'Advisor / Operatore Incaricato',
+            stato: 'pending',
+            note: `${se.notes || ''} ${se.locationUrl ? `(Link: ${se.locationUrl})` : ''}`,
+          }));
+          setEvents(prev => {
+            const existingIds = new Set(prev.map(e => e.id));
+            const newToAdd = mapped.filter(m => !existingIds.has(m.id));
+            return [...newToAdd, ...prev];
+          });
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+  }, []);
+
   const handleCreateEventSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formTitolo) return;
