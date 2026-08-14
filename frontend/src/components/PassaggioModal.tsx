@@ -245,14 +245,30 @@ export function PassaggioModal({ project, mid, vidx, onClose }: PassaggioModalPr
         {activeTab === 'documenti' && (
           <div style={{ flex: 1, overflowY: 'auto', padding: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
             <form onSubmit={handleAddDocument} style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 10, padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <div style={{ fontSize: 12, fontWeight: 600 }}>Carica Documento o Contratto da Firmare</div>
+              <div style={{ fontSize: 12, fontWeight: 600 }}>Carica o Associa Documento / Contratto PDF Reale dal Computer</div>
+              
               <div>
-                <label style={{ fontSize: 10, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Nome File Documento *</label>
+                <label style={{ fontSize: 10, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Seleziona File dal Disco (.pdf, .doc, .docx) *</label>
+                <input
+                  type="file"
+                  accept=".pdf,.doc,.docx"
+                  onChange={e => {
+                    if (e.target.files && e.target.files[0]) {
+                      setDocName(e.target.files[0].name);
+                    }
+                  }}
+                  style={{ fontSize: 11, color: 'var(--text)' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: 10, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Nome o Descrizione Documento *</label>
                 <input
                   value={docName}
                   onChange={e => setDocName(e.target.value)}
                   placeholder="es. Procura_Legale_Firma_Cliente.pdf"
                   required
+                  style={{ fontSize: 12 }}
                 />
               </div>
 
@@ -270,7 +286,7 @@ export function PassaggioModal({ project, mid, vidx, onClose }: PassaggioModalPr
 
               <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                 <button type="submit" style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>
-                  + Carica Documento
+                  + Carica & Collega Documento Reale
                 </button>
               </div>
             </form>

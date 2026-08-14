@@ -35,6 +35,9 @@ export interface Passaggio {
   file?: string | null;
   fileSize?: number;
   fields?: string[];
+  documentoAllegatoUrl?: string;
+  formMasterId?: string;
+  linkIstruzioni?: string;
 }
 
 export interface ModuloProgetto {

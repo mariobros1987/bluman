@@ -437,9 +437,45 @@ function ArticoliCatalogView({ articoliList, onOpenNew }: { articoliList: Artico
               </div>
             </div>
 
+            <div>
+              <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>📄 Modello Documento / PDF Allegato</label>
+              <input
+                type="text"
+                placeholder="es. https://storage.bluman.com/templates/Accordo_NDA.pdf"
+                value={editingArt?.documentoAllegatoUrl || ''}
+                onChange={e => setEditingArt({ ...editingArt!, documentoAllegatoUrl: e.target.value })}
+                style={{ fontSize: 12 }}
+              />
+            </div>
+
+            <div>
+              <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>📋 Form Master Dati da far Compilare al Cliente</label>
+              <select
+                value={editingArt?.formMasterId || ''}
+                onChange={e => setEditingArt({ ...editingArt!, formMasterId: e.target.value })}
+                style={{ padding: 8, fontSize: 12 }}
+              >
+                <option value="">-- Nessun Form Richiesto --</option>
+                <option value="f1">Form Dati Societari & Legale Rappresentante</option>
+                <option value="f2">Form Titolarità Effettiva & UBO</option>
+                <option value="f3">Form Dati Bancari & KYC Compliance</option>
+              </select>
+            </div>
+
+            <div>
+              <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>🔗 Link Istruzioni per il Cliente (URL / Guida)</label>
+              <input
+                type="url"
+                placeholder="es. https://gov.mt/adempimenti-notarili-guida"
+                value={editingArt?.linkIstruzioni || ''}
+                onChange={e => setEditingArt({ ...editingArt!, linkIstruzioni: e.target.value })}
+                style={{ fontSize: 12 }}
+              />
+            </div>
+
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
               <button type="button" onClick={() => setEditingArt(null)} style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '7px 14px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}>Annulla</button>
-              <button type="submit" disabled={savingEdit} style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '7px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{savingEdit ? 'Salvataggio...' : '✓ Salva Modifiche Prezzo'}</button>
+              <button type="submit" disabled={savingEdit} style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '7px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{savingEdit ? 'Salvataggio...' : '✓ Salva Modifiche Prestazione'}</button>
             </div>
           </form>
         </div>

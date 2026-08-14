@@ -121,6 +121,9 @@ model Articolo {
   versione         Int      @default(1)
   oreDefault       Int      @map("ore_default")
   prezzoDefault    Int      @map("prezzo_default") // in centesimi, mai float per denaro
+  documentoAllegatoUrl String? @map("documento_allegato_url")
+  formMasterId         String? @map("form_master_id")
+  linkIstruzioni       String? @map("link_istruzioni")
   isUltimaVersione Boolean  @default(true) @map("is_ultima_versione")
   isAttivo         Boolean  @default(true) @map("is_attivo") // §30: disattiva, non elimina
   createdAt        DateTime @default(now()) @map("created_at")
