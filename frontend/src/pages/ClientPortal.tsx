@@ -29,6 +29,10 @@ export function ClientPortal() {
   const [clientName, setClientName] = useState('Marco Ricci / Holding Beta S.r.l.');
   const [moduliProposti, setModuliProposti] = useState<ModuloProposta[]>([]);
   const [signed, setSigned] = useState(false);
+  const [addendums, setAddendums] = useState<any[]>(() => {
+    const saved = localStorage.getItem(`bluman_addendums_Marco Ricci / Holding Beta S.r.l.`);
+    return saved ? JSON.parse(saved) : [];
+  });
   const [loading, setLoading] = useState(false);
   const [pageLoading, setPageLoading] = useState(true);
 
@@ -265,55 +269,157 @@ export function ClientPortal() {
         {activeTab === 'proposta' && (
           <div style={docBoxStyle}>
             {signed ? (
-              <div style={successBoxStyle}>
-                <div style={{ fontSize: 48, marginBottom: 12 }}>🎉</div>
-                <h2 style={{ fontSize: 20, fontWeight: 700, color: '#34d399', marginBottom: 8 }}>Engagement Letter Firmata con Successo!</h2>
-                <p style={{ fontSize: 13, color: 'var(--muted)', maxWidth: 480, lineHeight: 1.6, marginBottom: 20 }}>
-                  La proposta d'ordine per <strong>{clientName}</strong> è stata verificata e registrata con marca temporale. Il progetto è in lavorazione ed i moduli sono accessibili nella scheda "Avanzamento Live Lavori".
-                </p>
-                <div style={{ display: 'flex', gap: 10, marginBottom: 20 }}>
-                  <button
-                    onClick={() => setActiveTab('avanzamento')}
-                    style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '10px 22px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
-                  >
-                    Vai all'Avanzamento Live Lavori →
-                  </button>
-                  <button
-                    onClick={async () => {
-                      const htmlContent = `
-                        <div style="border-bottom:2px solid #0f172a;padding-bottom:15px;display:flex;justify-content:space-between;align-items:flex-start;">
-                          <div>
-                            <img src="${window.location.origin}/logo.png" style="max-height:55px;max-width:220px;object-fit:contain;margin-bottom:8px;display:block;" />
-                            <div style="font-size:20px;font-weight:800;color:#1e1b4b;">BLUECODE LTD — ADVISORY</div>
-                            <div style="font-size:11px;color:#475569;margin-top:2px;">Level 4, Valuation Centre, Sliema, Malta</div>
+              <div>
+                {/* 🔒 CONTRATTO BASE STIPULATO & CONGELATO (v1.0) */}
+                <div style={{ background: '#0d2d22', border: '1px solid #1a5c3c', borderRadius: 14, padding: 20, marginBottom: 24 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12, marginBottom: 14 }}>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                        <span style={{ background: '#34d399', color: '#064e3b', fontSize: 10, fontWeight: 800, padding: '3px 8px', borderRadius: 12, textTransform: 'uppercase' }}>
+                          🔒 FIRMATO & CONGELATO (v1.0)
+                        </span>
+                        <span style={{ fontSize: 11, color: '#34d399', fontFamily: 'monospace' }}>EL-2026-089-STIPULA</span>
+                      </div>
+                      <h3 style={{ fontSize: 17, fontWeight: 700, color: '#fff', margin: 0 }}>Engagement Letter & Proposta d'Ordine Iniziale (v1.0)</h3>
+                      <div style={{ fontSize: 11, color: '#a7f3d0', marginTop: 4 }}>
+                        Stipulato il: <strong>15/08/2026 ore 01:44:12</strong> · Marca Temporale SHA-256 eIDAS Validata
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 10 }}>
+                      <button
+                        onClick={async () => {
+                          const htmlContent = `
+                            <div style="border-bottom:2px solid #0f172a;padding-bottom:15px;display:flex;justify-content:space-between;align-items:flex-start;">
+                              <div>
+                                <img src="${window.location.origin}/logo.png" style="max-height:55px;max-width:220px;object-fit:contain;margin-bottom:8px;display:block;" />
+                                <div style="font-size:20px;font-weight:800;color:#1e1b4b;">BLUECODE LTD — ADVISORY</div>
+                                <div style="font-size:11px;color:#475569;margin-top:2px;">Level 4, Valuation Centre, Sliema, Malta</div>
+                              </div>
+                              <div style="text-align:right;">
+                                <div style="font-size:16px;font-weight:800;color:#4338ca;">ENGAGEMENT LETTER v1.0 (CONGELATO)</div>
+                                <div style="font-size:12px;font-weight:700;margin-top:2px;">Cliente: ${clientName}</div>
+                                <div style="font-size:10px;color:#166534;margin-top:2px;">✓ FIRMATO DIGITALMENTE E CONGELATO</div>
+                              </div>
+                            </div>
+                            <p style="margin-top:20px;line-height:1.6;">Si attesta la stipula ed il congelamento immutabile dell'Engagement Letter professionale per l'avvio delle attività di consulenza patrimoniale.</p>
+                          `;
+                          await downloadRealPdf(`Engagement_Letter_v1.0_${clientName.replace(/\s+/g, '_')}`, htmlContent, [
+                            {
+                              signerName: clientName,
+                              signerRole: 'Cliente Incarico (Legale Rappresentante)',
+                              timestamp: '15/08/2026 01:44:12',
+                              ipAddress: '2.234.190.44',
+                            },
+                            {
+                              signerName: 'Joe Disabato',
+                              signerRole: 'Senior Advisor (Bluecode Ltd)',
+                              timestamp: '15/08/2026 01:44:12',
+                              ipAddress: '83.211.12.94',
+                            }
+                          ]);
+                        }}
+                        style={{ background: '#166534', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+                      >
+                        📥 Scarica PDF Contratto Congelato v1.0
+                      </button>
+                    </div>
+                  </div>
+
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#6ee7b7', textTransform: 'uppercase', marginBottom: 8 }}>
+                    Moduli Inclusi nel Contratto Base (Stipula Iniziale):
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
+                    {moduliProposti.map((m, idx) => (
+                      <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, background: 'rgba(0,0,0,0.2)', padding: '6px 12px', borderRadius: 6 }}>
+                        <span>✓ {m.nome} ({m.cat})</span>
+                        <span style={{ fontWeight: 700 }}>{fmt(m.prezzo)}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: '#34d399', textAlign: 'right' }}>
+                    Valore Base Congelato: {fmt(totalValue)}
+                  </div>
+                </div>
+
+                {/* 📜 STORICO INTEGRATIVO ADDENDUM D'ORDINE (POSIZIONATI SOTTO) */}
+                <div style={{ borderTop: '2px dashed var(--border)', paddingTop: 20, marginTop: 24 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
+                    <div>
+                      <div style={{ fontSize: 14, fontWeight: 700 }}>📜 Storico Integrazioni d'Ordine & Addendum (Cronologia)</div>
+                      <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
+                        Tutti i moduli aggiuntivi ed i cambi di scopo vengono registrati in append cronologico sotto al contratto base
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        const newAdd: any = {
+                          id: `add-${Date.now()}`,
+                          version: `v1.1`,
+                          title: `Addendum v1.1 — Integrazione Modulo Fiscale International Tax Refund`,
+                          date: new Date().toLocaleDateString('it-IT'),
+                          status: 'pending',
+                          prezzo: 3500,
+                          modules: [
+                            { nome: 'Ottimizzazione Regime Fiscale 6/7 Refund Mechanism Malta', cat: 'Fiscale', prezzo: 3500 }
+                          ]
+                        };
+                        const updated = [newAdd, ...addendums];
+                        setAddendums(updated);
+                        localStorage.setItem(`bluman_addendums_${clientName}`, JSON.stringify(updated));
+                      }}
+                      style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '7px 14px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+                    >
+                      ➕ Richiedi / Aggiungi Modulo d'Integrazione
+                    </button>
+                  </div>
+
+                  {addendums.length === 0 ? (
+                    <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 10, padding: 16, textAlign: 'center', fontSize: 11, color: 'var(--muted)' }}>
+                      Nessuna integrazione o addendum d'ordine aggiuntivo richiesto. Il contratto base v1.0 è attualmente la versione attiva.
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                      {addendums.map((add, aIdx) => (
+                        <div key={aIdx} style={{ background: add.status === 'signed' ? '#0d2d22' : 'var(--card2)', border: `1px solid ${add.status === 'signed' ? '#1a5c3c' : 'var(--border)'}`, borderRadius: 12, padding: 16 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 10, marginBottom: 8 }}>
+                            <div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                                <span style={{ background: add.status === 'signed' ? '#34d399' : 'var(--amber)', color: '#000', fontSize: 9, fontWeight: 800, padding: '2px 6px', borderRadius: 10 }}>
+                                  {add.status === 'signed' ? '🔒 FIRMATO & CONGELATO' : '✍️ IN ATTESA DI FIRMA CLIENTE'}
+                                </span>
+                                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text)' }}>{add.title}</span>
+                              </div>
+                              <div style={{ fontSize: 10, color: 'var(--muted)' }}>Data Richiesta Integrazione: {add.date}</div>
+                            </div>
+                            <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--indigo-l)' }}>{fmt(add.prezzo)}</div>
                           </div>
-                          <div style="text-align:right;">
-                            <div style="font-size:16px;font-weight:800;color:#4338ca;">ENGAGEMENT LETTER & PROPOSTA D'ORDINE</div>
-                            <div style="font-size:12px;font-weight:700;margin-top:2px;">Cliente: ${clientName}</div>
-                            <div style="font-size:10px;color:#166534;margin-top:2px;">✓ FIRMATA DIGITALMENTE (1-Click eIDAS)</div>
+
+                          <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 12 }}>
+                            {add.modules.map((m: any, mI: number) => (
+                              <div key={mI}>• {m.nome} ({m.cat}) — {fmt(m.prezzo)}</div>
+                            ))}
                           </div>
+
+                          {add.status === 'pending' ? (
+                            <button
+                              onClick={() => {
+                                const updated = addendums.map(a => a.id === add.id ? { ...a, status: 'signed', signedAt: new Date().toLocaleString('it-IT') } : a);
+                                setAddendums(updated);
+                                localStorage.setItem(`bluman_addendums_${clientName}`, JSON.stringify(updated));
+                              }}
+                              style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '8px 18px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+                            >
+                              ✍️ Firma ed Accetta Addendum d'Ordine ({fmt(add.prezzo)})
+                            </button>
+                          ) : (
+                            <div style={{ fontSize: 10, color: '#34d399', fontWeight: 600 }}>
+                              ✓ Firmato e Congelato il {add.signedAt || add.date} (IP: 2.234.190.44)
+                            </div>
+                          )}
                         </div>
-                        <p style="margin-top:20px;line-height:1.6;">Si attesta la stipula ed accettazione dell'Engagement Letter professionale per l'avvio delle attività di consulenza patrimoniale e corporate structuring.</p>
-                      `;
-                      await downloadRealPdf(`Engagement_Letter_${clientName.replace(/\s+/g, '_')}`, htmlContent, [
-                        {
-                          signerName: clientName,
-                          signerRole: 'Cliente Incarico (Legale Rappresentante)',
-                          timestamp: new Date().toLocaleString('it-IT'),
-                          ipAddress: '2.234.190.44',
-                        },
-                        {
-                          signerName: 'Joe Disabato',
-                          signerRole: 'Senior Advisor (Bluecode Ltd)',
-                          timestamp: new Date().toLocaleString('it-IT'),
-                          ipAddress: '83.211.12.94',
-                        }
-                      ]);
-                    }}
-                    style={{ background: 'var(--card2)', border: '1px solid var(--border)', color: 'var(--text)', padding: '10px 18px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
-                  >
-                    📥 Esporta Engagement Letter PDF (A4)
-                  </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             ) : (

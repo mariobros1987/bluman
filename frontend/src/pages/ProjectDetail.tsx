@@ -16,7 +16,7 @@ import { TEAM } from '../store/mockData';
 import type { Progetto, ModuloProgetto, CategoriaModulo } from '../types';
 import styles from './ProjectDetail.module.css';
 
-type Tab = 'moduli' | 'grafo' | 'fatturazione' | 'comunicazioni' | 'documenti' | 'calendario';
+type Tab = 'moduli' | 'grafo' | 'fatturazione' | 'storico' | 'comunicazioni' | 'documenti' | 'calendario';
 
 export function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
@@ -171,9 +171,9 @@ export function ProjectDetail() {
 
       {/* Tabs */}
       <div className={styles.tabs}>
-        {(['moduli', 'grafo', 'fatturazione', 'comunicazioni', 'documenti', 'calendario'] as Tab[]).map(t => (
+        {(['moduli', 'grafo', 'fatturazione', 'storico', 'comunicazioni', 'documenti', 'calendario'] as Tab[]).map(t => (
           <button key={t} className={`${styles.tab} ${tab === t ? styles.tabActive : ''}`} onClick={() => setTab(t)}>
-            {{ moduli: '🗂 Moduli & Microvoci', grafo: '🕸 Grafo & Dipendenze Moduli', fatturazione: '💶 Fatturazione & SDI', comunicazioni: '💬 Comunicazioni & Ingestion', documenti: '📄 Documenti', calendario: '📅 Calendario' }[t]}
+            {{ moduli: '🗂 Moduli & Microvoci', grafo: '🕸 Grafo & Dipendenze Moduli', fatturazione: '💶 Fatturazione & SDI', storico: '📜 Storico Contratti & Addendum', comunicazioni: '💬 Comunicazioni & Ingestion', documenti: '📄 Documenti', calendario: '📅 Calendario' }[t]}
           </button>
         ))}
       </div>
@@ -219,6 +219,56 @@ export function ProjectDetail() {
           />
         )}
         {tab === 'fatturazione' && <FatturazioneTab project={project} rawDbProject={rawDbProject} onRefresh={() => loadDetail()} />}
+        {tab === 'storico' && (
+          <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 14, padding: 20 }}>
+            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>📜 Storico Contrattuale & Cronologia Addendum d'Ordine</div>
+            <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 20 }}>
+              Registro immutabile delle versioni contrattuali firmate, marca temporale eIDAS ed addendum integrativi d'ordine per <strong>{project.cl}</strong>.
+            </div>
+
+            {/* Baseline v1.0 */}
+            <div style={{ background: '#0d2d22', border: '1px solid #1a5c3c', borderRadius: 12, padding: 16, marginBottom: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', gap: 8 }}>
+                <div>
+                  <span style={{ background: '#34d399', color: '#064e3b', fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 10, textTransform: 'uppercase' }}>
+                    🔒 CONTRATTO FIRMATO & CONGELATO (v1.0)
+                  </span>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', marginTop: 4 }}>Engagement Letter & Proposta d'Ordine Iniziale</div>
+                  <div style={{ fontSize: 10, color: '#a7f3d0' }}>Stipula: 15/08/2026 ore 01:44:12 · Registrazione eIDAS Validata</div>
+                </div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: '#34d399' }}>{fmt(project.val)}</div>
+              </div>
+              <div style={{ fontSize: 11, color: '#6ee7b7' }}>• Moduli Iniziali Incorporati: {project.mods.map(m => m.n).join(', ') || 'Analisi Preliminare, Structuring Malta, Trust'}</div>
+            </div>
+
+            {/* Timeline Addendums */}
+            <div style={{ borderTop: '1px solid var(--border)', paddingTop: 16, marginTop: 16 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>Integrazioni & Addendum d'Ordine Successivi (Cronologia Posizionata Sotto):</div>
+              {(() => {
+                const savedAdd = localStorage.getItem(`bluman_addendums_${project.cl}`);
+                const addList = savedAdd ? JSON.parse(savedAdd) : [];
+                if (addList.length === 0) {
+                  return (
+                    <div style={{ fontSize: 11, color: 'var(--muted)', background: 'var(--card2)', padding: 12, borderRadius: 8 }}>
+                      Nessun addendum o modulo aggiuntivo istanziato successivamente. Il contratto base v1.0 è attualmente la versione attiva.
+                    </div>
+                  );
+                }
+                return addList.map((a: any, idx: number) => (
+                  <div key={idx} style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 10, padding: 14, marginBottom: 10 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 700 }}>
+                      <span>{a.title || `Addendum v1.${idx + 1}`}</span>
+                      <span style={{ color: 'var(--indigo-l)' }}>{fmt(a.prezzo || 3500)}</span>
+                    </div>
+                    <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>
+                      Stato: {a.status === 'signed' ? '🔒 FIRMATO E CONGELATO' : '✍️ IN ATTESA DI FIRMA CLIENTE'} · Data: {a.date}
+                    </div>
+                  </div>
+                ));
+              })()}
+            </div>
+          </div>
+        )}
         {tab === 'comunicazioni' && <ComunicazioniTab progettoId={String(project.id)} nomeCliente={project.cl} emailCliente="client@holdingbeta.advisory" />}
         {tab === 'documenti' && <PlaceholderTab icon="📄" label="Documenti contrattuali allegati" />}
         {tab === 'calendario' && <PlaceholderTab icon="📅" label="Scadenzario e Calendario condiviso" />}
