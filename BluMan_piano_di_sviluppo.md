@@ -40,6 +40,10 @@
 - [x] **Impostazioni Studio (`/settings`)**:
   - Sede Legale e Sede Operativa disaccoppiate.
   - Configuratore Layout Fattura PDF (Logo studio, colore tema, note legali ed anteprima live).
+- [x] **Calendario Condiviso & Scadenzario Studio (`/calendar`)**:
+  - [x] Vista Mese ed Inserimento Scadenze Attività.
+  - [x] Scadenzario Cronologico Filtrabile (Microvoci, Compliance KYC, Emissione Fatture, Firma Contratti e Promemoria).
+  - [x] Drawer Modal Dettagli Evento ed Azione `✓ Marca Come Completato`.
 
 ---
 

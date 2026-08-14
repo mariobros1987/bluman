@@ -8,6 +8,7 @@ Questo file serve come indice rapido per l'IA ed i collaboratori per identificar
 
 - **`pages/Dashboard.tsx`**: Dashboard principale con KPI portafoglio, avvisi ritardo e progetti in corso.
 - **`pages/ClientsPage.tsx`**: Anagrafica Clienti ERP, filtraggio, Magic Link passwordless e modal `AnagraficaErpModal`.
+- **`pages/CalendarPage.tsx`**: Calendario Condiviso & Scadenzario Attività Studio (Vista Mese, Lista Scadenzario, Filtro Categorie e Modal Nuovo Evento).
 - **`pages/ProjectDetail.tsx`**: Vista dettagliata del progetto con tab:
   - `🗂 Moduli & Microvoci`
   - `🕸 Grafo & Dipendenze Moduli` (`GrafoModuliProgettoView`)

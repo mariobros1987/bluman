@@ -9,7 +9,7 @@ import { ClientsPage }  from './pages/ClientsPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { ClientPortal } from './pages/ClientPortal';
 import { LoginPage }    from './pages/LoginPage';
-import { Calendar }     from './pages/Placeholders';
+import { CalendarPage } from './pages/CalendarPage';
 import { PROJECTS } from './store/mockData';
 import './styles/tokens.css';
 
@@ -63,7 +63,7 @@ export default function App() {
             <Route path="/projects"      element={<Projects />} />
             <Route path="/projects/:id"  element={<ProjectDetail />} />
             <Route path="/clients"       element={<ClientsPage />} />
-            <Route path="/calendar"      element={<Calendar />} />
+            <Route path="/calendar"      element={<CalendarPage />} />
             <Route path="/library"       element={<Library />} />
             <Route path="/settings"      element={<SettingsPage />} />
           </Route>
