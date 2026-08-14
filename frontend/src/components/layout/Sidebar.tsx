@@ -21,6 +21,11 @@ export function Sidebar({ alertCount = 0, user, onLogout }: SidebarProps) {
   const userName = user?.nome || user?.name || 'Joe Disabato';
   const initials = userName.substring(0, 2).toUpperCase();
 
+  const isSuperAdmin = user?.ruolo === 'super_admin';
+  const navItems = isSuperAdmin
+    ? [...NAV, { path: '/admin/tenants', label: 'Multi-Tenant Admin', icon: '👑' }]
+    : NAV;
+
   return (
     <aside className={styles.sidebar}>
       {/* Logo */}
@@ -34,7 +39,7 @@ export function Sidebar({ alertCount = 0, user, onLogout }: SidebarProps) {
 
       {/* Navigation */}
       <nav className={styles.nav}>
-        {NAV.map(item => (
+        {navItems.map(item => (
           <NavLink
             key={item.path}
             to={item.path}
