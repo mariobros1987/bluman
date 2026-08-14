@@ -26,7 +26,11 @@ const inMemoryTenantStore = new Map<string, any>();
 export function buildServer(app: AppPort): FastifyInstance {
   const server = Fastify({ logger: false });
 
-  server.register(cors, { origin: true });
+  server.register(cors, {
+    origin: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-tenant-id'],
+  });
 
   server.setErrorHandler((err, _req, reply) => {
     if (
