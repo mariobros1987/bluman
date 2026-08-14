@@ -43,24 +43,7 @@ export function ProjectDetail() {
       const dbRes = await fetchProgettoDettaglio(id);
       if (dbRes && dbRes.id) {
         setRawDbProject(dbRes);
-        const mapped: Progetto = {
-          id: dbRes.id,
-          n: dbRes.nome,
-          cl: dbRes.cliente?.nome || 'Cliente',
-          ct: (dbRes.cliente?.tipo as any) || 'individual',
-          st: dbRes.stato || 'in_progress',
-          pct: dbRes.stato === 'completed' ? 100 : dbRes.stato === 'in_progress' ? 50 : 10,
-          start: dbRes.createdAt ? new Date(dbRes.createdAt).toLocaleDateString('it-IT') : 'Oggi',
-          due: 'In corso',
-          val: dbRes.valoreTotale ? dbRes.valoreTotale / 100 : 15000,
-          delay: dbRes.moduli?.some((m: any) => m.stato === 'delayed' || m.stato === 'blocked') || false,
-          fisc: 'privato',
-          fatture: (dbRes.fatture || []).map((f: any) => ({
-            tipo: 'milestone_libera',
-            importo: f.righe ? f.righe.reduce((acc: number, r: any) => acc + r.importo, 0) / 100 : 0,
-            desc: f.numero ? `Fattura n. ${f.numero}` : 'Fattura acconto',
-            stato: f.stato === 'incassata' ? 'incassata' : 'emessa',
-          })),
+
         let finalMods = (dbRes.moduli || []).map((m: any, mIdx: number) => ({
           id: mIdx + 100,
           n: m.nome,
