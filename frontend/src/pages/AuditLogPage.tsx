@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { fmt } from '../utils';
+import { fetchAuditLogsApi } from '../api/client';
 
 export interface AuditEntry {
   id: string;
@@ -97,6 +98,21 @@ export function AuditLogPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterRuolo, setFilterRuolo] = useState<string>('TUTTI');
   const [filterCat, setFilterCat] = useState<string>('TUTTI');
+
+  useEffect(() => {
+    const loadAuditLogs = async () => {
+      const dbLogs = await fetchAuditLogsApi();
+      if (dbLogs && Array.isArray(dbLogs) && dbLogs.length > 0) {
+        setLogs(dbLogs.map((l: any) => ({
+          ...l,
+          tenantName: l.tenantName || 'Bluecode Ltd (Malta HQ)',
+          categoria: l.categoria || 'DOCUMENTI',
+          dataOra: l.createdAt ? new Date(l.createdAt).toLocaleString('it-IT') : l.dataOra,
+        })));
+      }
+    };
+    loadAuditLogs();
+  }, []);
 
   // Filtra per tenant (SuperAdmin vede tutti i tenant, gli altri vedono SOLO il proprio tenant)
   const tenantFilteredLogs = logs.filter(l => {

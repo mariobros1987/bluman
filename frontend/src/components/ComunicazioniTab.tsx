@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { fetchComunicazioniApi, inviaComunicazioneApi } from '../api/client';
 
 export interface MessaggioComunicazione {
   id: string;
@@ -76,21 +77,45 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente }: Comu
   const [canaleSelezionato, setCanaleSelezionato] = useState<'email' | 'whatsapp' | 'telegram' | 'signal'>('whatsapp');
   const [filtroCanale, setFiltroCanale] = useState<string>('TUTTI');
 
-  const handleInviaMessaggio = (e: React.FormEvent) => {
+  useEffect(() => {
+    const loadComunicazioni = async () => {
+      const dbMsgs = await fetchComunicazioniApi(progettoId);
+      if (dbMsgs && Array.isArray(dbMsgs) && dbMsgs.length > 0) {
+        setMessaggi(dbMsgs.map((m: any) => ({
+          ...m,
+          dataOra: m.createdAt ? new Date(m.createdAt).toLocaleString('it-IT') : m.dataOra,
+          allegati: m.allegatiJson ? JSON.parse(m.allegatiJson) : m.allegati,
+        })));
+      }
+    };
+    loadComunicazioni();
+  }, [progettoId]);
+
+  const handleInviaMessaggio = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!nuovoTesto.trim()) return;
+
+    const mittente = 'Joe Disabato (Senior Advisor)';
+    const destinatario = canaleSelezionato === 'email' ? emailCliente : `Cliente (${nomeCliente})`;
 
     const nuovoMsg: MessaggioComunicazione = {
       id: `msg-${Date.now()}`,
       canale: canaleSelezionato,
-      mittente: 'Joe Disabato (Senior Advisor)',
-      destinatario: canaleSelezionato === 'email' ? emailCliente : `Cliente (${nomeCliente})`,
+      mittente,
+      destinatario,
       direzione: 'uscita',
       testo: nuovoTesto.trim(),
       dataOra: new Date().toLocaleString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
     };
 
     setMessaggi(prev => [...prev, nuovoMsg]);
+    await inviaComunicazioneApi(progettoId, {
+      canale: canaleSelezionato,
+      mittente,
+      destinatario,
+      direzione: 'uscita',
+      testo: nuovoTesto.trim(),
+    });
     setNuovoTesto('');
   };
 

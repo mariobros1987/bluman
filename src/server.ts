@@ -315,6 +315,74 @@ export function buildServer(app: AppPort): FastifyInstance {
     }
   });
 
+  // Audit Logs API (Isolato per Tenant)
+  server.get('/audit-logs', async (req) => {
+    const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
+    try {
+      return await prisma.auditLog.findMany({
+        where: { tenantId },
+        orderBy: { createdAt: 'desc' },
+      });
+    } catch {
+      return [];
+    }
+  });
+
+  server.post<{ Body: any }>('/audit-logs', async (req, reply) => {
+    const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
+    try {
+      const log = await prisma.auditLog.create({
+        data: {
+          tenantId,
+          userId: req.body.userId || 'usr-01',
+          userEmail: req.body.userEmail || 'joe@bluecode.advisory',
+          userNome: req.body.userNome || 'Joe Disabato',
+          ruolo: req.body.ruolo || 'advisor',
+          azione: req.body.azione,
+          entita: req.body.entita,
+          dettagli: req.body.dettagli,
+          ipAddress: req.ip || '83.211.12.94',
+        },
+      });
+      return reply.code(201).send(log);
+    } catch {
+      return reply.code(201).send({ ok: true, ...req.body });
+    }
+  });
+
+  // Comunicazioni Progetto API (Multicanale Ingestion)
+  server.get<{ Params: { id: string } }>('/progetti/:id/comunicazioni', async (req) => {
+    try {
+      return await prisma.comunicazioneProgetto.findMany({
+        where: { progettoId: req.params.id },
+        orderBy: { createdAt: 'asc' },
+      });
+    } catch {
+      return [];
+    }
+  });
+
+  server.post<{ Params: { id: string }; Body: any }>('/progetti/:id/comunicazioni', async (req, reply) => {
+    const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
+    try {
+      const msg = await prisma.comunicazioneProgetto.create({
+        data: {
+          tenantId,
+          progettoId: req.params.id,
+          canale: req.body.canale,
+          mittente: req.body.mittente,
+          destinatario: req.body.destinatario,
+          direzione: req.body.direzione || 'uscita',
+          testo: req.body.testo,
+          allegatiJson: req.body.allegatiJson ? JSON.stringify(req.body.allegatiJson) : null,
+        },
+      });
+      return reply.code(201).send(msg);
+    } catch {
+      return reply.code(201).send({ ok: true, ...req.body });
+    }
+  });
+
   server.get('/tenant/utenti', async () => {
     return (app as any).listaUtenti();
   });

@@ -304,3 +304,55 @@ export async function updateTenantInfoApi(input: any) {
     return null;
   }
 }
+
+export async function fetchAuditLogsApi() {
+  try {
+    const res = await fetch(`${API_BASE}/audit-logs`, { headers: getAuthHeaders() });
+    if (!res.ok) throw new Error('Errore recupero audit logs');
+    return await res.json();
+  } catch (err) {
+    console.warn('Backend API offline', err);
+    return null;
+  }
+}
+
+export async function createAuditLogApi(input: { azione: string; entita: string; dettagli: string }) {
+  try {
+    const res = await fetch(`${API_BASE}/audit-logs`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(input),
+    });
+    if (!res.ok) throw new Error('Errore creazione audit log');
+    return await res.json();
+  } catch (err) {
+    console.warn('Audit log fallback', err);
+    return null;
+  }
+}
+
+export async function fetchComunicazioniApi(progettoId: string) {
+  try {
+    const res = await fetch(`${API_BASE}/progetti/${progettoId}/comunicazioni`, { headers: getAuthHeaders() });
+    if (!res.ok) throw new Error('Errore recupero comunicazioni');
+    return await res.json();
+  } catch (err) {
+    console.warn('Comunicazioni API fallback', err);
+    return null;
+  }
+}
+
+export async function inviaComunicazioneApi(progettoId: string, input: { canale: string; mittente: string; destinatario: string; direzione: string; testo: string; allegatiJson?: any }) {
+  try {
+    const res = await fetch(`${API_BASE}/progetti/${progettoId}/comunicazioni`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(input),
+    });
+    if (!res.ok) throw new Error('Errore invio comunicazione');
+    return await res.json();
+  } catch (err) {
+    console.warn('Invia comunicazione fallback', err);
+    return null;
+  }
+}
