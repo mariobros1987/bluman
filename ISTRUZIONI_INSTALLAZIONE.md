@@ -60,6 +60,17 @@ Per accedere direttamente al **Portale Cliente Passwordless**, apri:
 
 ---
 
+## 🔑 Tabella Credenziali di Accesso Ufficiali
+
+| Ruolo Attore | Email Registrata | Password di Accesso | Tipo Accesso |
+| :--- | :--- | :--- | :--- |
+| 👨‍💼 **Advisor Senior** | `joe@bluecode.advisory` | `password123` | JWT Access Token |
+| 👑 **Super Admin** | `admin@bluecode.advisory` | `admin2026!` | JWT Access Token |
+| 👷 **Operatore Studio** | `operator@bluecode.advisory` | `operator123` | JWT Access Token |
+| 🔑 **Cliente Incarico** | `client@holdingbeta.advisory` | *Passwordless* | Magic Link `/portal` |
+
+---
+
 ## 4. Connessione a Supabase PostgreSQL (Produzione)
 
 1. Duplica `.env.example` in `.env`:

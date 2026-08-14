@@ -62,6 +62,17 @@ cd frontend && npm run dev # Dev Server in ascolto su http://localhost:5173
 
 ---
 
+## 🔑 Credenziali Ufficiali di Accesso (Ruoli Staff & Cliente)
+
+| Ruolo Attore | Email Registrata | Password di Accesso | Tipo Accesso |
+| :--- | :--- | :--- | :--- |
+| 👨‍💼 **Advisor Senior** | `joe@bluecode.advisory` | `password123` | JWT Access Token |
+| 👑 **Super Admin** | `admin@bluecode.advisory` | `admin2026!` | JWT Access Token |
+| 👷 **Operatore Studio** | `operator@bluecode.advisory` | `operator123` | JWT Access Token |
+| 🔑 **Cliente Incarico** | `client@holdingbeta.advisory` | *Passwordless* | `/portal?magic_token=client_demo` |
+
+---
+
 ## 🔍 AUDIT SCHIETTO: Cosa Manca per la Produzione A-Z (Enterprise Checklist)
 
 Per distribuire BluMan in produzione a clienti e studi reali:

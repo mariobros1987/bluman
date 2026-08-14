@@ -21,6 +21,15 @@ Questo file serve come indice rapido per l'IA ed i collaboratori per identificar
 ## 🔌 2. API Backend Fastify (`src/server.ts`) & API Client (`frontend/src/api/client.ts`)
 
 - **Autenticazione RBAC**: `POST /auth/login`, `POST /auth/magic-login`, `GET /auth/me` (Token JWT 15 min + Magic Link).
+
+### 🔑 Tabella Credenziali di Accesso Ufficiali
+
+| Ruolo Attore | Email Registrata | Password di Accesso | Tipo Accesso |
+| :--- | :--- | :--- | :--- |
+| 👨‍💼 **Advisor Senior** | `joe@bluecode.advisory` | `password123` | JWT Access Token |
+| 👑 **Super Admin** | `admin@bluecode.advisory` | `admin2026!` | JWT Access Token |
+| 👷 **Operatore Studio** | `operator@bluecode.advisory` | `operator123` | JWT Access Token |
+| 🔑 **Cliente Incarico** | `client@holdingbeta.advisory` | *Passwordless* | Magic Link `/portal` |
 - **Progetti**: `GET /progetti`, `GET /progetti/:id`
 - **Clienti**: `GET /clienti`, `POST /clienti`
 - **Fatturazione**: `POST /progetti/:id/fatture` (gestisce sia Fatture `FT` che Note di Credito `NC` con numerazione distinta).
