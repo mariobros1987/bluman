@@ -62,8 +62,10 @@ Questo file serve come indice rapido per l'IA ed i collaboratori per identificar
    - I dati tra i vari Tenant/Studi **NON SI DEVONO ASSOLUTAMENTE MISCHIARE**.
    - Ogni query, rotta API e tabella PostgreSQL **DEVE essere rigorosamente isolata** tramite `tenant_id` ed a livello database con PostgreSQL Row-Level Security (RLS).
 
-2. **Sincronizzazione Schema Database (Prisma & Supabase)**:
-   - Ogni nuova funzionalità, campo form o dato aggiunto nell'interfaccia React o nelle API Fastify **DEVE essere istantaneamente mappato** in `prisma/schema.prisma` ed allineato a Supabase PostgreSQL. NESSUN dato deve essere mantenuto solo in RAM o volatilizzato.
+2. **Sincronizzazione Schema Database & Persistenza Cloud Obbligatoria (Prisma & Fastify DB)**:
+   - **TUTTO QUELLO CHE VIENE AGGIUNTO O MODIFICATO NELL'INTERFACCIA E NEI MODULI (spunte, passaggi, microvoci, note, scadenze, assegnazioni operatori) DEVE ESSERE TASSATIVAMENTE SALVABILE E COLLEGATO AL DATABASE POSTGRESQL/PRISMA VIA API FASTIFY.**
+   - **NON POSSIAMO PERMETTERCI DI PERDERE DATI.** Ogni stato o azione deve persistere su Database Server in modo che, spegnendo il PC o collegandosi da qualsiasi altra postazione/dispositivo, lo storico rimanga al 100% integro ed accessibile.
+   - Ogni nuova funzionalità o campo form aggiunto **DEVE essere istantaneamente mappato** in `prisma/schema.prisma` ed allineato al backend. NESSUN dato deve essere mantenuto solo in RAM o registrato solo temporaneamente.
    - Eseguire sempre `npx prisma generate` ad ogni variazione dello schema.
 
 3. **Aggiornamento Documentazione Markdown (`.md`)**:

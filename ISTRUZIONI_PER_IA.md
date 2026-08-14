@@ -14,7 +14,7 @@ Stack: React 19 + TypeScript + Fastify API + Prisma ORM + Supabase PostgreSQL + 
 
 REGOLE TASSATIVE DA SEGUIRE RIGOROSAMENTE:
 1. Isolamento Multi-Tenant Tassativo (tenant_id): I dati tra i vari Tenant/Studi non si devono MAI mischiare. Ogni query DB e rotta deve essere filtrata su tenant_id e protetta da RLS PostgreSQL.
-2. Sincronizzazione Database & File MD: Ad ogni modifica o nuova funzionalità, aggiorna sia prisma/schema.prisma (con npx prisma generate) sia tutti i file di documentazione (.md).
+2. Sincronizzazione Database & Persistenza Cloud Tassativa: Tutto quello che viene aggiunto o modificato nell'interfaccia (spunte, passaggi, note, scadenze, assegnazioni) deve essere tassativamente salvabile e collegato al database PostgreSQL via API Fastify. Non possiamo permetterci di perdere dati. Aggiorna sia prisma/schema.prisma (con npx prisma generate) sia tutti i file di documentazione (.md).
 3. Grafo Graphify: Esegui `graphify update . --code-only` per mantenere la mappa delle dipendenze aggiornata.
 
 CREDENZIALI UFFICIALI DI TEST (LOGIN):
