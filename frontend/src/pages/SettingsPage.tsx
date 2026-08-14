@@ -391,19 +391,18 @@ export function SettingsPage() {
             {/* Header Documento con Colore Personalizzato */}
             <div style={{ borderBottom: `3px solid ${coloreTemaFattura}`, paddingBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
-                {logoUrl ? (
-                  <img src={logoUrl} alt="Logo" style={{ maxHeight: 45, marginBottom: 6 }} />
-                ) : (
-                  <div style={{ fontSize: 20, fontWeight: 800, color: coloreTemaFattura }}>{titoloIntestazione}</div>
+                {logoUrl && (
+                  <img src={logoUrl} alt="Logo Studio" style={{ maxHeight: 60, maxWidth: 220, objectFit: 'contain', marginBottom: 8, display: 'block' }} />
                 )}
+                <div style={{ fontSize: 20, fontWeight: 800, color: coloreTemaFattura }}>{titoloIntestazione || ragioneSociale}</div>
                 <div style={{ fontSize: 11, color: '#475569', marginTop: 4 }}>
                   <strong>Sede Legale:</strong> {sedeLegale}<br />
                   <strong>Sede Operativa:</strong> {sedeOperativa}<br />
-                  P.IVA/VAT: {pIva} · Reg. C-99881
+                  P.IVA/VAT: {pIva} · IBAN: {iban}
                 </div>
               </div>
               <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: 16, fontWeight: 800, color: coloreTemaFattura }}>FATTURA PROFORMA</div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: coloreTemaFattura }}>FATTURA DI VENDITA</div>
                 <div style={{ fontSize: 13, fontWeight: 700, marginTop: 2 }}>FT-2026-PREVIEW</div>
                 <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>Data: {new Date().toLocaleDateString('it-IT')}</div>
               </div>

@@ -69,9 +69,26 @@ export async function downloadRealPdf(
   }
 
   try {
-    // Attendi render DOM
-    await new Promise(resolve => setTimeout(resolve, 100));
+    // 1. Attendi il caricamento completo di tutte le immagini (incluse immagini logo in Base64 / URL)
+    const images = Array.from(container.querySelectorAll('img'));
+    await Promise.all(
+      images.map(
+        (img) =>
+          new Promise<void>((resolve) => {
+            if (img.complete && img.naturalHeight !== 0) {
+              resolve();
+            } else {
+              img.onload = () => resolve();
+              img.onerror = () => resolve(); // Non bloccare il PDF se un'immagine remota fallisce
+            }
+          })
+      )
+    );
 
+    // Attendi render finale del DOM
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    // 2. Cattura Canvas in Alta Risoluzione 300 DPI
     const canvas = await html2canvas(container, {
       scale: 2,
       useCORS: true,
@@ -81,30 +98,35 @@ export async function downloadRealPdf(
       windowWidth: 794,
     });
 
-    const imgData = canvas.toDataURL('image/jpeg', 0.98);
+    const imgData = canvas.toDataURL('image/png');
+
+    // 3. Generazione PDF Formato A4 (210mm x 297mm)
     const pdf = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
       format: 'a4',
+      compress: true,
     });
 
-    const imgWidth = 210;
-    const pageHeight = 297;
+    const imgWidth = 210; // Larghezza esatta A4 in mm
+    const pageHeight = 297; // Altezza esatta A4 in mm
     const imgHeight = (canvas.height * imgWidth) / canvas.width;
     let heightLeft = imgHeight;
     let position = 0;
 
-    pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+    pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
     heightLeft -= pageHeight;
 
-    while (heightLeft > 5) { // margine minimo tolleranza
+    while (heightLeft > 5) {
       position = heightLeft - imgHeight;
       pdf.addPage();
-      pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
       heightLeft -= pageHeight;
     }
 
     const cleanFileName = fileName.endsWith('.pdf') ? fileName : `${fileName}.pdf`;
+
+    // 4. Download Diretto Binary PDF
     pdf.save(cleanFileName);
   } catch (error) {
     console.error('Errore generazione PDF:', error);

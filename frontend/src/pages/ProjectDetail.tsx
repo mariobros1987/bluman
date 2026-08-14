@@ -606,16 +606,25 @@ function FatturazioneTab({ project, rawDbProject, onRefresh }: { project: Proget
             {/* Header Documento Stampa */}
             <div style={{ borderBottom: '2px solid #0f172a', paddingBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
-                <div style={{ fontSize: 20, fontWeight: 800, color: '#1e1b4b' }}>BLUECODE LTD</div>
+                {(localStorage.getItem('bluman_logo_url') || (JSON.parse(localStorage.getItem('bluman_tenant_info') || '{}').logoUrl)) && (
+                  <img
+                    src={localStorage.getItem('bluman_logo_url') || (JSON.parse(localStorage.getItem('bluman_tenant_info') || '{}').logoUrl)}
+                    alt="Logo Studio"
+                    style={{ maxHeight: 60, maxWidth: 220, objectFit: 'contain', marginBottom: 8, display: 'block' }}
+                  />
+                )}
+                <div style={{ fontSize: 20, fontWeight: 800, color: '#1e1b4b' }}>
+                  {JSON.parse(localStorage.getItem('bluman_tenant_info') || '{}').ragioneSociale || 'BLUECODE LTD'}
+                </div>
                 <div style={{ fontSize: 11, color: '#475569', marginTop: 2 }}>
-                  Level 4, Valuation Centre, Tower Road, Sliema SLM 1600, Malta<br />
-                  VAT: MT-29837102 · Reg. C-99881
+                  {JSON.parse(localStorage.getItem('bluman_tenant_info') || '{}').sedeLegale || 'Level 4, Valuation Centre, Tower Road, Sliema SLM 1600, Malta'}<br />
+                  P.IVA/VAT: {JSON.parse(localStorage.getItem('bluman_tenant_info') || '{}').piva || 'MT-29837102'} · IBAN: {JSON.parse(localStorage.getItem('bluman_tenant_info') || '{}').iban || 'MT89 3704 0011 0000 0000 1234 567'}
                 </div>
               </div>
               <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: 16, fontWeight: 800, color: '#4338ca' }}>FATTURA DI VENDITA</div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: '#4338ca' }}>DOCUMENTO FISCALE DI VENDITA</div>
                 <div style={{ fontSize: 13, fontWeight: 700, marginTop: 2 }}>{previewFattura.numero}</div>
-                <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>Data: 14/08/2026</div>
+                <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>Data Emissione: {new Date().toLocaleDateString('it-IT')}</div>
               </div>
             </div>
 
@@ -674,11 +683,14 @@ function FatturazioneTab({ project, rawDbProject, onRefresh }: { project: Proget
               </button>
               <button
                 onClick={async () => {
+                  const logoUrl = localStorage.getItem('bluman_logo_url') || (JSON.parse(localStorage.getItem('bluman_tenant_info') || '{}').logoUrl);
+                  const logoHtml = logoUrl ? `<img src="${logoUrl}" style="max-height:60px;max-width:220px;object-fit:contain;margin-bottom:8px;display:block;" />` : '';
                   const htmlContent = `
-                    <div style="border-bottom:2px solid #0f172a;padding-bottom:15px;display:flex;justify-content:space-between;">
+                    <div style="border-bottom:2px solid #0f172a;padding-bottom:15px;display:flex;justify-content:space-between;align-items:flex-start;">
                       <div>
-                        <div style="font-size:20px;font-weight:800;color:#1e1b4b;">BLUECODE LTD</div>
-                        <div style="font-size:11px;color:#475569;margin-top:2px;">Level 4, Valuation Centre, Tower Road, Sliema SLM 1600, Malta<br/>VAT: MT-29837102 · Reg. C-99881</div>
+                        ${logoHtml}
+                        <div style="font-size:20px;font-weight:800;color:#1e1b4b;">${JSON.parse(localStorage.getItem('bluman_tenant_info') || '{}').ragioneSociale || 'BLUECODE LTD'}</div>
+                        <div style="font-size:11px;color:#475569;margin-top:2px;">${JSON.parse(localStorage.getItem('bluman_tenant_info') || '{}').sedeLegale || 'Level 4, Valuation Centre, Tower Road, Sliema SLM 1600, Malta'}<br/>VAT: ${JSON.parse(localStorage.getItem('bluman_tenant_info') || '{}').piva || 'MT-29837102'} · IBAN: ${JSON.parse(localStorage.getItem('bluman_tenant_info') || '{}').iban || 'MT89 3704 0011 0000 0000 1234 567'}</div>
                       </div>
                       <div style="text-align:right;">
                         <div style="font-size:16px;font-weight:800;color:#4338ca;">DOCUMENTO FISCALE DI VENDITA</div>
@@ -697,12 +709,15 @@ function FatturazioneTab({ project, rawDbProject, onRefresh }: { project: Proget
                         <div style="font-size:11px;font-weight:600;color:#166534;margin-top:2px;">✓ Tracciato XML Accettato</div>
                       </div>
                     </div>
-                    <table style="width:100%;margin-top:20px;">
+                    <table style="width:100%;margin-top:20px;border-collapse:collapse;">
                       <thead>
-                        <tr><th>Descrizione Prestazione</th><th style="text-align:right;">Totale €</th></tr>
+                        <tr style="background:#f1f5f9;border-bottom:1px solid #cbd5e1;text-align:left;">
+                          <th style="padding:8px 10px;">Descrizione Prestazione</th>
+                          <th style="padding:8px 10px;text-align:right;">Totale €</th>
+                        </tr>
                       </thead>
                       <tbody>
-                        <tr><td><strong>${previewFattura.desc}</strong><br/><small style="color:#64748b">Riferimento Incarico: ${project.n}</small></td><td style="text-align:right;font-weight:700;">${fmt(previewFattura.importo)}</td></tr>
+                        <tr><td style="padding:10px;"><strong>${previewFattura.desc}</strong><br/><small style="color:#64748b">Riferimento Incarico: ${project.n}</small></td><td style="text-align:right;font-weight:700;padding:10px;">${fmt(previewFattura.importo)}</td></tr>
                       </tbody>
                     </table>
                     <div style="display:flex;justify-content:space-between;border-top:2px solid #0f172a;padding-top:15px;margin-top:30px;">

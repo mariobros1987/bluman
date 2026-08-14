@@ -7,6 +7,16 @@ const getApiBase = () => {
 
 const API_BASE = getApiBase();
 
+function getAuthHeaders() {
+  const token = localStorage.getItem('bluman_jwt_token') || 'jwt_advisor_mock_123';
+  const tenantId = localStorage.getItem('bluman_tenant_id') || '00000000-0000-0000-0000-000000000001';
+  return {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`,
+    'x-tenant-id': tenantId,
+  };
+}
+
 export async function loginApi(email: string, password?: string) {
   try {
     const res = await fetch(`${API_BASE}/auth/login`, {
