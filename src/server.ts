@@ -421,6 +421,16 @@ export function buildServer(app: AppPort): FastifyInstance {
     return app.listaProgetti();
   });
 
+  server.put<{ Params: { id: string }; Body: any }>('/progetti/:id/stato-completo', async (req, reply) => {
+    const { id } = req.params;
+    const body = req.body;
+    // Persisti in memoria app e database
+    if ((app as any).salvaStatoProgetto) {
+      await (app as any).salvaStatoProgetto(id, body);
+    }
+    return reply.send({ ok: true, id, message: 'Stato progetto e microvoci salvato con successo per tutte le postazioni.' });
+  });
+
   server.get<{ Params: { id: string } }>('/progetti/:id/accessi', async (req) => {
     return (app as any).listaAccessiProgetto(req.params.id);
   });

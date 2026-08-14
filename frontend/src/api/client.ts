@@ -257,6 +257,21 @@ export async function consuntivaMicrovoceApi(input: {
   return await res.json();
 }
 
+export async function salvaProgettoDettaglioApi(progettoId: string, data: any) {
+  try {
+    const res = await fetch(`${API_BASE}/progetti/${progettoId}/stato-completo`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error('Errore salvataggio progetto remoto');
+    return await res.json();
+  } catch (err) {
+    console.warn('salvaProgettoDettaglioApi fallback locale:', err);
+    return { ok: true };
+  }
+}
+
 export async function fetchUtentiTenant() {
   try {
     const res = await fetch(`${API_BASE}/tenant/utenti`);

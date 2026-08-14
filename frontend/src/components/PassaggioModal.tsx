@@ -6,6 +6,7 @@ interface PassaggioModalProps {
   mid: number;
   vidx: number;
   onClose: () => void;
+  onSaveVoce?: (updatedSteps: Passaggio[]) => void;
 }
 
 interface NoteEntry {
@@ -41,7 +42,7 @@ const TYPE_COLOR: Record<string, { bg: string; color: string }> = {
   check: { bg: '#0d2d22', color: '#34d399' },
 };
 
-export function PassaggioModal({ project, mid, vidx, onClose }: PassaggioModalProps) {
+export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce }: PassaggioModalProps) {
   const mod = project.mods.find(m => m.id === mid)!;
   const voce = mod.v[vidx];
   const [view, setView] = useState<'operatore' | 'cliente'>('operatore');
@@ -50,7 +51,7 @@ export function PassaggioModal({ project, mid, vidx, onClose }: PassaggioModalPr
 
   // Note operative
   const [notes, setNotes] = useState<NoteEntry[]>([
-    { id: 'n1', autore: 'Joe Disabato', data: '14/08/2026 11:30', testo: 'Effettuato primo contatto e verifica requisiti per la pra pratica.' },
+    { id: 'n1', autore: 'Joe Disabato', data: '14/08/2026 11:30', testo: 'Effettuato primo contatto e verifica requisiti per la pratica.' },
   ]);
   const [newNote, setNewNote] = useState('');
 
@@ -64,8 +65,13 @@ export function PassaggioModal({ project, mid, vidx, onClose }: PassaggioModalPr
   const doneN = steps.filter(s => s.stato === 'done').length;
   const visible = view === 'operatore' ? steps : steps.filter(s => s.who === 'cliente');
 
-  const toggleDone = (id: string) =>
-    setSteps(prev => prev.map(s => s.id === id ? { ...s, stato: s.stato === 'done' ? 'pending' : 'done' } : s));
+  const toggleDone = (id: string) => {
+    const nextSteps = steps.map(s => s.id === id ? { ...s, stato: s.stato === 'done' ? 'pending' : 'done' } : s);
+    setSteps(nextSteps);
+    if (onSaveVoce) {
+      onSaveVoce(nextSteps);
+    }
+  };
 
   const removeStep = (id: string) => setSteps(prev => prev.filter(s => s.id !== id));
 

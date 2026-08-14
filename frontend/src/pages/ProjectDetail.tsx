@@ -10,8 +10,9 @@ import { downloadRealPdf } from '../utils/pdfGenerator';
 import type { SignatureData } from '../utils/pdfGenerator';
 import { DigitalSignatureModal } from '../components/DigitalSignatureModal';
 import { ComunicazioniTab } from '../components/ComunicazioniTab';
+import { AssignOperatorModal } from '../components/AssignOperatorModal';
 import { PROJECTS } from '../store/mockData';
-import { fetchProgettoDettaglio, emettiFatturaApi, consuntivaMicrovoceApi, fetchAccessiProgetto, assegnaAccessoProgettoApi } from '../api/client';
+import { fetchProgettoDettaglio, emettiFatturaApi, consuntivaMicrovoceApi, fetchAccessiProgetto, assegnaAccessoProgettoApi, salvaProgettoDettaglioApi } from '../api/client';
 import { TEAM } from '../store/mockData';
 import type { Progetto, ModuloProgetto, CategoriaModulo } from '../types';
 import styles from './ProjectDetail.module.css';
@@ -33,6 +34,46 @@ export function ProjectDetail() {
   const [selectedUser, setSelectedUser] = useState(TEAM[0].name);
   const [livello, setLivello] = useState('write');
   const [accessiList, setAccessiList] = useState<any[]>([]);
+  const [assignModalTarget, setAssignModalTarget] = useState<{
+    modId: number;
+    mvIdx?: number;
+    name: string;
+    currentAssigned: number[];
+  } | null>(null);
+
+  const handleAssignOperatorConfirm = (operatorId: number, roleLevel: string) => {
+    if (!project || !assignModalTarget) return;
+
+    const newMods = project.mods.map(m => {
+      if (m.id === assignModalTarget.modId) {
+        if (assignModalTarget.mvIdx !== undefined) {
+          const newV = m.v.map((mv, idx) => {
+            if (idx === assignModalTarget.mvIdx) {
+              return { ...mv, as: operatorId };
+            }
+            return mv;
+          });
+          return { ...m, v: newV };
+        } else {
+          const teamSet = new Set(m.team || []);
+          teamSet.add(operatorId);
+          return { ...m, team: Array.from(teamSet) };
+        }
+      }
+      return m;
+    });
+
+    const updatedProject = { ...project, mods: newMods };
+    setProject(updatedProject);
+
+    const savedStr = localStorage.getItem('bluman_custom_projects');
+    const savedArr: Progetto[] = savedStr ? JSON.parse(savedStr) : [];
+    const updatedArr = [updatedProject, ...savedArr.filter(p => String(p.id) !== String(project.id))];
+    localStorage.setItem('bluman_custom_projects', JSON.stringify(updatedArr));
+
+    salvaProgettoDettaglioApi(String(project.id), updatedProject).catch(() => {});
+    assegnaAccessoProgettoApi({ projectId: String(project.id), userId: `usr-0${operatorId}`, livello: roleLevel }).catch(() => {});
+  };
 
   // Raw DB response per conservare gli ID reali delle microvoci Supabase
   const [rawDbProject, setRawDbProject] = useState<any>(null);
@@ -232,6 +273,108 @@ export function ProjectDetail() {
     });
   };
 
+  const handleToggleMicrovoce = (modId: number, mvIdx: number) => {
+    if (!project) return;
+    const newMods = project.mods.map(m => {
+      if (m.id === modId) {
+        const newV = m.v.map((mv, idx) => {
+          if (idx === mvIdx) {
+            const isDone = mv.s === 'done';
+            return {
+              ...mv,
+              s: isDone ? 'in_progress' : 'done',
+              hA: isDone ? 0 : mv.hE,
+            };
+          }
+          return mv;
+        });
+        const doneCount = newV.filter(v => v.s === 'done').length;
+        const newPct = newV.length > 0 ? Math.round((doneCount / newV.length) * 100) : 0;
+        const newSt = newPct === 100 ? 'done' : newPct > 0 ? 'in_progress' : 'pending';
+        return {
+          ...m,
+          v: newV,
+          pct: newPct,
+          st: newSt,
+          a: newV.reduce((acc, v) => acc + v.hA, 0),
+        };
+      }
+      return m;
+    });
+
+    const totalV = newMods.flatMap(m => m.v);
+    const totalDone = totalV.filter(v => v.s === 'done').length;
+    const globalPct = totalV.length > 0 ? Math.round((totalDone / totalV.length) * 100) : 0;
+    const globalSt = globalPct === 100 ? 'completed' : 'in_progress';
+
+    const updatedProject = {
+      ...project,
+      mods: newMods,
+      pct: globalPct,
+      st: globalSt,
+    };
+
+    setProject(updatedProject);
+
+    // Salva in localStorage per la persistenza permanente
+    const savedStr = localStorage.getItem('bluman_custom_projects');
+    const savedArr: Progetto[] = savedStr ? JSON.parse(savedStr) : [];
+    const updatedArr = [updatedProject, ...savedArr.filter(p => String(p.id) !== String(project.id))];
+    localStorage.setItem('bluman_custom_projects', JSON.stringify(updatedArr));
+
+    // Persistenza remota server DB per multi-postazione
+    salvaProgettoDettaglioApi(String(project.id), updatedProject).catch(() => {});
+  };
+
+  const handleSavePassaggiModal = (modId: number, mvIdx: number, nextSteps: any[]) => {
+    if (!project) return;
+    const isAllDone = nextSteps.length > 0 && nextSteps.every(s => s.stato === 'done');
+    const newMods = project.mods.map(m => {
+      if (m.id === modId) {
+        const newV = m.v.map((mv, idx) => {
+          if (idx === mvIdx) {
+            return {
+              ...mv,
+              proc: nextSteps,
+              s: isAllDone ? 'done' : nextSteps.some(s => s.stato === 'done') ? 'in_progress' : mv.s,
+            };
+          }
+          return mv;
+        });
+        const doneCount = newV.filter(v => v.s === 'done').length;
+        const newPct = newV.length > 0 ? Math.round((doneCount / newV.length) * 100) : 0;
+        const newSt = newPct === 100 ? 'done' : newPct > 0 ? 'in_progress' : 'pending';
+        return {
+          ...m,
+          v: newV,
+          pct: newPct,
+          st: newSt,
+        };
+      }
+      return m;
+    });
+
+    const totalV = newMods.flatMap(m => m.v);
+    const totalDone = totalV.filter(v => v.s === 'done').length;
+    const globalPct = totalV.length > 0 ? Math.round((totalDone / totalV.length) * 100) : 0;
+
+    const updatedProject = {
+      ...project,
+      mods: newMods,
+      pct: globalPct,
+    };
+
+    setProject(updatedProject);
+
+    const savedStr = localStorage.getItem('bluman_custom_projects');
+    const savedArr: Progetto[] = savedStr ? JSON.parse(savedStr) : [];
+    const updatedArr = [updatedProject, ...savedArr.filter(p => String(p.id) !== String(project.id))];
+    localStorage.setItem('bluman_custom_projects', JSON.stringify(updatedArr));
+
+    // Persistenza remota server DB per multi-postazione
+    salvaProgettoDettaglioApi(String(project.id), updatedProject).catch(() => {});
+  };
+
   return (
     <div className={styles.wrapper}>
       {/* Header */}
@@ -368,6 +511,9 @@ export function ProjectDetail() {
                   onOpenProc={(vidx) => setProcV({ mid: mod.id, vidx })}
                   rawDbModulo={rawDbProject?.moduli?.[mIdx]}
                   onRefresh={() => loadDetail()}
+                  onToggleMv={(vidx) => handleToggleMicrovoce(mod.id, vidx)}
+                  onOpenAssignMod={() => setAssignModalTarget({ modId: mod.id, name: `Modulo: ${mod.n}`, currentAssigned: mod.team || [1] })}
+                  onOpenAssignMv={(vidx) => setAssignModalTarget({ modId: mod.id, mvIdx: vidx, name: `Microvoce: ${mod.v[vidx]?.n || 'Microvoce'}`, currentAssigned: [mod.v[vidx]?.as || 1] })}
                 />
               ))
             )}
@@ -449,6 +595,7 @@ export function ProjectDetail() {
           mid={procV.mid}
           vidx={procV.vidx}
           onClose={() => setProcV(null)}
+          onSaveVoce={(steps) => handleSavePassaggiModal(procV.mid, procV.vidx, steps)}
         />
       )}
 
@@ -515,15 +662,30 @@ export function ProjectDetail() {
           </div>
         </div>
       )}
+
+      {assignModalTarget && (
+        <AssignOperatorModal
+          isOpen={!!assignModalTarget}
+          onClose={() => setAssignModalTarget(null)}
+          targetName={assignModalTarget.name}
+          currentAssignedIds={assignModalTarget.currentAssigned}
+          onAssign={(opId, roleLvl) => {
+            handleAssignOperatorConfirm(opId, roleLvl);
+          }}
+        />
+      )}
     </div>
   );
 }
 
 // ─── Modulo Block ─────────────────────────────────────────────────
-function ModuloBlock({ mod, open, onToggle, onOpenProc, rawDbModulo, onRefresh }: {
+function ModuloBlock({ mod, open, onToggle, onOpenProc, rawDbModulo, onRefresh, onToggleMv, onOpenAssignMod, onOpenAssignMv }: {
   mod: ModuloProgetto; open: boolean;
   onToggle: () => void; onOpenProc: (vidx: number) => void;
   rawDbModulo?: any; onRefresh: () => void;
+  onToggleMv: (vidx: number) => void;
+  onOpenAssignMod: () => void;
+  onOpenAssignMv: (vidx: number) => void;
 }) {
   const color = mod.st === 'blocked' ? 'var(--red)'
     : mod.delay ? 'var(--amber)'
@@ -573,10 +735,7 @@ function ModuloBlock({ mod, open, onToggle, onOpenProc, rawDbModulo, onRefresh }
             <button
               onClick={e => {
                 e.stopPropagation();
-                const op = prompt(`Assegna Operatore di Studio al modulo "${mod.n}":\n\n1: Joe Disabato (Lead Advisor)\n2: Francesca Disabato (Back Office)\n3: Avv. Lorenzo Marino (Legal Counsel)\n4: Dr. Elena Russo (Tax Advisor)\n\nInserisci numero ID operatore:`, '4');
-                if (op) {
-                  alert(`✓ Accesso al modulo "${mod.n}" assegnato all'operatore di studio selezionato!`);
-                }
+                onOpenAssignMod();
               }}
               title="Assegna operatore o concedi permessi su questo modulo"
               style={{ background: 'var(--card2)', border: '1px solid var(--border)', color: 'var(--muted)', padding: '2px 6px', borderRadius: 6, fontSize: 10, cursor: 'pointer' }}
@@ -638,7 +797,9 @@ function ModuloBlock({ mod, open, onToggle, onOpenProc, rawDbModulo, onRefresh }
                           <div style={{ fontSize: 10, color: isBlock ? 'var(--red)' : 'var(--amber)', marginTop: 2 }}>{v.vn}</div>
                         )}
                       </td>
-                      <td><Avatar id={v.as} size={22} /></td>
+                      <td onClick={e => { e.stopPropagation(); onOpenAssignMv(i); }} style={{ cursor: 'pointer' }} title="Clicca per riassegnare l'operatore di studio">
+                        <Avatar id={v.as} size={22} />
+                      </td>
                       <td><span style={{ color: 'var(--muted)' }}>{v.hE}h</span></td>
                       <td>
                         <span style={{ color: v.hA > v.hE ? 'var(--red)' : v.hA > 0 ? 'var(--green)' : 'var(--hint)', fontWeight: v.hA > v.hE ? 700 : undefined }}>
@@ -646,16 +807,36 @@ function ModuloBlock({ mod, open, onToggle, onOpenProc, rawDbModulo, onRefresh }
                         </span>
                       </td>
                       <td>
-                        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                          {rawMv ? (
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                          <button
+                            onClick={e => {
+                              e.stopPropagation();
+                              onToggleMv(i);
+                            }}
+                            style={{
+                              background: v.s === 'done' ? '#0d2d22' : 'var(--card2)',
+                              border: `1px solid ${v.s === 'done' ? '#1a5c3c' : 'var(--border)'}`,
+                              color: v.s === 'done' ? '#34d399' : 'var(--text)',
+                              padding: '3px 8px',
+                              borderRadius: 6,
+                              fontSize: 10,
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 4,
+                            }}
+                            title="Clicca per mettere la spunta e salvare lo stato di completamento"
+                          >
+                            {v.s === 'done' ? '✓ Completata' : '⬜ Spunta'}
+                          </button>
+                          {rawMv && (
                             <button
                               onClick={e => { e.stopPropagation(); setConsuntivaMv(rawMv); }}
                               style={{ background: '#1a1f3d', border: '1px solid #2d3260', color: '#818cf8', padding: '3px 8px', borderRadius: 6, fontSize: 10, fontWeight: 600, cursor: 'pointer' }}
                             >
                               ⏱ Consuntiva
                             </button>
-                          ) : (
-                            <span style={{ color: 'var(--hint)', fontSize: 10 }}>—</span>
                           )}
                           <button
                             onClick={e => {
