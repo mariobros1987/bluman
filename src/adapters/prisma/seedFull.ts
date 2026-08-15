@@ -133,6 +133,11 @@ async function main() {
       versione: 1,
       giurisdizioneId: 'giur-mt', // Specifico Malta
       prezzoPacchetto: 11500 * 100,
+      dipendenze: {
+        create: [
+          { tenantId: TENANT_ID, dipendeDaModuloTemplateId: 'mod-m01' },
+        ],
+      },
       righeDistinta: {
         create: [
           { tenantId: TENANT_ID, articoloId: 'art-06', articoloVersione: 1, ordine: 1, quantita: 1 },
@@ -145,7 +150,88 @@ async function main() {
     },
   });
 
-  console.log('✅ Moduli Template creati');
+  const m03 = await prisma.moduloTemplate.upsert({
+    where: { id: 'mod-m03' },
+    update: {},
+    create: {
+      id: 'mod-m03',
+      tenantId: TENANT_ID,
+      nome: 'Holding internazionale',
+      categoria: 'Societario',
+      versione: 1,
+      giurisdizioneId: null,
+      dipendenze: { create: [{ tenantId: TENANT_ID, dipendeDaModuloTemplateId: 'mod-m01' }] },
+      righeDistinta: {
+        create: [
+          { tenantId: TENANT_ID, articoloId: 'art-06', articoloVersione: 1, ordine: 1, quantita: 1 },
+          { tenantId: TENANT_ID, articoloId: 'art-07', articoloVersione: 1, ordine: 2, quantita: 1 },
+        ],
+      },
+    },
+  });
+
+  const m04 = await prisma.moduloTemplate.upsert({
+    where: { id: 'mod-m04' },
+    update: {},
+    create: {
+      id: 'mod-m04',
+      tenantId: TENANT_ID,
+      nome: 'Struttura Trust Elvetico',
+      categoria: 'Trust',
+      versione: 1,
+      giurisdizioneId: null,
+      dipendenze: { create: [{ tenantId: TENANT_ID, dipendeDaModuloTemplateId: 'mod-m01' }] },
+      righeDistinta: {
+        create: [
+          { tenantId: TENANT_ID, articoloId: 'art-11', articoloVersione: 1, ordine: 1, quantita: 1 },
+          { tenantId: TENANT_ID, articoloId: 'art-12', articoloVersione: 1, ordine: 2, quantita: 1 },
+        ],
+      },
+    },
+  });
+
+  const m05 = await prisma.moduloTemplate.upsert({
+    where: { id: 'mod-m05' },
+    update: { giurisdizioneId: 'giur-mt' },
+    create: {
+      id: 'mod-m05',
+      tenantId: TENANT_ID,
+      nome: 'Apertura conti correnti Malta',
+      categoria: 'Banking',
+      versione: 1,
+      giurisdizioneId: 'giur-mt',
+      dipendenze: { create: [{ tenantId: TENANT_ID, dipendeDaModuloTemplateId: 'mod-m02' }] },
+      righeDistinta: {
+        create: [
+          { tenantId: TENANT_ID, articoloId: 'art-13', articoloVersione: 1, ordine: 1, quantita: 1 },
+          { tenantId: TENANT_ID, articoloId: 'art-14', articoloVersione: 1, ordine: 2, quantita: 1 },
+          { tenantId: TENANT_ID, articoloId: 'art-15', articoloVersione: 1, ordine: 3, quantita: 1 },
+        ],
+      },
+    },
+  });
+
+  const m06 = await prisma.moduloTemplate.upsert({
+    where: { id: 'mod-m06' },
+    update: {},
+    create: {
+      id: 'mod-m06',
+      tenantId: TENANT_ID,
+      nome: 'Tax planning internazionale Malta',
+      categoria: 'Fiscale',
+      versione: 1,
+      giurisdizioneId: 'giur-mt',
+      dipendenze: { create: [{ tenantId: TENANT_ID, dipendeDaModuloTemplateId: 'mod-m02' }] },
+      righeDistinta: {
+        create: [
+          { tenantId: TENANT_ID, articoloId: 'art-03', articoloVersione: 1, ordine: 1, quantita: 1 },
+          { tenantId: TENANT_ID, articoloId: 'art-08', articoloVersione: 1, ordine: 2, quantita: 1 },
+        ],
+      },
+    },
+  });
+
+  console.log('✅ Moduli Template creati con dipendenze a cascata');
 
   // 5. Clienti
   const c1 = await prisma.cliente.upsert({
