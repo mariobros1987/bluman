@@ -1,37 +1,37 @@
 # Graph Report - bluman-api  (2026-08-15)
 
 ## Corpus Check
-- 80 files · ~86,583 words
+- 86 files · ~104,565 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 807 nodes · 1418 edges · 42 communities (37 shown, 5 thin omitted)
-- Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 51 edges (avg confidence: 0.8)
+- 847 nodes · 1511 edges · 55 communities (46 shown, 9 thin omitted)
+- Extraction: 97% EXTRACTED · 3% INFERRED · 0% AMBIGUOUS · INFERRED: 51 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `65bc61dd`
+- Built from commit: `761ff785`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
 ## Community Hubs (Navigation)
 - istanziazionePort.ts
-- stateEngine.ts
+- esecuzione.ts
 - inMemoryApp.ts
 - PrismaApp
-- App.tsx
+- LoginPage.tsx
 - plugins
 - BluMan Advisory Platform — Analisi Professionale & Piano Esecutivo
 - buildServer
 - compilerOptions
 - scripts
 - compilerOptions
-- devDependencies
+- dependencies
 - BluMan_specifica_di_sviluppo_v2.3_6ca9437e.md
 - InMemoryApp
 - compilerOptions
 - PassaggioModal.tsx
-- NewProjectWizard.tsx
+- NewProjectWizard
 - client.ts
 - 📖 BluMan — Guida Dettagliata Configurazione Canali Multicanale & Associazione Automatica Progetti
 - 🏛 BluMan Advisory Platform — Istruzioni di Installazione & Avvio sul Nuovo PC
@@ -39,7 +39,7 @@
 - Placeholders.tsx
 - frontend/tsconfig.json
 - seedFull.ts
-- 🏛 BluMan Advisory Platform — Architettura & Guida Produzione
+- 🎯 Stato del Progetto & Componenti Verificati
 - 🎯 Stato di Avanzamento Fasi (Aggiornato)
 - 5. Caso di studio: trasferimento/costituzione di una struttura societaria internazionale
 - 🤖 Istruzioni & Context Prompt per l'IA (Nuovo PC)
@@ -52,18 +52,30 @@
 - 7. Regole di calcolo (da implementare come logica di dominio, non come dato statico)
 - applyRls.ts
 - ProjectDetail.tsx
-- Dashboard.tsx
+- App.tsx
 - Avatar.tsx
 - AppLayout.tsx
+- Library.tsx
+- istanziaProgetto.ts
+- PrismaIstanziazionePort
+- FakeIstanziazionePort
 - 🟢 1. WhatsApp Business API (Official Meta Cloud API)
+- ClientPortal.tsx
+- ModuloTemplateConDistinta
+- IstanziazioneTransazione
+- downloadRealPdf
+- teamAnalytics.test.ts
+- antiDuplication.test.ts
+- giurisdizioni.test.ts
+- catalogDocumentLinkage.test.ts
 
 ## God Nodes (most connected - your core abstractions)
-1. `buildServer()` - 38 edges
+1. `buildServer()` - 39 edges
 2. `PrismaApp` - 37 edges
 3. `InMemoryApp` - 33 edges
 4. `AppPort` - 33 edges
 5. `react` - 29 edges
-6. `fmt()` - 23 edges
+6. `fmt()` - 27 edges
 7. `FakeIstanziazionePort` - 19 edges
 8. `compilerOptions` - 18 edges
 9. `PrismaIstanziazionePort` - 16 edges
@@ -72,39 +84,39 @@
 ## Surprising Connections (you probably didn't know these)
 - `ClientPortal()` --calls--> `fetchProgetti()`  [EXTRACTED]
   frontend/src/pages/ClientPortal.tsx → frontend/src/api/client.ts
-- `LibreriaDocumentiEForm()` --calls--> `uploadFileApi()`  [EXTRACTED]
+- `AssegnaModuloClienteModal()` --calls--> `fetchProgetti()`  [EXTRACTED]
   frontend/src/pages/Library.tsx → frontend/src/api/client.ts
-- `DigitalSignatureModalProps` --references--> `SignatureData`  [EXTRACTED]
-  frontend/src/components/DigitalSignatureModal.tsx → frontend/src/utils/pdfGenerator.ts
-- `NewProjectWizard()` --calls--> `fmt()`  [EXTRACTED]
-  frontend/src/components/NewProjectWizard.tsx → frontend/src/utils/index.ts
-- `NewProjectWizard()` --calls--> `moduloH()`  [EXTRACTED]
-  frontend/src/components/NewProjectWizard.tsx → frontend/src/utils/index.ts
+- `LibreriaDocumentiEForm()` --calls--> `fetchProgetti()`  [EXTRACTED]
+  frontend/src/pages/Library.tsx → frontend/src/api/client.ts
+- `ClientPortal()` --calls--> `fetchModuliLibreria()`  [EXTRACTED]
+  frontend/src/pages/ClientPortal.tsx → frontend/src/api/client.ts
+- `NewProjectWizard()` --calls--> `fetchGiurisdizioniApi()`  [EXTRACTED]
+  frontend/src/components/NewProjectWizard.tsx → frontend/src/api/client.ts
 
 ## Import Cycles
 - None detected.
 
-## Communities (42 total, 5 thin omitted)
+## Communities (55 total, 9 thin omitted)
 
 ### Community 0 - "istanziazionePort.ts"
-Cohesion: 0.05
-Nodes (29): PrismaIstanziazionePort, main(), prisma, seedModulo(), StatoMicrovoce, StatoModulo, moduloAnalisiPatrimoniale, moduloCorporateStructuring (+21 more)
+Cohesion: 0.21
+Nodes (11): StatoModulo, DbState, ModuloStored, PassaggioStored, ModuloConDipendenzeRuntime, ModuloRecord, NuovaMicrovoceProgettoInput, NuovoModuloProgettoInput (+3 more)
 
-### Community 1 - "stateEngine.ts"
-Cohesion: 0.18
-Nodes (17): calcolaPercentualeMicrovoce(), calcolaPercentualeModulo(), calcolaPercentualeProgetto(), calcolaStatoModulo(), calcolaStatoProgetto(), marcaRitardoManuale(), ModuloConDipendenze, registraConsuntivazione() (+9 more)
+### Community 1 - "esecuzione.ts"
+Cohesion: 0.10
+Nodes (32): calcolaPercentualeMicrovoce(), calcolaPercentualeModulo(), calcolaPercentualeProgetto(), calcolaStatoModulo(), calcolaStatoProgetto(), marcaRitardoManuale(), ModuloConDipendenze, registraConsuntivazione() (+24 more)
 
 ### Community 2 - "inMemoryApp.ts"
-Cohesion: 0.07
-Nodes (45): ClienteNonTrovatoError, ModuloNonTrovatoError, PreventivoNonTrovatoError, ProgettoNonTrovatoError, TransizioneNonValidaError, Cliente, Preventivo, Progetto (+37 more)
+Cohesion: 0.14
+Nodes (20): ClienteNonTrovatoError, ModuloNonTrovatoError, PreventivoNonTrovatoError, ProgettoNonTrovatoError, TransizioneNonValidaError, Cliente, Preventivo, Progetto (+12 more)
 
 ### Community 3 - "PrismaApp"
 Cohesion: 0.06
 Nodes (7): app, porta, prisma, server, PrismaApp, Cliente, Preventivo
 
-### Community 4 - "App.tsx"
-Cohesion: 0.16
-Nodes (15): fetchAuditLogsApi(), loginApi(), App(), AuditEntry, AuditLogPage(), CalendarPage(), EventoStudio, getCategoryColor() (+7 more)
+### Community 4 - "LoginPage.tsx"
+Cohesion: 0.60
+Nodes (4): loginApi(), LoginPage(), LoginPageProps, roleBtnStyle()
 
 ### Community 5 - "plugins"
 Cohesion: 0.22
@@ -116,7 +128,7 @@ Nodes (44): 10. Primo Passo Concreto, 1. Contesto e Perimetro, 2. Stato Attuale 
 
 ### Community 7 - "buildServer"
 Cohesion: 0.07
-Nodes (13): main(), prisma, start(), buildServer(), nuovoServer(), templateAnalisi, AppPort, JwtPayload (+5 more)
+Nodes (15): main(), prisma, start(), buildServer(), recordAudit(), AppPort, createTransporter(), EmailOptions (+7 more)
 
 ### Community 8 - "compilerOptions"
 Cohesion: 0.08
@@ -130,9 +142,9 @@ Nodes (37): dotenv, fastify, @fastify/cors, nodemailer, dependencies, dotenv, fa
 Cohesion: 0.10
 Nodes (19): compilerOptions, allowImportingTsExtensions, erasableSyntaxOnly, lib, module, moduleDetection, noEmit, noFallthroughCasesInSwitch (+11 more)
 
-### Community 11 - "devDependencies"
+### Community 11 - "dependencies"
 Cohesion: 0.05
-Nodes (37): dependencies, html2canvas, jspdf, react, react-dom, react-router-dom, @supabase/supabase-js, devDependencies (+29 more)
+Nodes (39): dependencies, html2canvas, jspdf, react, react-dom, react-router-dom, @supabase/supabase-js, @types/jspdf (+31 more)
 
 ### Community 12 - "BluMan_specifica_di_sviluppo_v2.3_6ca9437e.md"
 Cohesion: 0.06
@@ -146,13 +158,13 @@ Nodes (16): src/adapters/prisma, compilerOptions, esModuleInterop, module, modul
 Cohesion: 0.18
 Nodes (13): closeBtnStyle, DocumentoEntry, getDefaultPassaggi(), headStyle, modalStyle, NoteEntry, overlayStyle, PassaggioModal() (+5 more)
 
-### Community 16 - "NewProjectWizard.tsx"
-Cohesion: 0.15
-Nodes (21): creaClienteApi(), creaPreventivoEAccettaApi(), creaProgettoApi(), fetchClienti(), fetchModuliLibreria(), closeBtnStyle, labelStyle, NewProjectWizard() (+13 more)
+### Community 16 - "NewProjectWizard"
+Cohesion: 0.27
+Nodes (10): creaClienteApi(), creaPreventivoEAccettaApi(), creaProgettoApi(), fetchClienti(), NewProjectWizard(), ClientPortal(), AnagraficaErpModal(), ClientsPage() (+2 more)
 
 ### Community 17 - "client.ts"
-Cohesion: 0.17
-Nodes (18): API_BASE, createAuditLogApi(), creaUtenteTenantApi(), fetchComunicazioniApi(), fetchTenantInfoApi(), fetchUtentiTenant(), getAuthHeaders(), inviaComunicazioneApi() (+10 more)
+Cohesion: 0.14
+Nodes (21): API_BASE, createAuditLogApi(), creaUtenteTenantApi(), fetchAuditLogsApi(), fetchComunicazioniApi(), fetchGiurisdizioniApi(), fetchNotificheApi(), fetchTenantInfoApi() (+13 more)
 
 ### Community 18 - "📖 BluMan — Guida Dettagliata Configurazione Canali Multicanale & Associazione Automatica Progetti"
 Cohesion: 0.12
@@ -164,11 +176,11 @@ Nodes (10): 1. Prerequisiti, 2. Installazione sul NUOVO PC, 3. Avvio dei Server,
 
 ### Community 20 - "utils/index.ts"
 Cohesion: 0.13
-Nodes (28): creaArticoloApi(), creaModuloTemplateApi(), fetchArticoli(), CreaModuloForm(), Library(), LibreriaDocumentiEForm(), NuovoArticoloModal(), SubTab (+20 more)
+Nodes (22): closeBtnStyle, labelStyle, NewProjectWizardProps, overlayStyle, wizStyle, ARTICOLI, GIURISDIZIONI, MLIB (+14 more)
 
-### Community 25 - "🏛 BluMan Advisory Platform — Architettura & Guida Produzione"
-Cohesion: 0.17
-Nodes (11): 📋 Anagrafica Master Cliente ERP (4 Schede), 🗄 Archiviazione & Eliminazione Sicura, 🔍 AUDIT SCHIETTO: Cosa Manca per la Produzione A-Z (Enterprise Checklist), 🏛 BluMan Advisory Platform — Architettura & Guida Produzione, 🔑 Credenziali Ufficiali di Accesso (Ruoli Staff & Cliente), 💶 Fatturazione & Note di Credito (Numerazione Sequenziale Distinta), 🕸 Grafo & Dipendenze Moduli nel Progetto, ⚙️ Guida Avvio Rapido Locale (+3 more)
+### Community 25 - "🎯 Stato del Progetto & Componenti Verificati"
+Cohesion: 0.14
+Nodes (13): 📋 Anagrafica Master Cliente ERP (4 Schede), 🗄 Archiviazione & Eliminazione Sicura, 🔍 AUDIT SCHIETTO: Cosa Manca per la Produzione A-Z (Enterprise Checklist), 🏛 BluMan Advisory Platform — Architettura & Guida Produzione, 🔑 Credenziali Ufficiali di Accesso (Ruoli Staff & Cliente), 💶 Fatturazione & Note di Credito (Numerazione Sequenziale Distinta), 👥 Gestione Team & Timesheet Live Operatori (`/settings`), 🕸 Grafo & Dipendenze Moduli nel Progetto (+5 more)
 
 ### Community 26 - "🎯 Stato di Avanzamento Fasi (Aggiornato)"
 Cohesion: 0.25
@@ -211,44 +223,76 @@ Cohesion: 0.67
 Nodes (3): 7. Regole di calcolo (da implementare come logica di dominio, non come dato statico), 7bis. Ritardo/blocco — doppio innesco (automatico + manuale), 7ter. Grafo di dipendenze tra moduli
 
 ### Community 37 - "ProjectDetail.tsx"
-Cohesion: 0.15
-Nodes (21): archiviaProgettoApi(), assegnaAccessoProgettoApi(), consuntivaMicrovoceApi(), eliminaProgettoApi(), emettiFatturaApi(), fetchAccessiProgetto(), fetchProgettoDettaglio(), fetchTutteFattureStudioApi() (+13 more)
+Cohesion: 0.16
+Nodes (16): archiviaProgettoApi(), assegnaAccessoProgettoApi(), consuntivaMicrovoceApi(), eliminaProgettoApi(), emettiFatturaApi(), fetchAccessiProgetto(), fetchProgettoDettaglio(), salvaProgettoDettaglioApi() (+8 more)
 
-### Community 38 - "Dashboard.tsx"
-Cohesion: 0.25
-Nodes (10): fetchProgetti(), Badge(), BadgeProps, ProgressBar(), ProgressBarProps, Dashboard(), KpiCardProps, Projects() (+2 more)
+### Community 38 - "App.tsx"
+Cohesion: 0.17
+Nodes (17): fetchProgetti(), App(), AvatarGroup(), Badge(), BadgeProps, ProgressBar(), ProgressBarProps, Dashboard() (+9 more)
 
 ### Community 39 - "Avatar.tsx"
-Cohesion: 0.25
-Nodes (8): AssignOperatorModal(), AssignOperatorModalProps, CalendarPreviewModalProps, Avatar(), AvatarGroup(), AvatarGroupProps, AvatarProps, TEAM
+Cohesion: 0.21
+Nodes (10): AssignOperatorModal(), AssignOperatorModalProps, CalendarPreviewModalProps, Avatar(), AvatarGroupProps, AvatarProps, CalendarPage(), EventoStudio (+2 more)
 
 ### Community 40 - "AppLayout.tsx"
-Cohesion: 0.28
-Nodes (7): AppLayout(), AppLayoutProps, TITLES, NAV, Sidebar(), SidebarProps, getFormattedLogoUrl()
+Cohesion: 0.21
+Nodes (10): AppLayoutProps, INITIAL_NOTIFICATIONS, TITLES, NAV, Sidebar(), SidebarProps, NotificationItem, NotificationModal() (+2 more)
+
+### Community 41 - "Library.tsx"
+Cohesion: 0.20
+Nodes (18): creaArticoloApi(), creaGiurisdizioneApi(), creaModuloTemplateApi(), fetchArticoli(), fetchModuliLibreria(), updateArticoloPrezzoApi(), ArticoliCatalogView(), AssegnaModuloClienteModal() (+10 more)
+
+### Community 42 - "istanziaProgetto.ts"
+Cohesion: 0.16
+Nodes (10): ConsoleNotificationPort, FakeNotificationPort, calcolaOreModulo(), calcolaPrezzoModulo(), istanziaProgetto(), IstanziaProgettoInput, IstanziaProgettoRisultato, ModuloCreatoInfo (+2 more)
+
+### Community 43 - "PrismaIstanziazionePort"
+Cohesion: 0.14
+Nodes (3): PrismaIstanziazionePort, IstanziazionePort, StatoMicrovoceIniziale
+
+### Community 44 - "FakeIstanziazionePort"
+Cohesion: 0.21
+Nodes (5): clonaDb(), FakeIstanziazionePort, nuovoId(), MicrovoceRecord, PassaggioRecord
 
 ### Community 45 - "🟢 1. WhatsApp Business API (Official Meta Cloud API)"
 Cohesion: 0.22
 Nodes (8): 🟢 1. WhatsApp Business API (Official Meta Cloud API), ✈️ 2. Telegram Bot API (100% Gratuito), ✉️ 3. Email Inbound Webhook Parse (SendGrid / SMTP / PEC), A. Creare il Bot dello Studio con @BotFather, A. Ottenere le Credenziali da Meta Developers, B. Configurare il Webhook di Ricezione Messaggi, 📖 BluMan — Guida Dettagliata Configurazione Canali Multicanale & Associazione Automatica Progetti, C. Associazione Automatica al Progetto Cliente
 
+### Community 46 - "ClientPortal.tsx"
+Cohesion: 0.28
+Nodes (9): DigitalSignatureModal(), DigitalSignatureModalProps, CatBadge(), CatBadgeProps, ModuloProposta, PortalTab, CategoriaModulo, catCls() (+1 more)
+
+### Community 47 - "ModuloTemplateConDistinta"
+Cohesion: 0.22
+Nodes (8): main(), prisma, seedModulo(), moduloAnalisiPatrimoniale, moduloCorporateStructuring, nuovoServer(), templateAnalisi, ModuloTemplateConDistinta
+
+### Community 49 - "downloadRealPdf"
+Cohesion: 0.38
+Nodes (6): fetchTutteFattureStudioApi(), uploadFileApi(), InvoicesPage(), LibreriaDocumentiEForm(), DocumentiTab(), downloadRealPdf()
+
+### Community 50 - "teamAnalytics.test.ts"
+Cohesion: 0.40
+Nodes (3): Modulo, Progetto, Task
+
 ## Knowledge Gaps
-- **311 isolated node(s):** `$schema`, `typescript`, `oxc`, `react/rules-of-hooks`, `warn` (+306 more)
+- **323 isolated node(s):** `$schema`, `typescript`, `oxc`, `react/rules-of-hooks`, `warn` (+318 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **5 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **9 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `PrismaApp` connect `PrismaApp` to `istanziazionePort.ts`, `inMemoryApp.ts`, `buildServer`?**
-  _High betweenness centrality (0.024) - this node is a cross-community bridge._
-- **Why does `AppPort` connect `buildServer` to `inMemoryApp.ts`, `PrismaApp`, `InMemoryApp`?**
+- **Why does `PrismaApp` connect `PrismaApp` to `inMemoryApp.ts`, `PrismaIstanziazionePort`, `buildServer`?**
   _High betweenness centrality (0.022) - this node is a cross-community bridge._
-- **Why does `InMemoryApp` connect `InMemoryApp` to `inMemoryApp.ts`, `buildServer`?**
+- **Why does `AppPort` connect `buildServer` to `inMemoryApp.ts`, `PrismaApp`, `InMemoryApp`?**
   _High betweenness centrality (0.020) - this node is a cross-community bridge._
+- **Why does `react` connect `App.tsx` to `ConfirmDeleteModal.tsx`, `LoginPage.tsx`, `plugins`, `ProjectDetail.tsx`, `Avatar.tsx`, `AppLayout.tsx`, `Library.tsx`, `ClientPortal.tsx`, `PassaggioModal.tsx`, `NewProjectWizard`, `client.ts`, `downloadRealPdf`, `utils/index.ts`, `Placeholders.tsx`?**
+  _High betweenness centrality (0.018) - this node is a cross-community bridge._
 - **Are the 26 inferred relationships involving `buildServer()` (e.g. with `.accettaPreventivoEIstanzia()` and `.archiviaProgetto()`) actually correct?**
   _`buildServer()` has 26 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `$schema`, `typescript`, `oxc` to the rest of the system?**
-  _311 weakly-connected nodes found - possible documentation gaps or missing edges._
-- **Should `istanziazionePort.ts` be split into smaller, more focused modules?**
-  _Cohesion score 0.051577152600170505 - nodes in this community are weakly interconnected._
+  _323 weakly-connected nodes found - possible documentation gaps or missing edges._
+- **Should `esecuzione.ts` be split into smaller, more focused modules?**
+  _Cohesion score 0.0975177304964539 - nodes in this community are weakly interconnected._
 - **Should `inMemoryApp.ts` be split into smaller, more focused modules?**
-  _Cohesion score 0.06790890269151138 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.14039408866995073 - nodes in this community are weakly interconnected._
