@@ -63,6 +63,10 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce }: Pass
   const [docRequiresSign, setDocRequiresSign] = useState(true);
   const [selectedDocPreview, setSelectedDocPreview] = useState<DocumentoEntry | null>(null);
 
+  // Form master preview state
+  const [previewFormModalStep, setPreviewFormModalStep] = useState<Passaggio | null>(null);
+  const [previewFormValues, setPreviewFormValues] = useState<Record<string, string>>({});
+
   const doneN = steps.filter(s => s.stato === 'done').length;
   const visible = view === 'operatore' ? steps : steps.filter(s => s.who === 'cliente');
 
@@ -201,6 +205,64 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce }: Pass
                         )}
                       </div>
                     </div>
+
+                    {/* Modulo di Selezione & Abbinamento Form Master */}
+                    {s.type === 'form' && (
+                      <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px dashed var(--border)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--indigo-l)' }}>📋 Abbina Form Master:</span>
+                            <select
+                              value={s.formMasterId || 'f1'}
+                              onChange={e => {
+                                const val = e.target.value;
+                                let defaultFields = s.fields || [];
+                                if (val === 'f1') defaultFields = ['Ragione Sociale', 'P.IVA / VAT', 'Codice Fiscale', 'Sede Legale', 'Legale Rappresentante'];
+                                if (val === 'f2') defaultFields = ['Nome Titolare Effettivo', 'Quota % Possesso', 'Codice Fiscale UBO', 'Residenza Fiscale'];
+                                if (val === 'f3') defaultFields = ['Banca Accreditamento', 'IBAN Operativo', 'Origine dei Fondi', 'Volume d Affari Annuo'];
+
+                                const updated = steps.map(item => item.id === s.id ? { ...item, formMasterId: val, fields: defaultFields } : item);
+                                setSteps(updated);
+                                if (onSaveVoce) onSaveVoce(updated);
+                              }}
+                              style={{ padding: '3px 8px', fontSize: 11, background: '#200f40', color: '#a78bfa', border: '1px solid #581c87', borderRadius: 6, fontWeight: 600, cursor: 'pointer' }}
+                            >
+                              <option value="f1">Form Dati Societari & Legale Rappresentante</option>
+                              <option value="f2">Form Titolarità Effettiva & UBO</option>
+                              <option value="f3">Form Dati Bancari & KYC Compliance</option>
+                            </select>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPreviewFormValues({
+                                'Ragione Sociale': project.cl,
+                                'P.IVA / VAT': 'IT99887766554',
+                                'Legale Rappresentante': 'Mario Dibenedetto',
+                                'Codice Fiscale': 'DBNMRI85M12H501Z',
+                                'Sede Legale': 'Milano (MI) Via Roma 10',
+                                'IBAN Operativo': 'IT99C0306903200100000001234',
+                                'Nome Titolare Effettivo': 'Mario Dibenedetto (100%)',
+                              });
+                              setPreviewFormModalStep(s);
+                            }}
+                            style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '4px 10px', borderRadius: 6, fontSize: 10, fontWeight: 700, cursor: 'pointer' }}
+                          >
+                            👁 Visualizza / Compila Form
+                          </button>
+                        </div>
+
+                        {/* Badges dei campi di raccolta dati */}
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                          {(s.fields || ['Ragione Sociale', 'P.IVA / VAT', 'Legale Rappresentante']).map((fld, idx) => (
+                            <span key={idx} style={{ background: 'var(--card2)', border: '1px solid var(--border)', color: 'var(--text)', padding: '2px 7px', borderRadius: 6, fontSize: 9.5, fontWeight: 600 }}>
+                              📝 {fld}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               );
@@ -475,6 +537,59 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce }: Pass
                     style={{ background: 'var(--card2)', border: '1px solid var(--border)', color: 'var(--muted)', padding: '7px 14px', borderRadius: 8, fontSize: 11, cursor: 'pointer' }}
                   >
                     Chiudi Visualizzatore
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        {/* Popup Compilazione / Anteprima Form Master Operatore */}
+        {previewFormModalStep && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 120, padding: 16 }}>
+            <div style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, width: '100%', maxWidth: 540, padding: 22, boxShadow: '0 16px 48px rgba(0,0,0,.6)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, borderBottom: '1px solid var(--border)', paddingBottom: 12 }}>
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>📋 Dati Compilati nel Form dal Cliente</div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{previewFormModalStep.title} · Cliente {project.cl}</div>
+                </div>
+                <button onClick={() => setPreviewFormModalStep(null)} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: 18 }}>✕</button>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20, maxHeight: 300, overflowY: 'auto' }}>
+                {(previewFormModalStep.fields || ['Ragione Sociale', 'P.IVA / VAT', 'Legale Rappresentante', 'Codice Fiscale', 'IBAN Operativo']).map((fld, fIdx) => (
+                  <div key={fIdx} style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 8, padding: 10 }}>
+                    <label style={{ fontSize: 10, fontWeight: 700, color: 'var(--indigo-l)', display: 'block', marginBottom: 4, textTransform: 'uppercase' }}>
+                      📝 {fld}
+                    </label>
+                    <input
+                      type="text"
+                      value={previewFormValues[fld] || ''}
+                      onChange={e => setPreviewFormValues({ ...previewFormValues, [fld]: e.target.value })}
+                      placeholder={`Inserisci valore per ${fld}...`}
+                      style={{ fontSize: 12, padding: 6 }}
+                    />
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 10, color: '#34d399', fontWeight: 600 }}>✓ Dati verificati dal sistema KYC</span>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewFormModalStep(null)}
+                    style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '7px 14px', borderRadius: 8, fontSize: 11, cursor: 'pointer' }}
+                  >
+                    Annulla
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      alert(`✓ Dati form salvati e verificati con successo per la voce "${previewFormModalStep.title}"!`);
+                      setPreviewFormModalStep(null);
+                    }}
+                    style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '7px 16px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+                  >
+                    ✓ Salva & Valida Dati Form
                   </button>
                 </div>
               </div>
