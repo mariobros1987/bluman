@@ -815,6 +815,9 @@ export function SettingsPage() {
               <input value="SUBM70N" readOnly style={{ fontFamily: 'monospace', fontWeight: 700 }} />
             </div>
           </div>
+        </div>
+      )}
+
       {/* Modal Invita Collaboratore Studio */}
       {modalUserOpen && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 16 }}>

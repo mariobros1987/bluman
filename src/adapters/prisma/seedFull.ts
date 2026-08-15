@@ -259,6 +259,30 @@ async function main() {
 
   console.log('✅ Moduli Template creati con dipendenze a cascata');
 
+  // Assicurati che le dipendenze siano sempre presenti su Supabase DB
+  const depSeeds = [
+    { moduloTemplateId: 'mod-m02', dipendeDaModuloTemplateId: 'mod-m01' },
+    { moduloTemplateId: 'mod-m03', dipendeDaModuloTemplateId: 'mod-m01' },
+    { moduloTemplateId: 'mod-m04', dipendeDaModuloTemplateId: 'mod-m01' },
+    { moduloTemplateId: 'mod-m05', dipendeDaModuloTemplateId: 'mod-m02' },
+    { moduloTemplateId: 'mod-m06', dipendeDaModuloTemplateId: 'mod-m02' },
+  ];
+
+  for (const dep of depSeeds) {
+    const existing = await prisma.moduloDipendenzaTemplate.findFirst({
+      where: { tenantId: TENANT_ID, moduloTemplateId: dep.moduloTemplateId, dipendeDaModuloTemplateId: dep.dipendeDaModuloTemplateId },
+    });
+    if (!existing) {
+      await prisma.moduloDipendenzaTemplate.create({
+        data: {
+          tenantId: TENANT_ID,
+          moduloTemplateId: dep.moduloTemplateId,
+          dipendeDaModuloTemplateId: dep.dipendeDaModuloTemplateId,
+        },
+      });
+    }
+  }
+
   // 5. Clienti
   const c1 = await prisma.cliente.upsert({
     where: { id: 'cli-01' },
