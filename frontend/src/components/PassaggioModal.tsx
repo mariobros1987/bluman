@@ -61,6 +61,7 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce }: Pass
   ]);
   const [docName, setDocName] = useState('');
   const [docRequiresSign, setDocRequiresSign] = useState(true);
+  const [selectedDocPreview, setSelectedDocPreview] = useState<DocumentoEntry | null>(null);
 
   const doneN = steps.filter(s => s.stato === 'done').length;
   const visible = view === 'operatore' ? steps : steps.filter(s => s.who === 'cliente');
@@ -304,16 +305,20 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce }: Pass
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {documents.map(d => (
                 <div key={d.id} style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10, padding: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div style={{ fontSize: 20 }}>📄</div>
+                  <div
+                    onClick={() => setSelectedDocPreview(d)}
+                    style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}
+                    title="Clicca per aprire ed anteporre il documento PDF"
+                  >
+                    <div style={{ fontSize: 22 }}>📄</div>
                     <div>
-                      <div style={{ fontSize: 12.5, fontWeight: 600 }}>{d.nome}</div>
+                      <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--indigo-l)', textDecoration: 'underline' }}>{d.nome}</div>
                       <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>
                         {d.dimensione} · Caricato il {d.dataCaricamento}
                       </div>
                     </div>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     {d.richiedeFirma ? (
                       <span style={{ background: d.firmato ? '#0d2d22' : '#200f40', color: d.firmato ? '#34d399' : '#a78bfa', padding: '3px 8px', borderRadius: 12, fontSize: 10, fontWeight: 700 }}>
                         {d.firmato ? '✓ Firmato' : '✍️ Richiede Firma Cliente'}
@@ -321,6 +326,14 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce }: Pass
                     ) : (
                       <span style={{ color: 'var(--muted)', fontSize: 10 }}>Informativo</span>
                     )}
+
+                    <button
+                      type="button"
+                      onClick={() => setSelectedDocPreview(d)}
+                      style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '4px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer', fontWeight: 600, boxShadow: '0 2px 8px rgba(99,102,241,.3)' }}
+                    >
+                      👁 Visualizza
+                    </button>
 
                     <button
                       type="button"
@@ -357,6 +370,119 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce }: Pass
             Chiudi
           </button>
         </div>
+
+        {/* Modal Anteprima PDF Documento */}
+        {selectedDocPreview && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 16 }}>
+            <div style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, width: '100%', maxWidth: 720, maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 60px rgba(0,0,0,.8)' }}>
+              {/* Header Viewer */}
+              <div style={{ padding: 18, borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--card)' }}>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--indigo-l)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span>📄 {selectedDocPreview.nome}</span>
+                    {selectedDocPreview.richiedeFirma && (
+                      <span style={{ fontSize: 10, background: selectedDocPreview.firmato ? '#0d2d22' : '#200f40', color: selectedDocPreview.firmato ? '#34d399' : '#a78bfa', padding: '2px 8px', borderRadius: 10, border: '1px solid #3730a3' }}>
+                        {selectedDocPreview.firmato ? '🔒 eIDAS Firmato' : '✍️ In Attesa di Firma Cliente'}
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
+                    Dimensione: {selectedDocPreview.dimensione} · Data Caricamento: {selectedDocPreview.dataCaricamento} · Cliente: <strong>{project.cl}</strong>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setSelectedDocPreview(null)}
+                  style={{ background: 'var(--card2)', border: 'none', width: 30, height: 30, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--muted)', fontSize: 16 }}
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Reader Body / Simulation PDF Container */}
+              <div style={{ flex: 1, padding: 24, overflowY: 'auto', background: '#0a0d14', display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <div style={{ background: '#fff', color: '#1e293b', borderRadius: 8, padding: 32, fontFamily: 'serif', boxShadow: '0 10px 30px rgba(0,0,0,.5)', border: '1px solid #cbd5e1', lineHeight: 1.6 }}>
+                  {/* PDF Document Header */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #0284c7', paddingBottom: 16, marginBottom: 24 }}>
+                    <div>
+                      <div style={{ fontSize: 18, fontWeight: 800, color: '#0369a1', fontFamily: 'sans-serif' }}>BLUMAN ADVISORY SERVICES</div>
+                      <div style={{ fontSize: 10, color: '#64748b', fontFamily: 'sans-serif' }}>Cross-Border Wealth Structuring & Legal Advisory</div>
+                    </div>
+                    <div style={{ textAlign: 'right', fontSize: 10, color: '#64748b', fontFamily: 'sans-serif' }}>
+                      Rif. Incarico: #{project.id}<br />
+                      Data Registrazione: {selectedDocPreview.dataCaricamento}
+                    </div>
+                  </div>
+
+                  {/* Title */}
+                  <div style={{ textAlign: 'center', fontSize: 16, fontWeight: 700, marginBottom: 20, color: '#0f172a', textTransform: 'uppercase' }}>
+                    {selectedDocPreview.nome.replace(/\.pdf$/i, '')}
+                  </div>
+
+                  {/* Body Content */}
+                  <div style={{ fontSize: 11.5, color: '#334155', textAlign: 'justify', marginBottom: 24 }}>
+                    <p style={{ marginBottom: 12 }}>
+                      Tra la sottoscritta società di consulenza professionale <strong>BluMan Advisory Ltd</strong> (con sede legale in Malta / Svizzera) ed il Cliente <strong>{project.cl}</strong>, si stipula ed approva il presente documento relativo al progetto di consulenza societaria e wealth protection.
+                    </p>
+                    <p style={{ marginBottom: 12 }}>
+                      <strong>Articolo 1 — Oggetto delle Prestazioni:</strong> L'advisor si impegna ad adempiere a tutte le microvoci ed i passaggi contrattuali previsti nel modulo operativo <em>"{voce.n}"</em>.
+                    </p>
+                    <p style={{ marginBottom: 12 }}>
+                      <strong>Articolo 2 — Riservatezza & Compliance eIDAS:</strong> Le parti riconoscono la validità giuridica della firma elettronica apposta tramite il Portale Cliente BluMan ai sensi del Regolamento UE n. 910/2014 (eIDAS).
+                    </p>
+                  </div>
+
+                  {/* Footer Signatures */}
+                  <div style={{ marginTop: 40, paddingTop: 16, borderTop: '1px dashed #cbd5e1', display: 'flex', justifyContent: 'space-between', fontSize: 10, fontFamily: 'sans-serif' }}>
+                    <div>
+                      <div style={{ fontWeight: 700, color: '#475569' }}>Firma Advisory Firm:</div>
+                      <div style={{ marginTop: 24, fontStyle: 'italic', color: '#0284c7', fontWeight: 600 }}>Joe Disabato (Senior Partner)</div>
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 700, color: '#475569' }}>Firma Cliente:</div>
+                      <div style={{ marginTop: 24, fontStyle: selectedDocPreview.firmato ? 'normal' : 'italic', color: selectedDocPreview.firmato ? '#059669' : '#94a3b8', fontWeight: 700 }}>
+                        {selectedDocPreview.firmato ? `✓ FIRMATO DA ${project.cl.toUpperCase()} (OTP eIDAS Validato)` : '✍️ In attesa di firma elettronica'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Viewer Actions Footer */}
+              <div style={{ padding: '14px 20px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--card)' }}>
+                <button
+                  type="button"
+                  onClick={() => alert(`📥 Download del file "${selectedDocPreview.nome}" avviato sul tuo dispositivo.`)}
+                  style={{ background: 'var(--card2)', border: '1px solid var(--border)', color: 'var(--text)', padding: '7px 14px', borderRadius: 8, fontSize: 11, cursor: 'pointer', fontWeight: 600 }}
+                >
+                  📥 Scarica Copia Localmente
+                </button>
+
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {selectedDocPreview.richiedeFirma && !selectedDocPreview.firmato && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDocuments(documents.map(x => x.id === selectedDocPreview.id ? { ...x, firmato: true } : x));
+                        setSelectedDocPreview({ ...selectedDocPreview, firmato: true });
+                        alert(`✓ Notifica ed il link di firma eIDAS per "${selectedDocPreview.nome}" inviati con successo al cliente ${project.cl}!`);
+                      }}
+                      style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '7px 14px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+                    >
+                      ✍️ Sollecita Firma Cliente (Magic Link)
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setSelectedDocPreview(null)}
+                    style={{ background: 'var(--card2)', border: '1px solid var(--border)', color: 'var(--muted)', padding: '7px 14px', borderRadius: 8, fontSize: 11, cursor: 'pointer' }}
+                  >
+                    Chiudi Visualizzatore
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
