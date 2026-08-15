@@ -33,8 +33,10 @@ Piattaforma ERP per studi di consulenza societaria, wealth protection ed advisor
 - **Doppio Controllo**: L'eliminazione definitiva richiede la digitazione manuale del nome progetto.
 
 ### 🕸 Grafo & Dipendenze Moduli nel Progetto
-- **Visual Flow**: Grafico visuale con frecce `➔ Sblocca` delle dipendenze dei moduli acquistati dal cliente.
-- **Upselling Moduli**: Pulsante `+ Aggiungi Modulo da Libreria` per espandere l'incarico del cliente in tempo reale.
+- **Visual Flow Topologico & Frecce SVG**: Layout a 3 colonne (*Punto di partenza*, *Sbloccati a cascata*, *Dipendenti*) con connettori direzionali SVG viola.
+- **Associazione Giurisdizioni**: Menù a tendina `🌍 Giurisdizione Target *` nel costruttore di moduli ed articoli.
+- **Assegnazione 1-Click a Cliente & Smart Anti-Duplicazione**: Pulsante `🚀 Assegna a Progetto Cliente` direttamente dalle card del Grafo con scansione automatica per evitare la duplicazione di articoli o lavoro già svolto.
+- **Upselling Moduli**: Pulsante `+ Aggiungi Modulo da Libreria` anche all'interno della scheda del progetto del cliente.
 
 ---
 
