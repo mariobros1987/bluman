@@ -197,6 +197,80 @@ async function main() {
   });
 
   console.log('✅ Progetti e moduli progetto creati su Supabase!');
+
+  // 7. Audit Logs Storico
+  const auditEntries = [
+    {
+      userId: userAdmin.id,
+      userEmail: userAdmin.email,
+      userNome: userAdmin.nome,
+      ruolo: 'super_admin',
+      azione: 'AUTENTICAZIONE_LOGIN',
+      entita: 'Sessione Studio',
+      dettagli: 'Login effettuato con successo tramite credenziali cifrate da IP 83.211.12.94',
+      ipAddress: '83.211.12.94',
+    },
+    {
+      userId: userAdmin.id,
+      userEmail: userAdmin.email,
+      userNome: userAdmin.nome,
+      ruolo: 'advisor',
+      azione: 'CREAZIONE_CLIENTE',
+      entita: 'Marco Ricci',
+      dettagli: 'Creata nuova anagrafica ERP cliente privato con codice SDI e fascicolo KYC/AML',
+      ipAddress: '83.211.12.94',
+    },
+    {
+      userId: userAdmin.id,
+      userEmail: userAdmin.email,
+      userNome: userAdmin.nome,
+      ruolo: 'advisor',
+      azione: 'CREAZIONE_PROGETTO',
+      entita: 'Struttura Holding — Famiglia Ricci',
+      dettagli: 'Istanziato nuovo progetto per valore totale di €38.000,00 con 5 moduli distinti',
+      ipAddress: '83.211.12.94',
+    },
+    {
+      userId: userAdmin.id,
+      userEmail: userAdmin.email,
+      userNome: userAdmin.nome,
+      ruolo: 'advisor',
+      azione: 'MAGIC_LINK_GENERATO',
+      entita: 'Marco Ricci',
+      dettagli: 'Generato Magic Token di accesso passwordless al Portale Cliente per firma 1-click',
+      ipAddress: '83.211.12.94',
+    },
+    {
+      userId: userAdmin.id,
+      userEmail: userAdmin.email,
+      userNome: userAdmin.nome,
+      ruolo: 'advisor',
+      azione: 'EMISSIONE_FATTURA',
+      entita: 'Fattura FT-2026/001',
+      dettagli: 'Emessa fattura elettronica acconto per importo di €3.500,00 inviata su canale SDI',
+      ipAddress: '83.211.12.94',
+    },
+    {
+      userId: userAdmin.id,
+      userEmail: userAdmin.email,
+      userNome: userAdmin.nome,
+      ruolo: 'advisor',
+      azione: 'CONSUNTIVAZIONE_ORE',
+      entita: 'Analisi struttura patrimoniale',
+      dettagli: 'Registrate 4 ore di consulenza lavorate dall operatore con aggiornamento avanzamento modulo',
+      ipAddress: '83.211.12.94',
+    },
+  ];
+
+  for (const log of auditEntries) {
+    await prisma.auditLog.create({
+      data: {
+        tenantId: TENANT_ID,
+        ...log,
+      },
+    });
+  }
+  console.log('✅ Audit Log storico inserito su Supabase!');
   console.log('🎉 Seed completato con successo!');
 }
 

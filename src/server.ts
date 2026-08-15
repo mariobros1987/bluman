@@ -23,6 +23,38 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 const inMemoryTenantStore = new Map<string, any>();
 
+async function recordAudit(params: {
+  tenantId?: string;
+  userId?: string;
+  userEmail?: string;
+  userNome?: string;
+  ruolo?: string;
+  azione: string;
+  entita: string;
+  dettagli: string;
+  ipAddress?: string;
+}) {
+  setImmediate(async () => {
+    try {
+      await prisma.auditLog.create({
+        data: {
+          tenantId: params.tenantId || '00000000-0000-0000-0000-000000000001',
+          userId: params.userId || 'usr-system',
+          userEmail: params.userEmail || 'system@bluecode.advisory',
+          userNome: params.userNome || 'Sistema / Operatore',
+          ruolo: params.ruolo || 'operator',
+          azione: params.azione,
+          entita: params.entita,
+          dettagli: params.dettagli,
+          ipAddress: params.ipAddress || '127.0.0.1',
+        },
+      });
+    } catch {
+      // Background audit log silently
+    }
+  });
+}
+
 export function buildServer(app: AppPort): FastifyInstance {
   const server = Fastify({ logger: false });
 
@@ -116,6 +148,18 @@ export function buildServer(app: AppPort): FastifyInstance {
       ruolo: targetUser.role,
     });
 
+    recordAudit({
+      tenantId,
+      userId: `usr-${email}`,
+      userEmail: email,
+      userNome: targetUser.name,
+      ruolo: targetUser.role,
+      azione: 'AUTENTICAZIONE_LOGIN',
+      entita: 'Sessione Studio',
+      dettagli: `Login effettuato con successo per il ruolo ${targetUser.role}`,
+      ipAddress: req.ip || '127.0.0.1',
+    });
+
     return {
       ok: true,
       token,
@@ -185,7 +229,15 @@ export function buildServer(app: AppPort): FastifyInstance {
     Body: { filename: string; contentBase64: string };
   }>('/upload', async (req) => {
     const { filename, contentBase64 } = req.body;
-    return uploadDocumento(filename, contentBase64);
+    const res = await uploadDocumento(filename, contentBase64);
+    recordAudit({
+      tenantId: (req as any).tenantId,
+      azione: 'DOCUMENTO_CARICATO',
+      entita: filename,
+      dettagli: `Caricato nuovo file (${res.size}) con URL ${res.url}`,
+      ipAddress: req.ip,
+    });
+    return res;
   });
 
   server.get<{ Params: { filename: string } }>('/uploads/:filename', async (req, reply) => {
@@ -274,6 +326,13 @@ export function buildServer(app: AppPort): FastifyInstance {
     const magicUrl = `http://localhost:5173/portal?magic_token=${magicToken}`;
 
     const sent = await sendMagicLinkEmail(toEmail, cliente.nome, magicUrl);
+    recordAudit({
+      tenantId: (req as any).tenantId,
+      azione: 'MAGIC_LINK_GENERATO',
+      entita: cliente.nome,
+      dettagli: `Generato Magic Link per l'accesso passwordless del cliente (${toEmail})`,
+      ipAddress: req.ip,
+    });
     return { ok: true, sent, magicUrl, magicToken };
   });
 
