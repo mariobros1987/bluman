@@ -53,13 +53,18 @@ export function progressColor(p: Progetto | null): string {
 // ─── Library helpers ─────────────────────────────────────────────
 interface ResolvedRiga { art: Articolo; qty: number; h: number; p: number; override: boolean; }
 
-export function resolveRighe(m: ModuloTemplate): ResolvedRiga[] {
+export function resolveRighe(m: ModuloTemplate, articlesPool?: Articolo[]): ResolvedRiga[] {
   if (!m || !m.righe) return [];
+  const pool = articlesPool && articlesPool.length > 0 ? articlesPool : ARTICOLI;
   return m.righe.map(r => {
-    const art = ARTICOLI.find(a => a.id === r.art) || {
+    const embedded = (r as any).artObj;
+    const foundInPool = pool.find(a => a.id === r.art);
+    const foundInMock = ARTICOLI.find(a => a.id === r.art);
+    
+    const art: Articolo = embedded || foundInPool || foundInMock || {
       id: r.art,
-      n: r.art || 'Prestazione Generica',
-      cat: 'Societario' as CategoriaModulo,
+      n: (r as any).artName || 'Prestazione',
+      cat: (m.cat || 'Societario') as CategoriaModulo,
       h: 5,
       p: 500,
       ver: 1,
@@ -71,12 +76,12 @@ export function resolveRighe(m: ModuloTemplate): ResolvedRiga[] {
   });
 }
 
-export function moduloH(m: ModuloTemplate): number {
-  return resolveRighe(m).reduce((a, r) => a + r.h, 0);
+export function moduloH(m: ModuloTemplate, articlesPool?: Articolo[]): number {
+  return resolveRighe(m, articlesPool).reduce((a, r) => a + r.h, 0);
 }
 
-export function moduloP(m: ModuloTemplate): number {
-  return m.pkg != null ? m.pkg : resolveRighe(m).reduce((a, r) => a + r.p, 0);
+export function moduloP(m: ModuloTemplate, articlesPool?: Articolo[]): number {
+  return m.pkg != null ? m.pkg : resolveRighe(m, articlesPool).reduce((a, r) => a + r.p, 0);
 }
 
 // ─── Topological sort for library graph ───────────────────────────

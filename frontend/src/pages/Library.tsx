@@ -47,6 +47,14 @@ export function Library() {
         giurisdizione: m.giurisdizione,
         righe: (m.righeDistinta || []).map((r: any) => ({
           art: r.articoloId,
+          artObj: r.articolo ? {
+            id: r.articolo.id,
+            n: r.articolo.nome,
+            cat: r.articolo.categoria as CategoriaModulo,
+            h: r.articolo.oreDefault,
+            p: r.articolo.prezzoDefault ? r.articolo.prezzoDefault / 100 : 500,
+            ver: r.articolo.versione || 1,
+          } : undefined,
           qty: r.quantita,
           oO: r.overrideOre,
           oP: r.overridePrezzo ? r.overridePrezzo / 100 : undefined,
@@ -222,7 +230,7 @@ export function Library() {
                   {items.map(m => {
                     const isOpen = open.has(m.id);
                     const dn = m.deps.map(d => moduliList.find(x => x.id === d)?.n).filter(Boolean);
-                    const righe = resolveRighe(m);
+                    const righe = resolveRighe(m, articoliList);
 
                     // Flag ed etichetta Giurisdizione
                     const gMatch = giurList.find(g => g.id === m.giurisdizioneId);
@@ -248,7 +256,7 @@ export function Library() {
                             <span
                               title={`Giurisdizione: ${gLabel}`}
                               style={{
-                                fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 6,
+                                fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 12,
                                 background: m.giurisdizioneId ? '#1a1f3d' : 'var(--card2)',
                                 border: `1px solid ${m.giurisdizioneId ? '#2d3260' : 'var(--border)'}`,
                                 color: m.giurisdizioneId ? '#a5b4fc' : 'var(--muted)',
@@ -261,15 +269,15 @@ export function Library() {
                         </div>
                         <div style={{ fontSize: 12.5, fontWeight: 600, lineHeight: 1.35, margin: '6px 0 8px' }}>{m.n}</div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11, color: 'var(--muted)' }}>
-                          <span>{moduloH(m)}h · {righe.length} articoli{dn.length ? ` · ➔ Dipende da: ${dn.join(', ')}` : ''}</span>
+                          <span>{moduloH(m, articoliList)}h · {righe.length} articoli{dn.length ? ` · ➔ Dipende da: ${dn.join(', ')}` : ''}</span>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
-                          <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>{fmt(moduloP(m))}</span>
+                          <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>{fmt(moduloP(m, articoliList))}</span>
                           <span style={{ fontSize: 10, color: 'var(--muted)' }}>{isOpen ? '▲' : '▼'}</span>
                         </div>
 
                         {isOpen && (
-                          <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px dashed var(--border)', display: 'flex', flexDirection: 'column', gap: 5 }}>
+                          <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px dashed var(--border)', display: 'flex', flexDirection: 'column', gap: 6 }}>
                             {righe.map((r, i) => (
                               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--muted)' }}>
                                 <span style={{ width: 4, height: 4, borderRadius: '50%', background: 'var(--hint)', flexShrink: 0 }} />
@@ -277,6 +285,15 @@ export function Library() {
                                 {r.qty > 1 && <span style={{ color: '#818cf8' }}>×{r.qty}</span>}
                               </div>
                             ))}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                window.location.href = `/clients`;
+                              }}
+                              style={{ marginTop: 6, width: '100%', background: 'var(--indigo)', color: '#fff', border: 'none', padding: '6px 10px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer', boxShadow: '0 2px 8px rgba(99,102,241,.3)' }}
+                            >
+                              🚀 Usa in un Progetto Cliente ➔
+                            </button>
                           </div>
                         )}
                       </div>
@@ -312,7 +329,14 @@ export function Library() {
 
       {/* TAB 4: Costruttore Modulo Template */}
       {subTab === 'crea_modulo' && (
-        <CreaModuloForm articoliList={articoliList} giurList={giurList} onCreated={() => setSubTab('grafo')} />
+        <CreaModuloForm
+          articoliList={articoliList}
+          giurList={giurList}
+          onCreated={() => {
+            loadData();
+            setSubTab('grafo');
+          }}
+        />
       )}
 
       {/* TAB 4: Modelli Documenti in Bianco & Form Master */}
