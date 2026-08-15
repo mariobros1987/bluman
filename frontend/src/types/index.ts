@@ -59,7 +59,7 @@ export interface ModuloProgetto {
   a: number;
   p: number;
   team: number[];
-  delay: boolean;
+  delay?: boolean;
   dn?: string;
   waitDep?: boolean;
   wdn?: string;
