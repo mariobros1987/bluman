@@ -329,6 +329,9 @@ export function Library() {
             setSelectedGiurId(giurId);
             setSubTab('grafo');
           }}
+          onLinkModulo={(modId, giurId) => {
+            setModuliList(prev => prev.map(m => m.id === modId ? { ...m, giurisdizioneId: giurId || undefined } : m));
+          }}
         />
       )}
 
@@ -907,11 +910,13 @@ function GiurisdizioniView({
   moduliList,
   onAddGiur,
   onOpenInGraph,
+  onLinkModulo,
 }: {
   giurList: Giurisdizione[];
   moduliList: ModuloTemplate[];
   onAddGiur: (g: Giurisdizione) => void;
   onOpenInGraph: (giurId: string) => void;
+  onLinkModulo?: (modId: string, giurId: string | null) => void;
 }) {
   const [modalGiurOpen, setModalGiurOpen] = useState(false);
   const [selectedGiur, setSelectedGiur] = useState<Giurisdizione | null>(null);
@@ -919,16 +924,22 @@ function GiurisdizioniView({
   const [newGiurCodice, setNewGiurCodice] = useState('');
   const [newGiurTipo, setNewGiurTipo] = useState<'ue' | 'extra_ue' | 'stato_usa' | 'altro'>('ue');
   const [newGiurNote, setNewGiurNote] = useState('');
+  const [selectedModToAssign, setSelectedModToAssign] = useState<string>('');
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      {/* Guida / Instruction Banner */}
+      <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 14, padding: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <div style={{ fontSize: 15, fontWeight: 700 }}>🌍 Giurisdizioni & Piazze Finanziarie Studio</div>
-          <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
-            Clicca su una giurisdizione per vederne i moduli associati o per posizionarti direttamente nel Grafo delle dipendenze.
+          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--indigo-l)', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span>💡 Come assegnare un Modello alla Giurisdizione:</span>
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4, lineHeight: 1.4 }}>
+            • <strong>Metodo 1 (Rapido):</strong> Clicca su qualsiasi giurisdizione sotto per aprire il modal e seleziona il modulo da associare.<br />
+            • <strong>Metodo 2 (Costruttore):</strong> Vai nella scheda <em>"Costruttore Modulo Template"</em> e scegli la giurisdizione target dal menu a tendina.
           </div>
         </div>
+
         <button
           onClick={() => setModalGiurOpen(true)}
           style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '8px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
@@ -995,7 +1006,7 @@ function GiurisdizioniView({
                   🧩 {linkedMods.length} Moduli Specifici
                 </span>
                 <span style={{ fontSize: 11, color: 'var(--indigo-l)', fontWeight: 600 }}>
-                  Dettagli ➔
+                  Gestisci & Associa ➔
                 </span>
               </div>
             </div>
@@ -1003,37 +1014,67 @@ function GiurisdizioniView({
         })}
       </div>
 
-      {/* Modal Dettaglio Giurisdizione Cliccata */}
+      {/* Modal Dettaglio & Assegnazione Moduli Giurisdizione */}
       {selectedGiur && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 16 }}>
-          <div style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, width: '100%', maxWidth: 520, padding: 24, boxShadow: '0 8px 32px rgba(0,0,0,.4)' }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 16 }}>
+          <div style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, width: '100%', maxWidth: 560, padding: 24, boxShadow: '0 12px 40px rgba(0,0,0,.5)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span style={{ fontSize: 24 }}>{selectedGiur.codice === 'MT' ? '🇲🇹' : selectedGiur.codice === 'GI' ? '🇬🇮' : selectedGiur.codice.startsWith('US') ? '🇺🇸' : selectedGiur.codice === 'AE' ? '🇦🇪' : '🌐'}</span>
+                <span style={{ fontSize: 26 }}>{selectedGiur.codice === 'MT' ? '🇲🇹' : selectedGiur.codice === 'GI' ? '🇬🇮' : selectedGiur.codice.startsWith('US') ? '🇺🇸' : selectedGiur.codice === 'AE' ? '🇦🇪' : '🌐'}</span>
                 <div>
                   <div style={{ fontSize: 16, fontWeight: 800 }}>{selectedGiur.nome} ({selectedGiur.codice})</div>
-                  <div style={{ fontSize: 11, color: 'var(--muted)' }}>Giurisdizione Studio · Tipo {selectedGiur.tipo.toUpperCase()}</div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)' }}>Gestione Moduli Specifici della Piazza Finanziaria</div>
                 </div>
               </div>
               <button onClick={() => setSelectedGiur(null)} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: 18 }}>✕</button>
             </div>
 
-            <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, padding: 14, marginBottom: 16 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--hint)', marginBottom: 4, textTransform: 'uppercase' }}>Note & Regole Operative:</div>
-              <div style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.4 }}>
-                {selectedGiur.note || 'Nessuna specifica o nota inserita.'}
+            {/* Assegnazione 1-Click Nuovo Modulo */}
+            <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 14, marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--indigo-l)', textTransform: 'uppercase' }}>
+                ➕ Associa un Modello di Libreria a questa Giurisdizione
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <select
+                  value={selectedModToAssign}
+                  onChange={e => setSelectedModToAssign(e.target.value)}
+                  style={{ flex: 1, padding: 8, fontSize: 12 }}
+                >
+                  <option value="">-- Seleziona Modulo da Associare --</option>
+                  {moduliList.filter(m => m.giurisdizioneId !== selectedGiur.id).map(m => (
+                    <option key={m.id} value={m.id}>
+                      {m.n} ({m.cat}) {m.giurisdizioneId ? '— (Già associato ad altra giur)' : '— (Generico)'}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!selectedModToAssign) return;
+                    if (onLinkModulo) {
+                      onLinkModulo(selectedModToAssign, selectedGiur.id);
+                    }
+                    const targetMod = moduliList.find(m => m.id === selectedModToAssign);
+                    alert(`✓ Modulo "${targetMod?.n}" associato con successo alla giurisdizione ${selectedGiur.nome}!`);
+                    setSelectedModToAssign('');
+                  }}
+                  style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '8px 14px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+                >
+                  ✓ Associa
+                </button>
               </div>
             </div>
 
+            {/* Lista Moduli Collegati */}
             <div style={{ marginBottom: 20 }}>
               <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', marginBottom: 10, display: 'flex', justifyContent: 'space-between' }}>
-                <span>🧩 Moduli Template Collegati ({moduliList.filter(m => m.giurisdizioneId === selectedGiur.id).length}):</span>
+                <span>🧩 Moduli Template Attualmente Collegati ({moduliList.filter(m => m.giurisdizioneId === selectedGiur.id).length}):</span>
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 200, overflowY: 'auto' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 220, overflowY: 'auto' }}>
                 {moduliList.filter(m => m.giurisdizioneId === selectedGiur.id).length === 0 ? (
-                  <div style={{ fontSize: 12, color: 'var(--muted)', fontStyle: 'italic', padding: 10, background: 'var(--card2)', borderRadius: 8 }}>
-                    Nessun modulo specifico attualmente collegato a questa giurisdizione. In questa piazza verranno usati i moduli generici.
+                  <div style={{ fontSize: 12, color: 'var(--muted)', fontStyle: 'italic', padding: 12, background: 'var(--card2)', borderRadius: 8, textAlign: 'center' }}>
+                    Nessun modulo specifico attualmente collegato a questa giurisdizione.<br />Usa il menu sopra per associare i moduli spettai.
                   </div>
                 ) : (
                   moduliList.filter(m => m.giurisdizioneId === selectedGiur.id).map(m => (
@@ -1042,7 +1083,22 @@ function GiurisdizioniView({
                         <div style={{ fontSize: 12.5, fontWeight: 600 }}>{m.n}</div>
                         <div style={{ fontSize: 10, color: 'var(--muted)' }}>Cat: {m.cat} · Version v{m.ver}</div>
                       </div>
-                      <CatBadge cat={m.cat} />
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <CatBadge cat={m.cat} />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (onLinkModulo) {
+                              onLinkModulo(m.id, null);
+                            }
+                            alert(`✓ Modulo "${m.n}" scollegato dalla giurisdizione ${selectedGiur.nome}. Torna ad essere generico.`);
+                          }}
+                          title="Scollega da questa giurisdizione"
+                          style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--red)', padding: '2px 6px', borderRadius: 4, fontSize: 10, cursor: 'pointer' }}
+                        >
+                          ✕ Scollega
+                        </button>
+                      </div>
                     </div>
                   ))
                 )}
@@ -1066,7 +1122,7 @@ function GiurisdizioniView({
                 }}
                 style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', boxShadow: '0 4px 14px rgba(99,102,241,.3)' }}
               >
-                🕸 VEDI NEL GRAFO DEI MODULI ➔
+                🕸 VEDI NEL GRAFO CON FILTRO ATTIVO ➔
               </button>
             </div>
           </div>
