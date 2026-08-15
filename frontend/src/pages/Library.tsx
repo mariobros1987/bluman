@@ -14,6 +14,7 @@ export function Library() {
   const [giurList, setGiurList] = useState<Giurisdizione[]>(GIURISDIZIONI);
   const [moduliList, setModuliList] = useState<ModuloTemplate[]>(MLIB);
   const [modalArticoloOpen, setModalArticoloOpen] = useState(false);
+  const [selectedGiurId, setSelectedGiurId] = useState<string>('ALL');
 
   const graphRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -84,7 +85,16 @@ export function Library() {
     const wr = wrap.getBoundingClientRect();
     svg.setAttribute('width', String(wrap.scrollWidth));
     svg.setAttribute('height', String(wrap.scrollHeight));
-    svg.innerHTML = '';
+    svg.innerHTML = `
+      <defs>
+        <marker id="arrow-inactive" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M 0 1 L 10 5 L 0 9 z" fill="#474b68" />
+        </marker>
+        <marker id="arrow-active" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M 0 1 L 10 5 L 0 9 z" fill="#818cf8" />
+        </marker>
+      </defs>
+    `;
     moduliList.forEach(m => {
       m.deps.forEach(depId => {
         const from = document.getElementById(`lib-${depId}`);
@@ -97,11 +107,13 @@ export function Library() {
         const x2 = tr.left - wr.left;
         const y2 = tr.top + tr.height / 2 - wr.top;
         const cx = (x1 + x2) / 2;
+        const isActive = open.has(m.id) || open.has(depId);
         const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
         path.setAttribute('d', `M ${x1} ${y1} C ${cx} ${y1}, ${cx} ${y2}, ${x2} ${y2}`);
         path.setAttribute('fill', 'none');
-        path.setAttribute('stroke', open.has(m.id) || open.has(depId) ? '#6366f1' : '#3a3d56');
-        path.setAttribute('stroke-width', open.has(m.id) || open.has(depId) ? '2' : '1.5');
+        path.setAttribute('stroke', isActive ? '#818cf8' : '#474b68');
+        path.setAttribute('stroke-width', isActive ? '2.5' : '1.8');
+        path.setAttribute('marker-end', isActive ? 'url(#arrow-active)' : 'url(#arrow-inactive)');
         svg.appendChild(path);
       });
     });
@@ -165,26 +177,44 @@ export function Library() {
         </button>
       </div>
 
-      {/* TAB 1: Grafo */}
+      {/* TAB 1: Grafo & Dipendenze Moduli */}
       {subTab === 'grafo' && (
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 18, fontSize: 11, color: 'var(--muted)', marginBottom: 18, flexWrap: 'wrap' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <div style={{ width: 12, height: 12, borderRadius: 3, background: '#1a1f3d', border: '1px solid #2d3260' }} />
-              Versione template congelata nei progetti
+          {/* Toolbar Filtri Grafo */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 14, padding: '12px 16px', marginBottom: 18 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)' }}>🌍 Giurisdizione Target:</span>
+              <select
+                value={selectedGiurId}
+                onChange={e => setSelectedGiurId(e.target.value)}
+                style={{ fontSize: 12, padding: '6px 12px', borderRadius: 8, background: 'var(--card2)', color: 'var(--text)', border: '1px solid var(--border)', cursor: 'pointer', fontWeight: 600 }}
+              >
+                <option value="ALL">🌐 Tutte le Giurisdizioni & Generici</option>
+                {giurList.map(g => {
+                  const flag = g.codice === 'MT' ? '🇲🇹' : g.codice === 'GI' ? '🇬🇮' : g.codice.startsWith('US') ? '🇺🇸' : g.codice === 'AE' ? '🇦🇪' : '🌐';
+                  return <option key={g.id} value={g.id}>{flag} {g.nome} ({g.codice})</option>;
+                })}
+              </select>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <div style={{ width: 16, height: 2, background: '#3a3d56', borderRadius: 0 }} />
-              Dipendenza tra moduli
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 18, fontSize: 11, color: 'var(--muted)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 12 }}>🇲🇹 / 🌐</span>
+                Badge Giurisdizione
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ width: 14, height: 2, background: '#818cf8' }} />
+                Frecce Dipendenza ➔
+              </div>
+              <div>Clic su un modulo per espandere distinta base</div>
             </div>
-            <div>Clic su un modulo per espandere la distinta base</div>
           </div>
 
           <div ref={graphRef} style={{ position: 'relative', overflowX: 'auto', paddingBottom: 12 }}>
             <svg ref={svgRef} style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 0, overflow: 'visible' }} />
             <div style={{ display: 'flex', gap: 56, alignItems: 'flex-start', position: 'relative', zIndex: 1, minWidth: 'max-content', padding: 4 }}>
               {cols.map((items, ci) => (
-                <div key={ci} style={{ display: 'flex', flexDirection: 'column', gap: 22, width: 230, flexShrink: 0 }}>
+                <div key={ci} style={{ display: 'flex', flexDirection: 'column', gap: 22, width: 240, flexShrink: 0 }}>
                   <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--hint)', textTransform: 'uppercase', letterSpacing: '.6px', display: 'flex', alignItems: 'center', gap: 6 }}>
                     {colLabels[ci] || `Livello ${ci}`}
                     <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
@@ -193,6 +223,12 @@ export function Library() {
                     const isOpen = open.has(m.id);
                     const dn = m.deps.map(d => moduliList.find(x => x.id === d)?.n).filter(Boolean);
                     const righe = resolveRighe(m);
+
+                    // Flag ed etichetta Giurisdizione
+                    const gMatch = giurList.find(g => g.id === m.giurisdizioneId);
+                    const gFlag = gMatch ? (gMatch.codice === 'MT' ? '🇲🇹' : gMatch.codice === 'GI' ? '🇬🇮' : gMatch.codice.startsWith('US') ? '🇺🇸' : gMatch.codice === 'AE' ? '🇦🇪' : '🌐') : '🌐';
+                    const gLabel = gMatch ? gMatch.nome : 'Generico';
+
                     return (
                       <div
                         key={m.id}
@@ -200,18 +236,32 @@ export function Library() {
                         onClick={() => toggle(m.id)}
                         style={{
                           background: isOpen ? 'var(--card2)' : 'var(--card)',
-                          border: `1px solid ${isOpen ? 'var(--indigo-l)' : 'var(--border)'}`,
+                          border: `1px solid ${isOpen ? 'var(--indigo-l)' : selectedGiurId !== 'ALL' && m.giurisdizioneId === selectedGiurId ? 'var(--indigo)' : 'var(--border)'}`,
                           borderRadius: 12, padding: 14, cursor: 'pointer',
                           transition: 'all .15s',
+                          boxShadow: selectedGiurId !== 'ALL' && m.giurisdizioneId === selectedGiurId ? '0 0 12px rgba(99,102,241,.35)' : undefined,
                         }}
                       >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, marginBottom: 6 }}>
-                          <CatBadge cat={m.cat} />
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <CatBadge cat={m.cat} />
+                            <span
+                              title={`Giurisdizione: ${gLabel}`}
+                              style={{
+                                fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 6,
+                                background: m.giurisdizioneId ? '#1a1f3d' : 'var(--card2)',
+                                border: `1px solid ${m.giurisdizioneId ? '#2d3260' : 'var(--border)'}`,
+                                color: m.giurisdizioneId ? '#a5b4fc' : 'var(--muted)',
+                              }}
+                            >
+                              {gFlag} {gLabel}
+                            </span>
+                          </div>
                           <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--indigo-l)', background: '#1a1f3d', border: '1px solid #2d3260', padding: '1px 6px', borderRadius: 20 }}>v{m.ver}</span>
                         </div>
                         <div style={{ fontSize: 12.5, fontWeight: 600, lineHeight: 1.35, margin: '6px 0 8px' }}>{m.n}</div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11, color: 'var(--muted)' }}>
-                          <span>{moduloH(m)}h · {righe.length} articoli{dn.length ? ` · da: ${dn.join(', ')}` : ''}</span>
+                          <span>{moduloH(m)}h · {righe.length} articoli{dn.length ? ` · ➔ Dipende da: ${dn.join(', ')}` : ''}</span>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
                           <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>{fmt(moduloP(m))}</span>
