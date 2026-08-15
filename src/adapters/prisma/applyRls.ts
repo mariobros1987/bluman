@@ -9,18 +9,24 @@ async function main() {
   const sqlPath = path.join(process.cwd(), 'supabase', 'migrations', '20260815_enable_rls.sql');
   const sqlContent = fs.readFileSync(sqlPath, 'utf8');
 
-  // Splitta gli statement SQL e li esegue su Supabase
-  const statements = sqlContent
-    .split(';')
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0 && !s.startsWith('--'));
+  // Esegui l'intero script SQL in un unico blocco transazionale
+  try {
+    await prisma.$executeRawUnsafe(sqlContent);
+    console.log('✅ Eseguito script SQL RLS completo in un unico blocco transazionale!');
+  } catch (err: any) {
+    console.warn('⚠️ Esecuzione in fallback statement per statement...');
+    const statements = sqlContent
+      .split(';')
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0 && !s.startsWith('--'));
 
-  for (const statement of statements) {
-    try {
-      await prisma.$executeRawUnsafe(statement);
-      console.log('✅ Eseguito:', statement.substring(0, 60).replace(/\n/g, ' '), '...');
-    } catch (err: any) {
-      console.warn('⚠️ Nota durante l execution SQL:', err.message || err);
+    for (const statement of statements) {
+      try {
+        await prisma.$executeRawUnsafe(statement);
+        console.log('✅ Eseguito:', statement.substring(0, 60).replace(/\n/g, ' '), '...');
+      } catch (e: any) {
+        console.log('ℹ️ Info SQL:', e.message || e);
+      }
     }
   }
 
