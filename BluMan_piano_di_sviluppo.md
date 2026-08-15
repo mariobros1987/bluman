@@ -29,6 +29,10 @@
   - `🕸 Grafo & Dipendenze Moduli` (Workflow visivo con **🔒 Lucchetti Topologici Dinamici**, frecce `➔`, pulsante `+ Aggiungi Modulo da Libreria` e **`✉️ Notifica Sblocco al Cliente`**).
   - `💶 Fatturazione & SDI` (Emissione sia di Fatture `FT` che Note di Credito `NC` con serie distinte ed anteprima PDF).
   - `📊 Redditività & Margini` (Dashboard analitica con Margine Lordo Studio, Resa Oraria Effettiva €/ora, Ore Stimate vs Reali ed export **📄 Dossier Trasparenza PDF**).
+  - `📄 Documenti & Vault Legale` (Archivio contratti, certificati MFSA, fascicolo KYC ed **📤 Upload File PDF**).
+  - `📅 Calendario & Scadenzario` (Scadenzario cronologico del progetto, promemoria ed inserimento 1-click **`+ Programma Nuova Scadenza`**).
+  - `💬 Comunicazioni & Ingestion` (Timeline messaggi omnichannel WhatsApp, Telegram, Email, Signal).
+  - `📜 Storico Contratti & Addendum` (Registro immutabile delle versioni contrattuali firmate e marca temporale eIDAS).
   - **Archiviazione & Eliminazione Sicura**: Blocco fiscale anti-cancellazione se presenti fatture.
 - [x] **Gestionale Fatture & Pagamenti (`/invoices`)**:
   - Dashboard globale per tutte le fatture e note di credito dello studio.
