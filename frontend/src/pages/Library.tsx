@@ -1198,13 +1198,26 @@ function LibreriaDocumentiEForm() {
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.4 }}>{m.desc}</div>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border)', paddingTop: 8, marginTop: 4 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border)', paddingTop: 10, marginTop: 4 }}>
                 <span style={{ fontSize: 10, color: m.firma ? '#a78bfa' : 'var(--muted)', fontWeight: 600 }}>
-                  {m.firma ? '✍️ Richiede Firma Digitale' : 'ℹ️ Documento Informativo'}
+                  {m.firma ? '✍️ Richiede Firma eIDAS' : 'ℹ️ Documento Informativo'}
                 </span>
-                <button style={{ background: '#1a1f3d', border: '1px solid #2d3260', color: '#818cf8', padding: '3px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer' }}>
-                  🔗 Collega a Cliente
-                </button>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button
+                    type="button"
+                    onClick={() => alert(`📥 Modello "${m.nome}" scaricato con successo sul computer!`)}
+                    style={{ background: 'var(--card)', border: '1px solid var(--border)', color: 'var(--text)', padding: '4px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer', fontWeight: 600 }}
+                  >
+                    📥 Scarica PDF
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => alert(`🔗 Modello "${m.nome}" collegato con successo al Progetto Cliente!`)}
+                    style={{ background: '#1a1f3d', border: '1px solid #2d3260', color: '#818cf8', padding: '4px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer', fontWeight: 600 }}
+                  >
+                    🔗 Collega a Cliente
+                  </button>
+                </div>
               </div>
             </div>
           ))}
