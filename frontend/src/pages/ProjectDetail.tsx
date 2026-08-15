@@ -700,8 +700,8 @@ export function ProjectDetail() {
           </div>
         )}
         {tab === 'comunicazioni' && <ComunicazioniTab progettoId={String(project.id)} nomeCliente={project.cl} emailCliente="client@holdingbeta.advisory" />}
-        {tab === 'documenti' && <PlaceholderTab icon="📄" label="Documenti contrattuali allegati" />}
-        {tab === 'calendario' && <PlaceholderTab icon="📅" label="Scadenzario e Calendario condiviso" />}
+        {tab === 'documenti' && <DocumentiTab project={project} />}
+        {tab === 'calendario' && <CalendarioProgettoTab project={project} />}
       </div>
 
       {/* Passaggio Modal */}
@@ -1782,6 +1782,268 @@ function RedditivitaTab({
           </table>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ─── Componente Documenti & Vault Legale Progetto ──────────────────
+function DocumentiTab({ project }: { project: Progetto }) {
+  const [docCategory, setDocCategory] = useState('ALL');
+  const [uploading, setUploading] = useState(false);
+  const [docList, setDocList] = useState<any[]>([
+    { id: 'doc-01', nome: 'Engagement Letter & Proposta d Incarico Firmata.pdf', cat: 'Contratti', dimensione: '1.4 MB', data: '15/08/2026', firmato: true, url: '#' },
+    { id: 'doc-02', nome: 'Certificato Camerale & Statuto MFSA Malta.pdf', cat: 'Societario', dimensione: '3.2 MB', data: '14/08/2026', firmato: true, url: '#' },
+    { id: 'doc-03', nome: 'Fascicolo Compliance KYC & UBO Registry.pdf', cat: 'Compliance', dimensione: '2.8 MB', data: '12/08/2026', firmato: true, url: '#' },
+    { id: 'doc-04', nome: 'Deed of Trust & Letter of Wishes.pdf', cat: 'Trust', dimensione: '4.1 MB', data: '10/08/2026', firmato: false, url: '#' },
+  ]);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+
+    try {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const base64 = (reader.result as string).split(',')[1];
+        const res = await uploadFileApi(file.name, base64);
+        const newDoc = {
+          id: `doc-${Date.now()}`,
+          nome: file.name,
+          cat: 'Allegati Progetto',
+          dimensione: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
+          data: 'Oggi',
+          firmato: false,
+          url: res?.url || '#',
+        };
+        setDocList([newDoc, ...docList]);
+        alert(`✓ Documento "${file.name}" caricato nel Vault del Progetto con successo!`);
+      };
+      reader.readAsDataURL(file);
+    } catch (err) {
+      console.error(err);
+      alert('Errore nel caricamento del file');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const filteredDocs = docCategory === 'ALL' ? docList : docList.filter(d => d.cat === docCategory);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      {/* Header Document Vault */}
+      <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, padding: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 14 }}>
+        <div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--indigo-l)', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span>📄 Vault Documenti Legali & Fascicolo Incarico</span>
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 3 }}>
+            Archivio di tutti i contratti firmati, certificati societari, dossier KYC ed allegati relativi a <strong>{project.cl}</strong>
+          </div>
+        </div>
+
+        <label style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: 10, fontSize: 12, fontWeight: 600, cursor: 'pointer', boxShadow: '0 4px 14px rgba(99,102,241,.3)', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span>{uploading ? 'Caricamento in corso...' : '📤 Carica Nuovo Documento'}</span>
+          <input type="file" onChange={handleFileUpload} disabled={uploading} style={{ display: 'none' }} />
+        </label>
+      </div>
+
+      {/* Toolbar Filtro Categorie */}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        {['ALL', 'Contratti', 'Societario', 'Compliance', 'Trust', 'Allegati Progetto'].map(cat => (
+          <button
+            key={cat}
+            onClick={() => setDocCategory(cat)}
+            style={{
+              padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer',
+              background: docCategory === cat ? '#1a1f3d' : 'var(--card2)',
+              color: docCategory === cat ? '#818cf8' : 'var(--muted)',
+              border: `1px solid ${docCategory === cat ? '#3730a3' : 'var(--border)'}`,
+            }}
+          >
+            {cat === 'ALL' ? '🌐 Tutti i Documenti' : cat}
+          </button>
+        ))}
+      </div>
+
+      {/* Tabella Documenti */}
+      <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 16, padding: 20 }}>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5 }}>
+            <thead>
+              <tr style={{ background: 'var(--card)', borderBottom: '1px solid var(--border)', textAlign: 'left', color: 'var(--muted)' }}>
+                <th style={{ padding: '10px 12px' }}>Nome File / Documento</th>
+                <th style={{ padding: '10px 12px' }}>Categoria</th>
+                <th style={{ padding: '10px 12px' }}>Dimensione</th>
+                <th style={{ padding: '10px 12px' }}>Data Caricamento</th>
+                <th style={{ padding: '10px 12px' }}>Firma eIDAS</th>
+                <th style={{ padding: '10px 12px', textAlign: 'right' }}>Azioni</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredDocs.map(doc => (
+                <tr key={doc.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                  <td style={{ padding: '12px', fontWeight: 700, color: 'var(--text)' }}>
+                    📄 {doc.nome}
+                  </td>
+                  <td style={{ padding: '12px' }}>
+                    <span style={{ fontSize: 10, background: '#1a1f3d', color: '#818cf8', padding: '2px 8px', borderRadius: 10, border: '1px solid #3730a3' }}>
+                      {doc.cat}
+                    </span>
+                  </td>
+                  <td style={{ padding: '12px', color: 'var(--muted)' }}>{doc.dimensione}</td>
+                  <td style={{ padding: '12px', color: 'var(--muted)' }}>{doc.data}</td>
+                  <td style={{ padding: '12px' }}>
+                    <span style={{ fontSize: 9.5, background: doc.firmato ? '#0d2d22' : '#2d1a05', color: doc.firmato ? '#34d399' : '#f59e0b', border: `1px solid ${doc.firmato ? '#059669' : '#d97706'}`, padding: '2px 8px', borderRadius: 10, fontWeight: 700 }}>
+                      {doc.firmato ? '🔒 eIDAS Verificato' : '⏳ In attesa di firma'}
+                    </span>
+                  </td>
+                  <td style={{ padding: '12px', textAlign: 'right' }}>
+                    <button
+                      type="button"
+                      onClick={() => alert(`Apertura ed anteprima documento: ${doc.nome}`)}
+                      style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--indigo-l)', padding: '4px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer', fontWeight: 600 }}
+                    >
+                      👁 Visualizza
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Componente Calendario & Scadenzario Incarico ─────────────────
+function CalendarioProgettoTab({ project }: { project: Progetto }) {
+  const [modalNewEvent, setModalNewEvent] = useState(false);
+  const [titoloScadenza, setTitoloScadenza] = useState('');
+  const [dataScadenza, setDataScadenza] = useState('');
+  const [assegnatario, setAssegnatario] = useState('Joe Disabato');
+
+  const [events, setEvents] = useState<any[]>([
+    { id: 'ev-1', titolo: 'Consegna bozza Deed of Trust al Cliente', data: '18/08/2026', stato: 'pending', assegnatario: 'Joe Disabato', tipo: 'Milestone' },
+    { id: 'ev-2', titolo: 'Deposito Istanza autorizzativa MFSA', data: '22/08/2026', stato: 'pending', assegnatario: 'Francesca Disabato', tipo: 'Compliance' },
+    { id: 'ev-3', titolo: 'Call di allineamento con Advisor Elvetico', data: '25/08/2026', stato: 'pending', assegnatario: 'Avv. Lorenzo Marino', tipo: 'Meeting' },
+    { id: 'ev-4', titolo: 'Verifica preliminare fascicolo KYC', data: '12/08/2026', stato: 'done', assegnatario: 'Elena Rossi', tipo: 'Check' },
+  ]);
+
+  const handleAddEvent = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!titoloScadenza || !dataScadenza) return;
+    const newEv = {
+      id: `ev-${Date.now()}`,
+      titolo: titoloScadenza,
+      data: dataScadenza,
+      stato: 'pending',
+      assegnatario,
+      tipo: 'Scadenza Incarico',
+    };
+    setEvents([newEv, ...events]);
+    setModalNewEvent(false);
+    setTitoloScadenza('');
+    setDataScadenza('');
+    alert(`✓ Scadenza "${titoloScadenza}" aggiunta allo Scadenzario del Progetto ed integrata nel Calendario Studio!`);
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      {/* Header Calendario */}
+      <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, padding: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 14 }}>
+        <div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--indigo-l)', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span>📅 Scadenzario & Milestone Incarico</span>
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 3 }}>
+            Pianificazione temporale e promemoria delle scadenze operative per <strong>{project.cl}</strong>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setModalNewEvent(true)}
+          style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: 10, fontSize: 12, fontWeight: 600, cursor: 'pointer', boxShadow: '0 4px 14px rgba(99,102,241,.3)' }}
+        >
+          + Programma Nuova Scadenza
+        </button>
+      </div>
+
+      {/* Lista Scadenze */}
+      <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 16, padding: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>
+          ⏱ Cronologia Scadenze e Promemoria Incarico
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {events.map(ev => (
+            <div key={ev.id} style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, padding: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ fontSize: 20 }}>{ev.stato === 'done' ? '✅' : '⏳'}</div>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{ev.titolo}</div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
+                    Assegnato a: <strong>{ev.assegnatario}</strong> · Categoria: <span style={{ color: '#818cf8' }}>{ev.tipo}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                <div style={{ fontSize: 12, fontWeight: 800, color: '#818cf8', background: '#1a1f3d', padding: '4px 10px', borderRadius: 8, border: '1px solid #3730a3' }}>
+                  📅 {ev.data}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEvents(events.map(x => x.id === ev.id ? { ...x, stato: x.stato === 'done' ? 'pending' : 'done' } : x));
+                  }}
+                  style={{ background: ev.stato === 'done' ? '#0d2d22' : 'transparent', border: `1px solid ${ev.stato === 'done' ? '#059669' : 'var(--border)'}`, color: ev.stato === 'done' ? '#34d399' : 'var(--muted)', padding: '5px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer', fontWeight: 600 }}
+                >
+                  {ev.stato === 'done' ? '✓ Completato' : 'Marca Come Completato'}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Modal Nuova Scadenza */}
+      {modalNewEvent && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 110, padding: 16 }}>
+          <form onSubmit={handleAddEvent} style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, padding: 22, width: '100%', maxWidth: 440, display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ fontSize: 16, fontWeight: 700 }}>+ Programma Nuova Scadenza Incarico</div>
+            <div style={{ fontSize: 11, color: 'var(--muted)' }}>Crea un evento nel calendario condiviso dello studio associato a questo progetto</div>
+
+            <div>
+              <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Titolo Scadenza / Attività *</label>
+              <input value={titoloScadenza} onChange={e => setTitoloScadenza(e.target.value)} required placeholder="es. Deposito statuto presso MFSA" style={{ fontSize: 12 }} />
+            </div>
+
+            <div>
+              <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Data Scadenza *</label>
+              <input type="date" value={dataScadenza} onChange={e => setDataScadenza(e.target.value)} required style={{ fontSize: 12 }} />
+            </div>
+
+            <div>
+              <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Assegnatario *</label>
+              <select value={assegnatario} onChange={e => setAssegnatario(e.target.value)} style={{ padding: 10, fontSize: 12 }}>
+                <option value="Joe Disabato">Joe Disabato (Lead Advisor)</option>
+                <option value="Francesca Disabato">Francesca Disabato (Back Office)</option>
+                <option value="Avv. Lorenzo Marino">Avv. Lorenzo Marino (Legal Counsel)</option>
+                <option value="Elena Rossi">Elena Rossi (Tax Advisor)</option>
+              </select>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
+              <button type="button" onClick={() => setModalNewEvent(false)} style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '7px 14px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}>Annulla</button>
+              <button type="submit" style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '7px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>✓ Salva Scadenza</button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 }
