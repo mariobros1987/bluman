@@ -14,7 +14,7 @@ import { AssignOperatorModal } from '../components/AssignOperatorModal';
 import { CalendarPreviewModal } from '../components/CalendarPreviewModal';
 import { ConfirmDeleteModal } from '../components/ConfirmDeleteModal';
 import { PROJECTS } from '../store/mockData';
-import { fetchProgettoDettaglio, emettiFatturaApi, consuntivaMicrovoceApi, fetchAccessiProgetto, assegnaAccessoProgettoApi, salvaProgettoDettaglioApi, archiviaProgettoApi, eliminaProgettoApi } from '../api/client';
+import { fetchProgettoDettaglio, emettiFatturaApi, consuntivaMicrovoceApi, fetchAccessiProgetto, assegnaAccessoProgettoApi, salvaProgettoDettaglioApi, archiviaProgettoApi, eliminaProgettoApi, fetchModuliLibreria, fetchArticoli } from '../api/client';
 import { TEAM } from '../store/mockData';
 import type { Progetto, ModuloProgetto, CategoriaModulo } from '../types';
 import styles from './ProjectDetail.module.css';
@@ -619,8 +619,26 @@ export function ProjectDetail() {
         {tab === 'grafo' && (
           <GrafoModuliProgettoView
             project={project}
-            onAddModule={(newMod) => {
-              project.mods.push(newMod);
+            onAddModule={async (newMod) => {
+              const newMods = [...(project.mods || []), newMod];
+              const updatedVal = (project.val || 0) + (newMod.p || 0);
+              const updatedProject = { ...project, mods: newMods, val: updatedVal };
+              setProject(updatedProject);
+
+              // 1. Persisti in DB Supabase via API Fastify
+              try {
+                await salvaProgettoDettaglioApi(String(project.id), updatedProject);
+              } catch (err) {
+                console.warn('salvaProgettoDettaglioApi fallback:', err);
+              }
+
+              // 2. Persisti in localStorage backup
+              const savedStr = localStorage.getItem('bluman_custom_projects');
+              const savedArr: Progetto[] = savedStr ? JSON.parse(savedStr) : [];
+              const updatedArr = [updatedProject, ...savedArr.filter(p => String(p.id) !== String(project.id))];
+              localStorage.setItem('bluman_custom_projects', JSON.stringify(updatedArr));
+
+              // 3. Ricarica dettaglio
               loadDetail();
             }}
             onSelectMod={(modId) => {
@@ -1390,17 +1408,63 @@ function GrafoModuliProgettoView({
   onSelectMod: (modId: number) => void;
 }) {
   const [addModalOpen, setAddModalOpen] = useState(false);
-  const [selectedTemplate, setSelectedTemplate] = useState<string>('t-trust');
+  const [dbModTemplates, setDbModTemplates] = useState<Array<{ id: string; n: string; cat: string; h: number; p: number; righe: any[] }>>([]);
+  const [selectedTemplate, setSelectedTemplate] = useState<string>('');
+
+  useEffect(() => {
+    async function loadTemplates() {
+      try {
+        const [mods, arts] = await Promise.all([fetchModuliLibreria(), fetchArticoli()]);
+        if (mods && Array.isArray(mods) && mods.length > 0) {
+          const mapped = mods.map((m: any) => {
+            const righeResolved = (m.righeDistinta || []).map((r: any) => {
+              const art = (arts || []).find((a: any) => a.id === r.articoloId) || r.articolo;
+              return {
+                n: art ? art.nome : 'Microvoce operativa',
+                hE: (r.overrideOre != null ? r.overrideOre : (art?.oreDefault || 4)) * (r.quantita || 1),
+                hA: 0,
+                s: 'pending',
+                as: 1,
+                d: 0,
+              };
+            });
+            const totH = righeResolved.reduce((acc: number, x: any) => acc + x.hE, 0);
+            const totP = m.prezzoPacchetto ? m.prezzoPacchetto / 100 : (righeResolved.reduce((acc: number, x: any) => acc + (x.hE * 150), 0));
+            return {
+              id: m.id,
+              n: m.nome,
+              cat: m.categoria,
+              h: totH || 10,
+              p: totP || 1500,
+              righe: righeResolved.length > 0 ? righeResolved : [
+                { n: 'Analisi requisiti preliminari', hE: 5, hA: 0, s: 'pending', as: 1, d: 0 },
+                { n: 'Esecuzione pratiche societarie', hE: 5, hA: 0, s: 'pending', as: 1, d: 0 },
+              ],
+            };
+          });
+          setDbModTemplates(mapped);
+          if (mapped.length > 0) setSelectedTemplate(mapped[0].id);
+        }
+      } catch (err) {
+        console.warn('loadTemplates fallback:', err);
+      }
+    }
+    loadTemplates();
+  }, []);
 
   const libraryTemplates = [
-    { id: 't-trust', n: 'Trust & Asset Protection', cat: 'Trust', h: 30, p: 4500, desc: 'Costituzione trust di garanzia e patrimonio segregato.' },
-    { id: 't-ip', n: 'IP Licensing & Tax Optimization', cat: 'IP & Tax', h: 22, p: 3800, desc: 'Regime Patent Box e licenza marchio UE.' },
-    { id: 't-mfsa', n: 'Licenza Finanziaria MFSA VASP', cat: 'Compliance', h: 50, p: 9500, desc: 'Pratica autorizzazione autorità dei servizi finanziari.' },
+    { id: 't-trust', n: 'Trust & Asset Protection', cat: 'Trust', h: 30, p: 4500, righe: [{ n: 'Redazione Deed of Trust', hE: 15, hA: 0, s: 'pending', as: 1, d: 0 }] },
+    { id: 't-ip', n: 'IP Licensing & Tax Optimization', cat: 'IP & Tax', h: 22, p: 3800, righe: [{ n: 'Deposito Marchio UE', hE: 10, hA: 0, s: 'pending', as: 1, d: 0 }] },
+    { id: 't-mfsa', n: 'Licenza Finanziaria MFSA VASP', cat: 'Compliance', h: 50, p: 9500, righe: [{ n: 'Deposito Istanza MFSA', hE: 25, hA: 0, s: 'pending', as: 1, d: 0 }] },
   ];
+
+  const allAvailableTemplates = dbModTemplates.length > 0 ? dbModTemplates : libraryTemplates;
 
   const handleAddModuleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const tmpl = libraryTemplates.find(t => t.id === selectedTemplate) || libraryTemplates[0];
+    const tmpl = allAvailableTemplates.find(t => t.id === selectedTemplate) || allAvailableTemplates[0];
+    if (!tmpl) return;
+
     const newMod: ModuloProgetto = {
       id: Date.now(),
       n: tmpl.n,
@@ -1411,7 +1475,7 @@ function GrafoModuliProgettoView({
       a: 0,
       p: tmpl.p,
       team: [1],
-      v: [
+      v: tmpl.righe && tmpl.righe.length > 0 ? tmpl.righe : [
         { n: 'Analisi requisiti preliminari', hE: 5, hA: 0, s: 'pending', as: 1, d: 0 },
         { n: 'Redazione documentazione integrativa', hE: 10, hA: 0, s: 'pending', as: 1, d: 0 },
       ],
@@ -1532,7 +1596,7 @@ function GrafoModuliProgettoView({
             <div>
               <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Modulo Template Libreria *</label>
               <select value={selectedTemplate} onChange={e => setSelectedTemplate(e.target.value)} style={{ padding: 10, fontSize: 12 }}>
-                {libraryTemplates.map(t => (
+                {allAvailableTemplates.map(t => (
                   <option key={t.id} value={t.id}>
                     {t.n} ({t.cat}) — {t.h}h — {fmt(t.p)}
                   </option>
