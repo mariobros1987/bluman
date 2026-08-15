@@ -815,6 +815,39 @@ export function SettingsPage() {
               <input value="SUBM70N" readOnly style={{ fontFamily: 'monospace', fontWeight: 700 }} />
             </div>
           </div>
+      {/* Modal Invita Collaboratore Studio */}
+      {modalUserOpen && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 16 }}>
+          <form onSubmit={handleAddUser} style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, padding: 22, width: '100%', maxWidth: 460, display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ fontSize: 16, fontWeight: 700 }}>+ Invita Nuovo Collaboratore Studio</div>
+            <div style={{ fontSize: 11, color: 'var(--muted)' }}>Crea un utente operatore ed invia le credenziali di accesso al gestionale.</div>
+
+            <div>
+              <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Nome Completo *</label>
+              <input value={newUserName} onChange={e => setNewUserName(e.target.value)} required placeholder="es. Marco Bianchi" style={{ fontSize: 12 }} />
+            </div>
+
+            <div>
+              <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Email Aziendale *</label>
+              <input type="email" value={newUserEmail} onChange={e => setNewUserEmail(e.target.value)} required placeholder="es. marco.bianchi@bluecode.advisory" style={{ fontSize: 12 }} />
+            </div>
+
+            <div>
+              <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Ruolo & Permessi Accesso *</label>
+              <select value={newUserRole} onChange={e => setNewUserRole(e.target.value as any)} style={{ padding: 10, fontSize: 12 }}>
+                <option value="advisor">👨‍💼 Advisor Senior (Gestione Progetti & Clienti)</option>
+                <option value="operator">👷 Operatore Studio (Consuntivazione Ore & Task)</option>
+                <option value="super_admin">👑 Super Admin (Tutti i permessi Multi-Tenant)</option>
+              </select>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
+              <button type="button" onClick={() => setModalUserOpen(false)} style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '7px 14px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}>Annulla</button>
+              <button type="submit" disabled={submittingUser} style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '7px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                {submittingUser ? 'Creazione in corso...' : '✓ Invita Collaboratore'}
+              </button>
+            </div>
+          </form>
         </div>
       )}
     </div>

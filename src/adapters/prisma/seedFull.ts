@@ -33,7 +33,33 @@ async function main() {
       stato: 'attivo',
     },
   });
-  console.log('✅ User creato:', userAdmin.nome);
+
+  await prisma.user.upsert({
+    where: { email: 'admin@bluecode.advisory' },
+    update: {},
+    create: {
+      id: '22222222-2222-2222-2222-222222222222',
+      tenantId: TENANT_ID,
+      nome: 'Super Admin',
+      email: 'admin@bluecode.advisory',
+      ruolo: 'super_admin',
+      stato: 'attivo',
+    },
+  });
+
+  await prisma.user.upsert({
+    where: { email: 'operator@bluecode.advisory' },
+    update: {},
+    create: {
+      id: '33333333-3333-3333-3333-333333333333',
+      tenantId: TENANT_ID,
+      nome: 'Elena Rossi',
+      email: 'operator@bluecode.advisory',
+      ruolo: 'collaboratore_interno',
+      stato: 'attivo',
+    },
+  });
+  console.log('✅ Utenti Team creati su Supabase');
 
   // 3. Articoli
   const articoliData = [
