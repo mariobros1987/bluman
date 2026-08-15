@@ -301,7 +301,12 @@ export function Library() {
       {subTab === 'giurisdizioni' && (
         <GiurisdizioniView
           giurList={giurList}
+          moduliList={moduliList}
           onAddGiur={(g) => setGiurList(prev => [...prev, g])}
+          onOpenInGraph={(giurId) => {
+            setSelectedGiurId(giurId);
+            setSubTab('grafo');
+          }}
         />
       )}
 
@@ -580,8 +585,19 @@ function ArticoliCatalogView({ articoliList, onOpenNew }: { articoliList: Artico
 }
 
 // ─── Componente Giurisdizioni Studio ──────────────────────────────
-function GiurisdizioniView({ giurList, onAddGiur }: { giurList: Giurisdizione[]; onAddGiur: (g: Giurisdizione) => void }) {
+function GiurisdizioniView({
+  giurList,
+  moduliList,
+  onAddGiur,
+  onOpenInGraph,
+}: {
+  giurList: Giurisdizione[];
+  moduliList: ModuloTemplate[];
+  onAddGiur: (g: Giurisdizione) => void;
+  onOpenInGraph: (giurId: string) => void;
+}) {
   const [modalGiurOpen, setModalGiurOpen] = useState(false);
+  const [selectedGiur, setSelectedGiur] = useState<Giurisdizione | null>(null);
   const [newGiurNome, setNewGiurNome] = useState('');
   const [newGiurCodice, setNewGiurCodice] = useState('');
   const [newGiurTipo, setNewGiurTipo] = useState<'ue' | 'extra_ue' | 'stato_usa' | 'altro'>('ue');
@@ -593,7 +609,7 @@ function GiurisdizioniView({ giurList, onAddGiur }: { giurList: Giurisdizione[];
         <div>
           <div style={{ fontSize: 15, fontWeight: 700 }}>🌍 Giurisdizioni & Piazze Finanziarie Studio</div>
           <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
-            Gestisci le nazioni e giurisdizioni in cui lo studio opera per filtrare i moduli ed applicare regole fiscali SDI.
+            Clicca su una giurisdizione per vederne i moduli associati o per posizionarti direttamente nel Grafo delle dipendenze.
           </div>
         </div>
         <button
@@ -607,9 +623,12 @@ function GiurisdizioniView({ giurList, onAddGiur }: { giurList: Giurisdizione[];
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14 }}>
         {giurList.map((g) => {
           const flag = g.codice === 'MT' ? '🇲🇹' : g.codice === 'GI' ? '🇬🇮' : g.codice.startsWith('US') ? '🇺🇸' : g.codice === 'AE' ? '🇦🇪' : '🌐';
+          const linkedMods = moduliList.filter(m => m.giurisdizioneId === g.id);
+
           return (
             <div
               key={g.id}
+              onClick={() => setSelectedGiur(g)}
               style={{
                 background: 'var(--card)',
                 border: '1px solid var(--border)',
@@ -619,11 +638,21 @@ function GiurisdizioniView({ giurList, onAddGiur }: { giurList: Giurisdizione[];
                 flexDirection: 'column',
                 justifyContent: 'space-between',
                 boxShadow: '0 4px 14px rgba(0,0,0,.2)',
+                cursor: 'pointer',
+                transition: 'transform .15s, border-color .15s',
+              }}
+              onMouseEnter={e => {
+                (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)';
+                (e.currentTarget as HTMLElement).style.borderColor = 'var(--indigo)';
+              }}
+              onMouseLeave={e => {
+                (e.currentTarget as HTMLElement).style.transform = 'translateY(0)';
+                (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)';
               }}
             >
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                  <span style={{ fontSize: 16 }}>{flag}</span>
+                  <span style={{ fontSize: 20 }}>{flag}</span>
                   <span
                     style={{
                       fontSize: 10,
@@ -638,15 +667,94 @@ function GiurisdizioniView({ giurList, onAddGiur }: { giurList: Giurisdizione[];
                     {g.tipo}
                   </span>
                 </div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>{g.nome} ({g.codice})</div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{g.nome} ({g.codice})</div>
                 <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6, lineHeight: 1.4 }}>
                   {g.note || 'Nessuna nota aggiuntiva'}
                 </div>
+              </div>
+
+              <div style={{ marginTop: 14, paddingTop: 10, borderTop: '1px dashed var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 11, color: '#818cf8', fontWeight: 600 }}>
+                  🧩 {linkedMods.length} Moduli Specifici
+                </span>
+                <span style={{ fontSize: 11, color: 'var(--indigo-l)', fontWeight: 600 }}>
+                  Dettagli ➔
+                </span>
               </div>
             </div>
           );
         })}
       </div>
+
+      {/* Modal Dettaglio Giurisdizione Cliccata */}
+      {selectedGiur && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 16 }}>
+          <div style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, width: '100%', maxWidth: 520, padding: 24, boxShadow: '0 8px 32px rgba(0,0,0,.4)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 24 }}>{selectedGiur.codice === 'MT' ? '🇲🇹' : selectedGiur.codice === 'GI' ? '🇬🇮' : selectedGiur.codice.startsWith('US') ? '🇺🇸' : selectedGiur.codice === 'AE' ? '🇦🇪' : '🌐'}</span>
+                <div>
+                  <div style={{ fontSize: 16, fontWeight: 800 }}>{selectedGiur.nome} ({selectedGiur.codice})</div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)' }}>Giurisdizione Studio · Tipo {selectedGiur.tipo.toUpperCase()}</div>
+                </div>
+              </div>
+              <button onClick={() => setSelectedGiur(null)} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: 18 }}>✕</button>
+            </div>
+
+            <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, padding: 14, marginBottom: 16 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--hint)', marginBottom: 4, textTransform: 'uppercase' }}>Note & Regole Operative:</div>
+              <div style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.4 }}>
+                {selectedGiur.note || 'Nessuna specifica o nota inserita.'}
+              </div>
+            </div>
+
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', marginBottom: 10, display: 'flex', justifyContent: 'space-between' }}>
+                <span>🧩 Moduli Template Collegati ({moduliList.filter(m => m.giurisdizioneId === selectedGiur.id).length}):</span>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 200, overflowY: 'auto' }}>
+                {moduliList.filter(m => m.giurisdizioneId === selectedGiur.id).length === 0 ? (
+                  <div style={{ fontSize: 12, color: 'var(--muted)', fontStyle: 'italic', padding: 10, background: 'var(--card2)', borderRadius: 8 }}>
+                    Nessun modulo specifico attualmente collegato a questa giurisdizione. In questa piazza verranno usati i moduli generici.
+                  </div>
+                ) : (
+                  moduliList.filter(m => m.giurisdizioneId === selectedGiur.id).map(m => (
+                    <div key={m.id} style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <div style={{ fontSize: 12.5, fontWeight: 600 }}>{m.n}</div>
+                        <div style={{ fontSize: 10, color: 'var(--muted)' }}>Cat: {m.cat} · Version v{m.ver}</div>
+                      </div>
+                      <CatBadge cat={m.cat} />
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+              <button
+                type="button"
+                onClick={() => setSelectedGiur(null)}
+                style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '8px 16px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}
+              >
+                Chiudi
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const gId = selectedGiur.id;
+                  setSelectedGiur(null);
+                  onOpenInGraph(gId);
+                }}
+                style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', boxShadow: '0 4px 14px rgba(99,102,241,.3)' }}
+              >
+                🕸 VEDI NEL GRAFO DEI MODULI ➔
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal Nuova Giurisdizione */}
       {modalGiurOpen && (
