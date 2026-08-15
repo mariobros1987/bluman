@@ -59,6 +59,32 @@ async function main() {
       stato: 'attivo',
     },
   });
+
+  await prisma.user.upsert({
+    where: { email: 'francesca@bluecode.advisory' },
+    update: {},
+    create: {
+      id: '44444444-4444-4444-4444-444444444444',
+      tenantId: TENANT_ID,
+      nome: 'Francesca Disabato',
+      email: 'francesca@bluecode.advisory',
+      ruolo: 'collaboratore_interno',
+      stato: 'attivo',
+    },
+  });
+
+  await prisma.user.upsert({
+    where: { email: 'lorenzo@bluecode.advisory' },
+    update: {},
+    create: {
+      id: '55555555-5555-5555-5555-555555555555',
+      tenantId: TENANT_ID,
+      nome: 'Avv. Lorenzo Marino',
+      email: 'lorenzo@bluecode.advisory',
+      ruolo: 'collaboratore_interno',
+      stato: 'attivo',
+    },
+  });
   console.log('✅ Utenti Team creati su Supabase');
 
   // 3. Articoli
