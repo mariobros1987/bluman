@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
+import { NotificationModal, NotificationItem } from '../NotificationModal';
 import styles from './AppLayout.module.css';
 
 const TITLES: Record<string, string> = {
@@ -10,7 +11,39 @@ const TITLES: Record<string, string> = {
   '/calendar':  'Calendario',
   '/library':   'Libreria moduli',
   '/settings':  'Impostazioni',
+  '/invoices':  'Fatture & Pagamenti',
+  '/audit':     'Log Audit Studio',
 };
+
+const INITIAL_NOTIFICATIONS: NotificationItem[] = [
+  {
+    id: 'n1',
+    title: 'Struttura Trust (Famiglia Ricci)',
+    body: 'In attesa documentazione fiduciaria dal trustee designato.',
+    time: '10 min fa',
+    read: false,
+    type: 'delay',
+    link: '/projects/proj-01',
+  },
+  {
+    id: 'n2',
+    title: 'Apertura Conti (Famiglia Ricci)',
+    body: 'KYC respinto da Bank of Valletta — documentazione integrativa urgente.',
+    time: '1 ora fa',
+    read: false,
+    type: 'blocked',
+    link: '/projects/proj-01',
+  },
+  {
+    id: 'n3',
+    title: 'Engagement Letter Firmata',
+    body: 'Marco Ricci ha firmato la proposta d ordine 1-click dal Portale.',
+    time: '3 ore fa',
+    read: true,
+    type: 'signature',
+    link: '/clients',
+  },
+];
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -21,13 +54,30 @@ interface AppLayoutProps {
 
 export function AppLayout({ children, alertCount = 2, user, onLogout }: AppLayoutProps) {
   const location = useLocation();
+  const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [notifications, setNotifications] = useState<NotificationItem[]>(INITIAL_NOTIFICATIONS);
+
   const title = TITLES[location.pathname] || (location.pathname.startsWith('/projects/') ? 'Dettaglio Progetto' : 'BluMan');
+  const unreadCount = notifications.filter(n => !n.read).length;
+
+  const handleMarkAllRead = () => {
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+  };
+
+  const handleSelectNotif = (notif: NotificationItem) => {
+    setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, read: true } : n));
+    setNotifOpen(false);
+    if (notif.link) {
+      navigate(notif.link);
+    }
+  };
 
   return (
     <div className={styles.app}>
       <div className={`${styles.sidebarWrapper} ${mobileOpen ? styles.sidebarMobileOpen : ''}`}>
-        <Sidebar alertCount={alertCount} user={user} onLogout={onLogout} />
+        <Sidebar alertCount={unreadCount} user={user} onLogout={onLogout} />
       </div>
 
       {mobileOpen && (
@@ -49,14 +99,33 @@ export function AppLayout({ children, alertCount = 2, user, onLogout }: AppLayou
                 👤 {user.nome || user.name} ({user.ruolo || 'advisor'})
               </div>
             )}
-            {alertCount > 0 && (
-              <div className={styles.alertPill}>
-                ⚠ {alertCount} ritard{alertCount === 1 ? 'o' : 'i'}
+            {unreadCount > 0 && (
+              <div className={styles.alertPill} onClick={() => setNotifOpen(true)} style={{ cursor: 'pointer' }}>
+                ⚠ {unreadCount} ritard{unreadCount === 1 ? 'o' : 'i'}
               </div>
             )}
-            <button className={styles.notifBtn} title="Notifiche">🔔</button>
+            <button
+              className={styles.notifBtn}
+              title="Notifiche Studio"
+              onClick={() => setNotifOpen(!notifOpen)}
+              style={{ position: 'relative' }}
+            >
+              🔔
+              {unreadCount > 0 && (
+                <span style={{ position: 'absolute', top: 2, right: 2, width: 8, height: 8, borderRadius: '50%', background: '#ef4444' }} />
+              )}
+            </button>
           </div>
         </div>
+
+        {notifOpen && (
+          <NotificationModal
+            notifications={notifications}
+            onClose={() => setNotifOpen(false)}
+            onMarkAllRead={handleMarkAllRead}
+            onSelectNotif={handleSelectNotif}
+          />
+        )}
 
         {/* Page content */}
         <div className={styles.content}>

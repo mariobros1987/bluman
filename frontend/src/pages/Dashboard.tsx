@@ -68,14 +68,22 @@ export function Dashboard() {
     loadProjects();
   }, []);
 
+  const currentUserStr = localStorage.getItem('bluman_user');
+  const currentUser = currentUserStr ? JSON.parse(currentUserStr) : { ruolo: 'advisor' };
+  const isSuperAdminOrAdvisor = ['super_admin', 'advisor'].includes(currentUser.ruolo);
+
   const active   = projectList.filter(p => p.st === 'in_progress').length;
   const alerts   = projectList.filter(p => p.delay).length;
   const totalVal = projectList.reduce((a, p) => a + p.val, 0);
   const avgPct   = Math.round(projectList.reduce((a, p) => a + p.pct, 0) / (projectList.length || 1));
 
-  const delayedProjects = projectList.filter(p =>
-    p.delay || p.mods?.some(m => m.st === 'blocked' || m.st === 'delayed')
-  );
+  // Gli avvisi mostrano i ritardi dello studio per gli Advisor/Admin, e i soli ritardi dei propri incarici per gli Operatori
+  const delayedProjects = projectList.filter(p => {
+    const hasDelay = p.delay || p.mods?.some(m => m.st === 'blocked' || m.st === 'delayed');
+    if (!hasDelay) return false;
+    if (isSuperAdminOrAdvisor) return true;
+    return p.mods?.some(m => m.team?.includes(1) || m.team?.includes(2));
+  });
 
   return (
     <>

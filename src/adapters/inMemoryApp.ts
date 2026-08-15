@@ -62,6 +62,7 @@ export class InMemoryApp implements AppPort {
   private readonly progetti = new Map<string, Progetto & { stato: string }>();
   private readonly preventivi = new Map<string, Preventivo>();
   private readonly templates = new Map<string, ModuloTemplateConDistinta>();
+  private readonly fatture = new Map<string, any>();
 
   /** Popola la libreria — equivalente allo script di seed (§27) in questa versione in-memory. */
   registraModuloTemplate(template: ModuloTemplateConDistinta): void {

@@ -305,23 +305,24 @@ export function buildServer(app: AppPort): FastifyInstance {
     }
   });
 
-  server.patch<{ Body: any }>('/tenant/info', async (req, reply) => {
+  server.patch<{ Body: Record<string, any> }>('/tenant/info', async (req, reply) => {
     const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
+    const body = (req.body || {}) as Record<string, any>;
     try {
       const updated = await prisma.tenant.upsert({
         where: { id: tenantId },
-        update: req.body,
+        update: body,
         create: {
           id: tenantId,
-          ragioneSociale: req.body.ragioneSociale || 'Bluecode Ltd',
+          ragioneSociale: body.ragioneSociale || 'Bluecode Ltd',
           piano: 'enterprise',
-          ...req.body,
+          ...body,
         },
       });
       return reply.send(updated);
     } catch {
       const current = inMemoryTenantStore.get(tenantId) || { id: tenantId };
-      const updated = { ...current, ...req.body };
+      const updated = { ...current, ...body };
       inMemoryTenantStore.set(tenantId, updated);
       return reply.send(updated);
     }
@@ -340,25 +341,26 @@ export function buildServer(app: AppPort): FastifyInstance {
     }
   });
 
-  server.post<{ Body: any }>('/audit-logs', async (req, reply) => {
+  server.post<{ Body: Record<string, any> }>('/audit-logs', async (req, reply) => {
     const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
+    const body = (req.body || {}) as Record<string, any>;
     try {
       const log = await prisma.auditLog.create({
         data: {
           tenantId,
-          userId: req.body.userId || 'usr-01',
-          userEmail: req.body.userEmail || 'joe@bluecode.advisory',
-          userNome: req.body.userNome || 'Joe Disabato',
-          ruolo: req.body.ruolo || 'advisor',
-          azione: req.body.azione,
-          entita: req.body.entita,
-          dettagli: req.body.dettagli,
+          userId: body.userId || 'usr-01',
+          userEmail: body.userEmail || 'joe@bluecode.advisory',
+          userNome: body.userNome || 'Joe Disabato',
+          ruolo: body.ruolo || 'advisor',
+          azione: body.azione,
+          entita: body.entita,
+          dettagli: body.dettagli,
           ipAddress: req.ip || '83.211.12.94',
         },
       });
       return reply.code(201).send(log);
     } catch {
-      return reply.code(201).send({ ok: true, ...req.body });
+      return reply.code(201).send({ ok: true, ...body });
     }
   });
 
@@ -374,24 +376,25 @@ export function buildServer(app: AppPort): FastifyInstance {
     }
   });
 
-  server.post<{ Params: { id: string }; Body: any }>('/progetti/:id/comunicazioni', async (req, reply) => {
+  server.post<{ Params: { id: string }; Body: Record<string, any> }>('/progetti/:id/comunicazioni', async (req, reply) => {
     const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
+    const body = (req.body || {}) as Record<string, any>;
     try {
       const msg = await prisma.comunicazioneProgetto.create({
         data: {
           tenantId,
           progettoId: req.params.id,
-          canale: req.body.canale,
-          mittente: req.body.mittente,
-          destinatario: req.body.destinatario,
-          direzione: req.body.direzione || 'uscita',
-          testo: req.body.testo,
-          allegatiJson: req.body.allegatiJson ? JSON.stringify(req.body.allegatiJson) : null,
+          canale: body.canale,
+          mittente: body.mittente,
+          destinatario: body.destinatario,
+          direzione: body.direzione || 'uscita',
+          testo: body.testo,
+          allegatiJson: body.allegatiJson ? JSON.stringify(body.allegatiJson) : null,
         },
       });
       return reply.code(201).send(msg);
     } catch {
-      return reply.code(201).send({ ok: true, ...req.body });
+      return reply.code(201).send({ ok: true, ...body });
     }
   });
 
