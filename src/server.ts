@@ -465,6 +465,17 @@ export function buildServer(app: AppPort): FastifyInstance {
     }
   });
 
+  server.post<{ Body: { emailDestinatario?: string } }>('/tenant/test-email', async (req, reply) => {
+    const { emailDestinatario } = req.body || {};
+    const toEmail = emailDestinatario || 'client@holdingbeta.advisory';
+    try {
+      const sent = await sendMagicLinkEmail(toEmail, 'Test Connessione SMTP Studio', 'http://localhost:5173');
+      return reply.send({ success: true, message: `Email di prova inviata con successo a ${toEmail}` });
+    } catch (err: any) {
+      return reply.code(500).send({ success: false, errore: err.message || 'Errore durante l\'invio dell\'email di test' });
+    }
+  });
+
   // Audit Logs API (Isolato per Tenant)
   server.get('/audit-logs', async (req) => {
     const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';

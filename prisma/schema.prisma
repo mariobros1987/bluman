@@ -39,6 +39,13 @@ model Tenant {
   waVerifyToken     String?  @map("wa_verify_token")
   tgBotToken        String?  @map("tg_bot_token")
   tgBotUsername     String?  @map("tg_bot_username")
+  smtpHost          String?  @map("smtp_host")
+  smtpPort          Int?     @map("smtp_port")
+  smtpSecure        Boolean? @default(false) @map("smtp_secure")
+  smtpUser          String?  @map("smtp_user")
+  smtpPass          String?  @map("smtp_pass")
+  smtpFromEmail     String?  @map("smtp_from_email")
+  smtpFromName      String?  @map("smtp_from_name")
   piano             String   @default("enterprise")
   stato             String   @default("attivo") // attivo|sospeso|trial
   createdAt         DateTime @default(now()) @map("created_at")
