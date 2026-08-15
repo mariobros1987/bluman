@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { CatBadge } from '../components/ui/CatBadge';
 import { fmt, moduloH, moduloP, resolveRighe, levelOf } from '../utils';
-import { GIURISDIZIONI } from '../store/mockData';
-import { fetchArticoli, fetchGiurisdizioniApi, creaGiurisdizioneApi, creaArticoloApi, creaModuloTemplateApi } from '../api/client';
+import { MLIB, ARTICOLI, GIURISDIZIONI } from '../store/mockData';
+import { fetchModuliLibreria, fetchArticoli, fetchGiurisdizioniApi, creaGiurisdizioneApi, creaArticoloApi, creaModuloTemplateApi } from '../api/client';
 import type { CategoriaModulo, Articolo, Giurisdizione } from '../types';
 import styles from './Library.module.css';
 
@@ -13,6 +13,7 @@ export function Library() {
   const [open, setOpen] = useState<Set<string>>(new Set());
   const [articoliList, setArticoliList] = useState<Articolo[]>(ARTICOLI);
   const [giurList, setGiurList] = useState<Giurisdizione[]>(GIURISDIZIONI);
+  const [moduliList, setModuliList] = useState<ModuloTemplate[]>(MLIB);
   const [modalArticoloOpen, setModalArticoloOpen] = useState(false);
   const [modalGiurOpen, setModalGiurOpen] = useState(false);
   const [newGiurNome, setNewGiurNome] = useState('');
@@ -23,7 +24,7 @@ export function Library() {
   const graphRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
 
-  // Carica articoli e giurisdizioni da Supabase DB
+  // Carica articoli, moduli e giurisdizioni da Supabase DB
   const loadData = async () => {
     const dbArts = await fetchArticoli();
     if (dbArts && Array.isArray(dbArts) && dbArts.length > 0) {
@@ -36,6 +37,27 @@ export function Library() {
         ver: a.versione || 1,
       }));
       setArticoliList(mapped);
+    }
+
+    const dbMods = await fetchModuliLibreria();
+    if (dbMods && Array.isArray(dbMods) && dbMods.length > 0) {
+      const mappedMods: ModuloTemplate[] = dbMods.map((m: any) => ({
+        id: m.id,
+        n: m.nome,
+        cat: m.categoria as CategoriaModulo,
+        ver: m.versione || 1,
+        deps: (m.dipendenze || []).map((d: any) => d.dipendeDaModuloTemplateId),
+        pkg: m.prezzoPacchetto ? m.prezzoPacchetto / 100 : undefined,
+        giurisdizioneId: m.giurisdizioneId,
+        giurisdizione: m.giurisdizione,
+        righe: (m.righeDistinta || []).map((r: any) => ({
+          art: r.articoloId,
+          qty: r.quantita,
+          oO: r.overrideOre,
+          oP: r.overridePrezzo ? r.overridePrezzo / 100 : undefined,
+        })),
+      }));
+      setModuliList(mappedMods);
     }
 
     const dbGiur = await fetchGiurisdizioniApi();
@@ -52,14 +74,14 @@ export function Library() {
     setOpen(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
 
   // Topological levels
-  const maxLvl = Math.max(...MLIB.map(m => levelOf(m.id)));
+  const maxLvl = Math.max(...moduliList.map(m => levelOf(m.id)), 0);
   const cols: typeof MLIB[] = [];
-  for (let i = 0; i <= maxLvl; i++) cols.push(MLIB.filter(m => levelOf(m.id) === i));
+  for (let i = 0; i <= maxLvl; i++) cols.push(moduliList.filter(m => levelOf(m.id) === i));
   const colLabels = ['Punto di partenza', 'Sbloccati a cascata', 'Dipendenti'];
 
   useEffect(() => {
     if (subTab === 'grafo') drawEdges();
-  }, [open, subTab]);
+  }, [open, subTab, moduliList]);
 
   function drawEdges() {
     const svg = svgRef.current;
@@ -69,7 +91,7 @@ export function Library() {
     svg.setAttribute('width', String(wrap.scrollWidth));
     svg.setAttribute('height', String(wrap.scrollHeight));
     svg.innerHTML = '';
-    MLIB.forEach(m => {
+    moduliList.forEach(m => {
       m.deps.forEach(depId => {
         const from = document.getElementById(`lib-${depId}`);
         const to   = document.getElementById(`lib-${m.id}`);
@@ -175,7 +197,7 @@ export function Library() {
                   </div>
                   {items.map(m => {
                     const isOpen = open.has(m.id);
-                    const dn = m.deps.map(d => MLIB.find(x => x.id === d)?.n).filter(Boolean);
+                    const dn = m.deps.map(d => moduliList.find(x => x.id === d)?.n).filter(Boolean);
                     const righe = resolveRighe(m);
                     return (
                       <div
