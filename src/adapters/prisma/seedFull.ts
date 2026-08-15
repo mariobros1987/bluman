@@ -260,10 +260,10 @@ async function main() {
 
   // 6. Progetto 1
   const p1 = await prisma.progetto.upsert({
-    where: { id: 'proj-01' },
+    where: { id: 'prj-01' },
     update: {},
     create: {
-      id: 'proj-01',
+      id: 'prj-01',
       tenantId: TENANT_ID,
       clienteId: c1.id,
       nome: 'Struttura Holding — Famiglia Ricci',
