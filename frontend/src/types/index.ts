@@ -6,6 +6,15 @@ export type StatoMicrovoce = 'pending' | 'attesa_dipendenza' | 'active' | 'delay
 export type TipoCliente   = 'individual' | 'company';
 export type CategoriaModulo = 'Analisi' | 'Societario' | 'Trust' | 'Banking' | 'Fiscale' | 'Legale' | 'IP' | 'Compliance';
 
+export interface Cliente {
+  id: string;
+  nome: string;
+  tipo: TipoCliente;
+  email?: string;
+  partitaIva?: string;
+  codiceFiscale?: string;
+}
+
 export interface TeamMember {
   id: number;
   n: string;

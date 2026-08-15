@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { CatBadge } from './ui/CatBadge';
 import { fmt, moduloH, moduloP } from '../utils';
 import { MLIB, GIURISDIZIONI } from '../store/mockData';
-import type { CategoriaModulo, Cliente, Giurisdizione, ModuloTemplate } from '../types';
+import type { Cliente, Giurisdizione } from '../types';
 import { fetchClienti, fetchGiurisdizioniApi, creaClienteApi, creaProgettoApi, creaPreventivoEAccettaApi } from '../api/client';
 
 interface NewProjectWizardProps {
