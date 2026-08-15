@@ -312,7 +312,7 @@ export function Library() {
 
       {/* TAB 4: Costruttore Modulo Template */}
       {subTab === 'crea_modulo' && (
-        <CreaModuloForm articoliList={articoliList} onCreated={() => setSubTab('grafo')} />
+        <CreaModuloForm articoliList={articoliList} giurList={giurList} onCreated={() => setSubTab('grafo')} />
       )}
 
       {/* TAB 4: Modelli Documenti in Bianco & Form Master */}
@@ -323,6 +323,7 @@ export function Library() {
       {/* Modal Nuovo Articolo */}
       {modalArticoloOpen && (
         <NuovoArticoloModal
+          giurList={giurList}
           onClose={() => setModalArticoloOpen(false)}
           onCreated={() => loadData()}
         />
@@ -1057,9 +1058,10 @@ function LibreriaDocumentiEForm() {
 }
 
 // ─── Componente Nuovo Articolo Modal ──────────────────────────────
-function NuovoArticoloModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+function NuovoArticoloModal({ giurList, onClose, onCreated }: { giurList: Giurisdizione[]; onClose: () => void; onCreated: () => void }) {
   const [nome, setNome] = useState('');
   const [cat, setCat] = useState<CategoriaModulo>('Analisi');
+  const [giurisdizioneId, setGiurisdizioneId] = useState<string>('');
   const [ore, setOre] = useState(4);
   const [prezzo, setPrezzo] = useState(1200);
   const [loading, setLoading] = useState(false);
@@ -1137,6 +1139,17 @@ function NuovoArticoloModal({ onClose, onCreated }: { onClose: () => void; onCre
               ))}
             </select>
           </div>
+        </div>
+
+        <div>
+          <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>🌍 Giurisdizione Target *</label>
+          <select value={giurisdizioneId} onChange={e => setGiurisdizioneId(e.target.value)}>
+            <option value="">🌐 Generico / Tutte le Giurisdizioni</option>
+            {giurList.map(g => {
+              const flag = g.codice === 'MT' ? '🇲🇹' : g.codice === 'GI' ? '🇬🇮' : g.codice.startsWith('US') ? '🇺🇸' : g.codice === 'AE' ? '🇦🇪' : '🌐';
+              return <option key={g.id} value={g.id}>{flag} {g.nome} ({g.codice})</option>;
+            })}
+          </select>
         </div>
 
         <div style={{ display: 'flex', gap: 12 }}>
@@ -1254,9 +1267,10 @@ function NuovoArticoloModal({ onClose, onCreated }: { onClose: () => void; onCre
 }
 
 // ─── Componente Costruttore Modulo Template ───────────────────────
-function CreaModuloForm({ articoliList, onCreated }: { articoliList: Articolo[]; onCreated: () => void }) {
+function CreaModuloForm({ articoliList, giurList, onCreated }: { articoliList: Articolo[]; giurList: Giurisdizione[]; onCreated: () => void }) {
   const [nome, setNome] = useState('');
   const [cat, setCat] = useState<CategoriaModulo>('Societario');
+  const [giurisdizioneId, setGiurisdizioneId] = useState<string>('');
   const [prezzoPkg, setPrezzoPkg] = useState<number | ''>('');
   const [selectedArts, setSelectedArts] = useState<Array<{ artId: string; qty: number; customPrice?: number }>>([]);
   const [loading, setLoading] = useState(false);
@@ -1286,6 +1300,7 @@ function CreaModuloForm({ articoliList, onCreated }: { articoliList: Articolo[];
       await creaModuloTemplateApi({
         nome,
         categoria: cat,
+        giurisdizioneId: giurisdizioneId || null,
         prezzoPacchetto: prezzoPkg !== '' ? Number(prezzoPkg) * 100 : null,
         righe: selectedArts.map(x => ({ articoloId: x.artId, quantita: x.qty })),
       });
@@ -1320,7 +1335,7 @@ function CreaModuloForm({ articoliList, onCreated }: { articoliList: Articolo[];
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <div style={{ fontSize: 16, fontWeight: 700 }}>Costruttore Modulo Template</div>
-            <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>Componi la distinta base ed imposta il listino pacchetto</div>
+            <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>Componi la distinta base ed imposta la giurisdizione target ed il listino pacchetto</div>
           </div>
           <CatBadge cat={cat} />
         </div>
@@ -1337,13 +1352,26 @@ function CreaModuloForm({ articoliList, onCreated }: { articoliList: Articolo[];
             />
           </div>
 
-          <div>
-            <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Categoria *</label>
-            <select value={cat} onChange={e => setCat(e.target.value as CategoriaModulo)}>
-              {['Analisi', 'Societario', 'Trust', 'Banking', 'Fiscale', 'Legale', 'IP', 'Compliance'].map(c => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div>
+              <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Categoria *</label>
+              <select value={cat} onChange={e => setCat(e.target.value as CategoriaModulo)}>
+                {['Analisi', 'Societario', 'Trust', 'Banking', 'Fiscale', 'Legale', 'IP', 'Compliance'].map(c => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>🌍 Giurisdizione Target *</label>
+              <select value={giurisdizioneId} onChange={e => setGiurisdizioneId(e.target.value)}>
+                <option value="">🌐 Generico (Tutte)</option>
+                {giurList.map(g => {
+                  const flag = g.codice === 'MT' ? '🇲🇹' : g.codice === 'GI' ? '🇬🇮' : g.codice.startsWith('US') ? '🇺🇸' : g.codice === 'AE' ? '🇦🇪' : '🌐';
+                  return <option key={g.id} value={g.id}>{flag} {g.nome} ({g.codice})</option>;
+                })}
+              </select>
+            </div>
           </div>
         </div>
 

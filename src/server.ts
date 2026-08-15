@@ -279,6 +279,7 @@ export function buildServer(app: AppPort): FastifyInstance {
           },
           include: {
             giurisdizione: true,
+            dipendenze: true,
             righeDistinta: { include: { articolo: true } },
           },
         });
@@ -288,6 +289,7 @@ export function buildServer(app: AppPort): FastifyInstance {
         where: { tenantId, isAttivo: true },
         include: {
           giurisdizione: true,
+          dipendenze: true,
           righeDistinta: { include: { articolo: true } },
         },
       });
