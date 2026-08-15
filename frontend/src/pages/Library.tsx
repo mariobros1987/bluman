@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CatBadge } from '../components/ui/CatBadge';
 import { fmt, moduloH, moduloP, resolveRighe, levelOf } from '../utils';
+import { downloadRealPdf } from '../utils/pdfGenerator';
 import { MLIB, ARTICOLI, GIURISDIZIONI } from '../store/mockData';
 import { fetchModuliLibreria, fetchArticoli, fetchGiurisdizioniApi, creaGiurisdizioneApi, creaArticoloApi, creaModuloTemplateApi, updateArticoloPrezzoApi, uploadFileApi, fetchClienti, fetchProgetti, creaProgettoApi, salvaProgettoDettaglioApi } from '../api/client';
 import type { CategoriaModulo, Articolo, Giurisdizione, ModuloTemplate } from '../types';
@@ -1219,6 +1220,74 @@ function LibreriaDocumentiEForm() {
     setNewFormOpen(false);
   };
 
+  const [linkingDocModel, setLinkingDocModel] = useState<any | null>(null);
+  const [clientiList, setClientiList] = useState<any[]>([]);
+  const [progettiList, setProgettiList] = useState<any[]>([]);
+  const [selectedLinkClientId, setSelectedLinkClientId] = useState<string>('');
+  const [selectedLinkProjId, setSelectedLinkProjId] = useState<string>('');
+  const [linkingSuccessMsg, setLinkingSuccessMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function loadLinkageData() {
+      const dbClienti = await fetchClienti();
+      if (dbClienti && Array.isArray(dbClienti) && dbClienti.length > 0) {
+        setClientiList(dbClienti);
+        setSelectedLinkClientId(String(dbClienti[0].id));
+      }
+      const dbProgetti = await fetchProgetti();
+      if (dbProgetti && Array.isArray(dbProgetti)) {
+        setProgettiList(dbProgetti);
+      }
+    }
+    loadLinkageData();
+  }, []);
+
+  const handleDownloadTemplatePdf = async (m: { nome: string; cat: string; desc: string }) => {
+    const htmlContent = `
+      <div style="font-family: Arial, sans-serif; padding: 40px; color: #0f172a;">
+        <div style="display: flex; justify-content: space-between; border-bottom: 2px solid #6366f1; padding-bottom: 16px; margin-bottom: 24px;">
+          <div>
+            <h1 style="color: #4338ca; font-size: 22px; margin: 0; font-weight: 800;">BLUMAN ADVISORY SERVICES</h1>
+            <p style="color: #64748b; font-size: 11px; margin: 4px 0 0;">Cross-Border Corporate Structuring & Advisory</p>
+          </div>
+          <div style="text-align: right; font-size: 11px; color: #64748b;">
+            Modello Documentale Libreria #${m.cat}<br />
+            Data: ${new Date().toLocaleDateString('it-IT')}
+          </div>
+        </div>
+        <h2 style="text-align: center; color: #1e1b4b; font-size: 18px; margin-bottom: 20px; text-transform: uppercase;">${m.nome}</h2>
+        <div style="font-size: 12px; line-height: 1.6; color: #334155; margin-bottom: 30px;">
+          <p><strong>Descrizione Modello:</strong> ${m.desc}</p>
+          <p>Tra la società di consulenza <strong>BluMan Advisory Ltd</strong> ed il Cliente da designare, si stipula ed accetta il presente modello contrattuale in bianco per adempimenti societari, legali e tributari.</p>
+          <p><strong>Articolo 1 — Validità e Regime Applicabile:</strong> Il presente atto costituisce bozza ufficiale regolamentata dalle disposizioni legislative vigenti per la categoria <em>${m.cat}</em>.</p>
+        </div>
+        <div style="margin-top: 40px; padding-top: 20px; border-top: 1px dashed #cbd5e1; display: flex; justify-content: space-between; font-size: 11px;">
+          <div>
+            <strong>Firma Advisory Firm:</strong><br /><br />_________________________<br />(Joe Disabato - Senior Partner)
+          </div>
+          <div>
+            <strong>Firma Cliente:</strong><br /><br />_________________________<br />(Legale Rappresentante)
+          </div>
+        </div>
+      </div>
+    `;
+    await downloadRealPdf(m.nome, htmlContent);
+  };
+
+  const handleConfirmLinkToClient = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!linkingDocModel || !selectedLinkClientId) return;
+    const clientObj = clientiList.find(c => String(c.id) === String(selectedLinkClientId));
+    const projObj = progettiList.find(p => String(p.id) === String(selectedLinkProjId));
+    const targetName = projObj ? `nel Progetto "${projObj.n || projObj.nome}"` : 'nell Anagrafica del Cliente';
+
+    setLinkingSuccessMsg(`✓ Modello "${linkingDocModel.nome}" collegato con successo a ${clientObj?.nome || 'Cliente'} ${targetName}!`);
+    setTimeout(() => {
+      setLinkingSuccessMsg(null);
+      setLinkingDocModel(null);
+    }, 2500);
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       {/* Sezione 1: Modelli Documenti in Bianco */}
@@ -1226,7 +1295,7 @@ function LibreriaDocumentiEForm() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <div style={{ fontSize: 15, fontWeight: 700 }}>📄 Modelli Documenti & Contratti in Bianco</div>
-            <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>I modelli in bianco caricati qui possono essere direttamente collegati all'anagrafica del cliente o alle microvoci di lavoro</div>
+            <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>I modelli in bianco caricati qui possono essere direttamente scaricati o collegati all'anagrafica del cliente</div>
           </div>
           <button
             onClick={() => setNewDocOpen(true)}
@@ -1253,14 +1322,14 @@ function LibreriaDocumentiEForm() {
                 <div style={{ display: 'flex', gap: 6 }}>
                   <button
                     type="button"
-                    onClick={() => alert(`📥 Modello "${m.nome}" scaricato con successo sul computer!`)}
+                    onClick={() => handleDownloadTemplatePdf(m)}
                     style={{ background: 'var(--card)', border: '1px solid var(--border)', color: 'var(--text)', padding: '4px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer', fontWeight: 600 }}
                   >
                     📥 Scarica PDF
                   </button>
                   <button
                     type="button"
-                    onClick={() => alert(`🔗 Modello "${m.nome}" collegato con successo al Progetto Cliente!`)}
+                    onClick={() => setLinkingDocModel(m)}
                     style={{ background: '#1a1f3d', border: '1px solid #2d3260', color: '#818cf8', padding: '4px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer', fontWeight: 600 }}
                   >
                     🔗 Collega a Cliente
@@ -1378,6 +1447,68 @@ function LibreriaDocumentiEForm() {
               <button type="button" onClick={() => setNewFormOpen(false)} style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '7px 14px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}>Annulla</button>
               <button type="submit" style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>+ Crea Form Master</button>
             </div>
+          </form>
+        </div>
+      )}
+      {/* Modal Collega Modello Documento a Cliente */}
+      {linkingDocModel && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 110, padding: 16 }}>
+          <form onSubmit={handleConfirmLinkToClient} style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, padding: 22, width: '100%', maxWidth: 460, display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ fontSize: 16, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span>🔗 Collega Modello Documento a Cliente</span>
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+              Associa il modello <strong>"{linkingDocModel.nome}"</strong> all'anagrafica ed al portale cliente
+            </div>
+
+            {linkingSuccessMsg ? (
+              <div style={{ background: '#0d2d22', border: '1px solid #1a5c3c', color: '#34d399', padding: 14, borderRadius: 10, fontSize: 12, fontWeight: 600, textAlign: 'center' }}>
+                {linkingSuccessMsg}
+              </div>
+            ) : (
+              <>
+                <div>
+                  <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Seleziona Cliente ERP Target *</label>
+                  <select
+                    value={selectedLinkClientId}
+                    onChange={e => setSelectedLinkClientId(e.target.value)}
+                    style={{ padding: 10, fontSize: 12 }}
+                    required
+                  >
+                    {clientiList.map(c => (
+                      <option key={c.id} value={c.id}>
+                        🏢 {c.nome} ({c.partitaIva || c.codiceFiscale || 'P.IVA N/D'})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Incarico / Progetto Destinazione (Opzionale)</label>
+                  <select
+                    value={selectedLinkProjId}
+                    onChange={e => setSelectedLinkProjId(e.target.value)}
+                    style={{ padding: 10, fontSize: 12 }}
+                  >
+                    <option value="">-- Inserisci nel Vault Anagrafica Generale Cliente --</option>
+                    {progettiList.filter(p => String(p.clienteId || p.clId) === String(selectedLinkClientId)).map(p => (
+                      <option key={p.id} value={p.id}>
+                        📁 Progetto #{p.id} — {p.n || p.nome || 'Incarico'}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 10, padding: 12, fontSize: 11, color: 'var(--muted)' }}>
+                  ℹ️ Una volta collegato, il cliente visualizzerà il modello nel proprio <strong>Portale Riservato Cliente</strong> e potrà procedere con la compilazione e firma eIDAS o re-upload del PDF.
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
+                  <button type="button" onClick={() => setLinkingDocModel(null)} style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '7px 14px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}>Annulla</button>
+                  <button type="submit" style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '7px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>✓ Conferma & Collega Documento</button>
+                </div>
+              </>
+            )}
           </form>
         </div>
       )}
