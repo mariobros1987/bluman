@@ -267,7 +267,9 @@ export function Library() {
                               {gFlag} {gLabel}
                             </span>
                           </div>
-                          <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--indigo-l)', background: '#1a1f3d', border: '1px solid #2d3260', padding: '1px 6px', borderRadius: 20 }}>v{m.ver}</span>
+                          <span style={{ fontSize: 9, fontWeight: 700, color: dn.length ? '#f59e0b' : '#34d399', background: dn.length ? '#2d1a05' : '#0d2d22', border: `1px solid ${dn.length ? '#d97706' : '#059669'}`, padding: '1px 8px', borderRadius: 20 }}>
+                            {dn.length ? `🔒 Dipende da ${dn[0]}` : '🔓 Partenza'}
+                          </span>
                         </div>
                         <div style={{ fontSize: 12.5, fontWeight: 600, lineHeight: 1.35, margin: '6px 0 8px' }}>{m.n}</div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11, color: 'var(--muted)' }}>

@@ -1522,7 +1522,13 @@ function GrafoModuliProgettoView({
           {project.mods.map((m, idx) => {
             const isDone = m.st === 'done' || m.pct === 100;
             const isInProgress = m.st === 'in_progress' || (m.pct > 0 && m.pct < 100);
-            const statusColor = isDone ? '#34d399' : isInProgress ? '#818cf8' : 'var(--muted)';
+
+            // Calcolo sblocco topologico (locked / unlocked)
+            const prevMod = idx > 0 ? project.mods[idx - 1] : null;
+            const isLocked = prevMod ? (prevMod.st !== 'done' && prevMod.pct < 100) : false;
+
+            const statusColor = isDone ? '#34d399' : isLocked ? '#f59e0b' : isInProgress ? '#818cf8' : '#64748b';
+            const lockBadgeText = isDone ? '✓ Ultimato' : isLocked ? `🔒 Bloccato da ${prevMod?.n.substring(0, 14)}...` : isInProgress ? '⚡ In Lavorazione' : '🔓 Sbloccato & Eseguibile';
 
             return (
               <React.Fragment key={m.id}>
@@ -1530,25 +1536,26 @@ function GrafoModuliProgettoView({
                 <div
                   onClick={() => onSelectMod(m.id)}
                   style={{
-                    minWidth: 260,
-                    maxWidth: 280,
-                    background: 'var(--card)',
-                    border: `1.5px solid ${isDone ? '#059669' : isInProgress ? 'var(--indigo)' : 'var(--border)'}`,
+                    minWidth: 270,
+                    maxWidth: 290,
+                    background: isLocked ? 'rgba(217, 119, 6, 0.05)' : 'var(--card)',
+                    border: `1.5px solid ${isDone ? '#059669' : isLocked ? '#d97706' : isInProgress ? 'var(--indigo)' : 'var(--border)'}`,
                     borderRadius: 14,
                     padding: 16,
                     display: 'flex',
                     flexDirection: 'column',
                     gap: 12,
                     cursor: 'pointer',
-                    boxShadow: isInProgress ? '0 0 20px rgba(99,102,241,.25)' : '0 4px 16px rgba(0,0,0,.3)',
+                    boxShadow: isInProgress ? '0 0 20px rgba(99,102,241,.25)' : isLocked ? '0 0 10px rgba(217,119,6,.15)' : '0 4px 16px rgba(0,0,0,.3)',
                     transition: 'all .2s',
+                    opacity: isLocked ? 0.82 : 1,
                   }}
-                  title="Clicca per aprire la scheda dettagliata del modulo"
+                  title={isLocked ? `Modulo bloccato in attesa del completamento di: ${prevMod?.n}` : "Clicca per aprire la scheda dettagliata del modulo"}
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6 }}>
                     <CatBadge cat={m.cat} />
-                    <span style={{ fontSize: 10, fontWeight: 700, color: statusColor, background: 'var(--card2)', border: '1px solid var(--border)', padding: '2px 8px', borderRadius: 12 }}>
-                      {isDone ? '✓ Ultimato' : isInProgress ? '⚡ In Lavorazione' : '⏳ In Attesa'}
+                    <span style={{ fontSize: 9.5, fontWeight: 700, color: statusColor, background: isLocked ? '#2d1a05' : 'var(--card2)', border: `1px solid ${isLocked ? '#d97706' : 'var(--border)'}`, padding: '2px 8px', borderRadius: 12 }}>
+                      {lockBadgeText}
                     </span>
                   </div>
 
@@ -1567,17 +1574,31 @@ function GrafoModuliProgettoView({
                     <ProgressBar value={m.pct} color={statusColor} height={5} />
                   </div>
 
-                  <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--muted)' }}>
+                  <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 10, color: 'var(--muted)' }}>
                     <span>⏱ {m.a}/{m.h}h</span>
                     <span style={{ fontWeight: 700, color: 'var(--text)' }}>{fmt(m.p)}</span>
                   </div>
+
+                  {/* Pulsante Notifica Sblocco al Cliente */}
+                  {isDone && idx < project.mods.length - 1 && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        alert(`✉️ Notifica Sblocco inviata con successo al cliente per la fase successiva: ${project.mods[idx + 1].n}!`);
+                      }}
+                      style={{ background: '#0d2d22', border: '1px solid #059669', color: '#34d399', padding: '5px 8px', borderRadius: 8, fontSize: 10, fontWeight: 600, cursor: 'pointer', marginTop: 2 }}
+                    >
+                      ✉️ Notifica Sblocco al Cliente
+                    </button>
+                  )}
                 </div>
 
                 {/* Arrow Connector */}
                 {idx < project.mods.length - 1 && (
-                  <div style={{ display: 'flex', flexShrink: 0, flexDirection: 'column', alignItems: 'center', gap: 4, color: isDone ? '#34d399' : 'var(--muted)' }}>
-                    <div style={{ fontSize: 20, fontWeight: 800 }}>➔</div>
-                    <span style={{ fontSize: 9, fontWeight: 600 }}>Sblocca</span>
+                  <div style={{ display: 'flex', flexShrink: 0, flexDirection: 'column', alignItems: 'center', gap: 4, color: isDone ? '#34d399' : isLocked ? '#d97706' : 'var(--muted)' }}>
+                    <div style={{ fontSize: 20, fontWeight: 800 }}>{isDone ? '🔓 ➔' : '🔒 ➔'}</div>
+                    <span style={{ fontSize: 9, fontWeight: 600 }}>{isDone ? 'Sbloccato' : 'In attesa'}</span>
                   </div>
                 )}
               </React.Fragment>
