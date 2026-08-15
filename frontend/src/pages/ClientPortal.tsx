@@ -593,30 +593,102 @@ export function ClientPortal() {
         {/* TAB 4: Documenti Legali */}
         {activeTab === 'documenti' && (
           <div style={docBoxStyle}>
-            <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>📎 Vault Documenti Legali e Contratti</div>
-            <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 18 }}>Accedi ai contratti ed ai modelli caricati dall'advisor per la consultazione e la firma</div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 18 }}>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>📎 Vault Documenti Legali e Modelli In Incarico</div>
+                <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+                  Visualizza, scarica, firma con <strong>Firma Digitale eIDAS (1-Click)</strong> oppure <strong>ricarica il PDF firmato a mano</strong>
+                </div>
+              </div>
+            </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {/* Documento 1 */}
+              <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 14, padding: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ fontSize: 24 }}>📄</div>
+                  <div style={{ fontSize: 26 }}>📄</div>
                   <div>
-                    <div style={{ fontSize: 13, fontWeight: 600 }}>Procura Legale & Accordo NDA.pdf</div>
-                    <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>1.4 MB · Firmato digitalmente con marca temporale</div>
+                    <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text)' }}>Accordo di Riservatezza NDA & Incarico.pdf</div>
+                    <div style={{ fontSize: 10.5, color: 'var(--muted)', marginTop: 2 }}>1.4 MB · Firmato digitalmente con marca temporale eIDAS</div>
                   </div>
                 </div>
-                <span style={{ background: '#0d2d22', color: '#34d399', padding: '4px 10px', borderRadius: 12, fontSize: 10, fontWeight: 700 }}>✓ Firmato</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ background: '#0d2d22', border: '1px solid #1a5c3c', color: '#34d399', padding: '4px 12px', borderRadius: 12, fontSize: 10, fontWeight: 800 }}>
+                    🔒 FIRMATO eIDAS
+                  </span>
+                  <button
+                    onClick={() => alert('📥 Download copia firmata dell Accordo NDA avviato.')}
+                    style={{ background: 'var(--card)', border: '1px solid var(--border)', color: 'var(--text)', padding: '5px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer', fontWeight: 600 }}
+                  >
+                    📥 Scarica PDF
+                  </button>
+                </div>
               </div>
 
-              <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              {/* Documento 2 */}
+              <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 14, padding: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ fontSize: 24 }}>📄</div>
+                  <div style={{ fontSize: 26 }}>📄</div>
                   <div>
-                    <div style={{ fontSize: 13, fontWeight: 600 }}>Modulo Adeguata Verifica & KYC Compliance.pdf</div>
-                    <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>920 KB · In attesa di firma cliente</div>
+                    <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text)' }}>Statuto Standard Holding Malta & Procura MFSA.pdf</div>
+                    <div style={{ fontSize: 10.5, color: 'var(--muted)', marginTop: 2 }}>3.2 MB · Richiede firma del Legale Rappresentante per la lavorazione</div>
                   </div>
                 </div>
-                <button style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>✍️ Firma Ora</button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <button
+                    onClick={() => alert('✍️ Apertura modulo di Firma Digitale eIDAS per Statuto Holding Malta...')}
+                    style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', boxShadow: '0 2px 8px rgba(99,102,241,.3)' }}
+                  >
+                    ✍️ Firma Digitale eIDAS (1-Click)
+                  </button>
+
+                  <label style={{ background: '#1a1f3d', border: '1px solid #2d3260', color: '#818cf8', padding: '6px 14px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    <span>📤 Ricarica PDF Firmato a Mano</span>
+                    <input
+                      type="file"
+                      accept=".pdf,.doc,.docx"
+                      style={{ display: 'none' }}
+                      onChange={e => {
+                        if (e.target.files?.[0]) {
+                          alert(`✓ File firmato a mano "${e.target.files[0].name}" ricaricato con successo nel portale! L operatore è stato notificato per la lavorazione.`);
+                        }
+                      }}
+                    />
+                  </label>
+                </div>
+              </div>
+
+              {/* Documento 3 */}
+              <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 14, padding: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ fontSize: 26 }}>📄</div>
+                  <div>
+                    <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text)' }}>Dichiarazione Titolare Effettivo (UBO Registry).pdf</div>
+                    <div style={{ fontSize: 10.5, color: 'var(--muted)', marginTop: 2 }}>2.8 MB · Richiede firma dell'UBO per la lavorazione</div>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <button
+                    onClick={() => alert('✍️ Apertura modulo di Firma Digitale eIDAS per Dichiarazione UBO...')}
+                    style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', boxShadow: '0 2px 8px rgba(99,102,241,.3)' }}
+                  >
+                    ✍️ Firma Digitale eIDAS (1-Click)
+                  </button>
+
+                  <label style={{ background: '#1a1f3d', border: '1px solid #2d3260', color: '#818cf8', padding: '6px 14px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    <span>📤 Ricarica PDF Firmato a Mano</span>
+                    <input
+                      type="file"
+                      accept=".pdf,.doc,.docx"
+                      style={{ display: 'none' }}
+                      onChange={e => {
+                        if (e.target.files?.[0]) {
+                          alert(`✓ File firmato a mano "${e.target.files[0].name}" ricaricato con successo nel portale! L operatore è stato notificato per la lavorazione.`);
+                        }
+                      }}
+                    />
+                  </label>
+                </div>
               </div>
             </div>
           </div>

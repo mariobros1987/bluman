@@ -607,6 +607,8 @@ function ArticoliCatalogView({ articoliList, onOpenNew }: { articoliList: Artico
   const [editPrice, setEditPrice] = useState<number>(0);
   const [editHours, setEditHours] = useState<number>(0);
   const [editName, setEditName] = useState<string>('');
+  const [editFormMasterId, setEditFormMasterId] = useState<string>('f1');
+  const [editDocModels, setEditDocModels] = useState<string[]>(['m1']);
   const [savingEdit, setSavingEdit] = useState(false);
 
   const categories = ['TUTTI', 'Analisi', 'Societario', 'Compliance', 'Banking', 'Trust', 'IP & Tax'];
@@ -625,6 +627,8 @@ function ArticoliCatalogView({ articoliList, onOpenNew }: { articoliList: Artico
     setEditPrice(art.p);
     setEditHours(art.h);
     setEditName(art.n);
+    setEditFormMasterId(art.formMasterId || 'f1');
+    setEditDocModels(art.documentiRichiesti || ['m1']);
   };
 
   const handleSaveEdit = async (e: React.FormEvent) => {
@@ -641,12 +645,16 @@ function ArticoliCatalogView({ articoliList, onOpenNew }: { articoliList: Artico
       editingArt.p = editPrice;
       editingArt.h = editHours;
       editingArt.n = editName;
+      editingArt.documentiRichiesti = editDocModels;
+      editingArt.formMasterId = editFormMasterId;
       setEditingArt(null);
     } catch (err) {
       console.error(err);
       editingArt.p = editPrice;
       editingArt.h = editHours;
       editingArt.n = editName;
+      editingArt.documentiRichiesti = editDocModels;
+      editingArt.formMasterId = editFormMasterId;
       setEditingArt(null);
     } finally {
       setSavingEdit(false);
@@ -759,11 +767,30 @@ function ArticoliCatalogView({ articoliList, onOpenNew }: { articoliList: Artico
                 </div>
               </div>
               <div style={{ fontSize: 14, fontWeight: 700, lineHeight: 1.35, color: 'var(--text)' }}>{a.n}</div>
-              <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6, display: 'flex', gap: 6, alignItems: 'center' }}>
-                <span>📋 Procedura guidata:</span>
-                <span style={{ background: '#200f40', color: '#a78bfa', padding: '1px 6px', borderRadius: 6, fontSize: 10, fontWeight: 600 }}>
-                  Form & Passaggi integrati
-                </span>
+              <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 600 }}>📄 Documenti Richiesti:</span>
+                  {(a.documentiRichiesti && a.documentiRichiesti.length > 0) ? (
+                    a.documentiRichiesti.map(mId => (
+                      <span key={mId} style={{ background: '#1a1f3d', color: '#818cf8', padding: '2px 6px', borderRadius: 6, fontSize: 9.5, fontWeight: 700, border: '1px solid #3730a3' }}>
+                        {mId === 'm1' ? 'Accordo NDA' : mId === 'm2' ? 'Procura MFSA' : mId === 'm3' ? 'Dichiarazione UBO' : mId === 'm4' ? 'Statuto Holding Malta' : mId}
+                      </span>
+                    ))
+                  ) : (
+                    <span style={{ color: 'var(--muted)', fontSize: 10, fontStyle: 'italic' }}>Nessun modello in bianco</span>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <span style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 600 }}>📋 Form Cliente:</span>
+                  {a.formMasterId ? (
+                    <span style={{ background: '#200f40', color: '#a78bfa', padding: '2px 6px', borderRadius: 6, fontSize: 9.5, fontWeight: 700, border: '1px solid #581c87' }}>
+                      {a.formMasterId === 'f1' ? 'Form Dati Societari' : a.formMasterId === 'f2' ? 'Form UBO & Controllo' : 'Form Dati Bancari & KYC'}
+                    </span>
+                  ) : (
+                    <span style={{ color: 'var(--muted)', fontSize: 10, fontStyle: 'italic' }}>Nessun form richiesto</span>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -784,9 +811,9 @@ function ArticoliCatalogView({ articoliList, onOpenNew }: { articoliList: Artico
       {/* Modal Modifica Prezzo & Ore Articolo (§Admin) */}
       {editingArt && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 16 }}>
-          <form onSubmit={handleSaveEdit} style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, padding: 22, width: '100%', maxWidth: 450, display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <form onSubmit={handleSaveEdit} style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, padding: 22, width: '100%', maxWidth: 480, display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div style={{ fontSize: 16, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span>✏️ Modifica Listino Articolo (Admin)</span>
+              <span>✏️ Modifica Listino & Collegamento Documenti (Admin)</span>
             </div>
 
             <div>
@@ -805,22 +832,43 @@ function ArticoliCatalogView({ articoliList, onOpenNew }: { articoliList: Artico
               </div>
             </div>
 
+            {/* Collegamento Modelli Documenti in Bianco */}
             <div>
-              <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>📄 Modello Documento / PDF Allegato</label>
-              <input
-                type="text"
-                placeholder="es. https://storage.bluman.com/templates/Accordo_NDA.pdf"
-                value={editingArt?.documentoAllegatoUrl || ''}
-                onChange={e => setEditingArt({ ...editingArt!, documentoAllegatoUrl: e.target.value })}
-                style={{ fontSize: 12 }}
-              />
+              <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 6 }}>📄 Modelli Documenti in Bianco da far Compilare/Firmare al Cliente</label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, background: 'var(--card2)', padding: 10, borderRadius: 8, border: '1px solid var(--border)' }}>
+                {[
+                  { id: 'm1', label: 'Accordo NDA Tipo' },
+                  { id: 'm2', label: 'Procura Legale MFSA' },
+                  { id: 'm3', label: 'Dichiarazione UBO' },
+                  { id: 'm4', label: 'Statuto Holding Malta' },
+                ].map(item => {
+                  const checked = editDocModels.includes(item.id);
+                  return (
+                    <label key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, cursor: 'pointer', color: checked ? '#818cf8' : 'var(--text)' }}>
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={e => {
+                          if (e.target.checked) {
+                            setEditDocModels([...editDocModels, item.id]);
+                          } else {
+                            setEditDocModels(editDocModels.filter(x => x !== item.id));
+                          }
+                        }}
+                      />
+                      <span>{item.label}</span>
+                    </label>
+                  );
+                })}
+              </div>
             </div>
 
+            {/* Form Master Dinamico */}
             <div>
               <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>📋 Form Master Dati da far Compilare al Cliente</label>
               <select
-                value={editingArt?.formMasterId || ''}
-                onChange={e => setEditingArt({ ...editingArt!, formMasterId: e.target.value })}
+                value={editFormMasterId}
+                onChange={e => setEditFormMasterId(e.target.value)}
                 style={{ padding: 8, fontSize: 12 }}
               >
                 <option value="">-- Nessun Form Richiesto --</option>

@@ -99,7 +99,8 @@ export interface Articolo {
   p: number;
   ver: number;
   documentoAllegatoUrl?: string | null;
-  formMasterId?: string | null;
+  documentiRichiesti?: string[]; // Array di ID modelli documenti (es. ['m1', 'm4'])
+  formMasterId?: string | null;  // ID Form Master dinamico (es. 'f1')
   linkIstruzioni?: string | null;
 }
 
