@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
-import { NotificationModal, NotificationItem } from '../NotificationModal';
+import { NotificationModal, type NotificationItem } from '../NotificationModal';
 import { fetchNotificheApi, markNotificheReadApi } from '../../api/client';
 import styles from './AppLayout.module.css';
 
@@ -53,7 +53,7 @@ interface AppLayoutProps {
   onLogout?: () => void;
 }
 
-export function AppLayout({ children, alertCount = 2, user, onLogout }: AppLayoutProps) {
+export function AppLayout({ children, alertCount: _alertCount = 2, user, onLogout }: AppLayoutProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Badge } from '../components/ui/Badge';
 import { ProgressBar } from '../components/ui/ProgressBar';
@@ -22,7 +22,7 @@ export function Dashboard() {
     const remote = await fetchProgetti();
     if (remote && Array.isArray(remote)) {
       setIsDbConnected(true);
-      const dbProjs: Progetto[] = remote.map((rp: any, idx: number) => ({
+      const dbProjs: Progetto[] = remote.map((rp: any) => ({
         id: rp.id,
         n: rp.nome,
         cl: rp.cliente?.nome || 'Cliente',

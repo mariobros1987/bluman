@@ -1,6 +1,6 @@
 // BluMan — Shared TypeScript types
 
-export type StatoProgetto = 'pre_project' | 'in_progress' | 'completed';
+export type StatoProgetto = 'pre_project' | 'in_progress' | 'completed' | 'archived';
 export type StatoModulo   = 'pending' | 'attesa_dipendenza' | 'in_progress' | 'delayed' | 'blocked' | 'done';
 export type StatoMicrovoce = 'pending' | 'attesa_dipendenza' | 'active' | 'delayed' | 'blocked' | 'done';
 export type TipoCliente   = 'individual' | 'company';
