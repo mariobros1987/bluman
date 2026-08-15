@@ -144,3 +144,64 @@ export async function downloadRealPdf(
     }
   }
 }
+
+/**
+ * Genera e scarica direttamente la Guida Configurazione Canali Omnichannel in formato VERO PDF A4
+ */
+export async function downloadGuidePdf() {
+  const guideHtml = `
+    <div style="font-family: Arial, Helvetica, sans-serif; color: #0f172a; line-height: 1.6; padding: 20px;">
+      <!-- Header Studio -->
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #4338ca; padding-bottom: 16px; margin-bottom: 24px;">
+        <div>
+          <h1 style="font-size: 20px; font-weight: 800; color: #1e1b4b; margin: 0;">BluMan Advisory Platform</h1>
+          <div style="font-size: 12px; color: #4338ca; font-weight: 700; margin-top: 4px;">GUIDA UFFICIALE CONFIGURAZIONE CANALI MULTICANALE</div>
+        </div>
+        <div style="text-align: right; font-size: 11px; color: #64748b;">
+          <div>Data Documento: ${new Date().toLocaleDateString('it-IT')}</div>
+          <div>Versione Guida: v2.4 (Cloud Multi-Tenant)</div>
+        </div>
+      </div>
+
+      <h2 style="font-size: 16px; color: #1e1b4b; border-bottom: 1px solid #cbd5e1; padding-bottom: 6px; margin-top: 20px;">🟢 1. WhatsApp Business API (Meta Cloud API)</h2>
+      <div style="font-size: 12px; color: #334155;">
+        <h4 style="margin: 8px 0 4px 0; color: #4338ca;">A. Credenziali Meta Developers:</h4>
+        <ol style="margin: 0; padding-left: 20px;">
+          <li>Accedi a <strong>developers.facebook.com</strong> con l'account aziendale.</li>
+          <li>Crea un'applicazione di tipo <strong>Business</strong> ed aggiungi il prodotto <strong>WhatsApp</strong>.</li>
+          <li>Copia il <strong>Phone Number ID</strong> ed il <strong>System User Permanent Access Token</strong>.</li>
+        </ol>
+        <h4 style="margin: 12px 0 4px 0; color: #4338ca;">B. Setup Webhook Ingestion:</h4>
+        <div style="background: #f1f5f9; padding: 8px 12px; border-radius: 6px; font-family: monospace; font-size: 11px; margin: 6px 0;">
+          Callback URL: https://api.tuostudio.com/webhooks/communications/whatsapp<br/>
+          Verify Token: bluman_wa_secure_token_2026<br/>
+          Eventi sottoscritti: messages
+        </div>
+      </div>
+
+      <h2 style="font-size: 16px; color: #1e1b4b; border-bottom: 1px solid #cbd5e1; padding-bottom: 6px; margin-top: 24px;">✈️ 2. Telegram Bot API (100% Gratuito)</h2>
+      <div style="font-size: 12px; color: #334155;">
+        <ol style="margin: 0; padding-left: 20px;">
+          <li>Cerca l'utente <strong>@BotFather</strong> su Telegram ed invia il comando <code>/newbot</code>.</li>
+          <li>Imposta il nome (es: <em>BluMan Studio Bot</em>) e copia l'<strong>HTTP API Token</strong>.</li>
+          <li>Inserisci il Token in BluMan (<em>Impostazioni → Canali Omnichannel</em>) per registrare automaticamente il Webhook.</li>
+        </ol>
+      </div>
+
+      <h2 style="font-size: 16px; color: #1e1b4b; border-bottom: 1px solid #cbd5e1; padding-bottom: 6px; margin-top: 24px;">✉️ 3. Email Inbound Webhook Parse (SendGrid / PEC / SMTP)</h2>
+      <div style="font-size: 12px; color: #334155;">
+        <p style="margin: 0 0 8px 0;">Configura l'Inbound Parse sul tuo provider DNS o SendGrid verso:</p>
+        <div style="background: #f1f5f9; padding: 8px 12px; border-radius: 6px; font-family: monospace; font-size: 11px;">
+          https://api.tuostudio.com/webhooks/communications/email
+        </div>
+      </div>
+
+      <h2 style="font-size: 16px; color: #1e1b4b; border-bottom: 1px solid #cbd5e1; padding-bottom: 6px; margin-top: 24px;">🔒 4. Regola Tassativa di Associazione Automatica al Progetto</h2>
+      <div style="font-size: 12px; color: #334155; background: #e0e7ff; border-left: 4px solid #4338ca; padding: 12px; border-radius: 0 8px 8px 0; margin-top: 10px;">
+        Tutti i messaggi ricevuti ed i file PDF allegati inviati dai recapiti censiti nell'anagrafica <strong>Clienti ERP</strong> vengono automaticamente instradati ed archiviati nel Vault del Progetto attivo del Cliente. Nessun dato viene disperso.
+      </div>
+    </div>
+  `;
+
+  await downloadRealPdf('Guida_Configurazione_Canali_BluMan.pdf', guideHtml);
+}

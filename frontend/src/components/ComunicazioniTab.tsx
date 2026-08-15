@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
 import { fetchComunicazioniApi, inviaComunicazioneApi } from '../api/client';
+import { downloadGuidePdf } from '../utils/pdfGenerator';
 
 export interface MessaggioComunicazione {
   id: string;
@@ -170,17 +170,25 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente }: Comu
 
       {/* Info Banner Regole di Associazione Automatica */}
       <div style={{ background: '#0d2d22', border: '1px solid #1a5c3c', borderRadius: 12, padding: 14, fontSize: 11.5, color: '#34d399', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
-        <div>
+        <div style={{ flex: 1, minWidth: 280 }}>
           <strong>🔗 Associazione Automatica Attiva:</strong> I messaggi inviati da <code>{emailCliente}</code> ed dal cellulare registrato in anagrafica <code>+39 335 1234567</code> confluiscono automaticamente in questa scheda ed i file allegati vengono archiviati nel Vault.
         </div>
-        <a
-          href="/GUIDA_CONFIGURAZIONE_CANALI.md"
-          target="_blank"
-          rel="noreferrer"
-          style={{ color: '#6ee7b7', textDecoration: 'underline', fontWeight: 600, fontSize: 11 }}
+        <button
+          onClick={() => downloadGuidePdf()}
+          style={{
+            background: 'rgba(52, 211, 153, 0.15)',
+            border: '1px solid #34d399',
+            color: '#34d399',
+            padding: '6px 14px',
+            borderRadius: 8,
+            fontSize: 11,
+            fontWeight: 700,
+            cursor: 'pointer',
+            whiteSpace: 'nowrap',
+          }}
         >
-          📖 Apri Guida Completa Setup API →
-        </a>
+          📄 Scarica Guida Ufficiale PDF A4
+        </button>
       </div>
 
       {/* Timeline Chat Comunicazioni */}
