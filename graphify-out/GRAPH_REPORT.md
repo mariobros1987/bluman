@@ -1,16 +1,16 @@
 # Graph Report - bluman-api  (2026-08-15)
 
 ## Corpus Check
-- 78 files · ~84,189 words
+- 78 files · ~84,197 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 780 nodes · 1371 edges · 46 communities (39 shown, 7 thin omitted)
+- 780 nodes · 1372 edges · 46 communities (39 shown, 7 thin omitted)
 - Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 49 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `74e2dab9`
+- Built from commit: `3a0c72ae`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -66,7 +66,7 @@
 2. `PrismaApp` - 34 edges
 3. `InMemoryApp` - 30 edges
 4. `AppPort` - 30 edges
-5. `react` - 26 edges
+5. `react` - 27 edges
 6. `fmt()` - 21 edges
 7. `FakeIstanziazionePort` - 19 edges
 8. `compilerOptions` - 18 edges

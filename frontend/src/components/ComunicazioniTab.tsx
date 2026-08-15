@@ -1,3 +1,4 @@
+import React, { useState, useEffect } from 'react';
 import { fetchComunicazioniApi, inviaComunicazioneApi } from '../api/client';
 import { downloadGuidePdf } from '../utils/pdfGenerator';
 

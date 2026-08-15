@@ -4,6 +4,45 @@
   "graph": {},
   "nodes": [
     {
+      "label": "ConsoleNotificationPort",
+      "file_type": "code",
+      "source_file": "src/adapters/prisma/prismaApp.ts",
+      "source_location": "L32",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "id": "src_adapters_prisma_prismaapp_consolenotificationport",
+      "community": 0,
+      "community_name": "istanziazionePort.ts",
+      "norm_label": "consolenotificationport"
+    },
+    {
+      "label": "StatoModulo",
+      "file_type": "code",
+      "source_file": "src/domain/types.ts",
+      "source_location": "L4",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "id": "src_domain_types_statomodulo",
+      "community": 0,
+      "community_name": "istanziazionePort.ts",
+      "norm_label": "statomodulo"
+    },
+    {
+      "label": "ProceduraIncompletaError",
+      "file_type": "code",
+      "source_file": "src/services/esecuzione.ts",
+      "source_location": "L47",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "id": "src_services_esecuzione_proceduraincompletaerror",
+      "community": 0,
+      "community_name": "istanziazionePort.ts",
+      "norm_label": "proceduraincompletaerror"
+    },
+    {
       "label": "DbState",
       "file_type": "code",
       "source_file": "src/services/fakeIstanziazionePort.ts",
@@ -28,6 +67,19 @@
       "community": 0,
       "community_name": "istanziazionePort.ts",
       "norm_label": "fakeistanziazioneport"
+    },
+    {
+      "label": "FakeNotificationPort",
+      "file_type": "code",
+      "source_file": "src/services/fakeIstanziazionePort.ts",
+      "source_location": "L211",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "id": "src_services_fakeistanziazioneport_fakenotificationport",
+      "community": 0,
+      "community_name": "istanziazionePort.ts",
+      "norm_label": "fakenotificationport"
     },
     {
       "label": "ModuloStored",
@@ -56,6 +108,58 @@
       "norm_label": "passaggiostored"
     },
     {
+      "label": "IstanziaProgettoInput",
+      "file_type": "code",
+      "source_file": "src/services/istanziaProgetto.ts",
+      "source_location": "L18",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "id": "src_services_istanziaprogetto_istanziaprogettoinput",
+      "community": 0,
+      "community_name": "istanziazionePort.ts",
+      "norm_label": "istanziaprogettoinput"
+    },
+    {
+      "label": "IstanziaProgettoRisultato",
+      "file_type": "code",
+      "source_file": "src/services/istanziaProgetto.ts",
+      "source_location": "L24",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "id": "src_services_istanziaprogetto_istanziaprogettorisultato",
+      "community": 0,
+      "community_name": "istanziazionePort.ts",
+      "norm_label": "istanziaprogettorisultato"
+    },
+    {
+      "label": "ModuloCreatoInfo",
+      "file_type": "code",
+      "source_file": "src/services/istanziaProgetto.ts",
+      "source_location": "L28",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "id": "src_services_istanziaprogetto_modulocreatoinfo",
+      "community": 0,
+      "community_name": "istanziazionePort.ts",
+      "norm_label": "modulocreatoinfo"
+    },
+    {
+      "label": "RigaPreventivoAccettato",
+      "file_type": "code",
+      "source_file": "src/services/istanziaProgetto.ts",
+      "source_location": "L13",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "id": "src_services_istanziaprogetto_rigapreventivoaccettato",
+      "community": 0,
+      "community_name": "istanziazionePort.ts",
+      "norm_label": "rigapreventivoaccettato"
+    },
+    {
       "label": "IstanziazionePort",
       "file_type": "code",
       "source_file": "src/services/istanziazionePort.ts",
@@ -67,6 +171,19 @@
       "community": 0,
       "community_name": "istanziazionePort.ts",
       "norm_label": "istanziazioneport"
+    },
+    {
+      "label": "IstanziazioneTransazione",
+      "file_type": "code",
+      "source_file": "src/services/istanziazionePort.ts",
+      "source_location": "L76",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "id": "src_services_istanziazioneport_istanziazionetransazione",
+      "community": 0,
+      "community_name": "istanziazionePort.ts",
+      "norm_label": "istanziazionetransazione"
     },
     {
       "label": "MicrovoceRecord",
@@ -106,6 +223,32 @@
       "community": 0,
       "community_name": "istanziazionePort.ts",
       "norm_label": "modulorecord"
+    },
+    {
+      "label": "ModuloTemplateConDistinta",
+      "file_type": "code",
+      "source_file": "src/services/istanziazionePort.ts",
+      "source_location": "L36",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "id": "src_services_istanziazioneport_modulotemplatecondistinta",
+      "community": 0,
+      "community_name": "istanziazionePort.ts",
+      "norm_label": "modulotemplatecondistinta"
+    },
+    {
+      "label": "NotificationPort",
+      "file_type": "code",
+      "source_file": "src/services/istanziazionePort.ts",
+      "source_location": "L92",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "id": "src_services_istanziazioneport_notificationport",
+      "community": 0,
+      "community_name": "istanziazionePort.ts",
+      "norm_label": "notificationport"
     },
     {
       "label": "NuovaMicrovoceProgettoInput",
@@ -208,7 +351,7 @@
       "_origin": "ast",
       "id": "src_domain_stateengine_modulocondipendenze",
       "community": 1,
-      "community_name": "stateEngine.ts",
+      "community_name": "esecuzione.ts",
       "norm_label": "modulocondipendenze"
     },
     {
@@ -221,7 +364,7 @@
       "_origin": "ast",
       "id": "src_domain_stateengine_risultatoconsuntivazione",
       "community": 1,
-      "community_name": "stateEngine.ts",
+      "community_name": "esecuzione.ts",
       "norm_label": "risultatoconsuntivazione"
     },
     {
@@ -234,7 +377,7 @@
       "_origin": "ast",
       "id": "src_domain_stateengine_segnalerischio",
       "community": 1,
-      "community_name": "stateEngine.ts",
+      "community_name": "esecuzione.ts",
       "norm_label": "segnalerischio"
     },
     {
@@ -247,7 +390,7 @@
       "_origin": "ast",
       "id": "src_domain_types_microvoceinput",
       "community": 1,
-      "community_name": "stateEngine.ts",
+      "community_name": "esecuzione.ts",
       "norm_label": "microvoceinput"
     },
     {
@@ -260,7 +403,7 @@
       "_origin": "ast",
       "id": "src_domain_types_moduloinput",
       "community": 1,
-      "community_name": "stateEngine.ts",
+      "community_name": "esecuzione.ts",
       "norm_label": "moduloinput"
     },
     {
@@ -273,7 +416,7 @@
       "_origin": "ast",
       "id": "src_domain_types_progettoinput",
       "community": 1,
-      "community_name": "stateEngine.ts",
+      "community_name": "esecuzione.ts",
       "norm_label": "progettoinput"
     },
     {
@@ -286,21 +429,8 @@
       "_origin": "ast",
       "id": "src_domain_types_statomicrovoce",
       "community": 1,
-      "community_name": "stateEngine.ts",
+      "community_name": "esecuzione.ts",
       "norm_label": "statomicrovoce"
-    },
-    {
-      "label": "StatoModulo",
-      "file_type": "code",
-      "source_file": "src/domain/types.ts",
-      "source_location": "L4",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "id": "src_domain_types_statomodulo",
-      "community": 1,
-      "community_name": "stateEngine.ts",
-      "norm_label": "statomodulo"
     },
     {
       "label": "StatoProgetto",
@@ -312,7 +442,7 @@
       "_origin": "ast",
       "id": "src_domain_types_statoprogetto",
       "community": 1,
-      "community_name": "stateEngine.ts",
+      "community_name": "esecuzione.ts",
       "norm_label": "statoprogetto"
     },
     {
@@ -325,8 +455,21 @@
       "_origin": "ast",
       "id": "src_services_fakeistanziazioneport_microvocestored",
       "community": 1,
-      "community_name": "stateEngine.ts",
+      "community_name": "esecuzione.ts",
       "norm_label": "microvocestored"
+    },
+    {
+      "label": "EsecuzionePort",
+      "file_type": "code",
+      "source_file": "src/services/istanziazionePort.ts",
+      "source_location": "L131",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "id": "src_services_istanziazioneport_esecuzioneport",
+      "community": 1,
+      "community_name": "esecuzione.ts",
+      "norm_label": "esecuzioneport"
     },
     {
       "label": "InMemoryApp",
@@ -888,6 +1031,19 @@
       "norm_label": "prismaapp"
     },
     {
+      "label": "PrismaIstanziazionePort",
+      "file_type": "code",
+      "source_file": "src/adapters/prisma/prismaIstanziazionePort.ts",
+      "source_location": "L28",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "id": "src_adapters_prisma_prismaistanziazioneport_prismaistanziazioneport",
+      "community": 3,
+      "community_name": "PrismaApp",
+      "norm_label": "prismaistanziazioneport"
+    },
+    {
       "label": "Cliente",
       "file_type": "code",
       "source_file": "src/services/appPort.ts",
@@ -912,45 +1068,6 @@
       "community": 3,
       "community_name": "PrismaApp",
       "norm_label": "preventivo"
-    },
-    {
-      "label": "ProceduraIncompletaError",
-      "file_type": "code",
-      "source_file": "src/services/esecuzione.ts",
-      "source_location": "L47",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "id": "src_services_esecuzione_proceduraincompletaerror",
-      "community": 32,
-      "community_name": "esecuzione.test.ts",
-      "norm_label": "proceduraincompletaerror"
-    },
-    {
-      "label": "FakeNotificationPort",
-      "file_type": "code",
-      "source_file": "src/services/fakeIstanziazionePort.ts",
-      "source_location": "L211",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "id": "src_services_fakeistanziazioneport_fakenotificationport",
-      "community": 32,
-      "community_name": "esecuzione.test.ts",
-      "norm_label": "fakenotificationport"
-    },
-    {
-      "label": "ModuloTemplateConDistinta",
-      "file_type": "code",
-      "source_file": "src/services/istanziazionePort.ts",
-      "source_location": "L36",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "id": "src_services_istanziazioneport_modulotemplatecondistinta",
-      "community": 32,
-      "community_name": "esecuzione.test.ts",
-      "norm_label": "modulotemplatecondistinta"
     },
     {
       "label": "Tab",
@@ -1018,17 +1135,43 @@
       "norm_label": "progetto"
     },
     {
-      "label": "EsecuzionePort",
+      "label": "EmailOptions",
       "file_type": "code",
-      "source_file": "src/services/istanziazionePort.ts",
-      "source_location": "L131",
+      "source_file": "src/services/emailService.ts",
+      "source_location": "L3",
       "_callable": true,
       "_callable_class": true,
       "_origin": "ast",
-      "id": "src_services_istanziazioneport_esecuzioneport",
+      "id": "src_services_emailservice_emailoptions",
       "community": 39,
-      "community_name": "esecuzione.ts",
-      "norm_label": "esecuzioneport"
+      "community_name": "server.ts",
+      "norm_label": "emailoptions"
+    },
+    {
+      "label": "UploadResult",
+      "file_type": "code",
+      "source_file": "src/services/storageService.ts",
+      "source_location": "L4",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "id": "src_services_storageservice_uploadresult",
+      "community": 39,
+      "community_name": "server.ts",
+      "norm_label": "uploadresult"
+    },
+    {
+      "label": "JwtPayload",
+      "file_type": "code",
+      "source_file": "src/util/jwt.ts",
+      "source_location": "L5",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "id": "src_util_jwt_jwtpayload",
+      "community": 39,
+      "community_name": "server.ts",
+      "norm_label": "jwtpayload"
     },
     {
       "label": "AssignOperatorModalProps",
@@ -1135,97 +1278,6 @@
       "norm_label": "subtab"
     },
     {
-      "label": "ConsoleNotificationPort",
-      "file_type": "code",
-      "source_file": "src/adapters/prisma/prismaApp.ts",
-      "source_location": "L32",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "id": "src_adapters_prisma_prismaapp_consolenotificationport",
-      "community": 41,
-      "community_name": "istanziaProgetto.ts",
-      "norm_label": "consolenotificationport"
-    },
-    {
-      "label": "IstanziaProgettoInput",
-      "file_type": "code",
-      "source_file": "src/services/istanziaProgetto.ts",
-      "source_location": "L18",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "id": "src_services_istanziaprogetto_istanziaprogettoinput",
-      "community": 41,
-      "community_name": "istanziaProgetto.ts",
-      "norm_label": "istanziaprogettoinput"
-    },
-    {
-      "label": "IstanziaProgettoRisultato",
-      "file_type": "code",
-      "source_file": "src/services/istanziaProgetto.ts",
-      "source_location": "L24",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "id": "src_services_istanziaprogetto_istanziaprogettorisultato",
-      "community": 41,
-      "community_name": "istanziaProgetto.ts",
-      "norm_label": "istanziaprogettorisultato"
-    },
-    {
-      "label": "ModuloCreatoInfo",
-      "file_type": "code",
-      "source_file": "src/services/istanziaProgetto.ts",
-      "source_location": "L28",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "id": "src_services_istanziaprogetto_modulocreatoinfo",
-      "community": 41,
-      "community_name": "istanziaProgetto.ts",
-      "norm_label": "modulocreatoinfo"
-    },
-    {
-      "label": "RigaPreventivoAccettato",
-      "file_type": "code",
-      "source_file": "src/services/istanziaProgetto.ts",
-      "source_location": "L13",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "id": "src_services_istanziaprogetto_rigapreventivoaccettato",
-      "community": 41,
-      "community_name": "istanziaProgetto.ts",
-      "norm_label": "rigapreventivoaccettato"
-    },
-    {
-      "label": "NotificationPort",
-      "file_type": "code",
-      "source_file": "src/services/istanziazionePort.ts",
-      "source_location": "L92",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "id": "src_services_istanziazioneport_notificationport",
-      "community": 41,
-      "community_name": "istanziaProgetto.ts",
-      "norm_label": "notificationport"
-    },
-    {
-      "label": "IstanziazioneTransazione",
-      "file_type": "code",
-      "source_file": "src/services/istanziazionePort.ts",
-      "source_location": "L76",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "id": "src_services_istanziazioneport_istanziazionetransazione",
-      "community": 42,
-      "community_name": "IstanziazioneTransazione",
-      "norm_label": "istanziazionetransazione"
-    },
-    {
       "label": "NewProjectWizardProps",
       "file_type": "code",
       "source_file": "frontend/src/components/NewProjectWizard.tsx",
@@ -1278,19 +1330,6 @@
       "norm_label": "categoriamodulo"
     },
     {
-      "label": "PrismaIstanziazionePort",
-      "file_type": "code",
-      "source_file": "src/adapters/prisma/prismaIstanziazionePort.ts",
-      "source_location": "L28",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "id": "src_adapters_prisma_prismaistanziazioneport_prismaistanziazioneport",
-      "community": 44,
-      "community_name": "PrismaIstanziazionePort",
-      "norm_label": "prismaistanziazioneport"
-    },
-    {
       "label": "LoginPageProps",
       "file_type": "code",
       "source_file": "frontend/src/pages/LoginPage.tsx",
@@ -1317,43 +1356,100 @@
       "norm_label": "appport"
     },
     {
-      "label": "EmailOptions",
+      "label": ".notificaProgettoAvviato()",
       "file_type": "code",
-      "source_file": "src/services/emailService.ts",
-      "source_location": "L3",
+      "source_file": "src/adapters/prisma/prismaApp.ts",
+      "source_location": "L33",
       "_callable": true,
-      "_callable_class": true,
       "_origin": "ast",
-      "id": "src_services_emailservice_emailoptions",
-      "community": 7,
-      "community_name": "buildServer",
-      "norm_label": "emailoptions"
+      "id": "src_adapters_prisma_prismaapp_consolenotificationport_notificaprogettoavviato",
+      "community": 0,
+      "community_name": "istanziazionePort.ts",
+      "norm_label": ".notificaprogettoavviato()"
     },
     {
-      "label": "UploadResult",
+      "label": ".eseguiInTransazione()",
       "file_type": "code",
-      "source_file": "src/services/storageService.ts",
-      "source_location": "L4",
+      "source_file": "src/adapters/prisma/prismaIstanziazionePort.ts",
+      "source_location": "L34",
       "_callable": true,
-      "_callable_class": true,
       "_origin": "ast",
-      "id": "src_services_storageservice_uploadresult",
-      "community": 7,
-      "community_name": "buildServer",
-      "norm_label": "uploadresult"
+      "id": "src_adapters_prisma_prismaistanziazioneport_prismaistanziazioneport_eseguiintransazione",
+      "community": 0,
+      "community_name": "istanziazionePort.ts",
+      "norm_label": ".eseguiintransazione()"
     },
     {
-      "label": "JwtPayload",
+      "label": "main()",
       "file_type": "code",
-      "source_file": "src/util/jwt.ts",
-      "source_location": "L5",
+      "source_file": "src/adapters/prisma/seed.ts",
+      "source_location": "L74",
       "_callable": true,
-      "_callable_class": true,
       "_origin": "ast",
-      "id": "src_util_jwt_jwtpayload",
-      "community": 7,
-      "community_name": "buildServer",
-      "norm_label": "jwtpayload"
+      "id": "src_adapters_prisma_seed_main",
+      "community": 0,
+      "community_name": "istanziazionePort.ts",
+      "norm_label": "main()"
+    },
+    {
+      "label": "seedModulo()",
+      "file_type": "code",
+      "source_file": "src/adapters/prisma/seed.ts",
+      "source_location": "L16",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "src_adapters_prisma_seed_seedmodulo",
+      "community": 0,
+      "community_name": "istanziazionePort.ts",
+      "norm_label": "seedmodulo()"
+    },
+    {
+      "label": "setupProgettoConDueModuli()",
+      "file_type": "code",
+      "source_file": "src/services/esecuzione.test.ts",
+      "source_location": "L71",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "src_services_esecuzione_test_setupprogettoconduemoduli",
+      "community": 0,
+      "community_name": "istanziazionePort.ts",
+      "norm_label": "setupprogettoconduemoduli()"
+    },
+    {
+      "label": "templateDipendente()",
+      "file_type": "code",
+      "source_file": "src/services/esecuzione.test.ts",
+      "source_location": "L47",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "src_services_esecuzione_test_templatedipendente",
+      "community": 0,
+      "community_name": "istanziazionePort.ts",
+      "norm_label": "templatedipendente()"
+    },
+    {
+      "label": "templateRadice()",
+      "file_type": "code",
+      "source_file": "src/services/esecuzione.test.ts",
+      "source_location": "L19",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "src_services_esecuzione_test_templateradice",
+      "community": 0,
+      "community_name": "istanziazionePort.ts",
+      "norm_label": "templateradice()"
+    },
+    {
+      "label": "clonaDb()",
+      "file_type": "code",
+      "source_file": "src/services/fakeIstanziazionePort.ts",
+      "source_location": "L76",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "src_services_fakeistanziazioneport_clonadb",
+      "community": 0,
+      "community_name": "istanziazionePort.ts",
+      "norm_label": "clonadb()"
     },
     {
       "label": "dbVuoto()",
@@ -1402,6 +1498,30 @@
       "community": 0,
       "community_name": "istanziazionePort.ts",
       "norm_label": ".aggiornapassaggio()"
+    },
+    {
+      "label": ".creaTransazione()",
+      "file_type": "code",
+      "source_file": "src/services/fakeIstanziazionePort.ts",
+      "source_location": "L110",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "src_services_fakeistanziazioneport_fakeistanziazioneport_creatransazione",
+      "community": 0,
+      "community_name": "istanziazionePort.ts",
+      "norm_label": ".creatransazione()"
+    },
+    {
+      "label": ".eseguiInTransazione()",
+      "file_type": "code",
+      "source_file": "src/services/fakeIstanziazionePort.ts",
+      "source_location": "L102",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "src_services_fakeistanziazioneport_fakeistanziazioneport_eseguiintransazione",
+      "community": 0,
+      "community_name": "istanziazionePort.ts",
+      "norm_label": ".eseguiintransazione()"
     },
     {
       "label": ".getMicrovoce()",
@@ -1476,6 +1596,102 @@
       "norm_label": ".getpassaggio()"
     },
     {
+      "label": ".registraTemplate()",
+      "file_type": "code",
+      "source_file": "src/services/fakeIstanziazionePort.ts",
+      "source_location": "L91",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "src_services_fakeistanziazioneport_fakeistanziazioneport_registratemplate",
+      "community": 0,
+      "community_name": "istanziazionePort.ts",
+      "norm_label": ".registratemplate()"
+    },
+    {
+      "label": ".snapshot()",
+      "file_type": "code",
+      "source_file": "src/services/fakeIstanziazionePort.ts",
+      "source_location": "L98",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "src_services_fakeistanziazioneport_fakeistanziazioneport_snapshot",
+      "community": 0,
+      "community_name": "istanziazionePort.ts",
+      "norm_label": ".snapshot()"
+    },
+    {
+      "label": ".notificaProgettoAvviato()",
+      "file_type": "code",
+      "source_file": "src/services/fakeIstanziazionePort.ts",
+      "source_location": "L215",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "src_services_fakeistanziazioneport_fakenotificationport_notificaprogettoavviato",
+      "community": 0,
+      "community_name": "istanziazionePort.ts",
+      "norm_label": ".notificaprogettoavviato()"
+    },
+    {
+      "label": "nuovoId()",
+      "file_type": "code",
+      "source_file": "src/services/fakeIstanziazionePort.ts",
+      "source_location": "L27",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "src_services_fakeistanziazioneport_nuovoid",
+      "community": 0,
+      "community_name": "istanziazionePort.ts",
+      "norm_label": "nuovoid()"
+    },
+    {
+      "label": "calcolaOreModulo()",
+      "file_type": "code",
+      "source_file": "src/services/istanziaProgetto.ts",
+      "source_location": "L40",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "src_services_istanziaprogetto_calcolaoremodulo",
+      "community": 0,
+      "community_name": "istanziazionePort.ts",
+      "norm_label": "calcolaoremodulo()"
+    },
+    {
+      "label": "calcolaPrezzoModulo()",
+      "file_type": "code",
+      "source_file": "src/services/istanziaProgetto.ts",
+      "source_location": "L35",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "src_services_istanziaprogetto_calcolaprezzomodulo",
+      "community": 0,
+      "community_name": "istanziazionePort.ts",
+      "norm_label": "calcolaprezzomodulo()"
+    },
+    {
+      "label": "istanziaProgetto()",
+      "file_type": "code",
+      "source_file": "src/services/istanziaProgetto.ts",
+      "source_location": "L68",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "src_services_istanziaprogetto_istanziaprogetto",
+      "community": 0,
+      "community_name": "istanziazionePort.ts",
+      "norm_label": "istanziaprogetto()"
+    },
+    {
+      "label": "templateSemplice()",
+      "file_type": "code",
+      "source_file": "src/services/istanziaProgetto.test.ts",
+      "source_location": "L6",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "src_services_istanziaprogetto_test_templatesemplice",
+      "community": 0,
+      "community_name": "istanziazionePort.ts",
+      "norm_label": "templatesemplice()"
+    },
+    {
       "label": ".eseguiInTransazione()",
       "file_type": "code",
       "source_file": "src/services/istanziazionePort.ts",
@@ -1488,6 +1704,102 @@
       "norm_label": ".eseguiintransazione()"
     },
     {
+      "label": ".aggiornaStatoProgetto()",
+      "file_type": "code",
+      "source_file": "src/services/istanziazionePort.ts",
+      "source_location": "L78",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "src_services_istanziazioneport_istanziazionetransazione_aggiornastatoprogetto",
+      "community": 0,
+      "community_name": "istanziazionePort.ts",
+      "norm_label": ".aggiornastatoprogetto()"
+    },
+    {
+      "label": ".creaMicrovoceProgetto()",
+      "file_type": "code",
+      "source_file": "src/services/istanziazionePort.ts",
+      "source_location": "L80",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "src_services_istanziazioneport_istanziazionetransazione_creamicrovoceprogetto",
+      "community": 0,
+      "community_name": "istanziazionePort.ts",
+      "norm_label": ".creamicrovoceprogetto()"
+    },
+    {
+      "label": ".creaModuloProgetto()",
+      "file_type": "code",
+      "source_file": "src/services/istanziazionePort.ts",
+      "source_location": "L79",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "src_services_istanziazioneport_istanziazionetransazione_creamoduloprogetto",
+      "community": 0,
+      "community_name": "istanziazionePort.ts",
+      "norm_label": ".creamoduloprogetto()"
+    },
+    {
+      "label": ".creaModuloProgettoDipendenza()",
+      "file_type": "code",
+      "source_file": "src/services/istanziazionePort.ts",
+      "source_location": "L84",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "src_services_istanziazioneport_istanziazionetransazione_creamoduloprogettodipendenza",
+      "community": 0,
+      "community_name": "istanziazionePort.ts",
+      "norm_label": ".creamoduloprogettodipendenza()"
+    },
+    {
+      "label": ".creaPassaggioProgetto()",
+      "file_type": "code",
+      "source_file": "src/services/istanziazionePort.ts",
+      "source_location": "L83",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "src_services_istanziazioneport_istanziazionetransazione_creapassaggioprogetto",
+      "community": 0,
+      "community_name": "istanziazionePort.ts",
+      "norm_label": ".creapassaggioprogetto()"
+    },
+    {
+      "label": ".getModuloTemplateConDistinta()",
+      "file_type": "code",
+      "source_file": "src/services/istanziazionePort.ts",
+      "source_location": "L77",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "src_services_istanziazioneport_istanziazionetransazione_getmodulotemplatecondistinta",
+      "community": 0,
+      "community_name": "istanziazionePort.ts",
+      "norm_label": ".getmodulotemplatecondistinta()"
+    },
+    {
+      "label": ".impostaStatoMicrovoceIniziale()",
+      "file_type": "code",
+      "source_file": "src/services/istanziazionePort.ts",
+      "source_location": "L82",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "src_services_istanziazioneport_istanziazionetransazione_impostastatomicrovoceiniziale",
+      "community": 0,
+      "community_name": "istanziazionePort.ts",
+      "norm_label": ".impostastatomicrovoceiniziale()"
+    },
+    {
+      "label": ".notificaProgettoAvviato()",
+      "file_type": "code",
+      "source_file": "src/services/istanziazionePort.ts",
+      "source_location": "L93",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "src_services_istanziazioneport_notificationport_notificaprogettoavviato",
+      "community": 0,
+      "community_name": "istanziazionePort.ts",
+      "norm_label": ".notificaprogettoavviato()"
+    },
+    {
       "label": "calcolaPercentualeMicrovoce()",
       "file_type": "code",
       "source_file": "src/domain/stateEngine.ts",
@@ -1496,7 +1808,7 @@
       "_origin": "ast",
       "id": "src_domain_stateengine_calcolapercentualemicrovoce",
       "community": 1,
-      "community_name": "stateEngine.ts",
+      "community_name": "esecuzione.ts",
       "norm_label": "calcolapercentualemicrovoce()"
     },
     {
@@ -1508,7 +1820,7 @@
       "_origin": "ast",
       "id": "src_domain_stateengine_calcolapercentualemodulo",
       "community": 1,
-      "community_name": "stateEngine.ts",
+      "community_name": "esecuzione.ts",
       "norm_label": "calcolapercentualemodulo()"
     },
     {
@@ -1520,8 +1832,20 @@
       "_origin": "ast",
       "id": "src_domain_stateengine_calcolapercentualeprogetto",
       "community": 1,
-      "community_name": "stateEngine.ts",
+      "community_name": "esecuzione.ts",
       "norm_label": "calcolapercentualeprogetto()"
+    },
+    {
+      "label": "calcolaStatoModulo()",
+      "file_type": "code",
+      "source_file": "src/domain/stateEngine.ts",
+      "source_location": "L50",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "src_domain_stateengine_calcolastatomodulo",
+      "community": 1,
+      "community_name": "esecuzione.ts",
+      "norm_label": "calcolastatomodulo()"
     },
     {
       "label": "calcolaStatoProgetto()",
@@ -1532,7 +1856,7 @@
       "_origin": "ast",
       "id": "src_domain_stateengine_calcolastatoprogetto",
       "community": 1,
-      "community_name": "stateEngine.ts",
+      "community_name": "esecuzione.ts",
       "norm_label": "calcolastatoprogetto()"
     },
     {
@@ -1544,7 +1868,7 @@
       "_origin": "ast",
       "id": "src_domain_stateengine_marcaritardomanuale",
       "community": 1,
-      "community_name": "stateEngine.ts",
+      "community_name": "esecuzione.ts",
       "norm_label": "marcaritardomanuale()"
     },
     {
@@ -1556,8 +1880,20 @@
       "_origin": "ast",
       "id": "src_domain_stateengine_registraconsuntivazione",
       "community": 1,
-      "community_name": "stateEngine.ts",
+      "community_name": "esecuzione.ts",
       "norm_label": "registraconsuntivazione()"
+    },
+    {
+      "label": "risolviDipendenze()",
+      "file_type": "code",
+      "source_file": "src/domain/stateEngine.ts",
+      "source_location": "L157",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "src_domain_stateengine_risolvidipendenze",
+      "community": 1,
+      "community_name": "esecuzione.ts",
+      "norm_label": "risolvidipendenze()"
     },
     {
       "label": "risolviRitardoManuale()",
@@ -1568,7 +1904,7 @@
       "_origin": "ast",
       "id": "src_domain_stateengine_risolviritardomanuale",
       "community": 1,
-      "community_name": "stateEngine.ts",
+      "community_name": "esecuzione.ts",
       "norm_label": "risolviritardomanuale()"
     },
     {
@@ -1580,7 +1916,7 @@
       "_origin": "ast",
       "id": "src_domain_stateengine_test_mv",
       "community": 1,
-      "community_name": "stateEngine.ts",
+      "community_name": "esecuzione.ts",
       "norm_label": "mv()"
     },
     {
@@ -1592,8 +1928,212 @@
       "_origin": "ast",
       "id": "src_domain_stateengine_valutasegnalerischio",
       "community": 1,
-      "community_name": "stateEngine.ts",
+      "community_name": "esecuzione.ts",
       "norm_label": "valutasegnalerischio()"
+    },
+    {
+      "label": "completaMicrovoce()",
+      "file_type": "code",
+      "source_file": "src/services/esecuzione.ts",
+      "source_location": "L55",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "src_services_esecuzione_completamicrovoce",
+      "community": 1,
+      "community_name": "esecuzione.ts",
+      "norm_label": "completamicrovoce()"
+    },
+    {
+      "label": "completaPassaggioDocumento()",
+      "file_type": "code",
+      "source_file": "src/services/esecuzione.ts",
+      "source_location": "L71",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "src_services_esecuzione_completapassaggiodocumento",
+      "community": 1,
+      "community_name": "esecuzione.ts",
+      "norm_label": "completapassaggiodocumento()"
+    },
+    {
+      "label": "completaPassaggioForm()",
+      "file_type": "code",
+      "source_file": "src/services/esecuzione.ts",
+      "source_location": "L77",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "src_services_esecuzione_completapassaggioform",
+      "community": 1,
+      "community_name": "esecuzione.ts",
+      "norm_label": "completapassaggioform()"
+    },
+    {
+      "label": "marcaPassaggioCompletato()",
+      "file_type": "code",
+      "source_file": "src/services/esecuzione.ts",
+      "source_location": "L83",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "src_services_esecuzione_marcapassaggiocompletato",
+      "community": 1,
+      "community_name": "esecuzione.ts",
+      "norm_label": "marcapassaggiocompletato()"
+    },
+    {
+      "label": "marcaRitardo()",
+      "file_type": "code",
+      "source_file": "src/services/esecuzione.ts",
+      "source_location": "L32",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "src_services_esecuzione_marcaritardo",
+      "community": 1,
+      "community_name": "esecuzione.ts",
+      "norm_label": "marcaritardo()"
+    },
+    {
+      "label": "registraConsuntivazione()",
+      "file_type": "code",
+      "source_file": "src/services/esecuzione.ts",
+      "source_location": "L20",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "src_services_esecuzione_registraconsuntivazione",
+      "community": 1,
+      "community_name": "esecuzione.ts",
+      "norm_label": "registraconsuntivazione()"
+    },
+    {
+      "label": "ricalcolaModuloECascata()",
+      "file_type": "code",
+      "source_file": "src/services/esecuzione.ts",
+      "source_location": "L93",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "src_services_esecuzione_ricalcolamoduloecascata",
+      "community": 1,
+      "community_name": "esecuzione.ts",
+      "norm_label": "ricalcolamoduloecascata()"
+    },
+    {
+      "label": "risolviRitardo()",
+      "file_type": "code",
+      "source_file": "src/services/esecuzione.ts",
+      "source_location": "L40",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "src_services_esecuzione_risolviritardo",
+      "community": 1,
+      "community_name": "esecuzione.ts",
+      "norm_label": "risolviritardo()"
+    },
+    {
+      "label": ".aggiornaMicrovoce()",
+      "file_type": "code",
+      "source_file": "src/services/istanziazionePort.ts",
+      "source_location": "L133",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "src_services_istanziazioneport_esecuzioneport_aggiornamicrovoce",
+      "community": 1,
+      "community_name": "esecuzione.ts",
+      "norm_label": ".aggiornamicrovoce()"
+    },
+    {
+      "label": ".aggiornaModulo()",
+      "file_type": "code",
+      "source_file": "src/services/istanziazionePort.ts",
+      "source_location": "L137",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "src_services_istanziazioneport_esecuzioneport_aggiornamodulo",
+      "community": 1,
+      "community_name": "esecuzione.ts",
+      "norm_label": ".aggiornamodulo()"
+    },
+    {
+      "label": ".aggiornaPassaggio()",
+      "file_type": "code",
+      "source_file": "src/services/istanziazionePort.ts",
+      "source_location": "L142",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "src_services_istanziazioneport_esecuzioneport_aggiornapassaggio",
+      "community": 1,
+      "community_name": "esecuzione.ts",
+      "norm_label": ".aggiornapassaggio()"
+    },
+    {
+      "label": ".getMicrovoce()",
+      "file_type": "code",
+      "source_file": "src/services/istanziazionePort.ts",
+      "source_location": "L132",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "src_services_istanziazioneport_esecuzioneport_getmicrovoce",
+      "community": 1,
+      "community_name": "esecuzione.ts",
+      "norm_label": ".getmicrovoce()"
+    },
+    {
+      "label": ".getMicrovociDelModulo()",
+      "file_type": "code",
+      "source_file": "src/services/istanziazionePort.ts",
+      "source_location": "L134",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "src_services_istanziazioneport_esecuzioneport_getmicrovocidelmodulo",
+      "community": 1,
+      "community_name": "esecuzione.ts",
+      "norm_label": ".getmicrovocidelmodulo()"
+    },
+    {
+      "label": ".getModuliDelProgettoConDipendenze()",
+      "file_type": "code",
+      "source_file": "src/services/istanziazionePort.ts",
+      "source_location": "L138",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "src_services_istanziazioneport_esecuzioneport_getmodulidelprogettocondipendenze",
+      "community": 1,
+      "community_name": "esecuzione.ts",
+      "norm_label": ".getmodulidelprogettocondipendenze()"
+    },
+    {
+      "label": ".getModulo()",
+      "file_type": "code",
+      "source_file": "src/services/istanziazionePort.ts",
+      "source_location": "L136",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "src_services_istanziazioneport_esecuzioneport_getmodulo",
+      "community": 1,
+      "community_name": "esecuzione.ts",
+      "norm_label": ".getmodulo()"
+    },
+    {
+      "label": ".getPassaggiDellaMicrovoce()",
+      "file_type": "code",
+      "source_file": "src/services/istanziazionePort.ts",
+      "source_location": "L141",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "src_services_istanziazioneport_esecuzioneport_getpassaggidellamicrovoce",
+      "community": 1,
+      "community_name": "esecuzione.ts",
+      "norm_label": ".getpassaggidellamicrovoce()"
+    },
+    {
+      "label": ".getPassaggio()",
+      "file_type": "code",
+      "source_file": "src/services/istanziazionePort.ts",
+      "source_location": "L140",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "src_services_istanziazioneport_esecuzioneport_getpassaggio",
+      "community": 1,
+      "community_name": "esecuzione.ts",
+      "norm_label": ".getpassaggio()"
     },
     {
       "label": ".accettaPreventivoEIstanzia()",
@@ -2268,64 +2808,28 @@
       "norm_label": "getformattedlogourl()"
     },
     {
-      "label": "completaPassaggioDocumento()",
+      "label": "downloadGuidePdf()",
       "file_type": "code",
-      "source_file": "src/services/esecuzione.ts",
-      "source_location": "L71",
+      "source_file": "frontend/src/utils/pdfGenerator.ts",
+      "source_location": "L151",
       "_callable": true,
       "_origin": "ast",
-      "id": "src_services_esecuzione_completapassaggiodocumento",
-      "community": 2,
-      "community_name": "inMemoryApp.ts",
-      "norm_label": "completapassaggiodocumento()"
+      "id": "frontend_src_utils_pdfgenerator_downloadguidepdf",
+      "community": 17,
+      "community_name": "SettingsPage.tsx",
+      "norm_label": "downloadguidepdf()"
     },
     {
-      "label": "completaPassaggioForm()",
+      "label": "start()",
       "file_type": "code",
-      "source_file": "src/services/esecuzione.ts",
-      "source_location": "L77",
+      "source_file": "src/index.ts",
+      "source_location": "L11",
       "_callable": true,
       "_origin": "ast",
-      "id": "src_services_esecuzione_completapassaggioform",
+      "id": "src_index_start",
       "community": 2,
       "community_name": "inMemoryApp.ts",
-      "norm_label": "completapassaggioform()"
-    },
-    {
-      "label": "marcaPassaggioCompletato()",
-      "file_type": "code",
-      "source_file": "src/services/esecuzione.ts",
-      "source_location": "L83",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "src_services_esecuzione_marcapassaggiocompletato",
-      "community": 2,
-      "community_name": "inMemoryApp.ts",
-      "norm_label": "marcapassaggiocompletato()"
-    },
-    {
-      "label": ".aggiornaPassaggio()",
-      "file_type": "code",
-      "source_file": "src/services/istanziazionePort.ts",
-      "source_location": "L142",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "src_services_istanziazioneport_esecuzioneport_aggiornapassaggio",
-      "community": 2,
-      "community_name": "inMemoryApp.ts",
-      "norm_label": ".aggiornapassaggio()"
-    },
-    {
-      "label": ".getPassaggio()",
-      "file_type": "code",
-      "source_file": "src/services/istanziazionePort.ts",
-      "source_location": "L140",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "src_services_istanziazioneport_esecuzioneport_getpassaggio",
-      "community": 2,
-      "community_name": "inMemoryApp.ts",
-      "norm_label": ".getpassaggio()"
+      "norm_label": "start()"
     },
     {
       "label": "Calendar()",
@@ -2736,6 +3240,126 @@
       "norm_label": ".risolviritardomicrovoce()"
     },
     {
+      "label": ".aggiornaMicrovoce()",
+      "file_type": "code",
+      "source_file": "src/adapters/prisma/prismaIstanziazionePort.ts",
+      "source_location": "L171",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "src_adapters_prisma_prismaistanziazioneport_prismaistanziazioneport_aggiornamicrovoce",
+      "community": 3,
+      "community_name": "PrismaApp",
+      "norm_label": ".aggiornamicrovoce()"
+    },
+    {
+      "label": ".aggiornaModulo()",
+      "file_type": "code",
+      "source_file": "src/adapters/prisma/prismaIstanziazionePort.ts",
+      "source_location": "L194",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "src_adapters_prisma_prismaistanziazioneport_prismaistanziazioneport_aggiornamodulo",
+      "community": 3,
+      "community_name": "PrismaApp",
+      "norm_label": ".aggiornamodulo()"
+    },
+    {
+      "label": ".aggiornaPassaggio()",
+      "file_type": "code",
+      "source_file": "src/adapters/prisma/prismaIstanziazionePort.ts",
+      "source_location": "L220",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "src_adapters_prisma_prismaistanziazioneport_prismaistanziazioneport_aggiornapassaggio",
+      "community": 3,
+      "community_name": "PrismaApp",
+      "norm_label": ".aggiornapassaggio()"
+    },
+    {
+      "label": ".constructor()",
+      "file_type": "code",
+      "source_file": "src/adapters/prisma/prismaIstanziazionePort.ts",
+      "source_location": "L29",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "src_adapters_prisma_prismaistanziazioneport_prismaistanziazioneport_constructor",
+      "community": 3,
+      "community_name": "PrismaApp",
+      "norm_label": ".constructor()"
+    },
+    {
+      "label": ".getMicrovoce()",
+      "file_type": "code",
+      "source_file": "src/adapters/prisma/prismaIstanziazionePort.ts",
+      "source_location": "L157",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "src_adapters_prisma_prismaistanziazioneport_prismaistanziazioneport_getmicrovoce",
+      "community": 3,
+      "community_name": "PrismaApp",
+      "norm_label": ".getmicrovoce()"
+    },
+    {
+      "label": ".getMicrovociDelModulo()",
+      "file_type": "code",
+      "source_file": "src/adapters/prisma/prismaIstanziazionePort.ts",
+      "source_location": "L175",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "src_adapters_prisma_prismaistanziazioneport_prismaistanziazioneport_getmicrovocidelmodulo",
+      "community": 3,
+      "community_name": "PrismaApp",
+      "norm_label": ".getmicrovocidelmodulo()"
+    },
+    {
+      "label": ".getModuliDelProgettoConDipendenze()",
+      "file_type": "code",
+      "source_file": "src/adapters/prisma/prismaIstanziazionePort.ts",
+      "source_location": "L198",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "src_adapters_prisma_prismaistanziazioneport_prismaistanziazioneport_getmodulidelprogettocondipendenze",
+      "community": 3,
+      "community_name": "PrismaApp",
+      "norm_label": ".getmodulidelprogettocondipendenze()"
+    },
+    {
+      "label": ".getModulo()",
+      "file_type": "code",
+      "source_file": "src/adapters/prisma/prismaIstanziazionePort.ts",
+      "source_location": "L189",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "src_adapters_prisma_prismaistanziazioneport_prismaistanziazioneport_getmodulo",
+      "community": 3,
+      "community_name": "PrismaApp",
+      "norm_label": ".getmodulo()"
+    },
+    {
+      "label": ".getPassaggiDellaMicrovoce()",
+      "file_type": "code",
+      "source_file": "src/adapters/prisma/prismaIstanziazionePort.ts",
+      "source_location": "L215",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "src_adapters_prisma_prismaistanziazioneport_prismaistanziazioneport_getpassaggidellamicrovoce",
+      "community": 3,
+      "community_name": "PrismaApp",
+      "norm_label": ".getpassaggidellamicrovoce()"
+    },
+    {
+      "label": ".getPassaggio()",
+      "file_type": "code",
+      "source_file": "src/adapters/prisma/prismaIstanziazionePort.ts",
+      "source_location": "L210",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "src_adapters_prisma_prismaistanziazioneport_prismaistanziazioneport_getpassaggio",
+      "community": 3,
+      "community_name": "PrismaApp",
+      "norm_label": ".getpassaggio()"
+    },
+    {
       "label": ".registraModuloTemplate()",
       "file_type": "code",
       "source_file": "src/adapters/inMemoryApp.ts",
@@ -2744,7 +3368,7 @@
       "_origin": "ast",
       "id": "src_adapters_inmemoryapp_inmemoryapp_registramodulotemplate",
       "community": 32,
-      "community_name": "esecuzione.test.ts",
+      "community_name": "server.test.ts",
       "norm_label": ".registramodulotemplate()"
     },
     {
@@ -2756,7 +3380,7 @@
       "_origin": "ast",
       "id": "src_server_test_nuovoserver",
       "community": 32,
-      "community_name": "esecuzione.test.ts",
+      "community_name": "server.test.ts",
       "norm_label": "nuovoserver()"
     },
     {
@@ -2768,68 +3392,8 @@
       "_origin": "ast",
       "id": "src_server_test_progettoavviato",
       "community": 32,
-      "community_name": "esecuzione.test.ts",
+      "community_name": "server.test.ts",
       "norm_label": "progettoavviato()"
-    },
-    {
-      "label": "setupProgettoConDueModuli()",
-      "file_type": "code",
-      "source_file": "src/services/esecuzione.test.ts",
-      "source_location": "L71",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "src_services_esecuzione_test_setupprogettoconduemoduli",
-      "community": 32,
-      "community_name": "esecuzione.test.ts",
-      "norm_label": "setupprogettoconduemoduli()"
-    },
-    {
-      "label": "templateDipendente()",
-      "file_type": "code",
-      "source_file": "src/services/esecuzione.test.ts",
-      "source_location": "L47",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "src_services_esecuzione_test_templatedipendente",
-      "community": 32,
-      "community_name": "esecuzione.test.ts",
-      "norm_label": "templatedipendente()"
-    },
-    {
-      "label": "templateRadice()",
-      "file_type": "code",
-      "source_file": "src/services/esecuzione.test.ts",
-      "source_location": "L19",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "src_services_esecuzione_test_templateradice",
-      "community": 32,
-      "community_name": "esecuzione.test.ts",
-      "norm_label": "templateradice()"
-    },
-    {
-      "label": ".registraTemplate()",
-      "file_type": "code",
-      "source_file": "src/services/fakeIstanziazionePort.ts",
-      "source_location": "L91",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "src_services_fakeistanziazioneport_fakeistanziazioneport_registratemplate",
-      "community": 32,
-      "community_name": "esecuzione.test.ts",
-      "norm_label": ".registratemplate()"
-    },
-    {
-      "label": ".notificaProgettoAvviato()",
-      "file_type": "code",
-      "source_file": "src/services/fakeIstanziazionePort.ts",
-      "source_location": "L215",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "src_services_fakeistanziazioneport_fakenotificationport_notificaprogettoavviato",
-      "community": 32,
-      "community_name": "esecuzione.test.ts",
-      "norm_label": ".notificaprogettoavviato()"
     },
     {
       "label": "main()",
@@ -3132,172 +3696,76 @@
       "norm_label": "statoconfig()"
     },
     {
-      "label": "calcolaStatoModulo()",
+      "label": "createTransporter()",
       "file_type": "code",
-      "source_file": "src/domain/stateEngine.ts",
-      "source_location": "L50",
+      "source_file": "src/services/emailService.ts",
+      "source_location": "L9",
       "_callable": true,
       "_origin": "ast",
-      "id": "src_domain_stateengine_calcolastatomodulo",
+      "id": "src_services_emailservice_createtransporter",
       "community": 39,
-      "community_name": "esecuzione.ts",
-      "norm_label": "calcolastatomodulo()"
+      "community_name": "server.ts",
+      "norm_label": "createtransporter()"
     },
     {
-      "label": "risolviDipendenze()",
+      "label": "sendMagicLinkEmail()",
       "file_type": "code",
-      "source_file": "src/domain/stateEngine.ts",
-      "source_location": "L157",
+      "source_file": "src/services/emailService.ts",
+      "source_location": "L27",
       "_callable": true,
       "_origin": "ast",
-      "id": "src_domain_stateengine_risolvidipendenze",
+      "id": "src_services_emailservice_sendmagiclinkemail",
       "community": 39,
-      "community_name": "esecuzione.ts",
-      "norm_label": "risolvidipendenze()"
+      "community_name": "server.ts",
+      "norm_label": "sendmagiclinkemail()"
     },
     {
-      "label": "completaMicrovoce()",
+      "label": "uploadDocumento()",
       "file_type": "code",
-      "source_file": "src/services/esecuzione.ts",
+      "source_file": "src/services/storageService.ts",
+      "source_location": "L11",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "src_services_storageservice_uploaddocumento",
+      "community": 39,
+      "community_name": "server.ts",
+      "norm_label": "uploaddocumento()"
+    },
+    {
+      "label": "generateMagicToken()",
+      "file_type": "code",
+      "source_file": "src/util/jwt.ts",
       "source_location": "L55",
       "_callable": true,
       "_origin": "ast",
-      "id": "src_services_esecuzione_completamicrovoce",
+      "id": "src_util_jwt_generatemagictoken",
       "community": 39,
-      "community_name": "esecuzione.ts",
-      "norm_label": "completamicrovoce()"
+      "community_name": "server.ts",
+      "norm_label": "generatemagictoken()"
     },
     {
-      "label": "marcaRitardo()",
+      "label": "signJwt()",
       "file_type": "code",
-      "source_file": "src/services/esecuzione.ts",
-      "source_location": "L32",
+      "source_file": "src/util/jwt.ts",
+      "source_location": "L13",
       "_callable": true,
       "_origin": "ast",
-      "id": "src_services_esecuzione_marcaritardo",
+      "id": "src_util_jwt_signjwt",
       "community": 39,
-      "community_name": "esecuzione.ts",
-      "norm_label": "marcaritardo()"
+      "community_name": "server.ts",
+      "norm_label": "signjwt()"
     },
     {
-      "label": "registraConsuntivazione()",
+      "label": "verifyJwt()",
       "file_type": "code",
-      "source_file": "src/services/esecuzione.ts",
-      "source_location": "L20",
+      "source_file": "src/util/jwt.ts",
+      "source_location": "L29",
       "_callable": true,
       "_origin": "ast",
-      "id": "src_services_esecuzione_registraconsuntivazione",
+      "id": "src_util_jwt_verifyjwt",
       "community": 39,
-      "community_name": "esecuzione.ts",
-      "norm_label": "registraconsuntivazione()"
-    },
-    {
-      "label": "ricalcolaModuloECascata()",
-      "file_type": "code",
-      "source_file": "src/services/esecuzione.ts",
-      "source_location": "L93",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "src_services_esecuzione_ricalcolamoduloecascata",
-      "community": 39,
-      "community_name": "esecuzione.ts",
-      "norm_label": "ricalcolamoduloecascata()"
-    },
-    {
-      "label": "risolviRitardo()",
-      "file_type": "code",
-      "source_file": "src/services/esecuzione.ts",
-      "source_location": "L40",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "src_services_esecuzione_risolviritardo",
-      "community": 39,
-      "community_name": "esecuzione.ts",
-      "norm_label": "risolviritardo()"
-    },
-    {
-      "label": ".aggiornaMicrovoce()",
-      "file_type": "code",
-      "source_file": "src/services/istanziazionePort.ts",
-      "source_location": "L133",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "src_services_istanziazioneport_esecuzioneport_aggiornamicrovoce",
-      "community": 39,
-      "community_name": "esecuzione.ts",
-      "norm_label": ".aggiornamicrovoce()"
-    },
-    {
-      "label": ".aggiornaModulo()",
-      "file_type": "code",
-      "source_file": "src/services/istanziazionePort.ts",
-      "source_location": "L137",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "src_services_istanziazioneport_esecuzioneport_aggiornamodulo",
-      "community": 39,
-      "community_name": "esecuzione.ts",
-      "norm_label": ".aggiornamodulo()"
-    },
-    {
-      "label": ".getMicrovoce()",
-      "file_type": "code",
-      "source_file": "src/services/istanziazionePort.ts",
-      "source_location": "L132",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "src_services_istanziazioneport_esecuzioneport_getmicrovoce",
-      "community": 39,
-      "community_name": "esecuzione.ts",
-      "norm_label": ".getmicrovoce()"
-    },
-    {
-      "label": ".getMicrovociDelModulo()",
-      "file_type": "code",
-      "source_file": "src/services/istanziazionePort.ts",
-      "source_location": "L134",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "src_services_istanziazioneport_esecuzioneport_getmicrovocidelmodulo",
-      "community": 39,
-      "community_name": "esecuzione.ts",
-      "norm_label": ".getmicrovocidelmodulo()"
-    },
-    {
-      "label": ".getModuliDelProgettoConDipendenze()",
-      "file_type": "code",
-      "source_file": "src/services/istanziazionePort.ts",
-      "source_location": "L138",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "src_services_istanziazioneport_esecuzioneport_getmodulidelprogettocondipendenze",
-      "community": 39,
-      "community_name": "esecuzione.ts",
-      "norm_label": ".getmodulidelprogettocondipendenze()"
-    },
-    {
-      "label": ".getModulo()",
-      "file_type": "code",
-      "source_file": "src/services/istanziazionePort.ts",
-      "source_location": "L136",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "src_services_istanziazioneport_esecuzioneport_getmodulo",
-      "community": 39,
-      "community_name": "esecuzione.ts",
-      "norm_label": ".getmodulo()"
-    },
-    {
-      "label": ".getPassaggiDellaMicrovoce()",
-      "file_type": "code",
-      "source_file": "src/services/istanziazionePort.ts",
-      "source_location": "L141",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "src_services_istanziazioneport_esecuzioneport_getpassaggidellamicrovoce",
-      "community": 39,
-      "community_name": "esecuzione.ts",
-      "norm_label": ".getpassaggidellamicrovoce()"
+      "community_name": "server.ts",
+      "norm_label": "verifyjwt()"
     },
     {
       "label": "fetchAuditLogsApi()",
@@ -3540,232 +4008,52 @@
       "norm_label": "resolverighe()"
     },
     {
-      "label": ".notificaProgettoAvviato()",
+      "label": "main()",
       "file_type": "code",
-      "source_file": "src/adapters/prisma/prismaApp.ts",
-      "source_location": "L33",
+      "source_file": "src/adapters/prisma/bootstrap.ts",
+      "source_location": "L14",
       "_callable": true,
       "_origin": "ast",
-      "id": "src_adapters_prisma_prismaapp_consolenotificationport_notificaprogettoavviato",
+      "id": "src_adapters_prisma_bootstrap_main",
       "community": 41,
-      "community_name": "istanziaProgetto.ts",
-      "norm_label": ".notificaprogettoavviato()"
+      "community_name": "password.ts",
+      "norm_label": "main()"
     },
     {
-      "label": "calcolaOreModulo()",
+      "label": "generaPasswordTemporanea()",
       "file_type": "code",
-      "source_file": "src/services/istanziaProgetto.ts",
-      "source_location": "L40",
+      "source_file": "src/util/password.ts",
+      "source_location": "L29",
       "_callable": true,
       "_origin": "ast",
-      "id": "src_services_istanziaprogetto_calcolaoremodulo",
+      "id": "src_util_password_generapasswordtemporanea",
       "community": 41,
-      "community_name": "istanziaProgetto.ts",
-      "norm_label": "calcolaoremodulo()"
+      "community_name": "password.ts",
+      "norm_label": "generapasswordtemporanea()"
     },
     {
-      "label": "calcolaPrezzoModulo()",
+      "label": "hashPassword()",
       "file_type": "code",
-      "source_file": "src/services/istanziaProgetto.ts",
-      "source_location": "L35",
+      "source_file": "src/util/password.ts",
+      "source_location": "L12",
       "_callable": true,
       "_origin": "ast",
-      "id": "src_services_istanziaprogetto_calcolaprezzomodulo",
+      "id": "src_util_password_hashpassword",
       "community": 41,
-      "community_name": "istanziaProgetto.ts",
-      "norm_label": "calcolaprezzomodulo()"
+      "community_name": "password.ts",
+      "norm_label": "hashpassword()"
     },
     {
-      "label": "istanziaProgetto()",
+      "label": "verifyPassword()",
       "file_type": "code",
-      "source_file": "src/services/istanziaProgetto.ts",
-      "source_location": "L68",
+      "source_file": "src/util/password.ts",
+      "source_location": "L19",
       "_callable": true,
       "_origin": "ast",
-      "id": "src_services_istanziaprogetto_istanziaprogetto",
+      "id": "src_util_password_verifypassword",
       "community": 41,
-      "community_name": "istanziaProgetto.ts",
-      "norm_label": "istanziaprogetto()"
-    },
-    {
-      "label": "templateSemplice()",
-      "file_type": "code",
-      "source_file": "src/services/istanziaProgetto.test.ts",
-      "source_location": "L6",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "src_services_istanziaprogetto_test_templatesemplice",
-      "community": 41,
-      "community_name": "istanziaProgetto.ts",
-      "norm_label": "templatesemplice()"
-    },
-    {
-      "label": ".notificaProgettoAvviato()",
-      "file_type": "code",
-      "source_file": "src/services/istanziazionePort.ts",
-      "source_location": "L93",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "src_services_istanziazioneport_notificationport_notificaprogettoavviato",
-      "community": 41,
-      "community_name": "istanziaProgetto.ts",
-      "norm_label": ".notificaprogettoavviato()"
-    },
-    {
-      "label": ".eseguiInTransazione()",
-      "file_type": "code",
-      "source_file": "src/adapters/prisma/prismaIstanziazionePort.ts",
-      "source_location": "L34",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "src_adapters_prisma_prismaistanziazioneport_prismaistanziazioneport_eseguiintransazione",
-      "community": 42,
-      "community_name": "IstanziazioneTransazione",
-      "norm_label": ".eseguiintransazione()"
-    },
-    {
-      "label": "clonaDb()",
-      "file_type": "code",
-      "source_file": "src/services/fakeIstanziazionePort.ts",
-      "source_location": "L76",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "src_services_fakeistanziazioneport_clonadb",
-      "community": 42,
-      "community_name": "IstanziazioneTransazione",
-      "norm_label": "clonadb()"
-    },
-    {
-      "label": ".creaTransazione()",
-      "file_type": "code",
-      "source_file": "src/services/fakeIstanziazionePort.ts",
-      "source_location": "L110",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "src_services_fakeistanziazioneport_fakeistanziazioneport_creatransazione",
-      "community": 42,
-      "community_name": "IstanziazioneTransazione",
-      "norm_label": ".creatransazione()"
-    },
-    {
-      "label": ".eseguiInTransazione()",
-      "file_type": "code",
-      "source_file": "src/services/fakeIstanziazionePort.ts",
-      "source_location": "L102",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "src_services_fakeistanziazioneport_fakeistanziazioneport_eseguiintransazione",
-      "community": 42,
-      "community_name": "IstanziazioneTransazione",
-      "norm_label": ".eseguiintransazione()"
-    },
-    {
-      "label": ".snapshot()",
-      "file_type": "code",
-      "source_file": "src/services/fakeIstanziazionePort.ts",
-      "source_location": "L98",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "src_services_fakeistanziazioneport_fakeistanziazioneport_snapshot",
-      "community": 42,
-      "community_name": "IstanziazioneTransazione",
-      "norm_label": ".snapshot()"
-    },
-    {
-      "label": "nuovoId()",
-      "file_type": "code",
-      "source_file": "src/services/fakeIstanziazionePort.ts",
-      "source_location": "L27",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "src_services_fakeistanziazioneport_nuovoid",
-      "community": 42,
-      "community_name": "IstanziazioneTransazione",
-      "norm_label": "nuovoid()"
-    },
-    {
-      "label": ".aggiornaStatoProgetto()",
-      "file_type": "code",
-      "source_file": "src/services/istanziazionePort.ts",
-      "source_location": "L78",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "src_services_istanziazioneport_istanziazionetransazione_aggiornastatoprogetto",
-      "community": 42,
-      "community_name": "IstanziazioneTransazione",
-      "norm_label": ".aggiornastatoprogetto()"
-    },
-    {
-      "label": ".creaMicrovoceProgetto()",
-      "file_type": "code",
-      "source_file": "src/services/istanziazionePort.ts",
-      "source_location": "L80",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "src_services_istanziazioneport_istanziazionetransazione_creamicrovoceprogetto",
-      "community": 42,
-      "community_name": "IstanziazioneTransazione",
-      "norm_label": ".creamicrovoceprogetto()"
-    },
-    {
-      "label": ".creaModuloProgetto()",
-      "file_type": "code",
-      "source_file": "src/services/istanziazionePort.ts",
-      "source_location": "L79",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "src_services_istanziazioneport_istanziazionetransazione_creamoduloprogetto",
-      "community": 42,
-      "community_name": "IstanziazioneTransazione",
-      "norm_label": ".creamoduloprogetto()"
-    },
-    {
-      "label": ".creaModuloProgettoDipendenza()",
-      "file_type": "code",
-      "source_file": "src/services/istanziazionePort.ts",
-      "source_location": "L84",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "src_services_istanziazioneport_istanziazionetransazione_creamoduloprogettodipendenza",
-      "community": 42,
-      "community_name": "IstanziazioneTransazione",
-      "norm_label": ".creamoduloprogettodipendenza()"
-    },
-    {
-      "label": ".creaPassaggioProgetto()",
-      "file_type": "code",
-      "source_file": "src/services/istanziazionePort.ts",
-      "source_location": "L83",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "src_services_istanziazioneport_istanziazionetransazione_creapassaggioprogetto",
-      "community": 42,
-      "community_name": "IstanziazioneTransazione",
-      "norm_label": ".creapassaggioprogetto()"
-    },
-    {
-      "label": ".getModuloTemplateConDistinta()",
-      "file_type": "code",
-      "source_file": "src/services/istanziazionePort.ts",
-      "source_location": "L77",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "src_services_istanziazioneport_istanziazionetransazione_getmodulotemplatecondistinta",
-      "community": 42,
-      "community_name": "IstanziazioneTransazione",
-      "norm_label": ".getmodulotemplatecondistinta()"
-    },
-    {
-      "label": ".impostaStatoMicrovoceIniziale()",
-      "file_type": "code",
-      "source_file": "src/services/istanziazionePort.ts",
-      "source_location": "L82",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "src_services_istanziazioneport_istanziazionetransazione_impostastatomicrovoceiniziale",
-      "community": 42,
-      "community_name": "IstanziazioneTransazione",
-      "norm_label": ".impostastatomicrovoceiniziale()"
+      "community_name": "password.ts",
+      "norm_label": "verifypassword()"
     },
     {
       "label": "CatBadge()",
@@ -3790,150 +4078,6 @@
       "community": 43,
       "community_name": "NewProjectWizard.tsx",
       "norm_label": "catcls()"
-    },
-    {
-      "label": ".aggiornaMicrovoce()",
-      "file_type": "code",
-      "source_file": "src/adapters/prisma/prismaIstanziazionePort.ts",
-      "source_location": "L171",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "src_adapters_prisma_prismaistanziazioneport_prismaistanziazioneport_aggiornamicrovoce",
-      "community": 44,
-      "community_name": "PrismaIstanziazionePort",
-      "norm_label": ".aggiornamicrovoce()"
-    },
-    {
-      "label": ".aggiornaModulo()",
-      "file_type": "code",
-      "source_file": "src/adapters/prisma/prismaIstanziazionePort.ts",
-      "source_location": "L194",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "src_adapters_prisma_prismaistanziazioneport_prismaistanziazioneport_aggiornamodulo",
-      "community": 44,
-      "community_name": "PrismaIstanziazionePort",
-      "norm_label": ".aggiornamodulo()"
-    },
-    {
-      "label": ".aggiornaPassaggio()",
-      "file_type": "code",
-      "source_file": "src/adapters/prisma/prismaIstanziazionePort.ts",
-      "source_location": "L220",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "src_adapters_prisma_prismaistanziazioneport_prismaistanziazioneport_aggiornapassaggio",
-      "community": 44,
-      "community_name": "PrismaIstanziazionePort",
-      "norm_label": ".aggiornapassaggio()"
-    },
-    {
-      "label": ".constructor()",
-      "file_type": "code",
-      "source_file": "src/adapters/prisma/prismaIstanziazionePort.ts",
-      "source_location": "L29",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "src_adapters_prisma_prismaistanziazioneport_prismaistanziazioneport_constructor",
-      "community": 44,
-      "community_name": "PrismaIstanziazionePort",
-      "norm_label": ".constructor()"
-    },
-    {
-      "label": ".getMicrovoce()",
-      "file_type": "code",
-      "source_file": "src/adapters/prisma/prismaIstanziazionePort.ts",
-      "source_location": "L157",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "src_adapters_prisma_prismaistanziazioneport_prismaistanziazioneport_getmicrovoce",
-      "community": 44,
-      "community_name": "PrismaIstanziazionePort",
-      "norm_label": ".getmicrovoce()"
-    },
-    {
-      "label": ".getMicrovociDelModulo()",
-      "file_type": "code",
-      "source_file": "src/adapters/prisma/prismaIstanziazionePort.ts",
-      "source_location": "L175",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "src_adapters_prisma_prismaistanziazioneport_prismaistanziazioneport_getmicrovocidelmodulo",
-      "community": 44,
-      "community_name": "PrismaIstanziazionePort",
-      "norm_label": ".getmicrovocidelmodulo()"
-    },
-    {
-      "label": ".getModuliDelProgettoConDipendenze()",
-      "file_type": "code",
-      "source_file": "src/adapters/prisma/prismaIstanziazionePort.ts",
-      "source_location": "L198",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "src_adapters_prisma_prismaistanziazioneport_prismaistanziazioneport_getmodulidelprogettocondipendenze",
-      "community": 44,
-      "community_name": "PrismaIstanziazionePort",
-      "norm_label": ".getmodulidelprogettocondipendenze()"
-    },
-    {
-      "label": ".getModulo()",
-      "file_type": "code",
-      "source_file": "src/adapters/prisma/prismaIstanziazionePort.ts",
-      "source_location": "L189",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "src_adapters_prisma_prismaistanziazioneport_prismaistanziazioneport_getmodulo",
-      "community": 44,
-      "community_name": "PrismaIstanziazionePort",
-      "norm_label": ".getmodulo()"
-    },
-    {
-      "label": ".getPassaggiDellaMicrovoce()",
-      "file_type": "code",
-      "source_file": "src/adapters/prisma/prismaIstanziazionePort.ts",
-      "source_location": "L215",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "src_adapters_prisma_prismaistanziazioneport_prismaistanziazioneport_getpassaggidellamicrovoce",
-      "community": 44,
-      "community_name": "PrismaIstanziazionePort",
-      "norm_label": ".getpassaggidellamicrovoce()"
-    },
-    {
-      "label": ".getPassaggio()",
-      "file_type": "code",
-      "source_file": "src/adapters/prisma/prismaIstanziazionePort.ts",
-      "source_location": "L210",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "src_adapters_prisma_prismaistanziazioneport_prismaistanziazioneport_getpassaggio",
-      "community": 44,
-      "community_name": "PrismaIstanziazionePort",
-      "norm_label": ".getpassaggio()"
-    },
-    {
-      "label": "main()",
-      "file_type": "code",
-      "source_file": "src/adapters/prisma/seed.ts",
-      "source_location": "L74",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "src_adapters_prisma_seed_main",
-      "community": 46,
-      "community_name": "seed.ts",
-      "norm_label": "main()"
-    },
-    {
-      "label": "seedModulo()",
-      "file_type": "code",
-      "source_file": "src/adapters/prisma/seed.ts",
-      "source_location": "L16",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "src_adapters_prisma_seed_seedmodulo",
-      "community": 46,
-      "community_name": "seed.ts",
-      "norm_label": "seedmodulo()"
     },
     {
       "label": "loginApi()",
@@ -3970,30 +4114,6 @@
       "community": 47,
       "community_name": "LoginPage.tsx",
       "norm_label": "rolebtnstyle()"
-    },
-    {
-      "label": "main()",
-      "file_type": "code",
-      "source_file": "src/adapters/prisma/bootstrap.ts",
-      "source_location": "L14",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "src_adapters_prisma_bootstrap_main",
-      "community": 7,
-      "community_name": "buildServer",
-      "norm_label": "main()"
-    },
-    {
-      "label": "start()",
-      "file_type": "code",
-      "source_file": "src/index.ts",
-      "source_location": "L11",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "src_index_start",
-      "community": 7,
-      "community_name": "buildServer",
-      "norm_label": "start()"
     },
     {
       "label": "buildServer()",
@@ -4296,114 +4416,6 @@
       "norm_label": ".risolviritardomicrovoce()"
     },
     {
-      "label": "createTransporter()",
-      "file_type": "code",
-      "source_file": "src/services/emailService.ts",
-      "source_location": "L9",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "src_services_emailservice_createtransporter",
-      "community": 7,
-      "community_name": "buildServer",
-      "norm_label": "createtransporter()"
-    },
-    {
-      "label": "sendMagicLinkEmail()",
-      "file_type": "code",
-      "source_file": "src/services/emailService.ts",
-      "source_location": "L27",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "src_services_emailservice_sendmagiclinkemail",
-      "community": 7,
-      "community_name": "buildServer",
-      "norm_label": "sendmagiclinkemail()"
-    },
-    {
-      "label": "uploadDocumento()",
-      "file_type": "code",
-      "source_file": "src/services/storageService.ts",
-      "source_location": "L11",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "src_services_storageservice_uploaddocumento",
-      "community": 7,
-      "community_name": "buildServer",
-      "norm_label": "uploaddocumento()"
-    },
-    {
-      "label": "generateMagicToken()",
-      "file_type": "code",
-      "source_file": "src/util/jwt.ts",
-      "source_location": "L55",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "src_util_jwt_generatemagictoken",
-      "community": 7,
-      "community_name": "buildServer",
-      "norm_label": "generatemagictoken()"
-    },
-    {
-      "label": "signJwt()",
-      "file_type": "code",
-      "source_file": "src/util/jwt.ts",
-      "source_location": "L13",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "src_util_jwt_signjwt",
-      "community": 7,
-      "community_name": "buildServer",
-      "norm_label": "signjwt()"
-    },
-    {
-      "label": "verifyJwt()",
-      "file_type": "code",
-      "source_file": "src/util/jwt.ts",
-      "source_location": "L29",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "src_util_jwt_verifyjwt",
-      "community": 7,
-      "community_name": "buildServer",
-      "norm_label": "verifyjwt()"
-    },
-    {
-      "label": "generaPasswordTemporanea()",
-      "file_type": "code",
-      "source_file": "src/util/password.ts",
-      "source_location": "L29",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "src_util_password_generapasswordtemporanea",
-      "community": 7,
-      "community_name": "buildServer",
-      "norm_label": "generapasswordtemporanea()"
-    },
-    {
-      "label": "hashPassword()",
-      "file_type": "code",
-      "source_file": "src/util/password.ts",
-      "source_location": "L12",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "src_util_password_hashpassword",
-      "community": 7,
-      "community_name": "buildServer",
-      "norm_label": "hashpassword()"
-    },
-    {
-      "label": "verifyPassword()",
-      "file_type": "code",
-      "source_file": "src/util/password.ts",
-      "source_location": "L19",
-      "_callable": true,
-      "_origin": "ast",
-      "id": "src_util_password_verifypassword",
-      "community": 7,
-      "community_name": "buildServer",
-      "norm_label": "verifypassword()"
-    },
-    {
       "label": "prismaIstanziazionePort.ts",
       "file_type": "code",
       "source_file": "src/adapters/prisma/prismaIstanziazionePort.ts",
@@ -4415,6 +4427,72 @@
       "norm_label": "prismaistanziazioneport.ts"
     },
     {
+      "label": "seed.ts",
+      "file_type": "code",
+      "source_file": "src/adapters/prisma/seed.ts",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "src_adapters_prisma_seed",
+      "community": 0,
+      "community_name": "istanziazionePort.ts",
+      "norm_label": "seed.ts"
+    },
+    {
+      "label": "prisma",
+      "file_type": "code",
+      "source_file": "src/adapters/prisma/seed.ts",
+      "source_location": "L14",
+      "_origin": "ast",
+      "id": "src_adapters_prisma_seed_prisma",
+      "community": 0,
+      "community_name": "istanziazionePort.ts",
+      "norm_label": "prisma"
+    },
+    {
+      "label": "seedData.ts",
+      "file_type": "code",
+      "source_file": "src/scripts/seedData.ts",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "src_scripts_seeddata",
+      "community": 0,
+      "community_name": "istanziazionePort.ts",
+      "norm_label": "seeddata.ts"
+    },
+    {
+      "label": "moduloAnalisiPatrimoniale",
+      "file_type": "code",
+      "source_file": "src/scripts/seedData.ts",
+      "source_location": "L7",
+      "_origin": "ast",
+      "id": "src_scripts_seeddata_moduloanalisipatrimoniale",
+      "community": 0,
+      "community_name": "istanziazionePort.ts",
+      "norm_label": "moduloanalisipatrimoniale"
+    },
+    {
+      "label": "moduloCorporateStructuring",
+      "file_type": "code",
+      "source_file": "src/scripts/seedData.ts",
+      "source_location": "L53",
+      "_origin": "ast",
+      "id": "src_scripts_seeddata_modulocorporatestructuring",
+      "community": 0,
+      "community_name": "istanziazionePort.ts",
+      "norm_label": "modulocorporatestructuring"
+    },
+    {
+      "label": "esecuzione.test.ts",
+      "file_type": "code",
+      "source_file": "src/services/esecuzione.test.ts",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "src_services_esecuzione_test",
+      "community": 0,
+      "community_name": "istanziazionePort.ts",
+      "norm_label": "esecuzione.test.ts"
+    },
+    {
       "label": "fakeIstanziazionePort.ts",
       "file_type": "code",
       "source_file": "src/services/fakeIstanziazionePort.ts",
@@ -4424,6 +4502,28 @@
       "community": 0,
       "community_name": "istanziazionePort.ts",
       "norm_label": "fakeistanziazioneport.ts"
+    },
+    {
+      "label": "istanziaProgetto.ts",
+      "file_type": "code",
+      "source_file": "src/services/istanziaProgetto.ts",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "src_services_istanziaprogetto",
+      "community": 0,
+      "community_name": "istanziazionePort.ts",
+      "norm_label": "istanziaprogetto.ts"
+    },
+    {
+      "label": "istanziaProgetto.test.ts",
+      "file_type": "code",
+      "source_file": "src/services/istanziaProgetto.test.ts",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "src_services_istanziaprogetto_test",
+      "community": 0,
+      "community_name": "istanziazionePort.ts",
+      "norm_label": "istanziaprogetto.test.ts"
     },
     {
       "label": "istanziazionePort.ts",
@@ -4444,7 +4544,7 @@
       "_origin": "ast",
       "id": "src_domain_stateengine",
       "community": 1,
-      "community_name": "stateEngine.ts",
+      "community_name": "esecuzione.ts",
       "norm_label": "stateengine.ts"
     },
     {
@@ -4455,7 +4555,7 @@
       "_origin": "ast",
       "id": "src_domain_stateengine_test",
       "community": 1,
-      "community_name": "stateEngine.ts",
+      "community_name": "esecuzione.ts",
       "norm_label": "stateengine.test.ts"
     },
     {
@@ -4466,8 +4566,19 @@
       "_origin": "ast",
       "id": "src_domain_types",
       "community": 1,
-      "community_name": "stateEngine.ts",
+      "community_name": "esecuzione.ts",
       "norm_label": "types.ts"
+    },
+    {
+      "label": "esecuzione.ts",
+      "file_type": "code",
+      "source_file": "src/services/esecuzione.ts",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "src_services_esecuzione",
+      "community": 1,
+      "community_name": "esecuzione.ts",
+      "norm_label": "esecuzione.ts"
     },
     {
       "label": "tsconfig.node.json",
@@ -6153,6 +6264,17 @@
       "norm_label": "prismaapp.ts"
     },
     {
+      "label": "src/index.ts",
+      "file_type": "code",
+      "source_file": "src/index.ts",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "src_index",
+      "community": 2,
+      "community_name": "inMemoryApp.ts",
+      "norm_label": "src/index.ts"
+    },
+    {
       "label": "appPort.ts",
       "file_type": "code",
       "source_file": "src/services/appPort.ts",
@@ -6919,7 +7041,7 @@
       "_origin": "ast",
       "id": "src_server_test",
       "community": 32,
-      "community_name": "esecuzione.test.ts",
+      "community_name": "server.test.ts",
       "norm_label": "server.test.ts"
     },
     {
@@ -6930,19 +7052,8 @@
       "_origin": "ast",
       "id": "src_server_test_templateanalisi",
       "community": 32,
-      "community_name": "esecuzione.test.ts",
+      "community_name": "server.test.ts",
       "norm_label": "templateanalisi"
-    },
-    {
-      "label": "esecuzione.test.ts",
-      "file_type": "code",
-      "source_file": "src/services/esecuzione.test.ts",
-      "source_location": "L1",
-      "_origin": "ast",
-      "id": "src_services_esecuzione_test",
-      "community": 32,
-      "community_name": "esecuzione.test.ts",
-      "norm_label": "esecuzione.test.ts"
     },
     {
       "label": "frontend/README.md",
@@ -7165,15 +7276,92 @@
       "norm_label": "projects.tsx"
     },
     {
-      "label": "esecuzione.ts",
+      "label": "fs",
       "file_type": "code",
-      "source_file": "src/services/esecuzione.ts",
+      "source_file": "fs",
+      "confidence": "EXTRACTED",
+      "_origin": "ast",
+      "id": "fs",
+      "community": 39,
+      "community_name": "server.ts",
+      "norm_label": "fs"
+    },
+    {
+      "label": "path",
+      "file_type": "code",
+      "source_file": "path",
+      "confidence": "EXTRACTED",
+      "_origin": "ast",
+      "id": "path",
+      "community": 39,
+      "community_name": "server.ts",
+      "norm_label": "path"
+    },
+    {
+      "label": "server.ts",
+      "file_type": "code",
+      "source_file": "src/server.ts",
       "source_location": "L1",
       "_origin": "ast",
-      "id": "src_services_esecuzione",
+      "id": "src_server",
       "community": 39,
-      "community_name": "esecuzione.ts",
-      "norm_label": "esecuzione.ts"
+      "community_name": "server.ts",
+      "norm_label": "server.ts"
+    },
+    {
+      "label": "inMemoryTenantStore",
+      "file_type": "code",
+      "source_file": "src/server.ts",
+      "source_location": "L24",
+      "_origin": "ast",
+      "id": "src_server_inmemorytenantstore",
+      "community": 39,
+      "community_name": "server.ts",
+      "norm_label": "inmemorytenantstore"
+    },
+    {
+      "label": "prisma",
+      "file_type": "code",
+      "source_file": "src/server.ts",
+      "source_location": "L23",
+      "_origin": "ast",
+      "id": "src_server_prisma",
+      "community": 39,
+      "community_name": "server.ts",
+      "norm_label": "prisma"
+    },
+    {
+      "label": "emailService.ts",
+      "file_type": "code",
+      "source_file": "src/services/emailService.ts",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "src_services_emailservice",
+      "community": 39,
+      "community_name": "server.ts",
+      "norm_label": "emailservice.ts"
+    },
+    {
+      "label": "storageService.ts",
+      "file_type": "code",
+      "source_file": "src/services/storageService.ts",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "src_services_storageservice",
+      "community": 39,
+      "community_name": "server.ts",
+      "norm_label": "storageservice.ts"
+    },
+    {
+      "label": "jwt.ts",
+      "file_type": "code",
+      "source_file": "src/util/jwt.ts",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "src_util_jwt",
+      "community": 39,
+      "community_name": "server.ts",
+      "norm_label": "jwt.ts"
     },
     {
       "label": "App.tsx",
@@ -7308,26 +7496,103 @@
       "norm_label": "library.tsx"
     },
     {
-      "label": "istanziaProgetto.ts",
+      "label": "bootstrap.ts",
       "file_type": "code",
-      "source_file": "src/services/istanziaProgetto.ts",
+      "source_file": "src/adapters/prisma/bootstrap.ts",
       "source_location": "L1",
       "_origin": "ast",
-      "id": "src_services_istanziaprogetto",
+      "id": "src_adapters_prisma_bootstrap",
       "community": 41,
-      "community_name": "istanziaProgetto.ts",
-      "norm_label": "istanziaprogetto.ts"
+      "community_name": "password.ts",
+      "norm_label": "bootstrap.ts"
     },
     {
-      "label": "istanziaProgetto.test.ts",
+      "label": "prisma",
       "file_type": "code",
-      "source_file": "src/services/istanziaProgetto.test.ts",
+      "source_file": "src/adapters/prisma/bootstrap.ts",
+      "source_location": "L12",
+      "_origin": "ast",
+      "id": "src_adapters_prisma_bootstrap_prisma",
+      "community": 41,
+      "community_name": "password.ts",
+      "norm_label": "prisma"
+    },
+    {
+      "label": "password.ts",
+      "file_type": "code",
+      "source_file": "src/util/password.ts",
       "source_location": "L1",
       "_origin": "ast",
-      "id": "src_services_istanziaprogetto_test",
+      "id": "src_util_password",
       "community": 41,
-      "community_name": "istanziaProgetto.ts",
-      "norm_label": "istanziaprogetto.test.ts"
+      "community_name": "password.ts",
+      "norm_label": "password.ts"
+    },
+    {
+      "label": "password.test.ts",
+      "file_type": "code",
+      "source_file": "src/util/password.test.ts",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "src_util_password_test",
+      "community": 41,
+      "community_name": "password.ts",
+      "norm_label": "password.test.ts"
+    },
+    {
+      "label": "prisma/index.ts",
+      "file_type": "code",
+      "source_file": "src/adapters/prisma/index.ts",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "src_adapters_prisma_index",
+      "community": 42,
+      "community_name": "prisma/index.ts",
+      "norm_label": "prisma/index.ts"
+    },
+    {
+      "label": "app",
+      "file_type": "code",
+      "source_file": "src/adapters/prisma/index.ts",
+      "source_location": "L23",
+      "_origin": "ast",
+      "id": "src_adapters_prisma_index_app",
+      "community": 42,
+      "community_name": "prisma/index.ts",
+      "norm_label": "app"
+    },
+    {
+      "label": "porta",
+      "file_type": "code",
+      "source_file": "src/adapters/prisma/index.ts",
+      "source_location": "L25",
+      "_origin": "ast",
+      "id": "src_adapters_prisma_index_porta",
+      "community": 42,
+      "community_name": "prisma/index.ts",
+      "norm_label": "porta"
+    },
+    {
+      "label": "prisma",
+      "file_type": "code",
+      "source_file": "src/adapters/prisma/index.ts",
+      "source_location": "L22",
+      "_origin": "ast",
+      "id": "src_adapters_prisma_index_prisma",
+      "community": 42,
+      "community_name": "prisma/index.ts",
+      "norm_label": "prisma"
+    },
+    {
+      "label": "server",
+      "file_type": "code",
+      "source_file": "src/adapters/prisma/index.ts",
+      "source_location": "L24",
+      "_origin": "ast",
+      "id": "src_adapters_prisma_index_server",
+      "community": 42,
+      "community_name": "prisma/index.ts",
+      "norm_label": "server"
     },
     {
       "label": "NewProjectWizard.tsx",
@@ -7493,61 +7758,6 @@
       "community": 45,
       "community_name": "\ud83d\udfe2 1. WhatsApp Business API (Official Meta Cloud API)",
       "norm_label": "c. associazione automatica al progetto cliente"
-    },
-    {
-      "label": "seed.ts",
-      "file_type": "code",
-      "source_file": "src/adapters/prisma/seed.ts",
-      "source_location": "L1",
-      "_origin": "ast",
-      "id": "src_adapters_prisma_seed",
-      "community": 46,
-      "community_name": "seed.ts",
-      "norm_label": "seed.ts"
-    },
-    {
-      "label": "prisma",
-      "file_type": "code",
-      "source_file": "src/adapters/prisma/seed.ts",
-      "source_location": "L14",
-      "_origin": "ast",
-      "id": "src_adapters_prisma_seed_prisma",
-      "community": 46,
-      "community_name": "seed.ts",
-      "norm_label": "prisma"
-    },
-    {
-      "label": "seedData.ts",
-      "file_type": "code",
-      "source_file": "src/scripts/seedData.ts",
-      "source_location": "L1",
-      "_origin": "ast",
-      "id": "src_scripts_seeddata",
-      "community": 46,
-      "community_name": "seed.ts",
-      "norm_label": "seeddata.ts"
-    },
-    {
-      "label": "moduloAnalisiPatrimoniale",
-      "file_type": "code",
-      "source_file": "src/scripts/seedData.ts",
-      "source_location": "L7",
-      "_origin": "ast",
-      "id": "src_scripts_seeddata_moduloanalisipatrimoniale",
-      "community": 46,
-      "community_name": "seed.ts",
-      "norm_label": "moduloanalisipatrimoniale"
-    },
-    {
-      "label": "moduloCorporateStructuring",
-      "file_type": "code",
-      "source_file": "src/scripts/seedData.ts",
-      "source_location": "L53",
-      "_origin": "ast",
-      "id": "src_scripts_seeddata_modulocorporatestructuring",
-      "community": 46,
-      "community_name": "seed.ts",
-      "norm_label": "modulocorporatestructuring"
     },
     {
       "label": "LoginPage.tsx",
@@ -8153,204 +8363,6 @@
       "community": 6,
       "community_name": "BluMan Advisory Platform \u2014 Analisi Professionale & Piano Esecutivo",
       "norm_label": "verifica manuale al termine di ogni sprint"
-    },
-    {
-      "label": "fs",
-      "file_type": "code",
-      "source_file": "fs",
-      "confidence": "EXTRACTED",
-      "_origin": "ast",
-      "id": "fs",
-      "community": 7,
-      "community_name": "buildServer",
-      "norm_label": "fs"
-    },
-    {
-      "label": "path",
-      "file_type": "code",
-      "source_file": "path",
-      "confidence": "EXTRACTED",
-      "_origin": "ast",
-      "id": "path",
-      "community": 7,
-      "community_name": "buildServer",
-      "norm_label": "path"
-    },
-    {
-      "label": "bootstrap.ts",
-      "file_type": "code",
-      "source_file": "src/adapters/prisma/bootstrap.ts",
-      "source_location": "L1",
-      "_origin": "ast",
-      "id": "src_adapters_prisma_bootstrap",
-      "community": 7,
-      "community_name": "buildServer",
-      "norm_label": "bootstrap.ts"
-    },
-    {
-      "label": "prisma",
-      "file_type": "code",
-      "source_file": "src/adapters/prisma/bootstrap.ts",
-      "source_location": "L12",
-      "_origin": "ast",
-      "id": "src_adapters_prisma_bootstrap_prisma",
-      "community": 7,
-      "community_name": "buildServer",
-      "norm_label": "prisma"
-    },
-    {
-      "label": "prisma/index.ts",
-      "file_type": "code",
-      "source_file": "src/adapters/prisma/index.ts",
-      "source_location": "L1",
-      "_origin": "ast",
-      "id": "src_adapters_prisma_index",
-      "community": 7,
-      "community_name": "buildServer",
-      "norm_label": "prisma/index.ts"
-    },
-    {
-      "label": "app",
-      "file_type": "code",
-      "source_file": "src/adapters/prisma/index.ts",
-      "source_location": "L23",
-      "_origin": "ast",
-      "id": "src_adapters_prisma_index_app",
-      "community": 7,
-      "community_name": "buildServer",
-      "norm_label": "app"
-    },
-    {
-      "label": "porta",
-      "file_type": "code",
-      "source_file": "src/adapters/prisma/index.ts",
-      "source_location": "L25",
-      "_origin": "ast",
-      "id": "src_adapters_prisma_index_porta",
-      "community": 7,
-      "community_name": "buildServer",
-      "norm_label": "porta"
-    },
-    {
-      "label": "prisma",
-      "file_type": "code",
-      "source_file": "src/adapters/prisma/index.ts",
-      "source_location": "L22",
-      "_origin": "ast",
-      "id": "src_adapters_prisma_index_prisma",
-      "community": 7,
-      "community_name": "buildServer",
-      "norm_label": "prisma"
-    },
-    {
-      "label": "server",
-      "file_type": "code",
-      "source_file": "src/adapters/prisma/index.ts",
-      "source_location": "L24",
-      "_origin": "ast",
-      "id": "src_adapters_prisma_index_server",
-      "community": 7,
-      "community_name": "buildServer",
-      "norm_label": "server"
-    },
-    {
-      "label": "src/index.ts",
-      "file_type": "code",
-      "source_file": "src/index.ts",
-      "source_location": "L1",
-      "_origin": "ast",
-      "id": "src_index",
-      "community": 7,
-      "community_name": "buildServer",
-      "norm_label": "src/index.ts"
-    },
-    {
-      "label": "server.ts",
-      "file_type": "code",
-      "source_file": "src/server.ts",
-      "source_location": "L1",
-      "_origin": "ast",
-      "id": "src_server",
-      "community": 7,
-      "community_name": "buildServer",
-      "norm_label": "server.ts"
-    },
-    {
-      "label": "inMemoryTenantStore",
-      "file_type": "code",
-      "source_file": "src/server.ts",
-      "source_location": "L24",
-      "_origin": "ast",
-      "id": "src_server_inmemorytenantstore",
-      "community": 7,
-      "community_name": "buildServer",
-      "norm_label": "inmemorytenantstore"
-    },
-    {
-      "label": "prisma",
-      "file_type": "code",
-      "source_file": "src/server.ts",
-      "source_location": "L23",
-      "_origin": "ast",
-      "id": "src_server_prisma",
-      "community": 7,
-      "community_name": "buildServer",
-      "norm_label": "prisma"
-    },
-    {
-      "label": "emailService.ts",
-      "file_type": "code",
-      "source_file": "src/services/emailService.ts",
-      "source_location": "L1",
-      "_origin": "ast",
-      "id": "src_services_emailservice",
-      "community": 7,
-      "community_name": "buildServer",
-      "norm_label": "emailservice.ts"
-    },
-    {
-      "label": "storageService.ts",
-      "file_type": "code",
-      "source_file": "src/services/storageService.ts",
-      "source_location": "L1",
-      "_origin": "ast",
-      "id": "src_services_storageservice",
-      "community": 7,
-      "community_name": "buildServer",
-      "norm_label": "storageservice.ts"
-    },
-    {
-      "label": "jwt.ts",
-      "file_type": "code",
-      "source_file": "src/util/jwt.ts",
-      "source_location": "L1",
-      "_origin": "ast",
-      "id": "src_util_jwt",
-      "community": 7,
-      "community_name": "buildServer",
-      "norm_label": "jwt.ts"
-    },
-    {
-      "label": "password.ts",
-      "file_type": "code",
-      "source_file": "src/util/password.ts",
-      "source_location": "L1",
-      "_origin": "ast",
-      "id": "src_util_password",
-      "community": 7,
-      "community_name": "buildServer",
-      "norm_label": "password.ts"
-    },
-    {
-      "label": "password.test.ts",
-      "file_type": "code",
-      "source_file": "src/util/password.test.ts",
-      "source_location": "L1",
-      "_origin": "ast",
-      "id": "src_util_password_test",
-      "community": 7,
-      "community_name": "buildServer",
-      "norm_label": "password.test.ts"
     },
     {
       "label": "tsconfig.app.json",
@@ -9119,6 +9131,18 @@
       "_origin": "ast",
       "source": "frontend_src_components_comunicazionitab_comunicazionitab",
       "target": "frontend_src_api_client_inviacomunicazioneapi"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "frontend/src/components/ComunicazioniTab.tsx",
+      "source_location": "L177",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "frontend_src_components_comunicazionitab_comunicazionitab",
+      "target": "frontend_src_utils_pdfgenerator_downloadguidepdf"
     },
     {
       "relation": "calls",
@@ -9922,6 +9946,18 @@
       "_origin": "ast",
       "source": "frontend_src_utils_index_modulop",
       "target": "frontend_src_utils_index_resolverighe",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/src/utils/pdfGenerator.ts",
+      "source_location": "L206",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "frontend_src_utils_pdfgenerator_downloadguidepdf",
+      "target": "frontend_src_utils_pdfgenerator_downloadrealpdf",
       "confidence_score": 1.0
     },
     {
@@ -11441,7 +11477,7 @@
       "context": "import",
       "confidence": "EXTRACTED",
       "source_file": "frontend/src/components/ComunicazioniTab.tsx",
-      "source_location": "L2",
+      "source_location": "L1",
       "weight": 1.0,
       "_origin": "ast",
       "source": "frontend_src_components_comunicazionitab",
@@ -11453,11 +11489,23 @@
       "context": "import",
       "confidence": "EXTRACTED",
       "source_file": "frontend/src/components/ComunicazioniTab.tsx",
-      "source_location": "L2",
+      "source_location": "L1",
       "weight": 1.0,
       "_origin": "ast",
       "source": "frontend_src_components_comunicazionitab",
       "target": "frontend_src_api_client_inviacomunicazioneapi",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/src/components/ComunicazioniTab.tsx",
+      "source_location": "L2",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "frontend_src_components_comunicazionitab",
+      "target": "frontend_src_utils_pdfgenerator_downloadguidepdf",
       "confidence_score": 1.0
     },
     {
@@ -14901,7 +14949,7 @@
       "weight": 1.0,
       "_origin": "ast",
       "source": "frontend_src_components_comunicazionitab",
-      "target": "ref_react",
+      "target": "frontend_src_api_client",
       "confidence_score": 1.0
     },
     {
@@ -14913,7 +14961,7 @@
       "weight": 1.0,
       "_origin": "ast",
       "source": "frontend_src_components_comunicazionitab",
-      "target": "frontend_src_api_client",
+      "target": "frontend_src_utils_pdfgenerator",
       "confidence_score": 1.0
     },
     {
@@ -19456,6 +19504,17 @@
       "_origin": "ast",
       "source": "frontend_src_utils_pdfgenerator",
       "target": "frontend_src_utils_pdfgenerator_downloadrealpdf",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "frontend/src/utils/pdfGenerator.ts",
+      "source_location": "L151",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "frontend_src_utils_pdfgenerator",
+      "target": "frontend_src_utils_pdfgenerator_downloadguidepdf",
       "confidence_score": 1.0
     },
     {
