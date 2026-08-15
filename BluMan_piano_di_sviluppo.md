@@ -11,6 +11,7 @@
 - [x] Backend Fastify + TypeScript + Prisma ORM.
 - [x] Frontend React 19 + Vite.
 - [x] Mappa architetturale ed indicizzazione per ottimizzazione token (`.agents/AGENTS.md`).
+- [x] **Audit Produzione Enterprise**: Documento analitico completo di Go-Live readiness (`production_readiness_audit.md`).
 
 ### FASE 1 — Schema Database PostgreSQL & Prisma (`prisma/schema.prisma`)
 - [x] `Tenant`: Dati fiscali studio, sedi legali/operative distinte, logo URL, colore tema PDF, note legali.
