@@ -263,6 +263,81 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce }: Pass
                         </div>
                       </div>
                     )}
+
+                    {/* Visualizzatore & Gestore Documento Allegato per la Firma */}
+                    {s.type === 'doc' && (
+                      <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px dashed var(--border)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 8, padding: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <div style={{ fontSize: 22 }}>📄</div>
+                            <div>
+                              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>
+                                {s.file || `Accordo_Riservatezza_${project.cl.replace(/\s+/g, '_')}.pdf`}
+                              </div>
+                              <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>
+                                1.4 MB · {s.stato === 'done' ? '✓ Firmato digitalmente dal cliente' : '✍️ Inviato per firma eIDAS'}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: 9.5, fontWeight: 700, padding: '3px 8px', borderRadius: 10, background: s.stato === 'done' ? '#0d2d22' : '#2d1a05', color: s.stato === 'done' ? '#34d399' : '#f59e0b', border: `1px solid ${s.stato === 'done' ? '#1a5c3c' : '#78350f'}` }}>
+                              {s.stato === 'done' ? '🔒 FIRMATO eIDAS' : '✍️ IN ATTESA DI FIRMA'}
+                            </span>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedDocPreview({
+                                  id: `doc-${s.id}`,
+                                  nome: s.file || `Accordo_Riservatezza_${project.cl.replace(/\s+/g, '_')}.pdf`,
+                                  dimensione: '1.4 MB',
+                                  richiedeFirma: true,
+                                  firmato: s.stato === 'done',
+                                  dataCaricamento: '14/08/2026',
+                                });
+                              }}
+                              style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '5px 10px', borderRadius: 6, fontSize: 10, fontWeight: 700, cursor: 'pointer' }}
+                            >
+                              👁 Visualizza / Leggi PDF
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => alert(`✓ Sollecito e Magic Link di firma per "${s.file || 'Contratto.pdf'}" inviati al cliente ${project.cl}!`)}
+                              style={{ background: '#1a1f3d', border: '1px solid #2d3260', color: '#818cf8', padding: '5px 10px', borderRadius: 6, fontSize: 10, fontWeight: 600, cursor: 'pointer' }}
+                            >
+                              ✉️ Sollecita Firma
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Sezione per Cambiare Modello PDF Allegato */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 600 }}>📎 Cambia Modello PDF:</span>
+                          <select
+                            value={s.documentoAllegatoUrl || 'm1'}
+                            onChange={e => {
+                              const val = e.target.value;
+                              let newFileName = `Accordo_Riservatezza_NDA_${project.cl.replace(/\s+/g, '_')}.pdf`;
+                              if (val === 'm2') newFileName = `Procura_Legale_MFSA_${project.cl.replace(/\s+/g, '_')}.pdf`;
+                              if (val === 'm3') newFileName = `Dichiarazione_UBO_${project.cl.replace(/\s+/g, '_')}.pdf`;
+                              if (val === 'm4') newFileName = `Statuto_Standard_Holding_${project.cl.replace(/\s+/g, '_')}.pdf`;
+
+                              const updated = steps.map(item => item.id === s.id ? { ...item, documentoAllegatoUrl: val, file: newFileName } : item);
+                              setSteps(updated);
+                              if (onSaveVoce) onSaveVoce(updated);
+                            }}
+                            style={{ padding: '2px 6px', fontSize: 10, background: 'var(--card2)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 6 }}
+                          >
+                            <option value="m1">Accordo NDA Tipo</option>
+                            <option value="m2">Procura Legale MFSA</option>
+                            <option value="m3">Dichiarazione UBO</option>
+                            <option value="m4">Statuto Standard Holding Malta</option>
+                          </select>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               );
