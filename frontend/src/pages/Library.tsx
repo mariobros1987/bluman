@@ -2,9 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { CatBadge } from '../components/ui/CatBadge';
 import { fmt, moduloH, moduloP, resolveRighe, levelOf } from '../utils';
 import { MLIB, ARTICOLI, GIURISDIZIONI } from '../store/mockData';
-import { fetchModuliLibreria, fetchArticoli, fetchGiurisdizioniApi, creaGiurisdizioneApi, creaArticoloApi, creaModuloTemplateApi } from '../api/client';
-import type { CategoriaModulo, Articolo, Giurisdizione } from '../types';
-import styles from './Library.module.css';
+import { fetchModuliLibreria, fetchArticoli, fetchGiurisdizioniApi, creaGiurisdizioneApi, creaArticoloApi, creaModuloTemplateApi, updateArticoloPrezzoApi, uploadFileApi } from '../api/client';
+import type { CategoriaModulo, Articolo, Giurisdizione, ModuloTemplate } from '../types';
 
 type SubTab = 'grafo' | 'articoli' | 'giurisdizioni' | 'crea_modulo' | 'doc_form';
 
@@ -15,11 +14,6 @@ export function Library() {
   const [giurList, setGiurList] = useState<Giurisdizione[]>(GIURISDIZIONI);
   const [moduliList, setModuliList] = useState<ModuloTemplate[]>(MLIB);
   const [modalArticoloOpen, setModalArticoloOpen] = useState(false);
-  const [modalGiurOpen, setModalGiurOpen] = useState(false);
-  const [newGiurNome, setNewGiurNome] = useState('');
-  const [newGiurCodice, setNewGiurCodice] = useState('');
-  const [newGiurTipo, setNewGiurTipo] = useState<'ue' | 'extra_ue' | 'stato_usa' | 'altro'>('ue');
-  const [newGiurNote, setNewGiurNote] = useState('');
 
   const graphRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -74,9 +68,9 @@ export function Library() {
     setOpen(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
 
   // Topological levels
-  const maxLvl = Math.max(...moduliList.map(m => levelOf(m.id)), 0);
-  const cols: typeof MLIB[] = [];
-  for (let i = 0; i <= maxLvl; i++) cols.push(moduliList.filter(m => levelOf(m.id) === i));
+  const maxLvl = Math.max(...moduliList.map(m => levelOf(m.id, moduliList)), 0);
+  const cols: ModuloTemplate[][] = [];
+  for (let i = 0; i <= maxLvl; i++) cols.push(moduliList.filter(m => levelOf(m.id, moduliList) === i));
   const colLabels = ['Punto di partenza', 'Sbloccati a cascata', 'Dipendenti'];
 
   useEffect(() => {
@@ -275,7 +269,7 @@ export function Library() {
       {modalArticoloOpen && (
         <NuovoArticoloModal
           onClose={() => setModalArticoloOpen(false)}
-          onCreated={() => loadArticoli()}
+          onCreated={() => loadData()}
         />
       )}
     </div>
@@ -419,7 +413,7 @@ function ArticoliCatalogView({ articoliList, onOpenNew }: { articoliList: Artico
               padding: 16,
               display: 'flex',
               flexDirection: 'column',
-              justify: 'space-between',
+              justifyContent: 'space-between',
               gap: 14,
               boxShadow: '0 6px 24px rgba(0,0,0,.2)',
               transition: 'all .2s',
@@ -665,7 +659,7 @@ function GiurisdizioniView({ giurList, onAddGiur }: { giurList: Giurisdizione[];
 
 // ─── Componente Libreria Documenti in Bianco & Form Master ────────
 function LibreriaDocumentiEForm() {
-  const [docModels, setDocModels] = useState([
+  const [docModels, setDocModels] = useState<Array<{ id: string; nome: string; cat: string; firma: boolean; desc: string; url?: string }>>([
     { id: 'm1', nome: 'Accordo di Riservatezza NDA Tipo.pdf', cat: 'Societario', firma: true, desc: 'Modello standard NDA bilingue Malta/Italia.' },
     { id: 'm2', nome: 'Procura Legale MFSA In Bianco.pdf', cat: 'Compliance', firma: true, desc: 'Procura per adempimenti registro MFSA.' },
     { id: 'm3', nome: 'Dichiarazione Titolare Effettivo (UBO).pdf', cat: 'Compliance', firma: true, desc: 'Dichiarazione antiriciclaggio e titolarità effettiva.' },

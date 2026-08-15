@@ -98,6 +98,9 @@ export interface Articolo {
   h: number;
   p: number;
   ver: number;
+  documentoAllegatoUrl?: string | null;
+  formMasterId?: string | null;
+  linkIstruzioni?: string | null;
 }
 
 export interface RigaDistinta {

@@ -54,11 +54,19 @@ export function progressColor(p: Progetto | null): string {
 interface ResolvedRiga { art: Articolo; qty: number; h: number; p: number; override: boolean; }
 
 export function resolveRighe(m: ModuloTemplate): ResolvedRiga[] {
+  if (!m || !m.righe) return [];
   return m.righe.map(r => {
-    const art = ARTICOLI.find(a => a.id === r.art)!;
+    const art = ARTICOLI.find(a => a.id === r.art) || {
+      id: r.art,
+      n: r.art || 'Prestazione Generica',
+      cat: 'Societario' as CategoriaModulo,
+      h: 5,
+      p: 500,
+      ver: 1,
+    };
     const qty = r.qty || 1;
-    const h = (r.oO != null ? r.oO : art.h) * qty;
-    const p = (r.oP != null ? r.oP : art.p) * qty;
+    const h = (r.oO != null ? r.oO : (art.h || 0)) * qty;
+    const p = (r.oP != null ? r.oP : (art.p || 0)) * qty;
     return { art, qty, h, p, override: r.oO != null || r.oP != null };
   });
 }
@@ -72,11 +80,9 @@ export function moduloP(m: ModuloTemplate): number {
 }
 
 // ─── Topological sort for library graph ───────────────────────────
-const lvlCache: Record<string, number> = {};
-export function levelOf(id: string): number {
-  if (lvlCache[id] !== undefined) return lvlCache[id];
-  const m = MLIB.find(x => x.id === id);
-  if (!m || !m.deps.length) { lvlCache[id] = 0; return 0; }
-  lvlCache[id] = 1 + Math.max(...m.deps.map(levelOf));
-  return lvlCache[id];
+export function levelOf(id: string, list?: ModuloTemplate[]): number {
+  const pool = list || MLIB;
+  const m = pool.find(x => x.id === id);
+  if (!m || !m.deps || !m.deps.length) return 0;
+  return 1 + Math.max(...m.deps.map(d => levelOf(d, pool)), 0);
 }
