@@ -1,24 +1,30 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { CatBadge } from '../components/ui/CatBadge';
 import { fmt, moduloH, moduloP, resolveRighe, levelOf } from '../utils';
-import { MLIB, ARTICOLI } from '../store/mockData';
-import { fetchArticoli, creaArticoloApi, creaModuloTemplateApi } from '../api/client';
-import type { CategoriaModulo, Articolo } from '../types';
+import { GIURISDIZIONI } from '../store/mockData';
+import { fetchArticoli, fetchGiurisdizioniApi, creaGiurisdizioneApi, creaArticoloApi, creaModuloTemplateApi } from '../api/client';
+import type { CategoriaModulo, Articolo, Giurisdizione } from '../types';
 import styles from './Library.module.css';
 
-type SubTab = 'grafo' | 'articoli' | 'crea_modulo' | 'doc_form';
+type SubTab = 'grafo' | 'articoli' | 'giurisdizioni' | 'crea_modulo' | 'doc_form';
 
 export function Library() {
   const [subTab, setSubTab] = useState<SubTab>('grafo');
   const [open, setOpen] = useState<Set<string>>(new Set());
   const [articoliList, setArticoliList] = useState<Articolo[]>(ARTICOLI);
+  const [giurList, setGiurList] = useState<Giurisdizione[]>(GIURISDIZIONI);
   const [modalArticoloOpen, setModalArticoloOpen] = useState(false);
+  const [modalGiurOpen, setModalGiurOpen] = useState(false);
+  const [newGiurNome, setNewGiurNome] = useState('');
+  const [newGiurCodice, setNewGiurCodice] = useState('');
+  const [newGiurTipo, setNewGiurTipo] = useState<'ue' | 'extra_ue' | 'stato_usa' | 'altro'>('ue');
+  const [newGiurNote, setNewGiurNote] = useState('');
 
   const graphRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
 
-  // Carica articoli da Supabase DB
-  const loadArticoli = async () => {
+  // Carica articoli e giurisdizioni da Supabase DB
+  const loadData = async () => {
     const dbArts = await fetchArticoli();
     if (dbArts && Array.isArray(dbArts) && dbArts.length > 0) {
       const mapped: Articolo[] = dbArts.map((a: any) => ({
@@ -31,10 +37,15 @@ export function Library() {
       }));
       setArticoliList(mapped);
     }
+
+    const dbGiur = await fetchGiurisdizioniApi();
+    if (dbGiur && Array.isArray(dbGiur) && dbGiur.length > 0) {
+      setGiurList(dbGiur);
+    }
   };
 
   useEffect(() => {
-    loadArticoli();
+    loadData();
   }, []);
 
   const toggle = (id: string) =>
@@ -105,6 +116,16 @@ export function Library() {
           }}
         >
           🧩 Catalogo Articoli ({articoliList.length})
+        </button>
+        <button
+          onClick={() => setSubTab('giurisdizioni')}
+          style={{
+            padding: '10px 16px', fontSize: 12, fontWeight: 500, cursor: 'pointer',
+            background: 'none', border: 'none', color: subTab === 'giurisdizioni' ? 'var(--indigo-l)' : 'var(--muted)',
+            borderBottom: `2px solid ${subTab === 'giurisdizioni' ? 'var(--indigo-l)' : 'transparent'}`,
+          }}
+        >
+          🌍 Giurisdizioni ({giurList.length})
         </button>
         <button
           onClick={() => setSubTab('crea_modulo')}
@@ -476,8 +497,123 @@ function ArticoliCatalogView({ articoliList, onOpenNew }: { articoliList: Artico
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
               <button type="button" onClick={() => setEditingArt(null)} style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '7px 14px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}>Annulla</button>
               <button type="submit" disabled={savingEdit} style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '7px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{savingEdit ? 'Salvataggio...' : '✓ Salva Modifiche Prestazione'}</button>
+      {/* SubTab Giurisdizioni Studio */}
+      {subTab === 'giurisdizioni' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 700 }}>🌍 Giurisdizioni & Piazze Finanziarie Studio</div>
+              <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
+                Gestisci le nazioni e giurisdizioni in cui lo studio opera per filtrare i moduli ed applicare regole fiscali SDI.
+              </div>
             </div>
-          </form>
+            <button
+              onClick={() => setModalGiurOpen(true)}
+              style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '8px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+            >
+              + Nuova Giurisdizione
+            </button>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14 }}>
+            {giurList.map((g) => {
+              const flag = g.codice === 'MT' ? '🇲🇹' : g.codice === 'GI' ? '🇬🇮' : g.codice.startsWith('US') ? '🇺🇸' : g.codice === 'AE' ? '🇦🇪' : '🌐';
+              return (
+                <div
+                  key={g.id}
+                  style={{
+                    background: 'var(--card)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 12,
+                    padding: 16,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    boxShadow: '0 4px 14px rgba(0,0,0,.2)',
+                  }}
+                >
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                      <span style={{ fontSize: 16 }}>{flag}</span>
+                      <span
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 700,
+                          padding: '2px 8px',
+                          borderRadius: 12,
+                          background: g.tipo === 'ue' ? '#0d2d22' : g.tipo === 'stato_usa' ? '#1e1b4b' : '#2d1a05',
+                          color: g.tipo === 'ue' ? '#34d399' : g.tipo === 'stato_usa' ? '#a5b4fc' : '#f59e0b',
+                          textTransform: 'uppercase',
+                        }}
+                      >
+                        {g.tipo}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>{g.nome} ({g.codice})</div>
+                    <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6, lineHeight: 1.4 }}>
+                      {g.note || 'Nessuna nota aggiuntiva'}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Modal Nuova Giurisdizione */}
+          {modalGiurOpen && (
+            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 16 }}>
+              <div style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, width: '100%', maxWidth: 440, padding: 20 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700 }}>+ Nuova Giurisdizione Studio</div>
+                  <button onClick={() => setModalGiurOpen(false)} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: 16 }}>✕</button>
+                </div>
+                <form
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    if (!newGiurNome || !newGiurCodice) return;
+                    const res = await creaGiurisdizioneApi({
+                      nome: newGiurNome,
+                      codice: newGiurCodice.toUpperCase(),
+                      tipo: newGiurTipo,
+                      note: newGiurNote,
+                    });
+                    setGiurList(prev => [...prev, res]);
+                    setModalGiurOpen(false);
+                    setNewGiurNome('');
+                    setNewGiurCodice('');
+                    setNewGiurNote('');
+                  }}
+                  style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
+                >
+                  <div>
+                    <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Nome Giurisdizione *</label>
+                    <input value={newGiurNome} onChange={e => setNewGiurNome(e.target.value)} placeholder="es. Svizzera / Lussemburgo" required />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Codice ISO / Paese *</label>
+                    <input value={newGiurCodice} onChange={e => setNewGiurCodice(e.target.value)} placeholder="es. CH / LU" required />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Tipo *</label>
+                    <select value={newGiurTipo} onChange={e => setNewGiurTipo(e.target.value as any)}>
+                      <option value="ue">Unione Europea (UE)</option>
+                      <option value="extra_ue">Extra-UE (Gibilterra, EAU, UK...)</option>
+                      <option value="stato_usa">Stato USA (Florida, Delaware...)</option>
+                      <option value="altro">Altro</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Note / Descrizione</label>
+                    <textarea value={newGiurNote} onChange={e => setNewGiurNote(e.target.value)} placeholder="Note adempimenti o valuta" rows={2} />
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
+                    <button type="button" onClick={() => setModalGiurOpen(false)} style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '6px 12px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}>Annulla</button>
+                    <button type="submit" style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>✓ Salva Giurisdizione</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

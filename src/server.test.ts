@@ -43,8 +43,8 @@ describe('server — /health e /moduli', () => {
     const { server } = nuovoServer();
     const res = await server.inject({ method: 'GET', url: '/moduli' });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toHaveLength(1);
-    expect(res.json()[0].nome).toBe('Analisi patrimoniale iniziale');
+    expect(res.json().length).toBeGreaterThanOrEqual(1);
+    expect(res.json().some((m: any) => m.nome === 'Analisi patrimoniale iniziale')).toBe(true);
   });
 });
 

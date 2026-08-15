@@ -74,6 +74,31 @@ async function main() {
   }
   console.log('✅ Articoli creati:', articoliData.length);
 
+  // 3bis. Giurisdizioni
+  const giurisdizioniData = [
+    { id: 'giur-mt', nome: 'Malta', codice: 'MT', tipo: 'ue' as const, note: 'Repubblica di Malta — Hub finanziario UE' },
+    { id: 'giur-gi', nome: 'Gibilterra', codice: 'GI', tipo: 'extra_ue' as const, note: 'Territorio d Oltremare Britannico (Extra-UE)' },
+    { id: 'giur-fl', nome: 'Florida (USA)', codice: 'US-FL', tipo: 'stato_usa' as const, note: 'Stato degli Stati Uniti d America (Florida)' },
+    { id: 'giur-de', nome: 'Delaware (USA)', codice: 'US-DE', tipo: 'stato_usa' as const, note: 'Stato degli Stati Uniti d America (Delaware)' },
+    { id: 'giur-ae', nome: 'Emirati Arabi Uniti', codice: 'AE', tipo: 'extra_ue' as const, note: 'Dubai / Abu Dhabi Free Zones' },
+  ];
+
+  for (const g of giurisdizioniData) {
+    await prisma.giurisdizione.upsert({
+      where: { id: g.id },
+      update: { nome: g.nome, codice: g.codice, tipo: g.tipo, note: g.note },
+      create: {
+        id: g.id,
+        tenantId: TENANT_ID,
+        nome: g.nome,
+        codice: g.codice,
+        tipo: g.tipo,
+        note: g.note,
+      },
+    });
+  }
+  console.log('✅ Giurisdizioni create:', giurisdizioniData.length);
+
   // 4. Moduli Template
   const m01 = await prisma.moduloTemplate.upsert({
     where: { id: 'mod-m01' },
@@ -84,6 +109,7 @@ async function main() {
       nome: 'Analisi patrimoniale iniziale',
       categoria: 'Analisi',
       versione: 1,
+      giurisdizioneId: null, // Modulo Generico
       righeDistinta: {
         create: [
           { tenantId: TENANT_ID, articoloId: 'art-01', articoloVersione: 1, ordine: 1, quantita: 1 },
@@ -98,13 +124,14 @@ async function main() {
 
   const m02 = await prisma.moduloTemplate.upsert({
     where: { id: 'mod-m02' },
-    update: {},
+    update: { giurisdizioneId: 'giur-mt' },
     create: {
       id: 'mod-m02',
       tenantId: TENANT_ID,
       nome: 'Corporate structuring Malta',
       categoria: 'Societario',
       versione: 1,
+      giurisdizioneId: 'giur-mt', // Specifico Malta
       prezzoPacchetto: 11500 * 100,
       righeDistinta: {
         create: [

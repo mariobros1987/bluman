@@ -47,6 +47,7 @@ model Tenant {
   clienti       Cliente[]
   articoli      Articolo[]
   moduli        ModuloTemplate[]
+  giurisdizioni Giurisdizione[]
   auditLogs     AuditLog[]
   comunicazioni ComunicazioneProgetto[]
 
@@ -156,6 +157,8 @@ model ModuloTemplate {
   prezzoPacchetto  Int?     @map("prezzo_pacchetto") // override della somma righe, §3bis/§7
   isUltimaVersione Boolean  @default(true) @map("is_ultima_versione")
   isAttivo         Boolean  @default(true) @map("is_attivo")
+  giurisdizioneId  String?  @map("giurisdizione_id")
+  giurisdizione    Giurisdizione? @relation(fields: [giurisdizioneId], references: [id])
   createdAt        DateTime @default(now()) @map("created_at")
 
   righeDistinta RigaDistinta[]
@@ -164,6 +167,29 @@ model ModuloTemplate {
   moduliProgetto ModuloProgetto[]
 
   @@map("modulo_template")
+}
+
+enum TipoGiurisdizione {
+  ue
+  extra_ue
+  stato_usa
+  altro
+}
+
+model Giurisdizione {
+  id        String            @id @default(uuid())
+  tenantId  String            @map("tenant_id")
+  tenant    Tenant            @relation(fields: [tenantId], references: [id])
+  nome      String
+  codice    String
+  tipo      TipoGiurisdizione @default(ue)
+  note      String?
+  createdAt DateTime          @default(now()) @map("created_at")
+
+  moduli   ModuloTemplate[]
+  progetti Progetto[]
+
+  @@map("giurisdizione")
 }
 
 model RigaDistinta {
@@ -277,16 +303,18 @@ enum StatoProgetto {
 }
 
 model Progetto {
-  id            String        @id @default(uuid())
-  tenantId      String        @map("tenant_id")
-  clienteId     String        @map("cliente_id")
-  cliente       Cliente       @relation(fields: [clienteId], references: [id])
-  nome          String
-  stato         StatoProgetto @default(pre_project)
-  dataInizio    DateTime?     @map("data_inizio")
-  dataScadenza  DateTime?     @map("data_scadenza")
-  valoreTotale  Int           @map("valore_totale")
-  createdAt     DateTime      @default(now()) @map("created_at")
+  id                      String        @id @default(uuid())
+  tenantId                String        @map("tenant_id")
+  clienteId               String        @map("cliente_id")
+  cliente                 Cliente       @relation(fields: [clienteId], references: [id])
+  nome                    String
+  stato                   StatoProgetto @default(pre_project)
+  dataInizio              DateTime?     @map("data_inizio")
+  dataScadenza            DateTime?     @map("data_scadenza")
+  valoreTotale            Int           @map("valore_totale")
+  giurisdizionePrimariaId String?       @map("giurisdizione_primaria_id")
+  giurisdizionePrimaria   Giurisdizione? @relation(fields: [giurisdizionePrimariaId], references: [id])
+  createdAt               DateTime      @default(now()) @map("created_at")
 
   moduli         ModuloProgetto[]
   preventivi     Preventivo[]

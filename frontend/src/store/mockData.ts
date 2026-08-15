@@ -1,7 +1,15 @@
 // Mock data — fedele al prototipo BluMan_platform.html
 // Sarà sostituito da chiamate API reali nelle fasi successive
 
-import type { TeamMember, Articolo, ModuloTemplate, Progetto } from '../types';
+import type { TeamMember, Articolo, ModuloTemplate, Progetto, Giurisdizione } from '../types';
+
+export const GIURISDIZIONI: Giurisdizione[] = [
+  { id: 'giur-mt', nome: 'Malta', codice: 'MT', tipo: 'ue', note: 'Repubblica di Malta — Hub finanziario UE' },
+  { id: 'giur-gi', nome: 'Gibilterra', codice: 'GI', tipo: 'extra_ue', note: 'Territorio d Oltremare Britannico (Extra-UE)' },
+  { id: 'giur-fl', nome: 'Florida (USA)', codice: 'US-FL', tipo: 'stato_usa', note: 'Stato degli Stati Uniti d America (Florida)' },
+  { id: 'giur-de', nome: 'Delaware (USA)', codice: 'US-DE', tipo: 'stato_usa', note: 'Stato degli Stati Uniti d America (Delaware)' },
+  { id: 'giur-ae', nome: 'Emirati Arabi Uniti', codice: 'AE', tipo: 'extra_ue', note: 'Dubai / Abu Dhabi Free Zones' },
+];
 
 export const TEAM: TeamMember[] = [
   { id: 1, n: 'Joe Disabato',       r: 'Lead Advisor',  i: 'JD', c: '#6366f1' },
@@ -59,16 +67,16 @@ export const ARTICOLI: Articolo[] = [
 ];
 
 export const MLIB: ModuloTemplate[] = [
-  { id: 'M01', n: 'Analisi patrimoniale iniziale',  cat: 'Analisi',    ver: 2, deps: [],       righe: [{ art: 'A_RACCOLTA_DOC' }, { art: 'A_ANALISI_STRUTT' }, { art: 'A_REPORT_ANALISI' }, { art: 'A_PRESENT_CLIENTE' }, { art: 'A_FIRMA_ENG' }] },
-  { id: 'M02', n: 'Corporate structuring Malta',    cat: 'Societario', ver: 3, deps: ['M01'],  pkg: 11500, righe: [{ art: 'A_STUDIO_STRUTT' }, { art: 'A_COST_SOCIETA' }, { art: 'A_ATTO_COST' }, { art: 'A_CONTRATTO_INTERCOMPANY' }, { art: 'A_REG_MFSA' }, { art: 'A_REG_FISCALE' }, { art: 'A_UBO' }] },
-  { id: 'M03', n: 'Holding internazionale',         cat: 'Societario', ver: 1, deps: ['M01'],  righe: [{ art: 'A_SEL_GIURISDIZIONE' }, { art: 'A_COST_HOLDING' }, { art: 'A_STRUTT_PARTECIPAZIONI' }, { art: 'A_CONTRATTO_SERVIZIO' }, { art: 'A_COMPLIANCE_ONGOING' }] },
-  { id: 'M04', n: 'Struttura Trust',                cat: 'Trust',      ver: 2, deps: ['M01'],  righe: [{ art: 'A_SEL_TRUST_CO' }, { art: 'A_DEED_TRUST' }, { art: 'A_LETTER_WISHES' }, { art: 'A_TRASF_ASSET' }, { art: 'A_REG_TRUST_MALTA' }] },
-  { id: 'M05', n: 'Apertura conti correnti',        cat: 'Banking',    ver: 1, deps: ['M02'],  righe: [{ art: 'A_SEL_BANCHE' }, { art: 'A_KYC_CLIENTE' }, { art: 'A_APERTURA_CONTO', qty: 2 }, { art: 'A_INTERNET_BANKING' }, { art: 'A_TEST_TRANSAZIONI' }] },
-  { id: 'M06', n: 'Contratti intra-societari',      cat: 'Legale',     ver: 1, deps: ['M02'],  righe: [{ art: 'A_CONTRATTO_SERVIZIO' }, { art: 'A_LICENSING_IP' }, { art: 'A_LOAN_INTERCOMPANY' }, { art: 'A_MGMT_AGREEMENT' }, { art: 'A_REVISIONE_LEGALE' }] },
-  { id: 'M07', n: 'Contratti con terzi',            cat: 'Legale',     ver: 1, deps: ['M02'],  righe: [{ art: 'A_CONTR_DISTRIBUZIONE' }, { art: 'A_NDA' }, { art: 'A_CONTR_AGENZIA' }, { art: 'A_REVISIONE_LEGALE', oO: 3, oP: 800 }] },
-  { id: 'M08', n: 'Gestione marchi e IP',           cat: 'IP',         ver: 1, deps: ['M02'],  righe: [{ art: 'A_RICERCA_EUIPO' }, { art: 'A_DEPOSITO_MARCHIO' }, { art: 'A_LICENZA_USO' }, { art: 'A_MONITOR_RINNOVO' }] },
-  { id: 'M09', n: 'Tax planning internazionale',    cat: 'Fiscale',    ver: 2, deps: ['M02'],  righe: [{ art: 'A_ANALISI_IPA' }, { art: 'A_STRUTT_RIMESSE' }, { art: 'A_OTTIM_REFUND' }, { art: 'A_REPORT_TAX' }] },
-  { id: 'M10', n: 'Compliance e KYC',               cat: 'Compliance', ver: 1, deps: ['M02'],  righe: [{ art: 'A_DUE_DILIGENCE' }, { art: 'A_KYC_CLIENTE' }, { art: 'A_REPORT_CRS_FATCA' }, { art: 'A_AGG_ANNUALE' }] },
+  { id: 'M01', n: 'Analisi patrimoniale iniziale',  cat: 'Analisi',    ver: 2, giurisdizioneId: null, deps: [],       righe: [{ art: 'A_RACCOLTA_DOC' }, { art: 'A_ANALISI_STRUTT' }, { art: 'A_REPORT_ANALISI' }, { art: 'A_PRESENT_CLIENTE' }, { art: 'A_FIRMA_ENG' }] },
+  { id: 'M02', n: 'Corporate structuring Malta',    cat: 'Societario', ver: 3, giurisdizioneId: 'giur-mt', deps: ['M01'],  pkg: 11500, righe: [{ art: 'A_STUDIO_STRUTT' }, { art: 'A_COST_SOCIETA' }, { art: 'A_ATTO_COST' }, { art: 'A_CONTRATTO_INTERCOMPANY' }, { art: 'A_REG_MFSA' }, { art: 'A_REG_FISCALE' }, { art: 'A_UBO' }] },
+  { id: 'M03', n: 'Holding internazionale',         cat: 'Societario', ver: 1, giurisdizioneId: null, deps: ['M01'],  righe: [{ art: 'A_SEL_GIURISDIZIONE' }, { art: 'A_COST_HOLDING' }, { art: 'A_STRUTT_PARTECIPAZIONI' }, { art: 'A_CONTRATTO_SERVIZIO' }, { art: 'A_COMPLIANCE_ONGOING' }] },
+  { id: 'M04', n: 'Struttura Trust',                cat: 'Trust',      ver: 2, giurisdizioneId: null, deps: ['M01'],  righe: [{ art: 'A_SEL_TRUST_CO' }, { art: 'A_DEED_TRUST' }, { art: 'A_LETTER_WISHES' }, { art: 'A_TRASF_ASSET' }, { art: 'A_REG_TRUST_MALTA' }] },
+  { id: 'M05', n: 'Apertura conti correnti',        cat: 'Banking',    ver: 1, giurisdizioneId: 'giur-mt', deps: ['M02'],  righe: [{ art: 'A_SEL_BANCHE' }, { art: 'A_KYC_CLIENTE' }, { art: 'A_APERTURA_CONTO', qty: 2 }, { art: 'A_INTERNET_BANKING' }, { art: 'A_TEST_TRANSAZIONI' }] },
+  { id: 'M06', n: 'Contratti intra-societari',      cat: 'Legale',     ver: 1, giurisdizioneId: null, deps: ['M02'],  righe: [{ art: 'A_CONTRATTO_SERVIZIO' }, { art: 'A_LICENSING_IP' }, { art: 'A_LOAN_INTERCOMPANY' }, { art: 'A_MGMT_AGREEMENT' }, { art: 'A_REVISIONE_LEGALE' }] },
+  { id: 'M07', n: 'Contratti con terzi',            cat: 'Legale',     ver: 1, giurisdizioneId: null, deps: ['M02'],  righe: [{ art: 'A_CONTR_DISTRIBUZIONE' }, { art: 'A_NDA' }, { art: 'A_CONTR_AGENZIA' }, { art: 'A_REVISIONE_LEGALE', oO: 3, oP: 800 }] },
+  { id: 'M08', n: 'Gestione marchi e IP',           cat: 'IP',         ver: 1, giurisdizioneId: null, deps: ['M02'],  righe: [{ art: 'A_RICERCA_EUIPO' }, { art: 'A_DEPOSITO_MARCHIO' }, { art: 'A_LICENZA_USO' }, { art: 'A_MONITOR_RINNOVO' }] },
+  { id: 'M09', n: 'Tax planning internazionale',    cat: 'Fiscale',    ver: 2, giurisdizioneId: 'giur-mt', deps: ['M02'],  righe: [{ art: 'A_ANALISI_IPA' }, { art: 'A_STRUTT_RIMESSE' }, { art: 'A_OTTIM_REFUND' }, { art: 'A_REPORT_TAX' }] },
+  { id: 'M10', n: 'Compliance e KYC',               cat: 'Compliance', ver: 1, giurisdizioneId: null, deps: ['M02'],  righe: [{ art: 'A_DUE_DILIGENCE' }, { art: 'A_KYC_CLIENTE' }, { art: 'A_REPORT_CRS_FATCA' }, { art: 'A_AGG_ANNUALE' }] },
 ];
 
 export const PROJECTS: Progetto[] = [

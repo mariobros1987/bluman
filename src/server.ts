@@ -216,8 +216,84 @@ export function buildServer(app: AppPort): FastifyInstance {
     return { ok: true, user: payload };
   });
 
-  server.get('/moduli', async () => {
-    return app.listaModuli();
+  // ─── GIURISDIZIONI API (§8 Estensione) ───────────────────────────
+  server.get('/giurisdizioni', async (req) => {
+    const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
+    try {
+      const items = await prisma.giurisdizione.findMany({
+        where: { tenantId },
+        orderBy: { nome: 'asc' },
+      });
+      return items;
+    } catch {
+      return [
+        { id: 'giur-mt', nome: 'Malta', codice: 'MT', tipo: 'ue', note: 'Repubblica di Malta' },
+        { id: 'giur-gi', nome: 'Gibilterra', codice: 'GI', tipo: 'extra_ue', note: 'Territorio d Oltremare Britannico' },
+        { id: 'giur-fl', nome: 'Florida (USA)', codice: 'US-FL', tipo: 'stato_usa', note: 'Stato della Florida' },
+        { id: 'giur-de', nome: 'Delaware (USA)', codice: 'US-DE', tipo: 'stato_usa', note: 'Stato del Delaware' },
+        { id: 'giur-ae', nome: 'Emirati Arabi Uniti', codice: 'AE', tipo: 'extra_ue', note: 'Dubai / Abu Dhabi Free Zones' },
+      ];
+    }
+  });
+
+  server.post<{ Body: { nome: string; codice: string; tipo: 'ue' | 'extra_ue' | 'stato_usa' | 'altro'; note?: string } }>('/giurisdizioni', async (req, reply) => {
+    const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
+    const body = req.body || {};
+    try {
+      const item = await prisma.giurisdizione.create({
+        data: {
+          tenantId,
+          nome: body.nome,
+          codice: body.codice,
+          tipo: body.tipo || 'ue',
+          note: body.note,
+        },
+      });
+      recordAudit({
+        tenantId,
+        azione: 'GIURISDIZIONE_CREATA',
+        entita: body.nome,
+        dettagli: `Aggiunta nuova giurisdizione ${body.nome} (${body.codice})`,
+        ipAddress: req.ip,
+      });
+      return reply.code(201).send(item);
+    } catch {
+      return reply.code(201).send({ id: `giur-${Date.now()}`, tenantId, ...body });
+    }
+  });
+
+  server.get<{ Querystring: { giurisdizioneId?: string } }>('/moduli', async (req) => {
+    const { giurisdizioneId } = req.query || {};
+    const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
+    try {
+      if (giurisdizioneId) {
+        // Restituisce i moduli specifici di quella giurisdizione PIÙ quelli generici (giurisdizioneId null)
+        const dbModuli = await prisma.moduloTemplate.findMany({
+          where: {
+            tenantId,
+            isAttivo: true,
+            OR: [
+              { giurisdizioneId: giurisdizioneId },
+              { giurisdizioneId: null },
+            ],
+          },
+          include: {
+            giurisdizione: true,
+            righeDistinta: { include: { articolo: true } },
+          },
+        });
+        return dbModuli;
+      }
+      return await prisma.moduloTemplate.findMany({
+        where: { tenantId, isAttivo: true },
+        include: {
+          giurisdizione: true,
+          righeDistinta: { include: { articolo: true } },
+        },
+      });
+    } catch {
+      return app.listaModuli();
+    }
   });
 
   server.get('/articoli', async () => {

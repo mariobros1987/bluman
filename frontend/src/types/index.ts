@@ -98,6 +98,14 @@ export interface RigaDistinta {
   oP?: number;
 }
 
+export interface Giurisdizione {
+  id: string;
+  nome: string;
+  codice: string;
+  tipo: 'ue' | 'extra_ue' | 'stato_usa' | 'altro';
+  note?: string;
+}
+
 export interface ModuloTemplate {
   id: string;
   n: string;
@@ -105,5 +113,7 @@ export interface ModuloTemplate {
   ver: number;
   deps: string[];
   pkg?: number;
+  giurisdizioneId?: string | null;
+  giurisdizione?: Giurisdizione | null;
   righe: RigaDistinta[];
 }

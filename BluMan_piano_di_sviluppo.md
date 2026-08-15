@@ -35,7 +35,12 @@
 - [x] **Libreria Moduli & Distinta Base (`/library`)**:
   - Split-screen builder con **editing prezzo unitario (€)** in distinta base.
   - Catalogo articoli con modal di modifica prezzo e ore listino per Admin.
-  - Tab 4: Modelli contratti PDF in bianco e Form Master.
+  - Tab **🌍 Giurisdizioni Studio**: Gestione giurisdizioni (Malta 🇲🇹, Gibilterra 🇬🇮, Florida 🇺🇸, Delaware 🇺🇸, EAU 🇦🇪).
+  - Tab 5: Modelli contratti PDF in bianco e Form Master.
+- [x] **Wizard Nuovo Progetto con Filtro Giurisdizioni a Cascata (`NewProjectWizard.tsx`)**:
+  - **Step 0**: Selezione Giurisdizione/Piazza Finanziaria target.
+  - **Step 1**: Selezione Cliente e Nome Progetto.
+  - **Step 2**: Filtro libreria a cascata (1. Moduli specifici in evidenza, 2. Moduli generici, 3. Altre giurisdizioni).
 - [x] **Portale Cliente Passwordless (`/portal`)**:
   - Scheda 1: ✍️ Proposta d'Ordine & Firma Engagement Letter 1-Click.
   - Scheda 2: 📊 Avanzamento Live Lavori (progress bar 65% e timeline).

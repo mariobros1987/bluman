@@ -74,14 +74,41 @@ export async function fetchProgettoDettaglio(id: string) {
   }
 }
 
-export async function fetchModuliLibreria() {
+export async function fetchModuliLibreria(giurisdizioneId?: string) {
   try {
-    const res = await fetch(`${API_BASE}/moduli`);
+    const url = giurisdizioneId ? `${API_BASE}/moduli?giurisdizioneId=${encodeURIComponent(giurisdizioneId)}` : `${API_BASE}/moduli`;
+    const res = await fetch(url);
     if (!res.ok) throw new Error('Errore nel recupero moduli');
     return await res.json();
   } catch (err) {
     console.warn('Backend API offline, uso fallback locale', err);
     return null;
+  }
+}
+
+export async function fetchGiurisdizioniApi() {
+  try {
+    const res = await fetch(`${API_BASE}/giurisdizioni`, { headers: getAuthHeaders() });
+    if (!res.ok) throw new Error('Errore nel recupero giurisdizioni');
+    return await res.json();
+  } catch (err) {
+    console.warn('Backend API offline giurisdizioni fallback', err);
+    return null;
+  }
+}
+
+export async function creaGiurisdizioneApi(input: { nome: string; codice: string; tipo: 'ue' | 'extra_ue' | 'stato_usa' | 'altro'; note?: string }) {
+  try {
+    const res = await fetch(`${API_BASE}/giurisdizioni`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(input),
+    });
+    if (!res.ok) throw new Error('Errore creazione giurisdizione');
+    return await res.json();
+  } catch (err) {
+    console.warn('Crea giurisdizione API fallback', err);
+    return { id: `giur-${Date.now()}`, ...input };
   }
 }
 
