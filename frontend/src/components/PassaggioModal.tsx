@@ -67,14 +67,12 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce }: Pass
   const visible = view === 'operatore' ? steps : steps.filter(s => s.who === 'cliente');
 
   const toggleDone = (id: string) => {
-    const nextSteps = steps.map(s => s.id === id ? { ...s, stato: s.stato === 'done' ? 'pending' : 'done' } : s);
+    const nextSteps: Passaggio[] = steps.map(s => s.id === id ? { ...s, stato: (s.stato === 'done' ? 'pending' : 'done') as 'pending' | 'done' } : s);
     setSteps(nextSteps);
     if (onSaveVoce) {
       onSaveVoce(nextSteps);
     }
   };
-
-  const removeStep = (id: string) => setSteps(prev => prev.filter(s => s.id !== id));
 
   const handleAddNote = (e: React.FormEvent) => {
     e.preventDefault();
@@ -120,7 +118,7 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce }: Pass
           </div>
 
           {/* Sub Navigation */}
-          <div style={{ display: 'flex', gap: 6, marginTop: 14, borderBottom: '1px solid var(--border)', pb: 8 }}>
+          <div style={{ display: 'flex', gap: 6, marginTop: 14, borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>
             <button
               onClick={() => setActiveTab('passaggi')}
               style={tabBtnStyle(activeTab === 'passaggi')}
