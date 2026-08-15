@@ -26,8 +26,9 @@
 - [x] **Anagrafica Clienti ERP (`/clients`)**: Modal `AnagraficaErpModal` a 4 schede per dati legali, sedi, fatturazione SDI e fascicolo KYC/AML.
 - [x] **Dettagli Progetto (`/projects/:id`)**:
   - `🗂 Moduli & Microvoci` (Consuntivazione ore e diario note operatore).
-  - `🕸 Grafo & Dipendenze Moduli` (Workflow visivo con frecce `➔` e pulsante `+ Aggiungi Modulo da Libreria`).
+  - `🕸 Grafo & Dipendenze Moduli` (Workflow visivo con **🔒 Lucchetti Topologici Dinamici**, frecce `➔`, pulsante `+ Aggiungi Modulo da Libreria` e **`✉️ Notifica Sblocco al Cliente`**).
   - `💶 Fatturazione & SDI` (Emissione sia di Fatture `FT` che Note di Credito `NC` con serie distinte ed anteprima PDF).
+  - `📊 Redditività & Margini` (Dashboard analitica con Margine Lordo Studio, Resa Oraria Effettiva €/ora, Ore Stimate vs Reali ed export **📄 Dossier Trasparenza PDF**).
   - **Archiviazione & Eliminazione Sicura**: Blocco fiscale anti-cancellazione se presenti fatture.
 - [x] **Gestionale Fatture & Pagamenti (`/invoices`)**:
   - Dashboard globale per tutte le fatture e note di credito dello studio.
@@ -37,9 +38,9 @@
   - Split-screen builder con **editing prezzo unitario (€)** in distinta base.
   - Catalogo articoli con modal di modifica prezzo e ore listino per Admin.
   - Tab **🌍 Giurisdizioni Studio**: Gestione giurisdizioni (Malta 🇲🇹, Gibilterra 🇬🇮, Florida 🇺🇸, Delaware 🇺🇸, EAU 🇦🇪).
-  - Tab **🕸 Grafo Topologico Moduli**: Layout topologico a 3 colonne (*Punto di partenza*, *Sbloccati a cascata*, *Dipendenti*) con **frecce connettori SVG viola illuminated** (`#arrow-active`).
+  - Tab **🕸 Grafo Topologico Moduli**: Layout topologico a 3 colonne (*Punto di partenza*, *Sbloccati a cascata*, *Dipendenti*) con **frecce connettori SVG viola illuminated** (`#arrow-active`) e badge **🔒 Dipende da**.
   - **Costruttore Moduli & Articoli**: menu a tendina **`🌍 Giurisdizione Target *`** per associare ciascun modulo o prestazione ad una giurisdizione specifica.
-  - **Assegnazione 1-Click a Cliente & Anti-Duplicazione**: Modal **`🚀 Assegna Modulo a Cliente`** con scansione live degli articoli già svolti per evitare lavoro doppio ed addebiti duplicati.
+  - **Assegnazione 1-Click a Cliente & Anti-Duplicazione**: Modal **`🚀 Assegna Modulo a Cliente`** con scansione live degli articoli già svolti per evitare lavoro doppio ed addebiti duplicati (0h addebitate per doppioni).
   - Tab 5: Modelli contratti PDF in bianco e Form Master.
 - [x] **Wizard Nuovo Progetto con Filtro Giurisdizioni a Cascata (`NewProjectWizard.tsx`)**:
   - **Step 0**: Selezione Giurisdizione/Piazza Finanziaria target.
@@ -51,9 +52,12 @@
   - Scheda 3: 📋 Form Dati Societari con salvataggio diretto.
   - Scheda 4: 📎 Vault Documenti Legali.
   - Scheda 5: 💬 Contatti Advisor.
-- [x] **Impostazioni Studio (`/settings`)**:
+- [x] **Impostazioni Studio & Gestione Team (`/settings`)**:
   - Sede Legale e Sede Operativa disaccoppiate.
   - Configuratore Layout Fattura PDF (Logo studio, colore tema, note legali ed anteprima live).
+  - **📧 Server Email SMTP Transazionale & Omnichannel**: Form configurazione SMTP + 4 Pulsanti di Test per WhatsApp, Telegram Bot, Signal Daemon ed Email.
+  - **👥 Gestione Team & Performance Operatori**: Card interattive con **Francesca Disabato**, **Joe Disabato**, **Avv. Lorenzo Marino**, **Elena Rossi** e **Super Admin**.
+  - **📊 Scheda Dettagliata Operatore & Timesheet Live**: Modal 1-Click con consuntivo ore lavorate, progetti assegnati, microvoci ultimate, tasso di efficienza ed export PDF.
 - [x] **Super Admin & Multi-Tenant Studio (`/admin/tenants`)**:
   - [x] Dashboard metrica globale per SuperAdmin (Fatturato globale, tenant attivi, contratti Enterprise).
   - [x] Modal registrazione nuovo Tenant / Studio professionale con isolamento `tenant_id`.

@@ -34,9 +34,19 @@ Piattaforma ERP per studi di consulenza societaria, wealth protection ed advisor
 
 ### 🕸 Grafo & Dipendenze Moduli nel Progetto
 - **Visual Flow Topologico & Frecce SVG**: Layout a 3 colonne (*Punto di partenza*, *Sbloccati a cascata*, *Dipendenti*) con connettori direzionali SVG viola.
-- **Associazione Giurisdizioni**: Menù a tendina `🌍 Giurisdizione Target *` nel costruttore di moduli ed articoli.
-- **Assegnazione 1-Click a Cliente & Smart Anti-Duplicazione**: Pulsante `🚀 Assegna a Progetto Cliente` direttamente dalle card del Grafo con scansione automatica per evitare la duplicazione di articoli o lavoro già svolto.
+- **🔒 Lucchetti Topologici Dinamici & Notifica Sblocco Cliente**: Visualizzazione dello stato `🔒 Locked` / `🔓 Unlocked` sulle dipendenze e pulsante `✉️ Notifica Sblocco al Cliente` al completamento delle fasi.
+- **Associazione Giurisdizioni**: Menù a tendina `🌍 Giurisdizione Target *` nel costruttore di moduli ed articoli per Malta 🇲🇹, Gibilterra 🇬🇮, USA 🇺🇸, EAU 🇦🇪.
+- **Assegnazione 1-Click a Cliente & Smart Anti-Duplicazione**: Pulsante `🚀 Assegna a Progetto Cliente` direttamente dalle card del Grafo con scansione automatica per evitare la duplicazione di articoli o lavoro già svolto (0h per doppioni).
 - **Upselling Moduli**: Pulsante `+ Aggiungi Modulo da Libreria` anche all'interno della scheda del progetto del cliente.
+
+### 📊 Redditività Incarico & Report Margini (€/ora)
+- **KPI Finanziari Live**: Margine Lordo Studio (€), Resa Oraria Effettiva Studio (€/ora), Ore Stimate vs Consuntivate Reali.
+- **Rendiconto per Singolo Modulo**: Tabella analitica con margine di profitto ed indicatori `🟢 In Utile Extra` / `🟡 In Target`.
+- **📄 Export Dossier Trasparenza PDF**: Esportazione 1-click del rendiconto trasparente dell'incarico per il cliente.
+
+### 👥 Gestione Team & Timesheet Live Operatori (`/settings`)
+- **Scheda Performance Operatore 1-Click**: Cliccando su qualsiasi collaboratore (*Francesca Disabato*, *Joe Disabato*, *Avv. Lorenzo Marino*, *Elena Rossi*, *Super Admin*) si apre la scheda analitica con ore consuntivate, incarichi gestiti e diario timesheet live.
+- **📧 Server Email SMTP Transazionale & Omnichannel**: Form credenziali SMTP + 4 Pulsanti di Test 1-Click per WhatsApp, Telegram Bot, Signal Daemon ed Email.
 
 ---
 
