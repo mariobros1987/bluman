@@ -143,8 +143,14 @@ export function ClientsPage() {
       {loading ? (
         <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)', fontSize: 12 }}>Caricamento anagrafica clienti...</div>
       ) : filtered.length === 0 ? (
-        <div style={{ padding: 40, textAlign: 'center', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, color: 'var(--muted)' }}>
-          Nessun cliente trovato. Clicca su "+ Nuovo Cliente".
+        <div style={{ padding: 40, textAlign: 'center', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, color: 'var(--muted)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+          <div>Nessun cliente trovato con i filtri correnti ({clienti.length} totali in anagrafica).</div>
+          <button
+            onClick={() => { setSearch(''); setFilterType('all'); }}
+            style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', boxShadow: '0 4px 12px rgba(99,102,241,.3)' }}
+          >
+            ✖ Azzera Filtro Ricerca
+          </button>
         </div>
       ) : (
         <div className={styles.clientGrid}>
