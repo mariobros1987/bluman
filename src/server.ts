@@ -421,6 +421,16 @@ export function buildServer(app: AppPort): FastifyInstance {
     return app.listaProgetti();
   });
 
+  server.delete<{ Params: { id: string } }>('/progetti/:id', async (req, reply) => {
+    await app.eliminaProgetto(req.params.id);
+    return reply.code(200).send({ success: true });
+  });
+
+  server.put<{ Params: { id: string }; Body: { archiviato: boolean } }>('/progetti/:id/archivia', async (req, reply) => {
+    await app.archiviaProgetto(req.params.id, req.body.archiviato);
+    return reply.code(200).send({ success: true });
+  });
+
   server.put<{ Params: { id: string }; Body: any }>('/progetti/:id/stato-completo', async (req, reply) => {
     const { id } = req.params;
     const body = req.body;
@@ -440,6 +450,10 @@ export function buildServer(app: AppPort): FastifyInstance {
     if (!userId) return reply.code(400).send({ errore: 'userId è obbligatorio' });
     const accesso = await (app as any).assegnaAccessoProgetto(req.params.id, userId, livello || 'write');
     return reply.code(201).send(accesso);
+  });
+
+  server.get('/fatture/tutte', async () => {
+    return (app as any).listaFattureTutte();
   });
 
   server.post<{

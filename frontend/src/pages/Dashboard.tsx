@@ -16,6 +16,7 @@ export function Dashboard() {
   const [wizardOpen, setWizardOpen] = useState(false);
   const [projectList, setProjectList] = useState<Progetto[]>(PROJECTS);
   const [isDbConnected, setIsDbConnected] = useState(false);
+  const [activeTab, setActiveTab] = useState<'attivi' | 'archiviati'>('attivi');
 
   const loadProjects = async () => {
     const remote = await fetchProgetti();
@@ -109,16 +110,31 @@ export function Dashboard() {
         </div>
       )}
 
-      {/* Projects list */}
+      {/* Tabs */}
+      <div style={{ display: 'flex', gap: 16, marginBottom: 16, borderBottom: '1px solid var(--border)' }}>
+        <button
+          onClick={() => setActiveTab('attivi')}
+          style={{ padding: '8px 16px', background: 'transparent', border: 'none', borderBottom: activeTab === 'attivi' ? '2px solid var(--indigo-l)' : '2px solid transparent', color: activeTab === 'attivi' ? 'var(--indigo-l)' : 'var(--muted)', cursor: 'pointer', fontWeight: 600 }}
+        >
+          Progetti in Corso ({projectList.filter(p => p.st !== 'archived').length})
+        </button>
+        <button
+          onClick={() => setActiveTab('archiviati')}
+          style={{ padding: '8px 16px', background: 'transparent', border: 'none', borderBottom: activeTab === 'archiviati' ? '2px solid var(--indigo-l)' : '2px solid transparent', color: activeTab === 'archiviati' ? 'var(--indigo-l)' : 'var(--muted)', cursor: 'pointer', fontWeight: 600 }}
+        >
+          🗄 Archivio Progetti ({projectList.filter(p => p.st === 'archived').length})
+        </button>
+      </div>
+
       <div className={styles.sectionHeader}>
-        <div className={styles.sectionTitle}>Progetti in corso ({projectList.length})</div>
+        <div className={styles.sectionTitle}>{activeTab === 'attivi' ? 'Progetti in corso' : 'Archivio Storico'}</div>
         <button className={styles.btnPrimary} onClick={() => setWizardOpen(true)}>
           + Nuovo progetto
         </button>
       </div>
 
       <div className={styles.projectList}>
-        {projectList.map(p => {
+        {projectList.filter(p => activeTab === 'attivi' ? p.st !== 'archived' : p.st === 'archived').map(p => {
           const color = progressColor(p);
           const allTeam = [...new Set((p.mods || []).flatMap(m => m.team || [1]).filter(Boolean))];
           return (

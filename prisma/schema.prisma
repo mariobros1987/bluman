@@ -242,7 +242,7 @@ model Preventivo {
   // §15.2 richiede progetto_id nel body di creazione ma §14 non lo includeva nello schema
   // originale — incoerenza trovata implementando l'adapter Prisma, corretta qui.
   progettoId   String          @map("progetto_id")
-  progetto     Progetto        @relation(fields: [progettoId], references: [id])
+  progetto     Progetto        @relation(fields: [progettoId], references: [id], onDelete: Cascade)
   stato        StatoPreventivo @default(bozza)
   righeJson    Json            @map("righe_json") // [{moduloTemplateId, moduloTemplateVersione}]
   valoreTotale Int             @map("valore_totale")
@@ -273,6 +273,7 @@ enum StatoProgetto {
   pre_project
   in_progress
   completed
+  archived
 }
 
 model Progetto {
@@ -310,7 +311,7 @@ model ModuloProgetto {
   id                     String         @id @default(uuid())
   tenantId               String         @map("tenant_id")
   progettoId             String         @map("progetto_id")
-  progetto               Progetto       @relation(fields: [progettoId], references: [id])
+  progetto               Progetto       @relation(fields: [progettoId], references: [id], onDelete: Cascade)
   moduloTemplateId       String         @map("modulo_template_id")
   moduloTemplate         ModuloTemplate @relation(fields: [moduloTemplateId], references: [id])
   moduloTemplateVersione Int            @map("modulo_template_versione") // congelata alla creazione, §15.3
@@ -493,7 +494,7 @@ model Fattura {
   id                     String               @id @default(uuid())
   tenantId               String               @map("tenant_id")
   progettoId             String               @map("progetto_id")
-  progetto               Progetto             @relation(fields: [progettoId], references: [id])
+  progetto               Progetto             @relation(fields: [progettoId], references: [id], onDelete: Cascade)
   tipoDocumento          TipoDocumentoFiscale @default(fattura) @map("tipo_documento")
   serie                  String               @default("FT") // "FT" per Fatture, "NC" per Note di Credito (Numerazione Distinta!)
   numeroProgressivoSerie Int                  @default(1) @map("numero_progressivo_serie")
@@ -546,7 +547,7 @@ model EventoCalendario {
   userId      String    @map("user_id")
   user        User      @relation(fields: [userId], references: [id])
   progettoId  String?   @map("progetto_id")
-  progetto    Progetto? @relation(fields: [progettoId], references: [id])
+  progetto    Progetto? @relation(fields: [progettoId], references: [id], onDelete: Cascade)
   titolo      String
   dataInizio  DateTime  @map("data_inizio")
   dataFine    DateTime  @map("data_fine")
@@ -622,7 +623,7 @@ model ComunicazioneProgetto {
   tenantId     String   @map("tenant_id")
   tenant       Tenant   @relation(fields: [tenantId], references: [id])
   progettoId   String   @map("progetto_id")
-  progetto     Progetto @relation(fields: [progettoId], references: [id])
+  progetto     Progetto @relation(fields: [progettoId], references: [id], onDelete: Cascade)
   canale       String   // email | whatsapp | telegram | signal
   mittente     String
   destinatario String

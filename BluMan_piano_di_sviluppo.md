@@ -27,6 +27,11 @@
   - `🗂 Moduli & Microvoci` (Consuntivazione ore e diario note operatore).
   - `🕸 Grafo & Dipendenze Moduli` (Workflow visivo con frecce `➔` e pulsante `+ Aggiungi Modulo da Libreria`).
   - `💶 Fatturazione & SDI` (Emissione sia di Fatture `FT` che Note di Credito `NC` con serie distinte ed anteprima PDF).
+  - **Archiviazione & Eliminazione Sicura**: Blocco fiscale anti-cancellazione se presenti fatture.
+- [x] **Gestionale Fatture & Pagamenti (`/invoices`)**:
+  - Dashboard globale per tutte le fatture e note di credito dello studio.
+  - KPI (Fatturato, Incassato, In Sospeso, Note Credito).
+  - Gestione stato pagamenti e filtro per numero/cliente.
 - [x] **Libreria Moduli & Distinta Base (`/library`)**:
   - Split-screen builder con **editing prezzo unitario (€)** in distinta base.
   - Catalogo articoli con modal di modifica prezzo e ore listino per Admin.

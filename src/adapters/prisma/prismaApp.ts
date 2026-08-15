@@ -267,6 +267,75 @@ export class PrismaApp implements AppPort {
     return progetti;
   }
 
+  async archiviaProgetto(id: string, archiviato: boolean): Promise<void> {
+    await this.prisma.progetto.update({
+      where: { id, tenantId: this.tenantId },
+      data: { stato: archiviato ? 'archived' : 'in_progress' },
+    });
+  }
+
+  async eliminaProgetto(id: string): Promise<void> {
+    // 1. Controllo Fiscale: Se ci sono fatture o note di credito, blocco.
+    const fatture = await this.prisma.fattura.count({
+      where: { progettoId: id, tenantId: this.tenantId },
+    });
+    
+    if (fatture > 0) {
+      throw new TransizioneNonValidaError(
+        `Impossibile eliminare il progetto perché contiene ${fatture} Fatture / Note di Credito. È necessario archiviarlo.`
+      );
+    }
+    
+    // 2. Eliminazione progetto
+    // Il database eliminerà a cascata (Cascade) le righe correlate oppure potremmo doverle eliminare manualmente se Prisma non è configurato per il cascade completo.
+    // Facciamo un tentativo. In caso di errore per FK constraint, dovremo eliminare prima le dipendenze.
+    try {
+      // Elimina manualmente prima le dipendenze note per sicurezza se non c'è cascade ovunque
+      const moduli = await this.prisma.moduloProgetto.findMany({ where: { progettoId: id } });
+      for (const m of moduli) {
+        await this.prisma.moduloProgettoDipendenza.deleteMany({ where: { dipendeDaId: m.id } });
+        await this.prisma.moduloProgettoDipendenza.deleteMany({ where: { moduloProgettoId: m.id } });
+        const microvoci = await this.prisma.microvoceProgetto.findMany({ where: { moduloProgettoId: m.id } });
+        for (const mv of microvoci) {
+          await this.prisma.passaggioProgetto.deleteMany({ where: { microvoceProgettoId: mv.id } });
+        }
+        await this.prisma.microvoceProgetto.deleteMany({ where: { moduloProgettoId: m.id } });
+      }
+      await this.prisma.moduloProgetto.deleteMany({ where: { progettoId: id } });
+      
+      const preventivi = await this.prisma.preventivo.findMany({ where: { progettoId: id } });
+      for (const p of preventivi) {
+        await this.prisma.preventivoRiga.deleteMany({ where: { preventivoId: p.id } });
+      }
+      await this.prisma.preventivo.deleteMany({ where: { progettoId: id } });
+      
+      await this.prisma.eventoCalendario.deleteMany({ where: { progettoId: id } });
+      await this.prisma.accessoRisorsa.deleteMany({ where: { progettoId: id } });
+      await this.prisma.comunicazioneProgetto.deleteMany({ where: { progettoId: id } });
+
+      await this.prisma.progetto.delete({
+        where: { id, tenantId: this.tenantId },
+      });
+    } catch (err: any) {
+      console.error('Errore durante eliminazione progetto:', err);
+      throw new TransizioneNonValidaError('Impossibile eliminare il progetto a causa di record collegati nel database.');
+    }
+  }
+
+  async listaFattureTutte(): Promise<any[]> {
+    return this.prisma.fattura.findMany({
+      where: { tenantId: this.tenantId },
+      include: {
+        progetto: {
+          include: {
+            cliente: true
+          }
+        },
+      },
+      orderBy: { data: 'desc' }
+    });
+  }
+
   async creaPreventivo(input: {
     clienteId: string;
     progettoId: string;

@@ -81,6 +81,9 @@ export interface AppPort {
   creaProgetto(input: { clienteId: string; nome: string }): ProgettoBase | Promise<ProgettoBase>;
   getProgetto(id: string): unknown | Promise<unknown>; // forma esatta (con moduli/microvoci) definita dall'implementazione
   listaProgetti(): unknown[] | Promise<unknown[]>;
+  archiviaProgetto(id: string, archiviato: boolean): Promise<void>;
+  eliminaProgetto(id: string): Promise<void>;
+  listaFattureTutte(): Promise<unknown[]>;
   creaPreventivo(input: { clienteId: string; progettoId: string; righe: RigaPreventivoInput[] }): Preventivo | Promise<Preventivo>;
   getPreventivo(id: string): Preventivo | Promise<Preventivo>;
   inviaPreventivo(id: string): Preventivo | Promise<Preventivo>;

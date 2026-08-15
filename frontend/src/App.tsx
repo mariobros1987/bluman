@@ -12,6 +12,7 @@ import { LoginPage }    from './pages/LoginPage';
 import { CalendarPage } from './pages/CalendarPage';
 import { SuperAdminPage } from './pages/SuperAdminPage';
 import { AuditLogPage } from './pages/AuditLogPage';
+import { InvoicesPage } from './pages/InvoicesPage';
 import { PROJECTS } from './store/mockData';
 import './styles/tokens.css';
 
@@ -66,6 +67,7 @@ export default function App() {
             <Route path="/projects/:id"  element={<ProjectDetail />} />
             <Route path="/clients"       element={<ClientsPage />} />
             <Route path="/calendar"      element={<CalendarPage />} />
+            <Route path="/invoices"      element={<InvoicesPage />} />
             <Route path="/audit"         element={<AuditLogPage />} />
             <Route path="/admin/tenants" element={<SuperAdminPage />} />
             <Route path="/library"       element={<Library />} />

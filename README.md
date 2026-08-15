@@ -26,6 +26,11 @@ Piattaforma ERP per studi di consulenza societaria, wealth protection ed advisor
 - **Note di Credito (Serie `NC`)**: Numerazione autonoma (es. `NC-2026/001`) con causale di storno e riferimento fattura originale.
 - **Tracciato SDI Comped Servizi FPA**: Generazione ed associazione XML FatturaPA.
 - **Configuratore Layout PDF (Admin)**: Upload Logo Studio, colore tema e note legali in piè di pagina con anteprima live.
+- **Gestionale Fatture (`/invoices`)**: Dashboard globale per il controllo pagamenti, scadenziario e filtri stato.
+
+### 🗄 Archiviazione & Eliminazione Sicura
+- **Blocco Fiscale**: Impossibile eliminare un progetto se sono state emesse Fatture/Note di Credito.
+- **Doppio Controllo**: L'eliminazione definitiva richiede la digitazione manuale del nome progetto.
 
 ### 🕸 Grafo & Dipendenze Moduli nel Progetto
 - **Visual Flow**: Grafico visuale con frecce `➔ Sblocca` delle dipendenze dei moduli acquistati dal cliente.

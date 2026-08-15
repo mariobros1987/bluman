@@ -189,6 +189,38 @@ export async function creaProgettoApi(input: { clienteId: string; nome: string }
   return await res.json();
 }
 
+export async function eliminaProgettoApi(id: string) {
+  const res = await fetch(`${API_BASE}/progetti/${id}`, {
+    method: 'DELETE',
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.errore || 'Errore eliminazione progetto');
+  }
+  return await res.json();
+}
+
+export async function archiviaProgettoApi(id: string, archiviato: boolean) {
+  const res = await fetch(`${API_BASE}/progetti/${id}/archivia`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ archiviato }),
+  });
+  if (!res.ok) throw new Error('Errore aggiornamento stato progetto');
+  return await res.json();
+}
+
+export async function fetchTutteFattureStudioApi() {
+  try {
+    const res = await fetch(`${API_BASE}/fatture/tutte`);
+    if (!res.ok) throw new Error('Errore nel recupero delle fatture dello studio');
+    return await res.json();
+  } catch (err) {
+    console.warn('Backend API offline o errore:', err);
+    return [];
+  }
+}
+
 export async function creaPreventivoEAccettaApi(input: {
   clienteId: string;
   progettoId: string;

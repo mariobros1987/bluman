@@ -121,6 +121,24 @@ export class InMemoryApp implements AppPort {
     return [...this.progetti.values()].map((p) => ({ id: p.id, clienteId: p.clienteId, nome: p.nome, stato: p.stato }));
   }
 
+  async archiviaProgetto(id: string, archiviato: boolean): Promise<void> {
+    const p = this.progetti.get(id);
+    if (!p) throw new ProgettoNonTrovatoError();
+    p.stato = archiviato ? 'archived' : 'in_progress';
+  }
+
+  async eliminaProgetto(id: string): Promise<void> {
+    const fattureCount = Array.from(this.fatture.values()).filter(f => (f as any).progettoId === id).length;
+    if (fattureCount > 0) {
+      throw new TransizioneNonValidaError(`Impossibile eliminare il progetto perché contiene ${fattureCount} Fatture / Note di Credito. È necessario archiviarlo.`);
+    }
+    this.progetti.delete(id);
+  }
+
+  async listaFattureTutte(): Promise<any[]> {
+    return Array.from(this.fatture.values());
+  }
+
   /** §15.2 — crea un preventivo, calcolando valore_totale dai moduli selezionati. */
   creaPreventivo(input: { clienteId: string; progettoId: string; righe: RigaPreventivoInput[] }): Preventivo {
     this.getCliente(input.clienteId);

@@ -12,8 +12,9 @@ import { DigitalSignatureModal } from '../components/DigitalSignatureModal';
 import { ComunicazioniTab } from '../components/ComunicazioniTab';
 import { AssignOperatorModal } from '../components/AssignOperatorModal';
 import { CalendarPreviewModal } from '../components/CalendarPreviewModal';
+import { ConfirmDeleteModal } from '../components/ConfirmDeleteModal';
 import { PROJECTS } from '../store/mockData';
-import { fetchProgettoDettaglio, emettiFatturaApi, consuntivaMicrovoceApi, fetchAccessiProgetto, assegnaAccessoProgettoApi, salvaProgettoDettaglioApi } from '../api/client';
+import { fetchProgettoDettaglio, emettiFatturaApi, consuntivaMicrovoceApi, fetchAccessiProgetto, assegnaAccessoProgettoApi, salvaProgettoDettaglioApi, archiviaProgettoApi, eliminaProgettoApi } from '../api/client';
 import { TEAM } from '../store/mockData';
 import type { Progetto, ModuloProgetto, CategoriaModulo } from '../types';
 import styles from './ProjectDetail.module.css';
@@ -47,6 +48,8 @@ export function ProjectDetail() {
     mvIdx: number;
     name: string;
   } | null>(null);
+
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
 
   const handleScheduleDeadlineConfirm = (
     date: string,
@@ -473,6 +476,28 @@ export function ProjectDetail() {
             >
               👥 Accessi Progetto
             </button>
+            <button
+              onClick={async () => {
+                const isArchived = project.st === 'archived';
+                if (confirm(isArchived ? 'Vuoi ripristinare questo progetto?' : 'Vuoi archiviare questo progetto?')) {
+                  try {
+                    await archiviaProgettoApi(String(project.id), !isArchived);
+                    setProject({ ...project, st: isArchived ? 'in_progress' : 'archived' });
+                  } catch (e: any) {
+                    alert('Errore archiviazione: ' + e.message);
+                  }
+                }
+              }}
+              style={{ background: '#2d3748', border: '1px solid #4a5568', color: '#fff', padding: '4px 10px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer', marginLeft: 8 }}
+            >
+              {project.st === 'archived' ? '↩️ Ripristina' : '📁 Archivia'}
+            </button>
+            <button
+              onClick={() => setDeleteModalOpen(true)}
+              style={{ background: '#7f1d1d', border: '1px solid #991b1b', color: '#fca5a5', padding: '4px 10px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer', marginLeft: 8 }}
+            >
+              🗑 Elimina
+            </button>
           </div>
         </div>
         <div className={styles.headerProgress}>
@@ -758,6 +783,24 @@ export function ProjectDetail() {
           }}
         />
       )}
+
+      <ConfirmDeleteModal
+        isOpen={deleteModalOpen}
+        onClose={() => setDeleteModalOpen(false)}
+        projectName={project.n}
+        hasInvoices={project.fatture && project.fatture.length > 0}
+        onConfirm={async () => {
+          await eliminaProgettoApi(String(project.id));
+          // Rimuovi dal local storage
+          const savedStr = localStorage.getItem('bluman_custom_projects');
+          if (savedStr) {
+            const savedArr: Progetto[] = JSON.parse(savedStr);
+            const updatedArr = savedArr.filter(p => String(p.id) !== String(project.id));
+            localStorage.setItem('bluman_custom_projects', JSON.stringify(updatedArr));
+          }
+          navigate('/');
+        }}
+      />
     </div>
   );
 }
@@ -1324,7 +1367,6 @@ function FatturazioneTab({ project, rawDbProject, onRefresh }: { project: Proget
     </div>
   );
 }
-
 function PlaceholderTab({ icon, label }: { icon: string; label: string }) {
   return (
     <div className={styles.placeholder}>
