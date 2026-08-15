@@ -41,11 +41,11 @@
 - [x] **Libreria Moduli & Distinta Base (`/library`)**:
   - Split-screen builder con **editing prezzo unitario (€)** in distinta base.
   - Catalogo articoli con modal di modifica prezzo, ore listino, **📄 Modelli Documenti in Bianco Collegati (PDF)** e **📋 Form Master Dinamici** per Admin.
-  - Tab **🌍 Giurisdizioni Studio**: Gestione giurisdizioni (Malta 🇲🇹, Gibilterra 🇬🇮, Florida 🇺🇸, Delaware 🇺🇸, EAU 🇦🇪).
-  - Tab **🕸 Grafo Topologico Moduli**: Layout topologico a 3 colonne (*Punto di partenza*, *Sbloccati a cascata*, *Dipendenti*) con **frecce connettori SVG viola illuminated** (`#arrow-active`) e badge **🔒 Dipende da**.
+  - Tab **🌍 Giurisdizioni Studio**: Gestione giurisdizioni (Malta 🇲🇹, Gibilterra 🇬🇮, Florida 🇺🇸, Delaware 🇺🇸, EAU 🇦🇪) e menu 1-click **`➕ Associa Modello`** e **`✕ Scollega`**.
+  - Tab **🕸 Grafo Topologico Moduli**: Layout topologico a 3 colonne (*Punto di partenza*, *Sbloccati a cascata*, *Dipendenti*) con **Filtro Live per Giurisdizione Target (`selectedGiurId`)**, frecce connettori SVG viola illuminated (`#arrow-active`) e badge **🔒 Dipende da**.
   - **Costruttore Moduli & Articoli**: menu a tendina **`🌍 Giurisdizione Target *`** per associare ciascun modulo o prestazione ad una giurisdizione specifica.
   - **Assegnazione 1-Click a Cliente & Anti-Duplicazione**: Modal **`🚀 Assegna Modulo a Cliente`** con scansione live degli articoli già svolti per evitare lavoro doppio ed addebiti duplicati (0h addebitate per doppioni).
-  - Tab 5: Modelli contratti PDF in bianco e Form Master con azionatori 1-Click **`📥 Scarica PDF`** e **`🔗 Collega a Cliente`**.
+  - Tab 5: Modelli contratti PDF in bianco e Form Master con azionatori 1-Click **`📥 Scarica PDF`** per generare PDF reali e **`🔗 Collega a Cliente`**.
 - [x] **Wizard Nuovo Progetto con Filtro Giurisdizioni a Cascata (`NewProjectWizard.tsx`)**:
   - **Step 0**: Selezione Giurisdizione/Piazza Finanziaria target.
   - **Step 1**: Selezione Cliente e Nome Progetto.
