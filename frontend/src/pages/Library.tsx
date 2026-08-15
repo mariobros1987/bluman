@@ -79,15 +79,22 @@ export function Library() {
   const toggle = (id: string) =>
     setOpen(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
 
-  // Topological levels
-  const maxLvl = Math.max(...moduliList.map(m => levelOf(m.id, moduliList)), 0);
+  // Filter moduli list by selected jurisdiction filter
+  const filteredModuliList = selectedGiurId === 'ALL'
+    ? moduliList
+    : moduliList.filter(m => m.giurisdizioneId === selectedGiurId || !m.giurisdizioneId);
+
+  // Topological levels calculation on filtered list
+  const maxLvl = Math.max(...filteredModuliList.map(m => levelOf(m.id, moduliList)), 0);
   const cols: ModuloTemplate[][] = [];
-  for (let i = 0; i <= maxLvl; i++) cols.push(moduliList.filter(m => levelOf(m.id, moduliList) === i));
+  for (let i = 0; i <= maxLvl; i++) {
+    cols.push(filteredModuliList.filter(m => levelOf(m.id, moduliList) === i));
+  }
   const colLabels = ['Punto di partenza', 'Sbloccati a cascata', 'Dipendenti'];
 
   useEffect(() => {
     if (subTab === 'grafo') drawEdges();
-  }, [open, subTab, moduliList]);
+  }, [open, subTab, moduliList, selectedGiurId]);
 
   function drawEdges() {
     const svg = svgRef.current;
@@ -106,7 +113,7 @@ export function Library() {
         </marker>
       </defs>
     `;
-    moduliList.forEach(m => {
+    filteredModuliList.forEach(m => {
       m.deps.forEach(depId => {
         const from = document.getElementById(`lib-${depId}`);
         const to   = document.getElementById(`lib-${m.id}`);
