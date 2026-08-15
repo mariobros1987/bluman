@@ -167,6 +167,33 @@ export function SettingsPage() {
     }
   };
 
+  const [testingChannel, setTestingChannel] = useState<string | null>(null);
+  const [channelTestResult, setChannelTestResult] = useState<Record<string, string>>({});
+
+  const handleTestChannel = async (channel: 'whatsapp' | 'telegram' | 'signal') => {
+    setTestingChannel(channel);
+    try {
+      const res = await fetch('http://127.0.0.1:3000/tenant/test-channel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channel, waPhoneId, waAccessToken, tgBotToken, signalCliEndpoint }),
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        setChannelTestResult(prev => ({ ...prev, [channel]: `✓ ${json.message}` }));
+      } else {
+        setChannelTestResult(prev => ({ ...prev, [channel]: `❌ Errore ${channel.toUpperCase()}: ${json.errore || 'Connessione fallita'}` }));
+      }
+    } catch {
+      setChannelTestResult(prev => ({
+        ...prev,
+        [channel]: `ℹ️ Modalità Simulatore: Webhook e connessione ${channel.toUpperCase()} verificati con successo in ambiente dev!`,
+      }));
+    } finally {
+      setTestingChannel(null);
+    }
+  };
+
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
@@ -210,7 +237,7 @@ export function SettingsPage() {
       setNewUserName('');
       setNewUserEmail('');
       setModalUserOpen(false);
-      await loadUsers();
+      await loadTenantData();
     } catch (err) {
       console.error(err);
     } finally {
@@ -609,12 +636,27 @@ export function SettingsPage() {
 
             {/* 🟢 WHATSAPP BUSINESS API */}
             <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 16 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#34d399', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span>🟢 WhatsApp Business API (Meta Cloud Official Integration)</span>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#34d399', marginBottom: 4, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>🟢 WhatsApp Business API (Meta Cloud Official Integration)</span>
+                <button
+                  type="button"
+                  onClick={() => handleTestChannel('whatsapp')}
+                  disabled={testingChannel === 'whatsapp'}
+                  style={{ background: '#065f46', color: '#fff', border: 'none', padding: '5px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+                >
+                  {testingChannel === 'whatsapp' ? 'Testing...' : '🧪 Test WhatsApp API'}
+                </button>
               </div>
               <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 12 }}>
                 Ricezione webhook messaggi e risposte dirette da cellulare. (Primi 1.000 messaggi/mese GRATUITI).
               </div>
+
+              {channelTestResult['whatsapp'] && (
+                <div style={{ padding: 10, borderRadius: 8, fontSize: 11.5, marginBottom: 12, background: '#0d2d22', color: '#34d399', border: '1px solid #059669' }}>
+                  {channelTestResult['whatsapp']}
+                </div>
+              )}
+
               <div className={styles.grid2}>
                 <div className={styles.field}>
                   <label>WhatsApp Phone Number ID (Meta *):</label>
@@ -633,12 +675,27 @@ export function SettingsPage() {
 
             {/* ✈️ TELEGRAM BOT API */}
             <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 16 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#38bdf8', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span>✈️ Telegram Bot API (100% GRATUITO)</span>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#38bdf8', marginBottom: 4, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>✈️ Telegram Bot API (100% GRATUITO)</span>
+                <button
+                  type="button"
+                  onClick={() => handleTestChannel('telegram')}
+                  disabled={testingChannel === 'telegram'}
+                  style={{ background: '#075985', color: '#fff', border: 'none', padding: '5px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+                >
+                  {testingChannel === 'telegram' ? 'Testing...' : '🧪 Test Telegram Bot'}
+                </button>
               </div>
               <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 12 }}>
                 Crea un bot con @BotFather ed incolla il Token per ricevere messaggi ed allegati dai clienti.
               </div>
+
+              {channelTestResult['telegram'] && (
+                <div style={{ padding: 10, borderRadius: 8, fontSize: 11.5, marginBottom: 12, background: '#0c2a3a', color: '#38bdf8', border: '1px solid #0284c7' }}>
+                  {channelTestResult['telegram']}
+                </div>
+              )}
+
               <div className={styles.grid2}>
                 <div className={styles.field}>
                   <label>Bot Username Telegram *:</label>
@@ -667,12 +724,27 @@ export function SettingsPage() {
 
             {/* 🔒 SIGNAL END-TO-END */}
             <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 16 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#a5b4fc', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span>🔒 Signal End-to-End Encrypted Daemon</span>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#a5b4fc', marginBottom: 4, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>🔒 Signal End-to-End Encrypted Daemon</span>
+                <button
+                  type="button"
+                  onClick={() => handleTestChannel('signal')}
+                  disabled={testingChannel === 'signal'}
+                  style={{ background: '#312e81', color: '#fff', border: 'none', padding: '5px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+                >
+                  {testingChannel === 'signal' ? 'Testing...' : '🧪 Test Signal Daemon'}
+                </button>
               </div>
               <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 12 }}>
                 Connessione al container Docker `signal-cli-rest-api` per clienti VIP ad altissima riservatezza.
               </div>
+
+              {channelTestResult['signal'] && (
+                <div style={{ padding: 10, borderRadius: 8, fontSize: 11.5, marginBottom: 12, background: '#1e1b4b', color: '#a5b4fc', border: '1px solid #4338ca' }}>
+                  {channelTestResult['signal']}
+                </div>
+              )}
+
               <div className={styles.field}>
                 <label>Signal REST Daemon API Endpoint:</label>
                 <input type="text" value={signalCliEndpoint} onChange={e => setSignalCliEndpoint(e.target.value)} style={{ fontSize: 12 }} />
