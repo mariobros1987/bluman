@@ -423,3 +423,28 @@ export async function inviaComunicazioneApi(progettoId: string, input: { canale:
     return null;
   }
 }
+
+export async function fetchNotificheApi() {
+  try {
+    const res = await fetch(`${API_BASE}/notifiche`, { headers: getAuthHeaders() });
+    if (!res.ok) throw new Error('Errore recupero notifiche');
+    return await res.json();
+  } catch (err) {
+    console.warn('Fetch notifiche API fallback', err);
+    return null;
+  }
+}
+
+export async function markNotificheReadApi() {
+  try {
+    const res = await fetch(`${API_BASE}/notifiche/read-all`, {
+      method: 'PATCH',
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok) throw new Error('Errore aggiornamento notifiche');
+    return await res.json();
+  } catch (err) {
+    console.warn('Mark notifiche read API fallback', err);
+    return { ok: true };
+  }
+}

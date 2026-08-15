@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { NotificationModal, NotificationItem } from '../NotificationModal';
+import { fetchNotificheApi, markNotificheReadApi } from '../../api/client';
 import styles from './AppLayout.module.css';
 
 const TITLES: Record<string, string> = {
@@ -59,11 +60,30 @@ export function AppLayout({ children, alertCount = 2, user, onLogout }: AppLayou
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>(INITIAL_NOTIFICATIONS);
 
+  useEffect(() => {
+    const loadDbNotifs = async () => {
+      const dbNotifs = await fetchNotificheApi();
+      if (dbNotifs && Array.isArray(dbNotifs) && dbNotifs.length > 0) {
+        const mapped: NotificationItem[] = dbNotifs.map((n: any) => ({
+          id: n.id,
+          title: n.oggetto || 'Notifica Studio',
+          body: n.corpo || '',
+          time: n.inviataAt ? new Date(n.inviataAt).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) : 'Ora',
+          read: n.statoLettura === 'letta',
+          type: n.oggetto?.includes('KYC') ? 'blocked' : n.oggetto?.includes('Firma') ? 'signature' : 'delay',
+        }));
+        setNotifications(mapped);
+      }
+    };
+    loadDbNotifs();
+  }, []);
+
   const title = TITLES[location.pathname] || (location.pathname.startsWith('/projects/') ? 'Dettaglio Progetto' : 'BluMan');
   const unreadCount = notifications.filter(n => !n.read).length;
 
-  const handleMarkAllRead = () => {
+  const handleMarkAllRead = async () => {
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    await markNotificheReadApi();
   };
 
   const handleSelectNotif = (notif: NotificationItem) => {
