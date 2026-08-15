@@ -640,11 +640,6 @@ function GiurisdizioniView({ giurList, onAddGiur }: { giurList: Giurisdizione[];
     </div>
   );
 }
-        </div>
-      )}
-    </div>
-  );
-}
 
 // ─── Componente Libreria Documenti in Bianco & Form Master ────────
 function LibreriaDocumentiEForm() {
