@@ -542,6 +542,8 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce }: Pass
               </div>
             </div>
           </div>
+        )}
+
         {/* Popup Compilazione / Anteprima Form Master Operatore */}
         {previewFormModalStep && (
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 120, padding: 16 }}>
