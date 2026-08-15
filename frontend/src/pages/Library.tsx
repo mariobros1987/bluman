@@ -119,7 +119,7 @@ export function Library() {
     });
   }
 
-  const cats = [...new Set(articoliList.map(a => a.cat))] as CategoriaModulo[];
+
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
