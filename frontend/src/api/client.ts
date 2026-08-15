@@ -172,6 +172,7 @@ export async function creaArticoloApi(input: {
 export async function creaModuloTemplateApi(input: {
   nome: string;
   categoria: string;
+  giurisdizioneId?: string | null;
   prezzoPacchetto?: number | null;
   righe: Array<{ articoloId: string; quantita: number; overrideOre?: number; overridePrezzo?: number }>;
   dipendenzeDaIds?: string[];
