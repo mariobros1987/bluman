@@ -18,6 +18,7 @@ import { ScadenzarioPage } from './pages/ScadenzarioPage';
 import { PrimaNotaPage } from './pages/PrimaNotaPage';
 import { BanksPage } from './pages/BanksPage';
 import { RetainersPage } from './pages/RetainersPage';
+import { DocumentEditorPage } from './pages/DocumentEditorPage';
 import { PROJECTS } from './store/mockData';
 import './styles/tokens.css';
 
@@ -33,7 +34,7 @@ function MainLayoutWrapper({ user, onLogout }: { user: any; onLogout: () => void
 export default function App() {
   const [currentUser, setCurrentUser] = useState<any>(() => {
     const saved = localStorage.getItem('bluman_user');
-    return saved ? JSON.parse(saved) : { id: 'usr-01', nome: 'Joe Disabato', email: 'joe@bluecode.advisory', ruolo: 'advisor' };
+    return saved ? JSON.parse(saved) : null;
   });
 
   const [token, setToken] = useState<string | null>(() => localStorage.getItem('bluman_token'));
@@ -78,6 +79,7 @@ export default function App() {
             <Route path="/banks"         element={<BanksPage />} />
             <Route path="/payments"      element={<PaymentsPage />} />
             <Route path="/retainers"     element={<RetainersPage />} />
+            <Route path="/documents"     element={<DocumentEditorPage />} />
             <Route path="/audit"         element={<AuditLogPage />} />
             <Route path="/admin/tenants" element={<SuperAdminPage />} />
             <Route path="/library"       element={<Library />} />

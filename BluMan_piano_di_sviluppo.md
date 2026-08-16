@@ -74,11 +74,30 @@
   - **👥 Gestione Team & Performance Operatori**: Card interattive con **Francesca Disabato**, **Joe Disabato**, **Avv. Lorenzo Marino**, **Elena Rossi** e **Super Admin**.
   - **📊 Scheda Dettagliata Operatore & Timesheet Live**: Modal 1-Click con consuntivo ore lavorate, progetti assegnati, microvoci ultimate, tasso di efficienza ed export PDF.
   - **🔑 Matrice Permessi & Controllo Accessi RBAC (Stile OpenSTAManager)**: Modal a tab per definire per ciascun operatore/collaboratore il livello di autorizzazione (`denied`, `read`, `write`) per le 8 sezioni dello studio, con persintenza DB Prisma `PermessoModulo` e blocco API.
-- [x] **Contratti Ricorrenti & Retainer Studio (`/retainers`) — *Ispirato ad OpenSTAManager***:
-  - Gestione contratti continuativi di Advisory, Corporate Governance e Compliance AML.
-  - Pianificazione frequenza canone (mensile, trimestrale, semestrale, annuale) e data prossima fatturazione.
-  - Modal 1-Click **`➕ Nuovo Contratto Retainer`** collegato all'Anagrafica Clienti ERP ed al **Progetto Specifico** (con menu a cascata che filtra solo i progetti del cliente selezionato).
-  - Navigazione 1-Click **`📁 Nome Progetto ↗`** per accedere direttamente al dettaglio dell'incarico.
+- [x] **Studio Document Studio & Word-like Contract Builder (`/documents`) — *Ispirato ad OpenSTAManager & DocuSeal***:
+  - Editor visuale WYSIWYG per la redazione e personalizzazione dei contratti, relazioni e documenti dello Studio.
+  - Toolbar di formattazione ricca (H1, H2, H3, tabelle, elenchi, allineamento, colori).
+  - Foglio A4 tipografico con Intestazione (Logo Studio e dati fiscali) e Piè di Pagina (Paginazione "Pagina X di Y" e dati legali).
+  - **🏷 Smart Tags ERP Live (Mail Merge)**: Inserimento 1-click di tag dinamici (`{{cliente.ragione_sociale}}`, `{{cliente.partita_iva}}`, `{{cliente.sede_legale}}`, `{{cliente.referente}}`, `{{progetto.titolo}}`, `{{progetto.importo_totale}}`, `{{studio.ragione_sociale}}`, `{{data_odierna}}`).
+  - **Libreria Modelli Master Predefiniti**: Lettera d'Incarico (Engagement Letter), Accordo NDA Bilaterale, Memorandum Società Malta, Contratto Servizi Intercompany, Procura Speciale.
+  - **Azioni 1-Click**: Esportazione PDF Vettoriale A4 e Salvataggio diretto nel Vault del Progetto.
+
+- [x] **Firma Elettronica Avanzata (FEA) con OTP SMS/WhatsApp/Email (`/portal`)**:
+  - Generazione codice OTP a 6 cifre temporizzato (TTL 5 minuti) con rate-limiting.
+  - Invio al cliente via WhatsApp Cloud API / Email transazionale.
+  - Modale interattivo nel Portale Cliente con convalida istantanea e apposizione del sigillo digitale eIDAS (Timestamp ISO UTC, SHA-256 Digest e IP certificato).
+- [x] **Worker Cron Scadenze & Rinnovi Automatici (`src/services/cronService.ts`)**:
+  - Scansione automatica delle scadenze rinnovi UBO Registry / MFSA Malta (annuali).
+  - Scansione monitoraggio marchi EUIPO e solleciti fatture in scadenza/scadute.
+  - Dispatch proattivo notifiche WhatsApp ed Email transazionali.
+  - Trigger manuale 1-Click nel Calendario Condiviso Studio (`CalendarPage.tsx`).
+- [x] **Webhook Ricezione Telegram Bot Reale (`/webhooks/communications/telegram`)**:
+  - Serverless Function e ricezione messaggi da Telegram Webhook API.
+  - Matching anagrafica cliente ERP e ingestion automatica delle comunicazioni nella timeline del progetto.
+- [x] **Connettore SDI Diretto 1-Click (`src/services/sdiService.ts` & `InvoicesPage.tsx`)**:
+  - Trasmissione web service delle fatture elettroniche XML al Sistema di Interscambio (SdI - Agenzia delle Entrate) con generazione identificativo SdI e audit trail.
+- [x] **Modulo di Sicurezza & Sanitizzazione Upload KYC (`src/services/securityScanner.ts`)**:
+  - Validazione binaria *Magic-Bytes* (PDF, PNG, JPEG) e blocco eseguibili/script pericolosi per la massima conformità bancaria.
 
 ---
 
@@ -100,4 +119,4 @@ Per la messa in produzione professionale ed il passaggio ad un ambiente live:
 4. **🛡 Row-Level Security (RLS) PostgreSQL**:
    - [x] Migrazione SQL nativa (`supabase/migrations/20260815_enable_rls.sql`) con policy di isolamento multi-tenant per tutte le tabelle.
 5. **📜 Webhook Firma Qualificata eIDAS (FEA / OTP SMS)**:
-   - [x] Tracciamento IP, User Agent e Timestamp 1-click engagement letter nel Portale Cliente.
+   - [x] Tracciamento IP, User Agent e Timestamp 1-click engagement letter nel Portale Cliente con convalida OTP WhatsApp/Email.

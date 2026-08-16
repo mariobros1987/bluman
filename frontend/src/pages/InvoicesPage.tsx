@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { fetchTutteFattureStudioApi, fetchTenantInfoApi, downloadFatturaXmlApi, inviaFatturaEmailApi } from '../api/client';
+import { fetchTutteFattureStudioApi, fetchTenantInfoApi, downloadFatturaXmlApi, inviaFatturaEmailApi, trasmettiFatturaSdiApi } from '../api/client';
 import { fmt, getFormattedLogoUrl } from '../utils';
 import { PROJECTS } from '../store/mockData';
 import { downloadRealPdf } from '../utils/pdfGenerator';
@@ -288,6 +288,16 @@ export function InvoicesPage() {
                           title="Scarica Tracciato XML SDI FatturaPA"
                         >
                           📥 XML SDI
+                        </button>
+                        <button 
+                          style={{ background: '#059669', border: 'none', color: 'white', padding: '4px 8px', borderRadius: 6, cursor: 'pointer', marginRight: 6, fontWeight: 700 }}
+                          onClick={async () => {
+                            const res = await trasmettiFatturaSdiApi(inv.id);
+                            if (res) alert(res.message || '✓ Fattura trasmessa a SDI!');
+                          }}
+                          title="Trasmetti Direttamente all'Agenzia delle Entrate via SDI Web Service"
+                        >
+                          🚀 Trasmetti a SDI
                         </button>
                         <button 
                           style={{ background: 'var(--indigo)', border: 'none', color: 'white', padding: '4px 8px', borderRadius: 6, cursor: 'pointer' }}

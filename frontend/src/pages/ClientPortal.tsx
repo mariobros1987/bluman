@@ -5,7 +5,7 @@ import { fmt } from '../utils';
 import { downloadRealPdf } from '../utils/pdfGenerator';
 import type { SignatureData } from '../utils/pdfGenerator';
 import { DigitalSignatureModal } from '../components/DigitalSignatureModal';
-import { fetchModuliLibreria, fetchProgetti, creaPreventivoEAccettaApi, fetchClienti, creaProgettoApi, creaClienteApi, fetchComunicazioniApi, inviaComunicazioneApi } from '../api/client';
+import { fetchModuliLibreria, fetchProgetti, creaPreventivoEAccettaApi, fetchClienti, creaProgettoApi, creaClienteApi, fetchComunicazioniApi, inviaComunicazioneApi, requestPortalOtpApi, verifyPortalOtpAndSignApi } from '../api/client';
 import type { CategoriaModulo } from '../types';
 
 interface ModuloProposta {
@@ -35,6 +35,18 @@ export function ClientPortal() {
   });
   const [loading, setLoading] = useState(false);
   const [pageLoading, setPageLoading] = useState(true);
+
+  // FEA OTP State
+  const [otpModalOpen, setOtpModalOpen] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
+  const [otpCanale, setOtpCanale] = useState<'whatsapp' | 'email'>('whatsapp');
+  const [otpTarget, setOtpTarget] = useState('+39 333 *** 6278');
+  const [otpLoading, setOtpLoading] = useState(false);
+  const [otpError, setOtpError] = useState<string | null>(null);
+  const [eidasSeal, setEidasSeal] = useState<any>(() => {
+    const saved = localStorage.getItem(`bluman_seal_${clientName}`);
+    return saved ? JSON.parse(saved) : null;
+  });
 
   // Form Cliente State
   const [formData, setFormData] = useState({
@@ -498,11 +510,22 @@ export function ClientPortal() {
                     Con il pulsante sottostante apponi la tua <strong>Firma Digitale 1-Click</strong> per confermare la proposta contrattuale e dare avvio immediato alle attività.
                   </p>
                   <button
-                    onClick={handleSign}
+                    onClick={async () => {
+                      setOtpLoading(true);
+                      setOtpError(null);
+                      const targetPhone = clientObj?.cellulare || '+39 333 5936278';
+                      const res = await requestPortalOtpApi(clientObj?.id || 'client-01', otpCanale, targetPhone, clientObj?.email);
+                      if (res && res.ok) {
+                        setOtpTarget(res.maskedTarget || targetPhone);
+                        if (res.devOtp) setOtpCode(res.devOtp); // auto-fill per test
+                      }
+                      setOtpLoading(false);
+                      setOtpModalOpen(true);
+                    }}
                     disabled={loading}
-                    style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '12px 28px', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 20px rgba(99,102,241,.4)' }}
+                    style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '12px 28px', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 20px rgba(99,102,241,.4)', display: 'flex', alignItems: 'center', gap: 8 }}
                   >
-                    {loading ? 'Firma e Registrazione in corso...' : '✍️ Apponi Firma Digitale ed Attiva Progetto'}
+                    <span>✍️ Procedi alla Firma con Codice OTP di Sicurezza</span>
                   </button>
                 </div>
               </div>
@@ -867,6 +890,178 @@ export function ClientPortal() {
           </div>
         )}
       </div>
+
+      {/* 🔐 MODALE DI FIRMA ELETTRONICA AVANZATA (FEA) CON OTP */}
+      {otpModalOpen && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(15, 23, 42, 0.85)',
+          backdropFilter: 'blur(8px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: 20,
+        }}>
+          <div style={{
+            background: 'var(--sidebar)',
+            border: '1px solid var(--border)',
+            borderRadius: 20,
+            padding: '28px 24px',
+            width: '100%',
+            maxWidth: 480,
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 16,
+          }}>
+            {/* Header Modale */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ width: 40, height: 40, borderRadius: 10, background: '#1e1b4b', color: '#818cf8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>
+                  🔐
+                </div>
+                <div>
+                  <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: 'var(--text)' }}>
+                    Firma Elettronica Avanzata (FEA)
+                  </h3>
+                  <span style={{ fontSize: 11, color: '#34d399', fontWeight: 600 }}>
+                    Conforme Regolamento eIDAS UE 910/2014
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={() => setOtpModalOpen(false)}
+                style={{ background: 'transparent', border: 'none', color: 'var(--muted)', fontSize: 18, cursor: 'pointer', padding: 4 }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Info Canale */}
+            <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 14 }}>
+              <div style={{ fontSize: 11.5, color: 'var(--muted)', marginBottom: 8 }}>
+                È stato generato un codice monouso di sicurezza valido <strong>5 minuti</strong> per convalidare l'accordo:
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12, fontWeight: 700, color: '#a5b4fc' }}>
+                <span>📱 Recapito Destinatario:</span>
+                <span>{otpTarget}</span>
+              </div>
+            </div>
+
+            {/* Input Codice OTP */}
+            <div>
+              <label style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text)', display: 'block', marginBottom: 6 }}>
+                Inserisci il Codice a 6 Cifre ricevuto:
+              </label>
+              <input
+                type="text"
+                maxLength={6}
+                value={otpCode}
+                onChange={(e) => {
+                  setOtpCode(e.target.value.replace(/\D/g, ''));
+                  setOtpError(null);
+                }}
+                placeholder="• • • • • •"
+                style={{
+                  width: '100%',
+                  textAlign: 'center',
+                  fontSize: 24,
+                  fontWeight: 900,
+                  letterSpacing: 10,
+                  padding: '12px',
+                  borderRadius: 10,
+                  background: 'var(--card)',
+                  color: 'var(--indigo-l)',
+                  border: `2px solid ${otpError ? '#ef4444' : 'var(--indigo)'}`,
+                  outline: 'none',
+                }}
+              />
+              {otpError && (
+                <div style={{ fontSize: 11, color: '#ef4444', marginTop: 4, fontWeight: 600 }}>
+                  ⚠️ {otpError}
+                </div>
+              )}
+            </div>
+
+            {/* Note Legali eIDAS */}
+            <div style={{ fontSize: 10.5, color: 'var(--muted)', lineHeight: 1.4, background: 'rgba(0,0,0,0.2)', padding: 10, borderRadius: 8 }}>
+              🛡 L'apposizione della firma tramite verifica OTP associa univocamente il documento al firmatario ({clientName}), registrando marcatura temporale ISO UTC, impronta crittografica SHA-256 e indirizzo IP certificato.
+            </div>
+
+            {/* Azioni */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 6 }}>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!otpCode || otpCode.length < 6) {
+                    setOtpError('Inserisci il codice completo a 6 cifre.');
+                    return;
+                  }
+                  setLoading(true);
+                  setOtpError(null);
+                  try {
+                    const res = await verifyPortalOtpAndSignApi(
+                      clientObj?.id || 'client-01',
+                      otpCode,
+                      clientName,
+                      'Engagement Letter & Mandato Fiduciario'
+                    );
+
+                    if (res && res.ok) {
+                      setEidasSeal(res.seal);
+                      localStorage.setItem(`bluman_seal_${clientName}`, JSON.stringify(res.seal));
+                      localStorage.setItem(`bluman_portal_signed_${clientName}`, 'true');
+                      setSigned(true);
+                      setOtpModalOpen(false);
+                      await handleSign(); // Istanzia moduli e sblocca il progetto operatore
+                    } else {
+                      setOtpError(res?.errore || 'Codice errato');
+                    }
+                  } catch (err: any) {
+                    setOtpError(err.message || 'Errore convalida codice');
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
+                disabled={loading}
+                style={{
+                  background: 'var(--indigo)',
+                  color: '#fff',
+                  border: 'none',
+                  padding: '14px',
+                  borderRadius: 12,
+                  fontSize: 13.5,
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 16px rgba(99,102,241,.4)',
+                }}
+              >
+                {loading ? 'Verifica & Apposizione Sigillo...' : '🔒 Valida Codice ed Apponi Firma FEA'}
+              </button>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11 }}>
+                <span style={{ color: 'var(--muted)' }}>Non hai ricevuto il codice?</span>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setOtpLoading(true);
+                    const targetPhone = clientObj?.cellulare || '+39 333 5936278';
+                    const res = await requestPortalOtpApi(clientObj?.id || 'client-01', otpCanale, targetPhone, clientObj?.email);
+                    if (res && res.devOtp) setOtpCode(res.devOtp);
+                    setOtpLoading(false);
+                    alert('✓ Nuovo codice OTP inviato con successo!');
+                  }}
+                  style={{ background: 'none', border: 'none', color: 'var(--indigo-l)', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}
+                >
+                  Reinvia Codice ↻
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

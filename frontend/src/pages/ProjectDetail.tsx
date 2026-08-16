@@ -2098,10 +2098,32 @@ function DocumentiTab({ project }: { project: Progetto }) {
           </div>
         </div>
 
-        <label style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: 10, fontSize: 12, fontWeight: 600, cursor: 'pointer', boxShadow: '0 4px 14px rgba(99,102,241,.3)', display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span>{uploading ? 'Caricamento in corso...' : '📤 Carica Nuovo Documento'}</span>
-          <input type="file" onChange={handleFileUpload} disabled={uploading} style={{ display: 'none' }} />
-        </label>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={() => window.location.href = '/documents'}
+            style={{
+              background: '#1e1b4b',
+              color: '#a5b4fc',
+              border: '1px solid #4338ca',
+              padding: '8px 16px',
+              borderRadius: 10,
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+            }}
+          >
+            <span>📝 Redigi nel Document Studio (Word)</span>
+          </button>
+
+          <label style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: 10, fontSize: 12, fontWeight: 600, cursor: 'pointer', boxShadow: '0 4px 14px rgba(99,102,241,.3)', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span>{uploading ? 'Caricamento in corso...' : '📤 Carica Nuovo Documento'}</span>
+            <input type="file" onChange={handleFileUpload} disabled={uploading} style={{ display: 'none' }} />
+          </label>
+        </div>
       </div>
 
       {/* Toolbar Filtro Categorie */}

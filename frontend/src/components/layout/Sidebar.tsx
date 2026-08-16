@@ -12,6 +12,7 @@ const NAV = [
   { path: '/primanota',  label: 'Registro Prima Nota',    icon: '💰' },
   { path: '/banks',      label: 'Banche & Conti',         icon: '🏦' },
   { path: '/retainers',  label: 'Contratti Retainer',    icon: '🔄' },
+  { path: '/documents',  label: 'Document Studio (Word)', icon: '📝' },
   { path: '/audit',      label: 'Log Audit Studio',       icon: '📋' },
   { path: '/library',    label: 'Libreria moduli',        icon: '📚' },
   { path: '/settings',   label: 'Impostazioni',           icon: '⚙️' },

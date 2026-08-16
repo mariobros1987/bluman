@@ -8,7 +8,7 @@
 
 generator client {
   provider      = "prisma-client-js"
-  binaryTargets = ["native", "linux-musl-openssl-3.0.x", "debian-openssl-3.0.x"]
+  binaryTargets = ["native"]
 }
 
 datasource db {
@@ -61,6 +61,7 @@ model Tenant {
   contrattiRicorrenti ContrattoRicorrente[]
   contiBancari  ContoBancario[]
   permessiModuli PermessoModulo[]
+  modelliDocumenti ModelloDocumentoCustom[]
 
   @@map("tenant")
 }
@@ -812,6 +813,20 @@ model ContoBancario {
   createdAt     DateTime @default(now()) @map("created_at")
 
   @@map("conto_bancario")
+}
+
+model ModelloDocumentoCustom {
+  id             String   @id @default(uuid())
+  tenantId       String   @map("tenant_id")
+  tenant         Tenant   @relation(fields: [tenantId], references: [id])
+  titolo         String
+  categoria      String   @default("contratto")
+  descrizione    String?
+  contenutoHtml  String   @map("contenuto_html") @db.Text
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@map("modello_documento_custom")
 }
 
 // ─────────────────────────────────────────────────────────────────

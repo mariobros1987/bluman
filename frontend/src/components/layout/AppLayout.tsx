@@ -13,6 +13,7 @@ const TITLES: Record<string, string> = {
   '/library':   'Libreria moduli',
   '/settings':  'Impostazioni',
   '/invoices':  'Fatture & Pagamenti',
+  '/documents': 'Document Studio (Word & Contratti)',
   '/audit':     'Log Audit Studio',
 };
 

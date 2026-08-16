@@ -1363,12 +1363,20 @@ function LibreriaDocumentiEForm() {
             <div style={{ fontSize: 15, fontWeight: 700 }}>📄 Modelli Documenti & Contratti in Bianco</div>
             <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>I modelli in bianco caricati qui possono essere direttamente scaricati o collegati all'anagrafica del cliente</div>
           </div>
-          <button
-            onClick={() => setNewDocOpen(true)}
-            style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer' }}
-          >
-            + Carica Nuovo Modello in Bianco
-          </button>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <button
+              onClick={() => window.location.href = '/documents'}
+              style={{ background: '#1e1b4b', color: '#a5b4fc', border: '1px solid #4338ca', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+            >
+              📝 Apri Document Studio (Word)
+            </button>
+            <button
+              onClick={() => setNewDocOpen(true)}
+              style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer' }}
+            >
+              + Carica Nuovo Modello in Bianco
+            </button>
+          </div>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 12 }}>

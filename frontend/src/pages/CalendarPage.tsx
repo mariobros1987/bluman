@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { PROJECTS } from '../store/mockData';
 import { CatBadge } from '../components/ui/CatBadge';
 import { Avatar } from '../components/ui/Avatar';
+import { triggerCronScadenzeApi } from '../api/client';
 
 interface EventoStudio {
   id: string;
@@ -215,6 +216,16 @@ export function CalendarPage() {
               📋 Scadenzario Lista
             </button>
           </div>
+
+          <button
+            onClick={async () => {
+              const res = await triggerCronScadenzeApi();
+              alert(res?.message || '✓ Scansione cron completata con successo!');
+            }}
+            style={{ background: '#1e1b4b', color: '#a5b4fc', border: '1px solid #4338ca', padding: '8px 14px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+          >
+            <span>⏰ Esegui Cron Notifiche</span>
+          </button>
 
           <button
             onClick={() => setNewEventModalOpen(true)}
