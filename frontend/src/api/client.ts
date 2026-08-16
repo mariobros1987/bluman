@@ -87,7 +87,7 @@ export async function magicLoginApi(magicToken: string) {
 
 export async function fetchProgetti() {
   try {
-    const res = await fetchWithTimeout(`${API_BASE}/progetti`, {}, 1500);
+    const res = await fetchWithTimeout(`${API_BASE}/progetti`, {}, 6000);
     if (!res.ok) throw new Error('Errore nel recupero progetti');
     return await res.json();
   } catch (err) {

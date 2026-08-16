@@ -60,10 +60,22 @@ export function buildServer(app: AppPort): FastifyInstance {
   const server = Fastify({ logger: false });
 
   server.register(cors, {
-    origin: '*',
+    origin: (origin, cb) => {
+      cb(null, true);
+    },
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-tenant-id', 'Accept', 'Origin'],
-    credentials: false,
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-tenant-id', 'Accept', 'Origin', 'X-Requested-With'],
+    credentials: true,
+  });
+
+  // Gestione pre-flight OPTIONS universale per evitare blocchi CORS da browser
+  server.options('*', async (_req, reply) => {
+    return reply
+      .header('Access-Control-Allow-Origin', '*')
+      .header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS')
+      .header('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-tenant-id, Accept, Origin, X-Requested-With')
+      .code(204)
+      .send();
   });
 
   server.setErrorHandler((err, _req, reply) => {
