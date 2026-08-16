@@ -181,9 +181,9 @@ export function InvoicesPage() {
                               </div>`
                             );
                           }}
-                          title="Scarica PDF Grafico VERO (A4)"
+                          title="Scarica Fattura PDF Grafico VERO (A4)"
                         >
-                          📄 PDF Grafico A4
+                          📄 Scarica Fattura PDF
                         </button>
                         <button 
                           style={{ background: '#0284c7', border: 'none', color: 'white', padding: '4px 8px', borderRadius: 6, cursor: 'pointer', marginRight: 6 }}
