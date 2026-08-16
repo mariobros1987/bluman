@@ -304,9 +304,14 @@ export function SettingsPage() {
               <input value={codFisc} onChange={e => setCodFisc(e.target.value)} required />
             </div>
             <div className={styles.field}>
-              <label>Registro Imprese / REA *</label>
-              <input value={regImprese} onChange={e => setRegImprese(e.target.value)} required />
+              <label>Capitale Sociale Versato *</label>
+              <input value={capitaleSociale} onChange={e => setCapitaleSociale(e.target.value)} required />
             </div>
+          </div>
+
+          <div className={styles.field}>
+            <label>Registro Imprese / REA *</label>
+            <input value={regImprese} onChange={e => setRegImprese(e.target.value)} required />
           </div>
 
           {/* SEDE LEGALE & SEDE OPERATIVA */}
