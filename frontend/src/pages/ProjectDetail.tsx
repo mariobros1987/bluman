@@ -1024,7 +1024,7 @@ function FatturazioneTab({ project, rawDbProject, onRefresh }: { project: Proget
     if (!rawDbProject) return;
     setSubmitting(true);
     try {
-      await emettiFatturaApi({
+      const resFattura: any = await emettiFatturaApi({
         progettoId: rawDbProject.id,
         tipoClienteFiscale: tipoFiscale,
         partitaIva: 'IT01234567890',
@@ -1039,6 +1039,28 @@ function FatturazioneTab({ project, rawDbProject, onRefresh }: { project: Proget
           },
         ],
       });
+
+      if (resFattura && resFattura.id) {
+        const nuovaFatturaLocal = {
+          id: resFattura.id,
+          numero: resFattura.numero || resFattura.numeroProgressivo || `FT-${Date.now()}`,
+          desc: tipoDocFiscale === 'nota_credito' ? `[NOTA DI CREDITO] ${desc}` : desc,
+          importo: (tipoDocFiscale === 'nota_credito' ? -1 : 1) * Math.abs(Number(importoEur)),
+          data: new Date().toLocaleDateString('it-IT'),
+          stato: 'emessa' as const,
+        };
+
+        const updatedProject = {
+          ...project,
+          fatture: [nuovaFatturaLocal, ...(project.fatture || [])],
+        };
+
+        const savedStr = localStorage.getItem('bluman_custom_projects');
+        const savedArr: any[] = savedStr ? JSON.parse(savedStr) : [];
+        const updatedArr = [updatedProject, ...savedArr.filter(p => String(p.id) !== String(project.id))];
+        localStorage.setItem('bluman_custom_projects', JSON.stringify(updatedArr));
+      }
+
       setModalOpen(false);
       onRefresh();
     } catch (err) {

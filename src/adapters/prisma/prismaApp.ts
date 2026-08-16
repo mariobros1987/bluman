@@ -439,6 +439,22 @@ export class PrismaApp implements AppPort {
       include: { righe: true },
     });
 
+    // ── OpenSTAManager Model: Generazione automatica Scadenzario Incasso a 30gg ──
+    const dataScadenza = new Date();
+    dataScadenza.setDate(dataScadenza.getDate() + 30);
+
+    await (this.prisma as any).scadenzaIncasso.create({
+      data: {
+        tenantId: this.tenantId,
+        fatturaId: fattura.id,
+        numeroRata: 1,
+        totaleRate: 1,
+        importoRataCentesimi: totale,
+        dataScadenza,
+        stato: 'in_attesa',
+      },
+    });
+
     return fattura;
   }
 
