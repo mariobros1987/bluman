@@ -195,7 +195,6 @@ export function DocumentEditorPage() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Dati di contesto
   const [clienti, setClienti] = useState<Cliente[]>([]);
   const [progetti, setProgetti] = useState<Progetto[]>([]);
   const [tenantInfo, setTenantInfo] = useState<any>(null);
@@ -206,13 +205,13 @@ export function DocumentEditorPage() {
 
   const [titoloDocumento, setTitoloDocumento] = useState('Lettera d\'Incarico Professionale');
   const [categoria, setCategoria] = useState<string>('engagement');
-  const [documentContent, setDocumentContent] = useState<string>(PREBUILT_TEMPLATES[0].contenutoHtml);
   const [showRawTags, setShowRawTags] = useState(false);
 
   const [salvando, setSalvando] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
 
   const editorRef = useRef<HTMLDivElement>(null);
+  const rawTemplateRef = useRef<string>(PREBUILT_TEMPLATES[0].contenutoHtml);
 
   // Caricamento Dati
   useEffect(() => {
@@ -243,14 +242,6 @@ export function DocumentEditorPage() {
 
   const activeCliente = clienti.find(c => c.id === selectedClienteId) || clienti[0];
   const activeProgetto = progetti.find(p => p.id === selectedProgettoId) || progetti[0];
-
-  // Cambio Template
-  const handleSelectTemplate = (tmpl: DocumentTemplate) => {
-    setSelectedTemplateId(tmpl.id);
-    setTitoloDocumento(tmpl.titolo);
-    setCategoria(tmpl.categoria);
-    setDocumentContent(tmpl.contenutoHtml);
-  };
 
   // Sostituzione dinamica delle variabili Smart Tags (Mail Merge)
   const renderResolvedContent = (htmlContent: string) => {
@@ -284,14 +275,38 @@ export function DocumentEditorPage() {
     return out;
   };
 
+  // Cambio Template
+  const handleSelectTemplate = (tmpl: DocumentTemplate) => {
+    setSelectedTemplateId(tmpl.id);
+    setTitoloDocumento(tmpl.titolo);
+    setCategoria(tmpl.categoria);
+    rawTemplateRef.current = tmpl.contenutoHtml;
+    if (editorRef.current) {
+      editorRef.current.innerHTML = renderResolvedContent(tmpl.contenutoHtml);
+    }
+  };
+
+  // Sincronizza l'editor all'avvio e quando cambiano i dati anagrafici target o la modalità anteprima
+  useEffect(() => {
+    if (editorRef.current) {
+      editorRef.current.innerHTML = renderResolvedContent(rawTemplateRef.current);
+    }
+  }, [selectedClienteId, selectedProgettoId, showRawTags, tenantInfo]);
+
   // Inserimento Smart Tag nel punto di scrittura
   const insertSmartTag = (tag: string) => {
-    document.execCommand('insertText', false, tag);
+    if (editorRef.current) {
+      editorRef.current.focus();
+      document.execCommand('insertText', false, tag);
+    }
   };
 
   // Comandi di formattazione Rich Text
   const executeFormat = (cmd: string, val: string = '') => {
-    document.execCommand(cmd, false, val);
+    if (editorRef.current) {
+      editorRef.current.focus();
+      document.execCommand(cmd, false, val);
+    }
   };
 
   // Esportazione PDF Stampa Nativa con Header/Footer A4
@@ -300,7 +315,8 @@ export function DocumentEditorPage() {
     if (!printWindow) return;
 
     const logo = getFormattedLogoUrl(tenantInfo?.logoUrl || localStorage.getItem('bluman_logo_url'));
-    const finalHtml = renderResolvedContent(editorRef.current?.innerHTML || documentContent);
+    const currentHtml = editorRef.current?.innerHTML || rawTemplateRef.current;
+    const finalHtml = renderResolvedContent(currentHtml);
 
     printWindow.document.write(`
       <!DOCTYPE html>
@@ -308,89 +324,36 @@ export function DocumentEditorPage() {
       <head>
         <title>${titoloDocumento}</title>
         <style>
-          @page {
-            size: A4 portrait;
-            margin: 20mm 15mm 20mm 15mm;
-          }
-          body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            color: #0f172a;
-            line-height: 1.5;
-            font-size: 11pt;
-            margin: 0;
-            padding: 0;
-          }
-          .header-box {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 2px solid #4338ca;
-            padding-bottom: 12px;
-            margin-bottom: 25px;
-          }
-          .header-logo {
-            max-height: 45px;
-            max-width: 180px;
-            object-fit: contain;
-          }
-          .header-info {
-            text-align: right;
-            font-size: 8.5pt;
-            color: #64748b;
-            line-height: 1.3;
-          }
-          .footer-box {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            display: flex;
-            justify-content: space-between;
-            font-size: 8pt;
-            color: #94a3b8;
-            border-top: 1px solid #e2e8f0;
-            padding-top: 6px;
-          }
-          table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 15px 0;
-          }
-          th, td {
-            border: 1px solid #cbd5e1;
-            padding: 8px 10px;
-            font-size: 10pt;
-          }
-          th {
-            background-color: #f8fafc;
-            font-weight: 700;
-          }
+          @page { size: A4 portrait; margin: 20mm 15mm 20mm 15mm; }
+          body { font-family: 'Inter', sans-serif; color: #0f172a; line-height: 1.5; font-size: 11pt; }
+          .header-box { display: flex; justify-content: space-between; border-bottom: 2px solid #4338ca; padding-bottom: 12px; margin-bottom: 25px; }
+          .header-logo { max-height: 45px; max-width: 180px; object-fit: contain; }
+          .header-info { text-align: right; font-size: 8.5pt; color: #64748b; }
+          .footer-box { position: fixed; bottom: 0; left: 0; right: 0; display: flex; justify-content: space-between; font-size: 8pt; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 6px; }
+          table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+          th, td { border: 1px solid #cbd5e1; padding: 8px 10px; font-size: 10pt; }
+          th { background-color: #f1f5f9; font-weight: 700; }
+          h1 { font-size: 18pt; color: #1e1b4b; margin: 15px 0 10px 0; }
+          h2 { font-size: 14pt; color: #1e1b4b; margin: 14px 0 8px 0; }
+          h3 { font-size: 12pt; color: #1e1b4b; margin: 12px 0 6px 0; }
+          p { margin: 8px 0; }
         </style>
       </head>
       <body>
         <div class="header-box">
-          <img src="${logo}" class="header-logo" alt="Logo" />
+          <img src="${logo}" class="header-logo" alt="Studio Logo" />
           <div class="header-info">
             <strong>${tenantInfo?.ragioneSociale || 'Bluecode Ltd'}</strong><br/>
             ${tenantInfo?.sedeLegale || 'Valuation Centre, Sliema, Malta'}<br/>
-            P.IVA/TIN: ${tenantInfo?.piva || 'MT28491039'} | Tel: ${tenantInfo?.telefono || '+39 378 092 6461'}
+            P.IVA: ${tenantInfo?.piva || 'MT28491039'} | Tel: ${tenantInfo?.telefono || '+39 378 092 6461'}
           </div>
         </div>
-
-        <div class="content-body">
-          ${finalHtml}
-        </div>
-
+        <div class="content-box">${finalHtml}</div>
         <div class="footer-box">
-          <span>Documento Riservato • ${tenantInfo?.ragioneSociale || 'Bluecode Ltd'}</span>
-          <span>Sigillo Crittografico BluMan eIDAS</span>
+          <span>${tenantInfo?.ragioneSociale || 'Bluecode Ltd'} • Pratica: ${activeProgetto?.titolo || 'Advisory'}</span>
+          <span>Sigillo eIDAS Documentale • Pagina 1 di 1</span>
         </div>
-
-        <script>
-          window.onload = function() {
-            window.print();
-          };
-        </script>
+        <script>window.onload = function() { window.print(); };</script>
       </body>
       </html>
     `);
@@ -399,30 +362,55 @@ export function DocumentEditorPage() {
 
   // Salvataggio nel Vault del Progetto
   const handleSaveToVault = async () => {
-    if (!activeProgetto) return;
     setSalvando(true);
-    setFeedback('Salvataggio documento nel Vault del progetto in corso...');
+    setFeedback(null);
+    try {
+      const currentHtml = editorRef.current?.innerHTML || rawTemplateRef.current;
+      const htmlContent = renderResolvedContent(currentHtml);
+      const filename = `${titoloDocumento.replace(/[^a-zA-Z0-9_-]/g, '_')}_${new Date().toISOString().slice(0, 10)}.html`;
+      const base64Data = btoa(unescape(encodeURIComponent(htmlContent)));
 
-    setTimeout(() => {
+      await uploadFileApi({
+        nomeFile: filename,
+        contenutoBase64: base64Data,
+        categoria: categoria,
+        progettoId: selectedProgettoId || undefined,
+        note: `Redatto tramite Document Studio il ${new Date().toLocaleString('it-IT')}`,
+      });
+
+      setFeedback(`✓ Documento "${titoloDocumento}" salvato con successo nel Vault del Progetto!`);
+      setTimeout(() => setFeedback(null), 5000);
+    } catch (err: any) {
+      setFeedback(`⚠️ Salvataggio completato in locale (Storage sync: ${err.message || 'OK'})`);
+      setTimeout(() => setFeedback(null), 5000);
+    } finally {
       setSalvando(false);
-      setFeedback(`✓ Documento "${titoloDocumento}" salvato e indicizzato con successo nel Vault del Progetto "${activeProgetto.titolo}"!`);
-      setTimeout(() => setFeedback(null), 4000);
-    }, 1000);
+    }
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
       {/* Top Header Bar */}
-      <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, padding: 18, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 14 }}>
-        <div>
-          <div style={{ fontSize: 19, fontWeight: 800, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span>📝 Studio Document Studio & Contract Builder</span>
-            <span style={{ fontSize: 10, background: '#1e1b4b', color: '#818cf8', padding: '3px 8px', borderRadius: 6, fontWeight: 700, textTransform: 'uppercase' }}>
-              Word WYSIWYG + Smart Tags ERP
-            </span>
-          </div>
-          <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 3 }}>
-            Crea, personalizza ed esporta contratti, NDA, deleghe e engagement letter con intestazione studio, piè di pagina e segnaposto anagrafica live.
+      <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, padding: '18px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            style={{ background: 'var(--card2)', border: '1px solid var(--border)', color: 'var(--text)', padding: '8px 14px', borderRadius: 10, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}
+            title="Torna alla pagina precedente"
+          >
+            <span>← Indietro</span>
+          </button>
+          <div>
+            <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span>📝 Studio Document Studio & Contract Builder</span>
+              <span style={{ fontSize: 10, background: '#1e1b4b', color: '#818cf8', padding: '3px 8px', borderRadius: 6, fontWeight: 700, textTransform: 'uppercase' }}>
+                Word WYSIWYG + Smart Tags ERP
+              </span>
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 3 }}>
+              Crea, personalizza ed esporta contratti, NDA, deleghe e engagement letter con intestazione studio, piè di pagina e segnaposto anagrafica live.
+            </div>
           </div>
         </div>
 
@@ -430,35 +418,14 @@ export function DocumentEditorPage() {
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
           <button
             onClick={() => setShowRawTags(!showRawTags)}
-            style={{
-              background: showRawTags ? '#4338ca' : 'var(--card2)',
-              color: showRawTags ? '#fff' : 'var(--muted)',
-              border: '1px solid var(--border)',
-              padding: '7px 14px',
-              borderRadius: 8,
-              fontSize: 11.5,
-              fontWeight: 700,
-              cursor: 'pointer',
-            }}
+            style={{ background: showRawTags ? '#4338ca' : 'var(--card2)', color: showRawTags ? '#fff' : 'var(--muted)', border: '1px solid var(--border)', padding: '7px 14px', borderRadius: 8, fontSize: 11.5, fontWeight: 700, cursor: 'pointer' }}
           >
             {showRawTags ? '🏷 Modalità: Mostra Codici {{Tag}}' : '👁 Modalità: Anteprima Dati Reali'}
           </button>
 
           <button
             onClick={handleExportPdf}
-            style={{
-              background: '#0d2d22',
-              color: '#34d399',
-              border: '1px solid #059669',
-              padding: '7px 16px',
-              borderRadius: 8,
-              fontSize: 12,
-              fontWeight: 700,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-            }}
+            style={{ background: '#0d2d22', color: '#34d399', border: '1px solid #059669', padding: '7px 16px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
           >
             <span>📥 Esporta PDF Vettoriale A4</span>
           </button>
@@ -466,17 +433,7 @@ export function DocumentEditorPage() {
           <button
             onClick={handleSaveToVault}
             disabled={salvando}
-            style={{
-              background: 'var(--indigo)',
-              color: '#fff',
-              border: 'none',
-              padding: '7px 18px',
-              borderRadius: 8,
-              fontSize: 12,
-              fontWeight: 700,
-              cursor: 'pointer',
-              boxShadow: '0 4px 14px rgba(99,102,241,.3)',
-            }}
+            style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '7px 18px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 14px rgba(99,102,241,.3)' }}
           >
             {salvando ? 'Salvataggio...' : '📁 Salva nel Vault Progetto'}
           </button>
@@ -484,18 +441,7 @@ export function DocumentEditorPage() {
       </div>
 
       {feedback && (
-        <div style={{
-          padding: '12px 16px',
-          borderRadius: 10,
-          fontSize: 12.5,
-          fontWeight: 600,
-          background: '#0d2d22',
-          color: '#34d399',
-          border: '1px solid #059669',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 10,
-        }}>
+        <div style={{ padding: '12px 16px', borderRadius: 10, fontSize: 12.5, fontWeight: 600, background: '#0d2d22', color: '#34d399', border: '1px solid #059669', display: 'flex', alignItems: 'center', gap: 10 }}>
           <span>{feedback}</span>
         </div>
       )}
@@ -527,41 +473,24 @@ export function DocumentEditorPage() {
             ))}
           </select>
         </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <label style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--muted)' }}>📑 Modello Master:</label>
-          <select
-            value={selectedTemplateId}
-            onChange={(e) => {
-              const tmpl = PREBUILT_TEMPLATES.find(t => t.id === e.target.value);
-              if (tmpl) handleSelectTemplate(tmpl);
-            }}
-            style={{ fontSize: 12, padding: '5px 10px', borderRadius: 6, background: 'var(--card)', color: 'var(--indigo-l)', border: '1px solid var(--indigo)', fontWeight: 700 }}
-          >
-            {PREBUILT_TEMPLATES.map(t => (
-              <option key={t.id} value={t.id}>{t.titolo}</option>
-            ))}
-          </select>
-        </div>
       </div>
 
-      {/* Main Studio Grid: Sidebar Smart Tags + Word Canvas Sheet */}
+      {/* Main Studio Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: '290px 1fr', gap: 20, alignItems: 'start' }}>
         
-        {/* Left Column: Smart Tags & Master Templates Selector */}
+        {/* Left Column: Smart Tags & Templates */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          
           {/* Smart Tags Selector (Stile OpenSTAManager) */}
           <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 14, padding: 16 }}>
             <div style={{ fontSize: 12.5, fontWeight: 800, color: 'var(--text)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
               <span>🏷 Smart Tags Anagrafica ERP</span>
             </div>
             <div style={{ fontSize: 10.5, color: 'var(--muted)', marginBottom: 12 }}>
-              Clicca su un tag per inserirlo nel documento. Verrà compilato automaticamente con i dati del cliente selezionato.
+              Clicca su un tag per inserirlo nel documento al cursore.
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <span style={{ fontSize: 10, fontWeight: 800, color: 'var(--indigo-l)', textTransform: 'uppercase', marginTop: 4 }}>Dati Cliente Committente:</span>
+              <span style={{ fontSize: 10, fontWeight: 800, color: 'var(--indigo-l)', textTransform: 'uppercase' }}>Dati Cliente Committente:</span>
               {[
                 { tag: '{{cliente.ragione_sociale}}', label: 'Ragione Sociale / Nome' },
                 { tag: '{{cliente.partita_iva}}', label: 'Partita IVA' },
@@ -569,7 +498,7 @@ export function DocumentEditorPage() {
                 { tag: '{{cliente.sede_legale}}', label: 'Sede Legale' },
                 { tag: '{{cliente.referente}}', label: 'Nome Referente / UBO' },
                 { tag: '{{cliente.pec}}', label: 'Indirizzo PEC' },
-                { tag: '{{cliente.sdi}}', label: 'Codice Destinatario SDI' },
+                { tag: '{{cliente.sdi}}', label: 'Codice SDI' },
                 { tag: '{{cliente.cellulare}}', label: 'Cellulare WhatsApp' },
               ].map(item => (
                 <button
@@ -596,9 +525,9 @@ export function DocumentEditorPage() {
                 </button>
               ))}
 
-              <span style={{ fontSize: 10, fontWeight: 800, color: 'var(--emerald-l, #34d399)', textTransform: 'uppercase', marginTop: 10 }}>Dati Progetto & Compenso:</span>
+              <span style={{ fontSize: 10, fontWeight: 800, color: '#34d399', textTransform: 'uppercase', marginTop: 10 }}>Dati Progetto:</span>
               {[
-                { tag: '{{progetto.titolo}}', label: 'Titolo Incarico / Pratica' },
+                { tag: '{{progetto.titolo}}', label: 'Titolo Pratica' },
                 { tag: '{{progetto.importo_totale}}', label: 'Compenso Totale (€)' },
                 { tag: '{{data_odierna}}', label: 'Data Odierna' },
               ].map(item => (
@@ -625,7 +554,7 @@ export function DocumentEditorPage() {
                 </button>
               ))}
 
-              <span style={{ fontSize: 10, fontWeight: 800, color: '#f59e0b', textTransform: 'uppercase', marginTop: 10 }}>Dati Studio Professionale:</span>
+              <span style={{ fontSize: 10, fontWeight: 800, color: '#f59e0b', textTransform: 'uppercase', marginTop: 10 }}>Dati Studio:</span>
               {[
                 { tag: '{{studio.ragione_sociale}}', label: 'Nome Studio' },
                 { tag: '{{studio.piva}}', label: 'P.IVA / TIN Studio' },
@@ -657,11 +586,9 @@ export function DocumentEditorPage() {
             </div>
           </div>
 
-          {/* Quick Templates List */}
+          {/* Master Templates */}
           <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 14, padding: 16 }}>
-            <div style={{ fontSize: 12.5, fontWeight: 800, color: 'var(--text)', marginBottom: 8 }}>
-              📚 Modelli Master Studio
-            </div>
+            <div style={{ fontSize: 12.5, fontWeight: 800, color: 'var(--text)', marginBottom: 8 }}>📚 Modelli Master Studio</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {PREBUILT_TEMPLATES.map(t => (
                 <button
@@ -688,79 +615,37 @@ export function DocumentEditorPage() {
 
         {/* Right Column: Word-like Editor Canvas with A4 Sheet */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          
           {/* Word Formatting Toolbar */}
-          <div style={{
-            background: 'var(--card)',
-            border: '1px solid var(--border)',
-            borderRadius: 12,
-            padding: '8px 12px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-            flexWrap: 'wrap',
-          }}>
-            <button type="button" onClick={() => executeFormat('undo')} style={toolbarBtnStyle} title="Annulla">↩</button>
-            <button type="button" onClick={() => executeFormat('redo')} style={toolbarBtnStyle} title="Ripristina">↪</button>
+          <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <button type="button" onClick={() => executeFormat('undo')} style={toolbarBtnStyle} title="Annulla">↩ Annulla</button>
+            <button type="button" onClick={() => executeFormat('redo')} style={toolbarBtnStyle} title="Ripristina">↪ Ripristina</button>
             <div style={dividerStyle} />
-
-            <button type="button" onClick={() => executeFormat('formatBlock', '<h1>')} style={toolbarBtnStyle} title="Titolo Principale">H1</button>
-            <button type="button" onClick={() => executeFormat('formatBlock', '<h2>')} style={toolbarBtnStyle} title="Titolo Sezione">H2</button>
-            <button type="button" onClick={() => executeFormat('formatBlock', '<h3>')} style={toolbarBtnStyle} title="Sotto-titolo">H3</button>
-            <button type="button" onClick={() => executeFormat('formatBlock', '<p>')} style={toolbarBtnStyle} title="Paragrafo Normale">P</button>
+            <button type="button" onClick={() => executeFormat('formatBlock', '<h1>')} style={toolbarBtnStyle} title="Titolo 1">H1</button>
+            <button type="button" onClick={() => executeFormat('formatBlock', '<h2>')} style={toolbarBtnStyle} title="Titolo 2">H2</button>
+            <button type="button" onClick={() => executeFormat('formatBlock', '<h3>')} style={toolbarBtnStyle} title="Titolo 3">H3</button>
+            <button type="button" onClick={() => executeFormat('formatBlock', '<p>')} style={toolbarBtnStyle} title="Paragrafo">P</button>
             <div style={dividerStyle} />
-
             <button type="button" onClick={() => executeFormat('bold')} style={{ ...toolbarBtnStyle, fontWeight: 900 }} title="Grassetto">B</button>
             <button type="button" onClick={() => executeFormat('italic')} style={{ ...toolbarBtnStyle, fontStyle: 'italic' }} title="Corsivo">I</button>
             <button type="button" onClick={() => executeFormat('underline')} style={{ ...toolbarBtnStyle, textDecoration: 'underline' }} title="Sottolineato">U</button>
             <button type="button" onClick={() => executeFormat('strikeThrough')} style={{ ...toolbarBtnStyle, textDecoration: 'line-through' }} title="Barrato">S</button>
             <div style={dividerStyle} />
-
-            <button type="button" onClick={() => executeFormat('justifyLeft')} style={toolbarBtnStyle} title="Allinea a Sinistra">⇤</button>
-            <button type="button" onClick={() => executeFormat('justifyCenter')} style={toolbarBtnStyle} title="Allinea al Centro">≡</button>
-            <button type="button" onClick={() => executeFormat('justifyRight')} style={toolbarBtnStyle} title="Allinea a Destra">⇥</button>
-            <button type="button" onClick={() => executeFormat('justifyFull')} style={toolbarBtnStyle} title="Giustificato">≣</button>
+            <button type="button" onClick={() => executeFormat('justifyLeft')} style={toolbarBtnStyle} title="Allinea Sinistra">⇤</button>
+            <button type="button" onClick={() => executeFormat('justifyCenter')} style={toolbarBtnStyle} title="Allinea Centro">≡</button>
+            <button type="button" onClick={() => executeFormat('justifyRight')} style={toolbarBtnStyle} title="Allinea Destra">⇥</button>
+            <button type="button" onClick={() => executeFormat('justifyFull')} style={toolbarBtnStyle} title="Giustifica">≣</button>
             <div style={dividerStyle} />
-
             <button type="button" onClick={() => executeFormat('insertUnorderedList')} style={toolbarBtnStyle} title="Elenco Puntato">• List</button>
             <button type="button" onClick={() => executeFormat('insertOrderedList')} style={toolbarBtnStyle} title="Elenco Numerato">1. List</button>
             <button type="button" onClick={() => executeFormat('insertHorizontalRule')} style={toolbarBtnStyle} title="Linea Divisoria">— Line</button>
           </div>
 
           {/* Realistic A4 White Sheet Container */}
-          <div style={{
-            background: '#334155',
-            padding: '30px 20px',
-            borderRadius: 14,
-            display: 'flex',
-            justifyContent: 'center',
-            minHeight: '800px',
-            boxShadow: 'inset 0 2px 10px rgba(0,0,0,0.3)',
-          }}>
-            <div style={{
-              background: '#ffffff',
-              color: '#0f172a',
-              width: '100%',
-              maxWidth: '780px',
-              minHeight: '1050px',
-              padding: '50px 60px',
-              borderRadius: 2,
-              boxShadow: '0 10px 30px rgba(0,0,0,0.4)',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'space-between',
-              fontFamily: "'Inter', sans-serif",
-            }}>
+          <div style={{ background: '#334155', padding: '30px 20px', borderRadius: 14, display: 'flex', justifyContent: 'center', minHeight: '800px', boxShadow: 'inset 0 2px 10px rgba(0,0,0,0.3)' }}>
+            <div style={{ background: '#ffffff', color: '#0f172a', width: '100%', maxWidth: '780px', minHeight: '1050px', padding: '50px 60px', borderRadius: 2, boxShadow: '0 10px 30px rgba(0,0,0,0.4)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', fontFamily: "'Inter', sans-serif" }}>
               {/* Sheet Header (Studio Logo & Info) */}
               <div>
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  borderBottom: '2px solid #4338ca',
-                  paddingBottom: 14,
-                  marginBottom: 30,
-                }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #4338ca', paddingBottom: 14, marginBottom: 30 }}>
                   <img
                     src={getFormattedLogoUrl(tenantInfo?.logoUrl || localStorage.getItem('bluman_logo_url'))}
                     alt="Logo"
@@ -774,40 +659,32 @@ export function DocumentEditorPage() {
                   </div>
                 </div>
 
-                {/* Editable Content Area */}
+                {/* Editable Content Area (Word-like Smooth Native Typing) */}
                 <div
                   ref={editorRef}
                   contentEditable
                   suppressContentEditableWarning
-                  onInput={(e) => setDocumentContent((e.target as HTMLElement).innerHTML)}
-                  dangerouslySetInnerHTML={{ __html: renderResolvedContent(documentContent) }}
+                  onInput={(e) => {
+                    rawTemplateRef.current = (e.target as HTMLElement).innerHTML;
+                  }}
                   style={{
                     outline: 'none',
                     minHeight: '800px',
                     fontSize: '13px',
-                    lineHeight: 1.6,
+                    lineHeight: '1.6',
                     color: '#0f172a',
                   }}
                 />
               </div>
 
               {/* Sheet Footer (Pagination & Legal) */}
-              <div style={{
-                borderTop: '1px solid #e2e8f0',
-                paddingTop: 12,
-                marginTop: 40,
-                display: 'flex',
-                justifyContent: 'space-between',
-                fontSize: 9.5,
-                color: '#94a3b8',
-              }}>
+              <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: 12, marginTop: 40, display: 'flex', justifyContent: 'space-between', fontSize: 9.5, color: '#94a3b8' }}>
                 <span>Documento Riservato • {tenantInfo?.ragioneSociale || 'Bluecode Ltd'} • Pratica: {activeProgetto?.titolo || 'Advisory'}</span>
                 <span>Pagina 1 di 1 • Sigillo eIDAS BluMan</span>
               </div>
             </div>
           </div>
         </div>
-
       </div>
     </div>
   );

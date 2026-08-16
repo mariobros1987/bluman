@@ -18,14 +18,13 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
     setLoading(true);
 
     try {
-      let emailToUse = email;
-      if (selectedRole === 'super_admin') emailToUse = 'admin@bluecode.advisory';
-      if (selectedRole === 'collaboratore_interno') emailToUse = 'operator@bluecode.advisory';
-
-      const res = await loginApi(emailToUse, password);
+      const res = await loginApi(email, password);
       if (res && res.token) {
-        localStorage.setItem('bluman_token', res.token);
+        localStorage.setItem('bluman_jwt_token', res.token);
         localStorage.setItem('bluman_user', JSON.stringify(res.user));
+        if (res.user?.tenantId) {
+          localStorage.setItem('bluman_tenant_id', res.user.tenantId);
+        }
         onLoginSuccess(res.user, res.token);
       } else {
         setError('Credenziali non valide o utente non autorizzato.');

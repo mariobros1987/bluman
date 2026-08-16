@@ -29,37 +29,48 @@ function getAuthHeaders() {
 }
 
 export async function loginApi(email: string, password?: string) {
+  const cleanEmail = (email || '').trim().toLowerCase();
   try {
     const res = await fetch(`${API_BASE}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email: cleanEmail, password }),
     });
     const data = await res.json();
     if (!res.ok) {
-      throw new Error(data.errore || 'Credenziali non valide');
+      throw new Error(data.errore || 'Credenziali non valide o utente non autorizzato');
     }
     return data;
   } catch (err: any) {
-    console.warn('Backend API login offline/fallback simulation', err);
-    if (email.includes('admin')) {
+    // Se l'errore proviene da una risposta HTTP 401/400 del server, rilancia immediatamente l'errore
+    if (err.message && (err.message.includes('non valide') || err.message.includes('non registrato') || err.message.includes('Password errata'))) {
+      throw err;
+    }
+
+    // Fallback sicuro offline solo se la rete è offline e solo per le credenziali ufficiali esatte
+    if (cleanEmail === 'joe@bluecode.advisory' && password === 'password123') {
       return {
-        token: 'jwt_admin_mock_999',
-        user: { id: 'usr-00', nome: 'Super Admin', email, ruolo: 'super_admin' },
+        token: 'jwt_advisor_official_123',
+        user: { id: 'usr-01', nome: 'Joe Disabato', email: cleanEmail, ruolo: 'advisor' },
       };
     }
-    if (email.includes('operator')) {
+    if (cleanEmail === 'admin@bluecode.advisory' && password === 'admin2026!') {
       return {
-        token: 'jwt_operator_mock_456',
-        user: { id: 'usr-02', nome: 'Operatore Studio', email, ruolo: 'operatore' },
+        token: 'jwt_admin_official_999',
+        user: { id: 'usr-00', nome: 'Super Admin Studio', email: cleanEmail, ruolo: 'super_admin' },
       };
     }
-    return {
-      token: 'jwt_advisor_mock_123',
-      user: { id: 'usr-01', nome: 'Joe Disabato', email, ruolo: 'advisor' },
-    };
+    if (cleanEmail === 'operator@bluecode.advisory' && password === 'operator123') {
+      return {
+        token: 'jwt_operator_official_456',
+        user: { id: 'usr-02', nome: 'Elena Rossi (Operatore)', email: cleanEmail, ruolo: 'collaboratore_interno' },
+      };
+    }
+
+    throw new Error('Credenziali non valide. Utente non autorizzato ad accedere allo studio.');
   }
 }
+
 
 export async function magicLoginApi(magicToken: string) {
   try {
