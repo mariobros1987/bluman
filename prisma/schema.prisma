@@ -333,6 +333,7 @@ model Progetto {
   eventi         EventoCalendario[]
   accessiRisorsa AccessoRisorsa[] @relation("AccessoProgetto")
   comunicazioni  ComunicazioneProgetto[]
+  contrattiRicorrenti ContrattoRicorrente[]
 
   @@map("progetto")
 }
@@ -531,6 +532,8 @@ model ContrattoRicorrente {
   tenant               Tenant                   @relation(fields: [tenantId], references: [id])
   clienteId            String                   @map("cliente_id")
   cliente              Cliente                  @relation(fields: [clienteId], references: [id])
+  progettoId           String?                  @map("progetto_id")
+  progetto             Progetto?                @relation(fields: [progettoId], references: [id], onDelete: SetNull)
   titolo               String
   frequenza            FrequenzaContratto       @default(mensile)
   importoCentesimi     Int                      @map("importo_centesimi")

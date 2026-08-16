@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { fetchContrattiRicorrentiApi, creaContrattoRicorrenteApi, fetchClienti } from '../api/client';
+import { PROJECTS } from '../store/mockData';
 import { fmt } from '../utils';
 
 export function RetainersPage() {
+  const navigate = useNavigate();
   const [contratti, setContratti] = useState<any[]>([]);
   const [clienti, setClienti] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -10,6 +13,7 @@ export function RetainersPage() {
 
   // Form state
   const [clienteId, setClienteId] = useState('');
+  const [progettoId, setProgettoId] = useState('');
   const [titolo, setTitolo] = useState('');
   const [frequenza, setFrequenza] = useState('mensile');
   const [importoEuro, setImportoEuro] = useState('');
@@ -40,6 +44,7 @@ export function RetainersPage() {
 
     const res = await creaContrattoRicorrenteApi({
       clienteId,
+      progettoId: progettoId || undefined,
       titolo,
       frequenza,
       importoCentesimi,
@@ -52,6 +57,7 @@ export function RetainersPage() {
       setShowModal(false);
       setTitolo('');
       setImportoEuro('');
+      setProgettoId('');
       loadData();
     }
   };
@@ -82,6 +88,7 @@ export function RetainersPage() {
               <tr style={{ borderBottom: '2px solid var(--border)', color: 'var(--muted)', fontSize: 13, textTransform: 'uppercase' }}>
                 <th style={{ padding: '12px 8px' }}>Oggetto Contratto</th>
                 <th style={{ padding: '12px 8px' }}>Cliente</th>
+                <th style={{ padding: '12px 8px' }}>Progetto Collegato</th>
                 <th style={{ padding: '12px 8px' }}>Frequenza</th>
                 <th style={{ padding: '12px 8px' }}>Canone Ricorrente</th>
                 <th style={{ padding: '12px 8px' }}>Prossima Fatturazione</th>
@@ -91,7 +98,7 @@ export function RetainersPage() {
             <tbody>
               {contratti.length === 0 ? (
                 <tr>
-                  <td colSpan={6} style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted)' }}>
+                  <td colSpan={7} style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted)' }}>
                     Nessun contratto ricorrente attivo. Clicca su "+ Nuovo Contratto Retainer" per crearne uno.
                   </td>
                 </tr>
@@ -103,6 +110,18 @@ export function RetainersPage() {
                     </td>
                     <td style={{ padding: '16px 8px' }}>
                       {c.cliente?.nome || 'Cliente Studio'}
+                    </td>
+                    <td style={{ padding: '16px 8px' }}>
+                      {c.progetto ? (
+                        <button
+                          onClick={() => navigate(`/projects/${c.progetto.id}`)}
+                          style={{ background: 'none', border: 'none', color: '#6366f1', textDecoration: 'underline', cursor: 'pointer', fontWeight: 600, padding: 0 }}
+                        >
+                          📁 {c.progetto.nome} ↗
+                        </button>
+                      ) : (
+                        <span style={{ color: 'var(--muted)', fontSize: 12 }}>— Canone Studio —</span>
+                      )}
                     </td>
                     <td style={{ padding: '16px 8px', textTransform: 'capitalize' }}>
                       ⏳ {c.frequenza}
@@ -142,6 +161,20 @@ export function RetainersPage() {
                 <option value="">Seleziona Cliente...</option>
                 {clienti.map(cl => (
                   <option key={cl.id} value={cl.id}>{cl.nome}</option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={{ display: 'block', fontSize: 12, marginBottom: 4, fontWeight: 600 }}>Progetto Collegato (Opzionale)</label>
+              <select
+                value={progettoId}
+                onChange={(e) => setProgettoId(e.target.value)}
+                style={{ width: '100%', padding: '8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
+              >
+                <option value="">Nessun progetto specifico (Canone Generico)</option>
+                {PROJECTS.map(p => (
+                  <option key={p.id} value={String(p.id)}>📁 {p.n} ({p.cl})</option>
                 ))}
               </select>
             </div>

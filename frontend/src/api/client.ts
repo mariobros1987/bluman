@@ -536,7 +536,7 @@ export async function fetchContrattiRicorrentiApi() {
   }
 }
 
-export async function creaContrattoRicorrenteApi(input: { clienteId: string; titolo: string; frequenza?: string; importoCentesimi: number; prossimaFatturazione: string; note?: string }) {
+export async function creaContrattoRicorrenteApi(input: { clienteId: string; progettoId?: string; titolo: string; frequenza?: string; importoCentesimi: number; prossimaFatturazione: string; note?: string }) {
   try {
     const res = await fetch(`${API_BASE}/contratti-ricorrenti`, {
       method: 'POST',

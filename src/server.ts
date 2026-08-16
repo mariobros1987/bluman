@@ -1027,7 +1027,7 @@ export function buildServer(app: AppPort): FastifyInstance {
     try {
       const contratti = await (prisma as any).contrattoRicorrente.findMany({
         where: { tenantId },
-        include: { cliente: true },
+        include: { cliente: true, progetto: true },
         orderBy: { prossimaFatturazione: 'asc' },
       });
       return reply.send(contratti);
@@ -1039,6 +1039,7 @@ export function buildServer(app: AppPort): FastifyInstance {
   server.post<{
     Body: {
       clienteId: string;
+      progettoId?: string;
       titolo: string;
       frequenza?: 'mensile' | 'trimestrale' | 'semestrale' | 'annuale';
       importoCentesimi: number;
@@ -1047,7 +1048,7 @@ export function buildServer(app: AppPort): FastifyInstance {
     };
   }>('/contratti-ricorrenti', async (req, reply) => {
     const tenantId = (req as any).tenantId;
-    const { clienteId, titolo, frequenza, importoCentesimi, prossimaFatturazione, note } = req.body;
+    const { clienteId, progettoId, titolo, frequenza, importoCentesimi, prossimaFatturazione, note } = req.body;
 
     if (!clienteId || !titolo || !importoCentesimi) {
       return reply.code(400).send({ errore: 'clienteId, titolo e importoCentesimi sono obbligatori' });
@@ -1058,12 +1059,14 @@ export function buildServer(app: AppPort): FastifyInstance {
         data: {
           tenantId,
           clienteId,
+          progettoId: progettoId || null,
           titolo,
           frequenza: frequenza || 'mensile',
           importoCentesimi,
           prossimaFatturazione: new Date(prossimaFatturazione),
           note,
         },
+        include: { cliente: true, progetto: true },
       });
 
       recordAudit({
