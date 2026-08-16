@@ -68,6 +68,10 @@ export async function downloadRealPdf(
     container = elementOrHtml as HTMLDivElement;
   }
 
+  if (!container) {
+    container = document.createElement('div');
+  }
+
   try {
     // 1. Converti tutte le immagini (incluso il logo) in Base64 Data URL sincroni per html2canvas
     const images = Array.from(container.querySelectorAll('img'));
