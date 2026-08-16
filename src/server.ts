@@ -752,18 +752,44 @@ export function buildServer(app: AppPort): FastifyInstance {
       });
 
       const totaleIncassato = scadenza.registrazioniRegistrate.reduce((acc, r) => acc + r.importoIncassatoCentesimi, 0) + importoIncassatoCentesimi;
-      const nuovoStato = totaleIncassato >= scadenza.importoCentesimi ? 'incassato' : 'parziale';
+      const nuovoStatoScadenza = totaleIncassato >= scadenza.importoCentesimi ? 'incassato' : 'parziale';
 
       await prisma.scadenzaIncasso.update({
         where: { id },
-        data: { stato: nuovoStato },
+        data: { stato: nuovoStatoScadenza },
       });
+
+      // ── LOGICA OPENSTAMANAGER: Mastrino::aggiornaScadenzario ──────
+      // Verifichiamo se TUTTE le scadenze della Fattura sono state incassate
+      const tutteScadenzeFattura = await prisma.scadenzaIncasso.findMany({
+        where: { fatturaId: scadenza.fatturaId },
+      });
+
+      const tutteSaldate = tutteScadenzeFattura.every(s => s.id === id ? nuovoStatoScadenza === 'incassato' : s.stato === 'incassato');
+      
+      // Aggiorniamo lo stato contabile immutabile della Fattura
+      await prisma.fattura.update({
+        where: { id: scadenza.fatturaId },
+        data: { stato: tutteSaldate ? 'incassata' : 'emessa' },
+      });
+
+      // ── LOGICA OPENSTAMANAGER: Accredito su Conto Bancario ────────
+      const contoPredefinito = await (prisma as any).contoBancario.findFirst({
+        where: { tenantId, isDefault: true },
+      });
+
+      if (contoPredefinito) {
+        await (prisma as any).contoBancario.update({
+          where: { id: contoPredefinito.id },
+          data: { saldoAttuale: { increment: importoIncassatoCentesimi } },
+        });
+      }
 
       recordAudit({
         tenantId,
         azione: 'INCASSO_REGISTRATO',
         entita: `Scadenza #${id}`,
-        dettagli: `Registrato incasso di €${(importoIncassatoCentesimi / 100).toFixed(2)} via ${metodoPagamento || 'bonifico'}`,
+        dettagli: `Registrato incasso di €${(importoIncassatoCentesimi / 100).toFixed(2)} via ${metodoPagamento || 'bonifico'} con chiusura partita di giro`,
       });
 
       return reply.code(201).send(registrazione);
@@ -833,8 +859,9 @@ export function buildServer(app: AppPort): FastifyInstance {
 
       reply.header('Content-Type', 'application/xml');
       reply.header('Content-Disposition', `attachment; filename="${fattura.numero || 'Fattura'}.xml"`);
-      return reply.send(xmlContent);
     } catch (err) {
+      return reply.code(500).send({ errore: 'Errore durante la generazione dell\'XML SDI' });
+    }
   });
 
   // ── MODULO BANCHE & CONTI CORRENTI STUDIO ─────────────────────────
