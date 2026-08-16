@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Badge } from '../components/ui/Badge';
 import { ProgressBar } from '../components/ui/ProgressBar';
@@ -14,6 +14,7 @@ export function Projects() {
   const navigate = useNavigate();
   const [projectList, setProjectList] = useState<Progetto[]>(PROJECTS);
   const [wizardOpen, setWizardOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
 
   const loadProjects = async () => {
     let combined: Progetto[] = [];
@@ -92,7 +93,8 @@ export function Projects() {
     loadProjects();
   }, []);
 
-  const [searchTerm, setSearchTerm] = useState('');
+  const currentUserStr = localStorage.getItem('bluman_user');
+  const currentUser = currentUserStr ? JSON.parse(currentUserStr) : { ruolo: 'advisor' };
 
   // Mostra TUTTI i progetti dello studio per il team, o filtra per cliente/ricerca
   const visibleProjects = projectList.filter(p => {
