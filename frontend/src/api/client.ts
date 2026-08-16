@@ -9,16 +9,11 @@ const getApiBase = () => {
 
 const API_BASE = getApiBase();
 
-// Helper per prevenire blocchi di caricamento in caso di latenza cloud
-async function fetchWithTimeout(url: string, options: RequestInit = {}, ms: number = 6000) {
-  const controller = new AbortController();
-  const id = setTimeout(() => controller.abort(), ms);
+// Helper nativo per le chiamate di rete al backend Cloud
+async function fetchWithTimeout(url: string, options: RequestInit = {}) {
   try {
-    const response = await fetch(url, { ...options, signal: controller.signal });
-    clearTimeout(id);
-    return response;
+    return await fetch(url, options);
   } catch (error) {
-    clearTimeout(id);
     throw error;
   }
 }
