@@ -335,7 +335,7 @@ export function ProjectDetail() {
 
     const updatedProject: Progetto = {
       ...project,
-      mods: newMods,
+      mods: newMods as ModuloProgetto[],
       pct: globalPct,
       st: globalSt,
     };
