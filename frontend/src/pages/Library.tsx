@@ -34,7 +34,10 @@ export function Library() {
         p: a.prezzoDefault ? a.prezzoDefault / 100 : 500,
         ver: a.versione || 1,
       }));
-      setArticoliList(mapped);
+      // Unisci gli articoli DB con quelli mock evitando duplicati per id/nome
+      const existingIds = new Set(mapped.map(m => m.id));
+      const combined = [...mapped, ...ARTICOLI.filter(a => !existingIds.has(a.id) && !mapped.some(m => m.n.toLowerCase() === a.n.toLowerCase()))];
+      setArticoliList(combined);
     }
 
     const dbMods = await fetchModuliLibreria();
