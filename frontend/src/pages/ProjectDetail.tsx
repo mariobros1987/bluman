@@ -249,51 +249,17 @@ export function ProjectDetail() {
                  || PROJECTS[0];
 
         if (match) {
-          // Garanzia moduli non vuoti per qualsiasi progetto selezionato dall'operatore
-          if (!match.mods || match.mods.length === 0) {
-            match = {
-              ...match,
-              mods: [
-                {
-                  id: 101,
-                  n: 'Analisi Patrimoniale & Risk Assessment',
-                  cat: 'Analisi' as CategoriaModulo,
-                  st: 'in_progress',
-                  pct: 50,
-                  h: 15,
-                  a: 5,
-                  p: 3500,
-                  team: [1, 2],
-                  delay: false,
-                  v: [
-                    { n: 'Raccolta documenti e KYC cliente', hE: 4, hA: 4, s: 'done', as: 1, d: 1 },
-                    { n: 'Verifica giurisdizione e fiscalità intercompany', hE: 6, hA: 1, s: 'active', as: 1, d: 0 },
-                    { n: 'Redazione report conclusivo', hE: 5, hA: 0, s: 'pending', as: 1, d: 0 }
-                  ]
-                },
-                {
-                  id: 102,
-                  n: 'Corporate Structuring & Holding Malta',
-                  cat: 'Societario' as CategoriaModulo,
-                  st: 'in_progress',
-                  pct: 20,
-                  h: 30,
-                  a: 6,
-                  p: 11500,
-                  team: [1, 3],
-                  delay: false,
-                  v: [
-                    { n: 'Bozza Atto Costitutivo e Statuto', hE: 10, hA: 6, s: 'active', as: 1, d: 0 },
-                    { n: 'Registrazione MFSA e deposito UBO', hE: 10, hA: 0, s: 'pending', as: 1, d: 0 },
-                    { n: 'Apertura posizioni fiscali e codice SDI', hE: 10, hA: 0, s: 'pending', as: 1, d: 0 }
-                  ]
-                }
-              ]
-            };
-          }
-          setProject(match);
-          if (match.mods && match.mods.length > 0) {
-            setExpanded(new Set(match.mods.map(m => m.id)));
+          const modValSum = (match.mods || []).reduce((acc: number, m: any) => acc + (m.p || 0), 0);
+          const finalVal = modValSum > 0 ? modValSum : match.val;
+
+          const updatedMatch = {
+            ...match,
+            val: finalVal,
+          };
+
+          setProject(updatedMatch);
+          if (updatedMatch.mods && updatedMatch.mods.length > 0) {
+            setExpanded(new Set(updatedMatch.mods.map(m => m.id)));
           }
         }
       }
