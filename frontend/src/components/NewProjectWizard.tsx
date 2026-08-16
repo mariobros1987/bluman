@@ -110,6 +110,45 @@ export function NewProjectWizard({ onClose, onProjectCreated }: NewProjectWizard
           progettoId: progettoId,
           righe: dbMods,
         });
+
+        // 3. Salva anche in localStorage per garantire la consistenza offline immediata con stato 'pending'
+        const customProjsStr = localStorage.getItem('bluman_custom_projects');
+        const customProjs: any[] = customProjsStr ? JSON.parse(customProjsStr) : [];
+        const newProjObject = {
+          id: progettoId,
+          n: projectName,
+          cl: clientName || 'Cliente',
+          ct: clientType,
+          st: 'pre_project',
+          pct: 0,
+          start: new Date().toLocaleDateString('it-IT'),
+          due: '30 giorni',
+          val: totalP,
+          delay: false,
+          fisc: 'privato_italia',
+          fatture: [],
+          mods: selModules.map((m, mIdx) => ({
+            id: Date.now() + mIdx,
+            n: m.n,
+            cat: m.cat,
+            st: 'pending',
+            pct: 0,
+            h: moduloH(m),
+            a: 0,
+            p: moduloP(m),
+            team: [1],
+            delay: false,
+            v: (m.v || []).map((voce: any) => ({
+              n: voce.n || 'Microvoce operativa',
+              hE: voce.hE || 4,
+              hA: 0,
+              s: 'pending',
+              as: 1,
+              d: 0,
+            })),
+          })),
+        };
+        localStorage.setItem('bluman_custom_projects', JSON.stringify([newProjObject, ...customProjs]));
       } catch (apiErr) {
         console.warn('Backend API project creation fallback local:', apiErr);
       }
