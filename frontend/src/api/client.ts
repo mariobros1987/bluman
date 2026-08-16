@@ -551,6 +551,20 @@ export async function creaContrattoRicorrenteApi(input: { clienteId: string; pro
   }
 }
 
+export async function generaFatturaRetainerApi(contrattoId: string) {
+  try {
+    const res = await fetch(`${API_BASE}/contratti-ricorrenti/${contrattoId}/genera-fattura`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok) throw new Error('Errore generazione fattura retainer');
+    return await res.json();
+  } catch (err) {
+    console.warn('Genera fattura retainer API fallback', err);
+    return null;
+  }
+}
+
 export async function fetchPermessiUtenteApi(userId: string) {
   try {
     const res = await fetch(`${API_BASE}/tenant/utenti/${userId}/permessi`, { headers: getAuthHeaders() });

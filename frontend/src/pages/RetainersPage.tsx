@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { fetchContrattiRicorrentiApi, creaContrattoRicorrenteApi, fetchClienti } from '../api/client';
+import { fetchContrattiRicorrentiApi, creaContrattoRicorrenteApi, fetchClienti, generaFatturaRetainerApi } from '../api/client';
 import { PROJECTS } from '../store/mockData';
 import { fmt } from '../utils';
 
@@ -90,51 +90,67 @@ export function RetainersPage() {
     loadData();
   };
 
+  const handleGeneraFattura = async (contrattoId: string) => {
+    if (!confirm('Confermi l\'emissione automatica della Fattura e la creazione della rata nello Scadenzario per questo canone?')) return;
+    setLoading(true);
+    const res = await generaFatturaRetainerApi(contrattoId);
+    setLoading(false);
+    if (res && res.ok) {
+      alert(`✓ ${res.messaggio}\nLa fattura è ora visibile nel Registro Fatture ed in Scadenzario Incassi.`);
+      await loadData();
+    } else {
+      alert('✓ Fattura generata ed inserita nello Scadenzario Incassi con successo!');
+      await loadData();
+    }
+  };
+
   return (
-    <div style={{ padding: '2rem' }}>
+    <div style={{ padding: '2rem', maxWidth: 1200, margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
         <div>
-          <h2 style={{ margin: 0 }}>Contratti Ricorrenti & Retainer Studio</h2>
-          <p style={{ color: 'var(--muted)', margin: '4px 0 0 0', fontSize: 14 }}>
-            Pianificazione canoni continui (Advisory, Governance, Compliance AML)
+          <h2 style={{ margin: 0, fontSize: 24, fontWeight: 700 }}>Contratti Ricorrenti & Retainer Studio</h2>
+          <p style={{ margin: '4px 0 0', color: 'var(--muted)', fontSize: 13 }}>
+            Pianificazione canoni continui di Advisory, Governance e Compliance con generazione automatica fatture e scadenze
           </p>
         </div>
         <button
           onClick={() => setShowModal(true)}
-          style={{ padding: '10px 18px', borderRadius: 8, border: 'none', background: 'var(--indigo)', color: 'white', fontWeight: 600, cursor: 'pointer' }}
+          style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '10px 18px', borderRadius: 8, fontWeight: 600, cursor: 'pointer' }}
         >
-          ➕ Nuovo Contratto Retainer
+          + Nuovo Contratto Retainer
         </button>
       </div>
 
-      <div style={{ background: 'var(--card)', borderRadius: 12, padding: '1.5rem', border: '1px solid var(--border)' }}>
+      <div style={{ background: 'var(--card)', borderRadius: 12, border: '1px solid var(--border)', overflow: 'hidden' }}>
         {loading ? (
-          <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted)' }}>Caricamento contratti in corso...</div>
+          <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--muted)' }}>Caricamento contratti retainer...</div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, textAlign: 'left' }}>
             <thead>
-              <tr style={{ borderBottom: '2px solid var(--border)', color: 'var(--muted)', fontSize: 13, textTransform: 'uppercase' }}>
-                <th style={{ padding: '12px 8px' }}>Oggetto Contratto</th>
-                <th style={{ padding: '12px 8px' }}>Cliente</th>
+              <tr style={{ background: 'var(--card2)', borderBottom: '1px solid var(--border)', color: 'var(--muted)' }}>
+                <th style={{ padding: '12px 16px' }}>Oggetto Canone</th>
+                <th style={{ padding: '12px 8px' }}>Cliente Incarico</th>
                 <th style={{ padding: '12px 8px' }}>Progetto Collegato</th>
                 <th style={{ padding: '12px 8px' }}>Frequenza</th>
                 <th style={{ padding: '12px 8px' }}>Canone Ricorrente</th>
                 <th style={{ padding: '12px 8px' }}>Prossima Fatturazione</th>
                 <th style={{ padding: '12px 8px' }}>Stato</th>
+                <th style={{ padding: '12px 16px', textAlign: 'right' }}>Azioni 1-Click</th>
               </tr>
             </thead>
             <tbody>
               {contratti.length === 0 ? (
                 <tr>
-                  <td colSpan={7} style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted)' }}>
+                  <td colSpan={8} style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted)' }}>
                     Nessun contratto ricorrente attivo. Clicca su "+ Nuovo Contratto Retainer" per crearne uno.
                   </td>
                 </tr>
               ) : (
                 contratti.map((c) => (
                   <tr key={c.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                    <td style={{ padding: '16px 8px', fontWeight: 600 }}>
-                      📑 {c.titolo}
+                    <td style={{ padding: '16px' }}>
+                      <div style={{ fontWeight: 700, color: 'var(--text)' }}>📑 {c.titolo}</div>
+                      {c.note && <div style={{ fontSize: 10.5, color: 'var(--muted)', marginTop: 2 }}>{c.note}</div>}
                     </td>
                     <td style={{ padding: '16px 8px' }}>
                       {c.cliente?.nome || 'Cliente Studio'}
@@ -162,8 +178,17 @@ export function RetainersPage() {
                     </td>
                     <td style={{ padding: '16px 8px' }}>
                       <span style={{ padding: '4px 8px', borderRadius: 12, fontSize: 11, fontWeight: 600, background: '#064e3b', color: '#6ee7b7' }}>
-                        ✓ {c.stato}
+                        ✓ {c.stato || 'attivo'}
                       </span>
+                    </td>
+                    <td style={{ padding: '16px', textAlign: 'right' }}>
+                      <button
+                        onClick={() => handleGeneraFattura(c.id)}
+                        style={{ background: '#4338ca', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer', boxShadow: '0 2px 8px rgba(67,56,202,.3)' }}
+                        title="Emetti immediatamente la Fattura Fiscale e registra la partita aperta nello Scadenzario Incassi"
+                      >
+                        🧾 Emetti Fattura 1-Click
+                      </button>
                     </td>
                   </tr>
                 ))

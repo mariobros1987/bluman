@@ -1082,6 +1082,86 @@ export function buildServer(app: AppPort): FastifyInstance {
     }
   });
 
+  // Genera Fattura 1-Click da Contratto Retainer Ricorrente (Stile OpenSTAManager)
+  server.post<{ Params: { id: string } }>('/contratti-ricorrenti/:id/genera-fattura', async (req, reply) => {
+    const tenantId = (req as any).tenantId;
+    const { id } = req.params;
+
+    try {
+      const contratto = await (prisma as any).contrattoRicorrente.findUnique({
+        where: { id },
+        include: { cliente: true, progetto: true },
+      });
+
+      if (!contratto) return reply.code(404).send({ errore: 'Contratto non trovato' });
+
+      // 1. Genera Numero Progressivo Fattura (Serie FT)
+      const lastFattura = await (prisma as any).fattura.findFirst({
+        where: { tenantId, tipoDocumento: 'fattura', serie: 'FT' },
+        orderBy: { numeroProgressivoSerie: 'desc' },
+      });
+      const annoCorrente = new Date().getFullYear();
+      const prossimoProgressivo = (lastFattura?.numeroProgressivoSerie || 0) + 1;
+      const numeroFattura = `FT-${annoCorrente}-${String(prossimoProgressivo).padStart(4, '0')}`;
+
+      // 2.Crea Fattura a DB
+      const nuovaFattura = await (prisma as any).fattura.create({
+        data: {
+          tenantId,
+          progettoId: contratto.progettoId || null,
+          tipoDocumento: 'fattura',
+          serie: 'FT',
+          numeroProgressivoSerie: prossimoProgressivo,
+          numero: numeroFattura,
+          importoCentesimi: contratto.importoCentesimi,
+          stato: 'inviata',
+          note: `Fatturazione canone retainer ricorrente: ${contratto.titolo} (${contratto.frequenza})`,
+        },
+      });
+
+      // 3. Genera Scadenza Incasso nello Scadenzario
+      const scadenza = await (prisma as any).scadenzaFattura.create({
+        data: {
+          tenantId,
+          fatturaId: nuovaFattura.id,
+          numeroRata: 1,
+          importoCentesimi: contratto.importoCentesimi,
+          dataScadenza: new Date(),
+          stato: 'aperta',
+        },
+      });
+
+      // 4. Calcola la data della Prossima Fatturazione in base alla frequenza
+      const prossimaData = new Date(contratto.prossimaFatturazione || new Date());
+      if (contratto.frequenza === 'mensile') prossimaData.setMonth(prossimaData.getMonth() + 1);
+      else if (contratto.frequenza === 'trimestrale') prossimaData.setMonth(prossimaData.getMonth() + 3);
+      else if (contratto.frequenza === 'semestrale') prossimaData.setMonth(prossimaData.getMonth() + 6);
+      else if (contratto.frequenza === 'annuale') prossimaData.setFullYear(prossimaData.getFullYear() + 1);
+
+      await (prisma as any).contrattoRicorrente.update({
+        where: { id },
+        data: { prossimaFatturazione: prossimaData },
+      });
+
+      recordAudit({
+        tenantId,
+        azione: 'FATTURA_RETAINER_GENERATA',
+        entita: numeroFattura,
+        dettagli: `Generata fattura ${numeroFattura} da €${(contratto.importoCentesimi / 100).toFixed(2)} per il canone retainer ${contratto.titolo}`,
+      });
+
+      return reply.send({
+        ok: true,
+        fattura: nuovaFattura,
+        scadenza,
+        prossimaFatturazione: prossimaData,
+        messaggio: `Fattura ${numeroFattura} generata con successo ed inserita nello Scadenzario Incassi!`,
+      });
+    } catch (err) {
+      return reply.code(500).send({ errore: err instanceof Error ? err.message : 'Errore generazione fattura retainer' });
+    }
+  });
+
   // ── GESTIONE PERMESSI GRANULARI MODULI & SEZIONI (STYLE OPENSTAMANAGER) ─
   server.get<{ Params: { userId: string } }>('/tenant/utenti/:userId/permessi', async (req, reply) => {
     const tenantId = (req as any).tenantId;
