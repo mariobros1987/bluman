@@ -11,6 +11,52 @@ export function PrimaNotaPage() {
   const [selectedMetodo, setSelectedMetodo] = useState('tutti');
   const [searchTerm, setSearchTerm] = useState('');
 
+  // Modal Nuova Registrazione Prima Nota
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newClienteId, setNewClienteId] = useState('');
+  const [newDesc, setNewDesc] = useState('');
+  const [newImporto, setNewImporto] = useState('');
+  const [newMetodo, setNewMetodo] = useState('bonifico');
+  const [newCro, setNewCro] = useState('');
+
+  const handleAddMovimento = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newImporto || !newDesc) return;
+    const importoCentesimi = Math.round(parseFloat(newImporto) * 100);
+    const cl = clienti.find(c => c.id === newClienteId);
+
+    const newScad = {
+      id: `pn-${Date.now()}`,
+      numeroRata: 1,
+      dataScadenza: new Date().toISOString(),
+      importoCentesimi,
+      stato: 'incassato',
+      fattura: {
+        numero: 'FT-MANUALE',
+        progetto: {
+          id: '1',
+          nome: newDesc,
+          cliente: { nome: cl?.nome || 'Cliente Generico' },
+        },
+      },
+      registrazioniRegistrate: [
+        {
+          importoIncassatoCentesimi: importoCentesimi,
+          metodoPagamento: newMetodo,
+          riferimentoTransazione: newCro || 'CRO-MANUALE',
+          dataIncasso: new Date().toISOString(),
+        },
+      ],
+    };
+
+    setScadenze([newScad, ...scadenze]);
+    setShowAddModal(false);
+    setNewDesc('');
+    setNewImporto('');
+    setNewCro('');
+    alert('✓ Nuova registrazione aggiunta con successo in Prima Nota!');
+  };
+
   const loadData = async () => {
     setLoading(true);
     const [scadData, clData] = await Promise.all([
@@ -51,6 +97,12 @@ export function PrimaNotaPage() {
             Storico contabile ufficiale delle entrate ed incassi registrati con codice di transazione CRO/TRN
           </p>
         </div>
+        <button
+          onClick={() => setShowAddModal(true)}
+          style={{ padding: '10px 18px', borderRadius: 8, border: 'none', background: 'var(--indigo)', color: 'white', fontWeight: 600, cursor: 'pointer' }}
+        >
+          ➕ Nuova Registrazione Prima Nota
+        </button>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
@@ -149,6 +201,99 @@ export function PrimaNotaPage() {
           </table>
         )}
       </div>
+
+      {/* MODAL NUOVA REGISTRAZIONE PRIMA NOTA */}
+      {showAddModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <form onSubmit={handleAddMovimento} style={{ background: 'var(--card)', padding: '2rem', borderRadius: 12, width: 480, border: '1px solid var(--border)' }}>
+            <h3 style={{ marginTop: 0 }}>Nuova Registrazione Movimento Prima Nota</h3>
+            
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={{ display: 'block', fontSize: 12, marginBottom: 4, fontWeight: 600 }}>Cliente / Anagrafica *</label>
+              <select
+                required
+                value={newClienteId}
+                onChange={(e) => setNewClienteId(e.target.value)}
+                style={{ width: '100%', padding: '8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
+              >
+                <option value="">Seleziona Cliente...</option>
+                {clienti.map(c => (
+                  <option key={c.id} value={c.id}>{c.nome}</option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={{ display: 'block', fontSize: 12, marginBottom: 4, fontWeight: 600 }}>Descrizione Movimento *</label>
+              <input
+                type="text"
+                required
+                placeholder="es. Incasso Acconto Consulenza Legale Malta"
+                value={newDesc}
+                onChange={(e) => setNewDesc(e.target.value)}
+                style={{ width: '100%', padding: '8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
+              />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 12, marginBottom: 4, fontWeight: 600 }}>Importo (€) *</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  required
+                  placeholder="2500"
+                  value={newImporto}
+                  onChange={(e) => setNewImporto(e.target.value)}
+                  style={{ width: '100%', padding: '8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: 12, marginBottom: 4, fontWeight: 600 }}>Metodo di Pagamento</label>
+                <select
+                  value={newMetodo}
+                  onChange={(e) => setNewMetodo(e.target.value)}
+                  style={{ width: '100%', padding: '8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
+                >
+                  <option value="bonifico">Bonifico Bancario</option>
+                  <option value="carta">POS / Carta di Credito</option>
+                  <option value="stripe">Stripe Gateway</option>
+                  <option value="assegno">Assegno</option>
+                  <option value="contanti">Contanti</option>
+                </select>
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label style={{ display: 'block', fontSize: 12, marginBottom: 4, fontWeight: 600 }}>Codice CRO / TRN Transazione</label>
+              <input
+                type="text"
+                placeholder="es. CRO 9876543210"
+                value={newCro}
+                onChange={(e) => setNewCro(e.target.value)}
+                style={{ width: '100%', padding: '8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+              <button
+                type="button"
+                onClick={() => setShowAddModal(false)}
+                style={{ padding: '8px 16px', borderRadius: 6, border: '1px solid var(--border)', background: 'transparent', color: 'white', cursor: 'pointer' }}
+              >
+                Annulla
+              </button>
+              <button
+                type="submit"
+                style={{ padding: '8px 16px', borderRadius: 6, border: 'none', background: 'var(--indigo)', color: 'white', cursor: 'pointer', fontWeight: 600 }}
+              >
+                ✓ Registra in Prima Nota
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 }
