@@ -13,7 +13,8 @@ Questo file serve come indice rapido per l'IA ed i collaboratori per identificar
   - `🗂 Moduli & Microvoci`
   - `🕸 Grafo & Dipendenze Moduli` (`GrafoModuliProgettoView`)
 - **`pages/InvoicesPage.tsx`**: Registro Fiscale Fatture, Note di Credito, Aliquote ed Export XML SDI.
-- **`pages/PaymentsPage.tsx`**: Scadenzario Incassi, Partite Aperte, Registrazione Prima Nota & Solleciti Clienti.
+- **`pages/ScadenzarioPage.tsx`**: Scadenzario Incassi, Partite Aperte & Solleciti Clienti con Link al Progetto.
+- **`pages/PrimaNotaPage.tsx`**: Registro Prima Nota, Transazioni Cassa/Banca, CRO/TRN & Estratto Conto.
 - **`pages/RetainersPage.tsx`**: Contratti Ricorrenti & Retainer Studio per la fatturazione periodica pianificata.
 - **`pages/Library.tsx`**: Gestione Distinta Base, Costruttore Moduli Template, Catalogo Articoli e Modelli Documenti in Bianco.
 - **`pages/ClientPortal.tsx`**: Portale Cliente a 5 schede (Proposta & Firma 1-Click, Live Progress, Form Societari, Documenti, Contatti Advisor).

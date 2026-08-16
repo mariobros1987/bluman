@@ -14,6 +14,8 @@ import { SuperAdminPage } from './pages/SuperAdminPage';
 import { AuditLogPage } from './pages/AuditLogPage';
 import { InvoicesPage } from './pages/InvoicesPage';
 import { PaymentsPage } from './pages/PaymentsPage';
+import { ScadenzarioPage } from './pages/ScadenzarioPage';
+import { PrimaNotaPage } from './pages/PrimaNotaPage';
 import { RetainersPage } from './pages/RetainersPage';
 import { PROJECTS } from './store/mockData';
 import './styles/tokens.css';
@@ -70,6 +72,8 @@ export default function App() {
             <Route path="/clients"       element={<ClientsPage />} />
             <Route path="/calendar"      element={<CalendarPage />} />
             <Route path="/invoices"      element={<InvoicesPage />} />
+            <Route path="/scadenzario"   element={<ScadenzarioPage />} />
+            <Route path="/primanota"     element={<PrimaNotaPage />} />
             <Route path="/payments"      element={<PaymentsPage />} />
             <Route path="/retainers"     element={<RetainersPage />} />
             <Route path="/audit"         element={<AuditLogPage />} />

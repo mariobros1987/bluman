@@ -4,16 +4,17 @@ import { getFormattedLogoUrl } from '../../utils';
 import styles from './Sidebar.module.css';
 
 const NAV = [
-  { path: '/',         label: 'Dashboard',             icon: '📊' },
-  { path: '/projects', label: 'Progetti',               icon: '📁' },
-  { path: '/clients',  label: 'Clienti',                icon: '👥' },
-  { path: '/calendar', label: 'Calendario',             icon: '📅' },
-  { path: '/invoices', label: 'Fatture & SDI',          icon: '💶' },
-  { path: '/payments', label: 'Incassi & Prima Nota',    icon: '💳' },
-  { path: '/retainers', label: 'Contratti Retainer',    icon: '🔄' },
-  { path: '/audit',    label: 'Log Audit Studio',       icon: '📋' },
-  { path: '/library',  label: 'Libreria moduli',        icon: '📚' },
-  { path: '/settings', label: 'Impostazioni',           icon: '⚙️' },
+  { path: '/',           label: 'Dashboard',             icon: '📊' },
+  { path: '/projects',   label: 'Progetti',               icon: '📁' },
+  { path: '/clients',    label: 'Clienti',                icon: '👥' },
+  { path: '/calendar',   label: 'Calendario',             icon: '📅' },
+  { path: '/invoices',   label: 'Fatture & SDI',          icon: '💶' },
+  { path: '/scadenzario',label: 'Scadenzario Incassi',    icon: '📅' },
+  { path: '/primanota',  label: 'Registro Prima Nota',    icon: '💰' },
+  { path: '/retainers',  label: 'Contratti Retainer',    icon: '🔄' },
+  { path: '/audit',      label: 'Log Audit Studio',       icon: '📋' },
+  { path: '/library',    label: 'Libreria moduli',        icon: '📚' },
+  { path: '/settings',   label: 'Impostazioni',           icon: '⚙️' },
 ];
 
 interface SidebarProps {

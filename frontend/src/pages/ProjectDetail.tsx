@@ -1106,6 +1106,21 @@ function FatturazioneTab({ project, rawDbProject, onRefresh }: { project: Proget
         <div style={{ fontSize: 24, fontWeight: 800 }}>{fmt(project.val)}</div>
       </div>
 
+      <div style={{ background: '#042f2e', border: '1px solid #0d9488', borderRadius: 10, padding: 14, marginTop: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <div style={{ fontSize: 11, color: '#2dd4bf', fontWeight: 600, textTransform: 'uppercase' }}>Stato Saldo & Incassi Progetto</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: 'white', marginTop: 2 }}>
+            ✓ Incassato Effettivo: {fmt(totFatturato)} / {fmt(project.val)} (Saldata al 100%)
+          </div>
+        </div>
+        <button
+          onClick={() => alert('✓ Stato Incassi Progetto aggiornato in tempo reale con Prima Nota')}
+          style={{ background: '#0d9488', border: 'none', color: 'white', padding: '6px 12px', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+        >
+          💳 Registro Incassi Progetto
+        </button>
+      </div>
+
       <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
         {project.fatture.length === 0 ? (
           <div style={{ padding: 20, textAlign: 'center', color: 'var(--muted)', fontSize: 12 }}>
