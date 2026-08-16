@@ -4,6 +4,10 @@
   "outputDirectory": "frontend/dist",
   "rewrites": [
     {
+      "source": "/webhooks/communications/whatsapp",
+      "destination": "/api/webhooks/communications/whatsapp"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

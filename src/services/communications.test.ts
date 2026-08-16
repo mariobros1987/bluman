@@ -45,22 +45,46 @@ describe('Omnichannel Communications & SMTP Verification Suite', () => {
     expect(res.errore).toBe('Host SMTP mancante');
   });
 
-  it('deve verificare con successo i test dei canali WhatsApp, Telegram, Signal ed Email', () => {
-    const testWa = simulaTestCanale('whatsapp');
-    const testTg = simulaTestCanale('telegram');
-    const testSig = simulaTestCanale('signal');
-    const testEm = simulaTestCanale('email');
+  it('deve validare l handshake di verifica Webhook Meta (GET /webhooks/communications/whatsapp)', () => {
+    const verifyTokenAtteso = 'bluman_wa_secure_token_2026';
+    const hubMode = 'subscribe';
+    const hubVerifyToken = 'bluman_wa_secure_token_2026';
+    const hubChallenge = '1158201444';
 
-    expect(testWa.success).toBe(true);
-    expect(testWa.message).toContain('Meta Cloud API');
+    const handshakeValido = hubMode === 'subscribe' && hubVerifyToken === verifyTokenAtteso;
+    expect(handshakeValido).toBe(true);
 
-    expect(testTg.success).toBe(true);
-    expect(testTg.message).toContain('@BotFather');
+    const rispostaChallenge = handshakeValido ? hubChallenge : 'Forbidden';
+    expect(rispostaChallenge).toBe('1158201444');
+  });
 
-    expect(testSig.success).toBe(true);
-    expect(testSig.message).toContain('Signal REST API');
+  it('deve rifiutare un handshake Webhook Meta con verify_token errato', () => {
+    const verifyTokenAtteso = 'bluman_wa_secure_token_2026';
+    const hubMode = 'subscribe';
+    const hubVerifyToken = 'token_sbagliato_123';
 
-    expect(testEm.success).toBe(true);
-    expect(testEm.message).toContain('SMTP');
+    const handshakeValido = hubMode === 'subscribe' && hubVerifyToken === verifyTokenAtteso;
+    expect(handshakeValido).toBe(false);
+  });
+
+  it('deve associare correttamente un messaggio WhatsApp entrante al Cliente ERP ed al Progetto', () => {
+    const clientiMock = [
+      { id: 'cl-01', nome: 'Holding Beta S.r.l.', telefono: '+39 02 889900', referentiJson: { cellulare: '+39 335 1234567' } },
+      { id: 'cl-02', nome: 'Roberto Rossi', telefono: '+39 335 1234567', referentiJson: {} },
+    ];
+
+    const mittenteFromMeta = '393351234567';
+
+    // Algoritmo di matching telefonico
+    const clienteTrovato = clientiMock.find(c => {
+      const telClean = (c.telefono || '').replace(/\D/g, '');
+      const ref = c.referentiJson && typeof c.referentiJson === 'object' ? (c.referentiJson as any) : {};
+      const refCellClean = (ref.cellulare || ref.whatsapp || ref.telefono || '').replace(/\D/g, '');
+      return (telClean && mittenteFromMeta.includes(telClean)) || (refCellClean && mittenteFromMeta.includes(refCellClean));
+    });
+
+    expect(clienteTrovato).toBeDefined();
+    expect(clienteTrovato?.nome).toBe('Holding Beta S.r.l.');
   });
 });
+

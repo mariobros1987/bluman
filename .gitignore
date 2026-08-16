@@ -23,3 +23,5 @@ supabase/functions/.deploy/
 .DS_Store
 
 .vercel
+openstamanager_source/
+*.log

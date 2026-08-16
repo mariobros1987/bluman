@@ -814,7 +814,7 @@ export function ClientPortal() {
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                 <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)' }}>Invia messaggio diretto all'Advisor:</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                   <span style={{ fontSize: 10.5, color: 'var(--muted)' }}>Canale preferito:</span>
                   <select
                     value={canaleMessaggio}
@@ -822,9 +822,9 @@ export function ClientPortal() {
                     style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, background: 'var(--card)', color: 'var(--text)', border: '1px solid var(--border)' }}
                   >
                     <option value="portal">🌐 Portale Riservato (Sicuro)</option>
-                    <option value="whatsapp">🟢 WhatsApp Business</option>
-                    <option value="email">✉️ Email Transazionale</option>
-                    <option value="telegram">✈️ Telegram</option>
+                    <option value="whatsapp">🟢 WhatsApp Business ({clientObj?.cellulare || (clientObj as any)?.referentiJson?.whatsapp || clientObj?.telefono || '+39 335 1234567'})</option>
+                    <option value="email">✉️ Email Transazionale ({clientObj?.email || (clientObj as any)?.referentiJson?.email || 'client@holdingbeta.advisory'})</option>
+                    <option value="telegram">✈️ Telegram ({clientObj?.telegram || (clientObj as any)?.referentiJson?.telegram || '@' + (clientName || 'Cliente').replace(/[^a-zA-Z0-9]/g, '')})</option>
                   </select>
                 </div>
               </div>

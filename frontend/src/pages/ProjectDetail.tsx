@@ -14,7 +14,7 @@ import { ConfirmDeleteModal } from '../components/ConfirmDeleteModal';
 import { PROJECTS, MLIB, ARTICOLI } from '../store/mockData';
 import { fetchProgettoDettaglio, emettiFatturaApi, consuntivaMicrovoceApi, assegnaAccessoProgettoApi, salvaProgettoDettaglioApi, archiviaProgettoApi, eliminaProgettoApi, fetchModuliLibreria, fetchArticoli, uploadFileApi } from '../api/client';
 import { TEAM } from '../store/mockData';
-import type { Progetto, ModuloProgetto, CategoriaModulo, StatoProgetto, StatoModulo } from '../types';
+import type { Progetto, ModuloProgetto, CategoriaModulo, StatoProgetto, StatoModulo, Cliente } from '../types';
 import styles from './ProjectDetail.module.css';
 
 type Tab = 'moduli' | 'grafo' | 'fatturazione' | 'redditivita' | 'storico' | 'comunicazioni' | 'documenti' | 'calendario';
@@ -23,6 +23,7 @@ export function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
+  const [currentClient, setCurrentClient] = useState<Cliente | null>(null);
   const [project, setProject] = useState<Progetto | null>(() => {
     return PROJECTS.find(p => String(p.id) === String(id)) || null;
   });
@@ -155,6 +156,9 @@ export function ProjectDetail() {
       const dbRes = await fetchProgettoDettaglio(id);
       if (dbRes && dbRes.id) {
         setRawDbProject(dbRes);
+        if (dbRes.cliente) {
+          setCurrentClient(dbRes.cliente);
+        }
 
         let finalMods = (dbRes.moduli || []).map((m: any, mIdx: number) => {
           let microvociList = (m.microvoci || []).map((mv: any, vIdx: number) => {
@@ -835,7 +839,14 @@ export function ProjectDetail() {
             </div>
           </div>
         )}
-        {tab === 'comunicazioni' && <ComunicazioniTab progettoId={String(project.id)} nomeCliente={project.cl} emailCliente="client@holdingbeta.advisory" />}
+        {tab === 'comunicazioni' && (
+          <ComunicazioniTab
+            progettoId={String(project.id)}
+            nomeCliente={project.cl}
+            emailCliente={currentClient?.email || "client@holdingbeta.advisory"}
+            cliente={currentClient}
+          />
+        )}
         {tab === 'documenti' && <DocumentiTab project={project} />}
         {tab === 'calendario' && <CalendarioProgettoTab project={project} />}
       </div>

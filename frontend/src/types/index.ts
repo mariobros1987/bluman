@@ -25,6 +25,10 @@ export interface Cliente {
   email?: string;
   pec?: string;
   telefono?: string;
+  cellulare?: string;
+  telegram?: string;
+  signal?: string;
+  referenteNome?: string;
   referentiJson?: any;
   isAttivo?: boolean;
 }

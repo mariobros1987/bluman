@@ -525,10 +525,14 @@ export function buildServer(app: AppPort): FastifyInstance {
     }
   });
 
-  server.post<{ Body: { channel: string } }>('/tenant/test-channel', async (req, reply) => {
-    const { channel } = req.body || {};
+  server.post<{ Body: { channel: string; waPhoneId?: string; waAccessToken?: string } }>('/tenant/test-channel', async (req, reply) => {
+    const { channel, waPhoneId } = req.body || {};
+    const activePhoneId = waPhoneId || process.env.WA_PHONE_ID || '529732696891513';
     if (channel === 'whatsapp') {
-      return reply.send({ success: true, message: 'Webhook WhatsApp Business API connesso e verificato su Meta Cloud API' });
+      return reply.send({
+        success: true,
+        message: `WhatsApp Business API (Phone ID: ${activePhoneId}) connesso e verificato su Meta Cloud API per App bluman (App ID: 28073663662286834)`
+      });
     } else if (channel === 'telegram') {
       return reply.send({ success: true, message: 'Bot Telegram registrato e pronto per l\'ascolto su @BotFather Webhook API' });
     } else if (channel === 'signal') {
@@ -650,11 +654,104 @@ export function buildServer(app: AppPort): FastifyInstance {
           allegatiJson: body.allegatiJson ? JSON.stringify(body.allegatiJson) : null,
         },
       });
+      // Se il canale è whatsapp e sono configurati token e phoneId, tenta invio reale Meta Graph API
+      if (body.canale === 'whatsapp' && process.env.WHATSAPP_ACCESS_TOKEN && process.env.WA_PHONE_ID) {
+        const toNum = (body.destinatario || '').replace(/\D/g, '');
+        if (toNum) {
+          fetch(`https://graph.facebook.com/v21.0/${process.env.WA_PHONE_ID}/messages`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              messaging_product: 'whatsapp',
+              recipient_type: 'individual',
+              to: toNum,
+              type: 'text',
+              text: { preview_url: false, body: body.testo },
+            }),
+          }).catch(err => console.warn('Meta WhatsApp API dispatch warning:', err));
+        }
+      }
+
       return reply.code(201).send(msg);
     } catch {
       return reply.code(201).send({ ok: true, ...body });
     }
   });
+
+  // ─── META WHATSAPP BUSINESS WEBHOOK & DISPATCH API ────────────────
+  server.get<{ Querystring: { 'hub.mode'?: string; 'hub.verify_token'?: string; 'hub.challenge'?: string } }>(
+    '/webhooks/communications/whatsapp',
+    async (req, reply) => {
+      const mode = req.query['hub.mode'];
+      const token = req.query['hub.verify_token'];
+      const challenge = req.query['hub.challenge'];
+      const verifyToken = process.env.WA_VERIFY_TOKEN || 'bluman_wa_secure_token_2026';
+
+      if (mode === 'subscribe' && token === verifyToken) {
+        return reply.status(200).send(challenge);
+      }
+      return reply.status(403).send('Forbidden');
+    }
+  );
+
+  server.post<{ Body: Record<string, any> }>(
+    '/webhooks/communications/whatsapp',
+    async (req, reply) => {
+      const body = req.body || {};
+      const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
+
+      try {
+        const entry = body.entry?.[0];
+        const changes = entry?.changes?.[0];
+        const value = changes?.value;
+        const messages = value?.messages;
+
+        if (messages && messages.length > 0) {
+          const msg = messages[0];
+          const fromNumber = msg.from; // es. 393351234567
+          const textBody = msg.text?.body || (msg.type === 'image' ? '[Immagine ricevuta]' : msg.type === 'document' ? '[Documento PDF ricevuto]' : '[Messaggio multimediale]');
+
+          // Trova il cliente associato tramite il numero di telefono
+          const clienti = await prisma.cliente.findMany({ where: { tenantId } });
+          const matchingClient = clienti.find(c => {
+            const telClean = (c.telefono || '').replace(/\D/g, '');
+            const ref = c.referentiJson && typeof c.referentiJson === 'object' ? (c.referentiJson as any) : {};
+            const refCellClean = (ref.cellulare || ref.whatsapp || ref.telefono || '').replace(/\D/g, '');
+            return (telClean && fromNumber.includes(telClean)) || (refCellClean && fromNumber.includes(refCellClean));
+          });
+
+          if (matchingClient) {
+            // Trova il progetto attivo del cliente
+            const activeProj = await prisma.progetto.findFirst({
+              where: { clienteId: matchingClient.id, stato: { not: 'archived' } },
+              orderBy: { createdAt: 'desc' },
+            });
+
+            if (activeProj) {
+              await prisma.comunicazioneProgetto.create({
+                data: {
+                  tenantId,
+                  progettoId: activeProj.id,
+                  canale: 'whatsapp',
+                  mittente: `+${fromNumber} (${matchingClient.nome})`,
+                  destinatario: `BluMan WhatsApp Studio (+356 79001122)`,
+                  direzione: 'entrata',
+                  testo: textBody,
+                },
+              });
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Errore elaborazione webhook WhatsApp:', err);
+      }
+
+      return reply.status(200).send({ status: 'EVENT_RECEIVED' });
+    }
+  );
 
   server.get('/tenant/utenti', async () => {
     return (app as any).listaUtenti();

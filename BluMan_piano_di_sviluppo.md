@@ -31,7 +31,7 @@
   - `📊 Redditività & Margini` (Dashboard analitica con Margine Lordo Studio, Resa Oraria Effettiva €/ora, Ore Stimate vs Reali ed export **📄 Dossier Trasparenza PDF**).
   - `📄 Documenti & Vault Legale` (Archivio contratti, certificati MFSA, fascicolo KYC ed **📤 Upload File PDF**).
   - `📅 Calendario & Scadenzario` (Scadenzario cronologico del progetto, promemoria ed inserimento 1-click **`+ Programma Nuova Scadenza`**).
-  - `💬 Comunicazioni & Ingestion` (Timeline messaggi omnichannel WhatsApp, Telegram, Email, Signal).
+  - `💬 Comunicazioni & Ingestion` (Timeline messaggi omnichannel WhatsApp, Telegram, Email, Signal con binding automatico e dinamico dei recapiti dall'Anagrafica Master Cliente ERP).
   - `📜 Storico Contratti & Addendum` (Registro immutabile delle versioni contrattuali firmate e marca temporale eIDAS).
   - **Archiviazione & Eliminazione Sicura**: Blocco fiscale anti-cancellazione se presenti fatture.
 - [x] **Registro Fatture & Note di Credito (`/invoices`)**:

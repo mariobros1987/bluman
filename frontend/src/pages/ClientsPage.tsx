@@ -68,12 +68,156 @@ export function ClientsPage() {
 
     // Includi clienti di default demo/studio
     const defaultClients: Cliente[] = [
-      { id: 'cl-01', nome: 'Holding Beta S.r.l.', tipo: 'company', piva: 'IT09876543210', codiceFiscale: 'BLUCD90A01H501X', sedeLegale: 'Via Montenapoleone 8, Milano', codiceSdi: 'SUBM70N', email: 'client@holdingbeta.advisory', telefono: '+39 02 889900', isAttivo: true },
-      { id: 'cl-02', nome: 'Roberto Rossi', tipo: 'individual', piva: 'IT01234567890', codiceFiscale: 'RSSRBT80A01H501U', sedeLegale: 'Corso Vittorio Emanuele II 15, Torino', codiceSdi: '0000000', email: 'roberto.rossi@email.it', telefono: '+39 335 1234567', isAttivo: true },
-      { id: 'cl-03', nome: 'Alpha Capital Ltd', tipo: 'company', piva: 'MT29481039', codiceFiscale: 'ALPHA90A01H501Z', sedeLegale: 'Tower Road, Sliema, Malta', codiceSdi: 'XXXXXXX', email: 'info@alphacapital.mt', telefono: '+356 2133 4455', isAttivo: true },
-      { id: 'cl-04', nome: 'Marco Ricci', tipo: 'individual', piva: 'IT98765432101', codiceFiscale: 'RCCMRC75A01H501Y', sedeLegale: 'Via della Spiga 12, Milano', codiceSdi: 'M5UXCR1', email: 'm.ricci@ricciholding.it', telefono: '+39 348 998877', isAttivo: true },
-      { id: 'cl-05', nome: 'Belfort Industries S.A.', tipo: 'company', piva: 'LU34918204', codiceFiscale: 'BLFRT88A01H501W', sedeLegale: 'Boulevard Royal 24, Lussemburgo', codiceSdi: 'XXXXXXX', email: 'legal@belfort.lu', telefono: '+352 26 12 34', isAttivo: true },
-      { id: 'cl-06', nome: 'Andrea & Sofia Conti', tipo: 'individual', piva: 'IT45678901234', codiceFiscale: 'CNTNDR82A01H501K', sedeLegale: 'Piazza Cavour 3, Roma', codiceSdi: '0000000', email: 'a.conti@conti-family.it', telefono: '+39 339 554433', isAttivo: true },
+      {
+        id: 'cl-01',
+        nome: 'Holding Beta S.r.l.',
+        tipo: 'company',
+        piva: 'IT09876543210',
+        codiceFiscale: 'BLUCD90A01H501X',
+        sedeLegale: 'Via Montenapoleone 8, Milano',
+        codiceSdi: 'SUBM70N',
+        email: 'client@holdingbeta.advisory',
+        telefono: '+39 02 889900',
+        cellulare: '+39 335 1234567',
+        telegram: '@RobertoRossiBeta',
+        signal: '+39 335 1234567',
+        referenteNome: 'Ing. Roberto Rossi (CEO)',
+        isAttivo: true,
+        referentiJson: {
+          email: 'client@holdingbeta.advisory',
+          telefono: '+39 02 889900',
+          cellulare: '+39 335 1234567',
+          whatsapp: '+39 335 1234567',
+          telegram: '@RobertoRossiBeta',
+          signal: '+39 335 1234567',
+          referenteNome: 'Ing. Roberto Rossi (CEO)',
+        },
+      },
+      {
+        id: 'cl-02',
+        nome: 'Roberto Rossi',
+        tipo: 'individual',
+        piva: 'IT01234567890',
+        codiceFiscale: 'RSSRBT80A01H501U',
+        sedeLegale: 'Corso Vittorio Emanuele II 15, Torino',
+        codiceSdi: '0000000',
+        email: 'roberto.rossi@email.it',
+        telefono: '+39 335 1234567',
+        cellulare: '+39 335 1234567',
+        telegram: '@RobertoRossi',
+        signal: '+39 335 1234567',
+        referenteNome: 'Roberto Rossi',
+        isAttivo: true,
+        referentiJson: {
+          email: 'roberto.rossi@email.it',
+          telefono: '+39 335 1234567',
+          cellulare: '+39 335 1234567',
+          whatsapp: '+39 335 1234567',
+          telegram: '@RobertoRossi',
+          signal: '+39 335 1234567',
+          referenteNome: 'Roberto Rossi',
+        },
+      },
+      {
+        id: 'cl-03',
+        nome: 'Alpha Capital Ltd',
+        tipo: 'company',
+        piva: 'MT29481039',
+        codiceFiscale: 'ALPHA90A01H501Z',
+        sedeLegale: 'Tower Road, Sliema, Malta',
+        codiceSdi: 'XXXXXXX',
+        email: 'info@alphacapital.mt',
+        telefono: '+356 2133 4455',
+        cellulare: '+356 7911 2233',
+        telegram: '@AlphaCapitalAdmin',
+        signal: '+356 7911 2233',
+        referenteNome: 'Alexander Borg (Director)',
+        isAttivo: true,
+        referentiJson: {
+          email: 'info@alphacapital.mt',
+          telefono: '+356 2133 4455',
+          cellulare: '+356 7911 2233',
+          whatsapp: '+356 7911 2233',
+          telegram: '@AlphaCapitalAdmin',
+          signal: '+356 7911 2233',
+          referenteNome: 'Alexander Borg (Director)',
+        },
+      },
+      {
+        id: 'cl-04',
+        nome: 'Marco Ricci',
+        tipo: 'individual',
+        piva: 'IT98765432101',
+        codiceFiscale: 'RCCMRC75A01H501Y',
+        sedeLegale: 'Via della Spiga 12, Milano',
+        codiceSdi: 'M5UXCR1',
+        email: 'm.ricci@ricciholding.it',
+        telefono: '+39 348 998877',
+        cellulare: '+39 348 998877',
+        telegram: '@MarcoRicci',
+        signal: '+39 348 998877',
+        referenteNome: 'Marco Ricci',
+        isAttivo: true,
+        referentiJson: {
+          email: 'm.ricci@ricciholding.it',
+          telefono: '+39 348 998877',
+          cellulare: '+39 348 998877',
+          whatsapp: '+39 348 998877',
+          telegram: '@MarcoRicci',
+          signal: '+39 348 998877',
+          referenteNome: 'Marco Ricci',
+        },
+      },
+      {
+        id: 'cl-05',
+        nome: 'Belfort Industries S.A.',
+        tipo: 'company',
+        piva: 'LU34918204',
+        codiceFiscale: 'BLFRT88A01H501W',
+        sedeLegale: 'Boulevard Royal 24, Lussemburgo',
+        codiceSdi: 'XXXXXXX',
+        email: 'legal@belfort.lu',
+        telefono: '+352 26 12 34',
+        cellulare: '+352 691 123 456',
+        telegram: '@BelfortLegal',
+        signal: '+352 691 123 456',
+        referenteNome: 'Jean Dupont (General Counsel)',
+        isAttivo: true,
+        referentiJson: {
+          email: 'legal@belfort.lu',
+          telefono: '+352 26 12 34',
+          cellulare: '+352 691 123 456',
+          whatsapp: '+352 691 123 456',
+          telegram: '@BelfortLegal',
+          signal: '+352 691 123 456',
+          referenteNome: 'Jean Dupont (General Counsel)',
+        },
+      },
+      {
+        id: 'cl-06',
+        nome: 'Andrea & Sofia Conti',
+        tipo: 'individual',
+        piva: 'IT45678901234',
+        codiceFiscale: 'CNTNDR82A01H501K',
+        sedeLegale: 'Piazza Cavour 3, Roma',
+        codiceSdi: '0000000',
+        email: 'a.conti@conti-family.it',
+        telefono: '+39 339 554433',
+        cellulare: '+39 339 554433',
+        telegram: '@FamigliaConti',
+        signal: '+39 339 554433',
+        referenteNome: 'Andrea Conti',
+        isAttivo: true,
+        referentiJson: {
+          email: 'a.conti@conti-family.it',
+          telefono: '+39 339 554433',
+          cellulare: '+39 339 554433',
+          whatsapp: '+39 339 554433',
+          telegram: '@FamigliaConti',
+          signal: '+39 339 554433',
+          referenteNome: 'Andrea Conti',
+        },
+      },
     ];
 
     const localClientsStr = localStorage.getItem('bluman_custom_clients');
@@ -335,6 +479,10 @@ function AnagraficaErpModal({ client, onClose, onSaved }: { client: Cliente; onC
   const [email, setEmail] = useState(client.email || refJson.email || 'm.ricci@holdingbeta.advisory');
   const [pec, setPec] = useState((client as any).pec || refJson.pec || 'holdingbeta@legalmail.it');
   const [telefono, setTelefono] = useState(client.telefono || refJson.telefono || '+356 21 888 999');
+  const [cellulare, setCellulare] = useState((client as any).cellulare || refJson.cellulare || refJson.whatsapp || client.telefono || '+39 335 1234567');
+  const [telegram, setTelegram] = useState((client as any).telegram || refJson.telegram || `@${(client.nome || 'cliente').replace(/[^a-zA-Z0-9]/g, '')}`);
+  const [signal, setSignal] = useState((client as any).signal || refJson.signal || (client as any).cellulare || refJson.cellulare || client.telefono || '+39 335 1234567');
+  const [referenteNome, setReferenteNome] = useState((client as any).referenteNome || refJson.referenteNome || refJson.referente || 'Ing. Roberto Rossi (CEO)');
 
   // Tab 3: SDI & Fatturazione
   const [sdiCode, setSdiCode] = useState(client.sdiCode || (client as any).codiceSdi || refJson.sdiCode || 'SUBM70N');
@@ -362,6 +510,12 @@ function AnagraficaErpModal({ client, onClose, onSaved }: { client: Cliente; onC
       nazione,
       pec,
       telefono,
+      cellulare,
+      whatsapp: cellulare,
+      telegram,
+      signal,
+      referenteNome,
+      referente: referenteNome,
       email,
       regimeFiscale,
       sdiCode,
@@ -392,6 +546,10 @@ function AnagraficaErpModal({ client, onClose, onSaved }: { client: Cliente; onC
       email,
       pec,
       telefono,
+      cellulare,
+      telegram,
+      signal,
+      referenteNome,
       capitale,
       regImprese,
       indirizzo,
@@ -447,7 +605,7 @@ function AnagraficaErpModal({ client, onClose, onSaved }: { client: Cliente; onC
               📑 Anagrafica Master Cliente ERP (§Gestionale)
             </div>
             <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
-              Dati anagrafici, fiscali, recapiti SDI e fascicolo antiriciclaggio KYC/AML
+              Dati anagrafici, fiscali, recapiti multicanale (WhatsApp, Telegram, Signal) e fascicolo KYC/AML
             </div>
           </div>
           <button type="button" onClick={onClose} style={{ background: 'var(--card2)', border: 'none', width: 28, height: 28, borderRadius: 6, color: 'var(--muted)', cursor: 'pointer' }}>✕</button>
@@ -539,8 +697,37 @@ function AnagraficaErpModal({ client, onClose, onSaved }: { client: Cliente; onC
                 <input type="email" value={pec} onChange={e => setPec(e.target.value)} required />
               </div>
               <div style={{ flex: 1 }}>
-                <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Telefono / Cellulare *</label>
-                <input value={telefono} onChange={e => setTelefono(e.target.value)} required />
+                <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Telefono Centralino / Ufficio</label>
+                <input value={telefono} onChange={e => setTelefono(e.target.value)} />
+              </div>
+            </div>
+
+            {/* Sezione Canali Diretti Omnichannel */}
+            <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 14, marginTop: 4, display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--indigo-l)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span>💬 Recapiti Diretti Comunicazioni (WhatsApp, Telegram, Signal)</span>
+              </div>
+
+              <div style={{ display: 'flex', gap: 12 }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>🟢 Cellulare / WhatsApp Diretto *</label>
+                  <input value={cellulare} onChange={e => setCellulare(e.target.value)} placeholder="+39 335 1234567" required />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>✈️ Account Telegram (Username / Link)</label>
+                  <input value={telegram} onChange={e => setTelegram(e.target.value)} placeholder="@RobertoRossi" />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: 12 }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>🔒 Numero Signal Cifrato</label>
+                  <input value={signal} onChange={e => setSignal(e.target.value)} placeholder="+39 335 1234567" />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>👤 Nome Referente / Contatto Diretto</label>
+                  <input value={referenteNome} onChange={e => setReferenteNome(e.target.value)} placeholder="es. Ing. Roberto Rossi (CEO)" />
+                </div>
               </div>
             </div>
           </div>

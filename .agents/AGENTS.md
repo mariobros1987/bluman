@@ -12,6 +12,7 @@ Questo file serve come indice rapido per l'IA ed i collaboratori per identificar
 - **`pages/ProjectDetail.tsx`**: Vista dettagliata del progetto con tab:
   - `🗂 Moduli & Microvoci`
   - `🕸 Grafo & Dipendenze Moduli` (`GrafoModuliProgettoView`)
+  - `💬 Comunicazioni & Ingestion` (`ComunicazioniTab` con binding dinamico recapiti WhatsApp, Email, Telegram, Signal dall'Anagrafica Cliente ERP)
 - **`pages/InvoicesPage.tsx`**: Registro Fiscale Fatture, Note di Credito, Aliquote ed Export XML SDI.
 - **`pages/ScadenzarioPage.tsx`**: Scadenzario Incassi, Partite Aperte & Solleciti Clienti con Link al Progetto.
 - **`pages/PrimaNotaPage.tsx`**: Registro Prima Nota, Transazioni Cassa/Banca, CRO/TRN & Estratto Conto.
@@ -47,6 +48,7 @@ Questo file serve come indice rapido per l'IA ed i collaboratori per identificar
   - `src/services/emailService.ts`: Invio email transazionali SMTP Nodemailer (Magic Link & notifica scadenze).
   - `src/services/storageService.ts`: Archiviazione Cloud S3/Supabase Storage con Presigned URL.
   - `src/adapters/prisma/applyRls.ts`: Applicazione automatica delle policy RLS PostgreSQL (`supabase/migrations/20260815_enable_rls.sql`).
+  - `.agents/skills/meta-whatsapp-integration/SKILL.md`: Skill e runbook per l'integrazione WhatsApp Business Cloud API & Remote MCP Meta DevTools.
 - **Articoli & Listino**: `GET /articoli`, `POST /articoli`, `PATCH /articoli/:id` (Modifica Prezzo & Ore Admin)
 
 ---
