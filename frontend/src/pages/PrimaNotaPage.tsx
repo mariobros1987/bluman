@@ -63,7 +63,48 @@ export function PrimaNotaPage() {
       fetchScadenzarioIncassiApi(),
       fetchClienti(),
     ]);
-    setScadenze(scadData || []);
+
+    let finalScadenze = scadData || [];
+
+    // Fallback/Integrazione se lo studio opera in modalità locale/custom
+    if (finalScadenze.length === 0) {
+      const localStr = localStorage.getItem('bluman_custom_projects');
+      const localProjs: any[] = localStr ? JSON.parse(localStr) : [];
+      const extractedScad: any[] = [];
+
+      localProjs.forEach((p) => {
+        (p.fatture || []).forEach((f: any, fIdx: number) => {
+          const importoCentesimi = Math.round((f.importo || 0) * 100);
+          extractedScad.push({
+            id: `scad-loc-${p.id}-${fIdx}`,
+            numeroRata: 1,
+            dataScadenza: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+            importoCentesimi,
+            stato: f.stato === 'incassata' ? 'incassato' : 'in_attesa',
+            fattura: {
+              numero: f.numero || `FT-2026-000${fIdx + 1}`,
+              progetto: {
+                id: p.id,
+                nome: p.n,
+                cliente: { nome: p.cl || 'Cliente Studio' },
+              },
+            },
+            registrazioniRegistrate: f.stato === 'incassata' ? [
+              {
+                importoIncassatoCentesimi: importoCentesimi,
+                metodoPagamento: 'bonifico',
+                riferimentoTransazione: 'TRN-SETTLED',
+                dataIncasso: new Date().toISOString(),
+              }
+            ] : [],
+          });
+        });
+      });
+
+      finalScadenze = extractedScad;
+    }
+
+    setScadenze(finalScadenze);
     setClienti(clData || []);
     setLoading(false);
   };
