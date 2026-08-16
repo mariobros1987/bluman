@@ -5,13 +5,13 @@ import { CatBadge } from '../components/ui/CatBadge';
 import { ProgressBar } from '../components/ui/ProgressBar';
 import { AvatarGroup, Avatar } from '../components/ui/Avatar';
 import { PassaggioModal } from '../components/PassaggioModal';
-import { fmt, progressColor, getFormattedLogoUrl } from '../utils';
+import { fmt, progressColor, getFormattedLogoUrl, resolveRighe } from '../utils';
 import { downloadRealPdf } from '../utils/pdfGenerator';
 import { ComunicazioniTab } from '../components/ComunicazioniTab';
 import { AssignOperatorModal } from '../components/AssignOperatorModal';
 import { CalendarPreviewModal } from '../components/CalendarPreviewModal';
 import { ConfirmDeleteModal } from '../components/ConfirmDeleteModal';
-import { PROJECTS } from '../store/mockData';
+import { PROJECTS, MLIB, ARTICOLI } from '../store/mockData';
 import { fetchProgettoDettaglio, emettiFatturaApi, consuntivaMicrovoceApi, assegnaAccessoProgettoApi, salvaProgettoDettaglioApi, archiviaProgettoApi, eliminaProgettoApi, fetchModuliLibreria, fetchArticoli, uploadFileApi } from '../api/client';
 import { TEAM } from '../store/mockData';
 import type { Progetto, ModuloProgetto, CategoriaModulo, StatoProgetto, StatoModulo } from '../types';
@@ -156,18 +156,8 @@ export function ProjectDetail() {
       if (dbRes && dbRes.id) {
         setRawDbProject(dbRes);
 
-        let finalMods = (dbRes.moduli || []).map((m: any, mIdx: number) => ({
-          id: mIdx + 100,
-          n: m.nome,
-          cat: (m.categoria as CategoriaModulo) || 'Societario',
-          st: m.stato || 'in_progress',
-          pct: m.stato === 'done' ? 100 : m.stato === 'in_progress' ? 60 : 0,
-          h: m.orePreventivate || 20,
-          a: m.oreConsuntivate || 0,
-          p: m.prezzo ? m.prezzo / 100 : 3500,
-          team: [1, 2],
-          delay: m.stato === 'delayed' || m.stato === 'blocked',
-          v: (m.microvoci || []).map((mv: any) => ({
+        let finalMods = (dbRes.moduli || []).map((m: any, mIdx: number) => {
+          let microvociList = (m.microvoci || []).map((mv: any) => ({
             n: mv.nome,
             hE: mv.orePreventivate || 4,
             hA: mv.oreConsuntivate || 0,
@@ -175,8 +165,45 @@ export function ProjectDetail() {
             as: 1,
             d: mv.passaggi?.length || 0,
             vn: mv.causaNota || undefined,
-          })),
-        }));
+          }));
+
+          // Se il modulo non ha ancora microvoci nel DB, cerca gli articoli corrispondenti per quel modulo
+          if (microvociList.length === 0) {
+            const matchedMockMod = MLIB.find(libM => libM.n.toLowerCase() === (m.nome || '').toLowerCase())
+              || MLIB[mIdx % MLIB.length];
+            if (matchedMockMod && matchedMockMod.righe) {
+              const rList = resolveRighe(matchedMockMod, ARTICOLI);
+              microvociList = rList.map(r => ({
+                n: r.n,
+                hE: r.h || 4,
+                hA: 0,
+                s: 'pending' as any,
+                as: 1,
+                d: 0,
+              }));
+            } else {
+              microvociList = [
+                { n: `Analisi e requisiti per ${m.nome}`, hE: 4, hA: 0, s: 'pending', as: 1, d: 0 },
+                { n: `Esecuzione e predisposizione fascicolo ${m.nome}`, hE: 6, hA: 0, s: 'pending', as: 1, d: 0 },
+                { n: `Rilascio parere e asseverazione ${m.nome}`, hE: 4, hA: 0, s: 'pending', as: 1, d: 0 },
+              ];
+            }
+          }
+
+          return {
+            id: mIdx + 100,
+            n: m.nome,
+            cat: (m.categoria as CategoriaModulo) || 'Societario',
+            st: m.stato || 'in_progress',
+            pct: m.stato === 'done' ? 100 : m.stato === 'in_progress' ? 60 : 0,
+            h: m.orePreventivate || microvociList.reduce((sum, v) => sum + v.hE, 0) || 20,
+            a: m.oreConsuntivate || 0,
+            p: m.prezzo ? m.prezzo / 100 : 3500,
+            team: [1, 2],
+            delay: m.stato === 'delayed' || m.stato === 'blocked',
+            v: microvociList,
+          };
+        });
 
         // Se i moduli DB sono vuoti, arricchisci dai progetti custom salvati in locale o mockData
         if (finalMods.length === 0) {
@@ -187,7 +214,7 @@ export function ProjectDetail() {
           if (match && match.mods && match.mods.length > 0) {
             finalMods = match.mods;
           } else {
-            // Genera moduli standard per l'operatore se non ancora istanziati
+            // Genera moduli standard e relative microvoci/articoli
             finalMods = [
               {
                 id: 101,
