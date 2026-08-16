@@ -24,6 +24,8 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "bootstrap": "tsx src/adapters/prisma/bootstrap.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
     "dev": "tsx watch src/index.ts",
     "start:db": "tsx watch src/adapters/prisma/index.ts",
     "seed": "tsx src/adapters/prisma/seed.ts"
