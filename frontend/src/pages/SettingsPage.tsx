@@ -38,7 +38,7 @@ export function SettingsPage() {
   const [sedeOperativa, setSedeOperativa] = useState('Via Montenapoleone 8, 20121 Milano (MI), Italia');
   const [email, setEmail] = useState('info@bluecode.advisory');
   const [pec, setPec] = useState('bluecode@legalmail.it');
-  const [telefono, setTelefono] = useState('+356 2134 5678');
+  const [telefono, setTelefono] = useState('+39 378 092 6461');
   const [iban, setIban] = useState('MT89VALL22013000000012345678');
   const [regimeFiscale, setRegimeFiscale] = useState('Ordinario / Malta EU Jurisdiction');
   const [capitaleSociale, setCapitaleSociale] = useState('€ 100.000,00 i.v.');

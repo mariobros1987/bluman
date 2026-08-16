@@ -44,10 +44,10 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
 
   const studioChannels = useMemo(() => {
     return {
-      whatsapp: tenantSettings?.telefono || '+356 79001122',
+      whatsapp: tenantSettings?.telefono || '+39 378 092 6461',
       email: tenantSettings?.smtpFromEmail || tenantSettings?.email || 'comunicazioni@bluecode.advisory',
       telegram: tenantSettings?.tgBotUsername || '@BluManStudioBot',
-      signal: tenantSettings?.telefono || '+356 79001122',
+      signal: tenantSettings?.telefono || '+39 378 092 6461',
     };
   }, [tenantSettings]);
 
