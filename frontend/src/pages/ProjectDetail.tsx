@@ -647,6 +647,23 @@ export function ProjectDetail() {
                   onOpenAssignMod={() => setAssignModalTarget({ modId: mod.id, name: `Modulo: ${mod.n}`, currentAssigned: mod.team || [1] })}
                   onOpenAssignMv={(vidx) => setAssignModalTarget({ modId: mod.id, mvIdx: vidx, name: `Microvoce: ${mod.v[vidx]?.n || 'Microvoce'}`, currentAssigned: [mod.v[vidx]?.as || 1] })}
                   onOpenCalendarMv={(vidx) => setCalendarModalTarget({ modId: mod.id, mvIdx: vidx, name: mod.v[vidx]?.n || 'Microvoce' })}
+                  onDeleteMod={async () => {
+                    const confirmDel = window.confirm(`Sei sicuro di voler eliminare il modulo "${mod.n}" dal progetto?`);
+                    if (!confirmDel) return;
+                    const newMods = project.mods.filter(m => m.id !== mod.id);
+                    const updatedVal = newMods.reduce((acc, m) => acc + (m.p || 0), 0);
+                    const updatedProject = { ...project, mods: newMods, val: updatedVal };
+                    setProject(updatedProject);
+                    try {
+                      await salvaProgettoDettaglioApi(String(project.id), updatedProject);
+                    } catch (err) {
+                      console.warn('Salvataggio eliminazione modulo fallback:', err);
+                    }
+                    const savedStr = localStorage.getItem('bluman_custom_projects');
+                    const savedArr: Progetto[] = savedStr ? JSON.parse(savedStr) : [];
+                    const updatedArr = [updatedProject, ...savedArr.filter(p => String(p.id) !== String(project.id))];
+                    localStorage.setItem('bluman_custom_projects', JSON.stringify(updatedArr));
+                  }}
                 />
               ))
             )}
@@ -860,8 +877,7 @@ export function ProjectDetail() {
   );
 }
 
-// ─── Modulo Block ─────────────────────────────────────────────────
-function ModuloBlock({ mod, open, onToggle, onOpenProc, rawDbModulo, onRefresh, onToggleMv, onOpenAssignMod, onOpenAssignMv, onOpenCalendarMv }: {
+function ModuloBlock({ mod, open, onToggle, onOpenProc, rawDbModulo, onRefresh, onToggleMv, onOpenAssignMod, onOpenAssignMv, onOpenCalendarMv, onDeleteMod }: {
   mod: ModuloProgetto; open: boolean;
   onToggle: () => void; onOpenProc: (vidx: number) => void;
   rawDbModulo?: any; onRefresh: () => void;
@@ -869,6 +885,7 @@ function ModuloBlock({ mod, open, onToggle, onOpenProc, rawDbModulo, onRefresh, 
   onOpenAssignMod: () => void;
   onOpenAssignMv: (vidx: number) => void;
   onOpenCalendarMv: (vidx: number) => void;
+  onDeleteMod?: () => void;
 }) {
   const color = mod.st === 'blocked' ? 'var(--red)'
     : mod.delay ? 'var(--amber)'
@@ -879,6 +896,29 @@ function ModuloBlock({ mod, open, onToggle, onOpenProc, rawDbModulo, onRefresh, 
   const [oreCons, setOreCons] = useState(2);
   const [completa, setCompleta] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  // Microvoci effettive (con fallback istantaneo su catalogo articoli se vuote)
+  const displayMicrovoci = (mod.v && mod.v.length > 0) ? mod.v : (() => {
+    const matchedMock = MLIB.find(libM => libM.n.toLowerCase().trim() === mod.n.toLowerCase().trim())
+      || MLIB.find(libM => mod.n.toLowerCase().includes(libM.n.toLowerCase()))
+      || MLIB[0];
+    if (matchedMock && matchedMock.righe) {
+      const rList = resolveRighe(matchedMock, ARTICOLI);
+      return rList.map(r => ({
+        n: r.n,
+        hE: r.h || 4,
+        hA: 0,
+        s: 'pending' as any,
+        as: 1,
+        d: 0,
+      }));
+    }
+    return [
+      { n: `Raccolta documentazione per ${mod.n}`, hE: 4, hA: 0, s: 'pending' as any, as: 1, d: 0 },
+      { n: `Predisposizione pratica ed adempimenti ${mod.n}`, hE: 5, hA: 0, s: 'pending' as any, as: 1, d: 0 },
+      { n: `Chiusura e verifica conformità ${mod.n}`, hE: 3, hA: 0, s: 'pending' as any, as: 1, d: 0 },
+    ];
+  })();
 
   const handleConsuntivaSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -898,6 +938,8 @@ function ModuloBlock({ mod, open, onToggle, onOpenProc, rawDbModulo, onRefresh, 
       setSubmitting(false);
     }
   };
+
+  const isDeletable = mod.a === 0 || displayMicrovoci.every(v => v.s !== 'done' && (v.hA || 0) === 0);
 
   return (
     <div className={`${styles.modBlock} ${mod.delay ? styles.modDelay : ''} ${mod.waitDep ? styles.modWaitDep : ''}`}>
@@ -925,6 +967,18 @@ function ModuloBlock({ mod, open, onToggle, onOpenProc, rawDbModulo, onRefresh, 
             >
               👥 +Assegna
             </button>
+            {isDeletable && onDeleteMod && (
+              <button
+                onClick={e => {
+                  e.stopPropagation();
+                  onDeleteMod();
+                }}
+                title="Elimina modulo dal progetto (0 ore espletate)"
+                style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)', color: '#f87171', padding: '2px 6px', borderRadius: 6, fontSize: 10, cursor: 'pointer', fontWeight: 600 }}
+              >
+                🗑 Elimina
+              </button>
+            )}
           </div>
           <div className={styles.modRightHours}>
             <div style={{ fontSize: 12, fontWeight: 700 }}>{mod.pct}%</div>
@@ -955,14 +1009,7 @@ function ModuloBlock({ mod, open, onToggle, onOpenProc, rawDbModulo, onRefresh, 
               </tr>
             </thead>
             <tbody>
-              {mod.v.length === 0 ? (
-                <tr>
-                  <td colSpan={6} style={{ textAlign: 'center', color: 'var(--muted)', padding: 16 }}>
-                    Nessuna microvoce in questo modulo
-                  </td>
-                </tr>
-              ) : (
-                mod.v.map((v, i) => {
+              {displayMicrovoci.map((v, i) => {
                   const rawMv = rawDbModulo?.microvoci?.[i];
                   const isDelay = v.s === 'delayed';
                   const isBlock = v.s === 'blocked';
@@ -1036,8 +1083,7 @@ function ModuloBlock({ mod, open, onToggle, onOpenProc, rawDbModulo, onRefresh, 
                       <td><Badge stato={v.s} size="sm" /></td>
                     </tr>
                   );
-                })
-              )}
+                })}
             </tbody>
             <tfoot>
               <tr>
