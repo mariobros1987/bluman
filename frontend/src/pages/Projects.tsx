@@ -6,6 +6,7 @@ import { AvatarGroup } from '../components/ui/Avatar';
 import { CatBadge } from '../components/ui/CatBadge';
 import { fmt, progressColor } from '../utils';
 import { fetchProgetti } from '../api/client';
+import { PROJECTS } from '../store/mockData';
 import { NewProjectWizard } from '../components/NewProjectWizard';
 import type { Progetto } from '../types';
 

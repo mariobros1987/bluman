@@ -7,6 +7,7 @@ import { CatBadge } from '../components/ui/CatBadge';
 import { fmt, progressColor } from '../utils';
 import { NewProjectWizard } from '../components/NewProjectWizard';
 import { fetchProgetti } from '../api/client';
+import { PROJECTS } from '../store/mockData';
 import type { Progetto } from '../types';
 import styles from './Dashboard.module.css';
 
