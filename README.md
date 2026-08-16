@@ -44,6 +44,13 @@ Piattaforma ERP per studi di consulenza societaria, wealth protection ed advisor
 - **Rendiconto per Singolo Modulo**: Tabella analitica con margine di profitto ed indicatori `🟢 In Utile Extra` / `🟡 In Target`.
 - **📄 Export Dossier Trasparenza PDF**: Esportazione 1-click del rendiconto trasparente dell'incarico per il cliente.
 
+### 💬 WhatsApp Business Cloud API & Omnichannel Integration (§14)
+- **WhatsApp Cloud API Ufficiale (Graph API v21.0)**: Phone ID `1318817114639409`, WABA `1397431142562576`, Token Permanente System User illimitato.
+- **Remote MCP Meta DevTools**: Configurato in `~/.gemini/config/mcp_config.json` su `https://mcp.facebook.com/devtools`.
+- **Webhooks Bidirezionali**: Connessione verificata sia su Vercel Serverless (`/api/webhooks/communications/whatsapp.ts`) che su Fastify (`/webhooks/communications/whatsapp`).
+- **Binding Dinamico Anagrafica ERP**: Scansione del numero mittente su Supabase ed inserimento automatico nella chat del progetto attivo del cliente.
+- **Guida Operativa Dettagliata**: Consulta [`GUIDA_META_WHATSAPP_INTEGRAZIONE.md`](file:///Volumes/Macintosh%20HD/Users/mariodibenedetto/Downloads/bluman-api/GUIDA_META_WHATSAPP_INTEGRAZIONE.md).
+
 ### 👥 Gestione Team & Timesheet Live Operatori (`/settings`)
 - **Scheda Performance Operatore 1-Click**: Cliccando su qualsiasi collaboratore (*Francesca Disabato*, *Joe Disabato*, *Avv. Lorenzo Marino*, *Elena Rossi*, *Super Admin*) si apre la scheda analitica con ore consuntivate, incarichi gestiti e diario timesheet live.
 - **📧 Server Email SMTP Transazionale & Omnichannel**: Form credenziali SMTP + 4 Pulsanti di Test 1-Click per WhatsApp, Telegram Bot, Signal Daemon ed Email.

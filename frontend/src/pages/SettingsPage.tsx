@@ -12,7 +12,7 @@ export function SettingsPage() {
 
   // Configuratore Canali Omnichannel & SMTP
   const [waPhoneId, setWaPhoneId] = useState('1318817114639409');
-  const [waAccessToken, setWaAccessToken] = useState('EAGO82S4iZAZCIBSBVg4kzugZCNpBylqmvRi2kb47qJmOvxheadNzYF2AC9mZCZAhQy34vtAZAXh5imsv7wFzSwqoxRVaDL4eZA7uRshYKgpElcBvFsWbHth5NVhZCuVx28sGDkQpCCDZAcRnNi2CV6sTwCllNe1zh5HheAlsH2RCvlBf3PZCb6aUL7RXg4kxsOa9PiMH7iDknyNCzPh7PsD9kZAge2gm4f5LHCviU1zr9tBkjq4rPhsX7cGKqIgAtUBFTm9Tx7Gz5zjhTp8D6aAlGEZD');
+  const [waAccessToken, setWaAccessToken] = useState('EAGO82S4iZAZCIBSCyV6ARilEgvBez7EwZA6pK5yaOa1ZCp7TmvFRTfxIZCWlLjQ4rBQeIZCRezgBJFm9BiQrUUsmfJA9ayZBTR3w3Qm3wGF8rUNpPCPqiSVOhTZCMF4EZBYpZAeQRjtgxfRqraBrXgBcZBCE0mZCfTvENnDAZBmgQhmtxeRp6N9Qcuj9C6CqigYHNXAZDZD');
   const [waVerifyToken, setWaVerifyToken] = useState('bluman_wa_secure_token_2026');
   const [tgBotToken, setTgBotToken] = useState('7182930412:AAHj39201982736192');
   const [tgBotUsername, setTgBotUsername] = useState('@BluManStudioBot');
