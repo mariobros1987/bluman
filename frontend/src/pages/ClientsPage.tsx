@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { fetchClienti, creaClienteApi } from '../api/client';
+import { fetchClienti, creaClienteApi, aggiornaClienteApi } from '../api/client';
 import { PROJECTS } from '../store/mockData';
 import type { Cliente } from '../types';
 import styles from './ClientsPage.module.css';
@@ -76,9 +76,17 @@ export function ClientsPage() {
       { id: 'cl-06', nome: 'Andrea & Sofia Conti', tipo: 'individual', piva: 'IT45678901234', codiceFiscale: 'CNTNDR82A01H501K', sedeLegale: 'Piazza Cavour 3, Roma', codiceSdi: '0000000', email: 'a.conti@conti-family.it', telefono: '+39 339 554433', isAttivo: true },
     ];
 
+    const localClientsStr = localStorage.getItem('bluman_custom_clients');
+    const localClients: Cliente[] = localClientsStr ? JSON.parse(localClientsStr) : [];
+
     const mergedMap = new Map();
-    [...apiList, ...extractedClients, ...defaultClients].forEach(c => {
-      if (c && c.nome) mergedMap.set(c.nome.toLowerCase(), c);
+    // Inserisci prima i default e i progetti estratti, poi apiList (DB) e localClients SOVRASCRIVONO tutto garantendo persistenza totale!
+    [...defaultClients, ...extractedClients, ...apiList, ...localClients].forEach(c => {
+      if (c && c.nome) {
+        const key = c.nome.toLowerCase().trim();
+        const existing = mergedMap.get(key) || {};
+        mergedMap.set(key, { ...existing, ...c });
+      }
     });
 
     const finalClients = Array.from(mergedMap.values());
@@ -101,16 +109,33 @@ export function ClientsPage() {
     e.preventDefault();
     if (!nome.trim()) return;
     setSubmitting(true);
+    const newClientObj: Cliente = {
+      id: `cl-${Date.now()}`,
+      nome: nome.trim(),
+      tipo,
+      piva: '',
+      codiceFiscale: '',
+      sedeLegale: '',
+      codiceSdi: 'SUBM70N',
+      email: '',
+      telefono: '',
+      isAttivo: true,
+    };
     try {
-      await creaClienteApi({ nome, tipo });
-      setNome('');
-      setModalOpen(false);
-      loadClienti();
+      const res = await creaClienteApi({ nome: nome.trim(), tipo });
+      if (res && res.id) newClientObj.id = res.id;
     } catch (err) {
-      console.error(err);
-    } finally {
-      setSubmitting(false);
+      console.error('API create fallback:', err);
     }
+
+    const savedStr = localStorage.getItem('bluman_custom_clients');
+    const savedArr: any[] = savedStr ? JSON.parse(savedStr) : [];
+    localStorage.setItem('bluman_custom_clients', JSON.stringify([newClientObj, ...savedArr]));
+
+    setNome('');
+    setModalOpen(false);
+    setSubmitting(false);
+    loadClienti();
   };
 
   const filtered = clienti.filter(c => {
@@ -292,33 +317,35 @@ export function ClientsPage() {
 function AnagraficaErpModal({ client, onClose, onSaved }: { client: Cliente; onClose: () => void; onSaved: () => void }) {
   const [tab, setTab] = useState<'generale' | 'sede' | 'sdi' | 'compliance'>('generale');
   
+  const refJson: any = client.referentiJson && typeof client.referentiJson === 'object' ? client.referentiJson : {};
+
   const [nome, setNome] = useState(client.nome || '');
   const [tipo, setTipo] = useState(client.tipo || 'company');
-  const [piva, setPiva] = useState(client.piva || client.partitaIva || '');
-  const [codFisc, setCodFisc] = useState(client.codiceFiscale || 'RCCMRC80A01H501Z');
-  const [giurisdizione, setGiurisdizione] = useState(client.giurisdizione || (client.tipo === 'company' ? 'Malta / UE' : 'Italia'));
-  const [capitale, setCapitale] = useState(100000);
-  const [regImprese, setRegImprese] = useState('C-99881 / REA 49021');
+  const [piva, setPiva] = useState(client.piva || (client as any).partitaIva || refJson.piva || '');
+  const [codFisc, setCodFisc] = useState(client.codiceFiscale || (client as any).codFisc || refJson.codiceFiscale || 'RCCMRC80A01H501Z');
+  const [giurisdizione, setGiurisdizione] = useState(client.giurisdizione || refJson.giurisdizione || (client.tipo === 'company' ? 'Malta / UE' : 'Italia'));
+  const [capitale, setCapitale] = useState<number>((client as any).capitale || refJson.capitale || 100000);
+  const [regImprese, setRegImprese] = useState((client as any).regImprese || refJson.regImprese || 'C-99881 / REA 49021');
 
   // Tab 2: Sede & Contatti
-  const [indirizzo, setIndirizzo] = useState(client.sedeLegale || 'Level 4, Valuation Centre, Tower Road');
-  const [citta, setCitta] = useState('Sliema / Milano');
-  const [cap, setCap] = useState('20121');
-  const [nazione, setNazione] = useState('Malta / Italia');
-  const [email, setEmail] = useState(client.email || 'm.ricci@holdingbeta.advisory');
-  const [pec, setPec] = useState(client.pec || 'holdingbeta@legalmail.it');
-  const [telefono, setTelefono] = useState(client.telefono || '+356 21 888 999');
+  const [indirizzo, setIndirizzo] = useState((client as any).indirizzo || refJson.indirizzo || client.sedeLegale || 'Level 4, Valuation Centre, Tower Road');
+  const [citta, setCitta] = useState((client as any).citta || refJson.citta || 'Sliema / Milano');
+  const [cap, setCap] = useState((client as any).cap || refJson.cap || '20121');
+  const [nazione, setNazione] = useState((client as any).nazione || refJson.nazione || 'Malta / Italia');
+  const [email, setEmail] = useState(client.email || refJson.email || 'm.ricci@holdingbeta.advisory');
+  const [pec, setPec] = useState((client as any).pec || refJson.pec || 'holdingbeta@legalmail.it');
+  const [telefono, setTelefono] = useState(client.telefono || refJson.telefono || '+356 21 888 999');
 
   // Tab 3: SDI & Fatturazione
-  const [sdiCode, setSdiCode] = useState(client.sdiCode || client.codiceSdi || 'SUBM70N');
-  const [regimeFiscale, setRegimeFiscale] = useState('RF01 - Ordinario');
-  const [iban, setIban] = useState(client.iban || 'IT60X0542811101000000123456');
+  const [sdiCode, setSdiCode] = useState(client.sdiCode || (client as any).codiceSdi || refJson.sdiCode || 'SUBM70N');
+  const [regimeFiscale, setRegimeFiscale] = useState((client as any).regimeFiscale || refJson.regimeFiscale || 'RF01 - Ordinario');
+  const [iban, setIban] = useState(client.iban || refJson.iban || 'IT60X0542811101000000123456');
 
   // Tab 4: Compliance & KYC
-  const [rischioAml, setRischioAml] = useState<'basso' | 'medio' | 'alto'>(client.rischioAml || 'medio');
-  const [ubo, setUbo] = useState(client.ubo || 'Marco Ricci (100% Quote)');
-  const [fontePatrimonio, setFontePatrimonio] = useState(client.fontePatrimonio || 'Dividendi Societari & IP Licensing');
-  const [dataKyc, setDataKyc] = useState(client.dataKyc || '14/08/2026');
+  const [rischioAml, setRischioAml] = useState<'basso' | 'medio' | 'alto'>(client.rischioAml || refJson.rischioAml || 'medio');
+  const [ubo, setUbo] = useState(client.ubo || refJson.ubo || 'Marco Ricci (100% Quote)');
+  const [fontePatrimonio, setFontePatrimonio] = useState(client.fontePatrimonio || refJson.fontePatrimonio || 'Dividendi Societari & IP Licensing');
+  const [dataKyc, setDataKyc] = useState(client.dataKyc || refJson.dataKyc || '14/08/2026');
 
   const [saving, setSaving] = useState(false);
 
@@ -326,14 +353,37 @@ function AnagraficaErpModal({ client, onClose, onSaved }: { client: Cliente; onC
     e.preventDefault();
     setSaving(true);
 
+    const referentiObj = {
+      capitale,
+      regImprese,
+      indirizzo,
+      citta,
+      cap,
+      nazione,
+      pec,
+      telefono,
+      email,
+      regimeFiscale,
+      sdiCode,
+      codiceSdi: sdiCode,
+      iban,
+      rischioAml,
+      ubo,
+      fontePatrimonio,
+      dataKyc,
+    };
+
     const clientPayload: Record<string, any> = {
+      id: client.id,
       nome,
       tipo,
       piva,
       codiceFiscale: codFisc,
+      codFisc,
       giurisdizione,
       sedeLegale: `${indirizzo}, ${citta} (${cap}) - ${nazione}`,
       sdiCode,
+      codiceSdi: sdiCode,
       iban,
       rischioAml,
       ubo,
@@ -342,17 +392,42 @@ function AnagraficaErpModal({ client, onClose, onSaved }: { client: Cliente; onC
       email,
       pec,
       telefono,
+      capitale,
+      regImprese,
+      indirizzo,
+      citta,
+      cap,
+      nazione,
+      regimeFiscale,
+      referentiJson: referentiObj,
     };
 
-    // Aggiorna l'oggetto in memoria
+    // 1. Aggiorna oggetto in memoria corrente
     Object.assign(client, clientPayload);
 
+    // 2. Persisti in localStorage bluman_custom_clients
+    const savedStr = localStorage.getItem('bluman_custom_clients');
+    const savedArr: any[] = savedStr ? JSON.parse(savedStr) : [];
+    const updatedArr = [
+      clientPayload,
+      ...savedArr.filter((c: any) => c.id !== client.id && c.nome?.toLowerCase() !== client.nome?.toLowerCase()),
+    ];
+    localStorage.setItem('bluman_custom_clients', JSON.stringify(updatedArr));
+
+    // 3. Persisti in PostgreSQL tramite API Fastify
     try {
       if (client.id && !client.id.startsWith('cl-0') && !client.id.startsWith('cl-proj-')) {
         await aggiornaClienteApi(client.id, clientPayload);
       } else {
         const nuovo = await creaClienteApi(clientPayload);
-        if (nuovo && nuovo.id) client.id = nuovo.id;
+        if (nuovo && nuovo.id) {
+          client.id = nuovo.id;
+          clientPayload.id = nuovo.id;
+          localStorage.setItem('bluman_custom_clients', JSON.stringify([
+            clientPayload,
+            ...savedArr.filter((c: any) => c.nome?.toLowerCase() !== client.nome?.toLowerCase()),
+          ]));
+        }
       }
     } catch (apiErr) {
       console.warn('Salvataggio API DB cliente fallback:', apiErr);

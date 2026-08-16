@@ -675,7 +675,25 @@ export function buildServer(app: AppPort): FastifyInstance {
         where: { tenantId },
         orderBy: { createdAt: 'desc' },
       });
-      return clienti;
+      return clienti.map(c => {
+        const ref = c.referentiJson && typeof c.referentiJson === 'object' ? (c.referentiJson as any) : {};
+        return {
+          ...ref,
+          ...c,
+          codiceFiscale: c.codiceFiscale || ref.codiceFiscale || ref.codFisc,
+          codFisc: c.codiceFiscale || ref.codiceFiscale || ref.codFisc,
+          sdiCode: c.sdiCode || ref.sdiCode || ref.codiceSdi || 'SUBM70N',
+          codiceSdi: c.sdiCode || ref.sdiCode || ref.codiceSdi || 'SUBM70N',
+          iban: c.iban || ref.iban,
+          piva: c.piva || ref.piva,
+          sedeLegale: c.sedeLegale || ref.sedeLegale,
+          giurisdizione: c.giurisdizione || ref.giurisdizione,
+          rischioAml: c.rischioAml || ref.rischioAml || 'medio',
+          ubo: c.ubo || ref.ubo,
+          fontePatrimonio: c.fontePatrimonio || ref.fontePatrimonio,
+          dataKyc: c.dataKyc || ref.dataKyc,
+        };
+      });
     } catch {
       return [];
     }
@@ -683,8 +701,23 @@ export function buildServer(app: AppPort): FastifyInstance {
 
   server.post<{ Body: Record<string, any> }>('/clienti', async (req, reply) => {
     const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
-    const b = req.body || {};
+    const b = (req.body || {}) as Record<string, any>;
     if (!b.nome) return reply.code(400).send({ errore: 'Il nome del cliente è obbligatorio' });
+
+    const referentiObj = b.referentiJson
+      ? (typeof b.referentiJson === 'string' ? JSON.parse(b.referentiJson) : b.referentiJson)
+      : {
+          capitale: b.capitale,
+          regImprese: b.regImprese,
+          indirizzo: b.indirizzo,
+          citta: b.citta,
+          cap: b.cap,
+          nazione: b.nazione,
+          pec: b.pec,
+          telefono: b.telefono,
+          email: b.email,
+          regimeFiscale: b.regimeFiscale,
+        };
 
     try {
       const cliente = await prisma.cliente.create({
@@ -702,7 +735,7 @@ export function buildServer(app: AppPort): FastifyInstance {
           ubo: b.ubo || null,
           fontePatrimonio: b.fontePatrimonio || null,
           dataKyc: b.dataKyc || null,
-          referentiJson: b.referentiJson ? (typeof b.referentiJson === 'string' ? JSON.parse(b.referentiJson) : b.referentiJson) : null,
+          referentiJson: referentiObj,
         },
       });
       recordAudit({
@@ -712,7 +745,7 @@ export function buildServer(app: AppPort): FastifyInstance {
         dettagli: `Creata anagrafica cliente ERP ${cliente.nome} (P.IVA: ${cliente.piva || 'N/D'})`,
         ipAddress: req.ip,
       });
-      return reply.code(201).send(cliente);
+      return reply.code(201).send({ ...referentiObj, ...cliente });
     } catch (err: any) {
       console.error('Errore creazione cliente DB:', err);
       return reply.code(500).send({ errore: err.message || 'Errore salvataggio cliente' });
@@ -722,7 +755,22 @@ export function buildServer(app: AppPort): FastifyInstance {
   server.put<{ Params: { id: string }; Body: Record<string, any> }>('/clienti/:id', async (req, reply) => {
     const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
     const { id } = req.params;
-    const b = req.body || {};
+    const b = (req.body || {}) as Record<string, any>;
+
+    const referentiObj = b.referentiJson !== undefined
+      ? (typeof b.referentiJson === 'string' ? JSON.parse(b.referentiJson) : b.referentiJson)
+      : {
+          capitale: b.capitale,
+          regImprese: b.regImprese,
+          indirizzo: b.indirizzo,
+          citta: b.citta,
+          cap: b.cap,
+          nazione: b.nazione,
+          pec: b.pec,
+          telefono: b.telefono,
+          email: b.email,
+          regimeFiscale: b.regimeFiscale,
+        };
 
     try {
       const updated = await prisma.cliente.update({
@@ -740,7 +788,7 @@ export function buildServer(app: AppPort): FastifyInstance {
           ubo: b.ubo !== undefined ? b.ubo : undefined,
           fontePatrimonio: b.fontePatrimonio !== undefined ? b.fontePatrimonio : undefined,
           dataKyc: b.dataKyc !== undefined ? b.dataKyc : undefined,
-          referentiJson: b.referentiJson !== undefined ? (typeof b.referentiJson === 'string' ? JSON.parse(b.referentiJson) : b.referentiJson) : undefined,
+          referentiJson: referentiObj,
         },
       });
       recordAudit({
@@ -750,7 +798,7 @@ export function buildServer(app: AppPort): FastifyInstance {
         dettagli: `Aggiornati dati legali/fiscali cliente ${updated.nome} (P.IVA: ${updated.piva})`,
         ipAddress: req.ip,
       });
-      return reply.send(updated);
+      return reply.send({ ...referentiObj, ...updated });
     } catch (err: any) {
       console.error('Errore aggiornamento cliente DB:', err);
       return reply.code(500).send({ errore: err.message || 'Errore aggiornamento cliente' });
