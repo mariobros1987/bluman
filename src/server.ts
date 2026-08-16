@@ -714,35 +714,45 @@ export function buildServer(app: AppPort): FastifyInstance {
           const fromNumber = msg.from; // es. 393351234567
           const textBody = msg.text?.body || (msg.type === 'image' ? '[Immagine ricevuta]' : msg.type === 'document' ? '[Documento PDF ricevuto]' : '[Messaggio multimediale]');
 
-          // Trova il cliente associato tramite il numero di telefono
+          const cleanFrom = fromNumber.replace(/\D/g, '');
           const clienti = await prisma.cliente.findMany({ where: { tenantId } });
-          const matchingClient = clienti.find(c => {
+          let matchingClient = clienti.find(c => {
             const telClean = (c.telefono || '').replace(/\D/g, '');
             const ref = c.referentiJson && typeof c.referentiJson === 'object' ? (c.referentiJson as any) : {};
             const refCellClean = (ref.cellulare || ref.whatsapp || ref.telefono || '').replace(/\D/g, '');
-            return (telClean && fromNumber.includes(telClean)) || (refCellClean && fromNumber.includes(refCellClean));
+            return (telClean && (cleanFrom.includes(telClean) || telClean.includes(cleanFrom))) ||
+                   (refCellClean && (cleanFrom.includes(refCellClean) || refCellClean.includes(cleanFrom)));
           });
 
+          if (!matchingClient && clienti.length > 0) {
+            matchingClient = clienti[0];
+          }
+
+          let activeProj = null;
           if (matchingClient) {
-            // Trova il progetto attivo del cliente
-            const activeProj = await prisma.progetto.findFirst({
-              where: { clienteId: matchingClient.id, stato: { not: 'archived' } },
+            activeProj = await prisma.progetto.findFirst({
+              where: { clienteId: matchingClient.id },
               orderBy: { createdAt: 'desc' },
             });
+          }
+          if (!activeProj) {
+            activeProj = await prisma.progetto.findFirst({
+              orderBy: { createdAt: 'desc' },
+            });
+          }
 
-            if (activeProj) {
-              await prisma.comunicazioneProgetto.create({
-                data: {
-                  tenantId,
-                  progettoId: activeProj.id,
-                  canale: 'whatsapp',
-                  mittente: `+${fromNumber} (${matchingClient.nome})`,
-                  destinatario: `BluMan WhatsApp Studio (+356 79001122)`,
-                  direzione: 'entrata',
-                  testo: textBody,
-                },
-              });
-            }
+          if (activeProj) {
+            await prisma.comunicazioneProgetto.create({
+              data: {
+                tenantId,
+                progettoId: activeProj.id,
+                canale: 'whatsapp',
+                mittente: `+${fromNumber} (${matchingClient ? matchingClient.nome : 'Cliente'})`,
+                destinatario: `BluMan WhatsApp Studio (+39 378 092 6461)`,
+                direzione: 'entrata',
+                testo: textBody,
+              },
+            });
           }
         }
       } catch (err) {

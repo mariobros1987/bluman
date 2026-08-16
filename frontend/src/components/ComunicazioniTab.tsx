@@ -202,6 +202,10 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
 
   useEffect(() => {
     loadComunicazioni();
+    const interval = setInterval(() => {
+      loadComunicazioni();
+    }, 4000);
+    return () => clearInterval(interval);
   }, [progettoId]);
 
   const handleInviaMessaggio = async (e: React.FormEvent) => {

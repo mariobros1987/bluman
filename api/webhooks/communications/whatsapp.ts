@@ -14,21 +14,21 @@ export default async function handler(req: any, res: any) {
     return res.status(403).send('Forbidden');
   }
 
-  // 2. Ricezione messaggi WhatsApp entranti (POST)
+  // 2. Ricezione messaggi WhatsApp entranti (POST) e inoltro al backend di produzione
   if (req.method === 'POST') {
     try {
       const body = req.body || {};
-      const entry = body.entry?.[0];
-      const changes = entry?.changes?.[0];
-      const value = changes?.value;
-      const messages = value?.messages;
+      
+      // Inoltra l'evento al backend Railway in produzione
+      const railwayRes = await fetch('https://bluman-api-production.up.railway.app/webhooks/communications/whatsapp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
 
-      if (messages && messages.length > 0) {
-        const msg = messages[0];
-        console.log(`[WhatsApp Webhook Vercel] Messaggio ricevuto da ${msg.from}:`, msg.text?.body);
-      }
+      console.log('[WhatsApp Webhook Vercel] Inoltrato a Railway, status:', railwayRes.status);
     } catch (err) {
-      console.warn('[WhatsApp Webhook Vercel] Errore parsing:', err);
+      console.warn('[WhatsApp Webhook Vercel] Errore inoltro a Railway:', err);
     }
 
     return res.status(200).json({ status: 'EVENT_RECEIVED' });
