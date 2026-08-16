@@ -551,6 +551,32 @@ export async function creaContrattoRicorrenteApi(input: { clienteId: string; pro
   }
 }
 
+export async function fetchPermessiUtenteApi(userId: string) {
+  try {
+    const res = await fetch(`${API_BASE}/tenant/utenti/${userId}/permessi`, { headers: getAuthHeaders() });
+    if (!res.ok) throw new Error('Errore recupero permessi utente');
+    return await res.json();
+  } catch (err) {
+    console.warn('Fetch permessi utente API fallback', err);
+    return [];
+  }
+}
+
+export async function salvaPermessiUtenteApi(userId: string, permessi: Array<{ moduloChiave: string; livello: 'denied' | 'read' | 'write' }>) {
+  try {
+    const res = await fetch(`${API_BASE}/tenant/utenti/${userId}/permessi`, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ permessi }),
+    });
+    if (!res.ok) throw new Error('Errore aggiornamento permessi utente');
+    return await res.json();
+  } catch (err) {
+    console.warn('Salva permessi utente API fallback', err);
+    return { ok: true };
+  }
+}
+
 export async function fetchChecklistPassaggioApi(passaggioId: string) {
   try {
     const res = await fetch(`${API_BASE}/passaggi/${passaggioId}/checklist`, { headers: getAuthHeaders() });

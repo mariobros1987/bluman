@@ -59,6 +59,7 @@ model Tenant {
   comunicazioni ComunicazioneProgetto[]
   contrattiRicorrenti ContrattoRicorrente[]
   contiBancari  ContoBancario[]
+  permessiModuli PermessoModulo[]
 
   @@map("tenant")
 }
@@ -98,6 +99,7 @@ model User {
   accessiRicevuti    AccessoRisorsa[]    @relation("AccessoUtente")
   accessiInvitati    AccessoRisorsa[]    @relation("AccessoInvitatoDa")
   notificheRicevute  Notifica[]
+  permessiModuli     PermessoModulo[]
   documentiCaricati  Documento[]
 
   @@map("user")
@@ -723,6 +725,26 @@ model AccessoRisorsa {
   // Vedi Note operative a fondo file.
 
   @@map("accesso_risorsa")
+}
+
+enum PermessoLivello {
+  denied
+  read
+  write
+}
+
+model PermessoModulo {
+  id           String          @id @default(uuid())
+  tenantId     String          @map("tenant_id")
+  tenant       Tenant          @relation(fields: [tenantId], references: [id])
+  userId       String          @map("user_id")
+  user         User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  moduloChiave String          @map("modulo_chiave") // 'projects'|'clients'|'invoices'|'scadenzario'|'primanota'|'banks'|'retainers'|'audit'
+  livello      PermessoLivello @default(write)
+  createdAt    DateTime        @default(now()) @map("created_at")
+
+  @@unique([tenantId, userId, moduloChiave])
+  @@map("permesso_modulo")
 }
 
 model Notifica {

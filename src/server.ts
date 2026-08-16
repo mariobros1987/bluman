@@ -1082,6 +1082,65 @@ export function buildServer(app: AppPort): FastifyInstance {
     }
   });
 
+  // ── GESTIONE PERMESSI GRANULARI MODULI & SEZIONI (STYLE OPENSTAMANAGER) ─
+  server.get<{ Params: { userId: string } }>('/tenant/utenti/:userId/permessi', async (req, reply) => {
+    const tenantId = (req as any).tenantId;
+    const { userId } = req.params;
+    try {
+      const permessi = await (prisma as any).permessoModulo.findMany({
+        where: { tenantId, userId },
+      });
+      return reply.send(permessi);
+    } catch {
+      return reply.send([]);
+    }
+  });
+
+  server.put<{
+    Params: { userId: string };
+    Body: { permessi: Array<{ moduloChiave: string; livello: 'denied' | 'read' | 'write' }> };
+  }>('/tenant/utenti/:userId/permessi', async (req, reply) => {
+    const tenantId = (req as any).tenantId;
+    const { userId } = req.params;
+    const { permessi } = req.body;
+
+    if (!Array.isArray(permessi)) {
+      return reply.code(400).send({ errore: 'Array permessi obbligatorio' });
+    }
+
+    try {
+      for (const p of permessi) {
+        await (prisma as any).permessoModulo.upsert({
+          where: {
+            tenantId_userId_moduloChiave: {
+              tenantId,
+              userId,
+              moduloChiave: p.moduloChiave,
+            },
+          },
+          update: { livello: p.livello },
+          create: {
+            tenantId,
+            userId,
+            moduloChiave: p.moduloChiave,
+            livello: p.livello,
+          },
+        });
+      }
+
+      recordAudit({
+        tenantId,
+        azione: 'PERMESSI_UTENTE_AGGIORNATI',
+        entita: userId,
+        dettagli: `Aggiornata matrice permessi RBAC per l'utente ${userId}`,
+      });
+
+      return reply.send({ ok: true, messaggio: 'Matrice permessi aggiornata con successo' });
+    } catch (err) {
+      return reply.code(500).send({ errore: err instanceof Error ? err.message : 'Errore aggiornamento permessi' });
+    }
+  });
+
   // ── CHECKLIST SOP COMPLIANCE (STYLE OPENSTAMANAGER) ───────────────
   server.get<{ Params: { passaggioId: string } }>('/passaggi/:passaggioId/checklist', async (req, reply) => {
     try {
