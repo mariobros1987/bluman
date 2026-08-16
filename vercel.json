@@ -12,6 +12,10 @@
       "destination": "/api/webhooks/communications/whatsapp"
     },
     {
+      "source": "/webhooks/communications/telegram",
+      "destination": "/api/webhooks/communications/telegram"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
