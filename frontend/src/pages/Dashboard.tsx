@@ -19,6 +19,20 @@ export function Dashboard() {
   const [activeTab, setActiveTab] = useState<'attivi' | 'archiviati'>('attivi');
 
   const loadProjects = async () => {
+    let combined: Progetto[] = [];
+
+    // 1. Carica progetti salvati localmente
+    const localStr = localStorage.getItem('bluman_custom_projects');
+    if (localStr) {
+      try {
+        const localProjs = JSON.parse(localStr);
+        if (Array.isArray(localProjs)) combined.push(...localProjs);
+      } catch (err) {
+        console.warn('Errore parsing custom projects in Dashboard:', err);
+      }
+    }
+
+    // 2. Carica progetti remoti da API
     const remote = await fetchProgetti();
     if (remote && Array.isArray(remote)) {
       setIsDbConnected(true);
@@ -57,11 +71,21 @@ export function Dashboard() {
           })),
         })),
       }));
-      
-      const existingIds = new Set(dbProjs.map(p => String(p.id)));
-      const filteredMock = PROJECTS.filter(p => !existingIds.has(String(p.id)));
-      setProjectList([...dbProjs, ...filteredMock]);
+
+      const existingIds = new Set(combined.map(p => String(p.id)));
+      for (const dp of dbProjs) {
+        if (!existingIds.has(String(dp.id))) {
+          combined.push(dp);
+        }
+      }
     }
+
+    // 3. Aggiungi progetti di default mock se non presenti
+    const existingIds = new Set(combined.map(p => String(p.id)));
+    const mockToAppend = PROJECTS.filter(p => !existingIds.has(String(p.id)));
+    combined.push(...mockToAppend);
+
+    setProjectList(combined);
   };
 
   useEffect(() => {
