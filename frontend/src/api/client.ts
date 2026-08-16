@@ -624,3 +624,34 @@ export async function inviaWebhookSdiApi(fatturaId: string, statoSdi: 'consegnat
   }
 }
 
+export async function fetchContiBancariApi() {
+  try {
+    const res = await fetch(`${API_BASE}/conti-bancari`, { headers: getAuthHeaders() });
+    if (!res.ok) throw new Error('Errore recupero conti bancari');
+    return await res.json();
+  } catch (err) {
+    console.warn('Conti bancari API fallback', err);
+    return [
+      { id: 'c-1', nomeConto: 'Unicredit c/c Principale', banca: 'Unicredit S.p.A.', iban: 'IT99C0306902100100000012345', bicSwift: 'UNCRITM1', saldoIniziale: 5000000, saldoAttuale: 7850000, isDefault: true },
+      { id: 'c-2', nomeConto: 'Intesa Sanpaolo Operativo', banca: 'Intesa Sanpaolo', iban: 'IT88X0306902100100000098765', bicSwift: 'BCITITMM', saldoIniziale: 1200000, saldoAttuale: 3450000, isDefault: false },
+      { id: 'c-3', nomeConto: 'Account Stripe Gateway', banca: 'Stripe Payments Europe', iban: 'N/D (Gateway)', bicSwift: 'STRPEU2D', saldoIniziale: 0, saldoAttuale: 125000, isDefault: false },
+      { id: 'c-4', nomeConto: 'Cassa Contanti Studio', banca: 'Cassa Interna', iban: 'N/D (Cassa)', bicSwift: 'N/D', saldoIniziale: 50000, saldoAttuale: 65000, isDefault: false },
+    ];
+  }
+}
+
+export async function creaContoBancarioApi(input: { nomeConto: string; banca: string; iban?: string; bicSwift?: string; saldoInizialeEur: number; isDefault?: boolean }) {
+  try {
+    const res = await fetch(`${API_BASE}/conti-bancari`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(input),
+    });
+    if (!res.ok) throw new Error('Errore creazione conto bancario');
+    return await res.json();
+  } catch (err) {
+    console.warn('Crea conto bancario API fallback', err);
+    return null;
+  }
+}
+

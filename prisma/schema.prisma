@@ -58,6 +58,7 @@ model Tenant {
   auditLogs     AuditLog[]
   comunicazioni ComunicazioneProgetto[]
   contrattiRicorrenti ContrattoRicorrente[]
+  contiBancari  ContoBancario[]
 
   @@map("tenant")
 }
@@ -769,6 +770,22 @@ model ComunicazioneProgetto {
   createdAt    DateTime @default(now()) @map("created_at")
 
   @@map("comunicazione_progetto")
+}
+
+model ContoBancario {
+  id            String   @id @default(uuid())
+  tenantId      String   @map("tenant_id")
+  tenant        Tenant   @relation(fields: [tenantId], references: [id])
+  nomeConto     String   @map("nome_conto")
+  banca         String
+  iban          String?
+  bicSwift      String?  @map("bic_swift")
+  saldoIniziale Int      @default(0) @map("saldo_iniziale") // centesimi
+  saldoAttuale  Int      @default(0) @map("saldo_attuale") // centesimi
+  isDefault     Boolean  @default(false) @map("is_default")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@map("conto_bancario")
 }
 
 // ─────────────────────────────────────────────────────────────────

@@ -16,6 +16,7 @@ import { InvoicesPage } from './pages/InvoicesPage';
 import { PaymentsPage } from './pages/PaymentsPage';
 import { ScadenzarioPage } from './pages/ScadenzarioPage';
 import { PrimaNotaPage } from './pages/PrimaNotaPage';
+import { BanksPage } from './pages/BanksPage';
 import { RetainersPage } from './pages/RetainersPage';
 import { PROJECTS } from './store/mockData';
 import './styles/tokens.css';
@@ -74,6 +75,7 @@ export default function App() {
             <Route path="/invoices"      element={<InvoicesPage />} />
             <Route path="/scadenzario"   element={<ScadenzarioPage />} />
             <Route path="/primanota"     element={<PrimaNotaPage />} />
+            <Route path="/banks"         element={<BanksPage />} />
             <Route path="/payments"      element={<PaymentsPage />} />
             <Route path="/retainers"     element={<RetainersPage />} />
             <Route path="/audit"         element={<AuditLogPage />} />

@@ -11,6 +11,7 @@ const NAV = [
   { path: '/invoices',   label: 'Fatture & SDI',          icon: '💶' },
   { path: '/scadenzario',label: 'Scadenzario Incassi',    icon: '📅' },
   { path: '/primanota',  label: 'Registro Prima Nota',    icon: '💰' },
+  { path: '/banks',      label: 'Banche & Conti',         icon: '🏦' },
   { path: '/retainers',  label: 'Contratti Retainer',    icon: '🔄' },
   { path: '/audit',      label: 'Log Audit Studio',       icon: '📋' },
   { path: '/library',    label: 'Libreria moduli',        icon: '📚' },
