@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { fetchComunicazioniApi, inviaComunicazioneApi, fetchClienti, sendWhatsAppDirectApi } from '../api/client';
+import { fetchComunicazioniApi, inviaComunicazioneApi, fetchClienti, sendWhatsAppDirectApi, fetchTenantInfoApi } from '../api/client';
 import { downloadGuidePdf } from '../utils/pdfGenerator';
 import { PROJECTS } from '../store/mockData';
 import type { Cliente } from '../types';
@@ -24,6 +24,32 @@ interface ComunicazioniTabProps {
 
 export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, cliente }: ComunicazioniTabProps) {
   const [clientData, setClientData] = useState<Cliente | null>(cliente || null);
+  const [tenantSettings, setTenantSettings] = useState<any>(null);
+
+  // Carica i dati delle impostazioni Studio (Canali di Invio Ufficiali Admin)
+  useEffect(() => {
+    const loadTenant = async () => {
+      const dbTenant = await fetchTenantInfoApi();
+      if (dbTenant) {
+        setTenantSettings(dbTenant);
+      } else {
+        const local = localStorage.getItem('bluman_tenant_info');
+        if (local) {
+          try { setTenantSettings(JSON.parse(local)); } catch {}
+        }
+      }
+    };
+    loadTenant();
+  }, []);
+
+  const studioChannels = useMemo(() => {
+    return {
+      whatsapp: tenantSettings?.telefono || '+356 79001122',
+      email: tenantSettings?.smtpFromEmail || tenantSettings?.email || 'comunicazioni@bluecode.advisory',
+      telegram: tenantSettings?.tgBotUsername || '@BluManStudioBot',
+      signal: tenantSettings?.telefono || '+356 79001122',
+    };
+  }, [tenantSettings]);
 
   // Carica i dati dell'anagrafica cliente (DB, localStorage o mock)
   useEffect(() => {
@@ -458,20 +484,20 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
           {/* Selettore Canale e Dati Anagrafica Dinamici */}
           <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <label style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>Canale Invio:</label>
+              <label style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>Linea / Canale Studio (Admin):</label>
               <select
                 value={canaleSelezionato}
                 onChange={e => setCanaleSelezionato(e.target.value as any)}
                 style={{ fontSize: 12, padding: '6px 12px', borderRadius: 8, background: 'var(--card2)', color: 'var(--text)', border: '1px solid var(--border)', fontWeight: 600 }}
               >
-                <option value="whatsapp">🟢 WhatsApp Business ({contactInfo.whatsapp})</option>
-                <option value="email">✉️ Email ({contactInfo.email})</option>
-                <option value="telegram">✈️ Telegram ({contactInfo.telegram})</option>
-                <option value="signal">🔒 Signal ({contactInfo.signal})</option>
+                <option value="whatsapp">🟢 WhatsApp Business Studio ({studioChannels.whatsapp})</option>
+                <option value="email">✉️ Email Ufficiale Studio ({studioChannels.email})</option>
+                <option value="telegram">✈️ Telegram Bot Studio ({studioChannels.telegram})</option>
+                <option value="signal">🔒 Signal Studio Cifrato ({studioChannels.signal})</option>
               </select>
             </div>
 
-            {/* Dati Dinamici Presi dall'Anagrafica Accanto al Selettore */}
+            {/* Dati Dinamici del Destinatario Presi dall'Anagrafica Cliente ERP */}
             <div style={{
               display: 'flex',
               alignItems: 'center',
@@ -483,7 +509,7 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
               fontSize: 11,
               color: channelDetail.color,
             }}>
-              <span style={{ fontWeight: 800 }}>{channelDetail.icon} {channelDetail.title}:</span>
+              <span style={{ fontWeight: 800 }}>🎯 Destinatario Cliente:</span>
               <span style={{ fontWeight: 700, color: '#fff', fontFamily: 'monospace' }}>{channelDetail.val}</span>
               <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)' }}>({contactInfo.referente})</span>
               <span style={{
