@@ -13,7 +13,19 @@ export function InvoicesPage() {
   const loadData = async () => {
     setLoading(true);
     const invData = await fetchTutteFattureStudioApi();
-    setInvoices(invData || []);
+    const apiInvoices = invData || [];
+
+    const savedStr = localStorage.getItem('bluman_custom_invoices');
+    const localInvoices: any[] = savedStr ? JSON.parse(savedStr) : [];
+
+    const mergedMap = new Map();
+    [...apiInvoices, ...localInvoices].forEach(item => {
+      if (item && (item.id || item.numero)) {
+        mergedMap.set(item.id || item.numero, item);
+      }
+    });
+
+    setInvoices(Array.from(mergedMap.values()));
     setLoading(false);
   };
 

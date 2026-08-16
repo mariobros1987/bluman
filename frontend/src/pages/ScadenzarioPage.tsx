@@ -67,7 +67,16 @@ export function ScadenzarioPage() {
       finalScadenze = extractedScad;
     }
 
-    setScadenze(finalScadenze);
+    // Integrazione scadenze Retainer/Custom salvate localmente
+    const savedCustomScadStr = localStorage.getItem('bluman_custom_scadenze');
+    const localCustomScad: any[] = savedCustomScadStr ? JSON.parse(savedCustomScadStr) : [];
+
+    const mergedMap = new Map();
+    [...finalScadenze, ...localCustomScad].forEach(item => {
+      if (item && item.id) mergedMap.set(item.id, item);
+    });
+
+    setScadenze(Array.from(mergedMap.values()));
     setClienti(clData || []);
     setLoading(false);
   };
