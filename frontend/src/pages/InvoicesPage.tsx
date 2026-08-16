@@ -1,18 +1,23 @@
 import { useState, useEffect } from 'react';
-import { fetchTutteFattureStudioApi, downloadFatturaXmlApi, inviaFatturaEmailApi } from '../api/client';
-import { fmt } from '../utils';
+import { fetchTutteFattureStudioApi, fetchTenantInfoApi, downloadFatturaXmlApi, inviaFatturaEmailApi } from '../api/client';
+import { fmt, getFormattedLogoUrl } from '../utils';
 import { downloadRealPdf } from '../utils/pdfGenerator';
 import styles from './Dashboard.module.css'; // Reusing KPI grid styles
 
 export function InvoicesPage() {
   const [invoices, setInvoices] = useState<any[]>([]);
+  const [tenantInfo, setTenantInfo] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [filterStato, setFilterStato] = useState('tutte');
   const [searchTerm, setSearchTerm] = useState('');
 
   const loadData = async () => {
     setLoading(true);
-    const invData = await fetchTutteFattureStudioApi();
+    const [invData, tenantRes] = await Promise.all([
+      fetchTutteFattureStudioApi(),
+      fetchTenantInfoApi(),
+    ]);
+    if (tenantRes) setTenantInfo(tenantRes);
     const apiInvoices = invData || [];
 
     const savedStr = localStorage.getItem('bluman_custom_invoices');
@@ -152,6 +157,10 @@ export function InvoicesPage() {
                   </td>
                 </tr>
               ) : (
+                filteredInvoices.map((inv) => {
+                  const isNote = (inv.tipo_documento || inv.tipoDocumento) === 'nota_credito';
+                  const importoTotale = getFatturaImporto(inv) / 100;
+
                   const formatPdfData = (dataRaw?: any) => {
                     if (!dataRaw) return new Date().toLocaleDateString('it-IT');
                     const d = new Date(dataRaw);
@@ -190,46 +199,59 @@ export function InvoicesPage() {
                         <button 
                           style={{ background: 'transparent', border: '1px solid var(--border)', color: 'white', padding: '4px 8px', borderRadius: 6, cursor: 'pointer', marginRight: 6 }}
                           onClick={async () => {
+                            const logoSrc = getFormattedLogoUrl(tenantInfo?.logoUrl);
+                            const studioNome = tenantInfo?.ragioneSociale || 'Bluecode Advisory Studio';
+                            const studioPiva = tenantInfo?.piva || '12345678901';
+                            const studioIban = tenantInfo?.iban || 'IT99C0306902100100000012345';
+                            const temaColore = tenantInfo?.coloreTemaFattura || '#1e3a8a';
+
                             await downloadRealPdf(
                               `Fattura_${inv.numero || 'Bozza'}.pdf`,
-                              `<div style="font-family: Arial, sans-serif; padding: 20px; color: #0f172a;">
-                                <div style="display: flex; justify-content: space-between; border-bottom: 2px solid #1e3a8a; padding-bottom: 12px; margin-bottom: 20px;">
-                                  <div>
-                                    <h1 style="margin: 0; color: #1e3a8a; font-size: 20px;">Bluecode Advisory Studio</h1>
-                                    <div style="font-size: 12px; color: #64748b;">P.IVA 12345678901 | Studio Advisory & Consulting</div>
+                              `<div style="font-family: Arial, sans-serif; padding: 25px; color: #0f172a; background: #ffffff;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid ${temaColore}; padding-bottom: 16px; margin-bottom: 24px;">
+                                  <div style="display: flex; align-items: center; gap: 16px;">
+                                    <img src="${logoSrc}" style="height: 54px; max-width: 180px; object-fit: contain;" />
+                                    <div>
+                                      <h1 style="margin: 0; color: ${temaColore}; font-size: 20px; font-weight: 800;">${studioNome}</h1>
+                                      <div style="font-size: 11px; color: #64748b; margin-top: 2px;">P.IVA ${studioPiva} | Studio Advisory & Consulting</div>
+                                    </div>
                                   </div>
                                   <div style="text-align: right;">
-                                    <h2 style="margin: 0; color: #0f172a; font-size: 16px;">${isNote ? 'NOTA DI CREDITO' : 'FATTURA ELETTRONICA'}</h2>
-                                    <div style="font-size: 13px; font-weight: bold; color: #1e3a8a;">${inv.numero || 'Bozza'}</div>
-                                    <div style="font-size: 11px; color: #64748b;">Data: ${pdfDate}</div>
+                                    <h2 style="margin: 0; color: #0f172a; font-size: 16px; font-weight: 700;">${isNote ? 'NOTA DI CREDITO' : 'FATTURA ELETTRONICA'}</h2>
+                                    <div style="font-size: 14px; font-weight: bold; color: ${temaColore}; margin-top: 2px;">${inv.numero || 'Bozza'}</div>
+                                    <div style="font-size: 11px; color: #64748b;">Data Emissione: ${pdfDate}</div>
                                   </div>
                                 </div>
-                                <div style="margin-bottom: 20px; background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0;">
-                                  <div style="font-size: 11px; text-transform: uppercase; color: #64748b; font-weight: bold;">Cliente Cessionario:</div>
-                                  <div style="font-size: 14px; font-weight: bold; color: #0f172a;">${inv.progetto?.cliente?.nome || 'Cliente Studio'}</div>
-                                  <div style="font-size: 12px; color: #334155;">Progetto: ${inv.progetto?.nome || 'Incarico'}</div>
+
+                                <div style="margin-bottom: 24px; background: #f8fafc; padding: 14px; border-radius: 8px; border: 1px solid #e2e8f0;">
+                                  <div style="font-size: 10.5px; text-transform: uppercase; color: #64748b; font-weight: 800; letter-spacing: 0.5px;">Cliente Cessionario:</div>
+                                  <div style="font-size: 15px; font-weight: 700; color: #0f172a; margin-top: 2px;">${inv.progetto?.cliente?.nome || 'Cliente Studio'}</div>
+                                  <div style="font-size: 12px; color: #334155; margin-top: 2px;">Progetto Collegato: ${inv.progetto?.nome || 'Incarico'}</div>
                                 </div>
-                                <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+
+                                <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px;">
                                   <thead>
                                     <tr style="background: #f1f5f9; border-bottom: 2px solid #cbd5e1; text-align: left; font-size: 12px;">
-                                      <th style="padding: 8px;">Descrizione Prestazione</th>
-                                      <th style="padding: 8px; text-align: right;">Importo</th>
+                                      <th style="padding: 10px 12px; color: #334155; font-weight: 700;">Descrizione Prestazione</th>
+                                      <th style="padding: 10px 12px; text-align: right; color: #334155; font-weight: 700;">Importo Euro</th>
                                     </tr>
                                   </thead>
                                   <tbody>
                                     ${righePdf.map((r: any) => `
                                       <tr style="border-bottom: 1px solid #e2e8f0; font-size: 13px;">
-                                        <td style="padding: 10px 8px;">${r.descrizione || 'Prestazione professionale'}</td>
-                                        <td style="padding: 10px 8px; text-align: right; font-weight: bold;">€ ${((r.importo || 0) / (r.importo > 5000 ? 100 : 1)).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                        <td style="padding: 12px 10px; color: #1e293b;">${r.descrizione || 'Prestazione professionale'}</td>
+                                        <td style="padding: 12px 10px; text-align: right; font-weight: 700; color: #0f172a;">€ ${((r.importo || 0) / (r.importo > 5000 ? 100 : 1)).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                                       </tr>
                                     `).join('')}
                                   </tbody>
                                 </table>
-                                <div style="text-align: right; font-size: 16px; font-weight: bold; color: #1e3a8a; border-top: 2px solid #1e3a8a; padding-top: 10px;">
+
+                                <div style="text-align: right; font-size: 16px; font-weight: 800; color: ${temaColore}; border-top: 2px solid ${temaColore}; padding-top: 12px;">
                                   TOTALE DOCUMENTO: € ${importoTotale.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </div>
-                                <div style="margin-top: 30px; font-size: 11px; color: #64748b; border-top: 1px solid #e2e8f0; padding-top: 10px;">
-                                  IBAN di Pagamento: IT99C0306902100100000012345 | Causale: Saldo Fattura ${inv.numero}
+
+                                <div style="margin-top: 36px; font-size: 11px; color: #64748b; border-top: 1px solid #e2e8f0; padding-top: 12px;">
+                                  <strong>Coordinate Bancarie:</strong> IBAN ${studioIban} | <strong>Causale:</strong> Saldo Fattura ${inv.numero || 'Bozza'}
                                 </div>
                               </div>`
                             );
