@@ -40,6 +40,13 @@
   - Tab **💳 Scadenzario & Prima Nota** con registrazione rate, scadenze d'incasso e metodo di pagamento.
   - Modal **💰 Registra Incasso** per saldare acconti/rate con tracciamento CRO/TRN e note operatore.
   - Generazione ed esportazione 1-Click **📥 XML SDI (FatturaPA v1.2.2)** per l'Agenzia delle Entrate.
+- [x] **Contratti Ricorrenti & Retainer Studio (`/retainers`) — *Ispirato ad OpenSTAManager***:
+  - Gestione contratti continuativi di Advisory, Corporate Governance e Compliance AML.
+  - Pianificazione frequenza canone (mensile, trimestrale, semestrale, annuale) e data prossima fatturazione.
+  - Modal 1-Click **`➕ Nuovo Contratto Retainer`** collegato all'Anagrafica Clienti ERP.
+- [x] **Checklist & SOP Compliance di Progetto — *Ispirato ad OpenSTAManager***:
+  - Voci di controllo e spunte obbligatorie per ciascun passaggio operativo di progetto.
+  - Persistenza dello stato completato ed audit operatore.
 - [x] **Libreria Moduli & Distinta Base (`/library`)**:
   - Split-screen builder con **editing prezzo unitario (€)** in distinta base.
   - Catalogo articoli con modal di modifica prezzo, ore listino, **📄 Modelli Documenti in Bianco Collegati (PDF)** e **📋 Form Master Dinamici** per Admin.

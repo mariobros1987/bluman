@@ -57,6 +57,7 @@ model Tenant {
   giurisdizioni Giurisdizione[]
   auditLogs     AuditLog[]
   comunicazioni ComunicazioneProgetto[]
+  contrattiRicorrenti ContrattoRicorrente[]
 
   @@map("tenant")
 }
@@ -88,6 +89,7 @@ model User {
   passwordHash String?     @map("password_hash")
   // §23 — obbligatorio per ruolo=super_admin prima di poter fare qualunque azione oltre al login
   totpSecret   String?     @map("totp_secret")
+  costoOrarioCentesimi Int? @default(3000) @map("costo_orario_centesimi") // Costo orario interno studio per margine netto
   createdAt    DateTime    @default(now()) @map("created_at")
 
   microvociAssegnate MicrovoceProgetto[] @relation("RisorsaAssegnata")
@@ -121,6 +123,7 @@ model Cliente {
 
   progetti   Progetto[]
   preventivi Preventivo[]
+  contrattiRicorrenti ContrattoRicorrente[]
 
   @@map("cliente")
 }
@@ -425,6 +428,7 @@ model PassaggioProgetto {
   documentoAllegatoUrl String?          @map("documento_allegato_url")
   formMasterId         String?          @map("form_master_id")
   linkIstruzioni       String?          @map("link_istruzioni")
+  checklistVoci        ChecklistVoce[]
 
   @@map("passaggio_progetto")
 }
@@ -484,10 +488,57 @@ model Documento {
   // Sicurezza upload — §28, incluso fin dallo schema iniziale (Fase 1 del piano)
   statoScansione      StatoScansione    @default(in_corso) @map("stato_scansione")
   scansionatoAt       DateTime?         @map("scansionato_at")
+  dataScadenzaDoc     DateTime?         @map("data_scadenza_doc")
+  categoriaDoc        String?           @default("generico") @map("categoria_doc") // identita|visura|contratto|generico
+  avvisoScadenzaInviato Boolean         @default(false) @map("avviso_scadenza_inviato")
 
   passaggioProgetto PassaggioProgetto?
 
   @@map("documento")
+}
+
+model ChecklistVoce {
+  id                  String            @id @default(uuid())
+  tenantId            String            @map("tenant_id")
+  passaggioProgettoId String            @map("passaggio_progetto_id")
+  passaggioProgetto   PassaggioProgetto @relation(fields: [passaggioProgettoId], references: [id], onDelete: Cascade)
+  titolo              String
+  obbligatorio        Boolean           @default(false)
+  completato          Boolean           @default(false)
+  completatoDa        String?           @map("completato_da")
+  completatoAt        DateTime?         @map("completato_at")
+
+  @@map("checklist_voce")
+}
+
+enum FrequenzaContratto {
+  mensile
+  trimestrale
+  semestrale
+  annuale
+}
+
+enum StatoContrattoRicorrente {
+  attivo
+  sospeso
+  concluso
+}
+
+model ContrattoRicorrente {
+  id                   String                   @id @default(uuid())
+  tenantId             String                   @map("tenant_id")
+  tenant               Tenant                   @relation(fields: [tenantId], references: [id])
+  clienteId            String                   @map("cliente_id")
+  cliente              Cliente                  @relation(fields: [clienteId], references: [id])
+  titolo               String
+  frequenza            FrequenzaContratto       @default(mensile)
+  importoCentesimi     Int                      @map("importo_centesimi")
+  prossimaFatturazione DateTime                 @map("prossima_fatturazione")
+  stato                StatoContrattoRicorrente @default(attivo)
+  note                 String?
+  createdAt            DateTime                 @default(now()) @map("created_at")
+
+  @@map("contratto_ricorrente")
 }
 
 // ─────────────────────────────────────────────────────────────────

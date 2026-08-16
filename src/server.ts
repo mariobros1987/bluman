@@ -838,6 +838,120 @@ export function buildServer(app: AppPort): FastifyInstance {
     }
   });
 
+  // ── CONTRATTI RICORRENTI & RETAINER (STYLE OPENSTAMANAGER) ────────
+  server.get('/contratti-ricorrenti', async (req, reply) => {
+    const tenantId = (req as any).tenantId;
+    try {
+      const contratti = await prisma.contrattoRicorrente.findMany({
+        where: { tenantId },
+        include: { cliente: true },
+        orderBy: { prossimaFatturazione: 'asc' },
+      });
+      return reply.send(contratti);
+    } catch {
+      return reply.send([]);
+    }
+  });
+
+  server.post<{
+    Body: {
+      clienteId: string;
+      titolo: string;
+      frequenza?: 'mensile' | 'trimestrale' | 'semestrale' | 'annuale';
+      importoCentesimi: number;
+      prossimaFatturazione: string;
+      note?: string;
+    };
+  }>('/contratti-ricorrenti', async (req, reply) => {
+    const tenantId = (req as any).tenantId;
+    const { clienteId, titolo, frequenza, importoCentesimi, prossimaFatturazione, note } = req.body;
+
+    if (!clienteId || !titolo || !importoCentesimi) {
+      return reply.code(400).send({ errore: 'clienteId, titolo e importoCentesimi sono obbligatori' });
+    }
+
+    try {
+      const contratto = await prisma.contrattoRicorrente.create({
+        data: {
+          tenantId,
+          clienteId,
+          titolo,
+          frequenza: frequenza || 'mensile',
+          importoCentesimi,
+          prossimaFatturazione: new Date(prossimaFatturazione),
+          note,
+        },
+      });
+
+      recordAudit({
+        tenantId,
+        azione: 'CONTRATTO_RICORRENTE_CREATO',
+        entita: titolo,
+        dettagli: `Creato contratto retainer da €${(importoCentesimi / 100).toFixed(2)} (${frequenza || 'mensile'})`,
+      });
+
+      return reply.code(201).send(contratto);
+    } catch (err) {
+      return reply.code(500).send({ errore: err instanceof Error ? err.message : 'Errore creazione contratto' });
+    }
+  });
+
+  // ── CHECKLIST SOP COMPLIANCE (STYLE OPENSTAMANAGER) ───────────────
+  server.get<{ Params: { passaggioId: string } }>('/passaggi/:passaggioId/checklist', async (req, reply) => {
+    try {
+      const voci = await prisma.checklistVoce.findMany({
+        where: { passaggioProgettoId: req.params.passaggioId },
+        orderBy: { titolo: 'asc' },
+      });
+      return reply.send(voci);
+    } catch {
+      return reply.send([]);
+    }
+  });
+
+  server.post<{
+    Params: { passaggioId: string };
+    Body: { titolo: string; obbligatorio?: boolean };
+  }>('/passaggi/:passaggioId/checklist', async (req, reply) => {
+    const tenantId = (req as any).tenantId;
+    const { passaggioId } = req.params;
+    const { titolo, obbligatorio } = req.body;
+
+    if (!titolo) return reply.code(400).send({ errore: 'Titolo voce checklist obbligatorio' });
+
+    try {
+      const voce = await prisma.checklistVoce.create({
+        data: {
+          tenantId,
+          passaggioProgettoId: passaggioId,
+          titolo,
+          obbligatorio: obbligatorio ?? false,
+        },
+      });
+      return reply.code(201).send(voce);
+    } catch (err) {
+      return reply.code(500).send({ errore: 'Errore creazione voce checklist' });
+    }
+  });
+
+  server.patch<{ Params: { id: string } }>('/checklist/:id/toggle', async (req, reply) => {
+    try {
+      const voce = await prisma.checklistVoce.findUnique({ where: { id: req.params.id } });
+      if (!voce) return reply.code(404).send({ errore: 'Voce non trovata' });
+
+      const updated = await prisma.checklistVoce.update({
+        where: { id: req.params.id },
+        data: {
+          completato: !voce.completato,
+          completatoAt: !voce.completato ? new Date() : null,
+        },
+      });
+      return reply.send(updated);
+    } catch (err) {
+      return reply.code(500).send({ errore: 'Errore aggiornamento checklist' });
+    }
+  });
+
   server.post<{
     Params: { id: string };
     Body: { oreAggiunte?: number; ore?: number };

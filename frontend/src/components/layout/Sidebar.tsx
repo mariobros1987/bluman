@@ -9,6 +9,7 @@ const NAV = [
   { path: '/clients',  label: 'Clienti',         icon: '👥' },
   { path: '/calendar', label: 'Calendario',      icon: '📅' },
   { path: '/invoices', label: 'Fatture & Pagamenti', icon: '💶' },
+  { path: '/retainers', label: 'Contratti Retainer', icon: '🔄' },
   { path: '/audit',    label: 'Log Audit Studio', icon: '📋' },
   { path: '/library',  label: 'Libreria moduli', icon: '📚' },
   { path: '/settings', label: 'Impostazioni',    icon: '⚙️' },

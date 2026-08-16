@@ -12,7 +12,8 @@ Questo file serve come indice rapido per l'IA ed i collaboratori per identificar
 - **`pages/ProjectDetail.tsx`**: Vista dettagliata del progetto con tab:
   - `🗂 Moduli & Microvoci`
   - `🕸 Grafo & Dipendenze Moduli` (`GrafoModuliProgettoView`)
-  - `💶 Fatturazione & SDI` (`FatturazioneTab` con Fatture FT e Note di Credito NC)
+- **`pages/InvoicesPage.tsx`**: Gestionale Fatture, Note di Credito, Scadenzario Incassi & Partite Aperte (Prima Nota Studio) ed Export XML SDI.
+- **`pages/RetainersPage.tsx`**: Contratti Ricorrenti & Retainer Studio per la fatturazione periodica pianificata.
 - **`pages/Library.tsx`**: Gestione Distinta Base, Costruttore Moduli Template, Catalogo Articoli e Modelli Documenti in Bianco.
 - **`pages/ClientPortal.tsx`**: Portale Cliente a 5 schede (Proposta & Firma 1-Click, Live Progress, Form Societari, Documenti, Contatti Advisor).
 - **`pages/SettingsPage.tsx`**: Anagrafica Studio, Sede Legale/Operativa, Configuratore PDF Fatture con Logo ed Anteprima Live.

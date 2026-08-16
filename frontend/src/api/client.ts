@@ -523,3 +523,54 @@ export async function downloadFatturaXmlApi(fatturaId: string) {
   }
 }
 
+export async function fetchContrattiRicorrentiApi() {
+  try {
+    const res = await fetch(`${API_BASE}/contratti-ricorrenti`, { headers: getAuthHeaders() });
+    if (!res.ok) throw new Error('Errore recupero contratti');
+    return await res.json();
+  } catch (err) {
+    console.warn('Contratti ricorrenti API fallback', err);
+    return null;
+  }
+}
+
+export async function creaContrattoRicorrenteApi(input: { clienteId: string; titolo: string; frequenza?: string; importoCentesimi: number; prossimaFatturazione: string; note?: string }) {
+  try {
+    const res = await fetch(`${API_BASE}/contratti-ricorrenti`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(input),
+    });
+    if (!res.ok) throw new Error('Errore creazione contratto');
+    return await res.json();
+  } catch (err) {
+    console.warn('Crea contratto ricorrente API fallback', err);
+    return null;
+  }
+}
+
+export async function fetchChecklistPassaggioApi(passaggioId: string) {
+  try {
+    const res = await fetch(`${API_BASE}/passaggi/${passaggioId}/checklist`, { headers: getAuthHeaders() });
+    if (!res.ok) throw new Error('Errore recupero checklist');
+    return await res.json();
+  } catch (err) {
+    console.warn('Checklist passaggio API fallback', err);
+    return [];
+  }
+}
+
+export async function toggleChecklistVoceApi(id: string) {
+  try {
+    const res = await fetch(`${API_BASE}/checklist/${id}/toggle`, {
+      method: 'PATCH',
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok) throw new Error('Errore aggiornamento checklist');
+    return await res.json();
+  } catch (err) {
+    console.warn('Toggle checklist API fallback', err);
+    return null;
+  }
+}
+
