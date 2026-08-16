@@ -92,21 +92,31 @@ export function Projects() {
     loadProjects();
   }, []);
 
-  const currentUserStr = localStorage.getItem('bluman_user');
-  const currentUser = currentUserStr ? JSON.parse(currentUserStr) : { ruolo: 'advisor' };
+  const [searchTerm, setSearchTerm] = useState('');
 
-  // Mostra TUTTI i progetti dello studio per il team, o filtra per cliente
+  // Mostra TUTTI i progetti dello studio per il team, o filtra per cliente/ricerca
   const visibleProjects = projectList.filter(p => {
     if (currentUser.ruolo === 'cliente') {
-      return p.cl?.toLowerCase().includes((currentUser.nome || '').toLowerCase());
+      if (!p.cl?.toLowerCase().includes((currentUser.nome || '').toLowerCase())) return false;
     }
+    const query = searchTerm.toLowerCase();
+    if (query && !p.n.toLowerCase().includes(query) && !p.cl.toLowerCase().includes(query)) return false;
     return true;
   });
 
   return (
     <>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
-        <div style={{ fontSize: 13, fontWeight: 600 }}>Tutti i progetti ({projectList.length})</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <div style={{ fontSize: 13, fontWeight: 600 }}>Tutti i progetti ({visibleProjects.length})</div>
+          <input
+            type="text"
+            placeholder="🔍 Cerca per nome o cliente..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--card)', color: 'var(--text)', fontSize: 13, width: 260 }}
+          />
+        </div>
         <button
           onClick={() => setWizardOpen(true)}
           style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer' }}

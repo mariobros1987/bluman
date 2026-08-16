@@ -68,6 +68,8 @@ export function Dashboard() {
     loadProjects();
   }, []);
 
+  const [searchTerm, setSearchTerm] = useState('');
+
   const currentUserStr = localStorage.getItem('bluman_user');
   const currentUser = currentUserStr ? JSON.parse(currentUserStr) : { ruolo: 'advisor' };
   const isSuperAdminOrAdvisor = ['super_admin', 'advisor'].includes(currentUser.ruolo);
@@ -77,12 +79,19 @@ export function Dashboard() {
   const totalVal = projectList.reduce((a, p) => a + p.val, 0);
   const avgPct   = Math.round(projectList.reduce((a, p) => a + p.pct, 0) / (projectList.length || 1));
 
-  // Gli avvisi mostrano i ritardi dello studio per gli Advisor/Admin, e i soli ritardi dei propri incarici per gli Operatori
   const delayedProjects = projectList.filter(p => {
     const hasDelay = p.delay || p.mods?.some(m => m.st === 'blocked' || m.st === 'delayed');
     if (!hasDelay) return false;
     if (isSuperAdminOrAdvisor) return true;
     return p.mods?.some(m => m.team?.includes(1) || m.team?.includes(2));
+  });
+
+  const filteredProjects = projectList.filter(p => {
+    if (activeTab === 'attivi' && p.st === 'archived') return false;
+    if (activeTab === 'archiviati' && p.st !== 'archived') return false;
+    const query = searchTerm.toLowerCase();
+    if (query && !p.n.toLowerCase().includes(query) && !p.cl.toLowerCase().includes(query)) return false;
+    return true;
   });
 
   return (
@@ -91,7 +100,7 @@ export function Dashboard() {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
         <div style={{ fontSize: 11, color: isDbConnected ? '#34d399' : 'var(--muted)', display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{ width: 7, height: 7, borderRadius: '50%', background: isDbConnected ? '#10b981' : 'var(--amber)' }} />
-          {isDbConnected ? '🟢 Enterprise Cloud Database Collegato' : '🟡 Server Locale API'}
+          {isDbConnected ? '🟢 Enterprise Cloud Database Collegato' : '🟡 Modalità Studio Offline / Dimostrativa'}
         </div>
       </div>
 
@@ -118,20 +127,30 @@ export function Dashboard() {
         </div>
       )}
 
-      {/* Tabs */}
-      <div style={{ display: 'flex', gap: 16, marginBottom: 16, borderBottom: '1px solid var(--border)' }}>
-        <button
-          onClick={() => setActiveTab('attivi')}
-          style={{ padding: '8px 16px', background: 'transparent', border: 'none', borderBottom: activeTab === 'attivi' ? '2px solid var(--indigo-l)' : '2px solid transparent', color: activeTab === 'attivi' ? 'var(--indigo-l)' : 'var(--muted)', cursor: 'pointer', fontWeight: 600 }}
-        >
-          Progetti in Corso ({projectList.filter(p => p.st !== 'archived').length})
-        </button>
-        <button
-          onClick={() => setActiveTab('archiviati')}
-          style={{ padding: '8px 16px', background: 'transparent', border: 'none', borderBottom: activeTab === 'archiviati' ? '2px solid var(--indigo-l)' : '2px solid transparent', color: activeTab === 'archiviati' ? 'var(--indigo-l)' : 'var(--muted)', cursor: 'pointer', fontWeight: 600 }}
-        >
-          🗄 Archivio Progetti ({projectList.filter(p => p.st === 'archived').length})
-        </button>
+      {/* Filtro Ricerca Live & Tabs */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>
+        <div style={{ display: 'flex', gap: 16 }}>
+          <button
+            onClick={() => setActiveTab('attivi')}
+            style={{ padding: '8px 16px', background: 'transparent', border: 'none', borderBottom: activeTab === 'attivi' ? '2px solid var(--indigo-l)' : '2px solid transparent', color: activeTab === 'attivi' ? 'var(--indigo-l)' : 'var(--muted)', cursor: 'pointer', fontWeight: 600 }}
+          >
+            Progetti in Corso ({projectList.filter(p => p.st !== 'archived').length})
+          </button>
+          <button
+            onClick={() => setActiveTab('archiviati')}
+            style={{ padding: '8px 16px', background: 'transparent', border: 'none', borderBottom: activeTab === 'archiviati' ? '2px solid var(--indigo-l)' : '2px solid transparent', color: activeTab === 'archiviati' ? 'var(--indigo-l)' : 'var(--muted)', cursor: 'pointer', fontWeight: 600 }}
+          >
+            🗄 Archivio Progetti ({projectList.filter(p => p.st === 'archived').length})
+          </button>
+        </div>
+
+        <input
+          type="text"
+          placeholder="🔍 Cerca progetto o cliente..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--card2)', color: 'var(--text)', fontSize: 13, width: 250 }}
+        />
       </div>
 
       <div className={styles.sectionHeader}>
@@ -142,7 +161,12 @@ export function Dashboard() {
       </div>
 
       <div className={styles.projectList}>
-        {projectList.filter(p => activeTab === 'attivi' ? p.st !== 'archived' : p.st === 'archived').map(p => {
+        {filteredProjects.length === 0 ? (
+          <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted)', width: '100%' }}>
+            Nessun progetto trovato per la ricerca "{searchTerm}".
+          </div>
+        ) : (
+          filteredProjects.map(p => {
           const color = progressColor(p);
           const allTeam = [...new Set((p.mods || []).flatMap(m => m.team || [1]).filter(Boolean))];
           return (

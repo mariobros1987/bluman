@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { fetchTutteFattureStudioApi, fetchTenantInfoApi, downloadFatturaXmlApi, inviaFatturaEmailApi } from '../api/client';
 import { fmt, getFormattedLogoUrl } from '../utils';
+import { PROJECTS } from '../store/mockData';
 import { downloadRealPdf } from '../utils/pdfGenerator';
 import styles from './Dashboard.module.css'; // Reusing KPI grid styles
 
@@ -44,6 +45,27 @@ export function InvoicesPage() {
             cliente: { nome: p.cl || p.cliente?.nome || 'Cliente Studio' },
           },
           righe: [{ descrizione: f.desc || `Prestazione professionale ${p.n || p.nome}`, importo: Math.round((f.importo || 1500) * 100) }],
+        });
+      });
+    });
+
+    // Includi fatture dei progetti dallo store PROJECTS di default
+    PROJECTS.forEach((p) => {
+      (p.fatture || []).forEach((f: any) => {
+        projInvoices.push({
+          id: f.id || `ft-mock-${p.id}-${f.numero}`,
+          numero: f.numero || `FT-2026-0001`,
+          tipo_documento: 'fattura',
+          serie: 'FT',
+          importo: f.importo || 1500,
+          data: f.data || new Date().toLocaleDateString('it-IT'),
+          stato: f.stato || 'emessa',
+          progetto: {
+            id: p.id,
+            nome: p.n,
+            cliente: { nome: p.cl || 'Cliente Studio' },
+          },
+          righe: [{ descrizione: f.desc || `Prestazione professionale: ${p.n}`, importo: Math.round((f.importo || 1500) * 100) }],
         });
       });
     });
