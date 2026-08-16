@@ -91,9 +91,63 @@ async function main() {
     data: { tenantId: tenant.id, moduloTemplateId: m02.id, dipendeDaModuloTemplateId: m01.id },
   });
 
+  // ── Creazione Progetti Istituzionali nel DB PostgreSQL ───────────────
+  let clienteDemo = await prisma.cliente.findFirst({ where: { tenantId: tenant.id, nome: 'Holding Beta S.r.l.' } });
+  if (!clienteDemo) {
+    clienteDemo = await prisma.cliente.create({
+      data: {
+        tenantId: tenant.id,
+        nome: 'Holding Beta S.r.l.',
+        tipo: 'company',
+        partitaIva: 'IT09876543210',
+        codiceFiscale: 'BLUCD90A01H501X',
+        sedeLegale: 'Via Montenapoleone 8, Milano',
+        codiceSdi: 'SUBM70N',
+        email: 'client@holdingbeta.advisory',
+      },
+    });
+  }
+
+  const p1 = await prisma.progetto.upsert({
+    where: { id: 'proj-db-001' },
+    update: {},
+    create: {
+      id: 'proj-db-001',
+      tenantId: tenant.id,
+      clienteId: clienteDemo.id,
+      nome: 'Structuring Holding Malta & IP',
+      stato: 'in_progress',
+      valoreTotale: 1500000,
+      moduli: {
+        create: [
+          {
+            tenantId: tenant.id,
+            moduloTemplateId: m01.id,
+            moduloTemplateVersione: 1,
+            nome: 'Analisi patrimoniale iniziale',
+            categoria: 'Analisi',
+            prezzo: 350000,
+            orePreventivate: 20,
+            stato: 'done',
+          },
+          {
+            tenantId: tenant.id,
+            moduloTemplateId: m02.id,
+            moduloTemplateVersione: 1,
+            nome: 'Corporate structuring Malta',
+            categoria: 'Societario',
+            prezzo: 1150000,
+            orePreventivate: 40,
+            stato: 'in_progress',
+          },
+        ],
+      },
+    },
+  });
+
   console.log('Seed completato.');
   console.log('Tenant:', tenant.id, tenant.ragioneSociale);
-  console.log('Moduli:', m01.nome, '/', m02.nome, '(con dipendenza tra loro)');
+  console.log('Progetto DB:', p1.nome, 'ID:', p1.id);
 }
 
 main()

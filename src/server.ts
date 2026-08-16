@@ -60,9 +60,10 @@ export function buildServer(app: AppPort): FastifyInstance {
   const server = Fastify({ logger: false });
 
   server.register(cors, {
-    origin: true,
+    origin: '*',
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-tenant-id'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-tenant-id', 'Accept', 'Origin'],
+    credentials: false,
   });
 
   server.setErrorHandler((err, _req, reply) => {
