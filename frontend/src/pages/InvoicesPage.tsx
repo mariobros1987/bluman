@@ -18,8 +18,33 @@ export function InvoicesPage() {
     const savedStr = localStorage.getItem('bluman_custom_invoices');
     const localInvoices: any[] = savedStr ? JSON.parse(savedStr) : [];
 
+    // Estrai fatture emesse direttamente dai progetti dello studio
+    const localProjStr = localStorage.getItem('bluman_custom_projects');
+    const localProjs: any[] = localProjStr ? JSON.parse(localProjStr) : [];
+    const projInvoices: any[] = [];
+
+    localProjs.forEach((p) => {
+      (p.fatture || []).forEach((f: any) => {
+        projInvoices.push({
+          id: f.id || `ft-proj-${p.id}-${f.numero}`,
+          numero: f.numero || `FT-2026-0001`,
+          tipo_documento: 'fattura',
+          serie: 'FT',
+          importo: f.importo || 1500,
+          data: f.data || new Date().toLocaleDateString('it-IT'),
+          stato: f.stato || 'emessa',
+          progetto: {
+            id: p.id,
+            nome: p.n || p.nome,
+            cliente: { nome: p.cl || p.cliente?.nome || 'Cliente Studio' },
+          },
+          righe: [{ descrizione: f.desc || `Prestazione professionale ${p.n || p.nome}`, importo: Math.round((f.importo || 1500) * 100) }],
+        });
+      });
+    });
+
     const mergedMap = new Map();
-    [...apiInvoices, ...localInvoices].forEach(item => {
+    [...apiInvoices, ...localInvoices, ...projInvoices].forEach(item => {
       if (item && (item.id || item.numero)) {
         mergedMap.set(item.id || item.numero, item);
       }
