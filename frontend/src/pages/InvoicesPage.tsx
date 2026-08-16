@@ -69,7 +69,7 @@ export function InvoicesPage() {
   return (
     <div style={{ padding: '2rem' }}>
       <div className={styles.sectionHeader}>
-        <div className={styles.sectionTitle}>Gestione Fatture & Incassi (Stile OpenSTAManager)</div>
+        <div className={styles.sectionTitle}>Gestione Fatture & Incassi Studio</div>
         <div style={{ display: 'flex', gap: 12 }}>
           <button
             onClick={() => setActiveTab('fatture')}

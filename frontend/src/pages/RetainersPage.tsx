@@ -62,7 +62,7 @@ export function RetainersPage() {
         <div>
           <h2 style={{ margin: 0 }}>Contratti Ricorrenti & Retainer Studio</h2>
           <p style={{ color: 'var(--muted)', margin: '4px 0 0 0', fontSize: 14 }}>
-            Pianificazione canoni continui (Advisory, Governance, Compliance AML) in stile OpenSTAManager
+            Pianificazione canoni continui (Advisory, Governance, Compliance AML)
           </p>
         </div>
         <button
