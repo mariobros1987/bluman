@@ -38,9 +38,8 @@ Questo file serve come indice rapido per l'IA ed i collaboratori per identificar
 | 👷 **Operatore Studio** | `operator@bluecode.advisory` | `operator123` | JWT Access Token |
 | 🔑 **Cliente Incarico** | `client@holdingbeta.advisory` | *Passwordless* | Magic Link `/portal` |
 
-- **Autenticazione RBAC**: `POST /auth/login`, `POST /auth/magic-login`, `GET /auth/me` (Token JWT 15 min + Magic Link).
-- **Progetti**: `GET /progetti`, `GET /progetti/:id`
-- **Clienti**: `GET /clienti`, `POST /clienti`
+- **Progetti**: `GET /progetti`, `GET /progetti/:id`, `PUT /progetti/:id/stato-completo` (Persistenza totale moduli, microvoci, checklist passaggi e note operative con audit log)
+- **Clienti**: `GET /clienti`, `POST /clienti`, `PUT /clienti/:id` (Aggiornamento completo dati ERP, legali, SDI, IBAN e KYC con audit log)
 - **Fatturazione & Incassi**: `POST /progetti/:id/fatture` (gestisce sia Fatture `FT` che Note di Credito `NC` con numerazione distinta), `GET /invoices/scadenzario`, `POST /invoices/scadenze/:id/incassi` (Prima Nota) e `GET /invoices/:id/sdi-xml` (Tracciato XML FatturaPA).
 - **Contratti Retainer**: `GET /contratti-ricorrenti`, `POST /contratti-ricorrenti` (collegati sia al Cliente che al Progetto specifico).
 - **Upload Documenti**: `POST /upload` (riceve base64 e salva in `./uploads/`), `GET /uploads/:filename`

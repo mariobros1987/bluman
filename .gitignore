@@ -21,3 +21,5 @@ supabase/functions/.deploy/
 
 # OS
 .DS_Store
+
+.vercel
