@@ -9,7 +9,7 @@ export const fmt = (n: number) => '€ ' + n.toLocaleString('it-IT');
 export function getFormattedLogoUrl(url?: string | null): string {
   if (!url || url.trim() === '') return '/logo.png';
   if (url.startsWith('data:') || url.startsWith('http://') || url.startsWith('https://')) return url;
-  if (url.startsWith('/uploads')) return `http://127.0.0.1:3000${url}`;
+  if (url.startsWith('/uploads')) return `https://bluman-api-production.up.railway.app${url}`;
   return url;
 }
 

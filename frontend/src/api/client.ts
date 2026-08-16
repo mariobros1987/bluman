@@ -494,6 +494,24 @@ export async function fetchNotificheApi() {
   }
 }
 
+export async function testEmailApi(emailDestinatario?: string) {
+  const res = await fetch(`${API_BASE}/tenant/test-email`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ emailDestinatario }),
+  });
+  return await res.json();
+}
+
+export async function testChannelApi(payload: { channel: string; waPhoneId?: string; waAccessToken?: string; tgBotToken?: string; signalCliEndpoint?: string }) {
+  const res = await fetch(`${API_BASE}/tenant/test-channel`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  return await res.json();
+}
+
 export async function markNotificheReadApi() {
   try {
     const res = await fetch(`${API_BASE}/notifiche/read-all`, {

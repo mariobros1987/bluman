@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { fetchUtentiTenant, creaUtenteTenantApi, uploadFileApi, fetchTenantInfoApi, updateTenantInfoApi, fetchProgetti, fetchPermessiUtenteApi, salvaPermessiUtenteApi } from '../api/client';
+import { fetchUtentiTenant, creaUtenteTenantApi, uploadFileApi, fetchTenantInfoApi, updateTenantInfoApi, fetchProgetti, fetchPermessiUtenteApi, salvaPermessiUtenteApi, testEmailApi, testChannelApi } from '../api/client';
 import { getFormattedLogoUrl, fmt } from '../utils';
 import { ProgressBar } from '../components/ui/ProgressBar';
 import styles from './Settings.module.css';
@@ -151,16 +151,11 @@ export function SettingsPage() {
     setTestingSmtp(true);
     setSmtpTestResult(null);
     try {
-      const res = await fetch('http://127.0.0.1:3000/tenant/test-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ emailDestinatario: email || 'client@holdingbeta.advisory' }),
-      });
-      const json = await res.json();
-      if (res.ok && json.success) {
+      const json = await testEmailApi(email || 'client@holdingbeta.advisory');
+      if (json && json.success) {
         setSmtpTestResult(`✓ CONNESSO! ${json.message}`);
       } else {
-        setSmtpTestResult(`❌ Errore SMTP: ${json.errore || 'Impossibile connettersi al server SMTP'}`);
+        setSmtpTestResult(`❌ Errore SMTP: ${json?.errore || 'Impossibile connettersi al server SMTP'}`);
       }
     } catch {
       setSmtpTestResult(`ℹ️ Modalità Simulatore: Email test generata ed inviata con successo in ambiente di sviluppo a ${email || 'client@holdingbeta.advisory'}`);
@@ -175,16 +170,11 @@ export function SettingsPage() {
   const handleTestChannel = async (channel: 'whatsapp' | 'telegram' | 'signal') => {
     setTestingChannel(channel);
     try {
-      const res = await fetch('http://127.0.0.1:3000/tenant/test-channel', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ channel, waPhoneId, waAccessToken, tgBotToken, signalCliEndpoint }),
-      });
-      const json = await res.json();
-      if (res.ok && json.success) {
+      const json = await testChannelApi({ channel, waPhoneId, waAccessToken, tgBotToken, signalCliEndpoint });
+      if (json && json.success) {
         setChannelTestResult(prev => ({ ...prev, [channel]: `✓ ${json.message}` }));
       } else {
-        setChannelTestResult(prev => ({ ...prev, [channel]: `❌ Errore ${channel.toUpperCase()}: ${json.errore || 'Connessione fallita'}` }));
+        setChannelTestResult(prev => ({ ...prev, [channel]: `❌ Errore ${channel.toUpperCase()}: ${json?.errore || 'Connessione fallita'}` }));
       }
     } catch {
       setChannelTestResult(prev => ({
