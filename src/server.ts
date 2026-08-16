@@ -796,6 +796,22 @@ export function buildServer(app: AppPort): FastifyInstance {
     } catch (err) {
       return reply.code(500).send({ errore: err instanceof Error ? err.message : 'Errore registrazione incasso' });
     }
+  // ── REGISTRO FATTURE STUDIO (STYLE OPENSTAMANAGER) ───────────────
+  server.get('/invoices', async (req, reply) => {
+    const tenantId = (req as any).tenantId;
+    try {
+      const fatture = await (prisma as any).fattura.findMany({
+        where: { tenantId },
+        include: {
+          righe: true,
+          progetto: { include: { cliente: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+      return reply.send(fatture);
+    } catch {
+      return reply.send([]);
+    }
   });
 
   server.get<{ Params: { id: string } }>('/invoices/:id/sdi-xml', async (req, reply) => {
@@ -1104,7 +1120,7 @@ export function buildServer(app: AppPort): FastifyInstance {
       const prossimoProgressivo = (lastFattura?.numeroProgressivoSerie || 0) + 1;
       const numeroFattura = `FT-${annoCorrente}-${String(prossimoProgressivo).padStart(4, '0')}`;
 
-      // 2.Crea Fattura a DB
+      // 2. Crea Fattura a DB con RigaFattura per l'importo del Canone Retainer
       const nuovaFattura = await (prisma as any).fattura.create({
         data: {
           tenantId,
@@ -1114,9 +1130,18 @@ export function buildServer(app: AppPort): FastifyInstance {
           numeroProgressivoSerie: prossimoProgressivo,
           numero: numeroFattura,
           importoCentesimi: contratto.importoCentesimi,
-          stato: 'inviata',
+          stato: 'emessa',
           note: `Fatturazione canone retainer ricorrente: ${contratto.titolo} (${contratto.frequenza})`,
+          righe: {
+            create: [
+              {
+                descrizione: `Canone Retainer: ${contratto.titolo} (${contratto.frequenza})`,
+                importo: contratto.importoCentesimi,
+              }
+            ]
+          }
         },
+        include: { righe: true, progetto: { include: { cliente: true } } },
       });
 
       // 3. Genera Scadenza Incasso nello Scadenzario

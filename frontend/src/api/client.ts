@@ -479,6 +479,17 @@ export async function markNotificheReadApi() {
   }
 }
 
+export async function fetchTutteFattureStudioApi() {
+  try {
+    const res = await fetch(`${API_BASE}/invoices`, { headers: getAuthHeaders() });
+    if (!res.ok) throw new Error('Errore recupero fatture studio');
+    return await res.json();
+  } catch (err) {
+    console.warn('Fetch tutte le fatture API fallback', err);
+    return [];
+  }
+}
+
 export async function fetchScadenzarioIncassiApi() {
   try {
     const res = await fetch(`${API_BASE}/invoices/scadenzario`, { headers: getAuthHeaders() });

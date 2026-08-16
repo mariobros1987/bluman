@@ -33,10 +33,19 @@ export function InvoicesPage() {
     loadData();
   }, []);
 
-  const totalEmesso = invoices.filter(f => f.tipo_documento === 'fattura').reduce((a, b) => a + (b.righe?.reduce((sa: any, sb: any) => sa + sb.importo, 0) || 0), 0);
-  const totalIncassato = invoices.filter(f => f.tipo_documento === 'fattura' && f.stato === 'incassata').reduce((a, b) => a + (b.righe?.reduce((sa: any, sb: any) => sa + sb.importo, 0) || 0), 0);
-  const totalSospeso = invoices.filter(f => f.tipo_documento === 'fattura' && f.stato === 'emessa').reduce((a, b) => a + (b.righe?.reduce((sa: any, sb: any) => sa + sb.importo, 0) || 0), 0);
-  const totalNoteCredito = invoices.filter(f => f.tipo_documento === 'nota_credito').reduce((a, b) => a + (b.righe?.reduce((sa: any, sb: any) => sa + sb.importo, 0) || 0), 0);
+  const getFatturaImporto = (f: any) => {
+    if (f.importo && typeof f.importo === 'number' && f.importo > 0) return f.importo * 100;
+    if (f.importoCentesimi && typeof f.importoCentesimi === 'number' && f.importoCentesimi > 0) return f.importoCentesimi;
+    if (f.righe && Array.isArray(f.righe) && f.righe.length > 0) {
+      return f.righe.reduce((sa: any, sb: any) => sa + (sb.importo || 0), 0);
+    }
+    return 0;
+  };
+
+  const totalEmesso = invoices.filter(f => (f.tipo_documento || f.tipoDocumento || 'fattura') === 'fattura').reduce((a, b) => a + getFatturaImporto(b), 0);
+  const totalIncassato = invoices.filter(f => (f.tipo_documento || f.tipoDocumento || 'fattura') === 'fattura' && f.stato === 'incassata').reduce((a, b) => a + getFatturaImporto(b), 0);
+  const totalSospeso = invoices.filter(f => (f.tipo_documento || f.tipoDocumento || 'fattura') === 'fattura' && f.stato !== 'incassata').reduce((a, b) => a + getFatturaImporto(b), 0);
+  const totalNoteCredito = invoices.filter(f => (f.tipo_documento || f.tipoDocumento) === 'nota_credito').reduce((a, b) => a + getFatturaImporto(b), 0);
 
   const filteredInvoices = invoices.filter(f => {
     if (filterStato !== 'tutte' && f.stato !== filterStato) return false;
@@ -119,8 +128,8 @@ export function InvoicesPage() {
                 </tr>
               ) : (
                 filteredInvoices.map((inv) => {
-                  const isNote = inv.tipo_documento === 'nota_credito';
-                  const importoTotale = (inv.righe?.reduce((a: any, b: any) => a + b.importo, 0) || 0) / 100;
+                  const isNote = (inv.tipo_documento || inv.tipoDocumento) === 'nota_credito';
+                  const importoTotale = getFatturaImporto(inv) / 100;
                   
                   return (
                     <tr key={inv.id} style={{ borderBottom: '1px solid var(--border)' }}>
