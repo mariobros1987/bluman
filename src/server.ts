@@ -691,6 +691,153 @@ export function buildServer(app: AppPort): FastifyInstance {
     return reply.code(201).send(fattura);
   });
 
+  // ── INCASSI, SCADENZARIO & PRIMA NOTA (STYLE OPENSTAMANAGER) ───────
+  server.get('/invoices/scadenzario', async (req, reply) => {
+    const tenantId = (req as any).tenantId;
+    try {
+      const scadenze = await prisma.scadenzaIncasso.findMany({
+        where: { tenantId },
+        include: {
+          fattura: {
+            include: {
+              progetto: {
+                include: { cliente: true },
+              },
+            },
+          },
+          registrazioniRegistrate: true,
+        },
+        orderBy: { dataScadenza: 'asc' },
+      });
+      return reply.send(scadenze);
+    } catch {
+      return reply.send([]);
+    }
+  });
+
+  server.post<{
+    Params: { id: string };
+    Body: {
+      importoIncassatoCentesimi: number;
+      metodoPagamento?: 'bonifico' | 'carta' | 'assegno' | 'contanti' | 'stripe';
+      riferimentoTransazione?: string;
+      noteOperatore?: string;
+    };
+  }>('/invoices/scadenze/:id/incassi', async (req, reply) => {
+    const tenantId = (req as any).tenantId;
+    const { id } = req.params;
+    const { importoIncassatoCentesimi, metodoPagamento, riferimentoTransazione, noteOperatore } = req.body;
+
+    try {
+      const scadenza = await prisma.scadenzaIncasso.findUnique({
+        where: { id },
+        include: { registrazioniRegistrate: true },
+      });
+
+      if (!scadenza) {
+        return reply.code(404).send({ errore: 'Scadenza incasso non trovata' });
+      }
+
+      const registrazione = await prisma.registrazioneIncasso.create({
+        data: {
+          tenantId,
+          scadenzaIncassoId: id,
+          fatturaId: scadenza.fatturaId,
+          importoIncassatoCentesimi,
+          metodoPagamento: metodoPagamento || 'bonifico',
+          riferimentoTransazione,
+          noteOperatore,
+        },
+      });
+
+      const totaleIncassato = scadenza.registrazioniRegistrate.reduce((acc, r) => acc + r.importoIncassatoCentesimi, 0) + importoIncassatoCentesimi;
+      const nuovoStato = totaleIncassato >= scadenza.importoCentesimi ? 'incassato' : 'parziale';
+
+      await prisma.scadenzaIncasso.update({
+        where: { id },
+        data: { stato: nuovoStato },
+      });
+
+      recordAudit({
+        tenantId,
+        azione: 'INCASSO_REGISTRATO',
+        entita: `Scadenza #${id}`,
+        dettagli: `Registrato incasso di €${(importoIncassatoCentesimi / 100).toFixed(2)} via ${metodoPagamento || 'bonifico'}`,
+      });
+
+      return reply.code(201).send(registrazione);
+    } catch (err) {
+      return reply.code(500).send({ errore: err instanceof Error ? err.message : 'Errore registrazione incasso' });
+    }
+  });
+
+  server.get<{ Params: { id: string } }>('/invoices/:id/sdi-xml', async (req, reply) => {
+    const { id } = req.params;
+    try {
+      const fattura = await prisma.fattura.findUnique({
+        where: { id },
+        include: {
+          righe: true,
+          progetto: { include: { cliente: true } },
+        },
+      });
+
+      if (!fattura) {
+        return reply.code(404).send({ errore: 'Fattura non trovata' });
+      }
+
+      const cliente = fattura.progetto.cliente;
+      const xmlContent = `<?xml version="1.0" encoding="UTF-8"?>
+<p:FatturaElettronica versione="FPR12" xmlns:ds="http://www.w3.org/2000/09/xmldsig#" xmlns:p="http://ivaservizi.agenziaentrate.gov.it/docs/xsd/fatture/v1.2" xmlns:xsi="http://www.w3.org/2000/01/XMLSchema-instance">
+  <FatturaElettronicaHeader>
+    <DatiTrasmissione>
+      <IdTrasmittente>
+        <IdPaese>IT</IdPaese>
+        <IdCodice>${cliente.piva || '00000000000'}</IdCodice>
+      </IdTrasmittente>
+      <ProgressivoInvio>${fattura.numeroProgressivo || '00001'}</ProgressivoInvio>
+      <FormatoTrasmissione>FPR12</FormatoTrasmissione>
+      <CodiceDestinatario>${cliente.sdiCode || '0000000'}</CodiceDestinatario>
+    </DatiTrasmissione>
+    <CessionarioCommittente>
+      <DatiAnagrafici>
+        <CodiceFiscale>${cliente.codiceFiscale || cliente.piva || '00000000000'}</CodiceFiscale>
+        <Anagrafica>
+          <Denominazione>${cliente.nome}</Denominazione>
+        </Anagrafica>
+      </DatiAnagrafici>
+    </CessionarioCommittente>
+  </FatturaElettronicaHeader>
+  <FatturaElettronicaBody>
+    <DatiGenerali>
+      <DatiGeneraliDocumento>
+        <TipoDocumento>${fattura.tipoDocumento === 'nota_credito' ? 'TD04' : 'TD01'}</TipoDocumento>
+        <Divisa>EUR</Divisa>
+        <Data>${(fattura.data || new Date()).toISOString().split('T')[0]}</Data>
+        <Numero>${fattura.numero || 'FT-2026/001'}</Numero>
+      </DatiGeneraliDocumento>
+    </DatiGenerali>
+    <DatiBeniServizi>
+      ${fattura.righe.map((r, idx) => `
+      <DettaglioLinee>
+        <NumeroLinea>${idx + 1}</NumeroLinea>
+        <Descrizione>${r.descrizione}</Descrizione>
+        <PrezzoUnitario>${(r.importo / 100).toFixed(2)}</PrezzoUnitario>
+        <PrezzoTotale>${(r.importo / 100).toFixed(2)}</PrezzoTotale>
+        <AliquotaIVA>22.00</AliquotaIVA>
+      </DettaglioLinee>`).join('')}
+    </DatiBeniServizi>
+  </FatturaElettronicaBody>
+</p:FatturaElettronica>`;
+
+      reply.header('Content-Type', 'application/xml');
+      reply.header('Content-Disposition', `attachment; filename="${fattura.numero || 'Fattura'}.xml"`);
+      return reply.send(xmlContent);
+    } catch (err) {
+      return reply.code(500).send({ errore: 'Errore durante la generazione dell\'XML SDI' });
+    }
+  });
+
   server.post<{
     Params: { id: string };
     Body: { oreAggiunte?: number; ore?: number };

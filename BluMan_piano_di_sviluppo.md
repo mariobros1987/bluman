@@ -34,10 +34,12 @@
   - `💬 Comunicazioni & Ingestion` (Timeline messaggi omnichannel WhatsApp, Telegram, Email, Signal).
   - `📜 Storico Contratti & Addendum` (Registro immutabile delle versioni contrattuali firmate e marca temporale eIDAS).
   - **Archiviazione & Eliminazione Sicura**: Blocco fiscale anti-cancellazione se presenti fatture.
-- [x] **Gestionale Fatture & Pagamenti (`/invoices`)**:
+- [x] **Gestionale Fatture, Incassi & Partite Aperte (`/invoices`) — *Ispirato ad OpenSTAManager***:
   - Dashboard globale per tutte le fatture e note di credito dello studio.
   - KPI (Fatturato, Incassato, In Sospeso, Note Credito).
-  - Gestione stato pagamenti e filtro per numero/cliente.
+  - Tab **💳 Scadenzario & Prima Nota** con registrazione rate, scadenze d'incasso e metodo di pagamento.
+  - Modal **💰 Registra Incasso** per saldare acconti/rate con tracciamento CRO/TRN e note operatore.
+  - Generazione ed esportazione 1-Click **📥 XML SDI (FatturaPA v1.2.2)** per l'Agenzia delle Entrate.
 - [x] **Libreria Moduli & Distinta Base (`/library`)**:
   - Split-screen builder con **editing prezzo unitario (€)** in distinta base.
   - Catalogo articoli con modal di modifica prezzo, ore listino, **📄 Modelli Documenti in Bianco Collegati (PDF)** e **📋 Form Master Dinamici** per Admin.

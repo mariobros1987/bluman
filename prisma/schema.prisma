@@ -546,9 +546,58 @@ model Fattura {
   // generato in transazione con lock — mai concorrente/ottimistico, §26
   canale                 CanaleFattura
   statoSdi               StatoSdi             @default(n_a) @map("stato_sdi")
-  righe FatturaRiga[]
+  righe                  FatturaRiga[]
+  scadenzeIncasso        ScadenzaIncasso[]
+  registrazioniIncasso   RegistrazioneIncasso[]
 
   @@map("fattura")
+}
+
+enum StatoScadenzaIncasso {
+  in_attesa
+  incassato
+  parziale
+  scaduto
+}
+
+model ScadenzaIncasso {
+  id               String               @id @default(uuid())
+  tenantId         String               @map("tenant_id")
+  fatturaId        String               @map("fattura_id")
+  fattura          Fattura              @relation(fields: [fatturaId], references: [id], onDelete: Cascade)
+  numeroRata       Int                  @default(1) @map("numero_rata")
+  importoCentesimi Int                  @map("importo_centesimi")
+  dataScadenza     DateTime             @map("data_scadenza")
+  stato            StatoScadenzaIncasso @default(in_attesa)
+  note             String?
+
+  registrazioniRegistrate RegistrazioneIncasso[]
+
+  @@map("scadenza_incasso")
+}
+
+enum MetodoPagamento {
+  bonifico
+  carta
+  assegno
+  contanti
+  stripe
+}
+
+model RegistrazioneIncasso {
+  id                      String           @id @default(uuid())
+  tenantId                String           @map("tenant_id")
+  scadenzaIncassoId       String?          @map("scadenza_incasso_id")
+  scadenzaIncasso         ScadenzaIncasso? @relation(fields: [scadenzaIncassoId], references: [id])
+  fatturaId               String           @map("fattura_id")
+  fattura                 Fattura          @relation(fields: [fatturaId], references: [id], onDelete: Cascade)
+  importoIncassatoCentesimi Int            @map("importo_incassato_centesimi")
+  dataIncasso             DateTime         @default(now()) @map("data_incasso")
+  metodoPagamento         MetodoPagamento  @default(bonifico) @map("metodo_pagamento")
+  riferimentoTransazione  String?          @map("riferimento_transazione")
+  noteOperatore           String?          @map("note_operatore")
+
+  @@map("registrazione_incasso")
 }
 
 enum TipoFatturaRiga {

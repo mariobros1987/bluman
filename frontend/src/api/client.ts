@@ -476,3 +476,50 @@ export async function markNotificheReadApi() {
     return { ok: true };
   }
 }
+
+export async function fetchScadenzarioIncassiApi() {
+  try {
+    const res = await fetch(`${API_BASE}/invoices/scadenzario`, { headers: getAuthHeaders() });
+    if (!res.ok) throw new Error('Errore recupero scadenzario incassi');
+    return await res.json();
+  } catch (err) {
+    console.warn('Scadenzario incassi API fallback', err);
+    return null;
+  }
+}
+
+export async function registraIncassoApi(scadenzaId: string, input: { importoIncassatoCentesimi: number; metodoPagamento?: string; riferimentoTransazione?: string; noteOperatore?: string }) {
+  try {
+    const res = await fetch(`${API_BASE}/invoices/scadenze/${scadenzaId}/incassi`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(input),
+    });
+    if (!res.ok) throw new Error('Errore durante la registrazione dell\'incasso');
+    return await res.json();
+  } catch (err) {
+    console.warn('Registrazione incasso API fallback', err);
+    return null;
+  }
+}
+
+export async function downloadFatturaXmlApi(fatturaId: string) {
+  try {
+    const res = await fetch(`${API_BASE}/invoices/${fatturaId}/sdi-xml`, { headers: getAuthHeaders() });
+    if (!res.ok) throw new Error('Errore durante la generazione dell\'XML');
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Fattura_${fatturaId}.xml`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+    return { ok: true };
+  } catch (err: any) {
+    alert('Errore download XML: ' + err.message);
+    return null;
+  }
+}
+

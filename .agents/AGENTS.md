@@ -37,7 +37,7 @@ Questo file serve come indice rapido per l'IA ed i collaboratori per identificar
 - **Autenticazione RBAC**: `POST /auth/login`, `POST /auth/magic-login`, `GET /auth/me` (Token JWT 15 min + Magic Link).
 - **Progetti**: `GET /progetti`, `GET /progetti/:id`
 - **Clienti**: `GET /clienti`, `POST /clienti`
-- **Fatturazione**: `POST /progetti/:id/fatture` (gestisce sia Fatture `FT` che Note di Credito `NC` con numerazione distinta).
+- **Fatturazione & Incassi**: `POST /progetti/:id/fatture` (gestisce sia Fatture `FT` che Note di Credito `NC` con numerazione distinta), `GET /invoices/scadenzario`, `POST /invoices/scadenze/:id/incassi` (Prima Nota) e `GET /invoices/:id/sdi-xml` (Tracciato XML FatturaPA).
 - **Upload Documenti**: `POST /upload` (riceve base64 e salva in `./uploads/`), `GET /uploads/:filename`
 - **Servizi Integrati**:
   - `src/services/emailService.ts`: Invio email transazionali SMTP Nodemailer (Magic Link & notifica scadenze).
