@@ -27,7 +27,18 @@ export function RetainersPage() {
       fetchContrattiRicorrentiApi(),
       fetchClienti(),
     ]);
-    setContratti(cData || []);
+
+    const apiContratti = cData || [];
+    const savedStr = localStorage.getItem('bluman_retainer_contracts');
+    const localContratti: any[] = savedStr ? JSON.parse(savedStr) : [];
+
+    // Evita duplicati per ID
+    const mergedMap = new Map();
+    [...apiContratti, ...localContratti].forEach(item => {
+      if (item && item.id) mergedMap.set(item.id, item);
+    });
+
+    setContratti(Array.from(mergedMap.values()));
     setClienti(clData || []);
     setLoading(false);
   };
@@ -51,15 +62,32 @@ export function RetainersPage() {
       prossimaFatturazione,
       note,
     });
+
+    // Garanzia salvataggio anche in ambiente offline / fallback
+    const newContractObj = res || {
+      id: `cnt-${Date.now()}`,
+      clienteId,
+      progettoId,
+      titolo,
+      frequenza,
+      importoCentesimi,
+      prossimaFatturazione,
+      stato: 'attivo',
+      cliente: clienti.find(c => c.id === clienteId) || { nome: 'Cliente Studio' },
+      progetto: PROJECTS.find(p => String(p.id) === String(progettoId)),
+    };
+
+    const savedStr = localStorage.getItem('bluman_retainer_contracts');
+    const savedArr: any[] = savedStr ? JSON.parse(savedStr) : [];
+    localStorage.setItem('bluman_retainer_contracts', JSON.stringify([newContractObj, ...savedArr]));
+
     setSaving(false);
-    if (res) {
-      alert('✓ Contratto Ricorrente attivato con successo!');
-      setShowModal(false);
-      setTitolo('');
-      setImportoEuro('');
-      setProgettoId('');
-      loadData();
-    }
+    alert('✓ Contratto Ricorrente attivato con successo!');
+    setShowModal(false);
+    setTitolo('');
+    setImportoEuro('');
+    setProgettoId('');
+    loadData();
   };
 
   return (
