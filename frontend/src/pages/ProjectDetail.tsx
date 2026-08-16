@@ -7,14 +7,12 @@ import { AvatarGroup, Avatar } from '../components/ui/Avatar';
 import { PassaggioModal } from '../components/PassaggioModal';
 import { fmt, progressColor, getFormattedLogoUrl } from '../utils';
 import { downloadRealPdf } from '../utils/pdfGenerator';
-import type { SignatureData } from '../utils/pdfGenerator';
-import { DigitalSignatureModal } from '../components/DigitalSignatureModal';
 import { ComunicazioniTab } from '../components/ComunicazioniTab';
 import { AssignOperatorModal } from '../components/AssignOperatorModal';
 import { CalendarPreviewModal } from '../components/CalendarPreviewModal';
 import { ConfirmDeleteModal } from '../components/ConfirmDeleteModal';
 import { PROJECTS } from '../store/mockData';
-import { fetchProgettoDettaglio, emettiFatturaApi, consuntivaMicrovoceApi, fetchAccessiProgetto, assegnaAccessoProgettoApi, salvaProgettoDettaglioApi, archiviaProgettoApi, eliminaProgettoApi, fetchModuliLibreria, fetchArticoli, uploadFileApi } from '../api/client';
+import { fetchProgettoDettaglio, emettiFatturaApi, consuntivaMicrovoceApi, assegnaAccessoProgettoApi, salvaProgettoDettaglioApi, archiviaProgettoApi, eliminaProgettoApi, fetchModuliLibreria, fetchArticoli, uploadFileApi } from '../api/client';
 import { TEAM } from '../store/mockData';
 import type { Progetto, ModuloProgetto, CategoriaModulo, StatoProgetto, StatoModulo } from '../types';
 import styles from './ProjectDetail.module.css';
@@ -35,7 +33,6 @@ export function ProjectDetail() {
   const [accessiModalOpen, setAccessiModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState(TEAM[0].n || (TEAM[0] as any).name);
   const [livello, setLivello] = useState('write');
-  const [accessiList, setAccessiList] = useState<any[]>([]);
   const [assignModalTarget, setAssignModalTarget] = useState<{
     modId: number;
     mvIdx?: number;
@@ -1355,21 +1352,59 @@ function FatturazioneTab({ project, rawDbProject, onRefresh }: { project: Proget
               </select>
             </div>
 
+            {tipoFattura === 'modulo_completo' && (
+              <div>
+                <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Modulo del Progetto *</label>
+                <select value={selectedModId} onChange={e => setSelectedModId(e.target.value)} required>
+                  <option value="">Seleziona modulo...</option>
+                  {project.mods.map(m => (
+                    <option key={m.id} value={String(m.id)}>📁 {m.n} ({fmt(m.val)})</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {tipoFattura === 'modulo_parziale' && (
+              <div style={{ display: 'flex', gap: 12 }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Modulo *</label>
+                  <select value={selectedModId} onChange={e => setSelectedModId(e.target.value)} required>
+                    <option value="">Seleziona modulo...</option>
+                    {project.mods.map(m => (
+                      <option key={m.id} value={String(m.id)}>📁 {m.n}</option>
+                    ))}
+                  </select>
+                </div>
+                <div style={{ width: 100 }}>
+                  <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Quota % *</label>
+                  <input type="number" value={pct} onChange={e => setPct(Number(e.target.value))} min={1} max={100} required />
+                </div>
+              </div>
+            )}
+
             <div>
               <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Descrizione in Fattura *</label>
               <input value={desc} onChange={e => setDesc(e.target.value)} placeholder="es. Saldo modulo analisi patrimoniale" required />
             </div>
 
-            <div style={{ display: 'flex', gap: 12 }}>
-              <div style={{ flex: 1 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+              <div>
                 <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Importo (€) *</label>
                 <input type="number" value={importoEur} onChange={e => setImportoEur(Number(e.target.value))} min={1} required />
               </div>
-              <div style={{ flex: 1 }}>
+              <div>
+                <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Regime Fiscale *</label>
+                <select value={tipoFiscale} onChange={e => setTipoFiscale(e.target.value as any)}>
+                  <option value="business_italia">🏢 B2B Italia</option>
+                  <option value="privato_italia">👤 B2C Privato</option>
+                  <option value="estero">🌍 Estero / Malta EU</option>
+                </select>
+              </div>
+              <div>
                 <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Canale Invio *</label>
                 <select value={canale} onChange={e => setCanale(e.target.value as any)}>
-                  <option value="sdi">📨 SDI (Comped Servizi FPA)</option>
-                  <option value="standard">📄 Standard / Estero</option>
+                  <option value="sdi">📨 SDI Comped</option>
+                  <option value="standard">📄 Standard / PDF</option>
                 </select>
               </div>
             </div>
@@ -1387,17 +1422,6 @@ function FatturazioneTab({ project, rawDbProject, onRefresh }: { project: Proget
           </form>
         </div>
       )}
-    </div>
-  );
-}
-function PlaceholderTab({ icon, label }: { icon: string; label: string }) {
-  return (
-    <div className={styles.placeholder}>
-      <div style={{ fontSize: 40 }}>{icon}</div>
-      <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)', marginTop: 8 }}>{label}</div>
-      <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
-        Contenuto sincronizzato in tempo reale con Supabase
-      </div>
     </div>
   );
 }
