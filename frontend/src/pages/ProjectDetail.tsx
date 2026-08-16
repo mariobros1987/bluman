@@ -1358,7 +1358,7 @@ function FatturazioneTab({ project, rawDbProject, onRefresh }: { project: Proget
                 <select value={selectedModId} onChange={e => setSelectedModId(e.target.value)} required>
                   <option value="">Seleziona modulo...</option>
                   {project.mods.map(m => (
-                    <option key={m.id} value={String(m.id)}>📁 {m.n} ({fmt(m.val)})</option>
+                    <option key={m.id} value={String(m.id)}>📁 {m.n} ({fmt((m as any).val || 0)})</option>
                   ))}
                 </select>
               </div>
