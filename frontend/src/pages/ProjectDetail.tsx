@@ -237,6 +237,37 @@ export function ProjectDetail() {
           }
         }
 
+        // Sanificazione generale: nessun modulo deve avere v vuoto
+        finalMods = finalMods.map((m, mIdx) => {
+          let vList = m.v || [];
+          if (!vList || vList.length === 0) {
+            const matchedMock = MLIB.find(libM => libM.n.toLowerCase().trim() === m.n.toLowerCase().trim())
+              || MLIB.find(libM => m.n.toLowerCase().includes(libM.n.toLowerCase()))
+              || MLIB[mIdx % MLIB.length];
+            if (matchedMock && matchedMock.righe) {
+              const rList = resolveRighe(matchedMock, ARTICOLI);
+              vList = rList.map(r => ({
+                n: r.n,
+                hE: r.h || 4,
+                hA: 0,
+                s: 'pending' as any,
+                as: 1,
+                d: 0,
+              }));
+            } else {
+              vList = [
+                { n: `Raccolta documentazione per ${m.n}`, hE: 4, hA: 0, s: 'pending', as: 1, d: 0 },
+                { n: `Predisposizione pratica ed adempimenti ${m.n}`, hE: 5, hA: 0, s: 'pending', as: 1, d: 0 },
+                { n: `Chiusura e verifica conformità ${m.n}`, hE: 3, hA: 0, s: 'pending', as: 1, d: 0 },
+              ];
+            }
+          }
+          return {
+            ...m,
+            v: vList,
+          };
+        });
+
         const calculatedVal = finalMods.reduce((acc: number, m: any) => acc + (m.p || 0), 0) || (dbRes.valoreCentesimi ? dbRes.valoreCentesimi / 100 : 3500);
 
         setProject({
@@ -273,17 +304,46 @@ export function ProjectDetail() {
                  || PROJECTS[0];
 
         if (match) {
-          const modValSum = (match.mods || []).reduce((acc: number, m: any) => acc + (m.p || 0), 0);
+          // Sanifica le microvoci del match
+          const sanitizedMods = (match.mods || []).map((m, mIdx) => {
+            let vList = m.v || [];
+            if (!vList || vList.length === 0) {
+              const matchedMock = MLIB.find(libM => libM.n.toLowerCase().trim() === m.n.toLowerCase().trim())
+                || MLIB.find(libM => m.n.toLowerCase().includes(libM.n.toLowerCase()))
+                || MLIB[mIdx % MLIB.length];
+              if (matchedMock && matchedMock.righe) {
+                const rList = resolveRighe(matchedMock, ARTICOLI);
+                vList = rList.map(r => ({
+                  n: r.n,
+                  hE: r.h || 4,
+                  hA: 0,
+                  s: 'pending' as any,
+                  as: 1,
+                  d: 0,
+                }));
+              } else {
+                vList = [
+                  { n: `Raccolta documentazione per ${m.n}`, hE: 4, hA: 0, s: 'pending', as: 1, d: 0 },
+                  { n: `Predisposizione pratica ed adempimenti ${m.n}`, hE: 5, hA: 0, s: 'pending', as: 1, d: 0 },
+                  { n: `Chiusura e verifica conformità ${m.n}`, hE: 3, hA: 0, s: 'pending', as: 1, d: 0 },
+                ];
+              }
+            }
+            return { ...m, v: vList };
+          });
+
+          const modValSum = sanitizedMods.reduce((acc: number, m: any) => acc + (m.p || 0), 0);
           const finalVal = modValSum > 0 ? modValSum : match.val;
 
           const updatedMatch = {
             ...match,
+            mods: sanitizedMods,
             val: finalVal,
           };
 
           setProject(updatedMatch);
-          if (updatedMatch.mods && updatedMatch.mods.length > 0) {
-            setExpanded(new Set(updatedMatch.mods.map(m => m.id)));
+          if (sanitizedMods.length > 0) {
+            setExpanded(new Set(sanitizedMods.map(m => m.id)));
           }
         }
       }
