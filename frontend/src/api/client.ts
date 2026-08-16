@@ -574,3 +574,53 @@ export async function toggleChecklistVoceApi(id: string) {
   }
 }
 
+export async function downloadFatturaPdfServerApi(fatturaId: string) {
+  try {
+    const res = await fetch(`${API_BASE}/invoices/${fatturaId}/pdf`, { headers: getAuthHeaders() });
+    if (!res.ok) throw new Error('Errore generazione PDF server');
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Fattura_Server_${fatturaId}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+    return { ok: true };
+  } catch (err: any) {
+    alert('Errore download PDF Server: ' + err.message);
+    return null;
+  }
+}
+
+export async function inviaFatturaEmailApi(fatturaId: string, emailDestinatario?: string) {
+  try {
+    const res = await fetch(`${API_BASE}/invoices/${fatturaId}/invia-email`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ emailDestinatario }),
+    });
+    if (!res.ok) throw new Error('Errore invio email fattura');
+    return await res.json();
+  } catch (err: any) {
+    alert('Errore invio email: ' + err.message);
+    return null;
+  }
+}
+
+export async function inviaWebhookSdiApi(fatturaId: string, statoSdi: 'consegnata' | 'scartata' | 'mancata_consegna') {
+  try {
+    const res = await fetch(`${API_BASE}/webhooks/sdi`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ fatturaId, statoSdi }),
+    });
+    if (!res.ok) throw new Error('Errore invio webhook SDI');
+    return await res.json();
+  } catch (err) {
+    console.warn('Webhook SDI fallback', err);
+    return null;
+  }
+}
+

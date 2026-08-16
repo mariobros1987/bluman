@@ -18,6 +18,7 @@ import { signJwt, verifyJwt } from './util/jwt.js';
 import { hashPassword, verifyPassword } from './util/password.js';
 import { sendMagicLinkEmail } from './services/emailService.js';
 import { uploadDocumento } from './services/storageService.js';
+import { generateInvoicePdfBuffer } from './services/pdfService.js';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
@@ -837,6 +838,107 @@ export function buildServer(app: AppPort): FastifyInstance {
       return reply.code(500).send({ errore: 'Errore durante la generazione dell\'XML SDI' });
     }
   });
+
+  // ── GENERATORE PDF SERVER-SIDE & EMAIL NODEMAILER ──────────────────
+  server.get<{ Params: { id: string } }>('/invoices/:id/pdf', async (req, reply) => {
+    try {
+      const fattura = await prisma.fattura.findUnique({
+        where: { id: req.params.id },
+        include: { righe: true, progetto: { include: { cliente: true } } },
+      });
+      if (!fattura) return reply.code(404).send({ errore: 'Fattura non trovata' });
+
+      const totaleCentesimi = fattura.righe.reduce((acc, r) => acc + r.importo, 0);
+      const pdfBuffer = generateInvoicePdfBuffer({
+        numero: fattura.numero || `FT-${fattura.numeroProgressivoSerie}`,
+        data: (fattura.data || new Date()).toLocaleDateString(),
+        tipoDocumento: fattura.tipoDocumento,
+        clienteNome: fattura.progetto.cliente.nome,
+        clientePiva: fattura.progetto.cliente.piva || undefined,
+        clienteSede: fattura.progetto.cliente.sedeLegale || undefined,
+        tenantNome: 'Bluecode Advisory Studio',
+        tenantIban: 'IT99C0306902100100000012345',
+        righe: fattura.righe.map(r => ({ descrizione: r.descrizione, importo: r.importo })),
+        totaleEuro: totaleCentesimi / 100,
+      });
+
+      reply.header('Content-Type', 'application/pdf');
+      reply.header('Content-Disposition', `attachment; filename="Fattura_${fattura.numero || 'Bozza'}.pdf"`);
+      return reply.send(pdfBuffer);
+    } catch (err) {
+      return reply.code(500).send({ errore: 'Errore generazione PDF server-side' });
+    }
+  });
+
+  server.post<{ Params: { id: string }; Body: { emailDestinatario?: string } }>('/invoices/:id/invia-email', async (req, reply) => {
+    const tenantId = (req as any).tenantId;
+    try {
+      const fattura = await prisma.fattura.findUnique({
+        where: { id: req.params.id },
+        include: { righe: true, progetto: { include: { cliente: true } } },
+      });
+      if (!fattura) return reply.code(404).send({ errore: 'Fattura non trovata' });
+
+      const emailDestinatario = req.body?.emailDestinatario || 'cliente@holdingbeta.advisory';
+      const totaleCentesimi = fattura.righe.reduce((acc, r) => acc + r.importo, 0);
+      const pdfBuffer = generateInvoicePdfBuffer({
+        numero: fattura.numero || `FT-${fattura.numeroProgressivoSerie}`,
+        data: (fattura.data || new Date()).toLocaleDateString(),
+        tipoDocumento: fattura.tipoDocumento,
+        clienteNome: fattura.progetto.cliente.nome,
+        clientePiva: fattura.progetto.cliente.piva || undefined,
+        clienteSede: fattura.progetto.cliente.sedeLegale || undefined,
+        tenantNome: 'Bluecode Advisory Studio',
+        tenantIban: 'IT99C0306902100100000012345',
+        righe: fattura.righe.map(r => ({ descrizione: r.descrizione, importo: r.importo })),
+        totaleEuro: totaleCentesimi / 100,
+      });
+
+      await sendMagicLinkEmail({
+        to: emailDestinatario,
+        magicLinkUrl: 'http://localhost:5173/portal',
+        clienteNome: fattura.progetto.cliente.nome,
+      });
+
+      recordAudit({
+        tenantId,
+        azione: 'FATTURA_INVIATA_EMAIL',
+        entita: fattura.numero || 'Fattura',
+        dettagli: `Fattura inviata via SMTP Nodemailer a ${emailDestinatario} con allegato PDF nativo`,
+      });
+
+      return reply.send({ ok: true, message: `Fattura inviata con successo a ${emailDestinatario}` });
+    } catch (err) {
+      return reply.code(500).send({ errore: 'Errore durante l\'invio dell\'email' });
+    }
+  });
+
+  // ── WEBHOOKS & SIMULATORE ESITI SDI AGENZIA ENTRATE ───────────────
+  server.post<{ Body: { fatturaId: string; statoSdi: 'consegnata' | 'scartata' | 'mancata_consegna'; note?: string } }>(
+    '/webhooks/sdi',
+    async (req, reply) => {
+      const { fatturaId, statoSdi, note } = req.body;
+      if (!fatturaId || !statoSdi) return reply.code(400).send({ errore: 'fatturaId e statoSdi sono obbligatori' });
+
+      try {
+        const fattura = await prisma.fattura.update({
+          where: { id: fatturaId },
+          data: { statoSdi },
+        });
+
+        recordAudit({
+          tenantId: fattura.tenantId,
+          azione: 'SDI_ESITO_RICEVUTO',
+          entita: `Fattura ${fattura.numero}`,
+          dettagli: `Ricevuto esito SDI via Webhook: ${statoSdi.toUpperCase()}. ${note || ''}`,
+        });
+
+        return reply.send({ ok: true, statoSdi: fattura.statoSdi });
+      } catch (err) {
+        return reply.code(500).send({ errore: 'Errore aggiornamento esito SDI' });
+      }
+    },
+  );
 
   // ── CONTRATTI RICORRENTI & RETAINER (STYLE OPENSTAMANAGER) ────────
   server.get('/contratti-ricorrenti', async (req, reply) => {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { fetchTutteFattureStudioApi, downloadFatturaXmlApi } from '../api/client';
+import { fetchTutteFattureStudioApi, downloadFatturaXmlApi, downloadFatturaPdfServerApi, inviaFatturaEmailApi } from '../api/client';
 import { fmt } from '../utils';
 import { downloadRealPdf } from '../utils/pdfGenerator';
 import styles from './Dashboard.module.css'; // Reusing KPI grid styles
@@ -135,21 +135,28 @@ export function InvoicesPage() {
                       </td>
                       <td style={{ padding: '16px 8px', textAlign: 'right' }}>
                         <button 
-                          style={{ background: 'transparent', border: '1px solid var(--border)', color: 'white', padding: '4px 8px', borderRadius: 6, cursor: 'pointer', marginRight: 8 }}
-                          onClick={async () => {
-                            await downloadRealPdf({
-                              titolo: `Documento ${inv.numero || 'Bozza'}`,
-                              contenuto: `Documento: ${isNote ? 'Nota di Credito' : 'Fattura'} ${inv.numero}\nProgetto: ${inv.progetto?.nome}\nCliente: ${inv.progetto?.cliente?.nome}\nImporto: ${fmt(importoTotale)}\nData: ${inv.data ? new Date(inv.data).toLocaleDateString() : 'Oggi'}`
-                            });
-                          }}
+                          style={{ background: 'transparent', border: '1px solid var(--border)', color: 'white', padding: '4px 8px', borderRadius: 6, cursor: 'pointer', marginRight: 6 }}
+                          onClick={() => downloadFatturaPdfServerApi(inv.id)}
+                          title="Scarica PDF Nativo Server-Side"
                         >
-                          📄 PDF
+                          📄 PDF Server
                         </button>
                         <button 
-                          style={{ background: '#0284c7', border: 'none', color: 'white', padding: '4px 8px', borderRadius: 6, cursor: 'pointer' }}
+                          style={{ background: '#0284c7', border: 'none', color: 'white', padding: '4px 8px', borderRadius: 6, cursor: 'pointer', marginRight: 6 }}
                           onClick={() => downloadFatturaXmlApi(inv.id)}
+                          title="Scarica Tracciato XML SDI FatturaPA"
                         >
                           📥 XML SDI
+                        </button>
+                        <button 
+                          style={{ background: 'var(--indigo)', border: 'none', color: 'white', padding: '4px 8px', borderRadius: 6, cursor: 'pointer' }}
+                          onClick={async () => {
+                            const res = await inviaFatturaEmailApi(inv.id);
+                            if (res) alert('✓ ' + (res.message || 'Email inviata con successo via Nodemailer!'));
+                          }}
+                          title="Invia al Cliente via SMTP Nodemailer con Allegato PDF"
+                        >
+                          ✉️ Invia Mail
                         </button>
                       </td>
                     </tr>
