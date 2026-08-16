@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { fetchContrattiRicorrentiApi, creaContrattoRicorrenteApi, fetchClientiApi } from '../api/client';
+import { fetchContrattiRicorrentiApi, creaContrattoRicorrenteApi, fetchClienti } from '../api/client';
 import { fmt } from '../utils';
 
 export function RetainersPage() {
@@ -21,7 +21,7 @@ export function RetainersPage() {
     setLoading(true);
     const [cData, clData] = await Promise.all([
       fetchContrattiRicorrentiApi(),
-      fetchClientiApi(),
+      fetchClienti(),
     ]);
     setContratti(cData || []);
     setClienti(clData || []);
