@@ -126,59 +126,23 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
     };
   }, [clientData, nomeCliente, emailCliente]);
 
-  const [messaggi, setMessaggi] = useState<MessaggioComunicazione[]>([
-    {
-      id: 'msg-001',
-      canale: 'email',
-      mittente: contactInfo.email,
-      destinatario: 'joe@bluecode.advisory',
-      direzione: 'entrata',
-      testo: 'Buongiorno Joe, vi ho inviato a mezzo pec la delibera di approvazione bilancio 2025. In allegato la bozza preliminare per il deposito EUIPO.',
-      dataOra: '14/08/2026 10:15',
-      allegati: [
-        { nome: `Bozza_Marchio_EUIPO_${(nomeCliente || 'Holding').replace(/\s+/g, '_')}.pdf`, url: '#', dimensione: '1.4 MB' },
-      ],
-    },
-    {
-      id: 'msg-002',
-      canale: 'whatsapp',
-      mittente: `${contactInfo.whatsapp} (${contactInfo.referente})`,
-      destinatario: 'BluMan WhatsApp Studio (+356 79001122)',
-      direzione: 'entrata',
-      testo: 'Ciao Joe! Ho appena completato la registrazione sul Portale Cliente ed effettuato la Firma 1-Click della Proposta d\'Ordine. Procediamo con il deposito?',
-      dataOra: '14/08/2026 11:30',
-    },
-    {
-      id: 'msg-003',
-      canale: 'whatsapp',
-      mittente: 'Joe Disabato (Senior Advisor)',
-      destinatario: `${contactInfo.whatsapp} (${contactInfo.referente})`,
-      direzione: 'uscita',
-      testo: `Perfetto ${contactInfo.referente}! Confermo ricezione firma ed allegati. L'operatore ha avviato la microvoce per il deposito marchio. Ti aggiorniamo sul portale.`,
-      dataOra: '14/08/2026 11:45',
-    },
-    {
-      id: 'msg-004',
-      canale: 'telegram',
-      mittente: contactInfo.telegram,
-      destinatario: '@BluManBot',
-      direzione: 'entrata',
-      testo: 'Invio copia della ricevuta di versamento tasse di deposito per il dossier IP.',
-      dataOra: '14/08/2026 15:20',
-      allegati: [
-        { nome: 'Ricevuta_Versamento_F24_EUIPO.pdf', url: '#', dimensione: '450 KB' },
-      ],
-    },
-    {
-      id: 'msg-005',
-      canale: 'signal',
-      mittente: `${contactInfo.signal} (Signal Cifrato)`,
-      destinatario: 'Studio Malta Secure Vault',
-      direzione: 'entrata',
-      testo: 'Messaggio con crittografia end-to-end: Confermo approvazione struttura holding partecipata Malta.',
-      dataOra: '14/08/2026 16:50',
-    },
-  ]);
+  const [messaggi, setMessaggi] = useState<MessaggioComunicazione[]>(() => {
+    const saved = localStorage.getItem(`bluman_msgs_${progettoId}`);
+    if (saved) {
+      try { return JSON.parse(saved); } catch {}
+    }
+    return [
+      {
+        id: `msg-welcome-${progettoId}`,
+        canale: 'whatsapp',
+        mittente: `${contactInfo.whatsapp} (${contactInfo.referente})`,
+        destinatario: 'Studio Advisory (+356 79001122)',
+        direzione: 'entrata',
+        testo: `Buongiorno Studio, confermiamo l'avvio delle attività per la pratica ${nomeCliente || 'Incarico'}. Restiamo a disposizione per i dettagli.`,
+        dataOra: new Date().toLocaleDateString('it-IT'),
+      }
+    ];
+  });
 
   const [nuovoTesto, setNuovoTesto] = useState('');
   const [canaleSelezionato, setCanaleSelezionato] = useState<'email' | 'whatsapp' | 'telegram' | 'signal'>('whatsapp');
@@ -189,14 +153,18 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
 
   const loadComunicazioni = async () => {
     setLoadingMsgs(true);
-    const dbMsgs = await fetchComunicazioniApi(progettoId);
-    if (dbMsgs && Array.isArray(dbMsgs) && dbMsgs.length > 0) {
-      setMessaggi(dbMsgs.map((m: any) => ({
-        ...m,
-        dataOra: m.createdAt ? new Date(m.createdAt).toLocaleString('it-IT') : (m.dataOra || 'Oggi'),
-        allegati: m.allegatiJson ? (typeof m.allegatiJson === 'string' ? JSON.parse(m.allegatiJson) : m.allegatiJson) : m.allegati,
-      })));
-    }
+    try {
+      const dbMsgs = await fetchComunicazioniApi(progettoId);
+      if (dbMsgs && Array.isArray(dbMsgs) && dbMsgs.length > 0) {
+        const mapped = dbMsgs.map((m: any) => ({
+          ...m,
+          dataOra: m.createdAt ? new Date(m.createdAt).toLocaleString('it-IT') : (m.dataOra || 'Oggi'),
+          allegati: m.allegatiJson ? (typeof m.allegatiJson === 'string' ? JSON.parse(m.allegatiJson) : m.allegatiJson) : m.allegati,
+        }));
+        setMessaggi(mapped);
+        localStorage.setItem(`bluman_msgs_${progettoId}`, JSON.stringify(mapped));
+      }
+    } catch {}
     setLoadingMsgs(false);
   };
 
@@ -204,7 +172,7 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
     loadComunicazioni();
     const interval = setInterval(() => {
       loadComunicazioni();
-    }, 4000);
+    }, 5000);
     return () => clearInterval(interval);
   }, [progettoId]);
 

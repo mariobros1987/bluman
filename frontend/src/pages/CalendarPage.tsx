@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { PROJECTS } from '../store/mockData';
 import { CatBadge } from '../components/ui/CatBadge';
 import { Avatar } from '../components/ui/Avatar';
-import { triggerCronScadenzeApi } from '../api/client';
+import { triggerCronScadenzeApi, fetchProgetti, fetchClienti, fetchTutteFattureStudioApi } from '../api/client';
 
 interface EventoStudio {
   id: string;
@@ -12,7 +12,7 @@ interface EventoStudio {
   categoria: 'microvoce' | 'kyc' | 'fattura' | 'contratto' | 'promemoria';
   priorita: 'alta' | 'media' | 'normale';
   clienteNome?: string;
-  progettoId?: number;
+  progettoId?: number | string;
   progettoNome?: string;
   operatoreNome?: string;
   stato: 'pending' | 'delayed' | 'done';
@@ -24,130 +24,134 @@ export function CalendarPage() {
   const [filterCat, setFilterCat] = useState<string>('tutti');
   const [selectedEvent, setSelectedEvent] = useState<EventoStudio | null>(null);
   const [newEventModalOpen, setNewEventModalOpen] = useState(false);
+  const [cronRunning, setCronRunning] = useState(false);
 
-  // Initial Events built from Projects, KYC audits, and Invoices
-  const [events, setEvents] = useState<EventoStudio[]>([
-    {
-      id: 'ev-1',
-      titolo: 'Consuntivazione Fiscale IP Box & Patent Box',
-      data: '2026-08-14',
-      ora: '10:30',
-      categoria: 'microvoce',
-      priorita: 'alta',
-      clienteNome: 'Holding Beta S.r.l.',
-      progettoId: 1,
-      progettoNome: 'Ristrutturazione Corporate Alpha',
-      operatoreNome: 'Joe Disabato',
-      stato: 'delayed',
-      note: 'In attesa della documentazione integrativa sui costi di ricerca dal CFO.',
-    },
-    {
-      id: 'ev-2',
-      titolo: 'Rinnovo Audit Antiriciclaggio (KYC/AML)',
-      data: '2026-08-18',
-      ora: '15:00',
-      categoria: 'kyc',
-      priorita: 'alta',
-      clienteNome: 'Gamma Real Estate S.r.l.',
-      operatoreNome: 'Elena Rossi',
-      stato: 'pending',
-      note: 'Verifica titolare effettivo (UBO) e registro imprese per scadenza annuale.',
-    },
-    {
-      id: 'ev-3',
-      titolo: 'Emissione Saldo Fattura FT-2026/001',
-      data: '2026-08-20',
-      ora: '09:00',
-      categoria: 'fattura',
-      priorita: 'media',
-      clienteNome: 'Holding Beta S.r.l.',
-      progettoId: 1,
-      progettoNome: 'Ristrutturazione Corporate Alpha',
-      operatoreNome: 'Joe Disabato',
-      stato: 'pending',
-      note: 'Importo €12.500 + IVA. Tracciato SDI FPA pronto.',
-    },
-    {
-      id: 'ev-4',
-      titolo: 'Firma Digitale Atto Costitutivo Trust',
-      data: '2026-08-25',
-      ora: '11:00',
-      categoria: 'contratto',
-      priorita: 'alta',
-      clienteNome: 'Delta Tech Kft (Ungheria)',
-      progettoId: 2,
-      progettoNome: 'Protezione Patrimoniale Trust',
-      operatoreNome: 'Marco Bianchi',
-      stato: 'pending',
-      note: 'Sessione di firma da remoto tramite Portale Cliente 1-Click.',
-    },
-    {
-      id: 'ev-5',
-      titolo: 'Riunione Comitato Direttivo Advisory',
-      data: '2026-08-28',
-      ora: '16:30',
-      categoria: 'promemoria',
-      priorita: 'normale',
-      operatoreNome: 'Joe Disabato',
-      stato: 'pending',
-      note: 'Revisione budget Q3 e pianificazione nuove pratiche cliente.',
-    },
-  ]);
+  // Dynamic Events State
+  const [events, setEvents] = useState<EventoStudio[]>(() => {
+    const saved = localStorage.getItem('bluman_calendar_events');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  // Carica i dati reali da Progetti, Clienti ERP e Fatture
+  useEffect(() => {
+    const loadRealEvents = async () => {
+      try {
+        const [prjs, cls, invs] = await Promise.all([
+          fetchProgetti(),
+          fetchClienti(),
+          fetchTutteFattureStudioApi(),
+        ]);
+
+        const dynamicEvents: EventoStudio[] = [];
+
+        // 1. Eventi da Clienti (Rinnovo KYC / UBO Registry MFSA)
+        if (cls && Array.isArray(cls)) {
+          cls.forEach((c: any, idx: number) => {
+            const dateStr = c.dataKyc ? new Date(c.dataKyc).toISOString().slice(0, 10) : `2026-08-${(12 + (idx % 15)).toString().padStart(2, '0')}`;
+            dynamicEvents.push({
+              id: `kyc-${c.id}`,
+              titolo: `Rinnovo Compliance UBO & Audit KYC`,
+              data: dateStr,
+              ora: '10:00',
+              categoria: 'kyc',
+              priorita: 'alta',
+              clienteNome: c.nome,
+              operatoreNome: 'Joe Disabato',
+              stato: 'pending',
+              note: `Verifica annuale antiriciclaggio e registro titolari effettivi per ${c.nome}.`,
+            });
+          });
+        }
+
+        // 2. Eventi da Progetti (Microvoci e consegne)
+        if (prjs && Array.isArray(prjs)) {
+          prjs.forEach((p: any, pIdx: number) => {
+            dynamicEvents.push({
+              id: `prj-${p.id}`,
+              titolo: `Consegna Milestone: ${p.titolo || p.nome || 'Incarico'}`,
+              data: `2026-08-${(14 + (pIdx % 12)).toString().padStart(2, '0')}`,
+              ora: '14:30',
+              categoria: 'microvoce',
+              priorita: p.delay ? 'alta' : 'media',
+              clienteNome: p.cliente?.nome || p.cl || 'Cliente Studio',
+              progettoId: p.id,
+              progettoNome: p.titolo || p.nome,
+              operatoreNome: 'Elena Rossi',
+              stato: p.delay ? 'delayed' : 'pending',
+              note: `Avanzamento del progetto ${p.titolo || p.nome} con coordinamento team.`,
+            });
+          });
+        }
+
+        // 3. Eventi da Fatture (Scadenze Incassi)
+        if (invs && Array.isArray(invs)) {
+          invs.forEach((inv: any, iIdx: number) => {
+            dynamicEvents.push({
+              id: `inv-${inv.id}`,
+              titolo: `Scadenza Rata Fattura ${inv.numeroProgressivoSerie || inv.numero || 'FT-2026'}`,
+              data: inv.dataEmissione ? new Date(inv.dataEmissione).toISOString().slice(0, 10) : `2026-08-${(18 + (iIdx % 10)).toString().padStart(2, '0')}`,
+              ora: '09:00',
+              categoria: 'fattura',
+              priorita: 'alta',
+              clienteNome: inv.progetto?.cliente?.nome || 'Cliente Incarico',
+              progettoNome: inv.progetto?.nome || 'Incarico',
+              operatoreNome: 'Joe Disabato',
+              stato: inv.stato === 'incassata' ? 'done' : 'pending',
+              note: `Importo da incassare: €${((inv.importoTotaleCentesimi || 350000) / 100).toFixed(2)} tramite bonifico bancario.`,
+            });
+          });
+        }
+
+        // Recupera eventuali eventi custom creati a mano dall'utente
+        const savedCustom = localStorage.getItem('bluman_custom_calendar_events');
+        const customEvents: EventoStudio[] = savedCustom ? JSON.parse(savedCustom) : [];
+
+        const merged = [...customEvents, ...dynamicEvents];
+        setEvents(merged);
+        localStorage.setItem('bluman_calendar_events', JSON.stringify(merged));
+      } catch (err) {
+        console.warn('Errore sync eventi calendario:', err);
+      }
+    };
+
+    loadRealEvents();
+  }, []);
 
   // New Event Form State
   const [formTitolo, setFormTitolo] = useState('');
-  const [formData, setFormData] = useState('2026-08-15');
+  const [formData, setFormData] = useState('2026-08-18');
   const [formOra, setFormOra] = useState('10:00');
-  const [formCat, setFormCat] = useState<EventoStudio['categoria']>('microvoce');
-  const [formPriorita, setFormPriorita] = useState<EventoStudio['priorita']>('media');
+  const [formCat, setFormCat] = useState<'microvoce' | 'kyc' | 'fattura' | 'contratto' | 'promemoria'>('promemoria');
+  const [formPriorita, setFormPriorita] = useState<'alta' | 'media' | 'normale'>('normale');
   const [formCliente, setFormCliente] = useState('Holding Beta S.r.l.');
+  const [formOperatore, setFormOperatore] = useState('Joe Disabato');
   const [formNote, setFormNote] = useState('');
-
-  React.useEffect(() => {
-    const savedStr = localStorage.getItem('bluman_calendar_events');
-    if (savedStr) {
-      try {
-        const savedArr = JSON.parse(savedStr);
-        if (Array.isArray(savedArr) && savedArr.length > 0) {
-          const mapped: EventoStudio[] = savedArr.map((se: any) => ({
-            id: se.id || `ev-${Math.random()}`,
-            titolo: se.title || 'Scadenza Pianificata',
-            data: se.date || '2026-08-25',
-            ora: se.time || '10:30',
-            categoria: 'microvoce',
-            priorita: (se.priority as any) || 'alta',
-            operatoreNome: 'Advisor / Operatore Incaricato',
-            stato: 'pending',
-            note: `${se.notes || ''} ${se.locationUrl ? `(Link: ${se.locationUrl})` : ''}`,
-          }));
-          setEvents(prev => {
-            const existingIds = new Set(prev.map(e => e.id));
-            const newToAdd = mapped.filter(m => !existingIds.has(m.id));
-            return [...newToAdd, ...prev];
-          });
-        }
-      } catch (err) {
-        console.error(err);
-      }
-    }
-  }, []);
 
   const handleCreateEventSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formTitolo) return;
     const newEv: EventoStudio = {
-      id: `ev-${Date.now()}`,
+      id: `ev-custom-${Date.now()}`,
       titolo: formTitolo,
       data: formData,
       ora: formOra,
       categoria: formCat,
       priorita: formPriorita,
       clienteNome: formCliente,
-      operatoreNome: 'Joe Disabato',
+      operatoreNome: formOperatore || 'Joe Disabato',
       stato: 'pending',
       note: formNote,
     };
-    setEvents([newEv, ...events]);
+    
+    // Aggiorna stato e localStorage custom
+    const updated = [newEv, ...events];
+    setEvents(updated);
+    
+    const savedCustom = localStorage.getItem('bluman_custom_calendar_events');
+    const customList: EventoStudio[] = savedCustom ? JSON.parse(savedCustom) : [];
+    customList.unshift(newEv);
+    localStorage.setItem('bluman_custom_calendar_events', JSON.stringify(customList));
+
     setNewEventModalOpen(false);
     setFormTitolo('');
     setFormNote('');
