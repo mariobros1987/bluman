@@ -136,10 +136,54 @@ export function InvoicesPage() {
                       <td style={{ padding: '16px 8px', textAlign: 'right' }}>
                         <button 
                           style={{ background: 'transparent', border: '1px solid var(--border)', color: 'white', padding: '4px 8px', borderRadius: 6, cursor: 'pointer', marginRight: 6 }}
-                          onClick={() => downloadFatturaPdfServerApi(inv.id)}
-                          title="Scarica PDF Nativo Server-Side"
+                          onClick={async () => {
+                            await downloadRealPdf(
+                              `Fattura_${inv.numero || 'Bozza'}.pdf`,
+                              `<div style="font-family: Arial, sans-serif; padding: 20px; color: #0f172a;">
+                                <div style="display: flex; justify-content: space-between; border-bottom: 2px solid #1e3a8a; padding-bottom: 12px; margin-bottom: 20px;">
+                                  <div>
+                                    <h1 style="margin: 0; color: #1e3a8a; font-size: 20px;">Bluecode Advisory Studio</h1>
+                                    <div style="font-size: 12px; color: #64748b;">P.IVA 12345678901 | Studio Advisory & Consulting</div>
+                                  </div>
+                                  <div style="text-align: right;">
+                                    <h2 style="margin: 0; color: #0f172a; font-size: 16px;">${isNote ? 'NOTA DI CREDITO' : 'FATTURA ELETTRONICA'}</h2>
+                                    <div style="font-size: 13px; font-weight: bold; color: #1e3a8a;">${inv.numero || 'Bozza'}</div>
+                                    <div style="font-size: 11px; color: #64748b;">Data: ${inv.data ? new Date(inv.data).toLocaleDateString() : 'Oggi'}</div>
+                                  </div>
+                                </div>
+                                <div style="margin-bottom: 20px; background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0;">
+                                  <div style="font-size: 11px; text-transform: uppercase; color: #64748b; font-weight: bold;">Cliente Cessionario:</div>
+                                  <div style="font-size: 14px; font-weight: bold; color: #0f172a;">${inv.progetto?.cliente?.nome || 'Cliente Studio'}</div>
+                                  <div style="font-size: 12px; color: #334155;">Progetto: ${inv.progetto?.nome || 'Incarico'}</div>
+                                </div>
+                                <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                                  <thead>
+                                    <tr style={{ background: '#f1f5f9', borderBottom: '2px solid #cbd5e1', textAlign: 'left', fontSize: '12px' }}>
+                                      <th style="padding: 8px;">Descrizione Prestazione</th>
+                                      <th style="padding: 8px; text-align: right;">Importo</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    ${(inv.righe || []).map((r: any) => `
+                                      <tr style="border-bottom: 1px solid #e2e8f0; font-size: 13px;">
+                                        <td style="padding: 10px 8px;">${r.descrizione}</td>
+                                        <td style="padding: 10px 8px; text-align: right; font-weight: bold;">€ ${(r.importo / 100).toFixed(2)}</td>
+                                      </tr>
+                                    `).join('')}
+                                  </tbody>
+                                </table>
+                                <div style="text-align: right; font-size: 16px; font-weight: bold; color: #1e3a8a; border-top: 2px solid #1e3a8a; padding-top: 10px;">
+                                  TOTALE DOCUMENTO: € ${fmt(importoTotale)}
+                                </div>
+                                <div style="margin-top: 30px; font-size: 11px; color: #64748b; border-top: 1px solid #e2e8f0; padding-top: 10px;">
+                                  IBAN di Pagamento: IT99C0306902100100000012345 | Causale: Saldo Fattura ${inv.numero}
+                                </div>
+                              </div>`
+                            );
+                          }}
+                          title="Scarica PDF Grafico VERO (A4)"
                         >
-                          📄 PDF Server
+                          📄 PDF Grafico A4
                         </button>
                         <button 
                           style={{ background: '#0284c7', border: 'none', color: 'white', padding: '4px 8px', borderRadius: 6, cursor: 'pointer', marginRight: 6 }}
