@@ -8,7 +8,6 @@ RUN npm ci
 
 COPY . .
 RUN npx prisma generate
-RUN npx tsc
 
 EXPOSE 3000
-CMD ["sh", "-c", "npx prisma db push --accept-data-loss ; node dist/index.js"]
+CMD ["sh", "-c", "npx prisma db push --accept-data-loss ; npx tsx src/index.ts"]
