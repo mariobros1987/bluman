@@ -1,17 +1,17 @@
-# Graph Report - bluman  (2026-08-16)
+# Graph Report - bluman  (2026-08-17)
 
 ## Corpus Check
 - cluster-only mode — file stats not available
 
 ## Summary
-- 13373 nodes · 25255 edges · 1036 communities (842 shown, 194 thin omitted)
-- Extraction: 93% EXTRACTED · 7% INFERRED · 0% AMBIGUOUS · INFERRED: 1646 edges (avg confidence: 0.75)
-- Token cost: 0 input · 0 output
+- 13420 nodes · 25380 edges · 1045 communities (850 shown, 195 thin omitted)
+- Extraction: 94% EXTRACTED · 6% INFERRED · 0% AMBIGUOUS
+- New Hubs: Document Studio & Word WYSIWYG, eIDAS FEA OTP Service, Cron Scadenze Worker, Connettore SDI, Telegram Ingestion
 
 ## Graph Freshness
-- Built from commit: `f32e2447`
-- Run `git rev-parse HEAD` and compare to check if the graph is stale.
-- Run `graphify update .` after code changes (no API cost).
+- Built from commit: `2ddcb0b`
+- Repository: `https://github.com/mariobros1987/bluman.git`
+
 
 ## Community Hubs (Navigation)
 - .database
