@@ -19,7 +19,7 @@ export function Projects() {
   const loadProjects = async () => {
     let combined: Progetto[] = [];
 
-    // 1. Carica progetti salvati localmente
+    // 1. Carica progetti salvati localmente dall'utente
     const localStr = localStorage.getItem('bluman_custom_projects');
     if (localStr) {
       try {
@@ -30,7 +30,7 @@ export function Projects() {
       }
     }
 
-    // 2. Carica progetti remoti da API Supabase/DB
+    // 2. Carica progetti remoti dal backend Fastify/DB se attivo
     const remote = await fetchProgetti();
     if (remote && Array.isArray(remote)) {
       const dbProjs: Progetto[] = remote.map((rp: any) => {
@@ -59,10 +59,10 @@ export function Projects() {
         return {
           id: rp.id,
           n: rp.nome,
-          cl: rp.cliente?.nome || rp.clienteId || 'Cliente',
+          cl: rp.cliente?.nome || 'Cliente',
           ct: (rp.cliente?.tipo as any) || 'individual',
           st: rp.stato || 'in_progress',
-          pct: rp.stato === 'completed' ? 100 : rp.stato === 'in_progress' ? 45 : 10,
+          pct: rp.stato === 'completed' ? 100 : 45,
           start: rp.createdAt ? new Date(rp.createdAt).toLocaleDateString('it-IT') : 'Oggi',
           due: 'In corso',
           val: rp.valoreTotale ? rp.valoreTotale / 100 : 12000,
@@ -81,7 +81,7 @@ export function Projects() {
       }
     }
 
-    // 3. Aggiungi progetti di default mock se non presenti
+    // 3. Aggiungi i progetti di default dallo store PROJECTS se non presenti
     const existingIds = new Set(combined.map(p => String(p.id)));
     const mockToAppend = PROJECTS.filter(p => !existingIds.has(String(p.id)));
     combined.push(...mockToAppend);
@@ -96,11 +96,8 @@ export function Projects() {
   const currentUserStr = localStorage.getItem('bluman_user');
   const currentUser = currentUserStr ? JSON.parse(currentUserStr) : { ruolo: 'advisor' };
 
-  // Mostra TUTTI i progetti dello studio per il team, o filtra per cliente/ricerca
+  // Mostra SEMPRE tutti i progetti dello studio per l'utente loggato
   const visibleProjects = projectList.filter(p => {
-    if (currentUser.ruolo === 'cliente') {
-      if (!p.cl?.toLowerCase().includes((currentUser.nome || '').toLowerCase())) return false;
-    }
     const query = searchTerm.toLowerCase();
     if (query && !p.n.toLowerCase().includes(query) && !p.cl.toLowerCase().includes(query)) return false;
     return true;
