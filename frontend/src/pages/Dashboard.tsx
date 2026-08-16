@@ -5,7 +5,6 @@ import { ProgressBar } from '../components/ui/ProgressBar';
 import { AvatarGroup } from '../components/ui/Avatar';
 import { CatBadge } from '../components/ui/CatBadge';
 import { fmt, progressColor } from '../utils';
-import { PROJECTS } from '../store/mockData';
 import { NewProjectWizard } from '../components/NewProjectWizard';
 import { fetchProgetti } from '../api/client';
 import type { Progetto } from '../types';
@@ -14,85 +13,67 @@ import styles from './Dashboard.module.css';
 export function Dashboard() {
   const navigate = useNavigate();
   const [wizardOpen, setWizardOpen] = useState(false);
-  const [projectList, setProjectList] = useState<Progetto[]>(PROJECTS);
-  const [isDbConnected, setIsDbConnected] = useState(false);
+  const [projectList, setProjectList] = useState<Progetto[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'attivi' | 'archiviati'>('attivi');
+  const [searchTerm, setSearchTerm] = useState('');
 
   const loadProjects = async () => {
-    let combined: Progetto[] = [];
-
-    // 1. Carica progetti salvati localmente
-    const localStr = localStorage.getItem('bluman_custom_projects');
-    if (localStr) {
-      try {
-        const localProjs = JSON.parse(localStr);
-        if (Array.isArray(localProjs)) combined.push(...localProjs);
-      } catch (err) {
-        console.warn('Errore parsing custom projects in Dashboard:', err);
-      }
-    }
-
-    // 2. Carica progetti remoti da API
-    const remote = await fetchProgetti();
-    if (remote && Array.isArray(remote)) {
-      setIsDbConnected(true);
-      const dbProjs: Progetto[] = remote.map((rp: any) => ({
-        id: rp.id,
-        n: rp.nome,
-        cl: rp.cliente?.nome || 'Cliente',
-        ct: (rp.cliente?.tipo as any) || 'individual',
-        st: rp.stato || 'in_progress',
-        pct: rp.stato === 'completed' ? 100 : rp.stato === 'in_progress' ? 45 : 10,
-        start: rp.createdAt ? new Date(rp.createdAt).toLocaleDateString('it-IT') : 'Oggi',
-        due: 'In corso',
-        val: rp.valoreTotale ? rp.valoreTotale / 100 : 15000,
-        delay: false,
-        fisc: 'privato',
-        fatture: [],
-        mods: (rp.moduli || []).map((m: any, mIdx: number) => ({
-          id: mIdx + 100,
-          n: m.nome,
-          cat: m.categoria || 'Societario',
-          st: m.stato || 'pending',
-          pct: m.stato === 'done' ? 100 : m.stato === 'in_progress' ? 50 : 0,
-          h: m.orePreventivate || 20,
-          a: m.oreConsuntivate || 0,
-          p: m.prezzo ? m.prezzo / 100 : 3500,
-          team: [1, 2],
-          delay: m.stato === 'delayed' || m.stato === 'blocked',
-          v: (m.microvoci || []).map((mv: any) => ({
-            n: mv.nome,
-            hE: mv.orePreventivate || 4,
-            hA: mv.oreConsuntivate || 0,
-            s: mv.stato || 'pending',
-            as: 1,
-            d: 0,
-            vn: mv.causaNota || undefined,
+    setLoading(true);
+    setError(null);
+    try {
+      const remote = await fetchProgetti();
+      if (remote && Array.isArray(remote)) {
+        const dbProjs: Progetto[] = remote.map((rp: any) => ({
+          id: rp.id,
+          n: rp.nome,
+          cl: rp.cliente?.nome || 'Cliente',
+          ct: (rp.cliente?.tipo as any) || 'individual',
+          st: rp.stato || 'in_progress',
+          pct: rp.stato === 'completed' ? 100 : rp.stato === 'in_progress' ? 45 : 10,
+          start: rp.createdAt ? new Date(rp.createdAt).toLocaleDateString('it-IT') : 'Oggi',
+          due: 'In corso',
+          val: rp.valoreTotale ? rp.valoreTotale / 100 : 0,
+          delay: false,
+          fisc: 'privato',
+          fatture: [],
+          mods: (rp.moduli || []).map((m: any, mIdx: number) => ({
+            id: mIdx + 100,
+            n: m.nome,
+            cat: m.categoria || 'Societario',
+            st: m.stato || 'pending',
+            pct: m.stato === 'done' ? 100 : m.stato === 'in_progress' ? 50 : 0,
+            h: m.orePreventivate || 20,
+            a: m.oreConsuntivate || 0,
+            p: m.prezzo ? m.prezzo / 100 : 3500,
+            team: [1, 2],
+            delay: m.stato === 'delayed' || m.stato === 'blocked',
+            v: (m.microvoci || []).map((mv: any) => ({
+              n: mv.nome,
+              hE: mv.orePreventivate || 4,
+              hA: mv.oreConsuntivate || 0,
+              s: mv.stato || 'pending',
+              as: 1,
+              d: 0,
+              vn: mv.causaNota || undefined,
+            })),
           })),
-        })),
-      }));
-
-      const existingIds = new Set(combined.map(p => String(p.id)));
-      for (const dp of dbProjs) {
-        if (!existingIds.has(String(dp.id))) {
-          combined.push(dp);
-        }
+        }));
+        setProjectList(dbProjs);
+      } else {
+        setError('Connessione al database non riuscita. Contattare l\'amministratore di sistema.');
       }
+    } catch (err: any) {
+      setError('Impossibile connettersi al database. Verificare la connessione e contattare l\'amministratore.');
+    } finally {
+      setLoading(false);
     }
-
-    // 3. Aggiungi progetti di default mock se non presenti
-    const existingIds = new Set(combined.map(p => String(p.id)));
-    const mockToAppend = PROJECTS.filter(p => !existingIds.has(String(p.id)));
-    combined.push(...mockToAppend);
-
-    setProjectList(combined);
   };
 
   useEffect(() => {
     loadProjects();
   }, []);
-
-  const [searchTerm, setSearchTerm] = useState('');
 
   const currentUserStr = localStorage.getItem('bluman_user');
   const currentUser = currentUserStr ? JSON.parse(currentUserStr) : { ruolo: 'advisor' };
@@ -118,13 +99,69 @@ export function Dashboard() {
     return true;
   });
 
+  // ── Stato: Caricamento ──────────────────────────────────────────────────────
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 400, gap: 16 }}>
+        <div style={{
+          width: 48, height: 48, borderRadius: '50%',
+          border: '3px solid var(--border)',
+          borderTopColor: 'var(--accent)',
+          animation: 'spin 0.8s linear infinite'
+        }} />
+        <p style={{ color: 'var(--muted)', fontSize: 14 }}>Connessione al database in corso...</p>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
+  }
+
+  // ── Stato: Errore DB ────────────────────────────────────────────────────────
+  if (error) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 400, gap: 20 }}>
+        <div style={{ fontSize: 48 }}>🔴</div>
+        <div style={{ textAlign: 'center', maxWidth: 480 }}>
+          <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--fg)', marginBottom: 8 }}>
+            Errore di connessione al database
+          </div>
+          <div style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.6, marginBottom: 20 }}>
+            {error}
+          </div>
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+            <button
+              onClick={loadProjects}
+              style={{
+                padding: '8px 20px', borderRadius: 8, border: 'none',
+                background: 'var(--accent)', color: '#fff', cursor: 'pointer',
+                fontSize: 13, fontWeight: 600
+              }}
+            >
+              🔄 Riprova
+            </button>
+            <button
+              onClick={() => window.open('mailto:admin@bluecode.advisory?subject=Errore%20Database%20BluMan', '_blank')}
+              style={{
+                padding: '8px 20px', borderRadius: 8,
+                border: '1px solid var(--border)',
+                background: 'transparent', color: 'var(--muted)', cursor: 'pointer',
+                fontSize: 13
+              }}
+            >
+              📧 Contatta Amministratore
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       {/* DB Connection Indicator */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-        <div style={{ fontSize: 11, color: isDbConnected ? '#34d399' : 'var(--muted)', display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ width: 7, height: 7, borderRadius: '50%', background: isDbConnected ? '#10b981' : 'var(--amber)' }} />
-          {isDbConnected ? '🟢 Enterprise Cloud Database Collegato' : '🟡 Modalità Studio Offline / Dimostrativa'}
+        <div style={{ fontSize: 11, color: '#34d399', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#10b981' }} />
+          🟢 Enterprise Cloud Database Collegato
         </div>
       </div>
 
@@ -186,64 +223,65 @@ export function Dashboard() {
 
       <div className={styles.projectList}>
         {filteredProjects.length === 0 ? (
-          <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted)', width: '100%' }}>
-            Nessun progetto trovato per la ricerca "{searchTerm}".
+          <div style={{ padding: '3rem 2rem', textAlign: 'center', color: 'var(--muted)', width: '100%' }}>
+            <div style={{ fontSize: 40, marginBottom: 12 }}>📁</div>
+            <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>Nessun progetto in corso</div>
+            <div style={{ fontSize: 13 }}>Crea il primo progetto per il tuo studio cliccando su "+ Nuovo progetto"</div>
           </div>
         ) : (
           filteredProjects.map(p => {
-          const color = progressColor(p);
-          const allTeam = [...new Set((p.mods || []).flatMap(m => m.team || [1]).filter(Boolean))];
-          return (
-            <div
-              key={p.id}
-              className={`${styles.projectCard} ${p.delay ? styles.hasDelay : ''}`}
-              onClick={() => navigate(`/projects/${p.id}`)}
-            >
-              <div className={styles.projectTop}>
-                <div>
-                  <div className={styles.projectName} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span>{p.n}</span>
-                    <span style={{ fontSize: 11, color: 'var(--muted)', cursor: 'pointer' }} title="Apri / Modifica Dettagli Progetto">✏️</span>
+            const color = progressColor(p);
+            const allTeam = [...new Set((p.mods || []).flatMap(m => m.team || [1]).filter(Boolean))];
+            return (
+              <div
+                key={p.id}
+                className={`${styles.projectCard} ${p.delay ? styles.hasDelay : ''}`}
+                onClick={() => navigate(`/projects/${p.id}`)}
+              >
+                <div className={styles.projectTop}>
+                  <div>
+                    <div className={styles.projectName} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span>{p.n}</span>
+                      <span style={{ fontSize: 11, color: 'var(--muted)', cursor: 'pointer' }} title="Apri / Modifica Dettagli Progetto">✏️</span>
+                    </div>
+                    <div className={styles.projectMeta}>
+                      <span
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/clients?client=${encodeURIComponent(p.cl)}`);
+                        }}
+                        style={{ cursor: 'pointer', color: 'var(--indigo-l)', textDecoration: 'underline' }}
+                        title="Apri Anagrafica Specifica Cliente"
+                      >
+                        {p.ct === 'individual' ? '👤' : '🏢'} {p.cl}
+                      </span>
+                      <span>📅 {p.start} → {p.due}</span>
+                      <span>💶 {fmt(p.val)}</span>
+                    </div>
                   </div>
-                  <div className={styles.projectMeta}>
-                    <span
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        navigate(`/clients?client=${encodeURIComponent(p.cl)}`);
-                      }}
-                      style={{ cursor: 'pointer', color: 'var(--indigo-l)', textDecoration: 'underline' }}
-                      title="Apri Anagrafica Specifica Cliente"
-                    >
-                      {p.ct === 'individual' ? '👤' : '🏢'} {p.cl}
-                    </span>
-                    <span>📅 {p.start} → {p.due}</span>
-                    <span>💶 {fmt(p.val)}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+                    <AvatarGroup ids={allTeam.length ? allTeam : [1]} size={22} />
+                    <Badge stato={p.st} />
                   </div>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-                  <AvatarGroup ids={allTeam.length ? allTeam : [1]} size={22} />
-                  <Badge stato={p.st} />
+
+                <div className={styles.modsSummary}>
+                  {(p.mods || []).map((m, idx) => (
+                    <CatBadge key={idx} cat={m.cat} />
+                  ))}
+                </div>
+
+                <div style={{ marginTop: 10 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--muted)', marginBottom: 4 }}>
+                    <span>Avanzamento</span>
+                    <span style={{ color, fontWeight: 600 }}>{p.pct}%</span>
+                  </div>
+                  <ProgressBar value={p.pct} color={color} height={5} />
                 </div>
               </div>
-
-              {/* Modules summary */}
-              <div className={styles.modsSummary}>
-                {(p.mods || []).map((m, idx) => (
-                  <CatBadge key={idx} cat={m.cat} />
-                ))}
-              </div>
-
-              {/* Progress */}
-              <div style={{ marginTop: 10 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--muted)', marginBottom: 4 }}>
-                  <span>Avanzamento</span>
-                  <span style={{ color, fontWeight: 600 }}>{p.pct}%</span>
-                </div>
-                <ProgressBar value={p.pct} color={color} height={5} />
-              </div>
-            </div>
-          );
-        }))}
+            );
+          })
+        )}
       </div>
 
       {wizardOpen && (
@@ -256,7 +294,6 @@ export function Dashboard() {
   );
 }
 
-// ─── KPI Card ─────────────────────────────────────────────────────
 interface KpiCardProps {
   icon: string; iconBg: string;
   value: string | number; label: string; sub?: string;
