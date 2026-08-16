@@ -822,7 +822,7 @@ export function ClientPortal() {
                     style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, background: 'var(--card)', color: 'var(--text)', border: '1px solid var(--border)' }}
                   >
                     <option value="portal">🌐 Portale Riservato (Sicuro)</option>
-                    <option value="whatsapp">🟢 WhatsApp Business ({clientObj?.cellulare || (clientObj as any)?.referentiJson?.whatsapp || clientObj?.telefono || '+39 335 1234567'})</option>
+                    <option value="whatsapp">🟢 WhatsApp Business ({clientObj?.cellulare || (clientObj as any)?.referentiJson?.whatsapp || clientObj?.telefono || '+39 333 5936278'})</option>
                     <option value="email">✉️ Email Transazionale ({clientObj?.email || (clientObj as any)?.referentiJson?.email || 'client@holdingbeta.advisory'})</option>
                     <option value="telegram">✈️ Telegram ({clientObj?.telegram || (clientObj as any)?.referentiJson?.telegram || '@' + (clientName || 'Cliente').replace(/[^a-zA-Z0-9]/g, '')})</option>
                   </select>

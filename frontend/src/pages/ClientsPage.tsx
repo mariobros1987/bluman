@@ -78,18 +78,18 @@ export function ClientsPage() {
         codiceSdi: 'SUBM70N',
         email: 'client@holdingbeta.advisory',
         telefono: '+39 02 889900',
-        cellulare: '+39 335 1234567',
+        cellulare: '+39 333 5936278',
         telegram: '@RobertoRossiBeta',
-        signal: '+39 335 1234567',
+        signal: '+39 333 5936278',
         referenteNome: 'Ing. Roberto Rossi (CEO)',
         isAttivo: true,
         referentiJson: {
           email: 'client@holdingbeta.advisory',
           telefono: '+39 02 889900',
-          cellulare: '+39 335 1234567',
-          whatsapp: '+39 335 1234567',
+          cellulare: '+39 333 5936278',
+          whatsapp: '+39 333 5936278',
           telegram: '@RobertoRossiBeta',
-          signal: '+39 335 1234567',
+          signal: '+39 333 5936278',
           referenteNome: 'Ing. Roberto Rossi (CEO)',
         },
       },
@@ -102,19 +102,19 @@ export function ClientsPage() {
         sedeLegale: 'Corso Vittorio Emanuele II 15, Torino',
         codiceSdi: '0000000',
         email: 'roberto.rossi@email.it',
-        telefono: '+39 335 1234567',
-        cellulare: '+39 335 1234567',
+        telefono: '+39 333 5936278',
+        cellulare: '+39 333 5936278',
         telegram: '@RobertoRossi',
-        signal: '+39 335 1234567',
+        signal: '+39 333 5936278',
         referenteNome: 'Roberto Rossi',
         isAttivo: true,
         referentiJson: {
           email: 'roberto.rossi@email.it',
-          telefono: '+39 335 1234567',
-          cellulare: '+39 335 1234567',
-          whatsapp: '+39 335 1234567',
+          telefono: '+39 333 5936278',
+          cellulare: '+39 333 5936278',
+          whatsapp: '+39 333 5936278',
           telegram: '@RobertoRossi',
-          signal: '+39 335 1234567',
+          signal: '+39 333 5936278',
           referenteNome: 'Roberto Rossi',
         },
       },
@@ -479,9 +479,9 @@ function AnagraficaErpModal({ client, onClose, onSaved }: { client: Cliente; onC
   const [email, setEmail] = useState(client.email || refJson.email || 'm.ricci@holdingbeta.advisory');
   const [pec, setPec] = useState((client as any).pec || refJson.pec || 'holdingbeta@legalmail.it');
   const [telefono, setTelefono] = useState(client.telefono || refJson.telefono || '+356 21 888 999');
-  const [cellulare, setCellulare] = useState((client as any).cellulare || refJson.cellulare || refJson.whatsapp || client.telefono || '+39 335 1234567');
+  const [cellulare, setCellulare] = useState((client as any).cellulare || refJson.cellulare || refJson.whatsapp || client.telefono || '+39 333 5936278');
   const [telegram, setTelegram] = useState((client as any).telegram || refJson.telegram || `@${(client.nome || 'cliente').replace(/[^a-zA-Z0-9]/g, '')}`);
-  const [signal, setSignal] = useState((client as any).signal || refJson.signal || (client as any).cellulare || refJson.cellulare || client.telefono || '+39 335 1234567');
+  const [signal, setSignal] = useState((client as any).signal || refJson.signal || (client as any).cellulare || refJson.cellulare || client.telefono || '+39 333 5936278');
   const [referenteNome, setReferenteNome] = useState((client as any).referenteNome || refJson.referenteNome || refJson.referente || 'Ing. Roberto Rossi (CEO)');
 
   // Tab 3: SDI & Fatturazione
@@ -711,7 +711,7 @@ function AnagraficaErpModal({ client, onClose, onSaved }: { client: Cliente; onC
               <div style={{ display: 'flex', gap: 12 }}>
                 <div style={{ flex: 1 }}>
                   <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>🟢 Cellulare / WhatsApp Diretto *</label>
-                  <input value={cellulare} onChange={e => setCellulare(e.target.value)} placeholder="+39 335 1234567" required />
+                  <input value={cellulare} onChange={e => setCellulare(e.target.value)} placeholder="+39 333 5936278" required />
                 </div>
                 <div style={{ flex: 1 }}>
                   <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>✈️ Account Telegram (Username / Link)</label>
@@ -722,7 +722,7 @@ function AnagraficaErpModal({ client, onClose, onSaved }: { client: Cliente; onC
               <div style={{ display: 'flex', gap: 12 }}>
                 <div style={{ flex: 1 }}>
                   <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>🔒 Numero Signal Cifrato</label>
-                  <input value={signal} onChange={e => setSignal(e.target.value)} placeholder="+39 335 1234567" />
+                  <input value={signal} onChange={e => setSignal(e.target.value)} placeholder="+39 333 5936278" />
                 </div>
                 <div style={{ flex: 1 }}>
                   <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>👤 Nome Referente / Contatto Diretto</label>

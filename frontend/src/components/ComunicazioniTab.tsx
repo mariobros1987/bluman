@@ -64,10 +64,10 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
             nome: mockProj.cl,
             tipo: mockProj.ct || 'company',
             email: emailCliente || 'client@holdingbeta.advisory',
-            telefono: '+39 335 1234567',
-            cellulare: '+39 335 1234567',
+            telefono: '+39 333 5936278',
+            cellulare: '+39 333 5936278',
             telegram: `@${mockProj.cl.replace(/[^a-zA-Z0-9]/g, '')}`,
-            signal: '+39 335 1234567',
+            signal: '+39 333 5936278',
             referenteNome: mockProj.cl,
           };
         }
@@ -86,9 +86,9 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
     const refJson: any = clientData?.referentiJson && typeof clientData.referentiJson === 'object' ? clientData.referentiJson : {};
 
     const email = clientData?.email || refJson.email || emailCliente || 'client@holdingbeta.advisory';
-    const whatsapp = clientData?.cellulare || refJson.cellulare || refJson.whatsapp || clientData?.telefono || refJson.telefono || '+39 335 1234567';
+    const whatsapp = clientData?.cellulare || refJson.cellulare || refJson.whatsapp || clientData?.telefono || refJson.telefono || '+39 333 5936278';
     const telegram = clientData?.telegram || refJson.telegram || `@${(nomeCliente || 'Cliente').replace(/[^a-zA-Z0-9]/g, '')}`;
-    const signal = clientData?.signal || refJson.signal || clientData?.cellulare || refJson.cellulare || clientData?.telefono || refJson.telefono || '+39 335 1234567';
+    const signal = clientData?.signal || refJson.signal || clientData?.cellulare || refJson.cellulare || clientData?.telefono || refJson.telefono || '+39 333 5936278';
     const referente = clientData?.referenteNome || refJson.referenteNome || refJson.referente || clientData?.ubo || nomeCliente || 'Referente Incarico';
 
     return {
