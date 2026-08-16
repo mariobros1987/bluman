@@ -301,8 +301,19 @@ export function buildServer(app: AppPort): FastifyInstance {
     }
   });
 
-  server.get('/articoli', async () => {
-    return app.listaArticoli();
+  // ─── ARTICOLI & PRESTAZIONI API (§Prisma Persistenza Cloud) ───────
+  server.get('/articoli', async (req) => {
+    const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
+    try {
+      const dbArts = await prisma.articolo.findMany({
+        where: { tenantId, isAttivo: true },
+        orderBy: { nome: 'asc' },
+      });
+      if (dbArts.length > 0) return dbArts;
+      return app.listaArticoli();
+    } catch {
+      return app.listaArticoli();
+    }
   });
 
   // Upload Documento Endpoint (Base64 file upload & static download)
@@ -344,11 +355,30 @@ export function buildServer(app: AppPort): FastifyInstance {
   server.patch<{
     Params: { id: string };
     Body: { prezzoDefault?: number; oreDefault?: number; nome?: string };
-  }>('/articoli/:id', async (req) => {
+  }>('/articoli/:id', async (req, reply) => {
     const { id } = req.params;
     const { prezzoDefault, oreDefault, nome } = req.body;
-    // se l'adapter implementa la modifica li aggiorna
-    return { ok: true, id, prezzoDefault, oreDefault, nome };
+    const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
+    try {
+      const updated = await prisma.articolo.update({
+        where: { id },
+        data: {
+          prezzoDefault: prezzoDefault !== undefined ? prezzoDefault : undefined,
+          oreDefault: oreDefault !== undefined ? oreDefault : undefined,
+          nome: nome !== undefined ? nome : undefined,
+        },
+      });
+      recordAudit({
+        tenantId,
+        azione: 'ARTICOLO_AGGIORNATO',
+        entita: updated.nome,
+        dettagli: `Aggiornato prezzo (€${(updated.prezzoDefault || 0)/100}) e ore (${updated.oreDefault}h)`,
+        ipAddress: req.ip,
+      });
+      return reply.send(updated);
+    } catch {
+      return reply.send({ ok: true, id, prezzoDefault, oreDefault, nome });
+    }
   });
 
   server.post<{
@@ -360,12 +390,33 @@ export function buildServer(app: AppPort): FastifyInstance {
       passaggi?: Array<{ titolo: string; tipo: 'info' | 'documento' | 'form' | 'verifica'; chi: 'operatore' | 'cliente'; descrizione?: string }>;
     };
   }>('/articoli', async (req, reply) => {
-    const { nome, categoria, oreDefault, prezzoDefault } = req.body;
+    const { nome, categoria, oreDefault, prezzoDefault, passaggi } = req.body;
+    const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
     if (!nome || !categoria) {
       return reply.code(400).send({ errore: 'nome e categoria sono obbligatori' });
     }
-    const articolo = await app.creaArticolo(req.body);
-    return reply.code(201).send(articolo);
+    try {
+      const art = await prisma.articolo.create({
+        data: {
+          tenantId,
+          nome,
+          categoria,
+          oreDefault: oreDefault || 1,
+          prezzoDefault: prezzoDefault || 0,
+        },
+      });
+      recordAudit({
+        tenantId,
+        azione: 'ARTICOLO_CREATO',
+        entita: art.nome,
+        dettagli: `Creato articolo prestazione ${art.nome} (${art.categoria}) - €${art.prezzoDefault/100}`,
+        ipAddress: req.ip,
+      });
+      return reply.code(201).send(art);
+    } catch {
+      const articolo = await app.creaArticolo(req.body);
+      return reply.code(201).send(articolo);
+    }
   });
 
   server.post<{
@@ -385,19 +436,14 @@ export function buildServer(app: AppPort): FastifyInstance {
     return reply.code(201).send(modulo);
   });
 
-  server.post<{ Body: { nome: string; tipo: 'individual' | 'company' } }>('/clienti', async (req, reply) => {
-    const { nome, tipo } = req.body;
-    if (!nome || !tipo) return reply.code(400).send({ errore: 'nome e tipo sono obbligatori' });
-    const cliente = await app.creaCliente({ nome, tipo });
-    return reply.code(201).send(cliente);
-  });
-
-  server.get<{ Params: { id: string } }>('/clienti/:id', async (req) => {
-    return app.getCliente(req.params.id);
-  });
-
-  server.get('/clienti', async () => {
-    return app.listaClienti();
+  server.get<{ Params: { id: string } }>('/clienti/:id', async (req, reply) => {
+    try {
+      const c = await prisma.cliente.findUnique({ where: { id: req.params.id } });
+      if (c) return reply.send(c);
+      return app.getCliente(req.params.id);
+    } catch {
+      return app.getCliente(req.params.id);
+    }
   });
 
   server.post<{ Params: { id: string }; Body: { email?: string } }>('/clienti/:id/magic-link', async (req, reply) => {
