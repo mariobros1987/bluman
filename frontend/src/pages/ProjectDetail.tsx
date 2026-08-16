@@ -194,65 +194,51 @@ export function ProjectDetail() {
             finalMods = [
               {
                 id: 101,
-                n: 'Analisi Patrimoniale & Risk Assessment',
+                n: 'Modulo Iniziale Incarico Advisory',
                 cat: 'Analisi' as CategoriaModulo,
-                st: 'in_progress',
-                pct: 50,
+                st: 'pending',
+                pct: 0,
                 h: 15,
-                a: 5,
+                a: 0,
                 p: 3500,
-                team: [1, 2],
+                team: [1],
                 delay: false,
                 v: [
-                  { n: 'Raccolta documenti e KYC cliente', hE: 4, hA: 4, s: 'done', as: 1, d: 1 },
-                  { n: 'Verifica giurisdizione e fiscalità intercompany', hE: 6, hA: 1, s: 'in_progress', as: 1, d: 0 },
+                  { n: 'Raccolta documenti e KYC cliente', hE: 5, hA: 0, s: 'pending', as: 1, d: 0 },
+                  { n: 'Verifica requisiti e giurisdizione', hE: 5, hA: 0, s: 'pending', as: 1, d: 0 },
                   { n: 'Redazione report conclusivo', hE: 5, hA: 0, s: 'pending', as: 1, d: 0 }
-                ]
-              },
-              {
-                id: 102,
-                n: 'Corporate Structuring & Holding Malta',
-                cat: 'Societario' as CategoriaModulo,
-                st: 'in_progress',
-                pct: 20,
-                h: 30,
-                a: 6,
-                p: 11500,
-                team: [1, 3],
-                delay: false,
-                v: [
-                  { n: 'Bozza Atto Costitutivo e Statuto', hE: 10, hA: 6, s: 'in_progress', as: 1, d: 0 },
-                  { n: 'Registrazione MFSA e deposito UBO', hE: 10, hA: 0, s: 'pending', as: 1, d: 0 },
-                  { n: 'Apertura posizioni fiscali e codice SDI', hE: 10, hA: 0, s: 'pending', as: 1, d: 0 }
                 ]
               }
             ];
           }
         }
 
-        const mapped: Progetto = {
+        const calculatedVal = finalMods.reduce((acc: number, m: any) => acc + (m.p || 0), 0) || (dbRes.valoreCentesimi ? dbRes.valoreCentesimi / 100 : 3500);
+
+        setProject({
           id: dbRes.id,
           n: dbRes.nome,
-          cl: dbRes.cliente?.nome || 'Cliente',
-          ct: (dbRes.cliente?.tipo as any) || 'individual',
+          cl: dbRes.cliente?.nome || 'Cliente Studio',
+          ct: dbRes.cliente?.tipo === 'company' ? 'company' : 'individual',
           st: dbRes.stato || 'in_progress',
-          pct: dbRes.stato === 'completed' ? 100 : dbRes.stato === 'in_progress' ? 50 : 10,
-          start: dbRes.createdAt ? new Date(dbRes.createdAt).toLocaleDateString('it-IT') : 'Oggi',
-          due: 'In corso',
-          val: dbRes.valoreTotale ? dbRes.valoreTotale / 100 : 15000,
-          delay: dbRes.moduli?.some((m: any) => m.stato === 'delayed' || m.stato === 'blocked') || false,
-          fisc: 'privato',
+          pct: dbRes.percentualeAvanzamento || 0,
+          start: new Date(dbRes.createdAt).toLocaleDateString(),
+          due: '30 giorni',
+          val: calculatedVal,
+          delay: false,
+          fisc: 'privato_italia',
           fatture: (dbRes.fatture || []).map((f: any) => ({
-            tipo: 'milestone_libera',
-            importo: f.righe ? f.righe.reduce((acc: number, r: any) => acc + r.importo, 0) / 100 : 0,
-            desc: f.numero ? `Fattura n. ${f.numero}` : 'Fattura acconto',
+            id: f.id,
+            numero: f.numero,
+            desc: f.righe?.[0]?.descrizione || 'Fattura Progetto',
+            importo: f.righe?.reduce((a: number, r: any) => a + r.importo, 0) / 100 || 0,
+            data: f.data,
             stato: f.stato === 'incassata' ? 'incassata' : 'emessa',
           })),
           mods: finalMods,
-        };
-        setProject(mapped);
-        if (mapped.mods.length > 0) {
-          setExpanded(new Set(mapped.mods.map(m => m.id)));
+        });
+        if (finalMods.length > 0) {
+          setExpanded(new Set(finalMods.map(m => m.id)));
         }
       } else {
         const localStr = localStorage.getItem('bluman_custom_projects');
