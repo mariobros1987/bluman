@@ -219,7 +219,7 @@ export function Dashboard() {
               </div>
             </div>
           );
-        })}
+        }))}
       </div>
 
       {wizardOpen && (
