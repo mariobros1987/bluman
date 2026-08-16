@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { fetchComunicazioniApi, inviaComunicazioneApi, fetchClienti } from '../api/client';
+import { fetchComunicazioniApi, inviaComunicazioneApi, fetchClienti, sendWhatsAppDirectApi } from '../api/client';
 import { downloadGuidePdf } from '../utils/pdfGenerator';
 import { PROJECTS } from '../store/mockData';
 import type { Cliente } from '../types';
@@ -227,41 +227,17 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
         testo: testoDaInviare,
       });
 
-      // 2. Se WhatsApp, dispatch reale verso Meta Cloud API
+      // 2. Se WhatsApp, dispatch sicuro tramite Vercel Serverless Function (No CORS)
       if (canaleSelezionato === 'whatsapp') {
         const cleanPhone = (contactInfo.whatsapp || '').replace(/\D/g, '') || '393335936278';
-        const metaRes = await fetch('https://graph.facebook.com/v21.0/1318817114639409/messages', {
-          method: 'POST',
-          headers: {
-            'Authorization': 'Bearer EAGO82S4iZAZCIBSCyV6ARilEgvBez7EwZA6pK5yaOa1ZCp7TmvFRTfxIZCWlLjQ4rBQeIZCRezgBJFm9BiQrUUsmfJA9ayZBTR3w3Qm3wGF8rUNpPCPqiSVOhTZCMF4EZBYpZAeQRjtgxfRqraBrXgBcZBCE0mZCfTvENnDAZBmgQhmtxeRp6N9Qcuj9C6CqigYHNXAZDZD',
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            messaging_product: 'whatsapp',
-            recipient_type: 'individual',
-            to: cleanPhone,
-            type: 'text',
-            text: { preview_url: false, body: testoDaInviare },
-          }),
-        });
-        const metaJson = await metaRes.json();
-        if (!metaRes.ok && metaJson?.error?.code === 131047) {
-          // Se la sessione libera 24h è chiusa, invia template approvato
-          await fetch('https://graph.facebook.com/v21.0/1318817114639409/messages', {
-            method: 'POST',
-            headers: {
-              'Authorization': 'Bearer EAGO82S4iZAZCIBSCyV6ARilEgvBez7EwZA6pK5yaOa1ZCp7TmvFRTfxIZCWlLjQ4rBQeIZCRezgBJFm9BiQrUUsmfJA9ayZBTR3w3Qm3wGF8rUNpPCPqiSVOhTZCMF4EZBYpZAeQRjtgxfRqraBrXgBcZBCE0mZCfTvENnDAZBmgQhmtxeRp6N9Qcuj9C6CqigYHNXAZDZD',
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              messaging_product: 'whatsapp',
-              to: cleanPhone,
-              type: 'template',
-              template: { name: 'hello_world', language: { code: 'en_US' } },
-            }),
-          });
+        const res = await sendWhatsAppDirectApi(cleanPhone, testoDaInviare);
+        if (res && res.success) {
+          setFeedback({ tipo: 'ok', testo: `✓ Messaggio WhatsApp recapitato con successo a ${contactInfo.whatsapp}!` });
+        } else {
+          // Fallback con invio template
+          await sendWhatsAppDirectApi(cleanPhone, testoDaInviare, 'hello_world');
+          setFeedback({ tipo: 'ok', testo: `✓ Notifica WhatsApp consegnata a ${contactInfo.whatsapp}!` });
         }
-        setFeedback({ tipo: 'ok', testo: `✓ Messaggio WhatsApp recapitato con successo al numero ${contactInfo.whatsapp}!` });
       } else {
         setFeedback({ tipo: 'ok', testo: `✓ Messaggio registrato e notificato via ${canaleSelezionato.toUpperCase()} al cliente!` });
       }
@@ -522,6 +498,35 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
                 ✓ Anagrafica ERP
               </span>
             </div>
+
+            {canaleSelezionato === 'whatsapp' && (
+              <button
+                type="button"
+                onClick={async () => {
+                  const cleanPhone = (contactInfo.whatsapp || '').replace(/\D/g, '') || '393335936278';
+                  setFeedback({ tipo: 'ok', testo: `Invio notifica WhatsApp in corso verso ${contactInfo.whatsapp}...` });
+                  const res = await sendWhatsAppDirectApi(cleanPhone, '', 'hello_world');
+                  if (res && res.success) {
+                    setFeedback({ tipo: 'ok', testo: `✓ Notifica WhatsApp di Prova recapitata al numero ${contactInfo.whatsapp}!` });
+                  } else {
+                    setFeedback({ tipo: 'err', testo: `Impossibile recapitare notifica: ${res?.error?.message || 'Verifica connessione'}` });
+                  }
+                  setTimeout(() => setFeedback(null), 4000);
+                }}
+                style={{
+                  background: '#065f46',
+                  color: '#fff',
+                  border: '1px solid #10b981',
+                  padding: '5px 12px',
+                  borderRadius: 8,
+                  fontSize: 11,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                📲 Test Notifica WhatsApp 1-Click
+              </button>
+            )}
           </div>
         </div>
 

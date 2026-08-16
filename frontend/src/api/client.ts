@@ -512,6 +512,20 @@ export async function testChannelApi(payload: { channel: string; waPhoneId?: str
   return await res.json();
 }
 
+export async function sendWhatsAppDirectApi(to: string, text: string, templateName?: string) {
+  try {
+    const res = await fetch('/api/send-whatsapp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to, text, templateName }),
+    });
+    return await res.json();
+  } catch (err) {
+    console.warn('Vercel serverless direct send fallback:', err);
+    return null;
+  }
+}
+
 export async function markNotificheReadApi() {
   try {
     const res = await fetch(`${API_BASE}/notifiche/read-all`, {
