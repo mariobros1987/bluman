@@ -9,6 +9,20 @@ const getApiBase = () => {
 
 const API_BASE = getApiBase();
 
+// Helper per prevenire blocchi di caricamento in caso di latenza cloud
+async function fetchWithTimeout(url: string, options: RequestInit = {}, ms: number = 1500) {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), ms);
+  try {
+    const response = await fetch(url, { ...options, signal: controller.signal });
+    clearTimeout(id);
+    return response;
+  } catch (error) {
+    clearTimeout(id);
+    throw error;
+  }
+}
+
 function getAuthHeaders() {
   const token = localStorage.getItem('bluman_jwt_token') || 'jwt_advisor_mock_123';
   const tenantId = localStorage.getItem('bluman_tenant_id') || '00000000-0000-0000-0000-000000000001';
@@ -73,11 +87,11 @@ export async function magicLoginApi(magicToken: string) {
 
 export async function fetchProgetti() {
   try {
-    const res = await fetch(`${API_BASE}/progetti`);
+    const res = await fetchWithTimeout(`${API_BASE}/progetti`, {}, 1500);
     if (!res.ok) throw new Error('Errore nel recupero progetti');
     return await res.json();
   } catch (err) {
-    console.warn('Backend API offline, uso fallback locale', err);
+    console.warn('Backend API offline o in latenza, uso il caricamento istantaneo locale', err);
     return null;
   }
 }
