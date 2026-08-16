@@ -78,17 +78,22 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente }: Comu
   const [canaleSelezionato, setCanaleSelezionato] = useState<'email' | 'whatsapp' | 'telegram' | 'signal'>('whatsapp');
   const [filtroCanale, setFiltroCanale] = useState<string>('TUTTI');
 
+  const [loadingMsgs, setLoadingMsgs] = useState(false);
+
+  const loadComunicazioni = async () => {
+    setLoadingMsgs(true);
+    const dbMsgs = await fetchComunicazioniApi(progettoId);
+    if (dbMsgs && Array.isArray(dbMsgs) && dbMsgs.length > 0) {
+      setMessaggi(dbMsgs.map((m: any) => ({
+        ...m,
+        dataOra: m.createdAt ? new Date(m.createdAt).toLocaleString('it-IT') : (m.dataOra || 'Oggi'),
+        allegati: m.allegatiJson ? (typeof m.allegatiJson === 'string' ? JSON.parse(m.allegatiJson) : m.allegatiJson) : m.allegati,
+      })));
+    }
+    setLoadingMsgs(false);
+  };
+
   useEffect(() => {
-    const loadComunicazioni = async () => {
-      const dbMsgs = await fetchComunicazioniApi(progettoId);
-      if (dbMsgs && Array.isArray(dbMsgs) && dbMsgs.length > 0) {
-        setMessaggi(dbMsgs.map((m: any) => ({
-          ...m,
-          dataOra: m.createdAt ? new Date(m.createdAt).toLocaleString('it-IT') : m.dataOra,
-          allegati: m.allegatiJson ? JSON.parse(m.allegatiJson) : m.allegati,
-        })));
-      }
-    };
     loadComunicazioni();
   }, [progettoId]);
 
@@ -145,8 +150,8 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente }: Comu
           </div>
         </div>
 
-        {/* Filtri Canali */}
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        {/* Filtri Canali & Refresh */}
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           {['TUTTI', 'email', 'whatsapp', 'telegram', 'signal'].map(cat => (
             <button
               key={cat}
@@ -166,6 +171,22 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente }: Comu
               {cat === 'TUTTI' ? 'Tutti i Canali' : cat}
             </button>
           ))}
+          <button
+            onClick={() => loadComunicazioni()}
+            disabled={loadingMsgs}
+            style={{
+              background: 'var(--card2)',
+              color: 'var(--indigo-l)',
+              border: '1px solid var(--border)',
+              padding: '5px 12px',
+              borderRadius: 20,
+              fontSize: 11,
+              fontWeight: 700,
+              cursor: 'pointer',
+            }}
+          >
+            {loadingMsgs ? '⏳ Caricamento...' : '🔄 Sincronizza Live'}
+          </button>
         </div>
       </div>
 

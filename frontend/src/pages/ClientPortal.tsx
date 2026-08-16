@@ -5,7 +5,7 @@ import { fmt } from '../utils';
 import { downloadRealPdf } from '../utils/pdfGenerator';
 import type { SignatureData } from '../utils/pdfGenerator';
 import { DigitalSignatureModal } from '../components/DigitalSignatureModal';
-import { fetchModuliLibreria, fetchProgetti, creaPreventivoEAccettaApi, fetchClienti, creaProgettoApi, creaClienteApi } from '../api/client';
+import { fetchModuliLibreria, fetchProgetti, creaPreventivoEAccettaApi, fetchClienti, creaProgettoApi, creaClienteApi, fetchComunicazioniApi, inviaComunicazioneApi } from '../api/client';
 import type { CategoriaModulo } from '../types';
 
 interface ModuloProposta {
@@ -47,6 +47,13 @@ export function ClientPortal() {
   });
   const [formSaved, setFormSaved] = useState(false);
 
+  // Comunicazioni State
+  const [progettoId, setProgettoId] = useState<string>('proj-001');
+  const [messaggi, setMessaggi] = useState<any[]>([]);
+  const [nuovoMessaggio, setNuovoMessaggio] = useState('');
+  const [canaleMessaggio, setCanaleMessaggio] = useState<'whatsapp' | 'email' | 'telegram' | 'portal'>('portal');
+  const [inviandoMessaggio, setInviandoMessaggio] = useState(false);
+
   useEffect(() => {
     const loadPortalData = async () => {
       setPageLoading(true);
@@ -79,6 +86,22 @@ export function ClientPortal() {
           { id: 'mod-m02', nome: 'Corporate structuring Malta', cat: 'Societario', prezzo: 11500, ore: 40, righeCount: 5 },
         ]);
       }
+      // Cerca progetto associato per caricare le comunicazioni
+      try {
+        const progettiRes = await fetchProgetti();
+        if (progettiRes && Array.isArray(progettiRes) && progettiRes.length > 0) {
+          const matchProj = progettiRes.find((p: any) => p.cliente?.nome === (clientObj?.nome || 'Marco Ricci / Holding Beta S.r.l.') || String(p.id).includes('proj-'));
+          const pId = matchProj ? String(matchProj.id) : String(progettiRes[0].id);
+          setProgettoId(pId);
+          const msgs = await fetchComunicazioniApi(pId);
+          if (msgs && Array.isArray(msgs)) {
+            setMessaggi(msgs);
+          }
+        }
+      } catch (err) {
+        console.warn('Errore recupero messaggi portale:', err);
+      }
+
       setPageLoading(false);
     };
 
@@ -694,24 +717,147 @@ export function ClientPortal() {
           </div>
         )}
 
-        {/* TAB 5: Contatto Advisor */}
+        {/* TAB 5: Contatto Advisor & Messaggistica Live */}
         {activeTab === 'contatti' && (
           <div style={docBoxStyle}>
-            <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>💬 Assistenza Dedicata & Contatti Studio</div>
-            <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 18 }}>Mettiti in contatto diretto con il tuo Senior Advisor di riferimento</div>
+            <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>💬 Assistenza Dedicata & Comunicazioni Dirette Studio</div>
+            <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 18 }}>Invia messaggi in tempo reale al tuo Senior Advisor di riferimento. La conversazione è sincronizzata con l'Advisor Hub dello Studio.</div>
 
+            {/* Senior Advisor Card */}
             <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 14, padding: 18, display: 'flex', alignItems: 'center', gap: 16, marginBottom: 20 }}>
               <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'var(--indigo)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 18 }}>
                 JD
               </div>
-              <div>
+              <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 14, fontWeight: 700 }}>Joe Disabato</div>
                 <div style={{ fontSize: 11, color: 'var(--indigo-l)', fontWeight: 600 }}>Senior Wealth & Corporate Advisory Lead</div>
                 <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>✉️ j.disabato@bluecode.advisory · 📞 +356 21 000 999</div>
               </div>
+              <div style={{ background: '#064e3b', border: '1px solid #10b981', color: '#6ee7b7', padding: '4px 10px', borderRadius: 20, fontSize: 10, fontWeight: 700 }}>
+                ● Advisor Online
+              </div>
             </div>
 
-            <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 14 }}>
+            {/* Live Chat Timeline */}
+            <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 14, padding: 16, display: 'flex', flexDirection: 'column', gap: 12, maxHeight: 360, overflowY: 'auto', marginBottom: 18 }}>
+              {messaggi.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '24px 10px', color: 'var(--muted)', fontSize: 12 }}>
+                  💬 Nessun messaggio scambiato finora. Scrivi qui sotto per contattare il tuo Advisor.
+                </div>
+              ) : (
+                messaggi.map((m: any, idx: number) => {
+                  const isCliente = m.direzione === 'entrata' || (m.mittente && m.mittente.includes('Cliente'));
+                  return (
+                    <div
+                      key={m.id || idx}
+                      style={{
+                        alignSelf: isCliente ? 'flex-end' : 'flex-start',
+                        maxWidth: '85%',
+                        background: isCliente ? '#1e1b4b' : 'var(--card2)',
+                        border: `1px solid ${isCliente ? '#4338ca' : 'var(--border)'}`,
+                        borderRadius: 12,
+                        padding: '10px 14px',
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 4 }}>
+                        <span style={{ fontSize: 10, fontWeight: 700, color: isCliente ? '#a5b4fc' : 'var(--indigo-l)' }}>
+                          {isCliente ? 'Tu (Cliente)' : 'Joe Disabato (Advisor)'}
+                        </span>
+                        <span style={{ fontSize: 9.5, color: 'var(--muted)' }}>
+                          {m.createdAt ? new Date(m.createdAt).toLocaleString('it-IT') : (m.dataOra || 'Oggi')}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.4, whiteSpace: 'pre-wrap' }}>
+                        {m.testo}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Live Message Sender Form */}
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!nuovoMessaggio.trim() || inviandoMessaggio) return;
+                setInviandoMessaggio(true);
+
+                const msgObj = {
+                  id: `msg-${Date.now()}`,
+                  canale: canaleMessaggio,
+                  mittente: `${clientName} (Cliente)`,
+                  destinatario: 'Studio Bluecode Advisory (Joe Disabato)',
+                  direzione: 'entrata',
+                  testo: nuovoMessaggio.trim(),
+                  dataOra: new Date().toLocaleString('it-IT'),
+                };
+
+                setMessaggi(prev => [...prev, msgObj]);
+
+                try {
+                  await inviaComunicazioneApi(progettoId, {
+                    canale: canaleMessaggio,
+                    mittente: `${clientName} (Cliente)`,
+                    destinatario: 'Studio Bluecode Advisory (Joe Disabato)',
+                    direzione: 'entrata',
+                    testo: nuovoMessaggio.trim(),
+                  });
+                } catch (err) {
+                  console.warn('Errore invio messaggio portale:', err);
+                }
+
+                setNuovoMessaggio('');
+                setInviandoMessaggio(false);
+              }}
+              style={{ display: 'flex', flexDirection: 'column', gap: 10, background: 'var(--card2)', padding: 14, borderRadius: 12, border: '1px solid var(--border)' }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)' }}>Invia messaggio diretto all'Advisor:</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 10.5, color: 'var(--muted)' }}>Canale preferito:</span>
+                  <select
+                    value={canaleMessaggio}
+                    onChange={(e) => setCanaleMessaggio(e.target.value as any)}
+                    style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, background: 'var(--card)', color: 'var(--text)', border: '1px solid var(--border)' }}
+                  >
+                    <option value="portal">🌐 Portale Riservato (Sicuro)</option>
+                    <option value="whatsapp">🟢 WhatsApp Business</option>
+                    <option value="email">✉️ Email Transazionale</option>
+                    <option value="telegram">✈️ Telegram</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: 10 }}>
+                <textarea
+                  value={nuovoMessaggio}
+                  onChange={(e) => setNuovoMessaggio(e.target.value)}
+                  placeholder="Scrivi qui la tua richiesta o domanda per l'Advisor..."
+                  rows={2}
+                  style={{ flex: 1, fontSize: 12, padding: 10, borderRadius: 8, background: 'var(--bg)', color: 'var(--text)', border: '1px solid var(--border)', resize: 'none' }}
+                />
+                <button
+                  type="submit"
+                  disabled={inviandoMessaggio || !nuovoMessaggio.trim()}
+                  style={{
+                    background: 'var(--indigo)',
+                    color: '#fff',
+                    border: 'none',
+                    padding: '0 20px',
+                    borderRadius: 8,
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    opacity: (!nuovoMessaggio.trim() || inviandoMessaggio) ? 0.6 : 1,
+                  }}
+                >
+                  {inviandoMessaggio ? 'Invio...' : 'Invia →'}
+                </button>
+              </div>
+            </form>
+
+            <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 14, marginTop: 18 }}>
               <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>Sede Legale Studio Bluecode Ltd</div>
               <div style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.5 }}>
                 Level 4, Valuation Centre, Tower Road, Sliema SLM 1600, Malta<br />
