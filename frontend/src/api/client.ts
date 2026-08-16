@@ -240,16 +240,7 @@ export async function archiviaProgettoApi(id: string, archiviato: boolean) {
   return await res.json();
 }
 
-export async function fetchTutteFattureStudioApi() {
-  try {
-    const res = await fetch(`${API_BASE}/fatture/tutte`);
-    if (!res.ok) throw new Error('Errore nel recupero delle fatture dello studio');
-    return await res.json();
-  } catch (err) {
-    console.warn('Backend API offline o errore:', err);
-    return [];
-  }
-}
+
 
 export async function creaPreventivoEAccettaApi(input: {
   clienteId: string;

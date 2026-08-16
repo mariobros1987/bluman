@@ -796,6 +796,8 @@ export function buildServer(app: AppPort): FastifyInstance {
     } catch (err) {
       return reply.code(500).send({ errore: err instanceof Error ? err.message : 'Errore registrazione incasso' });
     }
+  });
+
   // ── REGISTRO FATTURE STUDIO (STYLE OPENSTAMANAGER) ───────────────
   server.get('/invoices', async (req, reply) => {
     const tenantId = (req as any).tenantId;
