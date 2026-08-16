@@ -198,12 +198,40 @@ export function RetainersPage() {
               <select
                 value={progettoId}
                 onChange={(e) => setProgettoId(e.target.value)}
-                style={{ width: '100%', padding: '8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
+                disabled={!clienteId}
+                style={{ width: '100%', padding: '8px', borderRadius: 6, border: '1px solid var(--border)', background: !clienteId ? 'var(--card2)' : 'var(--bg)', color: 'var(--text)', opacity: !clienteId ? 0.6 : 1 }}
               >
-                <option value="">Nessun progetto specifico (Canone Generico)</option>
-                {PROJECTS.map(p => (
-                  <option key={p.id} value={String(p.id)}>📁 {p.n} ({p.cl})</option>
-                ))}
+                <option value="">
+                  {!clienteId
+                    ? '⚠️ Seleziona prima un cliente...'
+                    : 'Nessun progetto specifico (Canone Generico Studio)'}
+                </option>
+                {(() => {
+                  const selClienteObj = clienti.find(c => c.id === clienteId);
+                  const nomeCliente = selClienteObj?.nome?.toLowerCase() || '';
+
+                  // Estrai progetti da DB/LocalStorage/MockData
+                  const localStr = localStorage.getItem('bluman_custom_projects');
+                  const localProjs: any[] = localStr ? JSON.parse(localStr) : [];
+                  const allAvailable = [...localProjs, ...PROJECTS];
+
+                  const filtered = allAvailable.filter(p => {
+                    if (!clienteId) return false;
+                    if (p.clienteId === clienteId || p.cliente_id === clienteId) return true;
+                    if (nomeCliente && (p.cl?.toLowerCase().includes(nomeCliente) || p.cliente?.nome?.toLowerCase().includes(nomeCliente))) return true;
+                    return false;
+                  });
+
+                  // Rimuovi duplicati per ID o Nome
+                  const uniqueProjs = new Map();
+                  filtered.forEach(p => uniqueProjs.set(p.id || p.n, p));
+
+                  return Array.from(uniqueProjs.values()).map(p => (
+                    <option key={p.id || p.n} value={String(p.id)}>
+                      📁 {p.n || p.nome}
+                    </option>
+                  ));
+                })()}
               </select>
             </div>
 
