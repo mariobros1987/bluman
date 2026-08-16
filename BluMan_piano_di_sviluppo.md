@@ -34,12 +34,14 @@
   - `💬 Comunicazioni & Ingestion` (Timeline messaggi omnichannel WhatsApp, Telegram, Email, Signal).
   - `📜 Storico Contratti & Addendum` (Registro immutabile delle versioni contrattuali firmate e marca temporale eIDAS).
   - **Archiviazione & Eliminazione Sicura**: Blocco fiscale anti-cancellazione se presenti fatture.
-- [x] **Gestionale Fatture, Incassi & Partite Aperte (`/invoices`) — *Ispirato ad OpenSTAManager***:
+- [x] **Registro Fatture & Note di Credito (`/invoices`)**:
   - Dashboard globale per tutte le fatture e note di credito dello studio.
-  - KPI (Fatturato, Incassato, In Sospeso, Note Credito).
-  - Tab **💳 Scadenzario & Prima Nota** con registrazione rate, scadenze d'incasso e metodo di pagamento.
-  - Modal **💰 Registra Incasso** per saldare acconti/rate con tracciamento CRO/TRN e note operatore.
+  - KPI (Fatturato Emesso, Incassato Saldate, In Sospeso, Note Credito).
   - Generazione ed esportazione 1-Click **📥 XML SDI (FatturaPA v1.2.2)** per l'Agenzia delle Entrate.
+- [x] **Scadenzario Incassi & Prima Nota Studio (`/payments`)**:
+  - Sezione dedicata alle partite aperte, rateizzazioni ed incassi in scadenza.
+  - Modal **💰 Registra Incasso** per saldare acconti/rate con tracciamento CRO/TRN e note operatore.
+  - Azione **✉️ Sollecita Pagamento** con invio notifiche ed IBAN del Tenant.
 - [x] **Contratti Ricorrenti & Retainer Studio (`/retainers`) — *Ispirato ad OpenSTAManager***:
   - Gestione contratti continuativi di Advisory, Corporate Governance e Compliance AML.
   - Pianificazione frequenza canone (mensile, trimestrale, semestrale, annuale) e data prossima fatturazione.
