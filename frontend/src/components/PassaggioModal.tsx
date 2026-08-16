@@ -6,7 +6,7 @@ interface PassaggioModalProps {
   mid: number;
   vidx: number;
   onClose: () => void;
-  onSaveVoce?: (updatedSteps: Passaggio[]) => void;
+  onSaveVoce?: (updatedSteps: Passaggio[], updatedNotes?: NoteEntry[]) => void;
 }
 
 interface NoteEntry {
@@ -49,10 +49,19 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce }: Pass
   const [activeTab, setActiveTab] = useState<'passaggi' | 'note' | 'documenti'>('passaggi');
   const [steps, setSteps] = useState<Passaggio[]>(() => voce.proc || getDefaultPassaggi(voce));
 
-  // Note operative
-  const [notes, setNotes] = useState<NoteEntry[]>([
-    { id: 'n1', autore: 'Joe Disabato', data: '14/08/2026 11:30', testo: 'Effettuato primo contatto e verifica requisiti per la pratica.' },
-  ]);
+  // Note operative persistite
+  const [notes, setNotes] = useState<NoteEntry[]>(() => {
+    if (voce.note && Array.isArray(voce.note) && voce.note.length > 0) {
+      return voce.note;
+    }
+    const saved = localStorage.getItem(`bluman_notes_${project.id}_${mid}_${vidx}`);
+    if (saved) {
+      try { return JSON.parse(saved); } catch {}
+    }
+    return [
+      { id: 'n1', autore: 'Joe Disabato (Advisor)', data: '14/08/2026 11:30', testo: 'Verifica preliminare requisiti e fascicolo incarico.' },
+    ];
+  });
   const [newNote, setNewNote] = useState('');
 
   // Documenti da firmare
@@ -74,7 +83,7 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce }: Pass
     const nextSteps: Passaggio[] = steps.map(s => s.id === id ? { ...s, stato: (s.stato === 'done' ? 'pending' : 'done') as 'pending' | 'done' } : s);
     setSteps(nextSteps);
     if (onSaveVoce) {
-      onSaveVoce(nextSteps);
+      onSaveVoce(nextSteps, notes);
     }
   };
 
@@ -87,7 +96,13 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce }: Pass
       data: new Date().toLocaleString('it-IT'),
       testo: newNote,
     };
-    setNotes([entry, ...notes]);
+    const updatedNotes = [entry, ...notes];
+    setNotes(updatedNotes);
+    localStorage.setItem(`bluman_notes_${project.id}_${mid}_${vidx}`, JSON.stringify(updatedNotes));
+    voce.note = updatedNotes;
+    if (onSaveVoce) {
+      onSaveVoce(steps, updatedNotes);
+    }
     setNewNote('');
   };
 
@@ -223,7 +238,7 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce }: Pass
 
                                 const updated = steps.map(item => item.id === s.id ? { ...item, formMasterId: val, fields: defaultFields } : item);
                                 setSteps(updated);
-                                if (onSaveVoce) onSaveVoce(updated);
+                                if (onSaveVoce) onSaveVoce(updated, notes);
                               }}
                               style={{ padding: '3px 8px', fontSize: 11, background: '#200f40', color: '#a78bfa', border: '1px solid #581c87', borderRadius: 6, fontWeight: 600, cursor: 'pointer' }}
                             >
@@ -326,7 +341,7 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce }: Pass
 
                               const updated = steps.map(item => item.id === s.id ? { ...item, documentoAllegatoUrl: val, file: newFileName } : item);
                               setSteps(updated);
-                              if (onSaveVoce) onSaveVoce(updated);
+                              if (onSaveVoce) onSaveVoce(updated, notes);
                             }}
                             style={{ padding: '2px 6px', fontSize: 10, background: 'var(--card2)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 6 }}
                           >

@@ -157,15 +157,35 @@ export function ProjectDetail() {
         setRawDbProject(dbRes);
 
         let finalMods = (dbRes.moduli || []).map((m: any, mIdx: number) => {
-          let microvociList = (m.microvoci || []).map((mv: any) => ({
-            n: mv.nome,
-            hE: mv.orePreventivate || 4,
-            hA: mv.oreConsuntivate || 0,
-            s: mv.stato || 'pending',
-            as: 1,
-            d: mv.passaggi?.length || 0,
-            vn: mv.causaNota || undefined,
-          }));
+          let microvociList = (m.microvoci || []).map((mv: any, vIdx: number) => {
+            let savedNotes = mv.note;
+            if (!savedNotes) {
+              const localSaved = localStorage.getItem(`bluman_notes_${dbRes.id}_${m.id || mIdx + 100}_${vIdx}`);
+              if (localSaved) {
+                try { savedNotes = JSON.parse(localSaved); } catch {}
+              }
+            }
+            return {
+              n: mv.nome,
+              hE: mv.orePreventivate || 4,
+              hA: mv.oreConsuntivate || 0,
+              s: mv.stato || 'pending',
+              as: 1,
+              d: mv.passaggi?.length || 0,
+              vn: mv.causaNota || undefined,
+              proc: mv.proc || (mv.passaggi?.length ? mv.passaggi.map((p: any) => ({
+                id: p.id,
+                title: p.titolo,
+                type: p.tipo,
+                who: p.chi,
+                stato: p.stato,
+                desc: p.descrizione,
+                file: p.documentoAllegatoUrl,
+                fields: p.campiFormJson,
+              })) : undefined),
+              note: savedNotes,
+            };
+          });
 
           // Se il modulo non ha ancora microvoci nel DB, cerca gli articoli corrispondenti per quel modulo
           if (microvociList.length === 0) {
@@ -436,7 +456,7 @@ export function ProjectDetail() {
     salvaProgettoDettaglioApi(String(project.id), updatedProject).catch(() => {});
   };
 
-  const handleSavePassaggiModal = (modId: number, mvIdx: number, nextSteps: any[]) => {
+  const handleSavePassaggiModal = (modId: number, mvIdx: number, nextSteps: any[], nextNotes?: any[]) => {
     if (!project) return;
     const isAllDone = nextSteps.length > 0 && nextSteps.every(s => s.stato === 'done');
     const newMods = project.mods.map(m => {
@@ -446,6 +466,7 @@ export function ProjectDetail() {
             return {
               ...mv,
               proc: nextSteps,
+              ...(nextNotes ? { note: nextNotes } : {}),
               s: isAllDone ? ('done' as const) : nextSteps.some(s => s.stato === 'done') ? ('active' as const) : mv.s,
             };
           }
@@ -481,6 +502,10 @@ export function ProjectDetail() {
     const updatedArr = [updatedProject, ...savedArr.filter(p => String(p.id) !== String(project.id))];
     localStorage.setItem('bluman_custom_projects', JSON.stringify(updatedArr));
 
+    if (nextNotes) {
+      localStorage.setItem(`bluman_notes_${project.id}_${modId}_${mvIdx}`, JSON.stringify(nextNotes));
+    }
+
     // Persistenza remota server DB per multi-postazione
     salvaProgettoDettaglioApi(String(project.id), updatedProject).catch(() => {});
   };
@@ -493,7 +518,24 @@ export function ProjectDetail() {
         <div className={styles.headerInfo}>
           <h1 className={styles.title} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span>{project.n}</span>
-            <span style={{ fontSize: 13, color: 'var(--muted)', cursor: 'pointer' }} title="Modifica Titolo Progetto (Admin)">✏️</span>
+            <span
+              style={{ fontSize: 13, color: 'var(--muted)', cursor: 'pointer' }}
+              title="Modifica Titolo Progetto (Admin)"
+              onClick={async () => {
+                const nuovoTitolo = prompt('Inserisci il nuovo titolo del progetto:', project.n);
+                if (nuovoTitolo && nuovoTitolo.trim() && nuovoTitolo.trim() !== project.n) {
+                  const updated = { ...project, n: nuovoTitolo.trim() };
+                  setProject(updated);
+                  const savedStr = localStorage.getItem('bluman_custom_projects');
+                  const savedArr: Progetto[] = savedStr ? JSON.parse(savedStr) : [];
+                  const updatedArr = [updated, ...savedArr.filter(p => String(p.id) !== String(project.id))];
+                  localStorage.setItem('bluman_custom_projects', JSON.stringify(updatedArr));
+                  await salvaProgettoDettaglioApi(String(project.id), updated);
+                }
+              }}
+            >
+              ✏️
+            </span>
           </h1>
           <div className={styles.meta}>
             <span
@@ -504,7 +546,24 @@ export function ProjectDetail() {
               {project.ct === 'individual' ? '👤' : '🏢'} {project.cl}
             </span>
             <span>📅 {project.start} → {project.due}</span>
-            <span style={{ cursor: 'pointer' }} title="Valore Incarico (Modificabile dall'Admin)">💶 {fmt(project.val)} ✏️</span>
+            <span
+              style={{ cursor: 'pointer' }}
+              title="Valore Incarico (Modificabile dall'Admin)"
+              onClick={async () => {
+                const nuovoVal = prompt('Inserisci il nuovo valore totale dell\'incarico (€):', String(project.val));
+                if (nuovoVal && !isNaN(Number(nuovoVal))) {
+                  const updated = { ...project, val: Number(nuovoVal) };
+                  setProject(updated);
+                  const savedStr = localStorage.getItem('bluman_custom_projects');
+                  const savedArr: Progetto[] = savedStr ? JSON.parse(savedStr) : [];
+                  const updatedArr = [updated, ...savedArr.filter(p => String(p.id) !== String(project.id))];
+                  localStorage.setItem('bluman_custom_projects', JSON.stringify(updatedArr));
+                  await salvaProgettoDettaglioApi(String(project.id), updated);
+                }
+              }}
+            >
+              💶 {fmt(project.val)} ✏️
+            </span>
             <Badge stato={project.st} />
             <button
               onClick={() => setAccessiModalOpen(true)}
@@ -788,7 +847,7 @@ export function ProjectDetail() {
           mid={procV.mid}
           vidx={procV.vidx}
           onClose={() => setProcV(null)}
-          onSaveVoce={(steps) => handleSavePassaggiModal(procV.mid, procV.vidx, steps)}
+          onSaveVoce={(steps, notes) => handleSavePassaggiModal(procV.mid, procV.vidx, steps, notes)}
         />
       )}
 

@@ -46,6 +46,7 @@ export interface MicroVoce {
   d: number;  // documents count
   vn?: string; // nota ritardo
   proc?: Passaggio[];
+  note?: Array<{ id: string; autore: string; data: string; testo: string }>;
 }
 
 export interface Passaggio {
