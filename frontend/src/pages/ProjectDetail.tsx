@@ -14,7 +14,7 @@ import { AssignOperatorModal } from '../components/AssignOperatorModal';
 import { CalendarPreviewModal } from '../components/CalendarPreviewModal';
 import { ConfirmDeleteModal } from '../components/ConfirmDeleteModal';
 import { PROJECTS } from '../store/mockData';
-import { fetchProgettoDettaglio, emettiFatturaApi, consuntivaMicrovoceApi, fetchAccessiProgetto, assegnaAccessoProgettoApi, salvaProgettoDettaglioApi, archiviaProgettoApi, eliminaProgettoApi, fetchModuliLibreria, fetchArticoli } from '../api/client';
+import { fetchProgettoDettaglio, emettiFatturaApi, consuntivaMicrovoceApi, fetchAccessiProgetto, assegnaAccessoProgettoApi, salvaProgettoDettaglioApi, archiviaProgettoApi, eliminaProgettoApi, fetchModuliLibreria, fetchArticoli, uploadFileApi } from '../api/client';
 import { TEAM } from '../store/mockData';
 import type { Progetto, ModuloProgetto, CategoriaModulo } from '../types';
 import styles from './ProjectDetail.module.css';
@@ -146,7 +146,7 @@ export function ProjectDetail() {
     localStorage.setItem('bluman_custom_projects', JSON.stringify(updatedArr));
 
     salvaProgettoDettaglioApi(String(project.id), updatedProject).catch(() => {});
-    assegnaAccessoProgettoApi({ projectId: String(project.id), userId: `usr-0${operatorId}`, livello: roleLevel }).catch(() => {});
+    assegnaAccessoProgettoApi(String(project.id), `usr-0${operatorId}`, roleLevel).catch(() => {});
   };
 
   // Raw DB response per conservare gli ID reali delle microvoci Supabase
@@ -1113,7 +1113,7 @@ function FatturazioneTab({ project, rawDbProject, onRefresh }: { project: Proget
         padding: 14,
         marginTop: 14,
         display: 'flex',
-        justify: 'space-between',
+        justifyContent: 'space-between',
         alignItems: 'center',
       }}>
         <div>
