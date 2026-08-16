@@ -706,34 +706,58 @@ export function ProjectDetail() {
           <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 14, padding: 20 }}>
             <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>📜 Storico Contrattuale & Cronologia Addendum d'Ordine</div>
             <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 20 }}>
-              Registro immutabile delle versioni contrattuali firmate, marca temporale eIDAS ed addendum integrativi d'ordine per <strong>{project.cl}</strong>.
+              Registro delle versioni contrattuali, firma digitale ed addendum d'ordine per <strong>{project.cl}</strong> (Incarico: <em>{project.n}</em>).
             </div>
 
-            {/* Baseline v1.0 */}
-            <div style={{ background: '#0d2d22', border: '1px solid #1a5c3c', borderRadius: 12, padding: 16, marginBottom: 16 }}>
+            {/* Baseline Contratto Iniziale */}
+            <div style={{
+              background: project.st === 'pre_project' ? 'rgba(217, 119, 6, 0.08)' : '#0d2d22',
+              border: `1px solid ${project.st === 'pre_project' ? '#f59e0b' : '#1a5c3c'}`,
+              borderRadius: 12,
+              padding: 16,
+              marginBottom: 16
+            }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', gap: 8 }}>
                 <div>
-                  <span style={{ background: '#34d399', color: '#064e3b', fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 10, textTransform: 'uppercase' }}>
-                    🔒 CONTRATTO FIRMATO & CONGELATO (v1.0)
+                  <span style={{
+                    background: project.st === 'pre_project' ? '#f59e0b' : '#34d399',
+                    color: project.st === 'pre_project' ? '#451a03' : '#064e3b',
+                    fontSize: 10,
+                    fontWeight: 800,
+                    padding: '2px 8px',
+                    borderRadius: 10,
+                    textTransform: 'uppercase'
+                  }}>
+                    {project.st === 'pre_project' ? '✍️ PROPOSTA D\'ORDINE IN ATTESA DI FIRMA (v1.0)' : '🔒 CONTRATTO FIRMATO & CONGELATO (v1.0)'}
                   </span>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', marginTop: 4 }}>Engagement Letter & Proposta d'Ordine Iniziale</div>
-                  <div style={{ fontSize: 10, color: '#a7f3d0' }}>Stipula: 15/08/2026 ore 01:44:12 · Registrazione eIDAS Validata</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', marginTop: 4 }}>
+                    Engagement Letter — {project.n}
+                  </div>
+                  <div style={{ fontSize: 10, color: project.st === 'pre_project' ? '#fde68a' : '#a7f3d0' }}>
+                    {project.st === 'pre_project'
+                      ? `Generata in data ${project.start} · In attesa di validazione e firma digitale 1-Click del cliente`
+                      : `Stipula: ${project.start} · Registrazione eIDAS Validata`}
+                  </div>
                 </div>
-                <div style={{ fontSize: 16, fontWeight: 800, color: '#34d399' }}>{fmt(project.val)}</div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: project.st === 'pre_project' ? '#f59e0b' : '#34d399' }}>
+                  {fmt(project.val)}
+                </div>
               </div>
-              <div style={{ fontSize: 11, color: '#6ee7b7' }}>• Moduli Iniziali Incorporati: {project.mods.map(m => m.n).join(', ') || 'Analisi Preliminare, Structuring Malta, Trust'}</div>
+              <div style={{ fontSize: 11, color: project.st === 'pre_project' ? '#fde68a' : '#6ee7b7' }}>
+                • Moduli Iniziali Incorporati: {project.mods && project.mods.length > 0 ? project.mods.map(m => m.n).join(', ') : 'Nessun modulo ancora incorporato'}
+              </div>
             </div>
 
             {/* Timeline Addendums */}
             <div style={{ borderTop: '1px solid var(--border)', paddingTop: 16, marginTop: 16 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>Integrazioni & Addendum d'Ordine Successivi (Cronologia Posizionata Sotto):</div>
+              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>Integrazioni & Addendum d'Ordine Successivi:</div>
               {(() => {
-                const savedAdd = localStorage.getItem(`bluman_addendums_${project.cl}`);
+                const savedAdd = localStorage.getItem(`bluman_addendums_${project.id}`);
                 const addList = savedAdd ? JSON.parse(savedAdd) : [];
                 if (addList.length === 0) {
                   return (
                     <div style={{ fontSize: 11, color: 'var(--muted)', background: 'var(--card2)', padding: 12, borderRadius: 8 }}>
-                      Nessun addendum o modulo aggiuntivo istanziato successivamente. Il contratto base v1.0 è attualmente la versione attiva.
+                      Nessun addendum successivo per questo progetto. La proposta/contratto v1.0 è attualmente la versione attiva.
                     </div>
                   );
                 }
@@ -741,7 +765,7 @@ export function ProjectDetail() {
                   <div key={idx} style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 10, padding: 14, marginBottom: 10 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 700 }}>
                       <span>{a.title || `Addendum v1.${idx + 1}`}</span>
-                      <span style={{ color: 'var(--indigo-l)' }}>{fmt(a.prezzo || 3500)}</span>
+                      <span style={{ color: 'var(--indigo-l)' }}>{fmt(a.prezzo || 0)}</span>
                     </div>
                     <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>
                       Stato: {a.status === 'signed' ? '🔒 FIRMATO E CONGELATO' : '✍️ IN ATTESA DI FIRMA CLIENTE'} · Data: {a.date}
