@@ -1,4 +1,3 @@
-import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { getFormattedLogoUrl } from '../../utils';
 import styles from './Sidebar.module.css';

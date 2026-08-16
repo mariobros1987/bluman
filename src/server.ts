@@ -696,7 +696,7 @@ export function buildServer(app: AppPort): FastifyInstance {
   server.get('/invoices/scadenzario', async (req, reply) => {
     const tenantId = (req as any).tenantId;
     try {
-      const scadenze = await prisma.scadenzaIncasso.findMany({
+      const scadenze = await (prisma as any).scadenzaIncasso.findMany({
         where: { tenantId },
         include: {
           fattura: {
@@ -730,7 +730,7 @@ export function buildServer(app: AppPort): FastifyInstance {
     const { importoIncassatoCentesimi, metodoPagamento, riferimentoTransazione, noteOperatore } = req.body;
 
     try {
-      const scadenza = await prisma.scadenzaIncasso.findUnique({
+      const scadenza = await (prisma as any).scadenzaIncasso.findUnique({
         where: { id },
         include: { registrazioniRegistrate: true },
       });
@@ -739,7 +739,7 @@ export function buildServer(app: AppPort): FastifyInstance {
         return reply.code(404).send({ errore: 'Scadenza incasso non trovata' });
       }
 
-      const registrazione = await prisma.registrazioneIncasso.create({
+      const registrazione = await (prisma as any).registrazioneIncasso.create({
         data: {
           tenantId,
           scadenzaIncassoId: id,
@@ -751,21 +751,21 @@ export function buildServer(app: AppPort): FastifyInstance {
         },
       });
 
-      const totaleIncassato = scadenza.registrazioniRegistrate.reduce((acc, r) => acc + r.importoIncassatoCentesimi, 0) + importoIncassatoCentesimi;
+      const totaleIncassato = scadenza.registrazioniRegistrate.reduce((acc: number, r: any) => acc + r.importoIncassatoCentesimi, 0) + importoIncassatoCentesimi;
       const nuovoStatoScadenza = totaleIncassato >= scadenza.importoCentesimi ? 'incassato' : 'parziale';
 
-      await prisma.scadenzaIncasso.update({
+      await (prisma as any).scadenzaIncasso.update({
         where: { id },
         data: { stato: nuovoStatoScadenza },
       });
 
       // ── LOGICA OPENSTAMANAGER: Mastrino::aggiornaScadenzario ──────
       // Verifichiamo se TUTTE le scadenze della Fattura sono state incassate
-      const tutteScadenzeFattura = await prisma.scadenzaIncasso.findMany({
+      const tutteScadenzeFattura = await (prisma as any).scadenzaIncasso.findMany({
         where: { fatturaId: scadenza.fatturaId },
       });
 
-      const tutteSaldate = tutteScadenzeFattura.every(s => s.id === id ? nuovoStatoScadenza === 'incassato' : s.stato === 'incassato');
+      const tutteSaldate = tutteScadenzeFattura.every((s: any) => s.id === id ? nuovoStatoScadenza === 'incassato' : s.stato === 'incassato');
       
       // Aggiorniamo lo stato contabile immutabile della Fattura
       await prisma.fattura.update({
@@ -975,11 +975,11 @@ export function buildServer(app: AppPort): FastifyInstance {
         totaleEuro: totaleCentesimi / 100,
       });
 
-      await sendMagicLinkEmail({
-        to: emailDestinatario,
-        magicLinkUrl: 'http://localhost:5173/portal',
-        clienteNome: fattura.progetto.cliente.nome,
-      });
+      await sendMagicLinkEmail(
+        emailDestinatario,
+        fattura.progetto.cliente.nome,
+        'http://localhost:5173/portal'
+      );
 
       recordAudit({
         tenantId,
@@ -1025,7 +1025,7 @@ export function buildServer(app: AppPort): FastifyInstance {
   server.get('/contratti-ricorrenti', async (req, reply) => {
     const tenantId = (req as any).tenantId;
     try {
-      const contratti = await prisma.contrattoRicorrente.findMany({
+      const contratti = await (prisma as any).contrattoRicorrente.findMany({
         where: { tenantId },
         include: { cliente: true },
         orderBy: { prossimaFatturazione: 'asc' },
@@ -1054,7 +1054,7 @@ export function buildServer(app: AppPort): FastifyInstance {
     }
 
     try {
-      const contratto = await prisma.contrattoRicorrente.create({
+      const contratto = await (prisma as any).contrattoRicorrente.create({
         data: {
           tenantId,
           clienteId,
@@ -1082,7 +1082,7 @@ export function buildServer(app: AppPort): FastifyInstance {
   // ── CHECKLIST SOP COMPLIANCE (STYLE OPENSTAMANAGER) ───────────────
   server.get<{ Params: { passaggioId: string } }>('/passaggi/:passaggioId/checklist', async (req, reply) => {
     try {
-      const voci = await prisma.checklistVoce.findMany({
+      const voci = await (prisma as any).checklistVoce.findMany({
         where: { passaggioProgettoId: req.params.passaggioId },
         orderBy: { titolo: 'asc' },
       });
@@ -1103,7 +1103,7 @@ export function buildServer(app: AppPort): FastifyInstance {
     if (!titolo) return reply.code(400).send({ errore: 'Titolo voce checklist obbligatorio' });
 
     try {
-      const voce = await prisma.checklistVoce.create({
+      const voce = await (prisma as any).checklistVoce.create({
         data: {
           tenantId,
           passaggioProgettoId: passaggioId,
@@ -1119,10 +1119,10 @@ export function buildServer(app: AppPort): FastifyInstance {
 
   server.patch<{ Params: { id: string } }>('/checklist/:id/toggle', async (req, reply) => {
     try {
-      const voce = await prisma.checklistVoce.findUnique({ where: { id: req.params.id } });
+      const voce = await (prisma as any).checklistVoce.findUnique({ where: { id: req.params.id } });
       if (!voce) return reply.code(404).send({ errore: 'Voce non trovata' });
 
-      const updated = await prisma.checklistVoce.update({
+      const updated = await (prisma as any).checklistVoce.update({
         where: { id: req.params.id },
         data: {
           completato: !voce.completato,
