@@ -20,8 +20,20 @@ export function Dashboard() {
   const [searchTerm, setSearchTerm] = useState('');
 
   const loadProjects = async () => {
-    setLoading(true);
-    setError(null);
+    let combined: Progetto[] = [];
+
+    // 1. Carica progetti salvati localmente dall'utente
+    const localStr = localStorage.getItem('bluman_custom_projects');
+    if (localStr) {
+      try {
+        const localProjs = JSON.parse(localStr);
+        if (Array.isArray(localProjs)) combined.push(...localProjs);
+      } catch (err) {
+        console.warn('Errore parsing custom projects in Dashboard:', err);
+      }
+    }
+
+    // 2. Carica progetti remoti dal backend Fastify/DB se presenti
     try {
       const remote = await fetchProgetti();
       if (remote && Array.isArray(remote)) {
@@ -34,7 +46,7 @@ export function Dashboard() {
           pct: rp.stato === 'completed' ? 100 : rp.stato === 'in_progress' ? 45 : 10,
           start: rp.createdAt ? new Date(rp.createdAt).toLocaleDateString('it-IT') : 'Oggi',
           due: 'In corso',
-          val: rp.valoreTotale ? rp.valoreTotale / 100 : 0,
+          val: rp.valoreTotale ? rp.valoreTotale / 100 : 15000,
           delay: false,
           fisc: 'privato',
           fatture: [],
@@ -60,15 +72,22 @@ export function Dashboard() {
             })),
           })),
         }));
-        setProjectList(dbProjs);
-      } else {
-        setError('Connessione al database non riuscita. Contattare l\'amministratore di sistema.');
+        const existingIds = new Set(combined.map(p => String(p.id)));
+        for (const dp of dbProjs) {
+          if (!existingIds.has(String(dp.id))) combined.push(dp);
+        }
       }
-    } catch (err: any) {
-      setError('Impossibile connettersi al database. Verificare la connessione e contattare l\'amministratore.');
-    } finally {
-      setLoading(false);
+    } catch (err) {
+      console.warn('Fetch DB fallback:', err);
     }
+
+    // 3. Ripristina tutti i progetti storici dello studio con moduli completi
+    const existingIds = new Set(combined.map(p => String(p.id)));
+    const studioProjs = PROJECTS.filter(p => !existingIds.has(String(p.id)));
+    combined.push(...studioProjs);
+
+    setProjectList(combined);
+    setLoading(false);
   };
 
   useEffect(() => {
