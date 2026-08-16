@@ -16,7 +16,7 @@ import { ConfirmDeleteModal } from '../components/ConfirmDeleteModal';
 import { PROJECTS } from '../store/mockData';
 import { fetchProgettoDettaglio, emettiFatturaApi, consuntivaMicrovoceApi, fetchAccessiProgetto, assegnaAccessoProgettoApi, salvaProgettoDettaglioApi, archiviaProgettoApi, eliminaProgettoApi, fetchModuliLibreria, fetchArticoli, uploadFileApi } from '../api/client';
 import { TEAM } from '../store/mockData';
-import type { Progetto, ModuloProgetto, CategoriaModulo } from '../types';
+import type { Progetto, ModuloProgetto, CategoriaModulo, StatoProgetto, StatoModulo } from '../types';
 import styles from './ProjectDetail.module.css';
 
 type Tab = 'moduli' | 'grafo' | 'fatturazione' | 'redditivita' | 'storico' | 'comunicazioni' | 'documenti' | 'calendario';

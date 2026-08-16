@@ -1037,6 +1037,7 @@ function OperatorDetailModal({
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 120, padding: 16 }}>
       <div style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, width: '100%', maxWidth: 820, maxHeight: '92vh', overflowY: 'auto', padding: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
         
+        {loading && <div style={{ fontSize: 11, color: 'var(--muted)', textAlign: 'center' }}>⏳ Caricamento dati operatore...</div>}
         {/* Header Scheda Operatore */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid var(--border)', paddingBottom: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
