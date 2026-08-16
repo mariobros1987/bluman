@@ -331,9 +331,9 @@ export function ProjectDetail() {
     const totalV = newMods.flatMap(m => m.v);
     const totalDone = totalV.filter(v => v.s === 'done').length;
     const globalPct = totalV.length > 0 ? Math.round((totalDone / totalV.length) * 100) : 0;
-    const globalSt = globalPct === 100 ? 'completed' : 'in_progress';
+    const globalSt: StatoProgetto = globalPct === 100 ? 'completed' : 'in_progress';
 
-    const updatedProject = {
+    const updatedProject: Progetto = {
       ...project,
       mods: newMods,
       pct: globalPct,
@@ -369,7 +369,7 @@ export function ProjectDetail() {
         });
         const doneCount = newV.filter(v => v.s === 'done').length;
         const newPct = newV.length > 0 ? Math.round((doneCount / newV.length) * 100) : 0;
-        const newSt = newPct === 100 ? 'done' : newPct > 0 ? 'in_progress' : 'pending';
+        const newSt: StatoModulo = newPct === 100 ? 'done' : newPct > 0 ? 'in_progress' : 'pending';
         return {
           ...m,
           v: newV,
@@ -384,7 +384,7 @@ export function ProjectDetail() {
     const totalDone = totalV.filter(v => v.s === 'done').length;
     const globalPct = totalV.length > 0 ? Math.round((totalDone / totalV.length) * 100) : 0;
 
-    const updatedProject = {
+    const updatedProject: Progetto = {
       ...project,
       mods: newMods,
       pct: globalPct,
@@ -496,7 +496,7 @@ export function ProjectDetail() {
                         delay: false,
                         v: [
                           { n: 'Raccolta documenti e KYC cliente', hE: 4, hA: 4, s: 'done', as: 1, d: 1 },
-                          { n: 'Verifica giurisdizione e fiscalità intercompany', hE: 6, hA: 1, s: 'in_progress', as: 1, d: 0 },
+                          { n: 'Verifica giurisdizione e fiscalità intercompany', hE: 6, hA: 1, s: 'active', as: 1, d: 0 },
                           { n: 'Redazione report conclusivo', hE: 5, hA: 0, s: 'pending', as: 1, d: 0 }
                         ]
                       },
