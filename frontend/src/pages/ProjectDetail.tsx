@@ -267,7 +267,7 @@ export function ProjectDetail() {
                   delay: false,
                   v: [
                     { n: 'Raccolta documenti e KYC cliente', hE: 4, hA: 4, s: 'done', as: 1, d: 1 },
-                    { n: 'Verifica giurisdizione e fiscalità intercompany', hE: 6, hA: 1, s: 'in_progress', as: 1, d: 0 },
+                    { n: 'Verifica giurisdizione e fiscalità intercompany', hE: 6, hA: 1, s: 'active', as: 1, d: 0 },
                     { n: 'Redazione report conclusivo', hE: 5, hA: 0, s: 'pending', as: 1, d: 0 }
                   ]
                 },
@@ -283,7 +283,7 @@ export function ProjectDetail() {
                   team: [1, 3],
                   delay: false,
                   v: [
-                    { n: 'Bozza Atto Costitutivo e Statuto', hE: 10, hA: 6, s: 'in_progress', as: 1, d: 0 },
+                    { n: 'Bozza Atto Costitutivo e Statuto', hE: 10, hA: 6, s: 'active', as: 1, d: 0 },
                     { n: 'Registrazione MFSA e deposito UBO', hE: 10, hA: 0, s: 'pending', as: 1, d: 0 },
                     { n: 'Apertura posizioni fiscali e codice SDI', hE: 10, hA: 0, s: 'pending', as: 1, d: 0 }
                   ]
@@ -396,7 +396,7 @@ export function ProjectDetail() {
             return {
               ...mv,
               proc: nextSteps,
-              s: isAllDone ? 'done' : nextSteps.some(s => s.stato === 'done') ? 'in_progress' : mv.s,
+              s: isAllDone ? ('done' as const) : nextSteps.some(s => s.stato === 'done') ? ('active' as const) : mv.s,
             };
           }
           return mv;
@@ -546,7 +546,7 @@ export function ProjectDetail() {
                         team: [1, 3],
                         delay: false,
                         v: [
-                          { n: 'Bozza Atto Costitutivo e Statuto', hE: 10, hA: 6, s: 'in_progress', as: 1, d: 0 },
+                          { n: 'Bozza Atto Costitutivo e Statuto', hE: 10, hA: 6, s: 'active', as: 1, d: 0 },
                           { n: 'Registrazione MFSA e deposito UBO', hE: 10, hA: 0, s: 'pending', as: 1, d: 0 },
                           { n: 'Apertura posizioni fiscali e codice SDI', hE: 10, hA: 0, s: 'pending', as: 1, d: 0 }
                         ]
@@ -563,7 +563,7 @@ export function ProjectDetail() {
                         team: [1, 3],
                         delay: false,
                         v: [
-                          { n: 'Selezione Trust Company idonea', hE: 5, hA: 2, s: 'in_progress', as: 1, d: 0 },
+                          { n: 'Selezione Trust Company idonea', hE: 5, hA: 2, s: 'active', as: 1, d: 0 },
                           { n: 'Redazione Deed of Trust e Letter of Wishes', hE: 10, hA: 0, s: 'pending', as: 1, d: 0 },
                           { n: 'Trasferimento asset e registrazione Malta', hE: 10, hA: 0, s: 'pending', as: 1, d: 0 }
                         ]

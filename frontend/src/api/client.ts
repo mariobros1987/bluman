@@ -207,20 +207,7 @@ export async function creaClienteApi(input: { nome: string; tipo: 'individual' |
   return await res.json();
 }
 
-export async function uploadFileApi(filename: string, base64: string) {
-  try {
-    const res = await fetch(`${API_BASE}/upload`, {
-      method: 'POST',
-      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
-      body: JSON.stringify({ filename, base64 }),
-    });
-    if (!res.ok) throw new Error('Errore caricamento file');
-    return await res.json();
-  } catch (err) {
-    console.warn('uploadFileApi fallback locale:', err);
-    return { url: `#local-${filename}` };
-  }
-}
+
 
 export async function creaProgettoApi(input: { clienteId: string; nome: string }) {
   const res = await fetch(`${API_BASE}/progetti`, {
