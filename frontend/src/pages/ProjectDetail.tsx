@@ -1106,16 +1106,31 @@ function FatturazioneTab({ project, rawDbProject, onRefresh }: { project: Proget
         <div style={{ fontSize: 24, fontWeight: 800 }}>{fmt(project.val)}</div>
       </div>
 
-      <div style={{ background: '#042f2e', border: '1px solid #0d9488', borderRadius: 10, padding: 14, marginTop: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{
+        background: totFatturato === 0 ? '#1e293b' : totFatturato >= project.val ? '#042f2e' : '#78350f',
+        border: `1px solid ${totFatturato === 0 ? '#334155' : totFatturato >= project.val ? '#0d9488' : '#b45309'}`,
+        borderRadius: 10,
+        padding: 14,
+        marginTop: 14,
+        display: 'flex',
+        justify: 'space-between',
+        alignItems: 'center',
+      }}>
         <div>
-          <div style={{ fontSize: 11, color: '#2dd4bf', fontWeight: 600, textTransform: 'uppercase' }}>Stato Saldo & Incassi Progetto</div>
+          <div style={{ fontSize: 11, color: totFatturato === 0 ? '#94a3b8' : totFatturato >= project.val ? '#2dd4bf' : '#fcd34d', fontWeight: 600, textTransform: 'uppercase' }}>
+            Stato Saldo & Incassi Progetto
+          </div>
           <div style={{ fontSize: 13, fontWeight: 700, color: 'white', marginTop: 2 }}>
-            ✓ Incassato Effettivo: {fmt(totFatturato)} / {fmt(project.val)} (Saldata al 100%)
+            {totFatturato === 0
+              ? `⏳ Incassato Effettivo: € 0 / ${fmt(project.val)} (Da Fatturare & Incassare)`
+              : totFatturato >= project.val
+              ? `✓ Incassato Effettivo: ${fmt(totFatturato)} / ${fmt(project.val)} (Saldata al 100%)`
+              : `🔹 Incassato Effettivo: ${fmt(totFatturato)} / ${fmt(project.val)} (Incasso Parziale)`}
           </div>
         </div>
         <button
-          onClick={() => alert('✓ Stato Incassi Progetto aggiornato in tempo reale con Prima Nota')}
-          style={{ background: '#0d9488', border: 'none', color: 'white', padding: '6px 12px', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+          onClick={() => alert('✓ Stato Incassi Progetto sincronizzato con lo Scadenzario e Prima Nota')}
+          style={{ background: totFatturato === 0 ? '#334155' : totFatturato >= project.val ? '#0d9488' : '#b45309', border: 'none', color: 'white', padding: '6px 12px', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
         >
           💳 Registro Incassi Progetto
         </button>
