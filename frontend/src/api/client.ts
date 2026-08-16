@@ -225,13 +225,23 @@ export async function fetchClienti() {
   }
 }
 
-export async function creaClienteApi(input: { nome: string; tipo: 'individual' | 'company' }) {
+export async function creaClienteApi(input: { nome: string; tipo?: 'individual' | 'company'; [key: string]: any }) {
   const res = await fetch(`${API_BASE}/clienti`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(input),
   });
   if (!res.ok) throw new Error('Errore creazione cliente');
+  return await res.json();
+}
+
+export async function aggiornaClienteApi(id: string, input: Record<string, any>) {
+  const res = await fetch(`${API_BASE}/clienti/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error('Errore aggiornamento cliente');
   return await res.json();
 }
 

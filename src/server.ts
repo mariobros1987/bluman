@@ -621,6 +621,106 @@ export function buildServer(app: AppPort): FastifyInstance {
     return reply.code(201).send(user);
   });
 
+  // ─── ANAGRAFICA CLIENTI ERP API (§2, §14) ─────────────────────────
+  server.get('/clienti', async (req) => {
+    const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
+    try {
+      const clienti = await prisma.cliente.findMany({
+        where: { tenantId },
+        orderBy: { createdAt: 'desc' },
+      });
+      return clienti;
+    } catch {
+      return [];
+    }
+  });
+
+  server.post<{ Body: Record<string, any> }>('/clienti', async (req, reply) => {
+    const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
+    const b = req.body || {};
+    if (!b.nome) return reply.code(400).send({ errore: 'Il nome del cliente è obbligatorio' });
+
+    try {
+      const cliente = await prisma.cliente.create({
+        data: {
+          tenantId,
+          nome: b.nome,
+          tipo: b.tipo || 'company',
+          piva: b.piva || null,
+          codiceFiscale: b.codiceFiscale || b.codFisc || null,
+          giurisdizione: b.giurisdizione || null,
+          sedeLegale: b.sedeLegale || b.sede || null,
+          sdiCode: b.sdiCode || b.codiceSdi || 'SUBM70N',
+          iban: b.iban || null,
+          rischioAml: b.rischioAml || 'medio',
+          ubo: b.ubo || null,
+          fontePatrimonio: b.fontePatrimonio || null,
+          dataKyc: b.dataKyc || null,
+          referentiJson: b.referentiJson ? (typeof b.referentiJson === 'string' ? JSON.parse(b.referentiJson) : b.referentiJson) : null,
+        },
+      });
+      recordAudit({
+        tenantId,
+        azione: 'CLIENTE_CREATO',
+        entita: cliente.nome,
+        dettagli: `Creata anagrafica cliente ERP ${cliente.nome} (P.IVA: ${cliente.piva || 'N/D'})`,
+        ipAddress: req.ip,
+      });
+      return reply.code(201).send(cliente);
+    } catch (err: any) {
+      console.error('Errore creazione cliente DB:', err);
+      return reply.code(500).send({ errore: err.message || 'Errore salvataggio cliente' });
+    }
+  });
+
+  server.put<{ Params: { id: string }; Body: Record<string, any> }>('/clienti/:id', async (req, reply) => {
+    const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
+    const { id } = req.params;
+    const b = req.body || {};
+
+    try {
+      const updated = await prisma.cliente.update({
+        where: { id },
+        data: {
+          nome: b.nome !== undefined ? b.nome : undefined,
+          tipo: b.tipo !== undefined ? b.tipo : undefined,
+          piva: b.piva !== undefined ? b.piva : undefined,
+          codiceFiscale: b.codiceFiscale !== undefined ? b.codiceFiscale : (b.codFisc !== undefined ? b.codFisc : undefined),
+          giurisdizione: b.giurisdizione !== undefined ? b.giurisdizione : undefined,
+          sedeLegale: b.sedeLegale !== undefined ? b.sedeLegale : (b.sede !== undefined ? b.sede : undefined),
+          sdiCode: b.sdiCode !== undefined ? b.sdiCode : (b.codiceSdi !== undefined ? b.codiceSdi : undefined),
+          iban: b.iban !== undefined ? b.iban : undefined,
+          rischioAml: b.rischioAml !== undefined ? b.rischioAml : undefined,
+          ubo: b.ubo !== undefined ? b.ubo : undefined,
+          fontePatrimonio: b.fontePatrimonio !== undefined ? b.fontePatrimonio : undefined,
+          dataKyc: b.dataKyc !== undefined ? b.dataKyc : undefined,
+          referentiJson: b.referentiJson !== undefined ? (typeof b.referentiJson === 'string' ? JSON.parse(b.referentiJson) : b.referentiJson) : undefined,
+        },
+      });
+      recordAudit({
+        tenantId,
+        azione: 'CLIENTE_AGGIORNATO',
+        entita: updated.nome,
+        dettagli: `Aggiornati dati legali/fiscali cliente ${updated.nome} (P.IVA: ${updated.piva})`,
+        ipAddress: req.ip,
+      });
+      return reply.send(updated);
+    } catch (err: any) {
+      console.error('Errore aggiornamento cliente DB:', err);
+      return reply.code(500).send({ errore: err.message || 'Errore aggiornamento cliente' });
+    }
+  });
+
+  server.delete<{ Params: { id: string } }>('/clienti/:id', async (req, reply) => {
+    const { id } = req.params;
+    try {
+      await prisma.cliente.delete({ where: { id } });
+      return reply.send({ ok: true, id });
+    } catch (err: any) {
+      return reply.code(500).send({ errore: err.message || 'Errore eliminazione cliente' });
+    }
+  });
+
   server.post<{ Body: { clienteId: string; nome: string } }>('/progetti', async (req, reply) => {
     const { clienteId, nome } = req.body;
     if (!clienteId || !nome) return reply.code(400).send({ errore: 'clienteId e nome sono obbligatori' });

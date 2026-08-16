@@ -10,9 +10,23 @@ export interface Cliente {
   id: string;
   nome: string;
   tipo: TipoCliente;
-  email?: string;
+  piva?: string;
   partitaIva?: string;
   codiceFiscale?: string;
+  giurisdizione?: string;
+  sedeLegale?: string;
+  sdiCode?: string;
+  codiceSdi?: string;
+  iban?: string;
+  rischioAml?: 'basso' | 'medio' | 'alto';
+  ubo?: string;
+  fontePatrimonio?: string;
+  dataKyc?: string;
+  email?: string;
+  pec?: string;
+  telefono?: string;
+  referentiJson?: any;
+  isAttivo?: boolean;
 }
 
 export interface TeamMember {

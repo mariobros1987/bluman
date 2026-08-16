@@ -292,46 +292,74 @@ export function ClientsPage() {
 function AnagraficaErpModal({ client, onClose, onSaved }: { client: Cliente; onClose: () => void; onSaved: () => void }) {
   const [tab, setTab] = useState<'generale' | 'sede' | 'sdi' | 'compliance'>('generale');
   
-  // Tab 1: Generale
-  const [nome, setNome] = useState(client.nome);
-  const [tipo, setTipo] = useState(client.tipo);
-  const [piva, setPiva] = useState(client.tipo === 'company' ? 'IT09876543210' : '');
-  const [codFisc, setCodFisc] = useState('RCCMRC80A01H501Z');
-  const [giurisdizione, setGiurisdizione] = useState(client.tipo === 'company' ? 'Malta / UE' : 'Italia');
+  const [nome, setNome] = useState(client.nome || '');
+  const [tipo, setTipo] = useState(client.tipo || 'company');
+  const [piva, setPiva] = useState(client.piva || client.partitaIva || '');
+  const [codFisc, setCodFisc] = useState(client.codiceFiscale || 'RCCMRC80A01H501Z');
+  const [giurisdizione, setGiurisdizione] = useState(client.giurisdizione || (client.tipo === 'company' ? 'Malta / UE' : 'Italia'));
   const [capitale, setCapitale] = useState(100000);
   const [regImprese, setRegImprese] = useState('C-99881 / REA 49021');
 
   // Tab 2: Sede & Contatti
-  const [indirizzo, setIndirizzo] = useState('Level 4, Valuation Centre, Tower Road');
+  const [indirizzo, setIndirizzo] = useState(client.sedeLegale || 'Level 4, Valuation Centre, Tower Road');
   const [citta, setCitta] = useState('Sliema / Milano');
   const [cap, setCap] = useState('20121');
   const [nazione, setNazione] = useState('Malta / Italia');
-  const [email, setEmail] = useState('m.ricci@holdingbeta.advisory');
-  const [pec, setPec] = useState('holdingbeta@legalmail.it');
-  const [telefono, setTelefono] = useState('+356 21 888 999');
+  const [email, setEmail] = useState(client.email || 'm.ricci@holdingbeta.advisory');
+  const [pec, setPec] = useState(client.pec || 'holdingbeta@legalmail.it');
+  const [telefono, setTelefono] = useState(client.telefono || '+356 21 888 999');
 
   // Tab 3: SDI & Fatturazione
-  const [sdiCode, setSdiCode] = useState('SUBM70N');
+  const [sdiCode, setSdiCode] = useState(client.sdiCode || client.codiceSdi || 'SUBM70N');
   const [regimeFiscale, setRegimeFiscale] = useState('RF01 - Ordinario');
-  const [iban, setIban] = useState('IT60X0542811101000000123456');
+  const [iban, setIban] = useState(client.iban || 'IT60X0542811101000000123456');
 
   // Tab 4: Compliance & KYC
-  const [rischioAml, setRischioAml] = useState<'basso' | 'medio' | 'alto'>('medio');
-  const [ubo, setUbo] = useState('Marco Ricci (100% Quote)');
-  const [fontePatrimonio, setFontePatrimonio] = useState('Dividendi Societari & IP Licensing');
-  const [dataKyc, setDataKyc] = useState('14/08/2026');
+  const [rischioAml, setRischioAml] = useState<'basso' | 'medio' | 'alto'>(client.rischioAml || 'medio');
+  const [ubo, setUbo] = useState(client.ubo || 'Marco Ricci (100% Quote)');
+  const [fontePatrimonio, setFontePatrimonio] = useState(client.fontePatrimonio || 'Dividendi Societari & IP Licensing');
+  const [dataKyc, setDataKyc] = useState(client.dataKyc || '14/08/2026');
 
   const [saving, setSaving] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
-    client.nome = nome;
-    client.tipo = tipo;
-    setTimeout(() => {
+
+    const clientPayload: Record<string, any> = {
+      nome,
+      tipo,
+      piva,
+      codiceFiscale: codFisc,
+      giurisdizione,
+      sedeLegale: `${indirizzo}, ${citta} (${cap}) - ${nazione}`,
+      sdiCode,
+      iban,
+      rischioAml,
+      ubo,
+      fontePatrimonio,
+      dataKyc,
+      email,
+      pec,
+      telefono,
+    };
+
+    // Aggiorna l'oggetto in memoria
+    Object.assign(client, clientPayload);
+
+    try {
+      if (client.id && !client.id.startsWith('cl-0') && !client.id.startsWith('cl-proj-')) {
+        await aggiornaClienteApi(client.id, clientPayload);
+      } else {
+        const nuovo = await creaClienteApi(clientPayload);
+        if (nuovo && nuovo.id) client.id = nuovo.id;
+      }
+    } catch (apiErr) {
+      console.warn('Salvataggio API DB cliente fallback:', apiErr);
+    } finally {
       setSaving(false);
       onSaved();
-    }, 400);
+    }
   };
 
   return (
