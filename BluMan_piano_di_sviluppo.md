@@ -67,21 +67,18 @@
   - Scheda 3: 📋 Form Dati Societari con salvataggio diretto.
   - Scheda 4: 📎 Vault Documenti Legali.
   - Scheda 5: 💬 Contatti Advisor.
-- [x] **Impostazioni Studio & Gestione Team (`/settings`)**:
+- [x] **Impostazioni Studio, Gestione Team & Matrice Permessi RBAC (`/settings`)**:
   - Sede Legale e Sede Operativa disaccoppiate.
   - Configuratore Layout Fattura PDF (Logo studio, colore tema, note legali ed anteprima live).
   - **📧 Server Email SMTP Transazionale & Omnichannel**: Form configurazione SMTP + 4 Pulsanti di Test per WhatsApp, Telegram Bot, Signal Daemon ed Email.
   - **👥 Gestione Team & Performance Operatori**: Card interattive con **Francesca Disabato**, **Joe Disabato**, **Avv. Lorenzo Marino**, **Elena Rossi** e **Super Admin**.
   - **📊 Scheda Dettagliata Operatore & Timesheet Live**: Modal 1-Click con consuntivo ore lavorate, progetti assegnati, microvoci ultimate, tasso di efficienza ed export PDF.
-- [x] **Super Admin & Multi-Tenant Studio (`/admin/tenants`)**:
-  - [x] Dashboard metrica globale per SuperAdmin (Fatturato globale, tenant attivi, contratti Enterprise).
-  - [x] Modal registrazione nuovo Tenant / Studio professionale con isolamento `tenant_id`.
-  - [x] Mappatura RBAC nella Sidebar per ruolo `super_admin`.
-- [x] **Calendario Condiviso & Scadenzario Studio (`/calendar`)**:
-  - [x] Vista Mese ed Inserimento Scadenze Attività con menu a tendina clienti dall'Anagrafica ERP.
-  - [x] Programmazione scadenze 1-Click direttamente dalle microvoci di progetto (`ProjectDetail.tsx`).
-  - [x] Scadenzario Cronologico Filtrabile (Microvoci, Compliance KYC, Emissione Fatture, Firma Contratti e Promemoria).
-  - [x] Drawer Modal Dettagli Evento ed Azione `✓ Marca Come Completato`.
+  - **🔑 Matrice Permessi & Controllo Accessi RBAC (Stile OpenSTAManager)**: Modal a tab per definire per ciascun operatore/collaboratore il livello di autorizzazione (`denied`, `read`, `write`) per le 8 sezioni dello studio, con persintenza DB Prisma `PermessoModulo` e blocco API.
+- [x] **Contratti Ricorrenti & Retainer Studio (`/retainers`) — *Ispirato ad OpenSTAManager***:
+  - Gestione contratti continuativi di Advisory, Corporate Governance e Compliance AML.
+  - Pianificazione frequenza canone (mensile, trimestrale, semestrale, annuale) e data prossima fatturazione.
+  - Modal 1-Click **`➕ Nuovo Contratto Retainer`** collegato all'Anagrafica Clienti ERP ed al **Progetto Specifico** (con menu a cascata che filtra solo i progetti del cliente selezionato).
+  - Navigazione 1-Click **`📁 Nome Progetto ↗`** per accedere direttamente al dettaglio dell'incarico.
 
 ---
 
