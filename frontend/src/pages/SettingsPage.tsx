@@ -60,6 +60,7 @@ export function SettingsPage() {
   const [modalUserOpen, setModalUserOpen] = useState(false);
   const [newUserName, setNewUserName] = useState('');
   const [newUserEmail, setNewUserEmail] = useState('');
+  const [newUserSpecializzazione, setNewUserSpecializzazione] = useState('');
   const [newUserRole, setNewUserRole] = useState<'super_admin' | 'advisor' | 'operator'>('advisor');
   const [submittingUser, setSubmittingUser] = useState(false);
   const [selectedOperator, setSelectedOperator] = useState<any | null>(null);
@@ -98,11 +99,6 @@ export function SettingsPage() {
     const dbUsers = await fetchUtentiTenant();
     if (dbUsers && Array.isArray(dbUsers) && dbUsers.length > 0) {
       setUsers(dbUsers);
-    } else {
-      setUsers([
-        { id: 'usr-01', nome: 'Joe Disabato', email: 'joe@bluecode.advisory', ruolo: 'super_admin' },
-        { id: 'usr-02', nome: 'Elena Rossi', email: 'elena@bluecode.advisory', ruolo: 'advisor' },
-      ]);
     }
     setLoadingUsers(false);
   };
@@ -225,9 +221,11 @@ export function SettingsPage() {
         nome: newUserName,
         email: newUserEmail,
         ruolo: newUserRole,
+        specializzazione: newUserSpecializzazione,
       });
       setNewUserName('');
       setNewUserEmail('');
+      setNewUserSpecializzazione('');
       setModalUserOpen(false);
       await loadTenantData();
     } catch (err) {
@@ -782,21 +780,22 @@ export function SettingsPage() {
                   key={u.id}
                   className={styles.userCard}
                   onClick={() => setSelectedOperator(u)}
-                  style={{ cursor: 'pointer', transition: 'all .2s' }}
+                  style={{ cursor: 'pointer', transition: 'all .2s', display: 'flex', alignItems: 'center', gap: 12 }}
                   title="Clicca per aprire la scheda dettagliata di performance ed ore lavorate"
                 >
-                  <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--indigo)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 14 }}>
+                  <div style={{ width: 42, height: 42, borderRadius: '50%', background: (u.ruolo || '').includes('super') ? '#4f46e5' : (u.specializzazione || '').toLowerCase().includes('legal') || (u.nome || '').toLowerCase().includes('avv') ? '#059669' : (u.specializzazione || '').toLowerCase().includes('tax') || (u.specializzazione || '').toLowerCase().includes('fiscale') ? '#d97706' : '#ec4899', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 14, flexShrink: 0 }}>
                     {(u.nome || u.name || 'U').substring(0, 2).toUpperCase()}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span>{u.nome || u.name}</span>
                       <span style={{ fontSize: 10, color: 'var(--indigo-l)' }}>🔍</span>
                     </div>
-                    <div style={{ fontSize: 10, color: 'var(--muted)' }}>{u.email}</div>
+                    <div style={{ fontSize: 11, color: '#818cf8', fontWeight: 600, marginTop: 1 }}>{u.specializzazione || (u.ruolo === 'super_admin' ? 'Senior Partner & Lead Advisor' : 'Collaboratore')}</div>
+                    <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>{u.email}</div>
                   </div>
-                  <span className={styles.roleBadge} style={{ background: (u.ruolo || u.role || '').includes('super') ? '#200f40' : '#1a1f3d', color: (u.ruolo || u.role || '').includes('super') ? '#a78bfa' : '#818cf8' }}>
-                    {u.ruolo || u.role}
+                  <span className={styles.roleBadge} style={{ background: (u.ruolo || u.role || '').includes('super') ? '#200f40' : '#1a1f3d', color: (u.ruolo || u.role || '').includes('super') ? '#a78bfa' : '#818cf8', whiteSpace: 'nowrap' }}>
+                    {u.ruolo === 'super_admin' ? '👑 Super Admin' : u.ruolo === 'advisor' ? '👨‍💼 Advisor' : '👷 Operatore'}
                   </span>
                 </div>
               ))}
@@ -827,25 +826,30 @@ export function SettingsPage() {
       {/* Modal Invita Collaboratore Studio */}
       {modalUserOpen && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 16 }}>
-          <form onSubmit={handleAddUser} style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, padding: 22, width: '100%', maxWidth: 460, display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <form onSubmit={handleAddUser} style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, padding: 22, width: '100%', maxWidth: 480, display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div style={{ fontSize: 16, fontWeight: 700 }}>+ Invita Nuovo Collaboratore Studio</div>
-            <div style={{ fontSize: 11, color: 'var(--muted)' }}>Crea un utente operatore ed invia le credenziali di accesso al gestionale.</div>
+            <div style={{ fontSize: 11, color: 'var(--muted)' }}>Crea un utente operatore o professionista esterno (Avvocato, Commercialista, Back Office).</div>
 
             <div>
-              <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Nome Completo *</label>
-              <input value={newUserName} onChange={e => setNewUserName(e.target.value)} required placeholder="es. Marco Bianchi" style={{ fontSize: 12 }} />
+              <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Nome e Titolo Professionale *</label>
+              <input value={newUserName} onChange={e => setNewUserName(e.target.value)} required placeholder="es. Avv. Lorenzo Marino" style={{ fontSize: 12 }} />
             </div>
 
             <div>
-              <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Email Aziendale *</label>
-              <input type="email" value={newUserEmail} onChange={e => setNewUserEmail(e.target.value)} required placeholder="es. marco.bianchi@bluecode.advisory" style={{ fontSize: 12 }} />
+              <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Specializzazione / Area di Competenza</label>
+              <input value={newUserSpecializzazione} onChange={e => setNewUserSpecializzazione(e.target.value)} placeholder="es. Legal Counsel — Diritto Societario & IP" style={{ fontSize: 12 }} />
+            </div>
+
+            <div>
+              <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Email Aziendale / PEC *</label>
+              <input type="email" value={newUserEmail} onChange={e => setNewUserEmail(e.target.value)} required placeholder="es. lorenzo.marino@bluecode.advisory" style={{ fontSize: 12 }} />
             </div>
 
             <div>
               <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Ruolo & Permessi Accesso *</label>
               <select value={newUserRole} onChange={e => setNewUserRole(e.target.value as any)} style={{ padding: 10, fontSize: 12 }}>
-                <option value="advisor">👨‍💼 Advisor Senior (Gestione Progetti & Clienti)</option>
-                <option value="operator">👷 Operatore Studio (Consuntivazione Ore & Task)</option>
+                <option value="advisor">👨‍💼 Advisor Senior / Legal Counsel (Gestione Progetti & Contratti)</option>
+                <option value="operator">👷 Operatore Studio / Back Office (Consuntivazione Ore & Microvoci)</option>
                 <option value="super_admin">👑 Super Admin (Tutti i permessi Multi-Tenant)</option>
               </select>
             </div>

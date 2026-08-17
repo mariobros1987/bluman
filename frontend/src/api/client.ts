@@ -380,25 +380,86 @@ export async function salvaProgettoDettaglioApi(progettoId: string, data: any) {
   }
 }
 
+export const DEFAULT_TEAM_USERS = [
+  { id: 'usr-01', nome: 'Joe Disabato', email: 'joe@bluecode.advisory', ruolo: 'super_admin', specializzazione: 'Lead Advisor & Strategia' },
+  { id: 'usr-02', nome: 'Avv. Lorenzo Marino', email: 'lorenzo.marino@bluecode.advisory', ruolo: 'advisor', specializzazione: 'Legal Counsel — Diritto Societario, Contrattualistica & IP' },
+  { id: 'usr-03', nome: 'Dr. Elena Russo', email: 'elena.russo@bluecode.advisory', ruolo: 'advisor', specializzazione: 'Tax Advisor — Fiscalità Internazionale & Holding' },
+  { id: 'usr-04', nome: 'Francesca Disabato', email: 'francesca@bluecode.advisory', ruolo: 'operator', specializzazione: 'Back Office & Compliance KYC/AML' },
+];
+
 export async function fetchUtentiTenant() {
+  const customStr = localStorage.getItem('bluman_custom_team_users');
+  let customList: any[] = [];
+  if (customStr) {
+    try {
+      customList = JSON.parse(customStr);
+    } catch {}
+  }
+
   try {
     const res = await fetch(`${API_BASE}/tenant/utenti`);
-    if (!res.ok) throw new Error('Errore recupero utenti tenant');
-    return await res.json();
+    if (res.ok) {
+      const dbUsers = await res.json();
+      if (Array.isArray(dbUsers) && dbUsers.length > 0) {
+        const existingEmails = new Set(dbUsers.map(u => (u.email || '').toLowerCase()));
+        const fullList = [...dbUsers];
+        for (const def of DEFAULT_TEAM_USERS) {
+          if (!existingEmails.has(def.email.toLowerCase())) {
+            fullList.push(def);
+          }
+        }
+        for (const cust of customList) {
+          if (!existingEmails.has(cust.email.toLowerCase())) {
+            fullList.push(cust);
+          }
+        }
+        return fullList;
+      }
+    }
   } catch (err) {
-    console.warn('Backend API offline', err);
-    return [];
+    console.warn('Backend API offline / fallback team', err);
   }
+
+  // Fallback combinato: default + custom salvati localmente
+  const existingEmails = new Set(DEFAULT_TEAM_USERS.map(u => u.email.toLowerCase()));
+  const merged = [...DEFAULT_TEAM_USERS];
+  for (const cust of customList) {
+    if (!existingEmails.has(cust.email.toLowerCase())) {
+      merged.push(cust);
+    }
+  }
+  return merged;
 }
 
-export async function creaUtenteTenantApi(input: { nome: string; email: string; ruolo: string }) {
-  const res = await fetch(`${API_BASE}/tenant/utenti`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(input),
-  });
-  if (!res.ok) throw new Error('Errore creazione utente tenant');
-  return await res.json();
+export async function creaUtenteTenantApi(input: { nome: string; email: string; ruolo: string; specializzazione?: string }) {
+  // Salva localmente per persistenza immediata
+  const customStr = localStorage.getItem('bluman_custom_team_users');
+  let customList: any[] = [];
+  if (customStr) {
+    try { customList = JSON.parse(customStr); } catch {}
+  }
+  const newUser = {
+    id: `usr-${Date.now()}`,
+    nome: input.nome,
+    email: input.email,
+    ruolo: input.ruolo,
+    specializzazione: input.specializzazione || 'Collaboratore Studio',
+    createdAt: new Date().toISOString(),
+  };
+  customList.push(newUser);
+  localStorage.setItem('bluman_custom_team_users', JSON.stringify(customList));
+
+  try {
+    const res = await fetch(`${API_BASE}/tenant/utenti`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    });
+    if (res.ok) return await res.json();
+  } catch (err) {
+    console.warn('Backend offline fallback for creaUtenteTenantApi', err);
+  }
+  return newUser;
 }
 
 export async function fetchAccessiProgetto(progettoId: string) {
