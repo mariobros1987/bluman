@@ -202,6 +202,7 @@ export async function creaArticoloApi(input: {
   categoria: string;
   oreDefault: number;
   prezzoDefault: number;
+  documentiRichiesti?: string[];
   passaggi?: Array<{ titolo: string; tipo: 'info' | 'documento' | 'form' | 'verifica'; chi: 'operatore' | 'cliente'; descrizione?: string }>;
 }) {
   const res = await fetch(`${API_BASE}/articoli`, {

@@ -3,12 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { Badge } from '../components/ui/Badge';
 import { ProgressBar } from '../components/ui/ProgressBar';
 import { AvatarGroup } from '../components/ui/Avatar';
-import { CatBadge } from '../components/ui/CatBadge';
 import { fmt, progressColor } from '../utils';
-import { fetchProgetti, fetchClienti } from '../api/client';
+import { fetchProgetti } from '../api/client';
 import { PROJECTS, TEAM } from '../store/mockData';
 import { NewProjectWizard } from '../components/NewProjectWizard';
-import type { Progetto, CategoriaModulo } from '../types';
+import type { Progetto } from '../types';
 
 type ViewMode = 'cards' | 'table' | 'kanban';
 type FilterStatus = 'all' | 'in_progress' | 'delayed' | 'pending_signature' | 'completed' | 'archived';
@@ -16,9 +15,7 @@ type FilterStatus = 'all' | 'in_progress' | 'delayed' | 'pending_signature' | 'c
 export function Projects() {
   const navigate = useNavigate();
   const [projectList, setProjectList] = useState<Progetto[]>([]);
-  const [clientiList, setClientiList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [wizardOpen, setWizardOpen] = useState(false);
 
   // Filtri e visualizzazione
@@ -32,13 +29,7 @@ export function Projects() {
   const loadProjects = async () => {
     let combined: Progetto[] = [];
 
-    // 1. Carica clienti per correlazione anagrafica
-    try {
-      const cls = await fetchClienti();
-      if (cls && Array.isArray(cls)) setClientiList(cls);
-    } catch {}
-
-    // 2. Carica progetti salvati localmente dall'utente
+    // 1. Carica progetti salvati localmente dall'utente
     const localStr = localStorage.getItem('bluman_custom_projects');
     if (localStr) {
       try {
@@ -49,7 +40,7 @@ export function Projects() {
       }
     }
 
-    // 3. Carica progetti remoti dal backend Fastify/DB se presenti
+    // 2. Carica progetti remoti dal backend Fastify/DB se presenti
     try {
       const remote = await fetchProgetti();
       if (remote && Array.isArray(remote)) {
@@ -99,7 +90,7 @@ export function Projects() {
       console.warn('Fetch DB fallback:', err);
     }
 
-    // 4. Ripristina progetti storici dello studio
+    // 3. Ripristina progetti storici dello studio
     const existingIds = new Set(combined.map(p => String(p.id)));
     const studioProjs = PROJECTS.filter(p => !existingIds.has(String(p.id)));
     combined.push(...studioProjs);
@@ -114,9 +105,9 @@ export function Projects() {
 
   // ── Statistiche KPI Operative ─────────────────────────────────────────
   const totalProjects = projectList.length;
-  const activeProjects = projectList.filter(p => p.st === 'in_progress' || p.st === 'active').length;
-  const delayedProjects = projectList.filter(p => p.delay || p.st === 'delayed').length;
-  const completedProjects = projectList.filter(p => p.st === 'completed' || p.st === 'done').length;
+  const activeProjects = projectList.filter(p => p.st === 'in_progress' || (p.st as any) === 'active').length;
+  const delayedProjects = projectList.filter(p => p.delay || (p.st as any) === 'delayed' || (p.st as any) === 'blocked').length;
+  const completedProjects = projectList.filter(p => p.st === 'completed' || (p.st as any) === 'done').length;
 
   const totalPortafoglioVal = projectList.reduce((sum, p) => sum + (p.val || 0), 0);
   
@@ -149,10 +140,10 @@ export function Projects() {
 
     // 2. Filtro Stato
     let matchStatus = true;
-    if (statusFilter === 'in_progress') matchStatus = p.st === 'in_progress' || p.st === 'active';
-    else if (statusFilter === 'delayed') matchStatus = p.delay || p.st === 'delayed' || p.st === 'blocked';
+    if (statusFilter === 'in_progress') matchStatus = p.st === 'in_progress' || (p.st as any) === 'active';
+    else if (statusFilter === 'delayed') matchStatus = p.delay || (p.st as any) === 'delayed' || (p.st as any) === 'blocked';
     else if (statusFilter === 'pending_signature') matchStatus = p.pct < 20 || p.st === 'pre_project';
-    else if (statusFilter === 'completed') matchStatus = p.st === 'completed' || p.st === 'done';
+    else if (statusFilter === 'completed') matchStatus = p.st === 'completed' || (p.st as any) === 'done';
     else if (statusFilter === 'archived') matchStatus = p.st === 'archived';
 
     // 3. Filtro Categoria Modulo
@@ -448,7 +439,6 @@ export function Projects() {
           {filteredProjects.map(p => {
             const daysRemaining = calculateDaysRemaining(p.due);
             const totalMods = (p.mods || []).length;
-            const completedMods = (p.mods || []).filter(m => m.st === 'done').length;
             
             // Consuntivo ore progetto
             const oreCons = (p.mods || []).reduce((sum, m) => sum + (m.a || 0), 0);
@@ -504,10 +494,7 @@ export function Projects() {
                           <span>⚠️</span> In Ritardo
                         </span>
                       )}
-                      <Badge
-                        label={p.st === 'in_progress' ? 'In corso' : p.st === 'completed' ? 'Completato' : p.st === 'archived' ? 'Archiviato' : p.st === 'pre_project' ? 'Pre-analisi' : p.st}
-                        color={p.st === 'completed' ? 'green' : p.st === 'archived' ? 'gray' : p.st === 'pre_project' ? 'purple' : 'blue'}
-                      />
+                      <Badge stato={p.st} />
                     </div>
                   </div>
 
@@ -527,7 +514,7 @@ export function Projects() {
                     <span style={{ fontWeight: 700, color: 'var(--text)' }}>Avanzamento Fascicolo</span>
                     <span style={{ fontWeight: 800, color: progressColor(p) }}>{p.pct}%</span>
                   </div>
-                  <ProgressBar pct={p.pct} color={progressColor(p)} />
+                  <ProgressBar value={p.pct} color={progressColor(p)} />
 
                   {/* Mini Pills dei Moduli */}
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
@@ -678,10 +665,7 @@ export function Projects() {
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                           <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                             {p.delay && <span style={{ fontSize: 9, background: '#7f1d1d', color: '#fca5a5', padding: '1px 4px', borderRadius: 4, fontWeight: 700 }}>⚠ Ritardo</span>}
-                            <Badge
-                              label={p.st === 'in_progress' ? 'In corso' : p.st === 'completed' ? 'Concluso' : p.st}
-                              color={p.st === 'completed' ? 'green' : 'blue'}
-                            />
+                            <Badge stato={p.st} />
                           </div>
                           <span style={{ fontSize: 10.5, color: 'var(--muted)' }}>📅 {p.due || 'In corso'}</span>
                         </div>
@@ -693,7 +677,7 @@ export function Projects() {
                             <span>{(p.mods || []).length} moduli</span>
                             <span>{p.pct}%</span>
                           </div>
-                          <ProgressBar pct={p.pct} color={progressColor(p)} />
+                          <ProgressBar value={p.pct} color={progressColor(p)} />
                         </div>
                       </td>
 
@@ -777,7 +761,7 @@ export function Projects() {
                     <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text)' }}>{p.n}</div>
                     <div style={{ fontSize: 11, color: 'var(--muted)' }}>🏢 {p.cl}</div>
 
-                    <ProgressBar pct={p.pct} color={progressColor(p)} />
+                    <ProgressBar value={p.pct} color={progressColor(p)} />
 
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border)', paddingTop: 6, marginTop: 2, fontSize: 10.5 }}>
                       <span style={{ fontWeight: 800, color: 'var(--indigo-l)' }}>{fmt(p.val)}</span>
@@ -795,7 +779,7 @@ export function Projects() {
       {wizardOpen && (
         <NewProjectWizard
           onClose={() => setWizardOpen(false)}
-          onCreated={() => { setWizardOpen(false); loadProjects(); }}
+          onProjectCreated={() => { setWizardOpen(false); loadProjects(); }}
         />
       )}
     </div>
