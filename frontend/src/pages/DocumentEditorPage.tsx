@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { fetchClienti, fetchProgetti, fetchTenantInfoApi, uploadFileApi } from '../api/client';
 import { getFormattedLogoUrl } from '../utils';
+import { downloadRealPdf } from '../utils/pdfGenerator';
 import { PROJECTS } from '../store/mockData';
 import type { Cliente, Progetto } from '../types';
 
@@ -531,56 +532,42 @@ export function DocumentEditorPage() {
     }
   };
 
-  // Esportazione PDF Stampa Nativa con Header/Footer A4 (100% Pulito senza Smart Chips)
-  const handleExportPdf = () => {
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
+  // Esportazione VERO File PDF A4 (ISO 32000 Binary PDF con download diretto)
+  const handleExportPdf = async () => {
+    setFeedback('⏳ Generazione file PDF ad alta risoluzione in corso...');
+    try {
+      const logo = getFormattedLogoUrl(tenantInfo?.logoUrl || localStorage.getItem('bluman_logo_url'));
+      const currentHtml = editorRef.current?.innerHTML || rawTemplateRef.current;
+      // Risolvi in modalità Stampa/PDF (senza smart chips, 100% testo pulito)
+      const finalHtml = renderResolvedContent(currentHtml, true);
 
-    const logo = getFormattedLogoUrl(tenantInfo?.logoUrl || localStorage.getItem('bluman_logo_url'));
-    const currentHtml = editorRef.current?.innerHTML || rawTemplateRef.current;
-    // Risolvi in modalità Stampa (isForPrintOrExport = true)
-    const finalHtml = renderResolvedContent(currentHtml, true);
-
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>${titoloDocumento}</title>
-        <style>
-          @page { size: A4 portrait; margin: 20mm 15mm 20mm 15mm; }
-          body { font-family: 'Inter', sans-serif; color: #0f172a; line-height: 1.5; font-size: 11pt; }
-          .header-box { display: flex; justify-content: space-between; border-bottom: 2px solid #4338ca; padding-bottom: 12px; margin-bottom: 25px; }
-          .header-logo { max-height: 45px; max-width: 180px; object-fit: contain; }
-          .header-info { text-align: right; font-size: 8.5pt; color: #64748b; }
-          .footer-box { position: fixed; bottom: 0; left: 0; right: 0; display: flex; justify-content: space-between; font-size: 8pt; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 6px; }
-          table { width: 100%; border-collapse: collapse; margin: 15px 0; }
-          th, td { border: 1px solid #cbd5e1; padding: 8px 10px; font-size: 10pt; }
-          th { background-color: #f1f5f9; font-weight: 700; }
-          h1 { font-size: 18pt; color: #1e1b4b; margin: 15px 0 10px 0; }
-          h2 { font-size: 14pt; color: #1e1b4b; margin: 14px 0 8px 0; }
-          h3 { font-size: 12pt; color: #1e1b4b; margin: 12px 0 6px 0; }
-          p { margin: 8px 0; }
-        </style>
-      </head>
-      <body>
-        <div class="header-box">
-          <img src="${logo}" class="header-logo" alt="Studio Logo" />
-          <div class="header-info">
-            <strong>${tenantInfo?.ragioneSociale || 'Bluecode Ltd'}</strong><br/>
-            ${tenantInfo?.sedeLegale || 'Valuation Centre, Sliema, Malta'}<br/>
-            P.IVA: ${tenantInfo?.piva || 'MT28491039'} | Tel: ${tenantInfo?.telefono || '+39 378 092 6461'}
+      const fullPrintHtml = `
+        <div style="font-family: 'Segoe UI', Helvetica, Arial, sans-serif; color: #0f172a; line-height: 1.6; font-size: 11.5pt; width: 100%;">
+          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #4338ca; padding-bottom: 14px; margin-bottom: 24px;">
+            <img src="${logo}" style="max-height: 45px; max-width: 180px; object-fit: contain;" alt="Logo Studio" />
+            <div style="text-align: right; font-size: 9pt; color: #64748b;">
+              <strong style="color: #1e1b4b;">${tenantInfo?.ragioneSociale || 'Bluecode Ltd'}</strong><br/>
+              ${tenantInfo?.sedeLegale || 'Valuation Centre, Sliema, Malta'}<br/>
+              P.IVA: ${tenantInfo?.piva || 'MT28491039'} | Tel: ${tenantInfo?.telefono || '+39 378 092 6461'}
+            </div>
+          </div>
+          <div style="min-height: 500px;">${finalHtml}</div>
+          <div style="margin-top: 40px; border-top: 1px solid #e2e8f0; padding-top: 10px; display: flex; justify-content: space-between; font-size: 8.5pt; color: #94a3b8;">
+            <span>${tenantInfo?.ragioneSociale || 'Bluecode Ltd'} • Pratica: ${activeProgetto?.titolo || 'Advisory'}</span>
+            <span>Sigillo eIDAS Documentale • Validità Giuridica UE</span>
           </div>
         </div>
-        <div class="content-box">${finalHtml}</div>
-        <div class="footer-box">
-          <span>${tenantInfo?.ragioneSociale || 'Bluecode Ltd'} • Pratica: ${activeProgetto?.titolo || 'Advisory'}</span>
-          <span>Sigillo eIDAS Documentale • Pagina 1 di 1</span>
-        </div>
-        <script>window.onload = function() { window.print(); };</script>
-      </body>
-      </html>
-    `);
-    printWindow.document.close();
+      `;
+
+      const safeFileName = `${titoloDocumento.replace(/[^a-zA-Z0-9_-]/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`;
+      await downloadRealPdf(safeFileName, fullPrintHtml);
+      setFeedback(`✓ File PDF "${safeFileName}" generato e scaricato con successo!`);
+      setTimeout(() => setFeedback(null), 5000);
+    } catch (err: any) {
+      console.error('Errore generazione PDF:', err);
+      setFeedback(`⚠️ Errore generazione PDF: ${err.message || 'Riprova'}`);
+      setTimeout(() => setFeedback(null), 5000);
+    }
   };
 
   // Salvataggio nel Vault del Progetto (Google Drive / Studio Cloud Vault)

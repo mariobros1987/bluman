@@ -2082,42 +2082,30 @@ function DocumentiTab({ project }: { project: Progetto }) {
   });
 
   // Helper per scaricare localmente copia reale del documento
-  const handleDownloadDocument = (doc: any) => {
-    const content = doc.contenutoHtml || `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>${doc.nome || doc.titolo}</title>
-  <style>
-    body { font-family: 'Segoe UI', Arial, sans-serif; padding: 40px; color: #1e293b; line-height: 1.6; max-width: 800px; margin: 0 auto; }
-    h1 { color: #1e1b4b; text-align: center; text-transform: uppercase; font-size: 20px; border-bottom: 2px solid #4338ca; padding-bottom: 10px; }
-    .meta { font-size: 12px; color: #64748b; margin-bottom: 25px; text-align: right; }
-    .box { background: #f8fafc; border: 1px solid #e2e8f0; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-size: 13px; }
-  </style>
-</head>
-<body>
-  <div class="meta">Rif. Incarico: #${project.id} | Data: ${doc.data || doc.dataCaricamento || '2026'}</div>
-  <h1>${doc.titolo || doc.nome}</h1>
-  <div class="box">
-    <strong>Studio Professionale:</strong> BluMan Advisory Ltd (Malta / Svizzera)<br/>
-    <strong>Cliente Committente:</strong> ${project.cl} (${project.n})<br/>
-    <strong>Categoria Vault:</strong> ${doc.cat || doc.categoria || 'Generale'}<br/>
-    <strong>Stato eIDAS:</strong> ${doc.firmato ? '🔒 Sottoscritto con Sigillo FEA eIDAS UE 910/2014' : 'Bozza Documentale Studio'}
-  </div>
-  <p>Documento ufficiale facente parte del fascicolo legale e societario archiviato nel Cloud Vault di BluMan Advisory Services.</p>
-</body>
-</html>`;
+  // Helper per scaricare localmente copia VERA in PDF A4
+  const handleDownloadDocument = async (doc: any) => {
+    const rawContent = doc.contenutoHtml || `
+      <div style="font-family: 'Segoe UI', Arial, sans-serif; color: #0f172a; line-height: 1.6; font-size: 11pt; padding: 10px;">
+        <div style="text-align: right; font-size: 9pt; color: #64748b; margin-bottom: 20px;">
+          Rif. Incarico: #${project.id} | Data: ${doc.data || doc.dataCaricamento || '2026'}
+        </div>
+        <h1 style="color: #1e1b4b; text-align: center; text-transform: uppercase; font-size: 18pt; border-bottom: 2px solid #4338ca; padding-bottom: 10px; margin-bottom: 20px;">
+          ${doc.titolo || doc.nome}
+        </h1>
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-size: 10pt;">
+          <strong>Studio Professionale:</strong> BluMan Advisory Ltd (Malta / Svizzera)<br/>
+          <strong>Cliente Committente:</strong> ${project.cl} (${project.n})<br/>
+          <strong>Categoria Vault:</strong> ${doc.cat || doc.categoria || 'Generale'}<br/>
+          <strong>Stato eIDAS:</strong> ${doc.firmato ? '🔒 Sottoscritto con Sigillo FEA eIDAS UE 910/2014' : 'Bozza Documentale Studio'}
+        </div>
+        <p style="font-size: 11pt; color: #334155; line-height: 1.6;">
+          Documento ufficiale facente parte del fascicolo legale e societario archiviato nel Cloud Vault di BluMan Advisory Services.
+        </p>
+      </div>
+    `;
 
-    const blob = new Blob([content], { type: 'text/html;charset=utf-8' });
-    const downloadUrl = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = downloadUrl;
-    const safeName = (doc.nome || `${doc.titolo}.docx`).replace(/\.docx$/i, '.html');
-    link.download = safeName;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(downloadUrl);
+    const safePdfName = `${(doc.titolo || doc.nome || 'Documento').replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`;
+    await downloadRealPdf(safePdfName, rawContent);
   };
 
   // Caricamento File da Disco nel Vault Progetto
