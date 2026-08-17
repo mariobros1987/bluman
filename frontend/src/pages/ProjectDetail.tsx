@@ -128,11 +128,11 @@ export function ProjectDetail() {
             }
             return mv;
           });
-          return { ...m, v: newV };
-        } else {
           const teamSet = new Set(m.team || []);
           teamSet.add(operatorId);
-          return { ...m, team: Array.from(teamSet) };
+          return { ...m, v: newV, team: Array.from(teamSet) };
+        } else {
+          return { ...m, team: [operatorId] };
         }
       }
       return m;
@@ -156,6 +156,10 @@ export function ProjectDetail() {
   const loadDetail = async () => {
     setLoading(true);
     if (id) {
+      const localStr = localStorage.getItem('bluman_custom_projects');
+      const localProjs: Progetto[] = localStr ? JSON.parse(localStr) : [];
+      const localSavedProj = localProjs.find(p => String(p.id) === String(id));
+
       const dbRes = await fetchProgettoDettaglio(id);
       if (dbRes && dbRes.id) {
         setRawDbProject(dbRes);
@@ -164,6 +168,8 @@ export function ProjectDetail() {
         }
 
         let finalMods = (dbRes.moduli || []).map((m: any, mIdx: number) => {
+          const localMod = localSavedProj?.mods?.find((lm: any) => lm.n.toLowerCase() === (m.nome || '').toLowerCase() || lm.id === (mIdx + 100));
+
           let microvociList = (m.microvoci || []).map((mv: any, vIdx: number) => {
             let savedNotes = mv.note;
             if (!savedNotes) {
@@ -172,12 +178,15 @@ export function ProjectDetail() {
                 try { savedNotes = JSON.parse(localSaved); } catch {}
               }
             }
+            const localMv = localMod?.v?.[vIdx];
+            const assignedAs = mv.as || mv.assegnatoId || localMv?.as || 1;
+
             return {
               n: mv.nome,
               hE: mv.orePreventivate || 4,
               hA: mv.oreConsuntivate || 0,
               s: mv.stato || 'pending',
-              as: 1,
+              as: assignedAs,
               d: mv.passaggi?.length || 0,
               vn: mv.causaNota || undefined,
               proc: mv.proc || (mv.passaggi?.length ? mv.passaggi.map((p: any) => ({
@@ -200,14 +209,17 @@ export function ProjectDetail() {
               || MLIB[mIdx % MLIB.length];
             if (matchedMockMod && matchedMockMod.righe) {
               const rList = resolveRighe(matchedMockMod, ARTICOLI);
-              microvociList = rList.map(r => ({
-                n: r.art?.n || (r as any).n || 'Microvoce',
-                hE: r.h || 4,
-                hA: 0,
-                s: 'pending' as any,
-                as: 1,
-                d: 0,
-              }));
+              microvociList = rList.map((r, rIdx) => {
+                const localMv = localMod?.v?.[rIdx];
+                return {
+                  n: r.art?.n || (r as any).n || 'Microvoce',
+                  hE: r.h || 4,
+                  hA: 0,
+                  s: 'pending' as any,
+                  as: localMv?.as || 1,
+                  d: 0,
+                };
+              });
             } else {
               microvociList = [
                 { n: `Analisi e requisiti per ${m.nome}`, hE: 4, hA: 0, s: 'pending', as: 1, d: 0 },
@@ -216,6 +228,8 @@ export function ProjectDetail() {
               ];
             }
           }
+
+          const assignedTeam = localMod?.team || m.team || [1, 2];
 
           return {
             id: mIdx + 100,
@@ -226,7 +240,7 @@ export function ProjectDetail() {
             h: m.orePreventivate || microvociList.reduce((sum, v) => sum + v.hE, 0) || 20,
             a: m.oreConsuntivate || 0,
             p: m.prezzo ? m.prezzo / 100 : 3500,
-            team: [1, 2],
+            team: assignedTeam,
             delay: m.stato === 'delayed' || m.stato === 'blocked',
             v: microvociList,
           };

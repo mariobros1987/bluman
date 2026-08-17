@@ -2,13 +2,16 @@ import React from 'react';
 import { TEAM, getTeamMembersList } from '../../store/mockData';
 
 interface AvatarProps {
-  id: number;
+  id: number | string;
   size?: number;
   showTitle?: boolean;
 }
 
 export function Avatar({ id, size = 24, showTitle = true }: AvatarProps) {
-  const m = getTeamMembersList().find(t => t.id === id) || { i: '?', c: '#888', n: 'Unknown', r: '' };
+  const teamList = getTeamMembersList();
+  const m = teamList.find(t => String(t.id) === String(id) || t.n.toLowerCase() === String(id).toLowerCase())
+    || TEAM.find(t => String(t.id) === String(id))
+    || { i: String(id).slice(0, 2).toUpperCase() || '?', c: '#6366f1', n: `Operatore #${id}`, r: 'Studio Advisor' };
   return (
     <div
       title={showTitle ? `${m.n} — ${m.r}` : undefined}
@@ -28,15 +31,16 @@ export function Avatar({ id, size = 24, showTitle = true }: AvatarProps) {
 }
 
 interface AvatarGroupProps {
-  ids: number[];
+  ids: (number | string)[];
   size?: number;
 }
 
-export function AvatarGroup({ ids, size = 24 }: AvatarGroupProps) {
+export function AvatarGroup({ ids = [], size = 24 }: AvatarGroupProps) {
+  const safeIds = Array.isArray(ids) ? ids : [];
   return (
     <div style={{ display: 'flex' }}>
-      {ids.map((id, i) => (
-        <div key={id} style={{ marginLeft: i === 0 ? 0 : -6 }}>
+      {safeIds.map((id, i) => (
+        <div key={`${id}-${i}`} style={{ marginLeft: i === 0 ? 0 : -6 }}>
           <Avatar id={id} size={size} />
         </div>
       ))}
