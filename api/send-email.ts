@@ -9,14 +9,16 @@ function cleanRawEmailBody(raw: string): string {
   if (str.includes('Content-Type: text/plain') || str.includes('Content-Type:text/plain')) {
     const plainSection = str.split(/Content-Type:\s*text\/plain[^\r\n]*/i)[1];
     if (plainSection) {
-      const beforeBoundary = plainSection.split(/\r?\n--/)[0];
+      const parts = plainSection.split(/\r?\n--/);
+      const beforeBoundary = parts[0] || '';
       const bodyOnly = beforeBoundary.replace(/^[\s\S]*?\r?\n\r?\n/, '');
       str = bodyOnly;
     }
   } else if (str.includes('Content-Type: text/html') || str.includes('Content-Type:text/html')) {
     const htmlSection = str.split(/Content-Type:\s*text\/html[^\r\n]*/i)[1];
     if (htmlSection) {
-      const beforeBoundary = htmlSection.split(/\r?\n--/)[0];
+      const parts = htmlSection.split(/\r?\n--/);
+      const beforeBoundary = parts[0] || '';
       const bodyOnly = beforeBoundary.replace(/^[\s\S]*?\r?\n\r?\n/, '');
       str = bodyOnly.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
     }
@@ -179,15 +181,16 @@ async function fetchRecentImapEmails(options: {
             let rawBody = '';
             const textMatch = chunk.match(/BODY\[TEXT\]\s*\{(\d+)\}\r\n([\s\S]*)/i);
             if (textMatch && textMatch[2]) {
-              rawBody = textMatch[2].split(/\r\n\)\r\n|\r\n\*\s*\d+\s*FETCH|\r\nA4 OK/)[0].trim();
+              const splitted = textMatch[2].split(/\r\n\)\r\n|\r\n\*\s*\d+\s*FETCH|\r\nA4 OK/);
+              rawBody = (splitted[0] || '').trim();
             }
 
             const cleanText = cleanRawEmailBody(rawBody);
 
-            if (fromMatch) {
+            if (fromMatch && fromMatch[1]) {
               const cleanFrom = fromMatch[1].trim();
-              const cleanSubject = subjectMatch ? subjectMatch[1].trim() : 'Nessun Oggetto';
-              const cleanDate = dateMatch ? new Date(dateMatch[1].trim()).toLocaleString('it-IT') : new Date().toLocaleString('it-IT');
+              const cleanSubject = subjectMatch && subjectMatch[1] ? subjectMatch[1].trim() : 'Nessun Oggetto';
+              const cleanDate = dateMatch && dateMatch[1] ? new Date(dateMatch[1].trim()).toLocaleString('it-IT') : new Date().toLocaleString('it-IT');
 
               emails.push({
                 id: `imap-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
