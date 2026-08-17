@@ -15,6 +15,7 @@ import { ConfirmDeleteModal } from '../components/ConfirmDeleteModal';
 import { PROJECTS, MLIB, ARTICOLI } from '../store/mockData';
 import { fetchProgettoDettaglio, emettiFatturaApi, consuntivaMicrovoceApi, assegnaAccessoProgettoApi, salvaProgettoDettaglioApi, archiviaProgettoApi, eliminaProgettoApi, fetchModuliLibreria, fetchArticoli, uploadFileApi } from '../api/client';
 import { TEAM } from '../store/mockData';
+import { useTeamMembers } from '../hooks/useTeamMembers';
 import type { Progetto, ModuloProgetto, MicroVoce, CategoriaModulo, StatoProgetto, StatoModulo, Cliente } from '../types';
 import styles from './ProjectDetail.module.css';
 
@@ -33,6 +34,7 @@ export function ProjectDetail() {
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const [procV, setProcV] = useState<{ mid: number; vidx: number } | null>(null);
   const [accessiModalOpen, setAccessiModalOpen] = useState(false);
+  const { team: teamList } = useTeamMembers();
   const [selectedUser, setSelectedUser] = useState(TEAM[0].n || (TEAM[0] as any).name);
   const [livello, setLivello] = useState('write');
   const [assignModalTarget, setAssignModalTarget] = useState<{
@@ -873,7 +875,7 @@ export function ProjectDetail() {
             <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 10, padding: 12 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--indigo-l)', textTransform: 'uppercase', marginBottom: 6 }}>Collaboratori Attualmente Assegnati:</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {TEAM.slice(0, 2).map((u, i) => (
+                {teamList.slice(0, 2).map((u, i) => (
                   <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11.5 }}>
                     <span>👤 <strong>{u.n || (u as any).name}</strong> ({u.r || (u as any).role})</span>
                     <span style={{ background: '#0d2d22', color: '#34d399', padding: '2px 8px', borderRadius: 12, fontSize: 10, fontWeight: 600 }}>Permesso: Operativo (Scrittura)</span>
@@ -885,7 +887,7 @@ export function ProjectDetail() {
             <div>
               <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Seleziona Collaboratore dello Studio *</label>
               <select value={selectedUser} onChange={e => setSelectedUser(e.target.value)}>
-                {TEAM.map(u => (
+                {teamList.map(u => (
                   <option key={u.id} value={u.n || (u as any).name}>{u.n || (u as any).name} — {u.r || (u as any).role}</option>
                 ))}
               </select>

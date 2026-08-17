@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { TEAM } from '../store/mockData';
+import { useTeamMembers } from '../hooks/useTeamMembers';
 import { Avatar } from './ui/Avatar';
 
 interface CalendarPreviewModalProps {
@@ -28,6 +28,7 @@ export function CalendarPreviewModal({
   initialDate = '2026-08-25',
   onSchedule,
 }: CalendarPreviewModalProps) {
+  const { team: teamList } = useTeamMembers();
   const [selectedDate, setSelectedDate] = useState<string>(initialDate);
   const [operatorId, setOperatorId] = useState<number>(1);
   const [priority, setPriority] = useState<string>('alta');
@@ -221,7 +222,7 @@ export function CalendarPreviewModal({
                   onChange={e => setOperatorId(Number(e.target.value))}
                   style={{ width: '100%', background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 10px', fontSize: 11.5, color: 'var(--text)' }}
                 >
-                  {TEAM.map(u => (
+                  {teamList.map(u => (
                     <option key={u.id} value={u.id}>{u.n} ({u.r})</option>
                   ))}
                 </select>

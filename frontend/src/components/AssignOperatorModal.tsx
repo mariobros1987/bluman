@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { TEAM } from '../store/mockData';
+import { useTeamMembers } from '../hooks/useTeamMembers';
 import { Avatar } from './ui/Avatar';
 
 interface AssignOperatorModalProps {
@@ -17,6 +17,7 @@ export function AssignOperatorModal({
   currentAssignedIds = [1],
   onAssign,
 }: AssignOperatorModalProps) {
+  const { team: teamList, loading } = useTeamMembers();
   const [selectedOpId, setSelectedOpId] = useState<number>(currentAssignedIds[0] || 1);
   const [roleLevel, setRoleLevel] = useState<string>('write');
   const [notif, setNotif] = useState(false);
@@ -83,10 +84,11 @@ export function AssignOperatorModal({
         {/* Operator Selection List */}
         <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', marginBottom: 10 }}>
           Seleziona Operatore o Consulente di Studio:
+          {loading && <span style={{ marginLeft: 8, fontWeight: 400, fontStyle: 'italic' }}>⏳ Caricamento dal database…</span>}
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 260, overflowY: 'auto', marginBottom: 20 }}>
-          {TEAM.map(op => {
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 320, overflowY: 'auto', marginBottom: 20 }}>
+          {teamList.map(op => {
             const isSelected = selectedOpId === op.id;
             return (
               <div

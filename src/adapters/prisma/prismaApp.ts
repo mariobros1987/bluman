@@ -235,8 +235,42 @@ export class PrismaApp implements AppPort {
   }
 
   async listaUtenti() {
+    // Assicura che i membri ufficiali dello studio siano sempre persistiti nel database
+    const OFFICIAL_TEAM = [
+      { nome: 'Joe Disabato', email: 'joe@bluecode.advisory', ruolo: 'super_admin' as const, costoOrarioCentesimi: 12000 },
+      { nome: 'Avv. Mario Dibenedetto', email: 'mario.dibenedetto87@gmail.com', ruolo: 'advisor' as const, costoOrarioCentesimi: 9500 },
+      { nome: 'Avv. Lorenzo Marino', email: 'lorenzo.marino@bluecode.advisory', ruolo: 'advisor' as const, costoOrarioCentesimi: 9000 },
+      { nome: 'Dr. Elena Russo', email: 'elena.russo@bluecode.advisory', ruolo: 'advisor' as const, costoOrarioCentesimi: 8500 },
+      { nome: 'Francesca Disabato', email: 'francesca@bluecode.advisory', ruolo: 'collaboratore_interno' as const, costoOrarioCentesimi: 4500 },
+    ];
+
+    try {
+      for (const u of OFFICIAL_TEAM) {
+        await this.prisma.user.upsert({
+          where: { email: u.email },
+          update: {
+            nome: u.nome,
+            ruolo: u.ruolo,
+            tenantId: this.tenantId,
+            stato: 'attivo',
+          },
+          create: {
+            tenantId: this.tenantId,
+            nome: u.nome,
+            email: u.email,
+            ruolo: u.ruolo,
+            stato: 'attivo',
+            costoOrarioCentesimi: u.costoOrarioCentesimi,
+          },
+        });
+      }
+    } catch (err) {
+      console.warn('Auto-seed utenti DB fallback:', err);
+    }
+
     return this.prisma.user.findMany({
       where: { tenantId: this.tenantId },
+      orderBy: { createdAt: 'asc' },
     });
   }
 

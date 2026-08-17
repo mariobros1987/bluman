@@ -16,7 +16,34 @@ export const TEAM: TeamMember[] = [
   { id: 2, n: 'Francesca Disabato', r: 'Back Office',   i: 'FD', c: '#ec4899' },
   { id: 3, n: 'Avv. Lorenzo Marino',r: 'Legal Counsel', i: 'LM', c: '#10b981' },
   { id: 4, n: 'Dr. Elena Russo',    r: 'Tax Advisor',   i: 'ER', c: '#f59e0b' },
+  { id: 5, n: 'Avv. Mario Dibenedetto', r: 'Legal Counsel', i: 'MD', c: '#3b82f6' },
 ];
+
+export function getTeamMembersList(): TeamMember[] {
+  const base = [...TEAM];
+  try {
+    const customStr = localStorage.getItem('bluman_custom_team_users');
+    if (customStr) {
+      const customList = JSON.parse(customStr);
+      if (Array.isArray(customList)) {
+        customList.forEach((c: any, idx: number) => {
+          const name = c.nome || c.name || c.email;
+          if (name && !base.some(b => b.n.toLowerCase() === name.toLowerCase())) {
+            const initials = name.split(' ').map((p: string) => p[0]).join('').toUpperCase().slice(0, 2) || 'OP';
+            base.push({
+              id: 10 + idx,
+              n: name,
+              r: c.specializzazione || c.ruolo || 'Collaboratore Studio',
+              i: initials,
+              c: '#8b5cf6',
+            });
+          }
+        });
+      }
+    }
+  } catch {}
+  return base;
+}
 
 export const ARTICOLI: Articolo[] = [
   { id: 'A_RACCOLTA_DOC',        n: 'Raccolta documentazione cliente',            cat: 'Analisi',    h: 2,  p: 600,  ver: 2, documentiRichiesti: ['m3'], formMasterId: 'f3' },

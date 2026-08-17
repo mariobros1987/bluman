@@ -6,6 +6,7 @@ import { AvatarGroup } from '../components/ui/Avatar';
 import { fmt, progressColor } from '../utils';
 import { fetchProgetti } from '../api/client';
 import { PROJECTS, TEAM } from '../store/mockData';
+import { useTeamMembers } from '../hooks/useTeamMembers';
 import { NewProjectWizard } from '../components/NewProjectWizard';
 import type { Progetto } from '../types';
 
@@ -14,6 +15,7 @@ type FilterStatus = 'all' | 'in_progress' | 'delayed' | 'pending_signature' | 'c
 
 export function Projects() {
   const navigate = useNavigate();
+  const { team: teamList } = useTeamMembers();
   const [projectList, setProjectList] = useState<Progetto[]>([]);
   const [loading, setLoading] = useState(true);
   const [wizardOpen, setWizardOpen] = useState(false);
@@ -398,7 +400,7 @@ export function Projects() {
               style={{ fontSize: 11.5, padding: '6px 10px', borderRadius: 8, background: 'var(--card2)', border: '1px solid var(--border)', color: 'var(--text)' }}
             >
               <option value="ALL">👤 Tutti gli Operatori</option>
-              {TEAM.map(t => (
+              {teamList.map(t => (
                 <option key={t.id} value={t.id}>{t.n} ({t.r})</option>
               ))}
             </select>

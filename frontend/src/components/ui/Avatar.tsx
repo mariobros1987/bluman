@@ -1,5 +1,5 @@
 import React from 'react';
-import { TEAM } from '../../store/mockData';
+import { TEAM, getTeamMembersList } from '../../store/mockData';
 
 interface AvatarProps {
   id: number;
@@ -8,7 +8,7 @@ interface AvatarProps {
 }
 
 export function Avatar({ id, size = 24, showTitle = true }: AvatarProps) {
-  const m = TEAM.find(t => t.id === id) || { i: '?', c: '#888', n: 'Unknown', r: '' };
+  const m = getTeamMembersList().find(t => t.id === id) || { i: '?', c: '#888', n: 'Unknown', r: '' };
   return (
     <div
       title={showTitle ? `${m.n} — ${m.r}` : undefined}
