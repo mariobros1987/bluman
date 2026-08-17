@@ -179,7 +179,7 @@ export function buildServer(app: AppPort): FastifyInstance {
     if (!targetUser && password === 'password123') {
       targetUser = {
         passHash: hashPassword(password),
-        name: cleanEmail.split('@')[0],
+        name: cleanEmail.split('@')[0] || cleanEmail,
         role: 'collaboratore_interno',
       };
     }
@@ -1907,7 +1907,9 @@ export function buildServer(app: AppPort): FastifyInstance {
       // Masked target per privacy (es. +39 333 *** 6278 o c***t@domain.com)
       let masked = target;
       if (target.includes('@')) {
-        const [userPart, domainPart] = target.split('@');
+        const parts = target.split('@');
+        const userPart = parts[0] || '';
+        const domainPart = parts[1] || '';
         masked = `${userPart.slice(0, 2)}***${userPart.slice(-1)}@${domainPart}`;
       } else if (target.length > 8) {
         masked = `${target.slice(0, 6)} *** ${target.slice(-4)}`;

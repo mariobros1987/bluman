@@ -125,13 +125,14 @@ export async function fetchRecentImapEmails(options: {
             let text = '';
             const textMatch = chunk.match(/BODY\[TEXT\]\s*\{(\d+)\}\r\n([\s\S]*)/i);
             if (textMatch && textMatch[2]) {
-              text = textMatch[2].split(/\r\n\)\r\n|\r\n\*\s*\d+\s*FETCH|\r\nA4 OK/)[0].trim();
+              const splitParts = textMatch[2].split(/\r\n\)\r\n|\r\n\*\s*\d+\s*FETCH|\r\nA4 OK/);
+              text = (splitParts[0] || '').trim();
             }
 
-            if (fromMatch) {
+            if (fromMatch && fromMatch[1]) {
               const cleanFrom = fromMatch[1].trim();
-              const cleanSubject = subjectMatch ? subjectMatch[1].trim() : 'Nessun Oggetto';
-              const cleanDate = dateMatch ? new Date(dateMatch[1].trim()).toLocaleString('it-IT') : new Date().toLocaleString('it-IT');
+              const cleanSubject = (subjectMatch && subjectMatch[1]) ? subjectMatch[1].trim() : 'Nessun Oggetto';
+              const cleanDate = (dateMatch && dateMatch[1]) ? new Date(dateMatch[1].trim()).toLocaleString('it-IT') : new Date().toLocaleString('it-IT');
               
               emails.push({
                 id: `imap-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
