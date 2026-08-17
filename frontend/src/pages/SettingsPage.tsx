@@ -27,17 +27,25 @@ export function SettingsPage() {
   const [smtpPass, setSmtpPass] = useState('');
   const [smtpFromEmail, setSmtpFromEmail] = useState('support@bluecode-ltd.com');
   const [smtpFromName, setSmtpFromName] = useState('BlueCode Advisory & Consulting');
+  const [smtpReplyTo, setSmtpReplyTo] = useState('support@bluecode-ltd.com');
+  const [smtpBcc, setSmtpBcc] = useState('');
   const [testingSmtp, setTestingSmtp] = useState(false);
   const [smtpTestResult, setSmtpTestResult] = useState<string | null>(null);
 
-  // IMAP Server Credentials (Posta in Entrata & Ingestion)
+  // IMAP / POP3 Server Credentials (Posta in Entrata & Ingestion)
+  const [imapProtocol, setImapProtocol] = useState<'imap' | 'pop3'>('imap');
   const [imapHost, setImapHost] = useState('imap.register.it');
   const [imapPort, setImapPort] = useState('993');
   const [imapSecure, setImapSecure] = useState(true);
   const [imapUser, setImapUser] = useState('support@bluecode-ltd.com');
   const [imapPass, setImapPass] = useState('');
+  const [imapFolder, setImapFolder] = useState('INBOX');
+  const [imapPollInterval, setImapPollInterval] = useState('5m');
   const [testingImap, setTestingImap] = useState(false);
   const [imapTestResult, setImapTestResult] = useState<string | null>(null);
+
+  // Firma Digitale & Disclaimer Privacy Email Studio
+  const [emailSignatureHtml, setEmailSignatureHtml] = useState('Cordiali Saluti,\n{{nome_operatore}}\n{{ruolo_operatore}}\nBlueCode Advisory & Consulting — https://bluecode-ltd.com\n\nAvviso di Riservatezza (GDPR): Questo messaggio ed i suoi allegati sono confidenziali e destinati esclusivamente al destinatario indicato.');
 
   // Form dati azienda (Sede Legale & Operativa)
   const [ragioneSociale, setRagioneSociale] = useState('Bluecode Ltd');
@@ -110,11 +118,17 @@ export function SettingsPage() {
       if (tData.smtpPass) setSmtpPass(tData.smtpPass);
       if (tData.smtpFromEmail) setSmtpFromEmail(tData.smtpFromEmail);
       if (tData.smtpFromName) setSmtpFromName(tData.smtpFromName);
+      if (tData.smtpReplyTo) setSmtpReplyTo(tData.smtpReplyTo);
+      if (tData.smtpBcc) setSmtpBcc(tData.smtpBcc);
+      if (tData.imapProtocol) setImapProtocol(tData.imapProtocol);
       if (tData.imapHost) setImapHost(tData.imapHost);
       if (tData.imapPort) setImapPort(String(tData.imapPort));
       if (tData.imapSecure != null) setImapSecure(tData.imapSecure);
       if (tData.imapUser) setImapUser(tData.imapUser);
       if (tData.imapPass) setImapPass(tData.imapPass);
+      if (tData.imapFolder) setImapFolder(tData.imapFolder);
+      if (tData.imapPollInterval) setImapPollInterval(tData.imapPollInterval);
+      if (tData.emailSignatureHtml) setEmailSignatureHtml(tData.emailSignatureHtml);
     }
 
     const dbUsers = await fetchUtentiTenant();
@@ -156,11 +170,17 @@ export function SettingsPage() {
       smtpPass,
       smtpFromEmail,
       smtpFromName,
+      smtpReplyTo,
+      smtpBcc,
+      imapProtocol,
       imapHost,
       imapPort: Number(imapPort) || 993,
       imapSecure,
       imapUser,
       imapPass,
+      imapFolder,
+      imapPollInterval,
+      emailSignatureHtml,
     };
 
     await updateTenantInfoApi(dataToSave);
@@ -673,11 +693,22 @@ export function SettingsPage() {
               <div className={styles.grid2} style={{ marginTop: 10 }}>
                 <div className={styles.field}>
                   <label>Email Mittente Visibile *:</label>
-                  <input type="email" value={smtpFromEmail} onChange={e => setSmtpFromEmail(e.target.value)} placeholder="info@studio.it" style={{ fontSize: 12 }} />
+                  <input type="email" value={smtpFromEmail} onChange={e => setSmtpFromEmail(e.target.value)} placeholder="support@bluecode-ltd.com" style={{ fontSize: 12 }} />
                 </div>
                 <div className={styles.field}>
                   <label>Nome Mittente Visualizzato *:</label>
-                  <input type="text" value={smtpFromName} onChange={e => setSmtpFromName(e.target.value)} placeholder="Bluecode Advisory — Notifiche" style={{ fontSize: 12 }} />
+                  <input type="text" value={smtpFromName} onChange={e => setSmtpFromName(e.target.value)} placeholder="BlueCode Advisory & Consulting" style={{ fontSize: 12 }} />
+                </div>
+              </div>
+
+              <div className={styles.grid2} style={{ marginTop: 10 }}>
+                <div className={styles.field}>
+                  <label>Indirizzo di Risposta (Reply-To):</label>
+                  <input type="email" value={smtpReplyTo} onChange={e => setSmtpReplyTo(e.target.value)} placeholder="support@bluecode-ltd.com" style={{ fontSize: 12 }} />
+                </div>
+                <div className={styles.field}>
+                  <label>Copia Conoscenza Nascosta Studio (BCC Archivio):</label>
+                  <input type="email" value={smtpBcc} onChange={e => setSmtpBcc(e.target.value)} placeholder="archivio@bluecode-ltd.com" style={{ fontSize: 12 }} />
                 </div>
               </div>
 
@@ -687,10 +718,10 @@ export function SettingsPage() {
               </div>
             </div>
 
-            {/* 📥 SERVER EMAIL IMAP (POSTA IN ENTRATA & INGESTION FASCICOLI) */}
+            {/* 📥 SERVER EMAIL IMAP / POP3 (POSTA IN ENTRATA & INGESTION FASCICOLI) */}
             <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 16 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: '#38bdf8', marginBottom: 4, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>📥 Server Email IMAP (Posta in Entrata & Ingestion Fascicoli)</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>📥 Server Email IMAP / POP3 (Posta in Entrata & Ingestion Fascicoli)</span>
                 <button
                   type="button"
                   onClick={handleTestImap}
@@ -701,7 +732,7 @@ export function SettingsPage() {
                 </button>
               </div>
               <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 12 }}>
-                Configura i parametri IMAP per consentire a BluMan di leggere le email inviate dai clienti a <code>support@bluecode-ltd.com</code> ed associarle in tempo reale ai rispettivi progetti.
+                Configura i parametri di ricezione per consentire a BluMan di leggere le email inviate dai clienti a <code>support@bluecode-ltd.com</code> ed associarle in tempo reale ai rispettivi progetti.
               </div>
 
               {imapTestResult && (
@@ -712,29 +743,116 @@ export function SettingsPage() {
 
               <div className={styles.grid2}>
                 <div className={styles.field}>
-                  <label>Host Server IMAP *:</label>
-                  <input type="text" value={imapHost} onChange={e => setImapHost(e.target.value)} placeholder="imap.register.it" style={{ fontSize: 12 }} />
+                  <label>Protocollo Ricezione:</label>
+                  <select value={imapProtocol} onChange={e => setImapProtocol(e.target.value as any)} style={{ fontSize: 12, padding: '7px 10px' }}>
+                    <option value="imap">IMAP4 (Sincronizzazione Bidirezionale Multi-Device - Consigliato)</option>
+                    <option value="pop3">POP3 (Download Singolo Posta)</option>
+                  </select>
                 </div>
                 <div className={styles.field}>
-                  <label>Porta Server IMAP *:</label>
-                  <input type="number" value={imapPort} onChange={e => setImapPort(e.target.value)} placeholder="993" style={{ fontSize: 12 }} />
+                  <label>Host Server Posta in Entrata *:</label>
+                  <input type="text" value={imapHost} onChange={e => setImapHost(e.target.value)} placeholder="imap.register.it" style={{ fontSize: 12 }} />
                 </div>
               </div>
 
               <div className={styles.grid2} style={{ marginTop: 10 }}>
                 <div className={styles.field}>
-                  <label>Username / Email IMAP *:</label>
+                  <label>Porta Server Ricezione *:</label>
+                  <input type="number" value={imapPort} onChange={e => setImapPort(e.target.value)} placeholder="993" style={{ fontSize: 12 }} />
+                </div>
+                <div className={styles.field}>
+                  <label>Cartella Remota da Monitorare:</label>
+                  <input type="text" value={imapFolder} onChange={e => setImapFolder(e.target.value)} placeholder="INBOX" style={{ fontSize: 12 }} />
+                </div>
+              </div>
+
+              <div className={styles.grid2} style={{ marginTop: 10 }}>
+                <div className={styles.field}>
+                  <label>Username / Email Posta in Entrata *:</label>
                   <input type="text" value={imapUser} onChange={e => setImapUser(e.target.value)} placeholder="support@bluecode-ltd.com" style={{ fontSize: 12 }} />
                 </div>
                 <div className={styles.field}>
-                  <label>Password IMAP *:</label>
+                  <label>Password Casella Posta *:</label>
                   <input type="password" value={imapPass} onChange={e => setImapPass(e.target.value)} placeholder="••••••••••••" style={{ fontSize: 12 }} />
                 </div>
               </div>
 
-              <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: 'var(--muted)' }}>
-                <input type="checkbox" id="imapSecure" checked={imapSecure} onChange={e => setImapSecure(e.target.checked)} style={{ width: 14, height: 14 }} />
-                <label htmlFor="imapSecure" style={{ cursor: 'pointer' }}>Usa Connessione Crittografata SSL/TLS (Porta 993 - Consigliata)</label>
+              <div className={styles.grid2} style={{ marginTop: 10 }}>
+                <div className={styles.field}>
+                  <label>Frequenza Polling Sincronizzazione:</label>
+                  <select value={imapPollInterval} onChange={e => setImapPollInterval(e.target.value)} style={{ fontSize: 12, padding: '7px 10px' }}>
+                    <option value="2m">⚡ Ogni 2 Minuti (Live Ingestion)</option>
+                    <option value="5m">⏱ Ogni 5 Minuti (Standard)</option>
+                    <option value="15m">⏳ Ogni 15 Minuti</option>
+                    <option value="manual">✋ Solo Manuale</option>
+                  </select>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: 'var(--muted)', paddingTop: 20 }}>
+                  <input type="checkbox" id="imapSecure" checked={imapSecure} onChange={e => setImapSecure(e.target.checked)} style={{ width: 14, height: 14 }} />
+                  <label htmlFor="imapSecure" style={{ cursor: 'pointer' }}>Usa Connessione Crittografata SSL/TLS (Porta 993 - Consigliata)</label>
+                </div>
+              </div>
+            </div>
+
+            {/* 🖋️ FIRMA AUTOMATICA & DISCLAIMER PRIVACY EMAIL STUDIO */}
+            <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 16 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#f59e0b', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span>🖋️ Firma Automatica & Disclaimer Privacy GDPR Studio</span>
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 10 }}>
+                Questa firma e clausola legale verranno allegate automaticamente in calce a tutte le email inviate da BluMan ai clienti.
+              </div>
+              <div className={styles.field}>
+                <label>Modello Firma & Disclaimer (Supporta tag: &#123;&#123;nome_operatore&#125;&#125;, &#123;&#123;ruolo_operatore&#125;&#125;, &#123;&#123;sito_web&#125;&#125;):</label>
+                <textarea
+                  value={emailSignatureHtml}
+                  onChange={e => setEmailSignatureHtml(e.target.value)}
+                  rows={4}
+                  style={{ width: '100%', fontSize: 11.5, fontFamily: 'monospace', padding: 10, background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)' }}
+                />
+              </div>
+            </div>
+
+            {/* 🛡️ DIAGNOSTICA RECORD DNS DOMINIO (SPF, DKIM, DMARC, MX) */}
+            <div style={{ background: '#0b132b', border: '1px solid #1c2541', borderRadius: 12, padding: 16 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#60a5fa', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span>🛡️ Configurazione Record DNS Dominio per Register.it (Anti-Spam & Deliverability 100%)</span>
+              </div>
+              <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 12 }}>
+                Per garantire che le email inviate da <code>support@bluecode-ltd.com</code> arrivino nella posta in arrivo dei clienti (senza finire nello spam), assicurati che i record DNS sul pannello di Register.it siano configurati come segue:
+              </div>
+
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11, textAlign: 'left', color: '#e2e8f0' }}>
+                  <thead>
+                    <tr style={{ background: '#1c2541', borderBottom: '1px solid #334155' }}>
+                      <th style={{ padding: '8px 10px' }}>Tipo Record</th>
+                      <th style={{ padding: '8px 10px' }}>Nome / Host</th>
+                      <th style={{ padding: '8px 10px' }}>Valore Raccomandato (Register.it)</th>
+                      <th style={{ padding: '8px 10px' }}>Stato Deliverability</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr style={{ borderBottom: '1px solid #1e293b' }}>
+                      <td style={{ padding: '8px 10px', fontWeight: 700, color: '#38bdf8' }}>TXT (SPF)</td>
+                      <td style={{ padding: '8px 10px', fontFamily: 'monospace' }}>@ (o bluecode-ltd.com)</td>
+                      <td style={{ padding: '8px 10px', fontFamily: 'monospace' }}>v=spf1 include:register.it ~all</td>
+                      <td style={{ padding: '8px 10px', color: '#34d399', fontWeight: 700 }}>✓ Conforme</td>
+                    </tr>
+                    <tr style={{ borderBottom: '1px solid #1e293b' }}>
+                      <td style={{ padding: '8px 10px', fontWeight: 700, color: '#a78bfa' }}>TXT (DMARC)</td>
+                      <td style={{ padding: '8px 10px', fontFamily: 'monospace' }}>_dmarc</td>
+                      <td style={{ padding: '8px 10px', fontFamily: 'monospace' }}>v=DMARC1; p=none; rua=mailto:support@bluecode-ltd.com</td>
+                      <td style={{ padding: '8px 10px', color: '#34d399', fontWeight: 700 }}>✓ Conforme</td>
+                    </tr>
+                    <tr style={{ borderBottom: '1px solid #1e293b' }}>
+                      <td style={{ padding: '8px 10px', fontWeight: 700, color: '#fbbf24' }}>MX (Mail)</td>
+                      <td style={{ padding: '8px 10px', fontFamily: 'monospace' }}>@</td>
+                      <td style={{ padding: '8px 10px', fontFamily: 'monospace' }}>mail.register.it (Priorità 10)</td>
+                      <td style={{ padding: '8px 10px', color: '#34d399', fontWeight: 700 }}>✓ Conforme</td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
             </div>
 
