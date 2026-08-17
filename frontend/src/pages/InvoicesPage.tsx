@@ -108,13 +108,66 @@ export function InvoicesPage() {
 
   return (
     <div style={{ padding: '2rem' }}>
-      <div className={styles.sectionHeader} style={{ marginBottom: '1.5rem' }}>
+      <div className={styles.sectionHeader} style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
         <div>
           <h2 style={{ margin: 0 }}>Registro Fatture & Note di Credito</h2>
           <p style={{ color: 'var(--muted)', margin: '4px 0 0 0', fontSize: 14 }}>
             Emissione fiscale, formato SDI XML ed archivio PDF delle prestazioni
           </p>
         </div>
+
+        <button
+          onClick={() => {
+            if (invoices.length === 0) {
+              alert('Nessuna fattura presente nel registro da esportare.');
+              return;
+            }
+            const headers = [
+              'Tipo Documento',
+              'Numero Documento',
+              'Data Emissione',
+              'Cliente Committente',
+              'Pratica / Incarico',
+              'Imponibile (€)',
+              'Aliquota IVA (%)',
+              'Totale Documento (€)',
+              'Stato Fiscale',
+              'Codice SDI / Tracciato'
+            ];
+            const rows = invoices.map(inv => {
+              const isNote = (inv.tipo_documento || inv.tipoDocumento) === 'nota_credito';
+              const importoTot = getFatturaImporto(inv) / 100;
+              const imponibile = (importoTot / 1.22).toFixed(2);
+              const numDoc = inv.numero || `${isNote ? 'NC' : 'FT'}-${inv.numeroProgressivoSerie || '01'}`;
+              return [
+                isNote ? 'Nota di Credito (NC)' : 'Fattura Elettronica (FT)',
+                numDoc,
+                inv.data ? new Date(inv.data).toLocaleDateString('it-IT') : new Date().toLocaleDateString('it-IT'),
+                `"${(inv.progetto?.cliente?.nome || 'Cliente Studio').replace(/"/g, '""')}"`,
+                `"${(inv.progetto?.nome || 'Incarico Studio').replace(/"/g, '""')}"`,
+                `${isNote ? '-' : ''}${imponibile}`,
+                '22%',
+                `${isNote ? '-' : ''}${importoTot.toFixed(2)}`,
+                inv.stato === 'incassata' ? 'SALDATA' : inv.stato === 'emessa' ? 'DA_INCASSARE' : 'ANNULLATA',
+                inv.sdiIdentificativo || 'SDI-XML-GEN'
+              ];
+            });
+            const csvContent = '\uFEFF' + [headers.join(';'), ...rows.map(r => r.join(';'))].join('\r\n');
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.setAttribute('href', url);
+            link.setAttribute('download', `Registro_Fatture_Commercialista_${new Date().toISOString().slice(0, 10)}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+          }}
+          style={{ padding: '10px 18px', borderRadius: 8, border: '1px solid #1e40af', background: '#1e3a8a', color: '#93c5fd', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+          title="Esporta il registro completo delle fatture e note di credito per il commercialista (CSV / Excel)"
+        >
+          <span>📊 Export Registro Fiscale (CSV / Excel)</span>
+        </button>
       </div>
 
       <div className={styles.kpiGrid} style={{ marginBottom: '2rem' }}>

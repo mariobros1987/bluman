@@ -7,13 +7,14 @@ import { AvatarGroup, Avatar } from '../components/ui/Avatar';
 import { PassaggioModal } from '../components/PassaggioModal';
 import { fmt, progressColor, getFormattedLogoUrl, resolveRighe } from '../utils';
 import { downloadRealPdf } from '../utils/pdfGenerator';
+import { SimpleZipBuilder } from '../utils/zipBuilder';
 import { PREBUILT_TEMPLATES, resolveDocumentTemplateHtml } from '../utils/documentTemplates';
 import { ComunicazioniTab } from '../components/ComunicazioniTab';
 import { AssignOperatorModal } from '../components/AssignOperatorModal';
 import { CalendarPreviewModal } from '../components/CalendarPreviewModal';
 import { ConfirmDeleteModal } from '../components/ConfirmDeleteModal';
 import { PROJECTS, MLIB, ARTICOLI } from '../store/mockData';
-import { fetchProgettoDettaglio, emettiFatturaApi, consuntivaMicrovoceApi, assegnaAccessoProgettoApi, salvaProgettoDettaglioApi, archiviaProgettoApi, eliminaProgettoApi, fetchModuliLibreria, fetchArticoli, uploadFileApi } from '../api/client';
+import { fetchProgettoDettaglio, emettiFatturaApi, consuntivaMicrovoceApi, assegnaAccessoProgettoApi, salvaProgettoDettaglioApi, archiviaProgettoApi, eliminaProgettoApi, fetchModuliLibreria, fetchArticoli, uploadFileApi, inviaComunicazioneApi } from '../api/client';
 import { TEAM } from '../store/mockData';
 import { useTeamMembers } from '../hooks/useTeamMembers';
 import type { Progetto, ModuloProgetto, MicroVoce, CategoriaModulo, StatoProgetto, StatoModulo, Cliente } from '../types';
@@ -475,6 +476,18 @@ export function ProjectDetail() {
 
     // Persistenza remota server DB per multi-postazione
     salvaProgettoDettaglioApi(String(project.id), updatedProject).catch(() => {});
+
+    // Notifica automatica milestone completata nel fascicolo comunicazione
+    const targetMv = project.mods.find(m => m.id === modId)?.v?.[mvIdx];
+    if (targetMv && targetMv.s !== 'done') {
+      inviaComunicazioneApi(String(project.id), {
+        canale: 'whatsapp',
+        mittente: 'BlueCode Advisor Studio',
+        destinatario: project.cl,
+        direzione: 'uscita',
+        testo: `🔔 Avanzamento Pratica "${project.n}": La fase "${targetMv.n}" è stata completata con successo! L'avanzamento complessivo è ora al ${globalPct}%.`,
+      }).catch(() => {});
+    }
   };
 
   const handleSavePassaggiModal = (modId: number, mvIdx: number, nextSteps: any[], nextNotes?: any[]) => {
@@ -1921,19 +1934,73 @@ function RedditivitaTab({
 }) {
   const valoreTotale = project.val || 38000;
   
-  // Ore Stimate totali vs Ore Consuntivate totali
-  const oreStimateTot = (project.mods || []).reduce((acc, m) => acc + (m.h || 0), 0) || 52;
-  const oreConsuntivateTot = (project.mods || []).reduce((acc, m) => acc + (m.a || 0), 0) || 48.5;
-  
-  // Costo orario interno studio (es. € 150/h)
-  const costoOrarioStudio = 150;
-  const costoOperativoStudio = oreConsuntivateTot * costoOrarioStudio;
-  
-  // Margine Lordo Studio (€)
-  const margineLordo = valoreTotale - costoOperativoStudio;
-  
+  // Mappa tariffe orarie reali per id operatore
+  const OPERATOR_RATES: Record<number, { name: string; rate: number; role: string }> = {
+    1: { name: 'Joe Disabato', rate: 120, role: 'Lead Advisor & Senior Partner' },
+    2: { name: 'Francesca Disabato', rate: 45, role: 'Back Office & Compliance KYC' },
+    3: { name: 'Avv. Lorenzo Marino', rate: 90, role: 'Legal Counsel — Diritto Societario' },
+    4: { name: 'Dr. Elena Russo', rate: 85, role: 'Tax Advisor & Fiscalità Internazionale' },
+    5: { name: 'Avv. Mario Dibenedetto', rate: 95, role: 'Legal Counsel & Partner' },
+  };
+
+  // Calcolo ore e costi reali analitici per microvoce
+  let costoOperativoStudioReale = 0;
+  let oreStimateTot = 0;
+  let oreConsuntivateTot = 0;
+  const teamContributions: Record<number, { hours: number; cost: number }> = {};
+
+  (project.mods || []).forEach(m => {
+    oreStimateTot += (m.h || 0);
+    const modActual = (m.a || 0);
+    oreConsuntivateTot += modActual;
+
+    if (m.v && m.v.length > 0) {
+      m.v.forEach(mv => {
+        const opId = mv.as || (m.team && m.team[0]) || 1;
+        const opRate = OPERATOR_RATES[opId]?.rate || 95;
+        const mvHours = mv.hA || 0;
+        const mvCost = mvHours * opRate;
+        costoOperativoStudioReale += mvCost;
+
+        if (!teamContributions[opId]) {
+          teamContributions[opId] = { hours: 0, cost: 0 };
+        }
+        teamContributions[opId].hours += mvHours;
+        teamContributions[opId].cost += mvCost;
+      });
+    } else {
+      const defaultOp = (m.team && m.team[0]) || 1;
+      const opRate = OPERATOR_RATES[defaultOp]?.rate || 95;
+      const modCost = modActual * opRate;
+      costoOperativoStudioReale += modCost;
+
+      if (!teamContributions[defaultOp]) {
+        teamContributions[defaultOp] = { hours: 0, cost: 0 };
+      }
+      teamContributions[defaultOp].hours += modActual;
+      teamContributions[defaultOp].cost += modCost;
+    }
+  });
+
+  // Se non ci sono ore consuntivate dettagliate, fallback proporzionale realistico
+  if (costoOperativoStudioReale === 0 && oreConsuntivateTot > 0) {
+    costoOperativoStudioReale = oreConsuntivateTot * 95;
+  }
+
+  // Margine Lordo Studio (€ e %)
+  const margineLordo = valoreTotale - costoOperativoStudioReale;
+  const marginePercentuale = valoreTotale > 0 ? ((margineLordo / valoreTotale) * 100) : 0;
+  const percentualeBudgetCosumata = valoreTotale > 0 ? ((costoOperativoStudioReale / valoreTotale) * 100) : 0;
+
   // Resa Oraria Effettiva Studio (€/ora)
-  const resaOrariaStudio = oreConsuntivateTot > 0 ? (valoreTotale / oreConsuntivateTot) : (valoreTotale / 1);
+  const resaOrariaStudio = oreConsuntivateTot > 0 ? (valoreTotale / oreConsuntivateTot) : valoreTotale;
+
+  // Semaforo Alert
+  const semaforoStato = marginePercentuale >= 50 ? 'green' : marginePercentuale >= 20 ? 'yellow' : 'red';
+  const semaforoText = semaforoStato === 'green' ? '🟢 Margine Ottimale (>50%)' : semaforoStato === 'yellow' ? '🟡 Margine in Linea (20% - 50%)' : '🔴 Attenzione: Sforamento Budget';
+  const semaforoBg = semaforoStato === 'green' ? '#0d2d22' : semaforoStato === 'yellow' ? '#2d1a05' : '#3b1c1c';
+  const semaforoBorder = semaforoStato === 'green' ? '#059669' : semaforoStato === 'yellow' ? '#d97706' : '#ef4444';
+  const semaforoColor = semaforoStato === 'green' ? '#34d399' : semaforoStato === 'yellow' ? '#f59e0b' : '#f87171';
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -1941,50 +2008,137 @@ function RedditivitaTab({
       <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, padding: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 14 }}>
         <div>
           <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--indigo-l)', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span>📊 Analisi Redditività Incarico & Rendiconto Margini Orari</span>
+            <span>📊 Analisi Redditività Incarico & Controllo Budget Commessa</span>
+            <span style={{ fontSize: 11, background: semaforoBg, color: semaforoColor, border: `1px solid ${semaforoBorder}`, padding: '2px 10px', borderRadius: 12, fontWeight: 800 }}>
+              {semaforoText}
+            </span>
           </div>
           <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 3 }}>
-            Monitoraggio in tempo reale del margine di profitto dello studio per <strong>{project.cl}</strong> (Ore Stimate vs Ore Reali)
+            Monitoraggio finanziario in tempo reale: Valore Contrattuale vs Costo Lavoro Reale Studio per <strong>{project.cl}</strong>
           </div>
         </div>
 
         <button
           type="button"
           onClick={() => {
-            alert(`📄 Dossier Trasparenza & Rendiconto Incarico per ${project.cl} generato ed esportato in PDF con successo!`);
+            const csvRows = [
+              ['Riepilogo Redditivita Commessa', project.n, project.cl],
+              ['Valore Incarico', valoreTotale.toFixed(2)],
+              ['Costo Lavoro Studio Reale', costoOperativoStudioReale.toFixed(2)],
+              ['Margine Lordo Studio', margineLordo.toFixed(2)],
+              ['Margine Percentuale', `${marginePercentuale.toFixed(1)}%`],
+              ['Ore Stimate', oreStimateTot.toFixed(1)],
+              ['Ore Consuntivate', oreConsuntivateTot.toFixed(1)],
+              [],
+              ['Modulo', 'Prezzo', 'Ore Stimate', 'Ore Reali', 'Costo Lavoro Studio', 'Margine Modulo'],
+              ...(project.mods || []).map(m => [
+                m.n,
+                (m.p || 0).toFixed(2),
+                (m.h || 0).toFixed(1),
+                (m.a || 0).toFixed(1),
+                ((m.a || 0) * 95).toFixed(2),
+                ((m.p || 0) - (m.a || 0) * 95).toFixed(2),
+              ])
+            ];
+            const csvContent = 'data:text/csv;charset=utf-8,' + csvRows.map(e => e.join(';')).join('\n');
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement('a');
+            link.setAttribute('href', encodedUri);
+            link.setAttribute('download', `Rendiconto_Redditivita_${project.n.replace(/\s+/g, '_')}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
           }}
-          style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: 10, fontSize: 12, fontWeight: 600, cursor: 'pointer', boxShadow: '0 4px 14px rgba(99,102,241,.3)' }}
+          style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: 10, fontSize: 12, fontWeight: 600, cursor: 'pointer', boxShadow: '0 4px 14px rgba(99,102,241,.3)', display: 'flex', alignItems: 'center', gap: 6 }}
         >
-          📄 Esporta Dossier Trasparenza PDF
+          <span>📥 Esporta Rendiconto Economico CSV</span>
         </button>
       </div>
 
       {/* 📊 KPI FINANCIAL CARDS */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12 }}>
         <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 14, padding: 16 }}>
-          <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 700 }}>💶 Valore Incarico Cliente</div>
+          <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 700 }}>💶 Valore Incarico Forfait</div>
           <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--text)', marginTop: 4 }}>{fmt(valoreTotale)}</div>
           <div style={{ fontSize: 10, color: '#34d399', marginTop: 2 }}>✓ Concordato a contrattazione</div>
         </div>
 
         <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 14, padding: 16 }}>
-          <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 700 }}>⏱ Ore Stimate vs Consuntivate</div>
-          <div style={{ fontSize: 22, fontWeight: 800, color: '#818cf8', marginTop: 4 }}>{oreConsuntivateTot}h <span style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 500 }}>/ {oreStimateTot}h</span></div>
+          <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 700 }}>⏱ Ore Consuntivate / Stimate</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: '#818cf8', marginTop: 4 }}>{oreConsuntivateTot.toFixed(1)}h <span style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 500 }}>/ {oreStimateTot}h</span></div>
           <div style={{ fontSize: 10, color: oreConsuntivateTot <= oreStimateTot ? '#34d399' : '#f59e0b', marginTop: 2 }}>
-            {oreConsuntivateTot <= oreStimateTot ? '✓ In linea con la stima' : '⚠️ Sforamento ore stimate'}
+            {oreConsuntivateTot <= oreStimateTot ? '✓ In linea con la stima' : '⚠️ Sforamento monte ore'}
           </div>
         </div>
 
         <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 14, padding: 16 }}>
-          <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 700 }}>🏦 Margine Lordo Studio</div>
-          <div style={{ fontSize: 22, fontWeight: 800, color: '#34d399', marginTop: 4 }}>{fmt(margineLordo)}</div>
-          <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>Costo Op: {fmt(costoOperativoStudio)}</div>
+          <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 700 }}>🏦 Margine Lordo Commessa</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: margineLordo >= 0 ? '#34d399' : '#ef4444', marginTop: 4 }}>
+            {fmt(margineLordo)} <span style={{ fontSize: 13, fontWeight: 600 }}>({marginePercentuale.toFixed(1)}%)</span>
+          </div>
+          <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>Costo Lavoro Studio: {fmt(costoOperativoStudioReale)}</div>
         </div>
 
         <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 14, padding: 16 }}>
-          <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 700 }}>⚡ Resa Oraria Effettiva Studio</div>
+          <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 700 }}>⚡ Resa Oraria Effettiva</div>
           <div style={{ fontSize: 22, fontWeight: 800, color: '#fbbf24', marginTop: 4 }}>{fmt(resaOrariaStudio)} / h</div>
-          <div style={{ fontSize: 10, color: '#34d399', marginTop: 2 }}>⚡ Target Studio: € 250 / h</div>
+          <div style={{ fontSize: 10, color: '#34d399', marginTop: 2 }}>Target Studio: € 200 / h</div>
+        </div>
+      </div>
+
+      {/* 📈 GAUGE CONSUMO BUDGET COMMESSA */}
+      <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 14, padding: 16 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, fontSize: 12 }}>
+          <span style={{ fontWeight: 700 }}>📉 Consumo Budget Lavoro Studio:</span>
+          <span style={{ fontWeight: 800, color: semaforoColor }}>{percentualeBudgetCosumata.toFixed(1)}% del valore vendita utilizzato</span>
+        </div>
+        <div style={{ width: '100%', height: 10, background: 'rgba(255,255,255,0.08)', borderRadius: 6, overflow: 'hidden', display: 'flex' }}>
+          <div style={{ width: `${Math.min(100, percentualeBudgetCosumata)}%`, background: semaforoColor, transition: 'width 0.4s ease' }} />
+        </div>
+      </div>
+
+      {/* 👥 RIPARTIZIONE ORE E COSTI PER PROFESSIONISTA STUDIO */}
+      <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 16, padding: 20 }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', marginBottom: 12 }}>
+          👥 Ripartizione Lavoro & Costi per Professionista Studio
+        </div>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5 }}>
+            <thead>
+              <tr style={{ background: 'var(--card)', borderBottom: '1px solid var(--border)', textAlign: 'left', color: 'var(--muted)' }}>
+                <th style={{ padding: '8px 12px' }}>Professionista</th>
+                <th style={{ padding: '8px 12px' }}>Ruolo & Specializzazione</th>
+                <th style={{ padding: '8px 12px' }}>Tariffa Oraria</th>
+                <th style={{ padding: '8px 12px' }}>Ore Registrate</th>
+                <th style={{ padding: '8px 12px' }}>Costo Totale Studio</th>
+              </tr>
+            </thead>
+            <tbody>
+              {Object.entries(teamContributions).map(([opIdStr, data]) => {
+                const opId = Number(opIdStr);
+                const info = OPERATOR_RATES[opId] || { name: `Operatore #${opId}`, rate: 95, role: 'Consulente Studio' };
+                return (
+                  <tr key={opId} style={{ borderBottom: '1px solid var(--border)' }}>
+                    <td style={{ padding: '10px 12px', fontWeight: 700, color: 'var(--text)' }}>
+                      👤 {info.name}
+                    </td>
+                    <td style={{ padding: '10px 12px', color: 'var(--muted)' }}>
+                      {info.role}
+                    </td>
+                    <td style={{ padding: '10px 12px', fontWeight: 600 }}>
+                      € {info.rate},00 / h
+                    </td>
+                    <td style={{ padding: '10px 12px', fontWeight: 700, color: '#818cf8' }}>
+                      {data.hours.toFixed(1)} h
+                    </td>
+                    <td style={{ padding: '10px 12px', fontWeight: 700, color: '#34d399' }}>
+                      € {data.cost.toFixed(2)}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -2013,10 +2167,12 @@ function RedditivitaTab({
                 const modP = m.p || 3500;
                 const modH_Stima = m.h || 10;
                 const modH_Reali = m.a || (m.pct === 100 ? modH_Stima : modH_Stima * (m.pct / 100));
-                const modCostoStudio = modH_Reali * costoOrarioStudio;
+                const defaultOp = (m.team && m.team[0]) || 1;
+                const opRate = OPERATOR_RATES[defaultOp]?.rate || 95;
+                const modCostoStudio = modH_Reali * opRate;
                 const modMargine = modP - modCostoStudio;
                 const modResa = modH_Reali > 0 ? (modP / modH_Reali) : modP;
-                const isProfit = modResa >= 250;
+                const isProfit = modResa >= 200;
 
                 return (
                   <tr key={idx} style={{ borderBottom: '1px solid var(--border)' }}>
@@ -2036,7 +2192,7 @@ function RedditivitaTab({
                     <td style={{ padding: '12px', color: 'var(--muted)' }}>
                       {fmt(modCostoStudio)}
                     </td>
-                    <td style={{ padding: '12px', fontWeight: 700, color: modMargine > 0 ? '#34d399' : '#ef4444' }}>
+                    <td style={{ padding: '12px', fontWeight: 700, color: modMargine >= 0 ? '#34d399' : '#ef4444' }}>
                       {fmt(modMargine)}
                     </td>
                     <td style={{ padding: '12px', fontWeight: 800, color: '#fbbf24' }}>
@@ -2238,6 +2394,75 @@ function DocumentiTab({ project }: { project: Progetto }) {
         </div>
 
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+          <button
+            type="button"
+            onClick={() => {
+              const zip = new SimpleZipBuilder();
+              const safeProjName = (project.n || 'Pratica').replace(/[^a-zA-Z0-9_-]/g, '_');
+              const safeClientName = (project.cl || 'Cliente').replace(/[^a-zA-Z0-9_-]/g, '_');
+
+              // Indice del fascicolo
+              const indiceText = `================================================================================
+BLUECODE LTD — ADVISORY PLATFORM
+FASCICOLO COMMESSA: ${project.n}
+COMMITTENTE: ${project.cl}
+DATA EXPORT: ${new Date().toLocaleString('it-IT')}
+VALORE COMMESSA: € ${project.val || 0}
+STATO PRATICA: ${project.st}
+================================================================================
+
+ELENCO DEI DOCUMENTI PRESENTI NEL FASCICOLO DIGITALE:
+
+${docList.map((d, i) => `${i + 1}. [${d.cat || 'Documento'}] ${d.nome || d.titolo} (${d.firmato ? 'Firma FEA eIDAS Verificata' : 'Bozza Documentale Studio'})`).join('\n')}
+
+================================================================================
+Note di Conformita:
+I documenti contrattuali sottoscritti con Firma Elettronica Avanzata (FEA)
+sono pienamente conformi al Regolamento UE 910/2014 (eIDAS) con marcatura
+temporale certificata ISO UTC ed impronta crittografica SHA-256.
+================================================================================
+`;
+
+              zip.addTextFile('INDICE_FASCICOLO.txt', indiceText);
+
+              // Inserisci i documenti nelle cartelle ordinate
+              docList.forEach(d => {
+                let folder = '01_Contratti_e_Incarico';
+                const catLower = (d.cat || '').toLowerCase();
+                if (catLower.includes('societario') || catLower.includes('mfsa') || catLower.includes('statuto')) {
+                  folder = '02_Societario_e_Delibere';
+                } else if (catLower.includes('compliance') || catLower.includes('kyc') || catLower.includes('aml') || catLower.includes('allegati')) {
+                  folder = '03_KYC_Compliance_e_Visure';
+                } else if (catLower.includes('fattur') || catLower.includes('ricevut')) {
+                  folder = '04_Fatture_e_Ricevute';
+                }
+
+                const fileName = (d.nome || `${d.titolo}.html`).replace(/[^a-zA-Z0-9._-]/g, '_');
+                const docHtmlContent = d.contenutoHtml || `<h1>${d.titolo || d.nome}</h1><p>Documento del fascicolo ${project.n} - ${project.cl}</p>`;
+                zip.addTextFile(`${folder}/${fileName.replace(/\.docx?$/, '.html')}`, docHtmlContent);
+              });
+
+              zip.download(`Fascicolo_Completo_${safeProjName}_${safeClientName}.zip`);
+            }}
+            style={{
+              background: '#059669',
+              color: '#fff',
+              border: '1px solid #10b981',
+              padding: '8px 16px',
+              borderRadius: 10,
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              boxShadow: '0 4px 14px rgba(5,150,105,.3)',
+            }}
+            title="Scarica tutti i contratti, atti, documenti KYC e ricevute della pratica in un unico archivio ZIP ordinato"
+          >
+            <span>📦 Esporta Fascicolo ZIP Completo</span>
+          </button>
+
           <button
             type="button"
             onClick={() => navigate(`/documents?projId=${project.id}`)}

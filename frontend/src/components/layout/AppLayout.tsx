@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { NotificationModal, type NotificationItem } from '../NotificationModal';
 import { fetchNotificheApi, markNotificheReadApi } from '../../api/client';
+import { QuickTimeTracker } from '../QuickTimeTracker';
 import styles from './AppLayout.module.css';
 
 const TITLES: Record<string, string> = {
@@ -115,6 +116,7 @@ export function AppLayout({ children, alertCount: _alertCount = 2, user, onLogou
             <div className={styles.topbarTitle}>{title}</div>
           </div>
           <div className={styles.topbarRight}>
+            <QuickTimeTracker user={user} />
             {user && (
               <div style={{ fontSize: 11, color: 'var(--muted)', background: 'var(--card2)', padding: '4px 10px', borderRadius: 20, border: '1px solid var(--border)' }}>
                 👤 {user.nome || user.name} ({user.ruolo || 'advisor'})

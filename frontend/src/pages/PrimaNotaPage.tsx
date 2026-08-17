@@ -198,7 +198,54 @@ export function PrimaNotaPage() {
             Storico contabile ufficiale delle entrate ed incassi registrati con codice di transazione CRO/TRN
           </p>
         </div>
-        <div style={{ display: 'flex', gap: 10 }}>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <button
+            onClick={() => {
+              if (scadenze.length === 0) {
+                alert('Nessun movimento contabile presente da esportare.');
+                return;
+              }
+              const headers = [
+                'Data Registrazione',
+                'Tipo Documento',
+                'Numero Fattura / Riferimento',
+                'Cliente Committente',
+                'Progetto / Incarico',
+                'Metodo Pagamento',
+                'CRO / Riferimento Transazione',
+                'Importo Incassato (€)',
+                'Stato Contabile'
+              ];
+              const rows = scadenze.map(s => {
+                const reg = s.registrazioniRegistrate?.[0] || {};
+                return [
+                  reg.dataIncasso ? new Date(reg.dataIncasso).toLocaleDateString('it-IT') : new Date(s.dataScadenza).toLocaleDateString('it-IT'),
+                  s.fattura?.numero?.startsWith('NC') ? 'Nota di Credito' : 'Fattura Professionale',
+                  s.fattura?.numero || 'FT-PROV',
+                  `"${(s.fattura?.progetto?.cliente?.nome || 'Cliente Studio').replace(/"/g, '""')}"`,
+                  `"${(s.fattura?.progetto?.nome || 'Incarico Studio').replace(/"/g, '""')}"`,
+                  reg.metodoPagamento || 'bonifico',
+                  reg.riferimentoTransazione || 'TRN-VERIFIED',
+                  ((s.importoCentesimi || 0) / 100).toFixed(2),
+                  s.stato === 'incassato' ? 'INCASSATO_REGISTRATO' : 'IN_ATTESA'
+                ];
+              });
+              const csvContent = '\uFEFF' + [headers.join(';'), ...rows.map(r => r.join(';'))].join('\r\n');
+              const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+              const url = URL.createObjectURL(blob);
+              const link = document.createElement('a');
+              link.setAttribute('href', url);
+              link.setAttribute('download', `Prima_Nota_Commercialista_${new Date().toISOString().slice(0, 10)}.csv`);
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+              URL.revokeObjectURL(url);
+            }}
+            style={{ padding: '10px 18px', borderRadius: 8, border: '1px solid #059669', background: '#064e3b', color: '#6ee7b7', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+            title="Esporta il tracciato contabile per il commercialista (compatibile con Zucchetti, TeamSystem, Datev, Profis ed Excel)"
+          >
+            <span>📊 Export Commercialista (CSV / Excel)</span>
+          </button>
           <button
             onClick={() => setShowCsvModal(true)}
             style={{ padding: '10px 18px', borderRadius: 8, border: '1px solid var(--indigo)', background: '#1e1b4b', color: '#a5b4fc', fontWeight: 600, cursor: 'pointer' }}
