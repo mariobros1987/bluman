@@ -68,32 +68,39 @@ export function SettingsPage() {
   const loadTenantData = async () => {
     setLoadingUsers(true);
     const dbTenant = await fetchTenantInfoApi();
-    if (dbTenant) {
-      if (dbTenant.ragioneSociale) setRagioneSociale(dbTenant.ragioneSociale);
-      if (dbTenant.piva) setPIva(dbTenant.piva);
-      if (dbTenant.codiceFiscale) setCodFisc(dbTenant.codiceFiscale);
-      if (dbTenant.sedeLegale) setSedeLegale(dbTenant.sedeLegale);
-      if (dbTenant.sedeOperativa) setSedeOperativa(dbTenant.sedeOperativa);
-      if (dbTenant.email) setEmail(dbTenant.email);
-      if (dbTenant.pec) setPec(dbTenant.pec);
-      if (dbTenant.telefono) setTelefono(dbTenant.telefono);
-      if (dbTenant.iban) setIban(dbTenant.iban);
-      if (dbTenant.logoUrl) setLogoUrl(dbTenant.logoUrl);
-      if (dbTenant.coloreTemaFattura) setColoreTemaFattura(dbTenant.coloreTemaFattura);
-      if (dbTenant.notePieFattura) setNotePieDiPagina(dbTenant.notePieFattura);
-      if (dbTenant.titoloIntestazione) setTitoloIntestazione(dbTenant.titoloIntestazione);
-      if (dbTenant.waPhoneId) setWaPhoneId(dbTenant.waPhoneId);
-      if (dbTenant.waAccessToken) setWaAccessToken(dbTenant.waAccessToken);
-      if (dbTenant.waVerifyToken) setWaVerifyToken(dbTenant.waVerifyToken);
-      if (dbTenant.tgBotToken) setTgBotToken(dbTenant.tgBotToken);
-      if (dbTenant.tgBotUsername) setTgBotUsername(dbTenant.tgBotUsername);
-      if (dbTenant.smtpHost) setSmtpHost(dbTenant.smtpHost);
-      if (dbTenant.smtpPort) setSmtpPort(String(dbTenant.smtpPort));
-      if (dbTenant.smtpSecure != null) setSmtpSecure(dbTenant.smtpSecure);
-      if (dbTenant.smtpUser) setSmtpUser(dbTenant.smtpUser);
-      if (dbTenant.smtpPass) setSmtpPass(dbTenant.smtpPass);
-      if (dbTenant.smtpFromEmail) setSmtpFromEmail(dbTenant.smtpFromEmail);
-      if (dbTenant.smtpFromName) setSmtpFromName(dbTenant.smtpFromName);
+    const localInfoStr = localStorage.getItem('bluman_tenant_info');
+    let localInfo: any = {};
+    if (localInfoStr) {
+      try { localInfo = JSON.parse(localInfoStr); } catch {}
+    }
+    const tData = { ...localInfo, ...(dbTenant || {}) };
+
+    if (tData) {
+      if (tData.ragioneSociale) setRagioneSociale(tData.ragioneSociale);
+      if (tData.piva) setPIva(tData.piva);
+      if (tData.codiceFiscale) setCodFisc(tData.codiceFiscale);
+      if (tData.sedeLegale) setSedeLegale(tData.sedeLegale);
+      if (tData.sedeOperativa) setSedeOperativa(tData.sedeOperativa);
+      if (tData.email) setEmail(tData.email);
+      if (tData.pec) setPec(tData.pec);
+      if (tData.telefono) setTelefono(tData.telefono);
+      if (tData.iban) setIban(tData.iban);
+      if (tData.logoUrl) setLogoUrl(tData.logoUrl);
+      if (tData.coloreTemaFattura) setColoreTemaFattura(tData.coloreTemaFattura);
+      if (tData.notePieFattura) setNotePieDiPagina(tData.notePieFattura);
+      if (tData.titoloIntestazione) setTitoloIntestazione(tData.titoloIntestazione);
+      if (tData.waPhoneId) setWaPhoneId(tData.waPhoneId);
+      if (tData.waAccessToken) setWaAccessToken(tData.waAccessToken);
+      if (tData.waVerifyToken) setWaVerifyToken(tData.waVerifyToken);
+      if (tData.tgBotToken) setTgBotToken(tData.tgBotToken);
+      if (tData.tgBotUsername) setTgBotUsername(tData.tgBotUsername);
+      if (tData.smtpHost) setSmtpHost(tData.smtpHost);
+      if (tData.smtpPort) setSmtpPort(String(tData.smtpPort));
+      if (tData.smtpSecure != null) setSmtpSecure(tData.smtpSecure);
+      if (tData.smtpUser) setSmtpUser(tData.smtpUser);
+      if (tData.smtpPass) setSmtpPass(tData.smtpPass);
+      if (tData.smtpFromEmail) setSmtpFromEmail(tData.smtpFromEmail);
+      if (tData.smtpFromName) setSmtpFromName(tData.smtpFromName);
     }
 
     const dbUsers = await fetchUtentiTenant();
