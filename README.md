@@ -45,10 +45,26 @@ Piattaforma ERP per studi di consulenza societaria, wealth protection ed advisor
 - **Assegnazione 1-Click a Cliente & Smart Anti-Duplicazione**: Pulsante `🚀 Assegna a Progetto Cliente` direttamente dalle card del Grafo con scansione automatica per evitare la duplicazione di articoli o lavoro già svolto (0h per doppioni).
 - **Upselling Moduli**: Pulsante `+ Aggiungi Modulo da Libreria` anche all'interno della scheda del progetto del cliente.
 
-### 📊 Redditività Incarico & Report Margini (€/ora)
-- **KPI Finanziari Live**: Margine Lordo Studio (€), Resa Oraria Effettiva Studio (€/ora), Ore Stimate vs Consuntivate Reali.
-- **Rendiconto per Singolo Modulo**: Tabella analitica con margine di profitto ed indicatori `🟢 In Utile Extra` / `🟡 In Target`.
-- **📄 Export Dossier Trasparenza PDF**: Esportazione 1-click del rendiconto trasparente dell'incarico per il cliente.
+### ⏱️ Quick Time Tracker Fluttuante nella Topbar (Stopwatch 1-Click)
+- **Timer Digitale Live**: Avvio, pausa e stop sessione di lavoro sempre a portata di mano nella barra superiore.
+- **Selettore Pratica Rapido**: Caricamento dinamico di tutte le pratiche dal DB/local con selezione della microvoce.
+- **Calcolo Costo Lavoro Reale**: Calcolo automatico della spesa lavoro in base alla tariffa oraria specifica dell'operatore (es. 120€/h, 95€/h, 90€/h, 85€/h, 45€/h) e consuntivazione immediata a database.
+
+### 📦 Export Fascicolo Digitale Completo ZIP in 1-Click
+- **Archivio Strutturato Zero-Dependency**: Compressione client-side di tutti gli atti del progetto in cartelle ordinate (`/01_Contratti_e_Incarico`, `/02_Societario_e_Delibere`, `/03_KYC_Compliance_e_Visure`, `/04_Fatture_e_Ricevute`).
+- **Indice Conforme eIDAS**: Generazione automatica del file `INDICE_FASCICOLO.txt` con metadati, cliente, valore e marcatura temporale ISO UTC.
+
+### 📊 Export Contabile Commercialista (CSV / Excel)
+- **Prima Nota & Registro Fatture**: Download 1-click in formato CSV UTF-8 con BOM per la massima compatibilità con i gestionali fiscali (**Zucchetti, TeamSystem, Datev, Profis ed Excel**).
+
+### 📲 Notifiche Push Desktop Native del Browser
+- **Centro Notifiche Integrato**: Richiesta permessi push al browser (`Notification.requestPermission()`) con test istantaneo e ricezione avvisi live su scadenze, firme FEA e ritardi.
+
+### 📊 Redditività Incarico & Controllo Budget Commessa Live
+- **KPI Finanziari Live**: Margine Lordo Studio (€ e %), Resa Oraria Effettiva Studio (€/ora), Ore Stimate vs Consuntivate Reali.
+- **Barra Progressiva Consumo Budget**: Semaforo visivo intelligente (🟢 Ottimale >50%, 🟡 In Linea 20-50%, 🔴 Allerta Sforamento <20%).
+- **Ripartizione Lavoro Team**: Tabella dettagliata con ore registrate e costi effettivi per ogni singolo professionista dello studio.
+- **📄 Export Rendiconto Economico CSV / PDF**: Esportazione immediata del prospetto trasparenza per lo studio o il cliente.
 
 ### 💬 WhatsApp Business Cloud API & Omnichannel Integration (§14)
 - **WhatsApp Cloud API Ufficiale (Graph API v21.0)**: Phone ID `1318817114639409`, WABA `1397431142562576`, Token Permanente System User illimitato.
@@ -58,7 +74,7 @@ Piattaforma ERP per studi di consulenza societaria, wealth protection ed advisor
 - **Guida Operativa Dettagliata**: Consulta [`GUIDA_META_WHATSAPP_INTEGRAZIONE.md`](file:///Volumes/Macintosh%20HD/Users/mariodibenedetto/Downloads/bluman-api/GUIDA_META_WHATSAPP_INTEGRAZIONE.md).
 
 ### 👥 Gestione Team & Timesheet Live Operatori (`/settings`)
-- **Scheda Performance Operatore 1-Click**: Cliccando su qualsiasi collaboratore (*Francesca Disabato*, *Joe Disabato*, *Avv. Lorenzo Marino*, *Elena Rossi*, *Super Admin*) si apre la scheda analitica con ore consuntivate, incarichi gestiti e diario timesheet live.
+- **Scheda Performance Operatore 1-Click**: Cliccando su qualsiasi collaboratore (*Francesca Disabato*, *Joe Disabato*, *Avv. Lorenzo Marino*, *Dr. Elena Russo*, *Avv. Mario Dibenedetto*) si apre la scheda analitica con ore consuntivate, incarichi gestiti e diario timesheet live.
 - **📧 Server Email SMTP Transazionale & Omnichannel**: Form credenziali SMTP + 4 Pulsanti di Test 1-Click per WhatsApp, Telegram Bot, Signal Daemon ed Email.
 
 ---
