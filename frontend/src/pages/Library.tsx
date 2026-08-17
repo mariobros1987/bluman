@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { CatBadge } from '../components/ui/CatBadge';
 import { fmt, moduloH, moduloP, resolveRighe, levelOf } from '../utils';
 import { downloadRealPdf } from '../utils/pdfGenerator';
+import { PREBUILT_TEMPLATES } from '../utils/documentTemplates';
 import { MLIB, ARTICOLI, GIURISDIZIONI } from '../store/mockData';
 import { fetchModuliLibreria, fetchArticoli, fetchGiurisdizioniApi, creaGiurisdizioneApi, creaArticoloApi, creaModuloTemplateApi, updateArticoloPrezzoApi, uploadFileApi, fetchClienti, fetchProgetti, creaProgettoApi, salvaProgettoDettaglioApi } from '../api/client';
 import type { CategoriaModulo, Articolo, Giurisdizione, ModuloTemplate } from '../types';
@@ -1200,12 +1201,20 @@ function GiurisdizioniView({
 
 // ─── Componente Libreria Documenti in Bianco & Form Master ────────
 function LibreriaDocumentiEForm() {
-  const [docModels, setDocModels] = useState<Array<{ id: string; nome: string; cat: string; firma: boolean; desc: string; url?: string }>>([
-    { id: 'm1', nome: 'Accordo di Riservatezza NDA Tipo.pdf', cat: 'Societario', firma: true, desc: 'Modello standard NDA bilingue Malta/Italia.' },
-    { id: 'm2', nome: 'Procura Legale MFSA In Bianco.pdf', cat: 'Compliance', firma: true, desc: 'Procura per adempimenti registro MFSA.' },
-    { id: 'm3', nome: 'Dichiarazione Titolare Effettivo (UBO).pdf', cat: 'Compliance', firma: true, desc: 'Dichiarazione antiriciclaggio e titolarità effettiva.' },
-    { id: 'm4', nome: 'Statuto Standard Holding Malta.pdf', cat: 'Societario', firma: false, desc: 'Bozza statuto societario tipo per holding europea.' },
-  ]);
+  const [docModels, setDocModels] = useState<Array<{ id: string; nome: string; cat: string; firma: boolean; desc: string; url?: string; templateId?: string }>>(() => {
+    return PREBUILT_TEMPLATES.map(t => ({
+      id: t.id,
+      templateId: t.id,
+      nome: `${t.titolo}.docx`,
+      cat: t.categoria === 'engagement' || t.categoria === 'nda' ? 'Contratti' :
+           t.categoria === 'societario' ? 'Societario' :
+           t.categoria === 'trust' ? 'Trust' :
+           t.categoria === 'compliance' ? 'Compliance' :
+           t.categoria === 'delega' ? 'Societario' : 'Contratti',
+      firma: t.id === 'tmpl-engagement' || t.id === 'tmpl-nda' || t.id === 'tmpl-delega' || t.id === 'tmpl-compliance',
+      desc: t.descrizione,
+    }));
+  });
 
   const [formMasters, setFormMasters] = useState([
     { id: 'f1', nome: 'Form Dati Societari & Legale Rappresentante', campi: ['Ragione Sociale', 'P.IVA / VAT', 'Codice Fiscale', 'Indirizzo Sede Legale', 'Legale Rappresentante'] },
@@ -1251,7 +1260,7 @@ function LibreriaDocumentiEForm() {
         ...docModels,
         {
           id: `m-${Date.now()}`,
-          nome: nameToUse.endsWith('.pdf') ? nameToUse : `${nameToUse}.pdf`,
+          nome: nameToUse.endsWith('.pdf') || nameToUse.endsWith('.docx') ? nameToUse : `${nameToUse}.docx`,
           cat: docCat,
           firma: docSign,
           desc: docDesc || 'Modello documento caricato in libreria.',
@@ -1308,36 +1317,28 @@ function LibreriaDocumentiEForm() {
     loadLinkageData();
   }, []);
 
-  const handleDownloadTemplatePdf = async (m: { nome: string; cat: string; desc: string }) => {
+  const handleDownloadTemplatePdf = async (m: any) => {
+    const tmpl = PREBUILT_TEMPLATES.find(t => t.id === m.templateId || t.id === m.id) || PREBUILT_TEMPLATES[0];
     const htmlContent = `
-      <div style="font-family: Arial, sans-serif; padding: 40px; color: #0f172a;">
-        <div style="display: flex; justify-content: space-between; border-bottom: 2px solid #6366f1; padding-bottom: 16px; margin-bottom: 24px;">
+      <div style="font-family: 'Segoe UI', Arial, sans-serif; padding: 20px; color: #0f172a;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #4338ca; padding-bottom: 14px; margin-bottom: 24px;">
           <div>
-            <h1 style="color: #4338ca; font-size: 22px; margin: 0; font-weight: 800;">BLUMAN ADVISORY SERVICES</h1>
-            <p style="color: #64748b; font-size: 11px; margin: 4px 0 0;">Cross-Border Corporate Structuring & Advisory</p>
+            <div style="font-size: 16pt; font-weight: 800; color: #1e1b4b;">BLUECODE LTD — ADVISORY SERVICES</div>
+            <div style="font-size: 9pt; color: #64748b;">Valuation Centre, Sliema, Malta · Reg. N. C-99881</div>
           </div>
-          <div style="text-align: right; font-size: 11px; color: #64748b;">
-            Modello Documentale Libreria #${m.cat}<br />
+          <div style="text-align: right; font-size: 8.5pt; color: #64748b;">
+            Modello in Bianco: #${m.cat}<br />
             Data: ${new Date().toLocaleDateString('it-IT')}
           </div>
         </div>
-        <h2 style="text-align: center; color: #1e1b4b; font-size: 18px; margin-bottom: 20px; text-transform: uppercase;">${m.nome}</h2>
-        <div style="font-size: 12px; line-height: 1.6; color: #334155; margin-bottom: 30px;">
-          <p><strong>Descrizione Modello:</strong> ${m.desc}</p>
-          <p>Tra la società di consulenza <strong>BluMan Advisory Ltd</strong> ed il Cliente da designare, si stipula ed accetta il presente modello contrattuale in bianco per adempimenti societari, legali e tributari.</p>
-          <p><strong>Articolo 1 — Validità e Regime Applicabile:</strong> Il presente atto costituisce bozza ufficiale regolamentata dalle disposizioni legislative vigenti per la categoria <em>${m.cat}</em>.</p>
-        </div>
-        <div style="margin-top: 40px; padding-top: 20px; border-top: 1px dashed #cbd5e1; display: flex; justify-content: space-between; font-size: 11px;">
-          <div>
-            <strong>Firma Advisory Firm:</strong><br /><br />_________________________<br />(Joe Disabato - Senior Partner)
-          </div>
-          <div>
-            <strong>Firma Cliente:</strong><br /><br />_________________________<br />(Legale Rappresentante)
-          </div>
+        <div>${tmpl.contenutoHtml}</div>
+        <div style="margin-top: 40px; border-top: 1px solid #e2e8f0; padding-top: 10px; display: flex; justify-content: space-between; font-size: 8.5pt; color: #94a3b8;">
+          <span>Bluecode Ltd • Modello Ufficiale Studio</span>
+          <span>Sigillo eIDAS Documentale • Validità Giuridica UE</span>
         </div>
       </div>
     `;
-    await downloadRealPdf(m.nome, htmlContent);
+    await downloadRealPdf(m.nome.replace(/\.[^/.]+$/, "") + '.pdf', htmlContent);
   };
 
   const handleConfirmLinkToClient = (e: React.FormEvent) => {

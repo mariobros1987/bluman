@@ -6,269 +6,9 @@ import { downloadRealPdf } from '../utils/pdfGenerator';
 import { PROJECTS } from '../store/mockData';
 import type { Cliente, Progetto } from '../types';
 
-export interface DocumentTemplate {
-  id: string;
-  titolo: string;
-  categoria: 'contratto' | 'nda' | 'engagement' | 'societario' | 'delega' | 'fiscale';
-  descrizione: string;
-  contenutoHtml: string;
-}
-
-// ── Modelli Predefiniti di Alto Valore per lo Studio ───────────────────────
-export const PREBUILT_TEMPLATES: DocumentTemplate[] = [
-  {
-    id: 'tmpl-engagement',
-    titolo: 'Lettera d\'Incarico Professionale (Engagement Letter)',
-    categoria: 'engagement',
-    descrizione: 'Mandato di consulenza patrimoniale e corporate structuring con compenso e firma 1-click.',
-    contenutoHtml: `
-<h1 style="text-align: center; color: #1e1b4b; margin-bottom: 20px; font-size: 20px; text-transform: uppercase; letter-spacing: 0.5px;">
-  LETTERA D'INCARICO PROFESSIONALE E MANDATO FIDUCIARIO
-</h1>
-
-<p style="text-align: right; color: #64748b; font-size: 11px; margin-bottom: 25px;">
-  <strong>Data di emissione:</strong> {{data_odierna}} | <strong>Rif. Pratica:</strong> {{progetto.titolo}}
-</p>
-
-<div style="background: #f8fafc; border-left: 4px solid #4338ca; padding: 12px 16px; margin-bottom: 25px; font-size: 11.5px; line-height: 1.6;">
-  <strong>TRA LE PARTI:</strong><br/>
-  <strong>Lo Studio Professionale:</strong> {{studio.ragione_sociale}}, con sede legale in {{studio.sede_legale}}, P.IVA/TIN {{studio.piva}}, rappresentato da Joe Disabato (Senior Partner Advisory).<br/><br/>
-  <strong>E Il Cliente Committente:</strong> <strong>{{cliente.ragione_sociale}}</strong>, con sede legale in {{cliente.sede_legale}}, Codice Fiscale / P.IVA <code>{{cliente.partita_iva}}</code>, Codice SDI <code>{{cliente.sdi}}</code>, rappresentato dal Sig. <strong>{{cliente.referente}}</strong> (in qualità di Legale Rappresentante e UBO).
-</div>
-
-<h3 style="color: #1e1b4b; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; font-size: 13px; margin-top: 20px;">
-  1. OGGETTO DELL'INCARICO
-</h3>
-<p style="font-size: 11.5px; line-height: 1.6; text-align: justify;">
-  Il Cliente affida allo Studio l'incarico professionale di consulenza strategica, assistenza societaria e strutturazione internazionale avente ad oggetto l'esecuzione del progetto denominato <strong>"{{progetto.titolo}}"</strong>, comprensivo delle relative microvoci operative, della redazione degli atti societari, del supporto alla compliance KYC/AML e del coordinamento con le autorità competenti.
-</p>
-
-<h3 style="color: #1e1b4b; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; font-size: 13px; margin-top: 20px;">
-  2. COMPENSI PROFESSIONALI E MODALITÀ DI PAGAMENTO
-</h3>
-<p style="font-size: 11.5px; line-height: 1.6; text-align: justify;">
-  Per l'espletamento dell'incarico sopra descritto, viene pattuito un compenso complessivo omnicomprensivo pari ad <strong>{{progetto.importo_totale}}</strong>, oltre eventuali oneri di legge e spese vive anticipate. Il pagamento avverrà tramite bonifico bancario sulle coordinate IBAN dello Studio: <code>{{studio.iban}}</code>, secondo le scadenze concordate nel piano di fatturazione.
-</p>
-
-<h3 style="color: #1e1b4b; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; font-size: 13px; margin-top: 20px;">
-  3. RISERVATEZZA E TRATTAMENTO DATI (GDPR)
-</h3>
-<p style="font-size: 11.5px; line-height: 1.6; text-align: justify;">
-  Tutte le informazioni, i documenti patrimoniali e i dati societari scambiati tra le Parti saranno trattati con la massima riservatezza e nel rispetto del Regolamento UE 2016/679 (GDPR), con conservazione crittografata all'interno del Vault Documentale Sicuro dello Studio.
-</p>
-
-<h3 style="color: #1e1b4b; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; font-size: 13px; margin-top: 20px;">
-  4. FORO COMPETENTE E LEGGE APPLICABILE
-</h3>
-<p style="font-size: 11.5px; line-height: 1.6; text-align: justify;">
-  Il presente accordo è regolato dalla legge maltese/italiana. Per ogni eventuale controversia sarà competente in via esclusiva il Foro di competenza della sede legale dello Studio.
-</p>
-
-<div style="margin-top: 40px; display: flex; justify-content: space-between; page-break-inside: avoid;">
-  <div style="width: 45%; text-align: center; border-top: 1px dashed #94a3b8; padding-top: 8px; font-size: 11px;">
-    <strong>Per Lo Studio:</strong><br/>
-    {{studio.ragione_sociale}}<br/>
-    <span style="color: #64748b; font-size: 10px;">(Firma Digitale Autorizzata)</span>
-  </div>
-  <div style="width: 45%; text-align: center; border-top: 1px dashed #94a3b8; padding-top: 8px; font-size: 11px;">
-    <strong>Per Il Cliente Committente:</strong><br/>
-    {{cliente.referente}}<br/>
-    <span style="color: #4338ca; font-weight: 700; font-size: 10px;">[ Sottoscrizione FEA 1-Click eIDAS ]</span>
-  </div>
-</div>
-`,
-  },
-  {
-    id: 'tmpl-nda',
-    titolo: 'Accordo di Riservatezza & Non Divulgazione (NDA)',
-    categoria: 'nda',
-    descrizione: 'Accordo bilaterale di riservatezza per analisi patrimoniali e due diligence pre-incarico.',
-    contenutoHtml: `
-<h1 style="text-align: center; color: #1e1b4b; margin-bottom: 20px; font-size: 19px; text-transform: uppercase;">
-  ACCORDO BILATERALE DI RISERVATEZZA E NON DIVULGAZIONE (NDA)
-</h1>
-
-<p style="text-align: center; color: #64748b; font-size: 11px; margin-bottom: 25px;">
-  Stipulato in data {{data_odierna}} in relazione alla pratica <strong>{{progetto.titolo}}</strong>
-</p>
-
-<p style="font-size: 11.5px; line-height: 1.6; text-align: justify;">
-  <strong>TRA:</strong> <strong>{{studio.ragione_sociale}}</strong> (di seguito "Parte Ricevente") e <strong>{{cliente.ragione_sociale}}</strong> (P.IVA {{cliente.partita_iva}}, rappresentata da {{cliente.referente}}, di seguito "Parte Divulgante").
-</p>
-
-<h3 style="color: #1e1b4b; font-size: 12.5px; margin-top: 18px;">1. DEFINIZIONE DI INFORMAZIONI RISERVATE</h3>
-<p style="font-size: 11.5px; line-height: 1.6; text-align: justify;">
-  Si considerano "Informazioni Riservate" tutti i dati societari, patrimoniali, contabili, bancari, know-how, strategie di pianificazione fiscale e documenti KYC scambiati per la valutazione della struttura aziendale.
-</p>
-
-<h3 style="color: #1e1b4b; font-size: 12.5px; margin-top: 18px;">2. OBBLIGHI DI SEGRETEZZA</h3>
-<p style="font-size: 11.5px; line-height: 1.6; text-align: justify;">
-  Le Parti si impegnano a custodire con la massima diligenza professionale le informazioni ricevute, a non divulgarle a terzi non autorizzati e ad utilizzarle esclusivamente per l'esecuzione del mandato professionale.
-</p>
-
-<div style="margin-top: 40px; display: flex; justify-content: space-between;">
-  <div style="width: 45%; text-align: center; border-top: 1px solid #cbd5e1; padding-top: 8px; font-size: 11px;">
-    {{studio.ragione_sociale}}
-  </div>
-  <div style="width: 45%; text-align: center; border-top: 1px solid #cbd5e1; padding-top: 8px; font-size: 11px;">
-    {{cliente.ragione_sociale}} ({{cliente.referente}})
-  </div>
-</div>
-`,
-  },
-  {
-    id: 'tmpl-memorandum',
-    titolo: 'Memorandum & Statuto Società Malta (M&A Summary)',
-    categoria: 'societario',
-    descrizione: 'Sintesi costitutiva per società LTD maltese con struttura partecipazioni, quote e UBO.',
-    contenutoHtml: `
-<h1 style="text-align: center; color: #1e1b4b; margin-bottom: 20px; font-size: 19px; text-transform: uppercase;">
-  MEMORANDUM OF ASSOCIATION — EXECUTIVE SUMMARY
-</h1>
-
-<div style="background: #f1f5f9; padding: 14px; border-radius: 8px; margin-bottom: 20px; font-size: 11.5px; line-height: 1.7;">
-  <strong>Company Name:</strong> {{progetto.titolo}} (Malta Limited Company)<br/>
-  <strong>Jurisdiction:</strong> Republic of Malta (MFSA / MBR Registered)<br/>
-  <strong>Registered Office:</strong> {{studio.sede_legale}}<br/>
-  <strong>Ultimate Beneficial Owner (UBO):</strong> {{cliente.referente}} ({{cliente.ragione_sociale}})<br/>
-  <strong>Authorized Share Capital:</strong> € 1,200 divided into 1,200 Ordinary Shares of € 1.00 each.
-</div>
-
-<h3 style="color: #1e1b4b; font-size: 12.5px;">1. CORPORATE OBJECTS & TRADING ACTIVITIES</h3>
-<p style="font-size: 11.5px; line-height: 1.6; text-align: justify;">
-  The Company is established to carry on the business of international commercial trading, management consulting, holding of participating interests, and intellectual property licensing under the Malta Business Companies Act (Cap. 386).
-</p>
-
-<h3 style="color: #1e1b4b; font-size: 12.5px;">2. TAX REGIME APPLICABILITY</h3>
-<p style="font-size: 11.5px; line-height: 1.6; text-align: justify;">
-  The Company is eligible for the full imputation tax system with a 6/7ths refund mechanism on distributed trading dividends, resulting in an effective tax burden of 5% in accordance with the Malta Income Tax Act.
-</p>
-`,
-  },
-  {
-    id: 'tmpl-intercompany',
-    titolo: 'Contratto di Servizi Intra-Societari (Intercompany Agreement)',
-    categoria: 'contratto',
-    descrizione: 'Accordo per prestazioni di servizi di management e consulenza in conformità Transfer Pricing.',
-    contenutoHtml: `
-<h1 style="text-align: center; color: #1e1b4b; margin-bottom: 20px; font-size: 19px; text-transform: uppercase;">
-  INTERCOMPANY MANAGEMENT SERVICES AGREEMENT
-</h1>
-
-<p style="font-size: 11.5px; line-height: 1.6; text-align: justify;">
-  Il presente accordo quadro di servizi infra-gruppo è stipulato in data {{data_odierna}} tra <strong>{{studio.ragione_sociale}}</strong> e la società controllata <strong>{{cliente.ragione_sociale}}</strong> (P.IVA {{cliente.partita_iva}}).
-</p>
-
-<h3 style="color: #1e1b4b; font-size: 12.5px;">1. PRESTAZIONI DI SERVIZI E CORRISPETTIVO</h3>
-<p style="font-size: 11.5px; line-height: 1.6; text-align: justify;">
-  La Capogruppo presterà a favore della Controllata servizi continuativi di direzione strategica, consulenza legale, supporto marketing e gestione contabile. Il corrispettivo annuale è pattuito a condizioni di piena concorrenza (Arm's Length Principle).
-</p>
-`,
-  },
-  {
-    id: 'tmpl-delega',
-    titolo: 'Procura Speciale & Delega Operativa',
-    categoria: 'delega',
-    descrizione: 'Delega conferita allo Studio per il deposito pratiche MFSA, Agenzia Entrate e banche.',
-    contenutoHtml: `
-<h1 style="text-align: center; color: #1e1b4b; margin-bottom: 20px; font-size: 19px; text-transform: uppercase;">
-  PROCURA SPECIALE E DELEGA DI RAPPRESENTANZA (POWER OF ATTORNEY)
-</h1>
-
-<p style="font-size: 11.5px; line-height: 1.6; text-align: justify;">
-  Il sottoscritto <strong>{{cliente.referente}}</strong>, in qualità di Legale Rappresentante di <strong>{{cliente.ragione_sociale}}</strong> (Codice Fiscale {{cliente.codice_fiscale}}), con la presente
-</p>
-
-<h3 style="text-align: center; color: #4338ca; margin: 15px 0;">DELEGA E NOMINA</h3>
-
-<p style="font-size: 11.5px; line-height: 1.6; text-align: justify;">
-  Lo Studio <strong>{{studio.ragione_sociale}}</strong> a rappresentare la società mandante innanzi a qualsiasi Ufficio Pubblico, Autorità di Vigilanza (MFSA / MBR / Agenzia delle Entrate) e Istituti Bancari, per il compimento di tutti gli atti connessi al dossier <strong>{{progetto.titolo}}</strong>.
-</p>
-
-<div style="margin-top: 40px; text-align: right;">
-  <p style="font-size: 11px; color: #64748b;">Firma del Delegante:</p>
-  <p style="font-size: 12px; font-weight: 700; color: #1e1b4b;">{{cliente.referente}}</p>
-</div>
-`,
-  },
-  {
-    id: 'tmpl-letter-of-wishes',
-    titolo: 'Letter of Wishes per Struttura Trust (Fiduciaria)',
-    categoria: 'fiscale',
-    descrizione: 'Lettera confidenziale del disponente (Settlor) con le direttive per la gestione dei beni in Trust.',
-    contenutoHtml: `
-<h1 style="text-align: center; color: #1e1b4b; margin-bottom: 20px; font-size: 19px; text-transform: uppercase;">
-  CONFIDENTIAL LETTER OF WISHES (TRUST DEED)
-</h1>
-
-<p style="text-align: right; color: #64748b; font-size: 11px; margin-bottom: 20px;">
-  <strong>Data:</strong> {{data_odierna}} | <strong>Rif. Trust:</strong> {{progetto.titolo}}
-</p>
-
-<p style="font-size: 11.5px; line-height: 1.6; text-align: justify;">
-  <strong>To the Trustees of:</strong> <strong>{{progetto.titolo}}</strong><br/>
-  <strong>From the Settlor:</strong> <strong>{{cliente.referente}}</strong> (on behalf of {{cliente.ragione_sociale}}).
-</p>
-
-<h3 style="color: #1e1b4b; font-size: 12.5px; margin-top: 18px;">1. SCOPO E PRINCIPI GUIDA</h3>
-<p style="font-size: 11.5px; line-height: 1.6; text-align: justify;">
-  La presente Lettera di Desideri esprime i miei auspici per l'amministrazione, la protezione e la successiva distribuzione del fondo in Trust. Sebbene non vincolante legalmente ai sensi del Trust Act, confido che i Trustees considerino attentamente le mie indicazioni nel pieno rispetto del loro dovere fiduciario.
-</p>
-
-<h3 style="color: #1e1b4b; font-size: 12.5px; margin-top: 18px;">2. PROTEZIONE E DISTRIBUZIONE BENEFICIARI</h3>
-<p style="font-size: 11.5px; line-height: 1.6; text-align: justify;">
-  Desidero che il fondo in Trust sia primariamente orientato a garantire la stabilità economica e la continuità generazionale dei Beneficiari designati, preservando l'integrità del patrimonio da rischi commerciali o di aggressione patrimoniale ingiustificata.
-</p>
-
-<div style="margin-top: 40px; display: flex; justify-content: space-between;">
-  <div style="width: 45%; text-align: center; border-top: 1px solid #cbd5e1; padding-top: 8px; font-size: 11px;">
-    <strong>The Settlor:</strong><br/>
-    {{cliente.referente}}
-  </div>
-  <div style="width: 45%; text-align: center; border-top: 1px solid #cbd5e1; padding-top: 8px; font-size: 11px;">
-    <strong>Received by Advisory Trustee:</strong><br/>
-    {{studio.ragione_sociale}}
-  </div>
-</div>
-`,
-  },
-  {
-    id: 'tmpl-shareholders-agreement',
-    titolo: 'Patto Parasociale & Governance Societaria (Shareholders Agreement)',
-    categoria: 'societario',
-    descrizione: 'Accordo tra soci con clausole di gradimento, prelazione, drag-along e tag-along.',
-    contenutoHtml: `
-<h1 style="text-align: center; color: #1e1b4b; margin-bottom: 20px; font-size: 19px; text-transform: uppercase;">
-  PATTO PARASOCIALE E REGOLE DI GOVERNANCE (SHAREHOLDERS AGREEMENT)
-</h1>
-
-<p style="font-size: 11.5px; line-height: 1.6; text-align: justify;">
-  In data {{data_odierna}}, in relazione alla società veicolo <strong>{{progetto.titolo}}</strong>, i Soci sottoscritti convengono e stipulano il presente accordo parasociale a completamento dello Statuto societario.
-</p>
-
-<h3 style="color: #1e1b4b; font-size: 12.5px; margin-top: 18px;">1. DIRITTO DI PRELAZIONE E TRASFERIMENTO PARTECIPAZIONI</h3>
-<p style="font-size: 11.5px; line-height: 1.6; text-align: justify;">
-  Ciascun Socio che intenda alienare, in tutto o in parte, le proprie quote o azioni a favore di terzi è tenuto ad offrirle preventivamente agli altri Soci alle medesime condizioni economiche e di pagamento (Diritto di Prelazione).
-</p>
-
-<h3 style="color: #1e1b4b; font-size: 12.5px; margin-top: 18px;">2. CLAUSOLE DI DRAG-ALONG E TAG-ALONG</h3>
-<p style="font-size: 11.5px; line-height: 1.6; text-align: justify;">
-  In caso di offerta irrevocabile di acquisto del 100% del capitale sociale da parte di un acquirente terzo, i soci di maggioranza hanno il diritto di trascinare i soci di minoranza alle stesse condizioni (Obbligo di Co-Vendita - Drag Along).
-</p>
-
-<div style="margin-top: 40px; display: flex; justify-content: space-between;">
-  <div style="width: 45%; text-align: center; border-top: 1px solid #cbd5e1; padding-top: 8px; font-size: 11px;">
-    <strong>Socio Promotore:</strong><br/>
-    {{cliente.referente}}
-  </div>
-  <div style="width: 45%; text-align: center; border-top: 1px solid #cbd5e1; padding-top: 8px; font-size: 11px;">
-    <strong>Advisor Studio Garante:</strong><br/>
-    {{studio.ragione_sociale}}
-  </div>
-</div>
-`,
-  },
-];
+import { PREBUILT_TEMPLATES, resolveDocumentTemplateHtml, type DocumentTemplate } from '../utils/documentTemplates';
+export type { DocumentTemplate };
+export { PREBUILT_TEMPLATES };
 
 export function DocumentEditorPage() {
   const [searchParams] = useSearchParams();
@@ -276,6 +16,7 @@ export function DocumentEditorPage() {
 
   const queryProjId = searchParams.get('projId') || '';
   const queryDocId = searchParams.get('docId') || '';
+  const queryTmplId = searchParams.get('tmplId') || 'tmpl-engagement';
 
   const [clienti, setClienti] = useState<Cliente[]>([]);
   const [progetti, setProgetti] = useState<Progetto[]>([]);
@@ -283,17 +24,18 @@ export function DocumentEditorPage() {
 
   const [selectedClienteId, setSelectedClienteId] = useState<string>('');
   const [selectedProgettoId, setSelectedProgettoId] = useState<string>(queryProjId);
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('tmpl-engagement');
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>(queryTmplId);
 
-  const [titoloDocumento, setTitoloDocumento] = useState('Lettera d\'Incarico Professionale');
-  const [categoria, setCategoria] = useState<string>('engagement');
+  const initialTmpl = PREBUILT_TEMPLATES.find(t => t.id === queryTmplId) || PREBUILT_TEMPLATES[0];
+  const [titoloDocumento, setTitoloDocumento] = useState(initialTmpl.titolo);
+  const [categoria, setCategoria] = useState<string>(initialTmpl.categoria);
   const [tagDisplayMode, setTagDisplayMode] = useState<'highlight' | 'plain' | 'raw'>('highlight');
 
   const [salvando, setSalvando] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
 
   const editorRef = useRef<HTMLDivElement>(null);
-  const rawTemplateRef = useRef<string>(PREBUILT_TEMPLATES[0].contenutoHtml);
+  const rawTemplateRef = useRef<string>(initialTmpl.contenutoHtml);
 
   // Caricamento Dati Completi (DB + LocalStorage + Default Studio)
   useEffect(() => {

@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { downloadRealPdf } from '../utils/pdfGenerator';
+import { getTemplateForVoce, resolveDocumentTemplateHtml } from '../utils/documentTemplates';
+import { fmt } from '../utils';
 import type { Progetto, Passaggio } from '../types';
 
 interface PassaggioModalProps {
@@ -65,10 +68,23 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce }: Pass
   });
   const [newNote, setNewNote] = useState('');
 
-  // Documenti da firmare
-  const [documents, setDocuments] = useState<DocumentoEntry[]>([
-    { id: 'd1', nome: `Accordo_Servizio_${project.cl.replace(/\s+/g, '_')}.pdf`, dimensione: '1.4 MB', richiedeFirma: true, firmato: false, dataCaricamento: '14/08/2026' },
-  ]);
+  const navigate = useNavigate();
+  const matchedTmpl = getTemplateForVoce(voce.n, mod.cat);
+
+  // Documenti da firmare (collegati 1-to-1 ai Modelli Word Ufficiali)
+  const [documents, setDocuments] = useState<DocumentoEntry[]>(() => {
+    const defaultDocName = `${matchedTmpl.titolo} — ${project.cl}.docx`;
+    return [
+      {
+        id: `d-${matchedTmpl.id}`,
+        nome: defaultDocName,
+        dimensione: '54 KB',
+        richiedeFirma: true,
+        firmato: voce.s === 'done',
+        dataCaricamento: new Date().toLocaleDateString('it-IT'),
+      },
+    ];
+  });
   const [docName, setDocName] = useState('');
   const [docRequiresSign, setDocRequiresSign] = useState(true);
   const [selectedDocPreview, setSelectedDocPreview] = useState<DocumentoEntry | null>(null);
@@ -616,102 +632,86 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce }: Pass
                 </button>
               </div>
 
-              {/* Reader Body / Simulation PDF Container */}
+              {/* Reader Body / Rich Word-Style Container */}
               <div style={{ flex: 1, padding: 24, overflowY: 'auto', background: '#0a0d14', display: 'flex', flexDirection: 'column', gap: 16 }}>
-                <div style={{ background: '#fff', color: '#1e293b', borderRadius: 8, padding: 32, fontFamily: 'serif', boxShadow: '0 10px 30px rgba(0,0,0,.5)', border: '1px solid #cbd5e1', lineHeight: 1.6 }}>
-                  {/* PDF Document Header */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #0284c7', paddingBottom: 16, marginBottom: 24 }}>
+                <div style={{ background: '#fff', color: '#1e293b', borderRadius: 10, padding: '36px 40px', fontFamily: "'Segoe UI', Arial, sans-serif", boxShadow: '0 10px 30px rgba(0,0,0,.5)', border: '1px solid #cbd5e1', lineHeight: 1.6 }}>
+                  {/* PDF Document Header Studio */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #4338ca', paddingBottom: 16, marginBottom: 24 }}>
                     <div>
-                      <div style={{ fontSize: 18, fontWeight: 800, color: '#0369a1', fontFamily: 'sans-serif' }}>BLUMAN ADVISORY SERVICES</div>
-                      <div style={{ fontSize: 10, color: '#64748b', fontFamily: 'sans-serif' }}>Cross-Border Wealth Structuring & Legal Advisory</div>
+                      <div style={{ fontSize: 18, fontWeight: 800, color: '#1e1b4b' }}>BLUECODE LTD — ADVISORY SERVICES</div>
+                      <div style={{ fontSize: 10.5, color: '#64748b' }}>Cross-Border Wealth Structuring & Legal Advisory · Malta / Switzerland</div>
                     </div>
-                    <div style={{ textAlign: 'right', fontSize: 10, color: '#64748b', fontFamily: 'sans-serif' }}>
+                    <div style={{ textAlign: 'right', fontSize: 10, color: '#64748b' }}>
                       Rif. Incarico: #{project.id}<br />
                       Data Registrazione: {selectedDocPreview.dataCaricamento}
                     </div>
                   </div>
 
-                  {/* Title */}
-                  <div style={{ textAlign: 'center', fontSize: 16, fontWeight: 700, marginBottom: 20, color: '#0f172a', textTransform: 'uppercase' }}>
-                    {selectedDocPreview.nome.replace(/\.pdf$/i, '')}
-                  </div>
-
-                  {/* Body Content */}
-                  <div style={{ fontSize: 11.5, color: '#334155', textAlign: 'justify', marginBottom: 24 }}>
-                    <p style={{ marginBottom: 12 }}>
-                      Tra la sottoscritta società di consulenza professionale <strong>BluMan Advisory Ltd</strong> (con sede legale in Malta / Svizzera) ed il Cliente <strong>{project.cl}</strong>, si stipula ed approva il presente documento relativo al progetto di consulenza societaria e wealth protection.
-                    </p>
-                    <p style={{ marginBottom: 12 }}>
-                      <strong>Articolo 1 — Oggetto delle Prestazioni:</strong> L'advisor si impegna ad adempiere a tutte le microvoci ed i passaggi contrattuali previsti nel modulo operativo <em>"{voce.n}"</em>.
-                    </p>
-                    <p style={{ marginBottom: 12 }}>
-                      <strong>Articolo 2 — Riservatezza & Compliance eIDAS:</strong> Le parti riconoscono la validità giuridica della firma elettronica apposta tramite il Portale Cliente BluMan ai sensi del Regolamento UE n. 910/2014 (eIDAS).
-                    </p>
-                  </div>
-
-                  {/* Footer Signatures */}
-                  <div style={{ marginTop: 40, paddingTop: 16, borderTop: '1px dashed #cbd5e1', display: 'flex', justifyContent: 'space-between', fontSize: 10, fontFamily: 'sans-serif' }}>
-                    <div>
-                      <div style={{ fontWeight: 700, color: '#475569' }}>Firma Advisory Firm:</div>
-                      <div style={{ marginTop: 24, fontStyle: 'italic', color: '#0284c7', fontWeight: 600 }}>Joe Disabato (Senior Partner)</div>
-                    </div>
-                    <div>
-                      <div style={{ fontWeight: 700, color: '#475569' }}>Firma Cliente:</div>
-                      <div style={{ marginTop: 24, fontStyle: selectedDocPreview.firmato ? 'normal' : 'italic', color: selectedDocPreview.firmato ? '#059669' : '#94a3b8', fontWeight: 700 }}>
-                        {selectedDocPreview.firmato ? `✓ FIRMATO DA ${project.cl.toUpperCase()} (OTP eIDAS Validato)` : '✍️ In attesa di firma elettronica'}
-                      </div>
-                    </div>
-                  </div>
+                  {/* Body Content from Word Template */}
+                  <div
+                    style={{ fontSize: 11.5, color: '#334155', textAlign: 'justify', marginBottom: 24 }}
+                    dangerouslySetInnerHTML={{
+                      __html: resolveDocumentTemplateHtml(matchedTmpl.contenutoHtml, {
+                        cliente: { nome: project.cl, ragione_sociale: project.cl },
+                        progetto: { titolo: project.n, importo_totale: fmt(project.val) },
+                        studio: { ragioneSociale: 'Bluecode Ltd', sedeLegale: 'Level 4, Valuation Centre, Sliema, Malta', piva: 'MT28491039' },
+                        isForPrintOrExport: false,
+                        tagMode: 'plain',
+                      })
+                    }}
+                  />
                 </div>
               </div>
 
               {/* Viewer Actions Footer */}
-              <div style={{ padding: '14px 20px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--card)' }}>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    const docHtml = `
-                      <div style="font-family: 'Segoe UI', Arial, sans-serif; color: #1e293b; line-height: 1.6; padding: 20px;">
-                        <div style="text-align: right; font-size: 9pt; color: #64748b; margin-bottom: 20px;">
-                          Rif. Pratica: #${project.id} | Data: ${selectedDocPreview.dataCaricamento}
-                        </div>
-                        <h1 style="color: #1e1b4b; text-align: center; text-transform: uppercase; font-size: 18pt; border-bottom: 2px solid #4338ca; padding-bottom: 10px; margin-bottom: 20px;">
-                          ${selectedDocPreview.nome.replace(/\.[^/.]+$/, "")}
-                        </h1>
-                        
-                        <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-size: 10pt;">
-                          <strong>Studio Professionale:</strong> BluMan Advisory Ltd (Malta / Svizzera)<br/>
-                          <strong>Cliente Committente:</strong> ${project.cl} (Pratica: ${project.n})<br/>
-                          <strong>Modulo di Lavoro:</strong> ${voce.n}<br/>
-                          <strong>Stato eIDAS:</strong> ${selectedDocPreview.firmato ? '🔒 FIRMATO CON SIGILLO DIGITALE eIDAS (Reg. UE 910/2014)' : 'BOZZA IN ATTESA DI SOTTOSCRIZIONE'}
-                        </div>
-
-                        <p style="font-size: 11pt; color: #334155; line-height: 1.6;">
-                          Con il presente atto le Parti confermano l'espletamento e la presa d'atto delle attività descritte nella distinta base dell'incarico fiduciario e societario.
-                        </p>
-                        <p style="font-size: 11pt; color: #334155; line-height: 1.6;">
-                          Tutti i dati e i documenti sono protetti con standard di crittografia avanzata all'interno del Vault Documentale BluMan.
-                        </p>
-
-                        <div style="display: flex; justify-content: space-between; margin-top: 50px; font-size: 9.5pt;">
-                          <div style="width: 45%; border-top: 1px solid #94a3b8; padding-top: 10px; text-align: center;">
-                            <strong>Per BluMan Advisory Ltd</strong><br/>
-                            <em>(Firma Digitale Autorizzata)</em>
+              <div style={{ padding: '14px 20px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--card)', flexWrap: 'wrap', gap: 10 }}>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const finalPrintHtml = resolveDocumentTemplateHtml(matchedTmpl.contenutoHtml, {
+                        cliente: { nome: project.cl, ragione_sociale: project.cl },
+                        progetto: { titolo: project.n, importo_totale: fmt(project.val) },
+                        studio: { ragioneSociale: 'Bluecode Ltd', sedeLegale: 'Level 4, Valuation Centre, Sliema, Malta', piva: 'MT28491039' },
+                        isForPrintOrExport: true,
+                      });
+                      const fullPrintHtml = `
+                        <div style="font-family: 'Segoe UI', Arial, sans-serif; color: #0f172a; line-height: 1.6; padding: 20px;">
+                          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #4338ca; padding-bottom: 14px; margin-bottom: 24px;">
+                            <div>
+                              <div style="font-size: 16pt; font-weight: 800; color: #1e1b4b;">BLUECODE LTD — ADVISORY SERVICES</div>
+                              <div style="font-size: 9pt; color: #64748b;">Valuation Centre, Sliema, Malta · Reg. N. C-99881</div>
+                            </div>
+                            <div style="text-align: right; font-size: 8.5pt; color: #64748b;">
+                              Rif. Incarico: #${project.id}<br/>Data: ${selectedDocPreview.dataCaricamento}
+                            </div>
                           </div>
-                          <div style="width: 45%; border-top: 1px solid #94a3b8; padding-top: 10px; text-align: center;">
-                            <strong>Per il Cliente: ${project.cl}</strong><br/>
-                            <em>${selectedDocPreview.firmato ? '✓ Sottoscritto con Sigillo FEA eIDAS' : '(In attesa di firma)'}</em>
+                          <div>${finalPrintHtml}</div>
+                          <div style="margin-top: 40px; border-top: 1px solid #e2e8f0; padding-top: 10px; display: flex; justify-content: space-between; font-size: 8.5pt; color: #94a3b8;">
+                            <span>Bluecode Ltd • Pratica: ${project.n}</span>
+                            <span>Sigillo eIDAS Documentale • Validità Giuridica UE</span>
                           </div>
                         </div>
-                      </div>
-                    `;
-                    const safeName = `${selectedDocPreview.nome.replace(/\.[^/.]+$/, "")}.pdf`;
-                    await downloadRealPdf(safeName, docHtml);
-                  }}
-                  style={{ background: '#0d2d22', border: '1px solid #059669', color: '#34d399', padding: '7px 14px', borderRadius: 8, fontSize: 11, cursor: 'pointer', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}
-                >
-                  📥 Scarica File PDF VERO (.pdf)
-                </button>
+                      `;
+                      const safeName = `${selectedDocPreview.nome.replace(/\.[^/.]+$/, "")}.pdf`;
+                      await downloadRealPdf(safeName, fullPrintHtml);
+                    }}
+                    style={{ background: '#0d2d22', border: '1px solid #059669', color: '#34d399', padding: '7px 14px', borderRadius: 8, fontSize: 11, cursor: 'pointer', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}
+                  >
+                    📥 Scarica File PDF VERO (.pdf)
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      navigate(`/documents?projId=${project.id}&tmplId=${matchedTmpl.id}`);
+                    }}
+                    style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '7px 14px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+                  >
+                    ✏️ Apri in Document Studio (Word)
+                  </button>
+                </div>
 
                 <div style={{ display: 'flex', gap: 8 }}>
                   {selectedDocPreview.richiedeFirma && !selectedDocPreview.firmato && (
@@ -722,7 +722,7 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce }: Pass
                         setSelectedDocPreview({ ...selectedDocPreview, firmato: true });
                         alert(`✓ Notifica ed il link di firma eIDAS per "${selectedDocPreview.nome}" inviati con successo al cliente ${project.cl}!`);
                       }}
-                      style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '7px 14px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+                      style={{ background: '#1e1b4b', border: '1px solid #4338ca', color: '#818cf8', padding: '7px 14px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
                     >
                       ✍️ Sollecita Firma Cliente (Magic Link)
                     </button>

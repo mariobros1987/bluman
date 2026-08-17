@@ -7,6 +7,7 @@ import { AvatarGroup, Avatar } from '../components/ui/Avatar';
 import { PassaggioModal } from '../components/PassaggioModal';
 import { fmt, progressColor, getFormattedLogoUrl, resolveRighe } from '../utils';
 import { downloadRealPdf } from '../utils/pdfGenerator';
+import { PREBUILT_TEMPLATES, resolveDocumentTemplateHtml } from '../utils/documentTemplates';
 import { ComunicazioniTab } from '../components/ComunicazioniTab';
 import { AssignOperatorModal } from '../components/AssignOperatorModal';
 import { CalendarPreviewModal } from '../components/CalendarPreviewModal';
@@ -2051,14 +2052,36 @@ function DocumentiTab({ project }: { project: Progetto }) {
   const [uploading, setUploading] = useState(false);
   const [selectedPreviewDoc, setSelectedPreviewDoc] = useState<any | null>(null);
 
-  // Caricamento Documenti dal Vault Locale e Cloud
+  // Caricamento Documenti dal Vault Locale e Cloud (Sincronizzati 1-a-1 con i Modelli Word Studio)
   const [docList, setDocList] = useState<any[]>(() => {
-    const defaultDocs = [
-      { id: 'doc-01', nome: 'Engagement Letter & Proposta d\'Incarico Firmata.docx', titolo: 'Engagement Letter & Proposta d\'Incarico Firmata', cat: 'Contratti', dimensione: '48 KB', data: '15/08/2026', dataCaricamento: '15/08/2026', firmato: true, formato: 'word', url: '#' },
-      { id: 'doc-02', nome: 'Certificato Camerale & Statuto MFSA Malta.pdf', titolo: 'Certificato Camerale & Statuto MFSA Malta', cat: 'Societario', dimensione: '3.2 MB', data: '14/08/2026', dataCaricamento: '14/08/2026', firmato: true, formato: 'pdf', url: '#' },
-      { id: 'doc-03', nome: 'Fascicolo Compliance KYC & UBO Registry.pdf', titolo: 'Fascicolo Compliance KYC & UBO Registry', cat: 'Compliance', dimensione: '2.8 MB', data: '12/08/2026', dataCaricamento: '12/08/2026', firmato: true, formato: 'pdf', url: '#' },
-      { id: 'doc-04', nome: 'Deed of Trust & Letter of Wishes.docx', titolo: 'Deed of Trust & Letter of Wishes', cat: 'Trust', dimensione: '64 KB', data: '10/08/2026', dataCaricamento: '10/08/2026', firmato: false, formato: 'word', url: '#' },
-    ];
+    const defaultDocs = PREBUILT_TEMPLATES.map(t => {
+      const isSigned = t.id === 'tmpl-engagement' || t.id === 'tmpl-nda';
+      const catLabel = t.categoria === 'engagement' ? 'Contratti' :
+                       t.categoria === 'nda' ? 'Contratti' :
+                       t.categoria === 'societario' ? 'Societario' :
+                       t.categoria === 'trust' ? 'Trust' :
+                       t.categoria === 'compliance' ? 'Compliance' :
+                       t.categoria === 'delega' ? 'Societario' : 'Contratti';
+      return {
+        id: `doc-${t.id}`,
+        templateId: t.id,
+        nome: `${t.titolo} — ${project.cl}.docx`,
+        titolo: t.titolo,
+        cat: catLabel,
+        dimensione: '54 KB',
+        data: '15/08/2026',
+        dataCaricamento: '15/08/2026',
+        firmato: isSigned,
+        formato: 'word',
+        contenutoHtml: resolveDocumentTemplateHtml(t.contenutoHtml, {
+          cliente: { nome: project.cl, ragione_sociale: project.cl },
+          progetto: { titolo: project.n, importo_totale: fmt(project.val) },
+          studio: { ragioneSociale: 'Bluecode Ltd', sedeLegale: 'Level 4, Valuation Centre, Sliema, Malta', piva: 'MT28491039' },
+          isForPrintOrExport: false,
+          tagMode: 'plain',
+        }),
+      };
+    });
 
     try {
       const storageKey = `bluman_project_documents_${project.id}`;
@@ -2081,31 +2104,43 @@ function DocumentiTab({ project }: { project: Progetto }) {
     }
   });
 
-  // Helper per scaricare localmente copia reale del documento
-  // Helper per scaricare localmente copia VERA in PDF A4
+  // Helper per scaricare localmente copia VERA in PDF A4 con Header/Footer Studio
   const handleDownloadDocument = async (doc: any) => {
     const rawContent = doc.contenutoHtml || `
       <div style="font-family: 'Segoe UI', Arial, sans-serif; color: #0f172a; line-height: 1.6; font-size: 11pt; padding: 10px;">
-        <div style="text-align: right; font-size: 9pt; color: #64748b; margin-bottom: 20px;">
-          Rif. Incarico: #${project.id} | Data: ${doc.data || doc.dataCaricamento || '2026'}
-        </div>
         <h1 style="color: #1e1b4b; text-align: center; text-transform: uppercase; font-size: 18pt; border-bottom: 2px solid #4338ca; padding-bottom: 10px; margin-bottom: 20px;">
           ${doc.titolo || doc.nome}
         </h1>
         <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-size: 10pt;">
-          <strong>Studio Professionale:</strong> BluMan Advisory Ltd (Malta / Svizzera)<br/>
+          <strong>Studio Professionale:</strong> Bluecode Ltd (Malta / Svizzera)<br/>
           <strong>Cliente Committente:</strong> ${project.cl} (${project.n})<br/>
           <strong>Categoria Vault:</strong> ${doc.cat || doc.categoria || 'Generale'}<br/>
           <strong>Stato eIDAS:</strong> ${doc.firmato ? '🔒 Sottoscritto con Sigillo FEA eIDAS UE 910/2014' : 'Bozza Documentale Studio'}
         </div>
-        <p style="font-size: 11pt; color: #334155; line-height: 1.6;">
-          Documento ufficiale facente parte del fascicolo legale e societario archiviato nel Cloud Vault di BluMan Advisory Services.
-        </p>
+      </div>
+    `;
+
+    const fullPrintHtml = `
+      <div style="font-family: 'Segoe UI', Arial, sans-serif; color: #0f172a; line-height: 1.6; padding: 20px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #4338ca; padding-bottom: 14px; margin-bottom: 24px;">
+          <div>
+            <div style="font-size: 16pt; font-weight: 800; color: #1e1b4b;">BLUECODE LTD — ADVISORY SERVICES</div>
+            <div style="font-size: 9pt; color: #64748b;">Valuation Centre, Sliema, Malta · Reg. N. C-99881</div>
+          </div>
+          <div style="text-align: right; font-size: 8.5pt; color: #64748b;">
+            Rif. Incarico: #${project.id}<br/>Data: ${doc.data || doc.dataCaricamento || '2026'}
+          </div>
+        </div>
+        <div>${rawContent}</div>
+        <div style="margin-top: 40px; border-top: 1px solid #e2e8f0; padding-top: 10px; display: flex; justify-content: space-between; font-size: 8.5pt; color: #94a3b8;">
+          <span>Bluecode Ltd • Pratica: ${project.n}</span>
+          <span>Sigillo eIDAS Documentale • Validità Giuridica UE</span>
+        </div>
       </div>
     `;
 
     const safePdfName = `${(doc.titolo || doc.nome || 'Documento').replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`;
-    await downloadRealPdf(safePdfName, rawContent);
+    await downloadRealPdf(safePdfName, fullPrintHtml);
   };
 
   // Caricamento File da Disco nel Vault Progetto
