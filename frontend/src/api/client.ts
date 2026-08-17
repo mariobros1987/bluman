@@ -431,6 +431,49 @@ export async function fetchUtentiTenant() {
   return merged;
 }
 
+export async function sendInviteCollaboratoreApi(input: {
+  nome: string;
+  email: string;
+  ruolo: string;
+  specializzazione?: string;
+  tempPassword?: string;
+}) {
+  let localTenant: any = {};
+  try {
+    localTenant = JSON.parse(localStorage.getItem('bluman_tenant_info') || '{}');
+  } catch {}
+
+  const payload = {
+    action: 'invite-collaborator',
+    smtpHost: localTenant.smtpHost || 'authsmtp.register.it',
+    smtpPort: localTenant.smtpPort || 465,
+    smtpSecure: localTenant.smtpSecure !== undefined ? localTenant.smtpSecure : true,
+    smtpUser: localTenant.smtpUser || 'support@bluecode-ltd.com',
+    smtpPass: localTenant.smtpPass || '',
+    smtpFromEmail: localTenant.smtpFromEmail || 'support@bluecode-ltd.com',
+    smtpFromName: localTenant.smtpFromName || 'BlueCode Advisory & Consulting',
+    smtpReplyTo: localTenant.smtpReplyTo,
+    smtpBcc: localTenant.smtpBcc,
+    to: input.email,
+    collaboratorName: input.nome,
+    collaboratorRole: input.ruolo,
+    collaboratorSpecialization: input.specializzazione,
+    collaboratorPassword: input.tempPassword || 'BlueCode2026!',
+  };
+
+  try {
+    const res = await fetch('/api/send-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return await res.json();
+  } catch (err: any) {
+    console.warn('Errore invio email invito collaboratore', err);
+    return { success: false, errore: err.message };
+  }
+}
+
 export async function creaUtenteTenantApi(input: { nome: string; email: string; ruolo: string; specializzazione?: string }) {
   // Salva localmente per persistenza immediata
   const customStr = localStorage.getItem('bluman_custom_team_users');
@@ -448,6 +491,14 @@ export async function creaUtenteTenantApi(input: { nome: string; email: string; 
   };
   customList.push(newUser);
   localStorage.setItem('bluman_custom_team_users', JSON.stringify(customList));
+
+  // Invia email reale di benvenuto con credenziali al nuovo collaboratore
+  sendInviteCollaboratoreApi({
+    nome: input.nome,
+    email: input.email,
+    ruolo: input.ruolo,
+    specializzazione: input.specializzazione,
+  }).catch(() => {});
 
   try {
     const res = await fetch(`${API_BASE}/tenant/utenti`, {
@@ -481,6 +532,48 @@ export async function assegnaAccessoProgettoApi(progettoId: string, userId: stri
   });
   if (!res.ok) throw new Error('Errore assegnazione accesso');
   return await res.json();
+}
+
+export async function testEmailApi(payload?: {
+  smtpHost?: string;
+  smtpPort?: number;
+  smtpSecure?: boolean;
+  smtpUser?: string;
+  smtpPass?: string;
+  smtpFromEmail?: string;
+  smtpFromName?: string;
+  smtpReplyTo?: string;
+  smtpBcc?: string;
+  emailDestinatario?: string;
+}) {
+  const body = {
+    action: 'test',
+    ...payload,
+    to: payload?.emailDestinatario || payload?.smtpUser,
+  };
+
+  // 1. Tenta prima la Serverless Function Vercel /api/send-email (connessione diretta live)
+  try {
+    const res = await fetch('/api/send-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const json = await res.json();
+    if (json) return json;
+  } catch {}
+
+  // 2. Fallback su Backend Fastify
+  try {
+    const res = await fetch(`${API_BASE}/tenant/test-email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload || {}),
+    });
+    return await res.json();
+  } catch (err: any) {
+    return { success: false, errore: err.message || 'Server backend non raggiungibile' };
+  }
 }
 
 export async function fetchTenantInfoApi() {
@@ -572,27 +665,6 @@ export async function fetchNotificheApi() {
   }
 }
 
-export async function testEmailApi(payload?: {
-  smtpHost?: string;
-  smtpPort?: number;
-  smtpSecure?: boolean;
-  smtpUser?: string;
-  smtpPass?: string;
-  smtpFromEmail?: string;
-  smtpFromName?: string;
-  emailDestinatario?: string;
-}) {
-  try {
-    const res = await fetch(`${API_BASE}/tenant/test-email`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload || {}),
-    });
-    return await res.json();
-  } catch (err: any) {
-    return { success: false, errore: err.message || 'Server backend non raggiungibile' };
-  }
-}
 
 export async function testImapApi(payload: {
   imapHost?: string;

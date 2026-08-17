@@ -306,6 +306,8 @@ export function SettingsPage() {
       setNewUserSpecializzazione('');
       setModalUserOpen(false);
       await loadTenantData();
+      setSaved(true);
+      setTimeout(() => setSaved(false), 4000);
     } catch (err) {
       console.error(err);
     } finally {

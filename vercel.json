@@ -4,6 +4,10 @@
   "outputDirectory": "frontend/dist",
   "rewrites": [
     {
+      "source": "/api/send-email",
+      "destination": "/api/send-email"
+    },
+    {
       "source": "/api/send-whatsapp",
       "destination": "/api/send-whatsapp"
     },
