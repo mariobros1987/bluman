@@ -15,11 +15,57 @@ export interface MessaggioComunicazione {
   allegati?: { nome: string; url: string; dimensione: string }[];
 }
 
-interface ComunicazioniTabProps {
-  progettoId: string;
-  nomeCliente: string;
-  emailCliente?: string;
-  cliente?: Cliente | null;
+export function cleanDisplayEmailText(raw: string): string {
+  if (!raw) return '';
+  let str = raw;
+
+  if (str.includes('Content-Type: text/plain') || str.includes('Content-Type:text/plain')) {
+    const plainSection = str.split(/Content-Type:\s*text\/plain[^\r\n]*/i)[1];
+    if (plainSection) {
+      const beforeBoundary = plainSection.split(/\r?\n--/)[0];
+      str = beforeBoundary.replace(/^[\s\S]*?\r?\n\r?\n/, '');
+    }
+  } else if (str.includes('Content-Type: text/html') || str.includes('Content-Type:text/html')) {
+    const htmlSection = str.split(/Content-Type:\s*text\/html[^\r\n]*/i)[1];
+    if (htmlSection) {
+      const beforeBoundary = htmlSection.split(/\r?\n--/)[0];
+      str = beforeBoundary.replace(/^[\s\S]*?\r?\n\r?\n/, '').replace(/<[^>]+>/g, ' ');
+    }
+  }
+
+  str = str
+    .replace(/=\r?\n/g, '')
+    .replace(/=3D/gi, '=')
+    .replace(/=20/g, ' ')
+    .replace(/=E2=80=99/g, "'")
+    .replace(/=E2=80=94/g, "—")
+    .replace(/=E2=80=A2/g, "•")
+    .replace(/=C3=A0/g, "à")
+    .replace(/=C3=A8/g, "è")
+    .replace(/=C3=A9/g, "é")
+    .replace(/=C3=AC/g, "ì")
+    .replace(/=C3=B2/g, "ò")
+    .replace(/=C3=B9/g, "ù");
+
+  str = str.replace(/--[a-zA-Z0-9_-]{10,}/g, '');
+  str = str.replace(/Content-Transfer-Encoding:[^\r\n]*/gi, '');
+  str = str.replace(/Content-Type:[^\r\n]*/gi, '');
+
+  const lines = str.split(/\r?\n/);
+  const cleanLines: string[] = [];
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith('>') || trimmed.startsWith('&gt;')) continue;
+    if (/^Il giorno .+ ha scritto:?$/i.test(trimmed)) break;
+    if (/^On .+ wrote:?$/i.test(trimmed)) break;
+    if (/^In data .+ ha scritto:?$/i.test(trimmed)) break;
+    if (trimmed.includes('--- Messaggio Originale ---')) break;
+    if (trimmed.includes('________________________________')) break;
+    cleanLines.push(line);
+  }
+
+  const result = cleanLines.join('\n').trim();
+  return result || raw;
 }
 
 export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, cliente }: ComunicazioniTabProps) {
@@ -482,7 +528,7 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
 
               {/* Testo Messaggio */}
               <div style={{ fontSize: 12.5, color: 'var(--text)', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
-                {m.testo}
+                {cleanDisplayEmailText(m.testo)}
               </div>
 
               {/* Allegati Messaggio */}

@@ -112,30 +112,86 @@ async function fetchRecentImapEmails(options: {
       // Step 4: Fetch Risposta
       if (step === 4) {
         if (buffer.includes('A4 OK') || buffer.includes('A9 OK')) {
+function cleanRawEmailBody(raw: string): string {
+  if (!raw) return '';
+  let str = raw;
+
+  // 1. Se è un MIME multipart, estrai solo la sezione Content-Type: text/plain
+  if (str.includes('Content-Type: text/plain') || str.includes('Content-Type:text/plain')) {
+    const plainSection = str.split(/Content-Type:\s*text\/plain[^\r\n]*/i)[1];
+    if (plainSection) {
+      const beforeBoundary = plainSection.split(/\r?\n--/)[0];
+      const bodyOnly = beforeBoundary.replace(/^[\s\S]*?\r?\n\r?\n/, '');
+      str = bodyOnly;
+    }
+  } else if (str.includes('Content-Type: text/html') || str.includes('Content-Type:text/html')) {
+    const htmlSection = str.split(/Content-Type:\s*text\/html[^\r\n]*/i)[1];
+    if (htmlSection) {
+      const beforeBoundary = htmlSection.split(/\r?\n--/)[0];
+      const bodyOnly = beforeBoundary.replace(/^[\s\S]*?\r?\n\r?\n/, '');
+      str = bodyOnly.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+    }
+  }
+
+  // 2. Decode Quoted-Printable
+  str = str
+    .replace(/=\r?\n/g, '')
+    .replace(/=3D/gi, '=')
+    .replace(/=20/g, ' ')
+    .replace(/=E2=80=99/g, "'")
+    .replace(/=E2=80=94/g, "—")
+    .replace(/=E2=80=A2/g, "•")
+    .replace(/=C3=A0/g, "à")
+    .replace(/=C3=A8/g, "è")
+    .replace(/=C3=A9/g, "é")
+    .replace(/=C3=AC/g, "ì")
+    .replace(/=C3=B2/g, "ò")
+    .replace(/=C3=B9/g, "ù");
+
+  str = str.replace(/--[a-zA-Z0-9_-]{10,}/g, '');
+  str = str.replace(/Content-Transfer-Encoding:[^\r\n]*/gi, '');
+  str = str.replace(/Content-Type:[^\r\n]*/gi, '');
+
+  // 3. Rimuovi le quote e lo storico delle risposte precedenti
+  const lines = str.split(/\r?\n/);
+  const cleanLines: string[] = [];
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith('>') || trimmed.startsWith('&gt;')) continue;
+    if (/^Il giorno .+ ha scritto:?$/i.test(trimmed)) break;
+    if (/^On .+ wrote:?$/i.test(trimmed)) break;
+    if (/^In data .+ ha scritto:?$/i.test(trimmed)) break;
+    if (trimmed.includes('--- Messaggio Originale ---')) break;
+    if (trimmed.includes('________________________________')) break;
+    cleanLines.push(line);
+  }
+
           const chunks = buffer.split(/\* \d+ FETCH/);
           for (const chunk of chunks) {
             if (!chunk.trim()) continue;
             const fromMatch = chunk.match(/From:\s*([^\r\n]+)/i);
             const subjectMatch = chunk.match(/Subject:\s*([^\r\n]+)/i);
             const dateMatch = chunk.match(/Date:\s*([^\r\n]+)/i);
-            
-            let text = '';
+
+            let rawBody = '';
             const textMatch = chunk.match(/BODY\[TEXT\]\s*\{(\d+)\}\r\n([\s\S]*)/i);
             if (textMatch && textMatch[2]) {
-              text = textMatch[2].split(/\r\n\)\r\n|\r\n\*\s*\d+\s*FETCH|\r\nA4 OK/)[0].trim();
+              rawBody = textMatch[2].split(/\r\n\)\r\n|\r\n\*\s*\d+\s*FETCH|\r\nA4 OK/)[0].trim();
             }
+
+            const cleanText = cleanRawEmailBody(rawBody);
 
             if (fromMatch) {
               const cleanFrom = fromMatch[1].trim();
               const cleanSubject = subjectMatch ? subjectMatch[1].trim() : 'Nessun Oggetto';
               const cleanDate = dateMatch ? new Date(dateMatch[1].trim()).toLocaleString('it-IT') : new Date().toLocaleString('it-IT');
-              
+
               emails.push({
                 id: `imap-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
                 from: cleanFrom,
                 subject: cleanSubject,
                 date: cleanDate,
-                text: text.substring(0, 1500) || cleanSubject,
+                text: cleanText || cleanSubject,
               });
             }
           }
