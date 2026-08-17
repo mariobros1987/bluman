@@ -1,6 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import { getFormattedLogoUrl } from '../../utils';
 import { getUserPermission } from '../../utils/rbac';
+import { getCurrentTenantId, getStudioInfoForTenant } from '../../utils/tenant';
 import styles from './Sidebar.module.css';
 
 const NAV = [
@@ -26,7 +27,10 @@ interface SidebarProps {
 }
 
 export function Sidebar({ alertCount = 0, user, onLogout }: SidebarProps) {
-  const userName = user?.nome || user?.name || 'Joe Disabato';
+  const currentTenantId = getCurrentTenantId(user);
+  const studioInfo = getStudioInfoForTenant(currentTenantId);
+
+  const userName = user?.nome || user?.name || studioInfo.leadAdvisor || 'Operatore Studio';
   const initials = userName.substring(0, 2).toUpperCase();
 
   const isSuperAdmin = user?.ruolo === 'super_admin';
@@ -44,16 +48,19 @@ export function Sidebar({ alertCount = 0, user, onLogout }: SidebarProps) {
 
   return (
     <aside className={styles.sidebar}>
-      {/* Logo */}
+      {/* Logo & Tenant Studio Badge */}
       <div className={styles.logo} style={{ background: '#0f172a', padding: '10px 14px', borderRadius: 10, border: '1px solid #1e293b', marginBottom: 16 }}>
         <img
           src={getFormattedLogoUrl(localStorage.getItem('bluman_logo_url'))}
           alt="BLUECODE"
-          style={{ height: 38, maxWidth: 170, objectFit: 'contain', display: 'block' }}
+          style={{ height: 32, maxWidth: 160, objectFit: 'contain', display: 'block' }}
           onError={(e) => {
             (e.target as HTMLImageElement).src = '/logo.png';
           }}
         />
+        <div style={{ marginTop: 6, fontSize: 11, fontWeight: 600, color: '#38bdf8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          🏛 {studioInfo.nomeBreve}
+        </div>
       </div>
 
       {/* Navigation */}

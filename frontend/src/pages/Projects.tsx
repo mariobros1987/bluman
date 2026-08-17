@@ -5,9 +5,9 @@ import { ProgressBar } from '../components/ui/ProgressBar';
 import { AvatarGroup } from '../components/ui/Avatar';
 import { fmt, progressColor } from '../utils';
 import { fetchProgetti } from '../api/client';
-import { PROJECTS, TEAM } from '../store/mockData';
 import { useTeamMembers } from '../hooks/useTeamMembers';
 import { NewProjectWizard } from '../components/NewProjectWizard';
+import { getTenantStorageKey, getTenantSeedData, getCurrentTenantId, BLUECODE_TENANT_ID } from '../utils/tenant';
 import type { Progetto } from '../types';
 
 type ViewMode = 'cards' | 'table' | 'kanban';
@@ -30,9 +30,11 @@ export function Projects() {
 
   const loadProjects = async () => {
     let combined: Progetto[] = [];
+    const currentTenantId = getCurrentTenantId();
+    const storageKey = getTenantStorageKey('bluman_custom_projects', currentTenantId);
 
-    // 1. Carica progetti salvati localmente dall'utente
-    const localStr = localStorage.getItem('bluman_custom_projects');
+    // 1. Carica progetti salvati localmente per questo specifico Tenant
+    const localStr = localStorage.getItem(storageKey);
     if (localStr) {
       try {
         const localProjs = JSON.parse(localStr);
@@ -42,47 +44,49 @@ export function Projects() {
       }
     }
 
-    // 2. Carica progetti remoti dal backend Fastify/DB se presenti
+    // 2. Carica progetti remoti dal backend Fastify/DB se presenti (filtrati per tenantId)
     try {
       const remote = await fetchProgetti();
       if (remote && Array.isArray(remote)) {
-        const dbProjs: Progetto[] = remote.map((rp: any) => {
-          let rpMods = (rp.moduli || []).map((m: any, mIdx: number) => ({
-            id: mIdx + 100,
-            n: m.nome,
-            cat: m.categoria || 'Societario',
-            st: m.stato || 'in_progress',
-            pct: m.stato === 'done' ? 100 : 50,
-            h: m.orePreventivate || 20,
-            a: m.oreConsuntivate || 0,
-            p: m.prezzo ? m.prezzo / 100 : 3500,
-            team: [1, 2],
-            delay: false,
-            v: (m.microvoci || []).map((v: any) => ({
-              n: v.titolo || v.nome,
-              hE: v.orePreventivate || 2,
-              hA: v.oreConsuntivate || 0,
-              s: v.completato ? 'done' : 'pending',
-              as: 1,
-              d: 1,
-            })),
-          }));
-          return {
-            id: rp.id,
-            n: rp.nome,
-            cl: rp.cliente?.nome || 'Cliente',
-            ct: (rp.cliente?.tipo as any) || 'individual',
-            st: rp.stato || 'in_progress',
-            pct: rp.stato === 'completed' ? 100 : rp.stato === 'done' ? 100 : 45,
-            start: rp.createdAt ? new Date(rp.createdAt).toLocaleDateString('it-IT') : 'Oggi',
-            due: rp.scadenza ? new Date(rp.scadenza).toLocaleDateString('it-IT') : '31/12/2026',
-            val: rp.valoreTotale ? rp.valoreTotale / 100 : 15000,
-            delay: rp.inRitardo || false,
-            fisc: rp.regimeFiscale || 'privato_italia',
-            fatture: rp.fatture || [],
-            mods: rpMods,
-          };
-        });
+        const dbProjs: Progetto[] = remote
+          .filter((rp: any) => !rp.tenantId || rp.tenantId === currentTenantId)
+          .map((rp: any) => {
+            let rpMods = (rp.moduli || []).map((m: any, mIdx: number) => ({
+              id: mIdx + 100,
+              n: m.nome,
+              cat: m.categoria || 'Societario',
+              st: m.stato || 'in_progress',
+              pct: m.stato === 'done' ? 100 : 50,
+              h: m.orePreventivate || 20,
+              a: m.oreConsuntivate || 0,
+              p: m.prezzo ? m.prezzo / 100 : 3500,
+              team: [1, 2],
+              delay: false,
+              v: (m.microvoci || []).map((v: any) => ({
+                n: v.titolo || v.nome,
+                hE: v.orePreventivate || 2,
+                hA: v.oreConsuntivate || 0,
+                s: v.completato ? 'done' : 'pending',
+                as: 1,
+                d: 1,
+              })),
+            }));
+            return {
+              id: rp.id,
+              n: rp.nome,
+              cl: rp.cliente?.nome || 'Cliente',
+              ct: (rp.cliente?.tipo as any) || 'individual',
+              st: rp.stato || 'in_progress',
+              pct: rp.stato === 'completed' ? 100 : rp.stato === 'done' ? 100 : 45,
+              start: rp.createdAt ? new Date(rp.createdAt).toLocaleDateString('it-IT') : 'Oggi',
+              due: rp.scadenza ? new Date(rp.scadenza).toLocaleDateString('it-IT') : '31/12/2026',
+              val: rp.valoreTotale ? rp.valoreTotale / 100 : 15000,
+              delay: rp.inRitardo || false,
+              fisc: rp.regimeFiscale || 'privato_italia',
+              fatture: rp.fatture || [],
+              mods: rpMods,
+            };
+          });
         const existingIds = new Set(combined.map(p => String(p.id)));
         for (const dp of dbProjs) {
           if (!existingIds.has(String(dp.id))) combined.push(dp);
@@ -92,10 +96,11 @@ export function Projects() {
       console.warn('Fetch DB fallback:', err);
     }
 
-    // 3. Ripristina progetti storici dello studio
-    const existingIds = new Set(combined.map(p => String(p.id)));
-    const studioProjs = PROJECTS.filter(p => !existingIds.has(String(p.id)));
-    combined.push(...studioProjs);
+    // 3. Se e solo se è il tenant demo Bluecode Ltd e non ci sono progetti salvati, carica i progetti di seed
+    if (combined.length === 0 && currentTenantId === BLUECODE_TENANT_ID) {
+      const seedData = getTenantSeedData(currentTenantId);
+      combined.push(...seedData.projects);
+    }
 
     setProjectList(combined);
     setLoading(false);

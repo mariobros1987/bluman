@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchScadenzarioIncassiApi, fetchClienti } from '../api/client';
+import { getCurrentTenantId, getTenantStorageKey } from '../utils/tenant';
 import { fmt } from '../utils';
 
 export function PrimaNotaPage() {
@@ -27,6 +28,7 @@ export function PrimaNotaPage() {
 
     const lines = csvContent.trim().split('\n');
     const newItems: any[] = [];
+    const currentTenantId = getCurrentTenantId();
 
     lines.forEach((line, idx) => {
       // Formato atteso: Data, Descrizione/Causale, Importo, CRO/TRN (separati da virgola o punto e virgola)
@@ -45,6 +47,7 @@ export function PrimaNotaPage() {
 
         newItems.push({
           id: `pn-csv-${Date.now()}-${idx}`,
+          tenantId: currentTenantId,
           numeroRata: 1,
           dataScadenza: new Date().toISOString(),
           importoCentesimi,
@@ -70,6 +73,11 @@ export function PrimaNotaPage() {
     });
 
     if (newItems.length > 0) {
+      const pnStorageKey = getTenantStorageKey('bluman_custom_primanota', currentTenantId);
+      const existingPn = JSON.parse(localStorage.getItem(pnStorageKey) || '[]');
+      const updatedPn = [...newItems, ...existingPn];
+      localStorage.setItem(pnStorageKey, JSON.stringify(updatedPn));
+      
       setScadenze(prev => [...newItems, ...prev]);
       setShowCsvModal(false);
       setCsvContent('');
@@ -84,9 +92,11 @@ export function PrimaNotaPage() {
     if (!newImporto || !newDesc) return;
     const importoCentesimi = Math.round(parseFloat(newImporto) * 100);
     const cl = clienti.find(c => c.id === newClienteId);
+    const currentTenantId = getCurrentTenantId();
 
     const newScad = {
       id: `pn-${Date.now()}`,
+      tenantId: currentTenantId,
       numeroRata: 1,
       dataScadenza: new Date().toISOString(),
       importoCentesimi,
@@ -109,6 +119,10 @@ export function PrimaNotaPage() {
       ],
     };
 
+    const pnStorageKey = getTenantStorageKey('bluman_custom_primanota', currentTenantId);
+    const existingPn = JSON.parse(localStorage.getItem(pnStorageKey) || '[]');
+    localStorage.setItem(pnStorageKey, JSON.stringify([newScad, ...existingPn]));
+
     setScadenze([newScad, ...scadenze]);
     setShowAddModal(false);
     setNewDesc('');
@@ -119,53 +133,63 @@ export function PrimaNotaPage() {
 
   const loadData = async () => {
     setLoading(true);
+    const currentTenantId = getCurrentTenantId();
     const [scadData, clData] = await Promise.all([
       fetchScadenzarioIncassiApi(),
       fetchClienti(),
     ]);
 
-    let finalScadenze = scadData || [];
+    let finalScadenze = (scadData || []).filter((s: any) => !s.tenantId || s.tenantId === currentTenantId);
 
-    // Fallback/Integrazione se lo studio opera in modalità locale/custom
-    if (finalScadenze.length === 0) {
-      const localStr = localStorage.getItem('bluman_custom_projects');
-      const localProjs: any[] = localStr ? JSON.parse(localStr) : [];
-      const extractedScad: any[] = [];
+    // Integrazione progetti del tenant
+    const projStorageKey = getTenantStorageKey('bluman_custom_projects', currentTenantId);
+    const localStr = localStorage.getItem(projStorageKey);
+    const localProjs: any[] = localStr ? JSON.parse(localStr) : [];
+    const extractedScad: any[] = [];
 
-      localProjs.forEach((p) => {
-        (p.fatture || []).forEach((f: any, fIdx: number) => {
-          const importoCentesimi = Math.round((f.importo || 0) * 100);
-          extractedScad.push({
-            id: `scad-loc-${p.id}-${fIdx}`,
-            numeroRata: 1,
-            dataScadenza: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-            importoCentesimi,
-            stato: f.stato === 'incassata' ? 'incassato' : 'in_attesa',
-            fattura: {
-              numero: f.numero || `FT-2026-000${fIdx + 1}`,
-              progetto: {
-                id: p.id,
-                nome: p.n,
-                cliente: { nome: p.cl || 'Cliente Studio' },
-              },
+    localProjs.forEach((p) => {
+      (p.fatture || []).forEach((f: any, fIdx: number) => {
+        const importoCentesimi = Math.round((f.importo || 0) * 100);
+        extractedScad.push({
+          id: `scad-loc-${p.id}-${fIdx}`,
+          tenantId: currentTenantId,
+          numeroRata: 1,
+          dataScadenza: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+          importoCentesimi,
+          stato: f.stato === 'incassata' ? 'incassato' : 'in_attesa',
+          fattura: {
+            numero: f.numero || `FT-2026-000${fIdx + 1}`,
+            progetto: {
+              id: p.id,
+              nome: p.n,
+              cliente: { nome: p.cl || 'Cliente Studio' },
             },
-            registrazioniRegistrate: f.stato === 'incassata' ? [
-              {
-                importoIncassatoCentesimi: importoCentesimi,
-                metodoPagamento: 'bonifico',
-                riferimentoTransazione: 'TRN-SETTLED',
-                dataIncasso: new Date().toISOString(),
-              }
-            ] : [],
-          });
+          },
+          registrazioniRegistrate: f.stato === 'incassata' ? [
+            {
+              importoIncassatoCentesimi: importoCentesimi,
+              metodoPagamento: 'bonifico',
+              riferimentoTransazione: 'TRN-SETTLED',
+              dataIncasso: new Date().toISOString(),
+            }
+          ] : [],
         });
       });
+    });
 
-      finalScadenze = extractedScad;
-    }
+    // Custom Prima Nota salvate
+    const pnStorageKey = getTenantStorageKey('bluman_custom_primanota', currentTenantId);
+    const pnSavedStr = localStorage.getItem(pnStorageKey);
+    const customPn = pnSavedStr ? JSON.parse(pnSavedStr) : [];
 
-    setScadenze(finalScadenze);
-    setClienti(clData || []);
+    const mergedMap = new Map();
+    [...finalScadenze, ...extractedScad, ...customPn].forEach(item => {
+      if (item && item.id) mergedMap.set(item.id, item);
+    });
+
+    setScadenze(Array.from(mergedMap.values()));
+    const filteredClients = (clData || []).filter((c: any) => !c.tenantId || c.tenantId === currentTenantId);
+    setClienti(filteredClients);
     setLoading(false);
   };
 

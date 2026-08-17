@@ -4,6 +4,7 @@ import { fmt, moduloH, moduloP } from '../utils';
 import { MLIB, GIURISDIZIONI } from '../store/mockData';
 import type { Cliente, Giurisdizione, ModuloTemplate, CategoriaModulo } from '../types';
 import { fetchClienti, fetchGiurisdizioniApi, fetchModuliLibreria, creaClienteApi, creaProgettoApi, creaPreventivoEAccettaApi } from '../api/client';
+import { getCurrentTenantId, getTenantStorageKey } from '../utils/tenant';
 
 interface NewProjectWizardProps {
   onClose: () => void;
@@ -133,11 +134,14 @@ export function NewProjectWizard({ onClose, onProjectCreated }: NewProjectWizard
           righe: dbMods,
         });
 
-        // 3. Salva anche in localStorage per garantire la consistenza offline immediata con stato 'pending'
-        const customProjsStr = localStorage.getItem('bluman_custom_projects');
+        // 3. Salva anche in localStorage per garantire la consistenza offline immediata isolata per tenant
+        const currentTenantId = getCurrentTenantId();
+        const storageKey = getTenantStorageKey('bluman_custom_projects', currentTenantId);
+        const customProjsStr = localStorage.getItem(storageKey);
         const customProjs: any[] = customProjsStr ? JSON.parse(customProjsStr) : [];
         const newProjObject = {
           id: progettoId,
+          tenantId: currentTenantId,
           n: projectName,
           cl: clientName || 'Cliente',
           ct: clientType,

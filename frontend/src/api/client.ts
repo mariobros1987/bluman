@@ -49,28 +49,63 @@ export async function loginApi(email: string, password?: string) {
     }
   } catch {}
 
-  // 2. Fallback credenziali ufficiali studio
-  const defaultUserMap: Record<string, { nome: string; ruolo: string; validPass: string[] }> = {
-    'joe@bluecode.advisory': { nome: 'Joe Disabato', ruolo: 'advisor', validPass: ['password123', 'admin2026!'] },
-    'admin@bluecode.advisory': { nome: 'Super Admin Studio', ruolo: 'super_admin', validPass: ['admin2026!', 'password123'] },
-    'operator@bluecode.advisory': { nome: 'Francesca Disabato', ruolo: 'collaboratore_interno', validPass: ['operator123', 'password123'] },
-    'lorenzo.marino@bluecode.advisory': { nome: 'Avv. Lorenzo Marino', ruolo: 'advisor', validPass: ['password123'] },
-    'elena.russo@bluecode.advisory': { nome: 'Dr. Elena Russo', ruolo: 'advisor', validPass: ['password123'] },
-    'francesca.disabato@bluecode.advisory': { nome: 'Francesca Disabato', ruolo: 'collaboratore_interno', validPass: ['password123'] },
-    'mario.dibenedetto@bluecode.advisory': { nome: 'Avv. Mario Dibenedetto', ruolo: 'advisor', validPass: ['password123'] },
+  // 2. Fallback credenziali ufficiali studio con isolamento multi-tenant
+  const defaultUserMap: Record<string, { nome: string; ruolo: string; tenantId: string; validPass: string[] }> = {
+    'joe@bluecode.advisory': { nome: 'Joe Disabato', ruolo: 'advisor', tenantId: '00000000-0000-0000-0000-000000000001', validPass: ['password123', 'admin2026!'] },
+    'admin@bluecode.advisory': { nome: 'Super Admin Studio', ruolo: 'super_admin', tenantId: '00000000-0000-0000-0000-000000000001', validPass: ['admin2026!', 'password123'] },
+    'operator@bluecode.advisory': { nome: 'Francesca Disabato', ruolo: 'collaboratore_interno', tenantId: '00000000-0000-0000-0000-000000000001', validPass: ['operator123', 'password123'] },
+    'lorenzo.marino@bluecode.advisory': { nome: 'Avv. Lorenzo Marino', ruolo: 'advisor', tenantId: '00000000-0000-0000-0000-000000000002', validPass: ['password123'] },
+    'lorenzo.marino@advisory.it': { nome: 'Avv. Lorenzo Marino', ruolo: 'advisor', tenantId: '00000000-0000-0000-0000-000000000002', validPass: ['password123', 'Studio2026!'] },
+    'elena.russo@bluecode.advisory': { nome: 'Dr. Elena Russo', ruolo: 'advisor', tenantId: '00000000-0000-0000-0000-000000000003', validPass: ['password123'] },
+    'elena.russo@swisswealth.ch': { nome: 'Dr. Elena Russo', ruolo: 'advisor', tenantId: '00000000-0000-0000-0000-000000000003', validPass: ['password123', 'Studio2026!'] },
+    'francesca.disabato@bluecode.advisory': { nome: 'Francesca Disabato', ruolo: 'collaboratore_interno', tenantId: '00000000-0000-0000-0000-000000000001', validPass: ['password123'] },
+    'mario.dibenedetto@bluecode.advisory': { nome: 'Avv. Mario Dibenedetto', ruolo: 'advisor', tenantId: '00000000-0000-0000-0000-000000000001', validPass: ['password123'] },
   };
 
   if (defaultUserMap[cleanEmail]) {
     const userDef = defaultUserMap[cleanEmail];
     if (!password || userDef.validPass.includes(password)) {
+      localStorage.setItem('bluman_tenant_id', userDef.tenantId);
       return {
         token: `jwt_${cleanEmail}_${Date.now()}`,
-        user: { id: `usr-${cleanEmail}`, nome: userDef.nome, email: cleanEmail, ruolo: userDef.ruolo },
+        user: { id: `usr-${cleanEmail}`, nome: userDef.nome, email: cleanEmail, ruolo: userDef.ruolo, tenantId: userDef.tenantId },
       };
     }
   }
 
-  // 3. Fallback collaboratori creati/invitati di recente dallo studio
+  // 3. Fallback Gestori Tenant registrati dal Super Admin
+  try {
+    const allTenantsStr = localStorage.getItem('bluman_all_tenants_admin');
+    if (allTenantsStr) {
+      const allTenants = JSON.parse(allTenantsStr);
+      if (Array.isArray(allTenants)) {
+        const foundTenant = allTenants.find(t => (t.leadAdvisorEmail || '').toLowerCase().trim() === cleanEmail);
+        if (foundTenant) {
+          if (foundTenant.stato === 'sospeso') {
+            throw new Error(`Accesso negato: Lo Studio "${foundTenant.ragioneSociale}" è stato SOSPESO dal Super Admin.`);
+          }
+          if (!password || password === 'password123' || password === 'Studio2026!' || password === foundTenant.leadAdvisorPassword) {
+            localStorage.setItem('bluman_tenant_id', foundTenant.id);
+            return {
+              token: `jwt_tenant_lead_${Date.now()}`,
+              user: {
+                id: `usr-lead-${foundTenant.id}`,
+                nome: foundTenant.leadAdvisorNome || 'Lead Senior Advisor',
+                email: cleanEmail,
+                ruolo: 'advisor',
+                tenantId: foundTenant.id,
+                specializzazione: `Lead Partner — ${foundTenant.ragioneSociale}`,
+              }
+            };
+          }
+        }
+      }
+    }
+  } catch (err: any) {
+    if (err.message && err.message.includes('SOSPESO')) throw err;
+  }
+
+  // 4. Fallback collaboratori creati/invitati di recente dallo studio
   try {
     const customStr = localStorage.getItem('bluman_custom_team_users');
     if (customStr) {
@@ -79,6 +114,8 @@ export async function loginApi(email: string, password?: string) {
         const found = customList.find(u => (u.email || '').toLowerCase() === cleanEmail);
         if (found) {
           if (!password || password === 'password123' || password === found.password) {
+            const userTenantId = found.tenantId || localStorage.getItem('bluman_tenant_id') || '00000000-0000-0000-0000-000000000001';
+            localStorage.setItem('bluman_tenant_id', userTenantId);
             return {
               token: `jwt_custom_${Date.now()}`,
               user: {
@@ -86,6 +123,7 @@ export async function loginApi(email: string, password?: string) {
                 nome: found.nome || cleanEmail,
                 email: cleanEmail,
                 ruolo: found.ruolo || 'collaboratore_interno',
+                tenantId: userTenantId,
                 specializzazione: found.specializzazione || 'Collaboratore di Studio',
               },
             };

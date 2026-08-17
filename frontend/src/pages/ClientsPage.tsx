@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { fetchClienti, creaClienteApi, aggiornaClienteApi } from '../api/client';
-import { PROJECTS } from '../store/mockData';
+import { getCurrentTenantId, getTenantStorageKey, getTenantSeedData, BLUECODE_TENANT_ID } from '../utils/tenant';
 import type { Cliente } from '../types';
 import styles from './ClientsPage.module.css';
 
@@ -36,20 +36,24 @@ export function ClientsPage() {
 
   const loadClienti = async () => {
     setLoading(true);
+    const currentTenantId = getCurrentTenantId();
     let apiList: Cliente[] = [];
     try {
       const res = await fetchClienti();
-      if (res && Array.isArray(res)) apiList = res;
+      if (res && Array.isArray(res)) {
+        apiList = res.filter((c: any) => !c.tenantId || c.tenantId === currentTenantId);
+      }
     } catch (err) {
       console.warn('Errore fetch clienti DB:', err);
     }
 
-    // Estrai clienti dai progetti
-    const localProjStr = localStorage.getItem('bluman_custom_projects');
+    // Estrai clienti dai progetti del tenant
+    const projStorageKey = getTenantStorageKey('bluman_custom_projects', currentTenantId);
+    const localProjStr = localStorage.getItem(projStorageKey);
     const localProjs: any[] = localProjStr ? JSON.parse(localProjStr) : [];
     const extractedClients: Cliente[] = [];
 
-    [...PROJECTS, ...localProjs].forEach((p: any) => {
+    localProjs.forEach((p: any) => {
       if (p.cl) {
         extractedClients.push({
           id: `cl-proj-${p.id}`,
@@ -66,161 +70,11 @@ export function ClientsPage() {
       }
     });
 
-    // Includi clienti di default demo/studio
-    const defaultClients: Cliente[] = [
-      {
-        id: 'cl-01',
-        nome: 'Holding Beta S.r.l.',
-        tipo: 'company',
-        piva: 'IT09876543210',
-        codiceFiscale: 'BLUCD90A01H501X',
-        sedeLegale: 'Via Montenapoleone 8, Milano',
-        codiceSdi: 'SUBM70N',
-        email: 'client@holdingbeta.advisory',
-        telefono: '+39 02 889900',
-        cellulare: '+39 333 5936278',
-        telegram: '@RobertoRossiBeta',
-        signal: '+39 333 5936278',
-        referenteNome: 'Ing. Roberto Rossi (CEO)',
-        isAttivo: true,
-        referentiJson: {
-          email: 'client@holdingbeta.advisory',
-          telefono: '+39 02 889900',
-          cellulare: '+39 333 5936278',
-          whatsapp: '+39 333 5936278',
-          telegram: '@RobertoRossiBeta',
-          signal: '+39 333 5936278',
-          referenteNome: 'Ing. Roberto Rossi (CEO)',
-        },
-      },
-      {
-        id: 'cl-02',
-        nome: 'Roberto Rossi',
-        tipo: 'individual',
-        piva: 'IT01234567890',
-        codiceFiscale: 'RSSRBT80A01H501U',
-        sedeLegale: 'Corso Vittorio Emanuele II 15, Torino',
-        codiceSdi: '0000000',
-        email: 'roberto.rossi@email.it',
-        telefono: '+39 333 5936278',
-        cellulare: '+39 333 5936278',
-        telegram: '@RobertoRossi',
-        signal: '+39 333 5936278',
-        referenteNome: 'Roberto Rossi',
-        isAttivo: true,
-        referentiJson: {
-          email: 'roberto.rossi@email.it',
-          telefono: '+39 333 5936278',
-          cellulare: '+39 333 5936278',
-          whatsapp: '+39 333 5936278',
-          telegram: '@RobertoRossi',
-          signal: '+39 333 5936278',
-          referenteNome: 'Roberto Rossi',
-        },
-      },
-      {
-        id: 'cl-03',
-        nome: 'Alpha Capital Ltd',
-        tipo: 'company',
-        piva: 'MT29481039',
-        codiceFiscale: 'ALPHA90A01H501Z',
-        sedeLegale: 'Tower Road, Sliema, Malta',
-        codiceSdi: 'XXXXXXX',
-        email: 'info@alphacapital.mt',
-        telefono: '+356 2133 4455',
-        cellulare: '+356 7911 2233',
-        telegram: '@AlphaCapitalAdmin',
-        signal: '+356 7911 2233',
-        referenteNome: 'Alexander Borg (Director)',
-        isAttivo: true,
-        referentiJson: {
-          email: 'info@alphacapital.mt',
-          telefono: '+356 2133 4455',
-          cellulare: '+356 7911 2233',
-          whatsapp: '+356 7911 2233',
-          telegram: '@AlphaCapitalAdmin',
-          signal: '+356 7911 2233',
-          referenteNome: 'Alexander Borg (Director)',
-        },
-      },
-      {
-        id: 'cl-04',
-        nome: 'Marco Ricci',
-        tipo: 'individual',
-        piva: 'IT98765432101',
-        codiceFiscale: 'RCCMRC75A01H501Y',
-        sedeLegale: 'Via della Spiga 12, Milano',
-        codiceSdi: 'M5UXCR1',
-        email: 'm.ricci@ricciholding.it',
-        telefono: '+39 348 998877',
-        cellulare: '+39 348 998877',
-        telegram: '@MarcoRicci',
-        signal: '+39 348 998877',
-        referenteNome: 'Marco Ricci',
-        isAttivo: true,
-        referentiJson: {
-          email: 'm.ricci@ricciholding.it',
-          telefono: '+39 348 998877',
-          cellulare: '+39 348 998877',
-          whatsapp: '+39 348 998877',
-          telegram: '@MarcoRicci',
-          signal: '+39 348 998877',
-          referenteNome: 'Marco Ricci',
-        },
-      },
-      {
-        id: 'cl-05',
-        nome: 'Belfort Industries S.A.',
-        tipo: 'company',
-        piva: 'LU34918204',
-        codiceFiscale: 'BLFRT88A01H501W',
-        sedeLegale: 'Boulevard Royal 24, Lussemburgo',
-        codiceSdi: 'XXXXXXX',
-        email: 'legal@belfort.lu',
-        telefono: '+352 26 12 34',
-        cellulare: '+352 691 123 456',
-        telegram: '@BelfortLegal',
-        signal: '+352 691 123 456',
-        referenteNome: 'Jean Dupont (General Counsel)',
-        isAttivo: true,
-        referentiJson: {
-          email: 'legal@belfort.lu',
-          telefono: '+352 26 12 34',
-          cellulare: '+352 691 123 456',
-          whatsapp: '+352 691 123 456',
-          telegram: '@BelfortLegal',
-          signal: '+352 691 123 456',
-          referenteNome: 'Jean Dupont (General Counsel)',
-        },
-      },
-      {
-        id: 'cl-06',
-        nome: 'Andrea & Sofia Conti',
-        tipo: 'individual',
-        piva: 'IT45678901234',
-        codiceFiscale: 'CNTNDR82A01H501K',
-        sedeLegale: 'Piazza Cavour 3, Roma',
-        codiceSdi: '0000000',
-        email: 'a.conti@conti-family.it',
-        telefono: '+39 339 554433',
-        cellulare: '+39 339 554433',
-        telegram: '@FamigliaConti',
-        signal: '+39 339 554433',
-        referenteNome: 'Andrea Conti',
-        isAttivo: true,
-        referentiJson: {
-          email: 'a.conti@conti-family.it',
-          telefono: '+39 339 554433',
-          cellulare: '+39 339 554433',
-          whatsapp: '+39 339 554433',
-          telegram: '@FamigliaConti',
-          signal: '+39 339 554433',
-          referenteNome: 'Andrea Conti',
-        },
-      },
-    ];
+    // Includi clienti demo SOLO se è il tenant demo Bluecode Ltd
+    const defaultClients: Cliente[] = currentTenantId === BLUECODE_TENANT_ID ? getTenantSeedData(currentTenantId).clients : [];
 
-    const localClientsStr = localStorage.getItem('bluman_custom_clients');
+    const clientStorageKey = getTenantStorageKey('bluman_custom_clients', currentTenantId);
+    const localClientsStr = localStorage.getItem(clientStorageKey);
     const localClients: Cliente[] = localClientsStr ? JSON.parse(localClientsStr) : [];
 
     const mergedMap = new Map();
@@ -272,9 +126,11 @@ export function ClientsPage() {
       console.error('API create fallback:', err);
     }
 
-    const savedStr = localStorage.getItem('bluman_custom_clients');
+    const currentTenantId = getCurrentTenantId();
+    const clientStorageKey = getTenantStorageKey('bluman_custom_clients', currentTenantId);
+    const savedStr = localStorage.getItem(clientStorageKey);
     const savedArr: any[] = savedStr ? JSON.parse(savedStr) : [];
-    localStorage.setItem('bluman_custom_clients', JSON.stringify([newClientObj, ...savedArr]));
+    localStorage.setItem(clientStorageKey, JSON.stringify([newClientObj, ...savedArr]));
 
     setNome('');
     setModalOpen(false);
@@ -563,14 +419,16 @@ function AnagraficaErpModal({ client, onClose, onSaved }: { client: Cliente; onC
     // 1. Aggiorna oggetto in memoria corrente
     Object.assign(client, clientPayload);
 
-    // 2. Persisti in localStorage bluman_custom_clients
-    const savedStr = localStorage.getItem('bluman_custom_clients');
+    // 2. Persisti in localStorage bluman_custom_clients isolato per tenant
+    const currentTenantId = getCurrentTenantId();
+    const clientStorageKey = getTenantStorageKey('bluman_custom_clients', currentTenantId);
+    const savedStr = localStorage.getItem(clientStorageKey);
     const savedArr: any[] = savedStr ? JSON.parse(savedStr) : [];
     const updatedArr = [
       clientPayload,
       ...savedArr.filter((c: any) => c.id !== client.id && c.nome?.toLowerCase() !== client.nome?.toLowerCase()),
     ];
-    localStorage.setItem('bluman_custom_clients', JSON.stringify(updatedArr));
+    localStorage.setItem(clientStorageKey, JSON.stringify(updatedArr));
 
     // 3. Persisti in PostgreSQL tramite API Fastify
     try {
@@ -581,7 +439,7 @@ function AnagraficaErpModal({ client, onClose, onSaved }: { client: Cliente; onC
         if (nuovo && nuovo.id) {
           client.id = nuovo.id;
           clientPayload.id = nuovo.id;
-          localStorage.setItem('bluman_custom_clients', JSON.stringify([
+          localStorage.setItem(clientStorageKey, JSON.stringify([
             clientPayload,
             ...savedArr.filter((c: any) => c.nome?.toLowerCase() !== client.nome?.toLowerCase()),
           ]));

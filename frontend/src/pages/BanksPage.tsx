@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { fetchContiBancariApi, creaContoBancarioApi } from '../api/client';
+import { getCurrentTenantId, getTenantStorageKey, getStudioInfoForTenant, BLUECODE_TENANT_ID } from '../utils/tenant';
 import { fmt } from '../utils';
 
 export function BanksPage() {
@@ -18,8 +19,33 @@ export function BanksPage() {
 
   const loadConti = async () => {
     setLoading(true);
+    const currentTenantId = getCurrentTenantId();
     const data = await fetchContiBancariApi();
-    setConti(data || []);
+    const apiConti = (data || []).filter((c: any) => !c.tenantId || c.tenantId === currentTenantId);
+
+    const bankStorageKey = getTenantStorageKey('bluman_custom_banks', currentTenantId);
+    const saved = JSON.parse(localStorage.getItem(bankStorageKey) || '[]');
+
+    let finalConti = [...apiConti, ...saved];
+
+    if (finalConti.length === 0) {
+      if (currentTenantId === BLUECODE_TENANT_ID) {
+        finalConti = [
+          {
+            id: 'bank-01',
+            tenantId: BLUECODE_TENANT_ID,
+            nomeConto: 'Conto Operativo Malta (EUR)',
+            banca: 'Bank of Valletta plc',
+            iban: 'MT89VALL22013000000012345678',
+            bicSwift: 'VALLMTM1',
+            saldoAttuale: 18540000,
+            isDefault: true,
+          }
+        ];
+      }
+    }
+
+    setConti(finalConti);
     setLoading(false);
   };
 
@@ -33,28 +59,47 @@ export function BanksPage() {
     e.preventDefault();
     if (!nomeConto || !banca) return;
     setSubmitting(true);
+    const currentTenantId = getCurrentTenantId();
 
-    const res = await creaContoBancarioApi({
+    const saldoNum = parseFloat(saldoInizialeEur) || 0;
+    const saldoCentesimi = Math.round(saldoNum * 100);
+
+    const newConto = {
+      id: `bank-${Date.now()}`,
+      tenantId: currentTenantId,
       nomeConto,
       banca,
       iban,
       bicSwift,
-      saldoInizialeEur: parseFloat(saldoInizialeEur) || 0,
+      saldoAttuale: saldoCentesimi,
       isDefault,
-    });
+    };
+
+    const bankStorageKey = getTenantStorageKey('bluman_custom_banks', currentTenantId);
+    const saved = JSON.parse(localStorage.getItem(bankStorageKey) || '[]');
+    localStorage.setItem(bankStorageKey, JSON.stringify([newConto, ...saved]));
+
+    try {
+      await creaContoBancarioApi({
+        nomeConto,
+        banca,
+        iban,
+        bicSwift,
+        saldoInizialeEur: saldoNum,
+        isDefault,
+      });
+    } catch {}
 
     setSubmitting(false);
-    if (res) {
-      alert('✓ Conto Bancario / Cassa aggiunto con successo!');
-      setModalOpen(false);
-      setNomeConto('');
-      setBanca('');
-      setIban('');
-      setBicSwift('');
-      setSaldoInizialeEur('');
-      setIsDefault(false);
-      loadConti();
-    }
+    alert('✓ Conto Bancario / Cassa aggiunto con successo!');
+    setModalOpen(false);
+    setNomeConto('');
+    setBanca('');
+    setIban('');
+    setBicSwift('');
+    setSaldoInizialeEur('');
+    setIsDefault(false);
+    loadConti();
   };
 
   return (

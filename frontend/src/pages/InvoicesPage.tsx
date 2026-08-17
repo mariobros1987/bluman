@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { fetchTutteFattureStudioApi, fetchTenantInfoApi, downloadFatturaXmlApi, inviaFatturaEmailApi, trasmettiFatturaSdiApi } from '../api/client';
 import { fmt, getFormattedLogoUrl } from '../utils';
-import { PROJECTS } from '../store/mockData';
+import { getCurrentTenantId, getTenantStorageKey, getTenantSeedData, BLUECODE_TENANT_ID } from '../utils/tenant';
 import { downloadRealPdf } from '../utils/pdfGenerator';
 import styles from './Dashboard.module.css'; // Reusing KPI grid styles
 
@@ -14,18 +14,21 @@ export function InvoicesPage() {
 
   const loadData = async () => {
     setLoading(true);
+    const currentTenantId = getCurrentTenantId();
     const [invData, tenantRes] = await Promise.all([
       fetchTutteFattureStudioApi(),
       fetchTenantInfoApi(),
     ]);
     if (tenantRes) setTenantInfo(tenantRes);
-    const apiInvoices = invData || [];
+    const apiInvoices = (invData || []).filter((f: any) => !f.tenantId || f.tenantId === currentTenantId);
 
-    const savedStr = localStorage.getItem('bluman_custom_invoices');
+    const invStorageKey = getTenantStorageKey('bluman_custom_invoices', currentTenantId);
+    const savedStr = localStorage.getItem(invStorageKey);
     const localInvoices: any[] = savedStr ? JSON.parse(savedStr) : [];
 
-    // Estrai fatture emesse direttamente dai progetti dello studio
-    const localProjStr = localStorage.getItem('bluman_custom_projects');
+    // Estrai fatture emesse direttamente dai progetti del tenant
+    const projStorageKey = getTenantStorageKey('bluman_custom_projects', currentTenantId);
+    const localProjStr = localStorage.getItem(projStorageKey);
     const localProjs: any[] = localProjStr ? JSON.parse(localProjStr) : [];
     const projInvoices: any[] = [];
 
@@ -49,29 +52,11 @@ export function InvoicesPage() {
       });
     });
 
-    // Includi fatture dei progetti dallo store PROJECTS di default
-    PROJECTS.forEach((p) => {
-      (p.fatture || []).forEach((f: any) => {
-        projInvoices.push({
-          id: f.id || `ft-mock-${p.id}-${f.numero}`,
-          numero: f.numero || `FT-2026-0001`,
-          tipo_documento: 'fattura',
-          serie: 'FT',
-          importo: f.importo || 1500,
-          data: f.data || new Date().toLocaleDateString('it-IT'),
-          stato: f.stato || 'emessa',
-          progetto: {
-            id: p.id,
-            nome: p.n,
-            cliente: { nome: p.cl || 'Cliente Studio' },
-          },
-          righe: [{ descrizione: f.desc || `Prestazione professionale: ${p.n}`, importo: Math.round((f.importo || 1500) * 100) }],
-        });
-      });
-    });
+    // Includi fatture di seed solo se è il tenant demo Bluecode Ltd
+    const seedInvoices: any[] = currentTenantId === BLUECODE_TENANT_ID ? getTenantSeedData(currentTenantId).invoices : [];
 
     const mergedMap = new Map();
-    [...apiInvoices, ...localInvoices, ...projInvoices].forEach(item => {
+    [...apiInvoices, ...localInvoices, ...projInvoices, ...seedInvoices].forEach(item => {
       if (item && (item.id || item.numero)) {
         mergedMap.set(item.id || item.numero, item);
       }

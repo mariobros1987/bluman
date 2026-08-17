@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { PROJECTS } from '../store/mockData';
 import { CatBadge } from '../components/ui/CatBadge';
 import { Avatar } from '../components/ui/Avatar';
 import { triggerCronScadenzeApi, fetchProgetti, fetchClienti, fetchTutteFattureStudioApi } from '../api/client';
+import { getCurrentTenantId, getTenantStorageKey, getStudioInfoForTenant } from '../utils/tenant';
 
 interface EventoStudio {
   id: string;
@@ -25,28 +25,30 @@ export function CalendarPage() {
   const [selectedEvent, setSelectedEvent] = useState<EventoStudio | null>(null);
   const [newEventModalOpen, setNewEventModalOpen] = useState(false);
   const [cronRunning, setCronRunning] = useState(false);
+  const [events, setEvents] = useState<EventoStudio[]>([]);
 
-  // Dynamic Events State
-  const [events, setEvents] = useState<EventoStudio[]>(() => {
-    const saved = localStorage.getItem('bluman_calendar_events');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  // Carica i dati reali da Progetti, Clienti ERP e Fatture
+  // Carica i dati reali da Progetti, Clienti ERP e Fatture isolati per Tenant
   useEffect(() => {
     const loadRealEvents = async () => {
       try {
+        const currentTenantId = getCurrentTenantId();
+        const studioInfo = getStudioInfoForTenant(currentTenantId);
+
         const [prjs, cls, invs] = await Promise.all([
           fetchProgetti(),
           fetchClienti(),
           fetchTutteFattureStudioApi(),
         ]);
 
+        const filteredPrjs = (prjs || []).filter((p: any) => !p.tenantId || p.tenantId === currentTenantId);
+        const filteredCls = (cls || []).filter((c: any) => !c.tenantId || c.tenantId === currentTenantId);
+        const filteredInvs = (invs || []).filter((i: any) => !i.tenantId || i.tenantId === currentTenantId);
+
         const dynamicEvents: EventoStudio[] = [];
 
-        // 1. Eventi da Clienti (Rinnovo KYC / UBO Registry MFSA)
-        if (cls && Array.isArray(cls)) {
-          cls.forEach((c: any, idx: number) => {
+        // 1. Eventi da Clienti
+        if (filteredCls && Array.isArray(filteredCls)) {
+          filteredCls.forEach((c: any, idx: number) => {
             const dateStr = c.dataKyc ? new Date(c.dataKyc).toISOString().slice(0, 10) : `2026-08-${(12 + (idx % 15)).toString().padStart(2, '0')}`;
             dynamicEvents.push({
               id: `kyc-${c.id}`,
@@ -56,16 +58,16 @@ export function CalendarPage() {
               categoria: 'kyc',
               priorita: 'alta',
               clienteNome: c.nome,
-              operatoreNome: 'Joe Disabato',
+              operatoreNome: studioInfo.leadAdvisor || 'Lead Advisor',
               stato: 'pending',
               note: `Verifica annuale antiriciclaggio e registro titolari effettivi per ${c.nome}.`,
             });
           });
         }
 
-        // 2. Eventi da Progetti (Microvoci e consegne)
-        if (prjs && Array.isArray(prjs)) {
-          prjs.forEach((p: any, pIdx: number) => {
+        // 2. Eventi da Progetti
+        if (filteredPrjs && Array.isArray(filteredPrjs)) {
+          filteredPrjs.forEach((p: any, pIdx: number) => {
             dynamicEvents.push({
               id: `prj-${p.id}`,
               titolo: `Consegna Milestone: ${p.titolo || p.nome || 'Incarico'}`,
@@ -76,16 +78,16 @@ export function CalendarPage() {
               clienteNome: p.cliente?.nome || p.cl || 'Cliente Studio',
               progettoId: p.id,
               progettoNome: p.titolo || p.nome,
-              operatoreNome: 'Elena Rossi',
+              operatoreNome: studioInfo.leadAdvisor || 'Lead Advisor',
               stato: p.delay ? 'delayed' : 'pending',
               note: `Avanzamento del progetto ${p.titolo || p.nome} con coordinamento team.`,
             });
           });
         }
 
-        // 3. Eventi da Fatture (Scadenze Incassi)
-        if (invs && Array.isArray(invs)) {
-          invs.forEach((inv: any, iIdx: number) => {
+        // 3. Eventi da Fatture
+        if (filteredInvs && Array.isArray(filteredInvs)) {
+          filteredInvs.forEach((inv: any, iIdx: number) => {
             dynamicEvents.push({
               id: `inv-${inv.id}`,
               titolo: `Scadenza Rata Fattura ${inv.numeroProgressivoSerie || inv.numero || 'FT-2026'}`,
@@ -95,7 +97,7 @@ export function CalendarPage() {
               priorita: 'alta',
               clienteNome: inv.progetto?.cliente?.nome || 'Cliente Incarico',
               progettoNome: inv.progetto?.nome || 'Incarico',
-              operatoreNome: 'Joe Disabato',
+              operatoreNome: studioInfo.leadAdvisor || 'Lead Advisor',
               stato: inv.stato === 'incassata' ? 'done' : 'pending',
               note: `Importo da incassare: €${((inv.importoTotaleCentesimi || 350000) / 100).toFixed(2)} tramite bonifico bancario.`,
             });
@@ -103,12 +105,12 @@ export function CalendarPage() {
         }
 
         // Recupera eventuali eventi custom creati a mano dall'utente
-        const savedCustom = localStorage.getItem('bluman_custom_calendar_events');
+        const calStorageKey = getTenantStorageKey('bluman_custom_calendar_events', currentTenantId);
+        const savedCustom = localStorage.getItem(calStorageKey);
         const customEvents: EventoStudio[] = savedCustom ? JSON.parse(savedCustom) : [];
 
         const merged = [...customEvents, ...dynamicEvents];
         setEvents(merged);
-        localStorage.setItem('bluman_calendar_events', JSON.stringify(merged));
       } catch (err) {
         console.warn('Errore sync eventi calendario:', err);
       }

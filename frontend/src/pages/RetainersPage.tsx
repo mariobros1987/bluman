@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchContrattiRicorrentiApi, creaContrattoRicorrenteApi, fetchClienti, generaFatturaRetainerApi } from '../api/client';
-import { PROJECTS } from '../store/mockData';
+import { getCurrentTenantId, getTenantStorageKey } from '../utils/tenant';
 import { fmt } from '../utils';
 
 export function RetainersPage() {
@@ -23,13 +23,15 @@ export function RetainersPage() {
 
   const loadData = async () => {
     setLoading(true);
+    const currentTenantId = getCurrentTenantId();
     const [cData, clData] = await Promise.all([
       fetchContrattiRicorrentiApi(),
       fetchClienti(),
     ]);
 
-    const apiContratti = cData || [];
-    const savedStr = localStorage.getItem('bluman_retainer_contracts');
+    const apiContratti = (cData || []).filter((c: any) => !c.tenantId || c.tenantId === currentTenantId);
+    const retStorageKey = getTenantStorageKey('bluman_retainer_contracts', currentTenantId);
+    const savedStr = localStorage.getItem(retStorageKey);
     const localContratti: any[] = savedStr ? JSON.parse(savedStr) : [];
 
     // Evita duplicati per ID
@@ -39,7 +41,8 @@ export function RetainersPage() {
     });
 
     setContratti(Array.from(mergedMap.values()));
-    setClienti(clData || []);
+    const filteredClients = (clData || []).filter((c: any) => !c.tenantId || c.tenantId === currentTenantId);
+    setClienti(filteredClients);
     setLoading(false);
   };
 
@@ -51,6 +54,7 @@ export function RetainersPage() {
     e.preventDefault();
     if (!clienteId || !titolo || !importoEuro || !prossimaFatturazione) return;
     setSaving(true);
+    const currentTenantId = getCurrentTenantId();
     const importoCentesimi = Math.round(parseFloat(importoEuro) * 100);
 
     const res = await creaContrattoRicorrenteApi({
@@ -66,6 +70,7 @@ export function RetainersPage() {
     // Garanzia salvataggio anche in ambiente offline / fallback
     const newContractObj = res || {
       id: `cnt-${Date.now()}`,
+      tenantId: currentTenantId,
       clienteId,
       progettoId,
       titolo,
@@ -74,12 +79,12 @@ export function RetainersPage() {
       prossimaFatturazione,
       stato: 'attivo',
       cliente: clienti.find(c => c.id === clienteId) || { nome: 'Cliente Studio' },
-      progetto: PROJECTS.find(p => String(p.id) === String(progettoId)),
     };
 
-    const savedStr = localStorage.getItem('bluman_retainer_contracts');
+    const retStorageKey = getTenantStorageKey('bluman_retainer_contracts', currentTenantId);
+    const savedStr = localStorage.getItem(retStorageKey);
     const savedArr: any[] = savedStr ? JSON.parse(savedStr) : [];
-    localStorage.setItem('bluman_retainer_contracts', JSON.stringify([newContractObj, ...savedArr]));
+    localStorage.setItem(retStorageKey, JSON.stringify([newContractObj, ...savedArr]));
 
     setSaving(false);
     alert('✓ Contratto Ricorrente attivato con successo!');
