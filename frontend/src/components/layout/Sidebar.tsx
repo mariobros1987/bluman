@@ -1,21 +1,22 @@
 import { NavLink } from 'react-router-dom';
 import { getFormattedLogoUrl } from '../../utils';
+import { getUserPermission } from '../../utils/rbac';
 import styles from './Sidebar.module.css';
 
 const NAV = [
-  { path: '/',           label: 'Dashboard',             icon: '📊' },
-  { path: '/projects',   label: 'Progetti',               icon: '📁' },
-  { path: '/clients',    label: 'Clienti',                icon: '👥' },
-  { path: '/calendar',   label: 'Calendario',             icon: '📅' },
-  { path: '/invoices',   label: 'Fatture & SDI',          icon: '💶' },
-  { path: '/scadenzario',label: 'Scadenzario Incassi',    icon: '📅' },
-  { path: '/primanota',  label: 'Registro Prima Nota',    icon: '💰' },
-  { path: '/banks',      label: 'Banche & Conti',         icon: '🏦' },
-  { path: '/retainers',  label: 'Contratti Retainer',    icon: '🔄' },
-  { path: '/documents',  label: 'Document Studio (Word)', icon: '📝' },
-  { path: '/audit',      label: 'Log Audit Studio',       icon: '📋' },
-  { path: '/library',    label: 'Libreria moduli',        icon: '📚' },
-  { path: '/settings',   label: 'Impostazioni',           icon: '⚙️' },
+  { path: '/',           moduleKey: 'dashboard',   label: 'Dashboard',             icon: '📊' },
+  { path: '/projects',   moduleKey: 'projects',    label: 'Progetti',               icon: '📁' },
+  { path: '/clients',    moduleKey: 'clients',     label: 'Clienti',                icon: '👥' },
+  { path: '/calendar',   moduleKey: 'calendar',    label: 'Calendario',             icon: '📅' },
+  { path: '/invoices',   moduleKey: 'invoices',    label: 'Fatture & SDI',          icon: '💶' },
+  { path: '/scadenzario',moduleKey: 'scadenzario', label: 'Scadenzario Incassi',    icon: '📅' },
+  { path: '/primanota',  moduleKey: 'primanota',   label: 'Registro Prima Nota',    icon: '💰' },
+  { path: '/banks',      moduleKey: 'banks',       label: 'Banche & Conti',         icon: '🏦' },
+  { path: '/retainers',  moduleKey: 'retainers',   label: 'Contratti Retainer',    icon: '🔄' },
+  { path: '/documents',  moduleKey: 'documents',   label: 'Document Studio (Word)', icon: '📝' },
+  { path: '/audit',      moduleKey: 'audit',       label: 'Log Audit Studio',       icon: '📋' },
+  { path: '/library',    moduleKey: 'library',     label: 'Libreria moduli',        icon: '📚' },
+  { path: '/settings',   moduleKey: 'settings',    label: 'Impostazioni',           icon: '⚙️' },
 ];
 
 interface SidebarProps {
@@ -29,9 +30,17 @@ export function Sidebar({ alertCount = 0, user, onLogout }: SidebarProps) {
   const initials = userName.substring(0, 2).toUpperCase();
 
   const isSuperAdmin = user?.ruolo === 'super_admin';
-  const navItems = isSuperAdmin
-    ? [...NAV, { path: '/admin/tenants', label: 'Multi-Tenant Admin', icon: '👑' }]
+  const baseItems = isSuperAdmin
+    ? [...NAV, { path: '/admin/tenants', moduleKey: 'admin', label: 'Multi-Tenant Admin', icon: '👑' }]
     : NAV;
+
+  // Filtra i moduli bloccati per l'utente loggato in base alla Matrice Permessi RBAC
+  const navItems = baseItems.filter(item => {
+    if (item.path === '/') return true;
+    if (item.path === '/admin/tenants') return isSuperAdmin;
+    const perm = getUserPermission(user, item.moduleKey);
+    return perm !== 'denied';
+  });
 
   return (
     <aside className={styles.sidebar}>

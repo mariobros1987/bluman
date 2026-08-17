@@ -1241,14 +1241,40 @@ function OperatorDetailModal({
 
   useEffect(() => {
     async function loadPermessi() {
-      if (operator && operator.id) {
-        const list = await fetchPermessiUtenteApi(operator.id);
-        if (Array.isArray(list) && list.length > 0) {
-          const map: Record<string, 'denied' | 'read' | 'write'> = { ...permessiMap };
-          list.forEach((p: any) => {
-            map[p.moduloChiave] = p.livello;
-          });
-          setPermessiMap(map);
+      if (operator) {
+        const userKey = operator.id || operator.email;
+        const emailKey = operator.email ? operator.email.toLowerCase() : '';
+
+        // 1. Carica prima da localStorage per persistenza istantanea
+        let savedPermsStr = localStorage.getItem(`bluman_rbac_permissions_${userKey}`);
+        if (!savedPermsStr && emailKey) {
+          savedPermsStr = localStorage.getItem(`bluman_rbac_permissions_${emailKey}`);
+        }
+
+        if (savedPermsStr) {
+          try {
+            const list = JSON.parse(savedPermsStr);
+            if (Array.isArray(list) && list.length > 0) {
+              const map: Record<string, 'denied' | 'read' | 'write'> = { ...permessiMap };
+              list.forEach((p: any) => {
+                map[p.moduloChiave] = p.livello;
+              });
+              setPermessiMap(map);
+              return;
+            }
+          } catch {}
+        }
+
+        // 2. Carica da API Backend
+        if (operator.id) {
+          const list = await fetchPermessiUtenteApi(operator.id);
+          if (Array.isArray(list) && list.length > 0) {
+            const map: Record<string, 'denied' | 'read' | 'write'> = { ...permessiMap };
+            list.forEach((p: any) => {
+              map[p.moduloChiave] = p.livello;
+            });
+            setPermessiMap(map);
+          }
         }
       }
     }
@@ -1261,22 +1287,35 @@ function OperatorDetailModal({
       moduloChiave,
       livello,
     }));
-    await salvaPermessiUtenteApi(operator.id, payload);
+
+    const userKey = operator.id || operator.email;
+    localStorage.setItem(`bluman_rbac_permissions_${userKey}`, JSON.stringify(payload));
+    if (operator.email) {
+      localStorage.setItem(`bluman_rbac_permissions_${operator.email.toLowerCase()}`, JSON.stringify(payload));
+    }
+
+    if (operator.id) {
+      await salvaPermessiUtenteApi(operator.id, payload);
+    }
     setSavingPermessi(false);
-    alert(`✓ Matrice Permessi RBAC aggiornata con successo per ${operator.nome || operator.name}!`);
+    alert(`✓ Matrice Permessi RBAC salvata ed ATTIVA per ${operator.nome || operator.name}! I moduli bloccati (Denied) sono ora inaccessibili.`);
   };
 
   const nameInitial = (operator.nome || operator.name || 'U').substring(0, 2).toUpperCase();
 
   const MODULES_LIST = [
-    { key: 'projects', label: '📁 Progetti & Incarichi Studio', desc: 'Consultazione ed operatività sui progetti' },
-    { key: 'clients', label: '👥 Anagrafica Clienti ERP', desc: 'Accesso all\'anagrafica clienti, KYC e Magic Link' },
+    { key: 'projects', label: '📁 Progetti & Incarichi Studio', desc: 'Consultazione ed operatività sui progetti e fascicoli' },
+    { key: 'clients', label: '👥 Anagrafica Clienti ERP & KYC', desc: 'Accesso all\'anagrafica clienti, KYC e Magic Link' },
     { key: 'invoices', label: '📄 Registro Fiscale Fatture & SDI', desc: 'Emissione fatture, Note di Credito ed Export XML' },
     { key: 'scadenzario', label: '📅 Scadenzario Incassi & Partite Aperte', desc: 'Gestione rate scadenze e solleciti clienti' },
     { key: 'primanota', label: '🏛 Registro Prima Nota & Mastrino', desc: 'Movimentazioni cassa, banca e TRN' },
     { key: 'banks', label: '🏦 Banche & Liquidità Studio', desc: 'Conti correnti studio, IBAN e saldi di cassa' },
     { key: 'retainers', label: '🔄 Contratti Ricorrenti & Retainer', desc: 'Pianificazione canoni continui e contratti' },
+    { key: 'documents', label: '📝 Document Studio & Contratti Word', desc: 'Editor contratti WYSIWYG ed export PDF' },
+    { key: 'library', label: '📚 Libreria Moduli & Distinta Base', desc: 'Catalogo articoli, template e moduli studio' },
+    { key: 'calendar', label: '🗓 Calendario Studio & Scadenziario', desc: 'Calendario condiviso e gestione scadenze' },
     { key: 'audit', label: '🔍 Log Audit & Attività Operatori', desc: 'Tracciamento completo azioni operatori' },
+    { key: 'settings', label: '⚙️ Impostazioni Studio & Canali', desc: 'Anagrafica studio, SMTP, IMAP e configurazioni' },
   ];
 
   return (
