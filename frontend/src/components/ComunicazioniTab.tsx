@@ -351,7 +351,12 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
             </button>
           ))}
           <button
-            onClick={() => loadComunicazioni()}
+            onClick={async () => {
+              setLoadingMsgs(true);
+              await loadComunicazioni();
+              setFeedback({ tipo: 'ok', testo: '✓ Sincronizzazione completata con successo: chat e fascicolo aggiornati in tempo reale!' });
+              setTimeout(() => setFeedback(null), 3500);
+            }}
             disabled={loadingMsgs}
             style={{
               background: 'var(--card2)',
@@ -364,7 +369,7 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
               cursor: 'pointer',
             }}
           >
-            {loadingMsgs ? '⏳ Caricamento...' : '🔄 Sincronizza Live'}
+            {loadingMsgs ? '⏳ Sincronizzazione...' : '🔄 Sincronizza Live'}
           </button>
         </div>
       </div>
