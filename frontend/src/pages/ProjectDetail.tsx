@@ -490,7 +490,7 @@ export function ProjectDetail() {
     }
   };
 
-  const handleSavePassaggiModal = (modId: number, mvIdx: number, nextSteps: any[], nextNotes?: any[]) => {
+  const handleSavePassaggiModal = (modId: number, mvIdx: number, nextSteps: any[], nextNotes?: any[], updatedDocCount?: number) => {
     if (!project) return;
     const isAllDone = nextSteps.length > 0 && nextSteps.every(s => s.stato === 'done');
     const newMods = project.mods.map(m => {
@@ -501,6 +501,7 @@ export function ProjectDetail() {
               ...mv,
               proc: nextSteps,
               ...(nextNotes ? { note: nextNotes } : {}),
+              d: updatedDocCount !== undefined ? updatedDocCount : mv.d,
               s: isAllDone ? ('done' as const) : nextSteps.some(s => s.stato === 'done') ? ('active' as const) : mv.s,
             };
           }

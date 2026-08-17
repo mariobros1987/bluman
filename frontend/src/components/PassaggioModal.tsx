@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { downloadRealPdf } from '../utils/pdfGenerator';
-import { getTemplateForVoce, resolveDocumentTemplateHtml } from '../utils/documentTemplates';
+import { PREBUILT_TEMPLATES, resolveDocumentTemplateHtml, type DocumentTemplate } from '../utils/documentTemplates';
+import { REORGANIZATION_TEMPLATES } from '../utils/reorganizationTemplates';
 import { fmt } from '../utils';
 import type { Progetto, Passaggio } from '../types';
 
@@ -10,7 +11,7 @@ interface PassaggioModalProps {
   mid: number;
   vidx: number;
   onClose: () => void;
-  onSaveVoce?: (updatedSteps: Passaggio[], updatedNotes?: NoteEntry[]) => void;
+  onSaveVoce?: (updatedSteps: Passaggio[], updatedNotes?: NoteEntry[], updatedDocCount?: number) => void;
 }
 
 interface NoteEntry {
@@ -27,12 +28,139 @@ interface DocumentoEntry {
   richiedeFirma: boolean;
   firmato: boolean;
   dataCaricamento: string;
+  templateId?: string;
+}
+
+interface RecommendationResult {
+  template: DocumentTemplate | null;
+  confidence: 'high' | 'medium' | 'low';
+  reason: string;
+}
+
+// Tutte le 30 cartelle e modelli studio disponibili
+const ALL_STUDIO_TEMPLATES: DocumentTemplate[] = [
+  ...PREBUILT_TEMPLATES,
+  ...REORGANIZATION_TEMPLATES.filter(rt => !PREBUILT_TEMPLATES.some(pt => pt.id === rt.id)),
+];
+
+/**
+ * Motore di Pre-screening Intelligente Studio BluMan
+ * Analizza la microvoce, il modulo e la categoria e individua il modello più idoneo.
+ */
+export function getSmartDocumentRecommendation(voceTitle: string, category: string = '', moduleName: string = ''): RecommendationResult {
+  const v = voceTitle.toLowerCase();
+  const c = category.toLowerCase();
+  const m = moduleName.toLowerCase();
+
+  // 1. Intake, KYC, Antiriciclaggio, Raccolta Documenti
+  if (v.includes('kyc') || v.includes('intake') || v.includes('questionario') || v.includes('adeguata verifica') || v.includes('antiriciclaggio') || v.includes('raccolta doc')) {
+    const tmpl = ALL_STUDIO_TEMPLATES.find(t => t.id === 'tmpl-01-1-questionario-intake-cliente' || t.id === 'tmpl-ubo' || t.id === 'tmpl-antiriciclaggio') || ALL_STUDIO_TEMPLATES[0];
+    return {
+      template: tmpl,
+      confidence: 'high',
+      reason: 'Rilevata fase di onboarding/compliance: consigliato il Questionario Intake & Adeguata Verifica Antiriciclaggio.',
+    };
+  }
+
+  // 2. Trust, Fiduciaria, Protezione Patrimoniale
+  if (v.includes('trust') || v.includes('fiduciar') || v.includes('deed') || v.includes('wishes') || c.includes('trust') || m.includes('trust')) {
+    const tmpl = ALL_STUDIO_TEMPLATES.find(t => t.id === 'tmpl-trust-malta' || t.categoria === 'trust') || ALL_STUDIO_TEMPLATES[0];
+    return {
+      template: tmpl,
+      confidence: 'high',
+      reason: 'Rilevata operazione fiduciaria: consigliato il Deed of Trust con clausole di protezione e Letter of Wishes.',
+    };
+  }
+
+  // 3. Exit Tax, Fiscalità Internazionale, CFC, Residenza Fiscale
+  if (v.includes('exit tax') || v.includes('rateizzazione') || v.includes('plusvalenz') || v.includes('trasferimento residenza')) {
+    const tmpl = ALL_STUDIO_TEMPLATES.find(t => t.id === 'tmpl-01-3-memo-valutazione-exit-tax' || t.id === 'tmpl-06-1-memo-procedurale-exit-tax-rateizzazione') || ALL_STUDIO_TEMPLATES[0];
+    return {
+      template: tmpl,
+      confidence: 'high',
+      reason: 'Rilevato adempimento fiscale straordinario: consigliato il Memo Valutazione Exit Tax ex art. 166 TUIR.',
+    };
+  }
+  if (v.includes('analisi fiscale') || v.includes('cfc') || v.includes('esterovestizione') || v.includes('interpello') || c.includes('fiscale')) {
+    const tmpl = ALL_STUDIO_TEMPLATES.find(t => t.id === 'tmpl-01-2-memo-analisi-fiscale-preliminare') || ALL_STUDIO_TEMPLATES[0];
+    return {
+      template: tmpl,
+      confidence: 'high',
+      reason: 'Rilevata perizia tributaria: consigliato il Memo di Analisi Fiscale Preliminare & Sostanza Economica.',
+    };
+  }
+
+  // 4. Costituzione Società, Statuto, Holding, Atto Costitutivo
+  if (v.includes('statuto') || v.includes('costituz') || v.includes('atto') || v.includes('holding') || v.includes('ltd') || v.includes('societ') || c.includes('societario') || m.includes('structuring')) {
+    const tmpl = ALL_STUDIO_TEMPLATES.find(t => t.id === 'tmpl-statuto-holding' || t.id === 'tmpl-02-3-checklist-costituzione-societa-estera' || t.id === 'tmpl-02-1-memorandum-struttura') || ALL_STUDIO_TEMPLATES[0];
+    return {
+      template: tmpl,
+      confidence: 'high',
+      reason: 'Rilevata costituzione/corporate structuring: consigliato lo Statuto Standard Holding o Memorandum di Struttura.',
+    };
+  }
+
+  // 5. Cessione Quote, Patti Parasociali, M&A
+  if (v.includes('cessione') || v.includes('quote') || v.includes('partecipaz') || v.includes('compravendita')) {
+    const tmpl = ALL_STUDIO_TEMPLATES.find(t => t.titolo.toLowerCase().includes('cessione') || t.id.includes('cessione')) || ALL_STUDIO_TEMPLATES[0];
+    return {
+      template: tmpl,
+      confidence: 'high',
+      reason: 'Rilevato trasferimento partecipazioni: consigliato il Contratto di Cessione Quote con clausole di garanzia.',
+    };
+  }
+
+  // 6. Banche, Conti Correnti, KYC Bancario
+  if (v.includes('banc') || v.includes('conto') || v.includes('emi') || v.includes('iban') || c.includes('banking')) {
+    const tmpl = ALL_STUDIO_TEMPLATES.find(t => t.id === 'tmpl-03-1-matrice-comparativa-istituti-bancari' || t.id === 'tmpl-03-3-procedura-apertura-conto-societario') || ALL_STUDIO_TEMPLATES[0];
+    return {
+      template: tmpl,
+      confidence: 'high',
+      reason: 'Rilevato dossier bancario: consigliata la Procedura di Apertura Conto Societario & Matrice Banche.',
+    };
+  }
+
+  // 7. Marchi, Proprietà Intellettuale (IP), Licenze
+  if (v.includes('marchi') || v.includes('ip') || v.includes('brevett') || v.includes('euipo') || c.includes('ip')) {
+    const tmpl = ALL_STUDIO_TEMPLATES.find(t => t.id === 'tmpl-05-3-bozza-contratto-cessione-licenza-ip' || t.id === 'tmpl-05-2-procedura-deposito-marchio') || ALL_STUDIO_TEMPLATES[0];
+    return {
+      template: tmpl,
+      confidence: 'high',
+      reason: 'Rilevata tutela asset intangibili: consigliato il Contratto di Cessione e Licenza d\'Uso Marchio/IP.',
+    };
+  }
+
+  // 8. Engagement, Mandato, Accordo di Riservatezza NDA
+  if (v.includes('nda') || v.includes('riservatezza') || v.includes('segreto')) {
+    const tmpl = ALL_STUDIO_TEMPLATES.find(t => t.id === 'tmpl-nda') || ALL_STUDIO_TEMPLATES[0];
+    return {
+      template: tmpl,
+      confidence: 'high',
+      reason: 'Rilevato scambio preliminare informazioni: consigliato il Non-Disclosure Agreement (NDA) bilaterale.',
+    };
+  }
+  if (v.includes('incarico') || v.includes('mandato') || v.includes('lettera') || v.includes('preventivo')) {
+    const tmpl = ALL_STUDIO_TEMPLATES.find(t => t.id === 'tmpl-engagement') || ALL_STUDIO_TEMPLATES[0];
+    return {
+      template: tmpl,
+      confidence: 'high',
+      reason: 'Rilevato avvio formale incarico: consigliata la Lettera d\'Incarico Professionale (Engagement Letter).',
+    };
+  }
+
+  // Fallback a suggerimento medio
+  const fallbackTmpl = ALL_STUDIO_TEMPLATES.find(t => t.categoria === (c as any)) || ALL_STUDIO_TEMPLATES[0];
+  return {
+    template: fallbackTmpl,
+    confidence: 'medium',
+    reason: `Attività generale di categoria ${category || 'Advisory'}: puoi associare un modello correlato o lasciare l'attività senza documenti.`,
+  };
 }
 
 function getDefaultPassaggi(v: { s: string; d: number }): Passaggio[] {
   return [
     { id: 's1', title: 'Informazioni preliminari & Briefing', type: 'info', who: 'operatore', stato: v.s !== 'pending' ? 'done' : 'pending', desc: 'Briefing interno del team prima di avviare l\'attività.' },
-    { id: 's2', title: 'Documentazione richiesta al cliente', type: 'doc', who: 'cliente', stato: v.d > 0 ? 'done' : 'pending', desc: 'Il cliente carica i documenti o firma l\'accordo.', file: v.d > 0 ? 'Contratto_Firma_Cliente.pdf' : null },
+    { id: 's2', title: 'Verifica & Documentazione Incarico', type: 'doc', who: 'cliente', stato: 'pending', desc: 'Collega o carica un documento solo se richiesto dall\'attività.', file: undefined },
     { id: 's3', title: 'Dati aggiuntivi dal cliente', type: 'form', who: 'cliente', stato: 'pending', desc: 'Il cliente compila il form con i dati societari.', fields: ['Nome completo', 'Recapito preferito'] },
     { id: 's4', title: 'Conferma e validazione finale', type: 'check', who: 'operatore', stato: v.s === 'done' ? 'done' : 'pending', desc: 'Verifica finale del team prima di chiudere la voce.' },
   ];
@@ -63,31 +191,34 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce }: Pass
       try { return JSON.parse(saved); } catch {}
     }
     return [
-      { id: 'n1', autore: 'Joe Disabato (Advisor)', data: '14/08/2026 11:30', testo: 'Verifica preliminare requisiti e fascicolo incarico.' },
+      { id: 'n1', autore: 'Avv. Mario Dibenedetto', data: new Date().toLocaleDateString('it-IT'), testo: 'Attività avviata nel fascicolo digitale dello studio.' },
     ];
   });
   const [newNote, setNewNote] = useState('');
 
   const navigate = useNavigate();
-  const matchedTmpl = getTemplateForVoce(voce.n, mod.cat);
 
-  // Documenti da firmare (collegati 1-to-1 ai Modelli Word Ufficiali)
+  // Calcolo Pre-screening Intelligente
+  const recommendation = getSmartDocumentRecommendation(voce.n, mod.cat, mod.n);
+
+  // Documenti collegati alla microvoce (PARTE DA ARRAY VUOTO SE L'OPERATORE NON HA COLLEGATO NULLA!)
   const [documents, setDocuments] = useState<DocumentoEntry[]>(() => {
-    const defaultDocName = `${matchedTmpl.titolo} — ${project.cl}.docx`;
-    return [
-      {
-        id: `d-${matchedTmpl.id}`,
-        nome: defaultDocName,
-        dimensione: '54 KB',
-        richiedeFirma: true,
-        firmato: voce.s === 'done',
-        dataCaricamento: new Date().toLocaleDateString('it-IT'),
-      },
-    ];
+    const savedDocsKey = `bluman_docs_${project.id}_${mid}_${vidx}`;
+    const savedStr = localStorage.getItem(savedDocsKey);
+    if (savedStr) {
+      try {
+        const parsed = JSON.parse(savedStr);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch {}
+    }
+    return []; // NESSUN DOCUMENTO FORZATO DI DEFAULT!
   });
+
   const [docName, setDocName] = useState('');
   const [docRequiresSign, setDocRequiresSign] = useState(true);
   const [selectedDocPreview, setSelectedDocPreview] = useState<DocumentoEntry | null>(null);
+  const [showCatalogModal, setShowCatalogModal] = useState(false);
+  const [selectedCatalogCategory, setSelectedCatalogCategory] = useState<string>('ALL');
 
   // Form master preview state
   const [previewFormModalStep, setPreviewFormModalStep] = useState<Passaggio | null>(null);
@@ -102,12 +233,21 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce }: Pass
   const doneN = steps.filter(s => s.stato === 'done').length;
   const visible = view === 'operatore' ? steps : steps.filter(s => s.who === 'cliente');
 
+  const persistDocuments = (newDocs: DocumentoEntry[]) => {
+    setDocuments(newDocs);
+    localStorage.setItem(`bluman_docs_${project.id}_${mid}_${vidx}`, JSON.stringify(newDocs));
+    voce.d = newDocs.length;
+    if (onSaveVoce) {
+      onSaveVoce(steps, notes, newDocs.length);
+    }
+  };
+
   const toggleDone = (id: string) => {
     const nextSteps: Passaggio[] = steps.map(s => s.id === id ? { ...s, stato: (s.stato === 'done' ? 'pending' : 'done') as 'pending' | 'done' } : s);
     setSteps(nextSteps);
     voce.proc = nextSteps;
     if (onSaveVoce) {
-      onSaveVoce(nextSteps, notes);
+      onSaveVoce(nextSteps, notes, documents.length);
     }
   };
 
@@ -117,7 +257,7 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce }: Pass
     setSteps(nextSteps);
     voce.proc = nextSteps;
     if (onSaveVoce) {
-      onSaveVoce(nextSteps, notes);
+      onSaveVoce(nextSteps, notes, documents.length);
     }
   };
 
@@ -132,13 +272,13 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce }: Pass
       who: newStepWho,
       stato: 'pending',
       fields: newStepType === 'form' ? ['Dato Richiesto 1', 'Dato Richiesto 2'] : undefined,
-      file: newStepType === 'doc' ? `Documento_${project.cl.replace(/\s+/g, '_')}.pdf` : undefined,
+      file: undefined,
     };
     const nextSteps = [...steps, newStep];
     setSteps(nextSteps);
     voce.proc = nextSteps;
     if (onSaveVoce) {
-      onSaveVoce(nextSteps, notes);
+      onSaveVoce(nextSteps, notes, documents.length);
     }
     setShowAddStepModal(false);
     setNewStepTitle('');
@@ -150,7 +290,7 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce }: Pass
     if (!newNote.trim()) return;
     const entry: NoteEntry = {
       id: `n-${Date.now()}`,
-      autore: 'Joe Disabato (Advisor)',
+      autore: 'Avv. Mario Dibenedetto (Advisor)',
       data: new Date().toLocaleString('it-IT'),
       testo: newNote,
     };
@@ -159,25 +299,70 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce }: Pass
     localStorage.setItem(`bluman_notes_${project.id}_${mid}_${vidx}`, JSON.stringify(updatedNotes));
     voce.note = updatedNotes;
     if (onSaveVoce) {
-      onSaveVoce(steps, updatedNotes);
+      onSaveVoce(steps, updatedNotes, documents.length);
     }
     setNewNote('');
   };
 
-  const handleAddDocument = (e: React.FormEvent) => {
+  // Applica Modello dal Pre-screening o dal Catalogo
+  const handleApplyTemplate = (tmpl: DocumentTemplate) => {
+    const formattedName = `${tmpl.titolo} — ${project.cl}.docx`;
+    const newDoc: DocumentoEntry = {
+      id: `d-${tmpl.id}-${Date.now()}`,
+      nome: formattedName,
+      dimensione: '56 KB',
+      richiedeFirma: true,
+      firmato: false,
+      dataCaricamento: new Date().toLocaleDateString('it-IT'),
+      templateId: tmpl.id,
+    };
+    const updatedDocs = [...documents, newDoc];
+    persistDocuments(updatedDocs);
+
+    // Collega anche al primo passaggio di tipo 'doc' se vuoto
+    const updatedSteps = steps.map(s => {
+      if (s.type === 'doc' && !s.file) {
+        return { ...s, file: formattedName, documentoAllegatoUrl: tmpl.id };
+      }
+      return s;
+    });
+    setSteps(updatedSteps);
+    voce.proc = updatedSteps;
+    if (onSaveVoce) onSaveVoce(updatedSteps, notes, updatedDocs.length);
+
+    setShowCatalogModal(false);
+    alert(`✓ Modello "${tmpl.titolo}" collegato con successo alla voce "${voce.n}"!`);
+  };
+
+  // Caricamento manuale documento dal computer
+  const handleAddCustomDocument = (e: React.FormEvent) => {
     e.preventDefault();
     if (!docName.trim()) return;
     const docEntry: DocumentoEntry = {
       id: `d-${Date.now()}`,
-      nome: docName.endsWith('.pdf') ? docName : `${docName}.pdf`,
-      dimensione: '850 KB',
+      nome: docName.endsWith('.pdf') || docName.endsWith('.docx') ? docName : `${docName}.pdf`,
+      dimensione: '480 KB',
       richiedeFirma: docRequiresSign,
       firmato: false,
       dataCaricamento: new Date().toLocaleDateString('it-IT'),
     };
-    setDocuments([...documents, docEntry]);
+    const updatedDocs = [...documents, docEntry];
+    persistDocuments(updatedDocs);
     setDocName('');
   };
+
+  // Scollega documento da un singolo step
+  const handleUnlinkStepDoc = (stepId: string) => {
+    const updated = steps.map(item => item.id === stepId ? { ...item, file: undefined, documentoAllegatoUrl: undefined } : item);
+    setSteps(updated);
+    voce.proc = updated;
+    if (onSaveVoce) onSaveVoce(updated, notes, documents.length);
+  };
+
+  const filteredCatalog = ALL_STUDIO_TEMPLATES.filter(t => {
+    if (selectedCatalogCategory === 'ALL') return true;
+    return t.categoria === selectedCatalogCategory;
+  });
 
   return (
     <div style={overlayStyle} onClick={e => { if ((e.target as HTMLElement).id === 'proc-ov') onClose(); }} id="proc-ov">
@@ -186,9 +371,9 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce }: Pass
         <div style={headStyle}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
-              <div style={{ fontSize: 15, fontWeight: 600 }}>{voce.n}</div>
-              <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
-                {mod.n} · {project.n}
+              <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{voce.n}</div>
+              <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 3 }}>
+                📁 {mod.n} ({mod.cat}) · Pratica: <strong>{project.n}</strong> — Cliente: {project.cl}
               </div>
             </div>
             <button onClick={onClose} style={closeBtnStyle}>✕</button>
@@ -212,7 +397,7 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce }: Pass
               onClick={() => setActiveTab('documenti')}
               style={tabBtnStyle(activeTab === 'documenti')}
             >
-              📎 Documenti per Firma ({documents.length})
+              📎 Documenti Collegati ({documents.length})
             </button>
           </div>
         </div>
@@ -232,10 +417,10 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce }: Pass
                       border: `1px solid ${view === v ? 'var(--indigo)' : 'var(--border)'}`,
                       background: view === v ? '#1a1f3d' : 'var(--card)',
                       color: view === v ? 'var(--indigo-l)' : 'var(--muted)',
-                      fontSize: 11.5, fontWeight: 500, cursor: 'pointer',
+                      fontSize: 11.5, fontWeight: 600, cursor: 'pointer',
                     }}
                   >
-                    {v === 'operatore' ? '👤 Vista Operatore' : '🧑‍💼 Vista Cliente'}
+                    {v === 'operatore' ? '👤 Vista Operatore Studio' : '🧑‍💼 Vista Portale Cliente'}
                   </button>
                 ))}
               </div>
@@ -259,7 +444,7 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce }: Pass
               const isLast = i === visible.length - 1;
               const tc = TYPE_COLOR[s.type] || TYPE_COLOR.info;
               return (
-                <div key={s.id} style={{ display: 'flex', gap: 12, position: 'relative', paddingBottom: isLast ? 0 : 22 }}>
+                <div key={s.id} style={{ display: 'flex', gap: 12, position: 'relative', paddingBottom: isLast ? 0 : 20 }}>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
                     <div style={{
                       width: 26, height: 26, borderRadius: '50%',
@@ -277,7 +462,7 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce }: Pass
                   <div style={{ flex: 1, background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10, padding: '12px 14px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
                       <div>
-                        <div style={{ fontSize: 12.5, fontWeight: 600 }}>{s.title}</div>
+                        <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text)' }}>{s.title}</div>
                         <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 3 }}>{s.desc}</div>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
@@ -298,40 +483,18 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce }: Pass
                               title="Elimina passaggio"
                               style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 12, opacity: 0.7 }}
                             >
-                              🗑
+                              ✕
                             </button>
                           </div>
                         )}
                       </div>
                     </div>
 
-                    {/* Modulo di Selezione & Abbinamento Form Master */}
+                    {/* Step Type = Form */}
                     {s.type === 'form' && (
                       <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px dashed var(--border)', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--indigo-l)' }}>📋 Abbina Form Master:</span>
-                            <select
-                              value={s.formMasterId || 'f1'}
-                              onChange={e => {
-                                const val = e.target.value;
-                                let defaultFields = s.fields || [];
-                                if (val === 'f1') defaultFields = ['Ragione Sociale', 'P.IVA / VAT', 'Codice Fiscale', 'Sede Legale', 'Legale Rappresentante'];
-                                if (val === 'f2') defaultFields = ['Nome Titolare Effettivo', 'Quota % Possesso', 'Codice Fiscale UBO', 'Residenza Fiscale'];
-                                if (val === 'f3') defaultFields = ['Banca Accreditamento', 'IBAN Operativo', 'Origine dei Fondi', 'Volume d Affari Annuo'];
-
-                                const updated = steps.map(item => item.id === s.id ? { ...item, formMasterId: val, fields: defaultFields } : item);
-                                setSteps(updated);
-                                if (onSaveVoce) onSaveVoce(updated, notes);
-                              }}
-                              style={{ padding: '3px 8px', fontSize: 11, background: '#200f40', color: '#a78bfa', border: '1px solid #581c87', borderRadius: 6, fontWeight: 600, cursor: 'pointer' }}
-                            >
-                              <option value="f1">Form Dati Societari & Legale Rappresentante</option>
-                              <option value="f2">Form Titolarità Effettiva & UBO</option>
-                              <option value="f3">Form Dati Bancari & KYC Compliance</option>
-                            </select>
-                          </div>
-
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: 10.5, fontWeight: 700, color: '#a78bfa' }}>📋 Dati da raccogliere dal cliente:</span>
                           <button
                             type="button"
                             onClick={() => {
@@ -348,11 +511,9 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce }: Pass
                             }}
                             style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '4px 10px', borderRadius: 6, fontSize: 10, fontWeight: 700, cursor: 'pointer' }}
                           >
-                            👁 Visualizza / Compila Form
+                            👁 Compila / Visualizza Form
                           </button>
                         </div>
-
-                        {/* Badges dei campi di raccolta dati */}
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
                           {(s.fields || ['Ragione Sociale', 'P.IVA / VAT', 'Legale Rappresentante']).map((fld, idx) => (
                             <span key={idx} style={{ background: 'var(--card2)', border: '1px solid var(--border)', color: 'var(--text)', padding: '2px 7px', borderRadius: 6, fontSize: 9.5, fontWeight: 600 }}>
@@ -363,78 +524,100 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce }: Pass
                       </div>
                     )}
 
-                    {/* Visualizzatore & Gestore Documento Allegato per la Firma */}
+                    {/* Step Type = Doc (Mostra SOLO se c'è un documento, altrimenti propone il Pre-screening!) */}
                     {s.type === 'doc' && (
                       <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px dashed var(--border)', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 8, padding: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                            <div style={{ fontSize: 22 }}>📄</div>
-                            <div>
-                              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>
-                                {s.file || `Accordo_Riservatezza_${project.cl.replace(/\s+/g, '_')}.pdf`}
-                              </div>
-                              <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>
-                                1.4 MB · {s.stato === 'done' ? '✓ Firmato digitalmente dal cliente' : '✍️ Inviato per firma eIDAS'}
+                        {s.file ? (
+                          <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 8, padding: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                              <div style={{ fontSize: 20 }}>📄</div>
+                              <div>
+                                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>
+                                  {s.file}
+                                </div>
+                                <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 1 }}>
+                                  {s.stato === 'done' ? '✓ Firmato digitalmente dal cliente' : '✍️ Richiede Firma FEA / eIDAS'}
+                                </div>
                               </div>
                             </div>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                              <span style={{ fontSize: 9.5, fontWeight: 700, padding: '2px 7px', borderRadius: 10, background: s.stato === 'done' ? '#0d2d22' : '#2d1a05', color: s.stato === 'done' ? '#34d399' : '#f59e0b', border: `1px solid ${s.stato === 'done' ? '#1a5c3c' : '#78350f'}` }}>
+                                {s.stato === 'done' ? '🔒 FIRMATO' : '✍️ DA FIRMARE'}
+                              </span>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedDocPreview({
+                                    id: `doc-${s.id}`,
+                                    nome: s.file || 'Documento.pdf',
+                                    dimensione: '56 KB',
+                                    richiedeFirma: true,
+                                    firmato: s.stato === 'done',
+                                    dataCaricamento: new Date().toLocaleDateString('it-IT'),
+                                  });
+                                }}
+                                style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: 6, fontSize: 10, fontWeight: 700, cursor: 'pointer' }}
+                              >
+                                👁 Leggi PDF
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleUnlinkStepDoc(s.id)}
+                                title="Scollega documento da questo passaggio"
+                                style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--red)', padding: '4px 8px', borderRadius: 6, fontSize: 10, fontWeight: 600, cursor: 'pointer' }}
+                              >
+                                🗑 Scollega
+                              </button>
+                            </div>
                           </div>
-
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                            <span style={{ fontSize: 9.5, fontWeight: 700, padding: '3px 8px', borderRadius: 10, background: s.stato === 'done' ? '#0d2d22' : '#2d1a05', color: s.stato === 'done' ? '#34d399' : '#f59e0b', border: `1px solid ${s.stato === 'done' ? '#1a5c3c' : '#78350f'}` }}>
-                              {s.stato === 'done' ? '🔒 FIRMATO eIDAS' : '✍️ IN ATTESA DI FIRMA'}
-                            </span>
-
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setSelectedDocPreview({
-                                  id: `doc-${s.id}`,
-                                  nome: s.file || `Accordo_Riservatezza_${project.cl.replace(/\s+/g, '_')}.pdf`,
-                                  dimensione: '1.4 MB',
-                                  richiedeFirma: true,
-                                  firmato: s.stato === 'done',
-                                  dataCaricamento: '14/08/2026',
-                                });
-                              }}
-                              style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '5px 10px', borderRadius: 6, fontSize: 10, fontWeight: 700, cursor: 'pointer' }}
-                            >
-                              👁 Visualizza / Leggi PDF
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => alert(`✓ Sollecito e Magic Link di firma per "${s.file || 'Contratto.pdf'}" inviati al cliente ${project.cl}!`)}
-                              style={{ background: '#1a1f3d', border: '1px solid #2d3260', color: '#818cf8', padding: '5px 10px', borderRadius: 6, fontSize: 10, fontWeight: 600, cursor: 'pointer' }}
-                            >
-                              ✉️ Sollecita Firma
-                            </button>
+                        ) : (
+                          <div style={{ background: '#1e1b4b20', border: '1px dashed #6366f1', borderRadius: 8, padding: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                            <div>
+                              <div style={{ fontSize: 11, fontWeight: 700, color: '#818cf8' }}>
+                                📁 Nessun documento collegato a questo passaggio
+                              </div>
+                              <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>
+                                {recommendation.template ? `Modello consigliato: ${recommendation.template.titolo}` : 'Puoi associare un atto studio o lasciare l\'attività come procedura interna.'}
+                              </div>
+                            </div>
+                            <div style={{ display: 'flex', gap: 6 }}>
+                              {recommendation.template && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const formattedName = `${recommendation.template!.titolo} — ${project.cl}.docx`;
+                                    const updated = steps.map(item => item.id === s.id ? { ...item, file: formattedName, documentoAllegatoUrl: recommendation.template!.id } : item);
+                                    setSteps(updated);
+                                    voce.proc = updated;
+                                    const updatedDocs = [...documents, {
+                                      id: `d-${recommendation.template!.id}-${Date.now()}`,
+                                      nome: formattedName,
+                                      dimensione: '56 KB',
+                                      richiedeFirma: true,
+                                      firmato: false,
+                                      dataCaricamento: new Date().toLocaleDateString('it-IT'),
+                                      templateId: recommendation.template!.id,
+                                    }];
+                                    persistDocuments(updatedDocs);
+                                  }}
+                                  style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '4px 10px', borderRadius: 6, fontSize: 10, fontWeight: 700, cursor: 'pointer' }}
+                                >
+                                  ⚡ Collega Consigliato
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => setShowCatalogModal(true)}
+                                style={{ background: 'var(--card2)', border: '1px solid var(--border)', color: 'var(--text)', padding: '4px 10px', borderRadius: 6, fontSize: 10, fontWeight: 600, cursor: 'pointer' }}
+                              >
+                                📂 Scegli Modello
+                              </button>
+                            </div>
                           </div>
-                        </div>
-
-                        {/* Sezione per Cambiare Modello PDF Allegato */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <span style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 600 }}>📎 Cambia Modello PDF:</span>
-                          <select
-                            value={s.documentoAllegatoUrl || 'm1'}
-                            onChange={e => {
-                              const val = e.target.value;
-                              let newFileName = `Accordo_Riservatezza_NDA_${project.cl.replace(/\s+/g, '_')}.pdf`;
-                              if (val === 'm2') newFileName = `Procura_Legale_MFSA_${project.cl.replace(/\s+/g, '_')}.pdf`;
-                              if (val === 'm3') newFileName = `Dichiarazione_UBO_${project.cl.replace(/\s+/g, '_')}.pdf`;
-                              if (val === 'm4') newFileName = `Statuto_Standard_Holding_${project.cl.replace(/\s+/g, '_')}.pdf`;
-
-                              const updated = steps.map(item => item.id === s.id ? { ...item, documentoAllegatoUrl: val, file: newFileName } : item);
-                              setSteps(updated);
-                              if (onSaveVoce) onSaveVoce(updated, notes);
-                            }}
-                            style={{ padding: '2px 6px', fontSize: 10, background: 'var(--card2)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 6 }}
-                          >
-                            <option value="m1">Accordo NDA Tipo</option>
-                            <option value="m2">Procura Legale MFSA</option>
-                            <option value="m3">Dichiarazione UBO</option>
-                            <option value="m4">Statuto Standard Holding Malta</option>
-                          </select>
-                        </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -448,162 +631,255 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce }: Pass
         {activeTab === 'note' && (
           <div style={{ flex: 1, overflowY: 'auto', padding: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
             <form onSubmit={handleAddNote} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase' }}>Aggiungi Nota di Lavoro / Report *</label>
+              <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text)' }}>
+                Aggiungi Nota Operativa o Aggiornamento:
+              </label>
               <textarea
                 value={newNote}
                 onChange={e => setNewNote(e.target.value)}
-                placeholder="Scrivi cosa è stato fatto per questa attività (es. Verificato atto costitutivo e inviata bozza al notaio)..."
+                placeholder="Inserisci dettagli sull'avanzamento, note di riunione, riscontri dal cliente..."
                 rows={3}
-                required
-                style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', padding: 10, fontSize: 12, resize: 'vertical' }}
+                style={{ width: '100%', padding: '10px 12px', fontSize: 12, borderRadius: 8, background: 'var(--card)', color: 'var(--text)', border: '1px solid var(--border)' }}
               />
               <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                <button type="submit" style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>
+                <button type="submit" style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: 8, fontSize: 11.5, fontWeight: 600, cursor: 'pointer' }}>
                   + Registra Nota
                 </button>
               </div>
             </form>
 
             <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.5px' }}>
-              Storico Note & Attività ({notes.length})
+              Storico Note Operative ({notes.length})
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {notes.map(n => (
                 <div key={n.id} style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10, padding: 12 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 6 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 11 }}>
                     <strong style={{ color: 'var(--indigo-l)' }}>👤 {n.autore}</strong>
-                    <span style={{ color: 'var(--muted)' }}>📅 {n.data}</span>
+                    <span style={{ color: 'var(--muted)', fontSize: 10 }}>{n.data}</span>
                   </div>
-                  <div style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.5 }}>{n.testo}</div>
+                  <div style={{ fontSize: 11.5, color: 'var(--text)', lineHeight: 1.5 }}>
+                    {n.testo}
+                  </div>
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {/* Body TAB 3: Documenti da Firmare */}
+        {/* Body TAB 3: Documenti & Pre-screening AI */}
         {activeTab === 'documenti' && (
-          <div style={{ flex: 1, overflowY: 'auto', padding: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <form onSubmit={handleAddDocument} style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 10, padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <div style={{ fontSize: 12, fontWeight: 600 }}>Carica o Associa Documento / Contratto PDF Reale dal Computer</div>
-              
-              <div>
-                <label style={{ fontSize: 10, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Seleziona File dal Disco (.pdf, .doc, .docx) *</label>
-                <input
-                  type="file"
-                  accept=".pdf,.doc,.docx"
-                  onChange={e => {
-                    if (e.target.files && e.target.files[0]) {
-                      setDocName(e.target.files[0].name);
-                    }
-                  }}
-                  style={{ fontSize: 11, color: 'var(--text)' }}
-                />
-              </div>
-
-              <div>
-                <label style={{ fontSize: 10, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Nome o Descrizione Documento *</label>
-                <input
-                  value={docName}
-                  onChange={e => setDocName(e.target.value)}
-                  placeholder="es. Procura_Legale_Firma_Cliente.pdf"
-                  required
-                  style={{ fontSize: 12 }}
-                />
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <input
-                  type="checkbox"
-                  id="signChk"
-                  checked={docRequiresSign}
-                  onChange={e => setDocRequiresSign(e.target.checked)}
-                />
-                <label htmlFor="signChk" style={{ fontSize: 11.5, color: 'var(--text)', cursor: 'pointer' }}>
-                  <strong>Richiede Firma Digitale del Cliente (§22)</strong>
-                </label>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                <button type="submit" style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>
-                  + Carica & Collega Documento Reale
+          <div style={{ flex: 1, overflowY: 'auto', padding: 20, display: 'flex', flexDirection: 'column', gap: 18 }}>
+            {/* Box Pre-screening & Suggerimento Modello Intelligente */}
+            <div style={{ background: '#1e1b4b30', border: '1.5px solid #6366f1', borderRadius: 12, padding: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#818cf8', fontWeight: 700, fontSize: 12 }}>
+                  <span>💡 Pre-screening AI Studio & Modello Consigliato</span>
+                  <span style={{ fontSize: 10, background: '#312e81', color: '#c7d2fe', padding: '2px 8px', borderRadius: 10, fontWeight: 700 }}>
+                    {recommendation.confidence === 'high' ? '🎯 ALTA AFFINITÀ' : '💡 SUGGERIMENTO'}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowCatalogModal(true)}
+                  style={{ background: 'transparent', border: 'none', color: '#818cf8', fontSize: 11, cursor: 'pointer', textDecoration: 'underline', fontWeight: 600 }}
+                >
+                  Sfoglia tutti i 30 modelli ↗
                 </button>
               </div>
-            </form>
 
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.5px' }}>
-              Documenti Collegati a questa Microvoce ({documents.length})
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {documents.map(d => (
-                <div key={d.id} style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10, padding: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div
-                    onClick={() => setSelectedDocPreview(d)}
-                    style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}
-                    title="Clicca per aprire ed anteporre il documento PDF"
-                  >
-                    <div style={{ fontSize: 22 }}>📄</div>
-                    <div>
-                      <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--indigo-l)', textDecoration: 'underline' }}>{d.nome}</div>
-                      <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>
-                        {d.dimensione} · Caricato il {d.dataCaricamento}
-                      </div>
-                    </div>
+              {recommendation.template ? (
+                <div style={{ marginTop: 10 }}>
+                  <div style={{ fontSize: 13.5, fontWeight: 800, color: '#f8fafc' }}>
+                    📄 {recommendation.template.titolo}
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    {d.richiedeFirma ? (
-                      <span style={{ background: d.firmato ? '#0d2d22' : '#200f40', color: d.firmato ? '#34d399' : '#a78bfa', padding: '3px 8px', borderRadius: 12, fontSize: 10, fontWeight: 700 }}>
-                        {d.firmato ? '✓ Firmato' : '✍️ Richiede Firma Cliente'}
-                      </span>
-                    ) : (
-                      <span style={{ color: 'var(--muted)', fontSize: 10 }}>Informativo</span>
-                    )}
-
+                  <div style={{ fontSize: 11, color: '#cbd5e1', marginTop: 4, lineHeight: 1.4 }}>
+                    {recommendation.reason}
+                  </div>
+                  <div style={{ display: 'flex', gap: 10, marginTop: 12, flexWrap: 'wrap' }}>
                     <button
                       type="button"
-                      onClick={() => setSelectedDocPreview(d)}
-                      style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '4px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer', fontWeight: 600, boxShadow: '0 2px 8px rgba(99,102,241,.3)' }}
+                      onClick={() => handleApplyTemplate(recommendation.template!)}
+                      style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '7px 16px', borderRadius: 8, fontSize: 11.5, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 12px rgba(99,102,241,0.3)' }}
                     >
-                      👁 Visualizza
+                      ⚡ Collega Modello Consigliato (1-Click)
                     </button>
-
                     <button
                       type="button"
-                      onClick={() => {
-                        // Prima conferma
-                        const c1 = confirm(`⚠️ PRIMA CONFERMA: Sei sicuro di voler eliminare il documento "${d.nome}"?`);
-                        if (!c1) return;
-
-                        // Seconda conferma (Doppia Conferma di sicurezza)
-                        const c2 = confirm(`🔴 SECONDA CONFERMA DEFINITIVA: Questa operazione è irreversibile e cancellerà definitivamente il file "${d.nome}". Procedere?`);
-                        if (c2) {
-                          setDocuments(prev => prev.filter(doc => doc.id !== d.id));
-                          alert(`✓ Documento "${d.nome}" eliminato con successo. Azione registrata nel Log Audit Studio.`);
-                        }
-                      }}
-                      title="Elimina documento con doppia conferma di sicurezza"
-                      style={{ background: 'var(--card2)', border: '1px solid var(--border)', color: 'var(--red)', padding: '4px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer', fontWeight: 600 }}
+                      onClick={() => setShowCatalogModal(true)}
+                      style={{ background: 'var(--card2)', border: '1px solid var(--border)', color: 'var(--text)', padding: '7px 14px', borderRadius: 8, fontSize: 11.5, fontWeight: 600, cursor: 'pointer' }}
                     >
-                      🗑 Elimina
+                      📂 Scegli Altro Modello Studio
                     </button>
                   </div>
                 </div>
-              ))}
+              ) : (
+                <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 8 }}>
+                  Nessun modello consigliato in modo automatico per questo tipo di attività.
+                </div>
+              )}
             </div>
+
+            {/* Lista Documenti Effettivamente Collegati */}
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 10 }}>
+                Documenti Collegati a questa Microvoce ({documents.length})
+              </div>
+
+              {documents.length === 0 ? (
+                <div style={{ padding: 24, textAlign: 'center', background: 'var(--card)', border: '1px dashed var(--border)', borderRadius: 10, color: 'var(--muted)', fontSize: 12 }}>
+                  <div style={{ fontSize: 24, marginBottom: 6 }}>📭</div>
+                  <strong>Nessun documento collegato a questa voce.</strong>
+                  <div style={{ fontSize: 11, marginTop: 4 }}>
+                    Questa attività non ha atti o contratti forzati. Puoi associare il modello consigliato sopra o caricare un file personalizzato.
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {documents.map(d => (
+                    <div key={d.id} style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10, padding: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                      <div
+                        onClick={() => setSelectedDocPreview(d)}
+                        style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}
+                        title="Clicca per visualizzare"
+                      >
+                        <div style={{ fontSize: 22 }}>📄</div>
+                        <div>
+                          <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--indigo-l)', textDecoration: 'underline' }}>{d.nome}</div>
+                          <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>
+                            {d.dimensione} · Caricato il {d.dataCaricamento}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        {d.richiedeFirma ? (
+                          <span style={{ background: d.firmato ? '#0d2d22' : '#200f40', color: d.firmato ? '#34d399' : '#a78bfa', padding: '3px 8px', borderRadius: 12, fontSize: 10, fontWeight: 700 }}>
+                            {d.firmato ? '✓ Firmato' : '✍️ Richiede Firma Cliente'}
+                          </span>
+                        ) : (
+                          <span style={{ color: 'var(--muted)', fontSize: 10 }}>Informativo</span>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={() => setSelectedDocPreview(d)}
+                          style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '4px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer', fontWeight: 600 }}
+                        >
+                          👁 Visualizza
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (confirm(`Sei sicuro di voler scollegare ed eliminare il documento "${d.nome}" da questa voce?`)) {
+                              const nextDocs = documents.filter(doc => doc.id !== d.id);
+                              persistDocuments(nextDocs);
+                            }
+                          }}
+                          style={{ background: 'var(--card2)', border: '1px solid var(--border)', color: 'var(--red)', padding: '4px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer', fontWeight: 600 }}
+                        >
+                          🗑 Scollega
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Form Caricamento Documento Personalizzato */}
+            <form onSubmit={handleAddCustomDocument} style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text)' }}>
+                📎 Oppure Carica Documento Personalizzato dal Computer:
+              </div>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <input
+                  type="text"
+                  value={docName}
+                  onChange={e => setDocName(e.target.value)}
+                  placeholder="Es. Procura_Legale_Firma_Cliente.pdf o Atto_Notarile.docx"
+                  style={{ flex: 1, padding: '7px 10px', fontSize: 11.5, borderRadius: 6, background: 'var(--card)', color: 'var(--text)', border: '1px solid var(--border)' }}
+                />
+                <button
+                  type="submit"
+                  style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '7px 14px', borderRadius: 6, fontSize: 11.5, fontWeight: 600, cursor: 'pointer' }}
+                >
+                  + Carica & Associa
+                </button>
+              </div>
+            </form>
           </div>
         )}
 
         {/* Footer */}
         <div style={{ padding: '14px 20px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{ fontSize: 11, color: 'var(--muted)' }}>
-            Registra le note operative ed i documenti da far firmare al cliente per questa micro-voce.
+            Nessun documento viene imposto automaticamente. Utilizza il pre-screening guidato per associare modelli quando necessario.
           </span>
-          <button onClick={onClose} style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '7px 16px', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>
+          <button onClick={onClose} style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '7px 18px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
             Chiudi
           </button>
         </div>
+
+        {/* Modale Catalogo Completo 30 Modelli Studio */}
+        {showCatalogModal && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000, padding: 16 }}>
+            <div style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, width: '100%', maxWidth: 740, maxHeight: '85vh', display: 'flex', flexDirection: 'column', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7)' }}>
+              <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--indigo-l)' }}>📂 Catalogo Completo Modelli Studio ({ALL_STUDIO_TEMPLATES.length} Atti)</div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>Seleziona l'atto societario, tributario o contrattuale da associare alla voce "{voce.n}"</div>
+                </div>
+                <button onClick={() => setShowCatalogModal(false)} style={closeBtnStyle}>✕</button>
+              </div>
+
+              {/* Filtri Categoria */}
+              <div style={{ padding: '10px 20px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 6, overflowX: 'auto', background: 'var(--card)' }}>
+                {['ALL', 'societario', 'fiscale', 'trust', 'compliance', 'engagement', 'nda'].map(cat => (
+                  <button
+                    key={cat}
+                    onClick={() => setSelectedCatalogCategory(cat)}
+                    style={{
+                      padding: '4px 10px', borderRadius: 14, fontSize: 10.5, fontWeight: 600, border: 'none', cursor: 'pointer',
+                      background: selectedCatalogCategory === cat ? 'var(--indigo)' : 'var(--card2)',
+                      color: selectedCatalogCategory === cat ? '#fff' : 'var(--muted)',
+                    }}
+                  >
+                    {cat.toUpperCase()}
+                  </button>
+                ))}
+              </div>
+
+              {/* Lista Modelli */}
+              <div style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'grid', gridTemplateColumns: '1fr', gap: 10 }}>
+                {filteredCatalog.map(t => (
+                  <div key={t.id} style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10, padding: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text)' }}>📄 {t.titolo}</span>
+                        <span style={{ fontSize: 9.5, padding: '2px 6px', borderRadius: 8, background: '#312e81', color: '#c7d2fe', textTransform: 'uppercase', fontWeight: 700 }}>
+                          {t.categoria}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 3, lineHeight: 1.3 }}>
+                        {t.descrizione}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleApplyTemplate(t)}
+                      style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
+                    >
+                      ⚡ Collega alla Voce
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Modal Anteprima PDF Documento */}
         {selectedDocPreview && (
@@ -614,307 +890,74 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce }: Pass
                 <div>
                   <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--indigo-l)', display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span>📄 {selectedDocPreview.nome}</span>
-                    {selectedDocPreview.richiedeFirma && (
-                      <span style={{ fontSize: 10, background: selectedDocPreview.firmato ? '#0d2d22' : '#200f40', color: selectedDocPreview.firmato ? '#34d399' : '#a78bfa', padding: '2px 8px', borderRadius: 10, border: '1px solid #3730a3' }}>
-                        {selectedDocPreview.firmato ? '🔒 eIDAS Firmato' : '✍️ In Attesa di Firma Cliente'}
-                      </span>
-                    )}
                   </div>
                   <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
-                    Dimensione: {selectedDocPreview.dimensione} · Data Caricamento: {selectedDocPreview.dataCaricamento} · Cliente: <strong>{project.cl}</strong>
+                    Fascicolo Commessa: {project.n} · Cliente: {project.cl}
                   </div>
                 </div>
-                <button
-                  onClick={() => setSelectedDocPreview(null)}
-                  style={{ background: 'var(--card2)', border: 'none', width: 30, height: 30, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--muted)', fontSize: 16 }}
-                >
-                  ✕
-                </button>
-              </div>
-
-              {/* Reader Body / Rich Word-Style Container */}
-              <div style={{ flex: 1, padding: 24, overflowY: 'auto', background: '#0a0d14', display: 'flex', flexDirection: 'column', gap: 16 }}>
-                <div style={{ background: '#fff', color: '#1e293b', borderRadius: 10, padding: '36px 40px', fontFamily: "'Segoe UI', Arial, sans-serif", boxShadow: '0 10px 30px rgba(0,0,0,.5)', border: '1px solid #cbd5e1', lineHeight: 1.6 }}>
-                  {/* PDF Document Header Studio */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #4338ca', paddingBottom: 16, marginBottom: 24 }}>
-                    <div>
-                      <div style={{ fontSize: 18, fontWeight: 800, color: '#1e1b4b' }}>BLUECODE LTD — ADVISORY SERVICES</div>
-                      <div style={{ fontSize: 10.5, color: '#64748b' }}>Cross-Border Wealth Structuring & Legal Advisory · Malta / Switzerland</div>
-                    </div>
-                    <div style={{ textAlign: 'right', fontSize: 10, color: '#64748b' }}>
-                      Rif. Incarico: #{project.id}<br />
-                      Data Registrazione: {selectedDocPreview.dataCaricamento}
-                    </div>
-                  </div>
-
-                  {/* Body Content from Word Template */}
-                  <div
-                    style={{ fontSize: 11.5, color: '#334155', textAlign: 'justify', marginBottom: 24 }}
-                    dangerouslySetInnerHTML={{
-                      __html: resolveDocumentTemplateHtml(matchedTmpl.contenutoHtml, {
-                        cliente: { nome: project.cl, ragione_sociale: project.cl },
-                        progetto: { titolo: project.n, importo_totale: fmt(project.val) },
-                        studio: { ragioneSociale: 'Bluecode Ltd', sedeLegale: 'Level 4, Valuation Centre, Sliema, Malta', piva: 'MT28491039' },
-                        isForPrintOrExport: false,
-                        tagMode: 'plain',
-                      })
-                    }}
-                  />
-                </div>
-              </div>
-
-              {/* Viewer Actions Footer */}
-              <div style={{ padding: '14px 20px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--card)', flexWrap: 'wrap', gap: 10 }}>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                   <button
-                    type="button"
-                    onClick={async () => {
-                      const finalPrintHtml = resolveDocumentTemplateHtml(matchedTmpl.contenutoHtml, {
-                        cliente: { nome: project.cl, ragione_sociale: project.cl },
-                        progetto: { titolo: project.n, importo_totale: fmt(project.val) },
-                        studio: { ragioneSociale: 'Bluecode Ltd', sedeLegale: 'Level 4, Valuation Centre, Sliema, Malta', piva: 'MT28491039' },
-                        isForPrintOrExport: true,
-                      });
-                      const fullPrintHtml = `
-                        <div style="font-family: 'Segoe UI', Arial, sans-serif; color: #0f172a; line-height: 1.6; padding: 20px;">
-                          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #4338ca; padding-bottom: 14px; margin-bottom: 24px;">
-                            <div>
-                              <div style="font-size: 16pt; font-weight: 800; color: #1e1b4b;">BLUECODE LTD — ADVISORY SERVICES</div>
-                              <div style="font-size: 9pt; color: #64748b;">Valuation Centre, Sliema, Malta · Reg. N. C-99881</div>
-                            </div>
-                            <div style="text-align: right; font-size: 8.5pt; color: #64748b;">
-                              Rif. Incarico: #${project.id}<br/>Data: ${selectedDocPreview.dataCaricamento}
-                            </div>
-                          </div>
-                          <div>${finalPrintHtml}</div>
-                          <div style="margin-top: 40px; border-top: 1px solid #e2e8f0; padding-top: 10px; display: flex; justify-content: space-between; font-size: 8.5pt; color: #94a3b8;">
-                            <span>Bluecode Ltd • Pratica: ${project.n}</span>
-                            <span>Sigillo eIDAS Documentale • Validità Giuridica UE</span>
-                          </div>
-                        </div>
-                      `;
-                      const safeName = `${selectedDocPreview.nome.replace(/\.[^/.]+$/, "")}.pdf`;
-                      await downloadRealPdf(safeName, fullPrintHtml);
-                    }}
-                    style={{ background: '#0d2d22', border: '1px solid #059669', color: '#34d399', padding: '7px 14px', borderRadius: 8, fontSize: 11, cursor: 'pointer', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}
-                  >
-                    📥 Scarica File PDF VERO (.pdf)
-                  </button>
-
-                  <button
-                    type="button"
                     onClick={() => {
-                      onClose();
-                      navigate(`/documents?projId=${project.id}&tmplId=${matchedTmpl.id}`);
+                      const matched = ALL_STUDIO_TEMPLATES.find(t => selectedDocPreview.nome.toLowerCase().includes(t.titolo.toLowerCase())) || ALL_STUDIO_TEMPLATES[0];
+                      const resolvedHtml = resolveDocumentTemplateHtml(matched.contenutoHtml, project);
+                      downloadRealPdf(resolvedHtml, selectedDocPreview.nome.replace(/\.[^/.]+$/, ''));
                     }}
-                    style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '7px 14px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+                    style={{ background: '#059669', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
                   >
-                    ✏️ Apri in Document Studio (Word)
+                    📥 Scarica PDF
                   </button>
+                  <button onClick={() => setSelectedDocPreview(null)} style={closeBtnStyle}>✕</button>
                 </div>
+              </div>
 
-                <div style={{ display: 'flex', gap: 8 }}>
-                  {selectedDocPreview.richiedeFirma && !selectedDocPreview.firmato && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setDocuments(documents.map(x => x.id === selectedDocPreview.id ? { ...x, firmato: true } : x));
-                        setSelectedDocPreview({ ...selectedDocPreview, firmato: true });
-                        alert(`✓ Notifica ed il link di firma eIDAS per "${selectedDocPreview.nome}" inviati con successo al cliente ${project.cl}!`);
-                      }}
-                      style={{ background: '#1e1b4b', border: '1px solid #4338ca', color: '#818cf8', padding: '7px 14px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
-                    >
-                      ✍️ Sollecita Firma Cliente (Magic Link)
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => setSelectedDocPreview(null)}
-                    style={{ background: 'var(--card2)', border: '1px solid var(--border)', color: 'var(--muted)', padding: '7px 14px', borderRadius: 8, fontSize: 11, cursor: 'pointer' }}
-                  >
-                    Chiudi Visualizzatore
-                  </button>
-                </div>
+              {/* PDF Document View Render */}
+              <div style={{ flex: 1, overflowY: 'auto', padding: 24, background: '#ffffff', color: '#1e293b', fontSize: 12 }}>
+                <div dangerouslySetInnerHTML={{
+                  __html: (() => {
+                    const matched = ALL_STUDIO_TEMPLATES.find(t => selectedDocPreview.nome.toLowerCase().includes(t.titolo.toLowerCase())) || ALL_STUDIO_TEMPLATES[0];
+                    return resolveDocumentTemplateHtml(matched.contenutoHtml, project);
+                  })()
+                }} />
               </div>
             </div>
           </div>
         )}
 
-        {/* Popup Compilazione / Anteprima Form Master Operatore */}
-        {previewFormModalStep && (
-          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 120, padding: 16 }}>
-            <div style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, width: '100%', maxWidth: 540, padding: 22, boxShadow: '0 16px 48px rgba(0,0,0,.6)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, borderBottom: '1px solid var(--border)', paddingBottom: 12 }}>
-                <div>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>📋 Dati Compilati nel Form dal Cliente</div>
-                  <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{previewFormModalStep.title} · Cliente {project.cl}</div>
-                </div>
-                <button onClick={() => setPreviewFormModalStep(null)} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: 18 }}>✕</button>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20, maxHeight: 300, overflowY: 'auto' }}>
-                {(previewFormModalStep.fields || ['Ragione Sociale', 'P.IVA / VAT', 'Legale Rappresentante', 'Codice Fiscale', 'IBAN Operativo']).map((fld, fIdx) => (
-                  <div key={fIdx} style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 8, padding: 10 }}>
-                    <label style={{ fontSize: 10, fontWeight: 700, color: 'var(--indigo-l)', display: 'block', marginBottom: 4, textTransform: 'uppercase' }}>
-                      📝 {fld}
-                    </label>
-                    <input
-                      type="text"
-                      value={previewFormValues[fld] || ''}
-                      onChange={e => setPreviewFormValues({ ...previewFormValues, [fld]: e.target.value })}
-                      placeholder={`Inserisci valore per ${fld}...`}
-                      style={{ fontSize: 12, padding: 6 }}
-                    />
-                  </div>
-                ))}
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: 10, color: '#34d399', fontWeight: 600 }}>✓ Dati verificati dal sistema KYC</span>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button
-                    type="button"
-                    onClick={() => setPreviewFormModalStep(null)}
-                    style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '7px 14px', borderRadius: 8, fontSize: 11, cursor: 'pointer' }}
-                  >
-                    Annulla
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      alert(`✓ Dati form salvati e verificati con successo per la voce "${previewFormModalStep.title}"!`);
-                      setPreviewFormModalStep(null);
-                    }}
-                    style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '7px 16px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
-                  >
-                    ✓ Salva & Valida Dati Form
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Modal Creazione Nuovo Passaggio Checklist */}
-        {showAddStepModal && (
-          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 120, padding: 16 }}>
-            <div style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, width: '100%', maxWidth: 480, padding: 22, boxShadow: '0 16px 48px rgba(0,0,0,.6)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, borderBottom: '1px solid var(--border)', paddingBottom: 12 }}>
-                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>➕ Aggiungi Azione alla Checklist</div>
-                <button onClick={() => setShowAddStepModal(false)} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: 18 }}>✕</button>
-              </div>
-
-              <form onSubmit={handleCreateStep} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <div>
-                  <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Titolo del Passaggio / Azione *</label>
-                  <input
-                    type="text"
-                    value={newStepTitle}
-                    onChange={e => setNewStepTitle(e.target.value)}
-                    placeholder="es. Verifica Visura Camerale Storica o Bonifico Caparra"
-                    required
-                    style={{ fontSize: 12, padding: 8, width: '100%' }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Descrizione / Istruzioni Operative</label>
-                  <textarea
-                    value={newStepDesc}
-                    onChange={e => setNewStepDesc(e.target.value)}
-                    placeholder="Dettagli sulle azioni richieste all'operatore o al cliente..."
-                    rows={2}
-                    style={{ fontSize: 12, padding: 8, width: '100%', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)' }}
-                  />
-                </div>
-
-                <div style={{ display: 'flex', gap: 12 }}>
-                  <div style={{ flex: 1 }}>
-                    <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Tipo di Passaggio</label>
-                    <select
-                      value={newStepType}
-                      onChange={e => setNewStepType(e.target.value as any)}
-                      style={{ fontSize: 11, padding: 6, width: '100%', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)' }}
-                    >
-                      <option value="check">Verifica / Checkmark</option>
-                      <option value="doc">Documento / Firma PDF</option>
-                      <option value="form">Form / Questionario Dati</option>
-                      <option value="info">Info / Istruzioni</option>
-                    </select>
-                  </div>
-
-                  <div style={{ flex: 1 }}>
-                    <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Assegnato a</label>
-                    <select
-                      value={newStepWho}
-                      onChange={e => setNewStepWho(e.target.value as any)}
-                      style={{ fontSize: 11, padding: 6, width: '100%', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)' }}
-                    >
-                      <option value="operatore">👤 Operatore Studio</option>
-                      <option value="cliente">🧑‍💼 Cliente Committente</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14 }}>
-                  <button
-                    type="button"
-                    onClick={() => setShowAddStepModal(false)}
-                    style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '7px 14px', borderRadius: 8, fontSize: 11, cursor: 'pointer' }}
-                  >
-                    Annulla
-                  </button>
-                  <button
-                    type="submit"
-                    style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '7px 16px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
-                  >
-                    + Salva Passaggio
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
 }
 
-const tabBtnStyle = (active: boolean): React.CSSProperties => ({
-  background: active ? '#1a1f3d' : 'transparent',
-  border: 'none',
-  borderBottom: active ? '2px solid var(--indigo-l)' : '2px solid transparent',
-  color: active ? 'var(--indigo-l)' : 'var(--muted)',
-  fontSize: 11.5,
-  fontWeight: 600,
-  padding: '6px 12px',
-  cursor: 'pointer',
-});
-
 const overlayStyle: React.CSSProperties = {
-  position: 'fixed', inset: 0, background: 'rgba(0,0,0,.75)',
+  position: 'fixed', inset: 0,
+  background: 'rgba(0,0,0,.75)', backdropFilter: 'blur(3px)',
   display: 'flex', alignItems: 'center', justifyContent: 'center',
   zIndex: 100, padding: 16,
 };
 
 const modalStyle: React.CSSProperties = {
-  background: 'var(--sidebar)',
-  border: '1px solid var(--border)',
-  borderRadius: 16,
-  width: '100%', maxWidth: 660, maxHeight: '88vh',
-  display: 'flex', flexDirection: 'column',
-  boxShadow: '0 24px 60px rgba(0,0,0,.6)',
+  background: 'var(--sidebar)', border: '1px solid var(--border)',
+  borderRadius: 14, width: '100%', maxWidth: 640,
+  maxHeight: '90vh', display: 'flex', flexDirection: 'column',
+  boxShadow: '0 20px 40px rgba(0,0,0,.6)',
 };
 
 const headStyle: React.CSSProperties = {
-  padding: 20,
-  borderBottom: '1px solid var(--border)',
-  flexShrink: 0,
+  padding: '16px 20px 0', borderBottom: 'none', background: 'var(--card)',
+  borderTopLeftRadius: 14, borderTopRightRadius: 14,
 };
 
 const closeBtnStyle: React.CSSProperties = {
-  background: 'var(--card2)', border: 'none',
-  width: 28, height: 28, borderRadius: 6,
-  display: 'flex', alignItems: 'center', justifyContent: 'center',
-  cursor: 'pointer', color: 'var(--muted)', fontSize: 14,
+  background: 'none', border: 'none', color: 'var(--muted)',
+  fontSize: 16, cursor: 'pointer', padding: '2px 6px',
 };
+
+function tabBtnStyle(active: boolean): React.CSSProperties {
+  return {
+    background: 'none', border: 'none',
+    borderBottom: active ? '2px solid var(--indigo)' : '2px solid transparent',
+    color: active ? 'var(--indigo-l)' : 'var(--muted)',
+    padding: '6px 12px', fontSize: 12, fontWeight: 600,
+    cursor: 'pointer', transition: 'all .15s',
+  };
+}
