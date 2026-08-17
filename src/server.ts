@@ -16,7 +16,7 @@ import {
 
 import { signJwt, verifyJwt } from './util/jwt.js';
 import { hashPassword, verifyPassword } from './util/password.js';
-import { sendMagicLinkEmail, verifyAndSendTestSmtp, verifyRealImap } from './services/emailService.js';
+import { sendMagicLinkEmail, sendOtpSecurityEmail, verifyAndSendTestSmtp, verifyRealImap } from './services/emailService.js';
 import { uploadDocumento } from './services/storageService.js';
 import { generateInvoicePdfBuffer } from './services/pdfService.js';
 import { generateOtp, verifyOtp, generateEidasSignatureSeal } from './services/otpService.js';
@@ -1886,27 +1886,36 @@ export function buildServer(app: AppPort): FastifyInstance {
   });
 
   // ── FIRMA ELETTRONICA AVANZATA (FEA) CON OTP SMS / WHATSAPP / EMAIL ──
-  server.post<{ Body: { clienteId: string; canale?: 'whatsapp' | 'email' | 'sms'; cellulare?: string; email?: string } }>('/portal/request-otp', async (req, reply) => {
-    const { clienteId, canale = 'whatsapp', cellulare, email } = req.body;
+  server.post<{ Body: { clienteId: string; canale?: 'whatsapp' | 'email' | 'sms'; cellulare?: string; email?: string; signerName?: string } }>('/portal/request-otp', async (req, reply) => {
+    const { clienteId, canale = 'whatsapp', cellulare, email, signerName = 'Cliente' } = req.body;
     try {
       const target = cellulare || email || '+39 333 5936278';
       const otp = generateOtp(clienteId, target, canale);
 
-      // Masked target per privacy (es. +39 333 *** 6278)
-      const masked = target.length > 8 
-        ? `${target.slice(0, 6)} *** ${target.slice(-4)}` 
-        : target;
+      // Masked target per privacy (es. +39 333 *** 6278 o c***t@domain.com)
+      let masked = target;
+      if (target.includes('@')) {
+        const [userPart, domainPart] = target.split('@');
+        masked = `${userPart.slice(0, 2)}***${userPart.slice(-1)}@${domainPart}`;
+      } else if (target.length > 8) {
+        masked = `${target.slice(0, 6)} *** ${target.slice(-4)}`;
+      }
 
-      // Invia il codice tramite il canale prescelto (simulato / live WhatsApp)
-      console.log(`[FEA-OTP] Inviato codice OTP ${otp} a ${target} via ${canale}`);
+      // Dispatch reale via Email SMTP
+      if (canale === 'email' && (email || target.includes('@'))) {
+        const toMail = email || target;
+        await sendOtpSecurityEmail(toMail, signerName, otp);
+      }
+
+      console.log(`[FEA-OTP] Generato ed inviato codice OTP a ${masked} via ${canale}`);
 
       return reply.send({
         ok: true,
         expiresInSeconds: 300,
         maskedTarget: masked,
         canale,
-        // In dev / test includiamo l'OTP per facilità di collaudo immediato
-        devOtp: otp,
+        // In modalita dev-test restituiamo devOtp se esplicitamente richiesto
+        devOtp: req.headers['x-dev-test'] ? otp : undefined,
       });
     } catch (err) {
       return reply.code(500).send({ errore: err instanceof Error ? err.message : 'Errore richiesta OTP' });

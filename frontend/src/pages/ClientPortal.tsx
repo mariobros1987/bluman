@@ -93,7 +93,9 @@ export function ClientPortal() {
   // FEA OTP State
   const [otpModalOpen, setOtpModalOpen] = useState(false);
   const [otpCode, setOtpCode] = useState('');
-  const [otpCanale, setOtpCanale] = useState<'whatsapp' | 'email'>('whatsapp');
+  const [otpCanale, setOtpCanale] = useState<'whatsapp' | 'email' | 'sms'>('whatsapp');
+  const [otpPhoneInput, setOtpPhoneInput] = useState('+39 333 5936278');
+  const [otpEmailInput, setOtpEmailInput] = useState('client@holdingbeta.advisory');
   const [otpTarget, setOtpTarget] = useState('+39 333 *** 6278');
   const [otpLoading, setOtpLoading] = useState(false);
   const [otpError, setOtpError] = useState<string | null>(null);
@@ -645,26 +647,129 @@ export function ClientPortal() {
 
                 <div style={{ borderTop: '1px solid var(--border)', paddingTop: 20 }}>
                   <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>Accettazione & Apposizione Firma Digitale Unificata</div>
-                  <p style={{ fontSize: 11.5, color: 'var(--muted)', lineHeight: 1.5, marginBottom: 16 }}>
-                    Con il pulsante sottostante apponi la tua <strong>Firma Digitale 1-Click</strong> per confermare la proposta contrattuale e dare avvio immediato alle attività.
+                  <p style={{ fontSize: 11.5, color: 'var(--muted)', lineHeight: 1.5, marginBottom: 14 }}>
+                    Conferma la proposta contrattuale mediante <strong>Firma Elettronica Avanzata (FEA)</strong> conforme al Regolamento eIDAS UE 910/2014.
                   </p>
+
+                  {/* 📲 SCELTA CANALE DI INVIO CODICE OTP */}
+                  <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 16, marginBottom: 18 }}>
+                    <div style={{ fontSize: 11.5, fontWeight: 800, color: 'var(--text)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span>📲 Scegli il Canale di Ricezione Codice OTP di Sicurezza:</span>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10, marginBottom: 14 }}>
+                      {/* Canale WhatsApp */}
+                      <button
+                        type="button"
+                        onClick={() => setOtpCanale('whatsapp')}
+                        style={{
+                          background: otpCanale === 'whatsapp' ? '#0d2d22' : 'var(--card)',
+                          border: `1.5px solid ${otpCanale === 'whatsapp' ? '#059669' : 'var(--border)'}`,
+                          borderRadius: 10,
+                          padding: '10px 14px',
+                          textAlign: 'left',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 10,
+                        }}
+                      >
+                        <span style={{ fontSize: 20 }}>🟢</span>
+                        <div>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: otpCanale === 'whatsapp' ? '#34d399' : 'var(--text)' }}>WhatsApp</div>
+                          <div style={{ fontSize: 10, color: 'var(--muted)' }}>Messaggio istantaneo</div>
+                        </div>
+                      </button>
+
+                      {/* Canale Email */}
+                      <button
+                        type="button"
+                        onClick={() => setOtpCanale('email')}
+                        style={{
+                          background: otpCanale === 'email' ? '#1e1b4b' : 'var(--card)',
+                          border: `1.5px solid ${otpCanale === 'email' ? '#6366f1' : 'var(--border)'}`,
+                          borderRadius: 10,
+                          padding: '10px 14px',
+                          textAlign: 'left',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 10,
+                        }}
+                      >
+                        <span style={{ fontSize: 20 }}>✉️</span>
+                        <div>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: otpCanale === 'email' ? '#818cf8' : 'var(--text)' }}>Email Certificata</div>
+                          <div style={{ fontSize: 10, color: 'var(--muted)' }}>Posta elettronica</div>
+                        </div>
+                      </button>
+
+                      {/* Canale SMS */}
+                      <button
+                        type="button"
+                        onClick={() => setOtpCanale('sms')}
+                        style={{
+                          background: otpCanale === 'sms' ? '#3b1c1c' : 'var(--card)',
+                          border: `1.5px solid ${otpCanale === 'sms' ? '#ef4444' : 'var(--border)'}`,
+                          borderRadius: 10,
+                          padding: '10px 14px',
+                          textAlign: 'left',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 10,
+                        }}
+                      >
+                        <span style={{ fontSize: 20 }}>📱</span>
+                        <div>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: otpCanale === 'sms' ? '#f87171' : 'var(--text)' }}>SMS Tradizionale</div>
+                          <div style={{ fontSize: 10, color: 'var(--muted)' }}>Rete cellulare</div>
+                        </div>
+                      </button>
+                    </div>
+
+                    {/* Dettaglio Recapito Destinazione */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                      <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)' }}>
+                        {otpCanale === 'email' ? '📬 Invia Codice all\'Indirizzo Email:' : '📱 Invia Codice al Numero Cellulare:'}
+                      </label>
+                      {otpCanale === 'email' ? (
+                        <input
+                          type="email"
+                          value={otpEmailInput}
+                          onChange={(e) => setOtpEmailInput(e.target.value)}
+                          placeholder="client@holdingbeta.advisory"
+                          style={{ fontSize: 12, padding: '6px 12px', borderRadius: 8, background: 'var(--card)', color: 'var(--text)', border: '1px solid var(--border)', minWidth: 260 }}
+                        />
+                      ) : (
+                        <input
+                          type="tel"
+                          value={otpPhoneInput}
+                          onChange={(e) => setOtpPhoneInput(e.target.value)}
+                          placeholder="+39 333 5936278"
+                          style={{ fontSize: 12, padding: '6px 12px', borderRadius: 8, background: 'var(--card)', color: 'var(--text)', border: '1px solid var(--border)', minWidth: 200 }}
+                        />
+                      )}
+                    </div>
+                  </div>
+
                   <button
                     onClick={async () => {
                       setOtpLoading(true);
                       setOtpError(null);
-                      const targetPhone = clientObj?.cellulare || '+39 333 5936278';
-                      const res = await requestPortalOtpApi(clientObj?.id || 'client-01', otpCanale, targetPhone, clientObj?.email);
+                      setOtpCode(''); // Campo sempre pulito per digitazione manuale dell'utente
+                      const target = otpCanale === 'email' ? otpEmailInput : otpPhoneInput;
+                      const res = await requestPortalOtpApi(clientObj?.id || 'client-01', otpCanale, otpPhoneInput, otpEmailInput);
                       if (res && res.ok) {
-                        setOtpTarget(res.maskedTarget || targetPhone);
-                        if (res.devOtp) setOtpCode(res.devOtp); // auto-fill per test
+                        setOtpTarget(res.maskedTarget || target);
                       }
                       setOtpLoading(false);
                       setOtpModalOpen(true);
                     }}
-                    disabled={loading}
+                    disabled={loading || otpLoading}
                     style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '12px 28px', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 20px rgba(99,102,241,.4)', display: 'flex', alignItems: 'center', gap: 8 }}
                   >
-                    <span>✍️ Procedi alla Firma con Codice OTP di Sicurezza</span>
+                    <span>{otpLoading ? 'Invio Codice in Corso...' : `📲 Invia Codice OTP via ${otpCanale.toUpperCase()} e Firma`}</span>
                   </button>
                 </div>
               </div>
@@ -1101,18 +1206,18 @@ export function ClientPortal() {
             {/* Info Canale */}
             <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 14 }}>
               <div style={{ fontSize: 11.5, color: 'var(--muted)', marginBottom: 8 }}>
-                È stato generato un codice monouso di sicurezza valido <strong>5 minuti</strong> per convalidare l'accordo:
+                Abbiamo inviato un codice di sicurezza monouso valido <strong>5 minuti</strong> tramite <strong>{otpCanale.toUpperCase()}</strong>:
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12, fontWeight: 700, color: '#a5b4fc' }}>
-                <span>📱 Recapito Destinatario:</span>
+                <span>{otpCanale === 'email' ? '📬 Email Destinatario:' : '📱 Recapito Destinatario:'}</span>
                 <span>{otpTarget}</span>
               </div>
             </div>
 
-            {/* Input Codice OTP */}
+            {/* Input Codice OTP (Nessun codice pre-compilato, digitazione manuale) */}
             <div>
               <label style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text)', display: 'block', marginBottom: 6 }}>
-                Inserisci il Codice a 6 Cifre ricevuto:
+                Inserisci il Codice a 6 Cifre ricevuto sul tuo dispositivo:
               </label>
               <input
                 type="text"
@@ -1206,11 +1311,10 @@ export function ClientPortal() {
                   type="button"
                   onClick={async () => {
                     setOtpLoading(true);
-                    const targetPhone = clientObj?.cellulare || '+39 333 5936278';
-                    const res = await requestPortalOtpApi(clientObj?.id || 'client-01', otpCanale, targetPhone, clientObj?.email);
-                    if (res && res.devOtp) setOtpCode(res.devOtp);
+                    setOtpCode('');
+                    const res = await requestPortalOtpApi(clientObj?.id || 'client-01', otpCanale, otpPhoneInput, otpEmailInput);
                     setOtpLoading(false);
-                    alert('✓ Nuovo codice OTP inviato con successo!');
+                    alert(`✓ Nuovo codice OTP inviato con successo a ${otpTarget}!`);
                   }}
                   style={{ background: 'none', border: 'none', color: 'var(--indigo-l)', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}
                 >
