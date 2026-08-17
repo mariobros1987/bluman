@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useTeamMembers } from '../hooks/useTeamMembers';
 import { Avatar } from './ui/Avatar';
 

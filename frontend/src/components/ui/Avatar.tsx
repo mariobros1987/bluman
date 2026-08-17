@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { TEAM, getTeamMembersList } from '../../store/mockData';
+import { useState } from 'react';
+import { useTeamMembers, extractInitialsFromName } from '../../hooks/useTeamMembers';
+import type { TeamMember } from '../../types';
 
 interface AvatarProps {
   id: number | string;
@@ -10,18 +11,29 @@ interface AvatarProps {
 
 export function Avatar({ id, size = 24, showTooltip = true }: AvatarProps) {
   const [hovered, setHovered] = useState(false);
-  const teamList = getTeamMembersList();
+  const { team: teamList } = useTeamMembers();
   
-  // Ricerca intelligente dell'operatore per ID, nome o email
-  const m = teamList.find(t => String(t.id) === String(id) || t.n.toLowerCase() === String(id).toLowerCase())
-    || TEAM.find(t => String(t.id) === String(id))
-    || {
-      id: id,
-      i: String(id).slice(0, 2).toUpperCase() || 'OP',
-      c: '#6366f1',
-      n: `Operatore #${id}`,
-      r: 'Studio Advisor',
-    };
+  // Ricerca robusta nel team caricato dal database
+  const idStr = String(id || '').trim().toLowerCase();
+  const idNum = typeof id === 'number' ? id : parseInt(idStr.replace(/\D/g, ''), 10);
+
+  const m: TeamMember = teamList.find(t => 
+    String(t.id) === idStr || 
+    (idNum && t.id === idNum) ||
+    t.n.toLowerCase() === idStr ||
+    (idStr.includes('mario') && t.n.toLowerCase().includes('mario'))
+  ) || {
+    id: idNum || 1,
+    i: idStr.includes('mario') ? 'MD' : extractInitialsFromName(idStr),
+    c: idStr.includes('mario') ? '#3b82f6' : '#6366f1',
+    n: idStr.includes('mario') ? 'Avv. Mario Dibenedetto' : `Operatore Studio #${id || 1}`,
+    r: idStr.includes('mario') ? 'Legal Counsel & Partner' : 'Studio Advisor',
+  };
+
+  const displayName = m.n || 'Operatore Studio';
+  const displayRole = m.r || 'Studio Advisor';
+  const displayInitials = m.i || extractInitialsFromName(displayName);
+  const displayColor = m.c || '#6366f1';
 
   return (
     <div
@@ -34,7 +46,7 @@ export function Avatar({ id, size = 24, showTooltip = true }: AvatarProps) {
           width: size,
           height: size,
           borderRadius: '50%',
-          background: m.c,
+          background: displayColor,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -43,19 +55,19 @@ export function Avatar({ id, size = 24, showTooltip = true }: AvatarProps) {
           color: '#fff',
           flexShrink: 0,
           border: '2px solid var(--card, #1e293b)',
-          boxShadow: hovered ? `0 0 10px ${m.c}aa` : '0 2px 4px rgba(0,0,0,0.2)',
+          boxShadow: hovered ? `0 0 12px ${displayColor}bb` : '0 2px 4px rgba(0,0,0,0.2)',
           cursor: 'pointer',
           transition: 'all .18s cubic-bezier(0.4, 0, 0.2, 1)',
-          transform: hovered ? 'scale(1.14) translateY(-2px)' : 'scale(1)',
+          transform: hovered ? 'scale(1.15) translateY(-2px)' : 'scale(1)',
           zIndex: hovered ? 50 : 1,
           letterSpacing: '0.4px',
           userSelect: 'none',
         }}
       >
-        {m.i}
+        {displayInitials}
       </div>
 
-      {/* Floating Interactive Pop-up / Tooltip on Hover */}
+      {/* Floating Interactive Pop-up / Card on Hover */}
       {showTooltip && hovered && (
         <div
           style={{
@@ -64,9 +76,9 @@ export function Avatar({ id, size = 24, showTooltip = true }: AvatarProps) {
             left: '50%',
             transform: 'translateX(-50%)',
             background: 'rgba(15, 23, 42, 0.96)',
-            backdropFilter: 'blur(8px)',
-            border: `1px solid ${m.c}88`,
-            boxShadow: '0 12px 28px -4px rgba(0, 0, 0, 0.7), 0 0 16px rgba(99, 102, 241, 0.25)',
+            backdropFilter: 'blur(10px)',
+            border: `1px solid ${displayColor}88`,
+            boxShadow: '0 12px 28px -4px rgba(0, 0, 0, 0.75), 0 0 16px rgba(99, 102, 241, 0.25)',
             borderRadius: 8,
             padding: '7px 12px',
             whiteSpace: 'nowrap',
@@ -81,13 +93,13 @@ export function Avatar({ id, size = 24, showTooltip = true }: AvatarProps) {
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-            <span style={{ width: 7, height: 7, borderRadius: '50%', background: m.c, flexShrink: 0, boxShadow: `0 0 6px ${m.c}` }} />
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: displayColor, flexShrink: 0, boxShadow: `0 0 6px ${displayColor}` }} />
             <span style={{ fontSize: 12, fontWeight: 700, color: '#f8fafc' }}>
-              {m.n}
+              {displayName}
             </span>
           </div>
           <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 500 }}>
-            {m.r}
+            {displayRole}
           </div>
           {/* Arrow */}
           <div

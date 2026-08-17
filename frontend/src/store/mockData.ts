@@ -12,30 +12,55 @@ export const GIURISDIZIONI: Giurisdizione[] = [
 ];
 
 export const TEAM: TeamMember[] = [
-  { id: 1, n: 'Joe Disabato',       r: 'Lead Advisor',  i: 'JD', c: '#6366f1' },
-  { id: 2, n: 'Francesca Disabato', r: 'Back Office',   i: 'FD', c: '#ec4899' },
-  { id: 3, n: 'Avv. Lorenzo Marino',r: 'Legal Counsel', i: 'LM', c: '#10b981' },
-  { id: 4, n: 'Dr. Elena Russo',    r: 'Tax Advisor',   i: 'ER', c: '#f59e0b' },
-  { id: 5, n: 'Avv. Mario Dibenedetto', r: 'Legal Counsel', i: 'MD', c: '#3b82f6' },
+  { id: 1, n: 'Joe Disabato',       r: 'Lead Advisor & Senior Partner', i: 'JD', c: '#6366f1' },
+  { id: 2, n: 'Francesca Disabato', r: 'Back Office & Compliance',      i: 'FD', c: '#ec4899' },
+  { id: 3, n: 'Avv. Lorenzo Marino',r: 'Legal Counsel — Diritto Societario', i: 'LM', c: '#10b981' },
+  { id: 4, n: 'Dr. Elena Russo',    r: 'Tax Advisor & Fiscalità Internazionale', i: 'ER', c: '#f59e0b' },
+  { id: 5, n: 'Avv. Mario Dibenedetto', r: 'Legal Counsel & Partner',   i: 'MD', c: '#3b82f6' },
 ];
 
+export function extractInitialsFromName(name: string): string {
+  if (!name) return 'OP';
+  // Rimuovi prefissi e titoli professionali
+  const clean = name.replace(/^(avv\.?|dr\.?|dott\.?|dott\.ssa|ing\.?|rag\.?|prof\.?|avvocato|dottore)\s+/i, '').trim();
+  const parts = clean.split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return 'OP';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
 export function getTeamMembersList(): TeamMember[] {
-  const base = [...TEAM];
+  const base = TEAM.map(t => {
+    // Verifica se ci sono iniziali o colori personalizzati dall'utente
+    try {
+      const customInitials = localStorage.getItem(`bluman_avatar_initials_${t.id}`);
+      const customColor = localStorage.getItem(`bluman_avatar_color_${t.id}`);
+      return {
+        ...t,
+        i: customInitials || t.i,
+        c: customColor || t.c,
+      };
+    } catch {
+      return t;
+    }
+  });
+
   try {
     const customStr = localStorage.getItem('bluman_custom_team_users');
     if (customStr) {
       const customList = JSON.parse(customStr);
       if (Array.isArray(customList)) {
         customList.forEach((c: any, idx: number) => {
-          const name = c.nome || c.name || c.email;
-          if (name && !base.some(b => b.n.toLowerCase() === name.toLowerCase())) {
-            const initials = name.split(' ').map((p: string) => p[0]).join('').toUpperCase().slice(0, 2) || 'OP';
+          const name = c.nome || c.name || c.n || c.email;
+          if (name && !base.some(b => b.n.toLowerCase() === name.toLowerCase() || (c.email && b.n.toLowerCase().includes(c.email.toLowerCase())))) {
+            const initials = c.iniziali || extractInitialsFromName(name);
+            const id = typeof c.id === 'number' ? c.id : 10 + idx;
             base.push({
-              id: 10 + idx,
+              id,
               n: name,
-              r: c.specializzazione || c.ruolo || 'Collaboratore Studio',
+              r: c.specializzazione || c.ruolo || c.r || 'Collaboratore Studio',
               i: initials,
-              c: '#8b5cf6',
+              c: c.colore || c.c || '#8b5cf6',
             });
           }
         });

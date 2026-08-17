@@ -15,6 +15,13 @@ export interface MessaggioComunicazione {
   allegati?: { nome: string; url: string; dimensione: string }[];
 }
 
+export interface ComunicazioniTabProps {
+  progettoId: string | number;
+  nomeCliente: string;
+  emailCliente?: string;
+  cliente?: Cliente | null;
+}
+
 export function cleanDisplayEmailText(raw: string): string {
   if (!raw) return '';
   let str = raw;
