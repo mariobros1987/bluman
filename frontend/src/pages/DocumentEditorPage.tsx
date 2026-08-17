@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { fetchClienti, fetchProgetti, fetchTenantInfoApi, uploadFileApi } from '../api/client';
 import { getFormattedLogoUrl } from '../utils';
+import { PROJECTS } from '../store/mockData';
 import type { Cliente, Progetto } from '../types';
 
 export interface DocumentTemplate {
@@ -290,23 +291,132 @@ export function DocumentEditorPage() {
   const editorRef = useRef<HTMLDivElement>(null);
   const rawTemplateRef = useRef<string>(PREBUILT_TEMPLATES[0].contenutoHtml);
 
-  // Caricamento Dati
+  // Caricamento Dati Completi (DB + LocalStorage + Default Studio)
   useEffect(() => {
     const loadInitialData = async () => {
-      const [cls, prjs, tnt] = await Promise.all([
-        fetchClienti(),
-        fetchProgetti(),
-        fetchTenantInfoApi(),
-      ]);
+      let apiCls: Cliente[] = [];
+      let apiPrjs: any[] = [];
+      let tnt: any = null;
 
-      if (cls && Array.isArray(cls)) {
-        setClienti(cls);
-        if (cls.length > 0) setSelectedClienteId(cls[0].id);
+      try {
+        const [cls, prjs, tntRes] = await Promise.all([
+          fetchClienti(),
+          fetchProgetti(),
+          fetchTenantInfoApi(),
+        ]);
+        if (cls && Array.isArray(cls)) apiCls = cls;
+        if (prjs && Array.isArray(prjs)) apiPrjs = prjs;
+        if (tntRes) tnt = tntRes;
+      } catch (err) {
+        console.warn('Caricamento remoto parziale:', err);
       }
-      if (prjs && Array.isArray(prjs)) {
-        setProgetti(prjs);
-        if (prjs.length > 0) setSelectedProgettoId(prjs[0].id);
-      }
+
+      // 1. Clienti: Unione DB + LocalStorage + Extracted from Projects + Default Studio
+      const customClStr = localStorage.getItem('bluman_custom_clients');
+      const customCls: Cliente[] = customClStr ? JSON.parse(customClStr) : [];
+
+      const localProjStr = localStorage.getItem('bluman_custom_projects');
+      const localProjs: any[] = localProjStr ? JSON.parse(localProjStr) : [];
+
+      const defaultClients: Cliente[] = [
+        {
+          id: 'cl-01',
+          nome: 'Holding Beta S.r.l.',
+          tipo: 'company',
+          piva: 'IT09876543210',
+          codiceFiscale: 'BLUCD90A01H501X',
+          sedeLegale: 'Via Montenapoleone 8, Milano',
+          codiceSdi: 'SUBM70N',
+          email: 'client@holdingbeta.advisory',
+          telefono: '+39 02 889900',
+          cellulare: '+39 333 5936278',
+          referenteNome: 'Ing. Roberto Rossi (CEO)',
+        },
+        {
+          id: 'cl-02',
+          nome: 'Roberto Rossi',
+          tipo: 'individual',
+          piva: 'IT09876543210',
+          codiceFiscale: 'RSSRRT75B10F205Y',
+          sedeLegale: 'Corso Vittorio Emanuele II 12, Milano',
+          email: 'r.rossi@holdingbeta.it',
+          telefono: '+39 335 1234567',
+          cellulare: '+39 335 1234567',
+          referenteNome: 'Roberto Rossi',
+        },
+        {
+          id: 'cl-03',
+          nome: 'Blue Wave Capital Ltd',
+          tipo: 'company',
+          piva: 'MT28491039',
+          codiceFiscale: 'MT28491039',
+          sedeLegale: 'Tower Road 45, Sliema SLM 1600, Malta',
+          email: 'finance@bluewave.mt',
+          telefono: '+356 2133 4455',
+          referenteNome: 'Dott. Mark Borg',
+        },
+        {
+          id: 'cl-04',
+          nome: 'Trust San Giorgio',
+          tipo: 'company',
+          piva: 'IT11223344556',
+          codiceFiscale: 'TRSGRG80A01H501K',
+          sedeLegale: 'Piazza San Giorgio 4, Lugano, Svizzera',
+          email: 'trustee@sangiorgio.ch',
+          referenteNome: 'Avv. Gianluigi Parodi',
+        },
+      ];
+
+      const extractedClients: Cliente[] = [];
+      [...PROJECTS, ...localProjs].forEach((p: any) => {
+        if (p.cl) {
+          extractedClients.push({
+            id: `cl-proj-${p.id}`,
+            nome: p.cl,
+            tipo: p.ct || 'company',
+            piva: p.piva || 'IT09876543210',
+            codiceFiscale: p.codFisc || 'BLUCD90A01H501X',
+            sedeLegale: p.sede || 'Via Montenapoleone 8, Milano',
+            codiceSdi: 'SUBM70N',
+            email: 'client@holdingbeta.advisory',
+            telefono: '+39 02 889900',
+            referenteNome: p.cl,
+          });
+        }
+      });
+
+      const clientMap = new Map<string, Cliente>();
+      // Ordine di precedenza: default -> extracted -> custom -> API DB reale
+      [...defaultClients, ...extractedClients, ...customCls, ...apiCls].forEach(c => {
+        if (c && c.nome) {
+          clientMap.set(c.nome.trim().toLowerCase(), c);
+        }
+      });
+      const allClients = Array.from(clientMap.values());
+      setClienti(allClients);
+      if (allClients.length > 0) setSelectedClienteId(allClients[0].id);
+
+      // 2. Progetti: Unione DB + LocalStorage + Mock PROJECTS
+      const allRawProjects = [...apiPrjs, ...localProjs, ...PROJECTS];
+      const projMap = new Map<string, any>();
+      allRawProjects.forEach((p: any) => {
+        const title = p.titolo || p.n || p.nome || `Progetto #${p.id}`;
+        const idKey = String(p.id || title);
+        projMap.set(idKey, {
+          id: idKey,
+          titolo: title,
+          n: title,
+          nome: title,
+          cl: p.cl || p.cliente?.nome || 'Cliente Studio',
+          clienteId: p.clienteId || p.cliente?.id,
+          totalePreventivo: p.totalePreventivo || p.val || (p.valoreCentesimi ? p.valoreCentesimi / 100 : 8500),
+          stato: p.st || p.stato || 'in_progress',
+        });
+      });
+      const allNormalizedProjects = Array.from(projMap.values());
+      setProgetti(allNormalizedProjects);
+      if (allNormalizedProjects.length > 0) setSelectedProgettoId(allNormalizedProjects[0].id);
+
       if (tnt) {
         setTenantInfo(tnt);
       } else {
@@ -318,7 +428,7 @@ export function DocumentEditorPage() {
   }, []);
 
   const activeCliente = clienti.find(c => c.id === selectedClienteId) || clienti[0];
-  const activeProgetto = progetti.find(p => p.id === selectedProgettoId) || progetti[0];
+  const activeProgetto: any = progetti.find((p: any) => String(p.id) === String(selectedProgettoId)) || progetti[0];
 
   // Sostituzione dinamica delle variabili Smart Tags (Mail Merge)
   const renderResolvedContent = (htmlContent: string) => {
@@ -326,6 +436,9 @@ export function DocumentEditorPage() {
 
     const refJson: any = activeCliente?.referentiJson && typeof activeCliente.referentiJson === 'object' ? activeCliente.referentiJson : {};
     const dataOggi = new Date().toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' });
+
+    const projTitolo = activeProgetto?.titolo || activeProgetto?.n || activeProgetto?.nome || 'Costituzione Holding & Trading Malta';
+    const projImporto = activeProgetto?.totalePreventivo || activeProgetto?.val || 8500;
 
     let out = htmlContent;
     out = out.replace(/\{\{data_odierna\}\}/g, dataOggi);
@@ -341,8 +454,8 @@ export function DocumentEditorPage() {
     out = out.replace(/\{\{cliente\.cellulare\}\}/g, activeCliente?.cellulare || '+39 333 5936278');
     out = out.replace(/\{\{cliente\.ubo\}\}/g, activeCliente?.ubo || activeCliente?.referenteNome || 'Roberto Rossi');
 
-    out = out.replace(/\{\{progetto\.titolo\}\}/g, activeProgetto?.titolo || 'Costituzione Holding & Trading Malta');
-    out = out.replace(/\{\{progetto\.importo_totale\}\}/g, activeProgetto?.totalePreventivo ? `€ ${activeProgetto.totalePreventivo.toLocaleString('it-IT')},00` : '€ 8.500,00');
+    out = out.replace(/\{\{progetto\.titolo\}\}/g, projTitolo);
+    out = out.replace(/\{\{progetto\.importo_totale\}\}/g, `€ ${Number(projImporto).toLocaleString('it-IT')},00`);
 
     out = out.replace(/\{\{studio\.ragione_sociale\}\}/g, tenantInfo?.ragioneSociale || 'Bluecode Ltd');
     out = out.replace(/\{\{studio\.piva\}\}/g, tenantInfo?.piva || 'MT28491039');
@@ -545,8 +658,8 @@ export function DocumentEditorPage() {
             onChange={(e) => setSelectedProgettoId(e.target.value)}
             style={{ fontSize: 12, padding: '5px 10px', borderRadius: 6, background: 'var(--card)', color: 'var(--text)', border: '1px solid var(--border)', fontWeight: 600 }}
           >
-            {progetti.map(p => (
-              <option key={p.id} value={p.id}>{p.titolo} ({p.cl || 'Cliente'})</option>
+            {progetti.map((p: any) => (
+              <option key={p.id} value={p.id}>{p.titolo || p.n || p.nome || `Progetto #${p.id}`} ({p.cl || 'Cliente'})</option>
             ))}
           </select>
         </div>
