@@ -54,6 +54,10 @@ Questo file serve come indice rapido per l'IA ed i collaboratori per identificar
 - **Contratti Retainer**: `GET /contratti-ricorrenti`, `POST /contratti-ricorrenti` (collegati sia al Cliente che al Progetto specifico).
 - **Upload Documenti**: `POST /upload` (riceve base64 e salva in `./uploads/`), `GET /uploads/:filename`
 - **Servizi Integrati**:
+  - `prisma/seed.ts`: Script di seed master completo e idempotente per popolare Supabase/PostgreSQL (7 utenti studio, 5 giurisdizioni, 45 articoli distinta base, 10 moduli template e clienti ERP).
+  - `frontend/src/hooks/useTeamMembers.ts`: Hook React centralizzato e performante per interrogare gli operatori live dal database via API `GET /tenant/utenti` con calcolo dinamico delle iniziali reali (`MD`, `JD`, `LM`, `ER`, `FD`) e supporto personalizzazione colori.
+  - `frontend/src/utils/reorganizationTemplates.ts`: Collezione di 22 modelli contrattuali e verbali Word per operazioni di riorganizzazione societaria (Cessioni quote, trasformazioni, holding, trust, conferimenti) integrati nativamente in Document Studio con Smart Tags ERP.
+  - `frontend/src/components/ui/Avatar.tsx`: Componente avatar fluttuante con iniziali operatore e card di anteprima (nome completo, ruolo, punto di stato) al passaggio del mouse (hover).
   - `api/send-email.ts`: Vercel Serverless Function ultra-rapida con Nodemailer per invio test SMTP, inviti collaboratori con credenziali e comunicazioni live fascicolo a clienti.
   - `frontend/src/utils/rbac.ts`: Motore di sicurezza e controllo accessi RBAC granulare a 12 moduli (filtra Sidebar e Route Guards per moduli `denied` / `read` / `write`).
   - `src/services/otpService.ts`: Gestione codice OTP a tempo (5 min), rate limiting e sigillo crittografico FEA eIDAS UE 910/2014.
