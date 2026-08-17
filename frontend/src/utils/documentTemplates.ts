@@ -4,6 +4,8 @@ export interface DocumentTemplate {
   categoria: 'contratto' | 'nda' | 'engagement' | 'societario' | 'delega' | 'fiscale' | 'trust' | 'compliance';
   descrizione: string;
   contenutoHtml: string;
+  archiviato?: boolean;
+  dataCreazione?: string;
 }
 
 export const PREBUILT_TEMPLATES: DocumentTemplate[] = [
@@ -344,14 +346,35 @@ export function getTemplateForVoce(voceTitle: string, category: string = ''): Do
 
 /**
  * Restituisce tutti i modelli (Predefiniti + Modelli Master Personalizzati creati o importati dallo studio)
+ * Parametro includeArchived: se false, esclude i modelli contrassegnati come archiviati.
+ * 
+ * GARANZIA IMMUTABILITÀ: I documenti già istanziati, firmati o salvati all'interno dei singoli Progetti
+ * sono copie indipendenti e congelate alla data della firma. Modificare, archiviare o eliminare un modello
+ * nella Libreria NON altera in alcun modo i documenti storici dei Progetti.
  */
-export function getAllTemplates(): DocumentTemplate[] {
+export function getAllTemplates(includeArchived: boolean = true): DocumentTemplate[] {
   try {
+    const archivedIdsStr = localStorage.getItem('bluman_archived_template_ids');
+    const archivedIds = new Set<string>(archivedIdsStr ? JSON.parse(archivedIdsStr) : []);
+
+    const deletedIdsStr = localStorage.getItem('bluman_deleted_template_ids');
+    const deletedIds = new Set<string>(deletedIdsStr ? JSON.parse(deletedIdsStr) : []);
+
     const customStr = localStorage.getItem('bluman_custom_document_templates');
     const customArr: DocumentTemplate[] = customStr ? JSON.parse(customStr) : [];
-    const prebuiltIds = new Set(PREBUILT_TEMPLATES.map(t => t.id));
-    const uniqueCustom = customArr.filter(c => !prebuiltIds.has(c.id));
-    return [...PREBUILT_TEMPLATES, ...uniqueCustom];
+    const prebuiltFiltered = PREBUILT_TEMPLATES.filter(p => !deletedIds.has(p.id));
+    const prebuiltIds = new Set(prebuiltFiltered.map(t => t.id));
+    const uniqueCustom = customArr.filter(c => !prebuiltIds.has(c.id) && !deletedIds.has(c.id));
+
+    const combined: DocumentTemplate[] = [...prebuiltFiltered, ...uniqueCustom].map(t => ({
+      ...t,
+      archiviato: archivedIds.has(t.id) || !!t.archiviato,
+    }));
+
+    if (!includeArchived) {
+      return combined.filter(t => !t.archiviato);
+    }
+    return combined;
   } catch {
     return PREBUILT_TEMPLATES;
   }
@@ -361,7 +384,7 @@ export function getAllTemplates(): DocumentTemplate[] {
  * Salva o aggiorna un Modello Master personalizzato nello storage persistente dello studio
  */
 export function saveCustomTemplate(tmpl: DocumentTemplate): DocumentTemplate[] {
-  const current = getAllTemplates();
+  const current = getAllTemplates(true);
   const exists = current.some(t => t.id === tmpl.id);
   const updated = exists ? current.map(t => t.id === tmpl.id ? tmpl : t) : [tmpl, ...current];
   
@@ -372,19 +395,65 @@ export function saveCustomTemplate(tmpl: DocumentTemplate): DocumentTemplate[] {
 }
 
 /**
- * Elimina un Modello Master personalizzato
+ * Archivia un Modello Master (sia prebuilt che custom).
+ * NOTA: Non cancella i dati, ma imposta lo stato su archiviato nascondendolo dai menu operativi predefiniti.
+ */
+export function archiveTemplate(templateId: string): DocumentTemplate[] {
+  try {
+    const archivedIdsStr = localStorage.getItem('bluman_archived_template_ids');
+    const archivedIds: string[] = archivedIdsStr ? JSON.parse(archivedIdsStr) : [];
+    if (!archivedIds.includes(templateId)) {
+      archivedIds.push(templateId);
+      localStorage.setItem('bluman_archived_template_ids', JSON.stringify(archivedIds));
+    }
+    return getAllTemplates(true);
+  } catch {
+    return getAllTemplates(true);
+  }
+}
+
+/**
+ * Ripristina un Modello Master precedentemente archiviato.
+ */
+export function restoreTemplate(templateId: string): DocumentTemplate[] {
+  try {
+    const archivedIdsStr = localStorage.getItem('bluman_archived_template_ids');
+    const archivedIds: string[] = archivedIdsStr ? JSON.parse(archivedIdsStr) : [];
+    const filtered = archivedIds.filter(id => id !== templateId);
+    localStorage.setItem('bluman_archived_template_ids', JSON.stringify(filtered));
+    return getAllTemplates(true);
+  } catch {
+    return getAllTemplates(true);
+  }
+}
+
+/**
+ * Elimina definitivamente un Modello Master.
+ * NOTA FONDAMENTALE: Non tocca né altera i documenti già congelati/firmati nei progetti.
  */
 export function deleteCustomTemplate(templateId: string): DocumentTemplate[] {
   try {
+    // 1. Rimuovi dai custom
     const customStr = localStorage.getItem('bluman_custom_document_templates');
     const customArr: DocumentTemplate[] = customStr ? JSON.parse(customStr) : [];
-    const filtered = customArr.filter(t => t.id !== templateId);
-    localStorage.setItem('bluman_custom_document_templates', JSON.stringify(filtered));
-    return [...PREBUILT_TEMPLATES, ...filtered];
+    const filteredCustom = customArr.filter(t => t.id !== templateId);
+    localStorage.setItem('bluman_custom_document_templates', JSON.stringify(filteredCustom));
+
+    // 2. Se era un prebuilt, segnalo come eliminato
+    const deletedPrebuiltStr = localStorage.getItem('bluman_deleted_template_ids');
+    const deletedPrebuilt: string[] = deletedPrebuiltStr ? JSON.parse(deletedPrebuiltStr) : [];
+    if (!deletedPrebuilt.includes(templateId)) {
+      deletedPrebuilt.push(templateId);
+      localStorage.setItem('bluman_deleted_template_ids', JSON.stringify(deletedPrebuilt));
+    }
+
+    return getAllTemplates(true);
   } catch {
-    return PREBUILT_TEMPLATES;
+    return getAllTemplates(true);
   }
 }
+
+export const deleteTemplate = deleteCustomTemplate;
 
 /**
  * Importa un bundle JSON o singolo Modello Master
@@ -405,6 +474,7 @@ export function importTemplatesFromJson(jsonString: string): { success: boolean;
         categoria: (tmpl.categoria as any) || 'societario',
         descrizione: tmpl.descrizione || 'Modello master importato nel Vault Studio.',
         contenutoHtml: tmpl.contenutoHtml || '<h1>Modello Master</h1><p>Inserisci testo...</p>',
+        archiviato: !!tmpl.archiviato,
       };
       saveCustomTemplate(formatted);
       addedCount++;
@@ -420,7 +490,8 @@ export function importTemplatesFromJson(jsonString: string): { success: boolean;
  * Esporta tutti i Modelli Master correnti in formato JSON scaricabile
  */
 export function exportTemplatesAsJson(): string {
-  const all = getAllTemplates();
+  const all = getAllTemplates(true);
   return JSON.stringify(all, null, 2);
 }
+
 

@@ -3,9 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { CatBadge } from '../components/ui/CatBadge';
 import { fmt, moduloH, moduloP, resolveRighe, levelOf } from '../utils';
 import { downloadRealPdf } from '../utils/pdfGenerator';
-import { PREBUILT_TEMPLATES, getAllTemplates, saveCustomTemplate, deleteCustomTemplate, importTemplatesFromJson, exportTemplatesAsJson, type DocumentTemplate } from '../utils/documentTemplates';
+import { PREBUILT_TEMPLATES, getAllTemplates, saveCustomTemplate, deleteCustomTemplate, deleteTemplate, archiveTemplate, restoreTemplate, importTemplatesFromJson, exportTemplatesAsJson, type DocumentTemplate } from '../utils/documentTemplates';
 import { MLIB, ARTICOLI, GIURISDIZIONI } from '../store/mockData';
-import { fetchModuliLibreria, fetchArticoli, fetchGiurisdizioniApi, creaGiurisdizioneApi, creaArticoloApi, creaModuloTemplateApi, updateArticoloPrezzoApi, uploadFileApi, fetchClienti, fetchProgetti, creaProgettoApi, salvaProgettoDettaglioApi, fetchDocumentiTemplateApi, creaDocumentoTemplateApi } from '../api/client';
+import { fetchModuliLibreria, fetchArticoli, fetchGiurisdizioniApi, creaGiurisdizioneApi, creaArticoloApi, creaModuloTemplateApi, updateArticoloPrezzoApi, uploadFileApi, fetchClienti, fetchProgetti, creaProgettoApi, salvaProgettoDettaglioApi, fetchDocumentiTemplateApi, creaDocumentoTemplateApi, eliminaDocumentoTemplateApi } from '../api/client';
 import type { CategoriaModulo, Articolo, Giurisdizione, ModuloTemplate } from '../types';
 
 type SubTab = 'grafo' | 'articoli' | 'giurisdizioni' | 'crea_modulo' | 'doc_form';
@@ -973,9 +973,20 @@ function ArticoliCatalogView({ articoliList, onOpenNew }: { articoliList: Artico
                 </div>
               </div>
 
+              {/* Search Filter per i Modelli nel modale */}
+              <input
+                type="text"
+                placeholder="🔍 Cerca modello da allacciare..."
+                value={searchEditArtTmpl}
+                onChange={e => setSearchEditArtTmpl(e.target.value)}
+                style={{ fontSize: 11, padding: '4px 8px', borderRadius: 6, background: 'var(--card)', border: '1px solid var(--border)', width: '100%' }}
+              />
+
               {/* Grid di selezione di tutti i modelli in memoria */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 6, maxHeight: 180, overflowY: 'auto', background: 'var(--card)', padding: 8, borderRadius: 8, border: '1px solid var(--border)' }}>
-                {allMasterTemplates.map(item => {
+                {allMasterTemplates
+                  .filter(item => !searchEditArtTmpl || item.titolo.toLowerCase().includes(searchEditArtTmpl.toLowerCase()) || item.categoria.toLowerCase().includes(searchEditArtTmpl.toLowerCase()))
+                  .map(item => {
                   const checked = editDocModels.includes(item.id);
                   const isCustom = item.id.startsWith('tmpl-custom');
                   return (
@@ -1352,8 +1363,12 @@ function LibreriaDocumentiEForm() {
   const navigate = useNavigate();
   const libImportFileRef = useRef<HTMLInputElement>(null);
 
-  const [docModels, setDocModels] = useState<Array<{ id: string; nome: string; cat: string; firma: boolean; desc: string; url?: string; templateId?: string }>>(() => {
-    return getAllTemplates().map(t => ({
+  const [searchDocQuery, setSearchDocQuery] = useState('');
+  const [selectedCatFilter, setSelectedCatFilter] = useState('TUTTI');
+  const [statusFilter, setStatusFilter] = useState<'attivi' | 'archiviati' | 'tutti'>('attivi');
+
+  const [docModels, setDocModels] = useState<Array<{ id: string; nome: string; cat: string; firma: boolean; desc: string; url?: string; templateId?: string; archiviato?: boolean }>>(() => {
+    return getAllTemplates(true).map(t => ({
       id: t.id,
       templateId: t.id,
       nome: `${t.titolo}.docx`,
@@ -1364,6 +1379,7 @@ function LibreriaDocumentiEForm() {
            t.categoria === 'delega' ? 'Societario' : 'Contratti',
       firma: t.id === 'tmpl-engagement' || t.id === 'tmpl-nda' || t.id === 'tmpl-delega' || t.id === 'tmpl-compliance',
       desc: t.descrizione,
+      archiviato: !!t.archiviato,
     }));
   });
 
@@ -1387,7 +1403,7 @@ function LibreriaDocumentiEForm() {
   const [uploading, setUploading] = useState(false);
 
   const reloadDocModels = () => {
-    const all = getAllTemplates();
+    const all = getAllTemplates(true);
     setDocModels(all.map(t => ({
       id: t.id,
       templateId: t.id,
@@ -1399,7 +1415,30 @@ function LibreriaDocumentiEForm() {
            t.categoria === 'delega' ? 'Societario' : 'Contratti',
       firma: t.id === 'tmpl-engagement' || t.id === 'tmpl-nda' || t.id === 'tmpl-delega' || t.id === 'tmpl-compliance',
       desc: t.descrizione,
+      archiviato: !!t.archiviato,
     })));
+  };
+
+  const handleArchiveDoc = (templateId: string, nome: string) => {
+    archiveTemplate(templateId);
+    reloadDocModels();
+    alert(`📦 Modello "${nome}" archiviato con successo. (I documenti storici già presenti nei progetti rimangono inalterati).`);
+  };
+
+  const handleRestoreDoc = (templateId: string, nome: string) => {
+    restoreTemplate(templateId);
+    reloadDocModels();
+    alert(`♻️ Modello "${nome}" ripristinato tra i modelli attivi dello studio.`);
+  };
+
+  const handleDeleteDoc = async (templateId: string, nome: string) => {
+    if (!confirm(`Sei sicuro di voler eliminare definitivamente il modello master "${nome}"?\n\nI documenti già firmati o salvati nei progetti del cliente rimarranno comunque congelati e perfettamente integri.`)) return;
+    deleteTemplate(templateId);
+    try {
+      await eliminaDocumentoTemplateApi(templateId);
+    } catch {}
+    reloadDocModels();
+    alert(`🗑️ Modello "${nome}" eliminato dalla libreria master.`);
   };
 
   const handleAddDoc = async (e: React.FormEvent) => {
@@ -1516,6 +1555,7 @@ function LibreriaDocumentiEForm() {
   const [progettiList, setProgettiList] = useState<any[]>([]);
   const [selectedLinkClientId, setSelectedLinkClientId] = useState<string>('');
   const [selectedLinkProjId, setSelectedLinkProjId] = useState<string>('');
+  const [clientModalSearch, setClientModalSearch] = useState<string>('');
   const [linkingSuccessMsg, setLinkingSuccessMsg] = useState<string | null>(null);
 
   useEffect(() => {
@@ -1534,7 +1574,7 @@ function LibreriaDocumentiEForm() {
   }, []);
 
   const handleDownloadTemplatePdf = async (m: any) => {
-    const tmpl = getAllTemplates().find(t => t.id === m.templateId || t.id === m.id) || PREBUILT_TEMPLATES[0];
+    const tmpl = getAllTemplates(true).find(t => t.id === m.templateId || t.id === m.id) || PREBUILT_TEMPLATES[0];
     const htmlContent = `
       <div style="font-family: 'Segoe UI', Arial, sans-serif; padding: 20px; color: #0f172a;">
         <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #4338ca; padding-bottom: 14px; margin-bottom: 24px;">
@@ -1543,7 +1583,7 @@ function LibreriaDocumentiEForm() {
             <div style="font-size: 9pt; color: #64748b;">Valuation Centre, Sliema, Malta · Reg. N. C-99881</div>
           </div>
           <div style="text-align: right; font-size: 8.5pt; color: #64748b;">
-            Modello in Bianco: #${m.cat}<br />
+            Modello: #${m.cat}<br />
             Data: ${new Date().toLocaleDateString('it-IT')}
           </div>
         </div>
@@ -1571,14 +1611,27 @@ function LibreriaDocumentiEForm() {
     }, 2500);
   };
 
+  // Filtraggio dinamico Modelli
+  const filteredDocModels = docModels.filter(m => {
+    const matchSearch = m.nome.toLowerCase().includes(searchDocQuery.toLowerCase()) || m.desc.toLowerCase().includes(searchDocQuery.toLowerCase());
+    const matchCat = selectedCatFilter === 'TUTTI' || m.cat.toLowerCase() === selectedCatFilter.toLowerCase();
+    const matchStatus = statusFilter === 'tutti' || (statusFilter === 'archiviati' ? !!m.archiviato : !m.archiviato);
+    return matchSearch && matchCat && matchStatus;
+  });
+
+  const countAttivi = docModels.filter(m => !m.archiviato).length;
+  const countArchiviati = docModels.filter(m => !!m.archiviato).length;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       {/* Sezione 1: Modelli Documenti in Bianco */}
       <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, padding: 22, display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
           <div>
-            <div style={{ fontSize: 15, fontWeight: 700 }}>📄 Modelli Documenti & Contratti Master ({docModels.length})</div>
-            <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>Crea, importa o esporta modelli in bianco riutilizzabili e collegabili ai progetti</div>
+            <div style={{ fontSize: 15, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span>📄 Modelli Documenti & Contratti Master ({filteredDocModels.length})</span>
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>Crea, importa, archivia o elimina modelli in bianco riutilizzabili dello studio</div>
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <input
@@ -1615,21 +1668,168 @@ function LibreriaDocumentiEForm() {
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 12 }}>
-          {docModels.map(m => (
-            <div key={m.id} style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 14, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 10 }}>
+        {/* 🛡️ Banner Immutabilità Documenti Progetto */}
+        <div style={{ background: '#0d221c', border: '1px solid #059669', borderRadius: 10, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10, fontSize: 11.5, color: '#34d399' }}>
+          <span style={{ fontSize: 16 }}>🛡️</span>
+          <div>
+            <strong>Garanzia di Immutabilità Fascicoli & Progetti:</strong> L'archiviazione o l'eliminazione dei modelli master riguarda esclusivamente i nuovi utilizzi. I documenti già generati, firmati digitalmente con sigillo eIDAS e archiviati all'interno dei singoli Progetti del Cliente <strong>rimangono sigillati e congelati alla data di firma</strong>.
+          </div>
+        </div>
+
+        {/* Barra Filtri di Ricerca & Stato */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, background: 'var(--card2)', padding: 10, borderRadius: 12, border: '1px solid var(--border)' }}>
+          {/* Categorie */}
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {['TUTTI', 'Contratti', 'Societario', 'Trust', 'Compliance'].map(cat => (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => setSelectedCatFilter(cat)}
+                style={{
+                  background: selectedCatFilter === cat ? 'var(--indigo)' : 'var(--card)',
+                  color: selectedCatFilter === cat ? '#fff' : 'var(--muted)',
+                  border: `1px solid ${selectedCatFilter === cat ? 'var(--indigo-l)' : 'var(--border)'}`,
+                  padding: '4px 10px',
+                  borderRadius: 16,
+                  fontSize: 11,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+
+          {/* Stato Toggle & Search Bar */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+              <button
+                type="button"
+                onClick={() => setStatusFilter('attivi')}
+                style={{
+                  background: statusFilter === 'attivi' ? '#1e1b4b' : 'transparent',
+                  color: statusFilter === 'attivi' ? '#818cf8' : 'var(--muted)',
+                  border: 'none',
+                  padding: '4px 10px',
+                  fontSize: 11,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                🟢 Attivi ({countAttivi})
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatusFilter('archiviati')}
+                style={{
+                  background: statusFilter === 'archiviati' ? '#1e1b4b' : 'transparent',
+                  color: statusFilter === 'archiviati' ? '#818cf8' : 'var(--muted)',
+                  border: 'none',
+                  padding: '4px 10px',
+                  fontSize: 11,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                📦 Archiviati ({countArchiviati})
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatusFilter('tutti')}
+                style={{
+                  background: statusFilter === 'tutti' ? '#1e1b4b' : 'transparent',
+                  color: statusFilter === 'tutti' ? '#818cf8' : 'var(--muted)',
+                  border: 'none',
+                  padding: '4px 10px',
+                  fontSize: 11,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                Tutti ({docModels.length})
+              </button>
+            </div>
+
+            <input
+              type="text"
+              placeholder="🔍 Cerca modello..."
+              value={searchDocQuery}
+              onChange={e => setSearchDocQuery(e.target.value)}
+              style={{ fontSize: 11.5, padding: '5px 10px', borderRadius: 8, width: 180 }}
+            />
+          </div>
+        </div>
+
+        {/* Griglia Modelli */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(310px, 1fr))', gap: 12 }}>
+          {filteredDocModels.map(m => (
+            <div
+              key={m.id}
+              style={{
+                background: m.archiviato ? 'rgba(30, 27, 75, 0.25)' : 'var(--card2)',
+                border: `1px solid ${m.archiviato ? '#4338ca' : 'var(--border)'}`,
+                borderRadius: 12,
+                padding: 14,
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                gap: 10,
+                opacity: m.archiviato ? 0.8 : 1,
+              }}
+            >
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600 }}>{m.nome}</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span>{m.nome}</span>
+                    {m.archiviato && (
+                      <span style={{ fontSize: 9, background: '#312e81', color: '#c7d2fe', padding: '1px 5px', borderRadius: 4, fontWeight: 700 }}>
+                        📦 Archiviato
+                      </span>
+                    )}
+                  </div>
                   <CatBadge cat={m.cat as any} />
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.4 }}>{m.desc}</div>
               </div>
+
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border)', paddingTop: 10, marginTop: 4, flexWrap: 'wrap', gap: 6 }}>
                 <span style={{ fontSize: 10, color: m.firma ? '#a78bfa' : 'var(--muted)', fontWeight: 600 }}>
                   {m.firma ? '✍️ Firma eIDAS' : 'ℹ️ Informativo'}
                 </span>
-                <div style={{ display: 'flex', gap: 6 }}>
+                
+                <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                  {/* Pulsanti Archiviazione & Ripristino */}
+                  {m.archiviato ? (
+                    <button
+                      type="button"
+                      onClick={() => handleRestoreDoc(m.id, m.nome)}
+                      style={{ background: '#064e3b', border: '1px solid #059669', color: '#34d399', padding: '4px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer', fontWeight: 700 }}
+                      title="Ripristina modello tra quelli attivi"
+                    >
+                      ♻️ Ripristina
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => handleArchiveDoc(m.id, m.nome)}
+                      style={{ background: 'var(--card)', border: '1px solid var(--border)', color: 'var(--muted)', padding: '4px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer', fontWeight: 600 }}
+                      title="Archivia modello master"
+                    >
+                      📦 Archivia
+                    </button>
+                  )}
+
+                  {/* Pulsante Eliminazione */}
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteDoc(m.id, m.nome)}
+                    style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid #ef4444', color: '#f87171', padding: '4px 7px', borderRadius: 6, fontSize: 10, cursor: 'pointer' }}
+                    title="Elimina modello master dalla libreria"
+                  >
+                    🗑️
+                  </button>
+
                   <button
                     type="button"
                     onClick={() => navigate(`/documents?tmplId=${m.templateId || m.id}`)}
@@ -1646,7 +1846,10 @@ function LibreriaDocumentiEForm() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setLinkingDocModel(m)}
+                    onClick={() => {
+                      setLinkingDocModel(m);
+                      setClientModalSearch('');
+                    }}
                     style={{ background: '#1a1f3d', border: '1px solid #2d3260', color: '#818cf8', padding: '4px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer', fontWeight: 600 }}
                   >
                     🔗 Collega
@@ -1785,18 +1988,29 @@ function LibreriaDocumentiEForm() {
             ) : (
               <>
                 <div>
-                  <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Seleziona Cliente ERP Target *</label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                    <label style={{ fontSize: 11, color: 'var(--muted)' }}>Seleziona Cliente ERP Target *</label>
+                    <input
+                      type="text"
+                      placeholder="🔍 Filtra cliente..."
+                      value={clientModalSearch}
+                      onChange={e => setClientModalSearch(e.target.value)}
+                      style={{ fontSize: 10.5, padding: '3px 8px', width: 140, borderRadius: 6 }}
+                    />
+                  </div>
                   <select
                     value={selectedLinkClientId}
                     onChange={e => setSelectedLinkClientId(e.target.value)}
-                    style={{ padding: 10, fontSize: 12 }}
+                    style={{ padding: 10, fontSize: 12, width: '100%' }}
                     required
                   >
-                    {clientiList.map(c => (
-                      <option key={c.id} value={c.id}>
-                        🏢 {c.nome} ({c.partitaIva || c.codiceFiscale || 'P.IVA N/D'})
-                      </option>
-                    ))}
+                    {clientiList
+                      .filter(c => !clientModalSearch || c.nome.toLowerCase().includes(clientModalSearch.toLowerCase()) || (c.partitaIva || c.piva || '').toLowerCase().includes(clientModalSearch.toLowerCase()))
+                      .map(c => (
+                        <option key={c.id} value={c.id}>
+                          🏢 {c.nome} ({c.partitaIva || c.piva || c.codiceFiscale || 'P.IVA N/D'})
+                        </option>
+                      ))}
                   </select>
                 </div>
 
@@ -1843,6 +2057,7 @@ function NuovoArticoloModal({ giurList, onClose, onCreated }: { giurList: Giuris
   const [loading, setLoading] = useState(false);
 
   const fileInputNewArtRef = useRef<HTMLInputElement>(null);
+  const [searchNewArtTmpl, setSearchNewArtTmpl] = useState('');
   const [allMasterTemplates, setAllMasterTemplates] = useState<DocumentTemplate[]>(() => getAllTemplates());
   const [selectedDocIds, setSelectedDocIds] = useState<string[]>(['tmpl-engagement']);
 
@@ -2052,9 +2267,20 @@ function NuovoArticoloModal({ giurList, onClose, onCreated }: { giurList: Giuris
             </div>
           </div>
 
+          {/* Search filter nel modale */}
+          <input
+            type="text"
+            placeholder="🔍 Cerca modello da allacciare..."
+            value={searchNewArtTmpl}
+            onChange={e => setSearchNewArtTmpl(e.target.value)}
+            style={{ fontSize: 11, padding: '4px 8px', borderRadius: 6, background: 'var(--card)', border: '1px solid var(--border)', width: '100%' }}
+          />
+
           {/* Lista Modelli in Memoria */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 6, maxHeight: 150, overflowY: 'auto', background: 'var(--card)', padding: 8, borderRadius: 8, border: '1px solid var(--border)' }}>
-            {allMasterTemplates.map(item => {
+            {allMasterTemplates
+              .filter(item => !searchNewArtTmpl || item.titolo.toLowerCase().includes(searchNewArtTmpl.toLowerCase()) || item.categoria.toLowerCase().includes(searchNewArtTmpl.toLowerCase()))
+              .map(item => {
               const checked = selectedDocIds.includes(item.id);
               const isCustom = item.id.startsWith('tmpl-custom');
               return (
