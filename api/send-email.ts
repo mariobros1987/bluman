@@ -65,24 +65,31 @@ export default async function handler(req: any, res: any) {
     }
 
     // ─────────────────────────────────────────────────────────────
-    // Configurazione Transporter Nodemailer
+    // Configurazione Transporter con Automatic Host & Port Fallback
     // ─────────────────────────────────────────────────────────────
-    const portNum = Number(smtpPort) || 465;
-    const isSecure = smtpSecure !== undefined ? Boolean(smtpSecure) : portNum === 465;
+    const primaryPort = Number(smtpPort) || 465;
+    const primaryHost = smtpHost || 'authsmtp.register.it';
 
-    const transporter = nodemailer.createTransport({
-      host: smtpHost,
-      port: portNum,
-      secure: isSecure,
-      auth: {
-        user: smtpUser,
-        pass: smtpPass,
-      },
-      tls: {
-        rejectUnauthorized: false,
-      },
-      connectionTimeout: 15000,
-    });
+    const candidates: Array<{ host: string; port: number; secure: boolean }> = [
+      { host: primaryHost, port: primaryPort, secure: primaryPort === 465 },
+      { host: primaryHost, port: 587, secure: false },
+      { host: 'smtp.register.it', port: 465, secure: true },
+      { host: 'smtp.register.it', port: 587, secure: false },
+      { host: 'mail.register.it', port: 465, secure: true },
+      { host: 'mail.register.it', port: 587, secure: false },
+      { host: 'mail.bluecode-ltd.com', port: 465, secure: true },
+      { host: 'mail.bluecode-ltd.com', port: 587, secure: false },
+    ];
+
+    // Rimuovi duplicati
+    const uniqueCandidates = candidates.filter(
+      (c, index, self) => index === self.findIndex(t => t.host === c.host && t.port === c.port)
+    );
+
+    let lastError: any = null;
+    let sentSuccess = false;
+    let successfulHost = primaryHost;
+    let successfulPort = primaryPort;
 
     // ─────────────────────────────────────────────────────────────
     // AZIONE 2: Invito Nuovo Collaboratore Studio
@@ -143,11 +150,37 @@ export default async function handler(req: any, res: any) {
       if (smtpReplyTo) mailOptions.replyTo = smtpReplyTo;
       if (smtpBcc) mailOptions.bcc = smtpBcc;
 
-      await transporter.sendMail(mailOptions);
+      for (const cand of uniqueCandidates) {
+        try {
+          const transporter = nodemailer.createTransport({
+            host: cand.host,
+            port: cand.port,
+            secure: cand.secure,
+            auth: { user: smtpUser, pass: smtpPass },
+            tls: { rejectUnauthorized: false },
+            connectionTimeout: 8000,
+          });
 
-      return res.status(200).json({
-        success: true,
-        message: `✓ Email di invito e credenziali inviata con successo a ${recipientEmail}!`,
+          await transporter.sendMail(mailOptions);
+          sentSuccess = true;
+          successfulHost = cand.host;
+          successfulPort = cand.port;
+          break;
+        } catch (err: any) {
+          lastError = err;
+        }
+      }
+
+      if (sentSuccess) {
+        return res.status(200).json({
+          success: true,
+          message: `✓ Email di invito e credenziali inviata con successo a ${recipientEmail}! (Server: ${successfulHost}:${successfulPort})`,
+        });
+      }
+
+      return res.status(400).json({
+        success: false,
+        errore: lastError?.message || 'Impossibile inviare email ai server SMTP di Register.it',
       });
     }
 
@@ -159,13 +192,11 @@ export default async function handler(req: any, res: any) {
       <div style="font-family: Arial, sans-serif; padding: 24px; border: 1px solid #059669; border-radius: 12px; background: #f0fdf4; color: #166534; max-width: 600px; margin: 0 auto;">
         <h2 style="margin-top: 0; color: #047857;">✓ Connessione SMTP con Register.it Riuscita!</h2>
         <p style="font-size: 14px; line-height: 1.5; color: #065f46;">
-          Questa è un'email reale inviata dai server di <strong>${smtpHost}</strong> tramite BluMan Advisory Platform.
+          Questa è un'email reale inviata dai server di <strong>Register.it</strong> tramite BluMan Advisory Platform.
         </p>
         <div style="background: #ffffff; border: 1px solid #a7f3d0; padding: 14px; border-radius: 8px; margin: 16px 0; font-size: 13px;">
           <p style="margin: 0 0 6px 0;"><strong>Dettagli configurazione verificata:</strong></p>
           <ul style="margin: 0; padding-left: 20px;">
-            <li>Host SMTP: <code>${smtpHost}</code></li>
-            <li>Porta: <code>${portNum}</code> (${isSecure ? 'SSL/TLS' : 'STARTTLS'})</li>
             <li>Account Autenticato: <code>${smtpUser}</code></li>
             <li>Data/Ora: <code>${new Date().toLocaleString('it-IT')}</code></li>
           </ul>
@@ -186,11 +217,38 @@ export default async function handler(req: any, res: any) {
     if (smtpReplyTo) mailOptions.replyTo = smtpReplyTo;
     if (smtpBcc) mailOptions.bcc = smtpBcc;
 
-    await transporter.sendMail(mailOptions);
+    for (const cand of uniqueCandidates) {
+      try {
+        const transporter = nodemailer.createTransport({
+          host: cand.host,
+          port: cand.port,
+          secure: cand.secure,
+          auth: { user: smtpUser, pass: smtpPass },
+          tls: { rejectUnauthorized: false },
+          connectionTimeout: 8000,
+        });
 
-    return res.status(200).json({
-      success: true,
-      message: `✓ Email di prova recapitata con successo a ${recipientEmail}!`,
+        await transporter.sendMail(mailOptions);
+        sentSuccess = true;
+        successfulHost = cand.host;
+        successfulPort = cand.port;
+        break;
+      } catch (err: any) {
+        lastError = err;
+      }
+    }
+
+    if (sentSuccess) {
+      return res.status(200).json({
+        success: true,
+        message: `✓ Email di prova recapitata con successo a ${recipientEmail}! (Connesso via ${successfulHost}:${successfulPort})`,
+      });
+    }
+
+    return res.status(400).json({
+      success: false,
+      errore: lastError?.message || 'Errore durante la connessione con il server SMTP',
+      dettagli: lastError?.code || lastError?.response || lastError?.toString(),
     });
   } catch (err: any) {
     console.error('[API Send Email Error]', err);
