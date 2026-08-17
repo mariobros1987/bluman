@@ -668,10 +668,60 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce }: Pass
               <div style={{ padding: '14px 20px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--card)' }}>
                 <button
                   type="button"
-                  onClick={() => alert(`📥 Download del file "${selectedDocPreview.nome}" avviato sul tuo dispositivo.`)}
-                  style={{ background: 'var(--card2)', border: '1px solid var(--border)', color: 'var(--text)', padding: '7px 14px', borderRadius: 8, fontSize: 11, cursor: 'pointer', fontWeight: 600 }}
+                  onClick={() => {
+                    const docHtml = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>${selectedDocPreview.nome}</title>
+  <style>
+    body { font-family: 'Times New Roman', serif; padding: 40px; color: #1e293b; line-height: 1.6; max-width: 800px; margin: 0 auto; }
+    h1 { color: #1e1b4b; text-align: center; text-transform: uppercase; font-size: 20px; border-bottom: 2px solid #4338ca; padding-bottom: 10px; }
+    .meta { font-size: 12px; color: #64748b; margin-bottom: 25px; text-align: right; }
+    .box { background: #f8fafc; border: 1px solid #e2e8f0; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-size: 13px; }
+    .signature { margin-top: 50px; display: flex; justify-content: space-between; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="meta">Rif. Pratica: #${project.id} | Data: ${selectedDocPreview.dataCaricamento}</div>
+  <h1>${selectedDocPreview.nome.replace(/\\.[^/.]+$/, "")}</h1>
+  
+  <div class="box">
+    <strong>Studio Professionale:</strong> BluMan Advisory Ltd (Malta / Switzerland)<br/>
+    <strong>Cliente Committente:</strong> ${project.cl} (Pratica: ${project.n})<br/>
+    <strong>Modulo di Lavoro:</strong> ${voce.n}<br/>
+    <strong>Stato eIDAS:</strong> ${selectedDocPreview.firmato ? 'FIRMATO CON SIGILLO DIGITALE eIDAS (Reg. UE 910/2014)' : 'BOZZA IN ATTESA DI SOTTOSCRIZIONE'}
+  </div>
+
+  <p>Con il presente atto le Parti confermano l'espletamento e la presa d'atto delle attività descritte nella distinta base dell'incarico fiduciario e societario.</p>
+  <p>Tutti i dati e i documenti sono protetti con standard di crittografia avanzata all'interno del Vault Documentale BluMan.</p>
+
+  <div class="signature" style="display: flex; justify-content: space-between; margin-top: 60px;">
+    <div style="width: 45%; border-top: 1px solid #94a3b8; padding-top: 10px; text-align: center;">
+      <strong>Per BluMan Advisory Ltd</strong><br/>
+      <em>(Firma Digitale Autorizzata)</em>
+    </div>
+    <div style="width: 45%; border-top: 1px solid #94a3b8; padding-top: 10px; text-align: center;">
+      <strong>Per il Cliente: ${project.cl}</strong><br/>
+      <em>${selectedDocPreview.firmato ? '✓ Sottoscritto con Sigillo FEA eIDAS' : '(In attesa di firma)'}</em>
+    </div>
+  </div>
+</body>
+</html>`;
+                    const blob = new Blob([docHtml], { type: 'text/html;charset=utf-8' });
+                    const downloadUrl = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = downloadUrl;
+                    const safeName = selectedDocPreview.nome.endsWith('.html') || selectedDocPreview.nome.endsWith('.doc') ? selectedDocPreview.nome : `${selectedDocPreview.nome.replace(/\.pdf$/i, '')}.html`;
+                    link.download = safeName;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(downloadUrl);
+                  }}
+                  style={{ background: '#0d2d22', border: '1px solid #059669', color: '#34d399', padding: '7px 14px', borderRadius: 8, fontSize: 11, cursor: 'pointer', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}
                 >
-                  📥 Scarica Copia Localmente
+                  📥 Scarica Copia Localmente (.doc/html)
                 </button>
 
                 <div style={{ display: 'flex', gap: 8 }}>

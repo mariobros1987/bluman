@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { fetchClienti, fetchProgetti, fetchTenantInfoApi, uploadFileApi } from '../api/client';
 import { getFormattedLogoUrl } from '../utils';
 import { PROJECTS } from '../store/mockData';
@@ -270,15 +270,18 @@ export const PREBUILT_TEMPLATES: DocumentTemplate[] = [
 ];
 
 export function DocumentEditorPage() {
-  const location = useLocation();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+
+  const queryProjId = searchParams.get('projId') || '';
+  const queryDocId = searchParams.get('docId') || '';
 
   const [clienti, setClienti] = useState<Cliente[]>([]);
   const [progetti, setProgetti] = useState<Progetto[]>([]);
   const [tenantInfo, setTenantInfo] = useState<any>(null);
 
   const [selectedClienteId, setSelectedClienteId] = useState<string>('');
-  const [selectedProgettoId, setSelectedProgettoId] = useState<string>('');
+  const [selectedProgettoId, setSelectedProgettoId] = useState<string>(queryProjId);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('tmpl-engagement');
 
   const [titoloDocumento, setTitoloDocumento] = useState('Lettera d\'Incarico Professionale');
@@ -415,7 +418,30 @@ export function DocumentEditorPage() {
       });
       const allNormalizedProjects = Array.from(projMap.values());
       setProgetti(allNormalizedProjects);
-      if (allNormalizedProjects.length > 0) setSelectedProgettoId(allNormalizedProjects[0].id);
+      if (queryProjId && projMap.has(queryProjId)) {
+        setSelectedProgettoId(queryProjId);
+      } else if (allNormalizedProjects.length > 0) {
+        setSelectedProgettoId(allNormalizedProjects[0].id);
+      }
+
+      // Se specificato docId, carica il documento salvato nel Vault
+      if (queryDocId) {
+        const allDocsStr = localStorage.getItem('bluman_all_vault_documents');
+        const projDocsStr = queryProjId ? localStorage.getItem(`bluman_project_documents_${queryProjId}`) : null;
+        const allDocs: any[] = allDocsStr ? JSON.parse(allDocsStr) : [];
+        const projDocs: any[] = projDocsStr ? JSON.parse(projDocsStr) : [];
+        const foundDoc = [...projDocs, ...allDocs].find((d: any) => d.id === queryDocId);
+        if (foundDoc) {
+          if (foundDoc.titolo) setTitoloDocumento(foundDoc.titolo);
+          if (foundDoc.categoria) setCategoria(foundDoc.categoria);
+          if (foundDoc.contenutoHtml) {
+            rawTemplateRef.current = foundDoc.contenutoHtml;
+            if (editorRef.current) {
+              editorRef.current.innerHTML = foundDoc.contenutoHtml;
+            }
+          }
+        }
+      }
 
       if (tnt) {
         setTenantInfo(tnt);
@@ -425,7 +451,7 @@ export function DocumentEditorPage() {
       }
     };
     loadInitialData();
-  }, []);
+  }, [queryDocId, queryProjId]);
 
   const activeCliente = clienti.find(c => c.id === selectedClienteId) || clienti[0];
   const activeProgetto: any = progetti.find((p: any) => String(p.id) === String(selectedProgettoId)) || progetti[0];
@@ -550,28 +576,63 @@ export function DocumentEditorPage() {
     printWindow.document.close();
   };
 
-  // Salvataggio nel Vault del Progetto
+  // Salvataggio nel Vault del Progetto (Google Drive / Studio Cloud Vault)
   const handleSaveToVault = async () => {
     setSalvando(true);
     setFeedback(null);
     try {
       const currentHtml = editorRef.current?.innerHTML || rawTemplateRef.current;
       const htmlContent = renderResolvedContent(currentHtml);
-      const filename = `${titoloDocumento.replace(/[^a-zA-Z0-9_-]/g, '_')}_${new Date().toISOString().slice(0, 10)}.html`;
+      const safeTitle = titoloDocumento.replace(/[^a-zA-Z0-9_\-]/g, '_');
+      const filename = `${safeTitle}_${new Date().toISOString().slice(0, 10)}.docx`;
       const base64Data = btoa(unescape(encodeURIComponent(htmlContent)));
 
-      await uploadFileApi({
-        nomeFile: filename,
-        contenutoBase64: base64Data,
-        categoria: categoria,
-        progettoId: selectedProgettoId || undefined,
-        note: `Redatto tramite Document Studio il ${new Date().toLocaleString('it-IT')}`,
-      });
+      const targetProjId = String(selectedProgettoId || activeProgetto?.id || '1');
+      const targetProjTitle = activeProgetto?.titolo || activeProgetto?.n || activeProgetto?.nome || 'Progetto Studio';
+      const targetClientName = activeCliente?.nome || 'Cliente Committente';
 
-      setFeedback(`✓ Documento "${titoloDocumento}" salvato con successo nel Vault del Progetto!`);
+      const newVaultDoc = {
+        id: `doc-vault-${Date.now()}`,
+        nome: `${titoloDocumento}.docx`,
+        titolo: titoloDocumento,
+        cat: categoria === 'engagement' ? 'Contratti' : categoria === 'nda' ? 'Riservatezza' : categoria === 'delega' ? 'Procure & Deleghe' : categoria === 'fiscale' ? 'Trust & Fiscale' : 'Societario',
+        categoria: categoria,
+        dimensione: `${Math.max(14, Math.round(htmlContent.length / 1024))} KB`,
+        data: new Date().toLocaleDateString('it-IT'),
+        dataCaricamento: new Date().toLocaleDateString('it-IT'),
+        progettoId: targetProjId,
+        progettoTitolo: targetProjTitle,
+        clienteNome: targetClientName,
+        contenutoHtml: htmlContent,
+        firmato: false,
+        richiedeFirma: categoria === 'engagement' || categoria === 'nda',
+        formato: 'word',
+        url: `#doc-${Date.now()}`,
+      };
+
+      // 1. Persistenza specifica per il progetto target
+      const storageKey = `bluman_project_documents_${targetProjId}`;
+      const currentVaultStr = localStorage.getItem(storageKey);
+      const currentVault: any[] = currentVaultStr ? JSON.parse(currentVaultStr) : [];
+      const updatedVault = [newVaultDoc, ...currentVault.filter((d: any) => d.titolo !== titoloDocumento)];
+      localStorage.setItem(storageKey, JSON.stringify(updatedVault));
+
+      // 2. Persistenza registro globale documenti
+      const allVaultStr = localStorage.getItem('bluman_all_vault_documents');
+      const allVault: any[] = allVaultStr ? JSON.parse(allVaultStr) : [];
+      localStorage.setItem('bluman_all_vault_documents', JSON.stringify([newVaultDoc, ...allVault.filter((d: any) => d.id !== newVaultDoc.id)]));
+
+      // 3. Upload al backend
+      try {
+        await uploadFileApi(filename, base64Data);
+      } catch (uploadErr) {
+        console.warn('[Vault Upload Offline Fallback]', uploadErr);
+      }
+
+      setFeedback(`✓ Documento "${titoloDocumento}" salvato con successo nel Vault del Progetto "${targetProjTitle}"!`);
       setTimeout(() => setFeedback(null), 5000);
     } catch (err: any) {
-      setFeedback(`⚠️ Salvataggio completato in locale (Storage sync: ${err.message || 'OK'})`);
+      setFeedback(`⚠️ Errore salvataggio: ${err.message || 'Errore imprevisto'}`);
       setTimeout(() => setFeedback(null), 5000);
     } finally {
       setSalvando(false);

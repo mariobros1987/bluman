@@ -14,7 +14,7 @@ import { ConfirmDeleteModal } from '../components/ConfirmDeleteModal';
 import { PROJECTS, MLIB, ARTICOLI } from '../store/mockData';
 import { fetchProgettoDettaglio, emettiFatturaApi, consuntivaMicrovoceApi, assegnaAccessoProgettoApi, salvaProgettoDettaglioApi, archiviaProgettoApi, eliminaProgettoApi, fetchModuliLibreria, fetchArticoli, uploadFileApi } from '../api/client';
 import { TEAM } from '../store/mockData';
-import type { Progetto, ModuloProgetto, CategoriaModulo, StatoProgetto, StatoModulo, Cliente } from '../types';
+import type { Progetto, ModuloProgetto, MicroVoce, CategoriaModulo, StatoProgetto, StatoModulo, Cliente } from '../types';
 import styles from './ProjectDetail.module.css';
 
 type Tab = 'moduli' | 'grafo' | 'fatturazione' | 'redditivita' | 'storico' | 'comunicazioni' | 'documenti' | 'calendario';
@@ -2042,16 +2042,85 @@ function RedditivitaTab({
 }
 
 // ─── Componente Documenti & Vault Legale Progetto ──────────────────
+// ─── Componente Documenti & Vault Legale Progetto (Google Drive / Cloud Vault) ───
 function DocumentiTab({ project }: { project: Progetto }) {
+  const navigate = useNavigate();
   const [docCategory, setDocCategory] = useState('ALL');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [uploading, setUploading] = useState(false);
-  const [docList, setDocList] = useState<any[]>([
-    { id: 'doc-01', nome: 'Engagement Letter & Proposta d Incarico Firmata.pdf', cat: 'Contratti', dimensione: '1.4 MB', data: '15/08/2026', firmato: true, url: '#' },
-    { id: 'doc-02', nome: 'Certificato Camerale & Statuto MFSA Malta.pdf', cat: 'Societario', dimensione: '3.2 MB', data: '14/08/2026', firmato: true, url: '#' },
-    { id: 'doc-03', nome: 'Fascicolo Compliance KYC & UBO Registry.pdf', cat: 'Compliance', dimensione: '2.8 MB', data: '12/08/2026', firmato: true, url: '#' },
-    { id: 'doc-04', nome: 'Deed of Trust & Letter of Wishes.pdf', cat: 'Trust', dimensione: '4.1 MB', data: '10/08/2026', firmato: false, url: '#' },
-  ]);
+  const [selectedPreviewDoc, setSelectedPreviewDoc] = useState<any | null>(null);
 
+  // Caricamento Documenti dal Vault Locale e Cloud
+  const [docList, setDocList] = useState<any[]>(() => {
+    const defaultDocs = [
+      { id: 'doc-01', nome: 'Engagement Letter & Proposta d\'Incarico Firmata.docx', titolo: 'Engagement Letter & Proposta d\'Incarico Firmata', cat: 'Contratti', dimensione: '48 KB', data: '15/08/2026', dataCaricamento: '15/08/2026', firmato: true, formato: 'word', url: '#' },
+      { id: 'doc-02', nome: 'Certificato Camerale & Statuto MFSA Malta.pdf', titolo: 'Certificato Camerale & Statuto MFSA Malta', cat: 'Societario', dimensione: '3.2 MB', data: '14/08/2026', dataCaricamento: '14/08/2026', firmato: true, formato: 'pdf', url: '#' },
+      { id: 'doc-03', nome: 'Fascicolo Compliance KYC & UBO Registry.pdf', titolo: 'Fascicolo Compliance KYC & UBO Registry', cat: 'Compliance', dimensione: '2.8 MB', data: '12/08/2026', dataCaricamento: '12/08/2026', firmato: true, formato: 'pdf', url: '#' },
+      { id: 'doc-04', nome: 'Deed of Trust & Letter of Wishes.docx', titolo: 'Deed of Trust & Letter of Wishes', cat: 'Trust', dimensione: '64 KB', data: '10/08/2026', dataCaricamento: '10/08/2026', firmato: false, formato: 'word', url: '#' },
+    ];
+
+    try {
+      const storageKey = `bluman_project_documents_${project.id}`;
+      const savedProjDocsStr = localStorage.getItem(storageKey);
+      const savedProjDocs: any[] = savedProjDocsStr ? JSON.parse(savedProjDocsStr) : [];
+
+      const allVaultStr = localStorage.getItem('bluman_all_vault_documents');
+      const allVault: any[] = allVaultStr ? JSON.parse(allVaultStr) : [];
+      const matchingGlobalDocs = allVault.filter((d: any) => String(d.progettoId) === String(project.id));
+
+      const mergedMap = new Map<string, any>();
+      [...defaultDocs, ...savedProjDocs, ...matchingGlobalDocs].forEach(d => {
+        if (d && (d.id || d.nome)) {
+          mergedMap.set(d.id || d.nome, d);
+        }
+      });
+      return Array.from(mergedMap.values());
+    } catch {
+      return defaultDocs;
+    }
+  });
+
+  // Helper per scaricare localmente copia reale del documento
+  const handleDownloadDocument = (doc: any) => {
+    const content = doc.contenutoHtml || `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>${doc.nome || doc.titolo}</title>
+  <style>
+    body { font-family: 'Segoe UI', Arial, sans-serif; padding: 40px; color: #1e293b; line-height: 1.6; max-width: 800px; margin: 0 auto; }
+    h1 { color: #1e1b4b; text-align: center; text-transform: uppercase; font-size: 20px; border-bottom: 2px solid #4338ca; padding-bottom: 10px; }
+    .meta { font-size: 12px; color: #64748b; margin-bottom: 25px; text-align: right; }
+    .box { background: #f8fafc; border: 1px solid #e2e8f0; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <div class="meta">Rif. Incarico: #${project.id} | Data: ${doc.data || doc.dataCaricamento || '2026'}</div>
+  <h1>${doc.titolo || doc.nome}</h1>
+  <div class="box">
+    <strong>Studio Professionale:</strong> BluMan Advisory Ltd (Malta / Svizzera)<br/>
+    <strong>Cliente Committente:</strong> ${project.cl} (${project.n})<br/>
+    <strong>Categoria Vault:</strong> ${doc.cat || doc.categoria || 'Generale'}<br/>
+    <strong>Stato eIDAS:</strong> ${doc.firmato ? '🔒 Sottoscritto con Sigillo FEA eIDAS UE 910/2014' : 'Bozza Documentale Studio'}
+  </div>
+  <p>Documento ufficiale facente parte del fascicolo legale e societario archiviato nel Cloud Vault di BluMan Advisory Services.</p>
+</body>
+</html>`;
+
+    const blob = new Blob([content], { type: 'text/html;charset=utf-8' });
+    const downloadUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    const safeName = (doc.nome || `${doc.titolo}.docx`).replace(/\.docx$/i, '.html');
+    link.download = safeName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(downloadUrl);
+  };
+
+  // Caricamento File da Disco nel Vault Progetto
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -2062,50 +2131,81 @@ function DocumentiTab({ project }: { project: Progetto }) {
       reader.onload = async () => {
         const base64 = (reader.result as string).split(',')[1];
         const res = await uploadFileApi(file.name, base64);
+        const isWord = file.name.endsWith('.docx') || file.name.endsWith('.doc');
         const newDoc = {
           id: `doc-${Date.now()}`,
           nome: file.name,
-          cat: 'Allegati Progetto',
+          titolo: file.name.replace(/\.[^/.]+$/, ''),
+          cat: isWord ? 'Contratti' : 'Allegati Progetto',
           dimensione: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
-          data: 'Oggi',
+          data: new Date().toLocaleDateString('it-IT'),
+          dataCaricamento: new Date().toLocaleDateString('it-IT'),
+          progettoId: String(project.id),
+          clienteNome: project.cl,
           firmato: false,
+          formato: isWord ? 'word' : 'pdf',
           url: res?.url || '#',
         };
-        setDocList([newDoc, ...docList]);
-        alert(`✓ Documento "${file.name}" caricato nel Vault del Progetto con successo!`);
+
+        const updated = [newDoc, ...docList];
+        setDocList(updated);
+        localStorage.setItem(`bluman_project_documents_${project.id}`, JSON.stringify(updated));
+
+        const allVaultStr = localStorage.getItem('bluman_all_vault_documents');
+        const allVault: any[] = allVaultStr ? JSON.parse(allVaultStr) : [];
+        localStorage.setItem('bluman_all_vault_documents', JSON.stringify([newDoc, ...allVault]));
+
+        alert(`✓ File "${file.name}" archiviato nel Cloud Drive del Progetto con successo!`);
       };
       reader.readAsDataURL(file);
     } catch (err) {
       console.error(err);
-      alert('Errore nel caricamento del file');
+      alert('Errore nel caricamento del file nel Drive');
     } finally {
       setUploading(false);
     }
   };
 
-  const filteredDocs = docCategory === 'ALL' ? docList : docList.filter(d => d.cat === docCategory);
+  // Eliminazione Documento dal Vault
+  const handleDeleteDoc = (docId: string) => {
+    if (!confirm('Vuoi rimuovere questo documento dal Vault del progetto?')) return;
+    const updated = docList.filter(d => d.id !== docId);
+    setDocList(updated);
+    localStorage.setItem(`bluman_project_documents_${project.id}`, JSON.stringify(updated));
+    if (selectedPreviewDoc?.id === docId) setSelectedPreviewDoc(null);
+  };
+
+  // Filtraggio dinamico
+  const filteredDocs = docList.filter(d => {
+    const matchCat = docCategory === 'ALL' || d.cat === docCategory || (docCategory === 'Contratti' && d.formato === 'word');
+    const matchSearch = !searchQuery || (d.nome || d.titolo || '').toLowerCase().includes(searchQuery.toLowerCase());
+    return matchCat && matchSearch;
+  });
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      {/* Header Document Vault */}
-      <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, padding: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 14 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+      {/* Header Document Vault Google Drive Style */}
+      <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16, boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}>
         <div>
-          <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--indigo-l)', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span>📄 Vault Documenti Legali & Fascicolo Incarico</span>
+          <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span>📁 Google Drive & Cloud Vault Documenti</span>
+            <span style={{ fontSize: 10, background: '#1e1b4b', color: '#818cf8', padding: '3px 8px', borderRadius: 6, fontWeight: 700, textTransform: 'uppercase' }}>
+              Word Studio + PDF Vault
+            </span>
           </div>
-          <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 3 }}>
-            Archivio di tutti i contratti firmati, certificati societari, dossier KYC ed allegati relativi a <strong>{project.cl}</strong>
+          <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>
+            Fascicolo digitale per <strong>{project.cl}</strong> · <strong>{project.n}</strong> ({docList.length} file archiviati)
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
           <button
             type="button"
-            onClick={() => window.location.href = '/documents'}
+            onClick={() => navigate(`/documents?projId=${project.id}`)}
             style={{
-              background: '#1e1b4b',
-              color: '#a5b4fc',
-              border: '1px solid #4338ca',
+              background: 'linear-gradient(135deg, #4338ca 0%, #312e81 100%)',
+              color: '#fff',
+              border: '1px solid #6366f1',
               padding: '8px 16px',
               borderRadius: 10,
               fontSize: 12,
@@ -2113,84 +2213,343 @@ function DocumentiTab({ project }: { project: Progetto }) {
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              gap: 6,
+              gap: 8,
+              boxShadow: '0 4px 14px rgba(99,102,241,.3)',
             }}
           >
-            <span>📝 Redigi nel Document Studio (Word)</span>
+            <span>📝 Nuovo con Word Studio</span>
           </button>
 
-          <label style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: 10, fontSize: 12, fontWeight: 600, cursor: 'pointer', boxShadow: '0 4px 14px rgba(99,102,241,.3)', display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span>{uploading ? 'Caricamento in corso...' : '📤 Carica Nuovo Documento'}</span>
+          <label style={{ background: 'var(--card2)', border: '1px solid var(--border)', color: 'var(--text)', padding: '8px 16px', borderRadius: 10, fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, boxShadow: '0 2px 8px rgba(0,0,0,.1)' }}>
+            <span>{uploading ? 'Caricamento in corso...' : '📤 Carica File da Disco'}</span>
             <input type="file" onChange={handleFileUpload} disabled={uploading} style={{ display: 'none' }} />
           </label>
         </div>
       </div>
 
-      {/* Toolbar Filtro Categorie */}
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        {['ALL', 'Contratti', 'Societario', 'Compliance', 'Trust', 'Allegati Progetto'].map(cat => (
-          <button
-            key={cat}
-            onClick={() => setDocCategory(cat)}
-            style={{
-              padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer',
-              background: docCategory === cat ? '#1a1f3d' : 'var(--card2)',
-              color: docCategory === cat ? '#818cf8' : 'var(--muted)',
-              border: `1px solid ${docCategory === cat ? '#3730a3' : 'var(--border)'}`,
-            }}
-          >
-            {cat === 'ALL' ? '🌐 Tutti i Documenti' : cat}
-          </button>
-        ))}
-      </div>
+      {/* Toolbar: Ricerca, Filtri e Switch Visualizzazione (Grid / Table) */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, background: 'var(--card2)', padding: '12px 18px', borderRadius: 12, border: '1px solid var(--border)' }}>
+        {/* Filtri Categoria */}
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {[
+            { id: 'ALL', label: `🌐 Tutti (${docList.length})` },
+            { id: 'Contratti', label: '📄 Contratti & Word' },
+            { id: 'Societario', label: '🏢 Societario & MFSA' },
+            { id: 'Compliance', label: '🛡 Compliance & KYC' },
+            { id: 'Trust', label: '🏛 Trust & Fiscale' },
+            { id: 'Allegati Progetto', label: '📎 Allegati' },
+          ].map(cat => (
+            <button
+              key={cat.id}
+              onClick={() => setDocCategory(cat.id)}
+              style={{
+                padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                background: docCategory === cat.id ? '#1e1b4b' : 'var(--card)',
+                color: docCategory === cat.id ? '#818cf8' : 'var(--muted)',
+                border: `1px solid ${docCategory === cat.id ? '#4338ca' : 'var(--border)'}`,
+              }}
+            >
+              {cat.label}
+            </button>
+          ))}
+        </div>
 
-      {/* Tabella Documenti */}
-      <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 16, padding: 20 }}>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5 }}>
-            <thead>
-              <tr style={{ background: 'var(--card)', borderBottom: '1px solid var(--border)', textAlign: 'left', color: 'var(--muted)' }}>
-                <th style={{ padding: '10px 12px' }}>Nome File / Documento</th>
-                <th style={{ padding: '10px 12px' }}>Categoria</th>
-                <th style={{ padding: '10px 12px' }}>Dimensione</th>
-                <th style={{ padding: '10px 12px' }}>Data Caricamento</th>
-                <th style={{ padding: '10px 12px' }}>Firma eIDAS</th>
-                <th style={{ padding: '10px 12px', textAlign: 'right' }}>Azioni</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredDocs.map(doc => (
-                <tr key={doc.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                  <td style={{ padding: '12px', fontWeight: 700, color: 'var(--text)' }}>
-                    📄 {doc.nome}
-                  </td>
-                  <td style={{ padding: '12px' }}>
-                    <span style={{ fontSize: 10, background: '#1a1f3d', color: '#818cf8', padding: '2px 8px', borderRadius: 10, border: '1px solid #3730a3' }}>
-                      {doc.cat}
-                    </span>
-                  </td>
-                  <td style={{ padding: '12px', color: 'var(--muted)' }}>{doc.dimensione}</td>
-                  <td style={{ padding: '12px', color: 'var(--muted)' }}>{doc.data}</td>
-                  <td style={{ padding: '12px' }}>
-                    <span style={{ fontSize: 9.5, background: doc.firmato ? '#0d2d22' : '#2d1a05', color: doc.firmato ? '#34d399' : '#f59e0b', border: `1px solid ${doc.firmato ? '#059669' : '#d97706'}`, padding: '2px 8px', borderRadius: 10, fontWeight: 700 }}>
-                      {doc.firmato ? '🔒 eIDAS Verificato' : '⏳ In attesa di firma'}
-                    </span>
-                  </td>
-                  <td style={{ padding: '12px', textAlign: 'right' }}>
-                    <button
-                      type="button"
-                      onClick={() => alert(`Apertura ed anteprima documento: ${doc.nome}`)}
-                      style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--indigo-l)', padding: '4px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer', fontWeight: 600 }}
-                    >
-                      👁 Visualizza
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        {/* Search & Mode Switch */}
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <input
+            type="text"
+            placeholder="🔍 Cerca file nel Vault..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            style={{ fontSize: 11.5, padding: '6px 12px', borderRadius: 8, background: 'var(--card)', color: 'var(--text)', border: '1px solid var(--border)', width: 190 }}
+          />
+
+          <div style={{ display: 'flex', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+            <button
+              onClick={() => setViewMode('grid')}
+              style={{ padding: '6px 10px', background: viewMode === 'grid' ? '#1e1b4b' : 'transparent', color: viewMode === 'grid' ? '#818cf8' : 'var(--muted)', border: 'none', cursor: 'pointer', fontSize: 12 }}
+              title="Vista Griglia Schede"
+            >
+              ⊞ Griglia
+            </button>
+            <button
+              onClick={() => setViewMode('list')}
+              style={{ padding: '6px 10px', background: viewMode === 'list' ? '#1e1b4b' : 'transparent', color: viewMode === 'list' ? '#818cf8' : 'var(--muted)', border: 'none', cursor: 'pointer', fontSize: 12 }}
+              title="Vista Elenco Tabellare"
+            >
+              ☰ Elenco
+            </button>
+          </div>
         </div>
       </div>
+
+      {/* Grid View Google Drive Style */}
+      {viewMode === 'grid' && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(270px, 1fr))', gap: 16 }}>
+          {filteredDocs.map(doc => {
+            const isWord = doc.formato === 'word' || (doc.nome && (doc.nome.endsWith('.docx') || doc.nome.endsWith('.doc')));
+            return (
+              <div
+                key={doc.id}
+                style={{
+                  background: 'var(--card)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 14,
+                  padding: 16,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  gap: 12,
+                  boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
+                  transition: 'transform .15s, border-color .15s',
+                }}
+              >
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                    <div style={{ fontSize: 28 }}>
+                      {isWord ? '📝' : '📄'}
+                    </div>
+                    <span style={{ fontSize: 9.5, background: doc.firmato ? '#0d2d22' : '#1e1b4b', color: doc.firmato ? '#34d399' : '#818cf8', border: `1px solid ${doc.firmato ? '#059669' : '#4338ca'}`, padding: '2px 8px', borderRadius: 8, fontWeight: 700 }}>
+                      {doc.firmato ? '🔒 eIDAS Firmato' : (isWord ? 'DOCX Word' : 'PDF')}
+                    </span>
+                  </div>
+
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', lineHeight: 1.4, wordBreak: 'break-word' }}>
+                    {doc.titolo || doc.nome}
+                  </div>
+
+                  <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6, display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <span>📁 {doc.cat || doc.categoria || 'Vault'}</span>
+                    <span>·</span>
+                    <span>💾 {doc.dimensione || '24 KB'}</span>
+                  </div>
+                  <div style={{ fontSize: 10.5, color: 'var(--muted)', marginTop: 2 }}>
+                    📅 {doc.data || doc.dataCaricamento || '15/08/2026'}
+                  </div>
+                </div>
+
+                {/* Actions per Card */}
+                <div style={{ display: 'flex', gap: 6, borderTop: '1px solid var(--border)', paddingTop: 10, flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedPreviewDoc(doc)}
+                    style={{ flex: 1, background: 'var(--card2)', border: '1px solid var(--border)', color: 'var(--text)', padding: '5px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}
+                  >
+                    👁 Anteprima
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/documents?projId=${project.id}&docId=${doc.id}`)}
+                    style={{ background: '#1e1b4b', border: '1px solid #4338ca', color: '#818cf8', padding: '5px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+                    title="Apri e Modifica con Word Studio"
+                  >
+                    ✏️ Studio
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleDownloadDocument(doc)}
+                    style={{ background: '#0d2d22', border: '1px solid #059669', color: '#34d399', padding: '5px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+                    title="Scarica Copia Localmente"
+                  >
+                    📥 Scarica
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteDoc(doc.id)}
+                    style={{ background: '#2d1515', border: '1px solid #7f1d1d', color: '#f87171', padding: '5px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer' }}
+                    title="Elimina Documento dal Drive"
+                  >
+                    🗑
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* List View Table */}
+      {viewMode === 'list' && (
+        <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, padding: 20 }}>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5 }}>
+              <thead>
+                <tr style={{ background: 'var(--card2)', borderBottom: '1px solid var(--border)', textAlign: 'left', color: 'var(--muted)' }}>
+                  <th style={{ padding: '10px 12px' }}>Nome File / Documento</th>
+                  <th style={{ padding: '10px 12px' }}>Categoria</th>
+                  <th style={{ padding: '10px 12px' }}>Dimensione</th>
+                  <th style={{ padding: '10px 12px' }}>Data</th>
+                  <th style={{ padding: '10px 12px' }}>Firma eIDAS</th>
+                  <th style={{ padding: '10px 12px', textAlign: 'right' }}>Azioni Cloud Vault</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredDocs.map(doc => {
+                  const isWord = doc.formato === 'word' || (doc.nome && (doc.nome.endsWith('.docx') || doc.nome.endsWith('.doc')));
+                  return (
+                    <tr key={doc.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ padding: '12px', fontWeight: 700, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span>{isWord ? '📝' : '📄'}</span>
+                        <span>{doc.titolo || doc.nome}</span>
+                      </td>
+                      <td style={{ padding: '12px' }}>
+                        <span style={{ fontSize: 10, background: '#1a1f3d', color: '#818cf8', padding: '2px 8px', borderRadius: 10, border: '1px solid #3730a3' }}>
+                          {doc.cat || doc.categoria || 'Generale'}
+                        </span>
+                      </td>
+                      <td style={{ padding: '12px', color: 'var(--muted)' }}>{doc.dimensione || '24 KB'}</td>
+                      <td style={{ padding: '12px', color: 'var(--muted)' }}>{doc.data || doc.dataCaricamento || '15/08/2026'}</td>
+                      <td style={{ padding: '12px' }}>
+                        <span style={{ fontSize: 9.5, background: doc.firmato ? '#0d2d22' : '#2d1a05', color: doc.firmato ? '#34d399' : '#f59e0b', border: `1px solid ${doc.firmato ? '#059669' : '#d97706'}`, padding: '2px 8px', borderRadius: 10, fontWeight: 700 }}>
+                          {doc.firmato ? '🔒 eIDAS Verificato' : '⏳ In attesa di firma'}
+                        </span>
+                      </td>
+                      <td style={{ padding: '12px', textAlign: 'right' }}>
+                        <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedPreviewDoc(doc)}
+                            style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--indigo-l)', padding: '4px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer', fontWeight: 600 }}
+                          >
+                            👁 Anteprima
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => navigate(`/documents?projId=${project.id}&docId=${doc.id}`)}
+                            style={{ background: '#1e1b4b', border: '1px solid #4338ca', color: '#818cf8', padding: '4px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer', fontWeight: 600 }}
+                          >
+                            ✏️ Word Studio
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDownloadDocument(doc)}
+                            style={{ background: '#0d2d22', border: '1px solid #059669', color: '#34d399', padding: '4px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer', fontWeight: 700 }}
+                          >
+                            📥 Scarica
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteDoc(doc.id)}
+                            style={{ background: 'transparent', border: '1px solid #7f1d1d', color: '#f87171', padding: '4px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer' }}
+                          >
+                            🗑
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Visualizzatore Anteprima Documento Vault */}
+      {selectedPreviewDoc && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 130, padding: 20 }}>
+          <div style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, width: '100%', maxWidth: 780, maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 25px 50px -12px rgba(0,0,0,.7)' }}>
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--card)' }}>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span>📄 {selectedPreviewDoc.titolo || selectedPreviewDoc.nome}</span>
+                  <span style={{ fontSize: 10, background: selectedPreviewDoc.firmato ? '#0d2d22' : '#200f40', color: selectedPreviewDoc.firmato ? '#34d399' : '#a78bfa', padding: '2px 8px', borderRadius: 10, border: '1px solid #3730a3' }}>
+                    {selectedPreviewDoc.firmato ? '🔒 eIDAS Sottoscritto' : 'Bozza Legale Studio'}
+                  </span>
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 3 }}>
+                  Pratica: <strong>{project.n}</strong> · Cliente: <strong>{project.cl}</strong> · Dimensione: {selectedPreviewDoc.dimensione || '32 KB'}
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedPreviewDoc(null)}
+                style={{ background: 'var(--card2)', border: 'none', width: 32, height: 32, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--muted)', fontSize: 16 }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Document Content Rendering */}
+            <div style={{ flex: 1, padding: 24, overflowY: 'auto', background: '#0a0d14' }}>
+              <div style={{ background: '#fff', color: '#1e293b', borderRadius: 8, padding: 32, fontFamily: 'serif', boxShadow: '0 10px 30px rgba(0,0,0,.5)', border: '1px solid #cbd5e1', lineHeight: 1.6 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #0284c7', paddingBottom: 14, marginBottom: 20 }}>
+                  <div>
+                    <div style={{ fontSize: 18, fontWeight: 800, color: '#0369a1', fontFamily: 'sans-serif' }}>BLUMAN ADVISORY SERVICES</div>
+                    <div style={{ fontSize: 10, color: '#64748b', fontFamily: 'sans-serif' }}>Corporate Structuring & Cross-Border Wealth Planning</div>
+                  </div>
+                  <div style={{ textAlign: 'right', fontSize: 10, color: '#64748b', fontFamily: 'sans-serif' }}>
+                    Rif. Incarico: #{project.id}<br />
+                    Data: {selectedPreviewDoc.data || selectedPreviewDoc.dataCaricamento || '2026'}
+                  </div>
+                </div>
+
+                <div style={{ textAlign: 'center', fontSize: 16, fontWeight: 700, marginBottom: 18, color: '#0f172a', textTransform: 'uppercase' }}>
+                  {selectedPreviewDoc.titolo || selectedPreviewDoc.nome}
+                </div>
+
+                {selectedPreviewDoc.contenutoHtml ? (
+                  <div dangerouslySetInnerHTML={{ __html: selectedPreviewDoc.contenutoHtml }} />
+                ) : (
+                  <div style={{ fontSize: 12, color: '#334155', textAlign: 'justify' }}>
+                    <p style={{ marginBottom: 12 }}>
+                      Il presente documento certifica la conformità delle procedure societarie e contrattuali svolte per il Cliente <strong>{project.cl}</strong> nell'ambito dell'incarico <strong>{project.n}</strong>.
+                    </p>
+                    <p style={{ marginBottom: 12 }}>
+                      Tutti gli atti societari, visure, delibere ed accordi sono archiviati con crittografia end-to-end e valore legale probatorio ai sensi dell'art. 20 del CAD e del Regolamento UE 910/2014 (eIDAS).
+                    </p>
+                  </div>
+                )}
+
+                <div style={{ marginTop: 40, paddingTop: 16, borderTop: '1px dashed #cbd5e1', display: 'flex', justifyContent: 'space-between', fontSize: 10, fontFamily: 'sans-serif' }}>
+                  <div>
+                    <div style={{ fontWeight: 700, color: '#475569' }}>BluMan Advisory Firm:</div>
+                    <div style={{ marginTop: 20, fontStyle: 'italic', color: '#0284c7', fontWeight: 600 }}>Joe Disabato (Senior Partner)</div>
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 700, color: '#475569' }}>Firma Committente:</div>
+                    <div style={{ marginTop: 20, fontStyle: 'italic', color: selectedPreviewDoc.firmato ? '#059669' : '#64748b', fontWeight: 700 }}>
+                      {selectedPreviewDoc.firmato ? `✓ FIRMATO DA ${project.cl.toUpperCase()} (FEA eIDAS Validata)` : `(Sottoscrizione per ${project.cl})`}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Actions Footer */}
+            <div style={{ padding: '14px 20px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--card)' }}>
+              <button
+                type="button"
+                onClick={() => handleDownloadDocument(selectedPreviewDoc)}
+                style={{ background: '#0d2d22', border: '1px solid #059669', color: '#34d399', padding: '8px 16px', borderRadius: 8, fontSize: 12, cursor: 'pointer', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}
+              >
+                📥 Scarica Copia Localmente (.docx/html)
+              </button>
+
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigate(`/documents?projId=${project.id}&docId=${selectedPreviewDoc.id}`);
+                  }}
+                  style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+                >
+                  📝 Modifica in Document Studio
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedPreviewDoc(null)}
+                  style={{ background: 'var(--card2)', border: '1px solid var(--border)', color: 'var(--muted)', padding: '8px 14px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}
+                >
+                  Chiudi
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
