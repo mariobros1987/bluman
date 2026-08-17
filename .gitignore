@@ -1,7 +1,10 @@
-# Environment
+# Environment & Secrets (NON PUSHARE MAI SU GITHUB)
 .env
 .env.local
 .env.*.local
+secrets/
+.secrets/
+*.secret.*
 
 # Node
 node_modules/
