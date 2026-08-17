@@ -7,39 +7,45 @@ export function getUserPermission(user: any, moduleKey: string): PermissionLevel
   if (user.ruolo === 'super_admin') return 'write';
   if (moduleKey === 'dashboard') return 'write';
 
-  const userKey = user.id || user.email;
-  const emailKey = user.email ? user.email.toLowerCase() : '';
+  const userKey = (user.id || '').toString().toLowerCase();
+  const emailKey = (user.email || '').toLowerCase().trim();
 
-  // 1. Controlla prima gli override specifici salvati nella Matrice Permessi
-  let savedPermsStr = localStorage.getItem(`bluman_rbac_permissions_${userKey}`);
-  if (!savedPermsStr && emailKey) {
-    savedPermsStr = localStorage.getItem(`bluman_rbac_permissions_${emailKey}`);
-  }
+  // 1. Controlla gli override specifici salvati nella Matrice Permessi per questo specifico utente
+  const candidateKeys = [
+    `bluman_rbac_permissions_${emailKey}`,
+    `bluman_rbac_permissions_usr-${emailKey}`,
+    `bluman_rbac_permissions_${userKey}`,
+  ].filter(Boolean);
 
-  if (savedPermsStr) {
-    try {
-      const perms = JSON.parse(savedPermsStr);
-      if (Array.isArray(perms)) {
-        const found = perms.find((p: any) => p.moduloChiave === moduleKey);
-        if (found && found.livello) {
-          return found.livello as PermissionLevel;
+  for (const k of candidateKeys) {
+    const savedStr = localStorage.getItem(k);
+    if (savedStr) {
+      try {
+        const perms = JSON.parse(savedStr);
+        if (Array.isArray(perms)) {
+          const found = perms.find((p: any) => p.moduloChiave === moduleKey);
+          if (found && found.livello) {
+            return found.livello as PermissionLevel;
+          }
         }
-      }
-    } catch {}
+      } catch {}
+    }
   }
 
-  // 2. Se non sono definiti override specifici, applica i permessi di default per ruolo
+  // 2. Permessi di Default per Ruolo (quando non è stata ancora salvata una Matrice personalizzata)
   if (user.ruolo === 'advisor') {
-    if (['projects', 'clients', 'documents', 'calendar', 'retainers', 'invoices'].includes(moduleKey)) return 'write';
-    if (['banks', 'primanota', 'scadenzario', 'library'].includes(moduleKey)) return 'read';
-    if (['audit', 'settings', 'admin'].includes(moduleKey)) return 'denied';
+    // Advisor/Partner hanno accesso a tutti i moduli operativi e impostazioni di studio
+    if (['projects', 'clients', 'documents', 'calendar', 'retainers', 'invoices', 'settings', 'library', 'banks', 'primanota', 'scadenzario'].includes(moduleKey)) {
+      return 'write';
+    }
+    if (['audit', 'admin'].includes(moduleKey)) return 'denied';
     return 'write';
   }
 
   if (user.ruolo === 'collaboratore_interno' || user.ruolo === 'operator') {
     if (['projects', 'calendar'].includes(moduleKey)) return 'write';
     if (['clients', 'documents', 'library'].includes(moduleKey)) return 'read';
-    return 'denied'; // Tutti gli altri moduli finanziari e di sistema rimangono bloccati
+    return 'denied'; // Invoices, Banche, Prima Nota, Scadenzario, Retainers, Audit, Settings bloccati
   }
 
   return 'write';

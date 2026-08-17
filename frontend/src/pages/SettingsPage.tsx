@@ -1288,10 +1288,15 @@ function OperatorDetailModal({
       livello,
     }));
 
-    const userKey = operator.id || operator.email;
-    localStorage.setItem(`bluman_rbac_permissions_${userKey}`, JSON.stringify(payload));
-    if (operator.email) {
-      localStorage.setItem(`bluman_rbac_permissions_${operator.email.toLowerCase()}`, JSON.stringify(payload));
+    const userKey = (operator.id || '').toString();
+    const emailClean = (operator.email || '').toLowerCase().trim();
+
+    if (userKey) {
+      localStorage.setItem(`bluman_rbac_permissions_${userKey}`, JSON.stringify(payload));
+    }
+    if (emailClean) {
+      localStorage.setItem(`bluman_rbac_permissions_${emailClean}`, JSON.stringify(payload));
+      localStorage.setItem(`bluman_rbac_permissions_usr-${emailClean}`, JSON.stringify(payload));
     }
 
     if (operator.id) {
