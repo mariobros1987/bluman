@@ -787,9 +787,19 @@ export async function sendEmailDirectApi(to: string, subject: string, text: stri
       signal: controller.signal,
     });
     clearTimeout(timer);
-    return await res.json();
+    const data = await res.json();
+    if (res.ok && data.success) {
+      return data;
+    }
+    return {
+      success: false,
+      errore: data.errore || 'Errore durante la trasmissione email',
+    };
   } catch (err: any) {
-    return { success: true, message: `Email inoltrata con successo a ${to}!` };
+    return {
+      success: false,
+      errore: err.message || 'Timeout o errore di connessione con il server SMTP',
+    };
   }
 }
 

@@ -147,6 +147,7 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
   const [nuovoTesto, setNuovoTesto] = useState('');
   const [canaleSelezionato, setCanaleSelezionato] = useState<'email' | 'whatsapp' | 'telegram' | 'signal'>('whatsapp');
   const [filtroCanale, setFiltroCanale] = useState<string>('TUTTI');
+  const [customDestEmail, setCustomDestEmail] = useState('');
   const [loadingMsgs, setLoadingMsgs] = useState(false);
   const [inviando, setInviando] = useState(false);
   const [feedback, setFeedback] = useState<{ tipo: 'ok' | 'err'; testo: string } | null>(null);
@@ -190,7 +191,7 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
         destinatario = `${contactInfo.referente} (${contactInfo.whatsapp})`;
         break;
       case 'email':
-        destinatario = contactInfo.email;
+        destinatario = customDestEmail.trim() || contactInfo.email;
         break;
       case 'telegram':
         destinatario = `${contactInfo.telegram} (${contactInfo.referente})`;
@@ -227,7 +228,7 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
 
       // 2. Se Email, invio reale tramite Serverless SMTP Nodemailer
       if (canaleSelezionato === 'email') {
-        const destEmail = contactInfo.email || emailCliente || 'support@bluecode-ltd.com';
+        const destEmail = (customDestEmail || contactInfo.email || emailCliente || 'support@bluecode-ltd.com').trim();
         const res = await sendEmailDirectApi(
           destEmail,
           `💬 Comunicazione Studio BlueCode Advisory — Fascicolo ${nomeCliente || 'Pratica'}`,
@@ -236,7 +237,7 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
         if (res && res.success) {
           setFeedback({ tipo: 'ok', testo: `✓ Email recapitata con successo alla casella ${destEmail}!` });
         } else {
-          setFeedback({ tipo: 'ok', testo: `✓ Email registrata nel fascicolo e inoltrata a ${destEmail}!` });
+          setFeedback({ tipo: 'err', testo: `❌ Errore Invio Email: ${res?.errore || 'Verifica la password SMTP in Impostazioni'}` });
         }
       } else if (canaleSelezionato === 'whatsapp') {
         // 3. Se WhatsApp, dispatch sicuro tramite Vercel Serverless Function (No CORS)
@@ -509,6 +510,28 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
                 ✓ Anagrafica ERP
               </span>
             </div>
+
+            {canaleSelezionato === 'email' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.8)', fontWeight: 600 }}>📧 Destinatario:</span>
+                <input
+                  type="email"
+                  value={customDestEmail || contactInfo.email}
+                  onChange={e => setCustomDestEmail(e.target.value)}
+                  placeholder="destinatario@email.com"
+                  style={{
+                    background: 'rgba(0,0,0,0.35)',
+                    border: '1px solid rgba(255,255,255,0.3)',
+                    color: '#fff',
+                    padding: '4px 10px',
+                    borderRadius: 6,
+                    fontSize: 11.5,
+                    minWidth: 240,
+                    fontWeight: 600,
+                  }}
+                />
+              </div>
+            )}
 
             {canaleSelezionato === 'whatsapp' && (
               <button
