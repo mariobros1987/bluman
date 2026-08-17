@@ -866,5 +866,73 @@ export async function trasmettiFatturaSdiApi(fatturaId: string) {
   }
 }
 
+export async function fetchDocumentiTemplateApi() {
+  try {
+    const res = await fetch(`${API_BASE}/documenti-template`, { headers: getAuthHeaders() });
+    if (!res.ok) throw new Error('Errore recupero template documenti');
+    return await res.json();
+  } catch (err) {
+    console.warn('Recupero template documenti fallback local:', err);
+    const local = localStorage.getItem('bluman_custom_document_templates');
+    return local ? JSON.parse(local) : [];
+  }
+}
+
+export async function creaDocumentoTemplateApi(data: { titolo: string; categoria?: string; descrizione?: string; contenutoHtml: string }) {
+  try {
+    const res = await fetch(`${API_BASE}/documenti-template`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error('Errore salvataggio template');
+    return await res.json();
+  } catch (err) {
+    console.warn('Salvataggio template fallback local:', err);
+    const newTmpl = { id: `tmpl-custom-${Date.now()}`, ...data, dataCreazione: new Date().toISOString() };
+    const local = localStorage.getItem('bluman_custom_document_templates');
+    const list = local ? JSON.parse(local) : [];
+    localStorage.setItem('bluman_custom_document_templates', JSON.stringify([newTmpl, ...list]));
+    return newTmpl;
+  }
+}
+
+export async function aggiornaDocumentoTemplateApi(id: string, data: { titolo?: string; categoria?: string; descrizione?: string; contenutoHtml?: string }) {
+  try {
+    const res = await fetch(`${API_BASE}/documenti-template/${id}`, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error('Errore aggiornamento template');
+    return await res.json();
+  } catch (err) {
+    console.warn('Aggiornamento template fallback local:', err);
+    const local = localStorage.getItem('bluman_custom_document_templates');
+    const list: any[] = local ? JSON.parse(local) : [];
+    const updated = list.map(t => t.id === id ? { ...t, ...data } : t);
+    localStorage.setItem('bluman_custom_document_templates', JSON.stringify(updated));
+    return { ok: true };
+  }
+}
+
+export async function eliminaDocumentoTemplateApi(id: string) {
+  try {
+    const res = await fetch(`${API_BASE}/documenti-template/${id}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok) throw new Error('Errore eliminazione template');
+    return await res.json();
+  } catch (err) {
+    console.warn('Eliminazione template fallback local:', err);
+    const local = localStorage.getItem('bluman_custom_document_templates');
+    const list: any[] = local ? JSON.parse(local) : [];
+    const updated = list.filter(t => t.id !== id);
+    localStorage.setItem('bluman_custom_document_templates', JSON.stringify(updated));
+    return { ok: true };
+  }
+}
+
 
 

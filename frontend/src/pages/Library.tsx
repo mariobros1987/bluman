@@ -3,9 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { CatBadge } from '../components/ui/CatBadge';
 import { fmt, moduloH, moduloP, resolveRighe, levelOf } from '../utils';
 import { downloadRealPdf } from '../utils/pdfGenerator';
-import { PREBUILT_TEMPLATES } from '../utils/documentTemplates';
+import { PREBUILT_TEMPLATES, getAllTemplates, saveCustomTemplate, deleteCustomTemplate, importTemplatesFromJson, exportTemplatesAsJson, type DocumentTemplate } from '../utils/documentTemplates';
 import { MLIB, ARTICOLI, GIURISDIZIONI } from '../store/mockData';
-import { fetchModuliLibreria, fetchArticoli, fetchGiurisdizioniApi, creaGiurisdizioneApi, creaArticoloApi, creaModuloTemplateApi, updateArticoloPrezzoApi, uploadFileApi, fetchClienti, fetchProgetti, creaProgettoApi, salvaProgettoDettaglioApi } from '../api/client';
+import { fetchModuliLibreria, fetchArticoli, fetchGiurisdizioniApi, creaGiurisdizioneApi, creaArticoloApi, creaModuloTemplateApi, updateArticoloPrezzoApi, uploadFileApi, fetchClienti, fetchProgetti, creaProgettoApi, salvaProgettoDettaglioApi, fetchDocumentiTemplateApi, creaDocumentoTemplateApi } from '../api/client';
 import type { CategoriaModulo, Articolo, Giurisdizione, ModuloTemplate } from '../types';
 
 type SubTab = 'grafo' | 'articoli' | 'giurisdizioni' | 'crea_modulo' | 'doc_form';
@@ -1201,8 +1201,11 @@ function GiurisdizioniView({
 
 // ─── Componente Libreria Documenti in Bianco & Form Master ────────
 function LibreriaDocumentiEForm() {
+  const navigate = useNavigate();
+  const libImportFileRef = useRef<HTMLInputElement>(null);
+
   const [docModels, setDocModels] = useState<Array<{ id: string; nome: string; cat: string; firma: boolean; desc: string; url?: string; templateId?: string }>>(() => {
-    return PREBUILT_TEMPLATES.map(t => ({
+    return getAllTemplates().map(t => ({
       id: t.id,
       templateId: t.id,
       nome: `${t.titolo}.docx`,
@@ -1235,14 +1238,31 @@ function LibreriaDocumentiEForm() {
   const [fileToUpload, setFileToUpload] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
 
+  const reloadDocModels = () => {
+    const all = getAllTemplates();
+    setDocModels(all.map(t => ({
+      id: t.id,
+      templateId: t.id,
+      nome: `${t.titolo}.docx`,
+      cat: t.categoria === 'engagement' || t.categoria === 'nda' ? 'Contratti' :
+           t.categoria === 'societario' ? 'Societario' :
+           t.categoria === 'trust' ? 'Trust' :
+           t.categoria === 'compliance' ? 'Compliance' :
+           t.categoria === 'delega' ? 'Societario' : 'Contratti',
+      firma: t.id === 'tmpl-engagement' || t.id === 'tmpl-nda' || t.id === 'tmpl-delega' || t.id === 'tmpl-compliance',
+      desc: t.descrizione,
+    })));
+  };
+
   const handleAddDoc = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!docName.trim() && !fileToUpload) return;
     setUploading(true);
     let uploadedUrl = '';
-    const nameToUse = docName.trim() || (fileToUpload ? fileToUpload.name : 'Documento.pdf');
+    const nameToUse = docName.trim() || (fileToUpload ? fileToUpload.name : 'Documento.docx');
 
     try {
+      let fileText = '';
       if (fileToUpload) {
         const reader = new FileReader();
         const base64Promise = new Promise<string>((resolve) => {
@@ -1256,26 +1276,74 @@ function LibreriaDocumentiEForm() {
         }
       }
 
-      setDocModels([
-        ...docModels,
-        {
-          id: `m-${Date.now()}`,
-          nome: nameToUse.endsWith('.pdf') || nameToUse.endsWith('.docx') ? nameToUse : `${nameToUse}.docx`,
-          cat: docCat,
-          firma: docSign,
-          desc: docDesc || 'Modello documento caricato in libreria.',
-          url: uploadedUrl || `/uploads/${nameToUse}`,
-        },
-      ]);
+      const customTmpl: DocumentTemplate = {
+        id: `tmpl-custom-${Date.now()}`,
+        titolo: nameToUse.replace(/\.[^/.]+$/, ""),
+        categoria: (docCat.toLowerCase() as any) || 'societario',
+        descrizione: docDesc || 'Modello master personalizzato caricato nella libreria studio.',
+        contenutoHtml: fileText || `<h1>${nameToUse}</h1><p>Bozza modello master studio...</p>`,
+      };
+
+      saveCustomTemplate(customTmpl);
+      await creaDocumentoTemplateApi(customTmpl);
+      reloadDocModels();
+
       setDocName('');
       setDocDesc('');
       setFileToUpload(null);
       setNewDocOpen(false);
+      alert(`✓ Nuovo Modello Master "${customTmpl.titolo}" aggiunto con successo!`);
     } catch (err) {
       console.error(err);
     } finally {
       setUploading(false);
     }
+  };
+
+  const handleImportBundle = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const content = event.target?.result as string;
+      if (file.name.endsWith('.json')) {
+        const res = importTemplatesFromJson(content);
+        if (res.success) {
+          reloadDocModels();
+          alert(`✓ ${res.count} Modelli Master importati con successo nel Vault Studio!`);
+        } else {
+          alert('Errore importazione: ' + res.error);
+        }
+      } else {
+        const customTmpl: DocumentTemplate = {
+          id: `tmpl-custom-${Date.now()}`,
+          titolo: file.name.replace(/\.[^/.]+$/, ""),
+          categoria: 'societario',
+          descrizione: `Modello importato da "${file.name}"`,
+          contenutoHtml: content,
+        };
+        saveCustomTemplate(customTmpl);
+        await creaDocumentoTemplateApi(customTmpl);
+        reloadDocModels();
+        alert(`✓ Modello "${customTmpl.titolo}" importato con successo!`);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
+  const handleExportBundle = () => {
+    const jsonStr = exportTemplatesAsJson();
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `bluman_master_templates_bundle_${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
   };
 
   const handleAddForm = (e: React.FormEvent) => {
@@ -1318,7 +1386,7 @@ function LibreriaDocumentiEForm() {
   }, []);
 
   const handleDownloadTemplatePdf = async (m: any) => {
-    const tmpl = PREBUILT_TEMPLATES.find(t => t.id === m.templateId || t.id === m.id) || PREBUILT_TEMPLATES[0];
+    const tmpl = getAllTemplates().find(t => t.id === m.templateId || t.id === m.id) || PREBUILT_TEMPLATES[0];
     const htmlContent = `
       <div style="font-family: 'Segoe UI', Arial, sans-serif; padding: 20px; color: #0f172a;">
         <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #4338ca; padding-bottom: 14px; margin-bottom: 24px;">
@@ -1359,23 +1427,42 @@ function LibreriaDocumentiEForm() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       {/* Sezione 1: Modelli Documenti in Bianco */}
       <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, padding: 22, display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
           <div>
-            <div style={{ fontSize: 15, fontWeight: 700 }}>📄 Modelli Documenti & Contratti in Bianco</div>
-            <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>I modelli in bianco caricati qui possono essere direttamente scaricati o collegati all'anagrafica del cliente</div>
+            <div style={{ fontSize: 15, fontWeight: 700 }}>📄 Modelli Documenti & Contratti Master ({docModels.length})</div>
+            <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>Crea, importa o esporta modelli in bianco riutilizzabili e collegabili ai progetti</div>
           </div>
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <input
+              type="file"
+              ref={libImportFileRef}
+              accept=".json,.html,.htm"
+              style={{ display: 'none' }}
+              onChange={handleImportBundle}
+            />
             <button
-              onClick={() => window.location.href = '/documents'}
-              style={{ background: '#1e1b4b', color: '#a5b4fc', border: '1px solid #4338ca', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+              onClick={() => libImportFileRef.current?.click()}
+              style={{ background: '#1e1b4b', color: '#818cf8', border: '1px solid #4338ca', padding: '7px 12px', borderRadius: 8, fontSize: 11.5, fontWeight: 700, cursor: 'pointer' }}
             >
-              📝 Apri Document Studio (Word)
+              📥 Importa Modello / Bundle
+            </button>
+            <button
+              onClick={handleExportBundle}
+              style={{ background: 'var(--card2)', color: 'var(--text)', border: '1px solid var(--border)', padding: '7px 12px', borderRadius: 8, fontSize: 11.5, fontWeight: 600, cursor: 'pointer' }}
+            >
+              📤 Esporta (.json)
+            </button>
+            <button
+              onClick={() => navigate('/documents')}
+              style={{ background: '#312e81', color: '#c7d2fe', border: '1px solid #4f46e5', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+            >
+              📝 Apri Document Studio
             </button>
             <button
               onClick={() => setNewDocOpen(true)}
-              style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer' }}
+              style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
             >
-              + Carica Nuovo Modello in Bianco
+              + Nuovo Modello Master
             </button>
           </div>
         </div>
@@ -1390,24 +1477,31 @@ function LibreriaDocumentiEForm() {
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.4 }}>{m.desc}</div>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border)', paddingTop: 10, marginTop: 4 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border)', paddingTop: 10, marginTop: 4, flexWrap: 'wrap', gap: 6 }}>
                 <span style={{ fontSize: 10, color: m.firma ? '#a78bfa' : 'var(--muted)', fontWeight: 600 }}>
-                  {m.firma ? '✍️ Richiede Firma eIDAS' : 'ℹ️ Documento Informativo'}
+                  {m.firma ? '✍️ Firma eIDAS' : 'ℹ️ Informativo'}
                 </span>
                 <div style={{ display: 'flex', gap: 6 }}>
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/documents?tmplId=${m.templateId || m.id}`)}
+                    style={{ background: '#1e1b4b', border: '1px solid #4338ca', color: '#818cf8', padding: '4px 8px', borderRadius: 6, fontSize: 10.5, cursor: 'pointer', fontWeight: 700 }}
+                  >
+                    ✏️ Studio
+                  </button>
                   <button
                     type="button"
                     onClick={() => handleDownloadTemplatePdf(m)}
                     style={{ background: 'var(--card)', border: '1px solid var(--border)', color: 'var(--text)', padding: '4px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer', fontWeight: 600 }}
                   >
-                    📥 Scarica PDF
+                    📥 PDF
                   </button>
                   <button
                     type="button"
                     onClick={() => setLinkingDocModel(m)}
                     style={{ background: '#1a1f3d', border: '1px solid #2d3260', color: '#818cf8', padding: '4px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer', fontWeight: 600 }}
                   >
-                    🔗 Collega a Cliente
+                    🔗 Collega
                   </button>
                 </div>
               </div>

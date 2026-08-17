@@ -1,12 +1,21 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { fetchClienti, fetchProgetti, fetchTenantInfoApi, uploadFileApi } from '../api/client';
+import { fetchClienti, fetchProgetti, fetchTenantInfoApi, uploadFileApi, fetchDocumentiTemplateApi, creaDocumentoTemplateApi, eliminaDocumentoTemplateApi } from '../api/client';
 import { getFormattedLogoUrl } from '../utils';
 import { downloadRealPdf } from '../utils/pdfGenerator';
 import { PROJECTS } from '../store/mockData';
 import type { Cliente, Progetto } from '../types';
 
-import { PREBUILT_TEMPLATES, resolveDocumentTemplateHtml, type DocumentTemplate } from '../utils/documentTemplates';
+import {
+  PREBUILT_TEMPLATES,
+  resolveDocumentTemplateHtml,
+  getAllTemplates,
+  saveCustomTemplate,
+  deleteCustomTemplate,
+  importTemplatesFromJson,
+  exportTemplatesAsJson,
+  type DocumentTemplate,
+} from '../utils/documentTemplates';
 export type { DocumentTemplate };
 export { PREBUILT_TEMPLATES };
 
@@ -18,6 +27,12 @@ export function DocumentEditorPage() {
   const queryDocId = searchParams.get('docId') || '';
   const queryTmplId = searchParams.get('tmplId') || 'tmpl-engagement';
 
+  const [templatesList, setTemplatesList] = useState<DocumentTemplate[]>(() => getAllTemplates());
+  const [showNewTmplModal, setShowNewTmplModal] = useState(false);
+  const [newTmplTitolo, setNewTmplTitolo] = useState('');
+  const [newTmplCat, setNewTmplCat] = useState<'societario' | 'contratto' | 'nda' | 'engagement' | 'delega' | 'fiscale' | 'trust' | 'compliance'>('societario');
+  const [newTmplDesc, setNewTmplDesc] = useState('');
+
   const [clienti, setClienti] = useState<Cliente[]>([]);
   const [progetti, setProgetti] = useState<Progetto[]>([]);
   const [tenantInfo, setTenantInfo] = useState<any>(null);
@@ -26,7 +41,7 @@ export function DocumentEditorPage() {
   const [selectedProgettoId, setSelectedProgettoId] = useState<string>(queryProjId);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>(queryTmplId);
 
-  const initialTmpl = PREBUILT_TEMPLATES.find(t => t.id === queryTmplId) || PREBUILT_TEMPLATES[0];
+  const initialTmpl = templatesList.find(t => t.id === queryTmplId) || templatesList[0] || PREBUILT_TEMPLATES[0];
   const [titoloDocumento, setTitoloDocumento] = useState(initialTmpl.titolo);
   const [categoria, setCategoria] = useState<string>(initialTmpl.categoria);
   const [tagDisplayMode, setTagDisplayMode] = useState<'highlight' | 'plain' | 'raw'>('highlight');
@@ -35,6 +50,7 @@ export function DocumentEditorPage() {
   const [feedback, setFeedback] = useState<string | null>(null);
 
   const editorRef = useRef<HTMLDivElement>(null);
+  const fileImportRef = useRef<HTMLInputElement>(null);
   const rawTemplateRef = useRef<string>(initialTmpl.contenutoHtml);
 
   // Caricamento Dati Completi (DB + LocalStorage + Default Studio)
@@ -249,6 +265,151 @@ export function DocumentEditorPage() {
     if (editorRef.current) {
       editorRef.current.innerHTML = renderResolvedContent(tmpl.contenutoHtml);
     }
+  };
+
+  // Creazione Nuovo Modello Master da Zero
+  const handleCreateCustomMaster = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTmplTitolo.trim()) return;
+
+    const newTmpl: DocumentTemplate = {
+      id: `tmpl-custom-${Date.now()}`,
+      titolo: newTmplTitolo.trim(),
+      categoria: newTmplCat,
+      descrizione: newTmplDesc.trim() || 'Modello master personalizzato salvato nello studio.',
+      contenutoHtml: `
+<h1 style="text-align: center; color: #1e1b4b; margin-bottom: 20px; font-size: 19px; text-transform: uppercase;">
+  ${newTmplTitolo.toUpperCase()}
+</h1>
+
+<p style="text-align: right; color: #64748b; font-size: 11px; margin-bottom: 20px;">
+  <strong>Data:</strong> {{data_odierna}} | <strong>Rif. Pratica:</strong> {{progetto.titolo}}
+</p>
+
+<div style="background: #f8fafc; border-left: 4px solid #4338ca; padding: 12px 16px; margin-bottom: 20px; font-size: 11.5px;">
+  <strong>Studio Professionale:</strong> {{studio.ragione_sociale}} ({{studio.sede_legale}})<br/>
+  <strong>Cliente Committente:</strong> {{cliente.ragione_sociale}} (P.IVA {{cliente.partita_iva}}, Rappresentante: {{cliente.referente}})
+</div>
+
+<h3 style="color: #1e1b4b; font-size: 13px;">1. OGGETTO E CONDIZIONI GENERALI</h3>
+<p style="font-size: 11.5px; line-height: 1.6; text-align: justify;">
+  Inserisci qui il testo normativo del contratto, statuto o accordo dello studio.
+</p>
+
+<div style="margin-top: 40px; display: flex; justify-content: space-between;">
+  <div style="width: 45%; text-align: center; border-top: 1px solid #cbd5e1; padding-top: 8px; font-size: 11px;">
+    {{studio.ragione_sociale}}
+  </div>
+  <div style="width: 45%; text-align: center; border-top: 1px solid #cbd5e1; padding-top: 8px; font-size: 11px;">
+    {{cliente.referente}}
+  </div>
+</div>
+      `,
+    };
+
+    saveCustomTemplate(newTmpl);
+    await creaDocumentoTemplateApi(newTmpl);
+    const updated = getAllTemplates();
+    setTemplatesList(updated);
+    handleSelectTemplate(newTmpl);
+    setShowNewTmplModal(false);
+    setNewTmplTitolo('');
+    setNewTmplDesc('');
+    setFeedback(`✓ Nuovo Modello Master "${newTmpl.titolo}" creato e salvato con successo!`);
+    setTimeout(() => setFeedback(null), 4000);
+  };
+
+  // Salva l'attuale bozza dell'editor come Nuovo Modello Master
+  const handleSaveCurrentAsMasterTemplate = async () => {
+    const currentHtml = editorRef.current?.innerHTML || rawTemplateRef.current;
+    const name = prompt('Inserisci il nome per questo nuovo Modello Master Studio:', `${titoloDocumento} (Copia Master)`);
+    if (!name || !name.trim()) return;
+
+    const newTmpl: DocumentTemplate = {
+      id: `tmpl-custom-${Date.now()}`,
+      titolo: name.trim(),
+      categoria: (categoria as any) || 'societario',
+      descrizione: `Modello master derivato da "${titoloDocumento}" salvato in data ${new Date().toLocaleDateString('it-IT')}.`,
+      contenutoHtml: currentHtml,
+    };
+
+    saveCustomTemplate(newTmpl);
+    await creaDocumentoTemplateApi(newTmpl);
+    setTemplatesList(getAllTemplates());
+    handleSelectTemplate(newTmpl);
+    setFeedback(`✓ Modello Master "${newTmpl.titolo}" salvato permanentemente nello studio!`);
+    setTimeout(() => setFeedback(null), 4000);
+  };
+
+  // Importazione da File (.json / .html)
+  const handleImportFileTrigger = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const content = event.target?.result as string;
+      if (file.name.endsWith('.json')) {
+        const res = importTemplatesFromJson(content);
+        if (res.success) {
+          const updated = getAllTemplates();
+          setTemplatesList(updated);
+          handleSelectTemplate(updated[0]);
+          setFeedback(`✓ ${res.count} Modello/i Master importati con successo dal file JSON!`);
+        } else {
+          alert('Errore importazione JSON: ' + (res.error || 'Formato non valido'));
+        }
+      } else {
+        const tmplName = file.name.replace(/\.[^/.]+$/, "");
+        const newTmpl: DocumentTemplate = {
+          id: `tmpl-custom-${Date.now()}`,
+          titolo: tmplName,
+          categoria: 'societario',
+          descrizione: `Modello importato da file "${file.name}".`,
+          contenutoHtml: content,
+        };
+        saveCustomTemplate(newTmpl);
+        await creaDocumentoTemplateApi(newTmpl);
+        const updated = getAllTemplates();
+        setTemplatesList(updated);
+        handleSelectTemplate(newTmpl);
+        setFeedback(`✓ File "${file.name}" importato come Modello Master!`);
+      }
+      setTimeout(() => setFeedback(null), 4000);
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
+  // Esportazione di tutti i modelli in JSON
+  const handleExportTemplatesJson = () => {
+    const jsonStr = exportTemplatesAsJson();
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `bluman_master_templates_bundle_${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    setFeedback('✓ Bundle Modelli Master esportato in formato JSON!');
+    setTimeout(() => setFeedback(null), 4000);
+  };
+
+  // Eliminazione Modello Custom
+  const handleDeleteTemplate = async (tmplId: string, tmplTitolo: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm(`Sei sicuro di voler eliminare il Modello Master "${tmplTitolo}"?`)) return;
+    deleteCustomTemplate(tmplId);
+    await eliminaDocumentoTemplateApi(tmplId);
+    const updated = getAllTemplates();
+    setTemplatesList(updated);
+    if (selectedTemplateId === tmplId) {
+      handleSelectTemplate(updated[0]);
+    }
+    setFeedback(`✓ Modello "${tmplTitolo}" rimosso dai Modelli Master.`);
+    setTimeout(() => setFeedback(null), 4000);
   };
 
   // Sincronizza l'editor all'avvio e quando cambiano i dati anagrafici target o la modalità di visualizzazione
@@ -614,29 +775,107 @@ export function DocumentEditorPage() {
             </div>
           </div>
 
-          {/* Master Templates */}
+          {/* Master Templates Studio Library with Import / Export / Creation */}
           <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 14, padding: 16 }}>
-            <div style={{ fontSize: 12.5, fontWeight: 800, color: 'var(--text)', marginBottom: 8 }}>📚 Modelli Master Studio</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {PREBUILT_TEMPLATES.map(t => (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--text)' }}>📚 Modelli Master ({templatesList.length})</div>
+                <div style={{ fontSize: 10, color: 'var(--muted)' }}>Libreria template studio</div>
+              </div>
+              <div style={{ display: 'flex', gap: 4 }}>
                 <button
-                  key={t.id}
-                  onClick={() => handleSelectTemplate(t)}
-                  style={{
-                    background: selectedTemplateId === t.id ? '#1e1b4b' : 'var(--card2)',
-                    border: `1px solid ${selectedTemplateId === t.id ? '#6366f1' : 'var(--border)'}`,
-                    padding: '8px 10px',
-                    borderRadius: 8,
-                    fontSize: 11,
-                    textAlign: 'left',
-                    color: selectedTemplateId === t.id ? '#fff' : 'var(--muted)',
-                    cursor: 'pointer',
-                  }}
+                  type="button"
+                  onClick={() => setShowNewTmplModal(true)}
+                  style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: 6, fontSize: 10.5, fontWeight: 700, cursor: 'pointer' }}
+                  title="Crea Nuovo Modello Master da Zero"
                 >
-                  <div style={{ fontWeight: 700, color: selectedTemplateId === t.id ? '#a5b4fc' : 'var(--text)' }}>{t.titolo}</div>
-                  <div style={{ fontSize: 9.5, color: 'var(--muted)', marginTop: 2 }}>{t.descrizione}</div>
+                  ➕ Nuovo
                 </button>
-              ))}
+                <button
+                  type="button"
+                  onClick={() => fileImportRef.current?.click()}
+                  style={{ background: '#1e1b4b', color: '#818cf8', border: '1px solid #4338ca', padding: '4px 8px', borderRadius: 6, fontSize: 10.5, fontWeight: 700, cursor: 'pointer' }}
+                  title="Importa Modello Master da file JSON o HTML"
+                >
+                  📥 Importa
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExportTemplatesJson}
+                  style={{ background: 'var(--card2)', color: 'var(--muted)', border: '1px solid var(--border)', padding: '4px 6px', borderRadius: 6, fontSize: 10.5, cursor: 'pointer' }}
+                  title="Esporta Bundle Modelli Master in JSON"
+                >
+                  📤
+                </button>
+              </div>
+            </div>
+
+            <input
+              type="file"
+              ref={fileImportRef}
+              accept=".json,.html,.htm"
+              style={{ display: 'none' }}
+              onChange={handleImportFileTrigger}
+            />
+
+            <button
+              type="button"
+              onClick={handleSaveCurrentAsMasterTemplate}
+              style={{ width: '100%', marginBottom: 12, background: 'rgba(99, 102, 241, 0.1)', border: '1px dashed #6366f1', color: '#818cf8', padding: '6px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+              title="Salva l'attuale bozza dell'editor come nuovo modello master riutilizzabile"
+            >
+              💾 Salva Bozza Attuale come Master
+            </button>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 420, overflowY: 'auto' }}>
+              {templatesList.map(t => {
+                const isCustom = t.id.startsWith('tmpl-custom');
+                const isSelected = selectedTemplateId === t.id;
+                return (
+                  <div
+                    key={t.id}
+                    onClick={() => handleSelectTemplate(t)}
+                    style={{
+                      background: isSelected ? '#1e1b4b' : 'var(--card2)',
+                      border: `1px solid ${isSelected ? '#6366f1' : 'var(--border)'}`,
+                      padding: '8px 10px',
+                      borderRadius: 8,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'flex-start',
+                      gap: 6,
+                    }}
+                  >
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontWeight: 700, fontSize: 11, color: isSelected ? '#a5b4fc' : 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {t.titolo}
+                        </span>
+                        {isCustom && (
+                          <span style={{ fontSize: 9, background: '#064e3b', color: '#34d399', padding: '1px 4px', borderRadius: 4, fontWeight: 700 }}>
+                            Custom
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: 9.5, color: 'var(--muted)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {t.descrizione}
+                      </div>
+                    </div>
+
+                    {isCustom && (
+                      <button
+                        type="button"
+                        onClick={(e) => handleDeleteTemplate(t.id, t.titolo, e)}
+                        style={{ background: 'transparent', border: 'none', color: '#f87171', fontSize: 12, cursor: 'pointer', padding: '2px 4px', borderRadius: 4 }}
+                        title="Elimina modello personalizzato"
+                      >
+                        🗑️
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -714,6 +953,116 @@ export function DocumentEditorPage() {
           </div>
         </div>
       </div>
+
+      {/* ➕ MODALE CREAZIONE NUOVO MODELLO MASTER STUDIO */}
+      {showNewTmplModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.75)',
+            backdropFilter: 'blur(6px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: 20,
+          }}
+          onClick={() => setShowNewTmplModal(false)}
+        >
+          <div
+            style={{
+              background: 'var(--card)',
+              border: '1px solid var(--border)',
+              borderRadius: 16,
+              width: '100%',
+              maxWidth: 520,
+              padding: 24,
+              boxShadow: '0 20px 40px rgba(0,0,0,0.5)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--text)' }}>➕ Crea Nuovo Modello Master Studio</div>
+                <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>Crea un nuovo modello personalizzato con Smart Tags riutilizzabili</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowNewTmplModal(false)}
+                style={{ background: 'transparent', border: 'none', color: 'var(--muted)', fontSize: 18, cursor: 'pointer' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateCustomMaster} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div>
+                <label style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text)', display: 'block', marginBottom: 5 }}>
+                  Titolo Modello Master *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Es. Patto di Riservatezza Dipendenti, Mandato Wealth Management..."
+                  value={newTmplTitolo}
+                  onChange={(e) => setNewTmplTitolo(e.target.value)}
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: 8, background: 'var(--card2)', color: 'var(--text)', border: '1px solid var(--border)', fontSize: 12.5 }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text)', display: 'block', marginBottom: 5 }}>
+                  Categoria *
+                </label>
+                <select
+                  value={newTmplCat}
+                  onChange={(e) => setNewTmplCat(e.target.value as any)}
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: 8, background: 'var(--card2)', color: 'var(--text)', border: '1px solid var(--border)', fontSize: 12.5 }}
+                >
+                  <option value="societario">Societario & Statuti</option>
+                  <option value="contratto">Contratti & Accordi</option>
+                  <option value="engagement">Engagement Letter & Mandati</option>
+                  <option value="nda">NDA & Riservatezza</option>
+                  <option value="delega">Procure & Deleghe</option>
+                  <option value="trust">Trust & Fiduciaria</option>
+                  <option value="compliance">Compliance & UBO KYC</option>
+                  <option value="fiscale">Fiscale & Tax Planning</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text)', display: 'block', marginBottom: 5 }}>
+                  Descrizione Modello
+                </label>
+                <textarea
+                  rows={3}
+                  placeholder="Breve descrizione dell'utilizzo pratico e delle condizioni previste dal modello..."
+                  value={newTmplDesc}
+                  onChange={(e) => setNewTmplDesc(e.target.value)}
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: 8, background: 'var(--card2)', color: 'var(--text)', border: '1px solid var(--border)', fontSize: 12 }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 10 }}>
+                <button
+                  type="button"
+                  onClick={() => setShowNewTmplModal(false)}
+                  style={{ background: 'var(--card2)', border: '1px solid var(--border)', color: 'var(--muted)', padding: '8px 16px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}
+                >
+                  Annulla
+                </button>
+                <button
+                  type="submit"
+                  style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '8px 20px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 14px rgba(99,102,241,0.3)' }}
+                >
+                  ✓ Crea e Apri nell'Editor
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

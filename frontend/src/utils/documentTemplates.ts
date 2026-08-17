@@ -341,3 +341,86 @@ export function getTemplateForVoce(voceTitle: string, category: string = ''): Do
 
   return PREBUILT_TEMPLATES[0];
 }
+
+/**
+ * Restituisce tutti i modelli (Predefiniti + Modelli Master Personalizzati creati o importati dallo studio)
+ */
+export function getAllTemplates(): DocumentTemplate[] {
+  try {
+    const customStr = localStorage.getItem('bluman_custom_document_templates');
+    const customArr: DocumentTemplate[] = customStr ? JSON.parse(customStr) : [];
+    const prebuiltIds = new Set(PREBUILT_TEMPLATES.map(t => t.id));
+    const uniqueCustom = customArr.filter(c => !prebuiltIds.has(c.id));
+    return [...PREBUILT_TEMPLATES, ...uniqueCustom];
+  } catch {
+    return PREBUILT_TEMPLATES;
+  }
+}
+
+/**
+ * Salva o aggiorna un Modello Master personalizzato nello storage persistente dello studio
+ */
+export function saveCustomTemplate(tmpl: DocumentTemplate): DocumentTemplate[] {
+  const current = getAllTemplates();
+  const exists = current.some(t => t.id === tmpl.id);
+  const updated = exists ? current.map(t => t.id === tmpl.id ? tmpl : t) : [tmpl, ...current];
+  
+  // Salva solo i modelli custom nel local storage
+  const customOnly = updated.filter(t => !PREBUILT_TEMPLATES.some(p => p.id === t.id));
+  localStorage.setItem('bluman_custom_document_templates', JSON.stringify(customOnly));
+  return updated;
+}
+
+/**
+ * Elimina un Modello Master personalizzato
+ */
+export function deleteCustomTemplate(templateId: string): DocumentTemplate[] {
+  try {
+    const customStr = localStorage.getItem('bluman_custom_document_templates');
+    const customArr: DocumentTemplate[] = customStr ? JSON.parse(customStr) : [];
+    const filtered = customArr.filter(t => t.id !== templateId);
+    localStorage.setItem('bluman_custom_document_templates', JSON.stringify(filtered));
+    return [...PREBUILT_TEMPLATES, ...filtered];
+  } catch {
+    return PREBUILT_TEMPLATES;
+  }
+}
+
+/**
+ * Importa un bundle JSON o singolo Modello Master
+ */
+export function importTemplatesFromJson(jsonString: string): { success: boolean; count: number; error?: string } {
+  try {
+    const parsed = JSON.parse(jsonString);
+    const incoming: DocumentTemplate[] = Array.isArray(parsed) ? parsed : [parsed];
+    if (incoming.length === 0 || !incoming[0].titolo) {
+      return { success: false, count: 0, error: 'Formato file JSON non valido. Richiesto titolo e contenutoHtml.' };
+    }
+    
+    let addedCount = 0;
+    incoming.forEach(tmpl => {
+      const formatted: DocumentTemplate = {
+        id: tmpl.id || `tmpl-custom-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        titolo: tmpl.titolo || 'Nuovo Modello Master Importato',
+        categoria: (tmpl.categoria as any) || 'societario',
+        descrizione: tmpl.descrizione || 'Modello master importato nel Vault Studio.',
+        contenutoHtml: tmpl.contenutoHtml || '<h1>Modello Master</h1><p>Inserisci testo...</p>',
+      };
+      saveCustomTemplate(formatted);
+      addedCount++;
+    });
+
+    return { success: true, count: addedCount };
+  } catch (err: any) {
+    return { success: false, count: 0, error: err.message || 'Errore di decodifica JSON' };
+  }
+}
+
+/**
+ * Esporta tutti i Modelli Master correnti in formato JSON scaricabile
+ */
+export function exportTemplatesAsJson(): string {
+  const all = getAllTemplates();
+  return JSON.stringify(all, null, 2);
+}
+
