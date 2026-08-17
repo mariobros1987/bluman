@@ -286,7 +286,7 @@ export function DocumentEditorPage() {
 
   const [titoloDocumento, setTitoloDocumento] = useState('Lettera d\'Incarico Professionale');
   const [categoria, setCategoria] = useState<string>('engagement');
-  const [showRawTags, setShowRawTags] = useState(false);
+  const [tagDisplayMode, setTagDisplayMode] = useState<'highlight' | 'plain' | 'raw'>('highlight');
 
   const [salvando, setSalvando] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -456,9 +456,9 @@ export function DocumentEditorPage() {
   const activeCliente = clienti.find(c => c.id === selectedClienteId) || clienti[0];
   const activeProgetto: any = progetti.find((p: any) => String(p.id) === String(selectedProgettoId)) || progetti[0];
 
-  // Sostituzione dinamica delle variabili Smart Tags (Mail Merge)
-  const renderResolvedContent = (htmlContent: string) => {
-    if (showRawTags) return htmlContent;
+  // Sostituzione dinamica delle variabili Smart Tags (Mail Merge) con Smart Chips interattivi
+  const renderResolvedContent = (htmlContent: string, isForPrintOrExport: boolean = false) => {
+    if (tagDisplayMode === 'raw' && !isForPrintOrExport) return htmlContent;
 
     const refJson: any = activeCliente?.referentiJson && typeof activeCliente.referentiJson === 'object' ? activeCliente.referentiJson : {};
     const dataOggi = new Date().toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' });
@@ -466,27 +466,33 @@ export function DocumentEditorPage() {
     const projTitolo = activeProgetto?.titolo || activeProgetto?.n || activeProgetto?.nome || 'Costituzione Holding & Trading Malta';
     const projImporto = activeProgetto?.totalePreventivo || activeProgetto?.val || 8500;
 
+    // Se in anteprima bozza e modalità 'highlight', evidenzia il dato reale con un elegante Smart Chip ERP
+    const wrapTag = (value: string, tagCode: string) => {
+      if (isForPrintOrExport || tagDisplayMode === 'plain') return value;
+      return `<span class="bluman-smart-chip" title="Smart Tag ERP: {{${tagCode}}}" style="background: rgba(99, 102, 241, 0.14); color: #4338ca; border: 1px solid rgba(99, 102, 241, 0.35); border-bottom: 2px solid #4f46e5; border-radius: 4px; padding: 1px 6px; font-weight: 600; cursor: help; display: inline-block; box-shadow: 0 1px 3px rgba(99,102,241,0.12);">🏷️ ${value}</span>`;
+    };
+
     let out = htmlContent;
-    out = out.replace(/\{\{data_odierna\}\}/g, dataOggi);
-    out = out.replace(/\{\{cliente\.ragione_sociale\}\}/g, activeCliente?.nome || 'Holding Beta S.r.l.');
-    out = out.replace(/\{\{cliente\.nome\}\}/g, activeCliente?.nome || 'Holding Beta S.r.l.');
-    out = out.replace(/\{\{cliente\.partita_iva\}\}/g, activeCliente?.piva || activeCliente?.codiceFiscale || 'IT09876543210');
-    out = out.replace(/\{\{cliente\.codice_fiscale\}\}/g, activeCliente?.codiceFiscale || activeCliente?.piva || 'IT09876543210');
-    out = out.replace(/\{\{cliente\.sede_legale\}\}/g, activeCliente?.sedeLegale || 'Via Montenapoleone 8, Milano');
-    out = out.replace(/\{\{cliente\.pec\}\}/g, activeCliente?.pec || 'holdingbeta@legalmail.it');
-    out = out.replace(/\{\{cliente\.sdi\}\}/g, activeCliente?.codiceSdi || 'SUBM70N');
-    out = out.replace(/\{\{cliente\.iban\}\}/g, activeCliente?.iban || 'IT60X0542811101000000123456');
-    out = out.replace(/\{\{cliente\.referente\}\}/g, activeCliente?.referenteNome || refJson.referente || 'Ing. Roberto Rossi (CEO)');
-    out = out.replace(/\{\{cliente\.cellulare\}\}/g, activeCliente?.cellulare || '+39 333 5936278');
-    out = out.replace(/\{\{cliente\.ubo\}\}/g, activeCliente?.ubo || activeCliente?.referenteNome || 'Roberto Rossi');
+    out = out.replace(/\{\{data_odierna\}\}/g, wrapTag(dataOggi, 'data_odierna'));
+    out = out.replace(/\{\{cliente\.ragione_sociale\}\}/g, wrapTag(activeCliente?.nome || 'Holding Beta S.r.l.', 'cliente.ragione_sociale'));
+    out = out.replace(/\{\{cliente\.nome\}\}/g, wrapTag(activeCliente?.nome || 'Holding Beta S.r.l.', 'cliente.nome'));
+    out = out.replace(/\{\{cliente\.partita_iva\}\}/g, wrapTag(activeCliente?.piva || activeCliente?.codiceFiscale || 'IT09876543210', 'cliente.partita_iva'));
+    out = out.replace(/\{\{cliente\.codice_fiscale\}\}/g, wrapTag(activeCliente?.codiceFiscale || activeCliente?.piva || 'IT09876543210', 'cliente.codice_fiscale'));
+    out = out.replace(/\{\{cliente\.sede_legale\}\}/g, wrapTag(activeCliente?.sedeLegale || 'Via Montenapoleone 8, Milano', 'cliente.sede_legale'));
+    out = out.replace(/\{\{cliente\.pec\}\}/g, wrapTag(activeCliente?.pec || 'holdingbeta@legalmail.it', 'cliente.pec'));
+    out = out.replace(/\{\{cliente\.sdi\}\}/g, wrapTag(activeCliente?.codiceSdi || 'SUBM70N', 'cliente.sdi'));
+    out = out.replace(/\{\{cliente\.iban\}\}/g, wrapTag(activeCliente?.iban || 'IT60X0542811101000000123456', 'cliente.iban'));
+    out = out.replace(/\{\{cliente\.referente\}\}/g, wrapTag(activeCliente?.referenteNome || refJson.referente || 'Ing. Roberto Rossi (CEO)', 'cliente.referente'));
+    out = out.replace(/\{\{cliente\.cellulare\}\}/g, wrapTag(activeCliente?.cellulare || '+39 333 5936278', 'cliente.cellulare'));
+    out = out.replace(/\{\{cliente\.ubo\}\}/g, wrapTag(activeCliente?.ubo || activeCliente?.referenteNome || 'Roberto Rossi', 'cliente.ubo'));
 
-    out = out.replace(/\{\{progetto\.titolo\}\}/g, projTitolo);
-    out = out.replace(/\{\{progetto\.importo_totale\}\}/g, `€ ${Number(projImporto).toLocaleString('it-IT')},00`);
+    out = out.replace(/\{\{progetto\.titolo\}\}/g, wrapTag(projTitolo, 'progetto.titolo'));
+    out = out.replace(/\{\{progetto\.importo_totale\}\}/g, wrapTag(`€ ${Number(projImporto).toLocaleString('it-IT')},00`, 'progetto.importo_totale'));
 
-    out = out.replace(/\{\{studio\.ragione_sociale\}\}/g, tenantInfo?.ragioneSociale || 'Bluecode Ltd');
-    out = out.replace(/\{\{studio\.piva\}\}/g, tenantInfo?.piva || 'MT28491039');
-    out = out.replace(/\{\{studio\.sede_legale\}\}/g, tenantInfo?.sedeLegale || 'Level 4, Valuation Centre, Tower Road, Sliema SLM 1600, Malta');
-    out = out.replace(/\{\{studio\.iban\}\}/g, tenantInfo?.iban || 'MT89VALL22013000000012345678');
+    out = out.replace(/\{\{studio\.ragione_sociale\}\}/g, wrapTag(tenantInfo?.ragioneSociale || 'Bluecode Ltd', 'studio.ragione_sociale'));
+    out = out.replace(/\{\{studio\.piva\}\}/g, wrapTag(tenantInfo?.piva || 'MT28491039', 'studio.piva'));
+    out = out.replace(/\{\{studio\.sede_legale\}\}/g, wrapTag(tenantInfo?.sedeLegale || 'Level 4, Valuation Centre, Tower Road, Sliema SLM 1600, Malta', 'studio.sede_legale'));
+    out = out.replace(/\{\{studio\.iban\}\}/g, wrapTag(tenantInfo?.iban || 'MT89VALL22013000000012345678', 'studio.iban'));
 
     return out;
   };
@@ -502,12 +508,12 @@ export function DocumentEditorPage() {
     }
   };
 
-  // Sincronizza l'editor all'avvio e quando cambiano i dati anagrafici target o la modalità anteprima
+  // Sincronizza l'editor all'avvio e quando cambiano i dati anagrafici target o la modalità di visualizzazione
   useEffect(() => {
     if (editorRef.current) {
       editorRef.current.innerHTML = renderResolvedContent(rawTemplateRef.current);
     }
-  }, [selectedClienteId, selectedProgettoId, showRawTags, tenantInfo]);
+  }, [selectedClienteId, selectedProgettoId, tagDisplayMode, tenantInfo]);
 
   // Inserimento Smart Tag nel punto di scrittura
   const insertSmartTag = (tag: string) => {
@@ -525,14 +531,15 @@ export function DocumentEditorPage() {
     }
   };
 
-  // Esportazione PDF Stampa Nativa con Header/Footer A4
+  // Esportazione PDF Stampa Nativa con Header/Footer A4 (100% Pulito senza Smart Chips)
   const handleExportPdf = () => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
 
     const logo = getFormattedLogoUrl(tenantInfo?.logoUrl || localStorage.getItem('bluman_logo_url'));
     const currentHtml = editorRef.current?.innerHTML || rawTemplateRef.current;
-    const finalHtml = renderResolvedContent(currentHtml);
+    // Risolvi in modalità Stampa (isForPrintOrExport = true)
+    const finalHtml = renderResolvedContent(currentHtml, true);
 
     printWindow.document.write(`
       <!DOCTYPE html>
@@ -665,14 +672,55 @@ export function DocumentEditorPage() {
           </div>
         </div>
 
-        {/* Action Buttons */}
+        {/* Action Buttons & Tag Display Switcher */}
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-          <button
-            onClick={() => setShowRawTags(!showRawTags)}
-            style={{ background: showRawTags ? '#4338ca' : 'var(--card2)', color: showRawTags ? '#fff' : 'var(--muted)', border: '1px solid var(--border)', padding: '7px 14px', borderRadius: 8, fontSize: 11.5, fontWeight: 700, cursor: 'pointer' }}
-          >
-            {showRawTags ? '🏷 Modalità: Mostra Codici {{Tag}}' : '👁 Modalità: Anteprima Dati Reali'}
-          </button>
+          <div style={{ display: 'flex', background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+            <button
+              onClick={() => setTagDisplayMode('highlight')}
+              style={{
+                background: tagDisplayMode === 'highlight' ? '#1e1b4b' : 'transparent',
+                color: tagDisplayMode === 'highlight' ? '#818cf8' : 'var(--muted)',
+                border: 'none',
+                padding: '6px 12px',
+                fontSize: 11.5,
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+              title="Mostra i dati anagrafici reali evidenziati come Smart Chip dinamico"
+            >
+              🏷️ Dati Reali (Smart Chip)
+            </button>
+            <button
+              onClick={() => setTagDisplayMode('plain')}
+              style={{
+                background: tagDisplayMode === 'plain' ? '#1e1b4b' : 'transparent',
+                color: tagDisplayMode === 'plain' ? '#818cf8' : 'var(--muted)',
+                border: 'none',
+                padding: '6px 12px',
+                fontSize: 11.5,
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+              title="Mostra i dati anagrafici in testo normale non evidenziato"
+            >
+              📄 Testo Naturale
+            </button>
+            <button
+              onClick={() => setTagDisplayMode('raw')}
+              style={{
+                background: tagDisplayMode === 'raw' ? '#1e1b4b' : 'transparent',
+                color: tagDisplayMode === 'raw' ? '#818cf8' : 'var(--muted)',
+                border: 'none',
+                padding: '6px 12px',
+                fontSize: 11.5,
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+              title="Mostra i codici grezzi {{tag}}"
+            >
+              🔍 Codici &#123;&#123;Tag&#125;&#125;
+            </button>
+          </div>
 
           <button
             onClick={handleExportPdf}
