@@ -1798,49 +1798,52 @@ function LibreriaDocumentiEForm() {
                   {m.firma ? '✍️ Firma eIDAS' : 'ℹ️ Informativo'}
                 </span>
                 
-                <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
                   {/* Pulsanti Archiviazione & Ripristino */}
                   {m.archiviato ? (
                     <button
                       type="button"
                       onClick={() => handleRestoreDoc(m.id, m.nome)}
-                      style={{ background: '#064e3b', border: '1px solid #059669', color: '#34d399', padding: '4px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer', fontWeight: 700 }}
+                      style={{ background: '#064e3b', border: '1px solid #059669', color: '#34d399', padding: '5px 10px', borderRadius: 6, fontSize: 10.5, cursor: 'pointer', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}
                       title="Ripristina modello tra quelli attivi"
                     >
-                      ♻️ Ripristina
+                      <span>♻️</span>
+                      <span>Ripristina</span>
                     </button>
                   ) : (
                     <button
                       type="button"
                       onClick={() => handleArchiveDoc(m.id, m.nome)}
-                      style={{ background: 'var(--card)', border: '1px solid var(--border)', color: 'var(--muted)', padding: '4px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer', fontWeight: 600 }}
+                      style={{ background: 'var(--card)', border: '1px solid var(--border)', color: 'var(--muted)', padding: '5px 10px', borderRadius: 6, fontSize: 10.5, cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}
                       title="Archivia modello master"
                     >
-                      📦 Archivia
+                      <span>📦</span>
+                      <span>Archivia</span>
                     </button>
                   )}
 
-                  {/* Pulsante Eliminazione */}
+                  {/* Pulsante Eliminazione Ben Visibile */}
                   <button
                     type="button"
                     onClick={() => handleDeleteDoc(m.id, m.nome)}
-                    style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid #ef4444', color: '#f87171', padding: '4px 7px', borderRadius: 6, fontSize: 10, cursor: 'pointer' }}
-                    title="Elimina modello master dalla libreria"
+                    style={{ background: 'rgba(239, 68, 68, 0.15)', border: '1px solid #ef4444', color: '#f87171', padding: '5px 10px', borderRadius: 6, fontSize: 10.5, cursor: 'pointer', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}
+                    title="Elimina definitivamente modello master dalla libreria"
                   >
-                    🗑️
+                    <span>🗑️</span>
+                    <span>Elimina</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => navigate(`/documents?tmplId=${m.templateId || m.id}`)}
-                    style={{ background: '#1e1b4b', border: '1px solid #4338ca', color: '#818cf8', padding: '4px 8px', borderRadius: 6, fontSize: 10.5, cursor: 'pointer', fontWeight: 700 }}
+                    style={{ background: '#1e1b4b', border: '1px solid #4338ca', color: '#818cf8', padding: '5px 10px', borderRadius: 6, fontSize: 10.5, cursor: 'pointer', fontWeight: 700 }}
                   >
                     ✏️ Studio
                   </button>
                   <button
                     type="button"
                     onClick={() => handleDownloadTemplatePdf(m)}
-                    style={{ background: 'var(--card)', border: '1px solid var(--border)', color: 'var(--text)', padding: '4px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer', fontWeight: 600 }}
+                    style={{ background: 'var(--card)', border: '1px solid var(--border)', color: 'var(--text)', padding: '5px 10px', borderRadius: 6, fontSize: 10.5, cursor: 'pointer', fontWeight: 600 }}
                   >
                     📥 PDF
                   </button>
@@ -1850,7 +1853,7 @@ function LibreriaDocumentiEForm() {
                       setLinkingDocModel(m);
                       setClientModalSearch('');
                     }}
-                    style={{ background: '#1a1f3d', border: '1px solid #2d3260', color: '#818cf8', padding: '4px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer', fontWeight: 600 }}
+                    style={{ background: '#1a1f3d', border: '1px solid #2d3260', color: '#818cf8', padding: '5px 10px', borderRadius: 6, fontSize: 10.5, cursor: 'pointer', fontWeight: 600 }}
                   >
                     🔗 Collega
                   </button>
@@ -1863,14 +1866,14 @@ function LibreriaDocumentiEForm() {
 
       {/* Sezione 2: Form Master Dinamici */}
       <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, padding: 22, display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
           <div>
-            <div style={{ fontSize: 15, fontWeight: 700 }}>📋 Form Master Dinamici</div>
+            <div style={{ fontSize: 15, fontWeight: 700 }}>📋 Form Master Dinamici ({formMasters.length})</div>
             <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>Definisci la struttura dei moduli di raccolta dati da guidare al cliente nel suo portale</div>
           </div>
           <button
             onClick={() => setNewFormOpen(true)}
-            style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer' }}
+            style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
           >
             + Crea Nuovo Form Master
           </button>
@@ -1878,15 +1881,32 @@ function LibreriaDocumentiEForm() {
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 12 }}>
           {formMasters.map(f => (
-            <div key={f.id} style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--indigo-l)' }}>📋 {f.nome}</div>
-              <div style={{ fontSize: 11, color: 'var(--muted)' }}>Campi di raccolta dati incorporati ({f.campi.length}):</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {f.campi.map((c, i) => (
-                  <span key={i} style={{ background: '#200f40', color: '#a78bfa', padding: '2px 8px', borderRadius: 6, fontSize: 10, fontWeight: 600 }}>
-                    {c}
-                  </span>
-                ))}
+            <div key={f.id} style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 14, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 10 }}>
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--indigo-l)' }}>📋 {f.nome}</div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (confirm(`Eliminare il Form Master "${f.nome}"?`)) {
+                        setFormMasters(formMasters.filter(x => x.id !== f.id));
+                      }
+                    }}
+                    style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid #ef4444', color: '#f87171', padding: '3px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 3 }}
+                    title="Elimina Form Master"
+                  >
+                    <span>🗑️</span>
+                    <span>Elimina</span>
+                  </button>
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 8 }}>Campi di raccolta dati incorporati ({f.campi.length}):</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {f.campi.map((c, i) => (
+                    <span key={i} style={{ background: '#200f40', color: '#a78bfa', padding: '2px 8px', borderRadius: 6, fontSize: 10, fontWeight: 600 }}>
+                      {c}
+                    </span>
+                  ))}
+                </div>
               </div>
             </div>
           ))}

@@ -650,6 +650,14 @@ export function DocumentEditorPage() {
           </button>
 
           <button
+            onClick={(e) => handleDeleteTemplate(selectedTemplateId, titoloDocumento, e)}
+            style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#f87171', border: '1px solid #ef4444', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+            title="Elimina questo modello master dalla libreria"
+          >
+            <span>🗑️ Elimina Modello Master</span>
+          </button>
+
+          <button
             onClick={handleSaveToVault}
             disabled={salvando}
             style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '7px 18px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 14px rgba(99,102,241,.3)' }}
@@ -975,29 +983,31 @@ export function DocumentEditorPage() {
                           <button
                             type="button"
                             onClick={(e) => handleRestoreTemplate(t.id, t.titolo, e)}
-                            style={{ background: '#064e3b', border: '1px solid #059669', color: '#34d399', fontSize: 10, cursor: 'pointer', padding: '2px 4px', borderRadius: 4, fontWeight: 700 }}
+                            style={{ background: '#064e3b', border: '1px solid #059669', color: '#34d399', fontSize: 10, cursor: 'pointer', padding: '3px 6px', borderRadius: 4, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 2 }}
                             title="Ripristina modello tra gli attivi"
                           >
-                            ♻️
+                            <span>♻️</span>
+                            <span>Ripristina</span>
                           </button>
                         ) : (
                           <button
                             type="button"
                             onClick={(e) => handleArchiveTemplate(t.id, t.titolo, e)}
-                            style={{ background: 'transparent', border: 'none', color: 'var(--muted)', fontSize: 11, cursor: 'pointer', padding: '2px 4px', borderRadius: 4 }}
+                            style={{ background: 'var(--card)', border: '1px solid var(--border)', color: 'var(--muted)', fontSize: 10, cursor: 'pointer', padding: '3px 6px', borderRadius: 4, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 2 }}
                             title="Archivia modello master"
                           >
-                            📦
+                            <span>📦</span>
                           </button>
                         )}
 
                         <button
                           type="button"
                           onClick={(e) => handleDeleteTemplate(t.id, t.titolo, e)}
-                          style={{ background: 'transparent', border: 'none', color: '#f87171', fontSize: 11, cursor: 'pointer', padding: '2px 4px', borderRadius: 4 }}
+                          style={{ background: 'rgba(239, 68, 68, 0.15)', border: '1px solid #ef4444', color: '#f87171', fontSize: 10, cursor: 'pointer', padding: '3px 6px', borderRadius: 4, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 2 }}
                           title="Elimina definitivamente modello master"
                         >
-                          🗑️
+                          <span>🗑️</span>
+                          <span>Elimina</span>
                         </button>
                       </div>
                     </div>
