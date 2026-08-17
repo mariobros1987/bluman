@@ -1,3 +1,5 @@
+import { REORGANIZATION_TEMPLATES } from './reorganizationTemplates';
+
 export interface DocumentTemplate {
   id: string;
   titolo: string;
@@ -257,6 +259,7 @@ export const PREBUILT_TEMPLATES: DocumentTemplate[] = [
 </div>
 `,
   },
+  ...REORGANIZATION_TEMPLATES,
 ];
 
 /**
@@ -319,6 +322,49 @@ export function getTemplateForVoce(voceTitle: string, category: string = ''): Do
   const v = voceTitle.toLowerCase();
   const c = category.toLowerCase();
 
+  // 1. Modelli Specifici di Riorganizzazione Societaria
+  if (v.includes('intake') || v.includes('questionario')) {
+    const found = PREBUILT_TEMPLATES.find(t => t.id === 'tmpl-01-1-questionario-intake-cliente');
+    if (found) return found;
+  }
+  if (v.includes('exit tax') || v.includes('rateizzazione')) {
+    const found = PREBUILT_TEMPLATES.find(t => t.id === 'tmpl-01-3-memo-valutazione-exit-tax' || t.id === 'tmpl-06-1-memo-procedurale-exit-tax-rateizzazione');
+    if (found) return found;
+  }
+  if (v.includes('analisi fiscale') || v.includes('cfc') || v.includes('esterovestizione')) {
+    const found = PREBUILT_TEMPLATES.find(t => t.id === 'tmpl-01-2-memo-analisi-fiscale-preliminare');
+    if (found) return found;
+  }
+  if (v.includes('fattibilit') || v.includes('raccomandazioni')) {
+    const found = PREBUILT_TEMPLATES.find(t => t.id === 'tmpl-01-4-report-fattibilita-raccomandazioni');
+    if (found) return found;
+  }
+  if (v.includes('giurisdiz') || v.includes('comparativ')) {
+    const found = PREBUILT_TEMPLATES.find(t => t.id === 'tmpl-02-2-memo-comparativo-giurisdizioni');
+    if (found) return found;
+  }
+  if (v.includes('banc') || v.includes('conto') || v.includes('emi')) {
+    const found = PREBUILT_TEMPLATES.find(t => t.id === 'tmpl-03-1-matrice-comparativa-istituti-bancari' || t.id === 'tmpl-03-3-procedura-apertura-conto-societario');
+    if (found) return found;
+  }
+  if (v.includes('marchi') || v.includes('ip') || v.includes('brevett') || v.includes('euipo')) {
+    const found = PREBUILT_TEMPLATES.find(t => t.id === 'tmpl-05-1-checklist-verifica-disponibilita-marchio' || t.id === 'tmpl-05-2-procedura-deposito-marchio' || t.id === 'tmpl-05-3-bozza-contratto-cessione-licenza-ip');
+    if (found) return found;
+  }
+  if (v.includes('aire') || v.includes('residenza estera')) {
+    const found = PREBUILT_TEMPLATES.find(t => t.id === 'tmpl-06-2-checklist-iscrizione-aire');
+    if (found) return found;
+  }
+  if (v.includes('iva') || v.includes('chiusura italia') || v.includes('adeguamento')) {
+    const found = PREBUILT_TEMPLATES.find(t => t.id === 'tmpl-06-3-checklist-chiusura-adeguamento-iva');
+    if (found) return found;
+  }
+  if (v.includes('fornitor')) {
+    const found = PREBUILT_TEMPLATES.find(t => t.id === 'tmpl-04-2-bozza-contratto-fornitori-esterni');
+    if (found) return found;
+  }
+
+  // 2. Modelli Core Standard
   if (v.includes('engagement') || v.includes('incarico') || v.includes('firma') || v.includes('mandato')) {
     return PREBUILT_TEMPLATES.find(t => t.id === 'tmpl-engagement')!;
   }
@@ -326,19 +372,19 @@ export function getTemplateForVoce(voceTitle: string, category: string = ''): Do
     return PREBUILT_TEMPLATES.find(t => t.id === 'tmpl-nda')!;
   }
   if (v.includes('trust') || v.includes('wishes') || v.includes('fiduciari') || c.includes('trust')) {
-    return PREBUILT_TEMPLATES.find(t => t.id === 'tmpl-letter-of-wishes')!;
+    return PREBUILT_TEMPLATES.find(t => t.id === 'tmpl-02-5-memo-predisposizione-trust' || t.id === 'tmpl-letter-of-wishes')!;
   }
   if (v.includes('ubo') || v.includes('kyc') || v.includes('antiriciclaggio') || v.includes('compliance') || c.includes('compliance')) {
-    return PREBUILT_TEMPLATES.find(t => t.id === 'tmpl-compliance')!;
+    return PREBUILT_TEMPLATES.find(t => t.id === 'tmpl-03-2-checklist-dossier-kyc' || t.id === 'tmpl-compliance')!;
   }
   if (v.includes('intercompany') || v.includes('servizio') || v.includes('management') || v.includes('contratto')) {
-    return PREBUILT_TEMPLATES.find(t => t.id === 'tmpl-intercompany')!;
+    return PREBUILT_TEMPLATES.find(t => t.id === 'tmpl-04-1-bozza-contratto-intra-societario' || t.id === 'tmpl-intercompany')!;
   }
-  if (v.includes('delega') || v.includes('procura') || v.includes('mfsa') || v.includes('banc')) {
+  if (v.includes('delega') || v.includes('procura') || v.includes('mfsa')) {
     return PREBUILT_TEMPLATES.find(t => t.id === 'tmpl-delega')!;
   }
   if (v.includes('costituzione') || v.includes('statuto') || v.includes('atto') || v.includes('holding') || c.includes('societario')) {
-    return PREBUILT_TEMPLATES.find(t => t.id === 'tmpl-memorandum')!;
+    return PREBUILT_TEMPLATES.find(t => t.id === 'tmpl-02-1-memorandum-struttura' || t.id === 'tmpl-02-4-bozza-memorandum-articles-of-association' || t.id === 'tmpl-memorandum')!;
   }
 
   return PREBUILT_TEMPLATES[0];
