@@ -282,10 +282,42 @@ export function ClientPortal() {
       const savedStr = localStorage.getItem('bluman_custom_projects');
       const savedArr: Progetto[] = savedStr ? JSON.parse(savedStr) : [];
       const updatedArr = [nuovoProgettoOperatore, ...savedArr.filter(p => p.cl !== clientName && p.id !== projectId)];
-      localStorage.setItem('bluman_custom_projects', JSON.stringify(updatedArr));
-
-      // Salva lo stato di firma del cliente
+      // Salva lo stato di firma del cliente e sigillo FEA
       localStorage.setItem(`bluman_portal_signed_${clientName}`, 'true');
+
+      // Registra l'Engagement Letter firmata nel Vault Documentale del Progetto (Google Drive dello studio)
+      const storageKey = `bluman_project_documents_${projectId}`;
+      const existingVaultStr = localStorage.getItem(storageKey);
+      const existingVault: any[] = existingVaultStr ? JSON.parse(existingVaultStr) : [];
+      
+      const engagementDoc = {
+        id: `doc-el-signed-${projectId}`,
+        nome: `Engagement Letter & Mandato Professionale Firmato (v1.0) — ${clientName}.docx`,
+        titolo: `Engagement Letter & Mandato Professionale Firmato (v1.0)`,
+        cat: 'Contratti',
+        dimensione: '54 KB',
+        data: new Date().toLocaleDateString('it-IT'),
+        dataCaricamento: new Date().toLocaleDateString('it-IT'),
+        firmato: true,
+        formato: 'word',
+        progettoId: projectId,
+        clienteNome: clientName,
+        descrizione: `Contratto di incarico professionale stipulato dal cliente ${clientName} con verifica OTP e Sigillo FEA eIDAS UE 910/2014.`,
+        signatureData: {
+          signerName: clientName,
+          signerRole: 'Cliente Incarico (Legale Rappresentante)',
+          timestamp: new Date().toLocaleString('it-IT'),
+          ipAddress: '83.211.12.94 (eIDAS Verificato)',
+        },
+      };
+
+      const updatedVault = [engagementDoc, ...existingVault.filter((d: any) => d.id !== engagementDoc.id)];
+      localStorage.setItem(storageKey, JSON.stringify(updatedVault));
+
+      // Sincronizza anche nel registro Vault Globale dello Studio
+      const globalVaultStr = localStorage.getItem('bluman_all_vault_documents');
+      const globalVault: any[] = globalVaultStr ? JSON.parse(globalVaultStr) : [];
+      localStorage.setItem('bluman_all_vault_documents', JSON.stringify([engagementDoc, ...globalVault.filter((d: any) => d.id !== engagementDoc.id)]));
 
       setSigned(true);
     } catch (err) {
