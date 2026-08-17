@@ -209,7 +209,7 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
     setLoadingMsgs(true);
     try {
       // 1. Recupero messaggi già salvati su DB Fastify / Supabase
-      const dbMsgs = await fetchComunicazioniApi(progettoId);
+      const dbMsgs = await fetchComunicazioniApi(String(progettoId));
       let currentList: MessaggioComunicazione[] = [];
       if (dbMsgs && Array.isArray(dbMsgs) && dbMsgs.length > 0) {
         currentList = dbMsgs.map((m: any) => ({
@@ -247,7 +247,7 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
             currentList.push(newInboundMsg);
 
             // Persiste automaticamente l'email in entrata a database
-            inviaComunicazioneApi(progettoId, {
+            inviaComunicazioneApi(String(progettoId), {
               canale: 'email',
               mittente: mail.from,
               destinatario: 'Studio Advisory (support@bluecode-ltd.com)',
@@ -315,7 +315,7 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
 
     try {
       // 1. Persistenza su Backend Fastify / Supabase
-      await inviaComunicazioneApi(progettoId, {
+      await inviaComunicazioneApi(String(progettoId), {
         canale: canaleSelezionato,
         mittente,
         destinatario,
