@@ -348,10 +348,46 @@ export function DocumentEditorPage() {
     setTimeout(() => setFeedback(null), 4000);
   };
 
-  // Importazione da File (.json / .html)
+  // Importazione da File (.json / .html / .pdf)
   const handleImportFileTrigger = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    if (file.name.toLowerCase().endsWith('.pdf')) {
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        const dataUrl = event.target?.result as string;
+        const tmplName = file.name.replace(/\.[^/.]+$/, "");
+        const newTmpl: DocumentTemplate = {
+          id: `tmpl-pdf-${Date.now()}`,
+          titolo: tmplName,
+          categoria: 'societario',
+          descrizione: `Documento PDF importato: "${file.name}".`,
+          contenutoHtml: `
+<div style="font-family: Arial, sans-serif; max-width: 850px; margin: 0 auto; color: #1e293b;">
+  <div style="background: #0f172a; color: #fff; padding: 14px 18px; border-radius: 8px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center;">
+    <div>
+      <div style="font-size: 13px; font-weight: 700; color: #818cf8;">📄 ${file.name}</div>
+      <div style="font-size: 11px; color: #94a3b8;">Documento PDF importato nel Vault Document Studio</div>
+    </div>
+    <a href="${dataUrl}" download="${file.name}" style="background: #4338ca; color: #fff; text-decoration: none; padding: 6px 14px; border-radius: 6px; font-size: 11.5px; font-weight: 700;">📥 Scarica PDF</a>
+  </div>
+  <iframe src="${dataUrl}" style="width: 100%; height: 850px; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff;" title="${file.name}"></iframe>
+</div>
+          `.trim(),
+        };
+        saveCustomTemplate(newTmpl);
+        await creaDocumentoTemplateApi(newTmpl);
+        const updated = getAllTemplates();
+        setTemplatesList(updated);
+        handleSelectTemplate(newTmpl);
+        setFeedback(`✓ Documento PDF "${file.name}" importato con visualizzatore integrato!`);
+        setTimeout(() => setFeedback(null), 4000);
+      };
+      reader.readAsDataURL(file);
+      e.target.value = '';
+      return;
+    }
 
     const reader = new FileReader();
     reader.onload = async (event) => {
@@ -851,7 +887,7 @@ export function DocumentEditorPage() {
               <input
                 type="file"
                 ref={fileImportRef}
-                accept=".json,.html,.htm"
+                accept=".json,.html,.htm,.pdf"
                 style={{ display: 'none' }}
                 onChange={handleImportFileTrigger}
               />
