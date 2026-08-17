@@ -267,50 +267,77 @@ export const PREBUILT_TEMPLATES: DocumentTemplate[] = [
  */
 export function resolveDocumentTemplateHtml(
   htmlContent: string,
-  context: {
-    cliente?: any;
-    progetto?: any;
-    studio?: any;
-    isForPrintOrExport?: boolean;
-    tagMode?: 'highlight' | 'plain' | 'raw';
-  }
+  context: any = {}
 ): string {
-  const { cliente, progetto, studio, isForPrintOrExport = false, tagMode = 'highlight' } = context;
+  if (!htmlContent) return '';
 
-  if (tagMode === 'raw' && !isForPrintOrExport) return htmlContent;
+  let targetCliente: any = null;
+  let targetProgetto: any = null;
+  let targetStudio: any = null;
+  let isForPrintOrExport = true;
+  let tagMode: 'highlight' | 'plain' | 'raw' = 'plain';
+
+  if (context && (context.cl || context.mods || context.totalePreventivo !== undefined)) {
+    // Il contesto è stato passato direttamente come oggetto Progetto
+    targetProgetto = context;
+    try {
+      const clsStr = localStorage.getItem('bluman_clients') || localStorage.getItem('bluman_custom_clients');
+      const clsArr = clsStr ? JSON.parse(clsStr) : [];
+      targetCliente = clsArr.find((c: any) => c.nome === context.cl || String(c.id) === String(context.clienteId)) || {
+        nome: context.cl,
+        referenteNome: context.referente || context.cl,
+      };
+    } catch {
+      targetCliente = { nome: context.cl, referenteNome: context.referente || context.cl };
+    }
+  } else if (context) {
+    targetProgetto = context.progetto;
+    targetCliente = context.cliente;
+    targetStudio = context.studio;
+    isForPrintOrExport = context.isForPrintOrExport !== undefined ? context.isForPrintOrExport : true;
+    tagMode = context.tagMode || 'plain';
+  }
+
+  // Dati studio da Tenant o Storage
+  if (!targetStudio) {
+    try {
+      const tntStr = localStorage.getItem('bluman_tenant_info');
+      if (tntStr) targetStudio = JSON.parse(tntStr);
+    } catch {}
+  }
 
   const dataOggi = new Date().toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' });
-  const refJson: any = cliente?.referentiJson && typeof cliente.referentiJson === 'object' ? cliente.referentiJson : {};
+  const refJson: any = targetCliente?.referentiJson && typeof targetCliente.referentiJson === 'object' ? targetCliente.referentiJson : {};
 
-  const projTitolo = progetto?.titolo || progetto?.n || progetto?.nome || 'Costituzione Holding & Trading Malta';
-  const projImporto = progetto?.totalePreventivo || progetto?.val || 8500;
+  const projTitolo = targetProgetto?.titolo || targetProgetto?.n || targetProgetto?.nome || 'Costituzione Holding & Trading Malta';
+  const projImporto = targetProgetto?.totalePreventivo || targetProgetto?.val || 8500;
 
-  const wrapTag = (value: string, tagCode: string) => {
-    if (isForPrintOrExport || tagMode === 'plain') return value;
-    return `<span class="bluman-smart-chip" title="Smart Tag ERP: {{${tagCode}}}" style="background: rgba(99, 102, 241, 0.14); color: #4338ca; border: 1px solid rgba(99, 102, 241, 0.35); border-bottom: 2px solid #4f46e5; border-radius: 4px; padding: 1px 6px; font-weight: 600; cursor: help; display: inline-block; box-shadow: 0 1px 3px rgba(99,102,241,0.12);">🏷️ ${value}</span>`;
+  // Sostituzione formale dei tag: NESSUN riquadro o badge, solo elegante grassetto istituzionale
+  const wrapTag = (value: string) => {
+    return `<strong>${value}</strong>`;
   };
 
   let out = htmlContent;
-  out = out.replace(/\{\{data_odierna\}\}/g, wrapTag(dataOggi, 'data_odierna'));
-  out = out.replace(/\{\{cliente\.ragione_sociale\}\}/g, wrapTag(cliente?.nome || 'Holding Beta S.r.l.', 'cliente.ragione_sociale'));
-  out = out.replace(/\{\{cliente\.nome\}\}/g, wrapTag(cliente?.nome || 'Holding Beta S.r.l.', 'cliente.nome'));
-  out = out.replace(/\{\{cliente\.partita_iva\}\}/g, wrapTag(cliente?.piva || cliente?.codiceFiscale || 'IT09876543210', 'cliente.partita_iva'));
-  out = out.replace(/\{\{cliente\.codice_fiscale\}\}/g, wrapTag(cliente?.codiceFiscale || cliente?.piva || 'IT09876543210', 'cliente.codice_fiscale'));
-  out = out.replace(/\{\{cliente\.sede_legale\}\}/g, wrapTag(cliente?.sedeLegale || 'Via Montenapoleone 8, Milano', 'cliente.sede_legale'));
-  out = out.replace(/\{\{cliente\.pec\}\}/g, wrapTag(cliente?.pec || 'holdingbeta@legalmail.it', 'cliente.pec'));
-  out = out.replace(/\{\{cliente\.sdi\}\}/g, wrapTag(cliente?.codiceSdi || 'SUBM70N', 'cliente.sdi'));
-  out = out.replace(/\{\{cliente\.iban\}\}/g, wrapTag(cliente?.iban || 'IT60X0542811101000000123456', 'cliente.iban'));
-  out = out.replace(/\{\{cliente\.referente\}\}/g, wrapTag(cliente?.referenteNome || refJson.referente || 'Ing. Roberto Rossi (CEO)', 'cliente.referente'));
-  out = out.replace(/\{\{cliente\.cellulare\}\}/g, wrapTag(cliente?.cellulare || '+39 333 5936278', 'cliente.cellulare'));
-  out = out.replace(/\{\{cliente\.ubo\}\}/g, wrapTag(cliente?.ubo || cliente?.referenteNome || 'Roberto Rossi', 'cliente.ubo'));
+  out = out.replace(/\{\{data_odierna\}\}/g, wrapTag(dataOggi));
+  out = out.replace(/\{\{cliente\.ragione_sociale\}\}/g, wrapTag(targetCliente?.nome || targetProgetto?.cl || 'Holding Beta S.r.l.'));
+  out = out.replace(/\{\{cliente\.nome\}\}/g, wrapTag(targetCliente?.nome || targetProgetto?.cl || 'Holding Beta S.r.l.'));
+  out = out.replace(/\{\{cliente\.partita_iva\}\}/g, wrapTag(targetCliente?.piva || targetCliente?.codiceFiscale || 'IT09876543210'));
+  out = out.replace(/\{\{cliente\.codice_fiscale\}\}/g, wrapTag(targetCliente?.codiceFiscale || targetCliente?.piva || 'IT09876543210'));
+  out = out.replace(/\{\{cliente\.sede_legale\}\}/g, wrapTag(targetCliente?.sedeLegale || 'Via Montenapoleone 8, Milano'));
+  out = out.replace(/\{\{cliente\.pec\}\}/g, wrapTag(targetCliente?.pec || 'holdingbeta@legalmail.it'));
+  out = out.replace(/\{\{cliente\.sdi\}\}/g, wrapTag(targetCliente?.codiceSdi || 'SUBM70N'));
+  out = out.replace(/\{\{cliente\.iban\}\}/g, wrapTag(targetCliente?.iban || 'IT60X0542811101000000123456'));
+  out = out.replace(/\{\{cliente\.referente\}\}/g, wrapTag(targetCliente?.referenteNome || refJson.referente || targetCliente?.referente || 'Ing. Roberto Rossi (CEO)'));
+  out = out.replace(/\{\{cliente\.cellulare\}\}/g, wrapTag(targetCliente?.cellulare || '+39 333 5936278'));
+  out = out.replace(/\{\{cliente\.ubo\}\}/g, wrapTag(targetCliente?.ubo || targetCliente?.referenteNome || 'Roberto Rossi'));
 
-  out = out.replace(/\{\{progetto\.titolo\}\}/g, wrapTag(projTitolo, 'progetto.titolo'));
-  out = out.replace(/\{\{progetto\.importo_totale\}\}/g, wrapTag(`€ ${Number(projImporto).toLocaleString('it-IT')},00`, 'progetto.importo_totale'));
+  out = out.replace(/\{\{progetto\.titolo\}\}/g, wrapTag(projTitolo));
+  out = out.replace(/\{\{progetto\.importo_totale\}\}/g, wrapTag(`€ ${Number(projImporto).toLocaleString('it-IT')},00`));
 
-  out = out.replace(/\{\{studio\.ragione_sociale\}\}/g, wrapTag(studio?.ragioneSociale || 'Bluecode Ltd', 'studio.ragione_sociale'));
-  out = out.replace(/\{\{studio\.piva\}\}/g, wrapTag(studio?.piva || 'MT28491039', 'studio.piva'));
-  out = out.replace(/\{\{studio\.sede_legale\}\}/g, wrapTag(studio?.sedeLegale || 'Level 4, Valuation Centre, Tower Road, Sliema SLM 1600, Malta', 'studio.sede_legale'));
-  out = out.replace(/\{\{studio\.iban\}\}/g, wrapTag(studio?.iban || 'MT89VALL22013000000012345678', 'studio.iban'));
+  out = out.replace(/\{\{studio\.ragione_sociale\}\}/g, wrapTag(targetStudio?.ragioneSociale || 'Bluecode Ltd'));
+  out = out.replace(/\{\{studio\.piva\}\}/g, wrapTag(targetStudio?.piva || 'MT28491039'));
+  out = out.replace(/\{\{studio\.sede_legale\}\}/g, wrapTag(targetStudio?.sedeLegale || 'Level 4, Valuation Centre, Tower Road, Sliema SLM 1600, Malta'));
+  out = out.replace(/\{\{studio\.iban\}\}/g, wrapTag(targetStudio?.iban || 'MT89VALL22013000000012345678'));
 
   return out;
 }
