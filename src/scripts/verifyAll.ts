@@ -26,7 +26,7 @@ async function runAllVerificationChecks() {
   // 1. TEST OTP & FEA eIDAS
   console.log('🔐 [1/4] Test Modulo OTP & Firma Elettronica Avanzata (FEA eIDAS)...');
   const otp = generateOtp('cli-1', '+39 333 5936278', 'whatsapp');
-  assertTest('Generazione OTP a 6 cifre valido', otp && otp.length === 6 && /^\d{6}$/.test(otp), `Codice: ${otp}`);
+  assertTest('Generazione OTP a 6 cifre valido', Boolean(otp && otp.length === 6 && /^\d{6}$/.test(otp)), `Codice: ${otp}`);
 
   const v1 = verifyOtp('cli-1', otp);
   assertTest('Verifica e validazione OTP corretto', v1.valid === true);

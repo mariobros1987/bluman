@@ -23,29 +23,31 @@
 
 ### FASE 2 — Frontend UI & Portale Cliente Passwordless
 - [x] **Dashboard (`/`)**: KPI portafoglio, avvisi ritardo, navigazione deep-link ai clienti ed ai progetti.
-- [x] **Anagrafica Clienti ERP (`/clients`)**: Modal `AnagraficaErpModal` a 4 schede per dati legali, sedi, fatturazione SDI e fascicolo KYC/AML.
+- [x] **Anagrafica Clienti ERP (`/clients`)**: Modal `AnagraficaErpModal` a 4 schede per dati legali, sedi, fatturazione SDI e fascicolo KYC/AML con persistenza bidirezionale garantita (PostgreSQL `prisma.cliente` + `referentiJson`).
 - [x] **Dettagli Progetto (`/projects/:id`)**:
-  - `🗂 Moduli & Microvoci` (Consuntivazione ore e diario note operatore).
+  - `🗂 Moduli & Microvoci` (Consuntivazione ore, diario note operatore salvabili e checklist passaggi con audit log).
   - `🕸 Grafo & Dipendenze Moduli` (Workflow visivo con **🔒 Lucchetti Topologici Dinamici**, frecce `➔`, pulsante `+ Aggiungi Modulo da Libreria` e **`✉️ Notifica Sblocco al Cliente`**).
   - `💶 Fatturazione & SDI` (Emissione sia di Fatture `FT` che Note di Credito `NC` con serie distinte ed anteprima PDF).
   - `📊 Redditività & Margini` (Dashboard analitica con Margine Lordo Studio, Resa Oraria Effettiva €/ora, Ore Stimate vs Reali ed export **📄 Dossier Trasparenza PDF**).
   - `📄 Documenti & Vault Legale` (Archivio contratti, certificati MFSA, fascicolo KYC ed **📤 Upload File PDF**).
-  - `📅 Calendario & Scadenzario` (Scadenzario cronologico del progetto, promemoria ed inserimento 1-click **`+ Programma Nuova Scadenza`**).
-  - `💬 Comunicazioni & Ingestion` (Timeline messaggi omnichannel WhatsApp, Telegram, Email, Signal con binding automatico e dinamico dei recapiti dall'Anagrafica Master Cliente ERP).
+  - `💬 Comunicazioni & Ingestion` (Timeline messaggi omnichannel WhatsApp, Telegram, Email, Signal sincronizzata live col Portale Cliente e con binding automatico dei recapiti dall'Anagrafica ERP).
   - `📜 Storico Contratti & Addendum` (Registro immutabile delle versioni contrattuali firmate e marca temporale eIDAS).
   - **Archiviazione & Eliminazione Sicura**: Blocco fiscale anti-cancellazione se presenti fatture.
 - [x] **Registro Fatture & Note di Credito (`/invoices`)**:
   - Dashboard globale per tutte le fatture e note di credito dello studio.
   - KPI (Fatturato Emesso, Incassato Saldate, In Sospeso, Note Credito).
   - Generazione ed esportazione 1-Click **📥 XML SDI (FatturaPA v1.2.2)** per l'Agenzia delle Entrate.
-- [x] **Scadenzario Incassi & Prima Nota Studio (`/payments`)**:
+- [x] **Registro Prima Nota & Movimenti Cassa/Banca (`/prima-nota`)**:
+  - Storico contabile con tracciamento codice CRO/TRN e metodo di pagamento.
+  - Modal **📥 Importa Estratto Conto (CSV)** per caricamento e riconciliazione automatica con le partite aperte.
+- [x] **Scadenzario Incassi & Partite Aperte (`/payments`)**:
   - Sezione dedicata alle partite aperte, rateizzazioni ed incassi in scadenza.
   - Modal **💰 Registra Incasso** per saldare acconti/rate con tracciamento CRO/TRN e note operatore.
   - Azione **✉️ Sollecita Pagamento** con invio notifiche ed IBAN del Tenant.
 - [x] **Contratti Ricorrenti & Retainer Studio (`/retainers`) — *Ispirato ad OpenSTAManager***:
   - Gestione contratti continuativi di Advisory, Corporate Governance e Compliance AML.
   - Pianificazione frequenza canone (mensile, trimestrale, semestrale, annuale) e data prossima fatturazione.
-  - Modal 1-Click **`➕ Nuovo Contratto Retainer`** collegato all'Anagrafica Clienti ERP.
+  - Modal 1-Click **`➕ Nuovo Contratto Retainer`** collegato all'Anagrafica Clienti ERP ed al Progetto con link 1-Click `📁 Nome Progetto ↗`.
 - [x] **Checklist & SOP Compliance di Progetto — *Ispirato ad OpenSTAManager***:
   - Voci di controllo e spunte obbligatorie per ciascun passaggio operativo di progetto.
   - Persistenza dello stato completato ed audit operatore.
@@ -63,10 +65,10 @@
   - **Step 2**: Filtro libreria a cascata (1. Moduli specifici in evidenza, 2. Moduli generici, 3. Altre giurisdizioni).
 - [x] **Portale Cliente Passwordless (`/portal`)**:
   - Scheda 1: ✍️ Proposta d'Ordine & Firma Engagement Letter 1-Click.
-  - Scheda 2: 📊 Avanzamento Live Lavori (progress bar 65% e timeline).
+  - Scheda 2: 📊 Avanzamento Live Lavori (progress bar e timeline sincronizzata).
   - Scheda 3: 📋 Form Dati Societari con salvataggio diretto.
   - Scheda 4: 📎 Vault Documenti Legali.
-  - Scheda 5: 💬 Contatti Advisor.
+  - Scheda 5: 💬 Live Chat & Comunicazioni Dirette con l'Advisor (invio messaggi reali con persistenza PostgreSQL).
 - [x] **Impostazioni Studio, Gestione Team & Matrice Permessi RBAC (`/settings`)**:
   - Sede Legale e Sede Operativa disaccoppiate.
   - Configuratore Layout Fattura PDF (Logo studio, colore tema, note legali ed anteprima live).

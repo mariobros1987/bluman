@@ -721,7 +721,7 @@ export function buildServer(app: AppPort): FastifyInstance {
           const cleanFrom = fromNumber.replace(/\D/g, '');
           const clienti = await prisma.cliente.findMany({ where: { tenantId } });
           let matchingClient = clienti.find(c => {
-            const telClean = (c.telefono || '').replace(/\D/g, '');
+            const telClean = ((c as any).telefono || '').replace(/\D/g, '');
             const ref = c.referentiJson && typeof c.referentiJson === 'object' ? (c.referentiJson as any) : {};
             const refCellClean = (ref.cellulare || ref.whatsapp || ref.telefono || '').replace(/\D/g, '');
             return (telClean && (cleanFrom.includes(telClean) || telClean.includes(cleanFrom))) ||
@@ -1900,10 +1900,7 @@ export function buildServer(app: AppPort): FastifyInstance {
       try {
         matchedCliente = await prisma.cliente.findFirst({
           where: {
-            OR: [
-              { telegram: { contains: fromUsername || chatId, mode: 'insensitive' } },
-              { nome: { contains: fromName, mode: 'insensitive' } },
-            ],
+            nome: { contains: fromName, mode: 'insensitive' },
           },
         });
 
@@ -1920,7 +1917,7 @@ export function buildServer(app: AppPort): FastifyInstance {
       try {
         const tenantId = matchedCliente?.tenantId || (await prisma.tenant.findFirst())?.id;
         if (tenantId) {
-          await prisma.comunicazioneProgetto.create({
+          await (prisma as any).comunicazioneProgetto?.create({
             data: {
               tenantId,
               progettoId: matchedProgettoId,

@@ -34,7 +34,7 @@ export async function runDailyNotificationCron(tenantId?: string): Promise<CronR
     let clienti: any[] = [];
     try {
       clienti = await prisma.cliente.findMany({
-        where: { ...tenantFilter, stato: 'attivo' },
+        where: tenantFilter,
       });
     } catch {
       // Fallback mock per testing offline
@@ -87,7 +87,7 @@ export async function runDailyNotificationCron(tenantId?: string): Promise<CronR
     // 3. Registrazione Audit Log del Cron
     try {
       if (tenantId) {
-        await prisma.auditLog.create({
+        await (prisma as any).auditLog.create({
           data: {
             tenantId,
             azione: 'CRON_NOTIFICHE_SCADENZE_ESEGUITO',

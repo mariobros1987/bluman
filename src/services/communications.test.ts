@@ -59,9 +59,9 @@ describe('Omnichannel Communications & SMTP Verification Suite', () => {
   });
 
   it('deve rifiutare un handshake Webhook Meta con verify_token errato', () => {
-    const verifyTokenAtteso = 'bluman_wa_secure_token_2026';
+    const verifyTokenAtteso: string = 'bluman_wa_secure_token_2026';
     const hubMode = 'subscribe';
-    const hubVerifyToken = 'token_sbagliato_123';
+    const hubVerifyToken: string = 'token_sbagliato_123';
 
     const handshakeValido = hubMode === 'subscribe' && hubVerifyToken === verifyTokenAtteso;
     expect(handshakeValido).toBe(false);

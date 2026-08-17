@@ -13,13 +13,19 @@ Piattaforma ERP per studi di consulenza societaria, wealth protection ed advisor
 - **Avanzamento Live Lavori**: Timeline delle fasi di consulenza in corso con percentuale globale.
 - **Form Dati Societari**: Compilazione guidata dei dati fiscali, IBAN e UBO.
 - **Vault Documenti**: Archivio contratti ed allegati da firmare.
-- **Contatti Advisor**: Canale diretto di assistenza col Lead Senior Advisor.
+- **Live Chat & Contatti Advisor**: Chat bidirezionale interattiva con l'Advisor collegata via API Fastify e salvata su PostgreSQL.
 
-### 📋 Anagrafica Master Cliente ERP (4 Schede)
-- **Dati Legali**: Ragione Sociale, Partita IVA / VAT, Codice Fiscale, Giurisdizione, REA.
-- **Sedi Distinte**: Sede Legale e Sede Operativa / Rappresentanza disaccoppiate.
-- **Fatturazione SDI**: Codice Destinatario 7 caratteri (es. `SUBM70N`) ed IBAN cliente.
-- **Compliance KYC/AML**: Classe di rischio antiriciclaggio, Titolare Effettivo (UBO), origine patrimoniale e rinnovo KYC.
+### 📋 Anagrafica Master Cliente ERP (4 Schede & Persistenza Totale)
+- **Dati Legali**: Ragione Sociale, Partita IVA / VAT, Codice Fiscale, Giurisdizione, REA, Capitale Sociale.
+- **Sedi Distinte**: Sede Legale (Indirizzo, Città, CAP, Nazione) e Sede Operativa / Rappresentanza disaccoppiate.
+- **Fatturazione SDI**: Codice Destinatario 7 caratteri (es. `SUBM70N`), Regime Fiscale ed IBAN cliente.
+- **Compliance KYC/AML**: Classe di rischio antiriciclaggio, Titolare Effettivo (UBO), origine patrimoniale e data rinnovo KYC.
+- **Salvataggio Bidirezionale**: Persistenza sincrona su PostgreSQL (`prisma.cliente` + `referentiJson`) e fallback in locale.
+
+### 📥 Prima Nota & Riconciliazione Estratto Conto Bancario (CSV)
+- **Import Estratto Conto (CSV)**: Parsing automatico di righe CSV bancarie (`Data, Causale, Importo, CRO/TRN`).
+- **Smart Reconciliation**: Riconciliazione automatica con le anagrafiche dei clienti e le fatture dello studio.
+- **Registro Movimenti**: Tracciamento contabile per metodo di pagamento (Bonifico, POS, Stripe, Assegno) e codice CRO/TRN.
 
 ### 💶 Fatturazione & Note di Credito (Numerazione Sequenziale Distinta)
 - **Fatture VENDITA (Serie `FT`)**: Numerazione autonoma (es. `FT-2026/001`).
@@ -64,7 +70,7 @@ Piattaforma ERP per studi di consulenza societaria, wealth protection ed advisor
 2. **Allineamento Documentazione Markdown (`.md`)**:
    - Tutti i file `.md` (`README.md`, `BluMan_piano_di_sviluppo.md`, `ISTRUZIONI_INSTALLAZIONE.md`, `.agents/AGENTS.md`) DEVONO essere tassativamente aggiornati dopo ogni modifica importante.
 3. **Mappa Grafo (Graphify)**:
-   - Mantenere aggiornato il grafo con `graphify update . --code-only`.
+   - Mantenere aggiornato il grafo con `graphify extract . --code-only` e `graphify cluster-only .`.
 
 ---
 
