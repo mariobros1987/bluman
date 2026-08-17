@@ -18,13 +18,16 @@ REGOLE TASSATIVE DA SEGUIRE RIGOROSAMENTE:
 3. Grafo Graphify: Esegui `graphify update . --code-only` per mantenere la mappa delle dipendenze aggiornata.
 
 CREDENZIALI UFFICIALI DI TEST (LOGIN):
-- 👨‍💼 Advisor Senior: joe@bluecode.advisory / password123
+- 👨‍💼 Lead Advisor Senior: joe@bluecode.advisory / password123
+- ⚖️ Legal Counsel Advisor: mario.dibenedetto87@gmail.com / BlueCode2026!
+- ⚖️ Avv. Lorenzo Marino: lorenzo.marino@bluecode.advisory / password123
+- 💶 Dr. Elena Russo (Tax Advisor): elena.russo@bluecode.advisory / password123
 - 👑 Super Admin: admin@bluecode.advisory / admin2026!
 - 👷 Operatore Studio: operator@bluecode.advisory / operator123
-- 🔑 Cliente Incarico: /portal?magic_token=client_demo (Passwordless)
+- 🔑 Cliente Incarico: client@holdingbeta.advisory (Magic Link /portal)
 
 STATO ATTUALE:
-Abbiamo completato l'autenticazione JWT RBAC, il Portale Cliente a 5 schede, l'Anagrafica ERP Clienti, la Fatturazione/NC con serie distinte (FT vs NC), il Grafo Dipendenze Moduli nel progetto ed il Calendario Condiviso con Scadenzario Attività Studio (/calendar).
+Abbiamo completato l'autenticazione JWT RBAC, il Portale Cliente con Firma FEA eIDAS OTP, l'Anagrafica ERP Clienti, la Fatturazione/NC con tracciato XML SDI, il Connettore SDI 1-Click, il Document Studio Word-like con Smart Tags, il Grafo Dipendenze Moduli nel progetto, il Calendario Condiviso con Scadenzario Attività Studio (/calendar) ed il Cron Worker Scadenze UBO/Marchi.
 
 Leggiti i file .agents/AGENTS.md, README.md ed ISTRUZIONI_INSTALLAZIONE.md prima di iniziare qualsiasi modifica!
 ```
@@ -34,14 +37,19 @@ Leggiti i file .agents/AGENTS.md, README.md ed ISTRUZIONI_INSTALLAZIONE.md prima
 ## 🏛 Mappa Architetturale Rapida
 
 - **`frontend/src/pages/Dashboard.tsx`**: Dashboard KPI portafoglio, avvisi ritardo e navigazione clienti.
+- **`frontend/src/pages/Projects.tsx`**: Gestione Avanzata Progetti (Schede Operatore, Tabella ERP Matrice, Kanban Pipeline).
 - **`frontend/src/pages/ClientsPage.tsx`**: Anagrafica Clienti ERP (4 schede) e Magic Link passwordless.
-- **`frontend/src/pages/CalendarPage.tsx`**: Calendario Condiviso & Scadenzario Studio (Vista Mese / Agenda Lista).
-- **`frontend/src/pages/ProjectDetail.tsx`**: Dettaglio Progetto con Grafo Moduli (`GrafoModuliProgettoView`), Fatture/NC e Scadenze microvoci.
-- **`frontend/src/pages/Library.tsx`**: Distinta Base, Catalogo Articoli ed Editing Prezzi Unitari.
-- **`frontend/src/pages/ClientPortal.tsx`**: Portale Cliente a 5 schede (Firma 1-Click, Live Progress, Form Societari, Vault Documenti).
-- **`frontend/src/pages/LoginPage.tsx`**: Login Staff cifrato con ruoli RBAC.
-- **`src/server.ts`**: Server Fastify API con endpoint `/auth/login`, `/auth/magic-login`, `/upload`, `/progetti` ed isolamento multi-tenant.
-- **`prisma/schema.prisma`**: Schema database Supabase PostgreSQL.
+- **`frontend/src/pages/CalendarPage.tsx`**: Calendario Condiviso & Scadenzario Studio (Vista Mese / Agenda Lista con dati reali da DB).
+- **`frontend/src/pages/ProjectDetail.tsx`**: Dettaglio Progetto con Grafo Moduli (`GrafoModuliProgettoView`), Comunicazioni Omnichannel, Fatture/NC e Scadenze microvoci.
+- **`frontend/src/pages/DocumentEditorPage.tsx`**: Studio Document Studio (Word WYSIWYG, Smart Tags ERP, Foglio A4, PDF).
+- **`frontend/src/pages/Library.tsx`**: Distinta Base, Catalogo Articoli, Modelli Documenti ed Editing Prezzi Unitari.
+- **`frontend/src/pages/ClientPortal.tsx`**: Portale Cliente a 5 schede (Firma FEA OTP 1-Click, Live Progress, Form Societari, Vault Documenti, Chat Advisor).
+- **`frontend/src/pages/InvoicesPage.tsx`**: Registro Fatture/NC ed Export XML SDI FatturaPA.
+- **`frontend/src/pages/PrimaNotaPage.tsx`**: Registro Prima Nota, Movimenti Cassa/Banca e Riconciliazione CSV.
+- **`frontend/src/pages/RetainersPage.tsx`**: Contratti Ricorrenti & Retainer Studio periodici.
+- **`frontend/src/pages/SettingsPage.tsx`**: Impostazioni Studio, Configuratore PDF, Gestione Team con iniziali/hover card, Matrice Permessi RBAC ed Email Suite SMTP/IMAP.
+- **`src/server.ts`**: Server Fastify API con endpoint `/auth/login`, `/auth/magic-login`, `/portal/request-otp`, `/portal/verify-otp-and-sign`, `/cron/esegui-notifiche-scadenze`, `/invoices/:id/trasmetti-sdi`.
+- **`prisma/schema.prisma`**: Schema database Supabase PostgreSQL con RLS isolata per Tenant.
 
 ---
 
@@ -84,6 +92,6 @@ npx supabase link --project-ref cfdtjdrfeidbemhunilt
 # B. Generazione Prisma Client & Allineamento Schema DB
 npx prisma generate
 npx prisma db push             # Sincronizza lo schema Prisma con Supabase
-npx tsx src/adapters/prisma/seedFull.ts # Popola i dati di seed sul DB reale Supabase
+npx tsx prisma/seed.ts         # Popola i dati master di seed sul DB reale Supabase
 ```
 

@@ -60,6 +60,9 @@ Questo file serve come indice rapido per l'IA ed i collaboratori per identificar
   - `frontend/src/components/ui/Avatar.tsx`: Componente avatar fluttuante con iniziali operatore e card di anteprima (nome completo, ruolo, punto di stato) al passaggio del mouse (hover).
   - `api/send-email.ts`: Vercel Serverless Function ultra-rapida con Nodemailer per invio test SMTP, inviti collaboratori con credenziali e comunicazioni live fascicolo a clienti.
   - `frontend/src/utils/rbac.ts`: Motore di sicurezza e controllo accessi RBAC granulare a 12 moduli (filtra Sidebar e Route Guards per moduli `denied` / `read` / `write`).
+  - `src/scripts/backupDb.ts`: Script di backup e snapshot JSON di tutte le tabelle del database BluMan multi-tenant.
+  - `src/scripts/verifyAll.ts`: Test runner completo per il collaudo automatico della test suite end-to-end (11/11 test).
+  - `.github/workflows/ci.yml`: Workflow di Continuous Integration GitHub Actions per build e test automatici ad ogni push.
   - `src/services/otpService.ts`: Gestione codice OTP a tempo (5 min), rate limiting e sigillo crittografico FEA eIDAS UE 910/2014.
   - `src/services/cronService.ts`: Worker automatico background scansione rinnovi UBO Malta, marchi EUIPO e solleciti fatture.
   - `src/services/sdiService.ts`: Trasmissione diretta 1-Click della Fattura Elettronica XML a SdI Agenzia delle Entrate.

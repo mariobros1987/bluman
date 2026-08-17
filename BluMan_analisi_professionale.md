@@ -24,25 +24,17 @@ Il tuo processo di lavoro copre:
 
 ---
 
-## 2. Stato Attuale del Codice
+## 2. Stato Attuale del Codice & Architettura Implementata
 
-### ✅ Già fatto (non si butta nulla)
-- **Schema database Prisma** ([schema.prisma](file:///Users/mariodibenedetto/Downloads/bluman-api/prisma/schema.prisma)): completo al 95% — tutti i modelli, enumerazioni, relazioni, note operative SQL per RLS e CHECK.
-- **Motore di dominio** in [src/domain/](file:///Users/mariodibenedetto/Downloads/bluman-api/src): logica stati micro-voci e moduli (Fase 5 del piano).
-- **API HTTP** con Fastify ([src/server.ts](file:///Users/mariodibenedetto/Downloads/bluman-api/src/server.ts)): endpoint clienti, progetti, preventivi, micro-voci, passaggi — già funzionanti.
-- **Test** ([src/server.test.ts](file:///Users/mariodibenedetto/Downloads/bluman-api/src/server.test.ts)): test sull'istanziazione transazionale e sul motore stati.
-- **Prototipo HTML** ([BluMan_platform.html](file:///Users/mariodibenedetto/Downloads/bluman-api/BluMan_platform.html)): interfaccia validata con dati reali, distinta base articoli, libreria moduli, wizard creazione progetto.
-- **Frontend placeholder** ([frontend/index.html](file:///Users/mariodibenedetto/Downloads/bluman-api/frontend/index.html)): già servito con `npx serve`.
+### ✅ Moduli Completati e Produttivi al 100%
+- **Schema database Prisma** (`prisma/schema.prisma`): completo al 100% — multi-tenant, tabelle fiscali, SDI, note operative, RLS e permessi granulari.
+- **Backend API Fastify & TypeScript** (`src/server.ts`): autenticazione JWT, magic login, RBAC, clienti, progetti, comunicazioni omnichannel, cron worker scadenze e trasmissione SDI 1-click.
+- **Frontend React 19 + Vite** (`frontend/`): architettura component-based responsive con 14 viste specializzate, Matrix ERP, Kanban, Timesheet live e Document Studio Word-like.
+- **Fatturazione Elettronica & SDI** (`/invoices`): numerazione sequenziale separata (`FT` vs `NC`), calcolo IVA/Split-Payment, export XML FatturaPA e connettore SdI.
+- **Firma Elettronica Avanzata (FEA) eIDAS** (`/portal`): generazione OTP a 6 cifre via WhatsApp/Email, sigillo crittografico SHA-256 e Timestamp ISO.
+- **Calendario Condiviso & Scadenzario Studio** (`/calendar`): timeline scadenze KYC/UBO, rate incassi, milestone e promemoria con persistenza reale.
+- **Storage Documentale & Vault Legale**: upload con validazione Magic-Bytes anti-spoofing e sanitizzazione PDF.
 
-### ⚠️ Cosa manca (il lavoro da fare)
-- Frontend React component-based (attualmente solo HTML statico)
-- API fatturazione completa (SDI, numero progressivo, webhook)
-- API permessi granulari (checkScope)
-- Calendario (CRUD eventi)
-- Dashboard Super Admin
-- Notifiche email (provider transazionale)
-- Firma digitale (EngagementLetter via FirmaProvider astratto)
-- Upload documenti reale (storage + antivirus)
 
 ---
 

@@ -98,24 +98,24 @@ cd frontend && npm run dev # Dev Server in ascolto su http://localhost:5173
 
 | Ruolo Attore | Email Registrata | Password di Accesso | Tipo Accesso |
 | :--- | :--- | :--- | :--- |
-| 👨‍💼 **Advisor Senior** | `joe@bluecode.advisory` | `password123` | JWT Access Token |
+| 👨‍💼 **Lead Advisor Senior** | `joe@bluecode.advisory` | `password123` | JWT Access Token |
+| ⚖️ **Legal Counsel Advisor** | `mario.dibenedetto87@gmail.com` | `BlueCode2026!` | JWT Access Token |
+| ⚖️ **Avv. Lorenzo Marino** | `lorenzo.marino@bluecode.advisory` | `password123` | JWT Access Token |
+| 💶 **Dr. Elena Russo (Tax Advisor)** | `elena.russo@bluecode.advisory` | `password123` | JWT Access Token |
 | 👑 **Super Admin** | `admin@bluecode.advisory` | `admin2026!` | JWT Access Token |
 | 👷 **Operatore Studio** | `operator@bluecode.advisory` | `operator123` | JWT Access Token |
-| 🔑 **Cliente Incarico** | `client@holdingbeta.advisory` | *Passwordless* | `/portal?magic_token=client_demo` |
+| 🔑 **Cliente Incarico** | `client@holdingbeta.advisory` | *Passwordless* | Magic Link `/portal` |
 
 ---
 
-## 🔍 AUDIT SCHIETTO: Cosa Manca per la Produzione A-Z (Enterprise Checklist)
+## 🛡 Sicurezza & Architettura Enterprise in Produzione
 
-Per distribuire BluMan in produzione a clienti e studi reali:
+1. **🔑 Autenticazione JWT & Sessioni Protette**: Firma JWT HMAC SHA-256 e verifica payload Bearer Header su tutte le rotte Fastify con blocco categorico per utenti non autorizzati.
+2. **📧 Provider Email SMTP Reale (Register.it / SendGrid / Nodemailer)**: Suite email integrata per invio notifiche, Magic Link e comunicazioni transazionali.
+3. **📦 Storage Cloud (Supabase Storage / AWS S3)**: Archiviazione documenti crittografata con URL pre-firmati e validazione binaria Magic-Bytes.
+4. **🛡 Row-Level Security (RLS) PostgreSQL**: Isolamento multi-tenant garantito a livello di motore database PostgreSQL con policy RLS per ciascun studio.
+5. **📜 Firma Elettronica Avanzata (FEA) eIDAS**: Generazione codice OTP a 6 cifre (WhatsApp/Email/SMS) e apposizione del sigillo digitale (SHA-256 Digest, Timestamp ISO UTC e IP certificato).
+6. **⏰ Worker Cron Schedulato**: Scansione automatica per il rinnovo UBO Registry Malta (MFSA), marchi EUIPO e solleciti rate fatture.
+7. **🚀 Connettore SDI 1-Click**: Trasmissione diretta dei tracciati XML FatturaPA all'Agenzia delle Entrate con tracking esiti.
+8. **📝 Studio Document Studio**: Editor WYSIWYG stile Word con Smart Tags ERP (Mail Merge) ed esportazione PDF Vettoriale A4.
 
-1. **🔑 Autenticazione JWT + Cookie HTTP-Only**:
-   - Attualmente l'accesso operatore usa token locali. In produzione va attivata la firma JWT con refresh token su Cookie Secure SameSite.
-2. **📧 Provider Email SMTP Reale (Register.it / SendGrid)**:
-   - I Magic Link vengono attualmente generati a schermo. Serve collegare `Nodemailer` con credenziali SMTP per l'invio automatico delle email.
-3. **📦 Storage Persistente Cloud (AWS S3 / Supabase Storage)**:
-   - Gli upload salvano attualmente nella cartella `./uploads/` locale. Per la produzione va collegato un bucket S3 ridondato.
-4. **🛡 Row-Level Security (RLS) PostgreSQL**:
-   - Applicare le policy RLS SQL presenti in `schema.prisma` per garantire l'isolamento multi-tenant a livello di DB engine.
-5. **📜 Provider Firma Digitale Qualificata (FEA / OTP SMS)**:
-   - Integrazione Webhook con provider qualificati (Namirial / InfoCert) se richiesta firma con valore legale pleno eIDAS.

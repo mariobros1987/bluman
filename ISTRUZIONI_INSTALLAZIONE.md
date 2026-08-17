@@ -64,7 +64,10 @@ Per accedere direttamente al **Portale Cliente Passwordless**, apri:
 
 | Ruolo Attore | Email Registrata | Password di Accesso | Tipo Accesso |
 | :--- | :--- | :--- | :--- |
-| 👨‍💼 **Advisor Senior** | `joe@bluecode.advisory` | `password123` | JWT Access Token |
+| 👨‍💼 **Lead Advisor Senior** | `joe@bluecode.advisory` | `password123` | JWT Access Token |
+| ⚖️ **Legal Counsel Advisor** | `mario.dibenedetto87@gmail.com` | `BlueCode2026!` | JWT Access Token |
+| ⚖️ **Avv. Lorenzo Marino** | `lorenzo.marino@bluecode.advisory` | `password123` | JWT Access Token |
+| 💶 **Dr. Elena Russo (Tax Advisor)** | `elena.russo@bluecode.advisory` | `password123` | JWT Access Token |
 | 👑 **Super Admin** | `admin@bluecode.advisory` | `admin2026!` | JWT Access Token |
 | 👷 **Operatore Studio** | `operator@bluecode.advisory` | `operator123` | JWT Access Token |
 | 🔑 **Cliente Incarico** | `client@holdingbeta.advisory` | *Passwordless* | Magic Link `/portal` |
@@ -90,6 +93,6 @@ Per accedere direttamente al **Portale Cliente Passwordless**, apri:
    # Genera Prisma Client & Applica lo Schema DB
    npx prisma generate
    npx prisma db push
-   npx tsx src/adapters/prisma/seedFull.ts # Popola i dati sul DB reale Supabase
-   npm run start:db                        # Server in ascolto col DB Supabase reale
+   npx tsx prisma/seed.ts  # Popola i dati di seed master sul DB reale Supabase
+   npm run start:db        # Server in ascolto col DB Supabase reale
    ```
