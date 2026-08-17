@@ -17,6 +17,13 @@ export async function downloadRealPdf(
   elementOrHtml: HTMLElement | string,
   signatures: SignatureData[] = []
 ) {
+  // Protezione automatica se gli argomenti sono invertiti (HTML nel primo parametro)
+  if (typeof fileName === 'string' && fileName.includes('<') && (typeof elementOrHtml === 'string' && !elementOrHtml.includes('<'))) {
+    const temp = fileName;
+    fileName = elementOrHtml;
+    elementOrHtml = temp;
+  }
+
   let container: HTMLDivElement;
   let isTemp = false;
 

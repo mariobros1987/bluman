@@ -897,10 +897,10 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce }: Pass
                 </div>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                   <button
-                    onClick={() => {
-                      const matched = ALL_STUDIO_TEMPLATES.find(t => selectedDocPreview.nome.toLowerCase().includes(t.titolo.toLowerCase())) || ALL_STUDIO_TEMPLATES[0];
+                    onClick={async () => {
+                      const matched = ALL_STUDIO_TEMPLATES.find(t => selectedDocPreview.templateId === t.id || selectedDocPreview.nome.toLowerCase().includes(t.titolo.toLowerCase())) || ALL_STUDIO_TEMPLATES[0];
                       const resolvedHtml = resolveDocumentTemplateHtml(matched.contenutoHtml, project);
-                      downloadRealPdf(resolvedHtml, selectedDocPreview.nome.replace(/\.[^/.]+$/, ''));
+                      await downloadRealPdf(selectedDocPreview.nome.replace(/\.[^/.]+$/, ''), resolvedHtml);
                     }}
                     style={{ background: '#059669', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
                   >
@@ -914,7 +914,7 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce }: Pass
               <div style={{ flex: 1, overflowY: 'auto', padding: 24, background: '#ffffff', color: '#1e293b', fontSize: 12 }}>
                 <div dangerouslySetInnerHTML={{
                   __html: (() => {
-                    const matched = ALL_STUDIO_TEMPLATES.find(t => selectedDocPreview.nome.toLowerCase().includes(t.titolo.toLowerCase())) || ALL_STUDIO_TEMPLATES[0];
+                    const matched = ALL_STUDIO_TEMPLATES.find(t => selectedDocPreview.templateId === t.id || selectedDocPreview.nome.toLowerCase().includes(t.titolo.toLowerCase())) || ALL_STUDIO_TEMPLATES[0];
                     return resolveDocumentTemplateHtml(matched.contenutoHtml, project);
                   })()
                 }} />
