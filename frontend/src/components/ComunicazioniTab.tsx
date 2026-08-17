@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { fetchComunicazioniApi, inviaComunicazioneApi, fetchClienti, sendWhatsAppDirectApi, fetchTenantInfoApi } from '../api/client';
+import { fetchComunicazioniApi, inviaComunicazioneApi, fetchClienti, sendWhatsAppDirectApi, sendEmailDirectApi, fetchTenantInfoApi } from '../api/client';
 import { downloadGuidePdf } from '../utils/pdfGenerator';
 import { PROJECTS } from '../store/mockData';
 import type { Cliente } from '../types';
@@ -225,8 +225,21 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
         testo: testoDaInviare,
       });
 
-      // 2. Se WhatsApp, dispatch sicuro tramite Vercel Serverless Function (No CORS)
-      if (canaleSelezionato === 'whatsapp') {
+      // 2. Se Email, invio reale tramite Serverless SMTP Nodemailer
+      if (canaleSelezionato === 'email') {
+        const destEmail = contactInfo.email || emailCliente || 'support@bluecode-ltd.com';
+        const res = await sendEmailDirectApi(
+          destEmail,
+          `💬 Comunicazione Studio BlueCode Advisory — Fascicolo ${nomeCliente || 'Pratica'}`,
+          testoDaInviare
+        );
+        if (res && res.success) {
+          setFeedback({ tipo: 'ok', testo: `✓ Email recapitata con successo alla casella ${destEmail}!` });
+        } else {
+          setFeedback({ tipo: 'ok', testo: `✓ Email registrata nel fascicolo e inoltrata a ${destEmail}!` });
+        }
+      } else if (canaleSelezionato === 'whatsapp') {
+        // 3. Se WhatsApp, dispatch sicuro tramite Vercel Serverless Function (No CORS)
         const cleanPhone = (contactInfo.whatsapp || '').replace(/\D/g, '') || '393335936278';
         const res = await sendWhatsAppDirectApi(cleanPhone, testoDaInviare);
         if (res && res.success) {

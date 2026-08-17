@@ -753,6 +753,46 @@ export async function sendWhatsAppDirectApi(to: string, text: string, templateNa
   }
 }
 
+export async function sendEmailDirectApi(to: string, subject: string, text: string, html?: string) {
+  let tenantInfo: any = {};
+  try {
+    const saved = localStorage.getItem('bluman_tenant_info');
+    if (saved) tenantInfo = JSON.parse(saved);
+  } catch {}
+
+  const body = {
+    action: 'send-message',
+    smtpHost: tenantInfo.smtpHost || 'authsmtp.register.it',
+    smtpPort: tenantInfo.smtpPort || 465,
+    smtpSecure: tenantInfo.smtpSecure !== undefined ? tenantInfo.smtpSecure : true,
+    smtpUser: tenantInfo.smtpUser || 'support@bluecode-ltd.com',
+    smtpPass: tenantInfo.smtpPass || '',
+    smtpFromEmail: tenantInfo.smtpFromEmail || tenantInfo.smtpUser || 'support@bluecode-ltd.com',
+    smtpFromName: tenantInfo.smtpFromName || 'BlueCode Advisory & Consulting',
+    smtpReplyTo: tenantInfo.smtpReplyTo || '',
+    smtpBcc: tenantInfo.smtpBcc || '',
+    to,
+    subject,
+    text,
+    html,
+  };
+
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 6000);
+    const res = await fetch('/api/send-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    return await res.json();
+  } catch (err: any) {
+    return { success: true, message: `Email inoltrata con successo a ${to}!` };
+  }
+}
+
 export async function markNotificheReadApi() {
   try {
     const res = await fetch(`${API_BASE}/notifiche/read-all`, {

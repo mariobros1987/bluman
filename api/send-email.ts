@@ -104,6 +104,31 @@ export default async function handler(req: any, res: any) {
           </div>
         `,
       };
+    } else if (action === 'send-message') {
+      const emailSubject = subject || `💬 Comunicazione Studio BlueCode Advisory`;
+      const emailContent = html || `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
+          <div style="background: #0f172a; padding: 24px; text-align: center; color: #fff;">
+            <h2 style="margin: 0; color: #818cf8;">BLUECODE ADVISORY & CONSULTING</h2>
+            <p style="margin: 4px 0 0 0; font-size: 12px; color: #94a3b8;">Comunicazione Fascicolo Operativo</p>
+          </div>
+          <div style="padding: 24px;">
+            <p style="font-size: 14px; color: #334155; line-height: 1.6;">
+              ${(req.body?.text || '').replace(/\n/g, '<br/>')}
+            </p>
+            <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+            <p style="font-size: 12px; color: #64748b;">
+              BlueCode Advisory Studio • Canale Ufficiale di Notifica Incarichi
+            </p>
+          </div>
+        </div>
+      `;
+      mailOptions = {
+        from: `"${smtpFromName}" <${smtpFromEmail}>`,
+        to: recipientEmail,
+        subject: emailSubject,
+        html: emailContent,
+      };
     } else {
       mailOptions = {
         from: `"${smtpFromName}" <${smtpFromEmail}>`,
