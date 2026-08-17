@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { fetchComunicazioniApi, inviaComunicazioneApi, fetchClienti, sendWhatsAppDirectApi, sendEmailDirectApi, fetchTenantInfoApi } from '../api/client';
+import { fetchComunicazioniApi, inviaComunicazioneApi, fetchClienti, sendWhatsAppDirectApi, sendEmailDirectApi, fetchInboundImapEmailsApi, fetchTenantInfoApi } from '../api/client';
 import { downloadGuidePdf } from '../utils/pdfGenerator';
 import { PROJECTS } from '../store/mockData';
 import type { Cliente } from '../types';
@@ -155,15 +155,59 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
   const loadComunicazioni = async () => {
     setLoadingMsgs(true);
     try {
+      // 1. Recupero messaggi già salvati su DB Fastify / Supabase
       const dbMsgs = await fetchComunicazioniApi(progettoId);
+      let currentList: MessaggioComunicazione[] = [];
       if (dbMsgs && Array.isArray(dbMsgs) && dbMsgs.length > 0) {
-        const mapped = dbMsgs.map((m: any) => ({
+        currentList = dbMsgs.map((m: any) => ({
           ...m,
           dataOra: m.createdAt ? new Date(m.createdAt).toLocaleString('it-IT') : (m.dataOra || 'Oggi'),
           allegati: m.allegatiJson ? (typeof m.allegatiJson === 'string' ? JSON.parse(m.allegatiJson) : m.allegatiJson) : m.allegati,
         }));
-        setMessaggi(mapped);
-        localStorage.setItem(`bluman_msgs_${progettoId}`, JSON.stringify(mapped));
+      } else {
+        const saved = localStorage.getItem(`bluman_msgs_${progettoId}`);
+        if (saved) {
+          try { currentList = JSON.parse(saved); } catch {}
+        }
+      }
+
+      // 2. Ingestion Live IMAP: Controlla risposte reali arrivate alla casella di posta
+      const targetEmail = customDestEmail.trim() || contactInfo.email;
+      const inboundEmails = await fetchInboundImapEmailsApi(targetEmail);
+      if (Array.isArray(inboundEmails) && inboundEmails.length > 0) {
+        for (const mail of inboundEmails) {
+          const alreadyExists = currentList.some(
+            m => m.testo?.trim() === mail.text?.trim() || m.id === mail.id
+          );
+
+          if (!alreadyExists) {
+            const newInboundMsg: MessaggioComunicazione = {
+              id: mail.id || `msg-inbound-${Date.now()}`,
+              canale: 'email',
+              mittente: mail.from,
+              destinatario: 'Studio Advisory (support@bluecode-ltd.com)',
+              direzione: 'entrata',
+              testo: mail.text,
+              dataOra: mail.date,
+            };
+
+            currentList.push(newInboundMsg);
+
+            // Persiste automaticamente l'email in entrata a database
+            inviaComunicazioneApi(progettoId, {
+              canale: 'email',
+              mittente: mail.from,
+              destinatario: 'Studio Advisory (support@bluecode-ltd.com)',
+              direzione: 'entrata',
+              testo: mail.text,
+            }).catch(() => {});
+          }
+        }
+      }
+
+      if (currentList.length > 0) {
+        setMessaggi(currentList);
+        localStorage.setItem(`bluman_msgs_${progettoId}`, JSON.stringify(currentList));
       }
     } catch {}
     setLoadingMsgs(false);

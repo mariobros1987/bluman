@@ -1,6 +1,155 @@
 import nodemailer from 'nodemailer';
+import tls from 'tls';
 
-// Vercel Serverless Function ultra-rapida per dispatch email SMTP e test
+// Helper per scaricare le email reali dalla casella IMAP INBOX di Register.it
+async function fetchRecentImapEmails(options: {
+  host?: string;
+  port?: number;
+  user: string;
+  pass: string;
+  folder?: string;
+  limit?: number;
+}): Promise<Array<{ id: string; from: string; subject: string; date: string; text: string }>> {
+  return new Promise((resolve) => {
+    const host = options.host || 'imap.register.it';
+    const port = options.port || 993;
+    const user = options.user;
+    const pass = options.pass;
+    const folder = options.folder || 'INBOX';
+    const limit = options.limit || 10;
+
+    if (!user || !pass) {
+      return resolve([]);
+    }
+
+    const socket = tls.connect(
+      {
+        host,
+        port,
+        rejectUnauthorized: false,
+        timeout: 5000,
+      },
+      () => {}
+    );
+
+    let buffer = '';
+    let step = 0;
+    const emails: Array<{ id: string; from: string; subject: string; date: string; text: string }> = [];
+    let messageIds: string[] = [];
+
+    const cleanup = () => {
+      try {
+        socket.end();
+        socket.destroy();
+      } catch {}
+    };
+
+    socket.setTimeout(5000, () => {
+      cleanup();
+      resolve(emails);
+    });
+
+    socket.on('error', () => {
+      cleanup();
+      resolve(emails);
+    });
+
+    socket.on('data', (data) => {
+      buffer += data.toString();
+
+      // Step 0: Server Greeting "* OK ..." -> Invia LOGIN
+      if (step === 0 && buffer.includes('* OK')) {
+        step = 1;
+        buffer = '';
+        socket.write(`A1 LOGIN "${user}" "${pass}"\r\n`);
+        return;
+      }
+
+      // Step 1: Login Risposta
+      if (step === 1) {
+        if (buffer.includes('A1 OK')) {
+          step = 2;
+          buffer = '';
+          socket.write(`A2 SELECT "${folder}"\r\n`);
+          return;
+        } else if (buffer.includes('A1 NO') || buffer.includes('A1 BAD')) {
+          cleanup();
+          return resolve([]);
+        }
+      }
+
+      // Step 2: Select Risposta -> Invia SEARCH ALL
+      if (step === 2) {
+        if (buffer.includes('A2 OK')) {
+          step = 3;
+          buffer = '';
+          socket.write(`A3 SEARCH ALL\r\n`);
+          return;
+        }
+      }
+
+      // Step 3: Search Risposta "* SEARCH 1 2 3..."
+      if (step === 3) {
+        if (buffer.includes('A3 OK')) {
+          const searchMatch = buffer.match(/\* SEARCH ([\d\s]+)/);
+          buffer = '';
+          if (searchMatch && searchMatch[1]) {
+            const allIds = searchMatch[1].trim().split(/\s+/).filter(Boolean);
+            messageIds = allIds.slice(-limit); // Prendi gli ultimi N messaggi
+            if (messageIds.length > 0) {
+              step = 4;
+              const seqSet = messageIds.join(',');
+              socket.write(`A4 FETCH ${seqSet} (BODY[HEADER.FIELDS (FROM SUBJECT DATE)] BODY[TEXT])\r\n`);
+              return;
+            }
+          }
+          socket.write(`A9 LOGOUT\r\n`);
+          cleanup();
+          return resolve([]);
+        }
+      }
+
+      // Step 4: Fetch Risposta
+      if (step === 4) {
+        if (buffer.includes('A4 OK') || buffer.includes('A9 OK')) {
+          const chunks = buffer.split(/\* \d+ FETCH/);
+          for (const chunk of chunks) {
+            if (!chunk.trim()) continue;
+            const fromMatch = chunk.match(/From:\s*([^\r\n]+)/i);
+            const subjectMatch = chunk.match(/Subject:\s*([^\r\n]+)/i);
+            const dateMatch = chunk.match(/Date:\s*([^\r\n]+)/i);
+            
+            let text = '';
+            const textMatch = chunk.match(/BODY\[TEXT\]\s*\{(\d+)\}\r\n([\s\S]*)/i);
+            if (textMatch && textMatch[2]) {
+              text = textMatch[2].split(/\r\n\)\r\n|\r\n\*\s*\d+\s*FETCH|\r\nA4 OK/)[0].trim();
+            }
+
+            if (fromMatch) {
+              const cleanFrom = fromMatch[1].trim();
+              const cleanSubject = subjectMatch ? subjectMatch[1].trim() : 'Nessun Oggetto';
+              const cleanDate = dateMatch ? new Date(dateMatch[1].trim()).toLocaleString('it-IT') : new Date().toLocaleString('it-IT');
+              
+              emails.push({
+                id: `imap-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+                from: cleanFrom,
+                subject: cleanSubject,
+                date: cleanDate,
+                text: text.substring(0, 1500) || cleanSubject,
+              });
+            }
+          }
+
+          socket.write(`A9 LOGOUT\r\n`);
+          cleanup();
+          return resolve(emails);
+        }
+      }
+    });
+  });
+}
+
+// Vercel Serverless Function ultra-rapida per dispatch email SMTP, test e sincronizzazione IMAP
 export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -39,6 +188,10 @@ export default async function handler(req: any, res: any) {
       collaboratorPassword = '',
       imapHost = 'imap.register.it',
       imapPort = 993,
+      imapUser = 'support@bluecode-ltd.com',
+      imapPass = '',
+      imapFolder = 'INBOX',
+      clientEmail = '',
     } = req.body || {};
 
     // ─────────────────────────────────────────────────────────────
@@ -48,6 +201,35 @@ export default async function handler(req: any, res: any) {
       return res.status(200).json({
         success: true,
         message: `✓ Connessione IMAP verificata con successo su ${imapHost}:${imapPort} per la casella ${smtpUser}! Servizio posta in entrata attivo.`,
+      });
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // AZIONE 1b: Fetch Inbound IMAP Emails Reali
+    // ─────────────────────────────────────────────────────────────
+    if (action === 'fetch-imap-inbound') {
+      const activePass = imapPass || smtpPass;
+      if (!activePass) {
+        return res.status(200).json({ success: true, emails: [] });
+      }
+
+      const incomingEmails = await fetchRecentImapEmails({
+        host: imapHost || 'imap.register.it',
+        port: Number(imapPort) || 993,
+        user: imapUser || smtpUser,
+        pass: activePass,
+        folder: imapFolder || 'INBOX',
+        limit: 15,
+      });
+
+      const targetFilter = (clientEmail || '').toLowerCase().trim();
+      const filtered = targetFilter
+        ? incomingEmails.filter(e => e.from.toLowerCase().includes(targetFilter) || targetFilter.includes(e.from.toLowerCase()))
+        : incomingEmails;
+
+      return res.status(200).json({
+        success: true,
+        emails: filtered,
       });
     }
 
@@ -62,7 +244,6 @@ export default async function handler(req: any, res: any) {
     const primaryPort = Number(smtpPort) || 465;
     const primaryHost = smtpHost.trim() || 'authsmtp.register.it';
 
-    // Lista rapida candidate con timeout aggressivo di 4s per non bloccare mai la UI
     const hostCandidates = [
       { host: primaryHost, port: primaryPort, secure: primaryPort === 465 },
       { host: 'smtp.register.it', port: 465, secure: true },
@@ -180,7 +361,6 @@ export default async function handler(req: any, res: any) {
       });
     }
 
-    // Se tutti i tentativi socket hanno dato timeout o errore DNS/EBUSY, restituisci messaggio chiaro
     return res.status(400).json({
       success: false,
       errore: lastErr?.message || 'Timeout connessione SMTP su Register.it. Verifica la password e la connessione.',

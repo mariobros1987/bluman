@@ -803,6 +803,41 @@ export async function sendEmailDirectApi(to: string, subject: string, text: stri
   }
 }
 
+export async function fetchInboundImapEmailsApi(clientEmail?: string) {
+  let tenantInfo: any = {};
+  try {
+    const saved = localStorage.getItem('bluman_tenant_info');
+    if (saved) tenantInfo = JSON.parse(saved);
+  } catch {}
+
+  const body = {
+    action: 'fetch-imap-inbound',
+    imapHost: tenantInfo.imapHost || 'imap.register.it',
+    imapPort: tenantInfo.imapPort || 993,
+    imapUser: tenantInfo.imapUser || tenantInfo.smtpUser || 'support@bluecode-ltd.com',
+    imapPass: tenantInfo.imapPass || tenantInfo.smtpPass || '',
+    imapFolder: tenantInfo.imapFolder || 'INBOX',
+    clientEmail: clientEmail || '',
+  };
+
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 6000);
+    const res = await fetch('/api/send-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    const data = await res.json();
+    if (res.ok && data.success && Array.isArray(data.emails)) {
+      return data.emails;
+    }
+  } catch {}
+  return [];
+}
+
 export async function markNotificheReadApi() {
   try {
     const res = await fetch(`${API_BASE}/notifiche/read-all`, {
