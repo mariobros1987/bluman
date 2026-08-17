@@ -282,7 +282,7 @@ export function InvoicesPage() {
 
                             await downloadRealPdf(
                               `Fattura_${inv.numero || 'Bozza'}.pdf`,
-                              `<div style="font-family: Arial, sans-serif; padding: 25px; color: #0f172a; background: #ffffff;">
+                              `<div style="font-family: Arial, sans-serif; width: 100%; color: #0f172a; background: #ffffff;">
                                 <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid ${temaColore}; padding-bottom: 16px; margin-bottom: 24px;">
                                   <div style="display: flex; align-items: center; gap: 16px;">
                                     <img src="${logoSrc}" style="height: 54px; max-width: 180px; object-fit: contain;" />
