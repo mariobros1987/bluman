@@ -1,4 +1,6 @@
 import nodemailer from 'nodemailer';
+import tls from 'tls';
+import net from 'net';
 
 export interface EmailOptions {
   to: string;
@@ -6,11 +8,18 @@ export interface EmailOptions {
   html: string;
 }
 
-export function createTransporter() {
-  const host = process.env.SMTP_HOST;
-  const port = Number(process.env.SMTP_PORT ?? 465);
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
+export function createTransporter(customConfig?: {
+  host?: string;
+  port?: number;
+  secure?: boolean;
+  user?: string;
+  pass?: string;
+}) {
+  const host = customConfig?.host || process.env.SMTP_HOST;
+  const port = customConfig?.port || Number(process.env.SMTP_PORT ?? 465);
+  const secure = customConfig?.secure !== undefined ? customConfig.secure : port === 465;
+  const user = customConfig?.user || process.env.SMTP_USER;
+  const pass = customConfig?.pass || process.env.SMTP_PASS;
 
   if (!host || !user || !pass) {
     return null; // Fallback modalità simulazione
@@ -19,14 +28,170 @@ export function createTransporter() {
   return nodemailer.createTransport({
     host,
     port,
-    secure: port === 465,
+    secure,
     auth: { user, pass },
+    tls: {
+      rejectUnauthorized: false,
+    },
+    connectionTimeout: 10000,
+  });
+}
+
+export async function verifyAndSendTestSmtp(options: {
+  host: string;
+  port: number;
+  secure: boolean;
+  user: string;
+  pass: string;
+  fromEmail?: string;
+  fromName?: string;
+  toEmail?: string;
+}): Promise<{ success: boolean; message: string; errore?: string }> {
+  try {
+    const transporter = nodemailer.createTransport({
+      host: options.host,
+      port: options.port,
+      secure: options.secure,
+      auth: {
+        user: options.user,
+        pass: options.pass,
+      },
+      tls: {
+        rejectUnauthorized: false,
+      },
+      connectionTimeout: 10000,
+    });
+
+    // 1. Verifica autenticazione e socket reale con il server
+    await transporter.verify();
+
+    // 2. Invio email reale di test
+    const targetEmail = options.toEmail || options.user;
+    const from = options.fromEmail || options.user;
+    const senderName = options.fromName || 'BlueCode Advisory';
+
+    await transporter.sendMail({
+      from: `"${senderName}" <${from}>`,
+      to: targetEmail,
+      subject: `🧪 Test Connessione SMTP BluMan — ${new Date().toLocaleTimeString('it-IT')}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; padding: 24px; border: 1px solid #059669; border-radius: 12px; background: #f0fdf4; color: #166534; max-width: 600px; margin: 0 auto;">
+          <h2 style="margin-top: 0; color: #047857;">✓ Connessione SMTP con Register.it Riuscita!</h2>
+          <p style="font-size: 14px; line-height: 1.5; color: #065f46;">
+            Questa è un'email reale inviata dai server di <strong>${options.host}</strong> tramite BluMan Advisory Platform.
+          </p>
+          <div style="background: #ffffff; border: 1px solid #a7f3d0; padding: 14px; border-radius: 8px; margin: 16px 0; font-size: 13px;">
+            <p style="margin: 0 0 6px 0;"><strong>Dettagli configurazione verificata:</strong></p>
+            <ul style="margin: 0; padding-left: 20px;">
+              <li>Host SMTP: <code>${options.host}</code></li>
+              <li>Porta: <code>${options.port}</code> (${options.secure ? 'SSL/TLS' : 'STARTTLS'})</li>
+              <li>Account Autenticato: <code>${options.user}</code></li>
+              <li>Data/Ora: <code>${new Date().toLocaleString('it-IT')}</code></li>
+            </ul>
+          </div>
+          <p style="font-size: 12px; color: #059669; margin-bottom: 0;">
+            Il sistema è ora pronto per inviare Magic Link, OTP di firma FEA e solleciti fatture.
+          </p>
+        </div>
+      `,
+    });
+
+    return {
+      success: true,
+      message: `✓ Connessione SMTP verificata ed email reale di test recapitata con successo a ${targetEmail}!`,
+    };
+  } catch (err: any) {
+    console.error('[SMTP Real Test Error]', err);
+    return {
+      success: false,
+      message: `❌ Errore SMTP da ${options.host}: ${err.message || 'Autenticazione o connessione fallita'}`,
+      errore: err.message,
+    };
+  }
+}
+
+export async function verifyRealImap(options: {
+  host: string;
+  port: number;
+  secure: boolean;
+  user: string;
+  pass: string;
+}): Promise<{ success: boolean; message: string; errore?: string }> {
+  return new Promise((resolve) => {
+    const timeoutMs = 12000;
+    let finished = false;
+
+    const onDone = (res: { success: boolean; message: string; errore?: string }) => {
+      if (!finished) {
+        finished = true;
+        resolve(res);
+      }
+    };
+
+    const timer = setTimeout(() => {
+      onDone({
+        success: false,
+        message: `❌ Timeout connessione IMAP a ${options.host}:${options.port} dopo 12s`,
+        errore: 'Connection Timeout',
+      });
+    }, timeoutMs);
+
+    try {
+      const socket = options.secure
+        ? tls.connect({ host: options.host, port: options.port, rejectUnauthorized: false }, () => {
+            // Handshake TLS completato
+          })
+        : net.connect({ host: options.host, port: options.port }, () => {
+            // Handshake Plain completato
+          });
+
+      socket.setTimeout(timeoutMs);
+
+      socket.on('data', (data) => {
+        const str = data.toString();
+        if (str.includes('* OK')) {
+          // Banner IMAP di Register.it ricevuto, inviamo comando di autenticazione LOGIN
+          socket.write(`A01 LOGIN "${options.user}" "${options.pass}"\r\n`);
+        } else if (str.includes('A01 OK')) {
+          clearTimeout(timer);
+          socket.end();
+          onDone({
+            success: true,
+            message: `✓ Connessione IMAP e autenticazione RIUSCITE su ${options.host}:${options.port} per ${options.user}! Servizio posta in entrata attivo.`,
+          });
+        } else if (str.includes('A01 NO') || str.includes('A01 BAD')) {
+          clearTimeout(timer);
+          socket.end();
+          onDone({
+            success: false,
+            message: `❌ Errore autenticazione IMAP da ${options.host}: Password o Username errati (${str.trim()})`,
+            errore: str.trim(),
+          });
+        }
+      });
+
+      socket.on('error', (err) => {
+        clearTimeout(timer);
+        onDone({
+          success: false,
+          message: `❌ Errore socket IMAP (${options.host}:${options.port}): ${err.message}`,
+          errore: err.message,
+        });
+      });
+    } catch (err: any) {
+      clearTimeout(timer);
+      onDone({
+        success: false,
+        message: `❌ Impossibile stabilire socket IMAP: ${err.message}`,
+        errore: err.message,
+      });
+    }
   });
 }
 
 export async function sendMagicLinkEmail(toEmail: string, clienteNome: string, magicUrl: string): Promise<boolean> {
   const transporter = createTransporter();
-  const fromEmail = process.env.SMTP_FROM || 'noreply@blumanadvisory.com';
+  const fromEmail = process.env.SMTP_FROM || 'support@bluecode-ltd.com';
 
   const html = `
     <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; color: #1e293b;">

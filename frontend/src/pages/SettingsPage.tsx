@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { fetchUtentiTenant, creaUtenteTenantApi, uploadFileApi, fetchTenantInfoApi, updateTenantInfoApi, fetchProgetti, fetchPermessiUtenteApi, salvaPermessiUtenteApi, testEmailApi, testChannelApi } from '../api/client';
+import { fetchUtentiTenant, creaUtenteTenantApi, uploadFileApi, fetchTenantInfoApi, updateTenantInfoApi, fetchProgetti, fetchPermessiUtenteApi, salvaPermessiUtenteApi, testEmailApi, testImapApi, testChannelApi } from '../api/client';
 import { getFormattedLogoUrl, fmt } from '../utils';
 import { ProgressBar } from '../components/ui/ProgressBar';
 import styles from './Settings.module.css';
@@ -19,16 +19,25 @@ export function SettingsPage() {
   const [emailInboundParseUrl, setEmailInboundParseUrl] = useState('https://api.bluecode.advisory/webhooks/communications/email');
   const [signalCliEndpoint, setSignalCliEndpoint] = useState('http://localhost:8080/v1/receive/+35679001122');
 
-  // SMTP Server Credentials
-  const [smtpHost, setSmtpHost] = useState('smtp.register.it');
-  const [smtpPort, setSmtpPort] = useState('587');
-  const [smtpSecure, setSmtpSecure] = useState(false);
-  const [smtpUser, setSmtpUser] = useState('comunicazioni@bluecode.advisory');
-  const [smtpPass, setSmtpPass] = useState('••••••••••••');
-  const [smtpFromEmail, setSmtpFromEmail] = useState('comunicazioni@bluecode.advisory');
-  const [smtpFromName, setSmtpFromName] = useState('Bluecode Advisory — Servizio Comunicazioni Studio');
+  // SMTP Server Credentials (Posta in Uscita)
+  const [smtpHost, setSmtpHost] = useState('authsmtp.register.it');
+  const [smtpPort, setSmtpPort] = useState('465');
+  const [smtpSecure, setSmtpSecure] = useState(true);
+  const [smtpUser, setSmtpUser] = useState('support@bluecode-ltd.com');
+  const [smtpPass, setSmtpPass] = useState('');
+  const [smtpFromEmail, setSmtpFromEmail] = useState('support@bluecode-ltd.com');
+  const [smtpFromName, setSmtpFromName] = useState('BlueCode Advisory & Consulting');
   const [testingSmtp, setTestingSmtp] = useState(false);
   const [smtpTestResult, setSmtpTestResult] = useState<string | null>(null);
+
+  // IMAP Server Credentials (Posta in Entrata & Ingestion)
+  const [imapHost, setImapHost] = useState('imap.register.it');
+  const [imapPort, setImapPort] = useState('993');
+  const [imapSecure, setImapSecure] = useState(true);
+  const [imapUser, setImapUser] = useState('support@bluecode-ltd.com');
+  const [imapPass, setImapPass] = useState('');
+  const [testingImap, setTestingImap] = useState(false);
+  const [imapTestResult, setImapTestResult] = useState<string | null>(null);
 
   // Form dati azienda (Sede Legale & Operativa)
   const [ragioneSociale, setRagioneSociale] = useState('Bluecode Ltd');
@@ -101,6 +110,11 @@ export function SettingsPage() {
       if (tData.smtpPass) setSmtpPass(tData.smtpPass);
       if (tData.smtpFromEmail) setSmtpFromEmail(tData.smtpFromEmail);
       if (tData.smtpFromName) setSmtpFromName(tData.smtpFromName);
+      if (tData.imapHost) setImapHost(tData.imapHost);
+      if (tData.imapPort) setImapPort(String(tData.imapPort));
+      if (tData.imapSecure != null) setImapSecure(tData.imapSecure);
+      if (tData.imapUser) setImapUser(tData.imapUser);
+      if (tData.imapPass) setImapPass(tData.imapPass);
     }
 
     const dbUsers = await fetchUtentiTenant();
@@ -136,12 +150,17 @@ export function SettingsPage() {
       tgBotToken,
       tgBotUsername,
       smtpHost,
-      smtpPort: Number(smtpPort) || 587,
+      smtpPort: Number(smtpPort) || 465,
       smtpSecure,
       smtpUser,
       smtpPass,
       smtpFromEmail,
       smtpFromName,
+      imapHost,
+      imapPort: Number(imapPort) || 993,
+      imapSecure,
+      imapUser,
+      imapPass,
     };
 
     await updateTenantInfoApi(dataToSave);
@@ -154,16 +173,48 @@ export function SettingsPage() {
     setTestingSmtp(true);
     setSmtpTestResult(null);
     try {
-      const json = await testEmailApi(email || 'client@holdingbeta.advisory');
+      const json = await testEmailApi({
+        smtpHost,
+        smtpPort: Number(smtpPort) || 465,
+        smtpSecure,
+        smtpUser,
+        smtpPass,
+        smtpFromEmail,
+        smtpFromName,
+        emailDestinatario: smtpUser || email,
+      });
       if (json && json.success) {
-        setSmtpTestResult(`✓ CONNESSO! ${json.message}`);
+        setSmtpTestResult(json.message);
       } else {
-        setSmtpTestResult(`❌ Errore SMTP: ${json?.errore || 'Impossibile connettersi al server SMTP'}`);
+        setSmtpTestResult(json.message || `❌ Errore SMTP: ${json?.errore || 'Impossibile connettersi al server SMTP'}`);
       }
-    } catch {
-      setSmtpTestResult(`ℹ️ Modalità Simulatore: Email test generata ed inviata con successo in ambiente di sviluppo a ${email || 'client@holdingbeta.advisory'}`);
+    } catch (err: any) {
+      setSmtpTestResult(`❌ Errore di connessione: ${err.message}`);
     } finally {
       setTestingSmtp(false);
+    }
+  };
+
+  const handleTestImap = async () => {
+    setTestingImap(true);
+    setImapTestResult(null);
+    try {
+      const json = await testImapApi({
+        imapHost,
+        imapPort: Number(imapPort) || 993,
+        imapSecure,
+        imapUser,
+        imapPass,
+      });
+      if (json && json.success) {
+        setImapTestResult(json.message);
+      } else {
+        setImapTestResult(json.message || `❌ Errore IMAP: ${json?.errore || 'Impossibile connettersi al server IMAP'}`);
+      }
+    } catch (err: any) {
+      setImapTestResult(`❌ Errore di connessione IMAP: ${err.message}`);
+    } finally {
+      setTestingImap(false);
     }
   };
 
@@ -632,7 +683,58 @@ export function SettingsPage() {
 
               <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: 'var(--muted)' }}>
                 <input type="checkbox" id="smtpSecure" checked={smtpSecure} onChange={e => setSmtpSecure(e.target.checked)} style={{ width: 14, height: 14 }} />
-                <label htmlFor="smtpSecure" style={{ cursor: 'pointer' }}>Usa Connessione Crittografata SSL/TLS (Porta 465)</label>
+                <label htmlFor="smtpSecure" style={{ cursor: 'pointer' }}>Usa Connessione Crittografata SSL/TLS (Porta 465 - Consigliata)</label>
+              </div>
+            </div>
+
+            {/* 📥 SERVER EMAIL IMAP (POSTA IN ENTRATA & INGESTION FASCICOLI) */}
+            <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 16 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#38bdf8', marginBottom: 4, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>📥 Server Email IMAP (Posta in Entrata & Ingestion Fascicoli)</span>
+                <button
+                  type="button"
+                  onClick={handleTestImap}
+                  disabled={testingImap}
+                  style={{ background: '#0369a1', color: '#fff', border: 'none', padding: '5px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+                >
+                  {testingImap ? 'Testing IMAP...' : '🧪 Test Connessione IMAP'}
+                </button>
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 12 }}>
+                Configura i parametri IMAP per consentire a BluMan di leggere le email inviate dai clienti a <code>support@bluecode-ltd.com</code> ed associarle in tempo reale ai rispettivi progetti.
+              </div>
+
+              {imapTestResult && (
+                <div style={{ padding: 10, borderRadius: 8, fontSize: 11.5, marginBottom: 12, background: imapTestResult.includes('✓') ? '#0d2d22' : '#2d0d0d', color: imapTestResult.includes('✓') ? '#34d399' : '#f87171', border: `1px solid ${imapTestResult.includes('✓') ? '#059669' : '#dc2626'}` }}>
+                  {imapTestResult}
+                </div>
+              )}
+
+              <div className={styles.grid2}>
+                <div className={styles.field}>
+                  <label>Host Server IMAP *:</label>
+                  <input type="text" value={imapHost} onChange={e => setImapHost(e.target.value)} placeholder="imap.register.it" style={{ fontSize: 12 }} />
+                </div>
+                <div className={styles.field}>
+                  <label>Porta Server IMAP *:</label>
+                  <input type="number" value={imapPort} onChange={e => setImapPort(e.target.value)} placeholder="993" style={{ fontSize: 12 }} />
+                </div>
+              </div>
+
+              <div className={styles.grid2} style={{ marginTop: 10 }}>
+                <div className={styles.field}>
+                  <label>Username / Email IMAP *:</label>
+                  <input type="text" value={imapUser} onChange={e => setImapUser(e.target.value)} placeholder="support@bluecode-ltd.com" style={{ fontSize: 12 }} />
+                </div>
+                <div className={styles.field}>
+                  <label>Password IMAP *:</label>
+                  <input type="password" value={imapPass} onChange={e => setImapPass(e.target.value)} placeholder="••••••••••••" style={{ fontSize: 12 }} />
+                </div>
+              </div>
+
+              <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: 'var(--muted)' }}>
+                <input type="checkbox" id="imapSecure" checked={imapSecure} onChange={e => setImapSecure(e.target.checked)} style={{ width: 14, height: 14 }} />
+                <label htmlFor="imapSecure" style={{ cursor: 'pointer' }}>Usa Connessione Crittografata SSL/TLS (Porta 993 - Consigliata)</label>
               </div>
             </div>
 

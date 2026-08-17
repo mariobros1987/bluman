@@ -572,13 +572,45 @@ export async function fetchNotificheApi() {
   }
 }
 
-export async function testEmailApi(emailDestinatario?: string) {
-  const res = await fetch(`${API_BASE}/tenant/test-email`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ emailDestinatario }),
-  });
-  return await res.json();
+export async function testEmailApi(payload?: {
+  smtpHost?: string;
+  smtpPort?: number;
+  smtpSecure?: boolean;
+  smtpUser?: string;
+  smtpPass?: string;
+  smtpFromEmail?: string;
+  smtpFromName?: string;
+  emailDestinatario?: string;
+}) {
+  try {
+    const res = await fetch(`${API_BASE}/tenant/test-email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload || {}),
+    });
+    return await res.json();
+  } catch (err: any) {
+    return { success: false, errore: err.message || 'Server backend non raggiungibile' };
+  }
+}
+
+export async function testImapApi(payload: {
+  imapHost?: string;
+  imapPort?: number;
+  imapSecure?: boolean;
+  imapUser?: string;
+  imapPass?: string;
+}) {
+  try {
+    const res = await fetch(`${API_BASE}/tenant/test-imap`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload || {}),
+    });
+    return await res.json();
+  } catch (err: any) {
+    return { success: false, errore: err.message || 'Server backend non raggiungibile' };
+  }
 }
 
 export async function testChannelApi(payload: { channel: string; waPhoneId?: string; waAccessToken?: string; tgBotToken?: string; signalCliEndpoint?: string }) {

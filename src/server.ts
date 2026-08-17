@@ -16,7 +16,7 @@ import {
 
 import { signJwt, verifyJwt } from './util/jwt.js';
 import { hashPassword, verifyPassword } from './util/password.js';
-import { sendMagicLinkEmail } from './services/emailService.js';
+import { sendMagicLinkEmail, verifyAndSendTestSmtp, verifyRealImap } from './services/emailService.js';
 import { uploadDocumento } from './services/storageService.js';
 import { generateInvoicePdfBuffer } from './services/pdfService.js';
 import { generateOtp, verifyOtp, generateEidasSignatureSeal } from './services/otpService.js';
@@ -518,15 +518,54 @@ export function buildServer(app: AppPort): FastifyInstance {
     }
   });
 
-  server.post<{ Body: { emailDestinatario?: string } }>('/tenant/test-email', async (req, reply) => {
-    const { emailDestinatario } = req.body || {};
-    const toEmail = emailDestinatario || 'client@holdingbeta.advisory';
-    try {
-      const sent = await sendMagicLinkEmail(toEmail, 'Test Connessione SMTP Studio', 'http://localhost:5173');
-      return reply.send({ success: true, message: `Email di prova inviata con successo a ${toEmail}` });
-    } catch (err: any) {
-      return reply.code(500).send({ success: false, errore: err.message || 'Errore durante l\'invio dell\'email di test' });
+  server.post<{ Body: { smtpHost?: string; smtpPort?: number; smtpSecure?: boolean; smtpUser?: string; smtpPass?: string; smtpFromEmail?: string; smtpFromName?: string; emailDestinatario?: string } }>('/tenant/test-email', async (req, reply) => {
+    const body = req.body || {};
+    const host = body.smtpHost || process.env.SMTP_HOST || 'authsmtp.register.it';
+    const port = Number(body.smtpPort) || Number(process.env.SMTP_PORT) || 465;
+    const secure = body.smtpSecure !== undefined ? Boolean(body.smtpSecure) : port === 465;
+    const user = body.smtpUser || process.env.SMTP_USER || 'support@bluecode-ltd.com';
+    const pass = body.smtpPass || process.env.SMTP_PASS || '';
+    const fromEmail = body.smtpFromEmail || user;
+    const fromName = body.smtpFromName || 'BlueCode Advisory';
+    const toEmail = body.emailDestinatario || user;
+
+    const res = await verifyAndSendTestSmtp({
+      host,
+      port,
+      secure,
+      user,
+      pass,
+      fromEmail,
+      fromName,
+      toEmail,
+    });
+
+    if (!res.success) {
+      return reply.code(400).send(res);
     }
+    return reply.send(res);
+  });
+
+  server.post<{ Body: { imapHost?: string; imapPort?: number; imapUser?: string; imapPass?: string; imapSecure?: boolean } }>('/tenant/test-imap', async (req, reply) => {
+    const body = req.body || {};
+    const host = body.imapHost || 'imap.register.it';
+    const port = Number(body.imapPort) || 993;
+    const secure = body.imapSecure !== undefined ? Boolean(body.imapSecure) : port === 993;
+    const user = body.imapUser || 'support@bluecode-ltd.com';
+    const pass = body.imapPass || '';
+
+    const res = await verifyRealImap({
+      host,
+      port,
+      secure,
+      user,
+      pass,
+    });
+
+    if (!res.success) {
+      return reply.code(400).send(res);
+    }
+    return reply.send(res);
   });
 
   server.post<{ Body: { channel: string; waPhoneId?: string; waAccessToken?: string } }>('/tenant/test-channel', async (req, reply) => {

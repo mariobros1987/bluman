@@ -47,6 +47,11 @@ model Tenant {
   smtpPass          String?  @map("smtp_pass")
   smtpFromEmail     String?  @map("smtp_from_email")
   smtpFromName      String?  @map("smtp_from_name")
+  imapHost          String?  @map("imap_host")
+  imapPort          Int?     @map("imap_port")
+  imapSecure        Boolean? @default(true) @map("imap_secure")
+  imapUser          String?  @map("imap_user")
+  imapPass          String?  @map("imap_pass")
   piano             String   @default("enterprise")
   stato             String   @default("attivo") // attivo|sospeso|trial
   createdAt         DateTime @default(now()) @map("created_at")
