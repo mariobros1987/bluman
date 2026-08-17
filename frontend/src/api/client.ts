@@ -9,11 +9,16 @@ const getApiBase = () => {
 
 const API_BASE = getApiBase();
 
-// Helper nativo per le chiamate di rete al backend Cloud
-async function fetchWithTimeout(url: string, options: RequestInit = {}) {
+// Helper nativo per le chiamate di rete al backend Cloud con timeout configurabile
+async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs: number = 8000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    return await fetch(url, options);
+    const res = await fetch(url, { ...options, signal: controller.signal });
+    clearTimeout(timer);
+    return res;
   } catch (error) {
+    clearTimeout(timer);
     throw error;
   }
 }
