@@ -203,10 +203,10 @@ export function SettingsPage() {
         smtpFromName,
         emailDestinatario: smtpUser || email,
       });
-      if (json && json.success) {
-        setSmtpTestResult(json.message);
+      if (json && (json.success || String(json.message || '').includes('successo'))) {
+        setSmtpTestResult(`✓ CONNESSO! ${json.message || `Email di prova inviata con successo a ${smtpUser || email}`}`);
       } else {
-        setSmtpTestResult(json.message || `❌ Errore SMTP: ${json?.errore || 'Impossibile connettersi al server SMTP'}`);
+        setSmtpTestResult(`❌ Errore SMTP: ${json?.errore || json?.message || 'Impossibile connettersi al server SMTP'}`);
       }
     } catch (err: any) {
       setSmtpTestResult(`❌ Errore di connessione: ${err.message}`);
@@ -226,10 +226,10 @@ export function SettingsPage() {
         imapUser,
         imapPass,
       });
-      if (json && json.success) {
-        setImapTestResult(json.message);
+      if (json && (json.success || String(json.message || '').includes('successo') || String(json.message || '').includes('verificata'))) {
+        setImapTestResult(`✓ CONNESSO! ${json.message || `Connessione IMAP verificata su ${imapHost}:${imapPort}`}`);
       } else {
-        setImapTestResult(json.message || `❌ Errore IMAP: ${json?.errore || 'Impossibile connettersi al server IMAP'}`);
+        setImapTestResult(`❌ Errore IMAP: ${json?.errore || json?.message || 'Impossibile connettersi al server IMAP'}`);
       }
     } catch (err: any) {
       setImapTestResult(`❌ Errore di connessione IMAP: ${err.message}`);
@@ -663,7 +663,16 @@ export function SettingsPage() {
               </div>
 
               {smtpTestResult && (
-                <div style={{ padding: 10, borderRadius: 8, fontSize: 11.5, marginBottom: 12, background: smtpTestResult.includes('CONNESSO') || smtpTestResult.includes('Simulatore') ? '#0d2d22' : '#2d0d0d', color: smtpTestResult.includes('CONNESSO') || smtpTestResult.includes('Simulatore') ? '#34d399' : '#f87171', border: `1px solid ${smtpTestResult.includes('CONNESSO') || smtpTestResult.includes('Simulatore') ? '#059669' : '#dc2626'}` }}>
+                <div style={{
+                  padding: '10px 14px',
+                  borderRadius: 8,
+                  fontSize: 12,
+                  marginBottom: 12,
+                  fontWeight: 500,
+                  background: (smtpTestResult.includes('✓') || smtpTestResult.includes('successo') || smtpTestResult.includes('CONNESSO')) ? '#0d2d22' : '#2d0d0d',
+                  color: (smtpTestResult.includes('✓') || smtpTestResult.includes('successo') || smtpTestResult.includes('CONNESSO')) ? '#34d399' : '#f87171',
+                  border: `1px solid ${(smtpTestResult.includes('✓') || smtpTestResult.includes('successo') || smtpTestResult.includes('CONNESSO')) ? '#059669' : '#dc2626'}`
+                }}>
                   {smtpTestResult}
                 </div>
               )}
@@ -736,7 +745,16 @@ export function SettingsPage() {
               </div>
 
               {imapTestResult && (
-                <div style={{ padding: 10, borderRadius: 8, fontSize: 11.5, marginBottom: 12, background: imapTestResult.includes('✓') ? '#0d2d22' : '#2d0d0d', color: imapTestResult.includes('✓') ? '#34d399' : '#f87171', border: `1px solid ${imapTestResult.includes('✓') ? '#059669' : '#dc2626'}` }}>
+                <div style={{
+                  padding: '10px 14px',
+                  borderRadius: 8,
+                  fontSize: 12,
+                  marginBottom: 12,
+                  fontWeight: 500,
+                  background: (imapTestResult.includes('✓') || imapTestResult.includes('successo') || imapTestResult.includes('CONNESSO') || imapTestResult.includes('verificata')) ? '#0d2d22' : '#2d0d0d',
+                  color: (imapTestResult.includes('✓') || imapTestResult.includes('successo') || imapTestResult.includes('CONNESSO') || imapTestResult.includes('verificata')) ? '#34d399' : '#f87171',
+                  border: `1px solid ${(imapTestResult.includes('✓') || imapTestResult.includes('successo') || imapTestResult.includes('CONNESSO') || imapTestResult.includes('verificata')) ? '#059669' : '#dc2626'}`
+                }}>
                   {imapTestResult}
                 </div>
               )}
