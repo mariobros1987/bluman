@@ -198,7 +198,7 @@ export function ProjectDetail() {
             if (matchedMockMod && matchedMockMod.righe) {
               const rList = resolveRighe(matchedMockMod, ARTICOLI);
               microvociList = rList.map(r => ({
-                n: r.n,
+                n: r.art?.n || (r as any).n || 'Microvoce',
                 hE: r.h || 4,
                 hA: 0,
                 s: 'pending' as any,
@@ -271,7 +271,7 @@ export function ProjectDetail() {
             if (matchedMock && matchedMock.righe) {
               const rList = resolveRighe(matchedMock, ARTICOLI);
               vList = rList.map(r => ({
-                n: r.n,
+                n: r.art?.n || (r as any).n || 'Microvoce',
                 hE: r.h || 4,
                 hA: 0,
                 s: 'pending' as any,
@@ -338,7 +338,7 @@ export function ProjectDetail() {
               if (matchedMock && matchedMock.righe) {
                 const rList = resolveRighe(matchedMock, ARTICOLI);
                 vList = rList.map(r => ({
-                  n: r.n,
+                  n: r.art?.n || (r as any).n || 'Microvoce',
                   hE: r.h || 4,
                   hA: 0,
                   s: 'pending' as any,
@@ -992,14 +992,14 @@ function ModuloBlock({ mod, open, onToggle, onOpenProc, rawDbModulo, onRefresh, 
   const [submitting, setSubmitting] = useState(false);
 
   // Microvoci effettive (con fallback istantaneo su catalogo articoli se vuote)
-  const displayMicrovoci = (mod.v && mod.v.length > 0) ? mod.v : (() => {
+  const displayMicrovoci: MicroVoce[] = (mod.v && mod.v.length > 0) ? mod.v : (() => {
     const matchedMock = MLIB.find(libM => libM.n.toLowerCase().trim() === mod.n.toLowerCase().trim())
       || MLIB.find(libM => mod.n.toLowerCase().includes(libM.n.toLowerCase()))
       || MLIB[0];
     if (matchedMock && matchedMock.righe) {
       const rList = resolveRighe(matchedMock, ARTICOLI);
       return rList.map(r => ({
-        n: r.n,
+        n: r.art?.n || (r as any).n || 'Microvoce',
         hE: r.h || 4,
         hA: 0,
         s: 'pending' as any,
