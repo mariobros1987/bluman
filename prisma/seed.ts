@@ -49,9 +49,9 @@ async function main() {
     },
     {
       nome: 'Avv. Mario Dibenedetto',
-      email: 'mario.dibenedetto87@gmail.com',
+      email: 'mario.dibenedetto@bluecode.advisory',
       ruolo: RuoloUtente.advisor,
-      password: 'BlueCode2026!',
+      password: 'password123',
       costoOrarioCentesimi: 9500,
     },
     {
@@ -346,7 +346,7 @@ async function main() {
       dataKyc: '2026-02-10',
       referentiJson: {
         referente: 'Marco Ricci',
-        email: 'mario.dibenedetto87@gmail.com',
+        email: 'referente.ricci@holdingbeta.advisory',
         cellulare: '+39 335 1234567',
         whatsapp: '+393351234567',
       },

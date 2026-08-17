@@ -320,7 +320,7 @@ export default async function handler(req: any, res: any) {
     if (action === 'invite-collaborator') {
       const nomeCollab = collaboratorName || 'Dottore / Avvocato';
       const ruoloCollab = collaboratorRole === 'partner' ? 'Senior Partner' : 'Advisor / Operatore';
-      const tempPass = collaboratorPassword || 'BlueCode2026!';
+      const tempPass = collaboratorPassword || 'password123';
 
       mailOptions = {
         from: `"${smtpFromName}" <${smtpFromEmail}>`,

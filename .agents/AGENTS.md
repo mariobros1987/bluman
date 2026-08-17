@@ -40,7 +40,7 @@ Questo file serve come indice rapido per l'IA ed i collaboratori per identificar
 | Ruolo Attore | Email Registrata | Password di Accesso | Tipo Accesso |
 | :--- | :--- | :--- | :--- |
 | 👨‍💼 **Lead Advisor Senior** | `joe@bluecode.advisory` | `password123` | JWT Access Token |
-| ⚖️ **Legal Counsel Advisor** | `mario.dibenedetto87@gmail.com` | `BlueCode2026!` | JWT Access Token |
+| ⚖️ **Legal Counsel Advisor** | `mario.dibenedetto@bluecode.advisory` | `password123` | JWT Access Token |
 | ⚖️ **Avv. Lorenzo Marino** | `lorenzo.marino@bluecode.advisory` | `password123` | JWT Access Token |
 | 💶 **Dr. Elena Russo (Tax Advisor)** | `elena.russo@bluecode.advisory` | `password123` | JWT Access Token |
 | 👑 **Super Admin** | `admin@bluecode.advisory` | `admin2026!` | JWT Access Token |
@@ -82,7 +82,7 @@ Questo file serve come indice rapido per l'IA ed i collaboratori per identificar
 
 ## 🗄 3. Database Schema (`prisma/schema.prisma`)
 
-- **`Tenant`**: Dati studio, Sede Legale, Sede Operativa, P.IVA, Logo URL, Colore Tema PDF.
+- **`Tenant`**: Dati studio, Sede Legale, Sede Operativa, P.IVA, Logo URL, Colore Tema PDF, credenziali SMTP (`smtp_pass`) e IMAP (`imap_pass`) isolate per tenant.
 - **`Cliente`**: Dati ERP, Partita IVA, Codice Fiscale, Sede Legale, Codice SDI, IBAN, Rischio AML, UBO, Fonte Patrimonio, Data KYC, `referentiJson`.
 - **`ComunicazioneProgetto`**: `progettoId`, `canale` (`email`, `whatsapp`, `telegram`, `signal`), `mittente`, `direzione` (`entrata`, `uscita`), `testo`, `allegatiJson`.
 - **`ContrattoRicorrente`**: `clienteId`, `progettoId` (opzionale con FK), `frequenza`, `importoCentesimi`, `prossimaFatturazione`.
@@ -110,3 +110,9 @@ Questo file serve come indice rapido per l'IA ed i collaboratori per identificar
 
 4. **Aggiornamento Mappa Grafo (Graphify)**:
    - Dopo modifiche strutturali ai moduli o ai servizi, eseguire `graphify extract . --code-only` e `graphify cluster-only .` per mantenere la mappa delle dipendenze di codice e la documentazione architettonica sempre sincronizzate.
+
+5. **Divieto Assoluto di Esposizione Credenziali su GitHub & Persistenza Isolata su DB Tenant**:
+   - **NESSUNA credenziale reale (password email SMTP/IMAP, token segreti, chiavi API o password di database) deve MAI essere scritta in chiaro nel codice versionato su GitHub o nei file `.md`**.
+   - Tutte le password e credenziali dello studio DEVONO risiedere rigorosamente nel Database PostgreSQL collegate al singolo `Tenant` (`prisma.tenant.smtpPass`, `prisma.tenant.imapPass`, ecc.) e gestite in modo protetto via API (`PUT /tenant/settings`).
+   - L'isolamento multi-tenant garantisce che uno studio non possa in alcun modo visualizzare né accedere ai dati, alla posta o ai contratti di un altro studio.
+

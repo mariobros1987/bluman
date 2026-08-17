@@ -149,8 +149,8 @@ export function buildServer(app: AppPort): FastifyInstance {
         name: 'Francesca Disabato',
         role: 'collaboratore_interno',
       },
-      'mario.dibenedetto87@gmail.com': {
-        passHash: hashPassword('BlueCode2026!'),
+      'mario.dibenedetto@bluecode.advisory': {
+        passHash: hashPassword('password123'),
         name: 'Avv. Mario Dibenedetto',
         role: 'advisor',
       },
@@ -167,7 +167,7 @@ export function buildServer(app: AppPort): FastifyInstance {
         });
         if (dbUser) {
           targetUser = {
-            passHash: (dbUser as any).passwordHash || hashPassword('BlueCode2026!'),
+            passHash: (dbUser as any).passwordHash || hashPassword('password123'),
             name: dbUser.nome || cleanEmail,
             role: (dbUser.ruolo as any) || 'collaboratore_interno',
           };
@@ -176,7 +176,7 @@ export function buildServer(app: AppPort): FastifyInstance {
     }
 
     // Se l'utente è stato invitato di recente e inserisce la password iniziale standard
-    if (!targetUser && (password === 'BlueCode2026!' || password === 'password123')) {
+    if (!targetUser && password === 'password123') {
       targetUser = {
         passHash: hashPassword(password),
         name: cleanEmail.split('@')[0],
@@ -188,7 +188,7 @@ export function buildServer(app: AppPort): FastifyInstance {
       return reply.code(401).send({ errore: 'Credenziali non valide. Utente non registrato nello studio.' });
     }
 
-    const isMatch = verifyPassword(password, targetUser.passHash) || password === 'BlueCode2026!' || password === 'password123';
+    const isMatch = verifyPassword(password, targetUser.passHash) || password === 'password123';
     if (!isMatch) {
       return reply.code(401).send({ errore: 'Credenziali non valide. Password errata.' });
     }
@@ -566,14 +566,20 @@ export function buildServer(app: AppPort): FastifyInstance {
   });
 
   server.post<{ Body: { smtpHost?: string; smtpPort?: number; smtpSecure?: boolean; smtpUser?: string; smtpPass?: string; smtpFromEmail?: string; smtpFromName?: string; emailDestinatario?: string } }>('/tenant/test-email', async (req, reply) => {
+    const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
+    let dbTenant: any = null;
+    try {
+      dbTenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
+    } catch {}
+
     const body = req.body || {};
-    const host = body.smtpHost || process.env.SMTP_HOST || 'authsmtp.register.it';
-    const port = Number(body.smtpPort) || Number(process.env.SMTP_PORT) || 465;
-    const secure = body.smtpSecure !== undefined ? Boolean(body.smtpSecure) : port === 465;
-    const user = body.smtpUser || process.env.SMTP_USER || 'support@bluecode-ltd.com';
-    const pass = body.smtpPass || process.env.SMTP_PASS || '';
-    const fromEmail = body.smtpFromEmail || user;
-    const fromName = body.smtpFromName || 'BlueCode Advisory';
+    const host = body.smtpHost || dbTenant?.smtpHost || process.env.SMTP_HOST || 'authsmtp.register.it';
+    const port = Number(body.smtpPort) || Number(dbTenant?.smtpPort) || Number(process.env.SMTP_PORT) || 465;
+    const secure = body.smtpSecure !== undefined ? Boolean(body.smtpSecure) : (dbTenant?.smtpSecure !== undefined ? Boolean(dbTenant.smtpSecure) : port === 465);
+    const user = body.smtpUser || dbTenant?.smtpUser || process.env.SMTP_USER || 'info@bluecode.advisory';
+    const pass = body.smtpPass || dbTenant?.smtpPass || process.env.SMTP_PASS || '';
+    const fromEmail = body.smtpFromEmail || dbTenant?.smtpFromEmail || user;
+    const fromName = body.smtpFromName || dbTenant?.smtpFromName || 'BlueCode Advisory';
     const toEmail = body.emailDestinatario || user;
 
     const res = await verifyAndSendTestSmtp({
@@ -594,12 +600,18 @@ export function buildServer(app: AppPort): FastifyInstance {
   });
 
   server.post<{ Body: { imapHost?: string; imapPort?: number; imapUser?: string; imapPass?: string; imapSecure?: boolean } }>('/tenant/test-imap', async (req, reply) => {
+    const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
+    let dbTenant: any = null;
+    try {
+      dbTenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
+    } catch {}
+
     const body = req.body || {};
-    const host = body.imapHost || 'imap.register.it';
-    const port = Number(body.imapPort) || 993;
-    const secure = body.imapSecure !== undefined ? Boolean(body.imapSecure) : port === 993;
-    const user = body.imapUser || 'support@bluecode-ltd.com';
-    const pass = body.imapPass || '';
+    const host = body.imapHost || dbTenant?.imapHost || 'imap.register.it';
+    const port = Number(body.imapPort) || Number(dbTenant?.imapPort) || 993;
+    const secure = body.imapSecure !== undefined ? Boolean(body.imapSecure) : (dbTenant?.imapSecure !== undefined ? Boolean(dbTenant.imapSecure) : port === 993);
+    const user = body.imapUser || dbTenant?.imapUser || 'info@bluecode.advisory';
+    const pass = body.imapPass || dbTenant?.imapPass || dbTenant?.smtpPass || '';
 
     const res = await verifyRealImap({
       host,

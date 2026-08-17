@@ -29,7 +29,7 @@ const KNOWN_MEMBERS_MAP: Record<string, { id: number; initials: string; color: s
   'lorenzo@bluecode.advisory': { id: 3, initials: 'LM', color: '#10b981', defaultRole: 'Legal Counsel' },
   'elena.russo@bluecode.advisory': { id: 4, initials: 'ER', color: '#f59e0b', defaultRole: 'Tax Advisor & Fiscalità Internazionale' },
   'elena@bluecode.advisory': { id: 4, initials: 'ER', color: '#f59e0b', defaultRole: 'Tax Advisor' },
-  'mario.dibenedetto87@gmail.com': { id: 5, initials: 'MD', color: '#3b82f6', defaultRole: 'Legal Counsel & Partner' },
+  'mario.dibenedetto@bluecode.advisory': { id: 5, initials: 'MD', color: '#3b82f6', defaultRole: 'Legal Counsel & Partner' },
 };
 
 function apiUserToTeamMember(u: any, idx: number): TeamMember {

@@ -54,10 +54,10 @@ export async function loginApi(email: string, password?: string) {
     'joe@bluecode.advisory': { nome: 'Joe Disabato', ruolo: 'advisor', validPass: ['password123', 'admin2026!'] },
     'admin@bluecode.advisory': { nome: 'Super Admin Studio', ruolo: 'super_admin', validPass: ['admin2026!', 'password123'] },
     'operator@bluecode.advisory': { nome: 'Francesca Disabato', ruolo: 'collaboratore_interno', validPass: ['operator123', 'password123'] },
-    'lorenzo.marino@bluecode.advisory': { nome: 'Avv. Lorenzo Marino', ruolo: 'advisor', validPass: ['password123', 'BlueCode2026!'] },
-    'elena.russo@bluecode.advisory': { nome: 'Dr. Elena Russo', ruolo: 'advisor', validPass: ['password123', 'BlueCode2026!'] },
-    'francesca.disabato@bluecode.advisory': { nome: 'Francesca Disabato', ruolo: 'collaboratore_interno', validPass: ['password123', 'BlueCode2026!'] },
-    'mario.dibenedetto87@gmail.com': { nome: 'Avv. Mario Dibenedetto', ruolo: 'advisor', validPass: ['BlueCode2026!', 'password123'] },
+    'lorenzo.marino@bluecode.advisory': { nome: 'Avv. Lorenzo Marino', ruolo: 'advisor', validPass: ['password123'] },
+    'elena.russo@bluecode.advisory': { nome: 'Dr. Elena Russo', ruolo: 'advisor', validPass: ['password123'] },
+    'francesca.disabato@bluecode.advisory': { nome: 'Francesca Disabato', ruolo: 'collaboratore_interno', validPass: ['password123'] },
+    'mario.dibenedetto@bluecode.advisory': { nome: 'Avv. Mario Dibenedetto', ruolo: 'advisor', validPass: ['password123'] },
   };
 
   if (defaultUserMap[cleanEmail]) {
@@ -78,7 +78,7 @@ export async function loginApi(email: string, password?: string) {
       if (Array.isArray(customList)) {
         const found = customList.find(u => (u.email || '').toLowerCase() === cleanEmail);
         if (found) {
-          if (!password || password === 'BlueCode2026!' || password === 'password123' || password === found.password) {
+          if (!password || password === 'password123' || password === found.password) {
             return {
               token: `jwt_custom_${Date.now()}`,
               user: {
@@ -407,7 +407,7 @@ export const DEFAULT_TEAM_USERS = [
   { id: 'usr-02', nome: 'Avv. Lorenzo Marino', email: 'lorenzo.marino@bluecode.advisory', ruolo: 'advisor', specializzazione: 'Legal Counsel — Diritto Societario, Contrattualistica & IP' },
   { id: 'usr-03', nome: 'Dr. Elena Russo', email: 'elena.russo@bluecode.advisory', ruolo: 'advisor', specializzazione: 'Tax Advisor — Fiscalità Internazionale & Holding' },
   { id: 'usr-04', nome: 'Francesca Disabato', email: 'francesca@bluecode.advisory', ruolo: 'operator', specializzazione: 'Back Office & Compliance KYC/AML' },
-  { id: 'usr-05', nome: 'Avv. Mario Dibenedetto', email: 'mario.dibenedetto87@gmail.com', ruolo: 'advisor', specializzazione: 'Legal Counsel — Diritto Societario, Contrattualistica & Trust' },
+  { id: 'usr-05', nome: 'Avv. Mario Dibenedetto', email: 'mario.dibenedetto@bluecode.advisory', ruolo: 'advisor', specializzazione: 'Legal Counsel — Diritto Societario, Contrattualistica & Trust' },
 ];
 
 export async function fetchUtentiTenant() {
@@ -481,7 +481,7 @@ export async function sendInviteCollaboratoreApi(input: {
     collaboratorName: input.nome,
     collaboratorRole: input.ruolo,
     collaboratorSpecialization: input.specializzazione,
-    collaboratorPassword: input.tempPassword || 'BlueCode2026!',
+    collaboratorPassword: input.tempPassword || 'password123',
   };
 
   try {

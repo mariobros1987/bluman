@@ -65,7 +65,7 @@ Per accedere direttamente al **Portale Cliente Passwordless**, apri:
 | Ruolo Attore | Email Registrata | Password di Accesso | Tipo Accesso |
 | :--- | :--- | :--- | :--- |
 | 👨‍💼 **Lead Advisor Senior** | `joe@bluecode.advisory` | `password123` | JWT Access Token |
-| ⚖️ **Legal Counsel Advisor** | `mario.dibenedetto87@gmail.com` | `BlueCode2026!` | JWT Access Token |
+| ⚖️ **Legal Counsel Advisor** | `mario.dibenedetto@bluecode.advisory` | `password123` | JWT Access Token |
 | ⚖️ **Avv. Lorenzo Marino** | `lorenzo.marino@bluecode.advisory` | `password123` | JWT Access Token |
 | 💶 **Dr. Elena Russo (Tax Advisor)** | `elena.russo@bluecode.advisory` | `password123` | JWT Access Token |
 | 👑 **Super Admin** | `admin@bluecode.advisory` | `admin2026!` | JWT Access Token |
@@ -80,10 +80,10 @@ Per accedere direttamente al **Portale Cliente Passwordless**, apri:
    ```bash
    cp .env.example .env
    ```
-2. Incolla la tua stringa `DATABASE_URL` di Supabase PostgreSQL:
+2. Incolla la tua stringa `DATABASE_URL` di Supabase PostgreSQL nel tuo file `.env` locale:
    ```env
-   DATABASE_URL="postgresql://postgres:BluMan2026Dev!@db.cfdtjdrfeidbemhunilt.supabase.co:5432/postgres"
-   DIRECT_URL="postgresql://postgres:BluMan2026Dev!@db.cfdtjdrfeidbemhunilt.supabase.co:5432/postgres"
+   DATABASE_URL="postgresql://postgres:[YOUR-DB-PASSWORD]@db.[YOUR-PROJECT-REF].supabase.co:5432/postgres"
+   DIRECT_URL="postgresql://postgres:[YOUR-DB-PASSWORD]@db.[YOUR-PROJECT-REF].supabase.co:5432/postgres"
    ```
 3. Collega la CLI Supabase e sincronizza lo schema Prisma:
    ```bash

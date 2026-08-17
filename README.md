@@ -99,7 +99,7 @@ cd frontend && npm run dev # Dev Server in ascolto su http://localhost:5173
 | Ruolo Attore | Email Registrata | Password di Accesso | Tipo Accesso |
 | :--- | :--- | :--- | :--- |
 | 👨‍💼 **Lead Advisor Senior** | `joe@bluecode.advisory` | `password123` | JWT Access Token |
-| ⚖️ **Legal Counsel Advisor** | `mario.dibenedetto87@gmail.com` | `BlueCode2026!` | JWT Access Token |
+| ⚖️ **Legal Counsel Advisor** | `mario.dibenedetto@bluecode.advisory` | `password123` | JWT Access Token |
 | ⚖️ **Avv. Lorenzo Marino** | `lorenzo.marino@bluecode.advisory` | `password123` | JWT Access Token |
 | 💶 **Dr. Elena Russo (Tax Advisor)** | `elena.russo@bluecode.advisory` | `password123` | JWT Access Token |
 | 👑 **Super Admin** | `admin@bluecode.advisory` | `admin2026!` | JWT Access Token |

@@ -19,7 +19,7 @@ REGOLE TASSATIVE DA SEGUIRE RIGOROSAMENTE:
 
 CREDENZIALI UFFICIALI DI TEST (LOGIN):
 - 👨‍💼 Lead Advisor Senior: joe@bluecode.advisory / password123
-- ⚖️ Legal Counsel Advisor: mario.dibenedetto87@gmail.com / BlueCode2026!
+- ⚖️ Legal Counsel Advisor: mario.dibenedetto@bluecode.advisory / password123
 - ⚖️ Avv. Lorenzo Marino: lorenzo.marino@bluecode.advisory / password123
 - 💶 Dr. Elena Russo (Tax Advisor): elena.russo@bluecode.advisory / password123
 - 👑 Super Admin: admin@bluecode.advisory / admin2026!
@@ -78,8 +78,8 @@ cd frontend && npm run dev
 ### 1. Configurazione Variabile `.env` Database URL:
 Nel file `.env` sul nuovo PC, inserire la stringa di connessione ufficiale Supabase:
 ```env
-DATABASE_URL="postgresql://postgres:BluMan2026Dev!@db.cfdtjdrfeidbemhunilt.supabase.co:5432/postgres"
-DIRECT_URL="postgresql://postgres:BluMan2026Dev!@db.cfdtjdrfeidbemhunilt.supabase.co:5432/postgres"
+DATABASE_URL="postgresql://postgres:[YOUR-DB-PASSWORD]@db.[YOUR-PROJECT-REF].supabase.co:5432/postgres"
+DIRECT_URL="postgresql://postgres:[YOUR-DB-PASSWORD]@db.[YOUR-PROJECT-REF].supabase.co:5432/postgres"
 ```
 
 ### 2. Collegamento Supabase CLI & Migrazioni Prisma:
