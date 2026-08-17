@@ -617,6 +617,90 @@ function AssegnaModuloClienteModal({
 // ─── Componente Catalogo Articoli & Distinta Base ──────────────────
 function ArticoliCatalogView({ articoliList, onOpenNew }: { articoliList: Articolo[]; onOpenNew: () => void }) {
   const [selectedCat, setSelectedCat] = useState<string>('TUTTI');
+  const navigate = useNavigate();
+  const editArtFileImportRef = useRef<HTMLInputElement>(null);
+  const [allMasterTemplates, setAllMasterTemplates] = useState<DocumentTemplate[]>(() => getAllTemplates());
+
+  const reloadMasterTemplates = () => {
+    setAllMasterTemplates(getAllTemplates());
+  };
+
+  const resolveTemplateName = (mId: string) => {
+    if (mId === 'm1') return 'Accordo NDA Riservatezza';
+    if (mId === 'm2') return 'Procura Legale & Delega';
+    if (mId === 'm3') return 'Dichiarazione UBO';
+    if (mId === 'm4') return 'Statuto & Memorandum';
+    const found = allMasterTemplates.find(t => t.id === mId);
+    return found ? found.titolo : mId;
+  };
+
+  const handleCreateNewWordForArticle = async () => {
+    const title = prompt('Inserisci il nome del nuovo Modello Word per questa prestazione:', `${editName || 'Documento'} - Modello Word`);
+    if (!title || !title.trim()) return;
+
+    const newTmpl: DocumentTemplate = {
+      id: `tmpl-custom-${Date.now()}`,
+      titolo: title.trim(),
+      categoria: (editingArt?.cat.toLowerCase() as any) || 'societario',
+      descrizione: `Modello Word personalizzato creato per la prestazione "${editName}".`,
+      contenutoHtml: `
+<h1 style="text-align: center; color: #1e1b4b; font-size: 18px; margin-bottom: 20px;">${title.trim().toUpperCase()}</h1>
+<p style="text-align: right; color: #64748b; font-size: 11px;"><strong>Data:</strong> {{data_odierna}} | <strong>Pratica:</strong> {{progetto.titolo}}</p>
+<div style="background: #f8fafc; border-left: 4px solid #4338ca; padding: 12px; margin: 20px 0; font-size: 11.5px;">
+  <strong>Cliente:</strong> {{cliente.ragione_sociale}} (P.IVA {{cliente.partita_iva}})<br/>
+  <strong>Studio:</strong> {{studio.ragione_sociale}}
+</div>
+<p style="font-size: 11.5px; line-height: 1.6;">Testo e condizioni operative per la prestazione ${editName}...</p>
+      `,
+    };
+
+    saveCustomTemplate(newTmpl);
+    await creaDocumentoTemplateApi(newTmpl);
+    reloadMasterTemplates();
+    setEditDocModels(prev => [...prev, newTmpl.id]);
+    alert(`✓ Nuovo Modello Word "${newTmpl.titolo}" creato e allacciato all'articolo!`);
+  };
+
+  const handleImportDocFileForArticle = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const content = event.target?.result as string;
+      let htmlBody = '';
+      if (file.name.endsWith('.json')) {
+        const res = importTemplatesFromJson(content);
+        if (res.success) {
+          reloadMasterTemplates();
+          const first = getAllTemplates()[0];
+          if (first) setEditDocModels(prev => [...prev, first.id]);
+          alert(`✓ Modello importato da file JSON e allacciato all'articolo!`);
+          return;
+        }
+      } else {
+        htmlBody = content || `<h1>${file.name}</h1><p>Documento importato da PC per ${editName}...</p>`;
+      }
+
+      const docNameClean = file.name.replace(/\.[^/.]+$/, "");
+      const newTmpl: DocumentTemplate = {
+        id: `tmpl-custom-${Date.now()}`,
+        titolo: docNameClean,
+        categoria: (editingArt?.cat.toLowerCase() as any) || 'societario',
+        descrizione: `Documento caricato da PC (${file.name}) per la prestazione "${editName}".`,
+        contenutoHtml: htmlBody,
+      };
+
+      saveCustomTemplate(newTmpl);
+      await creaDocumentoTemplateApi(newTmpl);
+      reloadMasterTemplates();
+      setEditDocModels(prev => [...prev, newTmpl.id]);
+      alert(`✓ File "${file.name}" importato dal PC e allacciato con successo!`);
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [editingArt, setEditingArt] = useState<Articolo | null>(null);
   const [editPrice, setEditPrice] = useState<number>(0);
@@ -638,6 +722,7 @@ function ArticoliCatalogView({ articoliList, onOpenNew }: { articoliList: Artico
   const avgPrezzo = articoliList.length > 0 ? Math.round(articoliList.reduce((sum, a) => sum + a.p, 0) / articoliList.length) : 0;
 
   const handleStartEdit = (art: Articolo) => {
+    reloadMasterTemplates();
     setEditingArt(art);
     setEditPrice(art.p);
     setEditHours(art.h);
@@ -771,8 +856,8 @@ function ArticoliCatalogView({ articoliList, onOpenNew }: { articoliList: Artico
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <button
                     onClick={() => handleStartEdit(a)}
-                    title="Modifica Prezzo & Ore (Admin)"
-                    style={{ background: '#1a1f3d', border: '1px solid #2d3260', color: '#818cf8', padding: '2px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer', fontWeight: 600 }}
+                    title="Modifica Prezzo, Ore e Documenti Allacciati"
+                    style={{ background: '#1a1f3d', border: '1px solid #2d3260', color: '#818cf8', padding: '3px 9px', borderRadius: 6, fontSize: 11, cursor: 'pointer', fontWeight: 700 }}
                   >
                     ✏️ Modifica
                   </button>
@@ -784,15 +869,21 @@ function ArticoliCatalogView({ articoliList, onOpenNew }: { articoliList: Artico
               <div style={{ fontSize: 14, fontWeight: 700, lineHeight: 1.35, color: 'var(--text)' }}>{a.n}</div>
               <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
                 <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 600 }}>📄 Documenti Richiesti:</span>
+                  <span style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 600 }}>📄 Documenti Allacciati:</span>
                   {(a.documentiRichiesti && a.documentiRichiesti.length > 0) ? (
                     a.documentiRichiesti.map(mId => (
-                      <span key={mId} style={{ background: '#1a1f3d', color: '#818cf8', padding: '2px 6px', borderRadius: 6, fontSize: 9.5, fontWeight: 700, border: '1px solid #3730a3' }}>
-                        {mId === 'm1' ? 'Accordo NDA' : mId === 'm2' ? 'Procura MFSA' : mId === 'm3' ? 'Dichiarazione UBO' : mId === 'm4' ? 'Statuto Holding Malta' : mId}
+                      <span
+                        key={mId}
+                        onClick={() => navigate(`/documents?tmplId=${mId}`)}
+                        title="Clicca per aprire in Document Studio (Word)"
+                        style={{ background: '#1a1f3d', color: '#818cf8', padding: '2px 7px', borderRadius: 6, fontSize: 9.5, fontWeight: 700, border: '1px solid #3730a3', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                      >
+                        <span>📎 {resolveTemplateName(mId)}</span>
+                        <span style={{ fontSize: 8.5, opacity: 0.8 }}>↗</span>
                       </span>
                     ))
                   ) : (
-                    <span style={{ color: 'var(--muted)', fontSize: 10, fontStyle: 'italic' }}>Nessun modello in bianco</span>
+                    <span style={{ color: 'var(--muted)', fontSize: 10, fontStyle: 'italic' }}>Nessun documento allacciato</span>
                   )}
                 </div>
 
@@ -823,12 +914,12 @@ function ArticoliCatalogView({ articoliList, onOpenNew }: { articoliList: Artico
         ))}
       </div>
 
-      {/* Modal Modifica Prezzo & Ore Articolo (§Admin) */}
+      {/* Modal Modifica Prezzo & Ore Articolo (§Admin) con 3 Opzioni Documento */}
       {editingArt && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 16 }}>
-          <form onSubmit={handleSaveEdit} style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, padding: 22, width: '100%', maxWidth: 480, display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <form onSubmit={handleSaveEdit} style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, padding: 22, width: '100%', maxWidth: 540, maxHeight: '92vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div style={{ fontSize: 16, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span>✏️ Modifica Listino & Collegamento Documenti (Admin)</span>
+              <span>✏️ Modifica Listino & Documenti Allacciati</span>
             </div>
 
             <div>
@@ -847,31 +938,88 @@ function ArticoliCatalogView({ articoliList, onOpenNew }: { articoliList: Artico
               </div>
             </div>
 
-            {/* Collegamento Modelli Documenti in Bianco */}
-            <div>
-              <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 6 }}>📄 Modelli Documenti in Bianco da far Compilare/Firmare al Cliente</label>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, background: 'var(--card2)', padding: 10, borderRadius: 8, border: '1px solid var(--border)' }}>
-                {[
-                  { id: 'm1', label: 'Accordo NDA Tipo' },
-                  { id: 'm2', label: 'Procura Legale MFSA' },
-                  { id: 'm3', label: 'Dichiarazione UBO' },
-                  { id: 'm4', label: 'Statuto Holding Malta' },
-                ].map(item => {
+            {/* Sezione Documenti Allacciati: 1. In Memoria, 2. Crea Nuovo Word, 3. Importa da PC */}
+            <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>📄 Documenti & Modelli Allacciati ({editDocModels.length})</div>
+                  <div style={{ fontSize: 10, color: 'var(--muted)' }}>Seleziona dalla memoria, crea un nuovo modello Word o importalo dal PC</div>
+                </div>
+
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <input
+                    type="file"
+                    ref={editArtFileImportRef}
+                    accept=".docx,.doc,.pdf,.html,.htm,.json"
+                    style={{ display: 'none' }}
+                    onChange={handleImportDocFileForArticle}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleCreateNewWordForArticle}
+                    style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: 6, fontSize: 10.5, fontWeight: 700, cursor: 'pointer' }}
+                    title="Crea un nuovo modello Word dedicato a questa prestazione"
+                  >
+                    ➕ Nuovo Word
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => editArtFileImportRef.current?.click()}
+                    style={{ background: '#1e1b4b', color: '#818cf8', border: '1px solid #4338ca', padding: '4px 8px', borderRadius: 6, fontSize: 10.5, fontWeight: 700, cursor: 'pointer' }}
+                    title="Importa file .docx, .pdf, .html o .json dal tuo computer"
+                  >
+                    📁 Importa da PC
+                  </button>
+                </div>
+              </div>
+
+              {/* Grid di selezione di tutti i modelli in memoria */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 6, maxHeight: 180, overflowY: 'auto', background: 'var(--card)', padding: 8, borderRadius: 8, border: '1px solid var(--border)' }}>
+                {allMasterTemplates.map(item => {
                   const checked = editDocModels.includes(item.id);
+                  const isCustom = item.id.startsWith('tmpl-custom');
                   return (
-                    <label key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, cursor: 'pointer', color: checked ? '#818cf8' : 'var(--text)' }}>
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={e => {
-                          if (e.target.checked) {
-                            setEditDocModels([...editDocModels, item.id]);
-                          } else {
-                            setEditDocModels(editDocModels.filter(x => x !== item.id));
-                          }
-                        }}
-                      />
-                      <span>{item.label}</span>
+                    <label
+                      key={item.id}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 6,
+                        fontSize: 11,
+                        cursor: 'pointer',
+                        padding: '4px 6px',
+                        borderRadius: 6,
+                        background: checked ? 'rgba(99, 102, 241, 0.12)' : 'transparent',
+                        color: checked ? '#a5b4fc' : 'var(--text)',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={e => {
+                            if (e.target.checked) {
+                              setEditDocModels([...editDocModels, item.id]);
+                            } else {
+                              setEditDocModels(editDocModels.filter(x => x !== item.id));
+                            }
+                          }}
+                        />
+                        <span style={{ fontWeight: checked ? 700 : 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {item.titolo}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                        {isCustom && (
+                          <span style={{ fontSize: 8.5, background: '#064e3b', color: '#34d399', padding: '1px 4px', borderRadius: 4, fontWeight: 700 }}>
+                            Custom
+                          </span>
+                        )}
+                        <span style={{ fontSize: 8.5, background: 'var(--card2)', color: 'var(--muted)', padding: '1px 4px', borderRadius: 4, textTransform: 'uppercase' }}>
+                          {item.categoria}
+                        </span>
+                      </div>
                     </label>
                   );
                 })}
@@ -1694,6 +1842,81 @@ function NuovoArticoloModal({ giurList, onClose, onCreated }: { giurList: Giuris
   const [prezzo, setPrezzo] = useState(1200);
   const [loading, setLoading] = useState(false);
 
+  const fileInputNewArtRef = useRef<HTMLInputElement>(null);
+  const [allMasterTemplates, setAllMasterTemplates] = useState<DocumentTemplate[]>(() => getAllTemplates());
+  const [selectedDocIds, setSelectedDocIds] = useState<string[]>(['tmpl-engagement']);
+
+  const reloadMasterTemplates = () => {
+    setAllMasterTemplates(getAllTemplates());
+  };
+
+  const handleCreateNewWordForNewArt = async () => {
+    const title = prompt('Inserisci il nome del nuovo Modello Word per questo articolo:', `${nome || 'Documento'} - Modello Word`);
+    if (!title || !title.trim()) return;
+
+    const newTmpl: DocumentTemplate = {
+      id: `tmpl-custom-${Date.now()}`,
+      titolo: title.trim(),
+      categoria: (cat.toLowerCase() as any) || 'societario',
+      descrizione: `Modello Word personalizzato per la nuova prestazione "${nome}".`,
+      contenutoHtml: `
+<h1 style="text-align: center; color: #1e1b4b; font-size: 18px; margin-bottom: 20px;">${title.trim().toUpperCase()}</h1>
+<p style="text-align: right; color: #64748b; font-size: 11px;"><strong>Data:</strong> {{data_odierna}} | <strong>Pratica:</strong> {{progetto.titolo}}</p>
+<div style="background: #f8fafc; border-left: 4px solid #4338ca; padding: 12px; margin: 20px 0; font-size: 11.5px;">
+  <strong>Cliente:</strong> {{cliente.ragione_sociale}} (P.IVA {{cliente.partita_iva}})<br/>
+  <strong>Studio:</strong> {{studio.ragione_sociale}}
+</div>
+<p style="font-size: 11.5px; line-height: 1.6;">Testo e condizioni operative per la prestazione ${nome}...</p>
+      `,
+    };
+
+    saveCustomTemplate(newTmpl);
+    await creaDocumentoTemplateApi(newTmpl);
+    reloadMasterTemplates();
+    setSelectedDocIds(prev => [...prev, newTmpl.id]);
+    alert(`✓ Nuovo Modello Word "${newTmpl.titolo}" creato e collegato all'articolo!`);
+  };
+
+  const handleImportDocFileForNewArt = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const content = event.target?.result as string;
+      let htmlBody = '';
+      if (file.name.endsWith('.json')) {
+        const res = importTemplatesFromJson(content);
+        if (res.success) {
+          reloadMasterTemplates();
+          const first = getAllTemplates()[0];
+          if (first) setSelectedDocIds(prev => [...prev, first.id]);
+          alert(`✓ Modello importato da file JSON e allacciato all'articolo!`);
+          return;
+        }
+      } else {
+        htmlBody = content || `<h1>${file.name}</h1><p>Documento importato da PC per ${nome}...</p>`;
+      }
+
+      const docNameClean = file.name.replace(/\.[^/.]+$/, "");
+      const newTmpl: DocumentTemplate = {
+        id: `tmpl-custom-${Date.now()}`,
+        titolo: docNameClean,
+        categoria: (cat.toLowerCase() as any) || 'societario',
+        descrizione: `Documento caricato da PC (${file.name}) per la prestazione "${nome}".`,
+        contenutoHtml: htmlBody,
+      };
+
+      saveCustomTemplate(newTmpl);
+      await creaDocumentoTemplateApi(newTmpl);
+      reloadMasterTemplates();
+      setSelectedDocIds(prev => [...prev, newTmpl.id]);
+      alert(`✓ File "${file.name}" importato dal PC e allacciato con successo!`);
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
   // Passaggi dinamici con Form e Documenti
   const [passaggi, setPassaggi] = useState<Array<{
     titolo: string;
@@ -1729,6 +1952,7 @@ function NuovoArticoloModal({ giurList, onClose, onCreated }: { giurList: Giuris
         categoria: cat,
         oreDefault: Number(ore),
         prezzoDefault: Number(prezzo) * 100,
+        documentiRichiesti: selectedDocIds,
         passaggi: passaggi.map(p => ({
           titolo: p.titolo,
           tipo: p.tipo,
@@ -1752,7 +1976,9 @@ function NuovoArticoloModal({ giurList, onClose, onCreated }: { giurList: Giuris
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 16 }}>
       <form onSubmit={handleSubmit} style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, padding: 22, width: '100%', maxWidth: 580, maxHeight: '90vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <div style={{ fontSize: 16, fontWeight: 600 }}>Nuovo Articolo Prestazione con Procedura & Form</div>
+        <div style={{ fontSize: 16, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span>🧩 Nuovo Articolo Prestazione con Documenti & Procedura</span>
+        </div>
 
         <div style={{ display: 'flex', gap: 12 }}>
           <div style={{ flex: 2 }}>
@@ -1788,6 +2014,94 @@ function NuovoArticoloModal({ giurList, onClose, onCreated }: { giurList: Giuris
           <div style={{ flex: 1 }}>
             <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Prezzo listino (€)</label>
             <input type="number" value={prezzo} onChange={e => setPrezzo(Number(e.target.value))} min={0} step={50} required />
+          </div>
+        </div>
+
+        {/* Sezione Documenti & Modelli Allacciati (In Memoria, Crea Word, Importa da PC) */}
+        <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>📄 Documenti & Modelli Allacciati ({selectedDocIds.length})</div>
+              <div style={{ fontSize: 10, color: 'var(--muted)' }}>Allaccia modelli dalla memoria, creane uno nuovo in Word o importalo dal PC</div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 6 }}>
+              <input
+                type="file"
+                ref={fileInputNewArtRef}
+                accept=".docx,.doc,.pdf,.html,.htm,.json"
+                style={{ display: 'none' }}
+                onChange={handleImportDocFileForNewArt}
+              />
+              <button
+                type="button"
+                onClick={handleCreateNewWordForNewArt}
+                style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: 6, fontSize: 10.5, fontWeight: 700, cursor: 'pointer' }}
+                title="Crea un nuovo modello Word dedicato a questa prestazione"
+              >
+                ➕ Nuovo Word
+              </button>
+              <button
+                type="button"
+                onClick={() => fileInputNewArtRef.current?.click()}
+                style={{ background: '#1e1b4b', color: '#818cf8', border: '1px solid #4338ca', padding: '4px 8px', borderRadius: 6, fontSize: 10.5, fontWeight: 700, cursor: 'pointer' }}
+                title="Importa file .docx, .pdf, .html o .json dal tuo computer"
+              >
+                📁 Importa da PC
+              </button>
+            </div>
+          </div>
+
+          {/* Lista Modelli in Memoria */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 6, maxHeight: 150, overflowY: 'auto', background: 'var(--card)', padding: 8, borderRadius: 8, border: '1px solid var(--border)' }}>
+            {allMasterTemplates.map(item => {
+              const checked = selectedDocIds.includes(item.id);
+              const isCustom = item.id.startsWith('tmpl-custom');
+              return (
+                <label
+                  key={item.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 6,
+                    fontSize: 11,
+                    cursor: 'pointer',
+                    padding: '4px 6px',
+                    borderRadius: 6,
+                    background: checked ? 'rgba(99, 102, 241, 0.12)' : 'transparent',
+                    color: checked ? '#a5b4fc' : 'var(--text)',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={e => {
+                        if (e.target.checked) {
+                          setSelectedDocIds([...selectedDocIds, item.id]);
+                        } else {
+                          setSelectedDocIds(selectedDocIds.filter(x => x !== item.id));
+                        }
+                      }}
+                    />
+                    <span style={{ fontWeight: checked ? 700 : 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {item.titolo}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                    {isCustom && (
+                      <span style={{ fontSize: 8.5, background: '#064e3b', color: '#34d399', padding: '1px 4px', borderRadius: 4, fontWeight: 700 }}>
+                        Custom
+                      </span>
+                    )}
+                    <span style={{ fontSize: 8.5, background: 'var(--card2)', color: 'var(--muted)', padding: '1px 4px', borderRadius: 4, textTransform: 'uppercase' }}>
+                      {item.categoria}
+                    </span>
+                  </div>
+                </label>
+              );
+            })}
           </div>
         </div>
 
@@ -1887,7 +2201,7 @@ function NuovoArticoloModal({ giurList, onClose, onCreated }: { giurList: Giuris
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
           <button type="button" onClick={onClose} style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '7px 14px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}>Annulla</button>
-          <button type="submit" disabled={loading} style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>{loading ? 'Salvataggio...' : '✓ Salva Articolo & Procedura'}</button>
+          <button type="submit" disabled={loading} style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{loading ? 'Salvataggio...' : '✓ Salva Articolo & Procedura'}</button>
         </div>
       </form>
     </div>
