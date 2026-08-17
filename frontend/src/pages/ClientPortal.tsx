@@ -5,6 +5,7 @@ import { fmt } from '../utils';
 import { downloadRealPdf } from '../utils/pdfGenerator';
 import type { SignatureData } from '../utils/pdfGenerator';
 import { DigitalSignatureModal } from '../components/DigitalSignatureModal';
+import { resolveDocumentTemplateHtml, PREBUILT_TEMPLATES } from '../utils/documentTemplates';
 import { fetchModuliLibreria, fetchProgetti, creaPreventivoEAccettaApi, fetchClienti, creaProgettoApi, creaClienteApi, fetchComunicazioniApi, inviaComunicazioneApi, requestPortalOtpApi, verifyPortalOtpAndSignApi } from '../api/client';
 import type { CategoriaModulo } from '../types';
 
@@ -43,6 +44,7 @@ export function ClientPortal() {
   const [portalDocs, setPortalDocs] = useState<any[]>([
     {
       id: 'doc-nda',
+      templateId: 'tmpl-nda',
       titolo: 'Accordo di Riservatezza NDA & Mandato Fiduciario',
       nome: 'Accordo di Riservatezza NDA & Incarico.pdf',
       dimensione: '1.4 MB',
@@ -54,6 +56,7 @@ export function ClientPortal() {
     },
     {
       id: 'doc-statuto',
+      templateId: 'tmpl-memorandum',
       titolo: 'Statuto Standard Holding Malta & Procura MFSA',
       nome: 'Statuto Standard Holding Malta & Procura MFSA.pdf',
       dimensione: '3.2 MB',
@@ -65,6 +68,7 @@ export function ClientPortal() {
     },
     {
       id: 'doc-ubo',
+      templateId: 'tmpl-compliance',
       titolo: 'Dichiarazione Titolare Effettivo (UBO Registry)',
       nome: 'Dichiarazione Titolare Effettivo (UBO Registry).pdf',
       dimensione: '2.8 MB',
@@ -76,6 +80,7 @@ export function ClientPortal() {
     },
     {
       id: 'doc-trust',
+      templateId: 'tmpl-trust',
       titolo: 'Confidential Letter of Wishes per Struttura Trust',
       nome: 'Confidential Letter of Wishes Trust.pdf',
       dimensione: '2.1 MB',
@@ -86,6 +91,9 @@ export function ClientPortal() {
       descrizione: 'Istruzioni confidenziali per il trustee designato relative alla governance e protezione asset.',
     },
   ]);
+
+  // Visualizzatore A4 Documento Selezionato per Lettura Completa
+  const [selectedViewerDoc, setSelectedViewerDoc] = useState<any | null>(null);
 
   // Modale Firma Grafica per Documenti Singoli
   const [signingDoc, setSigningDoc] = useState<any | null>(null);
@@ -334,6 +342,113 @@ export function ClientPortal() {
     e.preventDefault();
     setFormSaved(true);
     setTimeout(() => setFormSaved(false), 4000);
+  };
+
+  const getResolvedEngagementHtml = () => {
+    const tmpl = PREBUILT_TEMPLATES.find(t => t.id === 'tmpl-engagement');
+    const baseHtml = tmpl ? tmpl.contenutoHtml : '';
+
+    const modulesTableHtml = `
+      <div style="margin: 16px 0; border: 1px solid #cbd5e1; border-radius: 8px; overflow: hidden;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 10pt; text-align: left;">
+          <thead style="background: #f1f5f9; color: #1e1b4b; font-weight: 700; border-bottom: 1px solid #cbd5e1;">
+            <tr>
+              <th style="padding: 8px 12px;">Modulo Specialistico</th>
+              <th style="padding: 8px 12px;">Categoria</th>
+              <th style="padding: 8px 12px; text-align: center;">Ore Stimate</th>
+              <th style="padding: 8px 12px; text-align: right;">Corrispettivo</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${moduliProposti.map(m => `
+              <tr style="border-bottom: 1px solid #f1f5f9;">
+                <td style="padding: 8px 12px; font-weight: 600; color: #0f172a;">${m.nome}</td>
+                <td style="padding: 8px 12px; color: #475569;">${m.cat}</td>
+                <td style="padding: 8px 12px; text-align: center; color: #475569;">${m.ore}h</td>
+                <td style="padding: 8px 12px; text-align: right; font-weight: 700; color: #1e1b4b;">${fmt(m.prezzo)}</td>
+              </tr>
+            `).join('')}
+            <tr style="background: #f8fafc; font-weight: 800;">
+              <td colspan="3" style="padding: 10px 12px; text-align: right; color: #1e1b4b;">TOTALE COMPLESSIVO MANDATO:</td>
+              <td style="padding: 10px 12px; text-align: right; color: #4338ca; font-size: 11pt;">${fmt(totalValue)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    `;
+
+    return resolveDocumentTemplateHtml(baseHtml.replace('<!-- {{TABELLA_MODULI}} -->', modulesTableHtml), {
+      cliente: clientObj || {
+        nome: clientName,
+        referenteNome: clientName,
+        ragioneSociale: formData.ragioneSociale || clientName,
+        piva: formData.piva || 'IT09876543210',
+        codiceFiscale: formData.codiceFiscale || 'RCCMRC80A01H501Z',
+      },
+      progetto: {
+        titolo: 'Progetto Consulenza & Structuring Patrimoniale',
+        totalePreventivo: totalValue,
+      },
+      studio: {
+        ragioneSociale: 'Bluecode Ltd',
+        sedeLegale: 'Level 4, Valuation Centre, Tower Road, Sliema SLM 1600, Malta',
+        piva: 'MT28491039',
+        iban: 'MT89VALL22013000000012345678',
+      }
+    });
+  };
+
+  const getResolvedDocumentHtml = (doc: any) => {
+    let templateHtml = '';
+    if (doc.id === 'doc-nda' || doc.templateId === 'tmpl-nda') {
+      templateHtml = PREBUILT_TEMPLATES.find(t => t.id === 'tmpl-nda')?.contenutoHtml || '';
+    } else if (doc.id === 'doc-statuto' || doc.templateId === 'tmpl-memorandum') {
+      templateHtml = PREBUILT_TEMPLATES.find(t => t.id === 'tmpl-memorandum')?.contenutoHtml || '';
+    } else if (doc.id === 'doc-ubo' || doc.templateId === 'tmpl-compliance') {
+      templateHtml = PREBUILT_TEMPLATES.find(t => t.id === 'tmpl-compliance')?.contenutoHtml || '';
+    } else if (doc.id === 'doc-trust' || doc.templateId === 'tmpl-trust') {
+      templateHtml = PREBUILT_TEMPLATES.find(t => t.id === 'tmpl-trust')?.contenutoHtml || '';
+    } else {
+      templateHtml = `
+        <h1 style="text-align: center; color: #1e1b4b; margin-bottom: 20px; font-size: 18pt; text-transform: uppercase;">
+          ${doc.titolo || doc.nome}
+        </h1>
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 14px; border-radius: 8px; margin-bottom: 20px; font-size: 10pt;">
+          <strong>Studio Professionale:</strong> Bluecode Ltd (Malta / Switzerland)<br/>
+          <strong>Cliente Committente:</strong> {{cliente.ragione_sociale}} ({{cliente.referente}})<br/>
+          <strong>Oggetto Documento:</strong> ${doc.descrizione || 'Atto professionale del fascicolo'}<br/>
+          <strong>Data di Emissione:</strong> {{data_odierna}}
+        </div>
+        <h3 style="color: #1e1b4b; font-size: 12pt; margin-top: 18px;">1. PREMESSE ED AMBITO GIURIDICO</h3>
+        <p style="font-size: 10.5pt; color: #334155; line-height: 1.6; text-align: justify;">
+          ${doc.descrizione || 'Il presente documento è redatto a cura dello Studio e forma parte integrante e sostanziale del fascicolo di consulenza e structuring.'}
+        </p>
+        <h3 style="color: #1e1b4b; font-size: 12pt; margin-top: 18px;">2. EFFICACIA E VALUTAZIONE PROBATORIA</h3>
+        <p style="font-size: 10.5pt; color: #334155; line-height: 1.6; text-align: justify;">
+          Le Parti riconoscono espressamente la piena validità legale ed efficacia probatoria del presente atto e della relativa sottoscrizione digitale ai sensi del Regolamento UE 910/2014 (eIDAS) e delle vigenti normative applicabili.
+        </p>
+      `;
+    }
+
+    return resolveDocumentTemplateHtml(templateHtml, {
+      cliente: clientObj || {
+        nome: clientName,
+        referenteNome: clientName,
+        ragioneSociale: formData.ragioneSociale || clientName,
+        piva: formData.piva || 'IT09876543210',
+        codiceFiscale: formData.codiceFiscale || 'RCCMRC80A01H501Z',
+      },
+      progetto: {
+        titolo: 'Progetto Consulenza & Structuring Patrimoniale',
+        totalePreventivo: totalValue,
+      },
+      studio: {
+        ragioneSociale: 'Bluecode Ltd',
+        sedeLegale: 'Level 4, Valuation Centre, Tower Road, Sliema SLM 1600, Malta',
+        piva: 'MT28491039',
+        iban: 'MT89VALL22013000000012345678',
+      }
+    });
   };
 
   if (pageLoading) {
@@ -645,6 +760,57 @@ export function ClientPortal() {
                   <div style={{ fontSize: 26, fontWeight: 800 }}>{fmt(totalValue)}</div>
                 </div>
 
+                {/* 📜 VISUALIZZATORE DOCUMENTALE ENGAGEMENT LETTER A4 */}
+                <div style={{ marginTop: 24, marginBottom: 24 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 10 }}>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span>📜 Testo Integrale del Mandato Professionale (Engagement Letter da Esaminare)</span>
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
+                        Leggi attentamente le clausole, i moduli incorporati, i corrispettivi e le condizioni legali prima di apporre la firma digitale.
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        await downloadRealPdf(`Engagement_Letter_Bozza_${clientName.replace(/\s+/g, '_')}`, getResolvedEngagementHtml());
+                      }}
+                      style={{
+                        background: '#1a1f3d',
+                        border: '1px solid #4338ca',
+                        color: '#c7d2fe',
+                        padding: '8px 16px',
+                        borderRadius: 8,
+                        fontSize: 11,
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6
+                      }}
+                    >
+                      📥 Scarica Bozza PDF A4
+                    </button>
+                  </div>
+
+                  {/* Foglio A4 Renderizzato */}
+                  <div
+                    style={{
+                      background: '#ffffff',
+                      color: '#0f172a',
+                      borderRadius: 12,
+                      padding: '36px 32px',
+                      boxShadow: '0 8px 30px rgba(0,0,0,0.35)',
+                      border: '1px solid #cbd5e1',
+                      maxHeight: 520,
+                      overflowY: 'auto',
+                      fontFamily: "'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+                    }}
+                    dangerouslySetInnerHTML={{ __html: getResolvedEngagementHtml() }}
+                  />
+                </div>
+
                 <div style={{ borderTop: '1px solid var(--border)', paddingTop: 20 }}>
                   <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>Accettazione & Apposizione Firma Digitale Unificata</div>
                   <p style={{ fontSize: 11.5, color: 'var(--muted)', lineHeight: 1.5, marginBottom: 14 }}>
@@ -917,12 +1083,33 @@ export function ClientPortal() {
                         <span style={{ fontSize: 10, background: 'var(--card)', padding: '2px 6px', borderRadius: 6, color: 'var(--muted)', fontWeight: 600 }}>{doc.categoria}</span>
                       </div>
                       <div style={{ fontSize: 10.5, color: doc.firmato ? '#a7f3d0' : 'var(--muted)', marginTop: 2 }}>
-                        {doc.dimensione} · {doc.firmato ? `✓ Firmato Digitalmente (${doc.dataFirma || 'eIDAS Validato'})` : 'In attesa di sottoscrizione legale'}
+                        {doc.dimensione} · {doc.firmato ? `✓ Firmato Digitalmente (${doc.dataFirma || 'eIDAS Validato'})` : 'In attesa di lettura e sottoscrizione'}
                       </div>
                     </div>
                   </div>
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    {/* Pulsante di Lettura Atto Integrale */}
+                    <button
+                      type="button"
+                      onClick={() => setSelectedViewerDoc(doc)}
+                      style={{
+                        background: '#1a1f3d',
+                        border: '1px solid #4338ca',
+                        color: '#c7d2fe',
+                        padding: '7px 14px',
+                        borderRadius: 8,
+                        fontSize: 11,
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6
+                      }}
+                    >
+                      👁 Leggi ed Esamina Atto Completo
+                    </button>
+
                     {doc.firmato ? (
                       <>
                         <span style={{ background: '#34d399', color: '#064e3b', padding: '4px 12px', borderRadius: 12, fontSize: 10, fontWeight: 800 }}>
@@ -931,27 +1118,7 @@ export function ClientPortal() {
                         <button
                           type="button"
                           onClick={async () => {
-                            const docHtml = `
-                              <div style="font-family: 'Segoe UI', Arial, sans-serif; color: #0f172a; line-height: 1.6; padding: 20px;">
-                                <div style="text-align: right; font-size: 9pt; color: #64748b; margin-bottom: 20px;">
-                                  Rif. Pratica: #${progettoId} | Data Registrazione: ${doc.dataFirma || new Date().toLocaleDateString('it-IT')}
-                                </div>
-                                <h1 style="color: #1e1b4b; text-align: center; text-transform: uppercase; font-size: 18pt; border-bottom: 2px solid #4338ca; padding-bottom: 10px; margin-bottom: 20px;">
-                                  ${doc.titolo}
-                                </h1>
-                                <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-size: 10pt;">
-                                  <strong>Studio Professionale:</strong> Bluecode Ltd (Malta / Switzerland)<br/>
-                                  <strong>Cliente Firmatario:</strong> ${clientName}<br/>
-                                  <strong>Stato eIDAS:</strong> 🔒 SOTTOSCRITTO CON FIRMA ELETTRONICA AVANZATA (Regolamento UE n. 910/2014)
-                                </div>
-                                <p style="font-size: 11pt; color: #334155; line-height: 1.6;">
-                                  ${doc.descrizione}
-                                </p>
-                                <p style="font-size: 11pt; color: #334155; line-height: 1.6;">
-                                  Le Parti riconoscono la piena validità probatoria ed efficacia giuridica della presente sottoscrizione ai sensi dell'art. 20 del CAD e del Regolamento UE 910/2014.
-                                </p>
-                              </div>
-                            `;
+                            const docHtml = getResolvedDocumentHtml(doc);
                             const sigs = doc.signatureData ? [doc.signatureData] : [
                               {
                                 signerName: clientName,
@@ -964,7 +1131,7 @@ export function ClientPortal() {
                           }}
                           style={{ background: '#064e3b', border: '1px solid #10b981', color: '#6ee7b7', padding: '6px 14px', borderRadius: 8, fontSize: 11, cursor: 'pointer', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}
                         >
-                          📥 Scarica VERO PDF Firmato
+                          📥 Scarica PDF Firmato
                         </button>
                       </>
                     ) : (
@@ -974,11 +1141,21 @@ export function ClientPortal() {
                           onClick={() => setSigningDoc(doc)}
                           style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '7px 16px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', boxShadow: '0 2px 10px rgba(99,102,241,.3)', display: 'flex', alignItems: 'center', gap: 6 }}
                         >
-                          ✍️ Firma Digitale eIDAS (1-Click)
+                          ✍️ Firma Digitale eIDAS
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            await downloadRealPdf(`Bozza_${doc.nome}`, getResolvedDocumentHtml(doc));
+                          }}
+                          style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '6px 12px', borderRadius: 8, fontSize: 11, cursor: 'pointer' }}
+                        >
+                          📥 Bozza PDF
                         </button>
 
                         <label style={{ background: '#1a1f3d', border: '1px solid #2d3260', color: '#818cf8', padding: '6px 14px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                          <span>📤 Ricarica PDF Firmato a Mano</span>
+                          <span>📤 Ricarica Firmato a Mano</span>
                           <input
                             type="file"
                             accept=".pdf,.doc,.docx"
@@ -1320,6 +1497,103 @@ export function ClientPortal() {
                 >
                   Reinvia Codice ↻
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 📄 MODALE A4 DOCUMENT VIEWER PER LETTURA COMPLETA PRE-FIRMA */}
+      {selectedViewerDoc && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 110, padding: 20 }}>
+          <div style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, width: '100%', maxWidth: 880, maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,.6)' }}>
+            {/* Top Modal Bar */}
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--card)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 22 }}>📄</span>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>{selectedViewerDoc.titolo || selectedViewerDoc.nome}</h3>
+                  <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
+                    Lettura ed Esame Atto Ufficiale · Cliente: <strong>{clientName}</strong> · Categoria: {selectedViewerDoc.categoria}
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedViewerDoc(null)}
+                style={{ background: 'transparent', border: 'none', color: 'var(--muted)', fontSize: 20, cursor: 'pointer', padding: '4px 8px' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* A4 Paper Document Content */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: 24, background: '#0f172a', display: 'flex', justifyContent: 'center' }}>
+              <div
+                style={{
+                  background: '#ffffff',
+                  color: '#0f172a',
+                  width: '100%',
+                  maxWidth: 760,
+                  minHeight: 600,
+                  padding: '40px 36px',
+                  borderRadius: 8,
+                  boxShadow: '0 4px 25px rgba(0,0,0,0.5)',
+                  fontFamily: "'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+                  lineHeight: 1.6,
+                }}
+                dangerouslySetInnerHTML={{ __html: getResolvedDocumentHtml(selectedViewerDoc) }}
+              />
+            </div>
+
+            {/* Bottom Modal Actions */}
+            <div style={{ padding: '14px 20px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, background: 'var(--card)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const html = getResolvedDocumentHtml(selectedViewerDoc);
+                    const sigs = selectedViewerDoc.firmato ? [
+                      selectedViewerDoc.signatureData || {
+                        signerName: clientName,
+                        signerRole: 'Cliente Incarico',
+                        timestamp: selectedViewerDoc.dataFirma || new Date().toLocaleString('it-IT'),
+                        ipAddress: '83.211.12.94',
+                      }
+                    ] : undefined;
+                    await downloadRealPdf(selectedViewerDoc.nome, html, sigs);
+                  }}
+                  style={{ background: '#1a1f3d', border: '1px solid #4338ca', color: '#c7d2fe', padding: '8px 16px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+                >
+                  📥 Scarica Copia PDF A4
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <button
+                  type="button"
+                  onClick={() => setSelectedViewerDoc(null)}
+                  style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '8px 16px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}
+                >
+                  Chiudi Lettura
+                </button>
+
+                {selectedViewerDoc.firmato ? (
+                  <div style={{ background: '#0d2d22', border: '1px solid #1a5c3c', color: '#34d399', padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 700 }}>
+                    ✓ Documento Già Sottoscritto (Sigillo eIDAS Apposto)
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const docToSign = selectedViewerDoc;
+                      setSelectedViewerDoc(null);
+                      setSigningDoc(docToSign);
+                    }}
+                    style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '8px 22px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 14px rgba(99,102,241,.35)', display: 'flex', alignItems: 'center', gap: 6 }}
+                  >
+                    ✍️ Ho Letto: Procedi alla Firma Digitale FEA
+                  </button>
+                )}
               </div>
             </div>
           </div>
