@@ -170,7 +170,7 @@ export const PREBUILT_TEMPLATES: DocumentTemplate[] = [
     descrizione: 'Delega conferita allo Studio per il deposito pratiche MFSA, Agenzia Entrate e banche.',
     contenutoHtml: `
 <h1 style="text-align: center; color: #1e1b4b; margin-bottom: 20px; font-size: 19px; text-transform: uppercase;">
-  PROCURA SPECIALE E DELEGA DI RAPPRESENTANZA
+  PROCURA SPECIALE E DELEGA DI RAPPRESENTANZA (POWER OF ATTORNEY)
 </h1>
 
 <p style="font-size: 11.5px; line-height: 1.6; text-align: justify;">
@@ -186,6 +186,83 @@ export const PREBUILT_TEMPLATES: DocumentTemplate[] = [
 <div style="margin-top: 40px; text-align: right;">
   <p style="font-size: 11px; color: #64748b;">Firma del Delegante:</p>
   <p style="font-size: 12px; font-weight: 700; color: #1e1b4b;">{{cliente.referente}}</p>
+</div>
+`,
+  },
+  {
+    id: 'tmpl-letter-of-wishes',
+    titolo: 'Letter of Wishes per Struttura Trust (Fiduciaria)',
+    categoria: 'fiscale',
+    descrizione: 'Lettera confidenziale del disponente (Settlor) con le direttive per la gestione dei beni in Trust.',
+    contenutoHtml: `
+<h1 style="text-align: center; color: #1e1b4b; margin-bottom: 20px; font-size: 19px; text-transform: uppercase;">
+  CONFIDENTIAL LETTER OF WISHES (TRUST DEED)
+</h1>
+
+<p style="text-align: right; color: #64748b; font-size: 11px; margin-bottom: 20px;">
+  <strong>Data:</strong> {{data_odierna}} | <strong>Rif. Trust:</strong> {{progetto.titolo}}
+</p>
+
+<p style="font-size: 11.5px; line-height: 1.6; text-align: justify;">
+  <strong>To the Trustees of:</strong> <strong>{{progetto.titolo}}</strong><br/>
+  <strong>From the Settlor:</strong> <strong>{{cliente.referente}}</strong> (on behalf of {{cliente.ragione_sociale}}).
+</p>
+
+<h3 style="color: #1e1b4b; font-size: 12.5px; margin-top: 18px;">1. SCOPO E PRINCIPI GUIDA</h3>
+<p style="font-size: 11.5px; line-height: 1.6; text-align: justify;">
+  La presente Lettera di Desideri esprime i miei auspici per l'amministrazione, la protezione e la successiva distribuzione del fondo in Trust. Sebbene non vincolante legalmente ai sensi del Trust Act, confido che i Trustees considerino attentamente le mie indicazioni nel pieno rispetto del loro dovere fiduciario.
+</p>
+
+<h3 style="color: #1e1b4b; font-size: 12.5px; margin-top: 18px;">2. PROTEZIONE E DISTRIBUZIONE BENEFICIARI</h3>
+<p style="font-size: 11.5px; line-height: 1.6; text-align: justify;">
+  Desidero che il fondo in Trust sia primariamente orientato a garantire la stabilità economica e la continuità generazionale dei Beneficiari designati, preservando l'integrità del patrimonio da rischi commerciali o di aggressione patrimoniale ingiustificata.
+</p>
+
+<div style="margin-top: 40px; display: flex; justify-content: space-between;">
+  <div style="width: 45%; text-align: center; border-top: 1px solid #cbd5e1; padding-top: 8px; font-size: 11px;">
+    <strong>The Settlor:</strong><br/>
+    {{cliente.referente}}
+  </div>
+  <div style="width: 45%; text-align: center; border-top: 1px solid #cbd5e1; padding-top: 8px; font-size: 11px;">
+    <strong>Received by Advisory Trustee:</strong><br/>
+    {{studio.ragione_sociale}}
+  </div>
+</div>
+`,
+  },
+  {
+    id: 'tmpl-shareholders-agreement',
+    titolo: 'Patto Parasociale & Governance Societaria (Shareholders Agreement)',
+    categoria: 'societario',
+    descrizione: 'Accordo tra soci con clausole di gradimento, prelazione, drag-along e tag-along.',
+    contenutoHtml: `
+<h1 style="text-align: center; color: #1e1b4b; margin-bottom: 20px; font-size: 19px; text-transform: uppercase;">
+  PATTO PARASOCIALE E REGOLE DI GOVERNANCE (SHAREHOLDERS AGREEMENT)
+</h1>
+
+<p style="font-size: 11.5px; line-height: 1.6; text-align: justify;">
+  In data {{data_odierna}}, in relazione alla società veicolo <strong>{{progetto.titolo}}</strong>, i Soci sottoscritti convengono e stipulano il presente accordo parasociale a completamento dello Statuto societario.
+</p>
+
+<h3 style="color: #1e1b4b; font-size: 12.5px; margin-top: 18px;">1. DIRITTO DI PRELAZIONE E TRASFERIMENTO PARTECIPAZIONI</h3>
+<p style="font-size: 11.5px; line-height: 1.6; text-align: justify;">
+  Ciascun Socio che intenda alienare, in tutto o in parte, le proprie quote o azioni a favore di terzi è tenuto ad offrirle preventivamente agli altri Soci alle medesime condizioni economiche e di pagamento (Diritto di Prelazione).
+</p>
+
+<h3 style="color: #1e1b4b; font-size: 12.5px; margin-top: 18px;">2. CLAUSOLE DI DRAG-ALONG E TAG-ALONG</h3>
+<p style="font-size: 11.5px; line-height: 1.6; text-align: justify;">
+  In caso di offerta irrevocabile di acquisto del 100% del capitale sociale da parte di un acquirente terzo, i soci di maggioranza hanno il diritto di trascinare i soci di minoranza alle stesse condizioni (Obbligo di Co-Vendita - Drag Along).
+</p>
+
+<div style="margin-top: 40px; display: flex; justify-content: space-between;">
+  <div style="width: 45%; text-align: center; border-top: 1px solid #cbd5e1; padding-top: 8px; font-size: 11px;">
+    <strong>Socio Promotore:</strong><br/>
+    {{cliente.referente}}
+  </div>
+  <div style="width: 45%; text-align: center; border-top: 1px solid #cbd5e1; padding-top: 8px; font-size: 11px;">
+    <strong>Advisor Studio Garante:</strong><br/>
+    {{studio.ragione_sociale}}
+  </div>
 </div>
 `,
   },

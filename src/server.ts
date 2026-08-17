@@ -1856,10 +1856,24 @@ export function buildServer(app: AppPort): FastifyInstance {
         ipAddress: seal.ipAddress,
       });
 
+      // Istanziazione / Attivazione transazionale del Progetto in Dashboard
+      try {
+        const prj = await prisma.progetto.findFirst({
+          where: { clienteId },
+          orderBy: { createdAt: 'desc' },
+        });
+        if (prj && prj.stato !== 'in_progress') {
+          await prisma.progetto.update({
+            where: { id: prj.id },
+            data: { stato: 'in_progress' },
+          });
+        }
+      } catch {}
+
       return reply.send({
         ok: true,
         seal,
-        message: 'Firma Elettronica Avanzata eIDAS apposta con successo!',
+        message: 'Firma Elettronica Avanzata eIDAS apposta con successo! Progetto attivato nel flusso operativo.',
       });
     } catch (err) {
       return reply.code(500).send({ errore: err instanceof Error ? err.message : 'Errore verifica OTP e firma' });

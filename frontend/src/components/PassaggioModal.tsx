@@ -76,15 +76,56 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce }: Pass
   const [previewFormModalStep, setPreviewFormModalStep] = useState<Passaggio | null>(null);
   const [previewFormValues, setPreviewFormValues] = useState<Record<string, string>>({});
 
+  const [showAddStepModal, setShowAddStepModal] = useState(false);
+  const [newStepTitle, setNewStepTitle] = useState('');
+  const [newStepDesc, setNewStepDesc] = useState('');
+  const [newStepType, setNewStepType] = useState<'info' | 'doc' | 'form' | 'check'>('check');
+  const [newStepWho, setNewStepWho] = useState<'operatore' | 'cliente'>('operatore');
+
   const doneN = steps.filter(s => s.stato === 'done').length;
   const visible = view === 'operatore' ? steps : steps.filter(s => s.who === 'cliente');
 
   const toggleDone = (id: string) => {
     const nextSteps: Passaggio[] = steps.map(s => s.id === id ? { ...s, stato: (s.stato === 'done' ? 'pending' : 'done') as 'pending' | 'done' } : s);
     setSteps(nextSteps);
+    voce.proc = nextSteps;
     if (onSaveVoce) {
       onSaveVoce(nextSteps, notes);
     }
+  };
+
+  const handleDeleteStep = (id: string) => {
+    if (!confirm('Sei sicuro di voler eliminare questo passaggio dalla checklist?')) return;
+    const nextSteps = steps.filter(s => s.id !== id);
+    setSteps(nextSteps);
+    voce.proc = nextSteps;
+    if (onSaveVoce) {
+      onSaveVoce(nextSteps, notes);
+    }
+  };
+
+  const handleCreateStep = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newStepTitle.trim()) return;
+    const newStep: Passaggio = {
+      id: `s-${Date.now()}`,
+      title: newStepTitle.trim(),
+      desc: newStepDesc.trim() || 'Azione operativa di processo.',
+      type: newStepType,
+      who: newStepWho,
+      stato: 'pending',
+      fields: newStepType === 'form' ? ['Dato Richiesto 1', 'Dato Richiesto 2'] : undefined,
+      file: newStepType === 'doc' ? `Documento_${project.cl.replace(/\s+/g, '_')}.pdf` : undefined,
+    };
+    const nextSteps = [...steps, newStep];
+    setSteps(nextSteps);
+    voce.proc = nextSteps;
+    if (onSaveVoce) {
+      onSaveVoce(nextSteps, notes);
+    }
+    setShowAddStepModal(false);
+    setNewStepTitle('');
+    setNewStepDesc('');
   };
 
   const handleAddNote = (e: React.FormEvent) => {
@@ -162,23 +203,39 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce }: Pass
         {/* Body TAB 1: Passaggi */}
         {activeTab === 'passaggi' && (
           <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
-            {/* View Switcher */}
-            <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-              {(['operatore', 'cliente'] as const).map(v => (
+            {/* View Switcher & Add Step Button */}
+            <div style={{ display: 'flex', gap: 8, marginBottom: 16, alignItems: 'center' }}>
+              <div style={{ display: 'flex', flex: 1, gap: 8 }}>
+                {(['operatore', 'cliente'] as const).map(v => (
+                  <button
+                    key={v}
+                    onClick={() => setView(v)}
+                    style={{
+                      flex: 1, padding: '7px', borderRadius: 8,
+                      border: `1px solid ${view === v ? 'var(--indigo)' : 'var(--border)'}`,
+                      background: view === v ? '#1a1f3d' : 'var(--card)',
+                      color: view === v ? 'var(--indigo-l)' : 'var(--muted)',
+                      fontSize: 11.5, fontWeight: 500, cursor: 'pointer',
+                    }}
+                  >
+                    {v === 'operatore' ? '👤 Vista Operatore' : '🧑‍💼 Vista Cliente'}
+                  </button>
+                ))}
+              </div>
+
+              {view === 'operatore' && (
                 <button
-                  key={v}
-                  onClick={() => setView(v)}
+                  type="button"
+                  onClick={() => setShowAddStepModal(true)}
                   style={{
-                    flex: 1, padding: '7px', borderRadius: 8,
-                    border: `1px solid ${view === v ? 'var(--indigo)' : 'var(--border)'}`,
-                    background: view === v ? '#1a1f3d' : 'var(--card)',
-                    color: view === v ? 'var(--indigo-l)' : 'var(--muted)',
-                    fontSize: 11.5, fontWeight: 500, cursor: 'pointer',
+                    background: 'var(--indigo)', color: '#fff', border: 'none',
+                    padding: '7px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600,
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0
                   }}
                 >
-                  {v === 'operatore' ? '👤 Vista Operatore' : '🧑‍💼 Vista Cliente'}
+                  ➕ Aggiungi Azione
                 </button>
-              ))}
+              )}
             </div>
 
             {visible.map((s, i) => {
@@ -211,12 +268,22 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce }: Pass
                           {TYPE_LABEL[s.type]}
                         </span>
                         {view === 'operatore' && (
-                          <button
-                            onClick={() => toggleDone(s.id)}
-                            style={{ background: 'none', border: 'none', color: s.stato === 'done' ? 'var(--green)' : 'var(--hint)', cursor: 'pointer', fontSize: 14 }}
-                          >
-                            {s.stato === 'done' ? '✓' : '○'}
-                          </button>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <button
+                              onClick={() => toggleDone(s.id)}
+                              title="Segna come completato / da fare"
+                              style={{ background: 'none', border: 'none', color: s.stato === 'done' ? 'var(--green)' : 'var(--hint)', cursor: 'pointer', fontSize: 15 }}
+                            >
+                              {s.stato === 'done' ? '✓' : '○'}
+                            </button>
+                            <button
+                              onClick={() => handleDeleteStep(s.id)}
+                              title="Elimina passaggio"
+                              style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 12, opacity: 0.7 }}
+                            >
+                              🗑
+                            </button>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -685,6 +752,87 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce }: Pass
                   </button>
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal Creazione Nuovo Passaggio Checklist */}
+        {showAddStepModal && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 120, padding: 16 }}>
+            <div style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, width: '100%', maxWidth: 480, padding: 22, boxShadow: '0 16px 48px rgba(0,0,0,.6)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, borderBottom: '1px solid var(--border)', paddingBottom: 12 }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>➕ Aggiungi Azione alla Checklist</div>
+                <button onClick={() => setShowAddStepModal(false)} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: 18 }}>✕</button>
+              </div>
+
+              <form onSubmit={handleCreateStep} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Titolo del Passaggio / Azione *</label>
+                  <input
+                    type="text"
+                    value={newStepTitle}
+                    onChange={e => setNewStepTitle(e.target.value)}
+                    placeholder="es. Verifica Visura Camerale Storica o Bonifico Caparra"
+                    required
+                    style={{ fontSize: 12, padding: 8, width: '100%' }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Descrizione / Istruzioni Operative</label>
+                  <textarea
+                    value={newStepDesc}
+                    onChange={e => setNewStepDesc(e.target.value)}
+                    placeholder="Dettagli sulle azioni richieste all'operatore o al cliente..."
+                    rows={2}
+                    style={{ fontSize: 12, padding: 8, width: '100%', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)' }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', gap: 12 }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Tipo di Passaggio</label>
+                    <select
+                      value={newStepType}
+                      onChange={e => setNewStepType(e.target.value as any)}
+                      style={{ fontSize: 11, padding: 6, width: '100%', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)' }}
+                    >
+                      <option value="check">Verifica / Checkmark</option>
+                      <option value="doc">Documento / Firma PDF</option>
+                      <option value="form">Form / Questionario Dati</option>
+                      <option value="info">Info / Istruzioni</option>
+                    </select>
+                  </div>
+
+                  <div style={{ flex: 1 }}>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Assegnato a</label>
+                    <select
+                      value={newStepWho}
+                      onChange={e => setNewStepWho(e.target.value as any)}
+                      style={{ fontSize: 11, padding: 6, width: '100%', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)' }}
+                    >
+                      <option value="operatore">👤 Operatore Studio</option>
+                      <option value="cliente">🧑‍💼 Cliente Committente</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14 }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddStepModal(false)}
+                    style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '7px 14px', borderRadius: 8, fontSize: 11, cursor: 'pointer' }}
+                  >
+                    Annulla
+                  </button>
+                  <button
+                    type="submit"
+                    style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '7px 16px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+                  >
+                    + Salva Passaggio
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}
