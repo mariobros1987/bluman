@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { CatBadge } from './ui/CatBadge';
 import { fmt, moduloH, moduloP } from '../utils';
 import { MLIB, GIURISDIZIONI } from '../store/mockData';
-import type { Cliente, Giurisdizione } from '../types';
-import { fetchClienti, fetchGiurisdizioniApi, creaClienteApi, creaProgettoApi, creaPreventivoEAccettaApi } from '../api/client';
+import type { Cliente, Giurisdizione, ModuloTemplate, CategoriaModulo } from '../types';
+import { fetchClienti, fetchGiurisdizioniApi, fetchModuliLibreria, creaClienteApi, creaProgettoApi, creaPreventivoEAccettaApi } from '../api/client';
 
 interface NewProjectWizardProps {
   onClose: () => void;
@@ -13,8 +13,9 @@ interface NewProjectWizardProps {
 export function NewProjectWizard({ onClose, onProjectCreated }: NewProjectWizardProps) {
   const [step, setStep] = useState(0);
 
-  // Giurisdizioni State
+  // Giurisdizioni & Moduli State
   const [giurisdizioni, setGiurisdizioni] = useState<Giurisdizione[]>(GIURISDIZIONI);
+  const [moduliList, setModuliList] = useState<ModuloTemplate[]>(MLIB);
   const [selectedGiurId, setSelectedGiurId] = useState<string>('giur-mt'); // Default Malta
   const [showOtherGiurMods, setShowOtherGiurMods] = useState(false);
 
@@ -26,11 +27,11 @@ export function NewProjectWizard({ onClose, onProjectCreated }: NewProjectWizard
   const [clientName, setClientName] = useState('');
   const [projectName, setProjectName] = useState('');
   const [clientType, setClientType] = useState<'individual' | 'company'>('individual');
-  const [selectedMods, setSelectedMods] = useState<Set<string>>(new Set(['M01', 'M02']));
+  const [selectedMods, setSelectedMods] = useState<Set<string>>(new Set(['mod-m01', 'mod-m02']));
   const [loading, setLoading] = useState(false);
   const [notif, setNotif] = useState(false);
 
-  // Fetch existing clients & jurisdictions on mount
+  // Fetch existing clients, jurisdictions & module templates on mount
   useEffect(() => {
     const loadInitData = async () => {
       const clientsRes = await fetchClienti();
@@ -48,6 +49,27 @@ export function NewProjectWizard({ onClose, onProjectCreated }: NewProjectWizard
       if (giurRes && Array.isArray(giurRes) && giurRes.length > 0) {
         setGiurisdizioni(giurRes);
       }
+
+      const modsRes = await fetchModuliLibreria();
+      if (modsRes && Array.isArray(modsRes) && modsRes.length > 0) {
+        const mappedMods: ModuloTemplate[] = modsRes.map((m: any) => ({
+          id: m.id,
+          n: m.nome,
+          cat: m.categoria as CategoriaModulo,
+          ver: m.versione || 1,
+          deps: (m.dipendenze || []).map((d: any) => d.dipendeDaModuloTemplateId),
+          pkg: m.prezzoPacchetto ? m.prezzoPacchetto / 100 : undefined,
+          giurisdizioneId: m.giurisdizioneId,
+          giurisdizione: m.giurisdizione,
+          righe: (m.righeDistinta || []).map((r: any) => ({
+            art: r.articoloId,
+            qty: r.quantita,
+            oO: r.overrideOre,
+            oP: r.overridePrezzo ? r.overridePrezzo / 100 : undefined,
+          })),
+        }));
+        setModuliList(mappedMods);
+      }
     };
     loadInitData();
   }, []);
@@ -63,12 +85,12 @@ export function NewProjectWizard({ onClose, onProjectCreated }: NewProjectWizard
 
   const selectedGiurObj = giurisdizioni.find(g => g.id === selectedGiurId);
 
-  // Moduli categorizzati in cascata
-  const specificMods = MLIB.filter(m => selectedGiurId && m.giurisdizioneId === selectedGiurId);
-  const genericMods = MLIB.filter(m => !m.giurisdizioneId);
-  const otherGiurMods = MLIB.filter(m => m.giurisdizioneId && m.giurisdizioneId !== selectedGiurId);
+  // Moduli categorizzati in cascata dal database
+  const specificMods = moduliList.filter(m => selectedGiurId && m.giurisdizioneId === selectedGiurId);
+  const genericMods = moduliList.filter(m => !m.giurisdizioneId);
+  const otherGiurMods = moduliList.filter(m => m.giurisdizioneId && m.giurisdizioneId !== selectedGiurId);
 
-  const selModules = MLIB.filter(m => selectedMods.has(m.id));
+  const selModules = moduliList.filter(m => selectedMods.has(m.id));
   const totalP = selModules.reduce((a, m) => a + moduloP(m), 0);
   const totalH = selModules.reduce((a, m) => a + moduloH(m), 0);
 
