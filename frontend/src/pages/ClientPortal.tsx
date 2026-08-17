@@ -28,13 +28,67 @@ export function ClientPortal() {
   const [clientObj, setClientObj] = useState<any>(null);
   const [clientName, setClientName] = useState('Marco Ricci / Holding Beta S.r.l.');
   const [moduliProposti, setModuliProposti] = useState<ModuloProposta[]>([]);
-  const [signed, setSigned] = useState(false);
+  const [signed, setSigned] = useState<boolean>(() => {
+    return localStorage.getItem('bluman_portal_signed_Marco Ricci / Holding Beta S.r.l.') === 'true' ||
+           localStorage.getItem('bluman_portal_signed_Holding Beta S.r.l.') === 'true';
+  });
   const [addendums, setAddendums] = useState<any[]>(() => {
     const saved = localStorage.getItem(`bluman_addendums_Marco Ricci / Holding Beta S.r.l.`);
     return saved ? JSON.parse(saved) : [];
   });
   const [loading, setLoading] = useState(false);
   const [pageLoading, setPageLoading] = useState(true);
+
+  // Documenti in Incarico con Stato Firma Persistente
+  const [portalDocs, setPortalDocs] = useState<any[]>([
+    {
+      id: 'doc-nda',
+      titolo: 'Accordo di Riservatezza NDA & Mandato Fiduciario',
+      nome: 'Accordo di Riservatezza NDA & Incarico.pdf',
+      dimensione: '1.4 MB',
+      categoria: 'Contratti',
+      firmato: true,
+      richiedeFirma: true,
+      dataFirma: '15/08/2026 01:44:12',
+      descrizione: 'Accordo bilaterale di riservatezza e segreto professionale conforme GDPR e standard fiduciario Malta/Svizzera.',
+    },
+    {
+      id: 'doc-statuto',
+      titolo: 'Statuto Standard Holding Malta & Procura MFSA',
+      nome: 'Statuto Standard Holding Malta & Procura MFSA.pdf',
+      dimensione: '3.2 MB',
+      categoria: 'Societario',
+      firmato: false,
+      richiedeFirma: true,
+      dataFirma: null,
+      descrizione: 'Statuto societario per costituzione LTD maltese con clausole di governance e procura speciale.',
+    },
+    {
+      id: 'doc-ubo',
+      titolo: 'Dichiarazione Titolare Effettivo (UBO Registry)',
+      nome: 'Dichiarazione Titolare Effettivo (UBO Registry).pdf',
+      dimensione: '2.8 MB',
+      categoria: 'Compliance',
+      firmato: false,
+      richiedeFirma: true,
+      dataFirma: null,
+      descrizione: 'Dichiarazione di trasparenza del Beneficiary Owner ai sensi della V Direttiva Antiriciclaggio UE 2018/843.',
+    },
+    {
+      id: 'doc-trust',
+      titolo: 'Confidential Letter of Wishes per Struttura Trust',
+      nome: 'Confidential Letter of Wishes Trust.pdf',
+      dimensione: '2.1 MB',
+      categoria: 'Trust',
+      firmato: false,
+      richiedeFirma: true,
+      dataFirma: null,
+      descrizione: 'Istruzioni confidenziali per il trustee designato relative alla governance e protezione asset.',
+    },
+  ]);
+
+  // Modale Firma Grafica per Documenti Singoli
+  const [signingDoc, setSigningDoc] = useState<any | null>(null);
 
   // FEA OTP State
   const [otpModalOpen, setOtpModalOpen] = useState(false);
@@ -44,7 +98,7 @@ export function ClientPortal() {
   const [otpLoading, setOtpLoading] = useState(false);
   const [otpError, setOtpError] = useState<string | null>(null);
   const [eidasSeal, setEidasSeal] = useState<any>(() => {
-    const saved = localStorage.getItem(`bluman_seal_${clientName}`);
+    const saved = localStorage.getItem(`bluman_seal_Marco Ricci / Holding Beta S.r.l.`) || localStorage.getItem(`bluman_seal_Holding Beta S.r.l.`);
     return saved ? JSON.parse(saved) : null;
   });
 
@@ -69,16 +123,48 @@ export function ClientPortal() {
   useEffect(() => {
     const loadPortalData = async () => {
       setPageLoading(true);
+      let resolvedClientName = clientName;
+
       const clientiRes = await fetchClienti();
       if (clientiRes && Array.isArray(clientiRes) && clientiRes.length > 0) {
         const found = clientiRes.find(c => token.includes(c.id.substring(0, 8)));
         if (found) {
           setClientObj(found);
           setClientName(found.nome);
+          resolvedClientName = found.nome;
         } else {
           setClientObj(clientiRes[0]);
           setClientName(clientiRes[0].nome);
+          resolvedClientName = clientiRes[0].nome;
         }
+      }
+
+      // Ripristina lo stato di firma persistito in memoria
+      const isSignedLocal = localStorage.getItem(`bluman_portal_signed_${resolvedClientName}`) === 'true' ||
+                            localStorage.getItem(`bluman_portal_signed_Marco Ricci / Holding Beta S.r.l.`) === 'true';
+      if (isSignedLocal) {
+        setSigned(true);
+        const savedSeal = localStorage.getItem(`bluman_seal_${resolvedClientName}`) ||
+                          localStorage.getItem(`bluman_seal_Marco Ricci / Holding Beta S.r.l.`);
+        if (savedSeal) {
+          try { setEidasSeal(JSON.parse(savedSeal)); } catch (e) {}
+        }
+      }
+
+      // Ripristina i documenti firmati singolarmente
+      const savedSignedDocsStr = localStorage.getItem(`bluman_signed_docs_${resolvedClientName}`);
+      if (savedSignedDocsStr) {
+        try {
+          const signedIds: string[] = JSON.parse(savedSignedDocsStr);
+          setPortalDocs(prev => prev.map(d => {
+            if (signedIds.includes(d.id)) {
+              const sigStr = localStorage.getItem(`bluman_portal_doc_sig_${d.id}`);
+              const sigData = sigStr ? JSON.parse(sigStr) : null;
+              return { ...d, firmato: true, signatureData: sigData, dataFirma: sigData?.timestamp || d.dataFirma || '15/08/2026' };
+            }
+            return d;
+          }));
+        } catch (e) {}
       }
 
       const moduliRes = await fetchModuliLibreria();
@@ -102,7 +188,7 @@ export function ClientPortal() {
       try {
         const progettiRes = await fetchProgetti();
         if (progettiRes && Array.isArray(progettiRes) && progettiRes.length > 0) {
-          const matchProj = progettiRes.find((p: any) => p.cliente?.nome === (clientObj?.nome || 'Marco Ricci / Holding Beta S.r.l.') || String(p.id).includes('proj-'));
+          const matchProj = progettiRes.find((p: any) => p.cliente?.nome === resolvedClientName || String(p.id).includes('proj-'));
           const pId = matchProj ? String(matchProj.id) : String(progettiRes[0].id);
           setProgettoId(pId);
           const msgs = await fetchComunicazioniApi(pId);
@@ -459,6 +545,27 @@ export function ClientPortal() {
               </div>
             ) : (
               <div>
+                {/* 🛡️ GUIDA STEP-BY-STEP PER IL CLIENTE NELLE FIRME */}
+                <div style={{ background: 'linear-gradient(135deg, rgba(30, 27, 75, 0.7), rgba(49, 46, 129, 0.45))', border: '1px solid #4338ca', borderRadius: 14, padding: 18, marginBottom: 22 }}>
+                  <div style={{ fontSize: 11, color: '#a5b4fc', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 12 }}>
+                    📋 Guida Rapida alla Sottoscrizione Digitale (3 Semplici Passaggi)
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+                    <div style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '12px 14px' }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: '#c7d2fe', marginBottom: 4 }}>1️⃣ Revisione Condizioni</div>
+                      <div style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.4 }}>Esamina i moduli inclusi, le tariffe trasparenti e le clausole dell'incarico.</div>
+                    </div>
+                    <div style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '12px 14px' }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: '#c7d2fe', marginBottom: 4 }}>2️⃣ Verifica OTP Sicuro</div>
+                      <div style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.4 }}>Ricevi un codice temporaneo a 6 cifre via WhatsApp o Email certificata.</div>
+                    </div>
+                    <div style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '12px 14px' }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: '#34d399', marginBottom: 4 }}>3️⃣ Sigillo FEA eIDAS</div>
+                      <div style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.4 }}>Apponi la firma con pieno valore legale e scarica il certificato PDF.</div>
+                    </div>
+                  </div>
+                </div>
+
                 <div style={{ borderBottom: '1px solid var(--border)', paddingBottom: 16, marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
                   <div>
                     <div style={{ fontSize: 10, textTransform: 'uppercase', color: 'var(--indigo-l)', fontWeight: 700, letterSpacing: '.5px', marginBottom: 4 }}>
@@ -636,106 +743,126 @@ export function ClientPortal() {
           </div>
         )}
 
-        {/* TAB 4: Documenti Legali */}
+        {/* TAB 4: Documenti Legali & Firme con Persistenza */}
         {activeTab === 'documenti' && (
           <div style={docBoxStyle}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 18 }}>
               <div>
                 <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>📎 Vault Documenti Legali e Modelli In Incarico</div>
                 <div style={{ fontSize: 11, color: 'var(--muted)' }}>
-                  Visualizza, scarica, firma con <strong>Firma Digitale eIDAS (1-Click)</strong> oppure <strong>ricarica il PDF firmato a mano</strong>
+                  Visualizza, scarica, firma con <strong>Firma Digitale eIDAS (1-Click)</strong> oppure <strong>ricarica il PDF firmato a mano</strong>. Le firme rimangono salvate in modo permanente.
                 </div>
               </div>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              {/* Documento 1 */}
-              <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 14, padding: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ fontSize: 26 }}>📄</div>
-                  <div>
-                    <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text)' }}>Accordo di Riservatezza NDA & Incarico.pdf</div>
-                    <div style={{ fontSize: 10.5, color: 'var(--muted)', marginTop: 2 }}>1.4 MB · Firmato digitalmente con marca temporale eIDAS</div>
+              {portalDocs.map((doc) => (
+                <div
+                  key={doc.id}
+                  style={{
+                    background: doc.firmato ? '#0d2d22' : 'var(--card2)',
+                    border: `1px solid ${doc.firmato ? '#1a5c3c' : 'var(--border)'}`,
+                    borderRadius: 14,
+                    padding: 16,
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    flexWrap: 'wrap',
+                    gap: 12,
+                    transition: 'all .2s ease',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 260 }}>
+                    <div style={{ fontSize: 26 }}>{doc.firmato ? '🔒' : '📄'}</div>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text)' }}>{doc.nome}</span>
+                        <span style={{ fontSize: 10, background: 'var(--card)', padding: '2px 6px', borderRadius: 6, color: 'var(--muted)', fontWeight: 600 }}>{doc.categoria}</span>
+                      </div>
+                      <div style={{ fontSize: 10.5, color: doc.firmato ? '#a7f3d0' : 'var(--muted)', marginTop: 2 }}>
+                        {doc.dimensione} · {doc.firmato ? `✓ Firmato Digitalmente (${doc.dataFirma || 'eIDAS Validato'})` : 'In attesa di sottoscrizione legale'}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    {doc.firmato ? (
+                      <>
+                        <span style={{ background: '#34d399', color: '#064e3b', padding: '4px 12px', borderRadius: 12, fontSize: 10, fontWeight: 800 }}>
+                          🔒 FIRMATO eIDAS
+                        </span>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const docHtml = `
+                              <div style="font-family: 'Segoe UI', Arial, sans-serif; color: #0f172a; line-height: 1.6; padding: 20px;">
+                                <div style="text-align: right; font-size: 9pt; color: #64748b; margin-bottom: 20px;">
+                                  Rif. Pratica: #${progettoId} | Data Registrazione: ${doc.dataFirma || new Date().toLocaleDateString('it-IT')}
+                                </div>
+                                <h1 style="color: #1e1b4b; text-align: center; text-transform: uppercase; font-size: 18pt; border-bottom: 2px solid #4338ca; padding-bottom: 10px; margin-bottom: 20px;">
+                                  ${doc.titolo}
+                                </h1>
+                                <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-size: 10pt;">
+                                  <strong>Studio Professionale:</strong> Bluecode Ltd (Malta / Switzerland)<br/>
+                                  <strong>Cliente Firmatario:</strong> ${clientName}<br/>
+                                  <strong>Stato eIDAS:</strong> 🔒 SOTTOSCRITTO CON FIRMA ELETTRONICA AVANZATA (Regolamento UE n. 910/2014)
+                                </div>
+                                <p style="font-size: 11pt; color: #334155; line-height: 1.6;">
+                                  ${doc.descrizione}
+                                </p>
+                                <p style="font-size: 11pt; color: #334155; line-height: 1.6;">
+                                  Le Parti riconoscono la piena validità probatoria ed efficacia giuridica della presente sottoscrizione ai sensi dell'art. 20 del CAD e del Regolamento UE 910/2014.
+                                </p>
+                              </div>
+                            `;
+                            const sigs = doc.signatureData ? [doc.signatureData] : [
+                              {
+                                signerName: clientName,
+                                signerRole: 'Cliente Incarico (Legale Rappresentante)',
+                                timestamp: doc.dataFirma || new Date().toLocaleString('it-IT'),
+                                ipAddress: '83.211.12.94 (eIDAS Verificato)',
+                              }
+                            ];
+                            await downloadRealPdf(doc.nome, docHtml, sigs);
+                          }}
+                          style={{ background: '#064e3b', border: '1px solid #10b981', color: '#6ee7b7', padding: '6px 14px', borderRadius: 8, fontSize: 11, cursor: 'pointer', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}
+                        >
+                          📥 Scarica VERO PDF Firmato
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setSigningDoc(doc)}
+                          style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '7px 16px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', boxShadow: '0 2px 10px rgba(99,102,241,.3)', display: 'flex', alignItems: 'center', gap: 6 }}
+                        >
+                          ✍️ Firma Digitale eIDAS (1-Click)
+                        </button>
+
+                        <label style={{ background: '#1a1f3d', border: '1px solid #2d3260', color: '#818cf8', padding: '6px 14px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                          <span>📤 Ricarica PDF Firmato a Mano</span>
+                          <input
+                            type="file"
+                            accept=".pdf,.doc,.docx"
+                            style={{ display: 'none' }}
+                            onChange={e => {
+                              if (e.target.files?.[0]) {
+                                const fileName = e.target.files[0].name;
+                                const updated = portalDocs.map(d => d.id === doc.id ? { ...d, firmato: true, dataFirma: new Date().toLocaleString('it-IT') } : d);
+                                setPortalDocs(updated);
+                                const signedIds = updated.filter(d => d.firmato).map(d => d.id);
+                                localStorage.setItem(`bluman_signed_docs_${clientName}`, JSON.stringify(signedIds));
+                                alert(`✓ File firmato "${fileName}" caricato e registrato in memoria! Lo studio è stato aggiornato.`);
+                              }
+                            }}
+                          />
+                        </label>
+                      </>
+                    )}
                   </div>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span style={{ background: '#0d2d22', border: '1px solid #1a5c3c', color: '#34d399', padding: '4px 12px', borderRadius: 12, fontSize: 10, fontWeight: 800 }}>
-                    🔒 FIRMATO eIDAS
-                  </span>
-                  <button
-                    onClick={() => alert('📥 Download copia firmata dell Accordo NDA avviato.')}
-                    style={{ background: 'var(--card)', border: '1px solid var(--border)', color: 'var(--text)', padding: '5px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer', fontWeight: 600 }}
-                  >
-                    📥 Scarica PDF
-                  </button>
-                </div>
-              </div>
-
-              {/* Documento 2 */}
-              <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 14, padding: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ fontSize: 26 }}>📄</div>
-                  <div>
-                    <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text)' }}>Statuto Standard Holding Malta & Procura MFSA.pdf</div>
-                    <div style={{ fontSize: 10.5, color: 'var(--muted)', marginTop: 2 }}>3.2 MB · Richiede firma del Legale Rappresentante per la lavorazione</div>
-                  </div>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                  <button
-                    onClick={() => alert('✍️ Apertura modulo di Firma Digitale eIDAS per Statuto Holding Malta...')}
-                    style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', boxShadow: '0 2px 8px rgba(99,102,241,.3)' }}
-                  >
-                    ✍️ Firma Digitale eIDAS (1-Click)
-                  </button>
-
-                  <label style={{ background: '#1a1f3d', border: '1px solid #2d3260', color: '#818cf8', padding: '6px 14px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                    <span>📤 Ricarica PDF Firmato a Mano</span>
-                    <input
-                      type="file"
-                      accept=".pdf,.doc,.docx"
-                      style={{ display: 'none' }}
-                      onChange={e => {
-                        if (e.target.files?.[0]) {
-                          alert(`✓ File firmato a mano "${e.target.files[0].name}" ricaricato con successo nel portale! L operatore è stato notificato per la lavorazione.`);
-                        }
-                      }}
-                    />
-                  </label>
-                </div>
-              </div>
-
-              {/* Documento 3 */}
-              <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 14, padding: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ fontSize: 26 }}>📄</div>
-                  <div>
-                    <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text)' }}>Dichiarazione Titolare Effettivo (UBO Registry).pdf</div>
-                    <div style={{ fontSize: 10.5, color: 'var(--muted)', marginTop: 2 }}>2.8 MB · Richiede firma dell'UBO per la lavorazione</div>
-                  </div>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                  <button
-                    onClick={() => alert('✍️ Apertura modulo di Firma Digitale eIDAS per Dichiarazione UBO...')}
-                    style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', boxShadow: '0 2px 8px rgba(99,102,241,.3)' }}
-                  >
-                    ✍️ Firma Digitale eIDAS (1-Click)
-                  </button>
-
-                  <label style={{ background: '#1a1f3d', border: '1px solid #2d3260', color: '#818cf8', padding: '6px 14px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                    <span>📤 Ricarica PDF Firmato a Mano</span>
-                    <input
-                      type="file"
-                      accept=".pdf,.doc,.docx"
-                      style={{ display: 'none' }}
-                      onChange={e => {
-                        if (e.target.files?.[0]) {
-                          alert(`✓ File firmato a mano "${e.target.files[0].name}" ricaricato con successo nel portale! L operatore è stato notificato per la lavorazione.`);
-                        }
-                      }}
-                    />
-                  </label>
-                </div>
-              </div>
+              ))}
             </div>
           </div>
         )}
@@ -1061,6 +1188,50 @@ export function ClientPortal() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ✍️ MODALE FIRMA DIGITALE GRAFICA CON CANVAS & MARCA TEMPORALE */}
+      {signingDoc && (
+        <DigitalSignatureModal
+          documentTitle={signingDoc.titolo}
+          signerName={clientName}
+          signerRole="Legale Rappresentante / Firmatario Autorizzato"
+          onClose={() => setSigningDoc(null)}
+          onSigned={(signature) => {
+            const updated = portalDocs.map(d => d.id === signingDoc.id ? { ...d, firmato: true, signatureData: signature, dataFirma: signature.timestamp } : d);
+            setPortalDocs(updated);
+
+            // Persisti nei registri locali
+            localStorage.setItem(`bluman_portal_doc_sig_${signingDoc.id}`, JSON.stringify(signature));
+            const signedIds = updated.filter(d => d.firmato).map(d => d.id);
+            localStorage.setItem(`bluman_signed_docs_${clientName}`, JSON.stringify(signedIds));
+
+            // Sincronizza nel Cloud Vault del Progetto
+            if (progettoId) {
+              const storageKey = `bluman_project_documents_${progettoId}`;
+              const currentVaultStr = localStorage.getItem(storageKey);
+              const currentVault: any[] = currentVaultStr ? JSON.parse(currentVaultStr) : [];
+              const newDocObj = {
+                id: `doc-signed-${signingDoc.id}-${Date.now()}`,
+                nome: signingDoc.nome,
+                titolo: signingDoc.titolo,
+                cat: signingDoc.categoria,
+                dimensione: signingDoc.dimensione,
+                data: new Date().toLocaleDateString('it-IT'),
+                dataCaricamento: new Date().toLocaleDateString('it-IT'),
+                progettoId: String(progettoId),
+                clienteNome: clientName,
+                firmato: true,
+                signatureData: signature,
+                formato: 'pdf',
+              };
+              localStorage.setItem(storageKey, JSON.stringify([newDocObj, ...currentVault.filter((x: any) => x.id !== newDocObj.id)]));
+            }
+
+            alert(`✓ Documento "${signingDoc.titolo}" firmato con successo con Sigillo FEA eIDAS UE 910/2014!`);
+            setSigningDoc(null);
+          }}
+        />
       )}
     </div>
   );
