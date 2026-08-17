@@ -131,48 +131,5 @@ export const MLIB: ModuloTemplate[] = [
   { id: 'mod-m10', n: 'Compliance e KYC',               cat: 'Compliance', ver: 1, giurisdizioneId: null, deps: ['mod-m02'],  righe: [{ art: 'A_DUE_DILIGENCE' }, { art: 'A_KYC_CLIENTE' }, { art: 'A_REPORT_CRS_FATCA' }, { art: 'A_AGG_ANNUALE' }] },
 ];
 
-export const PROJECTS: Progetto[] = [
-  {
-    id: 1, n: 'Struttura Holding — Famiglia Ricci', cl: 'Marco Ricci', ct: 'individual',
-    st: 'in_progress', pct: 42, start: '01/04/2026', due: '31/07/2026', val: 38000,
-    delay: true, fisc: 'privato_italia',
-    fatture: [
-      { tipo: 'modulo_completo', mid: 11, importo: 3500, desc: 'Analisi patrimoniale iniziale — saldo', stato: 'emessa' },
-      { tipo: 'modulo_parziale', mid: 12, pct: 50, importo: 6000, desc: 'Corporate structuring Malta — acconto 50%', stato: 'emessa' },
-      { tipo: 'milestone_libera', importo: 5000, desc: 'Acconto alla firma engagement letter', stato: 'incassata' },
-    ],
-    mods: [
-      { id: 11, n: 'Analisi patrimoniale iniziale', cat: 'Analisi', st: 'done', pct: 100, h: 12, a: 11, p: 3500, team: [1,2], delay: false,
-        v: [{ n:'Raccolta documentazione cliente',hE:2,hA:2,s:'done',as:2,d:3},{n:'Analisi struttura patrimoniale esistente',hE:4,hA:3.5,s:'done',as:1,d:1},{n:'Report analisi iniziale',hE:3,hA:3,s:'done',as:1,d:2},{n:'Presentazione al cliente',hE:2,hA:2.5,s:'done',as:1,d:1},{n:'Validazione e firma engagement letter',hE:1,hA:1,s:'done',as:2,d:2}] },
-      { id: 12, n: 'Corporate structuring Malta', cat: 'Societario', st: 'in_progress', pct: 70, h: 40, a: 28, p: 12000, team: [1,3], delay: false,
-        v: [{ n:'Studio struttura societaria ottimale',hE:6,hA:6,s:'done',as:1,d:2},{n:'Costituzione Cassio Consulting LTD',hE:8,hA:8,s:'done',as:2,d:5},{n:'Costituzione Solarys LTD (Holding)',hE:8,hA:8,s:'done',as:2,d:5},{n:'Contratto di servizio intercompany',hE:6,hA:3,s:'active',as:3,d:1},{n:'Registrazione fiscale e MFSA',hE:6,hA:0,s:'pending',as:2,d:0},{n:'Apertura VAT number EU',hE:4,hA:0,s:'pending',as:2,d:0},{n:'Documentazione UBO Registry',hE:2,hA:0,s:'pending',as:2,d:0}] },
-      { id: 13, n: 'Struttura Trust', cat: 'Trust', st: 'in_progress', pct: 25, h: 30, a: 7.5, p: 8500, team: [1,3], delay: true, dn: 'In attesa documentazione fiduciaria dal trustee designato',
-        v: [{ n:'Selezione trust company idonea',hE:4,hA:4,s:'done',as:1,d:1},{n:'Redazione deed of trust',hE:10,hA:3.5,s:'delayed',as:3,d:2,vn:'In attesa documentazione trustee'},{n:'Definizione letter of wishes',hE:6,hA:0,s:'pending',as:1,d:0},{n:'Trasferimento asset al trust',hE:6,hA:0,s:'pending',as:1,d:0},{n:'Registrazione trust Malta',hE:4,hA:0,s:'pending',as:2,d:0}] },
-      { id: 14, n: 'Apertura conti correnti', cat: 'Banking', st: 'blocked', pct: 15, h: 20, a: 3, p: 4500, team: [1,2], delay: true, dn: 'KYC respinto da Bank of Valletta — documentazione integrativa urgente',
-        v: [{ n:'Selezione banche idonee alla struttura',hE:3,hA:3,s:'done',as:1,d:1},{n:'Preparazione dossier KYC completo',hE:5,hA:0,s:'blocked',as:2,d:0,vn:'KYC respinto — integrazione documenti necessaria'},{n:'Apertura conto Cassio Consulting LTD',hE:4,hA:0,s:'pending',as:2,d:0},{n:'Apertura conto Solarys LTD',hE:4,hA:0,s:'pending',as:2,d:0},{n:'Configurazione internet banking',hE:2,hA:0,s:'pending',as:2,d:0},{n:'Test flussi transazionali intra-struttura',hE:2,hA:0,s:'pending',as:1,d:0}] },
-      { id: 15, n: 'Tax planning internazionale', cat: 'Fiscale', st: 'attesa_dipendenza', pct: 0, h: 18, a: 0, p: 5500, team: [1,4], delay: false, waitDep: true, wdn: 'In attesa: Corporate structuring Malta (70% — non ancora completato)',
-        v: [{ n:'Analisi regime IPA Malta',hE:5,hA:0,s:'attesa_dipendenza',as:4,d:0},{n:'Struttura rimesse e dividendi',hE:5,hA:0,s:'attesa_dipendenza',as:1,d:0},{n:'Ottimizzazione 6/7 refund mechanism',hE:5,hA:0,s:'attesa_dipendenza',as:4,d:0},{n:'Report tax planning definitivo',hE:3,hA:0,s:'attesa_dipendenza',as:1,d:0}] },
-    ],
-  },
-  {
-    id: 2, n: 'IP Protection — Belfort Industries', cl: 'Belfort Industries S.A.', ct: 'company',
-    st: 'in_progress', pct: 18, start: '01/05/2026', due: '15/08/2026', val: 22000,
-    delay: false, fisc: 'estero',
-    fatture: [{ tipo: 'milestone_libera', importo: 5000, desc: 'Acconto alla firma engagement letter', stato: 'incassata' }],
-    mods: [
-      { id: 21, n: 'Gestione marchi e IP', cat: 'IP', st: 'in_progress', pct: 40, h: 15, a: 6, p: 4000, team: [1,3], delay: false,
-        v: [{ n:'Ricerca anteriorità marchio EU',hE:3,hA:3,s:'done',as:3,d:2},{n:'Deposito marchio EUIPO',hE:4,hA:3,s:'active',as:3,d:1},{n:'Contratto licenza d\'uso marchio',hE:5,hA:0,s:'pending',as:3,d:0},{n:'Setup monitoraggio e rinnovo',hE:3,hA:0,s:'pending',as:2,d:0}] },
-      { id: 22, n: 'Contratti con terzi', cat: 'Legale', st: 'pending', pct: 0, h: 20, a: 0, p: 5000, team: [1,3], delay: false,
-        v: [{ n:'Contratto distribuzione commerciale',hE:8,hA:0,s:'pending',as:3,d:0},{n:'NDA e accordo di riservatezza',hE:3,hA:0,s:'pending',as:3,d:0},{n:'Contratto di agenzia e commissioni',hE:6,hA:0,s:'pending',as:3,d:0},{n:'Revisione e negoziazione finale',hE:3,hA:0,s:'pending',as:1,d:0}] },
-    ],
-  },
-  {
-    id: 3, n: 'Pre-analisi — Famiglia Conti', cl: 'Andrea & Sofia Conti', ct: 'individual',
-    st: 'pre_project', pct: 60, start: '20/05/2026', due: '10/06/2026', val: 3500,
-    delay: false, fisc: 'privato_italia', fatture: [],
-    mods: [
-      { id: 31, n: 'Analisi patrimoniale iniziale', cat: 'Analisi', st: 'in_progress', pct: 60, h: 12, a: 7, p: 3500, team: [1,2], delay: false,
-        v: [{ n:'Raccolta documentazione cliente',hE:2,hA:2,s:'done',as:2,d:4},{n:'Analisi struttura patrimoniale esistente',hE:4,hA:3,s:'active',as:1,d:1},{n:'Report analisi iniziale',hE:3,hA:0,s:'pending',as:1,d:0},{n:'Presentazione cliente e proposta progetto',hE:2,hA:0,s:'pending',as:1,d:0},{n:'Firma engagement letter',hE:1,hA:0,s:'pending',as:2,d:0}] },
-    ],
-  },
-];
+export const PROJECTS: Progetto[] = [];
+

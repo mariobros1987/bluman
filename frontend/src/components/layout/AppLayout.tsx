@@ -18,35 +18,7 @@ const TITLES: Record<string, string> = {
   '/audit':     'Log Audit Studio',
 };
 
-const INITIAL_NOTIFICATIONS: NotificationItem[] = [
-  {
-    id: 'n1',
-    title: 'Struttura Trust (Famiglia Ricci)',
-    body: 'In attesa documentazione fiduciaria dal trustee designato.',
-    time: '10 min fa',
-    read: false,
-    type: 'delay',
-    link: '/projects/proj-01',
-  },
-  {
-    id: 'n2',
-    title: 'Apertura Conti (Famiglia Ricci)',
-    body: 'KYC respinto da Bank of Valletta — documentazione integrativa urgente.',
-    time: '1 ora fa',
-    read: false,
-    type: 'blocked',
-    link: '/projects/proj-01',
-  },
-  {
-    id: 'n3',
-    title: 'Engagement Letter Firmata',
-    body: 'Marco Ricci ha firmato la proposta d ordine 1-click dal Portale.',
-    time: '3 ore fa',
-    read: true,
-    type: 'signature',
-    link: '/clients',
-  },
-];
+const INITIAL_NOTIFICATIONS: NotificationItem[] = [];
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -55,7 +27,7 @@ interface AppLayoutProps {
   onLogout?: () => void;
 }
 
-export function AppLayout({ children, alertCount: _alertCount = 2, user, onLogout }: AppLayoutProps) {
+export function AppLayout({ children, alertCount: _alertCount = 0, user, onLogout }: AppLayoutProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -75,6 +47,15 @@ export function AppLayout({ children, alertCount: _alertCount = 2, user, onLogou
           type: n.oggetto?.includes('KYC') ? 'blocked' : n.oggetto?.includes('Firma') ? 'signature' : 'delay',
         }));
         setNotifications(mapped);
+
+        // Se l'utente ha abilitato le notifiche desktop nel browser, invia la notifica push per quelle non lette
+        const unread = mapped.filter(n => !n.read);
+        if (unread.length > 0 && typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+          new Notification(`🔔 BluMan Studio: ${unread[0].title}`, {
+            body: unread[0].body,
+            icon: '/favicon.ico',
+          });
+        }
       }
     };
     loadDbNotifs();

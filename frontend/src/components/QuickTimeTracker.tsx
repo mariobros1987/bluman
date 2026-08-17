@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { loadTeamMembersFromDb } from '../hooks/useTeamMembers';
-import { salvaProgettoDettaglioApi } from '../api/client';
+import { fetchProgetti, salvaProgettoDettaglioApi } from '../api/client';
 import type { Progetto, TeamMember } from '../types';
 
 interface TimeTrackerProps {
@@ -8,6 +9,7 @@ interface TimeTrackerProps {
 }
 
 export function QuickTimeTracker({ user }: TimeTrackerProps) {
+  const navigate = useNavigate();
   const [isRunning, setIsRunning] = useState(false);
   const [seconds, setSeconds] = useState(0);
   const [projects, setProjects] = useState<Progetto[]>([]);
@@ -19,20 +21,80 @@ export function QuickTimeTracker({ user }: TimeTrackerProps) {
 
   const timerRef = useRef<any>(null);
 
-  // Carica progetti e team members
-  useEffect(() => {
+  const loadAllProjects = async () => {
+    const list: Progetto[] = [];
+
+    // 1. Progetti salvati in local storage
     try {
       const savedStr = localStorage.getItem('bluman_custom_projects');
       if (savedStr) {
         const arr = JSON.parse(savedStr);
-        if (Array.isArray(arr) && arr.length > 0) {
-          setProjects(arr);
-          setSelectedProjectId(String(arr[0].id));
+        if (Array.isArray(arr)) {
+          list.push(...arr);
         }
       }
     } catch {}
 
+    // 2. Progetti salvati sul DB server Fastify / PostgreSQL
+    try {
+      const remote = await fetchProgetti();
+      if (remote && Array.isArray(remote)) {
+        const existingIds = new Set(list.map(p => String(p.id)));
+        remote.forEach((rp: any) => {
+          if (!existingIds.has(String(rp.id))) {
+            list.push({
+              id: rp.id,
+              n: rp.nome,
+              cl: rp.cliente?.nome || 'Cliente',
+              ct: (rp.cliente?.tipo as any) || 'individual',
+              st: rp.stato || 'in_progress',
+              pct: rp.stato === 'completed' ? 100 : 50,
+              start: rp.createdAt ? new Date(rp.createdAt).toLocaleDateString('it-IT') : 'Oggi',
+              due: rp.scadenza ? new Date(rp.scadenza).toLocaleDateString('it-IT') : '31/12/2026',
+              val: rp.valoreTotale ? rp.valoreTotale / 100 : 15000,
+              delay: rp.inRitardo || false,
+              fisc: rp.regimeFiscale || 'privato_italia',
+              fatture: rp.fatture || [],
+              mods: (rp.moduli || []).map((m: any, mIdx: number) => ({
+                id: mIdx + 100,
+                n: m.nome,
+                cat: m.categoria || 'Societario',
+                st: m.stato || 'in_progress',
+                pct: 50,
+                h: m.orePreventivate || 20,
+                a: m.oreConsuntivate || 0,
+                p: m.prezzo ? m.prezzo / 100 : 3500,
+                team: [1, 2],
+                delay: false,
+                v: (m.microvoci || []).map((v: any) => ({
+                  n: v.titolo || v.nome,
+                  hE: v.orePreventivate || 2,
+                  hA: v.oreConsuntivate || 0,
+                  s: v.completato ? 'done' : 'pending',
+                  as: 1,
+                  d: 1,
+                })),
+              })),
+            });
+          }
+        });
+      }
+    } catch {}
+
+    setProjects(list);
+    if (list.length > 0) {
+      setSelectedProjectId(prev => (prev && list.some(p => String(p.id) === String(prev))) ? prev : String(list[0].id));
+    }
+  };
+
+  useEffect(() => {
+    loadAllProjects();
     loadTeamMembersFromDb().then(t => setTeamMembers(t));
+
+    // Ascolta aggiornamenti progetti da altre finestre o azioni
+    const handleStorage = () => loadAllProjects();
+    window.addEventListener('storage', handleStorage);
+    window.addEventListener('bluman_project_created', handleStorage);
 
     // Ripristina stato timer salvato
     try {
@@ -43,15 +105,20 @@ export function QuickTimeTracker({ user }: TimeTrackerProps) {
           const elapsed = Math.floor((Date.now() - savedTimer.startTime) / 1000) + (savedTimer.baseSeconds || 0);
           setSeconds(elapsed);
           setIsRunning(true);
-          setSelectedProjectId(savedTimer.projectId || '');
-          setSelectedMicrovoceIdx(savedTimer.mvIdx || 0);
+          if (savedTimer.projectId) setSelectedProjectId(String(savedTimer.projectId));
+          if (typeof savedTimer.mvIdx === 'number') setSelectedMicrovoceIdx(savedTimer.mvIdx);
         } else if (savedTimer.seconds) {
           setSeconds(savedTimer.seconds);
-          setSelectedProjectId(savedTimer.projectId || '');
-          setSelectedMicrovoceIdx(savedTimer.mvIdx || 0);
+          if (savedTimer.projectId) setSelectedProjectId(String(savedTimer.projectId));
+          if (typeof savedTimer.mvIdx === 'number') setSelectedMicrovoceIdx(savedTimer.mvIdx);
         }
       }
     } catch {}
+
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+      window.removeEventListener('bluman_project_created', handleStorage);
+    };
   }, []);
 
   // Tick timer
@@ -98,6 +165,11 @@ export function QuickTimeTracker({ user }: TimeTrackerProps) {
   };
 
   const handleStart = () => {
+    if (projects.length === 0) {
+      alert('Non hai ancora creato alcuna pratica. Clicca su "+ Nuovo Progetto" nella pagina Progetti per avviare il timer.');
+      navigate('/projects');
+      return;
+    }
     setIsRunning(true);
   };
 
@@ -110,14 +182,16 @@ export function QuickTimeTracker({ user }: TimeTrackerProps) {
     setShowStopModal(true);
   };
 
-  const currentProject = projects.find(p => String(p.id) === String(selectedProjectId));
+  const currentProject = projects.find(p => String(p.id) === String(selectedProjectId)) || projects[0];
   const microvociList: { name: string; modId: number; mvIdx: number }[] = [];
   if (currentProject && currentProject.mods) {
     currentProject.mods.forEach(m => {
-      if (m.v) {
+      if (m.v && m.v.length > 0) {
         m.v.forEach((mv, idx) => {
-          microvociList.push({ name: `${m.n}: ${mv.n}`, modId: m.id, mvIdx: idx });
+          microvociList.push({ name: `${m.n} › ${mv.n}`, modId: m.id, mvIdx: idx });
         });
+      } else {
+        microvociList.push({ name: `${m.n} (Attività generale)`, modId: m.id, mvIdx: 0 });
       }
     });
   }
@@ -138,17 +212,27 @@ export function QuickTimeTracker({ user }: TimeTrackerProps) {
     const selectedMv = microvociList[selectedMicrovoceIdx] || microvociList[0];
     const newMods = (currentProject.mods || []).map(m => {
       if (selectedMv && m.id === selectedMv.modId) {
-        const newV = (m.v || []).map((mv, idx) => {
+        const newV = (m.v && m.v.length > 0) ? m.v.map((mv, idx) => {
           if (idx === selectedMv.mvIdx) {
             return {
               ...mv,
               hA: (mv.hA || 0) + hoursSpentDecimal,
-              s: 'done',
+              s: 'done' as any,
               vn: sessionNotes ? `${mv.vn || ''} [Sessione: +${hoursSpentDecimal}h - ${sessionNotes}]`.trim() : mv.vn,
             };
           }
           return mv;
-        });
+        }) : [
+          {
+            n: selectedMv.name,
+            hE: 4,
+            hA: hoursSpentDecimal,
+            s: 'done' as any,
+            as: 1,
+            d: 1,
+            vn: sessionNotes ? `[Sessione: +${hoursSpentDecimal}h - ${sessionNotes}]` : undefined,
+          }
+        ];
         const newActualHours = newV.reduce((acc, v) => acc + (v.hA || 0), 0);
         return { ...m, v: newV, a: newActualHours };
       }
@@ -172,25 +256,27 @@ export function QuickTimeTracker({ user }: TimeTrackerProps) {
   };
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--card2)', border: `1.5px solid ${isRunning ? '#6366f1' : 'var(--border)'}`, borderRadius: 24, padding: '3px 10px', boxShadow: isRunning ? '0 0 12px rgba(99,102,241,0.25)' : 'none', transition: 'all 0.2s ease' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--card2)', border: `1.5px solid ${isRunning ? '#6366f1' : 'var(--border)'}`, borderRadius: 24, padding: '3px 8px', boxShadow: isRunning ? '0 0 14px rgba(99,102,241,0.3)' : 'none', transition: 'all 0.2s ease' }}>
       {/* Indicatore Stopwatch */}
       <span style={{ fontSize: 13, display: 'flex', alignItems: 'center' }}>
         {isRunning ? '⏱️' : '⏳'}
       </span>
 
       {/* Selettore Progetto Rapido */}
-      {projects.length > 0 && (
+      {projects.length > 0 ? (
         <select
           value={selectedProjectId}
           onChange={(e) => setSelectedProjectId(e.target.value)}
           disabled={isRunning}
           style={{
-            background: 'transparent',
+            background: 'var(--card)',
             color: 'var(--text)',
-            border: 'none',
+            border: '1px solid var(--border)',
+            borderRadius: 14,
+            padding: '2px 8px',
             fontSize: 11,
             fontWeight: 600,
-            maxWidth: 130,
+            maxWidth: 160,
             cursor: isRunning ? 'not-allowed' : 'pointer',
             outline: 'none',
             textOverflow: 'ellipsis',
@@ -199,14 +285,32 @@ export function QuickTimeTracker({ user }: TimeTrackerProps) {
         >
           {projects.map(p => (
             <option key={p.id} value={p.id} style={{ background: 'var(--card)', color: 'var(--text)' }}>
-              {p.n} ({p.cl})
+              📁 {p.n} ({p.cl})
             </option>
           ))}
         </select>
+      ) : (
+        <button
+          type="button"
+          onClick={() => navigate('/projects')}
+          style={{
+            background: 'var(--card)',
+            color: 'var(--indigo-l)',
+            border: '1px dashed var(--indigo)',
+            borderRadius: 14,
+            padding: '2px 8px',
+            fontSize: 10.5,
+            fontWeight: 600,
+            cursor: 'pointer',
+          }}
+          title="Crea una nuova pratica per iniziare a tracciare il tempo"
+        >
+          ➕ Crea Pratica
+        </button>
       )}
 
       {/* Display Tempo Digitale */}
-      <div style={{ fontFamily: 'monospace', fontSize: 12, fontWeight: 800, color: isRunning ? '#818cf8' : 'var(--text)', letterSpacing: 0.5, minWidth: 60, textAlign: 'center' }}>
+      <div style={{ fontFamily: 'monospace', fontSize: 12, fontWeight: 800, color: isRunning ? '#818cf8' : 'var(--text)', letterSpacing: 0.5, minWidth: 55, textAlign: 'center' }}>
         {formatTime(seconds)}
       </div>
 
@@ -245,7 +349,7 @@ export function QuickTimeTracker({ user }: TimeTrackerProps) {
       {/* Modale Consuntivazione Fine Sessione */}
       {showStopModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 16 }}>
-          <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, padding: 24, maxWidth: 460, width: '100%', boxShadow: '0 20px 40px rgba(0,0,0,0.5)' }}>
+          <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, padding: 24, maxWidth: 480, width: '100%', boxShadow: '0 20px 40px rgba(0,0,0,0.5)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--indigo-l)' }}>⏱ Consuntivazione Sessione di Lavoro</div>
               <button onClick={() => setShowStopModal(false)} style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: 18, cursor: 'pointer' }}>✕</button>
@@ -270,17 +374,29 @@ export function QuickTimeTracker({ user }: TimeTrackerProps) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}>
               <div>
                 <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text)', display: 'block', marginBottom: 4 }}>
-                  Pratica Selezionata:
+                  Pratica di Imputazione:
                 </label>
-                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', padding: '8px 12px', background: 'var(--card2)', borderRadius: 8, border: '1px solid var(--border)' }}>
-                  📁 {currentProject?.n} ({currentProject?.cl})
-                </div>
+                {projects.length > 0 ? (
+                  <select
+                    value={selectedProjectId}
+                    onChange={(e) => setSelectedProjectId(e.target.value)}
+                    style={{ width: '100%', padding: '8px 12px', fontSize: 12, fontWeight: 600, borderRadius: 8, background: 'var(--card2)', color: 'var(--text)', border: '1px solid var(--border)' }}
+                  >
+                    {projects.map(p => (
+                      <option key={p.id} value={p.id}>
+                        📁 {p.n} — Cliente: {p.cl}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <div style={{ fontSize: 11, color: '#ef4444' }}>Nessuna pratica presente</div>
+                )}
               </div>
 
               {microvociList.length > 0 && (
                 <div>
                   <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text)', display: 'block', marginBottom: 4 }}>
-                    Microvoce / Attività su cui imputare il tempo:
+                    Attività / Microvoce su cui imputare il tempo:
                   </label>
                   <select
                     value={selectedMicrovoceIdx}
