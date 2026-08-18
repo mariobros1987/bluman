@@ -99,7 +99,9 @@ export function buildServer(app: AppPort): FastifyInstance {
           tenantId = payload.tenantId;
         }
       }
-    } else if (req.headers['x-tenant-id']) {
+    }
+    // L'header x-tenant-id ha sempre la precedenza per consentire il passaggio tra tenant
+    if (req.headers['x-tenant-id']) {
       tenantId = req.headers['x-tenant-id'] as string;
     }
     (req as any).tenantId = tenantId;
@@ -516,13 +518,20 @@ export function buildServer(app: AppPort): FastifyInstance {
 
   server.get('/tenant/info', async (req) => {
     const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
+    const defaultNames: Record<string, string> = {
+      '00000000-0000-0000-0000-000000000001': 'Studio Advisory & Legal Partners',
+      '00000000-0000-0000-0000-000000000002': 'Advisory Italia S.r.l. (Milano)',
+      '00000000-0000-0000-0000-000000000003': 'Swiss Wealth Management SA (Lugano)',
+    };
+    const defaultName = defaultNames[tenantId] || 'Studio Professionale';
+
     try {
       let tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
       if (!tenant) {
         tenant = await prisma.tenant.create({
           data: {
             id: tenantId,
-            ragioneSociale: 'Bluecode Ltd',
+            ragioneSociale: defaultName,
             piano: 'enterprise',
             stato: 'attivo',
           },
@@ -533,7 +542,7 @@ export function buildServer(app: AppPort): FastifyInstance {
       if (!inMemoryTenantStore.has(tenantId)) {
         inMemoryTenantStore.set(tenantId, {
           id: tenantId,
-          ragioneSociale: 'Bluecode Ltd',
+          ragioneSociale: defaultName,
           piano: 'enterprise',
           stato: 'attivo',
         });

@@ -655,14 +655,44 @@ export async function testEmailApi(payload?: {
   };
 }
 
-export async function fetchTenantInfoApi() {
+export async function fetchTenantInfoApi(tenantIdParam?: string) {
+  const currentTenantId = tenantIdParam || getCurrentTenantId();
   try {
-    const res = await fetch(`${API_BASE}/tenant/info`, { headers: getAuthHeaders() });
+    const res = await fetch(`${API_BASE}/tenant/info`, {
+      headers: {
+        ...getAuthHeaders(),
+        'x-tenant-id': currentTenantId,
+      }
+    });
     if (!res.ok) throw new Error('Errore recupero info tenant');
-    return await res.json();
+    const data = await res.json();
+    if (data && (!data.ragioneSociale || (data.id && data.id !== currentTenantId))) {
+      const studioInfo = getStudioInfoForTenant(currentTenantId);
+      return {
+        ...data,
+        id: currentTenantId,
+        ragioneSociale: studioInfo.ragioneSociale,
+        sedeLegale: studioInfo.sedeLegale || data.sedeLegale,
+        piva: studioInfo.piva || data.piva,
+      };
+    }
+    return data;
   } catch (err) {
-    console.warn('Backend API offline, uso fallback locale', err);
-    return null;
+    const local = localStorage.getItem(getTenantStorageKey('bluman_tenant_info', currentTenantId));
+    if (local) {
+      try { return JSON.parse(local); } catch {}
+    }
+    const studioInfo = getStudioInfoForTenant(currentTenantId);
+    return {
+      id: currentTenantId,
+      ragioneSociale: studioInfo.ragioneSociale,
+      sedeLegale: studioInfo.sedeLegale,
+      piva: studioInfo.piva,
+      telefono: studioInfo.telefono,
+      email: studioInfo.email,
+      iban: studioInfo.iban,
+      codiceSdi: studioInfo.codiceSdi,
+    };
   }
 }
 
