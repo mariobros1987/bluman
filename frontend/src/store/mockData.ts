@@ -30,8 +30,7 @@ export function extractInitialsFromName(name: string): string {
 }
 
 export function getTeamMembersList(): TeamMember[] {
-  const base = TEAM.map(t => {
-    // Verifica se ci sono iniziali o colori personalizzati dall'utente
+  return TEAM.map(t => {
     try {
       const customInitials = localStorage.getItem(`bluman_avatar_initials_${t.id}`);
       const customColor = localStorage.getItem(`bluman_avatar_color_${t.id}`);
@@ -44,30 +43,6 @@ export function getTeamMembersList(): TeamMember[] {
       return t;
     }
   });
-
-  try {
-    const customStr = localStorage.getItem('bluman_custom_team_users');
-    if (customStr) {
-      const customList = JSON.parse(customStr);
-      if (Array.isArray(customList)) {
-        customList.forEach((c: any, idx: number) => {
-          const name = c.nome || c.name || c.n || c.email;
-          if (name && !base.some(b => b.n.toLowerCase() === name.toLowerCase() || (c.email && b.n.toLowerCase().includes(c.email.toLowerCase())))) {
-            const initials = c.iniziali || extractInitialsFromName(name);
-            const id = typeof c.id === 'number' ? c.id : 10 + idx;
-            base.push({
-              id,
-              n: name,
-              r: c.specializzazione || c.ruolo || c.r || 'Collaboratore Studio',
-              i: initials,
-              c: c.colore || c.c || '#8b5cf6',
-            });
-          }
-        });
-      }
-    }
-  } catch {}
-  return base;
 }
 
 export const ARTICOLI: Articolo[] = [

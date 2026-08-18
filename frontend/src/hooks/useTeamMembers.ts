@@ -71,7 +71,7 @@ export async function loadTeamMembersFromDb(): Promise<TeamMember[]> {
   try {
     const apiUsers = await fetchUtentiTenant();
     if (Array.isArray(apiUsers) && apiUsers.length > 0) {
-      const filtered = apiUsers.filter((u: any) => !u.tenantId || u.tenantId === currentTenantId);
+      const filtered = apiUsers.filter((u: any) => u.tenantId === currentTenantId);
       if (filtered.length > 0) {
         return filtered.map(apiUserToTeamMember);
       }

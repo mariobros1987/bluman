@@ -27,9 +27,9 @@ async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutM
   }
 }
 
-function getAuthHeaders() {
-  const token = localStorage.getItem('bluman_jwt_token') || 'jwt_advisor_mock_123';
-  const tenantId = localStorage.getItem('bluman_tenant_id') || '00000000-0000-0000-0000-000000000001';
+export function getAuthHeaders() {
+  const token = typeof localStorage !== 'undefined' ? (localStorage.getItem('bluman_jwt_token') || 'jwt_advisor_mock_123') : 'jwt_advisor_mock_123';
+  const tenantId = getCurrentTenantId();
   return {
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${token}`,
@@ -162,7 +162,7 @@ export async function magicLoginApi(magicToken: string) {
 
 export async function fetchProgetti() {
   try {
-    const res = await fetchWithTimeout(`${API_BASE}/progetti`, {}, 6000);
+    const res = await fetchWithTimeout(`${API_BASE}/progetti`, { headers: getAuthHeaders() }, 6000);
     if (!res.ok) throw new Error('Errore nel recupero progetti');
     return await res.json();
   } catch (err) {
@@ -173,7 +173,7 @@ export async function fetchProgetti() {
 
 export async function fetchProgettoDettaglio(id: string) {
   try {
-    const res = await fetch(`${API_BASE}/progetti/${id}`);
+    const res = await fetch(`${API_BASE}/progetti/${id}`, { headers: getAuthHeaders() });
     if (!res.ok) throw new Error('Errore nel recupero dettaglio progetto');
     return await res.json();
   } catch (err) {
@@ -185,7 +185,7 @@ export async function fetchProgettoDettaglio(id: string) {
 export async function fetchModuliLibreria(giurisdizioneId?: string) {
   try {
     const url = giurisdizioneId ? `${API_BASE}/moduli?giurisdizioneId=${encodeURIComponent(giurisdizioneId)}` : `${API_BASE}/moduli`;
-    const res = await fetch(url);
+    const res = await fetch(url, { headers: getAuthHeaders() });
     if (!res.ok) throw new Error('Errore nel recupero moduli');
     return await res.json();
   } catch (err) {
@@ -222,7 +222,7 @@ export async function creaGiurisdizioneApi(input: { nome: string; codice: string
 
 export async function fetchArticoli() {
   try {
-    const res = await fetch(`${API_BASE}/articoli`);
+    const res = await fetch(`${API_BASE}/articoli`, { headers: getAuthHeaders() });
     if (!res.ok) throw new Error('Errore nel recupero articoli');
     return await res.json();
   } catch (err) {
@@ -235,7 +235,7 @@ export async function uploadFileApi(filename: string, contentBase64: string) {
   try {
     const res = await fetch(`${API_BASE}/upload`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ filename, contentBase64 }),
     });
     if (!res.ok) throw new Error('Errore upload file');
@@ -250,7 +250,7 @@ export async function updateArticoloPrezzoApi(id: string, input: { prezzoDefault
   try {
     const res = await fetch(`${API_BASE}/articoli/${id}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(input),
     });
     if (!res.ok) throw new Error('Errore aggiornamento articolo');
@@ -271,7 +271,7 @@ export async function creaArticoloApi(input: {
 }) {
   const res = await fetch(`${API_BASE}/articoli`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders(),
     body: JSON.stringify(input),
   });
   if (!res.ok) throw new Error('Errore creazione articolo');
@@ -288,7 +288,7 @@ export async function creaModuloTemplateApi(input: {
 }) {
   const res = await fetch(`${API_BASE}/moduli-template`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders(),
     body: JSON.stringify(input),
   });
   if (!res.ok) throw new Error('Errore creazione modulo template');
@@ -297,7 +297,7 @@ export async function creaModuloTemplateApi(input: {
 
 export async function fetchClienti() {
   try {
-    const res = await fetch(`${API_BASE}/clienti`);
+    const res = await fetch(`${API_BASE}/clienti`, { headers: getAuthHeaders() });
     if (!res.ok) throw new Error('Errore nel recupero clienti');
     return await res.json();
   } catch (err) {
@@ -309,7 +309,7 @@ export async function fetchClienti() {
 export async function creaClienteApi(input: { nome: string; tipo?: 'individual' | 'company'; [key: string]: any }) {
   const res = await fetch(`${API_BASE}/clienti`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders(),
     body: JSON.stringify(input),
   });
   if (!res.ok) throw new Error('Errore creazione cliente');
@@ -319,19 +319,17 @@ export async function creaClienteApi(input: { nome: string; tipo?: 'individual' 
 export async function aggiornaClienteApi(id: string, input: Record<string, any>) {
   const res = await fetch(`${API_BASE}/clienti/${encodeURIComponent(id)}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders(),
     body: JSON.stringify(input),
   });
   if (!res.ok) throw new Error('Errore aggiornamento cliente');
   return await res.json();
 }
 
-
-
 export async function creaProgettoApi(input: { clienteId: string; nome: string }) {
   const res = await fetch(`${API_BASE}/progetti`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders(),
     body: JSON.stringify(input),
   });
   if (!res.ok) throw new Error('Errore creazione progetto');
@@ -341,6 +339,7 @@ export async function creaProgettoApi(input: { clienteId: string; nome: string }
 export async function eliminaProgettoApi(id: string) {
   const res = await fetch(`${API_BASE}/progetti/${id}`, {
     method: 'DELETE',
+    headers: getAuthHeaders(),
   });
   if (!res.ok) {
     const err = await res.json();
@@ -352,14 +351,12 @@ export async function eliminaProgettoApi(id: string) {
 export async function archiviaProgettoApi(id: string, archiviato: boolean) {
   const res = await fetch(`${API_BASE}/progetti/${id}/archivia`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders(),
     body: JSON.stringify({ archiviato }),
   });
   if (!res.ok) throw new Error('Errore aggiornamento stato progetto');
   return await res.json();
 }
-
-
 
 export async function creaPreventivoEAccettaApi(input: {
   clienteId: string;
@@ -369,7 +366,7 @@ export async function creaPreventivoEAccettaApi(input: {
   try {
     const resPrev = await fetch(`${API_BASE}/preventivi`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(input),
     });
     if (!resPrev.ok) {
@@ -380,6 +377,7 @@ export async function creaPreventivoEAccettaApi(input: {
 
     const resAccetta = await fetch(`${API_BASE}/preventivi/${prev.id}/accetta`, {
       method: 'POST',
+      headers: getAuthHeaders(),
     });
     if (!resAccetta.ok) {
       console.warn('POST /preventivi/:id/accetta risposto non-200, continuo fallback locale');
@@ -408,7 +406,7 @@ export async function emettiFatturaApi(input: {
 }) {
   const res = await fetch(`${API_BASE}/progetti/${input.progettoId}/fatture`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders(),
     body: JSON.stringify(input),
   });
   if (!res.ok) throw new Error('Errore emissione fattura');
@@ -422,7 +420,7 @@ export async function consuntivaMicrovoceApi(input: {
 }) {
   const res = await fetch(`${API_BASE}/microvoci/${input.microvoceId}/consuntiva`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders(),
     body: JSON.stringify(input),
   });
   if (!res.ok) throw new Error('Errore consuntivazione microvoce');
@@ -433,7 +431,7 @@ export async function salvaProgettoDettaglioApi(progettoId: string, data: any) {
   try {
     const res = await fetch(`${API_BASE}/progetti/${progettoId}/stato-completo`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(data),
     });
     if (!res.ok) throw new Error('Errore salvataggio progetto remoto');
