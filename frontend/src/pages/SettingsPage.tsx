@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { fetchUtentiTenant, creaUtenteTenantApi, uploadFileApi, fetchTenantInfoApi, updateTenantInfoApi, fetchProgetti, fetchPermessiUtenteApi, salvaPermessiUtenteApi, testEmailApi, testImapApi, testChannelApi } from '../api/client';
 import { getFormattedLogoUrl, fmt } from '../utils';
-import { getCurrentTenantId, getTenantStorageKey, getStudioInfoForTenant } from '../utils/tenant';
+import { getCurrentTenantId, getTenantStorageKey, getStudioInfoForTenant, saveTenantInfoToStorage } from '../utils/tenant';
 import { ProgressBar } from '../components/ui/ProgressBar';
 import styles from './Settings.module.css';
 
@@ -86,21 +86,30 @@ export function SettingsPage() {
   const loadTenantData = async () => {
     setLoadingUsers(true);
     const currentTenantId = getCurrentTenantId();
+    const studioDefaults = getStudioInfoForTenant(currentTenantId);
 
-    const dbTenant = await fetchTenantInfoApi();
-    const localInfoStr = localStorage.getItem(getTenantStorageKey('bluman_tenant_info'));
+    const dbTenant = await fetchTenantInfoApi(currentTenantId);
+    const localInfoStr = localStorage.getItem(getTenantStorageKey('bluman_tenant_info', currentTenantId));
     let localInfo: any = {};
     if (localInfoStr) {
       try { localInfo = JSON.parse(localInfoStr); } catch {}
     }
-    const tData = { ...localInfo, ...(dbTenant || {}) };
 
-    if (!tData.ragioneSociale) {
-      const studioDefaults = getStudioInfoForTenant(currentTenantId);
-      tData.ragioneSociale = studioDefaults.ragioneSociale || '';
-      tData.piva = studioDefaults.piva || '';
-      tData.sedeLegale = studioDefaults.sedeLegale || '';
-      tData.email = studioDefaults.email || '';
+    // Unione intelligente: parte dai defaults dello studio, sovrascrive con i dati DB se non vuoti, e infine con le modifiche locali
+    const tData: any = { ...studioDefaults };
+    if (dbTenant && typeof dbTenant === 'object') {
+      Object.keys(dbTenant).forEach(k => {
+        if (dbTenant[k] !== null && dbTenant[k] !== undefined && dbTenant[k] !== '') {
+          tData[k] = dbTenant[k];
+        }
+      });
+    }
+    if (localInfo && typeof localInfo === 'object') {
+      Object.keys(localInfo).forEach(k => {
+        if (localInfo[k] !== null && localInfo[k] !== undefined && localInfo[k] !== '') {
+          tData[k] = localInfo[k];
+        }
+      });
     }
 
     if (tData) {
@@ -113,9 +122,9 @@ export function SettingsPage() {
       setPec(tData.pec || '');
       setTelefono(tData.telefono || '');
       setIban(tData.iban || '');
-      setLogoUrl(tData.logoUrl || '');
+      setLogoUrl(tData.logoUrl || localStorage.getItem(getTenantStorageKey('bluman_logo_url', currentTenantId)) || '');
       setColoreTemaFattura(tData.coloreTemaFattura || '#4338ca');
-      setNotePieDiPagina(tData.notePieFattura || '');
+      setNotePieDiPagina(tData.notePieFattura || tData.notePieDiPagina || '');
       setTitoloIntestazione(tData.titoloIntestazione || '');
       setWaPhoneId(tData.waPhoneId || '');
       setWaAccessToken(tData.waAccessToken || '');
@@ -155,7 +164,9 @@ export function SettingsPage() {
 
   const handleSaveCompany = async (e: React.FormEvent) => {
     e.preventDefault();
+    const currentTenantId = getCurrentTenantId();
     const dataToSave = {
+      id: currentTenantId,
       ragioneSociale,
       piva: pIva,
       codiceFiscale: codFisc,
@@ -194,8 +205,8 @@ export function SettingsPage() {
       emailSignatureHtml,
     };
 
-    await updateTenantInfoApi(dataToSave);
-    localStorage.setItem(getTenantStorageKey('bluman_tenant_info'), JSON.stringify(dataToSave));
+    saveTenantInfoToStorage(currentTenantId, dataToSave);
+    await updateTenantInfoApi(dataToSave, currentTenantId);
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
   };

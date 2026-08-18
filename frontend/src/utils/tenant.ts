@@ -116,7 +116,6 @@ export function getTenantStorageKey(baseKey: string, tenantId?: string): string 
 export function getStudioInfoForTenant(tenantId?: string): StudioInfo {
   const tId = tenantId || getCurrentTenantId();
 
-  // Controlla se esistono impostazioni salvate esplicitamente per questo tenant
   let savedSettings: any = null;
   try {
     const savedSettingsStr = localStorage.getItem(getTenantStorageKey('bluman_tenant_info', tId));
@@ -125,65 +124,110 @@ export function getStudioInfoForTenant(tenantId?: string): StudioInfo {
     }
   } catch {}
 
-  if (TENANT_STUDIOS[tId]) {
-    const base = TENANT_STUDIOS[tId];
-    if (savedSettings) {
-      return {
-        ...base,
-        ...savedSettings,
-        ragioneSociale: savedSettings.ragioneSociale || base.ragioneSociale,
-        sedeLegale: savedSettings.sedeLegale || base.sedeLegale,
-        piva: savedSettings.piva || base.piva,
-      };
-    }
-    return base;
+  let base: any = TENANT_STUDIOS[tId];
+  if (!base) {
+    // Controlla se è un tenant registrato nel SuperAdmin
+    try {
+      const customTenantsStr = localStorage.getItem('bluman_all_tenants_admin');
+      if (customTenantsStr) {
+        const list = JSON.parse(customTenantsStr);
+        const found = list.find((t: any) => t.id === tId);
+        if (found) {
+          base = {
+            id: found.id,
+            ragioneSociale: found.ragioneSociale,
+            nomeBreve: found.ragioneSociale ? found.ragioneSociale.split(' ')[0] : 'Studio',
+            giurisdizione: found.giurisdizione || 'Italia',
+            piva: found.pIva || '',
+            codiceFiscale: found.pIva || '',
+            sedeLegale: '',
+            sedeOperativa: '',
+            email: found.leadAdvisorEmail || '',
+            telefono: '',
+            iban: '',
+            bic: '',
+            bancaNome: '',
+            codiceSdi: '',
+            leadAdvisor: found.leadAdvisorNome || 'Lead Senior Advisor',
+          };
+        }
+      }
+    } catch {}
   }
 
-  // Controlla se è un tenant registrato nel SuperAdmin
+  if (!base) {
+    base = {
+      id: tId,
+      ragioneSociale: 'Studio Professionale',
+      nomeBreve: 'Studio',
+      giurisdizione: 'Italia',
+      piva: '',
+      codiceFiscale: '',
+      sedeLegale: '',
+      sedeOperativa: '',
+      email: '',
+      telefono: '',
+      iban: '',
+      bic: '',
+      bancaNome: '',
+      codiceSdi: '',
+      leadAdvisor: 'Lead Senior Advisor',
+    };
+  }
+
+  if (savedSettings && typeof savedSettings === 'object') {
+    return {
+      ...base,
+      ...savedSettings,
+      ragioneSociale: savedSettings.ragioneSociale || base.ragioneSociale,
+      sedeLegale: savedSettings.sedeLegale !== undefined ? savedSettings.sedeLegale : base.sedeLegale,
+      sedeOperativa: savedSettings.sedeOperativa !== undefined ? savedSettings.sedeOperativa : base.sedeOperativa,
+      piva: savedSettings.piva !== undefined ? savedSettings.piva : base.piva,
+      codiceFiscale: savedSettings.codiceFiscale !== undefined ? savedSettings.codiceFiscale : base.codiceFiscale,
+      email: savedSettings.email !== undefined ? savedSettings.email : base.email,
+      telefono: savedSettings.telefono !== undefined ? savedSettings.telefono : base.telefono,
+      iban: savedSettings.iban !== undefined ? savedSettings.iban : base.iban,
+      codiceSdi: savedSettings.codiceSdi !== undefined ? savedSettings.codiceSdi : base.codiceSdi,
+      leadAdvisor: savedSettings.leadAdvisor !== undefined ? savedSettings.leadAdvisor : base.leadAdvisor,
+    };
+  }
+
+  return base;
+}
+
+/**
+ * Salva i dati di configurazione del Tenant in modo persistente e isolato
+ */
+export function saveTenantInfoToStorage(tenantId: string, data: any) {
   try {
+    localStorage.setItem(getTenantStorageKey('bluman_tenant_info', tenantId), JSON.stringify(data));
+    if (data.logoUrl) {
+      localStorage.setItem(getTenantStorageKey('bluman_logo_url', tenantId), data.logoUrl);
+    }
+    if (TENANT_STUDIOS[tenantId]) {
+      TENANT_STUDIOS[tenantId] = {
+        ...TENANT_STUDIOS[tenantId],
+        ...data,
+      };
+    }
     const customTenantsStr = localStorage.getItem('bluman_all_tenants_admin');
     if (customTenantsStr) {
       const list = JSON.parse(customTenantsStr);
-      const found = list.find((t: any) => t.id === tId);
-      if (found) {
-        return {
-          id: found.id,
-          ragioneSociale: savedSettings?.ragioneSociale || found.ragioneSociale,
-          nomeBreve: savedSettings?.nomeBreve || (found.ragioneSociale ? found.ragioneSociale.split(' ')[0] : 'Studio'),
-          giurisdizione: savedSettings?.giurisdizione || found.giurisdizione || 'Italia',
-          piva: savedSettings?.piva || found.pIva || '',
-          codiceFiscale: savedSettings?.codiceFiscale || found.pIva || '',
-          sedeLegale: savedSettings?.sedeLegale || '',
-          sedeOperativa: savedSettings?.sedeOperativa || '',
-          email: savedSettings?.email || found.leadAdvisorEmail || '',
-          telefono: savedSettings?.telefono || '',
-          iban: savedSettings?.iban || '',
-          bic: savedSettings?.bic || '',
-          bancaNome: savedSettings?.bancaNome || '',
-          codiceSdi: savedSettings?.codiceSdi || '',
-          leadAdvisor: savedSettings?.leadAdvisor || found.leadAdvisorNome || 'Lead Senior Advisor',
+      const idx = list.findIndex((t: any) => t.id === tenantId);
+      if (idx >= 0) {
+        list[idx] = {
+          ...list[idx],
+          ragioneSociale: data.ragioneSociale || list[idx].ragioneSociale,
+          pIva: data.piva || list[idx].pIva,
+          giurisdizione: data.giurisdizione || list[idx].giurisdizione,
         };
+        localStorage.setItem('bluman_all_tenants_admin', JSON.stringify(list));
       }
     }
-  } catch {}
-
-  return {
-    id: tId,
-    ragioneSociale: savedSettings?.ragioneSociale || 'Nuovo Studio',
-    nomeBreve: savedSettings?.nomeBreve || 'Studio',
-    giurisdizione: savedSettings?.giurisdizione || 'Italia',
-    piva: savedSettings?.piva || '',
-    codiceFiscale: savedSettings?.codiceFiscale || '',
-    sedeLegale: savedSettings?.sedeLegale || '',
-    sedeOperativa: savedSettings?.sedeOperativa || '',
-    email: savedSettings?.email || '',
-    telefono: savedSettings?.telefono || '',
-    iban: savedSettings?.iban || '',
-    bic: savedSettings?.bic || '',
-    bancaNome: savedSettings?.bancaNome || '',
-    codiceSdi: savedSettings?.codiceSdi || '',
-    leadAdvisor: savedSettings?.leadAdvisor || 'Lead Advisor',
-  };
+    window.dispatchEvent(new Event('tenant_changed'));
+  } catch (err) {
+    console.error('Errore salvataggio tenant info in storage:', err);
+  }
 }
 
 /**

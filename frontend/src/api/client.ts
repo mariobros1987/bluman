@@ -696,18 +696,25 @@ export async function fetchTenantInfoApi(tenantIdParam?: string) {
   }
 }
 
-export async function updateTenantInfoApi(input: any) {
+export async function updateTenantInfoApi(input: any, tenantIdParam?: string) {
+  const currentTenantId = tenantIdParam || getCurrentTenantId();
   try {
     const res = await fetch(`${API_BASE}/tenant/info`, {
       method: 'PATCH',
-      headers: getAuthHeaders(),
+      headers: {
+        ...getAuthHeaders(),
+        'x-tenant-id': currentTenantId,
+      },
       body: JSON.stringify(input),
     });
     if (!res.ok) throw new Error('Errore aggiornamento info tenant');
-    return await res.json();
+    const data = await res.json();
+    localStorage.setItem(getTenantStorageKey('bluman_tenant_info', currentTenantId), JSON.stringify({ ...input, ...data }));
+    return data;
   } catch (err) {
     console.warn('Backend API offline, aggiornamento locale', err);
-    return null;
+    localStorage.setItem(getTenantStorageKey('bluman_tenant_info', currentTenantId), JSON.stringify(input));
+    return input;
   }
 }
 

@@ -553,22 +553,51 @@ export function buildServer(app: AppPort): FastifyInstance {
 
   server.patch<{ Body: Record<string, any> }>('/tenant/info', async (req, reply) => {
     const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
-    const body = (req.body || {}) as Record<string, any>;
+    const rawBody = (req.body || {}) as Record<string, any>;
+
+    const allowedKeys = [
+      'ragioneSociale', 'piva', 'codiceFiscale', 'sedeLegale', 'sedeOperativa',
+      'logoUrl', 'coloreTemaFattura', 'notePieFattura', 'titoloIntestazione',
+      'iban', 'email', 'pec', 'telefono',
+      'waPhoneId', 'waAccessToken', 'waVerifyToken', 'tgBotToken', 'tgBotUsername',
+      'smtpHost', 'smtpPort', 'smtpSecure', 'smtpUser', 'smtpPass',
+      'smtpFromEmail', 'smtpFromName', 'smtpReplyTo', 'smtpBcc',
+      'imapHost', 'imapPort', 'imapSecure', 'imapUser', 'imapPass',
+      'imapFolder', 'imapPollInterval', 'imapProtocol', 'emailSignatureHtml',
+      'piano', 'stato'
+    ];
+
+    const sanitizedData: Record<string, any> = {};
+    for (const key of allowedKeys) {
+      if (rawBody[key] !== undefined) {
+        if (key === 'smtpPort' || key === 'imapPort') {
+          sanitizedData[key] = rawBody[key] ? Number(rawBody[key]) : null;
+        } else if (key === 'smtpSecure' || key === 'imapSecure') {
+          sanitizedData[key] = Boolean(rawBody[key]);
+        } else {
+          sanitizedData[key] = rawBody[key];
+        }
+      }
+    }
+
     try {
       const updated = await prisma.tenant.upsert({
         where: { id: tenantId },
-        update: body,
+        update: sanitizedData,
         create: {
           id: tenantId,
-          ragioneSociale: body.ragioneSociale || 'Bluecode Ltd',
+          ragioneSociale: sanitizedData.ragioneSociale || 'Studio Professionale',
           piano: 'enterprise',
-          ...body,
+          stato: 'attivo',
+          ...sanitizedData,
         },
       });
+      inMemoryTenantStore.set(tenantId, { ...inMemoryTenantStore.get(tenantId), ...sanitizedData, id: tenantId });
       return reply.send(updated);
-    } catch {
+    } catch (err) {
+      console.warn('Prisma tenant upsert fallback to inMemory store:', err);
       const current = inMemoryTenantStore.get(tenantId) || { id: tenantId };
-      const updated = { ...current, ...body };
+      const updated = { ...current, ...sanitizedData, id: tenantId };
       inMemoryTenantStore.set(tenantId, updated);
       return reply.send(updated);
     }
