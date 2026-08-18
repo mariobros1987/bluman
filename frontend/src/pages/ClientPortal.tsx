@@ -6,6 +6,7 @@ import { downloadRealPdf } from '../utils/pdfGenerator';
 import type { SignatureData } from '../utils/pdfGenerator';
 import { DigitalSignatureModal } from '../components/DigitalSignatureModal';
 import { resolveDocumentTemplateHtml, PREBUILT_TEMPLATES } from '../utils/documentTemplates';
+import { getStudioInfoForTenant, getCurrentTenantId, getTenantStorageKey, BLUECODE_TENANT_ID } from '../utils/tenant';
 import { fetchModuliLibreria, fetchProgetti, creaPreventivoEAccettaApi, fetchClienti, creaProgettoApi, creaClienteApi, fetchComunicazioniApi, inviaComunicazioneApi, requestPortalOtpApi, verifyPortalOtpAndSignApi } from '../api/client';
 import type { CategoriaModulo } from '../types';
 
@@ -377,28 +378,25 @@ export function ClientPortal() {
       </div>
     `;
 
+    const studio = getStudioInfoForTenant();
     return resolveDocumentTemplateHtml(baseHtml.replace('<!-- {{TABELLA_MODULI}} -->', modulesTableHtml), {
       cliente: clientObj || {
         nome: clientName,
         referenteNome: clientName,
         ragioneSociale: formData.ragioneSociale || clientName,
-        piva: formData.piva || 'IT09876543210',
-        codiceFiscale: formData.codiceFiscale || 'RCCMRC80A01H501Z',
+        piva: formData.piva || '',
+        codiceFiscale: formData.codiceFiscale || '',
       },
       progetto: {
         titolo: 'Progetto Consulenza & Structuring Patrimoniale',
         totalePreventivo: totalValue,
       },
-      studio: {
-        ragioneSociale: 'Bluecode Ltd',
-        sedeLegale: 'Level 4, Valuation Centre, Tower Road, Sliema SLM 1600, Malta',
-        piva: 'MT28491039',
-        iban: 'MT89VALL22013000000012345678',
-      }
+      studio,
     });
   };
 
   const getResolvedDocumentHtml = (doc: any) => {
+    const studio = getStudioInfoForTenant();
     let templateHtml = '';
     if (doc.id === 'doc-nda' || doc.templateId === 'tmpl-nda') {
       templateHtml = PREBUILT_TEMPLATES.find(t => t.id === 'tmpl-nda')?.contenutoHtml || '';
@@ -414,7 +412,7 @@ export function ClientPortal() {
           ${doc.titolo || doc.nome}
         </h1>
         <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 14px; border-radius: 8px; margin-bottom: 20px; font-size: 10pt;">
-          <strong>Studio Professionale:</strong> Bluecode Ltd (Malta / Switzerland)<br/>
+          <strong>Studio Professionale:</strong> ${studio.ragioneSociale}<br/>
           <strong>Cliente Committente:</strong> {{cliente.ragione_sociale}} ({{cliente.referente}})<br/>
           <strong>Oggetto Documento:</strong> ${doc.descrizione || 'Atto professionale del fascicolo'}<br/>
           <strong>Data di Emissione:</strong> {{data_odierna}}
@@ -435,19 +433,14 @@ export function ClientPortal() {
         nome: clientName,
         referenteNome: clientName,
         ragioneSociale: formData.ragioneSociale || clientName,
-        piva: formData.piva || 'IT09876543210',
-        codiceFiscale: formData.codiceFiscale || 'RCCMRC80A01H501Z',
+        piva: formData.piva || '',
+        codiceFiscale: formData.codiceFiscale || '',
       },
       progetto: {
         titolo: 'Progetto Consulenza & Structuring Patrimoniale',
         totalePreventivo: totalValue,
       },
-      studio: {
-        ragioneSociale: 'Bluecode Ltd',
-        sedeLegale: 'Level 4, Valuation Centre, Tower Road, Sliema SLM 1600, Malta',
-        piva: 'MT28491039',
-        iban: 'MT89VALL22013000000012345678',
-      }
+      studio,
     });
   };
 
@@ -558,12 +551,18 @@ export function ClientPortal() {
                     <div style={{ display: 'flex', gap: 10 }}>
                       <button
                         onClick={async () => {
+                          const studio = getStudioInfoForTenant();
+                          const isBC = getCurrentTenantId() === BLUECODE_TENANT_ID;
+                          const rawLogo = localStorage.getItem(getTenantStorageKey('bluman_logo_url')) || (isBC ? `${window.location.origin}/logo.png` : '');
+                          const logoHtml = rawLogo
+                            ? `<img src="${rawLogo}" style="max-height:55px;max-width:220px;object-fit:contain;margin-bottom:8px;display:block;" />`
+                            : `<div style="font-size:20px;font-weight:800;color:#1e1b4b;margin-bottom:8px;">🏛 ${studio.ragioneSociale.toUpperCase()}</div>`;
                           const htmlContent = `
                             <div style="border-bottom:2px solid #0f172a;padding-bottom:15px;display:flex;justify-content:space-between;align-items:flex-start;">
                               <div>
-                                <img src="${window.location.origin}/logo.png" style="max-height:55px;max-width:220px;object-fit:contain;margin-bottom:8px;display:block;" />
-                                <div style="font-size:20px;font-weight:800;color:#1e1b4b;">BLUECODE LTD — ADVISORY</div>
-                                <div style="font-size:11px;color:#475569;margin-top:2px;">Level 4, Valuation Centre, Sliema, Malta</div>
+                                ${logoHtml}
+                                <div style="font-size:20px;font-weight:800;color:#1e1b4b;">${studio.ragioneSociale.toUpperCase()} — ADVISORY</div>
+                                <div style="font-size:11px;color:#475569;margin-top:2px;">${studio.sedeLegale}</div>
                               </div>
                               <div style="text-align:right;">
                                 <div style="font-size:16px;font-weight:800;color:#4338ca;">ENGAGEMENT LETTER v1.0 (CONGELATO)</div>
@@ -581,8 +580,8 @@ export function ClientPortal() {
                               ipAddress: '2.234.190.44',
                             },
                             {
-                              signerName: 'Joe Disabato',
-                              signerRole: 'Senior Advisor (Bluecode Ltd)',
+                              signerName: studio.leadAdvisor || 'Advisor Studio',
+                              signerRole: `Senior Advisor (${studio.ragioneSociale})`,
                               timestamp: '15/08/2026 01:44:12',
                               ipAddress: '83.211.12.94',
                             }
@@ -722,12 +721,12 @@ export function ClientPortal() {
                     </div>
                     <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>Dettaglio Incarico Professionale & Moduli Spettanti</h2>
                     <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
-                      Studio Erogante: <strong>Bluecode Ltd (Malta)</strong> · Advisor Lead: <strong>Joe Disabato</strong>
+                      Studio Erogante: <strong>{getStudioInfoForTenant().ragioneSociale}</strong> · Advisor Lead: <strong>{getStudioInfoForTenant().leadAdvisor}</strong>
                     </div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <div style={{ fontSize: 10, color: 'var(--muted)' }}>Giurisdizione Incarico:</div>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--indigo-l)', marginTop: 2 }}>Malta / Unione Europea</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--indigo-l)', marginTop: 2 }}>{getStudioInfoForTenant().giurisdizione}</div>
                   </div>
                 </div>
 
@@ -1322,10 +1321,10 @@ export function ClientPortal() {
             </form>
 
             <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 14, marginTop: 18 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>Sede Legale Studio Bluecode Ltd</div>
+              <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>Sede Legale Studio {getStudioInfoForTenant().ragioneSociale}</div>
               <div style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.5 }}>
-                Level 4, Valuation Centre, Tower Road, Sliema SLM 1600, Malta<br />
-                PEC: bluecode@legalmail.it · Reg. N. C-99881
+                {getStudioInfoForTenant().sedeLegale || 'Sede in fase di configurazione'}<br />
+                {getStudioInfoForTenant().piva ? `P.IVA: ${getStudioInfoForTenant().piva}` : ''}{getStudioInfoForTenant().email ? ` · ${getStudioInfoForTenant().email}` : ''}
               </div>
             </div>
           </div>

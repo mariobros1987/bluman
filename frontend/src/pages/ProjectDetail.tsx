@@ -1416,22 +1416,31 @@ function FatturazioneTab({ project, rawDbProject, onRefresh }: { project: Proget
             <div style={{ borderBottom: '2px solid #0f172a', paddingBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               {(() => {
                 const studio = getStudioInfoForTenant();
+                const isBC = getCurrentTenantId() === BLUECODE_TENANT_ID;
+                const rawLogo = localStorage.getItem(getTenantStorageKey('bluman_logo_url')) || (isBC ? '/logo.png' : '');
+                const logo = rawLogo ? getFormattedLogoUrl(rawLogo) : '';
                 return (
                   <div>
-                    <img
-                      src={getFormattedLogoUrl(localStorage.getItem(getTenantStorageKey('bluman_logo_url')) || localStorage.getItem('bluman_logo_url'))}
-                      alt="Logo Studio"
-                      style={{ maxHeight: 60, maxWidth: 220, objectFit: 'contain', marginBottom: 8, display: 'block' }}
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = '/logo.png';
-                      }}
-                    />
+                    {logo ? (
+                      <img
+                        src={logo}
+                        alt="Logo Studio"
+                        style={{ maxHeight: 60, maxWidth: 220, objectFit: 'contain', marginBottom: 8, display: 'block' }}
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none';
+                        }}
+                      />
+                    ) : (
+                      <div style={{ fontSize: 18, fontWeight: 800, color: '#1e1b4b', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        🏛 {studio.ragioneSociale.toUpperCase()}
+                      </div>
+                    )}
                     <div style={{ fontSize: 20, fontWeight: 800, color: '#1e1b4b' }}>
                       {studio.ragioneSociale}
                     </div>
                     <div style={{ fontSize: 11, color: '#475569', marginTop: 2 }}>
-                      {studio.sedeLegale}<br />
-                      P.IVA/VAT: {studio.piva} · IBAN: {studio.iban}
+                      {studio.sedeLegale}{studio.sedeLegale ? <br /> : null}
+                      {studio.piva ? `P.IVA/VAT: ${studio.piva}` : ''}{studio.iban ? ` · IBAN: ${studio.iban}` : ''}
                     </div>
                   </div>
                 );
@@ -1499,15 +1508,18 @@ function FatturazioneTab({ project, rawDbProject, onRefresh }: { project: Proget
               <button
                 onClick={async () => {
                   const studio = getStudioInfoForTenant();
-                  const rawLogoUrl = localStorage.getItem(getTenantStorageKey('bluman_logo_url')) || localStorage.getItem('bluman_logo_url');
-                  const logoUrl = getFormattedLogoUrl(rawLogoUrl);
-                  const logoHtml = `<img src="${logoUrl}" style="max-height:60px;max-width:220px;object-fit:contain;margin-bottom:8px;display:block;" />`;
+                  const isBC = getCurrentTenantId() === BLUECODE_TENANT_ID;
+                  const rawLogoUrl = localStorage.getItem(getTenantStorageKey('bluman_logo_url')) || (isBC ? '/logo.png' : '');
+                  const logoUrl = rawLogoUrl ? getFormattedLogoUrl(rawLogoUrl) : '';
+                  const logoHtml = logoUrl
+                    ? `<img src="${logoUrl}" style="max-height:60px;max-width:220px;object-fit:contain;margin-bottom:8px;display:block;" />`
+                    : `<div style="font-size:18px;font-weight:800;color:#1e1b4b;margin-bottom:8px;">🏛 ${studio.ragioneSociale.toUpperCase()}</div>`;
                   const htmlContent = `
                     <div style="border-bottom:2px solid #0f172a;padding-bottom:15px;display:flex;justify-content:space-between;align-items:flex-start;">
                       <div>
                         ${logoHtml}
                         <div style="font-size:20px;font-weight:800;color:#1e1b4b;">${studio.ragioneSociale}</div>
-                        <div style="font-size:11px;color:#475569;margin-top:2px;">${studio.sedeLegale}<br/>VAT: ${studio.piva} · IBAN: ${studio.iban}</div>
+                        <div style="font-size:11px;color:#475569;margin-top:2px;">${studio.sedeLegale}${studio.sedeLegale ? '<br/>' : ''}${studio.piva ? `VAT: ${studio.piva}` : ''}${studio.iban ? ` · IBAN: ${studio.iban}` : ''}</div>
                       </div>
                       <div style="text-align:right;">
                         <div style="font-size:16px;font-weight:800;color:#4338ca;">DOCUMENTO FISCALE DI VENDITA</div>
@@ -2420,8 +2432,9 @@ function DocumentiTab({ project }: { project: Progetto }) {
               const safeClientName = (project.cl || 'Cliente').replace(/[^a-zA-Z0-9_-]/g, '_');
 
               // Indice del fascicolo
+              const studio = getStudioInfoForTenant();
               const indiceText = `================================================================================
-BLUECODE LTD — ADVISORY PLATFORM
+${studio.ragioneSociale.toUpperCase()} — ADVISORY PLATFORM
 FASCICOLO COMMESSA: ${project.n}
 COMMITTENTE: ${project.cl}
 DATA EXPORT: ${new Date().toLocaleString('it-IT')}

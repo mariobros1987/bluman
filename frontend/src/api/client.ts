@@ -1,4 +1,5 @@
 // API Client per integrare il React Frontend con il backend Fastify + Supabase DB
+import { getTenantStorageKey, getCurrentTenantId, getStudioInfoForTenant, BLUECODE_TENANT_ID } from '../utils/tenant';
 
 const getApiBase = () => {
   if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_BASE) {
@@ -500,19 +501,23 @@ export async function sendInviteCollaboratoreApi(input: {
   tempPassword?: string;
 }) {
   let localTenant: any = {};
+  const currentTenantId = getCurrentTenantId();
+  const isBC = currentTenantId === BLUECODE_TENANT_ID;
+  const studio = getStudioInfoForTenant(currentTenantId);
   try {
-    localTenant = JSON.parse(localStorage.getItem('bluman_tenant_info') || '{}');
+    const raw = localStorage.getItem(getTenantStorageKey('bluman_tenant_info'));
+    if (raw) localTenant = JSON.parse(raw);
   } catch {}
 
   const payload = {
     action: 'invite-collaborator',
-    smtpHost: localTenant.smtpHost || 'authsmtp.register.it',
+    smtpHost: localTenant.smtpHost || (isBC ? 'authsmtp.register.it' : ''),
     smtpPort: localTenant.smtpPort || 465,
     smtpSecure: localTenant.smtpSecure !== undefined ? localTenant.smtpSecure : true,
-    smtpUser: localTenant.smtpUser || 'support@bluecode-ltd.com',
+    smtpUser: localTenant.smtpUser || (isBC ? 'support@bluecode-ltd.com' : ''),
     smtpPass: localTenant.smtpPass || '',
-    smtpFromEmail: localTenant.smtpFromEmail || 'support@bluecode-ltd.com',
-    smtpFromName: localTenant.smtpFromName || 'BlueCode Advisory & Consulting',
+    smtpFromEmail: localTenant.smtpFromEmail || localTenant.smtpUser || (isBC ? 'support@bluecode-ltd.com' : ''),
+    smtpFromName: localTenant.smtpFromName || studio.ragioneSociale || 'Studio Professionale',
     smtpReplyTo: localTenant.smtpReplyTo,
     smtpBcc: localTenant.smtpBcc,
     to: input.email,
@@ -794,20 +799,23 @@ export async function sendWhatsAppDirectApi(to: string, text: string, templateNa
 
 export async function sendEmailDirectApi(to: string, subject: string, text: string, html?: string) {
   let tenantInfo: any = {};
+  const currentTenantId = getCurrentTenantId();
+  const isBC = currentTenantId === BLUECODE_TENANT_ID;
+  const studio = getStudioInfoForTenant(currentTenantId);
   try {
-    const saved = localStorage.getItem('bluman_tenant_info');
+    const saved = localStorage.getItem(getTenantStorageKey('bluman_tenant_info'));
     if (saved) tenantInfo = JSON.parse(saved);
   } catch {}
 
   const body = {
     action: 'send-message',
-    smtpHost: tenantInfo.smtpHost || 'authsmtp.register.it',
+    smtpHost: tenantInfo.smtpHost || (isBC ? 'authsmtp.register.it' : ''),
     smtpPort: tenantInfo.smtpPort || 465,
     smtpSecure: tenantInfo.smtpSecure !== undefined ? tenantInfo.smtpSecure : true,
-    smtpUser: tenantInfo.smtpUser || 'support@bluecode-ltd.com',
+    smtpUser: tenantInfo.smtpUser || (isBC ? 'support@bluecode-ltd.com' : ''),
     smtpPass: tenantInfo.smtpPass || '',
-    smtpFromEmail: tenantInfo.smtpFromEmail || tenantInfo.smtpUser || 'support@bluecode-ltd.com',
-    smtpFromName: tenantInfo.smtpFromName || 'BlueCode Advisory & Consulting',
+    smtpFromEmail: tenantInfo.smtpFromEmail || tenantInfo.smtpUser || (isBC ? 'support@bluecode-ltd.com' : ''),
+    smtpFromName: tenantInfo.smtpFromName || studio.ragioneSociale || 'Studio Professionale',
     smtpReplyTo: tenantInfo.smtpReplyTo || '',
     smtpBcc: tenantInfo.smtpBcc || '',
     to,
@@ -844,16 +852,18 @@ export async function sendEmailDirectApi(to: string, subject: string, text: stri
 
 export async function fetchInboundImapEmailsApi(clientEmail?: string) {
   let tenantInfo: any = {};
+  const currentTenantId = getCurrentTenantId();
+  const isBC = currentTenantId === BLUECODE_TENANT_ID;
   try {
-    const saved = localStorage.getItem('bluman_tenant_info');
+    const saved = localStorage.getItem(getTenantStorageKey('bluman_tenant_info'));
     if (saved) tenantInfo = JSON.parse(saved);
   } catch {}
 
   const body = {
     action: 'fetch-imap-inbound',
-    imapHost: tenantInfo.imapHost || 'imap.register.it',
+    imapHost: tenantInfo.imapHost || (isBC ? 'imap.register.it' : ''),
     imapPort: tenantInfo.imapPort || 993,
-    imapUser: tenantInfo.imapUser || tenantInfo.smtpUser || 'support@bluecode-ltd.com',
+    imapUser: tenantInfo.imapUser || tenantInfo.smtpUser || (isBC ? 'support@bluecode-ltd.com' : ''),
     imapPass: tenantInfo.imapPass || tenantInfo.smtpPass || '',
     imapFolder: tenantInfo.imapFolder || 'INBOX',
     clientEmail: clientEmail || '',

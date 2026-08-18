@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { fetchComunicazioniApi, inviaComunicazioneApi, fetchClienti, sendWhatsAppDirectApi, sendEmailDirectApi, fetchInboundImapEmailsApi, fetchTenantInfoApi } from '../api/client';
 import { downloadGuidePdf } from '../utils/pdfGenerator';
+import { getCurrentTenantId, getTenantStorageKey, getStudioInfoForTenant, BLUECODE_TENANT_ID } from '../utils/tenant';
 import { PROJECTS } from '../store/mockData';
 import type { Cliente } from '../types';
 
@@ -86,7 +87,7 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
       if (dbTenant) {
         setTenantSettings(dbTenant);
       } else {
-        const local = localStorage.getItem('bluman_tenant_info');
+        const local = localStorage.getItem(getTenantStorageKey('bluman_tenant_info'));
         if (local) {
           try { setTenantSettings(JSON.parse(local)); } catch {}
         }
@@ -96,11 +97,14 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
   }, []);
 
   const studioChannels = useMemo(() => {
+    const currentTenantId = getCurrentTenantId();
+    const isBC = currentTenantId === BLUECODE_TENANT_ID;
+    const studio = getStudioInfoForTenant(currentTenantId);
     return {
-      whatsapp: tenantSettings?.telefono || '+39 378 092 6461',
-      email: tenantSettings?.smtpFromEmail || tenantSettings?.email || 'comunicazioni@bluecode.advisory',
-      telegram: tenantSettings?.tgBotUsername || '@BluManStudioBot',
-      signal: tenantSettings?.telefono || '+39 378 092 6461',
+      whatsapp: tenantSettings?.telefono || studio.telefono || (isBC ? '+39 378 092 6461' : ''),
+      email: tenantSettings?.smtpFromEmail || tenantSettings?.email || studio.email || (isBC ? 'comunicazioni@bluecode.advisory' : ''),
+      telegram: tenantSettings?.tgBotUsername || (isBC ? '@BluManStudioBot' : ''),
+      signal: tenantSettings?.telefono || studio.telefono || (isBC ? '+39 378 092 6461' : ''),
     };
   }, [tenantSettings]);
 

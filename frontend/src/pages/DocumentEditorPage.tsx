@@ -229,7 +229,24 @@ export function DocumentEditorPage() {
         setTenantInfo(tnt);
       } else {
         const local = localStorage.getItem(getTenantStorageKey('bluman_tenant_info'));
-        if (local) setTenantInfo(JSON.parse(local));
+        if (local) {
+          setTenantInfo(JSON.parse(local));
+        } else {
+          // Fallback: popola tenantInfo dai dati di registrazione del tenant (SuperAdmin o TENANT_STUDIOS)
+          // Così il Document Studio ha SEMPRE un'identità corretta (nome, sede, piva) anche senza configurazione manuale
+          const studioFallback = getStudioInfoForTenant(currentTenantId);
+          setTenantInfo({
+            ragioneSociale: studioFallback.ragioneSociale || '',
+            piva: studioFallback.piva || '',
+            sedeLegale: studioFallback.sedeLegale || '',
+            sedeOperativa: studioFallback.sedeOperativa || '',
+            telefono: studioFallback.telefono || '',
+            email: studioFallback.email || '',
+            iban: studioFallback.iban || '',
+            codiceSdi: studioFallback.codiceSdi || '',
+            logoUrl: '',
+          });
+        }
       }
     };
     loadInitialData();
@@ -306,6 +323,13 @@ export function DocumentEditorPage() {
 
     return out;
   };
+
+  // Sincronizzazione automatica dell'editor con i dati reali del tenant/cliente/progetto attivo
+  useEffect(() => {
+    if (editorRef.current && !queryDocId) {
+      editorRef.current.innerHTML = renderResolvedContent(rawTemplateRef.current);
+    }
+  }, [tenantInfo, selectedClienteId, selectedProgettoId, tagDisplayMode, selectedTemplateId]);
 
   // Cambio Template
   const handleSelectTemplate = (tmpl: DocumentTemplate) => {
