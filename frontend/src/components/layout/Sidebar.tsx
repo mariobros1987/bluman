@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import { getFormattedLogoUrl } from '../../utils';
 import { getUserPermission } from '../../utils/rbac';
-import { getCurrentTenantId, getStudioInfoForTenant } from '../../utils/tenant';
+import { getCurrentTenantId, getTenantStorageKey, getStudioInfoForTenant, BLUECODE_TENANT_ID } from '../../utils/tenant';
 import styles from './Sidebar.module.css';
 
 const NAV = [
@@ -29,6 +29,10 @@ interface SidebarProps {
 export function Sidebar({ alertCount = 0, user, onLogout }: SidebarProps) {
   const currentTenantId = getCurrentTenantId(user);
   const studioInfo = getStudioInfoForTenant(currentTenantId);
+  const isBluecode = currentTenantId === BLUECODE_TENANT_ID;
+
+  const tenantLogo = localStorage.getItem(getTenantStorageKey('bluman_logo_url'));
+  const effectiveLogo = tenantLogo || (isBluecode ? '/logo.png' : '');
 
   const userName = user?.nome || user?.name || studioInfo.leadAdvisor || 'Operatore Studio';
   const initials = userName.substring(0, 2).toUpperCase();
@@ -50,16 +54,31 @@ export function Sidebar({ alertCount = 0, user, onLogout }: SidebarProps) {
     <aside className={styles.sidebar}>
       {/* Logo & Tenant Studio Badge */}
       <div className={styles.logo} style={{ background: '#0f172a', padding: '10px 14px', borderRadius: 10, border: '1px solid #1e293b', marginBottom: 16 }}>
-        <img
-          src={getFormattedLogoUrl(localStorage.getItem(getTenantStorageKey('bluman_logo_url')) || localStorage.getItem('bluman_logo_url'))}
-          alt="BLUECODE"
-          style={{ height: 32, maxWidth: 160, objectFit: 'contain', display: 'block' }}
-          onError={(e) => {
-            (e.target as HTMLImageElement).src = '/logo.png';
-          }}
-        />
+        {effectiveLogo ? (
+          <img
+            src={getFormattedLogoUrl(effectiveLogo)}
+            alt={studioInfo.ragioneSociale || 'Studio'}
+            style={{ height: 32, maxWidth: 160, objectFit: 'contain', display: 'block' }}
+            onError={(e) => {
+              if (isBluecode) {
+                (e.target as HTMLImageElement).src = '/logo.png';
+              } else {
+                (e.target as HTMLElement).style.display = 'none';
+              }
+            }}
+          />
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0' }}>
+            <div style={{ width: 28, height: 28, borderRadius: 6, background: '#1e293b', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, color: '#38bdf8', border: '1px solid #334155' }}>
+              🏛
+            </div>
+            <div style={{ fontWeight: 800, fontSize: 13.5, color: '#f8fafc', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 125 }}>
+              {studioInfo.nomeBreve || 'Studio'}
+            </div>
+          </div>
+        )}
         <div style={{ marginTop: 6, fontSize: 11, fontWeight: 600, color: '#38bdf8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          🏛 {studioInfo.nomeBreve}
+          🏛 {studioInfo.nomeBreve || studioInfo.ragioneSociale || 'Studio Professionale'}
         </div>
       </div>
 

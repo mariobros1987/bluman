@@ -85,6 +85,9 @@ export function SettingsPage() {
   
   const loadTenantData = async () => {
     setLoadingUsers(true);
+    const currentTenantId = getCurrentTenantId();
+    const isBluecode = currentTenantId === BLUECODE_TENANT_ID;
+
     const dbTenant = await fetchTenantInfoApi();
     const localInfoStr = localStorage.getItem(getTenantStorageKey('bluman_tenant_info'));
     let localInfo: any = {};
@@ -93,55 +96,64 @@ export function SettingsPage() {
     }
     const tData = { ...localInfo, ...(dbTenant || {}) };
 
-    // Se nessun dato trovato (nuovo tenant), pre-popola con i dati base dal registro tenant
-    const studioDefaults = getStudioInfoForTenant();
-    if (!tData.ragioneSociale && studioDefaults.ragioneSociale !== 'Studio Professionale') {
+    // Se è il tenant master Bluecode ed è vuoto, pre-popola i dati di default Bluecode.
+    // Tutti gli altri tenant partono rigorosamente AZZERATI (tabula rasa).
+    if (isBluecode && !tData.ragioneSociale) {
+      const studioDefaults = getStudioInfoForTenant(currentTenantId);
       tData.ragioneSociale = studioDefaults.ragioneSociale;
       tData.piva = studioDefaults.piva;
+      tData.codiceFiscale = studioDefaults.codiceFiscale;
       tData.sedeLegale = studioDefaults.sedeLegale;
       tData.sedeOperativa = studioDefaults.sedeOperativa;
       tData.email = studioDefaults.email;
       tData.telefono = studioDefaults.telefono;
       tData.iban = studioDefaults.iban;
+      tData.logoUrl = '/logo.png';
+      tData.coloreTemaFattura = '#4338ca';
+      tData.titoloIntestazione = 'BLUECODE ADVISORY & CONSULTING';
+      tData.notePieFattura = 'Fattura emessa ai sensi delle vigenti disposizioni fiscali UE. Pagamento a mezzo bonifico bancario su IBAN indicato.';
+    } else if (!tData.ragioneSociale) {
+      const studioDefaults = getStudioInfoForTenant(currentTenantId);
+      tData.ragioneSociale = studioDefaults.ragioneSociale || '';
     }
 
     if (tData) {
-      if (tData.ragioneSociale) setRagioneSociale(tData.ragioneSociale);
-      if (tData.piva) setPIva(tData.piva);
-      if (tData.codiceFiscale) setCodFisc(tData.codiceFiscale);
-      if (tData.sedeLegale) setSedeLegale(tData.sedeLegale);
-      if (tData.sedeOperativa) setSedeOperativa(tData.sedeOperativa);
-      if (tData.email) setEmail(tData.email);
-      if (tData.pec) setPec(tData.pec);
-      if (tData.telefono) setTelefono(tData.telefono);
-      if (tData.iban) setIban(tData.iban);
-      if (tData.logoUrl) setLogoUrl(tData.logoUrl);
-      if (tData.coloreTemaFattura) setColoreTemaFattura(tData.coloreTemaFattura);
-      if (tData.notePieFattura) setNotePieDiPagina(tData.notePieFattura);
-      if (tData.titoloIntestazione) setTitoloIntestazione(tData.titoloIntestazione);
-      if (tData.waPhoneId) setWaPhoneId(tData.waPhoneId);
-      if (tData.waAccessToken) setWaAccessToken(tData.waAccessToken);
-      if (tData.waVerifyToken) setWaVerifyToken(tData.waVerifyToken);
-      if (tData.tgBotToken) setTgBotToken(tData.tgBotToken);
-      if (tData.tgBotUsername) setTgBotUsername(tData.tgBotUsername);
-      if (tData.smtpHost) setSmtpHost(tData.smtpHost);
-      if (tData.smtpPort) setSmtpPort(String(tData.smtpPort));
-      if (tData.smtpSecure != null) setSmtpSecure(tData.smtpSecure);
-      if (tData.smtpUser) setSmtpUser(tData.smtpUser);
-      if (tData.smtpPass) setSmtpPass(tData.smtpPass);
-      if (tData.smtpFromEmail) setSmtpFromEmail(tData.smtpFromEmail);
-      if (tData.smtpFromName) setSmtpFromName(tData.smtpFromName);
-      if (tData.smtpReplyTo) setSmtpReplyTo(tData.smtpReplyTo);
-      if (tData.smtpBcc) setSmtpBcc(tData.smtpBcc);
-      if (tData.imapProtocol) setImapProtocol(tData.imapProtocol);
-      if (tData.imapHost) setImapHost(tData.imapHost);
-      if (tData.imapPort) setImapPort(String(tData.imapPort));
-      if (tData.imapSecure != null) setImapSecure(tData.imapSecure);
-      if (tData.imapUser) setImapUser(tData.imapUser);
-      if (tData.imapPass) setImapPass(tData.imapPass);
-      if (tData.imapFolder) setImapFolder(tData.imapFolder);
-      if (tData.imapPollInterval) setImapPollInterval(tData.imapPollInterval);
-      if (tData.emailSignatureHtml) setEmailSignatureHtml(tData.emailSignatureHtml);
+      setRagioneSociale(tData.ragioneSociale || '');
+      setPIva(tData.piva || '');
+      setCodFisc(tData.codiceFiscale || '');
+      setSedeLegale(tData.sedeLegale || '');
+      setSedeOperativa(tData.sedeOperativa || '');
+      setEmail(tData.email || '');
+      setPec(tData.pec || '');
+      setTelefono(tData.telefono || '');
+      setIban(tData.iban || '');
+      setLogoUrl(tData.logoUrl || (isBluecode ? '/logo.png' : ''));
+      setColoreTemaFattura(tData.coloreTemaFattura || '#4338ca');
+      setNotePieDiPagina(tData.notePieFattura || '');
+      setTitoloIntestazione(tData.titoloIntestazione || '');
+      setWaPhoneId(tData.waPhoneId || '');
+      setWaAccessToken(tData.waAccessToken || '');
+      setWaVerifyToken(tData.waVerifyToken || '');
+      setTgBotToken(tData.tgBotToken || '');
+      setTgBotUsername(tData.tgBotUsername || '');
+      setSmtpHost(tData.smtpHost || '');
+      setSmtpPort(tData.smtpPort ? String(tData.smtpPort) : '465');
+      setSmtpSecure(tData.smtpSecure != null ? tData.smtpSecure : true);
+      setSmtpUser(tData.smtpUser || '');
+      setSmtpPass(tData.smtpPass || '');
+      setSmtpFromEmail(tData.smtpFromEmail || '');
+      setSmtpFromName(tData.smtpFromName || '');
+      setSmtpReplyTo(tData.smtpReplyTo || '');
+      setSmtpBcc(tData.smtpBcc || '');
+      setImapProtocol(tData.imapProtocol || 'imap');
+      setImapHost(tData.imapHost || '');
+      setImapPort(tData.imapPort ? String(tData.imapPort) : '993');
+      setImapSecure(tData.imapSecure != null ? tData.imapSecure : true);
+      setImapUser(tData.imapUser || '');
+      setImapPass(tData.imapPass || '');
+      setImapFolder(tData.imapFolder || 'INBOX');
+      setImapPollInterval(tData.imapPollInterval || '5m');
+      setEmailSignatureHtml(tData.emailSignatureHtml || '');
     }
 
     const dbUsers = await fetchUtentiTenant();

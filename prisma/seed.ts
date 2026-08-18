@@ -13,7 +13,7 @@ const TENANT_ID = '00000000-0000-0000-0000-000000000001';
 async function main() {
   console.log('🚀 Avvio del seeding completo del Database Supabase / PostgreSQL...');
 
-  // 1. TENANT MASTER
+  // 1. TENANT MASTER (BLUECODE LTD)
   const tenant = await prisma.tenant.upsert({
     where: { id: TENANT_ID },
     update: {
@@ -21,8 +21,35 @@ async function main() {
       piva: 'MT28491039',
       codiceFiscale: 'MT28491039',
       sedeLegale: 'Level 4, Valuation Centre, Tower Road, Sliema SLM 1600, Malta',
+      sedeOperativa: 'Via Montenapoleone 8, 20121 Milano (MI), Italia',
       email: 'support@bluecode-ltd.com',
-      telefono: '+356 2133 4455',
+      pec: 'bluecode@legalmail.it',
+      telefono: '+39 378 092 6461',
+      iban: 'MT89VALL22013000000012345678',
+      logoUrl: '/logo.png',
+      coloreTemaFattura: '#4338ca',
+      titoloIntestazione: 'BLUECODE ADVISORY & CONSULTING',
+      notePieFattura: 'Fattura emessa ai sensi delle vigenti disposizioni fiscali UE. Pagamento a mezzo bonifico bancario su IBAN indicato.',
+      waPhoneId: '1318817114639409',
+      waAccessToken: 'EAGO82S4iZAZCIBSCyV6ARilEgvBez7EwZA6pK5yaOa1ZCp7TmvFRTfxIZCWlLjQ4rBQeIZCRezgBJFm9BiQrUUsmfJA9ayZBTR3w3Qm3wGF8rUNpPCPqiSVOhTZCMF4EZBYpZAeQRjtgxfRqraBrXgBcZBCE0mZCfTvENnDAZBmgQhmtxeRp6N9Qcuj9C6CqigYHNXAZDZD',
+      waVerifyToken: 'bluman_wa_secure_token_2026',
+      tgBotToken: '7182930412:AAHj39201982736192',
+      tgBotUsername: '@BluManStudioBot',
+      smtpHost: 'authsmtp.register.it',
+      smtpPort: 465,
+      smtpSecure: true,
+      smtpUser: 'support@bluecode-ltd.com',
+      smtpFromEmail: 'support@bluecode-ltd.com',
+      smtpFromName: 'BlueCode Advisory & Consulting',
+      smtpReplyTo: 'support@bluecode-ltd.com',
+      imapHost: 'imap.register.it',
+      imapPort: 993,
+      imapSecure: true,
+      imapUser: 'support@bluecode-ltd.com',
+      imapFolder: 'INBOX',
+      imapPollInterval: '5m',
+      imapProtocol: 'imap',
+      emailSignatureHtml: 'Cordiali Saluti,\n{{nome_operatore}}\n{{ruolo_operatore}}\nBlueCode Advisory & Consulting — https://bluecode-ltd.com\n\nAvviso di Riservatezza (GDPR): Questo messaggio ed i suoi allegati sono confidenziali e destinati esclusivamente al destinatario indicato.',
     },
     create: {
       id: TENANT_ID,
@@ -30,13 +57,40 @@ async function main() {
       piva: 'MT28491039',
       codiceFiscale: 'MT28491039',
       sedeLegale: 'Level 4, Valuation Centre, Tower Road, Sliema SLM 1600, Malta',
+      sedeOperativa: 'Via Montenapoleone 8, 20121 Milano (MI), Italia',
       email: 'support@bluecode-ltd.com',
-      telefono: '+356 2133 4455',
+      pec: 'bluecode@legalmail.it',
+      telefono: '+39 378 092 6461',
+      iban: 'MT89VALL22013000000012345678',
+      logoUrl: '/logo.png',
+      coloreTemaFattura: '#4338ca',
+      titoloIntestazione: 'BLUECODE ADVISORY & CONSULTING',
+      notePieFattura: 'Fattura emessa ai sensi delle vigenti disposizioni fiscali UE. Pagamento a mezzo bonifico bancario su IBAN indicato.',
+      waPhoneId: '1318817114639409',
+      waAccessToken: 'EAGO82S4iZAZCIBSCyV6ARilEgvBez7EwZA6pK5yaOa1ZCp7TmvFRTfxIZCWlLjQ4rBQeIZCRezgBJFm9BiQrUUsmfJA9ayZBTR3w3Qm3wGF8rUNpPCPqiSVOhTZCMF4EZBYpZAeQRjtgxfRqraBrXgBcZBCE0mZCfTvENnDAZBmgQhmtxeRp6N9Qcuj9C6CqigYHNXAZDZD',
+      waVerifyToken: 'bluman_wa_secure_token_2026',
+      tgBotToken: '7182930412:AAHj39201982736192',
+      tgBotUsername: '@BluManStudioBot',
+      smtpHost: 'authsmtp.register.it',
+      smtpPort: 465,
+      smtpSecure: true,
+      smtpUser: 'support@bluecode-ltd.com',
+      smtpFromEmail: 'support@bluecode-ltd.com',
+      smtpFromName: 'BlueCode Advisory & Consulting',
+      smtpReplyTo: 'support@bluecode-ltd.com',
+      imapHost: 'imap.register.it',
+      imapPort: 993,
+      imapSecure: true,
+      imapUser: 'support@bluecode-ltd.com',
+      imapFolder: 'INBOX',
+      imapPollInterval: '5m',
+      imapProtocol: 'imap',
+      emailSignatureHtml: 'Cordiali Saluti,\n{{nome_operatore}}\n{{ruolo_operatore}}\nBlueCode Advisory & Consulting — https://bluecode-ltd.com\n\nAvviso di Riservatezza (GDPR): Questo messaggio ed i suoi allegati sono confidenziali e destinati esclusivamente al destinatario indicato.',
       piano: 'enterprise',
       stato: 'attivo',
     },
   });
-  console.log('✓ Tenant configurato:', tenant.ragioneSociale);
+  console.log('✓ Tenant master Bluecode configurato nel database con tutte le impostazioni:', tenant.ragioneSociale);
 
   // 2. UTENTI E PROFESSIONISTI STUDIO
   const USERS = [
