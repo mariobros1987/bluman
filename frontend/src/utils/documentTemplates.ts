@@ -57,7 +57,7 @@ export const PREBUILT_TEMPLATES: DocumentTemplate[] = [
   4. FORO COMPETENTE E LEGGE APPLICABILE
 </h3>
 <p style="font-size: 11.5px; line-height: 1.6; text-align: justify;">
-  Il presente accordo è regolato dalla legge maltese/italiana. Per ogni eventuale controversia sarà competente in via esclusiva il Foro di competenza della sede legale dello Studio.
+  Il presente accordo è regolato dalla legge applicabile alla sede legale dello Studio. Per ogni eventuale controversia sarà competente in via esclusiva il Foro della sede legale dello Studio.
 </p>
 
 <div style="margin-top: 40px; display: flex; justify-content: space-between; page-break-inside: avoid;">
@@ -241,7 +241,7 @@ export const PREBUILT_TEMPLATES: DocumentTemplate[] = [
 </h1>
 
 <p style="font-size: 11.5px; line-height: 1.6; text-align: justify;">
-  Il sottoscritto <strong>{{cliente.referente}}</strong>, nato a Milano il 12/04/1980, Codice Fiscale <strong>{{cliente.codice_fiscale}}</strong>, in qualità di Legale Rappresentante della società <strong>{{cliente.ragione_sociale}}</strong> (P.IVA {{cliente.partita_iva}}),
+  Il sottoscritto <strong>{{cliente.referente}}</strong>, Codice Fiscale / ID <strong>{{cliente.codice_fiscale}}</strong>, in qualità di Legale Rappresentante della società <strong>{{cliente.ragione_sociale}}</strong> (P.IVA/TIN {{cliente.partita_iva}}),
 </p>
 
 <h3 style="text-align: center; color: #4338ca; margin: 15px 0;">DICHIARA SOTTO LA PROPRIA RESPONSABILITÀ</h3>
