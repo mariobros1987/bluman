@@ -269,26 +269,26 @@ export function DocumentEditorPage() {
     const projTitolo = activeProgetto?.titolo || activeProgetto?.n || activeProgetto?.nome || (isBluecode ? 'Costituzione Holding & Trading Malta' : 'Incarico Professionale');
     const projImporto = activeProgetto?.totalePreventivo || activeProgetto?.val || 0;
 
-    // Dati dinamici Studio del Tenant attivo (nessun fallback su Bluecode per gli altri tenant)
-    const studioRagioneSociale = tenantInfo?.ragioneSociale || studioInfo.ragioneSociale || (isBluecode ? 'Bluecode Ltd' : 'Studio Professionale');
-    const studioPiva = tenantInfo?.piva || studioInfo.piva || (isBluecode ? 'MT28491039' : '');
-    const studioSede = tenantInfo?.sedeLegale || studioInfo.sedeLegale || (isBluecode ? 'Level 4, Valuation Centre, Tower Road, Sliema SLM 1600, Malta' : '');
-    const studioIban = tenantInfo?.iban || studioInfo.iban || (isBluecode ? 'MT89VALL22013000000012345678' : '');
-    const studioLeadAdvisor = studioInfo.leadAdvisor || (isBluecode ? 'Joe Disabato' : 'Lead Advisor');
-    const studioTel = tenantInfo?.telefono || studioInfo.telefono || (isBluecode ? '+356 2134 5678' : '');
-    const studioEmail = tenantInfo?.email || studioInfo.email || (isBluecode ? 'contact@bluecode.advisory' : '');
+    // Dati dinamici Studio del Tenant attivo (totalmente dinamici dallo studio, nessun valore fisso)
+    const studioRagioneSociale = tenantInfo?.ragioneSociale || studioInfo.ragioneSociale || 'Studio Professionale';
+    const studioPiva = tenantInfo?.piva || studioInfo.piva || '';
+    const studioSede = tenantInfo?.sedeLegale || studioInfo.sedeLegale || '';
+    const studioIban = tenantInfo?.iban || studioInfo.iban || '';
+    const studioLeadAdvisor = studioInfo.leadAdvisor || 'Lead Senior Advisor';
+    const studioTel = tenantInfo?.telefono || studioInfo.telefono || '';
+    const studioEmail = tenantInfo?.email || studioInfo.email || '';
 
-    // Dati Cliente (se non selezionato, fallback su campi vuoti o dati generici del tenant)
-    const clientNome = activeCliente?.nome || activeProgetto?.cl || (isBluecode ? 'Holding Beta S.r.l.' : 'Cliente Committente');
-    const clientPiva = activeCliente?.piva || activeCliente?.codiceFiscale || (isBluecode ? 'IT09876543210' : '');
-    const clientCodFisc = activeCliente?.codiceFiscale || activeCliente?.piva || (isBluecode ? 'BLUCD90A01H501X' : '');
-    const clientSede = activeCliente?.sedeLegale || (isBluecode ? 'Via Montenapoleone 8, Milano' : '');
-    const clientPec = activeCliente?.pec || (isBluecode ? 'holdingbeta@legalmail.it' : '');
-    const clientSdi = activeCliente?.codiceSdi || (isBluecode ? 'SUBM70N' : '');
-    const clientIban = activeCliente?.iban || (isBluecode ? 'IT60X0542811101000000123456' : '');
-    const clientRef = activeCliente?.referenteNome || refJson.referente || (isBluecode ? 'Ing. Roberto Rossi (CEO)' : 'Legale Rappresentante');
-    const clientCell = activeCliente?.cellulare || (isBluecode ? '+39 333 5936278' : '');
-    const clientUbo = activeCliente?.ubo || activeCliente?.referenteNome || (isBluecode ? 'Roberto Rossi' : 'Titolare Effettivo (UBO)');
+    // Dati Cliente (se non selezionato, fallback su Smart Tags o etichette neutre)
+    const clientNome = activeCliente?.nome || activeProgetto?.cl || 'Cliente Committente';
+    const clientPiva = activeCliente?.piva || activeCliente?.codiceFiscale || '';
+    const clientCodFisc = activeCliente?.codiceFiscale || activeCliente?.piva || '';
+    const clientSede = activeCliente?.sedeLegale || '';
+    const clientPec = activeCliente?.pec || '';
+    const clientSdi = activeCliente?.codiceSdi || '';
+    const clientIban = activeCliente?.iban || '';
+    const clientRef = activeCliente?.referenteNome || refJson.referente || 'Legale Rappresentante';
+    const clientCell = activeCliente?.cellulare || '';
+    const clientUbo = activeCliente?.ubo || activeCliente?.referenteNome || 'Titolare Effettivo (UBO)';
 
     // Se in anteprima bozza e modalità 'highlight', evidenzia il dato reale con un elegante Smart Chip ERP
     const wrapTag = (value: string, tagCode: string) => {
@@ -1179,9 +1179,7 @@ export function DocumentEditorPage() {
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #4338ca', paddingBottom: 14, marginBottom: 30 }}>
                   {(() => {
-                    const cTid = getCurrentTenantId();
-                    const isBC = cTid === BLUECODE_TENANT_ID;
-                    const rawLogo = tenantInfo?.logoUrl || localStorage.getItem(getTenantStorageKey('bluman_logo_url')) || (isBC ? '/logo.png' : '');
+                    const rawLogo = tenantInfo?.logoUrl || localStorage.getItem(getTenantStorageKey('bluman_logo_url'));
                     if (rawLogo) {
                       return (
                         <img
@@ -1194,13 +1192,13 @@ export function DocumentEditorPage() {
                     }
                     return (
                       <div style={{ fontSize: 16, fontWeight: 800, color: '#1e1b4b', display: 'flex', alignItems: 'center', gap: 8 }}>
-                        🏛 {(tenantInfo?.ragioneSociale || 'Studio Professionale').toUpperCase()}
+                        🏛 {(tenantInfo?.ragioneSociale || getStudioInfoForTenant(getCurrentTenantId()).ragioneSociale || 'STUDIO PROFESSIONALE').toUpperCase()}
                       </div>
                     );
                   })()}
                   <div style={{ textAlign: 'right', fontSize: 10, color: '#64748b', lineHeight: 1.4 }}>
-                    <strong style={{ color: '#1e1b4b', fontSize: 11 }}>{tenantInfo?.ragioneSociale || (() => { const s = getStudioInfoForTenant(getCurrentTenantId()); return s.ragioneSociale || 'Studio Professionale'; })()}</strong><br/>
-                    {tenantInfo?.sedeLegale || (() => { const s = getStudioInfoForTenant(getCurrentTenantId()); return s.sedeLegale || ''; })()}{tenantInfo?.sedeLegale || getStudioInfoForTenant(getCurrentTenantId()).sedeLegale ? <br/> : null}
+                    <strong style={{ color: '#1e1b4b', fontSize: 11 }}>{tenantInfo?.ragioneSociale || getStudioInfoForTenant(getCurrentTenantId()).ragioneSociale || 'Studio Professionale'}</strong><br/>
+                    {tenantInfo?.sedeLegale || getStudioInfoForTenant(getCurrentTenantId()).sedeLegale ? <>{tenantInfo?.sedeLegale || getStudioInfoForTenant(getCurrentTenantId()).sedeLegale}<br/></> : null}
                     {(tenantInfo?.piva || getStudioInfoForTenant(getCurrentTenantId()).piva) ? `P.IVA/TIN: ${tenantInfo?.piva || getStudioInfoForTenant(getCurrentTenantId()).piva}` : ''}{(tenantInfo?.telefono || getStudioInfoForTenant(getCurrentTenantId()).telefono) ? ` | Tel: ${tenantInfo?.telefono || getStudioInfoForTenant(getCurrentTenantId()).telefono}` : ''}
                   </div>
                 </div>

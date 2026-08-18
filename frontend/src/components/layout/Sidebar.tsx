@@ -29,10 +29,9 @@ interface SidebarProps {
 export function Sidebar({ alertCount = 0, user, onLogout }: SidebarProps) {
   const currentTenantId = getCurrentTenantId(user);
   const studioInfo = getStudioInfoForTenant(currentTenantId);
-  const isBluecode = currentTenantId === BLUECODE_TENANT_ID;
 
   const tenantLogo = localStorage.getItem(getTenantStorageKey('bluman_logo_url'));
-  const effectiveLogo = tenantLogo || (isBluecode ? '/logo.png' : '');
+  const effectiveLogo = tenantLogo || '';
 
   const userName = user?.nome || user?.name || studioInfo.leadAdvisor || 'Operatore Studio';
   const initials = userName.substring(0, 2).toUpperCase();
@@ -60,11 +59,7 @@ export function Sidebar({ alertCount = 0, user, onLogout }: SidebarProps) {
             alt={studioInfo.ragioneSociale || 'Studio'}
             style={{ height: 32, maxWidth: 160, objectFit: 'contain', display: 'block' }}
             onError={(e) => {
-              if (isBluecode) {
-                (e.target as HTMLImageElement).src = '/logo.png';
-              } else {
-                (e.target as HTMLElement).style.display = 'none';
-              }
+              (e.target as HTMLElement).style.display = 'none';
             }}
           />
         ) : (

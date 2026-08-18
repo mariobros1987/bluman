@@ -311,30 +311,30 @@ export function resolveDocumentTemplateHtml(
     } catch {}
   }
 
-  // Dati studio dinamici dal tenant attivo (nessun fallback su Bluecode per gli altri tenant)
-  const studioRagioneSociale = targetStudio?.ragioneSociale || studioInfo.ragioneSociale || (isBluecode ? 'Bluecode Ltd' : '');
-  const studioPiva = targetStudio?.piva || studioInfo.piva || (isBluecode ? 'MT28491039' : '');
-  const studioSede = targetStudio?.sedeLegale || studioInfo.sedeLegale || (isBluecode ? 'Level 4, Valuation Centre, Tower Road, Sliema SLM 1600, Malta' : '');
-  const studioIban = targetStudio?.iban || studioInfo.iban || (isBluecode ? 'MT89VALL22013000000012345678' : '');
-  const studioLeadAdvisor = studioInfo.leadAdvisor || (isBluecode ? 'Joe Disabato' : '');
-  const studioTel = targetStudio?.telefono || studioInfo.telefono || (isBluecode ? '+356 2134 5678' : '');
-  const studioEmail = targetStudio?.email || studioInfo.email || (isBluecode ? 'contact@bluecode.advisory' : '');
+  // Dati studio dinamici dal tenant attivo
+  const studioRagioneSociale = targetStudio?.ragioneSociale || studioInfo.ragioneSociale || 'Studio Professionale';
+  const studioPiva = targetStudio?.piva || studioInfo.piva || '';
+  const studioSede = targetStudio?.sedeLegale || studioInfo.sedeLegale || '';
+  const studioIban = targetStudio?.iban || studioInfo.iban || '';
+  const studioLeadAdvisor = studioInfo.leadAdvisor || 'Lead Senior Advisor';
+  const studioTel = targetStudio?.telefono || studioInfo.telefono || '';
+  const studioEmail = targetStudio?.email || studioInfo.email || '';
 
-  // Dati cliente (fallback vuoti per tenant non-Bluecode)
-  const clientNome = targetCliente?.nome || targetProgetto?.cl || (isBluecode ? 'Holding Beta S.r.l.' : '');
-  const clientPiva = targetCliente?.piva || targetCliente?.codiceFiscale || (isBluecode ? 'IT09876543210' : '');
-  const clientCodFisc = targetCliente?.codiceFiscale || targetCliente?.piva || (isBluecode ? 'IT09876543210' : '');
-  const clientSede = targetCliente?.sedeLegale || (isBluecode ? 'Via Montenapoleone 8, Milano' : '');
-  const clientPec = targetCliente?.pec || (isBluecode ? 'holdingbeta@legalmail.it' : '');
-  const clientSdi = targetCliente?.codiceSdi || (isBluecode ? 'SUBM70N' : '');
-  const clientIban = targetCliente?.iban || (isBluecode ? 'IT60X0542811101000000123456' : '');
-  const clientRef = targetCliente?.referenteNome || (targetCliente?.referentiJson as any)?.referente || targetCliente?.referente || (isBluecode ? 'Ing. Roberto Rossi (CEO)' : '');
-  const clientCell = targetCliente?.cellulare || (isBluecode ? '+39 333 5936278' : '');
-  const clientUbo = targetCliente?.ubo || targetCliente?.referenteNome || (isBluecode ? 'Roberto Rossi' : '');
+  // Dati cliente
+  const clientNome = targetCliente?.nome || targetProgetto?.cl || 'Cliente Committente';
+  const clientPiva = targetCliente?.piva || targetCliente?.codiceFiscale || '';
+  const clientCodFisc = targetCliente?.codiceFiscale || targetCliente?.piva || '';
+  const clientSede = targetCliente?.sedeLegale || '';
+  const clientPec = targetCliente?.pec || '';
+  const clientSdi = targetCliente?.codiceSdi || '';
+  const clientIban = targetCliente?.iban || '';
+  const clientRef = targetCliente?.referenteNome || (targetCliente?.referentiJson as any)?.referente || targetCliente?.referente || 'Legale Rappresentante';
+  const clientCell = targetCliente?.cellulare || '';
+  const clientUbo = targetCliente?.ubo || targetCliente?.referenteNome || 'Titolare Effettivo (UBO)';
 
   const dataOggi = new Date().toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' });
 
-  const projTitolo = targetProgetto?.titolo || targetProgetto?.n || targetProgetto?.nome || (isBluecode ? 'Costituzione Holding & Trading Malta' : '');
+  const projTitolo = targetProgetto?.titolo || targetProgetto?.n || targetProgetto?.nome || 'Incarico Professionale';
   const projImporto = targetProgetto?.totalePreventivo || targetProgetto?.val || 0;
 
   // Sostituzione formale dei tag: NESSUN riquadro o badge, solo elegante grassetto istituzionale
