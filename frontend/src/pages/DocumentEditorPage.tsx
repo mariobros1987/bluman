@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { fetchClienti, fetchProgetti, fetchTenantInfoApi, uploadFileApi, fetchDocumentiTemplateApi, creaDocumentoTemplateApi, eliminaDocumentoTemplateApi } from '../api/client';
 import { getFormattedLogoUrl } from '../utils';
 import { downloadRealPdf } from '../utils/pdfGenerator';
-import { getCurrentTenantId, getTenantStorageKey, BLUECODE_TENANT_ID } from '../utils/tenant';
+import { getCurrentTenantId, getTenantStorageKey, getStudioInfoForTenant, BLUECODE_TENANT_ID } from '../utils/tenant';
 import { PROJECTS } from '../store/mockData';
 import type { Cliente, Progetto } from '../types';
 
@@ -74,8 +74,13 @@ export function DocumentEditorPage() {
           fetchProgetti(),
           fetchTenantInfoApi(),
         ]);
-        if (cls && Array.isArray(cls)) apiCls = cls;
-        if (prjs && Array.isArray(prjs)) apiPrjs = prjs;
+        const currentTenantId = getCurrentTenantId();
+        if (cls && Array.isArray(cls)) {
+          apiCls = cls.filter((c: any) => !c.tenantId || c.tenantId === currentTenantId);
+        }
+        if (prjs && Array.isArray(prjs)) {
+          apiPrjs = prjs.filter((p: any) => !p.tenantId || p.tenantId === currentTenantId);
+        }
         if (tntRes) tnt = tntRes;
       } catch (err) {
         console.warn('Caricamento remoto parziale:', err);
@@ -168,7 +173,11 @@ export function DocumentEditorPage() {
       });
       const allClients = Array.from(clientMap.values());
       setClienti(allClients);
-      if (allClients.length > 0) setSelectedClienteId(allClients[0].id);
+      if (allClients.length > 0) {
+        setSelectedClienteId(allClients[0].id);
+      } else {
+        setSelectedClienteId('');
+      }
 
       // 2. Progetti: Unione DB + LocalStorage + Mock PROJECTS (solo Bluecode)
       const allRawProjects = isBluecode ? [...apiPrjs, ...localProjs, ...PROJECTS] : [...apiPrjs, ...localProjs];
@@ -193,6 +202,8 @@ export function DocumentEditorPage() {
         setSelectedProgettoId(queryProjId);
       } else if (allNormalizedProjects.length > 0) {
         setSelectedProgettoId(allNormalizedProjects[0].id);
+      } else {
+        setSelectedProgettoId('');
       }
 
       // Se specificato docId, carica il documento salvato nel Vault
@@ -224,46 +235,74 @@ export function DocumentEditorPage() {
     loadInitialData();
   }, [queryDocId, queryProjId]);
 
-  const activeCliente = clienti.find(c => c.id === selectedClienteId) || clienti[0];
-  const activeProgetto: any = progetti.find((p: any) => String(p.id) === String(selectedProgettoId)) || progetti[0];
+  const activeCliente = clienti.find(c => c.id === selectedClienteId) || (clienti.length > 0 ? clienti[0] : null);
+  const activeProgetto: any = progetti.find((p: any) => String(p.id) === String(selectedProgettoId)) || (progetti.length > 0 ? progetti[0] : null);
 
   // Sostituzione dinamica delle variabili Smart Tags (Mail Merge) con Smart Chips interattivi
   const renderResolvedContent = (htmlContent: string, isForPrintOrExport: boolean = false) => {
     if (tagDisplayMode === 'raw' && !isForPrintOrExport) return htmlContent;
 
+    const currentTenantId = getCurrentTenantId();
+    const isBluecode = currentTenantId === BLUECODE_TENANT_ID;
+    const studioInfo = getStudioInfoForTenant(currentTenantId);
+
     const refJson: any = activeCliente?.referentiJson && typeof activeCliente.referentiJson === 'object' ? activeCliente.referentiJson : {};
     const dataOggi = new Date().toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' });
 
-    const projTitolo = activeProgetto?.titolo || activeProgetto?.n || activeProgetto?.nome || 'Costituzione Holding & Trading Malta';
-    const projImporto = activeProgetto?.totalePreventivo || activeProgetto?.val || 8500;
+    const projTitolo = activeProgetto?.titolo || activeProgetto?.n || activeProgetto?.nome || (isBluecode ? 'Costituzione Holding & Trading Malta' : 'Incarico Professionale');
+    const projImporto = activeProgetto?.totalePreventivo || activeProgetto?.val || 0;
+
+    // Dati dinamici Studio del Tenant attivo (nessun fallback su Bluecode per gli altri tenant)
+    const studioRagioneSociale = tenantInfo?.ragioneSociale || studioInfo.ragioneSociale || (isBluecode ? 'Bluecode Ltd' : 'Studio Professionale');
+    const studioPiva = tenantInfo?.piva || studioInfo.piva || (isBluecode ? 'MT28491039' : '');
+    const studioSede = tenantInfo?.sedeLegale || studioInfo.sedeLegale || (isBluecode ? 'Level 4, Valuation Centre, Tower Road, Sliema SLM 1600, Malta' : '');
+    const studioIban = tenantInfo?.iban || studioInfo.iban || (isBluecode ? 'MT89VALL22013000000012345678' : '');
+    const studioLeadAdvisor = studioInfo.leadAdvisor || (isBluecode ? 'Joe Disabato' : 'Lead Advisor');
+    const studioTel = tenantInfo?.telefono || studioInfo.telefono || (isBluecode ? '+356 2134 5678' : '');
+    const studioEmail = tenantInfo?.email || studioInfo.email || (isBluecode ? 'contact@bluecode.advisory' : '');
+
+    // Dati Cliente (se non selezionato, fallback su campi vuoti o dati generici del tenant)
+    const clientNome = activeCliente?.nome || activeProgetto?.cl || (isBluecode ? 'Holding Beta S.r.l.' : 'Cliente Committente');
+    const clientPiva = activeCliente?.piva || activeCliente?.codiceFiscale || (isBluecode ? 'IT09876543210' : '');
+    const clientCodFisc = activeCliente?.codiceFiscale || activeCliente?.piva || (isBluecode ? 'BLUCD90A01H501X' : '');
+    const clientSede = activeCliente?.sedeLegale || (isBluecode ? 'Via Montenapoleone 8, Milano' : '');
+    const clientPec = activeCliente?.pec || (isBluecode ? 'holdingbeta@legalmail.it' : '');
+    const clientSdi = activeCliente?.codiceSdi || (isBluecode ? 'SUBM70N' : '');
+    const clientIban = activeCliente?.iban || (isBluecode ? 'IT60X0542811101000000123456' : '');
+    const clientRef = activeCliente?.referenteNome || refJson.referente || (isBluecode ? 'Ing. Roberto Rossi (CEO)' : 'Legale Rappresentante');
+    const clientCell = activeCliente?.cellulare || (isBluecode ? '+39 333 5936278' : '');
+    const clientUbo = activeCliente?.ubo || activeCliente?.referenteNome || (isBluecode ? 'Roberto Rossi' : 'Titolare Effettivo (UBO)');
 
     // Se in anteprima bozza e modalità 'highlight', evidenzia il dato reale con un elegante Smart Chip ERP
     const wrapTag = (value: string, tagCode: string) => {
-      if (isForPrintOrExport || tagDisplayMode === 'plain') return value;
-      return `<span class="bluman-smart-chip" title="Smart Tag ERP: {{${tagCode}}}" style="background: rgba(99, 102, 241, 0.14); color: #4338ca; border: 1px solid rgba(99, 102, 241, 0.35); border-bottom: 2px solid #4f46e5; border-radius: 4px; padding: 1px 6px; font-weight: 600; cursor: help; display: inline-block; box-shadow: 0 1px 3px rgba(99,102,241,0.12);">🏷️ ${value}</span>`;
+      if (isForPrintOrExport || tagDisplayMode === 'plain') return value || `[${tagCode}]`;
+      return `<span class="bluman-smart-chip" title="Smart Tag ERP: {{${tagCode}}}" style="background: rgba(99, 102, 241, 0.14); color: #4338ca; border: 1px solid rgba(99, 102, 241, 0.35); border-bottom: 2px solid #4f46e5; border-radius: 4px; padding: 1px 6px; font-weight: 600; cursor: help; display: inline-block; box-shadow: 0 1px 3px rgba(99,102,241,0.12);">🏷️ ${value || `[${tagCode}]`}</span>`;
     };
 
     let out = htmlContent;
     out = out.replace(/\{\{data_odierna\}\}/g, wrapTag(dataOggi, 'data_odierna'));
-    out = out.replace(/\{\{cliente\.ragione_sociale\}\}/g, wrapTag(activeCliente?.nome || 'Holding Beta S.r.l.', 'cliente.ragione_sociale'));
-    out = out.replace(/\{\{cliente\.nome\}\}/g, wrapTag(activeCliente?.nome || 'Holding Beta S.r.l.', 'cliente.nome'));
-    out = out.replace(/\{\{cliente\.partita_iva\}\}/g, wrapTag(activeCliente?.piva || activeCliente?.codiceFiscale || 'IT09876543210', 'cliente.partita_iva'));
-    out = out.replace(/\{\{cliente\.codice_fiscale\}\}/g, wrapTag(activeCliente?.codiceFiscale || activeCliente?.piva || 'IT09876543210', 'cliente.codice_fiscale'));
-    out = out.replace(/\{\{cliente\.sede_legale\}\}/g, wrapTag(activeCliente?.sedeLegale || 'Via Montenapoleone 8, Milano', 'cliente.sede_legale'));
-    out = out.replace(/\{\{cliente\.pec\}\}/g, wrapTag(activeCliente?.pec || 'holdingbeta@legalmail.it', 'cliente.pec'));
-    out = out.replace(/\{\{cliente\.sdi\}\}/g, wrapTag(activeCliente?.codiceSdi || 'SUBM70N', 'cliente.sdi'));
-    out = out.replace(/\{\{cliente\.iban\}\}/g, wrapTag(activeCliente?.iban || 'IT60X0542811101000000123456', 'cliente.iban'));
-    out = out.replace(/\{\{cliente\.referente\}\}/g, wrapTag(activeCliente?.referenteNome || refJson.referente || 'Ing. Roberto Rossi (CEO)', 'cliente.referente'));
-    out = out.replace(/\{\{cliente\.cellulare\}\}/g, wrapTag(activeCliente?.cellulare || '+39 333 5936278', 'cliente.cellulare'));
-    out = out.replace(/\{\{cliente\.ubo\}\}/g, wrapTag(activeCliente?.ubo || activeCliente?.referenteNome || 'Roberto Rossi', 'cliente.ubo'));
+    out = out.replace(/\{\{cliente\.ragione_sociale\}\}/g, wrapTag(clientNome, 'cliente.ragione_sociale'));
+    out = out.replace(/\{\{cliente\.nome\}\}/g, wrapTag(clientNome, 'cliente.nome'));
+    out = out.replace(/\{\{cliente\.partita_iva\}\}/g, wrapTag(clientPiva, 'cliente.partita_iva'));
+    out = out.replace(/\{\{cliente\.codice_fiscale\}\}/g, wrapTag(clientCodFisc, 'cliente.codice_fiscale'));
+    out = out.replace(/\{\{cliente\.sede_legale\}\}/g, wrapTag(clientSede, 'cliente.sede_legale'));
+    out = out.replace(/\{\{cliente\.pec\}\}/g, wrapTag(clientPec, 'cliente.pec'));
+    out = out.replace(/\{\{cliente\.sdi\}\}/g, wrapTag(clientSdi, 'cliente.sdi'));
+    out = out.replace(/\{\{cliente\.iban\}\}/g, wrapTag(clientIban, 'cliente.iban'));
+    out = out.replace(/\{\{cliente\.referente\}\}/g, wrapTag(clientRef, 'cliente.referente'));
+    out = out.replace(/\{\{cliente\.cellulare\}\}/g, wrapTag(clientCell, 'cliente.cellulare'));
+    out = out.replace(/\{\{cliente\.ubo\}\}/g, wrapTag(clientUbo, 'cliente.ubo'));
 
     out = out.replace(/\{\{progetto\.titolo\}\}/g, wrapTag(projTitolo, 'progetto.titolo'));
-    out = out.replace(/\{\{progetto\.importo_totale\}\}/g, wrapTag(`€ ${Number(projImporto).toLocaleString('it-IT')},00`, 'progetto.importo_totale'));
+    out = out.replace(/\{\{progetto\.importo_totale\}\}/g, wrapTag(projImporto ? `€ ${Number(projImporto).toLocaleString('it-IT')},00` : '€ 0,00', 'progetto.importo_totale'));
 
-    out = out.replace(/\{\{studio\.ragione_sociale\}\}/g, wrapTag(tenantInfo?.ragioneSociale || 'Bluecode Ltd', 'studio.ragione_sociale'));
-    out = out.replace(/\{\{studio\.piva\}\}/g, wrapTag(tenantInfo?.piva || 'MT28491039', 'studio.piva'));
-    out = out.replace(/\{\{studio\.sede_legale\}\}/g, wrapTag(tenantInfo?.sedeLegale || 'Level 4, Valuation Centre, Tower Road, Sliema SLM 1600, Malta', 'studio.sede_legale'));
-    out = out.replace(/\{\{studio\.iban\}\}/g, wrapTag(tenantInfo?.iban || 'MT89VALL22013000000012345678', 'studio.iban'));
+    out = out.replace(/\{\{studio\.ragione_sociale\}\}/g, wrapTag(studioRagioneSociale, 'studio.ragione_sociale'));
+    out = out.replace(/\{\{studio\.piva\}\}/g, wrapTag(studioPiva, 'studio.piva'));
+    out = out.replace(/\{\{studio\.sede_legale\}\}/g, wrapTag(studioSede, 'studio.sede_legale'));
+    out = out.replace(/\{\{studio\.iban\}\}/g, wrapTag(studioIban, 'studio.iban'));
+    out = out.replace(/\{\{studio\.lead_advisor\}\}/g, wrapTag(studioLeadAdvisor, 'studio.lead_advisor'));
+    out = out.replace(/\{\{studio\.telefono\}\}/g, wrapTag(studioTel, 'studio.telefono'));
+    out = out.replace(/\{\{studio\.email\}\}/g, wrapTag(studioEmail, 'studio.email'));
 
     return out;
   };
@@ -510,24 +549,39 @@ export function DocumentEditorPage() {
   const handleExportPdf = async () => {
     setFeedback('⏳ Generazione file PDF ad alta risoluzione in corso...');
     try {
-      const logo = getFormattedLogoUrl(tenantInfo?.logoUrl || localStorage.getItem('bluman_logo_url'));
+      const currentTenantId = getCurrentTenantId();
+      const isBluecode = currentTenantId === BLUECODE_TENANT_ID;
+      const studioInfo = getStudioInfoForTenant(currentTenantId);
+
+      const studioRagioneSociale = tenantInfo?.ragioneSociale || studioInfo.ragioneSociale || (isBluecode ? 'Bluecode Ltd' : 'Studio Professionale');
+      const studioSede = tenantInfo?.sedeLegale || studioInfo.sedeLegale || '';
+      const studioPiva = tenantInfo?.piva || studioInfo.piva || '';
+      const studioTel = tenantInfo?.telefono || studioInfo.telefono || '';
+
+      const rawLogo = tenantInfo?.logoUrl || localStorage.getItem(getTenantStorageKey('bluman_logo_url')) || (isBluecode ? '/logo.png' : '');
+      const logo = rawLogo ? getFormattedLogoUrl(rawLogo) : '';
+
       const currentHtml = editorRef.current?.innerHTML || rawTemplateRef.current;
       // Risolvi in modalità Stampa/PDF (senza smart chips, 100% testo pulito)
       const finalHtml = renderResolvedContent(currentHtml, true);
 
+      const logoOrBadgeHtml = logo
+        ? `<img src="${logo}" style="max-height: 45px; max-width: 180px; object-fit: contain;" alt="Logo Studio" />`
+        : `<div style="font-size: 16pt; font-weight: 800; color: #1e1b4b; display: flex; align-items: center; gap: 8px;">🏛 ${studioRagioneSociale.toUpperCase()}</div>`;
+
       const fullPrintHtml = `
         <div style="font-family: 'Segoe UI', Helvetica, Arial, sans-serif; color: #0f172a; line-height: 1.6; font-size: 11.5pt; width: 100%;">
           <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #4338ca; padding-bottom: 14px; margin-bottom: 24px;">
-            <img src="${logo}" style="max-height: 45px; max-width: 180px; object-fit: contain;" alt="Logo Studio" />
+            ${logoOrBadgeHtml}
             <div style="text-align: right; font-size: 9pt; color: #64748b;">
-              <strong style="color: #1e1b4b;">${tenantInfo?.ragioneSociale || 'Bluecode Ltd'}</strong><br/>
-              ${tenantInfo?.sedeLegale || 'Valuation Centre, Sliema, Malta'}<br/>
-              P.IVA: ${tenantInfo?.piva || 'MT28491039'} | Tel: ${tenantInfo?.telefono || '+39 378 092 6461'}
+              <strong style="color: #1e1b4b;">${studioRagioneSociale}</strong><br/>
+              ${studioSede ? `${studioSede}<br/>` : ''}
+              ${studioPiva ? `P.IVA: ${studioPiva}` : ''} ${studioTel ? `| Tel: ${studioTel}` : ''}
             </div>
           </div>
           <div style="min-height: 500px;">${finalHtml}</div>
           <div style="margin-top: 40px; border-top: 1px solid #e2e8f0; padding-top: 10px; display: flex; justify-content: space-between; font-size: 8.5pt; color: #94a3b8;">
-            <span>${tenantInfo?.ragioneSociale || 'Bluecode Ltd'} • Pratica: ${activeProgetto?.titolo || 'Advisory'}</span>
+            <span>${studioRagioneSociale} • Pratica: ${activeProgetto?.titolo || activeProgetto?.n || 'Incarico Professionale'}</span>
             <span>Sigillo eIDAS Documentale • Validità Giuridica UE</span>
           </div>
         </div>
@@ -724,9 +778,13 @@ export function DocumentEditorPage() {
             onChange={(e) => setSelectedClienteId(e.target.value)}
             style={{ fontSize: 12, padding: '5px 10px', borderRadius: 6, background: 'var(--card)', color: 'var(--text)', border: '1px solid var(--border)', fontWeight: 600 }}
           >
-            {clienti.map(c => (
-              <option key={c.id} value={c.id}>{c.nome} ({c.piva || c.codiceFiscale || 'P.IVA'})</option>
-            ))}
+            {clienti.length === 0 ? (
+              <option value="">(Nessun cliente registrato in questo Studio)</option>
+            ) : (
+              clienti.map(c => (
+                <option key={c.id} value={c.id}>{c.nome} {c.piva || c.codiceFiscale ? `(${c.piva || c.codiceFiscale})` : ''}</option>
+              ))
+            )}
           </select>
         </div>
 
@@ -737,9 +795,13 @@ export function DocumentEditorPage() {
             onChange={(e) => setSelectedProgettoId(e.target.value)}
             style={{ fontSize: 12, padding: '5px 10px', borderRadius: 6, background: 'var(--card)', color: 'var(--text)', border: '1px solid var(--border)', fontWeight: 600 }}
           >
-            {progetti.map((p: any) => (
-              <option key={p.id} value={p.id}>{p.titolo || p.n || p.nome || `Progetto #${p.id}`} ({p.cl || 'Cliente'})</option>
-            ))}
+            {progetti.length === 0 ? (
+              <option value="">(Nessun progetto attivo in questo Studio)</option>
+            ) : (
+              progetti.map((p: any) => (
+                <option key={p.id} value={p.id}>{p.titolo || p.n || p.nome || `Progetto #${p.id}`} {p.cl ? `(${p.cl})` : ''}</option>
+              ))
+            )}
           </select>
         </div>
       </div>

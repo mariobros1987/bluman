@@ -1,5 +1,5 @@
 import { REORGANIZATION_TEMPLATES } from './reorganizationTemplates';
-import { getTenantStorageKey } from './tenant';
+import { getCurrentTenantId, getTenantStorageKey, getStudioInfoForTenant, BLUECODE_TENANT_ID } from './tenant';
 
 export interface DocumentTemplate {
   id: string;
@@ -28,7 +28,7 @@ export const PREBUILT_TEMPLATES: DocumentTemplate[] = [
 
 <div style="background: #f8fafc; border-left: 4px solid #4338ca; padding: 12px 16px; margin-bottom: 25px; font-size: 11.5px; line-height: 1.6;">
   <strong>TRA LE PARTI:</strong><br/>
-  <strong>Lo Studio Professionale:</strong> {{studio.ragione_sociale}}, con sede legale in {{studio.sede_legale}}, P.IVA/TIN {{studio.piva}}, rappresentato da Joe Disabato (Senior Partner Advisory).<br/><br/>
+  <strong>Lo Studio Professionale:</strong> {{studio.ragione_sociale}}, con sede legale in {{studio.sede_legale}}, P.IVA/TIN {{studio.piva}}, rappresentato da {{studio.lead_advisor}} (Senior Partner Advisory).<br/><br/>
   <strong>E Il Cliente Committente:</strong> <strong>{{cliente.ragione_sociale}}</strong>, con sede legale in {{cliente.sede_legale}}, Codice Fiscale / P.IVA <code>{{cliente.partita_iva}}</code>, Codice SDI <code>{{cliente.sdi}}</code>, rappresentato dal Sig. <strong>{{cliente.referente}}</strong> (in qualità di Legale Rappresentante e UBO).
 </div>
 
