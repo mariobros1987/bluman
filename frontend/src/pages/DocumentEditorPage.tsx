@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { fetchClienti, fetchProgetti, fetchTenantInfoApi, uploadFileApi, fetchDocumentiTemplateApi, creaDocumentoTemplateApi, eliminaDocumentoTemplateApi } from '../api/client';
 import { getFormattedLogoUrl } from '../utils';
 import { downloadRealPdf } from '../utils/pdfGenerator';
+import { getCurrentTenantId, getTenantStorageKey, BLUECODE_TENANT_ID } from '../utils/tenant';
 import { PROJECTS } from '../store/mockData';
 import type { Cliente, Progetto } from '../types';
 
@@ -80,14 +81,17 @@ export function DocumentEditorPage() {
         console.warn('Caricamento remoto parziale:', err);
       }
 
-      // 1. Clienti: Unione DB + LocalStorage + Extracted from Projects + Default Studio
-      const customClStr = localStorage.getItem('bluman_custom_clients');
+      const currentTenantId = getCurrentTenantId();
+      const isBluecode = currentTenantId === BLUECODE_TENANT_ID;
+
+      // 1. Clienti: Unione DB + LocalStorage + Extracted from Projects + Default Studio (solo Bluecode)
+      const customClStr = localStorage.getItem(getTenantStorageKey('bluman_custom_clients'));
       const customCls: Cliente[] = customClStr ? JSON.parse(customClStr) : [];
 
-      const localProjStr = localStorage.getItem('bluman_custom_projects');
+      const localProjStr = localStorage.getItem(getTenantStorageKey('bluman_custom_projects'));
       const localProjs: any[] = localProjStr ? JSON.parse(localProjStr) : [];
 
-      const defaultClients: Cliente[] = [
+      const defaultClients: Cliente[] = isBluecode ? [
         {
           id: 'cl-01',
           nome: 'Holding Beta S.r.l.',
@@ -134,21 +138,22 @@ export function DocumentEditorPage() {
           email: 'trustee@sangiorgio.ch',
           referenteNome: 'Avv. Gianluigi Parodi',
         },
-      ];
+      ] : [];
 
       const extractedClients: Cliente[] = [];
-      [...PROJECTS, ...localProjs].forEach((p: any) => {
+      const projectsForExtraction = isBluecode ? [...PROJECTS, ...localProjs] : [...localProjs];
+      projectsForExtraction.forEach((p: any) => {
         if (p.cl) {
           extractedClients.push({
             id: `cl-proj-${p.id}`,
             nome: p.cl,
             tipo: p.ct || 'company',
-            piva: p.piva || 'IT09876543210',
-            codiceFiscale: p.codFisc || 'BLUCD90A01H501X',
-            sedeLegale: p.sede || 'Via Montenapoleone 8, Milano',
-            codiceSdi: 'SUBM70N',
-            email: 'client@holdingbeta.advisory',
-            telefono: '+39 02 889900',
+            piva: p.piva || '',
+            codiceFiscale: p.codFisc || '',
+            sedeLegale: p.sede || '',
+            codiceSdi: '',
+            email: '',
+            telefono: '',
             referenteNome: p.cl,
           });
         }
@@ -165,8 +170,8 @@ export function DocumentEditorPage() {
       setClienti(allClients);
       if (allClients.length > 0) setSelectedClienteId(allClients[0].id);
 
-      // 2. Progetti: Unione DB + LocalStorage + Mock PROJECTS
-      const allRawProjects = [...apiPrjs, ...localProjs, ...PROJECTS];
+      // 2. Progetti: Unione DB + LocalStorage + Mock PROJECTS (solo Bluecode)
+      const allRawProjects = isBluecode ? [...apiPrjs, ...localProjs, ...PROJECTS] : [...apiPrjs, ...localProjs];
       const projMap = new Map<string, any>();
       allRawProjects.forEach((p: any) => {
         const title = p.titolo || p.n || p.nome || `Progetto #${p.id}`;
@@ -192,8 +197,8 @@ export function DocumentEditorPage() {
 
       // Se specificato docId, carica il documento salvato nel Vault
       if (queryDocId) {
-        const allDocsStr = localStorage.getItem('bluman_all_vault_documents');
-        const projDocsStr = queryProjId ? localStorage.getItem(`bluman_project_documents_${queryProjId}`) : null;
+        const allDocsStr = localStorage.getItem(getTenantStorageKey('bluman_all_vault_documents'));
+        const projDocsStr = queryProjId ? localStorage.getItem(getTenantStorageKey(`bluman_project_documents_${queryProjId}`)) : null;
         const allDocs: any[] = allDocsStr ? JSON.parse(allDocsStr) : [];
         const projDocs: any[] = projDocsStr ? JSON.parse(projDocsStr) : [];
         const foundDoc = [...projDocs, ...allDocs].find((d: any) => d.id === queryDocId);
@@ -212,7 +217,7 @@ export function DocumentEditorPage() {
       if (tnt) {
         setTenantInfo(tnt);
       } else {
-        const local = localStorage.getItem('bluman_tenant_info');
+        const local = localStorage.getItem(getTenantStorageKey('bluman_tenant_info'));
         if (local) setTenantInfo(JSON.parse(local));
       }
     };
@@ -574,16 +579,17 @@ export function DocumentEditorPage() {
       };
 
       // 1. Persistenza specifica per il progetto target
-      const storageKey = `bluman_project_documents_${targetProjId}`;
+      const storageKey = getTenantStorageKey(`bluman_project_documents_${targetProjId}`);
       const currentVaultStr = localStorage.getItem(storageKey);
       const currentVault: any[] = currentVaultStr ? JSON.parse(currentVaultStr) : [];
       const updatedVault = [newVaultDoc, ...currentVault.filter((d: any) => d.titolo !== titoloDocumento)];
       localStorage.setItem(storageKey, JSON.stringify(updatedVault));
 
       // 2. Persistenza registro globale documenti
-      const allVaultStr = localStorage.getItem('bluman_all_vault_documents');
+      const allVaultKey = getTenantStorageKey('bluman_all_vault_documents');
+      const allVaultStr = localStorage.getItem(allVaultKey);
       const allVault: any[] = allVaultStr ? JSON.parse(allVaultStr) : [];
-      localStorage.setItem('bluman_all_vault_documents', JSON.stringify([newVaultDoc, ...allVault.filter((d: any) => d.id !== newVaultDoc.id)]));
+      localStorage.setItem(allVaultKey, JSON.stringify([newVaultDoc, ...allVault.filter((d: any) => d.id !== newVaultDoc.id)]));
 
       // 3. Upload al backend
       try {

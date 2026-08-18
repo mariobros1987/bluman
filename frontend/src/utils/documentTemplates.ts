@@ -1,4 +1,5 @@
 import { REORGANIZATION_TEMPLATES } from './reorganizationTemplates';
+import { getTenantStorageKey } from './tenant';
 
 export interface DocumentTemplate {
   id: string;
@@ -427,13 +428,13 @@ export function getTemplateForVoce(voceTitle: string, category: string = ''): Do
  */
 export function getAllTemplates(includeArchived: boolean = true): DocumentTemplate[] {
   try {
-    const archivedIdsStr = localStorage.getItem('bluman_archived_template_ids');
+    const archivedIdsStr = localStorage.getItem(getTenantStorageKey('bluman_archived_template_ids'));
     const archivedIds = new Set<string>(archivedIdsStr ? JSON.parse(archivedIdsStr) : []);
 
-    const deletedIdsStr = localStorage.getItem('bluman_deleted_template_ids');
+    const deletedIdsStr = localStorage.getItem(getTenantStorageKey('bluman_deleted_template_ids'));
     const deletedIds = new Set<string>(deletedIdsStr ? JSON.parse(deletedIdsStr) : []);
 
-    const customStr = localStorage.getItem('bluman_custom_document_templates');
+    const customStr = localStorage.getItem(getTenantStorageKey('bluman_custom_document_templates'));
     const customArr: DocumentTemplate[] = customStr ? JSON.parse(customStr) : [];
     const prebuiltFiltered = PREBUILT_TEMPLATES.filter(p => !deletedIds.has(p.id));
     const prebuiltIds = new Set(prebuiltFiltered.map(t => t.id));
@@ -463,7 +464,7 @@ export function saveCustomTemplate(tmpl: DocumentTemplate): DocumentTemplate[] {
   
   // Salva solo i modelli custom nel local storage
   const customOnly = updated.filter(t => !PREBUILT_TEMPLATES.some(p => p.id === t.id));
-  localStorage.setItem('bluman_custom_document_templates', JSON.stringify(customOnly));
+  localStorage.setItem(getTenantStorageKey('bluman_custom_document_templates'), JSON.stringify(customOnly));
   return updated;
 }
 
@@ -473,11 +474,11 @@ export function saveCustomTemplate(tmpl: DocumentTemplate): DocumentTemplate[] {
  */
 export function archiveTemplate(templateId: string): DocumentTemplate[] {
   try {
-    const archivedIdsStr = localStorage.getItem('bluman_archived_template_ids');
+    const archivedIdsStr = localStorage.getItem(getTenantStorageKey('bluman_archived_template_ids'));
     const archivedIds: string[] = archivedIdsStr ? JSON.parse(archivedIdsStr) : [];
     if (!archivedIds.includes(templateId)) {
       archivedIds.push(templateId);
-      localStorage.setItem('bluman_archived_template_ids', JSON.stringify(archivedIds));
+      localStorage.setItem(getTenantStorageKey('bluman_archived_template_ids'), JSON.stringify(archivedIds));
     }
     return getAllTemplates(true);
   } catch {
@@ -490,10 +491,10 @@ export function archiveTemplate(templateId: string): DocumentTemplate[] {
  */
 export function restoreTemplate(templateId: string): DocumentTemplate[] {
   try {
-    const archivedIdsStr = localStorage.getItem('bluman_archived_template_ids');
+    const archivedIdsStr = localStorage.getItem(getTenantStorageKey('bluman_archived_template_ids'));
     const archivedIds: string[] = archivedIdsStr ? JSON.parse(archivedIdsStr) : [];
     const filtered = archivedIds.filter(id => id !== templateId);
-    localStorage.setItem('bluman_archived_template_ids', JSON.stringify(filtered));
+    localStorage.setItem(getTenantStorageKey('bluman_archived_template_ids'), JSON.stringify(filtered));
     return getAllTemplates(true);
   } catch {
     return getAllTemplates(true);
@@ -507,17 +508,17 @@ export function restoreTemplate(templateId: string): DocumentTemplate[] {
 export function deleteCustomTemplate(templateId: string): DocumentTemplate[] {
   try {
     // 1. Rimuovi dai custom
-    const customStr = localStorage.getItem('bluman_custom_document_templates');
+    const customStr = localStorage.getItem(getTenantStorageKey('bluman_custom_document_templates'));
     const customArr: DocumentTemplate[] = customStr ? JSON.parse(customStr) : [];
     const filteredCustom = customArr.filter(t => t.id !== templateId);
-    localStorage.setItem('bluman_custom_document_templates', JSON.stringify(filteredCustom));
+    localStorage.setItem(getTenantStorageKey('bluman_custom_document_templates'), JSON.stringify(filteredCustom));
 
     // 2. Se era un prebuilt, segnalo come eliminato
-    const deletedPrebuiltStr = localStorage.getItem('bluman_deleted_template_ids');
+    const deletedPrebuiltStr = localStorage.getItem(getTenantStorageKey('bluman_deleted_template_ids'));
     const deletedPrebuilt: string[] = deletedPrebuiltStr ? JSON.parse(deletedPrebuiltStr) : [];
     if (!deletedPrebuilt.includes(templateId)) {
       deletedPrebuilt.push(templateId);
-      localStorage.setItem('bluman_deleted_template_ids', JSON.stringify(deletedPrebuilt));
+      localStorage.setItem(getTenantStorageKey('bluman_deleted_template_ids'), JSON.stringify(deletedPrebuilt));
     }
 
     return getAllTemplates(true);

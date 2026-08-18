@@ -51,7 +51,7 @@ export function Sidebar({ alertCount = 0, user, onLogout }: SidebarProps) {
       {/* Logo & Tenant Studio Badge */}
       <div className={styles.logo} style={{ background: '#0f172a', padding: '10px 14px', borderRadius: 10, border: '1px solid #1e293b', marginBottom: 16 }}>
         <img
-          src={getFormattedLogoUrl(localStorage.getItem('bluman_logo_url'))}
+          src={getFormattedLogoUrl(localStorage.getItem(getTenantStorageKey('bluman_logo_url')) || localStorage.getItem('bluman_logo_url'))}
           alt="BLUECODE"
           style={{ height: 32, maxWidth: 160, objectFit: 'contain', display: 'block' }}
           onError={(e) => {

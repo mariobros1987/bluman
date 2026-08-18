@@ -17,6 +17,7 @@ import { PROJECTS, MLIB, ARTICOLI } from '../store/mockData';
 import { fetchProgettoDettaglio, emettiFatturaApi, consuntivaMicrovoceApi, assegnaAccessoProgettoApi, salvaProgettoDettaglioApi, archiviaProgettoApi, eliminaProgettoApi, fetchModuliLibreria, fetchArticoli, uploadFileApi, inviaComunicazioneApi } from '../api/client';
 import { TEAM } from '../store/mockData';
 import { useTeamMembers } from '../hooks/useTeamMembers';
+import { getCurrentTenantId, getTenantStorageKey, getStudioInfoForTenant, BLUECODE_TENANT_ID } from '../utils/tenant';
 import type { Progetto, ModuloProgetto, MicroVoce, CategoriaModulo, StatoProgetto, StatoModulo, Cliente } from '../types';
 import styles from './ProjectDetail.module.css';
 
@@ -28,7 +29,18 @@ export function ProjectDetail() {
 
   const [currentClient, setCurrentClient] = useState<Cliente | null>(null);
   const [project, setProject] = useState<Progetto | null>(() => {
-    return PROJECTS.find(p => String(p.id) === String(id)) || null;
+    const isBluecode = getCurrentTenantId() === BLUECODE_TENANT_ID;
+    if (isBluecode) {
+      return PROJECTS.find(p => String(p.id) === String(id)) || null;
+    }
+    const localStr = localStorage.getItem(getTenantStorageKey('bluman_custom_projects'));
+    if (localStr) {
+      try {
+        const list = JSON.parse(localStr);
+        return list.find((p: any) => String(p.id) === String(id)) || null;
+      } catch {}
+    }
+    return null;
   });
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>('moduli');
@@ -42,51 +54,43 @@ export function ProjectDetail() {
     modId: number;
     mvIdx?: number;
     name: string;
-    currentAssigned: number[];
   } | null>(null);
 
   const [calendarModalTarget, setCalendarModalTarget] = useState<{
     modId: number;
-    mvIdx: number;
+    mvIdx?: number;
     name: string;
+    currentDueDate?: string;
+    operatorName?: string;
+    operatorId?: number;
   } | null>(null);
 
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
-  const handleScheduleDeadlineConfirm = (
+  const handleSaveCalendarEvent = (
     date: string,
+    time: string,
     operatorId: number,
-    priority: string,
+    typeIcon: string,
+    priority: 'low' | 'normal' | 'urgent',
     sendEmail: boolean,
-    activityType?: string,
-    time?: string,
-    notes?: string,
+    notes: string,
     locationUrl?: string
   ) => {
     if (!project || !calendarModalTarget) return;
 
-    const typeIcon = activityType === 'video' ? '📹 Video Call'
-                   : activityType === 'riunione' ? '🤝 Riunione Studio'
-                   : activityType === 'call' ? '📞 Call'
-                   : activityType === 'fiscale' ? '⚖️ Adempimento Fiscale'
-                   : '📄 Scadenza Documento';
-
-    const noteText = notes ? ` · Note: ${notes}` : '';
-    const linkText = locationUrl ? ` · Link: ${locationUrl}` : '';
-
     const newMods = project.mods.map(m => {
       if (m.id === calendarModalTarget.modId) {
-        const newV = m.v.map((mv, idx) => {
-          if (idx === calendarModalTarget.mvIdx) {
-            return {
-              ...mv,
-              as: operatorId,
-              vn: `${typeIcon}: ${date} ore ${time || '10:30'} (${priority.toUpperCase()})${noteText}${linkText}`,
-            };
-          }
-          return mv;
-        });
-        return { ...m, v: newV };
+        if (calendarModalTarget.mvIdx !== undefined) {
+          const newV = m.v.map((mv, idx) => {
+            if (idx === calendarModalTarget.mvIdx) {
+              return { ...mv, due: date, as: operatorId };
+            }
+            return mv;
+          });
+          return { ...m, v: newV };
+        }
       }
       return m;
     });
@@ -94,12 +98,12 @@ export function ProjectDetail() {
     const updatedProject = { ...project, mods: newMods };
     setProject(updatedProject);
 
-    const savedStr = localStorage.getItem('bluman_custom_projects');
+    const savedStr = localStorage.getItem(getTenantStorageKey('bluman_custom_projects'));
     const savedArr: Progetto[] = savedStr ? JSON.parse(savedStr) : [];
     const updatedArr = [updatedProject, ...savedArr.filter(p => String(p.id) !== String(project.id))];
-    localStorage.setItem('bluman_custom_projects', JSON.stringify(updatedArr));
+    localStorage.setItem(getTenantStorageKey('bluman_custom_projects'), JSON.stringify(updatedArr));
 
-    const eventsStr = localStorage.getItem('bluman_calendar_events');
+    const eventsStr = localStorage.getItem(getTenantStorageKey('bluman_calendar_events'));
     const eventsArr = eventsStr ? JSON.parse(eventsStr) : [];
     const newEvent = {
       id: `ev-${Date.now()}`,
@@ -112,7 +116,7 @@ export function ProjectDetail() {
       notes,
       locationUrl,
     };
-    localStorage.setItem('bluman_calendar_events', JSON.stringify([newEvent, ...eventsArr]));
+    localStorage.setItem(getTenantStorageKey('bluman_calendar_events'), JSON.stringify([newEvent, ...eventsArr]));
 
     salvaProgettoDettaglioApi(String(project.id), updatedProject).catch(() => {});
   };
@@ -142,22 +146,21 @@ export function ProjectDetail() {
     const updatedProject = { ...project, mods: newMods };
     setProject(updatedProject);
 
-    const savedStr = localStorage.getItem('bluman_custom_projects');
+    const savedStr = localStorage.getItem(getTenantStorageKey('bluman_custom_projects'));
     const savedArr: Progetto[] = savedStr ? JSON.parse(savedStr) : [];
     const updatedArr = [updatedProject, ...savedArr.filter(p => String(p.id) !== String(project.id))];
-    localStorage.setItem('bluman_custom_projects', JSON.stringify(updatedArr));
+    localStorage.setItem(getTenantStorageKey('bluman_custom_projects'), JSON.stringify(updatedArr));
 
     salvaProgettoDettaglioApi(String(project.id), updatedProject).catch(() => {});
     assegnaAccessoProgettoApi(String(project.id), `usr-0${operatorId}`, roleLevel).catch(() => {});
   };
 
-  // Raw DB response per conservare gli ID reali delle microvoci Supabase
   const [rawDbProject, setRawDbProject] = useState<any>(null);
 
   const loadDetail = async () => {
     setLoading(true);
     if (id) {
-      const localStr = localStorage.getItem('bluman_custom_projects');
+      const localStr = localStorage.getItem(getTenantStorageKey('bluman_custom_projects'));
       const localProjs: Progetto[] = localStr ? JSON.parse(localStr) : [];
       const localSavedProj = localProjs.find(p => String(p.id) === String(id));
 
@@ -174,7 +177,7 @@ export function ProjectDetail() {
           let microvociList = (m.microvoci || []).map((mv: any, vIdx: number) => {
             let savedNotes = mv.note;
             if (!savedNotes) {
-              const localSaved = localStorage.getItem(`bluman_notes_${dbRes.id}_${m.id || mIdx + 100}_${vIdx}`);
+              const localSaved = localStorage.getItem(getTenantStorageKey(`bluman_notes_${dbRes.id}_${m.id || mIdx + 100}_${vIdx}`));
               if (localSaved) {
                 try { savedNotes = JSON.parse(localSaved); } catch {}
               }
@@ -247,12 +250,13 @@ export function ProjectDetail() {
           };
         });
 
-        // Se i moduli DB sono vuoti, arricchisci dai progetti custom salvati in locale o mockData
+        // Se i moduli DB sono vuoti, arricchisci dai progetti custom salvati in locale o mockData (solo Bluecode)
         if (finalMods.length === 0) {
-          const localStr = localStorage.getItem('bluman_custom_projects');
+          const isBluecode = getCurrentTenantId() === BLUECODE_TENANT_ID;
+          const localStr = localStorage.getItem(getTenantStorageKey('bluman_custom_projects'));
           const localProjs: Progetto[] = localStr ? JSON.parse(localStr) : [];
           const match = localProjs.find(p => String(p.id) === String(id) || p.cl === dbRes.cliente?.nome || p.n === dbRes.nome)
-                     || PROJECTS.find(p => String(p.id) === String(id) || p.cl === dbRes.cliente?.nome);
+                     || (isBluecode ? PROJECTS.find(p => String(p.id) === String(id) || p.cl === dbRes.cliente?.nome) : undefined);
           if (match && match.mods && match.mods.length > 0) {
             finalMods = match.mods;
           } else {
@@ -338,12 +342,13 @@ export function ProjectDetail() {
           setExpanded(new Set(finalMods.map(m => m.id)));
         }
       } else {
-        const localStr = localStorage.getItem('bluman_custom_projects');
+        const isBluecode = getCurrentTenantId() === BLUECODE_TENANT_ID;
+        const localStr = localStorage.getItem(getTenantStorageKey('bluman_custom_projects'));
         const localProjs: Progetto[] = localStr ? JSON.parse(localStr) : [];
         let match = localProjs.find(p => String(p.id) === String(id))
-                 || PROJECTS.find(p => String(p.id) === String(id))
+                 || (isBluecode ? PROJECTS.find(p => String(p.id) === String(id)) : undefined)
                  || localProjs.find(p => String(p.id).includes(String(id)))
-                 || PROJECTS[0];
+                 || (isBluecode ? PROJECTS[0] : undefined);
 
         if (match) {
           // Sanifica le microvoci del match
@@ -469,10 +474,10 @@ export function ProjectDetail() {
     setProject(updatedProject);
 
     // Salva in localStorage per la persistenza permanente
-    const savedStr = localStorage.getItem('bluman_custom_projects');
+    const savedStr = localStorage.getItem(getTenantStorageKey('bluman_custom_projects'));
     const savedArr: Progetto[] = savedStr ? JSON.parse(savedStr) : [];
     const updatedArr = [updatedProject, ...savedArr.filter(p => String(p.id) !== String(project.id))];
-    localStorage.setItem('bluman_custom_projects', JSON.stringify(updatedArr));
+    localStorage.setItem(getTenantStorageKey('bluman_custom_projects'), JSON.stringify(updatedArr));
 
     // Persistenza remota server DB per multi-postazione
     salvaProgettoDettaglioApi(String(project.id), updatedProject).catch(() => {});
@@ -532,13 +537,13 @@ export function ProjectDetail() {
 
     setProject(updatedProject);
 
-    const savedStr = localStorage.getItem('bluman_custom_projects');
+    const savedStr = localStorage.getItem(getTenantStorageKey('bluman_custom_projects'));
     const savedArr: Progetto[] = savedStr ? JSON.parse(savedStr) : [];
     const updatedArr = [updatedProject, ...savedArr.filter(p => String(p.id) !== String(project.id))];
-    localStorage.setItem('bluman_custom_projects', JSON.stringify(updatedArr));
+    localStorage.setItem(getTenantStorageKey('bluman_custom_projects'), JSON.stringify(updatedArr));
 
     if (nextNotes) {
-      localStorage.setItem(`bluman_notes_${project.id}_${modId}_${mvIdx}`, JSON.stringify(nextNotes));
+      localStorage.setItem(getTenantStorageKey(`bluman_notes_${project.id}_${modId}_${mvIdx}`), JSON.stringify(nextNotes));
     }
 
     // Persistenza remota server DB per multi-postazione
@@ -561,10 +566,10 @@ export function ProjectDetail() {
                 if (nuovoTitolo && nuovoTitolo.trim() && nuovoTitolo.trim() !== project.n) {
                   const updated = { ...project, n: nuovoTitolo.trim() };
                   setProject(updated);
-                  const savedStr = localStorage.getItem('bluman_custom_projects');
+                  const savedStr = localStorage.getItem(getTenantStorageKey('bluman_custom_projects'));
                   const savedArr: Progetto[] = savedStr ? JSON.parse(savedStr) : [];
                   const updatedArr = [updated, ...savedArr.filter(p => String(p.id) !== String(project.id))];
-                  localStorage.setItem('bluman_custom_projects', JSON.stringify(updatedArr));
+                  localStorage.setItem(getTenantStorageKey('bluman_custom_projects'), JSON.stringify(updatedArr));
                   await salvaProgettoDettaglioApi(String(project.id), updated);
                 }
               }}
@@ -589,10 +594,10 @@ export function ProjectDetail() {
                 if (nuovoVal && !isNaN(Number(nuovoVal))) {
                   const updated = { ...project, val: Number(nuovoVal) };
                   setProject(updated);
-                  const savedStr = localStorage.getItem('bluman_custom_projects');
+                  const savedStr = localStorage.getItem(getTenantStorageKey('bluman_custom_projects'));
                   const savedArr: Progetto[] = savedStr ? JSON.parse(savedStr) : [];
                   const updatedArr = [updated, ...savedArr.filter(p => String(p.id) !== String(project.id))];
-                  localStorage.setItem('bluman_custom_projects', JSON.stringify(updatedArr));
+                  localStorage.setItem(getTenantStorageKey('bluman_custom_projects'), JSON.stringify(updatedArr));
                   await salvaProgettoDettaglioApi(String(project.id), updated);
                 }
               }}
@@ -717,10 +722,10 @@ export function ProjectDetail() {
                     setProject(updated);
                     setExpanded(new Set(defaultMods.map(m => m.id)));
 
-                    const savedStr = localStorage.getItem('bluman_custom_projects');
+                    const savedStr = localStorage.getItem(getTenantStorageKey('bluman_custom_projects'));
                     const savedArr: Progetto[] = savedStr ? JSON.parse(savedStr) : [];
                     const updatedArr = [updated, ...savedArr.filter(p => String(p.id) !== String(project.id))];
-                    localStorage.setItem('bluman_custom_projects', JSON.stringify(updatedArr));
+                    localStorage.setItem(getTenantStorageKey('bluman_custom_projects'), JSON.stringify(updatedArr));
                   }}
                   style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '10px 22px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
                 >
@@ -753,10 +758,10 @@ export function ProjectDetail() {
                     } catch (err) {
                       console.warn('Salvataggio eliminazione modulo fallback:', err);
                     }
-                    const savedStr = localStorage.getItem('bluman_custom_projects');
+                    const savedStr = localStorage.getItem(getTenantStorageKey('bluman_custom_projects'));
                     const savedArr: Progetto[] = savedStr ? JSON.parse(savedStr) : [];
                     const updatedArr = [updatedProject, ...savedArr.filter(p => String(p.id) !== String(project.id))];
-                    localStorage.setItem('bluman_custom_projects', JSON.stringify(updatedArr));
+                    localStorage.setItem(getTenantStorageKey('bluman_custom_projects'), JSON.stringify(updatedArr));
                   }}
                 />
               ))
@@ -780,10 +785,10 @@ export function ProjectDetail() {
               }
 
               // 2. Persisti in localStorage backup
-              const savedStr = localStorage.getItem('bluman_custom_projects');
+              const savedStr = localStorage.getItem(getTenantStorageKey('bluman_custom_projects'));
               const savedArr: Progetto[] = savedStr ? JSON.parse(savedStr) : [];
               const updatedArr = [updatedProject, ...savedArr.filter(p => String(p.id) !== String(project.id))];
-              localStorage.setItem('bluman_custom_projects', JSON.stringify(updatedArr));
+              localStorage.setItem(getTenantStorageKey('bluman_custom_projects'), JSON.stringify(updatedArr));
 
               // 3. Ricarica dettaglio
               loadDetail();
@@ -846,7 +851,7 @@ export function ProjectDetail() {
             <div style={{ borderTop: '1px solid var(--border)', paddingTop: 16, marginTop: 16 }}>
               <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>Integrazioni & Addendum d'Ordine Successivi:</div>
               {(() => {
-                const savedAdd = localStorage.getItem(`bluman_addendums_${project.id}`);
+                const savedAdd = localStorage.getItem(getTenantStorageKey(`bluman_addendums_${project.id}`));
                 const addList = savedAdd ? JSON.parse(savedAdd) : [];
                 if (addList.length === 0) {
                   return (
@@ -989,11 +994,11 @@ export function ProjectDetail() {
         onConfirm={async () => {
           await eliminaProgettoApi(String(project.id));
           // Rimuovi dal local storage
-          const savedStr = localStorage.getItem('bluman_custom_projects');
+          const savedStr = localStorage.getItem(getTenantStorageKey('bluman_custom_projects'));
           if (savedStr) {
             const savedArr: Progetto[] = JSON.parse(savedStr);
             const updatedArr = savedArr.filter(p => String(p.id) !== String(project.id));
-            localStorage.setItem('bluman_custom_projects', JSON.stringify(updatedArr));
+            localStorage.setItem(getTenantStorageKey('bluman_custom_projects'), JSON.stringify(updatedArr));
           }
           navigate('/');
         }}
@@ -1310,10 +1315,10 @@ function FatturazioneTab({ project, rawDbProject, onRefresh }: { project: Proget
           fatture: [nuovaFatturaLocal, ...(project.fatture || [])],
         };
 
-        const savedStr = localStorage.getItem('bluman_custom_projects');
+        const savedStr = localStorage.getItem(getTenantStorageKey('bluman_custom_projects'));
         const savedArr: any[] = savedStr ? JSON.parse(savedStr) : [];
         const updatedArr = [updatedProject, ...savedArr.filter(p => String(p.id) !== String(project.id))];
-        localStorage.setItem('bluman_custom_projects', JSON.stringify(updatedArr));
+        localStorage.setItem(getTenantStorageKey('bluman_custom_projects'), JSON.stringify(updatedArr));
       }
 
       setModalOpen(false);
@@ -1409,23 +1414,28 @@ function FatturazioneTab({ project, rawDbProject, onRefresh }: { project: Proget
           <div style={{ background: '#fff', color: '#0f172a', borderRadius: 16, padding: 32, width: '100%', maxWidth: 640, maxHeight: '90vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 20, boxShadow: '0 24px 60px rgba(0,0,0,.6)' }}>
             {/* Header Documento Stampa */}
             <div style={{ borderBottom: '2px solid #0f172a', paddingBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <div>
-                <img
-                  src={getFormattedLogoUrl(localStorage.getItem('bluman_logo_url') || (JSON.parse(localStorage.getItem('bluman_tenant_info') || '{}').logoUrl))}
-                  alt="Logo Studio"
-                  style={{ maxHeight: 60, maxWidth: 220, objectFit: 'contain', marginBottom: 8, display: 'block' }}
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = '/logo.png';
-                  }}
-                />
-                <div style={{ fontSize: 20, fontWeight: 800, color: '#1e1b4b' }}>
-                  {JSON.parse(localStorage.getItem('bluman_tenant_info') || '{}').ragioneSociale || 'BLUECODE LTD'}
-                </div>
-                <div style={{ fontSize: 11, color: '#475569', marginTop: 2 }}>
-                  {JSON.parse(localStorage.getItem('bluman_tenant_info') || '{}').sedeLegale || 'Level 4, Valuation Centre, Tower Road, Sliema SLM 1600, Malta'}<br />
-                  P.IVA/VAT: {JSON.parse(localStorage.getItem('bluman_tenant_info') || '{}').piva || 'MT-29837102'} · IBAN: {JSON.parse(localStorage.getItem('bluman_tenant_info') || '{}').iban || 'MT89 3704 0011 0000 0000 1234 567'}
-                </div>
-              </div>
+              {(() => {
+                const studio = getStudioInfoForTenant();
+                return (
+                  <div>
+                    <img
+                      src={getFormattedLogoUrl(localStorage.getItem(getTenantStorageKey('bluman_logo_url')) || localStorage.getItem('bluman_logo_url'))}
+                      alt="Logo Studio"
+                      style={{ maxHeight: 60, maxWidth: 220, objectFit: 'contain', marginBottom: 8, display: 'block' }}
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = '/logo.png';
+                      }}
+                    />
+                    <div style={{ fontSize: 20, fontWeight: 800, color: '#1e1b4b' }}>
+                      {studio.ragioneSociale}
+                    </div>
+                    <div style={{ fontSize: 11, color: '#475569', marginTop: 2 }}>
+                      {studio.sedeLegale}<br />
+                      P.IVA/VAT: {studio.piva} · IBAN: {studio.iban}
+                    </div>
+                  </div>
+                );
+              })()}
               <div style={{ textAlign: 'right' }}>
                 <div style={{ fontSize: 16, fontWeight: 800, color: '#4338ca' }}>DOCUMENTO FISCALE DI VENDITA</div>
                 <div style={{ fontSize: 13, fontWeight: 700, marginTop: 2 }}>{previewFattura.numero}</div>
@@ -1488,15 +1498,16 @@ function FatturazioneTab({ project, rawDbProject, onRefresh }: { project: Proget
               </button>
               <button
                 onClick={async () => {
-                  const rawLogoUrl = localStorage.getItem('bluman_logo_url') || (JSON.parse(localStorage.getItem('bluman_tenant_info') || '{}').logoUrl);
+                  const studio = getStudioInfoForTenant();
+                  const rawLogoUrl = localStorage.getItem(getTenantStorageKey('bluman_logo_url')) || localStorage.getItem('bluman_logo_url');
                   const logoUrl = getFormattedLogoUrl(rawLogoUrl);
                   const logoHtml = `<img src="${logoUrl}" style="max-height:60px;max-width:220px;object-fit:contain;margin-bottom:8px;display:block;" />`;
                   const htmlContent = `
                     <div style="border-bottom:2px solid #0f172a;padding-bottom:15px;display:flex;justify-content:space-between;align-items:flex-start;">
                       <div>
                         ${logoHtml}
-                        <div style="font-size:20px;font-weight:800;color:#1e1b4b;">${JSON.parse(localStorage.getItem('bluman_tenant_info') || '{}').ragioneSociale || 'BLUECODE LTD'}</div>
-                        <div style="font-size:11px;color:#475569;margin-top:2px;">${JSON.parse(localStorage.getItem('bluman_tenant_info') || '{}').sedeLegale || 'Level 4, Valuation Centre, Tower Road, Sliema SLM 1600, Malta'}<br/>VAT: ${JSON.parse(localStorage.getItem('bluman_tenant_info') || '{}').piva || 'MT-29837102'} · IBAN: ${JSON.parse(localStorage.getItem('bluman_tenant_info') || '{}').iban || 'MT89 3704 0011 0000 0000 1234 567'}</div>
+                        <div style="font-size:20px;font-weight:800;color:#1e1b4b;">${studio.ragioneSociale}</div>
+                        <div style="font-size:11px;color:#475569;margin-top:2px;">${studio.sedeLegale}<br/>VAT: ${studio.piva} · IBAN: ${studio.iban}</div>
                       </div>
                       <div style="text-align:right;">
                         <div style="font-size:16px;font-weight:800;color:#4338ca;">DOCUMENTO FISCALE DI VENDITA</div>
@@ -2227,7 +2238,11 @@ function DocumentiTab({ project }: { project: Progetto }) {
 
   // Caricamento Documenti dal Vault Locale e Cloud (Sincronizzati 1-a-1 con i Modelli Word Studio)
   const [docList, setDocList] = useState<any[]>(() => {
-    const defaultDocs = PREBUILT_TEMPLATES.map(t => {
+    const isBluecode = getCurrentTenantId() === BLUECODE_TENANT_ID;
+    const isDemoProj = String(project.id) === 'proj-001' || String(project.id) === 'proj-002' || String(project.id) === '1' || String(project.id) === '2';
+    const studio = getStudioInfoForTenant();
+    
+    const defaultDocs = (isBluecode && isDemoProj) ? PREBUILT_TEMPLATES.map(t => {
       const isSigned = t.id === 'tmpl-engagement' || t.id === 'tmpl-nda';
       const catLabel = t.categoria === 'engagement' ? 'Contratti' :
                        t.categoria === 'nda' ? 'Contratti' :
@@ -2249,19 +2264,19 @@ function DocumentiTab({ project }: { project: Progetto }) {
         contenutoHtml: resolveDocumentTemplateHtml(t.contenutoHtml, {
           cliente: { nome: project.cl, ragione_sociale: project.cl },
           progetto: { titolo: project.n, importo_totale: fmt(project.val) },
-          studio: { ragioneSociale: 'Bluecode Ltd', sedeLegale: 'Level 4, Valuation Centre, Sliema, Malta', piva: 'MT28491039' },
+          studio: { ragioneSociale: studio.ragioneSociale, sedeLegale: studio.sedeLegale, piva: studio.piva },
           isForPrintOrExport: false,
           tagMode: 'plain',
         }),
       };
-    });
+    }) : [];
 
     try {
-      const storageKey = `bluman_project_documents_${project.id}`;
+      const storageKey = getTenantStorageKey(`bluman_project_documents_${project.id}`);
       const savedProjDocsStr = localStorage.getItem(storageKey);
       const savedProjDocs: any[] = savedProjDocsStr ? JSON.parse(savedProjDocsStr) : [];
 
-      const allVaultStr = localStorage.getItem('bluman_all_vault_documents');
+      const allVaultStr = localStorage.getItem(getTenantStorageKey('bluman_all_vault_documents'));
       const allVault: any[] = allVaultStr ? JSON.parse(allVaultStr) : [];
       const matchingGlobalDocs = allVault.filter((d: any) => String(d.progettoId) === String(project.id));
 
@@ -2279,13 +2294,14 @@ function DocumentiTab({ project }: { project: Progetto }) {
 
   // Helper per scaricare localmente copia VERA in PDF A4 con Header/Footer Studio
   const handleDownloadDocument = async (doc: any) => {
+    const studio = getStudioInfoForTenant();
     const rawContent = doc.contenutoHtml || `
       <div style="font-family: 'Segoe UI', Arial, sans-serif; color: #0f172a; line-height: 1.6; font-size: 11pt; padding: 10px;">
         <h1 style="color: #1e1b4b; text-align: center; text-transform: uppercase; font-size: 18pt; border-bottom: 2px solid #4338ca; padding-bottom: 10px; margin-bottom: 20px;">
           ${doc.titolo || doc.nome}
         </h1>
         <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-size: 10pt;">
-          <strong>Studio Professionale:</strong> Bluecode Ltd (Malta / Svizzera)<br/>
+          <strong>Studio Professionale:</strong> ${studio.ragioneSociale}<br/>
           <strong>Cliente Committente:</strong> ${project.cl} (${project.n})<br/>
           <strong>Categoria Vault:</strong> ${doc.cat || doc.categoria || 'Generale'}<br/>
           <strong>Stato eIDAS:</strong> ${doc.firmato ? '🔒 Sottoscritto con Sigillo FEA eIDAS UE 910/2014' : 'Bozza Documentale Studio'}
@@ -2297,8 +2313,8 @@ function DocumentiTab({ project }: { project: Progetto }) {
       <div style="font-family: 'Segoe UI', Arial, sans-serif; color: #0f172a; line-height: 1.6; padding: 20px;">
         <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #4338ca; padding-bottom: 14px; margin-bottom: 24px;">
           <div>
-            <div style="font-size: 16pt; font-weight: 800; color: #1e1b4b;">BLUECODE LTD — ADVISORY SERVICES</div>
-            <div style="font-size: 9pt; color: #64748b;">Valuation Centre, Sliema, Malta · Reg. N. C-99881</div>
+            <div style="font-size: 16pt; font-weight: 800; color: #1e1b4b;">${studio.ragioneSociale.toUpperCase()} — ADVISORY SERVICES</div>
+            <div style="font-size: 9pt; color: #64748b;">${studio.sedeLegale} · P.IVA ${studio.piva}</div>
           </div>
           <div style="text-align: right; font-size: 8.5pt; color: #64748b;">
             Rif. Incarico: #${project.id}<br/>Data: ${doc.data || doc.dataCaricamento || '2026'}
@@ -2306,7 +2322,7 @@ function DocumentiTab({ project }: { project: Progetto }) {
         </div>
         <div>${rawContent}</div>
         <div style="margin-top: 40px; border-top: 1px solid #e2e8f0; padding-top: 10px; display: flex; justify-content: space-between; font-size: 8.5pt; color: #94a3b8;">
-          <span>Bluecode Ltd • Pratica: ${project.n}</span>
+          <span>${studio.ragioneSociale} • Pratica: ${project.n}</span>
           <span>Sigillo eIDAS Documentale • Validità Giuridica UE</span>
         </div>
       </div>
@@ -2345,11 +2361,12 @@ function DocumentiTab({ project }: { project: Progetto }) {
 
         const updated = [newDoc, ...docList];
         setDocList(updated);
-        localStorage.setItem(`bluman_project_documents_${project.id}`, JSON.stringify(updated));
+        localStorage.setItem(getTenantStorageKey(`bluman_project_documents_${project.id}`), JSON.stringify(updated));
 
-        const allVaultStr = localStorage.getItem('bluman_all_vault_documents');
+        const allVaultKey = getTenantStorageKey('bluman_all_vault_documents');
+        const allVaultStr = localStorage.getItem(allVaultKey);
         const allVault: any[] = allVaultStr ? JSON.parse(allVaultStr) : [];
-        localStorage.setItem('bluman_all_vault_documents', JSON.stringify([newDoc, ...allVault]));
+        localStorage.setItem(allVaultKey, JSON.stringify([newDoc, ...allVault]));
 
         alert(`✓ File "${file.name}" archiviato nel Cloud Drive del Progetto con successo!`);
       };
@@ -2367,7 +2384,7 @@ function DocumentiTab({ project }: { project: Progetto }) {
     if (!confirm('Vuoi rimuovere questo documento dal Vault del progetto?')) return;
     const updated = docList.filter(d => d.id !== docId);
     setDocList(updated);
-    localStorage.setItem(`bluman_project_documents_${project.id}`, JSON.stringify(updated));
+    localStorage.setItem(getTenantStorageKey(`bluman_project_documents_${project.id}`), JSON.stringify(updated));
     if (selectedPreviewDoc?.id === docId) setSelectedPreviewDoc(null);
   };
 

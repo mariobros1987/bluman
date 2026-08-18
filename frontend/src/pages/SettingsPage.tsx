@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { fetchUtentiTenant, creaUtenteTenantApi, uploadFileApi, fetchTenantInfoApi, updateTenantInfoApi, fetchProgetti, fetchPermessiUtenteApi, salvaPermessiUtenteApi, testEmailApi, testImapApi, testChannelApi } from '../api/client';
 import { getFormattedLogoUrl, fmt } from '../utils';
+import { getCurrentTenantId, getTenantStorageKey, getStudioInfoForTenant } from '../utils/tenant';
 import { ProgressBar } from '../components/ui/ProgressBar';
 import styles from './Settings.module.css';
 
@@ -11,33 +12,33 @@ export function SettingsPage() {
   const [saved, setSaved] = useState(false);
 
   // Configuratore Canali Omnichannel & SMTP
-  const [waPhoneId, setWaPhoneId] = useState('1318817114639409');
-  const [waAccessToken, setWaAccessToken] = useState('EAGO82S4iZAZCIBSCyV6ARilEgvBez7EwZA6pK5yaOa1ZCp7TmvFRTfxIZCWlLjQ4rBQeIZCRezgBJFm9BiQrUUsmfJA9ayZBTR3w3Qm3wGF8rUNpPCPqiSVOhTZCMF4EZBYpZAeQRjtgxfRqraBrXgBcZBCE0mZCfTvENnDAZBmgQhmtxeRp6N9Qcuj9C6CqigYHNXAZDZD');
-  const [waVerifyToken, setWaVerifyToken] = useState('bluman_wa_secure_token_2026');
-  const [tgBotToken, setTgBotToken] = useState('7182930412:AAHj39201982736192');
-  const [tgBotUsername, setTgBotUsername] = useState('@BluManStudioBot');
-  const [emailInboundParseUrl, setEmailInboundParseUrl] = useState('https://api.bluecode.advisory/webhooks/communications/email');
-  const [signalCliEndpoint, setSignalCliEndpoint] = useState('http://localhost:8080/v1/receive/+35679001122');
+  const [waPhoneId, setWaPhoneId] = useState('');
+  const [waAccessToken, setWaAccessToken] = useState('');
+  const [waVerifyToken, setWaVerifyToken] = useState('');
+  const [tgBotToken, setTgBotToken] = useState('');
+  const [tgBotUsername, setTgBotUsername] = useState('');
+  const [emailInboundParseUrl, setEmailInboundParseUrl] = useState('');
+  const [signalCliEndpoint, setSignalCliEndpoint] = useState('');
 
   // SMTP Server Credentials (Posta in Uscita)
-  const [smtpHost, setSmtpHost] = useState('authsmtp.register.it');
+  const [smtpHost, setSmtpHost] = useState('');
   const [smtpPort, setSmtpPort] = useState('465');
   const [smtpSecure, setSmtpSecure] = useState(true);
-  const [smtpUser, setSmtpUser] = useState('support@bluecode-ltd.com');
+  const [smtpUser, setSmtpUser] = useState('');
   const [smtpPass, setSmtpPass] = useState('');
-  const [smtpFromEmail, setSmtpFromEmail] = useState('support@bluecode-ltd.com');
-  const [smtpFromName, setSmtpFromName] = useState('BlueCode Advisory & Consulting');
-  const [smtpReplyTo, setSmtpReplyTo] = useState('support@bluecode-ltd.com');
+  const [smtpFromEmail, setSmtpFromEmail] = useState('');
+  const [smtpFromName, setSmtpFromName] = useState('');
+  const [smtpReplyTo, setSmtpReplyTo] = useState('');
   const [smtpBcc, setSmtpBcc] = useState('');
   const [testingSmtp, setTestingSmtp] = useState(false);
   const [smtpTestResult, setSmtpTestResult] = useState<string | null>(null);
 
   // IMAP / POP3 Server Credentials (Posta in Entrata & Ingestion)
   const [imapProtocol, setImapProtocol] = useState<'imap' | 'pop3'>('imap');
-  const [imapHost, setImapHost] = useState('imap.register.it');
+  const [imapHost, setImapHost] = useState('');
   const [imapPort, setImapPort] = useState('993');
   const [imapSecure, setImapSecure] = useState(true);
-  const [imapUser, setImapUser] = useState('support@bluecode-ltd.com');
+  const [imapUser, setImapUser] = useState('');
   const [imapPass, setImapPass] = useState('');
   const [imapFolder, setImapFolder] = useState('INBOX');
   const [imapPollInterval, setImapPollInterval] = useState('5m');
@@ -45,27 +46,27 @@ export function SettingsPage() {
   const [imapTestResult, setImapTestResult] = useState<string | null>(null);
 
   // Firma Digitale & Disclaimer Privacy Email Studio
-  const [emailSignatureHtml, setEmailSignatureHtml] = useState('Cordiali Saluti,\n{{nome_operatore}}\n{{ruolo_operatore}}\nBlueCode Advisory & Consulting — https://bluecode-ltd.com\n\nAvviso di Riservatezza (GDPR): Questo messaggio ed i suoi allegati sono confidenziali e destinati esclusivamente al destinatario indicato.');
+  const [emailSignatureHtml, setEmailSignatureHtml] = useState('');
 
   // Form dati azienda (Sede Legale & Operativa)
-  const [ragioneSociale, setRagioneSociale] = useState('Bluecode Ltd');
-  const [pIva, setPIva] = useState('MT28491039');
-  const [codFisc, setCodFisc] = useState('BLUCD90A01H501X');
-  const [sedeLegale, setSedeLegale] = useState('Level 4, Valuation Centre, Tower Road, Sliema SLM 1600, Malta');
-  const [sedeOperativa, setSedeOperativa] = useState('Via Montenapoleone 8, 20121 Milano (MI), Italia');
-  const [email, setEmail] = useState('info@bluecode.advisory');
-  const [pec, setPec] = useState('bluecode@legalmail.it');
-  const [telefono, setTelefono] = useState('+39 378 092 6461');
-  const [iban, setIban] = useState('MT89VALL22013000000012345678');
-  const [regimeFiscale, setRegimeFiscale] = useState('Ordinario / Malta EU Jurisdiction');
-  const [capitaleSociale, setCapitaleSociale] = useState('€ 100.000,00 i.v.');
-  const [regImprese, setRegImprese] = useState('Reg. Imprese C-99881 / REA 49021');
+  const [ragioneSociale, setRagioneSociale] = useState('');
+  const [pIva, setPIva] = useState('');
+  const [codFisc, setCodFisc] = useState('');
+  const [sedeLegale, setSedeLegale] = useState('');
+  const [sedeOperativa, setSedeOperativa] = useState('');
+  const [email, setEmail] = useState('');
+  const [pec, setPec] = useState('');
+  const [telefono, setTelefono] = useState('');
+  const [iban, setIban] = useState('');
+  const [regimeFiscale, setRegimeFiscale] = useState('');
+  const [capitaleSociale, setCapitaleSociale] = useState('');
+  const [regImprese, setRegImprese] = useState('');
 
   // Personalizzazione Layout Fattura & PDF
   const [logoUrl, setLogoUrl] = useState('');
-  const [coloreTemaFattura, setColoreTemaFattura] = useState('#4338ca'); // Indigo
-  const [titoloIntestazione, setTitoloIntestazione] = useState('BLUECODE ADVISORY & CONSULTING');
-  const [notePieDiPagina, setNotePieDiPagina] = useState('Fattura emessa ai sensi delle vigenti disposizioni fiscali UE. Pagamento a mezzo bonifico bancario su IBAN indicato.');
+  const [coloreTemaFattura, setColoreTemaFattura] = useState('#4338ca');
+  const [titoloIntestazione, setTitoloIntestazione] = useState('');
+  const [notePieDiPagina, setNotePieDiPagina] = useState('');
   const [mostraSdi, setMostraSdi] = useState(true);
   const [mostraIva, setMostraIva] = useState(true);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -85,12 +86,24 @@ export function SettingsPage() {
   const loadTenantData = async () => {
     setLoadingUsers(true);
     const dbTenant = await fetchTenantInfoApi();
-    const localInfoStr = localStorage.getItem('bluman_tenant_info');
+    const localInfoStr = localStorage.getItem(getTenantStorageKey('bluman_tenant_info'));
     let localInfo: any = {};
     if (localInfoStr) {
       try { localInfo = JSON.parse(localInfoStr); } catch {}
     }
     const tData = { ...localInfo, ...(dbTenant || {}) };
+
+    // Se nessun dato trovato (nuovo tenant), pre-popola con i dati base dal registro tenant
+    const studioDefaults = getStudioInfoForTenant();
+    if (!tData.ragioneSociale && studioDefaults.ragioneSociale !== 'Studio Professionale') {
+      tData.ragioneSociale = studioDefaults.ragioneSociale;
+      tData.piva = studioDefaults.piva;
+      tData.sedeLegale = studioDefaults.sedeLegale;
+      tData.sedeOperativa = studioDefaults.sedeOperativa;
+      tData.email = studioDefaults.email;
+      tData.telefono = studioDefaults.telefono;
+      tData.iban = studioDefaults.iban;
+    }
 
     if (tData) {
       if (tData.ragioneSociale) setRagioneSociale(tData.ragioneSociale);
@@ -184,7 +197,7 @@ export function SettingsPage() {
     };
 
     await updateTenantInfoApi(dataToSave);
-    localStorage.setItem('bluman_tenant_info', JSON.stringify(dataToSave));
+    localStorage.setItem(getTenantStorageKey('bluman_tenant_info'), JSON.stringify(dataToSave));
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
   };
@@ -280,7 +293,7 @@ export function SettingsPage() {
         }
         setLogoUrl(finalLogoUrl);
         await updateTenantInfoApi({ logoUrl: finalLogoUrl });
-        localStorage.setItem('bluman_logo_url', finalLogoUrl);
+        localStorage.setItem(getTenantStorageKey('bluman_logo_url'), finalLogoUrl);
         alert('✓ Logo caricato e salvato permanentemente su Supabase PostgreSQL!');
       } catch (err) {
         console.error(err);
@@ -1246,9 +1259,9 @@ function OperatorDetailModal({
         const emailKey = operator.email ? operator.email.toLowerCase() : '';
 
         // 1. Carica prima da localStorage per persistenza istantanea
-        let savedPermsStr = localStorage.getItem(`bluman_rbac_permissions_${userKey}`);
+        let savedPermsStr = localStorage.getItem(getTenantStorageKey(`bluman_rbac_permissions_${userKey}`));
         if (!savedPermsStr && emailKey) {
-          savedPermsStr = localStorage.getItem(`bluman_rbac_permissions_${emailKey}`);
+          savedPermsStr = localStorage.getItem(getTenantStorageKey(`bluman_rbac_permissions_${emailKey}`));
         }
 
         if (savedPermsStr) {
@@ -1292,11 +1305,11 @@ function OperatorDetailModal({
     const emailClean = (operator.email || '').toLowerCase().trim();
 
     if (userKey) {
-      localStorage.setItem(`bluman_rbac_permissions_${userKey}`, JSON.stringify(payload));
+      localStorage.setItem(getTenantStorageKey(`bluman_rbac_permissions_${userKey}`), JSON.stringify(payload));
     }
     if (emailClean) {
-      localStorage.setItem(`bluman_rbac_permissions_${emailClean}`, JSON.stringify(payload));
-      localStorage.setItem(`bluman_rbac_permissions_usr-${emailClean}`, JSON.stringify(payload));
+      localStorage.setItem(getTenantStorageKey(`bluman_rbac_permissions_${emailClean}`), JSON.stringify(payload));
+      localStorage.setItem(getTenantStorageKey(`bluman_rbac_permissions_usr-${emailClean}`), JSON.stringify(payload));
     }
 
     if (operator.id) {

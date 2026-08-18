@@ -4,6 +4,7 @@ import { CatBadge } from '../components/ui/CatBadge';
 import { fmt, moduloH, moduloP, resolveRighe, levelOf } from '../utils';
 import { downloadRealPdf } from '../utils/pdfGenerator';
 import { PREBUILT_TEMPLATES, getAllTemplates, saveCustomTemplate, deleteTemplate, archiveTemplate, restoreTemplate, importTemplatesFromJson, exportTemplatesAsJson, type DocumentTemplate } from '../utils/documentTemplates';
+import { getTenantStorageKey, getStudioInfoForTenant, getCurrentTenantId } from '../utils/tenant';
 import { MLIB, ARTICOLI, GIURISDIZIONI } from '../store/mockData';
 import { fetchModuliLibreria, fetchArticoli, fetchGiurisdizioniApi, creaGiurisdizioneApi, creaArticoloApi, creaModuloTemplateApi, updateArticoloPrezzoApi, uploadFileApi, fetchClienti, fetchProgetti, creaProgettoApi, salvaProgettoDettaglioApi, creaDocumentoTemplateApi, eliminaDocumentoTemplateApi } from '../api/client';
 import type { CategoriaModulo, Articolo, Giurisdizione, ModuloTemplate } from '../types';
@@ -521,10 +522,11 @@ function AssegnaModuloClienteModal({
       await salvaProgettoDettaglioApi(projIdToUse, updatedProj);
 
       // Backup local storage
-      const savedStr = localStorage.getItem('bluman_custom_projects');
+      const storageKey = getTenantStorageKey('bluman_custom_projects');
+      const savedStr = localStorage.getItem(storageKey);
       const savedArr: any[] = savedStr ? JSON.parse(savedStr) : [];
       const updatedArr = [updatedProj, ...savedArr.filter(p => String(p.id) !== String(projIdToUse))];
-      localStorage.setItem('bluman_custom_projects', JSON.stringify(updatedArr));
+      localStorage.setItem(storageKey, JSON.stringify(updatedArr));
 
       onClose();
       navigate(`/projects/${projIdToUse}`);
@@ -1575,13 +1577,14 @@ function LibreriaDocumentiEForm() {
   }, []);
 
   const handleDownloadTemplatePdf = async (m: any) => {
+    const studio = getStudioInfoForTenant();
     const tmpl = getAllTemplates(true).find(t => t.id === m.templateId || t.id === m.id) || PREBUILT_TEMPLATES[0];
     const htmlContent = `
       <div style="font-family: 'Segoe UI', Arial, sans-serif; padding: 20px; color: #0f172a;">
         <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #4338ca; padding-bottom: 14px; margin-bottom: 24px;">
           <div>
-            <div style="font-size: 16pt; font-weight: 800; color: #1e1b4b;">BLUECODE LTD — ADVISORY SERVICES</div>
-            <div style="font-size: 9pt; color: #64748b;">Valuation Centre, Sliema, Malta · Reg. N. C-99881</div>
+            <div style="font-size: 16pt; font-weight: 800; color: #1e1b4b;">${studio.ragioneSociale.toUpperCase()} — ADVISORY SERVICES</div>
+            <div style="font-size: 9pt; color: #64748b;">${studio.sedeLegale} · P.IVA ${studio.piva}</div>
           </div>
           <div style="text-align: right; font-size: 8.5pt; color: #64748b;">
             Modello: #${m.cat}<br />
@@ -1590,7 +1593,7 @@ function LibreriaDocumentiEForm() {
         </div>
         <div>${tmpl.contenutoHtml}</div>
         <div style="margin-top: 40px; border-top: 1px solid #e2e8f0; padding-top: 10px; display: flex; justify-content: space-between; font-size: 8.5pt; color: #94a3b8;">
-          <span>Bluecode Ltd • Modello Ufficiale Studio</span>
+          <span>${studio.ragioneSociale} • Modello Ufficiale Studio</span>
           <span>Sigillo eIDAS Documentale • Validità Giuridica UE</span>
         </div>
       </div>
