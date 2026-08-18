@@ -1154,16 +1154,30 @@ export function DocumentEditorPage() {
               {/* Sheet Header (Studio Logo & Info) */}
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #4338ca', paddingBottom: 14, marginBottom: 30 }}>
-                  <img
-                    src={getFormattedLogoUrl(tenantInfo?.logoUrl || localStorage.getItem('bluman_logo_url'))}
-                    alt="Logo"
-                    style={{ height: 42, maxWidth: 180, objectFit: 'contain' }}
-                    onError={(e) => { (e.target as HTMLImageElement).src = '/logo.png'; }}
-                  />
+                  {(() => {
+                    const cTid = getCurrentTenantId();
+                    const isBC = cTid === BLUECODE_TENANT_ID;
+                    const rawLogo = tenantInfo?.logoUrl || localStorage.getItem(getTenantStorageKey('bluman_logo_url')) || (isBC ? '/logo.png' : '');
+                    if (rawLogo) {
+                      return (
+                        <img
+                          src={getFormattedLogoUrl(rawLogo)}
+                          alt="Logo"
+                          style={{ height: 42, maxWidth: 180, objectFit: 'contain' }}
+                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                        />
+                      );
+                    }
+                    return (
+                      <div style={{ fontSize: 16, fontWeight: 800, color: '#1e1b4b', display: 'flex', alignItems: 'center', gap: 8 }}>
+                        🏛 {(tenantInfo?.ragioneSociale || 'Studio Professionale').toUpperCase()}
+                      </div>
+                    );
+                  })()}
                   <div style={{ textAlign: 'right', fontSize: 10, color: '#64748b', lineHeight: 1.4 }}>
-                    <strong style={{ color: '#1e1b4b', fontSize: 11 }}>{tenantInfo?.ragioneSociale || 'Bluecode Ltd'}</strong><br/>
-                    {tenantInfo?.sedeLegale || 'Valuation Centre, Tower Road, Sliema, Malta'}<br/>
-                    P.IVA/TIN: {tenantInfo?.piva || 'MT28491039'} | Tel: {tenantInfo?.telefono || '+39 378 092 6461'}
+                    <strong style={{ color: '#1e1b4b', fontSize: 11 }}>{tenantInfo?.ragioneSociale || (() => { const s = getStudioInfoForTenant(getCurrentTenantId()); return s.ragioneSociale || 'Studio Professionale'; })()}</strong><br/>
+                    {tenantInfo?.sedeLegale || (() => { const s = getStudioInfoForTenant(getCurrentTenantId()); return s.sedeLegale || ''; })()}{tenantInfo?.sedeLegale || getStudioInfoForTenant(getCurrentTenantId()).sedeLegale ? <br/> : null}
+                    {(tenantInfo?.piva || getStudioInfoForTenant(getCurrentTenantId()).piva) ? `P.IVA/TIN: ${tenantInfo?.piva || getStudioInfoForTenant(getCurrentTenantId()).piva}` : ''}{(tenantInfo?.telefono || getStudioInfoForTenant(getCurrentTenantId()).telefono) ? ` | Tel: ${tenantInfo?.telefono || getStudioInfoForTenant(getCurrentTenantId()).telefono}` : ''}
                   </div>
                 </div>
 
@@ -1187,7 +1201,7 @@ export function DocumentEditorPage() {
 
               {/* Sheet Footer (Pagination & Legal) */}
               <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: 12, marginTop: 40, display: 'flex', justifyContent: 'space-between', fontSize: 9.5, color: '#94a3b8' }}>
-                <span>Documento Riservato • {tenantInfo?.ragioneSociale || 'Bluecode Ltd'} • Pratica: {activeProgetto?.titolo || 'Advisory'}</span>
+                <span>Documento Riservato • {tenantInfo?.ragioneSociale || getStudioInfoForTenant(getCurrentTenantId()).ragioneSociale || 'Studio Professionale'} • Pratica: {activeProgetto?.titolo || activeProgetto?.n || 'Incarico Professionale'}</span>
                 <span>Pagina 1 di 1 • Sigillo eIDAS BluMan</span>
               </div>
             </div>
