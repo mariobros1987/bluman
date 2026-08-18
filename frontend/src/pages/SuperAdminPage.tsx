@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { fmt } from '../utils';
+import { setActiveTenantId } from '../utils/tenant';
 
 interface TenantStudio {
   id: string;
@@ -366,6 +367,18 @@ export function SuperAdminPage() {
                     </td>
                     <td style={{ padding: '10px 8px', textAlign: 'right' }}>
                       <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                        {/* Accesso Immediato / Entra nello Studio */}
+                        <button
+                          onClick={() => {
+                            setActiveTenantId(t.id);
+                            window.location.href = '/documents';
+                          }}
+                          title={`Imposta "${t.ragioneSociale}" come Studio Attivo e apri Document Studio`}
+                          style={{ background: '#047857', border: '1px solid #10b981', color: '#ecfdf5', padding: '5px 10px', borderRadius: 6, fontSize: 11, fontWeight: 800, cursor: 'pointer' }}
+                        >
+                          🚀 Entra
+                        </button>
+
                         {/* Credenziali e Link Accesso Gestore */}
                         <button
                           onClick={() => setCredentialsModalTenant(t)}

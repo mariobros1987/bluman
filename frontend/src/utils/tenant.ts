@@ -77,10 +77,10 @@ export const TENANT_STUDIOS: Record<string, StudioInfo> = {
   },
 };
 
-/**
- * Ottiene il Tenant ID attivo dell'utente loggato
- */
 export function getCurrentTenantId(user?: any): string {
+  const storedTenantId = localStorage.getItem('bluman_tenant_id');
+  if (storedTenantId) return storedTenantId;
+
   if (user?.tenantId) return user.tenantId;
   const storedUserStr = localStorage.getItem('bluman_user');
   if (storedUserStr) {
@@ -98,8 +98,6 @@ export function getCurrentTenantId(user?: any): string {
       }
     } catch {}
   }
-  const storedTenantId = localStorage.getItem('bluman_tenant_id');
-  if (storedTenantId) return storedTenantId;
 
   return BLUECODE_TENANT_ID;
 }
@@ -117,9 +115,31 @@ export function getTenantStorageKey(baseKey: string, tenantId?: string): string 
  */
 export function getStudioInfoForTenant(tenantId?: string): StudioInfo {
   const tId = tenantId || getCurrentTenantId();
-  if (TENANT_STUDIOS[tId]) return TENANT_STUDIOS[tId];
 
-  // Controlla se è un tenant custom registrato dal SuperAdmin
+  // Controlla se esistono impostazioni salvate esplicitamente per questo tenant
+  let savedSettings: any = null;
+  try {
+    const savedSettingsStr = localStorage.getItem(getTenantStorageKey('bluman_tenant_info', tId));
+    if (savedSettingsStr) {
+      savedSettings = JSON.parse(savedSettingsStr);
+    }
+  } catch {}
+
+  if (TENANT_STUDIOS[tId]) {
+    const base = TENANT_STUDIOS[tId];
+    if (savedSettings) {
+      return {
+        ...base,
+        ...savedSettings,
+        ragioneSociale: savedSettings.ragioneSociale || base.ragioneSociale,
+        sedeLegale: savedSettings.sedeLegale || base.sedeLegale,
+        piva: savedSettings.piva || base.piva,
+      };
+    }
+    return base;
+  }
+
+  // Controlla se è un tenant registrato nel SuperAdmin
   try {
     const customTenantsStr = localStorage.getItem('bluman_all_tenants_admin');
     if (customTenantsStr) {
@@ -128,20 +148,20 @@ export function getStudioInfoForTenant(tenantId?: string): StudioInfo {
       if (found) {
         return {
           id: found.id,
-          ragioneSociale: found.ragioneSociale,
-          nomeBreve: found.ragioneSociale.split(' ')[0] || 'Studio',
-          giurisdizione: found.giurisdizione || 'Italia',
-          piva: found.pIva || '',
-          codiceFiscale: found.pIva || '',
-          sedeLegale: '',
-          sedeOperativa: '',
-          email: found.leadAdvisorEmail || '',
-          telefono: '',
-          iban: '',
-          bic: '',
-          bancaNome: '',
-          codiceSdi: '',
-          leadAdvisor: found.leadAdvisorNome || 'Lead Senior Advisor',
+          ragioneSociale: savedSettings?.ragioneSociale || found.ragioneSociale,
+          nomeBreve: savedSettings?.nomeBreve || (found.ragioneSociale ? found.ragioneSociale.split(' ')[0] : 'Studio'),
+          giurisdizione: savedSettings?.giurisdizione || found.giurisdizione || 'Italia',
+          piva: savedSettings?.piva || found.pIva || '',
+          codiceFiscale: savedSettings?.codiceFiscale || found.pIva || '',
+          sedeLegale: savedSettings?.sedeLegale || '',
+          sedeOperativa: savedSettings?.sedeOperativa || '',
+          email: savedSettings?.email || found.leadAdvisorEmail || '',
+          telefono: savedSettings?.telefono || '',
+          iban: savedSettings?.iban || '',
+          bic: savedSettings?.bic || '',
+          bancaNome: savedSettings?.bancaNome || '',
+          codiceSdi: savedSettings?.codiceSdi || '',
+          leadAdvisor: savedSettings?.leadAdvisor || found.leadAdvisorNome || 'Lead Senior Advisor',
         };
       }
     }
@@ -149,21 +169,54 @@ export function getStudioInfoForTenant(tenantId?: string): StudioInfo {
 
   return {
     id: tId,
-    ragioneSociale: 'Nuovo Studio',
-    nomeBreve: 'Studio',
-    giurisdizione: 'Italia',
-    piva: '',
-    codiceFiscale: '',
-    sedeLegale: '',
-    sedeOperativa: '',
-    email: '',
-    telefono: '',
-    iban: '',
-    bic: '',
-    bancaNome: '',
-    codiceSdi: '',
-    leadAdvisor: 'Lead Advisor',
+    ragioneSociale: savedSettings?.ragioneSociale || 'Nuovo Studio',
+    nomeBreve: savedSettings?.nomeBreve || 'Studio',
+    giurisdizione: savedSettings?.giurisdizione || 'Italia',
+    piva: savedSettings?.piva || '',
+    codiceFiscale: savedSettings?.codiceFiscale || '',
+    sedeLegale: savedSettings?.sedeLegale || '',
+    sedeOperativa: savedSettings?.sedeOperativa || '',
+    email: savedSettings?.email || '',
+    telefono: savedSettings?.telefono || '',
+    iban: savedSettings?.iban || '',
+    bic: savedSettings?.bic || '',
+    bancaNome: savedSettings?.bancaNome || '',
+    codiceSdi: savedSettings?.codiceSdi || '',
+    leadAdvisor: savedSettings?.leadAdvisor || 'Lead Advisor',
   };
+}
+
+/**
+ * Restituisce l'elenco di tutti gli studi/tenant disponibili per lo switch
+ */
+export function getAllAvailableTenants(): { id: string; ragioneSociale: string; giurisdizione: string }[] {
+  try {
+    const customTenantsStr = localStorage.getItem('bluman_all_tenants_admin');
+    if (customTenantsStr) {
+      const list = JSON.parse(customTenantsStr);
+      if (Array.isArray(list) && list.length > 0) {
+        return list.map((t: any) => ({
+          id: t.id,
+          ragioneSociale: t.ragioneSociale,
+          giurisdizione: t.giurisdizione || 'Italia',
+        }));
+      }
+    }
+  } catch {}
+
+  return [
+    { id: '00000000-0000-0000-0000-000000000001', ragioneSociale: 'Bluecode Ltd (Malta HQ)', giurisdizione: 'Malta (UE)' },
+    { id: '00000000-0000-0000-0000-000000000002', ragioneSociale: 'Advisory Italia S.r.l. (Milano)', giurisdizione: 'Italia' },
+    { id: '00000000-0000-0000-0000-000000000003', ragioneSociale: 'Swiss Wealth Management SA (Lugano)', giurisdizione: 'Svizzera' },
+  ];
+}
+
+/**
+ * Imposta lo studio attivo sulla piattaforma e notifica i componenti
+ */
+export function setActiveTenantId(tenantId: string) {
+  localStorage.setItem('bluman_tenant_id', tenantId);
+  window.dispatchEvent(new Event('tenant_changed'));
 }
 
 /**

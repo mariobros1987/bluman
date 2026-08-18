@@ -4,6 +4,7 @@ import { Sidebar } from './Sidebar';
 import { NotificationModal, type NotificationItem } from '../NotificationModal';
 import { fetchNotificheApi, markNotificheReadApi } from '../../api/client';
 import { QuickTimeTracker } from '../QuickTimeTracker';
+import { getCurrentTenantId, getAllAvailableTenants, setActiveTenantId } from '../../utils/tenant';
 import styles from './AppLayout.module.css';
 
 const TITLES: Record<string, string> = {
@@ -97,6 +98,32 @@ export function AppLayout({ children, alertCount: _alertCount = 0, user, onLogou
             <div className={styles.topbarTitle}>{title}</div>
           </div>
           <div className={styles.topbarRight}>
+            {/* Selettore Studio / Tenant Switcher */}
+            {(() => {
+              const currentTid = getCurrentTenantId(user);
+              const allTenants = getAllAvailableTenants();
+              return (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#1e1b4b', border: '1px solid #4338ca', borderRadius: 20, padding: '3px 10px', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' }}>
+                  <span style={{ fontSize: 13 }}>🏛</span>
+                  <select
+                    value={currentTid}
+                    onChange={(e) => {
+                      setActiveTenantId(e.target.value);
+                      window.location.reload();
+                    }}
+                    style={{ background: 'transparent', border: 'none', color: '#c7d2fe', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', outline: 'none', maxWidth: 190 }}
+                    title="Cambia Studio Professionale Attivo (Tenant)"
+                  >
+                    {allTenants.map(t => (
+                      <option key={t.id} value={t.id} style={{ background: '#0f172a', color: '#f8fafc' }}>
+                        {t.ragioneSociale}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              );
+            })()}
+
             <QuickTimeTracker user={user} />
             {user && (
               <div style={{ fontSize: 11, color: 'var(--muted)', background: 'var(--card2)', padding: '4px 10px', borderRadius: 20, border: '1px solid var(--border)' }}>
