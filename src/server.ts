@@ -1071,6 +1071,44 @@ export function buildServer(app: AppPort): FastifyInstance {
     }
   );
 
+  // ─── TEAM MEMBERS / UTENTI TENANT-ISOLATI (§RBAC) ─────────────────
+  server.get('/tenant/utenti', async (req) => {
+    const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
+    try {
+      const utenti = await prisma.user.findMany({
+        where: { tenantId },
+        orderBy: { createdAt: 'asc' },
+      });
+      return utenti;
+    } catch {
+      return (app as any).listaUtenti?.() || [];
+    }
+  });
+
+  server.post<{ Body: { nome: string; email: string; ruolo: string; specializzazione?: string } }>('/tenant/utenti', async (req, reply) => {
+    const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
+    const { nome, email, ruolo, specializzazione } = req.body;
+    if (!nome || !email) return reply.code(400).send({ errore: 'nome ed email sono obbligatori' });
+
+    try {
+      const user = await prisma.user.upsert({
+        where: { email },
+        update: { nome, ruolo: (ruolo as any) || 'collaboratore_interno', specializzazione, tenantId, stato: 'attivo' },
+        create: { tenantId, nome, email, ruolo: (ruolo as any) || 'collaboratore_interno', specializzazione, stato: 'attivo' },
+      });
+      recordAudit({
+        tenantId,
+        azione: 'UTENTE_CREATO',
+        entita: nome,
+        dettagli: `Creato/aggiornato operatore ${nome} (${email}) nel team dello studio`,
+        ipAddress: req.ip,
+      });
+      return reply.code(201).send(user);
+    } catch (err: any) {
+      return reply.code(500).send({ errore: err.message || 'Errore creazione utente' });
+    }
+  });
+
   // ─── ANAGRAFICA CLIENTI ERP API (§2, §14) ─────────────────────────
   server.get('/clienti', async (req) => {
     const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';

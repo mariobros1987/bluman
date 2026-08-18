@@ -444,37 +444,37 @@ export async function salvaProgettoDettaglioApi(progettoId: string, data: any) {
   }
 }
 
+// DEFAULT_TEAM_USERS serve SOLO come fallback di seed per il Tenant Demo Bluecode (tenant-1) se il DB è offline
 export const DEFAULT_TEAM_USERS = [
-  { id: 'usr-01', nome: 'Joe Disabato', email: 'joe@bluecode.advisory', ruolo: 'super_admin', specializzazione: 'Lead Advisor & Strategia' },
-  { id: 'usr-02', nome: 'Avv. Lorenzo Marino', email: 'lorenzo.marino@bluecode.advisory', ruolo: 'advisor', specializzazione: 'Legal Counsel — Diritto Societario, Contrattualistica & IP' },
-  { id: 'usr-03', nome: 'Dr. Elena Russo', email: 'elena.russo@bluecode.advisory', ruolo: 'advisor', specializzazione: 'Tax Advisor — Fiscalità Internazionale & Holding' },
-  { id: 'usr-04', nome: 'Francesca Disabato', email: 'francesca@bluecode.advisory', ruolo: 'operator', specializzazione: 'Back Office & Compliance KYC/AML' },
-  { id: 'usr-05', nome: 'Avv. Mario Dibenedetto', email: 'mario.dibenedetto@bluecode.advisory', ruolo: 'advisor', specializzazione: 'Legal Counsel — Diritto Societario, Contrattualistica & Trust' },
+  { id: 'usr-01', nome: 'Joe Disabato', email: 'joe@bluecode.advisory', ruolo: 'super_admin', specializzazione: 'Lead Advisor & Strategia', tenantId: '00000000-0000-0000-0000-000000000001' },
+  { id: 'usr-02', nome: 'Avv. Lorenzo Marino', email: 'lorenzo.marino@bluecode.advisory', ruolo: 'advisor', specializzazione: 'Legal Counsel — Diritto Societario, Contrattualistica & IP', tenantId: '00000000-0000-0000-0000-000000000001' },
+  { id: 'usr-03', nome: 'Dr. Elena Russo', email: 'elena.russo@bluecode.advisory', ruolo: 'advisor', specializzazione: 'Tax Advisor — Fiscalità Internazionale & Holding', tenantId: '00000000-0000-0000-0000-000000000001' },
+  { id: 'usr-04', nome: 'Francesca Disabato', email: 'francesca@bluecode.advisory', ruolo: 'operator', specializzazione: 'Back Office & Compliance KYC/AML', tenantId: '00000000-0000-0000-0000-000000000001' },
+  { id: 'usr-05', nome: 'Avv. Mario Dibenedetto', email: 'mario.dibenedetto@bluecode.advisory', ruolo: 'advisor', specializzazione: 'Legal Counsel — Diritto Societario, Contrattualistica & Trust', tenantId: '00000000-0000-0000-0000-000000000001' },
 ];
 
 export async function fetchUtentiTenant() {
-  const customStr = localStorage.getItem('bluman_custom_team_users');
-  let customList: any[] = [];
-  if (customStr) {
-    try {
-      customList = JSON.parse(customStr);
-    } catch {}
-  }
+  const currentTenantId = getCurrentTenantId();
+  const teamStorageKey = getTenantStorageKey('bluman_custom_team_users', currentTenantId);
 
+  // Carica eventuali collaboratori salvati localmente per questo specifico tenant
+  let customList: any[] = [];
   try {
-    const res = await fetch(`${API_BASE}/tenant/utenti`);
+    const customStr = localStorage.getItem(teamStorageKey);
+    if (customStr) customList = JSON.parse(customStr);
+  } catch {}
+
+  // 1. Prova a caricare dal backend Fastify/DB — la rotta filtra già per x-tenant-id
+  try {
+    const res = await fetch(`${API_BASE}/tenant/utenti`, { headers: getAuthHeaders() });
     if (res.ok) {
       const dbUsers = await res.json();
       if (Array.isArray(dbUsers) && dbUsers.length > 0) {
-        const existingEmails = new Set(dbUsers.map(u => (u.email || '').toLowerCase()));
+        // Aggiungi solo eventuali custom locali non già presenti nel DB
+        const existingEmails = new Set(dbUsers.map((u: any) => (u.email || '').toLowerCase()));
         const fullList = [...dbUsers];
-        for (const def of DEFAULT_TEAM_USERS) {
-          if (!existingEmails.has(def.email.toLowerCase())) {
-            fullList.push(def);
-          }
-        }
         for (const cust of customList) {
-          if (!existingEmails.has(cust.email.toLowerCase())) {
+          if (cust.email && !existingEmails.has(cust.email.toLowerCase())) {
             fullList.push(cust);
           }
         }
@@ -482,18 +482,73 @@ export async function fetchUtentiTenant() {
       }
     }
   } catch (err) {
-    console.warn('Backend API offline / fallback team', err);
+    console.warn('Backend API offline / fallback team locale per tenant', err);
   }
 
-  // Fallback combinato: default + custom salvati localmente
-  const existingEmails = new Set(DEFAULT_TEAM_USERS.map(u => u.email.toLowerCase()));
-  const merged = [...DEFAULT_TEAM_USERS];
-  for (const cust of customList) {
-    if (!existingEmails.has(cust.email.toLowerCase())) {
-      merged.push(cust);
-    }
+  // 2. Fallback offline: custom locali salvati per questo tenant
+  if (customList.length > 0) {
+    return customList;
   }
-  return merged;
+
+  // 3. Fallback solo per il Tenant Demo Bluecode Ltd
+  if (currentTenantId === BLUECODE_TENANT_ID) {
+    return DEFAULT_TEAM_USERS;
+  }
+
+  // 4. Per qualsiasi altro tenant senza dati: lista vuota (l'admin dello studio aggiungerà i propri collaboratori)
+  return [];
+}
+
+export async function creaUtenteTenantApi(input: {
+  nome: string;
+  email: string;
+  ruolo: string;
+  specializzazione?: string;
+}) {
+  const currentTenantId = getCurrentTenantId();
+  const teamStorageKey = getTenantStorageKey('bluman_custom_team_users', currentTenantId);
+
+  // 1. Salva nel local storage isolato del tenant
+  try {
+    const raw = localStorage.getItem(teamStorageKey);
+    const list: any[] = raw ? JSON.parse(raw) : [];
+    const exists = list.findIndex(u => (u.email || '').toLowerCase() === input.email.toLowerCase());
+    const newUserObj = {
+      id: `usr-${Date.now()}`,
+      tenantId: currentTenantId,
+      ...input,
+    };
+    if (exists >= 0) {
+      list[exists] = { ...list[exists], ...newUserObj };
+    } else {
+      list.push(newUserObj);
+    }
+    localStorage.setItem(teamStorageKey, JSON.stringify(list));
+  } catch {}
+
+  // Invia email di benvenuto con credenziali al nuovo collaboratore
+  sendInviteCollaboratoreApi({
+    nome: input.nome,
+    email: input.email,
+    ruolo: input.ruolo,
+    specializzazione: input.specializzazione,
+  }).catch(() => {});
+
+  // 2. Invia al backend Fastify per persistenza su PostgreSQL Supabase
+  try {
+    const res = await fetch(`${API_BASE}/tenant/utenti`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ ...input, tenantId: currentTenantId }),
+    });
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch (err) {
+    console.warn('Persistenza utente team fallback locale:', err);
+  }
+
+  return { ok: true, ...input };
 }
 
 export async function sendInviteCollaboratoreApi(input: {
@@ -541,45 +596,6 @@ export async function sendInviteCollaboratoreApi(input: {
     console.warn('Errore invio email invito collaboratore', err);
     return { success: false, errore: err.message };
   }
-}
-
-export async function creaUtenteTenantApi(input: { nome: string; email: string; ruolo: string; specializzazione?: string }) {
-  // Salva localmente per persistenza immediata
-  const customStr = localStorage.getItem('bluman_custom_team_users');
-  let customList: any[] = [];
-  if (customStr) {
-    try { customList = JSON.parse(customStr); } catch {}
-  }
-  const newUser = {
-    id: `usr-${Date.now()}`,
-    nome: input.nome,
-    email: input.email,
-    ruolo: input.ruolo,
-    specializzazione: input.specializzazione || 'Collaboratore Studio',
-    createdAt: new Date().toISOString(),
-  };
-  customList.push(newUser);
-  localStorage.setItem('bluman_custom_team_users', JSON.stringify(customList));
-
-  // Invia email reale di benvenuto con credenziali al nuovo collaboratore
-  sendInviteCollaboratoreApi({
-    nome: input.nome,
-    email: input.email,
-    ruolo: input.ruolo,
-    specializzazione: input.specializzazione,
-  }).catch(() => {});
-
-  try {
-    const res = await fetch(`${API_BASE}/tenant/utenti`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(input),
-    });
-    if (res.ok) return await res.json();
-  } catch (err) {
-    console.warn('Backend offline fallback for creaUtenteTenantApi', err);
-  }
-  return newUser;
 }
 
 export async function fetchAccessiProgetto(progettoId: string) {
