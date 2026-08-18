@@ -272,6 +272,10 @@ export function resolveDocumentTemplateHtml(
 ): string {
   if (!htmlContent) return '';
 
+  const currentTenantId = getCurrentTenantId();
+  const isBluecode = currentTenantId === BLUECODE_TENANT_ID;
+  const studioInfo = getStudioInfoForTenant(currentTenantId);
+
   let targetCliente: any = null;
   let targetProgetto: any = null;
   let targetStudio: any = null;
@@ -282,7 +286,7 @@ export function resolveDocumentTemplateHtml(
     // Il contesto è stato passato direttamente come oggetto Progetto
     targetProgetto = context;
     try {
-      const clsStr = localStorage.getItem('bluman_clients') || localStorage.getItem('bluman_custom_clients');
+      const clsStr = localStorage.getItem(getTenantStorageKey('bluman_clients')) || localStorage.getItem(getTenantStorageKey('bluman_custom_clients'));
       const clsArr = clsStr ? JSON.parse(clsStr) : [];
       targetCliente = clsArr.find((c: any) => c.nome === context.cl || String(c.id) === String(context.clienteId)) || {
         nome: context.cl,
@@ -299,19 +303,39 @@ export function resolveDocumentTemplateHtml(
     tagMode = context.tagMode || 'plain';
   }
 
-  // Dati studio da Tenant o Storage
+  // Dati studio da Tenant o Storage (isolato per tenant)
   if (!targetStudio) {
     try {
-      const tntStr = localStorage.getItem('bluman_tenant_info');
+      const tntStr = localStorage.getItem(getTenantStorageKey('bluman_tenant_info'));
       if (tntStr) targetStudio = JSON.parse(tntStr);
     } catch {}
   }
 
-  const dataOggi = new Date().toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' });
-  const refJson: any = targetCliente?.referentiJson && typeof targetCliente.referentiJson === 'object' ? targetCliente.referentiJson : {};
+  // Dati studio dinamici dal tenant attivo (nessun fallback su Bluecode per gli altri tenant)
+  const studioRagioneSociale = targetStudio?.ragioneSociale || studioInfo.ragioneSociale || (isBluecode ? 'Bluecode Ltd' : '');
+  const studioPiva = targetStudio?.piva || studioInfo.piva || (isBluecode ? 'MT28491039' : '');
+  const studioSede = targetStudio?.sedeLegale || studioInfo.sedeLegale || (isBluecode ? 'Level 4, Valuation Centre, Tower Road, Sliema SLM 1600, Malta' : '');
+  const studioIban = targetStudio?.iban || studioInfo.iban || (isBluecode ? 'MT89VALL22013000000012345678' : '');
+  const studioLeadAdvisor = studioInfo.leadAdvisor || (isBluecode ? 'Joe Disabato' : '');
+  const studioTel = targetStudio?.telefono || studioInfo.telefono || (isBluecode ? '+356 2134 5678' : '');
+  const studioEmail = targetStudio?.email || studioInfo.email || (isBluecode ? 'contact@bluecode.advisory' : '');
 
-  const projTitolo = targetProgetto?.titolo || targetProgetto?.n || targetProgetto?.nome || 'Costituzione Holding & Trading Malta';
-  const projImporto = targetProgetto?.totalePreventivo || targetProgetto?.val || 8500;
+  // Dati cliente (fallback vuoti per tenant non-Bluecode)
+  const clientNome = targetCliente?.nome || targetProgetto?.cl || (isBluecode ? 'Holding Beta S.r.l.' : '');
+  const clientPiva = targetCliente?.piva || targetCliente?.codiceFiscale || (isBluecode ? 'IT09876543210' : '');
+  const clientCodFisc = targetCliente?.codiceFiscale || targetCliente?.piva || (isBluecode ? 'IT09876543210' : '');
+  const clientSede = targetCliente?.sedeLegale || (isBluecode ? 'Via Montenapoleone 8, Milano' : '');
+  const clientPec = targetCliente?.pec || (isBluecode ? 'holdingbeta@legalmail.it' : '');
+  const clientSdi = targetCliente?.codiceSdi || (isBluecode ? 'SUBM70N' : '');
+  const clientIban = targetCliente?.iban || (isBluecode ? 'IT60X0542811101000000123456' : '');
+  const clientRef = targetCliente?.referenteNome || (targetCliente?.referentiJson as any)?.referente || targetCliente?.referente || (isBluecode ? 'Ing. Roberto Rossi (CEO)' : '');
+  const clientCell = targetCliente?.cellulare || (isBluecode ? '+39 333 5936278' : '');
+  const clientUbo = targetCliente?.ubo || targetCliente?.referenteNome || (isBluecode ? 'Roberto Rossi' : '');
+
+  const dataOggi = new Date().toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' });
+
+  const projTitolo = targetProgetto?.titolo || targetProgetto?.n || targetProgetto?.nome || (isBluecode ? 'Costituzione Holding & Trading Malta' : '');
+  const projImporto = targetProgetto?.totalePreventivo || targetProgetto?.val || 0;
 
   // Sostituzione formale dei tag: NESSUN riquadro o badge, solo elegante grassetto istituzionale
   const wrapTag = (value: string) => {
@@ -320,25 +344,28 @@ export function resolveDocumentTemplateHtml(
 
   let out = htmlContent;
   out = out.replace(/\{\{data_odierna\}\}/g, wrapTag(dataOggi));
-  out = out.replace(/\{\{cliente\.ragione_sociale\}\}/g, wrapTag(targetCliente?.nome || targetProgetto?.cl || 'Holding Beta S.r.l.'));
-  out = out.replace(/\{\{cliente\.nome\}\}/g, wrapTag(targetCliente?.nome || targetProgetto?.cl || 'Holding Beta S.r.l.'));
-  out = out.replace(/\{\{cliente\.partita_iva\}\}/g, wrapTag(targetCliente?.piva || targetCliente?.codiceFiscale || 'IT09876543210'));
-  out = out.replace(/\{\{cliente\.codice_fiscale\}\}/g, wrapTag(targetCliente?.codiceFiscale || targetCliente?.piva || 'IT09876543210'));
-  out = out.replace(/\{\{cliente\.sede_legale\}\}/g, wrapTag(targetCliente?.sedeLegale || 'Via Montenapoleone 8, Milano'));
-  out = out.replace(/\{\{cliente\.pec\}\}/g, wrapTag(targetCliente?.pec || 'holdingbeta@legalmail.it'));
-  out = out.replace(/\{\{cliente\.sdi\}\}/g, wrapTag(targetCliente?.codiceSdi || 'SUBM70N'));
-  out = out.replace(/\{\{cliente\.iban\}\}/g, wrapTag(targetCliente?.iban || 'IT60X0542811101000000123456'));
-  out = out.replace(/\{\{cliente\.referente\}\}/g, wrapTag(targetCliente?.referenteNome || refJson.referente || targetCliente?.referente || 'Ing. Roberto Rossi (CEO)'));
-  out = out.replace(/\{\{cliente\.cellulare\}\}/g, wrapTag(targetCliente?.cellulare || '+39 333 5936278'));
-  out = out.replace(/\{\{cliente\.ubo\}\}/g, wrapTag(targetCliente?.ubo || targetCliente?.referenteNome || 'Roberto Rossi'));
+  out = out.replace(/\{\{cliente\.ragione_sociale\}\}/g, wrapTag(clientNome));
+  out = out.replace(/\{\{cliente\.nome\}\}/g, wrapTag(clientNome));
+  out = out.replace(/\{\{cliente\.partita_iva\}\}/g, wrapTag(clientPiva));
+  out = out.replace(/\{\{cliente\.codice_fiscale\}\}/g, wrapTag(clientCodFisc));
+  out = out.replace(/\{\{cliente\.sede_legale\}\}/g, wrapTag(clientSede));
+  out = out.replace(/\{\{cliente\.pec\}\}/g, wrapTag(clientPec));
+  out = out.replace(/\{\{cliente\.sdi\}\}/g, wrapTag(clientSdi));
+  out = out.replace(/\{\{cliente\.iban\}\}/g, wrapTag(clientIban));
+  out = out.replace(/\{\{cliente\.referente\}\}/g, wrapTag(clientRef));
+  out = out.replace(/\{\{cliente\.cellulare\}\}/g, wrapTag(clientCell));
+  out = out.replace(/\{\{cliente\.ubo\}\}/g, wrapTag(clientUbo));
 
   out = out.replace(/\{\{progetto\.titolo\}\}/g, wrapTag(projTitolo));
-  out = out.replace(/\{\{progetto\.importo_totale\}\}/g, wrapTag(`€ ${Number(projImporto).toLocaleString('it-IT')},00`));
+  out = out.replace(/\{\{progetto\.importo_totale\}\}/g, wrapTag(projImporto ? `€ ${Number(projImporto).toLocaleString('it-IT')},00` : '€ 0,00'));
 
-  out = out.replace(/\{\{studio\.ragione_sociale\}\}/g, wrapTag(targetStudio?.ragioneSociale || 'Bluecode Ltd'));
-  out = out.replace(/\{\{studio\.piva\}\}/g, wrapTag(targetStudio?.piva || 'MT28491039'));
-  out = out.replace(/\{\{studio\.sede_legale\}\}/g, wrapTag(targetStudio?.sedeLegale || 'Level 4, Valuation Centre, Tower Road, Sliema SLM 1600, Malta'));
-  out = out.replace(/\{\{studio\.iban\}\}/g, wrapTag(targetStudio?.iban || 'MT89VALL22013000000012345678'));
+  out = out.replace(/\{\{studio\.ragione_sociale\}\}/g, wrapTag(studioRagioneSociale));
+  out = out.replace(/\{\{studio\.piva\}\}/g, wrapTag(studioPiva));
+  out = out.replace(/\{\{studio\.sede_legale\}\}/g, wrapTag(studioSede));
+  out = out.replace(/\{\{studio\.iban\}\}/g, wrapTag(studioIban));
+  out = out.replace(/\{\{studio\.lead_advisor\}\}/g, wrapTag(studioLeadAdvisor));
+  out = out.replace(/\{\{studio\.telefono\}\}/g, wrapTag(studioTel));
+  out = out.replace(/\{\{studio\.email\}\}/g, wrapTag(studioEmail));
 
   return out;
 }
