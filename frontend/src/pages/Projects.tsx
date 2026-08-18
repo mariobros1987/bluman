@@ -49,7 +49,7 @@ export function Projects() {
       const remote = await fetchProgetti();
       if (remote && Array.isArray(remote)) {
         const dbProjs: Progetto[] = remote
-          .filter((rp: any) => !rp.tenantId || rp.tenantId === currentTenantId)
+          .filter((rp: any) => rp.tenantId === currentTenantId)
           .map((rp: any) => {
             let rpMods = (rp.moduli || []).map((m: any, mIdx: number) => ({
               id: mIdx + 100,

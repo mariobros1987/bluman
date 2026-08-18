@@ -78,27 +78,38 @@ export const TENANT_STUDIOS: Record<string, StudioInfo> = {
 };
 
 export function getCurrentTenantId(user?: any): string {
+  let currentUser = user;
+  if (!currentUser) {
+    const storedUserStr = localStorage.getItem('bluman_user');
+    if (storedUserStr) {
+      try { currentUser = JSON.parse(storedUserStr); } catch {}
+    }
+  }
+
+  // Se l'utente NON è super_admin, è rigorosamente vincolato al proprio tenantId assegnato
+  const isSuperAdmin = currentUser?.ruolo === 'super_admin' || currentUser?.role === 'super_admin';
+  if (currentUser && !isSuperAdmin) {
+    if (currentUser.tenantId) {
+      localStorage.setItem('bluman_tenant_id', currentUser.tenantId);
+      return currentUser.tenantId;
+    }
+    if (currentUser.email) {
+      const clean = currentUser.email.toLowerCase().trim();
+      if (clean.includes('lorenzo.marino') || clean.includes('advisory.it')) {
+        localStorage.setItem('bluman_tenant_id', '00000000-0000-0000-0000-000000000002');
+        return '00000000-0000-0000-0000-000000000002';
+      }
+      if (clean.includes('elena.russo') || clean.includes('swisswealth')) {
+        localStorage.setItem('bluman_tenant_id', '00000000-0000-0000-0000-000000000003');
+        return '00000000-0000-0000-0000-000000000003';
+      }
+    }
+  }
+
   const storedTenantId = localStorage.getItem('bluman_tenant_id');
   if (storedTenantId) return storedTenantId;
 
-  if (user?.tenantId) return user.tenantId;
-  const storedUserStr = localStorage.getItem('bluman_user');
-  if (storedUserStr) {
-    try {
-      const u = JSON.parse(storedUserStr);
-      if (u.tenantId) return u.tenantId;
-      if (u.email) {
-        const clean = u.email.toLowerCase().trim();
-        if (clean.includes('lorenzo.marino') || clean.includes('advisory.it')) {
-          return '00000000-0000-0000-0000-000000000002';
-        }
-        if (clean.includes('elena.russo') || clean.includes('swisswealth')) {
-          return '00000000-0000-0000-0000-000000000003';
-        }
-      }
-    } catch {}
-  }
-
+  if (currentUser?.tenantId) return currentUser.tenantId;
   return BLUECODE_TENANT_ID;
 }
 

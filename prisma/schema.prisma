@@ -58,6 +58,20 @@ model Tenant {
   imapPollInterval  String?  @default("5m") @map("imap_poll_interval")
   imapProtocol      String?  @default("imap") @map("imap_protocol")
   emailSignatureHtml String? @map("email_signature_html")
+  regimeFiscale     String?  @map("regime_fiscale")
+  capitaleSociale   String?  @map("capitale_sociale")
+  regImprese        String?  @map("reg_imprese")
+  mostraSdi         Boolean? @default(true) @map("mostra_sdi")
+  mostraIva         Boolean? @default(true) @map("mostra_iva")
+  emailInboundParseUrl String? @map("email_inbound_parse_url")
+  signalCliEndpoint String?  @map("signal_cli_endpoint")
+  leadAdvisorNome   String?  @map("lead_advisor_nome")
+  leadAdvisorEmail  String?  @map("lead_advisor_email")
+  leadAdvisorPassword String? @map("lead_advisor_password")
+  giurisdizione     String?  @map("giurisdizione")
+  durataMesi        Int?     @default(12) @map("durata_mesi")
+  dataAttivazione   String?  @map("data_attivazione")
+  dataScadenza      String?  @map("data_scadenza")
   piano             String   @default("enterprise")
   stato             String   @default("attivo") // attivo|sospeso|trial
   createdAt         DateTime @default(now()) @map("created_at")
@@ -104,6 +118,7 @@ model User {
   passwordHash String?     @map("password_hash")
   // §23 — obbligatorio per ruolo=super_admin prima di poter fare qualunque azione oltre al login
   totpSecret   String?     @map("totp_secret")
+  specializzazione String? @map("specializzazione")
   costoOrarioCentesimi Int? @default(3000) @map("costo_orario_centesimi") // Costo orario interno studio per margine netto
   createdAt    DateTime    @default(now()) @map("created_at")
 

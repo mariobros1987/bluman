@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { loadTeamMembersFromDb } from '../hooks/useTeamMembers';
 import { fetchProgetti, salvaProgettoDettaglioApi } from '../api/client';
+import { getCurrentTenantId, getTenantStorageKey, getTenantSeedData, BLUECODE_TENANT_ID } from '../utils/tenant';
 import type { Progetto, TeamMember } from '../types';
 
 interface TimeTrackerProps {
@@ -23,10 +24,12 @@ export function QuickTimeTracker({ user }: TimeTrackerProps) {
 
   const loadAllProjects = async () => {
     const list: Progetto[] = [];
+    const currentTenantId = getCurrentTenantId(user);
+    const storageKey = getTenantStorageKey('bluman_custom_projects', currentTenantId);
 
-    // 1. Progetti salvati in local storage
+    // 1. Progetti salvati in local storage per questo specifico Tenant
     try {
-      const savedStr = localStorage.getItem('bluman_custom_projects');
+      const savedStr = localStorage.getItem(storageKey);
       if (savedStr) {
         const arr = JSON.parse(savedStr);
         if (Array.isArray(arr)) {
@@ -35,55 +38,65 @@ export function QuickTimeTracker({ user }: TimeTrackerProps) {
       }
     } catch {}
 
-    // 2. Progetti salvati sul DB server Fastify / PostgreSQL
+    // 2. Progetti salvati sul DB server Fastify / PostgreSQL filtrati per tenantId
     try {
       const remote = await fetchProgetti();
       if (remote && Array.isArray(remote)) {
         const existingIds = new Set(list.map(p => String(p.id)));
-        remote.forEach((rp: any) => {
-          if (!existingIds.has(String(rp.id))) {
-            list.push({
-              id: rp.id,
-              n: rp.nome,
-              cl: rp.cliente?.nome || 'Cliente',
-              ct: (rp.cliente?.tipo as any) || 'individual',
-              st: rp.stato || 'in_progress',
-              pct: rp.stato === 'completed' ? 100 : 50,
-              start: rp.createdAt ? new Date(rp.createdAt).toLocaleDateString('it-IT') : 'Oggi',
-              due: rp.scadenza ? new Date(rp.scadenza).toLocaleDateString('it-IT') : '31/12/2026',
-              val: rp.valoreTotale ? rp.valoreTotale / 100 : 15000,
-              delay: rp.inRitardo || false,
-              fisc: rp.regimeFiscale || 'privato_italia',
-              fatture: rp.fatture || [],
-              mods: (rp.moduli || []).map((m: any, mIdx: number) => ({
-                id: mIdx + 100,
-                n: m.nome,
-                cat: m.categoria || 'Societario',
-                st: m.stato || 'in_progress',
-                pct: 50,
-                h: m.orePreventivate || 20,
-                a: m.oreConsuntivate || 0,
-                p: m.prezzo ? m.prezzo / 100 : 3500,
-                team: [1, 2],
-                delay: false,
-                v: (m.microvoci || []).map((v: any) => ({
-                  n: v.titolo || v.nome,
-                  hE: v.orePreventivate || 2,
-                  hA: v.oreConsuntivate || 0,
-                  s: v.completato ? 'done' : 'pending',
-                  as: 1,
-                  d: 1,
+        remote
+          .filter((rp: any) => rp.tenantId === currentTenantId)
+          .forEach((rp: any) => {
+            if (!existingIds.has(String(rp.id))) {
+              list.push({
+                id: rp.id,
+                n: rp.nome,
+                cl: rp.cliente?.nome || 'Cliente',
+                ct: (rp.cliente?.tipo as any) || 'individual',
+                st: rp.stato || 'in_progress',
+                pct: rp.stato === 'completed' ? 100 : 50,
+                start: rp.createdAt ? new Date(rp.createdAt).toLocaleDateString('it-IT') : 'Oggi',
+                due: rp.scadenza ? new Date(rp.scadenza).toLocaleDateString('it-IT') : '31/12/2026',
+                val: rp.valoreTotale ? rp.valoreTotale / 100 : 15000,
+                delay: rp.inRitardo || false,
+                fisc: rp.regimeFiscale || 'privato_italia',
+                fatture: rp.fatture || [],
+                mods: (rp.moduli || []).map((m: any, mIdx: number) => ({
+                  id: mIdx + 100,
+                  n: m.nome,
+                  cat: m.categoria || 'Societario',
+                  st: m.stato || 'in_progress',
+                  pct: 50,
+                  h: m.orePreventivate || 20,
+                  a: m.oreConsuntivate || 0,
+                  p: m.prezzo ? m.prezzo / 100 : 3500,
+                  team: [1, 2],
+                  delay: false,
+                  v: (m.microvoci || []).map((v: any) => ({
+                    n: v.titolo || v.nome,
+                    hE: v.orePreventivate || 2,
+                    hA: v.oreConsuntivate || 0,
+                    s: v.completato ? 'done' : 'pending',
+                    as: 1,
+                    d: 1,
+                  })),
                 })),
-              })),
-            });
-          }
-        });
+              });
+            }
+          });
       }
     } catch {}
+
+    // 3. Se e solo se è il tenant demo Bluecode Ltd e non ci sono progetti salvati, carica i progetti di seed
+    if (list.length === 0 && currentTenantId === BLUECODE_TENANT_ID) {
+      const seed = getTenantSeedData(currentTenantId);
+      list.push(...seed.projects);
+    }
 
     setProjects(list);
     if (list.length > 0) {
       setSelectedProjectId(prev => (prev && list.some(p => String(p.id) === String(prev))) ? prev : String(list[0].id));
+    } else {
+      setSelectedProjectId('');
     }
   };
 
@@ -242,7 +255,8 @@ export function QuickTimeTracker({ user }: TimeTrackerProps) {
     const updatedPrj = { ...currentProject, mods: newMods };
     const savedArr = projects.map(p => String(p.id) === String(currentProject.id) ? updatedPrj : p);
     setProjects(savedArr);
-    localStorage.setItem('bluman_custom_projects', JSON.stringify(savedArr));
+    const currentTenantId = getCurrentTenantId(user);
+    localStorage.setItem(getTenantStorageKey('bluman_custom_projects', currentTenantId), JSON.stringify(savedArr));
 
     try {
       await salvaProgettoDettaglioApi(String(currentProject.id), updatedPrj);

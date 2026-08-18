@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { fmt } from '../utils';
 import { setActiveTenantId } from '../utils/tenant';
+import { fetchAdminTenantsApi, createAdminTenantApi, updateAdminTenantApi, deleteAdminTenantApi } from '../api/client';
 
 interface TenantStudio {
   id: string;
@@ -80,6 +81,14 @@ export function SuperAdminPage() {
     return saved ? JSON.parse(saved) : DEFAULT_TENANTS;
   });
 
+  useEffect(() => {
+    fetchAdminTenantsApi().then(dbTenants => {
+      if (dbTenants && Array.isArray(dbTenants) && dbTenants.length > 0) {
+        setTenants(dbTenants);
+      }
+    });
+  }, []);
+
   // Modals state
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [credentialsModalTenant, setCredentialsModalTenant] = useState<TenantStudio | null>(null);
@@ -151,6 +160,9 @@ export function SuperAdminPage() {
     setTenants(updated);
     setCreateModalOpen(false);
 
+    // Salva a database PostgreSQL Supabase
+    createAdminTenantApi(newTenant);
+
     // Reset Form
     setFormName('');
     setFormAdvisorNome('');
@@ -167,6 +179,7 @@ export function SuperAdminPage() {
     const nextState: 'attivo' | 'sospeso' = tenant.stato === 'attivo' ? 'sospeso' : 'attivo';
     const updated = tenants.map(t => t.id === tenant.id ? { ...t, stato: nextState } : t);
     setTenants(updated);
+    updateAdminTenantApi(tenant.id, { stato: nextState });
     alert(`✓ Tenant "${tenant.ragioneSociale}" impostato sullo stato: ${nextState.toUpperCase()}`);
   };
 
@@ -175,6 +188,7 @@ export function SuperAdminPage() {
     const updated = tenants.filter(t => t.id !== tenant.id);
     setTenants(updated);
     setDeleteModalTenant(null);
+    deleteAdminTenantApi(tenant.id);
     alert(`✓ Tenant "${tenant.ragioneSociale}" eliminato definitivamente dalla piattaforma.`);
   };
 
@@ -196,6 +210,7 @@ export function SuperAdminPage() {
 
     const updated = tenants.map(t => t.id === tenant.id ? { ...t, dataScadenza: newScadenza, stato: 'attivo' as const } : t);
     setTenants(updated);
+    updateAdminTenantApi(tenant.id, { dataScadenza: newScadenza, stato: 'attivo' });
     if (durationModalTenant && durationModalTenant.id === tenant.id) {
       setDurationModalTenant({ ...durationModalTenant, dataScadenza: newScadenza, stato: 'attivo' });
     }
@@ -212,6 +227,7 @@ export function SuperAdminPage() {
     const formatted = `${parts[2]}/${parts[1]}/${parts[0]}`;
     const updated = tenants.map(t => t.id === tenant.id ? { ...t, dataScadenza: formatted, stato: 'attivo' as const } : t);
     setTenants(updated);
+    updateAdminTenantApi(tenant.id, { dataScadenza: formatted, stato: 'attivo' });
     if (durationModalTenant && durationModalTenant.id === tenant.id) {
       setDurationModalTenant({ ...durationModalTenant, dataScadenza: formatted, stato: 'attivo' });
     }

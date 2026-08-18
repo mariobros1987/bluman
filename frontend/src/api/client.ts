@@ -5,6 +5,9 @@ const getApiBase = () => {
   if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_BASE) {
     return import.meta.env.VITE_API_BASE;
   }
+  if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+    return 'http://localhost:3000';
+  }
   return 'https://bluman-api-production.up.railway.app';
 };
 
@@ -1315,6 +1318,63 @@ export async function eliminaDocumentoTemplateApi(id: string) {
     return { ok: true };
   }
 }
+
+export async function fetchAdminTenantsApi() {
+  try {
+    const res = await fetch(`${API_BASE}/admin/tenants`, { headers: getAuthHeaders() });
+    if (!res.ok) throw new Error('Errore recupero tenants');
+    return await res.json();
+  } catch (err) {
+    console.warn('Recupero admin tenants fallback local:', err);
+    const local = localStorage.getItem('bluman_all_tenants_admin');
+    return local ? JSON.parse(local) : null;
+  }
+}
+
+export async function createAdminTenantApi(data: any) {
+  try {
+    const res = await fetch(`${API_BASE}/admin/tenants`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error('Errore creazione tenant su DB');
+    return await res.json();
+  } catch (err) {
+    console.warn('Creazione tenant API fallback local:', err);
+    return data;
+  }
+}
+
+export async function updateAdminTenantApi(id: string, data: any) {
+  try {
+    const res = await fetch(`${API_BASE}/admin/tenants/${id}`, {
+      method: 'PATCH',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error('Errore aggiornamento tenant');
+    return await res.json();
+  } catch (err) {
+    console.warn('Aggiornamento tenant API fallback local:', err);
+    return data;
+  }
+}
+
+export async function deleteAdminTenantApi(id: string) {
+  try {
+    const res = await fetch(`${API_BASE}/admin/tenants/${id}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok) throw new Error('Errore eliminazione tenant');
+    return await res.json();
+  } catch (err) {
+    console.warn('Eliminazione tenant API fallback local:', err);
+    return { ok: true };
+  }
+}
+
 
 
 

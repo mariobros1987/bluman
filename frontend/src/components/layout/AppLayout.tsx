@@ -98,13 +98,39 @@ export function AppLayout({ children, alertCount: _alertCount = 0, user, onLogou
             <div className={styles.topbarTitle}>{title}</div>
           </div>
           <div className={styles.topbarRight}>
-            {/* Selettore Studio / Tenant Switcher */}
+            {/* Selettore Studio / Tenant Switcher — RISERVATO AL SUPER ADMIN */}
             {(() => {
               const currentTid = getCurrentTenantId(user);
               const allTenants = getAllAvailableTenants();
+              const isSuperAdmin = user?.ruolo === 'super_admin' || user?.role === 'super_admin';
+              const currentTenantObj = allTenants.find(t => t.id === currentTid) || { id: currentTid, ragioneSociale: 'Studio Advisory' };
+
+              if (!isSuperAdmin) {
+                return (
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      background: '#111827',
+                      border: '1px solid #374151',
+                      borderRadius: 20,
+                      padding: '4px 12px',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                    }}
+                    title={`Studio Professionale Assegnato: ${currentTenantObj.ragioneSociale}`}
+                  >
+                    <span style={{ fontSize: 13 }}>🏛</span>
+                    <span style={{ color: '#93c5fd', fontSize: 11.5, fontWeight: 700, whiteSpace: 'nowrap', maxWidth: 190, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {currentTenantObj.ragioneSociale}
+                    </span>
+                  </div>
+                );
+              }
+
               return (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#1e1b4b', border: '1px solid #4338ca', borderRadius: 20, padding: '3px 10px', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' }}>
-                  <span style={{ fontSize: 13 }}>🏛</span>
+                  <span style={{ fontSize: 13 }} title="👑 Super Admin Multi-Tenant Switcher">🏛</span>
                   <select
                     value={currentTid}
                     onChange={(e) => {
@@ -112,7 +138,7 @@ export function AppLayout({ children, alertCount: _alertCount = 0, user, onLogou
                       window.location.reload();
                     }}
                     style={{ background: 'transparent', border: 'none', color: '#c7d2fe', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', outline: 'none', maxWidth: 190 }}
-                    title="Cambia Studio Professionale Attivo (Tenant)"
+                    title="👑 Cambia Studio Professionale Attivo (Super Admin)"
                   >
                     {allTenants.map(t => (
                       <option key={t.id} value={t.id} style={{ background: '#0f172a', color: '#f8fafc' }}>

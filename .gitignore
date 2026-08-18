@@ -27,4 +27,6 @@ supabase/functions/.deploy/
 
 .vercel
 openstamanager_source/
+openstamanager-reference/
+scratch/
 *.log

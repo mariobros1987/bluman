@@ -174,7 +174,7 @@ export function NewProjectWizard({ onClose, onProjectCreated }: NewProjectWizard
             })),
           })),
         };
-        localStorage.setItem('bluman_custom_projects', JSON.stringify([newProjObject, ...customProjs]));
+        localStorage.setItem(storageKey, JSON.stringify([newProjObject, ...customProjs]));
       } catch (apiErr) {
         console.warn('Backend API project creation fallback local:', apiErr);
       }

@@ -41,7 +41,7 @@ export function Dashboard() {
       const remote = await fetchProgetti();
       if (remote && Array.isArray(remote)) {
         const dbProjs: Progetto[] = remote
-          .filter((rp: any) => !rp.tenantId || rp.tenantId === currentTenantId)
+          .filter((rp: any) => rp.tenantId === currentTenantId)
           .map((rp: any) => ({
             id: rp.id,
             n: rp.nome,

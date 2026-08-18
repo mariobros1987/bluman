@@ -149,6 +149,13 @@ export function SettingsPage() {
       setImapFolder(tData.imapFolder || 'INBOX');
       setImapPollInterval(tData.imapPollInterval || '5m');
       setEmailSignatureHtml(tData.emailSignatureHtml || '');
+      setRegimeFiscale(tData.regimeFiscale || '');
+      setCapitaleSociale(tData.capitaleSociale || '');
+      setRegImprese(tData.regImprese || '');
+      setMostraSdi(tData.mostraSdi !== undefined ? tData.mostraSdi : true);
+      setMostraIva(tData.mostraIva !== undefined ? tData.mostraIva : true);
+      setEmailInboundParseUrl(tData.emailInboundParseUrl || 'https://bluman.vercel.app/api/webhooks/inbound-email');
+      setSignalCliEndpoint(tData.signalCliEndpoint || 'http://localhost:8080/v1/receive');
     }
 
     const dbUsers = await fetchUtentiTenant();
@@ -162,8 +169,8 @@ export function SettingsPage() {
     loadTenantData();
   }, []);
 
-  const handleSaveCompany = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSaveCompany = async (e?: React.FormEvent) => {
+    if (e && e.preventDefault) e.preventDefault();
     const currentTenantId = getCurrentTenantId();
     const dataToSave = {
       id: currentTenantId,
@@ -176,10 +183,17 @@ export function SettingsPage() {
       pec,
       telefono,
       iban,
+      regimeFiscale,
+      capitaleSociale,
+      regImprese,
       logoUrl,
       coloreTemaFattura,
       notePieFattura: notePieDiPagina,
       titoloIntestazione,
+      mostraSdi,
+      mostraIva,
+      emailInboundParseUrl,
+      signalCliEndpoint,
       waPhoneId,
       waAccessToken,
       waVerifyToken,
@@ -547,10 +561,7 @@ export function SettingsPage() {
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
             <button
-              onClick={() => {
-                setSaved(true);
-                setTimeout(() => setSaved(false), 2500);
-              }}
+              onClick={() => handleSaveCompany()}
               style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '9px 20px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
             >
               ✓ Salva Personalizzazione Fattura PDF

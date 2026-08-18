@@ -564,15 +564,19 @@ export function buildServer(app: AppPort): FastifyInstance {
       'smtpFromEmail', 'smtpFromName', 'smtpReplyTo', 'smtpBcc',
       'imapHost', 'imapPort', 'imapSecure', 'imapUser', 'imapPass',
       'imapFolder', 'imapPollInterval', 'imapProtocol', 'emailSignatureHtml',
+      'regimeFiscale', 'capitaleSociale', 'regImprese', 'mostraSdi', 'mostraIva',
+      'emailInboundParseUrl', 'signalCliEndpoint',
+      'leadAdvisorNome', 'leadAdvisorEmail', 'leadAdvisorPassword', 'giurisdizione',
+      'durataMesi', 'dataAttivazione', 'dataScadenza',
       'piano', 'stato'
     ];
 
     const sanitizedData: Record<string, any> = {};
     for (const key of allowedKeys) {
       if (rawBody[key] !== undefined) {
-        if (key === 'smtpPort' || key === 'imapPort') {
+        if (key === 'smtpPort' || key === 'imapPort' || key === 'durataMesi') {
           sanitizedData[key] = rawBody[key] ? Number(rawBody[key]) : null;
-        } else if (key === 'smtpSecure' || key === 'imapSecure') {
+        } else if (key === 'smtpSecure' || key === 'imapSecure' || key === 'mostraSdi' || key === 'mostraIva') {
           sanitizedData[key] = Boolean(rawBody[key]);
         } else {
           sanitizedData[key] = rawBody[key];
@@ -593,6 +597,12 @@ export function buildServer(app: AppPort): FastifyInstance {
         },
       });
       inMemoryTenantStore.set(tenantId, { ...inMemoryTenantStore.get(tenantId), ...sanitizedData, id: tenantId });
+      recordAudit({
+        tenantId,
+        azione: 'IMPOSTAZIONI_TENANT_SALVATE',
+        entita: 'Anagrafica Studio & Impostazioni',
+        dettagli: `Aggiornati e sincronizzati su DB Supabase tutti i parametri dello studio: ${sanitizedData.ragioneSociale || tenantId}`,
+      });
       return reply.send(updated);
     } catch (err) {
       console.warn('Prisma tenant upsert fallback to inMemory store:', err);
@@ -600,6 +610,164 @@ export function buildServer(app: AppPort): FastifyInstance {
       const updated = { ...current, ...sanitizedData, id: tenantId };
       inMemoryTenantStore.set(tenantId, updated);
       return reply.send(updated);
+    }
+  });
+
+  // ── GESTIONE UTENTI TEAM TENANT ───────────────────────────────────
+  server.get('/tenant/utenti', async (req, reply) => {
+    const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
+    try {
+      const users = await prisma.user.findMany({
+        where: {
+          OR: [
+            { tenantId },
+            { tenantId: null }
+          ]
+        },
+        orderBy: { createdAt: 'asc' },
+      });
+      return reply.send(users);
+    } catch {
+      return reply.send([]);
+    }
+  });
+
+  server.post<{
+    Body: { nome: string; email: string; ruolo?: string; specializzazione?: string; costoOrarioCentesimi?: number };
+  }>('/tenant/utenti', async (req, reply) => {
+    const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
+    const { nome, email, ruolo, specializzazione, costoOrarioCentesimi } = req.body || {};
+    if (!nome || !email) {
+      return reply.code(400).send({ errore: 'Nome ed email sono obbligatori' });
+    }
+
+    try {
+      const validRole = (ruolo === 'super_admin' || ruolo === 'advisor' || ruolo === 'collaboratore_interno' || ruolo === 'collaboratore_esterno')
+        ? (ruolo as any)
+        : 'collaboratore_interno';
+
+      const user = await prisma.user.upsert({
+        where: { email: email.trim().toLowerCase() },
+        update: {
+          nome,
+          ruolo: validRole,
+          specializzazione: specializzazione || undefined,
+          costoOrarioCentesimi: costoOrarioCentesimi || undefined,
+          tenantId,
+        },
+        create: {
+          nome,
+          email: email.trim().toLowerCase(),
+          ruolo: validRole,
+          specializzazione: specializzazione || 'Collaboratore di Studio',
+          costoOrarioCentesimi: costoOrarioCentesimi || 3000,
+          tenantId,
+          stato: 'attivo',
+        },
+      });
+
+      recordAudit({
+        tenantId,
+        azione: 'COLLABORATORE_CREATO',
+        entita: user.nome,
+        dettagli: `Aggiunto collaboratore ${user.nome} (${user.email}) con ruolo ${user.ruolo}`,
+      });
+
+      return reply.code(201).send(user);
+    } catch (err: any) {
+      return reply.code(500).send({ errore: err.message || 'Errore creazione collaboratore' });
+    }
+  });
+
+  // ── GESTIONE MULTI-TENANT SUPER ADMIN ─────────────────────────────
+  server.get('/admin/tenants', async (_req, reply) => {
+    try {
+      const tenants = await prisma.tenant.findMany({
+        include: {
+          _count: {
+            select: { users: true, clienti: true }
+          }
+        },
+        orderBy: { createdAt: 'desc' }
+      });
+      return reply.send(tenants.map(t => ({
+        id: t.id,
+        ragioneSociale: t.ragioneSociale,
+        giurisdizione: t.giurisdizione || 'Italia',
+        pIva: t.piva || '',
+        leadAdvisorNome: t.leadAdvisorNome || 'Lead Senior Advisor',
+        leadAdvisorEmail: t.leadAdvisorEmail || t.email || '',
+        leadAdvisorPassword: t.leadAdvisorPassword || 'Studio2026!',
+        piano: t.piano || 'enterprise',
+        stato: t.stato || 'attivo',
+        durataMesi: t.durataMesi || 12,
+        dataAttivazione: t.dataAttivazione || new Date(t.createdAt).toLocaleDateString('it-IT'),
+        dataScadenza: t.dataScadenza || '',
+        utentiCount: (t as any)._count?.users || 1,
+        progettiCount: (t as any)._count?.clienti || 0,
+        fatturatoMensile: 0,
+      })));
+    } catch {
+      return reply.send([]);
+    }
+  });
+
+  server.post<{ Body: Record<string, any> }>('/admin/tenants', async (req, reply) => {
+    const b = req.body || {};
+    try {
+      const tenant = await prisma.tenant.create({
+        data: {
+          id: b.id || undefined,
+          ragioneSociale: b.ragioneSociale || 'Nuovo Studio',
+          giurisdizione: b.giurisdizione,
+          piva: b.pIva || b.piva,
+          email: b.leadAdvisorEmail || b.email,
+          leadAdvisorNome: b.leadAdvisorNome,
+          leadAdvisorEmail: b.leadAdvisorEmail,
+          leadAdvisorPassword: b.leadAdvisorPassword,
+          piano: b.piano || 'enterprise',
+          stato: b.stato || 'attivo',
+          durataMesi: Number(b.durataMesi) || 12,
+          dataAttivazione: b.dataAttivazione,
+          dataScadenza: b.dataScadenza,
+        }
+      });
+      return reply.code(201).send(tenant);
+    } catch (err: any) {
+      return reply.code(500).send({ errore: err.message || 'Errore creazione tenant' });
+    }
+  });
+
+  server.patch<{ Params: { id: string }; Body: Record<string, any> }>('/admin/tenants/:id', async (req, reply) => {
+    const { id } = req.params;
+    const b = req.body || {};
+    try {
+      const updated = await prisma.tenant.update({
+        where: { id },
+        data: {
+          ...(b.ragioneSociale && { ragioneSociale: b.ragioneSociale }),
+          ...(b.stato && { stato: b.stato }),
+          ...(b.piano && { piano: b.piano }),
+          ...(b.dataScadenza && { dataScadenza: b.dataScadenza }),
+          ...(b.durataMesi !== undefined && { durataMesi: Number(b.durataMesi) }),
+          ...(b.leadAdvisorNome && { leadAdvisorNome: b.leadAdvisorNome }),
+          ...(b.leadAdvisorEmail && { leadAdvisorEmail: b.leadAdvisorEmail }),
+          ...(b.leadAdvisorPassword && { leadAdvisorPassword: b.leadAdvisorPassword }),
+        }
+      });
+      return reply.send(updated);
+    } catch (err: any) {
+      return reply.code(500).send({ errore: err.message || 'Errore aggiornamento tenant' });
+    }
+  });
+
+  server.delete<{ Params: { id: string } }>('/admin/tenants/:id', async (req, reply) => {
+    const { id } = req.params;
+    try {
+      await prisma.tenant.delete({ where: { id } });
+      return reply.send({ ok: true, id });
+    } catch (err: any) {
+      return reply.code(500).send({ errore: err.message || 'Errore eliminazione tenant' });
     }
   });
 
@@ -903,17 +1071,6 @@ export function buildServer(app: AppPort): FastifyInstance {
     }
   );
 
-  server.get('/tenant/utenti', async () => {
-    return (app as any).listaUtenti();
-  });
-
-  server.post<{ Body: { nome: string; email: string; ruolo: string } }>('/tenant/utenti', async (req, reply) => {
-    const { nome, email, ruolo } = req.body;
-    if (!nome || !email) return reply.code(400).send({ errore: 'nome ed email sono obbligatori' });
-    const user = await (app as any).creaUtente({ nome, email, ruolo });
-    return reply.code(201).send(user);
-  });
-
   // ─── ANAGRAFICA CLIENTI ERP API (§2, §14) ─────────────────────────
   server.get('/clienti', async (req) => {
     const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
@@ -1062,11 +1219,48 @@ export function buildServer(app: AppPort): FastifyInstance {
     }
   });
 
+  server.get('/progetti', async (req) => {
+    const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
+    try {
+      const projs = await prisma.progetto.findMany({
+        where: { tenantId },
+        include: {
+          cliente: true,
+          moduli: {
+            include: {
+              microvoci: true,
+            }
+          }
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+      if (projs && projs.length > 0) return projs;
+      return (app as any).listaProgetti?.() || [];
+    } catch {
+      return (app as any).listaProgetti?.() || [];
+    }
+  });
+
   server.post<{ Body: { clienteId: string; nome: string } }>('/progetti', async (req, reply) => {
+    const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
     const { clienteId, nome } = req.body;
     if (!clienteId || !nome) return reply.code(400).send({ errore: 'clienteId e nome sono obbligatori' });
-    const progetto = await app.creaProgetto({ clienteId, nome });
-    return reply.code(201).send(progetto);
+
+    try {
+      const progetto = await prisma.progetto.create({
+        data: {
+          tenantId,
+          clienteId,
+          nome,
+          stato: 'pre_project',
+        },
+        include: { cliente: true }
+      });
+      return reply.code(201).send(progetto);
+    } catch {
+      const progetto = await app.creaProgetto({ clienteId, nome });
+      return reply.code(201).send(progetto);
+    }
   });
 
   const projectStateStore = new Map<string, any>();
