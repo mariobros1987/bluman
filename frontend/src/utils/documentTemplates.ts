@@ -273,7 +273,6 @@ export function resolveDocumentTemplateHtml(
   if (!htmlContent) return '';
 
   const currentTenantId = getCurrentTenantId();
-  const isBluecode = currentTenantId === BLUECODE_TENANT_ID;
   const studioInfo = getStudioInfoForTenant(currentTenantId);
 
   let targetCliente: any = null;

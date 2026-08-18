@@ -260,13 +260,12 @@ export function DocumentEditorPage() {
     if (tagDisplayMode === 'raw' && !isForPrintOrExport) return htmlContent;
 
     const currentTenantId = getCurrentTenantId();
-    const isBluecode = currentTenantId === BLUECODE_TENANT_ID;
     const studioInfo = getStudioInfoForTenant(currentTenantId);
 
     const refJson: any = activeCliente?.referentiJson && typeof activeCliente.referentiJson === 'object' ? activeCliente.referentiJson : {};
     const dataOggi = new Date().toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' });
 
-    const projTitolo = activeProgetto?.titolo || activeProgetto?.n || activeProgetto?.nome || (isBluecode ? 'Costituzione Holding & Trading Malta' : 'Incarico Professionale');
+    const projTitolo = activeProgetto?.titolo || activeProgetto?.n || activeProgetto?.nome || 'Incarico Professionale';
     const projImporto = activeProgetto?.totalePreventivo || activeProgetto?.val || 0;
 
     // Dati dinamici Studio del Tenant attivo (totalmente dinamici dallo studio, nessun valore fisso)
@@ -574,15 +573,14 @@ export function DocumentEditorPage() {
     setFeedback('⏳ Generazione file PDF ad alta risoluzione in corso...');
     try {
       const currentTenantId = getCurrentTenantId();
-      const isBluecode = currentTenantId === BLUECODE_TENANT_ID;
       const studioInfo = getStudioInfoForTenant(currentTenantId);
 
-      const studioRagioneSociale = tenantInfo?.ragioneSociale || studioInfo.ragioneSociale || (isBluecode ? 'Bluecode Ltd' : 'Studio Professionale');
+      const studioRagioneSociale = tenantInfo?.ragioneSociale || studioInfo.ragioneSociale || 'Studio Professionale';
       const studioSede = tenantInfo?.sedeLegale || studioInfo.sedeLegale || '';
       const studioPiva = tenantInfo?.piva || studioInfo.piva || '';
       const studioTel = tenantInfo?.telefono || studioInfo.telefono || '';
 
-      const rawLogo = tenantInfo?.logoUrl || localStorage.getItem(getTenantStorageKey('bluman_logo_url')) || (isBluecode ? '/logo.png' : '');
+      const rawLogo = tenantInfo?.logoUrl || localStorage.getItem(getTenantStorageKey('bluman_logo_url'));
       const logo = rawLogo ? getFormattedLogoUrl(rawLogo) : '';
 
       const currentHtml = editorRef.current?.innerHTML || rawTemplateRef.current;

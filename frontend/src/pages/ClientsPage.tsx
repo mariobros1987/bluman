@@ -322,34 +322,34 @@ function AnagraficaErpModal({ client, onClose, onSaved }: { client: Cliente; onC
   const [nome, setNome] = useState(client.nome || '');
   const [tipo, setTipo] = useState(client.tipo || 'company');
   const [piva, setPiva] = useState(client.piva || (client as any).partitaIva || refJson.piva || '');
-  const [codFisc, setCodFisc] = useState(client.codiceFiscale || (client as any).codFisc || refJson.codiceFiscale || 'RCCMRC80A01H501Z');
-  const [giurisdizione, setGiurisdizione] = useState(client.giurisdizione || refJson.giurisdizione || (client.tipo === 'company' ? 'Malta / UE' : 'Italia'));
-  const [capitale, setCapitale] = useState<number>((client as any).capitale || refJson.capitale || 100000);
-  const [regImprese, setRegImprese] = useState((client as any).regImprese || refJson.regImprese || 'C-99881 / REA 49021');
+  const [codFisc, setCodFisc] = useState(client.codiceFiscale || (client as any).codFisc || refJson.codiceFiscale || '');
+  const [giurisdizione, setGiurisdizione] = useState(client.giurisdizione || refJson.giurisdizione || 'Italia');
+  const [capitale, setCapitale] = useState<number>((client as any).capitale || refJson.capitale || 10000);
+  const [regImprese, setRegImprese] = useState((client as any).regImprese || refJson.regImprese || '');
 
   // Tab 2: Sede & Contatti
-  const [indirizzo, setIndirizzo] = useState((client as any).indirizzo || refJson.indirizzo || client.sedeLegale || 'Level 4, Valuation Centre, Tower Road');
-  const [citta, setCitta] = useState((client as any).citta || refJson.citta || 'Sliema / Milano');
-  const [cap, setCap] = useState((client as any).cap || refJson.cap || '20121');
-  const [nazione, setNazione] = useState((client as any).nazione || refJson.nazione || 'Malta / Italia');
-  const [email, setEmail] = useState(client.email || refJson.email || 'm.ricci@holdingbeta.advisory');
-  const [pec, setPec] = useState((client as any).pec || refJson.pec || 'holdingbeta@legalmail.it');
-  const [telefono, setTelefono] = useState(client.telefono || refJson.telefono || '+356 21 888 999');
-  const [cellulare, setCellulare] = useState((client as any).cellulare || refJson.cellulare || refJson.whatsapp || client.telefono || '+39 333 5936278');
-  const [telegram, setTelegram] = useState((client as any).telegram || refJson.telegram || `@${(client.nome || 'cliente').replace(/[^a-zA-Z0-9]/g, '')}`);
-  const [signal, setSignal] = useState((client as any).signal || refJson.signal || (client as any).cellulare || refJson.cellulare || client.telefono || '+39 333 5936278');
-  const [referenteNome, setReferenteNome] = useState((client as any).referenteNome || refJson.referenteNome || refJson.referente || 'Ing. Roberto Rossi (CEO)');
+  const [indirizzo, setIndirizzo] = useState((client as any).indirizzo || refJson.indirizzo || client.sedeLegale || '');
+  const [citta, setCitta] = useState((client as any).citta || refJson.citta || '');
+  const [cap, setCap] = useState((client as any).cap || refJson.cap || '');
+  const [nazione, setNazione] = useState((client as any).nazione || refJson.nazione || 'Italia');
+  const [email, setEmail] = useState(client.email || refJson.email || '');
+  const [pec, setPec] = useState((client as any).pec || refJson.pec || '');
+  const [telefono, setTelefono] = useState(client.telefono || refJson.telefono || '');
+  const [cellulare, setCellulare] = useState((client as any).cellulare || refJson.cellulare || refJson.whatsapp || client.telefono || '');
+  const [telegram, setTelegram] = useState((client as any).telegram || refJson.telegram || '');
+  const [signal, setSignal] = useState((client as any).signal || refJson.signal || '');
+  const [referenteNome, setReferenteNome] = useState((client as any).referenteNome || refJson.referenteNome || refJson.referente || '');
 
   // Tab 3: SDI & Fatturazione
-  const [sdiCode, setSdiCode] = useState(client.sdiCode || (client as any).codiceSdi || refJson.sdiCode || 'SUBM70N');
+  const [sdiCode, setSdiCode] = useState(client.sdiCode || (client as any).codiceSdi || refJson.sdiCode || '0000000');
   const [regimeFiscale, setRegimeFiscale] = useState((client as any).regimeFiscale || refJson.regimeFiscale || 'RF01 - Ordinario');
-  const [iban, setIban] = useState(client.iban || refJson.iban || 'IT60X0542811101000000123456');
+  const [iban, setIban] = useState(client.iban || refJson.iban || '');
 
   // Tab 4: Compliance & KYC
-  const [rischioAml, setRischioAml] = useState<'basso' | 'medio' | 'alto'>(client.rischioAml || refJson.rischioAml || 'medio');
-  const [ubo, setUbo] = useState(client.ubo || refJson.ubo || 'Marco Ricci (100% Quote)');
-  const [fontePatrimonio, setFontePatrimonio] = useState(client.fontePatrimonio || refJson.fontePatrimonio || 'Dividendi Societari & IP Licensing');
-  const [dataKyc, setDataKyc] = useState(client.dataKyc || refJson.dataKyc || '14/08/2026');
+  const [rischioAml, setRischioAml] = useState<'basso' | 'medio' | 'alto'>(client.rischioAml || refJson.rischioAml || 'basso');
+  const [ubo, setUbo] = useState(client.ubo || refJson.ubo || '');
+  const [fontePatrimonio, setFontePatrimonio] = useState(client.fontePatrimonio || refJson.fontePatrimonio || '');
+  const [dataKyc, setDataKyc] = useState(client.dataKyc || refJson.dataKyc || '');
 
   const [saving, setSaving] = useState(false);
 

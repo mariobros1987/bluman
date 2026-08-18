@@ -86,7 +86,6 @@ export function SettingsPage() {
   const loadTenantData = async () => {
     setLoadingUsers(true);
     const currentTenantId = getCurrentTenantId();
-    const isBluecode = currentTenantId === BLUECODE_TENANT_ID;
 
     const dbTenant = await fetchTenantInfoApi();
     const localInfoStr = localStorage.getItem(getTenantStorageKey('bluman_tenant_info'));
@@ -96,25 +95,12 @@ export function SettingsPage() {
     }
     const tData = { ...localInfo, ...(dbTenant || {}) };
 
-    // Se è il tenant master Bluecode ed è vuoto, pre-popola i dati di default Bluecode.
-    // Tutti gli altri tenant partono rigorosamente AZZERATI (tabula rasa).
-    if (isBluecode && !tData.ragioneSociale) {
-      const studioDefaults = getStudioInfoForTenant(currentTenantId);
-      tData.ragioneSociale = studioDefaults.ragioneSociale;
-      tData.piva = studioDefaults.piva;
-      tData.codiceFiscale = studioDefaults.codiceFiscale;
-      tData.sedeLegale = studioDefaults.sedeLegale;
-      tData.sedeOperativa = studioDefaults.sedeOperativa;
-      tData.email = studioDefaults.email;
-      tData.telefono = studioDefaults.telefono;
-      tData.iban = studioDefaults.iban;
-      tData.logoUrl = '/logo.png';
-      tData.coloreTemaFattura = '#4338ca';
-      tData.titoloIntestazione = 'BLUECODE ADVISORY & CONSULTING';
-      tData.notePieFattura = 'Fattura emessa ai sensi delle vigenti disposizioni fiscali UE. Pagamento a mezzo bonifico bancario su IBAN indicato.';
-    } else if (!tData.ragioneSociale) {
+    if (!tData.ragioneSociale) {
       const studioDefaults = getStudioInfoForTenant(currentTenantId);
       tData.ragioneSociale = studioDefaults.ragioneSociale || '';
+      tData.piva = studioDefaults.piva || '';
+      tData.sedeLegale = studioDefaults.sedeLegale || '';
+      tData.email = studioDefaults.email || '';
     }
 
     if (tData) {
@@ -127,7 +113,7 @@ export function SettingsPage() {
       setPec(tData.pec || '');
       setTelefono(tData.telefono || '');
       setIban(tData.iban || '');
-      setLogoUrl(tData.logoUrl || (isBluecode ? '/logo.png' : ''));
+      setLogoUrl(tData.logoUrl || '');
       setColoreTemaFattura(tData.coloreTemaFattura || '#4338ca');
       setNotePieDiPagina(tData.notePieFattura || '');
       setTitoloIntestazione(tData.titoloIntestazione || '');
