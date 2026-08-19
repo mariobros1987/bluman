@@ -77,6 +77,35 @@ interamente dal fatto che nessuna query dimenticasse il filtro applicativo.
   l'`advisor` è responsabile del solo proprio tenant e non può creare un `super_admin`; i
   collaboratori appartengono al tenant da cui vengono creati. Email già registrata presso
   un altro studio → 409, mai spostamento di tenant.
+- [x] **Il `super_admin` era finito *dentro* un tenant, e un advisor poteva declassarlo**.
+  La policy RLS di `user` concede la visione delle righe senza tenant al solo super admin,
+  cioè dà per assodato che i super_admin *siano* le righe con `tenant_id` NULL. Il database
+  non lo rispettava: `seedFull.ts` li creava con `tenantId = TENANT_ID` e
+  `prismaApp.listaUtenti()` li riassegnava al tenant che stava leggendo. Con i `tenant_id`
+  uguali, il controllo anti-furto di `POST /tenant/utenti` non scattava e l'`update`
+  riscriveva `ruolo` a `collaboratore_interno`: il responsabile di un singolo studio poteva
+  declassare il super admin della piattaforma, e con due sole righe lasciarla senza.
+  Chiuso su tre piani: la migrazione `20260819190000_super_admin_senza_tenant` ripara il
+  dato — con NULL è **RLS** a nascondere la riga, quindi la difesa torna al motore e non a
+  un confronto applicativo (regola 1); `listaUtenti()` è tornato di sola lettura; e un 403
+  esplicito copre la modifica di una riga il cui ruolo *esistente* è `super_admin`.
+  Presidio: `src/gerarchiaRuoli.test.ts`, che verifica anche che l'`update` non venga
+  nemmeno tentato — la risposta giusta non basta, la scrittura non deve avvenire.
+- [x] **`prismaApp.listaUtenti()` non riscrive più il team a ogni lettura**. Conteneva un
+  elenco cablato di cinque persone riscritto con `upsert` a ogni chiamata: `update:
+  { tenantId: this.tenantId }` **spostava** quelle righe nello studio che stava leggendo —
+  lo stesso furto cross-tenant che il 409 respinge, per una via che nessun controllo
+  copriva — e creava utenti senza `password_hash` con email divergenti da quelle vere
+  (`francesca@` accanto a `francesca.disabato@`), che restano in anagrafica senza poter
+  accedere. Era anche il ripiego del `catch` di `GET /tenant/utenti`: un fallimento di
+  lettura si trasformava in una scrittura non richiesta sullo stesso database appena
+  fallito. Ora la rotta risponde `503` e lo dice, invece di restituire un elenco vuoto che
+  farebbe sembrare lo studio senza collaboratori.
+- [x] **Verifica di accessibilità prima del rilascio**: `npx tsx src/scripts/verificaAccessi.ts`
+  elenca ruolo, tenant e presenza/assenza di `password_hash` (mai l'hash) e esce con 1 se
+  non esiste un `super_admin` attivo con password. Un deploy che chiude l'autenticazione
+  senza un super admin utilizzabile blocca la piattaforma fuori da sé stessa: la domanda va
+  posta prima, non scoperta dopo.
 - [x] **Hashing password senza dipendenze native**: scrypt (`src/util/password.ts`) e JWT
   HMAC-SHA256 firmati a mano (`src/util/jwt.ts`); `bcrypt` e `jsonwebtoken` rimossi dalle
   dipendenze. `JWT_SECRET` obbligatorio (≥32 caratteri) con `NODE_ENV=production`.
@@ -246,6 +275,13 @@ Elencati qui perché non chiuderli è una scelta, non una dimenticanza.
 4. **Mappa Graphify STALE**: le correzioni di Fase 0 non sono nel grafo, perché la CLI
    `graphify` non è installata sulla postazione Windows dove sono state fatte. Da rigenerare
    dove la CLI esiste (`graphify extract . --code-only` + `graphify cluster-only .`).
+5. **Due righe `user` residue senza password** — `francesca@bluecode.advisory` e
+   `lorenzo@bluecode.advisory`, duplicati di `francesca.disabato@` e `lorenzo.marino@`
+   lasciati da `seedFull.ts` e dal vecchio auto-seed di `listaUtenti()`. Sono inerti (senza
+   `password_hash` non si accede da `/auth/login`) e ora non si rigenerano più, ma sporcano
+   l'anagrafica del team. Non le si cancella da qui: `user` è referenziata da audit log,
+   timesheet e accessi progetto, quindi la rimozione va fatta consapevolmente dalla
+   dashboard super admin. Verifica dello stato: `npx tsx src/scripts/verificaAccessi.ts`.
 
 ### ✅ Chiusi in questa fase
 

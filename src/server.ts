@@ -709,8 +709,14 @@ export function buildServer(app: AppPort): FastifyInstance {
         orderBy: { createdAt: 'asc' },
       });
       return reply.send(utenti.map(senzaHash));
-    } catch {
-      return reply.send((app as any).listaUtenti?.() || []);
+    } catch (err) {
+      // Il ripiego di prima chiamava `app.listaUtenti()`, che era un secondo percorso di
+      // scrittura sullo stesso database appena fallito — e riassegnava utenti al tenant
+      // corrente. Se la lettura non riesce (database irraggiungibile, o policy RLS che
+      // nega perché manca il contesto) la risposta onesta è un errore: un elenco vuoto
+      // farebbe sembrare lo studio senza collaboratori.
+      console.error('GET /tenant/utenti —', err instanceof Error ? err.message : err);
+      return reply.code(503).send({ errore: 'Elenco team non disponibile. Riprova tra poco.' });
     }
   });
 
@@ -760,6 +766,17 @@ export function buildServer(app: AppPort): FastifyInstance {
         return reply.code(409).send({ errore: 'Questa email è già registrata in un altro studio.' });
       }
 
+      // Una riga che è già super_admin la tocca solo un super_admin, e il controllo guarda
+      // il ruolo *esistente*, non quello richiesto. Il vincolo qui sopra sul tenant non
+      // basta: un super_admin con `tenant_id` valorizzato per errore — condizione che il
+      // database aveva davvero, dal vecchio auto-seed di `listaUtenti` — appartiene allo
+      // stesso tenant dell'advisor, quindi supera il 409. L'advisor arrivava all'update e
+      // riscriveva `ruolo` a `collaboratore_interno`: il super admin della piattaforma
+      // declassato dal responsabile di un singolo studio.
+      if (esistente?.ruolo === 'super_admin' && ruoloRichiedente !== 'super_admin') {
+        return reply.code(403).send({ errore: 'Solo il super admin può modificare un super admin.' });
+      }
+
       // Password iniziale generata dal server e mostrata una sola volta nella risposta,
       // così il responsabile può consegnarla. Nessuna password di default (§23).
       const passwordTemporanea = esistente?.passwordHash ? null : generaPasswordTemporanea();
@@ -798,6 +815,14 @@ export function buildServer(app: AppPort): FastifyInstance {
       // salvata in chiaro né rispedita da nessun altro endpoint.
       return reply.code(201).send({ ...senzaHash(utente), passwordTemporanea });
     } catch (err: any) {
+      // P2002 = vincolo di unicità sull'email. Ci si arriva quando la riga esiste ma RLS
+      // l'ha nascosta alla `findUnique` qui sopra, perché appartiene a un altro studio o
+      // è un super_admin senza tenant: la create tenta l'inserimento e il database la
+      // respinge. È lo stesso caso del 409, quindi merita lo stesso messaggio invece di
+      // un 500 con il testo dell'errore Prisma addosso.
+      if (err?.code === 'P2002') {
+        return reply.code(409).send({ errore: 'Questa email è già registrata in un altro studio.' });
+      }
       return reply.code(500).send({ errore: err.message || 'Errore creazione collaboratore' });
     }
   });

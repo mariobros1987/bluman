@@ -92,6 +92,45 @@ L'unica fonte di verità è ora la tabella `user` del database.
   `advisor` non può creare un `super_admin`; un'email registrata presso un altro studio
   viene rifiutata con 409 invece di cambiare tenant; la risposta non contiene mai
   `passwordHash`.
+
+#### ⚠️ `super_admin` ha `tenant_id` NULL, e non è una finezza di modellazione
+
+È l'invariante su cui si appoggia la policy RLS di `public."user"`:
+
+```sql
+USING (tenant_id = app_tenant_corrente()
+       OR (tenant_id IS NULL AND app_ruolo_corrente() = 'super_admin'))
+```
+
+cioè la policy dà per assodato che i super_admin *siano* le righe senza tenant. Il database
+non lo rispettava: `seedFull.ts` creava i due super_admin con `tenantId = TENANT_ID`, e
+`prismaApp.listaUtenti()` li riassegnava al tenant che stava leggendo. Risultavano quindi
+membri ordinari dello studio di default.
+
+La conseguenza era concreta. Il controllo che impedisce di rubare un utente a un altro
+studio confronta `esistente.tenant_id` col tenant corrente; per un super_admin finito nel
+tenant dell'advisor quel confronto era vero, il 409 non scattava, e l'`update` successivo
+riscriveva `ruolo` a `collaboratore_interno`. **Un advisor poteva declassare il super admin
+della piattaforma** — e con due sole righe di quel tipo, lasciarla senza.
+
+Le tre correzioni, in ordine di robustezza:
+
+1. `prisma/migrations/20260819190000_super_admin_senza_tenant` rimette a NULL i `tenant_id`
+   dei super_admin esistenti. Con NULL è **RLS** a nascondere la riga all'advisor: la
+   difesa torna al motore, non a un confronto applicativo (regola 1).
+2. `prismaApp.listaUtenti()` è ora di sola lettura. Prima riscriveva cinque utenti cablati
+   a ogni chiamata: spostava righe altrui nel tenant che leggeva, riportava il super_admin
+   dentro un tenant e creava utenti senza `password_hash` con email divergenti da quelle
+   vere. Una GET che scrive è un effetto collaterale che nessun chiamante si aspetta.
+3. `POST /tenant/utenti` respinge con 403 la modifica di una riga il cui ruolo *esistente*
+   è `super_admin`, se chi chiede non è super_admin. Serve come difesa in profondità: regge
+   anche se un domani una riga tornasse fuori invariante.
+
+Presidio: `src/gerarchiaRuoli.test.ts` (8 test). Verifica il 403 **e** che l'`update` non
+venga nemmeno tentato, che un super_admin creato nasca con `tenantId: null`, che un
+collaboratore nasca nel tenant di chi lo crea, e che un errore di lettura su
+`GET /tenant/utenti` produca 503 invece di un elenco vuoto.
+
 - **La password la emette sempre il server, mai il client.** `POST /tenant/utenti`,
   `POST /admin/tenants` e `POST /admin/tenants/:id/reset-password` la generano con
   `generaPasswordTemporanea()`, ne salvano l'hash scrypt e la restituiscono in chiaro
@@ -133,6 +172,8 @@ L'unica fonte di verità è ora la tabella `user` del database.
   - `supabase/migrations/20260819_rls_effettiva.sql`: Ruolo `bluman_app` (senza `BYPASSRLS`), policy `isolamento_tenant` su tutte le tabelle, `FORCE ROW LEVEL SECURITY`. Si applica con `psql` (usa `\gexec` per non stampare la password). Sostituisce `20260815_enable_rls.sql`, che era inerte: `src/adapters/prisma/applyRls.ts` ora si rifiuta di eseguire quel file perché le sue policy PERMISSIVE si sommerebbero in OR a quelle nuove, vanificandole.
   - `src/scripts/checkRls.ts`: Diagnostica read-only dell'isolamento reale — ruolo di connessione, `bypassrls`, RLS attivo/forzato per tabella e prova pratica con un tenant inesistente (deve restituire 0 righe).
   - `src/credenziali.test.ts`: Test di regressione che scandisce `src/`, `frontend/src/` e `api/` alla ricerca delle vecchie password cablate, dei token finti e del ripiego `!password ||`. Non elenca le credenziali per documentarle: le cerca per impedirne il ritorno.
+  - `src/gerarchiaRuoli.test.ts`: Presidio della gerarchia §2bis con il client Prisma sostituito da un finto — è l'unico modo di osservare cosa succede *dopo* i controlli di ruolo, cioè se la scrittura avviene comunque. Copre il 403 sulla modifica di una riga `super_admin`, il `tenantId: null` del super_admin creato, il tenant di chi crea per i collaboratori, e il 503 (non l'elenco vuoto) quando la lettura del team fallisce.
+  - `src/scripts/verificaAccessi.ts`: Diagnostica read-only di chi può effettivamente autenticarsi, da lanciare **prima** di un rilascio che chiude l'autenticazione: elenca ruolo, tenant e presenza/assenza di `password_hash` (mai l'hash) e fallisce con exit 1 se non esiste un `super_admin` attivo con password. Senza questa verifica un deploy corretto può bloccare la piattaforma fuori da sé stessa.
   - `src/scripts/testTenantDb.ts`: Verifica di andata e ritorno delle impostazioni studio su database. Pretende `TEST_TENANT_ID` e si rifiuta di girare senza (scriveva sul tenant di produzione), usa valori segnaposto `.invalid` e maschera i campi segreti (`smtpPass`, `imapPass`, `waAccessToken`, `waVerifyToken`, `tgBotToken`) invece di stamparli.
   - `.agents/skills/meta-whatsapp-integration/SKILL.md`: Skill e runbook per l'integrazione WhatsApp Business Cloud API & Remote MCP Meta DevTools.
 - **Firma FEA & OTP**: `POST /portal/request-otp`, `POST /portal/verify-otp-and-sign` (Sigillo SHA-256 e Timestamp ISO).
@@ -149,6 +190,7 @@ L'unica fonte di verità è ora la tabella `user` del database.
 - **`Tenant`**: Dati studio, Sede Legale, Sede Operativa, P.IVA, Logo URL, Colore Tema PDF, credenziali SMTP (`smtp_pass`) e IMAP (`imap_pass`) isolate per tenant.
   - ⚠️ La colonna `lead_advisor_password` **non esiste più**: rimossa dalla migrazione `prisma/migrations/20260819120000_rimozione_password_chiaro_tenant/`. Conteneva la password del responsabile in chiaro, era restituita da `GET /admin/tenants`, era scrivibile da qualunque utente del tenant via `PATCH /tenant/info` e finiva in ogni backup. Le password dello staff vivono solo come hash scrypt su `user.password_hash`. La DROP è volutamente irreversibile: non c'è nulla da recuperare, solo qualcosa da non ricreare.
 - **`Cliente`**: Dati ERP, Partita IVA, Codice Fiscale, Sede Legale, Codice SDI, IBAN, Rischio AML, UBO, Fonte Patrimonio, Data KYC, `referentiJson`.
+- **`User`**: `tenantId` **nullable**, e la nullità è semantica: `NULL` significa `super_admin`, cioè un utente di piattaforma che non appartiene a nessuno studio (§2bis). La policy RLS di `public."user"` concede la visione delle righe senza tenant al solo `super_admin`, quindi un `super_admin` con `tenant_id` valorizzato diventa un utente ordinario di quello studio — modificabile dal suo advisor. Ripristinato da `prisma/migrations/20260819190000_super_admin_senza_tenant/`; dettagli e conseguenze nella sezione «Accesso & Gerarchia dei Ruoli» qui sopra. Password solo come hash scrypt su `password_hash`; `stato` è `StatoUtente` (`attivo` | `invitato` | `disattivato`), non un booleano.
 - **`ComunicazioneProgetto`**: `progettoId`, `canale` (`email`, `whatsapp`, `telegram`, `signal`), `mittente`, `direzione` (`entrata`, `uscita`), `testo`, `allegatiJson`.
 - **`ContrattoRicorrente`**: `clienteId`, `progettoId` (opzionale con FK), `frequenza`, `importoCentesimi`, `prossimaFatturazione`.
 - **`ModelloDocumentoCustom`**: `tenantId`, `titolo`, `categoria`, `descrizione`, `contenutoHtml` (persistenza template Word-like studio).
@@ -170,6 +212,7 @@ L'unica fonte di verità è ora la tabella `user` del database.
 2. **Migrazioni Versionate, Mai `db push` su Dati Reali**:
    - Lo schema si cambia con `prisma migrate dev` in sviluppo e `prisma migrate deploy` in produzione, mai con `prisma db push --accept-data-loss`: quest'ultimo riallinea il database al file cancellando in silenzio colonne e tabelle non presenti. Era il comando di avvio del container su Railway.
    - Le migrazioni girano su `DIRECT_URL` (ruolo proprietario dello schema); il server usa `DATABASE_URL` (ruolo `bluman_app`, che non ha `CREATE` su `public` di proposito).
+   - Vale anche per le correzioni di **dati**, non solo di schema: la riparazione dei `tenant_id` dei super_admin è la migrazione `20260819190000_super_admin_senza_tenant`, scritta idempotente (`WHERE tenant_id IS NOT NULL`), non una `UPDATE` lanciata a mano da una console. Una correzione fuori dalle migrazioni non arriva sugli altri ambienti e non lascia traccia del perché.
 
 3. **Sincronizzazione Schema Database & Persistenza Cloud Obbligatoria (Prisma & Fastify DB)**:
    - **TUTTO QUELLO CHE VIENE AGGIUNTO O MODIFICATO NELL'INTERFACCIA E NEI MODULI (spunte, passaggi, microvoci, note, scadenze, assegnazioni operatori, clienti, comunicazioni) DEVE ESSERE TASSATIVAMENTE SALVABILE E COLLEGATO AL DATABASE POSTGRESQL/PRISMA VIA API FASTIFY.**

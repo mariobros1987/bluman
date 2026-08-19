@@ -129,7 +129,7 @@ stati rimossi. L'unica fonte di verità è la tabella `user` del database.
 
 | Ruolo | Ambito (§2bis) | Accesso |
 | :--- | :--- | :--- |
-| 👑 `super_admin` | Gestisce tutto e vede tutti i tenant (`tenant_id` NULL); può cambiare studio corrente via `x-tenant-id` | JWT |
+| 👑 `super_admin` | Gestisce tutto e vede tutti i tenant (`tenant_id` NULL — è l'invariante su cui si appoggia RLS, non un dettaglio); può cambiare studio corrente via `x-tenant-id` | JWT |
 | 👨‍💼 `advisor` | Responsabile del **proprio** tenant; crea e gestisce i collaboratori del proprio studio | JWT |
 | 👷 `collaboratore_interno` / `collaboratore_esterno` | Appartengono al tenant da cui vengono creati e non ne escono | JWT |
 | 🔑 `cliente` | Passwordless: solo Magic Link su `/portal`, mai `/auth/login` | Magic Link |
@@ -169,7 +169,23 @@ verbi. Neanche questo è un compito di RLS: `tenant` è la tabella che *contiene
 non una tabella figlia filtrata per `tenant_id`, quindi le policy non le danno protezione.
 
 `src/server.test.ts` verifica, rotta per rotta, 401 senza token e non-401 con un token
-valido (`npx vitest run` → 15 file, 171 test).
+valido; `src/gerarchiaRuoli.test.ts` presidia la gerarchia dei ruoli (`npx vitest run` →
+16 file, 187 test).
+
+### 👑 Il `super_admin` non appartiene a nessuno studio
+
+`user.tenant_id` è NULL per il `super_admin`, ed è l'invariante su cui si appoggia la policy
+RLS di `user`: le righe senza tenant sono visibili al solo super admin. Il database non lo
+rispettava — il seed li creava dentro il tenant di default e `listaUtenti()` li riassegnava
+a ogni lettura — e la conseguenza era che **un advisor poteva declassare il super admin
+della piattaforma** a collaboratore, perché il controllo anti-furto confronta i `tenant_id`
+e li trovava uguali.
+
+Corretto su tre piani: la migrazione `20260819190000_super_admin_senza_tenant` ripara il
+dato (con NULL è RLS a nascondere la riga), `prismaApp.listaUtenti()` è tornato di sola
+lettura, e `POST /tenant/utenti` risponde 403 a chi non è super admin e tenta di modificare
+una riga che già lo è. Verifica prima di un rilascio:
+`npx tsx src/scripts/verificaAccessi.ts`.
 
 ---
 

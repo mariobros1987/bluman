@@ -234,40 +234,28 @@ export class PrismaApp implements AppPort {
     });
   }
 
+  /**
+   * Sola lettura, e deliberatamente (§2bis).
+   *
+   * Qui c'era un elenco cablato di cinque persone che veniva riscritto a ogni chiamata con
+   * `upsert`. Tre conseguenze, tutte reali e tutte osservate sul database di produzione:
+   *
+   *  - `update: { tenantId: this.tenantId }` **spostava** quelle righe nello studio che
+   *    stava leggendo. Bastava aprire la pagina team da un altro tenant per portarsi via
+   *    utenti altrui — esattamente il furto cross-tenant che `POST /tenant/utenti`
+   *    respinge con 409, ma per una via che nessun controllo copriva.
+   *  - fra quelle righe c'era un `super_admin`, che per §2bis deve avere `tenant_id` NULL.
+   *    Riassegnarlo a un tenant lo rendeva un utente ordinario di quello studio, quindi
+   *    modificabile dal suo advisor: un advisor poteva declassare il super admin della
+   *    piattaforma. La policy RLS su `user` presuppone quell'invariante NULL.
+   *  - creava utenti senza `password_hash` e con email divergenti da quelle vere
+   *    (`francesca@` accanto a `francesca.disabato@`): righe che non possono accedere e
+   *    che restano lì a sporcare l'anagrafica.
+   *
+   * Il popolamento iniziale è competenza di `seedFull.ts` e `bootstrap.ts`, non di una
+   * lettura. Una GET che scrive è un effetto collaterale che nessun chiamante si aspetta.
+   */
   async listaUtenti() {
-    // Assicura che i membri ufficiali dello studio siano sempre persistiti nel database
-    const OFFICIAL_TEAM = [
-      { nome: 'Joe Disabato', email: 'joe@bluecode.advisory', ruolo: 'super_admin' as const, costoOrarioCentesimi: 12000 },
-      { nome: 'Avv. Mario Dibenedetto', email: 'mario.dibenedetto@bluecode.advisory', ruolo: 'advisor' as const, costoOrarioCentesimi: 9500 },
-      { nome: 'Avv. Lorenzo Marino', email: 'lorenzo.marino@bluecode.advisory', ruolo: 'advisor' as const, costoOrarioCentesimi: 9000 },
-      { nome: 'Dr. Elena Russo', email: 'elena.russo@bluecode.advisory', ruolo: 'advisor' as const, costoOrarioCentesimi: 8500 },
-      { nome: 'Francesca Disabato', email: 'francesca@bluecode.advisory', ruolo: 'collaboratore_interno' as const, costoOrarioCentesimi: 4500 },
-    ];
-
-    try {
-      for (const u of OFFICIAL_TEAM) {
-        await this.prisma.user.upsert({
-          where: { email: u.email },
-          update: {
-            nome: u.nome,
-            ruolo: u.ruolo,
-            tenantId: this.tenantId,
-            stato: 'attivo',
-          },
-          create: {
-            tenantId: this.tenantId,
-            nome: u.nome,
-            email: u.email,
-            ruolo: u.ruolo,
-            stato: 'attivo',
-            costoOrarioCentesimi: u.costoOrarioCentesimi,
-          },
-        });
-      }
-    } catch (err) {
-      console.warn('Auto-seed utenti DB fallback:', err);
-    }
-
     return this.prisma.user.findMany({
       where: { tenantId: this.tenantId },
       orderBy: { createdAt: 'asc' },

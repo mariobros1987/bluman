@@ -39,14 +39,23 @@ ripiego, solo l'hash scrypt in database.
 Gerarchia (§2bis): super_admin gestisce tutto e vede tutti i tenant; advisor è
 responsabile del solo proprio tenant; i collaboratori appartengono al tenant da cui sono
 stati creati. Un advisor non può creare un super_admin.
-La suite ha due presidi: src/server.test.ts rifiuta ognuna delle vecchie coppie
-email/password, e src/credenziali.test.ts scandisce src/, frontend/src/, api/ ed i file .md
-alla ricerca di credenziali cablate, token finti e del ripiego `!password ||`.
+ATTENZIONE all'invariante `user.tenant_id` NULL per i super_admin: la policy RLS di `user`
+concede la visione delle righe senza tenant al solo super_admin, quindi dà per assodato che
+i super_admin SIANO quelle righe. Un super_admin con tenant_id valorizzato diventa un utente
+ordinario di quello studio e il suo advisor può declassarlo — succedeva davvero, perché il
+seed li creava dentro il tenant e prismaApp.listaUtenti() li riassegnava a ogni lettura.
+Non reintrodurre né l'una né l'altra cosa. Verifica: `npx tsx src/scripts/verificaAccessi.ts`
+(i super_admin devono comparire come `tutti i tenant`).
+La suite ha tre presidi: src/server.test.ts rifiuta ognuna delle vecchie coppie
+email/password, src/credenziali.test.ts scandisce src/, frontend/src/, api/ ed i file .md
+alla ricerca di credenziali cablate, token finti e del ripiego `!password ||`, e
+src/gerarchiaRuoli.test.ts verifica la gerarchia dei ruoli controllando anche che la
+scrittura respinta non avvenga comunque.
 
 STATO ATTUALE:
 Abbiamo completato l'autenticazione JWT RBAC, il Portale Cliente con Firma FEA eIDAS OTP, l'Anagrafica ERP Clienti, la Fatturazione/NC con tracciato XML SDI, il Connettore SDI 1-Click, il Document Studio Word-like con Smart Tags, il Grafo Dipendenze Moduli nel progetto, il Calendario Condiviso con Scadenzario Attività Studio (/calendar) ed il Cron Worker Scadenze UBO/Marchi.
-Fase 0 di sicurezza chiusa: credenziali cablate rimosse dal sorgente E dal frontend (il bundle Vite su Vercel è pubblico come il repository) e dalle funzioni serverless in api/; guard onRequest che respinge con 401 tutto ciò che non è in un elenco di rotte pubbliche, così una rotta nuova nasce protetta; /admin/tenants riservato al super_admin su tutti e quattro i verbi (RLS non poteva coprirlo: `tenant` è la tabella che contiene gli studi, non una tabella figlia filtrata per tenant_id); colonna tenant.lead_advisor_password eliminata dal database; scrypt + JWT HMAC senza dipendenze native; rate limiting su /auth/*; RLS effettiva e forzata su tutte le tabelle col ruolo `bluman_app` che non può scavalcarla; migrazioni versionate al posto di `db push` nel Dockerfile; variabili Railway puntate a Supabase. Suite: 15 file, 171 test.
-Debiti ancora aperti, elencati in BluMan_piano_di_sviluppo.md ("Debiti Noti Aperti"): /auth/magic-login accetta qualunque stringa `client_*`; GET /uploads/:filename è pubblica e non sanifica il nome file (path traversal); Dashboard.tsx ha percentuali cablate; grafo Graphify STALE.
+Fase 0 di sicurezza chiusa: credenziali cablate rimosse dal sorgente E dal frontend (il bundle Vite su Vercel è pubblico come il repository) e dalle funzioni serverless in api/; guard onRequest che respinge con 401 tutto ciò che non è in un elenco di rotte pubbliche, così una rotta nuova nasce protetta; /admin/tenants riservato al super_admin su tutti e quattro i verbi (RLS non poteva coprirlo: `tenant` è la tabella che contiene gli studi, non una tabella figlia filtrata per tenant_id); colonna tenant.lead_advisor_password eliminata dal database; super_admin riportati a tenant_id NULL con la migrazione 20260819190000 e listaUtenti() tornato di sola lettura (prima riscriveva cinque utenti cablati a ogni GET, spostandoli nel tenant che leggeva); scrypt + JWT HMAC senza dipendenze native; rate limiting su /auth/*; RLS effettiva e forzata su tutte le tabelle col ruolo `bluman_app` che non può scavalcarla; migrazioni versionate al posto di `db push` nel Dockerfile; variabili Railway puntate a Supabase. Suite: 16 file, 187 test.
+Debiti ancora aperti, elencati in BluMan_piano_di_sviluppo.md ("Debiti Noti Aperti"): /auth/magic-login accetta qualunque stringa `client_*`; GET /uploads/:filename è pubblica e non sanifica il nome file (path traversal); Dashboard.tsx ha percentuali cablate; grafo Graphify STALE; due righe user residue senza password (francesca@ e lorenzo@, duplicati inerti lasciati dal seed).
 
 Leggiti i file .agents/AGENTS.md, README.md ed ISTRUZIONI_INSTALLAZIONE.md prima di iniziare qualsiasi modifica!
 ```

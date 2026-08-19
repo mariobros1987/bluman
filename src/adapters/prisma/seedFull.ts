@@ -23,12 +23,22 @@ async function main() {
   console.log('✅ Tenant creato:', tenant.ragioneSociale);
 
   // 2. Users
+  //
+  // §2bis — il super_admin sovrintende tutti i tenant, quindi non appartiene a nessuno:
+  // `tenantId` è NULL. Non è una finezza di modellazione, è l'invariante su cui si appoggia
+  // la policy RLS di `public."user"` (`tenant_id IS NULL AND app_ruolo_corrente() =
+  // 'super_admin'`). Con un tenant valorizzato il super admin diventa un utente ordinario
+  // di quello studio, e l'advisor di quello studio può modificarlo.
+  //
+  // `update` non è vuoto per queste due righe, a differenza delle altre: se il database
+  // contiene già un super_admin con un tenant — come è successo — rieseguire il seed lo
+  // riporta all'invariante invece di lasciarlo com'è.
   const userAdmin = await prisma.user.upsert({
     where: { email: 'joe@bluecode.advisory' },
-    update: {},
+    update: { tenantId: null },
     create: {
       id: '11111111-1111-1111-1111-111111111111',
-      tenantId: TENANT_ID,
+      tenantId: null,
       nome: 'Joe Disabato',
       email: 'joe@bluecode.advisory',
       ruolo: 'super_admin',
@@ -38,10 +48,10 @@ async function main() {
 
   await prisma.user.upsert({
     where: { email: 'admin@bluecode.advisory' },
-    update: {},
+    update: { tenantId: null },
     create: {
       id: '22222222-2222-2222-2222-222222222222',
-      tenantId: TENANT_ID,
+      tenantId: null,
       nome: 'Super Admin',
       email: 'admin@bluecode.advisory',
       ruolo: 'super_admin',

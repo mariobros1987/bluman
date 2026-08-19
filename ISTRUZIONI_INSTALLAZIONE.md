@@ -100,7 +100,24 @@ mano. La gerarchia è quella di §2bis:
 | 🔑 `cliente` | Passwordless: accede solo via Magic Link su `/portal`, mai da `/auth/login`. |
 
 Un `advisor` non può creare un `super_admin`, e un'email già registrata presso un altro
-studio viene rifiutata con 409 invece di essere spostata di tenant.
+studio viene rifiutata con 409 invece di essere spostata di tenant. Una riga che è già
+`super_admin` la può modificare solo un `super_admin`: 403 per tutti gli altri.
+
+**Prima di ogni rilascio, chiediti se qualcuno potrà ancora entrare:**
+
+```bash
+npx tsx src/scripts/verificaAccessi.ts
+```
+
+Elenca ruolo, tenant e presenza/assenza di `password_hash` — mai l'hash — ed esce con
+codice 1 se non esiste un `super_admin` attivo con password. Un deploy che chiude
+correttamente l'autenticazione, su un database dove nessuno ha una password, blocca la
+piattaforma fuori da sé stessa. La domanda va posta prima, non scoperta dopo.
+
+Nell'elenco i `super_admin` devono comparire con `tutti i tenant`, non con un id di tenant:
+`user.tenant_id` NULL è l'invariante su cui si appoggia la policy RLS di `user`. Se un
+super admin risulta dentro uno studio, l'advisor di quello studio può modificarlo — è il
+guasto chiuso dalla migrazione `20260819190000_super_admin_senza_tenant`.
 
 **Nuovi studi (solo `super_admin`)** — `POST /admin/tenants` registra lo studio **e** la
 riga `user` del responsabile con ruolo `advisor`, restituendo la sua password temporanea
