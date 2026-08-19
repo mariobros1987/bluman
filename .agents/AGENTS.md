@@ -28,7 +28,8 @@ Questo file serve come indice rapido per l'IA ed i collaboratori per identificar
 - **`pages/Library.tsx`**: Gestione Distinta Base, Costruttore Moduli Template, Catalogo Articoli e Modelli Documenti in Bianco.
 - **`pages/ClientPortal.tsx`**: Portale Cliente a 5 schede (Proposta & Firma 1-Click, Live Progress, Form Societari, Documenti, Live Chat & Comunicazioni con Advisor).
 - **`pages/SettingsPage.tsx`**: Anagrafica Studio, Sede Legale/Operativa, Configuratore PDF Fatture con Logo, Gestione Team con 4 Professionisti Ufficiali, Matrice Permessi Granulari RBAC, ed **Email Suite Completa** (SMTP Outbound + Reply-To + BCC, IMAP/POP3 Inbound + Cartelle + Polling Live, Firma Automatica HTML con Smart Tags e Diagnostica DNS Register.it SPF/DMARC/MX con Test Socket TLS Reali).
-- **`pages/SuperAdminPage.tsx`**: Dashboard Super Admin & Gestione Multi-Tenant Studi (`/admin/tenants`).
+- **`pages/SuperAdminPage.tsx`**: Dashboard Super Admin & Gestione Multi-Tenant Studi (`/admin/tenants`). La password del responsabile non è più un campo del form: la emette il server alla creazione dello studio e il modale la mostra **una volta sola**, tenendola in un `useState` che muore alla chiusura. Se va perduta, il pulsante `🔄 Rigenera Password di Accesso` chiama `POST /admin/tenants/:id/reset-password`. L'invio delle credenziali per email si rifiuta di partire senza una password appena emessa, e riporta gli errori invece di dichiarare comunque il successo.
+- **`pages/LoginPage.tsx`**: Pagina di accesso staff. Campi vuoti e nessuna scorciatoia: le tre scorciatoie "Advisor / Operatore / SuperAdmin" precompilavano email e password di account reali dello studio, servite in chiaro dal bundle pubblico a chiunque aprisse la pagina. Il ruolo non si sceglie dal client — lo determina il backend leggendo la riga `user`.
 - **`pages/AuditLogPage.tsx`**: Registro Audit Super Dettagliato & Tracciamento Attività Operatori per Tenant (`/audit`).
 
 ---
@@ -37,14 +38,45 @@ Questo file serve come indice rapido per l'IA ed i collaboratori per identificar
 
 - **Autenticazione & Permessi RBAC**: `POST /auth/login`, `POST /auth/magic-login`, `GET /auth/me`, `GET /tenant/utenti/:userId/permessi`, `PUT /tenant/utenti/:userId/permessi` (Token JWT 15 min + Magic Link + Matrice Permessi Sezioni).
 
+### 🚧 Il guard di autenticazione: elenco di rotte pubbliche, non di rotte protette (§23)
+
+L'hook `onRequest` di `src/server.ts` respinge con `401 { errore: 'Non autenticato' }`
+qualunque richiesta senza un JWT verificabile. L'elenco codificato è quello delle rotte
+**pubbliche** (`/health`, `/auth/login`, `/auth/magic-login`, i webhook di canale, il
+portale cliente passwordless): tutto il resto è protetto per difetto. È deliberato ed è il
+punto centrale della correzione — con l'elenco opposto, una rotta nuova sarebbe nata
+aperta e nessuno se ne sarebbe accorto.
+
+Il confronto avviene sul *pattern* di rotta (`req.routeOptions.url`), non sull'URL grezzo,
+perché `onRequest` gira dopo il routing: `/progetti/abc-123` risulta `/progetti/:id`.
+
+Attenzione a non confondere due controlli distinti:
+
+- **RLS** protegge uno studio dall'altro. Non protegge da "non serve autenticarsi": una
+  richiesta anonima che porta il tenant di default corrisponde legittimamente alle policy.
+- **Il guard** decide *se* la richiesta esiste. Senza di lui RLS lavorava correttamente
+  sul tenant sbagliato.
+
+Un secondo controllo copre `/admin/tenants`: la funzione `soloSuperAdmin` risponde 403 a
+chiunque non sia `super_admin` su tutti e quattro i verbi. Anche questo non è un compito
+che RLS possa svolgere — `tenant` è la tabella che *contiene* gli studi, non una tabella
+figlia filtrata per `tenant_id`, quindi le policy non le danno alcuna protezione. Prima del
+guard un collaboratore interno poteva elencare ogni studio della piattaforma con ragione
+sociale, P.IVA ed email del responsabile, registrarne di nuovi, sospenderli e cancellarli.
+
+`src/server.test.ts` presidia entrambi: per ognuna delle dieci rotte di `ROTTE_PROTETTE`
+verifica 401 senza token e **non** 401 con un token valido, controlla che le rotte
+pubbliche restino raggiungibili e che il preflight CORS non venga respinto.
+
 ### 🔑 Accesso & Gerarchia dei Ruoli (§2bis, §23)
 
 **Non esistono credenziali precaricate e non vanno reintrodotte.** Fino alla Fase 0
-`src/server.ts` conteneva una tabella di sette utenti con password nel sorgente
-(`joe@…`/`password123`, `admin@…`/`admin2026!` …) e accettava qualunque password come
-jolly: chiunque leggesse il repository pubblico poteva autenticarsi in produzione. La
-tabella che stava qui elencava proprio quelle coppie, in violazione della regola 5 più in
-basso. L'unica fonte di verità è ora la tabella `user` del database.
+`src/server.ts` conteneva una tabella di sette utenti con password nel sorgente e accettava
+qualunque password come jolly: chiunque leggesse il repository pubblico poteva autenticarsi
+in produzione. La tabella che stava qui elencava proprio quelle coppie, in violazione della
+regola 6 più in basso — motivo per cui non le si trascrive nemmeno per raccontare che sono
+state rimosse: l'elenco esatto vive solo in `src/credenziali.test.ts`, che le cerca.
+L'unica fonte di verità è ora la tabella `user` del database.
 
 | Ruolo | Ambito | Accesso |
 | :--- | :--- | :--- |
@@ -60,14 +92,26 @@ basso. L'unica fonte di verità è ora la tabella `user` del database.
   `advisor` non può creare un `super_admin`; un'email registrata presso un altro studio
   viene rifiutata con 409 invece di cambiare tenant; la risposta non contiene mai
   `passwordHash`.
+- **La password la emette sempre il server, mai il client.** `POST /tenant/utenti`,
+  `POST /admin/tenants` e `POST /admin/tenants/:id/reset-password` la generano con
+  `generaPasswordTemporanea()`, ne salvano l'hash scrypt e la restituiscono in chiaro
+  **una sola volta** nella risposta. Non è rileggibile dopo: se va perduta si rigenera.
+  Il frontend non ne propone nessuna e non ne conserva nessuna; `api/send-email.ts` si
+  rifiuta di spedire un invito privo di `collaboratorPassword` invece di annunciarne una
+  di ripiego. Una password di default comunicata dall'API è comunque una password valida.
 - `src/server.test.ts` ha un test di regressione che rifiuta ognuna delle otto vecchie
   coppie email/password: se torna verde per una di esse, la falla è stata reintrodotta.
+- `src/credenziali.test.ts` è il presidio più ampio: scandisce `src/`, `frontend/src/` e
+  `api/` e fallisce se una delle vecchie password, dei token finti o del ripiego
+  `!password ||` ricompare su una riga non commentata. Copre anche i file `.tsx` del
+  frontend e le funzioni serverless, che una ricerca sul solo backend non tocca.
 
 - **Progetti**: `GET /progetti`, `GET /progetti/:id`, `PUT /progetti/:id/stato-completo` (Persistenza totale moduli, microvoci, checklist passaggi e note operative con audit log)
 - **Clienti**: `GET /clienti`, `POST /clienti`, `PUT /clienti/:id` (Salvataggio e recupero completo di tutti i campi ERP, legali, SDI, IBAN, KYC e referentiJson con audit log)
 - **Comunicazioni Omnichannel**: `GET /progetti/:id/comunicazioni`, `POST /progetti/:id/comunicazioni` (Messaggistica bidirezionale live Portale Cliente ⇄ Advisor Hub su tabella PostgreSQL `comunicazione_progetto`, con invio email reale Nodemailer SMTP Register.it e WhatsApp Cloud API)
 - **Fatturazione & Incassi**: `POST /progetti/:id/fatture` (gestisce sia Fatture `FT` che Note di Credito `NC` con numerazione distinta), `GET /invoices/scadenzario`, `POST /invoices/scadenze/:id/incassi` (Prima Nota) e `GET /invoices/:id/sdi-xml` (Tracciato XML FatturaPA).
 - **Contratti Retainer**: `GET /contratti-ricorrenti`, `POST /contratti-ricorrenti` (collegati sia al Cliente che al Progetto specifico).
+- **Multi-Tenant Piattaforma (solo `super_admin`)**: `GET /admin/tenants`, `POST /admin/tenants` (registra lo studio **e** la riga `user` del responsabile con ruolo `advisor`, restituendo la password temporanea una volta sola), `PATCH /admin/tenants/:id`, `DELETE /admin/tenants/:id`, `POST /admin/tenants/:id/reset-password` (rigenera la password del responsabile: nuovo hash su `user.passwordHash`, chiaro nella sola risposta). Tutti passano da `soloSuperAdmin` → 403 per gli altri ruoli.
 - **Upload Documenti**: `POST /upload` (riceve base64 e salva in `./uploads/`), `GET /uploads/:filename`
 - **Servizi Integrati**:
   - `prisma/seed.ts`: Script di seed master completo e idempotente per popolare Supabase/PostgreSQL (7 utenti studio, 5 giurisdizioni, 45 articoli distinta base, 10 moduli template e clienti ERP).
@@ -88,6 +132,8 @@ basso. L'unica fonte di verità è ora la tabella `user` del database.
   - `src/util/prismaClient.ts`: I tre client Prisma e il contesto tenant per richiesta (§14). `prisma` è il client applicativo: impone `app.current_tenant_id` a ogni query, così le policy RLS hanno qualcosa su cui filtrare. `prismaAmministrativo()` scavalca RLS e va usato **solo** per script, seed, bootstrap, backup e la ricerca dell'utente per email al login. `conContestoInTransazione()` reimposta la variabile dentro una transazione interattiva, che gira su una connessione propria.
   - `supabase/migrations/20260819_rls_effettiva.sql`: Ruolo `bluman_app` (senza `BYPASSRLS`), policy `isolamento_tenant` su tutte le tabelle, `FORCE ROW LEVEL SECURITY`. Si applica con `psql` (usa `\gexec` per non stampare la password). Sostituisce `20260815_enable_rls.sql`, che era inerte: `src/adapters/prisma/applyRls.ts` ora si rifiuta di eseguire quel file perché le sue policy PERMISSIVE si sommerebbero in OR a quelle nuove, vanificandole.
   - `src/scripts/checkRls.ts`: Diagnostica read-only dell'isolamento reale — ruolo di connessione, `bypassrls`, RLS attivo/forzato per tabella e prova pratica con un tenant inesistente (deve restituire 0 righe).
+  - `src/credenziali.test.ts`: Test di regressione che scandisce `src/`, `frontend/src/` e `api/` alla ricerca delle vecchie password cablate, dei token finti e del ripiego `!password ||`. Non elenca le credenziali per documentarle: le cerca per impedirne il ritorno.
+  - `src/scripts/testTenantDb.ts`: Verifica di andata e ritorno delle impostazioni studio su database. Pretende `TEST_TENANT_ID` e si rifiuta di girare senza (scriveva sul tenant di produzione), usa valori segnaposto `.invalid` e maschera i campi segreti (`smtpPass`, `imapPass`, `waAccessToken`, `waVerifyToken`, `tgBotToken`) invece di stamparli.
   - `.agents/skills/meta-whatsapp-integration/SKILL.md`: Skill e runbook per l'integrazione WhatsApp Business Cloud API & Remote MCP Meta DevTools.
 - **Firma FEA & OTP**: `POST /portal/request-otp`, `POST /portal/verify-otp-and-sign` (Sigillo SHA-256 e Timestamp ISO).
 - **Cron Scadenze**: `POST /cron/esegui-notifiche-scadenze` (Scansione UBO, KYC, fatture e solleciti automatici).
@@ -101,6 +147,7 @@ basso. L'unica fonte di verità è ora la tabella `user` del database.
 ## 🗄 3. Database Schema (`prisma/schema.prisma`)
 
 - **`Tenant`**: Dati studio, Sede Legale, Sede Operativa, P.IVA, Logo URL, Colore Tema PDF, credenziali SMTP (`smtp_pass`) e IMAP (`imap_pass`) isolate per tenant.
+  - ⚠️ La colonna `lead_advisor_password` **non esiste più**: rimossa dalla migrazione `prisma/migrations/20260819120000_rimozione_password_chiaro_tenant/`. Conteneva la password del responsabile in chiaro, era restituita da `GET /admin/tenants`, era scrivibile da qualunque utente del tenant via `PATCH /tenant/info` e finiva in ogni backup. Le password dello staff vivono solo come hash scrypt su `user.password_hash`. La DROP è volutamente irreversibile: non c'è nulla da recuperare, solo qualcosa da non ricreare.
 - **`Cliente`**: Dati ERP, Partita IVA, Codice Fiscale, Sede Legale, Codice SDI, IBAN, Rischio AML, UBO, Fonte Patrimonio, Data KYC, `referentiJson`.
 - **`ComunicazioneProgetto`**: `progettoId`, `canale` (`email`, `whatsapp`, `telegram`, `signal`), `mittente`, `direzione` (`entrata`, `uscita`), `testo`, `allegatiJson`.
 - **`ContrattoRicorrente`**: `clienteId`, `progettoId` (opzionale con FK), `frequenza`, `importoCentesimi`, `prossimaFatturazione`.
@@ -135,9 +182,15 @@ basso. L'unica fonte di verità è ora la tabella `user` del database.
 
 5. **Aggiornamento Mappa Grafo (Graphify)**:
    - Dopo modifiche strutturali ai moduli o ai servizi, eseguire `graphify extract . --code-only` e `graphify cluster-only .` per mantenere la mappa delle dipendenze di codice e la documentazione architettonica sempre sincronizzate.
+   - ⚠️ **Grafo attualmente STALE.** La CLI `graphify` non è installata sulla postazione Windows su cui sono state fatte le correzioni di Fase 0 (guard di autenticazione, rimozione credenziali frontend, guard `/admin/tenants`), quindi il grafo non riflette quelle modifiche. Va rigenerato sulla prima postazione che ha la CLI: non va reinstallata qui solo per questo.
+
 
 6. **Divieto Assoluto di Esposizione Credenziali su GitHub & Persistenza Isolata su DB Tenant**:
    - **NESSUNA credenziale reale (password email SMTP/IMAP, token segreti, chiavi API o password di database) deve MAI essere scritta in chiaro nel codice versionato su GitHub o nei file `.md`**.
    - Tutte le password e credenziali dello studio DEVONO risiedere rigorosamente nel Database PostgreSQL collegate al singolo `Tenant` (`prisma.tenant.smtpPass`, `prisma.tenant.imapPass`, ecc.) e gestite in modo protetto via API (`PUT /tenant/settings`).
+   - Le password **degli utenti** non risiedono nemmeno lì: solo come hash scrypt su `user.password_hash`. Nessuna colonna, nessuna risposta API e nessun `localStorage` conserva una password di persona in chiaro.
+   - Il divieto vale anche per le credenziali *di ripiego*: un `|| 'password-qualunque'` e un campo password precompilato nella UI sono credenziali cablate a tutti gli effetti, perché il valore che l'API annuncia è il valore con cui si entra. Il presidio automatico è `src/credenziali.test.ts`, che scandisce `src/`, `frontend/src/`, `api/` ed i file `.md` — non solo il backend, perché il bundle frontend è pubblico esattamente come il repository.
+   - Un segreto non va documentato nemmeno per spiegare che è stato rimosso: nei commenti si rimanda a `src/credenziali.test.ts`, che lo cerca, invece di trascriverlo.
    - L'isolamento multi-tenant garantisce che uno studio non possa in alcun modo visualizzare né accedere ai dati, alla posta o ai contratti di un altro studio.
+
 

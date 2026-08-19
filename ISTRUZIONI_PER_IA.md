@@ -16,29 +16,37 @@ REGOLE TASSATIVE DA SEGUIRE RIGOROSAMENTE:
 1. Isolamento Multi-Tenant Tassativo (tenant_id): I dati tra i vari Tenant/Studi non si devono MAI mischiare. Il filtro applicativo su tenant_id non basta e non è la difesa: è RLS che lo è. Nel codice che serve una richiesta HTTP usa `prisma` da src/util/prismaClient.ts, mai `new PrismaClient()`; `prismaAmministrativo()` scavalca le policy ed è ammesso solo in script, seed, bootstrap, backup e nella ricerca utente al login. Verifica con `npx tsx src/scripts/checkRls.ts`.
 2. Migrazioni Versionate: lo schema si cambia con `prisma migrate dev` / `prisma migrate deploy`. MAI `prisma db push --accept-data-loss` su un database con dati reali: riallinea lo schema cancellando in silenzio colonne e tabelle.
 3. Sincronizzazione Database & Persistenza Cloud Tassativa: Tutto quello che viene aggiunto o modificato nell'interfaccia (spunte, passaggi, note, scadenze, assegnazioni) deve essere tassativamente salvabile e collegato al database PostgreSQL via API Fastify. Non possiamo permetterci di perdere dati. Aggiorna sia prisma/schema.prisma (con npx prisma generate) sia tutti i file di documentazione (.md).
-4. Grafo Graphify: Esegui `graphify extract . --code-only` e `graphify cluster-only .` per mantenere la mappa delle dipendenze aggiornata.
-5. Nessuna credenziale reale (password SMTP/IMAP, token, chiavi API, password di database) nel codice versionato o nei file .md. Le credenziali dello studio stanno nella riga Tenant del database e si gestiscono via PUT /tenant/settings.
+4. Grafo Graphify: Esegui `graphify extract . --code-only` e `graphify cluster-only .` per mantenere la mappa delle dipendenze aggiornata. NOTA: il grafo è attualmente STALE — la CLI non è installata sulla postazione Windows dove sono state fatte le correzioni di Fase 0.
+5. Nessuna credenziale reale (password SMTP/IMAP, token, chiavi API, password di database) nel codice versionato o nei file .md, ripieghi inclusi: `|| 'password-qualunque'` ed un campo password precompilato nella UI sono credenziali cablate, perché il valore che l'API annuncia è quello con cui si entra. Le credenziali dello studio stanno nella riga Tenant del database e si gestiscono via PUT /tenant/settings; le password delle persone solo come hash scrypt su user.password_hash. Presidio: `npx vitest run src/credenziali.test.ts`.
 
 CREDENZIALI DI TEST:
 Non esistono e non devono essere reintrodotte. Fino alla Fase 0 src/server.ts conteneva
-una tabella di utenti e password nel sorgente (joe@…/password123, admin@…/admin2026! e
-altre cinque): chiunque leggesse il repository pubblico poteva autenticarsi in produzione.
-Sono state rimosse, insieme all'accettazione di qualunque password come jolly.
+una tabella di sette utenti con password nel sorgente: chiunque leggesse il repository
+pubblico poteva autenticarsi in produzione. Sono state rimosse, insieme all'accettazione
+di qualunque password come jolly, e non vanno trascritte nemmeno qui per spiegare che sono
+state rimosse — l'elenco esatto vive solo in src/credenziali.test.ts, che le cerca.
 L'unica fonte di verità è la tabella `user` del database (§23).
 - Primo super_admin su DB vuoto: `npm run bootstrap` (§27), stampa la password una volta.
 - Utenti esistenti senza password: `npm run passwords:assign`.
 - Nuovi collaboratori: li crea il super_admin o l'advisor via POST /tenant/utenti, che
   restituisce la password temporanea nella risposta.
+- Nuovi studi: solo il super_admin, via POST /admin/tenants, che crea anche la riga user
+  del responsabile (ruolo advisor) e restituisce la password una volta sola. Perduta? La
+  rigenera POST /admin/tenants/:id/reset-password.
 - Ruolo `cliente`: passwordless, solo Magic Link su /portal.
+La password la emette SEMPRE il server: nessun campo per proporla, nessun valore di
+ripiego, solo l'hash scrypt in database.
 Gerarchia (§2bis): super_admin gestisce tutto e vede tutti i tenant; advisor è
 responsabile del solo proprio tenant; i collaboratori appartengono al tenant da cui sono
 stati creati. Un advisor non può creare un super_admin.
-La suite ha un test di regressione che rifiuta ognuna delle vecchie coppie email/password:
-se torna verde per una di esse, la falla è stata reintrodotta.
+La suite ha due presidi: src/server.test.ts rifiuta ognuna delle vecchie coppie
+email/password, e src/credenziali.test.ts scandisce src/, frontend/src/, api/ ed i file .md
+alla ricerca di credenziali cablate, token finti e del ripiego `!password ||`.
 
 STATO ATTUALE:
 Abbiamo completato l'autenticazione JWT RBAC, il Portale Cliente con Firma FEA eIDAS OTP, l'Anagrafica ERP Clienti, la Fatturazione/NC con tracciato XML SDI, il Connettore SDI 1-Click, il Document Studio Word-like con Smart Tags, il Grafo Dipendenze Moduli nel progetto, il Calendario Condiviso con Scadenzario Attività Studio (/calendar) ed il Cron Worker Scadenze UBO/Marchi.
-Fase 0 di sicurezza chiusa: credenziali cablate rimosse dal sorgente, scrypt + JWT HMAC senza dipendenze native, rate limiting su /auth/*, RLS effettiva e forzata su tutte le tabelle col ruolo `bluman_app` che non può scavalcarla, migrazioni versionate al posto di `db push` nel Dockerfile. I debiti ancora aperti sono elencati in BluMan_piano_di_sviluppo.md ("Debiti Noti Aperti"): fra questi il token finto `jwt_advisor_mock_123` in frontend/src/api/client.ts e /auth/magic-login che accetta qualunque stringa `client_*`.
+Fase 0 di sicurezza chiusa: credenziali cablate rimosse dal sorgente E dal frontend (il bundle Vite su Vercel è pubblico come il repository) e dalle funzioni serverless in api/; guard onRequest che respinge con 401 tutto ciò che non è in un elenco di rotte pubbliche, così una rotta nuova nasce protetta; /admin/tenants riservato al super_admin su tutti e quattro i verbi (RLS non poteva coprirlo: `tenant` è la tabella che contiene gli studi, non una tabella figlia filtrata per tenant_id); colonna tenant.lead_advisor_password eliminata dal database; scrypt + JWT HMAC senza dipendenze native; rate limiting su /auth/*; RLS effettiva e forzata su tutte le tabelle col ruolo `bluman_app` che non può scavalcarla; migrazioni versionate al posto di `db push` nel Dockerfile; variabili Railway puntate a Supabase. Suite: 15 file, 171 test.
+Debiti ancora aperti, elencati in BluMan_piano_di_sviluppo.md ("Debiti Noti Aperti"): /auth/magic-login accetta qualunque stringa `client_*`; GET /uploads/:filename è pubblica e non sanifica il nome file (path traversal); Dashboard.tsx ha percentuali cablate; grafo Graphify STALE.
 
 Leggiti i file .agents/AGENTS.md, README.md ed ISTRUZIONI_INSTALLAZIONE.md prima di iniziare qualsiasi modifica!
 ```

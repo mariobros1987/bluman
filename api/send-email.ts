@@ -323,7 +323,18 @@ export default async function handler(req: any, res: any) {
     if (action === 'invite-collaborator') {
       const nomeCollab = collaboratorName || 'Dottore / Avvocato';
       const ruoloCollab = collaboratorRole === 'partner' ? 'Senior Partner' : 'Advisor / Operatore';
-      const tempPass = collaboratorPassword || 'password123';
+      // §23 — nessun ripiego. Qui c'era una password di default: quando il chiamante non
+      // ne passava una, l'email di benvenuto comunicava al nuovo collaboratore una
+      // password nota, identica per tutti gli studi e leggibile in questo file. La
+      // password la genera il server alla creazione dell'utente (POST /tenant/utenti):
+      // se non è arrivata, l'invito non ha nulla da comunicare e non va spedito.
+      const tempPass = collaboratorPassword;
+      if (!tempPass) {
+        return res.status(400).json({
+          ok: false,
+          errore: 'Password temporanea assente: crea prima l\'utente, il server la genera.',
+        });
+      }
 
       mailOptions = {
         from: `"${smtpFromName}" <${smtpFromEmail}>`,

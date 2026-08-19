@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { fmt } from '../utils';
 import { setActiveTenantId } from '../utils/tenant';
-import { fetchAdminTenantsApi, createAdminTenantApi, updateAdminTenantApi, deleteAdminTenantApi } from '../api/client';
+import { fetchAdminTenantsApi, createAdminTenantApi, updateAdminTenantApi, deleteAdminTenantApi, resetPasswordTenantApi } from '../api/client';
 
 interface TenantStudio {
   id: string;
@@ -10,7 +10,6 @@ interface TenantStudio {
   pIva: string;
   leadAdvisorNome: string;
   leadAdvisorEmail: string;
-  leadAdvisorPassword?: string;
   piano: 'enterprise' | 'pro' | 'trial';
   stato: 'attivo' | 'sospeso' | 'scaduto';
   durataMesi: number;
@@ -21,6 +20,11 @@ interface TenantStudio {
   fatturatoMensile: number;
 }
 
+// §23 — nessun campo `leadAdvisorPassword`. Era una password in chiaro nel tipo, nel
+// bundle, nel localStorage e nella colonna `tenant.lead_advisor_password` del database.
+// La password iniziale la genera il server e si vede una volta sola: vive in
+// `passwordEmessa` qui sotto, che è stato di componente e non viene mai persistito.
+
 const DEFAULT_TENANTS: TenantStudio[] = [
   {
     id: '00000000-0000-0000-0000-000000000001',
@@ -29,7 +33,6 @@ const DEFAULT_TENANTS: TenantStudio[] = [
     pIva: 'MT28491023',
     leadAdvisorNome: 'Joe Disabato',
     leadAdvisorEmail: 'joe@bluecode.advisory',
-    leadAdvisorPassword: 'password123',
     piano: 'enterprise',
     stato: 'attivo',
     durataMesi: 12,
@@ -46,7 +49,6 @@ const DEFAULT_TENANTS: TenantStudio[] = [
     pIva: 'IT01234567890',
     leadAdvisorNome: 'Avv. Lorenzo Marino',
     leadAdvisorEmail: 'lorenzo.marino@bluecode.advisory',
-    leadAdvisorPassword: 'password123',
     piano: 'pro',
     stato: 'attivo',
     durataMesi: 6,
@@ -63,7 +65,6 @@ const DEFAULT_TENANTS: TenantStudio[] = [
     pIva: 'CHE-123.456.789',
     leadAdvisorNome: 'Dr. Elena Russo',
     leadAdvisorEmail: 'elena.russo@bluecode.advisory',
-    leadAdvisorPassword: 'password123',
     piano: 'enterprise',
     stato: 'attivo',
     durataMesi: 12,
@@ -92,6 +93,13 @@ export function SuperAdminPage() {
   // Modals state
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [credentialsModalTenant, setCredentialsModalTenant] = useState<TenantStudio | null>(null);
+  /**
+   * §23 — la password del responsabile, così come l'ha appena emessa il server. Vive solo
+   * qui, in memoria, finché il modale resta aperto: non va nel localStorage, non torna
+   * dall'API di elenco, non è recuperabile dopo. Se il super admin la perde, la rigenera.
+   */
+  const [passwordEmessa, setPasswordEmessa] = useState<string | null>(null);
+  const [rigenerandoPassword, setRigenerandoPassword] = useState(false);
   const [durationModalTenant, setDurationModalTenant] = useState<TenantStudio | null>(null);
   const [deleteModalTenant, setDeleteModalTenant] = useState<TenantStudio | null>(null);
   const [customExpiryInput, setCustomExpiryInput] = useState('');
@@ -103,7 +111,6 @@ export function SuperAdminPage() {
   const [formPiva, setFormPiva] = useState('');
   const [formAdvisorNome, setFormAdvisorNome] = useState('');
   const [formEmail, setFormEmail] = useState('');
-  const [formPassword, setFormPassword] = useState('Studio2026!');
   const [formPiano, setFormPiano] = useState<'enterprise' | 'pro' | 'trial'>('enterprise');
   const [formDurataMesi, setFormDurataMesi] = useState<number>(12);
 
@@ -130,7 +137,7 @@ export function SuperAdminPage() {
   };
 
   // Creazione Nuovo Tenant
-  const handleCreateTenant = (e: React.FormEvent) => {
+  const handleCreateTenant = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formName || !formEmail) return;
 
@@ -138,39 +145,52 @@ export function SuperAdminPage() {
     const expDate = new Date();
     expDate.setMonth(expDate.getMonth() + Number(formDurataMesi));
 
-    const newTenant: TenantStudio = {
+    const nuovoStudio = {
       id: `00000000-0000-0000-0000-${Date.now().toString().padStart(12, '0')}`,
       ragioneSociale: formName,
       giurisdizione: formGiurisdizione,
       pIva: formPiva || 'IT' + Date.now().toString().substring(0, 9),
       leadAdvisorNome: formAdvisorNome || 'Lead Senior Advisor',
       leadAdvisorEmail: formEmail,
-      leadAdvisorPassword: formPassword || 'Studio2026!',
       piano: formPiano,
-      stato: 'attivo',
+      stato: 'attivo' as const,
       durataMesi: Number(formDurataMesi),
       dataAttivazione: today.toLocaleDateString('it-IT'),
       dataScadenza: expDate.toLocaleDateString('it-IT'),
+    };
+
+    // Il database decide per primo: è lui a creare anche l'utente `advisor` responsabile
+    // e a generare la password iniziale. Prima l'ordine era invertito — si aggiungeva lo
+    // studio alla lista e poi si tentava la scrittura ignorandone l'esito, quindi un
+    // rifiuto del server lasciava in interfaccia uno studio inesistente.
+    let creato: any;
+    try {
+      creato = await createAdminTenantApi(nuovoStudio);
+    } catch (err: any) {
+      alert(`⚠️ Registrazione non riuscita: ${err.message}`);
+      return;
+    }
+
+    const newTenant: TenantStudio = {
+      ...nuovoStudio,
+      id: creato?.id || nuovoStudio.id,
       utentiCount: 1,
       progettiCount: 0,
       fatturatoMensile: 0,
     };
 
-    const updated = [newTenant, ...tenants];
-    setTenants(updated);
+    setTenants([newTenant, ...tenants]);
     setCreateModalOpen(false);
-
-    // Salva a database PostgreSQL Supabase
-    createAdminTenantApi(newTenant);
 
     // Reset Form
     setFormName('');
     setFormAdvisorNome('');
     setFormEmail('');
     setFormPiva('');
-    setFormPassword('Studio2026!');
 
-    // Mostra subito il modale con le credenziali del nuovo gestore
+    // Mostra subito il modale con le credenziali: è l'unica occasione in cui la password
+    // emessa dal server è leggibile.
+    setPasswordEmessa(creato?.passwordTemporanea || null);
     setCredentialsModalTenant(newTenant);
   };
 
@@ -234,31 +254,59 @@ export function SuperAdminPage() {
     alert(`✓ Nuova data di scadenza per "${tenant.ragioneSociale}" impostata al: ${formatted}`);
   };
 
+  /**
+   * Rigenera la password del responsabile. Serve quando il super admin riapre il modale
+   * di uno studio già registrato: la password iniziale non è più leggibile da nessuna
+   * parte, quindi l'unica strada è emetterne una nuova.
+   */
+  const handleRigeneraPassword = async (t: TenantStudio) => {
+    if (!confirm(`Rigenerare la password di accesso per ${t.leadAdvisorEmail}?\n\nLa password attuale smetterà di funzionare immediatamente.`)) return;
+    setRigenerandoPassword(true);
+    try {
+      const res = await resetPasswordTenantApi(t.id);
+      setPasswordEmessa(res.passwordTemporanea);
+    } catch (err: any) {
+      alert(`⚠️ ${err.message}`);
+    } finally {
+      setRigenerandoPassword(false);
+    }
+  };
+
   // Invio Email di Benvenuto con Credenziali
   const handleSendCredentialsEmail = async (t: TenantStudio) => {
+    // Senza una password appena emessa non c'è nulla da inviare: il database ne conserva
+    // solo l'hash. Prima qui c'era `t.leadAdvisorPassword || 'Studio2026!'`, che spediva
+    // al gestore una password di default valida per chiunque la indovinasse.
+    if (!passwordEmessa) {
+      alert('ℹ️ Rigenera prima la password: quella attuale non è leggibile, il database ne conserva solo l\'hash.');
+      return;
+    }
     setSendingInvite(true);
     try {
       const res = await fetch('/api/send-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'send_collaborator_invite',
-          toEmail: t.leadAdvisorEmail,
+          // `invite-collaborator` è l'azione che `api/send-email.ts` implementa davvero.
+          // Qui c'era `send_collaborator_invite`, che nessun ramo gestiva: la richiesta
+          // cadeva nel caso di default e l'email di credenziali non partiva mai, mentre
+          // l'interfaccia dichiarava "inviata con successo".
+          action: 'invite-collaborator',
+          to: t.leadAdvisorEmail,
           collaboratorName: t.leadAdvisorNome || 'Gestore Studio',
-          senderStudioName: 'BluMan Multi-Tenant Cloud Platform',
-          loginUrl: window.location.origin,
-          temporaryPassword: t.leadAdvisorPassword || 'Studio2026!',
-          roleName: `Lead Senior Advisor (${t.ragioneSociale})`,
+          collaboratorRole: 'partner',
+          collaboratorSpecialization: `Lead Senior Advisor — ${t.ragioneSociale}`,
+          collaboratorPassword: passwordEmessa,
         })
       });
       const data = await res.json();
       if (data.ok) {
         alert(`✓ Email di attivazione e credenziali inviata con successo a ${t.leadAdvisorEmail}!`);
       } else {
-        alert(`ℹ️ Credenziali pronte! (Simulazione invio completata per ${t.leadAdvisorEmail})`);
+        alert(`⚠️ Invio non riuscito: ${data.errore || 'errore SMTP'}. Consegna le credenziali manualmente.`);
       }
-    } catch (e) {
-      alert(`✓ Credenziali registrate con successo per ${t.leadAdvisorEmail}!`);
+    } catch (e: any) {
+      alert(`⚠️ Invio non riuscito: ${e.message}. Consegna le credenziali manualmente.`);
     } finally {
       setSendingInvite(false);
     }
@@ -397,7 +445,7 @@ export function SuperAdminPage() {
 
                         {/* Credenziali e Link Accesso Gestore */}
                         <button
-                          onClick={() => setCredentialsModalTenant(t)}
+                          onClick={() => { setPasswordEmessa(null); setCredentialsModalTenant(t); }}
                           title="Visualizza Link di Accesso e Credenziali Gestore"
                           style={{ background: '#1e1b4b', border: '1px solid #4338ca', color: '#a5b4fc', padding: '5px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
                         >
@@ -457,7 +505,7 @@ export function SuperAdminPage() {
               <div style={{ fontSize: 16, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span>🔑 Link di Accesso & Credenziali Gestore Studio</span>
               </div>
-              <button onClick={() => setCredentialsModalTenant(null)} style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: 18, cursor: 'pointer' }}>✕</button>
+              <button onClick={() => { setCredentialsModalTenant(null); setPasswordEmessa(null); }} style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: 18, cursor: 'pointer' }}>✕</button>
             </div>
 
             <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, padding: 14 }}>
@@ -501,18 +549,38 @@ export function SuperAdminPage() {
 
               <div style={{ background: 'var(--card2)', padding: 12, borderRadius: 10, border: '1px solid var(--border)' }}>
                 <div style={{ fontSize: 10.5, color: 'var(--muted)', fontWeight: 700 }}>🔒 PASSWORD DI PRIMO ACCESSO:</div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
-                  <code style={{ fontSize: 13, fontWeight: 800, color: '#34d399', letterSpacing: '1px' }}>{credentialsModalTenant.leadAdvisorPassword || 'Studio2026!'}</code>
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(credentialsModalTenant.leadAdvisorPassword || 'Studio2026!');
-                      alert('✓ Password copiata!');
-                    }}
-                    style={{ background: 'var(--card)', border: '1px solid var(--border)', color: 'var(--text)', padding: '4px 10px', borderRadius: 6, fontSize: 10.5, cursor: 'pointer', fontWeight: 700 }}
-                  >
-                    📋 Copia Password
-                  </button>
-                </div>
+                {passwordEmessa ? (
+                  <>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+                      <code style={{ fontSize: 13, fontWeight: 800, color: '#34d399', letterSpacing: '1px' }}>{passwordEmessa}</code>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(passwordEmessa);
+                          alert('✓ Password copiata!');
+                        }}
+                        style={{ background: 'var(--card)', border: '1px solid var(--border)', color: 'var(--text)', padding: '4px 10px', borderRadius: 6, fontSize: 10.5, cursor: 'pointer', fontWeight: 700 }}
+                      >
+                        📋 Copia Password
+                      </button>
+                    </div>
+                    <div style={{ fontSize: 10, color: '#fbbf24', marginTop: 6 }}>
+                      ⚠️ Visibile solo ora: il database ne conserva soltanto l'hash. Copiala prima di chiudere.
+                    </div>
+                  </>
+                ) : (
+                  <div style={{ marginTop: 6 }}>
+                    <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+                      Non leggibile: il database conserva solo l'hash scrypt della password. Per consegnarne una nuova al gestore, rigenerala.
+                    </div>
+                    <button
+                      onClick={() => handleRigeneraPassword(credentialsModalTenant)}
+                      disabled={rigenerandoPassword}
+                      style={{ marginTop: 8, background: 'var(--card)', border: '1px solid var(--border)', color: 'var(--text)', padding: '6px 12px', borderRadius: 6, fontSize: 11, cursor: 'pointer', fontWeight: 700 }}
+                    >
+                      {rigenerandoPassword ? '⏳ Generazione...' : '🔄 Rigenera Password di Accesso'}
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -524,7 +592,11 @@ export function SuperAdminPage() {
               <button
                 type="button"
                 onClick={() => {
-                  const summary = `Gentile ${credentialsModalTenant.leadAdvisorNome || 'Gestore'},\nÈ stato attivato il tuo Studio "${credentialsModalTenant.ragioneSociale}" su BluMan Advisory Platform.\n\nLink Accesso: ${window.location.origin}\nEmail: ${credentialsModalTenant.leadAdvisorEmail}\nPassword: ${credentialsModalTenant.leadAdvisorPassword || 'Studio2026!'}\n\nScadenza Licenza: ${credentialsModalTenant.dataScadenza}`;
+                  if (!passwordEmessa) {
+                    alert('ℹ️ Rigenera prima la password: non è leggibile dal database.');
+                    return;
+                  }
+                  const summary = `Gentile ${credentialsModalTenant.leadAdvisorNome || 'Gestore'},\nÈ stato attivato il tuo Studio "${credentialsModalTenant.ragioneSociale}" su BluMan Advisory Platform.\n\nLink Accesso: ${window.location.origin}\nEmail: ${credentialsModalTenant.leadAdvisorEmail}\nPassword: ${passwordEmessa}\n\nScadenza Licenza: ${credentialsModalTenant.dataScadenza}`;
                   navigator.clipboard.writeText(summary);
                   alert('✓ Messaggio riepilogativo completo copiato negli appunti!');
                 }}
@@ -712,9 +784,15 @@ export function SuperAdminPage() {
                 </div>
               </div>
 
-              <div>
-                <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Password Iniziale per il Gestore *</label>
-                <input type="text" value={formPassword} onChange={e => setFormPassword(e.target.value)} required placeholder="Studio2026!" style={{ width: '100%', fontSize: 12, fontWeight: 700 }} />
+              {/*
+                §23 — il campo "Password Iniziale per il Gestore" è stato rimosso. Era un
+                `type="text"` con una password di default precompilata: viaggiava dal
+                browser al server e finiva in chiaro nella colonna
+                `tenant.lead_advisor_password`. Ora la genera il server alla creazione e la
+                restituisce una volta sola, nel modale che si apre subito dopo.
+              */}
+              <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 8, padding: 10, fontSize: 10.5, color: 'var(--muted)' }}>
+                🔒 La password di primo accesso viene generata dal server alla creazione e mostrata una volta sola nel riquadro successivo.
               </div>
             </div>
 

@@ -7,7 +7,7 @@ import type { SignatureData } from '../utils/pdfGenerator';
 import { DigitalSignatureModal } from '../components/DigitalSignatureModal';
 import { resolveDocumentTemplateHtml, PREBUILT_TEMPLATES } from '../utils/documentTemplates';
 import { getStudioInfoForTenant, getCurrentTenantId, getTenantStorageKey, BLUECODE_TENANT_ID } from '../utils/tenant';
-import { fetchModuliLibreria, fetchProgetti, creaPreventivoEAccettaApi, fetchClienti, creaProgettoApi, creaClienteApi, fetchComunicazioniApi, inviaComunicazioneApi, requestPortalOtpApi, verifyPortalOtpAndSignApi } from '../api/client';
+import { fetchModuliLibreria, fetchProgetti, creaPreventivoEAccettaApi, fetchClienti, creaProgettoApi, creaClienteApi, fetchComunicazioniApi, inviaComunicazioneApi, requestPortalOtpApi, verifyPortalOtpAndSignApi, magicLoginApi } from '../api/client';
 import type { CategoriaModulo } from '../types';
 
 interface ModuloProposta {
@@ -135,6 +135,17 @@ export function ClientPortal() {
     const loadPortalData = async () => {
       setPageLoading(true);
       let resolvedClientName = clientName;
+
+      // §23 — scambia il magic token dell'URL con un JWT vero prima di qualunque altra
+      // chiamata. Il portale leggeva `magic_token` solo per riconoscere il cliente e poi
+      // interrogava l'API senza autenticarsi: funzionava perché l'API non chiedeva un
+      // token a nessuno. Ora lo chiede, quindi lo scambio è il primo passo.
+      try {
+        const sessione = await magicLoginApi(token);
+        if (sessione?.token) localStorage.setItem('bluman_jwt_token', sessione.token);
+      } catch (err) {
+        console.warn('Magic login non riuscito: il portale resterà senza dati', err);
+      }
 
       const clientiRes = await fetchClienti();
       if (clientiRes && Array.isArray(clientiRes) && clientiRes.length > 0) {

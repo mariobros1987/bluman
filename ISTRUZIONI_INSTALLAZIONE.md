@@ -102,6 +102,39 @@ mano. La gerarchia è quella di §2bis:
 Un `advisor` non può creare un `super_admin`, e un'email già registrata presso un altro
 studio viene rifiutata con 409 invece di essere spostata di tenant.
 
+**Nuovi studi (solo `super_admin`)** — `POST /admin/tenants` registra lo studio **e** la
+riga `user` del responsabile con ruolo `advisor`, restituendo la sua password temporanea
+una volta sola. Se va perduta, `POST /admin/tenants/:id/reset-password` ne genera un'altra.
+Nella dashboard Super Admin il modale la mostra una volta e non la conserva: non torna
+dall'elenco, non finisce nel `localStorage`, non è rileggibile.
+
+> La password la emette **sempre** il server. Non esiste un campo per proporne una, non
+> esiste un valore di ripiego, e il database ne conserva soltanto l'hash scrypt. Anche una
+> password di default annunciata dall'API sarebbe una password valida per chiunque legga la
+> risposta o il sorgente, quindi non ce ne sono: `src/credenziali.test.ts` scandisce `src/`,
+> `frontend/src/` e `api/` e fallisce se ne ricompare una.
+
+---
+
+## 🚧 Perché serve un login anche in locale
+
+Il server respinge con `401` qualunque richiesta priva di un JWT verificabile: l'elenco
+delle rotte pubbliche è breve (`/health`, `/auth/login`, `/auth/magic-login`, i webhook di
+canale, il portale cliente) e tutto il resto è protetto per difetto.
+
+In pratica: dopo `npx tsx src/index.ts` un `curl http://127.0.0.1:3000/clienti` risponde
+`401 {"errore":"Non autenticato"}`, ed è corretto. Serve prima un token:
+
+```bash
+curl -s -X POST http://127.0.0.1:3000/auth/login \
+     -H 'Content-Type: application/json' \
+     -d '{"email":"tua.email@studio.example","password":"LA-TUA-PASSWORD"}'
+# poi:  curl http://127.0.0.1:3000/clienti -H "Authorization: Bearer <token>"
+```
+
+Dal browser non serve nulla di manuale: la pagina di login lo ottiene e lo mette in
+`localStorage`.
+
 ---
 
 ## 4. Connessione a Supabase PostgreSQL via CLI (Produzione)
@@ -149,3 +182,44 @@ studio viene rifiutata con 409 invece di essere spostata di tenant.
 > di avvio del container su Railway: ora il `Dockerfile` esegue `prisma migrate deploy`, che
 > applica solo le migrazioni versionate in `prisma/migrations/` e si ferma se il database è
 > in uno stato che non riconosce.
+
+---
+
+## 5. Variabili d'Ambiente su Railway (Backend in Produzione)
+
+Il servizio `bluman-api` del progetto Railway `bluman-backend` punta a **Supabase**, non
+più al Postgres di Railway (che resta in piedi ma inutilizzato). Le tre connection string
+sono le stesse tre di §14, con gli stessi tre ruoli distinti:
+
+```bash
+railway variable set "DATABASE_URL=postgresql://bluman_app.[REF]:[APP-PW]@[POOLER]:5432/postgres" \
+                     --service bluman-api --skip-deploys
+railway variable set "DIRECT_URL=postgresql://postgres.[REF]:[DB-PW]@[POOLER]:5432/postgres" \
+                     --service bluman-api --skip-deploys
+railway variable set "ADMIN_DATABASE_URL=postgresql://postgres.[REF]:[DB-PW]@[POOLER]:5432/postgres" \
+                     --service bluman-api --skip-deploys
+railway variables --service bluman-api --json   # verifica
+```
+
+Tre avvertenze pratiche, tutte imparate sul campo:
+
+- **`--skip-deploys`** è voluto: senza di esso ogni `set` fa ripartire il servizio, quindi
+  tre variabili significherebbero tre riavvii, i primi due con la configurazione a metà.
+  Le variabili nuove entrano in vigore al deploy successivo.
+- **Non passare il valore per stdin da PowerShell.** `$v | railway variable set K --stdin`
+  premette un BOM UTF-8 al valore: la variabile diventa `﻿postgresql://…` e la
+  connessione fallisce con un errore di schema che non nomina il BOM. Passare il valore come
+  argomento (`railway variable set "K=$v"`) evita il problema.
+- **`JWT_SECRET` (≥32 caratteri) è obbligatorio.** Senza, il server non si arresta —
+  `NODE_ENV` non è impostato nel `Dockerfile` — ma genera un segreto casuale a ogni
+  processo: **tutti i token in circolazione vengono invalidati a ogni redeploy.**
+
+Dopo il deploy, la verifica che conta la fa il ruolo di runtime:
+
+```bash
+npx tsx src/scripts/checkRls.ts
+```
+
+Deve mostrare `current_user: bluman_app`, `bypassa_rls: false`, RLS attivo **e forzato** su
+tutte e 33 le tabelle applicative (`_prisma_migrations` esclusa, correttamente) e **0
+clienti visibili** con un tenant inesistente.

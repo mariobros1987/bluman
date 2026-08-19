@@ -91,8 +91,10 @@ Piattaforma ERP per studi di consulenza societaria, wealth protection ed advisor
    - Tutti i file `.md` (`README.md`, `BluMan_piano_di_sviluppo.md`, `ISTRUZIONI_INSTALLAZIONE.md`, `.agents/AGENTS.md`) DEVONO essere tassativamente aggiornati dopo ogni modifica importante.
 5. **Mappa Grafo (Graphify)**:
    - Mantenere aggiornato il grafo con `graphify extract . --code-only` e `graphify cluster-only .`.
+   - ⚠️ Grafo **STALE**: la CLI non è installata sulla postazione Windows delle correzioni di Fase 0. Va rigenerato sulla prima postazione che la ha.
 6. **Divieto Assoluto di Credenziali in Chiaro**:
-   - Nessuna password, token o chiave API reale nel codice versionato o nei file `.md`. Le credenziali dello studio risiedono nella riga `Tenant` del database (`smtpPass`, `imapPass`) e si gestiscono via `PUT /tenant/settings`.
+   - Nessuna password, token o chiave API reale nel codice versionato o nei file `.md`. Le credenziali dello studio risiedono nella riga `Tenant` del database (`smtpPass`, `imapPass`) e si gestiscono via `PUT /tenant/settings`. Le password delle persone stanno solo come hash scrypt su `user.password_hash`.
+   - Vale anche per i ripieghi: un `|| 'password-qualunque'` e un campo password precompilato sono credenziali cablate, perché il valore che l'API annuncia è quello con cui si entra. Presidio: `src/credenziali.test.ts`, che scandisce anche `frontend/src/`, `api/` ed i file `.md` — il bundle frontend è pubblico esattamente come il repository, e un segreto non va trascritto nemmeno per spiegare che è stato rimosso.
 
 Il testo integrale ed autorevole delle regole è in [`.agents/AGENTS.md`](.agents/AGENTS.md).
 
@@ -138,11 +140,42 @@ e stampa una password temporanea **una sola volta**. Utenti esistenti senza pass
 dalla dashboard, e la risposta contiene la password temporanea da consegnare a mano.
 Dettagli in `ISTRUZIONI_INSTALLAZIONE.md`.
 
+**La password la emette sempre il server.** Non c'è un campo dove proporne una, non esiste
+un valore di ripiego, e la risposta la mostra in chiaro una volta sola: dopo, nel database
+c'è solo l'hash scrypt. Se va perduta si rigenera — per il responsabile di uno studio con
+`POST /admin/tenants/:id/reset-password`. Una password di default annunciata dall'API
+sarebbe comunque una password valida, quindi non ce ne sono.
+
+Il presidio automatico è `src/credenziali.test.ts`: scandisce `src/`, `frontend/src/` e
+`api/` e fallisce se una vecchia password cablata, un token finto o un ripiego
+`!password ||` ricompare su una riga non commentata.
+
+---
+
+## 🚧 Nessuna Rotta Aperta per Sbaglio (§23)
+
+L'hook `onRequest` di `src/server.ts` respinge con `401` qualunque richiesta priva di un
+JWT verificabile. L'elenco nel codice è quello delle rotte **pubbliche** — `/health`, il
+login, il Magic Link, i webhook di canale — e tutto il resto è protetto per difetto: con
+l'elenco opposto una rotta nuova sarebbe nata aperta senza che nessuno se ne accorgesse.
+
+Vale la pena distinguere due controlli che si confondono facilmente: **RLS** protegge uno
+studio dall'altro, ma non protegge da "non serve autenticarsi", perché una richiesta
+anonima che porta il tenant di default corrisponde legittimamente alle policy. Prima del
+guard RLS lavorava correttamente sul tenant sbagliato.
+
+Il blocco `/admin/tenants` ha un secondo controllo, `soloSuperAdmin`, su tutti e quattro i
+verbi. Neanche questo è un compito di RLS: `tenant` è la tabella che *contiene* gli studi,
+non una tabella figlia filtrata per `tenant_id`, quindi le policy non le danno protezione.
+
+`src/server.test.ts` verifica, rotta per rotta, 401 senza token e non-401 con un token
+valido (`npx vitest run` → 15 file, 171 test).
+
 ---
 
 ## 🛡 Sicurezza & Architettura Enterprise in Produzione
 
-1. **🔑 Autenticazione JWT & Sessioni Protette**: Firma JWT HMAC SHA-256 e verifica payload Bearer Header su tutte le rotte Fastify con blocco categorico per utenti non autorizzati. `JWT_SECRET` obbligatorio (minimo 32 caratteri): con `NODE_ENV=production` il server si rifiuta di partire senza.
+1. **🔑 Autenticazione JWT & Sessioni Protette**: Firma JWT HMAC SHA-256 e verifica payload Bearer Header su tutte le rotte Fastify con blocco categorico per utenti non autorizzati. `JWT_SECRET` obbligatorio (minimo 32 caratteri): con `NODE_ENV=production` il server si rifiuta di partire senza. Il guard `onRequest` lavora su un elenco di rotte *pubbliche*, quindi ogni rotta nuova nasce protetta; `/admin/tenants` ha in più il controllo di ruolo `soloSuperAdmin` (403 per chiunque altro).
 2. **📧 Provider Email SMTP Reale (Register.it / SendGrid / Nodemailer)**: Suite email integrata per invio notifiche, Magic Link e comunicazioni transazionali.
 3. **📦 Storage Cloud (Supabase Storage / AWS S3)**: Archiviazione documenti crittografata con URL pre-firmati e validazione binaria Magic-Bytes.
 4. **🛡 Row-Level Security (RLS) PostgreSQL**: Isolamento multi-tenant imposto dal motore database, non dal codice applicativo. Il runtime si connette col ruolo `bluman_app`, che **non può scavalcare le policy**, e ogni richiesta HTTP imposta `app.current_tenant_id` come variabile di transazione. RLS è attivo **e forzato** su tutte le tabelle, con una policy per ciascuna. Se il contesto tenant manca, la query non vede nulla: un errore di programmazione produce un guasto immediato invece di una fuga silenziosa di dati. Policy in `supabase/migrations/20260819_rls_effettiva.sql`, lato applicativo in `src/util/prismaClient.ts`, verifica con `npx tsx src/scripts/checkRls.ts`.

@@ -8,7 +8,12 @@
  * senza l'estensione che imposta il contesto — altrimenti la prova pratica qui sotto
  * misurerebbe l'estensione invece delle policy.
  */
+import dotenv from 'dotenv';
 import { PrismaClient } from '@prisma/client';
+
+// `tsx` non legge `.env` da sé: senza questa riga lo script si connetteva al database
+// indicato dall'ambiente della shell — cioè, tipicamente, a nessuno.
+dotenv.config();
 
 const prisma = new PrismaClient();
 

@@ -73,7 +73,9 @@ model Tenant {
   signalCliEndpoint String?  @map("signal_cli_endpoint")
   leadAdvisorNome   String?  @map("lead_advisor_nome")
   leadAdvisorEmail  String?  @map("lead_advisor_email")
-  leadAdvisorPassword String? @map("lead_advisor_password")
+  // `lead_advisor_password` è stata eliminata dalla migrazione
+  // 20260819_rimozione_password_chiaro_tenant: conteneva la password del responsabile
+  // dello studio in chiaro. Le password sono solo hash scrypt su `user.password_hash`.
   giurisdizione     String?  @map("giurisdizione")
   durataMesi        Int?     @default(12) @map("durata_mesi")
   dataAttivazione   String?  @map("data_attivazione")

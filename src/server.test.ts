@@ -27,10 +27,34 @@ const templateAnalisi: ModuloTemplateConDistinta = {
   ],
 };
 
+/**
+ * §23 — da quando `buildServer` respinge con 401 ogni rotta non pubblica, un `inject`
+ * privo di header Authorization riceve 401 invece della risposta applicativa. I test di
+ * questo file esercitano il comportamento delle rotte, non l'autenticazione: quindi ogni
+ * inject parte come sessione advisor autenticata. I test che l'autenticazione la
+ * esercitano davvero (§23, §2bis) passano headers propri, che hanno la precedenza.
+ */
+const TENANT_TEST = '00000000-0000-0000-0000-000000000001';
+const TOKEN_TEST_ADVISOR = signJwt({
+  userId: 'usr-test',
+  tenantId: TENANT_TEST,
+  email: 'test@studio.example',
+  ruolo: 'advisor',
+});
+
 function nuovoServer() {
   const app = new InMemoryApp();
   app.registraModuloTemplate(templateAnalisi);
-  return { app, server: buildServer(app) };
+  const server = buildServer(app);
+
+  const injectOriginale = server.inject.bind(server);
+  (server as any).inject = (opts: any) =>
+    injectOriginale({
+      ...opts,
+      headers: { authorization: `Bearer ${TOKEN_TEST_ADVISOR}`, ...(opts?.headers || {}) },
+    });
+
+  return { app, server };
 }
 
 describe('server — /health e /moduli', () => {
@@ -351,15 +375,16 @@ describe('server — §2bis isolamento tenant: header x-tenant-id', () => {
     expect(res.json().id).toBe(TENANT_B);
   });
 
-  it('ignora x-tenant-id se il token è assente o non verificabile', async () => {
+  it('un token non verificabile è respinto, non degradato al tenant di default', async () => {
+    // Prima della chiusura della falla la richiesta proseguiva col tenant di default,
+    // quindi una firma inventata otteneva comunque i dati dello studio principale.
     const { server } = nuovoServer();
     const res = await server.inject({
       method: 'GET',
       url: '/tenant/info',
       headers: { authorization: 'Bearer token-inventato', 'x-tenant-id': TENANT_B },
     });
-    expect(res.statusCode).toBe(200);
-    expect(res.json().id).toBe(TENANT_DEFAULT);
+    expect(res.statusCode).toBe(401);
   });
 
   // §14 — lo stesso tenant che decide la risposta deve arrivare al database come
@@ -401,13 +426,14 @@ describe('server — §2bis isolamento tenant: header x-tenant-id', () => {
       expect(visti).toEqual([{ tenantId: TENANT_B, ruolo: 'super_admin' }]);
     });
 
-    it('senza token il contesto è il tenant di default, mai vuoto', async () => {
-      // Un contesto assente non farebbe vedere nulla al ruolo applicativo: è la
-      // proprietà voluta, ma su una richiesta legittima sarebbe un guasto.
+    it('senza token la richiesta non arriva mai al contesto: 401 prima', async () => {
+      // Fino alla chiusura della falla questa proprietà era l'opposto — la richiesta
+      // proseguiva col tenant di default, cioè con quello che contiene i dati reali, ed è
+      // il motivo per cui `GET /clienti` restituiva le anagrafiche a chiunque.
       const { server, visti } = serverCheOsservaIlContesto();
       const res = await server.inject({ method: 'GET', url: '/moduli' });
-      expect(res.statusCode).toBe(200);
-      expect(visti).toEqual([{ tenantId: TENANT_DEFAULT, ruolo: undefined }]);
+      expect(res.statusCode).toBe(401);
+      expect(visti).toEqual([]);
     });
   });
 });
@@ -440,5 +466,116 @@ describe('server — /tenant/info persistenza logo e impostazioni studio', () =>
     expect(getFinal.statusCode).toBe(200);
     expect(getFinal.json().logoUrl).toBe('https://supabase.co/storage/v1/object/public/logos/studio-logo.png');
     expect(getFinal.json().waPhoneId).toBe('102938475610293');
+  });
+});
+
+describe('server — §23 il guard di autenticazione: nessuna rotta aperta per sbaglio', () => {
+  /**
+   * Il buco che questo blocco presidia: `GET /clienti` sull'API pubblica restituiva le
+   * anagrafiche complete (P.IVA, codice fiscale, IBAN) senza alcun token, perché l'hook
+   * `onRequest` in assenza di token proseguiva col tenant di default — che è dove stanno
+   * tutti i dati di produzione. RLS non poteva farci niente: la richiesta portava un
+   * tenant legittimo e le policy restituivano correttamente le sue righe. Autenticazione
+   * e isolamento fra studi sono due controlli distinti, e mancava il primo.
+   */
+  const ROTTE_PROTETTE: Array<[string, string]> = [
+    ['GET', '/clienti'],
+    ['GET', '/progetti'],
+    ['GET', '/moduli'],
+    ['GET', '/articoli'],
+    ['GET', '/tenant/info'],
+    ['GET', '/tenant/utenti'],
+    ['GET', '/admin/tenants'],
+    ['POST', '/clienti'],
+    ['POST', '/progetti'],
+    ['POST', '/tenant/utenti'],
+  ];
+
+  it.each(ROTTE_PROTETTE)('%s %s risponde 401 senza token', async (method, url) => {
+    const { server } = nuovoServer();
+    // `buildServer` diretto: il wrapper di `nuovoServer` aggiunge un token, qui serve
+    // esattamente il caso opposto.
+    const res = await (server as any).inject({ method, url, headers: { authorization: '' }, payload: {} });
+    expect(res.statusCode).toBe(401);
+    expect(res.json()).toEqual({ errore: 'Non autenticato' });
+  });
+
+  it.each(ROTTE_PROTETTE)('%s %s non risponde 401 con un token valido', async (method, url) => {
+    const { server } = nuovoServer();
+    const res = await (server as any).inject({ method, url, payload: {} });
+    expect(res.statusCode).not.toBe(401);
+  });
+
+  // Le rotte che emettono i token non possono richiederne uno, e i webhook di Meta,
+  // Telegram e SdI non possono portare un nostro JWT.
+  it('GET /health resta raggiungibile senza token', async () => {
+    const { server } = nuovoServer();
+    const res = await (server as any).inject({ method: 'GET', url: '/health', headers: { authorization: '' } });
+    expect(res.statusCode).toBe(200);
+  });
+
+  it('POST /auth/login resta raggiungibile senza token', async () => {
+    const { server } = nuovoServer();
+    const res = await (server as any).inject({
+      method: 'POST',
+      url: '/auth/login',
+      headers: { authorization: '' },
+      payload: { email: 'nessuno@example.invalid', password: 'sbagliata' },
+    });
+    // Con credenziali errate la rotta risponde 401 di suo, quindi il codice non distingue:
+    // ciò che conta è che la richiesta sia arrivata all'handler e non al guard. Il corpo lo
+    // dice — `{ errore: 'Non autenticato' }` è la firma del guard.
+    expect(res.json()).not.toEqual({ errore: 'Non autenticato' });
+  });
+
+  it('il webhook WhatsApp resta raggiungibile senza token', async () => {
+    const { server } = nuovoServer();
+    const res = await (server as any).inject({
+      method: 'GET',
+      url: '/webhooks/communications/whatsapp',
+      headers: { authorization: '' },
+      query: { 'hub.mode': 'subscribe', 'hub.verify_token': 'sbagliato', 'hub.challenge': '42' },
+    });
+    expect(res.statusCode).not.toBe(401);
+  });
+
+  // Il browser invia la preflight senza Authorization: bloccarla impedirebbe la richiesta
+  // vera, che il token invece lo porta.
+  it('la preflight CORS passa senza token', async () => {
+    const { server } = nuovoServer();
+    const res = await (server as any).inject({
+      method: 'OPTIONS',
+      url: '/clienti',
+      headers: {
+        authorization: '',
+        origin: 'https://bluman.vercel.app',
+        'access-control-request-method': 'GET',
+      },
+    });
+    expect(res.statusCode).not.toBe(401);
+  });
+
+  // §2bis — la gerarchia: solo il super_admin governa gli studi della piattaforma.
+  it('un advisor autenticato non può elencare i tenant della piattaforma', async () => {
+    const { server } = nuovoServer();
+    const res = await server.inject({ method: 'GET', url: '/admin/tenants' });
+    expect(res.statusCode).toBe(403);
+  });
+
+  it('un collaboratore non può creare utenti nel proprio studio', async () => {
+    const { server } = nuovoServer();
+    const token = signJwt({
+      userId: 'usr-collab',
+      tenantId: TENANT_TEST,
+      email: 'collab@studio.example',
+      ruolo: 'collaboratore_interno',
+    });
+    const res = await server.inject({
+      method: 'POST',
+      url: '/tenant/utenti',
+      headers: { authorization: `Bearer ${token}` },
+      payload: { nome: 'Nuovo', email: 'nuovo@studio.example' },
+    });
+    expect(res.statusCode).toBe(403);
   });
 });

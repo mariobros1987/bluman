@@ -6,9 +6,11 @@ interface LoginPageProps {
 }
 
 export function LoginPage({ onLoginSuccess }: LoginPageProps) {
-  const [email, setEmail] = useState('joe@bluecode.advisory');
-  const [password, setPassword] = useState('••••••••');
-  const [selectedRole, setSelectedRole] = useState<'advisor' | 'super_admin' | 'collaboratore_interno'>('advisor');
+  // §23 — campi vuoti. Erano precompilati con `joe@bluecode.advisory` e otto puntini:
+  // i puntini venivano inviati come password letterale, quindi il campo sembrava già
+  // compilato e non lo era.
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -48,30 +50,14 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
           <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>Piattaforma ERP per Studi di Consulenza & Wealth Protection</p>
         </div>
 
-        {/* Quick Role Selector */}
-        <div style={{ background: 'var(--card2)', padding: 4, borderRadius: 12, display: 'flex', gap: 4 }}>
-          <button
-            type="button"
-            onClick={() => { setSelectedRole('advisor'); setEmail('joe@bluecode.advisory'); setPassword('password123'); }}
-            style={roleBtnStyle(selectedRole === 'advisor')}
-          >
-            👨‍💼 Advisor
-          </button>
-          <button
-            type="button"
-            onClick={() => { setSelectedRole('collaboratore_interno'); setEmail('operator@bluecode.advisory'); setPassword('operator123'); }}
-            style={roleBtnStyle(selectedRole === 'collaboratore_interno')}
-          >
-            👷 Operatore
-          </button>
-          <button
-            type="button"
-            onClick={() => { setSelectedRole('super_admin'); setEmail('admin@bluecode.advisory'); setPassword('admin2026!'); }}
-            style={roleBtnStyle(selectedRole === 'super_admin')}
-          >
-            👑 SuperAdmin
-          </button>
-        </div>
+        {/*
+          §23 — qui c'erano tre scorciatoie "Advisor / Operatore / SuperAdmin" che
+          precompilavano email e password di tre account reali dello studio. Erano
+          credenziali servite in chiaro dal bundle a chiunque aprisse la pagina di login
+          (l'elenco esatto è nel test `src/credenziali.test.ts`, che ne presidia
+          l'assenza). Il ruolo, del resto, non si sceglie: lo determina il backend
+          leggendo la riga `user` del database.
+        */}
 
         {error && (
           <div style={{ background: '#3b1414', border: '1px solid #7f1d1d', color: '#fca5a5', padding: '10px 14px', borderRadius: 8, fontSize: 12 }}>
@@ -88,6 +74,8 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
               value={email}
               onChange={e => setEmail(e.target.value)}
               required
+              autoComplete="username"
+              placeholder="nome.cognome@studio.it"
               style={{ width: '100%', fontSize: 13, fontWeight: 600 }}
             />
           </div>
@@ -99,6 +87,7 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
               value={password}
               onChange={e => setPassword(e.target.value)}
               required
+              autoComplete="current-password"
               style={{ width: '100%', fontSize: 13 }}
             />
           </div>
@@ -140,16 +129,3 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
     </div>
   );
 }
-
-const roleBtnStyle = (active: boolean): React.CSSProperties => ({
-  flex: 1,
-  padding: '6px 8px',
-  borderRadius: 8,
-  border: 'none',
-  background: active ? 'var(--indigo)' : 'transparent',
-  color: active ? '#fff' : 'var(--muted)',
-  fontSize: 11,
-  fontWeight: 600,
-  cursor: 'pointer',
-  transition: 'all .15s',
-});

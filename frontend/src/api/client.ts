@@ -28,136 +28,79 @@ async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutM
 }
 
 export function getAuthHeaders() {
-  const token = typeof localStorage !== 'undefined' ? (localStorage.getItem('bluman_jwt_token') || 'jwt_advisor_mock_123') : 'jwt_advisor_mock_123';
+  // §23 — nessun token di ripiego. Prima qui c'era `|| 'jwt_advisor_mock_123'`, una
+  // stringa che non è un JWT: il backend non poteva verificarla, ne ricavava un ruolo
+  // indefinito e trattava la richiesta come non autenticata. Meglio non mandare affatto
+  // l'header: la risposta è un 401 esplicito invece di un comportamento inspiegabile.
+  const token = typeof localStorage !== 'undefined' ? localStorage.getItem('bluman_jwt_token') : null;
   const tenantId = getCurrentTenantId();
-  return {
+  const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    'Authorization': `Bearer ${token}`,
     'x-tenant-id': tenantId,
   };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  return headers;
 }
 
+/**
+ * §23 — l'autenticazione avviene solo sul backend.
+ *
+ * Fino a questa modifica, se la chiamata a `/auth/login` non andava a buon fine questa
+ * funzione ripiegava su una tabella di nove coppie email/password scritte qui: le stesse
+ * che erano state rimosse dal server. Essendo codice del bundle Vite, finivano in chiaro
+ * nel JavaScript servito dal browser — pubblicamente leggibili. Non solo: la condizione
+ * accettava anche una password vuota, e altri due rami riconoscevano due password
+ * universali valide per qualunque studio registrato. L'elenco esatto dei valori vive nel
+ * test `src/credenziali.test.ts`, che ne presidia l'assenza dai sorgenti.
+ *
+ * Ora un login riuscito è solo un 200 dal backend, che confronta lo scrypt della
+ * password contro la riga `user` del database. Se il backend non risponde, il login
+ * fallisce: non c'è nessun percorso alternativo, ed è la proprietà voluta.
+ */
 export async function loginApi(email: string, password?: string) {
   const cleanEmail = (email || '').trim().toLowerCase();
-  
-  // 1. Tenta prima la chiamata backend API Fastify
+
+  let res: Response;
   try {
-    const res = await fetch(`${API_BASE}/auth/login`, {
+    res = await fetch(`${API_BASE}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: cleanEmail, password }),
     });
-    if (res.ok) {
-      const data = await res.json();
-      return data;
-    }
-  } catch {}
-
-  // 2. Fallback credenziali ufficiali studio con isolamento multi-tenant
-  const defaultUserMap: Record<string, { nome: string; ruolo: string; tenantId: string; validPass: string[] }> = {
-    'joe@bluecode.advisory': { nome: 'Joe Disabato', ruolo: 'advisor', tenantId: '00000000-0000-0000-0000-000000000001', validPass: ['password123', 'admin2026!'] },
-    'admin@bluecode.advisory': { nome: 'Super Admin Studio', ruolo: 'super_admin', tenantId: '00000000-0000-0000-0000-000000000001', validPass: ['admin2026!', 'password123'] },
-    'operator@bluecode.advisory': { nome: 'Francesca Disabato', ruolo: 'collaboratore_interno', tenantId: '00000000-0000-0000-0000-000000000001', validPass: ['operator123', 'password123'] },
-    'lorenzo.marino@bluecode.advisory': { nome: 'Avv. Lorenzo Marino', ruolo: 'advisor', tenantId: '00000000-0000-0000-0000-000000000002', validPass: ['password123'] },
-    'lorenzo.marino@advisory.it': { nome: 'Avv. Lorenzo Marino', ruolo: 'advisor', tenantId: '00000000-0000-0000-0000-000000000002', validPass: ['password123', 'Studio2026!'] },
-    'elena.russo@bluecode.advisory': { nome: 'Dr. Elena Russo', ruolo: 'advisor', tenantId: '00000000-0000-0000-0000-000000000003', validPass: ['password123'] },
-    'elena.russo@swisswealth.ch': { nome: 'Dr. Elena Russo', ruolo: 'advisor', tenantId: '00000000-0000-0000-0000-000000000003', validPass: ['password123', 'Studio2026!'] },
-    'francesca.disabato@bluecode.advisory': { nome: 'Francesca Disabato', ruolo: 'collaboratore_interno', tenantId: '00000000-0000-0000-0000-000000000001', validPass: ['password123'] },
-    'mario.dibenedetto@bluecode.advisory': { nome: 'Avv. Mario Dibenedetto', ruolo: 'advisor', tenantId: '00000000-0000-0000-0000-000000000001', validPass: ['password123'] },
-  };
-
-  if (defaultUserMap[cleanEmail]) {
-    const userDef = defaultUserMap[cleanEmail];
-    if (!password || userDef.validPass.includes(password)) {
-      localStorage.setItem('bluman_tenant_id', userDef.tenantId);
-      return {
-        token: `jwt_${cleanEmail}_${Date.now()}`,
-        user: { id: `usr-${cleanEmail}`, nome: userDef.nome, email: cleanEmail, ruolo: userDef.ruolo, tenantId: userDef.tenantId },
-      };
-    }
+  } catch {
+    throw new Error('Server non raggiungibile: impossibile verificare le credenziali.');
   }
 
-  // 3. Fallback Gestori Tenant registrati dal Super Admin
-  try {
-    const allTenantsStr = localStorage.getItem('bluman_all_tenants_admin');
-    if (allTenantsStr) {
-      const allTenants = JSON.parse(allTenantsStr);
-      if (Array.isArray(allTenants)) {
-        const foundTenant = allTenants.find(t => (t.leadAdvisorEmail || '').toLowerCase().trim() === cleanEmail);
-        if (foundTenant) {
-          if (foundTenant.stato === 'sospeso') {
-            throw new Error(`Accesso negato: Lo Studio "${foundTenant.ragioneSociale}" è stato SOSPESO dal Super Admin.`);
-          }
-          if (!password || password === 'password123' || password === 'Studio2026!' || password === foundTenant.leadAdvisorPassword) {
-            localStorage.setItem('bluman_tenant_id', foundTenant.id);
-            return {
-              token: `jwt_tenant_lead_${Date.now()}`,
-              user: {
-                id: `usr-lead-${foundTenant.id}`,
-                nome: foundTenant.leadAdvisorNome || 'Lead Senior Advisor',
-                email: cleanEmail,
-                ruolo: 'advisor',
-                tenantId: foundTenant.id,
-                specializzazione: `Lead Partner — ${foundTenant.ragioneSociale}`,
-              }
-            };
-          }
-        }
-      }
-    }
-  } catch (err: any) {
-    if (err.message && err.message.includes('SOSPESO')) throw err;
+  if (res.status === 429) {
+    throw new Error('Troppi tentativi di accesso. Riprova tra un minuto.');
+  }
+  if (!res.ok) {
+    throw new Error('Credenziali non valide. Utente non autorizzato ad accedere allo studio.');
   }
 
-  // 4. Fallback collaboratori creati/invitati di recente dallo studio
-  try {
-    const customStr = localStorage.getItem('bluman_custom_team_users');
-    if (customStr) {
-      const customList = JSON.parse(customStr);
-      if (Array.isArray(customList)) {
-        const found = customList.find(u => (u.email || '').toLowerCase() === cleanEmail);
-        if (found) {
-          if (!password || password === 'password123' || password === found.password) {
-            const userTenantId = found.tenantId || localStorage.getItem('bluman_tenant_id') || '00000000-0000-0000-0000-000000000001';
-            localStorage.setItem('bluman_tenant_id', userTenantId);
-            return {
-              token: `jwt_custom_${Date.now()}`,
-              user: {
-                id: found.id || `usr-${Date.now()}`,
-                nome: found.nome || cleanEmail,
-                email: cleanEmail,
-                ruolo: found.ruolo || 'collaboratore_interno',
-                tenantId: userTenantId,
-                specializzazione: found.specializzazione || 'Collaboratore di Studio',
-              },
-            };
-          }
-        }
-      }
-    }
-  } catch {}
-
-  throw new Error('Credenziali non valide. Utente non autorizzato ad accedere allo studio.');
+  const data = await res.json();
+  // Il tenant lo decide il backend in base alla riga dell'utente, non il client.
+  if (data?.user?.tenantId) {
+    localStorage.setItem('bluman_tenant_id', data.user.tenantId);
+  }
+  return data;
 }
 
 
+/**
+ * §23 — scambia il magic token del link firmato con un JWT di sessione per il ruolo
+ * `cliente`. Il ramo `catch` restituiva `{ ok: true, token: 'jwt_magic_mock_456' }`:
+ * un errore di rete o un token scaduto producevano comunque una sessione "valida"
+ * intestata a un cliente inventato. Ora l'errore si propaga e il portale lo mostra.
+ */
 export async function magicLoginApi(magicToken: string) {
-  try {
-    const res = await fetch(`${API_BASE}/auth/magic-login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ magicToken }),
-    });
-    if (!res.ok) throw new Error('Magic Link non valido');
-    return await res.json();
-  } catch (err) {
-    console.warn('Magic login fallback', err);
-    return {
-      ok: true,
-      token: 'jwt_magic_mock_456',
-      user: { id: 'client-usr-1', nome: 'Cliente Incarico', email: 'client@holdingbeta.advisory', ruolo: 'cliente' },
-    };
-  }
+  const res = await fetch(`${API_BASE}/auth/magic-login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ magicToken }),
+  });
+  if (!res.ok) throw new Error('Magic Link non valido o scaduto');
+  return await res.json();
 }
 
 export async function fetchProgetti() {
@@ -506,14 +449,39 @@ export async function creaUtenteTenantApi(input: {
   const currentTenantId = getCurrentTenantId();
   const teamStorageKey = getTenantStorageKey('bluman_custom_team_users', currentTenantId);
 
-  // 1. Salva nel local storage isolato del tenant
+  // 1. Il backend è la fonte della verità: crea la riga `user`, decide il tenant in base
+  // al ruolo (§2bis) e genera la password temporanea. Va chiamato per primo, perché è
+  // l'unico posto da cui quella password può arrivare — prima l'ordine era invertito e
+  // l'email di invito partiva con una password di default scritta nel bundle.
+  let creato: any = null;
+  try {
+    const res = await fetch(`${API_BASE}/tenant/utenti`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ ...input, tenantId: currentTenantId }),
+    });
+    if (res.ok) {
+      creato = await res.json();
+    } else {
+      const errore = await res.json().catch(() => ({}));
+      throw new Error(errore?.errore || 'Creazione collaboratore rifiutata dal server');
+    }
+  } catch (err: any) {
+    // Un 403 (ruolo insufficiente) o un 409 (email di un altro studio) non sono guasti di
+    // rete: propagarli, altrimenti l'interfaccia mostrerebbe un collaboratore che il
+    // database non ha mai accettato.
+    if (err?.message && !/fetch|network|Failed/i.test(err.message)) throw err;
+    console.warn('Persistenza utente team fallback locale:', err);
+  }
+
+  // 2. Cache locale per il rendering immediato della lista team. Nessuna password qui.
   try {
     const raw = localStorage.getItem(teamStorageKey);
     const list: any[] = raw ? JSON.parse(raw) : [];
     const exists = list.findIndex(u => (u.email || '').toLowerCase() === input.email.toLowerCase());
     const newUserObj = {
-      id: `usr-${Date.now()}`,
-      tenantId: currentTenantId,
+      id: creato?.id || `usr-${Date.now()}`,
+      tenantId: creato?.tenantId ?? currentTenantId,
       ...input,
     };
     if (exists >= 0) {
@@ -524,29 +492,19 @@ export async function creaUtenteTenantApi(input: {
     localStorage.setItem(teamStorageKey, JSON.stringify(list));
   } catch {}
 
-  // Invia email di benvenuto con credenziali al nuovo collaboratore
-  sendInviteCollaboratoreApi({
-    nome: input.nome,
-    email: input.email,
-    ruolo: input.ruolo,
-    specializzazione: input.specializzazione,
-  }).catch(() => {});
-
-  // 2. Invia al backend Fastify per persistenza su PostgreSQL Supabase
-  try {
-    const res = await fetch(`${API_BASE}/tenant/utenti`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify({ ...input, tenantId: currentTenantId }),
-    });
-    if (res.ok) {
-      return await res.json();
-    }
-  } catch (err) {
-    console.warn('Persistenza utente team fallback locale:', err);
+  // 3. Email di benvenuto, solo se il server ha davvero emesso una password temporanea
+  // (non lo fa per un utente che ne ha già una: in quel caso non c'è nulla da comunicare).
+  if (creato?.passwordTemporanea) {
+    sendInviteCollaboratoreApi({
+      nome: input.nome,
+      email: input.email,
+      ruolo: input.ruolo,
+      specializzazione: input.specializzazione,
+      tempPassword: creato.passwordTemporanea,
+    }).catch(() => {});
   }
 
-  return { ok: true, ...input };
+  return creato || { ok: true, ...input };
 }
 
 export async function sendInviteCollaboratoreApi(input: {
@@ -554,7 +512,8 @@ export async function sendInviteCollaboratoreApi(input: {
   email: string;
   ruolo: string;
   specializzazione?: string;
-  tempPassword?: string;
+  /** Emessa dal server alla creazione dell'utente. Senza di essa l'invito non parte. */
+  tempPassword: string;
 }) {
   let localTenant: any = {};
   const currentTenantId = getCurrentTenantId();
@@ -580,7 +539,7 @@ export async function sendInviteCollaboratoreApi(input: {
     collaboratorName: input.nome,
     collaboratorRole: input.ruolo,
     collaboratorSpecialization: input.specializzazione,
-    collaboratorPassword: input.tempPassword || 'password123',
+    collaboratorPassword: input.tempPassword,
   };
 
   try {
@@ -1346,18 +1305,35 @@ export async function fetchAdminTenantsApi() {
 }
 
 export async function createAdminTenantApi(data: any) {
-  try {
-    const res = await fetch(`${API_BASE}/admin/tenants`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(data),
-    });
-    if (!res.ok) throw new Error('Errore creazione tenant su DB');
-    return await res.json();
-  } catch (err) {
-    console.warn('Creazione tenant API fallback local:', err);
-    return data;
+  // Nessun fallback silenzioso: se il server rifiuta (403 non-super-admin) o non risponde,
+  // lo studio non esiste e va detto. Prima la funzione restituiva `data`, cioè l'oggetto
+  // appena costruito dal client, facendo sembrare riuscita una creazione mai avvenuta.
+  const res = await fetch(`${API_BASE}/admin/tenants`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const errore = await res.json().catch(() => ({}));
+    throw new Error(errore?.errore || 'Creazione studio rifiutata dal server');
   }
+  return await res.json();
+}
+
+/**
+ * Rigenera la password del responsabile dello studio. È l'unico modo per riottenerla:
+ * il database ne conserva solo l'hash scrypt, quindi la vecchia non è recuperabile.
+ */
+export async function resetPasswordTenantApi(id: string) {
+  const res = await fetch(`${API_BASE}/admin/tenants/${id}/reset-password`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) {
+    const errore = await res.json().catch(() => ({}));
+    throw new Error(errore?.errore || 'Reset password non riuscito');
+  }
+  return await res.json() as { ok: boolean; email: string; passwordTemporanea: string };
 }
 
 export async function updateAdminTenantApi(id: string, data: any) {

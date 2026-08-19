@@ -23,6 +23,51 @@ interamente dal fatto che nessuna query dimenticasse il filtro applicativo.
   come jolly. L'unica fonte di verità è la tabella `user` del database (§23).
   `src/server.test.ts` contiene un test di regressione che rifiuta ognuna delle vecchie
   coppie: se torna verde per una di esse, la falla è stata reintrodotta.
+- [x] **Credenziali cablate rimosse anche dal frontend e dalle funzioni serverless**. Il
+  backend non era l'unico posto: `frontend/src/api/client.ts` conteneva una `defaultUserMap`
+  di nove coppie email/password che autenticavano **lato client**, senza mai interpellare il
+  server — quel file finisce nel bundle pubblico su Vercel, quindi le password erano
+  scaricabili da chiunque aprisse la pagina. Rimossi: la mappa, il token di sessione finto,
+  la sessione finta di `magicLoginApi`, le tre scorciatoie di ruolo di `LoginPage.tsx`
+  (precompilavano tre account reali), il campo password del form di `SuperAdminPage.tsx` e
+  la password di ripiego di `api/send-email.ts`. `loginApi` ora interroga solo
+  `POST /auth/login` e propaga un errore se il server non risponde, invece di far entrare
+  comunque. I valori esatti non sono trascritti qui: vivono solo in
+  `src/credenziali.test.ts`, che li cerca.
+- [x] **Nessuna rotta aperta per sbaglio (§23)**: l'hook `onRequest` di `src/server.ts`
+  respinge con `401` ogni richiesta priva di JWT verificabile. L'elenco codificato è quello
+  delle rotte **pubbliche** (`/health`, login, Magic Link, webhook di canale): tutto il
+  resto è protetto per difetto, così una rotta nuova non nasce aperta. Il confronto è sul
+  pattern (`req.routeOptions.url`), non sull'URL grezzo, perché `onRequest` gira dopo il
+  routing. **RLS non copriva questo caso**: una richiesta anonima che porta il tenant di
+  default corrisponde legittimamente alle policy, quindi prima del guard RLS lavorava
+  correttamente sul tenant sbagliato. `src/server.test.ts` verifica dieci rotte in coppia
+  (401 senza token, non-401 con token) e controlla che login, `/health` e webhook restino
+  pubblici e che il preflight CORS non venga respinto.
+- [x] **`/admin/tenants` riservato al `super_admin`**: la funzione `soloSuperAdmin` risponde
+  403 su tutti e quattro i verbi. Prima erano raggiungibili da qualunque utente
+  autenticato: un collaboratore interno poteva elencare ogni studio della piattaforma con
+  ragione sociale, P.IVA ed email del responsabile, registrarne di nuovi, sospenderli e
+  cancellarli. Neanche questo è un compito di RLS — `tenant` è la tabella che *contiene* gli
+  studi, non una tabella figlia filtrata per `tenant_id`.
+- [x] **Password del responsabile: emessa dal server, mostrata una volta**. La colonna
+  `tenant.lead_advisor_password` conteneva la password in chiaro, era restituita da
+  `GET /admin/tenants`, era scrivibile da qualunque utente del tenant via `PATCH
+  /tenant/info` e finiva in ogni backup. Eliminata dallo schema e dal database con
+  `prisma/migrations/20260819120000_rimozione_password_chiaro_tenant/` (applicata su
+  Supabase). Al suo posto: `POST /admin/tenants` crea anche la riga `user` del responsabile
+  (`ruolo: advisor`) e restituisce la password temporanea una volta sola;
+  `POST /admin/tenants/:id/reset-password` la rigenera se va perduta. Il modale del super
+  admin la tiene in memoria finché resta aperto e non la salva da nessuna parte.
+- [x] **Presidio automatico contro il ritorno delle credenziali**: `src/credenziali.test.ts`
+  scandisce `src/`, `frontend/src/` e `api/` e fallisce se una delle vecchie password, un
+  token finto o il ripiego `!password ||` ricompare su una riga non commentata. È il test
+  che ha trovato `api/send-email.ts`, fuori dal perimetro della ricerca fatta a mano sul
+  solo `frontend/src`.
+- [x] **`src/scripts/testTenantDb.ts` non riscrive più il tenant di produzione**: conteneva
+  tre password in chiaro, sovrascriveva le impostazioni dello studio reale
+  `00000000-…-0001` e stampava ogni campo, segreti compresi. Ora pretende `TEST_TENANT_ID`,
+  usa segnaposto `.invalid` e maschera i campi segreti.
 - [x] **Primo accesso senza credenziali precaricate**: `npm run bootstrap` (§27) crea il
   primo `super_admin` e stampa una password temporanea una sola volta;
   `npm run passwords:assign` copre gli utenti creati dai seed con `password_hash` a NULL;
@@ -143,10 +188,17 @@ Per la messa in produzione professionale ed il passaggio ad un ambiente live:
 ### FASE 2 — Autenticazione RBAC & Permessi Attori (§2bis, §23)
 - [x] Staff: Login JWT (`POST /auth/login`), verifica token (`GET /auth/me`), ruoli (`super_admin`, `advisor`, `collaboratore_interno`, `collaboratore_esterno`).
 - [x] Cliente: Login passwordless a Magic Link (`POST /auth/magic-login`).
-- [x] Interfaccia Frontend: Pagina di Login `LoginPage.tsx`, supporto per disconnessione (Logout) e controllo sessione in `localStorage`.
+- [x] Interfaccia Frontend: Pagina di Login `LoginPage.tsx`, supporto per disconnessione (Logout) e controllo sessione in `localStorage`. Il login è **reale**: `loginApi` interroga solo `POST /auth/login`, non ha più una mappa di credenziali locali e propaga un errore se il server non risponde, invece di far entrare comunque.
 
 1. **🔐 Autenticazione JWT & Sessioni Cookie Secure**:
    - [x] Firma JWT con HMAC SHA-256 e verifica payload Bearer Header su tutte le rotte.
+   - [x] Guard `onRequest` con elenco di rotte **pubbliche** (non di rotte protette): ogni
+     rotta nuova nasce protetta. Confronto sul pattern `req.routeOptions.url`, perché
+     `onRequest` gira dopo il routing. 10 rotte presidiate da test in coppia (401 senza
+     token / non-401 con token) in `src/server.test.ts`.
+   - [x] Controllo di ruolo `soloSuperAdmin` sui quattro verbi di `/admin/tenants` (§2bis):
+     403 per advisor e collaboratori. RLS non poteva coprirlo, perché `tenant` è la tabella
+     che contiene gli studi, non una tabella figlia filtrata per `tenant_id`.
 2. **📧 Transport Email SMTP Reale (Nodemailer + Register.it / SendGrid)**:
    - [x] Modulo Nodemailer (`src/services/emailService.ts`) integrato per l'invio reale di Magic Link e notifiche.
 3. **📦 Cloud Object Storage (AWS S3 / Supabase Storage)**:
@@ -180,16 +232,34 @@ Per la messa in produzione professionale ed il passaggio ad un ambiente live:
 
 Elencati qui perché non chiuderli è una scelta, non una dimenticanza.
 
-1. **Variabili d'ambiente su Railway**: vanno impostate a mano `JWT_SECRET` (≥32 caratteri),
-   `DATABASE_URL` (ruolo `bluman_app`), `DIRECT_URL` e `ADMIN_DATABASE_URL`. La password di
-   `bluman_app` esiste solo nel `.env` locale, che è gitignorato. Senza `JWT_SECRET` il
-   server non si arresta (`NODE_ENV` non è impostato nel `Dockerfile`) ma genera un segreto
-   casuale a ogni processo: **tutti i token vengono invalidati a ogni redeploy.**
-2. **Token finto nel frontend**: `frontend/src/api/client.ts` usa `'jwt_advisor_mock_123'`,
-   che non è un JWT: il backend ne ricava `ruolo: undefined`, quindi ignora `x-tenant-id` e
-   vieta la creazione utenti. L'interfaccia deve fare un login reale.
-3. **`/auth/magic-login` accetta qualunque stringa con prefisso `client_`** — marcato
-   `⚠️ DEBITO NOTO (Fase 3)` nel codice. Va sostituito con token a scadenza monouso.
-4. **Dashboard con percentuali cablate**: `frontend/src/pages/Dashboard.tsx` calcola
+1. **`/auth/magic-login` accetta qualunque stringa con prefisso `client_`** — marcato
+   `⚠️ DEBITO NOTO (Fase 3)` nel codice. Va sostituito con token a scadenza monouso. È
+   l'ultima porta d'ingresso non verificata rimasta: il guard `onRequest` deve tenere questa
+   rotta pubblica per forza, quindi qui la difesa è tutta nel token.
+2. **`GET /uploads/:filename` è pubblica e non sanifica il nome file**. Resta pubblica di
+   proposito — gli URL finiscono in `<img src>` e in link diretti, quindi proteggerla con un
+   Bearer token la romperebbe — ma il parametro va vincolato a un elenco di caratteri
+   ammessi contro il path traversal, e la via giusta è passare agli URL pre-firmati di
+   Supabase Storage (`src/services/storageService.ts` esiste già).
+3. **Dashboard con percentuali cablate**: `frontend/src/pages/Dashboard.tsx` calcola
    `pct` con valori fissi (`45`, `10`) invece dello stato reale dei progetti (Fase 1).
+4. **Mappa Graphify STALE**: le correzioni di Fase 0 non sono nel grafo, perché la CLI
+   `graphify` non è installata sulla postazione Windows dove sono state fatte. Da rigenerare
+   dove la CLI esiste (`graphify extract . --code-only` + `graphify cluster-only .`).
+
+### ✅ Chiusi in questa fase
+
+- ~~**Variabili d'ambiente su Railway**~~ — `JWT_SECRET` (48 caratteri) era già impostato;
+  `DATABASE_URL` (ruolo `bluman_app`), `DIRECT_URL` e `ADMIN_DATABASE_URL` ora puntano al
+  pooler Supabase `aws-1-eu-west-1.pooler.supabase.com:5432`, impostati con
+  `railway variable set … --skip-deploys` perché prendano effetto al prossimo deploy e non
+  a metà traffico. Il Postgres di Railway resta in piedi ma non è più usato; il valore
+  precedente di `DATABASE_URL` è nel file locale gitignorato `.env.railway-backup.local`.
+  Verifica con `npx tsx src/scripts/checkRls.ts` → `current_user: bluman_app`,
+  `bypassa_rls: false`, RLS attivo e forzato su 33 tabelle, 0 clienti con tenant inesistente.
+- ~~**Token finto nel frontend**~~ — `getAuthHeaders()` non ha più il token di ripiego.
+  Quella stringa non era un JWT: il backend non poteva verificarla, ne ricavava
+  `ruolo: undefined` e trattava la richiesta come non autenticata. Ora, in assenza di token,
+  l'header non viene inviato affatto e la risposta è un `401` esplicito.
+
 

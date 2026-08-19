@@ -70,6 +70,38 @@ async function recordAudit(params: {
 export function buildServer(app: AppPort): FastifyInstance {
   const server = Fastify({ logger: false });
 
+  /**
+   * §23 — le sole rotte raggiungibili senza un token valido. Tutto il resto risponde 401.
+   *
+   * Fino a questa modifica l'elenco era implicitamente "tutte": l'hook `onRequest`
+   * ricavava il tenant dal token quando c'era, e senza token proseguiva col tenant di
+   * default. Siccome tutti i dati di produzione stanno in quel tenant, `GET /clienti`
+   * su un URL pubblico restituiva anagrafiche complete — P.IVA, codice fiscale, IBAN —
+   * a chiunque, e le POST erano altrettanto aperte. RLS non difende da questo: la
+   * richiesta porta un tenant legittimo, e le policy restituiscono giustamente le sue
+   * righe. L'isolamento fra studi e l'autenticazione sono due controlli distinti.
+   *
+   * La chiave è il pattern di rotta (`/uploads/:filename`), non l'URL della richiesta:
+   * confrontare l'URL grezzo lascerebbe passare varianti con query string o
+   * codifiche diverse.
+   */
+  const ROTTE_PUBBLICHE = new Set<string>([
+    'GET /health',
+    // Sono le rotte che emettono un token: per definizione non possono richiederne uno.
+    'POST /auth/login',
+    'POST /auth/magic-login',
+    // Chiamate da Meta, Telegram e SdI, che non possono portare un nostro JWT. Si
+    // autenticano col proprio meccanismo (hub.verify_token, secret del bot).
+    'GET /webhooks/communications/whatsapp',
+    'POST /webhooks/communications/whatsapp',
+    'POST /webhooks/communications/telegram',
+    'POST /webhooks/sdi',
+    // ⚠️ DEBITO RESIDUO: i file serviti qui finiscono in `<img src>` e in link diretti,
+    // che non possono inviare l'header Authorization. Chiudere questa rotta richiede
+    // prima di passare agli URL pre-firmati dello storage cloud (§Sicurezza punto 3).
+    'GET /uploads/:filename',
+  ]);
+
   server.register(cors, {
     origin: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -121,15 +153,17 @@ export function buildServer(app: AppPort): FastifyInstance {
   }
 
   // ─── MULTI-TENANT CONTEXT MIDDLEWARE (§14, §23) ───────────────────
-  server.addHook('onRequest', async (req) => {
+  server.addHook('onRequest', async (req, reply) => {
     let tenantId = TENANT_DEFAULT; // Default Studio Tenant
     let ruolo: string | undefined;
+    let autenticato = false;
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.split(' ')[1];
       if (token) {
         const payload = verifyJwt(token);
         if (payload) {
+          autenticato = true;
           ruolo = payload.ruolo;
           if (payload.tenantId) {
             tenantId = payload.tenantId;
@@ -137,6 +171,17 @@ export function buildServer(app: AppPort): FastifyInstance {
         }
       }
     }
+
+    // §23 — il controllo di autenticazione. Va qui e non su ogni singola rotta perché
+    // sono 87: un elenco di rotte da proteggere si dimentica di aggiornare, un elenco
+    // di rotte pubbliche no — una rotta nuova è protetta perché non è nell'insieme.
+    // Le preflight CORS non portano header Authorization e vanno lasciate passare,
+    // altrimenti il browser non arriva nemmeno a inviare la richiesta vera.
+    const chiaveRotta = `${req.method} ${req.routeOptions?.url ?? req.url}`;
+    if (req.method !== 'OPTIONS' && !autenticato && !ROTTE_PUBBLICHE.has(chiaveRotta)) {
+      return reply.code(401).send({ errore: 'Non autenticato' });
+    }
+
     // §2bis — solo il super_admin può spostarsi tra tenant. Onorare questo header per
     // chiunque rendeva l'isolamento multi-tenant aggirabile con una riga di curl: per
     // tutti gli altri ruoli il tenant del token è vincolante.
@@ -591,7 +636,10 @@ export function buildServer(app: AppPort): FastifyInstance {
       'imapFolder', 'imapPollInterval', 'imapProtocol', 'emailSignatureHtml',
       'regimeFiscale', 'capitaleSociale', 'regImprese', 'mostraSdi', 'mostraIva',
       'emailInboundParseUrl', 'signalCliEndpoint',
-      'leadAdvisorNome', 'leadAdvisorEmail', 'leadAdvisorPassword', 'giurisdizione',
+      // `leadAdvisorPassword` è stato rimosso: era una password in chiaro sulla riga
+      // Tenant, scrivibile da qualunque utente del tenant via questa rotta. Le password
+      // vivono solo come hash scrypt su `user.passwordHash` (§23).
+      'leadAdvisorNome', 'leadAdvisorEmail', 'giurisdizione',
       'durataMesi', 'dataAttivazione', 'dataScadenza',
       'piano', 'stato'
     ];
@@ -755,7 +803,25 @@ export function buildServer(app: AppPort): FastifyInstance {
   });
 
   // ── GESTIONE MULTI-TENANT SUPER ADMIN ─────────────────────────────
-  server.get('/admin/tenants', async (_req, reply) => {
+  /**
+   * §2bis — l'intero blocco `/admin/tenants` è riservato al super_admin.
+   *
+   * Prima di questo controllo le quattro rotte erano raggiungibili da qualunque utente
+   * autenticato: un collaboratore interno poteva elencare tutti gli studi della
+   * piattaforma con ragione sociale, P.IVA ed email del responsabile, registrarne di
+   * nuovi, sospenderli e cancellarli. RLS non c'entra: `Tenant` è la tabella che
+   * *contiene* i tenant, non una tabella figlia filtrata per `tenant_id`.
+   */
+  function soloSuperAdmin(req: any, reply: any): boolean {
+    if (req.ruolo !== 'super_admin') {
+      reply.code(403).send({ errore: 'Riservato al super admin della piattaforma.' });
+      return false;
+    }
+    return true;
+  }
+
+  server.get('/admin/tenants', async (req, reply) => {
+    if (!soloSuperAdmin(req, reply)) return reply;
     try {
       const tenants = await prisma.tenant.findMany({
         include: {
@@ -772,7 +838,10 @@ export function buildServer(app: AppPort): FastifyInstance {
         pIva: t.piva || '',
         leadAdvisorNome: t.leadAdvisorNome || 'Lead Senior Advisor',
         leadAdvisorEmail: t.leadAdvisorEmail || t.email || '',
-        leadAdvisorPassword: t.leadAdvisorPassword || 'Studio2026!',
+        // `leadAdvisorPassword` non viene più restituito: era la password in chiaro del
+        // responsabile dello studio, con `'Studio2026!'` come ripiego quando la colonna
+        // era vuota — cioè una password valida annunciata dall'API. La password iniziale
+        // si vede una volta sola, nella risposta alla creazione.
         piano: t.piano || 'enterprise',
         stato: t.stato || 'attivo',
         durataMesi: t.durataMesi || 12,
@@ -787,8 +856,17 @@ export function buildServer(app: AppPort): FastifyInstance {
     }
   });
 
+  /**
+   * Crea lo studio e, insieme, l'utente `advisor` che ne è il responsabile: erano due
+   * passaggi separati, e il secondo non avveniva mai — il tenant nasceva senza nessun
+   * utente e la password del responsabile viveva in chiaro nella colonna
+   * `lead_advisor_password`. Ora la password è generata dal server, salvata solo come
+   * hash scrypt e restituita una volta sola in `passwordTemporanea`.
+   */
   server.post<{ Body: Record<string, any> }>('/admin/tenants', async (req, reply) => {
+    if (!soloSuperAdmin(req, reply)) return reply;
     const b = req.body || {};
+    const emailResponsabile = (b.leadAdvisorEmail || b.email || '').trim().toLowerCase();
     try {
       const tenant = await prisma.tenant.create({
         data: {
@@ -796,10 +874,9 @@ export function buildServer(app: AppPort): FastifyInstance {
           ragioneSociale: b.ragioneSociale || 'Nuovo Studio',
           giurisdizione: b.giurisdizione,
           piva: b.pIva || b.piva,
-          email: b.leadAdvisorEmail || b.email,
+          email: emailResponsabile || undefined,
           leadAdvisorNome: b.leadAdvisorNome,
-          leadAdvisorEmail: b.leadAdvisorEmail,
-          leadAdvisorPassword: b.leadAdvisorPassword,
+          leadAdvisorEmail: emailResponsabile || undefined,
           piano: b.piano || 'enterprise',
           stato: b.stato || 'attivo',
           durataMesi: Number(b.durataMesi) || 12,
@@ -807,13 +884,44 @@ export function buildServer(app: AppPort): FastifyInstance {
           dataScadenza: b.dataScadenza,
         }
       });
-      return reply.code(201).send(tenant);
+
+      // Senza responsabile lo studio non è utilizzabile: nessuno potrebbe accedervi.
+      let passwordTemporanea: string | null = null;
+      if (emailResponsabile) {
+        const esistente = await prisma.user.findUnique({ where: { email: emailResponsabile } });
+        if (!esistente) {
+          passwordTemporanea = generaPasswordTemporanea();
+          await prisma.user.create({
+            data: {
+              email: emailResponsabile,
+              nome: b.leadAdvisorNome || 'Lead Senior Advisor',
+              ruolo: 'advisor' as any,
+              tenantId: tenant.id,
+              specializzazione: `Lead Partner — ${tenant.ragioneSociale}`,
+              passwordHash: hashPassword(passwordTemporanea),
+              stato: 'attivo',
+            },
+          });
+        }
+      }
+
+      recordAudit({
+        tenantId: tenant.id,
+        ruolo: 'super_admin',
+        azione: 'TENANT_CREATO',
+        entita: tenant.ragioneSociale,
+        dettagli: `Studio registrato con responsabile ${emailResponsabile || '(nessuno)'}`,
+        ipAddress: req.ip,
+      });
+
+      return reply.code(201).send({ ...tenant, passwordTemporanea });
     } catch (err: any) {
       return reply.code(500).send({ errore: err.message || 'Errore creazione tenant' });
     }
   });
 
   server.patch<{ Params: { id: string }; Body: Record<string, any> }>('/admin/tenants/:id', async (req, reply) => {
+    if (!soloSuperAdmin(req, reply)) return reply;
     const { id } = req.params;
     const b = req.body || {};
     try {
@@ -827,7 +935,8 @@ export function buildServer(app: AppPort): FastifyInstance {
           ...(b.durataMesi !== undefined && { durataMesi: Number(b.durataMesi) }),
           ...(b.leadAdvisorNome && { leadAdvisorNome: b.leadAdvisorNome }),
           ...(b.leadAdvisorEmail && { leadAdvisorEmail: b.leadAdvisorEmail }),
-          ...(b.leadAdvisorPassword && { leadAdvisorPassword: b.leadAdvisorPassword }),
+          // Nessuna scrittura di password qui: per rigenerarla c'è
+          // POST /admin/tenants/:id/reset-password, che ne salva solo l'hash.
         }
       });
       return reply.send(updated);
@@ -836,7 +945,60 @@ export function buildServer(app: AppPort): FastifyInstance {
     }
   });
 
+  /**
+   * Rigenera la password del responsabile dello studio e la restituisce una volta sola,
+   * perché il super admin possa consegnarla. Sostituisce la vecchia pratica di rileggere
+   * `leadAdvisorPassword` dal database, che presupponeva di averla conservata in chiaro.
+   */
+  server.post<{ Params: { id: string } }>('/admin/tenants/:id/reset-password', async (req, reply) => {
+    if (!soloSuperAdmin(req, reply)) return reply;
+    const { id } = req.params;
+    try {
+      const tenant = await prisma.tenant.findUnique({ where: { id } });
+      if (!tenant) return reply.code(404).send({ errore: 'Studio non trovato' });
+
+      const emailResponsabile = (tenant.leadAdvisorEmail || tenant.email || '').trim().toLowerCase();
+      if (!emailResponsabile) {
+        return reply.code(400).send({ errore: 'Lo studio non ha un responsabile con email.' });
+      }
+
+      const passwordTemporanea = generaPasswordTemporanea();
+      const passwordHash = hashPassword(passwordTemporanea);
+      const esistente = await prisma.user.findUnique({ where: { email: emailResponsabile } });
+
+      if (esistente) {
+        await prisma.user.update({ where: { id: esistente.id }, data: { passwordHash } });
+      } else {
+        await prisma.user.create({
+          data: {
+            email: emailResponsabile,
+            nome: tenant.leadAdvisorNome || 'Lead Senior Advisor',
+            ruolo: 'advisor' as any,
+            tenantId: tenant.id,
+            specializzazione: `Lead Partner — ${tenant.ragioneSociale}`,
+            passwordHash,
+            stato: 'attivo',
+          },
+        });
+      }
+
+      recordAudit({
+        tenantId: id,
+        ruolo: 'super_admin',
+        azione: 'PASSWORD_RESPONSABILE_RIGENERATA',
+        entita: tenant.ragioneSociale,
+        dettagli: `Nuova password temporanea emessa per ${emailResponsabile}`,
+        ipAddress: req.ip,
+      });
+
+      return reply.send({ ok: true, email: emailResponsabile, passwordTemporanea });
+    } catch (err: any) {
+      return reply.code(500).send({ errore: err.message || 'Errore reset password' });
+    }
+  });
+
   server.delete<{ Params: { id: string } }>('/admin/tenants/:id', async (req, reply) => {
+    if (!soloSuperAdmin(req, reply)) return reply;
     const { id } = req.params;
     try {
       await prisma.tenant.delete({ where: { id } });

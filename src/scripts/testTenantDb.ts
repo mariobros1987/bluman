@@ -1,70 +1,104 @@
+import dotenv from 'dotenv';
+dotenv.config();
+
 import { prismaAmministrativo } from '../util/prismaClient.js';
 
 // Verifica manuale della persistenza: connessione amministrativa (§14), perché lo script
 // gira fuori da una richiesta e non ha un tenant corrente da cui farsi filtrare.
 const prisma = prismaAmministrativo();
 
+/**
+ * Campi che contengono segreti. Vengono scritti con un valore sintetico generato al volo
+ * (mai una password reale, regola 6 di .agents/AGENTS.md) e mascherati in output: prima
+ * questo script portava in chiaro `smtpPass`/`imapPass` reali nel codice versionato e li
+ * stampava a terminale a ogni esecuzione.
+ */
+const CAMPI_SEGRETI = new Set(['smtpPass', 'imapPass', 'waAccessToken', 'waVerifyToken', 'tgBotToken']);
+
+function maschera(chiave: string, valore: unknown): unknown {
+  if (!CAMPI_SEGRETI.has(chiave) || !valore) return valore;
+  return `«${String(valore).length} caratteri, non stampati»`;
+}
+
 async function testTenantAllFields() {
   console.log('═══════════════════════════════════════════════════════════════════════');
   console.log('🏛 TEST PERSISTENZA TOTALE TUTTI I CAMPI TENANT SETTINGS SU SUPABASE');
   console.log('═══════════════════════════════════════════════════════════════════════\n');
 
-  const tenantId = '00000000-0000-0000-0000-000000000001';
+  /**
+   * Questo script sovrascrive per intero la riga del tenant indicato: eseguirlo sul tenant
+   * di produzione ne cancella le impostazioni vere, comprese le credenziali email dello
+   * studio. Va quindi indirizzato esplicitamente a un tenant di prova.
+   */
+  const tenantId = process.env.TEST_TENANT_ID;
+  if (!tenantId) {
+    console.error('❌ Imposta TEST_TENANT_ID sul tenant di prova da usare.');
+    console.error('   Lo script riscrive TUTTI i campi del tenant indicato: senza questo');
+    console.error('   vincolo esplicito cancellerebbe le impostazioni dello studio reale.');
+    process.exitCode = 1;
+    return;
+  }
+
+  // Segnaposto, non credenziali: servono solo a verificare che il campo faccia
+  // andata-e-ritorno sul database.
+  const segnaposto = `test-${Date.now()}`;
 
   const fullSettingsData = {
-    ragioneSociale: 'Studio Advisory & Legal Partners (Sede Centrale)',
-    piva: 'MT28491039',
-    codiceFiscale: 'MT28491039',
-    sedeLegale: 'Level 4, Valuation Centre, Tower Road, Sliema SLM 1600, Malta',
-    sedeOperativa: 'Via Montenapoleone 8, 20121 Milano (MI), Italia',
-    email: 'info@bluecode.advisory',
-    pec: 'bluecode@pec.advisory.it',
-    telefono: '+356 2133 4455',
-    iban: 'IT99C0306902100100000012345',
-    regimeFiscale: 'Ordinario IRES/IRAP - Holding & Advisory',
-    capitaleSociale: '€ 100.000,00 i.v.',
-    regImprese: 'MI-2849103',
-    logoUrl: 'https://supabase.co/storage/v1/object/public/logos/studio-logo.png',
+    ragioneSociale: 'Studio di Prova — Verifica Persistenza',
+    piva: 'IT00000000000',
+    codiceFiscale: 'IT00000000000',
+    sedeLegale: 'Via di Prova 1, 00000 Città (XX)',
+    sedeOperativa: 'Via di Prova 2, 00000 Città (XX)',
+    email: 'prova@example.invalid',
+    pec: 'prova@pec.example.invalid',
+    telefono: '+39 000 0000000',
+    iban: 'IT00X0000000000000000000000',
+    regimeFiscale: 'Ordinario',
+    capitaleSociale: '€ 10.000,00 i.v.',
+    regImprese: 'XX-0000000',
+    logoUrl: 'https://example.invalid/logo.png',
     coloreTemaFattura: '#4338ca',
-    notePieFattura: 'Pagamento a 30 gg d.f. coordinate IBAN IT99C0306902100100000012345',
-    titoloIntestazione: 'Bluecode Advisory Studio Legale & Tributario',
+    notePieFattura: 'Pagamento a 30 gg d.f.',
+    titoloIntestazione: 'Studio di Prova',
     mostraSdi: true,
     mostraIva: true,
-    waPhoneId: '529732696891513',
-    waAccessToken: 'EAALxxxxxxxxxxxxxx',
-    waVerifyToken: 'bluman_wa_secure_token_2026',
-    tgBotToken: '123456789:ABCdefGHIjklMNOpqrsTUVwxyz',
-    tgBotUsername: '@BlueCodeStudioBot',
-    smtpHost: 'authsmtp.register.it',
+    waPhoneId: '000000000000000',
+    waAccessToken: segnaposto,
+    waVerifyToken: segnaposto,
+    tgBotToken: segnaposto,
+    tgBotUsername: '@StudioDiProvaBot',
+    smtpHost: 'smtp.example.invalid',
     smtpPort: 465,
     smtpSecure: true,
-    smtpUser: 'support@bluecode-ltd.com',
-    smtpPass: 'RegisterSecret2026!',
-    smtpFromEmail: 'support@bluecode-ltd.com',
-    smtpFromName: 'BlueCode Advisory & Consulting',
-    smtpReplyTo: 'support@bluecode-ltd.com',
-    smtpBcc: 'archivio@bluecode-ltd.com',
+    smtpUser: 'prova@example.invalid',
+    smtpPass: segnaposto,
+    smtpFromEmail: 'prova@example.invalid',
+    smtpFromName: 'Studio di Prova',
+    smtpReplyTo: 'prova@example.invalid',
+    smtpBcc: 'archivio@example.invalid',
     imapProtocol: 'imap',
-    imapHost: 'imap.register.it',
+    imapHost: 'imap.example.invalid',
     imapPort: 993,
     imapSecure: true,
-    imapUser: 'support@bluecode-ltd.com',
-    imapPass: 'RegisterSecret2026!',
+    imapUser: 'prova@example.invalid',
+    imapPass: segnaposto,
     imapFolder: 'INBOX',
     imapPollInterval: '5m',
-    emailSignatureHtml: '<b>Bluecode Advisory</b><br>Legal & Tax Advisory Firm',
-    emailInboundParseUrl: 'https://bluman.vercel.app/api/webhooks/inbound-email',
+    emailSignatureHtml: '<b>Studio di Prova</b>',
+    emailInboundParseUrl: 'https://example.invalid/api/webhooks/inbound-email',
     signalCliEndpoint: 'http://localhost:8080/v1/receive',
-    leadAdvisorNome: 'Joe Disabato',
-    leadAdvisorEmail: 'joe@bluecode.advisory',
-    leadAdvisorPassword: 'password123',
-    giurisdizione: 'Malta (UE)',
+    leadAdvisorNome: 'Responsabile di Prova',
+    leadAdvisorEmail: 'responsabile@example.invalid',
+    // Nessun `leadAdvisorPassword`: la colonna è stata eliminata dalla migrazione
+    // 20260819120000_rimozione_password_chiaro_tenant. Le password stanno su
+    // `user.password_hash` come hash scrypt.
+    giurisdizione: 'Italia',
     durataMesi: 12,
     piano: 'enterprise',
     stato: 'attivo',
   };
 
-  console.log('1. Salvataggio / Upsert di tutti i campi Tenant su Supabase...');
+  console.log(`1. Salvataggio / Upsert di tutti i campi sul tenant di prova ${tenantId}...`);
   const updatedTenant = await prisma.tenant.upsert({
     where: { id: tenantId },
     update: fullSettingsData,
@@ -84,10 +118,10 @@ async function testTenantAllFields() {
   for (const [key, val] of Object.entries(fullSettingsData)) {
     const fetchedVal = (fetchedTenant as any)[key];
     if (fetchedVal !== val) {
-      console.error(`   ❌ Discrepanza per "${key}": atteso "${val}", ottenuto "${fetchedVal}"`);
+      console.error(`   ❌ Discrepanza per "${key}": atteso "${maschera(key, val)}", ottenuto "${maschera(key, fetchedVal)}"`);
       allMatches = false;
     } else {
-      console.log(`   ✓ Campo "${key}" salvato e verificato:`, fetchedVal);
+      console.log(`   ✓ Campo "${key}" salvato e verificato:`, maschera(key, fetchedVal));
     }
   }
 
@@ -97,6 +131,7 @@ async function testTenantAllFields() {
     console.log('═══════════════════════════════════════════════════════════════════════\n');
   } else {
     console.error('\n❌ Alcuni campi non combaciano.');
+    process.exitCode = 1;
   }
 }
 
