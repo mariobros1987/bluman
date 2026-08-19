@@ -81,12 +81,20 @@ Piattaforma ERP per studi di consulenza societaria, wealth protection ed advisor
 
 ## 🚨 REGOLE TASSATIVE DI SVILUPPO (MANDATORY DEV RULES)
 
-1. **Sincronizzazione Schema Database (Prisma & Supabase)**:
+1. **Isolamento Multi-Tenant (`tenant_id`) & RLS**:
+   - I dati tra i vari studi non si mischiano mai. Il filtro applicativo **non basta e non è la difesa**: è RLS che lo è. Nel codice che serve una richiesta HTTP usa `prisma` da `src/util/prismaClient.ts`, mai `new PrismaClient()`; `prismaAmministrativo()` scavalca le policy ed è ammesso solo in script, seed, bootstrap, backup e nella ricerca utente al login.
+2. **Migrazioni Versionate, Mai `db push` su Dati Reali**:
+   - Lo schema si cambia con `prisma migrate dev` / `prisma migrate deploy`. `prisma db push --accept-data-loss` riallinea il database cancellando in silenzio colonne e tabelle.
+3. **Sincronizzazione Schema Database (Prisma & Supabase)**:
    - Ad ogni cambio codice o nuova funzionalità, lo schema `prisma/schema.prisma` ed il database Supabase DEVONO essere istantaneamente aggiornati. Nessun dato viene perso o gestito solo volatile.
-2. **Allineamento Documentazione Markdown (`.md`)**:
+4. **Allineamento Documentazione Markdown (`.md`)**:
    - Tutti i file `.md` (`README.md`, `BluMan_piano_di_sviluppo.md`, `ISTRUZIONI_INSTALLAZIONE.md`, `.agents/AGENTS.md`) DEVONO essere tassativamente aggiornati dopo ogni modifica importante.
-3. **Mappa Grafo (Graphify)**:
+5. **Mappa Grafo (Graphify)**:
    - Mantenere aggiornato il grafo con `graphify extract . --code-only` e `graphify cluster-only .`.
+6. **Divieto Assoluto di Credenziali in Chiaro**:
+   - Nessuna password, token o chiave API reale nel codice versionato o nei file `.md`. Le credenziali dello studio risiedono nella riga `Tenant` del database (`smtpPass`, `imapPass`) e si gestiscono via `PUT /tenant/settings`.
+
+Il testo integrale ed autorevole delle regole è in [`.agents/AGENTS.md`](.agents/AGENTS.md).
 
 ---
 
@@ -110,26 +118,34 @@ cd frontend && npm run dev # Dev Server in ascolto su http://localhost:5173
 
 ---
 
-## 🔑 Credenziali Ufficiali di Accesso (Ruoli Staff & Cliente)
+## 🔑 Accesso & Gerarchia dei Ruoli
 
-| Ruolo Attore | Email Registrata | Password di Accesso | Tipo Accesso |
-| :--- | :--- | :--- | :--- |
-| 👨‍💼 **Lead Advisor Senior** | `joe@bluecode.advisory` | `password123` | JWT Access Token |
-| ⚖️ **Legal Counsel Advisor** | `mario.dibenedetto@bluecode.advisory` | `password123` | JWT Access Token |
-| ⚖️ **Avv. Lorenzo Marino** | `lorenzo.marino@bluecode.advisory` | `password123` | JWT Access Token |
-| 💶 **Dr. Elena Russo (Tax Advisor)** | `elena.russo@bluecode.advisory` | `password123` | JWT Access Token |
-| 👑 **Super Admin** | `admin@bluecode.advisory` | `admin2026!` | JWT Access Token |
-| 👷 **Operatore Studio** | `operator@bluecode.advisory` | `operator123` | JWT Access Token |
-| 🔑 **Cliente Incarico** | `client@holdingbeta.advisory` | *Passwordless* | Magic Link `/portal` |
+Nessuna credenziale precaricata: non nel codice, non in questi file `.md`, non nel
+frontend (§23). Fino alla Fase 0 `src/server.ts` conteneva una tabella di utenti e
+password nel sorgente — chiunque leggesse il repository poteva entrare in produzione. Sono
+stati rimossi. L'unica fonte di verità è la tabella `user` del database.
+
+| Ruolo | Ambito (§2bis) | Accesso |
+| :--- | :--- | :--- |
+| 👑 `super_admin` | Gestisce tutto e vede tutti i tenant (`tenant_id` NULL); può cambiare studio corrente via `x-tenant-id` | JWT |
+| 👨‍💼 `advisor` | Responsabile del **proprio** tenant; crea e gestisce i collaboratori del proprio studio | JWT |
+| 👷 `collaboratore_interno` / `collaboratore_esterno` | Appartengono al tenant da cui vengono creati e non ne escono | JWT |
+| 🔑 `cliente` | Passwordless: solo Magic Link su `/portal`, mai `/auth/login` | Magic Link |
+
+Primo accesso su un database vuoto: `npm run bootstrap` crea il primo `super_admin` (§27)
+e stampa una password temporanea **una sola volta**. Utenti esistenti senza password:
+`npm run passwords:assign`. Nuovi collaboratori: li crea il `super_admin` o l'`advisor`
+dalla dashboard, e la risposta contiene la password temporanea da consegnare a mano.
+Dettagli in `ISTRUZIONI_INSTALLAZIONE.md`.
 
 ---
 
 ## 🛡 Sicurezza & Architettura Enterprise in Produzione
 
-1. **🔑 Autenticazione JWT & Sessioni Protette**: Firma JWT HMAC SHA-256 e verifica payload Bearer Header su tutte le rotte Fastify con blocco categorico per utenti non autorizzati.
+1. **🔑 Autenticazione JWT & Sessioni Protette**: Firma JWT HMAC SHA-256 e verifica payload Bearer Header su tutte le rotte Fastify con blocco categorico per utenti non autorizzati. `JWT_SECRET` obbligatorio (minimo 32 caratteri): con `NODE_ENV=production` il server si rifiuta di partire senza.
 2. **📧 Provider Email SMTP Reale (Register.it / SendGrid / Nodemailer)**: Suite email integrata per invio notifiche, Magic Link e comunicazioni transazionali.
 3. **📦 Storage Cloud (Supabase Storage / AWS S3)**: Archiviazione documenti crittografata con URL pre-firmati e validazione binaria Magic-Bytes.
-4. **🛡 Row-Level Security (RLS) PostgreSQL**: Isolamento multi-tenant garantito a livello di motore database PostgreSQL con policy RLS per ciascun studio.
+4. **🛡 Row-Level Security (RLS) PostgreSQL**: Isolamento multi-tenant imposto dal motore database, non dal codice applicativo. Il runtime si connette col ruolo `bluman_app`, che **non può scavalcare le policy**, e ogni richiesta HTTP imposta `app.current_tenant_id` come variabile di transazione. RLS è attivo **e forzato** su tutte le tabelle, con una policy per ciascuna. Se il contesto tenant manca, la query non vede nulla: un errore di programmazione produce un guasto immediato invece di una fuga silenziosa di dati. Policy in `supabase/migrations/20260819_rls_effettiva.sql`, lato applicativo in `src/util/prismaClient.ts`, verifica con `npx tsx src/scripts/checkRls.ts`.
 5. **📜 Firma Elettronica Avanzata (FEA) eIDAS**: Generazione codice OTP a 6 cifre (WhatsApp/Email/SMS) e apposizione del sigillo digitale (SHA-256 Digest, Timestamp ISO UTC e IP certificato).
 6. **⏰ Worker Cron Schedulato**: Scansione automatica per il rinnovo UBO Registry Malta (MFSA), marchi EUIPO e solleciti rate fatture.
 7. **🚀 Connettore SDI 1-Click**: Trasmissione diretta dei tracciati XML FatturaPA all'Agenzia delle Entrate con tracking esiti.

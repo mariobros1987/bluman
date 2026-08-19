@@ -60,17 +60,47 @@ Per accedere direttamente al **Portale Cliente Passwordless**, apri:
 
 ---
 
-## 🔑 Tabella Credenziali di Accesso Ufficiali
+## 🔑 Accesso: come si ottengono le credenziali
 
-| Ruolo Attore | Email Registrata | Password di Accesso | Tipo Accesso |
-| :--- | :--- | :--- | :--- |
-| 👨‍💼 **Lead Advisor Senior** | `joe@bluecode.advisory` | `password123` | JWT Access Token |
-| ⚖️ **Legal Counsel Advisor** | `mario.dibenedetto@bluecode.advisory` | `password123` | JWT Access Token |
-| ⚖️ **Avv. Lorenzo Marino** | `lorenzo.marino@bluecode.advisory` | `password123` | JWT Access Token |
-| 💶 **Dr. Elena Russo (Tax Advisor)** | `elena.russo@bluecode.advisory` | `password123` | JWT Access Token |
-| 👑 **Super Admin** | `admin@bluecode.advisory` | `admin2026!` | JWT Access Token |
-| 👷 **Operatore Studio** | `operator@bluecode.advisory` | `operator123` | JWT Access Token |
-| 🔑 **Cliente Incarico** | `client@holdingbeta.advisory` | *Passwordless* | Magic Link `/portal` |
+Non esiste nessuna credenziale precaricata, né in questo file né nel codice (§23). Fino
+alla Fase 0 `src/server.ts` accettava una tabella di utenti e password scritti nel
+sorgente: chiunque leggesse il repository su GitHub poteva entrare in produzione. Sono
+stati rimossi, e con loro la tabella che stava qui.
+
+L'unica fonte di verità per le credenziali è la tabella `user` del database.
+
+**Primo accesso su un database vuoto** — crea il primo `super_admin` (§27):
+
+```bash
+# In .env: BOOTSTRAP_EMAIL="tua.email@studio.example"
+npm run bootstrap
+```
+
+Lo script stampa **una sola volta** una password temporanea: non viene salvata in chiaro
+da nessuna parte né inviata per email. Copiala subito.
+
+**Utenti già presenti in database senza password** — è il caso degli utenti creati dai
+seed, che avevano `password_hash` a NULL e dopo la rimozione degli utenti cablati non
+potrebbero più autenticarsi:
+
+```bash
+npm run passwords:assign            # solo chi non ha una password
+npm run passwords:assign -- --force # rigenera per tutti (invalida quelle in uso)
+```
+
+**Nuovi collaboratori** — li crea il `super_admin` o il responsabile dello studio dalla
+dashboard (`POST /tenant/utenti`), che restituisce la password temporanea da consegnare a
+mano. La gerarchia è quella di §2bis:
+
+| Ruolo | Ambito |
+| :--- | :--- |
+| 👑 `super_admin` | Gestisce tutto e vede tutti i tenant (`tenant_id` NULL). Può cambiare studio corrente. |
+| 👨‍💼 `advisor` | Responsabile del proprio tenant. Crea e gestisce collaboratori solo nel proprio studio. |
+| 👷 `collaboratore_interno` / `collaboratore_esterno` | Appartengono al tenant da cui vengono creati e non ne escono. |
+| 🔑 `cliente` | Passwordless: accede solo via Magic Link su `/portal`, mai da `/auth/login`. |
+
+Un `advisor` non può creare un `super_admin`, e un'email già registrata presso un altro
+studio viene rifiutata con 409 invece di essere spostata di tenant.
 
 ---
 
@@ -80,19 +110,42 @@ Per accedere direttamente al **Portale Cliente Passwordless**, apri:
    ```bash
    cp .env.example .env
    ```
-2. Incolla la tua stringa `DATABASE_URL` di Supabase PostgreSQL nel tuo file `.env` locale:
+2. Compila le **tre** connection string. Sono tre ruoli diversi di proposito (§14):
    ```env
-   DATABASE_URL="postgresql://postgres:[YOUR-DB-PASSWORD]@db.[YOUR-PROJECT-REF].supabase.co:5432/postgres"
-   DIRECT_URL="postgresql://postgres:[YOUR-DB-PASSWORD]@db.[YOUR-PROJECT-REF].supabase.co:5432/postgres"
+   # Runtime: ruolo applicativo, soggetto alle policy RLS. Vede solo il tenant della
+   # richiesta in corso; senza contesto tenant non legge nulla.
+   DATABASE_URL="postgresql://bluman_app.[PROJECT-REF]:[APP-PASSWORD]@[POOLER-HOST]:5432/postgres"
+   # Migrazioni Prisma: ruolo proprietario dello schema.
+   DIRECT_URL="postgresql://postgres.[PROJECT-REF]:[DB-PASSWORD]@[POOLER-HOST]:5432/postgres"
+   # Manutenzione, seed, bootstrap, backup e ricerca utente al login: scavalca RLS.
+   ADMIN_DATABASE_URL="postgresql://postgres.[PROJECT-REF]:[DB-PASSWORD]@[POOLER-HOST]:5432/postgres"
    ```
-3. Collega la CLI Supabase e sincronizza lo schema Prisma:
+3. Crea il ruolo applicativo e le policy RLS (una volta per database):
+   ```bash
+   PW=$(node -e "console.log(require('crypto').randomBytes(24).toString('base64').replace(/[^A-Za-z0-9]/g,'').slice(0,28))")
+   psql "$ADMIN_DATABASE_URL" -v ON_ERROR_STOP=1 -v pw="$PW" \
+        -f supabase/migrations/20260819_rls_effettiva.sql
+   # Metti $PW in DATABASE_URL, poi verifica:
+   npx tsx src/scripts/checkRls.ts
+   ```
+   `checkRls` deve mostrare `current_user: bluman_app`, `bypassa_rls: false`, RLS attivo e
+   forzato su tutte le tabelle, e **0 clienti visibili** con un tenant inesistente.
+   Serve `psql` perché la migrazione usa `\gexec` per creare il ruolo senza stampare la
+   password.
+4. Collega la CLI Supabase e applica lo schema Prisma:
    ```bash
    # Collegamento CLI Supabase
    npx supabase link --project-ref cfdtjdrfeidbemhunilt
 
-   # Genera Prisma Client & Applica lo Schema DB
+   # Genera Prisma Client & applica le migrazioni versionate
    npx prisma generate
-   npx prisma db push
-   npx tsx prisma/seed.ts  # Popola i dati di seed master sul DB reale Supabase
-   npm run start:db        # Server in ascolto col DB Supabase reale
+   npx prisma migrate deploy   # NON `db push`: vedi nota qui sotto
+   npm run seed                # Popola i dati di seed master sul DB reale Supabase
+   npm run start:db            # Server in ascolto col DB Supabase reale
    ```
+
+> ⚠️ **Mai `prisma db push --accept-data-loss` su un database con dati reali.** Riallinea
+> lo schema cancellando in silenzio colonne e tabelle non presenti nel file. Era il comando
+> di avvio del container su Railway: ora il `Dockerfile` esegue `prisma migrate deploy`, che
+> applica solo le migrazioni versionate in `prisma/migrations/` e si ferma se il database è
+> in uno stato che non riconosce.

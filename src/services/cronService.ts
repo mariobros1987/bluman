@@ -1,7 +1,8 @@
-import { PrismaClient } from '@prisma/client';
 import { sendMagicLinkEmail } from './emailService.js';
-
-const prisma = new PrismaClient();
+// §14 — invocato sempre dentro una richiesta (`POST /cron/esegui-notifiche-scadenze`),
+// quindi il contesto tenant è già attivo e il client condiviso è quello giusto: le query
+// qui sotto filtrano per tenantId e le policy RLS confermano lo stesso confine.
+import { prisma } from '../util/prismaClient.js';
 
 export interface CronReport {
   timestamp: string;

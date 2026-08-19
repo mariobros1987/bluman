@@ -1,43 +1,34 @@
-import { PrismaClient } from '@prisma/client';
-import fs from 'fs';
-import path from 'path';
+// ⚠️ SUPERATO — non applicare più da qui.
+//
+// Questo script eseguiva `supabase/migrations/20260815_enable_rls.sql`, sostituito da
+// `20260819_rls_effettiva.sql`. Rieseguirlo sarebbe attivamente dannoso: le policy del
+// file vecchio sono PERMISSIVE e senza destinatario, quindi si sommerebbero in OR a
+// `isolamento_tenant` vanificandola — l'isolamento tornerebbe inerte senza che nulla
+// segnali un errore.
+//
+// La migrazione nuova non è eseguibile via Prisma in nessun caso: usa `\gexec` per creare
+// il ruolo applicativo senza stampare la password, e `\gexec` è un meta-comando di psql
+// che `$executeRawUnsafe` non conosce.
+//
+// Il comando corretto è documentato nell'intestazione della migrazione:
+//
+//   PW=$(node -e "console.log(require('crypto').randomBytes(24).toString('base64').replace(/[^A-Za-z0-9]/g,'').slice(0,28))")
+//   psql "$ADMIN_DATABASE_URL" -v ON_ERROR_STOP=1 -v pw="$PW" \
+//        -f supabase/migrations/20260819_rls_effettiva.sql
+//
+// Per verificare lo stato effettivo: `npx tsx src/scripts/checkRls.ts`.
 
-const prisma = new PrismaClient();
-
-async function main() {
-  console.log('🛡 Applicazione Row-Level Security (RLS) su Supabase...');
-  const sqlPath = path.join(process.cwd(), 'supabase', 'migrations', '20260815_enable_rls.sql');
-  const sqlContent = fs.readFileSync(sqlPath, 'utf8');
-
-  // Esegui l'intero script SQL in un unico blocco transazionale
-  try {
-    await prisma.$executeRawUnsafe(sqlContent);
-    console.log('✅ Eseguito script SQL RLS completo in un unico blocco transazionale!');
-  } catch (err: any) {
-    console.warn('⚠️ Esecuzione in fallback statement per statement...');
-    const statements = sqlContent
-      .split(';')
-      .map((s) => s.trim())
-      .filter((s) => s.length > 0 && !s.startsWith('--'));
-
-    for (const statement of statements) {
-      try {
-        await prisma.$executeRawUnsafe(statement);
-        console.log('✅ Eseguito:', statement.substring(0, 60).replace(/\n/g, ' '), '...');
-      } catch (e: any) {
-        console.log('ℹ️ Info SQL:', e.message || e);
-      }
-    }
-  }
-
-  console.log('🎉 Policy RLS applicate con successo al DB Supabase!');
-}
-
-main()
-  .catch((e) => {
-    console.error('❌ Errore durante l applicazione RLS:', e);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+console.error(
+  [
+    '❌ Script superato: non applica più nulla.',
+    '',
+    '   La RLS effettiva sta in supabase/migrations/20260819_rls_effettiva.sql e va',
+    '   applicata con psql (usa \\gexec, che Prisma non può eseguire):',
+    '',
+    '     psql "$ADMIN_DATABASE_URL" -v ON_ERROR_STOP=1 -v pw="$PW" \\',
+    '          -f supabase/migrations/20260819_rls_effettiva.sql',
+    '',
+    '   Stato attuale: npx tsx src/scripts/checkRls.ts',
+  ].join('\n'),
+);
+process.exit(1);

@@ -8,9 +8,10 @@
 //   npm run start:db
 
 import 'dotenv/config';
-import { PrismaClient } from '@prisma/client';
 import { PrismaApp } from './prismaApp.js';
 import { buildServer } from '../../server.js';
+// §14 — client con contesto tenant: il ruolo applicativo è soggetto alle policy RLS.
+import { prisma } from '../../util/prismaClient.js';
 
 if (!process.env.DATABASE_URL) {
   console.error('DATABASE_URL non impostata. Copia .env.example in .env e inserisci la connection string (locale o Supabase).');
@@ -19,7 +20,6 @@ if (!process.env.DATABASE_URL) {
 
 const TENANT_ID_DEMO = '00000000-0000-0000-0000-000000000001'; // stesso id usato da seed.ts
 
-const prisma = new PrismaClient();
 const app = new PrismaApp(prisma, TENANT_ID_DEMO);
 const server = buildServer(app);
 const porta = Number(process.env.PORT ?? 3000);

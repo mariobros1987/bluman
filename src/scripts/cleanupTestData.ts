@@ -12,9 +12,12 @@
  *      dal seed e restano);
  *   3. non ha progetti né preventivi collegati.
  */
-import { PrismaClient } from '@prisma/client';
+import { prismaAmministrativo } from '../util/prismaClient.js';
 
-const prisma = new PrismaClient();
+// Manutenzione: connessione amministrativa, che scavalca le policy RLS (§14). Gli
+// artefatti da rimuovere appartengono a tenant diversi e lo script gira fuori da
+// qualunque richiesta.
+const prisma = prismaAmministrativo();
 
 /** Nomi usati come fixture in src/server.test.ts. */
 const NOMI_DI_TEST = ['Solo nome', 'Cliente A', 'Cliente B', 'Marco Ricci', 'Test'];

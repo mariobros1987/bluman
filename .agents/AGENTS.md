@@ -37,17 +37,31 @@ Questo file serve come indice rapido per l'IA ed i collaboratori per identificar
 
 - **Autenticazione & Permessi RBAC**: `POST /auth/login`, `POST /auth/magic-login`, `GET /auth/me`, `GET /tenant/utenti/:userId/permessi`, `PUT /tenant/utenti/:userId/permessi` (Token JWT 15 min + Magic Link + Matrice Permessi Sezioni).
 
-### 🔑 Tabella Credenziali di Accesso Ufficiali
+### 🔑 Accesso & Gerarchia dei Ruoli (§2bis, §23)
 
-| Ruolo Attore | Email Registrata | Password di Accesso | Tipo Accesso |
-| :--- | :--- | :--- | :--- |
-| 👨‍💼 **Lead Advisor Senior** | `joe@bluecode.advisory` | `password123` | JWT Access Token |
-| ⚖️ **Legal Counsel Advisor** | `mario.dibenedetto@bluecode.advisory` | `password123` | JWT Access Token |
-| ⚖️ **Avv. Lorenzo Marino** | `lorenzo.marino@bluecode.advisory` | `password123` | JWT Access Token |
-| 💶 **Dr. Elena Russo (Tax Advisor)** | `elena.russo@bluecode.advisory` | `password123` | JWT Access Token |
-| 👑 **Super Admin** | `admin@bluecode.advisory` | `admin2026!` | JWT Access Token |
-| 👷 **Operatore Studio** | `operator@bluecode.advisory` | `operator123` | JWT Access Token |
-| 🔑 **Cliente Incarico** | `client@holdingbeta.advisory` | *Passwordless* | Magic Link `/portal` |
+**Non esistono credenziali precaricate e non vanno reintrodotte.** Fino alla Fase 0
+`src/server.ts` conteneva una tabella di sette utenti con password nel sorgente
+(`joe@…`/`password123`, `admin@…`/`admin2026!` …) e accettava qualunque password come
+jolly: chiunque leggesse il repository pubblico poteva autenticarsi in produzione. La
+tabella che stava qui elencava proprio quelle coppie, in violazione della regola 5 più in
+basso. L'unica fonte di verità è ora la tabella `user` del database.
+
+| Ruolo | Ambito | Accesso |
+| :--- | :--- | :--- |
+| 👑 `super_admin` | Gestisce tutto e vede tutti i tenant (`tenant_id` NULL); può cambiare studio corrente via header `x-tenant-id` | JWT |
+| 👨‍💼 `advisor` | Responsabile del **solo proprio** tenant; crea e gestisce i collaboratori del proprio studio | JWT |
+| 👷 `collaboratore_interno` / `collaboratore_esterno` | Appartengono al tenant da cui vengono creati e non ne escono | JWT |
+| 🔑 `cliente` | Passwordless: solo Magic Link su `/portal`, mai `/auth/login` | Magic Link |
+
+- Primo `super_admin` su database vuoto: `npm run bootstrap` (§27), stampa la password
+  temporanea **una sola volta**.
+- Utenti già in database senza `password_hash`: `npm run passwords:assign`.
+- Nuovi collaboratori: `POST /tenant/utenti`, riservato a `super_admin` e `advisor`. Un
+  `advisor` non può creare un `super_admin`; un'email registrata presso un altro studio
+  viene rifiutata con 409 invece di cambiare tenant; la risposta non contiene mai
+  `passwordHash`.
+- `src/server.test.ts` ha un test di regressione che rifiuta ognuna delle otto vecchie
+  coppie email/password: se torna verde per una di esse, la falla è stata reintrodotta.
 
 - **Progetti**: `GET /progetti`, `GET /progetti/:id`, `PUT /progetti/:id/stato-completo` (Persistenza totale moduli, microvoci, checklist passaggi e note operative con audit log)
 - **Clienti**: `GET /clienti`, `POST /clienti`, `PUT /clienti/:id` (Salvataggio e recupero completo di tutti i campi ERP, legali, SDI, IBAN, KYC e referentiJson con audit log)
@@ -71,7 +85,9 @@ Questo file serve come indice rapido per l'IA ed i collaboratori per identificar
   - `src/services/securityScanner.ts`: Validazione Magic-Bytes e sanitizzazione PDF nel Vault Documenti.
   - `src/services/emailService.ts`: Invio email transazionali SMTP Nodemailer (Magic Link, notifica scadenze e test socket Register.it).
   - `src/services/storageService.ts`: Archiviazione Cloud S3/Supabase Storage con Presigned URL.
-  - `src/adapters/prisma/applyRls.ts`: Applicazione automatica delle policy RLS PostgreSQL (`supabase/migrations/20260815_enable_rls.sql`).
+  - `src/util/prismaClient.ts`: I tre client Prisma e il contesto tenant per richiesta (§14). `prisma` è il client applicativo: impone `app.current_tenant_id` a ogni query, così le policy RLS hanno qualcosa su cui filtrare. `prismaAmministrativo()` scavalca RLS e va usato **solo** per script, seed, bootstrap, backup e la ricerca dell'utente per email al login. `conContestoInTransazione()` reimposta la variabile dentro una transazione interattiva, che gira su una connessione propria.
+  - `supabase/migrations/20260819_rls_effettiva.sql`: Ruolo `bluman_app` (senza `BYPASSRLS`), policy `isolamento_tenant` su tutte le tabelle, `FORCE ROW LEVEL SECURITY`. Si applica con `psql` (usa `\gexec` per non stampare la password). Sostituisce `20260815_enable_rls.sql`, che era inerte: `src/adapters/prisma/applyRls.ts` ora si rifiuta di eseguire quel file perché le sue policy PERMISSIVE si sommerebbero in OR a quelle nuove, vanificandole.
+  - `src/scripts/checkRls.ts`: Diagnostica read-only dell'isolamento reale — ruolo di connessione, `bypassrls`, RLS attivo/forzato per tabella e prova pratica con un tenant inesistente (deve restituire 0 righe).
   - `.agents/skills/meta-whatsapp-integration/SKILL.md`: Skill e runbook per l'integrazione WhatsApp Business Cloud API & Remote MCP Meta DevTools.
 - **Firma FEA & OTP**: `POST /portal/request-otp`, `POST /portal/verify-otp-and-sign` (Sigillo SHA-256 e Timestamp ISO).
 - **Cron Scadenze**: `POST /cron/esegui-notifiche-scadenze` (Scansione UBO, KYC, fatture e solleciti automatici).
@@ -100,20 +116,27 @@ Questo file serve come indice rapido per l'IA ed i collaboratori per identificar
 1. **Isolamento Multi-Tenant Tassativo (`tenant_id`)**:
    - I dati tra i vari Tenant/Studi **NON SI DEVONO ASSOLUTAMENTE MISCHIARE**.
    - Ogni query, rotta API e tabella PostgreSQL **DEVE essere rigorosamente isolata** tramite `tenant_id` ed a livello database con PostgreSQL Row-Level Security (RLS).
+   - Il filtro applicativo su `tenant_id` **non basta e non è la difesa**: è RLS che lo è. Il runtime si connette col ruolo `bluman_app`, che non può scavalcare le policy, e il contesto tenant viene impostato per ogni richiesta dall'hook `onRequest` di `src/server.ts`. Non usare `new PrismaClient()` in codice che serve una richiesta HTTP: usa `prisma` da `src/util/prismaClient.ts`, altrimenti la query parte senza contesto e non vede nulla.
+   - `prismaAmministrativo()` scavalca RLS. È ammesso solo in script di manutenzione, seed, bootstrap, backup e nella ricerca dell'utente per email al login (dove il tenant si scopre proprio da quella riga). **Ogni altro uso riapre esattamente il buco che le policy chiudono.**
+   - Verifica sul database reale: `npx tsx src/scripts/checkRls.ts`.
 
-2. **Sincronizzazione Schema Database & Persistenza Cloud Obbligatoria (Prisma & Fastify DB)**:
+2. **Migrazioni Versionate, Mai `db push` su Dati Reali**:
+   - Lo schema si cambia con `prisma migrate dev` in sviluppo e `prisma migrate deploy` in produzione, mai con `prisma db push --accept-data-loss`: quest'ultimo riallinea il database al file cancellando in silenzio colonne e tabelle non presenti. Era il comando di avvio del container su Railway.
+   - Le migrazioni girano su `DIRECT_URL` (ruolo proprietario dello schema); il server usa `DATABASE_URL` (ruolo `bluman_app`, che non ha `CREATE` su `public` di proposito).
+
+3. **Sincronizzazione Schema Database & Persistenza Cloud Obbligatoria (Prisma & Fastify DB)**:
    - **TUTTO QUELLO CHE VIENE AGGIUNTO O MODIFICATO NELL'INTERFACCIA E NEI MODULI (spunte, passaggi, microvoci, note, scadenze, assegnazioni operatori, clienti, comunicazioni) DEVE ESSERE TASSATIVAMENTE SALVABILE E COLLEGATO AL DATABASE POSTGRESQL/PRISMA VIA API FASTIFY.**
    - **NON POSSIAMO PERMETTERCI DI PERDERE DATI.** Ogni stato o azione deve persistere su Database Server in modo che, spegnendo il PC o collegandosi da qualsiasi altra postazione/dispositivo, lo storico rimanga al 100% integro ed accessibile.
    - Ogni nuova funzionalità o campo form aggiunto **DEVE essere istantaneamente mappato** in `prisma/schema.prisma` ed allineato al backend. NESSUN dato deve essere mantenuto solo in RAM o registrato solo temporaneamente.
    - Eseguire sempre `npx prisma generate` ad ogni variazione dello schema.
 
-3. **Aggiornamento Documentazione Markdown (`.md`)**:
+4. **Aggiornamento Documentazione Markdown (`.md`)**:
    - Dopo ogni modifica importante, refactoring o cambio codice, tutti i file di documentazione (`README.md`, `BluMan_piano_di_sviluppo.md`, `ISTRUZIONI_INSTALLAZIONE.md`, `.agents/AGENTS.md`) **DEVONO essere tassativamente aggiornati ed allineati**.
 
-4. **Aggiornamento Mappa Grafo (Graphify)**:
+5. **Aggiornamento Mappa Grafo (Graphify)**:
    - Dopo modifiche strutturali ai moduli o ai servizi, eseguire `graphify extract . --code-only` e `graphify cluster-only .` per mantenere la mappa delle dipendenze di codice e la documentazione architettonica sempre sincronizzate.
 
-5. **Divieto Assoluto di Esposizione Credenziali su GitHub & Persistenza Isolata su DB Tenant**:
+6. **Divieto Assoluto di Esposizione Credenziali su GitHub & Persistenza Isolata su DB Tenant**:
    - **NESSUNA credenziale reale (password email SMTP/IMAP, token segreti, chiavi API o password di database) deve MAI essere scritta in chiaro nel codice versionato su GitHub o nei file `.md`**.
    - Tutte le password e credenziali dello studio DEVONO risiedere rigorosamente nel Database PostgreSQL collegate al singolo `Tenant` (`prisma.tenant.smtpPass`, `prisma.tenant.imapPass`, ecc.) e gestite in modo protetto via API (`PUT /tenant/settings`).
    - L'isolamento multi-tenant garantisce che uno studio non possa in alcun modo visualizzare né accedere ai dati, alla posta o ai contratti di un altro studio.

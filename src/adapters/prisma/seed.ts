@@ -7,11 +7,13 @@
 //
 //   npm run seed
 
-import { PrismaClient } from '@prisma/client';
+import { prismaAmministrativo } from '../../util/prismaClient.js';
 import { moduloAnalisiPatrimoniale, moduloCorporateStructuring } from '../../scripts/seedData.js';
 import type { ModuloTemplateConDistinta } from '../../services/istanziazionePort.js';
 
-const prisma = new PrismaClient();
+// Seed: connessione amministrativa (§14). Crea il tenant stesso, quindi non può
+// dipendere da un tenant già impostato nel contesto.
+const prisma = prismaAmministrativo();
 
 async function seedModulo(tenantId: string, template: ModuloTemplateConDistinta) {
   const modulo = await prisma.moduloTemplate.create({

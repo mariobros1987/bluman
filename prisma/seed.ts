@@ -1,7 +1,10 @@
-import { PrismaClient, RuoloUtente, StatoUtente, TipoGiurisdizione, TipoPassaggio, ChiPassaggio } from '@prisma/client';
+import { RuoloUtente, StatoUtente, TipoGiurisdizione, TipoPassaggio, ChiPassaggio } from '@prisma/client';
 import crypto from 'crypto';
+import { prismaAmministrativo } from '../src/util/prismaClient.js';
 
-const prisma = new PrismaClient();
+// Seed: connessione amministrativa (§14). Crea il tenant stesso, quindi non può
+// dipendere da un tenant già impostato nel contesto.
+const prisma = prismaAmministrativo();
 
 function hashPassword(password: string): string {
   const salt = 'bluman_salt_2026_fixed';

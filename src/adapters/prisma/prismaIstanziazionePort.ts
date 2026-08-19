@@ -16,7 +16,7 @@
 // campi usati qui sotto e quelli effettivi in schema.prisma (rinominati durante lo
 // sviluppo) — controlla prima lì.
 
-import { PrismaClient } from '@prisma/client';
+import { conContestoInTransazione, type PrismaConContesto } from '../../util/prismaClient.js';
 import type {
   IstanziazionePort,
   IstanziazioneTransazione,
@@ -27,7 +27,7 @@ import type {
 
 export class PrismaIstanziazionePort implements IstanziazionePort, EsecuzionePort {
   constructor(
-    private readonly prisma: PrismaClient,
+    private readonly prisma: PrismaConContesto,
     private readonly tenantId: string = '00000000-0000-0000-0000-000000000001'
   ) {}
 
@@ -146,7 +146,12 @@ export class PrismaIstanziazionePort implements IstanziazionePort, EsecuzionePor
         },
       };
 
-      return fn(wrapper);
+      // §14 — la transazione gira su una connessione propria: la variabile di sessione
+      // impostata dall'estensione fuori di qui non ci arriva. Va reimpostata sul `tx`,
+      // altrimenti le policy RLS non vedono nessun tenant e ogni scrittura viene
+      // rifiutata. Segnala anche alle operazioni annidate di non aprire una seconda
+      // transazione, che finirebbe su un'altra connessione ancora.
+      return conContestoInTransazione(tx, () => fn(wrapper));
     });
   }
 

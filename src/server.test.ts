@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { buildServer } from './server.js';
 import { InMemoryApp } from './adapters/inMemoryApp.js';
 import { signJwt } from './util/jwt.js';
+import { contestoTenant, type ContestoTenant } from './util/prismaClient.js';
 import type { ModuloTemplateConDistinta } from './services/istanziazionePort.js';
 
 const templateAnalisi: ModuloTemplateConDistinta = {
@@ -359,6 +360,55 @@ describe('server — §2bis isolamento tenant: header x-tenant-id', () => {
     });
     expect(res.statusCode).toBe(200);
     expect(res.json().id).toBe(TENANT_DEFAULT);
+  });
+
+  // §14 — lo stesso tenant che decide la risposta deve arrivare al database come
+  // variabile di sessione, altrimenti le policy RLS non hanno niente su cui filtrare.
+  // Si osserva dall'AppPort, che gira dentro il contesto asincrono della richiesta.
+  describe('il tenant della richiesta arriva al contesto del database', () => {
+    /** AppPort che annota il contesto tenant visto durante la chiamata. */
+    function serverCheOsservaIlContesto() {
+      const app = new InMemoryApp();
+      app.registraModuloTemplate(templateAnalisi);
+      const visti: Array<ContestoTenant | undefined> = [];
+      const originale = app.listaModuli.bind(app);
+      app.listaModuli = () => {
+        visti.push(contestoTenant.getStore());
+        return originale();
+      };
+      return { server: buildServer(app), visti };
+    }
+
+    it('usa il tenant del token per un advisor, ignorando x-tenant-id', async () => {
+      const { server, visti } = serverCheOsservaIlContesto();
+      const res = await server.inject({
+        method: 'GET',
+        url: '/moduli',
+        headers: { authorization: `Bearer ${tokenPer('advisor', TENANT_A)}`, 'x-tenant-id': TENANT_B },
+      });
+      expect(res.statusCode).toBe(200);
+      expect(visti).toEqual([{ tenantId: TENANT_A, ruolo: 'advisor' }]);
+    });
+
+    it('usa il tenant scelto dal super_admin', async () => {
+      const { server, visti } = serverCheOsservaIlContesto();
+      const res = await server.inject({
+        method: 'GET',
+        url: '/moduli',
+        headers: { authorization: `Bearer ${tokenPer('super_admin', TENANT_A)}`, 'x-tenant-id': TENANT_B },
+      });
+      expect(res.statusCode).toBe(200);
+      expect(visti).toEqual([{ tenantId: TENANT_B, ruolo: 'super_admin' }]);
+    });
+
+    it('senza token il contesto è il tenant di default, mai vuoto', async () => {
+      // Un contesto assente non farebbe vedere nulla al ruolo applicativo: è la
+      // proprietà voluta, ma su una richiesta legittima sarebbe un guasto.
+      const { server, visti } = serverCheOsservaIlContesto();
+      const res = await server.inject({ method: 'GET', url: '/moduli' });
+      expect(res.statusCode).toBe(200);
+      expect(visti).toEqual([{ tenantId: TENANT_DEFAULT, ruolo: undefined }]);
+    });
   });
 });
 

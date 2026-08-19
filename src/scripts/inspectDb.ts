@@ -1,6 +1,7 @@
-import { PrismaClient } from '@prisma/client';
+import { prismaAmministrativo } from '../util/prismaClient.js';
 
-const prisma = new PrismaClient();
+// Ispezione manuale: connessione amministrativa (§14), per vedere tutti i tenant.
+const prisma = prismaAmministrativo();
 
 async function main() {
   const users = await prisma.user.findMany();

@@ -12,10 +12,13 @@
 // Le password sono stampate UNA SOLA VOLTA: non vengono salvate in chiaro da nessuna
 // parte né inviate via email. Consegnale a mano.
 
-import { PrismaClient } from '@prisma/client';
+import { prismaAmministrativo } from '../util/prismaClient.js';
 import { hashPassword, generaPasswordTemporanea } from '../util/password.js';
 
-const prisma = new PrismaClient();
+// Script di manutenzione: usa la connessione amministrativa, che scavalca le policy RLS
+// (§14). Fuori da una richiesta HTTP non esiste un tenant corrente, quindi il client
+// applicativo non vedrebbe nessuna riga da aggiornare.
+const prisma = prismaAmministrativo();
 
 async function main() {
   const forza = process.argv.includes('--force');

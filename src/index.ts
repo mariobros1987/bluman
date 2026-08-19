@@ -1,7 +1,9 @@
-import { PrismaClient } from '@prisma/client';
 import { PrismaApp } from './adapters/prisma/prismaApp.js';
 import { InMemoryApp } from './adapters/inMemoryApp.js';
 import { buildServer } from './server.js';
+// §14 — il client condiviso, non `new PrismaClient()`: si connette col ruolo applicativo
+// soggetto alle policy RLS e impone a ogni query il tenant della richiesta in corso.
+import { prisma } from './util/prismaClient.js';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -12,7 +14,6 @@ async function start() {
   console.log('🚀 Avvio del processo BluMan API...');
   let app: any;
   try {
-    const prisma = new PrismaClient();
     console.log('🔌 Connessione a PostgreSQL / Prisma in corso...');
     await prisma.$connect();
     console.log('✅ Connesso a PostgreSQL con successo.');

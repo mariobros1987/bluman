@@ -13,6 +13,39 @@
 - [x] Mappa architetturale ed indicizzazione per ottimizzazione token (`.agents/AGENTS.md`).
 - [x] **Audit Produzione Enterprise**: Documento analitico completo di Go-Live readiness (`production_readiness_audit.md`).
 
+### FASE 0 (bis) — Chiusura Falle di Sicurezza Bloccanti (`analisi.txt`)
+Le voci qui sotto erano guasti sfruttabili, non miglioramenti: chiunque leggesse il
+repository pubblico poteva autenticarsi in produzione, e l'isolamento tra studi dipendeva
+interamente dal fatto che nessuna query dimenticasse il filtro applicativo.
+
+- [x] **Credenziali cablate rimosse da `src/server.ts`**: eliminata la tabella di utenti e
+  password nel sorgente (8 coppie email/password) e l'accettazione di qualunque password
+  come jolly. L'unica fonte di verità è la tabella `user` del database (§23).
+  `src/server.test.ts` contiene un test di regressione che rifiuta ognuna delle vecchie
+  coppie: se torna verde per una di esse, la falla è stata reintrodotta.
+- [x] **Primo accesso senza credenziali precaricate**: `npm run bootstrap` (§27) crea il
+  primo `super_admin` e stampa una password temporanea una sola volta;
+  `npm run passwords:assign` copre gli utenti creati dai seed con `password_hash` a NULL;
+  i collaboratori li crea il responsabile via `POST /tenant/utenti`.
+- [x] **Gerarchia ruoli applicata lato server (§2bis)**: `super_admin` gestisce tutto e vede
+  tutti i tenant (`tenant_id` NULL) ed è l'unico che può cambiare studio con `x-tenant-id`;
+  l'`advisor` è responsabile del solo proprio tenant e non può creare un `super_admin`; i
+  collaboratori appartengono al tenant da cui vengono creati. Email già registrata presso
+  un altro studio → 409, mai spostamento di tenant.
+- [x] **Hashing password senza dipendenze native**: scrypt (`src/util/password.ts`) e JWT
+  HMAC-SHA256 firmati a mano (`src/util/jwt.ts`); `bcrypt` e `jsonwebtoken` rimossi dalle
+  dipendenze. `JWT_SECRET` obbligatorio (≥32 caratteri) con `NODE_ENV=production`.
+- [x] **Rate limiting sulle rotte `/auth/*`** per fermare gli attacchi a forza bruta sul
+  login e sul Magic Link.
+- [x] **RLS effettiva, non solo dichiarata** — vedi la voce 4 della checklist di rilascio
+  qui sotto: il runtime si connette col ruolo `bluman_app`, che non può scavalcare le
+  policy, e il contesto tenant viaggia per richiesta.
+- [x] **Migrazioni versionate**: baseline `prisma/migrations/0_init/` con drift zero
+  verificato, e `Dockerfile` che esegue `prisma migrate deploy` al posto del precedente
+  `prisma db push --accept-data-loss`, che a ogni avvio del container riallineava lo schema
+  cancellando in silenzio colonne e tabelle non presenti nel file.
+- [x] **Pulizia dati inquinati**: rimossi i 57 record di test che attraversavano i tenant.
+
 ### FASE 1 — Schema Database PostgreSQL & Prisma (`prisma/schema.prisma`)
 - [x] `Tenant`: Dati fiscali studio, sedi legali/operative distinte, logo URL, colore tema PDF, note legali.
 - [x] `Cliente`: Dati anagrafici ERP, Partita IVA, Codice Fiscale, Sede Legale, Codice SDI, IBAN, Rischio AML, UBO, Fonte Patrimonio, Data KYC.
@@ -119,6 +152,44 @@ Per la messa in produzione professionale ed il passaggio ad un ambiente live:
 3. **📦 Cloud Object Storage (AWS S3 / Supabase Storage)**:
    - [x] Modulo Cloud Storage (`src/services/storageService.ts`) per l'upload e la gestione di contratti su Supabase Storage.
 4. **🛡 Row-Level Security (RLS) PostgreSQL**:
-   - [x] Migrazione SQL nativa (`supabase/migrations/20260815_enable_rls.sql`) con policy di isolamento multi-tenant per tutte le tabelle.
+   - [x] Migrazione SQL nativa (`supabase/migrations/20260819_rls_effettiva.sql`): una policy
+     RESTRICTIVE `isolamento_tenant` per tabella, RLS attivo **e forzato**
+     (`FORCE ROW LEVEL SECURITY`) su tutte le 33 tabelle.
+   - [x] Tre ruoli database distinti: `bluman_app` (runtime, `NOBYPASSRLS`, nessun `CREATE`
+     su `public`) su `DATABASE_URL`, il proprietario dello schema su `DIRECT_URL` per le
+     migrazioni, e `ADMIN_DATABASE_URL` per script di manutenzione, seed e backup.
+   - [x] Contesto tenant per richiesta: l'hook `onRequest` di `src/server.ts` chiama
+     `attivaContestoTenant`, e l'estensione Prisma in `src/util/prismaClient.ts` avvolge ogni
+     operazione in una transazione che imposta `app.current_tenant_id` e `app.current_ruolo`.
+     Le transazioni interattive reimpostano il contesto sul proprio `tx`, perché girano su
+     una connessione separata.
+   - [x] Comportamento **fail-closed**: senza contesto tenant nessuna riga è visibile. Un
+     errore di programmazione produce un guasto immediato, non una fuga silenziosa di dati.
+   - [x] Verifica sul database reale: `npx tsx src/scripts/checkRls.ts` →
+     `current_user: bluman_app`, `bypassa_rls: false`, 0 tabelle raggiungibili senza policy,
+     0 clienti visibili con un tenant inesistente.
+   - [x] La precedente `20260815_enable_rls.sql` è superata: le sue policy PERMISSIVE si
+     sommavano in OR annullando l'isolamento. `src/adapters/prisma/applyRls.ts` ora si rifiuta
+     di eseguire e stampa il comando corretto, invece di riapplicarla in silenzio.
 5. **📜 Webhook Firma Qualificata eIDAS (FEA / OTP SMS)**:
    - [x] Tracciamento IP, User Agent e Timestamp 1-click engagement letter nel Portale Cliente con convalida OTP WhatsApp/Email.
+
+---
+
+## ⚠️ Debiti Noti Aperti (da chiudere prima del Go-Live)
+
+Elencati qui perché non chiuderli è una scelta, non una dimenticanza.
+
+1. **Variabili d'ambiente su Railway**: vanno impostate a mano `JWT_SECRET` (≥32 caratteri),
+   `DATABASE_URL` (ruolo `bluman_app`), `DIRECT_URL` e `ADMIN_DATABASE_URL`. La password di
+   `bluman_app` esiste solo nel `.env` locale, che è gitignorato. Senza `JWT_SECRET` il
+   server non si arresta (`NODE_ENV` non è impostato nel `Dockerfile`) ma genera un segreto
+   casuale a ogni processo: **tutti i token vengono invalidati a ogni redeploy.**
+2. **Token finto nel frontend**: `frontend/src/api/client.ts` usa `'jwt_advisor_mock_123'`,
+   che non è un JWT: il backend ne ricava `ruolo: undefined`, quindi ignora `x-tenant-id` e
+   vieta la creazione utenti. L'interfaccia deve fare un login reale.
+3. **`/auth/magic-login` accetta qualunque stringa con prefisso `client_`** — marcato
+   `⚠️ DEBITO NOTO (Fase 3)` nel codice. Va sostituito con token a scadenza monouso.
+4. **Dashboard con percentuali cablate**: `frontend/src/pages/Dashboard.tsx` calcola
+   `pct` con valori fissi (`45`, `10`) invece dello stato reale dei progetti (Fase 1).
+

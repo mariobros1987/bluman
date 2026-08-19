@@ -6,10 +6,12 @@
 // Va lanciato UNA SOLA VOLTA, manualmente, mai come endpoint HTTP pubblico (§27):
 //   npm run bootstrap
 
-import { PrismaClient } from '@prisma/client';
+import { prismaAmministrativo } from '../../util/prismaClient.js';
 import { hashPassword, generaPasswordTemporanea } from '../../util/password.js';
 
-const prisma = new PrismaClient();
+// Connessione amministrativa (§14): il primo super_admin nasce senza tenant, quindi non
+// può essere creato attraverso policy che filtrano per tenant corrente.
+const prisma = prismaAmministrativo();
 
 async function main() {
   const esistente = await prisma.user.findFirst({ where: { ruolo: 'super_admin' } });

@@ -6,7 +6,7 @@
 // (rete bloccata verso binaries.prisma.sh). Verificalo sulla tua macchina — vedi
 // ISTRUZIONI_INSTALLAZIONE.md, Percorso B.
 
-import { PrismaClient } from '@prisma/client';
+import type { PrismaConContesto } from '../../util/prismaClient.js';
 import { PrismaIstanziazionePort } from './prismaIstanziazionePort.js';
 import { istanziaProgetto, calcolaPrezzoModulo } from '../../services/istanziaProgetto.js';
 import {
@@ -40,7 +40,7 @@ export class PrismaApp implements AppPort {
   private readonly notifiche = new ConsoleNotificationPort();
   private readonly tenantId: string;
 
-  constructor(private readonly prisma: PrismaClient, tenantId: string) {
+  constructor(private readonly prisma: PrismaConContesto, tenantId: string) {
     this.tenantId = tenantId;
     this.istanziazione = new PrismaIstanziazionePort(prisma, tenantId);
   }

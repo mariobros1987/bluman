@@ -10,7 +10,12 @@
 
 ## Graph Freshness
 - Built from commit: `dc61a5c`
-- Status: Fully synchronized with GitHub origin/main
+- Status: **STALE** — il grafo precede la Fase 0 di sicurezza (contesto tenant RLS in
+  `src/util/prismaClient.ts`, riscrittura di `src/adapters/prisma/applyRls.ts`, passaggio
+  degli script a `prismaAmministrativo()`). Le nuove dipendenze fra `src/server.ts`,
+  `src/index.ts`, gli adapter Prisma e `src/util/prismaClient.ts` **non sono nel grafo**.
+- Rigenerare su una macchina dove `graphify` è installato (non lo è su questo PC Windows):
+  `graphify extract . --code-only` seguito da `graphify cluster-only .`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 
 ## Community Hubs (Navigation)

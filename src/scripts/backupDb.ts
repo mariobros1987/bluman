@@ -1,8 +1,11 @@
 import fs from 'fs';
 import path from 'path';
-import { PrismaClient } from '@prisma/client';
+import { prismaAmministrativo } from '../util/prismaClient.js';
 
-const prisma = new PrismaClient();
+// Backup: connessione amministrativa (§14). Un backup fatto con il ruolo applicativo
+// esporterebbe soltanto il tenant corrente — che fuori da una richiesta non esiste,
+// quindi zero righe, senza nessun errore visibile.
+const prisma = prismaAmministrativo();
 
 async function exportTenantBackup(tenantId?: string) {
   console.log('📦 Avvio backup database BluMan...');

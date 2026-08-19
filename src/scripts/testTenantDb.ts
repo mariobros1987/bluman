@@ -1,6 +1,8 @@
-import { PrismaClient } from '@prisma/client';
+import { prismaAmministrativo } from '../util/prismaClient.js';
 
-const prisma = new PrismaClient();
+// Verifica manuale della persistenza: connessione amministrativa (§14), perché lo script
+// gira fuori da una richiesta e non ha un tenant corrente da cui farsi filtrare.
+const prisma = prismaAmministrativo();
 
 async function testTenantAllFields() {
   console.log('═══════════════════════════════════════════════════════════════════════');

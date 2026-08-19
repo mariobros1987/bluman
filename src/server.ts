@@ -23,10 +23,17 @@ import { generateOtp, verifyOtp, generateEidasSignatureSeal } from './services/o
 import { runDailyNotificationCron } from './services/cronService.js';
 import { trasmettiFatturaSdi } from './services/sdiService.js';
 import { scanFileBuffer } from './services/securityScanner.js';
-import { PrismaClient } from '@prisma/client';
+// §14 — non `new PrismaClient()`: questo client impone il tenant corrente a ogni query,
+// altrimenti le policy RLS non vedono nessun contesto e non restituiscono nulla.
+import { prisma, prismaAmministrativo, attivaContestoTenant } from './util/prismaClient.js';
 
-const prisma = new PrismaClient();
 const inMemoryTenantStore = new Map<string, any>();
+
+/**
+ * Tenant usato quando la richiesta non ne indica uno: le richieste non autenticate
+ * (login, health) e i record di sistema. Coincide con l'id creato dal seed.
+ */
+const TENANT_DEFAULT = '00000000-0000-0000-0000-000000000001';
 
 async function recordAudit(params: {
   tenantId?: string;
@@ -43,7 +50,7 @@ async function recordAudit(params: {
     try {
       await prisma.auditLog.create({
         data: {
-          tenantId: params.tenantId || '00000000-0000-0000-0000-000000000001',
+          tenantId: params.tenantId || TENANT_DEFAULT,
           userId: params.userId || 'usr-system',
           userEmail: params.userEmail || 'system@bluecode.advisory',
           userNome: params.userNome || 'Sistema / Operatore',
@@ -115,7 +122,7 @@ export function buildServer(app: AppPort): FastifyInstance {
 
   // ─── MULTI-TENANT CONTEXT MIDDLEWARE (§14, §23) ───────────────────
   server.addHook('onRequest', async (req) => {
-    let tenantId = '00000000-0000-0000-0000-000000000001'; // Default Studio Tenant
+    let tenantId = TENANT_DEFAULT; // Default Studio Tenant
     let ruolo: string | undefined;
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith('Bearer ')) {
@@ -139,6 +146,11 @@ export function buildServer(app: AppPort): FastifyInstance {
     }
     (req as any).tenantId = tenantId;
     (req as any).ruolo = ruolo;
+    // §14 — da qui in poi ogni query di questa richiesta viaggia con il tenant impostato
+    // come variabile di sessione, che è ciò su cui filtrano le policy RLS. Senza questa
+    // riga il ruolo `bluman_app` non vedrebbe nessuna riga: il guasto è immediato, non
+    // una fuga silenziosa.
+    attivaContestoTenant({ tenantId, ruolo });
   });
 
   server.get('/health', async () => ({ stato: 'ok' }));
@@ -162,9 +174,14 @@ export function buildServer(app: AppPort): FastifyInstance {
     // §23 — l'unica fonte di verità per le credenziali è la tabella user: nessun utente
     // hardcoded, nessuna password accettata come jolly. Il primo super_admin nasce da
     // `npm run bootstrap` (§27), le password del team esistente da `npm run passwords:assign`.
+    //
+    // Unico punto dell'applicazione che usa il client amministrativo: qui il tenant non è
+    // ancora noto — si scopre proprio dalla riga che stiamo cercando — quindi non può
+    // essere un vincolo della query che la trova. La ricerca è per email esatta, non
+    // restituisce niente di più della riga a cui l'utente sta provando ad accedere.
     let utente: Awaited<ReturnType<typeof prisma.user.findFirst>> = null;
     try {
-      utente = await prisma.user.findFirst({ where: { email: cleanEmail } });
+      utente = await prismaAmministrativo().user.findFirst({ where: { email: cleanEmail } });
     } catch (err) {
       console.error('Login: database non raggiungibile —', err instanceof Error ? err.message : err);
       return reply.code(503).send({ errore: 'Servizio di autenticazione non disponibile. Riprova tra poco.' });
@@ -188,6 +205,13 @@ export function buildServer(app: AppPort): FastifyInstance {
     // §2bis — il tenant è quello registrato sull'utente, non dedotto dal dominio dell'email.
     // Per il super_admin è null: sceglie il tenant corrente via header x-tenant-id.
     const userTenantId = utente.tenantId || '';
+
+    // §14 — l'hook onRequest ha impostato il tenant di default (questa richiesta non
+    // portava ancora un token): ora il tenant è noto, e va attivato prima dell'audit qui
+    // sotto. Senza questa riga l'INSERT nell'audit log verrebbe rifiutato dal WITH CHECK
+    // delle policy per chiunque appartenga a uno studio diverso da quello di default —
+    // e in silenzio, perché recordAudit ingoia gli errori di proposito.
+    attivaContestoTenant({ tenantId: userTenantId || TENANT_DEFAULT, ruolo: utente.ruolo });
 
     const token = signJwt({
       userId: utente.id,

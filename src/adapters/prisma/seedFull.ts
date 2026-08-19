@@ -1,6 +1,8 @@
-import { PrismaClient } from '@prisma/client';
+import { prismaAmministrativo } from '../../util/prismaClient.js';
 
-const prisma = new PrismaClient();
+// Seed: connessione amministrativa (§14). Crea il tenant stesso, quindi non può
+// dipendere da un tenant già impostato nel contesto.
+const prisma = prismaAmministrativo();
 
 const TENANT_ID = '00000000-0000-0000-0000-000000000001';
 

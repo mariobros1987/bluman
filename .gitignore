@@ -5,6 +5,9 @@
 secrets/
 .secrets/
 *.secret.*
+# Password del ruolo applicativo generata da 20260819_rls_effettiva.sql
+.bluman_app_pw.tmp
+*.pw.tmp
 
 # Node
 node_modules/

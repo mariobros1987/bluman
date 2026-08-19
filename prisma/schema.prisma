@@ -3,8 +3,9 @@
 // §26 (campi SDI su fattura) e §28 (sicurezza upload su documento) incluse fin dall'inizio —
 // vedi piano di sviluppo, Fase 1: evitare una migrazione dolorosa a metà sviluppo.
 //
-// Row-Level Security su tenant_id: da attivare via migrazione SQL manuale dopo il primo
-// `prisma migrate dev` — Prisma non genera RLS nativamente. Vedi § "Note operative" a fondo file.
+// Row-Level Security su tenant_id: attiva. Le policy stanno in
+// supabase/migrations/20260819_rls_effettiva.sql e si applicano con psql (usano \gexec).
+// Vedi § "Note operative" a fondo file e src/util/prismaClient.ts per il lato applicativo.
 
 generator client {
   provider      = "prisma-client-js"
@@ -13,7 +14,12 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  // Runtime: ruolo `bluman_app`, soggetto alle policy RLS.
   url      = env("DATABASE_URL")
+  // Migrazioni e introspezione: ruolo proprietario dello schema. Serve separato perché
+  // `bluman_app` non ha CREATE su public — di proposito, così lo schema lo cambiano solo
+  // le migrazioni. Senza questa riga `prisma migrate deploy` fallirebbe sui permessi.
+  directUrl = env("DIRECT_URL")
 }
 
 // ─────────────────────────────────────────────────────────────────
