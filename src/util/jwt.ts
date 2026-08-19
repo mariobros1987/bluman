@@ -1,6 +1,37 @@
 import crypto from 'crypto';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'bluman_advisory_jwt_secret_key_2026';
+const LUNGHEZZA_MINIMA_SEGRETO = 32;
+
+// §23 — il segreto di firma non ha mai un valore di default: un fallback hardcoded nel
+// repo equivale a nessuna autenticazione, perché chiunque legga il codice può forgiare
+// un token con qualunque tenantId e ruolo. In produzione l'assenza è un errore fatale;
+// in sviluppo si usa un segreto casuale valido solo per il processo corrente.
+function risolviSegreto(): string {
+  const daEnv = process.env.JWT_SECRET;
+
+  if (daEnv && daEnv.length >= LUNGHEZZA_MINIMA_SEGRETO) return daEnv;
+
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(
+      `JWT_SECRET mancante o più corto di ${LUNGHEZZA_MINIMA_SEGRETO} caratteri. ` +
+        'Generane uno con: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'base64\'))"',
+    );
+  }
+
+  if (daEnv) {
+    console.warn(
+      `⚠️  JWT_SECRET più corto di ${LUNGHEZZA_MINIMA_SEGRETO} caratteri: accettato solo perché NODE_ENV non è production.`,
+    );
+    return daEnv;
+  }
+
+  // I token firmati con questo segreto non sopravvivono a un restart: è voluto —
+  // un logout in sviluppo costa meno di un segreto noto committato nel repo.
+  console.warn('⚠️  JWT_SECRET non impostato: uso un segreto casuale valido solo per questo processo.');
+  return crypto.randomBytes(32).toString('hex');
+}
+
+const JWT_SECRET = risolviSegreto();
 
 export interface JwtPayload {
   userId: string;

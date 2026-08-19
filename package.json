@@ -24,6 +24,8 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "bootstrap": "tsx src/adapters/prisma/bootstrap.ts",
+    "passwords:assign": "tsx src/scripts/assignPasswords.ts",
+    "cleanup:test-data": "tsx src/scripts/cleanupTestData.ts",
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "tsx watch src/index.ts",

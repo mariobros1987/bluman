@@ -15,7 +15,7 @@ import {
 } from './adapters/appErrors.js';
 
 import { signJwt, verifyJwt } from './util/jwt.js';
-import { hashPassword, verifyPassword } from './util/password.js';
+import { verifyPassword, hashPassword, generaPasswordTemporanea } from './util/password.js';
 import { sendMagicLinkEmail, sendOtpSecurityEmail, verifyAndSendTestSmtp, verifyRealImap } from './services/emailService.js';
 import { uploadDocumento } from './services/storageService.js';
 import { generateInvoicePdfBuffer } from './services/pdfService.js';
@@ -87,24 +87,58 @@ export function buildServer(app: AppPort): FastifyInstance {
     return reply.code(500).send({ errore: err instanceof Error ? err.message : 'Errore interno' });
   });
 
+  // §23 — rate limiting sugli endpoint che verificano credenziali. Stato in memoria e
+  // per-istanza: basta per il deploy attuale a istanza singola, ma con più repliche il
+  // limite vale per replica e non globalmente — in quel caso va spostato su Redis.
+  const AUTH_MAX_TENTATIVI = 5;
+  const AUTH_FINESTRA_MS = 60_000;
+  const tentativiAuth = new Map<string, { conteggio: number; scadenza: number }>();
+
+  function superaLimiteAuth(chiave: string): boolean {
+    const ora = Date.now();
+
+    // Potatura opportunistica: senza questa la mappa cresce con ogni IP mai visto.
+    if (tentativiAuth.size > 1000) {
+      for (const [k, v] of tentativiAuth) {
+        if (ora > v.scadenza) tentativiAuth.delete(k);
+      }
+    }
+
+    const corrente = tentativiAuth.get(chiave);
+    if (!corrente || ora > corrente.scadenza) {
+      tentativiAuth.set(chiave, { conteggio: 1, scadenza: ora + AUTH_FINESTRA_MS });
+      return false;
+    }
+    corrente.conteggio += 1;
+    return corrente.conteggio > AUTH_MAX_TENTATIVI;
+  }
+
   // ─── MULTI-TENANT CONTEXT MIDDLEWARE (§14, §23) ───────────────────
   server.addHook('onRequest', async (req) => {
     let tenantId = '00000000-0000-0000-0000-000000000001'; // Default Studio Tenant
+    let ruolo: string | undefined;
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.split(' ')[1];
       if (token) {
         const payload = verifyJwt(token);
-        if (payload && payload.tenantId) {
-          tenantId = payload.tenantId;
+        if (payload) {
+          ruolo = payload.ruolo;
+          if (payload.tenantId) {
+            tenantId = payload.tenantId;
+          }
         }
       }
     }
-    // L'header x-tenant-id ha sempre la precedenza per consentire il passaggio tra tenant
-    if (req.headers['x-tenant-id']) {
-      tenantId = req.headers['x-tenant-id'] as string;
+    // §2bis — solo il super_admin può spostarsi tra tenant. Onorare questo header per
+    // chiunque rendeva l'isolamento multi-tenant aggirabile con una riga di curl: per
+    // tutti gli altri ruoli il tenant del token è vincolante.
+    const tenantRichiesto = req.headers['x-tenant-id'];
+    if (tenantRichiesto && ruolo === 'super_admin') {
+      tenantId = tenantRichiesto as string;
     }
     (req as any).tenantId = tenantId;
+    (req as any).ruolo = ruolo;
   });
 
   server.get('/health', async () => ({ stato: 'ok' }));
@@ -119,100 +153,58 @@ export function buildServer(app: AppPort): FastifyInstance {
       return reply.code(400).send({ errore: 'Email e password sono obbligatorie' });
     }
 
-    // Utenti registrati nello studio (in DB o seed)
-    const validUsers: Record<string, { passHash: string; name: string; role: 'super_admin' | 'advisor' | 'collaboratore_interno' }> = {
-      'joe@bluecode.advisory': {
-        passHash: hashPassword('password123'),
-        name: 'Joe Disabato',
-        role: 'advisor',
-      },
-      'admin@bluecode.advisory': {
-        passHash: hashPassword('admin2026!'),
-        name: 'Super Admin Studio',
-        role: 'super_admin',
-      },
-      'operator@bluecode.advisory': {
-        passHash: hashPassword('operator123'),
-        name: 'Elena Rossi (Operatore)',
-        role: 'collaboratore_interno',
-      },
-      'lorenzo.marino@bluecode.advisory': {
-        passHash: hashPassword('password123'),
-        name: 'Avv. Lorenzo Marino',
-        role: 'advisor',
-      },
-      'elena.russo@bluecode.advisory': {
-        passHash: hashPassword('password123'),
-        name: 'Dr. Elena Russo',
-        role: 'advisor',
-      },
-      'francesca.disabato@bluecode.advisory': {
-        passHash: hashPassword('password123'),
-        name: 'Francesca Disabato',
-        role: 'collaboratore_interno',
-      },
-      'mario.dibenedetto@bluecode.advisory': {
-        passHash: hashPassword('password123'),
-        name: 'Avv. Mario Dibenedetto',
-        role: 'advisor',
-      },
-    };
-
     const cleanEmail = email.toLowerCase().trim();
-    let targetUser = validUsers[cleanEmail];
 
-    // Se non presente nei predefiniti, cerca in DB Prisma
-    if (!targetUser) {
-      try {
-        const dbUser = await prisma.user.findFirst({
-          where: { email: cleanEmail },
-        });
-        if (dbUser) {
-          targetUser = {
-            passHash: (dbUser as any).passwordHash || hashPassword('password123'),
-            name: dbUser.nome || cleanEmail,
-            role: (dbUser.ruolo as any) || 'collaboratore_interno',
-          };
-        }
-      } catch {}
+    if (superaLimiteAuth(`login:${req.ip}`)) {
+      return reply.code(429).send({ errore: 'Troppi tentativi di accesso. Riprova tra un minuto.' });
     }
 
-    // Se l'utente è stato invitato di recente e inserisce la password iniziale standard
-    if (!targetUser && password === 'password123') {
-      targetUser = {
-        passHash: hashPassword(password),
-        name: cleanEmail.split('@')[0] || cleanEmail,
-        role: 'collaboratore_interno',
-      };
+    // §23 — l'unica fonte di verità per le credenziali è la tabella user: nessun utente
+    // hardcoded, nessuna password accettata come jolly. Il primo super_admin nasce da
+    // `npm run bootstrap` (§27), le password del team esistente da `npm run passwords:assign`.
+    let utente: Awaited<ReturnType<typeof prisma.user.findFirst>> = null;
+    try {
+      utente = await prisma.user.findFirst({ where: { email: cleanEmail } });
+    } catch (err) {
+      console.error('Login: database non raggiungibile —', err instanceof Error ? err.message : err);
+      return reply.code(503).send({ errore: 'Servizio di autenticazione non disponibile. Riprova tra poco.' });
     }
 
-    if (!targetUser) {
-      return reply.code(401).send({ errore: 'Credenziali non valide. Utente non registrato nello studio.' });
+    // Stesso messaggio per utente inesistente, password errata e cliente passwordless:
+    // distinguerli permetterebbe di enumerare le email registrate nello studio.
+    const nonValide = { errore: 'Credenziali non valide.' };
+
+    // Il cliente è passwordless (§23): accede solo via magic link, mai da questo endpoint.
+    if (!utente || !utente.passwordHash || utente.ruolo === 'cliente') {
+      return reply.code(401).send(nonValide);
+    }
+    if (!verifyPassword(password, utente.passwordHash)) {
+      return reply.code(401).send(nonValide);
+    }
+    if (utente.stato === 'disattivato') {
+      return reply.code(403).send({ errore: 'Utenza disattivata. Contatta il super admin dello studio.' });
     }
 
-    const isMatch = verifyPassword(password, targetUser.passHash) || password === 'password123';
-    if (!isMatch) {
-      return reply.code(401).send({ errore: 'Credenziali non valide. Password errata.' });
-    }
-
-    const tenantId = '00000000-0000-0000-0000-000000000001';
+    // §2bis — il tenant è quello registrato sull'utente, non dedotto dal dominio dell'email.
+    // Per il super_admin è null: sceglie il tenant corrente via header x-tenant-id.
+    const userTenantId = utente.tenantId || '';
 
     const token = signJwt({
-      userId: `usr-${cleanEmail}`,
-      tenantId,
+      userId: utente.id,
+      tenantId: userTenantId,
       email: cleanEmail,
-      ruolo: targetUser.role,
+      ruolo: utente.ruolo,
     });
 
     recordAudit({
-      tenantId,
-      userId: `usr-${cleanEmail}`,
+      tenantId: userTenantId,
+      userId: utente.id,
       userEmail: cleanEmail,
-      userNome: targetUser.name,
-      ruolo: targetUser.role,
+      userNome: utente.nome,
+      ruolo: utente.ruolo,
       azione: 'AUTENTICAZIONE_LOGIN',
       entita: 'Sessione Studio',
-      dettagli: `Login effettuato con successo per il ruolo ${targetUser.role}`,
+      dettagli: `Login effettuato con successo per il ruolo ${utente.ruolo}`,
       ipAddress: req.ip || '127.0.0.1',
     });
 
@@ -220,11 +212,11 @@ export function buildServer(app: AppPort): FastifyInstance {
       ok: true,
       token,
       user: {
-        id: `usr-${cleanEmail}`,
-        nome: targetUser.name,
-        email,
-        ruolo: targetUser.role,
-        tenantId,
+        id: utente.id,
+        nome: utente.nome,
+        email: cleanEmail,
+        ruolo: utente.ruolo,
+        tenantId: userTenantId,
       },
     };
   });
@@ -233,6 +225,15 @@ export function buildServer(app: AppPort): FastifyInstance {
     Body: { magicToken: string };
   }>('/auth/magic-login', async (req, reply) => {
     const { magicToken } = req.body;
+
+    if (superaLimiteAuth(`magic:${req.ip}`)) {
+      return reply.code(429).send({ errore: 'Troppi tentativi di accesso. Riprova tra un minuto.' });
+    }
+
+    // ⚠️ DEBITO NOTO (Fase 3 — portale cliente): questo endpoint accetta qualunque stringa
+    // che inizi per `client_` senza verificarla contro un token emesso e non scaduto. Il
+    // rate limiting qui sopra limita il brute force ma NON chiude il buco: serve
+    // persistere i magic token (valore, clienteId, scadenza, usato) e validarli qui.
     if (!magicToken || !magicToken.startsWith('client_')) {
       return reply.code(401).send({ errore: 'Magic Token non valido o scaduto' });
     }
@@ -614,66 +615,116 @@ export function buildServer(app: AppPort): FastifyInstance {
   });
 
   // ── GESTIONE UTENTI TEAM TENANT ───────────────────────────────────
+  // §2bis — gerarchia: il super_admin sovrintende tutti i tenant (tenantId null);
+  // l'advisor è il responsabile del proprio tenant e ne gestisce il team; i
+  // collaboratori appartengono al tenant da cui sono stati creati e non creano utenti.
+
+  /** L'hash della password non esce mai dal server, nemmeno verso il frontend dello studio. */
+  function senzaHash<T extends { passwordHash?: string | null }>(utente: T): Omit<T, 'passwordHash'> {
+    const { passwordHash: _ignorato, ...resto } = utente;
+    return resto;
+  }
+
   server.get('/tenant/utenti', async (req, reply) => {
     const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
+    const ruoloRichiedente = (req as any).ruolo as string | undefined;
+
     try {
-      const users = await prisma.user.findMany({
-        where: {
-          OR: [
-            { tenantId },
-            { tenantId: null }
-          ]
-        },
+      const utenti = await prisma.user.findMany({
+        // Il super_admin vede anche gli utenti senza tenant (gli altri super_admin);
+        // per ogni altro ruolo la lista è strettamente limitata al proprio tenant.
+        where: ruoloRichiedente === 'super_admin' ? { OR: [{ tenantId }, { tenantId: null }] } : { tenantId },
         orderBy: { createdAt: 'asc' },
       });
-      return reply.send(users);
+      return reply.send(utenti.map(senzaHash));
     } catch {
-      return reply.send([]);
+      return reply.send((app as any).listaUtenti?.() || []);
     }
   });
 
   server.post<{
-    Body: { nome: string; email: string; ruolo?: string; specializzazione?: string; costoOrarioCentesimi?: number };
+    Body: { nome?: string; email?: string; ruolo?: string; specializzazione?: string; costoOrarioCentesimi?: number };
   }>('/tenant/utenti', async (req, reply) => {
-    const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
+    const tenantCorrente = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
+    const ruoloRichiedente = (req as any).ruolo as string | undefined;
+
+    // Solo super_admin (qualunque tenant) e advisor (il proprio) ampliano il team.
+    if (ruoloRichiedente !== 'super_admin' && ruoloRichiedente !== 'advisor') {
+      return reply
+        .code(403)
+        .send({ errore: 'Solo il responsabile dello studio o il super admin possono creare utenti.' });
+    }
+
     const { nome, email, ruolo, specializzazione, costoOrarioCentesimi } = req.body || {};
     if (!nome || !email) {
       return reply.code(400).send({ errore: 'Nome ed email sono obbligatori' });
     }
+    const emailPulita = email.trim().toLowerCase();
+
+    // Il ruolo `cliente` non si crea da qui: il cliente è un'anagrafica separata (§3) e
+    // accede passwordless via magic link (§23).
+    const RUOLI_DELEGABILI = ['advisor', 'collaboratore_interno', 'collaboratore_esterno'];
+    let ruoloFinale = RUOLI_DELEGABILI.includes(ruolo || '') ? (ruolo as string) : 'collaboratore_interno';
+
+    // Senza questo vincolo un advisor si promuoverebbe a livello piattaforma creando
+    // un secondo super_admin con un'email che controlla.
+    if (ruolo === 'super_admin') {
+      if (ruoloRichiedente !== 'super_admin') {
+        return reply.code(403).send({ errore: 'Solo il super admin può creare un altro super admin.' });
+      }
+      ruoloFinale = 'super_admin';
+    }
+
+    // Il nuovo utente appartiene al tenant da cui viene creato. Il super_admin è l'unico
+    // senza tenant, perché li sovrintende tutti (§2bis).
+    const tenantAssegnato = ruoloFinale === 'super_admin' ? null : tenantCorrente;
 
     try {
-      const validRole = (ruolo === 'super_admin' || ruolo === 'advisor' || ruolo === 'collaboratore_interno' || ruolo === 'collaboratore_esterno')
-        ? (ruolo as any)
-        : 'collaboratore_interno';
+      const esistente = await prisma.user.findUnique({ where: { email: emailPulita } });
 
-      const user = await prisma.user.upsert({
-        where: { email: email.trim().toLowerCase() },
-        update: {
-          nome,
-          ruolo: validRole,
-          specializzazione: specializzazione || undefined,
-          costoOrarioCentesimi: costoOrarioCentesimi || undefined,
-          tenantId,
-        },
-        create: {
-          nome,
-          email: email.trim().toLowerCase(),
-          ruolo: validRole,
-          specializzazione: specializzazione || 'Collaboratore di Studio',
-          costoOrarioCentesimi: costoOrarioCentesimi || 3000,
-          tenantId,
-          stato: 'attivo',
-        },
-      });
+      // L'upsert su email, da solo, permetteva di sottrarre un utente al suo tenant:
+      // reinserendo la sua email lo si riassegnava al proprio studio.
+      if (esistente && ruoloRichiedente !== 'super_admin' && esistente.tenantId !== tenantCorrente) {
+        return reply.code(409).send({ errore: 'Questa email è già registrata in un altro studio.' });
+      }
+
+      // Password iniziale generata dal server e mostrata una sola volta nella risposta,
+      // così il responsabile può consegnarla. Nessuna password di default (§23).
+      const passwordTemporanea = esistente?.passwordHash ? null : generaPasswordTemporanea();
+
+      const datiComuni = {
+        nome,
+        ruolo: ruoloFinale as any,
+        specializzazione: specializzazione || undefined,
+        costoOrarioCentesimi: costoOrarioCentesimi || undefined,
+        tenantId: tenantAssegnato,
+        ...(passwordTemporanea ? { passwordHash: hashPassword(passwordTemporanea) } : {}),
+      };
+
+      const utente = esistente
+        ? await prisma.user.update({ where: { id: esistente.id }, data: datiComuni })
+        : await prisma.user.create({
+            data: {
+              ...datiComuni,
+              email: emailPulita,
+              specializzazione: specializzazione || 'Collaboratore di Studio',
+              costoOrarioCentesimi: costoOrarioCentesimi || 3000,
+              stato: 'attivo',
+            },
+          });
 
       recordAudit({
-        tenantId,
-        azione: 'COLLABORATORE_CREATO',
-        entita: user.nome,
-        dettagli: `Aggiunto collaboratore ${user.nome} (${user.email}) con ruolo ${user.ruolo}`,
+        tenantId: tenantCorrente,
+        ruolo: ruoloRichiedente,
+        azione: esistente ? 'UTENTE_AGGIORNATO' : 'UTENTE_CREATO',
+        entita: utente.nome,
+        dettagli: `${esistente ? 'Aggiornato' : 'Creato'} ${utente.nome} (${utente.email}) con ruolo ${utente.ruolo} nel tenant ${tenantAssegnato ?? 'piattaforma'}`,
+        ipAddress: req.ip,
       });
 
-      return reply.code(201).send(user);
+      // passwordTemporanea è l'unico momento in cui la password è leggibile: non viene
+      // salvata in chiaro né rispedita da nessun altro endpoint.
+      return reply.code(201).send({ ...senzaHash(utente), passwordTemporanea });
     } catch (err: any) {
       return reply.code(500).send({ errore: err.message || 'Errore creazione collaboratore' });
     }
@@ -1071,43 +1122,8 @@ export function buildServer(app: AppPort): FastifyInstance {
     }
   );
 
-  // ─── TEAM MEMBERS / UTENTI TENANT-ISOLATI (§RBAC) ─────────────────
-  server.get('/tenant/utenti', async (req) => {
-    const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
-    try {
-      const utenti = await prisma.user.findMany({
-        where: { tenantId },
-        orderBy: { createdAt: 'asc' },
-      });
-      return utenti;
-    } catch {
-      return (app as any).listaUtenti?.() || [];
-    }
-  });
-
-  server.post<{ Body: { nome: string; email: string; ruolo: string; specializzazione?: string } }>('/tenant/utenti', async (req, reply) => {
-    const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
-    const { nome, email, ruolo, specializzazione } = req.body;
-    if (!nome || !email) return reply.code(400).send({ errore: 'nome ed email sono obbligatori' });
-
-    try {
-      const user = await prisma.user.upsert({
-        where: { email },
-        update: { nome, ruolo: (ruolo as any) || 'collaboratore_interno', specializzazione, tenantId, stato: 'attivo' },
-        create: { tenantId, nome, email, ruolo: (ruolo as any) || 'collaboratore_interno', specializzazione, stato: 'attivo' },
-      });
-      recordAudit({
-        tenantId,
-        azione: 'UTENTE_CREATO',
-        entita: nome,
-        dettagli: `Creato/aggiornato operatore ${nome} (${email}) nel team dello studio`,
-        ipAddress: req.ip,
-      });
-      return reply.code(201).send(user);
-    } catch (err: any) {
-      return reply.code(500).send({ errore: err.message || 'Errore creazione utente' });
-    }
-  });
+  // Le rotte GET/POST /tenant/utenti vivono nel blocco "GESTIONE UTENTI TEAM TENANT"
+  // più sopra: erano dichiarate due volte e Fastify rifiutava di avviare il server.
 
   // ─── ANAGRAFICA CLIENTI ERP API (§2, §14) ─────────────────────────
   server.get('/clienti', async (req) => {
@@ -1137,7 +1153,9 @@ export function buildServer(app: AppPort): FastifyInstance {
         };
       });
     } catch {
-      return [];
+      // Database non raggiungibile: si serve la porta applicativa, come fanno già
+      // /progetti e /preventivi. Restituire [] silenziosamente nascondeva il guasto.
+      return (await app.listaClienti()) || [];
     }
   });
 
@@ -1145,6 +1163,13 @@ export function buildServer(app: AppPort): FastifyInstance {
     const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
     const b = (req.body || {}) as Record<string, any>;
     if (!b.nome) return reply.code(400).send({ errore: 'Il nome del cliente è obbligatorio' });
+
+    // `tipo` non ha un default: da persona fisica o società dipendono AML, regime
+    // fiscale e fatturazione. Cadere silenziosamente su 'company' significava
+    // classificare male il cliente senza che nessuno se ne accorgesse.
+    if (b.tipo !== 'individual' && b.tipo !== 'company') {
+      return reply.code(400).send({ errore: "Il tipo cliente è obbligatorio: 'individual' o 'company'" });
+    }
 
     const referentiObj = b.referentiJson
       ? (typeof b.referentiJson === 'string' ? JSON.parse(b.referentiJson) : b.referentiJson)
@@ -1166,7 +1191,7 @@ export function buildServer(app: AppPort): FastifyInstance {
         data: {
           tenantId,
           nome: b.nome,
-          tipo: b.tipo || 'company',
+          tipo: b.tipo,
           piva: b.piva || null,
           codiceFiscale: b.codiceFiscale || b.codFisc || null,
           giurisdizione: b.giurisdizione || null,
@@ -1189,8 +1214,15 @@ export function buildServer(app: AppPort): FastifyInstance {
       });
       return reply.code(201).send({ ...referentiObj, ...cliente });
     } catch (err: any) {
-      console.error('Errore creazione cliente DB:', err);
-      return reply.code(500).send({ errore: err.message || 'Errore salvataggio cliente' });
+      // Database non raggiungibile: si crea il cliente sulla porta applicativa, così il
+      // resto del flusso (progetto → preventivo → esecuzione) resta percorribile.
+      try {
+        const cliente = await app.creaCliente({ nome: b.nome, tipo: b.tipo });
+        return reply.code(201).send({ ...referentiObj, ...cliente });
+      } catch {
+        console.error('Errore creazione cliente DB:', err);
+        return reply.code(500).send({ errore: err.message || 'Errore salvataggio cliente' });
+      }
     }
   });
 
@@ -1291,6 +1323,9 @@ export function buildServer(app: AppPort): FastifyInstance {
           clienteId,
           nome,
           stato: 'pre_project',
+          // Il valore nasce a 0 e lo alza l'accettazione del preventivo (§16): il campo è
+          // obbligatorio a schema, ometterlo impediva la compilazione con `tsc`.
+          valoreTotale: 0,
         },
         include: { cliente: true }
       });

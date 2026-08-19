@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { buildServer } from './server.js';
 import { InMemoryApp } from './adapters/inMemoryApp.js';
+import { signJwt } from './util/jwt.js';
 import type { ModuloTemplateConDistinta } from './services/istanziazionePort.js';
 
 const templateAnalisi: ModuloTemplateConDistinta = {
@@ -234,6 +235,130 @@ describe('server — §17 esecuzione, tramite HTTP end-to-end', () => {
     const ok = await server.inject({ method: 'PATCH', url: `/microvoci/${microvoceId}/completa` });
     expect(ok.statusCode).toBe(200);
     expect(ok.json().stato).toBe('done');
+  });
+});
+
+describe('server — §23 autenticazione: nessuna credenziale hardcoded', () => {
+  // Queste credenziali erano cablate in server.ts fino alla Fase 0. Nessuna deve più
+  // permettere l'accesso. Il test esiste perché la regressione si è già verificata una
+  // volta: `verifyPassword(...) || password === 'password123'` apriva ogni account.
+  const CREDENZIALI_RIMOSSE = [
+    { email: 'joe@bluecode.advisory', password: 'password123' },
+    { email: 'admin@bluecode.advisory', password: 'admin2026!' },
+    { email: 'operator@bluecode.advisory', password: 'operator123' },
+    { email: 'lorenzo.marino@bluecode.advisory', password: 'password123' },
+    { email: 'elena.russo@bluecode.advisory', password: 'password123' },
+    { email: 'francesca.disabato@bluecode.advisory', password: 'password123' },
+    { email: 'mario.dibenedetto@bluecode.advisory', password: 'password123' },
+    // La backdoor peggiore: una email mai vista + `password123` creava al volo un
+    // utente con ruolo collaboratore_interno.
+    { email: 'sconosciuto@esterno.example', password: 'password123' },
+  ];
+
+  it.each(CREDENZIALI_RIMOSSE)('non emette un token per $email / $password', async ({ email, password }) => {
+    const { server } = nuovoServer();
+    const res = await server.inject({ method: 'POST', url: '/auth/login', payload: { email, password } });
+
+    // Senza database raggiungibile la risposta è 503, con database è 401: quel che conta
+    // è che non venga mai emesso un token.
+    expect(res.statusCode).not.toBe(200);
+    expect(res.json().token).toBeUndefined();
+  });
+
+  it('400 se manca email o password, senza consumare il rate limit', async () => {
+    const { server } = nuovoServer();
+    const senzaPassword = await server.inject({ method: 'POST', url: '/auth/login', payload: { email: 'a@b.it' } });
+    const senzaEmail = await server.inject({ method: 'POST', url: '/auth/login', payload: { password: 'x' } });
+    expect(senzaPassword.statusCode).toBe(400);
+    expect(senzaEmail.statusCode).toBe(400);
+  });
+});
+
+describe('server — §23 rate limiting sugli endpoint di autenticazione', () => {
+  const MAX_TENTATIVI = 5; // deve restare allineato ad AUTH_MAX_TENTATIVI in server.ts
+
+  it(`risponde 429 dal tentativo ${MAX_TENTATIVI + 1} nella stessa finestra`, async () => {
+    const { server } = nuovoServer();
+    const tentativo = () =>
+      server.inject({
+        method: 'POST',
+        url: '/auth/login',
+        payload: { email: 'bruteforce@esterno.example', password: 'tentativo-sbagliato' },
+      });
+
+    for (let i = 1; i <= MAX_TENTATIVI; i++) {
+      const res = await tentativo();
+      expect(res.statusCode, `tentativo ${i} non deve essere già bloccato`).not.toBe(429);
+    }
+
+    const bloccato = await tentativo();
+    expect(bloccato.statusCode).toBe(429);
+  });
+
+  it('il contatore è per istanza: un server nuovo riparte da zero', async () => {
+    const { server: primo } = nuovoServer();
+    for (let i = 0; i <= MAX_TENTATIVI; i++) {
+      await primo.inject({ method: 'POST', url: '/auth/login', payload: { email: 'x@y.it', password: 'z' } });
+    }
+
+    const { server: secondo } = nuovoServer();
+    const res = await secondo.inject({ method: 'POST', url: '/auth/login', payload: { email: 'x@y.it', password: 'z' } });
+    expect(res.statusCode).not.toBe(429);
+  });
+
+  it('limita anche /auth/magic-login', async () => {
+    const { server } = nuovoServer();
+    const tentativo = () => server.inject({ method: 'POST', url: '/auth/magic-login', payload: { magicToken: 'non-valido' } });
+
+    for (let i = 1; i <= MAX_TENTATIVI; i++) {
+      expect((await tentativo()).statusCode).not.toBe(429);
+    }
+    expect((await tentativo()).statusCode).toBe(429);
+  });
+});
+
+describe('server — §2bis isolamento tenant: header x-tenant-id', () => {
+  // UUID dedicati a questo blocco: lo store in-memory dei tenant è per processo,
+  // usare quelli di default renderebbe il test dipendente dall'ordine di esecuzione.
+  const TENANT_A = 'aaaaaaaa-0000-4000-8000-00000000000a';
+  const TENANT_B = 'bbbbbbbb-0000-4000-8000-00000000000b';
+  const TENANT_DEFAULT = '00000000-0000-0000-0000-000000000001';
+
+  function tokenPer(ruolo: 'advisor' | 'super_admin', tenantId: string) {
+    return signJwt({ userId: 'usr-test', tenantId, email: 'test@studio.example', ruolo });
+  }
+
+  it('ignora x-tenant-id per un advisor: resta vincolato al tenant del token', async () => {
+    const { server } = nuovoServer();
+    const res = await server.inject({
+      method: 'GET',
+      url: '/tenant/info',
+      headers: { authorization: `Bearer ${tokenPer('advisor', TENANT_A)}`, 'x-tenant-id': TENANT_B },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().id).toBe(TENANT_A);
+  });
+
+  it('onora x-tenant-id per il super_admin, che può cambiare tenant', async () => {
+    const { server } = nuovoServer();
+    const res = await server.inject({
+      method: 'GET',
+      url: '/tenant/info',
+      headers: { authorization: `Bearer ${tokenPer('super_admin', TENANT_A)}`, 'x-tenant-id': TENANT_B },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().id).toBe(TENANT_B);
+  });
+
+  it('ignora x-tenant-id se il token è assente o non verificabile', async () => {
+    const { server } = nuovoServer();
+    const res = await server.inject({
+      method: 'GET',
+      url: '/tenant/info',
+      headers: { authorization: 'Bearer token-inventato', 'x-tenant-id': TENANT_B },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().id).toBe(TENANT_DEFAULT);
   });
 });
 
