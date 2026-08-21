@@ -49,7 +49,13 @@ export async function verifyAndSendTestSmtp(options: {
 }): Promise<{ success: boolean; message: string; errore?: string }> {
   const candidates: Array<{ host: string; port: number; secure: boolean }> = [
     { host: options.host, port: options.port, secure: options.secure },
+    { host: options.host, port: 465, secure: true },
     { host: options.host, port: 587, secure: false },
+    { host: 'authsmtp.register.it', port: 465, secure: true },
+    { host: 'authsmtp.register.it', port: 587, secure: false },
+    { host: 'authsmtp.register.it', port: 25, secure: false },
+    { host: 'smtps.register.it', port: 465, secure: true },
+    { host: 'smtps.register.it', port: 587, secure: false },
     { host: 'smtp.register.it', port: 465, secure: true },
     { host: 'smtp.register.it', port: 587, secure: false },
     { host: 'mail.register.it', port: 465, secure: true },

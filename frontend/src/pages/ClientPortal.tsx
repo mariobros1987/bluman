@@ -288,6 +288,40 @@ export function ClientPortal() {
     loadPortalData();
   }, [token]);
 
+  const handleClientLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginError('');
+    if (!loginEmail || !loginPassword) {
+      setLoginError('Inserisci sia email che password');
+      return;
+    }
+    setLoginLoading(true);
+    try {
+      const res = await clientLoginApi(loginEmail.trim(), loginPassword);
+      if (res && res.token) {
+        localStorage.setItem('bluman_jwt_token', res.token);
+        if (res.user) {
+          localStorage.setItem('bluman_client_user', JSON.stringify(res.user));
+        }
+        setIsAuthenticated(true);
+        setAccessoNegato(null);
+        await loadPortalData(res.user?.clienteId);
+      } else {
+        setLoginError('Credenziali non valide o utente non trovato');
+      }
+    } catch (err: any) {
+      setLoginError(err.message || 'Credenziali non valide');
+    } finally {
+      setLoginLoading(false);
+    }
+  };
+
+  const handleClientLogout = () => {
+    localStorage.removeItem('bluman_jwt_token');
+    localStorage.removeItem('bluman_client_user');
+    setIsAuthenticated(false);
+  };
+
   const totalValue = moduliProposti.reduce((acc, m) => acc + m.prezzo, 0);
 
   const handleSign = async () => {
