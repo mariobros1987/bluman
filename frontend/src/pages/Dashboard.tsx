@@ -42,41 +42,60 @@ export function Dashboard() {
       if (remote && Array.isArray(remote)) {
         const dbProjs: Progetto[] = remote
           .filter((rp: any) => rp.tenantId === currentTenantId)
-          .map((rp: any) => ({
-            id: rp.id,
-            n: rp.nome,
-            cl: rp.cliente?.nome || 'Cliente',
-            ct: (rp.cliente?.tipo as any) || 'individual',
-            st: rp.stato || 'in_progress',
-            pct: rp.stato === 'completed' ? 100 : rp.stato === 'in_progress' ? 45 : 10,
-            start: rp.createdAt ? new Date(rp.createdAt).toLocaleDateString('it-IT') : 'Oggi',
-            due: 'In corso',
-            val: rp.valoreTotale ? rp.valoreTotale / 100 : 15000,
-            delay: false,
-            fisc: 'privato',
-            fatture: [],
-            mods: (rp.moduli || []).map((m: any, mIdx: number) => ({
-              id: mIdx + 100,
-              n: m.nome,
-              cat: m.categoria || 'Societario',
-              st: m.stato || 'pending',
-              pct: m.stato === 'done' ? 100 : m.stato === 'in_progress' ? 50 : 0,
-              h: m.orePreventivate || 20,
-              a: m.oreConsuntivate || 0,
-              p: m.prezzo ? m.prezzo / 100 : 3500,
-              team: [1, 2],
-              delay: m.stato === 'delayed' || m.stato === 'blocked',
-              v: (m.microvoci || []).map((mv: any) => ({
-                n: mv.nome,
-                hE: mv.orePreventivate || 4,
-                hA: mv.oreConsuntivate || 0,
-                s: mv.stato || 'pending',
-                as: 1,
-                d: 0,
-                vn: mv.causaNota || undefined,
-              })),
-            })),
-          }));
+          .map((rp: any) => {
+            // §16 — stato e percentuali arrivano calcolati dal backend (`avanzamento`), che è
+            // l'unico a conoscere le regole del motore. Qui non si deduce nulla: prima queste
+            // righe assegnavano percentuali fisse per stato (45% a ogni progetto in corso,
+            // 50% a ogni modulo), numeri che non avevano alcun rapporto con le ore lavorate.
+            const av = rp.avanzamento;
+            const avModuli = new Map<string, any>(
+              (av?.moduli || []).map((m: any) => [m.id, m]),
+            );
+
+            return {
+              id: rp.id,
+              n: rp.nome,
+              cl: rp.cliente?.nome || 'Cliente',
+              ct: (rp.cliente?.tipo as any) || 'individual',
+              st: av?.stato || rp.stato || 'in_progress',
+              pct: av?.percentuale ?? 0,
+              start: rp.createdAt ? new Date(rp.createdAt).toLocaleDateString('it-IT') : 'Oggi',
+              due: 'In corso',
+              val: rp.valoreTotale ? rp.valoreTotale / 100 : 15000,
+              // Il progetto è "in allarme" se un suo modulo è in ritardo o bloccato, oppure se
+              // il motore ha alzato un segnale di rischio su una micro-voce (§16.5): ore
+              // consuntivate oltre il preventivo. È ciò che alimenta il contatore `alerts`.
+              delay:
+                (av?.moduli || []).some((m: any) => m.stato === 'delayed' || m.stato === 'blocked') ||
+                Boolean(av?.segnaleRischio),
+              fisc: 'privato',
+              fatture: [],
+              mods: (rp.moduli || []).map((m: any, mIdx: number) => {
+                const avM = avModuli.get(m.id);
+                return {
+                  id: mIdx + 100,
+                  n: m.nome,
+                  cat: m.categoria || 'Societario',
+                  st: avM?.stato || m.stato || 'pending',
+                  pct: avM?.percentuale ?? 0,
+                  h: m.orePreventivate || 20,
+                  a: m.oreConsuntivate || 0,
+                  p: m.prezzo ? m.prezzo / 100 : 3500,
+                  team: [1, 2],
+                  delay: avM ? avM.stato === 'delayed' || avM.stato === 'blocked' : false,
+                  v: (m.microvoci || []).map((mv: any) => ({
+                    n: mv.nome,
+                    hE: mv.orePreventivate || 4,
+                    hA: mv.oreConsuntivate || 0,
+                    s: mv.stato || 'pending',
+                    as: 1,
+                    d: 0,
+                    vn: mv.causaNota || undefined,
+                  })),
+                };
+              }),
+            };
+          });
         const existingIds = new Set(combined.map(p => String(p.id)));
         for (const dp of dbProjs) {
           if (!existingIds.has(String(dp.id))) combined.push(dp);

@@ -398,6 +398,20 @@ export async function consuntivaMicrovoceApi(input: {
   return await res.json();
 }
 
+/**
+ * §16 — forza il ricalcolo della cascata micro-voce → modulo → progetto sul backend e
+ * restituisce l'avanzamento aggiornato. Le normali azioni (consuntivazione, completamento)
+ * aggiornano già lo stato: questa serve dopo un'importazione o una correzione fatta a mano.
+ */
+export async function ricalcolaProgettoApi(progettoId: string) {
+  const res = await fetch(`${API_BASE}/progetti/${progettoId}/ricalcola`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) throw new Error('Errore ricalcolo avanzamento progetto');
+  return await res.json();
+}
+
 export async function salvaProgettoDettaglioApi(progettoId: string, data: any) {
   try {
     const res = await fetch(`${API_BASE}/progetti/${progettoId}/stato-completo`, {

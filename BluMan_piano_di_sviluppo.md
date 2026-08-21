@@ -120,6 +120,51 @@ interamente dal fatto che nessuna query dimenticasse il filtro applicativo.
   cancellando in silenzio colonne e tabelle non presenti nel file.
 - [x] **Pulizia dati inquinati**: rimossi i 57 record di test che attraversavano i tenant.
 
+### FASE 1 (bis) — Integrazione del Motore di Stato (`analisi.txt`, §16)
+
+Il motore di calcolo esisteva già completo e testato in `src/domain/stateEngine.ts`, ma
+**nessuno lo chiamava** sul percorso di lettura: le percentuali mostrate erano costanti scritte
+nel frontend. Questa fase collega le due metà.
+
+Architettura scelta: **il backend è l'unica verità**. Il calcolo vive in un service che chiama
+le funzioni pure e persiste gli stati; le pagine leggono `avanzamento` dall'API e non deducono
+nulla. Il dominio non finisce nel bundle pubblico.
+
+- [x] **`src/services/calcoloService.ts`** — unico punto che traduce `stateEngine.ts` in
+  letture e scritture Prisma. Espone `calcolaAvanzamento()` (puro, nessuna query),
+  `arricchisciProgetti()` (allega l'avanzamento a un elenco già caricato) e
+  `ricalcolaProgetto()` (persiste la cascata micro-voce → modulo → progetto).
+- [x] **Le percentuali non vengono persistite, e non serve una migrazione**: derivano per
+  intero da `stato`, `orePreventivate` e `oreConsuntivate`, che sono già in riga. Una colonna
+  `percentuale` sarebbe un dato denormalizzato libero di divergere dai propri ingredienti
+  senza che nessuno se ne accorga. Si persistono solo `stato` (modulo, progetto) e
+  `segnaleRischio`/`oreExtra` (micro-voce), che una query non può ricostruire.
+- [x] **`POST /progetti/:id/ricalcola`** — ricalcolo esplicito dopo un'importazione, una
+  correzione a mano o un cambio di regole. Autenticata come tutte le altre, con audit log.
+  Nel piano originale si chiamava `/projects/:id/recalculate`: il nome è stato reso italiano
+  come ogni altra rotta del file.
+- [x] **`GET /progetti` e `GET /progetti/:id` restituiscono `avanzamento`** — stato,
+  percentuale, segnale di rischio e ore extra, per progetto e per singolo modulo. Su
+  `GET /progetti/:id` l'avanzamento è applicato **dopo** lo spread di `projectStateStore`,
+  così la forma inviata dal client non può riscrivere il valore calcolato.
+- [x] **`Dashboard.tsx` legge le percentuali invece di inventarle**. Assegnava `45%` a ogni
+  progetto in corso, `10%` a ogni altro e `50%` a ogni modulo `in_progress`: numeri senza
+  alcun rapporto con le ore lavorate. Ora l'avviso di ritardo di un progetto viene da uno stato
+  `delayed`/`blocked` reale o da un segnale di rischio del motore, non da `delay: false` fisso.
+- [x] **`ProjectDetail.tsx` mostra un avanzamento che esiste**. La barra del progetto leggeva
+  `dbRes.percentualeAvanzamento`, un campo che **il backend non ha mai prodotto**: era ferma a
+  zero da sempre. I moduli usavano `60%` fisso.
+- [x] **Un modulo senza micro-voci non viene declassato**. `calcolaStatoModulo([])` risponde
+  `pending`, corretto per un modulo appena creato ma distruttivo su uno chiuso a mano: con zero
+  micro-voci non c'è nulla da aggregare e la riga è l'unica informazione esistente. Il service
+  la preserva e non scrive. Il caso è reale — vedi il debito 3.
+- [x] **Presidio**: `src/calcoloService.test.ts`, 22 test. Coprono le percentuali mostrate
+  (compreso il tetto a 99 quando l'aritmetica arrotonderebbe a 100 su un progetto non chiuso),
+  la media pesata sulle ore, i segnali di rischio, **quali righe vengono scritte e quali no**,
+  e le quattro proprietà della rotta via HTTP (200, 404, 401, avanzamento in `GET /progetti`).
+- [x] **Diagnostica**: `npx tsx src/scripts/probeAvanzamento.ts` — sola lettura, dice quali
+  righe un ricalcolo cambierebbe *prima* di eseguirlo. È così che sono emersi i debiti 3 e 4.
+
 ### FASE 1 — Schema Database PostgreSQL & Prisma (`prisma/schema.prisma`)
 - [x] `Tenant`: Dati fiscali studio, sedi legali/operative distinte, logo URL, colore tema PDF, note legali.
 - [x] `Cliente`: Dati anagrafici ERP, Partita IVA, Codice Fiscale, Sede Legale, Codice SDI, IBAN, Rischio AML, UBO, Fonte Patrimonio, Data KYC.
@@ -264,21 +309,33 @@ Per la messa in produzione professionale ed il passaggio ad un ambiente live:
 
 Elencati qui perché non chiuderli è una scelta, non una dimenticanza.
 
-1. **Dashboard con percentuali cablate**: `frontend/src/pages/Dashboard.tsx` calcola
-   `pct` con valori fissi (`45`, `10`) invece dello stato reale dei progetti (Fase 1).
-2. **Mappa Graphify STALE**: l'ultima estrazione è del **17 agosto**, quindi *nessuna*
+1. **Mappa Graphify STALE**: l'ultima estrazione è del **17 agosto**, quindi *nessuna*
    correzione di Fase 0 è nel grafo — compresi il modello `MagicLink` e le funzioni nuove di
-   `src/util/jwt.ts` e `src/services/storageService.ts`, che sono nodi e archi mancanti, non
-   solo righe cambiate. La CLI `graphify` non è installata sulla postazione Windows dove sono
-   state fatte. Da rigenerare dove la CLI esiste (`graphify extract . --code-only` +
-   `graphify cluster-only .`), senza reinstallarla qui solo per questo.
-3. **Due righe `user` residue senza password** — `francesca@bluecode.advisory` e
+   `src/util/jwt.ts` e `src/services/storageService.ts` — né la Fase 1, che aggiunge
+   `src/services/calcoloService.ts` e la rotta `POST /progetti/:id/ricalcola`: sono nodi e
+   archi mancanti, non solo righe cambiate. La CLI `graphify` non è installata sulla
+   postazione Windows dove sono state fatte. Da rigenerare dove la CLI esiste
+   (`graphify extract . --code-only` + `graphify cluster-only .`), senza reinstallarla qui
+   solo per questo.
+2. **Due righe `user` residue senza password** — `francesca@bluecode.advisory` e
    `lorenzo@bluecode.advisory`, duplicati di `francesca.disabato@` e `lorenzo.marino@`
    lasciati da `seedFull.ts` e dal vecchio auto-seed di `listaUtenti()`. Sono inerti (senza
    `password_hash` non si accede da `/auth/login`) e ora non si rigenerano più, ma sporcano
    l'anagrafica del team. Non le si cancella da qui: `user` è referenziata da audit log,
    timesheet e accessi progetto, quindi la rimozione va fatta consapevolmente dalla
    dashboard super admin. Verifica dello stato: `npx tsx src/scripts/verificaAccessi.ts`.
+3. **Due moduli con stato non verificabile**: su `Struttura Holding — Famiglia Ricci` i moduli
+   `Analisi patrimoniale iniziale` (`done`) e `Corporate structuring Malta` (`in_progress`)
+   hanno **zero micro-voci** a database. Il loro stato è stato messo a mano e non ha nulla
+   sotto che lo giustifichi: il motore non può né confermarlo né correggerlo, e il service lo
+   preserva invece di declassarlo (vedi `calcoloService.ts`). Va deciso a mano se istanziare le
+   micro-voci o azzerare i moduli. Diagnosi: `npx tsx src/scripts/probeAvanzamento.ts`.
+4. **Una riga di stato modulo da riallineare**: su `holding dibenedetto` il modulo
+   `Analisi patrimoniale iniziale` è `pending` in riga ma ha 5 micro-voci con ore consuntivate
+   (17% calcolato) — residuo del periodo in cui nessuno propagava lo stato verso l'alto. Le
+   letture mostrano già il valore giusto perché lo calcolano; la riga si riallinea con
+   `POST /progetti/:id/ricalcola`. Non è stato eseguito sui dati reali: è una scrittura in
+   produzione e va fatta da chi possiede il dato.
 
 ### ✅ Chiusi in questa fase
 

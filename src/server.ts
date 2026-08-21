@@ -23,6 +23,8 @@ import { generateOtp, verifyOtp, generateEidasSignatureSeal } from './services/o
 import { runDailyNotificationCron } from './services/cronService.js';
 import { trasmettiFatturaSdi } from './services/sdiService.js';
 import { scanFileBuffer } from './services/securityScanner.js';
+// §16 — le percentuali e gli stati aggregati arrivano da qui, non dal frontend.
+import { arricchisciProgetti, calcolaAvanzamento, ricalcolaProgetto } from './services/calcoloService.js';
 // §14 — non `new PrismaClient()`: questo client impone il tenant corrente a ogni query,
 // altrimenti le policy RLS non vedono nessun contesto e non restituiscono nulla.
 import { prisma, prismaAmministrativo, attivaContestoTenant } from './util/prismaClient.js';
@@ -1662,7 +1664,9 @@ export function buildServer(app: AppPort): FastifyInstance {
         },
         orderBy: { createdAt: 'desc' },
       });
-      if (projs && projs.length > 0) return projs;
+      // §16 — l'avanzamento viaggia già calcolato: il client lo legge, non lo deduce.
+      // `arricchisciProgetti` non emette query, lavora sui moduli e micro-voci appena letti.
+      if (projs && projs.length > 0) return arricchisciProgetti(projs);
       return (app as any).listaProgetti?.() || [];
     } catch {
       return (app as any).listaProgetti?.() || [];
@@ -1700,16 +1704,52 @@ export function buildServer(app: AppPort): FastifyInstance {
     const { id } = req.params;
     try {
       const dbProj: any = await app.getProgetto(id);
+      // L'avanzamento si calcola dai dati appena letti e viene applicato **dopo** lo spread
+      // di `savedState`: quello store contiene la forma che il client ha inviato, `pct`
+      // compresa, e non deve poter riscrivere il valore che il motore ha calcolato (§16).
+      const avanzamento = calcolaAvanzamento(dbProj);
       const savedState = projectStateStore.get(id);
       if (savedState) {
-        return reply.send({ ...(typeof dbProj === 'object' && dbProj !== null ? dbProj : {}), ...savedState, id: dbProj?.id || id });
+        return reply.send({
+          ...(typeof dbProj === 'object' && dbProj !== null ? dbProj : {}),
+          ...savedState,
+          id: dbProj?.id || id,
+          avanzamento,
+        });
       }
-      return reply.send(dbProj);
+      return reply.send({ ...dbProj, avanzamento });
     } catch {
       const savedState = projectStateStore.get(id);
       if (savedState) return reply.send(savedState);
       return reply.code(404).send({ errore: 'Progetto non trovato' });
     }
+  });
+
+  /**
+   * §16 — Ricalcolo esplicito della cascata micro-voce → modulo → progetto (Fase 1, task 1.3).
+   *
+   * Serve dopo un'importazione, una correzione manuale a database o il rilascio di una
+   * modifica alle regole: i normali percorsi (consuntivazione, completamento) aggiornano già
+   * lo stato mano a mano, ma niente rimette in pari le righe scritte fuori da quei percorsi.
+   *
+   * Il nome della route resta in italiano come tutte le altre di questo file (`/progetti`,
+   * `/clienti`): il piano lo chiamava `/projects/:id/recalculate`.
+   */
+  server.post<{ Params: { id: string } }>('/progetti/:id/ricalcola', async (req, reply) => {
+    const { id } = req.params;
+    const tenantId = (req as any).tenantId || TENANT_DEFAULT;
+
+    const avanzamento = await ricalcolaProgetto(id);
+
+    recordAudit({
+      tenantId,
+      azione: 'PROGETTO_RICALCOLATO',
+      entita: id,
+      dettagli: `Ricalcolo stato progetto ${id}: ${avanzamento.stato}, ${avanzamento.percentuale}%`,
+      ipAddress: req.ip,
+    });
+
+    return reply.send(avanzamento);
   });
 
   server.put<{ Params: { id: string }; Body: any }>('/progetti/:id/stato-completo', async (req, reply) => {

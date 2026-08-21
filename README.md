@@ -66,6 +66,13 @@ Piattaforma ERP per studi di consulenza societaria, wealth protection ed advisor
 - **Ripartizione Lavoro Team**: Tabella dettagliata con ore registrate e costi effettivi per ogni singolo professionista dello studio.
 - **📄 Export Rendiconto Economico CSV / PDF**: Esportazione immediata del prospetto trasparenza per lo studio o il cliente.
 
+### 📈 Avanzamento Calcolato dal Motore di Stato (§16)
+- **Le percentuali non sono più inventate dal frontend**. `Dashboard` assegnava `45%` a ogni progetto in corso, `10%` a ogni altro e `50%` a ogni modulo `in_progress`; la barra di `ProjectDetail` leggeva `percentualeAvanzamento`, un campo che il backend non ha mai prodotto — quindi era ferma a zero. Ora `GET /progetti` e `GET /progetti/:id` restituiscono `avanzamento` (stato, percentuale, segnale di rischio, ore extra) per progetto **e per singolo modulo**, calcolato dalle ore effettivamente consuntivate.
+- **Il calcolo vive solo sul backend**: `src/services/calcoloService.ts` chiama le funzioni pure di `src/domain/stateEngine.ts`. Il dominio non finisce nel bundle pubblico e non esistono due implementazioni da tenere d'accordo.
+- **`POST /progetti/:id/ricalcola`**: riallinea le righe dopo un'importazione, una correzione fatta a mano a database o un cambio di regole. Scrive solo dove il valore calcolato differisce da quello in riga — un ricalcolo che riscrive valori identici sporcherebbe `updatedAt` e renderebbe indistinguibile "lo stato è cambiato" da "qualcuno ha premuto ricalcola".
+- **Le percentuali non sono una colonna**: derivano da `stato`, `orePreventivate` e `oreConsuntivate`, già in riga. Persisterle significherebbe tenere un dato che può divergere dai propri ingredienti senza che nessuno se ne accorga. Si persistono solo gli stati e i segnali di rischio, che una query non può ricostruire.
+- **Cosa vedere prima di scrivere**: `npx tsx src/scripts/probeAvanzamento.ts` — sola lettura, elenca esattamente quali righe un ricalcolo cambierebbe.
+
 ### 💬 WhatsApp Business Cloud API & Omnichannel Integration (§14)
 - **WhatsApp Cloud API Ufficiale (Graph API v21.0)**: Phone ID `1318817114639409`, WABA `1397431142562576`, Token Permanente System User illimitato.
 - **Remote MCP Meta DevTools**: Configurato in `~/.gemini/config/mcp_config.json` su `https://mcp.facebook.com/devtools`.
@@ -91,7 +98,7 @@ Piattaforma ERP per studi di consulenza societaria, wealth protection ed advisor
    - Tutti i file `.md` (`README.md`, `BluMan_piano_di_sviluppo.md`, `ISTRUZIONI_INSTALLAZIONE.md`, `.agents/AGENTS.md`) DEVONO essere tassativamente aggiornati dopo ogni modifica importante.
 5. **Mappa Grafo (Graphify)**:
    - Mantenere aggiornato il grafo con `graphify extract . --code-only` e `graphify cluster-only .`.
-   - ⚠️ Grafo **STALE**: la CLI non è installata sulla postazione Windows delle correzioni di Fase 0. Va rigenerato sulla prima postazione che la ha.
+   - ⚠️ Grafo **STALE**: la CLI non è installata sulla postazione Windows delle correzioni di Fase 0 e 1. Va rigenerato sulla prima postazione che la ha.
 6. **Divieto Assoluto di Credenziali in Chiaro**:
    - Nessuna password, token o chiave API reale nel codice versionato o nei file `.md`. Le credenziali dello studio risiedono nella riga `Tenant` del database (`smtpPass`, `imapPass`) e si gestiscono via `PUT /tenant/settings`. Le password delle persone stanno solo come hash scrypt su `user.password_hash`.
    - Vale anche per i ripieghi: un `|| 'password-qualunque'` e un campo password precompilato sono credenziali cablate, perché il valore che l'API annuncia è quello con cui si entra. Presidio: `src/credenziali.test.ts`, che scandisce anche `frontend/src/`, `api/` ed i file `.md` — il bundle frontend è pubblico esattamente come il repository, e un segreto non va trascritto nemmeno per spiegare che è stato rimosso.
@@ -170,7 +177,8 @@ non una tabella figlia filtrata per `tenant_id`, quindi le policy non le danno p
 
 `src/server.test.ts` verifica, rotta per rotta, 401 senza token e non-401 con un token
 valido; `src/gerarchiaRuoli.test.ts` presidia la gerarchia dei ruoli; `src/accessoCliente.test.ts`
-presidia il Magic Link e `GET /uploads/:filename` (`npx vitest run` → 17 file, 203 test).
+presidia il Magic Link e `GET /uploads/:filename`; `src/calcoloService.test.ts` presidia il
+motore di stato e ciò che il ricalcolo scrive a database (`npx vitest run` → 18 file, 225 test).
 
 ### 🔑 Il portale cliente non si apre con una stringa qualsiasi
 

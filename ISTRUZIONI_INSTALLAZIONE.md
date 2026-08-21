@@ -260,3 +260,48 @@ npx tsx src/scripts/checkRls.ts
 Deve mostrare `current_user: bluman_app`, `bypassa_rls: false`, RLS attivo **e forzato** su
 tutte e 34 le tabelle applicative (`_prisma_migrations` esclusa, correttamente) e **0
 clienti visibili** con un tenant inesistente.
+
+---
+
+## 6. Avanzamento dei Progetti: Verifica e Ricalcolo (§16)
+
+Stati e percentuali non li decide più il frontend. `GET /progetti` e `GET /progetti/:id`
+restituiscono un oggetto `avanzamento` (stato, percentuale, `segnaleRischio`, `oreExtra`)
+per il progetto **e per ciascun modulo**, calcolato da `src/services/calcoloService.ts`
+sulle ore realmente consuntivate. Non c'è nulla da installare né da migrare: le percentuali
+derivano da colonne che esistono già.
+
+**Guarda prima di scrivere.** Dopo un'importazione, una correzione fatta a mano a database o
+una modifica alle regole del motore, questo script dice esattamente quali righe un ricalcolo
+cambierebbe — e non ne cambia nessuna:
+
+```bash
+npx tsx src/scripts/probeAvanzamento.ts
+```
+
+Stampa, progetto per progetto, `stato in riga` contro `calcolato`, la percentuale, i moduli
+con il numero di micro-voci, e in coda il conteggio delle righe divergenti. Le righe marcate
+`<-- CAMBIA` sono quelle che un ricalcolo riscriverebbe.
+
+**Il ricalcolo che scrive** è una rotta autenticata, non uno script:
+
+```bash
+curl -s -X POST http://127.0.0.1:3000/progetti/<ID-PROGETTO>/ricalcola \
+     -H "Authorization: Bearer <token>"
+```
+
+Persiste la cascata verso l'alto — micro-voce → modulo → progetto — e scrive **solo** dove il
+valore calcolato differisce da quello in riga: un ricalcolo che riscrive valori identici
+sporcherebbe `updatedAt` e renderebbe indistinguibile "lo stato è cambiato" da "qualcuno ha
+premuto ricalcola". Ogni esecuzione lascia una riga di audit `PROGETTO_RICALCOLATO`.
+
+Due cose che il ricalcolo **non** fa, di proposito:
+
+- **Non tocca lo stato delle micro-voci.** La cascata sale, non scende (§16.6): una
+  micro-voce cambia stato solo per azione esplicita (consuntivazione, ritardo, chiusura).
+- **Non declassa un modulo senza micro-voci.** `calcolaStatoModulo([])` risponde `pending`,
+  che è giusto per un modulo appena creato e sbagliato per uno chiuso a mano: la riga è
+  l'unica fonte di informazione e sovrascriverla cancellerebbe un dato irrecuperabile. Il
+  probe li segnala a parte (`0 micro-voci: non ricalcolabile, riga preservata`) proprio
+  perché il loro stato non ha alcuna copertura di controllo — se ne trovi, la correzione è
+  aggiungere le micro-voci, non ricalcolare.

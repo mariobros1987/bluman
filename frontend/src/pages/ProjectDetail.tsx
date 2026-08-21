@@ -171,6 +171,13 @@ export function ProjectDetail() {
           setCurrentClient(dbRes.cliente);
         }
 
+        // §16 — l'avanzamento (stato e percentuali, per progetto e per modulo) arriva calcolato
+        // dal backend: qui si legge e non si ricalcola. Un modulo senza micro-voci a database
+        // risulta 0% anche se sotto vengono mostrate micro-voci di libreria: la percentuale
+        // segue le ore registrate, non quelle che il modello di riferimento prevederebbe.
+        const av = dbRes.avanzamento;
+        const avModuli = new Map<string, any>((av?.moduli || []).map((m: any) => [m.id, m]));
+
         let finalMods = (dbRes.moduli || []).map((m: any, mIdx: number) => {
           const localMod = localSavedProj?.mods?.find((lm: any) => lm.n.toLowerCase() === (m.nome || '').toLowerCase() || lm.id === (mIdx + 100));
 
@@ -234,18 +241,19 @@ export function ProjectDetail() {
           }
 
           const assignedTeam = localMod?.team || m.team || [1, 2];
+          const avM = avModuli.get(m.id);
 
           return {
             id: mIdx + 100,
             n: m.nome,
             cat: (m.categoria as CategoriaModulo) || 'Societario',
-            st: m.stato || 'in_progress',
-            pct: m.stato === 'done' ? 100 : m.stato === 'in_progress' ? 60 : 0,
+            st: avM?.stato || m.stato || 'in_progress',
+            pct: avM?.percentuale ?? 0,
             h: m.orePreventivate || microvociList.reduce((sum, v) => sum + v.hE, 0) || 20,
             a: m.oreConsuntivate || 0,
             p: m.prezzo ? m.prezzo / 100 : 3500,
             team: assignedTeam,
-            delay: m.stato === 'delayed' || m.stato === 'blocked',
+            delay: avM ? avM.stato === 'delayed' || avM.stato === 'blocked' : false,
             v: microvociList,
           };
         });
@@ -321,12 +329,16 @@ export function ProjectDetail() {
           n: dbRes.nome,
           cl: dbRes.cliente?.nome || 'Cliente Studio',
           ct: dbRes.cliente?.tipo === 'company' ? 'company' : 'individual',
-          st: dbRes.stato || 'in_progress',
-          pct: dbRes.percentualeAvanzamento || 0,
+          st: av?.stato || dbRes.stato || 'in_progress',
+          // Prima qui c'era `dbRes.percentualeAvanzamento`, un campo che il backend non ha mai
+          // prodotto: la barra di avanzamento del progetto è stata ferma a 0 da sempre.
+          pct: av?.percentuale ?? 0,
           start: new Date(dbRes.createdAt).toLocaleDateString(),
           due: '30 giorni',
           val: calculatedVal,
-          delay: false,
+          delay:
+            (av?.moduli || []).some((m: any) => m.stato === 'delayed' || m.stato === 'blocked') ||
+            Boolean(av?.segnaleRischio),
           fisc: 'privato_italia',
           fatture: (dbRes.fatture || []).map((f: any) => ({
             id: f.id,
