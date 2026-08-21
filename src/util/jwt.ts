@@ -87,3 +87,52 @@ export function generateMagicToken(clienteId: string): string {
   const randomBytes = crypto.randomBytes(16).toString('hex');
   return `client_${clienteId.substring(0, 8)}_${randomBytes}`;
 }
+
+/**
+ * SHA-256 del magic token: è questo che finisce nella tabella `magic_link`, non il token.
+ * Chi legge il database non deve poter entrare al posto del cliente.
+ *
+ * SHA-256 e non scrypt di proposito. scrypt è lento per difendere segreti *indovinabili*,
+ * cioè le password scelte da una persona; qui il segreto lo genera `generateMagicToken`
+ * con 16 byte da `crypto.randomBytes`, e non c'è dizionario che lo attacchi. Un hash lento
+ * su ogni verifica del link sarebbe solo costo.
+ */
+export function hashMagicToken(token: string): string {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
+
+// ─── Firma dei download (§Sicurezza) ─────────────────────────────────────────────
+// `GET /uploads/:filename` non può pretendere l'header Authorization: quegli URL finiscono
+// in `<img src>` — il logo dello studio nella sidebar, nelle fatture, dentro l'HTML delle
+// PDF di stampa — e in link diretti agli allegati. Nessuno di questi può inviare un header.
+// La prova di titolo viaggia quindi in query string, firmata con lo stesso segreto dei JWT.
+//
+// Scadenza lunga (7 giorni) perché `logoUrl` viene messo in cache nel `localStorage` del
+// browser: con una TTL da un'ora il logo si romperebbe da solo a metà sessione.
+const TTL_FIRMA_DOWNLOAD_SECONDI = 7 * 24 * 60 * 60;
+
+function calcolaFirmaDownload(filename: string, scadenza: number): string {
+  return crypto.createHmac('sha256', JWT_SECRET).update(`${filename}|${scadenza}`).digest('hex');
+}
+
+/** Firma e scadenza da appendere all'URL di un file servito da `/uploads/`. */
+export function firmaDownload(filename: string): { firma: string; scad: number } {
+  const scad = Math.floor(Date.now() / 1000) + TTL_FIRMA_DOWNLOAD_SECONDI;
+  return { firma: calcolaFirmaDownload(filename, scad), scad };
+}
+
+export function verificaFirmaDownload(filename: string, firma?: string, scad?: string): boolean {
+  if (!firma || !scad) return false;
+
+  const scadenza = Number(scad);
+  if (!Number.isInteger(scadenza) || Math.floor(Date.now() / 1000) > scadenza) return false;
+
+  const attesa = calcolaFirmaDownload(filename, scadenza);
+  const ricevuta = Buffer.from(firma, 'utf8');
+  const corretta = Buffer.from(attesa, 'utf8');
+  // `timingSafeEqual` pretende buffer di pari lunghezza: il confronto va fatto prima, ed è
+  // informazione che l'attaccante ha già (la lunghezza di un HMAC-SHA256 è nota).
+  if (ricevuta.length !== corretta.length) return false;
+
+  return crypto.timingSafeEqual(ricevuta, corretta);
+}

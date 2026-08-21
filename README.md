@@ -169,8 +169,37 @@ verbi. Neanche questo è un compito di RLS: `tenant` è la tabella che *contiene
 non una tabella figlia filtrata per `tenant_id`, quindi le policy non le danno protezione.
 
 `src/server.test.ts` verifica, rotta per rotta, 401 senza token e non-401 con un token
-valido; `src/gerarchiaRuoli.test.ts` presidia la gerarchia dei ruoli (`npx vitest run` →
-16 file, 187 test).
+valido; `src/gerarchiaRuoli.test.ts` presidia la gerarchia dei ruoli; `src/accessoCliente.test.ts`
+presidia il Magic Link e `GET /uploads/:filename` (`npx vitest run` → 17 file, 203 test).
+
+### 🔑 Il portale cliente non si apre con una stringa qualsiasi
+
+`POST /auth/magic-login` accettava qualunque valore che iniziasse per `client_`, e in cambio
+firmava un JWT con tenant ed email cablati nel sorgente. Non era una verifica debole:
+**assente**, perché i token non venivano persistiti da nessuna parte e non c'era nulla contro
+cui confrontarli — il rate limiting non lo copriva, non c'era niente da indovinare.
+
+Ora ogni link vive come riga in `magic_link`, con lo **SHA-256** del token (chi legge il
+database non entra al posto del cliente), scadenza a 7 giorni, indirizzo del destinatario e
+`usato_at` per l'audit. Il token lo genera il server con 16 byte da `crypto.randomBytes`, e
+`tenantId` ed email del JWT vengono dalla riga trovata, non da una costante. Il link resta
+valido fino a scadenza — un cliente riapre il proprio link più di una volta — e si revoca
+cancellando la riga.
+
+### 📎 `GET /uploads/:filename` è confinata, e non più anonima
+
+Fastify decodifica i parametri di rotta: `..%2f..%2fpackage.json` arrivava al handler come
+`../../package.json`, e `path.join` usciva dalla cartella. Il nome viene ora **rifiutato** con
+400 se non è `[a-zA-Z0-9_.-]` senza `..` — si rifiuta invece di sanificare, perché un nome
+riscritto in silenzio darebbe 404 e nasconderebbe il tentativo — e in aggiunta si verifica
+che il percorso *risolto* stia sotto `uploads/`.
+
+La rotta pretende una prova di titolo, ma ne accetta due alternative: il Bearer, oppure una
+firma HMAC in query string (`?firma=&scad=`). La seconda esiste perché questi URL finiscono
+in `<img src>` — il logo dello studio, le fatture, l'HTML delle stampe PDF — e in link
+diretti, e nessuno di questi può inviare un header `Authorization`. Resta nell'elenco delle
+rotte pubbliche perché il guard non legge la query string: lì "pubblica" significa "la
+controlla il handler", non "aperta".
 
 ### 👑 Il `super_admin` non appartiene a nessuno studio
 

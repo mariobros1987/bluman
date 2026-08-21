@@ -24,7 +24,10 @@ type PortalTab = 'proposta' | 'avanzamento' | 'form' | 'documenti' | 'contatti';
 export function ClientPortal() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const token = searchParams.get('magic_token') || 'client_demo';
+  // Nessun default: `|| 'client_demo'` faceva tentare l'accesso con un token inventato, e
+  // funzionava perché l'endpoint di verifica accettava qualunque stringa che iniziasse per
+  // `client_`. Senza token il portale non ha nulla da aprire e lo dice.
+  const token = searchParams.get('magic_token') || '';
 
   const [activeTab, setActiveTab] = useState<PortalTab>('proposta');
   const [clientObj, setClientObj] = useState<any>(null);
@@ -40,6 +43,8 @@ export function ClientPortal() {
   });
   const [loading, setLoading] = useState(false);
   const [pageLoading, setPageLoading] = useState(true);
+  /** Motivo per cui il portale non si apre: token assente, non valido o scaduto. */
+  const [accessoNegato, setAccessoNegato] = useState<string | null>(null);
 
   // Documenti in Incarico con Stato Firma Persistente
   const [portalDocs, setPortalDocs] = useState<any[]>([
@@ -139,17 +144,35 @@ export function ClientPortal() {
       // §23 — scambia il magic token dell'URL con un JWT vero prima di qualunque altra
       // chiamata. Il portale leggeva `magic_token` solo per riconoscere il cliente e poi
       // interrogava l'API senza autenticarsi: funzionava perché l'API non chiedeva un
-      // token a nessuno. Ora lo chiede, quindi lo scambio è il primo passo.
+      // token a nessuno. Ora lo chiede, quindi lo scambio è il primo passo — e se non
+      // riesce non si prosegue: senza sessione ogni chiamata prenderebbe 401 e la pagina
+      // mostrerebbe i dati di esempio come se fossero del cliente.
+      if (!token) {
+        setAccessoNegato('Link di accesso mancante. Apri il portale dal Magic Link che hai ricevuto per email.');
+        setPageLoading(false);
+        return;
+      }
+
+      let clienteIdSessione: string | null = null;
       try {
         const sessione = await magicLoginApi(token);
-        if (sessione?.token) localStorage.setItem('bluman_jwt_token', sessione.token);
+        if (!sessione?.token) throw new Error('Magic Link non valido o scaduto');
+        localStorage.setItem('bluman_jwt_token', sessione.token);
+        clienteIdSessione = sessione.user?.clienteId ?? null;
       } catch (err) {
-        console.warn('Magic login non riuscito: il portale resterà senza dati', err);
+        console.warn('Magic login non riuscito', err);
+        setAccessoNegato('Link di accesso non valido o scaduto. Richiedi un nuovo Magic Link al tuo referente.');
+        setPageLoading(false);
+        return;
       }
+      setAccessoNegato(null);
 
       const clientiRes = await fetchClienti();
       if (clientiRes && Array.isArray(clientiRes) && clientiRes.length > 0) {
-        const found = clientiRes.find(c => token.includes(c.id.substring(0, 8)));
+        // L'identità viene dalla sessione verificata, non da una sottostringa dell'URL.
+        const found = clienteIdSessione
+          ? clientiRes.find(c => c.id === clienteIdSessione)
+          : undefined;
         if (found) {
           setClientObj(found);
           setClientName(found.nome);
@@ -460,6 +483,21 @@ export function ClientPortal() {
       <div style={containerStyle}>
         <div style={{ padding: 60, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
           ⏳ Autenticazione sessione e caricamento portale riservato in corso...
+        </div>
+      </div>
+    );
+  }
+
+  // Senza una sessione verificata il portale non mostra niente: prima ci si arrivava con un
+  // token inventato e la pagina caricava comunque i dati di esempio, che sembravano quelli
+  // del cliente.
+  if (accessoNegato) {
+    return (
+      <div style={containerStyle}>
+        <div style={{ padding: 60, maxWidth: 520, margin: '0 auto', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ fontSize: 34 }}>🔒</div>
+          <div style={{ fontSize: 16, fontWeight: 700 }}>Accesso non disponibile</div>
+          <div style={{ fontSize: 12.5, color: 'var(--muted)', lineHeight: 1.6 }}>{accessoNegato}</div>
         </div>
       </div>
     );

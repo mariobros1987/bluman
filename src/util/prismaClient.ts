@@ -104,6 +104,10 @@ let clientAmministrativo: PrismaClient | null = null;
  * Va usato SOLO dove il tenant non è ancora noto o non è pertinente:
  *   - la ricerca dell'utente per email al login (§23): il tenant si scopre da quella
  *     riga, quindi non può essere un vincolo della query che la trova;
+ *   - la verifica del magic token in `POST /auth/magic-login` (§23): stesso caso, la
+ *     richiesta è anonima per definizione e il tenant si scopre dalla riga `magic_link`
+ *     che stiamo cercando. Il token è un segreto da 128 bit: è quello a delimitare cosa
+ *     la query può trovare, non il contesto tenant;
  *   - script di manutenzione, seed, bootstrap, backup.
  *
  * Ogni altro uso riapre esattamente il buco che le policy chiudono. Istanziato alla

@@ -95,6 +95,7 @@ model Tenant {
   contiBancari  ContoBancario[]
   permessiModuli PermessoModulo[]
   modelliDocumenti ModelloDocumentoCustom[]
+  magicLinks    MagicLink[]
 
   @@map("tenant")
 }
@@ -163,6 +164,7 @@ model Cliente {
   progetti   Progetto[]
   preventivi Preventivo[]
   contrattiRicorrenti ContrattoRicorrente[]
+  magicLinks MagicLink[]
 
   @@map("cliente")
 }
@@ -861,6 +863,40 @@ model ModelloDocumentoCustom {
   updatedAt      DateTime @updatedAt @map("updated_at")
 
   @@map("modello_documento_custom")
+}
+
+// ─────────────────────────────────────────────────────────────────
+// MAGIC LINK — accesso passwordless del cliente al portale (§23)
+// ─────────────────────────────────────────────────────────────────
+// Prima di questa tabella /auth/magic-login accettava qualunque stringa che iniziasse
+// per `client_` e in cambio firmava un JWT con tenant ed email cablati: non c'era
+// niente da verificare, perché i token non venivano persistiti da nessuna parte. Il
+// rate limiting non c'entrava — non era un problema di brute force, non c'era nulla
+// da indovinare.
+
+model MagicLink {
+  id        String    @id @default(uuid())
+  tenantId  String    @map("tenant_id")
+  tenant    Tenant    @relation(fields: [tenantId], references: [id])
+  clienteId String    @map("cliente_id")
+  cliente   Cliente   @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  // In tabella va lo SHA-256 del token, non il token: chi legge il database non deve
+  // poter entrare al posto del cliente. SHA-256 e non scrypt perché il token ha già
+  // 128 bit da crypto.randomBytes — scrypt difende dalle password indovinabili, e qui
+  // non c'è niente da indovinare.
+  tokenHash String    @unique @map("token_hash")
+  scadenza  DateTime  @map("scadenza")
+  // Indirizzo a cui il link è stato inviato. Serve all'audit — un credenziale di accesso
+  // senza traccia di dove è finita non è verificabile — e dà un'email al JWT di sessione:
+  // `Cliente` non ne ha una, e prima l'endpoint ne cablava una nel sorgente.
+  email     String?   @map("email")
+  // Primo utilizzo, per l'audit. Il link resta valido fino a scadenza: un cliente
+  // riapre il proprio link più di una volta, e invalidarlo al primo accesso lo
+  // chiuderebbe fuori. La revoca è la cancellazione della riga.
+  usatoAt   DateTime? @map("usato_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@map("magic_link")
 }
 
 // ─────────────────────────────────────────────────────────────────

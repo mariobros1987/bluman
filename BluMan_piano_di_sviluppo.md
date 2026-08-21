@@ -235,7 +235,10 @@ Per la messa in produzione professionale ed il passaggio ad un ambiente live:
 4. **🛡 Row-Level Security (RLS) PostgreSQL**:
    - [x] Migrazione SQL nativa (`supabase/migrations/20260819_rls_effettiva.sql`): una policy
      RESTRICTIVE `isolamento_tenant` per tabella, RLS attivo **e forzato**
-     (`FORCE ROW LEVEL SECURITY`) su tutte le 33 tabelle.
+     (`FORCE ROW LEVEL SECURITY`) su tutte le 34 tabelle. Il blocco per introspezione del
+     file copre ogni tabella con un `tenant_id` NOT NULL, quindi le tabelle nuove entrano
+     nell'isolamento appena viene rieseguito; le migrazioni Prisma che ne creano una portano
+     comunque la propria policy, perché `migrate deploy` gira senza nessuno davanti.
    - [x] Tre ruoli database distinti: `bluman_app` (runtime, `NOBYPASSRLS`, nessun `CREATE`
      su `public`) su `DATABASE_URL`, il proprietario dello schema su `DIRECT_URL` per le
      migrazioni, e `ADMIN_DATABASE_URL` per script di manutenzione, seed e backup.
@@ -261,21 +264,15 @@ Per la messa in produzione professionale ed il passaggio ad un ambiente live:
 
 Elencati qui perché non chiuderli è una scelta, non una dimenticanza.
 
-1. **`/auth/magic-login` accetta qualunque stringa con prefisso `client_`** — marcato
-   `⚠️ DEBITO NOTO (Fase 3)` nel codice. Va sostituito con token a scadenza monouso. È
-   l'ultima porta d'ingresso non verificata rimasta: il guard `onRequest` deve tenere questa
-   rotta pubblica per forza, quindi qui la difesa è tutta nel token.
-2. **`GET /uploads/:filename` è pubblica e non sanifica il nome file**. Resta pubblica di
-   proposito — gli URL finiscono in `<img src>` e in link diretti, quindi proteggerla con un
-   Bearer token la romperebbe — ma il parametro va vincolato a un elenco di caratteri
-   ammessi contro il path traversal, e la via giusta è passare agli URL pre-firmati di
-   Supabase Storage (`src/services/storageService.ts` esiste già).
-3. **Dashboard con percentuali cablate**: `frontend/src/pages/Dashboard.tsx` calcola
+1. **Dashboard con percentuali cablate**: `frontend/src/pages/Dashboard.tsx` calcola
    `pct` con valori fissi (`45`, `10`) invece dello stato reale dei progetti (Fase 1).
-4. **Mappa Graphify STALE**: le correzioni di Fase 0 non sono nel grafo, perché la CLI
-   `graphify` non è installata sulla postazione Windows dove sono state fatte. Da rigenerare
-   dove la CLI esiste (`graphify extract . --code-only` + `graphify cluster-only .`).
-5. **Due righe `user` residue senza password** — `francesca@bluecode.advisory` e
+2. **Mappa Graphify STALE**: l'ultima estrazione è del **17 agosto**, quindi *nessuna*
+   correzione di Fase 0 è nel grafo — compresi il modello `MagicLink` e le funzioni nuove di
+   `src/util/jwt.ts` e `src/services/storageService.ts`, che sono nodi e archi mancanti, non
+   solo righe cambiate. La CLI `graphify` non è installata sulla postazione Windows dove sono
+   state fatte. Da rigenerare dove la CLI esiste (`graphify extract . --code-only` +
+   `graphify cluster-only .`), senza reinstallarla qui solo per questo.
+3. **Due righe `user` residue senza password** — `francesca@bluecode.advisory` e
    `lorenzo@bluecode.advisory`, duplicati di `francesca.disabato@` e `lorenzo.marino@`
    lasciati da `seedFull.ts` e dal vecchio auto-seed di `listaUtenti()`. Sono inerti (senza
    `password_hash` non si accede da `/auth/login`) e ora non si rigenerano più, ma sporcano
@@ -285,6 +282,39 @@ Elencati qui perché non chiuderli è una scelta, non una dimenticanza.
 
 ### ✅ Chiusi in questa fase
 
+- ~~**`/auth/magic-login` accetta qualunque stringa con prefisso `client_`**~~ — era l'ultima
+  porta d'ingresso non verificata. Non un controllo debole: **assente**, perché i token non
+  venivano persistiti da nessuna parte e non c'era nulla contro cui confrontarli; e il JWT
+  restituito portava tenant ed email **cablati nel sorgente**, quindi un `curl` con
+  `{"magicToken":"client_x"}` otteneva una sessione `cliente` valida sul tenant che contiene
+  i dati. Il rate limiting non lo copriva: non c'era niente da indovinare. Ora esiste la
+  tabella `magic_link` (migrazione `20260819210000_magic_link_persistito`, con la propria
+  policy RLS): in riga va lo **SHA-256** del token — chi legge il database non entra al posto
+  del cliente — con scadenza a 7 giorni, email del destinatario e `usato_at` per l'audit. Il
+  token lo genera `generateMagicToken()` con 16 byte da `crypto.randomBytes`, non più
+  `Date.now()`; `tenantId` ed email del JWT vengono **dalla riga**. Link riutilizzabile fino a
+  scadenza (un cliente riapre il proprio link), revoca = cancellazione della riga. Il lookup
+  usa `prismaAmministrativo()` perché la richiesta è anonima per definizione e il tenant si
+  scopre proprio dalla riga cercata: è il caso ammesso dalla regola 1, come la ricerca utente
+  al login. Lato frontend spariscono le due fabbricazioni di token nel browser
+  (`ClientsPage.tsx`, `ClientPortal.tsx`) e il default `client_demo`.
+- ~~**`GET /uploads/:filename` è pubblica e non sanifica il nome file**~~ — Fastify decodifica
+  i parametri di rotta, quindi `..%2f..%2fpackage.json` arrivava al handler come
+  `../../package.json` e `path.join` usciva dalla cartella. Ora il nome viene **rifiutato**
+  con 400 se non passa `nomeFileValido()` (nessun `..`, solo `[a-zA-Z0-9_.-]`, max 255) — si
+  rifiuta invece di sanificare, perché un nome riscritto in silenzio darebbe 404 e
+  nasconderebbe il tentativo — e in aggiunta si verifica che il percorso **risolto** stia
+  sotto `uploads/`: è il controllo che regge anche alle codifiche che una regex non prevede.
+  La rotta non è più anonima: il handler pretende il Bearer **oppure** una firma HMAC in
+  query string (`?firma=&scad=`, `firmaDownload`/`verificaFirmaDownload` in `src/util/jwt.ts`,
+  confronto con `timingSafeEqual`). Servono due prove alternative perché questi URL finiscono
+  in `<img src>` in 6 punti — logo dello studio, fatture, HTML delle stampe PDF — e in un
+  `href` diretto, e nessuno di questi può inviare un header `Authorization`. Resta in
+  `ROTTE_PUBBLICHE` perché il guard non legge la query string: lì "pubblica" ora significa
+  "la controlla il handler". La firma dura 7 giorni e viene **rinnovata a ogni lettura** di
+  `logoUrl` (`rifirmaUrlUpload`), altrimenti il logo si romperebbe da solo dopo una settimana.
+  Corretto per la stessa via anche l'URL restituito da `uploadDocumento()`, che era
+  `http://127.0.0.1:3000/uploads/...`: dal browser di un utente non portava da nessuna parte.
 - ~~**Variabili d'ambiente su Railway**~~ — `JWT_SECRET` (48 caratteri) era già impostato;
   `DATABASE_URL` (ruolo `bluman_app`), `DIRECT_URL` e `ADMIN_DATABASE_URL` ora puntano al
   pooler Supabase `aws-1-eu-west-1.pooler.supabase.com:5432`, impostati con
@@ -292,7 +322,7 @@ Elencati qui perché non chiuderli è una scelta, non una dimenticanza.
   a metà traffico. Il Postgres di Railway resta in piedi ma non è più usato; il valore
   precedente di `DATABASE_URL` è nel file locale gitignorato `.env.railway-backup.local`.
   Verifica con `npx tsx src/scripts/checkRls.ts` → `current_user: bluman_app`,
-  `bypassa_rls: false`, RLS attivo e forzato su 33 tabelle, 0 clienti con tenant inesistente.
+  `bypassa_rls: false`, RLS attivo e forzato su 34 tabelle, 0 clienti con tenant inesistente.
 - ~~**Token finto nel frontend**~~ — `getAuthHeaders()` non ha più il token di ripiego.
   Quella stringa non era un JWT: il backend non poteva verificarla, ne ricavava
   `ruolo: undefined` e trattava la richiesta come non autenticata. Ora, in assenza di token,

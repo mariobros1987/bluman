@@ -269,6 +269,34 @@ export async function aggiornaClienteApi(id: string, input: Record<string, any>)
   return await res.json();
 }
 
+/**
+ * Genera un Magic Link per il portale cliente.
+ *
+ * Il token lo emette e lo firma il server: prima il modale se lo costruiva nel browser
+ * (`client_${id.substring(0,8)}`) e nessuno lo aveva mai registrato, quindi il link non
+ * apriva nulla — o, peggio, apriva tutto, perché l'endpoint di verifica accettava qualunque
+ * stringa. L'indirizzo è obbligatorio: `Cliente` non ha una colonna email e il server non
+ * inventa un destinatario.
+ */
+export async function generaMagicLinkApi(clienteId: string, email: string) {
+  const res = await fetch(`${API_BASE}/clienti/${encodeURIComponent(clienteId)}/magic-link`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ email }),
+  });
+  if (!res.ok) {
+    const dettaglio = await res.json().catch(() => null);
+    throw new Error(dettaglio?.errore || 'Errore generazione Magic Link');
+  }
+  return (await res.json()) as {
+    ok: boolean;
+    sent: boolean;
+    magicUrl: string;
+    magicToken: string;
+    scadenza: string;
+  };
+}
+
 export async function creaProgettoApi(input: { clienteId: string; nome: string }) {
   const res = await fetch(`${API_BASE}/progetti`, {
     method: 'POST',

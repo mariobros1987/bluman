@@ -14,10 +14,10 @@ import {
   TransizioneNonValidaError,
 } from './adapters/appErrors.js';
 
-import { signJwt, verifyJwt } from './util/jwt.js';
+import { signJwt, verifyJwt, generateMagicToken, hashMagicToken, verificaFirmaDownload } from './util/jwt.js';
 import { verifyPassword, hashPassword, generaPasswordTemporanea } from './util/password.js';
 import { sendMagicLinkEmail, sendOtpSecurityEmail, verifyAndSendTestSmtp, verifyRealImap } from './services/emailService.js';
-import { uploadDocumento } from './services/storageService.js';
+import { uploadDocumento, CARTELLA_UPLOADS, nomeFileValido, rifirmaUrlUpload } from './services/storageService.js';
 import { generateInvoicePdfBuffer } from './services/pdfService.js';
 import { generateOtp, verifyOtp, generateEidasSignatureSeal } from './services/otpService.js';
 import { runDailyNotificationCron } from './services/cronService.js';
@@ -34,6 +34,34 @@ const inMemoryTenantStore = new Map<string, any>();
  * (login, health) e i record di sistema. Coincide con l'id creato dal seed.
  */
 const TENANT_DEFAULT = '00000000-0000-0000-0000-000000000001';
+
+/**
+ * Validità di un Magic Link. Sette giorni perché il destinatario è un cliente che legge la
+ * posta quando può, non un operatore davanti alla console. La revoca non aspetta la
+ * scadenza: è la cancellazione della riga in `magic_link`.
+ */
+const GIORNI_VALIDITA_MAGIC_LINK = 7;
+
+/**
+ * Base pubblica del frontend, per i link che finiscono nelle email.
+ *
+ * Era cablata a `http://localhost:5173`, quindi ogni Magic Link inviato dalla produzione
+ * portava alla macchina di chi apriva l'email. In produzione l'assenza della variabile è un
+ * errore: un link rotto verso localhost è peggio di un errore visibile.
+ */
+function baseUrlApplicazione(): string {
+  const daEnv = process.env.APP_BASE_URL?.replace(/\/+$/, '');
+  if (daEnv) return daEnv;
+
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(
+      'APP_BASE_URL mancante: i link inviati per email punterebbero a localhost. ' +
+        'Impostala all\'origin pubblico del frontend (es. https://bluman.vercel.app).',
+    );
+  }
+
+  return 'http://localhost:5173';
+}
 
 async function recordAudit(params: {
   tenantId?: string;
@@ -96,9 +124,10 @@ export function buildServer(app: AppPort): FastifyInstance {
     'POST /webhooks/communications/whatsapp',
     'POST /webhooks/communications/telegram',
     'POST /webhooks/sdi',
-    // ⚠️ DEBITO RESIDUO: i file serviti qui finiscono in `<img src>` e in link diretti,
-    // che non possono inviare l'header Authorization. Chiudere questa rotta richiede
-    // prima di passare agli URL pre-firmati dello storage cloud (§Sicurezza punto 3).
+    // Qui "pubblica" significa "il guard non la controlla, la controlla il handler": i file
+    // finiscono in `<img src>` e in link diretti, che non possono inviare l'header
+    // Authorization. Il handler pretende il Bearer *oppure* la firma HMAC in query string
+    // (`?firma=&scad=`), che il guard non saprebbe leggere. Senza una delle due: 401.
     'GET /uploads/:filename',
   ]);
 
@@ -293,34 +322,74 @@ export function buildServer(app: AppPort): FastifyInstance {
   server.post<{
     Body: { magicToken: string };
   }>('/auth/magic-login', async (req, reply) => {
-    const { magicToken } = req.body;
+    const magicToken = req.body?.magicToken;
 
     if (superaLimiteAuth(`magic:${req.ip}`)) {
       return reply.code(429).send({ errore: 'Troppi tentativi di accesso. Riprova tra un minuto.' });
     }
 
-    // ⚠️ DEBITO NOTO (Fase 3 — portale cliente): questo endpoint accetta qualunque stringa
-    // che inizi per `client_` senza verificarla contro un token emesso e non scaduto. Il
-    // rate limiting qui sopra limita il brute force ma NON chiude il buco: serve
-    // persistere i magic token (valore, clienteId, scadenza, usato) e validarli qui.
-    if (!magicToken || !magicToken.startsWith('client_')) {
-      return reply.code(401).send({ errore: 'Magic Token non valido o scaduto' });
+    // §23 — il token si confronta con uno che abbiamo emesso e che non è scaduto.
+    //
+    // Prima della tabella `magic_link` qui bastava una stringa che iniziasse per `client_`,
+    // e il JWT restituito portava tenant ed email cablati nel sorgente: un curl con
+    // {"magicToken":"client_x"} otteneva una sessione valida di ruolo `cliente` sul tenant
+    // che contiene i dati. Non era un controllo debole da irrobustire, era assente — e il
+    // rate limiting qui sopra non lo sostituiva, perché non c'era niente da indovinare.
+    //
+    // Il lookup usa `prismaAmministrativo()` perché la richiesta è anonima per definizione:
+    // non porta un contesto tenant, e il tenant si scopre proprio dalla riga che stiamo
+    // cercando. È il caso ammesso dalla regola 1, lo stesso della ricerca utente per email
+    // al login, non una scorciatoia per aggirare le policy.
+    const rifiuto = { errore: 'Magic Token non valido o scaduto' };
+    if (!magicToken || typeof magicToken !== 'string') {
+      return reply.code(401).send(rifiuto);
     }
 
+    const db = prismaAmministrativo();
+    const link = await db.magicLink.findUnique({
+      where: { tokenHash: hashMagicToken(magicToken) },
+      include: { cliente: true },
+    });
+
+    // Un unico messaggio per token inesistente, scaduto o cliente cancellato: distinguerli
+    // direbbe a chi prova se un token è mai esistito.
+    if (!link || !link.cliente || link.scadenza.getTime() < Date.now()) {
+      return reply.code(401).send(rifiuto);
+    }
+
+    // Primo utilizzo registrato per l'audit; il link resta valido fino a scadenza perché un
+    // cliente riapre il proprio link più di una volta.
+    if (!link.usatoAt) {
+      await db.magicLink.update({ where: { id: link.id }, data: { usatoAt: new Date() } });
+    }
+
+    const emailCliente = link.email ?? '';
+    // Il tenant viene dalla riga del cliente, non da una costante: era il secondo guasto di
+    // questo endpoint, che firmava sempre il tenant di default qualunque cliente fosse.
+    const identitaPortale = `client-${link.clienteId}`;
     const token = signJwt({
-      userId: `client-usr-${Date.now()}`,
-      tenantId: '00000000-0000-0000-0000-000000000001',
-      email: 'client@holdingbeta.advisory',
+      userId: identitaPortale,
+      tenantId: link.cliente.tenantId,
+      email: emailCliente,
       ruolo: 'cliente',
+    });
+
+    recordAudit({
+      tenantId: link.cliente.tenantId,
+      azione: 'MAGIC_LINK_USATO',
+      entita: link.cliente.nome,
+      dettagli: `Accesso al portale cliente tramite Magic Link (${emailCliente || 'destinatario non registrato'})`,
+      ipAddress: req.ip,
     });
 
     return {
       ok: true,
       token,
       user: {
-        id: `client-usr-${Date.now()}`,
-        nome: 'Cliente Incarico',
-        email: 'client@holdingbeta.advisory',
+        id: identitaPortale,
+        clienteId: link.clienteId,
+        nome: link.cliente.nome,
+        email: emailCliente,
         ruolo: 'cliente',
       },
     };
@@ -455,24 +524,55 @@ export function buildServer(app: AppPort): FastifyInstance {
     return res;
   });
 
-  server.get<{ Params: { filename: string } }>('/uploads/:filename', async (req, reply) => {
-    const fs = await import('fs');
-    const path = await import('path');
-    const filePath = path.join(process.cwd(), 'uploads', req.params.filename);
-    if (!fs.existsSync(filePath)) {
-      return reply.code(404).send({ errore: 'File non trovato' });
-    }
-    const ext = path.extname(req.params.filename).toLowerCase();
-    let mimeType = 'application/octet-stream';
-    if (ext === '.png') mimeType = 'image/png';
-    else if (ext === '.jpg' || ext === '.jpeg') mimeType = 'image/jpeg';
-    else if (ext === '.webp') mimeType = 'image/webp';
-    else if (ext === '.svg') mimeType = 'image/svg+xml';
-    else if (ext === '.pdf') mimeType = 'application/pdf';
+  server.get<{ Params: { filename: string }; Querystring: { firma?: string; scad?: string } }>(
+    '/uploads/:filename',
+    async (req, reply) => {
+      const fs = await import('fs');
+      const path = await import('path');
+      const filename = req.params.filename;
 
-    const fileStream = fs.createReadStream(filePath);
-    return reply.type(mimeType).send(fileStream);
-  });
+      // 1. Il nome file. Prima il parametro veniva concatenato così com'era, e Fastify
+      // decodifica i parametri di rotta: `..%2f..%2f.env` arrivava qui come `../../.env` e
+      // `path.join` usciva dalla cartella. Si rifiuta invece di sanificare, perché un nome
+      // riscritto in silenzio darebbe 404 e nasconderebbe il tentativo.
+      if (!nomeFileValido(filename)) {
+        return reply.code(400).send({ errore: 'Nome file non valido' });
+      }
+
+      // 2. Il titolo per leggerlo. Due prove alternative, e non solo il Bearer, perché
+      // questi URL finiscono in `<img src>` (logo dello studio nella sidebar, nelle fatture,
+      // dentro l'HTML delle stampe PDF) e in href diretti: nessuno dei due può inviare un
+      // header Authorization. La firma in query string è HMAC sullo stesso segreto dei JWT.
+      const autenticato = Boolean((req as any).ruolo);
+      const firmato = verificaFirmaDownload(filename, req.query?.firma, req.query?.scad);
+      if (!autenticato && !firmato) {
+        return reply.code(401).send({ errore: 'Accesso al file non autorizzato' });
+      }
+
+      const filePath = path.join(CARTELLA_UPLOADS, filename);
+      // Terza rete: si verifica sul percorso risolto che il file stia davvero sotto
+      // `uploads/`. Il controllo sul nome dovrebbe già bastare, ma questo regge anche alle
+      // codifiche che quello non prevede — ed è l'unico che non dipende da una regex.
+      const radice = path.resolve(CARTELLA_UPLOADS);
+      if (!path.resolve(filePath).startsWith(radice + path.sep)) {
+        return reply.code(400).send({ errore: 'Nome file non valido' });
+      }
+
+      if (!fs.existsSync(filePath)) {
+        return reply.code(404).send({ errore: 'File non trovato' });
+      }
+      const ext = path.extname(filename).toLowerCase();
+      let mimeType = 'application/octet-stream';
+      if (ext === '.png') mimeType = 'image/png';
+      else if (ext === '.jpg' || ext === '.jpeg') mimeType = 'image/jpeg';
+      else if (ext === '.webp') mimeType = 'image/webp';
+      else if (ext === '.svg') mimeType = 'image/svg+xml';
+      else if (ext === '.pdf') mimeType = 'application/pdf';
+
+      const fileStream = fs.createReadStream(filePath);
+      return reply.type(mimeType).send(fileStream);
+    },
+  );
 
   // Aggiornamento Prezzo & Ore Articolo (§Admin)
   server.patch<{
@@ -570,21 +670,68 @@ export function buildServer(app: AppPort): FastifyInstance {
   });
 
   server.post<{ Params: { id: string }; Body: { email?: string } }>('/clienti/:id/magic-link', async (req, reply) => {
-    const cliente = await app.getCliente(req.params.id);
-    const toEmail = req.body?.email || (cliente as any).email || 'client@holdingbeta.advisory';
-    const magicToken = `client_${cliente.id.substring(0, 8)}_${Date.now()}`;
-    const magicUrl = `http://localhost:5173/portal?magic_token=${magicToken}`;
+    const tenantId = (req as any).tenantId as string;
+
+    // La riga del cliente serve davvero, non solo il suo nome: il magic link è una FK verso
+    // `cliente`, e un token che punta a un cliente inesistente non è verificabile. Se il
+    // cliente vive solo nello store in memoria (demo senza database) è meglio dirlo che
+    // emettere un link che `/auth/magic-login` rifiuterà sempre.
+    const cliente = await prisma.cliente.findUnique({ where: { id: req.params.id } });
+    if (!cliente) {
+      return reply.code(404).send({ errore: 'Cliente non trovato' });
+    }
+
+    const toEmail = req.body?.email?.trim();
+    if (!toEmail) {
+      // Prima qui c'era un fallback a un indirizzo cablato nel sorgente: il link finiva a una
+      // casella che non è del cliente. `Cliente` non ha una colonna email, quindi il
+      // destinatario deve arrivare dalla richiesta — chi invia sa a chi lo sta mandando.
+      return reply.code(400).send({ errore: "Indirizzo email del destinatario obbligatorio" });
+    }
+
+    // 16 byte da `crypto.randomBytes`, non `Date.now()`: il timestamp era prevedibile e il
+    // vecchio token non veniva nemmeno salvato, quindi non c'era nulla da verificare.
+    const magicToken = generateMagicToken(cliente.id);
+    const scadenza = new Date(Date.now() + GIORNI_VALIDITA_MAGIC_LINK * 24 * 60 * 60 * 1000);
+
+    await prisma.magicLink.create({
+      data: {
+        tenantId,
+        clienteId: cliente.id,
+        tokenHash: hashMagicToken(magicToken),
+        scadenza,
+        email: toEmail,
+      },
+    });
+
+    const magicUrl = `${baseUrlApplicazione()}/portal?magic_token=${magicToken}`;
 
     const sent = await sendMagicLinkEmail(toEmail, cliente.nome, magicUrl);
     recordAudit({
-      tenantId: (req as any).tenantId,
+      tenantId,
       azione: 'MAGIC_LINK_GENERATO',
       entita: cliente.nome,
-      dettagli: `Generato Magic Link per l'accesso passwordless del cliente (${toEmail})`,
+      dettagli: `Generato Magic Link per l'accesso passwordless del cliente (${toEmail}), valido fino al ${scadenza.toISOString()}`,
       ipAddress: req.ip,
     });
-    return { ok: true, sent, magicUrl, magicToken };
+    // Il token in chiaro esiste solo qui e nell'email: in tabella c'è il suo SHA-256, quindi
+    // questa risposta è l'unica occasione per mostrarlo a chi lo sta generando.
+    return { ok: true, sent, magicUrl, magicToken, scadenza: scadenza.toISOString() };
   });
+
+  /**
+   * Rinnova la firma del `logoUrl` a ogni lettura, quando è un file servito da noi.
+   *
+   * La firma scade dopo sette giorni mentre il valore in tabella resta: senza questo, il
+   * logo dello studio si romperebbe da solo dopo una settimana — anche nelle PDF, dove
+   * finisce dentro un `<img src>` generato lato server.
+   */
+  function conFirmaLogo<T>(tenant: T): T {
+    if (!tenant || typeof tenant !== 'object') return tenant;
+    const logoUrl = (tenant as any).logoUrl;
+    if (typeof logoUrl !== 'string') return tenant;
+    return { ...(tenant as any), logoUrl: rifirmaUrlUpload(logoUrl) };
+  }
 
   server.get('/tenant/info', async (req) => {
     const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
@@ -607,7 +754,7 @@ export function buildServer(app: AppPort): FastifyInstance {
           },
         });
       }
-      return tenant;
+      return conFirmaLogo(tenant);
     } catch {
       if (!inMemoryTenantStore.has(tenantId)) {
         inMemoryTenantStore.set(tenantId, {
@@ -617,7 +764,7 @@ export function buildServer(app: AppPort): FastifyInstance {
           stato: 'attivo',
         });
       }
-      return inMemoryTenantStore.get(tenantId);
+      return conFirmaLogo(inMemoryTenantStore.get(tenantId));
     }
   });
 
@@ -676,13 +823,13 @@ export function buildServer(app: AppPort): FastifyInstance {
         entita: 'Anagrafica Studio & Impostazioni',
         dettagli: `Aggiornati e sincronizzati su DB Supabase tutti i parametri dello studio: ${sanitizedData.ragioneSociale || tenantId}`,
       });
-      return reply.send(updated);
+      return reply.send(conFirmaLogo(updated));
     } catch (err) {
       console.warn('Prisma tenant upsert fallback to inMemory store:', err);
       const current = inMemoryTenantStore.get(tenantId) || { id: tenantId };
       const updated = { ...current, ...sanitizedData, id: tenantId };
       inMemoryTenantStore.set(tenantId, updated);
-      return reply.send(updated);
+      return reply.send(conFirmaLogo(updated));
     }
   });
 

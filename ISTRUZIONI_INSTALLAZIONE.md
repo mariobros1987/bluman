@@ -55,8 +55,23 @@ npm run dev
 ```
 *Apri il browser su: `http://localhost:5173`*
 
-Per accedere direttamente al **Portale Cliente Passwordless**, apri:
-`http://localhost:5173/portal?magic_token=client_demo`
+Per accedere al **Portale Cliente Passwordless** serve un Magic Link vero: l'indirizzo
+`?magic_token=client_demo` non funziona più, ed è la correzione — quella stringa apriva una
+sessione valida perché `POST /auth/magic-login` accettava qualunque valore che iniziasse per
+`client_`. Il link lo emette lo studio, dalla scheda del cliente:
+
+```bash
+# Autenticato come advisor o super_admin del tenant del cliente:
+curl -s -X POST http://127.0.0.1:3000/clienti/<ID_CLIENTE>/magic-link \
+     -H "Authorization: Bearer <JWT>" -H 'Content-Type: application/json' \
+     -d '{"email":"cliente@esempio.it"}'
+# → { "magicUrl": "http://localhost:5173/portal?magic_token=client_...", "scadenza": "..." }
+```
+
+Dall'interfaccia: **Clienti → riga del cliente → Magic Link**, inserendo l'indirizzo a cui
+inviarlo. Il token in chiaro esiste solo in quella risposta e nell'email: in tabella
+(`magic_link`) c'è il suo SHA-256, quindi non è recuperabile dopo. Vale 7 giorni, si riapre
+quante volte serve, e si revoca cancellando la riga.
 
 ---
 
@@ -230,6 +245,11 @@ Tre avvertenze pratiche, tutte imparate sul campo:
 - **`JWT_SECRET` (≥32 caratteri) è obbligatorio.** Senza, il server non si arresta —
   `NODE_ENV` non è impostato nel `Dockerfile` — ma genera un segreto casuale a ogni
   processo: **tutti i token in circolazione vengono invalidati a ogni redeploy.**
+- **`APP_BASE_URL` è l'origin pubblico del frontend** (es. `https://bluman.vercel.app`, senza
+  barra finale). Ci finiscono dentro i link inviati per email, primo fra tutti il Magic Link
+  del portale cliente: era cablato a `http://localhost:5173`, quindi ogni link spedito dalla
+  produzione portava alla macchina di chi apriva l'email. Con `NODE_ENV=production` la sua
+  assenza è ora un errore all'emissione del link, non un default silenzioso.
 
 Dopo il deploy, la verifica che conta la fa il ruolo di runtime:
 
@@ -238,5 +258,5 @@ npx tsx src/scripts/checkRls.ts
 ```
 
 Deve mostrare `current_user: bluman_app`, `bypassa_rls: false`, RLS attivo **e forzato** su
-tutte e 33 le tabelle applicative (`_prisma_migrations` esclusa, correttamente) e **0
+tutte e 34 le tabelle applicative (`_prisma_migrations` esclusa, correttamente) e **0
 clienti visibili** con un tenant inesistente.
