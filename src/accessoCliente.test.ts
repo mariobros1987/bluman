@@ -50,6 +50,8 @@ vi.mock('./util/prismaClient.js', async importOriginal => {
     },
     cliente: {
       findUnique: async () => stato.cliente,
+      findFirst: async () => stato.cliente,
+      update: async (args: any) => ({ ...stato.cliente, ...args.data }),
     },
     auditLog: { create: async () => ({}) },
     tenant: { findUnique: async () => null, create: async (a: any) => a.data, upsert: async (a: any) => a.update },
@@ -62,6 +64,7 @@ vi.mock('./util/prismaClient.js', async importOriginal => {
 const { buildServer } = await import('./server.js');
 const { InMemoryApp } = await import('./adapters/inMemoryApp.js');
 const { signJwt, hashMagicToken, firmaDownload } = await import('./util/jwt.js');
+const { hashPassword } = await import('./util/password.js');
 const { CARTELLA_UPLOADS } = await import('./services/storageService.js');
 
 const TENANT_STUDIO = '00000000-0000-0000-0000-000000000001';
@@ -369,3 +372,100 @@ describe('§Sicurezza GET /uploads/:filename — confinata e non anonima', () =>
     expect(passata.statusCode).toBe(401);
   });
 });
+
+describe('§23 POST /auth/client-login — credenziali dedicate per cliente', () => {
+  it('autentica il cliente con email e password corrette e rilascia JWT cliente', async () => {
+    const PWD_TEST = 'PasswordForte123!';
+    stato.cliente = {
+      id: 'cli-test-99',
+      tenantId: TENANT_ALTRO,
+      nome: 'Società Alfa S.r.l.',
+      email: 'alfa@holding.it',
+      passwordHash: hashPassword(PWD_TEST),
+    };
+
+    const app = server();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/auth/client-login',
+      payload: { email: 'alfa@holding.it', password: PWD_TEST },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.ok).toBe(true);
+    expect(body.user.ruolo).toBe('cliente');
+    expect(body.user.clienteId).toBe('cli-test-99');
+    expect(body.user.tenantId).toBe(TENANT_ALTRO);
+
+    const decoded = payloadJwt(body.token);
+    expect(decoded.ruolo).toBe('cliente');
+    expect(decoded.tenantId).toBe(TENANT_ALTRO);
+    expect(decoded.userId).toBe('client-cli-test-99');
+  });
+
+  it('rifiuta password errata con 401', async () => {
+    stato.cliente = {
+      id: 'cli-test-99',
+      tenantId: TENANT_ALTRO,
+      nome: 'Società Alfa S.r.l.',
+      email: 'alfa@holding.it',
+      passwordHash: hashPassword('PasswordCorretta!'),
+    };
+
+    const app = server();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/auth/client-login',
+      payload: { email: 'alfa@holding.it', password: 'PasswordSbagliata!' },
+    });
+
+    expect(res.statusCode).toBe(401);
+    expect(res.json().errore).toContain('non valide');
+  });
+
+  it('rifiuta cliente senza password configurata', async () => {
+    stato.cliente = {
+      id: 'cli-test-99',
+      tenantId: TENANT_ALTRO,
+      nome: 'Società Alfa S.r.l.',
+      email: 'alfa@holding.it',
+      passwordHash: null,
+    };
+
+    const app = server();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/auth/client-login',
+      payload: { email: 'alfa@holding.it', password: 'QualunquePassword' },
+    });
+
+    expect(res.statusCode).toBe(401);
+  });
+});
+
+describe('§23 POST /clienti/:id/reset-password — generazione credenziali cliente', () => {
+  it('genera una nuova password e la restituisce in chiaro nella risposta', async () => {
+    stato.cliente = {
+      id: 'cli-test-88',
+      tenantId: TENANT_STUDIO,
+      nome: 'Cliente Beta',
+      email: 'beta@holding.it',
+      passwordHash: null,
+    };
+
+    const app = server();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/clienti/cli-test-88/reset-password',
+      headers: { authorization: `Bearer ${tokenAdvisor(TENANT_STUDIO)}` },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.ok).toBe(true);
+    expect(typeof body.passwordChiaro).toBe('string');
+    expect(body.passwordChiaro.length).toBeGreaterThanOrEqual(12);
+  });
+});
+

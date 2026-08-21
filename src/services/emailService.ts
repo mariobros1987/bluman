@@ -292,3 +292,58 @@ export async function sendOtpSecurityEmail(toEmail: string, clienteNome: string,
     return false;
   }
 }
+
+export async function sendClientCredentialsEmail(
+  toEmail: string,
+  clienteNome: string,
+  passwordChiaro: string,
+  portalUrl?: string
+): Promise<boolean> {
+  const transporter = createTransporter();
+  const fromEmail = process.env.SMTP_FROM || 'info@bluman.app';
+  const url = portalUrl || 'https://bluman.vercel.app/portal';
+
+  const html = `
+    <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; color: #1e293b;">
+      <div style="background-color: #0f172a; padding: 24px; text-align: center;">
+        <h1 style="color: #6366f1; margin: 0; font-size: 24px; font-weight: 700;">BluMan Advisory</h1>
+        <p style="color: #94a3b8; margin: 4px 0 0 0; font-size: 13px;">Credenziali Accesso Portale Cliente</p>
+      </div>
+      <div style="padding: 32px 24px;">
+        <h2 style="margin-top: 0; font-size: 18px; color: #0f172a;">Gentile ${clienteNome},</h2>
+        <p style="line-height: 1.6; color: #475569;">Sono state generate le credenziali per il tuo accesso al Portale Riservato.</p>
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 18px 20px; margin: 24px 0;">
+          <p style="margin: 0 0 8px 0; font-size: 13px; color: #64748b;">Email (Username): <strong style="color: #0f172a;">${toEmail}</strong></p>
+          <p style="margin: 0; font-size: 13px; color: #64748b;">Password: <strong style="color: #4338ca; font-family: monospace; font-size: 15px;">${passwordChiaro}</strong></p>
+        </div>
+        <div style="text-align: center; margin: 28px 0;">
+          <a href="${url}" style="background-color: #6366f1; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; font-size: 14px; display: inline-block;">Accedi al Portale Cliente ➔</a>
+        </div>
+        <p style="font-size: 12px; color: #94a3b8; line-height: 1.5;">Ti consigliamo di conservare queste credenziali con cura e di non divulgarle.</p>
+      </div>
+      <div style="background-color: #f8fafc; padding: 16px 24px; text-align: center; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8;">
+        BluMan Advisory Platform • Portale Riservato Clienti
+      </div>
+    </div>
+  `;
+
+  if (!transporter) {
+    console.log(`[Email Simulation] Invio Credenziali a ${toEmail}: ${url} (Password: ${passwordChiaro})`);
+    return false;
+  }
+
+  try {
+    await transporter.sendMail({
+      from: `"BluMan Advisory" <${fromEmail}>`,
+      to: toEmail,
+      subject: `🔑 Credenziali di Accesso al Portale — ${clienteNome}`,
+      html,
+    });
+    console.log(`[SMTP] Email Credenziali inviata con successo a ${toEmail}`);
+    return true;
+  } catch (err) {
+    console.error('[SMTP Error] Errore invio email credenziali:', err);
+    return false;
+  }
+}
+

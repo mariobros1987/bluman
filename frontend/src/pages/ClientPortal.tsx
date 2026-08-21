@@ -7,7 +7,7 @@ import type { SignatureData } from '../utils/pdfGenerator';
 import { DigitalSignatureModal } from '../components/DigitalSignatureModal';
 import { resolveDocumentTemplateHtml, PREBUILT_TEMPLATES } from '../utils/documentTemplates';
 import { getStudioInfoForTenant, getCurrentTenantId, getTenantStorageKey, BLUECODE_TENANT_ID } from '../utils/tenant';
-import { fetchModuliLibreria, fetchProgetti, creaPreventivoEAccettaApi, fetchClienti, creaProgettoApi, creaClienteApi, fetchComunicazioniApi, inviaComunicazioneApi, requestPortalOtpApi, verifyPortalOtpAndSignApi, magicLoginApi } from '../api/client';
+import { fetchModuliLibreria, fetchProgetti, creaPreventivoEAccettaApi, fetchClienti, creaProgettoApi, creaClienteApi, fetchComunicazioniApi, inviaComunicazioneApi, requestPortalOtpApi, verifyPortalOtpAndSignApi, magicLoginApi, clientLoginApi } from '../api/client';
 import type { CategoriaModulo } from '../types';
 
 interface ModuloProposta {
@@ -24,14 +24,20 @@ type PortalTab = 'proposta' | 'avanzamento' | 'form' | 'documenti' | 'contatti';
 export function ClientPortal() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  // Nessun default: `|| 'client_demo'` faceva tentare l'accesso con un token inventato, e
-  // funzionava perché l'endpoint di verifica accettava qualunque stringa che iniziasse per
-  // `client_`. Senza token il portale non ha nulla da aprire e lo dice.
   const token = searchParams.get('magic_token') || '';
+
+  // Stati di autenticazione per Portale Cliente (Email + Password e Magic Link)
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [authMode, setAuthMode] = useState<'credentials' | 'magic'>('credentials');
+  const [manualMagicToken, setManualMagicToken] = useState('');
 
   const [activeTab, setActiveTab] = useState<PortalTab>('proposta');
   const [clientObj, setClientObj] = useState<any>(null);
-  const [clientName, setClientName] = useState('Marco Ricci / Holding Beta S.r.l.');
+  const [clientName, setClientName] = useState('Cliente Studio');
   const [moduliProposti, setModuliProposti] = useState<ModuloProposta[]>([]);
   const [signed, setSigned] = useState<boolean>(() => {
     return localStorage.getItem('bluman_portal_signed_Marco Ricci / Holding Beta S.r.l.') === 'true' ||
@@ -43,7 +49,6 @@ export function ClientPortal() {
   });
   const [loading, setLoading] = useState(false);
   const [pageLoading, setPageLoading] = useState(true);
-  /** Motivo per cui il portale non si apre: token assente, non valido o scaduto. */
   const [accessoNegato, setAccessoNegato] = useState<string | null>(null);
 
   // Documenti in Incarico con Stato Firma Persistente
@@ -136,40 +141,63 @@ export function ClientPortal() {
   const [canaleMessaggio, setCanaleMessaggio] = useState<'whatsapp' | 'email' | 'telegram' | 'portal'>('portal');
   const [inviandoMessaggio, setInviandoMessaggio] = useState(false);
 
-  useEffect(() => {
-    const loadPortalData = async () => {
-      setPageLoading(true);
-      let resolvedClientName = clientName;
+  const loadPortalData = async (clienteIdParam?: string) => {
+    setPageLoading(true);
+    let resolvedClientName = clientName;
+    let clienteIdSessione: string | null = clienteIdParam || null;
 
-      // §23 — scambia il magic token dell'URL con un JWT vero prima di qualunque altra
-      // chiamata. Il portale leggeva `magic_token` solo per riconoscere il cliente e poi
-      // interrogava l'API senza autenticarsi: funzionava perché l'API non chiedeva un
-      // token a nessuno. Ora lo chiede, quindi lo scambio è il primo passo — e se non
-      // riesce non si prosegue: senza sessione ogni chiamata prenderebbe 401 e la pagina
-      // mostrerebbe i dati di esempio come se fossero del cliente.
-      if (!token) {
-        setAccessoNegato('Link di accesso mancante. Apri il portale dal Magic Link che hai ricevuto per email.');
-        setPageLoading(false);
-        return;
-      }
-
-      let clienteIdSessione: string | null = null;
+    if (token) {
       try {
         const sessione = await magicLoginApi(token);
         if (!sessione?.token) throw new Error('Magic Link non valido o scaduto');
         localStorage.setItem('bluman_jwt_token', sessione.token);
+        if (sessione.user) {
+          localStorage.setItem('bluman_client_user', JSON.stringify(sessione.user));
+        }
         clienteIdSessione = sessione.user?.clienteId ?? null;
-      } catch (err) {
+        setIsAuthenticated(true);
+        setAccessoNegato(null);
+      } catch (err: any) {
         console.warn('Magic login non riuscito', err);
-        setAccessoNegato('Link di accesso non valido o scaduto. Richiedi un nuovo Magic Link al tuo referente.');
+        setAccessoNegato(err.message || 'Link di accesso non valido o scaduto.');
+        setIsAuthenticated(false);
         setPageLoading(false);
         return;
       }
+    } else if (clienteIdParam) {
+      clienteIdSessione = clienteIdParam;
+      setIsAuthenticated(true);
       setAccessoNegato(null);
+    } else {
+      const existingToken = localStorage.getItem('bluman_jwt_token');
+      const savedClientUser = localStorage.getItem('bluman_client_user');
+      if (existingToken && savedClientUser) {
+        try {
+          const parsed = JSON.parse(savedClientUser);
+          if (parsed.ruolo === 'cliente' && parsed.clienteId) {
+            clienteIdSessione = parsed.clienteId;
+            setIsAuthenticated(true);
+            setAccessoNegato(null);
+          } else {
+            setIsAuthenticated(false);
+            setPageLoading(false);
+            return;
+          }
+        } catch {
+          setIsAuthenticated(false);
+          setPageLoading(false);
+          return;
+        }
+      } else {
+        setIsAuthenticated(false);
+        setPageLoading(false);
+        return;
+      }
+    }
 
+    try {
       const clientiRes = await fetchClienti();
       if (clientiRes && Array.isArray(clientiRes) && clientiRes.length > 0) {
-        // L'identità viene dalla sessione verificata, non da una sottostringa dell'URL.
         const found = clienteIdSessione
           ? clientiRes.find(c => c.id === clienteIdSessione)
           : undefined;
@@ -244,12 +272,12 @@ export function ClientPortal() {
       } catch (err) {
         console.warn('Errore recupero messaggi portale:', err);
       }
-
+    } catch (err) {
+      console.warn('Errore caricamento dati portale:', err);
+    } finally {
       setPageLoading(false);
-    };
-
-    loadPortalData();
-  }, [token]);
+    }
+  };
 
   const totalValue = moduliProposti.reduce((acc, m) => acc + m.prezzo, 0);
 
@@ -469,14 +497,7 @@ export function ClientPortal() {
         ragioneSociale: formData.ragioneSociale || clientName,
         piva: formData.piva || '',
         codiceFiscale: formData.codiceFiscale || '',
-      },
-      progetto: {
-        titolo: 'Progetto Consulenza & Structuring Patrimoniale',
-        totalePreventivo: totalValue,
-      },
-      studio,
-    });
-  };
+  const currentStudioInfo = getStudioInfoForTenant();
 
   if (pageLoading) {
     return (
@@ -488,16 +509,166 @@ export function ClientPortal() {
     );
   }
 
-  // Senza una sessione verificata il portale non mostra niente: prima ci si arrivava con un
-  // token inventato e la pagina caricava comunque i dati di esempio, che sembravano quelli
-  // del cliente.
-  if (accessoNegato) {
+  // Schermata di Login Portale Cliente con Email + Password (o Magic Link)
+  if (!isAuthenticated) {
     return (
-      <div style={containerStyle}>
-        <div style={{ padding: 60, maxWidth: 520, margin: '0 auto', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div style={{ fontSize: 34 }}>🔒</div>
-          <div style={{ fontSize: 16, fontWeight: 700 }}>Accesso non disponibile</div>
-          <div style={{ fontSize: 12.5, color: 'var(--muted)', lineHeight: 1.6 }}>{accessoNegato}</div>
+      <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+        <div style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 20, padding: 32, width: '100%', maxWidth: 460, display: 'flex', flexDirection: 'column', gap: 20, boxShadow: '0 24px 60px rgba(0,0,0,.6)' }}>
+          {/* Header */}
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 54, height: 54, borderRadius: 16, background: 'var(--indigo)', color: '#fff', fontSize: 26, marginBottom: 12 }}>
+              🛡
+            </div>
+            <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--text)', margin: 0 }}>
+              {currentStudioInfo.ragioneSociale || 'BluMan Advisory'}
+            </h1>
+            <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>
+              Portale Riservato Clienti • Consultazione Incarichi & Firma Digitale
+            </p>
+          </div>
+
+          {/* Switcher Modalità Accesso */}
+          <div style={{ background: 'var(--card2)', padding: 4, borderRadius: 12, display: 'flex', gap: 4 }}>
+            <button
+              type="button"
+              onClick={() => { setAuthMode('credentials'); setLoginError(null); }}
+              style={{
+                flex: 1,
+                padding: '8px 12px',
+                borderRadius: 8,
+                border: 'none',
+                background: authMode === 'credentials' ? 'var(--indigo)' : 'transparent',
+                color: authMode === 'credentials' ? '#fff' : 'var(--muted)',
+                fontWeight: 700,
+                fontSize: 12,
+                cursor: 'pointer',
+                transition: 'all .2s ease',
+              }}
+            >
+              🔑 Email e Password
+            </button>
+            <button
+              type="button"
+              onClick={() => { setAuthMode('magic'); setLoginError(null); }}
+              style={{
+                flex: 1,
+                padding: '8px 12px',
+                borderRadius: 8,
+                border: 'none',
+                background: authMode === 'magic' ? 'var(--indigo)' : 'transparent',
+                color: authMode === 'magic' ? '#fff' : 'var(--muted)',
+                fontWeight: 700,
+                fontSize: 12,
+                cursor: 'pointer',
+                transition: 'all .2s ease',
+              }}
+            >
+              🔗 Magic Link
+            </button>
+          </div>
+
+          {accessoNegato && (
+            <div style={{ background: '#3b1414', border: '1px solid #7f1d1d', color: '#fca5a5', padding: '10px 14px', borderRadius: 8, fontSize: 12 }}>
+              ⚠️ {accessoNegato}
+            </div>
+          )}
+
+          {loginError && (
+            <div style={{ background: '#3b1414', border: '1px solid #7f1d1d', color: '#fca5a5', padding: '10px 14px', borderRadius: 8, fontSize: 12 }}>
+              ⚠️ {loginError}
+            </div>
+          )}
+
+          {/* Form Credenziali Classico */}
+          {authMode === 'credentials' ? (
+            <form onSubmit={handleClientLogin} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div>
+                <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Email di Registrazione Cliente *</label>
+                <input
+                  type="email"
+                  value={loginEmail}
+                  onChange={e => setLoginEmail(e.target.value)}
+                  placeholder="es. mario.rossi@holding.it"
+                  required
+                  style={{ width: '100%', fontSize: 13, fontWeight: 600, padding: '10px 12px', background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Password Riservata *</label>
+                <input
+                  type="password"
+                  value={loginPassword}
+                  onChange={e => setLoginPassword(e.target.value)}
+                  placeholder="••••••••••••"
+                  required
+                  style={{ width: '100%', fontSize: 13, fontWeight: 600, padding: '10px 12px', background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)' }}
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={loginLoading}
+                style={{
+                  background: 'var(--indigo)',
+                  color: '#fff',
+                  border: 'none',
+                  padding: '12px 20px',
+                  borderRadius: 10,
+                  fontSize: 13,
+                  fontWeight: 700,
+                  cursor: loginLoading ? 'wait' : 'pointer',
+                  marginTop: 6,
+                  boxShadow: '0 4px 14px rgba(99, 102, 241, 0.4)',
+                }}
+              >
+                {loginLoading ? 'Verifica credenziali in corso...' : 'Accedi al Portale Riservato ➔'}
+              </button>
+            </form>
+          ) : (
+            /* Form Magic Token */
+            <form onSubmit={handleManualMagicSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div>
+                <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Codice o Token Magic Link</label>
+                <input
+                  type="text"
+                  value={manualMagicToken}
+                  onChange={e => setManualMagicToken(e.target.value)}
+                  placeholder="es. client_12345678_abcdef..."
+                  required
+                  style={{ width: '100%', fontSize: 13, fontWeight: 600, padding: '10px 12px', background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)' }}
+                />
+                <span style={{ fontSize: 10, color: 'var(--muted)', marginTop: 4, display: 'block' }}>
+                  Incolla il codice Magic Token che hai ricevuto per email o WhatsApp dal tuo Advisor.
+                </span>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loginLoading}
+                style={{
+                  background: 'var(--indigo)',
+                  color: '#fff',
+                  border: 'none',
+                  padding: '12px 20px',
+                  borderRadius: 10,
+                  fontSize: 13,
+                  fontWeight: 700,
+                  cursor: loginLoading ? 'wait' : 'pointer',
+                  marginTop: 6,
+                  boxShadow: '0 4px 14px rgba(99, 102, 241, 0.4)',
+                }}
+              >
+                {loginLoading ? 'Verifica Magic Token...' : 'Accedi con Magic Token ➔'}
+              </button>
+            </form>
+          )}
+
+          <div style={{ textAlign: 'center', borderTop: '1px solid var(--border)', paddingTop: 14 }}>
+            <span style={{ fontSize: 11, color: 'var(--muted)' }}>
+              🔒 Connessione protetta con crittografia end-to-end e firma digitale eIDAS
+            </span>
+          </div>
         </div>
       </div>
     );
@@ -510,15 +681,35 @@ export function ClientPortal() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <div style={{ width: 36, height: 36, background: 'var(--indigo)', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, color: '#fff', fontWeight: 800 }}>🛡</div>
           <div>
-            <div style={{ fontSize: 14, fontWeight: 700 }}>Bluecode Advisory Platform</div>
-            <div style={{ fontSize: 11, color: 'var(--muted)' }}>Portale Riservato Cliente · {clientName}</div>
+            <div style={{ fontSize: 14, fontWeight: 700 }}>
+              {currentStudioInfo.ragioneSociale || 'BluMan Advisory Platform'}
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+              Portale Riservato Cliente · <strong>{clientName}</strong>
+            </div>
           </div>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ background: '#0d2d22', border: '1px solid #1a5c3c', color: '#34d399', fontSize: 11, padding: '5px 12px', borderRadius: 20, fontWeight: 600 }}>
-            🔒 Accesso Sicuro Passwordless
+            🔒 Accesso Riservato Cliente
           </div>
+          <button
+            onClick={handleClientLogout}
+            style={{
+              background: 'var(--card2)',
+              border: '1px solid var(--border)',
+              color: '#f87171',
+              padding: '5px 12px',
+              borderRadius: 8,
+              fontSize: 11,
+              fontWeight: 700,
+              cursor: 'pointer',
+            }}
+            title="Disconnettiti dal portale"
+          >
+            🚪 Esci
+          </button>
         </div>
       </div>
 

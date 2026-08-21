@@ -103,6 +103,22 @@ export async function magicLoginApi(magicToken: string) {
   return await res.json();
 }
 
+/**
+ * Accesso classico al Portale Cliente con Email e Password dedicate.
+ */
+export async function clientLoginApi(email: string, password: string) {
+  const res = await fetch(`${API_BASE}/auth/client-login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  });
+  if (!res.ok) {
+    const json = await res.json().catch(() => null);
+    throw new Error(json?.errore || 'Credenziali non valide o accesso disabilitato');
+  }
+  return await res.json();
+}
+
 export async function fetchProgetti() {
   try {
     const res = await fetchWithTimeout(`${API_BASE}/progetti`, { headers: getAuthHeaders() }, 6000);
@@ -294,6 +310,26 @@ export async function generaMagicLinkApi(clienteId: string, email: string) {
     magicUrl: string;
     magicToken: string;
     scadenza: string;
+  };
+}
+
+/**
+ * Genera o reimposta la password di accesso per il cliente, inviando opzionalmente l'email.
+ */
+export async function resetPasswordClienteApi(clienteId: string) {
+  const res = await fetch(`${API_BASE}/clienti/${encodeURIComponent(clienteId)}/reset-password`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) {
+    const dettaglio = await res.json().catch(() => null);
+    throw new Error(dettaglio?.errore || 'Errore generazione password cliente');
+  }
+  return (await res.json()) as {
+    ok: boolean;
+    passwordChiaro: string;
+    email: string;
+    emailInviata: boolean;
   };
 }
 

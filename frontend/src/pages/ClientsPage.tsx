@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { fetchClienti, creaClienteApi, aggiornaClienteApi, generaMagicLinkApi } from '../api/client';
+import { fetchClienti, creaClienteApi, aggiornaClienteApi, generaMagicLinkApi, resetPasswordClienteApi } from '../api/client';
 import { getCurrentTenantId, getTenantStorageKey, getTenantSeedData, BLUECODE_TENANT_ID } from '../utils/tenant';
 import type { Cliente } from '../types';
 import styles from './ClientsPage.module.css';
@@ -26,6 +26,33 @@ export function ClientsPage() {
 
   const [modalOpen, setModalOpen] = useState(false);
   const [magicLinkModal, setMagicLinkModal] = useState<Cliente | null>(null);
+  const [credentialsModal, setCredentialsModal] = useState<{
+    cliente: Cliente;
+    passwordChiaro: string;
+    email: string;
+    emailInviata: boolean;
+  } | null>(null);
+  const [generatingCredentials, setGeneratingCredentials] = useState<string | null>(null);
+
+  const handleGenerateCredentials = async (c: Cliente) => {
+    setGeneratingCredentials(c.id);
+    try {
+      const res = await resetPasswordClienteApi(c.id);
+      if (res && res.ok) {
+        setCredentialsModal({
+          cliente: c,
+          passwordChiaro: res.passwordChiaro,
+          email: res.email || (c as any).email || '',
+          emailInviata: res.emailInviata,
+        });
+        setClienti(prev => prev.map(item => item.id === c.id ? { ...item, hasPassword: true } : item));
+      }
+    } catch (err: any) {
+      alert(`Errore generazione credenziali: ${err.message}`);
+    } finally {
+      setGeneratingCredentials(null);
+    }
+  };
 
   // Form state
   const [nome, setNome] = useState('');
@@ -247,8 +274,10 @@ export function ClientsPage() {
                     <span style={{ fontSize: 10, fontFamily: 'monospace', color: 'var(--hint)' }}>{c.id.substring(0, 13)}...</span>
                   </div>
                   <div className={styles.metaRow}>
-                    <span>Stato Accesso:</span>
-                    <span style={{ color: 'var(--green)', fontWeight: 600 }}>Passwordless (Magic Link)</span>
+                    <span>Accesso Portale:</span>
+                    <span style={{ color: (c as any).hasPassword ? '#34d399' : 'var(--amber)', fontWeight: 600, fontSize: 11 }}>
+                      {(c as any).hasPassword ? '🟢 Password Attiva' : '⚪ Da Assegnare'}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -257,8 +286,17 @@ export function ClientsPage() {
                 <button className={styles.btnAction} onClick={() => openEditModal(c)} title="Modifica Anagrafica (Admin)">
                   ✏️ Modifica
                 </button>
+                <button
+                  className={styles.btnAction}
+                  onClick={() => handleGenerateCredentials(c)}
+                  disabled={generatingCredentials === c.id}
+                  style={{ background: '#1e1b4b', borderColor: '#4338ca', color: '#c7d2fe' }}
+                  title="Genera username e password per il portale cliente"
+                >
+                  {generatingCredentials === c.id ? '⏳ Generazione...' : '🔑 Credenziali Portale'}
+                </button>
                 <button className={styles.btnAction} onClick={() => setMagicLinkModal(c)}>
-                  🔑 Genera Magic Link
+                  🔗 Magic Link
                 </button>
               </div>
             </div>
@@ -308,6 +346,14 @@ export function ClientsPage() {
       {/* Modal Magic Link & Accettazione Cliente */}
       {magicLinkModal && (
         <MagicLinkExplainModal client={magicLinkModal} onClose={() => setMagicLinkModal(null)} />
+      )}
+
+      {/* Modal Credenziali Portale Cliente (Email + Password) */}
+      {credentialsModal && (
+        <CredentialsExplainModal
+          data={credentialsModal}
+          onClose={() => setCredentialsModal(null)}
+        />
       )}
     </div>
   );
@@ -779,3 +825,109 @@ function MagicLinkExplainModal({ client, onClose }: { client: Cliente; onClose: 
     </div>
   );
 }
+
+// ─── Modal Credenziali Portale Cliente (Email + Password) ─────────
+function CredentialsExplainModal({
+  data,
+  onClose,
+}: {
+  data: { cliente: Cliente; passwordChiaro: string; email: string; emailInviata: boolean };
+  onClose: () => void;
+}) {
+  const [copied, setCopied] = useState(false);
+  const portalUrl = typeof window !== 'undefined' ? `${window.location.origin}/portal` : 'https://bluman.vercel.app/portal';
+
+  const credenzialiTesto = `🔐 CREDENZIALI PORTALE RISERVATO CLIENTE
+Studio: BluMan Advisory Platform
+Cliente: ${data.cliente.nome}
+URL Portale: ${portalUrl}
+Username / Email: ${data.email || 'Non impostata'}
+Password: ${data.passwordChiaro}`;
+
+  const copyCredentials = () => {
+    navigator.clipboard.writeText(credenzialiTesto);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 16 }}>
+      <div style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, padding: 24, width: '100%', maxWidth: 520, display: 'flex', flexDirection: 'column', gap: 16, boxShadow: '0 20px 50px rgba(0,0,0,.5)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span>🔑</span> Credenziali Portale Generate
+            </div>
+            <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 2 }}>
+              Accesso riservato per: <strong style={{ color: 'var(--text)' }}>{data.cliente.nome}</strong>
+            </div>
+          </div>
+          <button onClick={onClose} style={{ background: 'var(--card2)', border: 'none', width: 28, height: 28, borderRadius: 6, color: 'var(--muted)', cursor: 'pointer' }}>✕</button>
+        </div>
+
+        {/* Status Invio Email */}
+        {data.emailInviata ? (
+          <div style={{ background: '#0d2d22', border: '1px solid #1a5c3c', borderRadius: 10, padding: '10px 14px', fontSize: 12, color: '#34d399', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span>✓</span> Email con le credenziali inviata con successo all'indirizzo <strong>{data.email}</strong>.
+          </div>
+        ) : (
+          <div style={{ background: '#2d1a0d', border: '1px solid #5c3c1a', borderRadius: 10, padding: '10px 14px', fontSize: 12, color: '#fbbf24', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span>ℹ️</span> {data.email ? `Invio email automatico non configurato: comunica le credenziali manualmente al cliente.` : `Nessuna email registrata per il cliente: consegna le credenziali a mano.`}
+          </div>
+        )}
+
+        {/* Box Credenziali */}
+        <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div>
+            <span style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '.5px' }}>Indirizzo Portale</span>
+            <div style={{ fontSize: 12, fontFamily: 'monospace', color: 'var(--indigo-l)', marginTop: 2 }}>{portalUrl}</div>
+          </div>
+
+          <div>
+            <span style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '.5px' }}>Username / Email</span>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginTop: 2 }}>{data.email || 'Nessuna email registrata (impostala in Anagrafica)'}</div>
+          </div>
+
+          <div>
+            <span style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '.5px' }}>Password di Accesso</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4 }}>
+              <div style={{ background: '#1e1b4b', border: '1px solid #4338ca', color: '#c7d2fe', padding: '8px 14px', borderRadius: 8, fontSize: 16, fontWeight: 800, fontFamily: 'monospace', letterSpacing: '1px', flex: 1 }}>
+                {data.passwordChiaro}
+              </div>
+              <button
+                onClick={copyCredentials}
+                style={{
+                  background: 'var(--indigo)',
+                  color: '#fff',
+                  border: 'none',
+                  padding: '9px 16px',
+                  borderRadius: 8,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {copied ? '✓ Copiato!' : '📋 Copia Tutto'}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.5 }}>
+          ⚠️ <strong>Nota di sicurezza:</strong> La password è stata salvata con crittografia irreversibile e non potrà più essere riletta dopo la chiusura di questa finestra. Se il cliente dovesse smarrirla, potrai rigenerarne una nuova in qualsiasi momento.
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 4 }}>
+          <button
+            onClick={onClose}
+            style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '8px 20px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+          >
+            Ho Salvato le Credenziali, Chiudi
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+

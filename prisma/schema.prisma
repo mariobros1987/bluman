@@ -148,6 +148,8 @@ model Cliente {
   tenant          Tenant   @relation(fields: [tenantId], references: [id])
   nome            String
   tipo            String // individual|company — §2
+  email           String?  @map("email")
+  passwordHash    String?  @map("password_hash")
   piva            String?  @map("piva")
   codiceFiscale   String?  @map("codice_fiscale")
   giurisdizione   String?  @map("giurisdizione")

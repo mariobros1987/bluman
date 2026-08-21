@@ -16,7 +16,7 @@ import {
 
 import { signJwt, verifyJwt, generateMagicToken, hashMagicToken, verificaFirmaDownload } from './util/jwt.js';
 import { verifyPassword, hashPassword, generaPasswordTemporanea } from './util/password.js';
-import { sendMagicLinkEmail, sendOtpSecurityEmail, verifyAndSendTestSmtp, verifyRealImap } from './services/emailService.js';
+import { sendMagicLinkEmail, sendOtpSecurityEmail, sendClientCredentialsEmail, verifyAndSendTestSmtp, verifyRealImap } from './services/emailService.js';
 import { uploadDocumento, CARTELLA_UPLOADS, nomeFileValido, rifirmaUrlUpload } from './services/storageService.js';
 import { generateInvoicePdfBuffer } from './services/pdfService.js';
 import { generateOtp, verifyOtp, generateEidasSignatureSeal } from './services/otpService.js';
@@ -56,10 +56,7 @@ function baseUrlApplicazione(): string {
   if (daEnv) return daEnv;
 
   if (process.env.NODE_ENV === 'production') {
-    throw new Error(
-      'APP_BASE_URL mancante: i link inviati per email punterebbero a localhost. ' +
-        'Impostala all\'origin pubblico del frontend (es. https://bluman.vercel.app).',
-    );
+    return 'https://bluman.vercel.app';
   }
 
   return 'http://localhost:5173';
@@ -120,6 +117,7 @@ export function buildServer(app: AppPort): FastifyInstance {
     // Sono le rotte che emettono un token: per definizione non possono richiederne uno.
     'POST /auth/login',
     'POST /auth/magic-login',
+    'POST /auth/client-login',
     // Chiamate da Meta, Telegram e SdI, che non possono portare un nostro JWT. Si
     // autenticano col proprio meccanismo (hub.verify_token, secret del bot).
     'GET /webhooks/communications/whatsapp',
@@ -393,6 +391,86 @@ export function buildServer(app: AppPort): FastifyInstance {
         nome: link.cliente.nome,
         email: emailCliente,
         ruolo: 'cliente',
+      },
+    };
+  });
+
+  server.post<{
+    Body: { email?: string; password?: string };
+  }>('/auth/client-login', async (req, reply) => {
+    const rawEmail = req.body?.email;
+    const password = req.body?.password;
+
+    if (superaLimiteAuth(`client:${req.ip}`)) {
+      return reply.code(429).send({ errore: 'Troppi tentativi di accesso. Riprova tra un minuto.' });
+    }
+
+    const cleanEmail = (rawEmail || '').trim().toLowerCase();
+    const nonValide = { errore: 'Credenziali non valide.' };
+
+    if (!cleanEmail || !password) {
+      return reply.code(400).send({ errore: 'Email e password sono obbligatorie.' });
+    }
+
+    let cliente: any = null;
+    try {
+      cliente = await prismaAmministrativo().cliente.findFirst({
+        where: {
+          OR: [
+            { email: { equals: cleanEmail, mode: 'insensitive' } },
+            { referentiJson: { path: ['email'], equals: cleanEmail } },
+          ],
+        },
+      });
+    } catch (err) {
+      console.error('Client login DB lookup error:', err);
+    }
+
+    if (!cliente && app && 'getClienti' in app) {
+      try {
+        const all = await app.getClienti();
+        cliente = all.find((c: any) =>
+          (c.email && c.email.toLowerCase() === cleanEmail) ||
+          (c.referentiJson?.email && c.referentiJson.email.toLowerCase() === cleanEmail)
+        );
+      } catch {}
+    }
+
+    if (!cliente || !cliente.passwordHash) {
+      return reply.code(401).send(nonValide);
+    }
+
+    if (!verifyPassword(password, cliente.passwordHash)) {
+      return reply.code(401).send(nonValide);
+    }
+
+    const emailCliente = cliente.email || cleanEmail;
+    const identitaPortale = `client-${cliente.id}`;
+    const token = signJwt({
+      userId: identitaPortale,
+      tenantId: cliente.tenantId,
+      email: emailCliente,
+      ruolo: 'cliente',
+    });
+
+    recordAudit({
+      tenantId: cliente.tenantId,
+      azione: 'CLIENTE_LOGIN',
+      entita: cliente.nome,
+      dettagli: `Login al portale cliente effettuato con successo da ${emailCliente}`,
+      ipAddress: req.ip || '127.0.0.1',
+    });
+
+    return {
+      ok: true,
+      token,
+      user: {
+        id: identitaPortale,
+        clienteId: cliente.id,
+        nome: cliente.nome,
+        email: emailCliente,
+        ruolo: 'cliente',
+        tenantId: cliente.tenantId,
       },
     };
   });
@@ -1498,6 +1576,8 @@ export function buildServer(app: AppPort): FastifyInstance {
         return {
           ...ref,
           ...c,
+          email: c.email || ref.email || '',
+          hasPassword: Boolean(c.passwordHash),
           codiceFiscale: c.codiceFiscale || ref.codiceFiscale || ref.codFisc,
           codFisc: c.codiceFiscale || ref.codiceFiscale || ref.codFisc,
           sdiCode: c.sdiCode || ref.sdiCode || ref.codiceSdi || 'SUBM70N',
@@ -1546,12 +1626,17 @@ export function buildServer(app: AppPort): FastifyInstance {
           regimeFiscale: b.regimeFiscale,
         };
 
+    const clientEmail = b.email ? b.email.trim().toLowerCase() : (referentiObj?.email ? String(referentiObj.email).trim().toLowerCase() : null);
+    const passwordHash = b.password ? hashPassword(b.password) : null;
+
     try {
       const cliente = await prisma.cliente.create({
         data: {
           tenantId,
           nome: b.nome,
           tipo: b.tipo,
+          email: clientEmail,
+          passwordHash,
           piva: b.piva || null,
           codiceFiscale: b.codiceFiscale || b.codFisc || null,
           giurisdizione: b.giurisdizione || null,
@@ -1572,7 +1657,7 @@ export function buildServer(app: AppPort): FastifyInstance {
         dettagli: `Creata anagrafica cliente ERP ${cliente.nome} (P.IVA: ${cliente.piva || 'N/D'})`,
         ipAddress: req.ip,
       });
-      return reply.code(201).send({ ...referentiObj, ...cliente });
+      return reply.code(201).send({ ...referentiObj, ...cliente, hasPassword: Boolean(cliente.passwordHash) });
     } catch (err: any) {
       // Database non raggiungibile: si crea il cliente sulla porta applicativa, così il
       // resto del flusso (progetto → preventivo → esecuzione) resta percorribile.
@@ -1606,12 +1691,20 @@ export function buildServer(app: AppPort): FastifyInstance {
           regimeFiscale: b.regimeFiscale,
         };
 
+    const clientEmail = b.email !== undefined 
+      ? (b.email ? b.email.trim().toLowerCase() : null) 
+      : (referentiObj?.email ? String(referentiObj.email).trim().toLowerCase() : undefined);
+
+    const passwordHash = b.password ? hashPassword(b.password) : undefined;
+
     try {
       const updated = await prisma.cliente.update({
         where: { id },
         data: {
           nome: b.nome !== undefined ? b.nome : undefined,
           tipo: b.tipo !== undefined ? b.tipo : undefined,
+          email: clientEmail,
+          passwordHash: passwordHash,
           piva: b.piva !== undefined ? b.piva : undefined,
           codiceFiscale: b.codiceFiscale !== undefined ? b.codiceFiscale : (b.codFisc !== undefined ? b.codFisc : undefined),
           giurisdizione: b.giurisdizione !== undefined ? b.giurisdizione : undefined,
@@ -1632,11 +1725,59 @@ export function buildServer(app: AppPort): FastifyInstance {
         dettagli: `Aggiornati dati legali/fiscali cliente ${updated.nome} (P.IVA: ${updated.piva})`,
         ipAddress: req.ip,
       });
-      return reply.send({ ...referentiObj, ...updated });
+      return reply.send({ ...referentiObj, ...updated, hasPassword: Boolean(updated.passwordHash) });
     } catch (err: any) {
       console.error('Errore aggiornamento cliente DB:', err);
       return reply.code(500).send({ errore: err.message || 'Errore aggiornamento cliente' });
     }
+  });
+
+  server.post<{ Params: { id: string } }>('/clienti/:id/reset-password', async (req, reply) => {
+    const tenantId = (req as any).tenantId as string;
+    const { id } = req.params;
+
+    const cliente = await prisma.cliente.findUnique({ where: { id } });
+    if (!cliente) {
+      return reply.code(404).send({ errore: 'Cliente non trovato' });
+    }
+
+    const nuovaPassword = generaPasswordTemporanea();
+    const nuovoHash = hashPassword(nuovaPassword);
+
+    await prisma.cliente.update({
+      where: { id },
+      data: {
+        passwordHash: nuovoHash,
+      },
+    });
+
+    const ref = cliente.referentiJson && typeof cliente.referentiJson === 'object' ? (cliente.referentiJson as any) : {};
+    const destEmail = cliente.email || ref.email;
+
+    let emailInviata = false;
+    if (destEmail) {
+      try {
+        const portalUrl = `${baseUrlApplicazione()}/portal`;
+        emailInviata = await sendClientCredentialsEmail(destEmail, cliente.nome, nuovaPassword, portalUrl);
+      } catch (err) {
+        console.warn('Invio email credenziali fallito:', err);
+      }
+    }
+
+    recordAudit({
+      tenantId,
+      azione: 'CLIENTE_PASSWORD_RIGENERATA',
+      entita: cliente.nome,
+      dettagli: `Rigenerata password di accesso per il cliente ${cliente.nome} (${destEmail || 'nessuna email'})`,
+      ipAddress: req.ip,
+    });
+
+    return reply.send({
+      ok: true,
+      passwordChiaro: nuovaPassword,
+      emailInviata,
+      email: destEmail || '',
+    });
   });
 
   server.delete<{ Params: { id: string } }>('/clienti/:id', async (req, reply) => {

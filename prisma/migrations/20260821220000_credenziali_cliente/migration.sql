@@ -1,0 +1,2 @@
+ALTER TABLE "cliente" ADD COLUMN IF NOT EXISTS "email" TEXT;
+ALTER TABLE "cliente" ADD COLUMN IF NOT EXISTS "password_hash" TEXT;
