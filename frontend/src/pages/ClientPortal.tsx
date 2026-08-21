@@ -407,7 +407,7 @@ export function ClientPortal() {
         const progettiRes = await fetchProgetti();
         if (progettiRes && Array.isArray(progettiRes) && progettiRes.length > 0) {
           const matched = progettiRes.filter((p: any) =>
-            p.clienteId === targetClientId ||
+            (clienteIdSessione && p.clienteId === clienteIdSessione) ||
             p.cliente?.nome?.toLowerCase() === resolvedClientName.toLowerCase() ||
             p.cliente?.email?.toLowerCase() === clientObj?.email?.toLowerCase() ||
             String(p.id).includes('proj-')
