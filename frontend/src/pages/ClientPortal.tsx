@@ -497,6 +497,15 @@ export function ClientPortal() {
         ragioneSociale: formData.ragioneSociale || clientName,
         piva: formData.piva || '',
         codiceFiscale: formData.codiceFiscale || '',
+      },
+      progetto: {
+        titolo: 'Progetto Consulenza & Structuring Patrimoniale',
+        totalePreventivo: totalValue,
+      },
+      studio,
+    });
+  };
+
   const currentStudioInfo = getStudioInfoForTenant();
 
   if (pageLoading) {
