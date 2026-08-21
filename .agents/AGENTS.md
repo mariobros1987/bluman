@@ -6,12 +6,12 @@ Questo file serve come indice rapido per l'IA ed i collaboratori per identificar
 
 ## 🏛 1. Mappa dei Componenti Frontend (`frontend/src/`)
 
+### 📄 Pagine (`pages/`)
+
 - **`pages/Dashboard.tsx`**: Dashboard principale con KPI portafoglio, avvisi ritardo e progetti in corso.
 - **`pages/Projects.tsx`**: Gestione Avanzata Progetti & Fascicoli Operativi con 3 viste switchabili (Schede Operatore con consuntivazione ore & checklist microvoci, Tabella ERP Matrice ad alta densità, Kanban Pipeline a 4 fasi di workflow) e Executive KPI Strip.
 - **`pages/ClientsPage.tsx`**: Anagrafica Clienti ERP con salvataggio bidirezionale completo, disimballo campi `referentiJson`, Magic Link passwordless e modal `AnagraficaErpModal` a 4 schede.
 - **`pages/CalendarPage.tsx`**: Calendario Condiviso & Scadenzario Attività Studio (Vista Mese, Lista Scadenzario, Filtro Categorie e Modal Nuovo Evento).
-- **`components/QuickTimeTracker.tsx`**: Timer orario fluttuante (Stopwatch 1-Click) integrato nella topbar con selezione rapida commessa/microvoce, calcolo automatico tariffa oraria e consuntivazione immediata a database.
-- **`utils/zipBuilder.ts`**: Modulo ZIP client-side autonomo a zero dipendenze per l'esportazione in 1-Click del fascicolo digitale completo in cartelle ordinate (`/01_Contratti`, `/02_Societario`, `/03_KYC`, `/04_Fatture`, `INDICE_FASCICOLO.txt`).
 - **`pages/ProjectDetail.tsx`**: Vista dettagliata del progetto con tab:
   - `🗂 Moduli & Microvoci` (Checklist passaggi, note operative, consuntivazione ore e notifiche milestone automatiche via WhatsApp/Email)
   - `🕸 Grafo & Dipendenze Moduli` (`GrafoModuliProgettoView`)
@@ -21,6 +21,7 @@ Questo file serve come indice rapido per l'IA ed i collaboratori per identificar
   - `📄 Documenti & Vault Legale` (Cloud Vault Google Drive Style ed Export Fascicolo Completo ZIP 1-Click)
 - **`pages/InvoicesPage.tsx`**: Registro Fiscale Fatture, Note di Credito, Aliquote, Export XML SDI ed **Export Registro Fiscale per Commercialista (CSV / Excel)**.
 - **`pages/PrimaNotaPage.tsx`**: Registro Prima Nota, Transazioni Cassa/Banca, CRO/TRN, Import & Riconciliazione Estratto Conto Bancario ed **Export Contabile Commercialista (CSV / Excel)** compatibile con Zucchetti, TeamSystem, Datev e Profis.
+- **`pages/PaymentsPage.tsx`**: Registrazione Incassi & Scadenzario Pagamenti con filtri stato/cliente/ricerca, modal registrazione incasso in Prima Nota con collegamento a banca e fattura, e aggiornamento stato scadenza (pagata/parziale/insoluta).
 - **`pages/ScadenzarioPage.tsx`**: Scadenzario Incassi, Partite Aperte & Solleciti Clienti con Link al Progetto.
 - **`pages/BanksPage.tsx`**: Gestione Banche, Conti Correnti Studio, IBAN & Riconciliazione Liquidità.
 - **`pages/RetainersPage.tsx`**: Contratti Ricorrenti & Retainer Studio per la fatturazione periodica pianificata, collegato ai Progetti specifici con filtraggio clienti a cascata e link 1-Click `📁 Nome Progetto ↗`.
@@ -31,6 +32,55 @@ Questo file serve come indice rapido per l'IA ed i collaboratori per identificar
 - **`pages/SuperAdminPage.tsx`**: Dashboard Super Admin & Gestione Multi-Tenant Studi (`/admin/tenants`). La password del responsabile non è più un campo del form: la emette il server alla creazione dello studio e il modale la mostra **una volta sola**, tenendola in un `useState` che muore alla chiusura. Se va perduta, il pulsante `🔄 Rigenera Password di Accesso` chiama `POST /admin/tenants/:id/reset-password`. L'invio delle credenziali per email si rifiuta di partire senza una password appena emessa, e riporta gli errori invece di dichiarare comunque il successo.
 - **`pages/LoginPage.tsx`**: Pagina di accesso staff. Campi vuoti e nessuna scorciatoia: le tre scorciatoie "Advisor / Operatore / SuperAdmin" precompilavano email e password di account reali dello studio, servite in chiaro dal bundle pubblico a chiunque aprisse la pagina. Il ruolo non si sceglie dal client — lo determina il backend leggendo la riga `user`.
 - **`pages/AuditLogPage.tsx`**: Registro Audit Super Dettagliato & Tracciamento Attività Operatori per Tenant (`/audit`).
+- **`pages/Placeholders.tsx`**: Pagine placeholder (Clienti, Calendario, Impostazioni) per sezioni in corso di sviluppo — export nominati `Clients`, `Calendar`, `Settings`.
+
+### 🧩 Componenti (`components/`)
+
+- **`components/QuickTimeTracker.tsx`**: Timer orario fluttuante (Stopwatch 1-Click) integrato nella topbar con selezione rapida commessa/microvoce, calcolo automatico tariffa oraria e consuntivazione immediata a database.
+- **`components/NewProjectWizard.tsx`**: Wizard multi-step per la creazione di un nuovo progetto: selezione/creazione cliente, scelta giurisdizione, composizione preventivo da catalogo moduli template, accettazione e istanziazione progetto con API backend.
+- **`components/PassaggioModal.tsx`**: Modal dettagliato per singolo passaggio/microvoce del progetto: checklist operativa, note operatore, consuntivazione ore, upload documenti, generazione PDF da template (precostruiti e riorganizzazione societaria), integrazione firma digitale.
+- **`components/ComunicazioniTab.tsx`**: Tab comunicazioni omnichannel standalone: chat interattiva bidirezionale Advisor ⇄ Cliente, binding recapiti WhatsApp/Email/Telegram/Signal, invio messaggi via canali multipli con sincronizzazione live.
+- **`components/AssignOperatorModal.tsx`**: Modal per assegnazione rapida di un operatore del team a un modulo/microvoce del progetto.
+- **`components/CalendarPreviewModal.tsx`**: Modal anteprima calendario con dettaglio eventi e scadenze del progetto.
+- **`components/ConfirmDeleteModal.tsx`**: Modal generico di conferma eliminazione con protezione da cancellazioni accidentali.
+- **`components/DigitalSignatureModal.tsx`**: Modal Firma Elettronica Avanzata (FEA) con pad firma, cattura IP e timestamp ISO per sigillo eIDAS.
+- **`components/DocumentEditorModal.tsx`**: Modal wrapper per apertura rapida dell'editor documenti da contesti esterni.
+- **`components/NotificationModal.tsx`**: Modal sistema notifiche e avvisi operatore.
+
+### 🏗 Layout (`components/layout/`)
+
+- **`components/layout/AppLayout.tsx`**: Layout principale dell'applicazione con topbar (logo, tenant switcher per super_admin, QuickTimeTracker, avatar utente), area contenuto e integrazione Sidebar.
+- **`components/layout/Sidebar.tsx`**: Sidebar navigazione principale con voci dinamiche filtrate da RBAC (permessi modulo `denied` / `read` / `write`), badge contatori e indicatore sezione attiva.
+
+### 🎨 Componenti UI (`components/ui/`)
+
+- **`components/ui/Avatar.tsx`**: Componente avatar fluttuante con iniziali operatore e card di anteprima (nome completo, ruolo, punto di stato) al passaggio del mouse (hover).
+- **`components/ui/Badge.tsx`**: Badge generico con stile e colore configurabili.
+- **`components/ui/CatBadge.tsx`**: Badge colorato per categoria modulo (Analisi, Societario, Trust, Banking, Fiscale, Legale, IP, Compliance).
+- **`components/ui/ProgressBar.tsx`**: Barra di progresso animata con percentuale.
+
+### 🔧 Utilities Frontend (`utils/`)
+
+- **`utils/index.ts`**: Utility helpers condivisi: formatter valuta (`fmt`), URL logo (`getFormattedLogoUrl`), colori categoria modulo (`catCls`), helpers modulo (`moduloH`, `moduloP`).
+- **`utils/tenant.ts`**: Modulo di gestione e isolamento dati multi-tenant lato client. `StudioInfo`, `getCurrentTenantId()`, `getTenantStorageKey()`, `getStudioInfoForTenant()`, gestione localStorage isolata per tenant e costante `BLUECODE_TENANT_ID`.
+- **`utils/rbac.ts`**: Motore di sicurezza e controllo accessi RBAC granulare a 12 moduli (filtra Sidebar e Route Guards per moduli `denied` / `read` / `write`).
+- **`utils/pdfGenerator.ts`**: Generatore PDF client-side con jsPDF + html2canvas per documenti A4 conformi ISO 216 / DIN 5008, supporto firma digitale, intestazione/piè di pagina e export da HTML.
+- **`utils/documentTemplates.ts`**: Catalogo template documenti precostruiti (contratti, NDA, engagement letter, societario, deleghe, fiscale, trust, compliance) con risoluzione Smart Tags ERP e supporto template custom da database.
+- **`utils/reorganizationTemplates.ts`**: Collezione di 22 modelli contrattuali e verbali Word per operazioni di riorganizzazione societaria (Cessioni quote, trasformazioni, holding, trust, conferimenti) integrati nativamente in Document Studio con Smart Tags ERP.
+- **`utils/zipBuilder.ts`**: Modulo ZIP client-side autonomo a zero dipendenze per l'esportazione in 1-Click del fascicolo digitale completo in cartelle ordinate (`/01_Contratti`, `/02_Societario`, `/03_KYC`, `/04_Fatture`, `INDICE_FASCICOLO.txt`).
+
+### 🪝 Hooks (`hooks/`)
+
+- **`hooks/useTeamMembers.ts`**: Hook React centralizzato e performante per interrogare gli operatori live dal database via API `GET /tenant/utenti` con calcolo dinamico delle iniziali reali (`MD`, `JD`, `LM`, `ER`, `FD`) e supporto personalizzazione colori.
+
+### 📦 Store (`store/`)
+
+- **`store/mockData.ts`**: ⚠️ **LEGACY — da rimuovere.** Dati mock statici (giurisdizioni, team, articoli, moduli template, progetti). Ancora importato da `utils/index.ts` e `components/NewProjectWizard.tsx`. Causa **leak cross-tenant** dei dati del tenant demo. Nessun'altra pagina lo importa più: la rimozione richiede di collegare `NewProjectWizard` e `utils/index.ts` alle API live corrispondenti (`GET /giurisdizioni`, `GET /articoli`, `GET /moduli-template`).
+
+### 🎨 Stili CSS Modulari
+
+- `pages/Dashboard.module.css`, `pages/ClientsPage.module.css`, `pages/Library.module.css`, `pages/ProjectDetail.module.css`, `pages/Settings.module.css`: CSS Modules per le pagine principali.
+- `components/layout/AppLayout.module.css`, `components/layout/Sidebar.module.css`: CSS Modules per layout e sidebar.
 
 ---
 
@@ -152,31 +202,115 @@ collaboratore nasca nel tenant di chi lo crea, e che un errore di lettura su
 - **Contratti Retainer**: `GET /contratti-ricorrenti`, `POST /contratti-ricorrenti` (collegati sia al Cliente che al Progetto specifico).
 - **Multi-Tenant Piattaforma (solo `super_admin`)**: `GET /admin/tenants`, `POST /admin/tenants` (registra lo studio **e** la riga `user` del responsabile con ruolo `advisor`, restituendo la password temporanea una volta sola), `PATCH /admin/tenants/:id`, `DELETE /admin/tenants/:id`, `POST /admin/tenants/:id/reset-password` (rigenera la password del responsabile: nuovo hash su `user.passwordHash`, chiaro nella sola risposta). Tutti passano da `soloSuperAdmin` → 403 per gli altri ruoli.
 - **Upload Documenti**: `POST /upload` (riceve base64 e salva in `./uploads/`), `GET /uploads/:filename` — confinata sotto `uploads/` e non anonima: nome rifiutato con 400 se non è `[a-zA-Z0-9_.-]` senza `..`, poi verifica sul percorso *risolto*; serve il file solo con Bearer **oppure** firma HMAC `?firma=&scad=`, perché quegli URL finiscono in `<img src>` che non può inviare header.
-- **Servizi Integrati**:
-  - `prisma/seed.ts`: Script di seed master completo e idempotente per popolare Supabase/PostgreSQL (7 utenti studio, 5 giurisdizioni, 45 articoli distinta base, 10 moduli template e clienti ERP).
-  - `frontend/src/hooks/useTeamMembers.ts`: Hook React centralizzato e performante per interrogare gli operatori live dal database via API `GET /tenant/utenti` con calcolo dinamico delle iniziali reali (`MD`, `JD`, `LM`, `ER`, `FD`) e supporto personalizzazione colori.
-  - `frontend/src/utils/reorganizationTemplates.ts`: Collezione di 22 modelli contrattuali e verbali Word per operazioni di riorganizzazione societaria (Cessioni quote, trasformazioni, holding, trust, conferimenti) integrati nativamente in Document Studio con Smart Tags ERP.
-  - `frontend/src/components/ui/Avatar.tsx`: Componente avatar fluttuante con iniziali operatore e card di anteprima (nome completo, ruolo, punto di stato) al passaggio del mouse (hover).
-  - `api/send-email.ts`: Vercel Serverless Function ultra-rapida con Nodemailer per invio test SMTP, inviti collaboratori con credenziali e comunicazioni live fascicolo a clienti.
-  - `frontend/src/utils/rbac.ts`: Motore di sicurezza e controllo accessi RBAC granulare a 12 moduli (filtra Sidebar e Route Guards per moduli `denied` / `read` / `write`).
-  - `src/scripts/backupDb.ts`: Script di backup e snapshot JSON di tutte le tabelle del database BluMan multi-tenant.
-  - `src/scripts/verifyAll.ts`: Test runner completo per il collaudo automatico della test suite end-to-end (11/11 test).
-  - `.github/workflows/ci.yml`: Workflow di Continuous Integration GitHub Actions per build e test automatici ad ogni push.
-  - `src/services/otpService.ts`: Gestione codice OTP a tempo (5 min), rate limiting e sigillo crittografico FEA eIDAS UE 910/2014.
-  - `src/services/cronService.ts`: Worker automatico background scansione rinnovi UBO Malta, marchi EUIPO e solleciti fatture.
-  - `src/services/sdiService.ts`: Trasmissione diretta 1-Click della Fattura Elettronica XML a SdI Agenzia delle Entrate.
-  - `src/services/securityScanner.ts`: Validazione Magic-Bytes e sanitizzazione PDF nel Vault Documenti.
-  - `src/services/emailService.ts`: Invio email transazionali SMTP Nodemailer (Magic Link, notifica scadenze e test socket Register.it).
-  - `src/services/storageService.ts`: Archiviazione Cloud S3/Supabase Storage con Presigned URL. Contiene il punto di verità per i nomi file: `nomeFileSicuro()` sanifica in scrittura, `nomeFileValido()` rifiuta in lettura (la divergenza fra le due metà *era* il path traversal), `urlUploadFirmato()` e `rifirmaUrlUpload()` emettono e rinnovano la firma HMAC dei download.
-  - `src/util/prismaClient.ts`: I tre client Prisma e il contesto tenant per richiesta (§14). `prisma` è il client applicativo: impone `app.current_tenant_id` a ogni query, così le policy RLS hanno qualcosa su cui filtrare. `prismaAmministrativo()` scavalca RLS e va usato **solo** per script, seed, bootstrap, backup, la ricerca dell'utente per email al login e la verifica del magic token (richieste anonime per definizione, dove il tenant si scopre dalla riga cercata). `conContestoInTransazione()` reimposta la variabile dentro una transazione interattiva, che gira su una connessione propria.
-  - `supabase/migrations/20260819_rls_effettiva.sql`: Ruolo `bluman_app` (senza `BYPASSRLS`), policy `isolamento_tenant` su tutte le tabelle, `FORCE ROW LEVEL SECURITY`. Si applica con `psql` (usa `\gexec` per non stampare la password). Sostituisce `20260815_enable_rls.sql`, che era inerte: `src/adapters/prisma/applyRls.ts` ora si rifiuta di eseguire quel file perché le sue policy PERMISSIVE si sommerebbero in OR a quelle nuove, vanificandole.
-  - `src/scripts/checkRls.ts`: Diagnostica read-only dell'isolamento reale — ruolo di connessione, `bypassrls`, RLS attivo/forzato per tabella e prova pratica con un tenant inesistente (deve restituire 0 righe).
-  - `src/credenziali.test.ts`: Test di regressione che scandisce `src/`, `frontend/src/` e `api/` alla ricerca delle vecchie password cablate, dei token finti e del ripiego `!password ||`. Non elenca le credenziali per documentarle: le cerca per impedirne il ritorno.
-  - `src/accessoCliente.test.ts`: Presidio dell'accesso del cliente al portale — magic token inventato, assente o scaduto → 401 con lo stesso messaggio per tutti i casi (distinguerli direbbe se un token è mai esistito); token valido → JWT col `tenantId` preso dalla riga, non da una costante; in tabella solo lo SHA-256; `..%2f` su `/uploads` → 400; `/uploads` senza Bearer né firma → 401; firma manomessa, di un altro file o scaduta → 401.
-  - `src/gerarchiaRuoli.test.ts`: Presidio della gerarchia §2bis con il client Prisma sostituito da un finto — è l'unico modo di osservare cosa succede *dopo* i controlli di ruolo, cioè se la scrittura avviene comunque. Copre il 403 sulla modifica di una riga `super_admin`, il `tenantId: null` del super_admin creato, il tenant di chi crea per i collaboratori, e il 503 (non l'elenco vuoto) quando la lettura del team fallisce.
-  - `src/scripts/verificaAccessi.ts`: Diagnostica read-only di chi può effettivamente autenticarsi, da lanciare **prima** di un rilascio che chiude l'autenticazione: elenca ruolo, tenant e presenza/assenza di `password_hash` (mai l'hash) e fallisce con exit 1 se non esiste un `super_admin` attivo con password. Senza questa verifica un deploy corretto può bloccare la piattaforma fuori da sé stessa.
-  - `src/scripts/testTenantDb.ts`: Verifica di andata e ritorno delle impostazioni studio su database. Pretende `TEST_TENANT_ID` e si rifiuta di girare senza (scriveva sul tenant di produzione), usa valori segnaposto `.invalid` e maschera i campi segreti (`smtpPass`, `imapPass`, `waAccessToken`, `waVerifyToken`, `tgBotToken`) invece di stamparli.
-  - `.agents/skills/meta-whatsapp-integration/SKILL.md`: Skill e runbook per l'integrazione WhatsApp Business Cloud API & Remote MCP Meta DevTools.
+### 🧠 Domain Layer (`src/domain/`)
+
+Moduli di dominio **puri**: nessuna chiamata a DB/HTTP. Ricevono entità, restituiscono valori nuovi. Il service layer chiama queste funzioni e persiste il risultato.
+
+- **`src/domain/types.ts`**: Tipi di dominio fondamentali: `StatoMicrovoce` (`pending` | `in_corso` | `completata` | `bloccata` | `attesa_dipendenza`), `StatoModulo`, `StatoProgetto`, `MicrovoceInput`.
+- **`src/domain/stateEngine.ts`**: Motore di calcolo stati (§16). Funzioni pure per: segnale rischio ore (`valutaSegnaleRischio`), cascata stato micro-voce → modulo → progetto (`calcolaStatoModulo`, `calcolaStatoProgetto`), ritardo manuale (`marcaRitardoManuale`, `risolviRitardoManuale`), risoluzione dipendenze modulo (`risolviDipendenze`). Le funzioni ricalcolano **solo verso l'alto** — §16.6.
+
+### 🔌 Porte & Interfacce (`src/services/`)
+
+Separano l'orchestrazione dal driver DB — la logica si tipizza e si testa senza `PrismaClient`.
+
+- **`src/services/appPort.ts`**: Interfaccia comune che `src/server.ts` usa per tutte le operazioni CRUD su clienti, progetti, preventivi, fatture e articoli. Non sa se sotto c'è `InMemoryApp` o `PrismaApp`. Definisce `Cliente`, `ProgettoBase`, `Preventivo`, `AppPort`.
+- **`src/services/istanziazionePort.ts`**: Interfacce (porte) per la transazione di istanziazione (§15.3) e per le operazioni di esecuzione del progetto (§17): `IstanziazionePort`, `IstanziazioneTransazione`, `EsecuzionePort`, `NotificationPort`. Definisce anche i tipi di input per passaggi template, righe distinta e moduli template con distinta.
+- **`src/services/fakeIstanziazionePort.ts`**: Implementazione in-memory delle porte di istanziazione, esecuzione e notifica — usata dall'adapter `InMemoryApp` e dai test.
+
+### ⚙️ Servizi di Orchestrazione (`src/services/`)
+
+- **`src/services/istanziaProgetto.ts`**: Orchestrazione §15.3 — cosa succede alla firma dell'engagement letter. Scrive il grafo di entità in una transazione atomica: crea moduli istanziati, micro-voci, passaggi template, calcola prezzo da distinta base.
+- **`src/services/esecuzione.ts`**: Orchestrazione §17 — consuntivazione ore, ritardo/blocco, procedura guidata, completamento micro-voce e passaggio, sblocco dipendenze. Chiama le funzioni pure di `stateEngine.ts` e persiste via `EsecuzionePort`.
+- **`src/services/pdfService.ts`**: Generazione PDF server-side nativi per fatture e documenti (Buffer PDF senza dipendenze browser).
+- **`src/services/emailService.ts`**: Invio email transazionali SMTP Nodemailer (Magic Link, notifica scadenze e test socket Register.it).
+- **`src/services/imapFetcher.ts`**: Fetcher email IMAP raw via TLS socket diretto — lettura posta in arrivo senza libreria IMAP esterna.
+- **`src/services/otpService.ts`**: Gestione codice OTP a tempo (5 min), rate limiting e sigillo crittografico FEA eIDAS UE 910/2014.
+- **`src/services/cronService.ts`**: Worker automatico background scansione rinnovi UBO Malta, marchi EUIPO e solleciti fatture.
+- **`src/services/sdiService.ts`**: Trasmissione diretta 1-Click della Fattura Elettronica XML a SdI Agenzia delle Entrate.
+- **`src/services/securityScanner.ts`**: Validazione Magic-Bytes e sanitizzazione PDF nel Vault Documenti.
+- **`src/services/storageService.ts`**: Archiviazione Cloud S3/Supabase Storage con Presigned URL. Contiene il punto di verità per i nomi file: `nomeFileSicuro()` sanifica in scrittura, `nomeFileValido()` rifiuta in lettura (la divergenza fra le due metà *era* il path traversal), `urlUploadFirmato()` e `rifirmaUrlUpload()` emettono e rinnovano la firma HMAC dei download.
+
+### 🔩 Adapters (`src/adapters/`)
+
+Implementazioni concrete delle porte di dominio.
+
+- **`src/adapters/inMemoryApp.ts`**: App in-memory — quick start senza database. Usa la stessa logica di dominio testata (`istanziaProgetto`, `stateEngine`), con persistenza solo in RAM. Si azzera ad ogni riavvio del processo. Per la persistenza vera: `src/adapters/prisma/`.
+- **`src/adapters/appErrors.ts`**: Errori applicativi condivisi (`ClienteNonTrovatoError`, `ProgettoNonTrovatoError`, `PreventivoNonTrovatoError`, `ModuloNonTrovatoError`, `TransizioneNonValidaError`). Sia `InMemoryApp` che `PrismaApp` li lanciano, `server.ts` li mappa agli status HTTP giusti.
+- **`src/adapters/prisma/prismaApp.ts`**: Adapter Prisma completo per PostgreSQL/Supabase. Implementa `AppPort` con tutte le operazioni CRUD reali via Prisma, inclusa `listaUtenti()` (ora di sola lettura — prima riscriveva utenti cablati ad ogni chiamata).
+- **`src/adapters/prisma/prismaIstanziazionePort.ts`**: Implementazione Prisma delle porte `IstanziazionePort` e `EsecuzionePort` — transazioni atomiche reali su PostgreSQL.
+- **`src/adapters/prisma/bootstrap.ts`**: Bootstrap del sistema (§27). Crea il primo `super_admin` con `tenantId: null`. Va lanciato **una sola volta** con `npm run bootstrap`, mai come endpoint HTTP.
+- **`src/adapters/prisma/seed.ts`**: Script di seed leggero esportato come modulo.
+- **`src/adapters/prisma/seedFull.ts`**: Seed completo di produzione per popolare Supabase/PostgreSQL (utenti studio, giurisdizioni, articoli distinta base, moduli template e clienti ERP).
+- **`src/adapters/prisma/applyRls.ts`**: ⚠️ **SUPERATO** — non applicare più da qui. Documentazione del perché il vecchio `20260815_enable_rls.sql` è stato sostituito. La migrazione nuova si applica solo con `psql` diretto.
+- **`src/adapters/prisma/index.ts`**: Re-export del modulo adapter Prisma.
+
+### 🔑 Utilities Backend (`src/util/`)
+
+- **`src/util/prismaClient.ts`**: I tre client Prisma e il contesto tenant per richiesta (§14). `prisma` è il client applicativo: impone `app.current_tenant_id` a ogni query, così le policy RLS hanno qualcosa su cui filtrare. `prismaAmministrativo()` scavalca RLS e va usato **solo** per script, seed, bootstrap, backup, la ricerca dell'utente per email al login e la verifica del magic token (richieste anonime per definizione, dove il tenant si scopre dalla riga cercata). `conContestoInTransazione()` reimposta la variabile dentro una transazione interattiva, che gira su una connessione propria.
+- **`src/util/password.ts`**: Hashing password con scrypt di `node:crypto` (§23) — nessuna dipendenza con binding nativi. `hashPassword()`, `verifyPassword()` con `timingSafeEqual`, `generaPasswordTemporanea()` con `randomBytes`.
+- **`src/util/jwt.ts`**: Gestione token JWT (generazione, verifica, estrazione claims), firma HMAC per download (`firmaDownload`, `verificaFirmaDownload`), generazione e hash magic token (`generateMagicToken`, `hashMagicToken`).
+
+### 🛠 Script di Manutenzione (`src/scripts/`)
+
+- **`src/scripts/backupDb.ts`**: Backup e snapshot JSON di tutte le tabelle del database BluMan multi-tenant.
+- **`src/scripts/verifyAll.ts`**: Test runner completo per il collaudo automatico della test suite end-to-end.
+- **`src/scripts/verificaAccessi.ts`**: Diagnostica read-only di chi può effettivamente autenticarsi, da lanciare **prima** di un rilascio che chiude l'autenticazione: elenca ruolo, tenant e presenza/assenza di `password_hash` (mai l'hash) e fallisce con exit 1 se non esiste un `super_admin` attivo con password.
+- **`src/scripts/checkRls.ts`**: Diagnostica read-only dell'isolamento reale — ruolo di connessione, `bypassrls`, RLS attivo/forzato per tabella e prova pratica con un tenant inesistente (deve restituire 0 righe).
+- **`src/scripts/assignPasswords.ts`**: Assegnazione password iniziali agli utenti senza `password_hash` (`npm run passwords:assign`). Complementare a bootstrap (§27). Le password sono stampate **una sola volta**, mai salvate né inviate.
+- **`src/scripts/testTenantDb.ts`**: Verifica di andata e ritorno delle impostazioni studio su database. Pretende `TEST_TENANT_ID` e si rifiuta di girare senza (scriveva sul tenant di produzione), usa valori segnaposto `.invalid` e maschera i campi segreti (`smtpPass`, `imapPass`, `waAccessToken`, `waVerifyToken`, `tgBotToken`) invece di stamparli.
+- **`src/scripts/cleanupTestData.ts`**: Rimozione artefatti lasciati nel database reale da run di vitest precedenti all'isolamento. Dry-run di default, `--conferma` per cancellare. Criteri di sicurezza: nome cablato nei test, UUID generato (non id parlanti del seed), nessun progetto/preventivo collegato.
+- **`src/scripts/mapTenantTables.ts`**: Diagnostica read-only: classifica le tabelle di `public` in base a come si legano al tenant (colonna diretta `tenant_id` vs risalita al padre). Serve a scrivere le policy RLS corrette.
+- **`src/scripts/inspectDb.ts`**: Ispezione rapida dello stato del database.
+- **`src/scripts/seedData.ts`**: Seed dati di supporto.
+
+### 🧪 Test Suite (`src/` — Vitest)
+
+Configurazione: `vitest.config.ts` + `vitest.setup.ts` (isolamento dal DB reale).
+
+- **`src/server.test.ts`**: Test end-to-end del server Fastify — guard di autenticazione (401 sulle rotte protette, raggiungibilità rotte pubbliche, preflight CORS), regressione sulle vecchie credenziali cablate.
+- **`src/credenziali.test.ts`**: Presidio che scandisce `src/`, `frontend/src/` e `api/` alla ricerca delle vecchie password cablate, dei token finti e del ripiego `!password ||`. Non elenca le credenziali per documentarle: le cerca per impedirne il ritorno.
+- **`src/accessoCliente.test.ts`**: Presidio dell'accesso del cliente al portale — magic token inventato, assente o scaduto → 401 con lo stesso messaggio; token valido → JWT col `tenantId` dalla riga; in tabella solo SHA-256; `..%2f` su `/uploads` → 400; `/uploads` senza Bearer né firma → 401; firma manomessa, di altro file o scaduta → 401.
+- **`src/gerarchiaRuoli.test.ts`**: Presidio della gerarchia §2bis con client Prisma finto — copre il 403 sulla modifica riga `super_admin`, `tenantId: null` del super_admin, tenant di chi crea per i collaboratori, e 503 (non elenco vuoto) su errore lettura team.
+- **`src/util/password.test.ts`**: Test hashing/verifica password scrypt, salt casuale, e gestione valori malformati.
+- **`src/util/prismaClient.test.ts`**: Test del client Prisma e contesto tenant.
+- **`src/domain/stateEngine.test.ts`**: Test del motore di calcolo stati — cascata micro-voce → modulo → progetto, segnali rischio, ritardi, dipendenze.
+- **`src/domain/giurisdizioni.test.ts`**: Test sulla coerenza dei dati giurisdizioni.
+- **`src/services/istanziaProgetto.test.ts`**: Test orchestrazione istanziazione progetto §15.3.
+- **`src/services/esecuzione.test.ts`**: Test orchestrazione consuntivazione ed esecuzione §17.
+- **`src/services/antiDuplication.test.ts`**: Test anti-duplicazione entità.
+- **`src/services/communications.test.ts`**: Test comunicazioni omnichannel.
+- **`src/services/catalogDocumentLinkage.test.ts`**: Test collegamento catalogo-documenti.
+- **`src/services/newFeatures.test.ts`**: Test funzionalità aggiunte di recente.
+- **`src/services/pdfService.test.ts`**: Test generazione PDF server-side.
+- **`src/services/auditAccounting.test.ts`**: Test audit contabile.
+- **`src/services/teamAnalytics.test.ts`**: Test analytics team operatori.
+
+### ☁️ Serverless Functions (`api/`)
+
+- **`api/send-email.ts`**: Vercel Serverless Function con Nodemailer per invio test SMTP, inviti collaboratori con credenziali e comunicazioni live fascicolo a clienti.
+- **`api/send-whatsapp.ts`**: Vercel Serverless Function per dispatch sicuro e senza CORS verso Meta WhatsApp Cloud API.
+- **`api/webhooks/communications/`**: Webhook per ingestion messaggi da canali esterni (Telegram, WhatsApp).
+
+### 📦 Migrazioni Database (`prisma/migrations/`)
+
+- `0_init/`: Schema iniziale completo.
+- `20260819120000_rimozione_password_chiaro_tenant/`: DROP della colonna `lead_advisor_password` da `Tenant`.
+- `20260819190000_super_admin_senza_tenant/`: Rimette a NULL i `tenant_id` dei super_admin.
+- `20260819210000_magic_link_persistito/`: Crea la tabella `MagicLink` con policy RLS incorporata.
+
+### 🔒 Migrazioni RLS Supabase (`supabase/migrations/`)
+
+- **`20260819_rls_effettiva.sql`**: Ruolo `bluman_app` (senza `BYPASSRLS`), policy `isolamento_tenant` su tutte le tabelle, `FORCE ROW LEVEL SECURITY`. Si applica con `psql` (usa `\gexec` per non stampare la password). Sostituisce `20260815_enable_rls.sql`.
+- `20260815_enable_rls.sql`: ⚠️ **INERTE** — le sue policy PERMISSIVE si sommerebbero in OR a quelle nuove, vanificandole. Non riapplicare.
+
+### 🏗 Infrastruttura & CI
+
+- **`.github/workflows/ci.yml`**: Workflow di Continuous Integration GitHub Actions per build e test automatici ad ogni push.
+- **`Dockerfile`** + **`docker-compose.yml`**: Containerizzazione backend.
+- **`railway.json`**: Configurazione deployment Railway.
+- **`vercel.json`**: Configurazione deployment Vercel (serverless functions + frontend).
+- **`.agents/skills/meta-whatsapp-integration/SKILL.md`**: Skill e runbook per l'integrazione WhatsApp Business Cloud API & Remote MCP Meta DevTools.
+- **`prisma/seed.ts`**: Script di seed master completo e idempotente per popolare Supabase/PostgreSQL (utenti studio, giurisdizioni, articoli distinta base, moduli template e clienti ERP).
 - **Firma FEA & OTP**: `POST /portal/request-otp`, `POST /portal/verify-otp-and-sign` (Sigillo SHA-256 e Timestamp ISO).
 - **Cron Scadenze**: `POST /cron/esegui-notifiche-scadenze` (Scansione UBO, KYC, fatture e solleciti automatici).
 - **Telegram Bot Webhook**: `POST /webhooks/communications/telegram`, `POST /tenant/telegram-webhook-setup` (Ingestion live nei progetti).
