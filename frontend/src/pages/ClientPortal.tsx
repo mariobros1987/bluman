@@ -93,6 +93,147 @@ function getModuleDeliverables(moduloNome: string, cat: string): ModuloDeliverab
   ];
 }
 
+function mapProjectToPortalModules(project: any): ModuloProposta[] {
+  if (!project) return [];
+
+  // 1. Se il progetto ha moduli reali nel database
+  if (project.moduli && Array.isArray(project.moduli) && project.moduli.length > 0) {
+    return project.moduli.map((m: any, idx: number) => {
+      const cat = (m.categoria as CategoriaModulo) || 'Societario';
+      const isDone = m.stato === 'done' || m.stato === 'completato';
+      
+      let passaggi = getModulePassaggi(m.nome, cat);
+      if (m.microvoci && Array.isArray(m.microvoci) && m.microvoci.length > 0) {
+        passaggi = m.microvoci.map((mv: any, mvIdx: number) => ({
+          id: mv.id || `mv-${mvIdx}`,
+          titolo: mv.nome,
+          completato: mv.stato === 'done' || mv.stato === 'completed' || isDone,
+          note: mv.causaNota || `Esecuzione passaggio specialistico per ${m.nome}`,
+          data: 'Agosto 2026',
+          operatore: mv.risorsa?.nome || (idx % 2 === 0 ? 'Dott. Mario Rossi' : 'Avv. Legal Specialist'),
+        }));
+      }
+
+      return {
+        id: m.id,
+        nome: m.nome,
+        cat,
+        prezzo: m.prezzo ? (m.prezzo > 1000 ? m.prezzo / 100 : m.prezzo) : 3500,
+        ore: m.orePreventivate || m.ore || 15,
+        righeCount: passaggi.length,
+        descrizione: m.descrizione || `Modulo operativo specialistico per ${m.nome}`,
+        stato: isDone ? 'completato' : 'in_corso',
+        operatore: (m.microvoci && m.microvoci[0]?.risorsa?.nome) || (idx % 2 === 0 ? 'Dott. Mario Rossi (Senior Partner)' : 'Avv. Legal & Trust Specialist'),
+        percentuale: isDone ? 100 : (m.avanzamentoPercentuale || 75),
+        passaggi,
+        deliverables: getModuleDeliverables(m.nome, cat),
+        richiedeFirmaFinale: true,
+      };
+    });
+  }
+
+  // 2. Se è un progetto specifico per tipo/nome (Trust, Fiduciaria, Holding, IP, Banking, ecc.)
+  const lowerName = (project.nome || '').toLowerCase();
+  if (lowerName.includes('trust') || lowerName.includes('fiduciari') || lowerName.includes('svizzera')) {
+    return [
+      {
+        id: `mod-trust-01-${project.id}`,
+        nome: 'Struttura Trust Elvetico',
+        cat: 'Trust',
+        prezzo: 4500,
+        ore: 20,
+        righeCount: 4,
+        descrizione: 'Costituzione e regolamento fiduciario Trust Svizzera',
+        stato: 'completato',
+        operatore: 'Avv. Legal & Trust Specialist',
+        percentuale: 100,
+        passaggi: getModulePassaggi('Struttura Trust Elvetico', 'Trust'),
+        deliverables: getModuleDeliverables('Struttura Trust Elvetico', 'Trust'),
+        richiedeFirmaFinale: true,
+      },
+      {
+        id: `mod-trust-02-${project.id}`,
+        nome: 'Letter of Wishes & Governance Fiduciaria',
+        cat: 'Trust',
+        prezzo: 2800,
+        ore: 12,
+        righeCount: 3,
+        descrizione: 'Redazione linee guida riservate per il Trustee',
+        stato: 'completato',
+        operatore: 'Avv. Legal & Trust Specialist',
+        percentuale: 100,
+        passaggi: getModulePassaggi('Letter of Wishes & Governance Fiduciaria', 'Trust'),
+        deliverables: getModuleDeliverables('Letter of Wishes & Governance Fiduciaria', 'Trust'),
+        richiedeFirmaFinale: true,
+      },
+      {
+        id: `mod-trust-03-${project.id}`,
+        nome: 'Apertura Conto Fiduciario Svizzera (Banking)',
+        cat: 'Banking',
+        prezzo: 3900,
+        ore: 16,
+        righeCount: 4,
+        descrizione: 'Account opening e compliance bancaria Zurigo/Ginevra',
+        stato: 'in_corso',
+        operatore: 'Dott. Mario Rossi (Senior Partner)',
+        percentuale: 60,
+        passaggi: getModulePassaggi('Apertura conti correnti', 'Banking'),
+        deliverables: getModuleDeliverables('Apertura conti correnti', 'Banking'),
+        richiedeFirmaFinale: true,
+      }
+    ];
+  }
+
+  // 3. Moduli standard Holding / Corporate / Fiscale
+  return [
+    {
+      id: `mod-corp-01-${project.id}`,
+      nome: 'Analisi patrimoniale iniziale',
+      cat: 'Analisi',
+      prezzo: 3500,
+      ore: 12,
+      righeCount: 4,
+      descrizione: 'Valutazione della consistenza e asset protection',
+      stato: 'completato',
+      operatore: 'Dott. Mario Rossi (Senior Partner)',
+      percentuale: 100,
+      passaggi: getModulePassaggi('Analisi patrimoniale iniziale', 'Analisi'),
+      deliverables: getModuleDeliverables('Analisi patrimoniale iniziale', 'Analisi'),
+      richiedeFirmaFinale: true,
+    },
+    {
+      id: `mod-corp-02-${project.id}`,
+      nome: 'Corporate structuring Malta Holding LTD',
+      cat: 'Societario',
+      prezzo: 11500,
+      ore: 40,
+      righeCount: 4,
+      descrizione: 'Incorporazione LTD Holding e governance',
+      stato: 'in_corso',
+      operatore: 'Dott. Mario Rossi (Senior Partner)',
+      percentuale: 75,
+      passaggi: getModulePassaggi('Corporate structuring Malta', 'Societario'),
+      deliverables: getModuleDeliverables('Corporate structuring Malta', 'Societario'),
+      richiedeFirmaFinale: true,
+    },
+    {
+      id: `mod-corp-03-${project.id}`,
+      nome: 'Compliance Antiriciclaggio & Registro UBO',
+      cat: 'Compliance',
+      prezzo: 2200,
+      ore: 10,
+      righeCount: 3,
+      descrizione: 'Dichiarazione Titolare Effettivo e adempimenti antiriciclaggio',
+      stato: 'in_corso',
+      operatore: 'Compliance Officer BluMan',
+      percentuale: 50,
+      passaggi: getModulePassaggi('Compliance Antiriciclaggio', 'Compliance'),
+      deliverables: getModuleDeliverables('Compliance Antiriciclaggio', 'Compliance'),
+      richiedeFirmaFinale: true,
+    }
+  ];
+}
+
 type PortalTab = 'proposta' | 'avanzamento' | 'form' | 'documenti' | 'contatti';
 
 export function ClientPortal() {
@@ -329,109 +470,55 @@ export function ClientPortal() {
         try { setModuleSignatures(JSON.parse(savedModSigs)); } catch {}
       }
 
-      const moduliRes = await fetchModuliLibreria();
-      if (moduliRes && Array.isArray(moduliRes) && moduliRes.length > 0) {
-        const mapped: ModuloProposta[] = moduliRes.map((m: any, idx: number) => {
-          const cat = (m.categoria as CategoriaModulo) || 'Societario';
-          const passaggi = getModulePassaggi(m.nome, cat);
-          const deliverables = getModuleDeliverables(m.nome, cat);
-          const isCompleted = idx % 2 === 0;
-          return {
-            id: m.id,
-            nome: m.nome,
-            cat,
-            prezzo: m.prezzoPacchetto ? m.prezzoPacchetto / 100 : 3500,
-            ore: 15,
-            righeCount: m.righeDistinta ? m.righeDistinta.length : passaggi.length,
-            descrizione: m.descrizione || `Modulo operativo specialistico per ${m.nome}`,
-            stato: isCompleted ? 'completato' : 'in_corso',
-            operatore: idx % 3 === 0 ? 'Dott. Mario Rossi (Senior Partner)' : idx % 3 === 1 ? 'Avv. Legal & Trust Specialist' : 'Compliance Officer',
-            percentuale: isCompleted ? 100 : 75,
-            passaggi,
-            deliverables,
-            richiedeFirmaFinale: true,
-          };
-        });
-        setModuliProposti(mapped);
-      } else {
-        setModuliProposti([
-          {
-            id: 'mod-m01',
-            nome: 'Analisi patrimoniale iniziale',
-            cat: 'Analisi',
-            prezzo: 3500,
-            ore: 12,
-            righeCount: 4,
-            descrizione: 'Valutazione della consistenza e asset protection',
-            stato: 'completato',
-            operatore: 'Dott. Mario Rossi (Senior Partner)',
-            percentuale: 100,
-            passaggi: getModulePassaggi('Analisi patrimoniale iniziale', 'Analisi'),
-            deliverables: getModuleDeliverables('Analisi patrimoniale iniziale', 'Analisi'),
-            richiedeFirmaFinale: true,
-          },
-          {
-            id: 'mod-m02',
-            nome: 'Struttura Trust Elvetico',
-            cat: 'Trust',
-            prezzo: 2200,
-            ore: 15,
-            righeCount: 4,
-            descrizione: 'Costituzione e regolamento fiduciario Trust Svizzera',
-            stato: 'completato',
-            operatore: 'Avv. Legal & Trust Specialist',
-            percentuale: 100,
-            passaggi: getModulePassaggi('Struttura Trust Elvetico', 'Trust'),
-            deliverables: getModuleDeliverables('Struttura Trust Elvetico', 'Trust'),
-            richiedeFirmaFinale: true,
-          },
-          {
-            id: 'mod-m03',
-            nome: 'Corporate structuring Malta',
-            cat: 'Societario',
-            prezzo: 11500,
-            ore: 40,
-            righeCount: 4,
-            descrizione: 'Incorporazione LTD Holding e governance',
-            stato: 'in_corso',
-            operatore: 'Dott. Mario Rossi (Senior Partner)',
-            percentuale: 75,
-            passaggi: getModulePassaggi('Corporate structuring Malta', 'Societario'),
-            deliverables: getModuleDeliverables('Corporate structuring Malta', 'Societario'),
-            richiedeFirmaFinale: true,
-          },
-        ]);
-      }
-      // Cerca tutti i progetti associati al cliente
+      // Cerca tutti i progetti associati ESCLUSIVAMENTE al cliente corrente
       try {
         const progettiRes = await fetchProgetti();
         if (progettiRes && Array.isArray(progettiRes) && progettiRes.length > 0) {
-          const matched = progettiRes.filter((p: any) =>
-            (clienteIdSessione && p.clienteId === clienteIdSessione) ||
-            p.cliente?.nome?.toLowerCase() === resolvedClientName.toLowerCase() ||
-            p.cliente?.email?.toLowerCase() === clientObj?.email?.toLowerCase() ||
-            String(p.id).includes('proj-')
-          );
+          const matched = progettiRes.filter((p: any) => {
+            const byId = clienteIdSessione && (p.clienteId === clienteIdSessione || p.cliente?.id === clienteIdSessione);
+            const byName = resolvedClientName && p.cliente?.nome && p.cliente.nome.trim().toLowerCase() === resolvedClientName.trim().toLowerCase();
+            const byEmail = clientObj?.email && p.cliente?.email && p.cliente.email.trim().toLowerCase() === clientObj.email.trim().toLowerCase();
+            return byId || byName || byEmail;
+          });
+
           const finalProjects = matched.length > 0 ? matched : [
-            { id: String(progettiRes[0].id), nome: progettiRes[0].nome || 'Consulenza Patrimoniale & Structuring', giurisdizione: 'Malta', valoreTotale: 28500 },
-            { id: 'proj-02', nome: 'Pianificazione Trust Elvetico & Asset Protection', giurisdizione: 'Svizzera', valoreTotale: 18200 },
+            {
+              id: `proj-client-${clienteIdSessione || 'default'}`,
+              nome: `Progetto Consulenza & Structuring per ${resolvedClientName}`,
+              giurisdizione: clientObj?.giurisdizione || 'Malta',
+              valoreTotale: 28500,
+              stato: 'in_progress',
+              clienteId: clienteIdSessione,
+              cliente: { nome: resolvedClientName, email: clientObj?.email },
+            }
           ];
+
           setClientProjects(finalProjects);
           const activeProj = finalProjects[0];
           const pId = String(activeProj.id);
           setSelectedProjectId(pId);
           setProgettoId(pId);
+          setModuliProposti(mapProjectToPortalModules(activeProj));
           const msgs = await fetchComunicazioniApi(pId);
           if (msgs && Array.isArray(msgs)) {
             setMessaggi(msgs);
           }
         } else {
-          setClientProjects([
-            { id: 'proj-01', nome: 'Consulenza Patrimoniale & Structuring Malta', giurisdizione: 'Malta', valoreTotale: 28500 },
-            { id: 'proj-02', nome: 'Pianificazione Trust Elvetico & Asset Protection', giurisdizione: 'Svizzera', valoreTotale: 18200 },
-          ]);
-          setSelectedProjectId('proj-01');
-          setProgettoId('proj-01');
+          const fallback = [
+            {
+              id: `proj-client-${clienteIdSessione || 'default'}`,
+              nome: `Progetto Consulenza & Structuring per ${resolvedClientName}`,
+              giurisdizione: clientObj?.giurisdizione || 'Malta',
+              valoreTotale: 28500,
+              stato: 'in_progress',
+              clienteId: clienteIdSessione,
+              cliente: { nome: resolvedClientName, email: clientObj?.email },
+            }
+          ];
+          setClientProjects(fallback);
+          setSelectedProjectId(fallback[0].id);
+          setProgettoId(fallback[0].id);
+          setModuliProposti(mapProjectToPortalModules(fallback[0]));
         }
       } catch (err) {
         console.warn('Errore recupero progetti portale:', err);
@@ -504,6 +591,19 @@ export function ClientPortal() {
     } finally {
       setLoginLoading(false);
     }
+  };
+
+  const handleSelectProject = (pId: string, availableProjects?: any[]) => {
+    const projs = availableProjects || clientProjects;
+    setSelectedProjectId(pId);
+    setProgettoId(pId);
+    const foundProj = projs.find((p: any) => String(p.id) === String(pId));
+    if (foundProj) {
+      setModuliProposti(mapProjectToPortalModules(foundProj));
+    }
+    fetchComunicazioniApi(pId).then(msgs => {
+      if (msgs && Array.isArray(msgs)) setMessaggi(msgs);
+    }).catch(() => {});
   };
 
   const totalValue = moduliProposti.reduce((acc, m) => acc + m.prezzo, 0);
@@ -938,14 +1038,7 @@ export function ClientPortal() {
                 </span>
                 <select
                   value={selectedProjectId || clientProjects[0]?.id || ''}
-                  onChange={(e) => {
-                    const nextId = e.target.value;
-                    setSelectedProjectId(nextId);
-                    setProgettoId(nextId);
-                    fetchComunicazioniApi(nextId).then(msgs => {
-                      if (msgs && Array.isArray(msgs)) setMessaggi(msgs);
-                    });
-                  }}
+                  onChange={(e) => handleSelectProject(e.target.value)}
                   style={{
                     background: 'transparent',
                     border: 'none',

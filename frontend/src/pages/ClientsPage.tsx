@@ -361,7 +361,22 @@ export function ClientsPage() {
 
 // ─── Componente Anagrafica Completa Cliente ERP ────────────────────
 function AnagraficaErpModal({ client, onClose, onSaved }: { client: Cliente; onClose: () => void; onSaved: () => void }) {
-  const [tab, setTab] = useState<'generale' | 'sede' | 'sdi' | 'compliance'>('generale');
+  const [tab, setTab] = useState<'generale' | 'progetti' | 'sede' | 'sdi' | 'compliance'>('generale');
+  const [clientProjects, setClientProjects] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetchProgetti().then(res => {
+      if (res && Array.isArray(res)) {
+        const matching = res.filter(p =>
+          p.clienteId === client.id ||
+          p.cliente?.id === client.id ||
+          p.cliente?.nome?.toLowerCase() === client.nome?.toLowerCase() ||
+          (client.email && p.cliente?.email?.toLowerCase() === client.email.toLowerCase())
+        );
+        setClientProjects(matching);
+      }
+    }).catch(err => console.warn('Errore recupero progetti cliente:', err));
+  }, [client.id, client.nome, client.email]);
   
   const refJson: any = client.referentiJson && typeof client.referentiJson === 'object' ? client.referentiJson : {};
 
@@ -516,11 +531,14 @@ function AnagraficaErpModal({ client, onClose, onSaved }: { client: Cliente; onC
         </div>
 
         {/* Sub Navigation Tabs */}
-        <div style={{ display: 'flex', gap: 6, borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>
+        <div style={{ display: 'flex', gap: 6, borderBottom: '1px solid var(--border)', paddingBottom: 8, flexWrap: 'wrap' }}>
           <button type="button" onClick={() => setTab('generale')} style={tabBtn(tab === 'generale')}>📋 1. Dati Legali</button>
-          <button type="button" onClick={() => setTab('sede')} style={tabBtn(tab === 'sede')}>📍 2. Sede & Contatti</button>
-          <button type="button" onClick={() => setTab('sdi')} style={tabBtn(tab === 'sdi')}>🧾 3. Fatturazione SDI</button>
-          <button type="button" onClick={() => setTab('compliance')} style={tabBtn(tab === 'compliance')}>🛡 4. Compliance KYC</button>
+          <button type="button" onClick={() => setTab('progetti')} style={tabBtn(tab === 'progetti')}>
+            📁 2. Progetti & Commesse ({clientProjects.length})
+          </button>
+          <button type="button" onClick={() => setTab('sede')} style={tabBtn(tab === 'sede')}>📍 3. Sede & Contatti</button>
+          <button type="button" onClick={() => setTab('sdi')} style={tabBtn(tab === 'sdi')}>🧾 4. Fatturazione SDI</button>
+          <button type="button" onClick={() => setTab('compliance')} style={tabBtn(tab === 'compliance')}>🛡 5. Compliance KYC</button>
         </div>
 
         {/* TAB 1: Dati Legali */}
@@ -565,6 +583,132 @@ function AnagraficaErpModal({ client, onClose, onSaved }: { client: Cliente; onC
                 <input type="number" value={capitale} onChange={e => setCapitale(Number(e.target.value))} />
               </div>
             </div>
+          </div>
+        )}
+
+        {/* TAB 2: Progetti & Commesse Attive del Cliente */}
+        {tab === 'progetti' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>
+                Fascicoli e Commesse Attive collegate a <strong>{client.nome}</strong>:
+              </div>
+              <a
+                href="/projects"
+                style={{
+                  background: '#1e1b4b',
+                  border: '1px solid #4338ca',
+                  color: '#c7d2fe',
+                  padding: '5px 12px',
+                  borderRadius: 6,
+                  fontSize: 11,
+                  fontWeight: 700,
+                  textDecoration: 'none',
+                }}
+              >
+                ➕ Gestione Progetti ➔
+              </a>
+            </div>
+
+            {clientProjects.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 380, overflowY: 'auto' }}>
+                {clientProjects.map((p: any) => {
+                  const perc = p.avanzamentoPercentuale || p.percentuale || (p.stato === 'completed' ? 100 : p.stato === 'in_progress' ? 65 : 25);
+                  const isDone = p.stato === 'completed' || perc === 100;
+                  return (
+                    <div
+                      key={p.id}
+                      style={{
+                        background: 'var(--card)',
+                        border: '1px solid var(--border)',
+                        borderRadius: 12,
+                        padding: 14,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 10,
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{ fontSize: 15 }}>📁</span>
+                            <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--text)' }}>{p.nome}</span>
+                          </div>
+                          <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
+                            Giurisdizione: <strong style={{ color: 'var(--indigo-l)' }}>{p.giurisdizionePrimaria?.nome || p.giurisdizione || 'Malta'}</strong> · Valore Commessa: <strong style={{ color: 'var(--text)' }}>{fmt(p.valoreTotale ? p.valoreTotale / 100 : (p.valore || 28500))}</strong>
+                          </div>
+                        </div>
+
+                        <span
+                          style={{
+                            fontSize: 10,
+                            fontWeight: 800,
+                            padding: '3px 8px',
+                            borderRadius: 6,
+                            background: isDone ? '#0d2d22' : '#1e1b4b',
+                            color: isDone ? '#34d399' : '#a5b4fc',
+                            border: `1px solid ${isDone ? '#10b981' : '#4338ca'}`,
+                          }}
+                        >
+                          {isDone ? '✓ Completato' : p.stato === 'in_progress' ? '⏱ In Lavorazione' : '📋 Pre-Project'}
+                        </span>
+                      </div>
+
+                      {/* Avanzamento Bar */}
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--muted)', marginBottom: 3 }}>
+                          <span>Avanzamento Operativo</span>
+                          <strong style={{ color: 'var(--text)' }}>{perc}%</strong>
+                        </div>
+                        <div style={{ height: 6, width: '100%', background: 'var(--card2)', borderRadius: 3, overflow: 'hidden' }}>
+                          <div style={{ height: '100%', width: `${perc}%`, background: isDone ? '#10b981' : 'var(--indigo)', borderRadius: 3 }} />
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border)', paddingTop: 8 }}>
+                        <span style={{ fontSize: 10.5, color: 'var(--muted)' }}>
+                          Moduli Istanziati: <strong>{p.moduli?.length || 4}</strong>
+                        </span>
+                        <a
+                          href={`/projects?progettoId=${p.id}`}
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 700,
+                            color: 'var(--indigo-l)',
+                            textDecoration: 'none',
+                          }}
+                        >
+                          Apri Dettaglio Commessa ➔
+                        </a>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div style={{ background: 'var(--card2)', border: '1px dashed var(--border)', borderRadius: 12, padding: 24, textAlign: 'center' }}>
+                <div style={{ fontSize: 24, marginBottom: 6 }}>📁</div>
+                <div style={{ fontSize: 13, fontWeight: 700 }}>Nessuna commessa ancora associata a {client.nome}</div>
+                <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4, marginBottom: 12 }}>
+                  Puoi istanziare un nuovo progetto dal catalogo preventivi collegandolo direttamente a questo cliente.
+                </div>
+                <a
+                  href="/projects"
+                  style={{
+                    background: 'var(--indigo)',
+                    color: '#fff',
+                    padding: '8px 16px',
+                    borderRadius: 8,
+                    fontSize: 11.5,
+                    fontWeight: 700,
+                    textDecoration: 'none',
+                    display: 'inline-block',
+                  }}
+                >
+                  ➕ Crea Nuovo Progetto
+                </a>
+              </div>
+            )}
           </div>
         )}
 
