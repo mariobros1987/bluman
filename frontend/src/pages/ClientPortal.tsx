@@ -171,6 +171,7 @@ export function ClientPortal() {
     } else {
       const existingToken = localStorage.getItem('bluman_jwt_token');
       const savedClientUser = localStorage.getItem('bluman_client_user');
+      const savedStudioUser = localStorage.getItem('bluman_user');
       if (existingToken && savedClientUser) {
         try {
           const parsed = JSON.parse(savedClientUser);
@@ -188,6 +189,10 @@ export function ClientPortal() {
           setPageLoading(false);
           return;
         }
+      } else if (existingToken && savedStudioUser) {
+        // Advisor o membro dello studio che apre l'anteprima portale
+        setIsAuthenticated(true);
+        setAccessoNegato(null);
       } else {
         setIsAuthenticated(false);
         setPageLoading(false);
@@ -278,6 +283,10 @@ export function ClientPortal() {
       setPageLoading(false);
     }
   };
+
+  useEffect(() => {
+    loadPortalData();
+  }, [token]);
 
   const totalValue = moduliProposti.reduce((acc, m) => acc + m.prezzo, 0);
 

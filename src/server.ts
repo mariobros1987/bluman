@@ -778,7 +778,18 @@ export function buildServer(app: AppPort): FastifyInstance {
 
       const magicUrl = `${baseUrlApplicazione()}/portal?magic_token=${magicToken}`;
 
-      const sent = await sendMagicLinkEmail(toEmail, cliente.nome, magicUrl);
+      const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
+      const customSmtp = tenant?.smtpHost && tenant?.smtpUser && tenant?.smtpPass ? {
+        host: tenant.smtpHost,
+        port: tenant.smtpPort || 465,
+        secure: tenant.smtpSecure ?? true,
+        user: tenant.smtpUser,
+        pass: tenant.smtpPass,
+        fromEmail: tenant.smtpFromEmail || tenant.smtpUser,
+        fromName: tenant.smtpFromName || tenant.ragioneSociale || 'BluMan Advisory',
+      } : undefined;
+
+      const sent = await sendMagicLinkEmail(toEmail, cliente.nome, magicUrl, customSmtp);
       recordAudit({
         tenantId,
         azione: 'MAGIC_LINK_GENERATO',
@@ -1753,8 +1764,18 @@ export function buildServer(app: AppPort): FastifyInstance {
       let emailInviata = false;
       if (destEmail) {
         try {
+          const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
+          const customSmtp = tenant?.smtpHost && tenant?.smtpUser && tenant?.smtpPass ? {
+            host: tenant.smtpHost,
+            port: tenant.smtpPort || 465,
+            secure: tenant.smtpSecure ?? true,
+            user: tenant.smtpUser,
+            pass: tenant.smtpPass,
+            fromEmail: tenant.smtpFromEmail || tenant.smtpUser,
+            fromName: tenant.smtpFromName || tenant.ragioneSociale || 'BluMan Advisory',
+          } : undefined;
           const portalUrl = `${baseUrlApplicazione()}/portal`;
-          emailInviata = await sendClientCredentialsEmail(destEmail, cliente.nome, nuovaPassword, portalUrl);
+          emailInviata = await sendClientCredentialsEmail(destEmail, cliente.nome, nuovaPassword, portalUrl, customSmtp);
         } catch (err) {
           console.warn('Invio email credenziali fallito:', err);
         }
