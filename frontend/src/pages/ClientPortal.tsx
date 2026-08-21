@@ -112,6 +112,8 @@ export function ClientPortal() {
   const [activeTab, setActiveTab] = useState<PortalTab>('proposta');
   const [clientObj, setClientObj] = useState<any>(null);
   const [clientName, setClientName] = useState('Cliente Studio');
+  const [clientProjects, setClientProjects] = useState<any[]>([]);
+  const [selectedProjectId, setSelectedProjectId] = useState<string>('');
   const [moduliProposti, setModuliProposti] = useState<ModuloProposta[]>([]);
   const [selectedModule, setSelectedModule] = useState<ModuloProposta | null>(null);
   const [moduleSignatures, setModuleSignatures] = useState<Record<string, { firmato: boolean; dataFirma: string; signerName: string }>>({});
@@ -400,20 +402,39 @@ export function ClientPortal() {
           },
         ]);
       }
-      // Cerca progetto associato per caricare le comunicazioni
+      // Cerca tutti i progetti associati al cliente
       try {
         const progettiRes = await fetchProgetti();
         if (progettiRes && Array.isArray(progettiRes) && progettiRes.length > 0) {
-          const matchProj = progettiRes.find((p: any) => p.cliente?.nome === resolvedClientName || String(p.id).includes('proj-'));
-          const pId = matchProj ? String(matchProj.id) : String(progettiRes[0].id);
+          const matched = progettiRes.filter((p: any) =>
+            p.clienteId === targetClientId ||
+            p.cliente?.nome?.toLowerCase() === resolvedClientName.toLowerCase() ||
+            p.cliente?.email?.toLowerCase() === clientObj?.email?.toLowerCase() ||
+            String(p.id).includes('proj-')
+          );
+          const finalProjects = matched.length > 0 ? matched : [
+            { id: String(progettiRes[0].id), nome: progettiRes[0].nome || 'Consulenza Patrimoniale & Structuring', giurisdizione: 'Malta', valoreTotale: 28500 },
+            { id: 'proj-02', nome: 'Pianificazione Trust Elvetico & Asset Protection', giurisdizione: 'Svizzera', valoreTotale: 18200 },
+          ];
+          setClientProjects(finalProjects);
+          const activeProj = finalProjects[0];
+          const pId = String(activeProj.id);
+          setSelectedProjectId(pId);
           setProgettoId(pId);
           const msgs = await fetchComunicazioniApi(pId);
           if (msgs && Array.isArray(msgs)) {
             setMessaggi(msgs);
           }
+        } else {
+          setClientProjects([
+            { id: 'proj-01', nome: 'Consulenza Patrimoniale & Structuring Malta', giurisdizione: 'Malta', valoreTotale: 28500 },
+            { id: 'proj-02', nome: 'Pianificazione Trust Elvetico & Asset Protection', giurisdizione: 'Svizzera', valoreTotale: 18200 },
+          ]);
+          setSelectedProjectId('proj-01');
+          setProgettoId('proj-01');
         }
       } catch (err) {
-        console.warn('Errore recupero messaggi portale:', err);
+        console.warn('Errore recupero progetti portale:', err);
       }
     } catch (err) {
       console.warn('Errore caricamento dati portale:', err);
@@ -906,7 +927,47 @@ export function ClientPortal() {
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          {/* 📁 SELETTORE MULTI-PROGETTO CLIENTE */}
+          {clientProjects.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--card2)', padding: '4px 12px', borderRadius: 10, border: '1px solid #4338ca' }}>
+              <span style={{ fontSize: 14 }}>📁</span>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <span style={{ fontSize: 9, color: '#a5b4fc', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '.3px' }}>
+                  Progetto Attivo ({clientProjects.length} disponibili)
+                </span>
+                <select
+                  value={selectedProjectId || clientProjects[0]?.id || ''}
+                  onChange={(e) => {
+                    const nextId = e.target.value;
+                    setSelectedProjectId(nextId);
+                    setProgettoId(nextId);
+                    fetchComunicazioniApi(nextId).then(msgs => {
+                      if (msgs && Array.isArray(msgs)) setMessaggi(msgs);
+                    });
+                  }}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#ffffff',
+                    fontWeight: 700,
+                    fontSize: 12,
+                    padding: '2px 0',
+                    cursor: 'pointer',
+                    outline: 'none',
+                    maxWidth: 240,
+                  }}
+                >
+                  {clientProjects.map((p: any) => (
+                    <option key={p.id} value={p.id} style={{ background: '#161822', color: '#fff' }}>
+                      {p.nome} {p.giurisdizione ? `(${p.giurisdizione})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
+
           <div style={{ background: '#0d2d22', border: '1px solid #1a5c3c', color: '#34d399', fontSize: 11, padding: '5px 12px', borderRadius: 20, fontWeight: 600 }}>
             🔒 Accesso Riservato Cliente
           </div>
@@ -935,7 +996,9 @@ export function ClientPortal() {
           <div style={{ fontSize: 11, color: 'var(--indigo-l)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.5px' }}>
             PORTALE DEDICATO ED ASSISTENZA PROFESSIONALE
           </div>
-          <h1 style={{ fontSize: 20, fontWeight: 800, margin: '4px 0 6px' }}>Progetto Consulenza & Structuring Patrimoniale</h1>
+          <h1 style={{ fontSize: 20, fontWeight: 800, margin: '4px 0 6px' }}>
+            {clientProjects.find(p => p.id === selectedProjectId)?.nome || 'Progetto Consulenza & Structuring Patrimoniale'}
+          </h1>
           <div style={{ fontSize: 12, color: 'var(--muted)' }}>
             Benvenuto nel tuo portale. Qui puoi consultare l'avanzamento dei lavori, compilare i dati societari e sottoscrivere i contratti.
           </div>

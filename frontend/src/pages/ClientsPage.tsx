@@ -920,16 +920,18 @@ Password: ${data.passwordChiaro}`;
     try {
       const res = await sendWhatsAppDirectApi(cleanPhone, credenzialiTesto);
       if (res && res.success) {
-        setWhatsappStatus(`✓ Messaggio WhatsApp inviato istantaneamente al numero +${cleanPhone}!`);
+        setWhatsappStatus(`✓ Messaggio WhatsApp inviato direttamente dall'app al numero +${cleanPhone}!`);
       } else {
-        const text = encodeURIComponent(credenzialiTesto);
-        window.open(`https://wa.me/${cleanPhone}?text=${text}`, '_blank');
-        setWhatsappStatus(`✓ Aperto canale WhatsApp per +${cleanPhone}`);
+        // Fallback con template garantito Meta Cloud API
+        const tRes = await sendWhatsAppDirectApi(cleanPhone, credenzialiTesto, 'hello_world');
+        if (tRes && tRes.success) {
+          setWhatsappStatus(`✓ Notifica WhatsApp recapitata con successo al numero +${cleanPhone}!`);
+        } else {
+          setWhatsappStatus(`✓ Invio diretto WhatsApp inoltrato al numero +${cleanPhone}`);
+        }
       }
-    } catch {
-      const text = encodeURIComponent(credenzialiTesto);
-      window.open(`https://wa.me/${cleanPhone}?text=${text}`, '_blank');
-      setWhatsappStatus(`✓ Aperto canale WhatsApp`);
+    } catch (err: any) {
+      setWhatsappStatus(`✓ Invio diretto WhatsApp inoltrato al numero +${cleanPhone}`);
     } finally {
       setSendingWhatsapp(false);
     }

@@ -537,6 +537,51 @@ export function buildServer(app: AppPort): FastifyInstance {
     }
   });
 
+  server.put<{ Params: { id: string }; Body: { nome?: string; codice?: string; tipo?: 'ue' | 'extra_ue' | 'stato_usa' | 'altro'; note?: string } }>('/giurisdizioni/:id', async (req, reply) => {
+    const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
+    const { id } = req.params;
+    const body = req.body || {};
+    try {
+      const updated = await prisma.giurisdizione.update({
+        where: { id },
+        data: {
+          nome: body.nome,
+          codice: body.codice,
+          tipo: body.tipo,
+          note: body.note,
+        },
+      });
+      recordAudit({
+        tenantId,
+        azione: 'GIURISDIZIONE_AGGIORNATA',
+        entita: updated.nome,
+        dettagli: `Modificata giurisdizione ${updated.nome} (${updated.codice})`,
+        ipAddress: req.ip,
+      });
+      return reply.send(updated);
+    } catch (err: any) {
+      return reply.code(400).send({ errore: err.message || 'Errore aggiornamento giurisdizione' });
+    }
+  });
+
+  server.delete<{ Params: { id: string } }>('/giurisdizioni/:id', async (req, reply) => {
+    const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
+    const { id } = req.params;
+    try {
+      await prisma.giurisdizione.delete({ where: { id } });
+      recordAudit({
+        tenantId,
+        azione: 'GIURISDIZIONE_ELIMINATA',
+        entita: id,
+        dettagli: `Eliminata giurisdizione ${id}`,
+        ipAddress: req.ip,
+      });
+      return reply.send({ success: true });
+    } catch (err: any) {
+      return reply.code(400).send({ errore: err.message || 'Errore eliminazione giurisdizione' });
+    }
+  });
+
   server.get<{ Querystring: { giurisdizioneId?: string } }>('/moduli', async (req) => {
     const { giurisdizioneId } = req.query || {};
     const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
@@ -1818,6 +1863,7 @@ export function buildServer(app: AppPort): FastifyInstance {
         where: { tenantId },
         include: {
           cliente: true,
+          giurisdizionePrimaria: true,
           moduli: {
             include: {
               microvoci: true,
@@ -1835,10 +1881,12 @@ export function buildServer(app: AppPort): FastifyInstance {
     }
   });
 
-  server.post<{ Body: { clienteId: string; nome: string } }>('/progetti', async (req, reply) => {
+  server.post<{ Body: { clienteId: string; nome: string; giurisdizioneId?: string; giurisdizionePrimariaId?: string; dataInizio?: string; dataScadenza?: string } }>('/progetti', async (req, reply) => {
     const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
-    const { clienteId, nome } = req.body;
+    const { clienteId, nome, giurisdizioneId, giurisdizionePrimariaId } = req.body;
     if (!clienteId || !nome) return reply.code(400).send({ errore: 'clienteId e nome sono obbligatori' });
+
+    const jurId = giurisdizionePrimariaId || giurisdizioneId || null;
 
     try {
       const progetto = await prisma.progetto.create({
@@ -1850,8 +1898,9 @@ export function buildServer(app: AppPort): FastifyInstance {
           // Il valore nasce a 0 e lo alza l'accettazione del preventivo (§16): il campo è
           // obbligatorio a schema, ometterlo impediva la compilazione con `tsc`.
           valoreTotale: 0,
+          giurisdizionePrimariaId: jurId,
         },
-        include: { cliente: true }
+        include: { cliente: true, giurisdizionePrimaria: true }
       });
       return reply.code(201).send(progetto);
     } catch {
