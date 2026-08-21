@@ -322,6 +322,31 @@ export function ClientPortal() {
     setIsAuthenticated(false);
   };
 
+  const handleManualMagicSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginError(null);
+    if (!manualMagicToken.trim()) {
+      setLoginError('Inserisci un Magic Token valido');
+      return;
+    }
+    setLoginLoading(true);
+    try {
+      const sessione = await magicLoginApi(manualMagicToken.trim());
+      if (!sessione?.token) throw new Error('Magic Token non valido o scaduto');
+      localStorage.setItem('bluman_jwt_token', sessione.token);
+      if (sessione.user) {
+        localStorage.setItem('bluman_client_user', JSON.stringify(sessione.user));
+      }
+      setIsAuthenticated(true);
+      setAccessoNegato(null);
+      await loadPortalData(sessione.user?.clienteId);
+    } catch (err: any) {
+      setLoginError(err.message || 'Magic Token non valido o scaduto');
+    } finally {
+      setLoginLoading(false);
+    }
+  };
+
   const totalValue = moduliProposti.reduce((acc, m) => acc + m.prezzo, 0);
 
   const handleSign = async () => {
