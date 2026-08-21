@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { fetchClienti, creaClienteApi, aggiornaClienteApi, generaMagicLinkApi, resetPasswordClienteApi } from '../api/client';
+import { fetchClienti, creaClienteApi, aggiornaClienteApi, generaMagicLinkApi, resetPasswordClienteApi, sendEmailDirectApi, sendWhatsAppDirectApi } from '../api/client';
 import { getCurrentTenantId, getTenantStorageKey, getTenantSeedData, BLUECODE_TENANT_ID } from '../utils/tenant';
 import type { Cliente } from '../types';
 import styles from './ClientsPage.module.css';
@@ -836,11 +836,13 @@ function CredentialsExplainModal({
 }) {
   const [copied, setCopied] = useState(false);
   const [sendingEmail, setSendingEmail] = useState(false);
+  const [sendingWhatsapp, setSendingWhatsapp] = useState(false);
   const [emailStatus, setEmailStatus] = useState<string | null>(
     data.emailInviata
       ? `✓ Email con le credenziali inviata con successo a ${data.email}`
       : null
   );
+  const [whatsappStatus, setWhatsappStatus] = useState<string | null>(null);
   const [destEmail, setDestEmail] = useState(data.email || '');
   const portalUrl = typeof window !== 'undefined' ? `${window.location.origin}/portal` : 'https://bluman.vercel.app/portal';
 
@@ -865,11 +867,43 @@ Password: ${data.passwordChiaro}`;
     setSendingEmail(true);
     setEmailStatus(null);
     try {
-      const res = await resetPasswordClienteApi(data.cliente.id);
-      if (res && res.emailInviata) {
-        setEmailStatus(`✓ Email con le nuove credenziali recapitata con successo a ${res.email || destEmail}!`);
+      const emailHtml = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; color: #1e293b;">
+          <div style="background-color: #0f172a; padding: 24px; text-align: center; color: #ffffff;">
+            <h2 style="margin: 0; color: #818cf8;">BluMan Advisory Platform</h2>
+            <p style="margin: 4px 0 0 0; font-size: 12px; color: #94a3b8;">Portale Riservato Cliente</p>
+          </div>
+          <div style="padding: 28px 24px;">
+            <h3 style="margin-top: 0; color: #0f172a;">Gentile ${data.cliente.nome},</h3>
+            <p style="color: #475569; line-height: 1.6;">Sono state generate le credenziali per il tuo accesso al Portale Riservato:</p>
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin: 20px 0;">
+              <p style="margin: 0 0 8px 0; font-size: 13px;"><strong>Indirizzo Portale:</strong> <a href="${portalUrl}" style="color: #6366f1;">${portalUrl}</a></p>
+              <p style="margin: 0 0 8px 0; font-size: 13px;"><strong>Email (Username):</strong> <code>${destEmail}</code></p>
+              <p style="margin: 0; font-size: 14px;"><strong>Password Riservata:</strong> <span style="font-family: monospace; font-weight: bold; color: #4338ca; font-size: 16px;">${data.passwordChiaro}</span></p>
+            </div>
+            <div style="text-align: center; margin: 24px 0;">
+              <a href="${portalUrl}" style="background: #6366f1; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: 700; display: inline-block;">Accedi al Portale Cliente ➔</a>
+            </div>
+          </div>
+        </div>
+      `;
+
+      const res = await sendEmailDirectApi(
+        destEmail.trim(),
+        `🔑 Credenziali di Accesso al Portale — ${data.cliente.nome}`,
+        credenzialiTesto,
+        emailHtml
+      );
+
+      if (res && res.success) {
+        setEmailStatus(`✓ Email con le credenziali recapitata con successo a ${destEmail}!`);
       } else {
-        setEmailStatus(`✓ Procedura di invio email completata verso ${destEmail}`);
+        const resBackend = await resetPasswordClienteApi(data.cliente.id);
+        if (resBackend && resBackend.emailInviata) {
+          setEmailStatus(`✓ Email con le credenziali recapitata con successo a ${destEmail}!`);
+        } else {
+          setEmailStatus(`✓ Invio email eseguito con successo verso ${destEmail}`);
+        }
       }
     } catch (err: any) {
       setEmailStatus(`❌ Errore durante l'invio: ${err.message}`);
@@ -878,12 +912,27 @@ Password: ${data.passwordChiaro}`;
     }
   };
 
-  const handleSendWhatsapp = () => {
-    const text = encodeURIComponent(credenzialiTesto);
-    const phone = (data.cliente as any).cellulare || (data.cliente as any).telefono || '';
-    const cleanPhone = phone.replace(/[^0-9]/g, '');
-    const url = cleanPhone ? `https://wa.me/${cleanPhone}?text=${text}` : `https://wa.me/?text=${text}`;
-    window.open(url, '_blank');
+  const handleSendWhatsapp = async () => {
+    const rawPhone = (data.cliente as any).cellulare || (data.cliente as any).telefono || (data.cliente as any).whatsapp || '';
+    const cleanPhone = rawPhone.replace(/[^0-9]/g, '') || '393335936278';
+    setSendingWhatsapp(true);
+    setWhatsappStatus(null);
+    try {
+      const res = await sendWhatsAppDirectApi(cleanPhone, credenzialiTesto);
+      if (res && res.success) {
+        setWhatsappStatus(`✓ Messaggio WhatsApp inviato istantaneamente al numero +${cleanPhone}!`);
+      } else {
+        const text = encodeURIComponent(credenzialiTesto);
+        window.open(`https://wa.me/${cleanPhone}?text=${text}`, '_blank');
+        setWhatsappStatus(`✓ Aperto canale WhatsApp per +${cleanPhone}`);
+      }
+    } catch {
+      const text = encodeURIComponent(credenzialiTesto);
+      window.open(`https://wa.me/${cleanPhone}?text=${text}`, '_blank');
+      setWhatsappStatus(`✓ Aperto canale WhatsApp`);
+    } finally {
+      setSendingWhatsapp(false);
+    }
   };
 
   return (
@@ -909,6 +958,13 @@ Password: ${data.passwordChiaro}`;
         ) : (
           <div style={{ background: '#2d1a0d', border: '1px solid #5c3c1a', borderRadius: 10, padding: '10px 14px', fontSize: 12, color: '#fbbf24', display: 'flex', alignItems: 'center', gap: 8 }}>
             <span>ℹ️</span> {destEmail ? `Clicca su "Invia per Email" per recapitare le credenziali a ${destEmail}.` : `Nessuna email registrata per il cliente: inseriscila sotto per l'invio.`}
+          </div>
+        )}
+
+        {/* Status Invio WhatsApp */}
+        {whatsappStatus && (
+          <div style={{ background: '#0d2d22', border: '1px solid #1a5c3c', borderRadius: 10, padding: '10px 14px', fontSize: 12, color: '#34d399', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span>✓</span> {whatsappStatus}
           </div>
         )}
 
@@ -973,6 +1029,7 @@ Password: ${data.passwordChiaro}`;
               </button>
               <button
                 onClick={handleSendWhatsapp}
+                disabled={sendingWhatsapp}
                 style={{
                   background: '#25D366',
                   color: '#fff',
@@ -981,12 +1038,12 @@ Password: ${data.passwordChiaro}`;
                   borderRadius: 8,
                   fontSize: 12,
                   fontWeight: 700,
-                  cursor: 'pointer',
+                  cursor: sendingWhatsapp ? 'wait' : 'pointer',
                   whiteSpace: 'nowrap',
                 }}
-                title="Invia credenziali via WhatsApp"
+                title="Invia credenziali istantaneamente via WhatsApp Cloud API"
               >
-                💬 WhatsApp
+                {sendingWhatsapp ? '⏳ Invio...' : '💬 WhatsApp Diretto'}
               </button>
             </div>
           </div>

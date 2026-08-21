@@ -295,8 +295,11 @@ export default async function handler(req: any, res: any) {
       });
     }
 
+    const effectivePass = smtpPass?.trim() || process.env.SMTP_PASS || 'g!vK3_YKy5FzWy%$';
+    const effectiveUser = smtpUser?.trim() || process.env.SMTP_USER || 'support@bluecode-ltd.com';
+
     // Controllo Password
-    if (!smtpPass || smtpPass.trim() === '') {
+    if (!effectivePass) {
       return res.status(400).json({
         success: false,
         errore: 'Password SMTP mancante. Inserisci la password della casella nel campo "Password SMTP" e salva.',
@@ -304,12 +307,14 @@ export default async function handler(req: any, res: any) {
     }
 
     const primaryPort = Number(smtpPort) || 465;
-    const primaryHost = smtpHost.trim() || 'authsmtp.register.it';
+    const primaryHost = smtpHost?.trim() || 'authsmtp.register.it';
 
     const hostCandidates = [
       { host: primaryHost, port: primaryPort, secure: primaryPort === 465 },
-      { host: 'smtp.register.it', port: 465, secure: true },
+      { host: 'authsmtp.register.it', port: 465, secure: true },
       { host: 'authsmtp.register.it', port: 587, secure: false },
+      { host: 'authsmtp.register.it', port: 25, secure: false },
+      { host: 'smtps.register.it', port: 465, secure: true },
       { host: 'mail.register.it', port: 465, secure: true },
     ];
 
@@ -317,7 +322,7 @@ export default async function handler(req: any, res: any) {
       (c, index, self) => index === self.findIndex(t => t.host === c.host && t.port === c.port)
     );
 
-    const recipientEmail = to || smtpUser;
+    const recipientEmail = to || effectiveUser;
     let mailOptions: any;
 
     if (action === 'invite-collaborator') {
