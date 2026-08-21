@@ -752,7 +752,8 @@ export function ClientPortal() {
   }
 
   return (
-    <div style={containerStyle}>
+    <div style={portalWrapperStyle}>
+      <div style={containerStyle}>
       {/* Top Navbar Header */}
       <div style={topNavStyle}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -1959,18 +1960,34 @@ export function ClientPortal() {
           }}
         />
       )}
+      </div>
     </div>
   );
 }
 
+const portalWrapperStyle: React.CSSProperties = {
+  width: '100%',
+  minHeight: '100vh',
+  overflowY: 'auto',
+  background: 'var(--bg)',
+  color: 'var(--text)',
+};
+
 const containerStyle: React.CSSProperties = {
-  minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)', fontFamily: 'var(--font)', padding: '24px 20px 40px',
-  maxWidth: 1040, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 18,
+  minHeight: '100%',
+  color: 'var(--text)',
+  fontFamily: 'var(--font)',
+  padding: '24px 20px 80px',
+  maxWidth: 1120,
+  margin: '0 auto',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 20,
 };
 
 const topNavStyle: React.CSSProperties = {
   display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12,
-  paddingBottom: 12, borderBottom: '1px solid var(--border)',
+  paddingBottom: 14, borderBottom: '1px solid var(--border)',
 };
 
 const heroBannerStyle: React.CSSProperties = {
@@ -1979,20 +1996,33 @@ const heroBannerStyle: React.CSSProperties = {
 };
 
 const tabsBarStyle: React.CSSProperties = {
-  display: 'flex', gap: 6, overflowX: 'auto', borderBottom: '1px solid var(--border)', paddingBottom: 8,
+  display: 'flex',
+  gap: 8,
+  overflowX: 'auto',
+  borderBottom: '2px solid var(--border)',
+  paddingBottom: 10,
+  paddingTop: 6,
+  position: 'sticky',
+  top: 0,
+  zIndex: 30,
+  background: 'var(--bg)',
 };
 
 const tabBtnStyle = (active: boolean): React.CSSProperties => ({
-  background: active ? '#1a1f3d' : 'transparent',
-  border: 'none',
-  borderBottom: active ? '2px solid var(--indigo-l)' : '2px solid transparent',
-  color: active ? 'var(--indigo-l)' : 'var(--muted)',
-  fontSize: 12,
-  fontWeight: 600,
-  padding: '8px 14px',
-  borderRadius: 8,
+  background: active ? 'var(--indigo)' : 'var(--card2)',
+  border: active ? '1px solid var(--indigo-l)' : '1px solid var(--border)',
+  color: active ? '#ffffff' : 'var(--text)',
+  fontSize: 13,
+  fontWeight: 700,
+  padding: '10px 18px',
+  borderRadius: 10,
   cursor: 'pointer',
   whiteSpace: 'nowrap',
+  boxShadow: active ? '0 4px 14px rgba(99, 102, 241, 0.4)' : 'none',
+  transition: 'all .2s ease',
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 6,
 });
 
 const bodyStyle: React.CSSProperties = {
