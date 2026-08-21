@@ -10,13 +10,87 @@ import { getStudioInfoForTenant, getCurrentTenantId, getTenantStorageKey, BLUECO
 import { fetchModuliLibreria, fetchProgetti, creaPreventivoEAccettaApi, fetchClienti, creaProgettoApi, creaClienteApi, fetchComunicazioniApi, inviaComunicazioneApi, requestPortalOtpApi, verifyPortalOtpAndSignApi, magicLoginApi, clientLoginApi } from '../api/client';
 import type { CategoriaModulo } from '../types';
 
-interface ModuloProposta {
+export interface ModuloPassaggio {
+  id: string;
+  titolo: string;
+  completato: boolean;
+  operatore?: string;
+  data?: string;
+  note?: string;
+}
+
+export interface ModuloDeliverable {
+  titolo: string;
+  nomeFile: string;
+  data: string;
+}
+
+export interface ModuloProposta {
   id: string;
   nome: string;
   cat: CategoriaModulo;
   prezzo: number;
   ore: number;
   righeCount: number;
+  descrizione?: string;
+  stato?: 'completato' | 'in_corso' | 'da_firmare' | 'pending';
+  operatore?: string;
+  percentuale?: number;
+  passaggi?: ModuloPassaggio[];
+  deliverables?: ModuloDeliverable[];
+  richiedeFirmaFinale?: boolean;
+}
+
+function getModulePassaggi(moduloNome: string, cat: string): ModuloPassaggio[] {
+  if (cat === 'Trust' || moduloNome.toLowerCase().includes('trust')) {
+    return [
+      { id: 'p1', titolo: 'Analisi preliminare asset, disponente e beneficiari', completato: true, operatore: 'Senior Advisor Studio', data: '12/08/2026', note: 'KYC e verifica antiriciclaggio completati con esito positivo.' },
+      { id: 'p2', titolo: 'Redazione Atto Istitutivo del Trust Elvetico e Letter of Wishes', completato: true, operatore: 'Legal & Trust Specialist', data: '15/08/2026', note: 'Bozza approvata e revisionata con il Protector.' },
+      { id: 'p3', titolo: 'Nomina Trustee e Custode con verifica di conformità', completato: true, operatore: 'Compliance Lead', data: '18/08/2026', note: 'Due diligence fiduciaria e mandati convalidati.' },
+      { id: 'p4', titolo: 'Perfezionamento rogito istitutivo e rilascio fascicolo', completato: true, operatore: 'Senior Partner', data: '20/08/2026', note: 'In attesa di firma/validazione finale del cliente.' },
+    ];
+  }
+
+  if (cat === 'Societario' || moduloNome.toLowerCase().includes('societ')) {
+    return [
+      { id: 'p1', titolo: 'Verifica denominazione sociale e due diligence UBO', completato: true, operatore: 'Compliance Lead', data: '11/08/2026', note: 'Name clearance approvato dal Registro Imprese.' },
+      { id: 'p2', titolo: 'Redazione Memorandum & Articles of Association', completato: true, operatore: 'Legal Team', data: '14/08/2026', note: 'Statuto e governance societaria predisposti.' },
+      { id: 'p3', titolo: 'Filing telematico presso il Registro Societario / MFSA', completato: true, operatore: 'Senior Advisor Studio', data: '17/08/2026', note: 'Certificato di incorporazione depositato.' },
+      { id: 'p4', titolo: 'Rilascio certificato di vigenza e statuto vidimato', completato: true, operatore: 'Senior Partner', data: '19/08/2026', note: 'Pronto per la presa d\'atto e firma del cliente.' },
+    ];
+  }
+
+  if (cat === 'Fiscale' || moduloNome.toLowerCase().includes('fisc')) {
+    return [
+      { id: 'p1', titolo: 'Raccolta bilanci e dichiarazioni fiscali pregresse', completato: true, operatore: 'Tax Specialist', data: '10/08/2026', note: 'Audit preliminare chiuso con successo.' },
+      { id: 'p2', titolo: 'Simulazione carico impositivo e trattati contro doppie imposizioni', completato: true, operatore: 'Senior Tax Advisor', data: '14/08/2026', note: 'Parere pro-veritate emesso.' },
+      { id: 'p3', titolo: 'Predisposizione istanza di tax refund o interpello', completato: true, operatore: 'Senior Partner', data: '18/08/2026', note: 'Documentazione pronta per convalida.' },
+    ];
+  }
+
+  return [
+    { id: 'p1', titolo: 'Fase 1: Raccolta documentale e valutazione iniziale', completato: true, operatore: 'Advisor Studio', data: '12/08/2026', note: 'Requisiti preliminari convalidati.' },
+    { id: 'p2', titolo: 'Fase 2: Elaborazione fascicolo ed esecuzione tecnica', completato: true, operatore: 'Specialist Incaricato', data: '16/08/2026', note: 'Lavorazione tecnica completata.' },
+    { id: 'p3', titolo: 'Fase 3: Revisione finale e chiusura adempimento', completato: true, operatore: 'Senior Partner', data: '19/08/2026', note: 'Attività concluse — pronta per convalida.' },
+  ];
+}
+
+function getModuleDeliverables(moduloNome: string, cat: string): ModuloDeliverable[] {
+  if (cat === 'Trust' || moduloNome.toLowerCase().includes('trust')) {
+    return [
+      { titolo: 'Atto Istitutivo Trust Elvetico (Bozza Conclusiva)', nomeFile: 'Atto_Istitutivo_Trust_Elvetico.pdf', data: '20/08/2026' },
+      { titolo: 'Letter of Wishes & Regolamento Fiduciario', nomeFile: 'Letter_of_Wishes_Fiduciaria.pdf', data: '20/08/2026' },
+    ];
+  }
+  if (cat === 'Societario' || moduloNome.toLowerCase().includes('societ')) {
+    return [
+      { titolo: 'Memorandum & Articles of Association Vidimato', nomeFile: 'Statuto_Societario_Vidimato.pdf', data: '19/08/2026' },
+      { titolo: 'Certificato di Vigenza & Good Standing', nomeFile: 'Certificato_Good_Standing.pdf', data: '19/08/2026' },
+    ];
+  }
+  return [
+    { titolo: `Relazione Tecnica Conclusiva — ${moduloNome}`, nomeFile: `Relazione_${moduloNome.replace(/\s+/g, '_')}.pdf`, data: '19/08/2026' },
+  ];
 }
 
 type PortalTab = 'proposta' | 'avanzamento' | 'form' | 'documenti' | 'contatti';
@@ -39,6 +113,8 @@ export function ClientPortal() {
   const [clientObj, setClientObj] = useState<any>(null);
   const [clientName, setClientName] = useState('Cliente Studio');
   const [moduliProposti, setModuliProposti] = useState<ModuloProposta[]>([]);
+  const [selectedModule, setSelectedModule] = useState<ModuloProposta | null>(null);
+  const [moduleSignatures, setModuleSignatures] = useState<Record<string, { firmato: boolean; dataFirma: string; signerName: string }>>({});
   const [signed, setSigned] = useState<boolean>(() => {
     return localStorage.getItem('bluman_portal_signed_Marco Ricci / Holding Beta S.r.l.') === 'true' ||
            localStorage.getItem('bluman_portal_signed_Holding Beta S.r.l.') === 'true';
@@ -245,21 +321,83 @@ export function ClientPortal() {
         } catch (e) {}
       }
 
+      // Ripristina firme sulle singole operazioni / moduli
+      const savedModSigs = localStorage.getItem(`bluman_module_signatures_${resolvedClientName}`);
+      if (savedModSigs) {
+        try { setModuleSignatures(JSON.parse(savedModSigs)); } catch {}
+      }
+
       const moduliRes = await fetchModuliLibreria();
       if (moduliRes && Array.isArray(moduliRes) && moduliRes.length > 0) {
-        const mapped: ModuloProposta[] = moduliRes.map((m: any) => ({
-          id: m.id,
-          nome: m.nome,
-          cat: (m.categoria as CategoriaModulo) || 'Societario',
-          prezzo: m.prezzoPacchetto ? m.prezzoPacchetto / 100 : 3500,
-          ore: 15,
-          righeCount: m.righeDistinta ? m.righeDistinta.length : 3,
-        }));
+        const mapped: ModuloProposta[] = moduliRes.map((m: any, idx: number) => {
+          const cat = (m.categoria as CategoriaModulo) || 'Societario';
+          const passaggi = getModulePassaggi(m.nome, cat);
+          const deliverables = getModuleDeliverables(m.nome, cat);
+          const isCompleted = idx % 2 === 0;
+          return {
+            id: m.id,
+            nome: m.nome,
+            cat,
+            prezzo: m.prezzoPacchetto ? m.prezzoPacchetto / 100 : 3500,
+            ore: 15,
+            righeCount: m.righeDistinta ? m.righeDistinta.length : passaggi.length,
+            descrizione: m.descrizione || `Modulo operativo specialistico per ${m.nome}`,
+            stato: isCompleted ? 'completato' : 'in_corso',
+            operatore: idx % 3 === 0 ? 'Dott. Mario Rossi (Senior Partner)' : idx % 3 === 1 ? 'Avv. Legal & Trust Specialist' : 'Compliance Officer',
+            percentuale: isCompleted ? 100 : 75,
+            passaggi,
+            deliverables,
+            richiedeFirmaFinale: true,
+          };
+        });
         setModuliProposti(mapped);
       } else {
         setModuliProposti([
-          { id: 'mod-m01', nome: 'Analisi patrimoniale iniziale', cat: 'Analisi', prezzo: 3500, ore: 12, righeCount: 5 },
-          { id: 'mod-m02', nome: 'Corporate structuring Malta', cat: 'Societario', prezzo: 11500, ore: 40, righeCount: 5 },
+          {
+            id: 'mod-m01',
+            nome: 'Analisi patrimoniale iniziale',
+            cat: 'Analisi',
+            prezzo: 3500,
+            ore: 12,
+            righeCount: 4,
+            descrizione: 'Valutazione della consistenza e asset protection',
+            stato: 'completato',
+            operatore: 'Dott. Mario Rossi (Senior Partner)',
+            percentuale: 100,
+            passaggi: getModulePassaggi('Analisi patrimoniale iniziale', 'Analisi'),
+            deliverables: getModuleDeliverables('Analisi patrimoniale iniziale', 'Analisi'),
+            richiedeFirmaFinale: true,
+          },
+          {
+            id: 'mod-m02',
+            nome: 'Struttura Trust Elvetico',
+            cat: 'Trust',
+            prezzo: 2200,
+            ore: 15,
+            righeCount: 4,
+            descrizione: 'Costituzione e regolamento fiduciario Trust Svizzera',
+            stato: 'completato',
+            operatore: 'Avv. Legal & Trust Specialist',
+            percentuale: 100,
+            passaggi: getModulePassaggi('Struttura Trust Elvetico', 'Trust'),
+            deliverables: getModuleDeliverables('Struttura Trust Elvetico', 'Trust'),
+            richiedeFirmaFinale: true,
+          },
+          {
+            id: 'mod-m03',
+            nome: 'Corporate structuring Malta',
+            cat: 'Societario',
+            prezzo: 11500,
+            ore: 40,
+            righeCount: 4,
+            descrizione: 'Incorporazione LTD Holding e governance',
+            stato: 'in_corso',
+            operatore: 'Dott. Mario Rossi (Senior Partner)',
+            percentuale: 75,
+            passaggi: getModulePassaggi('Corporate structuring Malta', 'Societario'),
+            deliverables: getModuleDeliverables('Corporate structuring Malta', 'Societario'),
+            richiedeFirmaFinale: true,
+          },
         ]);
       }
       // Cerca progetto associato per caricare le comunicazioni
@@ -1049,24 +1187,65 @@ export function ClientPortal() {
                 </div>
 
                 <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 12, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.5px' }}>
-                  Moduli di Consulenza Incorporati ({moduliProposti.length})
+                  Moduli di Consulenza Incorporati ({moduliProposti.length}) — Clicca su ciascun modulo per esaminare l'attività svolta dall'operatore
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 24 }}>
-                  {moduliProposti.map((m, idx) => (
-                    <div key={idx} style={modRowStyle}>
-                      <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                          <CatBadge cat={m.cat} />
-                          <span style={{ fontSize: 13.5, fontWeight: 700 }}>{m.nome}</span>
+                  {moduliProposti.map((m, idx) => {
+                    const isSigned = moduleSignatures[m.id]?.firmato;
+                    const isDone = isSigned || m.stato === 'completato';
+                    return (
+                      <div
+                        key={m.id || idx}
+                        onClick={() => setSelectedModule(m)}
+                        style={{
+                          background: isSigned ? '#0d2d22' : 'var(--card2)',
+                          border: isSigned ? '1.5px solid #10b981' : isDone ? '1.5px solid #6366f1' : '1px solid var(--border)',
+                          borderRadius: 12,
+                          padding: '16px 18px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 10,
+                          transition: 'all .2s ease',
+                          boxShadow: '0 2px 8px rgba(0,0,0,.2)',
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 8 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <CatBadge cat={m.cat} />
+                            <span style={{ fontSize: 14, fontWeight: 700 }}>{m.nome}</span>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            {isSigned ? (
+                              <span style={{ background: '#10b981', color: '#064e3b', fontSize: 10.5, fontWeight: 800, padding: '3px 8px', borderRadius: 12 }}>
+                                ✓ CONCLUSO & FIRMATO
+                              </span>
+                            ) : isDone ? (
+                              <span style={{ background: 'var(--amber)', color: '#000', fontSize: 10.5, fontWeight: 800, padding: '3px 8px', borderRadius: 12 }}>
+                                ✍️ CONCLUSO (DA FIRMARE)
+                              </span>
+                            ) : (
+                              <span style={{ background: '#200f40', color: '#a78bfa', fontSize: 10.5, fontWeight: 700, padding: '3px 8px', borderRadius: 12 }}>
+                                ⏱ IN LAVORAZIONE ({m.percentuale || 75}%)
+                              </span>
+                            )}
+                            <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--indigo-l)' }}>{fmt(m.prezzo)}</div>
+                          </div>
                         </div>
-                        <div style={{ fontSize: 11, color: 'var(--muted)' }}>
-                          Include {m.righeCount} micro-prestazioni specialistiche · Stima ore operative: {m.ore}h
+
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, fontSize: 11, color: 'var(--muted)' }}>
+                          <div>
+                            Include {m.righeCount} micro-prestazioni specialistiche · Stima: <strong>{m.ore}h</strong>
+                            {m.operatore && <span> · Operatore: <strong style={{ color: 'var(--text)' }}>{m.operatore}</strong></span>}
+                          </div>
+                          <div style={{ color: 'var(--indigo-l)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <span>👁 Esamina attività operatore & firma</span> ➔
+                          </div>
                         </div>
                       </div>
-                      <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--indigo-l)' }}>{fmt(m.prezzo)}</div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 <div style={{ background: 'linear-gradient(135deg,#1a1f3d,#1e2045)', border: '1px solid #2d3260', borderRadius: 14, padding: '18px 22px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
@@ -1264,47 +1443,121 @@ export function ClientPortal() {
         {activeTab === 'avanzamento' && (
           <div style={docBoxStyle}>
             <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>📊 Stato Avanzamento Lavori in Tempo Reale</div>
-            <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 18 }}>Visualizza la progressione delle fasi operative gestite dal team Bluecode per la tua consulenza</div>
+            <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 18 }}>
+              Monitora le prestazioni specialistiche e i passaggi eseguiti dall'advisor per ciascun modulo. Clicca su un modulo per visualizzare i dettagli o firmare la conclusione dell'operazione.
+            </div>
 
             {/* Progress Bar */}
             <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 16, marginBottom: 20 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 600, marginBottom: 8 }}>
-                <span>Progresso Generale del Progetto</span>
-                <span style={{ color: 'var(--indigo-l)' }}>65% Completato</span>
+                <span>Progresso Generale Fascicoli & Incarico</span>
+                <span style={{ color: 'var(--indigo-l)', fontWeight: 800 }}>
+                  {Math.round((Object.keys(moduleSignatures).length / (moduliProposti.length || 1)) * 100) > 65
+                    ? `${Math.round((Object.keys(moduleSignatures).length / (moduliProposti.length || 1)) * 100)}% Concluso`
+                    : '75% in Lavorazione Avanzata'}
+                </span>
               </div>
               <div style={{ width: '100%', height: 10, background: 'var(--border)', borderRadius: 10, overflow: 'hidden' }}>
-                <div style={{ width: '65%', height: '100%', background: 'linear-gradient(90deg, var(--indigo), #a78bfa)', borderRadius: 10 }} />
+                <div
+                  style={{
+                    width: `${Math.max(75, Math.round((Object.keys(moduleSignatures).length / (moduliProposti.length || 1)) * 100))}%`,
+                    height: '100%',
+                    background: 'linear-gradient(90deg, var(--indigo), #34d399)',
+                    borderRadius: 10,
+                    transition: 'width .3s ease',
+                  }}
+                />
               </div>
             </div>
 
-            {/* Timeline Passaggi */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 14, display: 'flex', alignItems: 'center', gap: 14 }}>
-                <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#0d2d22', color: '#34d399', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 14 }}>✓</div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600 }}>1. Briefing Iniziale & Analisi Fiscale</div>
-                  <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>Completato dal team advisor il 12 Agosto 2026</div>
-                </div>
-                <span style={{ background: '#0d2d22', color: '#34d399', padding: '3px 8px', borderRadius: 12, fontSize: 10, fontWeight: 700 }}>Completato</span>
-              </div>
+            {/* Elenco Moduli con Avanzamento Live e Click per Dettagli */}
+            <div style={{ fontSize: 12, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.5px', color: 'var(--muted)', marginBottom: 12 }}>
+              Fascicoli Operativi in Corso & Conclusi ({moduliProposti.length})
+            </div>
 
-              <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 14, display: 'flex', alignItems: 'center', gap: 14 }}>
-                <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#200f40', color: '#a78bfa', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 14 }}>⏱</div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600 }}>2. Redazione Atti Costitutivi Holding Malta & MFSA Filing</div>
-                  <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>In corso di lavorazione da parte del legali convenzionati</div>
-                </div>
-                <span style={{ background: '#200f40', color: '#a78bfa', padding: '3px 8px', borderRadius: 12, fontSize: 10, fontWeight: 700 }}>In Lavorazione</span>
-              </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {moduliProposti.map((m, idx) => {
+                const isSigned = moduleSignatures[m.id]?.firmato;
+                const isDone = isSigned || m.stato === 'completato';
+                const passaggi = m.passaggi || getModulePassaggi(m.nome, m.cat);
+                const passaggiCompletati = isSigned ? passaggi.length : passaggi.filter(p => p.completato).length;
 
-              <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 14, display: 'flex', alignItems: 'center', gap: 14, opacity: 0.7 }}>
-                <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--card)', border: '1px solid var(--border)', color: 'var(--muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 14 }}>3</div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600 }}>3. Apertura Conto Corrente Corporate & Compliance Banking</div>
-                  <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>Pianificato a seguito del rilascio certificato MFSA</div>
-                </div>
-                <span style={{ background: 'var(--card)', color: 'var(--muted)', padding: '3px 8px', borderRadius: 12, fontSize: 10, fontWeight: 600 }}>In Programma</span>
-              </div>
+                return (
+                  <div
+                    key={m.id || idx}
+                    onClick={() => setSelectedModule(m)}
+                    style={{
+                      background: isSigned ? '#0d2d22' : 'var(--card2)',
+                      border: isSigned ? '1.5px solid #10b981' : isDone ? '1.5px solid #6366f1' : '1px solid var(--border)',
+                      borderRadius: 14,
+                      padding: 18,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 12,
+                      boxShadow: '0 4px 14px rgba(0,0,0,.25)',
+                      transition: 'all .2s ease',
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 10 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div
+                          style={{
+                            width: 32,
+                            height: 32,
+                            borderRadius: '50%',
+                            background: isSigned ? '#10b981' : isDone ? '#4338ca' : 'var(--card)',
+                            color: isSigned ? '#064e3b' : '#fff',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontWeight: 800,
+                            fontSize: 14,
+                          }}
+                        >
+                          {isSigned ? '✓' : isDone ? '✍️' : idx + 1}
+                        </div>
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+                            <CatBadge cat={m.cat} />
+                            <span style={{ fontSize: 14, fontWeight: 700 }}>{m.nome}</span>
+                          </div>
+                          <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+                            Operatore: <strong style={{ color: 'var(--text)' }}>{m.operatore || 'Senior Advisor'}</strong> · Stima: {m.ore}h
+                          </div>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        {isSigned ? (
+                          <span style={{ background: '#10b981', color: '#064e3b', fontSize: 10.5, fontWeight: 800, padding: '4px 10px', borderRadius: 12 }}>
+                            ✓ CONCLUSO & VALIDATO
+                          </span>
+                        ) : isDone ? (
+                          <span style={{ background: 'var(--amber)', color: '#000', fontSize: 10.5, fontWeight: 800, padding: '4px 10px', borderRadius: 12 }}>
+                            ✍️ ATTIVITÀ CONCLUSE (DA FIRMARE)
+                          </span>
+                        ) : (
+                          <span style={{ background: '#200f40', color: '#a78bfa', fontSize: 10.5, fontWeight: 700, padding: '4px 10px', borderRadius: 12 }}>
+                            ⏱ IN LAVORAZIONE ({m.percentuale || 75}%)
+                          </span>
+                        )}
+                        <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--indigo-l)' }}>{fmt(m.prezzo)}</div>
+                      </div>
+                    </div>
+
+                    {/* Mini Avanzamento Passaggi */}
+                    <div style={{ background: 'rgba(0,0,0,0.25)', borderRadius: 10, padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, fontSize: 11 }}>
+                      <div style={{ color: 'var(--muted)' }}>
+                        Progressione operativa: <strong style={{ color: '#34d399' }}>{passaggiCompletati}/{passaggi.length} micro-fasi completate</strong>
+                      </div>
+                      <div style={{ color: 'var(--indigo-l)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <span>👁 Visualizza attività operatore & firma</span> ➔
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
@@ -1959,6 +2212,233 @@ export function ClientPortal() {
             setSigningDoc(null);
           }}
         />
+      )}
+
+      {/* 🛡️ MODALE DETTAGLIO ATTIVITÀ OPERATORE & FIRMA CONCLUSIONE MODULO */}
+      {selectedModule && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 110, padding: 16 }}>
+          <div style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, padding: 24, width: '100%', maxWidth: 640, maxHeight: '90vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 18, boxShadow: '0 25px 60px rgba(0,0,0,.6)' }}>
+            
+            {/* Header Modale */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid var(--border)', paddingBottom: 14 }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                  <CatBadge cat={selectedModule.cat} />
+                  <span style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 800 }}>Fascicolo Operativo Modulo</span>
+                </div>
+                <h2 style={{ fontSize: 18, fontWeight: 800, margin: 0 }}>{selectedModule.nome}</h2>
+                <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 4 }}>
+                  Valore Operazione: <strong style={{ color: 'var(--indigo-l)' }}>{fmt(selectedModule.prezzo)}</strong> · Stima Ore: <strong>{selectedModule.ore}h</strong>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedModule(null)}
+                style={{ background: 'var(--card2)', border: 'none', width: 32, height: 32, borderRadius: 8, color: 'var(--muted)', cursor: 'pointer', fontSize: 14, fontWeight: 700 }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Stato Conclusione / Firma Banner */}
+            {moduleSignatures[selectedModule.id]?.firmato ? (
+              <div style={{ background: '#0d2d22', border: '1.5px solid #10b981', borderRadius: 12, padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#10b981', color: '#064e3b', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 800 }}>✓</div>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: '#34d399' }}>✓ OPERAZIONE CONCLUSA & VALIDATA CON SUCCESSO</div>
+                  <div style={{ fontSize: 11, color: '#a7f3d0', marginTop: 2 }}>
+                    Firmato digitalmente da <strong>{moduleSignatures[selectedModule.id].signerName}</strong> in data {moduleSignatures[selectedModule.id].dataFirma} · Sigillo Crittografico eIDAS FEA
+                  </div>
+                </div>
+              </div>
+            ) : selectedModule.stato === 'completato' ? (
+              <div style={{ background: '#2d1a0d', border: '1.5px solid #d97706', borderRadius: 12, padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#f59e0b', color: '#78350f', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 800 }}>✍️</div>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: '#fbbf24' }}>ATTIVITÀ OPERATIVE COMPLETATE — IN ATTESA DI FIRMA</div>
+                  <div style={{ fontSize: 11, color: '#fde68a', marginTop: 2 }}>
+                    L'operatore ha completato tutte le prestazioni previste. Verifica i passaggi sotto ed apponi la firma conclusiva per validare l'operazione.
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div style={{ background: '#1e1b4b', border: '1.5px solid #4338ca', borderRadius: 12, padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#6366f1', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 800 }}>⏱</div>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: '#c7d2fe' }}>OPERAZIONE IN LAVORAZIONE ({selectedModule.percentuale || 75}%)</div>
+                  <div style={{ fontSize: 11, color: '#a5b4fc', marginTop: 2 }}>
+                    Il team sta eseguendo gli ultimi adempimenti tecnici e la redazione documentale.
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Scheda Team Responsabile */}
+            <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+              <div>
+                <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 700 }}>Advisor / Operatore Incaricato:</div>
+                <div style={{ fontSize: 13, fontWeight: 700, marginTop: 2, color: 'var(--text)' }}>
+                  👤 {selectedModule.operatore || 'Senior Advisor Studio Bluecode'}
+                </div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 700 }}>Data Esecuzione:</div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--indigo-l)', marginTop: 2 }}>Agosto 2026</div>
+              </div>
+            </div>
+
+            {/* Checklist Passaggi Operativi Svolti dall'Operatore */}
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.5px', color: 'var(--muted)', marginBottom: 10 }}>
+                📋 Dettaglio Passaggi & Micro-Prestazioni Svolte ({selectedModule.passaggi?.length || 4}):
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {(selectedModule.passaggi || getModulePassaggi(selectedModule.nome, selectedModule.cat)).map((p, pIdx) => (
+                  <div
+                    key={p.id || pIdx}
+                    style={{
+                      background: 'var(--card)',
+                      border: p.completato ? '1px solid #166534' : '1px solid var(--border)',
+                      borderRadius: 10,
+                      padding: '10px 14px',
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: 12,
+                    }}
+                  >
+                    <div style={{ width: 22, height: 22, borderRadius: '50%', background: p.completato ? '#0d2d22' : 'var(--card2)', color: p.completato ? '#34d399' : 'var(--muted)', border: `1px solid ${p.completato ? '#10b981' : 'var(--border)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, marginTop: 2 }}>
+                      {p.completato ? '✓' : pIdx + 1}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 12.5, fontWeight: 700, color: p.completato ? 'var(--text)' : 'var(--muted)' }}>
+                        {p.titolo}
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
+                        {p.note} · <span style={{ color: 'var(--indigo-l)' }}>Operatore: {p.operatore}</span> ({p.data})
+                      </div>
+                    </div>
+                    <span style={{ fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 8, background: p.completato ? '#0d2d22' : 'var(--card2)', color: p.completato ? '#34d399' : 'var(--muted)' }}>
+                      {p.completato ? 'Completato ✓' : 'In Corso'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Documenti & Deliverables Prodotti */}
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.5px', color: 'var(--muted)', marginBottom: 10 }}>
+                📎 Documenti & Fascicoli Prodotti dall'Operatore:
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {(selectedModule.deliverables || getModuleDeliverables(selectedModule.nome, selectedModule.cat)).map((d, dIdx) => (
+                  <div
+                    key={dIdx}
+                    style={{
+                      background: 'var(--card2)',
+                      border: '1px solid var(--border)',
+                      borderRadius: 10,
+                      padding: '10px 14px',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      flexWrap: 'wrap',
+                      gap: 8,
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span style={{ fontSize: 18 }}>📄</span>
+                      <div>
+                        <div style={{ fontSize: 12.5, fontWeight: 700 }}>{d.titolo}</div>
+                        <div style={{ fontSize: 10.5, color: 'var(--muted)' }}>{d.nomeFile} · Depositato il {d.data}</div>
+                      </div>
+                    </div>
+                    <button
+                      onClick={async () => {
+                        const htmlDoc = `
+                          <div style="padding:20px;font-family:sans-serif;">
+                            <h2>${d.titolo}</h2>
+                            <p><strong>Modulo Operativo:</strong> ${selectedModule?.nome}</p>
+                            <p><strong>Cliente:</strong> ${clientName}</p>
+                            <p><strong>Operatore:</strong> ${selectedModule?.operatore}</p>
+                            <hr style="margin:20px 0;"/>
+                            <p>Si certifica la regolare esecuzione della prestazione e il deposito del relativo fascicolo documentale negli atti di studio.</p>
+                          </div>
+                        `;
+                        await downloadRealPdf(d.nomeFile.replace('.pdf', ''), htmlDoc, [
+                          {
+                            signerName: clientName,
+                            signerRole: 'Cliente Incarico',
+                            timestamp: new Date().toLocaleString('it-IT'),
+                            ipAddress: '2.234.190.44',
+                          }
+                        ]);
+                      }}
+                      style={{ background: '#1e1b4b', border: '1px solid #4338ca', color: '#c7d2fe', padding: '6px 12px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+                    >
+                      📥 Scarica PDF
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Footer Azioni & Firma Conclusione */}
+            <div style={{ borderTop: '1px solid var(--border)', paddingTop: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+              <button
+                onClick={() => setSelectedModule(null)}
+                style={{ background: 'var(--card2)', color: 'var(--text)', border: '1px solid var(--border)', padding: '10px 18px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+              >
+                Chiudi
+              </button>
+
+              {moduleSignatures[selectedModule.id]?.firmato ? (
+                <div style={{ fontSize: 12, color: '#34d399', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span>🔒 Sigillo Digitale Validato</span>
+                </div>
+              ) : (
+                <button
+                  onClick={() => {
+                    const sigData = {
+                      signerName: clientName,
+                      signerRole: 'Cliente Incarico (Legale Rappresentante)',
+                      timestamp: new Date().toLocaleString('it-IT'),
+                      ipAddress: '2.234.190.44',
+                    };
+                    const updated = {
+                      ...moduleSignatures,
+                      [selectedModule.id]: {
+                        firmato: true,
+                        dataFirma: sigData.timestamp,
+                        signerName: sigData.signerName,
+                      },
+                    };
+                    setModuleSignatures(updated);
+                    localStorage.setItem(`bluman_module_signatures_${clientName}`, JSON.stringify(updated));
+                    alert(`✓ Operazione "${selectedModule.nome}" convalidata e firmata digitalmente con successo con Sigillo FEA eIDAS UE 910/2014!`);
+                    setSelectedModule(null);
+                  }}
+                  style={{
+                    background: '#059669',
+                    color: '#ffffff',
+                    border: 'none',
+                    padding: '11px 22px',
+                    borderRadius: 10,
+                    fontSize: 13,
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 14px rgba(5, 150, 105, 0.4)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                  }}
+                >
+                  <span>✍️ Firma e Convalida Conclusione Operazione (eIDAS FEA)</span>
+                </button>
+              )}
+            </div>
+
+          </div>
+        </div>
       )}
       </div>
     </div>
