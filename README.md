@@ -72,6 +72,7 @@ Piattaforma ERP per studi di consulenza societaria, wealth protection ed advisor
 - **`POST /progetti/:id/ricalcola`**: riallinea le righe dopo un'importazione, una correzione fatta a mano a database o un cambio di regole. Scrive solo dove il valore calcolato differisce da quello in riga — un ricalcolo che riscrive valori identici sporcherebbe `updatedAt` e renderebbe indistinguibile "lo stato è cambiato" da "qualcuno ha premuto ricalcola".
 - **Le percentuali non sono una colonna**: derivano da `stato`, `orePreventivate` e `oreConsuntivate`, già in riga. Persisterle significherebbe tenere un dato che può divergere dai propri ingredienti senza che nessuno se ne accorga. Si persistono solo gli stati e i segnali di rischio, che una query non può ricostruire.
 - **Cosa vedere prima di scrivere**: `npx tsx src/scripts/probeAvanzamento.ts` — sola lettura, elenca esattamente quali righe un ricalcolo cambierebbe.
+- **Gli avvisi dicono *quale* problema è**: il banner della Dashboard tiene separati il ritardo (stato `delayed`/`blocked`) dallo sforamento di ore (`⚠ Ore sforate — +Nh oltre il preventivo`), e il secondo compare anche sull'intestazione del modulo in `ProjectDetail`. Sono due problemi con due rimedi diversi: un ritardo si recupera col calendario, uno sforamento solo rinegoziando o assorbendo il costo. Prima il banner filtrava soltanto i ritardi mentre il contatore contava anche gli sforamenti, quindi un progetto in allarme per sole ore sforate compariva nel conteggio con il titolo sopra l'elenco vuoto.
 
 ### 💬 WhatsApp Business Cloud API & Omnichannel Integration (§14)
 - **WhatsApp Cloud API Ufficiale (Graph API v21.0)**: Phone ID `1318817114639409`, WABA `1397431142562576`, Token Permanente System User illimitato.
@@ -178,7 +179,7 @@ non una tabella figlia filtrata per `tenant_id`, quindi le policy non le danno p
 `src/server.test.ts` verifica, rotta per rotta, 401 senza token e non-401 con un token
 valido; `src/gerarchiaRuoli.test.ts` presidia la gerarchia dei ruoli; `src/accessoCliente.test.ts`
 presidia il Magic Link e `GET /uploads/:filename`; `src/calcoloService.test.ts` presidia il
-motore di stato e ciò che il ricalcolo scrive a database (`npx vitest run` → 18 file, 225 test).
+motore di stato e ciò che il ricalcolo scrive a database (`npx vitest run` → 18 file, 226 test).
 
 ### 🔑 Il portale cliente non si apre con una stringa qualsiasi
 

@@ -82,6 +82,15 @@ export interface ModuloProgetto {
   dn?: string;
   waitDep?: boolean;
   wdn?: string;
+  /**
+   * §16.1 — segnale di rischio alzato dal motore di stato: almeno una micro-voce attiva ha
+   * consuntivato oltre il preventivo. È distinto da `delay`, che è un ritardo di calendario
+   * dichiarato a mano: qui il lavoro procede, ma costa più di quanto è stato venduto.
+   * `oreExtra` è lo sforamento accumulato, e resta contato anche quando la voce viene chiusa
+   * (la spesa è avvenuta) mentre il segnale si spegne.
+   */
+  rischio?: boolean;
+  oreExtra?: number;
   v: MicroVoce[];
 }
 

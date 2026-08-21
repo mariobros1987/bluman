@@ -254,6 +254,11 @@ export function ProjectDetail() {
             p: m.prezzo ? m.prezzo / 100 : 3500,
             team: assignedTeam,
             delay: avM ? avM.stato === 'delayed' || avM.stato === 'blocked' : false,
+            // §16.1 — lo stesso segnale che la Dashboard mostra nel banner: se lì un modulo
+            // risulta in allarme per ore sforate, qui deve risultarlo pure, altrimenti chi
+            // apre il progetto per capire perché non trova nulla.
+            rischio: Boolean(avM?.segnaleRischio),
+            oreExtra: avM?.oreExtra ?? 0,
             v: microvociList,
           };
         });
@@ -1094,6 +1099,13 @@ function ModuloBlock({ mod, open, onToggle, onOpenProc, rawDbModulo, onRefresh, 
             <span className={styles.modName}>{mod.n}</span>
           </div>
           {mod.dn && <div className={styles.modNote}>⚠ {mod.dn}</div>}
+          {/* §16.1 — sforamento ore: il modulo avanza, ma sta costando oltre il preventivo.
+              Non è il ritardo di `dn`, ed è lo stesso segnale che la Dashboard mostra nel banner. */}
+          {mod.rischio && (
+            <div className={styles.modNote} style={{ color: 'var(--amber)' }}>
+              ⚠ Ore sforate{mod.oreExtra ? ` — +${mod.oreExtra}h oltre il preventivo` : ''}
+            </div>
+          )}
           {mod.wdn && <div className={styles.modNote} style={{ color: 'var(--purple)' }}>⏳ {mod.wdn}</div>}
         </div>
         <div className={styles.modRight}>

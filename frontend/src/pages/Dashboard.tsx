@@ -83,6 +83,10 @@ export function Dashboard() {
                   p: m.prezzo ? m.prezzo / 100 : 3500,
                   team: [1, 2],
                   delay: avM ? avM.stato === 'delayed' || avM.stato === 'blocked' : false,
+                  // §16.1 — sforamento ore: distinto dal ritardo di calendario. Il modulo
+                  // avanza, ma sta costando più del preventivo, e il banner lo dice a parte.
+                  rischio: Boolean(avM?.segnaleRischio),
+                  oreExtra: avM?.oreExtra ?? 0,
                   v: (m.microvoci || []).map((mv: any) => ({
                     n: mv.nome,
                     hE: mv.orePreventivate || 4,
@@ -129,11 +133,43 @@ export function Dashboard() {
   const avgPct   = Math.round(projectList.reduce((a, p) => a + p.pct, 0) / (projectList.length || 1));
 
   const delayedProjects = projectList.filter(p => {
-    const hasDelay = p.delay || p.mods?.some(m => m.st === 'blocked' || m.st === 'delayed');
+    const hasDelay = p.delay || p.mods?.some(m => m.st === 'blocked' || m.st === 'delayed' || m.rischio);
     if (!hasDelay) return false;
     if (isSuperAdminOrAdvisor) return true;
     return p.mods?.some(m => m.team?.includes(1) || m.team?.includes(2));
   });
+
+  /**
+   * §16 — le righe del banner, una per motivo di allarme.
+   *
+   * Prima il banner filtrava `m.delay || m.st === 'blocked'`, mentre il contatore `alerts`
+   * conta anche `segnaleRischio`: un progetto in allarme per sole ore sforate entrava
+   * nell'elenco ma non produceva nessuna riga, e il titolo compariva sopra il vuoto.
+   *
+   * Ritardo e sforamento restano due righe distinte perché sono due problemi diversi con due
+   * rimedi diversi: un ritardo si recupera con il calendario, uno sforamento di ore si
+   * recupera solo rinegoziando o assorbendo il costo. Riassumerli in "Ritardo rilevato"
+   * significherebbe cercare la causa nel posto sbagliato.
+   */
+  const alertRows = delayedProjects.flatMap(p =>
+    (p.mods || []).flatMap(m => {
+      const righe: Array<{ key: string; testo: string }> = [];
+      if (m.delay || m.st === 'blocked') {
+        righe.push({
+          key: `${p.id}-${m.id}-ritardo`,
+          testo: m.dn || (m.st === 'blocked' ? 'Modulo bloccato' : 'Ritardo rilevato'),
+        });
+      }
+      if (m.rischio) {
+        const extra = m.oreExtra ? ` (+${m.oreExtra}h oltre il preventivo)` : '';
+        righe.push({
+          key: `${p.id}-${m.id}-rischio`,
+          testo: `Ore sforate${extra}`,
+        });
+      }
+      return righe.map(r => ({ ...r, progetto: p.n, modulo: m.n }));
+    }),
+  );
 
   const filteredProjects = projectList.filter(p => {
     if (activeTab === 'attivi' && p.st === 'archived') return false;
@@ -218,16 +254,14 @@ export function Dashboard() {
       </div>
 
       {/* Alert banner */}
-      {delayedProjects.length > 0 && (
+      {alertRows.length > 0 && (
         <div className={styles.alertBanner}>
           <div className={styles.alertTitle}>⚠ Situazioni che richiedono attenzione immediata</div>
-          {(delayedProjects.flatMap(p =>
-            (p.mods || []).filter(m => m.delay || m.st === 'blocked').map(m => (
-              <div key={`${p.id}-${m.id}`} className={styles.alertRow}>
-                <span className={styles.alertDot} />
-                <span><strong>{p.n}</strong> — {m.n}: {m.dn || 'Ritardo rilevato'}</span>
-              </div>
-            ))
+          {alertRows.map(r => (
+            <div key={r.key} className={styles.alertRow}>
+              <span className={styles.alertDot} />
+              <span><strong>{r.progetto}</strong> — {r.modulo}: {r.testo}</span>
+            </div>
           ))}
         </div>
       )}

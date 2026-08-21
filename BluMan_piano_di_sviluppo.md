@@ -158,12 +158,29 @@ nulla. Il dominio non finisce nel bundle pubblico.
   `pending`, corretto per un modulo appena creato ma distruttivo su uno chiuso a mano: con zero
   micro-voci non c'è nulla da aggregare e la riga è l'unica informazione esistente. Il service
   la preserva e non scrive. Il caso è reale — vedi il debito 3.
-- [x] **Presidio**: `src/calcoloService.test.ts`, 22 test. Coprono le percentuali mostrate
+- [x] **Gli avvisi distinguono il ritardo dallo sforamento di ore** (task 1.6). Il banner della
+  Dashboard filtrava solo `delay || blocked`, mentre il contatore "Ritardi attivi" conta anche
+  `segnaleRischio`: un progetto in allarme per sole ore sforate compariva nel contatore e nel
+  titolo del banner **senza nessuna riga sotto**. Ora ogni motivo produce la propria riga, e
+  sono tenuti separati perché hanno rimedi diversi — un ritardo si recupera col calendario, uno
+  sforamento solo rinegoziando o assorbendo il costo. Lo stesso segnale compare sull'intestazione
+  del modulo in `ProjectDetail.tsx` (`⚠ Ore sforate — +Nh oltre il preventivo`): un allarme
+  visibile in dashboard e invisibile nel dettaglio manda a cercare la causa dove non c'è.
+- [x] **Presidio**: `src/calcoloService.test.ts`, 23 test. Coprono le percentuali mostrate
   (compreso il tetto a 99 quando l'aritmetica arrotonderebbe a 100 su un progetto non chiuso),
   la media pesata sulle ore, i segnali di rischio, **quali righe vengono scritte e quali no**,
-  e le quattro proprietà della rotta via HTTP (200, 404, 401, avanzamento in `GET /progetti`).
+  e le proprietà della rotta via HTTP (200, 404, 401, avanzamento in `GET /progetti` con
+  `segnaleRischio`/`oreExtra` per singolo modulo, che sono ciò su cui il banner si scrive).
+- [x] **Test del motore puro** (task 1.7): `src/domain/stateEngine.test.ts`, 42 test, un
+  `describe` per ognuna delle 10 funzioni esportate — comprese l'assenza di mutazione degli
+  input e le guardie contro array vuoti e divisione per zero.
 - [x] **Diagnostica**: `npx tsx src/scripts/probeAvanzamento.ts` — sola lettura, dice quali
   righe un ricalcolo cambierebbe *prima* di eseguirlo. È così che sono emersi i debiti 3 e 4.
+
+Resta fuori una sola cosa, di proposito: `ricalcolaProgettoApi()` esiste in
+`frontend/src/api/client.ts` ma nessun pulsante la chiama. Il ricalcolo è un'operazione di
+manutenzione, non un gesto quotidiano, e va collocata dove un errore si vede — non accanto ai
+comandi che si premono per abitudine.
 
 ### FASE 1 — Schema Database PostgreSQL & Prisma (`prisma/schema.prisma`)
 - [x] `Tenant`: Dati fiscali studio, sedi legali/operative distinte, logo URL, colore tema PDF, note legali.

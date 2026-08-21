@@ -331,6 +331,43 @@ describe('HTTP — l’avanzamento esce dalle rotte, non dal client', () => {
     expect(corpo[0].avanzamento.moduli[0].stato).toBe('in_progress');
   });
 
+  it('allega segnaleRischio e oreExtra a ogni modulo, non solo al progetto', async () => {
+    // Il banner della Dashboard nomina il modulo in allarme, non solo il progetto: senza
+    // questi due campi per modulo la riga non si può scrivere, e prima di §16 il contatore
+    // "Ritardi attivi" segnalava progetti per cui il banner non produceva nessuna riga.
+    stato.elenco = [
+      {
+        id: 'p1',
+        tenantId: TENANT_STUDIO,
+        nome: 'Alfa',
+        stato: 'in_progress',
+        valoreTotale: 0,
+        cliente: { nome: 'Cliente Uno' },
+        moduli: [
+          { id: 'm1', stato: 'in_progress', orePreventivate: 10, microvoci: [mv('active', 10, 4, 'mv1')] },
+          { id: 'm2', stato: 'in_progress', orePreventivate: 10, microvoci: [mv('active', 10, 17, 'mv2')] },
+        ],
+      },
+    ];
+
+    const app = server();
+    const res = await app.inject({
+      method: 'GET',
+      url: '/progetti',
+      headers: { authorization: `Bearer ${tokenAdvisor()}` },
+    });
+    await app.close();
+
+    const moduli = JSON.parse(res.body)[0].avanzamento.moduli;
+    const sano = moduli.find((m: any) => m.id === 'm1');
+    const sforato = moduli.find((m: any) => m.id === 'm2');
+
+    expect(sano.segnaleRischio).toBe(false);
+    expect(sano.oreExtra).toBe(0);
+    expect(sforato.segnaleRischio).toBe(true);
+    expect(sforato.oreExtra).toBe(7);
+  });
+
   it('POST /progetti/:id/ricalcola restituisce l’avanzamento aggiornato', async () => {
     stato.progetto = {
       id: 'p1',
