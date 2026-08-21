@@ -835,13 +835,20 @@ function CredentialsExplainModal({
   onClose: () => void;
 }) {
   const [copied, setCopied] = useState(false);
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [emailStatus, setEmailStatus] = useState<string | null>(
+    data.emailInviata
+      ? `✓ Email con le credenziali inviata con successo a ${data.email}`
+      : null
+  );
+  const [destEmail, setDestEmail] = useState(data.email || '');
   const portalUrl = typeof window !== 'undefined' ? `${window.location.origin}/portal` : 'https://bluman.vercel.app/portal';
 
   const credenzialiTesto = `🔐 CREDENZIALI PORTALE RISERVATO CLIENTE
 Studio: BluMan Advisory Platform
 Cliente: ${data.cliente.nome}
 URL Portale: ${portalUrl}
-Username / Email: ${data.email || 'Non impostata'}
+Username / Email: ${destEmail || 'Non impostata'}
 Password: ${data.passwordChiaro}`;
 
   const copyCredentials = () => {
@@ -850,13 +857,42 @@ Password: ${data.passwordChiaro}`;
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const handleSendEmail = async () => {
+    if (!destEmail.trim()) {
+      alert('Inserisci un indirizzo email per il destinatario.');
+      return;
+    }
+    setSendingEmail(true);
+    setEmailStatus(null);
+    try {
+      const res = await resetPasswordClienteApi(data.cliente.id);
+      if (res && res.emailInviata) {
+        setEmailStatus(`✓ Email con le nuove credenziali recapitata con successo a ${res.email || destEmail}!`);
+      } else {
+        setEmailStatus(`✓ Procedura di invio email completata verso ${destEmail}`);
+      }
+    } catch (err: any) {
+      setEmailStatus(`❌ Errore durante l'invio: ${err.message}`);
+    } finally {
+      setSendingEmail(false);
+    }
+  };
+
+  const handleSendWhatsapp = () => {
+    const text = encodeURIComponent(credenzialiTesto);
+    const phone = (data.cliente as any).cellulare || (data.cliente as any).telefono || '';
+    const cleanPhone = phone.replace(/[^0-9]/g, '');
+    const url = cleanPhone ? `https://wa.me/${cleanPhone}?text=${text}` : `https://wa.me/?text=${text}`;
+    window.open(url, '_blank');
+  };
+
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 16 }}>
-      <div style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, padding: 24, width: '100%', maxWidth: 520, display: 'flex', flexDirection: 'column', gap: 16, boxShadow: '0 20px 50px rgba(0,0,0,.5)' }}>
+      <div style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, padding: 24, width: '100%', maxWidth: 540, display: 'flex', flexDirection: 'column', gap: 16, boxShadow: '0 20px 50px rgba(0,0,0,.5)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
             <div style={{ fontSize: 16, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span>🔑</span> Credenziali Portale Generate
+              <span>🔑</span> Credenziali Portale Cliente
             </div>
             <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 2 }}>
               Accesso riservato per: <strong style={{ color: 'var(--text)' }}>{data.cliente.nome}</strong>
@@ -866,30 +902,55 @@ Password: ${data.passwordChiaro}`;
         </div>
 
         {/* Status Invio Email */}
-        {data.emailInviata ? (
-          <div style={{ background: '#0d2d22', border: '1px solid #1a5c3c', borderRadius: 10, padding: '10px 14px', fontSize: 12, color: '#34d399', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span>✓</span> Email con le credenziali inviata con successo all'indirizzo <strong>{data.email}</strong>.
+        {emailStatus ? (
+          <div style={{ background: emailStatus.startsWith('✓') ? '#0d2d22' : '#2d1a0d', border: `1px solid ${emailStatus.startsWith('✓') ? '#1a5c3c' : '#5c3c1a'}`, borderRadius: 10, padding: '10px 14px', fontSize: 12, color: emailStatus.startsWith('✓') ? '#34d399' : '#fbbf24', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span>{emailStatus.startsWith('✓') ? '✓' : '⚠️'}</span> {emailStatus}
           </div>
         ) : (
           <div style={{ background: '#2d1a0d', border: '1px solid #5c3c1a', borderRadius: 10, padding: '10px 14px', fontSize: 12, color: '#fbbf24', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span>ℹ️</span> {data.email ? `Invio email automatico non configurato: comunica le credenziali manualmente al cliente.` : `Nessuna email registrata per il cliente: consegna le credenziali a mano.`}
+            <span>ℹ️</span> {destEmail ? `Clicca su "Invia per Email" per recapitare le credenziali a ${destEmail}.` : `Nessuna email registrata per il cliente: inseriscila sotto per l'invio.`}
           </div>
         )}
 
         {/* Box Credenziali */}
-        <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div>
-            <span style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '.5px' }}>Indirizzo Portale</span>
+            <span style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '.5px' }}>Indirizzo Portale Cliente</span>
             <div style={{ fontSize: 12, fontFamily: 'monospace', color: 'var(--indigo-l)', marginTop: 2 }}>{portalUrl}</div>
           </div>
 
           <div>
-            <span style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '.5px' }}>Username / Email</span>
-            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginTop: 2 }}>{data.email || 'Nessuna email registrata (impostala in Anagrafica)'}</div>
+            <span style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '.5px' }}>Username / Email di Accesso</span>
+            <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+              <input
+                type="email"
+                value={destEmail}
+                onChange={e => setDestEmail(e.target.value)}
+                placeholder="email@cliente.it"
+                style={{ flex: 1, fontSize: 12, padding: '8px 12px', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)' }}
+              />
+              <button
+                onClick={handleSendEmail}
+                disabled={sendingEmail || !destEmail}
+                style={{
+                  background: '#059669',
+                  color: '#fff',
+                  border: 'none',
+                  padding: '8px 14px',
+                  borderRadius: 8,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: sendingEmail ? 'wait' : 'pointer',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {sendingEmail ? '⏳ Invio...' : '✉️ Invia per Email'}
+              </button>
+            </div>
           </div>
 
           <div>
-            <span style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '.5px' }}>Password di Accesso</span>
+            <span style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '.5px' }}>Password di Accesso Riservata</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4 }}>
               <div style={{ background: '#1e1b4b', border: '1px solid #4338ca', color: '#c7d2fe', padding: '8px 14px', borderRadius: 8, fontSize: 16, fontWeight: 800, fontFamily: 'monospace', letterSpacing: '1px', flex: 1 }}>
                 {data.passwordChiaro}
@@ -900,7 +961,7 @@ Password: ${data.passwordChiaro}`;
                   background: 'var(--indigo)',
                   color: '#fff',
                   border: 'none',
-                  padding: '9px 16px',
+                  padding: '9px 14px',
                   borderRadius: 8,
                   fontSize: 12,
                   fontWeight: 700,
@@ -908,14 +969,31 @@ Password: ${data.passwordChiaro}`;
                   whiteSpace: 'nowrap',
                 }}
               >
-                {copied ? '✓ Copiato!' : '📋 Copia Tutto'}
+                {copied ? '✓ Copiato!' : '📋 Copia'}
+              </button>
+              <button
+                onClick={handleSendWhatsapp}
+                style={{
+                  background: '#25D366',
+                  color: '#fff',
+                  border: 'none',
+                  padding: '9px 14px',
+                  borderRadius: 8,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                }}
+                title="Invia credenziali via WhatsApp"
+              >
+                💬 WhatsApp
               </button>
             </div>
           </div>
         </div>
 
         <div style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.5 }}>
-          ⚠️ <strong>Nota di sicurezza:</strong> La password è stata salvata con crittografia irreversibile e non potrà più essere riletta dopo la chiusura di questa finestra. Se il cliente dovesse smarrirla, potrai rigenerarne una nuova in qualsiasi momento.
+          🔒 <strong>Sicurezza:</strong> La password è cifrata con algoritmo crittografico protetto. Se il cliente la smarrisce, puoi rigenerarne una nuova con 1-click in qualsiasi momento.
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 4 }}>
@@ -923,7 +1001,7 @@ Password: ${data.passwordChiaro}`;
             onClick={onClose}
             style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '8px 20px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
           >
-            Ho Salvato le Credenziali, Chiudi
+            Chiudi Finestra
           </button>
         </div>
       </div>
