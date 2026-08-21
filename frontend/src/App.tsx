@@ -60,16 +60,19 @@ export default function App() {
     return saved ? JSON.parse(saved) : null;
   });
 
-  const [token, setToken] = useState<string | null>(() => localStorage.getItem('bluman_token'));
+  const [token, setToken] = useState<string | null>(() => localStorage.getItem('bluman_jwt_token') || localStorage.getItem('bluman_token'));
   const [isLoggedOut, setIsLoggedOut] = useState(false);
 
   const handleLoginSuccess = (user: any, jwtToken: string) => {
     setCurrentUser(user);
     setToken(jwtToken);
+    localStorage.setItem('bluman_jwt_token', jwtToken);
+    localStorage.setItem('bluman_user', JSON.stringify(user));
     setIsLoggedOut(false);
   };
 
   const handleLogout = () => {
+    localStorage.removeItem('bluman_jwt_token');
     localStorage.removeItem('bluman_token');
     localStorage.removeItem('bluman_user');
     setCurrentUser(null);
@@ -77,9 +80,17 @@ export default function App() {
     setIsLoggedOut(true);
   };
 
+  useEffect(() => {
+    const onUnauthorized = () => {
+      handleLogout();
+    };
+    window.addEventListener('bluman_unauthorized', onUnauthorized);
+    return () => window.removeEventListener('bluman_unauthorized', onUnauthorized);
+  }, []);
+
   return (
     <BrowserRouter>
-      {isLoggedOut || !currentUser ? (
+      {isLoggedOut || !currentUser || !token ? (
         <Routes>
           <Route path="/portal" element={<ClientPortal />} />
           <Route path="*" element={<LoginPage onLoginSuccess={handleLoginSuccess} />} />

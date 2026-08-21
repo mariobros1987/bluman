@@ -20,6 +20,9 @@ async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutM
   try {
     const res = await fetch(url, { ...options, signal: controller.signal });
     clearTimeout(timer);
+    if (res.status === 401 && typeof window !== 'undefined' && !url.includes('/auth/') && !window.location.pathname.startsWith('/portal')) {
+      window.dispatchEvent(new Event('bluman_unauthorized'));
+    }
     return res;
   } catch (error) {
     clearTimeout(timer);
