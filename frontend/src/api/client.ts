@@ -320,6 +320,7 @@ export async function resetPasswordClienteApi(clienteId: string) {
   const res = await fetch(`${API_BASE}/clienti/${encodeURIComponent(clienteId)}/reset-password`, {
     method: 'POST',
     headers: getAuthHeaders(),
+    body: JSON.stringify({}),
   });
   if (!res.ok) {
     const dettaglio = await res.json().catch(() => null);

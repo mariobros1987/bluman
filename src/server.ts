@@ -752,51 +752,46 @@ export function buildServer(app: AppPort): FastifyInstance {
   server.post<{ Params: { id: string }; Body: { email?: string } }>('/clienti/:id/magic-link', async (req, reply) => {
     const tenantId = (req as any).tenantId as string;
 
-    // La riga del cliente serve davvero, non solo il suo nome: il magic link è una FK verso
-    // `cliente`, e un token che punta a un cliente inesistente non è verificabile. Se il
-    // cliente vive solo nello store in memoria (demo senza database) è meglio dirlo che
-    // emettere un link che `/auth/magic-login` rifiuterà sempre.
-    const cliente = await prisma.cliente.findUnique({ where: { id: req.params.id } });
-    if (!cliente) {
-      return reply.code(404).send({ errore: 'Cliente non trovato' });
-    }
+    try {
+      const cliente = await prisma.cliente.findUnique({ where: { id: req.params.id } });
+      if (!cliente) {
+        return reply.code(404).send({ errore: 'Cliente non trovato' });
+      }
 
-    const toEmail = req.body?.email?.trim();
-    if (!toEmail) {
-      // Prima qui c'era un fallback a un indirizzo cablato nel sorgente: il link finiva a una
-      // casella che non è del cliente. `Cliente` non ha una colonna email, quindi il
-      // destinatario deve arrivare dalla richiesta — chi invia sa a chi lo sta mandando.
-      return reply.code(400).send({ errore: "Indirizzo email del destinatario obbligatorio" });
-    }
+      const toEmail = req.body?.email?.trim();
+      if (!toEmail) {
+        return reply.code(400).send({ errore: "Indirizzo email del destinatario obbligatorio" });
+      }
 
-    // 16 byte da `crypto.randomBytes`, non `Date.now()`: il timestamp era prevedibile e il
-    // vecchio token non veniva nemmeno salvato, quindi non c'era nulla da verificare.
-    const magicToken = generateMagicToken(cliente.id);
-    const scadenza = new Date(Date.now() + GIORNI_VALIDITA_MAGIC_LINK * 24 * 60 * 60 * 1000);
+      const magicToken = generateMagicToken(cliente.id);
+      const scadenza = new Date(Date.now() + GIORNI_VALIDITA_MAGIC_LINK * 24 * 60 * 60 * 1000);
 
-    await prisma.magicLink.create({
-      data: {
+      await prisma.magicLink.create({
+        data: {
+          tenantId,
+          clienteId: cliente.id,
+          tokenHash: hashMagicToken(magicToken),
+          scadenza,
+          email: toEmail,
+        },
+      });
+
+      const magicUrl = `${baseUrlApplicazione()}/portal?magic_token=${magicToken}`;
+
+      const sent = await sendMagicLinkEmail(toEmail, cliente.nome, magicUrl);
+      recordAudit({
         tenantId,
-        clienteId: cliente.id,
-        tokenHash: hashMagicToken(magicToken),
-        scadenza,
-        email: toEmail,
-      },
-    });
+        azione: 'MAGIC_LINK_GENERATO',
+        entita: cliente.nome,
+        dettagli: `Generato Magic Link per l'accesso passwordless del cliente (${toEmail}), valido fino al ${scadenza.toISOString()}`,
+        ipAddress: req.ip,
+      });
 
-    const magicUrl = `${baseUrlApplicazione()}/portal?magic_token=${magicToken}`;
-
-    const sent = await sendMagicLinkEmail(toEmail, cliente.nome, magicUrl);
-    recordAudit({
-      tenantId,
-      azione: 'MAGIC_LINK_GENERATO',
-      entita: cliente.nome,
-      dettagli: `Generato Magic Link per l'accesso passwordless del cliente (${toEmail}), valido fino al ${scadenza.toISOString()}`,
-      ipAddress: req.ip,
-    });
-    // Il token in chiaro esiste solo qui e nell'email: in tabella c'è il suo SHA-256, quindi
-    // questa risposta è l'unica occasione per mostrarlo a chi lo sta generando.
-    return { ok: true, sent, magicUrl, magicToken, scadenza: scadenza.toISOString() };
+      return { ok: true, sent, magicUrl, magicToken, scadenza: scadenza.toISOString() };
+    } catch (err: any) {
+      console.error('Errore generazione magic link:', err);
+      return reply.code(500).send({ errore: err.message || 'Errore generazione Magic Link' });
+    }
   });
 
   /**
@@ -1736,48 +1731,53 @@ export function buildServer(app: AppPort): FastifyInstance {
     const tenantId = (req as any).tenantId as string;
     const { id } = req.params;
 
-    const cliente = await prisma.cliente.findUnique({ where: { id } });
-    if (!cliente) {
-      return reply.code(404).send({ errore: 'Cliente non trovato' });
-    }
-
-    const nuovaPassword = generaPasswordTemporanea();
-    const nuovoHash = hashPassword(nuovaPassword);
-
-    await prisma.cliente.update({
-      where: { id },
-      data: {
-        passwordHash: nuovoHash,
-      },
-    });
-
-    const ref = cliente.referentiJson && typeof cliente.referentiJson === 'object' ? (cliente.referentiJson as any) : {};
-    const destEmail = cliente.email || ref.email;
-
-    let emailInviata = false;
-    if (destEmail) {
-      try {
-        const portalUrl = `${baseUrlApplicazione()}/portal`;
-        emailInviata = await sendClientCredentialsEmail(destEmail, cliente.nome, nuovaPassword, portalUrl);
-      } catch (err) {
-        console.warn('Invio email credenziali fallito:', err);
+    try {
+      const cliente = await prisma.cliente.findUnique({ where: { id } });
+      if (!cliente) {
+        return reply.code(404).send({ errore: 'Cliente non trovato' });
       }
+
+      const nuovaPassword = generaPasswordTemporanea();
+      const nuovoHash = hashPassword(nuovaPassword);
+
+      await prisma.cliente.update({
+        where: { id },
+        data: {
+          passwordHash: nuovoHash,
+        },
+      });
+
+      const ref = cliente.referentiJson && typeof cliente.referentiJson === 'object' ? (cliente.referentiJson as any) : {};
+      const destEmail = cliente.email || ref.email;
+
+      let emailInviata = false;
+      if (destEmail) {
+        try {
+          const portalUrl = `${baseUrlApplicazione()}/portal`;
+          emailInviata = await sendClientCredentialsEmail(destEmail, cliente.nome, nuovaPassword, portalUrl);
+        } catch (err) {
+          console.warn('Invio email credenziali fallito:', err);
+        }
+      }
+
+      recordAudit({
+        tenantId,
+        azione: 'CLIENTE_PASSWORD_RIGENERATA',
+        entita: cliente.nome,
+        dettagli: `Rigenerata password di accesso per il cliente ${cliente.nome} (${destEmail || 'nessuna email'})`,
+        ipAddress: req.ip,
+      });
+
+      return reply.send({
+        ok: true,
+        passwordChiaro: nuovaPassword,
+        emailInviata,
+        email: destEmail || '',
+      });
+    } catch (err: any) {
+      console.error('Errore reset password cliente:', err);
+      return reply.code(500).send({ errore: err.message || 'Errore generazione credenziali cliente' });
     }
-
-    recordAudit({
-      tenantId,
-      azione: 'CLIENTE_PASSWORD_RIGENERATA',
-      entita: cliente.nome,
-      dettagli: `Rigenerata password di accesso per il cliente ${cliente.nome} (${destEmail || 'nessuna email'})`,
-      ipAddress: req.ip,
-    });
-
-    return reply.send({
-      ok: true,
-      passwordChiaro: nuovaPassword,
-      emailInviata,
-      email: destEmail || '',
-    });
   });
 
   server.delete<{ Params: { id: string } }>('/clienti/:id', async (req, reply) => {
