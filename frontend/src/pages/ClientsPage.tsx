@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { fetchClienti, creaClienteApi, aggiornaClienteApi, generaMagicLinkApi, resetPasswordClienteApi, sendEmailDirectApi, sendWhatsAppDirectApi } from '../api/client';
+import { fetchClienti, fetchProgetti, creaClienteApi, aggiornaClienteApi, generaMagicLinkApi, resetPasswordClienteApi, sendEmailDirectApi, sendWhatsAppDirectApi } from '../api/client';
 import { getCurrentTenantId, getTenantStorageKey, getTenantSeedData, BLUECODE_TENANT_ID } from '../utils/tenant';
+import { fmt } from '../utils';
 import type { Cliente } from '../types';
 import styles from './ClientsPage.module.css';
 
@@ -254,14 +255,19 @@ export function ClientsPage() {
       ) : (
         <div className={styles.clientGrid}>
           {filtered.map(c => (
-            <div key={c.id} className={styles.clientCard}>
+            <div
+              key={c.id}
+              className={styles.clientCard}
+              onClick={() => openEditModal(c)}
+              style={{ cursor: 'pointer', transition: 'all .2s ease' }}
+            >
               <div>
                 <div className={styles.clientHeader}>
                   <div className={styles.avatarBox} style={{ background: c.tipo === 'company' ? '#200f40' : '#1a1f3d', color: c.tipo === 'company' ? '#a78bfa' : '#818cf8' }}>
                     {c.tipo === 'company' ? '🏢' : '👤'}
                   </div>
                   <div>
-                    <div className={styles.clientName}>{c.nome}</div>
+                    <div className={styles.clientName} style={{ color: 'var(--indigo-l)' }}>{c.nome}</div>
                     <span className={styles.clientTypeBadge} style={{ background: c.tipo === 'company' ? '#200f40' : '#1a1f3d', color: c.tipo === 'company' ? '#a78bfa' : '#818cf8' }}>
                       {c.tipo === 'company' ? 'Società / Entity' : 'Persona Fisica'}
                     </span>
@@ -282,15 +288,15 @@ export function ClientsPage() {
                 </div>
               </div>
 
-              <div className={styles.clientActions}>
-                <button className={styles.btnAction} onClick={() => openEditModal(c)} title="Modifica Anagrafica (Admin)">
-                  ✏️ Modifica
+              <div className={styles.clientActions} onClick={e => e.stopPropagation()}>
+                <button className={styles.btnAction} onClick={() => openEditModal(c)} style={{ background: '#1e1b4b', borderColor: '#4338ca', color: '#c7d2fe', fontWeight: 700 }} title="Apri Fascicolo Anagrafica & Commesse">
+                  📂 Apri
                 </button>
                 <button
                   className={styles.btnAction}
                   onClick={() => handleGenerateCredentials(c)}
                   disabled={generatingCredentials === c.id}
-                  style={{ background: '#1e1b4b', borderColor: '#4338ca', color: '#c7d2fe' }}
+                  style={{ background: 'var(--card)', borderColor: 'var(--border)', color: 'var(--text)' }}
                   title="Genera username e password per il portale cliente"
                 >
                   {generatingCredentials === c.id ? '⏳ Generazione...' : '🔑 Credenziali Portale'}
