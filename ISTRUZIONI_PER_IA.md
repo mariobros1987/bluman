@@ -67,6 +67,31 @@ Fase 0 di sicurezza chiusa: credenziali cablate rimosse dal sorgente E dal front
 Fase 1 (Integrazione State Engine) chiusa: `src/domain/stateEngine.ts` (già puro) è ora collegato all'applicazione da `src/services/calcoloService.ts`, che calcola l'avanzamento senza query e lo PERSISTE con `ricalcolaProgetto()`; `GET /progetti` e `GET /progetti/:id` restituiscono `avanzamento` (stato, percentuale, segnaleRischio, oreExtra) per progetto E per singolo modulo; nuova rotta `POST /progetti/:id/ricalcola` (audit `PROGETTO_RICALCOLATO`) che scrive solo le righe divergenti, per non sporcare `updatedAt` a ogni click. Sparite le percentuali cablate: Dashboard.tsx dava 45% a ogni progetto in corso, 10% a ogni altro e 50% a ogni modulo `in_progress`, mentre la barra di ProjectDetail.tsx leggeva `percentualeAvanzamento`, un campo che il backend non ha MAI prodotto — era ferma a zero da sempre. Le percentuali non hanno una colonna e non serviva una migrazione: derivano da `stato`, `orePreventivate` e `oreConsuntivate`, già in riga; si persistono solo gli stati e i segnali di rischio, che una query non ricostruisce. Due cose da non toccare: il tetto a 99 in `percentualeVisibile()` (un modulo al 99.7% non deve dichiarare 100 mentre è `in_progress`) e la guardia sui moduli senza micro-voci, che `calcolaStatoModulo([])` declasserebbe a `pending` cancellando uno stato messo a mano. Gli avvisi tengono separati il ritardo di calendario dallo sforamento di ore, perché hanno rimedi diversi: non riassumerli in un solo messaggio. Diagnostica di sola lettura prima di scrivere sui dati reali: `npx tsx src/scripts/probeAvanzamento.ts`. Suite: 18 file, 226 test.
 Debiti ancora aperti, elencati in BluMan_piano_di_sviluppo.md ("Debiti Noti Aperti"): grafo Graphify STALE; due righe user residue senza password (francesca@ e lorenzo@, duplicati inerti lasciati dal seed); due moduli con zero micro-voci su "Struttura Holding — Famiglia Ricci" (stato messo a mano, non verificabile dal motore); una riga di stato modulo da riallineare su "holding dibenedetto" con `POST /progetti/:id/ricalcola` (scrittura in produzione, non eseguita).
 
+DA DOVE RIPARTIRE (aggiornato al 21 agosto 2026, ultimo commit di Fase 1):
+Il piano operativo per fase e task sta in `analisi.txt`. Fase 0 e Fase 1 sono chiuse e committate.
+La prossima è FASE 2: UI CORE — TRACKING ORE, task 2.1-2.5:
+- 2.1 componente `frontend/src/components/MicrovoceRow.tsx` con input ore (click → modal → PATCH);
+- 2.2 `POST /microvoci/:id/consuntivazione` che chiama `registraConsuntivazione()` e aggiorna
+  oreConsuntivate, stato e segnaleRischio. ATTENZIONE: la funzione pura esiste già in
+  stateEngine.ts ed è testata, e in `src/server.ts` esiste già un percorso di consuntivazione
+  (vedi `consuntivaMicrovoceApi` nel client frontend): prima di scrivere codice nuovo, verifica
+  cosa c'è già e collegalo, come è stato fatto in Fase 1 — il motore era completo e inutilizzato;
+- 2.3 timer start/stop opzionale con localStorage per utente, sync su stop;
+- 2.4 `frontend/src/pages/TeamHours.tsx`, vista settimanale ore per membro del team;
+- 2.5 aggiornamento stato progetto senza refresh (l'avanzamento arriva già calcolato dall'API,
+  vedi regola 6: serve solo rileggerlo dopo la scrittura, non ricalcolarlo nel browser).
+
+Tre decisioni che aspettano il titolare del dato, da non prendere da soli:
+1. Il ricalcolo sulla riga divergente di "holding dibenedetto" è una SCRITTURA IN PRODUZIONE.
+   Le letture mostrano già il valore corretto perché lo calcolano: non c'è urgenza.
+2. I due moduli senza micro-voci vanno istanziati o azzerati a mano. Il codice li preserva.
+3. `ricalcolaProgettoApi()` esiste in `frontend/src/api/client.ts` ma nessun pulsante la chiama:
+   dove collocarla è una scelta di prodotto, non un dettaglio di implementazione.
+
+Prima di toccare qualsiasi cosa, esegui `npx vitest run` (devono passare 18 file / 226 test) e
+`npx tsc --noEmit` sia in radice sia in `frontend/`. Se qualcosa è rosso PRIMA delle tue
+modifiche, dillo invece di aggiustarlo di nascosto.
+
 Leggiti i file .agents/AGENTS.md, README.md ed ISTRUZIONI_INSTALLAZIONE.md prima di iniziare qualsiasi modifica!
 ```
 
