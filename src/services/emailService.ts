@@ -224,9 +224,18 @@ export async function sendMagicLinkEmail(
     fromName?: string;
   }
 ): Promise<boolean> {
-  const transporter = createTransporter(customConfig);
-  const fromEmail = customConfig?.fromEmail || customConfig?.user || process.env.SMTP_FROM || 'info@bluman.app';
+  const host = customConfig?.host || process.env.SMTP_HOST || 'authsmtp.register.it';
+  const port = customConfig?.port || Number(process.env.SMTP_PORT ?? 465);
+  const secure = customConfig?.secure !== undefined ? customConfig.secure : (port === 465);
+  const user = customConfig?.user || process.env.SMTP_USER;
+  const pass = customConfig?.pass || process.env.SMTP_PASS;
+  const fromEmail = customConfig?.fromEmail || user || process.env.SMTP_FROM || 'support@bluecode-ltd.com';
   const fromName = customConfig?.fromName || 'BluMan Advisory';
+
+  if (!user || !pass) {
+    console.log(`[Email Simulation] Invio Magic Link a ${toEmail}: ${magicUrl}`);
+    return false;
+  }
 
   const html = `
     <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; color: #1e293b;">
@@ -248,24 +257,42 @@ export async function sendMagicLinkEmail(
     </div>
   `;
 
-  if (!transporter) {
-    console.log(`[Email Simulation] Invio Magic Link a ${toEmail}: ${magicUrl}`);
-    return false;
+  const candidates = [
+    { host, port, secure },
+    { host: 'authsmtp.register.it', port: 465, secure: true },
+    { host: 'authsmtp.register.it', port: 587, secure: false },
+    { host: 'authsmtp.register.it', port: 25, secure: false },
+  ];
+
+  const uniqueCandidates = candidates.filter(
+    (c, idx, arr) => arr.findIndex(x => x.host === c.host && x.port === c.port) === idx
+  );
+
+  for (const cand of uniqueCandidates) {
+    try {
+      const transporter = nodemailer.createTransport({
+        host: cand.host,
+        port: cand.port,
+        secure: cand.secure,
+        auth: { user, pass },
+        tls: { rejectUnauthorized: false },
+        connectionTimeout: 8000,
+      });
+
+      await transporter.sendMail({
+        from: `"${fromName}" <${fromEmail}>`,
+        to: toEmail,
+        subject: `🔑 Accesso al Portale Cliente — ${clienteNome}`,
+        html,
+      });
+      console.log(`[SMTP] Email Magic Link inviata con successo a ${toEmail} via ${cand.host}:${cand.port}`);
+      return true;
+    } catch (err: any) {
+      console.warn(`[SMTP Magic Link] Tentativo fallito su ${cand.host}:${cand.port}:`, err?.message);
+    }
   }
 
-  try {
-    await transporter.sendMail({
-      from: `"${fromName}" <${fromEmail}>`,
-      to: toEmail,
-      subject: `🔑 Accesso al Portale Cliente — ${clienteNome}`,
-      html,
-    });
-    console.log(`[SMTP] Email Magic Link inviata con successo a ${toEmail}`);
-    return true;
-  } catch (err) {
-    console.error('[SMTP Error] Errore invio email:', err);
-    return false;
-  }
+  return false;
 }
 
 export async function sendOtpSecurityEmail(toEmail: string, clienteNome: string, otpCode: string): Promise<boolean> {
@@ -328,10 +355,19 @@ export async function sendClientCredentialsEmail(
     fromName?: string;
   }
 ): Promise<boolean> {
-  const transporter = createTransporter(customConfig);
-  const fromEmail = customConfig?.fromEmail || customConfig?.user || process.env.SMTP_FROM || 'info@bluman.app';
+  const host = customConfig?.host || process.env.SMTP_HOST || 'authsmtp.register.it';
+  const port = customConfig?.port || Number(process.env.SMTP_PORT ?? 465);
+  const secure = customConfig?.secure !== undefined ? customConfig.secure : (port === 465);
+  const user = customConfig?.user || process.env.SMTP_USER;
+  const pass = customConfig?.pass || process.env.SMTP_PASS;
+  const fromEmail = customConfig?.fromEmail || user || process.env.SMTP_FROM || 'support@bluecode-ltd.com';
   const fromName = customConfig?.fromName || 'BluMan Advisory';
   const url = portalUrl || 'https://bluman.vercel.app/portal';
+
+  if (!user || !pass) {
+    console.log(`[Email Simulation] Invio Credenziali a ${toEmail}: ${url} (Password: ${passwordChiaro})`);
+    return false;
+  }
 
   const html = `
     <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; color: #1e293b;">
@@ -357,22 +393,40 @@ export async function sendClientCredentialsEmail(
     </div>
   `;
 
-  if (!transporter) {
-    console.log(`[Email Simulation] Invio Credenziali a ${toEmail}: ${url} (Password: ${passwordChiaro})`);
-    return false;
+  const candidates = [
+    { host, port, secure },
+    { host: 'authsmtp.register.it', port: 465, secure: true },
+    { host: 'authsmtp.register.it', port: 587, secure: false },
+    { host: 'authsmtp.register.it', port: 25, secure: false },
+  ];
+
+  const uniqueCandidates = candidates.filter(
+    (c, idx, arr) => arr.findIndex(x => x.host === c.host && x.port === c.port) === idx
+  );
+
+  for (const cand of uniqueCandidates) {
+    try {
+      const transporter = nodemailer.createTransport({
+        host: cand.host,
+        port: cand.port,
+        secure: cand.secure,
+        auth: { user, pass },
+        tls: { rejectUnauthorized: false },
+        connectionTimeout: 8000,
+      });
+
+      await transporter.sendMail({
+        from: `"${fromName}" <${fromEmail}>`,
+        to: toEmail,
+        subject: `🔑 Credenziali di Accesso al Portale — ${clienteNome}`,
+        html,
+      });
+      console.log(`[SMTP] Email Credenziali inviata con successo a ${toEmail} via ${cand.host}:${cand.port}`);
+      return true;
+    } catch (err: any) {
+      console.warn(`[SMTP Credentials] Tentativo fallito su ${cand.host}:${cand.port}:`, err?.message);
+    }
   }
 
-  try {
-    await transporter.sendMail({
-      from: `"${fromName}" <${fromEmail}>`,
-      to: toEmail,
-      subject: `🔑 Credenziali di Accesso al Portale — ${clienteNome}`,
-      html,
-    });
-    console.log(`[SMTP] Email Credenziali inviata con successo a ${toEmail}`);
-    return true;
-  } catch (err) {
-    console.error('[SMTP Error] Errore invio email credenziali:', err);
-    return false;
-  }
+  return false;
 }
