@@ -98,12 +98,16 @@ export function Sidebar({ alertCount = 0, user, onLogout }: SidebarProps) {
       </nav>
 
       {/* User Footer & Logout */}
-      <div className={styles.user} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+      <div className={styles.user} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+        <div
+          onClick={onOpenProfile}
+          title="👤 Clicca per aprire il tuo Profilo & Sicurezza Password"
+          style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, cursor: onOpenProfile ? 'pointer' : 'default', flex: 1 }}
+        >
           <div className={styles.avatar} style={{ background: '#6366f1' }}>{initials}</div>
           <div style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>
             <div className={styles.userName} style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{userName}</div>
-            <div className={styles.userRole} style={{ fontSize: 10, color: 'var(--muted)' }}>{user?.ruolo || 'advisor'}</div>
+            <div className={styles.userRole} style={{ fontSize: 10, color: 'var(--muted)' }}>{user?.ruolo || 'advisor'} {onOpenProfile ? '· Profilo ⚙️' : ''}</div>
           </div>
         </div>
 

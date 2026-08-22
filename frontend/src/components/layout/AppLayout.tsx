@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { NotificationModal, type NotificationItem } from '../NotificationModal';
+import { UserProfileModal } from '../UserProfileModal';
 import { fetchNotificheApi, markNotificheReadApi } from '../../api/client';
 import { QuickTimeTracker } from '../QuickTimeTracker';
 import { getCurrentTenantId, getAllAvailableTenants, setActiveTenantId } from '../../utils/tenant';
@@ -33,7 +34,13 @@ export function AppLayout({ children, alertCount: _alertCount = 0, user, onLogou
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
+  const [currentUser, setCurrentUser] = useState(user);
   const [notifications, setNotifications] = useState<NotificationItem[]>(INITIAL_NOTIFICATIONS);
+
+  useEffect(() => {
+    setCurrentUser(user);
+  }, [user]);
 
   useEffect(() => {
     const loadDbNotifs = async () => {
@@ -81,7 +88,12 @@ export function AppLayout({ children, alertCount: _alertCount = 0, user, onLogou
   return (
     <div className={styles.app}>
       <div className={`${styles.sidebarWrapper} ${mobileOpen ? styles.sidebarMobileOpen : ''}`}>
-        <Sidebar alertCount={unreadCount} user={user} onLogout={onLogout} />
+        <Sidebar
+          alertCount={unreadCount}
+          user={currentUser}
+          onLogout={onLogout}
+          onOpenProfile={() => setProfileModalOpen(true)}
+        />
       </div>
 
       {mobileOpen && (
@@ -100,9 +112,9 @@ export function AppLayout({ children, alertCount: _alertCount = 0, user, onLogou
           <div className={styles.topbarRight}>
             {/* Selettore Studio / Tenant Switcher — RISERVATO AL SUPER ADMIN */}
             {(() => {
-              const currentTid = getCurrentTenantId(user);
+              const currentTid = getCurrentTenantId(currentUser);
               const allTenants = getAllAvailableTenants();
-              const isSuperAdmin = user?.ruolo === 'super_admin' || user?.role === 'super_admin';
+              const isSuperAdmin = currentUser?.ruolo === 'super_admin' || currentUser?.role === 'super_admin';
               const currentTenantObj = allTenants.find(t => t.id === currentTid) || { id: currentTid, ragioneSociale: 'Studio Advisory' };
 
               if (!isSuperAdmin) {
@@ -150,11 +162,30 @@ export function AppLayout({ children, alertCount: _alertCount = 0, user, onLogou
               );
             })()}
 
-            <QuickTimeTracker user={user} />
-            {user && (
-              <div style={{ fontSize: 11, color: 'var(--muted)', background: 'var(--card2)', padding: '4px 10px', borderRadius: 20, border: '1px solid var(--border)' }}>
-                👤 {user.nome || user.name} ({user.ruolo || 'advisor'})
-              </div>
+            <QuickTimeTracker user={currentUser} />
+            {currentUser && (
+              <button
+                onClick={() => setProfileModalOpen(true)}
+                title="👤 Il Mio Profilo & Sicurezza Password"
+                style={{
+                  fontSize: 11,
+                  color: 'var(--text)',
+                  background: 'var(--card2)',
+                  padding: '4px 12px',
+                  borderRadius: 20,
+                  border: '1px solid #4338ca',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  transition: 'all .2s ease',
+                }}
+              >
+                <span>👤</span>
+                <span style={{ fontWeight: 700, color: 'var(--indigo-l)' }}>{currentUser.nome || currentUser.name}</span>
+                <span style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'capitalize' }}>({currentUser.ruolo || 'advisor'})</span>
+                <span style={{ fontSize: 10, color: '#a5b4fc', marginLeft: 2 }}>⚙️</span>
+              </button>
             )}
             {unreadCount > 0 && (
               <div className={styles.alertPill} onClick={() => setNotifOpen(true)} style={{ cursor: 'pointer' }}>
@@ -181,6 +212,14 @@ export function AppLayout({ children, alertCount: _alertCount = 0, user, onLogou
             onClose={() => setNotifOpen(false)}
             onMarkAllRead={handleMarkAllRead}
             onSelectNotif={handleSelectNotif}
+          />
+        )}
+
+        {profileModalOpen && (
+          <UserProfileModal
+            user={currentUser}
+            onClose={() => setProfileModalOpen(false)}
+            onUserUpdated={(updated) => setCurrentUser(updated)}
           />
         )}
 

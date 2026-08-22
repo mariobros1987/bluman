@@ -7,7 +7,7 @@ import type { SignatureData } from '../utils/pdfGenerator';
 import { DigitalSignatureModal } from '../components/DigitalSignatureModal';
 import { resolveDocumentTemplateHtml, PREBUILT_TEMPLATES } from '../utils/documentTemplates';
 import { getStudioInfoForTenant, getCurrentTenantId, getTenantStorageKey, BLUECODE_TENANT_ID } from '../utils/tenant';
-import { fetchModuliLibreria, fetchProgetti, creaPreventivoEAccettaApi, fetchClienti, creaProgettoApi, creaClienteApi, fetchComunicazioniApi, inviaComunicazioneApi, requestPortalOtpApi, verifyPortalOtpAndSignApi, magicLoginApi, clientLoginApi } from '../api/client';
+import { fetchModuliLibreria, fetchProgetti, creaPreventivoEAccettaApi, fetchClienti, creaProgettoApi, creaClienteApi, fetchComunicazioniApi, inviaComunicazioneApi, requestPortalOtpApi, verifyPortalOtpAndSignApi, magicLoginApi, clientLoginApi, cambiaPasswordClienteApi } from '../api/client';
 import type { CategoriaModulo } from '../types';
 
 export interface ModuloPassaggio {
@@ -109,7 +109,7 @@ function mapProjectToPortalModules(project: any): ModuloProposta[] {
   });
 }
 
-type PortalTab = 'proposta' | 'avanzamento' | 'form' | 'documenti' | 'contatti';
+type PortalTab = 'proposta' | 'avanzamento' | 'form' | 'documenti' | 'contatti' | 'profilo';
 
 export function ClientPortal() {
   const [searchParams] = useSearchParams();
@@ -137,6 +137,14 @@ export function ClientPortal() {
   // cliente specifico, quindi un browser in cui quel cliente aveva firmato mostrava "firmato" a
   // qualunque altro cliente. Si risolve in `loadPortalData` sul nome del cliente autenticato.
   const [signed, setSigned] = useState<boolean>(false);
+
+  // Stati Gestione Password Personale Cliente
+  const [clientPassCurrent, setClientPassCurrent] = useState('');
+  const [clientPassNew, setClientPassNew] = useState('');
+  const [clientPassConfirm, setClientPassConfirm] = useState('');
+  const [clientPassShow, setClientPassShow] = useState(false);
+  const [clientPassLoading, setClientPassLoading] = useState(false);
+  const [clientPassMsg, setClientPassMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const [addendums, setAddendums] = useState<any[]>(() => {
     const saved = localStorage.getItem(`bluman_addendums_Marco Ricci / Holding Beta S.r.l.`);
     return saved ? JSON.parse(saved) : [];
@@ -641,6 +649,34 @@ export function ClientPortal() {
     setTimeout(() => setFormSaved(false), 4000);
   };
 
+  const handleSaveClientPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setClientPassMsg(null);
+    if (clientPassNew.length < 6) {
+      setClientPassMsg({ text: 'La nuova password deve contenere almeno 6 caratteri.', type: 'error' });
+      return;
+    }
+    if (clientPassNew !== clientPassConfirm) {
+      setClientPassMsg({ text: 'Le due password non coincidono.', type: 'error' });
+      return;
+    }
+    setClientPassLoading(true);
+    try {
+      await cambiaPasswordClienteApi(clientPassNew, clientPassCurrent, clientObj?.id, clientObj?.email || loginEmail);
+      setClientPassMsg({ text: '✓ Password salvata con successo! Ora puoi accedere al portale anche con la tua email e questa password.', type: 'success' });
+      setClientPassCurrent('');
+      setClientPassNew('');
+      setClientPassConfirm('');
+      if (clientObj) {
+        setClientObj({ ...clientObj, hasPassword: true });
+      }
+    } catch (err: any) {
+      setClientPassMsg({ text: err.message || 'Errore durante il salvataggio della password', type: 'error' });
+    } finally {
+      setClientPassLoading(false);
+    }
+  };
+
   const getResolvedEngagementHtml = () => {
     const tmpl = PREBUILT_TEMPLATES.find(t => t.id === 'tmpl-engagement');
     const baseHtml = tmpl ? tmpl.contenutoHtml : '';
@@ -1056,6 +1092,12 @@ export function ClientPortal() {
           style={tabBtnStyle(activeTab === 'contatti')}
         >
           💬 5. Contatto Advisor
+        </button>
+        <button
+          onClick={() => setActiveTab('profilo')}
+          style={tabBtnStyle(activeTab === 'profilo')}
+        >
+          👤 6. Profilo & Password
         </button>
       </div>
 
@@ -2011,6 +2053,193 @@ export function ClientPortal() {
               <div style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.5 }}>
                 {getStudioInfoForTenant().sedeLegale || 'Sede in fase di configurazione'}<br />
                 {getStudioInfoForTenant().piva ? `P.IVA: ${getStudioInfoForTenant().piva}` : ''}{getStudioInfoForTenant().email ? ` · ${getStudioInfoForTenant().email}` : ''}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 6: Profilo & Password Personale Cliente */}
+        {activeTab === 'profilo' && (
+          <div style={docBoxStyle}>
+            <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>👤 Profilo Riservato & Sicurezza Accesso</div>
+            <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 20 }}>
+              Gestisci i dati anagrafici del tuo account, i recapiti per le notifiche di sicurezza e imposta la tua password personale per accedere direttamente al portale.
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 20 }}>
+              {/* Card Dati Anagrafici & Contatti */}
+              <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 14, padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span>🏛</span> Dati Intestatario & Recapiti
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <div style={{ background: 'var(--bg)', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--border)' }}>
+                    <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 700 }}>Ragione Sociale / Intestatario</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--indigo-l)', marginTop: 2 }}>{clientName}</div>
+                  </div>
+
+                  <div style={{ background: 'var(--bg)', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--border)' }}>
+                    <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 700 }}>Email Principale Notifiche & OTP</div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', marginTop: 2 }}>{clientObj?.email || loginEmail || 'Non specificata'}</div>
+                  </div>
+
+                  <div style={{ background: 'var(--bg)', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--border)' }}>
+                    <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 700 }}>Telefono & WhatsApp di Sicurezza</div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', marginTop: 2 }}>
+                      {clientObj?.cellulare || (clientObj as any)?.referentiJson?.whatsapp || clientObj?.telefono || 'Non configurato'}
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    <div style={{ background: 'var(--bg)', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--border)' }}>
+                      <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 700 }}>Giurisdizione Incarico</div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: '#818cf8', marginTop: 2 }}>{clientObj?.giurisdizione || 'Malta'}</div>
+                    </div>
+                    <div style={{ background: 'var(--bg)', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--border)' }}>
+                      <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 700 }}>Stato Accesso Portale</div>
+                      <div style={{ fontSize: 11.5, fontWeight: 700, color: clientObj?.hasPassword ? '#34d399' : 'var(--amber)', marginTop: 2 }}>
+                        {clientObj?.hasPassword ? '🟢 Password Attiva' : '⚪ Solo Magic Link'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.4, marginTop: 'auto', paddingTop: 10, borderTop: '1px solid var(--border)' }}>
+                  ℹ️ Per modificare i dati anagrafici fiscali (P.IVA, SDI, Sede), puoi compilare la scheda <strong>📋 3. Form Dati Societari</strong> o richiedere l'aggiornamento all'Advisor.
+                </div>
+              </div>
+
+              {/* Card Imposta / Cambia Password Portale */}
+              <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 14, padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span>🔐</span> Imposta / Modifica Password Portale
+                </div>
+
+                <div style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.4 }}>
+                  Impostando una password personale potrai accedere direttamente al portale con la tua email (<strong>{clientObj?.email || loginEmail || clientName}</strong>) in qualsiasi momento, senza dover richiedere un nuovo Magic Link via email.
+                </div>
+
+                <form onSubmit={handleSaveClientPassword} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  {clientPassMsg && (
+                    <div
+                      style={{
+                        padding: '10px 14px',
+                        borderRadius: 8,
+                        fontSize: 12,
+                        background: clientPassMsg.type === 'success' ? '#0d2d22' : '#3b1c1c',
+                        color: clientPassMsg.type === 'success' ? '#34d399' : '#f87171',
+                        border: `1px solid ${clientPassMsg.type === 'success' ? '#059669' : '#ef4444'}`,
+                      }}
+                    >
+                      {clientPassMsg.text}
+                    </div>
+                  )}
+
+                  {clientObj?.hasPassword && (
+                    <div>
+                      <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>
+                        Password Attuale (se già impostata)
+                      </label>
+                      <input
+                        type={clientPassShow ? 'text' : 'password'}
+                        value={clientPassCurrent}
+                        onChange={e => setClientPassCurrent(e.target.value)}
+                        placeholder="Inserisci password attuale se la stai modificando"
+                        style={{
+                          width: '100%',
+                          background: 'var(--bg)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 8,
+                          padding: '9px 12px',
+                          color: 'var(--text)',
+                          fontSize: 12,
+                          boxSizing: 'border-box',
+                        }}
+                      />
+                    </div>
+                  )}
+
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                      <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)' }}>
+                        Nuova Password Portale * (min. 6 caratteri)
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setClientPassShow(!clientPassShow)}
+                        style={{ background: 'none', border: 'none', color: 'var(--indigo-l)', fontSize: 10.5, cursor: 'pointer', padding: 0 }}
+                      >
+                        {clientPassShow ? '🙈 Nascondi' : '👁 Mostra'}
+                      </button>
+                    </div>
+                    <input
+                      type={clientPassShow ? 'text' : 'password'}
+                      value={clientPassNew}
+                      onChange={e => setClientPassNew(e.target.value)}
+                      placeholder="es. PasswordSicura2026!"
+                      required
+                      style={{
+                        width: '100%',
+                        background: 'var(--bg)',
+                        border: '1px solid var(--border)',
+                        borderRadius: 8,
+                        padding: '9px 12px',
+                        color: 'var(--text)',
+                        fontSize: 12,
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>
+                      Conferma Nuova Password *
+                    </label>
+                    <input
+                      type={clientPassShow ? 'text' : 'password'}
+                      value={clientPassConfirm}
+                      onChange={e => setClientPassConfirm(e.target.value)}
+                      placeholder="Ripeti la nuova password"
+                      required
+                      style={{
+                        width: '100%',
+                        background: 'var(--bg)',
+                        border: '1px solid var(--border)',
+                        borderRadius: 8,
+                        padding: '9px 12px',
+                        color: 'var(--text)',
+                        fontSize: 12,
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                    {clientPassConfirm && clientPassNew !== clientPassConfirm && (
+                      <span style={{ fontSize: 10, color: '#f87171', marginTop: 4, display: 'block' }}>
+                        ⚠ Le due password non coincidono.
+                      </span>
+                    )}
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={clientPassLoading || !clientPassNew || clientPassNew !== clientPassConfirm}
+                    style={{
+                      background: 'var(--indigo)',
+                      color: '#fff',
+                      border: 'none',
+                      padding: '10px 18px',
+                      borderRadius: 8,
+                      fontSize: 12,
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      boxShadow: '0 4px 12px rgba(99,102,241,0.35)',
+                      opacity: (!clientPassNew || clientPassNew !== clientPassConfirm || clientPassLoading) ? 0.6 : 1,
+                      marginTop: 6,
+                    }}
+                  >
+                    {clientPassLoading ? 'Salvataggio in corso...' : '🔒 Salva Password Portale'}
+                  </button>
+                </form>
               </div>
             </div>
           </div>

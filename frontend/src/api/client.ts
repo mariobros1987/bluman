@@ -122,6 +122,68 @@ export async function clientLoginApi(email: string, password: string) {
   return await res.json();
 }
 
+/**
+ * Cambio Password per Utente Staff / Advisor dello Studio
+ */
+export async function cambiaPasswordStaffApi(currentPassword: string, newPassword: string) {
+  const res = await fetch(`${API_BASE}/auth/change-password`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ currentPassword, newPassword }),
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) {
+    throw new Error(data?.errore || 'Errore durante l\'aggiornamento della password');
+  }
+  return data;
+}
+
+/**
+ * Impostazione o Modifica Password per il Cliente del Portale
+ */
+export async function cambiaPasswordClienteApi(newPassword: string, currentPassword?: string, clienteId?: string, email?: string) {
+  const res = await fetch(`${API_BASE}/portal/change-password`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ newPassword, currentPassword, clienteId, email }),
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) {
+    throw new Error(data?.errore || 'Errore durante il salvataggio della password');
+  }
+  return data;
+}
+
+/**
+ * Recupero dati profilo utente autenticato
+ */
+export async function fetchProfiloUtenteApi() {
+  const res = await fetch(`${API_BASE}/auth/profilo`, {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => null);
+    throw new Error(data?.errore || 'Errore recupero profilo');
+  }
+  return await res.json();
+}
+
+/**
+ * Aggiornamento profilo utente autenticato
+ */
+export async function aggiornaProfiloUtenteApi(data: { nome?: string; specializzazione?: string }) {
+  const res = await fetch(`${API_BASE}/auth/profilo`, {
+    method: 'PUT',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const errData = await res.json().catch(() => null);
+    throw new Error(errData?.errore || 'Errore salvataggio profilo');
+  }
+  return await res.json();
+}
+
 export async function fetchProgetti() {
   try {
     const res = await fetchWithTimeout(`${API_BASE}/progetti`, { headers: getAuthHeaders() }, 6000);

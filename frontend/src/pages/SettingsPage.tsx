@@ -3,6 +3,7 @@ import { fetchUtentiTenant, creaUtenteTenantApi, uploadFileApi, fetchTenantInfoA
 import { getFormattedLogoUrl, fmt } from '../utils';
 import { getCurrentTenantId, getTenantStorageKey, getStudioInfoForTenant, saveTenantInfoToStorage } from '../utils/tenant';
 import { ProgressBar } from '../components/ui/ProgressBar';
+import { UserProfileModal } from '../components/UserProfileModal';
 import styles from './Settings.module.css';
 
 type Tab = 'company' | 'users' | 'sdi' | 'invoice_design' | 'channels';
@@ -10,6 +11,7 @@ type Tab = 'company' | 'users' | 'sdi' | 'invoice_design' | 'channels';
 export function SettingsPage() {
   const [tab, setTab] = useState<Tab>('company');
   const [saved, setSaved] = useState(false);
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
 
   // Configuratore Canali Omnichannel & SMTP
   const [waPhoneId, setWaPhoneId] = useState('');
@@ -1043,12 +1045,21 @@ export function SettingsPage() {
               <div style={{ fontSize: 14, fontWeight: 600 }}>Utenti & Collaboratori dello Studio</div>
               <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>Definisci i ruoli ed i permessi di accesso per il personale dello studio</div>
             </div>
-            <button
-              onClick={() => setModalUserOpen(true)}
-              style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer' }}
-            >
-              + Invita Collaboratore
-            </button>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={() => setProfileModalOpen(true)}
+                style={{ background: 'var(--card2)', color: 'var(--indigo-l)', border: '1px solid #4338ca', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+              >
+                <span>👤</span> Il Mio Profilo & Password
+              </button>
+              <button
+                onClick={() => setModalUserOpen(true)}
+                style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer' }}
+              >
+                + Invita Collaboratore
+              </button>
+            </div>
           </div>
 
           {loadingUsers ? (
@@ -1149,6 +1160,14 @@ export function SettingsPage() {
         <OperatorDetailModal
           operator={selectedOperator}
           onClose={() => setSelectedOperator(null)}
+        />
+      )}
+
+      {/* Modal Il Mio Profilo & Password */}
+      {profileModalOpen && (
+        <UserProfileModal
+          user={null}
+          onClose={() => setProfileModalOpen(false)}
         />
       )}
     </div>

@@ -118,6 +118,7 @@ export function buildServer(app: AppPort): FastifyInstance {
     'POST /auth/login',
     'POST /auth/magic-login',
     'POST /auth/client-login',
+    'POST /portal/change-password',
     // Chiamate da Meta, Telegram e SdI, che non possono portare un nostro JWT. Si
     // autenticano col proprio meccanismo (hub.verify_token, secret del bot).
     'GET /webhooks/communications/whatsapp',
@@ -186,11 +187,12 @@ export function buildServer(app: AppPort): FastifyInstance {
     let tenantId = TENANT_DEFAULT; // Default Studio Tenant
     let ruolo: string | undefined;
     let autenticato = false;
+    let payload: any = null;
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.split(' ')[1];
       if (token) {
-        const payload = verifyJwt(token);
+        payload = verifyJwt(token);
         if (payload) {
           autenticato = true;
           ruolo = payload.ruolo;
@@ -220,6 +222,8 @@ export function buildServer(app: AppPort): FastifyInstance {
     }
     (req as any).tenantId = tenantId;
     (req as any).ruolo = ruolo;
+    (req as any).user = payload;
+    (req as any).userId = payload?.userId;
     // §14 — da qui in poi ogni query di questa richiesta viaggia con il tenant impostato
     // come variabile di sessione, che è ciò su cui filtrano le policy RLS. Senza questa
     // riga il ruolo `bluman_app` non vedrebbe nessuna riga: il guasto è immediato, non
@@ -485,6 +489,160 @@ export function buildServer(app: AppPort): FastifyInstance {
       return reply.code(401).send({ errore: 'Token non valido o scaduto' });
     }
     return { ok: true, user: payload };
+  });
+
+  server.post<{
+    Body: { currentPassword?: string; newPassword?: string };
+  }>('/auth/change-password', async (req, reply) => {
+    const { currentPassword, newPassword } = req.body || {};
+    const authUser = (req as any).user;
+    const userId = authUser?.userId;
+
+    if (!userId) {
+      return reply.code(401).send({ errore: 'Non autenticato' });
+    }
+    if (!newPassword || newPassword.length < 8) {
+      return reply.code(400).send({ errore: 'La nuova password deve contenere almeno 8 caratteri.' });
+    }
+
+    try {
+      const utente = await prismaAmministrativo().user.findUnique({ where: { id: userId } });
+      if (!utente) {
+        return reply.code(404).send({ errore: 'Utente non trovato' });
+      }
+
+      // Se l'utente ha già una password, verifica quella attuale
+      if (utente.passwordHash) {
+        if (!currentPassword) {
+          return reply.code(400).send({ errore: 'Inserisci la password attuale per confermare la modifica.' });
+        }
+        if (!verifyPassword(currentPassword, utente.passwordHash)) {
+          return reply.code(401).send({ errore: 'La password attuale non è corretta.' });
+        }
+      }
+
+      const newHash = hashPassword(newPassword);
+      await prismaAmministrativo().user.update({
+        where: { id: utente.id },
+        data: {
+          passwordHash: newHash,
+          stato: 'attivo',
+        },
+      });
+
+      recordAudit({
+        tenantId: utente.tenantId || TENANT_DEFAULT,
+        userId: utente.id,
+        userEmail: utente.email,
+        azione: 'PASSWORD_MODIFICATA',
+        entita: utente.nome,
+        dettagli: `Password aggiornata autonomamente dall'utente ${utente.email}`,
+        ipAddress: req.ip,
+      });
+
+      return reply.send({ ok: true, messaggio: 'Password aggiornata con successo!' });
+    } catch (err: any) {
+      return reply.code(500).send({ errore: err.message || 'Errore aggiornamento password' });
+    }
+  });
+
+  server.get('/auth/profilo', async (req, reply) => {
+    const authUser = (req as any).user;
+    const userId = authUser?.userId;
+    if (!userId) return reply.code(401).send({ errore: 'Non autenticato' });
+
+    try {
+      const utente = await prismaAmministrativo().user.findUnique({
+        where: { id: userId },
+        include: { tenant: true },
+      });
+      if (!utente) return reply.code(404).send({ errore: 'Utente non trovato' });
+      return reply.send(senzaHash(utente));
+    } catch (err: any) {
+      return reply.code(500).send({ errore: err.message || 'Errore recupero profilo' });
+    }
+  });
+
+  server.put<{
+    Body: { nome?: string; specializzazione?: string };
+  }>('/auth/profilo', async (req, reply) => {
+    const authUser = (req as any).user;
+    const userId = authUser?.userId;
+    if (!userId) return reply.code(401).send({ errore: 'Non autenticato' });
+
+    const { nome, specializzazione } = req.body || {};
+    try {
+      const updated = await prismaAmministrativo().user.update({
+        where: { id: userId },
+        data: {
+          ...(nome ? { nome: nome.trim() } : {}),
+          ...(specializzazione !== undefined ? { specializzazione: specializzazione.trim() } : {}),
+        },
+      });
+      return reply.send(senzaHash(updated));
+    } catch (err: any) {
+      return reply.code(500).send({ errore: err.message || 'Errore salvataggio profilo' });
+    }
+  });
+
+  server.post<{
+    Body: { currentPassword?: string; newPassword?: string; clienteId?: string; email?: string };
+  }>('/portal/change-password', async (req, reply) => {
+    const { currentPassword, newPassword, clienteId, email } = req.body || {};
+    const authUser = (req as any).user;
+
+    if (!newPassword || newPassword.length < 6) {
+      return reply.code(400).send({ errore: 'La nuova password deve contenere almeno 6 caratteri.' });
+    }
+
+    const cleanEmail = (email || authUser?.email || '').trim().toLowerCase();
+    const targetClienteId = clienteId || (authUser?.userId?.startsWith('client-') ? authUser.userId.replace('client-', '') : null);
+
+    try {
+      let cliente: any = null;
+      if (targetClienteId) {
+        cliente = await prismaAmministrativo().cliente.findUnique({ where: { id: targetClienteId } });
+      }
+      if (!cliente && cleanEmail) {
+        cliente = await prismaAmministrativo().cliente.findFirst({
+          where: {
+            OR: [
+              { email: { equals: cleanEmail, mode: 'insensitive' } },
+              { referentiJson: { path: ['email'], equals: cleanEmail } },
+            ],
+          },
+        });
+      }
+
+      if (!cliente) {
+        return reply.code(404).send({ errore: 'Cliente non trovato' });
+      }
+
+      // Se il cliente ha già una password attiva e la sta cambiando, verifica quella attuale
+      if (cliente.passwordHash && currentPassword) {
+        if (!verifyPassword(currentPassword, cliente.passwordHash)) {
+          return reply.code(401).send({ errore: 'La password attuale inserita non è corretta.' });
+        }
+      }
+
+      const newHash = hashPassword(newPassword);
+      await prismaAmministrativo().cliente.update({
+        where: { id: cliente.id },
+        data: { passwordHash: newHash },
+      });
+
+      recordAudit({
+        tenantId: cliente.tenantId,
+        azione: 'CLIENTE_PASSWORD_MODIFICATA',
+        entita: cliente.nome,
+        dettagli: `Password del portale cliente aggiornata con successo per ${cliente.nome}`,
+        ipAddress: req.ip || '127.0.0.1',
+      });
+
+      return reply.send({ ok: true, messaggio: 'Password del portale impostata con successo!' });
+    } catch (err: any) {
+      return reply.code(500).send({ errore: err.message || 'Errore aggiornamento password portale' });
+    }
   });
 
   // ─── GIURISDIZIONI API (§8 Estensione) ───────────────────────────
