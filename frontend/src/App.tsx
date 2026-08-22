@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Outlet, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Outlet, useNavigate, Navigate } from 'react-router-dom';
 import { AppLayout } from './components/layout/AppLayout';
 import { Dashboard }    from './pages/Dashboard';
 import { Projects }     from './pages/Projects';
@@ -55,7 +55,8 @@ function MainLayoutWrapper({ user, onLogout }: { user: any; onLogout: () => void
   );
 }
 
-export default function App() {
+function AppContent() {
+  const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState<any>(() => {
     const saved = localStorage.getItem('bluman_user');
     return saved ? JSON.parse(saved) : null;
@@ -70,6 +71,7 @@ export default function App() {
     localStorage.setItem('bluman_jwt_token', jwtToken);
     localStorage.setItem('bluman_user', JSON.stringify(user));
     setIsLoggedOut(false);
+    navigate('/', { replace: true });
   };
 
   const handleLogout = () => {
@@ -79,6 +81,7 @@ export default function App() {
     setCurrentUser(null);
     setToken(null);
     setIsLoggedOut(true);
+    navigate('/login', { replace: true });
   };
 
   useEffect(() => {
@@ -115,40 +118,57 @@ export default function App() {
     }
   }, [token]);
 
+  const isAuthenticated = !isLoggedOut && Boolean(currentUser && token);
+
+  return (
+    <Routes>
+      {/* Client Portal Standalone */}
+      <Route path="/portal" element={<ClientPortal />} />
+
+      {/* Login Route */}
+      <Route
+        path="/login"
+        element={
+          isAuthenticated ? (
+            <Navigate to="/" replace />
+          ) : (
+            <LoginPage onLoginSuccess={handleLoginSuccess} />
+          )
+        }
+      />
+
+      {/* Authenticated routes or fallback to login */}
+      {isAuthenticated ? (
+        <Route element={<MainLayoutWrapper user={currentUser} onLogout={handleLogout} />}>
+          <Route path="/"              element={<Dashboard />} />
+          <Route path="/projects"      element={<ProtectedModule user={currentUser} moduleKey="projects" element={<Projects />} />} />
+          <Route path="/projects/:id"  element={<ProtectedModule user={currentUser} moduleKey="projects" element={<ProjectDetail />} />} />
+          <Route path="/clients"       element={<ProtectedModule user={currentUser} moduleKey="clients" element={<ClientsPage />} />} />
+          <Route path="/calendar"      element={<ProtectedModule user={currentUser} moduleKey="calendar" element={<CalendarPage />} />} />
+          <Route path="/invoices"      element={<ProtectedModule user={currentUser} moduleKey="invoices" element={<InvoicesPage />} />} />
+          <Route path="/scadenzario"   element={<ProtectedModule user={currentUser} moduleKey="scadenzario" element={<ScadenzarioPage />} />} />
+          <Route path="/primanota"     element={<ProtectedModule user={currentUser} moduleKey="primanota" element={<PrimaNotaPage />} />} />
+          <Route path="/banks"         element={<ProtectedModule user={currentUser} moduleKey="banks" element={<BanksPage />} />} />
+          <Route path="/payments"      element={<ProtectedModule user={currentUser} moduleKey="banks" element={<PaymentsPage />} />} />
+          <Route path="/retainers"     element={<ProtectedModule user={currentUser} moduleKey="retainers" element={<RetainersPage />} />} />
+          <Route path="/documents"     element={<ProtectedModule user={currentUser} moduleKey="documents" element={<DocumentEditorPage />} />} />
+          <Route path="/audit"         element={<ProtectedModule user={currentUser} moduleKey="audit" element={<AuditLogPage />} />} />
+          <Route path="/admin/tenants" element={<SuperAdminPage />} />
+          <Route path="/library"       element={<ProtectedModule user={currentUser} moduleKey="library" element={<Library />} />} />
+          <Route path="/settings"      element={<ProtectedModule user={currentUser} moduleKey="settings" element={<SettingsPage />} />} />
+          <Route path="*"              element={<Navigate to="/" replace />} />
+        </Route>
+      ) : (
+        <Route path="*" element={<LoginPage onLoginSuccess={handleLoginSuccess} />} />
+      )}
+    </Routes>
+  );
+}
+
+export default function App() {
   return (
     <BrowserRouter>
-      {isLoggedOut || !currentUser || !token ? (
-        <Routes>
-          <Route path="/portal" element={<ClientPortal />} />
-          <Route path="*" element={<LoginPage onLoginSuccess={handleLoginSuccess} />} />
-        </Routes>
-      ) : (
-        <Routes>
-          {/* Client Portal Standalone */}
-          <Route path="/portal" element={<ClientPortal />} />
-          <Route path="/login" element={<LoginPage onLoginSuccess={handleLoginSuccess} />} />
-
-          {/* Advisor Platform Layout with RBAC Protected Routes */}
-          <Route element={<MainLayoutWrapper user={currentUser} onLogout={handleLogout} />}>
-            <Route path="/"              element={<Dashboard />} />
-            <Route path="/projects"      element={<ProtectedModule user={currentUser} moduleKey="projects" element={<Projects />} />} />
-            <Route path="/projects/:id"  element={<ProtectedModule user={currentUser} moduleKey="projects" element={<ProjectDetail />} />} />
-            <Route path="/clients"       element={<ProtectedModule user={currentUser} moduleKey="clients" element={<ClientsPage />} />} />
-            <Route path="/calendar"      element={<ProtectedModule user={currentUser} moduleKey="calendar" element={<CalendarPage />} />} />
-            <Route path="/invoices"      element={<ProtectedModule user={currentUser} moduleKey="invoices" element={<InvoicesPage />} />} />
-            <Route path="/scadenzario"   element={<ProtectedModule user={currentUser} moduleKey="scadenzario" element={<ScadenzarioPage />} />} />
-            <Route path="/primanota"     element={<ProtectedModule user={currentUser} moduleKey="primanota" element={<PrimaNotaPage />} />} />
-            <Route path="/banks"         element={<ProtectedModule user={currentUser} moduleKey="banks" element={<BanksPage />} />} />
-            <Route path="/payments"      element={<ProtectedModule user={currentUser} moduleKey="banks" element={<PaymentsPage />} />} />
-            <Route path="/retainers"     element={<ProtectedModule user={currentUser} moduleKey="retainers" element={<RetainersPage />} />} />
-            <Route path="/documents"     element={<ProtectedModule user={currentUser} moduleKey="documents" element={<DocumentEditorPage />} />} />
-            <Route path="/audit"         element={<ProtectedModule user={currentUser} moduleKey="audit" element={<AuditLogPage />} />} />
-            <Route path="/admin/tenants" element={<SuperAdminPage />} />
-            <Route path="/library"       element={<ProtectedModule user={currentUser} moduleKey="library" element={<Library />} />} />
-            <Route path="/settings"      element={<ProtectedModule user={currentUser} moduleKey="settings" element={<SettingsPage />} />} />
-          </Route>
-        </Routes>
-      )}
+      <AppContent />
     </BrowserRouter>
   );
 }
