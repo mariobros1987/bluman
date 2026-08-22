@@ -368,7 +368,7 @@ Configurazione: `vitest.config.ts` + `vitest.setup.ts` (isolamento dal DB reale)
 
 5. **Aggiornamento Mappa Grafo (Graphify)**:
    - Dopo modifiche strutturali ai moduli o ai servizi, eseguire `python -m graphify extract . --code-only` e `python -m graphify cluster-only .` per mantenere la mappa delle dipendenze di codice e la documentazione architettonica sempre sincronizzate.
-   - ✅ **Grafo AGGIORNATO (21 agosto 2026):** 1192 nodi, 2379 archi, 213 community. Include tutte le modifiche di Fase 0 (contesto tenant RLS, guard autenticazione, MagicLink, firma upload, storage service) e Fase 1 (`calcoloService.ts`, `POST /progetti/:id/ricalcola`). Generati `graphify-out/graph.json`, `graphify-out/GRAPH_REPORT.md` e `graphify-out/graph.html`.
+   - ✅ **Grafo AGGIORNATO (22 agosto 2026):** 1201 nodi, 2408 archi, 219 community. Include tutte le ultime funzionalità di Portale Cliente (switcher multiprogetto, schede moduli interattive con checklist operatore e firma eIDAS, dispatch diretto WhatsApp Cloud API e persistenza credenziali cliente). Generati `graphify-out/graph.json`, `graphify-out/GRAPH_REPORT.md` e `graphify-out/graph.html`.
 
 
 6. **Divieto Assoluto di Esposizione Credenziali su GitHub & Persistenza Isolata su DB Tenant**:
