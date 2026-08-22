@@ -126,6 +126,7 @@ export default function App() {
         <Routes>
           {/* Client Portal Standalone */}
           <Route path="/portal" element={<ClientPortal />} />
+          <Route path="/login" element={<LoginPage onLoginSuccess={handleLoginSuccess} />} />
 
           {/* Advisor Platform Layout with RBAC Protected Routes */}
           <Route element={<MainLayoutWrapper user={currentUser} onLogout={handleLogout} />}>

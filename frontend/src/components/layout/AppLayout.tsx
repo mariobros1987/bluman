@@ -188,6 +188,28 @@ export function AppLayout({ children, alertCount: _alertCount = 0, user, onLogou
                 <span style={{ fontSize: 10, color: '#a5b4fc', marginLeft: 2 }}>⚙️</span>
               </button>
             )}
+            {onLogout && (
+              <button
+                onClick={onLogout}
+                title="Disconnetti ed esci (Logout)"
+                style={{
+                  background: 'var(--card)',
+                  border: '1px solid var(--border)',
+                  color: '#f87171',
+                  borderRadius: 20,
+                  padding: '4px 10px',
+                  fontSize: 11,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  transition: 'all .2s ease',
+                }}
+              >
+                <span>🚪</span> Esci
+              </button>
+            )}
             {unreadCount > 0 && (
               <div className={styles.alertPill} onClick={() => setNotifOpen(true)} style={{ cursor: 'pointer' }}>
                 ⚠ {unreadCount} ritard{unreadCount === 1 ? 'o' : 'i'}
