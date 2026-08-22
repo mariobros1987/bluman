@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { NotificationModal, type NotificationItem } from '../NotificationModal';
 import { UserProfileModal } from '../UserProfileModal';
+import { MustChangePasswordModal } from '../MustChangePasswordModal';
 import { fetchNotificheApi, markNotificheReadApi } from '../../api/client';
 import { QuickTimeTracker } from '../QuickTimeTracker';
 import { getCurrentTenantId, getAllAvailableTenants, setActiveTenantId } from '../../utils/tenant';
@@ -220,6 +221,16 @@ export function AppLayout({ children, alertCount: _alertCount = 0, user, onLogou
             user={currentUser}
             onClose={() => setProfileModalOpen(false)}
             onUserUpdated={(updated) => setCurrentUser(updated)}
+          />
+        )}
+
+        {/* 🔒 Modale Obbligatorio di Cambio Password al Primo Accesso (§23, §27) */}
+        {(currentUser?.mustChangePassword || currentUser?.stato === 'invitato') && (
+          <MustChangePasswordModal
+            user={currentUser}
+            onSuccess={() => {
+              setCurrentUser((prev: any) => prev ? { ...prev, mustChangePassword: false, stato: 'attivo' } : null);
+            }}
           />
         )}
 

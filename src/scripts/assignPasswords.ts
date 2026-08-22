@@ -43,7 +43,10 @@ async function main() {
     const passwordTemporanea = generaPasswordTemporanea();
     await prisma.user.update({
       where: { id: utente.id },
-      data: { passwordHash: hashPassword(passwordTemporanea) },
+      data: {
+        passwordHash: hashPassword(passwordTemporanea),
+        stato: 'invitato', // Obbligo di cambio password al primo accesso
+      },
     });
     generate.push({ email: utente.email, password: passwordTemporanea });
   }

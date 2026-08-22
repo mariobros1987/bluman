@@ -184,6 +184,21 @@ export async function aggiornaProfiloUtenteApi(data: { nome?: string; specializz
   return await res.json();
 }
 
+/**
+ * Reset password utente / collaboratore da parte di SuperAdmin o Lead Advisor
+ */
+export async function resetPasswordUtenteApi(userId: string) {
+  const res = await fetch(`${API_BASE}/tenant/utenti/${userId}/reset-password`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) {
+    throw new Error(data?.errore || 'Errore durante il reset della password');
+  }
+  return data;
+}
+
 export async function fetchProgetti() {
   try {
     const res = await fetchWithTimeout(`${API_BASE}/progetti`, { headers: getAuthHeaders() }, 6000);

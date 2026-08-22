@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { fetchUtentiTenant, creaUtenteTenantApi, uploadFileApi, fetchTenantInfoApi, updateTenantInfoApi, fetchProgetti, fetchPermessiUtenteApi, salvaPermessiUtenteApi, testEmailApi, testImapApi, testChannelApi } from '../api/client';
+import { fetchUtentiTenant, creaUtenteTenantApi, uploadFileApi, fetchTenantInfoApi, updateTenantInfoApi, fetchProgetti, fetchPermessiUtenteApi, salvaPermessiUtenteApi, testEmailApi, testImapApi, testChannelApi, resetPasswordUtenteApi } from '../api/client';
 import { getFormattedLogoUrl, fmt } from '../utils';
 import { getCurrentTenantId, getTenantStorageKey, getStudioInfoForTenant, saveTenantInfoToStorage } from '../utils/tenant';
 import { ProgressBar } from '../components/ui/ProgressBar';
@@ -12,6 +12,31 @@ export function SettingsPage() {
   const [tab, setTab] = useState<Tab>('company');
   const [saved, setSaved] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
+
+  // Stati Reset Password Utente
+  const [resetModalUser, setResetModalUser] = useState<any | null>(null);
+  const [resettingPassword, setResettingPassword] = useState(false);
+  const [resetResult, setResetResult] = useState<{ email: string; passwordTemporanea: string; nome: string } | null>(null);
+  const [copiedResetPass, setCopiedResetPass] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
+
+  const handleResetUserPassword = async () => {
+    if (!resetModalUser) return;
+    setResettingPassword(true);
+    setResetError(null);
+    try {
+      const res = await resetPasswordUtenteApi(resetModalUser.id);
+      setResetResult({
+        email: res.email || resetModalUser.email,
+        nome: res.nome || resetModalUser.nome || resetModalUser.name,
+        passwordTemporanea: res.passwordTemporanea,
+      });
+    } catch (err: any) {
+      setResetError(err.message || 'Errore durante il reset della password');
+    } finally {
+      setResettingPassword(false);
+    }
+  };
 
   // Configuratore Canali Omnichannel & SMTP
   const [waPhoneId, setWaPhoneId] = useState('');
@@ -1085,9 +1110,37 @@ export function SettingsPage() {
                     <div style={{ fontSize: 11, color: '#818cf8', fontWeight: 600, marginTop: 1 }}>{u.specializzazione || (u.ruolo === 'super_admin' ? 'Senior Partner & Lead Advisor' : 'Collaboratore')}</div>
                     <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>{u.email}</div>
                   </div>
-                  <span className={styles.roleBadge} style={{ background: (u.ruolo || u.role || '').includes('super') ? '#200f40' : '#1a1f3d', color: (u.ruolo || u.role || '').includes('super') ? '#a78bfa' : '#818cf8', whiteSpace: 'nowrap' }}>
-                    {u.ruolo === 'super_admin' ? '👑 Super Admin' : u.ruolo === 'advisor' ? '👨‍💼 Advisor' : '👷 Operatore'}
-                  </span>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0 }}>
+                    <span className={styles.roleBadge} style={{ background: (u.ruolo || u.role || '').includes('super') ? '#200f40' : '#1a1f3d', color: (u.ruolo || u.role || '').includes('super') ? '#a78bfa' : '#818cf8', whiteSpace: 'nowrap' }}>
+                      {u.ruolo === 'super_admin' ? '👑 Super Admin' : u.ruolo === 'advisor' ? '👨‍💼 Advisor' : '👷 Operatore'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setResetModalUser(u);
+                        setResetResult(null);
+                        setResetError(null);
+                        setCopiedResetPass(false);
+                      }}
+                      style={{
+                        background: 'rgba(99, 102, 241, 0.12)',
+                        border: '1px solid rgba(99, 102, 241, 0.35)',
+                        color: 'var(--indigo-l, #818cf8)',
+                        borderRadius: 6,
+                        padding: '3px 8px',
+                        fontSize: 10.5,
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 4,
+                      }}
+                      title="Rigenera password temporanea con cambio obbligatorio al 1° login"
+                    >
+                      <span>🔄</span> Reset Pass
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -1169,6 +1222,151 @@ export function SettingsPage() {
           user={null}
           onClose={() => setProfileModalOpen(false)}
         />
+      )}
+
+      {/* Modal Reset Password Utente */}
+      {resetModalUser && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.85)',
+            backdropFilter: 'blur(8px)',
+            zIndex: 99999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 20,
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: 'var(--sidebar, #111827)',
+              border: '1px solid var(--border, #374151)',
+              borderRadius: 18,
+              width: '100%',
+              maxWidth: 480,
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7)',
+              padding: 24,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 16,
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ width: 40, height: 40, borderRadius: 10, background: '#1e1b4b', color: '#818cf8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>
+                  🔄
+                </div>
+                <div>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: '#f8fafc' }}>
+                    Reset Password Utente
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+                    {resetModalUser.nome || resetModalUser.name} ({resetModalUser.email})
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={() => setResetModalUser(null)}
+                style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: 18, cursor: 'pointer' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {resetError && (
+              <div style={{ background: '#450a0a', border: '1px solid #dc2626', color: '#fca5a5', padding: '10px 14px', borderRadius: 8, fontSize: 12 }}>
+                ⚠️ {resetError}
+              </div>
+            )}
+
+            {!resetResult ? (
+              <>
+                <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 14, fontSize: 12, color: 'var(--text)', lineHeight: 1.5 }}>
+                  Generando una nuova password temporanea, la password precedente verrà immediatamente revocata.
+                  Al suo prossimo login, l'utente sarà <strong>obbligato a impostare una nuova password personale</strong> prima di accedere alle funzioni dello studio.
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 8 }}>
+                  <button
+                    type="button"
+                    onClick={() => setResetModalUser(null)}
+                    style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '8px 16px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}
+                  >
+                    Annulla
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleResetUserPassword}
+                    disabled={resettingPassword}
+                    style={{
+                      background: 'linear-gradient(135deg, #4f46e5 0%, #4338ca 100%)',
+                      color: '#fff',
+                      border: 'none',
+                      padding: '8px 18px',
+                      borderRadius: 8,
+                      fontSize: 12,
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      boxShadow: '0 4px 12px rgba(79, 70, 229, 0.35)',
+                      opacity: resettingPassword ? 0.6 : 1,
+                    }}
+                  >
+                    {resettingPassword ? 'Generazione in corso...' : '🔄 Genera Password Temporanea'}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{ background: '#0d2d22', border: '1px solid #059669', borderRadius: 12, padding: 16 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#34d399', marginBottom: 6 }}>
+                    ✓ Password Temporanea Generata con Successo
+                  </div>
+                  <div style={{ fontSize: 11, color: '#a7f3d0', lineHeight: 1.4 }}>
+                    Consegna questa password a <strong>{resetResult.nome}</strong>. Al primo accesso gli verrà richiesto obbligatoriamente di impostarne una nuova.
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, background: 'rgba(0,0,0,0.3)', padding: '10px 14px', borderRadius: 8, border: '1px solid #10b981' }}>
+                    <code style={{ fontSize: 14, fontWeight: 800, color: '#fff', letterSpacing: '0.05em', flex: 1, fontFamily: 'monospace' }}>
+                      {resetResult.passwordTemporanea}
+                    </code>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(resetResult.passwordTemporanea);
+                        setCopiedResetPass(true);
+                        setTimeout(() => setCopiedResetPass(false), 3000);
+                      }}
+                      style={{
+                        background: copiedResetPass ? '#059669' : '#1e1b4b',
+                        color: '#fff',
+                        border: '1px solid #4338ca',
+                        padding: '6px 12px',
+                        borderRadius: 6,
+                        fontSize: 11,
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {copiedResetPass ? '✓ Copiata!' : '📋 Copia'}
+                    </button>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 8 }}>
+                  <button
+                    type="button"
+                    onClick={() => setResetModalUser(null)}
+                    style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '8px 18px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+                  >
+                    Fatto
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );

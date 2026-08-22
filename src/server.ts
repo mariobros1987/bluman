@@ -319,6 +319,8 @@ export function buildServer(app: AppPort): FastifyInstance {
         email: cleanEmail,
         ruolo: utente.ruolo,
         tenantId: userTenantId,
+        stato: utente.stato,
+        mustChangePassword: utente.stato === 'invitato',
       },
     };
   });
@@ -488,7 +490,25 @@ export function buildServer(app: AppPort): FastifyInstance {
     if (!payload) {
       return reply.code(401).send({ errore: 'Token non valido o scaduto' });
     }
-    return { ok: true, user: payload };
+
+    let stato = 'attivo';
+    try {
+      if (payload.userId && !payload.userId.startsWith('client-')) {
+        const u = await prismaAmministrativo().user.findUnique({ where: { id: payload.userId } });
+        if (u) {
+          stato = u.stato;
+        }
+      }
+    } catch {}
+
+    return {
+      ok: true,
+      user: {
+        ...payload,
+        stato,
+        mustChangePassword: stato === 'invitato',
+      },
+    };
   });
 
   server.post<{
@@ -1230,7 +1250,7 @@ export function buildServer(app: AppPort): FastifyInstance {
               email: emailPulita,
               specializzazione: specializzazione || 'Collaboratore di Studio',
               costoOrarioCentesimi: costoOrarioCentesimi || 3000,
-              stato: 'attivo',
+              stato: 'invitato', // Obbligo cambio password al primo accesso
             },
           });
 
@@ -1256,6 +1276,68 @@ export function buildServer(app: AppPort): FastifyInstance {
         return reply.code(409).send({ errore: 'Questa email è già registrata in un altro studio.' });
       }
       return reply.code(500).send({ errore: err.message || 'Errore creazione collaboratore' });
+    }
+  });
+
+  /**
+   * Reset Password Utente / Collaboratore dello Studio
+   * Riservato a Super Admin e Lead Advisor dello Studio.
+   */
+  server.post<{ Params: { id: string } }>('/tenant/utenti/:id/reset-password', async (req, reply) => {
+    const ruoloRichiedente = (req as any).ruolo as string | undefined;
+    const tenantCorrente = (req as any).tenantId as string;
+    const { id } = req.params;
+
+    if (ruoloRichiedente !== 'super_admin' && ruoloRichiedente !== 'advisor') {
+      return reply.code(403).send({ errore: 'Solo il Super Admin o il Lead Advisor possono resettare le password degli utenti.' });
+    }
+
+    try {
+      const utente = await prisma.user.findUnique({ where: { id } });
+      if (!utente) {
+        return reply.code(404).send({ errore: 'Utente non trovato' });
+      }
+
+      // Un advisor può resettare solo utenti del proprio studio
+      if (ruoloRichiedente === 'advisor' && utente.tenantId !== tenantCorrente) {
+        return reply.code(403).send({ errore: 'Non puoi resettare password di utenti appartenenti ad altri studi.' });
+      }
+
+      // Non permettere a un advisor di resettare la password di un super_admin
+      if (ruoloRichiedente !== 'super_admin' && utente.ruolo === 'super_admin') {
+        return reply.code(403).send({ errore: 'Non autorizzato a resettare la password del Super Admin.' });
+      }
+
+      const passwordTemporanea = generaPasswordTemporanea();
+      const passwordHash = hashPassword(passwordTemporanea);
+
+      await prismaAmministrativo().user.update({
+        where: { id: utente.id },
+        data: {
+          passwordHash,
+          stato: 'invitato', // Imposta 'invitato' per obbligare il cambio password al primo accesso
+        },
+      });
+
+      recordAudit({
+        tenantId: utente.tenantId || tenantCorrente,
+        ruolo: ruoloRichiedente,
+        azione: 'PASSWORD_UTENTE_RESETTATA',
+        entita: utente.nome,
+        dettagli: `Password temporanea rigenerata per ${utente.email} da ${ruoloRichiedente}`,
+        ipAddress: req.ip,
+      });
+
+      return reply.send({
+        ok: true,
+        id: utente.id,
+        nome: utente.nome,
+        email: utente.email,
+        passwordTemporanea,
+        messaggio: 'Password temporanea generata con successo. L\'utente dovrà cambiarla al primo accesso.',
+      });
+    } catch (err: any) {
+      return reply.code(500).send({ errore: err.message || 'Errore reset password utente' });
     }
   });
 
@@ -1424,7 +1506,7 @@ export function buildServer(app: AppPort): FastifyInstance {
       const esistente = await prisma.user.findUnique({ where: { email: emailResponsabile } });
 
       if (esistente) {
-        await prisma.user.update({ where: { id: esistente.id }, data: { passwordHash } });
+        await prisma.user.update({ where: { id: esistente.id }, data: { passwordHash, stato: 'invitato' } });
       } else {
         await prisma.user.create({
           data: {
@@ -1434,7 +1516,7 @@ export function buildServer(app: AppPort): FastifyInstance {
             tenantId: tenant.id,
             specializzazione: `Lead Partner — ${tenant.ragioneSociale}`,
             passwordHash,
-            stato: 'attivo',
+            stato: 'invitato',
           },
         });
       }
