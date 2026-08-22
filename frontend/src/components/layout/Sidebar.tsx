@@ -24,9 +24,10 @@ interface SidebarProps {
   alertCount?: number;
   user?: any;
   onLogout?: () => void;
+  onOpenProfile?: () => void;
 }
 
-export function Sidebar({ alertCount = 0, user, onLogout }: SidebarProps) {
+export function Sidebar({ alertCount = 0, user, onLogout, onOpenProfile }: SidebarProps) {
   const currentTenantId = getCurrentTenantId(user);
   const studioInfo = getStudioInfoForTenant(currentTenantId);
 
