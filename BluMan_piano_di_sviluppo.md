@@ -177,10 +177,66 @@ nulla. Il dominio non finisce nel bundle pubblico.
 - [x] **Diagnostica**: `npx tsx src/scripts/probeAvanzamento.ts` — sola lettura, dice quali
   righe un ricalcolo cambierebbe *prima* di eseguirlo. È così che sono emersi i debiti 3 e 4.
 
-Resta fuori una sola cosa, di proposito: `ricalcolaProgettoApi()` esiste in
-`frontend/src/api/client.ts` ma nessun pulsante la chiama. Il ricalcolo è un'operazione di
-manutenzione, non un gesto quotidiano, e va collocata dove un errore si vede — non accanto ai
-comandi che si premono per abitudine.
+Il pulsante che mancava adesso c'è: `ricalcolaProgettoApi()` è collegata all'intestazione del
+Dettaglio Progetto, visibile ad advisor e super_admin, con conferma esplicita perché è una
+scrittura. La scelta di collocarla lì e non fra i comandi quotidiani è del titolare del dato: il
+ricalcolo è manutenzione, e va dove un errore si vede. La rotta `POST /progetti/:id/ricalcola`
+era però una scrittura **senza controllo di ruolo**: qualunque collaboratore autenticato poteva
+riallineare gli stati di un progetto. Ora risponde 403 a chi non è advisor o super_admin, perché
+il filtro nella UI non è la difesa (regola 1) — un gate solo nel browser si aggira con una
+chiamata diretta.
+
+### FASE 1 (ter) — Il frontend non inventa più i dati che il database non ha
+Difetto sistemico, non un refuso: **nove** punti fra due pagine costruivano contenuto verosimile
+al posto del dato mancante, rendendo l'inventato indistinguibile dal reale.
+- [x] **Portale Cliente** (`frontend/src/pages/ClientPortal.tsx`). Sintomo riferito: i moduli non
+  cambiavano al cambio di progetto dal selettore. Il selettore era sano; il difetto era
+  `mapProjectToPortalModules`, che quando il progetto non aveva moduli a database ripiegava su un
+  elenco scelto **per nome cliente** — perciò identico per ogni progetto dello stesso cliente. Ora
+  restituisce `[]` e la pagina dichiara il vuoto. Rimossi anche i due progetti sintetici di
+  ripiego (valore 28.500 €, giurisdizione Malta) che comparivano quando il cliente non aveva
+  progetti, il pannello "Data Esecuzione: Agosto 2026" (il tipo non porta alcuna data) e tre
+  ripieghi `|| 75` su percentuali che il backend calcola.
+- [x] **Dettaglio Progetto** (`frontend/src/pages/ProjectDetail.tsx`), sei punti. Il più grave era
+  un ripiego **a render time** dentro `ModuloBlock`, che avrebbe annullato ogni correzione a monte:
+  le micro-voci inventate erano cliccabili e `consuntivaMicrovoceApi` sarebbe stata chiamata con
+  l'id di una micro-voce inesistente. Sparito il "Modulo Iniziale Incarico Advisory" (id 101, 15h,
+  3.500 €) che si vedeva sul progetto "1234", il quale a database ha **zero** moduli.
+- [x] **Un pulsante che dichiarava di aver salvato senza salvare**: "⚡ Istanzia Subito Moduli &
+  Microvoci Operative" scriveva tre moduli per 23.500 € nel solo `localStorage`, mai a database —
+  violazione della regola 3. Ora rimanda al percorso reale, "+ Aggiungi Modulo da Libreria", che
+  passa da `salvaProgettoDettaglioApi`.
+- [x] **Tabella redditività**: le ore reali erano interpolate dalla percentuale, cioè ore che
+  nessuno aveva consuntivato, e un modulo senza consuntivazione mostrava "🟡 In Target". Ora legge
+  `m.a` (ore consuntivate) e senza dati scrive `—` e "⚪ Nessuna ora consuntivata".
+- [x] **Evidenze di firma cablate** — la parte con conseguenze legali. L'Engagement Letter generava
+  un PDF che attestava marca temporale e indirizzo IP fissi e **una controfirma dello studio che
+  non esiste in nessun registro**: una firma che nessuno aveva apposto. Repertorio, data e impronta
+  SHA-256 ora vengono dal sigillo eIDAS emesso da `/portal/verify-otp-and-sign` (che l'IP reale ce
+  l'ha, dalla richiesta); senza sigillo il PDF esce senza pagina di evidenze e il pannello lo
+  dichiara, invece di mostrarne di finte. Rimossi gli stessi IP cablati dal Vault documenti e dagli
+  allegati di modulo.
+- [x] **Lo stato di firma tracimava fra clienti**: era inizializzato da chiavi `localStorage` col
+  nome di un cliente specifico, quindi in un browser dove quel cliente aveva firmato **ogni** altro
+  cliente si vedeva "firmato & congelato". Ora si risolve solo sul nome del cliente autenticato.
+- [x] **Un `catch` che dichiarava firmato in caso di errore**: `handleSign` registrava "Simulazione
+  firma completata" e proseguiva come se tutto fosse riuscito. Ora dice che la firma è registrata
+  ma i moduli operativi non sono stati istanziati, che è quello che è davvero accaduto.
+- [x] **Conferma di modulo che si spacciava per FEA**: era interamente lato browser, senza chiamata
+  al server, con IP inventato, e annunciava "Sigillo FEA eIDAS UE 910/2014". Ora è etichettata come
+  presa visione locale. Trasformarla in firma vera è una scelta di prodotto: vedi i debiti.
+- [x] **Rimossa una fallback morta in `src/server.ts`**: il login cliente ripiegava su
+  `app.getClienti()`, metodo che `AppPort` non dichiara e che nessuna implementazione definisce —
+  `'getClienti' in app` era sempre falso. Era anche l'unico errore di `npx tsc --noEmit` in radice.
+- [x] **Il form dati societari mostrava a tutti i dati di un cliente reale**: ragione sociale,
+  partita IVA, **codice fiscale e IBAN** di `Holding Beta S.r.l.` erano i valori iniziali dello
+  stato, e nulla li sovrascriveva (`setFormData` era chiamata solo dagli `onChange` dei campi):
+  quindi qualunque cliente apriva la scheda 3 e trovava i dati di un terzo nei propri campi, pronti
+  da salvare come propri. Ora il form si riempie dalla riga del cliente autenticato (`nome`,
+  `piva`, `codiceFiscale`, `iban`, `ubo`) e i campi che il database non ha restano vuoti.
+- [x] **Verifica**: `npx tsc --noEmit` pulito in radice e in `frontend/`, `npx vitest run` 18 file /
+  230 test, `npx vite build` pulito. Nessuna scrittura sui dati di produzione: tutte le correzioni
+  sono di presentazione o di autorizzazione.
 
 ### FASE 1 — Schema Database PostgreSQL & Prisma (`prisma/schema.prisma`)
 - [x] `Tenant`: Dati fiscali studio, sedi legali/operative distinte, logo URL, colore tema PDF, note legali.
@@ -352,7 +408,28 @@ Elencati qui perché non chiuderli è una scelta, non una dimenticanza.
    (17% calcolato) — residuo del periodo in cui nessuno propagava lo stato verso l'alto. Le
    letture mostrano già il valore giusto perché lo calcolano; la riga si riallinea con
    `POST /progetti/:id/ricalcola`. Non è stato eseguito sui dati reali: è una scrittura in
-   produzione e va fatta da chi possiede il dato.
+   produzione e va fatta da chi possiede il dato. Il pulsante ora esiste nell'intestazione del
+   Dettaglio Progetto: premerlo **è** quella scrittura.
+5. **Due clienti e due progetti omonimi**, lasciati per decisione del titolare: `Holding Beta
+   S.r.l.` compare due volte in anagrafica e `Struttura Holding — Famiglia Ricci` due volte fra i
+   progetti. Nessuna scrittura di consolidamento: si distinguono nelle etichette della UI. Chi
+   legge un selettore con due voci identiche non sta guardando un bug del selettore.
+6. **La conferma di conclusione operazione nel portale non è una firma**: vive solo nel
+   `localStorage` del dispositivo del cliente, non passa da `/portal/verify-otp-and-sign`, non
+   produce sigillo FEA e **lo studio non la vede a database**. Le etichette non rivendicano più
+   una firma qualificata, ma restano due strade: farla passare dall'endpoint OTP che emette il
+   sigillo (diventa una firma vera e persistita), oppure togliere il pulsante. È una scelta di
+   prodotto, non di implementazione.
+7. **Le evidenze forensi vanno registrate lato server o non esistono**: gli indirizzi IP cablati
+   sono stati rimossi dal Vault e dagli allegati perché il browser non conosce il proprio IP
+   pubblico e non può attestarlo. Se l'evidenza serve su ogni documento firmato, va scritta al
+   momento della firma dove l'IP della richiesta è noto — come già fa
+   `generateEidasSignatureSeal()` in `src/services/otpService.ts`.
+8. **L'elenco documenti del portale è ancora un seed cablato**: `portalDocs` in
+   `ClientPortal.tsx` nasce con quattro documenti inventati (NDA, statuto, UBO, trust) con
+   dimensioni e date fisse, e l'NDA è marcato `firmato: true` con una data di firma cablata.
+   Non è stato toccato in questo giro perché è la scheda "Documenti", non i moduli: va deciso se
+   collegarlo al Vault reale o dichiararlo vuoto come si è fatto per i moduli.
 
 ### ✅ Chiusi in questa fase
 

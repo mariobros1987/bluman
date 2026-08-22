@@ -41,197 +41,72 @@ export interface ModuloProposta {
   richiedeFirmaFinale?: boolean;
 }
 
-function getModulePassaggi(moduloNome: string, cat: string): ModuloPassaggio[] {
-  if (cat === 'Trust' || moduloNome.toLowerCase().includes('trust')) {
-    return [
-      { id: 'p1', titolo: 'Analisi preliminare asset, disponente e beneficiari', completato: true, operatore: 'Senior Advisor Studio', data: '12/08/2026', note: 'KYC e verifica antiriciclaggio completati con esito positivo.' },
-      { id: 'p2', titolo: 'Redazione Atto Istitutivo del Trust Elvetico e Letter of Wishes', completato: true, operatore: 'Legal & Trust Specialist', data: '15/08/2026', note: 'Bozza approvata e revisionata con il Protector.' },
-      { id: 'p3', titolo: 'Nomina Trustee e Custode con verifica di conformità', completato: true, operatore: 'Compliance Lead', data: '18/08/2026', note: 'Due diligence fiduciaria e mandati convalidati.' },
-      { id: 'p4', titolo: 'Perfezionamento rogito istitutivo e rilascio fascicolo', completato: true, operatore: 'Senior Partner', data: '20/08/2026', note: 'In attesa di firma/validazione finale del cliente.' },
-    ];
-  }
-
-  if (cat === 'Societario' || moduloNome.toLowerCase().includes('societ')) {
-    return [
-      { id: 'p1', titolo: 'Verifica denominazione sociale e due diligence UBO', completato: true, operatore: 'Compliance Lead', data: '11/08/2026', note: 'Name clearance approvato dal Registro Imprese.' },
-      { id: 'p2', titolo: 'Redazione Memorandum & Articles of Association', completato: true, operatore: 'Legal Team', data: '14/08/2026', note: 'Statuto e governance societaria predisposti.' },
-      { id: 'p3', titolo: 'Filing telematico presso il Registro Societario / MFSA', completato: true, operatore: 'Senior Advisor Studio', data: '17/08/2026', note: 'Certificato di incorporazione depositato.' },
-      { id: 'p4', titolo: 'Rilascio certificato di vigenza e statuto vidimato', completato: true, operatore: 'Senior Partner', data: '19/08/2026', note: 'Pronto per la presa d\'atto e firma del cliente.' },
-    ];
-  }
-
-  if (cat === 'Fiscale' || moduloNome.toLowerCase().includes('fisc')) {
-    return [
-      { id: 'p1', titolo: 'Raccolta bilanci e dichiarazioni fiscali pregresse', completato: true, operatore: 'Tax Specialist', data: '10/08/2026', note: 'Audit preliminare chiuso con successo.' },
-      { id: 'p2', titolo: 'Simulazione carico impositivo e trattati contro doppie imposizioni', completato: true, operatore: 'Senior Tax Advisor', data: '14/08/2026', note: 'Parere pro-veritate emesso.' },
-      { id: 'p3', titolo: 'Predisposizione istanza di tax refund o interpello', completato: true, operatore: 'Senior Partner', data: '18/08/2026', note: 'Documentazione pronta per convalida.' },
-    ];
-  }
-
-  return [
-    { id: 'p1', titolo: 'Fase 1: Raccolta documentale e valutazione iniziale', completato: true, operatore: 'Advisor Studio', data: '12/08/2026', note: 'Requisiti preliminari convalidati.' },
-    { id: 'p2', titolo: 'Fase 2: Elaborazione fascicolo ed esecuzione tecnica', completato: true, operatore: 'Specialist Incaricato', data: '16/08/2026', note: 'Lavorazione tecnica completata.' },
-    { id: 'p3', titolo: 'Fase 3: Revisione finale e chiusura adempimento', completato: true, operatore: 'Senior Partner', data: '19/08/2026', note: 'Attività concluse — pronta per convalida.' },
-  ];
-}
-
-function getModuleDeliverables(moduloNome: string, cat: string): ModuloDeliverable[] {
-  if (cat === 'Trust' || moduloNome.toLowerCase().includes('trust')) {
-    return [
-      { titolo: 'Atto Istitutivo Trust Elvetico (Bozza Conclusiva)', nomeFile: 'Atto_Istitutivo_Trust_Elvetico.pdf', data: '20/08/2026' },
-      { titolo: 'Letter of Wishes & Regolamento Fiduciario', nomeFile: 'Letter_of_Wishes_Fiduciaria.pdf', data: '20/08/2026' },
-    ];
-  }
-  if (cat === 'Societario' || moduloNome.toLowerCase().includes('societ')) {
-    return [
-      { titolo: 'Memorandum & Articles of Association Vidimato', nomeFile: 'Statuto_Societario_Vidimato.pdf', data: '19/08/2026' },
-      { titolo: 'Certificato di Vigenza & Good Standing', nomeFile: 'Certificato_Good_Standing.pdf', data: '19/08/2026' },
-    ];
-  }
-  return [
-    { titolo: `Relazione Tecnica Conclusiva — ${moduloNome}`, nomeFile: `Relazione_${moduloNome.replace(/\s+/g, '_')}.pdf`, data: '19/08/2026' },
-  ];
-}
-
+/**
+ * Traduce i moduli REALI del progetto nella forma che il Portale Cliente mostra.
+ *
+ * Non inventa niente. Se il progetto non ha moduli a database restituisce un elenco vuoto e
+ * il portale lo dichiara.
+ *
+ * Fino ad agosto 2026 questa funzione, quando non trovava moduli, restituiva tre schede
+ * cablate scelte in base al NOME del progetto, complete di operatori, date, percentuali e
+ * PDF inesistenti, con `completato: true` su ogni passaggio. Erano indistinguibili dai dati
+ * veri e identiche per ogni progetto dello stesso cliente: è il motivo per cui cambiare
+ * progetto nel selettore non cambiava niente. Sette progetti su dieci non hanno moduli a
+ * database, quindi era il caso normale, non il caso limite — e al cliente quelle schede
+ * risultavano attività già eseguite. Non reintrodurle.
+ *
+ * Stato e percentuale arrivano da `avanzamento`, che il backend calcola col motore §16
+ * (`arricchisciProgetti` su `GET /progetti`): qui non si ricalcola e non si mette un ripiego.
+ */
 function mapProjectToPortalModules(project: any): ModuloProposta[] {
   if (!project) return [];
 
-  // 1. Se il progetto ha moduli reali nel database
-  if (project.moduli && Array.isArray(project.moduli) && project.moduli.length > 0) {
-    return project.moduli.map((m: any, idx: number) => {
-      const cat = (m.categoria as CategoriaModulo) || 'Societario';
-      const isDone = m.stato === 'done' || m.stato === 'completato';
-      
-      let passaggi = getModulePassaggi(m.nome, cat);
-      if (m.microvoci && Array.isArray(m.microvoci) && m.microvoci.length > 0) {
-        passaggi = m.microvoci.map((mv: any, mvIdx: number) => ({
-          id: mv.id || `mv-${mvIdx}`,
-          titolo: mv.nome,
-          completato: mv.stato === 'done' || mv.stato === 'completed' || isDone,
-          note: mv.causaNota || `Esecuzione passaggio specialistico per ${m.nome}`,
-          data: 'Agosto 2026',
-          operatore: mv.risorsa?.nome || (idx % 2 === 0 ? 'Dott. Mario Rossi' : 'Avv. Legal Specialist'),
-        }));
-      }
+  const moduli = Array.isArray(project.moduli) ? project.moduli : [];
+  if (moduli.length === 0) return [];
 
-      return {
-        id: m.id,
-        nome: m.nome,
-        cat,
-        prezzo: m.prezzo ? (m.prezzo > 1000 ? m.prezzo / 100 : m.prezzo) : 3500,
-        ore: m.orePreventivate || m.ore || 15,
-        righeCount: passaggi.length,
-        descrizione: m.descrizione || `Modulo operativo specialistico per ${m.nome}`,
-        stato: isDone ? 'completato' : 'in_corso',
-        operatore: (m.microvoci && m.microvoci[0]?.risorsa?.nome) || (idx % 2 === 0 ? 'Dott. Mario Rossi (Senior Partner)' : 'Avv. Legal & Trust Specialist'),
-        percentuale: isDone ? 100 : (m.avanzamentoPercentuale || 75),
-        passaggi,
-        deliverables: getModuleDeliverables(m.nome, cat),
-        richiedeFirmaFinale: true,
-      };
-    });
-  }
+  // Avanzamento calcolato dal backend, indicizzato per id modulo (regola 6: il dominio non
+  // si duplica nel browser).
+  const avanzamentoModuli = new Map<string, any>(
+    (project.avanzamento?.moduli || []).map((m: any) => [String(m.id), m]),
+  );
 
-  // 2. Se è un progetto specifico per tipo/nome (Trust, Fiduciaria, Holding, IP, Banking, ecc.)
-  const lowerName = (project.nome || '').toLowerCase();
-  if (lowerName.includes('trust') || lowerName.includes('fiduciari') || lowerName.includes('svizzera')) {
-    return [
-      {
-        id: `mod-trust-01-${project.id}`,
-        nome: 'Struttura Trust Elvetico',
-        cat: 'Trust',
-        prezzo: 4500,
-        ore: 20,
-        righeCount: 4,
-        descrizione: 'Costituzione e regolamento fiduciario Trust Svizzera',
-        stato: 'completato',
-        operatore: 'Avv. Legal & Trust Specialist',
-        percentuale: 100,
-        passaggi: getModulePassaggi('Struttura Trust Elvetico', 'Trust'),
-        deliverables: getModuleDeliverables('Struttura Trust Elvetico', 'Trust'),
-        richiedeFirmaFinale: true,
-      },
-      {
-        id: `mod-trust-02-${project.id}`,
-        nome: 'Letter of Wishes & Governance Fiduciaria',
-        cat: 'Trust',
-        prezzo: 2800,
-        ore: 12,
-        righeCount: 3,
-        descrizione: 'Redazione linee guida riservate per il Trustee',
-        stato: 'completato',
-        operatore: 'Avv. Legal & Trust Specialist',
-        percentuale: 100,
-        passaggi: getModulePassaggi('Letter of Wishes & Governance Fiduciaria', 'Trust'),
-        deliverables: getModuleDeliverables('Letter of Wishes & Governance Fiduciaria', 'Trust'),
-        richiedeFirmaFinale: true,
-      },
-      {
-        id: `mod-trust-03-${project.id}`,
-        nome: 'Apertura Conto Fiduciario Svizzera (Banking)',
-        cat: 'Banking',
-        prezzo: 3900,
-        ore: 16,
-        righeCount: 4,
-        descrizione: 'Account opening e compliance bancaria Zurigo/Ginevra',
-        stato: 'in_corso',
-        operatore: 'Dott. Mario Rossi (Senior Partner)',
-        percentuale: 60,
-        passaggi: getModulePassaggi('Apertura conti correnti', 'Banking'),
-        deliverables: getModuleDeliverables('Apertura conti correnti', 'Banking'),
-        richiedeFirmaFinale: true,
-      }
-    ];
-  }
+  return moduli.map((m: any): ModuloProposta => {
+    const cat = (m.categoria as CategoriaModulo) || 'Societario';
+    const av = avanzamentoModuli.get(String(m.id));
+    const statoModulo = av?.stato ?? m.stato;
+    const isDone = statoModulo === 'done' || statoModulo === 'completed' || statoModulo === 'completato';
 
-  // 3. Moduli standard Holding / Corporate / Fiscale
-  return [
-    {
-      id: `mod-corp-01-${project.id}`,
-      nome: 'Analisi patrimoniale iniziale',
-      cat: 'Analisi',
-      prezzo: 3500,
-      ore: 12,
-      righeCount: 4,
-      descrizione: 'Valutazione della consistenza e asset protection',
-      stato: 'completato',
-      operatore: 'Dott. Mario Rossi (Senior Partner)',
-      percentuale: 100,
-      passaggi: getModulePassaggi('Analisi patrimoniale iniziale', 'Analisi'),
-      deliverables: getModuleDeliverables('Analisi patrimoniale iniziale', 'Analisi'),
+    // Solo micro-voci reali: un passaggio senza riga a database non è un passaggio svolto.
+    const microvoci = Array.isArray(m.microvoci) ? m.microvoci : [];
+    const passaggi: ModuloPassaggio[] = microvoci.map((mv: any, mvIdx: number) => ({
+      id: mv.id || `mv-${mvIdx}`,
+      titolo: mv.nome,
+      completato: mv.stato === 'done' || mv.stato === 'completed',
+      note: mv.causaNota || undefined,
+      operatore: mv.risorsa?.nome || undefined,
+    }));
+
+    return {
+      id: m.id,
+      nome: m.nome,
+      cat,
+      // L'euristica centesimi/euro è preesistente e resta com'era. Prezzo assente vale 0,
+      // non un importo di listino inventato.
+      prezzo: typeof m.prezzo === 'number' && m.prezzo > 0 ? (m.prezzo > 1000 ? m.prezzo / 100 : m.prezzo) : 0,
+      ore: m.orePreventivate ?? 0,
+      righeCount: passaggi.length,
+      descrizione: m.descrizione || undefined,
+      stato: isDone ? 'completato' : 'in_corso',
+      // Nessun operatore di ripiego: senza risorsa assegnata a database il portale non nomina
+      // nessuno. Prima alternava due nomi propri in base all'indice del modulo.
+      operatore: microvoci.find((mv: any) => mv.risorsa?.nome)?.risorsa?.nome || undefined,
+      percentuale: av?.percentuale ?? 0,
+      passaggi,
+      // I documenti veri vivono nel Vault: qui non si annunciano PDF inesistenti.
+      deliverables: [],
       richiedeFirmaFinale: true,
-    },
-    {
-      id: `mod-corp-02-${project.id}`,
-      nome: 'Corporate structuring Malta Holding LTD',
-      cat: 'Societario',
-      prezzo: 11500,
-      ore: 40,
-      righeCount: 4,
-      descrizione: 'Incorporazione LTD Holding e governance',
-      stato: 'in_corso',
-      operatore: 'Dott. Mario Rossi (Senior Partner)',
-      percentuale: 75,
-      passaggi: getModulePassaggi('Corporate structuring Malta', 'Societario'),
-      deliverables: getModuleDeliverables('Corporate structuring Malta', 'Societario'),
-      richiedeFirmaFinale: true,
-    },
-    {
-      id: `mod-corp-03-${project.id}`,
-      nome: 'Compliance Antiriciclaggio & Registro UBO',
-      cat: 'Compliance',
-      prezzo: 2200,
-      ore: 10,
-      righeCount: 3,
-      descrizione: 'Dichiarazione Titolare Effettivo e adempimenti antiriciclaggio',
-      stato: 'in_corso',
-      operatore: 'Compliance Officer BluMan',
-      percentuale: 50,
-      passaggi: getModulePassaggi('Compliance Antiriciclaggio', 'Compliance'),
-      deliverables: getModuleDeliverables('Compliance Antiriciclaggio', 'Compliance'),
-      richiedeFirmaFinale: true,
-    }
-  ];
+    };
+  });
 }
 
 type PortalTab = 'proposta' | 'avanzamento' | 'form' | 'documenti' | 'contatti';
@@ -258,10 +133,10 @@ export function ClientPortal() {
   const [moduliProposti, setModuliProposti] = useState<ModuloProposta[]>([]);
   const [selectedModule, setSelectedModule] = useState<ModuloProposta | null>(null);
   const [moduleSignatures, setModuleSignatures] = useState<Record<string, { firmato: boolean; dataFirma: string; signerName: string }>>({});
-  const [signed, setSigned] = useState<boolean>(() => {
-    return localStorage.getItem('bluman_portal_signed_Marco Ricci / Holding Beta S.r.l.') === 'true' ||
-           localStorage.getItem('bluman_portal_signed_Holding Beta S.r.l.') === 'true';
-  });
+  // Lo stato di firma NON si inizializza da una chiave cablata: la chiave conteneva il nome di un
+  // cliente specifico, quindi un browser in cui quel cliente aveva firmato mostrava "firmato" a
+  // qualunque altro cliente. Si risolve in `loadPortalData` sul nome del cliente autenticato.
+  const [signed, setSigned] = useState<boolean>(false);
   const [addendums, setAddendums] = useState<any[]>(() => {
     const saved = localStorage.getItem(`bluman_addendums_Marco Ricci / Holding Beta S.r.l.`);
     return saved ? JSON.parse(saved) : [];
@@ -337,19 +212,21 @@ export function ClientPortal() {
   const [otpTarget, setOtpTarget] = useState('+39 333 *** 6278');
   const [otpLoading, setOtpLoading] = useState(false);
   const [otpError, setOtpError] = useState<string | null>(null);
-  const [eidasSeal, setEidasSeal] = useState<any>(() => {
-    const saved = localStorage.getItem(`bluman_seal_Marco Ricci / Holding Beta S.r.l.`) || localStorage.getItem(`bluman_seal_Holding Beta S.r.l.`);
-    return saved ? JSON.parse(saved) : null;
-  });
+  // Stesso motivo del flag `signed`: il sigillo eIDAS è di un cliente preciso e non va letto da
+  // una chiave cablata. Viene caricato in `loadPortalData` per il cliente autenticato.
+  const [eidasSeal, setEidasSeal] = useState<any>(null);
 
-  // Form Cliente State
+  // Form Cliente State — vuoto per definizione. Qui c'erano ragione sociale, partita IVA, codice
+  // fiscale, IBAN e legale rappresentante di un cliente reale come valori iniziali: siccome nulla
+  // li sovrascriveva, QUALUNQUE cliente apriva la scheda 3 e trovava i dati di un terzo nei propri
+  // campi. Vengono riempiti in `loadPortalData` con la riga del cliente autenticato, se c'è.
   const [formData, setFormData] = useState({
-    ragioneSociale: 'Holding Beta S.r.l.',
-    piva: 'IT09876543210',
-    legaleRappresentante: 'Marco Ricci',
-    codiceFiscale: 'RCCMRC80A01H501Z',
-    iban: 'IT60X0542811101000000123456',
-    titolareEffettivo: 'Marco Ricci (100% Quote)',
+    ragioneSociale: '',
+    piva: '',
+    legaleRappresentante: '',
+    codiceFiscale: '',
+    iban: '',
+    titolareEffettivo: '',
   });
   const [formSaved, setFormSaved] = useState(false);
 
@@ -425,27 +302,31 @@ export function ClientPortal() {
         const found = clienteIdSessione
           ? clientiRes.find(c => c.id === clienteIdSessione)
           : undefined;
-        if (found) {
-          setClientObj(found);
-          setClientName(found.nome);
-          resolvedClientName = found.nome;
-        } else {
-          setClientObj(clientiRes[0]);
-          setClientName(clientiRes[0].nome);
-          resolvedClientName = clientiRes[0].nome;
-        }
+        const risolto: any = found || clientiRes[0];
+        setClientObj(risolto);
+        setClientName(risolto.nome);
+        resolvedClientName = risolto.nome;
+        // Il form societario si riempie con la riga del cliente, non con valori d'esempio: i campi
+        // che il database non ha restano vuoti perché è il cliente a doverli compilare.
+        const referenti: any = risolto.referentiJson || {};
+        setFormData({
+          ragioneSociale: risolto.nome || '',
+          piva: risolto.piva || '',
+          legaleRappresentante: referenti.legaleRappresentante || '',
+          codiceFiscale: risolto.codiceFiscale || '',
+          iban: risolto.iban || '',
+          titolareEffettivo: risolto.ubo || '',
+        });
       }
 
-      // Ripristina lo stato di firma persistito in memoria
-      const isSignedLocal = localStorage.getItem(`bluman_portal_signed_${resolvedClientName}`) === 'true' ||
-                            localStorage.getItem(`bluman_portal_signed_Marco Ricci / Holding Beta S.r.l.`) === 'true';
-      if (isSignedLocal) {
-        setSigned(true);
-        const savedSeal = localStorage.getItem(`bluman_seal_${resolvedClientName}`) ||
-                          localStorage.getItem(`bluman_seal_Marco Ricci / Holding Beta S.r.l.`);
-        if (savedSeal) {
-          try { setEidasSeal(JSON.parse(savedSeal)); } catch (e) {}
-        }
+      // Ripristina lo stato di firma persistito in memoria, SOLO per il cliente autenticato.
+      const isSignedLocal = localStorage.getItem(`bluman_portal_signed_${resolvedClientName}`) === 'true';
+      setSigned(isSignedLocal);
+      const savedSeal = isSignedLocal ? localStorage.getItem(`bluman_seal_${resolvedClientName}`) : null;
+      if (savedSeal) {
+        try { setEidasSeal(JSON.parse(savedSeal)); } catch (e) { setEidasSeal(null); }
+      } else {
+        setEidasSeal(null);
       }
 
       // Ripristina i documenti firmati singolarmente
@@ -457,7 +338,7 @@ export function ClientPortal() {
             if (signedIds.includes(d.id)) {
               const sigStr = localStorage.getItem(`bluman_portal_doc_sig_${d.id}`);
               const sigData = sigStr ? JSON.parse(sigStr) : null;
-              return { ...d, firmato: true, signatureData: sigData, dataFirma: sigData?.timestamp || d.dataFirma || '15/08/2026' };
+              return { ...d, firmato: true, signatureData: sigData, dataFirma: sigData?.timestamp || d.dataFirma || null };
             }
             return d;
           }));
@@ -477,48 +358,40 @@ export function ClientPortal() {
           const matched = progettiRes.filter((p: any) => {
             const byId = clienteIdSessione && (p.clienteId === clienteIdSessione || p.cliente?.id === clienteIdSessione);
             const byName = resolvedClientName && p.cliente?.nome && p.cliente.nome.trim().toLowerCase() === resolvedClientName.trim().toLowerCase();
-            const byEmail = clientObj?.email && p.cliente?.email && p.cliente.email.trim().toLowerCase() === clientObj.email.trim().toLowerCase();
-            return byId || byName || byEmail;
+            // Nessun confronto per email: il modello `Cliente` non ha una colonna email (le
+            // referenze stanno in `referentiJson`), quindi `p.cliente.email` è sempre
+            // undefined e il ramo non poteva mai essere vero.
+            return byId || byName;
           });
 
-          const finalProjects = matched.length > 0 ? matched : [
-            {
-              id: `proj-client-${clienteIdSessione || 'default'}`,
-              nome: `Progetto Consulenza & Structuring per ${resolvedClientName}`,
-              giurisdizione: clientObj?.giurisdizione || 'Malta',
-              valoreTotale: 28500,
-              stato: 'in_progress',
-              clienteId: clienteIdSessione,
-              cliente: { nome: resolvedClientName, email: clientObj?.email },
+          // Nessun progetto di ripiego. Se il cliente non ha progetti a database l'elenco resta
+          // vuoto e il portale lo dichiara. Prima entrambi i rami fabbricavano un "Progetto
+          // Consulenza & Structuring per <nome>" da 28.500 € in Malta, stato in_progress: un
+          // incarico inesistente con un prezzo inventato, mostrato AL CLIENTE come se fosse il
+          // suo. Da lì il mapper ci attaccava anche i moduli, perché quel finto progetto non ha
+          // moduli a database.
+          setClientProjects(matched);
+          if (matched.length > 0) {
+            const activeProj = matched[0];
+            const pId = String(activeProj.id);
+            setSelectedProjectId(pId);
+            setProgettoId(pId);
+            setModuliProposti(mapProjectToPortalModules(activeProj));
+            const msgs = await fetchComunicazioniApi(pId);
+            if (msgs && Array.isArray(msgs)) {
+              setMessaggi(msgs);
             }
-          ];
-
-          setClientProjects(finalProjects);
-          const activeProj = finalProjects[0];
-          const pId = String(activeProj.id);
-          setSelectedProjectId(pId);
-          setProgettoId(pId);
-          setModuliProposti(mapProjectToPortalModules(activeProj));
-          const msgs = await fetchComunicazioniApi(pId);
-          if (msgs && Array.isArray(msgs)) {
-            setMessaggi(msgs);
+          } else {
+            setSelectedProjectId('');
+            setProgettoId('');
+            setModuliProposti([]);
           }
         } else {
-          const fallback = [
-            {
-              id: `proj-client-${clienteIdSessione || 'default'}`,
-              nome: `Progetto Consulenza & Structuring per ${resolvedClientName}`,
-              giurisdizione: clientObj?.giurisdizione || 'Malta',
-              valoreTotale: 28500,
-              stato: 'in_progress',
-              clienteId: clienteIdSessione,
-              cliente: { nome: resolvedClientName, email: clientObj?.email },
-            }
-          ];
-          setClientProjects(fallback);
-          setSelectedProjectId(fallback[0].id);
-          setProgettoId(fallback[0].id);
-          setModuliProposti(mapProjectToPortalModules(fallback[0]));
+          // L'API non ha restituito progetti: niente da mostrare e niente da inventare.
+          setClientProjects([]);
+          setSelectedProjectId('');
+          setProgettoId('');
+          setModuliProposti([]);
         }
       } catch (err) {
         console.warn('Errore recupero progetti portale:', err);
@@ -597,16 +470,29 @@ export function ClientPortal() {
     const projs = availableProjects || clientProjects;
     setSelectedProjectId(pId);
     setProgettoId(pId);
+    // Il modulo aperto appartiene al progetto che si sta lasciando: senza chiuderlo, il suo
+    // dettaglio resta a schermo sopra l'elenco del progetto nuovo.
+    setSelectedModule(null);
     const foundProj = projs.find((p: any) => String(p.id) === String(pId));
-    if (foundProj) {
-      setModuliProposti(mapProjectToPortalModules(foundProj));
-    }
+    // Si assegna anche quando il progetto non si trova: l'elenco vuoto è il dato corretto.
+    // Con `if (foundProj)` un progetto non trovato lasciava a schermo i moduli del precedente.
+    setModuliProposti(foundProj ? mapProjectToPortalModules(foundProj) : []);
     fetchComunicazioniApi(pId).then(msgs => {
       if (msgs && Array.isArray(msgs)) setMessaggi(msgs);
     }).catch(() => {});
   };
 
   const totalValue = moduliProposti.reduce((acc, m) => acc + m.prezzo, 0);
+
+  /** Progetto attualmente scelto nel selettore, con l'avanzamento che il backend ha calcolato. */
+  const progettoAttivo = clientProjects.find((p: any) => String(p.id) === String(selectedProjectId)) || clientProjects[0] || null;
+  /**
+   * Percentuale reale del progetto (§16). Prima la barra di avanzamento era
+   * `Math.max(75, firmati/totali)` con etichetta "75% in Lavorazione Avanzata": non poteva
+   * scendere sotto il 75% qualunque fosse lo stato dei lavori, e quel numero veniva mostrato
+   * al cliente come avanzamento del suo incarico.
+   */
+  const percentualeProgetto: number = progettoAttivo?.avanzamento?.percentuale ?? 0;
 
   const handleSign = async () => {
     setLoading(true);
@@ -703,12 +589,26 @@ export function ClientPortal() {
         progettoId: projectId,
         clienteNome: clientName,
         descrizione: `Contratto di incarico professionale stipulato dal cliente ${clientName} con verifica OTP e Sigillo FEA eIDAS UE 910/2014.`,
-        signatureData: {
-          signerName: clientName,
-          signerRole: 'Cliente Incarico (Legale Rappresentante)',
-          timestamp: new Date().toLocaleString('it-IT'),
-          ipAddress: '83.211.12.94 (eIDAS Verificato)',
-        },
+        signatureData: (() => {
+          // Il sigillo è già stato scritto in localStorage dal flusso OTP prima di questa chiamata:
+          // lo stato React `eidasSeal` non è ancora aggiornato nello stesso tick, quindi si legge da
+          // lì. L'IP era cablato ('83.211.12.94'): attribuiva al cliente una provenienza inventata.
+          try {
+            const sigilloStr = localStorage.getItem(`bluman_seal_${clientName}`);
+            const sigillo = sigilloStr ? JSON.parse(sigilloStr) : null;
+            if (sigillo?.timestampIso) {
+              return {
+                signerName: sigillo.signerName || clientName,
+                signerRole: 'Cliente Incarico (Legale Rappresentante)',
+                timestamp: new Date(sigillo.timestampIso).toLocaleString('it-IT'),
+                ipAddress: sigillo.ipAddress || 'non registrato',
+                signatureId: sigillo.signatureId,
+                sha256Digest: sigillo.sha256Digest,
+              };
+            }
+          } catch {}
+          return null;
+        })(),
       };
 
       const updatedVault = [engagementDoc, ...existingVault.filter((d: any) => d.id !== engagementDoc.id)];
@@ -721,8 +621,15 @@ export function ClientPortal() {
 
       setSigned(true);
     } catch (err) {
-      console.warn('Simulazione firma completata', err);
-      setSigned(true);
+      // La firma è già stata validata dal server PRIMA di questa funzione (unico punto di chiamata:
+      // il flusso OTP), quindi qui può fallire solo la preparazione locale dei moduli. Prima questo
+      // ramo scriveva "Simulazione firma completata" e dichiarava firmato comunque: inghiottiva
+      // l'errore e affermava più di quello che era riuscito.
+      console.error('Istanziazione moduli operativi post-firma non completata:', err);
+      alert(
+        'La firma è stata registrata, ma la preparazione dei moduli operativi non è andata a buon fine. ' +
+        'Lo studio deve completarla manualmente: nessun modulo è stato istanziato.',
+      );
     } finally {
       setLoading(false);
     }
@@ -1051,11 +958,25 @@ export function ClientPortal() {
                     maxWidth: 240,
                   }}
                 >
-                  {clientProjects.map((p: any) => (
-                    <option key={p.id} value={p.id} style={{ background: '#161822', color: '#fff' }}>
-                      {p.nome} {p.giurisdizione ? `(${p.giurisdizione})` : ''}
-                    </option>
-                  ))}
+                  {clientProjects.map((p: any) => {
+                    // Due progetti dello stesso cliente possono avere il nome identico (a
+                    // database ce ne sono: "Struttura Holding — Famiglia Ricci" ×2, uno con
+                    // moduli e uno vuoto). Col solo nome le due voci sono indistinguibili e
+                    // non si capisce quale si è scelto: l'etichetta porta anche il conteggio
+                    // dei moduli e l'avanzamento calcolato.
+                    const nModuli = Array.isArray(p.moduli) ? p.moduli.length : 0;
+                    const pct = p.avanzamento?.percentuale;
+                    const dettaglio = [
+                      p.giurisdizione ? `(${p.giurisdizione})` : null,
+                      `${nModuli} ${nModuli === 1 ? 'modulo' : 'moduli'}`,
+                      typeof pct === 'number' ? `${pct}%` : null,
+                    ].filter(Boolean).join(' · ');
+                    return (
+                      <option key={p.id} value={p.id} style={{ background: '#161822', color: '#fff' }}>
+                        {p.nome} — {dettaglio}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
             </div>
@@ -1153,12 +1074,25 @@ export function ClientPortal() {
                         <span style={{ background: '#34d399', color: '#064e3b', fontSize: 10, fontWeight: 800, padding: '3px 8px', borderRadius: 12, textTransform: 'uppercase' }}>
                           🔒 FIRMATO & CONGELATO (v1.0)
                         </span>
-                        <span style={{ fontSize: 11, color: '#34d399', fontFamily: 'monospace' }}>EL-2026-089-STIPULA</span>
+                        {/* Repertorio e marca temporale vengono dal sigillo eIDAS emesso dal server
+                            (/portal/verify-otp-and-sign). Prima erano cablati: mostravano data, ora e
+                            IP di una firma che non era quella del cliente collegato. */}
+                        {eidasSeal?.signatureId && (
+                          <span style={{ fontSize: 11, color: '#34d399', fontFamily: 'monospace' }}>{eidasSeal.signatureId}</span>
+                        )}
                       </div>
                       <h3 style={{ fontSize: 17, fontWeight: 700, color: '#fff', margin: 0 }}>Engagement Letter & Proposta d'Ordine Iniziale (v1.0)</h3>
-                      <div style={{ fontSize: 11, color: '#a7f3d0', marginTop: 4 }}>
-                        Stipulato il: <strong>15/08/2026 ore 01:44:12</strong> · Marca Temporale SHA-256 eIDAS Validata
-                      </div>
+                      {eidasSeal?.timestampIso ? (
+                        <div style={{ fontSize: 11, color: '#a7f3d0', marginTop: 4 }}>
+                          Stipulato il: <strong>{new Date(eidasSeal.timestampIso).toLocaleString('it-IT')}</strong>
+                          {eidasSeal.sha256Digest && <> · Impronta SHA-256: <span style={{ fontFamily: 'monospace' }}>{String(eidasSeal.sha256Digest).slice(0, 16)}…</span></>}
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: 11, color: '#fbbf24', marginTop: 4 }}>
+                          Firma registrata su questo dispositivo, ma il sigillo eIDAS non è disponibile:
+                          non possiamo mostrarne marca temporale né impronta. Richiedi allo studio la copia con evidenza di firma.
+                        </div>
+                      )}
                     </div>
                     <div style={{ display: 'flex', gap: 10 }}>
                       <button
@@ -1184,20 +1118,20 @@ export function ClientPortal() {
                             </div>
                             <p style="margin-top:20px;line-height:1.6;">Si attesta la stipula ed il congelamento immutabile dell'Engagement Letter professionale per l'avvio delle attività di consulenza patrimoniale.</p>
                           `;
-                          await downloadRealPdf(`Engagement_Letter_v1.0_${clientName.replace(/\s+/g, '_')}`, htmlContent, [
-                            {
-                              signerName: clientName,
-                              signerRole: 'Cliente Incarico (Legale Rappresentante)',
-                              timestamp: '15/08/2026 01:44:12',
-                              ipAddress: '2.234.190.44',
-                            },
-                            {
-                              signerName: studio.leadAdvisor || 'Advisor Studio',
-                              signerRole: `Senior Advisor (${studio.ragioneSociale})`,
-                              timestamp: '15/08/2026 01:44:12',
-                              ipAddress: '83.211.12.94',
-                            }
-                          ]);
+                          // Le evidenze di firma vengono SOLO dal sigillo eIDAS emesso dal server.
+                          // Prima erano due firmatari cablati con data e indirizzi IP inventati, e la
+                          // controfirma dello studio non esiste in nessun registro: il PDF attestava
+                          // una firma che nessuno aveva apposto. Senza sigillo il PDF esce senza
+                          // pagina di evidenze, non con evidenze finte.
+                          const evidenzeFirma = eidasSeal?.timestampIso
+                            ? [{
+                                signerName: eidasSeal.signerName || clientName,
+                                signerRole: 'Cliente Incarico (Legale Rappresentante)',
+                                timestamp: new Date(eidasSeal.timestampIso).toLocaleString('it-IT'),
+                                ipAddress: eidasSeal.ipAddress || 'non registrato',
+                              }]
+                            : [];
+                          await downloadRealPdf(`Engagement_Letter_v1.0_${clientName.replace(/\s+/g, '_')}`, htmlContent, evidenzeFirma);
                         }}
                         style={{ background: '#166534', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
                       >
@@ -1210,7 +1144,12 @@ export function ClientPortal() {
                     Moduli Inclusi nel Contratto Base (Stipula Iniziale):
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
-                    {moduliProposti.map((m, idx) => (
+                    {moduliProposti.length === 0 ? (
+                      <div style={{ fontSize: 11.5, color: 'var(--muted)', background: 'rgba(0,0,0,0.2)', padding: '10px 12px', borderRadius: 6 }}>
+                        Nessun modulo è ancora stato istanziato su questo progetto: l'elenco delle
+                        prestazioni comparirà qui appena lo Studio lo predispone.
+                      </div>
+                    ) : moduliProposti.map((m, idx) => (
                       <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, background: 'rgba(0,0,0,0.2)', padding: '6px 12px', borderRadius: 6 }}>
                         <span>✓ {m.nome} ({m.cat})</span>
                         <span style={{ fontWeight: 700 }}>{fmt(m.prezzo)}</span>
@@ -1294,7 +1233,7 @@ export function ClientPortal() {
                             </button>
                           ) : (
                             <div style={{ fontSize: 10, color: '#34d399', fontWeight: 600 }}>
-                              ✓ Firmato e Congelato il {add.signedAt || add.date} (IP: 2.234.190.44)
+                              ✓ Firmato e Congelato il {add.signedAt || add.date}
                             </div>
                           )}
                         </div>
@@ -1343,8 +1282,19 @@ export function ClientPortal() {
                 </div>
 
                 <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 12, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.5px' }}>
-                  Moduli di Consulenza Incorporati ({moduliProposti.length}) — Clicca su ciascun modulo per esaminare l'attività svolta dall'operatore
+                  {moduliProposti.length === 0
+                    ? 'Moduli di Consulenza — nessuno ancora istanziato su questo progetto'
+                    : `Moduli di Consulenza Incorporati (${moduliProposti.length}) — Clicca su ciascun modulo per esaminare l'attività svolta dall'operatore`}
                 </div>
+
+                {moduliProposti.length === 0 && (
+                  <div style={{ background: 'var(--card2)', border: '1px dashed var(--border)', borderRadius: 12, padding: 18, fontSize: 12, color: 'var(--muted)', marginBottom: 24, lineHeight: 1.6 }}>
+                    Questo progetto non ha ancora moduli operativi a database. Non compaiono
+                    prestazioni, operatori né percentuali di avanzamento perché non ce ne sono:
+                    appena lo Studio istanzia i moduli dell'incarico li trovi qui, ciascuno con
+                    il proprio stato reale.
+                  </div>
+                )}
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 24 }}>
                   {moduliProposti.map((m, idx) => {
@@ -1383,7 +1333,7 @@ export function ClientPortal() {
                               </span>
                             ) : (
                               <span style={{ background: '#200f40', color: '#a78bfa', fontSize: 10.5, fontWeight: 700, padding: '3px 8px', borderRadius: 12 }}>
-                                ⏱ IN LAVORAZIONE ({m.percentuale || 75}%)
+                                ⏱ IN LAVORAZIONE ({m.percentuale ?? 0}%)
                               </span>
                             )}
                             <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--indigo-l)' }}>{fmt(m.prezzo)}</div>
@@ -1603,20 +1553,20 @@ export function ClientPortal() {
               Monitora le prestazioni specialistiche e i passaggi eseguiti dall'advisor per ciascun modulo. Clicca su un modulo per visualizzare i dettagli o firmare la conclusione dell'operazione.
             </div>
 
-            {/* Progress Bar */}
+            {/* Progress Bar — percentuale calcolata dal backend (§16), non una soglia minima */}
             <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 16, marginBottom: 20 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 600, marginBottom: 8 }}>
                 <span>Progresso Generale Fascicoli & Incarico</span>
                 <span style={{ color: 'var(--indigo-l)', fontWeight: 800 }}>
-                  {Math.round((Object.keys(moduleSignatures).length / (moduliProposti.length || 1)) * 100) > 65
-                    ? `${Math.round((Object.keys(moduleSignatures).length / (moduliProposti.length || 1)) * 100)}% Concluso`
-                    : '75% in Lavorazione Avanzata'}
+                  {moduliProposti.length === 0
+                    ? 'Non ancora avviato'
+                    : `${percentualeProgetto}%${percentualeProgetto >= 100 ? ' Concluso' : ' in lavorazione'}`}
                 </span>
               </div>
               <div style={{ width: '100%', height: 10, background: 'var(--border)', borderRadius: 10, overflow: 'hidden' }}>
                 <div
                   style={{
-                    width: `${Math.max(75, Math.round((Object.keys(moduleSignatures).length / (moduliProposti.length || 1)) * 100))}%`,
+                    width: `${percentualeProgetto}%`,
                     height: '100%',
                     background: 'linear-gradient(90deg, var(--indigo), #34d399)',
                     borderRadius: 10,
@@ -1631,11 +1581,21 @@ export function ClientPortal() {
               Fascicoli Operativi in Corso & Conclusi ({moduliProposti.length})
             </div>
 
+            {moduliProposti.length === 0 && (
+              <div style={{ background: 'var(--card2)', border: '1px dashed var(--border)', borderRadius: 12, padding: 18, fontSize: 12, color: 'var(--muted)', lineHeight: 1.6 }}>
+                Non ci sono ancora fascicoli operativi aperti su questo progetto. Quando lo Studio
+                avvia le lavorazioni trovi qui i moduli, con le micro-fasi effettivamente eseguite
+                e l'operatore che le ha svolte.
+              </div>
+            )}
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               {moduliProposti.map((m, idx) => {
                 const isSigned = moduleSignatures[m.id]?.firmato;
                 const isDone = isSigned || m.stato === 'completato';
-                const passaggi = m.passaggi || getModulePassaggi(m.nome, m.cat);
+                // Solo passaggi reali: quando il modulo non ha micro-voci a database l'elenco
+                // resta vuoto invece di essere rimpiazzato da fasi cablate già spuntate.
+                const passaggi = m.passaggi || [];
                 const passaggiCompletati = isSigned ? passaggi.length : passaggi.filter(p => p.completato).length;
 
                 return (
@@ -1679,7 +1639,10 @@ export function ClientPortal() {
                             <span style={{ fontSize: 14, fontWeight: 700 }}>{m.nome}</span>
                           </div>
                           <div style={{ fontSize: 11, color: 'var(--muted)' }}>
-                            Operatore: <strong style={{ color: 'var(--text)' }}>{m.operatore || 'Senior Advisor'}</strong> · Stima: {m.ore}h
+                            {m.operatore
+                              ? <>Operatore: <strong style={{ color: 'var(--text)' }}>{m.operatore}</strong> · </>
+                              : <>Operatore non ancora assegnato · </>}
+                            Stima: {m.ore}h
                           </div>
                         </div>
                       </div>
@@ -1695,7 +1658,7 @@ export function ClientPortal() {
                           </span>
                         ) : (
                           <span style={{ background: '#200f40', color: '#a78bfa', fontSize: 10.5, fontWeight: 700, padding: '4px 10px', borderRadius: 12 }}>
-                            ⏱ IN LAVORAZIONE ({m.percentuale || 75}%)
+                            ⏱ IN LAVORAZIONE ({m.percentuale ?? 0}%)
                           </span>
                         )}
                         <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--indigo-l)' }}>{fmt(m.prezzo)}</div>
@@ -1845,14 +1808,10 @@ export function ClientPortal() {
                           type="button"
                           onClick={async () => {
                             const docHtml = getResolvedDocumentHtml(doc);
-                            const sigs = doc.signatureData ? [doc.signatureData] : [
-                              {
-                                signerName: clientName,
-                                signerRole: 'Cliente Incarico (Legale Rappresentante)',
-                                timestamp: doc.dataFirma || new Date().toLocaleString('it-IT'),
-                                ipAddress: '83.211.12.94 (eIDAS Verificato)',
-                              }
-                            ];
+                            // Nessuna evidenza di firma inventata: se il documento non ha un record
+                            // reale, il PDF esce senza pagina di evidenze. L'indirizzo IP di ripiego
+                            // era cablato e attribuiva al cliente una provenienza mai registrata.
+                            const sigs = doc.signatureData ? [doc.signatureData] : [];
                             await downloadRealPdf(doc.nome, docHtml, sigs);
                           }}
                           style={{ background: '#064e3b', border: '1px solid #10b981', color: '#6ee7b7', padding: '6px 14px', borderRadius: 8, fontSize: 11, cursor: 'pointer', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}
@@ -2278,14 +2237,8 @@ export function ClientPortal() {
                   type="button"
                   onClick={async () => {
                     const html = getResolvedDocumentHtml(selectedViewerDoc);
-                    const sigs = selectedViewerDoc.firmato ? [
-                      selectedViewerDoc.signatureData || {
-                        signerName: clientName,
-                        signerRole: 'Cliente Incarico',
-                        timestamp: selectedViewerDoc.dataFirma || new Date().toLocaleString('it-IT'),
-                        ipAddress: '83.211.12.94',
-                      }
-                    ] : undefined;
+                    // Come sopra: si allega solo l'evidenza realmente registrata.
+                    const sigs = selectedViewerDoc.signatureData ? [selectedViewerDoc.signatureData] : undefined;
                     await downloadRealPdf(selectedViewerDoc.nome, html, sigs);
                   }}
                   style={{ background: '#1a1f3d', border: '1px solid #4338ca', color: '#c7d2fe', padding: '8px 16px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
@@ -2420,35 +2373,50 @@ export function ClientPortal() {
               <div style={{ background: '#1e1b4b', border: '1.5px solid #4338ca', borderRadius: 12, padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 12 }}>
                 <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#6366f1', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 800 }}>⏱</div>
                 <div>
-                  <div style={{ fontSize: 13, fontWeight: 800, color: '#c7d2fe' }}>OPERAZIONE IN LAVORAZIONE ({selectedModule.percentuale || 75}%)</div>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: '#c7d2fe' }}>
+                    {(selectedModule.percentuale ?? 0) > 0
+                      ? `OPERAZIONE IN LAVORAZIONE (${selectedModule.percentuale}%)`
+                      : 'OPERAZIONE NON ANCORA AVVIATA'}
+                  </div>
                   <div style={{ fontSize: 11, color: '#a5b4fc', marginTop: 2 }}>
-                    Il team sta eseguendo gli ultimi adempimenti tecnici e la redazione documentale.
+                    {/* Prima: `{selectedModule.percentuale || 75}%` con "il team sta eseguendo gli
+                        ultimi adempimenti" — un modulo a 0% dichiarava al cliente il 75% e lavori
+                        agli sgoccioli. Il ripiego scattava proprio quando il dato mancava. */}
+                    {(selectedModule.percentuale ?? 0) > 0
+                      ? 'Le prestazioni previste sono in corso di esecuzione.'
+                      : 'Nessuna prestazione risulta ancora avviata su questo modulo.'}
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Scheda Team Responsabile */}
+            {/* Scheda Team Responsabile. Il riquadro "Data Esecuzione: Agosto 2026" che stava
+                qui a destra era una data cablata nel sorgente, identica per ogni modulo di ogni
+                cliente: `ModuloProposta` non porta nessuna data, quindi non c'era niente da
+                mostrare. Rimosso anziché sostituito con la data di oggi, che sarebbe la stessa
+                bugia con un numero diverso. */}
             <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
               <div>
                 <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 700 }}>Advisor / Operatore Incaricato:</div>
-                <div style={{ fontSize: 13, fontWeight: 700, marginTop: 2, color: 'var(--text)' }}>
-                  👤 {selectedModule.operatore || 'Senior Advisor Studio Bluecode'}
+                <div style={{ fontSize: 13, fontWeight: 700, marginTop: 2, color: selectedModule.operatore ? 'var(--text)' : 'var(--muted)' }}>
+                  {selectedModule.operatore ? `👤 ${selectedModule.operatore}` : 'Operatore non ancora assegnato'}
                 </div>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 700 }}>Data Esecuzione:</div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--indigo-l)', marginTop: 2 }}>Agosto 2026</div>
               </div>
             </div>
 
             {/* Checklist Passaggi Operativi Svolti dall'Operatore */}
             <div>
               <div style={{ fontSize: 12, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.5px', color: 'var(--muted)', marginBottom: 10 }}>
-                📋 Dettaglio Passaggi & Micro-Prestazioni Svolte ({selectedModule.passaggi?.length || 4}):
+                📋 Dettaglio Passaggi & Micro-Prestazioni Svolte ({selectedModule.passaggi?.length ?? 0}):
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {(selectedModule.passaggi || getModulePassaggi(selectedModule.nome, selectedModule.cat)).map((p, pIdx) => (
+                {(selectedModule.passaggi ?? []).length === 0 && (
+                  <div style={{ background: 'var(--card)', border: '1px dashed var(--border)', borderRadius: 10, padding: '12px 14px', fontSize: 11.5, color: 'var(--muted)', lineHeight: 1.6 }}>
+                    Questo modulo non ha ancora micro-prestazioni registrate a database. L'elenco
+                    si popola man mano che l'operatore consuntiva le attività.
+                  </div>
+                )}
+                {(selectedModule.passaggi ?? []).map((p, pIdx) => (
                   <div
                     key={p.id || pIdx}
                     style={{
@@ -2486,7 +2454,14 @@ export function ClientPortal() {
                 📎 Documenti & Fascicoli Prodotti dall'Operatore:
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {(selectedModule.deliverables || getModuleDeliverables(selectedModule.nome, selectedModule.cat)).map((d, dIdx) => (
+                {(selectedModule.deliverables ?? []).length === 0 && (
+                  <div style={{ background: 'var(--card2)', border: '1px dashed var(--border)', borderRadius: 10, padding: '12px 14px', fontSize: 11.5, color: 'var(--muted)', lineHeight: 1.6 }}>
+                    Nessun documento è ancora stato depositato per questo modulo. I fascicoli
+                    prodotti compaiono qui e nella scheda "Documenti & Contratti" appena lo Studio
+                    li carica: prima di allora questa sezione annunciava PDF che non esistevano.
+                  </div>
+                )}
+                {(selectedModule.deliverables ?? []).map((d, dIdx) => (
                   <div
                     key={dIdx}
                     style={{
@@ -2520,14 +2495,18 @@ export function ClientPortal() {
                             <p>Si certifica la regolare esecuzione della prestazione e il deposito del relativo fascicolo documentale negli atti di studio.</p>
                           </div>
                         `;
-                        await downloadRealPdf(d.nomeFile.replace('.pdf', ''), htmlDoc, [
-                          {
-                            signerName: clientName,
-                            signerRole: 'Cliente Incarico',
-                            timestamp: new Date().toLocaleString('it-IT'),
-                            ipAddress: '2.234.190.44',
-                          }
-                        ]);
+                        // Si allega l'evidenza della firma realmente registrata su questa operazione,
+                        // se c'è. L'IP era cablato: il browser non conosce il proprio IP pubblico e
+                        // non può attestarlo.
+                        const firmaModulo = selectedModule ? moduleSignatures[selectedModule.id] : undefined;
+                        await downloadRealPdf(d.nomeFile.replace('.pdf', ''), htmlDoc, firmaModulo?.firmato
+                          ? [{
+                              signerName: firmaModulo.signerName || clientName,
+                              signerRole: 'Cliente Incarico',
+                              timestamp: firmaModulo.dataFirma,
+                              ipAddress: 'non registrato',
+                            }]
+                          : []);
                       }}
                       style={{ background: '#1e1b4b', border: '1px solid #4338ca', color: '#c7d2fe', padding: '6px 12px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
                     >
@@ -2549,16 +2528,20 @@ export function ClientPortal() {
 
               {moduleSignatures[selectedModule.id]?.firmato ? (
                 <div style={{ fontSize: 12, color: '#34d399', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span>🔒 Sigillo Digitale Validato</span>
+                  <span>🔒 Presa visione registrata</span>
                 </div>
               ) : (
                 <button
                   onClick={() => {
+                    // ATTENZIONE: questa conferma è interamente lato browser. Non passa da
+                    // /portal/verify-otp-and-sign, quindi NON produce un sigillo FEA eIDAS e non
+                    // viene registrata a database: vive solo nel localStorage di questo dispositivo.
+                    // L'IP cablato è stato rimosso (il browser non conosce il proprio IP pubblico) e
+                    // il messaggio non rivendica più una firma qualificata che non è stata apposta.
                     const sigData = {
                       signerName: clientName,
                       signerRole: 'Cliente Incarico (Legale Rappresentante)',
                       timestamp: new Date().toLocaleString('it-IT'),
-                      ipAddress: '2.234.190.44',
                     };
                     const updated = {
                       ...moduleSignatures,
@@ -2570,7 +2553,10 @@ export function ClientPortal() {
                     };
                     setModuleSignatures(updated);
                     localStorage.setItem(`bluman_module_signatures_${clientName}`, JSON.stringify(updated));
-                    alert(`✓ Operazione "${selectedModule.nome}" convalidata e firmata digitalmente con successo con Sigillo FEA eIDAS UE 910/2014!`);
+                    alert(
+                      `✓ Presa visione dell'operazione "${selectedModule.nome}" registrata su questo dispositivo il ${sigData.timestamp}.\n\n` +
+                      `Non è una firma elettronica avanzata: la conferma è locale e va comunicata allo studio.`,
+                    );
                     setSelectedModule(null);
                   }}
                   style={{
@@ -2588,7 +2574,7 @@ export function ClientPortal() {
                     gap: 8,
                   }}
                 >
-                  <span>✍️ Firma e Convalida Conclusione Operazione (eIDAS FEA)</span>
+                  <span>✍️ Conferma Presa Visione Conclusione Operazione</span>
                 </button>
               )}
             </div>

@@ -426,15 +426,11 @@ export function buildServer(app: AppPort): FastifyInstance {
       console.error('Client login DB lookup error:', err);
     }
 
-    if (!cliente && app && 'getClienti' in app) {
-      try {
-        const all = await app.getClienti();
-        cliente = all.find((c: any) =>
-          (c.email && c.email.toLowerCase() === cleanEmail) ||
-          (c.referentiJson?.email && c.referentiJson.email.toLowerCase() === cleanEmail)
-        );
-      } catch {}
-    }
+    // Qui c'era un ripiego su `app.getClienti()`: un metodo che AppPort non dichiara e che nessuna
+    // implementazione definisce, quindi `'getClienti' in app` era sempre falso e il ramo non è mai
+    // stato eseguito. Rimosso senza cambiare comportamento (era anche l'unico errore di `tsc` in
+    // radice: TS restringe la proprietà a `unknown` e non la si può chiamare). Se serve un ripiego
+    // in memoria, il metodo del port è `listaClienti()` — ma attivarlo cambia l'autenticazione.
 
     if (!cliente || !cliente.passwordHash) {
       return reply.code(401).send(nonValide);
@@ -1949,6 +1945,18 @@ export function buildServer(app: AppPort): FastifyInstance {
   server.post<{ Params: { id: string } }>('/progetti/:id/ricalcola', async (req, reply) => {
     const { id } = req.params;
     const tenantId = (req as any).tenantId || TENANT_DEFAULT;
+
+    // Il ricalcolo SCRIVE (stati di moduli e micro-voci): non è una lettura e non lo autorizza
+    // il fatto di essere entrati. RLS confina la scrittura al tenant, ma dentro il tenant
+    // qualunque collaboratore potrebbe riallineare gli stati del progetto di un altro: qui
+    // decide chi risponde dello studio. Il filtro nel frontend (pulsante nascosto in
+    // ProjectDetail.tsx) è solo cortesia di interfaccia, non è questa difesa.
+    const ruoloRichiedente = (req as any).ruolo as string | undefined;
+    if (ruoloRichiedente !== 'super_admin' && ruoloRichiedente !== 'advisor') {
+      return reply
+        .code(403)
+        .send({ errore: 'Solo il responsabile dello studio o il super admin possono ricalcolare l\'avanzamento.' });
+    }
 
     const avanzamento = await ricalcolaProgetto(id);
 

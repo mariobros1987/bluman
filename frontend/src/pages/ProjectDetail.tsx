@@ -5,7 +5,7 @@ import { CatBadge } from '../components/ui/CatBadge';
 import { ProgressBar } from '../components/ui/ProgressBar';
 import { AvatarGroup, Avatar } from '../components/ui/Avatar';
 import { PassaggioModal } from '../components/PassaggioModal';
-import { fmt, progressColor, getFormattedLogoUrl, resolveRighe } from '../utils';
+import { fmt, progressColor, getFormattedLogoUrl } from '../utils';
 import { downloadRealPdf } from '../utils/pdfGenerator';
 import { SimpleZipBuilder } from '../utils/zipBuilder';
 import { PREBUILT_TEMPLATES, resolveDocumentTemplateHtml } from '../utils/documentTemplates';
@@ -13,8 +13,8 @@ import { ComunicazioniTab } from '../components/ComunicazioniTab';
 import { AssignOperatorModal } from '../components/AssignOperatorModal';
 import { CalendarPreviewModal } from '../components/CalendarPreviewModal';
 import { ConfirmDeleteModal } from '../components/ConfirmDeleteModal';
-import { PROJECTS, MLIB, ARTICOLI } from '../store/mockData';
-import { fetchProgettoDettaglio, emettiFatturaApi, consuntivaMicrovoceApi, assegnaAccessoProgettoApi, salvaProgettoDettaglioApi, archiviaProgettoApi, eliminaProgettoApi, fetchModuliLibreria, fetchArticoli, uploadFileApi, inviaComunicazioneApi } from '../api/client';
+import { PROJECTS } from '../store/mockData';
+import { fetchProgettoDettaglio, emettiFatturaApi, consuntivaMicrovoceApi, assegnaAccessoProgettoApi, salvaProgettoDettaglioApi, archiviaProgettoApi, eliminaProgettoApi, fetchModuliLibreria, fetchArticoli, uploadFileApi, inviaComunicazioneApi, ricalcolaProgettoApi } from '../api/client';
 import { TEAM } from '../store/mockData';
 import { useTeamMembers } from '../hooks/useTeamMembers';
 import { getCurrentTenantId, getTenantStorageKey, getStudioInfoForTenant, BLUECODE_TENANT_ID } from '../utils/tenant';
@@ -67,6 +67,23 @@ export function ProjectDetail() {
 
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [ricalcolando, setRicalcolando] = useState(false);
+
+  /**
+   * Ruolo dell'utente in sessione, per mostrare il ricalcolo dell'avanzamento (§16) solo a chi
+   * gestisce lo studio. È un filtro di interfaccia, non la difesa: `POST /progetti/:id/ricalcola`
+   * autorizza per conto proprio e RLS confina la scrittura al tenant. Senza `bluman_user` in
+   * sessione non si assume nessun ruolo: il pulsante non compare.
+   */
+  const ruoloSessione: string = (() => {
+    try {
+      const raw = localStorage.getItem('bluman_user');
+      return raw ? (JSON.parse(raw).ruolo || '') : '';
+    } catch {
+      return '';
+    }
+  })();
+  const puoRicalcolare = ruoloSessione === 'super_admin' || ruoloSessione === 'advisor';
 
   const handleSaveCalendarEvent = (
     date: string,
@@ -214,31 +231,13 @@ export function ProjectDetail() {
             };
           });
 
-          // Se il modulo non ha ancora microvoci nel DB, cerca gli articoli corrispondenti per quel modulo
-          if (microvociList.length === 0) {
-            const matchedMockMod = MLIB.find(libM => libM.n.toLowerCase() === (m.nome || '').toLowerCase())
-              || MLIB[mIdx % MLIB.length];
-            if (matchedMockMod && matchedMockMod.righe) {
-              const rList = resolveRighe(matchedMockMod, ARTICOLI);
-              microvociList = rList.map((r, rIdx) => {
-                const localMv = localMod?.v?.[rIdx];
-                return {
-                  n: r.art?.n || (r as any).n || 'Microvoce',
-                  hE: r.h || 4,
-                  hA: 0,
-                  s: 'pending' as any,
-                  as: localMv?.as || 1,
-                  d: 0,
-                };
-              });
-            } else {
-              microvociList = [
-                { n: `Analisi e requisiti per ${m.nome}`, hE: 4, hA: 0, s: 'pending', as: 1, d: 0 },
-                { n: `Esecuzione e predisposizione fascicolo ${m.nome}`, hE: 6, hA: 0, s: 'pending', as: 1, d: 0 },
-                { n: `Rilascio parere e asseverazione ${m.nome}`, hE: 4, hA: 0, s: 'pending', as: 1, d: 0 },
-              ];
-            }
-          }
+          // Se il modulo non ha micro-voci a database, l'elenco resta vuoto e la pagina lo
+          // dichiara. Prima qui si pescava dalla libreria mock MLIB per indice (`MLIB[mIdx %
+          // MLIB.length]`, quindi un modulo qualunque) oppure si generavano tre righe generiche
+          // interpolando il nome del modulo. Effetto: i due moduli reali senza micro-voci su
+          // "Struttura Holding — Famiglia Ricci" risultavano istruiti, con ore preventivate che
+          // nessuno aveva stimato — ed è il motivo per cui quel debito di Fase 1 non si vedeva
+          // dalla UI. Le micro-voci si creano dall'ERP e finiscono a database, non qui.
 
           const assignedTeam = localMod?.team || m.team || [1, 2];
           const avM = avModuli.get(m.id);
@@ -249,9 +248,11 @@ export function ProjectDetail() {
             cat: (m.categoria as CategoriaModulo) || 'Societario',
             st: avM?.stato || m.stato || 'in_progress',
             pct: avM?.percentuale ?? 0,
-            h: m.orePreventivate || microvociList.reduce((sum, v) => sum + v.hE, 0) || 20,
+            // Ore e prezzo come stanno a database. I ripieghi `|| 20` ore e `: 3500` euro
+            // facevano comparire un preventivo che nessuno aveva formulato: 0 è il dato vero.
+            h: m.orePreventivate || microvociList.reduce((sum, v) => sum + v.hE, 0) || 0,
             a: m.oreConsuntivate || 0,
-            p: m.prezzo ? m.prezzo / 100 : 3500,
+            p: m.prezzo ? m.prezzo / 100 : 0,
             team: assignedTeam,
             delay: avM ? avM.stato === 'delayed' || avM.stato === 'blocked' : false,
             // §16.1 — lo stesso segnale che la Dashboard mostra nel banner: se lì un modulo
@@ -272,62 +273,25 @@ export function ProjectDetail() {
                      || (isBluecode ? PROJECTS.find(p => String(p.id) === String(id) || p.cl === dbRes.cliente?.nome) : undefined);
           if (match && match.mods && match.mods.length > 0) {
             finalMods = match.mods;
-          } else {
-            // Genera moduli standard e relative microvoci/articoli
-            finalMods = [
-              {
-                id: 101,
-                n: 'Modulo Iniziale Incarico Advisory',
-                cat: 'Analisi' as CategoriaModulo,
-                st: 'pending',
-                pct: 0,
-                h: 15,
-                a: 0,
-                p: 3500,
-                team: [1],
-                delay: false,
-                v: [
-                  { n: 'Raccolta documenti e KYC cliente', hE: 5, hA: 0, s: 'pending', as: 1, d: 0 },
-                  { n: 'Verifica requisiti e giurisdizione', hE: 5, hA: 0, s: 'pending', as: 1, d: 0 },
-                  { n: 'Redazione report conclusivo', hE: 5, hA: 0, s: 'pending', as: 1, d: 0 }
-                ]
-              }
-            ];
           }
+          // Nessun modulo di ripiego. Prima, quando nemmeno il locale aveva niente, la pagina
+          // fabbricava un "Modulo Iniziale Incarico Advisory" da 15 ore e 3.500 € con tre
+          // micro-voci, id 101, assegnato al membro 1: era il caso NORMALE, non il caso limite —
+          // sette progetti su dieci non hanno moduli a database — e compariva identico su
+          // progetti diversi dello stesso cliente. Un progetto senza moduli è un progetto senza
+          // moduli: `finalMods` resta vuoto e il dettaglio lo dichiara.
         }
 
-        // Sanificazione generale: nessun modulo deve avere v vuoto
-        finalMods = finalMods.map((m, mIdx) => {
-          let vList = m.v || [];
-          if (!vList || vList.length === 0) {
-            const matchedMock = MLIB.find(libM => libM.n.toLowerCase().trim() === m.n.toLowerCase().trim())
-              || MLIB.find(libM => m.n.toLowerCase().includes(libM.n.toLowerCase()))
-              || MLIB[mIdx % MLIB.length];
-            if (matchedMock && matchedMock.righe) {
-              const rList = resolveRighe(matchedMock, ARTICOLI);
-              vList = rList.map(r => ({
-                n: r.art?.n || (r as any).n || 'Microvoce',
-                hE: r.h || 4,
-                hA: 0,
-                s: 'pending' as any,
-                as: 1,
-                d: 0,
-              }));
-            } else {
-              vList = [
-                { n: `Raccolta documentazione per ${m.n}`, hE: 4, hA: 0, s: 'pending', as: 1, d: 0 },
-                { n: `Predisposizione pratica ed adempimenti ${m.n}`, hE: 5, hA: 0, s: 'pending', as: 1, d: 0 },
-                { n: `Chiusura e verifica conformità ${m.n}`, hE: 3, hA: 0, s: 'pending', as: 1, d: 0 },
-              ];
-            }
-          }
-          return {
-            ...m,
-            v: vList,
-          };
-        });
+        // Nessuna "sanificazione": un modulo senza micro-voci resta senza micro-voci. Prima qui
+        // ogni modulo con `v` vuoto veniva riempito pescando da MLIB — per nome, per inclusione
+        // del nome e infine per indice, quindi SEMPRE qualcosa — oppure con tre righe generiche.
+        // Era la rete che rendeva invisibile il caso "modulo vuoto" su tutta la pagina, anche
+        // dove i moduli arrivavano davvero dal database.
 
-        const calculatedVal = finalMods.reduce((acc: number, m: any) => acc + (m.p || 0), 0) || (dbRes.valoreCentesimi ? dbRes.valoreCentesimi / 100 : 3500);
+        // Valore del progetto: somma dei moduli, altrimenti il valore a database. Il ripiego
+        // finale `: 3500` mostrava un importo inventato su un progetto senza moduli e senza
+        // valore in riga — e finiva anche nella redditività.
+        const calculatedVal = finalMods.reduce((acc: number, m: any) => acc + (m.p || 0), 0) || (dbRes.valoreCentesimi ? dbRes.valoreCentesimi / 100 : 0);
 
         setProject({
           id: dbRes.id,
@@ -368,46 +332,23 @@ export function ProjectDetail() {
                  || (isBluecode ? PROJECTS[0] : undefined);
 
         if (match) {
-          // Sanifica le microvoci del match
-          const sanitizedMods = (match.mods || []).map((m, mIdx) => {
-            let vList = m.v || [];
-            if (!vList || vList.length === 0) {
-              const matchedMock = MLIB.find(libM => libM.n.toLowerCase().trim() === m.n.toLowerCase().trim())
-                || MLIB.find(libM => m.n.toLowerCase().includes(libM.n.toLowerCase()))
-                || MLIB[mIdx % MLIB.length];
-              if (matchedMock && matchedMock.righe) {
-                const rList = resolveRighe(matchedMock, ARTICOLI);
-                vList = rList.map(r => ({
-                  n: r.art?.n || (r as any).n || 'Microvoce',
-                  hE: r.h || 4,
-                  hA: 0,
-                  s: 'pending' as any,
-                  as: 1,
-                  d: 0,
-                }));
-              } else {
-                vList = [
-                  { n: `Raccolta documentazione per ${m.n}`, hE: 4, hA: 0, s: 'pending', as: 1, d: 0 },
-                  { n: `Predisposizione pratica ed adempimenti ${m.n}`, hE: 5, hA: 0, s: 'pending', as: 1, d: 0 },
-                  { n: `Chiusura e verifica conformità ${m.n}`, hE: 3, hA: 0, s: 'pending', as: 1, d: 0 },
-                ];
-              }
-            }
-            return { ...m, v: vList };
-          });
+          // Nessuna sanificazione: i moduli del progetto locale si mostrano come sono. Prima un
+          // modulo con `v` vuoto veniva riempito pescando da MLIB — per nome, per inclusione del
+          // nome e infine per indice, quindi sempre qualcosa — oppure con tre righe generiche.
+          const modsLocali = match.mods || [];
 
-          const modValSum = sanitizedMods.reduce((acc: number, m: any) => acc + (m.p || 0), 0);
+          const modValSum = modsLocali.reduce((acc: number, m: any) => acc + (m.p || 0), 0);
           const finalVal = modValSum > 0 ? modValSum : match.val;
 
           const updatedMatch = {
             ...match,
-            mods: sanitizedMods,
+            mods: modsLocali,
             val: finalVal,
           };
 
           setProject(updatedMatch);
-          if (sanitizedMods.length > 0) {
-            setExpanded(new Set(sanitizedMods.map(m => m.id)));
+          if (modsLocali.length > 0) {
+            setExpanded(new Set(modsLocali.map(m => m.id)));
           }
         }
       }
@@ -628,6 +569,35 @@ export function ProjectDetail() {
             >
               👥 Accessi Progetto
             </button>
+            {/* §16 — Ricalcolo dell'avanzamento. Le letture mostrano già i valori calcolati in
+                memoria: questo pulsante li PERSISTE, scrivendo solo le righe divergenti (stati e
+                segnali di rischio; le percentuali derivano e non hanno colonna). Serve quando lo
+                stato a database si è disallineato da quello che il motore calcola. */}
+            {puoRicalcolare && (
+              <button
+                disabled={ricalcolando}
+                onClick={async () => {
+                  if (!confirm('Ricalcolare l\'avanzamento di questo progetto?\n\nScrive a database gli stati dei moduli e delle micro-voci che risultano divergenti da quelli calcolati (§16). Le righe già allineate non vengono toccate.')) return;
+                  setRicalcolando(true);
+                  try {
+                    // La rotta restituisce l'avanzamento ricalcolato (stato, percentuale, moduli),
+                    // non un conteggio: si riferisce quello, senza inventare un numero di righe.
+                    const esito: any = await ricalcolaProgettoApi(String(project.id));
+                    const pctEsito = typeof esito?.percentuale === 'number' ? `${esito.percentuale}%` : 'n.d.';
+                    alert(`Ricalcolo eseguito.\n\nStato progetto: ${esito?.stato ?? 'n.d.'}\nAvanzamento: ${pctEsito}\nModuli valutati: ${Array.isArray(esito?.moduli) ? esito.moduli.length : 0}`);
+                    await loadDetail();
+                  } catch (e: any) {
+                    alert('Ricalcolo non eseguito: ' + (e?.message || 'errore sconosciuto'));
+                  } finally {
+                    setRicalcolando(false);
+                  }
+                }}
+                title="Persiste a database gli stati calcolati dal motore §16, solo dove divergono"
+                style={{ background: '#1a2e1f', border: '1px solid #2f5d3a', color: '#6ee7a0', padding: '4px 10px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: ricalcolando ? 'wait' : 'pointer', marginLeft: 8, opacity: ricalcolando ? 0.6 : 1 }}
+              >
+                {ricalcolando ? '⏳ Ricalcolo…' : '🔄 Ricalcola avanzamento'}
+              </button>
+            )}
             <button
               onClick={async () => {
                 const isArchived = project.st === 'archived';
@@ -673,80 +643,27 @@ export function ProjectDetail() {
       <div className={styles.content}>
         {tab === 'moduli' && (
           <div>
+            {/* Stato vuoto sincero. Prima qui c'era "Inizializzazione Moduli Operativi in
+                Corso..." con un pulsante "Istanzia Subito" che scriveva tre moduli cablati
+                (Analisi/Societario/Trust, 23.500 € complessivi) con ore GIÀ consuntivate e una
+                micro-voce `s: 'done'` — e li salvava nel solo localStorage, mai a database:
+                sparivano cambiando browser e la Dashboard non li vedeva. Dichiarava anche "Il
+                preventivo è stato accettato dal cliente" senza saperlo. I moduli si aggiungono
+                dalla Libreria, che passa dall'API. */}
             {(!project.mods || project.mods.length === 0) ? (
               <div className={styles.emptyMods} style={{ padding: 24, textAlign: 'center' }}>
                 <div style={{ fontSize: 32, marginBottom: 8 }}>🗂</div>
-                <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>Inizializzazione Moduli Operativi in Corso...</div>
-                <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 16 }}>
-                  Il preventivo è stato accettato dal cliente. Clicca il pulsante per generare ed istanziare l'albero completo dei moduli e delle microvoci.
+                <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>Nessun modulo a database per questo progetto</div>
+                <div style={{ fontSize: 11, color: 'var(--muted)', maxWidth: 520, margin: '0 auto 16px' }}>
+                  Il progetto esiste ma non ha ancora moduli operativi: non c'è niente da mostrare —
+                  né ore, né avanzamento, né importi. I moduli si aggiungono dalla Libreria e vengono
+                  salvati sul database.
                 </div>
                 <button
-                  onClick={() => {
-                    const defaultMods: ModuloProgetto[] = [
-                      {
-                        id: 101,
-                        n: 'Analisi Patrimoniale & Risk Assessment',
-                        cat: 'Analisi' as CategoriaModulo,
-                        st: 'in_progress',
-                        pct: 50,
-                        h: 15,
-                        a: 5,
-                        p: 3500,
-                        team: [1, 2],
-                        delay: false,
-                        v: [
-                          { n: 'Raccolta documenti e KYC cliente', hE: 4, hA: 4, s: 'done', as: 1, d: 1 },
-                          { n: 'Verifica giurisdizione e fiscalità intercompany', hE: 6, hA: 1, s: 'active', as: 1, d: 0 },
-                          { n: 'Redazione report conclusivo', hE: 5, hA: 0, s: 'pending', as: 1, d: 0 }
-                        ]
-                      },
-                      {
-                        id: 102,
-                        n: 'Corporate Structuring & Holding Malta',
-                        cat: 'Societario' as CategoriaModulo,
-                        st: 'in_progress',
-                        pct: 20,
-                        h: 30,
-                        a: 6,
-                        p: 11500,
-                        team: [1, 3],
-                        delay: false,
-                        v: [
-                          { n: 'Bozza Atto Costitutivo e Statuto', hE: 10, hA: 6, s: 'active', as: 1, d: 0 },
-                          { n: 'Registrazione MFSA e deposito UBO', hE: 10, hA: 0, s: 'pending', as: 1, d: 0 },
-                          { n: 'Apertura posizioni fiscali e codice SDI', hE: 10, hA: 0, s: 'pending', as: 1, d: 0 }
-                        ]
-                      },
-                      {
-                        id: 103,
-                        n: 'Struttura Trust & Protezione Asset',
-                        cat: 'Trust' as CategoriaModulo,
-                        st: 'in_progress',
-                        pct: 10,
-                        h: 25,
-                        a: 2,
-                        p: 8500,
-                        team: [1, 3],
-                        delay: false,
-                        v: [
-                          { n: 'Selezione Trust Company idonea', hE: 5, hA: 2, s: 'active', as: 1, d: 0 },
-                          { n: 'Redazione Deed of Trust e Letter of Wishes', hE: 10, hA: 0, s: 'pending', as: 1, d: 0 },
-                          { n: 'Trasferimento asset e registrazione Malta', hE: 10, hA: 0, s: 'pending', as: 1, d: 0 }
-                        ]
-                      }
-                    ];
-                    const updated = { ...project, mods: defaultMods };
-                    setProject(updated);
-                    setExpanded(new Set(defaultMods.map(m => m.id)));
-
-                    const savedStr = localStorage.getItem(getTenantStorageKey('bluman_custom_projects'));
-                    const savedArr: Progetto[] = savedStr ? JSON.parse(savedStr) : [];
-                    const updatedArr = [updated, ...savedArr.filter(p => String(p.id) !== String(project.id))];
-                    localStorage.setItem(getTenantStorageKey('bluman_custom_projects'), JSON.stringify(updatedArr));
-                  }}
+                  onClick={() => setTab('grafo')}
                   style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '10px 22px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
                 >
-                  ⚡ Istanzia Subito Moduli & Microvoci Operative
+                  + Aggiungi Modulo da Libreria
                 </button>
               </div>
             ) : (
@@ -1044,28 +961,16 @@ function ModuloBlock({ mod, open, onToggle, onOpenProc, rawDbModulo, onRefresh, 
   const [completa, setCompleta] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  // Microvoci effettive (con fallback istantaneo su catalogo articoli se vuote)
-  const displayMicrovoci: MicroVoce[] = (mod.v && mod.v.length > 0) ? mod.v : (() => {
-    const matchedMock = MLIB.find(libM => libM.n.toLowerCase().trim() === mod.n.toLowerCase().trim())
-      || MLIB.find(libM => mod.n.toLowerCase().includes(libM.n.toLowerCase()))
-      || MLIB[0];
-    if (matchedMock && matchedMock.righe) {
-      const rList = resolveRighe(matchedMock, ARTICOLI);
-      return rList.map(r => ({
-        n: r.art?.n || (r as any).n || 'Microvoce',
-        hE: r.h || 4,
-        hA: 0,
-        s: 'pending' as any,
-        as: 1,
-        d: 0,
-      }));
-    }
-    return [
-      { n: `Raccolta documentazione per ${mod.n}`, hE: 4, hA: 0, s: 'pending' as any, as: 1, d: 0 },
-      { n: `Predisposizione pratica ed adempimenti ${mod.n}`, hE: 5, hA: 0, s: 'pending' as any, as: 1, d: 0 },
-      { n: `Chiusura e verifica conformità ${mod.n}`, hE: 3, hA: 0, s: 'pending' as any, as: 1, d: 0 },
-    ];
-  })();
+  // Micro-voci reali del modulo. Nessun ripiego: era l'ultimo fabbricatore della pagina e il
+  // più insidioso, perché agiva in fase di render — anche con i dati corretti a monte, un modulo
+  // senza micro-voci ne mostrava tre pescate da MLIB (per nome, per inclusione del nome e infine
+  // `MLIB[0]`, quindi sempre qualcosa) o generate col nome del modulo interpolato. Erano righe
+  // cliccabili con ore preventivate, indistinguibili da quelle vere: si potevano consuntivare, e
+  // `consuntivaMicrovoceApi` sarebbe stata chiamata con l'id di una micro-voce che a database non
+  // esiste. È anche la ragione per cui i due moduli senza micro-voci di "Struttura Holding —
+  // Famiglia Ricci" (debito noto di Fase 1) risultavano pieni. Un modulo senza micro-voci si
+  // dichiara vuoto.
+  const displayMicrovoci: MicroVoce[] = mod.v || [];
 
   const handleConsuntivaSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1163,6 +1068,14 @@ function ModuloBlock({ mod, open, onToggle, onOpenProc, rawDbModulo, onRefresh, 
               </tr>
             </thead>
             <tbody>
+              {displayMicrovoci.length === 0 && (
+                <tr>
+                  <td colSpan={6} style={{ textAlign: 'center', padding: 18, fontSize: 11, color: 'var(--muted)', lineHeight: 1.6 }}>
+                    Questo modulo non ha micro-voci a database.<br />
+                    Nessuna ora preventivata né consuntivata: non c'è avanzamento da calcolare finché non vengono istanziate.
+                  </td>
+                </tr>
+              )}
               {displayMicrovoci.map((v, i) => {
                   const rawMv = rawDbModulo?.microvoci?.[i];
                   const isDelay = v.s === 'delayed';
@@ -2212,18 +2125,28 @@ function RedditivitaTab({
             </thead>
             <tbody>
               {(project.mods || []).map((m, idx) => {
-                const modP = m.p || 3500;
-                const modH_Stima = m.h || 10;
-                const modH_Reali = m.a || (m.pct === 100 ? modH_Stima : modH_Stima * (m.pct / 100));
+                // Valori come stanno a database. I ripieghi precedenti (`|| 3500` di prezzo,
+                // `|| 10` ore stimate) producevano una riga di conto economico completa — ricavo,
+                // costo, margine, resa oraria e verdetto "In Target" — su un modulo che a
+                // database non ha né prezzo né ore. Le ore reali venivano inoltre INTERPOLATE
+                // dalla percentuale (`modH_Stima * pct/100`) e mostrate nella colonna "Ore
+                // Reali": ore che nessuno aveva consuntivato, usate poi per calcolare il costo
+                // interno dello studio. Ora la riga senza dati si dichiara non calcolabile.
+                const modP = m.p || 0;
+                const modH_Stima = m.h || 0;
+                const modH_Reali = m.a || 0;
                 const defaultOp = (m.team && m.team[0]) || 1;
                 const opRate = OPERATOR_RATES[defaultOp]?.rate || 95;
                 const modCostoStudio = modH_Reali * opRate;
                 const modMargine = modP - modCostoStudio;
-                const modResa = modH_Reali > 0 ? (modP / modH_Reali) : modP;
-                const isProfit = modResa >= 200;
+                // La resa oraria esiste solo con ore consuntivate: senza, non è "prezzo pieno
+                // all'ora", è indeterminata.
+                const modResa: number | null = modH_Reali > 0 ? modP / modH_Reali : null;
+                const isProfit = modResa !== null && modResa >= 200;
+                const calcolabile = modP > 0 || modH_Reali > 0;
 
                 return (
-                  <tr key={idx} style={{ borderBottom: '1px solid var(--border)' }}>
+                  <tr key={idx} style={{ borderBottom: '1px solid var(--border)', opacity: calcolabile ? 1 : 0.55 }}>
                     <td style={{ padding: '12px', fontWeight: 700, color: 'var(--text)' }}>
                       {m.n}
                     </td>
@@ -2241,15 +2164,21 @@ function RedditivitaTab({
                       {fmt(modCostoStudio)}
                     </td>
                     <td style={{ padding: '12px', fontWeight: 700, color: modMargine >= 0 ? '#34d399' : '#ef4444' }}>
-                      {fmt(modMargine)}
+                      {calcolabile ? fmt(modMargine) : '—'}
                     </td>
                     <td style={{ padding: '12px', fontWeight: 800, color: '#fbbf24' }}>
-                      {fmt(modResa)} / h
+                      {modResa !== null ? `${fmt(modResa)} / h` : '—'}
                     </td>
                     <td style={{ padding: '12px' }}>
-                      <span style={{ fontSize: 9.5, background: isProfit ? '#0d2d22' : '#2d1a05', color: isProfit ? '#34d399' : '#f59e0b', border: `1px solid ${isProfit ? '#059669' : '#d97706'}`, padding: '2px 8px', borderRadius: 12, fontWeight: 700 }}>
-                        {isProfit ? '🟢 In Utile Extra' : '🟡 In Target'}
-                      </span>
+                      {modResa === null ? (
+                        <span style={{ fontSize: 9.5, background: 'var(--card)', color: 'var(--muted)', border: '1px solid var(--border)', padding: '2px 8px', borderRadius: 12, fontWeight: 700 }}>
+                          ⚪ Nessuna ora consuntivata
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: 9.5, background: isProfit ? '#0d2d22' : '#2d1a05', color: isProfit ? '#34d399' : '#f59e0b', border: `1px solid ${isProfit ? '#059669' : '#d97706'}`, padding: '2px 8px', borderRadius: 12, fontWeight: 700 }}>
+                          {isProfit ? '🟢 In Utile Extra' : '🟡 In Target'}
+                        </span>
+                      )}
                     </td>
                   </tr>
                 );
