@@ -238,6 +238,14 @@ al posto del dato mancante, rendendo l'inventato indistinguibile dal reale.
   230 test, `npx vite build` pulito. Nessuna scrittura sui dati di produzione: tutte le correzioni
   sono di presentazione o di autorizzazione.
 
+### FASE 1 (quater) — Sicurezza Password al Primo Accesso (§27) & Profilo Staff
+- [x] **Cambio Password Obbligatorio al Primo Accesso**: gli utenti creati o resettati con `stato: 'invitato'` hanno `mustChangePassword = true` restituito da `POST /auth/login` e `GET /auth/me`.
+- [x] **Modale non chiudibile `MustChangePasswordModal.tsx`**: blocca l'accesso finché l'utente non inserisce la password provvisoria e una nuova password personale permanente (con misuratore di forza live conforme ISO/IEC 27001). Al salvataggio chiama `POST /auth/change-password`, aggiorna `stato: 'attivo'` su Supabase e sblocca l'interfaccia.
+- [x] **Modale Profilo Staff (`UserProfileModal.tsx`)**: accessibile dalla barra superiore e dal piè di pagina della Sidebar per aggiornare nome, specializzazione e password personale.
+- [x] **Scheda Profilo & Password nel Portale Cliente (`/portal`)**: aggiunta Tab 6 `👤 6. Profilo & Password` con endpoint dedicato `POST /portal/change-password`.
+- [x] **Reset Password da parte del Super Admin & Advisor**: pulsante `🔄 Reset Pass` su ogni collaboratore in `SettingsPage.tsx` e per i Lead Advisor in `SuperAdminPage.tsx` tramite `POST /tenant/utenti/:id/reset-password` e `POST /admin/tenants/:id/reset-password` (genera password temporanee monouso e imposta `stato: 'invitato'`).
+- [x] **Routing & Logout Rapido**: aggiunto pulsante `🚪 Esci` nella barra superiore di `AppLayout.tsx` e gestione della rotta esplicita `/login` con reindirizzamento pulito.
+
 ### FASE 1 — Schema Database PostgreSQL & Prisma (`prisma/schema.prisma`)
 - [x] `Tenant`: Dati fiscali studio, sedi legali/operative distinte, logo URL, colore tema PDF, note legali.
 - [x] `Cliente`: Dati anagrafici ERP, Partita IVA, Codice Fiscale, Sede Legale, Codice SDI, IBAN, Rischio AML, UBO, Fonte Patrimonio, Data KYC.

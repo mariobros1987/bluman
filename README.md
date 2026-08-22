@@ -6,14 +6,76 @@ Piattaforma ERP per studi di consulenza societaria, wealth protection ed advisor
 
 ---
 
+## 🗺️ Mappa & Grafo Architetturale della Piattaforma
+
+```mermaid
+graph TD
+    subgraph Frontend["🌐 React 19 Frontend (Vercel / Vite)"]
+        UI_Login["🔑 LoginPage (/login)"]
+        UI_Portal["🧑‍💼 ClientPortal (/portal - 6 Tab)"]
+        UI_AppLayout["🏗️ AppLayout + Topbar + QuickTracker + Esci"]
+        UI_MustChange["🔒 MustChangePasswordModal (Primo Accesso / Reset)"]
+        UI_UserProfile["👤 UserProfileModal (Profilo & Password Staff)"]
+        UI_Settings["⚙️ SettingsPage (Team RBAC + 🔄 Reset Pass)"]
+        UI_SuperAdmin["👑 SuperAdminPage (Multi-Tenant Studi + Reset Pass)"]
+        UI_Pages["📊 Dashboard / Progetti / Clienti / Fatture / PrimaNota / Banche"]
+    end
+
+    subgraph Backend["⚡ Fastify Node.js API (Railway)"]
+        Guard["🛡️ onRequest Auth Guard (JWT Verification & Public Route Whitelist)"]
+        AuthMe["GET /auth/me & GET /auth/profilo"]
+        AuthLogin["POST /auth/login (scrypt verification & stato invitato check)"]
+        AuthChange["POST /auth/change-password & POST /portal/change-password"]
+        ResetPass["POST /tenant/utenti/:id/reset-password & POST /admin/tenants/:id/reset-password"]
+        StateEngine["🧠 StateEngine & CalcoloService (Cascata Stati & Redditività)"]
+        SDI_XML["💶 SDI XML Generator & Invoicing Service"]
+        Omnichannel["💬 Omnichannel & Nodemailer SMTP Register.it / Meta WhatsApp"]
+    end
+
+    subgraph Database["🐘 PostgreSQL (Supabase) + Row-Level Security (RLS)"]
+        RLS["🛡️ Postgres RLS (app.current_tenant_id & bluman_app role)"]
+        T_Tenant["tenant"]
+        T_User["user (password_hash scrypt, stato, mustChangePassword)"]
+        T_Cliente["cliente + referentiJson"]
+        T_Progetto["progetto + modulo + microvoce"]
+        T_Fattura["fattura + scadenza + prima_nota"]
+        T_Comms["comunicazione_progetto + magic_link"]
+    end
+
+    Frontend -->|HTTPS / Bearer JWT| Guard
+    Guard --> AuthLogin
+    Guard --> AuthMe
+    Guard --> AuthChange
+    Guard --> ResetPass
+    Guard --> StateEngine
+    Guard --> SDI_XML
+    Guard --> Omnichannel
+
+    Backend -->|Prisma Connection Pool| RLS
+    RLS --> T_Tenant
+    RLS --> T_User
+    RLS --> T_Cliente
+    RLS --> T_Progetto
+    RLS --> T_Fattura
+    RLS --> T_Comms
+```
+
+---
+
 ## 🎯 Stato del Progetto & Componenti Verificati
 
-### 🧑‍💼 Portale Cliente Passwordless (5 Schede)
-- **Firma Engagement Letter**: Firma 1-click del preventivo d'ordine e della lettera di incarico.
-- **Avanzamento Live Lavori**: Timeline delle fasi di consulenza in corso con percentuale globale.
-- **Form Dati Societari**: Compilazione guidata dei dati fiscali, IBAN e UBO.
-- **Vault Documenti**: Archivio contratti ed allegati da firmare.
+### 🧑‍💼 Portale Cliente Passwordless (6 Schede)
+- **Firma Engagement Letter**: Firma 1-click del preventivo d'ordine e della lettera di incarico con sigillo eIDAS.
+- **Avanzamento Live Lavori**: Timeline delle fasi di consulenza in corso con percentuale globale e moduli/micro-voci filtrati dinamicamente in base al progetto selezionato.
+- **Form Dati Societari**: Compilazione guidata dei dati fiscali, IBAN, legale rappresentante e UBO.
+- **Vault Documenti**: Archivio contratti, delibere ed allegati firmati.
 - **Live Chat & Contatti Advisor**: Chat bidirezionale interattiva con l'Advisor collegata via API Fastify e salvata su PostgreSQL.
+- **👤 Profilo & Password**: Modifica dati anagrafici, recapiti telefonici e aggiornamento password personale.
+
+### 🔒 Sicurezza Password al Primo Accesso & Reset Admin (§23, §27)
+- **Cambio Password Obbligatorio**: Al primo accesso o in caso di reset, l'utente con `stato: 'invitato'` visualizza il modale non chiudibile `MustChangePasswordModal` che impone la scelta di una nuova password permanente (min. 8 caratteri con calcolo dinamico di robustezza conforme ISO/IEC 27001).
+- **Cifratura Scrypt**: Le password non sono mai salvate in chiaro ma protette da algoritmi di hash a prova di quantum/GPU brute-force.
+- **Pulsante `🔄 Reset Pass` in Gestione Team & Multi-Tenant**: Lead Advisor e Super Admin possono rigenerare istantaneamente una password provvisoria monouso per qualsiasi collaboratore o responsabile di studio.
 
 ### 📋 Anagrafica Master Cliente ERP (4 Schede & Persistenza Totale)
 - **Dati Legali**: Ragione Sociale, Partita IVA / VAT, Codice Fiscale, Giurisdizione, REA, Capitale Sociale.
