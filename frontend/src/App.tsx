@@ -20,6 +20,7 @@ import { BanksPage } from './pages/BanksPage';
 import { RetainersPage } from './pages/RetainersPage';
 import { DocumentEditorPage } from './pages/DocumentEditorPage';
 import { getUserPermission } from './utils/rbac';
+import { fetchMeApi } from './api/client';
 import { PROJECTS } from './store/mockData';
 import './styles/tokens.css';
 
@@ -87,6 +88,32 @@ export default function App() {
     window.addEventListener('bluman_unauthorized', onUnauthorized);
     return () => window.removeEventListener('bluman_unauthorized', onUnauthorized);
   }, []);
+
+  useEffect(() => {
+    if (token) {
+      fetchMeApi()
+        .then((res) => {
+          if (res && res.user) {
+            const isMust = Boolean(res.user.mustChangePassword ?? (res.user.stato === 'invitato'));
+            setCurrentUser((prev: any) => ({
+              ...(prev || {}),
+              ...res.user,
+              mustChangePassword: isMust,
+            }));
+            const userRaw = localStorage.getItem('bluman_user');
+            if (userRaw) {
+              try {
+                const u = JSON.parse(userRaw);
+                u.mustChangePassword = isMust;
+                u.stato = res.user.stato;
+                localStorage.setItem('bluman_user', JSON.stringify(u));
+              } catch {}
+            }
+          }
+        })
+        .catch(() => {});
+    }
+  }, [token]);
 
   return (
     <BrowserRouter>

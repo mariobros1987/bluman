@@ -157,6 +157,17 @@ export async function cambiaPasswordClienteApi(newPassword: string, currentPassw
 /**
  * Recupero dati profilo utente autenticato
  */
+export async function fetchMeApi() {
+  const res = await fetch(`${API_BASE}/auth/me`, {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => null);
+    throw new Error(data?.errore || 'Non autenticato');
+  }
+  return await res.json();
+}
+
 export async function fetchProfiloUtenteApi() {
   const res = await fetch(`${API_BASE}/auth/profilo`, {
     headers: getAuthHeaders(),
