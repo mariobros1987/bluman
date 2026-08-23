@@ -11,9 +11,11 @@
  * credenziale di portale partiva dalla produzione, quindi nessun cliente poteva né entrare
  * nel portale né firmare.
  *
- * La stessa email spedita dalla funzione serverless su Vercel arriva. Quindi quando l'SMTP
- * diretto non passa, il messaggio viene affidato a `POST /api/send-email`, che gira su
- * un'altra rete e usa le stesse credenziali dello studio.
+ * La stessa email spedita dalla funzione serverless su Vercel arriva. Quindi in produzione il
+ * messaggio viene affidato a `POST /api/send-email`, che gira su un'altra rete e usa le stesse
+ * credenziali dello studio; l'SMTP diretto resta come ripiego. L'ordine è quello e non
+ * l'inverso perché le porte bloccate non rifiutano, scadono: provarle per prime aggiungerebbe
+ * decine di secondi a ogni invio (il dettaglio è sopra `inviaEmail`).
  *
  * Due cose che questo file NON fa, per scelta:
  *
@@ -159,9 +161,58 @@ async function inviaViaRelay(messaggio: MessaggioEmail, smtp: CredenzialiSmtp): 
   }
 }
 
+/** Un tentativo SMTP diretto su tutte le porte plausibili. Vuoto se nessuna ha risposto. */
+async function inviaViaSmtp(
+  messaggio: MessaggioEmail,
+  smtp: CredenzialiSmtp,
+  mittente: string,
+  etichetta: string,
+  errori: string[],
+  timeoutMs: number,
+): Promise<EsitoEmail | null> {
+  for (const cand of candidatiSmtp(smtp)) {
+    const iniziato = Date.now();
+    try {
+      const trasporto = nodemailer.createTransport({
+        host: cand.host,
+        port: cand.port,
+        secure: cand.secure,
+        auth: { user: smtp.user, pass: smtp.pass },
+        tls: { rejectUnauthorized: false },
+        connectionTimeout: timeoutMs,
+        greetingTimeout: timeoutMs,
+      });
+
+      await trasporto.sendMail({
+        from: mittente,
+        to: messaggio.to,
+        subject: messaggio.subject,
+        html: messaggio.html,
+        attachments: messaggio.allegati,
+      });
+      console.log(`[Email ${etichetta}] inviata a ${messaggio.to} via ${cand.host}:${cand.port} in ${Date.now() - iniziato}ms`);
+      return { ok: true, via: `${cand.host}:${cand.port}` };
+    } catch (err: any) {
+      errori.push(`${cand.port}: ${err?.code ? `${err.code} — ` : ''}${err?.message || 'errore sconosciuto'}`);
+    }
+  }
+  return null;
+}
+
 /**
- * Spedisce, provando prima l'SMTP diretto e poi il relay. Unico punto di uscita della posta
- * dal backend.
+ * Spedisce. Unico punto di uscita della posta dal backend.
+ *
+ * L'ordine dipende da dove sta girando il codice, e la differenza si misura in secondi che
+ * qualcuno passa a guardare una rotella:
+ *
+ * - **con relay configurato** (la produzione) si prova prima il relay. Le quattro porte SMTP
+ *   qui non sono chiuse con un rifiuto immediato ma con un timeout: provarle per prime
+ *   costerebbe fino a quaranta secondi di attesa a ogni codice OTP, ogni volta, per poi
+ *   ripiegare comunque sul relay che risponde in circa due secondi. Peggio: qualche proxy
+ *   chiude la richiesta prima dei quaranta secondi, e il cliente vede un errore di rete su
+ *   un invio che stava per riuscire. L'SMTP diretto resta come ripiego, così se un giorno
+ *   l'hosting sbloccasse le porte o il relay si fermasse, la posta continua a partire.
+ * - **senza relay** (la macchina di chi sviluppa) c'è solo l'SMTP diretto, che lì funziona.
  */
 export async function inviaEmail(messaggio: MessaggioEmail): Promise<EsitoEmail> {
   const smtp: CredenzialiSmtp = {
@@ -183,45 +234,35 @@ export async function inviaEmail(messaggio: MessaggioEmail): Promise<EsitoEmail>
 
   const mittente = `"${messaggio.fromName || 'BluMan Advisory'}" <${messaggio.fromEmail || smtp.user}>`;
   const errori: string[] = [];
+  const relayDisponibile = Boolean(urlRelay());
 
-  for (const cand of candidatiSmtp(smtp)) {
-    const iniziato = Date.now();
-    try {
-      const trasporto = nodemailer.createTransport({
-        host: cand.host,
-        port: cand.port,
-        secure: cand.secure,
-        auth: { user: smtp.user, pass: smtp.pass },
-        tls: { rejectUnauthorized: false },
-        connectionTimeout: 10000,
-        greetingTimeout: 10000,
-      });
-
-      await trasporto.sendMail({
-        from: mittente,
-        to: messaggio.to,
-        subject: messaggio.subject,
-        html: messaggio.html,
-        attachments: messaggio.allegati,
-      });
-      console.log(`[Email ${etichetta}] inviata a ${messaggio.to} via ${cand.host}:${cand.port} in ${Date.now() - iniziato}ms`);
-      return { ok: true, via: `${cand.host}:${cand.port}` };
-    } catch (err: any) {
-      errori.push(`${cand.port}: ${err?.code ? `${err.code} — ` : ''}${err?.message || 'errore sconosciuto'}`);
+  if (relayDisponibile) {
+    const esitoRelay = await inviaViaRelay(messaggio, smtp);
+    if (esitoRelay.ok) {
+      console.log(`[Email ${etichetta}] inviata a ${messaggio.to} ${esitoRelay.via}`);
+      return esitoRelay;
     }
+
+    console.warn(`[Email ${etichetta}] relay non disponibile (${esitoRelay.errore}); tentativo SMTP diretto`);
+
+    // Timeout più corto del solito: qui l'SMTP è già il secondo tentativo e chi ha chiesto
+    // il codice sta aspettando da qualche secondo.
+    const esitoSmtp = await inviaViaSmtp(messaggio, smtp, mittente, etichetta, errori, 7000);
+    if (esitoSmtp) return esitoSmtp;
+
+    // Entrambi i motivi, perché richiedono interventi diversi: un rifiuto del relay si
+    // risolve nelle impostazioni della casella, le porte chiuse sull'hosting.
+    const errore = `${esitoRelay.errore}; nessuna porta utilizzabile verso ${smtp.host} (${errori.join('; ')})`;
+    console.error(`[Email ${etichetta}] invio non riuscito: ${errore}`);
+    return { ok: false, errore };
   }
 
-  console.warn(`[Email ${etichetta}] SMTP diretto non disponibile (${errori.join('; ')}); tentativo via relay`);
+  const esitoSmtp = await inviaViaSmtp(messaggio, smtp, mittente, etichetta, errori, 10000);
+  if (esitoSmtp) return esitoSmtp;
 
-  const esitoRelay = await inviaViaRelay(messaggio, smtp);
-  if (esitoRelay.ok) {
-    console.log(`[Email ${etichetta}] inviata a ${messaggio.to} ${esitoRelay.via}`);
-    return esitoRelay;
-  }
-
-  // Entrambi i motivi, perché richiedono interventi diversi: le porte chiuse si risolvono
-  // sull'hosting, un rifiuto del relay nelle impostazioni della casella.
-  const errore = `nessuna porta utilizzabile verso ${smtp.host} (${errori.join('; ')}); ${esitoRelay.errore}`;
+  const errore =
+    `nessuna porta utilizzabile verso ${smtp.host} (${errori.join('; ')}); ` +
+    'nessun relay configurato (EMAIL_RELAY_URL o APP_BASE_URL assenti)';
   console.error(`[Email ${etichetta}] invio non riuscito: ${errore}`);
   return { ok: false, errore };
 }
