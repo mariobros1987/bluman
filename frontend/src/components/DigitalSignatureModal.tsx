@@ -7,6 +7,14 @@ interface DigitalSignatureModalProps {
   signerRole: string;
   onClose: () => void;
   onSigned: (signature: SignatureData) => void;
+  /**
+   * Piano di sovrapposizione. Serve quando il pad viene aperto sopra un'altra modale — per
+   * esempio quella della firma FEA, che sta a 9999: col valore predefinito il pad si
+   * disegnerebbe dietro e il cliente vedrebbe soltanto lo sfondo scurirsi.
+   */
+  zIndex?: number;
+  /** Testo sotto l'area di firma: chi firma legge cosa viene davvero registrato. */
+  notaRegistrazione?: string;
 }
 
 export function DigitalSignatureModal({
@@ -15,6 +23,8 @@ export function DigitalSignatureModal({
   signerRole,
   onClose,
   onSigned,
+  zIndex = 120,
+  notaRegistrazione,
 }: DigitalSignatureModalProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -96,14 +106,19 @@ export function DigitalSignatureModal({
       signerRole: signerRole,
       signatureImageBase64: signatureImgBase64,
       timestamp: new Date().toLocaleString('it-IT'),
-      ipAddress: '83.211.12.94 (eIDAS Verificato)',
+      // L'indirizzo IP lo conosce solo il server. Qui c'era una costante,
+      // `'83.211.12.94 (eIDAS Verificato)'`, che compariva identica su ogni firma di ogni
+      // cliente e in un verbale probatorio è un dato falso con l'aspetto di una prova.
+      // Il valore vero viene registrato dal backend nel sigillo (campo `ipAddress` di
+      // `firma_elettronica`), e vale `null` quando il proxy non lo espone.
+      ipAddress: null,
     };
 
     onSigned(signatureResult);
   };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 120, padding: 16 }}>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex, padding: 16 }}>
       <div style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, padding: 24, width: '100%', maxWidth: 520, display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div>
           <div style={{ fontSize: 16, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -178,8 +193,15 @@ export function DigitalSignatureModal({
           </div>
         )}
 
-        <div style={{ background: '#0d2d22', border: '1px solid #1a5c3c', borderRadius: 8, padding: 10, fontSize: 11, color: '#34d399' }}>
-          ✓ La firma verrà apposta con marca temporale ed IP esecutore sul file PDF A4.
+        {/*
+          Diceva "marca temporale ed IP esecutore": l'IP qui non c'è più, perché il browser non
+          lo conosce e la costante che stava al suo posto era falsa. Chi apre il pad da un flusso
+          che registra altro (per esempio la firma FEA, dove il codice è già stato convalidato)
+          passa la nota giusta con `notaRegistrazione`.
+        */}
+        <div style={{ background: '#0d2d22', border: '1px solid #1a5c3c', borderRadius: 8, padding: 10, fontSize: 11, color: '#34d399', lineHeight: 1.45 }}>
+          {notaRegistrazione ??
+            '✓ Il tratto grafico viene allegato al documento insieme alla data e ora di apposizione. Da solo non identifica il firmatario: vale come elemento a corredo della verifica già effettuata.'}
         </div>
 
         {/* Bottoni Azione */}

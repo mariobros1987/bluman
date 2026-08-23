@@ -295,9 +295,28 @@ export async function sendMagicLinkEmail(
   return false;
 }
 
-export async function sendOtpSecurityEmail(toEmail: string, clienteNome: string, otpCode: string): Promise<boolean> {
-  const transporter = createTransporter();
-  const fromEmail = process.env.SMTP_FROM || 'support@bluecode-ltd.com';
+export interface OpzioniEmailOtp {
+  /** Credenziali SMTP dello studio: senza, l'OTP di ogni tenant partirebbe dal mittente di ambiente. */
+  smtp?: { host?: string; port?: number; secure?: boolean; user?: string; pass?: string };
+  fromEmail?: string;
+  fromName?: string;
+  /** Validità dichiarata al destinatario: deve coincidere con la TTL vera, non essere un numero fisso nell'HTML. */
+  minutiValidita?: number;
+  /** Cosa si sta firmando. Il testo diceva sempre "Engagement Letter", anche per un addendum. */
+  oggettoFirma?: string;
+}
+
+export async function sendOtpSecurityEmail(
+  toEmail: string,
+  clienteNome: string,
+  otpCode: string,
+  opzioni: OpzioniEmailOtp = {},
+): Promise<boolean> {
+  const transporter = createTransporter(opzioni.smtp);
+  const fromEmail = opzioni.fromEmail || process.env.SMTP_FROM || 'support@bluecode-ltd.com';
+  const fromName = opzioni.fromName || 'BluMan Security';
+  const minuti = opzioni.minutiValidita ?? 5;
+  const oggetto = opzioni.oggettoFirma || 'il documento in attesa di firma';
 
   const html = `
     <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; color: #1e293b;">
@@ -307,11 +326,11 @@ export async function sendOtpSecurityEmail(toEmail: string, clienteNome: string,
       </div>
       <div style="padding: 32px 24px; text-align: center;">
         <h2 style="margin-top: 0; font-size: 18px; color: #0f172a;">Gentile ${clienteNome},</h2>
-        <p style="line-height: 1.6; color: #475569;">Ecco il tuo codice di sicurezza monouso (OTP) a 6 cifre per la firma digitale dell'Engagement Letter:</p>
+        <p style="line-height: 1.6; color: #475569;">Ecco il tuo codice di sicurezza monouso (OTP) a 6 cifre per la firma digitale di ${oggetto}:</p>
         <div style="margin: 28px 0; background: #f1f5f9; padding: 20px; border-radius: 12px; display: inline-block;">
           <span style="font-size: 32px; font-weight: 900; letter-spacing: 8px; color: #4338ca; font-family: monospace;">${otpCode}</span>
         </div>
-        <p style="font-size: 13px; color: #64748b;">⏳ Questo codice ha una validità massima di <strong>5 minuti</strong>.</p>
+        <p style="font-size: 13px; color: #64748b;">⏳ Questo codice ha una validità massima di <strong>${minuti} ${minuti === 1 ? 'minuto' : 'minuti'}</strong>.</p>
         <p style="font-size: 12px; color: #94a3b8; margin-top: 24px; line-height: 1.5;">Non condividere questo codice con nessuno. Se non hai richiesto tu la firma, contatta immediatamente il tuo advisor.</p>
       </div>
       <div style="background-color: #f8fafc; padding: 16px 24px; text-align: center; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8;">
@@ -321,18 +340,22 @@ export async function sendOtpSecurityEmail(toEmail: string, clienteNome: string,
   `;
 
   if (!transporter) {
-    console.log(`[Email Simulation] Invio Codice OTP ${otpCode} a ${toEmail}`);
+    // Il codice non finisce nei log, né qui né in caso di successo: i log di Railway sono
+    // leggibili da chiunque abbia accesso al progetto, e un OTP scritto lì è un secondo
+    // fattore consegnato a tutti. Senza SMTP configurato l'invio FALLISCE, e la rotta lo
+    // dice al cliente — prima "simulazione" significava firma bloccata senza spiegazione.
+    console.warn(`[SMTP] Nessuna configurazione SMTP: codice OTP per ${toEmail} NON inviato.`);
     return false;
   }
 
   try {
     await transporter.sendMail({
-      from: `"BluMan Security" <${fromEmail}>`,
+      from: `"${fromName}" <${fromEmail}>`,
       to: toEmail,
-      subject: `🔐 Codice OTP di Sicurezza: ${otpCode} — Firma Incarico BluMan`,
+      subject: `🔐 Codice OTP di Sicurezza: ${otpCode} — Firma BluMan`,
       html,
     });
-    console.log(`[SMTP] Email OTP ${otpCode} inviata a ${toEmail}`);
+    console.log(`[SMTP] Email OTP inviata a ${toEmail}`);
     return true;
   } catch (err) {
     console.error('[SMTP Error] Errore invio email OTP:', err);

@@ -1491,14 +1491,13 @@ function FatturazioneTab({ project, rawDbProject, onRefresh }: { project: Proget
                       <div style="text-align:right;"><div style="font-size:11px;color:#64748b;">Totale Documento:</div><div style="font-size:22px;font-weight:800;color:#4338ca;">${fmt(previewFattura.importo)}</div></div>
                     </div>
                   `;
-                  await downloadRealPdf(`BluMan_Fattura_${previewFattura.numero}`, htmlContent, [
-                    {
-                      signerName: 'Joe Disabato',
-                      signerRole: 'Senior Advisor (Studio Erogante)',
-                      timestamp: new Date().toLocaleString('it-IT'),
-                      ipAddress: '83.211.12.94',
-                    }
-                  ]);
+                  // Qui veniva passato un blocco firma con nome dell'advisor e un IP fisso
+                  // ('83.211.12.94'): il generatore lo stampa sotto la dicitura «✓ FIRMATO
+                  // DIGITALMENTE (eIDAS UE 910/2014)», quindi ogni fattura esportata usciva
+                  // con un sigillo che nessuno aveva apposto e una provenienza inventata. La
+                  // fattura è un documento contabile: si esporta senza sigillo, e se un
+                  // giorno andrà firmata passerà dal flusso di firma vero.
+                  await downloadRealPdf(`BluMan_Fattura_${previewFattura.numero}`, htmlContent);
                 }}
                 style={{ background: '#4338ca', color: '#fff', border: 'none', padding: '8px 20px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 12px rgba(67,56,202,.3)' }}
               >

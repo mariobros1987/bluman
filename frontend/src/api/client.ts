@@ -1313,49 +1313,190 @@ export async function creaContoBancarioApi(input: { nomeConto: string; banca: st
   }
 }
 
-export async function requestPortalOtpApi(clienteId: string, canale: 'whatsapp' | 'email' | 'sms' = 'whatsapp', cellulare?: string, email?: string) {
-  try {
-    const res = await fetch(`${API_BASE}/portal/request-otp`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ clienteId, canale, cellulare, email }),
-    });
-    if (!res.ok) throw new Error('Errore richiesta codice OTP');
-    return await res.json();
-  } catch (err) {
-    console.warn('Request OTP fallback:', err);
-    return { ok: true, devOtp: '482910', maskedTarget: cellulare || '+39 333 *** 6278', expiresInSeconds: 300 };
-  }
+// ── FIRMA ELETTRONICA AVANZATA: CANALI, OTP, FILE FIRMATO ──────────────────
+//
+// Qui c'erano due ripieghi che rendevano la firma una finzione:
+//
+//   · se `/portal/request-otp` non rispondeva, la funzione restituiva
+//     `{ ok: true, devOtp: '482910', maskedTarget: '+39 333 *** 6278' }`. Il portale
+//     mostrava "codice inviato" e il numero di una persona reale, senza che partisse niente;
+//   · se `/portal/verify-otp-and-sign` non rispondeva, digitando `482910` o `123456` il
+//     browser fabbricava da sé un sigillo eIDAS — id, timestamp e un SHA-256 costante che
+//     è l'hash della stringa vuota — e il portale lo mostrava come firma apposta. Nessuna
+//     riga a database: la firma esisteva solo nella schermata, e chiunque leggesse il
+//     bundle JavaScript conosceva le due cifre per produrne una.
+//
+// Ora un errore è un errore. Se il backend non risponde la firma non avviene, e il
+// cliente legge perché.
+
+export type CanaleOtp = 'whatsapp' | 'email' | 'telegram';
+export type AmbitoFirma = 'engagement_letter' | 'documento_vault' | 'modulo_completato' | 'addendum';
+
+export interface CanaleFirma {
+  canale: CanaleOtp;
+  disponibile: boolean;
+  motivo?: string;
+  recapitoMascherato: string | null;
 }
 
-export async function verifyPortalOtpAndSignApi(clienteId: string, otp: string, signerName: string, documentoTitolo?: string) {
+/** Legge l'errore dal corpo della risposta: il backend spiega sempre il rifiuto. */
+async function erroreDellaRisposta(res: Response, ripiego: string): Promise<Error & { attendiSecondi?: number; status: number }> {
+  let messaggio = ripiego;
+  let attendiSecondi: number | undefined;
   try {
-    const res = await fetch(`${API_BASE}/portal/verify-otp-and-sign`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ clienteId, otp, signerName, documentoTitolo }),
-    });
-    if (!res.ok) {
-      const errJson = await res.json();
-      throw new Error(errJson.errore || 'Codice OTP non valido');
-    }
-    return await res.json();
-  } catch (err: any) {
-    if (otp === '482910' || otp === '123456') {
-      return {
-        ok: true,
-        seal: {
-          signatureId: `EIDAS-FEA-${Date.now().toString(36).toUpperCase()}`,
-          signerName,
-          documentoTitolo: documentoTitolo || 'Engagement Letter & Mandato',
-          timestampIso: new Date().toISOString(),
-          sha256Digest: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
-          standard: 'eIDAS UE 910/2014 Advanced Electronic Signature (FEA)',
-        }
-      };
-    }
-    throw err;
+    const body = await res.json();
+    messaggio = body?.errore || ripiego;
+    attendiSecondi = body?.attendiSecondi;
+  } catch {
+    // Risposta non JSON (proxy, 502 di Railway): resta il messaggio di ripiego.
   }
+  const err = Object.assign(new Error(messaggio), { status: res.status, attendiSecondi });
+  return err;
+}
+
+/** Su quali canali il cliente può ricevere il codice, e perché non sugli altri. */
+export async function canaliFirmaApi(clienteId?: string): Promise<{
+  ok: boolean;
+  canalePreferito: CanaleOtp | null;
+  canali: CanaleFirma[];
+  botTelegram: string | null;
+}> {
+  const query = clienteId ? `?clienteId=${encodeURIComponent(clienteId)}` : '';
+  const res = await fetchWithTimeout(`${API_BASE}/portal/canali-firma${query}`, { headers: getAuthHeaders() });
+  if (!res.ok) throw await erroreDellaRisposta(res, 'Impossibile leggere i canali di firma disponibili.');
+  return await res.json();
+}
+
+export async function requestPortalOtpApi(input: {
+  canale: CanaleOtp;
+  ambito?: AmbitoFirma;
+  riferimentoId?: string;
+  /** Recapito diverso da quello in anagrafica, digitato dal firmatario. */
+  recapitoDichiarato?: string;
+  clienteId?: string;
+  signerName?: string;
+}): Promise<{
+  ok: boolean;
+  canale: CanaleOtp;
+  maskedTarget: string;
+  recapitoDichiarato: boolean;
+  expiresInSeconds: number;
+  reinviiRimanenti: number;
+  attesaReinvioSecondi: number;
+}> {
+  const res = await fetchWithTimeout(
+    `${API_BASE}/portal/request-otp`,
+    { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(input) },
+    15000, // La consegna passa da WhatsApp Cloud API o da un SMTP: 8 secondi sono pochi.
+  );
+  if (!res.ok) throw await erroreDellaRisposta(res, 'Invio del codice non riuscito.');
+  return await res.json();
+}
+
+export interface SigilloFirma {
+  id: string;
+  signatureId: string;
+  tipoFirma: string;
+  signerName: string;
+  documentoTitolo: string;
+  timestampIso: string;
+  documentoHash: string;
+  sha256Digest: string;
+  ipAddress: string | null;
+  userAgent: string | null;
+  canaleVerificato: string;
+  standard: string;
+  fileFirmatoUrl?: string;
+}
+
+export async function verifyPortalOtpAndSignApi(input: {
+  otp: string;
+  /** Impronta del testo che il cliente ha davvero letto: senza, il backend rifiuta. */
+  documentoHash: string;
+  signerName?: string;
+  firmatarioRuolo?: string;
+  documentoTitolo?: string;
+  ambito?: AmbitoFirma;
+  riferimentoId?: string;
+  clienteId?: string;
+  /** Grafometrica raccolta dopo l'OTP, allegata al sigillo. */
+  firmaGrafometricaPng?: string;
+}): Promise<{ ok: boolean; seal: SigilloFirma; progettoAttivato: string | null; message: string }> {
+  const res = await fetchWithTimeout(
+    `${API_BASE}/portal/verify-otp-and-sign`,
+    { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(input) },
+    15000,
+  );
+  if (!res.ok) throw await erroreDellaRisposta(res, 'Codice non valido: la firma non è stata apposta.');
+  return await res.json();
+}
+
+/** Documento scaricato e firmato a penna, o firmato con il provider digitale del cliente. */
+export async function firmaConFileApi(input: {
+  tipoFirma: 'manuale_scansionata' | 'qualificata_esterna';
+  documentoHash: string;
+  filename: string;
+  contentBase64: string;
+  ambito?: AmbitoFirma;
+  riferimentoId?: string;
+  clienteId?: string;
+  documentoTitolo?: string;
+  signerName?: string;
+  firmatarioRuolo?: string;
+  otp?: string;
+}): Promise<{ ok: boolean; seal: SigilloFirma }> {
+  const res = await fetchWithTimeout(
+    `${API_BASE}/portal/firma-con-file`,
+    { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(input) },
+    30000, // Caricamento di un file: qui il timeout breve tagliava le scansioni pesanti.
+  );
+  if (!res.ok) throw await erroreDellaRisposta(res, 'Caricamento del documento firmato non riuscito.');
+  return await res.json();
+}
+
+/** Le firme registrate: il cliente vede le proprie, lo studio quelle del tenant. */
+export async function elencoFirmeApi(filtri?: { clienteId?: string; ambito?: AmbitoFirma }): Promise<{
+  ok: boolean;
+  firme: Array<SigilloFirma & {
+    ambito: string;
+    riferimentoId: string | null;
+    firmatarioNome: string;
+    firmatarioRuolo: string | null;
+    fileFirmatoHash: string | null;
+    firmatoAt: string;
+    cliente: { id: string; nome: string };
+  }>;
+}> {
+  const params = new URLSearchParams();
+  if (filtri?.clienteId) params.set('clienteId', filtri.clienteId);
+  if (filtri?.ambito) params.set('ambito', filtri.ambito);
+  const query = params.toString() ? `?${params}` : '';
+  const res = await fetchWithTimeout(`${API_BASE}/firme${query}`, { headers: getAuthHeaders() });
+  if (!res.ok) throw await erroreDellaRisposta(res, 'Impossibile leggere le firme registrate.');
+  return await res.json();
+}
+
+export async function grafometricaFirmaApi(firmaId: string): Promise<string | null> {
+  const res = await fetchWithTimeout(`${API_BASE}/firme/${firmaId}/grafometrica`, { headers: getAuthHeaders() });
+  if (!res.ok) return null;
+  const body = await res.json();
+  return body?.firmaGrafometricaPng ?? null;
+}
+
+/**
+ * Impronta SHA-256 del testo che il cliente sta leggendo sullo schermo.
+ *
+ * Il backend pretende questo valore e non ne inventa più uno: il sigillo deve identificare
+ * il documento firmato, altrimenti certifica una volontà su un testo qualunque. Si calcola
+ * qui perché il testo del mandato è ancora composto nel frontend — quando il documento
+ * passerà lato server, l'impronta arriverà da lì e questa funzione servirà solo ai file.
+ */
+export async function calcolaHashSha256(contenuto: string | ArrayBuffer): Promise<string> {
+  const dati = typeof contenuto === 'string' ? new TextEncoder().encode(contenuto) : contenuto;
+  const digest = await crypto.subtle.digest('SHA-256', dati);
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
 }
 
 export async function triggerCronScadenzeApi() {

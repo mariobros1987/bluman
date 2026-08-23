@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { generateOtp, verifyOtp, generateEidasSignatureSeal } from './otpService.js';
+import {
+  creaSigilloFea,
+  mascheraRecapito,
+  descriviCanaleVerificato,
+  canaleValido,
+  CANALI_OTP,
+} from './otpService.js';
+import { hashCodiceOtp, verificaCodiceOtp } from '../util/jwt.js';
 import { scanFileBuffer } from './securityScanner.js';
 import { trasmettiFatturaSdi } from './sdiService.js';
 import { runDailyNotificationCron } from './cronService.js';
@@ -7,49 +14,108 @@ import { runDailyNotificationCron } from './cronService.js';
 describe('🧪 Nuove Funzionalità Enterprise — Test Suite di Collaudo', () => {
 
   // ── 1. TEST SERVIZIO OTP & SIGILLO FEA eIDAS ────────────────────────────
+  //
+  // `creaOtp` e `verificaOtp` non sono qui: scrivono su `codice_otp`, e provarli senza
+  // database vorrebbe dire reintrodurre lo store in memoria che era il guasto da riparare.
+  // Restano coperte le parti pure, che sono quelle dove un errore diventa un verbale falso.
   describe('🔐 OTP Service & Sigillo eIDAS FEA', () => {
-    it('genera un codice OTP a 6 cifre valido', () => {
-      const otp = generateOtp('cli-test-01', '+39 333 5936278', 'whatsapp');
-      expect(otp).toBeDefined();
-      expect(otp.length).toBe(6);
-      expect(/^\d{6}$/.test(otp)).toBe(true);
+    it('non offre canali che il server non sa spedire', () => {
+      // Il canale SMS era nell'interfaccia e nel tipo senza nessun provider dietro:
+      // sceglierlo produceva un codice mai consegnato e una firma impossibile da chiudere.
+      expect(CANALI_OTP).toEqual(['whatsapp', 'email', 'telegram']);
+      expect(canaleValido('sms')).toBe(false);
+      expect(canaleValido('whatsapp')).toBe(true);
+      expect(canaleValido('')).toBe(false);
+      expect(canaleValido(undefined)).toBe(false);
     });
 
-    it('valida con successo il codice OTP corretto e ne impedisce il riutilizzo', () => {
-      const otp = generateOtp('cli-test-02', '+39 333 5936278', 'whatsapp');
-      const verification = verifyOtp('cli-test-02', otp);
-      expect(verification.valid).toBe(true);
+    it('lega il digest del codice al cliente e non lo rende ricostruibile senza segreto', () => {
+      const perUno = hashCodiceOtp('123456', 'cli-test-01');
+      const perAltro = hashCodiceOtp('123456', 'cli-test-02');
 
-      // Secondo tentativo con lo stesso codice deve fallire (monouso)
-      const secondAttempt = verifyOtp('cli-test-02', otp);
-      expect(secondAttempt.valid).toBe(false);
+      // Stesso codice, clienti diversi: digest diversi. Un valore intercettato su una riga
+      // non è riutilizzabile su un'altra.
+      expect(perUno).not.toBe(perAltro);
+      expect(perUno).toHaveLength(64);
+      // Non è lo SHA-256 nudo del codice: sei cifre sotto un hash veloce sono un milione
+      // di voci precalcolabili da chiunque legga il database.
+      expect(perUno).not.toBe('8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92');
     });
 
-    it('blocca tentativi errati e applica rate-limiting', () => {
-      generateOtp('cli-test-03', '+39 333 5936278', 'whatsapp');
-      const res1 = verifyOtp('cli-test-03', '000000');
-      expect(res1.valid).toBe(false);
-      expect(res1.reason).toContain('Tentativo 1 di 3');
-
-      const res2 = verifyOtp('cli-test-03', '000000');
-      expect(res2.valid).toBe(false);
-      expect(res2.reason).toContain('Tentativo 2 di 3');
+    it('accetta solo il codice corretto, a tempo costante', () => {
+      const atteso = hashCodiceOtp('654321', 'cli-test-03');
+      expect(verificaCodiceOtp('654321', 'cli-test-03', atteso)).toBe(true);
+      expect(verificaCodiceOtp('654322', 'cli-test-03', atteso)).toBe(false);
+      // Codice giusto, cliente sbagliato: non passa.
+      expect(verificaCodiceOtp('654321', 'cli-test-04', atteso)).toBe(false);
+      // Digest di lunghezza diversa: rifiutato senza far esplodere il confronto.
+      expect(verificaCodiceOtp('654321', 'cli-test-03', 'abc')).toBe(false);
     });
 
-    it('genera un sigillo di firma crittografica eIDAS con hash SHA-256 valido', () => {
-      const seal = generateEidasSignatureSeal({
+    it('maschera i recapiti nelle risposte al browser', () => {
+      const mascherata = mascheraRecapito('mario.rossi@example.com');
+      expect(mascherata).not.toContain('rio.rossi');
+      expect(mascherata).toContain('@example.com');
+      expect(mascheraRecapito('+39 000 0000000')).not.toContain('0000000');
+    });
+
+    it('genera un sigillo eIDAS con impronta SHA-256 valida', () => {
+      const seal = creaSigilloFea({
         clienteId: 'cli-test-04',
         signerName: 'Roberto Rossi (CEO)',
-        documentoTitolo: 'Lettera d\'Incarico Professionale',
-        documentoHash: 'abcdef1234567890',
+        documentoTitolo: "Lettera d'Incarico Professionale",
+        documentoHash: 'a'.repeat(64),
         ip: '192.168.1.100',
         userAgent: 'Mozilla/5.0 Mac',
+        canaleVerificato: 'Codice OTP monouso consegnato via email a ma***i@example.com',
       });
 
       expect(seal.signatureId).toContain('EIDAS-FEA-');
       expect(seal.signerName).toBe('Roberto Rossi (CEO)');
-      expect(seal.sha256Digest.length).toBe(64); // Lunghezza standard SHA-256 hex
+      expect(seal.sha256Digest).toHaveLength(64);
       expect(seal.standard).toContain('eIDAS UE 910/2014');
+      // Il canale dichiarato è quello usato davvero: prima il sigillo scriveva
+      // "OTP SMS/WhatsApp + Token Crittografico" qualunque fosse il canale.
+      expect(seal.canaleVerificato).toContain('email');
+    });
+
+    it('registra l\'assenza dell\'IP come assenza, non come 127.0.0.1', () => {
+      const senzaIp = creaSigilloFea({
+        clienteId: 'cli-test-05',
+        signerName: 'Anna Bianchi',
+        documentoTitolo: 'Addendum',
+        documentoHash: 'b'.repeat(64),
+        canaleVerificato: 'Codice OTP monouso consegnato via WhatsApp a +39***123',
+      });
+
+      // Nessun firmatario si collega dal loopback del server: quel valore in un verbale
+      // probatorio era un dato falso, e sembrava una prova.
+      expect(senzaIp.ipAddress).toBeNull();
+      expect(senzaIp.userAgent).toBeNull();
+      // L'impronta resta calcolabile: l'assenza è essa stessa parte di ciò che è firmato.
+      expect(senzaIp.sha256Digest).toHaveLength(64);
+    });
+
+    it('mette a verbale il recapito dichiarato quando è diverso da quello in anagrafica', () => {
+      const daAnagrafica = descriviCanaleVerificato({
+        canale: 'whatsapp',
+        target: '+39 111 1111111',
+        targetDichiarato: false,
+        targetAnagrafica: '+39 111 1111111',
+      });
+      expect(daAnagrafica).toContain('anagrafica');
+      expect(daAnagrafica).not.toContain('dichiarato');
+
+      const dichiarato = descriviCanaleVerificato({
+        canale: 'whatsapp',
+        target: '+39 222 2222222',
+        targetDichiarato: true,
+        targetAnagrafica: '+39 111 1111111',
+      });
+      // Chi possiede il magic link può dirottare il codice su un recapito proprio: la cosa
+      // indebolisce il legame fra codice e persona, e va scritta nel sigillo, non taciuta.
+      expect(dichiarato).toContain('dichiarato dal firmatario');
+      expect(dichiarato).toContain('diverso da quello in anagrafica');
     });
   });
 

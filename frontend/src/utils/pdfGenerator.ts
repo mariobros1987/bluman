@@ -6,7 +6,11 @@ export interface SignatureData {
   signerRole: string;
   signatureImageBase64?: string;
   timestamp: string;
-  ipAddress: string;
+  /** `null` quando il server non ha registrato l'IP del firmatario: si stampa così. */
+  ipAddress: string | null;
+  /** Identificativo e impronta del sigillo, quando la firma è registrata a database. */
+  signatureId?: string;
+  sha256Digest?: string;
 }
 
 /**
@@ -96,7 +100,8 @@ function createPaginatedPages(
             ${sig.signatureImageBase64 ? `<img src="${sig.signatureImageBase64}" style="height: 36px; max-width: 160px; margin: 4px 0; object-fit: contain;" />` : ''}
             <div style="font-size: 8pt; color: #64748b; font-family: monospace; margin-top: 3px; line-height: 1.3;">
               Data/Ora: ${sig.timestamp}<br/>
-              IP: ${sig.ipAddress} · SHA-256 Verified
+              IP: ${sig.ipAddress || 'non registrato'}${sig.signatureId ? `<br/>Sigillo: ${sig.signatureId}` : ''}
+              ${sig.sha256Digest ? `<br/>SHA-256: ${sig.sha256Digest}` : ''}
             </div>
           </div>
         `).join('')}

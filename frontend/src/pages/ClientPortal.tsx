@@ -7,8 +7,28 @@ import type { SignatureData } from '../utils/pdfGenerator';
 import { DigitalSignatureModal } from '../components/DigitalSignatureModal';
 import { resolveDocumentTemplateHtml, PREBUILT_TEMPLATES } from '../utils/documentTemplates';
 import { getStudioInfoForTenant, getCurrentTenantId, getTenantStorageKey, BLUECODE_TENANT_ID } from '../utils/tenant';
-import { fetchModuliLibreria, fetchProgetti, creaPreventivoEAccettaApi, fetchClienti, creaProgettoApi, creaClienteApi, fetchComunicazioniApi, inviaComunicazioneApi, requestPortalOtpApi, verifyPortalOtpAndSignApi, magicLoginApi, clientLoginApi, cambiaPasswordClienteApi } from '../api/client';
-import type { CategoriaModulo } from '../types';
+import {
+  fetchModuliLibreria,
+  fetchProgetti,
+  creaPreventivoEAccettaApi,
+  fetchClienti,
+  creaProgettoApi,
+  creaClienteApi,
+  fetchComunicazioniApi,
+  inviaComunicazioneApi,
+  canaliFirmaApi,
+  requestPortalOtpApi,
+  verifyPortalOtpAndSignApi,
+  firmaConFileApi,
+  calcolaHashSha256,
+  magicLoginApi,
+  clientLoginApi,
+  cambiaPasswordClienteApi,
+} from '../api/client';
+import type { CanaleOtp, CanaleFirma, AmbitoFirma } from '../api/client';
+// `Progetto` era annotato a riga 560 senza essere importato: `vite build` si fermava lì, e
+// il portale in produzione restava alla versione precedente qualunque cosa si correggesse.
+import type { CategoriaModulo, Progetto } from '../types';
 
 export interface ModuloPassaggio {
   id: string;
@@ -211,15 +231,41 @@ export function ClientPortal() {
   // Modale Firma Grafica per Documenti Singoli
   const [signingDoc, setSigningDoc] = useState<any | null>(null);
 
-  // FEA OTP State
+  // ── FIRMA ELETTRONICA AVANZATA: CANALE, CODICE, MODALITÀ ──────────────────
+  //
+  // I due valori iniziali che stavano qui erano il cellulare di una persona reale e un
+  // indirizzo email inventato: comparivano precompilati nei campi di QUALUNQUE cliente, e
+  // il primo era anche la destinazione predefinita del codice di firma. Ora i recapiti
+  // arrivano dall'anagrafica via `/portal/canali-firma`, e questi campi restano vuoti:
+  // servono solo se il firmatario dichiara un recapito diverso (§1.2).
   const [otpModalOpen, setOtpModalOpen] = useState(false);
   const [otpCode, setOtpCode] = useState('');
-  const [otpCanale, setOtpCanale] = useState<'whatsapp' | 'email' | 'sms'>('whatsapp');
-  const [otpPhoneInput, setOtpPhoneInput] = useState('+39 333 5936278');
-  const [otpEmailInput, setOtpEmailInput] = useState('client@holdingbeta.advisory');
-  const [otpTarget, setOtpTarget] = useState('+39 333 *** 6278');
+  const [otpCanale, setOtpCanale] = useState<CanaleOtp>('whatsapp');
+  const [canaliFirma, setCanaliFirma] = useState<CanaleFirma[]>([]);
+  const [botTelegram, setBotTelegram] = useState<string | null>(null);
+  const [usaRecapitoDiverso, setUsaRecapitoDiverso] = useState(false);
+  const [recapitoDichiarato, setRecapitoDichiarato] = useState('');
+  const [otpTarget, setOtpTarget] = useState('');
+  const [otpTargetDichiarato, setOtpTargetDichiarato] = useState(false);
   const [otpLoading, setOtpLoading] = useState(false);
   const [otpError, setOtpError] = useState<string | null>(null);
+  /** Secondi di attesa prima del prossimo reinvio, e reinvii ancora concessi (§1.5). */
+  const [otpAttesaReinvio, setOtpAttesaReinvio] = useState(0);
+  const [otpReinviiRimanenti, setOtpReinviiRimanenti] = useState<number | null>(null);
+  /** Validità residua del codice in corso: dichiarata dal backend, non un 5 scritto a mano. */
+  const [otpValiditaSecondi, setOtpValiditaSecondi] = useState(0);
+  /** Le tre strade di firma richieste (§1.3). */
+  const [modalitaFirma, setModalitaFirma] = useState<'otp' | 'manuale_scansionata' | 'qualificata_esterna'>('otp');
+  const [fileFirmato, setFileFirmato] = useState<{ nome: string; base64: string } | null>(null);
+  const [caricamentoFirmato, setCaricamentoFirmato] = useState(false);
+  /**
+   * Pad della firma grafometrica. Si apre DOPO che il codice è stato digitato e prima della
+   * chiamata di convalida (§1.11): il disegno viaggia nella stessa richiesta dell'OTP e
+   * finisce allegato al sigillo. Da sola la grafometrica non prova nulla — chiunque può
+   * tracciare un nome col mouse — quindi non è mai un'alternativa al codice, solo un
+   * elemento in più nel verbale.
+   */
+  const [padGrafometricaAperto, setPadGrafometricaAperto] = useState(false);
   // Stesso motivo del flag `signed`: il sigillo eIDAS è di un cliente preciso e non va letto da
   // una chiave cablata. Viene caricato in `loadPortalData` per il cliente autenticato.
   const [eidasSeal, setEidasSeal] = useState<any>(null);
@@ -414,6 +460,199 @@ export function ClientPortal() {
   useEffect(() => {
     loadPortalData();
   }, [token]);
+
+  // ── CANALI DI FIRMA: QUALI SONO DAVVERO UTILIZZABILI ──────────────────────
+  //
+  // Le tre voci erano scritte a mano nel JSX, SMS compreso, e nessuna sapeva se il canale
+  // fosse configurato: chi scegliesse SMS o WhatsApp su uno studio senza credenziali
+  // vedeva "codice inviato" e restava ad aspettare. Ora l'elenco arriva dal backend con il
+  // motivo dell'indisponibilità, e il preferito del cliente è preselezionato (§1.4).
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    let annullato = false;
+
+    (async () => {
+      try {
+        const res = await canaliFirmaApi();
+        if (annullato) return;
+        setCanaliFirma(res.canali || []);
+        setBotTelegram(res.botTelegram ?? null);
+
+        const disponibili = (res.canali || []).filter((c) => c.disponibile);
+        const preferito = disponibili.find((c) => c.canale === res.canalePreferito);
+        // Scelta ogni volta, con il preferito preselezionato: se il preferito non è
+        // utilizzabile si preseleziona il primo che lo è, invece di un default fisso su un
+        // canale che non spedirebbe.
+        if (preferito) setOtpCanale(preferito.canale);
+        else if (disponibili[0]) setOtpCanale(disponibili[0].canale);
+      } catch (err) {
+        // Nessun ripiego inventato: senza elenco i pulsanti restano disabilitati e il
+        // messaggio lo dice, invece di offrire canali di cui non sappiamo nulla.
+        if (!annullato) setCanaliFirma([]);
+      }
+    })();
+
+    return () => {
+      annullato = true;
+    };
+  }, [isAuthenticated, clientObj?.id]);
+
+  /** Contatore dell'attesa fra due reinvii: il pulsante resta spento finché non arriva a 0. */
+  useEffect(() => {
+    if (otpAttesaReinvio <= 0) return;
+    const t = setTimeout(() => setOtpAttesaReinvio((s) => Math.max(0, s - 1)), 1000);
+    return () => clearTimeout(t);
+  }, [otpAttesaReinvio]);
+
+  /** Validità residua del codice, per non far digitare a vuoto un codice già scaduto. */
+  useEffect(() => {
+    if (otpValiditaSecondi <= 0) return;
+    const t = setTimeout(() => setOtpValiditaSecondi((s) => Math.max(0, s - 1)), 1000);
+    return () => clearTimeout(t);
+  }, [otpValiditaSecondi]);
+
+  const canaleCorrente = canaliFirma.find((c) => c.canale === otpCanale);
+  const nomeCanale: Record<CanaleOtp, string> = {
+    whatsapp: 'WhatsApp',
+    email: 'Email',
+    telegram: 'Telegram',
+  };
+
+  /**
+   * Impronta del documento che il cliente ha davanti.
+   *
+   * Il backend la pretende e non ne fabbrica più una: un sigillo senza impronta certifica
+   * una volontà su un testo qualunque. Si calcola sull'HTML esattamente come viene
+   * mostrato, quindi due clienti con moduli diversi hanno impronte diverse e una modifica
+   * al mandato dopo la firma è dimostrabile.
+   */
+  const impronteDocumento = async () => calcolaHashSha256(getResolvedEngagementHtml());
+
+  const TITOLO_MANDATO = 'Engagement Letter & Mandato Professionale';
+
+  /** Invio o reinvio del codice. Un errore resta un errore, e il cliente legge quale. */
+  const inviaCodiceFirma = async (opzioni: { reinvio?: boolean } = {}) => {
+    setOtpLoading(true);
+    setOtpError(null);
+    setOtpCode('');
+
+    try {
+      const res = await requestPortalOtpApi({
+        canale: otpCanale,
+        ambito: 'engagement_letter',
+        recapitoDichiarato: usaRecapitoDiverso && recapitoDichiarato.trim() ? recapitoDichiarato.trim() : undefined,
+        signerName: clientName,
+      });
+
+      setOtpTarget(res.maskedTarget);
+      setOtpTargetDichiarato(Boolean(res.recapitoDichiarato));
+      setOtpValiditaSecondi(res.expiresInSeconds ?? 0);
+      setOtpReinviiRimanenti(res.reinviiRimanenti ?? null);
+      setOtpAttesaReinvio(res.attesaReinvioSecondi ?? 0);
+      setOtpModalOpen(true);
+      return true;
+    } catch (err: any) {
+      // 429: limite di frequenza. Il contatore parte dai secondi che dice il backend, così
+      // il pulsante non promette un reinvio che sarebbe rifiutato.
+      if (err?.attendiSecondi) setOtpAttesaReinvio(err.attendiSecondi);
+      setOtpError(err?.message || 'Invio del codice non riuscito.');
+      // In reinvio la modale è già aperta e mostra l'errore; al primo invio si apre perché
+      // è lì che il messaggio è leggibile, con il campo del codice ancora vuoto.
+      if (!opzioni.reinvio) setOtpModalOpen(true);
+      return false;
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  /** Verifica del codice e apposizione della firma, con la grafometrica se raccolta. */
+  const confermaFirmaConOtp = async (firmaGrafometricaPng?: string) => {
+    if (!otpCode || otpCode.length < 6) {
+      setOtpError('Inserisci il codice completo a 6 cifre.');
+      return false;
+    }
+    setLoading(true);
+    setOtpError(null);
+
+    try {
+      const res = await verifyPortalOtpAndSignApi({
+        otp: otpCode,
+        documentoHash: await impronteDocumento(),
+        signerName: clientName,
+        documentoTitolo: TITOLO_MANDATO,
+        ambito: 'engagement_letter',
+        firmaGrafometricaPng,
+      });
+
+      setEidasSeal(res.seal);
+      localStorage.setItem(`bluman_seal_${clientName}`, JSON.stringify(res.seal));
+      localStorage.setItem(`bluman_portal_signed_${clientName}`, 'true');
+      setSigned(true);
+      setOtpModalOpen(false);
+      setOtpCode('');
+      await handleSign();
+      return true;
+    } catch (err: any) {
+      setOtpError(err?.message || 'Convalida del codice non riuscita.');
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
+   * Firma a penna o con provider esterno (§1.3): il documento scaricato torna come file, e
+   * la prova è il file stesso. L'OTP, se c'è un codice digitato, viene citato nel sigillo.
+   */
+  const confermaFirmaConFile = async () => {
+    if (!fileFirmato) {
+      setOtpError('Carica prima il documento firmato.');
+      return false;
+    }
+    setCaricamentoFirmato(true);
+    setOtpError(null);
+
+    try {
+      const res = await firmaConFileApi({
+        tipoFirma: modalitaFirma === 'qualificata_esterna' ? 'qualificata_esterna' : 'manuale_scansionata',
+        documentoHash: await impronteDocumento(),
+        filename: fileFirmato.nome,
+        contentBase64: fileFirmato.base64,
+        ambito: 'engagement_letter',
+        documentoTitolo: TITOLO_MANDATO,
+        signerName: clientName,
+        otp: otpCode.length === 6 ? otpCode : undefined,
+      });
+
+      setEidasSeal(res.seal);
+      localStorage.setItem(`bluman_seal_${clientName}`, JSON.stringify(res.seal));
+      localStorage.setItem(`bluman_portal_signed_${clientName}`, 'true');
+      setSigned(true);
+      setFileFirmato(null);
+      await handleSign();
+      return true;
+    } catch (err: any) {
+      setOtpError(err?.message || 'Caricamento del documento firmato non riuscito.');
+      return false;
+    } finally {
+      setCaricamentoFirmato(false);
+    }
+  };
+
+  /** Legge il file scelto dal cliente come data URL, per spedirlo in base64. */
+  const leggiFileFirmato = (file: File) =>
+    new Promise<void>((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        setFileFirmato({ nome: file.name, base64: String(reader.result || '') });
+        resolve();
+      };
+      reader.onerror = () => {
+        setOtpError('Impossibile leggere il file selezionato.');
+        resolve();
+      };
+      reader.readAsDataURL(file);
+    });
 
   const handleClientLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1461,126 +1700,266 @@ export function ClientPortal() {
                     Conferma la proposta contrattuale mediante <strong>Firma Elettronica Avanzata (FEA)</strong> conforme al Regolamento eIDAS UE 910/2014.
                   </p>
 
-                  {/* 📲 SCELTA CANALE DI INVIO CODICE OTP */}
-                  <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 16, marginBottom: 18 }}>
-                    <div style={{ fontSize: 11.5, fontWeight: 800, color: 'var(--text)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span>📲 Scegli il Canale di Ricezione Codice OTP di Sicurezza:</span>
+                  {/* ── COME VUOI FIRMARE (§1.3) ─────────────────────────────────── */}
+                  <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 16, marginBottom: 14 }}>
+                    <div style={{ fontSize: 11.5, fontWeight: 800, color: 'var(--text)', marginBottom: 10 }}>
+                      ✍️ Scegli come firmare il mandato:
                     </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10, marginBottom: 14 }}>
-                      {/* Canale WhatsApp */}
-                      <button
-                        type="button"
-                        onClick={() => setOtpCanale('whatsapp')}
-                        style={{
-                          background: otpCanale === 'whatsapp' ? '#0d2d22' : 'var(--card)',
-                          border: `1.5px solid ${otpCanale === 'whatsapp' ? '#059669' : 'var(--border)'}`,
-                          borderRadius: 10,
-                          padding: '10px 14px',
-                          textAlign: 'left',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 10,
-                        }}
-                      >
-                        <span style={{ fontSize: 20 }}>🟢</span>
-                        <div>
-                          <div style={{ fontSize: 12, fontWeight: 700, color: otpCanale === 'whatsapp' ? '#34d399' : 'var(--text)' }}>WhatsApp</div>
-                          <div style={{ fontSize: 10, color: 'var(--muted)' }}>Messaggio istantaneo</div>
-                        </div>
-                      </button>
-
-                      {/* Canale Email */}
-                      <button
-                        type="button"
-                        onClick={() => setOtpCanale('email')}
-                        style={{
-                          background: otpCanale === 'email' ? '#1e1b4b' : 'var(--card)',
-                          border: `1.5px solid ${otpCanale === 'email' ? '#6366f1' : 'var(--border)'}`,
-                          borderRadius: 10,
-                          padding: '10px 14px',
-                          textAlign: 'left',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 10,
-                        }}
-                      >
-                        <span style={{ fontSize: 20 }}>✉️</span>
-                        <div>
-                          <div style={{ fontSize: 12, fontWeight: 700, color: otpCanale === 'email' ? '#818cf8' : 'var(--text)' }}>Email Certificata</div>
-                          <div style={{ fontSize: 10, color: 'var(--muted)' }}>Posta elettronica</div>
-                        </div>
-                      </button>
-
-                      {/* Canale SMS */}
-                      <button
-                        type="button"
-                        onClick={() => setOtpCanale('sms')}
-                        style={{
-                          background: otpCanale === 'sms' ? '#3b1c1c' : 'var(--card)',
-                          border: `1.5px solid ${otpCanale === 'sms' ? '#ef4444' : 'var(--border)'}`,
-                          borderRadius: 10,
-                          padding: '10px 14px',
-                          textAlign: 'left',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 10,
-                        }}
-                      >
-                        <span style={{ fontSize: 20 }}>📱</span>
-                        <div>
-                          <div style={{ fontSize: 12, fontWeight: 700, color: otpCanale === 'sms' ? '#f87171' : 'var(--text)' }}>SMS Tradizionale</div>
-                          <div style={{ fontSize: 10, color: 'var(--muted)' }}>Rete cellulare</div>
-                        </div>
-                      </button>
-                    </div>
-
-                    {/* Dettaglio Recapito Destinazione */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                      <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)' }}>
-                        {otpCanale === 'email' ? '📬 Invia Codice all\'Indirizzo Email:' : '📱 Invia Codice al Numero Cellulare:'}
-                      </label>
-                      {otpCanale === 'email' ? (
-                        <input
-                          type="email"
-                          value={otpEmailInput}
-                          onChange={(e) => setOtpEmailInput(e.target.value)}
-                          placeholder="client@holdingbeta.advisory"
-                          style={{ fontSize: 12, padding: '6px 12px', borderRadius: 8, background: 'var(--card)', color: 'var(--text)', border: '1px solid var(--border)', minWidth: 260 }}
-                        />
-                      ) : (
-                        <input
-                          type="tel"
-                          value={otpPhoneInput}
-                          onChange={(e) => setOtpPhoneInput(e.target.value)}
-                          placeholder="+39 333 5936278"
-                          style={{ fontSize: 12, padding: '6px 12px', borderRadius: 8, background: 'var(--card)', color: 'var(--text)', border: '1px solid var(--border)', minWidth: 200 }}
-                        />
-                      )}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 }}>
+                      {([
+                        { id: 'otp' as const, icona: '📲', titolo: 'Firma online con codice OTP', nota: 'Ricevi un codice e firmi qui, in un minuto' },
+                        { id: 'manuale_scansionata' as const, icona: '🖊', titolo: 'Scarica, firma a penna e ricarica', nota: 'Stampi il PDF, lo firmi e lo ricarichi' },
+                        { id: 'qualificata_esterna' as const, icona: '🪪', titolo: 'Firma digitale del mio provider', nota: 'Aruba, InfoCert, Namirial, CNS…' },
+                      ]).map((m) => (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => { setModalitaFirma(m.id); setOtpError(null); }}
+                          style={{
+                            background: modalitaFirma === m.id ? '#1e1b4b' : 'var(--card)',
+                            border: `1.5px solid ${modalitaFirma === m.id ? '#6366f1' : 'var(--border)'}`,
+                            borderRadius: 10,
+                            padding: '10px 14px',
+                            textAlign: 'left',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 10,
+                          }}
+                        >
+                          <span style={{ fontSize: 20 }}>{m.icona}</span>
+                          <div>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: modalitaFirma === m.id ? '#a5b4fc' : 'var(--text)' }}>{m.titolo}</div>
+                            <div style={{ fontSize: 10, color: 'var(--muted)' }}>{m.nota}</div>
+                          </div>
+                        </button>
+                      ))}
                     </div>
                   </div>
 
-                  <button
-                    onClick={async () => {
-                      setOtpLoading(true);
-                      setOtpError(null);
-                      setOtpCode(''); // Campo sempre pulito per digitazione manuale dell'utente
-                      const target = otpCanale === 'email' ? otpEmailInput : otpPhoneInput;
-                      const res = await requestPortalOtpApi(clientObj?.id || 'client-01', otpCanale, otpPhoneInput, otpEmailInput);
-                      if (res && res.ok) {
-                        setOtpTarget(res.maskedTarget || target);
-                      }
-                      setOtpLoading(false);
-                      setOtpModalOpen(true);
-                    }}
-                    disabled={loading || otpLoading}
-                    style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '12px 28px', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 20px rgba(99,102,241,.4)', display: 'flex', alignItems: 'center', gap: 8 }}
-                  >
-                    <span>{otpLoading ? 'Invio Codice in Corso...' : `📲 Invia Codice OTP via ${otpCanale.toUpperCase()} e Firma`}</span>
-                  </button>
+                  {modalitaFirma === 'otp' ? (
+                    <>
+                      {/* 📲 SCELTA CANALE DI RICEZIONE DEL CODICE (§1.1, §1.4) */}
+                      <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 16, marginBottom: 18 }}>
+                        <div style={{ fontSize: 11.5, fontWeight: 800, color: 'var(--text)', marginBottom: 4 }}>
+                          📲 Dove vuoi ricevere il codice di firma?
+                        </div>
+                        <div style={{ fontSize: 10.5, color: 'var(--muted)', marginBottom: 10 }}>
+                          La scelta è tua ogni volta. I recapiti sono quelli della tua scheda anagrafica.
+                        </div>
+
+                        {canaliFirma.length === 0 ? (
+                          <div style={{ fontSize: 11.5, color: '#fbbf24', background: 'rgba(251,191,36,.08)', border: '1px solid rgba(251,191,36,.3)', borderRadius: 8, padding: 10 }}>
+                            ⚠️ Non è stato possibile leggere i canali di invio disponibili. Ricarica la pagina o contatta lo Studio: senza un canale attivo il codice non può essere spedito.
+                          </div>
+                        ) : (
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10, marginBottom: 14 }}>
+                            {canaliFirma.map((c) => {
+                              const stile: Record<CanaleOtp, { icona: string; sfondo: string; bordo: string; testo: string }> = {
+                                whatsapp: { icona: '🟢', sfondo: '#0d2d22', bordo: '#059669', testo: '#34d399' },
+                                email: { icona: '✉️', sfondo: '#1e1b4b', bordo: '#6366f1', testo: '#818cf8' },
+                                telegram: { icona: '✈️', sfondo: '#0c2b3f', bordo: '#0ea5e9', testo: '#38bdf8' },
+                              };
+                              const s = stile[c.canale];
+                              const scelto = otpCanale === c.canale;
+                              return (
+                                <button
+                                  key={c.canale}
+                                  type="button"
+                                  disabled={!c.disponibile}
+                                  title={c.disponibile ? undefined : c.motivo}
+                                  onClick={() => { setOtpCanale(c.canale); setOtpError(null); setUsaRecapitoDiverso(false); }}
+                                  style={{
+                                    background: scelto ? s.sfondo : 'var(--card)',
+                                    border: `1.5px solid ${scelto ? s.bordo : 'var(--border)'}`,
+                                    borderRadius: 10,
+                                    padding: '10px 14px',
+                                    textAlign: 'left',
+                                    cursor: c.disponibile ? 'pointer' : 'not-allowed',
+                                    opacity: c.disponibile ? 1 : 0.5,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 10,
+                                  }}
+                                >
+                                  <span style={{ fontSize: 20 }}>{s.icona}</span>
+                                  <div style={{ minWidth: 0 }}>
+                                    <div style={{ fontSize: 12, fontWeight: 700, color: scelto ? s.testo : 'var(--text)' }}>
+                                      {nomeCanale[c.canale]}
+                                    </div>
+                                    {/* Il recapito è mascherato: serve a farti riconoscere il tuo, non a mostrarlo per intero. */}
+                                    <div style={{ fontSize: 10, color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                      {c.disponibile ? c.recapitoMascherato : c.motivo}
+                                    </div>
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {/* Recapito diverso da quello in anagrafica (§1.2) */}
+                        {canaleCorrente?.disponibile && otpCanale !== 'telegram' && (
+                          <div>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: 'var(--muted)', cursor: 'pointer' }}>
+                              <input
+                                type="checkbox"
+                                checked={usaRecapitoDiverso}
+                                onChange={(e) => { setUsaRecapitoDiverso(e.target.checked); setRecapitoDichiarato(''); }}
+                              />
+                              <span>
+                                {otpCanale === 'email'
+                                  ? "Voglio ricevere il codice a un altro indirizzo email"
+                                  : 'Voglio ricevere il codice su un altro numero'}
+                              </span>
+                            </label>
+                            {usaRecapitoDiverso && (
+                              <div style={{ marginTop: 8 }}>
+                                <input
+                                  type={otpCanale === 'email' ? 'email' : 'tel'}
+                                  value={recapitoDichiarato}
+                                  onChange={(e) => setRecapitoDichiarato(e.target.value)}
+                                  placeholder={otpCanale === 'email' ? 'nome@dominio.it' : '+39 ...'}
+                                  style={{ fontSize: 12, padding: '8px 12px', borderRadius: 8, background: 'var(--card)', color: 'var(--text)', border: '1px solid var(--border)', minWidth: 260 }}
+                                />
+                                <div style={{ fontSize: 10, color: '#fbbf24', marginTop: 6, lineHeight: 1.4 }}>
+                                  Il recapito che indichi qui viene registrato nel verbale di firma come dichiarato da te
+                                  e diverso da quello della tua scheda anagrafica.
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Telegram: la chat va attivata dal cliente, il codice non può arrivare prima */}
+                        {otpCanale === 'telegram' && !canaleCorrente?.disponibile && botTelegram && (
+                          <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
+                            Per usare questo canale scrivi una volta a{' '}
+                            <a href={`https://t.me/${botTelegram}`} target="_blank" rel="noreferrer" style={{ color: '#38bdf8', fontWeight: 700 }}>
+                              @{botTelegram}
+                            </a>{' '}
+                            e poi ricarica la pagina.
+                          </div>
+                        )}
+                      </div>
+
+                      {otpError && !otpModalOpen && (
+                        <div style={{ fontSize: 11.5, color: '#f87171', background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 8, padding: 10, marginBottom: 12 }}>
+                          ⚠️ {otpError}
+                        </div>
+                      )}
+
+                      <button
+                        onClick={() => inviaCodiceFirma()}
+                        disabled={loading || otpLoading || !canaleCorrente?.disponibile || (usaRecapitoDiverso && !recapitoDichiarato.trim())}
+                        style={{
+                          background: canaleCorrente?.disponibile ? 'var(--indigo)' : 'var(--card)',
+                          color: canaleCorrente?.disponibile ? '#fff' : 'var(--muted)',
+                          border: canaleCorrente?.disponibile ? 'none' : '1px solid var(--border)',
+                          padding: '12px 28px',
+                          borderRadius: 10,
+                          fontSize: 13,
+                          fontWeight: 700,
+                          cursor: canaleCorrente?.disponibile ? 'pointer' : 'not-allowed',
+                          boxShadow: canaleCorrente?.disponibile ? '0 4px 20px rgba(99,102,241,.4)' : 'none',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                        }}
+                      >
+                        <span>
+                          {otpLoading
+                            ? 'Invio del codice in corso…'
+                            : `📲 Invia il codice via ${nomeCanale[otpCanale]} e firma`}
+                        </span>
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      {/* FIRMA A PENNA O CON PROVIDER ESTERNO: SCARICA, FIRMA, RICARICA */}
+                      <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 16, marginBottom: 14 }}>
+                        <div style={{ fontSize: 11.5, color: 'var(--muted)', lineHeight: 1.6, marginBottom: 12 }}>
+                          {modalitaFirma === 'manuale_scansionata' ? (
+                            <>
+                              <strong style={{ color: 'var(--text)' }}>1.</strong> Scarica il PDF del mandato ·{' '}
+                              <strong style={{ color: 'var(--text)' }}>2.</strong> Firmalo a penna ·{' '}
+                              <strong style={{ color: 'var(--text)' }}>3.</strong> Ricarica qui la scansione o la foto.
+                            </>
+                          ) : (
+                            <>
+                              <strong style={{ color: 'var(--text)' }}>1.</strong> Scarica il PDF del mandato ·{' '}
+                              <strong style={{ color: 'var(--text)' }}>2.</strong> Firmalo con il tuo dispositivo o servizio
+                              di firma digitale (.p7m o PDF firmato) · <strong style={{ color: 'var(--text)' }}>3.</strong> Ricaricalo qui.
+                            </>
+                          )}
+                        </div>
+
+                        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              await downloadRealPdf(`Mandato_${clientName.replace(/\s+/g, '_')}`, getResolvedEngagementHtml());
+                            }}
+                            style={{ background: '#1a1f3d', border: '1px solid #4338ca', color: '#c7d2fe', padding: '10px 18px', borderRadius: 8, fontSize: 11.5, fontWeight: 700, cursor: 'pointer' }}
+                          >
+                            📥 Scarica il PDF da firmare
+                          </button>
+
+                          <label style={{ background: 'var(--card)', border: '1px solid var(--border)', color: 'var(--text)', padding: '10px 18px', borderRadius: 8, fontSize: 11.5, fontWeight: 700, cursor: 'pointer' }}>
+                            📎 {fileFirmato ? 'Cambia file' : 'Carica il documento firmato'}
+                            <input
+                              type="file"
+                              accept={modalitaFirma === 'manuale_scansionata' ? 'application/pdf,image/png,image/jpeg' : 'application/pdf,.p7m'}
+                              style={{ display: 'none' }}
+                              onChange={async (e) => {
+                                const file = e.target.files?.[0];
+                                if (file) { setOtpError(null); await leggiFileFirmato(file); }
+                              }}
+                            />
+                          </label>
+
+                          {fileFirmato && (
+                            <span style={{ fontSize: 11, color: '#34d399', fontWeight: 700 }}>✓ {fileFirmato.nome}</span>
+                          )}
+                        </div>
+
+                        {modalitaFirma === 'qualificata_esterna' && (
+                          // Detto come sta: il certificato non viene verificato dalla piattaforma, e questo
+                          // finisce scritto anche nel verbale. Prometterne la validazione sarebbe una firma
+                          // dichiarata valida da noi senza che nessuno l'abbia controllata.
+                          <div style={{ fontSize: 10.5, color: 'var(--muted)', marginTop: 12, lineHeight: 1.5 }}>
+                            La validità della firma qualificata è attestata dal tuo provider. La piattaforma
+                            registra la ricezione del file da questa sessione autenticata e ne calcola
+                            l'impronta, ma non verifica il certificato di firma.
+                          </div>
+                        )}
+                      </div>
+
+                      {otpError && (
+                        <div style={{ fontSize: 11.5, color: '#f87171', background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 8, padding: 10, marginBottom: 12 }}>
+                          ⚠️ {otpError}
+                        </div>
+                      )}
+
+                      <button
+                        onClick={() => confermaFirmaConFile()}
+                        disabled={!fileFirmato || caricamentoFirmato}
+                        style={{
+                          background: fileFirmato ? 'var(--indigo)' : 'var(--card)',
+                          color: fileFirmato ? '#fff' : 'var(--muted)',
+                          border: fileFirmato ? 'none' : '1px solid var(--border)',
+                          padding: '12px 28px',
+                          borderRadius: 10,
+                          fontSize: 13,
+                          fontWeight: 700,
+                          cursor: fileFirmato ? 'pointer' : 'not-allowed',
+                          boxShadow: fileFirmato ? '0 4px 20px rgba(99,102,241,.4)' : 'none',
+                        }}
+                      >
+                        {caricamentoFirmato ? 'Caricamento e registrazione…' : '🔒 Deposita il documento firmato'}
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             )}
@@ -2012,10 +2391,27 @@ export function ClientPortal() {
                     onChange={(e) => setCanaleMessaggio(e.target.value as any)}
                     style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, background: 'var(--card)', color: 'var(--text)', border: '1px solid var(--border)' }}
                   >
+                    {/*
+                      I tre ripieghi che stavano qui — un cellulare di una persona reale, un
+                      indirizzo inventato e una @ costruita dal nome del cliente — comparivano
+                      nella tendina di qualunque cliente che non avesse quel recapito in
+                      anagrafica, e sceglierli significava chiedere l'invio a un estraneo. Ora
+                      il canale senza recapito si vede spento e non è selezionabile.
+                    */}
                     <option value="portal">🌐 Portale Riservato (Sicuro)</option>
-                    <option value="whatsapp">🟢 WhatsApp Business ({clientObj?.cellulare || (clientObj as any)?.referentiJson?.whatsapp || clientObj?.telefono || '+39 333 5936278'})</option>
-                    <option value="email">✉️ Email Transazionale ({clientObj?.email || (clientObj as any)?.referentiJson?.email || 'client@holdingbeta.advisory'})</option>
-                    <option value="telegram">✈️ Telegram ({clientObj?.telegram || (clientObj as any)?.referentiJson?.telegram || '@' + (clientName || 'Cliente').replace(/[^a-zA-Z0-9]/g, '')})</option>
+                    {(() => {
+                      const referenti = (clientObj as any)?.referentiJson || {};
+                      const recapiti: Array<{ id: string; etichetta: string; valore?: string | null }> = [
+                        { id: 'whatsapp', etichetta: '🟢 WhatsApp Business', valore: clientObj?.cellulare || referenti.whatsapp || clientObj?.telefono },
+                        { id: 'email', etichetta: '✉️ Email', valore: clientObj?.email || referenti.email },
+                        { id: 'telegram', etichetta: '✈️ Telegram', valore: clientObj?.telegram || referenti.telegram },
+                      ];
+                      return recapiti.map((r) => (
+                        <option key={r.id} value={r.id} disabled={!r.valore}>
+                          {r.etichetta} {r.valore ? `(${r.valore})` : '— recapito non presente in anagrafica'}
+                        </option>
+                      ));
+                    })()}
                   </select>
                 </div>
               </div>
@@ -2294,15 +2690,39 @@ export function ClientPortal() {
               </button>
             </div>
 
-            {/* Info Canale */}
+            {/* Info Canale — validità e recapito sono quelli che ha detto il backend */}
             <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 14 }}>
               <div style={{ fontSize: 11.5, color: 'var(--muted)', marginBottom: 8 }}>
-                Abbiamo inviato un codice di sicurezza monouso valido <strong>5 minuti</strong> tramite <strong>{otpCanale.toUpperCase()}</strong>:
+                {otpTarget ? (
+                  <>
+                    Codice monouso inviato via <strong>{nomeCanale[otpCanale]}</strong>
+                    {otpValiditaSecondi > 0 ? (
+                      <>
+                        {' '}· scade fra{' '}
+                        <strong>
+                          {Math.floor(otpValiditaSecondi / 60)}:{String(otpValiditaSecondi % 60).padStart(2, '0')}
+                        </strong>
+                      </>
+                    ) : (
+                      <> · <strong style={{ color: '#fbbf24' }}>scaduto</strong>, richiedine uno nuovo</>
+                    )}
+                  </>
+                ) : (
+                  <>Il codice non è stato inviato: leggi il motivo qui sotto e riprova o cambia canale.</>
+                )}
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12, fontWeight: 700, color: '#a5b4fc' }}>
-                <span>{otpCanale === 'email' ? '📬 Email Destinatario:' : '📱 Recapito Destinatario:'}</span>
-                <span>{otpTarget}</span>
-              </div>
+              {otpTarget && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12, fontWeight: 700, color: '#a5b4fc', gap: 10 }}>
+                  <span>{otpCanale === 'email' ? '📬 Inviato a:' : otpCanale === 'telegram' ? '✈️ Inviato a:' : '📱 Inviato a:'}</span>
+                  <span>{otpTarget}</span>
+                </div>
+              )}
+              {otpTargetDichiarato && (
+                <div style={{ fontSize: 10.5, color: '#fbbf24', marginTop: 8, lineHeight: 1.4 }}>
+                  Recapito dichiarato da te in fase di firma, diverso da quello in anagrafica: la circostanza
+                  viene registrata nel verbale.
+                </div>
+              )}
             </div>
 
             {/* Input Codice OTP (Nessun codice pre-compilato, digitazione manuale) */}
@@ -2340,81 +2760,118 @@ export function ClientPortal() {
               )}
             </div>
 
-            {/* Note Legali eIDAS */}
-            <div style={{ fontSize: 10.5, color: 'var(--muted)', lineHeight: 1.4, background: 'rgba(0,0,0,0.2)', padding: 10, borderRadius: 8 }}>
-              🛡 L'apposizione della firma tramite verifica OTP associa univocamente il documento al firmatario ({clientName}), registrando marcatura temporale ISO UTC, impronta crittografica SHA-256 e indirizzo IP certificato.
+            {/* Note Legali eIDAS — dette come stanno */}
+            <div style={{ fontSize: 10.5, color: 'var(--muted)', lineHeight: 1.45, background: 'rgba(0,0,0,0.2)', padding: 10, borderRadius: 8 }}>
+              {/*
+                Il testo precedente dichiarava un "indirizzo IP certificato" e un'associazione
+                "univoca" del documento al firmatario. Nessuna delle due cose è vera: l'IP è
+                quello visto dal server, non certificato da nessuno, e può mancare; il fattore
+                verificato è il possesso del recapito, non l'identità della persona. Una nota
+                legale che promette più di quanto il sistema fa indebolisce il verbale, non lo
+                rafforza — perché è la prima cosa che una contestazione va a leggere.
+              */}
+              🛡 Firmando dichiari di aver letto il documento. Vengono registrati: il codice monouso
+              recapitato al tuo <strong>{nomeCanale[otpCanale].toLowerCase()}</strong>, la data e ora UTC,
+              l'impronta SHA-256 del testo che stai leggendo, l'indirizzo IP visto dal server (o
+              «non registrato», se la rete non lo espone) e il browser usato. La verifica attesta il
+              possesso del recapito registrato nella tua scheda: è una Firma Elettronica Avanzata ai
+              sensi del Regolamento eIDAS UE 910/2014, non una firma qualificata.
             </div>
 
             {/* Azioni */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 6 }}>
               <button
                 type="button"
-                onClick={async () => {
+                onClick={() => {
                   if (!otpCode || otpCode.length < 6) {
                     setOtpError('Inserisci il codice completo a 6 cifre.');
                     return;
                   }
-                  setLoading(true);
+                  // La grafometrica viene raccolta DOPO il codice e allegata al sigillo (§1.11):
+                  // da sola non prova nulla, dopo l'OTP è un elemento in più nel verbale.
                   setOtpError(null);
-                  try {
-                    const res = await verifyPortalOtpAndSignApi(
-                      clientObj?.id || 'client-01',
-                      otpCode,
-                      clientName,
-                      'Engagement Letter & Mandato Fiduciario'
-                    );
-
-                    if (res && res.ok) {
-                      setEidasSeal(res.seal);
-                      localStorage.setItem(`bluman_seal_${clientName}`, JSON.stringify(res.seal));
-                      localStorage.setItem(`bluman_portal_signed_${clientName}`, 'true');
-                      setSigned(true);
-                      setOtpModalOpen(false);
-                      await handleSign(); // Istanzia moduli e sblocca il progetto operatore
-                    } else {
-                      setOtpError(res?.errore || 'Codice errato');
-                    }
-                  } catch (err: any) {
-                    setOtpError(err.message || 'Errore convalida codice');
-                  } finally {
-                    setLoading(false);
-                  }
+                  setPadGrafometricaAperto(true);
                 }}
-                disabled={loading}
+                disabled={loading || otpCode.length < 6}
                 style={{
-                  background: 'var(--indigo)',
-                  color: '#fff',
-                  border: 'none',
+                  background: otpCode.length === 6 ? 'var(--indigo)' : 'var(--card)',
+                  color: otpCode.length === 6 ? '#fff' : 'var(--muted)',
+                  border: otpCode.length === 6 ? 'none' : '1px solid var(--border)',
                   padding: '14px',
                   borderRadius: 12,
                   fontSize: 13.5,
                   fontWeight: 800,
-                  cursor: 'pointer',
-                  boxShadow: '0 4px 16px rgba(99,102,241,.4)',
+                  cursor: otpCode.length === 6 ? 'pointer' : 'not-allowed',
+                  boxShadow: otpCode.length === 6 ? '0 4px 16px rgba(99,102,241,.4)' : 'none',
                 }}
               >
-                {loading ? 'Verifica & Apposizione Sigillo...' : '🔒 Valida Codice ed Apponi Firma FEA'}
+                {loading ? 'Verifica del codice e apposizione del sigillo…' : '🔒 Prosegui: convalida il codice e firma'}
               </button>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11 }}>
-                <span style={{ color: 'var(--muted)' }}>Non hai ricevuto il codice?</span>
+              <button
+                type="button"
+                onClick={() => confermaFirmaConOtp()}
+                disabled={loading || otpCode.length < 6}
+                style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: 10.5, cursor: otpCode.length === 6 ? 'pointer' : 'not-allowed', textDecoration: 'underline' }}
+              >
+                Firma senza apporre la firma grafica
+              </button>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11, gap: 10, flexWrap: 'wrap' }}>
+                <span style={{ color: 'var(--muted)' }}>
+                  Non hai ricevuto il codice?
+                  {otpReinviiRimanenti !== null && (
+                    <span style={{ marginLeft: 4 }}>
+                      ({otpReinviiRimanenti} {otpReinviiRimanenti === 1 ? 'reinvio' : 'reinvii'} disponibili)
+                    </span>
+                  )}
+                </span>
                 <button
                   type="button"
-                  onClick={async () => {
-                    setOtpLoading(true);
-                    setOtpCode('');
-                    const res = await requestPortalOtpApi(clientObj?.id || 'client-01', otpCanale, otpPhoneInput, otpEmailInput);
-                    setOtpLoading(false);
-                    alert(`✓ Nuovo codice OTP inviato con successo a ${otpTarget}!`);
+                  // Il pulsante conosce i due limiti veri (§1.5): 60 secondi fra un reinvio e
+                  // l'altro, massimo tre. Prima lanciava una `alert('✓ Nuovo codice inviato')`
+                  // senza guardare l'esito, quindi diceva "inviato" anche su un rifiuto.
+                  onClick={() => inviaCodiceFirma({ reinvio: true })}
+                  disabled={otpLoading || otpAttesaReinvio > 0 || otpReinviiRimanenti === 0}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: otpAttesaReinvio > 0 || otpReinviiRimanenti === 0 ? 'var(--muted)' : 'var(--indigo-l)',
+                    fontWeight: 700,
+                    cursor: otpAttesaReinvio > 0 || otpReinviiRimanenti === 0 ? 'not-allowed' : 'pointer',
+                    textDecoration: otpAttesaReinvio > 0 || otpReinviiRimanenti === 0 ? 'none' : 'underline',
                   }}
-                  style={{ background: 'none', border: 'none', color: 'var(--indigo-l)', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}
                 >
-                  Reinvia Codice ↻
+                  {otpLoading
+                    ? 'Invio…'
+                    : otpReinviiRimanenti === 0
+                      ? 'Reinvii esauriti'
+                      : otpAttesaReinvio > 0
+                        ? `Reinvia fra ${otpAttesaReinvio}s`
+                        : 'Reinvia codice ↻'}
                 </button>
               </div>
             </div>
           </div>
         </div>
+      )}
+
+      {/* ✍️ PAD GRAFOMETRICO DELLA FIRMA FEA — si apre col codice già digitato (§1.11) */}
+      {padGrafometricaAperto && (
+        <DigitalSignatureModal
+          documentTitle={TITOLO_MANDATO}
+          signerName={clientName}
+          signerRole="Legale Rappresentante / Firmatario"
+          zIndex={10000}
+          notaRegistrazione="✓ Il tratto viene allegato al sigillo insieme al codice monouso che hai appena inserito, alla data e ora UTC e all'impronta SHA-256 del documento."
+          onClose={() => setPadGrafometricaAperto(false)}
+          onSigned={async (firma) => {
+            // Il pad si chiude prima della chiamata: se la convalida rifiuta il codice
+            // l'errore va letto nella modale FEA, che è dove sta il campo da correggere.
+            setPadGrafometricaAperto(false);
+            await confermaFirmaConOtp(firma.signatureImageBase64);
+          }}
+        />
       )}
 
       {/* 📄 MODALE A4 DOCUMENT VIEWER PER LETTURA COMPLETA PRE-FIRMA */}

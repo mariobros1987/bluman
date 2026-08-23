@@ -4,6 +4,7 @@
 
 import Fastify, { type FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
+import crypto from 'crypto';
 import type { AppPort } from './services/appPort.js';
 import { ProceduraIncompletaError } from './services/esecuzione.js';
 import {
@@ -16,10 +17,23 @@ import {
 
 import { signJwt, verifyJwt, generateMagicToken, hashMagicToken, verificaFirmaDownload } from './util/jwt.js';
 import { verifyPassword, hashPassword, generaPasswordTemporanea } from './util/password.js';
-import { sendMagicLinkEmail, sendOtpSecurityEmail, sendClientCredentialsEmail, verifyAndSendTestSmtp, verifyRealImap } from './services/emailService.js';
+import { sendMagicLinkEmail, sendOtpSecurityEmail, sendClientCredentialsEmail, verifyAndSendTestSmtp, verifyRealImap, createTransporter } from './services/emailService.js';
 import { uploadDocumento, CARTELLA_UPLOADS, nomeFileValido, rifirmaUrlUpload } from './services/storageService.js';
 import { generateInvoicePdfBuffer } from './services/pdfService.js';
-import { generateOtp, verifyOtp, generateEidasSignatureSeal } from './services/otpService.js';
+import {
+  creaOtp,
+  verificaOtp,
+  annullaOtp,
+  creaSigilloFea,
+  mascheraRecapito,
+  descriviCanaleVerificato,
+  canaleValido,
+  TTL_OTP_SECONDI,
+  ATTESA_REINVIO_SECONDI,
+  type CanaleOtp,
+  type AmbitoOtp,
+} from './services/otpService.js';
+import { credenzialiCanali, canaliDisponibili, inviaCodiceOtp } from './services/otpDispatch.js';
 import { runDailyNotificationCron } from './services/cronService.js';
 import { trasmettiFatturaSdi } from './services/sdiService.js';
 import { scanFileBuffer } from './services/securityScanner.js';
@@ -62,6 +76,46 @@ function baseUrlApplicazione(): string {
   return 'http://localhost:5173';
 }
 
+/**
+ * IP reale del chiamante, `null` quando non è determinabile.
+ *
+ * Dietro il proxy di Railway `req.ip` è l'indirizzo del proxy: quello del client sta nel
+ * primo salto di `x-forwarded-for`. Il valore serve a due cose che non tollerano un
+ * segnaposto — il registro di audit e il verbale di firma — e prima entrambi ricadevano
+ * su `127.0.0.1`, che è l'unico indirizzo da cui un firmatario sicuramente non arriva.
+ * Meglio l'assenza registrata come assenza.
+ */
+function ipReale(req: { ip?: string; headers: Record<string, unknown> }): string | null {
+  const forwarded = req.headers['x-forwarded-for'];
+  const grezzo = Array.isArray(forwarded) ? forwarded[0] : forwarded;
+  if (typeof grezzo === 'string' && grezzo.trim()) {
+    const primo = grezzo.split(',')[0]?.trim();
+    if (primo) return primo;
+  }
+
+  const diretto = req.ip?.trim();
+  if (!diretto) return null;
+  // Loopback: è il server che parla con se stesso, non un firmatario.
+  if (diretto === '127.0.0.1' || diretto === '::1' || diretto === '::ffff:127.0.0.1') return null;
+  return diretto;
+}
+
+/**
+ * La firma grafometrica, ripulita prima di salvarla.
+ *
+ * Arriva dal browser come data URL prodotta da `canvas.toDataURL()`, quindi è un dato che
+ * il client controlla: si accetta solo un PNG in base64 e sotto il mezzo megabyte. Senza
+ * questi due controlli il campo diventerebbe un posto dove scrivere qualunque cosa, di
+ * qualunque dimensione, dentro il verbale di firma.
+ */
+function normalizzaGrafometrica(valore?: string | null): string | null {
+  if (!valore) return null;
+  const pulito = valore.trim();
+  if (!/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(pulito)) return null;
+  if (pulito.length > 512 * 1024) return null;
+  return pulito;
+}
+
 async function recordAudit(params: {
   tenantId?: string;
   userId?: string;
@@ -71,7 +125,7 @@ async function recordAudit(params: {
   azione: string;
   entita: string;
   dettagli: string;
-  ipAddress?: string;
+  ipAddress?: string | null;
 }) {
   setImmediate(async () => {
     try {
@@ -85,7 +139,9 @@ async function recordAudit(params: {
           azione: params.azione,
           entita: params.entita,
           dettagli: params.dettagli,
-          ipAddress: params.ipAddress || '127.0.0.1',
+          // `ip_address` è nullable: un indirizzo inventato in un registro immutabile è
+          // peggio di un campo vuoto, perché sembra una prova.
+          ipAddress: params.ipAddress || null,
         },
       });
     } catch {
@@ -1609,20 +1665,85 @@ export function buildServer(app: AppPort): FastifyInstance {
     return reply.send(res);
   });
 
-  server.post<{ Body: { channel: string; waPhoneId?: string; waAccessToken?: string } }>('/tenant/test-channel', async (req, reply) => {
-    const { channel, waPhoneId } = req.body || {};
-    const activePhoneId = waPhoneId || process.env.WA_PHONE_ID || '529732696891513';
-    if (channel === 'whatsapp') {
-      return reply.send({
-        success: true,
-        message: `WhatsApp Business API (Phone ID: ${activePhoneId}) connesso e verificato su Meta Cloud API per App bluman (App ID: 28073663662286834)`
-      });
-    } else if (channel === 'telegram') {
-      return reply.send({ success: true, message: 'Bot Telegram registrato e pronto per l\'ascolto su @BotFather Webhook API' });
-    } else if (channel === 'signal') {
-      return reply.send({ success: true, message: 'Daemon Signal REST API v1 in ascolto sul container Docker' });
+  /**
+   * Prova reale del canale.
+   *
+   * Prima questa rotta rispondeva `success: true` a qualunque cosa, senza contattare nessuno,
+   * e stampava un Phone ID e un App ID scritti nel codice. Chi premeva «Testa connessione»
+   * leggeva «connesso e verificato su Meta Cloud API» anche con le credenziali assenti o
+   * sbagliate, e scopriva il guasto il giorno in cui a un cliente non arrivava il codice di
+   * firma. Ora ogni canale viene interrogato per davvero e l'esito è quello che rispondono
+   * Meta, Telegram o il server SMTP: un canale rotto risponde 400.
+   */
+  server.post<{ Body: { channel?: string; waPhoneId?: string; waAccessToken?: string } }>('/tenant/test-channel', async (req, reply) => {
+    const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
+    const canale = (req.body?.channel || '').toLowerCase();
+    const cred = await credenzialiCanali(tenantId);
+
+    // Le credenziali nel corpo servono a provarle prima di salvarle: se non ci sono si usano
+    // quelle già registrate per lo studio.
+    const waPhoneId = req.body?.waPhoneId || cred.waPhoneId;
+    const waAccessToken = req.body?.waAccessToken || cred.waAccessToken;
+
+    const esito = (success: boolean, message: string) =>
+      success ? reply.send({ success, message }) : reply.code(400).send({ success, message });
+
+    try {
+      if (canale === 'whatsapp') {
+        if (!waPhoneId || !waAccessToken) {
+          return esito(false, 'Phone Number ID o Access Token di WhatsApp non impostati.');
+        }
+        const r = await fetch(
+          `https://graph.facebook.com/v21.0/${encodeURIComponent(waPhoneId)}?fields=display_phone_number,verified_name,quality_rating`,
+          { headers: { Authorization: `Bearer ${waAccessToken}` } },
+        );
+        const dati: any = await r.json().catch(() => ({}));
+        if (!r.ok) {
+          return esito(false, `Meta ha rifiutato le credenziali (HTTP ${r.status}): ${dati?.error?.message || 'errore non specificato'}`);
+        }
+        return esito(
+          true,
+          `WhatsApp attivo sul numero ${dati.display_phone_number || waPhoneId}` +
+            `${dati.verified_name ? ` — ${dati.verified_name}` : ''}` +
+            `${dati.quality_rating ? ` (qualità: ${dati.quality_rating})` : ''}.`,
+        );
+      }
+
+      if (canale === 'telegram') {
+        if (!cred.tgBotToken) return esito(false, 'Token del bot Telegram non impostato.');
+        const r = await fetch(`https://api.telegram.org/bot${cred.tgBotToken}/getMe`);
+        const dati: any = await r.json().catch(() => ({}));
+        if (!r.ok || !dati?.ok) {
+          return esito(false, `Telegram ha rifiutato il token: ${dati?.description || `HTTP ${r.status}`}`);
+        }
+        return esito(
+          true,
+          `Bot raggiungibile: @${dati.result?.username}. Perché il canale sia utilizzabile ogni ` +
+            `cliente deve scrivere al bot almeno una volta: è Telegram a non permettere il ` +
+            `contrario, e finché non lo fa non esiste una chat su cui spedire.`,
+        );
+      }
+
+      if (canale === 'email' || canale === 'smtp') {
+        const trasporto = createTransporter(cred.smtp);
+        if (!trasporto) return esito(false, 'SMTP non impostato: mancano host, utenza o password.');
+        await trasporto.verify();
+        return esito(
+          true,
+          `Server SMTP raggiungibile e credenziali accettate${cred.smtpFromEmail ? ` (mittente ${cred.smtpFromEmail})` : ''}.`,
+        );
+      }
+
+      // A «signal» rispondeva «Daemon Signal REST API v1 in ascolto sul container Docker»:
+      // quel demone non esiste in questo progetto e non c'è una riga di codice che lo
+      // contatti. Dichiararlo in ascolto era inventare un'infrastruttura.
+      return esito(
+        false,
+        `Canale «${canale || 'non indicato'}» non gestito: la piattaforma non ha un invio da provare per questo canale.`,
+      );
+    } catch (err: any) {
+      return esito(false, `Prova non riuscita: ${err?.message || 'errore di rete'}`);
     }
-    return reply.send({ success: true, message: `Canale ${channel} verificato con successo` });
   });
 
   // Audit Logs API (Isolato per Tenant)
@@ -1652,7 +1773,10 @@ export function buildServer(app: AppPort): FastifyInstance {
           azione: body.azione,
           entita: body.entita,
           dettagli: body.dettagli,
-          ipAddress: req.ip || '83.211.12.94',
+          // Un registro di audit serve a dire da dove è arrivata un'operazione. Qui c'era
+          // `req.ip || '83.211.12.94'`: quando il proxy non esponeva l'IP la riga ne
+          // riportava uno fisso, sempre lo stesso, con l'aspetto di un dato rilevato.
+          ipAddress: req.ip || null,
         },
       });
       return reply.code(201).send(log);
@@ -3059,97 +3183,548 @@ export function buildServer(app: AppPort): FastifyInstance {
     }
   });
 
-  // ── FIRMA ELETTRONICA AVANZATA (FEA) CON OTP SMS / WHATSAPP / EMAIL ──
-  server.post<{ Body: { clienteId: string; canale?: 'whatsapp' | 'email' | 'sms'; cellulare?: string; email?: string; signerName?: string } }>('/portal/request-otp', async (req, reply) => {
-    const { clienteId, canale = 'whatsapp', cellulare, email, signerName = 'Cliente' } = req.body;
+  // ── FIRMA ELETTRONICA AVANZATA (FEA) CON OTP: WHATSAPP / EMAIL / TELEGRAM ──
+  //
+  // Cosa non funzionava, e perché non erano dettagli:
+  //   · il recapito era `cellulare || email || '+39 333 5936278'`. Il numero di una persona
+  //     reale, cablato nel sorgente, come destinazione predefinita del codice di firma di
+  //     qualunque cliente di qualunque studio;
+  //   · `clienteId` arrivava dal body e nessuno lo confrontava con la sessione, mentre il
+  //     frontend spediva `'client-01'` quando non lo trovava: bastava un id nel body per
+  //     far partire il codice di un altro cliente;
+  //   · solo l'email spediva davvero. WhatsApp, SMS e Telegram generavano il codice, lo
+  //     scrivevano nei log e non mandavano niente, ma la risposta diceva "inviato";
+  //   · `devOtp` restituiva il codice in chiaro a chi metteva un header nella richiesta;
+  //   · il sigillo eIDAS non veniva salvato da nessuna parte, quindi la firma esisteva
+  //     solo nella schermata che la mostrava.
+
+  /**
+   * Il cliente della sessione. Per un token di portale (`ruolo: 'cliente'`) l'identità è
+   * `client-<clienteId>` e il body non conta: è la sessione a dire chi firma. Un operatore
+   * dello studio può invece indicare il cliente, perché firma per conto di un fascicolo che
+   * sta guardando.
+   */
+  function clienteDellaRichiesta(req: any, clienteIdBody?: string): string | null {
+    const identita: string | undefined = req.user?.userId;
+    if (req.ruolo === 'cliente') {
+      return identita?.startsWith('client-') ? identita.slice('client-'.length) : null;
+    }
+    return clienteIdBody?.trim() || null;
+  }
+
+  const AMBITI_OTP: AmbitoOtp[] = ['engagement_letter', 'documento_vault', 'modulo_completato', 'addendum'];
+
+  function ambitoValido(valore: unknown): valore is AmbitoOtp {
+    return typeof valore === 'string' && (AMBITI_OTP as string[]).includes(valore);
+  }
+
+  /** Come descrivere al firmatario cosa sta autorizzando, nel messaggio e nell'email. */
+  const DESCRIZIONE_AMBITO: Record<AmbitoOtp, string> = {
+    engagement_letter: "la lettera d'incarico e il mandato professionale",
+    documento_vault: 'un documento del tuo archivio riservato',
+    modulo_completato: 'la conferma di un modulo completato',
+    addendum: 'un addendum al mandato',
+  };
+
+  const HASH_SHA256 = /^[a-f0-9]{64}$/i;
+
+  server.get('/portal/canali-firma', async (req, reply) => {
+    const tenantId = (req as any).tenantId;
+    const clienteId = clienteDellaRichiesta(req, (req.query as any)?.clienteId);
+    if (!clienteId) {
+      return reply.code(400).send({ errore: 'Cliente non identificato nella sessione.' });
+    }
+
     try {
-      const target = cellulare || email || '+39 333 5936278';
-      const otp = generateOtp(clienteId, target, canale);
+      const cliente = await prisma.cliente.findFirst({
+        where: { id: clienteId, tenantId },
+        select: { nome: true, email: true, cellulare: true, telegramChatId: true, canaleOtpPreferito: true },
+      });
+      if (!cliente) return reply.code(404).send({ errore: 'Cliente non trovato.' });
 
-      // Masked target per privacy (es. +39 333 *** 6278 o c***t@domain.com)
-      let masked = target;
-      if (target.includes('@')) {
-        const parts = target.split('@');
-        const userPart = parts[0] || '';
-        const domainPart = parts[1] || '';
-        masked = `${userPart.slice(0, 2)}***${userPart.slice(-1)}@${domainPart}`;
-      } else if (target.length > 8) {
-        masked = `${target.slice(0, 6)} *** ${target.slice(-4)}`;
-      }
-
-      // Dispatch reale via Email SMTP
-      if (canale === 'email' && (email || target.includes('@'))) {
-        const toMail = email || target;
-        await sendOtpSecurityEmail(toMail, signerName, otp);
-      }
-
-      console.log(`[FEA-OTP] Generato ed inviato codice OTP a ${masked} via ${canale}`);
+      const cred = await credenzialiCanali(tenantId);
+      const recapiti: Record<CanaleOtp, string | null> = {
+        whatsapp: cliente.cellulare,
+        email: cliente.email,
+        telegram: cliente.telegramChatId,
+      };
 
       return reply.send({
         ok: true,
-        expiresInSeconds: 300,
-        maskedTarget: masked,
+        canalePreferito: cliente.canaleOtpPreferito,
+        canali: canaliDisponibili(cred, cliente).map((c) => ({
+          canale: c.canale,
+          disponibile: c.disponibile,
+          motivo: c.motivo,
+          // Mascherato: al browser basta che il firmatario si riconosca nel recapito.
+          // Telegram non ne ha uno leggibile, la chat id non dice nulla a chi la legge.
+          recapitoMascherato:
+            c.canale === 'telegram'
+              ? cliente.telegramChatId
+                ? 'chat Telegram collegata'
+                : null
+              : recapiti[c.canale]
+                ? mascheraRecapito(recapiti[c.canale] as string)
+                : null,
+        })),
+        botTelegram: cred.tgBotUsername,
+      });
+    } catch (err) {
+      return reply.code(500).send({ errore: err instanceof Error ? err.message : 'Errore lettura canali' });
+    }
+  });
+
+  server.post<{
+    Body: {
+      canale?: string;
+      ambito?: string;
+      riferimentoId?: string;
+      /** Recapito diverso da quello in anagrafica, dichiarato dal firmatario (§1.2). */
+      recapitoDichiarato?: string;
+      clienteId?: string;
+      signerName?: string;
+    };
+  }>('/portal/request-otp', async (req, reply) => {
+    const tenantId = (req as any).tenantId;
+    const { canale, ambito = 'engagement_letter', riferimentoId, recapitoDichiarato } = req.body || {};
+    const clienteId = clienteDellaRichiesta(req, req.body?.clienteId);
+
+    if (!clienteId) return reply.code(400).send({ errore: 'Cliente non identificato nella sessione.' });
+    if (!canaleValido(canale)) {
+      return reply.code(400).send({ errore: 'Canale non valido. Ammessi: whatsapp, email, telegram.' });
+    }
+    if (!ambitoValido(ambito)) {
+      return reply.code(400).send({ errore: 'Ambito di firma non valido.' });
+    }
+
+    try {
+      const cliente = await prisma.cliente.findFirst({
+        where: { id: clienteId, tenantId },
+        select: { nome: true, email: true, cellulare: true, telegramChatId: true },
+      });
+      if (!cliente) return reply.code(404).send({ errore: 'Cliente non trovato.' });
+
+      const inAnagrafica: Record<CanaleOtp, string | null> = {
+        whatsapp: cliente.cellulare,
+        email: cliente.email,
+        telegram: cliente.telegramChatId,
+      };
+
+      // Telegram è l'unico canale dove il recapito non si può dichiarare: la chat id non è
+      // un dato che il firmatario conosce, la produce il bot quando gli si scrive.
+      const dichiarato = canale === 'telegram' ? null : recapitoDichiarato?.trim() || null;
+      const target = dichiarato || inAnagrafica[canale];
+
+      if (!target) {
+        const cosaManca =
+          canale === 'whatsapp'
+            ? 'Nessun cellulare in anagrafica: indica un numero o scegli un altro canale.'
+            : canale === 'email'
+              ? 'Nessuna email in anagrafica: indica un indirizzo o scegli un altro canale.'
+              : 'Canale Telegram non collegato: scrivi prima al bot dello studio.';
+        return reply.code(400).send({ errore: cosaManca });
+      }
+
+      const esito = await creaOtp({
+        tenantId,
+        clienteId,
         canale,
-        // In modalita dev-test restituiamo devOtp se esplicitamente richiesto
-        devOtp: req.headers['x-dev-test'] ? otp : undefined,
+        target,
+        targetAnagrafica: inAnagrafica[canale],
+        ambito,
+        riferimentoId: riferimentoId ?? null,
+        ipRichiesta: ipReale(req),
+      });
+
+      // 429 e non 400: è un limite di frequenza, e il frontend ci accende il contatore.
+      if (!esito.ok || !esito.codice || !esito.otpId) {
+        return reply.code(429).send({ ok: false, errore: esito.errore, attendiSecondi: esito.attendiSecondi });
+      }
+
+      const invio = await inviaCodiceOtp({
+        tenantId,
+        canale,
+        target,
+        codice: esito.codice,
+        nomeFirmatario: req.body?.signerName?.trim() || cliente.nome,
+        oggettoFirma: DESCRIZIONE_AMBITO[ambito],
+      });
+
+      if (!invio.ok) {
+        // Il codice va invalidato subito: tenerlo vivo bloccherebbe per un minuto il
+        // tentativo su un altro canale, per una consegna che non è avvenuta.
+        await annullaOtp(esito.otpId);
+        return reply.code(502).send({ ok: false, errore: invio.errore });
+      }
+
+      recordAudit({
+        tenantId,
+        userId: (req as any).userId,
+        ruolo: (req as any).ruolo,
+        azione: 'FIRMA_OTP_RICHIESTO',
+        entita: cliente.nome,
+        dettagli:
+          `Codice di firma inviato via ${canale} a ${mascheraRecapito(target)} per ${DESCRIZIONE_AMBITO[ambito]}` +
+          (dichiarato ? ' — recapito dichiarato in fase di firma, diverso da quello in anagrafica' : ''),
+        ipAddress: ipReale(req),
+      });
+
+      return reply.send({
+        ok: true,
+        canale,
+        maskedTarget: mascheraRecapito(target),
+        recapitoDichiarato: Boolean(dichiarato),
+        expiresInSeconds: TTL_OTP_SECONDI,
+        reinviiRimanenti: esito.reinviiRimanenti,
+        attesaReinvioSecondi: ATTESA_REINVIO_SECONDI,
       });
     } catch (err) {
       return reply.code(500).send({ errore: err instanceof Error ? err.message : 'Errore richiesta OTP' });
     }
   });
 
-  server.post<{ Body: { clienteId: string; otp: string; signerName: string; documentoTitolo?: string; documentoHash?: string } }>('/portal/verify-otp-and-sign', async (req, reply) => {
-    const { clienteId, otp, signerName, documentoTitolo, documentoHash } = req.body;
+  server.post<{
+    Body: {
+      otp: string;
+      signerName?: string;
+      firmatarioRuolo?: string;
+      documentoTitolo?: string;
+      documentoHash?: string;
+      ambito?: string;
+      riferimentoId?: string;
+      clienteId?: string;
+      /** Grafometrica raccolta DOPO l'OTP e allegata al sigillo (§1.11). */
+      firmaGrafometricaPng?: string;
+    };
+  }>('/portal/verify-otp-and-sign', async (req, reply) => {
+    const tenantId = (req as any).tenantId;
+    const { otp, ambito = 'engagement_letter', riferimentoId, documentoHash, firmaGrafometricaPng } = req.body || {};
+    const clienteId = clienteDellaRichiesta(req, req.body?.clienteId);
+
+    if (!clienteId) return reply.code(400).send({ errore: 'Cliente non identificato nella sessione.' });
+    if (!otp || !/^\d{6}$/.test(otp.trim())) {
+      return reply.code(400).send({ ok: false, errore: 'Il codice è composto da 6 cifre.' });
+    }
+    if (!ambitoValido(ambito)) return reply.code(400).send({ errore: 'Ambito di firma non valido.' });
+
+    // Il sigillo deve identificare il testo firmato. Prima, in mancanza di hash, ne scriveva
+    // uno finto ('DOC_ORIGINAL_HASH'): un verbale che certifica la volontà su un documento
+    // qualunque. Senza impronta la firma non si appone.
+    if (!documentoHash || !HASH_SHA256.test(documentoHash.trim())) {
+      return reply
+        .code(400)
+        .send({ errore: 'Impronta SHA-256 del documento mancante o non valida: la firma non può essere apposta.' });
+    }
+
     try {
-      const validation = verifyOtp(clienteId, otp);
-      if (!validation.valid) {
-        return reply.code(400).send({ ok: false, errore: validation.reason });
+      const cliente = await prisma.cliente.findFirst({
+        where: { id: clienteId, tenantId },
+        select: { nome: true },
+      });
+      if (!cliente) return reply.code(404).send({ errore: 'Cliente non trovato.' });
+
+      const verifica = await verificaOtp(clienteId, otp, ambito, riferimentoId ?? null);
+      if (!verifica.valido || !verifica.record) {
+        return reply.code(400).send({ ok: false, errore: verifica.motivo });
       }
 
-      const clientIp = req.ip || req.headers['x-forwarded-for'] || '127.0.0.1';
-      const userAgent = req.headers['user-agent'] || 'BluMan Portal Client';
+      const grafometrica = normalizzaGrafometrica(firmaGrafometricaPng);
+      const documentoTitolo = req.body?.documentoTitolo?.trim() || DESCRIZIONE_AMBITO[ambito];
+      const firmatarioNome = req.body?.signerName?.trim() || cliente.nome;
 
-      const seal = generateEidasSignatureSeal({
+      const sigillo = creaSigilloFea({
         clienteId,
-        signerName: signerName || 'Legale Rappresentante',
-        documentoTitolo: documentoTitolo || 'Lettera d\'Incarico Professionale & Mandato',
-        documentoHash,
-        ip: Array.isArray(clientIp) ? clientIp[0] : String(clientIp),
-        userAgent,
-        canaleVerificato: 'OTP SMS/WhatsApp + Token Crittografico',
+        signerName: firmatarioNome,
+        documentoTitolo,
+        documentoHash: documentoHash.trim().toLowerCase(),
+        // L'IP della *verifica*, non quello della richiesta del codice: è il momento in cui
+        // la volontà viene manifestata.
+        ip: ipReale(req),
+        userAgent: req.headers['user-agent'] || null,
+        canaleVerificato: descriviCanaleVerificato(verifica.record),
       });
 
-      // Registrazione Audit immutabile
+      const firma = await (prisma as any).firmaElettronica.create({
+        data: {
+          tenantId,
+          clienteId,
+          signatureId: sigillo.signatureId,
+          tipoFirma: 'fea_otp',
+          ambito,
+          riferimentoId: riferimentoId ?? null,
+          documentoTitolo,
+          firmatarioNome,
+          firmatarioRuolo: req.body?.firmatarioRuolo?.trim() || null,
+          documentoHash: sigillo.documentoHash,
+          canaleVerificato: sigillo.canaleVerificato,
+          codiceOtpId: verifica.record.id,
+          ipAddress: sigillo.ipAddress,
+          userAgent: sigillo.userAgent,
+          firmaGrafometricaPng: grafometrica,
+          standard: sigillo.standard,
+          firmatoAt: new Date(sigillo.timestampIso),
+        },
+      });
+
       recordAudit({
-        azione: 'FIRMA_DIGITALE_FEA_APPOSITA',
-        entita: `Cliente #${clienteId}`,
-        dettagli: `Apposta Firma Elettronica Avanzata eIDAS ID: ${seal.signatureId} su "${seal.documentoTitolo}" da ${seal.signerName} (IP: ${seal.ipAddress})`,
-        ipAddress: seal.ipAddress,
+        tenantId,
+        userId: (req as any).userId,
+        ruolo: (req as any).ruolo,
+        azione: 'FIRMA_FEA_APPOSTA',
+        entita: cliente.nome,
+        dettagli:
+          `Firma Elettronica Avanzata ${sigillo.signatureId} su "${documentoTitolo}" da ${firmatarioNome}. ` +
+          `${sigillo.canaleVerificato}. IP: ${sigillo.ipAddress ?? 'non registrato'}.`,
+        ipAddress: sigillo.ipAddress,
       });
 
-      // Istanziazione / Attivazione transazionale del Progetto in Dashboard
-      try {
-        const prj = await prisma.progetto.findFirst({
-          where: { clienteId },
-          orderBy: { createdAt: 'desc' },
-        });
-        if (prj && prj.stato !== 'in_progress') {
-          await prisma.progetto.update({
-            where: { id: prj.id },
-            data: { stato: 'in_progress' },
+      // L'attivazione del progetto riguarda solo la lettera d'incarico: prima avveniva a
+      // ogni firma, quindi anche prendere visione di un documento faceva scattare un
+      // progetto in lavorazione.
+      let progettoAttivato: string | null = null;
+      if (ambito === 'engagement_letter') {
+        try {
+          const prj = await prisma.progetto.findFirst({
+            where: { clienteId },
+            orderBy: { createdAt: 'desc' },
           });
+          if (prj && prj.stato !== 'in_progress') {
+            await prisma.progetto.update({ where: { id: prj.id }, data: { stato: 'in_progress' } });
+            progettoAttivato = prj.id;
+          }
+        } catch {
+          // L'attivazione è un effetto collaterale: se salta, la firma resta valida.
         }
-      } catch {}
+      }
 
       return reply.send({
         ok: true,
-        seal,
-        message: 'Firma Elettronica Avanzata eIDAS apposta con successo! Progetto attivato nel flusso operativo.',
+        seal: { ...sigillo, id: firma.id, tipoFirma: 'fea_otp' },
+        progettoAttivato,
+        message: 'Firma elettronica avanzata registrata.',
       });
     } catch (err) {
       return reply.code(500).send({ errore: err instanceof Error ? err.message : 'Errore verifica OTP e firma' });
     }
   });
+
+  /**
+   * Le altre due strade di firma richieste (§1.3): il documento scaricato, firmato a penna e
+   * ricaricato, e quello firmato con il provider di firma digitale del cliente.
+   *
+   * Qui la prova non è l'OTP ma il file: la firma è già dentro al documento. L'OTP resta
+   * accettato e, se presente, viene citato nel sigillo — non è obbligatorio, perché
+   * pretenderlo non aggiungerebbe nulla a una firma qualificata apposta altrove.
+   */
+  server.post<{
+    Body: {
+      tipoFirma?: string;
+      ambito?: string;
+      riferimentoId?: string;
+      clienteId?: string;
+      documentoTitolo?: string;
+      documentoHash?: string;
+      filename?: string;
+      contentBase64?: string;
+      signerName?: string;
+      firmatarioRuolo?: string;
+      otp?: string;
+    };
+  }>('/portal/firma-con-file', async (req, reply) => {
+    const tenantId = (req as any).tenantId;
+    const { tipoFirma, ambito = 'engagement_letter', riferimentoId, documentoHash, filename, contentBase64 } =
+      req.body || {};
+    const clienteId = clienteDellaRichiesta(req, req.body?.clienteId);
+
+    if (!clienteId) return reply.code(400).send({ errore: 'Cliente non identificato nella sessione.' });
+    if (tipoFirma !== 'manuale_scansionata' && tipoFirma !== 'qualificata_esterna') {
+      return reply
+        .code(400)
+        .send({ errore: 'tipoFirma ammessi: manuale_scansionata, qualificata_esterna.' });
+    }
+    if (!ambitoValido(ambito)) return reply.code(400).send({ errore: 'Ambito di firma non valido.' });
+    if (!filename || !contentBase64) {
+      return reply.code(400).send({ errore: 'File firmato mancante.' });
+    }
+    if (!documentoHash || !HASH_SHA256.test(documentoHash.trim())) {
+      return reply
+        .code(400)
+        .send({ errore: 'Impronta SHA-256 del documento originale mancante o non valida.' });
+    }
+
+    try {
+      const cliente = await prisma.cliente.findFirst({
+        where: { id: clienteId, tenantId },
+        select: { nome: true },
+      });
+      if (!cliente) return reply.code(404).send({ errore: 'Cliente non trovato.' });
+
+      const buffer = Buffer.from(contentBase64.replace(/^data:[^;]+;base64,/, ''), 'base64');
+      // Lo stesso controllo degli altri caricamenti: un portale cliente è la porta più
+      // esposta che abbiamo, e qui il file arriva da fuori.
+      const scan = scanFileBuffer(buffer, filename);
+      if (!scan.safe) {
+        return reply.code(400).send({ errore: `File rifiutato: ${scan.reason}` });
+      }
+
+      let codiceOtpId: string | null = null;
+      let descrizioneOtp = '';
+      if (req.body?.otp) {
+        const verifica = await verificaOtp(clienteId, req.body.otp, ambito, riferimentoId ?? null);
+        if (!verifica.valido || !verifica.record) {
+          return reply.code(400).send({ ok: false, errore: verifica.motivo });
+        }
+        codiceOtpId = verifica.record.id;
+        descrizioneOtp = ` ${descriviCanaleVerificato(verifica.record)}.`;
+      }
+
+      const caricato = await uploadDocumento(filename, contentBase64);
+      const fileFirmatoHash = crypto.createHash('sha256').update(buffer).digest('hex');
+
+      const documentoTitolo = req.body?.documentoTitolo?.trim() || DESCRIZIONE_AMBITO[ambito];
+      const firmatarioNome = req.body?.signerName?.trim() || cliente.nome;
+
+      // Detto come sta: la piattaforma attesta di aver ricevuto un file da una sessione
+      // autenticata, non di aver verificato la firma che il file contiene. Per la firma
+      // qualificata esterna la validità la certifica il provider, e la verifica del
+      // certificato non è implementata — dirlo è parte del valore del verbale.
+      const canaleVerificato =
+        (tipoFirma === 'manuale_scansionata'
+          ? 'Documento scaricato, sottoscritto a mano e ricaricato dal cliente da sessione autenticata al portale'
+          : 'Documento sottoscritto con firma digitale qualificata di provider esterno al firmatario e ricaricato da sessione autenticata; il certificato non è stato validato dalla piattaforma') +
+        descrizioneOtp;
+
+      const standard =
+        tipoFirma === 'manuale_scansionata'
+          ? 'Sottoscrizione autografa su supporto cartaceo, acquisita per immagine'
+          : 'Firma digitale qualificata di provider esterno (eIDAS UE 910/2014 QES), non verificata dalla piattaforma';
+
+      const sigillo = creaSigilloFea({
+        clienteId,
+        signerName: firmatarioNome,
+        documentoTitolo,
+        documentoHash: documentoHash.trim().toLowerCase(),
+        ip: ipReale(req),
+        userAgent: req.headers['user-agent'] || null,
+        canaleVerificato,
+        standard,
+      });
+
+      const firma = await (prisma as any).firmaElettronica.create({
+        data: {
+          tenantId,
+          clienteId,
+          signatureId: sigillo.signatureId,
+          tipoFirma,
+          ambito,
+          riferimentoId: riferimentoId ?? null,
+          documentoTitolo,
+          firmatarioNome,
+          firmatarioRuolo: req.body?.firmatarioRuolo?.trim() || null,
+          documentoHash: sigillo.documentoHash,
+          canaleVerificato: sigillo.canaleVerificato,
+          codiceOtpId,
+          ipAddress: sigillo.ipAddress,
+          userAgent: sigillo.userAgent,
+          fileFirmatoUrl: caricato.url,
+          fileFirmatoHash,
+          standard: sigillo.standard,
+          firmatoAt: new Date(sigillo.timestampIso),
+        },
+      });
+
+      recordAudit({
+        tenantId,
+        userId: (req as any).userId,
+        ruolo: (req as any).ruolo,
+        azione: 'FIRMA_FILE_CARICATO',
+        entita: cliente.nome,
+        dettagli:
+          `Firma ${tipoFirma} ${sigillo.signatureId} su "${documentoTitolo}" da ${firmatarioNome}. ` +
+          `File ${filename} (${scan.fileSize} byte, SHA-256 ${fileFirmatoHash.slice(0, 16)}…). ` +
+          `IP: ${sigillo.ipAddress ?? 'non registrato'}.`,
+        ipAddress: sigillo.ipAddress,
+      });
+
+      return reply.send({ ok: true, seal: { ...sigillo, id: firma.id, tipoFirma, fileFirmatoUrl: caricato.url } });
+    } catch (err) {
+      return reply.code(500).send({ errore: err instanceof Error ? err.message : 'Errore firma con file' });
+    }
+  });
+
+  /**
+   * Le firme registrate. Un cliente vede solo le proprie, l'operatore quelle del tenant —
+   * ed è questo che permette allo studio di *vedere la firma a database*, che prima non
+   * esisteva da nessuna parte.
+   */
+  server.get<{ Querystring: { clienteId?: string; ambito?: string } }>('/firme', async (req, reply) => {
+    const tenantId = (req as any).tenantId;
+    const soloProprie = (req as any).ruolo === 'cliente';
+    const clienteId = soloProprie
+      ? clienteDellaRichiesta(req)
+      : req.query?.clienteId?.trim() || undefined;
+
+    if (soloProprie && !clienteId) {
+      return reply.code(400).send({ errore: 'Cliente non identificato nella sessione.' });
+    }
+
+    try {
+      const firme = await (prisma as any).firmaElettronica.findMany({
+        where: {
+          tenantId,
+          ...(clienteId ? { clienteId } : {}),
+          ...(req.query?.ambito ? { ambito: req.query.ambito } : {}),
+        },
+        orderBy: { firmatoAt: 'desc' },
+        select: {
+          id: true,
+          signatureId: true,
+          tipoFirma: true,
+          ambito: true,
+          riferimentoId: true,
+          documentoTitolo: true,
+          firmatarioNome: true,
+          firmatarioRuolo: true,
+          documentoHash: true,
+          canaleVerificato: true,
+          ipAddress: true,
+          fileFirmatoUrl: true,
+          fileFirmatoHash: true,
+          standard: true,
+          firmatoAt: true,
+          // La grafometrica è un'immagine e pesa: si scarica dal dettaglio, non in elenco.
+          cliente: { select: { id: true, nome: true } },
+        },
+      });
+      return reply.send({ ok: true, firme });
+    } catch (err) {
+      return reply.code(500).send({ errore: err instanceof Error ? err.message : 'Errore lettura firme' });
+    }
+  });
+
+  server.get<{ Params: { id: string } }>('/firme/:id/grafometrica', async (req, reply) => {
+    const tenantId = (req as any).tenantId;
+    try {
+      const firma = await (prisma as any).firmaElettronica.findFirst({
+        where: { id: req.params.id, tenantId },
+        select: { firmaGrafometricaPng: true, clienteId: true },
+      });
+      if (!firma) return reply.code(404).send({ errore: 'Firma non trovata.' });
+
+      // Un cliente non deve poter chiedere la grafometrica di un altro cliente dello stesso
+      // studio: RLS isola il tenant, non i clienti fra loro.
+      if ((req as any).ruolo === 'cliente' && clienteDellaRichiesta(req) !== firma.clienteId) {
+        return reply.code(403).send({ errore: 'Firma non accessibile.' });
+      }
+      if (!firma.firmaGrafometricaPng) {
+        return reply.code(404).send({ errore: 'Nessuna firma grafometrica allegata a questo sigillo.' });
+      }
+      return reply.send({ ok: true, firmaGrafometricaPng: firma.firmaGrafometricaPng });
+    } catch (err) {
+      return reply.code(500).send({ errore: err instanceof Error ? err.message : 'Errore lettura grafometrica' });
+    }
+  });
+
 
   // ── WORKER CRON SCADENZE & RINNOVI AUTOMATICI UBO/MFSA/SDI ──────────
   server.post('/cron/esegui-notifiche-scadenze', async (req, reply) => {
