@@ -426,7 +426,15 @@ export function ClientPortal() {
           // moduli a database.
           setClientProjects(matched);
           if (matched.length > 0) {
-            const activeProj = matched[0];
+            // Non il più recente in assoluto, ma il più recente CON moduli a database.
+            // `GET /progetti` ordina per data discendente e prima si prendeva `matched[0]`:
+            // se lo studio aveva aperto un secondo incarico per lo stesso cliente e non lo
+            // aveva ancora istanziato, il portale mostrava quello — vuoto — e il cliente
+            // vedeva zero moduli pur avendone due sull'incarico precedente. Da qui l'idea
+            // che servisse prima firmare: la firma non c'entra, l'elenco puntava al
+            // progetto sbagliato.
+            const conModuli = matched.find((p: any) => Array.isArray(p.moduli) && p.moduli.length > 0);
+            const activeProj = conModuli ?? matched[0];
             const pId = String(activeProj.id);
             setSelectedProjectId(pId);
             setProgettoId(pId);

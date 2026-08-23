@@ -217,16 +217,20 @@ export async function inviaCodiceOtp(richiesta: RichiestaInvio): Promise<EsitoIn
       return inviaTelegram(cred, richiesta.target, testo);
 
     case 'email': {
-      const inviata = await sendOtpSecurityEmail(richiesta.target, richiesta.nomeFirmatario, richiesta.codice, {
+      const esito = await sendOtpSecurityEmail(richiesta.target, richiesta.nomeFirmatario, richiesta.codice, {
         smtp: cred.smtp,
         fromEmail: cred.smtpFromEmail ?? undefined,
         fromName: cred.smtpFromName ?? undefined,
         minutiValidita: minuti,
         oggettoFirma: richiesta.oggettoFirma,
       });
-      return inviata
+      // Il motivo tecnico viene riportato invece del vecchio "controlla la configurazione
+      // SMTP": le impostazioni possono essere giuste e l'invio fallire comunque perché
+      // l'hosting blocca la porta in uscita, e mandare a rileggere impostazioni corrette
+      // fa perdere ore. Qui non c'è nessun segreto: host, porta e codice dell'errore.
+      return esito.ok
         ? { ok: true }
-        : { ok: false, errore: "Invio email non riuscito: controlla la configurazione SMTP dello studio." };
+        : { ok: false, errore: `Invio email non riuscito — ${esito.errore ?? 'causa non riportata dal server di posta'}.` };
     }
 
     default:

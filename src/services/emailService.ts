@@ -306,12 +306,23 @@ export interface OpzioniEmailOtp {
   oggettoFirma?: string;
 }
 
+export interface EsitoEmailOtp {
+  ok: boolean;
+  /** Host e porta che hanno accettato l'invio: serve a capire quale ripiego ha funzionato. */
+  via?: string;
+  /** Motivo tecnico del fallimento, da mostrare a chi firma invece di un generico "controlla la configurazione". */
+  errore?: string;
+}
+
 export async function sendOtpSecurityEmail(
   toEmail: string,
   clienteNome: string,
   otpCode: string,
   opzioni: OpzioniEmailOtp = {},
-): Promise<boolean> {
+): Promise<EsitoEmailOtp> {
+  // Non serve per spedire (sotto si costruisce un trasporto per ogni porta candidata): serve
+  // come controllo di configurazione, perché torna `null` quando host, utente o password
+  // mancano sia sul tenant sia nell'ambiente.
   const transporter = createTransporter(opzioni.smtp);
   const fromEmail = opzioni.fromEmail || process.env.SMTP_FROM || 'support@bluecode-ltd.com';
   const fromName = opzioni.fromName || 'BluMan Security';
@@ -345,22 +356,64 @@ export async function sendOtpSecurityEmail(
     // fattore consegnato a tutti. Senza SMTP configurato l'invio FALLISCE, e la rotta lo
     // dice al cliente — prima "simulazione" significava firma bloccata senza spiegazione.
     console.warn(`[SMTP] Nessuna configurazione SMTP: codice OTP per ${toEmail} NON inviato.`);
-    return false;
+    return {
+      ok: false,
+      errore: 'SMTP non configurato: host, utente o password mancanti nelle impostazioni dello studio.',
+    };
   }
 
-  try {
-    await transporter.sendMail({
-      from: `"${fromName}" <${fromEmail}>`,
-      to: toEmail,
-      subject: `🔐 Codice OTP di Sicurezza: ${otpCode} — Firma BluMan`,
-      html,
-    });
-    console.log(`[SMTP] Email OTP inviata a ${toEmail}`);
-    return true;
-  } catch (err) {
-    console.error('[SMTP Error] Errore invio email OTP:', err);
-    return false;
+  // Più di un tentativo, come già fa il Magic Link. Il codice di firma partiva da un solo
+  // host/porta: se l'hosting blocca in uscita quella porta — su Railway succede — l'invio
+  // moriva in timeout dopo 10 secondi e la firma restava impossibile, con le impostazioni
+  // dello studio perfettamente corrette. Le alternative sono la stessa casella su porte
+  // diverse, non un altro mittente: nessun invio parte da credenziali che non siano quelle
+  // configurate qui.
+  const hostConfigurato = opzioni.smtp?.host || process.env.SMTP_HOST!;
+  const portaConfigurata = opzioni.smtp?.port || Number(process.env.SMTP_PORT ?? 465);
+  const candidati = [
+    { host: hostConfigurato, port: portaConfigurata, secure: opzioni.smtp?.secure ?? portaConfigurata === 465 },
+    { host: hostConfigurato, port: 465, secure: true },
+    { host: hostConfigurato, port: 587, secure: false },
+    { host: hostConfigurato, port: 25, secure: false },
+  ].filter((c, i, arr) => arr.findIndex((x) => x.host === c.host && x.port === c.port) === i);
+
+  const utente = opzioni.smtp?.user || process.env.SMTP_USER!;
+  const password = opzioni.smtp?.pass || process.env.SMTP_PASS!;
+  const errori: string[] = [];
+
+  for (const cand of candidati) {
+    const iniziato = Date.now();
+    try {
+      const trasporto = nodemailer.createTransport({
+        host: cand.host,
+        port: cand.port,
+        secure: cand.secure,
+        auth: { user: utente, pass: password },
+        tls: { rejectUnauthorized: false },
+        connectionTimeout: 10000,
+        greetingTimeout: 10000,
+      });
+
+      await trasporto.sendMail({
+        from: `"${fromName}" <${fromEmail}>`,
+        to: toEmail,
+        subject: `🔐 Codice OTP di Sicurezza: ${otpCode} — Firma BluMan`,
+        html,
+      });
+      console.log(`[SMTP] Email OTP inviata a ${toEmail} via ${cand.host}:${cand.port} in ${Date.now() - iniziato}ms`);
+      return { ok: true, via: `${cand.host}:${cand.port}` };
+    } catch (err: any) {
+      // Il motivo va conservato per intero: "connessione in timeout" e "autenticazione
+      // rifiutata" richiedono due interventi diversi, e finora la rotta rispondeva con lo
+      // stesso testo per entrambi mandando a controllare impostazioni già corrette.
+      const motivo = `${cand.port}: ${err?.code ? `${err.code} — ` : ''}${err?.message || 'errore sconosciuto'}`;
+      errori.push(motivo);
+      console.warn(`[SMTP OTP] Tentativo fallito su ${cand.host}:${cand.port} dopo ${Date.now() - iniziato}ms:`, err?.message);
+    }
   }
+
+  console.error('[SMTP Error] Errore invio email OTP:', errori.join(' | '));
+  return { ok: false, errore: `nessuna porta utilizzabile verso ${hostConfigurato} (${errori.join('; ')})` };
 }
 
 export async function sendClientCredentialsEmail(
