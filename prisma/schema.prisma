@@ -96,6 +96,8 @@ model Tenant {
   permessiModuli PermessoModulo[]
   modelliDocumenti ModelloDocumentoCustom[]
   magicLinks    MagicLink[]
+  codiciOtp     CodiceOtp[]
+  firme         FirmaElettronica[]
 
   @@map("tenant")
 }
@@ -149,6 +151,17 @@ model Cliente {
   nome            String
   tipo            String // individual|company — §2
   email           String?  @map("email")
+  // Recapiti a cui può arrivare il codice OTP di firma. Prima non esistevano in anagrafica:
+  // il portale teneva il numero del firmatario cablato nel sorgente, quindi l'OTP di
+  // qualunque cliente partiva verso lo stesso telefono. Il recapito è un dato del cliente,
+  // non una costante del frontend.
+  cellulare       String?  @map("cellulare")
+  // Chat id numerica, non lo @username: sendMessage vuole la chat, e la chat esiste solo
+  // dopo che il cliente ha scritto almeno una volta al bot dello studio.
+  telegramChatId  String?  @map("telegram_chat_id")
+  // whatsapp|email|telegram — solo la preselezione. La scelta del canale resta del
+  // firmatario a ogni firma; null significa "nessuna preferenza registrata".
+  canaleOtpPreferito String? @map("canale_otp_preferito")
   passwordHash    String?  @map("password_hash")
   piva            String?  @map("piva")
   codiceFiscale   String?  @map("codice_fiscale")
@@ -167,6 +180,8 @@ model Cliente {
   preventivi Preventivo[]
   contrattiRicorrenti ContrattoRicorrente[]
   magicLinks MagicLink[]
+  codiciOtp  CodiceOtp[]
+  firme      FirmaElettronica[]
 
   @@map("cliente")
 }
@@ -902,14 +917,125 @@ model MagicLink {
 }
 
 // ─────────────────────────────────────────────────────────────────
+// CODICE OTP — secondo fattore della firma elettronica avanzata (§23bis)
+// ─────────────────────────────────────────────────────────────────
+// Prima i codici vivevano in una `Map` in memoria dentro otpService: bastava un restart
+// di Railway — o il secondo processo di un deploy a due istanze — perché il cliente si
+// trovasse "codice non valido" dopo averlo appena ricevuto. Un secondo fattore che non
+// sopravvive al riavvio del server non è un secondo fattore.
+
+model CodiceOtp {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  clienteId String   @map("cliente_id")
+  cliente   Cliente  @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  // HMAC-SHA-256 del codice, non il codice: vedi `hashCodiceOtp` in src/util/jwt.ts.
+  // Sei cifre sotto un hash veloce sono un milione di voci precalcolabili, quindi serve
+  // un segreto che nel database non c'è.
+  codiceHash String  @map("codice_hash")
+  // whatsapp|email|telegram. Niente SMS: nessun provider è collegato, e un canale che
+  // non spedisce ma compare nell'interfaccia è un modo di far fallire una firma.
+  canale    String   @map("canale")
+  // Recapito a cui il codice è stato effettivamente spedito, in chiaro e per intero.
+  // L'audit di una firma deve poter dire dove è finito il fattore di autenticazione;
+  // il mascheramento è una scelta di presentazione, si fa in risposta all'API.
+  target    String   @map("target")
+  // Il firmatario può indicare un recapito diverso da quello in anagrafica (§1.2). Quando
+  // lo fa va a verbale: `targetAnagrafica` conserva il valore su scheda, e il sigillo dirà
+  // che il fattore è stato consegnato a un recapito dichiarato in fase di firma. Senza
+  // questi due campi la deviazione sarebbe invisibile a posteriori.
+  targetDichiarato Boolean @default(false) @map("target_dichiarato")
+  targetAnagrafica String? @map("target_anagrafica")
+  // Cos'è che si sta autorizzando: engagement_letter|documento_vault|modulo_completato|addendum.
+  // Un codice emesso per firmare un addendum non deve valere per un documento del Vault.
+  ambito    String   @map("ambito")
+  riferimentoId String? @map("riferimento_id")
+  scadenza  DateTime @map("scadenza")
+  // Tentativi di inserimento errati. Al terzo il codice muore: va richiesto un reinvio.
+  tentativi Int      @default(0) @map("tentativi")
+  // Reinvii già concessi, massimo 3, non prima di 60 secondi dall'ultimo (§1.5).
+  reinvii   Int      @default(0) @map("reinvii")
+  ultimoInvioAt DateTime @map("ultimo_invio_at")
+  // IP reale del richiedente, null quando il proxy non lo espone: è il "non registrato"
+  // dell'interfaccia. Un IP inventato in un verbale di firma è peggio di un IP assente.
+  ipRichiesta String? @map("ip_richiesta")
+  usatoAt   DateTime? @map("usato_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  firme     FirmaElettronica[]
+
+  // La verifica cerca l'ultimo codice vivo di quel cliente per quell'ambito.
+  @@index([clienteId, ambito, scadenza])
+  @@map("codice_otp")
+}
+
+// ─────────────────────────────────────────────────────────────────
+// FIRMA ELETTRONICA — il sigillo, persistito (§23bis)
+// ─────────────────────────────────────────────────────────────────
+// Il sigillo eIDAS veniva costruito in memoria, restituito al browser e poi buttato: lo
+// studio non aveva modo di dimostrare che una firma fosse stata apposta, perché in
+// database non ne restava traccia. `engagement_letter.stato_firma = 'firmato'` dice che
+// è successo, non cosa è successo — e non regge una contestazione.
+
+model FirmaElettronica {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  clienteId String   @map("cliente_id")
+  cliente   Cliente  @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  // Identificativo mostrato al firmatario e citato nel PDF. Unico perché è la chiave con
+  // cui una firma viene richiamata da fuori.
+  signatureId String @unique @map("signature_id")
+  // fea_otp                → firma avanzata: lettura, OTP su canale scelto, grafometrica
+  // manuale_scansionata    → il cliente scarica, firma a penna, ricarica il file (§1.3)
+  // qualificata_esterna    → firmato con provider di firma digitale del cliente (§1.3)
+  // Il tipo non è cosmetico: cambia il valore probatorio, e va scritto accanto alla firma.
+  tipoFirma String  @map("tipo_firma")
+  ambito    String   @map("ambito")
+  riferimentoId String? @map("riferimento_id")
+  documentoTitolo String @map("documento_titolo")
+  firmatarioNome  String @map("firmatario_nome")
+  firmatarioRuolo String? @map("firmatario_ruolo")
+  // SHA-256 del contenuto firmato. È il legame fra sigillo e documento: senza, il sigillo
+  // certifica un atto di volontà su un testo che nessuno può più identificare.
+  documentoHash String @map("documento_hash")
+  // Come è stato verificato il firmatario, in chiaro: "OTP via WhatsApp al +39…".
+  // Prima diceva "OTP SMS/WhatsApp + Token Crittografico" a prescindere dal canale usato.
+  canaleVerificato String? @map("canale_verificato")
+  codiceOtpId String? @map("codice_otp_id")
+  codiceOtp   CodiceOtp? @relation(fields: [codiceOtpId], references: [id])
+  // Null quando l'IP non è disponibile. Il frontend scriveva '83.211.12.94 (eIDAS
+  // Verificato)': un indirizzo cablato in un sigillo probatorio è una dichiarazione falsa.
+  ipAddress String? @map("ip_address")
+  userAgent String? @map("user_agent")
+  // La grafometrica sta nella riga, come data URL, non in storage: `uploads/` su Railway
+  // è effimero e il file sparirebbe al deploy successivo, lasciando un sigillo che
+  // rimanda a un'immagine inesistente. Un PNG di firma sta in poche decine di KB.
+  firmaGrafometricaPng String? @map("firma_grafometrica_png")
+  // Per i due tipi non-FEA: il file caricato dal cliente e la sua impronta.
+  fileFirmatoUrl  String? @map("file_firmato_url")
+  fileFirmatoHash String? @map("file_firmato_hash")
+  standard  String   @map("standard")
+  firmatoAt DateTime @default(now()) @map("firmato_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([clienteId, ambito])
+  @@map("firma_elettronica")
+}
+
+// ─────────────────────────────────────────────────────────────────
 // NOTE OPERATIVE — da fare a mano dopo `prisma migrate dev`, Prisma non le genera:
 //
 // 1. Row-Level Security su tenant_id (§14):
-//      ALTER TABLE cliente ENABLE ROW LEVEL SECURITY;
-//      CREATE POLICY tenant_isolation ON cliente
-//        USING (tenant_id = current_setting('app.current_tenant_id')::uuid);
-//      -- ripetere per ogni tabella con tenant_id; il super_admin usa un ruolo DB
-//      -- separato che bypassa la policy (§2bis).
+//      NON si scrive una policy per tabella a mano. La sezione 3 di
+//      supabase/migrations/20260819_rls_effettiva.sql cicla per introspezione su ogni
+//      tabella che abbia una colonna `tenant_id` NOT NULL e le applica ENABLE + FORCE
+//      ROW LEVEL SECURITY più la policy `isolamento_tenant`. Dopo aver aggiunto un
+//      modello con `tenantId`, la procedura è rieseguire quel blocco (o la migrazione
+//      dedicata che lo richiama) e controllare la query di verifica in fondo al file,
+//      che elenca le tabelle raggiungibili da `bluman_app` rimaste senza policy.
+//      Il super_admin usa un ruolo DB separato che bypassa la policy (§2bis).
 //
 // 2. CHECK "esattamente una risorsa valorizzata" su accesso_risorsa (§19):
 //      ALTER TABLE accesso_risorsa ADD CONSTRAINT chk_una_risorsa CHECK (

@@ -101,6 +101,34 @@ export function hashMagicToken(token: string): string {
   return crypto.createHash('sha256').update(token).digest('hex');
 }
 
+/**
+ * HMAC-SHA-256 del codice OTP, ed è questo che finisce in `codice_otp.codice_hash`.
+ *
+ * Qui il ragionamento è l'opposto di `hashMagicToken`: il magic token ha 128 bit di
+ * entropia e un hash veloce basta, l'OTP ne ha sei cifre — un milione di possibilità,
+ * che una tabella precalcolata di SHA-256 esaurisce in un istante. Con l'HMAC il
+ * database da solo non è sufficiente: senza `JWT_SECRET`, che vive in ambiente e non
+ * in tabella, i digest non si possono ricostruire.
+ *
+ * L'etichetta `otp:` separa il dominio: lo stesso segreto firma i JWT di sessione e gli
+ * URL di download, e nessuno dei tre deve poter produrre un valore valido per un altro.
+ *
+ * `clienteId` entra nel messaggio perché due clienti possono ricevere lo stesso codice
+ * nello stesso minuto: legandolo al destinatario, un digest intercettato non è
+ * riutilizzabile su un'altra riga.
+ */
+export function hashCodiceOtp(codice: string, clienteId: string): string {
+  return crypto.createHmac('sha256', JWT_SECRET).update(`otp:${clienteId}:${codice}`).digest('hex');
+}
+
+/** Confronto a tempo costante fra il codice digitato e il digest in tabella. */
+export function verificaCodiceOtp(codice: string, clienteId: string, hashAtteso: string): boolean {
+  const calcolato = Buffer.from(hashCodiceOtp(codice, clienteId), 'utf8');
+  const atteso = Buffer.from(hashAtteso, 'utf8');
+  if (calcolato.length !== atteso.length) return false;
+  return crypto.timingSafeEqual(calcolato, atteso);
+}
+
 // ─── Firma dei download (§Sicurezza) ─────────────────────────────────────────────
 // `GET /uploads/:filename` non può pretendere l'header Authorization: quegli URL finiscono
 // in `<img src>` — il logo dello studio nella sidebar, nelle fatture, dentro l'HTML delle
