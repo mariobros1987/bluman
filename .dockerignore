@@ -1,0 +1,40 @@
+# Cosa non deve entrare nell'immagine del container.
+#
+# Il Dockerfile fa `COPY . .`. Senza questo file entrava anche `.env`, cioè le credenziali
+# reali di database e posta scritte in chiaro in un layer dell'immagine: leggibili con
+# `docker history`, presenti in ogni copia dell'immagine e non rimovibili cancellando il
+# file in un layer successivo. Le variabili le fornisce Railway al processo, non il file.
+#
+# `.railwayignore` accanto a questo governa invece cosa la CLI carica; le voci coincidono
+# perché il rischio è lo stesso.
+
+# Segreti
+.env
+.env.local
+.env.*.local
+secrets/
+.secrets/
+*.secret.*
+
+# Dipendenze e build: le rifà `npm ci` dentro l'immagine, e copiarle da macOS porterebbe
+# binari compilati per la piattaforma sbagliata
+node_modules
+frontend/node_modules
+dist
+build
+frontend/dist
+
+# Il frontend non gira in questo container: lo serve Vercel
+frontend
+
+# Materiale di lavoro locale
+scratch/
+uploads/
+*.log
+openstamanager_source/
+openstamanager-reference/
+graphify-out/
+*.zip
+.git
+.claude/
+.vercel
