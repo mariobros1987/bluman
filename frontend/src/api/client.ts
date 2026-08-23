@@ -764,40 +764,63 @@ export async function testEmailApi(payload?: {
     to: payload?.emailDestinatario || payload?.smtpUser,
   };
 
-  // 1. Tenta prima la Serverless Function Vercel /api/send-email con timeout di 4.5s
-  try {
+  // Un test SMTP onesto deve avere il tempo di fallire: aprire la connessione, fare
+  // l'handshake TLS, autenticarsi e spedire richiede più di 4,5 secondi su una rete lenta,
+  // e il vecchio timeout scadeva prima di conoscere l'esito. Venti secondi coprono anche il
+  // caso in cui il server prova più porte in sequenza.
+  const conTimeout = async (url: string, init: RequestInit) => {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 4500);
-    const res = await fetch('/api/send-email', {
+    const timer = setTimeout(() => controller.abort(), 20000);
+    try {
+      const res = await fetch(url, { ...init, signal: controller.signal });
+      return await res.json();
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+
+  const motivi: string[] = [];
+
+  // 1. Serverless Function Vercel /api/send-email
+  try {
+    const json = await conTimeout('/api/send-email', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
-      signal: controller.signal,
     });
-    clearTimeout(timer);
-    const json = await res.json();
     if (json) return json;
-  } catch {}
+    motivi.push('la funzione Vercel non ha risposto nulla');
+  } catch (err: any) {
+    motivi.push(
+      `funzione Vercel: ${err?.name === 'AbortError' ? 'nessuna risposta entro 20 secondi' : err?.message || 'errore di rete'}`,
+    );
+  }
 
-  // 2. Fallback su Backend Fastify con timeout di 4.5s
+  // 2. Ripiego sul backend Fastify. L'intestazione di autenticazione serve: la rotta è
+  // protetta e senza token rispondeva 401, che il vecchio codice scartava in silenzio.
   try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 4500);
-    const res = await fetch(`${API_BASE}/tenant/test-email`, {
+    const json = await conTimeout(`${API_BASE}/tenant/test-email`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(payload || {}),
-      signal: controller.signal,
     });
-    clearTimeout(timer);
-    const json = await res.json();
     if (json) return json;
-  } catch {}
+    motivi.push('il backend non ha risposto nulla');
+  } catch (err: any) {
+    motivi.push(
+      `backend: ${err?.name === 'AbortError' ? 'nessuna risposta entro 20 secondi' : err?.message || 'errore di rete'}`,
+    );
+  }
 
-  // 3. Risposta immediata sicura senza mai bloccare la UI
+  // 3. Nessuna delle due strade ha risposto: il test NON è stato eseguito.
+  //
+  // Qui prima si restituiva un `success: true` con il messaggio «Connessione SMTP testata»:
+  // un esito positivo inventato, identico con la configurazione giusta e con quella
+  // sbagliata. È il motivo per cui il test in impostazioni «funzionava» mentre il codice
+  // OTP non arrivava a nessuno. Un test che non ha potuto girare va detto.
   return {
-    success: true,
-    message: `✓ Connessione SMTP testata per ${payload?.smtpUser || 'support@bluecode-ltd.com'} su Register.it! Configurazione parametri salvata con successo.`,
+    success: false,
+    errore: `Test non eseguito: nessuna delle due strade di invio ha risposto (${motivi.join('; ') || 'motivo non riportato'}).`,
   };
 }
 
@@ -935,24 +958,24 @@ export async function testImapApi(payload: {
   imapUser?: string;
   imapPass?: string;
 }) {
+  // La rotta `/tenant/test-imap` fa una verifica vera (login IMAP reale). Qui si riporta
+  // il suo esito e nient'altro: nei due rami di ripiego c'era un `success: true` con il
+  // messaggio «Connessione IMAP verificata con successo», restituito proprio quando il
+  // server rispondeva con un errore o non rispondeva affatto. Con una password sbagliata
+  // la schermata impostazioni diceva «connesso».
   try {
     const res = await fetch(`${API_BASE}/tenant/test-imap`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(payload || {}),
     });
-    if (res.ok) {
-      return await res.json();
-    }
-    // Fallback se il server in background non ha ancora ricaricato la nuova rotta
-    return {
-      success: true,
-      message: `Connessione IMAP verificata con successo su ${payload.imapHost || 'imap.register.it'}:${payload.imapPort || 993} per la casella ${payload.imapUser || 'support@bluecode-ltd.com'}! Servizio posta in entrata attivo.`,
-    };
+    const json = await res.json().catch(() => null);
+    if (json) return json;
+    return { success: false, errore: `Il server ha risposto ${res.status} senza contenuto leggibile.` };
   } catch (err: any) {
     return {
-      success: true,
-      message: `Connessione IMAP verificata con successo su ${payload.imapHost || 'imap.register.it'}:${payload.imapPort || 993} per la casella ${payload.imapUser || 'support@bluecode-ltd.com'}! Servizio posta in entrata attivo.`,
+      success: false,
+      errore: `Test IMAP non eseguito: ${err?.message || 'il server non ha risposto'}.`,
     };
   }
 }
@@ -960,7 +983,7 @@ export async function testImapApi(payload: {
 export async function testChannelApi(payload: { channel: string; waPhoneId?: string; waAccessToken?: string; tgBotToken?: string; signalCliEndpoint?: string }) {
   const res = await fetch(`${API_BASE}/tenant/test-channel`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders(),
     body: JSON.stringify(payload),
   });
   return await res.json();

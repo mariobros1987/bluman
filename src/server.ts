@@ -1896,7 +1896,17 @@ export function buildServer(app: AppPort): FastifyInstance {
       const mode = req.query['hub.mode'];
       const token = req.query['hub.verify_token'];
       const challenge = req.query['hub.challenge'];
-      const verifyToken = process.env.WA_VERIFY_TOKEN || 'bluman_wa_secure_token_2026';
+      // Nessun ripiego cablato: qui c'era il token di verifica scritto in chiaro, cioè
+      // pubblicato su GitHub. Chi lo leggeva poteva superare l'handshake di Meta e far
+      // registrare il proprio endpoint come webhook dello studio, ricevendo i messaggi
+      // WhatsApp dei clienti. Regola 6 di `.agents/AGENTS.md`. Senza la variabile
+      // d'ambiente l'handshake viene rifiutato: meglio un webhook da riconfigurare di uno
+      // che accetta chiunque conosca una stringa pubblica.
+      const verifyToken = process.env.WA_VERIFY_TOKEN;
+
+      if (!verifyToken) {
+        return reply.status(503).send('WA_VERIFY_TOKEN non configurato');
+      }
 
       if (mode === 'subscribe' && token === verifyToken) {
         return reply.status(200).send(challenge);

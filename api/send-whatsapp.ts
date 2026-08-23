@@ -20,9 +20,27 @@ export default async function handler(req: any, res: any) {
   try {
     const { to, text, templateName, phoneId, token } = req.body || {};
 
-    const activePhoneId = phoneId || process.env.WA_PHONE_ID || '1318817114639409';
-    const activeToken = token || process.env.WHATSAPP_ACCESS_TOKEN || 'EAGO82S4iZAZCIBSCyV6ARilEgvBez7EwZA6pK5yaOa1ZCp7TmvFRTfxIZCWlLjQ4rBQeIZCRezgBJFm9BiQrUUsmfJA9ayZBTR3w3Qm3wGF8rUNpPCPqiSVOhTZCMF4EZBYpZAeQRjtgxfRqraBrXgBcZBCE0mZCfTvENnDAZBmgQhmtxeRp6N9Qcuj9C6CqigYHNXAZDZD';
-    const cleanTo = (to || '393335936278').toString().replace(/\D/g, '');
+    // Nessun ripiego cablato. Qui c'erano il Phone ID del numero WhatsApp Business dello
+    // studio e un access token Meta valido, scritti in chiaro nel repository: chiunque li
+    // leggesse su GitHub poteva spedire messaggi a nome dello studio. C'era anche un numero
+    // di destinatario reale come ripiego, cioè un messaggio spedito a una persona vera per
+    // una richiesta senza destinatario. Regola 6 di `.agents/AGENTS.md`.
+    const activePhoneId = phoneId || process.env.WA_PHONE_ID;
+    const activeToken = token || process.env.WHATSAPP_ACCESS_TOKEN;
+
+    if (!activePhoneId || !activeToken) {
+      return res.status(400).json({
+        errore:
+          'WhatsApp non configurato: mancano Phone ID e access token, sia nella richiesta ' +
+          'sia nelle variabili WA_PHONE_ID/WHATSAPP_ACCESS_TOKEN della funzione.',
+      });
+    }
+
+    if (!to) {
+      return res.status(400).json({ errore: 'Destinatario mancante: indica il numero in `to`.' });
+    }
+
+    const cleanTo = to.toString().replace(/\D/g, '');
 
     // 1. Tenta prima l'invio come Template (100% garantito da Meta) o come testo
     let payload: any;

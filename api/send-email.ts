@@ -260,9 +260,15 @@ export default async function handler(req: any, res: any) {
     // AZIONE 1: Test IMAP
     // ─────────────────────────────────────────────────────────────
     if (action === 'test-imap') {
-      return res.status(200).json({
-        success: true,
-        message: `✓ Connessione IMAP verificata con successo su ${imapHost}:${imapPort} per la casella ${smtpUser}! Servizio posta in entrata attivo.`,
+      // Qui si rispondeva `success: true` con «Connessione IMAP verificata con successo»
+      // senza aprire nessuna connessione: un esito inventato, identico con la password
+      // giusta e con quella sbagliata. La verifica vera esiste ed è `POST /tenant/test-imap`
+      // sul backend (login IMAP reale): questa funzione non la duplica e lo dice.
+      return res.status(501).json({
+        success: false,
+        errore:
+          'Il test IMAP non si esegue da questa funzione: usa «Testa connessione IMAP» ' +
+          'nelle impostazioni, che interroga il server di posta per davvero.',
       });
     }
 
@@ -295,14 +301,21 @@ export default async function handler(req: any, res: any) {
       });
     }
 
-    const effectivePass = smtpPass?.trim() || process.env.SMTP_PASS || 'g!vK3_YKy5FzWy%$';
-    const effectiveUser = smtpUser?.trim() || process.env.SMTP_USER || 'support@bluecode-ltd.com';
+    // La password della casella arriva dalla richiesta o dall'ambiente, e non ha un
+    // ripiego. Qui c'era la password reale della casella Register.it scritta in chiaro,
+    // cioè su GitHub: chiunque leggesse il repository poteva spedire come lo studio e,
+    // con la stessa credenziale, leggere la posta in arrivo via IMAP. Regola 6 di
+    // `.agents/AGENTS.md`. Senza credenziale questa funzione risponde 400 e non spedisce:
+    // meglio un invio che si ferma di uno che parte da un segreto pubblico.
+    const effectivePass = smtpPass?.trim() || process.env.SMTP_PASS;
+    const effectiveUser = smtpUser?.trim() || process.env.SMTP_USER;
 
-    // Controllo Password
-    if (!effectivePass) {
+    if (!effectivePass || !effectiveUser) {
       return res.status(400).json({
         success: false,
-        errore: 'Password SMTP mancante. Inserisci la password della casella nel campo "Password SMTP" e salva.',
+        errore:
+          'Credenziali SMTP mancanti: nessuna casella configurata nelle impostazioni dello studio ' +
+          'e nessuna variabile SMTP_USER/SMTP_PASS nell\'ambiente della funzione.',
       });
     }
 
@@ -416,7 +429,7 @@ export default async function handler(req: any, res: any) {
           host: cand.host,
           port: cand.port,
           secure: cand.secure,
-          auth: { user: smtpUser, pass: smtpPass },
+          auth: { user: effectiveUser, pass: effectivePass },
           tls: { rejectUnauthorized: false },
           connectionTimeout: 4000,
           greetingTimeout: 3500,

@@ -5,7 +5,14 @@ export default async function handler(req: any, res: any) {
     const mode = req.query['hub.mode'];
     const token = req.query['hub.verify_token'];
     const challenge = req.query['hub.challenge'];
-    const verifyToken = process.env.WA_VERIFY_TOKEN || 'bluman_wa_secure_token_2026';
+    // Il token di verifica non ha un ripiego cablato: era scritto in chiaro nel repository,
+    // e chi lo leggeva poteva superare l'handshake di Meta e registrare il proprio endpoint
+    // come webhook dello studio. Senza la variabile d'ambiente l'handshake viene rifiutato.
+    const verifyToken = process.env.WA_VERIFY_TOKEN;
+
+    if (!verifyToken) {
+      return res.status(503).send('WA_VERIFY_TOKEN non configurato');
+    }
 
     if (mode === 'subscribe' && token === verifyToken) {
       // Meta richiede di restituire unicamente il valore di challenge con status 200

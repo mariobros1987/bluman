@@ -126,6 +126,93 @@ describe('regola 6 — nessuna credenziale in chiaro nel codice versionato', () 
     }
     expect(colpevoli).toEqual([]);
   });
+
+  /**
+   * Il controllo per forma, non per valore.
+   *
+   * L'elenco `CREDENZIALI_VIETATE` cerca stringhe già note: funziona per le credenziali che
+   * qualcuno ha già trovato e rimosso, e non vede la prossima. È esattamente quello che è
+   * successo — la password della casella di posta, un access token Meta valido, il Phone ID
+   * del numero WhatsApp dello studio e il token di verifica del webhook sono stati scritti
+   * in chiaro *dopo* che questo test esisteva, e il test è passato tutte le volte: erano
+   * valori nuovi, non nell'elenco.
+   *
+   * Questa verifica guarda invece la forma `qualcosaConPassword || 'letterale'`. Un ripiego
+   * cablato su un nome che contiene password, token, segreto o chiave è una credenziale nel
+   * repository, qualunque sia il valore: se serve un ripiego, il posto è una variabile
+   * d'ambiente. `|| ''` resta lecito — la stringa vuota non apre niente, e serve a
+   * distinguere «non configurato» da `undefined` nei form.
+   */
+  it('nessun ripiego cablato su un nome che contiene password, token, segreto o chiave', () => {
+    // Il nome a sinistra dell'operatore, poi `||` o `??`, poi un letterale non vuoto.
+    const ripiegoCablato =
+      /\b[A-Za-z0-9_.?[\]'"]*(?:pass|passwd|password|token|secret|apikey|api_key|credential|phoneid)[A-Za-z0-9_]*\s*(?:\?\.\w+\(\)\s*)?(?:\|\||\?\?)\s*(['"`])([^'"`\n]+)\1/gi;
+
+    const colpevoli: string[] = [];
+
+    for (const percorso of file) {
+      if (percorso.endsWith('credenziali.test.ts')) continue;
+
+      const righe = readFileSync(percorso, 'utf8').split('\n');
+      righe.forEach((riga, i) => {
+        const ripulita = riga.trim();
+        // Un commento che spiega quale ripiego è stato rimosso è documentazione.
+        if (ripulita.startsWith('//') || ripulita.startsWith('*') || ripulita.startsWith('/*')) return;
+
+        ripiegoCablato.lastIndex = 0;
+        let trovato: RegExpExecArray | null;
+        while ((trovato = ripiegoCablato.exec(riga)) !== null) {
+          const letterale = trovato[2] ?? '';
+          // Un altro `process.env.X || process.env.Y` non è un letterale, e un percorso o
+          // un URL di servizio non è una credenziale.
+          if (/^(https?:\/\/|\/|\.\/)/.test(letterale)) continue;
+          colpevoli.push(`${percorso.replace(RADICE, '')}:${i + 1}`);
+        }
+      });
+    }
+
+    expect(
+      colpevoli,
+      'ripiego cablato su una credenziale in: ' +
+        `${colpevoli.join(', ')}. Il valore va in una variabile d'ambiente; senza di essa ` +
+        'la funzione deve rifiutare, non usare un segreto scritto nel repository.',
+    ).toEqual([]);
+  });
+
+  /**
+   * Le forme riconoscibili dei token dei servizi che il progetto usa. Qui non c'è nessun
+   * segreto: c'è il *prefisso* con cui ogni fornitore marca i propri token, quindi il test
+   * riconosce un token nuovo di zecca che nessuno ha ancora scoperto.
+   */
+  it('nessun token con la forma tipica di un fornitore', () => {
+    const forme: Array<{ nome: string; regex: RegExp }> = [
+      // I token Meta cominciano con `EA` seguito da due lettere che variano per tipo di
+      // app: `EAA...` per molte, `EAG...` per quello che era scritto in questo repository.
+      // Il prefisso stretto `EAA` non lo avrebbe visto.
+      { nome: 'access token Meta / Facebook Graph', regex: /['"`]EA[A-Za-z0-9]{40,}/ },
+      { nome: 'chiave OpenAI/Anthropic', regex: /['"`]sk-[A-Za-z0-9_-]{20,}/ },
+      { nome: 'token personale GitHub', regex: /['"`](?:ghp|gho|ghu|ghs|ghr|github_pat)_[A-Za-z0-9_]{20,}/ },
+      { nome: 'token Slack', regex: /['"`]xox[baprs]-[A-Za-z0-9-]{10,}/ },
+      { nome: 'token bot Telegram', regex: /['"`]\d{8,10}:[A-Za-z0-9_-]{30,}/ },
+      { nome: 'chiave di servizio Supabase / JWT firmato', regex: /['"`]eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{20,}\./ },
+    ];
+
+    const colpevoli: string[] = [];
+
+    for (const percorso of file) {
+      if (percorso.endsWith('credenziali.test.ts')) continue;
+      const righe = readFileSync(percorso, 'utf8').split('\n');
+      righe.forEach((riga, i) => {
+        for (const forma of forme) {
+          if (forma.regex.test(riga)) {
+            colpevoli.push(`${percorso.replace(RADICE, '')}:${i + 1} (${forma.nome})`);
+          }
+        }
+      });
+    }
+
+    expect(colpevoli, `token di un fornitore scritto nel codice: ${colpevoli.join(', ')}`).toEqual([]);
+  });
 });
 
 describe('regola 6 — nessuna credenziale in chiaro nella documentazione `.md`', () => {
