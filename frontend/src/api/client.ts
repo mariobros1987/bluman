@@ -398,6 +398,8 @@ export async function generaMagicLinkApi(clienteId: string, email: string) {
   return (await res.json()) as {
     ok: boolean;
     sent: boolean;
+    /** Perché l'email non è partita: l'operatore deve poter consegnare il link a mano. */
+    erroreInvio?: string;
     magicUrl: string;
     magicToken: string;
     scadenza: string;
@@ -422,6 +424,7 @@ export async function resetPasswordClienteApi(clienteId: string) {
     passwordChiaro: string;
     email: string;
     emailInviata: boolean;
+    erroreInvioEmail?: string;
   };
 }
 

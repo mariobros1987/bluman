@@ -126,7 +126,47 @@ function testoMessaggio(codice: string, oggettoFirma: string, minuti: number): s
   );
 }
 
-async function inviaWhatsapp(cred: CredenzialiCanali, numero: string, testo: string): Promise<EsitoInvio> {
+/**
+ * Il template di autenticazione approvato su Meta, con la lingua in cui è stato approvato.
+ *
+ * Serve perché WhatsApp non consegna testo libero a un numero che non ha scritto allo studio
+ * nelle ultime 24 ore: Graph accetta la richiesta o la rifiuta con l'errore 131047, e in
+ * entrambi i casi il codice non arriva. I template di categoria «Authentication» sono l'unica
+ * forma che WhatsApp recapita sempre, e in più il destinatario vede un pulsante «Copia
+ * codice» invece di dover selezionare sei cifre dentro un messaggio.
+ */
+function templateAutenticazione(): { nome: string; lingua: string } | null {
+  const nome = process.env.WA_OTP_TEMPLATE?.trim();
+  if (!nome) return null;
+  return { nome, lingua: process.env.WA_OTP_TEMPLATE_LANG?.trim() || 'it' };
+}
+
+async function chiamaGraph(cred: CredenzialiCanali, corpo: unknown): Promise<{ ok: boolean; motivo?: string }> {
+  const risposta = await fetch(`https://graph.facebook.com/v21.0/${cred.waPhoneId}/messages`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${cred.waAccessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(corpo),
+  });
+
+  if (risposta.ok) return { ok: true };
+
+  const dettaglio: any = await risposta.json().catch(() => null);
+  // Il messaggio di Graph va riportato: "fuori dalla finestra di 24 ore" (131047), "template
+  // non trovato" e "numero non registrato su WhatsApp" sono problemi diversi, con rimedi
+  // diversi, e chi sta firmando deve sapere quale dei tre è.
+  const codice = dettaglio?.error?.code ? ` [${dettaglio.error.code}]` : '';
+  return { ok: false, motivo: `${dettaglio?.error?.message || `HTTP ${risposta.status}`}${codice}` };
+}
+
+async function inviaWhatsapp(
+  cred: CredenzialiCanali,
+  numero: string,
+  codice: string,
+  testo: string,
+): Promise<EsitoInvio> {
   if (!cred.waPhoneId || !cred.waAccessToken) {
     return { ok: false, errore: 'WhatsApp non è configurato nelle impostazioni dello studio.' };
   }
@@ -138,34 +178,70 @@ async function inviaWhatsapp(cred: CredenzialiCanali, numero: string, testo: str
     return { ok: false, errore: 'Il numero di cellulare in anagrafica non è utilizzabile.' };
   }
 
-  try {
-    const risposta = await fetch(`https://graph.facebook.com/v21.0/${cred.waPhoneId}/messages`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${cred.waAccessToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
+  const motivi: string[] = [];
+  const template = templateAutenticazione();
+
+  if (template) {
+    try {
+      // Il codice compare due volte per costruzione del formato: una nel corpo del messaggio
+      // e una come valore del pulsante «Copia codice». È lo stesso codice, non due invii.
+      const esito = await chiamaGraph(cred, {
         messaging_product: 'whatsapp',
         recipient_type: 'individual',
         to: destinatario,
-        type: 'text',
-        text: { preview_url: false, body: testo },
-      }),
-    });
+        type: 'template',
+        template: {
+          name: template.nome,
+          language: { code: template.lingua },
+          components: [
+            { type: 'body', parameters: [{ type: 'text', text: codice }] },
+            { type: 'button', sub_type: 'url', index: '0', parameters: [{ type: 'text', text: codice }] },
+          ],
+        },
+      });
+      if (esito.ok) return { ok: true };
+      motivi.push(`template «${template.nome}» (${template.lingua}): ${esito.motivo}`);
 
-    if (!risposta.ok) {
-      const dettaglio: any = await risposta.json().catch(() => null);
-      // Il messaggio di Graph va riportato: "fuori dalla finestra di 24 ore" e "numero non
-      // registrato su WhatsApp" sono due problemi diversi, e il cliente deve sapere quale.
-      const motivo = dettaglio?.error?.message || `HTTP ${risposta.status}`;
-      return { ok: false, errore: `WhatsApp non ha accettato l'invio: ${motivo}` };
+      // Un template di autenticazione senza pulsante rifiuta il componente `button`. Vale
+      // un secondo tentativo con il solo corpo prima di ripiegare sul testo libero.
+      const senzaBottone = await chiamaGraph(cred, {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to: destinatario,
+        type: 'template',
+        template: {
+          name: template.nome,
+          language: { code: template.lingua },
+          components: [{ type: 'body', parameters: [{ type: 'text', text: codice }] }],
+        },
+      });
+      if (senzaBottone.ok) return { ok: true };
+      motivi.push(`template senza pulsante: ${senzaBottone.motivo}`);
+    } catch (err) {
+      motivi.push(`template: ${err instanceof Error ? err.message : 'errore di rete'}`);
     }
-
-    return { ok: true };
-  } catch (err) {
-    return { ok: false, errore: `Invio WhatsApp non riuscito: ${err instanceof Error ? err.message : 'errore di rete'}` };
+  } else {
+    motivi.push('nessun template di autenticazione configurato (WA_OTP_TEMPLATE)');
   }
+
+  // Testo libero: funziona solo se il cliente ha scritto allo studio nelle ultime 24 ore.
+  // Resta come ultima possibilità perché in quella finestra recapita, ed è meglio di niente
+  // finché il template non è approvato.
+  try {
+    const esito = await chiamaGraph(cred, {
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to: destinatario,
+      type: 'text',
+      text: { preview_url: false, body: testo },
+    });
+    if (esito.ok) return { ok: true };
+    motivi.push(`testo libero: ${esito.motivo}`);
+  } catch (err) {
+    motivi.push(`testo libero: ${err instanceof Error ? err.message : 'errore di rete'}`);
+  }
+
+  return { ok: false, errore: `WhatsApp non ha accettato l'invio — ${motivi.join('; ')}.` };
 }
 
 async function inviaTelegram(cred: CredenzialiCanali, chatId: string, testo: string): Promise<EsitoInvio> {
@@ -211,7 +287,7 @@ export async function inviaCodiceOtp(richiesta: RichiestaInvio): Promise<EsitoIn
 
   switch (richiesta.canale) {
     case 'whatsapp':
-      return inviaWhatsapp(cred, richiesta.target, testo);
+      return inviaWhatsapp(cred, richiesta.target, richiesta.codice, testo);
 
     case 'telegram':
       return inviaTelegram(cred, richiesta.target, testo);

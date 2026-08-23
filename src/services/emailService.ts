@@ -1,6 +1,10 @@
 import nodemailer from 'nodemailer';
 import tls from 'tls';
 import net from 'net';
+import { inviaEmail, type EsitoEmail } from './emailRelay.js';
+
+export type { EsitoEmail } from './emailRelay.js';
+export { inviaEmail } from './emailRelay.js';
 
 export interface EmailOptions {
   to: string;
@@ -223,19 +227,14 @@ export async function sendMagicLinkEmail(
     fromEmail?: string;
     fromName?: string;
   }
-): Promise<boolean> {
+): Promise<EsitoEmail> {
   const host = customConfig?.host || process.env.SMTP_HOST || 'authsmtp.register.it';
   const port = customConfig?.port || Number(process.env.SMTP_PORT ?? 465);
   const secure = customConfig?.secure !== undefined ? customConfig.secure : (port === 465);
   const user = customConfig?.user || process.env.SMTP_USER;
   const pass = customConfig?.pass || process.env.SMTP_PASS;
-  const fromEmail = customConfig?.fromEmail || user || process.env.SMTP_FROM || 'support@bluecode-ltd.com';
+  const fromEmail = customConfig?.fromEmail || user || process.env.SMTP_FROM;
   const fromName = customConfig?.fromName || 'BluMan Advisory';
-
-  if (!user || !pass) {
-    console.log(`[Email Simulation] Invio Magic Link a ${toEmail}: ${magicUrl}`);
-    return false;
-  }
 
   const html = `
     <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; color: #1e293b;">
@@ -257,42 +256,15 @@ export async function sendMagicLinkEmail(
     </div>
   `;
 
-  const candidates = [
-    { host, port, secure },
-    { host: 'authsmtp.register.it', port: 465, secure: true },
-    { host: 'authsmtp.register.it', port: 587, secure: false },
-    { host: 'authsmtp.register.it', port: 25, secure: false },
-  ];
-
-  const uniqueCandidates = candidates.filter(
-    (c, idx, arr) => arr.findIndex(x => x.host === c.host && x.port === c.port) === idx
-  );
-
-  for (const cand of uniqueCandidates) {
-    try {
-      const transporter = nodemailer.createTransport({
-        host: cand.host,
-        port: cand.port,
-        secure: cand.secure,
-        auth: { user, pass },
-        tls: { rejectUnauthorized: false },
-        connectionTimeout: 8000,
-      });
-
-      await transporter.sendMail({
-        from: `"${fromName}" <${fromEmail}>`,
-        to: toEmail,
-        subject: `🔑 Accesso al Portale Cliente — ${clienteNome}`,
-        html,
-      });
-      console.log(`[SMTP] Email Magic Link inviata con successo a ${toEmail} via ${cand.host}:${cand.port}`);
-      return true;
-    } catch (err: any) {
-      console.warn(`[SMTP Magic Link] Tentativo fallito su ${cand.host}:${cand.port}:`, err?.message);
-    }
-  }
-
-  return false;
+  return inviaEmail({
+    to: toEmail,
+    subject: `🔑 Accesso al Portale Cliente — ${clienteNome}`,
+    html,
+    smtp: { host, port, secure, user, pass },
+    fromEmail,
+    fromName,
+    etichetta: 'Magic Link',
+  });
 }
 
 export interface OpzioniEmailOtp {
@@ -320,11 +292,7 @@ export async function sendOtpSecurityEmail(
   otpCode: string,
   opzioni: OpzioniEmailOtp = {},
 ): Promise<EsitoEmailOtp> {
-  // Non serve per spedire (sotto si costruisce un trasporto per ogni porta candidata): serve
-  // come controllo di configurazione, perché torna `null` quando host, utente o password
-  // mancano sia sul tenant sia nell'ambiente.
-  const transporter = createTransporter(opzioni.smtp);
-  const fromEmail = opzioni.fromEmail || process.env.SMTP_FROM || 'support@bluecode-ltd.com';
+  const fromEmail = opzioni.fromEmail || process.env.SMTP_FROM;
   const fromName = opzioni.fromName || 'BluMan Security';
   const minuti = opzioni.minutiValidita ?? 5;
   const oggetto = opzioni.oggettoFirma || 'il documento in attesa di firma';
@@ -350,70 +318,22 @@ export async function sendOtpSecurityEmail(
     </div>
   `;
 
-  if (!transporter) {
-    // Il codice non finisce nei log, né qui né in caso di successo: i log di Railway sono
-    // leggibili da chiunque abbia accesso al progetto, e un OTP scritto lì è un secondo
-    // fattore consegnato a tutti. Senza SMTP configurato l'invio FALLISCE, e la rotta lo
-    // dice al cliente — prima "simulazione" significava firma bloccata senza spiegazione.
-    console.warn(`[SMTP] Nessuna configurazione SMTP: codice OTP per ${toEmail} NON inviato.`);
-    return {
-      ok: false,
-      errore: 'SMTP non configurato: host, utente o password mancanti nelle impostazioni dello studio.',
-    };
-  }
-
-  // Più di un tentativo, come già fa il Magic Link. Il codice di firma partiva da un solo
-  // host/porta: se l'hosting blocca in uscita quella porta — su Railway succede — l'invio
-  // moriva in timeout dopo 10 secondi e la firma restava impossibile, con le impostazioni
-  // dello studio perfettamente corrette. Le alternative sono la stessa casella su porte
-  // diverse, non un altro mittente: nessun invio parte da credenziali che non siano quelle
-  // configurate qui.
-  const hostConfigurato = opzioni.smtp?.host || process.env.SMTP_HOST!;
-  const portaConfigurata = opzioni.smtp?.port || Number(process.env.SMTP_PORT ?? 465);
-  const candidati = [
-    { host: hostConfigurato, port: portaConfigurata, secure: opzioni.smtp?.secure ?? portaConfigurata === 465 },
-    { host: hostConfigurato, port: 465, secure: true },
-    { host: hostConfigurato, port: 587, secure: false },
-    { host: hostConfigurato, port: 25, secure: false },
-  ].filter((c, i, arr) => arr.findIndex((x) => x.host === c.host && x.port === c.port) === i);
-
-  const utente = opzioni.smtp?.user || process.env.SMTP_USER!;
-  const password = opzioni.smtp?.pass || process.env.SMTP_PASS!;
-  const errori: string[] = [];
-
-  for (const cand of candidati) {
-    const iniziato = Date.now();
-    try {
-      const trasporto = nodemailer.createTransport({
-        host: cand.host,
-        port: cand.port,
-        secure: cand.secure,
-        auth: { user: utente, pass: password },
-        tls: { rejectUnauthorized: false },
-        connectionTimeout: 10000,
-        greetingTimeout: 10000,
-      });
-
-      await trasporto.sendMail({
-        from: `"${fromName}" <${fromEmail}>`,
-        to: toEmail,
-        subject: `🔐 Codice OTP di Sicurezza: ${otpCode} — Firma BluMan`,
-        html,
-      });
-      console.log(`[SMTP] Email OTP inviata a ${toEmail} via ${cand.host}:${cand.port} in ${Date.now() - iniziato}ms`);
-      return { ok: true, via: `${cand.host}:${cand.port}` };
-    } catch (err: any) {
-      // Il motivo va conservato per intero: "connessione in timeout" e "autenticazione
-      // rifiutata" richiedono due interventi diversi, e finora la rotta rispondeva con lo
-      // stesso testo per entrambi mandando a controllare impostazioni già corrette.
-      const motivo = `${cand.port}: ${err?.code ? `${err.code} — ` : ''}${err?.message || 'errore sconosciuto'}`;
-      errori.push(motivo);
-      console.warn(`[SMTP OTP] Tentativo fallito su ${cand.host}:${cand.port} dopo ${Date.now() - iniziato}ms:`, err?.message);
-    }
-  }
-
-  console.error('[SMTP Error] Errore invio email OTP:', errori.join(' | '));
-  return { ok: false, errore: `nessuna porta utilizzabile verso ${hostConfigurato} (${errori.join('; ')})` };
+  // Il codice non finisce nei log, né qui né in caso di successo: i log di Railway sono
+  // leggibili da chiunque abbia accesso al progetto, e un OTP scritto lì è un secondo fattore
+  // consegnato a tutti. Se l'invio non riesce l'esito è negativo con il motivo tecnico, e la
+  // rotta lo dice a chi sta firmando — prima "simulazione" significava firma bloccata senza
+  // nessuna spiegazione.
+  return inviaEmail({
+    to: toEmail,
+    // Il codice NON va nell'oggetto: l'oggetto è la riga che le notifiche mostrano sulla
+    // schermata bloccata del telefono e che i log dei server di posta conservano in chiaro.
+    subject: '🔐 Codice di sicurezza per la firma — BluMan',
+    html,
+    smtp: opzioni.smtp,
+    fromEmail,
+    fromName,
+    etichetta: 'OTP firma',
+  });
 }
 
 export async function sendClientCredentialsEmail(
@@ -430,20 +350,15 @@ export async function sendClientCredentialsEmail(
     fromEmail?: string;
     fromName?: string;
   }
-): Promise<boolean> {
+): Promise<EsitoEmail> {
   const host = customConfig?.host || process.env.SMTP_HOST || 'authsmtp.register.it';
   const port = customConfig?.port || Number(process.env.SMTP_PORT ?? 465);
   const secure = customConfig?.secure !== undefined ? customConfig.secure : (port === 465);
   const user = customConfig?.user || process.env.SMTP_USER;
   const pass = customConfig?.pass || process.env.SMTP_PASS;
-  const fromEmail = customConfig?.fromEmail || user || process.env.SMTP_FROM || 'support@bluecode-ltd.com';
+  const fromEmail = customConfig?.fromEmail || user || process.env.SMTP_FROM;
   const fromName = customConfig?.fromName || 'BluMan Advisory';
   const url = portalUrl || 'https://bluman.vercel.app/portal';
-
-  if (!user || !pass) {
-    console.log(`[Email Simulation] Invio Credenziali a ${toEmail}: ${url} (Password: ${passwordChiaro})`);
-    return false;
-  }
 
   const html = `
     <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; color: #1e293b;">
@@ -469,40 +384,13 @@ export async function sendClientCredentialsEmail(
     </div>
   `;
 
-  const candidates = [
-    { host, port, secure },
-    { host: 'authsmtp.register.it', port: 465, secure: true },
-    { host: 'authsmtp.register.it', port: 587, secure: false },
-    { host: 'authsmtp.register.it', port: 25, secure: false },
-  ];
-
-  const uniqueCandidates = candidates.filter(
-    (c, idx, arr) => arr.findIndex(x => x.host === c.host && x.port === c.port) === idx
-  );
-
-  for (const cand of uniqueCandidates) {
-    try {
-      const transporter = nodemailer.createTransport({
-        host: cand.host,
-        port: cand.port,
-        secure: cand.secure,
-        auth: { user, pass },
-        tls: { rejectUnauthorized: false },
-        connectionTimeout: 8000,
-      });
-
-      await transporter.sendMail({
-        from: `"${fromName}" <${fromEmail}>`,
-        to: toEmail,
-        subject: `🔑 Credenziali di Accesso al Portale — ${clienteNome}`,
-        html,
-      });
-      console.log(`[SMTP] Email Credenziali inviata con successo a ${toEmail} via ${cand.host}:${cand.port}`);
-      return true;
-    } catch (err: any) {
-      console.warn(`[SMTP Credentials] Tentativo fallito su ${cand.host}:${cand.port}:`, err?.message);
-    }
-  }
-
-  return false;
+  return inviaEmail({
+    to: toEmail,
+    subject: `🔑 Credenziali di Accesso al Portale — ${clienteNome}`,
+    html,
+    smtp: { host, port, secure, user, pass },
+    fromEmail,
+    fromName,
+    etichetta: 'credenziali portale',
+  });
 }

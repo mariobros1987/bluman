@@ -17,7 +17,7 @@ import {
 
 import { signJwt, verifyJwt, generateMagicToken, hashMagicToken, verificaFirmaDownload } from './util/jwt.js';
 import { verifyPassword, hashPassword, generaPasswordTemporanea } from './util/password.js';
-import { sendMagicLinkEmail, sendOtpSecurityEmail, sendClientCredentialsEmail, verifyAndSendTestSmtp, verifyRealImap, createTransporter } from './services/emailService.js';
+import { sendMagicLinkEmail, sendOtpSecurityEmail, sendClientCredentialsEmail, verifyAndSendTestSmtp, verifyRealImap, createTransporter, inviaEmail } from './services/emailService.js';
 import { uploadDocumento, CARTELLA_UPLOADS, nomeFileValido, rifirmaUrlUpload } from './services/storageService.js';
 import { generateInvoicePdfBuffer } from './services/pdfService.js';
 import {
@@ -1064,7 +1064,7 @@ export function buildServer(app: AppPort): FastifyInstance {
         fromName: tenant.smtpFromName || tenant.ragioneSociale || 'BluMan Advisory',
       } : undefined;
 
-      const sent = await sendMagicLinkEmail(toEmail, cliente.nome, magicUrl, customSmtp);
+      const esitoInvio = await sendMagicLinkEmail(toEmail, cliente.nome, magicUrl, customSmtp);
       recordAudit({
         tenantId,
         azione: 'MAGIC_LINK_GENERATO',
@@ -1073,7 +1073,17 @@ export function buildServer(app: AppPort): FastifyInstance {
         ipAddress: req.ip,
       });
 
-      return { ok: true, sent, magicUrl, magicToken, scadenza: scadenza.toISOString() };
+      // `sent: false` da solo non dice niente a chi sta guardando lo schermo: il motivo
+      // dell'invio mancato arriva insieme, così l'operatore sa se deve correggere le
+      // impostazioni della casella o mandare il link a mano.
+      return {
+        ok: true,
+        sent: esitoInvio.ok,
+        erroreInvio: esitoInvio.ok ? undefined : esitoInvio.errore,
+        magicUrl,
+        magicToken,
+        scadenza: scadenza.toISOString(),
+      };
     } catch (err: any) {
       console.error('Errore generazione magic link:', err);
       return reply.code(500).send({ errore: err.message || 'Errore generazione Magic Link' });
@@ -2177,6 +2187,7 @@ export function buildServer(app: AppPort): FastifyInstance {
       const destEmail = cliente.email || ref.email;
 
       let emailInviata = false;
+      let erroreInvioEmail: string | undefined;
       if (destEmail) {
         try {
           const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
@@ -2190,9 +2201,12 @@ export function buildServer(app: AppPort): FastifyInstance {
             fromName: tenant.smtpFromName || tenant.ragioneSociale || 'BluMan Advisory',
           } : undefined;
           const portalUrl = `${baseUrlApplicazione()}/portal`;
-          emailInviata = await sendClientCredentialsEmail(destEmail, cliente.nome, nuovaPassword, portalUrl, customSmtp);
-        } catch (err) {
+          const esitoCredenziali = await sendClientCredentialsEmail(destEmail, cliente.nome, nuovaPassword, portalUrl, customSmtp);
+          emailInviata = esitoCredenziali.ok;
+          erroreInvioEmail = esitoCredenziali.errore;
+        } catch (err: any) {
           console.warn('Invio email credenziali fallito:', err);
+          erroreInvioEmail = err?.message || 'errore inatteso durante l\'invio';
         }
       }
 
@@ -2208,6 +2222,7 @@ export function buildServer(app: AppPort): FastifyInstance {
         ok: true,
         passwordChiaro: nuovaPassword,
         emailInviata,
+        erroreInvioEmail,
         email: destEmail || '',
       });
     } catch (err: any) {
@@ -2624,13 +2639,12 @@ export function buildServer(app: AppPort): FastifyInstance {
         orderBy: { isDefault: 'desc' },
       });
       return reply.send(conti);
-    } catch (err) {
-      return reply.send([
-        { id: 'c-1', nomeConto: 'Unicredit c/c Principale', banca: 'Unicredit S.p.A.', iban: 'IT99C0306902100100000012345', bicSwift: 'UNCRITM1', saldoIniziale: 5000000, saldoAttuale: 7850000, isDefault: true },
-        { id: 'c-2', nomeConto: 'Intesa Sanpaolo Operativo', banca: 'Intesa Sanpaolo', iban: 'IT88X0306902100100000098765', bicSwift: 'BCITITMM', saldoIniziale: 1200000, saldoAttuale: 3450000, isDefault: false },
-        { id: 'c-3', nomeConto: 'Account Stripe Gateway', banca: 'Stripe Payments Europe', iban: 'N/D (Gateway)', bicSwift: 'STRPEU2D', saldoIniziale: 0, saldoAttuale: 125000, isDefault: false },
-        { id: 'c-4', nomeConto: 'Cassa Contanti Studio', banca: 'Cassa Interna', iban: 'N/D (Cassa)', bicSwift: 'N/D', saldoIniziale: 50000, saldoAttuale: 65000, isDefault: false },
-      ]);
+    } catch (err: any) {
+      // Qui, quando la query falliva, la rotta rispondeva con quattro conti inventati —
+      // Unicredit, Intesa, Stripe e una cassa contanti — completi di IBAN e di saldi.
+      // Lo studio vedeva 78.500 € su un conto che non esiste, e non vedeva nessun errore.
+      console.error('Errore lettura conti bancari:', err);
+      return reply.code(500).send({ errore: err?.message || 'Errore nella lettura dei conti bancari' });
     }
   });
 
@@ -2673,6 +2687,7 @@ export function buildServer(app: AppPort): FastifyInstance {
 
   // ── GENERATORE PDF SERVER-SIDE & EMAIL NODEMAILER ──────────────────
   server.get<{ Params: { id: string } }>('/invoices/:id/pdf', async (req, reply) => {
+    const tenantId = (req as any).tenantId;
     try {
       const fattura = await prisma.fattura.findUnique({
         where: { id: req.params.id },
@@ -2681,6 +2696,7 @@ export function buildServer(app: AppPort): FastifyInstance {
       if (!fattura) return reply.code(404).send({ errore: 'Fattura non trovata' });
 
       const totaleCentesimi = fattura.righe.reduce((acc, r) => acc + r.importo, 0);
+      const studio = await prisma.tenant.findUnique({ where: { id: tenantId } });
       const pdfBuffer = generateInvoicePdfBuffer({
         numero: fattura.numero || `FT-${fattura.numeroProgressivoSerie}`,
         data: (fattura.data || new Date()).toLocaleDateString(),
@@ -2688,8 +2704,12 @@ export function buildServer(app: AppPort): FastifyInstance {
         clienteNome: fattura.progetto.cliente.nome,
         clientePiva: fattura.progetto.cliente.piva || undefined,
         clienteSede: fattura.progetto.cliente.sedeLegale || undefined,
-        tenantNome: 'Bluecode Advisory Studio',
-        tenantIban: 'IT99C0306902100100000012345',
+        // Ragione sociale, P.IVA e IBAN dello studio che emette, non un nome e un IBAN
+        // scritti nel codice: la fattura è un documento fiscale e questi tre campi sono
+        // proprio quelli che il destinatario usa per registrarla e per pagare.
+        tenantNome: studio?.ragioneSociale || 'Studio',
+        tenantPiva: studio?.piva || undefined,
+        tenantIban: studio?.iban || undefined,
         righe: fattura.righe.map(r => ({ descrizione: r.descrizione, importo: r.importo })),
         totaleEuro: totaleCentesimi / 100,
       });
@@ -2711,8 +2731,19 @@ export function buildServer(app: AppPort): FastifyInstance {
       });
       if (!fattura) return reply.code(404).send({ errore: 'Fattura non trovata' });
 
-      const emailDestinatario = req.body?.emailDestinatario || 'cliente@holdingbeta.advisory';
+      // Il destinatario è quello indicato o quello del cliente in anagrafica. Qui c'era un
+      // indirizzo inventato come ripiego (`cliente@holdingbeta...`): la rotta rispondeva
+      // «inviata con successo» dopo aver spedito la fattura di un cliente reale a una
+      // casella che non esiste.
+      const emailDestinatario = req.body?.emailDestinatario?.trim() || fattura.progetto.cliente.email || '';
+      if (!emailDestinatario) {
+        return reply.code(400).send({
+          errore: `Nessun indirizzo email per ${fattura.progetto.cliente.nome}: indicane uno o compila l'anagrafica del cliente.`,
+        });
+      }
+
       const totaleCentesimi = fattura.righe.reduce((acc, r) => acc + r.importo, 0);
+      const studio = await prisma.tenant.findUnique({ where: { id: tenantId } });
       const pdfBuffer = generateInvoicePdfBuffer({
         numero: fattura.numero || `FT-${fattura.numeroProgressivoSerie}`,
         data: (fattura.data || new Date()).toLocaleDateString(),
@@ -2720,28 +2751,73 @@ export function buildServer(app: AppPort): FastifyInstance {
         clienteNome: fattura.progetto.cliente.nome,
         clientePiva: fattura.progetto.cliente.piva || undefined,
         clienteSede: fattura.progetto.cliente.sedeLegale || undefined,
-        tenantNome: 'Bluecode Advisory Studio',
-        tenantIban: 'IT99C0306902100100000012345',
+        tenantNome: studio?.ragioneSociale || 'Studio',
+        tenantPiva: studio?.piva || undefined,
+        tenantIban: studio?.iban || undefined,
         righe: fattura.righe.map(r => ({ descrizione: r.descrizione, importo: r.importo })),
         totaleEuro: totaleCentesimi / 100,
       });
 
-      await sendMagicLinkEmail(
-        emailDestinatario,
-        fattura.progetto.cliente.nome,
-        'http://localhost:5173/portal'
-      );
+      const numeroDocumento = fattura.numero || `FT-${fattura.numeroProgressivoSerie}`;
+      const tipoLeggibile = fattura.tipoDocumento === 'nota_credito' ? 'nota di credito' : 'fattura';
+      const nomeStudio = studio?.ragioneSociale || 'Studio';
+
+      // Qui partiva `sendMagicLinkEmail`: al cliente arrivava un'email intitolata «Accesso
+      // al Portale Cliente» con un link a `http://localhost:5173`, e il PDF appena generato
+      // veniva scartato — mentre il log di audit scriveva «con allegato PDF nativo» e la
+      // risposta diceva «inviata con successo». Tre affermazioni false per un invio che non
+      // conteneva la fattura.
+      const esitoInvio = await inviaEmail({
+        to: emailDestinatario,
+        subject: `${fattura.tipoDocumento === 'nota_credito' ? 'Nota di credito' : 'Fattura'} ${numeroDocumento} — ${nomeStudio}`,
+        html: `
+          <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1e293b;">
+            <h2 style="font-size: 18px; color: #0f172a;">Gentile ${fattura.progetto.cliente.nome},</h2>
+            <p style="line-height: 1.6; color: #475569;">
+              in allegato trova la ${tipoLeggibile} <strong>${numeroDocumento}</strong> del
+              ${(fattura.data || new Date()).toLocaleDateString('it-IT')}, per un totale di
+              <strong>€ ${(totaleCentesimi / 100).toFixed(2)}</strong>.
+            </p>
+            <p style="line-height: 1.6; color: #475569;">
+              Le coordinate per il pagamento sono indicate nel documento allegato.
+            </p>
+            <p style="font-size: 12px; color: #94a3b8; margin-top: 24px;">${nomeStudio}</p>
+          </div>
+        `,
+        smtp: studio?.smtpHost && studio?.smtpUser && studio?.smtpPass ? {
+          host: studio.smtpHost,
+          port: studio.smtpPort || 465,
+          secure: studio.smtpSecure ?? true,
+          user: studio.smtpUser,
+          pass: studio.smtpPass,
+        } : undefined,
+        fromEmail: studio?.smtpFromEmail || studio?.smtpUser || undefined,
+        fromName: studio?.smtpFromName || nomeStudio,
+        allegati: [{
+          filename: `${numeroDocumento}.pdf`,
+          content: pdfBuffer,
+          contentType: 'application/pdf',
+        }],
+        etichetta: 'fattura',
+      });
+
+      if (!esitoInvio.ok) {
+        return reply.code(502).send({
+          errore: `La ${tipoLeggibile} ${numeroDocumento} non è stata inviata a ${emailDestinatario}: ${esitoInvio.errore}`,
+        });
+      }
 
       recordAudit({
         tenantId,
         azione: 'FATTURA_INVIATA_EMAIL',
-        entita: fattura.numero || 'Fattura',
-        dettagli: `Fattura inviata via SMTP Nodemailer a ${emailDestinatario} con allegato PDF nativo`,
+        entita: numeroDocumento,
+        dettagli: `${tipoLeggibile.charAt(0).toUpperCase() + tipoLeggibile.slice(1)} inviata a ${emailDestinatario} con il PDF in allegato (${esitoInvio.via})`,
       });
 
-      return reply.send({ ok: true, message: `Fattura inviata con successo a ${emailDestinatario}` });
-    } catch (err) {
-      return reply.code(500).send({ errore: 'Errore durante l\'invio dell\'email' });
+      return reply.send({ ok: true, message: `${tipoLeggibile.charAt(0).toUpperCase() + tipoLeggibile.slice(1)} ${numeroDocumento} inviata a ${emailDestinatario}` });
+    } catch (err: any) {
+      console.error('Errore invio fattura via email:', err);
+      return reply.code(500).send({ errore: err?.message || 'Errore durante l\'invio dell\'email' });
     }
   });
 

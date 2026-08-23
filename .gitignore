@@ -33,3 +33,6 @@ openstamanager_source/
 openstamanager-reference/
 scratch/
 *.log
+
+# Configurazione locale dell'assistente CLI
+.claude/

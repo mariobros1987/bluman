@@ -22,7 +22,7 @@ export function generateInvoicePdfBuffer(data: FatturaPdfData): Buffer {
     `=================================================================`,
     `                     ${data.tenantNome.toUpperCase()}                     `,
     `=================================================================`,
-    `P.IVA: ${data.tenantPiva || '12345678901'} | Studio Advisory & Consulting`,
+    `P.IVA: ${data.tenantPiva || 'non impostata nelle anagrafiche dello studio'} | Studio Advisory & Consulting`,
     `-----------------------------------------------------------------`,
     `DOCUMENTO FISCALE: ${titoloDoc}`,
     `NUMERO: ${data.numero}`,
@@ -39,7 +39,10 @@ export function generateInvoicePdfBuffer(data: FatturaPdfData): Buffer {
     `TOTALE DOCUMENTO:                                € ${data.totaleEuro.toFixed(2)}`,
     `=================================================================`,
     `COORDINATE BANCARIE PER IL PAGAMENTO:`,
-    `IBAN: ${data.tenantIban || 'IT99C0306902100100000012345'}`,
+    // Nessun ripiego inventato: qui c'era un IBAN scritto nel codice, e finiva stampato su
+    // ogni fattura di uno studio che non avesse inserito il proprio. Un cliente che paga a
+    // quelle coordinate manda i soldi altrove. Se l'IBAN non c'è, la fattura lo dichiara.
+    `IBAN: ${data.tenantIban || 'DA COMPLETARE — nessun IBAN configurato nelle impostazioni dello studio'}`,
     `Causale: Saldo ${data.numero} - ${data.clienteNome}`,
     `=================================================================`,
   ];

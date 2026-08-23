@@ -419,6 +419,20 @@ export default async function handler(req: any, res: any) {
     if (smtpReplyTo) mailOptions.replyTo = smtpReplyTo;
     if (smtpBcc) mailOptions.bcc = smtpBcc;
 
+    // Allegati inviati dal backend quando la rete di Railway non lascia passare l'SMTP: il
+    // corpo è JSON, quindi il contenuto arriva in base64 e va riportato a byte prima di
+    // consegnarlo a nodemailer. Senza questo, la fattura partiva senza il suo PDF.
+    const allegatiRicevuti = Array.isArray(req.body?.allegati) ? req.body.allegati : [];
+    if (allegatiRicevuti.length > 0) {
+      mailOptions.attachments = allegatiRicevuti
+        .filter((a: any) => a?.filename && a?.contentBase64)
+        .map((a: any) => ({
+          filename: String(a.filename),
+          content: Buffer.from(a.contentBase64, 'base64'),
+          contentType: a.contentType ? String(a.contentType) : undefined,
+        }));
+    }
+
     let lastErr: any = null;
     let success = false;
     let connectedHost = primaryHost;

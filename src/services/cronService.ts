@@ -1,4 +1,3 @@
-import { sendMagicLinkEmail } from './emailService.js';
 // §14 — invocato sempre dentro una richiesta (`POST /cron/esegui-notifiche-scadenze`),
 // quindi il contesto tenant è già attivo e il client condiviso è quello giusto: le query
 // qui sotto filtrano per tenantId e le policy RLS confermano lo stesso confine.

@@ -1,0 +1,34 @@
+# Cosa non deve salire su Vercel quando il deployment parte dalla CLI.
+#
+# `vercel deploy` carica i file della cartella locale, non quelli di un commit: senza questo
+# elenco salirebbe anche `.env`, che contiene le credenziali reali di database e posta. Non
+# finirebbe tra i file pubblici (viene servita solo `frontend/dist`), ma starebbe nel
+# contesto di build su un'infrastruttura di terze parti senza nessun motivo.
+#
+# L'integrazione GitHub del progetto risulta bloccata sul piano attuale — i deployment con
+# `source: git` restano in stato BLOCKED e non vengono mai costruiti — quindi la produzione
+# si pubblica dalla CLI e questo file conta per davvero.
+
+# Segreti (le stesse voci di .gitignore)
+.env
+.env.local
+.env.*.local
+secrets/
+.secrets/
+*.secret.*
+
+# Dipendenze e risultati di build: li ricostruisce Vercel
+node_modules
+frontend/node_modules
+dist
+build
+frontend/dist
+
+# Materiale di lavoro locale, mai destinato alla produzione
+scratch/
+uploads/
+*.log
+openstamanager_source/
+openstamanager-reference/
+graphify-out/
+*.zip

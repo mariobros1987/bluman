@@ -32,6 +32,7 @@ export function ClientsPage() {
     passwordChiaro: string;
     email: string;
     emailInviata: boolean;
+    erroreInvioEmail?: string;
   } | null>(null);
   const [generatingCredentials, setGeneratingCredentials] = useState<string | null>(null);
 
@@ -45,6 +46,7 @@ export function ClientsPage() {
           passwordChiaro: res.passwordChiaro,
           email: res.email || (c as any).email || '',
           emailInviata: res.emailInviata,
+          erroreInvioEmail: res.erroreInvioEmail,
         });
         setClienti(prev => prev.map(item => item.id === c.id ? { ...item, hasPassword: true } : item));
       }
@@ -87,12 +89,18 @@ export function ClientsPage() {
           id: `cl-proj-${p.id}`,
           nome: p.cl,
           tipo: p.ct || 'company',
-          piva: p.piva || 'IT09876543210',
-          codiceFiscale: p.codFisc || 'BLUCD90A01H501X',
-          sedeLegale: p.sede || 'Via Montenapoleone 8, Milano',
-          codiceSdi: 'SUBM70N',
-          email: 'client@holdingbeta.advisory',
-          telefono: '+39 02 889900',
+          // Campi vuoti quando il progetto non li porta, non valori inventati. Qui c'erano
+          // una P.IVA, un codice fiscale, una sede a Milano, un codice SDI, un telefono e
+          // un'email (`client@holdingbeta.advisory`) scritti nel codice: comparivano
+          // nell'anagrafica di ogni cliente ricavato da un progetto, e quell'email finiva
+          // precompilata nella finestra del Magic Link — cioè il link di accesso al portale
+          // partiva verso una casella che non esiste.
+          piva: p.piva || '',
+          codiceFiscale: p.codFisc || '',
+          sedeLegale: p.sede || '',
+          codiceSdi: p.codiceSdi || '',
+          email: p.email || '',
+          telefono: p.telefono || '',
           isAttivo: true,
         });
       }
@@ -142,7 +150,9 @@ export function ClientsPage() {
       piva: '',
       codiceFiscale: '',
       sedeLegale: '',
-      codiceSdi: 'SUBM70N',
+      // 'SUBM70N' era il codice destinatario SDI di un'altra azienda, assegnato a ogni nuovo
+      // cliente creato: una fattura elettronica indirizzata lì sarebbe finita a loro.
+      codiceSdi: '',
       email: '',
       telefono: '',
       isAttivo: true,
@@ -873,7 +883,7 @@ function MagicLinkExplainModal({ client, onClose }: { client: Cliente; onClose: 
   // Il link non esiste finché il server non lo ha emesso. Prima questa riga era
   // `client_${client.id.substring(0, 8)}`, costruita qui nel browser: un token che nessuno
   // aveva registrato e che quindi non era verificabile da nessuna parte.
-  const [risultato, setRisultato] = useState<{ magicUrl: string; sent: boolean; scadenza: string } | null>(null);
+  const [risultato, setRisultato] = useState<{ magicUrl: string; sent: boolean; erroreInvio?: string; scadenza: string } | null>(null);
   const magicUrl = risultato?.magicUrl ?? '';
 
   const genera = async () => {
@@ -881,7 +891,7 @@ function MagicLinkExplainModal({ client, onClose }: { client: Cliente; onClose: 
     setGenerando(true);
     try {
       const res = await generaMagicLinkApi(client.id, email.trim());
-      setRisultato({ magicUrl: res.magicUrl, sent: res.sent, scadenza: res.scadenza });
+      setRisultato({ magicUrl: res.magicUrl, sent: res.sent, erroreInvio: res.erroreInvio, scadenza: res.scadenza });
     } catch (e) {
       setErrore(e instanceof Error ? e.message : 'Errore generazione Magic Link');
     } finally {
@@ -965,6 +975,14 @@ function MagicLinkExplainModal({ client, onClose }: { client: Cliente; onClose: 
             <div style={{ fontSize: 10.5, color: 'var(--muted)', marginTop: 5 }}>
               Copialo ora se serve: il link non è più recuperabile dopo la chiusura di questa finestra.
             </div>
+            {/* Il motivo dell'invio mancato, non solo il fatto: «non riuscito» manda a
+                controllare impostazioni che possono essere già corrette, mentre il testo del
+                server dice se è la porta bloccata o la password rifiutata. */}
+            {!risultato.sent && risultato.erroreInvio && (
+              <div style={{ background: '#3d1a1f', border: '1px solid #602d32', borderRadius: 10, padding: 10, fontSize: 10.5, color: '#f87171', marginTop: 8 }}>
+                Motivo tecnico dell'invio mancato: {risultato.erroreInvio}
+              </div>
+            )}
           </div>
         )}
 
@@ -981,7 +999,7 @@ function CredentialsExplainModal({
   data,
   onClose,
 }: {
-  data: { cliente: Cliente; passwordChiaro: string; email: string; emailInviata: boolean };
+  data: { cliente: Cliente; passwordChiaro: string; email: string; emailInviata: boolean; erroreInvioEmail?: string };
   onClose: () => void;
 }) {
   const [copied, setCopied] = useState(false);
@@ -990,7 +1008,11 @@ function CredentialsExplainModal({
   const [emailStatus, setEmailStatus] = useState<string | null>(
     data.emailInviata
       ? `✓ Email con le credenziali inviata con successo a ${data.email}`
-      : null
+      // Il motivo per cui non è partita, invece del silenzio: senza questa riga l'operatore
+      // non sa se la password è stata comunicata al cliente o se deve consegnarla lui.
+      : data.erroreInvioEmail
+        ? `✗ Email non inviata a ${data.email} — ${data.erroreInvioEmail}`
+        : null
   );
   const [whatsappStatus, setWhatsappStatus] = useState<string | null>(null);
   const [destEmail, setDestEmail] = useState(data.email || '');

@@ -146,11 +146,13 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
             id: `cl-${mockProj.id}`,
             nome: mockProj.cl,
             tipo: mockProj.ct || 'company',
-            email: emailCliente || 'client@holdingbeta.advisory',
-            telefono: '+39 333 5936278',
-            cellulare: '+39 333 5936278',
-            telegram: `@${mockProj.cl.replace(/[^a-zA-Z0-9]/g, '')}`,
-            signal: '+39 333 5936278',
+            // Il nome del progetto arriva dai dati di esempio, i recapiti no: qui c'erano
+            // un'email e un numero scritti nel codice, e da questa scheda partivano i messaggi.
+            email: emailCliente || '',
+            telefono: '',
+            cellulare: '',
+            telegram: '',
+            signal: '',
             referenteNome: mockProj.cl,
           };
         }
@@ -168,10 +170,15 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
   const contactInfo = useMemo(() => {
     const refJson: any = clientData?.referentiJson && typeof clientData.referentiJson === 'object' ? clientData.referentiJson : {};
 
-    const email = clientData?.email || refJson.email || emailCliente || 'client@holdingbeta.advisory';
-    const whatsapp = clientData?.cellulare || refJson.cellulare || refJson.whatsapp || clientData?.telefono || refJson.telefono || '+39 333 5936278';
-    const telegram = clientData?.telegram || refJson.telegram || `@${(nomeCliente || 'Cliente').replace(/[^a-zA-Z0-9]/g, '')}`;
-    const signal = clientData?.signal || refJson.signal || clientData?.cellulare || refJson.cellulare || clientData?.telefono || refJson.telefono || '+39 333 5936278';
+    // Nessun recapito inventato. Qui c'erano un'email (`client@holdingbeta...`), un numero
+    // di cellulare (+39 333 59...) usato sia per WhatsApp sia per Signal e un handle Telegram
+    // costruito dal nome del cliente: quando l'anagrafica era incompleta il messaggio partiva
+    // verso quei recapiti, cioè verso persone estranee al fascicolo, e l'interfaccia diceva
+    // «recapitato con successo». Un recapito che non c'è resta vuoto e blocca l'invio.
+    const email = clientData?.email || refJson.email || emailCliente || '';
+    const whatsapp = clientData?.cellulare || refJson.cellulare || refJson.whatsapp || clientData?.telefono || refJson.telefono || '';
+    const telegram = clientData?.telegram || refJson.telegram || '';
+    const signal = clientData?.signal || refJson.signal || clientData?.cellulare || refJson.cellulare || clientData?.telefono || refJson.telefono || '';
     const referente = clientData?.referenteNome || refJson.referenteNome || refJson.referente || clientData?.ubo || nomeCliente || 'Referente Incarico';
 
     return {
@@ -242,7 +249,7 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
               id: mail.id || `msg-inbound-${Date.now()}`,
               canale: 'email',
               mittente: mail.from,
-              destinatario: 'Studio Advisory (support@bluecode-ltd.com)',
+              destinatario: (mail as any).to || targetEmail || "Casella dello studio",
               direzione: 'entrata',
               testo: mail.text,
               dataOra: mail.date,
@@ -254,7 +261,7 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
             inviaComunicazioneApi(String(progettoId), {
               canale: 'email',
               mittente: mail.from,
-              destinatario: 'Studio Advisory (support@bluecode-ltd.com)',
+              destinatario: (mail as any).to || targetEmail || "Casella dello studio",
               direzione: 'entrata',
               testo: mail.text,
             }).catch(() => {});
@@ -285,7 +292,11 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
     setFeedback(null);
 
     const testoDaInviare = nuovoTesto.trim();
-    const mittente = 'Joe Disabato (Senior Advisor)';
+    // Chi ha fatto l'accesso, non 'Joe Disabato (Senior Advisor)' scritto nel codice: il
+    // registro delle comunicazioni attribuiva a lui ogni messaggio, da qualunque operatore.
+    const utenteStr = typeof window !== 'undefined' ? localStorage.getItem('bluman_user') : null;
+    const utente = utenteStr ? (() => { try { return JSON.parse(utenteStr); } catch { return null; } })() : null;
+    const mittente = utente?.nome ? `${utente.nome}${utente.email ? ` (${utente.email})` : ''}` : (utente?.email || 'Studio');
     let destinatario = '';
     switch (canaleSelezionato) {
       case 'whatsapp':
@@ -329,7 +340,15 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
 
       // 2. Se Email, invio reale tramite Serverless SMTP Nodemailer
       if (canaleSelezionato === 'email') {
-        const destEmail = (customDestEmail || contactInfo.email || emailCliente || 'support@bluecode-ltd.com').trim();
+        // Qui il ripiego era la casella dello studio: senza email in anagrafica il messaggio
+        // destinato al cliente arrivava allo studio stesso, e il riscontro diceva «recapitata
+        // con successo alla casella support@...». Meglio fermarsi e dirlo.
+        const destEmail = (customDestEmail || contactInfo.email || emailCliente || '').trim();
+        if (!destEmail) {
+          setFeedback({ tipo: 'err', testo: `Nessuna email per ${nomeCliente || 'il cliente'}: scrivila nel campo destinatario o compila l'anagrafica.` });
+          setInviando(false);
+          return;
+        }
         const res = await sendEmailDirectApi(
           destEmail,
           `💬 Comunicazione Studio BlueCode Advisory — Fascicolo ${nomeCliente || 'Pratica'}`,
@@ -342,21 +361,30 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
         }
       } else if (canaleSelezionato === 'whatsapp') {
         // 3. Se WhatsApp, dispatch sicuro tramite Vercel Serverless Function (No CORS)
-        const cleanPhone = (contactInfo.whatsapp || '').replace(/\D/g, '') || '393335936278';
+        // Il numero era `|| '393335936278'`: senza cellulare in anagrafica il messaggio del
+        // cliente partiva verso un numero scritto nel codice. E quando l'invio falliva, il
+        // ripiego spediva il template di esempio `hello_world` e annunciava «Notifica
+        // consegnata»: al destinatario arrivava «Hello World», all'operatore un successo.
+        const cleanPhone = (contactInfo.whatsapp || '').replace(/\D/g, '');
+        if (!cleanPhone) {
+          setFeedback({ tipo: 'err', testo: `Nessun cellulare in anagrafica per ${nomeCliente || 'il cliente'}: WhatsApp non può partire.` });
+          setInviando(false);
+          return;
+        }
         const res = await sendWhatsAppDirectApi(cleanPhone, testoDaInviare);
         if (res && res.success) {
-          setFeedback({ tipo: 'ok', testo: `✓ Messaggio WhatsApp recapitato con successo a ${contactInfo.whatsapp}!` });
+          setFeedback({ tipo: 'ok', testo: `✓ Messaggio WhatsApp recapitato a ${contactInfo.whatsapp}` });
         } else {
-          // Fallback con invio template
-          await sendWhatsAppDirectApi(cleanPhone, testoDaInviare, 'hello_world');
-          setFeedback({ tipo: 'ok', testo: `✓ Notifica WhatsApp consegnata a ${contactInfo.whatsapp}!` });
+          setFeedback({ tipo: 'err', testo: `WhatsApp non ha accettato l'invio verso ${contactInfo.whatsapp}: ${res?.errore || 'motivo non riportato'}. Il messaggio resta nel registro del fascicolo.` });
         }
       } else {
         setFeedback({ tipo: 'ok', testo: `✓ Messaggio registrato e notificato via ${canaleSelezionato.toUpperCase()} al cliente!` });
       }
     } catch (err) {
+      // Prima ogni errore diventava «✓ Messaggio salvato nel registro del progetto!»: il
+      // riscontro verde compariva anche quando la richiesta non era mai arrivata al server.
       console.warn('Errore invio comunicazione:', err);
-      setFeedback({ tipo: 'ok', testo: `✓ Messaggio salvato nel registro del progetto!` });
+      setFeedback({ tipo: 'err', testo: `Invio non riuscito: ${err instanceof Error ? err.message : 'errore di rete'}. Il messaggio è visibile qui ma potrebbe non essere stato registrato.` });
     } finally {
       setInviando(false);
       setTimeout(() => setFeedback(null), 4000);
@@ -667,7 +695,14 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
               <button
                 type="button"
                 onClick={async () => {
-                  const cleanPhone = (contactInfo.whatsapp || '').replace(/\D/g, '') || '393335936278';
+                  // Il ripiego era un numero scritto nel codice: premendo «Test» senza cellulare
+                  // in anagrafica, il messaggio di prova partiva verso quel numero.
+                  const cleanPhone = (contactInfo.whatsapp || '').replace(/\D/g, '');
+                  if (!cleanPhone) {
+                    setFeedback({ tipo: 'err', testo: 'Nessun cellulare in anagrafica: non c\'è un numero verso cui fare il test.' });
+                    setTimeout(() => setFeedback(null), 4000);
+                    return;
+                  }
                   setFeedback({ tipo: 'ok', testo: `Invio notifica WhatsApp in corso verso ${contactInfo.whatsapp}...` });
                   const res = await sendWhatsAppDirectApi(cleanPhone, '', 'hello_world');
                   if (res && res.success) {
