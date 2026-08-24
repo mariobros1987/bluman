@@ -1,7 +1,6 @@
 // Utility helpers
 
 import type { CategoriaModulo, StatoModulo, StatoMicrovoce, StatoProgetto, Articolo, ModuloTemplate, Progetto } from '../types';
-import { ARTICOLI, MLIB } from '../store/mockData';
 
 // ─── Formatters ───────────────────────────────────────────────────
 export const fmt = (n: number) => '€ ' + n.toLocaleString('it-IT');
@@ -55,13 +54,12 @@ interface ResolvedRiga { art: Articolo; qty: number; h: number; p: number; overr
 
 export function resolveRighe(m: ModuloTemplate, articlesPool?: Articolo[]): ResolvedRiga[] {
   if (!m || !m.righe) return [];
-  const pool = articlesPool && articlesPool.length > 0 ? articlesPool : ARTICOLI;
+  const pool = articlesPool && articlesPool.length > 0 ? articlesPool : [];
   return m.righe.map(r => {
     const embedded = (r as any).artObj;
     const foundInPool = pool.find(a => a.id === r.art);
-    const foundInMock = ARTICOLI.find(a => a.id === r.art);
-    
-    const art: Articolo = embedded || foundInPool || foundInMock || {
+
+    const art: Articolo = embedded || foundInPool || {
       id: r.art,
       n: (r as any).artName || 'Prestazione',
       cat: (m.cat || 'Societario') as CategoriaModulo,
@@ -86,8 +84,21 @@ export function moduloP(m: ModuloTemplate, articlesPool?: Articolo[]): number {
 
 // ─── Topological sort for library graph ───────────────────────────
 export function levelOf(id: string, list?: ModuloTemplate[]): number {
-  const pool = list || MLIB;
+  const pool = list || [];
   const m = pool.find(x => x.id === id);
   if (!m || !m.deps || !m.deps.length) return 0;
   return 1 + Math.max(...m.deps.map(d => levelOf(d, pool)), 0);
+}
+
+// ─── Iniziali per avatar ──────────────────────────────────────────
+// Estratta dal vecchio store mock: è logica pura (titoli professionali, iniziali),
+// non dati, quindi resta qui anche dopo la rimozione di mockData.ts.
+export function extractInitialsFromName(name: string): string {
+  if (!name) return 'OP';
+  // Rimuovi prefissi e titoli professionali
+  const clean = name.replace(/^(avv\.?|dr\.?|dott\.?|dott\.ssa|ing\.?|rag\.?|prof\.?|avvocato|dottore)\s+/i, '').trim();
+  const parts = clean.split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return 'OP';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }

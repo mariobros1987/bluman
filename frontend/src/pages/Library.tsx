@@ -5,7 +5,6 @@ import { fmt, moduloH, moduloP, resolveRighe, levelOf } from '../utils';
 import { downloadRealPdf } from '../utils/pdfGenerator';
 import { PREBUILT_TEMPLATES, getAllTemplates, saveCustomTemplate, deleteTemplate, archiveTemplate, restoreTemplate, importTemplatesFromJson, exportTemplatesAsJson, type DocumentTemplate } from '../utils/documentTemplates';
 import { getTenantStorageKey, getStudioInfoForTenant, getCurrentTenantId } from '../utils/tenant';
-import { MLIB, ARTICOLI, GIURISDIZIONI } from '../store/mockData';
 import { fetchModuliLibreria, fetchArticoli, fetchGiurisdizioniApi, creaGiurisdizioneApi, creaArticoloApi, creaModuloTemplateApi, updateArticoloPrezzoApi, uploadFileApi, fetchClienti, fetchProgetti, creaProgettoApi, salvaProgettoDettaglioApi, creaDocumentoTemplateApi, eliminaDocumentoTemplateApi } from '../api/client';
 import type { CategoriaModulo, Articolo, Giurisdizione, ModuloTemplate } from '../types';
 
@@ -14,9 +13,9 @@ type SubTab = 'grafo' | 'articoli' | 'giurisdizioni' | 'crea_modulo' | 'doc_form
 export function Library() {
   const [subTab, setSubTab] = useState<SubTab>('grafo');
   const [open, setOpen] = useState<Set<string>>(new Set());
-  const [articoliList, setArticoliList] = useState<Articolo[]>(ARTICOLI);
-  const [giurList, setGiurList] = useState<Giurisdizione[]>(GIURISDIZIONI);
-  const [moduliList, setModuliList] = useState<ModuloTemplate[]>(MLIB);
+  const [articoliList, setArticoliList] = useState<Articolo[]>([]);
+  const [giurList, setGiurList] = useState<Giurisdizione[]>([]);
+  const [moduliList, setModuliList] = useState<ModuloTemplate[]>([]);
   const [modalArticoloOpen, setModalArticoloOpen] = useState(false);
   const [selectedGiurId, setSelectedGiurId] = useState<string>('ALL');
   const [assignModalModule, setAssignModalModule] = useState<ModuloTemplate | null>(null);
@@ -36,10 +35,9 @@ export function Library() {
         p: a.prezzoDefault ? a.prezzoDefault / 100 : 500,
         ver: a.versione || 1,
       }));
-      // Unisci gli articoli DB con quelli mock evitando duplicati per id/nome
-      const existingIds = new Set(mapped.map(m => m.id));
-      const combined = [...mapped, ...ARTICOLI.filter(a => !existingIds.has(a.id) && !mapped.some(m => m.n.toLowerCase() === a.n.toLowerCase()))];
-      setArticoliList(combined);
+      // Solo articoli reali dal database: il vecchio merge con l'elenco mock
+      // reiniettava voci di esempio anche quando il catalogo era già completo.
+      setArticoliList(mapped);
     }
 
     const dbMods = await fetchModuliLibreria();

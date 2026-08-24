@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { fetchComunicazioniApi, inviaComunicazioneApi, fetchClienti, sendWhatsAppDirectApi, sendEmailDirectApi, fetchInboundImapEmailsApi, fetchTenantInfoApi } from '../api/client';
 import { downloadGuidePdf } from '../utils/pdfGenerator';
 import { getCurrentTenantId, getTenantStorageKey, getStudioInfoForTenant, BLUECODE_TENANT_ID } from '../utils/tenant';
-import { PROJECTS } from '../store/mockData';
 import type { Cliente } from '../types';
 
 export interface MessaggioComunicazione {
@@ -135,26 +134,6 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
           }
         } catch (e) {
           console.warn('Fallback caricamento cliente anagrafica:', e);
-        }
-      }
-
-      // 3. Fallback ai default di mockData
-      if (!found) {
-        const mockProj = PROJECTS.find(p => p.cl?.toLowerCase().trim() === (nomeCliente || '').toLowerCase().trim());
-        if (mockProj) {
-          found = {
-            id: `cl-${mockProj.id}`,
-            nome: mockProj.cl,
-            tipo: mockProj.ct || 'company',
-            // Il nome del progetto arriva dai dati di esempio, i recapiti no: qui c'erano
-            // un'email e un numero scritti nel codice, e da questa scheda partivano i messaggi.
-            email: emailCliente || '',
-            telefono: '',
-            cellulare: '',
-            telegram: '',
-            signal: '',
-            referenteNome: mockProj.cl,
-          };
         }
       }
 

@@ -21,7 +21,6 @@ import { RetainersPage } from './pages/RetainersPage';
 import { DocumentEditorPage } from './pages/DocumentEditorPage';
 import { getUserPermission } from './utils/rbac';
 import { fetchMeApi } from './api/client';
-import { PROJECTS } from './store/mockData';
 import './styles/tokens.css';
 
 function ProtectedModule({ user, moduleKey, element }: { user: any; moduleKey: string; element: React.ReactElement }) {
@@ -47,7 +46,9 @@ function ProtectedModule({ user, moduleKey, element }: { user: any; moduleKey: s
 }
 
 function MainLayoutWrapper({ user, onLogout }: { user: any; onLogout: () => void }) {
-  const alertCount = PROJECTS.filter(p => p.delay).length;
+  // Prima arrivava dallo store mock PROJECTS (ora rimosso): il conteggio degli avvisi
+  // partirà dalle scadenze reali quando la campanella sarà collegata al database.
+  const alertCount = 0;
   return (
     <AppLayout alertCount={alertCount} user={user} onLogout={onLogout}>
       <Outlet />

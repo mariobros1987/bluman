@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchScadenzarioIncassiApi, registraIncassoApi, fetchClienti } from '../api/client';
 import { fmt } from '../utils';
-import { PROJECTS } from '../store/mockData';
 
 export function ScadenzarioPage() {
   const navigate = useNavigate();
@@ -43,36 +42,6 @@ export function ScadenzarioPage() {
             id: `scad-loc-${p.id}-${fIdx}`,
             numeroRata: 1,
             dataScadenza: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-            importoCentesimi,
-            stato: f.stato === 'incassata' ? 'incassato' : 'in_attesa',
-            fattura: {
-              numero: f.numero || `FT-2026-000${fIdx + 1}`,
-              progetto: {
-                id: p.id,
-                nome: p.n,
-                cliente: { nome: p.cl || 'Cliente Studio' },
-              },
-            },
-            registrazioniRegistrate: f.stato === 'incassata' ? [
-              {
-                importoIncassatoCentesimi: importoCentesimi,
-                metodoPagamento: 'bonifico',
-                riferimentoTransazione: 'TRN-SETTLED',
-                dataIncasso: new Date().toISOString(),
-              }
-            ] : [],
-          });
-        });
-      });
-
-      // Integrazione scadenze progetti dallo store PROJECTS di default
-      PROJECTS.forEach((p) => {
-        (p.fatture || []).forEach((f: any, fIdx: number) => {
-          const importoCentesimi = Math.round((f.importo || 1500) * 100);
-          extractedScad.push({
-            id: `scad-mock-${p.id}-${fIdx}`,
-            numeroRata: 1,
-            dataScadenza: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
             importoCentesimi,
             stato: f.stato === 'incassata' ? 'incassato' : 'in_attesa',
             fattura: {

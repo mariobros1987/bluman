@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { CatBadge } from './ui/CatBadge';
 import { fmt, moduloH, moduloP } from '../utils';
-import { MLIB, GIURISDIZIONI } from '../store/mockData';
 import type { Cliente, Giurisdizione, ModuloTemplate, CategoriaModulo } from '../types';
 import { fetchClienti, fetchGiurisdizioniApi, fetchModuliLibreria, creaClienteApi, creaProgettoApi, creaPreventivoEAccettaApi } from '../api/client';
 import { getCurrentTenantId, getTenantStorageKey } from '../utils/tenant';
@@ -14,9 +13,9 @@ interface NewProjectWizardProps {
 export function NewProjectWizard({ onClose, onProjectCreated }: NewProjectWizardProps) {
   const [step, setStep] = useState(0);
 
-  // Giurisdizioni & Moduli State
-  const [giurisdizioni, setGiurisdizioni] = useState<Giurisdizione[]>(GIURISDIZIONI);
-  const [moduliList, setModuliList] = useState<ModuloTemplate[]>(MLIB);
+  // Giurisdizioni & Moduli State — partono vuoti e vengono caricati dal DB in mount
+  const [giurisdizioni, setGiurisdizioni] = useState<Giurisdizione[]>([]);
+  const [moduliList, setModuliList] = useState<ModuloTemplate[]>([]);
   const [selectedGiurId, setSelectedGiurId] = useState<string>('giur-mt'); // Default Malta
   const [showOtherGiurMods, setShowOtherGiurMods] = useState(false);
 

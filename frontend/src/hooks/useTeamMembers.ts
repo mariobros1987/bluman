@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { fetchUtentiTenant } from '../api/client';
-import { TEAM, extractInitialsFromName } from '../store/mockData';
-import { getCurrentTenantId, getTenantStorageKey, getStudioInfoForTenant, BLUECODE_TENANT_ID } from '../utils/tenant';
+import { extractInitialsFromName } from '../utils';
+import { getCurrentTenantId, getTenantStorageKey, getStudioInfoForTenant } from '../utils/tenant';
 import type { TeamMember } from '../types';
 
 export { extractInitialsFromName };
@@ -89,26 +89,9 @@ export async function loadTeamMembersFromDb(): Promise<TeamMember[]> {
     return customUsers.map(apiUserToTeamMember);
   }
 
-  // 3. Fallback per tenant:
-  if (currentTenantId === BLUECODE_TENANT_ID) {
-    return [...TEAM];
-  }
-
-  // Per tenant 2 (Advisory Italia / Lorenzo Marino)
-  if (currentTenantId === '00000000-0000-0000-0000-000000000002') {
-    return [
-      { id: 3, n: 'Avv. Lorenzo Marino', r: 'Lead Legal Advisor & Managing Partner', i: 'LM', c: '#10b981' },
-    ];
-  }
-
-  // Per tenant 3 (Swiss Wealth / Elena Russo)
-  if (currentTenantId === '00000000-0000-0000-0000-000000000003') {
-    return [
-      { id: 4, n: 'Dr. Elena Russo', r: 'Lead Tax Advisor & Managing Partner', i: 'ER', c: '#f59e0b' },
-    ];
-  }
-
-  // Per qualsiasi nuovo tenant registrato
+  // 3. Fallback per tenant: niente squadra finta precostituita. Se l'API non risponde e
+  // non ci sono collaboratori salvati in locale, si mostra solo il lead advisor del tenant,
+  // costruito dai dati dello studio — mai un elenco di persone inventate nel sorgente.
   return [
     {
       id: 1,

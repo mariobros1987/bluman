@@ -13,10 +13,8 @@ import { ComunicazioniTab } from '../components/ComunicazioniTab';
 import { AssignOperatorModal } from '../components/AssignOperatorModal';
 import { CalendarPreviewModal } from '../components/CalendarPreviewModal';
 import { ConfirmDeleteModal } from '../components/ConfirmDeleteModal';
-import { PROJECTS } from '../store/mockData';
 import { fetchProgettoDettaglio, emettiFatturaApi, consuntivaMicrovoceApi, assegnaAccessoProgettoApi, salvaProgettoDettaglioApi, archiviaProgettoApi, eliminaProgettoApi, fetchModuliLibreria, fetchArticoli, inviaComunicazioneApi, ricalcolaProgettoApi, creaPreventivoEAccettaApi, listaDocumentiProgetto, salvaDocumentoApi, eliminaDocumentoApi, richiesteAddendumStudioApi, aggiornaStatoAddendumApi } from '../api/client';
 import type { RichiestaAddendum } from '../api/client';
-import { TEAM } from '../store/mockData';
 import { useTeamMembers } from '../hooks/useTeamMembers';
 import { getCurrentTenantId, getTenantStorageKey, getStudioInfoForTenant, BLUECODE_TENANT_ID } from '../utils/tenant';
 import type { Progetto, ModuloProgetto, MicroVoce, CategoriaModulo, StatoProgetto, StatoModulo, Cliente } from '../types';
@@ -32,7 +30,8 @@ export function ProjectDetail() {
   const [project, setProject] = useState<Progetto | null>(() => {
     const isBluecode = getCurrentTenantId() === BLUECODE_TENANT_ID;
     if (isBluecode) {
-      return PROJECTS.find(p => String(p.id) === String(id)) || null;
+      // Bluecode parte da database: nessun progetto precaricato in memoria.
+      return null;
     }
     const localStr = localStorage.getItem(getTenantStorageKey('bluman_custom_projects'));
     if (localStr) {
@@ -60,7 +59,15 @@ export function ProjectDetail() {
   const [procV, setProcV] = useState<{ mid: number; vidx: number } | null>(null);
   const [accessiModalOpen, setAccessiModalOpen] = useState(false);
   const { team: teamList } = useTeamMembers();
-  const [selectedUser, setSelectedUser] = useState(TEAM[0].n || (TEAM[0] as any).name);
+  const [selectedUser, setSelectedUser] = useState('');
+  // Il primo collaboratore disponibile viene preselezionato solo quando la squadra
+  // arriva (dal database): prima c'era un nome fisso preso dall'elenco mock.
+  useEffect(() => {
+    if (!selectedUser && teamList.length > 0) {
+      setSelectedUser(teamList[0].n || (teamList[0] as any).name || '');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [teamList]);
   const [livello, setLivello] = useState('write');
   const [assignModalTarget, setAssignModalTarget] = useState<{
     modId: number;
@@ -318,13 +325,11 @@ export function ProjectDetail() {
           };
         });
 
-        // Se i moduli DB sono vuoti, arricchisci dai progetti custom salvati in locale o mockData (solo Bluecode)
+        // Se i moduli DB sono vuoti, cerca un ripiego nei progetti custom salvati in locale
         if (finalMods.length === 0) {
-          const isBluecode = getCurrentTenantId() === BLUECODE_TENANT_ID;
           const localStr = localStorage.getItem(getTenantStorageKey('bluman_custom_projects'));
           const localProjs: Progetto[] = localStr ? JSON.parse(localStr) : [];
-          const match = localProjs.find(p => String(p.id) === String(id) || p.cl === dbRes.cliente?.nome || p.n === dbRes.nome)
-                     || (isBluecode ? PROJECTS.find(p => String(p.id) === String(id) || p.cl === dbRes.cliente?.nome) : undefined);
+          const match = localProjs.find(p => String(p.id) === String(id) || p.cl === dbRes.cliente?.nome || p.n === dbRes.nome);
           if (match && match.mods && match.mods.length > 0) {
             finalMods = match.mods;
           }
@@ -377,13 +382,10 @@ export function ProjectDetail() {
           setExpanded(new Set(finalMods.map(m => m.id)));
         }
       } else {
-        const isBluecode = getCurrentTenantId() === BLUECODE_TENANT_ID;
         const localStr = localStorage.getItem(getTenantStorageKey('bluman_custom_projects'));
         const localProjs: Progetto[] = localStr ? JSON.parse(localStr) : [];
         let match = localProjs.find(p => String(p.id) === String(id))
-                 || (isBluecode ? PROJECTS.find(p => String(p.id) === String(id)) : undefined)
-                 || localProjs.find(p => String(p.id).includes(String(id)))
-                 || (isBluecode ? PROJECTS[0] : undefined);
+                 || localProjs.find(p => String(p.id).includes(String(id)));
 
         if (match) {
           // Nessuna sanificazione: i moduli del progetto locale si mostrano come sono. Prima un

@@ -3,8 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { fetchClienti, fetchProgetti, fetchTenantInfoApi, uploadFileApi, fetchDocumentiTemplateApi, creaDocumentoTemplateApi, eliminaDocumentoTemplateApi } from '../api/client';
 import { getFormattedLogoUrl } from '../utils';
 import { downloadRealPdf } from '../utils/pdfGenerator';
-import { getCurrentTenantId, getTenantStorageKey, getStudioInfoForTenant, BLUECODE_TENANT_ID } from '../utils/tenant';
-import { PROJECTS } from '../store/mockData';
+import { getCurrentTenantId, getTenantStorageKey, getStudioInfoForTenant } from '../utils/tenant';
 import type { Cliente, Progetto } from '../types';
 
 import {
@@ -87,66 +86,16 @@ export function DocumentEditorPage() {
       }
 
       const currentTenantId = getCurrentTenantId();
-      const isBluecode = currentTenantId === BLUECODE_TENANT_ID;
 
-      // 1. Clienti: Unione DB + LocalStorage + Extracted from Projects + Default Studio (solo Bluecode)
+      // 1. Clienti: Unione DB + LocalStorage + Extracted from Projects
       const customClStr = localStorage.getItem(getTenantStorageKey('bluman_custom_clients'));
       const customCls: Cliente[] = customClStr ? JSON.parse(customClStr) : [];
 
       const localProjStr = localStorage.getItem(getTenantStorageKey('bluman_custom_projects'));
       const localProjs: any[] = localProjStr ? JSON.parse(localProjStr) : [];
 
-      const defaultClients: Cliente[] = isBluecode ? [
-        {
-          id: 'cl-01',
-          nome: 'Holding Beta S.r.l.',
-          tipo: 'company',
-          piva: 'IT09876543210',
-          codiceFiscale: 'BLUCD90A01H501X',
-          sedeLegale: 'Via Montenapoleone 8, Milano',
-          codiceSdi: 'SUBM70N',
-          email: 'client@holdingbeta.advisory',
-          telefono: '+39 02 889900',
-          cellulare: '+39 333 5936278',
-          referenteNome: 'Ing. Roberto Rossi (CEO)',
-        },
-        {
-          id: 'cl-02',
-          nome: 'Roberto Rossi',
-          tipo: 'individual',
-          piva: 'IT09876543210',
-          codiceFiscale: 'RSSRRT75B10F205Y',
-          sedeLegale: 'Corso Vittorio Emanuele II 12, Milano',
-          email: 'r.rossi@holdingbeta.it',
-          telefono: '+39 335 1234567',
-          cellulare: '+39 335 1234567',
-          referenteNome: 'Roberto Rossi',
-        },
-        {
-          id: 'cl-03',
-          nome: 'Blue Wave Capital Ltd',
-          tipo: 'company',
-          piva: 'MT28491039',
-          codiceFiscale: 'MT28491039',
-          sedeLegale: 'Tower Road 45, Sliema SLM 1600, Malta',
-          email: 'finance@bluewave.mt',
-          telefono: '+356 2133 4455',
-          referenteNome: 'Dott. Mark Borg',
-        },
-        {
-          id: 'cl-04',
-          nome: 'Trust San Giorgio',
-          tipo: 'company',
-          piva: 'IT11223344556',
-          codiceFiscale: 'TRSGRG80A01H501K',
-          sedeLegale: 'Piazza San Giorgio 4, Lugano, Svizzera',
-          email: 'trustee@sangiorgio.ch',
-          referenteNome: 'Avv. Gianluigi Parodi',
-        },
-      ] : [];
-
       const extractedClients: Cliente[] = [];
-      const projectsForExtraction = isBluecode ? [...PROJECTS, ...localProjs] : [...localProjs];
+      const projectsForExtraction = localProjs;
       projectsForExtraction.forEach((p: any) => {
         if (p.cl) {
           extractedClients.push({
@@ -165,8 +114,8 @@ export function DocumentEditorPage() {
       });
 
       const clientMap = new Map<string, Cliente>();
-      // Ordine di precedenza: default -> extracted -> custom -> API DB reale
-      [...defaultClients, ...extractedClients, ...customCls, ...apiCls].forEach(c => {
+      // Ordine di precedenza: extracted -> custom -> API DB reale
+      [...extractedClients, ...customCls, ...apiCls].forEach(c => {
         if (c && c.nome) {
           clientMap.set(c.nome.trim().toLowerCase(), c);
         }
@@ -179,8 +128,8 @@ export function DocumentEditorPage() {
         setSelectedClienteId('');
       }
 
-      // 2. Progetti: Unione DB + LocalStorage + Mock PROJECTS (solo Bluecode)
-      const allRawProjects = isBluecode ? [...apiPrjs, ...localProjs, ...PROJECTS] : [...apiPrjs, ...localProjs];
+      // 2. Progetti: Unione DB + LocalStorage
+      const allRawProjects = [...apiPrjs, ...localProjs];
       const projMap = new Map<string, any>();
       allRawProjects.forEach((p: any) => {
         const title = p.titolo || p.n || p.nome || `Progetto #${p.id}`;
