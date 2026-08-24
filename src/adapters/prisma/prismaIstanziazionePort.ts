@@ -17,6 +17,7 @@
 // sviluppo) — controlla prima lì.
 
 import { conContestoInTransazione, type PrismaConContesto } from '../../util/prismaClient.js';
+import { notificaStudio } from '../../services/notificheService.js';
 import type {
   IstanziazionePort,
   IstanziazioneTransazione,
@@ -236,5 +237,20 @@ export class PrismaIstanziazionePort implements IstanziazionePort, EsecuzionePor
 
   async aggiornaPassaggio(id: string, updates: Record<string, unknown>) {
     await this.prisma.passaggioProgetto.update({ where: { id }, data: updates });
+  }
+
+  // Blocco 3 — il modulo è diventato 'done': avvisa lo studio in tempo reale.
+  async notificaModuloCompletato(moduloProgettoId: string) {
+    const modulo = await this.prisma.moduloProgetto.findUnique({
+      where: { id: moduloProgettoId },
+      include: { progetto: { select: { id: true, nome: true, clienteId: true } } },
+    });
+    if (!modulo) return;
+    await notificaStudio(modulo.tenantId, {
+      tipoEvento: 'modulo_completato',
+      oggetto: 'Modulo completato',
+      corpo: `Il modulo «${modulo.nome}» del progetto «${modulo.progetto.nome}» è stato completato.`,
+      link: `/projects/${modulo.progettoId}`,
+    });
   }
 }

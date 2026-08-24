@@ -8,7 +8,40 @@ export interface NotificationItem {
   read: boolean;
   type: 'delay' | 'blocked' | 'system' | 'signature';
   link?: string;
+  /** Epoch ms: quando presente il pannello mostra il tempo relativo ("5 min fa"). */
+  timestamp?: number;
 }
+
+/** "adesso", "5 min fa", "2 h fa", "ieri", "18 ago" — per la timeline delle notifiche. */
+export function tempoRelativo(timestamp: number): string {
+  const diffMs = Date.now() - timestamp;
+  if (diffMs < 60_000) return 'adesso';
+  const minuti = Math.floor(diffMs / 60_000);
+  if (minuti < 60) return `${minuti} min fa`;
+  const ore = Math.floor(minuti / 60);
+  if (ore < 24) return `${ore} h fa`;
+  const giorni = Math.floor(ore / 24);
+  if (giorni === 1) return 'ieri';
+  if (giorni < 7) return `${giorni} giorni fa`;
+  return new Date(timestamp).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' });
+}
+
+/** Etichetta del separatore di giorno nella timeline: Oggi / Ieri / data estesa. */
+export function etichettaGiorno(timestamp: number): string {
+  const d = new Date(timestamp);
+  const oggi = new Date();
+  const inizioOggi = new Date(oggi.getFullYear(), oggi.getMonth(), oggi.getDate()).getTime();
+  if (timestamp >= inizioOggi) return 'Oggi';
+  if (timestamp >= inizioOggi - 24 * 60 * 60 * 1000) return 'Ieri';
+  return d.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' });
+}
+
+const STILE_TIPO: Record<NotificationItem['type'], { icona: string; colore: string }> = {
+  blocked: { icona: '🚫', colore: '#ef4444' },
+  delay: { icona: '⚠️', colore: '#f59e0b' },
+  signature: { icona: '✍️', colore: '#8b5cf6' },
+  system: { icona: 'ℹ️', colore: '#6366f1' },
+};
 
 interface NotificationModalProps {
   notifications: NotificationItem[];
@@ -130,7 +163,7 @@ export function NotificationModal({ notifications, onClose, onMarkAllRead, onSel
         )}
       </div>
 
-      {/* Notifiche List */}
+      {/* Notifiche List — timeline raggruppata per giorno */}
       <div style={{ maxHeight: 360, overflowY: 'auto', padding: 8 }}>
         {notifications.length === 0 ? (
           <div style={{ padding: 28, textAlign: 'center', color: '#94a3b8', fontSize: 12 }}>
@@ -138,29 +171,52 @@ export function NotificationModal({ notifications, onClose, onMarkAllRead, onSel
             Nessuna notifica in sospeso
           </div>
         ) : (
-          notifications.map((n) => (
-            <div
-              key={n.id}
-              onClick={() => onSelectNotif && onSelectNotif(n)}
-              style={{
-                padding: 12,
-                borderRadius: 8,
-                marginBottom: 6,
-                background: n.read ? '#1e293b40' : '#1e293b',
-                borderLeft: n.type === 'blocked' ? '3px solid #ef4444' : n.type === 'delay' ? '3px solid #f59e0b' : '3px solid #6366f1',
-                cursor: 'pointer',
-                transition: 'all .15s',
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                <span style={{ fontWeight: 600, fontSize: 12, color: n.read ? '#94a3b8' : '#f8fafc' }}>
-                  {n.type === 'blocked' ? '🚫' : n.type === 'delay' ? '⚠️' : 'ℹ️'} {n.title}
-                </span>
-                <span style={{ fontSize: 10, color: '#64748b' }}>{n.time}</span>
-              </div>
-              <div style={{ fontSize: 11, color: '#cbd5e1', lineHeight: 1.4 }}>{n.body}</div>
-            </div>
-          ))
+          (() => {
+            let ultimoGiorno = '';
+            return notifications.map((n) => {
+              const stile = STILE_TIPO[n.type] || STILE_TIPO.system;
+              // Separatore di giorno: compare quando si cambia data rispetto alla notifica sopra.
+              let separatore: string | null = null;
+              if (n.timestamp) {
+                const giorno = etichettaGiorno(n.timestamp);
+                if (giorno !== ultimoGiorno) {
+                  ultimoGiorno = giorno;
+                  separatore = giorno;
+                }
+              }
+              return (
+                <div key={n.id}>
+                  {separatore && (
+                    <div style={{ fontSize: 9.5, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '.5px', padding: '8px 4px 4px' }}>
+                      {separatore}
+                    </div>
+                  )}
+                  <div
+                    onClick={() => onSelectNotif && onSelectNotif(n)}
+                    style={{
+                      padding: 12,
+                      borderRadius: 8,
+                      marginBottom: 6,
+                      background: n.read ? '#1e293b40' : '#1e293b',
+                      borderLeft: `3px solid ${stile.colore}`,
+                      cursor: 'pointer',
+                      transition: 'all .15s',
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                      <span style={{ fontWeight: 600, fontSize: 12, color: n.read ? '#94a3b8' : '#f8fafc' }}>
+                        {stile.icona} {n.title}
+                      </span>
+                      <span style={{ fontSize: 10, color: '#64748b', whiteSpace: 'nowrap', marginLeft: 8 }}>
+                        {n.timestamp ? tempoRelativo(n.timestamp) : n.time}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 11, color: '#cbd5e1', lineHeight: 1.4 }}>{n.body}</div>
+                  </div>
+                </div>
+              );
+            });
+          })()
         )}
       </div>
     </div>

@@ -4,7 +4,7 @@ import { Sidebar } from './Sidebar';
 import { NotificationModal, type NotificationItem } from '../NotificationModal';
 import { UserProfileModal } from '../UserProfileModal';
 import { MustChangePasswordModal } from '../MustChangePasswordModal';
-import { fetchNotificheApi, markNotificheReadApi } from '../../api/client';
+import { fetchNotificheApi, markNotificheReadApi, apriStreamNotifiche, type NotificaStreamEvent } from '../../api/client';
 import { QuickTimeTracker } from '../QuickTimeTracker';
 import { getCurrentTenantId, getAllAvailableTenants, setActiveTenantId } from '../../utils/tenant';
 import styles from './AppLayout.module.css';
@@ -22,6 +22,41 @@ const TITLES: Record<string, string> = {
 };
 
 const INITIAL_NOTIFICATIONS: NotificationItem[] = [];
+
+// Blocco 3 — il backend classifica ogni notifica con `tipoEvento`; la campanella la
+// traduce nel tipo visivo del pannello. Le righe vecchie (senza tipoEvento) ripiegano
+// sull'euristica basata sull'oggetto.
+const TIPO_PER_EVENTO: Record<string, NotificationItem['type']> = {
+  modulo_completato: 'system',
+  fattura_incassata: 'system',
+  messaggio_cliente: 'system',
+  documento_da_firmare: 'signature',
+  firma_apposta: 'signature',
+  scadenza_imminente: 'delay',
+};
+
+function mapNotificaBackend(n: any): NotificationItem {
+  const tsRaw = n.createdAt || n.inviataAt;
+  const tipo: NotificationItem['type'] =
+    (n.tipoEvento && TIPO_PER_EVENTO[n.tipoEvento]) ||
+    (n.oggetto?.includes('KYC') ? 'blocked' : n.oggetto?.includes('Firma') || n.oggetto?.includes('firma') ? 'signature' : 'delay');
+  return {
+    id: n.id,
+    title: n.oggetto || 'Notifica Studio',
+    body: n.corpo || '',
+    time: n.inviataAt ? new Date(n.inviataAt).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) : 'Ora',
+    read: n.statoLettura === 'letta',
+    type: tipo,
+    link: n.link || undefined,
+    timestamp: tsRaw ? new Date(tsRaw).getTime() : undefined,
+  };
+}
+
+function notificaDesktop(titolo: string, corpo: string) {
+  if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+    new Notification(`🔔 BluMan Studio: ${titolo}`, { body: corpo, icon: '/favicon.ico' });
+  }
+}
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -47,27 +82,31 @@ export function AppLayout({ children, alertCount: _alertCount = 0, user, onLogou
     const loadDbNotifs = async () => {
       const dbNotifs = await fetchNotificheApi();
       if (dbNotifs && Array.isArray(dbNotifs) && dbNotifs.length > 0) {
-        const mapped: NotificationItem[] = dbNotifs.map((n: any) => ({
-          id: n.id,
-          title: n.oggetto || 'Notifica Studio',
-          body: n.corpo || '',
-          time: n.inviataAt ? new Date(n.inviataAt).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) : 'Ora',
-          read: n.statoLettura === 'letta',
-          type: n.oggetto?.includes('KYC') ? 'blocked' : n.oggetto?.includes('Firma') ? 'signature' : 'delay',
-        }));
+        const mapped: NotificationItem[] = dbNotifs.map(mapNotificaBackend);
         setNotifications(mapped);
 
-        // Se l'utente ha abilitato le notifiche desktop nel browser, invia la notifica push per quelle non lette
+        // Se l'utente ha abilitato le notifiche desktop nel browser, avvisa per la più recente non letta
         const unread = mapped.filter(n => !n.read);
-        if (unread.length > 0 && typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
-          new Notification(`🔔 BluMan Studio: ${unread[0].title}`, {
-            body: unread[0].body,
-            icon: '/favicon.ico',
-          });
+        if (unread.length > 0) {
+          notificaDesktop(unread[0].title, unread[0].body);
         }
       }
     };
     loadDbNotifs();
+  }, []);
+
+  // Blocco 3 — stream SSE: le notifiche create dal backend arrivano in tempo reale
+  // senza ricaricare la pagina. Ogni evento viene inserito in testa alla lista.
+  useEffect(() => {
+    const chiudi = apriStreamNotifiche((evento: NotificaStreamEvent) => {
+      const item = mapNotificaBackend({ ...evento, statoLettura: 'non_letta' });
+      setNotifications(prev => {
+        if (prev.some(n => n.id === item.id)) return prev; // già ricevuta (ricarica o doppio stream)
+        return [item, ...prev].slice(0, 100);
+      });
+      notificaDesktop(item.title, item.body);
+    });
+    return chiudi;
   }, []);
 
   const title = TITLES[location.pathname] || (location.pathname.startsWith('/projects/') ? 'Dettaglio Progetto' : 'BluMan');

@@ -148,5 +148,12 @@ export interface EsecuzionePort {
   getPassaggio(id: string): Promise<PassaggioRecord>;
   getPassaggiDellaMicrovoce(microvoceProgettoId: string): Promise<PassaggioRecord[]>;
   aggiornaPassaggio(id: string, updates: Partial<Pick<PassaggioRecord, 'stato'>>): Promise<void>;
+
+  /**
+   * Blocco 3 — chiamato quando un modulo passa a 'done' per la prima volta.
+   * Opzionale: le porte finte dei test non lo implementano, e un guasto qui
+   * non deve mai rompere la cascata di calcolo.
+   */
+  notificaModuloCompletato?(moduloProgettoId: string): Promise<void>;
 }
 

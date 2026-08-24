@@ -101,6 +101,10 @@ async function ricalcolaModuloECascata(moduloProgettoId: string, port: Esecuzion
   // §16.5 — se il modulo è appena diventato 'done' (non lo era prima), prova a sbloccare
   // i moduli dipendenti dello stesso progetto.
   if (nuovoStatoModulo === 'done' && !eraGiaDone) {
+    // Blocco 3 — evento "modulo completato" verso lo studio. Fuori dalla logica
+    // di cascata: se la notifica fallisce il calcolo resta comunque applicato.
+    await port.notificaModuloCompletato?.(moduloProgettoId).catch(() => {});
+
     const moduliProgetto = await port.getModuliDelProgettoConDipendenze(modulo.progettoId);
     const sbloccati = risolviDipendenze(moduliProgetto, moduloProgettoId);
 

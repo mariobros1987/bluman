@@ -29,6 +29,9 @@ import {
   richiesteAddendumPortaleApi,
   inviaRichiestaAddendumApi,
   fatturePortaleApi,
+  fetchNotificheApi,
+  markNotificheReadApi,
+  apriStreamNotifiche,
 } from '../api/client';
 import type {
   CanaleOtp,
@@ -39,8 +42,21 @@ import type {
   PropostaDatiFiscale,
   RichiestaAddendum,
   FatturaPortale,
+  NotificaStreamEvent,
 } from '../api/client';
+import { tempoRelativo } from '../components/NotificationModal';
 import type { CategoriaModulo } from '../types';
+
+/** Notifica destinata al cliente, come la mostra la campanella del portale. */
+interface NotificaPortale {
+  id: string;
+  oggetto: string;
+  corpo: string;
+  link: string | null;
+  tipoEvento: string | null;
+  createdAt: string;
+  letto: boolean;
+}
 
 export interface ModuloPassaggio {
   id: string;
@@ -231,6 +247,13 @@ export function ClientPortal() {
 
   // Visualizzatore A4 Documento Selezionato per Lettura Completa
   const [selectedViewerDoc, setSelectedViewerDoc] = useState<any | null>(null);
+
+  // ── Blocco 3 — CAMPANELLA NOTIFICHE DEL CLIENTE ─────────────────────────────
+  // Il backend scrive notifiche destinate al cliente (documento da firmare, pagamento
+  // registrato, firma apposta): qui si caricano all'accesso e si aggiornano in tempo
+  // reale via stream SSE, così il cliente vede subito quando c'è qualcosa da firmare.
+  const [notifichePortale, setNotifichePortale] = useState<NotificaPortale[]>([]);
+  const [notifPortaleOpen, setNotifPortaleOpen] = useState(false);
 
   // ── FIRMA ELETTRONICA AVANZATA: CANALE, CODICE, MODALITÀ ──────────────────
   //
@@ -643,6 +666,57 @@ export function ClientPortal() {
   useEffect(() => {
     loadPortalData();
   }, [token]);
+
+  // ── Blocco 3 — CAMPANELLA: CARICAMENTO NOTIFICHE + STREAM IN TEMPO REALE ──
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    (async () => {
+      const righe = await fetchNotificheApi();
+      if (Array.isArray(righe)) {
+        setNotifichePortale(righe.map((n: any) => ({
+          id: n.id,
+          oggetto: n.oggetto || 'Notifica',
+          corpo: n.corpo || '',
+          link: n.link || null,
+          tipoEvento: n.tipoEvento || null,
+          createdAt: n.createdAt || n.inviataAt || '',
+          letto: n.statoLettura === 'letta',
+        })));
+      }
+    })();
+
+    const chiudi = apriStreamNotifiche((evento: NotificaStreamEvent) => {
+      setNotifichePortale((prev) =>
+        prev.some((n) => n.id === evento.id)
+          ? prev
+          : [{
+              id: evento.id,
+              oggetto: evento.oggetto,
+              corpo: evento.corpo,
+              link: evento.link ?? null,
+              tipoEvento: evento.tipoEvento ?? null,
+              createdAt: evento.createdAt,
+              letto: false,
+            }, ...prev].slice(0, 50),
+      );
+    });
+    return chiudi;
+  }, [isAuthenticated]);
+
+  const notificheNonLette = notifichePortale.filter((n) => !n.letto).length;
+
+  const handleSegnaNotificheLette = async () => {
+    setNotifichePortale((prev) => prev.map((n) => ({ ...n, letto: true })));
+    await markNotificheReadApi();
+  };
+
+  /** Il link della notifica porta alla scheda giusta del portale (documenti o fatture). */
+  const handleSelezionaNotificaPortale = (n: NotificaPortale) => {
+    setNotifPortaleOpen(false);
+    if (n.link === '/portal/documents') setActiveTab('documenti');
+    else if (n.link === '/portal/invoices') setActiveTab('fatture');
+  };
 
   // ── CANALI DI FIRMA: QUALI SONO DAVVERO UTILIZZABILI ──────────────────────
   //
@@ -1471,6 +1545,122 @@ export function ClientPortal() {
               </div>
             </div>
           )}
+
+          {/* 🔔 Blocco 3 — Campanella notifiche del cliente (documenti da firmare, pagamenti, firme) */}
+          <div style={{ position: 'relative' }}>
+            <button
+              onClick={() => setNotifPortaleOpen((v) => !v)}
+              title="Le mie notifiche"
+              style={{
+                position: 'relative',
+                background: 'var(--card2)',
+                border: '1px solid var(--border)',
+                borderRadius: 8,
+                padding: '5px 10px',
+                fontSize: 14,
+                cursor: 'pointer',
+              }}
+            >
+              🔔
+              {notificheNonLette > 0 && (
+                <span
+                  style={{
+                    position: 'absolute',
+                    top: -5,
+                    right: -5,
+                    background: '#ef4444',
+                    color: '#fff',
+                    fontSize: 9,
+                    fontWeight: 800,
+                    minWidth: 15,
+                    height: 15,
+                    borderRadius: 8,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '0 3px',
+                  }}
+                >
+                  {notificheNonLette}
+                </span>
+              )}
+            </button>
+
+            {notifPortaleOpen && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 40,
+                  right: 0,
+                  width: 340,
+                  maxWidth: '90vw',
+                  background: '#0f172a',
+                  border: '1px solid #334155',
+                  borderRadius: 12,
+                  boxShadow: '0 20px 25px -5px rgba(0,0,0,0.5)',
+                  zIndex: 1200,
+                  overflow: 'hidden',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: '#1e293b', borderBottom: '1px solid #334155' }}>
+                  <span style={{ fontWeight: 700, fontSize: 12 }}>🔔 Le mie notifiche</span>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    {notificheNonLette > 0 && (
+                      <button
+                        onClick={handleSegnaNotificheLette}
+                        style={{ background: 'transparent', border: 'none', color: '#818cf8', fontSize: 10.5, cursor: 'pointer', textDecoration: 'underline' }}
+                      >
+                        ✓ Segna lette
+                      </button>
+                    )}
+                    <button onClick={() => setNotifPortaleOpen(false)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', fontSize: 14, cursor: 'pointer' }}>
+                      ✕
+                    </button>
+                  </div>
+                </div>
+                <div style={{ maxHeight: 300, overflowY: 'auto', padding: 6 }}>
+                  {notifichePortale.length === 0 ? (
+                    <div style={{ padding: 22, textAlign: 'center', color: '#94a3b8', fontSize: 11.5 }}>
+                      <div style={{ fontSize: 20, marginBottom: 4 }}>📭</div>
+                      Nessuna notifica
+                    </div>
+                  ) : (
+                    notifichePortale.map((n) => {
+                      const icona = n.tipoEvento === 'documento_da_firmare' ? '✍️'
+                        : n.tipoEvento === 'firma_apposta' ? '✅'
+                        : n.tipoEvento === 'fattura_incassata' ? '💶'
+                        : 'ℹ️';
+                      const ts = n.createdAt ? new Date(n.createdAt).getTime() : 0;
+                      return (
+                        <div
+                          key={n.id}
+                          onClick={() => handleSelezionaNotificaPortale(n)}
+                          style={{
+                            padding: 10,
+                            borderRadius: 8,
+                            marginBottom: 5,
+                            background: n.letto ? '#1e293b40' : '#1e293b',
+                            borderLeft: n.letto ? '3px solid #334155' : '3px solid #6366f1',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3, gap: 8 }}>
+                            <span style={{ fontWeight: 600, fontSize: 11.5, color: n.letto ? '#94a3b8' : '#f8fafc' }}>
+                              {icona} {n.oggetto}
+                            </span>
+                            {ts > 0 && (
+                              <span style={{ fontSize: 9.5, color: '#64748b', whiteSpace: 'nowrap' }}>{tempoRelativo(ts)}</span>
+                            )}
+                          </div>
+                          <div style={{ fontSize: 10.5, color: '#cbd5e1', lineHeight: 1.4 }}>{n.corpo}</div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
 
           <div style={{ background: '#0d2d22', border: '1px solid #1a5c3c', color: '#34d399', fontSize: 11, padding: '5px 12px', borderRadius: 20, fontWeight: 600 }}>
             🔒 Accesso Riservato Cliente

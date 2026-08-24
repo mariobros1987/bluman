@@ -186,6 +186,7 @@ model Cliente {
   firme      FirmaElettronica[]
   proposteDatiFiscale PropostaDatiFiscale[]
   richiesteAddendum   RichiestaAddendum[]
+  notifiche    Notifica[]
 
   @@map("cliente")
 }
@@ -821,15 +822,26 @@ model PermessoModulo {
 model Notifica {
   id               String    @id @default(uuid())
   tenantId         String    @map("tenant_id")
-  destinatarioId   String    @map("destinatario_id")
-  destinatarioUser User      @relation(fields: [destinatarioId], references: [id])
+  // Blocco 3: il destinatario è un utente dello studio OPPURE un cliente del portale.
+  // I due FK sono entrambi opzionali: esattamente uno dei due è valorizzato.
+  destinatarioId   String?   @map("destinatario_id")
+  destinatarioUser User?     @relation(fields: [destinatarioId], references: [id])
+  destinatarioClienteId String? @map("destinatario_cliente_id")
+  destinatarioCliente Cliente? @relation(fields: [destinatarioClienteId], references: [id])
   destinatarioTipo String    @map("destinatario_tipo") // user|cliente
+  // Evento origine (Blocco 3): modulo_completato|documento_da_firmare|messaggio_cliente|
+  // scadenza_imminente|fattura_incassata|firma_apposta. Null per notifiche legacy/generiche.
+  tipoEvento       String?   @map("tipo_evento")
+  link             String?   // deep-link frontend (es. /projects/123, /portal)
   canale           String    @default("email")
   oggetto          String
   corpo            String
   statoLettura      String   @default("non_letta") @map("stato_lettura")
   inviataAt        DateTime? @map("inviata_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
 
+  @@index([tenantId, destinatarioId])
+  @@index([tenantId, destinatarioClienteId])
   @@map("notifica")
 }
 

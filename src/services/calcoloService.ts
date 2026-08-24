@@ -32,6 +32,7 @@ import {
 import type { StatoModulo, StatoProgetto } from '../domain/types.js';
 import { prisma } from '../util/prismaClient.js';
 import { ProgettoNonTrovatoError } from '../adapters/appErrors.js';
+import { notificaStudio } from './notificheService.js';
 
 /** Proiezione minima che serve al calcolo: è quanto `GET /progetti` già carica. */
 export interface MicrovoceCalcolo {
@@ -205,6 +206,16 @@ export async function ricalcolaProgetto(progettoId: string): Promise<Avanzamento
     const statoModulo = calcolaStatoModulo(modulo.microvoci as any);
     if (modulo.stato !== statoModulo) {
       await prisma.moduloProgetto.update({ where: { id: modulo.id }, data: { stato: statoModulo } });
+      // Blocco 3 — il ricalcolo (pulsante «Ricalcola») può chiudere un modulo tanto
+      // quanto la consuntivazione: stesso evento, stesso destinatario.
+      if (statoModulo === 'done' && modulo.stato !== 'done') {
+        await notificaStudio(progetto.tenantId, {
+          tipoEvento: 'modulo_completato',
+          oggetto: 'Modulo completato',
+          corpo: `Il modulo «${modulo.nome}» del progetto «${progetto.nome}» è stato completato.`,
+          link: `/projects/${progettoId}`,
+        }).catch(() => {});
+      }
       (modulo as any).stato = statoModulo;
     }
   }

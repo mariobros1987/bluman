@@ -35,6 +35,7 @@ import {
 } from './services/otpService.js';
 import { credenzialiCanali, canaliDisponibili, inviaCodiceOtp, recapitiCliente } from './services/otpDispatch.js';
 import { runDailyNotificationCron } from './services/cronService.js';
+import { apriStreamSse, notificaStudio, notificaCliente } from './services/notificheService.js';
 import { trasmettiFatturaSdi } from './services/sdiService.js';
 import { scanFileBuffer } from './services/securityScanner.js';
 // §16 — le percentuali e gli stati aggregati arrivano da qui, non dal frontend.
@@ -1867,53 +1868,115 @@ export function buildServer(app: AppPort): FastifyInstance {
     }
   });
 
-  // Notifiche API (Collegate al DB Supabase ed al tenant/utente)
+  // ─── NOTIFICHE (Blocco 3) ─────────────────────────────────────────
+  // Le notifiche sono per destinatario, non per tenant: la campanella dello
+  // studio mostra le righe dell'utente loggato, quella del portale quelle del
+  // cliente. L'identità cliente arriva dal JWT come `client-<clienteId>`.
+  const destinatarioCorrente = (req: any): { tenantId: string; where: Record<string, any> } | null => {
+    const tenantId = req.tenantId as string;
+    const userId = req.userId as string | undefined;
+    if (!userId) return null;
+    if (req.ruolo === 'cliente' || userId.startsWith('client-')) {
+      return { tenantId, where: { tenantId, destinatarioClienteId: userId.replace(/^client-/, '') } };
+    }
+    return { tenantId, where: { tenantId, destinatarioId: userId } };
+  };
+
   server.get('/notifiche', async (req) => {
-    const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
+    const dest = destinatarioCorrente(req);
+    if (!dest) return [];
     try {
-      const items = await prisma.notifica.findMany({
-        where: { tenantId },
-        orderBy: { inviataAt: 'desc' },
+      return await prisma.notifica.findMany({
+        where: dest.where,
+        orderBy: { createdAt: 'desc' },
+        take: 100,
       });
-      return items;
     } catch {
       return [];
     }
   });
 
   server.post<{ Body: Record<string, any> }>('/notifiche', async (req, reply) => {
-    const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
+    const tenantId = (req as any).tenantId as string;
     const body = (req.body || {}) as Record<string, any>;
-    try {
-      const notif = await prisma.notifica.create({
-        data: {
-          tenantId,
-          destinatarioId: body.destinatarioId || 'usr-01',
-          destinatarioTipo: body.destinatarioTipo || 'user',
-          canale: body.canale || 'email',
-          oggetto: body.oggetto || body.title || 'Notifica Studio',
-          corpo: body.corpo || body.body || '',
-          statoLettura: 'non_letta',
-          inviataAt: new Date(),
-        },
-      });
-      return reply.code(201).send(notif);
-    } catch {
-      return reply.code(201).send({ ok: true, ...body });
+    // Nessuna scorciatoia tipo `destinatarioId || 'usr-01'`: una notifica senza
+    // destinatario reale è solo rumore che nessuno leggerà mai.
+    const destinatarioId = body.destinatarioId as string | undefined;
+    const destinatarioClienteId = body.destinatarioClienteId as string | undefined;
+    if (!destinatarioId && !destinatarioClienteId) {
+      return reply.code(400).send({ errore: 'destinatarioId o destinatarioClienteId è obbligatorio' });
     }
+    const notif = await prisma.notifica.create({
+      data: {
+        tenantId,
+        destinatarioId: destinatarioId ?? null,
+        destinatarioClienteId: destinatarioClienteId ?? null,
+        destinatarioTipo: destinatarioClienteId ? 'cliente' : 'user',
+        tipoEvento: body.tipoEvento ?? null,
+        link: body.link ?? null,
+        canale: body.canale || 'in_app',
+        oggetto: body.oggetto || body.title || 'Notifica Studio',
+        corpo: body.corpo || body.body || '',
+        statoLettura: 'non_letta',
+        inviataAt: new Date(),
+      },
+    });
+    return reply.code(201).send(notif);
   });
 
   server.patch('/notifiche/read-all', async (req) => {
-    const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
+    const dest = destinatarioCorrente(req);
+    if (!dest) return { ok: true };
     try {
       await prisma.notifica.updateMany({
-        where: { tenantId, statoLettura: 'non_letta' },
+        where: { ...dest.where, statoLettura: 'non_letta' },
         data: { statoLettura: 'letta' },
       });
       return { ok: true };
     } catch {
       return { ok: true };
     }
+  });
+
+  // ─── STREAM SSE (Blocco 3) ────────────────────────────────────────
+  // Server-Sent Events: il client apre lo stream con il proprio JWT (header
+  // Authorization, per questo non usiamo EventSource lato browser ma fetch +
+  // ReadableStream) e riceve un frame `event: notifica` per ogni evento del
+  // suo tenant/identità. Ping ogni 25 s per tenere vivo il collegamento
+  // attraverso i proxy (Railway in testa).
+  server.get('/stream', async (req, reply) => {
+    const auth = req as any;
+    const tenantId = auth.tenantId as string;
+    const userId = auth.userId as string | undefined;
+    const isCliente = auth.ruolo === 'cliente' || (userId || '').startsWith('client-');
+
+    reply.hijack();
+    reply.raw.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache, no-transform',
+      Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no', // i proxy non devono bufferizzare lo stream
+    });
+    reply.raw.write(': connesso\n\n');
+
+    const chiudi = apriStreamSse(reply, {
+      tenantId,
+      destinatarioId: isCliente ? null : userId ?? null,
+      destinatarioClienteId: isCliente && userId ? userId.replace(/^client-/, '') : null,
+    });
+
+    const ping = setInterval(() => {
+      try {
+        reply.raw.write(': ping\n\n');
+      } catch {
+        // socket già chiuso: la pulizia avviene sul listener 'close'
+      }
+    }, 25_000);
+
+    req.raw.on('close', () => {
+      clearInterval(ping);
+      chiudi();
+    });
   });
 
   // Comunicazioni Progetto API (Multicanale Ingestion)
@@ -1944,6 +2007,21 @@ export function buildServer(app: AppPort): FastifyInstance {
           allegatiJson: body.allegatiJson ? JSON.stringify(body.allegatiJson) : null,
         },
       });
+      // Blocco 3 — messaggio in arrivo dal cliente: lo studio viene avvisato subito.
+      if (body.direzione === 'entrata' || body.direzione === 'ingresso') {
+        const progetto = await prisma.progetto.findUnique({
+          where: { id: req.params.id },
+          include: { cliente: { select: { nome: true } } },
+        });
+        if (progetto) {
+          await notificaStudio(tenantId, {
+            tipoEvento: 'messaggio_cliente',
+            oggetto: 'Nuovo messaggio dal cliente',
+            corpo: `${progetto.cliente.nome} ha scritto su «${progetto.nome}»: ${(body.testo || '').slice(0, 120)}`,
+            link: `/projects/${progetto.id}`,
+          }).catch(() => {});
+        }
+      }
       // Se il canale è whatsapp e sono configurati token e phoneId, tenta invio reale Meta Graph API
       if (body.canale === 'whatsapp' && process.env.WHATSAPP_ACCESS_TOKEN && process.env.WA_PHONE_ID) {
         const toNum = (body.destinatario || '').replace(/\D/g, '');
@@ -2053,6 +2131,13 @@ export function buildServer(app: AppPort): FastifyInstance {
                 testo: textBody,
               },
             });
+            // Blocco 3 — il messaggio WhatsApp del cliente arriva allo studio in tempo reale.
+            await notificaStudio(tenantId, {
+              tipoEvento: 'messaggio_cliente',
+              oggetto: 'Nuovo messaggio WhatsApp',
+              corpo: `${matchingClient ? matchingClient.nome : `+${fromNumber}`} ha scritto su WhatsApp: ${(textBody || '').slice(0, 120)}`,
+              link: `/projects/${activeProj.id}`,
+            }).catch(() => {});
           }
         }
       } catch (err) {
@@ -2773,6 +2858,30 @@ export function buildServer(app: AppPort): FastifyInstance {
         where: { id: scadenza.fatturaId },
         data: { stato: tutteSaldate ? 'incassata' : 'emessa' },
       });
+
+      // Blocco 3 — partita saldata: evento "fattura incassata" a studio e cliente.
+      if (tutteSaldate) {
+        const fattura = await prisma.fattura.findUnique({
+          where: { id: scadenza.fatturaId },
+          include: { progetto: { select: { id: true, nome: true, clienteId: true, cliente: { select: { nome: true } } } } },
+        });
+        if (fattura) {
+          const etichetta = fattura.numero || `${fattura.serie}-${fattura.numeroProgressivoSerie}`;
+          const importo = `€ ${(scadenza.importoCentesimi / 100).toLocaleString('it-IT')}`;
+          await notificaStudio(tenantId, {
+            tipoEvento: 'fattura_incassata',
+            oggetto: 'Fattura incassata',
+            corpo: `La fattura ${etichetta} di ${fattura.progetto.cliente.nome} è stata saldata (${importo}).`,
+            link: '/invoices',
+          }).catch(() => {});
+          await notificaCliente(tenantId, fattura.progetto.clienteId, {
+            tipoEvento: 'fattura_incassata',
+            oggetto: 'Pagamento registrato',
+            corpo: `Abbiamo registrato il pagamento della fattura ${etichetta} (${importo}). Grazie!`,
+            link: '/portal/invoices',
+          }).catch(() => {});
+        }
+      }
 
       // ── LOGICA OPENSTAMANAGER: Accredito su Conto Bancario ────────
       const contoPredefinito = await (prisma as any).contoBancario.findFirst({
@@ -3620,7 +3729,7 @@ export function buildServer(app: AppPort): FastifyInstance {
     }
 
     try {
-      const progetto = await prisma.progetto.findFirst({ where: { id: progettoId, tenantId }, select: { id: true, clienteId: true } });
+      const progetto = await prisma.progetto.findFirst({ where: { id: progettoId, tenantId }, select: { id: true, clienteId: true, nome: true } });
       if (!progetto) return reply.code(404).send({ errore: 'Progetto non trovato.' });
 
       // §28 — la scansione avviene PRIMA di scrivere qualunque cosa: un file bocciato non
@@ -3657,6 +3766,17 @@ export function buildServer(app: AppPort): FastifyInstance {
         dettagli: `Archiviato «${filename}» (${archiviato.size}) nel fascicolo del progetto ${progettoId}`,
         ipAddress: req.ip,
       });
+
+      // Blocco 3 — un documento nuovo (non ancora firmato) finisce nel fascicolo:
+      // il cliente viene avvisato che c'è un documento da visionare/firmare.
+      if (tipo !== 'firmato' && progetto.clienteId) {
+        await notificaCliente(tenantId, progetto.clienteId, {
+          tipoEvento: 'documento_da_firmare',
+          oggetto: 'Documento da firmare',
+          corpo: `Lo studio ha caricato «${filename}» sul progetto «${progetto.nome}»: accedi al portale per visionarlo e firmarlo.`,
+          link: `/portal/documents`,
+        }).catch(() => {});
+      }
 
       return reply.send({ ok: true, documento: { ...documento, firmato: false, firma: null } });
     } catch (err) {
@@ -4704,6 +4824,20 @@ export function buildServer(app: AppPort): FastifyInstance {
         ipAddress: sigillo.ipAddress,
       });
 
+      // Blocco 3 — firma apposta: lo studio lo vede subito, il cliente ne ha conferma.
+      await notificaStudio(tenantId, {
+        tipoEvento: 'firma_apposta',
+        oggetto: 'Firma apposta',
+        corpo: `${firmatarioNome} (${cliente.nome}) ha firmato «${documentoTitolo}» con firma elettronica avanzata.`,
+        link: null,
+      }).catch(() => {});
+      await notificaCliente(tenantId, clienteId, {
+        tipoEvento: 'firma_apposta',
+        oggetto: 'Firma registrata',
+        corpo: `La tua firma su «${documentoTitolo}» è stata registrata correttamente.`,
+        link: '/portal/documents',
+      }).catch(() => {});
+
       // L'attivazione del progetto riguarda solo la lettera d'incarico: prima avveniva a
       // ogni firma, quindi anche prendere visione di un documento faceva scattare un
       // progetto in lavorazione.
@@ -4891,6 +5025,20 @@ export function buildServer(app: AppPort): FastifyInstance {
         ipAddress: sigillo.ipAddress,
       });
 
+      // Blocco 3 — come per la firma OTP: evento "firma apposta" a studio e cliente.
+      await notificaStudio(tenantId, {
+        tipoEvento: 'firma_apposta',
+        oggetto: 'Firma apposta',
+        corpo: `${firmatarioNome} (${cliente.nome}) ha caricato il documento firmato «${documentoTitolo}».`,
+        link: null,
+      }).catch(() => {});
+      await notificaCliente(tenantId, clienteId, {
+        tipoEvento: 'firma_apposta',
+        oggetto: 'Firma registrata',
+        corpo: `Il documento firmato «${documentoTitolo}» è stato registrato correttamente.`,
+        link: '/portal/documents',
+      }).catch(() => {});
+
       return reply.send({ ok: true, seal: { ...sigillo, id: firma.id, tipoFirma, fileFirmatoUrl: caricato.url } });
     } catch (err) {
       return reply.code(500).send({ errore: err instanceof Error ? err.message : 'Errore firma con file' });
@@ -5036,6 +5184,13 @@ export function buildServer(app: AppPort): FastifyInstance {
               stato: 'ricevuto',
             },
           });
+          // Blocco 3 — stesso evento degli altri canali: messaggio cliente → studio.
+          await notificaStudio(tenantId, {
+            tipoEvento: 'messaggio_cliente',
+            oggetto: 'Nuovo messaggio Telegram',
+            corpo: `${fromName} ha scritto al bot Telegram: ${(text || '').slice(0, 120)}`,
+            link: matchedProgettoId ? `/projects/${matchedProgettoId}` : null,
+          }).catch(() => {});
         }
       } catch (dbErr) {
         console.warn('[Telegram Webhook DB Save Fallback]', dbErr);
