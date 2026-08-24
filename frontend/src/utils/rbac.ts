@@ -35,7 +35,7 @@ export function getUserPermission(user: any, moduleKey: string): PermissionLevel
   // 2. Permessi di Default per Ruolo (quando non è stata ancora salvata una Matrice personalizzata)
   if (user.ruolo === 'advisor') {
     // Advisor/Partner hanno accesso a tutti i moduli operativi e impostazioni di studio
-    if (['projects', 'clients', 'documents', 'calendar', 'retainers', 'invoices', 'settings', 'library', 'banks', 'primanota', 'scadenzario'].includes(moduleKey)) {
+    if (['projects', 'clients', 'documents', 'calendar', 'retainers', 'invoices', 'settings', 'library', 'banks', 'primanota', 'scadenzario', 'reports'].includes(moduleKey)) {
       return 'write';
     }
     if (['audit', 'admin'].includes(moduleKey)) return 'denied';

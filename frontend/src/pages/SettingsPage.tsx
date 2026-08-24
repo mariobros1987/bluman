@@ -1575,6 +1575,7 @@ function OperatorDetailModal({
     primanota: 'write',
     banks: 'read',
     retainers: 'write',
+    reports: 'write',
     audit: 'denied',
   });
   const [savingPermessi, setSavingPermessi] = useState(false);
@@ -1657,6 +1658,7 @@ function OperatorDetailModal({
     { key: 'banks', label: '🏦 Banche & Liquidità Studio', desc: 'Conti correnti studio, IBAN e saldi di cassa' },
     { key: 'retainers', label: '🔄 Contratti Ricorrenti & Retainer', desc: 'Pianificazione canoni continui e contratti' },
     { key: 'documents', label: '📝 Document Studio & Contratti Word', desc: 'Editor contratti WYSIWYG ed export PDF' },
+    { key: 'reports', label: '📈 Report & Analytics Direzionali', desc: 'Ore, margini, ricavi, scadenzario e redditività con export PDF/Excel' },
     { key: 'library', label: '📚 Libreria Moduli & Distinta Base', desc: 'Catalogo articoli, template e moduli studio' },
     { key: 'calendar', label: '🗓 Calendario Studio & Scadenziario', desc: 'Calendario condiviso e gestione scadenze' },
     { key: 'audit', label: '🔍 Log Audit & Attività Operatori', desc: 'Tracciamento completo azioni operatori' },

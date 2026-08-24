@@ -19,6 +19,7 @@ import { PrimaNotaPage } from './pages/PrimaNotaPage';
 import { BanksPage } from './pages/BanksPage';
 import { RetainersPage } from './pages/RetainersPage';
 import { DocumentEditorPage } from './pages/DocumentEditorPage';
+import { ReportsPage } from './pages/ReportsPage';
 import { getUserPermission } from './utils/rbac';
 import { fetchMeApi } from './api/client';
 import './styles/tokens.css';
@@ -154,6 +155,7 @@ function AppContent() {
           <Route path="/retainers"     element={<ProtectedModule user={currentUser} moduleKey="retainers" element={<RetainersPage />} />} />
           <Route path="/documents"     element={<ProtectedModule user={currentUser} moduleKey="documents" element={<DocumentEditorPage />} />} />
           <Route path="/audit"         element={<ProtectedModule user={currentUser} moduleKey="audit" element={<AuditLogPage />} />} />
+          <Route path="/reports"       element={<ProtectedModule user={currentUser} moduleKey="reports" element={<ReportsPage />} />} />
           <Route path="/admin/tenants" element={<SuperAdminPage />} />
           <Route path="/library"       element={<ProtectedModule user={currentUser} moduleKey="library" element={<Library />} />} />
           <Route path="/settings"      element={<ProtectedModule user={currentUser} moduleKey="settings" element={<SettingsPage />} />} />

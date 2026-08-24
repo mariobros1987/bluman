@@ -40,6 +40,8 @@ import { trasmettiFatturaSdi } from './services/sdiService.js';
 import { scanFileBuffer } from './services/securityScanner.js';
 // §16 — le percentuali e gli stati aggregati arrivano da qui, non dal frontend.
 import { arricchisciProgetti, calcolaAvanzamento, ricalcolaProgetto } from './services/calcoloService.js';
+import { costruisciReport, REPORT_DISPONIBILI, type ChiaveReport } from './services/reportsService.js';
+import { generaPdfReport, generaExcelReport } from './services/reportExport.js';
 // §14 — non `new PrismaClient()`: questo client impone il tenant corrente a ogni query,
 // altrimenti le policy RLS non vedono nessun contesto e non restituiscono nulla.
 import { prisma, prismaAmministrativo, attivaContestoTenant } from './util/prismaClient.js';
@@ -3046,6 +3048,62 @@ export function buildServer(app: AppPort): FastifyInstance {
       }
     },
   );
+
+  // ── REPORTISTICA DIREZIONALE (BLOCCO 5) ─────────────────────────────
+  // Cinque report aggregati su dati reali + export PDF/Excel server-side.
+  // `GET /reports/:tipo` → JSON (struttura tabellare per il frontend).
+  // `GET /reports/:tipo/export?formato=pdf|xlsx&anno=NNNN` → file allegato.
+  server.get<{ Params: { tipo: string }; Querystring: { anno?: string } }>('/reports/:tipo', async (req, reply) => {
+    const tenantId = (req as any).tenantId;
+    const { tipo } = req.params;
+    if (!REPORT_DISPONIBILI.includes(tipo as ChiaveReport)) {
+      return reply.code(404).send({ errore: `Report "${tipo}" non disponibile. Disponibili: ${REPORT_DISPONIBILI.join(', ')}` });
+    }
+    const anno = req.query.anno ? Number(req.query.anno) : undefined;
+    if (req.query.anno !== undefined && (!Number.isFinite(anno) || (anno as number) < 2000 || (anno as number) > 2100)) {
+      return reply.code(400).send({ errore: 'Parametro anno non valido' });
+    }
+    try {
+      const report = await costruisciReport(tenantId, tipo as ChiaveReport, anno);
+      return reply.send(report);
+    } catch (err: any) {
+      console.error(`Errore report ${tipo}:`, err);
+      return reply.code(500).send({ errore: err?.message || 'Errore nella generazione del report' });
+    }
+  });
+
+  server.get<{ Params: { tipo: string }; Querystring: { formato?: string; anno?: string } }>('/reports/:tipo/export', async (req, reply) => {
+    const tenantId = (req as any).tenantId;
+    const { tipo } = req.params;
+    if (!REPORT_DISPONIBILI.includes(tipo as ChiaveReport)) {
+      return reply.code(404).send({ errore: `Report "${tipo}" non disponibile` });
+    }
+    const formato = (req.query.formato || 'pdf').toLowerCase();
+    if (formato !== 'pdf' && formato !== 'xlsx') {
+      return reply.code(400).send({ errore: 'Formato non valido: usare pdf o xlsx' });
+    }
+    const anno = req.query.anno ? Number(req.query.anno) : undefined;
+    if (req.query.anno !== undefined && (!Number.isFinite(anno) || (anno as number) < 2000 || (anno as number) > 2100)) {
+      return reply.code(400).send({ errore: 'Parametro anno non valido' });
+    }
+    try {
+      const report = await costruisciReport(tenantId, tipo as ChiaveReport, anno);
+      const suffissoAnno = anno ? `_${anno}` : '';
+      if (formato === 'pdf') {
+        const buffer = await generaPdfReport(report);
+        reply.header('Content-Type', 'application/pdf');
+        reply.header('Content-Disposition', `attachment; filename="${report.chiave}${suffissoAnno}.pdf"`);
+        return reply.send(buffer);
+      }
+      const buffer = await generaExcelReport(report);
+      reply.header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      reply.header('Content-Disposition', `attachment; filename="${report.chiave}${suffissoAnno}.xlsx"`);
+      return reply.send(buffer);
+    } catch (err: any) {
+      console.error(`Errore export report ${tipo} (${formato}):`, err);
+      return reply.code(500).send({ errore: err?.message || 'Errore nella generazione del file' });
+    }
+  });
 
   // ── GENERATORE PDF SERVER-SIDE & EMAIL NODEMAILER ──────────────────
   server.get<{ Params: { id: string } }>('/invoices/:id/pdf', async (req, reply) => {
