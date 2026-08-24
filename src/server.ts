@@ -3558,7 +3558,8 @@ export function buildServer(app: AppPort): FastifyInstance {
           ok: true,
           documenti: documenti.map((d) => {
             const firma = firmaPerDocumento.get(d.id);
-            return { ...d, firmato: Boolean(firma) || d.tipo === 'firmato', firma };
+            // Come /portal/documenti: la firma HMAC degli URL /uploads/ va rinnovata alla lettura.
+            return { ...d, fileUrl: rifirmaUrlUpload(d.fileUrl) as string, firmato: Boolean(firma) || d.tipo === 'firmato', firma };
           }),
         });
       } catch (err) {
@@ -3809,7 +3810,9 @@ export function buildServer(app: AppPort): FastifyInstance {
           modulo: d.microvoceProgetto?.moduloProgetto.nome ?? null,
           progetto: nomeProgetto,
           progettoId,
-          fileUrl: d.fileUrl,
+          // La firma HMAC degli URL /uploads/ scade dopo qualche giorno: si rinnova alla
+          // lettura, altrimenti un documento in fascicolo da mesi non si aprirebbe più.
+          fileUrl: rifirmaUrlUpload(d.fileUrl) as string,
           tipo: d.tipo,
           versione: d.versione,
           caricatoIl: d.createdAt,
