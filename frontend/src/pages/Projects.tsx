@@ -45,52 +45,83 @@ export function Projects() {
     }
 
     // 2. Carica progetti remoti dal backend Fastify/DB se presenti (filtrati per tenantId)
+    //
+    // L'avanzamento arriva già calcolato dal server (§16, `arricchisciProgetti`): percentuale e
+    // stato di ogni modulo e del progetto nascono dalle ore consuntivate sulle micro-voci. Qui
+    // prima venivano ignorati e sostituiti da costanti — 45% per ogni progetto, 50% per ogni
+    // modulo, 20 ore preventivate, 3.500 € di prezzo, due persone in squadra. Le barre di
+    // avanzamento erano quindi immobili per costruzione: consuntivare ore o chiudere una
+    // micro-voce non poteva cambiare un numero scritto a mano nel frontend. È il «i grafici non
+    // si aggiornano» segnalato. Dove il dato non c'è si mostra zero: un preventivo mai fatto
+    // vale zero, non 15.000 €.
     try {
       const remote = await fetchProgetti();
       if (remote && Array.isArray(remote)) {
         const dbProjs: Progetto[] = remote
           .filter((rp: any) => rp.tenantId === currentTenantId)
           .map((rp: any) => {
-            let rpMods = (rp.moduli || []).map((m: any, mIdx: number) => ({
-              id: mIdx + 100,
-              n: m.nome,
-              cat: m.categoria || 'Societario',
-              st: m.stato || 'in_progress',
-              pct: m.stato === 'done' ? 100 : 50,
-              h: m.orePreventivate || 20,
-              a: m.oreConsuntivate || 0,
-              p: m.prezzo ? m.prezzo / 100 : 3500,
-              team: [1, 2],
-              delay: false,
-              v: (m.microvoci || []).map((v: any) => ({
-                n: v.titolo || v.nome,
-                hE: v.orePreventivate || 2,
-                hA: v.oreConsuntivate || 0,
-                s: v.completato ? 'done' : 'pending',
-                as: 1,
-                d: 1,
-              })),
-            }));
+            const avanzamento = rp.avanzamento;
+            // L'avanzamento dei moduli è indicizzato per id di database, non per posizione.
+            const avModuli = new Map<string, any>(
+              (avanzamento?.moduli || []).map((am: any) => [String(am.id), am]),
+            );
+
+            let rpMods = (rp.moduli || []).map((m: any, mIdx: number) => {
+              const av = avModuli.get(String(m.id));
+              return {
+                id: mIdx + 100,
+                dbId: m.id,
+                n: m.nome,
+                cat: m.categoria || 'Societario',
+                st: av?.stato || m.stato || 'pending',
+                pct: av?.percentuale ?? 0,
+                h: m.orePreventivate ?? 0,
+                a: m.oreConsuntivate ?? 0,
+                p: m.prezzo ? m.prezzo / 100 : 0,
+                // La squadra vera sono le risorse assegnate alle micro-voci: finché non
+                // arrivano da qui, meglio nessun volto che due volti inventati.
+                team: [],
+                segnaleRischio: av?.segnaleRischio ?? m.segnaleRischio ?? false,
+                oreExtra: av?.oreExtra ?? 0,
+                delay: (av?.stato || m.stato) === 'delayed',
+                v: (m.microvoci || []).map((v: any) => ({
+                  dbId: v.id,
+                  n: v.nome || v.titolo,
+                  hE: v.orePreventivate ?? 0,
+                  hA: v.oreConsuntivate ?? 0,
+                  s: v.stato || 'pending',
+                  as: v.risorsaId ?? null,
+                  d: v.ordine ?? 1,
+                })),
+              };
+            });
             return {
               id: rp.id,
               n: rp.nome,
               cl: rp.cliente?.nome || 'Cliente',
               ct: (rp.cliente?.tipo as any) || 'individual',
-              st: rp.stato || 'in_progress',
-              pct: rp.stato === 'completed' ? 100 : rp.stato === 'done' ? 100 : 45,
-              start: rp.createdAt ? new Date(rp.createdAt).toLocaleDateString('it-IT') : 'Oggi',
-              due: rp.scadenza ? new Date(rp.scadenza).toLocaleDateString('it-IT') : '31/12/2026',
-              val: rp.valoreTotale ? rp.valoreTotale / 100 : 15000,
-              delay: rp.inRitardo || false,
+              st: avanzamento?.stato || rp.stato || 'pre_project',
+              pct: avanzamento?.percentuale ?? 0,
+              start: rp.createdAt ? new Date(rp.createdAt).toLocaleDateString('it-IT') : '—',
+              due: rp.dataScadenza || rp.scadenza
+                ? new Date(rp.dataScadenza || rp.scadenza).toLocaleDateString('it-IT')
+                : '—',
+              val: rp.valoreTotale ? rp.valoreTotale / 100 : 0,
+              delay: (avanzamento?.stato || rp.stato) === 'delayed' || rp.inRitardo || false,
               fisc: rp.regimeFiscale || 'privato_italia',
               fatture: rp.fatture || [],
               mods: rpMods,
             };
           });
-        const existingIds = new Set(combined.map(p => String(p.id)));
-        for (const dp of dbProjs) {
-          if (!existingIds.has(String(dp.id))) combined.push(dp);
-        }
+        // Quando lo stesso progetto esiste sia a database sia nella copia locale, vince il
+        // database. Prima vinceva `localStorage`: la copia locale veniva inserita per prima e il
+        // progetto vero dal DB scartato come duplicato, quindi l'elenco mostrava una fotografia
+        // vecchia — moduli, ore e avanzamento congelati al momento in cui quel browser li aveva
+        // scritti — e nessun ricalcolo del server riusciva più a farsi vedere. La copia locale
+        // resta solo per i progetti che a database non esistono (quelli creati prima che la
+        // creazione passasse dal server).
+        const idsDb = new Set(dbProjs.map(p => String(p.id)));
+        combined = [...dbProjs, ...combined.filter(p => !idsDb.has(String(p.id)))];
       }
     } catch (err) {
       console.warn('Fetch DB fallback:', err);

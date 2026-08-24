@@ -56,7 +56,35 @@ async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutM
  * non un timeout del browser che nasconde la risposta in arrivo.
  */
 async function apiFetch(url: string, options: RequestInit = {}, timeoutMs: number = 60000) {
-  return fetchWithTimeout(url, options, timeoutMs);
+  return fetchWithTimeout(url, conCorpoCoerente(options), timeoutMs);
+}
+
+/**
+ * Rende coerente la coppia intestazione/corpo prima di partire.
+ *
+ * `getAuthHeaders()` dichiara sempre `Content-Type: application/json`, perché quasi tutte le
+ * chiamate mandano un oggetto. Le poche che non hanno niente da mandare — accettare un
+ * preventivo, ricalcolare un progetto, azzerare una password — partivano quindi annunciando un
+ * JSON che non c'era, e Fastify le rifiutava in blocco con «Body cannot be empty when
+ * content-type is set to 'application/json'»: nessuna arrivava al gestore della rotta. Era il
+ * guasto per cui la creazione di un progetto si fermava a metà, con il preventivo scritto a
+ * database e i moduli mai istanziati.
+ *
+ * Si manda `{}`: un oggetto vuoto è quello che quelle rotte si aspettano di leggere, e non
+ * cambia niente per chi un corpo lo passa davvero.
+ */
+function conCorpoCoerente(options: RequestInit): RequestInit {
+  const metodo = (options.method || 'GET').toUpperCase();
+  if (metodo === 'GET' || metodo === 'HEAD' || metodo === 'DELETE') return options;
+  if (options.body !== undefined && options.body !== null) return options;
+
+  const intestazioni = options.headers as Record<string, string> | undefined;
+  const dichiaraJson = Object.entries(intestazioni ?? {}).some(
+    ([nome, valore]) => nome.toLowerCase() === 'content-type' && String(valore).includes('application/json'),
+  );
+  if (!dichiaraJson) return options;
+
+  return { ...options, body: '{}' };
 }
 
 export function getAuthHeaders() {
