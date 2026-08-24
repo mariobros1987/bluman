@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { fetchClienti, fetchProgetti, creaClienteApi, aggiornaClienteApi, generaMagicLinkApi, resetPasswordClienteApi, sendEmailDirectApi, sendWhatsAppDirectApi } from '../api/client';
+import { fetchClienti, fetchProgetti, creaClienteApi, aggiornaClienteApi, generaMagicLinkApi, resetPasswordClienteApi, sendEmailDirectApi, sendWhatsAppDirectApi, proposteDatiStudioApi, confermaPropostaDatiApi, rifiutaPropostaDatiApi } from '../api/client';
+import type { PropostaDatiFiscale } from '../api/client';
 import { getCurrentTenantId, getTenantStorageKey, getTenantSeedData, BLUECODE_TENANT_ID } from '../utils/tenant';
 import { fmt } from '../utils';
 import type { Cliente } from '../types';
@@ -393,7 +394,70 @@ function AnagraficaErpModal({ client, onClose, onSaved }: { client: Cliente; onC
       }
     }).catch(err => console.warn('Errore recupero progetti cliente:', err));
   }, [client.id, client.nome, client.email]);
-  
+
+  // §2.3 — proposte di modifica inviate dal cliente dal portale: lo studio le conferma o le rifiuta.
+  const [proposteInAttesa, setProposteInAttesa] = useState<PropostaDatiFiscale[]>([]);
+  const [propostaInAzione, setPropostaInAzione] = useState<string | null>(null);
+  const [rifiutoId, setRifiutoId] = useState<string | null>(null);
+  const [notaRifiuto, setNotaRifiuto] = useState('');
+  const [proposteMsg, setProposteMsg] = useState<string | null>(null);
+
+  const ETICHETTE_CAMPI: Record<string, string> = {
+    ragioneSociale: 'Ragione Sociale',
+    piva: 'Partita IVA',
+    codiceFiscale: 'Codice Fiscale',
+    iban: 'IBAN',
+    titolareEffettivo: 'Titolare Effettivo (UBO)',
+    sedeLegale: 'Sede Legale',
+    legaleRappresentante: 'Legale Rappresentante',
+  };
+
+  const caricaProposteInAttesa = async () => {
+    try {
+      const lista = await proposteDatiStudioApi({ clienteId: client.id, stato: 'in_attesa' });
+      setProposteInAttesa(lista);
+    } catch (err) {
+      console.warn('Errore recupero proposte dati del cliente:', err);
+    }
+  };
+
+  useEffect(() => { void caricaProposteInAttesa(); }, [client.id]);
+
+  const confermaProposta = async (p: PropostaDatiFiscale) => {
+    setPropostaInAzione(p.id);
+    try {
+      await confermaPropostaDatiApi(p.id);
+      // Allinea gli input locali del modal al valore appena confermato in anagrafica.
+      if (p.campo === 'ragioneSociale') setNome(p.valoreProposto);
+      if (p.campo === 'piva') setPiva(p.valoreProposto);
+      if (p.campo === 'codiceFiscale') setCodFisc(p.valoreProposto);
+      if (p.campo === 'iban') setIban(p.valoreProposto);
+      if (p.campo === 'titolareEffettivo') setUbo(p.valoreProposto);
+      setProposteMsg(`✓ «${ETICHETTE_CAMPI[p.campo] ?? p.campo}» confermata: l'anagrafica è stata aggiornata.`);
+      await caricaProposteInAttesa();
+      onSaved();
+    } catch (err: any) {
+      setProposteMsg(err?.message || 'Errore durante la conferma della proposta.');
+    } finally {
+      setPropostaInAzione(null);
+    }
+  };
+
+  const rifiutaProposta = async (p: PropostaDatiFiscale) => {
+    setPropostaInAzione(p.id);
+    try {
+      await rifiutaPropostaDatiApi(p.id, notaRifiuto.trim() || undefined);
+      setProposteMsg(`⛔ Proposta «${ETICHETTE_CAMPI[p.campo] ?? p.campo}» rifiutata.`);
+      setRifiutoId(null);
+      setNotaRifiuto('');
+      await caricaProposteInAttesa();
+    } catch (err: any) {
+      setProposteMsg(err?.message || 'Errore durante il rifiuto della proposta.');
+    } finally {
+      setPropostaInAzione(null);
+    }
+  };
+
   const refJson: any = client.referentiJson && typeof client.referentiJson === 'object' ? client.referentiJson : {};
 
   const [nome, setNome] = useState(client.nome || '');
@@ -548,7 +612,9 @@ function AnagraficaErpModal({ client, onClose, onSaved }: { client: Cliente; onC
 
         {/* Sub Navigation Tabs */}
         <div style={{ display: 'flex', gap: 6, borderBottom: '1px solid var(--border)', paddingBottom: 8, flexWrap: 'wrap' }}>
-          <button type="button" onClick={() => setTab('generale')} style={tabBtn(tab === 'generale')}>📋 1. Dati Legali</button>
+          <button type="button" onClick={() => setTab('generale')} style={tabBtn(tab === 'generale')}>
+            📋 1. Dati Legali{proposteInAttesa.length > 0 ? ` (${proposteInAttesa.length} proposte)` : ''}
+          </button>
           <button type="button" onClick={() => setTab('progetti')} style={tabBtn(tab === 'progetti')}>
             📁 2. Progetti & Commesse ({clientProjects.length})
           </button>
@@ -560,6 +626,74 @@ function AnagraficaErpModal({ client, onClose, onSaved }: { client: Cliente; onC
         {/* TAB 1: Dati Legali */}
         {tab === 'generale' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {/* §2.3 — proposte di modifica inviate dal cliente dal portale */}
+            {proposteInAttesa.length > 0 && (
+              <div style={{ background: '#2b2410', border: '1px solid #8a6d1a', borderRadius: 10, padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#fcd34d' }}>
+                  📨 Proposte di modifica inviate dal cliente ({proposteInAttesa.length})
+                </div>
+                {proposteInAttesa.map((p) => (
+                  <div key={p.id} style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, padding: 10 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, flexWrap: 'wrap' }}>
+                      <div style={{ flex: 1, minWidth: 220 }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text)' }}>{ETICHETTE_CAMPI[p.campo] ?? p.campo}</div>
+                        <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
+                          Attuale: <b style={{ color: 'var(--text)' }}>{p.valoreAttuale || '—'}</b>
+                          {'  →  '}
+                          Proposto: <b style={{ color: '#fcd34d' }}>{p.valoreProposto}</b>
+                        </div>
+                        {p.notaCliente && (
+                          <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>Nota del cliente: {p.notaCliente}</div>
+                        )}
+                      </div>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button
+                          type="button"
+                          disabled={propostaInAzione === p.id}
+                          onClick={() => { void confermaProposta(p); }}
+                          style={{ background: '#14532d', border: '1px solid #16a34a', color: '#bbf7d0', padding: '5px 12px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: propostaInAzione === p.id ? 'default' : 'pointer' }}
+                        >
+                          ✓ Conferma
+                        </button>
+                        <button
+                          type="button"
+                          disabled={propostaInAzione === p.id}
+                          onClick={() => { setRifiutoId(rifiutoId === p.id ? null : p.id); setNotaRifiuto(''); }}
+                          style={{ background: '#450a0a', border: '1px solid #b91c1c', color: '#fecaca', padding: '5px 12px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: propostaInAzione === p.id ? 'default' : 'pointer' }}
+                        >
+                          ⛔ Rifiuta
+                        </button>
+                      </div>
+                    </div>
+                    {rifiutoId === p.id && (
+                      <div style={{ marginTop: 8, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                        <input
+                          value={notaRifiuto}
+                          onChange={(e) => setNotaRifiuto(e.target.value)}
+                          placeholder="Motivo del rifiuto (visibile al cliente)…"
+                          style={{ flex: 1, minWidth: 200 }}
+                        />
+                        <button
+                          type="button"
+                          disabled={propostaInAzione === p.id}
+                          onClick={() => { void rifiutaProposta(p); }}
+                          style={{ background: '#b91c1c', border: 'none', color: '#fff', padding: '6px 14px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: propostaInAzione === p.id ? 'default' : 'pointer' }}
+                        >
+                          {propostaInAzione === p.id ? 'Invio…' : 'Conferma rifiuto'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {proposteMsg && (
+              <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 12px', fontSize: 11, color: 'var(--text)' }}>
+                {proposteMsg}
+              </div>
+            )}
+
             <div style={{ display: 'flex', gap: 12 }}>
               <div style={{ flex: 2 }}>
                 <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Nome / Ragione Sociale *</label>

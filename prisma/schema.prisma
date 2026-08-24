@@ -98,6 +98,8 @@ model Tenant {
   magicLinks    MagicLink[]
   codiciOtp     CodiceOtp[]
   firme         FirmaElettronica[]
+  proposteDatiFiscale PropostaDatiFiscale[]
+  richiesteAddendum   RichiestaAddendum[]
 
   @@map("tenant")
 }
@@ -182,6 +184,8 @@ model Cliente {
   magicLinks MagicLink[]
   codiciOtp  CodiceOtp[]
   firme      FirmaElettronica[]
+  proposteDatiFiscale PropostaDatiFiscale[]
+  richiesteAddendum   RichiestaAddendum[]
 
   @@map("cliente")
 }
@@ -382,6 +386,10 @@ model Progetto {
   valoreTotale            Int           @map("valore_totale")
   giurisdizionePrimariaId String?       @map("giurisdizione_primaria_id")
   giurisdizionePrimaria   Giurisdizione? @relation(fields: [giurisdizionePrimariaId], references: [id])
+  // §2.8 — numero progressivo della lettera d'incarico (EL-<anno>-<seq>), assegnato dal
+  // backend alla creazione e unico nel tenant per anno. Prima il portale mostrava a tutti
+  // lo stesso numero cablato (EL-2026-089).
+  numeroContratto         String?       @map("numero_contratto")
   createdAt               DateTime      @default(now()) @map("created_at")
 
   moduli         ModuloProgetto[]
@@ -392,6 +400,7 @@ model Progetto {
   accessiRisorsa AccessoRisorsa[] @relation("AccessoProgetto")
   comunicazioni  ComunicazioneProgetto[]
   contrattiRicorrenti ContrattoRicorrente[]
+  richiesteAddendum   RichiestaAddendum[]
 
   @@map("progetto")
 }
@@ -559,6 +568,7 @@ model Documento {
 
   passaggioProgetto PassaggioProgetto?
 
+  @@index([progettoId])
   @@map("documento")
 }
 
@@ -1028,6 +1038,78 @@ model FirmaElettronica {
 
   @@index([clienteId, ambito])
   @@map("firma_elettronica")
+}
+
+// ─────────────────────────────────────────────────────────────────
+// PORTALE CLIENTE — §2.3, §2.5
+// ─────────────────────────────────────────────────────────────────
+
+// §2.3 — I dati fiscali (P.IVA, codice fiscale, IBAN, titolare effettivo…) il cliente li
+// PROPONE e lo studio li CONFERMA: la riga del cliente cambia solo quando lo studio
+// approva, così un errore di digitazione del cliente non finisce mai in anagrafica da solo.
+enum StatoPropostaDati {
+  in_attesa
+  confermata
+  rifiutata
+}
+
+model PropostaDatiFiscale {
+  id          String            @id @default(uuid())
+  tenantId    String            @map("tenant_id")
+  tenant      Tenant            @relation(fields: [tenantId], references: [id])
+  clienteId   String            @map("cliente_id")
+  cliente     Cliente           @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  // piva|codiceFiscale|iban|titolareEffettivo|legaleRappresentante|ragioneSociale|sedeLegale
+  campo       String            @map("campo")
+  valoreAttuale  String?        @map("valore_attuale")
+  valoreProposto String         @map("valore_proposto")
+  notaCliente String?           @map("nota_cliente")
+  notaStudio  String?           @map("nota_studio")
+  stato       StatoPropostaDati @default(in_attesa)
+  // Id di chi ha chiesto e di chi ha deciso: colonne semplici, non FK — l'utente può
+  // essere disattivato e la proposta deve restare leggibile come storico.
+  richiestoDaId String?         @map("richiesto_da_id")
+  gestitoDaId   String?         @map("gestito_da_id")
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
+
+  // Una sola proposta pendente per campo: il cliente che ridigita sostituisce la sua
+  // richiesta, non ne accumula.
+  @@index([clienteId, campo, stato])
+  @@map("proposta_dati_fiscale")
+}
+
+// §2.5 — L'addendum lo chiede il cliente con una richiesta libera; lo studio prepara il
+// documento e la prestazione aggiuntiva. Prima la "cronologia addendum" viveva nel
+// localStorage del browser del cliente: nessun altro la vedeva, e bastava cambiare
+// dispositivo perché sparisse.
+enum StatoRichiestaAddendum {
+  richiesta
+  in_preparazione
+  pronta
+  rifiutata
+}
+
+model RichiestaAddendum {
+  id             String                 @id @default(uuid())
+  tenantId       String                 @map("tenant_id")
+  tenant         Tenant                 @relation(fields: [tenantId], references: [id])
+  clienteId      String                 @map("cliente_id")
+  cliente        Cliente                @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  progettoId     String                 @map("progetto_id")
+  progetto       Progetto               @relation(fields: [progettoId], references: [id], onDelete: Cascade)
+  testoRichiesta String                 @map("testo_richiesta")
+  stato          StatoRichiestaAddendum @default(richiesta)
+  // Cosa risponde lo studio: motivazione del rifiuto, oppure istruzioni e riferimento al
+  // documento predisposto quando la richiesta è pronta.
+  rispostaStudio String?                @map("risposta_studio")
+  richiestoDaId  String?                @map("richiesto_da_id")
+  gestitoDaId    String?                @map("gestito_da_id")
+  createdAt      DateTime               @default(now()) @map("created_at")
+  updatedAt      DateTime               @updatedAt @map("updated_at")
+
+  @@index([progettoId, stato])
+  @@map("richiesta_addendum")
 }
 
 // ─────────────────────────────────────────────────────────────────

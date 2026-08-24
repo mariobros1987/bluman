@@ -426,6 +426,212 @@ export async function eliminaDocumentoApi(id: string) {
   return await res.json();
 }
 
+// ── Blocco 2: portale cliente su database ──────────────────────────────────────────────
+// §2.6 contatti dello studio (lead advisor reale), §2.3 proposte di modifica dei dati
+// fiscali, §2.5 richieste di addendum, §2.11 fatture e stato di pagamento.
+
+export interface ContattiStudio {
+  studio: string | null;
+  advisorNome: string | null;
+  advisorEmail: string | null;
+  telefono: string | null;
+  emailStudio: string | null;
+  sedeLegale: string | null;
+}
+
+export async function contattiPortaleApi(clienteId?: string): Promise<ContattiStudio> {
+  const query = clienteId ? `?clienteId=${encodeURIComponent(clienteId)}` : '';
+  const res = await apiFetch(`${API_BASE}/portal/contatti${query}`, { headers: getAuthHeaders() });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.errore ?? 'Errore lettura contatti dello studio');
+  }
+  const data = await res.json();
+  return data.contatti;
+}
+
+export interface PropostaDatiFiscale {
+  id: string;
+  clienteId: string;
+  campo: string;
+  valoreAttuale: string | null;
+  valoreProposto: string;
+  notaCliente: string | null;
+  notaStudio: string | null;
+  stato: 'in_attesa' | 'confermata' | 'rifiutata';
+  createdAt: string;
+  updatedAt: string;
+  cliente?: { id: string; nome: string };
+}
+
+export async function proposteDatiPortaleApi(clienteId?: string): Promise<PropostaDatiFiscale[]> {
+  const query = clienteId ? `?clienteId=${encodeURIComponent(clienteId)}` : '';
+  const res = await apiFetch(`${API_BASE}/portal/proposte-dati${query}`, { headers: getAuthHeaders() });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.errore ?? 'Errore lettura proposte dati');
+  }
+  const data = await res.json();
+  return data.proposte ?? [];
+}
+
+export async function inviaPropostaDatiApi(input: {
+  campo: string;
+  valoreProposto: string;
+  notaCliente?: string;
+  clienteId?: string;
+}): Promise<PropostaDatiFiscale> {
+  const res = await apiFetch(`${API_BASE}/portal/proposte-dati`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.errore ?? 'Errore invio proposta dati');
+  }
+  const data = await res.json();
+  return data.proposta;
+}
+
+export async function proposteDatiStudioApi(filtri?: { clienteId?: string; stato?: string }): Promise<PropostaDatiFiscale[]> {
+  const params = new URLSearchParams();
+  if (filtri?.clienteId) params.set('clienteId', filtri.clienteId);
+  if (filtri?.stato) params.set('stato', filtri.stato);
+  const query = params.toString() ? `?${params.toString()}` : '';
+  const res = await apiFetch(`${API_BASE}/proposte-dati${query}`, { headers: getAuthHeaders() });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.errore ?? 'Errore lettura proposte dati');
+  }
+  const data = await res.json();
+  return data.proposte ?? [];
+}
+
+export async function confermaPropostaDatiApi(id: string): Promise<PropostaDatiFiscale> {
+  const res = await apiFetch(`${API_BASE}/proposte-dati/${encodeURIComponent(id)}/conferma`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.errore ?? 'Errore conferma proposta');
+  }
+  const data = await res.json();
+  return data.proposta;
+}
+
+export async function rifiutaPropostaDatiApi(id: string, notaStudio?: string): Promise<PropostaDatiFiscale> {
+  const res = await apiFetch(`${API_BASE}/proposte-dati/${encodeURIComponent(id)}/rifiuta`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ notaStudio }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.errore ?? 'Errore rifiuto proposta');
+  }
+  const data = await res.json();
+  return data.proposta;
+}
+
+export interface RichiestaAddendum {
+  id: string;
+  clienteId: string;
+  progettoId: string;
+  testoRichiesta: string;
+  stato: 'richiesta' | 'in_preparazione' | 'pronta' | 'rifiutata';
+  rispostaStudio: string | null;
+  createdAt: string;
+  updatedAt: string;
+  cliente?: { id: string; nome: string };
+  progetto?: { id: string; nome: string };
+}
+
+export async function richiesteAddendumPortaleApi(clienteId?: string, progettoId?: string): Promise<RichiestaAddendum[]> {
+  const params = new URLSearchParams();
+  if (clienteId) params.set('clienteId', clienteId);
+  if (progettoId) params.set('progettoId', progettoId);
+  const query = params.toString() ? `?${params.toString()}` : '';
+  const res = await apiFetch(`${API_BASE}/portal/addendum${query}`, { headers: getAuthHeaders() });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.errore ?? 'Errore lettura richieste addendum');
+  }
+  const data = await res.json();
+  return data.richieste ?? [];
+}
+
+export async function inviaRichiestaAddendumApi(input: {
+  testoRichiesta: string;
+  progettoId?: string;
+  clienteId?: string;
+}): Promise<RichiestaAddendum> {
+  const res = await apiFetch(`${API_BASE}/portal/addendum`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.errore ?? 'Errore invio richiesta addendum');
+  }
+  const data = await res.json();
+  return data.richiesta;
+}
+
+export async function richiesteAddendumStudioApi(filtri?: { progettoId?: string; stato?: string }): Promise<RichiestaAddendum[]> {
+  const params = new URLSearchParams();
+  if (filtri?.progettoId) params.set('progettoId', filtri.progettoId);
+  if (filtri?.stato) params.set('stato', filtri.stato);
+  const query = params.toString() ? `?${params.toString()}` : '';
+  const res = await apiFetch(`${API_BASE}/addendum${query}`, { headers: getAuthHeaders() });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.errore ?? 'Errore lettura richieste addendum');
+  }
+  const data = await res.json();
+  return data.richieste ?? [];
+}
+
+export async function aggiornaStatoAddendumApi(id: string, input: { stato?: string; rispostaStudio?: string }): Promise<RichiestaAddendum> {
+  const res = await apiFetch(`${API_BASE}/addendum/${encodeURIComponent(id)}/stato`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.errore ?? 'Errore aggiornamento addendum');
+  }
+  const data = await res.json();
+  return data.richiesta;
+}
+
+export interface FatturaPortale {
+  id: string;
+  numero: string;
+  tipoDocumento: 'fattura' | 'nota_credito';
+  data: string | null;
+  stato: 'emessa' | 'incassata';
+  pagata: boolean;
+  totaleCentesimi: number;
+  progettoId: string;
+  progetto: string | null;
+  prossimaScadenza: { dataScadenza: string; importoCentesimi: number } | null;
+}
+
+export async function fatturePortaleApi(clienteId?: string): Promise<FatturaPortale[]> {
+  const query = clienteId ? `?clienteId=${encodeURIComponent(clienteId)}` : '';
+  const res = await apiFetch(`${API_BASE}/portal/fatture${query}`, { headers: getAuthHeaders() });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.errore ?? 'Errore lettura fatture');
+  }
+  const data = await res.json();
+  return data.fatture ?? [];
+}
+
 export async function updateArticoloPrezzoApi(id: string, input: { prezzoDefault?: number; oreDefault?: number; nome?: string }) {
   try {
     const res = await apiFetch(`${API_BASE}/articoli/${id}`, {

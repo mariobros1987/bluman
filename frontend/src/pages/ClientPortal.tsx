@@ -23,8 +23,23 @@ import {
   cambiaPasswordClienteApi,
   documentiPortaleApi,
   urlFileArchivio,
+  contattiPortaleApi,
+  proposteDatiPortaleApi,
+  inviaPropostaDatiApi,
+  richiesteAddendumPortaleApi,
+  inviaRichiestaAddendumApi,
+  fatturePortaleApi,
 } from '../api/client';
-import type { CanaleOtp, CanaleFirma, AmbitoFirma, DocumentoPortale } from '../api/client';
+import type {
+  CanaleOtp,
+  CanaleFirma,
+  AmbitoFirma,
+  DocumentoPortale,
+  ContattiStudio,
+  PropostaDatiFiscale,
+  RichiestaAddendum,
+  FatturaPortale,
+} from '../api/client';
 import type { CategoriaModulo } from '../types';
 
 export interface ModuloPassaggio {
@@ -126,7 +141,7 @@ function mapProjectToPortalModules(project: any): ModuloProposta[] {
   });
 }
 
-type PortalTab = 'proposta' | 'avanzamento' | 'form' | 'documenti' | 'contatti' | 'profilo';
+type PortalTab = 'proposta' | 'avanzamento' | 'form' | 'documenti' | 'fatture' | 'contatti' | 'profilo';
 
 /**
  * L'atto che il codice OTP sta autorizzando: la lettera d'incarico o un documento del fascicolo.
@@ -185,11 +200,16 @@ export function ClientPortal() {
   const [clientPassShow, setClientPassShow] = useState(false);
   const [clientPassLoading, setClientPassLoading] = useState(false);
   const [clientPassMsg, setClientPassMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
-  // Stessa ragione del flag `signed`: la chiave era `bluman_addendums_Marco Ricci / Holding Beta
-  // S.r.l.`, il nome di un cliente preciso, mentre la scrittura usa `bluman_addendums_<cliente>`.
-  // Risultato: le richieste di integrazione non venivano mai rilette, e su un browser dove quel
-  // cliente aveva scritto qualcosa comparivano a chiunque. Si carica in `loadPortalData`.
-  const [addendums, setAddendums] = useState<any[]>([]);
+  // Le richieste di integrazione dell'incarico (§2.5) vivono a database, agganciate al
+  // progetto, e lo studio le vede. Prima stavano in `localStorage` sotto una chiave col nome
+  // del cliente: invisibili allo studio e perse al cambio dispositivo. Si leggono e si
+  // scrivono via API in `loadPortalData` e nella sezione dedicata del contratto firmato.
+  const [addendums, setAddendums] = useState<RichiestaAddendum[]>([]);
+  const [addendumErrore, setAddendumErrore] = useState<string | null>(null);
+  /** Testo libero della nuova richiesta di addendum che il cliente sta scrivendo. */
+  const [nuovaRichiestaAddendum, setNuovaRichiestaAddendum] = useState('');
+  const [invioAddendum, setInvioAddendum] = useState(false);
+  const [addendumMsg, setAddendumMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const [loading, setLoading] = useState(false);
   const [pageLoading, setPageLoading] = useState(true);
   const [accessoNegato, setAccessoNegato] = useState<string | null>(null);
@@ -255,6 +275,11 @@ export function ClientPortal() {
   // fiscale, IBAN e legale rappresentante di un cliente reale come valori iniziali: siccome nulla
   // li sovrascriveva, QUALUNQUE cliente apriva la scheda 3 e trovava i dati di un terzo nei propri
   // campi. Vengono riempiti in `loadPortalData` con la riga del cliente autenticato, se c'è.
+  //
+  // §2.3: questi sono i valori ATTUALI a database (sola lettura). Le modifiche passano da una
+  // proposta che lo studio conferma: il campo non si scrive qui, si invia via
+  // `inviaPropostaDatiApi`. `bozzaDati` contiene i valori digitati, `proposteDati` lo stato
+  // delle richieste già inviate.
   const [formData, setFormData] = useState({
     ragioneSociale: '',
     piva: '',
@@ -262,8 +287,51 @@ export function ClientPortal() {
     codiceFiscale: '',
     iban: '',
     titolareEffettivo: '',
+    sedeLegale: '',
   });
   const [formSaved, setFormSaved] = useState(false);
+  /** Valori digitati dal cliente, campo per campo: diventano proposte solo all'invio. */
+  const [bozzaDati, setBozzaDati] = useState({
+    ragioneSociale: '',
+    piva: '',
+    legaleRappresentante: '',
+    codiceFiscale: '',
+    iban: '',
+    titolareEffettivo: '',
+    sedeLegale: '',
+  });
+  /** Proposte di modifica dei dati fiscali inviate dal cliente, col loro stato. */
+  const [proposteDati, setProposteDati] = useState<PropostaDatiFiscale[]>([]);
+  const [invioProposta, setInvioProposta] = useState(false);
+  const [propostaMsg, setPropostaMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+  /**
+   * §2.4: IBAN e titolare effettivo sono mostrati mascherati. Il cliente può scoprirli
+   * esplicitamente con un interruttore: non c'è motivo che un dato bancario o il nome del
+   * titolare effettivo restino in chiaro su uno schermo condiviso o in una schermata di
+   * cortesia.
+   */
+  const [mostraDatiSensibili, setMostraDatiSensibili] = useState(false);
+
+  /**
+   * §2.6: i recapiti dello studio (lead advisor reale) arrivano dal backend. Prima la scheda
+   * mostrava a tutti un nome proprio, un indirizzo email e un telefono scritti a mano nel
+   * codice — e il pallino verde "Advisor Online", che non riflette la presenza di nessuno.
+   */
+  const [contattiStudio, setContattiStudio] = useState<ContattiStudio | null>(null);
+
+  /** §2.11: fatture e stato di pagamento dei progetti del cliente. */
+  const [fatturePortale, setFatturePortale] = useState<FatturaPortale[]>([]);
+  const [fattureCaricamento, setFattureCaricamento] = useState(false);
+  const [fattureErrore, setFattureErrore] = useState<string | null>(null);
+
+  /**
+   * §2.10: anteprima del portale aperta da un utente dello studio. Quando è vera il portale
+   * mostra un selettore del cliente e un banner «anteprima», perché i dati che si vedono non
+   * sono di chi sta guardando ma del cliente scelto.
+   */
+  const [isStudioPreview, setIsStudioPreview] = useState(false);
+  /** Elenco completo dei clienti, per il selettore dell'anteprima studio. */
+  const [elencoClienti, setElencoClienti] = useState<any[]>([]);
 
   // Comunicazioni State
   const [progettoId, setProgettoId] = useState<string>('proj-001');
@@ -364,10 +432,66 @@ export function ClientPortal() {
     }
   };
 
+  /**
+   * §2.5 — Rilegge da database le richieste di integrazione dell'incarico.
+   *
+   * Prima venivano da `localStorage`: lo studio non le vedeva mai e un cambio dispositivo le
+   * perdeva. Un errore di lettura viene dichiarato, non mascherato da elenco vuoto.
+   */
+  const caricaAddendum = async (clienteIdSessione?: string | null) => {
+    setAddendumErrore(null);
+    try {
+      const res = await richiesteAddendumPortaleApi(clienteIdSessione ?? undefined);
+      setAddendums(Array.isArray(res) ? res : []);
+    } catch (err: any) {
+      setAddendums([]);
+      setAddendumErrore(err?.message || 'Impossibile leggere le richieste di integrazione.');
+    }
+  };
+
+  /** §2.3 — Rilegge le proposte di modifica dei dati fiscali inviate dal cliente. */
+  const caricaProposteDati = async (clienteIdSessione?: string | null) => {
+    try {
+      const res = await proposteDatiPortaleApi(clienteIdSessione ?? undefined);
+      setProposteDati(Array.isArray(res) ? res : []);
+    } catch {
+      setProposteDati([]);
+    }
+  };
+
+  /** §2.6 — Recapiti reali dello studio (lead advisor) dalla riga del tenant. */
+  const caricaContattiStudio = async (clienteIdSessione?: string | null) => {
+    try {
+      const res = await contattiPortaleApi(clienteIdSessione ?? undefined);
+      setContattiStudio(res);
+    } catch {
+      setContattiStudio(null);
+    }
+  };
+
+  /** §2.11 — Fatture e stato di pagamento dei progetti del cliente. */
+  const caricaFatturePortale = async (clienteIdSessione?: string | null) => {
+    setFattureCaricamento(true);
+    setFattureErrore(null);
+    try {
+      const res = await fatturePortaleApi(clienteIdSessione ?? undefined);
+      setFatturePortale(Array.isArray(res) ? res : []);
+    } catch (err: any) {
+      setFatturePortale([]);
+      setFattureErrore(err?.message || 'Impossibile leggere le fatture.');
+    } finally {
+      setFattureCaricamento(false);
+    }
+  };
+
   const loadPortalData = async (clienteIdParam?: string) => {
     setPageLoading(true);
     let resolvedClientName = clientName;
     let clienteIdSessione: string | null = clienteIdParam || null;
+    // §2.10: vero solo quando chi apre il portale è un utente dello studio (nessuna sessione
+    // cliente). In quel caso i dati mostrati sono del cliente scelto nel selettore, non di chi
+    // guarda, e la pagina lo dichiara con il banner «anteprima».
+    let anteprimaStudio = false;
 
     if (token) {
       try {
@@ -389,6 +513,9 @@ export function ClientPortal() {
       }
     } else if (clienteIdParam) {
       clienteIdSessione = clienteIdParam;
+      // Se non c'è una sessione cliente salvata ma c'è un utente studio, il `clienteIdParam`
+      // è la scelta di un'anteprima, non la sessione di quel cliente.
+      anteprimaStudio = !localStorage.getItem('bluman_client_user') && Boolean(localStorage.getItem('bluman_user'));
       setIsAuthenticated(true);
       setAccessoNegato(null);
     } else {
@@ -414,6 +541,7 @@ export function ClientPortal() {
         }
       } else if (existingToken && savedStudioUser) {
         // Advisor o membro dello studio che apre l'anteprima portale
+        anteprimaStudio = true;
         setIsAuthenticated(true);
         setAccessoNegato(null);
       } else {
@@ -422,6 +550,7 @@ export function ClientPortal() {
         return;
       }
     }
+    setIsStudioPreview(anteprimaStudio);
 
     try {
       // Id del cliente di cui si stanno guardando i dati: quello della sessione, oppure quello
@@ -430,6 +559,8 @@ export function ClientPortal() {
       let clienteIdRisolto: string | null = clienteIdSessione;
       const clientiRes = await fetchClienti();
       if (clientiRes && Array.isArray(clientiRes) && clientiRes.length > 0) {
+        // §2.10: l'elenco completo serve al selettore dell'anteprima studio.
+        setElencoClienti(clientiRes);
         const found = clienteIdSessione
           ? clientiRes.find(c => c.id === clienteIdSessione)
           : undefined;
@@ -453,14 +584,18 @@ export function ClientPortal() {
         // Il form societario si riempie con la riga del cliente, non con valori d'esempio: i campi
         // che il database non ha restano vuoti perché è il cliente a doverli compilare.
         const referenti: any = risolto.referentiJson || {};
-        setFormData({
+        const valoriCliente = {
           ragioneSociale: risolto.nome || '',
           piva: risolto.piva || '',
           legaleRappresentante: referenti.legaleRappresentante || '',
           codiceFiscale: risolto.codiceFiscale || '',
           iban: risolto.iban || '',
           titolareEffettivo: risolto.ubo || '',
-        });
+          sedeLegale: risolto.sedeLegale || '',
+        };
+        setFormData(valoriCliente);
+        // La bozza parte dai valori attuali: il cliente digita solo ciò che vuole cambiare (§2.3).
+        setBozzaDati(valoriCliente);
       }
 
       // Ripristina lo stato di firma persistito in memoria, SOLO per il cliente autenticato.
@@ -473,13 +608,14 @@ export function ClientPortal() {
         setEidasSeal(null);
       }
 
-      // Ripristina le richieste di integrazione dell'incarico del cliente autenticato.
-      const savedAddendums = localStorage.getItem(`bluman_addendums_${resolvedClientName}`);
-      try {
-        setAddendums(savedAddendums ? JSON.parse(savedAddendums) : []);
-      } catch {
-        setAddendums([]);
-      }
+      // §2.5 — le richieste di integrazione dell'incarico si rileggono da database, non più da
+      // `localStorage`: lo studio le vede e non vanno perse al cambio dispositivo.
+      await caricaAddendum(clienteIdRisolto);
+      // §2.3 proposte dati fiscali, §2.6 contatti studio, §2.11 fatture. Sono letture
+      // indipendenti: un errore su una non blocca le altre.
+      await caricaProposteDati(clienteIdRisolto);
+      await caricaContattiStudio(clienteIdRisolto);
+      await caricaFatturePortale(clienteIdRisolto);
 
       // I documenti firmati NON si rileggono più da `localStorage`. La firma di un documento
       // stava in `bluman_signed_docs_<cliente>`: firmato su un browser voleva dire non firmato
@@ -853,6 +989,17 @@ export function ClientPortal() {
     }).catch(() => {});
   };
 
+  /**
+   * §2.10 — Cambio del cliente nell'anteprima dello studio.
+   *
+   * Rilegge l'intero portale sul cliente scelto: anagrafica, progetti, documenti, proposte,
+   * addendum, contatti e fatture. È un'anteprima, quindi il banner resta visibile anche dopo.
+   */
+  const handleSelectPreviewClient = (clienteId: string) => {
+    if (!clienteId || clienteId === clientObj?.id) return;
+    void loadPortalData(clienteId);
+  };
+
   const totalValue = moduliProposti.reduce((acc, m) => acc + m.prezzo, 0);
 
   /** Progetto attualmente scelto nel selettore, con l'avanzamento che il backend ha calcolato. */
@@ -896,10 +1043,81 @@ export function ClientPortal() {
     }
   };
 
-  const handleSaveForm = (e: React.FormEvent) => {
+  /** §2.4 — Maschera l'IBAN lasciando visibili solo gli ultimi caratteri. */
+  const mascheraIban = (iban: string) => {
+    const compatto = (iban || '').replace(/\s+/g, '');
+    if (!compatto) return '';
+    return `•••• ${compatto.slice(-8)}`;
+  };
+
+  /** §2.4 — Maschera il titolare effettivo: il nome intero si vede solo scoprendo il dato. */
+  const mascheraUbo = (nome: string) => ((nome || '').trim() ? '••••••••' : '');
+
+  /**
+   * §2.3 — Invio delle proposte di modifica dei dati fiscali.
+   *
+   * Il cliente non scrive direttamente in anagrafica: per ogni campo il cui valore digitato
+   * differisce da quello attuale invia una proposta che resta `in_attesa` finché lo studio non
+   * la conferma. Solo allora il valore entra nella riga del cliente.
+   */
+  const handleSaveForm = async (e: React.FormEvent) => {
     e.preventDefault();
-    setFormSaved(true);
-    setTimeout(() => setFormSaved(false), 4000);
+    if (invioProposta) return;
+    setPropostaMsg(null);
+    const campi = ['ragioneSociale', 'piva', 'legaleRappresentante', 'codiceFiscale', 'iban', 'titolareEffettivo', 'sedeLegale'] as const;
+    const modifiche = campi.filter((c) => {
+      const nuovo = (bozzaDati[c] || '').trim();
+      return nuovo !== '' && nuovo !== (formData[c] || '').trim();
+    });
+    if (modifiche.length === 0) {
+      setPropostaMsg({ text: 'Nessun campo da aggiornare: digita un valore diverso da quello attuale per proporre una modifica.', type: 'error' });
+      return;
+    }
+    setInvioProposta(true);
+    try {
+      for (const campo of modifiche) {
+        await inviaPropostaDatiApi({ campo, valoreProposto: (bozzaDati as any)[campo].trim(), clienteId: clientObj?.id });
+      }
+      await caricaProposteDati(clientObj?.id);
+      setPropostaMsg({
+        text: `✓ ${modifiche.length === 1 ? 'Proposta inviata' : `${modifiche.length} proposte inviate`} allo studio. Le modifiche saranno effettive solo dopo la conferma dello studio.`,
+        type: 'success',
+      });
+      setFormSaved(true);
+      setTimeout(() => setFormSaved(false), 4000);
+    } catch (err: any) {
+      setPropostaMsg({ text: err?.message || 'Errore durante l\'invio della proposta.', type: 'error' });
+    } finally {
+      setInvioProposta(false);
+    }
+  };
+
+  /** §2.3 — proposta di modifica ancora in attesa di conferma, per un campo del form. */
+  const propostaInAttesa = (campo: string) =>
+    proposteDati.find((p) => p.campo === campo && p.stato === 'in_attesa') || null;
+
+  /**
+   * §2.5 — Invio di una nuova richiesta di integrazione dell'incarico.
+   *
+   * Testo libero agganciato al progetto selezionato: lo studio la riceve, la lavora e ne
+   * aggiorna lo stato. Prima era un bottone che fabbricava in `localStorage` un addendum già
+   * scritto — titolo, modulo e prezzo di 3.500 € — che lo studio non vedeva.
+   */
+  const inviaNuovaRichiestaAddendum = async () => {
+    const testo = nuovaRichiestaAddendum.trim();
+    if (!testo || invioAddendum) return;
+    setInvioAddendum(true);
+    setAddendumMsg(null);
+    try {
+      await inviaRichiestaAddendumApi({ testoRichiesta: testo, progettoId: selectedProjectId || undefined, clienteId: clientObj?.id });
+      setNuovaRichiestaAddendum('');
+      await caricaAddendum(clientObj?.id);
+      setAddendumMsg({ text: '✓ Richiesta inviata allo studio. Lo stato dell\'integrazione sarà aggiornato qui.', type: 'success' });
+    } catch (err: any) {
+      setAddendumMsg({ text: err?.message || 'Errore durante l\'invio della richiesta.', type: 'error' });
+    } finally {
+      setInvioAddendum(false);
+    }
   };
 
   const handleSaveClientPassword = async (e: React.FormEvent) => {
@@ -1170,6 +1388,28 @@ export function ClientPortal() {
   return (
     <div style={portalWrapperStyle}>
       <div style={containerStyle}>
+      {/* §2.10 — Banner anteprima: un utente dello studio sta guardando il portale di un
+          cliente. I dati non sono i suoi e ogni azione va letta come simulazione. */}
+      {isStudioPreview && (
+        <div style={{ margin: '0 0 12px', background: '#2a1f0d', border: '1px solid #b45309', borderRadius: 10, padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+          <div style={{ color: '#fcd34d', fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
+            👁 ANTEPRIMA STUDIO — Stai visualizzando il portale di <strong>{clientName}</strong>. Nessuna modifica è reale.
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ color: '#fcd34d', fontSize: 11 }}>Cliente:</span>
+            <select
+              value={clientObj?.id || ''}
+              onChange={(e) => handleSelectPreviewClient(e.target.value)}
+              style={{ background: '#1c1608', color: '#fde68a', border: '1px solid #b45309', borderRadius: 8, padding: '5px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+            >
+              {elencoClienti.map((c: any) => (
+                <option key={c.id} value={c.id} style={{ background: '#1c1608', color: '#fde68a' }}>{c.nome}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      )}
+
       {/* Top Navbar Header */}
       <div style={topNavStyle}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -1315,16 +1555,22 @@ export function ClientPortal() {
           📎 4. Documenti & Contratti
         </button>
         <button
+          onClick={() => setActiveTab('fatture')}
+          style={tabBtnStyle(activeTab === 'fatture')}
+        >
+          💳 5. Fatture & Pagamenti
+        </button>
+        <button
           onClick={() => setActiveTab('contatti')}
           style={tabBtnStyle(activeTab === 'contatti')}
         >
-          💬 5. Contatto Advisor
+          💬 6. Contatto Advisor
         </button>
         <button
           onClick={() => setActiveTab('profilo')}
           style={tabBtnStyle(activeTab === 'profilo')}
         >
-          👤 6. Profilo & Password
+          👤 7. Profilo & Password
         </button>
       </div>
 
@@ -1430,83 +1676,89 @@ export function ClientPortal() {
                   </div>
                 </div>
 
-                {/* 📜 STORICO INTEGRATIVO ADDENDUM D'ORDINE (POSIZIONATI SOTTO) */}
+                {/* 📜 ADDENDUM D'ORDINE — richieste del cliente gestite dallo studio (§2.5) */}
                 <div style={{ borderTop: '2px dashed var(--border)', paddingTop: 20, marginTop: 24 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
-                    <div>
-                      <div style={{ fontSize: 14, fontWeight: 700 }}>📜 Storico Integrazioni d'Ordine & Addendum (Cronologia)</div>
-                      <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
-                        Tutti i moduli aggiuntivi ed i cambi di scopo vengono registrati in append cronologico sotto al contratto base
-                      </div>
+                  <div style={{ marginBottom: 16 }}>
+                    <div style={{ fontSize: 14, fontWeight: 700 }}>📜 Richieste d'Integrazione & Addendum</div>
+                    <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
+                      Descrivi la modifica o il modulo aggiuntivo che ti serve: lo studio preparerà l'addendum e lo troverai qui, pronto per la firma.
                     </div>
-                    <button
-                      onClick={() => {
-                        const newAdd: any = {
-                          id: `add-${Date.now()}`,
-                          version: `v1.1`,
-                          title: `Addendum v1.1 — Integrazione Modulo Fiscale International Tax Refund`,
-                          date: new Date().toLocaleDateString('it-IT'),
-                          status: 'pending',
-                          prezzo: 3500,
-                          modules: [
-                            { nome: 'Ottimizzazione Regime Fiscale 6/7 Refund Mechanism Malta', cat: 'Fiscale', prezzo: 3500 }
-                          ]
-                        };
-                        const updated = [newAdd, ...addendums];
-                        setAddendums(updated);
-                        localStorage.setItem(`bluman_addendums_${clientName}`, JSON.stringify(updated));
-                      }}
-                      style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '7px 14px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
-                    >
-                      ➕ Richiedi / Aggiungi Modulo d'Integrazione
-                    </button>
+                  </div>
+
+                  {addendumErrore && (
+                    <div style={{ background: '#2d1516', border: '1px solid #7f1d1d', color: '#fca5a5', borderRadius: 10, padding: 10, fontSize: 11, marginBottom: 14 }}>
+                      ⚠️ {addendumErrore}
+                    </div>
+                  )}
+
+                  <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 16, marginBottom: 14 }}>
+                    <textarea
+                      value={nuovaRichiestaAddendum}
+                      onChange={(e) => setNuovaRichiestaAddendum(e.target.value)}
+                      placeholder="Es. Vorrei aggiungere il modulo Tax Refund Malta al contratto in corso…"
+                      rows={3}
+                      style={{ width: '100%', boxSizing: 'border-box', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, padding: 10, fontSize: 12, color: 'var(--text)', resize: 'vertical', fontFamily: 'inherit', outline: 'none' }}
+                    />
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, gap: 10, flexWrap: 'wrap' }}>
+                      <div style={{ fontSize: 10, color: 'var(--muted)' }}>
+                        {progettoAttivo ? (<>Riferimento progetto: <b style={{ color: 'var(--text)' }}>{progettoAttivo.nome}</b></>) : 'La richiesta sarà agganciata al progetto attivo del portale'}
+                      </div>
+                      <button
+                        onClick={() => void inviaNuovaRichiestaAddendum()}
+                        disabled={invioAddendum || !nuovaRichiestaAddendum.trim()}
+                        style={{ background: invioAddendum || !nuovaRichiestaAddendum.trim() ? 'var(--muted)' : 'var(--indigo)', color: '#fff', border: 'none', padding: '7px 14px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: invioAddendum || !nuovaRichiestaAddendum.trim() ? 'default' : 'pointer', opacity: invioAddendum ? 0.6 : 1 }}
+                      >
+                        {invioAddendum ? 'Invio in corso…' : '➕ Invia richiesta allo studio'}
+                      </button>
+                    </div>
+                    {addendumMsg && (
+                      <div style={{ fontSize: 11, marginTop: 8, fontWeight: 600, color: addendumMsg.type === 'success' ? '#34d399' : '#fca5a5' }}>
+                        {addendumMsg.text}
+                      </div>
+                    )}
                   </div>
 
                   {addendums.length === 0 ? (
                     <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 10, padding: 16, textAlign: 'center', fontSize: 11, color: 'var(--muted)' }}>
-                      Nessuna integrazione o addendum d'ordine aggiuntivo richiesto. Il contratto base v1.0 è attualmente la versione attiva.
+                      Nessuna richiesta di addendum inviata. Il contratto base è attualmente la versione attiva.
                     </div>
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                      {addendums.map((add, aIdx) => (
-                        <div key={aIdx} style={{ background: add.status === 'signed' ? '#0d2d22' : 'var(--card2)', border: `1px solid ${add.status === 'signed' ? '#1a5c3c' : 'var(--border)'}`, borderRadius: 12, padding: 16 }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 10, marginBottom: 8 }}>
-                            <div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                                <span style={{ background: add.status === 'signed' ? '#34d399' : 'var(--amber)', color: '#000', fontSize: 9, fontWeight: 800, padding: '2px 6px', borderRadius: 10 }}>
-                                  {add.status === 'signed' ? '🔒 FIRMATO & CONGELATO' : '✍️ IN ATTESA DI FIRMA CLIENTE'}
+                      {addendums.map((add) => {
+                        const badgeStato: Record<string, { testo: string; colore: string; sfondo: string }> = {
+                          richiesta: { testo: '📨 INVIATA — IN ATTESA', colore: '#000', sfondo: 'var(--amber)' },
+                          in_preparazione: { testo: '⚙️ IN PREPARAZIONE', colore: '#fff', sfondo: 'var(--indigo)' },
+                          pronta: { testo: '✅ PRONTA', colore: '#000', sfondo: '#34d399' },
+                          rifiutata: { testo: '⛔ RIFIUTATA', colore: '#fff', sfondo: '#b91c1c' },
+                        };
+                        const badge = badgeStato[add.stato] ?? badgeStato.richiesta;
+                        return (
+                          <div key={add.id} style={{ background: add.stato === 'pronta' ? '#0d2d22' : 'var(--card2)', border: `1px solid ${add.stato === 'pronta' ? '#1a5c3c' : 'var(--border)'}`, borderRadius: 12, padding: 16 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
+                              <span style={{ background: badge.sfondo, color: badge.colore, fontSize: 9, fontWeight: 800, padding: '2px 6px', borderRadius: 10 }}>
+                                {badge.testo}
+                              </span>
+                              {add.progetto && (
+                                <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--muted)', border: '1px solid var(--border)', padding: '2px 6px', borderRadius: 10 }}>
+                                  {add.progetto.nome}
                                 </span>
-                                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text)' }}>{add.title}</span>
+                              )}
+                              <span style={{ fontSize: 10, color: 'var(--muted)', marginLeft: 'auto' }}>Richiesta del {dataOraLeggibile(add.createdAt)}</span>
+                            </div>
+
+                            <div style={{ fontSize: 12, color: 'var(--text)', whiteSpace: 'pre-wrap', marginBottom: add.rispostaStudio ? 10 : 0 }}>
+                              {add.testoRichiesta}
+                            </div>
+
+                            {add.rispostaStudio && (
+                              <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, padding: 10, fontSize: 11, color: 'var(--muted)' }}>
+                                <b style={{ color: 'var(--text)' }}>Risposta dello studio:</b>{' '}
+                                <span style={{ whiteSpace: 'pre-wrap' }}>{add.rispostaStudio}</span>
                               </div>
-                              <div style={{ fontSize: 10, color: 'var(--muted)' }}>Data Richiesta Integrazione: {add.date}</div>
-                            </div>
-                            <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--indigo-l)' }}>{fmt(add.prezzo)}</div>
+                            )}
                           </div>
-
-                          <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 12 }}>
-                            {add.modules.map((m: any, mI: number) => (
-                              <div key={mI}>• {m.nome} ({m.cat}) — {fmt(m.prezzo)}</div>
-                            ))}
-                          </div>
-
-                          {add.status === 'pending' ? (
-                            <button
-                              onClick={() => {
-                                const updated = addendums.map(a => a.id === add.id ? { ...a, status: 'signed', signedAt: new Date().toLocaleString('it-IT') } : a);
-                                setAddendums(updated);
-                                localStorage.setItem(`bluman_addendums_${clientName}`, JSON.stringify(updated));
-                              }}
-                              style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '8px 18px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
-                            >
-                              ✍️ Firma ed Accetta Addendum d'Ordine ({fmt(add.prezzo)})
-                            </button>
-                          ) : (
-                            <div style={{ fontSize: 10, color: '#34d399', fontWeight: 600 }}>
-                              ✓ Firmato e Congelato il {add.signedAt || add.date}
-                            </div>
-                          )}
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -1537,7 +1789,9 @@ export function ClientPortal() {
                 <div style={{ borderBottom: '1px solid var(--border)', paddingBottom: 16, marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
                   <div>
                     <div style={{ fontSize: 10, textTransform: 'uppercase', color: 'var(--indigo-l)', fontWeight: 700, letterSpacing: '.5px', marginBottom: 4 }}>
-                      ENGAGEMENT LETTER & PROPOSTA D'ORDINE N. EL-2026-089
+                      {/* §2.8: il numero della lettera d'incarico è del progetto, assegnato dal
+                          backend alla creazione. Prima era cablato EL-2026-089 per tutti. */}
+                      ENGAGEMENT LETTER & PROPOSTA D'ORDINE N. {progettoAttivo?.numeroContratto || '— numero in assegnazione —'}
                     </div>
                     <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>Dettaglio Incarico Professionale & Moduli Spettanti</h2>
                     <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
@@ -2097,12 +2351,32 @@ export function ClientPortal() {
         {/* TAB 3: Form Dati Societari */}
         {activeTab === 'form' && (
           <div style={docBoxStyle}>
-            <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>📋 Compilazione Guidata Dati Societari e KYC</div>
-            <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 18 }}>Inserisci o aggiorna i dati richiesti dal team legale per completare gli adempimenti</div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12, marginBottom: 4 }}>
+              <div style={{ flex: 1, minWidth: 240 }}>
+                <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>📋 Dati Societari e KYC</div>
+                <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+                  Le modifiche diventano una <b>proposta</b>: i nuovi valori entrano in anagrafica solo dopo la conferma dello studio. IBAN e titolare effettivo sono mascherati.
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMostraDatiSensibili(!mostraDatiSensibili)}
+                style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '7px 14px', borderRadius: 8, fontSize: 11, cursor: 'pointer', whiteSpace: 'nowrap' }}
+              >
+                {mostraDatiSensibili ? '🙈 Nascondi dati sensibili' : '👁 Mostra dati sensibili'}
+              </button>
+            </div>
+            <div style={{ height: 14 }} />
 
             {formSaved && (
               <div style={{ background: '#0d2d22', border: '1px solid #1a5c3c', color: '#34d399', padding: '10px 14px', borderRadius: 10, fontSize: 12, fontWeight: 600, marginBottom: 16 }}>
-                ✓ Dati salvati con successo ed inviati al team operativo!
+                ✓ Proposta inviata allo studio!
+              </div>
+            )}
+
+            {propostaMsg && (
+              <div style={{ background: propostaMsg.type === 'success' ? '#0d2d22' : '#2d1516', border: `1px solid ${propostaMsg.type === 'success' ? '#1a5c3c' : '#7f1d1d'}`, color: propostaMsg.type === 'success' ? '#34d399' : '#fca5a5', padding: '10px 14px', borderRadius: 10, fontSize: 12, fontWeight: 600, marginBottom: 16 }}>
+                {propostaMsg.text}
               </div>
             )}
 
@@ -2110,38 +2384,58 @@ export function ClientPortal() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 }}>
                 <div>
                   <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Ragione Sociale Entità *</label>
-                  <input value={formData.ragioneSociale} onChange={e => setFormData({ ...formData, ragioneSociale: e.target.value })} required />
+                  <input value={bozzaDati.ragioneSociale} onChange={e => setBozzaDati({ ...bozzaDati, ragioneSociale: e.target.value })} required />
+                  {propostaInAttesa('ragioneSociale') && <div style={{ fontSize: 10, color: 'var(--amber)', marginTop: 4 }}>⏳ Proposta in attesa: «{propostaInAttesa('ragioneSociale')?.valoreProposto}»</div>}
                 </div>
                 <div>
                   <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Partita IVA / VAT Number *</label>
-                  <input value={formData.piva} onChange={e => setFormData({ ...formData, piva: e.target.value })} required />
+                  <input value={bozzaDati.piva} onChange={e => setBozzaDati({ ...bozzaDati, piva: e.target.value })} required />
+                  {propostaInAttesa('piva') && <div style={{ fontSize: 10, color: 'var(--amber)', marginTop: 4 }}>⏳ Proposta in attesa: «{propostaInAttesa('piva')?.valoreProposto}»</div>}
                 </div>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 }}>
                 <div>
                   <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Legale Rappresentante *</label>
-                  <input value={formData.legaleRappresentante} onChange={e => setFormData({ ...formData, legaleRappresentante: e.target.value })} required />
+                  <input value={bozzaDati.legaleRappresentante} onChange={e => setBozzaDati({ ...bozzaDati, legaleRappresentante: e.target.value })} required />
+                  {propostaInAttesa('legaleRappresentante') && <div style={{ fontSize: 10, color: 'var(--amber)', marginTop: 4 }}>⏳ Proposta in attesa: «{propostaInAttesa('legaleRappresentante')?.valoreProposto}»</div>}
                 </div>
                 <div>
                   <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Codice Fiscale *</label>
-                  <input value={formData.codiceFiscale} onChange={e => setFormData({ ...formData, codiceFiscale: e.target.value })} required />
+                  <input value={bozzaDati.codiceFiscale} onChange={e => setBozzaDati({ ...bozzaDati, codiceFiscale: e.target.value })} required />
+                  {propostaInAttesa('codiceFiscale') && <div style={{ fontSize: 10, color: 'var(--amber)', marginTop: 4 }}>⏳ Proposta in attesa: «{propostaInAttesa('codiceFiscale')?.valoreProposto}»</div>}
                 </div>
               </div>
 
               <div>
                 <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>IBAN per Operazioni / Accreditamento *</label>
-                <input value={formData.iban} onChange={e => setFormData({ ...formData, iban: e.target.value })} style={{ fontFamily: 'monospace' }} required />
+                {mostraDatiSensibili ? (
+                  <input value={bozzaDati.iban} onChange={e => setBozzaDati({ ...bozzaDati, iban: e.target.value })} style={{ fontFamily: 'monospace' }} required />
+                ) : (
+                  <input value={mascheraIban(formData.iban)} disabled style={{ fontFamily: 'monospace', opacity: 0.65 }} title="Usa «Mostra dati sensibili» per vedere o modificare l'IBAN" />
+                )}
+                {propostaInAttesa('iban') && <div style={{ fontSize: 10, color: 'var(--amber)', marginTop: 4 }}>⏳ Proposta in attesa di conferma dello studio</div>}
               </div>
 
               <div>
                 <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Titolare Effettivo (UBO) & Quota di Possesso *</label>
-                <input value={formData.titolareEffettivo} onChange={e => setFormData({ ...formData, titolareEffettivo: e.target.value })} required />
+                {mostraDatiSensibili ? (
+                  <input value={bozzaDati.titolareEffettivo} onChange={e => setBozzaDati({ ...bozzaDati, titolareEffettivo: e.target.value })} required />
+                ) : (
+                  <input value={mascheraUbo(formData.titolareEffettivo)} disabled style={{ opacity: 0.65 }} title="Usa «Mostra dati sensibili» per vedere o modificare il titolare effettivo" />
+                )}
+                {propostaInAttesa('titolareEffettivo') && <div style={{ fontSize: 10, color: 'var(--amber)', marginTop: 4 }}>⏳ Proposta in attesa di conferma dello studio</div>}
+              </div>
+
+              <div>
+                <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Sede Legale</label>
+                <input value={bozzaDati.sedeLegale} onChange={e => setBozzaDati({ ...bozzaDati, sedeLegale: e.target.value })} />
+                {propostaInAttesa('sedeLegale') && <div style={{ fontSize: 10, color: 'var(--amber)', marginTop: 4 }}>⏳ Proposta in attesa: «{propostaInAttesa('sedeLegale')?.valoreProposto}»</div>}
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 10 }}>
-                <button type="submit" style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '10px 22px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
-                  ✓ Conferma & Salva Dati
+                <button type="submit" disabled={invioProposta} style={{ background: invioProposta ? 'var(--muted)' : 'var(--indigo)', color: '#fff', border: 'none', padding: '10px 22px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: invioProposta ? 'default' : 'pointer', opacity: invioProposta ? 0.6 : 1 }}>
+                  {invioProposta ? 'Invio in corso…' : '➕ Invia proposte di modifica allo studio'}
                 </button>
               </div>
             </form>
@@ -2339,24 +2633,137 @@ export function ClientPortal() {
           </div>
         )}
 
-        {/* TAB 5: Contatto Advisor & Messaggistica Live */}
+        {/* TAB 5: Fatture & Stato Pagamenti (§2.11) */}
+        {activeTab === 'fatture' && (
+          <div style={docBoxStyle}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 18 }}>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>💳 Fatture & Stato dei Pagamenti</div>
+                <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+                  Le fatture emesse sui tuoi incarichi, con l'importo, lo stato di incasso e la prossima scadenza. Le bozze non ancora emesse restano allo studio.
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => caricaFatturePortale(clientObj?.id)}
+                disabled={fattureCaricamento}
+                style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '7px 14px', borderRadius: 8, fontSize: 11, cursor: fattureCaricamento ? 'default' : 'pointer' }}
+              >
+                {fattureCaricamento ? 'Aggiorno…' : '↻ Aggiorna'}
+              </button>
+            </div>
+
+            {fattureErrore && (
+              <div style={{ background: '#3b1219', border: '1px solid #7f1d1d', color: '#fecaca', borderRadius: 12, padding: 14, fontSize: 12, marginBottom: 14 }}>
+                <strong>Non riesco a leggere le fatture.</strong> {fattureErrore}
+              </div>
+            )}
+
+            {!fattureErrore && fatturePortale.length === 0 && (
+              <div style={{ background: 'var(--card2)', border: '1px dashed var(--border)', borderRadius: 12, padding: 22, textAlign: 'center' }}>
+                <div style={{ fontSize: 26, marginBottom: 8 }}>🧾</div>
+                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>
+                  {fattureCaricamento ? 'Sto leggendo le fatture…' : 'Nessuna fattura emessa'}
+                </div>
+                {!fattureCaricamento && (
+                  <div style={{ fontSize: 11.5, color: 'var(--muted)', lineHeight: 1.6 }}>
+                    Lo studio non ha ancora emesso fatture sui tuoi incarichi. Quando lo farà le troverai qui, con lo stato di pagamento.
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {fatturePortale.map((f) => (
+                <div
+                  key={f.id}
+                  style={{
+                    background: f.pagata ? '#0d2d22' : 'var(--card2)',
+                    border: `1px solid ${f.pagata ? '#1a5c3c' : 'var(--border)'}`,
+                    borderRadius: 12,
+                    padding: '14px 16px',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    flexWrap: 'wrap',
+                    gap: 12,
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 240 }}>
+                    <div style={{ fontSize: 22 }}>{f.tipoDocumento === 'nota_credito' ? '↩️' : '🧾'}</div>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>
+                          {f.tipoDocumento === 'nota_credito' ? 'Nota di Credito' : 'Fattura'} {f.numero}
+                        </span>
+                        {f.progetto && (
+                          <span style={{ fontSize: 10, background: 'var(--card)', padding: '2px 6px', borderRadius: 6, color: 'var(--muted)', fontWeight: 600 }}>{f.progetto}</span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: 10.5, color: f.pagata ? '#a7f3d0' : 'var(--muted)', marginTop: 3 }}>
+                        {f.data ? `Emessa il ${new Date(f.data).toLocaleDateString('it-IT')}` : 'Data non indicata'}
+                        {f.pagata
+                          ? ' · ✓ Pagata'
+                          : f.prossimaScadenza
+                            ? ` · Scadenza ${new Date(f.prossimaScadenza.dataScadenza).toLocaleDateString('it-IT')} (${fmt(f.prossimaScadenza.importoCentesimi / 100)})`
+                            : ' · In attesa di pagamento'}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span
+                      style={{
+                        background: f.pagata ? '#10b981' : 'var(--amber)',
+                        color: '#000',
+                        fontSize: 10.5,
+                        fontWeight: 800,
+                        padding: '3px 9px',
+                        borderRadius: 12,
+                      }}
+                    >
+                      {f.pagata ? '✓ INCASSATA' : '⏳ DA INCASSARE'}
+                    </span>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--indigo-l)' }}>{fmt(f.totaleCentesimi / 100)}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* TAB 6: Contatto Advisor & Messaggistica Live */}
         {activeTab === 'contatti' && (
           <div style={docBoxStyle}>
             <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>💬 Assistenza Dedicata & Comunicazioni Dirette Studio</div>
-            <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 18 }}>Invia messaggi in tempo reale al tuo Senior Advisor di riferimento. La conversazione è sincronizzata con l'Advisor Hub dello Studio.</div>
+            <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 18 }}>Invia messaggi in tempo reale al tuo Advisor di riferimento. La conversazione è sincronizzata con l'Advisor Hub dello Studio.</div>
 
-            {/* Senior Advisor Card */}
-            <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 14, padding: 18, display: 'flex', alignItems: 'center', gap: 16, marginBottom: 20 }}>
-              <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'var(--indigo)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 18 }}>
-                JD
+            {/* §2.6 — Scheda Advisor costruita sui recapiti reali dello studio (riga del
+                tenant), non su un nome e un telefono scritti a mano. Il pallino "Advisor
+                Online" non c'è più: non riflette la presenza reale di nessuno. */}
+            <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 14, padding: 18, display: 'flex', alignItems: 'center', gap: 16, marginBottom: 20, flexWrap: 'wrap' }}>
+              <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'var(--indigo)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 16 }}>
+                {(contattiStudio?.advisorNome || contattiStudio?.studio || '??')
+                  .split(/\s+/)
+                  .map((p) => p[0])
+                  .filter(Boolean)
+                  .slice(0, 2)
+                  .join('')
+                  .toUpperCase()}
               </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 14, fontWeight: 700 }}>Joe Disabato</div>
-                <div style={{ fontSize: 11, color: 'var(--indigo-l)', fontWeight: 600 }}>Senior Wealth & Corporate Advisory Lead</div>
-                <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>✉️ j.disabato@bluecode.advisory · 📞 +356 21 000 999</div>
-              </div>
-              <div style={{ background: '#064e3b', border: '1px solid #10b981', color: '#6ee7b7', padding: '4px 10px', borderRadius: 20, fontSize: 10, fontWeight: 700 }}>
-                ● Advisor Online
+              <div style={{ flex: 1, minWidth: 220 }}>
+                <div style={{ fontSize: 14, fontWeight: 700 }}>
+                  {contattiStudio?.advisorNome || 'Il tuo Advisor di riferimento'}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--indigo-l)', fontWeight: 600 }}>
+                  {contattiStudio?.studio || 'Studio'}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
+                  {[
+                    contattiStudio?.advisorEmail ? `✉️ ${contattiStudio.advisorEmail}` : null,
+                    contattiStudio?.telefono ? `📞 ${contattiStudio.telefono}` : null,
+                    !contattiStudio?.advisorEmail && contattiStudio?.emailStudio ? `✉️ ${contattiStudio.emailStudio}` : null,
+                  ].filter(Boolean).join('  ·  ') || 'Recapiti non ancora configurati dallo studio'}
+                </div>
               </div>
             </div>
 
@@ -2383,7 +2790,9 @@ export function ClientPortal() {
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 4 }}>
                         <span style={{ fontSize: 10, fontWeight: 700, color: isCliente ? '#a5b4fc' : 'var(--indigo-l)' }}>
-                          {isCliente ? 'Tu (Cliente)' : 'Joe Disabato (Advisor)'}
+                          {/* §2.6: il mittente dello studio prende il nome vero se c'è, senza
+                              inventare una persona. */}
+                          {isCliente ? 'Tu (Cliente)' : (m.mittente || contattiStudio?.advisorNome || 'Studio (Advisor)')}
                         </span>
                         <span style={{ fontSize: 9.5, color: 'var(--muted)' }}>
                           {m.createdAt ? new Date(m.createdAt).toLocaleString('it-IT') : (m.dataOra || 'Oggi')}
@@ -2405,11 +2814,17 @@ export function ClientPortal() {
                 if (!nuovoMessaggio.trim() || inviandoMessaggio) return;
                 setInviandoMessaggio(true);
 
+                // §2.6: il destinatario è lo studio reale (e il suo advisor se c'è), non un
+                // nome cablato.
+                const destinatarioStudio = contattiStudio?.advisorNome
+                  ? `${contattiStudio.studio || 'Studio'} (${contattiStudio.advisorNome})`
+                  : (contattiStudio?.studio || 'Studio');
+
                 const msgObj = {
                   id: `msg-${Date.now()}`,
                   canale: canaleMessaggio,
                   mittente: `${clientName} (Cliente)`,
-                  destinatario: 'Studio Bluecode Advisory (Joe Disabato)',
+                  destinatario: destinatarioStudio,
                   direzione: 'entrata',
                   testo: nuovoMessaggio.trim(),
                   dataOra: new Date().toLocaleString('it-IT'),
@@ -2421,7 +2836,7 @@ export function ClientPortal() {
                   await inviaComunicazioneApi(progettoId, {
                     canale: canaleMessaggio,
                     mittente: `${clientName} (Cliente)`,
-                    destinatario: 'Studio Bluecode Advisory (Joe Disabato)',
+                    destinatario: destinatarioStudio,
                     direzione: 'entrata',
                     testo: nuovoMessaggio.trim(),
                   });
@@ -2496,17 +2911,21 @@ export function ClientPortal() {
               </div>
             </form>
 
+            {/* §2.6 — Sede legale dello studio: prima dai contatti reali letti dal tenant, con
+                il ripiego locale solo se il backend non ha risposto. */}
             <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 14, marginTop: 18 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>Sede Legale Studio {getStudioInfoForTenant().ragioneSociale}</div>
+              <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>
+                Sede Legale {contattiStudio?.studio || getStudioInfoForTenant().ragioneSociale}
+              </div>
               <div style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.5 }}>
-                {getStudioInfoForTenant().sedeLegale || 'Sede in fase di configurazione'}<br />
-                {getStudioInfoForTenant().piva ? `P.IVA: ${getStudioInfoForTenant().piva}` : ''}{getStudioInfoForTenant().email ? ` · ${getStudioInfoForTenant().email}` : ''}
+                {contattiStudio?.sedeLegale || getStudioInfoForTenant().sedeLegale || 'Sede in fase di configurazione'}<br />
+                {contattiStudio?.emailStudio ? `✉️ ${contattiStudio.emailStudio}` : (getStudioInfoForTenant().email ? `${getStudioInfoForTenant().email}` : '')}
               </div>
             </div>
           </div>
         )}
 
-        {/* TAB 6: Profilo & Password Personale Cliente */}
+        {/* TAB 7: Profilo & Password Personale Cliente */}
         {activeTab === 'profilo' && (
           <div style={docBoxStyle}>
             <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>👤 Profilo Riservato & Sicurezza Accesso</div>
