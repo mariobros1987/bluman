@@ -340,8 +340,15 @@ export function buildServer(app: AppPort): FastifyInstance {
     // di rotte pubbliche no — una rotta nuova è protetta perché non è nell'insieme.
     // Le preflight CORS non portano header Authorization e vanno lasciate passare,
     // altrimenti il browser non arriva nemmeno a inviare la richiesta vera.
+    //
+    // Attenzione però: questo hook gira anche sul gestore not-found. Se rispondesse
+    // 401 pure lì, una rotta inesistente diventerebbe indistinguibile da una rotta
+    // esistente ma protetta (il 404 scomparirebbe del tutto). Quando la richiesta
+    // non ha matching, routeOptions non ha né url né method: la si lascia passare
+    // e Fastify risponde il 404 corretto.
     const chiaveRotta = `${req.method} ${req.routeOptions?.url ?? req.url}`;
-    if (req.method !== 'OPTIONS' && !autenticato && !ROTTE_PUBBLICHE.has(chiaveRotta)) {
+    const rottaEsistente = req.routeOptions?.url !== undefined;
+    if (req.method !== 'OPTIONS' && rottaEsistente && !autenticato && !ROTTE_PUBBLICHE.has(chiaveRotta)) {
       return reply.code(401).send({ errore: 'Non autenticato' });
     }
 
