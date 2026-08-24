@@ -60,11 +60,14 @@ export function ProjectDetail() {
   const [accessiModalOpen, setAccessiModalOpen] = useState(false);
   const { team: teamList } = useTeamMembers();
   const [selectedUser, setSelectedUser] = useState('');
+  // §Blocco 7 (fix) — la selezione viaggia sull'id reale del membro (dbId),
+  // non sul nome: è quello che l'API di assegnazione accessi si aspetta.
+  const idMembro = (u: (typeof teamList)[number]) => u.dbId || String(u.id);
   // Il primo collaboratore disponibile viene preselezionato solo quando la squadra
   // arriva (dal database): prima c'era un nome fisso preso dall'elenco mock.
   useEffect(() => {
     if (!selectedUser && teamList.length > 0) {
-      setSelectedUser(teamList[0].n || (teamList[0] as any).name || '');
+      setSelectedUser(idMembro(teamList[0]));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [teamList]);
@@ -911,7 +914,7 @@ export function ProjectDetail() {
               <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Seleziona Collaboratore dello Studio *</label>
               <select value={selectedUser} onChange={e => setSelectedUser(e.target.value)}>
                 {teamList.map(u => (
-                  <option key={u.id} value={u.n || (u as any).name}>{u.n || (u as any).name} — {u.r || (u as any).role}</option>
+                  <option key={u.id} value={idMembro(u)}>{u.n || (u as any).name} — {u.r || (u as any).role}</option>
                 ))}
               </select>
             </div>
@@ -929,18 +932,27 @@ export function ProjectDetail() {
               <button onClick={() => setAccessiModalOpen(false)} style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '7px 14px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}>Chiudi</button>
               <button
                 onClick={async () => {
+                  // §Blocco 7 (fix) — prima l'accesso veniva assegnato SEMPRE a uno
+                  // userId fisso hardcoded ('11111111-…', Joe Disabato) ignorando la
+                  // scelta fatta nella tendina. Ora si usa il membro selezionato e,
+                  // in caso di errore, l'errore viene mostrato invece di un finto "salvato".
                   try {
-                    const targetUserId = '11111111-1111-1111-1111-111111111111'; // Joe Disabato
-                    if (rawDbProject?.id) {
-                      await assegnaAccessoProgettoApi(rawDbProject.id, targetUserId, livello === 'read' ? 'lettura' : 'scrittura');
+                    const membro = teamList.find(u => idMembro(u) === selectedUser);
+                    if (!rawDbProject?.id) {
+                      alert('⚠️ Progetto non ancora salvato sul database: impossibile assegnare accessi.');
+                      return;
                     }
-                    alert(`✓ Accesso collegato con successo al progetto!`);
+                    if (!membro?.dbId) {
+                      alert('⚠️ Seleziona un collaboratore caricato dal database dello studio.');
+                      return;
+                    }
+                    await assegnaAccessoProgettoApi(rawDbProject.id, membro.dbId, livello);
+                    alert(`✓ Accesso "${livello}" assegnato a ${membro.n} sul progetto.`);
                     setAccessiModalOpen(false);
                     loadDetail();
                   } catch (err) {
                     console.error(err);
-                    alert(`✓ Accesso salvato per ${selectedUser}!`);
-                    setAccessiModalOpen(false);
+                    alert('❌ Assegnazione accesso non riuscita. Riprova.');
                   }
                 }}
                 style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer' }}

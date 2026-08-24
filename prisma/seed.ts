@@ -11,6 +11,36 @@ function hashPassword(password: string): string {
   return crypto.scryptSync(password, salt, 64).toString('hex');
 }
 
+// §Blocco 7 (fix) — Regola 6: nessuna password o token reale nel codice
+// versionato. Le password degli utenti seed arrivano dall'ambiente:
+//   SEED_ADMIN_PASSWORD  → admin@bluecode.advisory
+//   SEED_USER_PASSWORD   → tutti gli altri utenti seed
+// Se le variabili mancano (sviluppo locale), viene generata UNICA password
+// casuale per l'intera corsa e stampata UNA sola volta sulla console: niente
+// valori prevedibili né segreti nel repository.
+const passwordAdminSeed =
+  process.env.SEED_ADMIN_PASSWORD || crypto.randomBytes(12).toString('base64url');
+const passwordUtentiSeed =
+  process.env.SEED_USER_PASSWORD || crypto.randomBytes(12).toString('base64url');
+if (!process.env.SEED_ADMIN_PASSWORD || !process.env.SEED_USER_PASSWORD) {
+  console.log('ℹ️  Password seed non impostate in SEED_ADMIN_PASSWORD / SEED_USER_PASSWORD.');
+  console.log(`   Password sviluppatori generata per questa corsa: ${passwordUtentiSeed}`);
+  if (!process.env.SEED_ADMIN_PASSWORD) {
+    console.log(`   Password super admin generata per questa corsa: ${passwordAdminSeed}`);
+  }
+  console.log('   Imposta le variabili d\'ambiente per una password stabile tra più seed.');
+}
+
+// Token reali dei canali (WhatsApp/Telegram) solo dall'ambiente: il seed non li
+// contiene più. Se la variabile manca e il tenant esiste già, il valore già in
+// database non viene toccato (l'aggiornamento avviene solo sui campi definiti).
+const datiCanaliSeed: Record<string, string | number | boolean> = {};
+if (process.env.WA_PHONE_ID) datiCanaliSeed.waPhoneId = process.env.WA_PHONE_ID;
+if (process.env.WHATSAPP_ACCESS_TOKEN) datiCanaliSeed.waAccessToken = process.env.WHATSAPP_ACCESS_TOKEN;
+if (process.env.WA_VERIFY_TOKEN) datiCanaliSeed.waVerifyToken = process.env.WA_VERIFY_TOKEN;
+if (process.env.TELEGRAM_BOT_TOKEN) datiCanaliSeed.tgBotToken = process.env.TELEGRAM_BOT_TOKEN;
+if (process.env.TELEGRAM_BOT_USERNAME) datiCanaliSeed.tgBotUsername = process.env.TELEGRAM_BOT_USERNAME;
+
 const TENANT_ID = '00000000-0000-0000-0000-000000000001';
 
 async function main() {
@@ -33,11 +63,7 @@ async function main() {
       coloreTemaFattura: '#4338ca',
       titoloIntestazione: 'BLUECODE ADVISORY & CONSULTING',
       notePieFattura: 'Fattura emessa ai sensi delle vigenti disposizioni fiscali UE. Pagamento a mezzo bonifico bancario su IBAN indicato.',
-      waPhoneId: '1318817114639409',
-      waAccessToken: 'EAGO82S4iZAZCIBSCyV6ARilEgvBez7EwZA6pK5yaOa1ZCp7TmvFRTfxIZCWlLjQ4rBQeIZCRezgBJFm9BiQrUUsmfJA9ayZBTR3w3Qm3wGF8rUNpPCPqiSVOhTZCMF4EZBYpZAeQRjtgxfRqraBrXgBcZBCE0mZCfTvENnDAZBmgQhmtxeRp6N9Qcuj9C6CqigYHNXAZDZD',
-      waVerifyToken: 'bluman_wa_secure_token_2026',
-      tgBotToken: '7182930412:AAHj39201982736192',
-      tgBotUsername: '@BluManStudioBot',
+      ...datiCanaliSeed,
       smtpHost: 'authsmtp.register.it',
       smtpPort: 465,
       smtpSecure: true,
@@ -69,11 +95,7 @@ async function main() {
       coloreTemaFattura: '#4338ca',
       titoloIntestazione: 'BLUECODE ADVISORY & CONSULTING',
       notePieFattura: 'Fattura emessa ai sensi delle vigenti disposizioni fiscali UE. Pagamento a mezzo bonifico bancario su IBAN indicato.',
-      waPhoneId: '1318817114639409',
-      waAccessToken: 'EAGO82S4iZAZCIBSCyV6ARilEgvBez7EwZA6pK5yaOa1ZCp7TmvFRTfxIZCWlLjQ4rBQeIZCRezgBJFm9BiQrUUsmfJA9ayZBTR3w3Qm3wGF8rUNpPCPqiSVOhTZCMF4EZBYpZAeQRjtgxfRqraBrXgBcZBCE0mZCfTvENnDAZBmgQhmtxeRp6N9Qcuj9C6CqigYHNXAZDZD',
-      waVerifyToken: 'bluman_wa_secure_token_2026',
-      tgBotToken: '7182930412:AAHj39201982736192',
-      tgBotUsername: '@BluManStudioBot',
+      ...datiCanaliSeed,
       smtpHost: 'authsmtp.register.it',
       smtpPort: 465,
       smtpSecure: true,
@@ -96,59 +118,64 @@ async function main() {
   console.log('✓ Tenant master Bluecode configurato nel database con tutte le impostazioni:', tenant.ragioneSociale);
 
   // 2. UTENTI E PROFESSIONISTI STUDIO
+  // §Blocco 7 (fix) — la colonna `password` arriva dall'ambiente (vedi in testa
+  // al file): nessun valore in chiaro nel repository.
   const USERS = [
     {
       nome: 'Joe Disabato',
       email: 'joe@bluecode.advisory',
       ruolo: RuoloUtente.super_admin,
-      password: 'password123',
+      password: passwordUtentiSeed,
       costoOrarioCentesimi: 12000,
     },
     {
       nome: 'Avv. Mario Dibenedetto',
       email: 'mario.dibenedetto@bluecode.advisory',
       ruolo: RuoloUtente.advisor,
-      password: 'password123',
+      password: passwordUtentiSeed,
       costoOrarioCentesimi: 9500,
     },
     {
       nome: 'Avv. Lorenzo Marino',
       email: 'lorenzo.marino@bluecode.advisory',
       ruolo: RuoloUtente.advisor,
-      password: 'password123',
+      password: passwordUtentiSeed,
       costoOrarioCentesimi: 9000,
     },
     {
       nome: 'Dr. Elena Russo',
       email: 'elena.russo@bluecode.advisory',
       ruolo: RuoloUtente.advisor,
-      password: 'password123',
+      password: passwordUtentiSeed,
       costoOrarioCentesimi: 8500,
     },
     {
       nome: 'Francesca Disabato',
       email: 'francesca.disabato@bluecode.advisory',
       ruolo: RuoloUtente.collaboratore_interno,
-      password: 'password123',
+      password: passwordUtentiSeed,
       costoOrarioCentesimi: 4500,
     },
     {
       nome: 'Super Admin',
       email: 'admin@bluecode.advisory',
       ruolo: RuoloUtente.super_admin,
-      password: 'admin2026!',
+      password: passwordAdminSeed,
       costoOrarioCentesimi: 15000,
     },
     {
       nome: 'Operatore Studio',
       email: 'operator@bluecode.advisory',
       ruolo: RuoloUtente.collaboratore_interno,
-      password: 'operator123',
+      password: passwordUtentiSeed,
       costoOrarioCentesimi: 4000,
     },
   ];
 
   for (const u of USERS) {
+    // §Blocco 7 (fix) — l'update NON tocca più il passwordHash: rifare il seed
+    // su un database già popolato non deve resettare le password reali degli
+    // utenti (prima ogni corsa sovrascriveva l'hash con quello seed).
     await prisma.user.upsert({
       where: { email: u.email },
       update: {
@@ -156,7 +183,6 @@ async function main() {
         ruolo: u.ruolo,
         tenantId: TENANT_ID,
         stato: StatoUtente.attivo,
-        passwordHash: hashPassword(u.password),
         costoOrarioCentesimi: u.costoOrarioCentesimi,
       },
       create: {
@@ -252,29 +278,30 @@ async function main() {
     { id: 'A_AGG_ANNUALE', nome: 'Aggiornamento annuale compliance', cat: 'Compliance', h: 1, p: 20000, ver: 1 },
   ];
 
+  // §Blocco 7 (fix) — gli articoli si risolvono per chiave unica
+  // (tenant, nome, versione), non per id: se l'articolo esiste già sotto un id
+  // diverso (es. 'art-03' creato da un seed storico), il seed aggiorna quello
+  // invece di creare un doppione. La mappa tiene traccia dell'id reale da usare
+  // nelle righe distinta dei moduli più sotto.
+  const idRealeArticolo = new Map<string, string>();
   for (const art of ARTICOLI) {
-    await prisma.articolo.upsert({
-      where: { id: art.id },
-      update: {
-        nome: art.nome,
-        categoria: art.cat,
-        oreDefault: art.h,
-        prezzoDefault: art.p,
-        versione: art.ver,
-        formMasterId: art.formMasterId || null,
-        tenantId: TENANT_ID,
-      },
-      create: {
-        id: art.id,
-        tenantId: TENANT_ID,
-        nome: art.nome,
-        categoria: art.cat,
-        oreDefault: art.h,
-        prezzoDefault: art.p,
-        versione: art.ver,
-        formMasterId: art.formMasterId || null,
-      },
-    });
+    const chiaveUnica = {
+      tenantId_nome_versione: { tenantId: TENANT_ID, nome: art.nome, versione: art.ver },
+    };
+    const dati = {
+      nome: art.nome,
+      categoria: art.cat,
+      oreDefault: art.h,
+      prezzoDefault: art.p,
+      versione: art.ver,
+      formMasterId: art.formMasterId || null,
+      tenantId: TENANT_ID,
+    };
+    const esistente = await prisma.articolo.findUnique({ where: chiaveUnica });
+    const salvato = esistente
+      ? await prisma.articolo.update({ where: chiaveUnica, data: dati })
+      : await prisma.articolo.create({ data: { id: art.id, ...dati } });
+    idRealeArticolo.set(art.id, salvato.id);
   }
   console.log(`✓ ${ARTICOLI.length} Articoli inseriti nel DB.`);
 
@@ -316,8 +343,10 @@ async function main() {
 
     // Righe distinta
     for (let i = 0; i < m.righe.length; i++) {
-      const artId = m.righe[i];
-      const rigaId = `rd-${m.id}-${artId}`;
+      const artSeed = m.righe[i];
+      // L'id reale dell'articolo può differire da quello del seed (chiave unica).
+      const artId = idRealeArticolo.get(artSeed) || artSeed;
+      const rigaId = `rd-${m.id}-${artSeed}`;
       try {
         await prisma.rigaDistinta.upsert({
           where: { id: rigaId },

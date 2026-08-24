@@ -35,6 +35,13 @@ export interface Cliente {
 
 export interface TeamMember {
   id: number;
+  /**
+   * Identificativo reale a database dell'utente (UUID), quando il membro
+   * proviene dall'API del tenant. Assente sui membri costruiti localmente.
+   * Serve alle chiamate che richiedono lo userId vero (es. assegnazione
+   * accessi progetto §19): `id` è numerico e serve solo alla UI/avatar.
+   */
+  dbId?: string;
   n: string;
   r: string;
   i: string;

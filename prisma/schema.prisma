@@ -217,6 +217,10 @@ model Articolo {
   passaggiTemplate   PassaggioTemplate[]
   microvociProgetto  MicrovoceProgetto[]
 
+  // §Blocco 7 (fix) — anti-duplicato: stesso tenant non può avere due articoli
+  // con lo stesso nome alla stessa versione (i doppioni seed/UI sono stati
+  // ripuliti con scripts/pulizia-duplicati-catalogo.mjs).
+  @@unique([tenantId, nome, versione])
   @@map("articolo")
 }
 
@@ -239,6 +243,9 @@ model ModuloTemplate {
   dipendenzeDi  ModuloDipendenzaTemplate[] @relation("ModuloDaCuiDipende")
   moduliProgetto ModuloProgetto[]
 
+  // §Blocco 7 (fix) — anti-duplicato: stesso tenant non può avere due moduli
+  // con lo stesso nome alla stessa versione.
+  @@unique([tenantId, nome, versione])
   @@map("modulo_template")
 }
 
