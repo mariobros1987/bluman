@@ -21,8 +21,10 @@ import {
   magicLoginApi,
   clientLoginApi,
   cambiaPasswordClienteApi,
+  documentiPortaleApi,
+  urlFileArchivio,
 } from '../api/client';
-import type { CanaleOtp, CanaleFirma, AmbitoFirma } from '../api/client';
+import type { CanaleOtp, CanaleFirma, AmbitoFirma, DocumentoPortale } from '../api/client';
 import type { CategoriaModulo } from '../types';
 
 export interface ModuloPassaggio {
@@ -126,6 +128,29 @@ function mapProjectToPortalModules(project: any): ModuloProposta[] {
 
 type PortalTab = 'proposta' | 'avanzamento' | 'form' | 'documenti' | 'contatti' | 'profilo';
 
+/**
+ * L'atto che il codice OTP sta autorizzando: la lettera d'incarico o un documento del fascicolo.
+ * `riferimentoId` è l'id del documento, e finisce nel sigillo a database — senza, una firma non si
+ * potrebbe più ricollegare all'atto firmato.
+ */
+interface BersaglioFirma {
+  ambito: AmbitoFirma;
+  titolo: string;
+  riferimentoId?: string;
+}
+
+/**
+ * Data e ora nel formato italiano, a partire da quello che manda il backend (ISO).
+ * Se il valore non è una data valida si restituisce così com'è: meglio un testo grezzo che un
+ * «Invalid Date» al posto della data di una firma.
+ */
+function dataOraLeggibile(valore: string | null): string {
+  if (!valore) return '';
+  const d = new Date(valore);
+  if (Number.isNaN(d.getTime())) return valore;
+  return d.toLocaleString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
 export function ClientPortal() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -169,63 +194,23 @@ export function ClientPortal() {
   const [pageLoading, setPageLoading] = useState(true);
   const [accessoNegato, setAccessoNegato] = useState<string | null>(null);
 
-  // Documenti in Incarico con Stato Firma Persistente
-  const [portalDocs, setPortalDocs] = useState<any[]>([
-    {
-      id: 'doc-nda',
-      templateId: 'tmpl-nda',
-      titolo: 'Accordo di Riservatezza NDA & Mandato Fiduciario',
-      nome: 'Accordo di Riservatezza NDA & Incarico.pdf',
-      dimensione: '1.4 MB',
-      categoria: 'Contratti',
-      firmato: true,
-      richiedeFirma: true,
-      dataFirma: '15/08/2026 01:44:12',
-      descrizione: 'Accordo bilaterale di riservatezza e segreto professionale conforme GDPR e standard fiduciario Malta/Svizzera.',
-    },
-    {
-      id: 'doc-statuto',
-      templateId: 'tmpl-memorandum',
-      titolo: 'Statuto Standard Holding Malta & Procura MFSA',
-      nome: 'Statuto Standard Holding Malta & Procura MFSA.pdf',
-      dimensione: '3.2 MB',
-      categoria: 'Societario',
-      firmato: false,
-      richiedeFirma: true,
-      dataFirma: null,
-      descrizione: 'Statuto societario per costituzione LTD maltese con clausole di governance e procura speciale.',
-    },
-    {
-      id: 'doc-ubo',
-      templateId: 'tmpl-compliance',
-      titolo: 'Dichiarazione Titolare Effettivo (UBO Registry)',
-      nome: 'Dichiarazione Titolare Effettivo (UBO Registry).pdf',
-      dimensione: '2.8 MB',
-      categoria: 'Compliance',
-      firmato: false,
-      richiedeFirma: true,
-      dataFirma: null,
-      descrizione: 'Dichiarazione di trasparenza del Beneficiary Owner ai sensi della V Direttiva Antiriciclaggio UE 2018/843.',
-    },
-    {
-      id: 'doc-trust',
-      templateId: 'tmpl-trust',
-      titolo: 'Confidential Letter of Wishes per Struttura Trust',
-      nome: 'Confidential Letter of Wishes Trust.pdf',
-      dimensione: '2.1 MB',
-      categoria: 'Trust',
-      firmato: false,
-      richiedeFirma: true,
-      dataFirma: null,
-      descrizione: 'Istruzioni confidenziali per il trustee designato relative alla governance e protezione asset.',
-    },
-  ]);
+  /**
+   * Documenti del fascicolo, letti da `GET /portal/documenti`.
+   *
+   * Qui c'erano quattro documenti scritti nel codice: un NDA «firmato il 15/08/2026 01:44:12», uno
+   * statuto maltese, una dichiarazione UBO e una letter of wishes per un trust. Nessuno esisteva a
+   * database, per nessun cliente, e la data di firma del primo era inventata: ogni cliente che
+   * apriva il portale vedeva quei quattro atti come se fossero i suoi, con uno già sottoscritto.
+   * Ora l'elenco è quello vero e, quando è vuoto, la sezione lo dichiara (§2.1).
+   */
+  const [portalDocs, setPortalDocs] = useState<DocumentoPortale[]>([]);
+  const [portalDocsErrore, setPortalDocsErrore] = useState<string | null>(null);
+  const [portalDocsCaricamento, setPortalDocsCaricamento] = useState(false);
+  /** Documento del fascicolo per cui il cliente ha scelto un file firmato a mano, da confermare. */
+  const [documentoDaCaricare, setDocumentoDaCaricare] = useState<DocumentoPortale | null>(null);
 
   // Visualizzatore A4 Documento Selezionato per Lettura Completa
   const [selectedViewerDoc, setSelectedViewerDoc] = useState<any | null>(null);
-
-  // Modale Firma Grafica per Documenti Singoli
-  const [signingDoc, setSigningDoc] = useState<any | null>(null);
 
   // ── FIRMA ELETTRONICA AVANZATA: CANALE, CODICE, MODALITÀ ──────────────────
   //
@@ -357,6 +342,28 @@ export function ClientPortal() {
     }
   };
 
+  /**
+   * Rilegge i documenti del fascicolo con il loro stato di firma a database.
+   *
+   * Serve anche dopo una firma: il sigillo lo emette il backend, quindi l'unico modo di sapere
+   * che un documento è firmato è richiederlo. Un errore di lettura viene mostrato: prima l'elenco
+   * era finto e non poteva fallire, ora può, e «non riesco a leggere i documenti» non deve
+   * assomigliare a «non ci sono documenti».
+   */
+  const caricaDocumenti = async (clienteIdSessione?: string | null) => {
+    setPortalDocsCaricamento(true);
+    setPortalDocsErrore(null);
+    try {
+      const res = await documentiPortaleApi(clienteIdSessione ?? undefined);
+      setPortalDocs(Array.isArray(res?.documenti) ? res.documenti : []);
+    } catch (err: any) {
+      setPortalDocs([]);
+      setPortalDocsErrore(err?.message || 'Impossibile leggere i documenti del fascicolo.');
+    } finally {
+      setPortalDocsCaricamento(false);
+    }
+  };
+
   const loadPortalData = async (clienteIdParam?: string) => {
     setPageLoading(true);
     let resolvedClientName = clientName;
@@ -417,6 +424,10 @@ export function ClientPortal() {
     }
 
     try {
+      // Id del cliente di cui si stanno guardando i dati: quello della sessione, oppure quello
+      // scelto nell'anteprima dello studio. Serve alle rotte del portale, che per un utente
+      // studio non possono dedurlo dal token.
+      let clienteIdRisolto: string | null = clienteIdSessione;
       const clientiRes = await fetchClienti();
       if (clientiRes && Array.isArray(clientiRes) && clientiRes.length > 0) {
         const found = clienteIdSessione
@@ -435,6 +446,7 @@ export function ClientPortal() {
         // Senza id di sessione siamo nell'anteprima aperta da uno studio autenticato: lì
         // `clientiRes[0]` è una scelta, non un travisamento (§2.10 prevede un selettore).
         const risolto: any = found || clientiRes[0];
+        clienteIdRisolto = risolto.id ?? clienteIdSessione;
         setClientObj(risolto);
         setClientName(risolto.nome);
         resolvedClientName = risolto.nome;
@@ -469,21 +481,10 @@ export function ClientPortal() {
         setAddendums([]);
       }
 
-      // Ripristina i documenti firmati singolarmente
-      const savedSignedDocsStr = localStorage.getItem(`bluman_signed_docs_${resolvedClientName}`);
-      if (savedSignedDocsStr) {
-        try {
-          const signedIds: string[] = JSON.parse(savedSignedDocsStr);
-          setPortalDocs(prev => prev.map(d => {
-            if (signedIds.includes(d.id)) {
-              const sigStr = localStorage.getItem(`bluman_portal_doc_sig_${d.id}`);
-              const sigData = sigStr ? JSON.parse(sigStr) : null;
-              return { ...d, firmato: true, signatureData: sigData, dataFirma: sigData?.timestamp || d.dataFirma || null };
-            }
-            return d;
-          }));
-        } catch (e) {}
-      }
+      // I documenti firmati NON si rileggono più da `localStorage`. La firma di un documento
+      // stava in `bluman_signed_docs_<cliente>`: firmato su un browser voleva dire non firmato
+      // su un altro, e lo studio non ne vedeva traccia. Ora arriva da database (§2.9).
+      await caricaDocumenti(clienteIdRisolto);
 
       // Ripristina firme sulle singole operazioni / moduli
       const savedModSigs = localStorage.getItem(`bluman_module_signatures_${resolvedClientName}`);
@@ -576,8 +577,48 @@ export function ClientPortal() {
 
   const TITOLO_MANDATO = 'Engagement Letter & Mandato Professionale';
 
+  /**
+   * Cosa si sta firmando in questo momento.
+   *
+   * Il flusso OTP era cablato sulla lettera d'incarico: ambito, titolo e impronta erano costanti.
+   * I documenti del Vault avevano quindi una firma tutta loro, che non passava dal backend —
+   * `DigitalSignatureModal` disegnava la grafometrica, la scriveva in `localStorage` e il portale
+   * dichiarava al cliente «firmato con Sigillo FEA eIDAS UE 910/2014». Non c'era nessun codice
+   * OTP, nessuna riga in `FirmaElettronica`, nessuna impronta del documento: una dichiarazione di
+   * validità legale su una firma che a database non esisteva, e che lo studio non vedeva.
+   *
+   * Ora il bersaglio è un dato: la stessa modale, lo stesso codice e lo stesso sigillo servono la
+   * lettera d'incarico e un documento del fascicolo, cambiando solo ambito e riferimento.
+   *
+   * Nello stato stanno solo i tre valori, non la funzione che calcola l'impronta: una closure
+   * salvata al primo render firmerebbe l'HTML di allora, con i moduli ancora da caricare.
+   */
+  const [bersaglioFirma, setBersaglioFirma] = useState<BersaglioFirma>({
+    ambito: 'engagement_letter',
+    titolo: TITOLO_MANDATO,
+  });
+
+  /**
+   * Impronta da mandare al backend, secondo cosa si sta firmando.
+   *
+   * Per un documento del fascicolo non si manda niente: l'impronta la calcola il server dal file
+   * che ha in archivio. È l'unico modo perché voglia dire qualcosa — chi firma è anche chi manda
+   * la richiesta, e un'impronta scelta dal browser descrive il documento che vuole il firmatario,
+   * non quello che ha firmato. Per la lettera d'incarico resta questa, perché il testo del mandato
+   * è ancora composto qui e il server non ce l'ha.
+   */
+  const improntaDelBersaglio = async (bersaglio: BersaglioFirma): Promise<string | undefined> => {
+    if (bersaglio.ambito === 'documento_vault' && bersaglio.riferimentoId) return undefined;
+    return impronteDocumento();
+  };
+
   /** Invio o reinvio del codice. Un errore resta un errore, e il cliente legge quale. */
-  const inviaCodiceFirma = async (opzioni: { reinvio?: boolean } = {}) => {
+  const inviaCodiceFirma = async (opzioni: { reinvio?: boolean; bersaglio?: BersaglioFirma } = {}) => {
+    const bersaglio = opzioni.bersaglio ?? bersaglioFirma;
+    // Chi chiede un codice per un atto preciso fissa anche il bersaglio: la convalida che
+    // arriva dopo legge lo stato, e se restasse quello dell'atto firmato prima il sigillo
+    // finirebbe sul documento sbagliato. Il reinvio non passa il bersaglio e non lo tocca.
+    if (opzioni.bersaglio) setBersaglioFirma(opzioni.bersaglio);
     setOtpLoading(true);
     setOtpError(null);
     setOtpCode('');
@@ -585,9 +626,11 @@ export function ClientPortal() {
     try {
       const res = await requestPortalOtpApi({
         canale: otpCanale,
-        ambito: 'engagement_letter',
+        ambito: bersaglio.ambito,
+        riferimentoId: bersaglio.riferimentoId,
         recapitoDichiarato: usaRecapitoDiverso && recapitoDichiarato.trim() ? recapitoDichiarato.trim() : undefined,
         signerName: clientName,
+        clienteId: clientObj?.id,
       });
 
       setOtpTarget(res.maskedTarget);
@@ -623,20 +666,18 @@ export function ClientPortal() {
     try {
       const res = await verifyPortalOtpAndSignApi({
         otp: otpCode,
-        documentoHash: await impronteDocumento(),
+        documentoHash: await improntaDelBersaglio(bersaglioFirma),
         signerName: clientName,
-        documentoTitolo: TITOLO_MANDATO,
-        ambito: 'engagement_letter',
+        documentoTitolo: bersaglioFirma.titolo,
+        ambito: bersaglioFirma.ambito,
+        riferimentoId: bersaglioFirma.riferimentoId,
+        clienteId: clientObj?.id,
         firmaGrafometricaPng,
       });
 
-      setEidasSeal(res.seal);
-      localStorage.setItem(`bluman_seal_${clientName}`, JSON.stringify(res.seal));
-      localStorage.setItem(`bluman_portal_signed_${clientName}`, 'true');
-      setSigned(true);
+      await registraEsitoFirma(res.seal);
       setOtpModalOpen(false);
       setOtpCode('');
-      await ricaricaDopoFirma();
       return true;
     } catch (err: any) {
       setOtpError(err?.message || 'Convalida del codice non riuscita.');
@@ -661,21 +702,19 @@ export function ClientPortal() {
     try {
       const res = await firmaConFileApi({
         tipoFirma: modalitaFirma === 'qualificata_esterna' ? 'qualificata_esterna' : 'manuale_scansionata',
-        documentoHash: await impronteDocumento(),
+        documentoHash: await improntaDelBersaglio(bersaglioFirma),
         filename: fileFirmato.nome,
         contentBase64: fileFirmato.base64,
-        ambito: 'engagement_letter',
-        documentoTitolo: TITOLO_MANDATO,
+        ambito: bersaglioFirma.ambito,
+        riferimentoId: bersaglioFirma.riferimentoId,
+        documentoTitolo: bersaglioFirma.titolo,
         signerName: clientName,
+        clienteId: clientObj?.id,
         otp: otpCode.length === 6 ? otpCode : undefined,
       });
 
-      setEidasSeal(res.seal);
-      localStorage.setItem(`bluman_seal_${clientName}`, JSON.stringify(res.seal));
-      localStorage.setItem(`bluman_portal_signed_${clientName}`, 'true');
-      setSigned(true);
+      await registraEsitoFirma(res.seal);
       setFileFirmato(null);
-      await ricaricaDopoFirma();
       return true;
     } catch (err: any) {
       setOtpError(err?.message || 'Caricamento del documento firmato non riuscito.');
@@ -683,6 +722,45 @@ export function ClientPortal() {
     } finally {
       setCaricamentoFirmato(false);
     }
+  };
+
+  /**
+   * Cosa aggiornare dopo che il backend ha emesso il sigillo.
+   *
+   * Cambia con l'ambito: la lettera d'incarico sblocca il portale e attiva il progetto, un
+   * documento del fascicolo va semplicemente riletto — il suo stato di firma sta a database e non
+   * si deduce dal fatto che il pulsante è stato premuto.
+   */
+  const registraEsitoFirma = async (seal: any) => {
+    if (bersaglioFirma.ambito === 'documento_vault') {
+      await caricaDocumenti(clientObj?.id);
+      setSelectedViewerDoc(null);
+      return;
+    }
+
+    setEidasSeal(seal);
+    localStorage.setItem(`bluman_seal_${clientName}`, JSON.stringify(seal));
+    localStorage.setItem(`bluman_portal_signed_${clientName}`, 'true');
+    setSigned(true);
+    await ricaricaDopoFirma();
+  };
+
+  /**
+   * Avvia la firma di un documento del fascicolo: sceglie il bersaglio e chiede il codice.
+   *
+   * Il codice viene richiesto per QUESTO documento, con il suo `riferimentoId`: un OTP emesso per
+   * la lettera d'incarico non convalida la firma di un documento, e viceversa.
+   */
+  const avviaFirmaDocumento = async (doc: DocumentoPortale) => {
+    const bersaglio: BersaglioFirma = {
+      ambito: 'documento_vault',
+      titolo: doc.titolo || doc.nome,
+      riferimentoId: doc.id,
+    };
+    setModalitaFirma('otp');
+    setFileFirmato(null);
+    // `inviaCodiceFirma` fissa il bersaglio: qui non serve scriverlo due volte.
+    await inviaCodiceFirma({ bersaglio });
   };
 
   /** Legge il file scelto dal cliente come data URL, per spedirlo in base64. */
@@ -905,57 +983,12 @@ export function ClientPortal() {
     });
   };
 
-  const getResolvedDocumentHtml = (doc: any) => {
-    const studio = getStudioInfoForTenant();
-    let templateHtml = '';
-    if (doc.id === 'doc-nda' || doc.templateId === 'tmpl-nda') {
-      templateHtml = PREBUILT_TEMPLATES.find(t => t.id === 'tmpl-nda')?.contenutoHtml || '';
-    } else if (doc.id === 'doc-statuto' || doc.templateId === 'tmpl-memorandum') {
-      templateHtml = PREBUILT_TEMPLATES.find(t => t.id === 'tmpl-memorandum')?.contenutoHtml || '';
-    } else if (doc.id === 'doc-ubo' || doc.templateId === 'tmpl-compliance') {
-      templateHtml = PREBUILT_TEMPLATES.find(t => t.id === 'tmpl-compliance')?.contenutoHtml || '';
-    } else if (doc.id === 'doc-trust' || doc.templateId === 'tmpl-trust') {
-      templateHtml = PREBUILT_TEMPLATES.find(t => t.id === 'tmpl-trust')?.contenutoHtml || '';
-    } else {
-      templateHtml = `
-        <h1 style="text-align: center; color: #1e1b4b; margin-bottom: 20px; font-size: 18pt; text-transform: uppercase;">
-          ${doc.titolo || doc.nome}
-        </h1>
-        <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 14px; border-radius: 8px; margin-bottom: 20px; font-size: 10pt;">
-          <strong>Studio Professionale:</strong> ${studio.ragioneSociale}<br/>
-          <strong>Cliente Committente:</strong> {{cliente.ragione_sociale}} ({{cliente.referente}})<br/>
-          <strong>Oggetto Documento:</strong> ${doc.descrizione || 'Atto professionale del fascicolo'}<br/>
-          <strong>Data di Emissione:</strong> {{data_odierna}}
-        </div>
-        <h3 style="color: #1e1b4b; font-size: 12pt; margin-top: 18px;">1. PREMESSE ED AMBITO GIURIDICO</h3>
-        <p style="font-size: 10.5pt; color: #334155; line-height: 1.6; text-align: justify;">
-          ${doc.descrizione || 'Il presente documento è redatto a cura dello Studio e forma parte integrante e sostanziale del fascicolo di consulenza e structuring.'}
-        </p>
-        <h3 style="color: #1e1b4b; font-size: 12pt; margin-top: 18px;">2. EFFICACIA E VALUTAZIONE PROBATORIA</h3>
-        <p style="font-size: 10.5pt; color: #334155; line-height: 1.6; text-align: justify;">
-          Le Parti riconoscono espressamente la piena validità legale ed efficacia probatoria del presente atto e della relativa sottoscrizione digitale ai sensi del Regolamento UE 910/2014 (eIDAS) e delle vigenti normative applicabili.
-        </p>
-      `;
-    }
-
-    return resolveDocumentTemplateHtml(templateHtml, {
-      cliente: clientObj || {
-        nome: clientName,
-        referenteNome: clientName,
-        ragioneSociale: formData.ragioneSociale || clientName,
-        piva: formData.piva || '',
-        codiceFiscale: formData.codiceFiscale || '',
-      },
-      progetto: {
-        // Il nome dell'incarico a database. Era cablato «Progetto Consulenza & Structuring
-        // Patrimoniale»: compariva dentro il testo che il cliente sottoscrive, riferito a un
-        // incarico che non è il suo. Senza progetto resta la dizione generica.
-        titolo: progettoAttivo?.nome || 'Incarico professionale',
-        totalePreventivo: totalValue,
-      },
-      studio,
-    });
-  };
+  // Qui c'era `getResolvedDocumentHtml`: per un documento del fascicolo componeva un testo
+  // legale — premesse, articoli, richiami a eIDAS — e lo mostrava al cliente come se fosse il
+  // documento. Il file vero stava in archivio e non veniva nemmeno aperto: il cliente leggeva
+  // articoli che nessuno aveva scritto e poi firmava. I documenti del fascicolo si aprono ora
+  // per quello che sono, e il testo generato è rimasto solo per la lettera d'incarico, che
+  // effettivamente si compone qui.
 
   const currentStudioInfo = getStudioInfoForTenant();
 
@@ -1805,7 +1838,11 @@ export function ClientPortal() {
                       )}
 
                       <button
-                        onClick={() => inviaCodiceFirma()}
+                        // Il bersaglio va dichiarato qui e non lasciato a quello che c'è in stato:
+                        // dopo aver firmato un documento del fascicolo `bersaglioFirma` punta
+                        // ancora a quel documento, e il mandato finirebbe registrato con
+                        // l'ambito e il riferimento di un altro atto.
+                        onClick={() => inviaCodiceFirma({ bersaglio: { ambito: 'engagement_letter', titolo: TITOLO_MANDATO } })}
                         disabled={loading || otpLoading || !canaleCorrente?.disponibile || (usaRecapitoDiverso && !recapitoDichiarato.trim())}
                         style={{
                           background: canaleCorrente?.disponibile ? 'var(--indigo)' : 'var(--card)',
@@ -2118,10 +2155,43 @@ export function ClientPortal() {
               <div>
                 <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>📎 Vault Documenti Legali e Modelli In Incarico</div>
                 <div style={{ fontSize: 11, color: 'var(--muted)' }}>
-                  Visualizza, scarica, firma con <strong>Firma Digitale eIDAS (1-Click)</strong> oppure <strong>ricarica il PDF firmato a mano</strong>. Le firme rimangono salvate in modo permanente.
+                  Visualizza, scarica, firma con <strong>firma elettronica avanzata</strong> (lettura, codice sul canale che scegli, firma grafometrica) oppure <strong>ricarica il PDF firmato a mano</strong>. Le firme sono registrate a database e visibili allo studio.
                 </div>
               </div>
+              <button
+                type="button"
+                onClick={() => caricaDocumenti(clientObj?.id)}
+                disabled={portalDocsCaricamento}
+                style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '7px 14px', borderRadius: 8, fontSize: 11, cursor: portalDocsCaricamento ? 'default' : 'pointer' }}
+              >
+                {portalDocsCaricamento ? 'Aggiorno…' : '↻ Aggiorna elenco'}
+              </button>
             </div>
+
+            {/* Un errore di lettura non si traveste da fascicolo vuoto. */}
+            {portalDocsErrore && (
+              <div style={{ background: '#3b1219', border: '1px solid #7f1d1d', color: '#fecaca', borderRadius: 12, padding: 14, fontSize: 12, marginBottom: 14 }}>
+                <strong>Non riesco a leggere i tuoi documenti.</strong> {portalDocsErrore}
+                <div style={{ marginTop: 6, color: '#fca5a5', fontSize: 11 }}>
+                  Non significa che il fascicolo sia vuoto: riprova con «Aggiorna elenco» o avvisa lo studio.
+                </div>
+              </div>
+            )}
+
+            {!portalDocsErrore && portalDocs.length === 0 && (
+              <div style={{ background: 'var(--card2)', border: '1px dashed var(--border)', borderRadius: 12, padding: 22, textAlign: 'center' }}>
+                <div style={{ fontSize: 26, marginBottom: 8 }}>📂</div>
+                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>
+                  {portalDocsCaricamento ? 'Sto leggendo il tuo fascicolo…' : 'Nessun documento nel fascicolo'}
+                </div>
+                {!portalDocsCaricamento && (
+                  <div style={{ fontSize: 11.5, color: 'var(--muted)', lineHeight: 1.6 }}>
+                    Lo studio non ha ancora caricato documenti sulle attività del tuo incarico.
+                    Quando lo farà li troverai qui, con il testo integrale da leggere prima di firmare.
+                  </div>
+                )}
+              </div>
+            )}
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               {portalDocs.map((doc) => (
@@ -2143,93 +2213,120 @@ export function ClientPortal() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 260 }}>
                     <div style={{ fontSize: 26 }}>{doc.firmato ? '🔒' : '📄'}</div>
                     <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                         <span style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text)' }}>{doc.nome}</span>
                         <span style={{ fontSize: 10, background: 'var(--card)', padding: '2px 6px', borderRadius: 6, color: 'var(--muted)', fontWeight: 600 }}>{doc.categoria}</span>
+                        {doc.versione && doc.versione > 1 && (
+                          <span style={{ fontSize: 10, background: 'var(--card)', padding: '2px 6px', borderRadius: 6, color: 'var(--muted)', fontWeight: 600 }}>v{doc.versione}</span>
+                        )}
                       </div>
-                      <div style={{ fontSize: 10.5, color: doc.firmato ? '#a7f3d0' : 'var(--muted)', marginTop: 2 }}>
-                        {doc.dimensione} · {doc.firmato ? `✓ Firmato Digitalmente (${doc.dataFirma || 'eIDAS Validato'})` : 'In attesa di lettura e sottoscrizione'}
+                      {/* Da quale attività dell'incarico arriva il documento: il cliente sa a cosa
+                          si riferisce senza doverlo chiedere. */}
+                      {doc.modulo && (
+                        <div style={{ fontSize: 10.5, color: 'var(--muted)', marginTop: 3 }}>
+                          {doc.modulo}{doc.progetto ? ` · ${doc.progetto}` : ''}
+                        </div>
+                      )}
+                      <div style={{ fontSize: 10.5, color: doc.firmato ? '#a7f3d0' : 'var(--muted)', marginTop: 3 }}>
+                        {doc.firmato
+                          ? `✓ Firmato${doc.dataFirma ? ` il ${dataOraLeggibile(doc.dataFirma)}` : ''}${doc.canaleVerificato ? ` · ${doc.canaleVerificato}` : ''}`
+                          : doc.statoScansione === 'in_corso'
+                            ? '⏳ Controllo antivirus in corso: disponibile a breve'
+                            : doc.statoScansione === 'infetto'
+                              ? '⛔ Il controllo antivirus ha bloccato questo file: lo studio è stato avvisato'
+                              : 'In attesa di lettura e sottoscrizione'}
                       </div>
+                      {doc.documentoNonPiuDisponibile && (
+                        <div style={{ fontSize: 10.5, color: '#fbbf24', marginTop: 3 }}>
+                          Firma registrata: il file a cui si riferisce non è più nel fascicolo.
+                        </div>
+                      )}
                     </div>
                   </div>
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                    {/* Pulsante di Lettura Atto Integrale */}
+                    {/* Apertura del documento vero. Prima questo pulsante mostrava un testo legale
+                        composto dal portale: il file in archivio non veniva nemmeno aperto. */}
                     <button
                       type="button"
+                      disabled={!urlFileArchivio(doc.fileUrl) || !doc.scaricabile}
+                      title={
+                        !doc.fileUrl
+                          ? 'Nessun file allegato a questo documento'
+                          : !doc.scaricabile
+                            ? 'File non disponibile: controllo antivirus non superato o ancora in corso'
+                            : undefined
+                      }
                       onClick={() => setSelectedViewerDoc(doc)}
                       style={{
                         background: '#1a1f3d',
                         border: '1px solid #4338ca',
-                        color: '#c7d2fe',
+                        color: doc.scaricabile && doc.fileUrl ? '#c7d2fe' : '#6b7280',
                         padding: '7px 14px',
                         borderRadius: 8,
                         fontSize: 11,
                         fontWeight: 700,
-                        cursor: 'pointer',
+                        cursor: doc.scaricabile && doc.fileUrl ? 'pointer' : 'not-allowed',
                         display: 'flex',
                         alignItems: 'center',
                         gap: 6
                       }}
                     >
-                      👁 Leggi ed Esamina Atto Completo
+                      👁 Apri il documento
                     </button>
+
+                    {doc.scaricabile && urlFileArchivio(doc.fileUrl) && (
+                      <a
+                        href={urlFileArchivio(doc.fileUrl) as string}
+                        target="_blank"
+                        rel="noreferrer"
+                        download={doc.nome}
+                        style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '6px 12px', borderRadius: 8, fontSize: 11, textDecoration: 'none' }}
+                      >
+                        ⬇ Scarica il file
+                      </a>
+                    )}
 
                     {doc.firmato ? (
                       <>
                         <span style={{ background: '#34d399', color: '#064e3b', padding: '4px 12px', borderRadius: 12, fontSize: 10, fontWeight: 800 }}>
-                          🔒 FIRMATO eIDAS
+                          🔒 FIRMATO
                         </span>
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            const docHtml = getResolvedDocumentHtml(doc);
-                            // Nessuna evidenza di firma inventata: se il documento non ha un record
-                            // reale, il PDF esce senza pagina di evidenze. L'indirizzo IP di ripiego
-                            // era cablato e attribuiva al cliente una provenienza mai registrata.
-                            const sigs = doc.signatureData ? [doc.signatureData] : [];
-                            await downloadRealPdf(doc.nome, docHtml, sigs);
-                          }}
-                          style={{ background: '#064e3b', border: '1px solid #10b981', color: '#6ee7b7', padding: '6px 14px', borderRadius: 8, fontSize: 11, cursor: 'pointer', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}
-                        >
-                          📥 Scarica PDF Firmato
-                        </button>
                       </>
                     ) : (
                       <>
+                        {/* La firma passa dal backend: codice sul canale scelto, impronta calcolata
+                            dal server sul file in archivio, sigillo scritto a database. Prima questo
+                            pulsante apriva un pad grafometrico che salvava in `localStorage` e
+                            dichiarava al cliente una firma eIDAS che non esisteva da nessuna parte. */}
                         <button
                           type="button"
-                          onClick={() => setSigningDoc(doc)}
-                          style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '7px 16px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', boxShadow: '0 2px 10px rgba(99,102,241,.3)', display: 'flex', alignItems: 'center', gap: 6 }}
+                          disabled={!doc.richiedeFirma || otpLoading}
+                          title={doc.richiedeFirma ? undefined : 'Documento non firmabile in questo momento'}
+                          onClick={() => avviaFirmaDocumento(doc)}
+                          style={{ background: doc.richiedeFirma ? 'var(--indigo)' : 'var(--card)', color: doc.richiedeFirma ? '#fff' : 'var(--muted)', border: 'none', padding: '7px 16px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: doc.richiedeFirma && !otpLoading ? 'pointer' : 'default', boxShadow: doc.richiedeFirma ? '0 2px 10px rgba(99,102,241,.3)' : 'none', display: 'flex', alignItems: 'center', gap: 6 }}
                         >
-                          ✍️ Firma Digitale eIDAS
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            await downloadRealPdf(`Bozza_${doc.nome}`, getResolvedDocumentHtml(doc));
-                          }}
-                          style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '6px 12px', borderRadius: 8, fontSize: 11, cursor: 'pointer' }}
-                        >
-                          📥 Bozza PDF
+                          ✍️ Firma con codice
                         </button>
 
                         <label style={{ background: '#1a1f3d', border: '1px solid #2d3260', color: '#818cf8', padding: '6px 14px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                          <span>📤 Ricarica Firmato a Mano</span>
+                          <span>{caricamentoFirmato ? '⏳ Carico…' : '📤 Ricarica Firmato a Mano'}</span>
                           <input
                             type="file"
                             accept=".pdf,.doc,.docx"
                             style={{ display: 'none' }}
-                            onChange={e => {
-                              if (e.target.files?.[0]) {
-                                const fileName = e.target.files[0].name;
-                                const updated = portalDocs.map(d => d.id === doc.id ? { ...d, firmato: true, dataFirma: new Date().toLocaleString('it-IT') } : d);
-                                setPortalDocs(updated);
-                                const signedIds = updated.filter(d => d.firmato).map(d => d.id);
-                                localStorage.setItem(`bluman_signed_docs_${clientName}`, JSON.stringify(signedIds));
-                                alert(`✓ File firmato "${fileName}" caricato e registrato in memoria! Lo studio è stato aggiornato.`);
-                              }
+                            onChange={async e => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              // Il file va al backend, che registra la firma e ne conserva
+                              // l'impronta. Prima questo caricamento scriveva solo in
+                              // `localStorage` e diceva al cliente «lo studio è stato aggiornato»:
+                              // lo studio non riceveva niente, e il file non usciva dal browser.
+                              await leggiFileFirmato(file);
+                              setBersaglioFirma({ ambito: 'documento_vault', titolo: doc.titolo || doc.nome, riferimentoId: doc.id });
+                              setModalitaFirma('manuale_scansionata');
+                              setDocumentoDaCaricare(doc);
+                              e.target.value = '';
                             }}
                           />
                         </label>
@@ -2840,7 +2937,7 @@ export function ClientPortal() {
                 <div>
                   <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>{selectedViewerDoc.titolo || selectedViewerDoc.nome}</h3>
                   <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
-                    Lettura ed Esame Atto Ufficiale · Cliente: <strong>{clientName}</strong> · Categoria: {selectedViewerDoc.categoria}
+                    {selectedViewerDoc.nome} · Cliente: <strong>{clientName}</strong> · Categoria: {selectedViewerDoc.categoria}
                   </div>
                 </div>
               </div>
@@ -2852,40 +2949,62 @@ export function ClientPortal() {
               </button>
             </div>
 
-            {/* A4 Paper Document Content */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: 24, background: '#0f172a', display: 'flex', justifyContent: 'center' }}>
-              <div
-                style={{
-                  background: '#ffffff',
-                  color: '#0f172a',
-                  width: '100%',
-                  maxWidth: 760,
-                  minHeight: 600,
-                  padding: '40px 36px',
-                  borderRadius: 8,
-                  boxShadow: '0 4px 25px rgba(0,0,0,0.5)',
-                  fontFamily: "'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-                  lineHeight: 1.6,
-                }}
-                dangerouslySetInnerHTML={{ __html: getResolvedDocumentHtml(selectedViewerDoc) }}
-              />
+            {/* Il file dell'archivio, mostrato per quello che è.
+                Qui prima c'era l'HTML composto da `getResolvedDocumentHtml`: articoli e premesse
+                inventati dal portale, mostrati al posto del documento che il cliente stava per
+                firmare. Il browser mostra da sé i PDF e le immagini; per gli altri formati non si
+                finge un'anteprima, si dice che va scaricato. */}
+            <div style={{ flex: 1, overflow: 'hidden', padding: 16, background: '#0f172a', display: 'flex', justifyContent: 'center' }}>
+              {(() => {
+                const url = urlFileArchivio(selectedViewerDoc.fileUrl);
+                const anteprimabile = /\.(pdf|png|jpe?g|gif|webp|svg)(\?|$)/i.test(selectedViewerDoc.fileUrl || '');
+
+                if (!url) {
+                  return (
+                    <div style={{ alignSelf: 'center', textAlign: 'center', color: 'var(--muted)', fontSize: 12.5, maxWidth: 460, lineHeight: 1.7 }}>
+                      A questo documento non è allegato nessun file.<br />
+                      Se ti è stato chiesto di firmarlo, scrivilo allo studio dalla scheda Contatti: senza il file
+                      la firma non può essere apposta.
+                    </div>
+                  );
+                }
+
+                if (!anteprimabile) {
+                  return (
+                    <div style={{ alignSelf: 'center', textAlign: 'center', color: 'var(--muted)', fontSize: 12.5, maxWidth: 460, lineHeight: 1.7 }}>
+                      Questo formato non si apre dentro il portale.<br />
+                      <a href={url} target="_blank" rel="noreferrer" download={selectedViewerDoc.nome} style={{ color: '#818cf8', fontWeight: 700 }}>
+                        Scarica «{selectedViewerDoc.nome}»
+                      </a>{' '}
+                      e leggilo prima di firmare.
+                    </div>
+                  );
+                }
+
+                return (
+                  <iframe
+                    src={url}
+                    title={selectedViewerDoc.nome}
+                    style={{ width: '100%', height: '100%', minHeight: 480, border: 'none', borderRadius: 8, background: '#ffffff' }}
+                  />
+                );
+              })()}
             </div>
 
             {/* Bottom Modal Actions */}
             <div style={{ padding: '14px 20px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, background: 'var(--card)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    const html = getResolvedDocumentHtml(selectedViewerDoc);
-                    // Come sopra: si allega solo l'evidenza realmente registrata.
-                    const sigs = selectedViewerDoc.signatureData ? [selectedViewerDoc.signatureData] : undefined;
-                    await downloadRealPdf(selectedViewerDoc.nome, html, sigs);
-                  }}
-                  style={{ background: '#1a1f3d', border: '1px solid #4338ca', color: '#c7d2fe', padding: '8px 16px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
-                >
-                  📥 Scarica Copia PDF A4
-                </button>
+                {urlFileArchivio(selectedViewerDoc.fileUrl) && (
+                  <a
+                    href={urlFileArchivio(selectedViewerDoc.fileUrl) as string}
+                    target="_blank"
+                    rel="noreferrer"
+                    download={selectedViewerDoc.nome}
+                    style={{ background: '#1a1f3d', border: '1px solid #4338ca', color: '#c7d2fe', padding: '8px 16px', borderRadius: 8, fontSize: 11, fontWeight: 700, textDecoration: 'none' }}
+                  >
+                    ⬇ Scarica il file
+                  </a>
+                )}
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -2899,19 +3018,16 @@ export function ClientPortal() {
 
                 {selectedViewerDoc.firmato ? (
                   <div style={{ background: '#0d2d22', border: '1px solid #1a5c3c', color: '#34d399', padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 700 }}>
-                    ✓ Documento Già Sottoscritto (Sigillo eIDAS Apposto)
+                    ✓ Documento già sottoscritto{selectedViewerDoc.dataFirma ? ` il ${dataOraLeggibile(selectedViewerDoc.dataFirma)}` : ''}
                   </div>
                 ) : (
                   <button
                     type="button"
-                    onClick={() => {
-                      const docToSign = selectedViewerDoc;
-                      setSelectedViewerDoc(null);
-                      setSigningDoc(docToSign);
-                    }}
-                    style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '8px 22px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 14px rgba(99,102,241,.35)', display: 'flex', alignItems: 'center', gap: 6 }}
+                    disabled={!selectedViewerDoc.richiedeFirma || otpLoading}
+                    onClick={() => avviaFirmaDocumento(selectedViewerDoc)}
+                    style={{ background: selectedViewerDoc.richiedeFirma ? 'var(--indigo)' : 'var(--card)', color: selectedViewerDoc.richiedeFirma ? '#fff' : 'var(--muted)', border: 'none', padding: '8px 22px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: selectedViewerDoc.richiedeFirma && !otpLoading ? 'pointer' : 'default', boxShadow: selectedViewerDoc.richiedeFirma ? '0 4px 14px rgba(99,102,241,.35)' : 'none', display: 'flex', alignItems: 'center', gap: 6 }}
                   >
-                    ✍️ Ho Letto: Procedi alla Firma Digitale FEA
+                    {otpLoading ? 'Invio il codice…' : '✍️ Ho letto: ricevi il codice e firma'}
                   </button>
                 )}
               </div>
@@ -2921,47 +3037,71 @@ export function ClientPortal() {
       )}
 
       {/* ✍️ MODALE FIRMA DIGITALE GRAFICA CON CANVAS & MARCA TEMPORALE */}
-      {signingDoc && (
-        <DigitalSignatureModal
-          documentTitle={signingDoc.titolo}
-          signerName={clientName}
-          signerRole="Legale Rappresentante / Firmatario Autorizzato"
-          onClose={() => setSigningDoc(null)}
-          onSigned={(signature) => {
-            const updated = portalDocs.map(d => d.id === signingDoc.id ? { ...d, firmato: true, signatureData: signature, dataFirma: signature.timestamp } : d);
-            setPortalDocs(updated);
+      {/* 📤 CONFERMA INVIO DEL DOCUMENTO FIRMATO A MANO (§1.3)
+          Qui c'era `DigitalSignatureModal`: disegnava la grafometrica, la scriveva in
+          `localStorage`, sincronizzava un finto vault di progetto e concludeva con «firmato con
+          successo con Sigillo FEA eIDAS UE 910/2014». Nessun codice OTP, nessuna riga in
+          `FirmaElettronica`, nessuna impronta del documento: il cliente credeva di aver firmato,
+          lo studio non vedeva niente, e su un altro browser il documento risultava da firmare.
+          La firma FEA passa ora dalla modale del codice; questa serve solo alla firma a penna. */}
+      {documentoDaCaricare && fileFirmato && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 120, padding: 16 }}>
+          <div style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, padding: 24, width: '100%', maxWidth: 520, display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 6 }}>📤 Invio del documento firmato a mano</div>
+              <div style={{ fontSize: 11.5, color: 'var(--muted)', lineHeight: 1.6 }}>
+                Stai inviando allo studio il file firmato per <strong>{documentoDaCaricare.titolo || documentoDaCaricare.nome}</strong>.
+                Il documento e la sua impronta vengono registrati a database: la prova della firma è il file stesso.
+              </div>
+            </div>
 
-            // Persisti nei registri locali
-            localStorage.setItem(`bluman_portal_doc_sig_${signingDoc.id}`, JSON.stringify(signature));
-            const signedIds = updated.filter(d => d.firmato).map(d => d.id);
-            localStorage.setItem(`bluman_signed_docs_${clientName}`, JSON.stringify(signedIds));
+            <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 10, padding: 12, fontSize: 11.5 }}>
+              <div style={{ color: 'var(--muted)', marginBottom: 3 }}>File selezionato</div>
+              <div style={{ fontWeight: 700, wordBreak: 'break-all' }}>{fileFirmato.nome}</div>
+            </div>
 
-            // Sincronizza nel Cloud Vault del Progetto
-            if (progettoId) {
-              const storageKey = `bluman_project_documents_${progettoId}`;
-              const currentVaultStr = localStorage.getItem(storageKey);
-              const currentVault: any[] = currentVaultStr ? JSON.parse(currentVaultStr) : [];
-              const newDocObj = {
-                id: `doc-signed-${signingDoc.id}-${Date.now()}`,
-                nome: signingDoc.nome,
-                titolo: signingDoc.titolo,
-                cat: signingDoc.categoria,
-                dimensione: signingDoc.dimensione,
-                data: new Date().toLocaleDateString('it-IT'),
-                dataCaricamento: new Date().toLocaleDateString('it-IT'),
-                progettoId: String(progettoId),
-                clienteNome: clientName,
-                firmato: true,
-                signatureData: signature,
-                formato: 'pdf',
-              };
-              localStorage.setItem(storageKey, JSON.stringify([newDocObj, ...currentVault.filter((x: any) => x.id !== newDocObj.id)]));
-            }
+            <label style={{ fontSize: 11.5, color: 'var(--muted)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+              Se hai firmato con un provider di firma digitale, indicalo: cambia il valore probatorio scritto accanto alla firma.
+              <select
+                value={modalitaFirma === 'qualificata_esterna' ? 'qualificata_esterna' : 'manuale_scansionata'}
+                onChange={(e) => setModalitaFirma(e.target.value as 'manuale_scansionata' | 'qualificata_esterna')}
+                style={{ padding: '8px 10px', borderRadius: 8, background: 'var(--card)', color: 'var(--text)', border: '1px solid var(--border)', fontSize: 12 }}
+              >
+                <option value="manuale_scansionata">Firmato a penna e scansionato</option>
+                <option value="qualificata_esterna">Firmato con firma digitale qualificata</option>
+              </select>
+            </label>
 
-            alert(`✓ Documento "${signingDoc.titolo}" firmato con successo con Sigillo FEA eIDAS UE 910/2014!`);
-            setSigningDoc(null);
-          }}
-        />
+            {otpError && (
+              <div style={{ background: '#3b1219', border: '1px solid #7f1d1d', color: '#fecaca', borderRadius: 10, padding: 12, fontSize: 11.5 }}>
+                {otpError}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+              <button
+                type="button"
+                onClick={() => { setDocumentoDaCaricare(null); setFileFirmato(null); setOtpError(null); }}
+                style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '9px 16px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}
+              >
+                Annulla
+              </button>
+              <button
+                type="button"
+                disabled={caricamentoFirmato}
+                onClick={async () => {
+                  const esito = await confermaFirmaConFile();
+                  // La modale resta aperta se l'invio è fallito: l'errore è lì sopra, e chiuderla
+                  // farebbe credere che il file sia arrivato.
+                  if (esito) setDocumentoDaCaricare(null);
+                }}
+                style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '9px 20px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: caricamentoFirmato ? 'default' : 'pointer' }}
+              >
+                {caricamentoFirmato ? 'Invio in corso…' : 'Invia allo studio'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* 🛡️ MODALE DETTAGLIO ATTIVITÀ OPERATORE & FIRMA CONCLUSIONE MODULO */}

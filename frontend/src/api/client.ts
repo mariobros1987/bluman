@@ -1450,6 +1450,44 @@ export async function canaliFirmaApi(clienteId?: string): Promise<{
   return await res.json();
 }
 
+export interface DocumentoPortale {
+  id: string;
+  nome: string;
+  titolo: string;
+  categoria: string;
+  modulo: string | null;
+  progetto: string | null;
+  progettoId: string | null;
+  fileUrl: string | null;
+  tipo: string;
+  versione: number | null;
+  caricatoIl: string | null;
+  scadenza: string | null;
+  statoScansione: 'in_corso' | 'pulito' | 'infetto' | null;
+  scaricabile: boolean;
+  firmato: boolean;
+  richiedeFirma: boolean;
+  dataFirma: string | null;
+  tipoFirma: string | null;
+  signatureId: string | null;
+  canaleVerificato: string | null;
+  documentoNonPiuDisponibile?: boolean;
+}
+
+/**
+ * I documenti del fascicolo del cliente, con lo stato di firma che sta a database.
+ *
+ * Non c'è ripiego su un elenco vuoto: un errore di lettura viene propagato perché «lo studio non
+ * ti ha caricato niente» e «non riesco a leggere i tuoi documenti» sono due messaggi diversi, e
+ * mostrare il primo al posto del secondo fa chiudere la pagina a chi invece deve firmare.
+ */
+export async function documentiPortaleApi(clienteId?: string): Promise<{ ok: boolean; documenti: DocumentoPortale[] }> {
+  const query = clienteId ? `?clienteId=${encodeURIComponent(clienteId)}` : '';
+  const res = await fetchWithTimeout(`${API_BASE}/portal/documenti${query}`, { headers: getAuthHeaders() });
+  if (!res.ok) throw await erroreDellaRisposta(res, 'Impossibile leggere i documenti del fascicolo.');
+  return await res.json();
+}
+
 export async function requestPortalOtpApi(input: {
   canale: CanaleOtp;
   ambito?: AmbitoFirma;
@@ -1494,8 +1532,15 @@ export interface SigilloFirma {
 
 export async function verifyPortalOtpAndSignApi(input: {
   otp: string;
-  /** Impronta del testo che il cliente ha davvero letto: senza, il backend rifiuta. */
-  documentoHash: string;
+  /**
+   * Impronta del testo che il cliente ha davvero letto.
+   *
+   * Va mandata per la lettera d'incarico, il cui testo è composto qui nel browser. Per un
+   * documento del fascicolo si omette: la calcola il backend dal file che ha in archivio, ed è
+   * l'unico modo perché il sigillo descriva il documento firmato e non quello che il firmatario
+   * dichiara di aver firmato.
+   */
+  documentoHash?: string;
   signerName?: string;
   firmatarioRuolo?: string;
   documentoTitolo?: string;
@@ -1517,7 +1562,8 @@ export async function verifyPortalOtpAndSignApi(input: {
 /** Documento scaricato e firmato a penna, o firmato con il provider digitale del cliente. */
 export async function firmaConFileApi(input: {
   tipoFirma: 'manuale_scansionata' | 'qualificata_esterna';
-  documentoHash: string;
+  /** Impronta dell'originale: facoltativa per i documenti del fascicolo, vedi sopra. */
+  documentoHash?: string;
   filename: string;
   contentBase64: string;
   ambito?: AmbitoFirma;
@@ -1564,6 +1610,22 @@ export async function grafometricaFirmaApi(firmaId: string): Promise<string | nu
   if (!res.ok) return null;
   const body = await res.json();
   return body?.firmaGrafometricaPng ?? null;
+}
+
+/**
+ * URL con cui il browser può davvero aprire un file dell'archivio.
+ *
+ * I file caricati sul ripiego locale sono memorizzati come `/uploads/<nome>?firma=…`, relativi
+ * all'host dell'API: aperti così come sono porterebbero a una pagina inesistente del frontend.
+ * Quelli su Supabase Storage sono già assoluti e passano invariati. Ritorna `null` quando non
+ * c'è nessun file, perché «nessun documento» e «documento non apribile» non sono la stessa cosa.
+ */
+export function urlFileArchivio(url?: string | null): string | null {
+  const valore = (url ?? '').trim();
+  if (valore === '') return null;
+  if (/^(data:|blob:|https?:\/\/)/i.test(valore)) return valore;
+  if (valore.startsWith('/uploads')) return `${API_BASE}${valore}`;
+  return valore;
 }
 
 /**

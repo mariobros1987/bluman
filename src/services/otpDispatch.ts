@@ -79,6 +79,51 @@ export async function credenzialiCanali(tenantId: string): Promise<CredenzialiCa
   };
 }
 
+export interface RecapitiCliente {
+  email: string | null;
+  cellulare: string | null;
+  telegramChatId: string | null;
+}
+
+/**
+ * Recapiti su cui consegnare il codice: le colonne dell'anagrafica e, quando sono vuote, il
+ * `referentiJson`.
+ *
+ * Il ripiego non è un vezzo, è il guasto per cui «il codice OTP non arriva via mail». L'indirizzo
+ * del cliente sta scritto in due posti: la colonna `cliente.email` e la chiave `email` dentro
+ * `referentiJson`, che è quella che la scheda cliente mostra. Le anagrafiche create dal seed o
+ * dalle versioni precedenti hanno l'indirizzo solo nel JSON: chi apriva la scheda leggeva
+ * l'email giusta, il portale rispondeva «Nessuna email in anagrafica» e non provava nemmeno a
+ * spedire. Le impostazioni SMTP erano corrette, il test funzionava, e non c'era nulla da
+ * correggere lì. Stessa storia per il cellulare, che le rotte `/clienti` non scrivevano affatto
+ * nella colonna: WhatsApp risultava indisponibile per tutti.
+ *
+ * `telefono` non viene usato come numero WhatsApp: può essere un fisso, e tentare la consegna
+ * verso un numero che non riceve messaggi è peggio che dire che il canale non è disponibile.
+ */
+export function recapitiCliente(cliente: {
+  email?: string | null;
+  cellulare?: string | null;
+  telegramChatId?: string | null;
+  referentiJson?: unknown;
+}): RecapitiCliente {
+  const ref: Record<string, any> =
+    cliente.referentiJson && typeof cliente.referentiJson === 'object' && !Array.isArray(cliente.referentiJson)
+      ? (cliente.referentiJson as Record<string, any>)
+      : {};
+
+  const valore = (v: unknown): string | null => {
+    const s = typeof v === 'string' ? v.trim() : '';
+    return s.length > 0 ? s : null;
+  };
+
+  return {
+    email: valore(cliente.email) ?? valore(ref.email) ?? valore(ref.emailPrincipale),
+    cellulare: valore(cliente.cellulare) ?? valore(ref.cellulare) ?? valore(ref.whatsapp),
+    telegramChatId: valore(cliente.telegramChatId) ?? valore(ref.telegramChatId),
+  };
+}
+
 /** Quali canali sono realmente utilizzabili per questo cliente, e perché no quando no. */
 export function canaliDisponibili(
   cred: CredenzialiCanali,

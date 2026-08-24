@@ -18,7 +18,7 @@ import {
 import { signJwt, verifyJwt, generateMagicToken, hashMagicToken, verificaFirmaDownload } from './util/jwt.js';
 import { verifyPassword, hashPassword, generaPasswordTemporanea } from './util/password.js';
 import { sendMagicLinkEmail, sendOtpSecurityEmail, sendClientCredentialsEmail, verifyAndSendTestSmtp, verifyRealImap, createTransporter, inviaEmail } from './services/emailService.js';
-import { uploadDocumento, CARTELLA_UPLOADS, nomeFileValido, rifirmaUrlUpload } from './services/storageService.js';
+import { uploadDocumento, CARTELLA_UPLOADS, nomeFileValido, rifirmaUrlUpload, leggiFileArchivio } from './services/storageService.js';
 import { generateInvoicePdfBuffer } from './services/pdfService.js';
 import {
   creaOtp,
@@ -33,7 +33,7 @@ import {
   type CanaleOtp,
   type AmbitoOtp,
 } from './services/otpService.js';
-import { credenzialiCanali, canaliDisponibili, inviaCodiceOtp } from './services/otpDispatch.js';
+import { credenzialiCanali, canaliDisponibili, inviaCodiceOtp, recapitiCliente } from './services/otpDispatch.js';
 import { runDailyNotificationCron } from './services/cronService.js';
 import { trasmettiFatturaSdi } from './services/sdiService.js';
 import { scanFileBuffer } from './services/securityScanner.js';
@@ -50,6 +50,17 @@ const inMemoryTenantStore = new Map<string, any>();
  * (login, health) e i record di sistema. Coincide con l'id creato dal seed.
  */
 const TENANT_DEFAULT = '00000000-0000-0000-0000-000000000001';
+
+/** Recapito ripulito, oppure `null` se dopo il taglio degli spazi non rimane niente. */
+function pulisciRecapito(v: unknown): string | null {
+  const s = typeof v === 'string' ? v.trim() : '';
+  return s.length > 0 ? s : null;
+}
+
+/** I tre canali su cui può viaggiare il codice di firma; qualunque altra cosa non è una scelta. */
+function canaleOtpValido(v: unknown): v is 'whatsapp' | 'email' | 'telegram' {
+  return v === 'whatsapp' || v === 'email' || v === 'telegram';
+}
 
 /**
  * Gli stati ammessi, per validare quello che arriva dal client prima di scriverlo.
@@ -2119,6 +2130,13 @@ export function buildServer(app: AppPort): FastifyInstance {
         };
 
     const clientEmail = b.email ? b.email.trim().toLowerCase() : (referentiObj?.email ? String(referentiObj.email).trim().toLowerCase() : null);
+    // Il cellulare non veniva scritto in colonna da nessuna delle due rotte: la scheda cliente
+    // lo inviava, finiva solo dentro `referentiJson`, e `cliente.cellulare` restava NULL per
+    // tutti. Conseguenza: il canale WhatsApp del portale risultava indisponibile con il motivo
+    // «Nessun cellulare in anagrafica» anche per chi il numero ce l'aveva.
+    // `telegram` NON diventa `telegramChatId`: quello del form è lo @username, la chat id la
+    // produce il bot quando il cliente gli scrive.
+    const clientCellulare = pulisciRecapito(b.cellulare) ?? pulisciRecapito(referentiObj?.cellulare) ?? pulisciRecapito(referentiObj?.whatsapp);
     const passwordHash = b.password ? hashPassword(b.password) : null;
 
     try {
@@ -2128,6 +2146,8 @@ export function buildServer(app: AppPort): FastifyInstance {
           nome: b.nome,
           tipo: b.tipo,
           email: clientEmail,
+          cellulare: clientCellulare,
+          canaleOtpPreferito: canaleOtpValido(b.canaleOtpPreferito) ? b.canaleOtpPreferito : null,
           passwordHash,
           piva: b.piva || null,
           codiceFiscale: b.codiceFiscale || b.codFisc || null,
@@ -2183,9 +2203,16 @@ export function buildServer(app: AppPort): FastifyInstance {
           regimeFiscale: b.regimeFiscale,
         };
 
-    const clientEmail = b.email !== undefined 
-      ? (b.email ? b.email.trim().toLowerCase() : null) 
+    const clientEmail = b.email !== undefined
+      ? (b.email ? b.email.trim().toLowerCase() : null)
       : (referentiObj?.email ? String(referentiObj.email).trim().toLowerCase() : undefined);
+
+    // Stesso ragionamento della creazione: il numero arriva in colonna, non solo nel JSON.
+    // `undefined` quando la richiesta non parla di cellulare, così una modifica parziale non
+    // cancella un numero già registrato.
+    const clientCellulare = b.cellulare !== undefined
+      ? pulisciRecapito(b.cellulare)
+      : (pulisciRecapito(referentiObj?.cellulare) ?? pulisciRecapito(referentiObj?.whatsapp) ?? undefined);
 
     const passwordHash = b.password ? hashPassword(b.password) : undefined;
 
@@ -2196,6 +2223,8 @@ export function buildServer(app: AppPort): FastifyInstance {
           nome: b.nome !== undefined ? b.nome : undefined,
           tipo: b.tipo !== undefined ? b.tipo : undefined,
           email: clientEmail,
+          cellulare: clientCellulare,
+          canaleOtpPreferito: canaleOtpValido(b.canaleOtpPreferito) ? b.canaleOtpPreferito : undefined,
           passwordHash: passwordHash,
           piva: b.piva !== undefined ? b.piva : undefined,
           codiceFiscale: b.codiceFiscale !== undefined ? b.codiceFiscale : (b.codFisc !== undefined ? b.codFisc : undefined),
@@ -3512,6 +3541,149 @@ export function buildServer(app: AppPort): FastifyInstance {
 
   const HASH_SHA256 = /^[a-f0-9]{64}$/i;
 
+  /** Nome leggibile del file a partire dal suo URL, senza il percorso di storage. */
+  function nomeFileDaUrl(url: string): string | null {
+    const pulito = url.split(/[?#]/)[0] ?? '';
+    const ultimo = pulito.split('/').filter(Boolean).pop();
+    if (!ultimo) return null;
+    try {
+      return decodeURIComponent(ultimo);
+    } catch {
+      return ultimo;
+    }
+  }
+
+  /**
+   * I documenti del fascicolo del cliente, con lo stato di firma preso dal database (§2.1, §2.9).
+   *
+   * Prima questa sezione del portale non esisteva come rotta: il browser teneva quattro documenti
+   * scritti a mano nel codice — un NDA, uno statuto maltese, una dichiarazione UBO e una letter of
+   * wishes — di cui il primo era marcato «firmato il 15/08/2026 01:44:12». Nessuno dei quattro
+   * esisteva a database, per nessun cliente, e la data di firma era inventata. Lo stato di firma
+   * viveva in `localStorage`: firmato su un browser voleva dire non firmato su un altro, e lo
+   * studio non ne vedeva traccia da nessuna parte.
+   *
+   * Qui i documenti sono quelli realmente caricati sulle micro-voci dei progetti del cliente, e
+   * «firmato» significa che esiste una riga in `FirmaElettronica`. Quando il fascicolo è vuoto la
+   * risposta è un elenco vuoto: il portale lo dichiara, non lo riempie.
+   */
+  server.get('/portal/documenti', async (req, reply) => {
+    const tenantId = (req as any).tenantId;
+    const clienteId = clienteDellaRichiesta(req, (req.query as any)?.clienteId);
+    if (!clienteId) {
+      return reply.code(400).send({ errore: 'Cliente non identificato nella sessione.' });
+    }
+
+    try {
+      const documenti = await prisma.documento.findMany({
+        where: { tenantId, microvoceProgetto: { moduloProgetto: { progetto: { clienteId } } } },
+        select: {
+          id: true,
+          tipo: true,
+          fileUrl: true,
+          versione: true,
+          createdAt: true,
+          categoriaDoc: true,
+          statoScansione: true,
+          dataScadenzaDoc: true,
+          microvoceProgetto: {
+            select: {
+              nome: true,
+              moduloProgetto: { select: { nome: true, progettoId: true, progetto: { select: { nome: true } } } },
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      const firme = await prisma.firmaElettronica.findMany({
+        where: { tenantId, clienteId, ambito: 'documento_vault' },
+        select: {
+          signatureId: true,
+          riferimentoId: true,
+          documentoTitolo: true,
+          tipoFirma: true,
+          firmatoAt: true,
+          canaleVerificato: true,
+        },
+        orderBy: { firmatoAt: 'desc' },
+      });
+
+      // Una firma per documento: la più recente. Le successive sono rifirme dello stesso atto e
+      // non vanno mostrate come documenti distinti.
+      const firmaPerDocumento = new Map<string, (typeof firme)[number]>();
+      for (const f of firme) {
+        if (f.riferimentoId && !firmaPerDocumento.has(f.riferimentoId)) firmaPerDocumento.set(f.riferimentoId, f);
+      }
+
+      const elenco = documenti.map((d) => {
+        const firma = firmaPerDocumento.get(d.id) ?? null;
+        return {
+          id: d.id,
+          nome: nomeFileDaUrl(d.fileUrl) ?? `${d.microvoceProgetto.nome} (v${d.versione})`,
+          titolo: d.microvoceProgetto.nome,
+          categoria: d.categoriaDoc || 'generico',
+          modulo: d.microvoceProgetto.moduloProgetto.nome,
+          progetto: d.microvoceProgetto.moduloProgetto.progetto?.nome ?? null,
+          progettoId: d.microvoceProgetto.moduloProgetto.progettoId,
+          fileUrl: d.fileUrl,
+          tipo: d.tipo,
+          versione: d.versione,
+          caricatoIl: d.createdAt,
+          scadenza: d.dataScadenzaDoc,
+          // §28: un file ancora in scansione o risultato infetto non si scarica e non si firma.
+          statoScansione: d.statoScansione,
+          scaricabile: d.statoScansione === 'pulito',
+          firmato: Boolean(firma) || d.tipo === 'firmato',
+          richiedeFirma: !firma && d.tipo !== 'firmato' && d.statoScansione === 'pulito',
+          dataFirma: firma?.firmatoAt ?? null,
+          tipoFirma: firma?.tipoFirma ?? null,
+          signatureId: firma?.signatureId ?? null,
+          canaleVerificato: firma?.canaleVerificato ?? null,
+        };
+      });
+
+      // Firme il cui documento non è più nel fascicolo (file sostituito, micro-voce rimossa).
+      // Restano elencate: una firma registrata è un atto del cliente e non può sparire dalla sua
+      // vista perché il file a cui puntava non c'è più.
+      const idPresenti = new Set(documenti.map((d) => d.id));
+      const orfane = firme
+        .filter((f) => !f.riferimentoId || !idPresenti.has(f.riferimentoId))
+        .map((f) => ({
+          id: `firma-${f.signatureId}`,
+          nome: f.documentoTitolo,
+          titolo: f.documentoTitolo,
+          categoria: 'firmato',
+          modulo: null,
+          progetto: null,
+          progettoId: null,
+          fileUrl: null,
+          tipo: 'firmato',
+          versione: null,
+          caricatoIl: f.firmatoAt,
+          scadenza: null,
+          statoScansione: null,
+          scaricabile: false,
+          firmato: true,
+          richiedeFirma: false,
+          dataFirma: f.firmatoAt,
+          tipoFirma: f.tipoFirma,
+          signatureId: f.signatureId,
+          canaleVerificato: f.canaleVerificato,
+          documentoNonPiuDisponibile: true,
+        }));
+
+      return reply.send({ ok: true, documenti: [...elenco, ...orfane] });
+    } catch (err) {
+      // Nessun ripiego su un elenco vuoto: «nessun documento» e «non riesco a leggere i documenti»
+      // sono due cose diverse, e la prima al posto della seconda fa credere al cliente che lo
+      // studio non gli abbia caricato niente.
+      return reply.code(500).send({
+        errore: err instanceof Error ? err.message : 'Errore lettura documenti del fascicolo',
+      });
+    }
+  });
+
   server.get('/portal/canali-firma', async (req, reply) => {
     const tenantId = (req as any).tenantId;
     const clienteId = clienteDellaRichiesta(req, (req.query as any)?.clienteId);
@@ -3522,21 +3694,25 @@ export function buildServer(app: AppPort): FastifyInstance {
     try {
       const cliente = await prisma.cliente.findFirst({
         where: { id: clienteId, tenantId },
-        select: { nome: true, email: true, cellulare: true, telegramChatId: true, canaleOtpPreferito: true },
+        select: { nome: true, email: true, cellulare: true, telegramChatId: true, canaleOtpPreferito: true, referentiJson: true },
       });
       if (!cliente) return reply.code(404).send({ errore: 'Cliente non trovato.' });
 
       const cred = await credenzialiCanali(tenantId);
-      const recapiti: Record<CanaleOtp, string | null> = {
-        whatsapp: cliente.cellulare,
-        email: cliente.email,
-        telegram: cliente.telegramChatId,
+      // I recapiti vengono risolti anche dal `referentiJson`: vedi `recapitiCliente`. Prima si
+      // leggevano solo le colonne, e per un'anagrafica che ha l'email solo nel JSON questa
+      // rotta dichiarava «Nessuna email in anagrafica» con l'indirizzo scritto nella scheda.
+      const recapiti = recapitiCliente(cliente);
+      const perCanale: Record<CanaleOtp, string | null> = {
+        whatsapp: recapiti.cellulare,
+        email: recapiti.email,
+        telegram: recapiti.telegramChatId,
       };
 
       return reply.send({
         ok: true,
         canalePreferito: cliente.canaleOtpPreferito,
-        canali: canaliDisponibili(cred, cliente).map((c) => ({
+        canali: canaliDisponibili(cred, recapiti).map((c) => ({
           canale: c.canale,
           disponibile: c.disponibile,
           motivo: c.motivo,
@@ -3544,11 +3720,11 @@ export function buildServer(app: AppPort): FastifyInstance {
           // Telegram non ne ha uno leggibile, la chat id non dice nulla a chi la legge.
           recapitoMascherato:
             c.canale === 'telegram'
-              ? cliente.telegramChatId
+              ? recapiti.telegramChatId
                 ? 'chat Telegram collegata'
                 : null
-              : recapiti[c.canale]
-                ? mascheraRecapito(recapiti[c.canale] as string)
+              : perCanale[c.canale]
+                ? mascheraRecapito(perCanale[c.canale] as string)
                 : null,
         })),
         botTelegram: cred.tgBotUsername,
@@ -3584,14 +3760,18 @@ export function buildServer(app: AppPort): FastifyInstance {
     try {
       const cliente = await prisma.cliente.findFirst({
         where: { id: clienteId, tenantId },
-        select: { nome: true, email: true, cellulare: true, telegramChatId: true },
+        select: { nome: true, email: true, cellulare: true, telegramChatId: true, referentiJson: true },
       });
       if (!cliente) return reply.code(404).send({ errore: 'Cliente non trovato.' });
 
+      // Anche qui i recapiti arrivano dalle colonne o dal `referentiJson` (vedi
+      // `recapitiCliente`): era il punto esatto in cui la richiesta di codice via email si
+      // fermava con «Nessuna email in anagrafica» per un cliente che ce l'ha.
+      const risolti = recapitiCliente(cliente);
       const inAnagrafica: Record<CanaleOtp, string | null> = {
-        whatsapp: cliente.cellulare,
-        email: cliente.email,
-        telegram: cliente.telegramChatId,
+        whatsapp: risolti.cellulare,
+        email: risolti.email,
+        telegram: risolti.telegramChatId,
       };
 
       // Telegram è l'unico canale dove il recapito non si può dichiarare: la chat id non è
@@ -3667,6 +3847,58 @@ export function buildServer(app: AppPort): FastifyInstance {
     }
   });
 
+  /**
+   * Impronta SHA-256 di un documento del fascicolo, calcolata dal file che sta in archivio.
+   *
+   * Il valore che arriva nel body non è una prova: chi firma è anche chi manda la richiesta, e
+   * un'impronta scelta dal firmatario descrive il documento che vuole lui, non quello che ha
+   * firmato. Per la lettera d'incarico non c'è alternativa — il testo è ancora composto nel
+   * browser — ma un documento del fascicolo il file ce l'ha qui, e allora l'impronta si calcola
+   * qui. La `where` passa dalla catena microvoce → modulo → progetto → cliente: un id di
+   * documento di un altro cliente non trova niente.
+   */
+  async function improntaDocumentoDelFascicolo(
+    tenantId: string,
+    clienteId: string,
+    documentoId: string,
+  ): Promise<{ hash: string; titolo: string } | { errore: string; codice: number }> {
+    const doc = await prisma.documento.findFirst({
+      where: {
+        id: documentoId,
+        tenantId,
+        microvoceProgetto: { moduloProgetto: { progetto: { clienteId } } },
+      },
+      select: {
+        fileUrl: true,
+        statoScansione: true,
+        microvoceProgetto: { select: { nome: true } },
+      },
+    });
+
+    if (!doc) return { errore: 'Documento non presente nel fascicolo di questo cliente.', codice: 404 };
+    if (doc.statoScansione === 'infetto') {
+      return { errore: 'Il controllo antivirus ha bloccato questo file: non è firmabile.', codice: 400 };
+    }
+    if (doc.statoScansione === 'in_corso') {
+      return { errore: 'Il controllo antivirus su questo file non è ancora finito: riprova fra poco.', codice: 409 };
+    }
+
+    const contenuto = await leggiFileArchivio(doc.fileUrl);
+    if (!contenuto || contenuto.length === 0) {
+      // Non si ripiega su un'impronta calcolata altrove: un sigillo con l'impronta sbagliata è
+      // peggio di una firma non apposta.
+      return {
+        errore: "Il file del documento non è leggibile dall'archivio: la firma non può essere apposta.",
+        codice: 502,
+      };
+    }
+
+    return {
+      hash: crypto.createHash('sha256').update(contenuto).digest('hex'),
+      titolo: doc.microvoceProgetto.nome,
+    };
+  }
+
   server.post<{
     Body: {
       otp: string;
@@ -3694,10 +3926,19 @@ export function buildServer(app: AppPort): FastifyInstance {
     // Il sigillo deve identificare il testo firmato. Prima, in mancanza di hash, ne scriveva
     // uno finto ('DOC_ORIGINAL_HASH'): un verbale che certifica la volontà su un documento
     // qualunque. Senza impronta la firma non si appone.
-    if (!documentoHash || !HASH_SHA256.test(documentoHash.trim())) {
+    //
+    // Per un documento del fascicolo l'impronta la calcola il server dal file in archivio, e
+    // quella eventualmente mandata dal browser viene ignorata: vedi
+    // `improntaDocumentoDelFascicolo`. Per la lettera d'incarico resta quella del browser,
+    // perché il testo è ancora composto lì.
+    const vault = ambito === 'documento_vault' && riferimentoId;
+    if (!vault && (!documentoHash || !HASH_SHA256.test(documentoHash.trim()))) {
       return reply
         .code(400)
         .send({ errore: 'Impronta SHA-256 del documento mancante o non valida: la firma non può essere apposta.' });
+    }
+    if (ambito === 'documento_vault' && !riferimentoId) {
+      return reply.code(400).send({ errore: 'Manca il documento da firmare.' });
     }
 
     try {
@@ -3707,20 +3948,32 @@ export function buildServer(app: AppPort): FastifyInstance {
       });
       if (!cliente) return reply.code(404).send({ errore: 'Cliente non trovato.' });
 
+      // L'impronta si risolve PRIMA di consumare il codice: il codice è monouso, e bruciarlo
+      // per un file illeggibile costringerebbe il cliente a rifare tutto il giro.
+      let improntaFinale = (documentoHash ?? '').trim().toLowerCase();
+      let titoloDalFascicolo: string | null = null;
+      if (vault && riferimentoId) {
+        const esito = await improntaDocumentoDelFascicolo(tenantId, clienteId, riferimentoId);
+        if ('errore' in esito) return reply.code(esito.codice).send({ errore: esito.errore });
+        improntaFinale = esito.hash;
+        titoloDalFascicolo = esito.titolo;
+      }
+
       const verifica = await verificaOtp(clienteId, otp, ambito, riferimentoId ?? null);
       if (!verifica.valido || !verifica.record) {
         return reply.code(400).send({ ok: false, errore: verifica.motivo });
       }
 
       const grafometrica = normalizzaGrafometrica(firmaGrafometricaPng);
-      const documentoTitolo = req.body?.documentoTitolo?.trim() || DESCRIZIONE_AMBITO[ambito];
+      const documentoTitolo =
+        req.body?.documentoTitolo?.trim() || titoloDalFascicolo || DESCRIZIONE_AMBITO[ambito];
       const firmatarioNome = req.body?.signerName?.trim() || cliente.nome;
 
       const sigillo = creaSigilloFea({
         clienteId,
         signerName: firmatarioNome,
         documentoTitolo,
-        documentoHash: documentoHash.trim().toLowerCase(),
+        documentoHash: improntaFinale,
         // L'IP della *verifica*, non quello della richiesta del codice: è il momento in cui
         // la volontà viene manifestata.
         ip: ipReale(req),
@@ -3830,10 +4083,16 @@ export function buildServer(app: AppPort): FastifyInstance {
     if (!filename || !contentBase64) {
       return reply.code(400).send({ errore: 'File firmato mancante.' });
     }
-    if (!documentoHash || !HASH_SHA256.test(documentoHash.trim())) {
+    // Come nella firma con codice: per un documento del fascicolo l'impronta dell'originale la
+    // calcola il server dal file in archivio, non il browser.
+    const vault = ambito === 'documento_vault' && riferimentoId;
+    if (!vault && (!documentoHash || !HASH_SHA256.test(documentoHash.trim()))) {
       return reply
         .code(400)
         .send({ errore: 'Impronta SHA-256 del documento originale mancante o non valida.' });
+    }
+    if (ambito === 'documento_vault' && !riferimentoId) {
+      return reply.code(400).send({ errore: 'Manca il documento a cui si riferisce la firma.' });
     }
 
     try {
@@ -3853,6 +4112,18 @@ export function buildServer(app: AppPort): FastifyInstance {
 
       let codiceOtpId: string | null = null;
       let descrizioneOtp = '';
+
+      // Prima di consumare l'eventuale codice: se il file originale non è leggibile la firma
+      // non si appone, e il codice deve restare valido.
+      let improntaFinale = (documentoHash ?? '').trim().toLowerCase();
+      let titoloDalFascicolo: string | null = null;
+      if (vault && riferimentoId) {
+        const esito = await improntaDocumentoDelFascicolo(tenantId, clienteId, riferimentoId);
+        if ('errore' in esito) return reply.code(esito.codice).send({ errore: esito.errore });
+        improntaFinale = esito.hash;
+        titoloDalFascicolo = esito.titolo;
+      }
+
       if (req.body?.otp) {
         const verifica = await verificaOtp(clienteId, req.body.otp, ambito, riferimentoId ?? null);
         if (!verifica.valido || !verifica.record) {
@@ -3865,7 +4136,8 @@ export function buildServer(app: AppPort): FastifyInstance {
       const caricato = await uploadDocumento(filename, contentBase64);
       const fileFirmatoHash = crypto.createHash('sha256').update(buffer).digest('hex');
 
-      const documentoTitolo = req.body?.documentoTitolo?.trim() || DESCRIZIONE_AMBITO[ambito];
+      const documentoTitolo =
+        req.body?.documentoTitolo?.trim() || titoloDalFascicolo || DESCRIZIONE_AMBITO[ambito];
       const firmatarioNome = req.body?.signerName?.trim() || cliente.nome;
 
       // Detto come sta: la piattaforma attesta di aver ricevuto un file da una sessione
@@ -3887,7 +4159,7 @@ export function buildServer(app: AppPort): FastifyInstance {
         clienteId,
         signerName: firmatarioNome,
         documentoTitolo,
-        documentoHash: documentoHash.trim().toLowerCase(),
+        documentoHash: improntaFinale,
         ip: ipReale(req),
         userAgent: req.headers['user-agent'] || null,
         canaleVerificato,

@@ -101,6 +101,51 @@ export function urlUploadFirmato(safeFilename: string): string {
 }
 
 /**
+ * Legge dall'archivio il contenuto di un file già caricato, qualunque sia il ripiego usato.
+ *
+ * Serve a chi deve calcolare l'impronta di un documento senza fidarsi di quella che gli manda
+ * il browser: il file sta qui, e chi firma non deve poter dire al server quale sia l'impronta
+ * di ciò che sta firmando. Gestisce le due forme che `uploadDocumento` produce — l'URL
+ * pubblico di Supabase Storage e il percorso relativo `/uploads/<nome>` del ripiego locale.
+ *
+ * Ritorna `null` quando il file non è raggiungibile: chi chiama deve trattarlo come un errore,
+ * non come un file vuoto.
+ */
+export async function leggiFileArchivio(url: string): Promise<Buffer | null> {
+  if (typeof url !== 'string' || url.trim() === '') return null;
+  const pulito = url.trim();
+
+  if (pulito.startsWith('/uploads/') || pulito.includes('/uploads/')) {
+    const nome = pulito.split('?')[0]?.split('/uploads/').pop();
+    if (!nome || !nomeFileValido(nome)) return null;
+    const percorso = path.join(CARTELLA_UPLOADS, nome);
+    try {
+      return await fs.promises.readFile(percorso);
+    } catch {
+      return null;
+    }
+  }
+
+  if (!/^https?:\/\//i.test(pulito)) return null;
+
+  try {
+    // La chiave di servizio serve per i bucket non pubblici: sull'URL pubblico è ignorata,
+    // su quello privato è l'unica cosa che fa rispondere 200 invece di 400.
+    const chiave = process.env.SUPABASE_SERVICE_KEY;
+    const supabase = process.env.SUPABASE_URL;
+    const intestazioni: Record<string, string> =
+      chiave && supabase && pulito.startsWith(supabase)
+        ? { Authorization: `Bearer ${chiave}`, apikey: chiave }
+        : {};
+    const risposta = await fetch(pulito, { headers: intestazioni });
+    if (!risposta.ok) return null;
+    return Buffer.from(await risposta.arrayBuffer());
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Rinnova la firma di un URL `/uploads/` già memorizzato, e lascia intatto tutto il resto.
  *
  * Serve perché la firma scade e i valori come `tenant.logoUrl` restano in tabella per anni:
