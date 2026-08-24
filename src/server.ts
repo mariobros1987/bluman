@@ -3716,9 +3716,11 @@ export function buildServer(app: AppPort): FastifyInstance {
     const ultimo = pulito.split('/').filter(Boolean).pop();
     if (!ultimo) return null;
     try {
-      return decodeURIComponent(ultimo);
+      // uploadDocumento prefissa `${Date.now()}_` per evitare omonimie in archivio:
+      // all'utente si mostra il nome originale del file.
+      return decodeURIComponent(ultimo).replace(/^\d{13}_/, '');
     } catch {
-      return ultimo;
+      return ultimo.replace(/^\d{13}_/, '');
     }
   }
 

@@ -2279,7 +2279,8 @@ function RedditivitaTab({
 // §2.9 — converte una riga della tabella `documento` (API GET /documenti) nella forma
 // usata dalla griglia del vault (nome/cat/formato/url).
 function documentoApiAVista(d: any, projectId: string): any {
-  const nome = decodeURIComponent((d.fileUrl || '').split('?')[0].split('/').pop() || 'Documento');
+  // Il prefisso `${Date.now()}_` aggiunto dall'archivio per evitare omonimie non va mostrato.
+  const nome = decodeURIComponent((d.fileUrl || '').split('?')[0].split('/').pop() || 'Documento').replace(/^\d{13}_/, '');
   const dataFmt = d.createdAt ? new Date(d.createdAt).toLocaleDateString('it-IT') : '';
   return {
     id: d.id,
