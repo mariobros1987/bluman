@@ -268,4 +268,38 @@ describe('istanziaProgetto — atomicità: rollback su fallimento a metà (§15.
     expect(db.moduliProgetto.size).toBe(1);
     expect(db.progettiStato.get('P1')).toBe('in_progress');
   });
+
+  it('con preventivoId: se l’istanziazione fallisce, il preventivo NON resta accettato', async () => {
+    const port = new FakeIstanziazionePort();
+    const notifiche = new FakeNotificationPort();
+    port.registraTemplate(templateSemplice());
+    port.guastaAllaCreazioneMicrovoce = 'A_ANALISI_STRUTT'; // fallisce a metà
+
+    // È il guasto osservato in produzione: l’accettazione fuori transazione lasciava un
+    // preventivo «accettato» senza moduli, e non più riprovabile (il controllo di stato
+    // a monte rifiuta i preventivi già accettati) — cliente bloccato.
+    await expect(
+      istanziaProgetto(
+        { progettoId: 'P1', clienteId: 'C1', preventivoId: 'PREV1', righe: [{ moduloTemplateId: 'M01', moduloTemplateVersione: 1 }] },
+        port,
+        notifiche,
+      ),
+    ).rejects.toThrow(/Guasto simulato/);
+
+    expect(port.statoPreventivo('PREV1')).toBeNull(); // il rollback annulla anche il passo 0
+  });
+
+  it('con preventivoId: a successo il preventivo risulta accettato', async () => {
+    const port = new FakeIstanziazionePort();
+    const notifiche = new FakeNotificationPort();
+    port.registraTemplate(templateSemplice());
+
+    await istanziaProgetto(
+      { progettoId: 'P1', clienteId: 'C1', preventivoId: 'PREV1', righe: [{ moduloTemplateId: 'M01', moduloTemplateVersione: 1 }] },
+      port,
+      notifiche,
+    );
+
+    expect(port.statoPreventivo('PREV1')).toBe('accettato');
+  });
 });

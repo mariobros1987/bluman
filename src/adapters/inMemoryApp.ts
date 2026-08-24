@@ -192,14 +192,17 @@ export class InMemoryApp implements AppPort {
     if (p.stato !== 'bozza' && p.stato !== 'inviato') {
       throw new TransizioneNonValidaError(`Preventivo in stato ${p.stato} non può essere accettato`);
     }
-    this.preventivi.set(id, { ...p, stato: 'accettato' });
 
+    // Prima l'istanziazione, poi il passaggio di stato: se l'istanziazione lancia, il
+    // preventivo non risulta mai «accettato» senza moduli (stessa proprietà della porta
+    // Prisma, che fa le due cose in un'unica transazione).
     const risultato = await istanziaProgetto(
       { progettoId: p.progettoId, clienteId: p.clienteId, righe: p.righe },
       this.port,
       this.notifiche,
     );
 
+    this.preventivi.set(id, { ...p, stato: 'accettato' });
     const progetto = this.progetti.get(p.progettoId)!;
     this.progetti.set(p.progettoId, { ...progetto, stato: 'in_progress' });
 

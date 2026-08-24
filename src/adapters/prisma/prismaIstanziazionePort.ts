@@ -34,6 +34,11 @@ export class PrismaIstanziazionePort implements IstanziazionePort, EsecuzionePor
   async eseguiInTransazione<T>(fn: (tx: IstanziazioneTransazione) => Promise<T>): Promise<T> {
     // $transaction di Prisma fornisce già l'atomicità che in fakeIstanziazionePort.ts
     // abbiamo dovuto simulare a mano con lo staging — qui il DB la garantisce nativamente.
+    //
+    // Timeout esplicito: il default di Prisma è 5 secondi, ma l'istanziazione fa una query
+    // separata per ogni micro-voce e per ogni passaggio del progetto, e ogni query paga la
+    // latenza di rete verso Supabase. Un preventivo con una decina di moduli arrivava a
+    // 5,1 secondi e l'intera transazione veniva annullata a un soffio dal traguardo.
     return this.prisma.$transaction(async (tx) => {
       const wrapper: IstanziazioneTransazione = {
         getModuloTemplateConDistinta: async (moduloTemplateId, versione) => {
@@ -83,6 +88,13 @@ export class PrismaIstanziazionePort implements IstanziazionePort, EsecuzionePor
 
         aggiornaStatoProgetto: async (progettoId, stato) => {
           await tx.progetto.update({ where: { id: progettoId }, data: { stato } });
+        },
+
+        // Dentro la stessa transazione dell'istanziazione: se questa fa rollback, anche il
+        // passaggio di stato del preventivo sparisce (il guasto del preventivo «accettato
+        // senza moduli» che non si poteva più riprovare).
+        marcaAccettatoPreventivo: async (preventivoId) => {
+          await tx.preventivo.update({ where: { id: preventivoId }, data: { stato: 'accettato' } });
         },
 
         creaModuloProgetto: async (input) => {
@@ -152,7 +164,7 @@ export class PrismaIstanziazionePort implements IstanziazionePort, EsecuzionePor
       // rifiutata. Segnala anche alle operazioni annidate di non aprire una seconda
       // transazione, che finirebbe su un'altra connessione ancora.
       return conContestoInTransazione(tx, () => fn(wrapper));
-    });
+    }, { maxWait: 10_000, timeout: 60_000 });
   }
 
   // ── EsecuzionePort — §17: scritture dirette, non transazionali ────────────────────

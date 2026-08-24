@@ -19,6 +19,12 @@ export interface IstanziaProgettoInput {
   progettoId: string;
   clienteId: string;
   righe: RigaPreventivoAccettato[];
+  /**
+   * Se l'istanziazione nasce dall'accettazione di un preventivo, il suo id passa di qui:
+   * il passaggio di stato a «accettato» avviene dentro la stessa transazione (§15.3),
+   * così un rollback non lascia mai un preventivo accettato con i moduli mai istanziati.
+   */
+  preventivoId?: string;
 }
 
 export interface IstanziaProgettoRisultato {
@@ -54,6 +60,10 @@ export { calcolaPrezzoModulo, calcolaOreModulo };
  *     i moduli con dipendenze non soddisfatte partono con microvoci in attesa_dipendenza
  *  6. Notifica cliente + team
  *
+ * Se è fornito `preventivoId`, prima del passo 1 il preventivo viene segnato «accettato»
+ * dentro la stessa transazione: un rollback non può quindi lasciare un preventivo accettato
+ * con i moduli mai istanziati (il guasto che questa chiamata unica esiste per prevenire).
+ *
  * Tutto dentro `port.eseguiInTransazione`: se un passaggio fallisce, rollback completo —
  * mai un progetto "a metà istanziato" (§15.3, ultima riga del documento).
  *
@@ -75,6 +85,12 @@ export async function istanziaProgetto(
   }
 
   const risultato = await port.eseguiInTransazione(async (tx) => {
+    // passo 0 — l'accettazione del preventivo, se è da lì che nasce questa istanziazione:
+    // dentro la transazione, così un rollback la annulla insieme a tutto il resto.
+    if (input.preventivoId && tx.marcaAccettatoPreventivo) {
+      await tx.marcaAccettatoPreventivo(input.preventivoId);
+    }
+
     // passo 1
     await tx.aggiornaStatoProgetto(input.progettoId, 'in_progress');
 

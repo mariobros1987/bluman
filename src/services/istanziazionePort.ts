@@ -82,6 +82,14 @@ export interface IstanziazioneTransazione {
   impostaStatoMicrovoceIniziale(microvoceProgettoId: string, stato: StatoMicrovoceIniziale): Promise<void>;
   creaPassaggioProgetto(input: NuovoPassaggioProgettoInput): Promise<void>;
   creaModuloProgettoDipendenza(moduloProgettoId: string, dipendeDaModuloProgettoId: string): Promise<void>;
+  /**
+   * Segna il preventivo come «accettato» dentro la STESSA transazione dell'istanziazione.
+   * Opzionale: non tutte le istanziazioni nascono da un preventivo accettato (i test sulla
+   * porta finta, per esempio). Fuori dalla transazione non deve stare: se l'istanziazione
+   * facesse rollback, resterebbe un preventivo accettato senza moduli — e non riprovabile,
+   * perché un preventivo già accettato viene rifiutato dal controllo di stato a monte.
+   */
+  marcaAccettatoPreventivo?(preventivoId: string): Promise<void>;
 }
 
 export interface IstanziazionePort {

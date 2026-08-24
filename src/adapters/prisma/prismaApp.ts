@@ -407,11 +407,19 @@ export class PrismaApp implements AppPort {
     if (p.stato !== 'bozza' && p.stato !== 'inviato') {
       throw new TransizioneNonValidaError(`Preventivo in stato ${p.stato} non può essere accettato`);
     }
-    await this.prisma.preventivo.update({ where: { id }, data: { stato: 'accettato' } });
 
     // §15.3 — l'istanziazione vera, stessa funzione già testata con la porta finta
     // (src/services/istanziaProgetto.test.ts), qui usata con la porta Prisma reale.
-    return istanziaProgetto({ progettoId: p.progettoId, clienteId: p.clienteId, righe: p.righe }, this.istanziazione, this.notifiche);
+    // L'accettazione del preventivo passa come `preventivoId`: il passaggio di stato avviene
+    // DENTRO la stessa transazione dell'istanziazione. Prima era un update separato fatto
+    // prima: se l'istanziazione faceva rollback (capitava: il timeout di 5 secondi scattava
+    // a un soffio dal completamento) restava un preventivo «accettato» senza moduli, e non
+    // più riprovabile perché il controllo qui sopra lo avrebbe rifiutato.
+    return istanziaProgetto(
+      { progettoId: p.progettoId, clienteId: p.clienteId, righe: p.righe, preventivoId: id },
+      this.istanziazione,
+      this.notifiche,
+    );
   }
 
   // ── §17 — esecuzione: delega diretta al servizio, con la porta Prisma già scritta sopra ──

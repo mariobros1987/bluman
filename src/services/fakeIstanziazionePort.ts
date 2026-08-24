@@ -57,6 +57,7 @@ interface PassaggioStored extends NuovoPassaggioProgettoInput {
 
 interface DbState {
   progettiStato: Map<string, string>;
+  preventiviStato: Map<string, string>;
   moduliProgetto: Map<string, ModuloStored>;
   microvociProgetto: Map<string, MicrovoceStored>;
   passaggiProgetto: Map<string, PassaggioStored>;
@@ -66,6 +67,7 @@ interface DbState {
 function dbVuoto(): DbState {
   return {
     progettiStato: new Map(),
+    preventiviStato: new Map(),
     moduliProgetto: new Map(),
     microvociProgetto: new Map(),
     passaggiProgetto: new Map(),
@@ -76,6 +78,7 @@ function dbVuoto(): DbState {
 function clonaDb(db: DbState): DbState {
   return {
     progettiStato: new Map(db.progettiStato),
+    preventiviStato: new Map(db.preventiviStato),
     moduliProgetto: new Map(db.moduliProgetto),
     microvociProgetto: new Map(db.microvociProgetto),
     passaggiProgetto: new Map(db.passaggiProgetto),
@@ -90,6 +93,11 @@ export class FakeIstanziazionePort implements IstanziazionePort, EsecuzionePort 
   /** Popola la libreria finta per i test — equivalente a seed di articolo/modulo_template/riga_distinta. */
   registraTemplate(template: ModuloTemplateConDistinta): void {
     this.templates.set(`${template.id}@${template.versione}`, template);
+  }
+
+  /** Stato di un preventivo committato (per le asserzioni dei test); null se mai toccato. */
+  statoPreventivo(preventivoId: string): string | null {
+    return this.db.preventiviStato.get(preventivoId) ?? null;
   }
 
   /** Permette a un test di forzare un errore a un certo punto, per verificare il rollback. */
@@ -116,6 +124,9 @@ export class FakeIstanziazionePort implements IstanziazionePort, EsecuzionePort 
       },
       aggiornaStatoProgetto: async (progettoId, stato) => {
         staging.progettiStato.set(progettoId, stato);
+      },
+      marcaAccettatoPreventivo: async (preventivoId) => {
+        staging.preventiviStato.set(preventivoId, 'accettato');
       },
       creaModuloProgetto: async (input) => {
         const id = nuovoId('modprog');
