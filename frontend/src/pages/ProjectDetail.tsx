@@ -14,7 +14,7 @@ import { AssignOperatorModal } from '../components/AssignOperatorModal';
 import { CalendarPreviewModal } from '../components/CalendarPreviewModal';
 import { ConfirmDeleteModal } from '../components/ConfirmDeleteModal';
 import { PROJECTS } from '../store/mockData';
-import { fetchProgettoDettaglio, emettiFatturaApi, consuntivaMicrovoceApi, assegnaAccessoProgettoApi, salvaProgettoDettaglioApi, archiviaProgettoApi, eliminaProgettoApi, fetchModuliLibreria, fetchArticoli, uploadFileApi, inviaComunicazioneApi, ricalcolaProgettoApi } from '../api/client';
+import { fetchProgettoDettaglio, emettiFatturaApi, consuntivaMicrovoceApi, assegnaAccessoProgettoApi, salvaProgettoDettaglioApi, archiviaProgettoApi, eliminaProgettoApi, fetchModuliLibreria, fetchArticoli, uploadFileApi, inviaComunicazioneApi, ricalcolaProgettoApi, creaPreventivoEAccettaApi } from '../api/client';
 import { TEAM } from '../store/mockData';
 import { useTeamMembers } from '../hooks/useTeamMembers';
 import { getCurrentTenantId, getTenantStorageKey, getStudioInfoForTenant, BLUECODE_TENANT_ID } from '../utils/tenant';
@@ -43,6 +43,17 @@ export function ProjectDetail() {
     return null;
   });
   const [loading, setLoading] = useState(true);
+
+  /**
+   * Motivo dell'ultimo salvataggio non riuscito, mostrato in cima alla pagina.
+   *
+   * Ogni salvataggio verso il database finiva con `.catch(() => {})`: l'operatore assegnava una
+   * risorsa, chiudeva una micro-voce, correggeva il valore dell'incarico, vedeva la modifica
+   * comparire (arrivava da `localStorage`) e non sapeva che a database non era arrivata niente.
+   * Da lì nasceva la segnalazione «il cliente non vede i moduli inseriti dall'operatore»: il
+   * portale legge il database, e nel database quelle modifiche non c'erano.
+   */
+  const [erroreSalvataggio, setErroreSalvataggio] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>('moduli');
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const [procV, setProcV] = useState<{ mid: number; vidx: number } | null>(null);
@@ -84,6 +95,41 @@ export function ProjectDetail() {
     }
   })();
   const puoRicalcolare = ruoloSessione === 'super_admin' || ruoloSessione === 'advisor';
+
+  /**
+   * Manda a database il progetto modificato e riporta l'esito.
+   *
+   * Il server risponde con quante righe ha aggiornato e quali non ha potuto aggiornare: se il
+   * corpo conteneva moduli e nessuno è finito a database, il salvataggio non è riuscito anche se
+   * la risposta è un 200, e va detto. Il caso tipico è un progetto che esiste solo in questo
+   * browser perché è stato creato mentre la sessione era scaduta.
+   */
+  const salvaSuDatabase = async (aggiornato: Progetto) => {
+    try {
+      const esito: any = await salvaProgettoDettaglioApi(String(aggiornato.id), aggiornato);
+      const moduliInviati = (aggiornato.mods || []).length;
+
+      if (moduliInviati > 0 && esito && esito.moduliSalvati === 0 && esito.microvociSalvate === 0) {
+        setErroreSalvataggio(
+          'Il database non ha registrato nessuna modifica: i moduli di questo progetto non esistono a database. ' +
+            'Quello che vedi è la copia locale di questo browser, e il cliente dal portale non la vede. ' +
+            (esito.nonSalvate?.length ? `Dettaglio: ${esito.nonSalvate.join('; ')}.` : ''),
+        );
+        return false;
+      }
+
+      if (esito?.nonSalvate?.length) {
+        setErroreSalvataggio(`Salvato in parte. Non registrato a database: ${esito.nonSalvate.join('; ')}.`);
+        return false;
+      }
+
+      setErroreSalvataggio(null);
+      return true;
+    } catch (err: any) {
+      setErroreSalvataggio(err?.message || 'Salvataggio su database non riuscito.');
+      return false;
+    }
+  };
 
   const handleSaveCalendarEvent = (
     date: string,
@@ -135,7 +181,7 @@ export function ProjectDetail() {
     };
     localStorage.setItem(getTenantStorageKey('bluman_calendar_events'), JSON.stringify([newEvent, ...eventsArr]));
 
-    salvaProgettoDettaglioApi(String(project.id), updatedProject).catch(() => {});
+    void salvaSuDatabase(updatedProject);
   };
 
   const handleAssignOperatorConfirm = (operatorId: number, roleLevel: string) => {
@@ -168,7 +214,7 @@ export function ProjectDetail() {
     const updatedArr = [updatedProject, ...savedArr.filter(p => String(p.id) !== String(project.id))];
     localStorage.setItem(getTenantStorageKey('bluman_custom_projects'), JSON.stringify(updatedArr));
 
-    salvaProgettoDettaglioApi(String(project.id), updatedProject).catch(() => {});
+    void salvaSuDatabase(updatedProject);
     assegnaAccessoProgettoApi(String(project.id), `usr-0${operatorId}`, roleLevel).catch(() => {});
   };
 
@@ -210,6 +256,10 @@ export function ProjectDetail() {
             const assignedAs = mv.as || mv.assegnatoId || localMv?.as || 1;
 
             return {
+              // L'identificativo di database, che serve al salvataggio per sapere quale riga
+              // aggiornare. Senza questo `PUT /progetti/:id/stato-completo` deve indovinare per
+              // nome, e su due micro-voci omonime non salva niente.
+              dbId: mv.id,
               n: mv.nome,
               hE: mv.orePreventivate || 4,
               hA: mv.oreConsuntivate || 0,
@@ -243,7 +293,10 @@ export function ProjectDetail() {
           const avM = avModuli.get(m.id);
 
           return {
+            // `id` resta l'indice sintetico perché tutta la pagina confronta numeri
+            // (`m.id === modId`); `dbId` è l'identificativo vero, quello che il salvataggio usa.
             id: mIdx + 100,
+            dbId: m.id,
             n: m.nome,
             cat: (m.categoria as CategoriaModulo) || 'Societario',
             st: avM?.stato || m.stato || 'in_progress',
@@ -438,7 +491,7 @@ export function ProjectDetail() {
     localStorage.setItem(getTenantStorageKey('bluman_custom_projects'), JSON.stringify(updatedArr));
 
     // Persistenza remota server DB per multi-postazione
-    salvaProgettoDettaglioApi(String(project.id), updatedProject).catch(() => {});
+    void salvaSuDatabase(updatedProject);
 
     // Notifica automatica milestone completata nel fascicolo comunicazione
     const targetMv = project.mods.find(m => m.id === modId)?.v?.[mvIdx];
@@ -505,11 +558,30 @@ export function ProjectDetail() {
     }
 
     // Persistenza remota server DB per multi-postazione
-    salvaProgettoDettaglioApi(String(project.id), updatedProject).catch(() => {});
+    void salvaSuDatabase(updatedProject);
   };
 
   return (
     <div className={styles.wrapper}>
+      {/* Salvataggio non riuscito: resta in cima finché il successivo non va a buon fine, perché
+          quello che si vede sotto è la copia locale e non quello che il database contiene. */}
+      {erroreSalvataggio && (
+        <div style={{ background: '#2d0d0d', border: '1px solid #7f1d1d', color: '#fca5a5', padding: '10px 14px', borderRadius: 10, fontSize: 12, lineHeight: 1.5, marginBottom: 12, display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+          <span style={{ fontSize: 14 }}>⚠</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 600, marginBottom: 2 }}>Modifiche non salvate a database</div>
+            {erroreSalvataggio}
+          </div>
+          <button
+            onClick={() => setErroreSalvataggio(null)}
+            style={{ background: 'transparent', border: 'none', color: '#fca5a5', cursor: 'pointer', fontSize: 14 }}
+            title="Chiudi"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <div className={styles.header}>
         <button className={styles.backBtn} onClick={() => navigate(-1)}>←</button>
@@ -528,7 +600,7 @@ export function ProjectDetail() {
                   const savedArr: Progetto[] = savedStr ? JSON.parse(savedStr) : [];
                   const updatedArr = [updated, ...savedArr.filter(p => String(p.id) !== String(project.id))];
                   localStorage.setItem(getTenantStorageKey('bluman_custom_projects'), JSON.stringify(updatedArr));
-                  await salvaProgettoDettaglioApi(String(project.id), updated);
+                  await salvaSuDatabase(updated);
                 }
               }}
             >
@@ -556,7 +628,7 @@ export function ProjectDetail() {
                   const savedArr: Progetto[] = savedStr ? JSON.parse(savedStr) : [];
                   const updatedArr = [updated, ...savedArr.filter(p => String(p.id) !== String(project.id))];
                   localStorage.setItem(getTenantStorageKey('bluman_custom_projects'), JSON.stringify(updatedArr));
-                  await salvaProgettoDettaglioApi(String(project.id), updated);
+                  await salvaSuDatabase(updated);
                 }
               }}
             >
@@ -688,7 +760,7 @@ export function ProjectDetail() {
                     const updatedProject = { ...project, mods: newMods, val: updatedVal };
                     setProject(updatedProject);
                     try {
-                      await salvaProgettoDettaglioApi(String(project.id), updatedProject);
+                      await salvaSuDatabase(updatedProject);
                     } catch (err) {
                       console.warn('Salvataggio eliminazione modulo fallback:', err);
                     }
@@ -705,27 +777,29 @@ export function ProjectDetail() {
         {tab === 'grafo' && (
           <GrafoModuliProgettoView
             project={project}
-            onAddModule={async (newMod) => {
-              const newMods = [...(project.mods || []), newMod];
-              const updatedVal = (project.val || 0) + (newMod.p || 0);
-              const updatedProject = { ...project, mods: newMods, val: updatedVal };
-              setProject(updatedProject);
-
-              // 1. Persisti in DB Supabase via API Fastify
-              try {
-                await salvaProgettoDettaglioApi(String(project.id), updatedProject);
-              } catch (err) {
-                console.warn('salvaProgettoDettaglioApi fallback:', err);
+            onAddModule={async (modello) => {
+              // Aggiungere un modulo a un progetto è un atto contrattuale: la riga nasce da un
+              // preventivo accettato, che congela modello e versione (§15.3) e genera le
+              // micro-voci dalla distinta. Prima qui si costruiva il modulo nel browser e si
+              // chiamava `stato-completo`, che aggiorna righe esistenti e non ne crea: il modulo
+              // compariva sullo schermo dell'operatore e non esisteva da nessun'altra parte.
+              const clienteId = currentClient?.id || rawDbProject?.clienteId || rawDbProject?.cliente?.id;
+              if (!clienteId) {
+                setErroreSalvataggio('Modulo non aggiunto: il cliente di questo progetto non risulta a database.');
+                return;
               }
-
-              // 2. Persisti in localStorage backup
-              const savedStr = localStorage.getItem(getTenantStorageKey('bluman_custom_projects'));
-              const savedArr: Progetto[] = savedStr ? JSON.parse(savedStr) : [];
-              const updatedArr = [updatedProject, ...savedArr.filter(p => String(p.id) !== String(project.id))];
-              localStorage.setItem(getTenantStorageKey('bluman_custom_projects'), JSON.stringify(updatedArr));
-
-              // 3. Ricarica dettaglio
-              loadDetail();
+              try {
+                await creaPreventivoEAccettaApi({
+                  clienteId: String(clienteId),
+                  progettoId: String(project.id),
+                  righe: [{ moduloTemplateId: modello.id, moduloTemplateVersione: modello.versione }],
+                });
+                setErroreSalvataggio(null);
+                // Il modulo si rilegge da database, con l'identificativo e le micro-voci vere.
+                await loadDetail();
+              } catch (err: any) {
+                setErroreSalvataggio(`Modulo «${modello.nome}» non aggiunto: ${err?.message || 'errore sconosciuto'}.`);
+              }
             }}
             onSelectMod={(modId) => {
               setExpanded(new Set([modId]));
@@ -1650,83 +1724,85 @@ function GrafoModuliProgettoView({
   onSelectMod,
 }: {
   project: Progetto;
-  onAddModule: (mod: ModuloProgetto) => void;
+  /**
+   * Aggiunge al progetto un modulo della libreria. Passa il modello, non un modulo già
+   * costruito: l'istanza — righe di distinta, versioni congelate (§15.3), micro-voci — la crea
+   * il backend dal preventivo. Costruirla qui produceva un modulo che esisteva solo nel browser.
+   */
+  onAddModule: (modello: { id: string; versione: number; nome: string; prezzo: number }) => void;
   onSelectMod: (modId: number) => void;
 }) {
   const [addModalOpen, setAddModalOpen] = useState(false);
-  const [dbModTemplates, setDbModTemplates] = useState<Array<{ id: string; n: string; cat: string; h: number; p: number; righe: any[] }>>([]);
+  const [dbModTemplates, setDbModTemplates] = useState<Array<{ id: string; ver: number; n: string; cat: string; h: number; p: number; righe: any[] }>>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<string>('');
+  const [erroreLibreria, setErroreLibreria] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadTemplates() {
       try {
         const [mods, arts] = await Promise.all([fetchModuliLibreria(), fetchArticoli()]);
-        if (mods && Array.isArray(mods) && mods.length > 0) {
-          const mapped = mods.map((m: any) => {
-            const righeResolved = (m.righeDistinta || []).map((r: any) => {
-              const art = (arts || []).find((a: any) => a.id === r.articoloId) || r.articolo;
-              return {
-                n: art ? art.nome : 'Microvoce operativa',
-                hE: (r.overrideOre != null ? r.overrideOre : (art?.oreDefault || 4)) * (r.quantita || 1),
-                hA: 0,
-                s: 'pending',
-                as: 1,
-                d: 0,
-              };
-            });
-            const totH = righeResolved.reduce((acc: number, x: any) => acc + x.hE, 0);
-            const totP = m.prezzoPacchetto ? m.prezzoPacchetto / 100 : (righeResolved.reduce((acc: number, x: any) => acc + (x.hE * 150), 0));
+        if (!mods || !Array.isArray(mods)) {
+          setErroreLibreria('Libreria moduli non raggiungibile: non è possibile aggiungere moduli.');
+          return;
+        }
+        if (mods.length === 0) {
+          setErroreLibreria('La libreria moduli di questo studio è vuota: creane uno in Libreria prima di aggiungerlo a un progetto.');
+          return;
+        }
+        const mapped = mods.map((m: any) => {
+          const righeResolved = (m.righeDistinta || []).map((r: any) => {
+            const art = (arts || []).find((a: any) => a.id === r.articoloId) || r.articolo;
+            const quantita = r.quantita || 1;
             return {
-              id: m.id,
-              n: m.nome,
-              cat: m.categoria,
-              h: totH || 10,
-              p: totP || 1500,
-              righe: righeResolved.length > 0 ? righeResolved : [
-                { n: 'Analisi requisiti preliminari', hE: 5, hA: 0, s: 'pending', as: 1, d: 0 },
-                { n: 'Esecuzione pratiche societarie', hE: 5, hA: 0, s: 'pending', as: 1, d: 0 },
-              ],
+              n: art ? art.nome : 'Articolo non trovato in libreria',
+              hE: (r.overrideOre != null ? r.overrideOre : (art?.oreDefault || 0)) * quantita,
+              prezzo: (r.overridePrezzo != null ? r.overridePrezzo : (art?.prezzoDefault || 0)) * quantita,
+              hA: 0,
+              s: 'pending',
+              as: 1,
+              d: 0,
             };
           });
-          setDbModTemplates(mapped);
-          if (mapped.length > 0) setSelectedTemplate(mapped[0].id);
-        }
-      } catch (err) {
-        console.warn('loadTemplates fallback:', err);
+          // Ore e prezzo del modulo sono la somma di quello che la distinta contiene davvero.
+          // Prima c'erano tre invenzioni in tre righe: `|| 10` ore, `|| 1500` euro e una tariffa
+          // di 150 €/ora applicata alle ore quando il pacchetto non aveva prezzo. Un modulo
+          // senza distinta risultava così da 10 ore e 1.500 €, cifre che nessuno aveva stimato
+          // e che finivano nel valore dell'incarico e nella redditività.
+          return {
+            id: m.id,
+            ver: m.versione || 1,
+            n: m.nome,
+            cat: m.categoria,
+            h: righeResolved.reduce((acc: number, x: any) => acc + x.hE, 0),
+            p: m.prezzoPacchetto != null
+              ? m.prezzoPacchetto / 100
+              : righeResolved.reduce((acc: number, x: any) => acc + x.prezzo, 0) / 100,
+            // Nessuna micro-voce inventata: un modulo di libreria senza distinta è un modulo
+            // senza distinta, e l'elenco lo dichiara vuoto.
+            righe: righeResolved,
+          };
+        });
+        setDbModTemplates(mapped);
+        setErroreLibreria(null);
+        if (mapped.length > 0) setSelectedTemplate(mapped[0].id);
+      } catch (err: any) {
+        setErroreLibreria(`Libreria moduli non caricata: ${err?.message || 'errore di rete'}.`);
       }
     }
     loadTemplates();
   }, []);
 
-  const libraryTemplates = [
-    { id: 't-trust', n: 'Trust & Asset Protection', cat: 'Trust', h: 30, p: 4500, righe: [{ n: 'Redazione Deed of Trust', hE: 15, hA: 0, s: 'pending', as: 1, d: 0 }] },
-    { id: 't-ip', n: 'IP Licensing & Tax Optimization', cat: 'IP & Tax', h: 22, p: 3800, righe: [{ n: 'Deposito Marchio UE', hE: 10, hA: 0, s: 'pending', as: 1, d: 0 }] },
-    { id: 't-mfsa', n: 'Licenza Finanziaria MFSA VASP', cat: 'Compliance', h: 50, p: 9500, righe: [{ n: 'Deposito Istanza MFSA', hE: 25, hA: 0, s: 'pending', as: 1, d: 0 }] },
-  ];
-
-  const allAvailableTemplates = dbModTemplates.length > 0 ? dbModTemplates : libraryTemplates;
+  // I moduli disponibili sono quelli della libreria dello studio. Qui c'era un elenco fisso di
+  // tre voci — «Trust & Asset Protection» 30h/4.500 €, «IP Licensing» 22h/3.800 €, «Licenza MFSA
+  // VASP» 50h/9.500 € — che compariva ogni volta che la libreria non rispondeva: nomi, ore e
+  // prezzi di uno studio immaginario, aggiungibili a un progetto vero con un clic.
+  const allAvailableTemplates = dbModTemplates;
 
   const handleAddModuleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const tmpl = allAvailableTemplates.find(t => t.id === selectedTemplate) || allAvailableTemplates[0];
+    const tmpl = allAvailableTemplates.find(t => t.id === selectedTemplate);
     if (!tmpl) return;
-
-    const newMod: ModuloProgetto = {
-      id: Date.now(),
-      n: tmpl.n,
-      cat: tmpl.cat as any,
-      st: 'pending',
-      pct: 0,
-      h: tmpl.h,
-      a: 0,
-      p: tmpl.p,
-      team: [1],
-      v: tmpl.righe && tmpl.righe.length > 0 ? tmpl.righe : [
-        { n: 'Analisi requisiti preliminari', hE: 5, hA: 0, s: 'pending', as: 1, d: 0 },
-        { n: 'Redazione documentazione integrativa', hE: 10, hA: 0, s: 'pending', as: 1, d: 0 },
-      ],
-    };
-    onAddModule(newMod);
+    onAddModule({ id: tmpl.id, versione: tmpl.ver, nome: tmpl.n, prezzo: tmpl.p });
     setAddModalOpen(false);
   };
 
@@ -1860,9 +1936,16 @@ function GrafoModuliProgettoView({
             <div style={{ fontSize: 16, fontWeight: 700 }}>+ Aggiungi Modulo da Libreria al Progetto</div>
             <div style={{ fontSize: 11, color: 'var(--muted)' }}>Seleziona una prestazione o modulo aggiuntivo dal catalogo della libreria da associare al cliente</div>
 
+            {erroreLibreria && (
+              <div style={{ background: '#2d0d0d', border: '1px solid #7f1d1d', color: '#fca5a5', padding: '9px 12px', borderRadius: 10, fontSize: 11, lineHeight: 1.5 }}>
+                {erroreLibreria}
+              </div>
+            )}
+
             <div>
               <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Modulo Template Libreria *</label>
-              <select value={selectedTemplate} onChange={e => setSelectedTemplate(e.target.value)} style={{ padding: 10, fontSize: 12 }}>
+              <select value={selectedTemplate} onChange={e => setSelectedTemplate(e.target.value)} style={{ padding: 10, fontSize: 12 }} disabled={allAvailableTemplates.length === 0}>
+                {allAvailableTemplates.length === 0 && <option value="">— nessun modulo in libreria —</option>}
                 {allAvailableTemplates.map(t => (
                   <option key={t.id} value={t.id}>
                     {t.n} ({t.cat}) — {t.h}h — {fmt(t.p)}
@@ -1872,12 +1955,12 @@ function GrafoModuliProgettoView({
             </div>
 
             <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 10, padding: 12, fontSize: 11, color: 'var(--muted)' }}>
-              ℹ️ Il nuovo modulo verrà inserito nel <strong>Grafo del Progetto</strong> con stato <em>Pending</em> ed integrato nello scadenzario delle microvoci.
+              ℹ️ Il modulo viene istanziato a database da un preventivo accettato: modello e versione restano congelati (§15.3) e le micro-voci nascono dalla distinta del modello.
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
               <button type="button" onClick={() => setAddModalOpen(false)} style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '7px 14px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}>Annulla</button>
-              <button type="submit" style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '7px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>✓ Aggiungi al Progetto</button>
+              <button type="submit" disabled={!selectedTemplate} style={{ background: selectedTemplate ? 'var(--indigo)' : 'var(--card2)', color: selectedTemplate ? '#fff' : 'var(--hint)', border: 'none', padding: '7px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: selectedTemplate ? 'pointer' : 'not-allowed' }}>✓ Aggiungi al Progetto</button>
             </div>
           </form>
         </div>

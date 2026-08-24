@@ -31,6 +31,7 @@ export function NewProjectWizard({ onClose, onProjectCreated }: NewProjectWizard
   const [selectedMods, setSelectedMods] = useState<Set<string>>(new Set(['mod-m01', 'mod-m02']));
   const [loading, setLoading] = useState(false);
   const [notif, setNotif] = useState(false);
+  const [errore, setErrore] = useState<string | null>(null);
 
   // Fetch existing clients, jurisdictions & module templates on mount
   useEffect(() => {
@@ -70,6 +71,18 @@ export function NewProjectWizard({ onClose, onProjectCreated }: NewProjectWizard
           })),
         }));
         setModuliList(mappedMods);
+
+        // La preselezione iniziale è `mod-m01`/`mod-m02`, gli identificativi che quei due
+        // moduli hanno nella libreria di partenza. Se la libreria di questo studio non li
+        // contiene, quelle due voci restavano selezionate senza corrispondere a nessun
+        // modulo: il conteggio diceva «2 selezionati», il pulsante si sbloccava e al server
+        // arrivava un preventivo senza righe. Qui la selezione viene ristretta a quello che
+        // esiste davvero.
+        setSelectedMods(prev => {
+          const esistenti = new Set(mappedMods.map(m => m.id));
+          const ripulita = new Set([...prev].filter(id => esistenti.has(id)));
+          return ripulita;
+        });
       }
     };
     loadInitData();
@@ -106,8 +119,9 @@ export function NewProjectWizard({ onClose, onProjectCreated }: NewProjectWizard
 
   const handleNext = async () => {
     if (step < 3) { setStep(s => s + 1); return; }
-    
+
     setLoading(true);
+    setErrore(null);
     try {
       let finalClientId = selectedClientId;
 
@@ -117,76 +131,83 @@ export function NewProjectWizard({ onClose, onProjectCreated }: NewProjectWizard
         finalClientId = nuovoCliente.id;
       }
 
-      // 2. Crea progetto associato al cliente e giurisdizione primaria
-      let progettoId = `proj-${Date.now()}`;
-      try {
-        const progetto = await creaProgettoApi({ clienteId: finalClientId, nome: projectName });
-        if (progetto && progetto.id) progettoId = progetto.id;
-
-        const dbMods = selModules.map(m => ({
-          moduloTemplateId: m.id === 'M01' ? 'mod-m01' : m.id === 'M02' ? 'mod-m02' : m.id,
-          moduloTemplateVersione: m.ver,
-        }));
-
-        await creaPreventivoEAccettaApi({
-          clienteId: finalClientId,
-          progettoId: progettoId,
-          righe: dbMods,
-        });
-
-        // 3. Salva anche in localStorage per garantire la consistenza offline immediata isolata per tenant
-        const currentTenantId = getCurrentTenantId();
-        const storageKey = getTenantStorageKey('bluman_custom_projects', currentTenantId);
-        const customProjsStr = localStorage.getItem(storageKey);
-        const customProjs: any[] = customProjsStr ? JSON.parse(customProjsStr) : [];
-        const newProjObject = {
-          id: progettoId,
-          tenantId: currentTenantId,
-          n: projectName,
-          cl: clientName || 'Cliente',
-          ct: clientType,
-          st: 'pre_project',
-          pct: 0,
-          start: new Date().toLocaleDateString('it-IT'),
-          due: '30 giorni',
-          val: totalP,
-          delay: false,
-          fisc: 'privato_italia',
-          fatture: [],
-          mods: selModules.map((m, mIdx) => ({
-            id: Date.now() + mIdx,
-            n: m.n,
-            cat: m.cat,
-            st: 'pending',
-            pct: 0,
-            h: moduloH(m),
-            a: 0,
-            p: moduloP(m),
-            team: [1],
-            delay: false,
-            v: (m.v || []).map((voce: any) => ({
-              n: voce.n || 'Microvoce operativa',
-              hE: voce.hE || 4,
-              hA: 0,
-              s: 'pending',
-              as: 1,
-              d: 0,
-            })),
-          })),
-        };
-        localStorage.setItem(storageKey, JSON.stringify([newProjObject, ...customProjs]));
-      } catch (apiErr) {
-        console.warn('Backend API project creation fallback local:', apiErr);
+      // 2. Crea il progetto e istanzia i moduli a database. Non c'è un ripiego locale: un
+      //    progetto che esiste solo nel browser di chi lo ha creato è invisibile al cliente,
+      //    agli altri operatori e alla fatturazione. Meglio un errore adesso.
+      const progetto = await creaProgettoApi({ clienteId: finalClientId, nome: projectName });
+      if (!progetto?.id) {
+        throw new Error('Il server non ha restituito l\'identificativo del progetto: niente è stato creato.');
       }
+      const progettoId = progetto.id;
+
+      // Gli identificativi arrivano dalla libreria moduli del database e si passano come
+      // sono. Qui c'era una traduzione a mano — `m.id === 'M01' ? 'mod-m01' : ...` — che
+      // copriva due soli moduli: era il residuo di quando l'elenco veniva dai dati di
+      // esempio, e con la libreria vera trasformava gli altri in identificativi inesistenti.
+      const dbMods = selModules.map(m => ({
+        moduloTemplateId: m.id,
+        moduloTemplateVersione: m.ver,
+      }));
+
+      await creaPreventivoEAccettaApi({
+        clienteId: finalClientId,
+        progettoId,
+        righe: dbMods,
+      });
+
+      // 3. Copia locale per far comparire subito il progetto negli elenchi, scritta solo
+      //    dopo che il database l'ha accettato: prima veniva scritta anche quando la
+      //    creazione era fallita, e da lì nasceva il progetto fantasma con i moduli che il
+      //    cliente non vedeva.
+      const currentTenantId = getCurrentTenantId();
+      const storageKey = getTenantStorageKey('bluman_custom_projects', currentTenantId);
+      const customProjsStr = localStorage.getItem(storageKey);
+      const customProjs: any[] = customProjsStr ? JSON.parse(customProjsStr) : [];
+      const newProjObject = {
+        id: progettoId,
+        tenantId: currentTenantId,
+        n: projectName,
+        cl: clientName || 'Cliente',
+        ct: clientType,
+        st: 'pre_project',
+        pct: 0,
+        start: new Date().toLocaleDateString('it-IT'),
+        due: '30 giorni',
+        val: totalP,
+        delay: false,
+        fisc: 'privato_italia',
+        fatture: [],
+        mods: selModules.map((m, mIdx) => ({
+          id: Date.now() + mIdx,
+          n: m.n,
+          cat: m.cat,
+          st: 'pending',
+          pct: 0,
+          h: moduloH(m),
+          a: 0,
+          p: moduloP(m),
+          team: [1],
+          delay: false,
+          v: (m.v || []).map((voce: any) => ({
+            n: voce.n || 'Microvoce operativa',
+            hE: voce.hE || 4,
+            hA: 0,
+            s: 'pending',
+            as: 1,
+            d: 0,
+          })),
+        })),
+      };
+      localStorage.setItem(storageKey, JSON.stringify([newProjObject, ...customProjs]));
 
       setNotif(true);
       if (onProjectCreated) onProjectCreated();
       setTimeout(() => { setNotif(false); onClose(); }, 1500);
     } catch (err: any) {
+      // Prima anche questo ramo mostrava «✓ Progetto istanziato e collegato su Supabase DB!»
+      // e chiudeva la finestra: il progetto non c'era e nessuno lo sapeva.
       console.error('Errore salvataggio progetto:', err);
-      setNotif(true);
-      if (onProjectCreated) onProjectCreated();
-      setTimeout(() => { setNotif(false); onClose(); }, 1500);
+      setErrore(err instanceof Error ? err.message : 'Errore sconosciuto durante la creazione del progetto.');
     } finally {
       setLoading(false);
     }
@@ -507,6 +528,16 @@ export function NewProjectWizard({ onClose, onProjectCreated }: NewProjectWizard
               </div>
             )}
           </div>
+
+          {/* Il motivo del fallimento, dentro la finestra e non in un avviso che scompare: se il
+              progetto non è stato creato la finestra resta aperta con i dati inseriti, così si
+              può riprovare senza ricompilare tutto. Il testo è quello del server. */}
+          {errore && (
+            <div style={{ margin: '0 20px 4px', background: '#2d0d0d', border: '1px solid #7f1d1d', color: '#fca5a5', padding: '10px 12px', borderRadius: 10, fontSize: 12, lineHeight: 1.5 }}>
+              <div style={{ fontWeight: 600, marginBottom: 2 }}>Progetto non creato</div>
+              {errore}
+            </div>
+          )}
 
           {/* Footer */}
           <div style={{ padding: '14px 20px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

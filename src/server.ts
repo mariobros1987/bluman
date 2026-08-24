@@ -52,6 +52,51 @@ const inMemoryTenantStore = new Map<string, any>();
 const TENANT_DEFAULT = '00000000-0000-0000-0000-000000000001';
 
 /**
+ * Gli stati ammessi, per validare quello che arriva dal client prima di scriverlo.
+ *
+ * Sono le stesse voci degli `enum` in `prisma/schema.prisma`: qui servono come elenco a runtime,
+ * perché un valore fuori elenco farebbe fallire l'`update` di Prisma con un errore che non dice
+ * niente a chi lo legge dal frontend, invece di essere respinto con il motivo.
+ */
+const STATI_MICROVOCE = ['pending', 'attesa_dipendenza', 'active', 'delayed', 'blocked', 'done'];
+const STATI_PROGETTO = ['pre_project', 'in_progress', 'completed', 'archived'];
+
+/**
+ * Durata della sessione di un operatore dello studio, in minuti.
+ *
+ * Era un'ora, senza rinnovo. Una giornata di lavoro su un progetto dura più di un'ora, quindi il
+ * token scadeva **durante** il lavoro: da quel momento ogni salvataggio tornava 401, e siccome
+ * quasi nessuna chiamata del frontend distingueva il 401 dal successo, le modifiche continuavano
+ * a comparire sullo schermo — arrivavano da `localStorage` — senza mai raggiungere il database.
+ * È la causa a monte del guasto segnalato, «il cliente non vede i moduli inseriti
+ * dall'operatore»: il portale legge il database.
+ *
+ * Dodici ore coprono una giornata; il rinnovo scorrevole qui sotto copre chi lavora oltre.
+ */
+const DURATA_SESSIONE_OPERATORE_MINUTI = 12 * 60;
+
+/**
+ * Durata della sessione di un cliente nel portale, in minuti.
+ *
+ * Più corta di quella dell'operatore: il portale si apre da un link ricevuto via email, che può
+ * finire su un dispositivo condiviso o restare in una cronologia. Quattro ore bastano a leggere
+ * i documenti, ricevere il codice e firmare; scaduta, il Magic Link (valido sette giorni) ne
+ * produce una nuova senza passare dallo studio.
+ */
+const DURATA_SESSIONE_CLIENTE_MINUTI = 4 * 60;
+
+/**
+ * Quando rinnovare un token ancora valido: a metà della sua vita.
+ *
+ * Il rinnovo viaggia nell'header `X-Bluman-Token` della risposta e il frontend lo sostituisce a
+ * quello che ha in memoria. Così chi sta lavorando non viene mai buttato fuori a metà di una
+ * modifica, e chi ha chiuso il portatile venerdì sera rientra lunedì con le credenziali, che è la
+ * differenza fra una sessione lunga e una sessione eterna. Non serve nessuna tabella di refresh
+ * token: il token nuovo è firmato con lo stesso segreto e porta lo stesso contenuto.
+ */
+const SOGLIA_RINNOVO = 0.5;
+
+/**
  * Validità di un Magic Link. Sette giorni perché il destinatario è un cliente che legge la
  * posta quando può, non un operatore davanti alla console. La revoca non aspetta la
  * scadenza: è la cancellazione della riga in `magic_link`.
@@ -255,6 +300,22 @@ export function buildServer(app: AppPort): FastifyInstance {
           if (payload.tenantId) {
             tenantId = payload.tenantId;
           }
+
+          // Rinnovo scorrevole: superata metà della vita del token se ne restituisce uno nuovo
+          // nell'header della risposta. Vale solo per un token ancora valido — `verifyJwt` ha
+          // già respinto quelli scaduti — quindi non è un modo di rientrare, è un modo di non
+          // uscire mentre si sta lavorando.
+          const durataMinuti =
+            payload.ruolo === 'cliente' ? DURATA_SESSIONE_CLIENTE_MINUTI : DURATA_SESSIONE_OPERATORE_MINUTI;
+          const adesso = Math.floor(Date.now() / 1000);
+          const rimanenti = (payload.exp ?? 0) - adesso;
+          if (rimanenti > 0 && rimanenti < durataMinuti * 60 * SOGLIA_RINNOVO) {
+            const { exp: _scaduto, ...contenuto } = payload;
+            reply.header('X-Bluman-Token', signJwt(contenuto, durataMinuti));
+            // Senza questo il browser non legge l'header: le risposte cross-origin espongono
+            // solo gli header elencati qui.
+            reply.header('Access-Control-Expose-Headers', 'X-Bluman-Token');
+          }
         }
       }
     }
@@ -352,7 +413,7 @@ export function buildServer(app: AppPort): FastifyInstance {
       tenantId: userTenantId,
       email: cleanEmail,
       ruolo: utente.ruolo,
-    });
+    }, DURATA_SESSIONE_OPERATORE_MINUTI);
 
     recordAudit({
       tenantId: userTenantId,
@@ -434,7 +495,7 @@ export function buildServer(app: AppPort): FastifyInstance {
       tenantId: link.cliente.tenantId,
       email: emailCliente,
       ruolo: 'cliente',
-    });
+    }, DURATA_SESSIONE_CLIENTE_MINUTI);
 
     recordAudit({
       tenantId: link.cliente.tenantId,
@@ -509,7 +570,7 @@ export function buildServer(app: AppPort): FastifyInstance {
       tenantId: cliente.tenantId,
       email: emailCliente,
       ruolo: 'cliente',
-    });
+    }, DURATA_SESSIONE_CLIENTE_MINUTI);
 
     recordAudit({
       tenantId: cliente.tenantId,
@@ -2294,29 +2355,24 @@ export function buildServer(app: AppPort): FastifyInstance {
     }
   });
 
-  const projectStateStore = new Map<string, any>();
-
+  /**
+   * Il dettaglio del progetto, con l'avanzamento calcolato (§16).
+   *
+   * Qui c'era una `Map` in memoria (`projectStateStore`) che conservava l'ultimo corpo inviato
+   * dal client e lo sovrapponeva alla lettura da database. Faceva danni in tre modi: si azzerava
+   * a ogni rilascio, quindi lo "stato salvato" scompariva senza che nessuno lo sapesse; era
+   * locale al processo, quindi due istanze rispondevano cose diverse; e restituiva come dato di
+   * database quello che il client aveva mandato, coprendo il fatto che a database non era mai
+   * arrivato. Ora si legge quello che c'è scritto, e se non c'è scritto niente si vede.
+   */
   server.get<{ Params: { id: string } }>('/progetti/:id', async (req, reply) => {
     const { id } = req.params;
     try {
       const dbProj: any = await app.getProgetto(id);
-      // L'avanzamento si calcola dai dati appena letti e viene applicato **dopo** lo spread
-      // di `savedState`: quello store contiene la forma che il client ha inviato, `pct`
-      // compresa, e non deve poter riscrivere il valore che il motore ha calcolato (§16).
-      const avanzamento = calcolaAvanzamento(dbProj);
-      const savedState = projectStateStore.get(id);
-      if (savedState) {
-        return reply.send({
-          ...(typeof dbProj === 'object' && dbProj !== null ? dbProj : {}),
-          ...savedState,
-          id: dbProj?.id || id,
-          avanzamento,
-        });
-      }
-      return reply.send({ ...dbProj, avanzamento });
-    } catch {
-      const savedState = projectStateStore.get(id);
-      if (savedState) return reply.send(savedState);
+      if (!dbProj) return reply.code(404).send({ errore: `Progetto ${id} non trovato` });
+      return reply.send({ ...dbProj, avanzamento: calcolaAvanzamento(dbProj) });
+    } catch (err) {
+      console.warn(`Lettura progetto ${id} non riuscita:`, err);
       return reply.code(404).send({ errore: 'Progetto non trovato' });
     }
   });
@@ -2360,46 +2416,188 @@ export function buildServer(app: AppPort): FastifyInstance {
     return reply.send(avanzamento);
   });
 
+  /**
+   * Salva su database lo stato di un progetto così come l'operatore l'ha modificato.
+   *
+   * Prima questa funzione scriveva il corpo della richiesta in una `Map` in memoria e aggiornava
+   * a database soltanto tre campi del progetto — nome, stato e valore. **Moduli e micro-voci non
+   * venivano mai salvati.** Le ore consuntivate, gli stati delle micro-voci e le note di causa
+   * restavano nel browser di chi le aveva scritte e nella memoria del processo, che si azzera a
+   * ogni rilascio. Chi apriva lo stesso progetto da un'altra postazione — o il cliente dal
+   * portale, che legge il database — vedeva il progetto fermo a come era stato istanziato.
+   *
+   * Il `catch` peggiorava le cose: rispondeva `ok: true` con «memorizzato in fallback locale»
+   * anche quando la scrittura era andata male, quindi il frontend non aveva modo di accorgersene.
+   *
+   * Cosa viene salvato e cosa no, per scelta:
+   *
+   * - **si salva** quello che l'operatore inserisce: ore consuntivate e preventivate, stato della
+   *   micro-voce, causa del ritardo, nome e prezzo del modulo, nome e valore del progetto.
+   * - **non si salva** quello che il motore calcola (§16): lo stato del modulo e la percentuale
+   *   di avanzamento arrivano dalla cascata micro-voce → modulo → progetto, che gira in fondo a
+   *   questa funzione. Accettarli dal client vorrebbe dire lasciargli riscrivere un valore
+   *   derivato con uno che ha calcolato per conto suo.
+   * - **non ha una colonna** il blocco note libero della micro-voce (`note`) e resta dove sta
+   *   oggi, in `localStorage`. Va aggiunto allo schema, non finto qui.
+   *
+   * Le righe si riconoscono per identificativo di database (`dbId`), che il frontend porta con
+   * sé da quando legge il progetto. Per i progetti salvati prima di questa modifica il `dbId`
+   * non c'è: si ripiega sul nome, ma solo quando è univoco — due moduli omonimi non si possono
+   * distinguere e la riga viene dichiarata non salvata invece di aggiornare quella sbagliata.
+   */
   server.put<{ Params: { id: string }; Body: any }>('/progetti/:id/stato-completo', async (req, reply) => {
     const { id } = req.params;
     const body: any = req.body || {};
-    const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
+    const tenantId = (req as any).tenantId || TENANT_DEFAULT;
 
-    try {
-      // 1. Memorizza in cache di stato rapida
-      projectStateStore.set(id, body);
-
-      // 2. Se app implementa salvaStatoProgetto, invoca
-      if ((app as any).salvaStatoProgetto) {
-        await (app as any).salvaStatoProgetto(id, body);
-      }
-
-      // 3. Persisti su PostgreSQL tramite Prisma se il progetto esiste
-      const exists = await prisma.progetto.findUnique({ where: { id } }).catch(() => null);
-      if (exists) {
-        await prisma.progetto.update({
-          where: { id },
-          data: {
-            nome: body.n || exists.nome,
-            stato: body.st || exists.stato,
-            valoreTotale: Math.round((body.val || 0) * 100),
+    const progetto = await prisma.progetto.findUnique({
+      where: { id },
+      include: {
+        moduli: {
+          select: {
+            id: true,
+            nome: true,
+            microvoci: { select: { id: true, nome: true, ordine: true, stato: true, causaNota: true } },
           },
-        }).catch((err) => console.warn('Sync Prisma Progetto update error:', err));
+        },
+      },
+    });
+
+    if (!progetto) {
+      return reply.code(404).send({
+        errore:
+          `Il progetto ${id} non esiste a database: le modifiche non sono state salvate. ` +
+          'Se il progetto è stato creato mentre la sessione era scaduta esiste solo in questo browser e va ricreato.',
+      });
+    }
+
+    /** Righe che non si è potuto salvare, con il motivo. Non vengono mai passate sotto silenzio. */
+    const nonSalvate: string[] = [];
+    let moduliSalvati = 0;
+    let microvociSalvate = 0;
+
+    const modsRichiesti: any[] = Array.isArray(body.mods) ? body.mods : [];
+
+    for (const mod of modsRichiesti) {
+      const perNome = progetto.moduli.filter(
+        (m) => m.nome.trim().toLowerCase() === String(mod.n ?? '').trim().toLowerCase(),
+      );
+      const riga =
+        (mod.dbId ? progetto.moduli.find((m) => m.id === mod.dbId) : undefined) ||
+        (perNome.length === 1 ? perNome[0] : undefined);
+
+      if (!riga) {
+        nonSalvate.push(
+          perNome.length > 1
+            ? `modulo «${mod.n}»: a database ce ne sono ${perNome.length} con lo stesso nome e la richiesta non porta l'identificativo`
+            : `modulo «${mod.n ?? '(senza nome)'}»: nessun modulo corrispondente a database`,
+        );
+        continue;
       }
 
-      recordAudit({
-        tenantId,
-        azione: 'PROGETTO_STATO_AGGIORNATO',
-        entita: body.n || id,
-        dettagli: `Aggiornato stato completo, moduli e microvoci del progetto ${body.n || id} (Avanzamento: ${body.pct || 0}%)`,
-        ipAddress: req.ip,
-      });
+      const datiModulo: any = {};
+      if (typeof mod.n === 'string' && mod.n.trim() && mod.n.trim() !== riga.nome) datiModulo.nome = mod.n.trim();
+      if (Number.isFinite(mod.h)) datiModulo.orePreventivate = Math.max(0, Math.round(Number(mod.h)));
+      if (Number.isFinite(mod.a)) datiModulo.oreConsuntivate = Math.max(0, Math.round(Number(mod.a)));
+      if (Number.isFinite(mod.p)) datiModulo.prezzo = Math.max(0, Math.round(Number(mod.p) * 100));
 
-      return reply.send({ ok: true, id, message: 'Stato progetto, note e microvoci salvati con successo per tutte le postazioni.' });
-    } catch (err: any) {
-      console.error('Errore persistenza stato progetto:', err);
-      return reply.send({ ok: true, id, message: 'Stato progetto memorizzato in fallback locale.' });
+      if (Object.keys(datiModulo).length > 0) {
+        await prisma.moduloProgetto.update({ where: { id: riga.id }, data: datiModulo });
+        moduliSalvati++;
+      }
+
+      const microRichieste: any[] = Array.isArray(mod.v) ? mod.v : [];
+      for (let indice = 0; indice < microRichieste.length; indice++) {
+        const mv = microRichieste[indice];
+        const mvPerNome = riga.microvoci.filter(
+          (r) => r.nome.trim().toLowerCase() === String(mv.n ?? '').trim().toLowerCase(),
+        );
+        // L'indice è l'ultimo appiglio: l'elenco nel frontend nasce dall'ordine con cui le
+        // micro-voci arrivano da database, quindi le posizioni combaciano finché nessuno ne
+        // aggiunge o toglie. Vale come ripiego, non come regola: per questo viene dopo il
+        // nome, e il nome dopo l'identificativo.
+        const rigaMv =
+          (mv.dbId ? riga.microvoci.find((r) => r.id === mv.dbId) : undefined) ||
+          (mvPerNome.length === 1 ? mvPerNome[0] : undefined) ||
+          (riga.microvoci.length === microRichieste.length ? riga.microvoci[indice] : undefined);
+
+        if (!rigaMv) {
+          nonSalvate.push(
+            `micro-voce «${mv.n ?? indice + 1}» del modulo «${riga.nome}»: nessuna riga corrispondente a database`,
+          );
+          continue;
+        }
+
+        const datiMv: any = {};
+        if (Number.isFinite(mv.hE)) datiMv.orePreventivate = Math.max(0, Math.round(Number(mv.hE)));
+        if (Number.isFinite(mv.hA)) datiMv.oreConsuntivate = Math.max(0, Math.round(Number(mv.hA)));
+
+        const causa = typeof mv.vn === 'string' && mv.vn.trim() ? mv.vn.trim() : null;
+        if (causa !== rigaMv.causaNota) datiMv.causaNota = causa;
+
+        if (typeof mv.s === 'string' && STATI_MICROVOCE.includes(mv.s) && mv.s !== rigaMv.stato) {
+          // §7bis — «in ritardo» e «bloccata» senza causa non sono uno stato, sono un buco nel
+          // fascicolo: chi legge il progetto un mese dopo non sa perché si è fermato.
+          if ((mv.s === 'delayed' || mv.s === 'blocked') && !(causa || rigaMv.causaNota)) {
+            nonSalvate.push(
+              `micro-voce «${rigaMv.nome}»: lo stato «${mv.s === 'delayed' ? 'in ritardo' : 'bloccata'}» richiede la causa (§7bis) e la richiesta non la porta`,
+            );
+          } else {
+            datiMv.stato = mv.s;
+          }
+        }
+
+        if (Object.keys(datiMv).length > 0) {
+          await prisma.microvoceProgetto.update({ where: { id: rigaMv.id }, data: datiMv });
+          microvociSalvate++;
+        }
+      }
     }
+
+    const datiProgetto: any = {};
+    if (typeof body.n === 'string' && body.n.trim() && body.n.trim() !== progetto.nome) {
+      datiProgetto.nome = body.n.trim();
+    }
+    if (Number.isFinite(body.val)) datiProgetto.valoreTotale = Math.max(0, Math.round(Number(body.val) * 100));
+    // Lo stato del progetto si accetta solo per far uscire un progetto da `pre_project`: da lì
+    // in poi lo calcola la cascata in fondo a questa funzione, e prenderlo dal client
+    // significherebbe sovrascrivere il risultato con una stima fatta nel browser.
+    if (progetto.stato === 'pre_project' && typeof body.st === 'string' && STATI_PROGETTO.includes(body.st) && body.st !== 'pre_project') {
+      datiProgetto.stato = body.st;
+    }
+    if (Object.keys(datiProgetto).length > 0) {
+      await prisma.progetto.update({ where: { id }, data: datiProgetto });
+    }
+
+    // §16 — la cascata risale dopo la scrittura: ore nuove significano segnale di rischio,
+    // stato del modulo e stato del progetto da rifare.
+    let avanzamento: any = null;
+    try {
+      avanzamento = await ricalcolaProgetto(id);
+    } catch (err) {
+      console.warn(`Ricalcolo avanzamento non riuscito per il progetto ${id}:`, err);
+    }
+
+    recordAudit({
+      tenantId,
+      azione: 'PROGETTO_STATO_AGGIORNATO',
+      entita: id,
+      dettagli:
+        `Progetto «${datiProgetto.nome || progetto.nome}»: ${moduliSalvati} moduli e ${microvociSalvate} micro-voci aggiornati` +
+        (nonSalvate.length ? `; ${nonSalvate.length} righe non salvate` : ''),
+      ipAddress: req.ip,
+    });
+
+    // Il corpo dice quante righe sono finite a database e quali no. Un `ok: true` senza numeri
+    // era indistinguibile da un salvataggio che non aveva scritto niente.
+    return reply.send({
+      ok: true,
+      id,
+      moduliSalvati,
+      microvociSalvate,
+      nonSalvate,
+      avanzamento,
+    });
   });
 
   server.get<{ Params: { id: string } }>('/progetti/:id/accessi', async (req) => {

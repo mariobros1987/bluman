@@ -42,6 +42,14 @@ export interface TeamMember {
 }
 
 export interface MicroVoce {
+  /**
+   * Identificativo della riga a database (`microvoce_progetto.id`).
+   *
+   * Assente sulle micro-voci che vivono solo nel browser (dati di esempio, progetti salvati
+   * prima che questo campo esistesse). Serve al salvataggio per sapere quale riga aggiornare:
+   * il ripiego sul nome non distingue due voci omonime.
+   */
+  dbId?: string;
   n: string;
   hE: number; // ore estimate
   hA: number; // ore actual
@@ -69,7 +77,10 @@ export interface Passaggio {
 }
 
 export interface ModuloProgetto {
+  /** Indice sintetico usato dai confronti dentro le pagine. Non è l'id di database. */
   id: number;
+  /** Identificativo della riga a database (`modulo_progetto.id`). Vedi `MicroVoce.dbId`. */
+  dbId?: string;
   n: string;
   cat: CategoriaModulo;
   st: StatoModulo;

@@ -20,6 +20,16 @@ async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutM
   try {
     const res = await fetch(url, { ...options, signal: controller.signal });
     clearTimeout(timer);
+
+    // Rinnovo scorrevole della sessione: superata metà della vita del token il backend ne
+    // manda uno nuovo in questo header, e qui prende il posto del precedente. Serve a non
+    // buttare fuori chi sta lavorando: prima il token durava un'ora e non si rinnovava, quindi
+    // a metà giornata ogni salvataggio tornava 401.
+    const rinnovato = res.headers.get('X-Bluman-Token');
+    if (rinnovato && typeof localStorage !== 'undefined') {
+      localStorage.setItem('bluman_jwt_token', rinnovato);
+    }
+
     if (res.status === 401 && typeof window !== 'undefined' && !url.includes('/auth/') && !window.location.pathname.startsWith('/portal')) {
       window.dispatchEvent(new Event('bluman_unauthorized'));
     }
@@ -28,6 +38,25 @@ async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutM
     clearTimeout(timer);
     throw error;
   }
+}
+
+/**
+ * La chiamata usata da tutte le funzioni di questo file.
+ *
+ * Esisteva già `fetchWithTimeout`, che segnala la sessione scaduta con l'evento
+ * `bluman_unauthorized`, ma la usavano 8 funzioni su 87: le altre chiamavano `fetch` nudo. Il
+ * risultato pratico: il token di accesso dura poco, l'operatore che resta al lavoro oltre la
+ * scadenza riceve 401 su ogni salvataggio, nessuno di quei 401 veniva riconosciuto come
+ * sessione scaduta, e i `catch` di queste funzioni li trasformavano in `{ok: true}`. Da lì il
+ * guasto che si vedeva: l'operatore aggiunge moduli, l'interfaccia conferma, il database non
+ * riceve niente e il portale del cliente resta vuoto.
+ *
+ * Il timeout è di sessanta secondi, più lungo di qualunque attesa lato server (il relay email
+ * si arrende a quarantacinque): così quello che arriva all'utente è il motivo vero del server,
+ * non un timeout del browser che nasconde la risposta in arrivo.
+ */
+async function apiFetch(url: string, options: RequestInit = {}, timeoutMs: number = 60000) {
+  return fetchWithTimeout(url, options, timeoutMs);
 }
 
 export function getAuthHeaders() {
@@ -65,7 +94,7 @@ export async function loginApi(email: string, password?: string) {
 
   let res: Response;
   try {
-    res = await fetch(`${API_BASE}/auth/login`, {
+    res = await apiFetch(`${API_BASE}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: cleanEmail, password }),
@@ -97,7 +126,7 @@ export async function loginApi(email: string, password?: string) {
  * intestata a un cliente inventato. Ora l'errore si propaga e il portale lo mostra.
  */
 export async function magicLoginApi(magicToken: string) {
-  const res = await fetch(`${API_BASE}/auth/magic-login`, {
+  const res = await apiFetch(`${API_BASE}/auth/magic-login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ magicToken }),
@@ -110,7 +139,7 @@ export async function magicLoginApi(magicToken: string) {
  * Accesso classico al Portale Cliente con Email e Password dedicate.
  */
 export async function clientLoginApi(email: string, password: string) {
-  const res = await fetch(`${API_BASE}/auth/client-login`, {
+  const res = await apiFetch(`${API_BASE}/auth/client-login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password }),
@@ -126,7 +155,7 @@ export async function clientLoginApi(email: string, password: string) {
  * Cambio Password per Utente Staff / Advisor dello Studio
  */
 export async function cambiaPasswordStaffApi(currentPassword: string, newPassword: string) {
-  const res = await fetch(`${API_BASE}/auth/change-password`, {
+  const res = await apiFetch(`${API_BASE}/auth/change-password`, {
     method: 'POST',
     headers: getAuthHeaders(),
     body: JSON.stringify({ currentPassword, newPassword }),
@@ -142,7 +171,7 @@ export async function cambiaPasswordStaffApi(currentPassword: string, newPasswor
  * Impostazione o Modifica Password per il Cliente del Portale
  */
 export async function cambiaPasswordClienteApi(newPassword: string, currentPassword?: string, clienteId?: string, email?: string) {
-  const res = await fetch(`${API_BASE}/portal/change-password`, {
+  const res = await apiFetch(`${API_BASE}/portal/change-password`, {
     method: 'POST',
     headers: getAuthHeaders(),
     body: JSON.stringify({ newPassword, currentPassword, clienteId, email }),
@@ -158,7 +187,7 @@ export async function cambiaPasswordClienteApi(newPassword: string, currentPassw
  * Recupero dati profilo utente autenticato
  */
 export async function fetchMeApi() {
-  const res = await fetch(`${API_BASE}/auth/me`, {
+  const res = await apiFetch(`${API_BASE}/auth/me`, {
     headers: getAuthHeaders(),
   });
   if (!res.ok) {
@@ -169,7 +198,7 @@ export async function fetchMeApi() {
 }
 
 export async function fetchProfiloUtenteApi() {
-  const res = await fetch(`${API_BASE}/auth/profilo`, {
+  const res = await apiFetch(`${API_BASE}/auth/profilo`, {
     headers: getAuthHeaders(),
   });
   if (!res.ok) {
@@ -183,7 +212,7 @@ export async function fetchProfiloUtenteApi() {
  * Aggiornamento profilo utente autenticato
  */
 export async function aggiornaProfiloUtenteApi(data: { nome?: string; specializzazione?: string }) {
-  const res = await fetch(`${API_BASE}/auth/profilo`, {
+  const res = await apiFetch(`${API_BASE}/auth/profilo`, {
     method: 'PUT',
     headers: getAuthHeaders(),
     body: JSON.stringify(data),
@@ -199,7 +228,7 @@ export async function aggiornaProfiloUtenteApi(data: { nome?: string; specializz
  * Reset password utente / collaboratore da parte di SuperAdmin o Lead Advisor
  */
 export async function resetPasswordUtenteApi(userId: string) {
-  const res = await fetch(`${API_BASE}/tenant/utenti/${userId}/reset-password`, {
+  const res = await apiFetch(`${API_BASE}/tenant/utenti/${userId}/reset-password`, {
     method: 'POST',
     headers: getAuthHeaders(),
   });
@@ -223,7 +252,7 @@ export async function fetchProgetti() {
 
 export async function fetchProgettoDettaglio(id: string) {
   try {
-    const res = await fetch(`${API_BASE}/progetti/${id}`, { headers: getAuthHeaders() });
+    const res = await apiFetch(`${API_BASE}/progetti/${id}`, { headers: getAuthHeaders() });
     if (!res.ok) throw new Error('Errore nel recupero dettaglio progetto');
     return await res.json();
   } catch (err) {
@@ -235,7 +264,7 @@ export async function fetchProgettoDettaglio(id: string) {
 export async function fetchModuliLibreria(giurisdizioneId?: string) {
   try {
     const url = giurisdizioneId ? `${API_BASE}/moduli?giurisdizioneId=${encodeURIComponent(giurisdizioneId)}` : `${API_BASE}/moduli`;
-    const res = await fetch(url, { headers: getAuthHeaders() });
+    const res = await apiFetch(url, { headers: getAuthHeaders() });
     if (!res.ok) throw new Error('Errore nel recupero moduli');
     return await res.json();
   } catch (err) {
@@ -246,7 +275,7 @@ export async function fetchModuliLibreria(giurisdizioneId?: string) {
 
 export async function fetchGiurisdizioniApi() {
   try {
-    const res = await fetch(`${API_BASE}/giurisdizioni`, { headers: getAuthHeaders() });
+    const res = await apiFetch(`${API_BASE}/giurisdizioni`, { headers: getAuthHeaders() });
     if (!res.ok) throw new Error('Errore nel recupero giurisdizioni');
     return await res.json();
   } catch (err) {
@@ -257,7 +286,7 @@ export async function fetchGiurisdizioniApi() {
 
 export async function creaGiurisdizioneApi(input: { nome: string; codice: string; tipo: 'ue' | 'extra_ue' | 'stato_usa' | 'altro'; note?: string }) {
   try {
-    const res = await fetch(`${API_BASE}/giurisdizioni`, {
+    const res = await apiFetch(`${API_BASE}/giurisdizioni`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(input),
@@ -272,7 +301,7 @@ export async function creaGiurisdizioneApi(input: { nome: string; codice: string
 
 export async function fetchArticoli() {
   try {
-    const res = await fetch(`${API_BASE}/articoli`, { headers: getAuthHeaders() });
+    const res = await apiFetch(`${API_BASE}/articoli`, { headers: getAuthHeaders() });
     if (!res.ok) throw new Error('Errore nel recupero articoli');
     return await res.json();
   } catch (err) {
@@ -283,7 +312,7 @@ export async function fetchArticoli() {
 
 export async function uploadFileApi(filename: string, contentBase64: string) {
   try {
-    const res = await fetch(`${API_BASE}/upload`, {
+    const res = await apiFetch(`${API_BASE}/upload`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify({ filename, contentBase64 }),
@@ -298,7 +327,7 @@ export async function uploadFileApi(filename: string, contentBase64: string) {
 
 export async function updateArticoloPrezzoApi(id: string, input: { prezzoDefault?: number; oreDefault?: number; nome?: string }) {
   try {
-    const res = await fetch(`${API_BASE}/articoli/${id}`, {
+    const res = await apiFetch(`${API_BASE}/articoli/${id}`, {
       method: 'PATCH',
       headers: getAuthHeaders(),
       body: JSON.stringify(input),
@@ -319,7 +348,7 @@ export async function creaArticoloApi(input: {
   documentiRichiesti?: string[];
   passaggi?: Array<{ titolo: string; tipo: 'info' | 'documento' | 'form' | 'verifica'; chi: 'operatore' | 'cliente'; descrizione?: string }>;
 }) {
-  const res = await fetch(`${API_BASE}/articoli`, {
+  const res = await apiFetch(`${API_BASE}/articoli`, {
     method: 'POST',
     headers: getAuthHeaders(),
     body: JSON.stringify(input),
@@ -336,7 +365,7 @@ export async function creaModuloTemplateApi(input: {
   righe: Array<{ articoloId: string; quantita: number; overrideOre?: number; overridePrezzo?: number }>;
   dipendenzeDaIds?: string[];
 }) {
-  const res = await fetch(`${API_BASE}/moduli-template`, {
+  const res = await apiFetch(`${API_BASE}/moduli-template`, {
     method: 'POST',
     headers: getAuthHeaders(),
     body: JSON.stringify(input),
@@ -347,7 +376,7 @@ export async function creaModuloTemplateApi(input: {
 
 export async function fetchClienti() {
   try {
-    const res = await fetch(`${API_BASE}/clienti`, { headers: getAuthHeaders() });
+    const res = await apiFetch(`${API_BASE}/clienti`, { headers: getAuthHeaders() });
     if (!res.ok) throw new Error('Errore nel recupero clienti');
     return await res.json();
   } catch (err) {
@@ -357,7 +386,7 @@ export async function fetchClienti() {
 }
 
 export async function creaClienteApi(input: { nome: string; tipo?: 'individual' | 'company'; [key: string]: any }) {
-  const res = await fetch(`${API_BASE}/clienti`, {
+  const res = await apiFetch(`${API_BASE}/clienti`, {
     method: 'POST',
     headers: getAuthHeaders(),
     body: JSON.stringify(input),
@@ -367,7 +396,7 @@ export async function creaClienteApi(input: { nome: string; tipo?: 'individual' 
 }
 
 export async function aggiornaClienteApi(id: string, input: Record<string, any>) {
-  const res = await fetch(`${API_BASE}/clienti/${encodeURIComponent(id)}`, {
+  const res = await apiFetch(`${API_BASE}/clienti/${encodeURIComponent(id)}`, {
     method: 'PUT',
     headers: getAuthHeaders(),
     body: JSON.stringify(input),
@@ -386,7 +415,7 @@ export async function aggiornaClienteApi(id: string, input: Record<string, any>)
  * inventa un destinatario.
  */
 export async function generaMagicLinkApi(clienteId: string, email: string) {
-  const res = await fetch(`${API_BASE}/clienti/${encodeURIComponent(clienteId)}/magic-link`, {
+  const res = await apiFetch(`${API_BASE}/clienti/${encodeURIComponent(clienteId)}/magic-link`, {
     method: 'POST',
     headers: getAuthHeaders(),
     body: JSON.stringify({ email }),
@@ -410,7 +439,7 @@ export async function generaMagicLinkApi(clienteId: string, email: string) {
  * Genera o reimposta la password di accesso per il cliente, inviando opzionalmente l'email.
  */
 export async function resetPasswordClienteApi(clienteId: string) {
-  const res = await fetch(`${API_BASE}/clienti/${encodeURIComponent(clienteId)}/reset-password`, {
+  const res = await apiFetch(`${API_BASE}/clienti/${encodeURIComponent(clienteId)}/reset-password`, {
     method: 'POST',
     headers: getAuthHeaders(),
     body: JSON.stringify({}),
@@ -429,7 +458,7 @@ export async function resetPasswordClienteApi(clienteId: string) {
 }
 
 export async function creaProgettoApi(input: { clienteId: string; nome: string }) {
-  const res = await fetch(`${API_BASE}/progetti`, {
+  const res = await apiFetch(`${API_BASE}/progetti`, {
     method: 'POST',
     headers: getAuthHeaders(),
     body: JSON.stringify(input),
@@ -439,7 +468,7 @@ export async function creaProgettoApi(input: { clienteId: string; nome: string }
 }
 
 export async function eliminaProgettoApi(id: string) {
-  const res = await fetch(`${API_BASE}/progetti/${id}`, {
+  const res = await apiFetch(`${API_BASE}/progetti/${id}`, {
     method: 'DELETE',
     headers: getAuthHeaders(),
   });
@@ -451,7 +480,7 @@ export async function eliminaProgettoApi(id: string) {
 }
 
 export async function archiviaProgettoApi(id: string, archiviato: boolean) {
-  const res = await fetch(`${API_BASE}/progetti/${id}/archivia`, {
+  const res = await apiFetch(`${API_BASE}/progetti/${id}/archivia`, {
     method: 'PUT',
     headers: getAuthHeaders(),
     body: JSON.stringify({ archiviato }),
@@ -460,36 +489,57 @@ export async function archiviaProgettoApi(id: string, archiviato: boolean) {
   return await res.json();
 }
 
+/**
+ * Crea il preventivo con i moduli scelti e lo accetta subito: è l'unico percorso che
+ * istanzia i moduli del progetto a database (§15.3 — con versioni di template e articoli
+ * congelate, microvoci, passaggi e dipendenze, tutto in una transazione).
+ *
+ * Prima ognuno dei tre esiti negativi — preventivo rifiutato, accettazione rifiutata,
+ * errore di rete — restituiva `{id: 'prev-<timestamp>', ok: true}`. Il chiamante lo leggeva
+ * come riuscito, scriveva il progetto con i suoi moduli in localStorage e mostrava la
+ * conferma. A database non c'era nessun modulo. Il portale del cliente legge il database,
+ * quindi il cliente apriva una pagina vuota: è il guasto segnalato, e su dieci progetti
+ * sette non avevano nemmeno un modulo.
+ *
+ * Ora l'errore arriva a chi ha premuto il pulsante, con il motivo del server.
+ */
 export async function creaPreventivoEAccettaApi(input: {
   clienteId: string;
   progettoId: string;
   righe: Array<{ moduloTemplateId: string; moduloTemplateVersione: number }>;
 }) {
-  try {
-    const resPrev = await fetch(`${API_BASE}/preventivi`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(input),
-    });
-    if (!resPrev.ok) {
-      console.warn('POST /preventivi risposto non-200, continuo fallback locale');
-      return { id: `prev-${Date.now()}`, ok: true };
-    }
-    const prev = await resPrev.json();
-
-    const resAccetta = await fetch(`${API_BASE}/preventivi/${prev.id}/accetta`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-    });
-    if (!resAccetta.ok) {
-      console.warn('POST /preventivi/:id/accetta risposto non-200, continuo fallback locale');
-      return { id: prev.id, ok: true };
-    }
-    return await resAccetta.json();
-  } catch (err) {
-    console.warn('creaPreventivoEAccettaApi fallback locale:', err);
-    return { id: `prev-${Date.now()}`, ok: true };
+  if (!input.righe?.length) {
+    throw new Error('Nessun modulo selezionato: il progetto verrebbe creato senza niente dentro.');
   }
+
+  const resPrev = await apiFetch(`${API_BASE}/preventivi`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(input),
+  });
+  if (!resPrev.ok) {
+    const dett = await resPrev.json().catch(() => null);
+    if (resPrev.status === 401) {
+      throw new Error('Sessione scaduta: rientra e ripeti l\'operazione, i moduli non sono stati salvati.');
+    }
+    throw new Error(dett?.errore || `Il server ha rifiutato il preventivo (HTTP ${resPrev.status}).`);
+  }
+  const prev = await resPrev.json();
+
+  const resAccetta = await apiFetch(`${API_BASE}/preventivi/${prev.id}/accetta`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
+  if (!resAccetta.ok) {
+    const dett = await resAccetta.json().catch(() => null);
+    // Il preventivo esiste ma i moduli no: va detto, perché il rimedio è accettarlo di nuovo
+    // e non ricreare tutto da capo.
+    throw new Error(
+      `${dett?.errore || `Il server ha rifiutato l'accettazione (HTTP ${resAccetta.status})`}. ` +
+        `Il preventivo ${prev.id} è stato creato ma i moduli non sono stati istanziati.`,
+    );
+  }
+  return await resAccetta.json();
 }
 
 export async function emettiFatturaApi(input: {
@@ -506,7 +556,7 @@ export async function emettiFatturaApi(input: {
     descrizione: string;
   }>;
 }) {
-  const res = await fetch(`${API_BASE}/progetti/${input.progettoId}/fatture`, {
+  const res = await apiFetch(`${API_BASE}/progetti/${input.progettoId}/fatture`, {
     method: 'POST',
     headers: getAuthHeaders(),
     body: JSON.stringify(input),
@@ -520,7 +570,7 @@ export async function consuntivaMicrovoceApi(input: {
   oreAggiunte: number;
   completa?: boolean;
 }) {
-  const res = await fetch(`${API_BASE}/microvoci/${input.microvoceId}/consuntiva`, {
+  const res = await apiFetch(`${API_BASE}/microvoci/${input.microvoceId}/consuntiva`, {
     method: 'POST',
     headers: getAuthHeaders(),
     body: JSON.stringify(input),
@@ -535,7 +585,7 @@ export async function consuntivaMicrovoceApi(input: {
  * aggiornano già lo stato: questa serve dopo un'importazione o una correzione fatta a mano.
  */
 export async function ricalcolaProgettoApi(progettoId: string) {
-  const res = await fetch(`${API_BASE}/progetti/${progettoId}/ricalcola`, {
+  const res = await apiFetch(`${API_BASE}/progetti/${progettoId}/ricalcola`, {
     method: 'POST',
     headers: getAuthHeaders(),
   });
@@ -543,19 +593,26 @@ export async function ricalcolaProgettoApi(progettoId: string) {
   return await res.json();
 }
 
+/**
+ * Salva su database lo stato del progetto modificato dall'operatore.
+ *
+ * Il `catch` restituiva `{ok: true}`: un salvataggio non riuscito era indistinguibile da uno
+ * riuscito, e chi lavorava continuava a modificare credendo che tutto fosse a posto.
+ */
 export async function salvaProgettoDettaglioApi(progettoId: string, data: any) {
-  try {
-    const res = await fetch(`${API_BASE}/progetti/${progettoId}/stato-completo`, {
-      method: 'PUT',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(data),
-    });
-    if (!res.ok) throw new Error('Errore salvataggio progetto remoto');
-    return await res.json();
-  } catch (err) {
-    console.warn('salvaProgettoDettaglioApi fallback locale:', err);
-    return { ok: true };
+  const res = await apiFetch(`${API_BASE}/progetti/${progettoId}/stato-completo`, {
+    method: 'PUT',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const dett = await res.json().catch(() => null);
+    if (res.status === 401) {
+      throw new Error('Sessione scaduta: rientra e ripeti il salvataggio, le modifiche non sono state registrate.');
+    }
+    throw new Error(dett?.errore || `Salvataggio non riuscito (HTTP ${res.status}).`);
   }
+  return await res.json();
 }
 
 // DEFAULT_TEAM_USERS serve SOLO come fallback di seed per il Tenant Demo Bluecode (tenant-1) se il DB è offline
@@ -580,7 +637,7 @@ export async function fetchUtentiTenant() {
 
   // 1. Prova a caricare dal backend Fastify/DB — la rotta filtra già per x-tenant-id
   try {
-    const res = await fetch(`${API_BASE}/tenant/utenti`, { headers: getAuthHeaders() });
+    const res = await apiFetch(`${API_BASE}/tenant/utenti`, { headers: getAuthHeaders() });
     if (res.ok) {
       const dbUsers = await res.json();
       if (Array.isArray(dbUsers) && dbUsers.length > 0) {
@@ -628,7 +685,7 @@ export async function creaUtenteTenantApi(input: {
   // l'email di invito partiva con una password di default scritta nel bundle.
   let creato: any = null;
   try {
-    const res = await fetch(`${API_BASE}/tenant/utenti`, {
+    const res = await apiFetch(`${API_BASE}/tenant/utenti`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify({ ...input, tenantId: currentTenantId }),
@@ -716,7 +773,7 @@ export async function sendInviteCollaboratoreApi(input: {
   };
 
   try {
-    const res = await fetch('/api/send-email', {
+    const res = await apiFetch('/api/send-email', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -730,7 +787,7 @@ export async function sendInviteCollaboratoreApi(input: {
 
 export async function fetchAccessiProgetto(progettoId: string) {
   try {
-    const res = await fetch(`${API_BASE}/progetti/${progettoId}/accessi`);
+    const res = await apiFetch(`${API_BASE}/progetti/${progettoId}/accessi`);
     if (!res.ok) throw new Error('Errore recupero accessi');
     return await res.json();
   } catch (err) {
@@ -740,7 +797,7 @@ export async function fetchAccessiProgetto(progettoId: string) {
 }
 
 export async function assegnaAccessoProgettoApi(progettoId: string, userId: string, livello: string = 'write') {
-  const res = await fetch(`${API_BASE}/progetti/${progettoId}/accessi`, {
+  const res = await apiFetch(`${API_BASE}/progetti/${progettoId}/accessi`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ userId, livello }),
@@ -775,7 +832,7 @@ export async function testEmailApi(payload?: {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 20000);
     try {
-      const res = await fetch(url, { ...init, signal: controller.signal });
+      const res = await apiFetch(url, { ...init, signal: controller.signal });
       return await res.json();
     } finally {
       clearTimeout(timer);
@@ -830,7 +887,7 @@ export async function testEmailApi(payload?: {
 export async function fetchTenantInfoApi(tenantIdParam?: string) {
   const currentTenantId = tenantIdParam || getCurrentTenantId();
   try {
-    const res = await fetch(`${API_BASE}/tenant/info`, {
+    const res = await apiFetch(`${API_BASE}/tenant/info`, {
       headers: {
         ...getAuthHeaders(),
         'x-tenant-id': currentTenantId,
@@ -871,7 +928,7 @@ export async function fetchTenantInfoApi(tenantIdParam?: string) {
 export async function updateTenantInfoApi(input: any, tenantIdParam?: string) {
   const currentTenantId = tenantIdParam || getCurrentTenantId();
   try {
-    const res = await fetch(`${API_BASE}/tenant/info`, {
+    const res = await apiFetch(`${API_BASE}/tenant/info`, {
       method: 'PATCH',
       headers: {
         ...getAuthHeaders(),
@@ -892,7 +949,7 @@ export async function updateTenantInfoApi(input: any, tenantIdParam?: string) {
 
 export async function fetchAuditLogsApi() {
   try {
-    const res = await fetch(`${API_BASE}/audit-logs`, { headers: getAuthHeaders() });
+    const res = await apiFetch(`${API_BASE}/audit-logs`, { headers: getAuthHeaders() });
     if (!res.ok) throw new Error('Errore recupero audit logs');
     return await res.json();
   } catch (err) {
@@ -903,7 +960,7 @@ export async function fetchAuditLogsApi() {
 
 export async function createAuditLogApi(input: { azione: string; entita: string; dettagli: string }) {
   try {
-    const res = await fetch(`${API_BASE}/audit-logs`, {
+    const res = await apiFetch(`${API_BASE}/audit-logs`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(input),
@@ -918,7 +975,7 @@ export async function createAuditLogApi(input: { azione: string; entita: string;
 
 export async function fetchComunicazioniApi(progettoId: string) {
   try {
-    const res = await fetch(`${API_BASE}/progetti/${progettoId}/comunicazioni`, { headers: getAuthHeaders() });
+    const res = await apiFetch(`${API_BASE}/progetti/${progettoId}/comunicazioni`, { headers: getAuthHeaders() });
     if (!res.ok) throw new Error('Errore recupero comunicazioni');
     return await res.json();
   } catch (err) {
@@ -929,7 +986,7 @@ export async function fetchComunicazioniApi(progettoId: string) {
 
 export async function inviaComunicazioneApi(progettoId: string, input: { canale: string; mittente: string; destinatario: string; direzione: string; testo: string; allegatiJson?: any }) {
   try {
-    const res = await fetch(`${API_BASE}/progetti/${progettoId}/comunicazioni`, {
+    const res = await apiFetch(`${API_BASE}/progetti/${progettoId}/comunicazioni`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(input),
@@ -944,7 +1001,7 @@ export async function inviaComunicazioneApi(progettoId: string, input: { canale:
 
 export async function fetchNotificheApi() {
   try {
-    const res = await fetch(`${API_BASE}/notifiche`, { headers: getAuthHeaders() });
+    const res = await apiFetch(`${API_BASE}/notifiche`, { headers: getAuthHeaders() });
     if (!res.ok) throw new Error('Errore recupero notifiche');
     return await res.json();
   } catch (err) {
@@ -967,7 +1024,7 @@ export async function testImapApi(payload: {
   // server rispondeva con un errore o non rispondeva affatto. Con una password sbagliata
   // la schermata impostazioni diceva «connesso».
   try {
-    const res = await fetch(`${API_BASE}/tenant/test-imap`, {
+    const res = await apiFetch(`${API_BASE}/tenant/test-imap`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(payload || {}),
@@ -984,7 +1041,7 @@ export async function testImapApi(payload: {
 }
 
 export async function testChannelApi(payload: { channel: string; waPhoneId?: string; waAccessToken?: string; tgBotToken?: string; signalCliEndpoint?: string }) {
-  const res = await fetch(`${API_BASE}/tenant/test-channel`, {
+  const res = await apiFetch(`${API_BASE}/tenant/test-channel`, {
     method: 'POST',
     headers: getAuthHeaders(),
     body: JSON.stringify(payload),
@@ -994,7 +1051,7 @@ export async function testChannelApi(payload: { channel: string; waPhoneId?: str
 
 export async function sendWhatsAppDirectApi(to: string, text: string, templateName?: string) {
   try {
-    const res = await fetch('/api/send-whatsapp', {
+    const res = await apiFetch('/api/send-whatsapp', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ to, text, templateName }),
@@ -1036,7 +1093,7 @@ export async function sendEmailDirectApi(to: string, subject: string, text: stri
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 6000);
-    const res = await fetch('/api/send-email', {
+    const res = await apiFetch('/api/send-email', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -1081,7 +1138,7 @@ export async function fetchInboundImapEmailsApi(clientEmail?: string) {
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 6000);
-    const res = await fetch('/api/send-email', {
+    const res = await apiFetch('/api/send-email', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -1098,7 +1155,7 @@ export async function fetchInboundImapEmailsApi(clientEmail?: string) {
 
 export async function markNotificheReadApi() {
   try {
-    const res = await fetch(`${API_BASE}/notifiche/read-all`, {
+    const res = await apiFetch(`${API_BASE}/notifiche/read-all`, {
       method: 'PATCH',
       headers: getAuthHeaders(),
     });
@@ -1112,7 +1169,7 @@ export async function markNotificheReadApi() {
 
 export async function fetchTutteFattureStudioApi() {
   try {
-    const res = await fetch(`${API_BASE}/invoices`, { headers: getAuthHeaders() });
+    const res = await apiFetch(`${API_BASE}/invoices`, { headers: getAuthHeaders() });
     if (!res.ok) throw new Error('Errore recupero fatture studio');
     return await res.json();
   } catch (err) {
@@ -1123,7 +1180,7 @@ export async function fetchTutteFattureStudioApi() {
 
 export async function fetchScadenzarioIncassiApi() {
   try {
-    const res = await fetch(`${API_BASE}/invoices/scadenzario`, { headers: getAuthHeaders() });
+    const res = await apiFetch(`${API_BASE}/invoices/scadenzario`, { headers: getAuthHeaders() });
     if (!res.ok) throw new Error('Errore recupero scadenzario incassi');
     return await res.json();
   } catch (err) {
@@ -1134,7 +1191,7 @@ export async function fetchScadenzarioIncassiApi() {
 
 export async function registraIncassoApi(scadenzaId: string, input: { importoIncassatoCentesimi: number; metodoPagamento?: string; riferimentoTransazione?: string; noteOperatore?: string }) {
   try {
-    const res = await fetch(`${API_BASE}/invoices/scadenze/${scadenzaId}/incassi`, {
+    const res = await apiFetch(`${API_BASE}/invoices/scadenze/${scadenzaId}/incassi`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(input),
@@ -1149,7 +1206,7 @@ export async function registraIncassoApi(scadenzaId: string, input: { importoInc
 
 export async function downloadFatturaXmlApi(fatturaId: string) {
   try {
-    const res = await fetch(`${API_BASE}/invoices/${fatturaId}/sdi-xml`, { headers: getAuthHeaders() });
+    const res = await apiFetch(`${API_BASE}/invoices/${fatturaId}/sdi-xml`, { headers: getAuthHeaders() });
     if (!res.ok) throw new Error('Errore durante la generazione dell\'XML');
     const blob = await res.blob();
     const url = window.URL.createObjectURL(blob);
@@ -1169,7 +1226,7 @@ export async function downloadFatturaXmlApi(fatturaId: string) {
 
 export async function fetchContrattiRicorrentiApi() {
   try {
-    const res = await fetch(`${API_BASE}/contratti-ricorrenti`, { headers: getAuthHeaders() });
+    const res = await apiFetch(`${API_BASE}/contratti-ricorrenti`, { headers: getAuthHeaders() });
     if (!res.ok) throw new Error('Errore recupero contratti');
     return await res.json();
   } catch (err) {
@@ -1180,7 +1237,7 @@ export async function fetchContrattiRicorrentiApi() {
 
 export async function creaContrattoRicorrenteApi(input: { clienteId: string; progettoId?: string; titolo: string; frequenza?: string; importoCentesimi: number; prossimaFatturazione: string; note?: string }) {
   try {
-    const res = await fetch(`${API_BASE}/contratti-ricorrenti`, {
+    const res = await apiFetch(`${API_BASE}/contratti-ricorrenti`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(input),
@@ -1195,7 +1252,7 @@ export async function creaContrattoRicorrenteApi(input: { clienteId: string; pro
 
 export async function generaFatturaRetainerApi(contrattoId: string) {
   try {
-    const res = await fetch(`${API_BASE}/contratti-ricorrenti/${contrattoId}/genera-fattura`, {
+    const res = await apiFetch(`${API_BASE}/contratti-ricorrenti/${contrattoId}/genera-fattura`, {
       method: 'POST',
       headers: getAuthHeaders(),
     });
@@ -1209,7 +1266,7 @@ export async function generaFatturaRetainerApi(contrattoId: string) {
 
 export async function fetchPermessiUtenteApi(userId: string) {
   try {
-    const res = await fetch(`${API_BASE}/tenant/utenti/${userId}/permessi`, { headers: getAuthHeaders() });
+    const res = await apiFetch(`${API_BASE}/tenant/utenti/${userId}/permessi`, { headers: getAuthHeaders() });
     if (!res.ok) throw new Error('Errore recupero permessi utente');
     return await res.json();
   } catch (err) {
@@ -1220,7 +1277,7 @@ export async function fetchPermessiUtenteApi(userId: string) {
 
 export async function salvaPermessiUtenteApi(userId: string, permessi: Array<{ moduloChiave: string; livello: 'denied' | 'read' | 'write' }>) {
   try {
-    const res = await fetch(`${API_BASE}/tenant/utenti/${userId}/permessi`, {
+    const res = await apiFetch(`${API_BASE}/tenant/utenti/${userId}/permessi`, {
       method: 'PUT',
       headers: getAuthHeaders(),
       body: JSON.stringify({ permessi }),
@@ -1235,7 +1292,7 @@ export async function salvaPermessiUtenteApi(userId: string, permessi: Array<{ m
 
 export async function fetchChecklistPassaggioApi(passaggioId: string) {
   try {
-    const res = await fetch(`${API_BASE}/passaggi/${passaggioId}/checklist`, { headers: getAuthHeaders() });
+    const res = await apiFetch(`${API_BASE}/passaggi/${passaggioId}/checklist`, { headers: getAuthHeaders() });
     if (!res.ok) throw new Error('Errore recupero checklist');
     return await res.json();
   } catch (err) {
@@ -1246,7 +1303,7 @@ export async function fetchChecklistPassaggioApi(passaggioId: string) {
 
 export async function toggleChecklistVoceApi(id: string) {
   try {
-    const res = await fetch(`${API_BASE}/checklist/${id}/toggle`, {
+    const res = await apiFetch(`${API_BASE}/checklist/${id}/toggle`, {
       method: 'PATCH',
       headers: getAuthHeaders(),
     });
@@ -1260,7 +1317,7 @@ export async function toggleChecklistVoceApi(id: string) {
 
 export async function downloadFatturaPdfServerApi(fatturaId: string) {
   try {
-    const res = await fetch(`${API_BASE}/invoices/${fatturaId}/pdf`, { headers: getAuthHeaders() });
+    const res = await apiFetch(`${API_BASE}/invoices/${fatturaId}/pdf`, { headers: getAuthHeaders() });
     if (!res.ok) throw new Error('Errore generazione PDF server');
     const blob = await res.blob();
     const url = window.URL.createObjectURL(blob);
@@ -1280,7 +1337,7 @@ export async function downloadFatturaPdfServerApi(fatturaId: string) {
 
 export async function inviaFatturaEmailApi(fatturaId: string, emailDestinatario?: string) {
   try {
-    const res = await fetch(`${API_BASE}/invoices/${fatturaId}/invia-email`, {
+    const res = await apiFetch(`${API_BASE}/invoices/${fatturaId}/invia-email`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify({ emailDestinatario }),
@@ -1295,7 +1352,7 @@ export async function inviaFatturaEmailApi(fatturaId: string, emailDestinatario?
 
 export async function inviaWebhookSdiApi(fatturaId: string, statoSdi: 'consegnata' | 'scartata' | 'mancata_consegna') {
   try {
-    const res = await fetch(`${API_BASE}/webhooks/sdi`, {
+    const res = await apiFetch(`${API_BASE}/webhooks/sdi`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify({ fatturaId, statoSdi }),
@@ -1310,7 +1367,7 @@ export async function inviaWebhookSdiApi(fatturaId: string, statoSdi: 'consegnat
 
 export async function fetchContiBancariApi() {
   try {
-    const res = await fetch(`${API_BASE}/conti-bancari`, { headers: getAuthHeaders() });
+    const res = await apiFetch(`${API_BASE}/conti-bancari`, { headers: getAuthHeaders() });
     if (!res.ok) throw new Error('Errore recupero conti bancari');
     return await res.json();
   } catch (err) {
@@ -1326,7 +1383,7 @@ export async function fetchContiBancariApi() {
 
 export async function creaContoBancarioApi(input: { nomeConto: string; banca: string; iban?: string; bicSwift?: string; saldoInizialeEur: number; isDefault?: boolean }) {
   try {
-    const res = await fetch(`${API_BASE}/conti-bancari`, {
+    const res = await apiFetch(`${API_BASE}/conti-bancari`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(input),
@@ -1527,7 +1584,7 @@ export async function calcolaHashSha256(contenuto: string | ArrayBuffer): Promis
 
 export async function triggerCronScadenzeApi() {
   try {
-    const res = await fetch(`${API_BASE}/cron/esegui-notifiche-scadenze`, {
+    const res = await apiFetch(`${API_BASE}/cron/esegui-notifiche-scadenze`, {
       method: 'POST',
       headers: getAuthHeaders(),
     });
@@ -1545,7 +1602,7 @@ export async function triggerCronScadenzeApi() {
 
 export async function trasmettiFatturaSdiApi(fatturaId: string) {
   try {
-    const res = await fetch(`${API_BASE}/invoices/${fatturaId}/trasmetti-sdi`, {
+    const res = await apiFetch(`${API_BASE}/invoices/${fatturaId}/trasmetti-sdi`, {
       method: 'POST',
       headers: getAuthHeaders(),
     });
@@ -1563,7 +1620,7 @@ export async function trasmettiFatturaSdiApi(fatturaId: string) {
 
 export async function fetchDocumentiTemplateApi() {
   try {
-    const res = await fetch(`${API_BASE}/documenti-template`, { headers: getAuthHeaders() });
+    const res = await apiFetch(`${API_BASE}/documenti-template`, { headers: getAuthHeaders() });
     if (!res.ok) throw new Error('Errore recupero template documenti');
     return await res.json();
   } catch (err) {
@@ -1575,7 +1632,7 @@ export async function fetchDocumentiTemplateApi() {
 
 export async function creaDocumentoTemplateApi(data: { titolo: string; categoria?: string; descrizione?: string; contenutoHtml: string }) {
   try {
-    const res = await fetch(`${API_BASE}/documenti-template`, {
+    const res = await apiFetch(`${API_BASE}/documenti-template`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(data),
@@ -1594,7 +1651,7 @@ export async function creaDocumentoTemplateApi(data: { titolo: string; categoria
 
 export async function aggiornaDocumentoTemplateApi(id: string, data: { titolo?: string; categoria?: string; descrizione?: string; contenutoHtml?: string }) {
   try {
-    const res = await fetch(`${API_BASE}/documenti-template/${id}`, {
+    const res = await apiFetch(`${API_BASE}/documenti-template/${id}`, {
       method: 'PUT',
       headers: getAuthHeaders(),
       body: JSON.stringify(data),
@@ -1613,7 +1670,7 @@ export async function aggiornaDocumentoTemplateApi(id: string, data: { titolo?: 
 
 export async function eliminaDocumentoTemplateApi(id: string) {
   try {
-    const res = await fetch(`${API_BASE}/documenti-template/${id}`, {
+    const res = await apiFetch(`${API_BASE}/documenti-template/${id}`, {
       method: 'DELETE',
       headers: getAuthHeaders(),
     });
@@ -1631,7 +1688,7 @@ export async function eliminaDocumentoTemplateApi(id: string) {
 
 export async function fetchAdminTenantsApi() {
   try {
-    const res = await fetch(`${API_BASE}/admin/tenants`, { headers: getAuthHeaders() });
+    const res = await apiFetch(`${API_BASE}/admin/tenants`, { headers: getAuthHeaders() });
     if (!res.ok) throw new Error('Errore recupero tenants');
     return await res.json();
   } catch (err) {
@@ -1645,7 +1702,7 @@ export async function createAdminTenantApi(data: any) {
   // Nessun fallback silenzioso: se il server rifiuta (403 non-super-admin) o non risponde,
   // lo studio non esiste e va detto. Prima la funzione restituiva `data`, cioè l'oggetto
   // appena costruito dal client, facendo sembrare riuscita una creazione mai avvenuta.
-  const res = await fetch(`${API_BASE}/admin/tenants`, {
+  const res = await apiFetch(`${API_BASE}/admin/tenants`, {
     method: 'POST',
     headers: getAuthHeaders(),
     body: JSON.stringify(data),
@@ -1662,7 +1719,7 @@ export async function createAdminTenantApi(data: any) {
  * il database ne conserva solo l'hash scrypt, quindi la vecchia non è recuperabile.
  */
 export async function resetPasswordTenantApi(id: string) {
-  const res = await fetch(`${API_BASE}/admin/tenants/${id}/reset-password`, {
+  const res = await apiFetch(`${API_BASE}/admin/tenants/${id}/reset-password`, {
     method: 'POST',
     headers: getAuthHeaders(),
   });
@@ -1675,7 +1732,7 @@ export async function resetPasswordTenantApi(id: string) {
 
 export async function updateAdminTenantApi(id: string, data: any) {
   try {
-    const res = await fetch(`${API_BASE}/admin/tenants/${id}`, {
+    const res = await apiFetch(`${API_BASE}/admin/tenants/${id}`, {
       method: 'PATCH',
       headers: getAuthHeaders(),
       body: JSON.stringify(data),
@@ -1690,7 +1747,7 @@ export async function updateAdminTenantApi(id: string, data: any) {
 
 export async function deleteAdminTenantApi(id: string) {
   try {
-    const res = await fetch(`${API_BASE}/admin/tenants/${id}`, {
+    const res = await apiFetch(`${API_BASE}/admin/tenants/${id}`, {
       method: 'DELETE',
       headers: getAuthHeaders(),
     });

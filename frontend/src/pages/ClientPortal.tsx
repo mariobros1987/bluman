@@ -10,10 +10,7 @@ import { getStudioInfoForTenant, getCurrentTenantId, getTenantStorageKey, BLUECO
 import {
   fetchModuliLibreria,
   fetchProgetti,
-  creaPreventivoEAccettaApi,
   fetchClienti,
-  creaProgettoApi,
-  creaClienteApi,
   fetchComunicazioniApi,
   inviaComunicazioneApi,
   canaliFirmaApi,
@@ -26,9 +23,7 @@ import {
   cambiaPasswordClienteApi,
 } from '../api/client';
 import type { CanaleOtp, CanaleFirma, AmbitoFirma } from '../api/client';
-// `Progetto` era annotato a riga 560 senza essere importato: `vite build` si fermava lì, e
-// il portale in produzione restava alla versione precedente qualunque cosa si correggesse.
-import type { CategoriaModulo, Progetto } from '../types';
+import type { CategoriaModulo } from '../types';
 
 export interface ModuloPassaggio {
   id: string;
@@ -165,10 +160,11 @@ export function ClientPortal() {
   const [clientPassShow, setClientPassShow] = useState(false);
   const [clientPassLoading, setClientPassLoading] = useState(false);
   const [clientPassMsg, setClientPassMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
-  const [addendums, setAddendums] = useState<any[]>(() => {
-    const saved = localStorage.getItem(`bluman_addendums_Marco Ricci / Holding Beta S.r.l.`);
-    return saved ? JSON.parse(saved) : [];
-  });
+  // Stessa ragione del flag `signed`: la chiave era `bluman_addendums_Marco Ricci / Holding Beta
+  // S.r.l.`, il nome di un cliente preciso, mentre la scrittura usa `bluman_addendums_<cliente>`.
+  // Risultato: le richieste di integrazione non venivano mai rilette, e su un browser dove quel
+  // cliente aveva scritto qualcosa comparivano a chiunque. Si carica in `loadPortalData`.
+  const [addendums, setAddendums] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [pageLoading, setPageLoading] = useState(true);
   const [accessoNegato, setAccessoNegato] = useState<string | null>(null);
@@ -291,6 +287,76 @@ export function ClientPortal() {
   const [canaleMessaggio, setCanaleMessaggio] = useState<'whatsapp' | 'email' | 'telegram' | 'portal'>('portal');
   const [inviandoMessaggio, setInviandoMessaggio] = useState(false);
 
+  /**
+   * Errore della rilettura dopo la firma. Serve per distinguere le due cose davanti al cliente:
+   * la firma è registrata a database, è solo la pagina che non si è aggiornata.
+   */
+  const [erroreRicarica, setErroreRicarica] = useState<string | null>(null);
+
+  /**
+   * Rilegge dal database i progetti del cliente autenticato e allinea moduli e messaggi.
+   *
+   * Vive fuori da `loadPortalData` perché serve anche subito dopo la firma: ripassare da tutto
+   * il caricamento significherebbe riconsumare il magic token (con un secondo
+   * `MAGIC_LINK_USATO` nell'audit), rileggere l'elenco clienti e azzerare la scelta del
+   * progetto. Qui serve solo il dato che la firma ha cambiato.
+   *
+   * `preferisciId` mantiene selezionato il progetto che il cliente sta guardando, quando esiste
+   * ancora dopo la rilettura.
+   */
+  const ricaricaProgetti = async (
+    clienteIdSessione: string | null,
+    nomeCliente: string,
+    preferisciId?: string,
+  ) => {
+    const progettiRes = await fetchProgetti();
+    const elenco: any[] = Array.isArray(progettiRes) ? progettiRes : [];
+
+    // Cerca i progetti associati ESCLUSIVAMENTE al cliente corrente.
+    const matched = elenco.filter((p: any) => {
+      const byId = clienteIdSessione && (p.clienteId === clienteIdSessione || p.cliente?.id === clienteIdSessione);
+      const byName = nomeCliente && p.cliente?.nome && p.cliente.nome.trim().toLowerCase() === nomeCliente.trim().toLowerCase();
+      // Nessun confronto per email: il modello `Cliente` non ha una colonna email (le
+      // referenze stanno in `referentiJson`), quindi `p.cliente.email` è sempre
+      // undefined e il ramo non poteva mai essere vero.
+      return byId || byName;
+    });
+
+    // Nessun progetto di ripiego. Se il cliente non ha progetti a database l'elenco resta
+    // vuoto e il portale lo dichiara. Prima entrambi i rami fabbricavano un "Progetto
+    // Consulenza & Structuring per <nome>" da 28.500 € in Malta, stato in_progress: un
+    // incarico inesistente con un prezzo inventato, mostrato AL CLIENTE come se fosse il
+    // suo. Da lì il mapper ci attaccava anche i moduli, perché quel finto progetto non ha
+    // moduli a database.
+    setClientProjects(matched);
+
+    if (matched.length === 0) {
+      setSelectedProjectId('');
+      setProgettoId('');
+      setModuliProposti([]);
+      return;
+    }
+
+    // Non il più recente in assoluto, ma il più recente CON moduli a database.
+    // `GET /progetti` ordina per data discendente e prima si prendeva `matched[0]`:
+    // se lo studio aveva aperto un secondo incarico per lo stesso cliente e non lo
+    // aveva ancora istanziato, il portale mostrava quello — vuoto — e il cliente
+    // vedeva zero moduli pur avendone due sull'incarico precedente. Da qui l'idea
+    // che servisse prima firmare: la firma non c'entra, l'elenco puntava al
+    // progetto sbagliato.
+    const preferito = preferisciId ? matched.find((p: any) => String(p.id) === String(preferisciId)) : undefined;
+    const conModuli = matched.find((p: any) => Array.isArray(p.moduli) && p.moduli.length > 0);
+    const activeProj = preferito ?? conModuli ?? matched[0];
+    const pId = String(activeProj.id);
+    setSelectedProjectId(pId);
+    setProgettoId(pId);
+    setModuliProposti(mapProjectToPortalModules(activeProj));
+    const msgs = await fetchComunicazioniApi(pId);
+    if (msgs && Array.isArray(msgs)) {
+      setMessaggi(msgs);
+    }
+  };
+
   const loadPortalData = async (clienteIdParam?: string) => {
     setPageLoading(true);
     let resolvedClientName = clientName;
@@ -356,6 +422,18 @@ export function ClientPortal() {
         const found = clienteIdSessione
           ? clientiRes.find(c => c.id === clienteIdSessione)
           : undefined;
+        // Con una sessione cliente il ripiego su `clientiRes[0]` non è ammesso: se l'id della
+        // sessione non compare nell'elenco, il portale apriva l'anagrafica di UN ALTRO cliente
+        // — nome, partita IVA, IBAN e titolare effettivo compresi — e da lì proseguiva con i
+        // suoi progetti. Meglio negare l'accesso: è un dato che non torna, non un dettaglio.
+        if (clienteIdSessione && !found) {
+          setAccessoNegato('La tua anagrafica non risulta più disponibile. Contatta lo studio.');
+          setIsAuthenticated(false);
+          setPageLoading(false);
+          return;
+        }
+        // Senza id di sessione siamo nell'anteprima aperta da uno studio autenticato: lì
+        // `clientiRes[0]` è una scelta, non un travisamento (§2.10 prevede un selettore).
         const risolto: any = found || clientiRes[0];
         setClientObj(risolto);
         setClientName(risolto.nome);
@@ -383,6 +461,14 @@ export function ClientPortal() {
         setEidasSeal(null);
       }
 
+      // Ripristina le richieste di integrazione dell'incarico del cliente autenticato.
+      const savedAddendums = localStorage.getItem(`bluman_addendums_${resolvedClientName}`);
+      try {
+        setAddendums(savedAddendums ? JSON.parse(savedAddendums) : []);
+      } catch {
+        setAddendums([]);
+      }
+
       // Ripristina i documenti firmati singolarmente
       const savedSignedDocsStr = localStorage.getItem(`bluman_signed_docs_${resolvedClientName}`);
       if (savedSignedDocsStr) {
@@ -405,56 +491,8 @@ export function ClientPortal() {
         try { setModuleSignatures(JSON.parse(savedModSigs)); } catch {}
       }
 
-      // Cerca tutti i progetti associati ESCLUSIVAMENTE al cliente corrente
       try {
-        const progettiRes = await fetchProgetti();
-        if (progettiRes && Array.isArray(progettiRes) && progettiRes.length > 0) {
-          const matched = progettiRes.filter((p: any) => {
-            const byId = clienteIdSessione && (p.clienteId === clienteIdSessione || p.cliente?.id === clienteIdSessione);
-            const byName = resolvedClientName && p.cliente?.nome && p.cliente.nome.trim().toLowerCase() === resolvedClientName.trim().toLowerCase();
-            // Nessun confronto per email: il modello `Cliente` non ha una colonna email (le
-            // referenze stanno in `referentiJson`), quindi `p.cliente.email` è sempre
-            // undefined e il ramo non poteva mai essere vero.
-            return byId || byName;
-          });
-
-          // Nessun progetto di ripiego. Se il cliente non ha progetti a database l'elenco resta
-          // vuoto e il portale lo dichiara. Prima entrambi i rami fabbricavano un "Progetto
-          // Consulenza & Structuring per <nome>" da 28.500 € in Malta, stato in_progress: un
-          // incarico inesistente con un prezzo inventato, mostrato AL CLIENTE come se fosse il
-          // suo. Da lì il mapper ci attaccava anche i moduli, perché quel finto progetto non ha
-          // moduli a database.
-          setClientProjects(matched);
-          if (matched.length > 0) {
-            // Non il più recente in assoluto, ma il più recente CON moduli a database.
-            // `GET /progetti` ordina per data discendente e prima si prendeva `matched[0]`:
-            // se lo studio aveva aperto un secondo incarico per lo stesso cliente e non lo
-            // aveva ancora istanziato, il portale mostrava quello — vuoto — e il cliente
-            // vedeva zero moduli pur avendone due sull'incarico precedente. Da qui l'idea
-            // che servisse prima firmare: la firma non c'entra, l'elenco puntava al
-            // progetto sbagliato.
-            const conModuli = matched.find((p: any) => Array.isArray(p.moduli) && p.moduli.length > 0);
-            const activeProj = conModuli ?? matched[0];
-            const pId = String(activeProj.id);
-            setSelectedProjectId(pId);
-            setProgettoId(pId);
-            setModuliProposti(mapProjectToPortalModules(activeProj));
-            const msgs = await fetchComunicazioniApi(pId);
-            if (msgs && Array.isArray(msgs)) {
-              setMessaggi(msgs);
-            }
-          } else {
-            setSelectedProjectId('');
-            setProgettoId('');
-            setModuliProposti([]);
-          }
-        } else {
-          // L'API non ha restituito progetti: niente da mostrare e niente da inventare.
-          setClientProjects([]);
-          setSelectedProjectId('');
-          setProgettoId('');
-          setModuliProposti([]);
-        }
+        await ricaricaProgetti(clienteIdSessione, resolvedClientName);
       } catch (err) {
         console.warn('Errore recupero progetti portale:', err);
       }
@@ -598,7 +636,7 @@ export function ClientPortal() {
       setSigned(true);
       setOtpModalOpen(false);
       setOtpCode('');
-      await handleSign();
+      await ricaricaDopoFirma();
       return true;
     } catch (err: any) {
       setOtpError(err?.message || 'Convalida del codice non riuscita.');
@@ -637,7 +675,7 @@ export function ClientPortal() {
       localStorage.setItem(`bluman_portal_signed_${clientName}`, 'true');
       setSigned(true);
       setFileFirmato(null);
-      await handleSign();
+      await ricaricaDopoFirma();
       return true;
     } catch (err: any) {
       setOtpError(err?.message || 'Caricamento del documento firmato non riuscito.');
@@ -749,141 +787,31 @@ export function ClientPortal() {
    */
   const percentualeProgetto: number = progettoAttivo?.avanzamento?.percentuale ?? 0;
 
-  const handleSign = async () => {
+  /**
+   * Rilettura del portale dopo una firma già convalidata dal server.
+   *
+   * Non c'è niente da costruire nel browser: la riga di firma, l'evento in audit e il passaggio
+   * del progetto a `in_progress` li scrive l'endpoint di firma (`POST /portale/firma-otp`),
+   * e i moduli dell'incarico erano già a database perché li ha istanziati lo studio. Qui si
+   * rilegge, così il cliente vede lo stato aggiornato invece di una copia locale.
+   *
+   * Prima, dopo la firma, questa funzione: prendeva un cliente qualunque con `clientiRes[0]`
+   * o ne creava uno nuovo; inventava un id `proj-<timestamp>`; apriva un secondo progetto e un
+   * preventivo che duplicava i moduli già istanziati, traducendo in `mod-m01` ogni modulo con
+   * un id non riconosciuto; poi fabbricava moduli al 25% con tre micro-voci fisse, un progetto
+   * "operatore" al 20% e un documento «Engagement Letter firmata — 54 KB» scritto solo in
+   * localStorage. Nessuno di quei dati esisteva a database, e l'unico errore possibile veniva
+   * inghiottito da un `catch` che scriveva in console.
+   */
+  const ricaricaDopoFirma = async () => {
     setLoading(true);
+    setErroreRicarica(null);
     try {
-      let targetClient = clientObj;
-      if (!targetClient) {
-        const clientiRes = await fetchClienti();
-        targetClient = (clientiRes && clientiRes.length > 0) ? clientiRes[0] : await creaClienteApi({ nome: clientName, tipo: 'individual' });
-      }
-
-      let projectId = `proj-${Date.now()}`;
-      try {
-        const progettiRes = await fetchProgetti();
-        let targetProject = (progettiRes || []).find((p: any) => p.clienteId === targetClient.id || p.cliente?.nome === targetClient.nome);
-
-        if (!targetProject) {
-          targetProject = await creaProgettoApi({
-            clienteId: targetClient.id,
-            nome: `Progetto Structuring — ${targetClient.nome}`,
-          });
-        }
-        if (targetProject && targetProject.id) projectId = targetProject.id;
-
-        const dbRighe = moduliProposti.map(m => ({
-          moduloTemplateId: m.id.startsWith('mod-') ? m.id : 'mod-m01',
-          moduloTemplateVersione: 1,
-        }));
-
-        await creaPreventivoEAccettaApi({
-          clienteId: targetClient.id,
-          progettoId: projectId,
-          righe: dbRighe.length > 0 ? dbRighe : [{ moduloTemplateId: 'mod-m01', moduloTemplateVersione: 1 }],
-        });
-      } catch (apiErr) {
-        console.warn('Backend API sync fallback local:', apiErr);
-      }
-
-      // Popola i moduli e le microvoci nel progetto visualizzabile dall'operatore
-      const moduliIstanziati = moduliProposti.map((m, idx) => ({
-        id: idx + 300,
-        n: m.nome,
-        cat: m.cat,
-        st: 'in_progress',
-        pct: 25,
-        h: m.ore,
-        a: 0,
-        p: m.prezzo,
-        team: [1, 2],
-        delay: false,
-        v: [
-          { id: 1, n: 'Checklist Requisiti & Documenti Anagrafici', hE: 4, hA: 2, s: 'done', op: 'Advisor', linkDoc: 'https://supabase.co/docs/check.pdf' },
-          { id: 2, n: 'Redazione Bozza Contrattuale & Allegati', hE: 6, hA: 0, s: 'in_progress', op: 'Operatore', linkDoc: '' },
-          { id: 3, n: 'Invio Registri Fiscati & Notifica SDI', hE: 5, hA: 0, s: 'pending', op: 'Operatore', linkDoc: '' },
-        ],
-      }));
-
-      const nuovoProgettoOperatore: Progetto = {
-        id: projectId,
-        n: `Progetto Structuring — ${clientName}`,
-        cl: clientName,
-        ct: 'company',
-        st: 'in_progress',
-        pct: 20,
-        start: new Date().toLocaleDateString('it-IT'),
-        due: 'In corso',
-        val: moduliProposti.reduce((acc, m) => acc + m.prezzo, 0),
-        delay: false,
-        fisc: 'privato',
-        fatture: [],
-        mods: moduliIstanziati,
-      };
-
-      const savedStr = localStorage.getItem('bluman_custom_projects');
-      const savedArr: Progetto[] = savedStr ? JSON.parse(savedStr) : [];
-      const updatedArr = [nuovoProgettoOperatore, ...savedArr.filter(p => p.cl !== clientName && p.id !== projectId)];
-      // Salva lo stato di firma del cliente e sigillo FEA
-      localStorage.setItem(`bluman_portal_signed_${clientName}`, 'true');
-
-      // Registra l'Engagement Letter firmata nel Vault Documentale del Progetto (Google Drive dello studio)
-      const storageKey = `bluman_project_documents_${projectId}`;
-      const existingVaultStr = localStorage.getItem(storageKey);
-      const existingVault: any[] = existingVaultStr ? JSON.parse(existingVaultStr) : [];
-      
-      const engagementDoc = {
-        id: `doc-el-signed-${projectId}`,
-        nome: `Engagement Letter & Mandato Professionale Firmato (v1.0) — ${clientName}.docx`,
-        titolo: `Engagement Letter & Mandato Professionale Firmato (v1.0)`,
-        cat: 'Contratti',
-        dimensione: '54 KB',
-        data: new Date().toLocaleDateString('it-IT'),
-        dataCaricamento: new Date().toLocaleDateString('it-IT'),
-        firmato: true,
-        formato: 'word',
-        progettoId: projectId,
-        clienteNome: clientName,
-        descrizione: `Contratto di incarico professionale stipulato dal cliente ${clientName} con verifica OTP e Sigillo FEA eIDAS UE 910/2014.`,
-        signatureData: (() => {
-          // Il sigillo è già stato scritto in localStorage dal flusso OTP prima di questa chiamata:
-          // lo stato React `eidasSeal` non è ancora aggiornato nello stesso tick, quindi si legge da
-          // lì. L'IP era cablato ('83.211.12.94'): attribuiva al cliente una provenienza inventata.
-          try {
-            const sigilloStr = localStorage.getItem(`bluman_seal_${clientName}`);
-            const sigillo = sigilloStr ? JSON.parse(sigilloStr) : null;
-            if (sigillo?.timestampIso) {
-              return {
-                signerName: sigillo.signerName || clientName,
-                signerRole: 'Cliente Incarico (Legale Rappresentante)',
-                timestamp: new Date(sigillo.timestampIso).toLocaleString('it-IT'),
-                ipAddress: sigillo.ipAddress || 'non registrato',
-                signatureId: sigillo.signatureId,
-                sha256Digest: sigillo.sha256Digest,
-              };
-            }
-          } catch {}
-          return null;
-        })(),
-      };
-
-      const updatedVault = [engagementDoc, ...existingVault.filter((d: any) => d.id !== engagementDoc.id)];
-      localStorage.setItem(storageKey, JSON.stringify(updatedVault));
-
-      // Sincronizza anche nel registro Vault Globale dello Studio
-      const globalVaultStr = localStorage.getItem('bluman_all_vault_documents');
-      const globalVault: any[] = globalVaultStr ? JSON.parse(globalVaultStr) : [];
-      localStorage.setItem('bluman_all_vault_documents', JSON.stringify([engagementDoc, ...globalVault.filter((d: any) => d.id !== engagementDoc.id)]));
-
-      setSigned(true);
+      await ricaricaProgetti(clientObj?.id ?? null, clientName, selectedProjectId || undefined);
     } catch (err) {
-      // La firma è già stata validata dal server PRIMA di questa funzione (unico punto di chiamata:
-      // il flusso OTP), quindi qui può fallire solo la preparazione locale dei moduli. Prima questo
-      // ramo scriveva "Simulazione firma completata" e dichiarava firmato comunque: inghiottiva
-      // l'errore e affermava più di quello che era riuscito.
-      console.error('Istanziazione moduli operativi post-firma non completata:', err);
-      alert(
-        'La firma è stata registrata, ma la preparazione dei moduli operativi non è andata a buon fine. ' +
-        'Lo studio deve completarla manualmente: nessun modulo è stato istanziato.',
+      console.error('Rilettura dei dati dopo la firma non riuscita:', err);
+      setErroreRicarica(
+        'La firma è stata registrata. Non è riuscito soltanto l\'aggiornamento di questa pagina: ricaricala per vedere lo stato aggiornato dell\'incarico.',
       );
     } finally {
       setLoading(false);
@@ -967,7 +895,10 @@ export function ClientPortal() {
         codiceFiscale: formData.codiceFiscale || '',
       },
       progetto: {
-        titolo: 'Progetto Consulenza & Structuring Patrimoniale',
+        // Il nome dell'incarico a database. Era cablato «Progetto Consulenza & Structuring
+        // Patrimoniale»: compariva dentro il testo che il cliente sottoscrive, riferito a un
+        // incarico che non è il suo. Senza progetto resta la dizione generica.
+        titolo: progettoAttivo?.nome || 'Incarico professionale',
         totalePreventivo: totalValue,
       },
       studio,
@@ -1016,7 +947,10 @@ export function ClientPortal() {
         codiceFiscale: formData.codiceFiscale || '',
       },
       progetto: {
-        titolo: 'Progetto Consulenza & Structuring Patrimoniale',
+        // Il nome dell'incarico a database. Era cablato «Progetto Consulenza & Structuring
+        // Patrimoniale»: compariva dentro il testo che il cliente sottoscrive, riferito a un
+        // incarico che non è il suo. Senza progetto resta la dizione generica.
+        titolo: progettoAttivo?.nome || 'Incarico professionale',
         totalePreventivo: totalValue,
       },
       studio,
@@ -1287,6 +1221,19 @@ export function ClientPortal() {
         </div>
       </div>
 
+      {erroreRicarica && (
+        <div style={{ margin: '0 0 12px', background: '#2d0d0d', border: '1px solid #7f1d1d', color: '#fca5a5', padding: '10px 14px', borderRadius: 10, fontSize: 12, lineHeight: 1.5, display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
+          <span>{erroreRicarica}</span>
+          <button
+            onClick={() => setErroreRicarica(null)}
+            style={{ background: 'transparent', border: 'none', color: '#fca5a5', cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: 0 }}
+            title="Chiudi"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* Hero Welcome Banner */}
       <div style={heroBannerStyle}>
         <div>
@@ -1294,7 +1241,7 @@ export function ClientPortal() {
             PORTALE DEDICATO ED ASSISTENZA PROFESSIONALE
           </div>
           <h1 style={{ fontSize: 20, fontWeight: 800, margin: '4px 0 6px' }}>
-            {clientProjects.find(p => p.id === selectedProjectId)?.nome || 'Progetto Consulenza & Structuring Patrimoniale'}
+            {progettoAttivo?.nome || 'Nessun incarico aperto'}
           </h1>
           <div style={{ fontSize: 12, color: 'var(--muted)' }}>
             Benvenuto nel tuo portale. Qui puoi consultare l'avanzamento dei lavori, compilare i dati societari e sottoscrivere i contratti.
