@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
+import { GlobalSearch } from './GlobalSearch';
 import { NotificationModal, type NotificationItem } from '../NotificationModal';
 import { UserProfileModal } from '../UserProfileModal';
 import { MustChangePasswordModal } from '../MustChangePasswordModal';
@@ -148,6 +149,7 @@ export function AppLayout({ children, alertCount: _alertCount = 0, user, onLogou
               ☰
             </button>
             <div className={styles.topbarTitle}>{title}</div>
+            <GlobalSearch />
           </div>
           <div className={styles.topbarRight}>
             {/* Selettore Studio / Tenant Switcher — RISERVATO AL SUPER ADMIN */}

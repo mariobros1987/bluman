@@ -2284,6 +2284,44 @@ export async function downloadReportApi(chiave: string, formato: 'pdf' | 'xlsx',
   }
 }
 
+// ─────────────────────────────────────────────────────────────────
+// RICERCA GLOBALE (Blocco 4)
+// Ricerca trasversale server-side su clienti, progetti, fatture,
+// documenti, team, calendario e retainer. I risultati tornano già
+// raggruppati per tipo, con link di navigazione pronti all'uso.
+// ─────────────────────────────────────────────────────────────────
+
+export interface RisultatoRicerca {
+  id: string;
+  titolo: string;
+  sottotitolo: string;
+  link: string;
+}
+
+export interface GruppoRicerca {
+  tipo: string;
+  etichetta: string;
+  icona: string;
+  risultati: RisultatoRicerca[];
+}
+
+export interface RispostaRicercaGlobale {
+  query: string;
+  totale: number;
+  gruppi: GruppoRicerca[];
+}
+
+/** Ricerca globale: lancia la query e restituisce i risultati raggruppati (THROW su errore). */
+export async function ricercaGlobaleApi(query: string): Promise<RispostaRicercaGlobale> {
+  const qs = `?q=${encodeURIComponent(query)}`;
+  const res = await apiFetch(`${API_BASE}/search${qs}`, { headers: getAuthHeaders() }, 20000);
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.errore || `Errore ricerca (HTTP ${res.status})`);
+  }
+  return (await res.json()) as RispostaRicercaGlobale;
+}
+
 
 
 

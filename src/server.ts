@@ -42,6 +42,7 @@ import { scanFileBuffer } from './services/securityScanner.js';
 import { arricchisciProgetti, calcolaAvanzamento, ricalcolaProgetto } from './services/calcoloService.js';
 import { costruisciReport, REPORT_DISPONIBILI, type ChiaveReport } from './services/reportsService.js';
 import { generaPdfReport, generaExcelReport } from './services/reportExport.js';
+import { ricercaGlobale } from './services/ricercaGlobaleService.js';
 // §14 — non `new PrismaClient()`: questo client impone il tenant corrente a ogni query,
 // altrimenti le policy RLS non vedono nessun contesto e non restituiscono nulla.
 import { prisma, prismaAmministrativo, attivaContestoTenant } from './util/prismaClient.js';
@@ -3102,6 +3103,27 @@ export function buildServer(app: AppPort): FastifyInstance {
     } catch (err: any) {
       console.error(`Errore export report ${tipo} (${formato}):`, err);
       return reply.code(500).send({ errore: err?.message || 'Errore nella generazione del file' });
+    }
+  });
+
+  // ── RICERCA GLOBALE (BLOCCO 4) ─────────────────────────────────────
+  // Ricerca trasversale server-side (ILIKE + indici trigram) su clienti,
+  // progetti, fatture, documenti, team, calendario e retainer. Sempre
+  // limitata al tenant della richiesta. Minimo 2 caratteri per evitare
+  // scansioni inutili su prefissi di un solo carattere.
+  server.get<{ Querystring: { q?: string } }>('/search', async (req, reply) => {
+    const tenantId = (req as any).tenantId;
+    const q = (req.query.q || '').trim();
+    if (q.length < 2) {
+      return reply.code(400).send({ errore: 'Inserisci almeno 2 caratteri per la ricerca' });
+    }
+    try {
+      const gruppi = await ricercaGlobale(tenantId, q);
+      const totale = gruppi.reduce((s, g) => s + g.risultati.length, 0);
+      return reply.send({ query: q, totale, gruppi });
+    } catch (err: any) {
+      console.error(`Errore ricerca globale ("${q}"):`, err);
+      return reply.code(500).send({ errore: err?.message || 'Errore durante la ricerca' });
     }
   });
 
