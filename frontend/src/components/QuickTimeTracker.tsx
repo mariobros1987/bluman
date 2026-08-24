@@ -39,50 +39,80 @@ export function QuickTimeTracker({ user }: TimeTrackerProps) {
     } catch {}
 
     // 2. Progetti salvati sul DB server Fastify / PostgreSQL filtrati per tenantId
+    //
+    // L'avanzamento arriva già calcolato dal server (§16): percentuale, stato e ore extra di ogni
+    // modulo nascono dalle ore consuntivate sulle micro-voci. Qui venivano scartati e sostituiti
+    // da costanti — 50% per ogni progetto e per ogni modulo, 20 ore preventivate, 3.500 € di
+    // prezzo, 15.000 € di valore, scadenza 31/12/2026 — cioè esattamente i numeri che non si
+    // muovevano mai. Dove il dato non c'è si mostra zero, non un valore inventato: un progetto
+    // senza preventivo vale zero, e una scadenza non impostata è «—», non fine 2026.
+    //
+    // Quando lo stesso progetto esiste sia a database sia nella copia locale vince il database:
+    // prima veniva scartato come duplicato della copia locale, e il timer consuntivava ore su
+    // una fotografia vecchia dei moduli.
     try {
       const remote = await fetchProgetti();
       if (remote && Array.isArray(remote)) {
-        const existingIds = new Set(list.map(p => String(p.id)));
+        const dalDb: Progetto[] = [];
         remote
           .filter((rp: any) => rp.tenantId === currentTenantId)
           .forEach((rp: any) => {
-            if (!existingIds.has(String(rp.id))) {
-              list.push({
-                id: rp.id,
-                n: rp.nome,
-                cl: rp.cliente?.nome || 'Cliente',
-                ct: (rp.cliente?.tipo as any) || 'individual',
-                st: rp.stato || 'in_progress',
-                pct: rp.stato === 'completed' ? 100 : 50,
-                start: rp.createdAt ? new Date(rp.createdAt).toLocaleDateString('it-IT') : 'Oggi',
-                due: rp.scadenza ? new Date(rp.scadenza).toLocaleDateString('it-IT') : '31/12/2026',
-                val: rp.valoreTotale ? rp.valoreTotale / 100 : 15000,
-                delay: rp.inRitardo || false,
-                fisc: rp.regimeFiscale || 'privato_italia',
-                fatture: rp.fatture || [],
-                mods: (rp.moduli || []).map((m: any, mIdx: number) => ({
+            const avanzamento = rp.avanzamento;
+            // L'avanzamento dei moduli è indicizzato per id di database, non per posizione.
+            const avModuli = new Map<string, any>(
+              (avanzamento?.moduli || []).map((am: any) => [String(am.id), am]),
+            );
+            dalDb.push({
+              id: rp.id,
+              n: rp.nome,
+              cl: rp.cliente?.nome || 'Cliente',
+              ct: (rp.cliente?.tipo as any) || 'individual',
+              st: avanzamento?.stato || rp.stato || 'in_progress',
+              pct: avanzamento?.percentuale ?? 0,
+              start: rp.createdAt ? new Date(rp.createdAt).toLocaleDateString('it-IT') : '—',
+              due: rp.dataScadenza || rp.scadenza
+                ? new Date(rp.dataScadenza || rp.scadenza).toLocaleDateString('it-IT')
+                : '—',
+              val: rp.valoreTotale ? rp.valoreTotale / 100 : 0,
+              delay: (avanzamento?.stato || rp.stato) === 'delayed' || rp.inRitardo || false,
+              fisc: rp.regimeFiscale || 'privato_italia',
+              fatture: rp.fatture || [],
+              mods: (rp.moduli || []).map((m: any, mIdx: number) => {
+                const av = avModuli.get(String(m.id));
+                return {
                   id: mIdx + 100,
+                  dbId: m.id,
                   n: m.nome,
                   cat: m.categoria || 'Societario',
-                  st: m.stato || 'in_progress',
-                  pct: 50,
-                  h: m.orePreventivate || 20,
-                  a: m.oreConsuntivate || 0,
-                  p: m.prezzo ? m.prezzo / 100 : 3500,
-                  team: [1, 2],
-                  delay: false,
+                  st: av?.stato || m.stato || 'pending',
+                  pct: av?.percentuale ?? 0,
+                  h: m.orePreventivate ?? 0,
+                  a: m.oreConsuntivate ?? 0,
+                  p: m.prezzo ? m.prezzo / 100 : 0,
+                  // La squadra vera sono le risorse assegnate alle micro-voci: finché non
+                  // arrivano da qui, nessun volto è meglio di due volti inventati.
+                  team: [],
+                  delay: (av?.stato || m.stato) === 'delayed',
                   v: (m.microvoci || []).map((v: any) => ({
+                    dbId: v.id,
                     n: v.titolo || v.nome,
-                    hE: v.orePreventivate || 2,
-                    hA: v.oreConsuntivate || 0,
-                    s: v.completato ? 'done' : 'pending',
-                    as: 1,
-                    d: 1,
+                    hE: v.orePreventivate ?? 0,
+                    hA: v.oreConsuntivate ?? 0,
+                    s: v.stato || 'pending',
+                    as: v.risorsaId ?? null,
+                    d: v.ordine ?? 1,
                   })),
-                })),
-              });
-            }
+                } as any;
+              }),
+            } as any);
           });
+
+        const idsDb = new Set(dalDb.map(p => String(p.id)));
+        // I progetti locali restano solo se a database non esistono (creati prima che la
+        // creazione passasse dal server).
+        const soloLocali = list.filter(p => !idsDb.has(String(p.id)));
+        list.length = 0;
+        list.push(...dalDb, ...soloLocali);
       }
     } catch {}
 
