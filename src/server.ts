@@ -3496,6 +3496,174 @@ export function buildServer(app: AppPort): FastifyInstance {
     }
   });
 
+  // ── §2.9 — Fascicolo documentale del progetto: le scritture vanno a database ──────────
+  //
+  // Prima di questo blocco l'upload dello studio salvava il file sul server (POST /upload)
+  // ma il «documento» esisteva solo in localStorage del browser che lo aveva caricato:
+  // il portale del cliente (/portal/documenti) legge la tabella `documento`, quindi non
+  // vedeva niente, e un altro operatore dello studio non vedeva niente nemmeno lui.
+  // Qui l'upload crea la riga in `documento`, agganciata al progetto (o alla micro-voce).
+
+  server.get<{ Querystring: { progettoId?: string; microvoceProgettoId?: string } }>(
+    '/documenti',
+    async (req, reply) => {
+      const tenantId = (req as any).tenantId;
+      const { progettoId, microvoceProgettoId } = req.query;
+      if (!progettoId && !microvoceProgettoId) {
+        return reply.code(400).send({ errore: 'Specificare progettoId o microvoceProgettoId.' });
+      }
+
+      try {
+        if (progettoId) {
+          const progetto = await prisma.progetto.findFirst({ where: { id: progettoId, tenantId }, select: { id: true } });
+          if (!progetto) return reply.code(404).send({ errore: 'Progetto non trovato.' });
+        }
+
+        const documenti = await prisma.documento.findMany({
+          where: {
+            tenantId,
+            ...(progettoId ? { progettoId } : {}),
+            ...(microvoceProgettoId ? { microvoceProgettoId } : {}),
+          },
+          select: {
+            id: true,
+            tipo: true,
+            fileUrl: true,
+            versione: true,
+            createdAt: true,
+            caricatoDa: true,
+            categoriaDoc: true,
+            statoScansione: true,
+            dataScadenzaDoc: true,
+            progettoId: true,
+            microvoceProgettoId: true,
+            microvoceProgetto: { select: { nome: true } },
+          },
+          orderBy: { createdAt: 'desc' },
+        });
+
+        // Lo stato di firma di ciascun documento, come in /portal/documenti: senza questa
+        // informazione lo studio mostrerebbe «da firmare» un documento già sottoscritto.
+        const firme = await prisma.firmaElettronica.findMany({
+          where: { tenantId, ambito: 'documento_vault', riferimentoId: { in: documenti.map((d) => d.id) } },
+          select: { riferimentoId: true, firmatoAt: true, signatureId: true, tipoFirma: true },
+          orderBy: { firmatoAt: 'desc' },
+        });
+        const firmaPerDocumento = new Map<string, (typeof firme)[number]>();
+        for (const f of firme) {
+          if (f.riferimentoId && !firmaPerDocumento.has(f.riferimentoId)) firmaPerDocumento.set(f.riferimentoId, f);
+        }
+
+        return reply.send({
+          ok: true,
+          documenti: documenti.map((d) => {
+            const firma = firmaPerDocumento.get(d.id);
+            return { ...d, firmato: Boolean(firma) || d.tipo === 'firmato', firma };
+          }),
+        });
+      } catch (err) {
+        return reply.code(500).send({ errore: err instanceof Error ? err.message : 'Errore lettura documenti' });
+      }
+    },
+  );
+
+  server.post<{
+    Body: {
+      progettoId: string;
+      microvoceProgettoId?: string;
+      filename: string;
+      contentBase64: string;
+      tipo?: string;
+      categoriaDoc?: string;
+      dataScadenzaDoc?: string;
+    };
+  }>('/documenti', async (req, reply) => {
+    const tenantId = (req as any).tenantId;
+    const userId = (req as any).userId as string | undefined;
+    const { progettoId, microvoceProgettoId, filename, contentBase64, tipo, categoriaDoc, dataScadenzaDoc } = req.body;
+
+    if (!progettoId || !filename || !contentBase64) {
+      return reply.code(400).send({ errore: 'progettoId, filename e contentBase64 sono obbligatori.' });
+    }
+    if (!userId) return reply.code(401).send({ errore: 'Sessione non valida.' });
+
+    const scadenza = dataScadenzaDoc ? new Date(dataScadenzaDoc) : null;
+    if (dataScadenzaDoc && Number.isNaN(scadenza?.getTime())) {
+      return reply.code(400).send({ errore: 'dataScadenzaDoc non è una data valida.' });
+    }
+
+    try {
+      const progetto = await prisma.progetto.findFirst({ where: { id: progettoId, tenantId }, select: { id: true, clienteId: true } });
+      if (!progetto) return reply.code(404).send({ errore: 'Progetto non trovato.' });
+
+      // §28 — la scansione avviene PRIMA di scrivere qualunque cosa: un file bocciato non
+      // arriva né nell'archivio né nella tabella.
+      const buffer = Buffer.from(contentBase64.replace(/^data:[^;]+;base64,/, ''), 'base64');
+      const esito = scanFileBuffer(buffer, filename);
+      if (!esito.safe) {
+        return reply.code(400).send({ errore: esito.reason ?? 'File non ammesso nel fascicolo.' });
+      }
+
+      const archiviato = await uploadDocumento(filename, contentBase64);
+
+      const documento = await prisma.documento.create({
+        data: {
+          tenantId,
+          progettoId,
+          microvoceProgettoId,
+          tipo: tipo === 'firmato' ? 'firmato' : 'allegato',
+          fileUrl: archiviato.url,
+          caricatoDa: userId,
+          categoriaDoc: categoriaDoc || 'generico',
+          dataScadenzaDoc: scadenza,
+          // La scansione è quella sincrona sui magic bytes fatta qui sopra: se è passata,
+          // il documento è subito scaricabile e firmabile dal portale.
+          statoScansione: 'pulito',
+          scansionatoAt: new Date(),
+        },
+      });
+
+      recordAudit({
+        tenantId,
+        azione: 'DOCUMENTO_ARCHIVIATO',
+        entita: documento.id,
+        dettagli: `Archiviato «${filename}» (${archiviato.size}) nel fascicolo del progetto ${progettoId}`,
+        ipAddress: req.ip,
+      });
+
+      return reply.send({ ok: true, documento: { ...documento, firmato: false, firma: null } });
+    } catch (err) {
+      return reply.code(500).send({ errore: err instanceof Error ? err.message : 'Errore archiviazione documento' });
+    }
+  });
+
+  server.delete<{ Params: { id: string } }>('/documenti/:id', async (req, reply) => {
+    const tenantId = (req as any).tenantId;
+    const { id } = req.params;
+
+    try {
+      const documento = await prisma.documento.findFirst({ where: { id, tenantId }, select: { id: true, fileUrl: true } });
+      if (!documento) return reply.code(404).send({ errore: 'Documento non trovato.' });
+
+      await prisma.documento.delete({ where: { id } });
+
+      // Il file fisico resta in archivio: la riga è il riferimento legale, e lo storage può
+      // essere condiviso con altri riferimenti (firme, versioni precedenti). La pulizia dei
+      // file orfani è un lavoro di manutenzione separato.
+      recordAudit({
+        tenantId,
+        azione: 'DOCUMENTO_RIMOSSO',
+        entita: id,
+        dettagli: `Rimosso dal fascicolo il documento ${documento.fileUrl}`,
+        ipAddress: req.ip,
+      });
+
+      return reply.send({ ok: true });
+    } catch (err) {
+      return reply.code(500).send({ errore: err instanceof Error ? err.message : 'Errore eliminazione documento' });
+    }
+  });
+
   // ── FIRMA ELETTRONICA AVANZATA (FEA) CON OTP: WHATSAPP / EMAIL / TELEGRAM ──
   //
   // Cosa non funzionava, e perché non erano dettagli:
@@ -3575,8 +3743,16 @@ export function buildServer(app: AppPort): FastifyInstance {
     }
 
     try {
+      // §2.9 — il fascicolo contiene sia i documenti agganciati alle micro-voci dei moduli
+      // sia quelli caricati direttamente a livello di progetto dallo studio.
       const documenti = await prisma.documento.findMany({
-        where: { tenantId, microvoceProgetto: { moduloProgetto: { progetto: { clienteId } } } },
+        where: {
+          tenantId,
+          OR: [
+            { microvoceProgetto: { moduloProgetto: { progetto: { clienteId } } } },
+            { progetto: { clienteId } },
+          ],
+        },
         select: {
           id: true,
           tipo: true,
@@ -3586,6 +3762,8 @@ export function buildServer(app: AppPort): FastifyInstance {
           categoriaDoc: true,
           statoScansione: true,
           dataScadenzaDoc: true,
+          progettoId: true,
+          progetto: { select: { nome: true } },
           microvoceProgetto: {
             select: {
               nome: true,
@@ -3618,14 +3796,19 @@ export function buildServer(app: AppPort): FastifyInstance {
 
       const elenco = documenti.map((d) => {
         const firma = firmaPerDocumento.get(d.id) ?? null;
+        // I documenti a livello progetto (§2.9) non hanno micro-voce: titolo, modulo e
+        // progetto si ripiegano sul collegamento diretto al progetto.
+        const nomeProgetto = d.microvoceProgetto?.moduloProgetto.progetto?.nome ?? d.progetto?.nome ?? null;
+        const progettoId = d.microvoceProgetto?.moduloProgetto.progettoId ?? d.progettoId ?? null;
+        const titoloVoce = d.microvoceProgetto?.nome ?? d.progetto?.nome ?? 'Documento';
         return {
           id: d.id,
-          nome: nomeFileDaUrl(d.fileUrl) ?? `${d.microvoceProgetto.nome} (v${d.versione})`,
-          titolo: d.microvoceProgetto.nome,
+          nome: nomeFileDaUrl(d.fileUrl) ?? `${titoloVoce} (v${d.versione})`,
+          titolo: titoloVoce,
           categoria: d.categoriaDoc || 'generico',
-          modulo: d.microvoceProgetto.moduloProgetto.nome,
-          progetto: d.microvoceProgetto.moduloProgetto.progetto?.nome ?? null,
-          progettoId: d.microvoceProgetto.moduloProgetto.progettoId,
+          modulo: d.microvoceProgetto?.moduloProgetto.nome ?? null,
+          progetto: nomeProgetto,
+          progettoId,
           fileUrl: d.fileUrl,
           tipo: d.tipo,
           versione: d.versione,
@@ -3866,12 +4049,18 @@ export function buildServer(app: AppPort): FastifyInstance {
       where: {
         id: documentoId,
         tenantId,
-        microvoceProgetto: { moduloProgetto: { progetto: { clienteId } } },
+        // §2.9 — il documento appartiene al cliente se è agganciato a una micro-voce di un
+        // suo progetto OPPURE direttamente al progetto (upload a livello fascicolo).
+        OR: [
+          { microvoceProgetto: { moduloProgetto: { progetto: { clienteId } } } },
+          { progetto: { clienteId } },
+        ],
       },
       select: {
         fileUrl: true,
         statoScansione: true,
         microvoceProgetto: { select: { nome: true } },
+        progetto: { select: { nome: true } },
       },
     });
 
@@ -3895,7 +4084,7 @@ export function buildServer(app: AppPort): FastifyInstance {
 
     return {
       hash: crypto.createHash('sha256').update(contenuto).digest('hex'),
-      titolo: doc.microvoceProgetto.nome,
+      titolo: doc.microvoceProgetto?.nome ?? doc.progetto?.nome ?? 'Documento',
     };
   }
 

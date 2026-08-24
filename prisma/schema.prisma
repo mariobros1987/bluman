@@ -386,6 +386,7 @@ model Progetto {
 
   moduli         ModuloProgetto[]
   preventivi     Preventivo[]
+  documenti      Documento[]
   fatture        Fattura[]
   eventi         EventoCalendario[]
   accessiRisorsa AccessoRisorsa[] @relation("AccessoProgetto")
@@ -536,9 +537,14 @@ enum StatoScansione {
 model Documento {
   id                  String            @id @default(uuid())
   tenantId            String            @map("tenant_id")
-  microvoceProgettoId String            @map("microvoce_progetto_id")
-  microvoceProgetto   MicrovoceProgetto @relation(fields: [microvoceProgettoId], references: [id])
-  tipo                String // template_vuoto|compilato|firmato
+  // §2.9 — i file caricati dallo studio appartengono al fascicolo del progetto, non per
+  // forza a una micro-voce (che può non esistere ancora: upload prima dell'istanziazione).
+  // Almeno uno dei due collegamenti è sempre valorizzato.
+  microvoceProgettoId String?           @map("microvoce_progetto_id")
+  microvoceProgetto   MicrovoceProgetto? @relation(fields: [microvoceProgettoId], references: [id], onDelete: SetNull)
+  progettoId          String?           @map("progetto_id")
+  progetto            Progetto?         @relation(fields: [progettoId], references: [id], onDelete: SetNull)
+  tipo                String // template_vuoto|compilato|firmato|allegato
   fileUrl             String            @map("file_url")
   versione             Int              @default(1)
   caricatoDa          String            @map("caricato_da")

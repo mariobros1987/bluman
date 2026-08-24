@@ -353,6 +353,79 @@ export async function uploadFileApi(filename: string, contentBase64: string) {
   }
 }
 
+// ── §2.9 — Fascicolo documentale del progetto: lettura/scrittura sul database ──────────
+// L'upload dello studio crea una riga nella tabella `documento` (agganciata al progetto),
+// così il portale del cliente e gli altri operatori vedono davvero i file caricati.
+
+export interface DocumentoProgetto {
+  id: string;
+  tipo: string;
+  fileUrl: string;
+  versione: number;
+  createdAt: string;
+  categoriaDoc: string | null;
+  statoScansione: string;
+  dataScadenzaDoc: string | null;
+  progettoId: string | null;
+  microvoceProgettoId: string | null;
+  microvoceProgetto?: { nome: string } | null;
+  caricatoDa?: { id: string; nome?: string; email?: string } | null;
+  firmato: boolean;
+  firma: { riferimentoId: string | null; firmatoAt: string | null; signatureId: string | null; tipoFirma: string | null } | null;
+}
+
+// Lo storage locale di fallback serve i file da /uploads/<nome> sul backend: per il
+// browser quei path relativi puntano al frontend, quindi li rendiamo assoluti.
+function urlDocumentoAssoluto(fileUrl: unknown): string {
+  if (typeof fileUrl === 'string' && fileUrl.startsWith('/uploads/')) return `${API_BASE}${fileUrl}`;
+  return typeof fileUrl === 'string' ? fileUrl : '';
+}
+
+export async function listaDocumentiProgetto(progettoId: string): Promise<DocumentoProgetto[]> {
+  const res = await apiFetch(`${API_BASE}/documenti?progettoId=${encodeURIComponent(progettoId)}`, {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.errore ?? 'Errore lettura documenti del progetto');
+  }
+  const data = await res.json();
+  return (data.documenti ?? []).map((d: DocumentoProgetto) => ({ ...d, fileUrl: urlDocumentoAssoluto(d.fileUrl) }));
+}
+
+export async function salvaDocumentoApi(input: {
+  progettoId: string;
+  microvoceProgettoId?: string;
+  filename: string;
+  contentBase64: string;
+  categoriaDoc?: string;
+  dataScadenzaDoc?: string;
+}): Promise<DocumentoProgetto> {
+  const res = await apiFetch(`${API_BASE}/documenti`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.errore ?? 'Errore archiviazione documento');
+  }
+  const data = await res.json();
+  return { ...data.documento, fileUrl: urlDocumentoAssoluto(data.documento?.fileUrl) };
+}
+
+export async function eliminaDocumentoApi(id: string) {
+  const res = await apiFetch(`${API_BASE}/documenti/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.errore ?? 'Errore eliminazione documento');
+  }
+  return await res.json();
+}
+
 export async function updateArticoloPrezzoApi(id: string, input: { prezzoDefault?: number; oreDefault?: number; nome?: string }) {
   try {
     const res = await apiFetch(`${API_BASE}/articoli/${id}`, {

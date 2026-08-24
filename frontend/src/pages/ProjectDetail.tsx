@@ -14,7 +14,7 @@ import { AssignOperatorModal } from '../components/AssignOperatorModal';
 import { CalendarPreviewModal } from '../components/CalendarPreviewModal';
 import { ConfirmDeleteModal } from '../components/ConfirmDeleteModal';
 import { PROJECTS } from '../store/mockData';
-import { fetchProgettoDettaglio, emettiFatturaApi, consuntivaMicrovoceApi, assegnaAccessoProgettoApi, salvaProgettoDettaglioApi, archiviaProgettoApi, eliminaProgettoApi, fetchModuliLibreria, fetchArticoli, uploadFileApi, inviaComunicazioneApi, ricalcolaProgettoApi, creaPreventivoEAccettaApi } from '../api/client';
+import { fetchProgettoDettaglio, emettiFatturaApi, consuntivaMicrovoceApi, assegnaAccessoProgettoApi, salvaProgettoDettaglioApi, archiviaProgettoApi, eliminaProgettoApi, fetchModuliLibreria, fetchArticoli, inviaComunicazioneApi, ricalcolaProgettoApi, creaPreventivoEAccettaApi, listaDocumentiProgetto, salvaDocumentoApi, eliminaDocumentoApi } from '../api/client';
 import { TEAM } from '../store/mockData';
 import { useTeamMembers } from '../hooks/useTeamMembers';
 import { getCurrentTenantId, getTenantStorageKey, getStudioInfoForTenant, BLUECODE_TENANT_ID } from '../utils/tenant';
@@ -2275,6 +2275,27 @@ function RedditivitaTab({
 
 // ─── Componente Documenti & Vault Legale Progetto ──────────────────
 // ─── Componente Documenti & Vault Legale Progetto (Google Drive / Cloud Vault) ───
+
+// §2.9 — converte una riga della tabella `documento` (API GET /documenti) nella forma
+// usata dalla griglia del vault (nome/cat/formato/url).
+function documentoApiAVista(d: any, projectId: string): any {
+  const nome = decodeURIComponent((d.fileUrl || '').split('?')[0].split('/').pop() || 'Documento');
+  const dataFmt = d.createdAt ? new Date(d.createdAt).toLocaleDateString('it-IT') : '';
+  return {
+    id: d.id,
+    dbDoc: true,
+    nome,
+    titolo: nome.replace(/\.[^/.]+$/, ''),
+    cat: d.categoriaDoc && d.categoriaDoc !== 'generico' ? d.categoriaDoc : 'Allegati Progetto',
+    data: dataFmt,
+    dataCaricamento: dataFmt,
+    progettoId: projectId,
+    firmato: Boolean(d.firmato),
+    formato: /\.png$|\.jpe?g$/i.test(nome) ? 'immagine' : 'pdf',
+    url: d.fileUrl,
+  };
+}
+
 function DocumentiTab({ project }: { project: Progetto }) {
   const navigate = useNavigate();
   const [docCategory, setDocCategory] = useState('ALL');
@@ -2339,8 +2360,32 @@ function DocumentiTab({ project }: { project: Progetto }) {
     }
   });
 
+  // §2.9 — i file caricati dallo studio vivono nella tabella `documento`, agganciati al
+  // progetto: qui li leggiamo dal database e li aggiungiamo alla lista (i template Word
+  // generati in locale restano, i doppioni eventualmente già presenti vengono vinti dal DB).
+  useEffect(() => {
+    let attivo = true;
+    listaDocumentiProgetto(String(project.id))
+      .then((dbDocs) => {
+        if (!attivo) return;
+        const vista = dbDocs.map((d) => documentoApiAVista(d, String(project.id)));
+        setDocList((prev) => {
+          const idsDb = new Set(vista.map((d) => d.id));
+          return [...vista, ...prev.filter((d) => !idsDb.has(d.id))];
+        });
+      })
+      .catch((err) => console.warn('Lettura documenti progetto non riuscita', err));
+    return () => { attivo = false; };
+  }, [project.id]);
+
   // Helper per scaricare localmente copia VERA in PDF A4 con Header/Footer Studio
   const handleDownloadDocument = async (doc: any) => {
+    // §2.9 — i file caricati nel fascicolo sono già il file vero: si scarica l'originale,
+    // non una copia PDF generata dal contenuto HTML.
+    if (doc.dbDoc && doc.url && doc.url !== '#') {
+      window.open(doc.url, '_blank');
+      return;
+    }
     const studio = getStudioInfoForTenant();
     const rawContent = doc.contenutoHtml || `
       <div style="font-family: 'Segoe UI', Arial, sans-serif; color: #0f172a; line-height: 1.6; font-size: 11pt; padding: 10px;">
@@ -2380,59 +2425,60 @@ function DocumentiTab({ project }: { project: Progetto }) {
   };
 
   // Caricamento File da Disco nel Vault Progetto
+  // §2.9 — il file va nel fascicolo del progetto a database (tabella `documento`): prima
+  // la scansione lato server (§28), poi la riga visibile al portale cliente e agli altri
+  // operatori. Niente più localStorage, che era invisibile a chiunque altro.
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploading(true);
 
     try {
-      const reader = new FileReader();
-      reader.onload = async () => {
-        const base64 = (reader.result as string).split(',')[1];
-        const res = await uploadFileApi(file.name, base64);
-        const isWord = file.name.endsWith('.docx') || file.name.endsWith('.doc');
-        const newDoc = {
-          id: `doc-${Date.now()}`,
-          nome: file.name,
-          titolo: file.name.replace(/\.[^/.]+$/, ''),
-          cat: isWord ? 'Contratti' : 'Allegati Progetto',
-          dimensione: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
-          data: new Date().toLocaleDateString('it-IT'),
-          dataCaricamento: new Date().toLocaleDateString('it-IT'),
-          progettoId: String(project.id),
-          clienteNome: project.cl,
-          firmato: false,
-          formato: isWord ? 'word' : 'pdf',
-          url: res?.url || '#',
-        };
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(((reader.result as string) || '').split(',')[1] || '');
+        reader.onerror = () => reject(new Error('Lettura del file non riuscita'));
+        reader.readAsDataURL(file);
+      });
 
-        const updated = [newDoc, ...docList];
-        setDocList(updated);
-        localStorage.setItem(getTenantStorageKey(`bluman_project_documents_${project.id}`), JSON.stringify(updated));
+      const salvato = await salvaDocumentoApi({
+        progettoId: String(project.id),
+        filename: file.name,
+        contentBase64: base64,
+        categoriaDoc: 'Allegati Progetto',
+      });
 
-        const allVaultKey = getTenantStorageKey('bluman_all_vault_documents');
-        const allVaultStr = localStorage.getItem(allVaultKey);
-        const allVault: any[] = allVaultStr ? JSON.parse(allVaultStr) : [];
-        localStorage.setItem(allVaultKey, JSON.stringify([newDoc, ...allVault]));
-
-        alert(`✓ File "${file.name}" archiviato nel Cloud Drive del Progetto con successo!`);
-      };
-      reader.readAsDataURL(file);
+      setDocList((prev) => [documentoApiAVista(salvato, String(project.id)), ...prev]);
+      alert(`✓ File "${file.name}" archiviato nel fascicolo del progetto con successo!`);
     } catch (err) {
       console.error(err);
-      alert('Errore nel caricamento del file nel Drive');
+      const motivo = err instanceof Error && err.message ? `: ${err.message}` : '';
+      alert(`Caricamento non riuscito${motivo}`);
     } finally {
       setUploading(false);
+      e.target.value = ''; // permette di ricaricare lo stesso file
     }
   };
 
   // Eliminazione Documento dal Vault
-  const handleDeleteDoc = (docId: string) => {
+  // §2.9 — le riga a database passano da DELETE /documenti/:id; i template generati in
+  // locale (demo) si rimuovono solo dalla lista a schermo come prima.
+  const handleDeleteDoc = async (docId: string) => {
     if (!confirm('Vuoi rimuovere questo documento dal Vault del progetto?')) return;
-    const updated = docList.filter(d => d.id !== docId);
-    setDocList(updated);
-    localStorage.setItem(getTenantStorageKey(`bluman_project_documents_${project.id}`), JSON.stringify(updated));
-    if (selectedPreviewDoc?.id === docId) setSelectedPreviewDoc(null);
+    const doc = docList.find(d => d.id === docId);
+    try {
+      if (doc?.dbDoc) await eliminaDocumentoApi(docId);
+      const updated = docList.filter(d => d.id !== docId);
+      setDocList(updated);
+      if (!doc?.dbDoc) {
+        localStorage.setItem(getTenantStorageKey(`bluman_project_documents_${project.id}`), JSON.stringify(updated.filter(d => !d.dbDoc)));
+      }
+      if (selectedPreviewDoc?.id === docId) setSelectedPreviewDoc(null);
+    } catch (err) {
+      console.error(err);
+      const motivo = err instanceof Error && err.message ? `: ${err.message}` : '';
+      alert(`Eliminazione non riuscita${motivo}`);
+    }
   };
 
   // Filtraggio dinamico
@@ -2822,6 +2868,18 @@ temporale certificata ISO UTC ed impronta crittografica SHA-256.
 
                 {selectedPreviewDoc.contenutoHtml ? (
                   <div dangerouslySetInnerHTML={{ __html: selectedPreviewDoc.contenutoHtml }} />
+                ) : selectedPreviewDoc.dbDoc && selectedPreviewDoc.url && selectedPreviewDoc.url !== '#' ? (
+                  // §2.9 — file reale archiviato nel fascicolo: anteprima del PDF/immagine caricato
+                  <div style={{ fontFamily: 'sans-serif' }}>
+                    {/\.(png|jpe?g)$/i.test(selectedPreviewDoc.nome || '') ? (
+                      <img src={selectedPreviewDoc.url} alt={selectedPreviewDoc.nome} style={{ maxWidth: '100%', borderRadius: 6 }} />
+                    ) : (
+                      <iframe src={selectedPreviewDoc.url} title={selectedPreviewDoc.nome || 'Documento'} style={{ width: '100%', height: 480, border: '1px solid #cbd5e1', borderRadius: 6, background: '#f1f5f9' }} />
+                    )}
+                    <div style={{ marginTop: 12, textAlign: 'center', fontSize: 12 }}>
+                      <a href={selectedPreviewDoc.url} target="_blank" rel="noreferrer" style={{ color: '#0284c7', fontWeight: 700 }}>↗ Apri il file originale</a>
+                    </div>
+                  </div>
                 ) : (
                   <div style={{ fontSize: 12, color: '#334155', textAlign: 'justify' }}>
                     <p style={{ marginBottom: 12 }}>
