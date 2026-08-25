@@ -100,6 +100,7 @@ model Tenant {
   firme         FirmaElettronica[]
   proposteDatiFiscale PropostaDatiFiscale[]
   richiesteAddendum   RichiestaAddendum[]
+  oreTimesheet    OraTimesheet[]
 
   @@map("tenant")
 }
@@ -142,6 +143,10 @@ model User {
   notificheRicevute  Notifica[]
   permessiModuli     PermessoModulo[]
   documentiCaricati  Documento[]
+  // §Blocco 6.1 — registro ore settimanale: righe registrate, approvate o rifiutate
+  oreRegistrate      OraTimesheet[]      @relation("TimesheetUtente")
+  oreApprovate       OraTimesheet[]      @relation("TimesheetApprovatore")
+  oreRifiutate       OraTimesheet[]      @relation("TimesheetRifiutante")
 
   @@map("user")
 }
@@ -409,6 +414,7 @@ model Progetto {
   comunicazioni  ComunicazioneProgetto[]
   contrattiRicorrenti ContrattoRicorrente[]
   richiesteAddendum   RichiestaAddendum[]
+  oreTimesheet   OraTimesheet[]
 
   @@map("progetto")
 }
@@ -1129,6 +1135,49 @@ model RichiestaAddendum {
 
   @@index([progettoId, stato])
   @@map("richiesta_addendum")
+}
+
+// ─────────────────────────────────────────────────────────────────
+// BLOCCO 6.1 — TIMESHEET SETTIMANALE (§ consuntivazione oraria)
+// Una riga per operatore per giorno (chiave unica tenant+utente+giorno).
+// L'operatore registra le ore in stato `bozza`; advisor/super_admin le
+// approvano o le rifiutano. Solo le ore `approvato` alimentano il report
+// "Ore per Operatore" (Blocco 5): le bozze sono auto-dichiarazioni non
+// verificate e non entrano nella reportistica direzionale.
+// ─────────────────────────────────────────────────────────────────
+
+enum StatoTimesheet {
+  bozza
+  approvato
+  rifiutato
+}
+
+model OraTimesheet {
+  id            String         @id @default(uuid())
+  tenantId      String         @map("tenant_id")
+  tenant        Tenant         @relation(fields: [tenantId], references: [id])
+  userId        String         @map("user_id")
+  utente        User           @relation("TimesheetUtente", fields: [userId], references: [id], onDelete: Cascade)
+  giorno        DateTime       @db.Date
+  minuti        Int            // durata registrata nella giornata, in minuti
+  progettoId    String?        @map("progetto_id")
+  progetto      Progetto?      @relation(fields: [progettoId], references: [id], onDelete: SetNull)
+  nota          String?
+  stato         StatoTimesheet @default(bozza)
+  approvatoDaId String?        @map("approvato_da_id")
+  approvatoDa   User?          @relation("TimesheetApprovatore", fields: [approvatoDaId], references: [id], onDelete: SetNull)
+  approvatoAt   DateTime?      @map("approvato_at")
+  motivoRifiuto String?        @map("motivo_rifiuto")
+  rifiutatoDaId String?        @map("rifiutato_da_id")
+  rifiutatoDa   User?          @relation("TimesheetRifiutante", fields: [rifiutatoDaId], references: [id], onDelete: SetNull)
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+
+  // Una registrazione per membro per giorno: la griglia settimanale ha una
+  // cella sola per incrocio, e l'upsert dell'API si appoggia a questa chiave.
+  @@unique([tenantId, userId, giorno])
+  @@index([tenantId, giorno])
+  @@map("ora_timesheet")
 }
 
 // ─────────────────────────────────────────────────────────────────

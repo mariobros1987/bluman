@@ -76,6 +76,9 @@ export function ProjectDetail() {
     modId: number;
     mvIdx?: number;
     name: string;
+    currentAssigned: number[];
+    /** Categoria del modulo: alimenta il suggerimento operatore §6.2 (specializzazione + carico). */
+    categoria?: string;
   } | null>(null);
 
   const [calendarModalTarget, setCalendarModalTarget] = useState<{
@@ -755,8 +758,8 @@ export function ProjectDetail() {
                   rawDbModulo={rawDbProject?.moduli?.[mIdx]}
                   onRefresh={() => loadDetail()}
                   onToggleMv={(vidx) => handleToggleMicrovoce(mod.id, vidx)}
-                  onOpenAssignMod={() => setAssignModalTarget({ modId: mod.id, name: `Modulo: ${mod.n}`, currentAssigned: mod.team || [1] })}
-                  onOpenAssignMv={(vidx) => setAssignModalTarget({ modId: mod.id, mvIdx: vidx, name: `Microvoce: ${mod.v[vidx]?.n || 'Microvoce'}`, currentAssigned: [mod.v[vidx]?.as || 1] })}
+                  onOpenAssignMod={() => setAssignModalTarget({ modId: mod.id, name: `Modulo: ${mod.n}`, currentAssigned: mod.team || [1], categoria: mod.cat })}
+                  onOpenAssignMv={(vidx) => setAssignModalTarget({ modId: mod.id, mvIdx: vidx, name: `Microvoce: ${mod.v[vidx]?.n || 'Microvoce'}`, currentAssigned: [mod.v[vidx]?.as || 1], categoria: mod.cat })}
                   onOpenCalendarMv={(vidx) => setCalendarModalTarget({ modId: mod.id, mvIdx: vidx, name: mod.v[vidx]?.n || 'Microvoce' })}
                   onDeleteMod={async () => {
                     const confirmDel = window.confirm(`Sei sicuro di voler eliminare il modulo "${mod.n}" dal progetto?`);
@@ -969,6 +972,7 @@ export function ProjectDetail() {
           isOpen={!!assignModalTarget}
           onClose={() => setAssignModalTarget(null)}
           targetName={assignModalTarget.name}
+          categoria={assignModalTarget.categoria}
           currentAssignedIds={assignModalTarget.currentAssigned}
           onAssign={(opId, roleLvl) => {
             handleAssignOperatorConfirm(opId, roleLvl);

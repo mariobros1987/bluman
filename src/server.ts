@@ -3113,6 +3113,331 @@ export function buildServer(app: AppPort): FastifyInstance {
     }
   });
 
+  // ── TIMESHEET SETTIMANALE (BLOCCO 6.1) ─────────────────────────────
+  // Griglia delle ore registrate per membro × giorno: ogni operatore segna
+  // le proprie ore in stato `bozza`; advisor/super_admin le approvano o le
+  // rifiutano. Solo le ore approvate alimentano il report "Ore per Operatore"
+  // (Blocco 5, reportsService). Nessuna squadra finta: i membri della griglia
+  // sono gli utenti reali del tenant.
+
+  const MINUTI_IN_SETTIMANA = 7 * 24 * 60 * 60 * 1000;
+
+  /** Data YYYY-MM-DD → Date a mezzanotte UTC, oppure null se non valida. */
+  function parseDataIso(iso: string | undefined): Date | null {
+    if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return null;
+    const parti = iso.split('-').map(Number);
+    const data = new Date(Date.UTC(parti[0] ?? 0, (parti[1] ?? 1) - 1, parti[2] ?? 1));
+    if (Number.isNaN(data.getTime())) return null;
+    // Difesa da date ambigue tipo 2026-02-30 che Date farebbe slittare a marzo.
+    if (data.getUTCFullYear() !== parti[0] || data.getUTCMonth() !== (parti[1] ?? 1) - 1 || data.getUTCDate() !== parti[2]) return null;
+    return data;
+  }
+
+  /** Lunedì (UTC) della settimana che contiene la data; senza data, settimana corrente. */
+  function lunediSettimana(iso?: string): Date | null {
+    let base: Date;
+    if (iso !== undefined) {
+      const trovata = parseDataIso(iso);
+      if (!trovata) return null;
+      base = trovata;
+    } else {
+      const oggi = new Date();
+      base = new Date(Date.UTC(oggi.getUTCFullYear(), oggi.getUTCMonth(), oggi.getUTCDate()));
+    }
+    const giornoSettimana = base.getUTCDay(); // 0 = domenica
+    const delta = giornoSettimana === 0 ? -6 : 1 - giornoSettimana;
+    base.setUTCDate(base.getUTCDate() + delta);
+    return base;
+  }
+
+  const isoData = (d: Date): string => d.toISOString().slice(0, 10);
+
+  server.get<{ Querystring: { inizio?: string } }>('/timesheet', async (req, reply) => {
+    const tenantId = (req as any).tenantId;
+    const userId = (req as any).userId as string | undefined;
+    const ruolo = (req as any).ruolo as string | undefined;
+    const inizio = lunediSettimana(req.query.inizio);
+    if (!inizio) {
+      return reply.code(400).send({ errore: 'Parametro inizio non valido: usare una data YYYY-MM-DD' });
+    }
+    const fine = new Date(inizio.getTime() + MINUTI_IN_SETTIMANA);
+    const puoApprovare = ruolo === 'advisor' || ruolo === 'super_admin';
+    if (!puoApprovare && !userId) {
+      return reply.code(401).send({ errore: 'Non autenticato' });
+    }
+
+    try {
+      const voci = await prisma.oraTimesheet.findMany({
+        where: {
+          tenantId,
+          giorno: { gte: inizio, lt: fine },
+          // Chi non approva vede solo le proprie registrazioni: la griglia
+          // completa del team è una vista da responsabile.
+          ...(puoApprovare ? {} : { userId }),
+        },
+        orderBy: { giorno: 'asc' },
+        include: {
+          approvatoDa: { select: { nome: true } },
+          rifiutatoDa: { select: { nome: true } },
+          progetto: { select: { nome: true } },
+        },
+      });
+      const membri = await prisma.user.findMany({
+        where: puoApprovare ? { tenantId, ruolo: { not: 'cliente' } } : { id: userId },
+        select: { id: true, nome: true, email: true, ruolo: true, specializzazione: true },
+        orderBy: { createdAt: 'asc' },
+      });
+      const progetti = await prisma.progetto.findMany({
+        where: { tenantId },
+        select: { id: true, nome: true },
+        orderBy: { createdAt: 'desc' },
+        take: 200,
+      });
+      return reply.send({
+        inizio: isoData(inizio),
+        fine: isoData(new Date(fine.getTime() - MINUTI_IN_SETTIMANA)),
+        puoApprovare,
+        membri,
+        progetti,
+        voci: voci.map((v) => ({
+          id: v.id,
+          userId: v.userId,
+          giorno: isoData(v.giorno),
+          minuti: v.minuti,
+          stato: v.stato,
+          nota: v.nota,
+          progettoId: v.progettoId,
+          nomeProgetto: v.progetto?.nome ?? null,
+          motivoRifiuto: v.motivoRifiuto,
+          approvatoDa: v.approvatoDa?.nome ?? null,
+          approvatoAt: v.approvatoAt,
+        })),
+      });
+    } catch (err: any) {
+      console.error('GET /timesheet —', err instanceof Error ? err.message : err);
+      return reply.code(500).send({ errore: 'Errore nel caricamento del timesheet' });
+    }
+  });
+
+  // Upsert della propria giornata: minuti=0 svuota la cella. Le ore già
+  // approvate sono intoccabili (409); una riga rifiutata torna in bozza e si
+  // può correggere. L'unicità (tenant, utente, giorno) rende l'operazione
+  // idempotente sulla stessa cella.
+  server.post<{ Body: { giorno?: string; minuti?: number; nota?: string; progettoId?: string | null } }>('/timesheet', async (req, reply) => {
+    const tenantId = (req as any).tenantId;
+    const userId = (req as any).userId as string | undefined;
+    if (!userId) {
+      return reply.code(401).send({ errore: 'Non autenticato' });
+    }
+    const { giorno: giornoIso, minuti, nota, progettoId } = req.body || {};
+    const giorno = parseDataIso(giornoIso);
+    if (!giorno) {
+      return reply.code(400).send({ errore: 'Campo giorno non valido: usare una data YYYY-MM-DD' });
+    }
+    if (typeof minuti !== 'number' || !Number.isFinite(minuti) || minuti < 0 || minuti > 24 * 60) {
+      return reply.code(400).send({ errore: 'Campo minuti non valido: numero tra 0 e 1440' });
+    }
+    const minutiArrotondati = Math.round(minuti);
+
+    try {
+      if (progettoId) {
+        const progetto = await prisma.progetto.findUnique({ where: { id: progettoId }, select: { tenantId: true } });
+        if (!progetto || progetto.tenantId !== tenantId) {
+          return reply.code(400).send({ errore: 'Progetto non trovato nel tenant' });
+        }
+      }
+
+      const esistente = await prisma.oraTimesheet.findUnique({
+        where: { tenantId_userId_giorno: { tenantId, userId, giorno } },
+      });
+      if (esistente?.stato === 'approvato') {
+        return reply.code(409).send({ errore: 'Queste ore sono già state approvate: chiedi al responsabile per modificarle.' });
+      }
+
+      if (minutiArrotondati === 0) {
+        if (esistente) {
+          await prisma.oraTimesheet.delete({ where: { id: esistente.id } });
+        }
+        return reply.send({ eliminata: true, giorno: isoData(giorno) });
+      }
+
+      const dati = {
+        minuti: minutiArrotondati,
+        nota: typeof nota === 'string' && nota.trim() ? nota.trim().slice(0, 500) : null,
+        progettoId: progettoId || null,
+        // Ogni (ri)registrazione riparte dalla bozza: anche dopo un rifiuto.
+        stato: 'bozza' as const,
+        motivoRifiuto: null,
+        rifiutatoDaId: null,
+        approvatoDaId: null,
+        approvatoAt: null,
+      };
+      const salvata = esistente
+        ? await prisma.oraTimesheet.update({ where: { id: esistente.id }, data: dati })
+        : await prisma.oraTimesheet.create({ data: { ...dati, tenantId, userId, giorno } });
+      return reply.send(salvata);
+    } catch (err: any) {
+      console.error('POST /timesheet —', err instanceof Error ? err.message : err);
+      return reply.code(500).send({ errore: 'Errore nel salvataggio delle ore' });
+    }
+  });
+
+  const soloChiApprova = (ruolo: string | undefined, reply: any): boolean => {
+    if (ruolo === 'advisor' || ruolo === 'super_admin') return true;
+    reply.code(403).send({ errore: 'Solo il responsabile dello studio o il super admin possono approvare le ore.' });
+    return false;
+  };
+
+  server.post<{ Params: { id: string } }>('/timesheet/:id/approva', async (req, reply) => {
+    if (!soloChiApprova((req as any).ruolo as string | undefined, reply)) return;
+    const tenantId = (req as any).tenantId;
+    const userId = (req as any).userId as string | undefined;
+    try {
+      // RLS limita già al tenant: una riga di un altro tenant qui non arriva.
+      const voce = await prisma.oraTimesheet.findUnique({ where: { id: req.params.id } });
+      if (!voce || voce.tenantId !== tenantId) {
+        return reply.code(404).send({ errore: 'Registrazione non trovata' });
+      }
+      if (voce.stato === 'approvato') {
+        return reply.code(409).send({ errore: 'Registrazione già approvata' });
+      }
+      const aggiornata = await prisma.oraTimesheet.update({
+        where: { id: voce.id },
+        data: { stato: 'approvato', approvatoDaId: userId ?? null, approvatoAt: new Date(), motivoRifiuto: null, rifiutatoDaId: null },
+      });
+      return reply.send(aggiornata);
+    } catch (err: any) {
+      console.error('POST /timesheet/:id/approva —', err instanceof Error ? err.message : err);
+      return reply.code(500).send({ errore: 'Errore nell\'approvazione delle ore' });
+    }
+  });
+
+  server.post<{ Params: { id: string }; Body: { motivo?: string } }>('/timesheet/:id/rifiuta', async (req, reply) => {
+    if (!soloChiApprova((req as any).ruolo as string | undefined, reply)) return;
+    const tenantId = (req as any).tenantId;
+    const userId = (req as any).userId as string | undefined;
+    try {
+      const voce = await prisma.oraTimesheet.findUnique({ where: { id: req.params.id } });
+      if (!voce || voce.tenantId !== tenantId) {
+        return reply.code(404).send({ errore: 'Registrazione non trovata' });
+      }
+      if (voce.stato === 'approvato') {
+        return reply.code(409).send({ errore: 'Una registrazione già approvata non può essere rifiutata' });
+      }
+      const motivo = req.body?.motivo;
+      const aggiornata = await prisma.oraTimesheet.update({
+        where: { id: voce.id },
+        data: {
+          stato: 'rifiutato',
+          motivoRifiuto: typeof motivo === 'string' && motivo.trim() ? motivo.trim().slice(0, 500) : null,
+          rifiutatoDaId: userId ?? null,
+        },
+      });
+      return reply.send(aggiornata);
+    } catch (err: any) {
+      console.error('POST /timesheet/:id/rifiuta —', err instanceof Error ? err.message : err);
+      return reply.code(500).send({ errore: 'Errore nel rifiuto delle ore' });
+    }
+  });
+
+  // Approvazione in blocco di tutte le bozze della settimana (opzionalmente di
+  // un solo membro): è il bottone "approva settimana" della griglia.
+  server.post<{ Body: { inizio?: string; userId?: string } }>('/timesheet/approva-settimana', async (req, reply) => {
+    if (!soloChiApprova((req as any).ruolo as string | undefined, reply)) return;
+    const tenantId = (req as any).tenantId;
+    const userIdRichiedente = (req as any).userId as string | undefined;
+    const inizio = lunediSettimana(req.body?.inizio);
+    if (!inizio) {
+      return reply.code(400).send({ errore: 'Parametro inizio non valido: usare una data YYYY-MM-DD' });
+    }
+    const fine = new Date(inizio.getTime() + MINUTI_IN_SETTIMANA);
+    try {
+      const risultato = await prisma.oraTimesheet.updateMany({
+        where: {
+          tenantId,
+          giorno: { gte: inizio, lt: fine },
+          stato: 'bozza',
+          ...(req.body?.userId ? { userId: req.body.userId } : {}),
+        },
+        data: { stato: 'approvato', approvatoDaId: userIdRichiedente ?? null, approvatoAt: new Date() },
+      });
+      return reply.send({ approvate: risultato.count, inizio: isoData(inizio), fine: isoData(new Date(fine.getTime() - MINUTI_IN_SETTIMANA)) });
+    } catch (err: any) {
+      console.error('POST /timesheet/approva-settimana —', err instanceof Error ? err.message : err);
+      return reply.code(500).send({ errore: 'Errore nell\'approvazione della settimana' });
+    }
+  });
+
+  // ── ASSEGNAZIONE AUTOMATICA OPERATORE (BLOCCO 6.2) ─────────────────
+  // Suggerimento per l'assegnazione di moduli/micro-voci: prima la
+  // specializzazione (corrispondenza con la categoria del lavoro), poi il
+  // minor carico: ore registrate nella settimana corrente + ore residue sulle
+  // voci aperte già assegnate. Nessun dato inventato: se il tenant non ha
+  // utenti la risposta è un elenco vuoto.
+  server.get<{ Querystring: { categoria?: string } }>('/operatori-suggeriti', async (req, reply) => {
+    const tenantId = (req as any).tenantId;
+    const categoria = (req.query.categoria || '').trim().toLowerCase();
+    try {
+      const inizio = lunediSettimana();
+      const fine = inizio ? new Date(inizio.getTime() + MINUTI_IN_SETTIMANA) : null;
+      const utenti = await prisma.user.findMany({
+        where: { tenantId, ruolo: { not: 'cliente' }, stato: { not: 'disattivato' } },
+        select: { id: true, nome: true, ruolo: true, specializzazione: true },
+        orderBy: { createdAt: 'asc' },
+      });
+      if (utenti.length === 0) {
+        return reply.send({ criterio: 'specializzazione + minor carico di lavoro', categoria: categoria || null, suggeriti: [] });
+      }
+      const ids = utenti.map((u) => u.id);
+
+      // Carico: ore già registrate questa settimana (tutti gli stati — il lavoro
+      // è comunque fatto) + ore da fare sulle voci aperte assegnate.
+      const registrazioniSettimana = await prisma.oraTimesheet.groupBy({
+        by: ['userId'],
+        where: { tenantId, userId: { in: ids }, ...(fine ? { giorno: { gte: inizio!, lt: fine } } : {}) },
+        _sum: { minuti: true },
+      });
+      const vociAperte = await prisma.microvoceProgetto.groupBy({
+        by: ['risorsaId'],
+        where: { tenantId, risorsaId: { in: ids }, stato: { not: 'done' } },
+        _sum: { orePreventivate: true, oreConsuntivate: true },
+      });
+      const oreSettimanaPerUtente = new Map(registrazioniSettimana.map((r) => [r.userId, (r._sum.minuti ?? 0) / 60]));
+      const residuePerUtente = new Map(
+        vociAperte.map((v) => [v.risorsaId ?? '', Math.max(0, (v._sum.orePreventivate ?? 0) - (v._sum.oreConsuntivate ?? 0))]),
+      );
+
+      const righe = utenti.map((u) => {
+        const specializzazione = (u.specializzazione || '').trim().toLowerCase();
+        const corrisponde = Boolean(categoria) && Boolean(specializzazione) &&
+          (specializzazione.includes(categoria) || categoria.includes(specializzazione));
+        const oreSettimana = oreSettimanaPerUtente.get(u.id) ?? 0;
+        const oreResidue = residuePerUtente.get(u.id) ?? 0;
+        const caricoOre = Math.round((oreSettimana + oreResidue) * 10) / 10;
+        return {
+          id: u.id,
+          nome: u.nome,
+          ruolo: u.ruolo,
+          specializzazione: u.specializzazione || null,
+          corrisponde,
+          oreSettimana: Math.round(oreSettimana * 10) / 10,
+          oreResidue: Math.round(oreResidue * 10) / 10,
+          caricoOre,
+        };
+      });
+      righe.sort(
+        (a, b) =>
+          Number(b.corrisponde) - Number(a.corrisponde) ||
+          a.caricoOre - b.caricoOre ||
+          a.nome.localeCompare(b.nome),
+      );
+      return reply.send({ criterio: 'specializzazione + minor carico di lavoro', categoria: categoria || null, suggeriti: righe });
+    } catch (err: any) {
+      console.error('GET /operatori-suggeriti —', err instanceof Error ? err.message : err);
+      return reply.code(500).send({ errore: 'Errore nel calcolo degli operatori suggeriti' });
+    }
+  });
+
   // ── RICERCA GLOBALE (BLOCCO 4) ─────────────────────────────────────
   // Ricerca trasversale server-side (ILIKE + indici trigram) su clienti,
   // progetti, fatture, documenti, team, calendario e retainer. Sempre

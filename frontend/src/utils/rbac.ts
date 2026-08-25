@@ -43,7 +43,7 @@ export function getUserPermission(user: any, moduleKey: string): PermissionLevel
   }
 
   if (user.ruolo === 'collaboratore_interno' || user.ruolo === 'operator') {
-    if (['projects', 'calendar'].includes(moduleKey)) return 'write';
+    if (['projects', 'calendar', 'timesheet'].includes(moduleKey)) return 'write';
     if (['clients', 'documents', 'library'].includes(moduleKey)) return 'read';
     return 'denied'; // Invoices, Banche, Prima Nota, Scadenzario, Retainers, Audit, Settings bloccati
   }

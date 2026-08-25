@@ -20,6 +20,7 @@ const TITLES: Record<string, string> = {
   '/invoices':  'Fatture & Pagamenti',
   '/documents': 'Document Studio (Word & Contratti)',
   '/audit':     'Log Audit Studio',
+  '/timesheet': 'Timesheet Settimanale Ore',
 };
 
 const INITIAL_NOTIFICATIONS: NotificationItem[] = [];

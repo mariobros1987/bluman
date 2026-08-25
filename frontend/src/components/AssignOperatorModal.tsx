@@ -1,11 +1,14 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTeamMembers } from '../hooks/useTeamMembers';
+import { fetchOperatoriSuggeriti, type OperatoreSuggeritoApi } from '../api/client';
 import { Avatar } from './ui/Avatar';
 
 interface AssignOperatorModalProps {
   isOpen: boolean;
   onClose: () => void;
   targetName: string; // e.g. "Modulo Corporate Structuring" or "Raccolta Documenti"
+  /** Categoria del lavoro da assegnare (es. 'Societario', 'Trust'): usata per il suggerimento §6.2. */
+  categoria?: string;
   currentAssignedIds?: number[];
   onAssign: (operatorId: number, roleLevel: string) => void;
 }
@@ -14,6 +17,7 @@ export function AssignOperatorModal({
   isOpen,
   onClose,
   targetName,
+  categoria,
   currentAssignedIds = [1],
   onAssign,
 }: AssignOperatorModalProps) {
@@ -21,6 +25,54 @@ export function AssignOperatorModal({
   const [selectedOpId, setSelectedOpId] = useState<number>(currentAssignedIds[0] || 1);
   const [roleLevel, setRoleLevel] = useState<string>('write');
   const [notif, setNotif] = useState(false);
+
+  // §6.2 — suggerimento operatore: prima la specializzazione (match con la
+  // categoria del lavoro), poi il minor carico di lavoro. L'ordinamento e il
+  // badge arrivano da GET /operatori-suggeriti; nessun calcolo finto in UI.
+  const [suggeriti, setSuggeriti] = useState<OperatoreSuggeritoApi[]>([]);
+  const selezioneManuale = useRef(false);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let attivo = true;
+    fetchOperatoriSuggeriti(categoria)
+      .then((r) => { if (attivo) setSuggeriti(r.suggeriti); })
+      .catch(() => { if (attivo) setSuggeriti([]); }); // senza API il modale resta utilizzabile
+    return () => { attivo = false; };
+  }, [isOpen, categoria]);
+
+  const suggerimentoPerDbId = useMemo(() => {
+    const mappa = new Map<string, OperatoreSuggeritoApi>();
+    for (const s of suggeriti) mappa.set(s.id, s);
+    return mappa;
+  }, [suggeriti]);
+
+  // Ordine della lista: specializzazione corrispondente prima, poi minor
+  // carico; chi non è nel database dello studio resta in coda.
+  const teamOrdinati = useMemo(() => {
+    if (suggeriti.length === 0) return teamList;
+    const punteggio = (op: (typeof teamList)[number]) => {
+      const s = op.dbId ? suggerimentoPerDbId.get(op.dbId) : undefined;
+      if (!s) return { priorita: 2, carico: Number.POSITIVE_INFINITY };
+      return { priorita: s.corrisponde ? 0 : 1, carico: s.caricoOre };
+    };
+    return [...teamList].sort((a, b) => {
+      const pa = punteggio(a);
+      const pb = punteggio(b);
+      return pa.priorita - pb.priorita || pa.carico - pb.carico;
+    });
+  }, [teamList, suggeriti, suggerimentoPerDbId]);
+
+  // Pre-selezione automatica del candidato migliore, finché l'utente non
+  // sceglie a mano: corrisponde alla specializzazione + ha il carico minore.
+  useEffect(() => {
+    if (!isOpen || selezioneManuale.current || suggeriti.length === 0 || teamList.length === 0) return;
+    const migliore = suggeriti.find((s) => s.corrisponde) ?? suggeriti[0];
+    if (!migliore) return;
+    const membro = teamList.find((t) => t.dbId === migliore.id);
+    if (membro) setSelectedOpId(membro.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, suggeriti, teamList]);
 
   if (!isOpen) return null;
 
@@ -87,13 +139,21 @@ export function AssignOperatorModal({
           {loading && <span style={{ marginLeft: 8, fontWeight: 400, fontStyle: 'italic' }}>⏳ Caricamento dal database…</span>}
         </div>
 
+        {/* §6.2 — criterio del suggerimento */}
+        {suggeriti.length > 0 && (
+          <div style={{ fontSize: 10, color: 'var(--muted)', background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.25)', borderRadius: 8, padding: '7px 10px', marginBottom: 10 }}>
+            ⭐ Ordinati per <strong>specializzazione{categoria ? ` (${categoria})` : ''} + minor carico di lavoro</strong>. Il migliore è pre-selezionato.
+          </div>
+        )}
+
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 320, overflowY: 'auto', marginBottom: 20 }}>
-          {teamList.map(op => {
+          {teamOrdinati.map(op => {
             const isSelected = selectedOpId === op.id;
+            const suggerimento = op.dbId ? suggerimentoPerDbId.get(op.dbId) : undefined;
             return (
               <div
                 key={op.id}
-                onClick={() => setSelectedOpId(op.id)}
+                onClick={() => { selezioneManuale.current = true; setSelectedOpId(op.id); }}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -109,8 +169,20 @@ export function AssignOperatorModal({
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   <Avatar id={op.id} size={36} />
                   <div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{op.n}</div>
-                    <div style={{ fontSize: 10, color: 'var(--muted)' }}>{op.r}</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>
+                      {op.n}
+                      {suggerimento?.corrisponde && (
+                        <span style={{ marginLeft: 8, fontSize: 9, fontWeight: 800, color: '#fbbf24' }}>⭐ SPECIALIZZAZIONE ✓</span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: 10, color: 'var(--muted)' }}>
+                      {op.r}
+                      {suggerimento && (
+                        <span style={{ marginLeft: 6, color: 'var(--indigo-l, #818cf8)' }}>
+                          · carico {suggerimento.caricoOre.toLocaleString('it-IT', { maximumFractionDigits: 1 })} h
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
 

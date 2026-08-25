@@ -16,6 +16,7 @@ const NAV = [
   { path: '/retainers',  moduleKey: 'retainers',   label: 'Contratti Retainer',    icon: '🔄' },
   { path: '/documents',  moduleKey: 'documents',   label: 'Document Studio (Word)', icon: '📝' },
   { path: '/reports',    moduleKey: 'reports',     label: 'Report & Analytics',     icon: '📈' },
+  { path: '/timesheet',  moduleKey: 'timesheet',   label: 'Timesheet Ore',          icon: '⏱️' },
   { path: '/audit',      moduleKey: 'audit',       label: 'Log Audit Studio',       icon: '📋' },
   { path: '/library',    moduleKey: 'library',     label: 'Libreria moduli',        icon: '📚' },
   { path: '/settings',   moduleKey: 'settings',    label: 'Impostazioni',           icon: '⚙️' },

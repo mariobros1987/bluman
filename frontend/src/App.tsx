@@ -20,6 +20,7 @@ import { BanksPage } from './pages/BanksPage';
 import { RetainersPage } from './pages/RetainersPage';
 import { DocumentEditorPage } from './pages/DocumentEditorPage';
 import { ReportsPage } from './pages/ReportsPage';
+import { TimesheetPage } from './pages/TimesheetPage';
 import { getUserPermission } from './utils/rbac';
 import { fetchMeApi } from './api/client';
 import './styles/tokens.css';
@@ -156,6 +157,7 @@ function AppContent() {
           <Route path="/documents"     element={<ProtectedModule user={currentUser} moduleKey="documents" element={<DocumentEditorPage />} />} />
           <Route path="/audit"         element={<ProtectedModule user={currentUser} moduleKey="audit" element={<AuditLogPage />} />} />
           <Route path="/reports"       element={<ProtectedModule user={currentUser} moduleKey="reports" element={<ReportsPage />} />} />
+          <Route path="/timesheet"     element={<ProtectedModule user={currentUser} moduleKey="timesheet" element={<TimesheetPage />} />} />
           <Route path="/admin/tenants" element={<SuperAdminPage />} />
           <Route path="/library"       element={<ProtectedModule user={currentUser} moduleKey="library" element={<Library />} />} />
           <Route path="/settings"      element={<ProtectedModule user={currentUser} moduleKey="settings" element={<SettingsPage />} />} />

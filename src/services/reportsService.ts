@@ -108,41 +108,83 @@ export async function reportOrePerOperatore(tenantId: string): Promise<ReportTab
     perOperatore.set(chiave, agg);
   }
 
-  const righe: CellaReport[][] = [...perOperatore.values()]
-    .sort((a, b) => b.oreCons - a.oreCons)
-    .map((a) => [
+  // Blocco 6.1 — ore del timesheet settimanale, SOLO se approvate dal
+  // responsabile: le bozze sono auto-dichiarazioni non verificate e non
+  // entrano nella reportistica direzionale. Chi ha ore approvate ma nessuna
+  // voce di progetto assegnata entra comunque in tabella.
+  const gruppiOreApprovate = await prisma.oraTimesheet.groupBy({
+    by: ['userId'],
+    where: { tenantId, stato: 'approvato' },
+    _sum: { minuti: true },
+  });
+  const oreApprovatePerUtente = new Map<string, number>(
+    gruppiOreApprovate.map((g) => [g.userId, Math.round(((g._sum.minuti ?? 0) / 60) * 10) / 10]),
+  );
+
+  const idsSoloTimesheet = [...oreApprovatePerUtente.keys()].filter((id) => !perOperatore.has(id));
+  if (idsSoloTimesheet.length > 0) {
+    const utentiSoloTimesheet = await prisma.user.findMany({
+      where: { id: { in: idsSoloTimesheet } },
+      select: { id: true, nome: true, costoOrarioCentesimi: true },
+    });
+    for (const u of utentiSoloTimesheet) {
+      perOperatore.set(u.id, {
+        nome: u.nome,
+        costoOrario: u.costoOrarioCentesimi ?? COSTO_ORARIO_DEFAULT_CENTESIMI,
+        voci: 0,
+        completate: 0,
+        orePrev: 0,
+        oreCons: 0,
+        oreExtra: 0,
+      });
+    }
+  }
+
+  const conOreApprovate = [...perOperatore.entries()].map(([chiave, a]) => ({
+    a,
+    oreApprovate: oreApprovatePerUtente.get(chiave) ?? 0,
+  }));
+
+  const righe: CellaReport[][] = conOreApprovate
+    .sort((x, y) => y.a.oreCons - x.a.oreCons)
+    .map(({ a, oreApprovate }) => [
       a.nome,
       a.voci,
       a.completate,
       a.orePrev,
       a.oreCons,
       a.oreExtra,
+      oreApprovate,
       euro(a.costoOrario),
       euro(a.oreCons * a.costoOrario),
     ]);
 
-  const totale = [...perOperatore.values()].reduce(
-    (t, a) => ({
+  const totale = conOreApprovate.reduce(
+    (t, { a, oreApprovate }) => ({
       voci: t.voci + a.voci,
       completate: t.completate + a.completate,
       orePrev: t.orePrev + a.orePrev,
       oreCons: t.oreCons + a.oreCons,
       oreExtra: t.oreExtra + a.oreExtra,
+      oreApprovate: Math.round((t.oreApprovate + oreApprovate) * 10) / 10,
       costo: t.costo + a.oreCons * a.costoOrario,
     }),
-    { voci: 0, completate: 0, orePrev: 0, oreCons: 0, oreExtra: 0, costo: 0 },
+    { voci: 0, completate: 0, orePrev: 0, oreCons: 0, oreExtra: 0, oreApprovate: 0, costo: 0 },
   );
 
   return {
     chiave: 'ore-operatori',
     titolo: 'Ore per Operatore',
-    sottotitolo: `Consuntivazione ore di progetto per risorsa · ${perOperatore.size} operatori`,
-    intestazioni: ['Operatore', 'Voci assegnate', 'Voci completate', 'Ore preventivate', 'Ore consuntivate', 'Ore extra', 'Costo orario (€)', 'Costo totale (€)'],
+    sottotitolo: `Consuntivazione ore di progetto per risorsa · ${perOperatore.size} operatori · include ore approvate dal timesheet`,
+    intestazioni: ['Operatore', 'Voci assegnate', 'Voci completate', 'Ore preventivate', 'Ore consuntivate', 'Ore extra', 'Ore approvate (timesheet)', 'Costo orario (€)', 'Costo totale (€)'],
     righe,
-    colonneValuta: [6, 7],
-    colonneOre: [3, 4, 5],
+    colonneValuta: [7, 8],
+    colonneOre: [3, 4, 5, 6],
     colonnePercentuali: [],
-    totali: [['TOTALE', totale.voci, totale.completate, totale.orePrev, totale.oreCons, totale.oreExtra, null, euro(totale.costo)]],
+    totali: [['TOTALE', totale.voci, totale.completate, totale.orePrev, totale.oreCons, totale.oreExtra, totale.oreApprovate, null, euro(totale.costo)]],
+    riepilogo: [
+      { etichetta: 'Ore approvate dal timesheet', valore: `${totale.oreApprovate} h` },
+    ],
   };
 }
 
