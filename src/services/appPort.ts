@@ -50,6 +50,7 @@ export interface ArticoloInput {
 export interface ModuloTemplateInput {
   nome: string;
   categoria: string;
+  giurisdizioneId?: string | null; // null = modulo generico, visibile per ogni giurisdizione
   prezzoPacchetto?: number | null; // centesimi
   righe: Array<{ articoloId: string; quantita: number; overrideOre?: number; overridePrezzo?: number }>;
   dipendenzeDaIds?: string[];
@@ -75,6 +76,11 @@ export interface AppPort {
   listaArticoli(): unknown[] | Promise<unknown[]>;
   creaArticolo(input: ArticoloInput): unknown | Promise<unknown>;
   creaModuloTemplate(input: ModuloTemplateInput): unknown | Promise<unknown>;
+  aggiornaModuloTemplate(id: string, input: Partial<ModuloTemplateInput>): unknown | Promise<unknown>;
+  // §30 — disattivazione, non cancellazione: i progetti e i preventivi già creati
+  // continuano a referenziare il template/Articolo, che però sparisce dalla libreria.
+  disattivaModuloTemplate(id: string): unknown | Promise<unknown>;
+  disattivaArticolo(id: string): unknown | Promise<unknown>;
   creaCliente(input: { nome: string; tipo: 'individual' | 'company' }): Cliente | Promise<Cliente>;
   getCliente(id: string): Cliente | Promise<Cliente>;
   listaClienti(): Cliente[] | Promise<Cliente[]>;

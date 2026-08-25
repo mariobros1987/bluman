@@ -8,7 +8,7 @@ import {
 } from './otpService.js';
 import { hashCodiceOtp, verificaCodiceOtp } from '../util/jwt.js';
 import { scanFileBuffer } from './securityScanner.js';
-import { trasmettiFatturaSdi } from './sdiService.js';
+import { preparaFatturaPerInvioManuale } from './sdiService.js';
 import { runDailyNotificationCron } from './cronService.js';
 
 describe('🧪 Nuove Funzionalità Enterprise — Test Suite di Collaudo', () => {
@@ -151,18 +151,20 @@ describe('🧪 Nuove Funzionalità Enterprise — Test Suite di Collaudo', () =>
     });
   });
 
-  // ── 3. TEST TRASMISSIONE SDI 1-CLICK ────────────────────────────────────
-  describe('🚀 Connettore SDI Trasmissione Diretta', () => {
-    it('genera identificativo SdI conforme e data di trasmissione', async () => {
-      const result = await trasmettiFatturaSdi({
+  // ── 3. TEST PREPARAZIONE INVIO MANUALE SDI (§3.5) ────────────────────────
+  describe('📦 Preparazione invio manuale SdI (nessun provider collegato)', () => {
+    it('restituisce un riferimento LOCALE di preparazione e non dichiara trasmissioni false', async () => {
+      const result = await preparaFatturaPerInvioManuale({
         fatturaId: 'inv-test-101',
         numeroProgressivo: 'FT-2026-001',
       });
 
       expect(result.ok).toBe(true);
-      expect(result.statoSdi).toBe('inviata');
-      expect(result.identificativoSdi).toMatch(/^SDI-IT-\d{4}-[A-Z0-9]+$/);
-      expect(result.message).toContain('trasmessa con successo');
+      expect(result.riferimentoPreparazione).toMatch(/^PREP-\d{4}-[A-Z0-9]+$/);
+      expect(result.message).toContain('pronta per l\'invio manuale');
+      // La vecchia versione dichiarava «trasmessa con successo» senza alcun provider:
+      // il messaggio non deve più contenere affermazioni di invio allo SdI.
+      expect(result.message).toContain('NON ha inviato nulla');
     });
   });
 

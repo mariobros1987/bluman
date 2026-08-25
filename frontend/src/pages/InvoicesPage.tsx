@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { fetchTutteFattureStudioApi, fetchTenantInfoApi, downloadFatturaXmlApi, inviaFatturaEmailApi, trasmettiFatturaSdiApi } from '../api/client';
+import { fetchTutteFattureStudioApi, fetchTenantInfoApi, downloadFatturaXmlApi, inviaFatturaEmailApi, preparaInvioManualeSdiApi } from '../api/client';
 import { fmt, getFormattedLogoUrl } from '../utils';
 import { getCurrentTenantId, getTenantStorageKey, getTenantSeedData, BLUECODE_TENANT_ID } from '../utils/tenant';
 import { downloadRealPdf } from '../utils/pdfGenerator';
@@ -330,18 +330,18 @@ export function InvoicesPage() {
                         <button
                           style={{ background: '#059669', border: 'none', color: 'white', padding: '4px 8px', borderRadius: 6, cursor: 'pointer', marginRight: 6, fontWeight: 700 }}
                           onClick={async () => {
-                            // §3.3 — trasmettiFatturaSdiApi ora lancia se lo SdI non risponde:
-                            // dichiarare «trasmessa» una fattura che non lo è sarebbe un falso.
+                            // §3.5 — nessun provider SdI collegato: il sistema prepara l'XML,
+                            // la trasmissione la fa l'operatore. Niente finte «trasmissioni».
                             try {
-                              const res = await trasmettiFatturaSdiApi(inv.id);
-                              if (res) alert(res.message || '✓ Fattura trasmessa a SDI!');
+                              const res = await preparaInvioManualeSdiApi(inv.id);
+                              if (res) alert(res.message || '✓ Fattura preparata per invio manuale');
                             } catch (err: any) {
-                              alert(`⚠️ Trasmissione SDI NON riuscita: ${err?.message || 'errore di rete'}. La fattura NON è stata inviata al Sistema di Interscambio.`);
+                              alert(`⚠️ Preparazione invio manuale NON riuscita: ${err?.message || 'errore di rete'}.`);
                             }
                           }}
-                          title="Trasmetti Direttamente all'Agenzia delle Entrate via SDI Web Service"
+                          title="Prepara la fattura per l'invio manuale: scarica l'XML e trasmettilo tramite il portale «Fatture & Corrispettivi» o il tuo intermediario (nessun provider collegato)"
                         >
-                          🚀 Trasmetti a SDI
+                          📦 Prepara invio manuale
                         </button>
                         <button 
                           style={{ background: 'var(--indigo)', border: 'none', color: 'white', padding: '4px 8px', borderRadius: 6, cursor: 'pointer' }}

@@ -47,7 +47,7 @@ export function AuditLogPage() {
       azione: 'FATTURA_EMESSA',
       categoria: 'FATTURAZIONE',
       entita: 'Fattura FT-2026-001 (€ 5.000,00)',
-      dettagli: 'Generato tracciato XML FatturaPA e inviato al canale SDI Comped SUBM70N',
+      dettagli: 'Generato XML FatturaPA e preparato per invio manuale a SdI (codice destinatario SUBM70N)',
       ipAddress: '83.211.12.94',
       dataOra: '15/08/2026 00:30:40',
     },

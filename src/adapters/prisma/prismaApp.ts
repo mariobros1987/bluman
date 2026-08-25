@@ -6,7 +6,7 @@
 // (rete bloccata verso binaries.prisma.sh). Verificalo sulla tua macchina — vedi
 // ISTRUZIONI_INSTALLAZIONE.md, Percorso B.
 
-import type { PrismaConContesto } from '../../util/prismaClient.js';
+import { conContestoInTransazione, type PrismaConContesto } from '../../util/prismaClient.js';
 import { PrismaIstanziazionePort } from './prismaIstanziazionePort.js';
 import { istanziaProgetto, calcolaPrezzoModulo } from '../../services/istanziaProgetto.js';
 import {
@@ -108,6 +108,7 @@ export class PrismaApp implements AppPort {
   async creaModuloTemplate(input: {
     nome: string;
     categoria: string;
+    giurisdizioneId?: string | null;
     prezzoPacchetto?: number | null;
     righe: Array<{ articoloId: string; quantita: number; overrideOre?: number; overridePrezzo?: number }>;
     dipendenzeDaIds?: string[];
@@ -117,6 +118,9 @@ export class PrismaApp implements AppPort {
         tenantId: this.tenantId,
         nome: input.nome,
         categoria: input.categoria,
+        // Prima il campo non veniva raccolto dal body e finiva sempre null: il filtro
+        // per giurisdizione della libreria mostrava ogni modulo come «generico».
+        giurisdizioneId: input.giurisdizioneId || null,
         prezzoPacchetto: input.prezzoPacchetto || null,
         versione: 1,
       },
@@ -152,8 +156,81 @@ export class PrismaApp implements AppPort {
 
     return this.prisma.moduloTemplate.findUnique({
       where: { id: modulo.id },
-      include: { righeDistinta: { include: { articolo: true } }, dipendenze: true },
+      include: { giurisdizione: true, righeDistinta: { include: { articolo: true } }, dipendenze: true },
     });
+  }
+
+  /**
+   * Aggiornamento di un template esistente: campi intestazione e, se fornite,
+   * sostituzione completa di distinta e dipendenze. Tutto in una transazione:
+   * l'aggiornamento e la ricostruzione della distinta devono viaggiare insieme,
+   * altrimenti un errore a metà lascerebbe il modulo con una distinta parziale.
+   */
+  async aggiornaModuloTemplate(
+    id: string,
+    input: {
+      nome?: string;
+      categoria?: string;
+      giurisdizioneId?: string | null;
+      prezzoPacchetto?: number | null;
+      righe?: Array<{ articoloId: string; quantita: number; overrideOre?: number; overridePrezzo?: number }>;
+      dipendenzeDaIds?: string[];
+    },
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      return conContestoInTransazione(tx, async () => {
+        const data: Record<string, unknown> = {};
+        if (input.nome !== undefined) data.nome = input.nome;
+        if (input.categoria !== undefined) data.categoria = input.categoria;
+        if (input.giurisdizioneId !== undefined) data.giurisdizioneId = input.giurisdizioneId;
+        if (input.prezzoPacchetto !== undefined) data.prezzoPacchetto = input.prezzoPacchetto;
+        await tx.moduloTemplate.update({ where: { id }, data });
+
+        if (input.righe) {
+          await tx.rigaDistinta.deleteMany({ where: { tenantId: this.tenantId, moduloTemplateId: id } });
+          for (const [idx, r] of input.righe.entries()) {
+            const art = await tx.articolo.findUniqueOrThrow({ where: { id: r.articoloId } });
+            await tx.rigaDistinta.create({
+              data: {
+                tenantId: this.tenantId,
+                moduloTemplateId: id,
+                articoloId: r.articoloId,
+                articoloVersione: art.versione,
+                ordine: idx + 1,
+                quantita: r.quantita || 1,
+                overrideOre: r.overrideOre || null,
+                overridePrezzo: r.overridePrezzo || null,
+              },
+            });
+          }
+        }
+
+        if (input.dipendenzeDaIds) {
+          await tx.moduloDipendenzaTemplate.deleteMany({ where: { tenantId: this.tenantId, moduloTemplateId: id } });
+          for (const depId of input.dipendenzeDaIds) {
+            await tx.moduloDipendenzaTemplate.create({
+              data: { tenantId: this.tenantId, moduloTemplateId: id, dipendeDaModuloTemplateId: depId },
+            });
+          }
+        }
+
+        return tx.moduloTemplate.findUnique({
+          where: { id },
+          include: { giurisdizione: true, righeDistinta: { include: { articolo: true } }, dipendenze: true },
+        });
+      });
+    });
+  }
+
+  /** §30 — soft delete: il template sparisce dalla libreria ma resta referenziabile dai progetti esistenti. */
+  async disattivaModuloTemplate(id: string) {
+    await this.prisma.moduloTemplate.update({ where: { id }, data: { isAttivo: false } });
+    return { ok: true, id, isAttivo: false };
+  }
+
+  async disattivaArticolo(id: string) {
+    await this.prisma.articolo.update({ where: { id }, data: { isAttivo: false } });
+    return { ok: true, id, isAttivo: false };
   }
 
   async creaCliente(input: { nome: string; tipo: 'individual' | 'company' }): Promise<Cliente> {
@@ -454,7 +531,12 @@ export class PrismaApp implements AppPort {
         partitaIva: input.partitaIva || null,
         codiceFiscale: input.codiceFiscale || null,
         canale: input.canale,
-        statoSdi: input.canale === 'sdi' ? 'consegnata' : 'n_a',
+        // §3.5 — all'emissione nulla è stato ancora trasmesso a SdI (nessun provider
+        // collegato: l'invio è manuale). Prima qui si scriveva 'consegnata' per il solo
+        // fatto di aver scelto il canale sdi: una fattura «consegnata» senza esserlo è
+        // un falso. statoSdi diventa consegnata/scartata solo con l'esito reale via
+        // webhook; l'intenzione di invio resta nel campo `canale`.
+        statoSdi: 'n_a',
         righe: {
           create: input.righe.map((r) => ({
             tenantId: this.tenantId,

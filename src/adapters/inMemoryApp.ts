@@ -266,6 +266,18 @@ export class InMemoryApp implements AppPort {
     return { id: randomUUID(), ...input };
   }
 
+  aggiornaModuloTemplate(id: string, input: any): unknown {
+    return { id, ...input };
+  }
+
+  disattivaModuloTemplate(id: string): unknown {
+    return { ok: true, id, isAttivo: false };
+  }
+
+  disattivaArticolo(id: string): unknown {
+    return { ok: true, id, isAttivo: false };
+  }
+
   emettiFattura(input: any): unknown {
     return { id: randomUUID(), ...input, stato: 'emessa' };
   }

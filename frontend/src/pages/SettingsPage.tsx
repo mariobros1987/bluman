@@ -420,7 +420,7 @@ export function SettingsPage() {
           👥 Gestione Team ({users.length})
         </button>
         <button className={`${styles.tab} ${tab === 'sdi' ? styles.tabActive : ''}`} onClick={() => setTab('sdi')}>
-          📨 Configurazione SDI & Firma
+          📨 Fatturazione Elettronica (Invio Manuale)
         </button>
         <button
           className={`${styles.tab} ${tab === 'manutenzione' ? styles.tabActive : ''}`}
@@ -653,8 +653,8 @@ export function SettingsPage() {
               </div>
               {mostraSdi && (
                 <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: 10, color: '#64748b', textTransform: 'uppercase', fontWeight: 700 }}>Canale SDI Comped:</div>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: '#166534', marginTop: 2 }}>✓ SDI SUBM70N</div>
+                  <div style={{ fontSize: 10, color: '#64748b', textTransform: 'uppercase', fontWeight: 700 }}>Canale SDI (invio manuale):</div>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: '#166534', marginTop: 2 }}>Codice destinatario SUBM70N</div>
                 </div>
               )}
             </div>
@@ -1174,13 +1174,17 @@ export function SettingsPage() {
       {/* TAB 4: Configurazione SDI */}
       {tab === 'sdi' && (
         <div className={styles.sectionBox}>
-          <div style={{ fontSize: 14, fontWeight: 600 }}>Configurazione Nodo Fatturazione SDI & Comped Servizi FPA</div>
-          <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>Imposta le credenziali ed i certificati per la fatturazione elettronica integrata</div>
-          
+          <div style={{ fontSize: 14, fontWeight: 600 }}>Fatturazione Elettronica — Invio Manuale</div>
+          <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
+            Nessun provider SdI collegato: il sistema prepara l'XML della fattura, la trasmissione è a cura
+            dell'operatore tramite il portale «Fatture & Corrispettivi» dell'Agenzia delle Entrate o il proprio
+            intermediario. L'esito reale (consegnata/scartata) si registra dal webhook esiti.
+          </div>
+
           <div className={styles.grid2} style={{ marginTop: 14 }}>
             <div className={styles.field}>
-              <label>Provider Fatturazione *</label>
-              <input value="Comped Servizi FPA (portale-fpa.compedservizi.it)" readOnly style={{ background: 'var(--card2)' }} />
+              <label>Provider Fatturazione</label>
+              <input value="Nessuno — invio manuale (Fatture & Corrispettivi / intermediario)" readOnly style={{ background: 'var(--card2)' }} />
             </div>
             <div className={styles.field}>
               <label>Codice Destinatario Default *</label>

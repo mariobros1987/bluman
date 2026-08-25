@@ -7,7 +7,7 @@ import {
 } from '../services/otpService.js';
 import { hashCodiceOtp, verificaCodiceOtp } from '../util/jwt.js';
 import { scanFileBuffer } from '../services/securityScanner.js';
-import { trasmettiFatturaSdi } from '../services/sdiService.js';
+import { preparaFatturaPerInvioManuale } from '../services/sdiService.js';
 import { runDailyNotificationCron } from '../services/cronService.js';
 
 async function runAllVerificationChecks() {
@@ -119,13 +119,13 @@ async function runAllVerificationChecks() {
   const pngBuf = Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
   assertTest('Validazione immagini conformi passaporto/carta identità (PNG)', scanFileBuffer(pngBuf, 'id.png').safe);
 
-  // 3. TEST TRASMISSIONE SDI FATTURAZIONE ELETTRONICA
-  console.log('\n🚀 [3/4] Test Connettore SDI Fattura Elettronica...');
-  const sdiRes = await trasmettiFatturaSdi({
+  // 3. TEST PREPARAZIONE INVIO MANUALE SDI (§3.5, nessun provider collegato)
+  console.log('\n📦 [3/4] Test preparazione invio manuale SdI...');
+  const sdiRes = await preparaFatturaPerInvioManuale({
     fatturaId: 'inv-1',
     numeroProgressivo: 'FT-2026-001',
   });
-  assertTest('Trasmissione 1-Click e generazione Identificativo SdI conforme', sdiRes.ok && sdiRes.identificativoSdi.startsWith('SDI-IT-'), `Identificativo SdI: ${sdiRes.identificativoSdi}`);
+  assertTest('Preparazione invio manuale con riferimento locale (nessuna finta trasmissione)', sdiRes.ok && sdiRes.riferimentoPreparazione.startsWith('PREP-'), `Riferimento locale: ${sdiRes.riferimentoPreparazione}`);
 
   // 4. TEST CRON WORKER NOTIFICHE SCADENZE
   console.log('\n⏰ [4/4] Test Worker Cron Scadenze & Rinnovi Automatici...');

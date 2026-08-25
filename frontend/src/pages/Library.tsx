@@ -5,7 +5,7 @@ import { fmt, moduloH, moduloP, resolveRighe, levelOf } from '../utils';
 import { downloadRealPdf } from '../utils/pdfGenerator';
 import { PREBUILT_TEMPLATES, getAllTemplates, saveCustomTemplate, deleteTemplate, archiveTemplate, restoreTemplate, importTemplatesFromJson, exportTemplatesAsJson, type DocumentTemplate } from '../utils/documentTemplates';
 import { getTenantStorageKey, getStudioInfoForTenant, getCurrentTenantId } from '../utils/tenant';
-import { fetchModuliLibreria, fetchArticoli, fetchGiurisdizioniApi, creaGiurisdizioneApi, creaArticoloApi, creaModuloTemplateApi, updateArticoloPrezzoApi, uploadFileApi, fetchClienti, fetchProgetti, creaProgettoApi, salvaProgettoDettaglioApi, creaDocumentoTemplateApi, eliminaDocumentoTemplateApi } from '../api/client';
+import { fetchModuliLibreria, fetchArticoli, fetchGiurisdizioniApi, creaGiurisdizioneApi, creaArticoloApi, creaModuloTemplateApi, aggiornaModuloTemplateApi, disattivaModuloTemplateApi, disattivaArticoloApi, updateArticoloPrezzoApi, uploadFileApi, fetchClienti, fetchProgetti, creaProgettoApi, salvaProgettoDettaglioApi, creaDocumentoTemplateApi, eliminaDocumentoTemplateApi } from '../api/client';
 import type { CategoriaModulo, Articolo, Giurisdizione, ModuloTemplate } from '../types';
 
 type SubTab = 'grafo' | 'articoli' | 'giurisdizioni' | 'crea_modulo' | 'doc_form';
@@ -19,6 +19,38 @@ export function Library() {
   const [modalArticoloOpen, setModalArticoloOpen] = useState(false);
   const [selectedGiurId, setSelectedGiurId] = useState<string>('ALL');
   const [assignModalModule, setAssignModalModule] = useState<ModuloTemplate | null>(null);
+  const [moduloInModifica, setModuloInModifica] = useState<ModuloTemplate | null>(null);
+
+  // §30 — la disattivazione è irreversibile per design: i riferimenti da
+  // ModuloProgetto/Preventivo restano validi, il modulo sparisce solo dalla libreria.
+  // Aggiorno lo stato locale solo DOPO la conferma del server (§3.3).
+  const handleDisattivaModulo = async (m: ModuloTemplate) => {
+    const conferma = window.confirm(
+      `Disattivare il modulo template «${m.n}»?\n` +
+      'Il modulo sparirà dalla libreria, ma i progetti e i preventivi già creati continueranno a funzionare.'
+    );
+    if (!conferma) return;
+    try {
+      await disattivaModuloTemplateApi(m.id);
+      setModuliList(prev => prev.filter(x => x.id !== m.id));
+    } catch (err: any) {
+      alert(`Disattivazione non riuscita: ${err?.message || 'errore di rete'}. Il modulo NON è stato disattivato.`);
+    }
+  };
+
+  const handleDisattivaArticolo = async (id: string, nome: string) => {
+    const conferma = window.confirm(
+      `Disattivare l'articolo «${nome}»?\n` +
+      'Sparirà dal catalogo, ma le distinte base e i progetti che già lo usano restano validi.'
+    );
+    if (!conferma) return;
+    try {
+      await disattivaArticoloApi(id);
+      setArticoliList(prev => prev.filter(a => a.id !== id));
+    } catch (err: any) {
+      alert(`Disattivazione non riuscita: ${err?.message || 'errore di rete'}. L'articolo NON è stato disattivato.`);
+    }
+  };
 
   const graphRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -309,6 +341,29 @@ export function Library() {
                             >
                               🚀 Assegna a Progetto Cliente ➔
                             </button>
+                            <div style={{ display: 'flex', gap: 6 }}>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setModuloInModifica(m);
+                                  setSubTab('crea_modulo');
+                                }}
+                                title="Riapri nel costruttore per modificare nome, giurisdizione, prezzo e distinta base"
+                                style={{ flex: 1, background: '#1a1f3d', border: '1px solid #2d3260', color: '#818cf8', padding: '6px 10px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+                              >
+                                ✏️ Modifica
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDisattivaModulo(m);
+                                }}
+                                title="§30 — Disattivazione: il modulo sparisce dalla libreria, i progetti esistenti restano validi"
+                                style={{ flex: 1, background: 'var(--card2)', border: '1px solid #5b2130', color: '#f87171', padding: '6px 10px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+                              >
+                                🗑 Disattiva
+                              </button>
+                            </div>
                           </div>
                         )}
                       </div>
@@ -326,6 +381,7 @@ export function Library() {
         <ArticoliCatalogView
           articoliList={articoliList}
           onOpenNew={() => setModalArticoloOpen(true)}
+          onDisattiva={handleDisattivaArticolo}
         />
       )}
 
@@ -345,13 +401,20 @@ export function Library() {
         />
       )}
 
-      {/* TAB 4: Costruttore Modulo Template */}
+      {/* TAB 4: Costruttore Modulo Template (anche modalità modifica §36) */}
       {subTab === 'crea_modulo' && (
         <CreaModuloForm
+          key={moduloInModifica?.id ?? 'nuovo'}
           articoliList={articoliList}
           giurList={giurList}
+          moduloInModifica={moduloInModifica}
           onCreated={() => {
+            setModuloInModifica(null);
             loadData();
+            setSubTab('grafo');
+          }}
+          onAnnullaModifica={() => {
+            setModuloInModifica(null);
             setSubTab('grafo');
           }}
         />
@@ -617,7 +680,7 @@ function AssegnaModuloClienteModal({
 }
 
 // ─── Componente Catalogo Articoli & Distinta Base ──────────────────
-function ArticoliCatalogView({ articoliList, onOpenNew }: { articoliList: Articolo[]; onOpenNew: () => void }) {
+function ArticoliCatalogView({ articoliList, onOpenNew, onDisattiva }: { articoliList: Articolo[]; onOpenNew: () => void; onDisattiva: (id: string, nome: string) => void }) {
   const [selectedCat, setSelectedCat] = useState<string>('TUTTI');
   const navigate = useNavigate();
   const editArtFileImportRef = useRef<HTMLInputElement>(null);
@@ -872,6 +935,13 @@ function ArticoliCatalogView({ articoliList, onOpenNew }: { articoliList: Artico
                     style={{ background: '#1a1f3d', border: '1px solid #2d3260', color: '#818cf8', padding: '3px 9px', borderRadius: 6, fontSize: 11, cursor: 'pointer', fontWeight: 700 }}
                   >
                     ✏️ Modifica
+                  </button>
+                  <button
+                    onClick={() => onDisattiva(a.id, a.n)}
+                    title="§30 — Disattivazione: sparisce dal catalogo, distinte e progetti esistenti restano validi"
+                    style={{ background: '#2a1218', border: '1px solid #5b2130', color: '#f87171', padding: '3px 9px', borderRadius: 6, fontSize: 11, cursor: 'pointer', fontWeight: 700 }}
+                  >
+                    🗑
                   </button>
                   <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--indigo-l)', background: '#1a1f3d', border: '1px solid #2d3260', padding: '2px 8px', borderRadius: 20 }}>
                     v{a.ver || 1}.0
@@ -2505,12 +2575,21 @@ function NuovoArticoloModal({ giurList, onClose, onCreated }: { giurList: Giuris
 }
 
 // ─── Componente Costruttore Modulo Template ───────────────────────
-function CreaModuloForm({ articoliList, giurList, onCreated }: { articoliList: Articolo[]; giurList: Giurisdizione[]; onCreated: () => void }) {
-  const [nome, setNome] = useState('');
-  const [cat, setCat] = useState<CategoriaModulo>('Societario');
-  const [giurisdizioneId, setGiurisdizioneId] = useState<string>('');
-  const [prezzoPkg, setPrezzoPkg] = useState<number | ''>('');
-  const [selectedArts, setSelectedArts] = useState<Array<{ artId: string; qty: number; customPrice?: number }>>([]);
+function CreaModuloForm({ articoliList, giurList, moduloInModifica, onCreated, onAnnullaModifica }: { articoliList: Articolo[]; giurList: Giurisdizione[]; moduloInModifica?: ModuloTemplate | null; onCreated: () => void; onAnnullaModifica?: () => void }) {
+  // §36 — modalità modifica: se arriva un modulo esistente, il costruttore si apre
+  // pre-popolato (nome, categoria, giurisdizione, forfait e distinta base) e il
+  // salvataggio passa per la PUT invece della POST di creazione.
+  const [nome, setNome] = useState(moduloInModifica?.n ?? '');
+  const [cat, setCat] = useState<CategoriaModulo>(moduloInModifica?.cat ?? 'Societario');
+  const [giurisdizioneId, setGiurisdizioneId] = useState<string>(moduloInModifica?.giurisdizioneId ?? '');
+  const [prezzoPkg, setPrezzoPkg] = useState<number | ''>(moduloInModifica?.pkg ?? '');
+  const [selectedArts, setSelectedArts] = useState<Array<{ artId: string; qty: number; customPrice?: number }>>(() =>
+    (moduloInModifica?.righe ?? []).map(r => ({
+      artId: r.art,
+      qty: r.qty ?? 1,
+      customPrice: r.oP !== undefined ? r.oP : articoliList.find(a => a.id === r.art)?.p,
+    }))
+  );
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -2535,13 +2614,20 @@ function CreaModuloForm({ articoliList, giurList, onCreated }: { articoliList: A
     if (!nome.trim() || selectedArts.length === 0) return;
     setLoading(true);
     try {
-      await creaModuloTemplateApi({
+      const payload = {
         nome,
         categoria: cat,
         giurisdizioneId: giurisdizioneId || null,
         prezzoPacchetto: prezzoPkg !== '' ? Number(prezzoPkg) * 100 : null,
         righe: selectedArts.map(x => ({ articoloId: x.artId, quantita: x.qty })),
-      });
+      };
+      if (moduloInModifica) {
+        // §36 — le dipendenze non sono gestite da questo costruttore: non inviandole
+        // nella PUT, il backend conserva quelle esistenti.
+        await aggiornaModuloTemplateApi(moduloInModifica.id, payload);
+      } else {
+        await creaModuloTemplateApi(payload);
+      }
       onCreated();
     } catch (err: any) {
       // §3.3 — salvataggio modulo template fallito: messaggio esplicito all'utente.
@@ -2573,10 +2659,24 @@ function CreaModuloForm({ articoliList, giurList, onCreated }: { articoliList: A
       <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, padding: 22, display: 'flex', flexDirection: 'column', gap: 16, boxShadow: '0 12px 36px rgba(0,0,0,.3)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <div style={{ fontSize: 16, fontWeight: 700 }}>Costruttore Modulo Template</div>
-            <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>Componi la distinta base ed imposta la giurisdizione target ed il listino pacchetto</div>
+            <div style={{ fontSize: 16, fontWeight: 700 }}>{moduloInModifica ? `✏️ Modifica Modulo Template — ${moduloInModifica.n}` : 'Costruttore Modulo Template'}</div>
+            <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
+              {moduloInModifica
+                ? 'Aggiorna nome, giurisdizione, listino pacchetto e distinta base; le dipendenze esistenti vengono conservate'
+                : 'Componi la distinta base ed imposta la giurisdizione target ed il listino pacchetto'}
+            </div>
           </div>
-          <CatBadge cat={cat} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {moduloInModifica && onAnnullaModifica && (
+              <button
+                onClick={onAnnullaModifica}
+                style={{ background: 'var(--card2)', color: 'var(--muted)', border: '1px solid var(--border)', padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+              >
+                ✕ Annulla modifica
+              </button>
+            )}
+            <CatBadge cat={cat} />
+          </div>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -2769,7 +2869,7 @@ function CreaModuloForm({ articoliList, giurList, onCreated }: { articoliList: A
                 boxShadow: '0 4px 16px rgba(99,102,241,.4)',
               }}
             >
-              {loading ? 'Salvataggio...' : '✓ Salva Modulo Template con Distinta Base'}
+              {loading ? 'Salvataggio...' : moduloInModifica ? '✓ Salva Modifiche al Modulo Template' : '✓ Salva Modulo Template con Distinta Base'}
             </button>
           </div>
         )}

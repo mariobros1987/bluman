@@ -1392,7 +1392,7 @@ function FatturazioneTab({ project, rawDbProject, onRefresh }: { project: Proget
                 <div>
                   <div style={{ fontSize: 12, fontWeight: 600 }}>{f.desc}</div>
                   <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>
-                    Fattura N. <strong>FT-2026-00{i + 1}</strong> · Canale: <strong>Comped Servizi FPA (SDI)</strong> · Stato: <span style={{ color: 'var(--green)' }}>Consegnata</span>
+                    Fattura N. <strong>FT-2026-00{i + 1}</strong> · Canale: <strong>SDI (invio manuale)</strong> · Stato: <span style={{ color: 'var(--indigo-l)' }}>Emessa · pronta per invio</span>
                   </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>

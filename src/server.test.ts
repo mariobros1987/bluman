@@ -483,6 +483,9 @@ describe('server — §23 il guard di autenticazione: nessuna rotta aperta per s
     ['GET', '/progetti'],
     ['GET', '/moduli'],
     ['GET', '/articoli'],
+    ['PUT', '/moduli-template/M01'],
+    ['DELETE', '/moduli-template/M01'],
+    ['DELETE', '/articoli/A_RACCOLTA_DOC'],
     ['GET', '/tenant/info'],
     ['GET', '/tenant/utenti'],
     ['GET', '/admin/tenants'],
@@ -577,5 +580,79 @@ describe('server — §23 il guard di autenticazione: nessuna rotta aperta per s
       payload: { nome: 'Nuovo', email: 'nuovo@studio.example' },
     });
     expect(res.statusCode).toBe(403);
+  });
+});
+
+// §36 — CRUD della libreria: creazione con giurisdizione, modifica, disattivazione.
+describe('server — §36 libreria: creazione, modifica e disattivazione', () => {
+  it('POST /moduli-template accetta e trasporta giurisdizioneId', async () => {
+    const { server } = nuovoServer();
+    const res = await server.inject({
+      method: 'POST',
+      url: '/moduli-template',
+      payload: {
+        nome: 'Corporate structuring Malta',
+        categoria: 'Strutturazione',
+        giurisdizioneId: 'giur-mt',
+        prezzoPacchetto: 150000,
+        righe: [{ articoloId: 'A_RACCOLTA_DOC', quantita: 2 }],
+      },
+    });
+    expect(res.statusCode).toBe(201);
+    // In modalità test il DB non risponde e la rotta ripiega sull'adapter in-memory,
+    // che restituisce il body ricevuto: il punto verificato è che giurisdizioneId
+    // attraversi la rotta invece di essere scartato come avveniva prima del fix.
+    expect(res.json().giurisdizioneId).toBe('giur-mt');
+    expect(res.json().nome).toBe('Corporate structuring Malta');
+  });
+
+  it('POST /moduli-template risponde 400 se manca la distinta', async () => {
+    const { server } = nuovoServer();
+    const res = await server.inject({
+      method: 'POST',
+      url: '/moduli-template',
+      payload: { nome: 'Modulo vuoto', categoria: 'X' },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('PUT /moduli-template/:id aggiorna i campi del modulo', async () => {
+    const { server } = nuovoServer();
+    const res = await server.inject({
+      method: 'PUT',
+      url: '/moduli-template/M01',
+      payload: { nome: 'Analisi patrimoniale aggiornata', prezzoPacchetto: 90000, giurisdizioneId: null },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().id).toBe('M01');
+    expect(res.json().nome).toBe('Analisi patrimoniale aggiornata');
+    expect(res.json().giurisdizioneId).toBeNull();
+  });
+
+  it('DELETE /moduli-template/:id risponde con la disattivazione, non una cancellazione', async () => {
+    const { server } = nuovoServer();
+    const res = await server.inject({ method: 'DELETE', url: '/moduli-template/M01' });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ ok: true, id: 'M01', isAttivo: false });
+  });
+
+  it('DELETE /articoli/:id risponde con la disattivazione', async () => {
+    const { server } = nuovoServer();
+    const res = await server.inject({ method: 'DELETE', url: '/articoli/A_RACCOLTA_DOC' });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ ok: true, id: 'A_RACCOLTA_DOC', isAttivo: false });
+  });
+
+  it('PATCH /articoli/:id non risponde più finto ok quando il DB non è raggiungibile', async () => {
+    const { server } = nuovoServer();
+    const res = await server.inject({
+      method: 'PATCH',
+      url: '/articoli/A_RACCOLTA_DOC',
+      payload: { prezzoDefault: 9900 },
+    });
+    // Prima del fix il catch rispondeva { ok: true } comunque: il dato non cambiava
+    // ma la UI dichiarava successo. Ora l'errore reale viene propagato (404/500).
+    expect(res.statusCode).toBeGreaterThanOrEqual(400);
+    expect(res.json().ok).toBeUndefined();
   });
 });

@@ -674,6 +674,43 @@ export async function creaModuloTemplateApi(input: {
   return await res.json();
 }
 
+export async function aggiornaModuloTemplateApi(id: string, input: {
+  nome?: string;
+  categoria?: string;
+  giurisdizioneId?: string | null;
+  prezzoPacchetto?: number | null;
+  righe?: Array<{ articoloId: string; quantita: number; overrideOre?: number; overridePrezzo?: number }>;
+  dipendenzeDaIds?: string[];
+}) {
+  const res = await apiFetch(`${API_BASE}/moduli-template/${id}`, {
+    method: 'PUT',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore aggiornamento modulo template'));
+  return await res.json();
+}
+
+// §30 — disattivazione, non cancellazione: i progetti e i preventivi già creati
+// continuano a funzionare, il modulo sparisce solo dalla libreria.
+export async function disattivaModuloTemplateApi(id: string) {
+  const res = await apiFetch(`${API_BASE}/moduli-template/${id}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore disattivazione modulo template'));
+  return await res.json();
+}
+
+export async function disattivaArticoloApi(id: string) {
+  const res = await apiFetch(`${API_BASE}/articoli/${id}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore disattivazione articolo'));
+  return await res.json();
+}
+
 export async function fetchClienti() {
   try {
     const res = await apiFetch(`${API_BASE}/clienti`, { headers: getAuthHeaders() });
@@ -1999,15 +2036,16 @@ export async function triggerCronScadenzeApi() {
   return await res.json();
 }
 
-export async function trasmettiFatturaSdiApi(fatturaId: string) {
-  // §3.3 — il fallback fabbricava un identificativo SdI finto ('SDI-IT-2026-FEA') e
-  // dichiarava la fattura "trasmessa al Sistema di Interscambio". Una fattura che
-  // risulta trasmessa ma non lo è è un falso fiscale: l'errore si propaga e basta.
-  const res = await apiFetch(`${API_BASE}/invoices/${fatturaId}/trasmetti-sdi`, {
+export async function preparaInvioManualeSdiApi(fatturaId: string) {
+  // §3.5 — la vecchia «trasmissione 1-click a SdI» fabbricava un identificativo finto
+  // senza alcun provider collegato. Ora il sistema prepara la fattura per l'invio
+  // manuale (XML scaricabile; trasmissione a cura dell'operatore tramite il portale
+  // «Fatture & Corrispettivi» o l'intermediario). Gli errori si propagano (§3.3).
+  const res = await apiFetch(`${API_BASE}/invoices/${fatturaId}/prepara-invio-manuale`, {
     method: 'POST',
     headers: getAuthHeaders(),
   });
-  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore trasmissione SDI'));
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore preparazione invio manuale'));
   return await res.json();
 }
 

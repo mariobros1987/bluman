@@ -36,7 +36,7 @@ import {
 import { credenzialiCanali, canaliDisponibili, inviaCodiceOtp, recapitiCliente } from './services/otpDispatch.js';
 import { runDailyNotificationCron } from './services/cronService.js';
 import { apriStreamSse, notificaStudio, notificaCliente } from './services/notificheService.js';
-import { trasmettiFatturaSdi } from './services/sdiService.js';
+import { preparaFatturaPerInvioManuale } from './services/sdiService.js';
 import { scanFileBuffer } from './services/securityScanner.js';
 // §16 — le percentuali e gli stati aggregati arrivano da qui, non dal frontend.
 import { arricchisciProgetti, calcolaAvanzamento, ricalcolaProgetto } from './services/calcoloService.js';
@@ -45,7 +45,7 @@ import { generaPdfReport, generaExcelReport } from './services/reportExport.js';
 import { ricercaGlobale } from './services/ricercaGlobaleService.js';
 // §14 — non `new PrismaClient()`: questo client impone il tenant corrente a ogni query,
 // altrimenti le policy RLS non vedono nessun contesto e non restituiscono nulla.
-import { prisma, prismaAmministrativo, attivaContestoTenant } from './util/prismaClient.js';
+import { prisma, prismaAmministrativo, attivaContestoTenant, conContestoInTransazione } from './util/prismaClient.js';
 
 const inMemoryTenantStore = new Map<string, any>();
 
@@ -974,12 +974,13 @@ export function buildServer(app: AppPort): FastifyInstance {
   server.get('/articoli', async (req) => {
     const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
     try {
-      const dbArts = await prisma.articolo.findMany({
+      // Una lista vuota è una risposta legittima (studio appena iscritto senza
+      // catalogo): prima veniva scambiata per un errore e sostituita coi dati
+      // dell'adapter in-memory. Il ripiego resta solo se il DB non risponde.
+      return await prisma.articolo.findMany({
         where: { tenantId, isAttivo: true },
         orderBy: { nome: 'asc' },
       });
-      if (dbArts.length > 0) return dbArts;
-      return app.listaArticoli();
     } catch {
       return app.listaArticoli();
     }
@@ -1076,8 +1077,14 @@ export function buildServer(app: AppPort): FastifyInstance {
         ipAddress: req.ip,
       });
       return reply.send(updated);
-    } catch {
-      return reply.send({ ok: true, id, prezzoDefault, oreDefault, nome });
+    } catch (err: any) {
+      // §3.3 — il catch rispondeva { ok: true } anche quando l'aggiornamento non
+      // aveva toccato nessuna riga (id sbagliato, articolo di un altro tenant
+      // invisibile per RLS): la UI ringraziava e il dato restava com'era.
+      if (err?.code === 'P2025') {
+        return reply.code(404).send({ errore: 'Articolo non trovato' });
+      }
+      return reply.code(500).send({ errore: err?.message || 'Errore aggiornamento articolo' });
     }
   });
 
@@ -1123,17 +1130,263 @@ export function buildServer(app: AppPort): FastifyInstance {
     Body: {
       nome: string;
       categoria: string;
+      giurisdizioneId?: string | null;
       prezzoPacchetto?: number | null;
       righe: Array<{ articoloId: string; quantita: number; overrideOre?: number; overridePrezzo?: number }>;
       dipendenzeDaIds?: string[];
     };
   }>('/moduli-template', async (req, reply) => {
-    const { nome, categoria, righe } = req.body;
+    const { nome, categoria, giurisdizioneId, prezzoPacchetto, righe, dipendenzeDaIds } = req.body;
+    // §14 — il tenant è quello della richiesta (JWT), NON un valore fisso: prima la
+    // creazione passava da app.creaModuloTemplate() che è legato al tenant Bluecode,
+    // quindi per ogni altro studio l'inserimento veniva rifiutato dalle policy RLS.
+    const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
     if (!nome || !categoria || !righe || righe.length === 0) {
       return reply.code(400).send({ errore: 'nome, categoria e almeno un articolo nella distinta sono obbligatori' });
     }
-    const modulo = await app.creaModuloTemplate(req.body);
-    return reply.code(201).send(modulo);
+    try {
+      // Validazioni lette fuori dalla transazione: le risposte 400 devono uscire
+      // pulite senza essere scambiate per guasti del DB dal catch qui sotto.
+      if (giurisdizioneId) {
+        const giur = await prisma.giurisdizione.findUnique({ where: { id: giurisdizioneId } });
+        if (!giur) {
+          return reply.code(400).send({ errore: 'La giurisdizione selezionata non esiste' });
+        }
+      }
+      for (const r of righe) {
+        const art = await prisma.articolo.findUnique({ where: { id: r.articoloId } });
+        if (!art) {
+          return reply.code(400).send({ errore: `Articolo non trovato nella distinta: ${r.articoloId}` });
+        }
+      }
+
+      const modulo = await prisma.$transaction(async (tx) =>
+        conContestoInTransazione(tx, async () => {
+          const creato = await tx.moduloTemplate.create({
+            data: {
+              tenantId,
+              nome,
+              categoria,
+              // Prima andava perso: il body lo portava ma la vecchia creazione non lo
+              // raccoglieva, e ogni modulo nuovo risultava «generico».
+              giurisdizioneId: giurisdizioneId || null,
+              prezzoPacchetto: prezzoPacchetto ?? null,
+              versione: 1,
+            },
+          });
+
+          for (const [idx, r] of righe.entries()) {
+            // §3bis — la riga pinna la versione corrente dell'articolo: i progetti
+            // già istanziati non devono cambiare quando il catalogo si aggiorna.
+            const art = await tx.articolo.findUniqueOrThrow({ where: { id: r.articoloId } });
+            await tx.rigaDistinta.create({
+              data: {
+                tenantId,
+                moduloTemplateId: creato.id,
+                articoloId: r.articoloId,
+                articoloVersione: art.versione,
+                ordine: idx + 1,
+                quantita: r.quantita || 1,
+                overrideOre: r.overrideOre || null,
+                overridePrezzo: r.overridePrezzo || null,
+              },
+            });
+          }
+
+          for (const depId of dipendenzeDaIds || []) {
+            await tx.moduloDipendenzaTemplate.create({
+              data: {
+                tenantId,
+                moduloTemplateId: creato.id,
+                dipendeDaModuloTemplateId: depId,
+              },
+            });
+          }
+
+          return tx.moduloTemplate.findUnique({
+            where: { id: creato.id },
+            include: { giurisdizione: true, righeDistinta: { include: { articolo: true } }, dipendenze: true },
+          });
+        }),
+      );
+
+      recordAudit({
+        tenantId,
+        azione: 'MODULO_TEMPLATE_CREATO',
+        entita: nome,
+        dettagli: `Creato modulo libreria ${nome} (${categoria}) con ${righe.length} articoli in distinta`,
+        ipAddress: req.ip,
+      });
+      return reply.code(201).send(modulo);
+    } catch (err: any) {
+      // Errori di vincolo (articolo/giurisdizione spariti fra validazione e
+      // inserimento): messaggio pulito, non un 500 generico.
+      if (err?.code === 'P2025' || err?.code === 'P2003') {
+        return reply.code(400).send({ errore: 'Un riferimento della distinta non è più valido' });
+      }
+      // Modalità test/demo senza DB raggiungibile: stesso ripiego in-memory di POST /articoli.
+      const modulo = await app.creaModuloTemplate(req.body);
+      return reply.code(201).send(modulo);
+    }
+  });
+
+  // §36 — modifica di un modulo della libreria. Campi intestazione sempre; distinta
+  // e dipendenze solo se presenti nel body, con sostituzione completa (deleteMany +
+  // ricreazione). Tutto in una transazione: un errore a metà non deve lasciare il
+  // modulo con una distinta parziale.
+  server.put<{
+    Params: { id: string };
+    Body: {
+      nome?: string;
+      categoria?: string;
+      giurisdizioneId?: string | null;
+      prezzoPacchetto?: number | null;
+      righe?: Array<{ articoloId: string; quantita: number; overrideOre?: number; overridePrezzo?: number }>;
+      dipendenzeDaIds?: string[];
+    };
+  }>('/moduli-template/:id', async (req, reply) => {
+    const { id } = req.params;
+    const body = req.body || {};
+    const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
+    try {
+      const esistente = await prisma.moduloTemplate.findUnique({ where: { id } });
+      // RLS rende invisibili i moduli degli altri tenant: chi prova a modificarne
+      // uno altrui riceve 404, come se non esistesse.
+      if (!esistente) {
+        return reply.code(404).send({ errore: 'Modulo non trovato' });
+      }
+      if (body.giurisdizioneId) {
+        const giur = await prisma.giurisdizione.findUnique({ where: { id: body.giurisdizioneId } });
+        if (!giur) {
+          return reply.code(400).send({ errore: 'La giurisdizione selezionata non esiste' });
+        }
+      }
+      if (body.righe && body.righe.length === 0) {
+        return reply.code(400).send({ errore: 'La distinta non può essere vuota' });
+      }
+
+      // §14 — come per la creazione: prisma diretto col tenant della richiesta,
+      // non app.aggiornaModuloTemplate() che è legato a un tenant fisso.
+      const aggiornato = await prisma.$transaction(async (tx) =>
+        conContestoInTransazione(tx, async () => {
+          const data: Record<string, unknown> = {};
+          if (body.nome !== undefined) data.nome = body.nome;
+          if (body.categoria !== undefined) data.categoria = body.categoria;
+          if (body.giurisdizioneId !== undefined) data.giurisdizioneId = body.giurisdizioneId;
+          if (body.prezzoPacchetto !== undefined) data.prezzoPacchetto = body.prezzoPacchetto;
+          await tx.moduloTemplate.update({ where: { id }, data });
+
+          if (body.righe) {
+            await tx.rigaDistinta.deleteMany({ where: { tenantId, moduloTemplateId: id } });
+            for (const [idx, r] of body.righe.entries()) {
+              const art = await tx.articolo.findUniqueOrThrow({ where: { id: r.articoloId } });
+              await tx.rigaDistinta.create({
+                data: {
+                  tenantId,
+                  moduloTemplateId: id,
+                  articoloId: r.articoloId,
+                  articoloVersione: art.versione,
+                  ordine: idx + 1,
+                  quantita: r.quantita || 1,
+                  overrideOre: r.overrideOre || null,
+                  overridePrezzo: r.overridePrezzo || null,
+                },
+              });
+            }
+          }
+
+          if (body.dipendenzeDaIds) {
+            await tx.moduloDipendenzaTemplate.deleteMany({ where: { tenantId, moduloTemplateId: id } });
+            for (const depId of body.dipendenzeDaIds) {
+              await tx.moduloDipendenzaTemplate.create({
+                data: { tenantId, moduloTemplateId: id, dipendeDaModuloTemplateId: depId },
+              });
+            }
+          }
+
+          return tx.moduloTemplate.findUnique({
+            where: { id },
+            include: { giurisdizione: true, righeDistinta: { include: { articolo: true } }, dipendenze: true },
+          });
+        }),
+      );
+
+      recordAudit({
+        tenantId,
+        azione: 'MODULO_TEMPLATE_AGGIORNATO',
+        entita: esistente.nome,
+        dettagli: `Aggiornato modulo libreria ${id}` + (body.righe ? ` con nuova distinta di ${body.righe.length} articoli` : ''),
+        ipAddress: req.ip,
+      });
+      return reply.send(aggiornato);
+    } catch (err: any) {
+      if (err?.code === 'P2025') {
+        return reply.code(400).send({ errore: 'Un articolo della nuova distinta non esiste' });
+      }
+      if (err?.code === 'P2003') {
+        return reply.code(400).send({ errore: 'Un riferimento di distinta o dipendenza non è valido' });
+      }
+      // Modalità test/demo senza DB raggiungibile: ripiego in-memory.
+      return reply.send(await app.aggiornaModuloTemplate(id, body));
+    }
+  });
+
+  // §36 / §30 — «eliminazione» = disattivazione: i progetti e i preventivi già
+  // creati referenziano ancora il template, che quindi non può essere cancellato
+  // davvero. Smettere di mostrarlo in libreria (isAttivo=false) ottiene lo scopo
+  // senza rompere lo storico.
+  server.delete<{ Params: { id: string } }>('/moduli-template/:id', async (req, reply) => {
+    const { id } = req.params;
+    const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
+    try {
+      const esistente = await prisma.moduloTemplate.findUnique({ where: { id } });
+      if (!esistente) {
+        return reply.code(404).send({ errore: 'Modulo non trovato' });
+      }
+      await prisma.moduloTemplate.update({ where: { id }, data: { isAttivo: false } });
+      recordAudit({
+        tenantId,
+        azione: 'MODULO_TEMPLATE_DISATTIVATO',
+        entita: esistente.nome,
+        dettagli: `Disattivato modulo libreria ${esistente.nome} (${id}): non compare più nella libreria, restano attivi i progetti esistenti`,
+        ipAddress: req.ip,
+      });
+      return reply.send({ ok: true, id, isAttivo: false });
+    } catch (err: any) {
+      if (err?.code === 'P2025') {
+        return reply.code(404).send({ errore: 'Modulo non trovato' });
+      }
+      // Modalità test/demo senza DB raggiungibile: ripiego in-memory.
+      return reply.send(app.disattivaModuloTemplate(id));
+    }
+  });
+
+  // §36 / §30 — stessa regola dei moduli: l'articolo sparisce dal catalogo ma le
+  // distinte e le microvoci dei progetti continuano a referenziarlo.
+  server.delete<{ Params: { id: string } }>('/articoli/:id', async (req, reply) => {
+    const { id } = req.params;
+    const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
+    try {
+      const esistente = await prisma.articolo.findUnique({ where: { id } });
+      if (!esistente) {
+        return reply.code(404).send({ errore: 'Articolo non trovato' });
+      }
+      await prisma.articolo.update({ where: { id }, data: { isAttivo: false } });
+      recordAudit({
+        tenantId,
+        azione: 'ARTICOLO_DISATTIVATO',
+        entita: esistente.nome,
+        dettagli: `Disattivato articolo ${esistente.nome} (${id}): non compare più nel catalogo`,
+        ipAddress: req.ip,
+      });
+      return reply.send({ ok: true, id, isAttivo: false });
+    } catch (err: any) {
+      if (err?.code === 'P2025') {
+        return reply.code(404).send({ errore: 'Articolo non trovato' });
+      }
+      // Modalità test/demo senza DB raggiungibile: ripiego in-memory.
+      return reply.send(app.disattivaArticolo(id));
+    }
   });
 
   server.get<{ Params: { id: string } }>('/clienti/:id', async (req, reply) => {
@@ -3635,7 +3888,10 @@ export function buildServer(app: AppPort): FastifyInstance {
     }
   });
 
-  // ── WEBHOOKS & SIMULATORE ESITI SDI AGENZIA ENTRATE ───────────────
+  // ── WEBHOOK ESITI SDI — registrazione dell'esito reale di una fattura ──
+  // Con l'invio manuale (§3.5) è così che lo stato fiscale si aggiorna davvero:
+  // l'operatore (o in futuro un'integrazione) comunica l'esito ricevuto da SdI
+  // (consegnata / scartata / mancata_consegna) dopo la trasmissione.
   server.post<{ Body: { fatturaId: string; statoSdi: 'consegnata' | 'scartata' | 'mancata_consegna'; note?: string } }>(
     '/webhooks/sdi',
     async (req, reply) => {
@@ -5677,8 +5933,10 @@ export function buildServer(app: AppPort): FastifyInstance {
     }
   });
 
-  // ── TRASMISSIONE DIRETTA SDI 1-CLICK (AGENZIA DELLE ENTRATE) ────────
-  server.post<{ Params: { id: string } }>('/invoices/:id/trasmetti-sdi', async (req, reply) => {
+  // ── §3.5 — PREPARAZIONE INVIO MANUALE SDI (nessun provider collegato) ──
+  // Il sistema prepara l'XML; la trasmissione la fa l'operatore tramite il portale
+  // «Fatture & Corrispettivi» o il proprio intermediario. L'esito vero arriva via webhook.
+  server.post<{ Params: { id: string } }>('/invoices/:id/prepara-invio-manuale', async (req, reply) => {
     const tenantId = (req as any).tenantId;
     const { id } = req.params;
     try {
@@ -5691,38 +5949,26 @@ export function buildServer(app: AppPort): FastifyInstance {
       } catch {}
 
       const numFattura = fattura?.numeroProgressivoSerie || `FT-2026-${id.slice(0, 3)}`;
-      const result = await trasmettiFatturaSdi({
+      const result = await preparaFatturaPerInvioManuale({
         fatturaId: id,
         numeroProgressivo: numFattura,
       });
 
-      if (fattura) {
-        try {
-          await (prisma as any).fattura.update({
-            where: { id },
-            data: {
-              tracciatoSdi: result.identificativoSdi,
-              sdiInviataIl: new Date(),
-            },
-          });
-        } catch {}
-      }
-
       recordAudit({
         tenantId,
-        azione: 'FATTURA_TRASMETTA_SDI',
+        azione: 'FATTURA_PREPARATA_INVIO_MANUALE',
         entita: `Fattura ${numFattura}`,
-        dettagli: `Fattura elettronica ${numFattura} inviata al Sistema di Interscambio con identificativo SdI: ${result.identificativoSdi}`,
+        dettagli: `Fattura elettronica ${numFattura} preparata per invio manuale a SdI (riferimento locale: ${result.riferimentoPreparazione}). Trasmissione a cura dell'operatore.`,
       });
 
       return reply.send({
         ok: true,
-        identificativoSdi: result.identificativoSdi,
-        dataTrasmissione: result.dataTrasmissione,
+        riferimentoPreparazione: result.riferimentoPreparazione,
+        dataPreparazione: result.dataPreparazione,
         message: result.message,
       });
     } catch (err) {
-      return reply.code(500).send({ errore: err instanceof Error ? err.message : 'Errore trasmissione SDI' });
+      return reply.code(500).send({ errore: err instanceof Error ? err.message : 'Errore preparazione invio manuale' });
     }
   });
 
