@@ -3120,7 +3120,8 @@ export function buildServer(app: AppPort): FastifyInstance {
   // (Blocco 5, reportsService). Nessuna squadra finta: i membri della griglia
   // sono gli utenti reali del tenant.
 
-  const MINUTI_IN_SETTIMANA = 7 * 24 * 60 * 60 * 1000;
+  const MS_SETTIMANA = 7 * 24 * 60 * 60 * 1000;
+  const MS_GIORNO = 24 * 60 * 60 * 1000;
 
   /** Data YYYY-MM-DD → Date a mezzanotte UTC, oppure null se non valida. */
   function parseDataIso(iso: string | undefined): Date | null {
@@ -3160,7 +3161,7 @@ export function buildServer(app: AppPort): FastifyInstance {
     if (!inizio) {
       return reply.code(400).send({ errore: 'Parametro inizio non valido: usare una data YYYY-MM-DD' });
     }
-    const fine = new Date(inizio.getTime() + MINUTI_IN_SETTIMANA);
+    const fine = new Date(inizio.getTime() + MS_SETTIMANA);
     const puoApprovare = ruolo === 'advisor' || ruolo === 'super_admin';
     if (!puoApprovare && !userId) {
       return reply.code(401).send({ errore: 'Non autenticato' });
@@ -3195,7 +3196,7 @@ export function buildServer(app: AppPort): FastifyInstance {
       });
       return reply.send({
         inizio: isoData(inizio),
-        fine: isoData(new Date(fine.getTime() - MINUTI_IN_SETTIMANA)),
+        fine: isoData(new Date(fine.getTime() - MS_GIORNO)),
         puoApprovare,
         membri,
         progetti,
@@ -3350,7 +3351,7 @@ export function buildServer(app: AppPort): FastifyInstance {
     if (!inizio) {
       return reply.code(400).send({ errore: 'Parametro inizio non valido: usare una data YYYY-MM-DD' });
     }
-    const fine = new Date(inizio.getTime() + MINUTI_IN_SETTIMANA);
+    const fine = new Date(inizio.getTime() + MS_SETTIMANA);
     try {
       const risultato = await prisma.oraTimesheet.updateMany({
         where: {
@@ -3361,7 +3362,7 @@ export function buildServer(app: AppPort): FastifyInstance {
         },
         data: { stato: 'approvato', approvatoDaId: userIdRichiedente ?? null, approvatoAt: new Date() },
       });
-      return reply.send({ approvate: risultato.count, inizio: isoData(inizio), fine: isoData(new Date(fine.getTime() - MINUTI_IN_SETTIMANA)) });
+      return reply.send({ approvate: risultato.count, inizio: isoData(inizio), fine: isoData(new Date(fine.getTime() - MS_GIORNO)) });
     } catch (err: any) {
       console.error('POST /timesheet/approva-settimana —', err instanceof Error ? err.message : err);
       return reply.code(500).send({ errore: 'Errore nell\'approvazione della settimana' });
@@ -3379,7 +3380,7 @@ export function buildServer(app: AppPort): FastifyInstance {
     const categoria = (req.query.categoria || '').trim().toLowerCase();
     try {
       const inizio = lunediSettimana();
-      const fine = inizio ? new Date(inizio.getTime() + MINUTI_IN_SETTIMANA) : null;
+      const fine = inizio ? new Date(inizio.getTime() + MS_SETTIMANA) : null;
       const utenti = await prisma.user.findMany({
         where: { tenantId, ruolo: { not: 'cliente' }, stato: { not: 'disattivato' } },
         select: { id: true, nome: true, ruolo: true, specializzazione: true },
