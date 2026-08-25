@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { hashPassword, verifyPassword, generaPasswordTemporanea } from './password.js';
+import { hashPassword, verifyPassword, generaPasswordTemporanea, confrontoTokenCostante } from './password.js';
 
 describe('hashPassword / verifyPassword', () => {
   it('verifica correttamente la password giusta', () => {
@@ -32,5 +32,31 @@ describe('generaPasswordTemporanea', () => {
     const b = generaPasswordTemporanea();
     expect(a).not.toBe(b);
     expect(a.length).toBeGreaterThanOrEqual(12);
+  });
+});
+
+describe('confrontoTokenCostante', () => {
+  it('accetta due token identici', () => {
+    expect(confrontoTokenCostante('segreto-123', 'segreto-123')).toBe(true);
+  });
+
+  it('rifiuta token diversi', () => {
+    expect(confrontoTokenCostante('segreto-123', 'segreto-errato')).toBe(false);
+  });
+
+  it('rifiuta token fornito vuoto o mancante senza lanciare', () => {
+    expect(confrontoTokenCostante('', 'segreto-123')).toBe(false);
+    expect(confrontoTokenCostante(null, 'segreto-123')).toBe(false);
+    expect(confrontoTokenCostante(undefined, 'segreto-123')).toBe(false);
+  });
+
+  it('rifiuta quando il token atteso è vuoto', () => {
+    expect(confrontoTokenCostante('qualsiasi-cosa', '')).toBe(false);
+  });
+
+  it('gestisce token di lunghezza diversa senza errori', () => {
+    // SHA-256 normalizza la lunghezza: nessun confronto su buffer di taglia diversa.
+    expect(confrontoTokenCostante('a', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')).toBe(false);
+    expect(confrontoTokenCostante('molto-piu-lungo-del-token-atteso-xyz', 'b')).toBe(false);
   });
 });

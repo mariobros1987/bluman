@@ -60,9 +60,11 @@ function nuovoServer() {
 describe('server — /health e /moduli', () => {
   it('GET /health risponde ok', async () => {
     const { server } = nuovoServer();
+    // In ambiente di test DATABASE_URL punta a un DB irraggiungibile (vitest.setup):
+    // l'health check onestamente lo segnala con 503 + stato degradato.
     const res = await server.inject({ method: 'GET', url: '/health' });
-    expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ stato: 'ok' });
+    expect(res.statusCode).toBe(503);
+    expect(res.json()).toEqual({ stato: 'degradato', db: 'irraggiungibile' });
   });
 
   it('GET /moduli elenca la libreria', async () => {
@@ -300,10 +302,28 @@ describe('server — §23 autenticazione: nessuna credenziale hardcoded', () => 
 });
 
 describe('server — §23 rate limiting sugli endpoint di autenticazione', () => {
-  const MAX_TENTATIVI = 5; // deve restare allineato ad AUTH_MAX_TENTATIVI in server.ts
+  const MAX_TENTATIVI = 5; // deve restare allineato al max per-route registrato in server.ts
+
+  /**
+   * Fase 1 — la protezione brute-force ora vive in @fastify/rate-limit (config
+   * per-route sulle rotte auth), che `buildServer` non registra con NODE_ENV=test
+   * per non falsare il resto della suite. Questi test costruiscono quindi il
+   * server con NODE_ENV diverso da 'test': lo store in-memory del plugin è per
+   * istanza, quindi ogni server nuovo riparte da zero come il guard che
+   * sostituisce.
+   */
+  function nuovoServerConLimiter() {
+    const prima = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'dev';
+    try {
+      return nuovoServer();
+    } finally {
+      process.env.NODE_ENV = prima;
+    }
+  }
 
   it(`risponde 429 dal tentativo ${MAX_TENTATIVI + 1} nella stessa finestra`, async () => {
-    const { server } = nuovoServer();
+    const { server } = nuovoServerConLimiter();
     const tentativo = () =>
       server.inject({
         method: 'POST',
@@ -321,18 +341,18 @@ describe('server — §23 rate limiting sugli endpoint di autenticazione', () =>
   });
 
   it('il contatore è per istanza: un server nuovo riparte da zero', async () => {
-    const { server: primo } = nuovoServer();
+    const { server: primo } = nuovoServerConLimiter();
     for (let i = 0; i <= MAX_TENTATIVI; i++) {
       await primo.inject({ method: 'POST', url: '/auth/login', payload: { email: 'x@y.it', password: 'z' } });
     }
 
-    const { server: secondo } = nuovoServer();
+    const { server: secondo } = nuovoServerConLimiter();
     const res = await secondo.inject({ method: 'POST', url: '/auth/login', payload: { email: 'x@y.it', password: 'z' } });
     expect(res.statusCode).not.toBe(429);
   });
 
   it('limita anche /auth/magic-login', async () => {
-    const { server } = nuovoServer();
+    const { server } = nuovoServerConLimiter();
     const tentativo = () => server.inject({ method: 'POST', url: '/auth/magic-login', payload: { magicToken: 'non-valido' } });
 
     for (let i = 1; i <= MAX_TENTATIVI; i++) {
@@ -514,7 +534,9 @@ describe('server — §23 il guard di autenticazione: nessuna rotta aperta per s
   it('GET /health resta raggiungibile senza token', async () => {
     const { server } = nuovoServer();
     const res = await (server as any).inject({ method: 'GET', url: '/health', headers: { authorization: '' } });
-    expect(res.statusCode).toBe(200);
+    // Il punto è l'assenza di autenticazione: la risposta può essere 200 o il 503
+    // di DB degradato (ambiente di test), ma mai un 401.
+    expect(res.statusCode).not.toBe(401);
   });
 
   it('POST /auth/login resta raggiungibile senza token', async () => {

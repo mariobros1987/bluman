@@ -5,6 +5,7 @@
   "type": "module",
   "dependencies": {
     "@fastify/cors": "^11.3.0",
+    "@fastify/rate-limit": "^11.2.0",
     "@prisma/client": "^5.20.0",
     "@types/nodemailer": "^8.0.1",
     "dotenv": "^16.4.5",

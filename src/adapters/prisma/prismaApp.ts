@@ -374,47 +374,62 @@ export class PrismaApp implements AppPort {
   }
 
   async eliminaProgetto(id: string): Promise<void> {
-    // 1. Controllo Fiscale: Se ci sono fatture o note di credito, blocco.
-    const fatture = await this.prisma.fattura.count({
-      where: { progettoId: id, tenantId: this.tenantId },
-    });
-    
-    if (fatture > 0) {
-      throw new TransizioneNonValidaError(
-        `Impossibile eliminare il progetto perché contiene ${fatture} Fatture / Note di Credito. È necessario archiviarlo.`
-      );
-    }
-    
-    // 2. Eliminazione progetto
-    // Il database eliminerà a cascata (Cascade) le righe correlate oppure potremmo doverle eliminare manualmente se Prisma non è configurato per il cascade completo.
-    // Facciamo un tentativo. In caso di errore per FK constraint, dovremo eliminare prima le dipendenze.
-    try {
-      // Elimina manualmente prima le dipendenze note per sicurezza se non c'è cascade ovunque
-      const moduli = await this.prisma.moduloProgetto.findMany({ where: { progettoId: id } });
-      for (const m of moduli) {
-        await this.prisma.moduloProgettoDipendenza.deleteMany({ where: { dipendeDaModuloProgettoId: m.id } });
-        await this.prisma.moduloProgettoDipendenza.deleteMany({ where: { moduloProgettoId: m.id } });
-        const microvoci = await this.prisma.microvoceProgetto.findMany({ where: { moduloProgettoId: m.id } });
-        for (const mv of microvoci) {
-          await this.prisma.passaggioProgetto.deleteMany({ where: { microvoceProgettoId: mv.id } });
-        }
-        await this.prisma.microvoceProgetto.deleteMany({ where: { moduloProgettoId: m.id } });
-      }
-      await this.prisma.moduloProgetto.deleteMany({ where: { progettoId: id } });
-      
-      await this.prisma.preventivo.deleteMany({ where: { progettoId: id } });
-      
-      await this.prisma.eventoCalendario.deleteMany({ where: { progettoId: id } });
-      await this.prisma.accessoRisorsa.deleteMany({ where: { progettoId: id } });
-      await this.prisma.comunicazioneProgetto.deleteMany({ where: { progettoId: id } });
+    // Fase 1 — tutto in UN'unica transazione: prima l'eliminazione era una sequenza
+    // di ~15 deleteMany non transazionali; un errore a metà (es. una FK non coperta
+    // dall'elenco manuale) lasciava il progetto mezzo cancellato — moduli o microvoci
+    // orfani, ma record del progetto ancora lì. Con la transazione, o si elimina
+    // tutto o non si tocca nulla.
+    await this.prisma.$transaction(async (tx) =>
+      conContestoInTransazione(tx, async () => {
+        // 1. Controllo Fiscale: Se ci sono fatture o note di credito, blocco.
+        const fatture = await tx.fattura.count({
+          where: { progettoId: id, tenantId: this.tenantId },
+        });
 
-      await this.prisma.progetto.delete({
-        where: { id, tenantId: this.tenantId },
-      });
-    } catch (err: any) {
-      console.error('Errore durante eliminazione progetto:', err);
-      throw new TransizioneNonValidaError('Impossibile eliminare il progetto a causa di record collegati nel database.');
-    }
+        if (fatture > 0) {
+          throw new TransizioneNonValidaError(
+            `Impossibile eliminare il progetto perché contiene ${fatture} Fatture / Note di Credito. È necessario archiviarlo.`,
+          );
+        }
+
+        // 2. Eliminazione progetto e dipendenze, nell'ordine che evita le FK.
+        try {
+          // Elimina manualmente prima le dipendenze note per sicurezza se non c'è cascade ovunque
+          const moduli = await tx.moduloProgetto.findMany({ where: { progettoId: id } });
+          for (const m of moduli) {
+            await tx.moduloProgettoDipendenza.deleteMany({ where: { dipendeDaModuloProgettoId: m.id } });
+            await tx.moduloProgettoDipendenza.deleteMany({ where: { moduloProgettoId: m.id } });
+            const microvoci = await tx.microvoceProgetto.findMany({ where: { moduloProgettoId: m.id } });
+            for (const mv of microvoci) {
+              await tx.passaggioProgetto.deleteMany({ where: { microvoceProgettoId: mv.id } });
+            }
+            await tx.microvoceProgetto.deleteMany({ where: { moduloProgettoId: m.id } });
+          }
+          await tx.moduloProgetto.deleteMany({ where: { progettoId: id } });
+
+          await tx.preventivo.deleteMany({ where: { progettoId: id } });
+
+          await tx.eventoCalendario.deleteMany({ where: { progettoId: id } });
+          await tx.accessoRisorsa.deleteMany({ where: { progettoId: id } });
+          await tx.comunicazioneProgetto.deleteMany({ where: { progettoId: id } });
+
+          // Prisma accetta solo campi unique nel where della delete (e `id` è
+          // l'unico unique di Progetto): il vecchio `{ id, tenantId }` lanciava
+          // un errore di validazione che finiva mascherato da «record collegati».
+          // L'appartenenza al tenant si verifica prima, l'isolamento lo fa anche
+          // la RLS dentro questa transazione.
+          const esistente = await tx.progetto.findFirst({ where: { id, tenantId: this.tenantId } });
+          if (!esistente) {
+            throw new ProgettoNonTrovatoError(`Progetto ${id} non trovato in questo studio.`);
+          }
+          await tx.progetto.delete({ where: { id } });
+        } catch (err: any) {
+          if (err instanceof TransizioneNonValidaError) throw err;
+          console.error('Errore durante eliminazione progetto:', err);
+          throw new TransizioneNonValidaError('Impossibile eliminare il progetto a causa di record collegati nel database.');
+        }
+      }),
+    );
   }
 
   async listaFattureTutte(): Promise<any[]> {

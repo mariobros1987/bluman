@@ -4,6 +4,7 @@
 
 import Fastify, { type FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
+import rateLimit from '@fastify/rate-limit';
 import crypto from 'crypto';
 import type { AppPort } from './services/appPort.js';
 import { ProceduraIncompletaError } from './services/esecuzione.js';
@@ -16,7 +17,7 @@ import {
 } from './adapters/appErrors.js';
 
 import { signJwt, verifyJwt, generateMagicToken, hashMagicToken, verificaFirmaDownload } from './util/jwt.js';
-import { verifyPassword, hashPassword, generaPasswordTemporanea } from './util/password.js';
+import { verifyPassword, hashPassword, generaPasswordTemporanea, confrontoTokenCostante } from './util/password.js';
 import { sendMagicLinkEmail, sendOtpSecurityEmail, sendClientCredentialsEmail, verifyAndSendTestSmtp, verifyRealImap, createTransporter, inviaEmail } from './services/emailService.js';
 import { uploadDocumento, CARTELLA_UPLOADS, nomeFileValido, rifirmaUrlUpload, leggiFileArchivio } from './services/storageService.js';
 import { generateInvoicePdfBuffer } from './services/pdfService.js';
@@ -295,7 +296,47 @@ export function buildServer(app: AppPort): FastifyInstance {
     strictPreflight: false,
   });
 
-  server.setErrorHandler((err, _req, reply) => {
+  // Fase 1 — da qui in poi (rate-limit, error handler, hook di autenticazione e
+  // tutte le rotte) vive dentro un plugin registrato sulla root. Il motivo è
+  // @fastify/rate-limit: applica i limiti con un hook `onRoute`, che vede solo le
+  // rotte registrate DOPO il suo caricamento. In un buildServer sincrono le rotte
+  // esisterebbero già quando il plugin viene caricato (al primo ready) e
+  // resterebbero tutte senza protezione. Dentro il plugin, invece,
+  // `await server.register(rateLimit, ...)` carica il limiter prima che le rotte
+  // vengano definite, e sia il limite globale sia quelli per-route si agganciano.
+  // Il parametro `server` ombra volutamente l'istanza esterna: tutto il codice che
+  // segue registra sul contesto del plugin senza dover essere riscritto.
+  // La condizione sul rate-limit va letta QUI, nella parte sincrona di buildServer:
+  // il corpo del plugin viene eseguito solo al primo ready(), quando NODE_ENV
+  // potrebbe essere già cambiato (i test lo ripristinano dopo la costruzione).
+  const abilitaRateLimit = process.env.NODE_ENV !== 'test';
+  server.register(async (server) => {
+  // Fase 1 — rate limiting. Protezione contro brute-force sulle tre rotte che
+  // verificano credenziali (/auth/login, /auth/magic-login, /auth/client-login:
+  // config per-route dedicata, più stretta) e contro abusi generici (limite globale).
+  // Onestà sui limiti: lo store è in-memory per istanza. Railway oggi serve una
+  // sola replica, quindi il limite è effettivo; con più repliche ogni istanza
+  // conterebbe per sé e il limite reale sarebbe max × repliche — in quel caso
+  // va collegato uno store condiviso (es. Redis).
+  // In NODE_ENV=test il plugin non viene registrato: la suite esegue centinaia
+  // di inject dalla stessa 'IP' e il limite falserebbe i test.
+  if (abilitaRateLimit) {
+    await server.register(rateLimit, {
+      global: true,
+      max: 300,
+      timeWindow: '1 minute',
+      // I probe dell'orchestratore su /health non devono mai consumare budget.
+      allowList: (req) => req.url === '/health',
+      errorResponseBuilder: (_req, context) => {
+        const messaggio = `Troppe richieste. Riprova tra ${Math.ceil(Number(context.ttl) / 1000)} secondi.`;
+        // Deve essere un Error con statusCode: il plugin lo lancia nell'hook e il
+        // setErrorHandler lo riemette col suo codice (429, o 403 in caso di ban).
+        return Object.assign(new Error(messaggio), { statusCode: context.statusCode, errore: messaggio });
+      },
+    });
+  }
+
+  server.setErrorHandler((err: any, _req, reply) => {
     if (
       err instanceof ClienteNonTrovatoError ||
       err instanceof ProgettoNonTrovatoError ||
@@ -307,35 +348,20 @@ export function buildServer(app: AppPort): FastifyInstance {
     if (err instanceof TransizioneNonValidaError || err instanceof ProceduraIncompletaError) {
       return reply.code(409).send({ errore: err.message });
     }
+    // Errori che nascono già con un codice HTTP (il 429 di @fastify/rate-limit,
+    // i 4xx standard di Fastify): il codice va rispettato, non sepolto in un 500.
+    if (typeof err?.statusCode === 'number' && err.statusCode >= 400 && err.statusCode < 500) {
+      return reply.code(err.statusCode).send({ errore: err.errore || err.message });
+    }
     console.error('Fastify route error:', err);
     return reply.code(500).send({ errore: err instanceof Error ? err.message : 'Errore interno' });
   });
 
-  // §23 — rate limiting sugli endpoint che verificano credenziali. Stato in memoria e
-  // per-istanza: basta per il deploy attuale a istanza singola, ma con più repliche il
-  // limite vale per replica e non globalmente — in quel caso va spostato su Redis.
-  const AUTH_MAX_TENTATIVI = 5;
-  const AUTH_FINESTRA_MS = 60_000;
-  const tentativiAuth = new Map<string, { conteggio: number; scadenza: number }>();
-
-  function superaLimiteAuth(chiave: string): boolean {
-    const ora = Date.now();
-
-    // Potatura opportunistica: senza questa la mappa cresce con ogni IP mai visto.
-    if (tentativiAuth.size > 1000) {
-      for (const [k, v] of tentativiAuth) {
-        if (ora > v.scadenza) tentativiAuth.delete(k);
-      }
-    }
-
-    const corrente = tentativiAuth.get(chiave);
-    if (!corrente || ora > corrente.scadenza) {
-      tentativiAuth.set(chiave, { conteggio: 1, scadenza: ora + AUTH_FINESTRA_MS });
-      return false;
-    }
-    corrente.conteggio += 1;
-    return corrente.conteggio > AUTH_MAX_TENTATIVI;
-  }
+  // §23 — la protezione brute-force sugli endpoint che verificano credenziali è
+  // demandata a @fastify/rate-limit (config per-route: 5 richieste/min per IP,
+  // registrata sopra insieme al limite globale). Un solo meccanismo, header
+  // Retry-After corretti, e il passaggio a store condiviso (Redis) per più
+  // repliche diventa una riga di configurazione invece di codice ad hoc.
 
   // ─── MULTI-TENANT CONTEXT MIDDLEWARE (§14, §23) ───────────────────
   server.addHook('onRequest', async (req, reply) => {
@@ -409,12 +435,31 @@ export function buildServer(app: AppPort): FastifyInstance {
     attivaContestoTenant({ tenantId, ruolo });
   });
 
-  server.get('/health', async () => ({ stato: 'ok' }));
+  // Fase 1 — /health verifica anche che il database sia raggiungibile, non solo
+  // che il processo Node sia vivo: se il DB è down l'istanza risponde 503 e
+  // l'orchestratore (Railway) può riavviarla, invece di servire errori su ogni
+  // rotta. Il ping ha un timeout corto per non trascinare la risposta.
+  server.get('/health', async (_req, reply) => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([
+        prisma.$queryRaw`SELECT 1`,
+        new Promise((_resolve, reject) => {
+          timer = setTimeout(() => reject(new Error('timeout ping DB')), 2500);
+        }),
+      ]);
+      return { stato: 'ok', db: 'ok' };
+    } catch {
+      return reply.code(503).send({ stato: 'degradato', db: 'irraggiungibile' });
+    } finally {
+      clearTimeout(timer);
+    }
+  });
 
   // ─── AUTH ENDPOINTS & RBAC PERMISSIONS (§2bis, §23) ───────────────
   server.post<{
     Body: { email?: string; password?: string };
-  }>('/auth/login', async (req, reply) => {
+  }>('/auth/login', { config: { rateLimit: { max: 5, timeWindow: '1 minute' } } }, async (req, reply) => {
     const { email, password } = req.body || {};
 
     if (!email || !password) {
@@ -422,10 +467,6 @@ export function buildServer(app: AppPort): FastifyInstance {
     }
 
     const cleanEmail = email.toLowerCase().trim();
-
-    if (superaLimiteAuth(`login:${req.ip}`)) {
-      return reply.code(429).send({ errore: 'Troppi tentativi di accesso. Riprova tra un minuto.' });
-    }
 
     // §23 — l'unica fonte di verità per le credenziali è la tabella user: nessun utente
     // hardcoded, nessuna password accettata come jolly. Il primo super_admin nasce da
@@ -505,12 +546,8 @@ export function buildServer(app: AppPort): FastifyInstance {
 
   server.post<{
     Body: { magicToken: string };
-  }>('/auth/magic-login', async (req, reply) => {
+  }>('/auth/magic-login', { config: { rateLimit: { max: 5, timeWindow: '1 minute' } } }, async (req, reply) => {
     const magicToken = req.body?.magicToken;
-
-    if (superaLimiteAuth(`magic:${req.ip}`)) {
-      return reply.code(429).send({ errore: 'Troppi tentativi di accesso. Riprova tra un minuto.' });
-    }
 
     // §23 — il token si confronta con uno che abbiamo emesso e che non è scaduto.
     //
@@ -581,13 +618,9 @@ export function buildServer(app: AppPort): FastifyInstance {
 
   server.post<{
     Body: { email?: string; password?: string };
-  }>('/auth/client-login', async (req, reply) => {
+  }>('/auth/client-login', { config: { rateLimit: { max: 5, timeWindow: '1 minute' } } }, async (req, reply) => {
     const rawEmail = req.body?.email;
     const password = req.body?.password;
-
-    if (superaLimiteAuth(`client:${req.ip}`)) {
-      return reply.code(429).send({ errore: 'Troppi tentativi di accesso. Riprova tra un minuto.' });
-    }
 
     const cleanEmail = (rawEmail || '').trim().toLowerCase();
     const nonValide = { errore: 'Credenziali non valide.' };
@@ -2370,7 +2403,7 @@ export function buildServer(app: AppPort): FastifyInstance {
         return reply.status(503).send('WA_VERIFY_TOKEN non configurato');
       }
 
-      if (mode === 'subscribe' && token === verifyToken) {
+      if (mode === 'subscribe' && confrontoTokenCostante(token, verifyToken)) {
         return reply.status(200).send(challenge);
       }
       return reply.status(403).send('Forbidden');
@@ -5970,6 +6003,7 @@ export function buildServer(app: AppPort): FastifyInstance {
     } catch (err) {
       return reply.code(500).send({ errore: err instanceof Error ? err.message : 'Errore preparazione invio manuale' });
     }
+  });
   });
 
   return server;

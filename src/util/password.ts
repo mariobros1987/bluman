@@ -4,7 +4,7 @@
 // considerato sicuro per questo uso ed è parte della libreria standard di Node — nessuna
 // installazione, nessun binario da scaricare.
 
-import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
+import { createHash, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 
 const KEYLEN = 64;
 
@@ -28,4 +28,21 @@ export function verifyPassword(password: string, stored: string): boolean {
 /** Password temporanea leggibile ma non banale, per il bootstrap (§27) — mai per un utente normale. */
 export function generaPasswordTemporanea(): string {
   return randomBytes(12).toString('base64url'); // 16 caratteri circa, url-safe
+}
+
+/**
+ * Confronto a tempo costante per token/secret di configurazione (es. verify token
+ * dei webhook). A differenza di `===`, il tempo di esecuzione non dipende da quanti
+ * caratteri iniziali coincidono, quindi un attaccante non può ricostruire il valore
+ * un carattere alla volta misurando i tempi di risposta.
+ *
+ * Entrambi i valori vengono prima ridotti con SHA-256: questo normalizza la
+ * lunghezza (timingSafeEqual richiede buffer di dimensione uguale) ed evita di
+ * rivelare la lunghezza del secret atteso tramite differenze di timing.
+ */
+export function confrontoTokenCostante(tokenFornito: string | null | undefined, tokenAtteso: string): boolean {
+  if (!tokenFornito || !tokenAtteso) return false;
+  const a = createHash('sha256').update(tokenFornito).digest();
+  const b = createHash('sha256').update(tokenAtteso).digest();
+  return timingSafeEqual(a, b);
 }
