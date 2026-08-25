@@ -1509,7 +1509,7 @@ function OperatorDetailModal({
                   clienteNome: p.cl || p.cliente?.nome || 'Cliente',
                   moduloNome: m.n,
                   taskNome: mv.n,
-                  oreSvolte: hA > 0 ? hA : mv.hE || 2,
+                  oreSvolte: hA > 0 ? hA : mv.hE || 0,
                   stato: mv.s || 'pending',
                   note: mv.vn || mv.n,
                   data: mv.updatedAt || 'Oggi',
@@ -1526,37 +1526,21 @@ function OperatorDetailModal({
               stato: p.st || p.stato || 'in_progress',
               valore: p.val || p.valoreTotale || 0,
               pct: p.pct || 50,
-              oreConsuntivate: projOre > 0 ? projOre : 12,
+              oreConsuntivate: projOre,
               tasksUltimati: projTasks,
-              tasksTotali: totalProjTasks || 5,
+              tasksTotali: totalProjTasks,
             });
           }
         });
 
-        // Fallback demo per rappresentazione completa
-        if (matchedProjects.length === 0) {
-          matchedProjects.push(
-            { id: 'prj-01', nome: 'Struttura Holding — Famiglia Ricci', cliente: 'Marco Ricci', stato: 'in_progress', valore: 38000, pct: 42, oreConsuntivate: 18.5, tasksUltimati: 4, tasksTotali: 8 },
-            { id: 'prj-02', nome: 'Belfort Industries S.A. — Licenza VASP', cliente: 'Belfort S.A.', stato: 'in_progress', valore: 45000, pct: 85, oreConsuntivate: 22, tasksUltimati: 6, tasksTotali: 7 },
-            { id: 'prj-03', nome: 'Trust Patrimoniale Rossi', cliente: 'Giuseppe Rossi', stato: 'in_progress', valore: 15000, pct: 25, oreConsuntivate: 8, tasksUltimati: 2, tasksTotali: 6 }
-          );
-
-          logs.push(
-            { progettoNome: 'Struttura Holding — Famiglia Ricci', clienteNome: 'Marco Ricci', moduloNome: 'Analisi Patrimoniale', taskNome: 'Raccolta documentazione KYC ed UBO', oreSvolte: 4, stato: 'done', note: 'Verificati certificati camerali e passaporti', data: 'Oggi 09:30' },
-            { progettoNome: 'Struttura Holding — Famiglia Ricci', clienteNome: 'Marco Ricci', moduloNome: 'Corporate structuring Malta', taskNome: 'Redazione Atto Costitutivo e Statuto', oreSvolte: 6, stato: 'done', note: 'Predisposto bozza statuto e clausole di garanzia', data: 'Ieri 15:45' },
-            { progettoNome: 'Belfort Industries S.A. — Licenza VASP', clienteNome: 'Belfort S.A.', moduloNome: 'Licenza Finanziaria MFSA', taskNome: 'Istanza autorizzativa MFSA', oreSvolte: 8.5, stato: 'done', note: 'Completato dossier compliance ed allegati tecnici', data: '12 Aug 2026' },
-            { progettoNome: 'Trust Patrimoniale Rossi', clienteNome: 'Giuseppe Rossi', moduloNome: 'Struttura Trust', taskNome: 'Redazione Deed of Trust di garanzia', oreSvolte: 5, stato: 'in_progress', note: 'In attesa di approvazione dal Trustee elvetico', data: '10 Aug 2026' }
-          );
-
-          calculatedTotOre = 48.5;
-          countCompletedTasks = 12;
-        }
-
+        // Nessun fallback demo: se l'operatore non ha ore o progetti reali, la
+        // scheda mostra zero. Inventare clienti e ore (Famiglia Ricci, Belfort…)
+        // mescolava dati finti a quelli veri — lezione del Blocco 7.
         setProgettiOperatore(matchedProjects);
         setTimesheetLogs(logs);
-        setTotOre(calculatedTotOre || 48.5);
+        setTotOre(calculatedTotOre);
         setTotProgetti(matchedProjects.length);
-        setTotTasksCompleted(countCompletedTasks || 12);
+        setTotTasksCompleted(countCompletedTasks);
       } catch (err) {
         console.error(err);
       } finally {
