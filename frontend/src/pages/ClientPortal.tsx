@@ -708,7 +708,14 @@ export function ClientPortal() {
 
   const handleSegnaNotificheLette = async () => {
     setNotifichePortale((prev) => prev.map((n) => ({ ...n, letto: true })));
-    await markNotificheReadApi();
+    // §3.3 — la campanella si svuota subito (stato visuale), ma se la scrittura sul server
+    // fallisce lo notifichiamo in console invece di far finta di niente con un'eccezione
+    // non gestita: al prossimo accesso le notifiche torneranno da leggere.
+    try {
+      await markNotificheReadApi();
+    } catch (err) {
+      console.warn('Segnala-notifiche-lette non persistito sul server:', err);
+    }
   };
 
   /** Il link della notifica porta alla scheda giusta del portale (documenti o fatture). */

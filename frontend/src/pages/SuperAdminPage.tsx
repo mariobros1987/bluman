@@ -195,25 +195,36 @@ export function SuperAdminPage() {
   };
 
   // Toggle Sospensione / Riattivazione
-  const handleToggleSuspend = (tenant: TenantStudio) => {
+  const handleToggleSuspend = async (tenant: TenantStudio) => {
+    // §3.3 — prima l'update ottimistico veniva applicato PRIMA della risposta e l'alert
+    // dichiarava successo a prescindere: uno studio restava «attivo» a database mentre
+    // la console lo mostrava sospeso (e viceversa). Ora la UI segue il server.
     const nextState: 'attivo' | 'sospeso' = tenant.stato === 'attivo' ? 'sospeso' : 'attivo';
-    const updated = tenants.map(t => t.id === tenant.id ? { ...t, stato: nextState } : t);
-    setTenants(updated);
-    updateAdminTenantApi(tenant.id, { stato: nextState });
-    alert(`✓ Tenant "${tenant.ragioneSociale}" impostato sullo stato: ${nextState.toUpperCase()}`);
+    try {
+      await updateAdminTenantApi(tenant.id, { stato: nextState });
+      setTenants(prev => prev.map(t => t.id === tenant.id ? { ...t, stato: nextState } : t));
+      alert(`✓ Tenant "${tenant.ragioneSociale}" impostato sullo stato: ${nextState.toUpperCase()}`);
+    } catch (err: any) {
+      alert(`⚠️ Cambio stato NON riuscito: ${err?.message || 'errore di rete'}. Il tenant "${tenant.ragioneSociale}" resta ${tenant.stato.toUpperCase()} sul server.`);
+    }
   };
 
   // Eliminazione Definitiva Tenant
-  const handleDeleteTenant = (tenant: TenantStudio) => {
-    const updated = tenants.filter(t => t.id !== tenant.id);
-    setTenants(updated);
-    setDeleteModalTenant(null);
-    deleteAdminTenantApi(tenant.id);
-    alert(`✓ Tenant "${tenant.ragioneSociale}" eliminato definitivamente dalla piattaforma.`);
+  const handleDeleteTenant = async (tenant: TenantStudio) => {
+    // §3.3 — eliminazione distruttiva: si toglie dalla lista solo a conferma avvenuta.
+    // Prima il tenant spariva dall'interfaccia anche se la DELETE non era mai partita.
+    try {
+      await deleteAdminTenantApi(tenant.id);
+      setTenants(prev => prev.filter(t => t.id !== tenant.id));
+      setDeleteModalTenant(null);
+      alert(`✓ Tenant "${tenant.ragioneSociale}" eliminato definitivamente dalla piattaforma.`);
+    } catch (err: any) {
+      alert(`⚠️ Eliminazione NON riuscita: ${err?.message || 'errore di rete'}. Il tenant "${tenant.ragioneSociale}" esiste ancora sul server.`);
+    }
   };
 
   // Aggiornamento Durata Licenza
-  const handleExtendDuration = (tenant: TenantStudio, aggiungiGiorni: number) => {
+  const handleExtendDuration = async (tenant: TenantStudio, aggiungiGiorni: number) => {
     let baseDate = new Date();
     try {
       const parts = tenant.dataScadenza.split('/');
@@ -228,16 +239,21 @@ export function SuperAdminPage() {
     baseDate.setDate(baseDate.getDate() + aggiungiGiorni);
     const newScadenza = baseDate.toLocaleDateString('it-IT');
 
-    const updated = tenants.map(t => t.id === tenant.id ? { ...t, dataScadenza: newScadenza, stato: 'attivo' as const } : t);
-    setTenants(updated);
-    updateAdminTenantApi(tenant.id, { dataScadenza: newScadenza, stato: 'attivo' });
-    if (durationModalTenant && durationModalTenant.id === tenant.id) {
-      setDurationModalTenant({ ...durationModalTenant, dataScadenza: newScadenza, stato: 'attivo' });
+    // §3.3 — la proroga di una licenza ha valore contrattuale: la nuova data si mostra
+    // solo dopo che il server l'ha registrata, altrimenti sembrava estesa e non lo era.
+    try {
+      await updateAdminTenantApi(tenant.id, { dataScadenza: newScadenza, stato: 'attivo' });
+      setTenants(prev => prev.map(t => t.id === tenant.id ? { ...t, dataScadenza: newScadenza, stato: 'attivo' as const } : t));
+      if (durationModalTenant && durationModalTenant.id === tenant.id) {
+        setDurationModalTenant({ ...durationModalTenant, dataScadenza: newScadenza, stato: 'attivo' });
+      }
+      alert(`✓ Licenza per "${tenant.ragioneSociale}" estesa con successo fino al ${newScadenza}!`);
+    } catch (err: any) {
+      alert(`⚠️ Estensione licenza NON riuscita: ${err?.message || 'errore di rete'}. La scadenza resta ${tenant.dataScadenza}.`);
     }
-    alert(`✓ Licenza per "${tenant.ragioneSociale}" estesa con successo fino al ${newScadenza}!`);
   };
 
-  const handleSetCustomExpiry = (tenant: TenantStudio) => {
+  const handleSetCustomExpiry = async (tenant: TenantStudio) => {
     if (!customExpiryInput) return;
     const parts = customExpiryInput.split('-');
     if (parts.length !== 3) {
@@ -245,13 +261,17 @@ export function SuperAdminPage() {
       return;
     }
     const formatted = `${parts[2]}/${parts[1]}/${parts[0]}`;
-    const updated = tenants.map(t => t.id === tenant.id ? { ...t, dataScadenza: formatted, stato: 'attivo' as const } : t);
-    setTenants(updated);
-    updateAdminTenantApi(tenant.id, { dataScadenza: formatted, stato: 'attivo' });
-    if (durationModalTenant && durationModalTenant.id === tenant.id) {
-      setDurationModalTenant({ ...durationModalTenant, dataScadenza: formatted, stato: 'attivo' });
+    // §3.3 — come per l'estensione: prima la conferma del server, poi la UI.
+    try {
+      await updateAdminTenantApi(tenant.id, { dataScadenza: formatted, stato: 'attivo' });
+      setTenants(prev => prev.map(t => t.id === tenant.id ? { ...t, dataScadenza: formatted, stato: 'attivo' as const } : t));
+      if (durationModalTenant && durationModalTenant.id === tenant.id) {
+        setDurationModalTenant({ ...durationModalTenant, dataScadenza: formatted, stato: 'attivo' });
+      }
+      alert(`✓ Nuova data di scadenza per "${tenant.ragioneSociale}" impostata al: ${formatted}`);
+    } catch (err: any) {
+      alert(`⚠️ Aggiornamento scadenza NON riuscito: ${err?.message || 'errore di rete'}. La data resta ${tenant.dataScadenza}.`);
     }
-    alert(`✓ Nuova data di scadenza per "${tenant.ragioneSociale}" impostata al: ${formatted}`);
   };
 
   /**

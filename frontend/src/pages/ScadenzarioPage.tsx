@@ -99,18 +99,24 @@ export function ScadenzarioPage() {
     setSavingIncasso(true);
     const importoCentesimi = Math.round(parseFloat(importoIncasso) * 100);
 
-    const res = await registraIncassoApi(selectedScadenza.id, {
-      importoIncassatoCentesimi: importoCentesimi,
-      metodoPagamento,
-      riferimentoTransazione,
-      noteOperatore,
-    });
-
-    setSavingIncasso(false);
-    if (res) {
-      alert('✓ Incasso registrato con successo in Prima Nota!');
-      setSelectedScadenza(null);
-      loadData();
+    // §3.3 — la registrazione dell'incasso è un'operazione di Prima Nota: se l'API
+    // fallisce l'utente deve saperlo (prima: nessun alert, la modal restava aperta in silenzio).
+    try {
+      const res = await registraIncassoApi(selectedScadenza.id, {
+        importoIncassatoCentesimi: importoCentesimi,
+        metodoPagamento,
+        riferimentoTransazione,
+        noteOperatore,
+      });
+      setSavingIncasso(false);
+      if (res) {
+        alert('✓ Incasso registrato con successo in Prima Nota!');
+        setSelectedScadenza(null);
+        loadData();
+      }
+    } catch (err: any) {
+      setSavingIncasso(false);
+      alert(`⚠️ Registrazione incasso NON riuscita: ${err?.message || 'errore di rete'}. La scadenza NON è stata aggiornata in Prima Nota: riprova.`);
     }
   };
 

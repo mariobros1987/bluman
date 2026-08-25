@@ -313,18 +313,16 @@ export async function fetchGiurisdizioniApi() {
 }
 
 export async function creaGiurisdizioneApi(input: { nome: string; codice: string; tipo: 'ue' | 'extra_ue' | 'stato_usa' | 'altro'; note?: string }) {
-  try {
-    const res = await apiFetch(`${API_BASE}/giurisdizioni`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(input),
-    });
-    if (!res.ok) throw new Error('Errore creazione giurisdizione');
-    return await res.json();
-  } catch (err) {
-    console.warn('Crea giurisdizione API fallback', err);
-    return { id: `giur-${Date.now()}`, ...input };
-  }
+  // §3.3 — prima il `catch` inventava `{ id: 'giur-<timestamp>', ...input }`: la riga
+  // compariva in lista con un id mai esistito a database e le successive letture la
+  // perdevano. Una scrittura rifiutata o non consegnata è un errore, non una creazione.
+  const res = await apiFetch(`${API_BASE}/giurisdizioni`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore creazione giurisdizione'));
+  return await res.json();
 }
 
 export async function fetchArticoli() {
@@ -339,18 +337,16 @@ export async function fetchArticoli() {
 }
 
 export async function uploadFileApi(filename: string, contentBase64: string) {
-  try {
-    const res = await apiFetch(`${API_BASE}/upload`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify({ filename, contentBase64 }),
-    });
-    if (!res.ok) throw new Error('Errore upload file');
-    return await res.json();
-  } catch (err) {
-    console.warn('Upload API fallback local simulation', err);
-    return { ok: true, url: `${API_BASE}/uploads/${filename}`, name: filename, size: '450 KB' };
-  }
+  // §3.3 — prima il `catch` restituiva `{ ok: true, url: '<API>/uploads/<nome>', size: '450 KB' }`:
+  // un upload mai avvenuto veniva riferito come riuscito, con un URL che puntava al nulla.
+  // Il documento «caricato» non esisteva né sul server né altrove, ma i moduli lo citavano.
+  const res = await apiFetch(`${API_BASE}/upload`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ filename, contentBase64 }),
+  });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore upload file'));
+  return await res.json();
 }
 
 // ── §2.9 — Fascicolo documentale del progetto: lettura/scrittura sul database ──────────
@@ -633,18 +629,15 @@ export async function fatturePortaleApi(clienteId?: string): Promise<FatturaPort
 }
 
 export async function updateArticoloPrezzoApi(id: string, input: { prezzoDefault?: number; oreDefault?: number; nome?: string }) {
-  try {
-    const res = await apiFetch(`${API_BASE}/articoli/${id}`, {
-      method: 'PATCH',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(input),
-    });
-    if (!res.ok) throw new Error('Errore aggiornamento articolo');
-    return await res.json();
-  } catch (err) {
-    console.warn('Update articolo API fallback', err);
-    return { ok: true, ...input };
-  }
+  // §3.3 — prima il `catch` restituiva `{ ok: true, ...input }`: un prezzo/ore aggiornato
+  // solo a schermo ma mai scritto a database. Il listino tornava al valore vecchio al reload.
+  const res = await apiFetch(`${API_BASE}/articoli/${id}`, {
+    method: 'PATCH',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore aggiornamento articolo'));
+  return await res.json();
 }
 
 export async function creaArticoloApi(input: {
@@ -987,29 +980,19 @@ export async function creaUtenteTenantApi(input: {
   const teamStorageKey = getTenantStorageKey('bluman_custom_team_users', currentTenantId);
 
   // 1. Il backend è la fonte della verità: crea la riga `user`, decide il tenant in base
-  // al ruolo (§2bis) e genera la password temporanea. Va chiamato per primo, perché è
-  // l'unico posto da cui quella password può arrivare — prima l'ordine era invertito e
-  // l'email di invito partiva con una password di default scritta nel bundle.
-  let creato: any = null;
-  try {
-    const res = await apiFetch(`${API_BASE}/tenant/utenti`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify({ ...input, tenantId: currentTenantId }),
-    });
-    if (res.ok) {
-      creato = await res.json();
-    } else {
-      const errore = await res.json().catch(() => ({}));
-      throw new Error(errore?.errore || 'Creazione collaboratore rifiutata dal server');
-    }
-  } catch (err: any) {
-    // Un 403 (ruolo insufficiente) o un 409 (email di un altro studio) non sono guasti di
-    // rete: propagarli, altrimenti l'interfaccia mostrerebbe un collaboratore che il
-    // database non ha mai accettato.
-    if (err?.message && !/fetch|network|Failed/i.test(err.message)) throw err;
-    console.warn('Persistenza utente team fallback locale:', err);
+  // al ruolo (§2bis) e genera la password temporanea. Se la chiamata fallisce (rete giù o
+  // rifiuto del server) l'utente NON è stato creato: si propaga l'errore reale invece di
+  // restituire un finto `{ok:true}` che faceva mostrare in lista un collaboratore mai
+  // salvato e gli spediva pure l'email di invito.
+  const res = await apiFetch(`${API_BASE}/tenant/utenti`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ ...input, tenantId: currentTenantId }),
+  });
+  if (!res.ok) {
+    throw new Error(await leggiErroreApi(res, 'Creazione collaboratore rifiutata dal server'));
   }
+  const creato = await res.json();
 
   // 2. Cache locale per il rendering immediato della lista team. Nessuna password qui.
   try {
@@ -1041,7 +1024,7 @@ export async function creaUtenteTenantApi(input: {
     }).catch(() => {});
   }
 
-  return creato || { ok: true, ...input };
+  return creato;
 }
 
 export async function sendInviteCollaboratoreApi(input: {
@@ -1233,25 +1216,22 @@ export async function fetchTenantInfoApi(tenantIdParam?: string) {
 }
 
 export async function updateTenantInfoApi(input: any, tenantIdParam?: string) {
+  // §3.3 — prima il `catch` scriveva solo in localStorage e restituiva `input`: lo studio
+  // leggeva «salvato» mentre l'anagrafica su Supabase restava quella vecchia (sedi, IBAN,
+  // firma fatture). La cache locale si aggiorna solo DOPO la conferma del server.
   const currentTenantId = tenantIdParam || getCurrentTenantId();
-  try {
-    const res = await apiFetch(`${API_BASE}/tenant/info`, {
-      method: 'PATCH',
-      headers: {
-        ...getAuthHeaders(),
-        'x-tenant-id': currentTenantId,
-      },
-      body: JSON.stringify(input),
-    });
-    if (!res.ok) throw new Error('Errore aggiornamento info tenant');
-    const data = await res.json();
-    localStorage.setItem(getTenantStorageKey('bluman_tenant_info', currentTenantId), JSON.stringify({ ...input, ...data }));
-    return data;
-  } catch (err) {
-    console.warn('Backend API offline, aggiornamento locale', err);
-    localStorage.setItem(getTenantStorageKey('bluman_tenant_info', currentTenantId), JSON.stringify(input));
-    return input;
-  }
+  const res = await apiFetch(`${API_BASE}/tenant/info`, {
+    method: 'PATCH',
+    headers: {
+      ...getAuthHeaders(),
+      'x-tenant-id': currentTenantId,
+    },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore aggiornamento info tenant'));
+  const data = await res.json();
+  localStorage.setItem(getTenantStorageKey('bluman_tenant_info', currentTenantId), JSON.stringify({ ...input, ...data }));
+  return data;
 }
 
 export async function fetchAuditLogsApi() {
@@ -1266,18 +1246,14 @@ export async function fetchAuditLogsApi() {
 }
 
 export async function createAuditLogApi(input: { azione: string; entita: string; dettagli: string }) {
-  try {
-    const res = await apiFetch(`${API_BASE}/audit-logs`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(input),
-    });
-    if (!res.ok) throw new Error('Errore creazione audit log');
-    return await res.json();
-  } catch (err) {
-    console.warn('Audit log fallback', err);
-    return null;
-  }
+  // §3.3 — nessun fallback silenzioso: se la scrittura del log fallisce l'errore si propaga.
+  const res = await apiFetch(`${API_BASE}/audit-logs`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore creazione audit log'));
+  return await res.json();
 }
 
 export async function fetchComunicazioniApi(progettoId: string) {
@@ -1292,18 +1268,15 @@ export async function fetchComunicazioniApi(progettoId: string) {
 }
 
 export async function inviaComunicazioneApi(progettoId: string, input: { canale: string; mittente: string; destinatario: string; direzione: string; testo: string; allegatiJson?: any }) {
-  try {
-    const res = await apiFetch(`${API_BASE}/progetti/${progettoId}/comunicazioni`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(input),
-    });
-    if (!res.ok) throw new Error('Errore invio comunicazione');
-    return await res.json();
-  } catch (err) {
-    console.warn('Invia comunicazione fallback', err);
-    return null;
-  }
+  // §3.3 — una comunicazione nel fascicolo cliente è un invio reale: se non viene persistita
+  // il messaggio non esiste. L'errore si propaga (i chiamanti fire-and-forget lo catturano).
+  const res = await apiFetch(`${API_BASE}/progetti/${progettoId}/comunicazioni`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore invio comunicazione'));
+  return await res.json();
 }
 
 export async function fetchNotificheApi() {
@@ -1547,17 +1520,14 @@ export async function fetchInboundImapEmailsApi(clientEmail?: string) {
 }
 
 export async function markNotificheReadApi() {
-  try {
-    const res = await apiFetch(`${API_BASE}/notifiche/read-all`, {
-      method: 'PATCH',
-      headers: getAuthHeaders(),
-    });
-    if (!res.ok) throw new Error('Errore aggiornamento notifiche');
-    return await res.json();
-  } catch (err) {
-    console.warn('Mark notifiche read API fallback', err);
-    return { ok: true };
-  }
+  // §3.3 — prima il `catch` restituiva `{ ok: true }`: le notifiche sparivano dalla campanella
+  // ma restavano «non lette» a database, ripresentandosi al login successivo.
+  const res = await apiFetch(`${API_BASE}/notifiche/read-all`, {
+    method: 'PATCH',
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore aggiornamento notifiche'));
+  return await res.json();
 }
 
 export async function fetchTutteFattureStudioApi() {
@@ -1583,18 +1553,15 @@ export async function fetchScadenzarioIncassiApi() {
 }
 
 export async function registraIncassoApi(scadenzaId: string, input: { importoIncassatoCentesimi: number; metodoPagamento?: string; riferimentoTransazione?: string; noteOperatore?: string }) {
-  try {
-    const res = await apiFetch(`${API_BASE}/invoices/scadenze/${scadenzaId}/incassi`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(input),
-    });
-    if (!res.ok) throw new Error('Errore durante la registrazione dell\'incasso');
-    return await res.json();
-  } catch (err) {
-    console.warn('Registrazione incasso API fallback', err);
-    return null;
-  }
+  // §3.3 — registrare un incasso muove la Prima Nota: un fallimento restituito come `null`
+  // lasciava l'operatore senza conferma né errore, con la rata ancora «aperta» a database.
+  const res = await apiFetch(`${API_BASE}/invoices/scadenze/${scadenzaId}/incassi`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore durante la registrazione dell\'incasso'));
+  return await res.json();
 }
 
 export async function downloadFatturaXmlApi(fatturaId: string) {
@@ -1629,32 +1596,28 @@ export async function fetchContrattiRicorrentiApi() {
 }
 
 export async function creaContrattoRicorrenteApi(input: { clienteId: string; progettoId?: string; titolo: string; frequenza?: string; importoCentesimi: number; prossimaFatturazione: string; note?: string }) {
-  try {
-    const res = await apiFetch(`${API_BASE}/contratti-ricorrenti`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(input),
-    });
-    if (!res.ok) throw new Error('Errore creazione contratto');
-    return await res.json();
-  } catch (err) {
-    console.warn('Crea contratto ricorrente API fallback', err);
-    return null;
-  }
+  // §3.3 — un canone ricorrente genera fatture automatiche: se la creazione non arriva a
+  // database il contratto non esiste. Prima il `null` scatenava la creazione di un contratto
+  // finto in localStorage sul chiamante, con tanto di alert «attivato con successo».
+  const res = await apiFetch(`${API_BASE}/contratti-ricorrenti`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore creazione contratto'));
+  return await res.json();
 }
 
 export async function generaFatturaRetainerApi(contrattoId: string) {
-  try {
-    const res = await apiFetch(`${API_BASE}/contratti-ricorrenti/${contrattoId}/genera-fattura`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-    });
-    if (!res.ok) throw new Error('Errore generazione fattura retainer');
-    return await res.json();
-  } catch (err) {
-    console.warn('Genera fattura retainer API fallback', err);
-    return null;
-  }
+  // §3.3 — l'emissione di una fattura è un atto fiscale: se il backend non la crea, la fattura
+  // non esiste. Prima il `null` faceva fabbricare al chiamante una fattura locale con numero
+  // inventato (`FT-<anno>-000N` casuale), mostrata in elenco come vera.
+  const res = await apiFetch(`${API_BASE}/contratti-ricorrenti/${contrattoId}/genera-fattura`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore generazione fattura retainer'));
+  return await res.json();
 }
 
 export async function fetchPermessiUtenteApi(userId: string) {
@@ -1669,18 +1632,16 @@ export async function fetchPermessiUtenteApi(userId: string) {
 }
 
 export async function salvaPermessiUtenteApi(userId: string, permessi: Array<{ moduloChiave: string; livello: 'denied' | 'read' | 'write' }>) {
-  try {
-    const res = await apiFetch(`${API_BASE}/tenant/utenti/${userId}/permessi`, {
-      method: 'PUT',
-      headers: getAuthHeaders(),
-      body: JSON.stringify({ permessi }),
-    });
-    if (!res.ok) throw new Error('Errore aggiornamento permessi utente');
-    return await res.json();
-  } catch (err) {
-    console.warn('Salva permessi utente API fallback', err);
-    return { ok: true };
-  }
+  // §3.3 — la matrice RBAC decide quali moduli un collaboratore può aprire: un salvataggio
+  // non riuscito restituito come `{ ok: true }` lasciava attivi permessi che l'admin credeva
+  // revocati. L'errore si propaga e la schermata lo mostra.
+  const res = await apiFetch(`${API_BASE}/tenant/utenti/${userId}/permessi`, {
+    method: 'PUT',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ permessi }),
+  });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore aggiornamento permessi utente'));
+  return await res.json();
 }
 
 export async function fetchChecklistPassaggioApi(passaggioId: string) {
@@ -1695,17 +1656,14 @@ export async function fetchChecklistPassaggioApi(passaggioId: string) {
 }
 
 export async function toggleChecklistVoceApi(id: string) {
-  try {
-    const res = await apiFetch(`${API_BASE}/checklist/${id}/toggle`, {
-      method: 'PATCH',
-      headers: getAuthHeaders(),
-    });
-    if (!res.ok) throw new Error('Errore aggiornamento checklist');
-    return await res.json();
-  } catch (err) {
-    console.warn('Toggle checklist API fallback', err);
-    return null;
-  }
+  // §3.3 — lo stato di una voce di checklist (compliance UBO/adempimenti) è un dato
+  // legale: se il toggle non viene persistito l'errore si propaga, nessun null silenzioso.
+  const res = await apiFetch(`${API_BASE}/checklist/${id}/toggle`, {
+    method: 'PATCH',
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore aggiornamento checklist'));
+  return await res.json();
 }
 
 export async function downloadFatturaPdfServerApi(fatturaId: string) {
@@ -1744,18 +1702,15 @@ export async function inviaFatturaEmailApi(fatturaId: string, emailDestinatario?
 }
 
 export async function inviaWebhookSdiApi(fatturaId: string, statoSdi: 'consegnata' | 'scartata' | 'mancata_consegna') {
-  try {
-    const res = await apiFetch(`${API_BASE}/webhooks/sdi`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify({ fatturaId, statoSdi }),
-    });
-    if (!res.ok) throw new Error('Errore invio webhook SDI');
-    return await res.json();
-  } catch (err) {
-    console.warn('Webhook SDI fallback', err);
-    return null;
-  }
+  // §3.3 — il webhook SDI aggiorna lo stato fiscale della fattura: se la scrittura
+  // fallisce l'errore si propaga, nessun "consegnata" finto.
+  const res = await apiFetch(`${API_BASE}/webhooks/sdi`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ fatturaId, statoSdi }),
+  });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore invio webhook SDI'));
+  return await res.json();
 }
 
 export async function fetchContiBancariApi() {
@@ -1764,29 +1719,24 @@ export async function fetchContiBancariApi() {
     if (!res.ok) throw new Error('Errore recupero conti bancari');
     return await res.json();
   } catch (err) {
-    console.warn('Conti bancari API fallback', err);
-    return [
-      { id: 'c-1', nomeConto: 'Unicredit c/c Principale', banca: 'Unicredit S.p.A.', iban: 'IT99C0306902100100000012345', bicSwift: 'UNCRITM1', saldoIniziale: 5000000, saldoAttuale: 7850000, isDefault: true },
-      { id: 'c-2', nomeConto: 'Intesa Sanpaolo Operativo', banca: 'Intesa Sanpaolo', iban: 'IT88X0306902100100000098765', bicSwift: 'BCITITMM', saldoIniziale: 1200000, saldoAttuale: 3450000, isDefault: false },
-      { id: 'c-3', nomeConto: 'Account Stripe Gateway', banca: 'Stripe Payments Europe', iban: 'N/D (Gateway)', bicSwift: 'STRPEU2D', saldoIniziale: 0, saldoAttuale: 125000, isDefault: false },
-      { id: 'c-4', nomeConto: 'Cassa Contanti Studio', banca: 'Cassa Interna', iban: 'N/D (Cassa)', bicSwift: 'N/D', saldoIniziale: 50000, saldoAttuale: 65000, isDefault: false },
-    ];
+    // §3.3 — prima il fallback restituiva QUATTRO conti bancari inventati (IBAN fittizi, saldi
+    // a 7 cifre, Unicredit/Intesa/Stripe/Cassa) spacciandoli per reali in una schermata
+    // finanziaria. Una lettura che fallisce restituisce lista vuota, non un bilancio immaginario.
+    console.warn('Conti bancari API non disponibile:', err);
+    return [];
   }
 }
 
 export async function creaContoBancarioApi(input: { nomeConto: string; banca: string; iban?: string; bicSwift?: string; saldoInizialeEur: number; isDefault?: boolean }) {
-  try {
-    const res = await apiFetch(`${API_BASE}/conti-bancari`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(input),
-    });
-    if (!res.ok) throw new Error('Errore creazione conto bancario');
-    return await res.json();
-  } catch (err) {
-    console.warn('Crea conto bancario API fallback', err);
-    return null;
-  }
+  // §3.3 — un conto bancario/cassa è dato contabile: se la creazione non va a buon fine il
+  // conto non esiste e non va mostrato come aggiunto. L'errore si propaga al chiamante.
+  const res = await apiFetch(`${API_BASE}/conti-bancari`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore creazione conto bancario'));
+  return await res.json();
 }
 
 // ── FIRMA ELETTRONICA AVANZATA: CANALI, OTP, FILE FIRMATO ──────────────────
@@ -2038,39 +1988,27 @@ export async function calcolaHashSha256(contenuto: string | ArrayBuffer): Promis
 }
 
 export async function triggerCronScadenzeApi() {
-  try {
-    const res = await apiFetch(`${API_BASE}/cron/esegui-notifiche-scadenze`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-    });
-    if (!res.ok) throw new Error('Errore esecuzione scansione cron');
-    return await res.json();
-  } catch (err) {
-    console.warn('Trigger cron API fallback:', err);
-    return {
-      ok: true,
-      message: 'Scansione completata con successo (3 notifiche elaborate: 2 UBO Malta, 1 Scadenza Incasso)',
-      report: { notificheInviate: 3, scadenzeUboTrovate: 2, fattureScaduteTrovate: 1 }
-    };
-  }
+  // §3.3 — qui il fallback era il più pericoloso dei report finti: dichiarava
+  // "3 notifiche elaborate: 2 UBO Malta, 1 Scadenza Incasso" senza che alcuna
+  // scansione fosse avvenuta. Notifiche scadenzate MAI inviate sembravano partite.
+  const res = await apiFetch(`${API_BASE}/cron/esegui-notifiche-scadenze`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore esecuzione scansione cron'));
+  return await res.json();
 }
 
 export async function trasmettiFatturaSdiApi(fatturaId: string) {
-  try {
-    const res = await apiFetch(`${API_BASE}/invoices/${fatturaId}/trasmetti-sdi`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-    });
-    if (!res.ok) throw new Error('Errore trasmissione SDI');
-    return await res.json();
-  } catch (err) {
-    console.warn('Trasmetti SDI API fallback:', err);
-    return {
-      ok: true,
-      identificativoSdi: `SDI-IT-2026-FEA`,
-      message: 'Fattura elettronica trasmessa con successo al Sistema di Interscambio (SdI)',
-    };
-  }
+  // §3.3 — il fallback fabbricava un identificativo SdI finto ('SDI-IT-2026-FEA') e
+  // dichiarava la fattura "trasmessa al Sistema di Interscambio". Una fattura che
+  // risulta trasmessa ma non lo è è un falso fiscale: l'errore si propaga e basta.
+  const res = await apiFetch(`${API_BASE}/invoices/${fatturaId}/trasmetti-sdi`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore trasmissione SDI'));
+  return await res.json();
 }
 
 export async function fetchDocumentiTemplateApi() {
@@ -2086,59 +2024,39 @@ export async function fetchDocumentiTemplateApi() {
 }
 
 export async function creaDocumentoTemplateApi(data: { titolo: string; categoria?: string; descrizione?: string; contenutoHtml: string }) {
-  try {
-    const res = await apiFetch(`${API_BASE}/documenti-template`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(data),
-    });
-    if (!res.ok) throw new Error('Errore salvataggio template');
-    return await res.json();
-  } catch (err) {
-    console.warn('Salvataggio template fallback local:', err);
-    const newTmpl = { id: `tmpl-custom-${Date.now()}`, ...data, dataCreazione: new Date().toISOString() };
-    const local = localStorage.getItem('bluman_custom_document_templates');
-    const list = local ? JSON.parse(local) : [];
-    localStorage.setItem('bluman_custom_document_templates', JSON.stringify([newTmpl, ...list]));
-    return newTmpl;
-  }
+  // §3.3 — il fallback fabbricava un template locale in localStorage spacciandolo per
+  // salvato sul server. Il salvataggio locale (se voluto) spetta al chiamante; qui
+  // l'errore si propaga così la UI può dire la verità.
+  const res = await apiFetch(`${API_BASE}/documenti-template`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore salvataggio template'));
+  return await res.json();
 }
 
 export async function aggiornaDocumentoTemplateApi(id: string, data: { titolo?: string; categoria?: string; descrizione?: string; contenutoHtml?: string }) {
-  try {
-    const res = await apiFetch(`${API_BASE}/documenti-template/${id}`, {
-      method: 'PUT',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(data),
-    });
-    if (!res.ok) throw new Error('Errore aggiornamento template');
-    return await res.json();
-  } catch (err) {
-    console.warn('Aggiornamento template fallback local:', err);
-    const local = localStorage.getItem('bluman_custom_document_templates');
-    const list: any[] = local ? JSON.parse(local) : [];
-    const updated = list.map(t => t.id === id ? { ...t, ...data } : t);
-    localStorage.setItem('bluman_custom_document_templates', JSON.stringify(updated));
-    return { ok: true };
-  }
+  // §3.3 — nessun fallback: aggiornamento fallito = il template è ancora com'era.
+  const res = await apiFetch(`${API_BASE}/documenti-template/${id}`, {
+    method: 'PUT',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore aggiornamento template'));
+  return await res.json();
 }
 
 export async function eliminaDocumentoTemplateApi(id: string) {
-  try {
-    const res = await apiFetch(`${API_BASE}/documenti-template/${id}`, {
-      method: 'DELETE',
-      headers: getAuthHeaders(),
-    });
-    if (!res.ok) throw new Error('Errore eliminazione template');
-    return await res.json();
-  } catch (err) {
-    console.warn('Eliminazione template fallback local:', err);
-    const local = localStorage.getItem('bluman_custom_document_templates');
-    const list: any[] = local ? JSON.parse(local) : [];
-    const updated = list.filter(t => t.id !== id);
-    localStorage.setItem('bluman_custom_document_templates', JSON.stringify(updated));
-    return { ok: true };
-  }
+  // §3.3 — il fallback eliminava il template da localStorage e rispondeva ok anche se
+  // il server non lo aveva cancellato: al reload il template riappariva. L'errore si
+  // propaga; la rimozione locale spetta al chiamante solo DOPO la conferma del server.
+  const res = await apiFetch(`${API_BASE}/documenti-template/${id}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore eliminazione template'));
+  return await res.json();
 }
 
 export async function fetchAdminTenantsApi() {
@@ -2186,32 +2104,26 @@ export async function resetPasswordTenantApi(id: string) {
 }
 
 export async function updateAdminTenantApi(id: string, data: any) {
-  try {
-    const res = await apiFetch(`${API_BASE}/admin/tenants/${id}`, {
-      method: 'PATCH',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(data),
-    });
-    if (!res.ok) throw new Error('Errore aggiornamento tenant');
-    return await res.json();
-  } catch (err) {
-    console.warn('Aggiornamento tenant API fallback local:', err);
-    return data;
-  }
+  // §3.3 — il fallback restituiva `data` (l'input stesso) facendo sembrare applicata
+  // una modifica mai arrivata al server: sospensioni, proroghe e scadenze fantasma.
+  const res = await apiFetch(`${API_BASE}/admin/tenants/${id}`, {
+    method: 'PATCH',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore aggiornamento tenant'));
+  return await res.json();
 }
 
 export async function deleteAdminTenantApi(id: string) {
-  try {
-    const res = await apiFetch(`${API_BASE}/admin/tenants/${id}`, {
-      method: 'DELETE',
-      headers: getAuthHeaders(),
-    });
-    if (!res.ok) throw new Error('Errore eliminazione tenant');
-    return await res.json();
-  } catch (err) {
-    console.warn('Eliminazione tenant API fallback local:', err);
-    return { ok: true };
-  }
+  // §3.3 — eliminare uno studio (tenant) è un'operazione distruttiva: se il server non
+  // conferma, lo studio esiste ancora e il "successo" finto è un danno, non un favore.
+  const res = await apiFetch(`${API_BASE}/admin/tenants/${id}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore eliminazione tenant'));
+  return await res.json();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2364,7 +2276,7 @@ export interface SettimanaTimesheetApi {
 
 async function leggiErroreApi(res: Response, fallback: string): Promise<string> {
   const body = await res.json().catch(() => null);
-  return body?.errore || `${fallback} (HTTP ${res.status})`;
+  return body?.errore || body?.error || body?.message || `${fallback} (HTTP ${res.status})`;
 }
 
 /** Carica la griglia della settimana (lunedì di riferimento `inizioIso`, o settimana corrente). */

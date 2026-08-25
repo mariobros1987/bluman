@@ -1,7 +1,7 @@
 import nodemailer from 'nodemailer';
 import tls from 'tls';
 import net from 'net';
-import { inviaEmail, type EsitoEmail } from './emailRelay.js';
+import { inviaEmail, tlsRejectUnauthorized, type EsitoEmail } from './emailRelay.js';
 
 export type { EsitoEmail } from './emailRelay.js';
 export { inviaEmail } from './emailRelay.js';
@@ -35,7 +35,7 @@ export function createTransporter(customConfig?: {
     secure,
     auth: { user, pass },
     tls: {
-      rejectUnauthorized: false,
+      rejectUnauthorized: tlsRejectUnauthorized(),
     },
     connectionTimeout: 10000,
   });
@@ -89,7 +89,7 @@ export async function verifyAndSendTestSmtp(options: {
           pass: options.pass,
         },
         tls: {
-          rejectUnauthorized: false,
+          rejectUnauthorized: tlsRejectUnauthorized(),
         },
         connectionTimeout: 8000,
       });
@@ -163,7 +163,7 @@ export async function verifyRealImap(options: {
 
     try {
       const socket = options.secure
-        ? tls.connect({ host: options.host, port: options.port, rejectUnauthorized: false }, () => {
+        ? tls.connect({ host: options.host, port: options.port, rejectUnauthorized: tlsRejectUnauthorized() }, () => {
             // Handshake TLS completato
           })
         : net.connect({ host: options.host, port: options.port }, () => {

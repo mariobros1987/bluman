@@ -79,6 +79,8 @@ export function BanksPage() {
     const saved = JSON.parse(localStorage.getItem(bankStorageKey) || '[]');
     localStorage.setItem(bankStorageKey, JSON.stringify([newConto, ...saved]));
 
+    // §3.3 — local-first: il conto è subito disponibile su questo dispositivo, ma l'alert
+    // deve dire com'è andata la sincronizzazione col server (prima: "aggiunto" sempre).
     try {
       await creaContoBancarioApi({
         nomeConto,
@@ -88,10 +90,13 @@ export function BanksPage() {
         saldoInizialeEur: saldoNum,
         isDefault,
       });
-    } catch {}
+      alert('✓ Conto Bancario / Cassa aggiunto con successo e sincronizzato col server dello studio!');
+    } catch (err: any) {
+      alert(`Conto "${nomeConto}" salvato in LOCALE ma NON sincronizzato col server: ${err?.message || 'errore di rete'}. Sarà visibile solo su questo dispositivo finché la sincronizzazione non andrà a buon fine.`);
+    } finally {
+      setSubmitting(false);
+    }
 
-    setSubmitting(false);
-    alert('✓ Conto Bancario / Cassa aggiunto con successo!');
     setModalOpen(false);
     setNomeConto('');
     setBanca('');

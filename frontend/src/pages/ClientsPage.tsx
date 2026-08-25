@@ -1220,7 +1220,13 @@ Password: ${data.passwordChiaro}`;
 
   const handleSendWhatsapp = async () => {
     const rawPhone = (data.cliente as any).cellulare || (data.cliente as any).telefono || (data.cliente as any).whatsapp || '';
-    const cleanPhone = rawPhone.replace(/[^0-9]/g, '') || '393335936278';
+    const cleanPhone = rawPhone.replace(/[^0-9]/g, '');
+    // §3.3 — niente numero inventato: senza recapito del cliente NON si procede (prima
+    // si ripiegava su un numero hardcoded, col rischio di inviare credenziali a un estraneo).
+    if (!cleanPhone) {
+      setWhatsappStatus('❌ Nessun numero di cellulare salvato per questo cliente: inseriscilo nella scheda anagrafica prima di inviare le credenziali via WhatsApp.');
+      return;
+    }
     setSendingWhatsapp(true);
     setWhatsappStatus(null);
     try {
@@ -1233,11 +1239,11 @@ Password: ${data.passwordChiaro}`;
         if (tRes && tRes.success) {
           setWhatsappStatus(`✓ Notifica WhatsApp recapitata con successo al numero +${cleanPhone}!`);
         } else {
-          setWhatsappStatus(`✓ Invio diretto WhatsApp inoltrato al numero +${cleanPhone}`);
+          setWhatsappStatus(`❌ Invio WhatsApp NON riuscito al numero +${cleanPhone}: il canale non ha confermato la consegna. Verifica la configurazione WhatsApp nelle Impostazioni o usa l'email.`);
         }
       }
     } catch (err: any) {
-      setWhatsappStatus(`✓ Invio diretto WhatsApp inoltrato al numero +${cleanPhone}`);
+      setWhatsappStatus(`❌ Invio WhatsApp NON riuscito: ${err?.message || 'errore di rete'}. Il messaggio NON è stato consegnato a +${cleanPhone}.`);
     } finally {
       setSendingWhatsapp(false);
     }

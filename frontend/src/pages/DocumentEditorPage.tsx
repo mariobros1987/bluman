@@ -331,14 +331,23 @@ export function DocumentEditorPage() {
     };
 
     saveCustomTemplate(newTmpl);
-    await creaDocumentoTemplateApi(newTmpl);
-    const updated = getAllTemplates();
-    setTemplatesList(updated);
-    handleSelectTemplate(newTmpl);
-    setShowNewTmplModal(false);
-    setNewTmplTitolo('');
-    setNewTmplDesc('');
-    setFeedback(`✓ Nuovo Modello Master "${newTmpl.titolo}" creato e salvato con successo!`);
+    // §3.3 — il salvataggio locale resta immediato (bozza disponibile), ma il feedback
+    // deve dire la verità sul sync col server: prima il successo era annunciato comunque.
+    try {
+      await creaDocumentoTemplateApi(newTmpl);
+      const updated = getAllTemplates();
+      setTemplatesList(updated);
+      handleSelectTemplate(newTmpl);
+      setShowNewTmplModal(false);
+      setNewTmplTitolo('');
+      setNewTmplDesc('');
+      setFeedback(`✓ Nuovo Modello Master "${newTmpl.titolo}" creato e salvato con successo!`);
+    } catch (err: any) {
+      const updated = getAllTemplates();
+      setTemplatesList(updated);
+      handleSelectTemplate(newTmpl);
+      setFeedback(`⚠️ Modello "${newTmpl.titolo}" salvato in LOCALE ma NON sincronizzato col server: ${err?.message || 'errore di rete'}`);
+    }
     setTimeout(() => setFeedback(null), 4000);
   };
 
@@ -357,10 +366,17 @@ export function DocumentEditorPage() {
     };
 
     saveCustomTemplate(newTmpl);
-    await creaDocumentoTemplateApi(newTmpl);
-    setTemplatesList(getAllTemplates());
-    handleSelectTemplate(newTmpl);
-    setFeedback(`✓ Modello Master "${newTmpl.titolo}" salvato permanentemente nello studio!`);
+    // §3.3 — come sopra: il template resta in locale, il feedback dipende dal sync server.
+    try {
+      await creaDocumentoTemplateApi(newTmpl);
+      setTemplatesList(getAllTemplates());
+      handleSelectTemplate(newTmpl);
+      setFeedback(`✓ Modello Master "${newTmpl.titolo}" salvato permanentemente nello studio!`);
+    } catch (err: any) {
+      setTemplatesList(getAllTemplates());
+      handleSelectTemplate(newTmpl);
+      setFeedback(`⚠️ Modello "${newTmpl.titolo}" salvato in LOCALE ma NON sincronizzato col server: ${err?.message || 'errore di rete'}`);
+    }
     setTimeout(() => setFeedback(null), 4000);
   };
 
@@ -393,11 +409,19 @@ export function DocumentEditorPage() {
           `.trim(),
         };
         saveCustomTemplate(newTmpl);
-        await creaDocumentoTemplateApi(newTmpl);
-        const updated = getAllTemplates();
-        setTemplatesList(updated);
-        handleSelectTemplate(newTmpl);
-        setFeedback(`✓ Documento PDF "${file.name}" importato con visualizzatore integrato!`);
+        // §3.3 — idem: import locale immediato, feedback onesto sul sync server.
+        try {
+          await creaDocumentoTemplateApi(newTmpl);
+          const updated = getAllTemplates();
+          setTemplatesList(updated);
+          handleSelectTemplate(newTmpl);
+          setFeedback(`✓ Documento PDF "${file.name}" importato con visualizzatore integrato!`);
+        } catch (err: any) {
+          const updated = getAllTemplates();
+          setTemplatesList(updated);
+          handleSelectTemplate(newTmpl);
+          setFeedback(`⚠️ PDF "${file.name}" salvato in LOCALE ma NON sincronizzato col server: ${err?.message || 'errore di rete'}`);
+        }
         setTimeout(() => setFeedback(null), 4000);
       };
       reader.readAsDataURL(file);
@@ -428,11 +452,19 @@ export function DocumentEditorPage() {
           contenutoHtml: content,
         };
         saveCustomTemplate(newTmpl);
-        await creaDocumentoTemplateApi(newTmpl);
-        const updated = getAllTemplates();
-        setTemplatesList(updated);
-        handleSelectTemplate(newTmpl);
-        setFeedback(`✓ File "${file.name}" importato come Modello Master!`);
+        // §3.3 — idem: import locale immediato, feedback onesto sul sync server.
+        try {
+          await creaDocumentoTemplateApi(newTmpl);
+          const updated = getAllTemplates();
+          setTemplatesList(updated);
+          handleSelectTemplate(newTmpl);
+          setFeedback(`✓ File "${file.name}" importato come Modello Master!`);
+        } catch (err: any) {
+          const updated = getAllTemplates();
+          setTemplatesList(updated);
+          handleSelectTemplate(newTmpl);
+          setFeedback(`⚠️ File "${file.name}" salvato in LOCALE ma NON sincronizzato col server: ${err?.message || 'errore di rete'}`);
+        }
       }
       setTimeout(() => setFeedback(null), 4000);
     };
@@ -480,10 +512,16 @@ export function DocumentEditorPage() {
   const handleDeleteTemplate = async (tmplId: string, tmplTitolo: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!confirm(`Sei sicuro di voler eliminare definitivamente il Modello Master "${tmplTitolo}"?\n\n(I documenti già salvati o firmati nei progetti rimangono perfettamente congelati e integri).`)) return;
-    deleteTemplate(tmplId);
+    // §3.3 — prima il server, poi lo stato locale: il catch vuoto dichiarava sempre
+    // successo anche con l'eliminazione fallita. Il modello sparisce solo se confermato.
     try {
       await eliminaDocumentoTemplateApi(tmplId);
-    } catch {}
+    } catch (err: any) {
+      setFeedback(`⚠️ Eliminazione di "${tmplTitolo}" NON riuscita: ${err?.message || 'errore di rete'}. Il modello NON è stato rimosso.`);
+      setTimeout(() => setFeedback(null), 4000);
+      return;
+    }
+    deleteTemplate(tmplId);
     const updated = getAllTemplates(true);
     setTemplatesList(updated);
     if (selectedTemplateId === tmplId) {

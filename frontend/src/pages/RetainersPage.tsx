@@ -57,18 +57,9 @@ export function RetainersPage() {
     const currentTenantId = getCurrentTenantId();
     const importoCentesimi = Math.round(parseFloat(importoEuro) * 100);
 
-    const res = await creaContrattoRicorrenteApi({
-      clienteId,
-      progettoId: progettoId || undefined,
-      titolo,
-      frequenza,
-      importoCentesimi,
-      prossimaFatturazione,
-      note,
-    });
-
-    // Garanzia salvataggio anche in ambiente offline / fallback
-    const newContractObj = res || {
+    // §3.3 — local-first: la bozza va comunque in localStorage, poi si sincronizza col
+    // server. Se l'API fallisce l'alert lo dice: prima annunciava "attivato" comunque.
+    const draftLocale = {
       id: `cnt-${Date.now()}`,
       tenantId: currentTenantId,
       clienteId,
@@ -80,14 +71,31 @@ export function RetainersPage() {
       stato: 'attivo',
       cliente: clienti.find(c => c.id === clienteId) || { nome: 'Cliente Studio' },
     };
-
     const retStorageKey = getTenantStorageKey('bluman_retainer_contracts', currentTenantId);
-    const savedStr = localStorage.getItem(retStorageKey);
-    const savedArr: any[] = savedStr ? JSON.parse(savedStr) : [];
-    localStorage.setItem(retStorageKey, JSON.stringify([newContractObj, ...savedArr]));
+    const salvaInLocale = (contratto: any) => {
+      const savedStr = localStorage.getItem(retStorageKey);
+      const savedArr: any[] = savedStr ? JSON.parse(savedStr) : [];
+      localStorage.setItem(retStorageKey, JSON.stringify([contratto, ...savedArr]));
+    };
 
-    setSaving(false);
-    alert('✓ Contratto Ricorrente attivato con successo!');
+    try {
+      const res = await creaContrattoRicorrenteApi({
+        clienteId,
+        progettoId: progettoId || undefined,
+        titolo,
+        frequenza,
+        importoCentesimi,
+        prossimaFatturazione,
+        note,
+      });
+      salvaInLocale(res || draftLocale);
+      alert('✓ Contratto Ricorrente attivato con successo!');
+    } catch (err: any) {
+      salvaInLocale(draftLocale);
+      alert(`Contratto "${titolo}" salvato in LOCALE ma NON sincronizzato col server: ${err?.message || 'errore di rete'}. Risulterà visibile solo su questo dispositivo finché la sincronizzazione non andrà a buon fine.`);
+    } finally {
+      setSaving(false);
+    }
     setShowModal(false);
     setTitolo('');
     setImportoEuro('');
@@ -100,11 +108,21 @@ export function RetainersPage() {
     setLoading(true);
 
     const targetContratto = contratti.find(c => String(c.id) === String(contrattoId));
-    const res = await generaFatturaRetainerApi(contrattoId);
 
-    // Garanzia aggiornamento locale per la visibilità immediata in Fatture e Scadenzario
-    const anno = new Date().getFullYear();
-    const numeroFattura = res?.fattura?.numero || `FT-${anno}-000${Math.floor(Math.random() * 900) + 100}`;
+    // §3.3 — emissione fiscale del canone: la fattura DEVE esistere sul server. Se l'API
+    // fallisce non si fabbrica nulla in locale (prima finiva nel registro fatture e nello
+    // scadenzario un numero casuale 'FT-<anno>-000N' senza alcuna emissione reale).
+    let res: any = null;
+    try {
+      res = await generaFatturaRetainerApi(contrattoId);
+    } catch (err: any) {
+      setLoading(false);
+      alert(`⚠️ Emissione fattura NON riuscita: ${err?.message || 'errore di rete'}. Nessuna fattura è stata creata e nessuna rata inserita nello Scadenzario: riprova.`);
+      return;
+    }
+
+    // Specchio locale per visibilità immediata in Fatture/Scadenzario (dati dalla risposta server)
+    const numeroFattura = res?.fattura?.numero || '(numero non comunicato dal server)';
     const importoEurVal = (targetContratto?.importoCentesimi || 150000) / 100;
 
     const nuovaFatturaLocal = {

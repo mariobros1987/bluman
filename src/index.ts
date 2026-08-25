@@ -19,7 +19,15 @@ async function start() {
     console.log('✅ Connesso a PostgreSQL con successo.');
     app = new PrismaApp(prisma, TENANT_ID);
   } catch (e) {
-    console.warn('⚠️ Impossibile connettersi a PostgreSQL, uso InMemoryApp fallback:', e);
+    // §3.2 — fail-fast: in produzione, senza PostgreSQL, NON si deve servire traffico
+    // col fallback InMemoryApp: l'API risponderebbe con dati vuoti (clienti, progetti,
+    // fatture spariti) e le scritture andrebbero perse per sempre. Meglio un crash
+    // visibile: Railway riavvia il processo finché il database non torna raggiungibile.
+    if (process.env.NODE_ENV === 'production') {
+      console.error('❌ Connessione a PostgreSQL fallita in produzione: arresto il processo invece di servire dati vuoti dal fallback InMemory.', e);
+      process.exit(1);
+    }
+    console.warn('⚠️ Impossibile connettersi a PostgreSQL, uso InMemoryApp fallback (solo sviluppo/demo):', e);
     app = new InMemoryApp();
   }
 

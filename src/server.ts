@@ -248,8 +248,47 @@ export function buildServer(app: AppPort): FastifyInstance {
     'GET /uploads/:filename',
   ]);
 
+  // §3.1 — CORS con whitelist esplicita: `origin: true` rifletteva qualunque Origin,
+  // quindi qualsiasi sito poteva chiamare l'API dal browser di un operatore loggato.
+  // Le origini ammesse si elencano in CORS_ORIGINS (separate da virgola; una voce che
+  // inizia con `*.` fa suffix-match sull'hostname, utile per i deploy Vercel).
+  // In sviluppo la whitelist di default è localhost; in produzione senza CORS_ORIGINS
+  // nessuna origine browser è ammessa (fail-closed) e resta solo l'accesso senza Origin.
+  const originiDaEnv = (process.env.CORS_ORIGINS || '')
+    .split(',')
+    .map(v => v.trim())
+    .filter(Boolean);
+  const DEFAULT_DEV = ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:4173', 'http://127.0.0.1:4173'];
+  const originiConsentite = originiDaEnv.length > 0
+    ? originiDaEnv
+    : (process.env.NODE_ENV === 'production' ? [] : DEFAULT_DEV);
+  if (process.env.NODE_ENV === 'production' && originiDaEnv.length === 0) {
+    console.warn('⚠️ CORS_ORIGINS non impostato in produzione: il frontend non potrà chiamare questa API dal browser. Imposta CORS_ORIGINS con l\'origine del frontend.');
+  }
+
+  function origineInWhitelist(origine: string): boolean {
+    return originiConsentite.some(voce => {
+      if (voce.startsWith('*.')) {
+        try {
+          return new URL(origine).hostname.endsWith(voce.slice(1));
+        } catch {
+          return false;
+        }
+      }
+      return origine === voce;
+    });
+  }
+
   server.register(cors, {
-    origin: true,
+    origin: (origine: string | undefined, callback) => {
+      // Senza header Origin non è una chiamata cross-origin del browser (curl,
+      // server-to-server, app mobile): passa. Idem l'origine letterale 'null'
+      // (client che non dichiarano un'origine, es. alcuni tool HTTP).
+      if (!origine || origine === 'null') return callback(null, true);
+      if (origineInWhitelist(origine)) return callback(null, true);
+      console.warn(`CORS bloccata per origine non in whitelist: ${origine}`);
+      return callback(new Error(`Origine non consentita dalla CORS policy: ${origine}`), false);
+    },
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'x-tenant-id', 'Accept', 'Origin', 'X-Requested-With'],
     credentials: true,

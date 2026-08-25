@@ -1,4 +1,7 @@
 import tls from 'tls';
+// §3.4 — stessa policy TLS di emailService/emailRelay: certificati verificati,
+// eccezione solo con SMTP_INSECURE_TLS=1.
+import { tlsRejectUnauthorized } from './emailRelay.js';
 
 export async function fetchRecentImapEmails(options: {
   host?: string;
@@ -24,7 +27,7 @@ export async function fetchRecentImapEmails(options: {
       {
         host,
         port,
-        rejectUnauthorized: false,
+        rejectUnauthorized: tlsRejectUnauthorized(),
         timeout: 6000,
       },
       () => {

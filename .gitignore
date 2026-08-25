@@ -18,6 +18,9 @@ build/
 uploads/
 *.zip
 
+# Documenti generati (fatture, lettere, guide): non vanno versionati (§3.6)
+*.pdf
+
 # TypeScript
 *.tsbuildinfo
 

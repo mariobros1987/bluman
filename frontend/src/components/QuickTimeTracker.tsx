@@ -288,11 +288,21 @@ export function QuickTimeTracker({ user }: TimeTrackerProps) {
     const currentTenantId = getCurrentTenantId(user);
     localStorage.setItem(getTenantStorageKey('bluman_custom_projects', currentTenantId), JSON.stringify(savedArr));
 
+    // §3.3 — le ore sono salvate subito in locale (il timer non deve perdere dati), ma
+    // l'alert deve dire se la sincronizzazione col server è riuscita: il catch vuoto
+    // dichiarava sempre "consuntivate con successo" anche con la pratica non salvata sul DB.
+    let syncOk = true;
     try {
       await salvaProgettoDettaglioApi(String(currentProject.id), updatedPrj);
-    } catch {}
+    } catch {
+      syncOk = false;
+    }
 
-    alert(`✓ Consuntivate con successo ${hoursSpentDecimal}h (€ ${totalCost}) sulla pratica "${currentProject.n}"!`);
+    if (syncOk) {
+      alert(`✓ Consuntivate con successo ${hoursSpentDecimal}h (€ ${totalCost}) sulla pratica "${currentProject.n}"!`);
+    } else {
+      alert(`⚠️ ${hoursSpentDecimal}h (€ ${totalCost}) consuntivate in LOCALE sulla pratica "${currentProject.n}", ma NON sincronizzate col server. I dati restano disponibili su questo dispositivo: apri la scheda del progetto e salvala per ritentare la sincronizzazione.`);
+    }
     setShowStopModal(false);
     setSeconds(0);
     setSessionNotes('');

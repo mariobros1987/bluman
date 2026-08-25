@@ -528,8 +528,10 @@ function AssegnaModuloClienteModal({
 
       onClose();
       navigate(`/projects/${projIdToUse}`);
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      // §3.3 — prima l'errore finiva solo in console.error: l'assegnazione falliva e il
+      // modal restava lì senza alcun messaggio, oppure l'utente riprovava alla cieca.
+      alert(`Assegnazione modulo non riuscita: ${err?.message || 'errore di rete'}. Il progetto NON è stato modificato.`);
     } finally {
       setLoading(false);
     }
@@ -655,10 +657,17 @@ function ArticoliCatalogView({ articoliList, onOpenNew }: { articoliList: Artico
     };
 
     saveCustomTemplate(newTmpl);
-    await creaDocumentoTemplateApi(newTmpl);
-    reloadMasterTemplates();
-    setEditDocModels(prev => [...prev, newTmpl.id]);
-    alert(`✓ Nuovo Modello Word "${newTmpl.titolo}" creato e allacciato all'articolo!`);
+    // §3.3 — se il server non conferma, il modello esiste solo in localStorage: va detto,
+    // non mostrato come «creato» e basta (al cambio dispositivo sparirebbe).
+    try {
+      await creaDocumentoTemplateApi(newTmpl);
+      reloadMasterTemplates();
+      setEditDocModels(prev => [...prev, newTmpl.id]);
+      alert(`✓ Nuovo Modello Word "${newTmpl.titolo}" creato e allacciato all'articolo!`);
+    } catch (err: any) {
+      alert(`Modello "${newTmpl.titolo}" salvato in LOCALE ma NON sincronizzato col server: ${err?.message || 'errore di rete'}. Al prossimo reload da un altro dispositivo non sarà visibile.`);
+      setEditDocModels(prev => [...prev, newTmpl.id]);
+    }
   };
 
   const handleImportDocFileForArticle = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -692,10 +701,16 @@ function ArticoliCatalogView({ articoliList, onOpenNew }: { articoliList: Artico
       };
 
       saveCustomTemplate(newTmpl);
-      await creaDocumentoTemplateApi(newTmpl);
-      reloadMasterTemplates();
-      setEditDocModels(prev => [...prev, newTmpl.id]);
-      alert(`✓ File "${file.name}" importato dal PC e allacciato con successo!`);
+      // §3.3 — come sopra: salvataggio locale subito, ma la verità sul sync col server.
+      try {
+        await creaDocumentoTemplateApi(newTmpl);
+        reloadMasterTemplates();
+        setEditDocModels(prev => [...prev, newTmpl.id]);
+        alert(`✓ File "${file.name}" importato dal PC e allacciato con successo!`);
+      } catch (err: any) {
+        alert(`File "${file.name}" salvato in LOCALE ma NON sincronizzato col server: ${err?.message || 'errore di rete'}.`);
+        setEditDocModels(prev => [...prev, newTmpl.id]);
+      }
     };
     reader.readAsText(file);
     e.target.value = '';
@@ -742,21 +757,17 @@ function ArticoliCatalogView({ articoliList, onOpenNew }: { articoliList: Artico
         oreDefault: editHours,
         nome: editName,
       });
-      // aggiorna locale
+      // §3.3 — aggiorna locale SOLO dopo la conferma del server. Prima anche il ramo
+      // catch applicava le modifiche in locale e chiudeva il modal in silenzio: prezzo
+      // e ore sembravano salvati mentre il database conservava i valori vecchi.
       editingArt.p = editPrice;
       editingArt.h = editHours;
       editingArt.n = editName;
       editingArt.documentiRichiesti = editDocModels;
       editingArt.formMasterId = editFormMasterId;
       setEditingArt(null);
-    } catch (err) {
-      console.error(err);
-      editingArt.p = editPrice;
-      editingArt.h = editHours;
-      editingArt.n = editName;
-      editingArt.documentiRichiesti = editDocModels;
-      editingArt.formMasterId = editFormMasterId;
-      setEditingArt(null);
+    } catch (err: any) {
+      alert(`Salvataggio articolo non riuscito: ${err?.message || 'errore di rete'}. Le modifiche NON sono state applicate, riprova.`);
     } finally {
       setSavingEdit(false);
     }
@@ -1312,17 +1323,24 @@ function GiurisdizioniView({
               onSubmit={async (e) => {
                 e.preventDefault();
                 if (!newGiurNome || !newGiurCodice) return;
-                const res = await creaGiurisdizioneApi({
-                  nome: newGiurNome,
-                  codice: newGiurCodice.toUpperCase(),
-                  tipo: newGiurTipo,
-                  note: newGiurNote,
-                });
-                onAddGiur(res);
-                setModalGiurOpen(false);
-                setNewGiurNome('');
-                setNewGiurCodice('');
-                setNewGiurNote('');
+                // §3.3 — creaGiurisdizioneApi ora lancia se il server rifiuta o non risponde:
+                // la giurisdizione si aggiunge alla lista SOLO con l'oggetto restituito dal DB,
+                // mai con un id inventato dal client (succedeva: 'giur-<timestamp>').
+                try {
+                  const res = await creaGiurisdizioneApi({
+                    nome: newGiurNome,
+                    codice: newGiurCodice.toUpperCase(),
+                    tipo: newGiurTipo,
+                    note: newGiurNote,
+                  });
+                  onAddGiur(res);
+                  setModalGiurOpen(false);
+                  setNewGiurNome('');
+                  setNewGiurCodice('');
+                  setNewGiurNote('');
+                } catch (err: any) {
+                  alert(`Creazione giurisdizione non riuscita: ${err?.message || 'errore di rete'}. Riprova.`);
+                }
               }}
               style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
             >
@@ -1434,12 +1452,17 @@ function LibreriaDocumentiEForm() {
 
   const handleDeleteDoc = async (templateId: string, nome: string) => {
     if (!confirm(`Sei sicuro di voler eliminare definitivamente il modello master "${nome}"?\n\nI documenti già firmati o salvati nei progetti del cliente rimarranno comunque congelati e perfettamente integri.`)) return;
-    deleteTemplate(templateId);
+    // §3.3 — prima la rimozione locale avveniva PRIMA della chiamata e il `catch {}`
+    // vuoto annunciava comunque «eliminato»: il modello spariva dalla lista ma restava
+    // a database (e riappariva al reload). Ora si cancella in locale solo a conferma avvenuta.
     try {
       await eliminaDocumentoTemplateApi(templateId);
-    } catch {}
-    reloadDocModels();
-    alert(`🗑️ Modello "${nome}" eliminato dalla libreria master.`);
+      deleteTemplate(templateId);
+      reloadDocModels();
+      alert(`🗑️ Modello "${nome}" eliminato dalla libreria master.`);
+    } catch (err: any) {
+      alert(`Eliminazione del modello "${nome}" non riuscita: ${err?.message || 'errore di rete'}. Il modello NON è stato rimosso.`);
+    }
   };
 
   const handleAddDoc = async (e: React.FormEvent) => {
@@ -1473,16 +1496,23 @@ function LibreriaDocumentiEForm() {
       };
 
       saveCustomTemplate(customTmpl);
-      await creaDocumentoTemplateApi(customTmpl);
-      reloadDocModels();
-
-      setDocName('');
-      setDocDesc('');
-      setFileToUpload(null);
-      setNewDocOpen(false);
-      alert(`✓ Nuovo Modello Master "${customTmpl.titolo}" aggiunto con successo!`);
-    } catch (err) {
-      console.error(err);
+      // §3.3 — il vecchio catch faceva solo console.error: upload o salvataggio falliti
+      // sparivano in silenzio con lo spinner che si fermava come se tutto fosse andato bene.
+      try {
+        await creaDocumentoTemplateApi(customTmpl);
+        reloadDocModels();
+        setDocName('');
+        setDocDesc('');
+        setFileToUpload(null);
+        setNewDocOpen(false);
+        alert(`✓ Nuovo Modello Master "${customTmpl.titolo}" aggiunto con successo!`);
+      } catch (err: any) {
+        reloadDocModels();
+        alert(`Modello "${customTmpl.titolo}" salvato in LOCALE ma NON sincronizzato col server: ${err?.message || 'errore di rete'}.`);
+      }
+    } catch (err: any) {
+      // Upload del file fallito: niente è stato salvato, né in locale né sul server.
+      alert(`Caricamento del documento non riuscito: ${err?.message || 'errore di rete'}. Il file NON è stato salvato.`);
     } finally {
       setUploading(false);
     }
@@ -1512,9 +1542,14 @@ function LibreriaDocumentiEForm() {
           contenutoHtml: content,
         };
         saveCustomTemplate(customTmpl);
-        await creaDocumentoTemplateApi(customTmpl);
-        reloadDocModels();
-        alert(`✓ Modello "${customTmpl.titolo}" importato con successo!`);
+        // §3.3 — l'import da file non deve annunciare successi se il server non conferma.
+        try {
+          await creaDocumentoTemplateApi(customTmpl);
+          reloadDocModels();
+          alert(`✓ Modello "${customTmpl.titolo}" importato con successo!`);
+        } catch (err: any) {
+          alert(`Modello "${customTmpl.titolo}" salvato in LOCALE ma NON sincronizzato col server: ${err?.message || 'errore di rete'}.`);
+        }
       }
     };
     reader.readAsText(file);
@@ -2108,10 +2143,16 @@ function NuovoArticoloModal({ giurList, onClose, onCreated }: { giurList: Giuris
     };
 
     saveCustomTemplate(newTmpl);
-    await creaDocumentoTemplateApi(newTmpl);
-    reloadMasterTemplates();
-    setSelectedDocIds(prev => [...prev, newTmpl.id]);
-    alert(`✓ Nuovo Modello Word "${newTmpl.titolo}" creato e collegato all'articolo!`);
+    // §3.3 — salvataggio locale immediato, esito del sync col server comunicato onestamente.
+    try {
+      await creaDocumentoTemplateApi(newTmpl);
+      reloadMasterTemplates();
+      setSelectedDocIds(prev => [...prev, newTmpl.id]);
+      alert(`✓ Nuovo Modello Word "${newTmpl.titolo}" creato e collegato all'articolo!`);
+    } catch (err: any) {
+      alert(`Modello "${newTmpl.titolo}" salvato in LOCALE ma NON sincronizzato col server: ${err?.message || 'errore di rete'}.`);
+      setSelectedDocIds(prev => [...prev, newTmpl.id]);
+    }
   };
 
   const handleImportDocFileForNewArt = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -2145,10 +2186,16 @@ function NuovoArticoloModal({ giurList, onClose, onCreated }: { giurList: Giuris
       };
 
       saveCustomTemplate(newTmpl);
-      await creaDocumentoTemplateApi(newTmpl);
-      reloadMasterTemplates();
-      setSelectedDocIds(prev => [...prev, newTmpl.id]);
-      alert(`✓ File "${file.name}" importato dal PC e allacciato con successo!`);
+      // §3.3 — stesso pattern: locale subito, sync col server dichiarato onestamente.
+      try {
+        await creaDocumentoTemplateApi(newTmpl);
+        reloadMasterTemplates();
+        setSelectedDocIds(prev => [...prev, newTmpl.id]);
+        alert(`✓ File "${file.name}" importato dal PC e allacciato con successo!`);
+      } catch (err: any) {
+        alert(`File "${file.name}" salvato in LOCALE ma NON sincronizzato col server: ${err?.message || 'errore di rete'}.`);
+        setSelectedDocIds(prev => [...prev, newTmpl.id]);
+      }
     };
     reader.readAsText(file);
     e.target.value = '';
@@ -2203,8 +2250,9 @@ function NuovoArticoloModal({ giurList, onClose, onCreated }: { giurList: Giuris
       });
       onCreated();
       onClose();
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      // §3.3 — creazione articolo fallita: va detto, non solo loggato in console.
+      alert(`Creazione prestazione non riuscita: ${err?.message || 'errore di rete'}. Riprova.`);
     } finally {
       setLoading(false);
     }
@@ -2495,8 +2543,9 @@ function CreaModuloForm({ articoliList, giurList, onCreated }: { articoliList: A
         righe: selectedArts.map(x => ({ articoloId: x.artId, quantita: x.qty })),
       });
       onCreated();
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      // §3.3 — salvataggio modulo template fallito: messaggio esplicito all'utente.
+      alert(`Salvataggio modulo non riuscito: ${err?.message || 'errore di rete'}. Riprova.`);
     } finally {
       setLoading(false);
     }

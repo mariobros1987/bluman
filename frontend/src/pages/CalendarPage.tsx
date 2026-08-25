@@ -225,8 +225,14 @@ export function CalendarPage() {
 
           <button
             onClick={async () => {
-              const res = await triggerCronScadenzeApi();
-              alert(res?.message || '✓ Scansione cron completata con successo!');
+              // §3.3 — triggerCronScadenzeApi ora lancia davvero: il successo si annuncia
+              // solo con il report restituito dal server, mai con un messaggio inventato.
+              try {
+                const res = await triggerCronScadenzeApi();
+                alert(res?.message || '✓ Scansione cron completata con successo!');
+              } catch (err: any) {
+                alert(`⚠️ Scansione cron NON eseguita: ${err?.message || 'errore di rete'}. Le notifiche di scadenza NON sono state inviate.`);
+              }
             }}
             style={{ background: '#1e1b4b', color: '#a5b4fc', border: '1px solid #4338ca', padding: '8px 14px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
           >

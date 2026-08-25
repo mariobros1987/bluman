@@ -327,11 +327,17 @@ export function InvoicesPage() {
                         >
                           📥 XML SDI
                         </button>
-                        <button 
+                        <button
                           style={{ background: '#059669', border: 'none', color: 'white', padding: '4px 8px', borderRadius: 6, cursor: 'pointer', marginRight: 6, fontWeight: 700 }}
                           onClick={async () => {
-                            const res = await trasmettiFatturaSdiApi(inv.id);
-                            if (res) alert(res.message || '✓ Fattura trasmessa a SDI!');
+                            // §3.3 — trasmettiFatturaSdiApi ora lancia se lo SdI non risponde:
+                            // dichiarare «trasmessa» una fattura che non lo è sarebbe un falso.
+                            try {
+                              const res = await trasmettiFatturaSdiApi(inv.id);
+                              if (res) alert(res.message || '✓ Fattura trasmessa a SDI!');
+                            } catch (err: any) {
+                              alert(`⚠️ Trasmissione SDI NON riuscita: ${err?.message || 'errore di rete'}. La fattura NON è stata inviata al Sistema di Interscambio.`);
+                            }
                           }}
                           title="Trasmetti Direttamente all'Agenzia delle Entrate via SDI Web Service"
                         >

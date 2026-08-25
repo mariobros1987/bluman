@@ -28,6 +28,22 @@
  */
 import nodemailer from 'nodemailer';
 
+/**
+ * §3.4 — verifica dei certificati TLS per SMTP/IMAP. Prima era disattivata ovunque
+ * (`rejectUnauthorized: false`): le credenziali SMTP potevano finire a chiunque fosse in
+ * grado di fare man-in-the-middle. La verifica è la regola; se un provider ha la catena
+ * di certificazione rotta si può TEMPORANEAMENTE tornare al comportamento insicuro con
+ * SMTP_INSECURE_TLS=1 — il warn allo startup lascia l'eccezione visibile nei log.
+ */
+const TLS_INSICURA_ATTIVA = process.env.SMTP_INSECURE_TLS === '1' || process.env.SMTP_INSECURE_TLS === 'true';
+if (TLS_INSICURA_ATTIVA) {
+  console.warn('⚠️ SMTP_INSECURE_TLS attivo: i certificati TLS di SMTP/IMAP NON vengono verificati. Rimuovere l\'eccezione appena il provider è a posto.');
+}
+
+export function tlsRejectUnauthorized(): boolean {
+  return !TLS_INSICURA_ATTIVA;
+}
+
 export interface CredenzialiSmtp {
   host?: string;
   port?: number;
@@ -178,7 +194,7 @@ async function inviaViaSmtp(
         port: cand.port,
         secure: cand.secure,
         auth: { user: smtp.user, pass: smtp.pass },
-        tls: { rejectUnauthorized: false },
+        tls: { rejectUnauthorized: tlsRejectUnauthorized() },
         connectionTimeout: timeoutMs,
         greetingTimeout: timeoutMs,
       });

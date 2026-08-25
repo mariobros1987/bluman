@@ -116,7 +116,13 @@ export function AppLayout({ children, alertCount: _alertCount = 0, user, onLogou
 
   const handleMarkAllRead = async () => {
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-    await markNotificheReadApi();
+    // §3.3 — come nel portale cliente: il badge si azzera subito (stato visuale), la
+    // persistenza sul server è best-effort; un eventuale errore non deve rompere la UI.
+    try {
+      await markNotificheReadApi();
+    } catch (err) {
+      console.warn('markNotificheRead non persistito sul server:', err);
+    }
   };
 
   const handleSelectNotif = (notif: NotificationItem) => {

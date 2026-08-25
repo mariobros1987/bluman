@@ -253,9 +253,16 @@ export function SettingsPage() {
     };
 
     saveTenantInfoToStorage(currentTenantId, dataToSave);
-    await updateTenantInfoApi(dataToSave, currentTenantId);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2500);
+    // §3.3 — prima il salvataggio server era atteso senza try/catch: al primo errore di
+    // rete l'handler moriva in silenzio e il banner «Salvato» non compariva né compariva
+    // un messaggio. Ora il fallimento è dichiarato (i dati restano in bozza locale).
+    try {
+      await updateTenantInfoApi(dataToSave, currentTenantId);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    } catch (err: any) {
+      alert(`Salvataggio impostazioni NON riuscito: ${err?.message || 'errore di rete'}. I dati sono conservati in locale su questo dispositivo ma non sincronizzati col server: riprova.`);
+    }
   };
 
   const handleTestSmtp = async () => {
@@ -351,8 +358,10 @@ export function SettingsPage() {
         await updateTenantInfoApi({ logoUrl: finalLogoUrl });
         localStorage.setItem(getTenantStorageKey('bluman_logo_url'), finalLogoUrl);
         alert('✓ Logo caricato e salvato permanentemente su Supabase PostgreSQL!');
-      } catch (err) {
-        console.error(err);
+      } catch (err: any) {
+        // §3.3 — upload o salvataggio falliti: prima sparivano in console.error e il logo
+        // sembrava caricato (era già in anteprima). Il localStorage viene scritto solo dopo.
+        alert(`Caricamento logo non riuscito: ${err?.message || 'errore di rete'}. Il logo NON è stato salvato sul server.`);
       } finally {
         setUploadingLogo(false);
       }
@@ -377,8 +386,10 @@ export function SettingsPage() {
       await loadTenantData();
       setSaved(true);
       setTimeout(() => setSaved(false), 4000);
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      // §3.3 — la creazione del collaboratore è una scrittura critica (account + eventuale
+      // email di invito): il fallimento va mostrato, il modal resta aperto per riprovare.
+      alert(`Creazione collaboratore non riuscita: ${err?.message || 'errore di rete'}. L'utente NON è stato creato.`);
     } finally {
       setSubmittingUser(false);
     }
@@ -1625,10 +1636,21 @@ function OperatorDetailModal({
     }
 
     if (operator.id) {
-      await salvaPermessiUtenteApi(operator.id, payload);
+      // §3.3 — la matrice RBAC esiste davvero solo se il server la persiste: prima un
+      // errore di rete non veniva nemmeno catturato e l'alert annunciava comunque
+      // «permessi ATTIVI», mentre a database restavano i vecchi livelli di accesso.
+      try {
+        await salvaPermessiUtenteApi(operator.id, payload);
+        setSavingPermessi(false);
+        alert(`✓ Matrice Permessi RBAC salvata ed ATTIVA per ${operator.nome || operator.name}! I moduli bloccati (Denied) sono ora inaccessibili.`);
+      } catch (err: any) {
+        setSavingPermessi(false);
+        alert(`Salvataggio permessi RBAC NON riuscito: ${err?.message || 'errore di rete'}. La matrice mostrata NON è attiva sul server: riprova prima di fare affidamento su questi livelli di accesso.`);
+      }
+    } else {
+      setSavingPermessi(false);
+      alert(`✓ Matrice Permessi RBAC salvata in locale per ${operator.nome || operator.name} (utente non ancora registrato sul server: verrà sincronizzata alla creazione).`);
     }
-    setSavingPermessi(false);
-    alert(`✓ Matrice Permessi RBAC salvata ed ATTIVA per ${operator.nome || operator.name}! I moduli bloccati (Denied) sono ora inaccessibili.`);
   };
 
   const nameInitial = (operator.nome || operator.name || 'U').substring(0, 2).toUpperCase();
