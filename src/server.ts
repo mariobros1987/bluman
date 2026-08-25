@@ -212,7 +212,16 @@ async function recordAudit(params: {
 }
 
 export function buildServer(app: AppPort): FastifyInstance {
-  const server = Fastify({ logger: false });
+  const server = Fastify({
+    logger: false,
+    // Dietro il proxy di Railway (NODE_ENV=production) `req.ip` senza questa opzione è
+    // l'indirizzo interno del load balancer, che cambia da connessione a connessione.
+    // @fastify/rate-limit tiene i contatori per-IP usando proprio `req.ip`: con IP
+    // sempre diversi il contatore non si accumula mai e il limite è di fatto disattivato
+    // (verificato in produzione: 401 anche al 6° tentativo di login). Fidandosi del proxy,
+    // Fastify risolve `req.ip` dal primo salto di `x-forwarded-for`, cioè il client reale.
+    trustProxy: process.env.NODE_ENV === 'production',
+  });
 
   /**
    * §23 — le sole rotte raggiungibili senza un token valido. Tutto il resto risponde 401.
