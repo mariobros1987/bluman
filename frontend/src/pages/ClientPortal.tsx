@@ -21,6 +21,7 @@ import {
   cambiaPasswordClienteApi,
   documentiPortaleApi,
   urlFileArchivio,
+  scaricaDocumentoClient,
   contattiPortaleApi,
   proposteDatiPortaleApi,
   inviaPropostaDatiApi,
@@ -2815,15 +2816,13 @@ export function ClientPortal() {
                     </button>
 
                     {doc.scaricabile && urlFileArchivio(doc.fileUrl) && (
-                      <a
-                        href={urlFileArchivio(doc.fileUrl) as string}
-                        target="_blank"
-                        rel="noreferrer"
-                        download={doc.nome}
-                        style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '6px 12px', borderRadius: 8, fontSize: 11, textDecoration: 'none' }}
+                      <button
+                        type="button"
+                        onClick={() => scaricaDocumentoClient(doc.fileUrl, doc.nome)}
+                        style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '6px 12px', borderRadius: 8, fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
                       >
                         ⬇ Scarica il file
-                      </a>
+                      </button>
                     )}
 
                     {doc.firmato ? (
@@ -3716,9 +3715,13 @@ export function ClientPortal() {
                   return (
                     <div style={{ alignSelf: 'center', textAlign: 'center', color: 'var(--muted)', fontSize: 12.5, maxWidth: 460, lineHeight: 1.7 }}>
                       Questo formato non si apre dentro il portale.<br />
-                      <a href={url} target="_blank" rel="noreferrer" download={selectedViewerDoc.nome} style={{ color: '#818cf8', fontWeight: 700 }}>
+                      <button
+                        type="button"
+                        onClick={() => scaricaDocumentoClient(selectedViewerDoc.fileUrl, selectedViewerDoc.nome)}
+                        style={{ background: 'transparent', border: 'none', color: '#818cf8', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline', padding: 0, fontSize: 'inherit' }}
+                      >
                         Scarica «{selectedViewerDoc.nome}»
-                      </a>{' '}
+                      </button>{' '}
                       e leggilo prima di firmare.
                     </div>
                   );
@@ -3738,15 +3741,13 @@ export function ClientPortal() {
             <div style={{ padding: '14px 20px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, background: 'var(--card)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 {urlFileArchivio(selectedViewerDoc.fileUrl) && (
-                  <a
-                    href={urlFileArchivio(selectedViewerDoc.fileUrl) as string}
-                    target="_blank"
-                    rel="noreferrer"
-                    download={selectedViewerDoc.nome}
-                    style={{ background: '#1a1f3d', border: '1px solid #4338ca', color: '#c7d2fe', padding: '8px 16px', borderRadius: 8, fontSize: 11, fontWeight: 700, textDecoration: 'none' }}
+                  <button
+                    type="button"
+                    onClick={() => scaricaDocumentoClient(selectedViewerDoc.fileUrl, selectedViewerDoc.nome)}
+                    style={{ background: '#1a1f3d', border: '1px solid #4338ca', color: '#c7d2fe', padding: '8px 16px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
                   >
                     ⬇ Scarica il file
-                  </a>
+                  </button>
                 )}
               </div>
 
@@ -4015,15 +4016,14 @@ export function ClientPortal() {
                                 👁 Apri
                               </button>
                               {doc.scaricabile && urlFileArchivio(doc.fileUrl) && (
-                                <a
-                                  href={urlFileArchivio(doc.fileUrl) as string}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  download={doc.nome}
-                                  style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '5px 8px', borderRadius: 6, fontSize: 10.5, textDecoration: 'none' }}
+                                <button
+                                  type="button"
+                                  onClick={() => scaricaDocumentoClient(doc.fileUrl, doc.nome)}
+                                  style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '5px 8px', borderRadius: 6, fontSize: 10.5, cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                                  title="Scarica il file"
                                 >
                                   ⬇
-                                </a>
+                                </button>
                               )}
                               {!doc.firmato && (
                                 <>
@@ -4113,15 +4113,13 @@ export function ClientPortal() {
                         </button>
 
                         {docReal?.scaricabile && urlFileArchivio(docReal.fileUrl) && (
-                          <a
-                            href={urlFileArchivio(docReal.fileUrl) as string}
-                            target="_blank"
-                            rel="noreferrer"
-                            download={d.nomeFile}
-                            style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '6px 10px', borderRadius: 6, fontSize: 11, textDecoration: 'none' }}
+                          <button
+                            type="button"
+                            onClick={() => scaricaDocumentoClient(docReal.fileUrl, d.nomeFile)}
+                            style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '6px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
                           >
                             ⬇ Scarica
-                          </a>
+                          </button>
                         )}
 
                         {!d.firmato && docReal && (

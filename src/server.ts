@@ -1101,6 +1101,18 @@ export function buildServer(app: AppPort): FastifyInstance {
       else if (ext === '.webp') mimeType = 'image/webp';
       else if (ext === '.svg') mimeType = 'image/svg+xml';
       else if (ext === '.pdf') mimeType = 'application/pdf';
+      else if (ext === '.docx') mimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+      else if (ext === '.doc') mimeType = 'application/msword';
+      else if (ext === '.xlsx') mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+      else if (ext === '.xls') mimeType = 'application/vnd.ms-excel';
+      else if (ext === '.zip') mimeType = 'application/zip';
+      else if (ext === '.txt') mimeType = 'text/plain; charset=utf-8';
+      else if (ext === '.html') mimeType = 'text/html; charset=utf-8';
+
+      const nomePulito = filename.replace(/^\d+_/, '') || filename;
+      const isAnteprima = ext === '.png' || ext === '.jpg' || ext === '.jpeg' || ext === '.webp' || ext === '.svg' || ext === '.pdf';
+      const disposition = isAnteprima ? `inline; filename="${nomePulito}"` : `attachment; filename="${nomePulito}"`;
+      reply.header('Content-Disposition', disposition);
 
       const fileStream = fs.createReadStream(filePath);
       return reply.type(mimeType).send(fileStream);

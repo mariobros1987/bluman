@@ -2109,7 +2109,41 @@ export function urlFileArchivio(url?: string | null): string | null {
   if (valore === '') return null;
   if (/^(data:|blob:|https?:\/\/)/i.test(valore)) return valore;
   if (valore.startsWith('/uploads')) return `${API_BASE}${valore}`;
+  if (valore.startsWith('uploads/')) return `${API_BASE}/${valore}`;
   return valore;
+}
+
+/**
+ * Scarica un file dell'archivio/fascicolo direttamente nel browser,
+ * garantendo il nome file corretto ed evitando blocchi cross-origin.
+ */
+export async function scaricaDocumentoClient(fileUrl?: string | null, nomeFile?: string): Promise<void> {
+  const url = urlFileArchivio(fileUrl);
+  if (!url) return;
+
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const blob = await res.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = objectUrl;
+    link.download = nomeFile || 'documento';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 4000);
+  } catch {
+    // Fallback con navigazione link se la fetch diretta è bloccata
+    const link = document.createElement('a');
+    link.href = url;
+    link.target = '_blank';
+    link.rel = 'noreferrer';
+    if (nomeFile) link.download = nomeFile;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
 }
 
 /**
