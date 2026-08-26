@@ -4,6 +4,7 @@
       "frontend_src_api_client",
       "frontend_src_api_client_aggiornaclienteapi",
       "frontend_src_api_client_aggiornadocumentotemplateapi",
+      "frontend_src_api_client_aggiornaprofiloutenteapi",
       "frontend_src_api_client_aggiornastatoaddendumapi",
       "frontend_src_api_client_api_base",
       "frontend_src_api_client_apifetch",
@@ -13,7 +14,6 @@
       "frontend_src_api_client_confermapropostadatiapi",
       "frontend_src_api_client_consuntivamicrovoceapi",
       "frontend_src_api_client_creaarticoloapi",
-      "frontend_src_api_client_creaclienteapi",
       "frontend_src_api_client_creacontobancarioapi",
       "frontend_src_api_client_creacontrattoricorrenteapi",
       "frontend_src_api_client_creagiurisdizioneapi",
@@ -21,6 +21,7 @@
       "frontend_src_api_client_creapreventivoeaccettaapi",
       "frontend_src_api_client_creaprogettoapi",
       "frontend_src_api_client_createauditlogapi",
+      "frontend_src_api_client_creautentetenantapi",
       "frontend_src_api_client_default_team_users",
       "frontend_src_api_client_documentoprogetto",
       "frontend_src_api_client_downloadfatturapdfserverapi",
@@ -36,7 +37,9 @@
       "frontend_src_api_client_fetchdocumentitemplateapi",
       "frontend_src_api_client_fetchgiurisdizioniapi",
       "frontend_src_api_client_fetchmeapi",
+      "frontend_src_api_client_fetchoperatorisuggeriti",
       "frontend_src_api_client_fetchpermessiutenteapi",
+      "frontend_src_api_client_fetchprofiloutenteapi",
       "frontend_src_api_client_fetchprogettodettaglio",
       "frontend_src_api_client_generafatturaretainerapi",
       "frontend_src_api_client_generamagiclinkapi",
@@ -45,9 +48,10 @@
       "frontend_src_api_client_inviacomunicazioneapi",
       "frontend_src_api_client_inviafatturaemailapi",
       "frontend_src_api_client_inviawebhooksdiapi",
+      "frontend_src_api_client_leggierroreapi",
       "frontend_src_api_client_listadocumentiprogetto",
+      "frontend_src_api_client_marknotifichereadapi",
       "frontend_src_api_client_membrotimesheetapi",
-      "frontend_src_api_client_operatoresuggeritoapi",
       "frontend_src_api_client_propostedatistudioapi",
       "frontend_src_api_client_resetpasswordclienteapi",
       "frontend_src_api_client_resetpasswordutenteapi",
@@ -58,6 +62,7 @@
       "frontend_src_api_client_salvadocumentoapi",
       "frontend_src_api_client_salvapermessiutenteapi",
       "frontend_src_api_client_salvaprogettodettaglioapi",
+      "frontend_src_api_client_sendinvitecollaboratoreapi",
       "frontend_src_api_client_sigillofirma",
       "frontend_src_api_client_statotimesheet",
       "frontend_src_api_client_testchannelapi",
@@ -69,16 +74,15 @@
       "frontend_src_api_client_updatearticoloprezzoapi",
       "frontend_src_api_client_updatetenantinfoapi",
       "frontend_src_api_client_urldocumentoassoluto",
-      "frontend_src_app_appcontent",
-      "frontend_src_pages_clientspage_anagraficaerpmodal",
       "frontend_src_pages_clientspage_magiclinkexplainmodal",
-      "frontend_src_pages_clientspage_tabbtn",
       "frontend_src_pages_projectdetail_projectdetail",
       "frontend_src_pages_projectdetail_richiesteaddendumtab"
     ],
     "1": [
       "frontend_src_api_client_creadocumentotemplateapi",
       "frontend_src_api_client_eliminadocumentotemplateapi",
+      "frontend_src_api_client_fetcharticoli",
+      "frontend_src_api_client_fetchmodulilibreria",
       "frontend_src_api_client_uploadfileapi",
       "frontend_src_components_digitalsignaturemodal",
       "frontend_src_components_digitalsignaturemodal_digitalsignaturemodal",
@@ -108,11 +112,18 @@
       "frontend_src_pages_documenteditorpage_toolbarbtnstyle",
       "frontend_src_pages_library",
       "frontend_src_pages_library_articolicatalogview",
+      "frontend_src_pages_library_assegnamoduloclientemodal",
+      "frontend_src_pages_library_assegnamoduloclientemodal_loadclientdata",
+      "frontend_src_pages_library_assegnamoduloclientemodal_loadprojects",
       "frontend_src_pages_library_creamoduloform",
       "frontend_src_pages_library_giurisdizioniview",
+      "frontend_src_pages_library_library",
+      "frontend_src_pages_library_library_drawedges",
       "frontend_src_pages_library_libreriadocumentieform",
       "frontend_src_pages_library_nuovoarticolomodal",
       "frontend_src_pages_library_subtab",
+      "frontend_src_pages_projectdetail_grafomoduliprogettoview",
+      "frontend_src_pages_projectdetail_grafomoduliprogettoview_loadtemplates",
       "frontend_src_types_index_passaggio",
       "frontend_src_utils_documenttemplates",
       "frontend_src_utils_documenttemplates_archivetemplate",
@@ -126,10 +137,13 @@
       "frontend_src_utils_documenttemplates_prebuilt_templates",
       "frontend_src_utils_documenttemplates_restoretemplate",
       "frontend_src_utils_documenttemplates_savecustomtemplate",
+      "frontend_src_utils_index_levelof",
+      "frontend_src_utils_index_moduloh",
+      "frontend_src_utils_index_modulop",
+      "frontend_src_utils_index_resolverighe",
       "frontend_src_utils_pdfgenerator",
       "frontend_src_utils_pdfgenerator_a4_specs",
       "frontend_src_utils_pdfgenerator_createpaginatedpages",
-      "frontend_src_utils_pdfgenerator_downloadguidepdf",
       "frontend_src_utils_pdfgenerator_downloadrealpdf",
       "frontend_src_utils_pdfgenerator_signaturedata",
       "frontend_src_utils_reorganizationtemplates",
@@ -137,6 +151,7 @@
     ],
     "2": [
       "frontend_src_api_client_ambitofirma",
+      "frontend_src_api_client_apristreamnotifiche",
       "frontend_src_api_client_calcolahashsha256",
       "frontend_src_api_client_cambiapasswordclienteapi",
       "frontend_src_api_client_canalefirma",
@@ -152,12 +167,14 @@
       "frontend_src_api_client_fatturaportale",
       "frontend_src_api_client_fattureportaleapi",
       "frontend_src_api_client_fetchcomunicazioniapi",
+      "frontend_src_api_client_fetchnotificheapi",
       "frontend_src_api_client_fetchwithtimeout",
       "frontend_src_api_client_firmaconfileapi",
       "frontend_src_api_client_grafometricafirmaapi",
       "frontend_src_api_client_inviapropostadatiapi",
       "frontend_src_api_client_inviarichiestaaddendumapi",
       "frontend_src_api_client_magicloginapi",
+      "frontend_src_api_client_notificastreamevent",
       "frontend_src_api_client_propostadatifiscale",
       "frontend_src_api_client_propostedatiportaleapi",
       "frontend_src_api_client_requestportalotpapi",
@@ -187,104 +204,57 @@
       "frontend_src_pages_clientportal_topnavstyle"
     ],
     "3": [
-      "frontend_oxlintrc",
-      "frontend_oxlintrc_plugins",
-      "frontend_oxlintrc_rules",
-      "frontend_oxlintrc_rules_react_only_export_components",
-      "frontend_oxlintrc_rules_react_rules_of_hooks",
-      "frontend_oxlintrc_schema",
-      "frontend_package",
-      "frontend_package_dependencies",
-      "frontend_package_dependencies_html2canvas",
-      "frontend_package_dependencies_jspdf",
-      "frontend_package_dependencies_react",
-      "frontend_package_dependencies_react_dom",
-      "frontend_package_dependencies_react_router_dom",
-      "frontend_package_dependencies_supabase_supabase_js",
-      "frontend_package_dependencies_types_jspdf",
-      "frontend_package_devdependencies",
-      "frontend_package_devdependencies_oxlint",
-      "frontend_package_devdependencies_types_node",
-      "frontend_package_devdependencies_types_react",
-      "frontend_package_devdependencies_types_react_dom",
-      "frontend_package_devdependencies_typescript",
-      "frontend_package_devdependencies_vite",
-      "frontend_package_devdependencies_vitejs_plugin_react",
-      "frontend_package_name",
-      "frontend_package_private",
-      "frontend_package_scripts",
-      "frontend_package_scripts_build",
-      "frontend_package_scripts_dev",
-      "frontend_package_scripts_lint",
-      "frontend_package_scripts_preview",
-      "frontend_package_type",
-      "frontend_package_version",
-      "html2canvas",
-      "jspdf",
-      "oxlint",
-      "package_devdependencies_typescript",
-      "react",
-      "react_dom",
-      "react_router_dom",
-      "ref_oxc",
-      "ref_warn",
-      "supabase_supabase_js",
-      "types_jspdf",
-      "types_react",
-      "types_react_dom",
-      "typescript",
-      "vite",
-      "vitejs_plugin_react"
+      "src_adapters_prisma_prismaistanziazioneport_prismaistanziazioneport_notificamodulocompletato",
+      "src_domain_stateengine",
+      "src_domain_stateengine_calcolapercentualemicrovoce",
+      "src_domain_stateengine_calcolapercentualemodulo",
+      "src_domain_stateengine_calcolapercentualeprogetto",
+      "src_domain_stateengine_calcolastatomodulo",
+      "src_domain_stateengine_calcolastatoprogetto",
+      "src_domain_stateengine_marcaritardomanuale",
+      "src_domain_stateengine_modulocondipendenze",
+      "src_domain_stateengine_registraconsuntivazione",
+      "src_domain_stateengine_risolvidipendenze",
+      "src_domain_stateengine_risolviritardomanuale",
+      "src_domain_stateengine_risultatoconsuntivazione",
+      "src_domain_stateengine_segnalerischio",
+      "src_domain_stateengine_test",
+      "src_domain_stateengine_test_mv",
+      "src_domain_stateengine_valutasegnalerischio",
+      "src_domain_types",
+      "src_domain_types_microvoceinput",
+      "src_domain_types_moduloinput",
+      "src_domain_types_progettoinput",
+      "src_domain_types_statomodulo",
+      "src_domain_types_statoprogetto",
+      "src_scripts_probeavanzamento",
+      "src_scripts_probeavanzamento_main",
+      "src_services_calcoloservice",
+      "src_services_calcoloservice_arricchisciprogetti",
+      "src_services_calcoloservice_avanzamentomodulo",
+      "src_services_calcoloservice_avanzamentoprogetto",
+      "src_services_calcoloservice_calcolaavanzamento",
+      "src_services_calcoloservice_microvocecalcolo",
+      "src_services_calcoloservice_modulocalcolo",
+      "src_services_calcoloservice_percentualevisibile",
+      "src_services_calcoloservice_progettocalcolo",
+      "src_services_calcoloservice_ricalcolaprogetto",
+      "src_services_notificheservice",
+      "src_services_notificheservice_apristreamsse",
+      "src_services_notificheservice_connessionesse",
+      "src_services_notificheservice_connessioni",
+      "src_services_notificheservice_conteggioconnessionisse",
+      "src_services_notificheservice_datievento",
+      "src_services_notificheservice_destinataa",
+      "src_services_notificheservice_eventi_notifica",
+      "src_services_notificheservice_inviaframe",
+      "src_services_notificheservice_notificacliente",
+      "src_services_notificheservice_notificapush",
+      "src_services_notificheservice_notificastudio",
+      "src_services_notificheservice_serializzanotifica",
+      "src_services_notificheservice_tipoeventonotifica"
     ],
     "4": [
-      "dotenv",
-      "exceljs",
-      "fastify",
-      "fastify_cors",
-      "nodemailer",
-      "package",
-      "package_dependencies",
-      "package_dependencies_dotenv",
-      "package_dependencies_exceljs",
-      "package_dependencies_fastify",
-      "package_dependencies_fastify_cors",
-      "package_dependencies_nodemailer",
-      "package_dependencies_pdfkit",
-      "package_dependencies_prisma_client",
-      "package_dependencies_types_nodemailer",
-      "package_description",
-      "package_devdependencies",
-      "package_devdependencies_prisma",
-      "package_devdependencies_tsx",
-      "package_devdependencies_types_node",
-      "package_devdependencies_types_pdfkit",
-      "package_devdependencies_vitest",
-      "package_name",
-      "package_scripts",
-      "package_scripts_bootstrap",
-      "package_scripts_build",
-      "package_scripts_cleanup_test_data",
-      "package_scripts_dev",
-      "package_scripts_passwords_assign",
-      "package_scripts_prisma_generate",
-      "package_scripts_prisma_migrate",
-      "package_scripts_seed",
-      "package_scripts_start",
-      "package_scripts_start_db",
-      "package_scripts_test",
-      "package_scripts_test_watch",
-      "package_type",
-      "package_version",
-      "pdfkit",
-      "prisma",
-      "prisma_client",
-      "tsx",
-      "types_node",
-      "types_nodemailer",
-      "types_pdfkit",
-      "vitest"
-    ],
-    "5": [
       "bluman_analisi_professionale",
       "bluman_analisi_professionale_10_primo_passo_concreto",
       "bluman_analisi_professionale_1_contesto_e_perimetro",
@@ -331,7 +301,7 @@
       "bluman_analisi_professionale_test_automatici_da_eseguire",
       "bluman_analisi_professionale_verifica_manuale_al_termine_di_ogni_sprint"
     ],
-    "6": [
+    "5": [
       "src_server_buildserver",
       "src_server_buildserver_aggiornaclientepercampo",
       "src_server_buildserver_ambitovalido",
@@ -339,6 +309,7 @@
       "src_server_buildserver_clientedellarichiesta",
       "src_server_buildserver_lunedisettimana",
       "src_server_buildserver_nomefiledaurl",
+      "src_server_buildserver_origineinwhitelist",
       "src_server_buildserver_parsedataiso",
       "src_server_buildserver_prossimonumerocontratto",
       "src_server_buildserver_senzahash",
@@ -374,80 +345,198 @@
       "src_services_appport_appport_marcaritardomicrovoce",
       "src_services_appport_appport_risolviritardomicrovoce"
     ],
+    "6": [
+      "prisma_seed",
+      "prisma_seed_daticanaliseed",
+      "prisma_seed_hashpassword",
+      "prisma_seed_main",
+      "prisma_seed_prisma",
+      "src_adapters_prisma_seedfull",
+      "src_adapters_prisma_seedfull_main",
+      "src_adapters_prisma_seedfull_prisma",
+      "src_scripts_backupdb",
+      "src_scripts_backupdb_exporttenantbackup",
+      "src_scripts_backupdb_prisma",
+      "src_scripts_cleanuptestdata",
+      "src_scripts_cleanuptestdata_main",
+      "src_scripts_cleanuptestdata_nomi_di_test",
+      "src_scripts_cleanuptestdata_prisma",
+      "src_scripts_inspectdb",
+      "src_scripts_inspectdb_main",
+      "src_scripts_inspectdb_prisma",
+      "src_scripts_maptenanttables",
+      "src_scripts_maptenanttables_main",
+      "src_scripts_maptenanttables_prisma",
+      "src_scripts_probemoduliportale",
+      "src_scripts_probemoduliportale_db",
+      "src_scripts_probemoduliportale_main",
+      "src_scripts_testtenantdb",
+      "src_scripts_testtenantdb_campi_segreti",
+      "src_scripts_testtenantdb_maschera",
+      "src_scripts_testtenantdb_prisma",
+      "src_scripts_testtenantdb_testtenantallfields",
+      "src_util_prismaclient",
+      "src_util_prismaclient_attivacontestotenant",
+      "src_util_prismaclient_clientbase",
+      "src_util_prismaclient_concontestointransazione",
+      "src_util_prismaclient_contestotenant",
+      "src_util_prismaclient_dentrotransazionecontenant",
+      "src_util_prismaclient_prismaamministrativo",
+      "src_util_prismaclient_test",
+      "src_util_prismaclient_test_hookfinto",
+      "src_util_prismaclient_test_txfinta"
+    ],
     "7": [
-      "frontend_src_api_client_creautentetenantapi",
-      "frontend_src_api_client_fetchtenantinfoapi",
+      "frontend_package",
+      "frontend_package_dependencies",
+      "frontend_package_dependencies_html2canvas",
+      "frontend_package_dependencies_jspdf",
+      "frontend_package_dependencies_react",
+      "frontend_package_dependencies_react_dom",
+      "frontend_package_dependencies_react_router_dom",
+      "frontend_package_dependencies_supabase_supabase_js",
+      "frontend_package_dependencies_types_jspdf",
+      "frontend_package_devdependencies",
+      "frontend_package_devdependencies_oxlint",
+      "frontend_package_devdependencies_types_node",
+      "frontend_package_devdependencies_types_react",
+      "frontend_package_devdependencies_types_react_dom",
+      "frontend_package_devdependencies_vite",
+      "frontend_package_devdependencies_vitejs_plugin_react",
+      "frontend_package_name",
+      "frontend_package_private",
+      "frontend_package_scripts",
+      "frontend_package_scripts_build",
+      "frontend_package_scripts_dev",
+      "frontend_package_scripts_lint",
+      "frontend_package_scripts_preview",
+      "frontend_package_type",
+      "frontend_package_version",
+      "html2canvas",
+      "jspdf",
+      "oxlint",
+      "react",
+      "react_dom",
+      "react_router_dom",
+      "supabase_supabase_js",
+      "types_jspdf",
+      "types_react",
+      "types_react_dom",
+      "vite",
+      "vitejs_plugin_react"
+    ],
+    "8": [
+      "frontend_src_api_client_creaclienteapi",
+      "frontend_src_api_client_fetchclienti",
+      "frontend_src_api_client_fetchprogetti",
       "frontend_src_api_client_fetchtuttefatturestudioapi",
-      "frontend_src_api_client_sendinvitecollaboratoreapi",
-      "frontend_src_components_layout_sidebar",
-      "frontend_src_components_layout_sidebar_nav",
-      "frontend_src_components_layout_sidebar_sidebar",
-      "frontend_src_components_layout_sidebar_sidebarprops",
+      "frontend_src_components_newprojectwizard",
+      "frontend_src_components_newprojectwizard_closebtnstyle",
+      "frontend_src_components_newprojectwizard_labelstyle",
+      "frontend_src_components_newprojectwizard_newprojectwizard",
+      "frontend_src_components_newprojectwizard_newprojectwizardprops",
+      "frontend_src_components_newprojectwizard_overlaystyle",
+      "frontend_src_components_newprojectwizard_wizstyle",
       "frontend_src_components_quicktimetracker_quicktimetracker",
+      "frontend_src_pages_bankspage",
+      "frontend_src_pages_bankspage_bankspage",
       "frontend_src_pages_calendarpage",
       "frontend_src_pages_calendarpage_calendarpage",
       "frontend_src_pages_calendarpage_eventostudio",
       "frontend_src_pages_calendarpage_getcategorycolor",
+      "frontend_src_pages_clientspage",
+      "frontend_src_pages_clientspage_anagraficaerpmodal",
       "frontend_src_pages_clientspage_clientspage",
+      "frontend_src_pages_clientspage_tabbtn",
       "frontend_src_pages_dashboard_dashboard",
       "frontend_src_pages_invoicespage",
       "frontend_src_pages_invoicespage_invoicespage",
-      "frontend_src_pages_projectdetail_documentitab",
+      "frontend_src_pages_library_libreriadocumentieform_loadlinkagedata",
+      "frontend_src_pages_primanotapage",
+      "frontend_src_pages_primanotapage_primanotapage",
       "frontend_src_pages_projectdetail_fatturazionetab",
       "frontend_src_pages_projects_projects",
-      "frontend_src_pages_settingspage",
-      "frontend_src_pages_settingspage_tab",
-      "frontend_src_utils_documenttemplates_resolvedocumenttemplatehtml",
-      "frontend_src_utils_index_getformattedlogourl",
-      "frontend_src_utils_index_progresscolor",
-      "frontend_src_utils_rbac",
-      "frontend_src_utils_rbac_getuserpermission",
-      "frontend_src_utils_rbac_permissionlevel",
-      "frontend_src_utils_tenant",
+      "frontend_src_pages_retainerspage",
+      "frontend_src_pages_retainerspage_retainerspage",
+      "frontend_src_utils_index_fmt",
       "frontend_src_utils_tenant_getcurrenttenantid",
-      "frontend_src_utils_tenant_getstudioinfofortenant",
       "frontend_src_utils_tenant_gettenantseeddata",
-      "frontend_src_utils_tenant_gettenantstoragekey",
-      "frontend_src_utils_tenant_savetenantinfotostorage",
-      "frontend_src_utils_tenant_studioinfo",
-      "frontend_src_utils_tenant_tenant_studios"
-    ],
-    "8": [
-      "client",
-      "scripts_backfill_recapiti_clienti",
-      "scripts_backfill_recapiti_clienti_db",
-      "scripts_backfill_recapiti_clienti_soloprova",
-      "scripts_backfill_recapiti_clienti_valore",
-      "scripts_ispezione_blocco7",
-      "scripts_ispezione_blocco7_prisma",
-      "scripts_pulizia_blocco7",
-      "scripts_pulizia_blocco7_applica",
-      "scripts_pulizia_blocco7_coppie",
-      "scripts_pulizia_blocco7_passiriassignazione",
-      "scripts_pulizia_blocco7_prisma",
-      "scripts_pulizia_blocco7_tenant_rinomina",
-      "scripts_pulizia_duplicati_catalogo",
-      "scripts_pulizia_duplicati_catalogo_applica",
-      "scripts_pulizia_duplicati_catalogo_chiavedigruppo",
-      "scripts_pulizia_duplicati_catalogo_conteggiariferimentiarticolo",
-      "scripts_pulizia_duplicati_catalogo_conteggiariferimentimodulo",
-      "scripts_pulizia_duplicati_catalogo_gruppiarticoli",
-      "scripts_pulizia_duplicati_catalogo_gruppimoduli",
-      "scripts_pulizia_duplicati_catalogo_piano",
-      "scripts_pulizia_duplicati_catalogo_prisma",
-      "scripts_pulizia_duplicati_catalogo_raggruppa",
-      "scripts_pulizia_duplicati_catalogo_sceglidatenere",
-      "scripts_reset_dati_prova",
-      "scripts_reset_dati_prova_ancheaudit",
-      "scripts_reset_dati_prova_da_cancellare",
-      "scripts_reset_dati_prova_da_tenere",
-      "scripts_reset_dati_prova_esegui",
-      "scripts_reset_dati_prova_prisma",
-      "scripts_stato_database",
-      "scripts_stato_database_prisma",
-      "scripts_stato_database_tabelle"
+      "frontend_src_utils_tenant_gettenantstoragekey"
     ],
     "9": [
+      "src_scripts_verifyall",
+      "src_scripts_verifyall_runallverificationchecks",
+      "src_scripts_verifyall_runallverificationchecks_asserttest",
+      "src_services_cronservice",
+      "src_services_cronservice_cronreport",
+      "src_services_cronservice_gianotificataoggi",
+      "src_services_cronservice_rundailynotificationcron",
+      "src_services_newfeatures_test",
+      "src_services_notificheservice_notificastudiosilenziosa",
+      "src_services_otpservice",
+      "src_services_otpservice_ambitootp",
+      "src_services_otpservice_annullaotp",
+      "src_services_otpservice_attesa_reinvio_secondi",
+      "src_services_otpservice_canalevalido",
+      "src_services_otpservice_canali_otp",
+      "src_services_otpservice_creaotp",
+      "src_services_otpservice_creasigillofea",
+      "src_services_otpservice_descrivicanaleverificato",
+      "src_services_otpservice_esitocreazioneotp",
+      "src_services_otpservice_esitoverificaotp",
+      "src_services_otpservice_generacodice",
+      "src_services_otpservice_mascherarecapito",
+      "src_services_otpservice_max_reinvii",
+      "src_services_otpservice_max_tentativi",
+      "src_services_otpservice_richiestaotp",
+      "src_services_otpservice_sessioneaperta",
+      "src_services_otpservice_sigillofea",
+      "src_services_otpservice_verificaotp",
+      "src_services_sdiservice",
+      "src_services_sdiservice_sditransmissionresult",
+      "src_services_sdiservice_trasmettifatturasdi",
+      "src_services_securityscanner",
+      "src_services_securityscanner_scanfilebuffer",
+      "src_services_securityscanner_scanresult",
+      "src_util_jwt_hashcodiceotp",
+      "src_util_jwt_verificacodiceotp"
+    ],
+    "10": [
+      "fs",
+      "path",
+      "src_server",
+      "src_server_baseurlapplicazione",
+      "src_server_canaleotpvalido",
+      "src_server_inmemorytenantstore",
+      "src_server_ipreale",
+      "src_server_normalizzagrafometrica",
+      "src_server_puliscirecapito",
+      "src_server_recordaudit",
+      "src_server_stati_microvoce",
+      "src_server_stati_progetto",
+      "src_services_emailservice_sendotpsecurityemail",
+      "src_services_otpdispatch",
+      "src_services_otpdispatch_canalidisponibili",
+      "src_services_otpdispatch_chiamagraph",
+      "src_services_otpdispatch_credenzialicanali",
+      "src_services_otpdispatch_esitoinvio",
+      "src_services_otpdispatch_inviacodiceotp",
+      "src_services_otpdispatch_inviatelegram",
+      "src_services_otpdispatch_inviawhatsapp",
+      "src_services_otpdispatch_recapiticliente",
+      "src_services_otpdispatch_richiestainvio",
+      "src_services_otpdispatch_templateautenticazione",
+      "src_services_otpdispatch_testomessaggio",
+      "src_services_otprecapiti_test",
+      "src_services_otprecapiti_test_credenzialicomplete",
+      "src_services_otpservice_canaleotp",
+      "src_services_otpservice_ttl_otp_secondi",
+      "src_services_pdfservice",
+      "src_services_pdfservice_fatturapdfdata",
+      "src_services_pdfservice_generateinvoicepdfbuffer",
+      "src_services_pdfservice_test"
+    ],
+    "11": [
       "src_adapters_prisma_prismaapp_prismaapp",
       "src_adapters_prisma_prismaapp_prismaapp_accettapreventivoeistanzia",
       "src_adapters_prisma_prismaapp_prismaapp_archiviaprogetto",
@@ -482,74 +571,8 @@
       "src_adapters_prisma_prismaapp_prismaapp_marcaritardomicrovoce",
       "src_adapters_prisma_prismaapp_prismaapp_risolviritardomicrovoce"
     ],
-    "10": [
-      "fs",
-      "path",
-      "src_gerarchiaruoli_test",
-      "src_gerarchiaruoli_test_server",
-      "src_gerarchiaruoli_test_stato",
-      "src_gerarchiaruoli_test_super_admin_con_tenant",
-      "src_gerarchiaruoli_test_token",
-      "src_rottenontrovate_test",
-      "src_rottenontrovate_test_server",
-      "src_server",
-      "src_server_baseurlapplicazione",
-      "src_server_canaleotpvalido",
-      "src_server_inmemorytenantstore",
-      "src_server_ipreale",
-      "src_server_normalizzagrafometrica",
-      "src_server_puliscirecapito",
-      "src_server_recordaudit",
-      "src_server_stati_microvoce",
-      "src_server_stati_progetto",
-      "src_services_pdfservice",
-      "src_services_pdfservice_fatturapdfdata",
-      "src_services_pdfservice_generateinvoicepdfbuffer",
-      "src_services_pdfservice_test",
-      "src_util_jwt",
-      "src_util_jwt_calcolafirmadownload",
-      "src_util_jwt_generatemagictoken",
-      "src_util_jwt_hashmagictoken",
-      "src_util_jwt_jwt_secret",
-      "src_util_jwt_jwtpayload",
-      "src_util_jwt_risolvisegreto",
-      "src_util_jwt_verificafirmadownload",
-      "src_util_jwt_verifyjwt"
-    ],
-    "11": [
-      "src_scripts_verifyall",
-      "src_scripts_verifyall_runallverificationchecks",
-      "src_scripts_verifyall_runallverificationchecks_asserttest",
-      "src_services_newfeatures_test",
-      "src_services_otpservice",
-      "src_services_otpservice_ambitootp",
-      "src_services_otpservice_annullaotp",
-      "src_services_otpservice_attesa_reinvio_secondi",
-      "src_services_otpservice_canalevalido",
-      "src_services_otpservice_canali_otp",
-      "src_services_otpservice_creaotp",
-      "src_services_otpservice_creasigillofea",
-      "src_services_otpservice_descrivicanaleverificato",
-      "src_services_otpservice_esitocreazioneotp",
-      "src_services_otpservice_esitoverificaotp",
-      "src_services_otpservice_generacodice",
-      "src_services_otpservice_mascherarecapito",
-      "src_services_otpservice_max_reinvii",
-      "src_services_otpservice_max_tentativi",
-      "src_services_otpservice_richiestaotp",
-      "src_services_otpservice_sessioneaperta",
-      "src_services_otpservice_sigillofea",
-      "src_services_otpservice_verificaotp",
-      "src_services_sdiservice",
-      "src_services_sdiservice_sditransmissionresult",
-      "src_services_sdiservice_trasmettifatturasdi",
-      "src_services_securityscanner",
-      "src_services_securityscanner_scanfilebuffer",
-      "src_services_securityscanner_scanresult",
-      "src_util_jwt_hashcodiceotp",
-      "src_util_jwt_verificacodiceotp"
-    ],
     "12": [
+      "frontend_src_api_client_operatoresuggeritoapi",
       "frontend_src_components_assignoperatormodal",
       "frontend_src_components_assignoperatormodal_assignoperatormodal",
       "frontend_src_components_assignoperatormodal_assignoperatormodalprops",
@@ -572,79 +595,17 @@
       "frontend_src_pages_dashboard_kpicardprops",
       "frontend_src_pages_projectdetail",
       "frontend_src_pages_projectdetail_calendarioprogettotab",
-      "frontend_src_pages_projectdetail_documentoapiavista",
+      "frontend_src_pages_projectdetail_moduloblock",
+      "frontend_src_pages_projectdetail_redditivitatab",
       "frontend_src_pages_projectdetail_tab",
       "frontend_src_pages_projects",
       "frontend_src_pages_projects_filterstatus",
       "frontend_src_pages_projects_viewmode",
-      "frontend_src_types_index_microvoce",
-      "frontend_src_types_index_moduloprogetto",
-      "frontend_src_utils_index_statoconfig"
+      "frontend_src_utils_index_progresscolor",
+      "frontend_src_utils_index_statoconfig",
+      "ref_react"
     ],
     "13": [
-      "prisma_seed",
-      "prisma_seed_daticanaliseed",
-      "prisma_seed_hashpassword",
-      "prisma_seed_main",
-      "prisma_seed_prisma",
-      "src_adapters_prisma_seedfull",
-      "src_adapters_prisma_seedfull_main",
-      "src_adapters_prisma_seedfull_prisma",
-      "src_scripts_backupdb",
-      "src_scripts_backupdb_exporttenantbackup",
-      "src_scripts_backupdb_prisma",
-      "src_scripts_inspectdb",
-      "src_scripts_inspectdb_main",
-      "src_scripts_inspectdb_prisma",
-      "src_scripts_maptenanttables",
-      "src_scripts_maptenanttables_main",
-      "src_scripts_maptenanttables_prisma",
-      "src_scripts_probemoduliportale",
-      "src_scripts_probemoduliportale_db",
-      "src_scripts_probemoduliportale_main",
-      "src_util_prismaclient",
-      "src_util_prismaclient_attivacontestotenant",
-      "src_util_prismaclient_clientbase",
-      "src_util_prismaclient_concontestointransazione",
-      "src_util_prismaclient_contestotenant",
-      "src_util_prismaclient_dentrotransazionecontenant",
-      "src_util_prismaclient_prismaamministrativo",
-      "src_util_prismaclient_test",
-      "src_util_prismaclient_test_hookfinto",
-      "src_util_prismaclient_test_txfinta"
-    ],
-    "14": [
-      "frontend_src_api_client_aggiornaprofiloutenteapi",
-      "frontend_src_api_client_apristreamnotifiche",
-      "frontend_src_api_client_cambiapasswordstaffapi",
-      "frontend_src_api_client_fetchnotificheapi",
-      "frontend_src_api_client_fetchprofiloutenteapi",
-      "frontend_src_api_client_marknotifichereadapi",
-      "frontend_src_api_client_notificastreamevent",
-      "frontend_src_components_layout_applayout",
-      "frontend_src_components_layout_applayout_applayout",
-      "frontend_src_components_layout_applayout_applayoutprops",
-      "frontend_src_components_layout_applayout_initial_notifications",
-      "frontend_src_components_layout_applayout_mapnotificabackend",
-      "frontend_src_components_layout_applayout_notificadesktop",
-      "frontend_src_components_layout_applayout_tipo_per_evento",
-      "frontend_src_components_layout_applayout_titles",
-      "frontend_src_components_mustchangepasswordmodal",
-      "frontend_src_components_mustchangepasswordmodal_mustchangepasswordmodal",
-      "frontend_src_components_mustchangepasswordmodal_mustchangepasswordmodalprops",
-      "frontend_src_components_notificationmodal",
-      "frontend_src_components_notificationmodal_etichettagiorno",
-      "frontend_src_components_notificationmodal_notificationitem",
-      "frontend_src_components_notificationmodal_notificationmodal",
-      "frontend_src_components_notificationmodal_notificationmodalprops",
-      "frontend_src_components_notificationmodal_stile_tipo",
-      "frontend_src_components_notificationmodal_temporelativo",
-      "frontend_src_components_userprofilemodal",
-      "frontend_src_components_userprofilemodal_userprofilemodal",
-      "frontend_src_components_userprofilemodal_userprofilemodalprops",
-      "frontend_src_utils_tenant_getallavailabletenants"
-    ],
-    "15": [
       "src_adapters_inmemoryapp_inmemoryapp",
       "src_adapters_inmemoryapp_inmemoryapp_accettapreventivoeistanzia",
       "src_adapters_inmemoryapp_inmemoryapp_archiviaprogetto",
@@ -675,35 +636,7 @@
       "src_adapters_inmemoryapp_inmemoryapp_notificheinviate",
       "src_adapters_inmemoryapp_inmemoryapp_risolviritardomicrovoce"
     ],
-    "16": [
-      "frontend_src_api_client_fetchclienti",
-      "frontend_src_api_client_fetchscadenzarioincassiapi",
-      "frontend_src_api_client_registraincassoapi",
-      "frontend_src_app",
-      "frontend_src_app_app",
-      "frontend_src_app_mainlayoutwrapper",
-      "frontend_src_app_protectedmodule",
-      "frontend_src_main",
-      "frontend_src_pages_auditlogpage",
-      "frontend_src_pages_auditlogpage_auditentry",
-      "frontend_src_pages_auditlogpage_auditlogpage",
-      "frontend_src_pages_bankspage",
-      "frontend_src_pages_bankspage_bankspage",
-      "frontend_src_pages_library_assegnamoduloclientemodal_loadclientdata",
-      "frontend_src_pages_paymentspage",
-      "frontend_src_pages_paymentspage_paymentspage",
-      "frontend_src_pages_primanotapage",
-      "frontend_src_pages_primanotapage_primanotapage",
-      "frontend_src_pages_projectdetail_moduloblock",
-      "frontend_src_pages_projectdetail_redditivitatab",
-      "frontend_src_pages_retainerspage",
-      "frontend_src_pages_retainerspage_retainerspage",
-      "frontend_src_pages_scadenzariopage",
-      "frontend_src_pages_scadenzariopage_scadenzariopage",
-      "frontend_src_utils_index_fmt",
-      "ref_react"
-    ],
-    "17": [
+    "14": [
       "src_services_reportexport",
       "src_services_reportexport_applicaformatoexcel",
       "src_services_reportexport_calcolalarghezze",
@@ -731,34 +664,7 @@
       "src_services_reportsservice_reportscadenzario",
       "src_services_reportsservice_reporttabella"
     ],
-    "18": [
-      "frontend_src_components_newprojectwizard",
-      "frontend_src_components_newprojectwizard_closebtnstyle",
-      "frontend_src_components_newprojectwizard_labelstyle",
-      "frontend_src_components_newprojectwizard_newprojectwizardprops",
-      "frontend_src_components_newprojectwizard_overlaystyle",
-      "frontend_src_components_newprojectwizard_wizstyle",
-      "frontend_src_components_ui_catbadge",
-      "frontend_src_components_ui_catbadge_catbadge",
-      "frontend_src_components_ui_catbadge_catbadgeprops",
-      "frontend_src_types_index",
-      "frontend_src_types_index_articolo",
-      "frontend_src_types_index_categoriamodulo",
-      "frontend_src_types_index_fatturariga",
-      "frontend_src_types_index_giurisdizione",
-      "frontend_src_types_index_modulotemplate",
-      "frontend_src_types_index_progetto",
-      "frontend_src_types_index_rigadistinta",
-      "frontend_src_types_index_statomicrovoce",
-      "frontend_src_types_index_statomodulo",
-      "frontend_src_types_index_statoprogetto",
-      "frontend_src_types_index_tipocliente",
-      "frontend_src_utils_index",
-      "frontend_src_utils_index_catcls",
-      "frontend_src_utils_index_resolvedriga",
-      "frontend_src_utils_index_statusconfig"
-    ],
-    "19": [
+    "15": [
       "frontend_tsconfig_app",
       "frontend_tsconfig_app_compileroptions",
       "frontend_tsconfig_app_compileroptions_allowarbitraryextensions",
@@ -784,55 +690,57 @@
       "ref_dom",
       "ref_vite_client"
     ],
-    "20": [
-      "frontend_src_api_client_approvasettimanatimesheet",
-      "frontend_src_api_client_approvavocetimesheet",
-      "frontend_src_api_client_fetchoperatorisuggeriti",
-      "frontend_src_api_client_fetchsettimanatimesheet",
-      "frontend_src_api_client_leggierroreapi",
-      "frontend_src_api_client_rifiutavocetimesheet",
-      "frontend_src_api_client_salvavocetimesheet",
-      "frontend_src_api_client_settimanatimesheetapi",
-      "frontend_src_api_client_vocetimesheetapi",
-      "frontend_src_pages_timesheetpage",
-      "frontend_src_pages_timesheetpage_aggiungigiorni",
-      "frontend_src_pages_timesheetpage_colori_stato",
-      "frontend_src_pages_timesheetpage_editorcella",
-      "frontend_src_pages_timesheetpage_fmtore",
-      "frontend_src_pages_timesheetpage_lunedidi",
-      "frontend_src_pages_timesheetpage_nomi_giorni",
-      "frontend_src_pages_timesheetpage_parseiso",
-      "frontend_src_pages_timesheetpage_stile_td",
-      "frontend_src_pages_timesheetpage_stile_th",
-      "frontend_src_pages_timesheetpage_stilenavbutton",
-      "frontend_src_pages_timesheetpage_timesheetpage",
-      "frontend_src_pages_timesheetpage_toiso"
+    "16": [
+      "frontend_src_api_client_cambiapasswordstaffapi",
+      "frontend_src_components_layout_applayout",
+      "frontend_src_components_layout_applayout_applayout",
+      "frontend_src_components_layout_applayout_applayoutprops",
+      "frontend_src_components_layout_applayout_initial_notifications",
+      "frontend_src_components_layout_applayout_mapnotificabackend",
+      "frontend_src_components_layout_applayout_notificadesktop",
+      "frontend_src_components_layout_applayout_tipo_per_evento",
+      "frontend_src_components_layout_applayout_titles",
+      "frontend_src_components_mustchangepasswordmodal",
+      "frontend_src_components_mustchangepasswordmodal_mustchangepasswordmodal",
+      "frontend_src_components_mustchangepasswordmodal_mustchangepasswordmodalprops",
+      "frontend_src_components_userprofilemodal",
+      "frontend_src_components_userprofilemodal_userprofilemodal",
+      "frontend_src_components_userprofilemodal_userprofilemodalprops",
+      "frontend_src_pages_settingspage",
+      "frontend_src_pages_settingspage_tab",
+      "frontend_src_utils_tenant",
+      "frontend_src_utils_tenant_getallavailabletenants",
+      "frontend_src_utils_tenant_savetenantinfotostorage",
+      "frontend_src_utils_tenant_setactivetenantid",
+      "frontend_src_utils_tenant_studioinfo",
+      "frontend_src_utils_tenant_tenant_studios"
     ],
-    "21": [
-      "src_accessocliente_test",
-      "src_accessocliente_test_linkvalido",
-      "src_accessocliente_test_payloadjwt",
-      "src_accessocliente_test_server",
-      "src_accessocliente_test_stato",
-      "src_accessocliente_test_tokenadvisor",
-      "src_server_buildserver_confirmalogo",
-      "src_server_buildserver_improntadocumentodelfascicolo",
-      "src_services_improntaarchivio_test",
-      "src_services_improntaarchivio_test_contenuto",
-      "src_services_improntaarchivio_test_percorso",
-      "src_services_storageservice",
-      "src_services_storageservice_caratteri_vietati_tutti",
-      "src_services_storageservice_cartella_uploads",
-      "src_services_storageservice_leggifilearchivio",
-      "src_services_storageservice_nomefilesicuro",
-      "src_services_storageservice_nomefilevalido",
-      "src_services_storageservice_rifirmaurlupload",
-      "src_services_storageservice_uploaddocumento",
-      "src_services_storageservice_uploadresult",
-      "src_services_storageservice_urluploadfirmato",
-      "src_util_jwt_firmadownload"
+    "17": [
+      "src_adapters_prisma_prismaapp_consolenotificationport",
+      "src_adapters_prisma_prismaapp_consolenotificationport_notificaprogettoavviato",
+      "src_services_esecuzione_proceduraincompletaerror",
+      "src_services_esecuzione_test",
+      "src_services_esecuzione_test_setupprogettoconduemoduli",
+      "src_services_esecuzione_test_templatedipendente",
+      "src_services_esecuzione_test_templateradice",
+      "src_services_fakeistanziazioneport_fakeistanziazioneport_registratemplate",
+      "src_services_fakeistanziazioneport_fakenotificationport",
+      "src_services_fakeistanziazioneport_fakenotificationport_notificaprogettoavviato",
+      "src_services_istanziaprogetto",
+      "src_services_istanziaprogetto_calcolaoremodulo",
+      "src_services_istanziaprogetto_calcolaprezzomodulo",
+      "src_services_istanziaprogetto_istanziaprogetto",
+      "src_services_istanziaprogetto_istanziaprogettoinput",
+      "src_services_istanziaprogetto_istanziaprogettorisultato",
+      "src_services_istanziaprogetto_modulocreatoinfo",
+      "src_services_istanziaprogetto_rigapreventivoaccettato",
+      "src_services_istanziaprogetto_test",
+      "src_services_istanziaprogetto_test_templatesemplice",
+      "src_services_istanziazioneport_modulotemplatecondistinta",
+      "src_services_istanziazioneport_notificationport",
+      "src_services_istanziazioneport_notificationport_notificaprogettoavviato"
     ],
-    "22": [
+    "18": [
       "src_adapters_apperrors",
       "src_adapters_apperrors_clientenontrovatoerror",
       "src_adapters_apperrors_modulonontrovatoerror",
@@ -856,55 +764,99 @@
       "src_services_appport_progettobase",
       "src_services_appport_rigapreventivoinput"
     ],
+    "19": [
+      "src_calcoloservice_test",
+      "src_calcoloservice_test_mv",
+      "src_calcoloservice_test_server",
+      "src_calcoloservice_test_stato",
+      "src_calcoloservice_test_tokenadvisor",
+      "src_gerarchiaruoli_test",
+      "src_gerarchiaruoli_test_server",
+      "src_gerarchiaruoli_test_stato",
+      "src_gerarchiaruoli_test_super_admin_con_tenant",
+      "src_gerarchiaruoli_test_token",
+      "src_rottenontrovate_test",
+      "src_rottenontrovate_test_server",
+      "src_util_jwt",
+      "src_util_jwt_calcolafirmadownload",
+      "src_util_jwt_firmadownload",
+      "src_util_jwt_generatemagictoken",
+      "src_util_jwt_hashmagictoken",
+      "src_util_jwt_jwt_secret",
+      "src_util_jwt_jwtpayload",
+      "src_util_jwt_risolvisegreto",
+      "src_util_jwt_verificafirmadownload",
+      "src_util_jwt_verifyjwt"
+    ],
+    "20": [
+      "src_services_emailrelay",
+      "src_services_emailrelay_allegatoemail",
+      "src_services_emailrelay_candidatismtp",
+      "src_services_emailrelay_credenzialismtp",
+      "src_services_emailrelay_esitoemail",
+      "src_services_emailrelay_inviaemail",
+      "src_services_emailrelay_inviaviarelay",
+      "src_services_emailrelay_inviaviasmtp",
+      "src_services_emailrelay_messaggioemail",
+      "src_services_emailrelay_tlsrejectunauthorized",
+      "src_services_emailrelay_urlrelay",
+      "src_services_emailservice",
+      "src_services_emailservice_createtransporter",
+      "src_services_emailservice_emailoptions",
+      "src_services_emailservice_esitoemailotp",
+      "src_services_emailservice_opzioniemailotp",
+      "src_services_emailservice_sendclientcredentialsemail",
+      "src_services_emailservice_sendmagiclinkemail",
+      "src_services_emailservice_verifyandsendtestsmtp",
+      "src_services_emailservice_verifyrealimap",
+      "src_services_imapfetcher",
+      "src_services_imapfetcher_fetchrecentimapemails"
+    ],
+    "21": [
+      "frontend_src_api_client_approvasettimanatimesheet",
+      "frontend_src_api_client_approvavocetimesheet",
+      "frontend_src_api_client_fetchsettimanatimesheet",
+      "frontend_src_api_client_rifiutavocetimesheet",
+      "frontend_src_api_client_salvavocetimesheet",
+      "frontend_src_api_client_settimanatimesheetapi",
+      "frontend_src_api_client_vocetimesheetapi",
+      "frontend_src_pages_timesheetpage",
+      "frontend_src_pages_timesheetpage_aggiungigiorni",
+      "frontend_src_pages_timesheetpage_colori_stato",
+      "frontend_src_pages_timesheetpage_editorcella",
+      "frontend_src_pages_timesheetpage_fmtore",
+      "frontend_src_pages_timesheetpage_lunedidi",
+      "frontend_src_pages_timesheetpage_nomi_giorni",
+      "frontend_src_pages_timesheetpage_parseiso",
+      "frontend_src_pages_timesheetpage_stile_td",
+      "frontend_src_pages_timesheetpage_stile_th",
+      "frontend_src_pages_timesheetpage_stilenavbutton",
+      "frontend_src_pages_timesheetpage_timesheetpage",
+      "frontend_src_pages_timesheetpage_toiso"
+    ],
+    "22": [
+      "frontend_src_components_ui_catbadge",
+      "frontend_src_components_ui_catbadge_catbadge",
+      "frontend_src_components_ui_catbadge_catbadgeprops",
+      "frontend_src_types_index",
+      "frontend_src_types_index_articolo",
+      "frontend_src_types_index_categoriamodulo",
+      "frontend_src_types_index_fatturariga",
+      "frontend_src_types_index_giurisdizione",
+      "frontend_src_types_index_microvoce",
+      "frontend_src_types_index_moduloprogetto",
+      "frontend_src_types_index_modulotemplate",
+      "frontend_src_types_index_rigadistinta",
+      "frontend_src_types_index_statomicrovoce",
+      "frontend_src_types_index_statomodulo",
+      "frontend_src_types_index_statoprogetto",
+      "frontend_src_types_index_tipocliente",
+      "frontend_src_utils_index",
+      "frontend_src_utils_index_catcls",
+      "frontend_src_utils_index_resolvedriga",
+      "frontend_src_utils_index_statusconfig"
+    ],
     "23": [
-      "src_services_esecuzione",
-      "src_services_esecuzione_completamicrovoce",
-      "src_services_esecuzione_completapassaggiodocumento",
-      "src_services_esecuzione_completapassaggioform",
-      "src_services_esecuzione_marcapassaggiocompletato",
-      "src_services_esecuzione_marcaritardo",
-      "src_services_esecuzione_proceduraincompletaerror",
-      "src_services_esecuzione_registraconsuntivazione",
-      "src_services_esecuzione_ricalcolamoduloecascata",
-      "src_services_esecuzione_risolviritardo",
-      "src_services_esecuzione_test",
-      "src_services_istanziazioneport_esecuzioneport",
-      "src_services_istanziazioneport_esecuzioneport_aggiornamicrovoce",
-      "src_services_istanziazioneport_esecuzioneport_aggiornamodulo",
-      "src_services_istanziazioneport_esecuzioneport_aggiornapassaggio",
-      "src_services_istanziazioneport_esecuzioneport_getmicrovoce",
-      "src_services_istanziazioneport_esecuzioneport_getmicrovocidelmodulo",
-      "src_services_istanziazioneport_esecuzioneport_getmodulidelprogettocondipendenze",
-      "src_services_istanziazioneport_esecuzioneport_getmodulo",
-      "src_services_istanziazioneport_esecuzioneport_getpassaggidellamicrovoce",
-      "src_services_istanziazioneport_esecuzioneport_getpassaggio",
-      "src_services_istanziazioneport_esecuzioneport_notificamodulocompletato"
-    ],
-    "24": [
-      "src_services_esecuzione_test_setupprogettoconduemoduli",
-      "src_services_esecuzione_test_templatedipendente",
-      "src_services_esecuzione_test_templateradice",
-      "src_services_fakeistanziazioneport_clonadb",
-      "src_services_fakeistanziazioneport_fakeistanziazioneport",
-      "src_services_fakeistanziazioneport_fakeistanziazioneport_aggiornamicrovoce",
-      "src_services_fakeistanziazioneport_fakeistanziazioneport_aggiornamodulo",
-      "src_services_fakeistanziazioneport_fakeistanziazioneport_aggiornapassaggio",
-      "src_services_fakeistanziazioneport_fakeistanziazioneport_creatransazione",
-      "src_services_fakeistanziazioneport_fakeistanziazioneport_eseguiintransazione",
-      "src_services_fakeistanziazioneport_fakeistanziazioneport_getmicrovoce",
-      "src_services_fakeistanziazioneport_fakeistanziazioneport_getmicrovocidelmodulo",
-      "src_services_fakeistanziazioneport_fakeistanziazioneport_getmodulo",
-      "src_services_fakeistanziazioneport_fakeistanziazioneport_getpassaggidellamicrovoce",
-      "src_services_fakeistanziazioneport_fakeistanziazioneport_getpassaggio",
-      "src_services_fakeistanziazioneport_fakeistanziazioneport_registratemplate",
-      "src_services_fakeistanziazioneport_fakeistanziazioneport_snapshot",
-      "src_services_fakeistanziazioneport_fakeistanziazioneport_statopreventivo",
-      "src_services_fakeistanziazioneport_nuovoid",
-      "src_services_istanziazioneport_microvocerecord",
-      "src_services_istanziazioneport_modulorecord",
-      "src_services_istanziazioneport_passaggiorecord"
-    ],
-    "25": [
       "frontend_tsconfig_node",
       "frontend_tsconfig_node_compileroptions",
       "frontend_tsconfig_node_compileroptions_allowimportingtsextensions",
@@ -926,7 +878,7 @@
       "frontend_tsconfig_node_json_ref_node",
       "ref_vite_config_ts"
     ],
-    "26": [
+    "24": [
       "src_adapters_prisma_prismaistanziazioneport",
       "src_domain_types_statomicrovoce",
       "src_services_fakeistanziazioneport",
@@ -948,71 +900,68 @@
       "src_services_istanziazioneport_statomicrovoceiniziale",
       "src_util_prismaclient_prismaconcontesto"
     ],
+    "25": [
+      "src_services_esecuzione",
+      "src_services_esecuzione_completamicrovoce",
+      "src_services_esecuzione_completapassaggiodocumento",
+      "src_services_esecuzione_completapassaggioform",
+      "src_services_esecuzione_marcapassaggiocompletato",
+      "src_services_esecuzione_marcaritardo",
+      "src_services_esecuzione_registraconsuntivazione",
+      "src_services_esecuzione_ricalcolamoduloecascata",
+      "src_services_esecuzione_risolviritardo",
+      "src_services_istanziazioneport_esecuzioneport",
+      "src_services_istanziazioneport_esecuzioneport_aggiornamicrovoce",
+      "src_services_istanziazioneport_esecuzioneport_aggiornamodulo",
+      "src_services_istanziazioneport_esecuzioneport_aggiornapassaggio",
+      "src_services_istanziazioneport_esecuzioneport_getmicrovoce",
+      "src_services_istanziazioneport_esecuzioneport_getmicrovocidelmodulo",
+      "src_services_istanziazioneport_esecuzioneport_getmodulidelprogettocondipendenze",
+      "src_services_istanziazioneport_esecuzioneport_getmodulo",
+      "src_services_istanziazioneport_esecuzioneport_getpassaggidellamicrovoce",
+      "src_services_istanziazioneport_esecuzioneport_getpassaggio",
+      "src_services_istanziazioneport_esecuzioneport_notificamodulocompletato"
+    ],
+    "26": [
+      "src_services_fakeistanziazioneport_clonadb",
+      "src_services_fakeistanziazioneport_fakeistanziazioneport",
+      "src_services_fakeistanziazioneport_fakeistanziazioneport_aggiornamicrovoce",
+      "src_services_fakeistanziazioneport_fakeistanziazioneport_aggiornamodulo",
+      "src_services_fakeistanziazioneport_fakeistanziazioneport_aggiornapassaggio",
+      "src_services_fakeistanziazioneport_fakeistanziazioneport_creatransazione",
+      "src_services_fakeistanziazioneport_fakeistanziazioneport_eseguiintransazione",
+      "src_services_fakeistanziazioneport_fakeistanziazioneport_getmicrovoce",
+      "src_services_fakeistanziazioneport_fakeistanziazioneport_getmicrovocidelmodulo",
+      "src_services_fakeistanziazioneport_fakeistanziazioneport_getmodulo",
+      "src_services_fakeistanziazioneport_fakeistanziazioneport_getpassaggidellamicrovoce",
+      "src_services_fakeistanziazioneport_fakeistanziazioneport_getpassaggio",
+      "src_services_fakeistanziazioneport_fakeistanziazioneport_snapshot",
+      "src_services_fakeistanziazioneport_fakeistanziazioneport_statopreventivo",
+      "src_services_fakeistanziazioneport_nuovoid",
+      "src_services_istanziazioneport_microvocerecord",
+      "src_services_istanziazioneport_modulorecord",
+      "src_services_istanziazioneport_passaggiorecord"
+    ],
     "27": [
-      "src_adapters_prisma_prismaistanziazioneport_prismaistanziazioneport_notificamodulocompletato",
-      "src_services_cronservice",
-      "src_services_cronservice_cronreport",
-      "src_services_cronservice_gianotificataoggi",
-      "src_services_cronservice_rundailynotificationcron",
-      "src_services_notificheservice",
-      "src_services_notificheservice_apristreamsse",
-      "src_services_notificheservice_connessionesse",
-      "src_services_notificheservice_connessioni",
-      "src_services_notificheservice_conteggioconnessionisse",
-      "src_services_notificheservice_datievento",
-      "src_services_notificheservice_destinataa",
-      "src_services_notificheservice_eventi_notifica",
-      "src_services_notificheservice_inviaframe",
-      "src_services_notificheservice_notificacliente",
-      "src_services_notificheservice_notificapush",
-      "src_services_notificheservice_notificastudio",
-      "src_services_notificheservice_notificastudiosilenziosa",
-      "src_services_notificheservice_serializzanotifica",
-      "src_services_notificheservice_tipoeventonotifica"
+      "dotenv",
+      "exceljs",
+      "fastify",
+      "fastify_cors",
+      "nodemailer",
+      "package_dependencies",
+      "package_dependencies_dotenv",
+      "package_dependencies_exceljs",
+      "package_dependencies_fastify",
+      "package_dependencies_fastify_cors",
+      "package_dependencies_nodemailer",
+      "package_dependencies_pdfkit",
+      "package_dependencies_prisma_client",
+      "package_dependencies_types_nodemailer",
+      "pdfkit",
+      "prisma_client",
+      "types_nodemailer"
     ],
     "28": [
-      "src_domain_stateengine",
-      "src_domain_stateengine_calcolapercentualemicrovoce",
-      "src_domain_stateengine_calcolapercentualemodulo",
-      "src_domain_stateengine_calcolapercentualeprogetto",
-      "src_domain_stateengine_marcaritardomanuale",
-      "src_domain_stateengine_modulocondipendenze",
-      "src_domain_stateengine_registraconsuntivazione",
-      "src_domain_stateengine_risolvidipendenze",
-      "src_domain_stateengine_risolviritardomanuale",
-      "src_domain_stateengine_risultatoconsuntivazione",
-      "src_domain_stateengine_segnalerischio",
-      "src_domain_stateengine_test",
-      "src_domain_stateengine_test_mv",
-      "src_domain_types",
-      "src_domain_types_microvoceinput",
-      "src_domain_types_moduloinput",
-      "src_domain_types_progettoinput",
-      "src_domain_types_statomodulo",
-      "src_domain_types_statoprogetto"
-    ],
-    "29": [
-      "src_services_emailrelay",
-      "src_services_emailrelay_allegatoemail",
-      "src_services_emailrelay_candidatismtp",
-      "src_services_emailrelay_credenzialismtp",
-      "src_services_emailrelay_esitoemail",
-      "src_services_emailrelay_inviaemail",
-      "src_services_emailrelay_inviaviarelay",
-      "src_services_emailrelay_inviaviasmtp",
-      "src_services_emailrelay_messaggioemail",
-      "src_services_emailrelay_urlrelay",
-      "src_services_emailservice",
-      "src_services_emailservice_createtransporter",
-      "src_services_emailservice_emailoptions",
-      "src_services_emailservice_esitoemailotp",
-      "src_services_emailservice_opzioniemailotp",
-      "src_services_emailservice_sendclientcredentialsemail",
-      "src_services_emailservice_sendmagiclinkemail",
-      "src_services_emailservice_verifyandsendtestsmtp",
-      "src_services_emailservice_verifyrealimap"
-    ],
-    "30": [
       "ref_src_adapters_prisma",
       "tsconfig",
       "tsconfig_compileroptions",
@@ -1031,42 +980,77 @@
       "tsconfig_json_ref_node",
       "tsconfig_json_ref_src"
     ],
+    "29": [
+      "src_accessocliente_test",
+      "src_accessocliente_test_linkvalido",
+      "src_accessocliente_test_payloadjwt",
+      "src_accessocliente_test_server",
+      "src_accessocliente_test_stato",
+      "src_accessocliente_test_tokenadvisor",
+      "src_adapters_prisma_bootstrap",
+      "src_adapters_prisma_bootstrap_main",
+      "src_adapters_prisma_bootstrap_prisma",
+      "src_scripts_assignpasswords",
+      "src_scripts_assignpasswords_main",
+      "src_scripts_assignpasswords_prisma",
+      "src_util_password",
+      "src_util_password_generapasswordtemporanea",
+      "src_util_password_hashpassword",
+      "src_util_password_test",
+      "src_util_password_verifypassword"
+    ],
+    "30": [
+      "frontend_src_api_client_fetchinboundimapemailsapi",
+      "frontend_src_api_client_fetchtenantinfoapi",
+      "frontend_src_api_client_sendemaildirectapi",
+      "frontend_src_api_client_sendwhatsappdirectapi",
+      "frontend_src_components_comunicazionitab",
+      "frontend_src_components_comunicazionitab_cleandisplayemailtext",
+      "frontend_src_components_comunicazionitab_comunicazionitab",
+      "frontend_src_components_comunicazionitab_comunicazionitabprops",
+      "frontend_src_components_comunicazionitab_messaggiocomunicazione",
+      "frontend_src_pages_clientspage_credentialsexplainmodal",
+      "frontend_src_pages_projectdetail_documentitab",
+      "frontend_src_pages_projectdetail_documentoapiavista",
+      "frontend_src_types_index_cliente",
+      "frontend_src_utils_documenttemplates_resolvedocumenttemplatehtml",
+      "frontend_src_utils_pdfgenerator_downloadguidepdf",
+      "frontend_src_utils_tenant_getstudioinfofortenant"
+    ],
     "31": [
-      "src_services_emailservice_sendotpsecurityemail",
-      "src_services_otpdispatch",
-      "src_services_otpdispatch_canalidisponibili",
-      "src_services_otpdispatch_chiamagraph",
-      "src_services_otpdispatch_credenzialicanali",
-      "src_services_otpdispatch_esitoinvio",
-      "src_services_otpdispatch_inviacodiceotp",
-      "src_services_otpdispatch_inviatelegram",
-      "src_services_otpdispatch_inviawhatsapp",
-      "src_services_otpdispatch_recapiticliente",
-      "src_services_otpdispatch_richiestainvio",
-      "src_services_otpdispatch_templateautenticazione",
-      "src_services_otpdispatch_testomessaggio",
-      "src_services_otprecapiti_test",
-      "src_services_otprecapiti_test_credenzialicomplete",
-      "src_services_otpservice_canaleotp",
-      "src_services_otpservice_ttl_otp_secondi"
+      "package",
+      "package_description",
+      "package_devdependencies",
+      "package_devdependencies_prisma",
+      "package_devdependencies_tsx",
+      "package_devdependencies_types_node",
+      "package_devdependencies_types_pdfkit",
+      "package_devdependencies_vitest",
+      "package_name",
+      "package_type",
+      "package_version",
+      "prisma",
+      "tsx",
+      "types_node",
+      "types_pdfkit",
+      "vitest"
     ],
     "32": [
-      "src_adapters_prisma_prismaapp_consolenotificationport",
-      "src_adapters_prisma_prismaapp_consolenotificationport_notificaprogettoavviato",
-      "src_services_fakeistanziazioneport_fakenotificationport",
-      "src_services_fakeistanziazioneport_fakenotificationport_notificaprogettoavviato",
-      "src_services_istanziaprogetto",
-      "src_services_istanziaprogetto_calcolaoremodulo",
-      "src_services_istanziaprogetto_calcolaprezzomodulo",
-      "src_services_istanziaprogetto_istanziaprogetto",
-      "src_services_istanziaprogetto_istanziaprogettoinput",
-      "src_services_istanziaprogetto_istanziaprogettorisultato",
-      "src_services_istanziaprogetto_modulocreatoinfo",
-      "src_services_istanziaprogetto_rigapreventivoaccettato",
-      "src_services_istanziaprogetto_test",
-      "src_services_istanziaprogetto_test_templatesemplice",
-      "src_services_istanziazioneport_notificationport",
-      "src_services_istanziazioneport_notificationport_notificaprogettoavviato"
+      "frontend_src_api_client_fetchutentitenant",
+      "frontend_src_components_quicktimetracker",
+      "frontend_src_components_quicktimetracker_timetrackerprops",
+      "frontend_src_hooks_useteammembers",
+      "frontend_src_hooks_useteammembers_apiusertoteammember",
+      "frontend_src_hooks_useteammembers_coloredachiave",
+      "frontend_src_hooks_useteammembers_disambiguaid",
+      "frontend_src_hooks_useteammembers_idnumericostabile",
+      "frontend_src_hooks_useteammembers_loadteammembersfromdb",
+      "frontend_src_hooks_useteammembers_role_colors",
+      "frontend_src_hooks_useteammembers_tavolozza_colori",
+      "frontend_src_types_index_progetto",
+      "frontend_src_types_index_teammember",
+      "frontend_src_utils_index_extractinitialsfromname",
+      "frontend_src_utils_tenant_bluecode_tenant_id"
     ],
     "33": [
       "guida_configurazione_canali",
@@ -1103,37 +1087,37 @@
       "src_util_prismaclient_prisma"
     ],
     "35": [
-      "src_domain_stateengine_calcolastatomodulo",
-      "src_domain_stateengine_calcolastatoprogetto",
-      "src_domain_stateengine_valutasegnalerischio",
-      "src_scripts_probeavanzamento",
-      "src_scripts_probeavanzamento_main",
-      "src_services_calcoloservice",
-      "src_services_calcoloservice_arricchisciprogetti",
-      "src_services_calcoloservice_avanzamentomodulo",
-      "src_services_calcoloservice_avanzamentoprogetto",
-      "src_services_calcoloservice_calcolaavanzamento",
-      "src_services_calcoloservice_microvocecalcolo",
-      "src_services_calcoloservice_modulocalcolo",
-      "src_services_calcoloservice_percentualevisibile",
-      "src_services_calcoloservice_progettocalcolo",
-      "src_services_calcoloservice_ricalcolaprogetto"
+      "src_server_buildserver_confirmalogo",
+      "src_server_buildserver_improntadocumentodelfascicolo",
+      "src_services_improntaarchivio_test",
+      "src_services_improntaarchivio_test_contenuto",
+      "src_services_improntaarchivio_test_percorso",
+      "src_services_storageservice",
+      "src_services_storageservice_caratteri_vietati_tutti",
+      "src_services_storageservice_cartella_uploads",
+      "src_services_storageservice_leggifilearchivio",
+      "src_services_storageservice_nomefilesicuro",
+      "src_services_storageservice_nomefilevalido",
+      "src_services_storageservice_rifirmaurlupload",
+      "src_services_storageservice_uploaddocumento",
+      "src_services_storageservice_uploadresult",
+      "src_services_storageservice_urluploadfirmato"
     ],
     "36": [
-      "frontend_src_api_client_fetchutentitenant",
-      "frontend_src_components_quicktimetracker",
-      "frontend_src_components_quicktimetracker_timetrackerprops",
-      "frontend_src_hooks_useteammembers",
-      "frontend_src_hooks_useteammembers_apiusertoteammember",
-      "frontend_src_hooks_useteammembers_coloredachiave",
-      "frontend_src_hooks_useteammembers_disambiguaid",
-      "frontend_src_hooks_useteammembers_idnumericostabile",
-      "frontend_src_hooks_useteammembers_loadteammembersfromdb",
-      "frontend_src_hooks_useteammembers_role_colors",
-      "frontend_src_hooks_useteammembers_tavolozza_colori",
-      "frontend_src_types_index_teammember",
-      "frontend_src_utils_index_extractinitialsfromname",
-      "frontend_src_utils_tenant_bluecode_tenant_id"
+      "frontend_src_api_client_fetchscadenzarioincassiapi",
+      "frontend_src_api_client_registraincassoapi",
+      "frontend_src_app",
+      "frontend_src_app_app",
+      "frontend_src_app_appcontent",
+      "frontend_src_app_mainlayoutwrapper",
+      "frontend_src_main",
+      "frontend_src_pages_auditlogpage",
+      "frontend_src_pages_auditlogpage_auditentry",
+      "frontend_src_pages_auditlogpage_auditlogpage",
+      "frontend_src_pages_paymentspage",
+      "frontend_src_pages_paymentspage_paymentspage",
+      "frontend_src_pages_scadenzariopage",
+      "frontend_src_pages_scadenzariopage_scadenzariopage"
     ],
     "37": [
       "readme",
@@ -1152,6 +1136,21 @@
       "readme_stato_del_progetto_componenti_verificati"
     ],
     "38": [
+      "package_scripts",
+      "package_scripts_bootstrap",
+      "package_scripts_build",
+      "package_scripts_cleanup_test_data",
+      "package_scripts_dev",
+      "package_scripts_passwords_assign",
+      "package_scripts_prisma_generate",
+      "package_scripts_prisma_migrate",
+      "package_scripts_seed",
+      "package_scripts_start",
+      "package_scripts_start_db",
+      "package_scripts_test",
+      "package_scripts_test_watch"
+    ],
+    "39": [
       "frontend_src_components_confirmdeletemodal",
       "frontend_src_components_confirmdeletemodal_closebtnstyle",
       "frontend_src_components_confirmdeletemodal_confirmdeletemodal",
@@ -1165,31 +1164,18 @@
       "frontend_src_components_confirmdeletemodal_primarybtnstyle",
       "frontend_src_components_confirmdeletemodal_secondarybtnstyle"
     ],
-    "39": [
-      "frontend_src_api_client_fetchinboundimapemailsapi",
-      "frontend_src_api_client_sendemaildirectapi",
-      "frontend_src_api_client_sendwhatsappdirectapi",
-      "frontend_src_components_comunicazionitab",
-      "frontend_src_components_comunicazionitab_cleandisplayemailtext",
-      "frontend_src_components_comunicazionitab_comunicazionitab",
-      "frontend_src_components_comunicazionitab_comunicazionitabprops",
-      "frontend_src_components_comunicazionitab_messaggiocomunicazione",
-      "frontend_src_pages_clientspage",
-      "frontend_src_pages_clientspage_credentialsexplainmodal",
-      "frontend_src_types_index_cliente"
-    ],
     "40": [
-      "frontend_src_api_client_fetchprogetti",
-      "frontend_src_components_newprojectwizard_newprojectwizard",
-      "frontend_src_pages_library_assegnamoduloclientemodal",
-      "frontend_src_pages_library_assegnamoduloclientemodal_loadprojects",
-      "frontend_src_pages_library_library",
-      "frontend_src_pages_library_library_drawedges",
-      "frontend_src_pages_library_libreriadocumentieform_loadlinkagedata",
-      "frontend_src_utils_index_levelof",
-      "frontend_src_utils_index_moduloh",
-      "frontend_src_utils_index_modulop",
-      "frontend_src_utils_index_resolverighe"
+      "frontend_oxlintrc",
+      "frontend_oxlintrc_plugins",
+      "frontend_oxlintrc_rules",
+      "frontend_oxlintrc_rules_react_only_export_components",
+      "frontend_oxlintrc_rules_react_rules_of_hooks",
+      "frontend_oxlintrc_schema",
+      "frontend_package_devdependencies_typescript",
+      "package_devdependencies_typescript",
+      "ref_oxc",
+      "ref_warn",
+      "typescript"
     ],
     "41": [
       "istruzioni_installazione",
@@ -1205,17 +1191,17 @@
       "istruzioni_installazione_tabella_credenziali_di_accesso_ufficiali"
     ],
     "42": [
-      "src_adapters_prisma_bootstrap",
-      "src_adapters_prisma_bootstrap_main",
-      "src_adapters_prisma_bootstrap_prisma",
-      "src_scripts_assignpasswords",
-      "src_scripts_assignpasswords_main",
-      "src_scripts_assignpasswords_prisma",
-      "src_util_password",
-      "src_util_password_generapasswordtemporanea",
-      "src_util_password_hashpassword",
-      "src_util_password_test",
-      "src_util_password_verifypassword"
+      "scripts_pulizia_duplicati_catalogo",
+      "scripts_pulizia_duplicati_catalogo_applica",
+      "scripts_pulizia_duplicati_catalogo_chiavedigruppo",
+      "scripts_pulizia_duplicati_catalogo_conteggiariferimentiarticolo",
+      "scripts_pulizia_duplicati_catalogo_conteggiariferimentimodulo",
+      "scripts_pulizia_duplicati_catalogo_gruppiarticoli",
+      "scripts_pulizia_duplicati_catalogo_gruppimoduli",
+      "scripts_pulizia_duplicati_catalogo_piano",
+      "scripts_pulizia_duplicati_catalogo_prisma",
+      "scripts_pulizia_duplicati_catalogo_raggruppa",
+      "scripts_pulizia_duplicati_catalogo_sceglidatenere"
     ],
     "43": [
       "src_adapters_prisma_prismaistanziazioneport_prismaistanziazioneport",
@@ -1243,18 +1229,6 @@
       "frontend_src_pages_reportspage_stile_th"
     ],
     "45": [
-      "frontend_src_api_client_createadmintenantapi",
-      "frontend_src_api_client_deleteadmintenantapi",
-      "frontend_src_api_client_fetchadmintenantsapi",
-      "frontend_src_api_client_resetpasswordtenantapi",
-      "frontend_src_api_client_updateadmintenantapi",
-      "frontend_src_pages_superadminpage",
-      "frontend_src_pages_superadminpage_default_tenants",
-      "frontend_src_pages_superadminpage_superadminpage",
-      "frontend_src_pages_superadminpage_tenantstudio",
-      "frontend_src_utils_tenant_setactivetenantid"
-    ],
-    "46": [
       "src_adapters_prisma_prismaistanziazioneport_prismaistanziazioneport_eseguiintransazione",
       "src_services_istanziazioneport_istanziazionetransazione",
       "src_services_istanziazioneport_istanziazionetransazione_aggiornastatoprogetto",
@@ -1266,7 +1240,29 @@
       "src_services_istanziazioneport_istanziazionetransazione_impostastatomicrovoceiniziale",
       "src_services_istanziazioneport_istanziazionetransazione_marcaaccettatopreventivo"
     ],
+    "46": [
+      "frontend_src_api_client_createadmintenantapi",
+      "frontend_src_api_client_deleteadmintenantapi",
+      "frontend_src_api_client_fetchadmintenantsapi",
+      "frontend_src_api_client_resetpasswordtenantapi",
+      "frontend_src_api_client_updateadmintenantapi",
+      "frontend_src_pages_superadminpage",
+      "frontend_src_pages_superadminpage_default_tenants",
+      "frontend_src_pages_superadminpage_superadminpage",
+      "frontend_src_pages_superadminpage_tenantstudio"
+    ],
     "47": [
+      "frontend_src_app_protectedmodule",
+      "frontend_src_components_layout_sidebar",
+      "frontend_src_components_layout_sidebar_nav",
+      "frontend_src_components_layout_sidebar_sidebar",
+      "frontend_src_components_layout_sidebar_sidebarprops",
+      "frontend_src_utils_index_getformattedlogourl",
+      "frontend_src_utils_rbac",
+      "frontend_src_utils_rbac_getuserpermission",
+      "frontend_src_utils_rbac_permissionlevel"
+    ],
+    "48": [
       "src_adapters_inmemoryapp_inmemoryapp_registramodulotemplate",
       "src_server_test",
       "src_server_test_nuovoserver",
@@ -1277,7 +1273,7 @@
       "src_server_test_tokenper",
       "src_util_jwt_signjwt"
     ],
-    "48": [
+    "49": [
       "bluman_piano_di_sviluppo",
       "bluman_piano_di_sviluppo_bluman_piano_di_sviluppo_stato_avanzamento_produzione",
       "bluman_piano_di_sviluppo_checklist_per_il_rilascio_in_produzione_a_z_enterprise_readiness",
@@ -1287,7 +1283,7 @@
       "bluman_piano_di_sviluppo_fase_2_frontend_ui_portale_cliente_passwordless",
       "bluman_piano_di_sviluppo_stato_di_avanzamento_fasi_aggiornato"
     ],
-    "49": [
+    "50": [
       "frontend_src_utils_zipbuilder",
       "frontend_src_utils_zipbuilder_simplezipbuilder",
       "frontend_src_utils_zipbuilder_simplezipbuilder_addbinaryfile",
@@ -1297,7 +1293,7 @@
       "frontend_src_utils_zipbuilder_simplezipbuilder_generatezipblob",
       "frontend_src_utils_zipbuilder_zipentry"
     ],
-    "50": [
+    "51": [
       "istruzioni_per_ia",
       "istruzioni_per_ia_1_configurazione_variabile_env_database_url",
       "istruzioni_per_ia_2_collegamento_supabase_cli_migrazioni_prisma",
@@ -1306,16 +1302,6 @@
       "istruzioni_per_ia_istruzioni_context_prompt_per_l_ia_nuovo_pc",
       "istruzioni_per_ia_mappa_architetturale_rapida",
       "istruzioni_per_ia_prompt_da_copiare_ed_incollare_alla_nuova_ia"
-    ],
-    "51": [
-      "src_adapters_prisma_seed",
-      "src_adapters_prisma_seed_main",
-      "src_adapters_prisma_seed_prisma",
-      "src_adapters_prisma_seed_seedmodulo",
-      "src_scripts_seeddata",
-      "src_scripts_seeddata_moduloanalisipatrimoniale",
-      "src_scripts_seeddata_modulocorporatestructuring",
-      "src_services_istanziazioneport_modulotemplatecondistinta"
     ],
     "52": [
       "src_credenziali_test",
@@ -1337,6 +1323,15 @@
       "agents_agents_tabella_credenziali_di_accesso_ufficiali"
     ],
     "54": [
+      "frontend_src_components_notificationmodal",
+      "frontend_src_components_notificationmodal_etichettagiorno",
+      "frontend_src_components_notificationmodal_notificationitem",
+      "frontend_src_components_notificationmodal_notificationmodal",
+      "frontend_src_components_notificationmodal_notificationmodalprops",
+      "frontend_src_components_notificationmodal_stile_tipo",
+      "frontend_src_components_notificationmodal_temporelativo"
+    ],
+    "55": [
       "railway",
       "railway_build",
       "railway_build_builder",
@@ -1345,7 +1340,16 @@
       "railway_deploy_restartpolicytype",
       "railway_schema"
     ],
-    "55": [
+    "56": [
+      "src_adapters_prisma_seed",
+      "src_adapters_prisma_seed_main",
+      "src_adapters_prisma_seed_prisma",
+      "src_adapters_prisma_seed_seedmodulo",
+      "src_scripts_seeddata",
+      "src_scripts_seeddata_moduloanalisipatrimoniale",
+      "src_scripts_seeddata_modulocorporatestructuring"
+    ],
+    "57": [
       "frontend_src_api_client_grupporicerca",
       "frontend_src_api_client_ricercaglobaleapi",
       "frontend_src_api_client_risultatoricerca",
@@ -1353,659 +1357,660 @@
       "frontend_src_components_layout_globalsearch_globalsearch",
       "frontend_src_components_layout_globalsearch_voceappiattita"
     ],
-    "56": [
+    "58": [
+      "scripts_pulizia_blocco7",
+      "scripts_pulizia_blocco7_applica",
+      "scripts_pulizia_blocco7_coppie",
+      "scripts_pulizia_blocco7_passiriassignazione",
+      "scripts_pulizia_blocco7_prisma",
+      "scripts_pulizia_blocco7_tenant_rinomina"
+    ],
+    "59": [
+      "scripts_reset_dati_prova",
+      "scripts_reset_dati_prova_ancheaudit",
+      "scripts_reset_dati_prova_da_cancellare",
+      "scripts_reset_dati_prova_da_tenere",
+      "scripts_reset_dati_prova_esegui",
+      "scripts_reset_dati_prova_prisma"
+    ],
+    "60": [
       "frontend_src_utils_datilocali",
       "frontend_src_utils_datilocali_chiavidatilocali",
       "frontend_src_utils_datilocali_restano_esatte",
       "frontend_src_utils_datilocali_restano_prefissi",
       "frontend_src_utils_datilocali_svuotadatilocali"
     ],
-    "57": [
-      "src_calcoloservice_test",
-      "src_calcoloservice_test_mv",
-      "src_calcoloservice_test_server",
-      "src_calcoloservice_test_stato",
-      "src_calcoloservice_test_tokenadvisor"
-    ],
-    "58": [
-      "src_scripts_testtenantdb",
-      "src_scripts_testtenantdb_campi_segreti",
-      "src_scripts_testtenantdb_maschera",
-      "src_scripts_testtenantdb_prisma",
-      "src_scripts_testtenantdb_testtenantallfields"
-    ],
-    "59": [
+    "61": [
       "src_services_teamanalytics_test",
       "src_services_teamanalytics_test_calcolaperformanceoperatore",
       "src_services_teamanalytics_test_modulo",
       "src_services_teamanalytics_test_progetto",
       "src_services_teamanalytics_test_task"
     ],
-    "60": [
+    "62": [
       "vercel",
       "vercel_buildcommand",
       "vercel_framework",
       "vercel_outputdirectory",
       "vercel_rewrites"
     ],
-    "61": [
+    "63": [
       "api_send_email",
       "api_send_email_cleanrawemailbody",
       "api_send_email_fetchrecentimapemails",
       "api_send_email_handler"
     ],
-    "62": [
+    "64": [
       "frontend_readme",
       "frontend_readme_expanding_the_oxlint_configuration",
       "frontend_readme_react_compiler",
       "frontend_readme_react_typescript_vite"
     ],
-    "63": [
-      "frontend_src_api_client_fetcharticoli",
-      "frontend_src_api_client_fetchmodulilibreria",
-      "frontend_src_pages_projectdetail_grafomoduliprogettoview",
-      "frontend_src_pages_projectdetail_grafomoduliprogettoview_loadtemplates"
-    ],
-    "64": [
+    "65": [
       "frontend_src_api_client_loginapi",
       "frontend_src_pages_loginpage",
       "frontend_src_pages_loginpage_loginpage",
       "frontend_src_pages_loginpage_loginpageprops"
     ],
-    "65": [
-      "src_scripts_cleanuptestdata",
-      "src_scripts_cleanuptestdata_main",
-      "src_scripts_cleanuptestdata_nomi_di_test",
-      "src_scripts_cleanuptestdata_prisma"
-    ],
     "66": [
+      "scripts_backfill_recapiti_clienti",
+      "scripts_backfill_recapiti_clienti_db",
+      "scripts_backfill_recapiti_clienti_soloprova",
+      "scripts_backfill_recapiti_clienti_valore"
+    ],
+    "67": [
       "src_services_antiduplication_test",
       "src_services_antiduplication_test_microvoce",
       "src_services_antiduplication_test_modulo",
       "src_services_antiduplication_test_processaassegnazionemoduloconantiduplicazione"
     ],
-    "67": [
+    "68": [
       "frontend_tsconfig",
       "frontend_tsconfig_files",
       "frontend_tsconfig_references"
     ],
-    "68": [
+    "69": [
+      "scripts_stato_database",
+      "scripts_stato_database_prisma",
+      "scripts_stato_database_tabelle"
+    ],
+    "70": [
       "src_domain_giurisdizioni_test",
       "src_domain_giurisdizioni_test_filtramodulipergiurisdizione",
       "src_domain_giurisdizioni_test_giurisdizioneinput"
     ],
-    "69": [
+    "71": [
       "src_scripts_checkrls",
       "src_scripts_checkrls_main",
       "src_scripts_checkrls_prisma"
     ],
-    "70": [
+    "72": [
       "src_scripts_verificaaccessi",
       "src_scripts_verificaaccessi_main",
       "src_scripts_verificaaccessi_prisma"
     ],
-    "71": [
+    "73": [
       "src_services_catalogdocumentlinkage_test",
       "src_services_catalogdocumentlinkage_test_articolotest",
       "src_services_catalogdocumentlinkage_test_test_articoli"
     ],
-    "72": [
+    "74": [
       "src_services_communications_test",
       "src_services_communications_test_simulatestcanale",
       "src_services_communications_test_validaconfigurazionesmtp"
     ],
-    "73": [
+    "75": [
       "api_send_whatsapp",
       "api_send_whatsapp_handler"
     ],
-    "74": [
+    "76": [
       "api_webhooks_communications_telegram",
       "api_webhooks_communications_telegram_handler"
     ],
-    "75": [
+    "77": [
       "api_webhooks_communications_whatsapp",
       "api_webhooks_communications_whatsapp_handler"
     ],
-    "76": [
-      "src_services_imapfetcher",
-      "src_services_imapfetcher_fetchrecentimapemails"
-    ],
-    "77": [
-      "api_interfaces_createinterface"
-    ],
     "78": [
-      "api_interfaces_deleteinterface"
+      "scripts_ispezione_blocco7",
+      "scripts_ispezione_blocco7_prisma"
     ],
     "79": [
-      "api_interfaces_retrieveinterface"
+      "api_interfaces_createinterface"
     ],
     "80": [
-      "api_interfaces_updateinterface"
+      "api_interfaces_deleteinterface"
     ],
     "81": [
-      "apiplatform_metadata_apiresource"
+      "api_interfaces_retrieveinterface"
     ],
     "82": [
-      "apiplatform_metadata_get"
+      "api_interfaces_updateinterface"
     ],
     "83": [
-      "apiplatform_metadata_getcollection"
+      "apiplatform_metadata_apiresource"
     ],
     "84": [
-      "apiplatform_metadata_post"
+      "apiplatform_metadata_get"
     ],
     "85": [
-      "apiplatform_metadata_put"
+      "apiplatform_metadata_getcollection"
     ],
     "86": [
-      "apiplatform_metadata_queryparameter"
+      "apiplatform_metadata_post"
     ],
     "87": [
-      "apiplatform_metadata_urlgeneratorinterface"
+      "apiplatform_metadata_put"
     ],
     "88": [
-      "apiplatform_state_processorinterface"
+      "apiplatform_metadata_queryparameter"
     ],
     "89": [
-      "apiplatform_state_providerinterface"
+      "apiplatform_metadata_urlgeneratorinterface"
     ],
     "90": [
-      "articolooriginale"
+      "apiplatform_state_processorinterface"
     ],
     "91": [
-      "carbon"
+      "apiplatform_state_providerinterface"
     ],
     "92": [
-      "carbon_carbon"
+      "articolooriginale"
     ],
     "93": [
-      "carbon_carboninterval"
+      "carbon"
     ],
     "94": [
-      "carbon_carbonperiod"
+      "carbon_carbon"
     ],
     "95": [
-      "common_simplemodeltrait"
+      "carbon_carboninterval"
     ],
     "96": [
-      "cron_cronexpression"
+      "carbon_carbonperiod"
     ],
     "97": [
-      "cuyz_valinor_mapperbuilder"
+      "common_simplemodeltrait"
     ],
     "98": [
-      "datetime"
+      "cron_cronexpression"
     ],
     "99": [
-      "destinatario"
+      "cuyz_valinor_mapperbuilder"
     ],
     "100": [
-      "digitick_sepa_paymentinformation"
+      "datetime"
     ],
     "101": [
-      "digitick_sepa_transferfile_factory_transferfilefacadefactory"
+      "destinatario"
     ],
     "102": [
-      "doctrine_sqlformatter_sqlformatter"
+      "digitick_sepa_paymentinformation"
     ],
     "103": [
-      "documentinterface"
+      "digitick_sepa_transferfile_factory_transferfilefacadefactory"
     ],
     "104": [
-      "druidfi_mysqldump_mysqldump"
+      "doctrine_sqlformatter_sqlformatter"
     ],
     "105": [
-      "endroid_qrcode_builder_builder"
+      "documentinterface"
     ],
     "106": [
-      "endroid_qrcode_encoding_encoding"
+      "druidfi_mysqldump_mysqldump"
     ],
     "107": [
-      "endroid_qrcode_errorcorrectionlevel"
+      "endroid_qrcode_builder_builder"
     ],
     "108": [
-      "endroid_qrcode_writer_pngwriter"
+      "endroid_qrcode_encoding_encoding"
     ],
     "109": [
-      "ergebnis_json_printer"
+      "endroid_qrcode_errorcorrectionlevel"
     ],
     "110": [
-      "exception"
+      "endroid_qrcode_writer_pngwriter"
     ],
     "111": [
-      "exporterinterface"
+      "ergebnis_json_printer"
     ],
     "112": [
-      "fatturaelettronica"
+      "exception"
     ],
     "113": [
-      "fluidxml_fluidxml"
+      "exporterinterface"
     ],
     "114": [
-      "frontend_vite_config"
+      "fatturaelettronica"
     ],
     "115": [
-      "guzzlehttp_client"
+      "fluidxml_fluidxml"
     ],
     "116": [
-      "guzzlehttp_exception_connectexception"
+      "frontend_vite_config"
     ],
     "117": [
-      "guzzlehttp_exception_requestexception"
+      "guzzlehttp_client"
     ],
     "118": [
-      "handlerinterface"
+      "guzzlehttp_exception_connectexception"
     ],
     "119": [
-      "illuminate_auth_access_authorizationexception"
+      "guzzlehttp_exception_requestexception"
     ],
     "120": [
-      "illuminate_auth_authenticationexception"
+      "handlerinterface"
     ],
     "121": [
-      "illuminate_contracts_auth_authenticatable"
+      "illuminate_auth_access_authorizationexception"
     ],
     "122": [
-      "illuminate_database_capsule_manager"
+      "illuminate_auth_authenticationexception"
     ],
     "123": [
-      "illuminate_database_eloquent_builder"
+      "illuminate_contracts_auth_authenticatable"
     ],
     "124": [
-      "illuminate_database_eloquent_collection"
+      "illuminate_database_capsule_manager"
     ],
     "125": [
-      "illuminate_database_eloquent_model"
+      "illuminate_database_eloquent_builder"
     ],
     "126": [
-      "illuminate_database_eloquent_relations_hasmany"
+      "illuminate_database_eloquent_collection"
     ],
     "127": [
-      "illuminate_database_eloquent_softdeletes"
+      "illuminate_database_eloquent_model"
     ],
     "128": [
-      "illuminate_database_query_expression"
+      "illuminate_database_eloquent_relations_hasmany"
     ],
     "129": [
-      "illuminate_database_queryexception"
+      "illuminate_database_eloquent_softdeletes"
     ],
     "130": [
-      "illuminate_foundation_application"
+      "illuminate_database_query_expression"
     ],
     "131": [
-      "illuminate_foundation_configuration_exceptions"
+      "illuminate_database_queryexception"
     ],
     "132": [
-      "illuminate_foundation_configuration_middleware"
+      "illuminate_foundation_application"
     ],
     "133": [
-      "illuminate_http_jsonresponse"
+      "illuminate_foundation_configuration_exceptions"
     ],
     "134": [
-      "illuminate_http_request"
+      "illuminate_foundation_configuration_middleware"
     ],
     "135": [
-      "illuminate_routing_controller"
+      "illuminate_http_jsonresponse"
     ],
     "136": [
-      "illuminate_support_collection"
+      "illuminate_http_request"
     ],
     "137": [
-      "illuminate_support_facades_auth"
+      "illuminate_routing_controller"
     ],
     "138": [
-      "illuminate_support_facades_route"
+      "illuminate_support_collection"
     ],
     "139": [
-      "illuminate_support_serviceprovider"
+      "illuminate_support_facades_auth"
     ],
     "140": [
-      "illuminate_support_str"
+      "illuminate_support_facades_route"
     ],
     "141": [
-      "importerinterface"
+      "illuminate_support_serviceprovider"
     ],
     "142": [
-      "intervention_image_drivers_gd_driver"
+      "illuminate_support_str"
     ],
     "143": [
-      "intervention_image_format"
+      "importerinterface"
     ],
     "144": [
-      "intervention_image_imagemanager"
+      "intervention_image_drivers_gd_driver"
     ],
     "145": [
-      "jurosh_pdfmerge_pdfmerger"
+      "intervention_image_format"
     ],
     "146": [
-      "laravel_sanctum_sanctum"
+      "intervention_image_imagemanager"
     ],
     "147": [
-      "league_csv_reader"
+      "jurosh_pdfmerge_pdfmerger"
     ],
     "148": [
-      "league_csv_statement"
+      "laravel_sanctum_sanctum"
     ],
     "149": [
-      "league_csv_writer"
+      "league_csv_reader"
     ],
     "150": [
-      "league_flysystem_filesystem"
+      "league_csv_statement"
     ],
     "151": [
-      "league_flysystem_ftp_ftpadapter"
+      "league_csv_writer"
     ],
     "152": [
-      "league_flysystem_ftp_ftpconnectionoptions"
+      "league_flysystem_filesystem"
     ],
     "153": [
-      "league_flysystem_local_localfilesystemadapter"
+      "league_flysystem_ftp_ftpadapter"
     ],
     "154": [
-      "league_oauth2_client_provider_abstractprovider"
+      "league_flysystem_ftp_ftpconnectionoptions"
     ],
     "155": [
-      "league_oauth2_client_provider_exception_identityproviderexception"
+      "league_flysystem_local_localfilesystemadapter"
     ],
     "156": [
-      "league_oauth2_client_provider_genericprovider"
+      "league_oauth2_client_provider_abstractprovider"
     ],
     "157": [
-      "league_oauth2_client_provider_google"
+      "league_oauth2_client_provider_exception_identityproviderexception"
     ],
     "158": [
-      "league_oauth2_client_token_accesstoken"
+      "league_oauth2_client_provider_genericprovider"
     ],
     "159": [
-      "manager"
+      "league_oauth2_client_provider_google"
     ],
     "160": [
-      "managerinterface"
+      "league_oauth2_client_token_accesstoken"
     ],
     "161": [
-      "mappingerror"
+      "manager"
     ],
     "162": [
-      "mockery_mockinterface"
+      "managerinterface"
     ],
     "163": [
-      "models_segment"
+      "mappingerror"
     ],
     "164": [
-      "modules_checklists_traits_checklisttrait"
+      "mockery_mockinterface"
     ],
     "165": [
-      "modules_fatture_components"
+      "models_segment"
     ],
     "166": [
-      "modules_sms_sms"
+      "modules_checklists_traits_checklisttrait"
     ],
     "167": [
-      "monolog_handler_abstractprocessinghandler"
+      "modules_fatture_components"
     ],
     "168": [
-      "monolog_handler_filterhandler"
+      "modules_sms_sms"
     ],
     "169": [
-      "monolog_handler_nullhandler"
+      "monolog_handler_abstractprocessinghandler"
     ],
     "170": [
-      "monolog_handler_rotatingfilehandler"
+      "monolog_handler_filterhandler"
     ],
     "171": [
-      "monolog_handler_streamhandler"
+      "monolog_handler_nullhandler"
     ],
     "172": [
-      "monolog_handler_syslogudphandler"
+      "monolog_handler_rotatingfilehandler"
     ],
     "173": [
-      "monolog_logger"
+      "monolog_handler_streamhandler"
     ],
     "174": [
-      "monolog_logrecord"
+      "monolog_handler_syslogudphandler"
     ],
     "175": [
-      "monolog_processor_psrlogmessageprocessor"
+      "monolog_logger"
     ],
     "176": [
-      "movimento"
+      "monolog_logrecord"
     ],
     "177": [
-      "mpdf_mpdf"
+      "monolog_processor_psrlogmessageprocessor"
     ],
     "178": [
-      "notificationinterface"
+      "movimento"
     ],
     "179": [
-      "openstamanager_reference_modules_articoli_src_import_csv_php_articolo"
+      "mpdf_mpdf"
     ],
     "180": [
-      "openstamanager_reference_modules_combinazioni_articoli_src_combinazione_php_articolo"
+      "notificationinterface"
     ],
     "181": [
-      "openstamanager_reference_modules_interventi_modutil_php_intervento"
+      "openstamanager_reference_modules_articoli_src_import_csv_php_articolo"
     ],
     "182": [
-      "openstamanager_reference_modules_interventi_src_components_sessione_php_intervento"
+      "openstamanager_reference_modules_combinazioni_articoli_src_combinazione_php_articolo"
     ],
     "183": [
-      "openstamanager_reference_modules_interventi_src_intervento_php_tiposessione"
+      "openstamanager_reference_modules_interventi_modutil_php_intervento"
     ],
     "184": [
-      "openstamanager_reference_plugins_exportfe_src_invoicehooktask_php_exception"
+      "openstamanager_reference_modules_interventi_src_components_sessione_php_intervento"
     ],
     "185": [
-      "openstamanager_reference_plugins_pianificazione_interventi_src_promemoria_php_tiposessione"
+      "openstamanager_reference_modules_interventi_src_intervento_php_tiposessione"
     ],
     "186": [
-      "openstamanager_reference_src_common_components_article_php_original"
+      "openstamanager_reference_plugins_exportfe_src_invoicehooktask_php_exception"
     ],
     "187": [
-      "openstamanager_reference_src_middlewares_apiauthmiddleware_php_closure"
+      "openstamanager_reference_plugins_pianificazione_interventi_src_promemoria_php_tiposessione"
     ],
     "188": [
-      "openstamanager_reference_src_middlewares_osmauthmiddleware_php_closure"
+      "openstamanager_reference_src_common_components_article_php_original"
     ],
     "189": [
-      "phpmailer_phpmailer_exception"
+      "openstamanager_reference_src_middlewares_apiauthmiddleware_php_closure"
     ],
     "190": [
-      "phpmailer_phpmailer_oauth"
+      "openstamanager_reference_src_middlewares_osmauthmiddleware_php_closure"
     ],
     "191": [
-      "phpmailer_phpmailer_phpmailer"
+      "phpmailer_phpmailer_exception"
     ],
     "192": [
-      "phpmailer_phpmailer_smtp"
+      "phpmailer_phpmailer_oauth"
     ],
     "193": [
-      "phpsqlparser_phpsqlparser"
+      "phpmailer_phpmailer_phpmailer"
     ],
     "194": [
-      "phpunit_framework_testcase"
+      "phpmailer_phpmailer_smtp"
     ],
     "195": [
-      "providerinterface"
+      "phpsqlparser_phpsqlparser"
     ],
     "196": [
-      "recordinterface"
+      "phpunit_framework_testcase"
     ],
     "197": [
-      "rector_codequality_rector_class_inlineconstructordefaulttopropertyrector"
+      "providerinterface"
     ],
     "198": [
-      "rector_config_rectorconfig"
+      "recordinterface"
     ],
     "199": [
-      "rector_set_valueobject_levelsetlist"
+      "rector_codequality_rector_class_inlineconstructordefaulttopropertyrector"
     ],
     "200": [
-      "referenceinterface"
+      "rector_config_rectorconfig"
     ],
     "201": [
-      "relationtrait"
+      "rector_set_valueobject_levelsetlist"
     ],
     "202": [
-      "scadenzetesthelpers"
+      "referenceinterface"
     ],
     "203": [
-      "simplemodeltrait"
+      "relationtrait"
     ],
     "204": [
-      "sortdirection"
+      "scadenzetesthelpers"
     ],
     "205": [
-      "spatie_routeattributes_attributes_any"
+      "simplemodeltrait"
     ],
     "206": [
-      "spatie_routeattributes_attributes_get"
+      "sortdirection"
     ],
     "207": [
-      "spatie_routeattributes_attributes_where"
+      "spatie_routeattributes_attributes_any"
     ],
     "208": [
-      "src_adapters_prisma_applyrls"
+      "spatie_routeattributes_attributes_get"
     ],
     "209": [
-      "src_services_auditaccounting_test"
+      "spatie_routeattributes_attributes_where"
     ],
     "210": [
-      "stato"
+      "src_adapters_prisma_applyrls"
     ],
     "211": [
-      "stringable"
+      "src_services_auditaccounting_test"
     ],
     "212": [
-      "symfony_component_filesystem_exception_ioexception"
+      "stato"
     ],
     "213": [
-      "symfony_component_finder_finder"
+      "stringable"
     ],
     "214": [
-      "symfony_component_httpfoundation_response"
+      "symfony_component_filesystem_exception_ioexception"
     ],
     "215": [
-      "symfony_component_serializer_attribute_ignore"
+      "symfony_component_finder_finder"
     ],
     "216": [
-      "symfony_component_serializer_nameconverter_snakecasetocamelcasenameconverter"
+      "symfony_component_httpfoundation_response"
     ],
     "217": [
-      "taskinterface"
+      "symfony_component_serializer_attribute_ignore"
     ],
     "218": [
-      "thenetworg_oauth2_client_provider_azure"
+      "symfony_component_serializer_nameconverter_snakecasetocamelcasenameconverter"
     ],
     "219": [
-      "traits_components_notetrait"
+      "taskinterface"
     ],
     "220": [
-      "traits_components_uploadtrait"
+      "thenetworg_oauth2_client_provider_azure"
     ],
     "221": [
-      "traits_hierarchytrait"
+      "traits_components_notetrait"
     ],
     "222": [
-      "traits_localpooltrait"
+      "traits_components_uploadtrait"
     ],
     "223": [
-      "traits_managertrait"
+      "traits_hierarchytrait"
     ],
     "224": [
-      "traits_pathtrait"
+      "traits_localpooltrait"
     ],
     "225": [
-      "traits_recordtrait"
+      "traits_managertrait"
     ],
     "226": [
-      "traits_referencetrait"
+      "traits_pathtrait"
     ],
     "227": [
-      "vitest_config"
+      "traits_recordtrait"
     ],
     "228": [
-      "vitest_setup"
+      "traits_referencetrait"
     ],
     "229": [
+      "vitest_config"
+    ],
+    "230": [
+      "vitest_setup"
+    ],
+    "231": [
       "wrapperinterface"
     ]
   },
   "cohesion": {
-    "0": 0.07182524990744169,
-    "1": 0.08521303258145363,
-    "2": 0.0663265306122449,
-    "3": 0.041666666666666664,
-    "4": 0.043478260869565216,
-    "5": 0.044444444444444446,
-    "6": 0.07682926829268293,
-    "7": 0.15714285714285714,
-    "8": 0.0625,
-    "9": 0.07007575757575757,
-    "10": 0.08064516129032258,
-    "11": 0.13978494623655913,
-    "12": 0.12643678160919541,
-    "13": 0.09425287356321839,
-    "14": 0.11083743842364532,
-    "15": 0.0812807881773399,
-    "16": 0.19692307692307692,
-    "17": 0.16,
-    "18": 0.14333333333333334,
-    "19": 0.08333333333333333,
+    "0": 0.07684210526315789,
+    "1": 0.06862745098039216,
+    "2": 0.06259426847662142,
+    "3": 0.08673469387755102,
+    "4": 0.044444444444444446,
+    "5": 0.0743321718931475,
+    "6": 0.07152496626180836,
+    "7": 0.05405405405405406,
+    "8": 0.17142857142857143,
+    "9": 0.12063492063492064,
+    "10": 0.09659090909090909,
+    "11": 0.07007575757575757,
+    "12": 0.13306451612903225,
+    "13": 0.0812807881773399,
+    "14": 0.16,
+    "15": 0.08333333333333333,
+    "16": 0.14624505928853754,
+    "17": 0.13438735177865613,
+    "18": 0.18614718614718614,
+    "19": 0.09956709956709957,
     "20": 0.16017316017316016,
-    "21": 0.12987012987012986,
-    "22": 0.18614718614718614,
-    "23": 0.23376623376623376,
-    "24": 0.12554112554112554,
-    "25": 0.1,
-    "26": 0.1631578947368421,
-    "27": 0.14736842105263157,
-    "28": 0.19883040935672514,
-    "29": 0.15789473684210525,
-    "30": 0.11764705882352941,
-    "31": 0.19117647058823528,
-    "32": 0.15833333333333333,
+    "21": 0.1631578947368421,
+    "22": 0.1631578947368421,
+    "23": 0.1,
+    "24": 0.1631578947368421,
+    "25": 0.23157894736842105,
+    "26": 0.1568627450980392,
+    "27": 0.11764705882352941,
+    "28": 0.11764705882352941,
+    "29": 0.19852941176470587,
+    "30": 0.225,
+    "31": 0.125,
+    "32": 0.22857142857142856,
     "33": 0.14285714285714285,
     "34": 0.1619047619047619,
-    "35": 0.2761904761904762,
+    "35": 0.20952380952380953,
     "36": 0.25274725274725274,
     "37": 0.14285714285714285,
-    "38": 0.16666666666666666,
-    "39": 0.34545454545454546,
-    "40": 0.2909090909090909,
+    "38": 0.15384615384615385,
+    "39": 0.16666666666666666,
+    "40": 0.18181818181818182,
     "41": 0.18181818181818182,
-    "42": 0.38181818181818183,
+    "42": 0.2,
     "43": 0.18181818181818182,
     "44": 0.26666666666666666,
-    "45": 0.3333333333333333,
-    "46": 0.2,
-    "47": 0.2777777777777778,
-    "48": 0.25,
-    "49": 0.32142857142857145,
-    "50": 0.25,
-    "51": 0.39285714285714285,
+    "45": 0.2,
+    "46": 0.3611111111111111,
+    "47": 0.3055555555555556,
+    "48": 0.2777777777777778,
+    "49": 0.25,
+    "50": 0.32142857142857145,
+    "51": 0.25,
     "52": 0.25,
     "53": 0.2857142857142857,
-    "54": 0.2857142857142857,
-    "55": 0.5333333333333333,
-    "56": 0.5,
-    "57": 0.4,
-    "58": 0.5,
-    "59": 0.4,
-    "60": 0.4,
-    "61": 0.8333333333333334,
-    "62": 0.5,
+    "54": 0.38095238095238093,
+    "55": 0.2857142857142857,
+    "56": 0.42857142857142855,
+    "57": 0.5333333333333333,
+    "58": 0.3333333333333333,
+    "59": 0.3333333333333333,
+    "60": 0.5,
+    "61": 0.4,
+    "62": 0.4,
     "63": 0.8333333333333334,
-    "64": 0.6666666666666666,
-    "65": 0.5,
+    "64": 0.5,
+    "65": 0.6666666666666666,
     "66": 0.5,
-    "67": 0.6666666666666666,
+    "67": 0.5,
     "68": 0.6666666666666666,
     "69": 0.6666666666666666,
     "70": 0.6666666666666666,
     "71": 0.6666666666666666,
     "72": 0.6666666666666666,
-    "73": 1.0,
-    "74": 1.0,
+    "73": 0.6666666666666666,
+    "74": 0.6666666666666666,
     "75": 1.0,
     "76": 1.0,
     "77": 1.0,
@@ -2160,7 +2165,9 @@
     "226": 1.0,
     "227": 1.0,
     "228": 1.0,
-    "229": 1.0
+    "229": 1.0,
+    "230": 1.0,
+    "231": 1.0
   },
   "gods": [
     {
@@ -2176,7 +2183,7 @@
     {
       "id": "src_server_buildserver",
       "label": "buildServer()",
-      "degree": 94
+      "degree": 93
     },
     {
       "id": "frontend_src_utils_tenant_gettenantstoragekey",
@@ -2216,15 +2223,26 @@
   ],
   "surprises": [
     {
-      "source": "start()",
-      "target": "buildServer()",
+      "source": "AppContent()",
+      "target": "fetchMeApi()",
       "source_files": [
-        "src/index.ts",
-        "src/server.ts"
+        "frontend/src/App.tsx",
+        "frontend/src/api/client.ts"
       ],
       "confidence": "EXTRACTED",
       "relation": "calls",
-      "why": "bridges separate communities; peripheral node `start()` unexpectedly reaches hub `buildServer()`"
+      "why": "bridges separate communities; peripheral node `AppContent()` unexpectedly reaches hub `fetchMeApi()`"
+    },
+    {
+      "source": "RedditivitaTab()",
+      "target": "fmt()",
+      "source_files": [
+        "frontend/src/pages/ProjectDetail.tsx",
+        "frontend/src/utils/index.ts"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "why": "bridges separate communities; peripheral node `RedditivitaTab()` unexpectedly reaches hub `fmt()`"
     },
     {
       "source": "plugins",
@@ -2238,15 +2256,15 @@
       "why": "connects across different repos/directories"
     },
     {
-      "source": "ProtectedModule()",
-      "target": "getUserPermission()",
+      "source": "loadProjects()",
+      "target": "fetchProgetti()",
       "source_files": [
-        "frontend/src/App.tsx",
-        "frontend/src/utils/rbac.ts"
+        "frontend/src/pages/Library.tsx",
+        "frontend/src/api/client.ts"
       ],
       "confidence": "EXTRACTED",
       "relation": "calls",
-      "why": "bridges separate communities; peripheral node `ProtectedModule()` unexpectedly reaches hub `getUserPermission()`"
+      "why": "bridges separate communities; peripheral node `loadProjects()` unexpectedly reaches hub `fetchProgetti()`"
     },
     {
       "source": "GiurisdizioniView()",
@@ -2258,17 +2276,6 @@
       "confidence": "EXTRACTED",
       "relation": "calls",
       "why": "bridges separate communities; peripheral node `GiurisdizioniView()` unexpectedly reaches hub `creaGiurisdizioneApi()`"
-    },
-    {
-      "source": "ModuloProposta",
-      "target": "CategoriaModulo",
-      "source_files": [
-        "frontend/src/pages/ClientPortal.tsx",
-        "frontend/src/types/index.ts"
-      ],
-      "confidence": "EXTRACTED",
-      "relation": "references",
-      "why": "bridges separate communities; peripheral node `ModuloProposta` unexpectedly reaches hub `CategoriaModulo`"
     }
   ],
   "tokens": {

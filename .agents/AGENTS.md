@@ -376,7 +376,7 @@ Configurazione: `vitest.config.ts` + `vitest.setup.ts` (isolamento dal DB reale)
 
 5. **Aggiornamento Mappa Grafo (Graphify)**:
    - Dopo modifiche strutturali ai moduli o ai servizi, eseguire `python -m graphify extract . --code-only` e `python -m graphify cluster-only .` per mantenere la mappa delle dipendenze di codice e la documentazione architettonica sempre sincronizzate.
-   - ✅ **Grafo AGGIORNATO (25 agosto 2026):** 1469 nodi, 3098 archi, 227 community. Include Blocco 4 (ricerca globale), Blocco 5 (reportistica), Blocco 6 (timesheet, OTP, notifiche), Blocco 7 (pulizia mockData, emailRelay, script manutenzione). Generati `graphify-out/graph.json`, `graphify-out/GRAPH_REPORT.md` e `graphify-out/graph.html`.
+   - ✅ **Grafo AGGIORNATO (26 agosto 2026):** 1483 nodi, 3143 archi, 233 community. Include Fase 1 robustezza, fix RLS portale dati addendum, rate-limit per-IP con trustProxy, pulizia typecheck TS e sicurezza password. Generati `graphify-out/graph.json`, `graphify-out/GRAPH_REPORT.md` e `graphify-out/graph.html`.
 
 
 6. **Divieto Assoluto di Esposizione Credenziali su GitHub & Persistenza Isolata su DB Tenant**:
