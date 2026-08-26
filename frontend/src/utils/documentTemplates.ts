@@ -267,10 +267,14 @@ export const PREBUILT_TEMPLATES: DocumentTemplate[] = [
  * Sostituisce le variabili dinamiche (Mail Merge) Smart Tags
  */
 export function resolveDocumentTemplateHtml(
-  htmlContent: string,
+  templateOrHtml: string | DocumentTemplate | any,
   context: any = {}
 ): string {
-  if (!htmlContent) return '';
+  let htmlContent = typeof templateOrHtml === 'string'
+    ? templateOrHtml
+    : (templateOrHtml?.html || templateOrHtml?.contenutoHtml || templateOrHtml?.testo || '');
+
+  if (!htmlContent || typeof htmlContent !== 'string') return '';
 
   const currentTenantId = getCurrentTenantId();
   const studioInfo = getStudioInfoForTenant(currentTenantId);

@@ -295,8 +295,9 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
   // Applica Modello dal Pre-screening o dal Catalogo
   const handleApplyTemplate = async (tmpl: DocumentTemplate) => {
     const formattedName = `${tmpl.titolo} — ${project.cl}.docx`;
-    const htmlContent = resolveDocumentTemplateHtml(tmpl, project.cl);
-    const contentBase64 = btoa(unescape(encodeURIComponent(htmlContent)));
+    const templateHtml = tmpl.html || (tmpl as any).contenutoHtml || '';
+    const htmlContent = resolveDocumentTemplateHtml(templateHtml, project);
+    const contentBase64 = btoa(unescape(encodeURIComponent(htmlContent || '<html><body><h1>' + formattedName + '</h1></body></html>')));
 
     let dbId: string | undefined;
     if (effProgettoId) {
@@ -415,7 +416,8 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
       if (isLocalId && effProgettoId) {
         // Documento template o locale non ancora salvato a DB: salvalo ora con stato pubblicato
         const tmpl = localDoc?.templateId ? ALL_STUDIO_TEMPLATES.find(t => t.id === localDoc.templateId) : null;
-        const htmlContent = tmpl ? resolveDocumentTemplateHtml(tmpl, project.cl) : `<html><body><h1>${localDoc?.nome || 'Documento'}</h1></body></html>`;
+        const rawHtml = tmpl?.html || (tmpl as any)?.contenutoHtml || `<html><body><h1>${localDoc?.nome || 'Documento'}</h1></body></html>`;
+        const htmlContent = resolveDocumentTemplateHtml(rawHtml, project);
         const contentBase64 = btoa(unescape(encodeURIComponent(htmlContent)));
 
         await salvaDocumentoApi({
@@ -433,7 +435,8 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
           if (effProgettoId) {
             // Se fallisce l'aggiornamento (es. documento orfano nel client), salvalo direttamente a DB
             const tmpl = localDoc?.templateId ? ALL_STUDIO_TEMPLATES.find(t => t.id === localDoc.templateId) : null;
-            const htmlContent = tmpl ? resolveDocumentTemplateHtml(tmpl, project.cl) : `<html><body><h1>${localDoc?.nome || 'Documento'}</h1></body></html>`;
+            const rawHtml = tmpl?.html || (tmpl as any)?.contenutoHtml || `<html><body><h1>${localDoc?.nome || 'Documento'}</h1></body></html>`;
+            const htmlContent = resolveDocumentTemplateHtml(rawHtml, project);
             const contentBase64 = btoa(unescape(encodeURIComponent(htmlContent)));
             await salvaDocumentoApi({
               progettoId: effProgettoId,
