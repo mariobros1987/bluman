@@ -678,3 +678,63 @@ describe('server — §36 libreria: creazione, modifica e disattivazione', () =>
     expect(res.json().ok).toBeUndefined();
   });
 });
+
+describe('server — DELETE /progetti/:id (§1.1 PIANO_DI_MIGLIORAMENTO)', () => {
+  it('elimina un progetto esistente; la rilettura risponde 404', async () => {
+    const { server } = nuovoServer();
+    const cliente = await server.inject({ method: 'POST', url: '/clienti', payload: { nome: 'Da eliminare', tipo: 'individual' } });
+    const progetto = await server.inject({ method: 'POST', url: '/progetti', payload: { clienteId: cliente.json().id, nome: 'Progetto transitorio' } });
+    const progettoId = progetto.json().id;
+
+    const res = await server.inject({ method: 'DELETE', url: `/progetti/${progettoId}` });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ ok: true, id: progettoId });
+
+    const rilettura = await server.inject({ method: 'GET', url: `/progetti/${progettoId}` });
+    expect(rilettura.statusCode).toBe(404);
+  });
+
+  it('404 su progetto inesistente, non un 409 o un 500', async () => {
+    const { server } = nuovoServer();
+    const res = await server.inject({ method: 'DELETE', url: '/progetti/non-esiste' });
+    expect(res.statusCode).toBe(404);
+    expect(res.json().errore).toMatch(/non trovato/);
+  });
+
+  it('409 se il progetto contiene fatture: si archivia, non si elimina', async () => {
+    const { app, server } = nuovoServer();
+    const cliente = await server.inject({ method: 'POST', url: '/clienti', payload: { nome: 'Con fatture', tipo: 'individual' } });
+    const progetto = await server.inject({ method: 'POST', url: '/progetti', payload: { clienteId: cliente.json().id, nome: 'Fatturato' } });
+    const progettoId = progetto.json().id;
+    // InMemoryApp non espone un metodo pubblico per creare fatture: si alimenta la
+    // mappa interna, come farebbe il ciclo di fatturazione.
+    (app as any).fatture.set('fatt-1', { id: 'fatt-1', progettoId });
+
+    const res = await server.inject({ method: 'DELETE', url: `/progetti/${progettoId}` });
+    expect(res.statusCode).toBe(409);
+    expect(res.json().errore).toMatch(/Fatture/);
+
+    // Il progetto deve essere ancora lì: il blocco fiscale non è un'eliminazione parziale.
+    const rilettura = await server.inject({ method: 'GET', url: `/progetti/${progettoId}` });
+    expect(rilettura.statusCode).toBe(200);
+  });
+
+  it('403 per i ruoli che non rispondono dello studio', async () => {
+    const { server } = nuovoServer();
+    const cliente = await server.inject({ method: 'POST', url: '/clienti', payload: { nome: 'Protetto', tipo: 'individual' } });
+    const progetto = await server.inject({ method: 'POST', url: '/progetti', payload: { clienteId: cliente.json().id, nome: 'P' } });
+    const tokenCollaboratore = signJwt({
+      userId: 'usr-collab',
+      tenantId: TENANT_TEST,
+      email: 'collab@studio.example',
+      ruolo: 'collaboratore_interno',
+    });
+
+    const res = await server.inject({
+      method: 'DELETE',
+      url: `/progetti/${progetto.json().id}`,
+      headers: { authorization: `Bearer ${tokenCollaboratore}` },
+    });
+    expect(res.statusCode).toBe(403);
+  });
+});

@@ -88,7 +88,9 @@ export interface AppPort {
   getProgetto(id: string): unknown | Promise<unknown>; // forma esatta (con moduli/microvoci) definita dall'implementazione
   listaProgetti(): unknown[] | Promise<unknown[]>;
   archiviaProgetto(id: string, archiviato: boolean): Promise<void>;
-  eliminaProgetto(id: string): Promise<void>;
+  // tenantId opzionale: se omesso l'implementazione usa il tenant del costruttore;
+  // le rotte HTTP passano SEMPRE quello del token JWT (§14, §2bis).
+  eliminaProgetto(id: string, tenantId?: string): Promise<void>;
   listaFattureTutte(): Promise<unknown[]>;
   creaPreventivo(input: { clienteId: string; progettoId: string; righe: RigaPreventivoInput[] }): Preventivo | Promise<Preventivo>;
   getPreventivo(id: string): Preventivo | Promise<Preventivo>;

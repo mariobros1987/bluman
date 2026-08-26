@@ -34,14 +34,14 @@
 ### Cosa va corretto 🔴
 | # | Problema | Rischio | Fase |
 |---|----------|---------|------|
-| 1 | CORS `origin: true` + `credentials: true` | Furto sessione cross-origin | 0.1 |
-| 2 | Fallback InMemoryApp in produzione | Dati non persistenti, comportamento imprevedibile | 0.2 |
-| 3 | Frontend: fallback silenziosi che restituiscono `{ok:true}` | Dati persi senza errore visibile | 0.3 |
-| 4 | TLS `rejectUnauthorized: false` su SMTP/IMAP | MITM su credenziali email | 0.4 |
-| 5 | Confronto firma JWT non constant-time | Timing attack (basso) | 0.5 |
+| 1 | ~~CORS `origin: true` + `credentials: true`~~ ✅ (0.1) | ~~Furto sessione cross-origin~~ | 0.1 |
+| 2 | ~~Fallback InMemoryApp in produzione~~ ✅ (0.2) | ~~Dati non persistenti, comportamento imprevedibile~~ | 0.2 |
+| 3 | ~~Frontend: fallback silenziosi che restituiscono `{ok:true}`~~ ✅ (0.3) | ~~Dati persi senza errore visibile~~ | 0.3 |
+| 4 | ~~TLS `rejectUnauthorized: false` su SMTP/IMAP~~ ✅ (0.4) | ~~MITM su credenziali email~~ | 0.4 |
+| 5 | ~~Confronto firma JWT non constant-time~~ ✅ (0.5) | ~~Timing attack (basso)~~ | 0.5 |
 | 6 | ~~Audit log fuori contesto AsyncLocalStorage~~ ✅ (0.6) | ~~Audit su tenant sbagliato o perso~~ | 0.6 |
-| 7 | PDF fatture reali nel repo | Esposizione dati sensibili | 0.7 |
-| 8 | `eliminaProgetto` non transazionale | Dati orfani su fallimento parziale | 1.1 |
+| 7 | ~~PDF fatture reali nel repo~~ ✅ (0.7) | ~~Esposizione dati sensibili~~ | 0.7 |
+| 8 | ~~`eliminaProgetto` non transazionale~~ ✅ (1.1) | ~~Dati orfani su fallimento parziale~~ | 1.1 |
 | 9 | `server.ts` monolite 4300 righe | Manutenibilità, rischio bug | 2.1 |
 | 10 | Nessuna validazione input strutturata | Injection, dati malformati | 2.2 |
 | 11 | Nessuna paginazione | Performance con dati crescenti | 4.1 |
@@ -55,7 +55,9 @@
 > **Tempo stimato**: 2-3 giorni
 > **Impatto**: NESSUNA modifica funzionale, solo hardening.
 
-### 0.1 🔴 CORS: whitelist delle origini
+### 0.1 🔴 CORS: whitelist delle origini — ✅ RISOLTO (2026-08-26)
+
+**Risoluzione**: whitelist implementata in `src/server.ts` (~righe 269-301): le origini ammesse arrivano da variabili d'ambiente (`ALLOWED_ORIGINS`/frontend URL), con fail-fast in produzione se la whitelist manca o contiene `*` — l'avvio si blocca invece di riflettere qualunque origine.
 
 **Problema**: `origin: true` riflette qualunque origine del richiedente. Combinato con `credentials: true`, un sito malevolo può fare richieste autenticate all'API BluMan usando i cookie/token del browser della vittima.
 
@@ -96,7 +98,9 @@ curl -H "Origin: http://localhost:5173" http://localhost:3000/health -v
 
 ---
 
-### 0.2 🔴 Rimuovere fallback InMemoryApp in produzione
+### 0.2 🔴 Rimuovere fallback InMemoryApp in produzione — ✅ RISOLTO (2026-08-26)
+
+**Risoluzione**: fail-fast in `src/index.ts` (§3.2): in produzione, senza PostgreSQL raggiungibile, il processo fa `process.exit(1)`; il fallback `InMemoryApp` resta attivo solo in sviluppo.
 
 **Problema**: Se il DB non risponde, il server parte con `InMemoryApp`. In produzione questo significa: dati non persistenti, nessun isolamento tenant, comportamento imprevedibile. L'utente non sa che i suoi dati non vengono salvati.
 
@@ -137,7 +141,9 @@ async function start() {
 
 ---
 
-### 0.3 🔴 Frontend: eliminareare fallback silenziosi sulle scritture
+### 0.3 🔴 Frontend: eliminareare fallback silenziosi sulle scritture — ✅ RISOLTO (2026-08-26)
+
+**Risoluzione**: verificato `frontend/src/api/client.ts`: le scritture non restituiscono più `{ ok: true }` con dati finti quando il backend non risponde; gli errori reali vengono propagati al chiamante (nessun catch silenzioso residuo).
 
 **Problema**: Diverse funzioni in `frontend/src/api/client.ts`, se il backend non risponde, restituiscono `{ ok: true }` con dati finti. L'utente crede che l'azione sia stata salvata, ma non è così.
 
@@ -177,7 +183,9 @@ export async function uploadFileApi(filename: string, contentBase64: string) {
 
 ---
 
-### 0.4 🔴 TLS: riattivare verifica certificati
+### 0.4 🔴 TLS: riattivare verifica certificati — ✅ RISOLTO (2026-08-26)
+
+**Risoluzione**: `tlsRejectUnauthorized()` in `src/services/imapFetcher.ts:30` e `src/services/emailRelay.ts:197` impone `rejectUnauthorized: true` di default; la disattivazione è possibile solo in sviluppo tramite variabile d'ambiente esplicita.
 
 **Problema**: `rejectUnauthorized: false` in `emailService.ts` disattiva la verifica del certificato TLS. Un attaccante in posizione di rete intermedia può intercettare le credenziali SMTP.
 
@@ -209,7 +217,9 @@ tls: {
 
 ---
 
-### 0.5 🟠 JWT: confronto firma constant-time
+### 0.5 🟠 JWT: confronto firma constant-time — ✅ RISOLTO (2026-08-26)
+
+**Risoluzione**: `src/util/jwt.ts` usa `crypto.timingSafeEqual` per il confronto della firma (righe 129 e 165), eliminando il confronto stringa vulnerabile a timing attack.
 
 **Problema**: `verifyJwt` usa `signature !== expectedSignature` (confronto stringa). Questo è teoricamente vulnerabile a timing attack, anche se il rischio è basso per HMAC-SHA256.
 
@@ -300,7 +310,9 @@ async function recordAudit(params: {
 
 ---
 
-### 0.7 🟠 Ripulire file sensibili dal repo
+### 0.7 🟠 Ripulire file sensibili dal repo — ✅ RISOLTO (2026-08-26)
+
+**Risoluzione**: verificato con `git ls-files`: nessun PDF né file con dati reali è tracciato; l'unico file di configurazione tracciato è `.env.example` (solo segnaposto).
 
 **Problema**: Nel repo ci sono file che contengono dati realieli:
 - `BluMan_Fattura_FT-2026-001.pdf`
@@ -328,7 +340,9 @@ docs/privati/
 > **Tempo stimato**: 3-4 giorni
 > **Impatto**: Nessuna modfica funziomle est, solo robbstezza.
 
-### 1.1 🟠 `elimProgetto`: transazione atomica
+### 1.1 🟠 `elimProgetto`: transazione atomica — ✅ RISOLTO (2026-08-26)
+
+**Risoluzione**: la logica transazionale FK-safe esisteva già nell'adapter (`PrismaApp.eliminaProgetto`) ma era orfana: nessuna rotta HTTP la esponeva, quindi il frontend (`eliminaProgettoApi` in ProjectDetail) riceveva 404. Aggiunta la rotta `DELETE /progetti/:id` in `src/server.ts` con: guard di ruolo (solo `super_admin`/`advisor`, come `/progetti/:id/ricalcola`), audit `PROGETTO_ELIMINATO`, errori tradotti dal gestore centrale (progetto inesistente → 404, fatture presenti → 409). L'adapter ora riceve il tenant della richiesta JWT (prima usava solo quello fisso del costruttore) e `ProgettoNonTrovatoError` non viene più mascherato da errore di record collegati. Coperta da 4 test in `src/server.test.ts` (suite a 273 test verdi).
 
 **Problema**: La cancellazione di un progetto avviene con una serie di `deleteMany`/ `delete` in sequenza. Se uno fallisce a metà, restano dati orfni.
 
@@ -371,7 +385,9 @@ async eliminaProgetto(id: string): Promise<void> {
 
 ---
 
-### 1.2 🟠 Cron service: rimuovere fallback mock
+### 1.2 🟠 Cron service: rimuovere fallback mock — ✅ RISOLTO (2026-08-26)
+
+**Risoluzione**: `src/services/cronService.ts` ora crea le notifiche reali sul database (nessun cliente fittizio nei catch), con deduplicazione giornaliera (`giaNotificataOggi`): il report del cron riflette solo la realtà.
 
 **Problema**: `cronService.ts` ha un `catch` che, se la query al DB fallisce, inventa un cliente fittizio e lo conta come "notifica inviata". Il report del cron deve riflettere solo la realtà.
 
@@ -396,7 +412,9 @@ try {
 
 ---
 
-### 1.3 🟠 Health check con verifica DB
+### 1.3 🟠 Health check con verifica DB — ✅ RISOLTO (2026-08-26)
+
+**Risoluzione**: `GET /health` in `src/server.ts` esegue un ping reale del database (`SELECT 1` con timeout corto); se il DB è irraggiungibile risponde 503 con `{ stato: 'degradato' }`, così Railway riavvia l'istanza invece di servire errori.
 
 **Problema**: `GET /health` restituisce `{ stato: 'ok' }` senza verificare che il DB sia raggiungibile. Railway può continuare a mandare traffico a un'istanza il cui DB è giù.
 
@@ -419,7 +437,9 @@ server.get('/health', async (_req, reply) => {
 
 ---
 
-### 1.4 🟡 Frontend: rimuovere `mockData` da App.tsx
+### 1.4 🟡 Frontend: rimuovere `mockData` da App.tsx — ✅ RISOLTO (2026-08-26)
+
+**Risoluzione**: `frontend/src/store/mockData.ts` è stato rimosso (la cartella `store/` non esiste più); App.tsx usa solo dati provenienti dalle API. Aggiornato anche `.agents/AGENTS.md` (Regola 7).
 
 **Problema**: `App.tsx` importa `PROJECTS` da `store/mockData.ts` per il conteggio alert. Dat finti mescolati a a dati reali.
 
@@ -808,19 +828,19 @@ REDIS_URL=
 ## 9. Checklist Finale
 
 ### FASE 0 — Sicurezza (2-3 giorni)
-- [ ] 0.1 CORS whitelist origini
-- [ ] 0.2 Fail-fast senza DB in produzione
-- [ ] 0.3 Frontend: rimuovere fallback silenziosi su scritture
-- [ ] 0.4 TLS `rejectUnauthorized: true`
-- [ ] 0.5 JWT confronto constant-time
+- [x] 0.1 CORS whitelist origini
+- [x] 0.2 Fail-fast senza DB in produzione
+- [x] 0.3 Frontend: rimuovere fallback silenziosi su scritture
+- [x] 0.4 TLS `rejectUnauthorized: true`
+- [x] 0.5 JWT confronto constant-time
 - [x] 0.6 Audit log con tenant esplicito
-- [ ] 0.7 File sensibili fuori dal repo
+- [x] 0.7 File sensibili fuori dal repo
 
 ### FASE 1 — Affidabilità (3-4 giorni)
-- [ ] 1.1 `eliminaProgetto` in transazione
-- [ ] 1.2 Cron senza dati mock
-- [ ] 1.3 Health check con verifica DB
-- [ ] 1.4 Frontend: rimuovere mockData da App.tsx
+- [x] 1.1 `eliminaProgetto` in transazione
+- [x] 1.2 Cron senza dati mock
+- [x] 1.3 Health check con verifica DB
+- [x] 1.4 Frontend: rimuovere mockData da App.tsx
 
 ### FASE 2 — Refactoring (1-2 settimane)
 - [ ] 2.1 Spezzare server.ts in moduli route

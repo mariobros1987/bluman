@@ -373,7 +373,11 @@ export class PrismaApp implements AppPort {
     });
   }
 
-  async eliminaProgetto(id: string): Promise<void> {
+  async eliminaProgetto(id: string, tenantId?: string): Promise<void> {
+    // Il tenant della richiesta HTTP può differire da quello del costruttore
+    // (super_admin che opera su un altro studio via X-Tenant-Id, §2bis): se è
+    // passato prevale; l'isolamento lo doppiano il filtro esplicito e la RLS.
+    const tenantEffettivo = tenantId ?? this.tenantId;
     // Fase 1 — tutto in UN'unica transazione: prima l'eliminazione era una sequenza
     // di ~15 deleteMany non transazionali; un errore a metà (es. una FK non coperta
     // dall'elenco manuale) lasciava il progetto mezzo cancellato — moduli o microvoci
@@ -383,7 +387,7 @@ export class PrismaApp implements AppPort {
       conContestoInTransazione(tx, async () => {
         // 1. Controllo Fiscale: Se ci sono fatture o note di credito, blocco.
         const fatture = await tx.fattura.count({
-          where: { progettoId: id, tenantId: this.tenantId },
+          where: { progettoId: id, tenantId: tenantEffettivo },
         });
 
         if (fatture > 0) {
@@ -418,13 +422,15 @@ export class PrismaApp implements AppPort {
           // un errore di validazione che finiva mascherato da «record collegati».
           // L'appartenenza al tenant si verifica prima, l'isolamento lo fa anche
           // la RLS dentro questa transazione.
-          const esistente = await tx.progetto.findFirst({ where: { id, tenantId: this.tenantId } });
+          const esistente = await tx.progetto.findFirst({ where: { id, tenantId: tenantEffettivo } });
           if (!esistente) {
             throw new ProgettoNonTrovatoError(`Progetto ${id} non trovato in questo studio.`);
           }
           await tx.progetto.delete({ where: { id } });
         } catch (err: any) {
-          if (err instanceof TransizioneNonValidaError) throw err;
+          // ProgettoNonTrovatoError va rilanciato com'è: il gestore centrale degli
+          // errori lo traduce in 404; mascherarlo qui produrrebbe un 409 fuorviante.
+          if (err instanceof TransizioneNonValidaError || err instanceof ProgettoNonTrovatoError) throw err;
           console.error('Errore durante eliminazione progetto:', err);
           throw new TransizioneNonValidaError('Impossibile eliminare il progetto a causa di record collegati nel database.');
         }

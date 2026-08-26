@@ -128,7 +128,8 @@ export class InMemoryApp implements AppPort {
     p.stato = archiviato ? 'archived' : 'in_progress';
   }
 
-  async eliminaProgetto(id: string): Promise<void> {
+  async eliminaProgetto(id: string, _tenantId?: string): Promise<void> {
+    if (!this.progetti.has(id)) throw new ProgettoNonTrovatoError(`Progetto ${id} non trovato in questo studio.`);
     const fattureCount = Array.from(this.fatture.values()).filter(f => (f as any).progettoId === id).length;
     if (fattureCount > 0) {
       throw new TransizioneNonValidaError(`Impossibile eliminare il progetto perché contiene ${fattureCount} Fatture / Note di Credito. È necessario archiviarlo.`);

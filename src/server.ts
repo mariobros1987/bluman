@@ -2872,6 +2872,40 @@ export function buildServer(app: AppPort): FastifyInstance {
     }
   });
 
+  // §1.1 (PIANO_DI_MIGLIORAMENTO) — l'eliminazione transazionale esisteva già
+  // nell'adapter (PrismaApp.eliminaProgetto) ma non era esposta via HTTP: il frontend
+  // chiamava DELETE /progetti/:id e riceveva 404. La rotta riusa quell'unica
+  // implementazione (niente logica duplicata): progetto inesistente → 404, blocco in
+  // presenza di Fatture/Note di Credito → 409 (TransizioneNonValidaError); entrambi
+  // sono tradotti dal gestore centrale degli errori. Come le altre scritture
+  // distruttive (es. /progetti/:id/ricalcola) è riservata a chi risponde dello studio.
+  server.delete<{ Params: { id: string } }>('/progetti/:id', async (req, reply) => {
+    const { id } = req.params;
+    const tenantId = (req as any).tenantId || TENANT_DEFAULT;
+
+    const ruoloRichiedente = (req as any).ruolo as string | undefined;
+    if (ruoloRichiedente !== 'super_admin' && ruoloRichiedente !== 'advisor') {
+      return reply
+        .code(403)
+        .send({ errore: 'Solo il responsabile dello studio può eliminare un progetto.' });
+    }
+
+    await app.eliminaProgetto(id, tenantId);
+
+    await recordAudit({
+      tenantId,
+      userId: (req as any).user?.userId,
+      userEmail: (req as any).user?.email,
+      ruolo: ruoloRichiedente,
+      azione: 'PROGETTO_ELIMINATO',
+      entita: 'Progetto',
+      dettagli: `Progetto ${id} eliminato`,
+      ipAddress: req.ip,
+    });
+
+    return reply.send({ ok: true, id });
+  });
+
   /**
    * §16 — Ricalcolo esplicito della cascata micro-voce → modulo → progetto (Fase 1, task 1.3).
    *
