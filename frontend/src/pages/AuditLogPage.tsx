@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from 'react';
-import { fmt } from '../utils';
+import { useState, useEffect } from 'react';
 import { fetchAuditLogsApi } from '../api/client';
 
 export interface AuditEntry {

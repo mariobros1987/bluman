@@ -1,9 +1,7 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { downloadRealPdf } from '../utils/pdfGenerator';
 import { PREBUILT_TEMPLATES, resolveDocumentTemplateHtml, type DocumentTemplate } from '../utils/documentTemplates';
 import { REORGANIZATION_TEMPLATES } from '../utils/reorganizationTemplates';
-import { fmt } from '../utils';
 import type { Progetto, Passaggio } from '../types';
 
 interface PassaggioModalProps {
@@ -157,7 +155,9 @@ export function getSmartDocumentRecommendation(voceTitle: string, category: stri
   };
 }
 
-function getDefaultPassaggi(v: { s: string; d: number }): Passaggio[] {
+// Usa solo lo stato della voce: il numero documenti (`d`) era richiesto nella firma
+// ma mai letto, e MicroVoce ora lo dichiara opzionale.
+function getDefaultPassaggi(v: { s: string }): Passaggio[] {
   return [
     { id: 's1', title: 'Informazioni preliminari & Briefing', type: 'info', who: 'operatore', stato: v.s !== 'pending' ? 'done' : 'pending', desc: 'Briefing interno del team prima di avviare l\'attività.' },
     { id: 's2', title: 'Verifica & Documentazione Incarico', type: 'doc', who: 'cliente', stato: 'pending', desc: 'Collega o carica un documento solo se richiesto dall\'attività.', file: undefined },
@@ -196,8 +196,6 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce }: Pass
   });
   const [newNote, setNewNote] = useState('');
 
-  const navigate = useNavigate();
-
   // Calcolo Pre-screening Intelligente
   const recommendation = getSmartDocumentRecommendation(voce.n, mod.cat, mod.n);
 
@@ -215,20 +213,16 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce }: Pass
   });
 
   const [docName, setDocName] = useState('');
-  const [docRequiresSign, setDocRequiresSign] = useState(true);
+  const [docRequiresSign] = useState(true);
   const [selectedDocPreview, setSelectedDocPreview] = useState<DocumentoEntry | null>(null);
   const [showCatalogModal, setShowCatalogModal] = useState(false);
   const [selectedCatalogCategory, setSelectedCatalogCategory] = useState<string>('ALL');
 
   // Form master preview state
-  const [previewFormModalStep, setPreviewFormModalStep] = useState<Passaggio | null>(null);
-  const [previewFormValues, setPreviewFormValues] = useState<Record<string, string>>({});
+  const [, setPreviewFormModalStep] = useState<Passaggio | null>(null);
+  const [, setPreviewFormValues] = useState<Record<string, string>>({});
 
-  const [showAddStepModal, setShowAddStepModal] = useState(false);
-  const [newStepTitle, setNewStepTitle] = useState('');
-  const [newStepDesc, setNewStepDesc] = useState('');
-  const [newStepType, setNewStepType] = useState<'info' | 'doc' | 'form' | 'check'>('check');
-  const [newStepWho, setNewStepWho] = useState<'operatore' | 'cliente'>('operatore');
+  const [, setShowAddStepModal] = useState(false);
 
   const doneN = steps.filter(s => s.stato === 'done').length;
   const visible = view === 'operatore' ? steps : steps.filter(s => s.who === 'cliente');
@@ -259,30 +253,6 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce }: Pass
     if (onSaveVoce) {
       onSaveVoce(nextSteps, notes, documents.length);
     }
-  };
-
-  const handleCreateStep = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newStepTitle.trim()) return;
-    const newStep: Passaggio = {
-      id: `s-${Date.now()}`,
-      title: newStepTitle.trim(),
-      desc: newStepDesc.trim() || 'Azione operativa di processo.',
-      type: newStepType,
-      who: newStepWho,
-      stato: 'pending',
-      fields: newStepType === 'form' ? ['Dato Richiesto 1', 'Dato Richiesto 2'] : undefined,
-      file: undefined,
-    };
-    const nextSteps = [...steps, newStep];
-    setSteps(nextSteps);
-    voce.proc = nextSteps;
-    if (onSaveVoce) {
-      onSaveVoce(nextSteps, notes, documents.length);
-    }
-    setShowAddStepModal(false);
-    setNewStepTitle('');
-    setNewStepDesc('');
   };
 
   const handleAddNote = (e: React.FormEvent) => {

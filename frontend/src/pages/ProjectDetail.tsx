@@ -91,7 +91,6 @@ export function ProjectDetail() {
   } | null>(null);
 
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-  const [deleting, setDeleting] = useState(false);
   const [ricalcolando, setRicalcolando] = useState(false);
 
   /**
@@ -150,7 +149,7 @@ export function ProjectDetail() {
     time: string,
     operatorId: number,
     typeIcon: string,
-    priority: 'low' | 'normal' | 'urgent',
+    priority: string,
     sendEmail: boolean,
     notes: string,
     locationUrl?: string
@@ -255,10 +254,10 @@ export function ProjectDetail() {
         const av = dbRes.avanzamento;
         const avModuli = new Map<string, any>((av?.moduli || []).map((m: any) => [m.id, m]));
 
-        let finalMods = (dbRes.moduli || []).map((m: any, mIdx: number) => {
+        let finalMods: ModuloProgetto[] = (dbRes.moduli || []).map((m: any, mIdx: number): ModuloProgetto => {
           const localMod = localSavedProj?.mods?.find((lm: any) => lm.n.toLowerCase() === (m.nome || '').toLowerCase() || lm.id === (mIdx + 100));
 
-          let microvociList = (m.microvoci || []).map((mv: any, vIdx: number) => {
+          let microvociList: MicroVoce[] = (m.microvoci || []).map((mv: any, vIdx: number): MicroVoce => {
             let savedNotes = mv.note;
             if (!savedNotes) {
               const localSaved = localStorage.getItem(getTenantStorageKey(`bluman_notes_${dbRes.id}_${m.id || mIdx + 100}_${vIdx}`));
@@ -987,7 +986,9 @@ export function ProjectDetail() {
           microvoceName={calendarModalTarget.name}
           projectName={project.n}
           onSchedule={(dt, opId, prio, sendE, actType, tm, nts, loc) => {
-            handleScheduleDeadlineConfirm(dt, opId, prio, sendE, actType, tm, nts, loc);
+            // onSchedule arriva in ordine (data, operatore, priorità, email, tipo, ora, note, luogo);
+            // handleSaveCalendarEvent li vuole in ordine diverso (data, ora, operatore, tipo, priorità, email, note, luogo).
+            handleSaveCalendarEvent(dt, tm ?? '', opId, actType ?? 'doc', prio, sendE, nts ?? '', loc);
           }}
         />
       )}
@@ -1167,7 +1168,8 @@ function ModuloBlock({ mod, open, onToggle, onOpenProc, rawDbModulo, onRefresh, 
                         )}
                       </td>
                       <td onClick={e => { e.stopPropagation(); onOpenAssignMv(i); }} style={{ cursor: 'pointer' }} title="Clicca per riassegnare l'operatore di studio">
-                        <Avatar id={v.as} size={22} />
+                        {/* `as` è opzionale (voci seed non assegnate): Avatar gestisce l'id vuoto. */}
+                        <Avatar id={v.as ?? ''} size={22} />
                       </td>
                       <td><span style={{ color: 'var(--muted)' }}>{v.hE}h</span></td>
                       <td>

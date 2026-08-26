@@ -1,4 +1,3 @@
-import React from 'react';
 import { statoConfig } from '../../utils';
 
 interface BadgeProps {

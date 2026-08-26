@@ -310,10 +310,12 @@ export function RetainersPage() {
                   const selClienteObj = clienti.find(c => c.id === clienteId);
                   const nomeCliente = selClienteObj?.nome?.toLowerCase() || '';
 
-                  // Estrai progetti da DB/LocalStorage/MockData
+                  // Estrai progetti dal LocalStorage (progetti custom/locally-synced). Il
+                  // precedente riferimento a un seed `PROJECTS` puntava a una costante mai
+                  // esistita: ReferenceError a runtime. Allineato a ScadenzarioPage.
                   const localStr = localStorage.getItem('bluman_custom_projects');
                   const localProjs: any[] = localStr ? JSON.parse(localStr) : [];
-                  const allAvailable = [...localProjs, ...PROJECTS];
+                  const allAvailable = [...localProjs];
 
                   const filtered = allAvailable.filter(p => {
                     if (!clienteId) return false;

@@ -2,7 +2,7 @@
 
 export type StatoProgetto = 'pre_project' | 'in_progress' | 'completed' | 'archived';
 export type StatoModulo   = 'pending' | 'attesa_dipendenza' | 'in_progress' | 'delayed' | 'blocked' | 'done';
-export type StatoMicrovoce = 'pending' | 'attesa_dipendenza' | 'active' | 'delayed' | 'blocked' | 'done';
+export type StatoMicrovoce = 'pending' | 'attesa_dipendenza' | 'active' | 'in_progress' | 'delayed' | 'blocked' | 'done';
 export type TipoCliente   = 'individual' | 'company';
 export type CategoriaModulo = 'Analisi' | 'Societario' | 'Trust' | 'Banking' | 'Fiscale' | 'Legale' | 'IP' | 'Compliance';
 
@@ -57,12 +57,20 @@ export interface MicroVoce {
    * il ripiego sul nome non distingue due voci omonime.
    */
   dbId?: string;
+  /** Id numerico locale dei dati seed/legacy (non è l'id di database). */
+  id?: number;
   n: string;
   hE: number; // ore estimate
   hA: number; // ore actual
   s: StatoMicrovoce;
-  as: number; // assignee id
-  d: number;  // documents count
+  /** Assignee id. Opzionale: i dati seed non lo valorizzano. */
+  as?: number;
+  /** Numero documenti. Opzionale: i dati seed non lo valorizzano. */
+  d?: number;
+  /** Nome operatore in forma testuale (dati seed/legacy). */
+  op?: string;
+  /** Data scadenza assegnata dalla pianificazione calendario. */
+  due?: string;
   vn?: string; // nota ritardo
   proc?: Passaggio[];
   note?: Array<{ id: string; autore: string; data: string; testo: string }>;
@@ -112,17 +120,29 @@ export interface ModuloProgetto {
   v: MicroVoce[];
 }
 
+/**
+ * Una fattura collegata a un progetto, come viene realmente letta e scritta:
+ * dal mapping del database (`ProjectDetail`), dai dati seed e dalle fatture create in pagina.
+ *
+ * In passato qui c'erano `tipo`/`mid`/`pct`, che modellano l'INPUT della generazione
+ * fattura (definito inline in `api/client.ts`), non la fattura salvata: nessun codice li
+ * leggeva da `Progetto.fatture`, e i dati reali non li hanno mai avuti.
+ */
 export interface FatturaRiga {
-  tipo: 'modulo_completo' | 'modulo_parziale' | 'milestone_libera';
-  mid?: number;
-  pct?: number;
+  id?: string | number;
+  numero?: string;
+  desc?: string;
   importo: number;
-  desc: string;
+  data?: string;
   stato: 'bozza' | 'emessa' | 'incassata';
 }
 
 export interface Progetto {
-  id: number;
+  /**
+   * Id del progetto: numero per i dati seed/legacy locali, stringa (UUID) per quelli dal
+   * database. I confronti in pagina usano sempre `String(p.id)`, quindi entrambi sono validi.
+   */
+  id: number | string;
   n: string;
   cl: string;
   ct: TipoCliente;

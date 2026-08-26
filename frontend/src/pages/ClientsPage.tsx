@@ -17,8 +17,8 @@ export function ClientsPage() {
   const [search, setSearch] = useState(targetClientQuery);
   const [filterType, setFilterType] = useState<'all' | 'individual' | 'company'>('all');
   const [editClientModal, setEditClientModal] = useState<Cliente | null>(null);
-  const [editClientName, setEditClientName] = useState('');
-  const [editClientType, setEditClientType] = useState<'individual' | 'company'>('company');
+  const [, setEditClientName] = useState('');
+  const [, setEditClientType] = useState<'individual' | 'company'>('company');
 
   const openEditModal = (c: Cliente) => {
     setEditClientModal(c);
@@ -62,8 +62,6 @@ export function ClientsPage() {
   const [nome, setNome] = useState('');
   const [tipo, setTipo] = useState<'individual' | 'company'>('individual');
   const [submitting, setSubmitting] = useState(false);
-
-  const [error, setError] = useState<string | null>(null);
 
   const loadClienti = async () => {
     setLoading(true);
@@ -524,7 +522,9 @@ function AnagraficaErpModal({ client, onClose, onSaved }: { client: Cliente; onC
       dataKyc,
     };
 
-    const clientPayload: Record<string, any> = {
+    // Stessa forma che chiede creaClienteApi (`nome` obbligatorio): il generico
+    // Record<string, any> non dimostra il campo richiesto e il compilatore lo rifiutava.
+    const clientPayload: { nome: string; tipo?: 'individual' | 'company'; [key: string]: any } = {
       id: client.id,
       nome,
       tipo,

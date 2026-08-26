@@ -1,6 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { CatBadge } from '../components/ui/CatBadge';
-import { Avatar } from '../components/ui/Avatar';
 import { triggerCronScadenzeApi, fetchProgetti, fetchClienti, fetchTutteFattureStudioApi } from '../api/client';
 import { getCurrentTenantId, getTenantStorageKey, getStudioInfoForTenant } from '../utils/tenant';
 
@@ -24,7 +22,6 @@ export function CalendarPage() {
   const [filterCat, setFilterCat] = useState<string>('tutti');
   const [selectedEvent, setSelectedEvent] = useState<EventoStudio | null>(null);
   const [newEventModalOpen, setNewEventModalOpen] = useState(false);
-  const [cronRunning, setCronRunning] = useState(false);
   const [events, setEvents] = useState<EventoStudio[]>([]);
 
   // Carica i dati reali da Progetti, Clienti ERP e Fatture isolati per Tenant
@@ -126,7 +123,7 @@ export function CalendarPage() {
   const [formCat, setFormCat] = useState<'microvoce' | 'kyc' | 'fattura' | 'contratto' | 'promemoria'>('promemoria');
   const [formPriorita, setFormPriorita] = useState<'alta' | 'media' | 'normale'>('normale');
   const [formCliente, setFormCliente] = useState('Holding Beta S.r.l.');
-  const [formOperatore, setFormOperatore] = useState('Joe Disabato');
+  const [formOperatore] = useState('Joe Disabato');
   const [formNote, setFormNote] = useState('');
 
   const handleCreateEventSubmit = (e: React.FormEvent) => {
@@ -371,7 +368,9 @@ export function CalendarPage() {
                   borderRadius: 14,
                   padding: 16,
                   display: 'flex',
-                  justify: 'space-between',
+                  // `justify` non esiste in CSSProperties: era ignorato dal browser e le
+                  // schede non si disponevano come previsto.
+                  justifyContent: 'space-between',
                   alignItems: 'center',
                   gap: 16,
                   boxShadow: '0 4px 14px rgba(0,0,0,.2)',

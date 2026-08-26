@@ -12,9 +12,11 @@ export function UserProfileModal({ user, onClose, onUserUpdated }: UserProfileMo
   const [tab, setTab] = useState<'profilo' | 'password' | 'sessione'>('profilo');
 
   // Profilo state
-  const [nome, setNome] = useState(user?.nome || user?.name || '');
-  const [email] = useState(user?.email || '');
-  const [specializzazione, setSpecializzazione] = useState(user?.specializzazione || '');
+  // `user` è `any`: senza il tipo esplicito lo stato diventa `any` e ogni callback
+  // a valle (es. `.map(p => ...)` per le iniziali) diventa un implicit any.
+  const [nome, setNome] = useState<string>(user?.nome || user?.name || '');
+  const [email] = useState<string>(user?.email || '');
+  const [specializzazione, setSpecializzazione] = useState<string>(user?.specializzazione || '');
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileMsg, setProfileMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
@@ -115,7 +117,10 @@ export function UserProfileModal({ user, onClose, onUserUpdated }: UserProfileMo
   };
 
   const roleInfo = getRoleBadge(user?.ruolo || user?.role || 'advisor');
-  const userInitials = (nome || user?.name || 'AD')
+  // `user?.name` è `any` e da solo renderebbe `any` l'intera catena `||`,
+  // quindi anche il `.map(p => ...)` qui sotto: la fissiamo a string.
+  const nomePerIniziali: string = nome || user?.name || 'AD';
+  const userInitials = nomePerIniziali
     .split(' ')
     .filter(Boolean)
     .slice(0, 2)

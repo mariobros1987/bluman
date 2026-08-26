@@ -1,14 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { CatBadge } from '../components/ui/CatBadge';
 import { fmt } from '../utils';
 import { downloadRealPdf } from '../utils/pdfGenerator';
-import type { SignatureData } from '../utils/pdfGenerator';
 import { DigitalSignatureModal } from '../components/DigitalSignatureModal';
 import { resolveDocumentTemplateHtml, PREBUILT_TEMPLATES } from '../utils/documentTemplates';
 import { getStudioInfoForTenant, getCurrentTenantId, getTenantStorageKey, BLUECODE_TENANT_ID } from '../utils/tenant';
 import {
-  fetchModuliLibreria,
   fetchProgetti,
   fetchClienti,
   fetchComunicazioniApi,
@@ -184,7 +182,6 @@ function dataOraLeggibile(valore: string | null): string {
 
 export function ClientPortal() {
   const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
   const token = searchParams.get('magic_token') || '';
 
   // Stati di autenticazione per Portale Cliente (Email + Password e Magic Link)
@@ -4052,10 +4049,3 @@ const docBoxStyle: React.CSSProperties = {
   background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, padding: 24, boxShadow: '0 12px 36px rgba(0,0,0,.3)',
 };
 
-const modRowStyle: React.CSSProperties = {
-  background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-};
-
-const successBoxStyle: React.CSSProperties = {
-  textAlign: 'center', padding: '40px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center',
-};

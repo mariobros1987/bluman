@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { fetchClienti, fetchProgetti, fetchTenantInfoApi, uploadFileApi, fetchDocumentiTemplateApi, creaDocumentoTemplateApi, eliminaDocumentoTemplateApi } from '../api/client';
+import { fetchClienti, fetchProgetti, fetchTenantInfoApi, uploadFileApi, creaDocumentoTemplateApi, eliminaDocumentoTemplateApi } from '../api/client';
 import { getFormattedLogoUrl } from '../utils';
 import { downloadRealPdf } from '../utils/pdfGenerator';
 import { getCurrentTenantId, getTenantStorageKey, getStudioInfoForTenant } from '../utils/tenant';
@@ -8,10 +8,8 @@ import type { Cliente, Progetto } from '../types';
 
 import {
   PREBUILT_TEMPLATES,
-  resolveDocumentTemplateHtml,
   getAllTemplates,
   saveCustomTemplate,
-  deleteCustomTemplate,
   deleteTemplate,
   archiveTemplate,
   restoreTemplate,
@@ -32,7 +30,6 @@ export function DocumentEditorPage() {
 
   const [templatesList, setTemplatesList] = useState<DocumentTemplate[]>(() => getAllTemplates(true));
   const [searchMasterTmplQuery, setSearchMasterTmplQuery] = useState('');
-  const [selectedCatSidebar, setSelectedCatSidebar] = useState<string>('TUTTI');
   const [tmplStatusSidebar, setTmplStatusSidebar] = useState<'attivi' | 'archiviati' | 'tutti'>('attivi');
 
   const [showNewTmplModal, setShowNewTmplModal] = useState(false);

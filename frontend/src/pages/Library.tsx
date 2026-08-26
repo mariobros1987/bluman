@@ -4,7 +4,7 @@ import { CatBadge } from '../components/ui/CatBadge';
 import { fmt, moduloH, moduloP, resolveRighe, levelOf } from '../utils';
 import { downloadRealPdf } from '../utils/pdfGenerator';
 import { PREBUILT_TEMPLATES, getAllTemplates, saveCustomTemplate, deleteTemplate, archiveTemplate, restoreTemplate, importTemplatesFromJson, exportTemplatesAsJson, type DocumentTemplate } from '../utils/documentTemplates';
-import { getTenantStorageKey, getStudioInfoForTenant, getCurrentTenantId } from '../utils/tenant';
+import { getTenantStorageKey, getStudioInfoForTenant } from '../utils/tenant';
 import { fetchModuliLibreria, fetchArticoli, fetchGiurisdizioniApi, creaGiurisdizioneApi, creaArticoloApi, creaModuloTemplateApi, aggiornaModuloTemplateApi, disattivaModuloTemplateApi, disattivaArticoloApi, updateArticoloPrezzoApi, uploadFileApi, fetchClienti, fetchProgetti, creaProgettoApi, salvaProgettoDettaglioApi, creaDocumentoTemplateApi, eliminaDocumentoTemplateApi } from '../api/client';
 import type { CategoriaModulo, Articolo, Giurisdizione, ModuloTemplate } from '../types';
 
@@ -1539,7 +1539,6 @@ function LibreriaDocumentiEForm() {
     e.preventDefault();
     if (!docName.trim() && !fileToUpload) return;
     setUploading(true);
-    let uploadedUrl = '';
     const nameToUse = docName.trim() || (fileToUpload ? fileToUpload.name : 'Documento.docx');
 
     try {
@@ -1551,10 +1550,7 @@ function LibreriaDocumentiEForm() {
           reader.readAsDataURL(fileToUpload);
         });
         const base64Data = await base64Promise;
-        const uploadRes = await uploadFileApi(nameToUse, base64Data);
-        if (uploadRes && uploadRes.url) {
-          uploadedUrl = uploadRes.url;
-        }
+        await uploadFileApi(nameToUse, base64Data);
       }
 
       const customTmpl: DocumentTemplate = {

@@ -1,5 +1,5 @@
 import { REORGANIZATION_TEMPLATES } from './reorganizationTemplates';
-import { getCurrentTenantId, getTenantStorageKey, getStudioInfoForTenant, BLUECODE_TENANT_ID } from './tenant';
+import { getCurrentTenantId, getTenantStorageKey, getStudioInfoForTenant } from './tenant';
 
 export interface DocumentTemplate {
   id: string;
@@ -278,8 +278,6 @@ export function resolveDocumentTemplateHtml(
   let targetCliente: any = null;
   let targetProgetto: any = null;
   let targetStudio: any = null;
-  let isForPrintOrExport = true;
-  let tagMode: 'highlight' | 'plain' | 'raw' = 'plain';
 
   if (context && (context.cl || context.mods || context.totalePreventivo !== undefined)) {
     // Il contesto è stato passato direttamente come oggetto Progetto
@@ -298,8 +296,6 @@ export function resolveDocumentTemplateHtml(
     targetProgetto = context.progetto;
     targetCliente = context.cliente;
     targetStudio = context.studio;
-    isForPrintOrExport = context.isForPrintOrExport !== undefined ? context.isForPrintOrExport : true;
-    tagMode = context.tagMode || 'plain';
   }
 
   // Dati studio da Tenant o Storage (isolato per tenant)

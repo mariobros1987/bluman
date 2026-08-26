@@ -46,7 +46,6 @@ export const A4_SPECS = {
 function createPaginatedPages(
   contentHtml: string,
   signatures: SignatureData[] = [],
-  fileName: string = 'Documento'
 ): HTMLElement[] {
   // 1. Container temporaneo di misura
   const measureContainer = document.createElement('div');
@@ -211,7 +210,7 @@ export async function downloadRealPdf(
   }
 
   const rawHtml = typeof elementOrHtml === 'string' ? elementOrHtml : elementOrHtml.innerHTML;
-  const pageDomElements = createPaginatedPages(rawHtml, signatures, fileName);
+  const pageDomElements = createPaginatedPages(rawHtml, signatures);
 
   try {
     // 1. Converti tutte le immagini in Base64 Data URL sincroni per html2canvas

@@ -1,4 +1,3 @@
-import React, { useState } from 'react';
 import { DocumentEditorPage } from '../pages/DocumentEditorPage';
 
 interface DocumentEditorModalProps {

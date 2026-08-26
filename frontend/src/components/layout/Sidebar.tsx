@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import { getFormattedLogoUrl } from '../../utils';
 import { getUserPermission } from '../../utils/rbac';
-import { getCurrentTenantId, getTenantStorageKey, getStudioInfoForTenant, BLUECODE_TENANT_ID } from '../../utils/tenant';
+import { getCurrentTenantId, getTenantStorageKey, getStudioInfoForTenant } from '../../utils/tenant';
 import styles from './Sidebar.module.css';
 
 const NAV = [

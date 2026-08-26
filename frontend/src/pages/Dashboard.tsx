@@ -16,7 +16,7 @@ export function Dashboard() {
   const [wizardOpen, setWizardOpen] = useState(false);
   const [projectList, setProjectList] = useState<Progetto[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'attivi' | 'archiviati'>('attivi');
   const [searchTerm, setSearchTerm] = useState('');
 

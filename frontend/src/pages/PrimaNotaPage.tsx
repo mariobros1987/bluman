@@ -34,7 +34,6 @@ export function PrimaNotaPage() {
       // Formato atteso: Data, Descrizione/Causale, Importo, CRO/TRN (separati da virgola o punto e virgola)
       const parts = line.includes(';') ? line.split(';') : line.split(',');
       if (parts.length >= 2) {
-        const rawDate = parts[0]?.trim();
         const rawDesc = parts[1]?.trim();
         const rawImporto = parts[2]?.replace(/[€\s]/g, '').trim();
         const rawCro = parts[3]?.trim() || `TRN-${Date.now()}-${idx}`;

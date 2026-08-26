@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { loadTeamMembersFromDb } from '../hooks/useTeamMembers';
 import { fetchProgetti, salvaProgettoDettaglioApi } from '../api/client';

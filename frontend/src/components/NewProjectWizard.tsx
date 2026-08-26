@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { CatBadge } from './ui/CatBadge';
-import { fmt, moduloH, moduloP } from '../utils';
+import { fmt, moduloH, moduloP, resolveRighe } from '../utils';
 import type { Cliente, Giurisdizione, ModuloTemplate, CategoriaModulo } from '../types';
 import { fetchClienti, fetchGiurisdizioniApi, fetchModuliLibreria, creaClienteApi, creaProgettoApi, creaPreventivoEAccettaApi } from '../api/client';
 import { getCurrentTenantId, getTenantStorageKey } from '../utils/tenant';
@@ -187,11 +187,14 @@ export function NewProjectWizard({ onClose, onProjectCreated }: NewProjectWizard
           p: moduloP(m),
           team: [1],
           delay: false,
-          v: (m.v || []).map((voce: any) => ({
-            n: voce.n || 'Microvoce operativa',
-            hE: voce.hE || 4,
+          // ModuloTemplate non ha `v`: qui c'era `m.v`, sempre undefined, quindi la copia
+          // locale nasceva senza micro-voci finché un refresh non la rileggeva dal server
+          // (che le istanzia dalla distinta). Le deriviamo dalle righe con la stessa logica.
+          v: resolveRighe(m).map(r => ({
+            n: r.art.n || 'Microvoce operativa',
+            hE: r.h || 4,
             hA: 0,
-            s: 'pending',
+            s: 'pending' as const,
             as: 1,
             d: 0,
           })),
