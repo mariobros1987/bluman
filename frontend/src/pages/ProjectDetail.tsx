@@ -914,7 +914,7 @@ export function ProjectDetail() {
             vidx={procV.vidx}
             onClose={() => setProcV(null)}
             onSaveVoce={(steps, notes) => handleSavePassaggiModal(procV.mid, procV.vidx, steps, notes)}
-            progettoDbId={rawDbProject?.id}
+            progettoDbId={rawDbProject?.id || (project as any)?.dbId || (project as any)?.id}
             microvoceDbId={rawMv?.id}
           />
         );

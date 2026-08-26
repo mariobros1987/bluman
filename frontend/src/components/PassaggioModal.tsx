@@ -193,6 +193,7 @@ const TYPE_COLOR: Record<string, { bg: string; color: string }> = {
 };
 
 export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, progettoDbId, microvoceDbId }: PassaggioModalProps) {
+  const effProgettoId = progettoDbId || (project as any)?.dbId || (project as any)?.id;
   const mod = project.mods.find(m => m.id === mid)!;
   const voce = mod.v[vidx];
   const [view, setView] = useState<'operatore' | 'cliente'>('operatore');
@@ -292,17 +293,16 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
   };
 
   // Applica Modello dal Pre-screening o dal Catalogo
-  // Applica Modello dal Pre-screening o dal Catalogo
   const handleApplyTemplate = async (tmpl: DocumentTemplate) => {
     const formattedName = `${tmpl.titolo} — ${project.cl}.docx`;
     const htmlContent = resolveDocumentTemplateHtml(tmpl, project.cl);
     const contentBase64 = btoa(unescape(encodeURIComponent(htmlContent)));
 
     let dbId: string | undefined;
-    if (progettoDbId) {
+    if (effProgettoId) {
       try {
         const salvato = await salvaDocumentoApi({
-          progettoId: progettoDbId,
+          progettoId: effProgettoId,
           microvoceProgettoId: microvoceDbId,
           filename: formattedName,
           contentBase64,
@@ -342,14 +342,14 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
 
     setShowCatalogModal(false);
     alert(`✓ Modello "${tmpl.titolo}" collegato in bozza alla voce "${voce.n}"!`);
-    if (progettoDbId) await ricaricaDocumentiDb();
+    if (effProgettoId) await ricaricaDocumentiDb();
   };
 
   // Caricamento documenti dal database su mount
   useEffect(() => {
-    if (!progettoDbId) return;
+    if (!effProgettoId) return;
     let mounted = true;
-    listaDocumentiProgetto(progettoDbId)
+    listaDocumentiProgetto(effProgettoId)
       .then(dbDocs => {
         if (!mounted) return;
         // Filtra documenti associati a questa microvoce
@@ -374,16 +374,16 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
       })
       .catch(err => console.warn('Errore lettura documenti DB:', err));
     return () => { mounted = false; };
-  }, [progettoDbId, microvoceDbId]);
+  }, [effProgettoId, microvoceDbId]);
 
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const [versionTargetDocId, setVersionTargetDocId] = useState<string | null>(null);
   const versionInputRef = useRef<HTMLInputElement>(null);
 
   const ricaricaDocumentiDb = async () => {
-    if (!progettoDbId) return;
+    if (!effProgettoId) return;
     try {
-      const dbDocs = await listaDocumentiProgetto(progettoDbId);
+      const dbDocs = await listaDocumentiProgetto(effProgettoId);
       const docsMv = dbDocs.filter(d => d.microvoceProgettoId === microvoceDbId);
       const mapped: DocumentoEntry[] = docsMv.map(d => ({
         id: d.id,
@@ -409,15 +409,17 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
   // Pubblica documento al cliente (visibile per firma)
   const handlePubblicaDocumento = async (docId: string) => {
     try {
-      if (docId.startsWith('d-') && progettoDbId) {
+      const localDoc = documents.find(d => d.id === docId);
+      const isLocalId = docId.startsWith('d-');
+
+      if (isLocalId && effProgettoId) {
         // Documento template o locale non ancora salvato a DB: salvalo ora con stato pubblicato
-        const localDoc = documents.find(d => d.id === docId);
         const tmpl = localDoc?.templateId ? ALL_STUDIO_TEMPLATES.find(t => t.id === localDoc.templateId) : null;
         const htmlContent = tmpl ? resolveDocumentTemplateHtml(tmpl, project.cl) : `<html><body><h1>${localDoc?.nome || 'Documento'}</h1></body></html>`;
         const contentBase64 = btoa(unescape(encodeURIComponent(htmlContent)));
 
         await salvaDocumentoApi({
-          progettoId: progettoDbId,
+          progettoId: effProgettoId,
           microvoceProgettoId: microvoceDbId,
           filename: localDoc?.nome || 'Documento.docx',
           contentBase64,
@@ -425,7 +427,26 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
           statoDoc: 'pubblicato',
         });
       } else {
-        await aggiornaStatoDocumentoApi(docId, 'pubblicato');
+        try {
+          await aggiornaStatoDocumentoApi(docId, 'pubblicato');
+        } catch (err: any) {
+          if (effProgettoId) {
+            // Se fallisce l'aggiornamento (es. documento orfano nel client), salvalo direttamente a DB
+            const tmpl = localDoc?.templateId ? ALL_STUDIO_TEMPLATES.find(t => t.id === localDoc.templateId) : null;
+            const htmlContent = tmpl ? resolveDocumentTemplateHtml(tmpl, project.cl) : `<html><body><h1>${localDoc?.nome || 'Documento'}</h1></body></html>`;
+            const contentBase64 = btoa(unescape(encodeURIComponent(htmlContent)));
+            await salvaDocumentoApi({
+              progettoId: effProgettoId,
+              microvoceProgettoId: microvoceDbId,
+              filename: localDoc?.nome || 'Documento.docx',
+              contentBase64,
+              categoriaDoc: tmpl?.categoria || 'Allegati Microvoce',
+              statoDoc: 'pubblicato',
+            });
+          } else {
+            throw err;
+          }
+        }
       }
       alert('🚀 Documento pubblicato al cliente con successo! Ora è visibile nel portale per la firma.');
       await ricaricaDocumentiDb();
@@ -464,17 +485,15 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
       await nuovaVersioneDocumentoApi(versionTargetDocId, {
         filename: file.name,
         contentBase64: base64,
-        categoriaDoc: 'Allegati Microvoce',
-        pubblicaSubito: false, // Parte in bozza, l'operatore conferma prima di pubblicare
       });
 
-      alert(`✓ Nuova versione "${file.name}" caricata con successo (in bozza). Clicca "Pubblica" quando sei pronto a farla vedere al cliente.`);
+      alert('✓ Nuova versione caricata con successo! Ora è in bozza: controllala e clicca "Pubblica al Cliente" quando è pronta.');
+      setVersionTargetDocId(null);
       await ricaricaDocumentiDb();
     } catch (err: any) {
-      alert(`❌ Errore caricamento versione: ${err?.message ?? 'Errore sconosciuto'}`);
+      alert(`❌ Errore caricamento nuova versione: ${err?.message ?? 'Errore sconosciuto'}`);
     } finally {
       setUploadingDoc(false);
-      setVersionTargetDocId(null);
     }
   };
 
@@ -498,7 +517,7 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
     setUploadingDoc(true);
 
     try {
-      if (progettoDbId) {
+      if (effProgettoId) {
         // Percorso principale: salva a DB con collegamento alla microvoce
         const base64 = await new Promise<string>((resolve, reject) => {
           const reader = new FileReader();
@@ -508,7 +527,7 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
         });
 
         const salvato = await salvaDocumentoApi({
-          progettoId: progettoDbId,
+          progettoId: effProgettoId,
           microvoceProgettoId: microvoceDbId,
           filename: file.name,
           contentBase64: base64,
@@ -1101,7 +1120,7 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
                             type="button"
                             onClick={async () => {
                               if (confirm(`Sei sicuro di voler eliminare il documento "${d.nome}"?`)) {
-                                if (progettoDbId && !d.id.startsWith('d-')) {
+                                if (effProgettoId && !d.id.startsWith('d-')) {
                                   try {
                                     await eliminaDocumentoApi(d.id);
                                   } catch (err: any) {
@@ -1132,7 +1151,7 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
               <div style={{ fontSize: 10.5, color: 'var(--muted)' }}>
                 💡 Il documento viene salvato in <strong>Bozza Interna</strong>: sarai tu a cliccare <strong>"🚀 Pubblica al Cliente"</strong> quando è pronto per la firma.
               </div>
-              {!progettoDbId && (
+              {!effProgettoId && (
                 <div style={{ fontSize: 10.5, color: '#f59e0b', background: '#2d1a0530', border: '1px solid #78350f', borderRadius: 6, padding: '6px 10px' }}>
                   ⚠️ Progetto non ancora a database: il documento verrà salvato solo localmente e non sarà visibile al cliente.
                 </div>
