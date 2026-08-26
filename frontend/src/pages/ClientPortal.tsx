@@ -3699,7 +3699,7 @@ export function ClientPortal() {
             <div style={{ flex: 1, overflow: 'hidden', padding: 16, background: '#0f172a', display: 'flex', justifyContent: 'center' }}>
               {(() => {
                 const url = urlFileArchivio(selectedViewerDoc.fileUrl);
-                const anteprimabile = /\.(pdf|png|jpe?g|gif|webp|svg)(\?|$)/i.test(selectedViewerDoc.fileUrl || '');
+                const anteprimabile = /\.(pdf|png|jpe?g|gif|webp|svg|html?|docx?)(\?|$)/i.test(selectedViewerDoc.fileUrl || '') || Boolean(url);
 
                 if (!url) {
                   return (
@@ -3707,22 +3707,6 @@ export function ClientPortal() {
                       A questo documento non è allegato nessun file.<br />
                       Se ti è stato chiesto di firmarlo, scrivilo allo studio dalla scheda Contatti: senza il file
                       la firma non può essere apposta.
-                    </div>
-                  );
-                }
-
-                if (!anteprimabile) {
-                  return (
-                    <div style={{ alignSelf: 'center', textAlign: 'center', color: 'var(--muted)', fontSize: 12.5, maxWidth: 460, lineHeight: 1.7 }}>
-                      Questo formato non si apre dentro il portale.<br />
-                      <button
-                        type="button"
-                        onClick={() => scaricaDocumentoClient(selectedViewerDoc.fileUrl, selectedViewerDoc.nome)}
-                        style={{ background: 'transparent', border: 'none', color: '#818cf8', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline', padding: 0, fontSize: 'inherit' }}
-                      >
-                        Scarica «{selectedViewerDoc.nome}»
-                      </button>{' '}
-                      e leggilo prima di firmare.
                     </div>
                   );
                 }
@@ -3746,7 +3730,7 @@ export function ClientPortal() {
                     onClick={() => scaricaDocumentoClient(selectedViewerDoc.fileUrl, selectedViewerDoc.nome)}
                     style={{ background: '#1a1f3d', border: '1px solid #4338ca', color: '#c7d2fe', padding: '8px 16px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
                   >
-                    ⬇ Scarica il file
+                    📥 Scarica PDF A4
                   </button>
                 )}
               </div>

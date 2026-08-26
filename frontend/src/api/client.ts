@@ -1,5 +1,6 @@
 // API Client per integrare il React Frontend con il backend Fastify + Supabase DB
 import { getTenantStorageKey, getCurrentTenantId, getStudioInfoForTenant, BLUECODE_TENANT_ID } from '../utils/tenant';
+import { downloadRealPdf } from '../utils/pdfGenerator';
 
 const getApiBase = () => {
   if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_BASE) {
@@ -2114,8 +2115,8 @@ export function urlFileArchivio(url?: string | null): string | null {
 }
 
 /**
- * Scarica un file dell'archivio/fascicolo direttamente nel browser,
- * garantendo il nome file corretto ed evitando blocchi cross-origin.
+ * Scarica un file dell'archivio/fascicolo direttamente nel browser in formato PDF / binario corretto,
+ * garantendo che i modelli HTML/Word vengano esportati come veri PDF A4 apribili.
  */
 export async function scaricaDocumentoClient(fileUrl?: string | null, nomeFile?: string): Promise<void> {
   const url = urlFileArchivio(fileUrl);
@@ -2125,10 +2126,28 @@ export async function scaricaDocumentoClient(fileUrl?: string | null, nomeFile?:
     const res = await fetch(url);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const blob = await res.blob();
+
+    // Rileva se il contenuto è HTML (modelli di studio o contratti salvati come HTML)
+    const textSnippet = await blob.slice(0, 1000).text().catch(() => '');
+    const isHtml = textSnippet.includes('<html') || textSnippet.includes('<!DOCTYPE') || textSnippet.includes('<body') || textSnippet.includes('<div') || textSnippet.includes('<p>') || textSnippet.includes('<table');
+
+    if (isHtml) {
+      const fullHtml = await blob.text();
+      const cleanPdfTitle = (nomeFile || 'Documento').replace(/\.(docx?|html?|txt)$/i, '');
+      await downloadRealPdf(cleanPdfTitle, fullHtml);
+      return;
+    }
+
+    // Se è un file binario (PDF reale, immagine, o altro allegato)
     const objectUrl = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = objectUrl;
-    link.download = nomeFile || 'documento';
+
+    let finalName = (nomeFile || 'documento').trim();
+    if (blob.type === 'application/pdf' && !finalName.toLowerCase().endsWith('.pdf')) {
+      finalName = finalName.replace(/\.[^/.]+$/, '') + '.pdf';
+    }
+    link.download = finalName;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -2139,7 +2158,11 @@ export async function scaricaDocumentoClient(fileUrl?: string | null, nomeFile?:
     link.href = url;
     link.target = '_blank';
     link.rel = 'noreferrer';
-    if (nomeFile) link.download = nomeFile;
+    let fallbackName = nomeFile;
+    if (fallbackName && fallbackName.endsWith('.docx')) {
+      fallbackName = fallbackName.replace(/\.docx$/i, '.pdf');
+    }
+    if (fallbackName) link.download = fallbackName;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
