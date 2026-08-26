@@ -865,11 +865,10 @@ export function ClientPortal() {
   };
 
   /** Invio o reinvio del codice. Un errore resta un errore, e il cliente legge quale. */
-  const inviaCodiceFirma = async (opzioni: { reinvio?: boolean; bersaglio?: BersaglioFirma } = {}) => {
+  const inviaCodiceFirma = async (opzioni: { reinvio?: boolean; bersaglio?: BersaglioFirma; canale?: CanaleOtp } = {}) => {
     const bersaglio = opzioni.bersaglio ?? bersaglioFirma;
-    // Chi chiede un codice per un atto preciso fissa anche il bersaglio: la convalida che
-    // arriva dopo legge lo stato, e se restasse quello dell'atto firmato prima il sigillo
-    // finirebbe sul documento sbagliato. Il reinvio non passa il bersaglio e non lo tocca.
+    const canaleDaUsare = opzioni.canale ?? otpCanale;
+    if (opzioni.canale) setOtpCanale(opzioni.canale);
     if (opzioni.bersaglio) setBersaglioFirma(opzioni.bersaglio);
     setOtpLoading(true);
     setOtpError(null);
@@ -877,7 +876,7 @@ export function ClientPortal() {
 
     try {
       const res = await requestPortalOtpApi({
-        canale: otpCanale,
+        canale: canaleDaUsare,
         ambito: bersaglio.ambito,
         riferimentoId: bersaglio.riferimentoId,
         recapitoDichiarato: usaRecapitoDiverso && recapitoDichiarato.trim() ? recapitoDichiarato.trim() : undefined,
@@ -2906,53 +2905,6 @@ export function ClientPortal() {
                 </div>
               ))}
             </div>
-
-            {/* Modal Richiesta Modifiche Documento */}
-            {modificaDocTarget && (
-              <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.75)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
-                <div style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, width: '100%', maxWidth: 540, padding: 22, display: 'flex', flexDirection: 'column', gap: 14, boxShadow: '0 20px 40px rgba(0,0,0,.6)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>📝 Richiedi Modifiche all'Atto</div>
-                      <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{modificaDocTarget.nome}</div>
-                    </div>
-                    <button type="button" onClick={() => setModificaDocTarget(null)} style={{ background: 'transparent', border: 'none', color: 'var(--muted)', fontSize: 16, cursor: 'pointer' }}>✕</button>
-                  </div>
-
-                  <form onSubmit={handleInviaRichiestaModifica} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    <div style={{ fontSize: 11.5, color: 'var(--text)', lineHeight: 1.5 }}>
-                      Descrivi con precisione quali clausole, dettagli o informazioni desideri rettificare. Lo studio riceverà la tua nota ed elaborerà una versione corretta prima della firma definitiva.
-                    </div>
-
-                    <textarea
-                      value={modificaDocTesto}
-                      onChange={e => setModificaDocTesto(e.target.value)}
-                      placeholder="Es. Vorrei rettificare l'indirizzo della sede legale al punto 2 e correggere la quota di partecipazione..."
-                      rows={5}
-                      required
-                      style={{ width: '100%', padding: '10px 12px', fontSize: 12, borderRadius: 8, background: 'var(--card)', color: 'var(--text)', border: '1px solid var(--border)', resize: 'vertical' }}
-                    />
-
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 6 }}>
-                      <button
-                        type="button"
-                        onClick={() => setModificaDocTarget(null)}
-                        style={{ background: 'var(--card2)', border: '1px solid var(--border)', color: 'var(--muted)', padding: '7px 14px', borderRadius: 8, fontSize: 11.5, fontWeight: 600, cursor: 'pointer' }}
-                      >
-                        Annulla
-                      </button>
-                      <button
-                        type="submit"
-                        disabled={modificaDocInviando || !modificaDocTesto.trim()}
-                        style={{ background: '#2563eb', color: '#fff', border: 'none', padding: '7px 18px', borderRadius: 8, fontSize: 11.5, fontWeight: 700, cursor: modificaDocInviando || !modificaDocTesto.trim() ? 'not-allowed' : 'pointer' }}
-                      >
-                        {modificaDocInviando ? 'Invio in corso…' : 'Invia Richiesta allo Studio'}
-                      </button>
-                    </div>
-                  </form>
-                </div>
-              </div>
-            )}
           </div>
         )}
 
@@ -3484,6 +3436,52 @@ export function ClientPortal() {
               </button>
             </div>
 
+            {/* Selettore Canale di Recapito OTP (Switch immediato tra Email, WhatsApp e Telegram) */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>Scegli o cambia il canale di ricezione codice:</span>
+                <span style={{ color: '#818cf8', fontWeight: 800 }}>{nomeCanale[otpCanale]}</span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                {[
+                  { id: 'email' as const, label: '✉️ Email' },
+                  { id: 'whatsapp' as const, label: '📱 WhatsApp' },
+                  { id: 'telegram' as const, label: '✈️ Telegram' },
+                ].map((c) => {
+                  const isSelected = otpCanale === c.id;
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      disabled={otpLoading}
+                      onClick={async () => {
+                        setOtpCanale(c.id);
+                        setOtpError(null);
+                        await inviaCodiceFirma({ canale: c.id, reinvio: true });
+                      }}
+                      style={{
+                        padding: '8px 10px',
+                        fontSize: 11.5,
+                        fontWeight: isSelected ? 800 : 600,
+                        background: isSelected ? 'var(--indigo)' : 'var(--card)',
+                        color: isSelected ? '#fff' : 'var(--muted)',
+                        border: isSelected ? '1.5px solid #818cf8' : '1px solid var(--border)',
+                        borderRadius: 8,
+                        cursor: otpLoading ? 'not-allowed' : 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 4,
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      {c.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             {/* Info Canale — validità e recapito sono quelli che ha detto il backend */}
             <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 14 }}>
               <div style={{ fontSize: 11.5, color: 'var(--muted)', marginBottom: 8 }}>
@@ -3733,6 +3731,21 @@ export function ClientPortal() {
                     📥 Scarica PDF A4
                   </button>
                 )}
+
+                {/* Pulsante Richiedi Modifiche integrato nel visualizzatore */}
+                {!selectedViewerDoc.firmato && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setModificaDocTarget(selectedViewerDoc);
+                      setModificaDocTesto('');
+                    }}
+                    style={{ background: '#27272a', border: '1px solid #52525b', color: '#fbbf24', padding: '8px 16px', borderRadius: 8, fontSize: 11.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+                    title="Invia note o chiedi modifiche allo studio prima di firmare"
+                  >
+                    📝 Richiedi Modifiche
+                  </button>
+                )}
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -3760,6 +3773,53 @@ export function ClientPortal() {
                 )}
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 📝 MODALE RICHIESTA MODIFICHE DOCUMENTO (Globale, zIndex: 11500) */}
+      {modificaDocTarget && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 11500, padding: 16 }}>
+          <div style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, width: '100%', maxWidth: 540, padding: 22, display: 'flex', flexDirection: 'column', gap: 14, boxShadow: '0 25px 60px rgba(0,0,0,.8)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>📝 Richiedi Modifiche all'Atto</div>
+                <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{modificaDocTarget.nome}</div>
+              </div>
+              <button type="button" onClick={() => setModificaDocTarget(null)} style={{ background: 'transparent', border: 'none', color: 'var(--muted)', fontSize: 16, cursor: 'pointer' }}>✕</button>
+            </div>
+
+            <form onSubmit={handleInviaRichiestaModifica} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div style={{ fontSize: 11.5, color: 'var(--text)', lineHeight: 1.5 }}>
+                Descrivi con precisione quali clausole, dettagli o informazioni desideri rettificare. Lo studio riceverà la tua nota ed elaborerà una versione corretta prima della firma definitiva.
+              </div>
+
+              <textarea
+                value={modificaDocTesto}
+                onChange={e => setModificaDocTesto(e.target.value)}
+                placeholder="Es. Vorrei rettificare l'indirizzo della sede legale al punto 2 e correggere la quota di partecipazione..."
+                rows={5}
+                required
+                style={{ width: '100%', padding: '10px 12px', fontSize: 12, borderRadius: 8, background: 'var(--card)', color: 'var(--text)', border: '1px solid var(--border)', resize: 'vertical' }}
+              />
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 6 }}>
+                <button
+                  type="button"
+                  onClick={() => setModificaDocTarget(null)}
+                  style={{ background: 'var(--card2)', border: '1px solid var(--border)', color: 'var(--muted)', padding: '7px 14px', borderRadius: 8, fontSize: 11.5, fontWeight: 600, cursor: 'pointer' }}
+                >
+                  Annulla
+                </button>
+                <button
+                  type="submit"
+                  disabled={modificaDocInviando || !modificaDocTesto.trim()}
+                  style={{ background: '#2563eb', color: '#fff', border: 'none', padding: '7px 18px', borderRadius: 8, fontSize: 11.5, fontWeight: 700, cursor: modificaDocInviando || !modificaDocTesto.trim() ? 'not-allowed' : 'pointer' }}
+                >
+                  {modificaDocInviando ? 'Invio in corso…' : 'Invia Richiesta allo Studio'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
