@@ -816,6 +816,18 @@ export async function eliminaProgettoApi(id: string) {
   return await res.json();
 }
 
+/** Elimina un singolo modulo (con le sue micro-voci) da un progetto. 409 se ha ore consuntivate. */
+export async function eliminaModuloApi(progettoId: string, moduloId: string): Promise<void> {
+  const res = await apiFetch(
+    `${API_BASE}/progetti/${encodeURIComponent(progettoId)}/moduli/${encodeURIComponent(moduloId)}`,
+    { method: 'DELETE', headers: getAuthHeaders() },
+  );
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error((data as any).errore ?? 'Eliminazione modulo non riuscita.');
+  }
+}
+
 export async function archiviaProgettoApi(id: string, archiviato: boolean) {
   const res = await apiFetch(`${API_BASE}/progetti/${id}/archivia`, {
     method: 'PUT',

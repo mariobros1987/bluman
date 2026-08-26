@@ -738,3 +738,46 @@ describe('server — DELETE /progetti/:id (§1.1 PIANO_DI_MIGLIORAMENTO)', () =>
     expect(res.statusCode).toBe(403);
   });
 });
+
+describe('server — DELETE /progetti/:id/moduli/:moduloId (§1.1bis)', () => {
+  it('guard di ruolo: advisor passa il check (il DB non è disponibile nei test)', async () => {
+    // Nei test il DB Prisma non è raggiungibile: la rotta arriva al guard di ruolo
+    // (advisor → ok) poi fallisce su prisma.moduloProgetto.findFirst (500 DB error).
+    // Il test presidia che il 403 NON scatti per un advisor.
+    const { server } = nuovoServer();
+    const res = await server.inject({ method: 'DELETE', url: '/progetti/qualsiasi/moduli/qualsiasi-id' });
+    expect(res.statusCode).not.toBe(403);
+  });
+
+  it('403 se il ruolo è collaboratore_interno', async () => {
+    const { server } = nuovoServer();
+    const cliente = await server.inject({ method: 'POST', url: '/clienti', payload: { nome: 'C', tipo: 'individual' } });
+    const progetto = await server.inject({ method: 'POST', url: '/progetti', payload: { clienteId: cliente.json().id, nome: 'P' } });
+    const tokenCollaboratore = signJwt({
+      userId: 'usr-collab',
+      tenantId: TENANT_TEST,
+      email: 'collab@test.example',
+      ruolo: 'collaboratore_interno',
+    });
+
+    const res = await server.inject({
+      method: 'DELETE',
+      url: `/progetti/${progetto.json().id}/moduli/qualsiasi-id`,
+      headers: { authorization: `Bearer ${tokenCollaboratore}` },
+    });
+    expect(res.statusCode).toBe(403);
+    expect(res.json().errore).toMatch(/advisor/i);
+  });
+
+  it('401 senza token di autenticazione — il guard JWT blocca prima del ruolo', async () => {
+    const { server } = nuovoServer();
+    // La rotta è protetta: senza token il guard onRequest risponde 401 prima
+    // che il handler venga invocato, indipendentemente dalla disponibilità del DB.
+    const res = await server.inject({
+      method: 'DELETE',
+      url: '/progetti/qualsiasi/moduli/qualsiasi-id',
+      headers: { authorization: '' },
+    });
+    expect(res.statusCode).toBe(401);
+  });
+});

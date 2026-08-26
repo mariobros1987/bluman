@@ -13,7 +13,7 @@ import { ComunicazioniTab } from '../components/ComunicazioniTab';
 import { AssignOperatorModal } from '../components/AssignOperatorModal';
 import { CalendarPreviewModal } from '../components/CalendarPreviewModal';
 import { ConfirmDeleteModal } from '../components/ConfirmDeleteModal';
-import { fetchProgettoDettaglio, emettiFatturaApi, consuntivaMicrovoceApi, assegnaAccessoProgettoApi, salvaProgettoDettaglioApi, archiviaProgettoApi, eliminaProgettoApi, fetchModuliLibreria, fetchArticoli, inviaComunicazioneApi, ricalcolaProgettoApi, creaPreventivoEAccettaApi, listaDocumentiProgetto, salvaDocumentoApi, eliminaDocumentoApi, richiesteAddendumStudioApi, aggiornaStatoAddendumApi } from '../api/client';
+import { fetchProgettoDettaglio, emettiFatturaApi, consuntivaMicrovoceApi, assegnaAccessoProgettoApi, salvaProgettoDettaglioApi, archiviaProgettoApi, eliminaProgettoApi, eliminaModuloApi, fetchModuliLibreria, fetchArticoli, inviaComunicazioneApi, ricalcolaProgettoApi, creaPreventivoEAccettaApi, listaDocumentiProgetto, salvaDocumentoApi, eliminaDocumentoApi, richiesteAddendumStudioApi, aggiornaStatoAddendumApi } from '../api/client';
 import type { RichiestaAddendum } from '../api/client';
 import { useTeamMembers } from '../hooks/useTeamMembers';
 import { getCurrentTenantId, getTenantStorageKey, getStudioInfoForTenant, BLUECODE_TENANT_ID } from '../utils/tenant';
@@ -767,19 +767,33 @@ export function ProjectDetail() {
                   onDeleteMod={async () => {
                     const confirmDel = window.confirm(`Sei sicuro di voler eliminare il modulo "${mod.n}" dal progetto?`);
                     if (!confirmDel) return;
+
+                    // Il modulo deve esistere a DB — senza dbId non c'è nulla da eliminare
+                    // e il modulo orfano non dovrebbe esistere (Regola 7).
+                    const dbModuloId = rawDbProject?.moduli?.[mIdx]?.id;
+                    if (!dbModuloId) {
+                      alert('⚠️ Questo modulo non risulta salvato a database e non può essere eliminato. Ricrea il progetto correttamente.');
+                      return;
+                    }
+
+                    try {
+                      await eliminaModuloApi(String(project.id), dbModuloId);
+                    } catch (err: any) {
+                      alert(`❌ Eliminazione non riuscita: ${err?.message ?? 'Errore sconosciuto'}`);
+                      return;
+                    }
+
+                    // Aggiorna state e localStorage solo dopo conferma dal server
                     const newMods = project.mods.filter(m => m.id !== mod.id);
                     const updatedVal = newMods.reduce((acc, m) => acc + (m.p || 0), 0);
                     const updatedProject = { ...project, mods: newMods, val: updatedVal };
                     setProject(updatedProject);
-                    try {
-                      await salvaSuDatabase(updatedProject);
-                    } catch (err) {
-                      console.warn('Salvataggio eliminazione modulo fallback:', err);
-                    }
                     const savedStr = localStorage.getItem(getTenantStorageKey('bluman_custom_projects'));
                     const savedArr: Progetto[] = savedStr ? JSON.parse(savedStr) : [];
                     const updatedArr = [updatedProject, ...savedArr.filter(p => String(p.id) !== String(project.id))];
                     localStorage.setItem(getTenantStorageKey('bluman_custom_projects'), JSON.stringify(updatedArr));
+                    // Rilegge dal DB per sincronizzare rawDbProject
+                    loadDetail();
                   }}
                 />
               ))
@@ -887,15 +901,24 @@ export function ProjectDetail() {
       </div>
 
       {/* Passaggio Modal */}
-      {procV && (
-        <PassaggioModal
-          project={project}
-          mid={procV.mid}
-          vidx={procV.vidx}
-          onClose={() => setProcV(null)}
-          onSaveVoce={(steps, notes) => handleSavePassaggiModal(procV.mid, procV.vidx, steps, notes)}
-        />
-      )}
+      {procV && (() => {
+        // Recupera l'id DB della microvoce dal rawDbProject per passarla al modal
+        const rawMod = rawDbProject?.moduli?.find((m: any) => m.id === rawDbProject?.moduli?.[
+          project.mods.findIndex(pm => pm.id === procV.mid)
+        ]?.id) ?? rawDbProject?.moduli?.[project.mods.findIndex(pm => pm.id === procV.mid)];
+        const rawMv = rawMod?.microvoci?.[procV.vidx];
+        return (
+          <PassaggioModal
+            project={project}
+            mid={procV.mid}
+            vidx={procV.vidx}
+            onClose={() => setProcV(null)}
+            onSaveVoce={(steps, notes) => handleSavePassaggiModal(procV.mid, procV.vidx, steps, notes)}
+            progettoDbId={rawDbProject?.id}
+            microvoceDbId={rawMv?.id}
+          />
+        );
+      })()}
 
       {/* Modal Accessi Progetto (§19) */}
       {accessiModalOpen && (

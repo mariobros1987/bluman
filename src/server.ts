@@ -2907,6 +2907,62 @@ export function buildServer(app: AppPort): FastifyInstance {
   });
 
   /**
+   * DELETE /progetti/:id/moduli/:moduloId — §1.1bis
+   *
+   * Rimuove un singolo modulo (con tutte le sue micro-voci e documenti) da un progetto.
+   * Bloccato con 409 se il modulo ha ore consuntivate: si perderebbe la storia operativa.
+   * Solo advisor e super_admin possono eseguire questa operazione.
+   */
+  server.delete<{ Params: { id: string; moduloId: string } }>(
+    '/progetti/:id/moduli/:moduloId',
+    async (req, reply) => {
+      const { id, moduloId } = req.params;
+      const tenantId = (req as any).tenantId || TENANT_DEFAULT;
+      const ruoloRichiedente = (req as any).ruolo as string | undefined;
+
+      if (ruoloRichiedente !== 'super_admin' && ruoloRichiedente !== 'advisor') {
+        return reply.code(403).send({ errore: 'Solo advisor e super_admin possono eliminare moduli da un progetto.' });
+      }
+
+      const modulo = await prisma.moduloProgetto.findFirst({
+        where: { id: moduloId, progettoId: id, tenantId },
+        include: {
+          microvoci: { select: { id: true, oreConsuntivate: true, nome: true } },
+        },
+      });
+
+      if (!modulo) {
+        return reply.code(404).send({ errore: 'Modulo non trovato in questo progetto.' });
+      }
+
+      const totaleOreConsuntivate = modulo.microvoci.reduce(
+        (acc, mv) => acc + (mv.oreConsuntivate ?? 0),
+        0,
+      );
+      if (totaleOreConsuntivate > 0) {
+        return reply.code(409).send({
+          errore: `Il modulo «${modulo.nome}» ha ${totaleOreConsuntivate} ore consuntivate e non può essere eliminato. Azzerare prima le ore o archiviare il modulo.`,
+        });
+      }
+
+      await prisma.moduloProgetto.delete({ where: { id: moduloId } });
+
+      await recordAudit({
+        tenantId,
+        userId: (req as any).userId,
+        userEmail: (req as any).user?.email,
+        ruolo: ruoloRichiedente,
+        azione: 'MODULO_ELIMINATO',
+        entita: 'ModuloProgetto',
+        dettagli: `Modulo ${moduloId} («${modulo.nome}») eliminato dal progetto ${id}`,
+        ipAddress: req.ip,
+      });
+
+      return reply.send({ ok: true, moduloId });
+    },
+  );
+
+  /**
    * §16 — Ricalcolo esplicito della cascata micro-voce → modulo → progetto (Fase 1, task 1.3).
    *
    * Serve dopo un'importazione, una correzione manuale a database o il rilascio di una

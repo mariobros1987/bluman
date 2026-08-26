@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { downloadRealPdf } from '../utils/pdfGenerator';
 import { PREBUILT_TEMPLATES, resolveDocumentTemplateHtml, type DocumentTemplate } from '../utils/documentTemplates';
 import { REORGANIZATION_TEMPLATES } from '../utils/reorganizationTemplates';
+import { salvaDocumentoApi } from '../api/client';
 import type { Progetto, Passaggio } from '../types';
 
 interface PassaggioModalProps {
@@ -10,6 +11,10 @@ interface PassaggioModalProps {
   vidx: number;
   onClose: () => void;
   onSaveVoce?: (updatedSteps: Passaggio[], updatedNotes?: NoteEntry[], updatedDocCount?: number) => void;
+  /** Id DB del progetto (uuid), necessario per salvare documenti a database. */
+  progettoDbId?: string;
+  /** Id DB della microvoce (uuid), necessario per collegare il documento alla microvoce. */
+  microvoceDbId?: string;
 }
 
 interface NoteEntry {
@@ -174,7 +179,7 @@ const TYPE_COLOR: Record<string, { bg: string; color: string }> = {
   check: { bg: '#0d2d22', color: '#34d399' },
 };
 
-export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce }: PassaggioModalProps) {
+export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, progettoDbId, microvoceDbId }: PassaggioModalProps) {
   const mod = project.mods.find(m => m.id === mid)!;
   const voce = mod.v[vidx];
   const [view, setView] = useState<'operatore' | 'cliente'>('operatore');
@@ -212,8 +217,7 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce }: Pass
     return []; // NESSUN DOCUMENTO FORZATO DI DEFAULT!
   });
 
-  const [docName, setDocName] = useState('');
-  const [docRequiresSign] = useState(true);
+
   const [selectedDocPreview, setSelectedDocPreview] = useState<DocumentoEntry | null>(null);
   const [showCatalogModal, setShowCatalogModal] = useState(false);
   const [selectedCatalogCategory, setSelectedCatalogCategory] = useState<string>('ALL');
@@ -304,22 +308,65 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce }: Pass
     alert(`✓ Modello "${tmpl.titolo}" collegato con successo alla voce "${voce.n}"!`);
   };
 
-  // Caricamento manuale documento dal computer
-  const handleAddCustomDocument = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!docName.trim()) return;
-    const docEntry: DocumentoEntry = {
-      id: `d-${Date.now()}`,
-      nome: docName.endsWith('.pdf') || docName.endsWith('.docx') ? docName : `${docName}.pdf`,
-      dimensione: '480 KB',
-      richiedeFirma: docRequiresSign,
-      firmato: false,
-      dataCaricamento: new Date().toLocaleDateString('it-IT'),
-    };
-    const updatedDocs = [...documents, docEntry];
-    persistDocuments(updatedDocs);
-    setDocName('');
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+
+  // Caricamento documento dal disco: salva a DB se abbiamo i DB id, altrimenti localStorage
+  const handleFileUploadPassaggio = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+    setUploadingDoc(true);
+
+    try {
+      if (progettoDbId) {
+        // Percorso principale: salva a DB con collegamento alla microvoce
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(((reader.result as string) || '').split(',')[1] || '');
+          reader.onerror = () => reject(new Error('Lettura file non riuscita'));
+          reader.readAsDataURL(file);
+        });
+
+        const salvato = await salvaDocumentoApi({
+          progettoId: progettoDbId,
+          microvoceProgettoId: microvoceDbId,
+          filename: file.name,
+          contentBase64: base64,
+          categoriaDoc: 'Allegati Microvoce',
+        });
+
+        const docEntry: DocumentoEntry = {
+          id: salvato.id,
+          nome: salvato.nome || file.name,
+          dimensione: `${Math.round(file.size / 1024)} KB`,
+          richiedeFirma: true,
+          firmato: false,
+          dataCaricamento: new Date().toLocaleDateString('it-IT'),
+        };
+        const updatedDocs = [...documents, docEntry];
+        persistDocuments(updatedDocs);
+        alert(`✓ File "${file.name}" salvato nel fascicolo del progetto e visibile al cliente.`);
+      } else {
+        // Fallback locale (progetto non ancora a DB)
+        const docEntry: DocumentoEntry = {
+          id: `d-${Date.now()}`,
+          nome: file.name,
+          dimensione: `${Math.round(file.size / 1024)} KB`,
+          richiedeFirma: true,
+          firmato: false,
+          dataCaricamento: new Date().toLocaleDateString('it-IT'),
+        };
+        const updatedDocs = [...documents, docEntry];
+        persistDocuments(updatedDocs);
+        alert('⚠️ Documento salvato solo in locale: il progetto non è ancora a database.');
+      }
+    } catch (err: any) {
+      alert(`❌ Caricamento non riuscito: ${err?.message ?? 'Errore sconosciuto'}`);
+    } finally {
+      setUploadingDoc(false);
+    }
   };
+
 
   // Scollega documento da un singolo step
   const handleUnlinkStepDoc = (stepId: string) => {
@@ -759,27 +806,36 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce }: Pass
               )}
             </div>
 
-            {/* Form Caricamento Documento Personalizzato */}
-            <form onSubmit={handleAddCustomDocument} style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {/* Caricamento Documento Reale dal Disco → DB */}
+            <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
               <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text)' }}>
-                📎 Oppure Carica Documento Personalizzato dal Computer:
+                📎 Carica Documento dal Computer nel Fascicolo Progetto:
               </div>
-              <div style={{ display: 'flex', gap: 10 }}>
+              {!progettoDbId && (
+                <div style={{ fontSize: 10.5, color: '#f59e0b', background: '#2d1a0530', border: '1px solid #78350f', borderRadius: 6, padding: '6px 10px' }}>
+                  ⚠️ Progetto non ancora a database: il documento verrà salvato solo localmente e non sarà visibile al cliente.
+                </div>
+              )}
+              <label
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10, cursor: uploadingDoc ? 'not-allowed' : 'pointer',
+                  background: 'var(--card)', border: '1.5px dashed var(--border)', borderRadius: 8, padding: '10px 14px',
+                  opacity: uploadingDoc ? 0.6 : 1,
+                }}
+              >
+                <span style={{ fontSize: 20 }}>📁</span>
+                <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>
+                  {uploadingDoc ? '⏳ Caricamento in corso...' : 'Clicca per selezionare un file (PDF, DOCX, JPG, PNG…)'}
+                </span>
                 <input
-                  type="text"
-                  value={docName}
-                  onChange={e => setDocName(e.target.value)}
-                  placeholder="Es. Procura_Legale_Firma_Cliente.pdf o Atto_Notarile.docx"
-                  style={{ flex: 1, padding: '7px 10px', fontSize: 11.5, borderRadius: 6, background: 'var(--card)', color: 'var(--text)', border: '1px solid var(--border)' }}
+                  type="file"
+                  accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xlsx,.xls,.txt,.p7m,.xml"
+                  style={{ display: 'none' }}
+                  disabled={uploadingDoc}
+                  onChange={handleFileUploadPassaggio}
                 />
-                <button
-                  type="submit"
-                  style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '7px 14px', borderRadius: 6, fontSize: 11.5, fontWeight: 600, cursor: 'pointer' }}
-                >
-                  + Carica & Associa
-                </button>
-              </div>
-            </form>
+              </label>
+            </div>
           </div>
         )}
 
