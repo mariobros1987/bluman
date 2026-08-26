@@ -191,6 +191,7 @@ model Cliente {
   firme      FirmaElettronica[]
   proposteDatiFiscale PropostaDatiFiscale[]
   richiesteAddendum   RichiestaAddendum[]
+  richiesteModificaDoc RichiestaModificaDocumento[] @relation("RichiesteModificaDocumento")
   notifiche    Notifica[]
 
   @@map("cliente")
@@ -557,6 +558,18 @@ enum StatoScansione {
   infetto
 }
 
+/// §WF-DOC — Ciclo di vita del documento nel workflow operatore-cliente.
+/// bozza: visibile solo all'operatore.
+/// pubblicato: il cliente può vedere, firmare o chiedere modifiche.
+/// in_revisione: il cliente ha richiesto una modifica (torna a bozza dopo upload v2).
+/// firmato: il cliente ha firmato via OTP — stato terminale positivo.
+enum StatoDocumento {
+  bozza
+  pubblicato
+  in_revisione
+  firmato
+}
+
 model Documento {
   id                  String            @id @default(uuid())
   tenantId            String            @map("tenant_id")
@@ -579,11 +592,41 @@ model Documento {
   dataScadenzaDoc     DateTime?         @map("data_scadenza_doc")
   categoriaDoc        String?           @default("generico") @map("categoria_doc") // identita|visura|contratto|generico
   avvisoScadenzaInviato Boolean         @default(false) @map("avviso_scadenza_inviato")
+  // §WF-DOC — Workflow operatore → cliente.
+  // Ogni upload parte come bozza: l'operatore pubblica esplicitamente quando il documento è pronto.
+  statoDoc            StatoDocumento    @default(bozza) @map("stato_doc")
+  pubblicatoAt        DateTime?         @map("pubblicato_at")
+  // Versioning: documentoPadreId punta alla riga v1 quando si carica una v2 corretta.
+  documentoPadreId    String?           @map("documento_padre_id")
+  documentoPadre      Documento?        @relation("VersioniDocumento", fields: [documentoPadreId], references: [id])
+  versioni            Documento[]       @relation("VersioniDocumento")
 
   passaggioProgetto PassaggioProgetto?
+  richiesteModifica RichiestaModificaDocumento[]
 
   @@index([progettoId])
+  @@index([statoDoc])
   @@map("documento")
+}
+
+/// §WF-DOC — Richiesta di modifica inviata dal cliente su un documento pubblicato.
+/// Ogni richiesta è registrata a DB e visibile all'advisor nella scheda del documento.
+model RichiestaModificaDocumento {
+  id             String    @id @default(uuid())
+  tenantId       String    @map("tenant_id")
+  documentoId    String    @map("documento_id")
+  documento      Documento @relation(fields: [documentoId], references: [id], onDelete: Cascade)
+  clienteId      String    @map("cliente_id")
+  cliente        Cliente   @relation("RichiesteModificaDocumento", fields: [clienteId], references: [id])
+  commento       String    // testo libero del cliente
+  stato          String    @default("aperta") // aperta | risolta
+  creatoAt       DateTime  @default(now()) @map("creato_at")
+  rispostoAt     DateTime? @map("risposto_at")
+  rispostaStudio String?   @map("risposta_studio")
+
+  @@index([documentoId])
+  @@index([tenantId, stato])
+  @@map("richiesta_modifica_documento")
 }
 
 model ChecklistVoce {

@@ -27,6 +27,7 @@ import {
   richiesteAddendumPortaleApi,
   inviaRichiestaAddendumApi,
   fatturePortaleApi,
+  richiediModificaDocumentoApi,
   fetchNotificheApi,
   markNotificheReadApi,
   apriStreamNotifiche,
@@ -244,6 +245,28 @@ export function ClientPortal() {
 
   // Visualizzatore A4 Documento Selezionato per Lettura Completa
   const [selectedViewerDoc, setSelectedViewerDoc] = useState<any | null>(null);
+
+  // §WF-DOC — Richiesta Modifiche Documento dal Portale Cliente
+  const [modificaDocTarget, setModificaDocTarget] = useState<DocumentoPortale | null>(null);
+  const [modificaDocTesto, setModificaDocTesto] = useState('');
+  const [modificaDocInviando, setModificaDocInviando] = useState(false);
+
+  const handleInviaRichiestaModifica = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!modificaDocTarget || !modificaDocTesto.trim()) return;
+    setModificaDocInviando(true);
+    try {
+      await richiediModificaDocumentoApi(modificaDocTarget.id, modificaDocTesto.trim(), clientObj?.id);
+      alert('✓ La tua richiesta di modifica è stata inviata allo studio. L\'advisor esaminerà le tue note e caricherà la versione aggiornata.');
+      setModificaDocTarget(null);
+      setModificaDocTesto('');
+      await caricaDocumenti(clientObj?.id);
+    } catch (err: any) {
+      alert(`❌ Errore invio richiesta: ${err?.message ?? 'Errore sconosciuto'}`);
+    } finally {
+      setModificaDocInviando(false);
+    }
+  };
 
   // ── Blocco 3 — CAMPANELLA NOTIFICHE DEL CLIENTE ─────────────────────────────
   // Il backend scrive notifiche destinate al cliente (documento da firmare, pagamento
@@ -2783,10 +2806,21 @@ export function ClientPortal() {
                       </>
                     ) : (
                       <>
+                        {/* Richiedi Modifiche al documento */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setModificaDocTarget(doc);
+                            setModificaDocTesto('');
+                          }}
+                          style={{ background: '#27272a', border: '1px solid #52525b', color: '#fbbf24', padding: '7px 14px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+                          title="Invia note o chiedi modifiche allo studio prima di firmare"
+                        >
+                          📝 Richiedi Modifiche
+                        </button>
+
                         {/* La firma passa dal backend: codice sul canale scelto, impronta calcolata
-                            dal server sul file in archivio, sigillo scritto a database. Prima questo
-                            pulsante apriva un pad grafometrico che salvava in `localStorage` e
-                            dichiarava al cliente una firma eIDAS che non esisteva da nessuna parte. */}
+                            dal server sul file in archivio, sigillo scritto a database. */}
                         <button
                           type="button"
                           disabled={!doc.richiedeFirma || otpLoading}
@@ -2806,10 +2840,6 @@ export function ClientPortal() {
                             onChange={async e => {
                               const file = e.target.files?.[0];
                               if (!file) return;
-                              // Il file va al backend, che registra la firma e ne conserva
-                              // l'impronta. Prima questo caricamento scriveva solo in
-                              // `localStorage` e diceva al cliente «lo studio è stato aggiornato»:
-                              // lo studio non riceveva niente, e il file non usciva dal browser.
                               await leggiFileFirmato(file);
                               setBersaglioFirma({ ambito: 'documento_vault', titolo: doc.titolo || doc.nome, riferimentoId: doc.id });
                               setModalitaFirma('manuale_scansionata');
@@ -2821,9 +2851,81 @@ export function ClientPortal() {
                       </>
                     )}
                   </div>
+
+                  {/* Storico Richieste di Modifica inviate per questo Documento */}
+                  {doc.richiesteModifica && doc.richiesteModifica.length > 0 && (
+                    <div style={{ width: '100%', background: '#18181b', border: '1px solid #3f3f46', borderRadius: 10, padding: 12, marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: '#fbbf24', display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span>💬 Le tue note e richieste di modifica per questo atto:</span>
+                      </div>
+                      {doc.richiesteModifica.map((rm) => (
+                        <div key={rm.id} style={{ background: 'var(--card2)', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', fontSize: 11 }}>
+                          <div style={{ color: 'var(--text)', fontStyle: 'italic' }}>«{rm.commento}»</div>
+                          <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+                            <span>Inviata il {new Date(rm.creatoAt).toLocaleString('it-IT')}</span>
+                            <span style={{ fontWeight: 700, color: rm.stato === 'risolta' ? '#34d399' : '#fbbf24' }}>
+                              {rm.stato === 'risolta' ? '✓ Risolta dallo studio' : '⏳ In esame dallo studio'}
+                            </span>
+                          </div>
+                          {rm.rispostaStudio && (
+                            <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px dashed var(--border)', color: '#93c5fd', fontSize: 10.5 }}>
+                              <strong>Riscontro Advisor:</strong> {rm.rispostaStudio}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
+
+            {/* Modal Richiesta Modifiche Documento */}
+            {modificaDocTarget && (
+              <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.75)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
+                <div style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, width: '100%', maxWidth: 540, padding: 22, display: 'flex', flexDirection: 'column', gap: 14, boxShadow: '0 20px 40px rgba(0,0,0,.6)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>📝 Richiedi Modifiche all'Atto</div>
+                      <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{modificaDocTarget.nome}</div>
+                    </div>
+                    <button type="button" onClick={() => setModificaDocTarget(null)} style={{ background: 'transparent', border: 'none', color: 'var(--muted)', fontSize: 16, cursor: 'pointer' }}>✕</button>
+                  </div>
+
+                  <form onSubmit={handleInviaRichiestaModifica} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    <div style={{ fontSize: 11.5, color: 'var(--text)', lineHeight: 1.5 }}>
+                      Descrivi con precisione quali clausole, dettagli o informazioni desideri rettificare. Lo studio riceverà la tua nota ed elaborerà una versione corretta prima della firma definitiva.
+                    </div>
+
+                    <textarea
+                      value={modificaDocTesto}
+                      onChange={e => setModificaDocTesto(e.target.value)}
+                      placeholder="Es. Vorrei rettificare l'indirizzo della sede legale al punto 2 e correggere la quota di partecipazione..."
+                      rows={5}
+                      required
+                      style={{ width: '100%', padding: '10px 12px', fontSize: 12, borderRadius: 8, background: 'var(--card)', color: 'var(--text)', border: '1px solid var(--border)', resize: 'vertical' }}
+                    />
+
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 6 }}>
+                      <button
+                        type="button"
+                        onClick={() => setModificaDocTarget(null)}
+                        style={{ background: 'var(--card2)', border: '1px solid var(--border)', color: 'var(--muted)', padding: '7px 14px', borderRadius: 8, fontSize: 11.5, fontWeight: 600, cursor: 'pointer' }}
+                      >
+                        Annulla
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={modificaDocInviando || !modificaDocTesto.trim()}
+                        style={{ background: '#2563eb', color: '#fff', border: 'none', padding: '7px 18px', borderRadius: 8, fontSize: 11.5, fontWeight: 700, cursor: modificaDocInviando || !modificaDocTesto.trim() ? 'not-allowed' : 'pointer' }}
+                      >
+                        {modificaDocInviando ? 'Invio in corso…' : 'Invia Richiesta allo Studio'}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

@@ -1,8 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { downloadRealPdf } from '../utils/pdfGenerator';
 import { PREBUILT_TEMPLATES, resolveDocumentTemplateHtml, type DocumentTemplate } from '../utils/documentTemplates';
 import { REORGANIZATION_TEMPLATES } from '../utils/reorganizationTemplates';
-import { salvaDocumentoApi } from '../api/client';
+import {
+  salvaDocumentoApi,
+  listaDocumentiProgetto,
+  aggiornaStatoDocumentoApi,
+  nuovaVersioneDocumentoApi,
+  aggiornaRichiestaModificaDocumentoApi,
+  eliminaDocumentoApi,
+  type RichiestaModificaDoc,
+} from '../api/client';
 import type { Progetto, Passaggio } from '../types';
 
 interface PassaggioModalProps {
@@ -32,6 +40,11 @@ interface DocumentoEntry {
   firmato: boolean;
   dataCaricamento: string;
   templateId?: string;
+  statoDoc?: 'bozza' | 'pubblicato' | 'in_revisione' | 'firmato';
+  versione?: number;
+  pubblicatoAt?: string | null;
+  fileUrl?: string;
+  richiesteModifica?: RichiestaModificaDoc[];
 }
 
 interface RecommendationResult {
@@ -308,7 +321,133 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
     alert(`✓ Modello "${tmpl.titolo}" collegato con successo alla voce "${voce.n}"!`);
   };
 
+  // Caricamento documenti dal database su mount
+  useEffect(() => {
+    if (!progettoDbId) return;
+    let mounted = true;
+    listaDocumentiProgetto(progettoDbId)
+      .then(dbDocs => {
+        if (!mounted) return;
+        // Filtra documenti associati a questa microvoce
+        const docsMv = dbDocs.filter(d => d.microvoceProgettoId === microvoceDbId);
+        if (docsMv.length > 0) {
+          const mapped: DocumentoEntry[] = docsMv.map(d => ({
+            id: d.id,
+            nome: d.fileUrl ? (d.fileUrl.split('/').pop()?.replace(/^\d+_/, '') || `Documento v${d.versione}`) : `Documento v${d.versione}`,
+            dimensione: 'Fascicolo DB',
+            richiedeFirma: d.tipo !== 'firmato' && !d.firmato,
+            firmato: d.firmato || d.statoDoc === 'firmato',
+            dataCaricamento: new Date(d.createdAt).toLocaleDateString('it-IT'),
+            statoDoc: d.statoDoc || 'bozza',
+            versione: d.versione || 1,
+            pubblicatoAt: d.pubblicatoAt,
+            fileUrl: d.fileUrl,
+            richiesteModifica: d.richiesteModifica || [],
+          }));
+          setDocuments(mapped);
+          voce.d = mapped.length;
+        }
+      })
+      .catch(err => console.warn('Errore lettura documenti DB:', err));
+    return () => { mounted = false; };
+  }, [progettoDbId, microvoceDbId]);
+
   const [uploadingDoc, setUploadingDoc] = useState(false);
+  const [versionTargetDocId, setVersionTargetDocId] = useState<string | null>(null);
+  const versionInputRef = useRef<HTMLInputElement>(null);
+
+  const ricaricaDocumentiDb = async () => {
+    if (!progettoDbId) return;
+    try {
+      const dbDocs = await listaDocumentiProgetto(progettoDbId);
+      const docsMv = dbDocs.filter(d => d.microvoceProgettoId === microvoceDbId);
+      const mapped: DocumentoEntry[] = docsMv.map(d => ({
+        id: d.id,
+        nome: d.fileUrl ? (d.fileUrl.split('/').pop()?.replace(/^\d+_/, '') || `Documento v${d.versione}`) : `Documento v${d.versione}`,
+        dimensione: 'Fascicolo DB',
+        richiedeFirma: d.tipo !== 'firmato' && !d.firmato,
+        firmato: d.firmato || d.statoDoc === 'firmato',
+        dataCaricamento: new Date(d.createdAt).toLocaleDateString('it-IT'),
+        statoDoc: d.statoDoc || 'bozza',
+        versione: d.versione || 1,
+        pubblicatoAt: d.pubblicatoAt,
+        fileUrl: d.fileUrl,
+        richiesteModifica: d.richiesteModifica || [],
+      }));
+      setDocuments(mapped);
+      voce.d = mapped.length;
+      if (onSaveVoce) onSaveVoce(steps, notes, mapped.length);
+    } catch (err) {
+      console.warn('Errore ricarica documenti:', err);
+    }
+  };
+
+  // Pubblica documento al cliente (visibile per firma)
+  const handlePubblicaDocumento = async (docId: string) => {
+    try {
+      await aggiornaStatoDocumentoApi(docId, 'pubblicato');
+      alert('🚀 Documento pubblicato al cliente con successo! Ora è visibile nel portale per la firma.');
+      await ricaricaDocumentiDb();
+    } catch (err: any) {
+      alert(`❌ Errore pubblicazione: ${err?.message ?? 'Errore sconosciuto'}`);
+    }
+  };
+
+  // Rimetti documento in bozza interna
+  const handleRimettiInBozza = async (docId: string) => {
+    if (!confirm('Vuoi rimettere questo documento in bozza interna? Il cliente non lo vedrà più fino a nuova pubblicazione.')) return;
+    try {
+      await aggiornaStatoDocumentoApi(docId, 'bozza');
+      alert('🔒 Documento rimesso in bozza interna.');
+      await ricaricaDocumentiDb();
+    } catch (err: any) {
+      alert(`❌ Errore: ${err?.message ?? 'Errore sconosciuto'}`);
+    }
+  };
+
+  // Carica nuova versione (v2, v3...) post revisione
+  const handleFileNuovaVersione = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !versionTargetDocId) return;
+    e.target.value = '';
+    setUploadingDoc(true);
+
+    try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(((reader.result as string) || '').split(',')[1] || '');
+        reader.onerror = () => reject(new Error('Lettura file non riuscita'));
+        reader.readAsDataURL(file);
+      });
+
+      await nuovaVersioneDocumentoApi(versionTargetDocId, {
+        filename: file.name,
+        contentBase64: base64,
+        categoriaDoc: 'Allegati Microvoce',
+        pubblicaSubito: false, // Parte in bozza, l'operatore conferma prima di pubblicare
+      });
+
+      alert(`✓ Nuova versione "${file.name}" caricata con successo (in bozza). Clicca "Pubblica" quando sei pronto a farla vedere al cliente.`);
+      await ricaricaDocumentiDb();
+    } catch (err: any) {
+      alert(`❌ Errore caricamento versione: ${err?.message ?? 'Errore sconosciuto'}`);
+    } finally {
+      setUploadingDoc(false);
+      setVersionTargetDocId(null);
+    }
+  };
+
+  // Risolvi richiesta di modifica del cliente
+  const handleRisolviRichiesta = async (rid: string) => {
+    const risposta = prompt('Inserisci un commento o nota di riscontro per il cliente (opzionale):') ?? '';
+    try {
+      await aggiornaRichiestaModificaDocumentoApi(rid, { stato: 'risolta', rispostaStudio: risposta });
+      alert('✓ Richiesta di modifica contrassegnata come risolta.');
+      await ricaricaDocumentiDb();
+    } catch (err: any) {
+      alert(`❌ Errore: ${err?.message ?? 'Errore sconosciuto'}`);
+    }
+  };
 
   // Caricamento documento dal disco: salva a DB se abbiamo i DB id, altrimenti localStorage
   const handleFileUploadPassaggio = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -333,19 +472,25 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
           filename: file.name,
           contentBase64: base64,
           categoriaDoc: 'Allegati Microvoce',
+          statoDoc: 'bozza', // Inizia SEMPRE come bozza interna
         });
 
         const docEntry: DocumentoEntry = {
           id: salvato.id,
-          nome: salvato.nome || file.name,
+          nome: salvato.fileUrl ? (salvato.fileUrl.split('/').pop()?.replace(/^\d+_/, '') || file.name) : file.name,
           dimensione: `${Math.round(file.size / 1024)} KB`,
           richiedeFirma: true,
           firmato: false,
           dataCaricamento: new Date().toLocaleDateString('it-IT'),
+          statoDoc: 'bozza',
+          versione: salvato.versione || 1,
+          fileUrl: salvato.fileUrl,
+          richiesteModifica: [],
         };
         const updatedDocs = [...documents, docEntry];
         persistDocuments(updatedDocs);
-        alert(`✓ File "${file.name}" salvato nel fascicolo del progetto e visibile al cliente.`);
+        alert(`✓ File "${file.name}" salvato in bozza nel fascicolo. Clicca "🚀 Pubblica" quando sei pronto a farlo vedere al cliente.`);
+        await ricaricaDocumentiDb();
       } else {
         // Fallback locale (progetto non ancora a DB)
         const docEntry: DocumentoEntry = {
@@ -355,6 +500,8 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
           richiedeFirma: true,
           firmato: false,
           dataCaricamento: new Date().toLocaleDateString('it-IT'),
+          statoDoc: 'bozza',
+          versione: 1,
         };
         const updatedDocs = [...documents, docEntry];
         persistDocuments(updatedDocs);
@@ -414,7 +561,7 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
               onClick={() => setActiveTab('documenti')}
               style={tabBtnStyle(activeTab === 'documenti')}
             >
-              📎 Documenti Collegati ({documents.length})
+              📎 Documenti & Workflow ({documents.length})
             </button>
           </div>
         </div>
@@ -617,6 +764,8 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
                                       firmato: false,
                                       dataCaricamento: new Date().toLocaleDateString('it-IT'),
                                       templateId: recommendation.template!.id,
+                                      statoDoc: 'bozza' as const,
+                                      versione: 1,
                                     }];
                                     persistDocuments(updatedDocs);
                                   }}
@@ -738,6 +887,15 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
               )}
             </div>
 
+            {/* Input file nascosto per caricare nuove versioni di documenti */}
+            <input
+              type="file"
+              ref={versionInputRef}
+              style={{ display: 'none' }}
+              accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xlsx,.xls,.txt,.p7m,.xml"
+              onChange={handleFileNuovaVersione}
+            />
+
             {/* Lista Documenti Effettivamente Collegati */}
             <div>
               <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 10 }}>
@@ -749,59 +907,178 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
                   <div style={{ fontSize: 24, marginBottom: 6 }}>📭</div>
                   <strong>Nessun documento collegato a questa voce.</strong>
                   <div style={{ fontSize: 11, marginTop: 4 }}>
-                    Questa attività non ha atti o contratti forzati. Puoi associare il modello consigliato sopra o caricare un file personalizzato.
+                    Questa attività non ha atti o contratti forzati. Puoi associare il modello consigliato sopra o caricare un file personalizzato in bozza.
                   </div>
                 </div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {documents.map(d => (
-                    <div key={d.id} style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10, padding: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {documents.map(d => {
+                    const st = d.statoDoc || (d.firmato ? 'firmato' : 'bozza');
+                    const hasAperte = d.richiesteModifica && d.richiesteModifica.some(r => r.stato === 'aperta');
+
+                    return (
                       <div
-                        onClick={() => setSelectedDocPreview(d)}
-                        style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}
-                        title="Clicca per visualizzare"
+                        key={d.id}
+                        style={{
+                          background: 'var(--card)',
+                          border: st === 'in_revisione' || hasAperte ? '1.5px solid #f59e0b' : (st === 'pubblicato' ? '1.5px solid #3b82f6' : (st === 'firmato' ? '1.5px solid #10b981' : '1px solid var(--border)')),
+                          borderRadius: 10,
+                          padding: 14,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 10,
+                        }}
                       >
-                        <div style={{ fontSize: 22 }}>📄</div>
-                        <div>
-                          <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--indigo-l)', textDecoration: 'underline' }}>{d.nome}</div>
-                          <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>
-                            {d.dimensione} · Caricato il {d.dataCaricamento}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 8 }}>
+                          <div
+                            onClick={() => setSelectedDocPreview(d)}
+                            style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', flex: 1, minWidth: 200 }}
+                            title="Clicca per visualizzare"
+                          >
+                            <div style={{ fontSize: 24 }}>📄</div>
+                            <div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--indigo-l)', textDecoration: 'underline' }}>{d.nome}</span>
+                                {d.versione && (
+                                  <span style={{ fontSize: 9.5, fontWeight: 700, padding: '1px 6px', borderRadius: 6, background: 'var(--card2)', border: '1px solid var(--border)', color: 'var(--text)' }}>
+                                    v{d.versione}
+                                  </span>
+                                )}
+                              </div>
+                              <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>
+                                {d.dimensione} · Caricato il {d.dataCaricamento}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Stato Workflow Badge */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                            {st === 'bozza' && (
+                              <span style={{ background: '#27272a', color: '#a1a1aa', border: '1px solid #3f3f46', padding: '3px 8px', borderRadius: 12, fontSize: 10, fontWeight: 700 }}>
+                                🔒 BOZZA (Cliente non vede)
+                              </span>
+                            )}
+                            {st === 'pubblicato' && (
+                              <span style={{ background: '#1e3a8a30', color: '#60a5fa', border: '1px solid #1d4ed8', padding: '3px 8px', borderRadius: 12, fontSize: 10, fontWeight: 700 }}>
+                                🚀 PUBBLICATO (In attesa di firma)
+                              </span>
+                            )}
+                            {st === 'in_revisione' && (
+                              <span style={{ background: '#451a0330', color: '#fbbf24', border: '1px solid #b45309', padding: '3px 8px', borderRadius: 12, fontSize: 10, fontWeight: 700 }}>
+                                ⚠️ IN REVISIONE (Modifica richiesta)
+                              </span>
+                            )}
+                            {st === 'firmato' && (
+                              <span style={{ background: '#064e3b30', color: '#34d399', border: '1px solid #059669', padding: '3px 8px', borderRadius: 12, fontSize: 10, fontWeight: 700 }}>
+                                ✅ FIRMATO CON OTP
+                              </span>
+                            )}
                           </div>
                         </div>
-                      </div>
 
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        {d.richiedeFirma ? (
-                          <span style={{ background: d.firmato ? '#0d2d22' : '#200f40', color: d.firmato ? '#34d399' : '#a78bfa', padding: '3px 8px', borderRadius: 12, fontSize: 10, fontWeight: 700 }}>
-                            {d.firmato ? '✓ Firmato' : '✍️ Richiede Firma Cliente'}
-                          </span>
-                        ) : (
-                          <span style={{ color: 'var(--muted)', fontSize: 10 }}>Informativo</span>
+                        {/* Note / Richieste di Modifica del Cliente */}
+                        {d.richiesteModifica && d.richiesteModifica.length > 0 && (
+                          <div style={{ background: '#27180430', border: '1px solid #78350f', borderRadius: 8, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: '#f59e0b', display: 'flex', alignItems: 'center', gap: 4 }}>
+                              <span>💬 Richieste di Modifica del Cliente ({d.richiesteModifica.length}):</span>
+                            </div>
+                            {d.richiesteModifica.map(rm => (
+                              <div key={rm.id} style={{ fontSize: 11, background: 'var(--card)', padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                                <div style={{ flex: 1 }}>
+                                  <div style={{ color: 'var(--text)', fontStyle: 'italic' }}>«{rm.commento}»</div>
+                                  <div style={{ fontSize: 9.5, color: 'var(--muted)', marginTop: 2 }}>
+                                    Inviato da {rm.cliente?.nome || 'Cliente'} il {new Date(rm.creatoAt).toLocaleString('it-IT')}
+                                    {rm.rispostaStudio && <span style={{ color: '#60a5fa' }}> · Risposta studio: {rm.rispostaStudio}</span>}
+                                  </div>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                  {rm.stato === 'aperta' ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRisolviRichiesta(rm.id)}
+                                      style={{ background: '#059669', color: '#fff', border: 'none', padding: '3px 8px', borderRadius: 6, fontSize: 9.5, fontWeight: 700, cursor: 'pointer' }}
+                                    >
+                                      ✓ Segna Risolta
+                                    </button>
+                                  ) : (
+                                    <span style={{ fontSize: 9.5, color: '#10b981', fontWeight: 700 }}>✓ Risolta</span>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
                         )}
 
-                        <button
-                          type="button"
-                          onClick={() => setSelectedDocPreview(d)}
-                          style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '4px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer', fontWeight: 600 }}
-                        >
-                          👁 Visualizza
-                        </button>
+                        {/* Barra Azioni Operatore */}
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 6, flexWrap: 'wrap', borderTop: '1px solid var(--border)', paddingTop: 8 }}>
+                          {/* Pulsante Pubblica al Cliente */}
+                          {(st === 'bozza' || st === 'in_revisione') && (
+                            <button
+                              type="button"
+                              onClick={() => handlePubblicaDocumento(d.id)}
+                              style={{ background: '#2563eb', color: '#fff', border: 'none', padding: '5px 12px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                              title="Pubblica questo documento nel portale cliente per consentirne la visione e la firma"
+                            >
+                              🚀 Pubblica al Cliente
+                            </button>
+                          )}
 
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (confirm(`Sei sicuro di voler scollegare ed eliminare il documento "${d.nome}" da questa voce?`)) {
-                              const nextDocs = documents.filter(doc => doc.id !== d.id);
-                              persistDocuments(nextDocs);
-                            }
-                          }}
-                          style={{ background: 'var(--card2)', border: '1px solid var(--border)', color: 'var(--red)', padding: '4px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer', fontWeight: 600 }}
-                        >
-                          🗑 Scollega
-                        </button>
+                          {/* Pulsante Rimetti in Bozza */}
+                          {st === 'pubblicato' && (
+                            <button
+                              type="button"
+                              onClick={() => handleRimettiInBozza(d.id)}
+                              style={{ background: 'var(--card2)', border: '1px solid var(--border)', color: 'var(--muted)', padding: '5px 10px', borderRadius: 6, fontSize: 10.5, fontWeight: 600, cursor: 'pointer' }}
+                              title="Nascondi temporaneamente al cliente per modifiche interne"
+                            >
+                              🔒 Rimetti in Bozza
+                            </button>
+                          )}
+
+                          {/* Pulsante Carica Nuova Versione */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setVersionTargetDocId(d.id);
+                              versionInputRef.current?.click();
+                            }}
+                            style={{ background: 'var(--card2)', border: '1px solid var(--border)', color: 'var(--text)', padding: '5px 10px', borderRadius: 6, fontSize: 10.5, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                            title="Carica una versione aggiornata (es. v2) mantenendo lo storico"
+                          >
+                            📤 Carica Nuova Versione (v{(d.versione || 1) + 1})
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setSelectedDocPreview(d)}
+                            style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '5px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer', fontWeight: 600 }}
+                          >
+                            👁 Visualizza
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              if (confirm(`Sei sicuro di voler eliminare il documento "${d.nome}"?`)) {
+                                if (progettoDbId && !d.id.startsWith('d-')) {
+                                  try {
+                                    await eliminaDocumentoApi(d.id);
+                                  } catch (err: any) {
+                                    console.warn('Errore delete DB:', err);
+                                  }
+                                }
+                                const nextDocs = documents.filter(doc => doc.id !== d.id);
+                                persistDocuments(nextDocs);
+                              }
+                            }}
+                            style={{ background: 'var(--card2)', border: '1px solid var(--border)', color: 'var(--red)', padding: '5px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer', fontWeight: 600 }}
+                          >
+                            🗑 Elimina
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -809,7 +1086,10 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
             {/* Caricamento Documento Reale dal Disco → DB */}
             <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
               <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text)' }}>
-                📎 Carica Documento dal Computer nel Fascicolo Progetto:
+                📎 Carica Nuovo Documento dal Computer nel Fascicolo Progetto:
+              </div>
+              <div style={{ fontSize: 10.5, color: 'var(--muted)' }}>
+                💡 Il documento viene salvato in <strong>Bozza Interna</strong>: sarai tu a cliccare <strong>"🚀 Pubblica al Cliente"</strong> quando è pronto per la firma.
               </div>
               {!progettoDbId && (
                 <div style={{ fontSize: 10.5, color: '#f59e0b', background: '#2d1a0530', border: '1px solid #78350f', borderRadius: 6, padding: '6px 10px' }}>

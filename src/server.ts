@@ -4523,7 +4523,22 @@ export function buildServer(app: AppPort): FastifyInstance {
             dataScadenzaDoc: true,
             progettoId: true,
             microvoceProgettoId: true,
+            statoDoc: true,
+            pubblicatoAt: true,
+            documentoPadreId: true,
             microvoceProgetto: { select: { nome: true } },
+            richiesteModifica: {
+              select: {
+                id: true,
+                commento: true,
+                stato: true,
+                creatoAt: true,
+                rispostoAt: true,
+                rispostaStudio: true,
+                cliente: { select: { id: true, nome: true } },
+              },
+              orderBy: { creatoAt: 'desc' },
+            },
           },
           orderBy: { createdAt: 'desc' },
         });
@@ -4563,11 +4578,12 @@ export function buildServer(app: AppPort): FastifyInstance {
       tipo?: string;
       categoriaDoc?: string;
       dataScadenzaDoc?: string;
+      statoDoc?: 'bozza' | 'pubblicato';
     };
   }>('/documenti', async (req, reply) => {
     const tenantId = (req as any).tenantId;
     const userId = (req as any).userId as string | undefined;
-    const { progettoId, microvoceProgettoId, filename, contentBase64, tipo, categoriaDoc, dataScadenzaDoc } = req.body;
+    const { progettoId, microvoceProgettoId, filename, contentBase64, tipo, categoriaDoc, dataScadenzaDoc, statoDoc } = req.body;
 
     if (!progettoId || !filename || !contentBase64) {
       return reply.code(400).send({ errore: 'progettoId, filename e contentBase64 sono obbligatori.' });
@@ -4593,6 +4609,8 @@ export function buildServer(app: AppPort): FastifyInstance {
 
       const archiviato = await uploadDocumento(filename, contentBase64);
 
+      const defaultStatoDoc = (statoDoc === 'pubblicato') ? 'pubblicato' : 'bozza';
+
       const documento = await prisma.documento.create({
         data: {
           tenantId,
@@ -4603,8 +4621,8 @@ export function buildServer(app: AppPort): FastifyInstance {
           caricatoDa: userId,
           categoriaDoc: categoriaDoc || 'generico',
           dataScadenzaDoc: scadenza,
-          // La scansione è quella sincrona sui magic bytes fatta qui sopra: se è passata,
-          // il documento è subito scaricabile e firmabile dal portale.
+          statoDoc: defaultStatoDoc,
+          pubblicatoAt: defaultStatoDoc === 'pubblicato' ? new Date() : null,
           statoScansione: 'pulito',
           scansionatoAt: new Date(),
         },
@@ -4614,24 +4632,226 @@ export function buildServer(app: AppPort): FastifyInstance {
         tenantId,
         azione: 'DOCUMENTO_ARCHIVIATO',
         entita: documento.id,
-        dettagli: `Archiviato «${filename}» (${archiviato.size}) nel fascicolo del progetto ${progettoId}`,
+        dettagli: `Archiviato «${filename}» (${archiviato.size}) stato «${defaultStatoDoc}» nel fascicolo del progetto ${progettoId}`,
         ipAddress: req.ip,
       });
 
-      // Blocco 3 — un documento nuovo (non ancora firmato) finisce nel fascicolo:
-      // il cliente viene avvisato che c'è un documento da visionare/firmare.
-      if (tipo !== 'firmato' && progetto.clienteId) {
+      // Se pubblicato subito, notifica il cliente
+      if (defaultStatoDoc === 'pubblicato' && tipo !== 'firmato' && progetto.clienteId) {
         await notificaCliente(tenantId, progetto.clienteId, {
           tipoEvento: 'documento_da_firmare',
           oggetto: 'Documento da firmare',
-          corpo: `Lo studio ha caricato «${filename}» sul progetto «${progetto.nome}»: accedi al portale per visionarlo e firmarlo.`,
+          corpo: `Lo studio ha pubblicato «${filename}» sul progetto «${progetto.nome}»: accedi al portale per visionarlo e firmarlo.`,
           link: `/portal/documents`,
         }).catch(() => {});
       }
 
-      return reply.send({ ok: true, documento: { ...documento, firmato: false, firma: null } });
+      return reply.send({ ok: true, documento: { ...documento, firmato: false, firma: null, richiesteModifica: [] } });
     } catch (err) {
       return reply.code(500).send({ errore: err instanceof Error ? err.message : 'Errore archiviazione documento' });
+    }
+  });
+
+  /**
+   * PATCH /documenti/:id/stato — §WF-DOC
+   * Permette all'operatore/advisor di pubblicare un documento al cliente o rimetterlo in bozza.
+   */
+  server.patch<{
+    Params: { id: string };
+    Body: { statoDoc: 'bozza' | 'pubblicato' | 'in_revisione' | 'firmato' };
+  }>('/documenti/:id/stato', async (req, reply) => {
+    const tenantId = (req as any).tenantId;
+    const { id } = req.params;
+    const { statoDoc } = req.body;
+
+    if (!['bozza', 'pubblicato', 'in_revisione', 'firmato'].includes(statoDoc)) {
+      return reply.code(400).send({ errore: 'statoDoc non valido.' });
+    }
+
+    try {
+      const doc = await prisma.documento.findFirst({
+        where: { id, tenantId },
+        include: {
+          progetto: { select: { id: true, clienteId: true, nome: true } },
+          microvoceProgetto: { select: { nome: true } },
+        },
+      });
+      if (!doc) return reply.code(404).send({ errore: 'Documento non trovato.' });
+
+      const updated = await prisma.documento.update({
+        where: { id },
+        data: {
+          statoDoc,
+          pubblicatoAt: statoDoc === 'pubblicato' ? (doc.pubblicatoAt ?? new Date()) : doc.pubblicatoAt,
+        },
+      });
+
+      await recordAudit({
+        tenantId,
+        azione: 'DOCUMENTO_STATO_AGGIORNATO',
+        entita: id,
+        dettagli: `Stato documento ${id} aggiornato a «${statoDoc}»`,
+        ipAddress: req.ip,
+      });
+
+      // Notifica il cliente se pubblicato
+      if (statoDoc === 'pubblicato' && doc.progetto?.clienteId) {
+        const nomeDoc = nomeFileDaUrl(doc.fileUrl) ?? doc.microvoceProgetto?.nome ?? 'Documento';
+        await notificaCliente(tenantId, doc.progetto.clienteId, {
+          tipoEvento: 'documento_da_firmare',
+          oggetto: 'Nuovo documento da visionare/firmare',
+          corpo: `Lo studio ha pubblicato «${nomeDoc}» sul progetto «${doc.progetto.nome}»: accedi al portale per visionarlo e firmarlo.`,
+          link: `/portal/documents`,
+        }).catch(() => {});
+      }
+
+      return reply.send({ ok: true, documento: updated });
+    } catch (err) {
+      return reply.code(500).send({ errore: err instanceof Error ? err.message : 'Errore aggiornamento stato documento' });
+    }
+  });
+
+  /**
+   * POST /documenti/:id/nuova-versione — §WF-DOC
+   * Carica una nuova versione del documento (es. v2 post revisione), mantenendo lo storico del documento padre.
+   */
+  server.post<{
+    Params: { id: string };
+    Body: {
+      filename: string;
+      contentBase64: string;
+      categoriaDoc?: string;
+      pubblicaSubito?: boolean;
+    };
+  }>('/documenti/:id/nuova-versione', async (req, reply) => {
+    const tenantId = (req as any).tenantId;
+    const userId = (req as any).userId as string | undefined;
+    const { id } = req.params;
+    const { filename, contentBase64, categoriaDoc, pubblicaSubito } = req.body;
+
+    if (!filename || !contentBase64) {
+      return reply.code(400).send({ errore: 'filename e contentBase64 sono obbligatori.' });
+    }
+    if (!userId) return reply.code(401).send({ errore: 'Sessione non valida.' });
+
+    try {
+      const docPadre = await prisma.documento.findFirst({
+        where: { id, tenantId },
+        include: {
+          progetto: { select: { id: true, clienteId: true, nome: true } },
+          microvoceProgetto: { select: { id: true, nome: true } },
+        },
+      });
+      if (!docPadre) return reply.code(404).send({ errore: 'Documento originale non trovato.' });
+
+      const buffer = Buffer.from(contentBase64.replace(/^data:[^;]+;base64,/, ''), 'base64');
+      const esito = scanFileBuffer(buffer, filename);
+      if (!esito.safe) {
+        return reply.code(400).send({ errore: esito.reason ?? 'File non ammesso nel fascicolo.' });
+      }
+
+      const archiviato = await uploadDocumento(filename, contentBase64);
+      const nuovaVersione = (docPadre.versione || 1) + 1;
+      const targetStato = pubblicaSubito ? 'pubblicato' : 'bozza';
+
+      const nuovoDoc = await prisma.documento.create({
+        data: {
+          tenantId,
+          progettoId: docPadre.progettoId,
+          microvoceProgettoId: docPadre.microvoceProgettoId,
+          tipo: docPadre.tipo,
+          fileUrl: archiviato.url,
+          versione: nuovaVersione,
+          caricatoDa: userId,
+          categoriaDoc: categoriaDoc || docPadre.categoriaDoc || 'generico',
+          statoDoc: targetStato,
+          pubblicatoAt: targetStato === 'pubblicato' ? new Date() : null,
+          statoScansione: 'pulito',
+          scansionatoAt: new Date(),
+          documentoPadreId: docPadre.id,
+        },
+      });
+
+      // Risolvi le richieste di modifica aperte sul padre
+      await prisma.richiestaModificaDocumento.updateMany({
+        where: { documentoId: docPadre.id, stato: 'aperta' },
+        data: {
+          stato: 'risolta',
+          rispostoAt: new Date(),
+          rispostaStudio: `Caricata nuova versione v${nuovaVersione}: ${filename}`,
+        },
+      });
+
+      await recordAudit({
+        tenantId,
+        azione: 'DOCUMENTO_NUOVA_VERSIONE',
+        entita: nuovoDoc.id,
+        dettagli: `Caricata v${nuovaVersione} per documento ${docPadre.id} («${filename}», stato ${targetStato})`,
+        ipAddress: req.ip,
+      });
+
+      if (targetStato === 'pubblicato' && docPadre.progetto?.clienteId) {
+        await notificaCliente(tenantId, docPadre.progetto.clienteId, {
+          tipoEvento: 'documento_da_firmare',
+          oggetto: 'Nuova versione documento disponibile',
+          corpo: `Lo studio ha caricato e pubblicato una nuova versione (v${nuovaVersione}) di «${filename}» sul progetto «${docPadre.progetto.nome}».`,
+          link: `/portal/documents`,
+        }).catch(() => {});
+      }
+
+      return reply.send({ ok: true, documento: nuovoDoc });
+    } catch (err) {
+      return reply.code(500).send({ errore: err instanceof Error ? err.message : 'Errore caricamento nuova versione' });
+    }
+  });
+
+  /**
+   * GET /documenti/:id/richieste-modifica — §WF-DOC
+   * Elenco richieste di modifica per un dato documento.
+   */
+  server.get<{ Params: { id: string } }>('/documenti/:id/richieste-modifica', async (req, reply) => {
+    const tenantId = (req as any).tenantId;
+    const { id } = req.params;
+
+    try {
+      const richieste = await prisma.richiestaModificaDocumento.findMany({
+        where: { documentoId: id, tenantId },
+        include: { cliente: { select: { id: true, nome: true, email: true } } },
+        orderBy: { creatoAt: 'desc' },
+      });
+      return reply.send({ ok: true, richieste });
+    } catch (err) {
+      return reply.code(500).send({ errore: err instanceof Error ? err.message : 'Errore lettura richieste modifica' });
+    }
+  });
+
+  /**
+   * PATCH /documenti/richieste-modifica/:rid — §WF-DOC
+   * Aggiorna lo stato di una richiesta di modifica o aggiunge la risposta dello studio.
+   */
+  server.patch<{
+    Params: { rid: string };
+    Body: { stato?: string; rispostaStudio?: string };
+  }>('/documenti/richieste-modifica/:rid', async (req, reply) => {
+    const tenantId = (req as any).tenantId;
+    const { rid } = req.params;
+    const { stato, rispostaStudio } = req.body;
+
+    try {
+      const esistente = await prisma.richiestaModificaDocumento.findFirst({ where: { id: rid, tenantId } });
+      if (!esistente) return reply.code(404).send({ errore: 'Richiesta non trovata.' });
+
+      const updated = await prisma.richiestaModificaDocumento.update({
+        where: { id: rid },
+        data: {
+          ...(stato ? { stato } : {}),
+          ...(rispostaStudio !== undefined ? { rispostaStudio, rispostoAt: new Date() } : {}),
+        },
+      });
+
+      return reply.send({ ok: true, richiesta: updated });
+    } catch (err) {
+      return reply.code(500).send({ errore: err instanceof Error ? err.message : 'Errore aggiornamento richiesta modifica' });
     }
   });
 
@@ -4743,11 +4963,12 @@ export function buildServer(app: AppPort): FastifyInstance {
     }
 
     try {
-      // §2.9 — il fascicolo contiene sia i documenti agganciati alle micro-voci dei moduli
-      // sia quelli caricati direttamente a livello di progetto dallo studio.
+      // §2.9 + §WF-DOC — il fascicolo per il cliente contiene solo i documenti con statoDoc
+      // 'pubblicato', 'in_revisione' o 'firmato'. I documenti in 'bozza' sono visibili solo all'operatore.
       const documenti = await prisma.documento.findMany({
         where: {
           tenantId,
+          statoDoc: { in: ['pubblicato', 'in_revisione', 'firmato'] },
           OR: [
             { microvoceProgetto: { moduloProgetto: { progetto: { clienteId } } } },
             { progetto: { clienteId } },
@@ -4762,6 +4983,9 @@ export function buildServer(app: AppPort): FastifyInstance {
           categoriaDoc: true,
           statoScansione: true,
           dataScadenzaDoc: true,
+          statoDoc: true,
+          pubblicatoAt: true,
+          documentoPadreId: true,
           progettoId: true,
           progetto: { select: { nome: true } },
           microvoceProgetto: {
@@ -4769,6 +4993,11 @@ export function buildServer(app: AppPort): FastifyInstance {
               nome: true,
               moduloProgetto: { select: { nome: true, progettoId: true, progetto: { select: { nome: true } } } },
             },
+          },
+          richiesteModifica: {
+            where: { clienteId },
+            select: { id: true, commento: true, stato: true, creatoAt: true, rispostoAt: true, rispostaStudio: true },
+            orderBy: { creatoAt: 'desc' },
           },
         },
         orderBy: { createdAt: 'desc' },
@@ -4801,6 +5030,7 @@ export function buildServer(app: AppPort): FastifyInstance {
         const nomeProgetto = d.microvoceProgetto?.moduloProgetto.progetto?.nome ?? d.progetto?.nome ?? null;
         const progettoId = d.microvoceProgetto?.moduloProgetto.progettoId ?? d.progettoId ?? null;
         const titoloVoce = d.microvoceProgetto?.nome ?? d.progetto?.nome ?? 'Documento';
+        const isFirmato = Boolean(firma) || d.tipo === 'firmato' || d.statoDoc === 'firmato';
         return {
           id: d.id,
           nome: nomeFileDaUrl(d.fileUrl) ?? `${titoloVoce} (v${d.versione})`,
@@ -4816,11 +5046,14 @@ export function buildServer(app: AppPort): FastifyInstance {
           versione: d.versione,
           caricatoIl: d.createdAt,
           scadenza: d.dataScadenzaDoc,
+          statoDoc: d.statoDoc,
+          pubblicatoAt: d.pubblicatoAt,
+          richiesteModifica: d.richiesteModifica,
           // §28: un file ancora in scansione o risultato infetto non si scarica e non si firma.
           statoScansione: d.statoScansione,
           scaricabile: d.statoScansione === 'pulito',
-          firmato: Boolean(firma) || d.tipo === 'firmato',
-          richiedeFirma: !firma && d.tipo !== 'firmato' && d.statoScansione === 'pulito',
+          firmato: isFirmato,
+          richiedeFirma: !isFirmato && d.statoScansione === 'pulito' && d.statoDoc !== 'in_revisione',
           dataFirma: firma?.firmatoAt ?? null,
           tipoFirma: firma?.tipoFirma ?? null,
           signatureId: firma?.signatureId ?? null,
@@ -4847,6 +5080,9 @@ export function buildServer(app: AppPort): FastifyInstance {
           versione: null,
           caricatoIl: f.firmatoAt,
           scadenza: null,
+          statoDoc: 'firmato' as const,
+          pubblicatoAt: null,
+          richiesteModifica: [],
           statoScansione: null,
           scaricabile: false,
           firmato: true,
@@ -4866,6 +5102,80 @@ export function buildServer(app: AppPort): FastifyInstance {
       return reply.code(500).send({
         errore: err instanceof Error ? err.message : 'Errore lettura documenti del fascicolo',
       });
+    }
+  });
+
+  /**
+   * POST /portal/documenti/:id/richiesta-modifica — §WF-DOC
+   * Inviata dal cliente per richiedere modifiche e chiarimenti su un documento pubblicato.
+   */
+  server.post<{
+    Params: { id: string };
+    Body: { commento: string; clienteId?: string };
+  }>('/portal/documenti/:id/richiesta-modifica', async (req, reply) => {
+    const tenantId = (req as any).tenantId;
+    const clienteId = clienteDellaRichiesta(req, req.body?.clienteId);
+    const { id } = req.params;
+    const { commento } = req.body;
+
+    if (!clienteId) {
+      return reply.code(400).send({ errore: 'Cliente non identificato nella sessione.' });
+    }
+    if (!commento || !commento.trim()) {
+      return reply.code(400).send({ errore: 'Il commento/nota con le richieste di modifica è obbligatorio.' });
+    }
+
+    try {
+      const documento = await prisma.documento.findFirst({
+        where: {
+          id,
+          tenantId,
+          OR: [
+            { microvoceProgetto: { moduloProgetto: { progetto: { clienteId } } } },
+            { progetto: { clienteId } },
+          ],
+        },
+        include: {
+          progetto: { select: { id: true, nome: true } },
+          microvoceProgetto: { select: { nome: true } },
+          caricatoDaUser: { select: { email: true, nome: true } },
+        },
+      });
+
+      if (!documento) {
+        return reply.code(404).send({ errore: 'Documento non trovato o non associato al cliente.' });
+      }
+
+      // Crea richiesta di modifica a DB
+      const richiesta = await prisma.richiestaModificaDocumento.create({
+        data: {
+          tenantId,
+          documentoId: id,
+          clienteId,
+          commento: commento.trim(),
+          stato: 'aperta',
+        },
+      });
+
+      // Aggiorna stato documento a 'in_revisione'
+      await prisma.documento.update({
+        where: { id },
+        data: { statoDoc: 'in_revisione' },
+      });
+
+      const nomeDoc = nomeFileDaUrl(documento.fileUrl) ?? documento.microvoceProgetto?.nome ?? 'Documento';
+
+      await recordAudit({
+        tenantId,
+        azione: 'RICHIESTA_MODIFICA_DOCUMENTO',
+        entita: richiesta.id,
+        dettagli: `Cliente ${clienteId} ha richiesto modifiche su «${nomeDoc}» (${documento.id}): ${commento.trim()}`,
+        ipAddress: req.ip,
+      });
+
+      return reply.send({ ok: true, richiesta });
+    } catch (err) {
+      return reply.code(500).send({ errore: err instanceof Error ? err.message : 'Errore registrazione richiesta modifica' });
     }
   });
 

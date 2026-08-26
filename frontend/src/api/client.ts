@@ -353,6 +353,16 @@ export async function uploadFileApi(filename: string, contentBase64: string) {
 // L'upload dello studio crea una riga nella tabella `documento` (agganciata al progetto),
 // così il portale del cliente e gli altri operatori vedono davvero i file caricati.
 
+export interface RichiestaModificaDoc {
+  id: string;
+  commento: string;
+  stato: string;
+  creatoAt: string;
+  rispostoAt?: string | null;
+  rispostaStudio?: string | null;
+  cliente?: { id: string; nome: string; email?: string } | null;
+}
+
 export interface DocumentoProgetto {
   id: string;
   tipo: string;
@@ -364,10 +374,14 @@ export interface DocumentoProgetto {
   dataScadenzaDoc: string | null;
   progettoId: string | null;
   microvoceProgettoId: string | null;
+  statoDoc?: 'bozza' | 'pubblicato' | 'in_revisione' | 'firmato';
+  pubblicatoAt?: string | null;
+  documentoPadreId?: string | null;
   microvoceProgetto?: { nome: string } | null;
   caricatoDa?: { id: string; nome?: string; email?: string } | null;
   firmato: boolean;
   firma: { riferimentoId: string | null; firmatoAt: string | null; signatureId: string | null; tipoFirma: string | null } | null;
+  richiesteModifica?: RichiestaModificaDoc[];
 }
 
 // Lo storage locale di fallback serve i file da /uploads/<nome> sul backend: per il
@@ -396,6 +410,7 @@ export async function salvaDocumentoApi(input: {
   contentBase64: string;
   categoriaDoc?: string;
   dataScadenzaDoc?: string;
+  statoDoc?: 'bozza' | 'pubblicato';
 }): Promise<DocumentoProgetto> {
   const res = await apiFetch(`${API_BASE}/documenti`, {
     method: 'POST',
@@ -408,6 +423,76 @@ export async function salvaDocumentoApi(input: {
   }
   const data = await res.json();
   return { ...data.documento, fileUrl: urlDocumentoAssoluto(data.documento?.fileUrl) };
+}
+
+export async function aggiornaStatoDocumentoApi(documentoId: string, statoDoc: 'bozza' | 'pubblicato' | 'in_revisione' | 'firmato') {
+  const res = await apiFetch(`${API_BASE}/documenti/${encodeURIComponent(documentoId)}/stato`, {
+    method: 'PATCH',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ statoDoc }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.errore ?? 'Errore aggiornamento stato documento');
+  }
+  return await res.json();
+}
+
+export async function nuovaVersioneDocumentoApi(documentoId: string, input: {
+  filename: string;
+  contentBase64: string;
+  categoriaDoc?: string;
+  pubblicaSubito?: boolean;
+}): Promise<DocumentoProgetto> {
+  const res = await apiFetch(`${API_BASE}/documenti/${encodeURIComponent(documentoId)}/nuova-versione`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.errore ?? 'Errore caricamento nuova versione');
+  }
+  const data = await res.json();
+  return { ...data.documento, fileUrl: urlDocumentoAssoluto(data.documento?.fileUrl) };
+}
+
+export async function listaRichiesteModificaDocumentoApi(documentoId: string): Promise<RichiestaModificaDoc[]> {
+  const res = await apiFetch(`${API_BASE}/documenti/${encodeURIComponent(documentoId)}/richieste-modifica`, {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.errore ?? 'Errore lettura richieste modifica');
+  }
+  const data = await res.json();
+  return data.richieste ?? [];
+}
+
+export async function aggiornaRichiestaModificaDocumentoApi(rid: string, input: { stato?: string; rispostaStudio?: string }) {
+  const res = await apiFetch(`${API_BASE}/documenti/richieste-modifica/${encodeURIComponent(rid)}`, {
+    method: 'PATCH',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.errore ?? 'Errore aggiornamento richiesta');
+  }
+  return await res.json();
+}
+
+export async function richiediModificaDocumentoApi(documentoId: string, commento: string, clienteId?: string) {
+  const res = await apiFetch(`${API_BASE}/portal/documenti/${encodeURIComponent(documentoId)}/richiesta-modifica`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ commento, clienteId }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.errore ?? 'Errore invio richiesta modifica');
+  }
+  return await res.json();
 }
 
 export async function eliminaDocumentoApi(id: string) {
@@ -1863,6 +1948,9 @@ export interface DocumentoPortale {
   tipoFirma: string | null;
   signatureId: string | null;
   canaleVerificato: string | null;
+  statoDoc?: 'bozza' | 'pubblicato' | 'in_revisione' | 'firmato';
+  pubblicatoAt?: string | null;
+  richiesteModifica?: RichiestaModificaDoc[];
   documentoNonPiuDisponibile?: boolean;
 }
 
