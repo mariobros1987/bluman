@@ -70,7 +70,22 @@ Correzione successiva a Fase 1 — il frontend non inventa più i moduli (regola
 Sicurezza Password al Primo Accesso & Profilo Operatore (§27, §23): implementato il modale bloccante `MustChangePasswordModal` per utenti con `stato: 'invitato'`, l'aggiornamento dinamico dello stato sessione da `/auth/me`, il cambio password cifrato scrypt da `POST /auth/change-password` e `POST /portal/change-password`, il modale profilo `UserProfileModal` per lo staff e la scheda `👤 6. Profilo & Password` nel Portale Cliente. Pulsante `🔄 Reset Pass` aggiunto nelle schede collaboratori di `SettingsPage.tsx` e in `SuperAdminPage.tsx`. Assegnate password temporanee monouso a tutti gli utenti con `npm run passwords:assign -- --force`.
 Debiti ancora aperti: due moduli con zero micro-voci su "Struttura Holding — Famiglia Ricci" (stato messo a mano, non verificabile dal motore); due clienti "Holding Beta S.r.l." e due progetti "Struttura Holding — Famiglia Ricci" omonimi, lasciati per decisione del titolare e distinti solo nelle etichette della UI.
 
-DA DOVE RIPARTIRE (aggiornato al 22 agosto 2026, dopo le correzioni di sicurezza password e moduli cliente):
+DA DOVE RIPARTIRE (aggiornato al 26 agosto 2026, dopo la bonifica Regola 7 e il fix audit §0.6):
+Completato e committato il 26 agosto 2026:
+- typecheck del frontend a zero errori (commit `9c85d26`);
+- rimossi TUTTI i dati inventati dal frontend (violazioni Regola 7) in Dashboard, Projects,
+  ClientsPage, ProjectDetail, NewProjectWizard, Library e QuickTimeTracker — qui è stata
+  eliminata anche l'intera tabella di tariffe orarie inventata per id che produceva costi
+  senza fonte; i dati assenti ora si mostrano come 'n/d' o non vengono renderizzati
+  (commit `62cb722`);
+- `recordAudit` in `src/server.ts` ora ha `tenantId` obbligatorio, scrive con
+  `prismaAmministrativo()`, non usa più `setImmediate` (tutti i chiamanti fanno await) e
+  logga gli errori invece di ingoiarli: voce 0.6 di `PIANO_DI_MIGLIORAMENTO.md` spuntata.
+Verifiche: typecheck backend e frontend verdi, 269 test passati, grep di presidio Regola 7
+pulito (restano solo commenti che documentano i fix).
+Restano aperte le voci non spuntate di `PIANO_DI_MIGLIORAMENTO.md` (0.1-0.5, 0.7, Fase 1+).
+
+PIANO OPERATIVO PRECEDENTE (aggiornato al 22 agosto 2026, dopo le correzioni di sicurezza password e moduli cliente):
 Il piano operativo per fase e task sta in `analisi.txt`. Fase 0 e Fase 1 sono chiuse e committate.
 La prossima è FASE 2: UI CORE — TRACKING ORE, task 2.1-2.5:
 - 2.1 componente `frontend/src/components/MicrovoceRow.tsx` con input ore (click → modal → PATCH);

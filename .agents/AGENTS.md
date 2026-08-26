@@ -77,7 +77,7 @@ Questo file serve come indice rapido per l'IA ed i collaboratori per identificar
 
 ### 📦 Store (`store/`)
 
-- **`store/mockData.ts`**: ⚠️ **LEGACY — da rimuovere.** Dati mock statici (giurisdizioni, team, articoli, moduli template, progetti). Ancora importato da `utils/index.ts` e `components/NewProjectWizard.tsx`. Causa **leak cross-tenant** dei dati del tenant demo. Nessun'altra pagina lo importa più: la rimozione richiede di collegare `NewProjectWizard` e `utils/index.ts` alle API live corrispondenti (`GET /giurisdizioni`, `GET /articoli`, `GET /moduli-template`).
+- **`store/mockData.ts`**: ✅ **RIMOSSO.** Il file di dati mock statici (giurisdizioni, team, articoli, moduli template, progetti) e l'intera cartella `store/` non esistono più: `NewProjectWizard` e `utils/index.ts` leggono dalle API live. I dati demo legittimi per il tenant demo Bluecode restano solo in `utils/tenant.ts`. Residuo storico del leak cross-tenant descritto in `PIANO_DI_MIGLIORAMENTO.md`.
 
 ### 🎨 Stili CSS Modulari
 
