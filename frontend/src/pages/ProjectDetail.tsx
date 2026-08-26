@@ -302,7 +302,9 @@ export function ProjectDetail() {
           // nessuno aveva stimato — ed è il motivo per cui quel debito di Fase 1 non si vedeva
           // dalla UI. Le micro-voci si creano dall'ERP e finiscono a database, non qui.
 
-          const assignedTeam = localMod?.team || m.team || [1, 2];
+          // Regola 7: se il DB e la copia locale non hanno assegnazioni, il team è vuoto.
+          // Il ripiego `[1, 2]` faceva comparire due persone mai assegnate sul modulo.
+          const assignedTeam = localMod?.team || m.team || [];
           const avM = avModuli.get(m.id);
 
           return {
@@ -311,7 +313,9 @@ export function ProjectDetail() {
             id: mIdx + 100,
             dbId: m.id,
             n: m.nome,
-            cat: (m.categoria as CategoriaModulo) || 'Societario',
+            // Regola 7: se la categoria manca si dichiara l'assenza — il ripiego
+            // 'Societario' etichettava il modulo con una pratica mai indicata.
+            cat: (m.categoria as CategoriaModulo) ?? ('Senza categoria' as CategoriaModulo),
             st: avM?.stato || m.stato || 'in_progress',
             pct: avM?.percentuale ?? 0,
             // Ore e prezzo come stanno a database. I ripieghi `|| 20` ore e `: 3500` euro
@@ -757,8 +761,8 @@ export function ProjectDetail() {
                   rawDbModulo={rawDbProject?.moduli?.[mIdx]}
                   onRefresh={() => loadDetail()}
                   onToggleMv={(vidx) => handleToggleMicrovoce(mod.id, vidx)}
-                  onOpenAssignMod={() => setAssignModalTarget({ modId: mod.id, name: `Modulo: ${mod.n}`, currentAssigned: mod.team || [1], categoria: mod.cat })}
-                  onOpenAssignMv={(vidx) => setAssignModalTarget({ modId: mod.id, mvIdx: vidx, name: `Microvoce: ${mod.v[vidx]?.n || 'Microvoce'}`, currentAssigned: [mod.v[vidx]?.as || 1], categoria: mod.cat })}
+                  onOpenAssignMod={() => setAssignModalTarget({ modId: mod.id, name: `Modulo: ${mod.n}`, currentAssigned: mod.team || [], categoria: mod.cat })}
+                  onOpenAssignMv={(vidx) => setAssignModalTarget({ modId: mod.id, mvIdx: vidx, name: `Microvoce: ${mod.v[vidx]?.n || 'Microvoce'}`, currentAssigned: mod.v[vidx]?.as != null ? [mod.v[vidx]!.as!] : [], categoria: mod.cat })}
                   onOpenCalendarMv={(vidx) => setCalendarModalTarget({ modId: mod.id, mvIdx: vidx, name: mod.v[vidx]?.n || 'Microvoce' })}
                   onDeleteMod={async () => {
                     const confirmDel = window.confirm(`Sei sicuro di voler eliminare il modulo "${mod.n}" dal progetto?`);
@@ -1759,7 +1763,8 @@ function GrafoModuliProgettoView({
               prezzo: (r.overridePrezzo != null ? r.overridePrezzo : (art?.prezzoDefault || 0)) * quantita,
               hA: 0,
               s: 'pending',
-              as: 1,
+              // Regola 7: nessun assegnatario fittizio — l'assegnazione avviene solo
+              // dopo che un membro reale del team viene scelto sul modulo/micro-voce.
               d: 0,
             };
           });

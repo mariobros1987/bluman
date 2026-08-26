@@ -1,9 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { loadTeamMembersFromDb } from '../hooks/useTeamMembers';
 import { fetchProgetti, salvaProgettoDettaglioApi } from '../api/client';
 import { getCurrentTenantId, getTenantStorageKey, getTenantSeedData, BLUECODE_TENANT_ID } from '../utils/tenant';
-import type { Progetto, TeamMember } from '../types';
+import type { Progetto } from '../types';
 
 interface TimeTrackerProps {
   user?: any;
@@ -18,7 +17,6 @@ export function QuickTimeTracker({ user }: TimeTrackerProps) {
   const [selectedMicrovoceIdx, setSelectedMicrovoceIdx] = useState<number>(0);
   const [showStopModal, setShowStopModal] = useState(false);
   const [sessionNotes, setSessionNotes] = useState('');
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
 
   const timerRef = useRef<any>(null);
 
@@ -132,7 +130,6 @@ export function QuickTimeTracker({ user }: TimeTrackerProps) {
 
   useEffect(() => {
     loadAllProjects();
-    loadTeamMembersFromDb().then(t => setTeamMembers(t));
 
     // Ascolta aggiornamenti progetti da altre finestre o azioni
     const handleStorage = () => loadAllProjects();
@@ -239,11 +236,11 @@ export function QuickTimeTracker({ user }: TimeTrackerProps) {
     });
   }
 
-  // Tariffa oraria operatore corrente
-  const currentMember = teamMembers.find(t => t.n.toLowerCase().includes((user?.nome || '').toLowerCase()) || (user?.email && t.n.toLowerCase().includes(user.email.toLowerCase()))) || teamMembers[0];
-  const hourlyRate = currentMember ? (currentMember.id === 1 ? 120 : currentMember.id === 5 ? 95 : currentMember.id === 3 ? 90 : currentMember.id === 4 ? 85 : 45) : 95;
+  // Regola 7: la tariffa oraria non esiste nel modello utente del server, quindi qui non si
+  // calcola alcun costo: prima c'era una tabella inventata per id numerico (1→120 €/h, 5→95,
+  // 3→90, 4→85, altrimenti 45) applicata a chiunque, e gli importi mostrati come "costo lavoro
+  // effettivo" non avevano alcuna fonte. Le ore registrate sono l'unico dato reale.
   const hoursSpentDecimal = Number((seconds / 3600).toFixed(2));
-  const totalCost = Number((hoursSpentDecimal * hourlyRate).toFixed(2));
 
   const handleConfirmSaveHours = async () => {
     if (!currentProject) {
@@ -268,11 +265,12 @@ export function QuickTimeTracker({ user }: TimeTrackerProps) {
         }) : [
           {
             n: selectedMv.name,
-            hE: 4,
+            // Regola 7: la riga nasce senza preventivo (hE 0, non 4 ore inventate), senza
+            // assegnatario fittizio e senza documenti; le ore lavorate finiscono in hA.
+            hE: 0,
             hA: hoursSpentDecimal,
             s: 'done' as any,
-            as: 1,
-            d: 1,
+            d: 0,
             vn: sessionNotes ? `[Sessione: +${hoursSpentDecimal}h - ${sessionNotes}]` : undefined,
           }
         ];
@@ -299,9 +297,9 @@ export function QuickTimeTracker({ user }: TimeTrackerProps) {
     }
 
     if (syncOk) {
-      alert(`✓ Consuntivate con successo ${hoursSpentDecimal}h (€ ${totalCost}) sulla pratica "${currentProject.n}"!`);
+      alert(`✓ Consuntivate con successo ${hoursSpentDecimal}h sulla pratica "${currentProject.n}"!`);
     } else {
-      alert(`⚠️ ${hoursSpentDecimal}h (€ ${totalCost}) consuntivate in LOCALE sulla pratica "${currentProject.n}", ma NON sincronizzate col server. I dati restano disponibili su questo dispositivo: apri la scheda del progetto e salvala per ritentare la sincronizzazione.`);
+      alert(`⚠️ ${hoursSpentDecimal}h consuntivate in LOCALE sulla pratica "${currentProject.n}", ma NON sincronizzate col server. I dati restano disponibili su questo dispositivo: apri la scheda del progetto e salvala per ritentare la sincronizzazione.`);
     }
     setShowStopModal(false);
     setSeconds(0);
@@ -416,12 +414,14 @@ export function QuickTimeTracker({ user }: TimeTrackerProps) {
                   <div style={{ fontSize: 18, fontWeight: 800, color: '#818cf8', marginTop: 2 }}>{formatTime(seconds)} <span style={{ fontSize: 11, fontWeight: 500 }}>({hoursSpentDecimal}h)</span></div>
                 </div>
                 <div>
-                  <div style={{ color: 'var(--muted)', fontSize: 10 }}>COSTO LAVORO EFFETTIVO</div>
-                  <div style={{ fontSize: 18, fontWeight: 800, color: '#34d399', marginTop: 2 }}>€ {totalCost.toFixed(2)}</div>
+                  <div style={{ color: 'var(--muted)', fontSize: 10 }}>COSTO LAVORO</div>
+                  {/* Regola 7: nessun costo calcolato con tariffe inventate per id operatore;
+                      il server non espone una tariffa oraria, quindi il dato è dichiarato n/d. */}
+                  <div style={{ fontSize: 18, fontWeight: 800, color: '#34d399', marginTop: 2 }}>n/d</div>
                 </div>
               </div>
               <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 8 }}>
-                👤 Operatore: <strong>{user?.nome || 'Avv. Mario Dibenedetto'}</strong> (Tariffa: {hourlyRate} €/h)
+                👤 Operatore: <strong>{user?.nome || user?.email || 'n/d'}</strong> (Tariffa: n/d)
               </div>
             </div>
 

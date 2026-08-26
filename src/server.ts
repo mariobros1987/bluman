@@ -177,38 +177,46 @@ function normalizzaGrafometrica(valore?: string | null): string | null {
   return pulito;
 }
 
+// Audit log — §0.6: il tenant è OBBLIGATORIO (ogni chiamata lo riceve dal payload
+// JWT o dal contesto della richiesta: nessun ripiego silenzioso su TENANT_DEFAULT)
+// e la scrittura passa dal client amministrativo, perché l'audit è un'operazione di
+// sistema non soggetta a RLS. Niente setImmediate: il fire-and-forget perdeva gli
+// audit se il processo moriva e rendeva impossibile il debug (il catch vuoto
+// ingoiava ogni errore). Gli errori di scrittura vengono loggati, non ingoiati.
 async function recordAudit(params: {
-  tenantId?: string;
-  userId?: string;
-  userEmail?: string;
-  userNome?: string;
-  ruolo?: string;
+  tenantId: string; // OBBLIGATORIO: l'audit va sempre attribuito al tenant giusto
+  userId?: string | null;
+  userEmail?: string | null;
+  userNome?: string | null;
+  ruolo?: string | null;
   azione: string;
   entita: string;
   dettagli: string;
   ipAddress?: string | null;
 }) {
-  setImmediate(async () => {
-    try {
-      await prisma.auditLog.create({
-        data: {
-          tenantId: params.tenantId || TENANT_DEFAULT,
-          userId: params.userId || 'usr-system',
-          userEmail: params.userEmail || 'system@bluecode.advisory',
-          userNome: params.userNome || 'Sistema / Operatore',
-          ruolo: params.ruolo || 'operator',
-          azione: params.azione,
-          entita: params.entita,
-          dettagli: params.dettagli,
-          // `ip_address` è nullable: un indirizzo inventato in un registro immutabile è
-          // peggio di un campo vuoto, perché sembra una prova.
-          ipAddress: params.ipAddress || null,
-        },
-      });
-    } catch {
-      // Background audit log silently
-    }
-  });
+  try {
+    await prismaAmministrativo().auditLog.create({
+      data: {
+        tenantId: params.tenantId,
+        // I ripieghi qui sotto identificano operazioni di sistema senza utente
+        // (avvio, seed, processi automatici), non utenti reali.
+        userId: params.userId ?? 'usr-system',
+        userEmail: params.userEmail ?? 'system@bluecode.advisory',
+        userNome: params.userNome ?? 'Sistema / Operatore',
+        ruolo: params.ruolo ?? 'operator',
+        azione: params.azione,
+        entita: params.entita,
+        dettagli: params.dettagli,
+        // `ip_address` è nullable: un indirizzo inventato in un registro immutabile è
+        // peggio di un campo vuoto, perché sembra una prova.
+        ipAddress: params.ipAddress || null,
+      },
+    });
+  } catch (err) {
+    // La richiesta non deve fallire per un errore di audit, ma l'errore va
+    // tracciato: prima veniva ingoiato in silenzio (vedi §0.6 del piano).
+    console.error('[AUDIT] Impossibile registrare audit log:', err);
+  }
 }
 
 export function buildServer(app: AppPort): FastifyInstance {
@@ -513,10 +521,11 @@ export function buildServer(app: AppPort): FastifyInstance {
     const userTenantId = utente.tenantId || '';
 
     // §14 — l'hook onRequest ha impostato il tenant di default (questa richiesta non
-    // portava ancora un token): ora il tenant è noto, e va attivato prima dell'audit qui
-    // sotto. Senza questa riga l'INSERT nell'audit log verrebbe rifiutato dal WITH CHECK
-    // delle policy per chiunque appartenga a uno studio diverso da quello di default —
-    // e in silenzio, perché recordAudit ingoia gli errori di proposito.
+    // portava ancora un token): ora il tenant è noto, e va attivato prima delle query
+    // di questa richiesta. Senza questa riga le letture vincolate a RLS verrebbero
+    // rifiutate dal WITH CHECK delle policy per chiunque appartenga a uno studio
+    // diverso da quello di default. (§0.6: l'audit vero e proprio ora passa dal
+    // client amministrativo e logga gli errori invece di ingoiarli.)
     attivaContestoTenant({ tenantId: userTenantId || TENANT_DEFAULT, ruolo: utente.ruolo });
 
     const token = signJwt({
@@ -526,8 +535,10 @@ export function buildServer(app: AppPort): FastifyInstance {
       ruolo: utente.ruolo,
     }, DURATA_SESSIONE_OPERATORE_MINUTI);
 
-    recordAudit({
-      tenantId: userTenantId,
+    // Per il super_admin `utente.tenantId` è null (→ userTenantId ''): l'audit di
+    // login va comunque attribuito al tenant di default, non a una stringa vuota.
+    await recordAudit({
+      tenantId: userTenantId || TENANT_DEFAULT,
       userId: utente.id,
       userEmail: cleanEmail,
       userNome: utente.nome,
@@ -604,7 +615,7 @@ export function buildServer(app: AppPort): FastifyInstance {
       ruolo: 'cliente',
     }, DURATA_SESSIONE_CLIENTE_MINUTI);
 
-    recordAudit({
+    await recordAudit({
       tenantId: link.cliente.tenantId,
       azione: 'MAGIC_LINK_USATO',
       entita: link.cliente.nome,
@@ -675,7 +686,7 @@ export function buildServer(app: AppPort): FastifyInstance {
       ruolo: 'cliente',
     }, DURATA_SESSIONE_CLIENTE_MINUTI);
 
-    recordAudit({
+    await recordAudit({
       tenantId: cliente.tenantId,
       azione: 'CLIENTE_LOGIN',
       entita: cliente.nome,
@@ -770,7 +781,7 @@ export function buildServer(app: AppPort): FastifyInstance {
         },
       });
 
-      recordAudit({
+      await recordAudit({
         tenantId: utente.tenantId || TENANT_DEFAULT,
         userId: utente.id,
         userEmail: utente.email,
@@ -871,7 +882,7 @@ export function buildServer(app: AppPort): FastifyInstance {
         data: { passwordHash: newHash },
       });
 
-      recordAudit({
+      await recordAudit({
         tenantId: cliente.tenantId,
         azione: 'CLIENTE_PASSWORD_MODIFICATA',
         entita: cliente.nome,
@@ -918,7 +929,7 @@ export function buildServer(app: AppPort): FastifyInstance {
           note: body.note,
         },
       });
-      recordAudit({
+      await recordAudit({
         tenantId,
         azione: 'GIURISDIZIONE_CREATA',
         entita: body.nome,
@@ -945,7 +956,7 @@ export function buildServer(app: AppPort): FastifyInstance {
           note: body.note,
         },
       });
-      recordAudit({
+      await recordAudit({
         tenantId,
         azione: 'GIURISDIZIONE_AGGIORNATA',
         entita: updated.nome,
@@ -963,7 +974,7 @@ export function buildServer(app: AppPort): FastifyInstance {
     const { id } = req.params;
     try {
       await prisma.giurisdizione.delete({ where: { id } });
-      recordAudit({
+      await recordAudit({
         tenantId,
         azione: 'GIURISDIZIONE_ELIMINATA',
         entita: id,
@@ -1034,7 +1045,7 @@ export function buildServer(app: AppPort): FastifyInstance {
   }>('/upload', async (req) => {
     const { filename, contentBase64 } = req.body;
     const res = await uploadDocumento(filename, contentBase64);
-    recordAudit({
+    await recordAudit({
       tenantId: (req as any).tenantId,
       azione: 'DOCUMENTO_CARICATO',
       entita: filename,
@@ -1111,7 +1122,7 @@ export function buildServer(app: AppPort): FastifyInstance {
           nome: nome !== undefined ? nome : undefined,
         },
       });
-      recordAudit({
+      await recordAudit({
         tenantId,
         azione: 'ARTICOLO_AGGIORNATO',
         entita: updated.nome,
@@ -1154,7 +1165,7 @@ export function buildServer(app: AppPort): FastifyInstance {
           prezzoDefault: prezzoDefault || 0,
         },
       });
-      recordAudit({
+      await recordAudit({
         tenantId,
         azione: 'ARTICOLO_CREATO',
         entita: art.nome,
@@ -1252,7 +1263,7 @@ export function buildServer(app: AppPort): FastifyInstance {
         }),
       );
 
-      recordAudit({
+      await recordAudit({
         tenantId,
         azione: 'MODULO_TEMPLATE_CREATO',
         entita: nome,
@@ -1353,7 +1364,7 @@ export function buildServer(app: AppPort): FastifyInstance {
         }),
       );
 
-      recordAudit({
+      await recordAudit({
         tenantId,
         azione: 'MODULO_TEMPLATE_AGGIORNATO',
         entita: esistente.nome,
@@ -1386,7 +1397,7 @@ export function buildServer(app: AppPort): FastifyInstance {
         return reply.code(404).send({ errore: 'Modulo non trovato' });
       }
       await prisma.moduloTemplate.update({ where: { id }, data: { isAttivo: false } });
-      recordAudit({
+      await recordAudit({
         tenantId,
         azione: 'MODULO_TEMPLATE_DISATTIVATO',
         entita: esistente.nome,
@@ -1414,7 +1425,7 @@ export function buildServer(app: AppPort): FastifyInstance {
         return reply.code(404).send({ errore: 'Articolo non trovato' });
       }
       await prisma.articolo.update({ where: { id }, data: { isAttivo: false } });
-      recordAudit({
+      await recordAudit({
         tenantId,
         azione: 'ARTICOLO_DISATTIVATO',
         entita: esistente.nome,
@@ -1482,7 +1493,7 @@ export function buildServer(app: AppPort): FastifyInstance {
       } : undefined;
 
       const esitoInvio = await sendMagicLinkEmail(toEmail, cliente.nome, magicUrl, customSmtp);
-      recordAudit({
+      await recordAudit({
         tenantId,
         azione: 'MAGIC_LINK_GENERATO',
         entita: cliente.nome,
@@ -1605,7 +1616,7 @@ export function buildServer(app: AppPort): FastifyInstance {
         },
       });
       inMemoryTenantStore.set(tenantId, { ...inMemoryTenantStore.get(tenantId), ...sanitizedData, id: tenantId });
-      recordAudit({
+      await recordAudit({
         tenantId,
         azione: 'IMPOSTAZIONI_TENANT_SALVATE',
         entita: 'Anagrafica Studio & Impostazioni',
@@ -1737,7 +1748,7 @@ export function buildServer(app: AppPort): FastifyInstance {
             },
           });
 
-      recordAudit({
+      await recordAudit({
         tenantId: tenantCorrente,
         ruolo: ruoloRichiedente,
         azione: esistente ? 'UTENTE_AGGIORNATO' : 'UTENTE_CREATO',
@@ -1802,7 +1813,7 @@ export function buildServer(app: AppPort): FastifyInstance {
         },
       });
 
-      recordAudit({
+      await recordAudit({
         tenantId: utente.tenantId || tenantCorrente,
         ruolo: ruoloRichiedente,
         azione: 'PASSWORD_UTENTE_RESETTATA',
@@ -1927,7 +1938,7 @@ export function buildServer(app: AppPort): FastifyInstance {
         }
       }
 
-      recordAudit({
+      await recordAudit({
         tenantId: tenant.id,
         ruolo: 'super_admin',
         azione: 'TENANT_CREATO',
@@ -2004,7 +2015,7 @@ export function buildServer(app: AppPort): FastifyInstance {
         });
       }
 
-      recordAudit({
+      await recordAudit({
         tenantId: id,
         ruolo: 'super_admin',
         azione: 'PASSWORD_RESPONSABILE_RIGENERATA',
@@ -2591,7 +2602,7 @@ export function buildServer(app: AppPort): FastifyInstance {
           referentiJson: referentiObj,
         },
       });
-      recordAudit({
+      await recordAudit({
         tenantId,
         azione: 'CLIENTE_CREATO',
         entita: cliente.nome,
@@ -2668,7 +2679,7 @@ export function buildServer(app: AppPort): FastifyInstance {
           referentiJson: referentiObj,
         },
       });
-      recordAudit({
+      await recordAudit({
         tenantId,
         azione: 'CLIENTE_AGGIORNATO',
         entita: updated.nome,
@@ -2729,7 +2740,7 @@ export function buildServer(app: AppPort): FastifyInstance {
         }
       }
 
-      recordAudit({
+      await recordAudit({
         tenantId,
         azione: 'CLIENTE_PASSWORD_RIGENERATA',
         entita: cliente.nome,
@@ -2889,7 +2900,7 @@ export function buildServer(app: AppPort): FastifyInstance {
 
     const avanzamento = await ricalcolaProgetto(id);
 
-    recordAudit({
+    await recordAudit({
       tenantId,
       azione: 'PROGETTO_RICALCOLATO',
       entita: id,
@@ -3062,7 +3073,7 @@ export function buildServer(app: AppPort): FastifyInstance {
       console.warn(`Ricalcolo avanzamento non riuscito per il progetto ${id}:`, err);
     }
 
-    recordAudit({
+    await recordAudit({
       tenantId,
       azione: 'PROGETTO_STATO_AGGIORNATO',
       entita: id,
@@ -3239,7 +3250,7 @@ export function buildServer(app: AppPort): FastifyInstance {
         });
       }
 
-      recordAudit({
+      await recordAudit({
         tenantId,
         azione: 'INCASSO_REGISTRATO',
         entita: `Scadenza #${id}`,
@@ -3916,7 +3927,7 @@ export function buildServer(app: AppPort): FastifyInstance {
         });
       }
 
-      recordAudit({
+      await recordAudit({
         tenantId,
         azione: 'FATTURA_INVIATA_EMAIL',
         entita: numeroDocumento,
@@ -3946,7 +3957,7 @@ export function buildServer(app: AppPort): FastifyInstance {
           data: { statoSdi },
         });
 
-        recordAudit({
+        await recordAudit({
           tenantId: fattura.tenantId,
           azione: 'SDI_ESITO_RICEVUTO',
           entita: `Fattura ${fattura.numero}`,
@@ -4008,7 +4019,7 @@ export function buildServer(app: AppPort): FastifyInstance {
         include: { cliente: true, progetto: true },
       });
 
-      recordAudit({
+      await recordAudit({
         tenantId,
         azione: 'CONTRATTO_RICORRENTE_CREATO',
         entita: titolo,
@@ -4091,7 +4102,7 @@ export function buildServer(app: AppPort): FastifyInstance {
         data: { prossimaFatturazione: prossimaData },
       });
 
-      recordAudit({
+      await recordAudit({
         tenantId,
         azione: 'FATTURA_RETAINER_GENERATA',
         entita: numeroFattura,
@@ -4156,7 +4167,7 @@ export function buildServer(app: AppPort): FastifyInstance {
         });
       }
 
-      recordAudit({
+      await recordAudit({
         tenantId,
         azione: 'PERMESSI_UTENTE_AGGIORNATI',
         entita: userId,
@@ -4339,7 +4350,7 @@ export function buildServer(app: AppPort): FastifyInstance {
           contenutoHtml: contenutoHtml || '',
         },
       });
-      recordAudit({
+      await recordAudit({
         tenantId,
         azione: 'MODELLO_DOCUMENTO_CREATO',
         entita: `Modello #${nuovo.id}`,
@@ -4509,7 +4520,7 @@ export function buildServer(app: AppPort): FastifyInstance {
         },
       });
 
-      recordAudit({
+      await recordAudit({
         tenantId,
         azione: 'DOCUMENTO_ARCHIVIATO',
         entita: documento.id,
@@ -4547,7 +4558,7 @@ export function buildServer(app: AppPort): FastifyInstance {
       // Il file fisico resta in archivio: la riga è il riferimento legale, e lo storage può
       // essere condiviso con altri riferimenti (firme, versioni precedenti). La pulizia dei
       // file orfani è un lavoro di manutenzione separato.
-      recordAudit({
+      await recordAudit({
         tenantId,
         azione: 'DOCUMENTO_RIMOSSO',
         entita: id,
@@ -5374,7 +5385,7 @@ export function buildServer(app: AppPort): FastifyInstance {
         return reply.code(502).send({ ok: false, errore: invio.errore });
       }
 
-      recordAudit({
+      await recordAudit({
         tenantId,
         userId: (req as any).userId,
         ruolo: (req as any).ruolo,
@@ -5562,7 +5573,7 @@ export function buildServer(app: AppPort): FastifyInstance {
         },
       });
 
-      recordAudit({
+      await recordAudit({
         tenantId,
         userId: (req as any).userId,
         ruolo: (req as any).ruolo,
@@ -5762,7 +5773,7 @@ export function buildServer(app: AppPort): FastifyInstance {
         },
       });
 
-      recordAudit({
+      await recordAudit({
         tenantId,
         userId: (req as any).userId,
         ruolo: (req as any).ruolo,
@@ -5996,7 +6007,7 @@ export function buildServer(app: AppPort): FastifyInstance {
         numeroProgressivo: numFattura,
       });
 
-      recordAudit({
+      await recordAudit({
         tenantId,
         azione: 'FATTURA_PREPARATA_INVIO_MANUALE',
         entita: `Fattura ${numFattura}`,

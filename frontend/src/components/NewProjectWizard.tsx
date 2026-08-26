@@ -171,10 +171,13 @@ export function NewProjectWizard({ onClose, onProjectCreated }: NewProjectWizard
         st: 'pre_project',
         pct: 0,
         start: new Date().toLocaleDateString('it-IT'),
-        due: '30 giorni',
+        // Regola 7: nessuna scadenza inventata ("30 giorni") né regime fiscale di comodo
+        // ('privato_italia'): il server non ha ricevuto nessuno dei due dati, e questa copia
+        // locale può restare a schermo finché un refresh non rilegge dal DB.
+        due: 'n/d',
         val: totalP,
         delay: false,
-        fisc: 'privato_italia',
+        fisc: 'n/d',
         fatture: [],
         mods: selModules.map((m, mIdx) => ({
           id: Date.now() + mIdx,
@@ -185,17 +188,20 @@ export function NewProjectWizard({ onClose, onProjectCreated }: NewProjectWizard
           h: moduloH(m),
           a: 0,
           p: moduloP(m),
-          team: [1],
+          // Regola 7: alla creazione nessuno è ancora assegnato — il team vuoto evita di
+          // mostrare un membro fittizio; l'assegnazione reale avviene dopo, dal progetto.
+          team: [],
           delay: false,
           // ModuloTemplate non ha `v`: qui c'era `m.v`, sempre undefined, quindi la copia
           // locale nasceva senza micro-voci finché un refresh non la rileggeva dal server
           // (che le istanzia dalla distinta). Le deriviamo dalle righe con la stessa logica.
           v: resolveRighe(m).map(r => ({
             n: r.art.n || 'Microvoce operativa',
-            hE: r.h || 4,
+            // Regola 7: le ore stimate sono quelle della distinta (riga h); il ripiego
+            // `|| 4` inventava un preventivo di 4 ore per ogni riga senza stima.
+            hE: r.h ?? 0,
             hA: 0,
             s: 'pending' as const,
-            as: 1,
             d: 0,
           })),
         })),

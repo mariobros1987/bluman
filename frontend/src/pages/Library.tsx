@@ -557,7 +557,9 @@ function AssegnaModuloClienteModal({
           hE: isDoneAlready ? 0 : r.h,
           hA: isDoneAlready ? r.h : 0,
           s: isDoneAlready ? 'done' : 'pending',
-          as: 1,
+          // Regola 7: nessun assegnatario fittizio — prima `as: 1` finiva persistito a
+          // database con salvaProgettoDettaglioApi. L'assegnazione avviene solo quando
+          // un membro reale del team viene scelto sulla micro-voce.
           d: 0,
           vn: isDoneAlready ? '✓ Già ultimato nel progetto precedente (Evitato doppione)' : undefined,
         };
@@ -572,7 +574,9 @@ function AssegnaModuloClienteModal({
         h: moduloH(modulo, articoliList),
         a: 0,
         p: moduloP(modulo, articoliList),
-        team: [1],
+        // Regola 7: il modulo appena aggiunto non ha ancora nessuno assegnato; il team
+        // vuoto evita che un membro fittizio venga persistito sul progetto.
+        team: [],
         v: newMicrovoci,
       };
 

@@ -785,7 +785,9 @@ function AnagraficaErpModal({ client, onClose, onSaved }: { client: Cliente; onC
                             <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--text)' }}>{p.nome}</span>
                           </div>
                           <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
-                            Giurisdizione: <strong style={{ color: 'var(--indigo-l)' }}>{p.giurisdizionePrimaria?.nome || p.giurisdizione || 'Malta'}</strong> · Valore Commessa: <strong style={{ color: 'var(--text)' }}>{fmt(p.valoreTotale ? p.valoreTotale / 100 : (p.valore || 28500))}</strong>
+                            {/* Regola 7: giurisdizione e valore si mostrano solo se il progetto li ha
+                                davvero; i ripieghi 'Malta' e 28.500 € inventavano dati inesistenti. */}
+                            Giurisdizione: <strong style={{ color: 'var(--indigo-l)' }}>{p.giurisdizionePrimaria?.nome || p.giurisdizione || 'n/d'}</strong> · Valore Commessa: <strong style={{ color: 'var(--text)' }}>{p.valoreTotale != null ? fmt(p.valoreTotale / 100) : (p.valore != null ? fmt(p.valore) : 'n/d')}</strong>
                           </div>
                         </div>
 

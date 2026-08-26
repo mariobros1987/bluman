@@ -72,7 +72,7 @@ export function Projects() {
                 id: mIdx + 100,
                 dbId: m.id,
                 n: m.nome,
-                cat: m.categoria || 'Societario',
+                cat: m.categoria ?? 'Senza categoria',
                 st: av?.stato || m.stato || 'pending',
                 pct: av?.percentuale ?? 0,
                 h: m.orePreventivate ?? 0,
@@ -108,7 +108,9 @@ export function Projects() {
                 : '—',
               val: rp.valoreTotale ? rp.valoreTotale / 100 : 0,
               delay: (avanzamento?.stato || rp.stato) === 'delayed' || rp.inRitardo || false,
-              fisc: rp.regimeFiscale || 'privato_italia',
+              // regimeFiscale vive sul Tenant, non arriva da /progetti: 'n/d' invece di
+              // un valore di comodo (Regola 7). Il campo non è comunque letto in pagina.
+              fisc: 'n/d',
               fatture: rp.fatture || [],
               mods: rpMods,
             };
@@ -624,7 +626,9 @@ export function Projects() {
                 {/* Footer Card: Advisor Assegnati & Quick Actions */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border)', paddingTop: 10, marginTop: 4 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <AvatarGroup ids={p.mods?.[0]?.team || [1, 2]} />
+                    {/* Regola 7: nessun volto inventato — se il progetto non ha un team
+                        assegnato il gruppo avatar resta vuoto. */}
+                    <AvatarGroup ids={p.mods?.[0]?.team || []} />
                     <span style={{ fontSize: 10.5, color: 'var(--muted)' }}>Team Lead</span>
                   </div>
 
@@ -729,7 +733,7 @@ export function Projects() {
                       </td>
 
                       <td style={{ padding: '12px 14px' }}>
-                        <AvatarGroup ids={p.mods?.[0]?.team || [1, 2]} />
+                        <AvatarGroup ids={p.mods?.[0]?.team || []} />
                       </td>
 
                       <td style={{ padding: '12px 14px', textAlign: 'right' }}>
@@ -803,7 +807,7 @@ export function Projects() {
 
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border)', paddingTop: 6, marginTop: 2, fontSize: 10.5 }}>
                       <span style={{ fontWeight: 800, color: 'var(--indigo-l)' }}>{fmt(p.val)}</span>
-                      <AvatarGroup ids={p.mods?.[0]?.team || [1]} />
+                      <AvatarGroup ids={p.mods?.[0]?.team || []} />
                     </div>
                   </div>
                 ))}

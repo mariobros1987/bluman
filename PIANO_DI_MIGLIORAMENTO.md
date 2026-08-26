@@ -39,7 +39,7 @@
 | 3 | Frontend: fallback silenziosi che restituiscono `{ok:true}` | Dati persi senza errore visibile | 0.3 |
 | 4 | TLS `rejectUnauthorized: false` su SMTP/IMAP | MITM su credenziali email | 0.4 |
 | 5 | Confronto firma JWT non constant-time | Timing attack (basso) | 0.5 |
-| 6 | Audit log fuori contesto AsyncLocalStorage | Audit su tenant sbagliato o perso | 0.6 |
+| 6 | ~~Audit log fuori contesto AsyncLocalStorage~~ ✅ (0.6) | ~~Audit su tenant sbagliato o perso~~ | 0.6 |
 | 7 | PDF fatture reali nel repo | Esposizione dati sensibili | 0.7 |
 | 8 | `eliminaProgetto` non transazionale | Dati orfani su fallimento parziale | 1.1 |
 | 9 | `server.ts` monolite 4300 righe | Manutenibilità, rischio bug | 2.1 |
@@ -252,7 +252,9 @@ export function verifyJwt(token: string): JwtPayload | null {
 
 ---
 
-### 0.6 🟠 Audit log: tenant esplicito
+### 0.6 🟠 Audit log: tenant esplicito — ✅ RISOLTO (2026-08-26)
+
+**Risoluzione**: `recordAudit` ora ha `tenantId` obbligatorio (non optional), scrive con `prismaAmministrativo()` (operazione di sistema, non soggetta a RLS), non usa più `setImmediate` (tutti i ~44 chiamanti fanno `await`) e logga gli errori con `console.error('[AUDIT] ...')` invece di ingoiarli. I due audit del login passano `userTenantId || TENANT_DEFAULT` perché per il super_admin `utente.tenantId` è null.
 
 **Problema**: `recordAudit` in `server.ts` usa `prisma.auditLog.create` dentro `setImmediate`. A quel punto l'`AsyncLocalStorage` potrebbe non avere più il contesto tenant, quindi l'audit finisce sul tenant di default o fallisce silenziosamente (c è un `catch {}`).
 
@@ -811,7 +813,7 @@ REDIS_URL=
 - [ ] 0.3 Frontend: rimuovere fallback silenziosi su scritture
 - [ ] 0.4 TLS `rejectUnauthorized: true`
 - [ ] 0.5 JWT confronto constant-time
-- [ ] 0.6 Audit log con tenant esplicito
+- [x] 0.6 Audit log con tenant esplicito
 - [ ] 0.7 File sensibili fuori dal repo
 
 ### FASE 1 — Affidabilità (3-4 giorni)

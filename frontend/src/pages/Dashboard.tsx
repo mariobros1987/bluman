@@ -59,29 +59,43 @@ export function Dashboard() {
               ct: (rp.cliente?.tipo as any) || 'individual',
               st: av?.stato || rp.stato || 'in_progress',
               pct: av?.percentuale ?? 0,
-              start: rp.createdAt ? new Date(rp.createdAt).toLocaleDateString('it-IT') : 'Oggi',
-              due: 'In corso',
-              val: rp.valoreTotale ? rp.valoreTotale / 100 : 15000,
+              // Regola 7: le date si mostrano solo se il progetto le ha davvero; 'n/d'
+              // dichiara l'assenza del dato invece di inventare "Oggi" o un'etichetta.
+              start: rp.dataInizio
+                ? new Date(rp.dataInizio).toLocaleDateString('it-IT')
+                : rp.createdAt ? new Date(rp.createdAt).toLocaleDateString('it-IT') : 'n/d',
+              due: rp.dataScadenza ? new Date(rp.dataScadenza).toLocaleDateString('it-IT') : 'n/d',
+              // Regola 7: il valore arriva dal DB (centesimi); se manca o è zero il progetto
+              // non contribuisce al portafoglio — mai inventare una cifra verosimile.
+              val: rp.valoreTotale != null ? rp.valoreTotale / 100 : 0,
               // Il progetto è "in allarme" se un suo modulo è in ritardo o bloccato, oppure se
               // il motore ha alzato un segnale di rischio su una micro-voce (§16.5): ore
               // consuntivate oltre il preventivo. È ciò che alimenta il contatore `alerts`.
               delay:
                 (av?.moduli || []).some((m: any) => m.stato === 'delayed' || m.stato === 'blocked') ||
                 Boolean(av?.segnaleRischio),
-              fisc: 'privato',
+              // Regola 7: il regime fiscale non è valorizzato in questa pagina (non serve
+              // alla Dashboard): 'n/d' invece di un valore di comodo.
+              fisc: 'n/d',
               fatture: [],
               mods: (rp.moduli || []).map((m: any, mIdx: number) => {
                 const avM = avModuli.get(m.id);
                 return {
                   id: mIdx + 100,
                   n: m.nome,
-                  cat: m.categoria || 'Societario',
+                  // Regola 7: categoria, ore e prezzo arrivano dal DB (campi obbligatori
+                  // nello schema Prisma). Nessuna cifra o etichetta di ripiego: se un dato
+                  // manca si mostra zero/vuoto, non un valore verosimile inventato.
+                  cat: m.categoria ?? 'Senza categoria',
                   st: avM?.stato || m.stato || 'pending',
                   pct: avM?.percentuale ?? 0,
-                  h: m.orePreventivate || 20,
-                  a: m.oreConsuntivate || 0,
-                  p: m.prezzo ? m.prezzo / 100 : 3500,
-                  team: [1, 2],
+                  h: m.orePreventivate ?? 0,
+                  a: m.oreConsuntivate ?? 0,
+                  p: m.prezzo != null ? m.prezzo / 100 : 0,
+                  // Le assegnazioni vivono sul server (risorse per micro-voce): il DB non
+                  // espone un "team" numerico del modulo, quindi l'array resta vuoto e la
+                  // UI non mostra avatar inventati (riga con AvatarGroup più sotto).
+                  team: [],
                   delay: avM ? avM.stato === 'delayed' || avM.stato === 'blocked' : false,
                   // §16.1 — sforamento ore: distinto dal ritardo di calendario. Il modulo
                   // avanza, ma sta costando più del preventivo, e il banner lo dice a parte.
@@ -89,11 +103,9 @@ export function Dashboard() {
                   oreExtra: avM?.oreExtra ?? 0,
                   v: (m.microvoci || []).map((mv: any) => ({
                     n: mv.nome,
-                    hE: mv.orePreventivate || 4,
-                    hA: mv.oreConsuntivate || 0,
+                    hE: mv.orePreventivate ?? 0,
+                    hA: mv.oreConsuntivate ?? 0,
                     s: mv.stato || 'pending',
-                    as: 1,
-                    d: 0,
                     vn: mv.causaNota || undefined,
                   })),
                 };
@@ -136,7 +148,15 @@ export function Dashboard() {
     const hasDelay = p.delay || p.mods?.some(m => m.st === 'blocked' || m.st === 'delayed' || m.rischio);
     if (!hasDelay) return false;
     if (isSuperAdminOrAdvisor) return true;
-    return p.mods?.some(m => m.team?.includes(1) || m.team?.includes(2));
+    const uid = currentUser?.id != null ? Number(currentUser.id) : NaN;
+    return (p.mods || []).some(m => {
+      const team = m.team || [];
+      // Regola 7: se il backend non fornisce informazioni di assegnazione (progetti DB),
+      // l'allarme è visibile a tutti — è meglio segnalare una situazione urgente in più
+      // che nasconderla in base a dati che non abbiamo.
+      if (team.length === 0) return true;
+      return Number.isFinite(uid) && team.includes(uid);
+    });
   });
 
   /**
@@ -309,7 +329,7 @@ export function Dashboard() {
         ) : (
           filteredProjects.map(p => {
             const color = progressColor(p);
-            const allTeam = [...new Set((p.mods || []).flatMap(m => m.team || [1]).filter(Boolean))];
+            const allTeam = [...new Set((p.mods || []).flatMap(m => m.team || []).filter(Boolean))];
             return (
               <div
                 key={p.id}
@@ -334,11 +354,15 @@ export function Dashboard() {
                         {p.ct === 'individual' ? '👤' : '🏢'} {p.cl}
                       </span>
                       <span>📅 {p.start} → {p.due}</span>
-                      <span>💶 {fmt(p.val)}</span>
+                      {/* Regola 7: il valore si mostra solo se il progetto lo porta davvero;
+                          mai esporre una cifra per un progetto senza valore registrato. */}
+                      {p.val > 0 && <span>💶 {fmt(p.val)}</span>}
                     </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-                    <AvatarGroup ids={allTeam.length ? allTeam : [1]} size={22} />
+                    {/* Regola 7: nessun avatar inventato — il gruppo si mostra solo se ci
+                        sono membri reali assegnati ai moduli del progetto. */}
+                    {allTeam.length > 0 && <AvatarGroup ids={allTeam} size={22} />}
                     <Badge stato={p.st} />
                   </div>
                 </div>
