@@ -2308,18 +2308,17 @@ export function buildServer(app: AppPort): FastifyInstance {
     const isCliente = auth.ruolo === 'cliente' || (userId || '').startsWith('client-');
 
     const requestOrigin = (req.headers.origin as string) || '';
-    const allowOrigin = requestOrigin && origineInWhitelist(requestOrigin) ? requestOrigin : (requestOrigin || '*');
+    const allowOrigin = requestOrigin && origineInWhitelist(requestOrigin) ? requestOrigin : (requestOrigin || 'https://bluman.vercel.app');
 
     reply.hijack();
-    reply.raw.writeHead(200, {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache, no-transform',
-      Connection: 'keep-alive',
-      'X-Accel-Buffering': 'no', // i proxy non devono bufferizzare lo stream
-      'Access-Control-Allow-Origin': allowOrigin,
-      'Access-Control-Allow-Credentials': 'true',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-tenant-id, Accept, Origin, X-Requested-With',
-    });
+    reply.raw.setHeader('Content-Type', 'text/event-stream');
+    reply.raw.setHeader('Cache-Control', 'no-cache, no-transform');
+    reply.raw.setHeader('Connection', 'keep-alive');
+    reply.raw.setHeader('X-Accel-Buffering', 'no');
+    reply.raw.setHeader('Access-Control-Allow-Origin', allowOrigin);
+    reply.raw.setHeader('Access-Control-Allow-Credentials', 'true');
+    reply.raw.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-tenant-id, Accept, Origin, X-Requested-With');
+    reply.raw.writeHead(200);
     reply.raw.write(': connesso\n\n');
 
     const chiudi = apriStreamSse(reply, {
