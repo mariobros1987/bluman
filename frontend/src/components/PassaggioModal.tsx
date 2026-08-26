@@ -1268,8 +1268,9 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
                   <button
                     onClick={async () => {
                       const matched = ALL_STUDIO_TEMPLATES.find(t => selectedDocPreview.templateId === t.id || selectedDocPreview.nome.toLowerCase().includes(t.titolo.toLowerCase())) || ALL_STUDIO_TEMPLATES[0];
-                      const resolvedHtml = resolveDocumentTemplateHtml(matched.contenutoHtml, project);
-                      await downloadRealPdf(selectedDocPreview.nome.replace(/\.[^/.]+$/, ''), resolvedHtml);
+                      const rawHtml = matched?.html || (matched as any)?.contenutoHtml || '';
+                      const resolvedHtml = resolveDocumentTemplateHtml(rawHtml, project);
+                      await downloadRealPdf((selectedDocPreview.nome || 'Documento').replace(/\.[^/.]+$/, ''), resolvedHtml);
                     }}
                     style={{ background: '#059669', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
                   >
@@ -1284,7 +1285,8 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
                 <div dangerouslySetInnerHTML={{
                   __html: (() => {
                     const matched = ALL_STUDIO_TEMPLATES.find(t => selectedDocPreview.templateId === t.id || selectedDocPreview.nome.toLowerCase().includes(t.titolo.toLowerCase())) || ALL_STUDIO_TEMPLATES[0];
-                    return resolveDocumentTemplateHtml(matched.contenutoHtml, project);
+                    const rawHtml = matched?.html || (matched as any)?.contenutoHtml || '';
+                    return resolveDocumentTemplateHtml(rawHtml, project);
                   })()
                 }} />
               </div>
