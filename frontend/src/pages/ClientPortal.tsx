@@ -64,12 +64,18 @@ export interface ModuloPassaggio {
   operatore?: string;
   data?: string;
   note?: string;
+  documenti?: DocumentoPortale[];
 }
 
 export interface ModuloDeliverable {
+  id?: string;
   titolo: string;
   nomeFile: string;
   data: string;
+  fileUrl?: string | null;
+  firmato?: boolean;
+  richiedeFirma?: boolean;
+  docCompleto?: DocumentoPortale;
 }
 
 export interface ModuloProposta {
@@ -89,30 +95,16 @@ export interface ModuloProposta {
 }
 
 /**
- * Traduce i moduli REALI del progetto nella forma che il Portale Cliente mostra.
- *
- * Non inventa niente. Se il progetto non ha moduli a database restituisce un elenco vuoto e
- * il portale lo dichiara.
- *
- * Fino ad agosto 2026 questa funzione, quando non trovava moduli, restituiva tre schede
- * cablate scelte in base al NOME del progetto, complete di operatori, date, percentuali e
- * PDF inesistenti, con `completato: true` su ogni passaggio. Erano indistinguibili dai dati
- * veri e identiche per ogni progetto dello stesso cliente: è il motivo per cui cambiare
- * progetto nel selettore non cambiava niente. Sette progetti su dieci non hanno moduli a
- * database, quindi era il caso normale, non il caso limite — e al cliente quelle schede
- * risultavano attività già eseguite. Non reintrodurle.
- *
- * Stato e percentuale arrivano da `avanzamento`, che il backend calcola col motore §16
- * (`arricchisciProgetti` su `GET /progetti`): qui non si ricalcola e non si mette un ripiego.
+ * Traduce i moduli REALI del progetto nella forma che il Portale Cliente mostra,
+ * associando ad ogni modulo e ad ogni micro-voce i documenti pubblicati a DB.
  */
-function mapProjectToPortalModules(project: any): ModuloProposta[] {
+function mapProjectToPortalModules(project: any, portalDocs: DocumentoPortale[] = []): ModuloProposta[] {
   if (!project) return [];
 
   const moduli = Array.isArray(project.moduli) ? project.moduli : [];
   if (moduli.length === 0) return [];
 
-  // Avanzamento calcolato dal backend, indicizzato per id modulo (regola 6: il dominio non
-  // si duplica nel browser).
+  // Avanzamento calcolato dal backend, indicizzato per id modulo
   const avanzamentoModuli = new Map<string, any>(
     (project.avanzamento?.moduli || []).map((m: any) => [String(m.id), m]),
   );
@@ -123,34 +115,56 @@ function mapProjectToPortalModules(project: any): ModuloProposta[] {
     const statoModulo = av?.stato ?? m.stato;
     const isDone = statoModulo === 'done' || statoModulo === 'completed' || statoModulo === 'completato';
 
-    // Solo micro-voci reali: un passaggio senza riga a database non è un passaggio svolto.
+    // Micro-voci reali dal database
     const microvoci = Array.isArray(m.microvoci) ? m.microvoci : [];
-    const passaggi: ModuloPassaggio[] = microvoci.map((mv: any, mvIdx: number) => ({
-      id: mv.id || `mv-${mvIdx}`,
-      titolo: mv.nome,
-      completato: mv.stato === 'done' || mv.stato === 'completed',
-      note: mv.causaNota || undefined,
-      operatore: mv.risorsa?.nome || undefined,
+    const passaggi: ModuloPassaggio[] = microvoci.map((mv: any, mvIdx: number) => {
+      const mvId = mv.id || `mv-${mvIdx}`;
+      const docsDiQuestaMicrovoce = portalDocs.filter(d => 
+        (d.microvoceProgettoId && String(d.microvoceProgettoId) === String(mv.id)) ||
+        (d.microvoceNome && d.microvoceNome.trim().toLowerCase() === (mv.nome || '').trim().toLowerCase() && d.modulo === m.nome)
+      );
+
+      return {
+        id: mvId,
+        titolo: mv.nome,
+        completato: mv.stato === 'done' || mv.stato === 'completed',
+        note: mv.causaNota || undefined,
+        operatore: mv.risorsa?.nome || undefined,
+        documenti: docsDiQuestaMicrovoce,
+      };
+    });
+
+    // Documenti pubblicati dallo studio per questo modulo
+    const docsDiQuestoModulo = portalDocs.filter(d => 
+      (d.moduloProgettoId && String(d.moduloProgettoId) === String(m.id)) ||
+      (d.modulo && d.modulo.trim().toLowerCase() === (m.nome || '').trim().toLowerCase()) ||
+      microvoci.some((mv: any) => String(mv.id) === String(d.microvoceProgettoId))
+    );
+
+    const deliverables: ModuloDeliverable[] = docsDiQuestoModulo.map(d => ({
+      id: d.id,
+      titolo: d.titolo || d.nome,
+      nomeFile: d.nome,
+      data: d.caricatoIl ? new Date(d.caricatoIl).toLocaleDateString('it-IT') : new Date().toLocaleDateString('it-IT'),
+      fileUrl: d.fileUrl,
+      firmato: d.firmato,
+      richiedeFirma: d.richiedeFirma,
+      docCompleto: d,
     }));
 
     return {
       id: m.id,
       nome: m.nome,
       cat,
-      // L'euristica centesimi/euro è preesistente e resta com'era. Prezzo assente vale 0,
-      // non un importo di listino inventato.
       prezzo: typeof m.prezzo === 'number' && m.prezzo > 0 ? (m.prezzo > 1000 ? m.prezzo / 100 : m.prezzo) : 0,
       ore: m.orePreventivate ?? 0,
       righeCount: passaggi.length,
       descrizione: m.descrizione || undefined,
       stato: isDone ? 'completato' : 'in_corso',
-      // Nessun operatore di ripiego: senza risorsa assegnata a database il portale non nomina
-      // nessuno. Prima alternava due nomi propri in base all'indice del modulo.
       operatore: microvoci.find((mv: any) => mv.risorsa?.nome)?.risorsa?.nome || undefined,
       percentuale: av?.percentuale ?? 0,
       passaggi,
-      // I documenti veri vivono nel Vault: qui non si annunciano PDF inesistenti.
-      deliverables: [],
+      deliverables,
       richiedeFirmaFinale: true,
     };
   });
@@ -1105,6 +1119,13 @@ export function ClientPortal() {
 
   /** Progetto attualmente scelto nel selettore, con l'avanzamento che il backend ha calcolato. */
   const progettoAttivo = clientProjects.find((p: any) => String(p.id) === String(selectedProjectId)) || clientProjects[0] || null;
+
+  useEffect(() => {
+    if (progettoAttivo) {
+      setModuliProposti(mapProjectToPortalModules(progettoAttivo, portalDocs));
+    }
+  }, [progettoAttivo, portalDocs]);
+
   /**
    * Percentuale reale del progetto (§16). Prima la barra di avanzamento era
    * `Math.max(75, firmati/totali)` con etichetta "75% in Lavorazione Avanzata": non poteva
@@ -2549,13 +2570,20 @@ export function ClientPortal() {
                       </div>
                     </div>
 
-                    {/* Mini Avanzamento Passaggi */}
+                    {/* Mini Avanzamento Passaggi & Documenti */}
                     <div style={{ background: 'rgba(0,0,0,0.25)', borderRadius: 10, padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, fontSize: 11 }}>
-                      <div style={{ color: 'var(--muted)' }}>
-                        Progressione operativa: <strong style={{ color: '#34d399' }}>{passaggiCompletati}/{passaggi.length} micro-fasi completate</strong>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                        <span style={{ color: 'var(--muted)' }}>
+                          Progressione operativa: <strong style={{ color: '#34d399' }}>{passaggiCompletati}/{passaggi.length} micro-fasi</strong>
+                        </span>
+                        {m.deliverables && m.deliverables.length > 0 && (
+                          <span style={{ background: '#1e1b4b', border: '1px solid #4338ca', color: '#c7d2fe', padding: '2px 8px', borderRadius: 6, fontWeight: 700, fontSize: 10 }}>
+                            📄 {m.deliverables.length} atto/i pubblicato/i
+                          </span>
+                        )}
                       </div>
                       <div style={{ color: 'var(--indigo-l)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <span>👁 Visualizza attività operatore & firma</span> ➔
+                        <span>👁 Visualizza attività & documenti</span> ➔
                       </div>
                     </div>
                   </div>
@@ -3919,26 +3947,109 @@ export function ClientPortal() {
                       background: 'var(--card)',
                       border: p.completato ? '1px solid #166534' : '1px solid var(--border)',
                       borderRadius: 10,
-                      padding: '10px 14px',
+                      padding: '12px 14px',
                       display: 'flex',
-                      alignItems: 'flex-start',
-                      gap: 12,
+                      flexDirection: 'column',
+                      gap: 8,
                     }}
                   >
-                    <div style={{ width: 22, height: 22, borderRadius: '50%', background: p.completato ? '#0d2d22' : 'var(--card2)', color: p.completato ? '#34d399' : 'var(--muted)', border: `1px solid ${p.completato ? '#10b981' : 'var(--border)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, marginTop: 2 }}>
-                      {p.completato ? '✓' : pIdx + 1}
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 12.5, fontWeight: 700, color: p.completato ? 'var(--text)' : 'var(--muted)' }}>
-                        {p.titolo}
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                      <div style={{ width: 22, height: 22, borderRadius: '50%', background: p.completato ? '#0d2d22' : 'var(--card2)', color: p.completato ? '#34d399' : 'var(--muted)', border: `1px solid ${p.completato ? '#10b981' : 'var(--border)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, marginTop: 2 }}>
+                        {p.completato ? '✓' : pIdx + 1}
                       </div>
-                      <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
-                        {p.note} · <span style={{ color: 'var(--indigo-l)' }}>Operatore: {p.operatore}</span> ({p.data})
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 12.5, fontWeight: 700, color: p.completato ? 'var(--text)' : 'var(--muted)' }}>
+                          {p.titolo}
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
+                          {p.note ? `${p.note} · ` : ''}<span style={{ color: 'var(--indigo-l)' }}>Operatore: {p.operatore || 'Studio'}</span>{p.data ? ` (${p.data})` : ''}
+                        </div>
                       </div>
+                      <span style={{ fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 8, background: p.completato ? '#0d2d22' : 'var(--card2)', color: p.completato ? '#34d399' : 'var(--muted)' }}>
+                        {p.completato ? 'Completato ✓' : 'In Corso'}
+                      </span>
                     </div>
-                    <span style={{ fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 8, background: p.completato ? '#0d2d22' : 'var(--card2)', color: p.completato ? '#34d399' : 'var(--muted)' }}>
-                      {p.completato ? 'Completato ✓' : 'In Corso'}
-                    </span>
+
+                    {/* Documenti specifici collegati a questa micro-voce */}
+                    {p.documenti && p.documenti.length > 0 && (
+                      <div style={{ marginTop: 4, paddingTop: 8, borderTop: '1px dashed var(--border)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: '#818cf8', textTransform: 'uppercase' }}>
+                          📄 Documenti pubblicati per questa micro-fase:
+                        </div>
+                        {p.documenti.map((doc) => (
+                          <div
+                            key={doc.id}
+                            style={{
+                              background: doc.firmato ? '#064e3b30' : 'var(--card2)',
+                              border: `1px solid ${doc.firmato ? '#10b981' : '#4338ca'}`,
+                              borderRadius: 8,
+                              padding: '8px 12px',
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              flexWrap: 'wrap',
+                              gap: 8,
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <span style={{ fontSize: 16 }}>{doc.firmato ? '🔒' : '📄'}</span>
+                              <div>
+                                <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text)' }}>
+                                  {doc.nome}
+                                  {doc.versione && doc.versione > 1 && (
+                                    <span style={{ marginLeft: 6, fontSize: 9.5, background: 'var(--card)', padding: '1px 5px', borderRadius: 4, color: '#818cf8', fontWeight: 600 }}>v{doc.versione}</span>
+                                  )}
+                                </div>
+                                <div style={{ fontSize: 10, color: doc.firmato ? '#34d399' : doc.statoDoc === 'in_revisione' ? '#fbbf24' : '#93c5fd' }}>
+                                  {doc.firmato ? '✓ Firmato con sigillo eIDAS' : doc.statoDoc === 'in_revisione' ? '⚠️ In attesa di riscontro modifica' : '🚀 Pubblicato dallo studio per la firma'}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <button
+                                type="button"
+                                onClick={() => setSelectedViewerDoc(doc)}
+                                style={{ background: '#1a1f3d', border: '1px solid #4338ca', color: '#c7d2fe', padding: '5px 10px', borderRadius: 6, fontSize: 10.5, fontWeight: 700, cursor: 'pointer' }}
+                              >
+                                👁 Apri
+                              </button>
+                              {doc.scaricabile && urlFileArchivio(doc.fileUrl) && (
+                                <a
+                                  href={urlFileArchivio(doc.fileUrl) as string}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  download={doc.nome}
+                                  style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '5px 8px', borderRadius: 6, fontSize: 10.5, textDecoration: 'none' }}
+                                >
+                                  ⬇
+                                </a>
+                              )}
+                              {!doc.firmato && (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => { setModificaDocTarget(doc); setModificaDocTesto(''); }}
+                                    style={{ background: '#27272a', border: '1px solid #52525b', color: '#fbbf24', padding: '5px 10px', borderRadius: 6, fontSize: 10.5, fontWeight: 700, cursor: 'pointer' }}
+                                    title="Chiedi modifiche o note prima di firmare"
+                                  >
+                                    📝 Modifica
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={!doc.richiedeFirma || otpLoading}
+                                    onClick={() => avviaFirmaDocumento(doc)}
+                                    style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '5px 12px', borderRadius: 6, fontSize: 10.5, fontWeight: 700, cursor: 'pointer' }}
+                                  >
+                                    ✍️ Firma
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -3947,69 +4058,96 @@ export function ClientPortal() {
             {/* Documenti & Deliverables Prodotti */}
             <div>
               <div style={{ fontSize: 12, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.5px', color: 'var(--muted)', marginBottom: 10 }}>
-                📎 Documenti & Fascicoli Prodotti dall'Operatore:
+                📎 Documenti & Fascicoli Prodotti dall'Operatore ({selectedModule.deliverables?.length ?? 0}):
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {(selectedModule.deliverables ?? []).length === 0 && (
                   <div style={{ background: 'var(--card2)', border: '1px dashed var(--border)', borderRadius: 10, padding: '12px 14px', fontSize: 11.5, color: 'var(--muted)', lineHeight: 1.6 }}>
-                    Nessun documento è ancora stato depositato per questo modulo. I fascicoli
-                    prodotti compaiono qui e nella scheda "Documenti & Contratti" appena lo Studio
-                    li carica: prima di allora questa sezione annunciava PDF che non esistevano.
+                    Nessun documento è ancora stato pubblicato per questo modulo. I fascicoli
+                    prodotti compaiono qui e nella scheda "Documenti & Contratti" non appena lo Studio
+                    li pubblica.
                   </div>
                 )}
-                {(selectedModule.deliverables ?? []).map((d, dIdx) => (
-                  <div
-                    key={dIdx}
-                    style={{
-                      background: 'var(--card2)',
-                      border: '1px solid var(--border)',
-                      borderRadius: 10,
-                      padding: '10px 14px',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      flexWrap: 'wrap',
-                      gap: 8,
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <span style={{ fontSize: 18 }}>📄</span>
-                      <div>
-                        <div style={{ fontSize: 12.5, fontWeight: 700 }}>{d.titolo}</div>
-                        <div style={{ fontSize: 10.5, color: 'var(--muted)' }}>{d.nomeFile} · Depositato il {d.data}</div>
+                {(selectedModule.deliverables ?? []).map((d, dIdx) => {
+                  const docReal = d.docCompleto;
+                  return (
+                    <div
+                      key={d.id || dIdx}
+                      style={{
+                        background: d.firmato ? '#064e3b30' : 'var(--card2)',
+                        border: `1px solid ${d.firmato ? '#10b981' : 'var(--border)'}`,
+                        borderRadius: 10,
+                        padding: '12px 14px',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        flexWrap: 'wrap',
+                        gap: 8,
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <span style={{ fontSize: 18 }}>{d.firmato ? '🔒' : '📄'}</span>
+                        <div>
+                          <div style={{ fontSize: 12.5, fontWeight: 700 }}>
+                            {d.titolo}
+                            {docReal?.versione && docReal.versione > 1 && (
+                              <span style={{ marginLeft: 6, fontSize: 10, background: 'var(--card)', padding: '1px 5px', borderRadius: 4, color: '#818cf8' }}>v{docReal.versione}</span>
+                            )}
+                          </div>
+                          <div style={{ fontSize: 10.5, color: 'var(--muted)', marginTop: 2 }}>
+                            {d.nomeFile} · Depositato il {d.data}
+                            {d.firmato && <span style={{ color: '#34d399', fontWeight: 700, marginLeft: 6 }}>✓ Firmato</span>}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (docReal) setSelectedViewerDoc(docReal);
+                          }}
+                          style={{ background: '#1a1f3d', border: '1px solid #4338ca', color: '#c7d2fe', padding: '6px 12px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+                        >
+                          👁 Apri Documento
+                        </button>
+
+                        {docReal?.scaricabile && urlFileArchivio(docReal.fileUrl) && (
+                          <a
+                            href={urlFileArchivio(docReal.fileUrl) as string}
+                            target="_blank"
+                            rel="noreferrer"
+                            download={d.nomeFile}
+                            style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '6px 10px', borderRadius: 6, fontSize: 11, textDecoration: 'none' }}
+                          >
+                            ⬇ Scarica
+                          </a>
+                        )}
+
+                        {!d.firmato && docReal && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => { setModificaDocTarget(docReal); setModificaDocTesto(''); }}
+                              style={{ background: '#27272a', border: '1px solid #52525b', color: '#fbbf24', padding: '6px 12px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+                              title="Invia note allo studio"
+                            >
+                              📝 Richiedi Modifiche
+                            </button>
+                            <button
+                              type="button"
+                              disabled={!docReal.richiedeFirma || otpLoading}
+                              onClick={() => avviaFirmaDocumento(docReal)}
+                              style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+                            >
+                              ✍️ Firma con codice
+                            </button>
+                          </>
+                        )}
                       </div>
                     </div>
-                    <button
-                      onClick={async () => {
-                        const htmlDoc = `
-                          <div style="padding:20px;font-family:sans-serif;">
-                            <h2>${d.titolo}</h2>
-                            <p><strong>Modulo Operativo:</strong> ${selectedModule?.nome}</p>
-                            <p><strong>Cliente:</strong> ${clientName}</p>
-                            <p><strong>Operatore:</strong> ${selectedModule?.operatore}</p>
-                            <hr style="margin:20px 0;"/>
-                            <p>Si certifica la regolare esecuzione della prestazione e il deposito del relativo fascicolo documentale negli atti di studio.</p>
-                          </div>
-                        `;
-                        // Si allega l'evidenza della firma realmente registrata su questa operazione,
-                        // se c'è. L'IP era cablato: il browser non conosce il proprio IP pubblico e
-                        // non può attestarlo.
-                        const firmaModulo = selectedModule ? moduleSignatures[selectedModule.id] : undefined;
-                        await downloadRealPdf(d.nomeFile.replace('.pdf', ''), htmlDoc, firmaModulo?.firmato
-                          ? [{
-                              signerName: firmaModulo.signerName || clientName,
-                              signerRole: 'Cliente Incarico',
-                              timestamp: firmaModulo.dataFirma,
-                              ipAddress: 'non registrato',
-                            }]
-                          : []);
-                      }}
-                      style={{ background: '#1e1b4b', border: '1px solid #4338ca', color: '#c7d2fe', padding: '6px 12px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
-                    >
-                      📥 Scarica PDF
-                    </button>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 

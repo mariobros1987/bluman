@@ -4995,11 +4995,13 @@ export function buildServer(app: AppPort): FastifyInstance {
           pubblicatoAt: true,
           documentoPadreId: true,
           progettoId: true,
+          microvoceProgettoId: true,
           progetto: { select: { nome: true } },
           microvoceProgetto: {
             select: {
+              id: true,
               nome: true,
-              moduloProgetto: { select: { nome: true, progettoId: true, progetto: { select: { nome: true } } } },
+              moduloProgetto: { select: { id: true, nome: true, progettoId: true, progetto: { select: { nome: true } } } },
             },
           },
           richiesteModifica: {
@@ -5037,6 +5039,7 @@ export function buildServer(app: AppPort): FastifyInstance {
         // progetto si ripiegano sul collegamento diretto al progetto.
         const nomeProgetto = d.microvoceProgetto?.moduloProgetto.progetto?.nome ?? d.progetto?.nome ?? null;
         const progettoId = d.microvoceProgetto?.moduloProgetto.progettoId ?? d.progettoId ?? null;
+        const moduloProgettoId = d.microvoceProgetto?.moduloProgetto.id ?? null;
         const titoloVoce = d.microvoceProgetto?.nome ?? d.progetto?.nome ?? 'Documento';
         const isFirmato = Boolean(firma) || d.tipo === 'firmato' || d.statoDoc === 'firmato';
         return {
@@ -5045,6 +5048,10 @@ export function buildServer(app: AppPort): FastifyInstance {
           titolo: titoloVoce,
           categoria: d.categoriaDoc || 'generico',
           modulo: d.microvoceProgetto?.moduloProgetto.nome ?? null,
+          moduloProgettoId,
+          moduloNome: d.microvoceProgetto?.moduloProgetto.nome ?? null,
+          microvoceProgettoId: d.microvoceProgettoId ?? d.microvoceProgetto?.id ?? null,
+          microvoceNome: d.microvoceProgetto?.nome ?? null,
           progetto: nomeProgetto,
           progettoId,
           // La firma HMAC degli URL /uploads/ scade dopo qualche giorno: si rinnova alla

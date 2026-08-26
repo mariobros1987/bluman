@@ -1933,6 +1933,10 @@ export interface DocumentoPortale {
   titolo: string;
   categoria: string;
   modulo: string | null;
+  moduloProgettoId?: string | null;
+  moduloNome?: string | null;
+  microvoceProgettoId?: string | null;
+  microvoceNome?: string | null;
   progetto: string | null;
   progettoId: string | null;
   fileUrl: string | null;
