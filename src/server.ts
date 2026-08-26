@@ -276,13 +276,15 @@ export function buildServer(app: AppPort): FastifyInstance {
     .split(',')
     .map(v => v.trim())
     .filter(Boolean);
-  const DEFAULT_DEV = ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:4173', 'http://127.0.0.1:4173'];
-  const originiConsentite = originiDaEnv.length > 0
-    ? originiDaEnv
-    : (process.env.NODE_ENV === 'production' ? [] : DEFAULT_DEV);
-  if (process.env.NODE_ENV === 'production' && originiDaEnv.length === 0) {
-    console.warn('⚠️ CORS_ORIGINS non impostato in produzione: il frontend non potrà chiamare questa API dal browser. Imposta CORS_ORIGINS con l\'origine del frontend.');
-  }
+  const DEFAULT_ORIGINS = [
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+    'http://localhost:4173',
+    'http://127.0.0.1:4173',
+    'https://bluman.vercel.app',
+    '*.vercel.app',
+  ];
+  const originiConsentite = Array.from(new Set([...DEFAULT_ORIGINS, ...originiDaEnv]));
 
   function origineInWhitelist(origine: string): boolean {
     return originiConsentite.some(voce => {
@@ -2305,12 +2307,18 @@ export function buildServer(app: AppPort): FastifyInstance {
     const userId = auth.userId as string | undefined;
     const isCliente = auth.ruolo === 'cliente' || (userId || '').startsWith('client-');
 
+    const requestOrigin = (req.headers.origin as string) || '';
+    const allowOrigin = requestOrigin && origineInWhitelist(requestOrigin) ? requestOrigin : (requestOrigin || '*');
+
     reply.hijack();
     reply.raw.writeHead(200, {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache, no-transform',
       Connection: 'keep-alive',
       'X-Accel-Buffering': 'no', // i proxy non devono bufferizzare lo stream
+      'Access-Control-Allow-Origin': allowOrigin,
+      'Access-Control-Allow-Credentials': 'true',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-tenant-id, Accept, Origin, X-Requested-With',
     });
     reply.raw.write(': connesso\n\n');
 

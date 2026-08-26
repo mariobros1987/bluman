@@ -292,16 +292,39 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
   };
 
   // Applica Modello dal Pre-screening o dal Catalogo
-  const handleApplyTemplate = (tmpl: DocumentTemplate) => {
+  // Applica Modello dal Pre-screening o dal Catalogo
+  const handleApplyTemplate = async (tmpl: DocumentTemplate) => {
     const formattedName = `${tmpl.titolo} — ${project.cl}.docx`;
+    const htmlContent = resolveDocumentTemplateHtml(tmpl, project.cl);
+    const contentBase64 = btoa(unescape(encodeURIComponent(htmlContent)));
+
+    let dbId: string | undefined;
+    if (progettoDbId) {
+      try {
+        const salvato = await salvaDocumentoApi({
+          progettoId: progettoDbId,
+          microvoceProgettoId: microvoceDbId,
+          filename: formattedName,
+          contentBase64,
+          categoriaDoc: tmpl.categoria || 'Modello Studio',
+          statoDoc: 'bozza',
+        });
+        dbId = salvato.id;
+      } catch (err) {
+        console.warn('Errore salvataggio template a DB:', err);
+      }
+    }
+
     const newDoc: DocumentoEntry = {
-      id: `d-${tmpl.id}-${Date.now()}`,
+      id: dbId || `d-${tmpl.id}-${Date.now()}`,
       nome: formattedName,
       dimensione: '56 KB',
       richiedeFirma: true,
       firmato: false,
       dataCaricamento: new Date().toLocaleDateString('it-IT'),
       templateId: tmpl.id,
+      statoDoc: 'bozza',
+      versione: 1,
     };
     const updatedDocs = [...documents, newDoc];
     persistDocuments(updatedDocs);
@@ -318,7 +341,8 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
     if (onSaveVoce) onSaveVoce(updatedSteps, notes, updatedDocs.length);
 
     setShowCatalogModal(false);
-    alert(`✓ Modello "${tmpl.titolo}" collegato con successo alla voce "${voce.n}"!`);
+    alert(`✓ Modello "${tmpl.titolo}" collegato in bozza alla voce "${voce.n}"!`);
+    if (progettoDbId) await ricaricaDocumentiDb();
   };
 
   // Caricamento documenti dal database su mount
@@ -385,7 +409,24 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
   // Pubblica documento al cliente (visibile per firma)
   const handlePubblicaDocumento = async (docId: string) => {
     try {
-      await aggiornaStatoDocumentoApi(docId, 'pubblicato');
+      if (docId.startsWith('d-') && progettoDbId) {
+        // Documento template o locale non ancora salvato a DB: salvalo ora con stato pubblicato
+        const localDoc = documents.find(d => d.id === docId);
+        const tmpl = localDoc?.templateId ? ALL_STUDIO_TEMPLATES.find(t => t.id === localDoc.templateId) : null;
+        const htmlContent = tmpl ? resolveDocumentTemplateHtml(tmpl, project.cl) : `<html><body><h1>${localDoc?.nome || 'Documento'}</h1></body></html>`;
+        const contentBase64 = btoa(unescape(encodeURIComponent(htmlContent)));
+
+        await salvaDocumentoApi({
+          progettoId: progettoDbId,
+          microvoceProgettoId: microvoceDbId,
+          filename: localDoc?.nome || 'Documento.docx',
+          contentBase64,
+          categoriaDoc: tmpl?.categoria || 'Allegati Microvoce',
+          statoDoc: 'pubblicato',
+        });
+      } else {
+        await aggiornaStatoDocumentoApi(docId, 'pubblicato');
+      }
       alert('🚀 Documento pubblicato al cliente con successo! Ora è visibile nel portale per la firma.');
       await ricaricaDocumentiDb();
     } catch (err: any) {
