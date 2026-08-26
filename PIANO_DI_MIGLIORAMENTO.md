@@ -838,9 +838,11 @@ REDIS_URL=
 
 ### FASE 1 — Affidabilità (3-4 giorni)
 - [x] 1.1 `eliminaProgetto` in transazione
+- [x] 1.1bis `eliminaModulo` con transazione, controllo ruoli e blocco ore consuntivate
 - [x] 1.2 Cron senza dati mock
 - [x] 1.3 Health check con verifica DB
 - [x] 1.4 Frontend: rimuovere mockData da App.tsx
+- [x] 1.5 §WF-DOC: Workflow bidirezionale documenti (bozza ⇄ pubblicato ⇄ revisione ⇄ firma OTP con versioning a DB)
 
 ### FASE 2 — Refactoring (1-2 settimane)
 - [ ] 2.1 Spezzare server.ts in moduli route

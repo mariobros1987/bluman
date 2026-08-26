@@ -203,12 +203,21 @@ collaboratore nasca nel tenant di chi lo crea, e che un errore di lettura su
   - `PUT /auth/profilo`: Aggiornamento dati profilo operatore.
   - `POST /portal/change-password`: Cambio password per il cliente autenticato nel portale.
   - `POST /tenant/utenti/:id/reset-password`: Reset password collaboratore da parte di Super Admin / Advisor (imposta `stato: 'invitato'`, genera password temporanea e la restituisce una volta sola).
-- **Progetti**: `GET /progetti`, `GET /progetti/:id`, `PUT /progetti/:id/stato-completo` (Persistenza totale moduli, microvoci, checklist passaggi e note operative con audit log)
+- **Progetti**: `GET /progetti`, `GET /progetti/:id`, `DELETE /progetti/:id`, `DELETE /progetti/:id/moduli/:moduloId` (Eliminazione sicura modulo persistita a DB con controllo ruoli, blocco su ore consuntivate e audit log), `PUT /progetti/:id/stato-completo` (Persistenza totale moduli, microvoci, checklist passaggi e note operative con audit log)
 - **Clienti**: `GET /clienti`, `POST /clienti`, `PUT /clienti/:id` (Salvataggio e recupero completo di tutti i campi ERP, legali, SDI, IBAN, KYC e referentiJson con audit log)
 - **Comunicazioni Omnichannel**: `GET /progetti/:id/comunicazioni`, `POST /progetti/:id/comunicazioni` (Messaggistica bidirezionale live Portale Cliente ⇄ Advisor Hub su tabella PostgreSQL `comunicazione_progetto`, con invio email reale Nodemailer SMTP Register.it e WhatsApp Cloud API)
 - **Fatturazione & Incassi**: `POST /progetti/:id/fatture` (gestisce sia Fatture `FT` che Note di Credito `NC` con numerazione distinta), `GET /invoices/scadenzario`, `POST /invoices/scadenze/:id/incassi` (Prima Nota) e `GET /invoices/:id/sdi-xml` (Tracciato XML FatturaPA).
 - **Contratti Retainer**: `GET /contratti-ricorrenti`, `POST /contratti-ricorrenti` (collegati sia al Cliente che al Progetto specifico).
 - **Multi-Tenant Piattaforma (solo `super_admin`)**: `GET /admin/tenants`, `POST /admin/tenants` (registra lo studio **e** la riga `user` del responsabile con ruolo `advisor`, restituendo la password temporanea una volta sola), `PATCH /admin/tenants/:id`, `DELETE /admin/tenants/:id`, `POST /admin/tenants/:id/reset-password` (rigenera la password del responsabile: nuovo hash su `user.passwordHash`, chiaro nella sola risposta, imposta `stato: 'invitato'`). Tutti passano da `soloSuperAdmin` → 403 per gli altri ruoli.
+- **Documenti & Workflow Bidirezionale Operatore ⇄ Cliente (§WF-DOC)**:
+  - `GET /documenti`: Lettura fascicolo con stato workflow (`bozza` | `pubblicato` | `in_revisione` | `firmato`), versione, richieste di modifica associate e firma.
+  - `POST /documenti`: Caricamento documento da computer/template nel fascicolo/microvoce (stato iniziale `bozza` con notifica condizionale).
+  - `PATCH /documenti/:id/stato`: Transizione di stato (`bozza` ⇄ `pubblicato`) con notifica automatica al cliente.
+  - `POST /documenti/:id/nuova-versione`: Caricamento v2, v3... mantenendo il link al documento padre e risolvendo le note aperte.
+  - `GET /portal/documenti`: Documenti visibili al cliente (solo `pubblicato`, `in_revisione`, `firmato`; le bozze restano protette).
+  - `POST /portal/documenti/:id/richiesta-modifica`: Richiesta di rettifica inviata dal cliente con note e commenti prima della firma OTP.
+  - `GET /documenti/:id/richieste-modifica` & `PATCH /documenti/richieste-modifica/:rid`: Gestione note di revisione e riscontri advisor.
+  - `DELETE /documenti/:id`: Eliminazione documento con audit log.
 - **Upload Documenti**: `POST /upload` (riceve base64 e salva in `./uploads/`), `GET /uploads/:filename` — confinata sotto `uploads/` e non anonima: nome rifiutato con 400 se non è `[a-zA-Z0-9_.-]` senza `..`, poi verifica sul percorso *risolto*; serve il file solo con Bearer **oppure** firma HMAC `?firma=&scad=`, perché quegli URL finiscono in `<img src>` che non può inviare header.
 ### 🧠 Domain Layer (`src/domain/`)
 
