@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { downloadRealPdf } from '../utils/pdfGenerator';
+import { downloadRealPdf, generateRealPdfBase64 } from '../utils/pdfGenerator';
 import { PREBUILT_TEMPLATES, resolveDocumentTemplateHtml, type DocumentTemplate } from '../utils/documentTemplates';
 import { REORGANIZATION_TEMPLATES } from '../utils/reorganizationTemplates';
 import {
@@ -312,7 +312,7 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
       open: true,
       tmpl,
       stepId,
-      titolo: `${tmpl.titolo} — ${project.cl}.docx`,
+      titolo: `${tmpl.titolo} — ${project.cl}.pdf`,
       richiedeFirma: true,
       metodoFirma: 'fea_otp',
       statoDoc: 'bozza',
@@ -325,13 +325,14 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
     if (!configFirmaModal) return;
     const { tmpl, file, fileBase64, stepId, titolo, richiedeFirma, metodoFirma, statoDoc, dataScadenzaDoc } = configFirmaModal;
 
-    const formattedName = titolo.trim() || (tmpl ? `${tmpl.titolo} — ${project.cl}.docx` : file?.name || 'Documento.docx');
+    const rawFilename = titolo.trim() || (tmpl ? `${tmpl.titolo} — ${project.cl}.pdf` : file?.name || 'Documento.pdf');
+    const formattedName = tmpl ? rawFilename.replace(/\.docx?$/i, '.pdf') : rawFilename;
 
     let contentBase64 = fileBase64 || '';
     if (tmpl && !contentBase64) {
       const rawHtml = tmpl.html || (tmpl as any).contenutoHtml || '';
       const resolvedHtml = resolveDocumentTemplateHtml(rawHtml, project);
-      contentBase64 = btoa(unescape(encodeURIComponent(resolvedHtml || `<html><body><h1>${formattedName}</h1></body></html>`)));
+      contentBase64 = await generateRealPdfBase64(resolvedHtml || `<html><body><h1>${formattedName}</h1></body></html>`);
     }
 
     let dbId: string | undefined;
@@ -472,16 +473,18 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
       const isLocalId = docId.startsWith('d-');
 
       if (isLocalId && effProgettoId) {
-        // Documento template o locale non ancora salvato a DB: salvalo ora con stato pubblicato
+        // Documento template o locale non ancora salvato a DB: salvalo ora come VERO PDF con stato pubblicato
         const tmpl = localDoc?.templateId ? ALL_STUDIO_TEMPLATES.find(t => t.id === localDoc.templateId) : null;
         const rawHtml = tmpl?.html || (tmpl as any)?.contenutoHtml || `<html><body><h1>${localDoc?.nome || 'Documento'}</h1></body></html>`;
         const htmlContent = resolveDocumentTemplateHtml(rawHtml, project);
-        const contentBase64 = btoa(unescape(encodeURIComponent(htmlContent)));
+        const contentBase64 = await generateRealPdfBase64(htmlContent);
+        const rawName = localDoc?.nome || 'Documento.pdf';
+        const pdfFilename = rawName.replace(/\.docx?$/i, '.pdf');
 
         await salvaDocumentoApi({
           progettoId: effProgettoId,
           microvoceProgettoId: microvoceDbId,
-          filename: localDoc?.nome || 'Documento.docx',
+          filename: pdfFilename,
           contentBase64,
           categoriaDoc: tmpl?.categoria || 'Allegati Microvoce',
           statoDoc: 'pubblicato',
@@ -495,11 +498,14 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
             const tmpl = localDoc?.templateId ? ALL_STUDIO_TEMPLATES.find(t => t.id === localDoc.templateId) : null;
             const rawHtml = tmpl?.html || (tmpl as any)?.contenutoHtml || `<html><body><h1>${localDoc?.nome || 'Documento'}</h1></body></html>`;
             const htmlContent = resolveDocumentTemplateHtml(rawHtml, project);
-            const contentBase64 = btoa(unescape(encodeURIComponent(htmlContent)));
+            const contentBase64 = await generateRealPdfBase64(htmlContent);
+            const rawName = localDoc?.nome || 'Documento.pdf';
+            const pdfFilename = rawName.replace(/\.docx?$/i, '.pdf');
+
             await salvaDocumentoApi({
               progettoId: effProgettoId,
               microvoceProgettoId: microvoceDbId,
-              filename: localDoc?.nome || 'Documento.docx',
+              filename: pdfFilename,
               contentBase64,
               categoriaDoc: tmpl?.categoria || 'Allegati Microvoce',
               statoDoc: 'pubblicato',

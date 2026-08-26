@@ -288,6 +288,80 @@ export async function downloadRealPdf(
 }
 
 /**
+ * Genera il contenuto Base64 di un file VERO PDF binario A4 a partire da HTML.
+ */
+export async function generateRealPdfBase64(
+  elementOrHtml: HTMLElement | string,
+  signatures: SignatureData[] = []
+): Promise<string> {
+  const rawHtml = typeof elementOrHtml === 'string' ? elementOrHtml : elementOrHtml.innerHTML;
+  const pageDomElements = createPaginatedPages(rawHtml, signatures);
+
+  try {
+    for (const pageEl of pageDomElements) {
+      const images = Array.from(pageEl.querySelectorAll('img'));
+      await Promise.all(
+        images.map(async (img) => {
+          try {
+            const src = img.getAttribute('src');
+            if (!src || src.startsWith('data:')) return;
+            const res = await fetch(src, { mode: 'cors' });
+            if (!res.ok) return;
+            const blob = await res.blob();
+            const dataUrl = await new Promise<string>((resolve) => {
+              const reader = new FileReader();
+              reader.onloadend = () => resolve(reader.result as string);
+              reader.readAsDataURL(blob);
+            });
+            img.setAttribute('src', dataUrl);
+          } catch (err) {
+            console.warn('Pre-caricamento immagine Base64 per PDF:', err);
+          }
+        })
+      );
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    const pdf = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4',
+      compress: true,
+    });
+
+    for (let i = 0; i < pageDomElements.length; i++) {
+      const pageEl = pageDomElements[i];
+      const canvas = await html2canvas(pageEl, {
+        scale: 2.0,
+        useCORS: true,
+        allowTaint: true,
+        logging: false,
+        backgroundColor: '#ffffff',
+        windowWidth: A4_SPECS.widthPx,
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      if (i > 0) pdf.addPage();
+      pdf.addImage(imgData, 'PNG', 0, 0, A4_SPECS.widthMm, A4_SPECS.heightMm);
+    }
+
+    const dataUri = pdf.output('datauristring');
+    return dataUri.split(',')[1] || '';
+  } catch (error) {
+    console.error('Errore generazione PDF Base64:', error);
+    // Fallback su conversione base64 dell'HTML se html2canvas fallisce
+    return btoa(unescape(encodeURIComponent(rawHtml)));
+  } finally {
+    pageDomElements.forEach((pageEl) => {
+      if (pageEl.parentNode) {
+        pageEl.parentNode.removeChild(pageEl);
+      }
+    });
+  }
+}
+
+/**
  * Genera e scarica direttamente la Guida Configurazione Canali Omnichannel in formato VERO PDF A4
  */
 export async function downloadGuidePdf() {

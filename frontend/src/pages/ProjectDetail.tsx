@@ -2488,14 +2488,14 @@ function DocumentiTab({ project }: { project: Progetto }) {
       return {
         id: `doc-${t.id}`,
         templateId: t.id,
-        nome: `${t.titolo} — ${project.cl}.docx`,
+        nome: `${t.titolo} — ${project.cl}.pdf`,
         titolo: t.titolo,
         cat: catLabel,
         dimensione: '54 KB',
         data: '15/08/2026',
         dataCaricamento: '15/08/2026',
         firmato: isSigned,
-        formato: 'word',
+        formato: 'pdf',
         contenutoHtml: resolveDocumentTemplateHtml(t.contenutoHtml, {
           cliente: { nome: project.cl, ragione_sociale: project.cl },
           progetto: { titolo: project.n, importo_totale: fmt(project.val) },
@@ -3080,7 +3080,7 @@ temporale certificata ISO UTC ed impronta crittografica SHA-256.
                 onClick={() => handleDownloadDocument(selectedPreviewDoc)}
                 style={{ background: '#0d2d22', border: '1px solid #059669', color: '#34d399', padding: '8px 16px', borderRadius: 8, fontSize: 12, cursor: 'pointer', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}
               >
-                📥 Scarica Copia Localmente (.docx/html)
+                📥 Scarica Documento PDF A4
               </button>
 
               <div style={{ display: 'flex', gap: 10 }}>
