@@ -233,12 +233,16 @@ export function buildServer(app: AppPort): FastifyInstance {
 
   // Supporta body vuoti con Content-Type: application/json (es. richieste DELETE, POST senza payload)
   server.addContentTypeParser('application/json', { parseAs: 'string' }, (_req, body, done) => {
-    if (!body || (typeof body === 'string' && body.trim() === '')) {
+    // `parseAs: 'string'` garantisce a runtime una stringa, ma la firma di Fastify resta
+    // `string | Buffer`: la normalizziamo invece di forzarla con un cast, così il parser
+    // regge anche se un domani il body arrivasse come Buffer.
+    const testo = typeof body === 'string' ? body : body.toString('utf8');
+    if (!testo || testo.trim() === '') {
       done(null, {});
       return;
     }
     try {
-      const json = JSON.parse(body);
+      const json = JSON.parse(testo);
       done(null, json);
     } catch (err: any) {
       err.statusCode = 400;
@@ -4707,12 +4711,18 @@ export function buildServer(app: AppPort): FastifyInstance {
 
       const defaultStatoDoc = (statoDoc === 'pubblicato') ? 'pubblicato' : 'bozza';
 
+      // Lo schema ammette template_vuoto|compilato|firmato|allegato: prima ogni valore
+      // diverso da 'firmato' diventava 'allegato', così un documento redatto dall'operatore
+      // ('compilato') era indistinguibile da un file allegato dal cliente.
+      const tipiAmmessi = ['template_vuoto', 'compilato', 'firmato', 'allegato'];
+      const tipoFinale = tipo && tipiAmmessi.includes(tipo) ? tipo : 'allegato';
+
       const documento = await prisma.documento.create({
         data: {
           tenantId,
           progettoId,
           microvoceProgettoId,
-          tipo: tipo === 'firmato' ? 'firmato' : 'allegato',
+          tipo: tipoFinale,
           fileUrl: archiviato.url,
           caricatoDa: userId,
           categoriaDoc: categoriaDoc || 'generico',
@@ -4749,18 +4759,30 @@ export function buildServer(app: AppPort): FastifyInstance {
   });
 
   /**
+   * §WF-DOC — «firmato» è lo stato terminale positivo: un atto sottoscritto dal cliente non si
+   * modifica più. Solo l'admin del tenant (`advisor`) e il `super_admin` possono riaprirlo, e
+   * unicamente dalla rotta dedicata `/documenti/:id/sblocca`, che pretende una motivazione e la
+   * registra nell'audit. Questo controllo sta qui, sul server: nasconderlo solo nella UI
+   * lascerebbe la transizione raggiungibile a chiunque abbia un token del tenant.
+   */
+  function puoSbloccareDocumentoFirmato(ruolo?: string): boolean {
+    return ruolo === 'advisor' || ruolo === 'super_admin';
+  }
+
+  /**
    * PATCH /documenti/:id/stato — §WF-DOC
    * Permette all'operatore/advisor di pubblicare un documento al cliente o rimetterlo in bozza.
+   * Non può dichiarare «firmato»: quello lo scrive solo il sigillo di firma (regola 7).
    */
   server.patch<{
     Params: { id: string };
-    Body: { statoDoc: 'bozza' | 'pubblicato' | 'in_revisione' | 'firmato' };
+    Body: { statoDoc: 'bozza' | 'pubblicato' | 'in_revisione' };
   }>('/documenti/:id/stato', async (req, reply) => {
     const tenantId = (req as any).tenantId;
     const { id } = req.params;
     const { statoDoc } = req.body;
 
-    if (!['bozza', 'pubblicato', 'in_revisione', 'firmato'].includes(statoDoc)) {
+    if (!['bozza', 'pubblicato', 'in_revisione'].includes(statoDoc)) {
       return reply.code(400).send({ errore: 'statoDoc non valido.' });
     }
 
@@ -4773,6 +4795,14 @@ export function buildServer(app: AppPort): FastifyInstance {
         },
       });
       if (!doc) return reply.code(404).send({ errore: 'Documento non trovato.' });
+
+      // Un documento già firmato non torna indietro da questa rotta, nemmeno per un advisor:
+      // la riapertura passa da `/documenti/:id/sblocca`, che chiede il motivo e lo verbalizza.
+      if (doc.statoDoc === 'firmato') {
+        return reply.code(409).send({
+          errore: 'Il documento è stato firmato dal cliente e non è più modificabile. Per riaprirlo serve lo sblocco dell\'amministratore dello studio, che ne registra la motivazione.',
+        });
+      }
 
       const updated = await prisma.documento.update({
         where: { id },
@@ -4808,6 +4838,86 @@ export function buildServer(app: AppPort): FastifyInstance {
   });
 
   /**
+   * PATCH /documenti/:id/sblocca — §WF-DOC
+   * Riapre un documento firmato dal cliente. È l'unica via per uscire dallo stato terminale
+   * «firmato», ed è riservata all'admin dello studio (`advisor`) e al `super_admin`.
+   *
+   * Il sigillo di firma NON viene toccato: la riga `firmaElettronica` resta dov'è, perché è la
+   * prova dell'atto compiuto dal cliente e non può essere cancellata da una decisione dello
+   * studio. Il documento torna in «bozza», così lo studio lo rilavora e ne pubblica una nuova
+   * versione da rifirmare; nel portale il cliente continua a vedere la firma già apposta.
+   */
+  server.patch<{
+    Params: { id: string };
+    Body: { motivo?: string };
+  }>('/documenti/:id/sblocca', async (req, reply) => {
+    const tenantId = (req as any).tenantId;
+    const userId = (req as any).userId as string | undefined;
+    const ruolo = (req as any).ruolo as string | undefined;
+    const { id } = req.params;
+    const motivo = (req.body?.motivo ?? '').trim();
+
+    if (!puoSbloccareDocumentoFirmato(ruolo)) {
+      return reply.code(403).send({
+        errore: 'Solo l\'amministratore dello studio può sbloccare un documento firmato dal cliente.',
+      });
+    }
+    // La motivazione è il motivo per cui l'operazione è ripercorribile: senza, resterebbe solo
+    // un documento tornato in bozza senza spiegazione.
+    if (motivo.length < 10) {
+      return reply.code(400).send({
+        errore: 'Indicare la motivazione dello sblocco (almeno 10 caratteri): viene registrata nel giornale di audit.',
+      });
+    }
+
+    try {
+      const doc = await prisma.documento.findFirst({
+        where: { id, tenantId },
+        include: {
+          progetto: { select: { id: true, clienteId: true, nome: true } },
+          microvoceProgetto: { select: { nome: true } },
+        },
+      });
+      if (!doc) return reply.code(404).send({ errore: 'Documento non trovato.' });
+
+      if (doc.statoDoc !== 'firmato') {
+        return reply.code(409).send({
+          errore: `Il documento non è firmato (stato attuale «${doc.statoDoc}»): non c'è nulla da sbloccare.`,
+        });
+      }
+
+      const aggiornato = await prisma.documento.update({
+        where: { id },
+        data: { statoDoc: 'bozza' },
+      });
+
+      const nomeDoc = nomeFileDaUrl(doc.fileUrl) ?? doc.microvoceProgetto?.nome ?? 'Documento';
+
+      await recordAudit({
+        tenantId,
+        azione: 'DOCUMENTO_SBLOCCATO',
+        entita: id,
+        dettagli: `Documento firmato «${nomeDoc}» riaperto in bozza dall'utente ${userId ?? 'sconosciuto'} (ruolo ${ruolo ?? 'n/d'}). Motivazione: ${motivo}`,
+        ipAddress: ipReale(req),
+      });
+
+      // Il cliente ha firmato: se lo studio riapre l'atto, deve vederlo dichiarato nel portale.
+      if (doc.progetto?.clienteId) {
+        await notificaCliente(tenantId, doc.progetto.clienteId, {
+          tipoEvento: 'documento_sbloccato',
+          oggetto: 'Documento firmato riaperto dallo studio',
+          corpo: `Lo studio ha riaperto «${nomeDoc}» sul progetto «${doc.progetto.nome}» per ulteriori modifiche. La firma che hai apposto resta registrata; riceverai la nuova versione da firmare. Motivazione indicata: ${motivo}`,
+          link: `/portal/documents`,
+        }).catch(() => {});
+      }
+
+      return reply.send({ ok: true, documento: aggiornato });
+    } catch (err) {
+      return reply.code(500).send({ errore: err instanceof Error ? err.message : 'Errore sblocco documento' });
+    }
+  });
+
+  /**
    * POST /documenti/:id/nuova-versione — §WF-DOC
    * Carica una nuova versione del documento (es. v2 post revisione), mantenendo lo storico del documento padre.
    */
@@ -4839,6 +4949,15 @@ export function buildServer(app: AppPort): FastifyInstance {
         },
       });
       if (!docPadre) return reply.code(404).send({ errore: 'Documento originale non trovato.' });
+
+      // §WF-DOC — su un atto firmato non si carica una v2 a piacere: prima l'admin dello studio
+      // lo sblocca motivando. Senza questo controllo la versione sottoscritta dal cliente
+      // verrebbe superata da un documento che il cliente non ha mai visto né approvato.
+      if (docPadre.statoDoc === 'firmato' && !puoSbloccareDocumentoFirmato((req as any).ruolo)) {
+        return reply.code(409).send({
+          errore: 'Il documento è firmato dal cliente: per caricarne una nuova versione serve prima lo sblocco dell\'amministratore dello studio.',
+        });
+      }
 
       const buffer = Buffer.from(contentBase64.replace(/^data:[^;]+;base64,/, ''), 'base64');
       const esito = scanFileBuffer(buffer, filename);
@@ -4877,6 +4996,19 @@ export function buildServer(app: AppPort): FastifyInstance {
           rispostaStudio: `Caricata nuova versione v${nuovaVersione}: ${filename}`,
         },
       });
+
+      // §WF-DOC — «in_revisione: torna a bozza dopo upload v2», come dichiara lo schema.
+      // Senza questo il padre restava `in_revisione` per sempre: il cliente continuava a
+      // vederlo in elenco accanto alla v2 e con due righe aperte non si capiva quale fosse
+      // il testo da firmare. La v1 resta nel fascicolo dello studio con il suo storico
+      // (`documentoPadreId`), ma esce dal portale, che elenca solo pubblicato/in_revisione/firmato.
+      // Un padre già `firmato` non si tocca: quello stato è terminale e ha un sigillo dietro.
+      if (docPadre.statoDoc !== 'firmato') {
+        await prisma.documento.updateMany({
+          where: { id: docPadre.id, tenantId },
+          data: { statoDoc: 'bozza' },
+        });
+      }
 
       await recordAudit({
         tenantId,
@@ -4958,9 +5090,17 @@ export function buildServer(app: AppPort): FastifyInstance {
     try {
       const documento = await prisma.documento.findFirst({
         where: tenantId ? { id, tenantId } : { id },
-        select: { id: true, fileUrl: true, tenantId: true },
+        select: { id: true, fileUrl: true, tenantId: true, statoDoc: true },
       });
       if (!documento) return reply.code(404).send({ errore: 'Documento non trovato.' });
+
+      // §WF-DOC — cancellare un documento firmato è l'atto più distruttivo del ciclo: il file
+      // sparisce e al cliente resta solo la firma orfana. Lo può fare solo l'admin dello studio.
+      if (documento.statoDoc === 'firmato' && !puoSbloccareDocumentoFirmato((req as any).ruolo)) {
+        return reply.code(409).send({
+          errore: 'Il documento è firmato dal cliente e non può essere eliminato: solo l\'amministratore dello studio può intervenire su un atto sottoscritto.',
+        });
+      }
 
       // Disaccoppia versioni figlie prima della cancellazione
       await prisma.documento.updateMany({
@@ -5153,6 +5293,49 @@ export function buildServer(app: AppPort): FastifyInstance {
         if (f.riferimentoId && !firmaPerDocumento.has(f.riferimentoId)) firmaPerDocumento.set(f.riferimentoId, f);
       }
 
+      // §WF-DOC — storico delle versioni, risalendo la catena `documentoPadreId`.
+      //
+      // Il campo era già a database e veniva perfino selezionato qui, ma non usciva dalla
+      // risposta: il cliente vedeva «v3» e nient'altro, senza modo di sapere che cosa la v3
+      // avesse sostituito né se avesse già firmato una versione precedente. Il percorso
+      // dev'essere ripercorribile all'indietro, quindi lo si ricostruisce: i padri stanno
+      // in `bozza` e non compaiono nell'elenco, per questo servono letture dedicate.
+      //
+      // Il ciclo è limitato a 12 salti: la catena è lineare per costruzione, ma un dato
+      // sporco non deve poter bloccare la lettura del fascicolo di un cliente.
+      const antenati = new Map<string, { id: string; versione: number; createdAt: Date; statoDoc: string; documentoPadreId: string | null }>();
+      let daRisalire = documenti.map((d) => d.documentoPadreId).filter((x): x is string => Boolean(x));
+      for (let salto = 0; salto < 12 && daRisalire.length > 0; salto++) {
+        const mancanti = daRisalire.filter((idPadre) => !antenati.has(idPadre));
+        if (mancanti.length === 0) break;
+        const righe = await prisma.documento.findMany({
+          where: { tenantId, id: { in: mancanti } },
+          select: { id: true, versione: true, createdAt: true, statoDoc: true, documentoPadreId: true },
+        });
+        for (const r of righe) antenati.set(r.id, r);
+        daRisalire = righe.map((r) => r.documentoPadreId).filter((x): x is string => Boolean(x));
+      }
+
+      /** Catena delle versioni precedenti, dalla più recente alla più antica. */
+      const storicoDi = (idPadre: string | null) => {
+        const catena: { id: string; versione: number; caricatoIl: Date; statoDoc: string; firmatoAt: Date | null }[] = [];
+        let corrente = idPadre;
+        for (let salto = 0; salto < 12 && corrente; salto++) {
+          const nodo = antenati.get(corrente);
+          if (!nodo) break;
+          const firmaAntenato = firmaPerDocumento.get(nodo.id) ?? null;
+          catena.push({
+            id: nodo.id,
+            versione: nodo.versione,
+            caricatoIl: nodo.createdAt,
+            statoDoc: nodo.statoDoc,
+            firmatoAt: firmaAntenato?.firmatoAt ?? null,
+          });
+          corrente = nodo.documentoPadreId;
+        }
+        return catena;
+      };
+
       const elenco = documenti.map((d) => {
         const firma = firmaPerDocumento.get(d.id) ?? null;
         // I documenti a livello progetto (§2.9) non hanno micro-voce: titolo, modulo e
@@ -5183,6 +5366,10 @@ export function buildServer(app: AppPort): FastifyInstance {
           scadenza: d.dataScadenzaDoc,
           statoDoc: d.statoDoc,
           pubblicatoAt: d.pubblicatoAt,
+          // §WF-DOC — da dove viene questa versione: l'id del documento sostituito e la
+          // catena completa delle versioni precedenti, per risalire il percorso all'indietro.
+          documentoPadreId: d.documentoPadreId,
+          versioniPrecedenti: storicoDi(d.documentoPadreId),
           richiesteModifica: d.richiesteModifica,
           // §28: un file ancora in scansione o risultato infetto non si scarica e non si firma.
           statoScansione: d.statoScansione,
@@ -6036,6 +6223,29 @@ export function buildServer(app: AppPort): FastifyInstance {
     };
   }
 
+  /**
+   * §WF-DOC — lo schema dichiara `firmato` «stato terminale positivo», ma nessuna delle due
+   * rotte di firma lo scriveva: il documento restava `pubblicato` (o `in_revisione`) per
+   * sempre. Portale e scheda dello studio derivano «firmato» dall'esistenza della riga
+   * `FirmaElettronica`, quindi l'incoerenza non si vedeva nella UI — ma `stato_doc` diceva il
+   * falso a chiunque leggesse il database, e `@@index([statoDoc])` non serviva a trovare i
+   * documenti firmati.
+   *
+   * `updateMany` e non `update`: la clausola porta il tenant, e non solleva se la riga non c'è.
+   */
+  async function segnaDocumentoFirmato(tenantId: string, documentoId: string) {
+    try {
+      await prisma.documento.updateMany({
+        where: { id: documentoId, tenantId },
+        data: { statoDoc: 'firmato' },
+      });
+    } catch (err) {
+      // La firma è già registrata e resta valida: l'aggiornamento dello stato non deve farla
+      // fallire a posteriori. Va però nei log, perché lascia il fascicolo incoerente.
+      console.error('Stato documento non aggiornato a «firmato» dopo la firma', documentoId, err);
+    }
+  }
+
   server.post<{
     Body: {
       otp: string;
@@ -6139,6 +6349,8 @@ export function buildServer(app: AppPort): FastifyInstance {
           firmatoAt: new Date(sigillo.timestampIso),
         },
       });
+
+      if (vault && riferimentoId) await segnaDocumentoFirmato(tenantId, riferimentoId);
 
       await recordAudit({
         tenantId,
@@ -6339,6 +6551,8 @@ export function buildServer(app: AppPort): FastifyInstance {
           firmatoAt: new Date(sigillo.timestampIso),
         },
       });
+
+      if (vault && riferimentoId) await segnaDocumentoFirmato(tenantId, riferimentoId);
 
       await recordAudit({
         tenantId,

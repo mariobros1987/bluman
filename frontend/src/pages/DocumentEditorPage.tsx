@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { fetchClienti, fetchProgetti, fetchTenantInfoApi, salvaDocumentoApi, creaDocumentoTemplateApi, eliminaDocumentoTemplateApi } from '../api/client';
+import { fetchClienti, fetchProgetti, fetchProgettoDettaglio, fetchTenantInfoApi, salvaDocumentoApi, creaDocumentoTemplateApi, eliminaDocumentoTemplateApi } from '../api/client';
 import { getFormattedLogoUrl } from '../utils';
 import { downloadRealPdf, downloadRealWordDoc } from '../utils/pdfGenerator';
 import { getCurrentTenantId, getTenantStorageKey, getStudioInfoForTenant } from '../utils/tenant';
@@ -44,6 +44,23 @@ export function DocumentEditorPage() {
   const [selectedClienteId, setSelectedClienteId] = useState<string>('');
   const [selectedProgettoId, setSelectedProgettoId] = useState<string>(queryProjId);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>(queryTmplId);
+
+  /**
+   * §WF-DOC / §2.9 — micro-voce di destinazione del documento.
+   *
+   * Qui prima non esisteva alcun riferimento alla micro-voce: il documento nasceva
+   * agganciato solo al progetto. Nel portale il cliente lo vedeva quindi comparire
+   * senza modulo e senza micro-voce, mentre quelli caricati dalla scheda passaggio
+   * (PassaggioModal) portavano il collegamento: due strade per lo stesso gesto, due
+   * risultati diversi. Da qui nasceva la discrepanza fra app e portale.
+   *
+   * Resta ammesso il documento di solo fascicolo (stringa vuota): §2.9 dice che i file
+   * dello studio non appartengono per forza a una micro-voce. Ma ora è una scelta
+   * dichiarata dall'operatore, non un effetto collaterale della pagina usata.
+   */
+  const [microvoci, setMicrovoci] = useState<{ id: string; nome: string; modulo: string }[]>([]);
+  const [selectedMicrovoceId, setSelectedMicrovoceId] = useState<string>(searchParams.get('microvoceId') || '');
+  const [caricandoMicrovoci, setCaricandoMicrovoci] = useState(false);
 
   const initialTmpl = templatesList.find(t => t.id === queryTmplId) || templatesList[0] || PREBUILT_TEMPLATES[0];
   const [titoloDocumento, setTitoloDocumento] = useState(initialTmpl.titolo);
@@ -200,6 +217,49 @@ export function DocumentEditorPage() {
 
   const activeCliente = clienti.find(c => c.id === selectedClienteId) || (clienti.length > 0 ? clienti[0] : null);
   const activeProgetto: any = progetti.find((p: any) => String(p.id) === String(selectedProgettoId)) || (progetti.length > 0 ? progetti[0] : null);
+
+  /**
+   * Progetto realmente in uso. Vale '' se in questo studio non c'è nessun progetto:
+   * in quel caso non si salva niente sul server, invece di inventare un id (§7).
+   */
+  const effProgettoId = String(selectedProgettoId || activeProgetto?.id || '');
+
+  // §WF-DOC — micro-voci del progetto scelto, lette dal database (GET /progetti/:id
+  // restituisce moduli → microvoci con gli id veri). Nessun elenco cablato: se il
+  // progetto non ha micro-voci istanziate, la tendina lo dice e resta vuota.
+  useEffect(() => {
+    let vivo = true;
+    if (!effProgettoId) {
+      setMicrovoci([]);
+      setSelectedMicrovoceId('');
+      return;
+    }
+    (async () => {
+      setCaricandoMicrovoci(true);
+      try {
+        const dettaglio: any = await fetchProgettoDettaglio(effProgettoId);
+        if (!vivo) return;
+        const elenco: { id: string; nome: string; modulo: string }[] = [];
+        for (const modulo of (dettaglio?.moduli ?? [])) {
+          for (const mv of (modulo?.microvoci ?? [])) {
+            elenco.push({ id: String(mv.id), nome: mv.nome ?? 'Micro-voce senza nome', modulo: modulo.nome ?? 'Modulo' });
+          }
+        }
+        setMicrovoci(elenco);
+        // Se la micro-voce selezionata non appartiene a questo progetto, la si azzera:
+        // agganciare un documento alla micro-voce di un altro progetto romperebbe il filo.
+        setSelectedMicrovoceId(prec => (prec && elenco.some(m => m.id === prec) ? prec : ''));
+      } catch (err) {
+        if (!vivo) return;
+        console.warn('Lettura micro-voci del progetto non riuscita:', err);
+        setMicrovoci([]);
+        setSelectedMicrovoceId('');
+      } finally {
+        if (vivo) setCaricandoMicrovoci(false);
+      }
+    })();
+    return () => { vivo = false; };
+  }, [effProgettoId]);
 
   // Sostituzione dinamica delle variabili Smart Tags (Mail Merge) con Smart Chips interattivi
   const renderResolvedContent = (htmlContent: string, isForPrintOrExport: boolean = false) => {
@@ -657,9 +717,19 @@ export function DocumentEditorPage() {
       const filename = `${safeTitle}_${new Date().toISOString().slice(0, 10)}.docx`;
       const base64Data = btoa(unescape(encodeURIComponent(htmlContent)));
 
-      const targetProjId = String(selectedProgettoId || activeProgetto?.id || '1');
+      // Senza un progetto vero non si archivia niente: prima qui c'era `|| '1'`, un id
+      // inventato che il server rifiutava, e il documento finiva solo nel localStorage
+      // di questo browser (regola 7 — il frontend non inventa dati che il DB non ha).
+      if (!effProgettoId) {
+        setFeedback('⚠️ Nessun progetto selezionato: scegli il progetto di destinazione prima di archiviare il documento.');
+        setTimeout(() => setFeedback(null), 6000);
+        return;
+      }
+
+      const targetProjId = effProgettoId;
       const targetProjTitle = activeProgetto?.titolo || activeProgetto?.n || activeProgetto?.nome || 'Progetto Studio';
       const targetClientName = activeCliente?.nome || 'Cliente Committente';
+      const microvoceScelta = microvoci.find(m => m.id === selectedMicrovoceId) || null;
 
       const newVaultDoc = {
         id: `doc-vault-${Date.now()}`,
@@ -672,6 +742,8 @@ export function DocumentEditorPage() {
         dataCaricamento: new Date().toLocaleDateString('it-IT'),
         progettoId: targetProjId,
         progettoTitolo: targetProjTitle,
+        microvoceProgettoId: selectedMicrovoceId || null,
+        microvoceNome: microvoceScelta?.nome ?? null,
         clienteNome: targetClientName,
         contenutoHtml: htmlContent,
         firmato: false,
@@ -689,6 +761,11 @@ export function DocumentEditorPage() {
       try {
         const creato = await salvaDocumentoApi({
           progettoId: targetProjId,
+          // §WF-DOC — il collegamento alla micro-voce viaggia con il documento: è quello
+          // che nel portale permette al cliente di risalire dal file al lavoro che lo ha
+          // prodotto (micro-voce → modulo → progetto). Se l'operatore non ne indica una,
+          // il documento resta di fascicolo, come previsto da §2.9.
+          microvoceProgettoId: selectedMicrovoceId || undefined,
           filename,
           contentBase64: base64Data,
           categoriaDoc: categoria,
@@ -718,7 +795,12 @@ export function DocumentEditorPage() {
       // Nessuna etichetta che promette più di quanto è successo (regola 7): se il server non ha
       // archiviato il documento, questa copia sta solo in questo browser e va detto.
       if (salvatoSulServer) {
-        setFeedback(`✓ Documento "${titoloDocumento}" archiviato nel Vault del Progetto "${targetProjTitle}".`);
+        // Il messaggio dice dove è finito il documento — progetto e, se indicata, micro-voce:
+        // è il primo anello del filo che il cliente ripercorrerà nel portale.
+        const dove = microvoceScelta
+          ? `micro-voce "${microvoceScelta.nome}" (modulo ${microvoceScelta.modulo}) del progetto "${targetProjTitle}"`
+          : `fascicolo del progetto "${targetProjTitle}" (nessuna micro-voce indicata)`;
+        setFeedback(`✓ Documento "${titoloDocumento}" archiviato in bozza nel ${dove}. Per renderlo visibile al cliente pubblicalo dalla micro-voce.`);
       } else {
         setFeedback(
           `⚠️ "${titoloDocumento}" NON è stato archiviato sul server: la copia è solo su questo browser. ` +
@@ -885,6 +967,56 @@ export function DocumentEditorPage() {
             )}
           </select>
         </div>
+
+        {/* §WF-DOC — micro-voce di destinazione. È il collegamento che nel portale
+            consente al cliente di risalire dal documento al lavoro che l'ha prodotto.
+            Se l'operatore non ne indica una il documento resta di solo fascicolo (§2.9),
+            ma è una scelta esplicita e la pagina lo dice. */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <label style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--muted)' }}>🔖 Micro-voce di Destinazione:</label>
+          <select
+            value={selectedMicrovoceId}
+            onChange={(e) => setSelectedMicrovoceId(e.target.value)}
+            disabled={!effProgettoId || caricandoMicrovoci}
+            style={{ fontSize: 12, padding: '5px 10px', borderRadius: 6, background: 'var(--card)', color: 'var(--text)', border: '1px solid var(--border)', fontWeight: 600, maxWidth: 340 }}
+            title="Il documento verrà agganciato a questa micro-voce: il cliente lo vedrà nel portale sotto la relativa lavorazione"
+          >
+            {caricandoMicrovoci ? (
+              <option value="">Lettura micro-voci…</option>
+            ) : microvoci.length === 0 ? (
+              <option value="">(Nessuna micro-voce a database su questo progetto)</option>
+            ) : (
+              <>
+                <option value="">— Solo fascicolo progetto (nessuna micro-voce) —</option>
+                {microvoci.map(mv => (
+                  <option key={mv.id} value={mv.id}>{mv.modulo} › {mv.nome}</option>
+                ))}
+              </>
+            )}
+          </select>
+        </div>
+      </div>
+
+      {/* Filo logico dichiarato: dove finirà il documento e cosa serve perché il cliente lo veda. */}
+      <div style={{ background: 'var(--card)', border: '1px dashed var(--border)', borderRadius: 10, padding: '9px 14px', fontSize: 11, color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <span style={{ fontWeight: 700, color: 'var(--text)' }}>Percorso del documento:</span>
+        <span>
+          {effProgettoId
+            ? <>
+                {activeProgetto?.titolo || activeProgetto?.n || activeProgetto?.nome || 'Progetto'}
+                {' › '}
+                {selectedMicrovoceId
+                  ? (microvoci.find(m => m.id === selectedMicrovoceId)?.modulo ?? 'Modulo') + ' › ' + (microvoci.find(m => m.id === selectedMicrovoceId)?.nome ?? 'Micro-voce')
+                  : 'fascicolo progetto'}
+                {' › '}
+                <span style={{ color: '#a1a1aa' }}>bozza interna</span>
+                {' → '}
+                <span style={{ color: '#60a5fa' }}>pubblicazione dalla micro-voce</span>
+                {' → '}
+                <span style={{ color: '#34d399' }}>firma del cliente nel portale</span>
+              </>
+            : 'nessun progetto selezionato — il salvataggio sul server è sospeso'}
+        </span>
       </div>
 
       {/* Main Studio Grid */}

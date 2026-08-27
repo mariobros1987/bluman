@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { CatBadge } from '../components/ui/CatBadge';
 import { fmt } from '../utils';
-import { downloadRealPdf, downloadRealWordDoc } from '../utils/pdfGenerator';
+import { downloadRealPdf } from '../utils/pdfGenerator';
 import { DigitalSignatureModal } from '../components/DigitalSignatureModal';
 import { resolveDocumentTemplateHtml, PREBUILT_TEMPLATES } from '../utils/documentTemplates';
 import { getStudioInfoForTenant, getCurrentTenantId, getTenantStorageKey, BLUECODE_TENANT_ID } from '../utils/tenant';
@@ -258,6 +258,12 @@ export function ClientPortal() {
   const [portalDocsCaricamento, setPortalDocsCaricamento] = useState(false);
   /** Documento del fascicolo per cui il cliente ha scelto un file firmato a mano, da confermare. */
   const [documentoDaCaricare, setDocumentoDaCaricare] = useState<DocumentoPortale | null>(null);
+  /**
+   * §WF-DOC — id del documento di cui il cliente ha aperto la cronologia delle versioni.
+   * Il percorso del documento deve essere sempre ripercorribile all'indietro: da qui si
+   * risale dalla versione attuale fino a quella che il cliente aveva eventualmente firmato.
+   */
+  const [storicoVersioniAperto, setStoricoVersioniAperto] = useState<string | null>(null);
 
   // Visualizzatore A4 Documento Selezionato per Lettura Completa
   const [selectedViewerDoc, setSelectedViewerDoc] = useState<any | null>(null);
@@ -2759,7 +2765,18 @@ export function ClientPortal() {
                         <span style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text)' }}>{doc.nome}</span>
                         <span style={{ fontSize: 10, background: 'var(--card)', padding: '2px 6px', borderRadius: 6, color: 'var(--muted)', fontWeight: 600 }}>{doc.categoria}</span>
                         {doc.versione && doc.versione > 1 && (
-                          <span style={{ fontSize: 10, background: 'var(--card)', padding: '2px 6px', borderRadius: 6, color: 'var(--muted)', fontWeight: 600 }}>v{doc.versione}</span>
+                          doc.versioniPrecedenti && doc.versioniPrecedenti.length > 0 ? (
+                            <button
+                              type="button"
+                              onClick={() => setStoricoVersioniAperto(storicoVersioniAperto === doc.id ? null : doc.id)}
+                              title="Mostra o nascondi le versioni precedenti di questo documento"
+                              style={{ fontSize: 10, background: 'var(--card)', padding: '2px 8px', borderRadius: 6, color: '#818cf8', fontWeight: 700, border: '1px solid #4338ca55', cursor: 'pointer' }}
+                            >
+                              🕘 v{doc.versione} · {doc.versioniPrecedenti.length} precedent{doc.versioniPrecedenti.length === 1 ? 'e' : 'i'}
+                            </button>
+                          ) : (
+                            <span style={{ fontSize: 10, background: 'var(--card)', padding: '2px 6px', borderRadius: 6, color: 'var(--muted)', fontWeight: 600 }}>v{doc.versione}</span>
+                          )
                         )}
                       </div>
                       {/* Da quale attività dell'incarico arriva il documento: il cliente sa a cosa
@@ -2934,6 +2951,41 @@ export function ClientPortal() {
                           )}
                         </div>
                       ))}
+                    </div>
+                  )}
+
+                  {/* §WF-DOC — Cronologia delle versioni: il percorso del documento è sempre
+                      ripercorribile all'indietro, dalla copia attuale fino a quella eventualmente
+                      già sottoscritta. I dati arrivano dal server (catena documentoPadreId):
+                      qui non viene inventato niente. */}
+                  {doc.versioniPrecedenti && doc.versioniPrecedenti.length > 0 && storicoVersioniAperto === doc.id && (
+                    <div style={{ width: '100%', background: 'var(--card)', border: '1px dashed #4338ca66', borderRadius: 10, padding: 12, marginTop: 10 }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: '#818cf8', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        🕘 Cronologia versioni — percorso del documento a ritroso
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        <div style={{ background: 'var(--card2)', padding: '7px 12px', borderRadius: 8, border: '1px solid var(--border)', fontSize: 11, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                          <strong style={{ color: 'var(--text)' }}>v{doc.versione}</strong>
+                          <span style={{ color: 'var(--muted)' }}>versione attuale{doc.caricatoIl ? ` · caricata il ${dataOraLeggibile(doc.caricatoIl)}` : ''}</span>
+                          <span style={{ fontWeight: 700, color: doc.firmato ? '#34d399' : '#93c5fd' }}>
+                            {doc.firmato
+                              ? `✍️ Firmata${doc.dataFirma ? ` il ${dataOraLeggibile(doc.dataFirma)}` : ''}`
+                              : 'In attesa di firma'}
+                          </span>
+                        </div>
+                        {doc.versioniPrecedenti.map((v) => (
+                          <div key={v.id} style={{ background: 'transparent', padding: '5px 12px 5px 22px', fontSize: 11, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', color: 'var(--muted)' }}>
+                            <span style={{ color: '#4338ca' }}>↳</span>
+                            <strong style={{ color: 'var(--muted)' }}>v{v.versione}</strong>
+                            <span>{v.caricatoIl ? `caricata il ${dataOraLeggibile(v.caricatoIl)}` : 'data di caricamento non disponibile'}</span>
+                            {v.firmatoAt ? (
+                              <span style={{ fontWeight: 700, color: '#34d399' }}>✍️ Firmata il {dataOraLeggibile(v.firmatoAt)}</span>
+                            ) : (
+                              <span style={{ color: '#71717a' }}>nessuna firma registrata su questa versione</span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -3731,7 +3783,6 @@ export function ClientPortal() {
             <div style={{ flex: 1, overflow: 'hidden', padding: 16, background: '#0f172a', display: 'flex', justifyContent: 'center' }}>
               {(() => {
                 const url = urlFileArchivio(selectedViewerDoc.fileUrl);
-                const anteprimabile = /\.(pdf|png|jpe?g|gif|webp|svg|html?|docx?)(\?|$)/i.test(selectedViewerDoc.fileUrl || '') || Boolean(url);
 
                 if (!url) {
                   return (
@@ -4251,6 +4302,11 @@ export function ClientPortal() {
                                 <div style={{ fontSize: 10, color: doc.firmato ? '#34d399' : doc.statoDoc === 'in_revisione' ? '#fbbf24' : '#93c5fd' }}>
                                   {doc.firmato ? '✓ Firmato con sigillo eIDAS' : doc.statoDoc === 'in_revisione' ? '⚠️ In attesa di riscontro modifica' : '🚀 Pubblicato dallo studio per la firma'}
                                 </div>
+                                {doc.versioniPrecedenti && doc.versioniPrecedenti.length > 0 && (
+                                  <div style={{ fontSize: 9.5, color: '#93c5fd', marginTop: 2 }}>
+                                    🕘 v{doc.versione}: sostituisce {doc.versioniPrecedenti.map(v => `v${v.versione}${v.firmatoAt ? ' (firmata)' : ''}`).join(', ')} — cronologia completa nella scheda «Documenti & Contratti»
+                                  </div>
+                                )}
                               </div>
                             </div>
 
@@ -4345,6 +4401,11 @@ export function ClientPortal() {
                             {d.nomeFile} · Depositato il {d.data}
                             {d.firmato && <span style={{ color: '#34d399', fontWeight: 700, marginLeft: 6 }}>✓ Firmato</span>}
                           </div>
+                          {docReal?.versioniPrecedenti && docReal.versioniPrecedenti.length > 0 && (
+                            <div style={{ fontSize: 9.5, color: '#93c5fd', marginTop: 2 }}>
+                              🕘 v{docReal.versione}: sostituisce {docReal.versioniPrecedenti.map(v => `v${v.versione}${v.firmatoAt ? ' (firmata)' : ''}`).join(', ')} — cronologia completa nella scheda «Documenti & Contratti»
+                            </div>
+                          )}
                         </div>
                       </div>
 

@@ -13,7 +13,11 @@ import { ComunicazioniTab } from '../components/ComunicazioniTab';
 import { AssignOperatorModal } from '../components/AssignOperatorModal';
 import { CalendarPreviewModal } from '../components/CalendarPreviewModal';
 import { ConfirmDeleteModal } from '../components/ConfirmDeleteModal';
-import { fetchProgettoDettaglio, emettiFatturaApi, consuntivaMicrovoceApi, assegnaAccessoProgettoApi, salvaProgettoDettaglioApi, archiviaProgettoApi, eliminaProgettoApi, eliminaModuloApi, fetchModuliLibreria, fetchArticoli, inviaComunicazioneApi, ricalcolaProgettoApi, creaPreventivoEAccettaApi, listaDocumentiProgetto, salvaDocumentoApi, eliminaDocumentoApi, richiesteAddendumStudioApi, aggiornaStatoAddendumApi } from '../api/client';
+// `scaricaDocumentoClient`/`scaricaDocumentoWordClient` erano usate in
+// handleDownloadDocumentPdf/Word senza essere importate: sul ramo `doc.dbDoc` — cioè
+// proprio i documenti archiviati a database — il click lanciava ReferenceError. Il
+// typecheck del frontend non lo vedeva perché girava su zero file (vedi tsconfig.json).
+import { fetchProgettoDettaglio, emettiFatturaApi, consuntivaMicrovoceApi, assegnaAccessoProgettoApi, salvaProgettoDettaglioApi, archiviaProgettoApi, eliminaProgettoApi, eliminaModuloApi, fetchModuliLibreria, fetchArticoli, inviaComunicazioneApi, ricalcolaProgettoApi, creaPreventivoEAccettaApi, listaDocumentiProgetto, salvaDocumentoApi, eliminaDocumentoApi, richiesteAddendumStudioApi, aggiornaStatoAddendumApi, scaricaDocumentoClient, scaricaDocumentoWordClient } from '../api/client';
 import type { RichiestaAddendum } from '../api/client';
 import { useTeamMembers } from '../hooks/useTeamMembers';
 import { getCurrentTenantId, getTenantStorageKey, getStudioInfoForTenant, BLUECODE_TENANT_ID } from '../utils/tenant';

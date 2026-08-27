@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { downloadRealPdf, downloadRealWordDoc, generateRealPdfBase64 } from '../utils/pdfGenerator';
+import { generateRealPdfBase64 } from '../utils/pdfGenerator';
 import { PREBUILT_TEMPLATES, resolveDocumentTemplateHtml, type DocumentTemplate } from '../utils/documentTemplates';
 import { REORGANIZATION_TEMPLATES } from '../utils/reorganizationTemplates';
 import {
@@ -9,11 +9,13 @@ import {
   nuovaVersioneDocumentoApi,
   aggiornaRichiestaModificaDocumentoApi,
   eliminaDocumentoApi,
+  sbloccaDocumentoApi,
   scaricaDocumentoClient,
   scaricaDocumentoWordClient,
   urlFileArchivio,
   type RichiestaModificaDoc,
 } from '../api/client';
+import { isAdminStudio } from '../utils/tenant';
 import type { Progetto, Passaggio } from '../types';
 
 interface PassaggioModalProps {
@@ -48,6 +50,13 @@ interface DocumentoEntry {
   pubblicatoAt?: string | null;
   fileUrl?: string;
   richiesteModifica?: RichiestaModificaDoc[];
+  /**
+   * §WF-DOC — sigillo di firma restituito dal server (data, id firma, tipo).
+   * Serve per mostrare all'operatore *quando* e *come* il cliente ha firmato:
+   * prima l'app diceva solo "FIRMATO" e la data era leggibile solo nel portale.
+   * Non viene mai ricostruito lato client: se il server non lo manda, non si mostra.
+   */
+  firma?: { riferimentoId: string | null; firmatoAt: string | null; signatureId: string | null; tipoFirma: string | null } | null;
 }
 
 interface RecommendationResult {
@@ -61,6 +70,20 @@ const ALL_STUDIO_TEMPLATES: DocumentTemplate[] = [
   ...PREBUILT_TEMPLATES,
   ...REORGANIZATION_TEMPLATES.filter(rt => !PREBUILT_TEMPLATES.some(pt => pt.id === rt.id)),
 ];
+
+/**
+ * §WF-DOC / regola 7 — traduce il `tipoFirma` del sigillo server in etichetta leggibile.
+ * Se il server non manda il tipo si restituisce stringa vuota: meglio dire solo
+ * "FIRMATO" che affermare una modalità di firma che non risulta agli atti.
+ */
+function etichettaTipoFirma(tipoFirma?: string | null): string {
+  switch (tipoFirma) {
+    case 'fea_otp': return 'firma elettronica avanzata con OTP';
+    case 'manuale_scansionata': return 'firma autografa scansionata';
+    case 'qualificata_esterna': return 'firma digitale qualificata';
+    default: return '';
+  }
+}
 
 /**
  * Motore di Pre-screening Intelligente Studio BluMan
@@ -334,7 +357,10 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
 
     let contentBase64 = fileBase64 || '';
     if (tmpl && !contentBase64) {
-      const rawHtml = tmpl.html || (tmpl as any).contenutoHtml || '';
+      // `DocumentTemplate` dichiara `contenutoHtml`: `tmpl.html` non esiste ed era sempre
+      // undefined, quindi il contenuto arrivava solo dal cast `as any`. Se qualcuno avesse
+      // rimosso quel fallback, ogni PDF pubblicato sarebbe diventato uno stub col solo titolo.
+      const rawHtml = tmpl.contenutoHtml || '';
       const resolvedHtml = resolveDocumentTemplateHtml(rawHtml, project);
       contentBase64 = await generateRealPdfBase64(resolvedHtml || `<html><body><h1>${formattedName}</h1></body></html>`);
     }
@@ -461,6 +487,7 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
         pubblicatoAt: d.pubblicatoAt,
         fileUrl: d.fileUrl,
         richiesteModifica: d.richiesteModifica || [],
+        firma: d.firma ?? null,
       }));
       setDocuments(mapped);
       voce.d = mapped.length;
@@ -479,7 +506,7 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
       if (isLocalId && effProgettoId) {
         // Documento template o locale non ancora salvato a DB: salvalo ora come VERO PDF con stato pubblicato
         const tmpl = localDoc?.templateId ? ALL_STUDIO_TEMPLATES.find(t => t.id === localDoc.templateId) : null;
-        const rawHtml = tmpl?.html || (tmpl as any)?.contenutoHtml || `<html><body><h1>${localDoc?.nome || 'Documento'}</h1></body></html>`;
+        const rawHtml = tmpl?.contenutoHtml || `<html><body><h1>${localDoc?.nome || 'Documento'}</h1></body></html>`;
         const htmlContent = resolveDocumentTemplateHtml(rawHtml, project);
         const contentBase64 = await generateRealPdfBase64(htmlContent);
         const rawName = localDoc?.nome || 'Documento.pdf';
@@ -500,7 +527,7 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
           if (effProgettoId) {
             // Se fallisce l'aggiornamento (es. documento orfano nel client), salvalo direttamente a DB
             const tmpl = localDoc?.templateId ? ALL_STUDIO_TEMPLATES.find(t => t.id === localDoc.templateId) : null;
-            const rawHtml = tmpl?.html || (tmpl as any)?.contenutoHtml || `<html><body><h1>${localDoc?.nome || 'Documento'}</h1></body></html>`;
+            const rawHtml = tmpl?.contenutoHtml || `<html><body><h1>${localDoc?.nome || 'Documento'}</h1></body></html>`;
             const htmlContent = resolveDocumentTemplateHtml(rawHtml, project);
             const contentBase64 = await generateRealPdfBase64(htmlContent);
             const rawName = localDoc?.nome || 'Documento.pdf';
@@ -535,6 +562,40 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
       await ricaricaDocumentiDb();
     } catch (err: any) {
       alert(`❌ Errore: ${err?.message ?? 'Errore sconosciuto'}`);
+    }
+  };
+
+  // §WF-DOC — sblocco di un documento firmato. Riservato all'admin dello studio
+  // (advisor) e al super_admin: il controllo vero lo fa il server, che rifiuta
+  // chiunque altro con 403 anche se il pulsante venisse raggiunto per altra via.
+  //
+  // La motivazione è obbligatoria e finisce nell'audit log: un atto sottoscritto
+  // dal cliente si riapre solo lasciando scritto perché. La firma già apposta NON
+  // viene cancellata, così il percorso resta ripercorribile all'indietro: il
+  // cliente continua a vedere la firma che ha dato sulla versione precedente.
+  const handleSbloccaDocumento = async (docId: string, nomeDoc: string) => {
+    if (docId.startsWith('d-')) {
+      alert('Questo documento non è ancora archiviato a database: non risulta firmato e non ha bisogno di sblocco.');
+      return;
+    }
+    const motivo = prompt(
+      `SBLOCCO DOCUMENTO FIRMATO\n\n"${nomeDoc}"\n\n` +
+      'Il cliente ha già sottoscritto questo documento. Riaprendolo torna in bozza interna: ' +
+      'il cliente ne verrà informato e dovrai pubblicare una nuova versione da fargli firmare.\n' +
+      'La firma già apposta resta agli atti e non viene cancellata.\n\n' +
+      'Indica la motivazione (almeno 10 caratteri, viene registrata nel registro delle attività):'
+    );
+    if (motivo === null) return;
+    if (motivo.trim().length < 10) {
+      alert('Motivazione troppo breve: serve una spiegazione di almeno 10 caratteri, perché resta agli atti.');
+      return;
+    }
+    try {
+      await sbloccaDocumentoApi(docId, motivo.trim());
+      alert('🔓 Documento riaperto in bozza interna. Motivazione registrata; il cliente è stato notificato.');
+      await ricaricaDocumentiDb();
+    } catch (err: any) {
+      alert(`❌ Sblocco non riuscito: ${err?.message ?? 'Errore sconosciuto'}`);
     }
   };
 
@@ -1048,11 +1109,36 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
                             )}
                             {st === 'firmato' && (
                               <span style={{ background: '#064e3b30', color: '#34d399', border: '1px solid #059669', padding: '3px 8px', borderRadius: 12, fontSize: 10, fontWeight: 700 }}>
-                                ✅ FIRMATO CON OTP
+                                {/* §WF-DOC / regola 7 — l'etichetta dice il tipo di firma che c'è stato
+                                    davvero: prima diceva "CON OTP" anche su una firma qualificata
+                                    esterna o su un cartaceo scansionato, promettendo più del vero. */}
+                                ✅ FIRMATO{etichettaTipoFirma(d.firma?.tipoFirma) ? ` — ${etichettaTipoFirma(d.firma?.tipoFirma)}` : ''}
                               </span>
                             )}
                           </div>
                         </div>
+
+                        {/* §WF-DOC — sigillo di firma: chi guarda la micro-voce nell'app deve
+                            vedere le stesse informazioni che vede il cliente nel portale, senza
+                            doverci arrivare per deduzione. Data, tipo e id firma vengono dal
+                            server (`creaSigilloFea`): qui non si ricostruisce nulla. */}
+                        {st === 'firmato' && (
+                          <div style={{ background: '#064e3b25', border: '1px solid #059669', borderRadius: 8, padding: '9px 12px', display: 'flex', flexDirection: 'column', gap: 3 }}>
+                            <div style={{ fontSize: 11.5, fontWeight: 700, color: '#34d399' }}>
+                              🔒 Documento sottoscritto dal cliente
+                              {d.firma?.firmatoAt ? ` il ${new Date(d.firma.firmatoAt).toLocaleString('it-IT')}` : ''}
+                            </div>
+                            <div style={{ fontSize: 10, color: 'var(--muted)' }}>
+                              {d.firma?.signatureId
+                                ? <>Riferimento firma: <code style={{ fontSize: 9.5 }}>{d.firma.signatureId}</code></>
+                                : 'Riferimento firma non disponibile su questo documento.'}
+                            </div>
+                            <div style={{ fontSize: 10, color: 'var(--muted)' }}>
+                              Stato terminale: pubblicazione, nuove versioni ed eliminazione sono bloccate.
+                              {' '}Solo l'amministratore dello studio può riaprirlo, motivando lo sblocco.
+                            </div>
+                          </div>
+                        )}
 
                         {/* Note / Richieste di Modifica del Cliente */}
                         {d.richiesteModifica && d.richiesteModifica.length > 0 && (
@@ -1113,18 +1199,22 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
                             </button>
                           )}
 
-                          {/* Pulsante Carica Nuova Versione */}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setVersionTargetDocId(d.id);
-                              versionInputRef.current?.click();
-                            }}
-                            style={{ background: 'var(--card2)', border: '1px solid var(--border)', color: 'var(--text)', padding: '5px 10px', borderRadius: 6, fontSize: 10.5, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
-                            title="Carica una versione aggiornata (es. v2) mantenendo lo storico"
-                          >
-                            📤 Carica Nuova Versione (v{(d.versione || 1) + 1})
-                          </button>
+                          {/* Pulsante Carica Nuova Versione — §WF-DOC: non su un atto firmato.
+                              Il server rifiuta comunque la richiesta (409), qui evitiamo di
+                              offrire un comando che non può funzionare. */}
+                          {st !== 'firmato' && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setVersionTargetDocId(d.id);
+                                versionInputRef.current?.click();
+                              }}
+                              style={{ background: 'var(--card2)', border: '1px solid var(--border)', color: 'var(--text)', padding: '5px 10px', borderRadius: 6, fontSize: 10.5, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                              title="Carica una versione aggiornata (es. v2) mantenendo lo storico"
+                            >
+                              📤 Carica Nuova Versione (v{(d.versione || 1) + 1})
+                            </button>
+                          )}
 
                           {d.fileUrl && (
                             <>
@@ -1155,35 +1245,62 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
                             👁 Visualizza
                           </button>
 
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              if (confirm(`Sei sicuro di voler eliminare il documento "${d.nome}"?`)) {
-                                if (effProgettoId && !d.id.startsWith('d-')) {
-                                  try {
-                                    await eliminaDocumentoApi(d.id);
-                                  } catch (err: any) {
-                                    // Prima l'errore finiva nella console e il documento
-                                    // veniva togliato dall'elenco locale comunque: sul
-                                    // database restava, e alla riapertura della micro-voce
-                                    // ricompariva. Se il server non l'ha cancellato,
-                                    // l'operatore deve saperlo adesso.
-                                    console.error('Eliminazione documento non riuscita:', err);
-                                    alert(
-                                      `Eliminazione non riuscita: ${err?.message || 'errore imprevisto'}.\n` +
-                                      'Il documento è ancora archiviato sul server e resta visibile.'
-                                    );
-                                    return;
+                          {/* Eliminazione — §WF-DOC: un atto firmato non si cancella.
+                              Sparirebbe il file e al cliente resterebbe una firma orfana. */}
+                          {st !== 'firmato' && (
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                if (confirm(`Sei sicuro di voler eliminare il documento "${d.nome}"?`)) {
+                                  if (effProgettoId && !d.id.startsWith('d-')) {
+                                    try {
+                                      await eliminaDocumentoApi(d.id);
+                                    } catch (err: any) {
+                                      // Prima l'errore finiva nella console e il documento
+                                      // veniva togliato dall'elenco locale comunque: sul
+                                      // database restava, e alla riapertura della micro-voce
+                                      // ricompariva. Se il server non l'ha cancellato,
+                                      // l'operatore deve saperlo adesso.
+                                      console.error('Eliminazione documento non riuscita:', err);
+                                      alert(
+                                        `Eliminazione non riuscita: ${err?.message || 'errore imprevisto'}.\n` +
+                                        'Il documento è ancora archiviato sul server e resta visibile.'
+                                      );
+                                      return;
+                                    }
                                   }
+                                  const nextDocs = documents.filter(doc => doc.id !== d.id);
+                                  persistDocuments(nextDocs);
                                 }
-                                const nextDocs = documents.filter(doc => doc.id !== d.id);
-                                persistDocuments(nextDocs);
-                              }
-                            }}
-                            style={{ background: 'var(--card2)', border: '1px solid var(--border)', color: 'var(--red)', padding: '5px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer', fontWeight: 600 }}
-                          >
-                            🗑 Elimina
-                          </button>
+                              }}
+                              style={{ background: 'var(--card2)', border: '1px solid var(--border)', color: 'var(--red)', padding: '5px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer', fontWeight: 600 }}
+                            >
+                              🗑 Elimina
+                            </button>
+                          )}
+
+                          {/* §WF-DOC — stato terminale: il documento è sottoscritto dal cliente.
+                              Restano solo lettura e download; per rilavorarlo serve lo sblocco
+                              dell'admin dello studio, che ne registra la motivazione. */}
+                          {st === 'firmato' && (
+                            isAdminStudio() ? (
+                              <button
+                                type="button"
+                                onClick={() => handleSbloccaDocumento(d.id, d.nome)}
+                                style={{ background: '#3f1d1d', border: '1px solid #b91c1c', color: '#fca5a5', padding: '5px 10px', borderRadius: 6, fontSize: 10.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                                title="Riapri in bozza questo documento firmato: la motivazione viene registrata nell'audit e il cliente ne viene informato"
+                              >
+                                🔓 Sblocca per modifiche (admin)
+                              </button>
+                            ) : (
+                              <span
+                                style={{ fontSize: 10.5, color: 'var(--muted)', fontStyle: 'italic', padding: '5px 8px' }}
+                                title="Solo l'amministratore dello studio può riaprire un documento firmato"
+                              >
+                                🔒 Bloccato dalla firma del cliente — sblocco riservato all'admin
+                              </span>
+                            )
+                          )}
                         </div>
                       </div>
                     );

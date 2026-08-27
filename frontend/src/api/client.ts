@@ -421,6 +421,10 @@ export async function salvaDocumentoApi(input: {
   categoriaDoc?: string;
   dataScadenzaDoc?: string;
   statoDoc?: 'bozza' | 'pubblicato';
+  // `PassaggioModal` lo passava già, ma non era dichiarato: TypeScript lo segnalava come
+  // proprietà sconosciuta (errore invisibile finché il typecheck girava su zero file) e il
+  // valore, pur arrivando al server, veniva appiattito su 'allegato'.
+  tipo?: 'template_vuoto' | 'compilato' | 'firmato' | 'allegato';
 }): Promise<DocumentoProgetto> {
   const res = await apiFetch(`${API_BASE}/documenti`, {
     method: 'POST',
@@ -435,7 +439,9 @@ export async function salvaDocumentoApi(input: {
   return { ...data.documento, fileUrl: urlDocumentoAssoluto(data.documento?.fileUrl) };
 }
 
-export async function aggiornaStatoDocumentoApi(documentoId: string, statoDoc: 'bozza' | 'pubblicato' | 'in_revisione' | 'firmato') {
+// 'firmato' non è più un valore accettato: lo scrive solo il sigillo di firma sul server
+// (regola 7). Per uscire dallo stato firmato si usa `sbloccaDocumentoApi`.
+export async function aggiornaStatoDocumentoApi(documentoId: string, statoDoc: 'bozza' | 'pubblicato' | 'in_revisione') {
   const res = await apiFetch(`${API_BASE}/documenti/${encodeURIComponent(documentoId)}/stato`, {
     method: 'PATCH',
     headers: getAuthHeaders(),
@@ -446,6 +452,25 @@ export async function aggiornaStatoDocumentoApi(documentoId: string, statoDoc: '
     throw new Error(data.errore ?? 'Errore aggiornamento stato documento');
   }
   return await res.json();
+}
+
+/**
+ * §WF-DOC — riapre un documento firmato dal cliente. Il server accetta solo `advisor` e
+ * `super_admin` e pretende la motivazione, che finisce nel giornale di audit. La firma già
+ * apposta non viene cancellata: resta la prova dell'atto del cliente.
+ */
+export async function sbloccaDocumentoApi(documentoId: string, motivo: string): Promise<DocumentoProgetto> {
+  const res = await apiFetch(`${API_BASE}/documenti/${encodeURIComponent(documentoId)}/sblocca`, {
+    method: 'PATCH',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ motivo }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.errore ?? 'Errore sblocco documento');
+  }
+  const data = await res.json();
+  return data.documento;
 }
 
 export async function nuovaVersioneDocumentoApi(documentoId: string, input: {
@@ -1970,6 +1995,20 @@ export interface DocumentoPortale {
   statoDoc?: 'bozza' | 'pubblicato' | 'in_revisione' | 'firmato';
   pubblicatoAt?: string | null;
   richiesteModifica?: RichiestaModificaDoc[];
+  /** §WF-DOC — id del documento che questa versione ha sostituito (catena di tracciabilità). */
+  documentoPadreId?: string | null;
+  /**
+   * §WF-DOC — versioni precedenti, dalla più recente alla più antica, ricostruita dal server
+   * risalendo `documentoPadreId`. Permette al cliente di ripercorrere il documento all'indietro
+   * fino alla versione che aveva eventualmente firmato.
+   */
+  versioniPrecedenti?: {
+    id: string;
+    versione: number;
+    caricatoIl: string | null;
+    statoDoc: string | null;
+    firmatoAt: string | null;
+  }[];
   documentoNonPiuDisponibile?: boolean;
 }
 

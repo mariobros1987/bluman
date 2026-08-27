@@ -31,6 +31,9 @@ export const EVENTI_NOTIFICA = [
   'scadenza_imminente',
   'fattura_incassata',
   'firma_apposta',
+  // §WF-DOC — lo studio ha riaperto un documento che il cliente aveva già firmato: il cliente
+  // deve saperlo, perché il suo atto non è più l'ultima parola sul fascicolo.
+  'documento_sbloccato',
 ] as const;
 
 export type TipoEventoNotifica = (typeof EVENTI_NOTIFICA)[number];

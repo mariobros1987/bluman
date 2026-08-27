@@ -77,6 +77,28 @@ export const TENANT_STUDIOS: Record<string, StudioInfo> = {
   },
 };
 
+/**
+ * Ruolo dell'utente collegato, letto dalla sessione salvata dal login.
+ * Serve solo a decidere quali comandi mostrare: l'autorizzazione vera la fa il server, che
+ * rifiuta la richiesta a chi non è admin anche se il pulsante viene raggiunto per altra via.
+ */
+export function getRuoloCorrente(): string | null {
+  try {
+    const raw = localStorage.getItem('bluman_user');
+    if (!raw) return null;
+    const utente = JSON.parse(raw);
+    return utente?.ruolo ?? utente?.role ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** §WF-DOC — chi può sbloccare un documento firmato: l'admin dello studio e il super_admin. */
+export function isAdminStudio(): boolean {
+  const ruolo = getRuoloCorrente();
+  return ruolo === 'advisor' || ruolo === 'super_admin';
+}
+
 export function getCurrentTenantId(user?: any): string {
   let currentUser = user;
   if (!currentUser) {
