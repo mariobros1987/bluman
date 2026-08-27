@@ -201,3 +201,17 @@ export function nomeFileDaUrl(url: string): string | null {
     return ultimo.replace(/^\d{13}_/, '');
   }
 }
+
+/**
+ * Il cliente della sessione. Per un token di portale (`ruolo: 'cliente'`) l'identità è
+ * `client-<clienteId>` e il body non conta: è la sessione a dire chi firma. Un operatore
+ * dello studio può invece indicare il cliente, perché firma per conto di un fascicolo che
+ * sta guardando.
+ */
+export function clienteDellaRichiesta(req: any, clienteIdBody?: string): string | null {
+  const identita: string | undefined = req.user?.userId;
+  if (req.ruolo === 'cliente') {
+    return identita?.startsWith('client-') ? identita.slice('client-'.length) : null;
+  }
+  return clienteIdBody?.trim() || null;
+}
