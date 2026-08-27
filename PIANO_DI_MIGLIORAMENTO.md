@@ -455,9 +455,11 @@ server.get('/health', async (_req, reply) => {
 > **Tempo stimato**: 1-2 setimane
 > **Impatto**: Nessuna modifca funzionale. Il comportmento est deve restare identico.
 
-### 2.1 🔴 Spezz `server.ts` in moduli di route
+### 2.1 ✅ Spezz `server.ts` in moduli di route — COMPLETATO (27/08/2026)
 
 **Problema**: 4.300+ r in un singlo file. Ogni modfica è a rischio di trovare, testare, revieware.
+
+**Risoluzione**: fatto il 27/08/2026 in 9 commit bisectabili ("Split monoliti 1/9…9/9"). `src/server.ts` è passato da ~4.570 a 513 righe: tiene middleware, hook `onRequest`, `/stream` SSE, health/refresh, error handler centrale e chiusura del wrapper `server.register`. Le rotte vivono in 11 moduli `src/routes/*.ts` (auth, tenant, catalogo, clienti, progetti, contabilita, documenti, portale, firma, notifiche, webhooks), registrate con `await registraRotte*(server[, app])` SEMPRE dentro il wrapper — hook auth e rate-limit si applicano esattamente come prima. Gli helper condivisi sono in `src/util/serverHelpers.ts`. Split puramente meccanico: zero cambi di comportamento, nessun rename; a ogni passo vitest (352/352), `tsc --noEmit` root e `tsc -b` frontend verdi. Nota: hook/limiter/error handler sono rimasti nel guscio invece che in `src/plugins/` per non spostare la chiusura del contesto di incapsulamento — la struttura proposta qui sotto è indicativa, quella reale è questa.
 
 **Struttura proposta**:
 ```
@@ -837,7 +839,7 @@ REDIS_URL=
 - [x] 1.6 §WF-DOC hardening (27/08/2026): documento firmato blocca tutto con 409 (stato/nuova versione/eliminazione), sblocco riservato all'admin del tenant con motivazione ≥10 caratteri e audit, tracciabilità a ritroso nel portale cliente (`documentoPadreId` + `versioniPrecedenti[]`)
 
 ### FASE 2 — Refactoring (1-2 settimane)
-- [ ] 2.1 Spezzare server.ts in moduli route
+- [x] 2.1 Spezzare server.ts in moduli route (27/08/2026, commit da 246d313 a 05c3d7e)
 - [ ] 2.2 Validazione Zod su tutti gli endpoint
 - [ ] 2.3 Tipizzare FastifyRequest
 - [ ] 2.4 Eliminare `as any` residui

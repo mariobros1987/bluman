@@ -86,9 +86,27 @@ Questo file serve come indice rapido per l'IA ed i collaboratori per identificar
 
 ---
 
-## 🔌 2. API Backend Fastify (`src/server.ts`) & API Client (`frontend/src/api/client.ts`)
+## 🔌 2. API Backend Fastify (`src/server.ts` + `src/routes/`) & API Client (`frontend/src/api/client.ts`)
 
 - **Autenticazione & Permessi RBAC**: `POST /auth/login`, `POST /auth/magic-login`, `GET /auth/me`, `GET /tenant/utenti/:userId/permessi`, `PUT /tenant/utenti/:userId/permessi` (Token JWT 15 min + Magic Link + Matrice Permessi Sezioni).
+
+### 🗂 Struttura del backend dopo lo split dei monoliti (27/08/2026)
+
+`src/server.ts` (prima ~4.570 righe, ora ~510) tiene solo ciò che deve avvolgere TUTTE le rotte: i middleware Fastify, l'hook `onRequest` di autenticazione (§23), lo stream SSE `/stream`, health/refresh del token, l'error handler centrale che mappa le sei classi errore applicative agli status HTTP, e la chiusura del wrapper `server.register(...)` con rate-limit. Le rotte vivono in `src/routes/`, un modulo per dominio, ciascuna esportata come `registraRotte*(server)` (o `registraRotte*(server, app)` quando usa la porta `AppPort`):
+
+- **`auth.ts`**: login, magic login, `GET /auth/me`, refresh.
+- **`tenant.ts`**: team/utenti, ruoli, matrice permessi, audit, dati tenant.
+- **`catalogo.ts`**: giurisdizioni, `/moduli`, articoli catalogo, listini.
+- **`clienti.ts`**: anagrafica clienti, lead, accesso cliente.
+- **`progetti.ts`**: progetti, preventivi, esecuzione (§17), timesheet, ricalcoli.
+- **`contabilita.ts`**: fatture, incassi/scadenzario/prima nota, registro fatture, banche, reportistica, generatore PDF+email, webhook esiti SDI, contratti ricorrenti, cron scadenze, SDI manuale.
+- **`documenti.ts`**: modelli studio (Document Studio) e fascicolo documentale del progetto (§2.9).
+- **`portale.ts`**: portale cliente — contatti (§2.6), fatture (§2.11), dati fiscali (§2.3), addendum (§2.5).
+- **`firma.ts`**: FEA (OTP, canali verificati, sigillo) e firma elettronica avanzata (sessione, grafometrica, verbale, esito).
+- **`notifiche.ts`**: `/stream-notifications`, segna-letto, impostazioni.
+- **`webhooks.ts`**: webhook di canale WhatsApp e Telegram.
+
+Le `registraRotte*` sono chiamate SEMPRE dentro il wrapper `register` di `buildServer`, quindi hook auth e rate-limit si applicano esattamente come prima dello split (stesso contesto di incapsulamento, nessuna nuova barriera). Lo split è stato meccanico: stesse identiche implementazioni, zero cambi di comportamento; ogni modulo è un commit separato e revertibile (serie "Split monoliti 1/9…9/9").
 
 ### 🚧 Il guard di autenticazione: elenco di rotte pubbliche, non di rotte protette (§23)
 
@@ -269,6 +287,7 @@ Implementazioni concrete delle porte di dominio.
 - **`src/util/prismaClient.ts`**: I tre client Prisma e il contesto tenant per richiesta (§14). `prisma` è il client applicativo: impone `app.current_tenant_id` a ogni query, così le policy RLS hanno qualcosa su cui filtrare. `prismaAmministrativo()` scavalca RLS e va usato **solo** per script, seed, bootstrap, backup, la ricerca dell'utente per email al login e la verifica del magic token (richieste anonime per definizione, dove il tenant si scopre dalla riga cercata). `conContestoInTransazione()` reimposta la variabile dentro una transazione interattiva, che gira su una connessione propria.
 - **`src/util/password.ts`**: Hashing password con scrypt di `node:crypto` (§23) — nessuna dipendenza con binding nativi. `hashPassword()`, `verifyPassword()` con `timingSafeEqual`, `generaPasswordTemporanea()` con `randomBytes`.
 - **`src/util/jwt.ts`**: Gestione token JWT (generazione, verifica, estrazione claims), firma HMAC per download (`firmaDownload`, `verificaFirmaDownload`), generazione e hash magic token (`generateMagicToken`, `hashMagicToken`).
+- **`src/util/serverHelpers.ts`**: Costanti e helper condivisi estratti da `src/server.ts` (split dei monoliti): costanti tenant/sessione (`TENANT_DEFAULT`, `DURATA_SESSIONE_*`, `SOGLIA_RINNOVO`, `GIORNI_VALIDITA_MAGIC_LINK`, stati micro-voce/progetto), `ipReale()`, `recordAudit()`, `normalizzaGrafometrica()`, `nomeFileDaUrl()`, `clienteDellaRichiesta()`, `senzaHash()`, `baseUrlApplicazione()`, validazione recapiti OTP. Sono importati da `server.ts` e dai moduli `src/routes/` che ne hanno bisogno.
 
 ### 🛠 Script di Manutenzione (`src/scripts/`)
 
