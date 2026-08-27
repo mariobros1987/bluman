@@ -22,7 +22,7 @@ Questo piano copre i 4 punti aperti dall'audit, in ordine di priorità operativa
 - **Punto 3 — ✅ chiuso il 27/08/2026.** Migrazione additiva `20260827180000_archiviazione_documenti_firmati` (`isArchiviato`/`archiviatoAt`/`archiviatoDaId` su `Documento`, `isArchiviato` su `EngagementLetter`); hard delete vietato con **409** su documento firmato o con firma/OTP pendente collegati — **per tutti, admin inclusi**; `PATCH /documenti/:id/archivia` (solo admin, idempotente, audit `DOCUMENTO_ARCHIVIATO`); liste operative senza archiviati (`?includiArchiviati=true` per lo storico); pulsante «📦 Archivia» nella UI; 17 test in `src/archiviazioneDocumentiFirmati.test.ts`. `riferimentoId` resta stringa libera (niente FK tipizzate), come deciso in questo stesso punto.
 - **Punto 2 — ✅ chiuso il 27/08/2026.** Migrazione additiva `20260827210000_verbale_documento_id_firma` (`FirmaElettronica.verbaleDocumentoId` nullable + relation verso `Documento`); builder puro `src/services/verbaleFirma.ts` (pdfkit, `compress:false`); hook `generaVerbaleDiFirma` in `server.ts` subito dopo `FirmaElettronica.create` in `POST /portal/verify-otp-and-sign`: genera il PDF, lo carica nello storage, crea un `Documento` tipo `verbale_firma`/statoDoc `pubblicato` nel progetto di origine (fallback: ultimo progetto del cliente), collega la firma al verbale, audit `VERBALE_FIRMA_GENERATO` e notifica cliente `verbale_disponibile`. **Deviazione**: `Documento.caricatoDa` reso nullable perché l'utente del portale ha `userId = client-<id>` senza riga `User`; il verbale ha `caricatoDa = null` (generato dal sistema). Guard 409: il verbale è atto certificativo → niente hard delete (`DELETE /documenti/:id`) né richieste di revisione (`POST /portal/documenti/:id/richiesta-modifica`). Fallimento della generazione (es. storage giù) non invalida la firma. 14 test in `src/verbaleFirma.test.ts` (builder PDF, guard, flusso E2E con mock prisma+storage).
 - **Punto 1 — ✅ chiuso il 27/08/2026.** Decisione titolare 27/08/2026: **Docxtemplater (Word) + pdfkit (PDF)** dallo stesso merge dati — **niente LibreOffice su Railway**; hash legale fissato sul PDF. Migrazione additiva `20260827230000_export_pdf_word_documenti` (`file_pdf_url`, `file_docx_url`, `formato_origine TEXT NOT NULL DEFAULT 'pdf'` su `Documento`). Motore `src/services/generazioneDocumenti.ts` (21 tag identici client/server, risoluzione server-side da DB; pdfkit `compress:false`; docxtemplater `paragraphLoop+linebreaks`); endpoint `POST /documenti/genera` (template grezzo o `modelloId`, produce e archivia PDF+Word, `tipo='compilato'`, `statoScansione='pulito'`, audit `DOCUMENTO_GENERATO`, notifica `documento_da_firmare` se pubblicato); `GET /portal/documenti/:id/download?formato=pdf|docx`; frontend portale con Word nascosto se `fileDocxUrl` assente; `PassaggioModal`/`ProjectDetail` lato operatore preferiscono il Word reale. 32 test in `src/generazioneDocumenti.test.ts`.
-- **Punto 4 — ⏳ in coda.** Audit del cablaggio esistente + implementazione dei trigger mancanti (non solo report).
+- **Punto 4 — ✅ chiuso il 27/08/2026.** Audit riga per riga della matrice + implementazione dei trigger mancanti. Evento `messaggio_cliente` riutilizzato per i tre gap cliente→studio (richiesta modifica documento, richiesta addendum, proposta dati); due **eventi nuovi** per i gap studio→cliente: `risposta_addendum` (solo su stati terminali `pronta`/`rifiutata`, mai su `in_preparazione` che resta rumore interno) e `risposta_proposta_dati` (conferma/rifiuto con motivazione). Deep-link cliente `/portal/proposal` e `/portal/avanzamento` gestiti dal portale; etichette campi in chiaro (`IBAN`, non `iban`). Fix collaterale: wording SES sulla notifica `firma_apposta` allineato al commit `0509f96`. Prerequisito 3 risolto: `canale` è solo `in_app`, i canali esterni esistono solo per l'OTP. 8 test in `src/matriceNotifiche.test.ts` (suite ora a 352).
 
 ---
 
@@ -169,7 +169,7 @@ model FirmaElettronica {
 ### Logica applicativa
 - Trigger: al completamento con successo del flusso di firma (dopo scrittura `FirmaElettronica`), generazione sincrona (o in coda, se il volume lo richiede) del PDF verbale da template HTML→PDF.
 - Salvataggio come nuovo `Documento` (tipo=`verbale_firma`, statoDoc=`pubblicato` direttamente, non richiede revisione cliente).
-- Notifica automatica al cliente con il verbale in allegato/scaricabile (collegamento al punto 4).
+- Notifica automatica al cliente con il verbale in allegato/scaricabile (collegamento al punto 4) — ✅ realizzata (evento `verbale_disponibile`, deep-link al documento).
 - Il verbale **non è modificabile né richiedibile in revisione** dal cliente (non passa per `RichiestaModificaDocumento`) — è un atto certificativo, non negoziabile.
 
 ### Test
@@ -182,7 +182,7 @@ model FirmaElettronica {
 
 ---
 
-## Punto 4 — Matrice completa dei trigger di notifica
+## Punto 4 — Matrice completa dei trigger di notifica — ✅ chiuso il 27/08/2026
 
 ### Problema
 `Notifica` e il relativo `tipoEvento` esistono, ma va verificato che ogni transizione di stato rilevante del workflow documento/firma generi effettivamente una notifica — oggi non è chiaro se tutte le transizioni siano cablate.
@@ -191,14 +191,16 @@ model FirmaElettronica {
 
 | Transizione | Trigger | Destinatario | tipoEvento |
 |---|---|---|---|
-| `Documento` bozza → pubblicato | operatore pubblica | cliente | `documento_da_firmare` (se richiedeFirmaCliente=true) oppure `documento_pubblicato` |
-| Cliente crea `RichiestaModificaDocumento` | cliente invia richiesta | operatore/advisor assegnato | `messaggio_cliente` |
-| Operatore ripubblica nuova versione dopo modifica | pubblicazione v2 | cliente | `documento_da_firmare` (ri-notifica) |
-| `FirmaElettronica` creata con successo | fine flusso firma | operatore/advisor + cliente (conferma) | `firma_apposta` |
+| `Documento` bozza → pubblicato | operatore pubblica | cliente | `documento_da_firmare` (sempre: il contratto eventi è chiuso, niente variante `documento_pubblicato`) — ✅ coperta |
+| Cliente crea `RichiestaModificaDocumento` | cliente invia richiesta | operatore/advisor assegnato | `messaggio_cliente` — ✅ implementata (Punto 4, prima era solo audit log) |
+| Operatore ripubblica nuova versione dopo modifica | pubblicazione v2 | cliente | `documento_da_firmare` (ri-notifica) — ✅ coperta |
+| `FirmaElettronica` creata con successo | fine flusso firma | operatore/advisor + cliente (conferma) | `firma_apposta` — ✅ coperta (wording SES corretto nel Punto 4) |
 | Verbale di firma generato (punto 2) — ✅ coperta | post-generazione | cliente | `verbale_disponibile` (valore aggiunto in `EVENTI_NOTIFICA` col punto 2, più la riga studio `firma_apposta`) |
 | `CodiceOtp` inviato | invio OTP | — (non è una Notifica di sistema, è il canale stesso: email/WA/TG con il codice) | n/a |
-| `RichiestaAddendum` cambia stato → pronta | operatore prepara addendum | cliente | evento esistente da verificare |
-| `PropostaDatiFiscale` confermata/rifiutata | operatore decide | cliente | evento esistente da verificare |
+| `RichiestaAddendum` cambia stato → pronta/rifiutata | operatore gestisce addendum | cliente | `risposta_addendum` (evento **nuovo**) — ✅ implementata; niente notifica su `in_preparazione` |
+| `PropostaDatiFiscale` confermata/rifiutata | operatore decide | cliente | `risposta_proposta_dati` (evento **nuovo**) — ✅ implementata |
+| Richiesta addendum dal portale | cliente invia | operatore/advisor | `messaggio_cliente` — ✅ implementata (gap simmetrico) |
+| Proposta modifica dati dal portale | cliente invia | operatore/advisor | `messaggio_cliente` — ✅ implementata (gap simmetrico) |
 
 ### Azione consigliata
 Prima di scrivere nuovo codice: **audit del codice esistente** (`grep -rn "tipoEvento"` e ricerca dei punti che scrivono `Notifica`) per verificare quali righe della matrice sono già coperte. Solo le righe mancanti richiedono nuovo codice — evitando duplicati o doppie notifiche sullo stesso evento.
@@ -207,6 +209,21 @@ Aggiungere eventualmente il valore `verbale_disponibile` all'enum informale di `
 
 ### Stima
 0.5 giornata audit codice esistente, 1 giornata implementazione trigger mancanti (dipende da quanti risultano già coperti), 0.5 giornata test end-to-end sull'intera matrice.
+
+### Esito audit e implementazione (27/08/2026)
+
+**Audit** (`grep -nE "tipoEvento|notificaStudio|notificaCliente"` su `server.ts` + `notificheService.ts`): righe 1, 3, 4, 5 già cablate; riga 6 (OTP) correttamente fuori dal sistema `Notifica` (il canale stesso è l'email/WA/TG via `otpService`); righe 7 e 8 e i due gap simmetrici cliente→studio (richiesta modifica, addendum, proposta dati) erano **muti** — solo audit log, campanella silenziosa.
+
+**Scelte di progetto** (contratto eventi chiuso, 10 valori in `EVENTI_NOTIFICA`):
+- **cliente→studio**: riuso di `messaggio_cliente` per tutti e tre i trigger (nessun nuovo evento; lo studio vede tre righe distinte dall'`oggetto`: «Richiesta di modifica documento», «Richiesta di addendum», «Proposta di modifica dati»).
+- **studio→cliente**: due eventi **nuovi e solo client-facing** — `risposta_addendum` e `risposta_proposta_dati` (l'`AppLayout` dello studio non li conosce e non serve: il destinatario è il portale).
+- **Gating addendum**: notifica al cliente solo su stati terminali cliente-visibili (`pronta`, `rifiutata`); `in_preparazione` è lavorazione interna e resta silenziosa per il cliente (l'audit c'è sempre).
+- **Etichette campi**: la notifica parla per persone, non per DB — `IBAN`/`Partita IVA`/ecc. via `ETICHETTE_CAMPI_PROPONIBILI`, mai il nome tecnico.
+- **Deep-link**: studio → `/projects/<id>` (addendum e modifica documento) e `/clients` (proposta dati); cliente → `/portal/proposal` (addendum e proposta dati) e `/portal/avanzamento` (conferme firma). `ClientPortal.tsx` mappa i nuovi link alle tab `proposta`/`avanzamento` e assegna le icone 📄 (addendum) e 🗂️ (proposta dati).
+- **Fix collaterale**: il corpo della notifica `firma_apposta` allo studio ora dice «Firma Elettronica Semplice (OTP verificata · art. 20 CAD)» — prima il wording SES del commit `0509f96` non aveva aggiornato la campanella.
+- Riga 1 della matrice: la pubblicazione notifica **sempre** con `documento_da_firmare` (anche senza firma richiesta) perché il contratto eventi è chiuso e non esiste `documento_pubblicato`; variante documentata qui invece di inventare un undicesimo evento.
+
+**File toccati**: `src/services/notificheService.ts` (2 nuovi eventi commentati), `src/server.ts` (8 punti: include esteso richiesta-modifica, trigger cliente→studio ×3, trigger studio→cliente ×3 con gating, fix wording firma_apposta), `frontend/src/pages/ClientPortal.tsx` (deep-link + icone), `src/matriceNotifiche.test.ts` (nuovo, 8 test: 3 cliente→studio, 3 addendum con il caso negativo `in_preparazione`, 2 proposta dati). Suite a **352 test** verdi; `tsc --noEmit` e `tsc -b` puliti.
 
 ---
 
@@ -223,4 +240,4 @@ Aggiungere eventualmente il valore `verbale_disponibile` all'enum informale di `
 ## Prerequisiti da chiarire prima di iniziare
 1. ✅ **Risolto (Punto 1, 27/08/2026)** — Prima il PDF era fabbricato **client-side** con **jsPDF** (`frontend/src/utils/pdfGenerator.ts`, `generateRealPdfBase64`/`downloadRealPdf`) e il Word era uno stub `.doc` ricostruito dall'HTML (`downloadRealWordDoc`/`scaricaDocumentoWordClient`). Ora la generazione è **server-side**: motore unico `src/services/generazioneDocumenti.ts` con **pdfkit** (PDF) + **docxtemplater** (Word) dallo stesso array di blocchi, invocato da `POST /documenti/genera`. Niente LibreOffice su Railway.
 2. ✅ **Risolto (Punto 2, 27/08/2026)** — Non esiste job/queue asincrono: la generazione del verbale è **sincrona dentro la richiesta di firma** (volumi bassi); un fallimento viene loggato e non invalida la firma.
-3. Conferma se `Notifica` ha già un dispatcher effettivo verso email/WhatsApp/Telegram o se il campo `canale` è solo documentale/futuro. *(Aperto — di competenza del Punto 4.)*
+3. ✅ **Risolto (Punto 4, 27/08/2026)** — `Notifica` **non ha dispatcher esterni**: il campo `canale` è sempre `'in_app'` (hardcoded in `notificaStudio`/`notificaCliente`/`notificaStudioSilenziosa`). Il DB è la fonte di verità (chi non è connesso ritrova le righe al prossimo accesso), lo stream SSE è la scorciatoia real-time. I canali email/WhatsApp/Telegram esistono **solo per l'OTP** via `otpService` — la riga 6 della matrice è infatti `n/a`.

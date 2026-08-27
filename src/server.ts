@@ -5882,7 +5882,7 @@ export function buildServer(app: AppPort): FastifyInstance {
           ],
         },
         include: {
-          progetto: { select: { id: true, nome: true } },
+          progetto: { select: { id: true, nome: true, cliente: { select: { nome: true } } } },
           microvoceProgetto: { select: { nome: true } },
           caricatoDaUser: { select: { email: true, nome: true } },
         },
@@ -5928,6 +5928,17 @@ export function buildServer(app: AppPort): FastifyInstance {
         dettagli: `Cliente ${clienteId} ha richiesto modifiche su «${nomeDoc}» (${documento.id}): ${commento.trim()}`,
         ipAddress: req.ip,
       });
+
+      // Punto 4 piano gap, riga 2 matrice — il cliente ha chiesto modifiche: lo studio deve
+      // vederlo subito alla campanella, non quando riapre il fascicolo. Riusa l'evento
+      // esistente `messaggio_cliente` (ogni messaggio del cliente allo studio è quello).
+      // La notifica non deve mai bloccare la richiesta di modifica.
+      await notificaStudio(tenantId, {
+        tipoEvento: 'messaggio_cliente',
+        oggetto: 'Richiesta di modifica documento',
+        corpo: `${documento.progetto?.cliente?.nome ?? 'Il cliente'} ha richiesto modifiche su «${nomeDoc}»: ${commento.trim().slice(0, 160)}`,
+        link: documento.progetto ? `/projects/${documento.progetto.id}` : null,
+      }).catch(() => {});
 
       return reply.send({ ok: true, richiesta });
     } catch (err) {
@@ -6061,6 +6072,18 @@ export function buildServer(app: AppPort): FastifyInstance {
   const CAMPI_PROPONIBILI = ['piva', 'codiceFiscale', 'iban', 'titolareEffettivo', 'ragioneSociale', 'sedeLegale', 'legaleRappresentante'] as const;
   type CampoProponibile = (typeof CAMPI_PROPONIBILI)[number];
 
+  // Punto 4 piano gap — il nome tecnico del campo non parla né al cliente né allo studio:
+  // nelle notifiche va l'etichetta in chiaro («Partita IVA», non «piva»).
+  const ETICHETTE_CAMPI_PROPONIBILI: Record<CampoProponibile, string> = {
+    piva: 'Partita IVA',
+    codiceFiscale: 'Codice fiscale',
+    iban: 'IBAN',
+    titolareEffettivo: 'Titolare effettivo',
+    ragioneSociale: 'Ragione sociale',
+    sedeLegale: 'Sede legale',
+    legaleRappresentante: 'Legale rappresentante',
+  };
+
   function campoProponibile(valore: unknown): valore is CampoProponibile {
     return typeof valore === 'string' && (CAMPI_PROPONIBILI as readonly string[]).includes(valore);
   }
@@ -6169,6 +6192,16 @@ export function buildServer(app: AppPort): FastifyInstance {
         dettagli: `Proposta modifica ${campo} per cliente ${clienteId}`,
       });
 
+      // Punto 4 piano gap (gap simmetrico cliente→studio) — la proposta di modifica dati è
+      // un messaggio del cliente allo studio: la campanella deve suonare. Le proposte si
+      // gestiscono dalla scheda cliente, da qui il link alla pagina clienti.
+      await notificaStudio(tenantId, {
+        tipoEvento: 'messaggio_cliente',
+        oggetto: 'Proposta di modifica dati',
+        corpo: `${cliente.nome} propone di modificare ${ETICHETTE_CAMPI_PROPONIBILI[campo]}: «${valore.slice(0, 80)}»`,
+        link: '/clients',
+      }).catch(() => {});
+
       return reply.code(201).send({ ok: true, proposta });
     } catch (err) {
       return reply.code(500).send({ errore: err instanceof Error ? err.message : 'Errore invio proposta dati' });
@@ -6232,6 +6265,16 @@ export function buildServer(app: AppPort): FastifyInstance {
         dettagli: `Confermata modifica ${proposta.campo} per cliente ${proposta.clienteId}`,
       });
 
+      // Punto 4 piano gap, riga 8 matrice — l'esito della proposta va comunicato al cliente:
+      // l'anagrafica è cambiata e la sua richiesta ha una risposta. Le proposte vivono nella
+      // tab «Proposta» del portale.
+      await notificaCliente(tenantId, proposta.clienteId, {
+        tipoEvento: 'risposta_proposta_dati',
+        oggetto: 'Proposta di modifica accettata',
+        corpo: `Lo studio ha confermato la modifica di ${ETICHETTE_CAMPI_PROPONIBILI[proposta.campo]}: il nuovo valore è attivo in anagrafica.`,
+        link: '/portal/proposal',
+      }).catch(() => {});
+
       return reply.send({ ok: true, proposta: confermata });
     } catch (err) {
       return reply.code(500).send({ errore: err instanceof Error ? err.message : 'Errore conferma proposta' });
@@ -6264,6 +6307,17 @@ export function buildServer(app: AppPort): FastifyInstance {
         entita: proposta.id,
         dettagli: `Rifiutata modifica ${proposta.campo} per cliente ${proposta.clienteId}`,
       });
+
+      // Punto 4 piano gap, riga 8 matrice — anche il rifiuto va comunicato, con la
+      // motivazione se lo studio l'ha scritta: il cliente non deve restare in sospeso.
+      // Qui il campo non ha passato il type-guard, quindi l'etichetta ricade sul nome tecnico.
+      await notificaCliente(tenantId, proposta.clienteId, {
+        tipoEvento: 'risposta_proposta_dati',
+        oggetto: 'Proposta di modifica rifiutata',
+        corpo: `Lo studio non ha accolto la modifica di ${(ETICHETTE_CAMPI_PROPONIBILI as Record<string, string>)[proposta.campo] ?? proposta.campo}.${rifiutata.notaStudio ? ` Motivazione: ${rifiutata.notaStudio}` : ''}`,
+        link: '/portal/proposal',
+      }).catch(() => {});
+
       return reply.send({ ok: true, proposta: rifiutata });
     } catch (err) {
       return reply.code(500).send({ errore: err instanceof Error ? err.message : 'Errore rifiuto proposta' });
@@ -6318,6 +6372,13 @@ export function buildServer(app: AppPort): FastifyInstance {
         : await prisma.progetto.findFirst({ where: { tenantId, clienteId }, orderBy: { createdAt: 'desc' }, select: { id: true, nome: true } });
       if (!progetto) return reply.code(404).send({ errore: 'Nessun progetto su cui richiedere l\'addendum.' });
 
+      // Il nome del cliente serve alla campanella dello studio (riga sotto): una notifica
+      // che dicesse solo «cli-42» non parlerebbe a nessuno.
+      const cliente = await prisma.cliente.findFirst({
+        where: { id: clienteId, tenantId },
+        select: { nome: true },
+      });
+
       const richiesta = await prisma.richiestaAddendum.create({
         data: {
           tenantId,
@@ -6337,6 +6398,16 @@ export function buildServer(app: AppPort): FastifyInstance {
         entita: richiesta.id,
         dettagli: `Richiesta addendum del cliente ${clienteId} sul progetto ${progetto.id}`,
       });
+
+      // Punto 4 piano gap (gap simmetrico cliente→studio) — la richiesta di addendum va
+      // vista subito dallo studio: campanella con l'evento `messaggio_cliente` e link al
+      // progetto, dove gli addendum si lavorano.
+      await notificaStudio(tenantId, {
+        tipoEvento: 'messaggio_cliente',
+        oggetto: 'Richiesta di addendum',
+        corpo: `${cliente?.nome ?? 'Il cliente'} ha chiesto un addendum su «${progetto.nome}»: ${testo.slice(0, 160)}`,
+        link: `/projects/${progetto.id}`,
+      }).catch(() => {});
 
       return reply.code(201).send({ ok: true, richiesta });
     } catch (err) {
@@ -6398,6 +6469,22 @@ export function buildServer(app: AppPort): FastifyInstance {
         entita: richiesta.id,
         dettagli: `Stato addendum ${richiesta.id} -> ${nuovoStato ?? 'invariato'}`,
       });
+
+      // Punto 4 piano gap, riga 7 matrice — il cliente va avvisato solo sugli esiti che lo
+      // riguardano: 'pronta' (l'addendum è disponibile) e 'rifiutata' (con la risposta dello
+      // studio, se scritta). 'in_preparazione' è lavorazione interna: notificarla sarebbe
+      // rumore sulla campanella.
+      if (aggiornata.stato === 'pronta' || aggiornata.stato === 'rifiutata') {
+        await notificaCliente(tenantId, aggiornata.clienteId, {
+          tipoEvento: 'risposta_addendum',
+          oggetto: aggiornata.stato === 'pronta' ? 'Addendum pronto' : 'Richiesta di addendum rifiutata',
+          corpo: aggiornata.stato === 'pronta'
+            ? `La tua richiesta di addendum su «${aggiornata.progetto?.nome ?? 'il progetto'}» è pronta: la trovi nella sezione Proposta del portale.`
+            : `La tua richiesta di addendum su «${aggiornata.progetto?.nome ?? 'il progetto'}» non è stata accolta.${aggiornata.rispostaStudio ? ` Risposta dello studio: ${aggiornata.rispostaStudio}` : ''}`,
+          link: '/portal/proposal',
+        }).catch(() => {});
+      }
+
       return reply.send({ ok: true, richiesta: aggiornata });
     } catch (err) {
       return reply.code(500).send({ errore: err instanceof Error ? err.message : 'Errore aggiornamento stato addendum' });
@@ -7045,10 +7132,12 @@ export function buildServer(app: AppPort): FastifyInstance {
       });
 
       // Blocco 3 — firma apposta: lo studio lo vede subito, il cliente ne ha conferma.
+      // Wording allineato alle etichette SES del portale (commit 0509f96): l'OTP verificato
+      // è una Firma Elettronica Semplice ex art. 20 CAD, non una firma «avanzata».
       await notificaStudio(tenantId, {
         tipoEvento: 'firma_apposta',
         oggetto: 'Firma apposta',
-        corpo: `${firmatarioNome} (${cliente.nome}) ha firmato «${documentoTitolo}» con firma elettronica avanzata.`,
+        corpo: `${firmatarioNome} (${cliente.nome}) ha firmato «${documentoTitolo}» con Firma Elettronica Semplice (OTP verificata · art. 20 CAD).`,
         link: null,
       }).catch(() => {});
       await notificaCliente(tenantId, clienteId, {

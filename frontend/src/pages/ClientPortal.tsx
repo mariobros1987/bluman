@@ -790,11 +790,15 @@ export function ClientPortal() {
     }
   };
 
-  /** Il link della notifica porta alla scheda giusta del portale (documenti o fatture). */
+  /** Il link della notifica porta alla scheda giusta del portale. */
   const handleSelezionaNotificaPortale = (n: NotificaPortale) => {
     setNotifPortaleOpen(false);
     if (n.link === '/portal/documents') setActiveTab('documenti');
     else if (n.link === '/portal/invoices') setActiveTab('fatture');
+    // Punto 4 — le risposte di addendum e proposte dati vivono nella tab «Proposta»;
+    // la conferma di una firma si rivede nell'avanzamento.
+    else if (n.link === '/portal/proposal') setActiveTab('proposta');
+    else if (n.link === '/portal/avanzamento') setActiveTab('avanzamento');
   };
 
   // ── CANALI DI FIRMA: QUALI SONO DAVVERO UTILIZZABILI ──────────────────────
@@ -1745,6 +1749,8 @@ export function ClientPortal() {
                       const icona = n.tipoEvento === 'documento_da_firmare' ? '✍️'
                         : n.tipoEvento === 'firma_apposta' ? '✅'
                         : n.tipoEvento === 'fattura_incassata' ? '💶'
+                        : n.tipoEvento === 'risposta_addendum' ? '📄'
+                        : n.tipoEvento === 'risposta_proposta_dati' ? '🗂️'
                         : 'ℹ️';
                       const ts = n.createdAt ? new Date(n.createdAt).getTime() : 0;
                       return (

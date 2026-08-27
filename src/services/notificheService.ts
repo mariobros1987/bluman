@@ -37,6 +37,13 @@ export const EVENTI_NOTIFICA = [
   // Punto 2 piano gap — il verbale di firma è stato generato: l'atto certificativo che
   // documenta la firma è disponibile nel fascicolo. Previsto dalla matrice del punto 4.
   'verbale_disponibile',
+  // Punto 4 piano gap, riga 7 matrice — lo studio ha gestito la richiesta di addendum del
+  // cliente (pronta o rifiutata): l'esito deve arrivare al portale, prima restava solo
+  // nell'audit log e il cliente doveva riaprire la pagina per scoprirlo.
+  'risposta_addendum',
+  // Punto 4 piano gap, riga 8 matrice — lo studio ha confermato o rifiutato la proposta di
+  // modifica dei dati inviata dal cliente: l'esito cambia (o no) l'anagrafica e va comunicato.
+  'risposta_proposta_dati',
 ] as const;
 
 export type TipoEventoNotifica = (typeof EVENTI_NOTIFICA)[number];
