@@ -231,6 +231,21 @@ export function buildServer(app: AppPort): FastifyInstance {
     trustProxy: process.env.NODE_ENV === 'production',
   });
 
+  // Supporta body vuoti con Content-Type: application/json (es. richieste DELETE, POST senza payload)
+  server.addContentTypeParser('application/json', { parseAs: 'string' }, (_req, body, done) => {
+    if (!body || (typeof body === 'string' && body.trim() === '')) {
+      done(null, {});
+      return;
+    }
+    try {
+      const json = JSON.parse(body);
+      done(null, json);
+    } catch (err: any) {
+      err.statusCode = 400;
+      done(err, undefined);
+    }
+  });
+
   /**
    * §23 — le sole rotte raggiungibili senza un token valido. Tutto il resto risponde 401.
    *
@@ -5057,6 +5072,14 @@ export function buildServer(app: AppPort): FastifyInstance {
           tipoFirma: true,
           firmatoAt: true,
           canaleVerificato: true,
+          // Evidenze del sigillo mostrate nel certificato di firma del portale: fuori dal
+          // select arrivano `undefined` e il modale dichiarerebbe una firma senza impronta
+          // né firmatario. Vengono solo da qui (regola 7): il browser non le può ricostruire.
+          ipAddress: true,
+          documentoHash: true,
+          firmaGrafometricaPng: true,
+          firmatarioNome: true,
+          standard: true,
         },
         orderBy: { firmatoAt: 'desc' },
       });
@@ -5900,12 +5923,34 @@ export function buildServer(app: AppPort): FastifyInstance {
       select: {
         fileUrl: true,
         statoScansione: true,
+        statoDoc: true,
         microvoceProgetto: { select: { nome: true } },
         progetto: { select: { nome: true } },
       },
     });
 
     if (!doc) return { errore: 'Documento non presente nel fascicolo di questo cliente.', codice: 404 };
+
+    // §WF-DOC — l'ordine del flusso lo decide il server, non il browser. Prima `/portal/documenti`
+    // si limitava a non esporre il bottone (`richiedeFirma: false`): una richiesta costruita a
+    // mano firmava comunque una bozza mai pubblicata dall'operatore, o la versione vecchia di un
+    // documento per cui il cliente ha appena chiesto una modifica. Il sigillo che ne uscirebbe
+    // sarebbe autentico e per questo peggio di una firma mancante: attesterebbe il consenso su un
+    // testo che lo studio stava ancora riscrivendo.
+    if (doc.statoDoc === 'bozza') {
+      return {
+        errore: "Il documento è ancora una bozza dello studio: non è firmabile finché non viene pubblicato.",
+        codice: 409,
+      };
+    }
+    if (doc.statoDoc === 'in_revisione') {
+      return {
+        errore:
+          'Per questo documento è aperta una richiesta di modifica: la firma si potrà apporre sulla nuova versione, ' +
+          'quando lo studio la pubblica.',
+        codice: 409,
+      };
+    }
     if (doc.statoScansione === 'infetto') {
       return { errore: 'Il controllo antivirus ha bloccato questo file: non è firmabile.', codice: 400 };
     }

@@ -76,16 +76,25 @@ async function apiFetch(url: string, options: RequestInit = {}, timeoutMs: numbe
  */
 function conCorpoCoerente(options: RequestInit): RequestInit {
   const metodo = (options.method || 'GET').toUpperCase();
-  if (metodo === 'GET' || metodo === 'HEAD' || metodo === 'DELETE') return options;
+  const intestazioni = { ...((options.headers as Record<string, string>) ?? {}) };
+
+  if (metodo === 'GET' || metodo === 'HEAD' || metodo === 'DELETE') {
+    if (!options.body) {
+      delete intestazioni['Content-Type'];
+      delete intestazioni['content-type'];
+      return { ...options, headers: intestazioni };
+    }
+    return options;
+  }
+
   if (options.body !== undefined && options.body !== null) return options;
 
-  const intestazioni = options.headers as Record<string, string> | undefined;
-  const dichiaraJson = Object.entries(intestazioni ?? {}).some(
+  const dichiaraJson = Object.entries(intestazioni).some(
     ([nome, valore]) => nome.toLowerCase() === 'content-type' && String(valore).includes('application/json'),
   );
   if (!dichiaraJson) return options;
 
-  return { ...options, body: '{}' };
+  return { ...options, headers: intestazioni, body: '{}' };
 }
 
 export function getAuthHeaders() {
