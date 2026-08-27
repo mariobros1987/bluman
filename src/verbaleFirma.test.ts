@@ -235,7 +235,7 @@ beforeEach(() => {
 
 describe('Punto 2 — descrizioneTipoFirma', () => {
   it('traduce i tre tipi tecnici in descrizioni leggibili', () => {
-    expect(descrizioneTipoFirma('fea_otp')).toBe('Firma Elettronica Avanzata (FEA) con codice OTP monouso');
+    expect(descrizioneTipoFirma('fea_otp')).toBe('Firma Elettronica Semplice con codice OTP monouso verificato · art. 20 CAD');
     expect(descrizioneTipoFirma('manuale_scansionata')).toBe(
       'Sottoscrizione autografa su carta, scansionata e ricaricata dal firmatario',
     );

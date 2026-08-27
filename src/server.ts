@@ -5703,7 +5703,7 @@ export function buildServer(app: AppPort): FastifyInstance {
           documentoHash: firma?.documentoHash ?? null,
           firmaGrafometricaPng: firma?.firmaGrafometricaPng ?? null,
           firmatarioNome: firma?.firmatarioNome ?? null,
-          standard: firma?.standard ?? 'eIDAS (UE 910/2014) - FEA',
+          standard: firma?.standard ?? 'Firma Elettronica Semplice (OTP verificata) · art. 20 CAD',
         };
       });
 

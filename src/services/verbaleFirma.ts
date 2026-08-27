@@ -52,7 +52,7 @@ export interface DatiVerbaleFirma {
 export function descrizioneTipoFirma(tipoFirma: string): string {
   switch (tipoFirma) {
     case 'fea_otp':
-      return 'Firma Elettronica Avanzata (FEA) con codice OTP monouso';
+      return 'Firma Elettronica Semplice con codice OTP monouso verificato · art. 20 CAD';
     case 'manuale_scansionata':
       return 'Sottoscrizione autografa su carta, scansionata e ricaricata dal firmatario';
     case 'qualificata_esterna':
