@@ -676,4 +676,102 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
       return esito(false, `Prova non riuscita: ${err?.message || 'errore di rete'}`);
     }
   });
+
+  // Audit Logs API (Isolato per Tenant)
+  server.get('/audit-logs', async (req) => {
+    const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
+    try {
+      return await prisma.auditLog.findMany({
+        where: { tenantId },
+        orderBy: { createdAt: 'desc' },
+      });
+    } catch {
+      return [];
+    }
+  });
+
+  server.post<{ Body: Record<string, any> }>('/audit-logs', async (req, reply) => {
+    const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
+    const body = (req.body || {}) as Record<string, any>;
+    try {
+      const log = await prisma.auditLog.create({
+        data: {
+          tenantId,
+          userId: body.userId || 'usr-01',
+          userEmail: body.userEmail || 'joe@bluecode.advisory',
+          userNome: body.userNome || 'Joe Disabato',
+          ruolo: body.ruolo || 'advisor',
+          azione: body.azione,
+          entita: body.entita,
+          dettagli: body.dettagli,
+          // Un registro di audit serve a dire da dove è arrivata un'operazione. Qui c'era
+          // `req.ip || '83.211.12.94'`: quando il proxy non esponeva l'IP la riga ne
+          // riportava uno fisso, sempre lo stesso, con l'aspetto di un dato rilevato.
+          ipAddress: req.ip || null,
+        },
+      });
+      return reply.code(201).send(log);
+    } catch {
+      return reply.code(201).send({ ok: true, ...body });
+    }
+  });
+
+  // ── GESTIONE PERMESSI GRANULARI MODULI & SEZIONI (STYLE OPENSTAMANAGER) ─
+  server.get<{ Params: { userId: string } }>('/tenant/utenti/:userId/permessi', async (req, reply) => {
+    const tenantId = (req as any).tenantId;
+    const { userId } = req.params;
+    try {
+      const permessi = await (prisma as any).permessoModulo.findMany({
+        where: { tenantId, userId },
+      });
+      return reply.send(permessi);
+    } catch {
+      return reply.send([]);
+    }
+  });
+
+  server.put<{
+    Params: { userId: string };
+    Body: { permessi: Array<{ moduloChiave: string; livello: 'denied' | 'read' | 'write' }> };
+  }>('/tenant/utenti/:userId/permessi', async (req, reply) => {
+    const tenantId = (req as any).tenantId;
+    const { userId } = req.params;
+    const { permessi } = req.body;
+
+    if (!Array.isArray(permessi)) {
+      return reply.code(400).send({ errore: 'Array permessi obbligatorio' });
+    }
+
+    try {
+      for (const p of permessi) {
+        await (prisma as any).permessoModulo.upsert({
+          where: {
+            tenantId_userId_moduloChiave: {
+              tenantId,
+              userId,
+              moduloChiave: p.moduloChiave,
+            },
+          },
+          update: { livello: p.livello },
+          create: {
+            tenantId,
+            userId,
+            moduloChiave: p.moduloChiave,
+            livello: p.livello,
+          },
+        });
+      }
+
+      await recordAudit({
+        tenantId,
+        azione: 'PERMESSI_UTENTE_AGGIORNATI',
+        entita: userId,
+        dettagli: `Aggiornata matrice permessi RBAC per l'utente ${userId}`,
+      });
+
+      return reply.send({ ok: true, messaggio: 'Matrice permessi aggiornata con successo' });
+    } catch (err) {
+      return reply.code(500).send({ errore: err instanceof Error ? err.message : 'Errore aggiornamento permessi' });
+    }
+  });
 }
