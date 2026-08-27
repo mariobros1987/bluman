@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { fetchClienti, fetchProgetti, fetchTenantInfoApi, uploadFileApi, creaDocumentoTemplateApi, eliminaDocumentoTemplateApi } from '../api/client';
+import { fetchClienti, fetchProgetti, fetchTenantInfoApi, salvaDocumentoApi, creaDocumentoTemplateApi, eliminaDocumentoTemplateApi } from '../api/client';
 import { getFormattedLogoUrl } from '../utils';
 import { downloadRealPdf, downloadRealWordDoc } from '../utils/pdfGenerator';
 import { getCurrentTenantId, getTenantStorageKey, getStudioInfoForTenant } from '../utils/tenant';
@@ -680,28 +680,52 @@ export function DocumentEditorPage() {
         url: `#doc-${Date.now()}`,
       };
 
-      // 1. Persistenza specifica per il progetto target
+      // 1. Archiviazione sul database (regola 3). Prima qui si chiamava `uploadFileApi`, che
+      //    carica il file ma NON crea la riga nella tabella `documento`: il documento viveva
+      //    solo nel localStorage di questo browser, gli altri operatori e il portale del
+      //    cliente non lo vedevano, e non essendoci nulla da cancellare il cestino del Vault
+      //    non aveva effetto. Nasce come bozza: pubblicarlo è un gesto dell'operatore (§WF-DOC).
+      let salvatoSulServer = false;
+      try {
+        const creato = await salvaDocumentoApi({
+          progettoId: targetProjId,
+          filename,
+          contentBase64: base64Data,
+          categoriaDoc: categoria,
+        });
+        // L'id del database diventa l'id del documento anche in locale: è quello che serve per
+        // ritrovarlo, pubblicarlo e cancellarlo.
+        newVaultDoc.id = creato.id;
+        newVaultDoc.url = creato.fileUrl || newVaultDoc.url;
+        salvatoSulServer = true;
+      } catch (errSalvataggio: any) {
+        console.error('Archiviazione documento sul server non riuscita:', errSalvataggio);
+      }
+
+      // 2. Copia locale per la scheda Documenti del progetto
       const storageKey = getTenantStorageKey(`bluman_project_documents_${targetProjId}`);
       const currentVaultStr = localStorage.getItem(storageKey);
       const currentVault: any[] = currentVaultStr ? JSON.parse(currentVaultStr) : [];
       const updatedVault = [newVaultDoc, ...currentVault.filter((d: any) => d.titolo !== titoloDocumento)];
       localStorage.setItem(storageKey, JSON.stringify(updatedVault));
 
-      // 2. Persistenza registro globale documenti
+      // 3. Registro globale documenti
       const allVaultKey = getTenantStorageKey('bluman_all_vault_documents');
       const allVaultStr = localStorage.getItem(allVaultKey);
       const allVault: any[] = allVaultStr ? JSON.parse(allVaultStr) : [];
       localStorage.setItem(allVaultKey, JSON.stringify([newVaultDoc, ...allVault.filter((d: any) => d.id !== newVaultDoc.id)]));
 
-      // 3. Upload al backend
-      try {
-        await uploadFileApi(filename, base64Data);
-      } catch (uploadErr) {
-        console.warn('[Vault Upload Offline Fallback]', uploadErr);
+      // Nessuna etichetta che promette più di quanto è successo (regola 7): se il server non ha
+      // archiviato il documento, questa copia sta solo in questo browser e va detto.
+      if (salvatoSulServer) {
+        setFeedback(`✓ Documento "${titoloDocumento}" archiviato nel Vault del Progetto "${targetProjTitle}".`);
+      } else {
+        setFeedback(
+          `⚠️ "${titoloDocumento}" NON è stato archiviato sul server: la copia è solo su questo browser. ` +
+          'Riprova il salvataggio, altrimenti il cliente e gli altri operatori non lo vedranno.'
+        );
       }
-
-      setFeedback(`✓ Documento "${titoloDocumento}" salvato con successo nel Vault del Progetto "${targetProjTitle}"!`);
-      setTimeout(() => setFeedback(null), 5000);
+      setTimeout(() => setFeedback(null), 8000);
     } catch (err: any) {
       setFeedback(`⚠️ Errore salvataggio: ${err.message || 'Errore imprevisto'}`);
       setTimeout(() => setFeedback(null), 5000);
