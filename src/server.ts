@@ -3170,6 +3170,68 @@ export function buildServer(app: AppPort): FastifyInstance {
           await prisma.microvoceProgetto.update({ where: { id: rigaMv.id }, data: datiMv });
           microvociSalvate++;
         }
+
+        // Persistenza dei passaggi checklist e documenti allegati alla micro-voce
+        if (Array.isArray(mv.proc) && mv.proc.length > 0) {
+          try {
+            for (let pIdx = 0; pIdx < mv.proc.length; pIdx++) {
+              const p = mv.proc[pIdx];
+              const pId = p.id && !String(p.id).startsWith('p-') && p.id.length > 10 ? p.id : undefined;
+              const tipo = ['documento', 'form', 'info', 'check'].includes(p.type || p.tipo) ? (p.type || p.tipo) : 'check';
+              const chi = ['operatore', 'cliente'].includes(p.who || p.chi) ? (p.who || p.chi) : 'operatore';
+              const statoP = p.stato === 'done' ? 'done' : 'pending';
+              const titolo = p.title || p.titolo || `Passaggio ${pIdx + 1}`;
+              const docAllegato = p.documentoAllegatoUrl || p.file || null;
+              const richiedeFirma = Boolean(p.richiedeFirmaCliente);
+
+              if (pId) {
+                await prisma.passaggioProgetto.upsert({
+                  where: { id: pId },
+                  update: {
+                    titolo,
+                    tipo,
+                    chi,
+                    stato: statoP,
+                    ordine: pIdx,
+                    descrizione: p.desc || p.descrizione || null,
+                    documentoAllegatoUrl: docAllegato,
+                    richiedeFirmaCliente: richiedeFirma,
+                  },
+                  create: {
+                    id: pId,
+                    tenantId,
+                    microvoceProgettoId: rigaMv.id,
+                    titolo,
+                    tipo,
+                    chi,
+                    stato: statoP,
+                    ordine: pIdx,
+                    descrizione: p.desc || p.descrizione || null,
+                    documentoAllegatoUrl: docAllegato,
+                    richiedeFirmaCliente: richiedeFirma,
+                  },
+                });
+              } else {
+                await prisma.passaggioProgetto.create({
+                  data: {
+                    tenantId,
+                    microvoceProgettoId: rigaMv.id,
+                    titolo,
+                    tipo,
+                    chi,
+                    stato: statoP,
+                    ordine: pIdx,
+                    descrizione: p.desc || p.descrizione || null,
+                    documentoAllegatoUrl: docAllegato,
+                    richiedeFirmaCliente: richiedeFirma,
+                  },
+                });
+              }
+            }
+          } catch (errPassaggi) {
+            console.warn(`Errore salvataggio passaggi per micro-voce ${rigaMv.id}:`, errPassaggi);
+          }
+        }
       }
     }
 

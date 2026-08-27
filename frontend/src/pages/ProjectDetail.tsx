@@ -902,20 +902,21 @@ export function ProjectDetail() {
 
       {/* Passaggio Modal */}
       {procV && (() => {
-        // Recupera l'id DB della microvoce dal rawDbProject per passarla al modal
-        const rawMod = rawDbProject?.moduli?.find((m: any) => m.id === rawDbProject?.moduli?.[
-          project.mods.findIndex(pm => pm.id === procV.mid)
-        ]?.id) ?? rawDbProject?.moduli?.[project.mods.findIndex(pm => pm.id === procV.mid)];
-        const rawMv = rawMod?.microvoci?.[procV.vidx];
+        const currentMod = project.mods.find(pm => pm.id === procV.mid);
+        const currentMv = currentMod?.v?.[procV.vidx];
+        const rawMod = rawDbProject?.moduli?.find((m: any) => m.id === currentMod?.dbId || m.nome?.trim().toLowerCase() === currentMod?.n?.trim().toLowerCase()) ?? rawDbProject?.moduli?.[project.mods.findIndex(pm => pm.id === procV.mid)];
+        const rawMv = rawMod?.microvoci?.find((rmv: any) => rmv.id === currentMv?.dbId || rmv.nome?.trim().toLowerCase() === currentMv?.n?.trim().toLowerCase()) ?? rawMod?.microvoci?.[procV.vidx];
+        const resolvedMicrovoceDbId = currentMv?.dbId || rawMv?.id;
+        const resolvedProgettoDbId = rawDbProject?.id || (project as any)?.dbId || (project as any)?.id;
         return (
           <PassaggioModal
             project={project}
             mid={procV.mid}
             vidx={procV.vidx}
             onClose={() => setProcV(null)}
-            onSaveVoce={(steps, notes) => handleSavePassaggiModal(procV.mid, procV.vidx, steps, notes)}
-            progettoDbId={rawDbProject?.id || (project as any)?.dbId || (project as any)?.id}
-            microvoceDbId={rawMv?.id}
+            onSaveVoce={(steps, notes, docCount) => handleSavePassaggiModal(procV.mid, procV.vidx, steps, notes, docCount)}
+            progettoDbId={resolvedProgettoDbId}
+            microvoceDbId={resolvedMicrovoceDbId}
           />
         );
       })()}
@@ -2463,6 +2464,36 @@ function documentoApiAVista(d: any, projectId: string): any {
   };
 }
 
+// Le rimozioni dei documenti che NON stanno su PostgreSQL: i modelli precompilati che
+// `defaultDocs` rigenera da PREBUILT_TEMPLATES a ogni mount e le voci del registro locale del
+// Vault. Senza ricordarle, il cestino non ha effetto: la lista si ricostruisce all'apertura
+// della scheda e il documento riappare. I documenti veri vivono nella tabella `documento` e li
+// cancella l'API: per quelli questo elenco non serve.
+function chiaveDocumentiRimossi(projectId: string | number) {
+  return getTenantStorageKey(`bluman_project_documents_removed_${projectId}`);
+}
+
+function documentiRimossi(projectId: string | number): Set<string> {
+  try {
+    const raw = localStorage.getItem(chiaveDocumentiRimossi(projectId));
+    const elenco: unknown = raw ? JSON.parse(raw) : [];
+    return new Set<string>(Array.isArray(elenco) ? elenco.map(String) : []);
+  } catch {
+    return new Set<string>();
+  }
+}
+
+function ricordaDocumentoRimosso(projectId: string | number, docId: string) {
+  try {
+    const elenco = documentiRimossi(projectId);
+    elenco.add(docId);
+    localStorage.setItem(chiaveDocumentiRimossi(projectId), JSON.stringify([...elenco]));
+  } catch {
+    // Spazio esaurito o storage negato: la lista in RAM è già aggiornata, ma alla riapertura
+    // il modello tornerebbe. Non c'è modo di evitarlo senza una riga sul database.
+  }
+}
+
 function DocumentiTab({ project }: { project: Progetto }) {
   const navigate = useNavigate();
   const [docCategory, setDocCategory] = useState('ALL');
@@ -2521,9 +2552,13 @@ function DocumentiTab({ project }: { project: Progetto }) {
           mergedMap.set(d.id || d.nome, d);
         }
       });
-      return Array.from(mergedMap.values());
+      // I documenti già rimossi non tornano: `defaultDocs` e il registro globale li
+      // riproporrebbero comunque, ed è questo che rendeva la cancellazione solo apparente.
+      const rimossi = documentiRimossi(project.id);
+      return Array.from(mergedMap.values()).filter(d => !rimossi.has(d.id));
     } catch {
-      return defaultDocs;
+      const rimossi = documentiRimossi(project.id);
+      return defaultDocs.filter(d => !rimossi.has(d.id));
     }
   });
 
@@ -2595,12 +2630,12 @@ function DocumentiTab({ project }: { project: Progetto }) {
 
   // Scarica Copia VERA in Word (.doc) Microsoft Office compatibile al 100%
   const handleDownloadDocumentWord = async (doc: any) => {
-    if (doc.dbDoc && doc.url && doc.url !== '#') {
-      await scaricaDocumentoWordClient(doc.url, doc.nome || doc.titolo);
-      return;
-    }
     const fullPrintHtml = buildDocumentHtml(doc);
     const safeWordName = `${(doc.titolo || doc.nome || 'Documento').replace(/[^a-zA-Z0-9_-]/g, '_')}.doc`;
+    if (doc.dbDoc && doc.url && doc.url !== '#') {
+      await scaricaDocumentoWordClient(doc.url, doc.nome || doc.titolo, fullPrintHtml);
+      return;
+    }
     downloadRealWordDoc(safeWordName, fullPrintHtml);
   };
 
@@ -2651,8 +2686,27 @@ function DocumentiTab({ project }: { project: Progetto }) {
       }
       const updated = docList.filter(d => d.id !== docId);
       setDocList(updated);
+
+      // La riga va togliata da TUTTE le sorgenti da cui la lista si ricostruisce al mount, non
+      // solo dalla chiave di progetto: prima il registro globale del Vault (scritto da
+      // DocumentEditorPage) e i modelli generati dal codice la riproponevano, quindi il
+      // documento riappariva e la conferma qui sotto era falsa.
       const storageKey = getTenantStorageKey(`bluman_project_documents_${project.id}`);
       localStorage.setItem(storageKey, JSON.stringify(updated.filter(d => !d.dbDoc)));
+
+      const allVaultKey = getTenantStorageKey('bluman_all_vault_documents');
+      try {
+        const allVault: unknown = JSON.parse(localStorage.getItem(allVaultKey) || '[]');
+        if (Array.isArray(allVault)) {
+          localStorage.setItem(allVaultKey, JSON.stringify(allVault.filter((d: any) => d?.id !== docId)));
+        }
+      } catch {
+        // Registro globale illeggibile: la chiave di progetto è già stata riscritta e il
+        // documento resta comunque escluso dall'elenco delle rimozioni.
+      }
+
+      if (!doc?.dbDoc) ricordaDocumentoRimosso(project.id, docId);
+
       if (selectedPreviewDoc?.id === docId) setSelectedPreviewDoc(null);
       alert('✓ Documento rimosso con successo dal Vault.');
     } catch (err) {

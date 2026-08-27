@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { downloadRealPdf, generateRealPdfBase64 } from '../utils/pdfGenerator';
+import { downloadRealPdf, downloadRealWordDoc, generateRealPdfBase64 } from '../utils/pdfGenerator';
 import { PREBUILT_TEMPLATES, resolveDocumentTemplateHtml, type DocumentTemplate } from '../utils/documentTemplates';
 import { REORGANIZATION_TEMPLATES } from '../utils/reorganizationTemplates';
 import {
@@ -9,6 +9,9 @@ import {
   nuovaVersioneDocumentoApi,
   aggiornaRichiestaModificaDocumentoApi,
   eliminaDocumentoApi,
+  scaricaDocumentoClient,
+  scaricaDocumentoWordClient,
+  urlFileArchivio,
   type RichiestaModificaDoc,
 } from '../api/client';
 import type { Progetto, Passaggio } from '../types';
@@ -196,6 +199,7 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
   const effProgettoId = progettoDbId || (project as any)?.dbId || (project as any)?.id;
   const mod = project.mods.find(m => m.id === mid)!;
   const voce = mod.v[vidx];
+  const effMicrovoceId = microvoceDbId || (voce as any)?.dbId;
   const [view, setView] = useState<'operatore' | 'cliente'>('operatore');
   const [activeTab, setActiveTab] = useState<'passaggi' | 'note' | 'documenti'>('passaggi');
   const [steps, setSteps] = useState<Passaggio[]>(() => voce.proc || getDefaultPassaggi(voce));
@@ -342,7 +346,7 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
       try {
         const salvato = await salvaDocumentoApi({
           progettoId: effProgettoId,
-          microvoceProgettoId: microvoceDbId,
+          microvoceProgettoId: effMicrovoceId,
           filename: formattedName,
           contentBase64,
           categoriaDoc: tmpl?.categoria || 'Allegati Microvoce',
@@ -413,7 +417,7 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
       .then(dbDocs => {
         if (!mounted) return;
         // Filtra documenti associati a questa microvoce
-        const docsMv = dbDocs.filter(d => d.microvoceProgettoId === microvoceDbId);
+        const docsMv = dbDocs.filter(d => effMicrovoceId ? (d.microvoceProgettoId === effMicrovoceId) : false);
         if (docsMv.length > 0) {
           const mapped: DocumentoEntry[] = docsMv.map(d => ({
             id: d.id,
@@ -434,7 +438,7 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
       })
       .catch(err => console.warn('Errore lettura documenti DB:', err));
     return () => { mounted = false; };
-  }, [effProgettoId, microvoceDbId]);
+  }, [effProgettoId, effMicrovoceId]);
 
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const [versionTargetDocId, setVersionTargetDocId] = useState<string | null>(null);
@@ -444,7 +448,7 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
     if (!effProgettoId) return;
     try {
       const dbDocs = await listaDocumentiProgetto(effProgettoId);
-      const docsMv = dbDocs.filter(d => d.microvoceProgettoId === microvoceDbId);
+      const docsMv = dbDocs.filter(d => effMicrovoceId ? (d.microvoceProgettoId === effMicrovoceId) : false);
       const mapped: DocumentoEntry[] = docsMv.map(d => ({
         id: d.id,
         nome: d.fileUrl ? (d.fileUrl.split('/').pop()?.replace(/^\d+_/, '') || `Documento v${d.versione}`) : `Documento v${d.versione}`,
@@ -1122,6 +1126,27 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
                             📤 Carica Nuova Versione (v{(d.versione || 1) + 1})
                           </button>
 
+                          {d.fileUrl && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => scaricaDocumentoClient(d.fileUrl, d.nome)}
+                                style={{ background: '#0d2d22', border: '1px solid #059669', color: '#34d399', padding: '5px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 3 }}
+                                title="Scarica in formato PDF A4"
+                              >
+                                📥 PDF
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => scaricaDocumentoWordClient(d.fileUrl, d.nome)}
+                                style={{ background: '#1e1b4b', border: '1px solid #3b82f6', color: '#93c5fd', padding: '5px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 3 }}
+                                title="Scarica in formato Microsoft Word (.doc)"
+                              >
+                                📝 Word
+                              </button>
+                            </>
+                          )}
+
                           <button
                             type="button"
                             onClick={() => setSelectedDocPreview(d)}
@@ -1138,7 +1163,17 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
                                   try {
                                     await eliminaDocumentoApi(d.id);
                                   } catch (err: any) {
-                                    console.warn('Errore delete DB:', err);
+                                    // Prima l'errore finiva nella console e il documento
+                                    // veniva togliato dall'elenco locale comunque: sul
+                                    // database restava, e alla riapertura della micro-voce
+                                    // ricompariva. Se il server non l'ha cancellato,
+                                    // l'operatore deve saperlo adesso.
+                                    console.error('Eliminazione documento non riuscita:', err);
+                                    alert(
+                                      `Eliminazione non riuscita: ${err?.message || 'errore imprevisto'}.\n` +
+                                      'Il documento è ancora archiviato sul server e resta visibile.'
+                                    );
+                                    return;
                                   }
                                 }
                                 const nextDocs = documents.filter(doc => doc.id !== d.id);
@@ -1481,6 +1516,85 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
                   style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '7px 18px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 14px rgba(99,102,241,0.4)', display: 'flex', alignItems: 'center', gap: 6 }}
                 >
                   ✓ Salva e Collega Atto
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal Anteprima Documento & Download */}
+        {selectedDocPreview && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 120, padding: 20 }}>
+            <div style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, width: '100%', maxWidth: 840, maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,.6)' }}>
+              {/* Header */}
+              <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--card)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ fontSize: 22 }}>📄</span>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>{selectedDocPreview.nome}</h3>
+                    <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
+                      Versione {selectedDocPreview.versione || 1} · Caricato il {selectedDocPreview.dataCaricamento} · Stato: <strong>{selectedDocPreview.statoDoc === 'pubblicato' ? 'Pubblicato' : 'Bozza'}</strong>
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setSelectedDocPreview(null)}
+                  style={{ background: 'transparent', border: 'none', color: 'var(--muted)', fontSize: 20, cursor: 'pointer', padding: '4px 8px' }}
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Viewer iframe o messaggio */}
+              <div style={{ flex: 1, overflow: 'hidden', padding: 16, background: '#0f172a', display: 'flex', justifyContent: 'center', minHeight: 440 }}>
+                {(() => {
+                  const url = urlFileArchivio(selectedDocPreview.fileUrl);
+                  if (!url) {
+                    return (
+                      <div style={{ alignSelf: 'center', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
+                        Nessun file fisico collegato o documento generato localmente.
+                      </div>
+                    );
+                  }
+                  return (
+                    <iframe
+                      src={url}
+                      title={selectedDocPreview.nome}
+                      style={{ width: '100%', height: '100%', minHeight: 440, border: 'none', borderRadius: 8, background: '#ffffff' }}
+                    />
+                  );
+                })()}
+              </div>
+
+              {/* Footer Azioni */}
+              <div style={{ padding: '14px 20px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, background: 'var(--card)' }}>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {selectedDocPreview.fileUrl && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => scaricaDocumentoClient(selectedDocPreview.fileUrl, selectedDocPreview.nome)}
+                        style={{ background: '#0d2d22', border: '1px solid #059669', color: '#34d399', padding: '7px 14px', borderRadius: 8, fontSize: 11.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+                      >
+                        📥 Scarica PDF A4
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => scaricaDocumentoWordClient(selectedDocPreview.fileUrl, selectedDocPreview.nome)}
+                        style={{ background: '#1e1b4b', border: '1px solid #3b82f6', color: '#93c5fd', padding: '7px 14px', borderRadius: 8, fontSize: 11.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+                      >
+                        📝 Scarica Word (.doc)
+                      </button>
+                    </>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedDocPreview(null)}
+                  style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '7px 16px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}
+                >
+                  Chiudi
                 </button>
               </div>
             </div>

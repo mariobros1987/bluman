@@ -2185,19 +2185,72 @@ export async function scaricaDocumentoClient(fileUrl?: string | null, nomeFile?:
 /**
  * Scarica un file dell'archivio/fascicolo direttamente nel browser in formato Microsoft Word (.doc) apribile senza errori.
  */
-export async function scaricaDocumentoWordClient(fileUrl?: string | null, nomeFile?: string): Promise<void> {
+export async function scaricaDocumentoWordClient(fileUrl?: string | null, nomeFile?: string, fallbackHtml?: string): Promise<void> {
+  const cleanWordTitle = (nomeFile || 'Documento').replace(/\.(docx?|pdf|html?|txt)$/i, '');
+
+  if (fallbackHtml && fallbackHtml.trim().length > 10) {
+    downloadRealWordDoc(cleanWordTitle, fallbackHtml);
+    return;
+  }
+
   const url = urlFileArchivio(fileUrl);
-  if (!url) return;
+  if (!url) {
+    if (fallbackHtml) downloadRealWordDoc(cleanWordTitle, fallbackHtml);
+    return;
+  }
 
   try {
     const res = await fetch(url);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const blob = await res.blob();
 
+    // Rileva se è un file Word binario nativo (.docx OpenXML / .doc)
+    const isDocx = (nomeFile && /\.(docx?)$/i.test(nomeFile)) || blob.type.includes('wordprocessingml') || blob.type.includes('msword');
+    if (isDocx) {
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      let finalName = (nomeFile || 'documento').trim();
+      if (!finalName.toLowerCase().endsWith('.docx') && !finalName.toLowerCase().endsWith('.doc')) {
+        finalName += '.docx';
+      }
+      link.download = finalName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 4000);
+      return;
+    }
+
+    // Rileva se il contenuto è testo / HTML
+    const textSnippet = await blob.slice(0, 1000).text().catch(() => '');
+    const isPdfBinary = textSnippet.startsWith('%PDF-');
+    const isHtml = textSnippet.includes('<html') || textSnippet.includes('<!DOCTYPE') || textSnippet.includes('<body') || textSnippet.includes('<div') || textSnippet.includes('<p>') || textSnippet.includes('<table');
+
+    if (isPdfBinary && !isHtml) {
+      if (fallbackHtml) {
+        downloadRealWordDoc(cleanWordTitle, fallbackHtml);
+        return;
+      }
+      // Se è un PDF compilato e non c'è HTML, scarica il file binario originale
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = (nomeFile || 'documento').trim();
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 4000);
+      return;
+    }
+
     const fullText = await blob.text();
-    const cleanWordTitle = (nomeFile || 'Documento').replace(/\.(docx?|pdf|html?|txt)$/i, '');
     downloadRealWordDoc(cleanWordTitle, fullText);
   } catch {
+    if (fallbackHtml) {
+      downloadRealWordDoc(cleanWordTitle, fallbackHtml);
+      return;
+    }
     const link = document.createElement('a');
     link.href = url;
     link.target = '_blank';
