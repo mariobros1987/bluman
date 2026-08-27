@@ -1521,87 +1521,86 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
             </div>
           </div>
         )}
+      </div>
 
-        {/* Modal Anteprima Documento & Download */}
-        {selectedDocPreview && (
-          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 120, padding: 20 }}>
-            <div style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, width: '100%', maxWidth: 840, maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,.6)' }}>
-              {/* Header */}
-              <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--card)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span style={{ fontSize: 22 }}>📄</span>
-                  <div>
-                    <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>{selectedDocPreview.nome}</h3>
-                    <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
-                      Versione {selectedDocPreview.versione || 1} · Caricato il {selectedDocPreview.dataCaricamento} · Stato: <strong>{selectedDocPreview.statoDoc === 'pubblicato' ? 'Pubblicato' : 'Bozza'}</strong>
-                    </div>
+      {/* Modal Anteprima Documento & Download al massimo livello zIndex */}
+      {selectedDocPreview && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 20 }}>
+          <div style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, width: '100%', maxWidth: 880, maxHeight: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 25px 60px rgba(0,0,0,.8)' }}>
+            {/* Header */}
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--card)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 22 }}>📄</span>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>{selectedDocPreview.nome}</h3>
+                  <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
+                    Versione {selectedDocPreview.versione || 1} · Caricato il {selectedDocPreview.dataCaricamento} · Stato: <strong>{selectedDocPreview.statoDoc === 'pubblicato' ? 'Pubblicato' : 'Bozza'}</strong>
                   </div>
                 </div>
-                <button
-                  onClick={() => setSelectedDocPreview(null)}
-                  style={{ background: 'transparent', border: 'none', color: 'var(--muted)', fontSize: 20, cursor: 'pointer', padding: '4px 8px' }}
-                >
-                  ✕
-                </button>
               </div>
+              <button
+                onClick={() => setSelectedDocPreview(null)}
+                style={{ background: 'transparent', border: 'none', color: 'var(--muted)', fontSize: 20, cursor: 'pointer', padding: '4px 8px' }}
+              >
+                ✕
+              </button>
+            </div>
 
-              {/* Viewer iframe o messaggio */}
-              <div style={{ flex: 1, overflow: 'hidden', padding: 16, background: '#0f172a', display: 'flex', justifyContent: 'center', minHeight: 440 }}>
-                {(() => {
-                  const url = urlFileArchivio(selectedDocPreview.fileUrl);
-                  if (!url) {
-                    return (
-                      <div style={{ alignSelf: 'center', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
-                        Nessun file fisico collegato o documento generato localmente.
-                      </div>
-                    );
-                  }
+            {/* Viewer iframe o messaggio */}
+            <div style={{ flex: 1, overflow: 'hidden', padding: 16, background: '#0f172a', display: 'flex', justifyContent: 'center', minHeight: 460 }}>
+              {(() => {
+                const url = urlFileArchivio(selectedDocPreview.fileUrl);
+                if (!url) {
                   return (
-                    <iframe
-                      src={url}
-                      title={selectedDocPreview.nome}
-                      style={{ width: '100%', height: '100%', minHeight: 440, border: 'none', borderRadius: 8, background: '#ffffff' }}
-                    />
+                    <div style={{ alignSelf: 'center', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
+                      Nessun file fisico collegato o documento generato localmente.
+                    </div>
                   );
-                })()}
+                }
+                return (
+                  <iframe
+                    src={url}
+                    title={selectedDocPreview.nome}
+                    style={{ width: '100%', height: '100%', minHeight: 460, border: 'none', borderRadius: 8, background: '#ffffff' }}
+                  />
+                );
+              })()}
+            </div>
+
+            {/* Footer Azioni */}
+            <div style={{ padding: '14px 20px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, background: 'var(--card)' }}>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {selectedDocPreview.fileUrl && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => scaricaDocumentoClient(selectedDocPreview.fileUrl, selectedDocPreview.nome)}
+                      style={{ background: '#0d2d22', border: '1px solid #059669', color: '#34d399', padding: '7px 14px', borderRadius: 8, fontSize: 11.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+                    >
+                      📥 Scarica PDF A4
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => scaricaDocumentoWordClient(selectedDocPreview.fileUrl, selectedDocPreview.nome)}
+                      style={{ background: '#1e1b4b', border: '1px solid #3b82f6', color: '#93c5fd', padding: '7px 14px', borderRadius: 8, fontSize: 11.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+                    >
+                      📝 Scarica Word (.doc)
+                    </button>
+                  </>
+                )}
               </div>
 
-              {/* Footer Azioni */}
-              <div style={{ padding: '14px 20px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, background: 'var(--card)' }}>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  {selectedDocPreview.fileUrl && (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => scaricaDocumentoClient(selectedDocPreview.fileUrl, selectedDocPreview.nome)}
-                        style={{ background: '#0d2d22', border: '1px solid #059669', color: '#34d399', padding: '7px 14px', borderRadius: 8, fontSize: 11.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
-                      >
-                        📥 Scarica PDF A4
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => scaricaDocumentoWordClient(selectedDocPreview.fileUrl, selectedDocPreview.nome)}
-                        style={{ background: '#1e1b4b', border: '1px solid #3b82f6', color: '#93c5fd', padding: '7px 14px', borderRadius: 8, fontSize: 11.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
-                      >
-                        📝 Scarica Word (.doc)
-                      </button>
-                    </>
-                  )}
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setSelectedDocPreview(null)}
-                  style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '7px 16px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}
-                >
-                  Chiudi
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedDocPreview(null)}
+                style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '7px 16px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}
+              >
+                Chiudi
+              </button>
             </div>
           </div>
-        )}
-
-      </div>
+        </div>
+      )}
     </div>
   );
 }

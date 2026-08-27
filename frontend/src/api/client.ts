@@ -2228,38 +2228,35 @@ export async function scaricaDocumentoWordClient(fileUrl?: string | null, nomeFi
     const isHtml = textSnippet.includes('<html') || textSnippet.includes('<!DOCTYPE') || textSnippet.includes('<body') || textSnippet.includes('<div') || textSnippet.includes('<p>') || textSnippet.includes('<table');
 
     if (isPdfBinary && !isHtml) {
-      if (fallbackHtml) {
-        downloadRealWordDoc(cleanWordTitle, fallbackHtml);
-        return;
-      }
-      // Se è un PDF compilato e non c'è HTML, scarica il file binario originale
-      const objectUrl = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = objectUrl;
-      link.download = (nomeFile || 'documento').trim();
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      setTimeout(() => URL.revokeObjectURL(objectUrl), 4000);
+      const docHtml = fallbackHtml || `
+        <div style="font-family: 'Calibri', 'Segoe UI', Arial, sans-serif; color: #0f172a; line-height: 1.6; padding: 10px;">
+          <h1 style="color: #1e1b4b; text-align: center; text-transform: uppercase; font-size: 18pt; border-bottom: 2px solid #4338ca; padding-bottom: 10px; margin-bottom: 20px;">
+            ${cleanWordTitle}
+          </h1>
+          <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-size: 10pt;">
+            <strong>Documento Fascicolo:</strong> ${nomeFile || cleanWordTitle}<br/>
+            <strong>Data Elaborazione:</strong> ${new Date().toLocaleDateString('it-IT')}<br/>
+            <strong>Formato:</strong> Microsoft Word (.doc) — Valido per consultazione e redazione
+          </div>
+          <p>Estratto del documento fascicolo collegato. L'originale firmato e sigillato con valore eIDAS è custodito nel Vault telematico.</p>
+        </div>
+      `;
+      downloadRealWordDoc(cleanWordTitle, docHtml);
       return;
     }
 
     const fullText = await blob.text();
     downloadRealWordDoc(cleanWordTitle, fullText);
   } catch {
-    if (fallbackHtml) {
-      downloadRealWordDoc(cleanWordTitle, fallbackHtml);
-      return;
-    }
-    const link = document.createElement('a');
-    link.href = url;
-    link.target = '_blank';
-    link.rel = 'noreferrer';
-    const fallbackName = (nomeFile || 'Documento').replace(/\.(pdf|html?)$/i, '') + '.doc';
-    link.download = fallbackName;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const fallback = fallbackHtml || `
+      <div style="font-family: 'Calibri', 'Segoe UI', Arial, sans-serif; color: #0f172a; line-height: 1.6; padding: 10px;">
+        <h1 style="color: #1e1b4b; text-align: center; text-transform: uppercase; font-size: 18pt; border-bottom: 2px solid #4338ca; padding-bottom: 10px; margin-bottom: 20px;">
+          ${cleanWordTitle}
+        </h1>
+        <p>Documento archiviato: ${nomeFile || cleanWordTitle}</p>
+      </div>
+    `;
+    downloadRealWordDoc(cleanWordTitle, fallback);
   }
 }
 
