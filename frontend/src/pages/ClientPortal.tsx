@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { CatBadge } from '../components/ui/CatBadge';
 import { fmt } from '../utils';
-import { downloadRealPdf } from '../utils/pdfGenerator';
+import { downloadRealPdf, downloadRealWordDoc } from '../utils/pdfGenerator';
 import { DigitalSignatureModal } from '../components/DigitalSignatureModal';
 import { resolveDocumentTemplateHtml, PREBUILT_TEMPLATES } from '../utils/documentTemplates';
 import { getStudioInfoForTenant, getCurrentTenantId, getTenantStorageKey, BLUECODE_TENANT_ID } from '../utils/tenant';
@@ -22,6 +22,7 @@ import {
   documentiPortaleApi,
   urlFileArchivio,
   scaricaDocumentoClient,
+  scaricaDocumentoWordClient,
   contattiPortaleApi,
   proposteDatiPortaleApi,
   inviaPropostaDatiApi,
@@ -2817,13 +2818,24 @@ export function ClientPortal() {
                     </button>
 
                     {doc.scaricabile && urlFileArchivio(doc.fileUrl) && (
-                      <button
-                        type="button"
-                        onClick={() => scaricaDocumentoClient(doc.fileUrl, doc.nome)}
-                        style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '6px 12px', borderRadius: 8, fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
-                      >
-                        ⬇ Scarica il file
-                      </button>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button
+                          type="button"
+                          onClick={() => scaricaDocumentoClient(doc.fileUrl, doc.nome)}
+                          style={{ background: '#1a1f3d', border: '1px solid #4338ca', color: '#c7d2fe', padding: '6px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                          title="Scarica in formato PDF A4"
+                        >
+                          📥 PDF
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => scaricaDocumentoWordClient(doc.fileUrl, doc.nome)}
+                          style={{ background: '#1e1b4b', border: '1px solid #3b82f6', color: '#93c5fd', padding: '6px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                          title="Scarica in formato Microsoft Word (.doc)"
+                        >
+                          📝 Word
+                        </button>
+                      </div>
                     )}
 
                     {doc.firmato ? (
@@ -3745,13 +3757,22 @@ export function ClientPortal() {
             <div style={{ padding: '14px 20px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, background: 'var(--card)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 {urlFileArchivio(selectedViewerDoc.fileUrl) && (
-                  <button
-                    type="button"
-                    onClick={() => scaricaDocumentoClient(selectedViewerDoc.fileUrl, selectedViewerDoc.nome)}
-                    style={{ background: '#1a1f3d', border: '1px solid #4338ca', color: '#c7d2fe', padding: '8px 16px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
-                  >
-                    📥 Scarica PDF A4
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => scaricaDocumentoClient(selectedViewerDoc.fileUrl, selectedViewerDoc.nome)}
+                      style={{ background: '#1a1f3d', border: '1px solid #4338ca', color: '#c7d2fe', padding: '8px 14px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+                    >
+                      📥 Scarica PDF A4
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => scaricaDocumentoWordClient(selectedViewerDoc.fileUrl, selectedViewerDoc.nome)}
+                      style={{ background: '#1e1b4b', border: '1px solid #3b82f6', color: '#93c5fd', padding: '8px 14px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+                    >
+                      📝 Scarica Word (.doc)
+                    </button>
+                  </>
                 )}
 
                 {/* Pulsante Richiedi Modifiche integrato nel visualizzatore */}
@@ -3974,15 +3995,24 @@ export function ClientPortal() {
             </div>
 
             {/* Footer Azioni */}
-            <div style={{ padding: '16px 24px', borderTop: '1px solid var(--border)', background: 'var(--card)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+            <div style={{ padding: '16px 24px', borderTop: '1px solid var(--border)', background: 'var(--card)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
               {successSealModal.fileUrl ? (
-                <button
-                  type="button"
-                  onClick={() => scaricaDocumentoClient(successSealModal.fileUrl, `${(successSealModal.documentoTitolo || 'Documento_Firmato').replace(/[^a-zA-Z0-9_-]/g, '_')}_FIRMATO.pdf`)}
-                  style={{ background: '#059669', color: '#fff', border: 'none', padding: '9px 18px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
-                >
-                  📥 Scarica Copia Firmata PDF
-                </button>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    type="button"
+                    onClick={() => scaricaDocumentoClient(successSealModal.fileUrl, `${(successSealModal.documentoTitolo || 'Documento_Firmato').replace(/[^a-zA-Z0-9_-]/g, '_')}_FIRMATO.pdf`)}
+                    style={{ background: '#059669', color: '#fff', border: 'none', padding: '9px 16px', borderRadius: 10, fontSize: 11.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+                  >
+                    📥 Copia PDF Firmata
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => scaricaDocumentoWordClient(successSealModal.fileUrl, `${(successSealModal.documentoTitolo || 'Documento_Firmato').replace(/[^a-zA-Z0-9_-]/g, '_')}_FIRMATO.doc`)}
+                    style={{ background: '#1e1b4b', border: '1px solid #3b82f6', color: '#93c5fd', padding: '9px 16px', borderRadius: 10, fontSize: 11.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+                  >
+                    📝 Copia Word (.doc)
+                  </button>
+                </div>
               ) : <div />}
 
               <button

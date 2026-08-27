@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { fetchClienti, fetchProgetti, fetchTenantInfoApi, uploadFileApi, creaDocumentoTemplateApi, eliminaDocumentoTemplateApi } from '../api/client';
 import { getFormattedLogoUrl } from '../utils';
-import { downloadRealPdf } from '../utils/pdfGenerator';
+import { downloadRealPdf, downloadRealWordDoc } from '../utils/pdfGenerator';
 import { getCurrentTenantId, getTenantStorageKey, getStudioInfoForTenant } from '../utils/tenant';
 import type { Cliente, Progetto } from '../types';
 
@@ -604,6 +604,48 @@ export function DocumentEditorPage() {
     }
   };
 
+  // Esportazione VERO File Word (.doc) Microsoft Office compatibile al 100%
+  const handleExportWord = () => {
+    try {
+      const currentTenantId = getCurrentTenantId();
+      const studioInfo = getStudioInfoForTenant(currentTenantId);
+
+      const studioRagioneSociale = tenantInfo?.ragioneSociale || studioInfo.ragioneSociale || 'Studio Professionale';
+      const studioSede = tenantInfo?.sedeLegale || studioInfo.sedeLegale || '';
+      const studioPiva = tenantInfo?.piva || studioInfo.piva || '';
+      const studioTel = tenantInfo?.telefono || studioInfo.telefono || '';
+
+      const currentHtml = editorRef.current?.innerHTML || rawTemplateRef.current;
+      const finalHtml = renderResolvedContent(currentHtml, true);
+
+      const fullPrintHtml = `
+        <div style="font-family: 'Calibri', 'Segoe UI', Arial, sans-serif; color: #0f172a; line-height: 1.6; font-size: 11pt;">
+          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #4338ca; padding-bottom: 14px; margin-bottom: 24px;">
+            <div style="font-size: 16pt; font-weight: bold; color: #1e1b4b;">🏛 ${studioRagioneSociale.toUpperCase()}</div>
+            <div style="text-align: right; font-size: 9pt; color: #64748b;">
+              <strong>${studioRagioneSociale}</strong><br/>
+              ${studioSede ? `${studioSede}<br/>` : ''}
+              ${studioPiva ? `P.IVA: ${studioPiva}` : ''} ${studioTel ? `| Tel: ${studioTel}` : ''}
+            </div>
+          </div>
+          <div style="min-height: 400px;">${finalHtml}</div>
+          <div style="margin-top: 40px; border-top: 1px solid #e2e8f0; padding-top: 10px; font-size: 8.5pt; color: #94a3b8;">
+            ${studioRagioneSociale} • Pratica: ${activeProgetto?.titolo || activeProgetto?.n || 'Incarico Professionale'} • Validità Giuridica UE
+          </div>
+        </div>
+      `;
+
+      const safeFileName = `${titoloDocumento.replace(/[^a-zA-Z0-9_-]/g, '_')}_${new Date().toISOString().slice(0, 10)}.doc`;
+      downloadRealWordDoc(safeFileName, fullPrintHtml);
+      setFeedback(`✓ File Word "${safeFileName}" scaricato con successo!`);
+      setTimeout(() => setFeedback(null), 5000);
+    } catch (err: any) {
+      console.error('Errore esportazione Word:', err);
+      setFeedback(`⚠️ Errore esportazione Word: ${err.message || 'Riprova'}`);
+      setTimeout(() => setFeedback(null), 5000);
+    }
+  };
+
   // Salvataggio nel Vault del Progetto (Google Drive / Studio Cloud Vault)
   const handleSaveToVault = async () => {
     setSalvando(true);
@@ -746,9 +788,18 @@ export function DocumentEditorPage() {
 
           <button
             onClick={handleExportPdf}
-            style={{ background: '#0d2d22', color: '#34d399', border: '1px solid #059669', padding: '7px 16px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+            style={{ background: '#0d2d22', color: '#34d399', border: '1px solid #059669', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+            title="Esporta in formato PDF A4 vettoriale"
           >
-            <span>📥 Esporta PDF Vettoriale A4</span>
+            <span>📥 Esporta PDF A4</span>
+          </button>
+
+          <button
+            onClick={handleExportWord}
+            style={{ background: '#1e1b4b', color: '#93c5fd', border: '1px solid #3b82f6', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+            title="Esporta in formato Microsoft Word (.doc) apribile"
+          >
+            <span>📝 Esporta Word (.doc)</span>
           </button>
 
           <button

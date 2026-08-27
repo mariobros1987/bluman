@@ -6,7 +6,7 @@ import { ProgressBar } from '../components/ui/ProgressBar';
 import { AvatarGroup, Avatar } from '../components/ui/Avatar';
 import { PassaggioModal } from '../components/PassaggioModal';
 import { fmt, progressColor, getFormattedLogoUrl } from '../utils';
-import { downloadRealPdf } from '../utils/pdfGenerator';
+import { downloadRealPdf, downloadRealWordDoc } from '../utils/pdfGenerator';
 import { SimpleZipBuilder } from '../utils/zipBuilder';
 import { PREBUILT_TEMPLATES, resolveDocumentTemplateHtml } from '../utils/documentTemplates';
 import { ComunicazioniTab } from '../components/ComunicazioniTab';
@@ -2545,14 +2545,8 @@ function DocumentiTab({ project }: { project: Progetto }) {
     return () => { attivo = false; };
   }, [project.id]);
 
-  // Helper per scaricare localmente copia VERA in PDF A4 con Header/Footer Studio
-  const handleDownloadDocument = async (doc: any) => {
-    // §2.9 — i file caricati nel fascicolo sono già il file vero: si scarica l'originale,
-    // non una copia PDF generata dal contenuto HTML.
-    if (doc.dbDoc && doc.url && doc.url !== '#') {
-      window.open(doc.url, '_blank');
-      return;
-    }
+  // Helper per costruire il layout HTML A4 formattato con Header/Footer Studio
+  const buildDocumentHtml = (doc: any) => {
     const studio = getStudioInfoForTenant();
     const rawContent = doc.contenutoHtml || `
       <div style="font-family: 'Segoe UI', Arial, sans-serif; color: #0f172a; line-height: 1.6; font-size: 11pt; padding: 10px;">
@@ -2568,7 +2562,7 @@ function DocumentiTab({ project }: { project: Progetto }) {
       </div>
     `;
 
-    const fullPrintHtml = `
+    return `
       <div style="font-family: 'Segoe UI', Arial, sans-serif; color: #0f172a; line-height: 1.6; padding: 20px;">
         <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #4338ca; padding-bottom: 14px; margin-bottom: 24px;">
           <div>
@@ -2586,9 +2580,28 @@ function DocumentiTab({ project }: { project: Progetto }) {
         </div>
       </div>
     `;
+  };
 
+  // Scarica Copia VERA in PDF A4
+  const handleDownloadDocumentPdf = async (doc: any) => {
+    if (doc.dbDoc && doc.url && doc.url !== '#') {
+      await scaricaDocumentoClient(doc.url, doc.nome || doc.titolo);
+      return;
+    }
+    const fullPrintHtml = buildDocumentHtml(doc);
     const safePdfName = `${(doc.titolo || doc.nome || 'Documento').replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`;
     await downloadRealPdf(safePdfName, fullPrintHtml);
+  };
+
+  // Scarica Copia VERA in Word (.doc) Microsoft Office compatibile al 100%
+  const handleDownloadDocumentWord = async (doc: any) => {
+    if (doc.dbDoc && doc.url && doc.url !== '#') {
+      await scaricaDocumentoWordClient(doc.url, doc.nome || doc.titolo);
+      return;
+    }
+    const fullPrintHtml = buildDocumentHtml(doc);
+    const safeWordName = `${(doc.titolo || doc.nome || 'Documento').replace(/[^a-zA-Z0-9_-]/g, '_')}.doc`;
+    downloadRealWordDoc(safeWordName, fullPrintHtml);
   };
 
   // Caricamento File da Disco nel Vault Progetto
@@ -2893,11 +2906,20 @@ temporale certificata ISO UTC ed impronta crittografica SHA-256.
 
                   <button
                     type="button"
-                    onClick={() => handleDownloadDocument(doc)}
-                    style={{ background: '#0d2d22', border: '1px solid #059669', color: '#34d399', padding: '5px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
-                    title="Scarica Copia Localmente"
+                    onClick={() => handleDownloadDocumentPdf(doc)}
+                    style={{ background: '#0d2d22', border: '1px solid #059669', color: '#34d399', padding: '5px 7px', borderRadius: 6, fontSize: 10.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}
+                    title="Scarica in formato PDF A4"
                   >
-                    📥 Scarica
+                    📥 PDF
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleDownloadDocumentWord(doc)}
+                    style={{ background: '#1e1b4b', border: '1px solid #3b82f6', color: '#93c5fd', padding: '5px 7px', borderRadius: 6, fontSize: 10.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}
+                    title="Scarica in formato Microsoft Word (.doc)"
+                  >
+                    📝 Word
                   </button>
 
                   <button
@@ -2969,10 +2991,19 @@ temporale certificata ISO UTC ed impronta crittografica SHA-256.
                           </button>
                           <button
                             type="button"
-                            onClick={() => handleDownloadDocument(doc)}
-                            style={{ background: '#0d2d22', border: '1px solid #059669', color: '#34d399', padding: '4px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer', fontWeight: 700 }}
+                            onClick={() => handleDownloadDocumentPdf(doc)}
+                            style={{ background: '#0d2d22', border: '1px solid #059669', color: '#34d399', padding: '4px 8px', borderRadius: 6, fontSize: 10.5, cursor: 'pointer', fontWeight: 700 }}
+                            title="Scarica in formato PDF A4"
                           >
-                            📥 Scarica
+                            📥 PDF
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDownloadDocumentWord(doc)}
+                            style={{ background: '#1e1b4b', border: '1px solid #3b82f6', color: '#93c5fd', padding: '4px 8px', borderRadius: 6, fontSize: 10.5, cursor: 'pointer', fontWeight: 700 }}
+                            title="Scarica in formato Microsoft Word (.doc)"
+                          >
+                            📝 Word
                           </button>
                           <button
                             type="button"
@@ -3075,14 +3106,23 @@ temporale certificata ISO UTC ed impronta crittografica SHA-256.
             </div>
 
             {/* Modal Actions Footer */}
-            <div style={{ padding: '14px 20px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--card)' }}>
-              <button
-                type="button"
-                onClick={() => handleDownloadDocument(selectedPreviewDoc)}
-                style={{ background: '#0d2d22', border: '1px solid #059669', color: '#34d399', padding: '8px 16px', borderRadius: 8, fontSize: 12, cursor: 'pointer', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}
-              >
-                📥 Scarica Documento PDF A4
-              </button>
+            <div style={{ padding: '14px 20px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--card)', flexWrap: 'wrap', gap: 10 }}>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => handleDownloadDocumentPdf(selectedPreviewDoc)}
+                  style={{ background: '#0d2d22', border: '1px solid #059669', color: '#34d399', padding: '8px 14px', borderRadius: 8, fontSize: 11.5, cursor: 'pointer', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}
+                >
+                  📥 Scarica PDF A4
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDownloadDocumentWord(selectedPreviewDoc)}
+                  style={{ background: '#1e1b4b', border: '1px solid #3b82f6', color: '#93c5fd', padding: '8px 14px', borderRadius: 8, fontSize: 11.5, cursor: 'pointer', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}
+                >
+                  📝 Scarica Word (.doc)
+                </button>
+              </div>
 
               <div style={{ display: 'flex', gap: 10 }}>
                 <button

@@ -1,6 +1,6 @@
 // API Client per integrare il React Frontend con il backend Fastify + Supabase DB
 import { getTenantStorageKey, getCurrentTenantId, getStudioInfoForTenant, BLUECODE_TENANT_ID } from '../utils/tenant';
-import { downloadRealPdf } from '../utils/pdfGenerator';
+import { downloadRealPdf, downloadRealWordDoc } from '../utils/pdfGenerator';
 
 const getApiBase = () => {
   if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_BASE) {
@@ -2120,8 +2120,7 @@ export function urlFileArchivio(url?: string | null): string | null {
 }
 
 /**
- * Scarica un file dell'archivio/fascicolo direttamente nel browser in formato PDF / binario corretto,
- * garantendo che i modelli HTML/Word vengano esportati come veri PDF A4 apribili.
+ * Scarica un file dell'archivio/fascicolo direttamente nel browser in formato PDF A4 apribile.
  */
 export async function scaricaDocumentoClient(fileUrl?: string | null, nomeFile?: string): Promise<void> {
   const url = urlFileArchivio(fileUrl);
@@ -2168,6 +2167,34 @@ export async function scaricaDocumentoClient(fileUrl?: string | null, nomeFile?:
       fallbackName = fallbackName.replace(/\.docx$/i, '.pdf');
     }
     if (fallbackName) link.download = fallbackName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+}
+
+/**
+ * Scarica un file dell'archivio/fascicolo direttamente nel browser in formato Microsoft Word (.doc) apribile senza errori.
+ */
+export async function scaricaDocumentoWordClient(fileUrl?: string | null, nomeFile?: string): Promise<void> {
+  const url = urlFileArchivio(fileUrl);
+  if (!url) return;
+
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const blob = await res.blob();
+
+    const fullText = await blob.text();
+    const cleanWordTitle = (nomeFile || 'Documento').replace(/\.(docx?|pdf|html?|txt)$/i, '');
+    downloadRealWordDoc(cleanWordTitle, fullText);
+  } catch {
+    const link = document.createElement('a');
+    link.href = url;
+    link.target = '_blank';
+    link.rel = 'noreferrer';
+    const fallbackName = (nomeFile || 'Documento').replace(/\.(pdf|html?)$/i, '') + '.doc';
+    link.download = fallbackName;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

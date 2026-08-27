@@ -418,3 +418,72 @@ export async function downloadGuidePdf() {
 
   await downloadRealPdf('Guida_Configurazione_Canali_BluMan.pdf', guideHtml);
 }
+
+/**
+ * Genera e scarica un documento Word (.doc) nativo, formattato con gli standard Microsoft Office Word XML/HTML
+ * per aprirsi istantaneamente in Microsoft Word, LibreOffice, Apple Pages o Google Docs senza errori o avvisi di corruzione.
+ */
+export function downloadRealWordDoc(fileName: string, htmlContent: string) {
+  const safeName = fileName.endsWith('.doc') || fileName.endsWith('.docx')
+    ? fileName.replace(/\.docx$/i, '.doc')
+    : `${fileName.replace(/\.pdf$/i, '')}.doc`;
+
+  const wordHeader = `
+<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+<head>
+<meta charset='utf-8'>
+<title>${safeName}</title>
+<!--[if gte mso 9]>
+<xml>
+<w:WordDocument>
+<w:View>Print</w:View>
+<w:Zoom>100</w:Zoom>
+<w:DoNotOptimizeForBrowser/>
+</w:WordDocument>
+</xml>
+<![endif]-->
+<style>
+@page WordSection1 {
+  size: 21.0cm 29.7cm;
+  margin: 2.0cm 2.0cm 2.0cm 2.0cm;
+  mso-header-margin: 35.4pt;
+  mso-footer-margin: 35.4pt;
+  mso-paper-source: 0;
+}
+div.WordSection1 {
+  page: WordSection1;
+}
+body {
+  font-family: 'Calibri', 'Segoe UI', Arial, sans-serif;
+  font-size: 11pt;
+  line-height: 1.5;
+  color: #1e293b;
+}
+h1 { font-size: 18pt; color: #1e1b4b; text-align: center; margin-bottom: 12pt; font-weight: bold; }
+h2 { font-size: 14pt; color: #1e1b4b; margin-top: 14pt; margin-bottom: 6pt; font-weight: bold; }
+h3 { font-size: 12pt; color: #1e1b4b; margin-top: 10pt; margin-bottom: 4pt; font-weight: bold; }
+p { margin-top: 0; margin-bottom: 8pt; text-align: justify; }
+table { border-collapse: collapse; width: 100%; margin-top: 10pt; margin-bottom: 12pt; }
+th, td { border: 1px solid #cbd5e1; padding: 6pt 8pt; vertical-align: top; }
+th { background-color: #f1f5f9; font-weight: bold; color: #0f172a; }
+.signature-box { border: 1px solid #cbd5e1; background-color: #f8fafc; padding: 10pt; margin-top: 15pt; border-radius: 4pt; }
+</style>
+</head>
+<body>
+<div class="WordSection1">
+${htmlContent}
+</div>
+</body>
+</html>`;
+
+  const blob = new Blob(['\ufeff' + wordHeader], { type: 'application/msword;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = safeName;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
