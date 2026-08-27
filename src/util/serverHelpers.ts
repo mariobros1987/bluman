@@ -187,3 +187,17 @@ export function senzaHash<T extends { passwordHash?: string | null }>(utente: T)
   const { passwordHash: _ignorato, ...resto } = utente;
   return resto;
 }
+
+/** Nome leggibile del file a partire dal suo URL, senza il percorso di storage. */
+export function nomeFileDaUrl(url: string): string | null {
+  const pulito = url.split(/[?#]/)[0] ?? '';
+  const ultimo = pulito.split('/').filter(Boolean).pop();
+  if (!ultimo) return null;
+  try {
+    // uploadDocumento prefissa `${Date.now()}_` per evitare omonimie in archivio:
+    // all'utente si mostra il nome originale del file.
+    return decodeURIComponent(ultimo).replace(/^\d{13}_/, '');
+  } catch {
+    return ultimo.replace(/^\d{13}_/, '');
+  }
+}
