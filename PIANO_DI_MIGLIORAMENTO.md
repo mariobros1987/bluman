@@ -1,7 +1,7 @@
 # 🛠️ BluMan — Piano di Miglioramento e Implementazione
 
-> **Data**: 2025-07-14
-> **Stato**: Piano approvato in attesa di esecuzione
+> **Data**: 2025-07-14 (creazione) — ultimo aggiornamento in calce
+> **Stato**: Fasi 0 e 1 completate, 6.1 CI/CD completata; Fasi 2-5 e resto Fase 6 in attesa
 > **Autore**: Analisi AI completa del codebase
 > **Priorità**: 🔴 Critica (sicurezza) → 🟠 Alta → 🟡 Media → 🟢 Bassa
 
@@ -762,24 +762,15 @@ Lo script `src/scripts/backupDb.ts` esiste. Schedularlo:
 > **Obiettivo**: Automatizzare test, deploy, monitoring.
 > **Tempo stimato**: 1 settimana
 
-### 6.1 🟡 CI/CD con GitHub Actions
+### 6.1 ✅ CI/CD con GitHub Actions (fatto, 27 agosto 2026)
 
-```yaml
-# .github/workflows/ci.yml
-name: CI
-on: [push, pull_request]
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: 20 }
-      - run: npm ci
-      - run: npm run prisma:generate
-      - run: npm test
-      - run: npm run build
-```
+La workflow reale è `.github/workflows/ci.yml` (push e PR su `main`) e comprende,
+nell'ordine: setup Node 20 con cache npm su entrambi i lockfile, `npm ci` in radice,
+`npx prisma generate`, **typecheck backend** (`npx tsc --noEmit`), **suite completa**
+(`npx vitest run`), **build backend** (`npm run build`), `npm ci` in `frontend/`,
+**typecheck frontend REALE** (`npx tsc -b --force` — il `tsc --noEmit` sul tsconfig del
+frontend con `"files": []` non verifica nulla) e **build frontend** (`tsc -b && vite build`).
+`frontend/package-lock.json` è versionato perché `npm ci` funzioni in CI.
 
 ---
 
@@ -843,6 +834,7 @@ REDIS_URL=
 - [x] 1.3 Health check con verifica DB
 - [x] 1.4 Frontend: rimuovere mockData da App.tsx
 - [x] 1.5 §WF-DOC: Workflow bidirezionale documenti (bozza ⇄ pubblicato ⇄ revisione ⇄ firma OTP con versioning a DB)
+- [x] 1.6 §WF-DOC hardening (27/08/2026): documento firmato blocca tutto con 409 (stato/nuova versione/eliminazione), sblocco riservato all'admin del tenant con motivazione ≥10 caratteri e audit, tracciabilità a ritroso nel portale cliente (`documentoPadreId` + `versioniPrecedenti[]`)
 
 ### FASE 2 — Refactoring (1-2 settimane)
 - [ ] 2.1 Spezzare server.ts in moduli route
@@ -867,7 +859,7 @@ REDIS_URL=
 - [ ] 5.4 Backup DB schedulato
 
 ### FASE 6 — DevOps (1 settimana)
-- [ ] 6.1 CI/CD GitHub Actions
+- [x] 6.1 CI/CD GitHub Actions
 - [ ] 6.2 Monitoring Sentry + uptime
 - [ ] 6.3 `.env.example` documentato
 
@@ -890,5 +882,5 @@ REDIS_URL=
 
 ---
 
-*Ultimo aggiornamento: 2025-07-14*
-*Prossima revisione: dopo completamento Fase 0*
+*Ultimo aggiornamento: 2026-08-27 (ciclo §WF-DOC firma/sblocco/tracciabilità + CI GitHub Actions completa; la conferma di conclusione operazione nel portale è ora una firma FEA vera — ambito `modulo_completato`, impronta server-side, riga `FirmaElettronica` a database; 281 test in 22 file)*
+*Prossima revisione: dopo completamento Fase 2 (refactoring server.ts)*

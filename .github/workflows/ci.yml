@@ -39,6 +39,10 @@ jobs:
       - name: Backend & Domain Tests
         run: npx vitest run
 
+      # Presidio 2b: anche l'emissione del compilato deve riuscire.
+      - name: Backend Build
+        run: npm run build
+
       - name: Install Frontend Dependencies
         run: npm ci
         working-directory: frontend

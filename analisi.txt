@@ -1,3 +1,11 @@
+================================================================================
+⚠️ DOCUMENTO STORICO — aggiornato alle fasi iniziali del progetto (agosto 2026).
+Non è più il piano operativo corrente: i task elencati qui sotto (Fase 0, Fase 1,
+Fase 2) sono stati completati o assorbiti dall'evoluzione dell'app.
+Il piano corrente sta in ISTRUZIONI_PER_IA.md (sezione «DA DOVE RIPARTIRE») e in
+PIANO_DI_MIGLIORAMENTO.md. NON aggiungere task nuovi in questo file.
+================================================================================
+
  0.4 │ Attivare RLS su          │ Migration SQL manuale                 │ psql -c "SELECT * FROM pg_policies WHERE          │   
   │     │ PostgreSQL               │                                       │ tablename='cliente';" → policy attiva             │   
   ├─────┼──────────────────────────┼───────────────────────────────────────┼───────────────────────────────────────────────────┤   

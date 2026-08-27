@@ -6224,6 +6224,85 @@ export function buildServer(app: AppPort): FastifyInstance {
   }
 
   /**
+   * Conferma di un modulo completato — impronta SHA-256 calcolata dal server sui dati
+   * canonici del modulo e delle sue micro-voci. Come per i documenti del fascicolo, non si
+   * accetta un hash dal browser: il sigillo deve descrivere ciò che lo studio ha davvero
+   * concluso, non ciò che il firmatario dichiara di confermare.
+   *
+   * Lo `stato` del modulo NON viene toccato qui: §16.2 lo vuole calcolato e mai scritto a
+   * mano. La conferma del cliente vive nella riga `FirmaElettronica` (ambito
+   * `modulo_completato`), come per i documenti firmati lo stato si deriva dal sigillo.
+   */
+  async function improntaModuloCompletato(
+    tenantId: string,
+    clienteId: string,
+    moduloId: string,
+  ): Promise<{ hash: string; titolo: string } | { errore: string; codice: number }> {
+    const modulo = await prisma.moduloProgetto.findFirst({
+      where: {
+        id: moduloId,
+        tenantId,
+        // Il modulo appartiene al cliente se sta in un suo progetto: stessa catena che
+        // `improntaDocumentoDelFascicolo` usa per i documenti.
+        progetto: { clienteId },
+      },
+      select: {
+        id: true,
+        nome: true,
+        categoria: true,
+        prezzo: true,
+        stato: true,
+        progetto: { select: { nome: true } },
+        microvoci: { select: { nome: true, stato: true } },
+      },
+    });
+
+    if (!modulo) return { errore: 'Il modulo non è presente nei progetti di questo cliente.', codice: 404 };
+
+    // L'ordine del flusso lo decide il server: una richiesta costruita a mano non può
+    // confermare un modulo che lo studio non ha ancora concluso. Il sigillo sarebbe
+    // autentico e per questo peggio di una firma mancante.
+    if (modulo.stato !== 'done') {
+      return {
+        errore:
+          'Il modulo non risulta concluso dallo studio: la conferma si può firmare solo quando le attività sono completate.',
+        codice: 409,
+      };
+    }
+
+    // Un modulo già confermato non si rifirma: due sigilli sullo stesso atto lascerebbero
+    // il dubbio su quale faccia fede.
+    const giaFirmato = await (prisma as any).firmaElettronica.findFirst({
+      where: { tenantId, clienteId, ambito: 'modulo_completato', riferimentoId: moduloId },
+      select: { id: true },
+    });
+    if (giaFirmato) {
+      return {
+        errore: 'Questo modulo è già stato confermato con firma: una seconda firma non può essere apposta.',
+        codice: 409,
+      };
+    }
+
+    // Ordine deterministico: le micro-voci per nome, così l'impronta non dipende
+    // dall'ordine di lettura del database.
+    const microvoci = [...modulo.microvoci].sort((a, b) => a.nome.localeCompare(b.nome));
+    const contenuto = JSON.stringify({
+      tipo: 'conferma_modulo_completato',
+      moduloId: modulo.id,
+      nome: modulo.nome,
+      categoria: modulo.categoria,
+      prezzo: modulo.prezzo,
+      progetto: modulo.progetto.nome,
+      microvoci: microvoci.map((mv) => ({ nome: mv.nome, stato: mv.stato })),
+    });
+
+    return {
+      hash: crypto.createHash('sha256').update(contenuto).digest('hex'),
+      titolo: `${modulo.nome} — ${modulo.progetto.nome}`,
+    };
+  }
+
+  /**
    * §WF-DOC — lo schema dichiara `firmato` «stato terminale positivo», ma nessuna delle due
    * rotte di firma lo scriveva: il documento restava `pubblicato` (o `in_revisione`) per
    * sempre. Portale e scheda dello studio derivano «firmato» dall'esistenza della riga
@@ -6276,16 +6355,21 @@ export function buildServer(app: AppPort): FastifyInstance {
     //
     // Per un documento del fascicolo l'impronta la calcola il server dal file in archivio, e
     // quella eventualmente mandata dal browser viene ignorata: vedi
-    // `improntaDocumentoDelFascicolo`. Per la lettera d'incarico resta quella del browser,
-    // perché il testo è ancora composto lì.
+    // `improntaDocumentoDelFascicolo`. Per la conferma di un modulo completato la calcola
+    // sempre il server, dai dati del modulo: vedi `improntaModuloCompletato`. Per la lettera
+    // d'incarico resta quella del browser, perché il testo è ancora composto lì.
     const vault = ambito === 'documento_vault' && riferimentoId;
-    if (!vault && (!documentoHash || !HASH_SHA256.test(documentoHash.trim()))) {
+    const moduloCompletato = ambito === 'modulo_completato';
+    if (!vault && !moduloCompletato && (!documentoHash || !HASH_SHA256.test(documentoHash.trim()))) {
       return reply
         .code(400)
         .send({ errore: 'Impronta SHA-256 del documento mancante o non valida: la firma non può essere apposta.' });
     }
     if (ambito === 'documento_vault' && !riferimentoId) {
       return reply.code(400).send({ errore: 'Manca il documento da firmare.' });
+    }
+    if (moduloCompletato && !riferimentoId) {
+      return reply.code(400).send({ errore: 'Manca il modulo da confermare.' });
     }
 
     try {
@@ -6301,6 +6385,12 @@ export function buildServer(app: AppPort): FastifyInstance {
       let titoloDalFascicolo: string | null = null;
       if (vault && riferimentoId) {
         const esito = await improntaDocumentoDelFascicolo(tenantId, clienteId, riferimentoId);
+        if ('errore' in esito) return reply.code(esito.codice).send({ errore: esito.errore });
+        improntaFinale = esito.hash;
+        titoloDalFascicolo = esito.titolo;
+      }
+      if (moduloCompletato && riferimentoId) {
+        const esito = await improntaModuloCompletato(tenantId, clienteId, riferimentoId);
         if ('errore' in esito) return reply.code(esito.codice).send({ errore: esito.errore });
         improntaFinale = esito.hash;
         titoloDalFascicolo = esito.titolo;
@@ -6375,7 +6465,8 @@ export function buildServer(app: AppPort): FastifyInstance {
         tipoEvento: 'firma_apposta',
         oggetto: 'Firma registrata',
         corpo: `La tua firma su «${documentoTitolo}» è stata registrata correttamente.`,
-        link: '/portal/documents',
+        // La conferma di un modulo si rivede nell'avanzamento, non nel fascicolo documenti.
+        link: moduloCompletato ? '/portal/avanzamento' : '/portal/documents',
       }).catch(() => {});
 
       // L'attivazione del progetto riguarda solo la lettera d'incarico: prima avveniva a
@@ -6447,15 +6538,20 @@ export function buildServer(app: AppPort): FastifyInstance {
       return reply.code(400).send({ errore: 'File firmato mancante.' });
     }
     // Come nella firma con codice: per un documento del fascicolo l'impronta dell'originale la
-    // calcola il server dal file in archivio, non il browser.
+    // calcola il server dal file in archivio, e per un modulo completato dai dati del modulo —
+    // mai il browser.
     const vault = ambito === 'documento_vault' && riferimentoId;
-    if (!vault && (!documentoHash || !HASH_SHA256.test(documentoHash.trim()))) {
+    const moduloCompletato = ambito === 'modulo_completato';
+    if (!vault && !moduloCompletato && (!documentoHash || !HASH_SHA256.test(documentoHash.trim()))) {
       return reply
         .code(400)
         .send({ errore: 'Impronta SHA-256 del documento originale mancante o non valida.' });
     }
     if (ambito === 'documento_vault' && !riferimentoId) {
       return reply.code(400).send({ errore: 'Manca il documento a cui si riferisce la firma.' });
+    }
+    if (moduloCompletato && !riferimentoId) {
+      return reply.code(400).send({ errore: 'Manca il modulo a cui si riferisce la firma.' });
     }
 
     try {
@@ -6482,6 +6578,12 @@ export function buildServer(app: AppPort): FastifyInstance {
       let titoloDalFascicolo: string | null = null;
       if (vault && riferimentoId) {
         const esito = await improntaDocumentoDelFascicolo(tenantId, clienteId, riferimentoId);
+        if ('errore' in esito) return reply.code(esito.codice).send({ errore: esito.errore });
+        improntaFinale = esito.hash;
+        titoloDalFascicolo = esito.titolo;
+      }
+      if (moduloCompletato && riferimentoId) {
+        const esito = await improntaModuloCompletato(tenantId, clienteId, riferimentoId);
         if ('errore' in esito) return reply.code(esito.codice).send({ errore: esito.errore });
         improntaFinale = esito.hash;
         titoloDalFascicolo = esito.titolo;

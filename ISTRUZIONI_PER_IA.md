@@ -70,51 +70,72 @@ Correzione successiva a Fase 1 — il frontend non inventa più i moduli (regola
 Sicurezza Password al Primo Accesso & Profilo Operatore (§27, §23): implementato il modale bloccante `MustChangePasswordModal` per utenti con `stato: 'invitato'`, l'aggiornamento dinamico dello stato sessione da `/auth/me`, il cambio password cifrato scrypt da `POST /auth/change-password` e `POST /portal/change-password`, il modale profilo `UserProfileModal` per lo staff e la scheda `👤 6. Profilo & Password` nel Portale Cliente. Pulsante `🔄 Reset Pass` aggiunto nelle schede collaboratori di `SettingsPage.tsx` e in `SuperAdminPage.tsx`. Assegnate password temporanee monouso a tutti gli utenti con `npm run passwords:assign -- --force`.
 Debiti ancora aperti: due moduli con zero micro-voci su "Struttura Holding — Famiglia Ricci" (stato messo a mano, non verificabile dal motore); due clienti "Holding Beta S.r.l." e due progetti "Struttura Holding — Famiglia Ricci" omonimi, lasciati per decisione del titolare e distinti solo nelle etichette della UI.
 
-DA DOVE RIPARTIRE (aggiornato al 26 agosto 2026, dopo la bonifica Regola 7 e il fix audit §0.6):
-Completato e committato il 26 agosto 2026:
-- typecheck del frontend a zero errori (commit `9c85d26`);
-- rimossi TUTTI i dati inventati dal frontend (violazioni Regola 7) in Dashboard, Projects,
-  ClientsPage, ProjectDetail, NewProjectWizard, Library e QuickTimeTracker — qui è stata
-  eliminata anche l'intera tabella di tariffe orarie inventata per id che produceva costi
-  senza fonte; i dati assenti ora si mostrano come 'n/d' o non vengono renderizzati
-  (commit `62cb722`);
-- `recordAudit` in `src/server.ts` ora ha `tenantId` obbligatorio, scrive con
-  `prismaAmministrativo()`, non usa più `setImmediate` (tutti i chiamanti fanno await) e
-  logga gli errori invece di ingoiarli: voce 0.6 di `PIANO_DI_MIGLIORAMENTO.md` spuntata.
-Verifiche: typecheck backend e frontend verdi, 269 test passati, grep di presidio Regola 7
-pulito (restano solo commenti che documentano i fix).
+DA DOVE RIPARTIRE (aggiornato al 27 agosto 2026, dopo il ciclo §WF-DOC firma/sblocco/tracciabilità):
+Completato il 27 agosto 2026:
+- la conclusione di un'operazione nel portale è una firma FEA a tutti gli effetti, non più
+  una conferma locale: nuovo ambito `modulo_completato` in `/portal/verify-otp-and-sign` e
+  `/portal/firma-con-file`; l'impronta SHA-256 la calcola il server dai dati canonici del
+  modulo (`improntaModuloCompletato`), il browser non la manda; guard 409 se il modulo non
+  appartiene al cliente, non è `done` o è già firmato; riga `FirmaElettronica` con data,
+  hash e IP visibile subito allo studio; il portale carica le conclusioni da `GET /firme`
+  (`elencoFirmeApi` con ambito) e non usa più `localStorage`;
+- blocco totale dei documenti `firmato`: `PATCH /documenti/:id/stato`,
+  `POST /documenti/:id/nuova-versione` e `DELETE /documenti/:id` rispondono **409** se il
+  documento è firmato (lato app e lato portale spariscono i pulsanti e restano data/riferimento
+  firma + ricevuta eIDAS);
+- `PATCH /documenti/:id/sblocca` riservato all'admin del tenant (`advisor`/`super_admin`),
+  motivazione obbligatoria ≥10 caratteri, audit `DOCUMENTO_SBLOCCATO`, notifica
+  `documento_sbloccato`, riga `firmaElettronica` conservata come evidenza storica;
+- tracciabilità a ritroso: `GET /portal/documenti` restituisce `documentoPadreId` e
+  `versioniPrecedenti[]` (risalita della catena con tetto di 12 salti, firme degli antenati
+  risolte dalla mappa `firmaPerDocumento`); il portale mostra la cronologia espandibile 🕘
+  nella scheda documento e richiami compatti nelle schede moduli/deliverable;
+- l'editor (`DocumentEditorPage.tsx`) vincola il salvataggio alla micro-voce reale del
+  progetto scelto (nessun id inventato, fascia «Percorso del documento»);
+- CI GitHub Actions riscritta: typecheck backend (`tsc --noEmit`), 281 test vitest, build
+  backend, typecheck frontend REALE (`tsc -b --force` — il `tsc --noEmit` sul tsconfig del
+  frontend con `"files": []` non verifica nulla) e build frontend; generato
+  `frontend/package-lock.json` perché `npm ci` in CI funzionasse;
+- `analisi.txt` declassato a documento storico (fotografia delle fasi iniziali, non è più il
+  piano operativo corrente).
+Verifiche: `npx tsc --noEmit` in radice verde, `npx tsc -b --force` in frontend/ verde,
+`npx vitest run` 281/281 in 22 file, `npm run build` verde.
 Restano aperte le voci non spuntate di `PIANO_DI_MIGLIORAMENTO.md` (0.1-0.5, 0.7, Fase 1+).
 
-PIANO OPERATIVO PRECEDENTE (aggiornato al 22 agosto 2026, dopo le correzioni di sicurezza password e moduli cliente):
-Il piano operativo per fase e task sta in `analisi.txt`. Fase 0 e Fase 1 sono chiuse e committate.
-La prossima è FASE 2: UI CORE — TRACKING ORE, task 2.1-2.5:
-- 2.1 componente `frontend/src/components/MicrovoceRow.tsx` con input ore (click → modal → PATCH);
-- 2.2 `POST /microvoci/:id/consuntivazione` che chiama `registraConsuntivazione()` e aggiorna
-  oreConsuntivate, stato e segnaleRischio. ATTENZIONE: la funzione pura esiste già in
-  stateEngine.ts ed è testata, e in `src/server.ts` esiste già un percorso di consuntivazione
-  (vedi `consuntivaMicrovoceApi` nel client frontend): prima di scrivere codice nuovo, verifica
-  cosa c'è già e collegalo, come è stato fatto in Fase 1 — il motore era completo e inutilizzato;
-- 2.3 timer start/stop opzionale con localStorage per utente, sync su stop;
-- 2.4 `frontend/src/pages/TeamHours.tsx`, vista settimanale ore per membro del team;
-- 2.5 aggiornamento stato progetto senza refresh (l'avanzamento arriva già calcolato dall'API,
-  vedi regola 6: serve solo rileggerlo dopo la scrittura, non ricalcolarlo nel browser).
+PIANO OPERATIVO STORICO (22 agosto 2026) — SUPERATO, conservato per memoria:
+Il piano per fasi in `analisi.txt` (Fase 0/1 chiuse, Fase 2 UI CORE tracking ore 2.1-2.5) è
+una fotografia delle fasi iniziali: i task elencati sono stati nel frattempo completati o
+assorbiti dall'evoluzione dell'app. `analisi.txt` resta come documento storico; il piano
+corrente è la sezione «DA DOVE RIPARTIRE» qui sopra più le voci aperte di
+`PIANO_DI_MIGLIORAMENTO.md`. Non aggiungere task nuovi in `analisi.txt`.
 
-Decisioni che aspettano il titolare del dato, da non prendere da soli:
-1. Il ricalcolo sulla riga divergente di "holding dibenedetto" è una SCRITTURA IN PRODUZIONE.
-   Le letture mostrano già il valore corretto perché lo calcolano: non c'è urgenza. Il pulsante
-   ora esiste (intestazione del Dettaglio Progetto, visibile ad advisor e super_admin): premerlo
-   su quel progetto è la scrittura, e va fatto sapendo che lo è.
-2. I due moduli senza micro-voci vanno istanziati o azzerati a mano. Il codice li preserva.
-3. La conferma di conclusione operazione nel portale vive solo nel `localStorage` del
-   dispositivo del cliente: non passa da `/portal/verify-otp-and-sign`, non produce sigillo FEA
-   e lo studio non la vede a database. Il testo non rivendica più una firma qualificata, ma
-   trasformarla in una firma vera (o togliere il pulsante) è una scelta di prodotto.
-4. Nel Vault i documenti allegano l'evidenza di firma solo se esiste; l'IP non c'è più perché
-   non era mai stato registrato. Se l'evidenza forense serve per davvero, va registrata lato
-   server al momento della firma, dove l'IP della richiesta è noto.
+Decisioni prese dal titolare (27 agosto 2026):
+1. Ricalcolo sulla riga divergente di "holding dibenedetto": LASCIARE COSÌ. Le letture
+   mostrano già il valore corretto perché lo calcolano; il pulsante esiste ma non va premuto.
+   Se in futuro si vorrà la scrittura in produzione, è `POST /progetti/:id/ricalcola`
+   (solo advisor/super_admin).
+2. I due moduli senza micro-voci su "Struttura Holding — Famiglia Ricci": LASCIARLI COSÌ
+   per ora. Il codice li preserva (nessun declassamento automatico).
+3. La conferma di conclusione operazione nel portale: TRASFORMATA IN FIRMA VERA. Ora è una
+   FEA con lo stesso flusso OTP dei documenti: ambito `modulo_completato` in
+   `/portal/verify-otp-and-sign` e `/portal/firma-con-file`, impronta calcolata dal server
+   sui dati canonici del modulo (`improntaModuloCompletato`: nome, categoria, prezzo,
+   progetto, microvoci ordinate — mai dal browser), guard 409 se il modulo non è `done` o
+   è già firmato, riga in `FirmaElettronica` con data, hash e IP del momento della firma.
+   Il portale rilegge le conclusioni da `GET /firme` filtrato per ambito: la firma fatta su
+   un dispositivo è visibile a tutti, studio compreso. La chiave localStorage
+   `bluman_module_signatures_…` non è più né scritta né letta.
 
-Prima di toccare qualsiasi cosa, esegui `npx prisma generate`, poi `npx vitest run` e
-`npx tsc --noEmit` sia in radice sia in `frontend/`. Se qualcosa è rosso PRIMA delle tue
+Decisioni che aspettano ancora il titolare del dato, da non prendere da soli:
+1. Nel Vault i documenti allegano l'evidenza di firma solo se esiste; l'IP non c'è più perché
+   non era mai stato registrato. Le firme NUOVE registrano l'IP lato server
+   (`firma_elettronica.ip_address` da `req.ip`): la voce riguarda solo le firme storiche.
+   Se l'evidenza forense serve per davvero anche sul pregresso, va decisa una sanatoria.
+
+Prima di toccare qualsiasi cosa, esegui `npx prisma generate`, poi `npx vitest run`,
+`npx tsc --noEmit` in radice e `npm run typecheck` in `frontend/` (che esegue
+`tsc -b --force`: il `tsc --noEmit` sul tsconfig del frontend, avendo `"files": []`, non
+verifica nulla ed è vietato come presidio). Se qualcosa è rosso PRIMA delle tue
 modifiche, dillo invece di aggiustarlo di nascosto.
 `npx prisma generate` viene prima per un motivo concreto: il client generato in `node_modules`
 non è versionato e resta indietro rispetto a `prisma/schema.prisma`. Succede davvero — `Cliente`
@@ -134,14 +155,14 @@ Leggiti i file .agents/AGENTS.md, README.md ed ISTRUZIONI_INSTALLAZIONE.md prima
 - **`frontend/src/pages/ClientsPage.tsx`**: Anagrafica Clienti ERP (4 schede) e Magic Link passwordless.
 - **`frontend/src/pages/CalendarPage.tsx`**: Calendario Condiviso & Scadenzario Studio (Vista Mese / Agenda Lista con dati reali da DB).
 - **`frontend/src/pages/ProjectDetail.tsx`**: Dettaglio Progetto con Grafo Moduli (`GrafoModuliProgettoView`), Comunicazioni Omnichannel, Fatture/NC e Scadenze microvoci.
-- **`frontend/src/pages/DocumentEditorPage.tsx`**: Studio Document Studio (Word WYSIWYG, Smart Tags ERP, Foglio A4, PDF).
+- **`frontend/src/pages/DocumentEditorPage.tsx`**: Studio Document Studio (Word WYSIWYG, Smart Tags ERP, Foglio A4, PDF) con selettore micro-voce di destinazione e «Percorso del documento».
 - **`frontend/src/pages/Library.tsx`**: Distinta Base, Catalogo Articoli, Modelli Documenti ed Editing Prezzi Unitari.
-- **`frontend/src/pages/ClientPortal.tsx`**: Portale Cliente a 5 schede (Firma FEA OTP 1-Click, Live Progress, Form Societari, Vault Documenti, Chat Advisor).
+- **`frontend/src/pages/ClientPortal.tsx`**: Portale Cliente a 6 schede (Proposta & Firma 1-Click, Live Progress, Form Societari, Documenti & Contratti, Chat & Comunicazioni, Profilo & Password) con cronologia versioni a ritroso §WF-DOC (`versioniPrecedenti[]`).
 - **`frontend/src/pages/InvoicesPage.tsx`**: Registro Fatture/NC ed Export XML SDI FatturaPA.
 - **`frontend/src/pages/PrimaNotaPage.tsx`**: Registro Prima Nota, Movimenti Cassa/Banca e Riconciliazione CSV.
 - **`frontend/src/pages/RetainersPage.tsx`**: Contratti Ricorrenti & Retainer Studio periodici.
 - **`frontend/src/pages/SettingsPage.tsx`**: Impostazioni Studio, Configuratore PDF, Gestione Team con iniziali/hover card, Matrice Permessi RBAC ed Email Suite SMTP/IMAP.
-- **`src/server.ts`**: Server Fastify API con endpoint `/auth/login`, `/auth/magic-login`, `/portal/request-otp`, `/portal/verify-otp-and-sign`, `/progetti/:id/ricalcola`, `/cron/esegui-notifiche-scadenze`, `/invoices/:id/trasmetti-sdi`.
+- **`src/server.ts`**: Server Fastify API con endpoint `/auth/login`, `/auth/magic-login`, `/portal/request-otp`, `/portal/verify-otp-and-sign`, `/portal/documenti` (con `documentoPadreId` + `versioniPrecedenti[]`), `/documenti/:id/sblocca` (solo admin, §WF-DOC), `/progetti/:id/ricalcola`, `/cron/esegui-notifiche-scadenze`, `/invoices/:id/trasmetti-sdi`.
 - **`src/domain/stateEngine.ts`**: Motore di stato §16 in funzioni pure (nessun database, solo `import type`). Non aggiungerci query.
 - **`src/services/calcoloService.ts`**: Unico ponte fra il motore e Prisma — `calcolaAvanzamento()` (in memoria, zero query), `arricchisciProgetti()` e `ricalcolaProgetto()` (persiste la cascata verso l'alto).
 - **`prisma/schema.prisma`**: Schema database Supabase PostgreSQL con RLS isolata per Tenant.

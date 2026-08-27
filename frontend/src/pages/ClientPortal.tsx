@@ -30,6 +30,7 @@ import {
   inviaRichiestaAddendumApi,
   fatturePortaleApi,
   richiediModificaDocumentoApi,
+  elencoFirmeApi,
   fetchNotificheApi,
   markNotificheReadApi,
   apriStreamNotifiche,
@@ -499,6 +500,35 @@ export function ClientPortal() {
   };
 
   /**
+   * Le firme di conclusione delle operazioni (ambito `modulo_completato`).
+   *
+   * Prima la conferma viveva in `localStorage` (`bluman_module_signatures_…`): firmata su un
+   * browser voleva dire non firmata su un altro, e lo studio non ne aveva traccia. Ora arriva da
+   * database come le firme dei documenti (§2.9): ogni conferma è una riga `FirmaElettronica`
+   * emessa da `/portal/verify-otp-and-sign`, con data, hash e IP del momento della firma.
+   */
+  const caricaFirmeModuli = async (clienteIdSessione?: string | null) => {
+    try {
+      const res = await elencoFirmeApi({ clienteId: clienteIdSessione ?? undefined, ambito: 'modulo_completato' });
+      const firme = Array.isArray(res?.firme) ? res.firme : [];
+      const mappa: Record<string, { firmato: boolean; dataFirma: string; signerName: string }> = {};
+      for (const f of firme) {
+        // L'elenco arriva già ordinato dal più recente: la prima riga per modulo è quella buona.
+        if (f.riferimentoId && !mappa[f.riferimentoId]) {
+          mappa[f.riferimentoId] = {
+            firmato: true,
+            dataFirma: dataOraLeggibile(f.firmatoAt),
+            signerName: f.firmatarioNome || clientName,
+          };
+        }
+      }
+      setModuleSignatures(mappa);
+    } catch {
+      setModuleSignatures({});
+    }
+  };
+
+  /**
    * §2.5 — Rilegge da database le richieste di integrazione dell'incarico.
    *
    * Prima venivano da `localStorage`: lo studio non le vedeva mai e un cambio dispositivo le
@@ -688,11 +718,10 @@ export function ClientPortal() {
       // su un altro, e lo studio non ne vedeva traccia. Ora arriva da database (§2.9).
       await caricaDocumenti(clienteIdRisolto);
 
-      // Ripristina firme sulle singole operazioni / moduli
-      const savedModSigs = localStorage.getItem(`bluman_module_signatures_${resolvedClientName}`);
-      if (savedModSigs) {
-        try { setModuleSignatures(JSON.parse(savedModSigs)); } catch {}
-      }
+      // Le firme di conclusione delle operazioni, come tutto il resto del portale, arrivano dal
+      // database (righe FirmaElettronica con ambito `modulo_completato`): firmate su qualsiasi
+      // dispositivo sono subito visibili qui e allo studio.
+      await caricaFirmeModuli(clienteIdSessione);
 
       try {
         await ricaricaProgetti(clienteIdSessione, resolvedClientName);
@@ -862,13 +891,20 @@ export function ClientPortal() {
    * Impronta da mandare al backend, secondo cosa si sta firmando.
    *
    * Per un documento del fascicolo non si manda niente: l'impronta la calcola il server dal file
-   * che ha in archivio. È l'unico modo perché voglia dire qualcosa — chi firma è anche chi manda
-   * la richiesta, e un'impronta scelta dal browser descrive il documento che vuole il firmatario,
+   * che ha in archivio. Lo stesso vale per la conclusione di un'operazione: il server firma i dati
+   * canonici del modulo (nome, categoria, prezzo, microvoci) che ha lui, non una scelta del
+   * browser. È l'unico modo perché voglia dire qualcosa — chi firma è anche chi manda la
+   * richiesta, e un'impronta scelta dal browser descrive il documento che vuole il firmatario,
    * non quello che ha firmato. Per la lettera d'incarico resta questa, perché il testo del mandato
    * è ancora composto qui e il server non ce l'ha.
    */
   const improntaDelBersaglio = async (bersaglio: BersaglioFirma): Promise<string | undefined> => {
-    if (bersaglio.ambito === 'documento_vault' && bersaglio.riferimentoId) return undefined;
+    if (
+      (bersaglio.ambito === 'documento_vault' || bersaglio.ambito === 'modulo_completato') &&
+      bersaglio.riferimentoId
+    ) {
+      return undefined;
+    }
     return impronteDocumento();
   };
 
@@ -997,6 +1033,12 @@ export function ClientPortal() {
       setSelectedViewerDoc(null);
       return;
     }
+    if (bersaglioFirma.ambito === 'modulo_completato') {
+      // La firma sta a database: si rilegge l'elenco delle conclusioni per mostrarla, senza
+      // scrivere in localStorage — non arriverebbe allo studio né agli altri dispositivi.
+      await caricaFirmeModuli(clientObj?.id);
+      return;
+    }
 
     setEidasSeal(seal);
     localStorage.setItem(`bluman_seal_${clientName}`, JSON.stringify(seal));
@@ -1020,6 +1062,22 @@ export function ClientPortal() {
     setModalitaFirma('otp');
     setFileFirmato(null);
     // `inviaCodiceFirma` fissa il bersaglio: qui non serve scriverlo due volte.
+    await inviaCodiceFirma({ bersaglio });
+  };
+
+  /**
+   * Conclusione di un'operazione: la firma è una FEA a tutti gli effetti, con lo stesso flusso
+   * OTP dei documenti del fascicolo. Il server firma i dati canonici del modulo (§2.9) e mette
+   * la riga in `FirmaElettronica` — data, hash e IP veri, visibili subito anche allo studio.
+   */
+  const avviaFirmaModulo = async (modulo: { id: string; nome: string }) => {
+    const bersaglio: BersaglioFirma = {
+      ambito: 'modulo_completato',
+      titolo: modulo.nome,
+      riferimentoId: modulo.id,
+    };
+    setModalitaFirma('otp');
+    setFileFirmato(null);
     await inviaCodiceFirma({ bersaglio });
   };
 
@@ -4468,37 +4526,11 @@ export function ClientPortal() {
 
               {moduleSignatures[selectedModule.id]?.firmato ? (
                 <div style={{ fontSize: 12, color: '#34d399', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span>🔒 Presa visione registrata</span>
+                  <span>🔒 Conclusione firmata · Sigillo FEA registrato</span>
                 </div>
               ) : (
                 <button
-                  onClick={() => {
-                    // ATTENZIONE: questa conferma è interamente lato browser. Non passa da
-                    // /portal/verify-otp-and-sign, quindi NON produce un sigillo FEA eIDAS e non
-                    // viene registrata a database: vive solo nel localStorage di questo dispositivo.
-                    // L'IP cablato è stato rimosso (il browser non conosce il proprio IP pubblico) e
-                    // il messaggio non rivendica più una firma qualificata che non è stata apposta.
-                    const sigData = {
-                      signerName: clientName,
-                      signerRole: 'Cliente Incarico (Legale Rappresentante)',
-                      timestamp: new Date().toLocaleString('it-IT'),
-                    };
-                    const updated = {
-                      ...moduleSignatures,
-                      [selectedModule.id]: {
-                        firmato: true,
-                        dataFirma: sigData.timestamp,
-                        signerName: sigData.signerName,
-                      },
-                    };
-                    setModuleSignatures(updated);
-                    localStorage.setItem(`bluman_module_signatures_${clientName}`, JSON.stringify(updated));
-                    alert(
-                      `✓ Presa visione dell'operazione "${selectedModule.nome}" registrata su questo dispositivo il ${sigData.timestamp}.\n\n` +
-                      `Non è una firma elettronica avanzata: la conferma è locale e va comunicata allo studio.`,
-                    );
-                    setSelectedModule(null);
-                  }}
+                  onClick={() => { void avviaFirmaModulo(selectedModule); }}
                   style={{
                     background: '#059669',
                     color: '#ffffff',
@@ -4514,7 +4546,7 @@ export function ClientPortal() {
                     gap: 8,
                   }}
                 >
-                  <span>✍️ Conferma Presa Visione Conclusione Operazione</span>
+                  <span>✍️ Firma la conclusione dell'operazione (FEA con codice OTP)</span>
                 </button>
               )}
             </div>
