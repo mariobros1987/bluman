@@ -177,3 +177,13 @@ export async function recordAudit(params: {
     console.error('[AUDIT] Impossibile registrare audit log:', err);
   }
 }
+
+/**
+ * L'hash della password non esce mai dal server, nemmeno verso il frontend dello
+ * studio. Usata dalle rotte auth (profilo) e tenant (elenco/creazione utenti);
+ * spostata qui dallo split dei monoliti (27/08/2026) senza cambio di comportamento.
+ */
+export function senzaHash<T extends { passwordHash?: string | null }>(utente: T): Omit<T, 'passwordHash'> {
+  const { passwordHash: _ignorato, ...resto } = utente;
+  return resto;
+}
