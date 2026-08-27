@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { generateRealPdfBase64 } from '../utils/pdfGenerator';
-import { PREBUILT_TEMPLATES, resolveDocumentTemplateHtml, type DocumentTemplate } from '../utils/documentTemplates';
+import { PREBUILT_TEMPLATES, type DocumentTemplate } from '../utils/documentTemplates';
 import { REORGANIZATION_TEMPLATES } from '../utils/reorganizationTemplates';
 import {
   salvaDocumentoApi,
+  generaDocumentoApi,
   listaDocumentiProgetto,
   aggiornaStatoDocumentoApi,
   nuovaVersioneDocumentoApi,
@@ -50,6 +50,10 @@ interface DocumentoEntry {
   versione?: number;
   pubblicatoAt?: string | null;
   fileUrl?: string;
+  /** §Punto-1 — URL del PDF master generato dal motore server-side. */
+  filePdfUrl?: string | null;
+  /** §Punto-1 — URL del Word (.docx) generato dal motore server-side; null se assente. */
+  fileDocxUrl?: string | null;
   richiesteModifica?: RichiestaModificaDoc[];
   /**
    * §WF-DOC — sigillo di firma restituito dal server (data, id firma, tipo).
@@ -356,33 +360,45 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
     const rawFilename = titolo.trim() || (tmpl ? `${tmpl.titolo} — ${project.cl}.pdf` : file?.name || 'Documento.pdf');
     const formattedName = tmpl ? rawFilename.replace(/\.docx?$/i, '.pdf') : rawFilename;
 
-    let contentBase64 = fileBase64 || '';
-    if (tmpl && !contentBase64) {
-      // `DocumentTemplate` dichiara `contenutoHtml`: `tmpl.html` non esiste ed era sempre
-      // undefined, quindi il contenuto arrivava solo dal cast `as any`. Se qualcuno avesse
-      // rimosso quel fallback, ogni PDF pubblicato sarebbe diventato uno stub col solo titolo.
-      const rawHtml = tmpl.contenutoHtml || '';
-      const resolvedHtml = resolveDocumentTemplateHtml(rawHtml, project);
-      contentBase64 = await generateRealPdfBase64(resolvedHtml || `<html><body><h1>${formattedName}</h1></body></html>`);
-    }
-
     let dbId: string | undefined;
     let savedFileUrl: string | undefined;
 
     if (effProgettoId) {
       try {
-        const salvato = await salvaDocumentoApi({
-          progettoId: effProgettoId,
-          microvoceProgettoId: effMicrovoceId,
-          filename: formattedName,
-          contentBase64,
-          categoriaDoc: tmpl?.categoria || 'Allegati Microvoce',
-          statoDoc,
-          dataScadenzaDoc: dataScadenzaDoc || undefined,
-          tipo: richiedeFirma ? 'allegato' : 'compilato',
-        });
-        dbId = salvato.id;
-        savedFileUrl = salvato.fileUrl;
+        if (tmpl && !fileBase64) {
+          // §Punto-1 — generazione server-side: lo stesso merge produce PDF (master, sigillo
+          // legale) e Word (.docx, copia per firma autografa). Il template viaggia con i
+          // placeholder {{...}} irrisolti: la risoluzione avviene sul server dai dati
+          // autorevoli di DB (tenant, cliente, progetto), non dallo snapshot localStorage.
+          // `DocumentTemplate` dichiara `contenutoHtml`: `tmpl.html` non esiste.
+          const rawHtml = tmpl.contenutoHtml || '';
+          const salvato = await generaDocumentoApi({
+            progettoId: effProgettoId,
+            microvoceProgettoId: effMicrovoceId,
+            contenutoHtml: rawHtml || `<p>${formattedName.replace(/\.pdf$/i, '')}</p>`,
+            titolo: formattedName.replace(/\.pdf$/i, ''),
+            categoriaDoc: tmpl.categoria || 'Allegati Microvoce',
+            statoDoc,
+            dataScadenzaDoc: dataScadenzaDoc || undefined,
+          });
+          dbId = salvato.id;
+          savedFileUrl = salvato.fileUrl;
+        } else {
+          // Upload manuale di un file dell'operatore: resta nel formato originale (allegato),
+          // senza doppio formato generato.
+          const salvato = await salvaDocumentoApi({
+            progettoId: effProgettoId,
+            microvoceProgettoId: effMicrovoceId,
+            filename: formattedName,
+            contentBase64: fileBase64 || '',
+            categoriaDoc: tmpl?.categoria || 'Allegati Microvoce',
+            statoDoc,
+            dataScadenzaDoc: dataScadenzaDoc || undefined,
+            tipo: richiedeFirma ? 'allegato' : 'compilato',
+          });
+          dbId = salvato.id;
+          savedFileUrl = salvato.fileUrl;
+        }
       } catch (err: any) {
         console.warn('Errore salvataggio documento a DB:', err);
       }
@@ -487,6 +503,8 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
         versione: d.versione || 1,
         pubblicatoAt: d.pubblicatoAt,
         fileUrl: d.fileUrl,
+        filePdfUrl: d.filePdfUrl ?? null,
+        fileDocxUrl: d.fileDocxUrl ?? null,
         richiesteModifica: d.richiesteModifica || [],
         firma: d.firma ?? null,
       }));
@@ -504,44 +522,34 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
       const localDoc = documents.find(d => d.id === docId);
       const isLocalId = docId.startsWith('d-');
 
-      if (isLocalId && effProgettoId) {
-        // Documento template o locale non ancora salvato a DB: salvalo ora come VERO PDF con stato pubblicato
+      // §Punto-1 — i documenti da template non ancora salvati a DB vengono generati sul
+      // server (PDF master + Word) dallo stesso merge dati, invece del PDF jsPDF
+      // client-side. Il template viaggia con i placeholder {{...}} irrisolti: la
+      // risoluzione avviene sul server dai dati autorevoli di DB.
+      const generaEPubblicaDaTemplate = async (progettoId: string) => {
         const tmpl = localDoc?.templateId ? ALL_STUDIO_TEMPLATES.find(t => t.id === localDoc.templateId) : null;
-        const rawHtml = tmpl?.contenutoHtml || `<html><body><h1>${localDoc?.nome || 'Documento'}</h1></body></html>`;
-        const htmlContent = resolveDocumentTemplateHtml(rawHtml, project);
-        const contentBase64 = await generateRealPdfBase64(htmlContent);
+        const rawHtml = tmpl?.contenutoHtml || '';
         const rawName = localDoc?.nome || 'Documento.pdf';
-        const pdfFilename = rawName.replace(/\.docx?$/i, '.pdf');
-
-        await salvaDocumentoApi({
-          progettoId: effProgettoId,
+        const titolo = rawName.replace(/\.(pdf|docx?)$/i, '');
+        await generaDocumentoApi({
+          progettoId,
           microvoceProgettoId: microvoceDbId,
-          filename: pdfFilename,
-          contentBase64,
+          contenutoHtml: rawHtml || `<p>${titolo}</p>`,
+          titolo,
           categoriaDoc: tmpl?.categoria || 'Allegati Microvoce',
           statoDoc: 'pubblicato',
         });
+      };
+
+      if (isLocalId && effProgettoId) {
+        await generaEPubblicaDaTemplate(effProgettoId);
       } else {
         try {
           await aggiornaStatoDocumentoApi(docId, 'pubblicato');
         } catch (err: any) {
           if (effProgettoId) {
             // Se fallisce l'aggiornamento (es. documento orfano nel client), salvalo direttamente a DB
-            const tmpl = localDoc?.templateId ? ALL_STUDIO_TEMPLATES.find(t => t.id === localDoc.templateId) : null;
-            const rawHtml = tmpl?.contenutoHtml || `<html><body><h1>${localDoc?.nome || 'Documento'}</h1></body></html>`;
-            const htmlContent = resolveDocumentTemplateHtml(rawHtml, project);
-            const contentBase64 = await generateRealPdfBase64(htmlContent);
-            const rawName = localDoc?.nome || 'Documento.pdf';
-            const pdfFilename = rawName.replace(/\.docx?$/i, '.pdf');
-
-            await salvaDocumentoApi({
-              progettoId: effProgettoId,
-              microvoceProgettoId: microvoceDbId,
-              filename: pdfFilename,
-              contentBase64,
-              categoriaDoc: tmpl?.categoria || 'Allegati Microvoce',
-              statoDoc: 'pubblicato',
-            });
+            await generaEPubblicaDaTemplate(effProgettoId);
           } else {
             throw err;
           }
@@ -1229,7 +1237,9 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
                               </button>
                               <button
                                 type="button"
-                                onClick={() => scaricaDocumentoWordClient(d.fileUrl, d.nome)}
+                                onClick={() => (d.fileDocxUrl
+                                  ? scaricaDocumentoClient(d.fileDocxUrl, d.nome.replace(/\.(pdf|docx?)$/i, '') + '.docx')
+                                  : scaricaDocumentoWordClient(d.fileUrl, d.nome))}
                                 style={{ background: '#1e1b4b', border: '1px solid #3b82f6', color: '#93c5fd', padding: '5px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 3 }}
                                 title="Scarica in formato Microsoft Word (.doc)"
                               >
@@ -1730,7 +1740,9 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
                     </button>
                     <button
                       type="button"
-                      onClick={() => scaricaDocumentoWordClient(selectedDocPreview.fileUrl, selectedDocPreview.nome)}
+                      onClick={() => (selectedDocPreview.fileDocxUrl
+                        ? scaricaDocumentoClient(selectedDocPreview.fileDocxUrl, selectedDocPreview.nome.replace(/\.(pdf|docx?)$/i, '') + '.docx')
+                        : scaricaDocumentoWordClient(selectedDocPreview.fileUrl, selectedDocPreview.nome))}
                       style={{ background: '#1e1b4b', border: '1px solid #3b82f6', color: '#93c5fd', padding: '7px 14px', borderRadius: 8, fontSize: 11.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
                     >
                       📝 Scarica Word (.doc)

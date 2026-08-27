@@ -22,7 +22,7 @@ import {
   documentiPortaleApi,
   urlFileArchivio,
   scaricaDocumentoClient,
-  scaricaDocumentoWordClient,
+  scaricaDocumentoPortaleApi,
   contattiPortaleApi,
   proposteDatiPortaleApi,
   inviaPropostaDatiApi,
@@ -2899,20 +2899,22 @@ export function ClientPortal() {
                       <div style={{ display: 'flex', gap: 6 }}>
                         <button
                           type="button"
-                          onClick={() => scaricaDocumentoClient(doc.fileUrl, doc.nome)}
+                          onClick={() => scaricaDocumentoPortaleApi(doc.id, 'pdf')}
                           style={{ background: '#1a1f3d', border: '1px solid #4338ca', color: '#c7d2fe', padding: '6px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
-                          title="Scarica in formato PDF A4"
+                          title="Scarica il PDF master generato dal motore (lo stesso file su cui è fissata l'impronta di firma)"
                         >
                           📥 PDF
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => scaricaDocumentoWordClient(doc.fileUrl, doc.nome)}
-                          style={{ background: '#1e1b4b', border: '1px solid #3b82f6', color: '#93c5fd', padding: '6px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
-                          title="Scarica in formato Microsoft Word (.doc)"
-                        >
-                          📝 Word
-                        </button>
+                        {doc.fileDocxUrl && (
+                          <button
+                            type="button"
+                            onClick={() => scaricaDocumentoPortaleApi(doc.id, 'docx')}
+                            style={{ background: '#1e1b4b', border: '1px solid #3b82f6', color: '#93c5fd', padding: '6px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                            title="Scarica la copia Word (.docx) generata dal motore server-side"
+                          >
+                            📝 Word
+                          </button>
+                        )}
                       </div>
                     )}
 
@@ -2937,6 +2939,8 @@ export function ClientPortal() {
                               standard: doc.standard || 'Firma Elettronica Semplice (OTP verificata) · art. 20 CAD',
                               firmaGrafometricaPng: doc.firmaGrafometricaPng,
                               fileUrl: doc.fileUrl,
+                              documentoId: doc.id,
+                              fileDocxUrl: doc.fileDocxUrl,
                             });
                           }}
                           style={{ background: '#1e1b4b', border: '1px solid #6366f1', color: '#c7d2fe', padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
@@ -3881,18 +3885,22 @@ export function ClientPortal() {
                   <>
                     <button
                       type="button"
-                      onClick={() => scaricaDocumentoClient(selectedViewerDoc.fileUrl, selectedViewerDoc.nome)}
+                      onClick={() => scaricaDocumentoPortaleApi(selectedViewerDoc.id, 'pdf')}
                       style={{ background: '#1a1f3d', border: '1px solid #4338ca', color: '#c7d2fe', padding: '8px 14px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+                      title="Scarica il PDF master generato dal motore (lo stesso file su cui è fissata l'impronta di firma)"
                     >
                       📥 Scarica PDF A4
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => scaricaDocumentoWordClient(selectedViewerDoc.fileUrl, selectedViewerDoc.nome)}
-                      style={{ background: '#1e1b4b', border: '1px solid #3b82f6', color: '#93c5fd', padding: '8px 14px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
-                    >
-                      📝 Scarica Word (.doc)
-                    </button>
+                    {selectedViewerDoc.fileDocxUrl && (
+                      <button
+                        type="button"
+                        onClick={() => scaricaDocumentoPortaleApi(selectedViewerDoc.id, 'docx')}
+                        style={{ background: '#1e1b4b', border: '1px solid #3b82f6', color: '#93c5fd', padding: '8px 14px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+                        title="Scarica la copia Word (.docx) generata dal motore server-side"
+                      >
+                        📝 Scarica Word (.docx)
+                      </button>
+                    )}
                   </>
                 )}
 
@@ -3942,6 +3950,8 @@ export function ClientPortal() {
                           standard: selectedViewerDoc.standard || 'Firma Elettronica Semplice (OTP verificata) · art. 20 CAD',
                           firmaGrafometricaPng: selectedViewerDoc.firmaGrafometricaPng,
                           fileUrl: selectedViewerDoc.fileUrl,
+                          documentoId: selectedViewerDoc.id,
+                          fileDocxUrl: selectedViewerDoc.fileDocxUrl,
                         });
                       }}
                       style={{ background: '#1e1b4b', border: '1px solid #6366f1', color: '#c7d2fe', padding: '8px 14px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
@@ -4133,13 +4143,17 @@ export function ClientPortal() {
                   >
                     📥 Copia PDF Firmata
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => scaricaDocumentoWordClient(successSealModal.fileUrl, `${(successSealModal.documentoTitolo || 'Documento_Firmato').replace(/[^a-zA-Z0-9_-]/g, '_')}_FIRMATO.doc`)}
-                    style={{ background: '#1e1b4b', border: '1px solid #3b82f6', color: '#93c5fd', padding: '9px 16px', borderRadius: 10, fontSize: 11.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
-                  >
-                    📝 Copia Word (.doc)
-                  </button>
+                  {/* §Punto-1 — la copia Word ha senso solo se esiste un .docx reale generato dal
+                      motore: prima qui veniva fabbricato un .doc stub con testo inventato. */}
+                  {successSealModal.documentoId && successSealModal.fileDocxUrl && (
+                    <button
+                      type="button"
+                      onClick={() => scaricaDocumentoPortaleApi(successSealModal.documentoId, 'docx')}
+                      style={{ background: '#1e1b4b', border: '1px solid #3b82f6', color: '#93c5fd', padding: '9px 16px', borderRadius: 10, fontSize: 11.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+                    >
+                      📝 Copia Word (.docx)
+                    </button>
+                  )}
                 </div>
               ) : <div />}
 

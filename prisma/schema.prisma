@@ -583,7 +583,17 @@ model Documento {
   progettoId          String?           @map("progetto_id")
   progetto            Progetto?         @relation(fields: [progettoId], references: [id], onDelete: SetNull)
   tipo                String // template_vuoto|compilato|firmato|allegato|verbale_firma
+  // Punto 1 piano gap — export contestuale PDF + Word. `fileUrl` resta il master
+  // (retrocompatibilità: tutto il codice esistente, incluso l'hash legale della firma
+  // calcolato da `leggiFileArchivio(fileUrl)`, continua a puntare qui). I due campi
+  // sotto indicano la disponibilità del doppio formato e si popolano solo per i
+  // documenti prodotti dal motore di generazione (tipo=`compilato`), non per gli
+  // `allegato` caricati manualmente nel loro formato originale. `formatoOrigine`
+  // dichiara qual è il master: per i generati è sempre 'pdf' (sigillo legale sul PDF).
   fileUrl             String            @map("file_url")
+  filePdfUrl          String?           @map("file_pdf_url")
+  fileDocxUrl         String?           @map("file_docx_url")
+  formatoOrigine      String            @default("pdf") @map("formato_origine") // pdf|docx
   versione             Int              @default(1)
   // Chi ha caricato il file. Nullable: i documenti generati automaticamente dalla
   // piattaforma (verbale_firma, Punto 2 piano gap) non hanno un caricatore umano — il

@@ -44,6 +44,7 @@ import { arricchisciProgetti, calcolaAvanzamento, ricalcolaProgetto } from './se
 import { costruisciReport, REPORT_DISPONIBILI, type ChiaveReport } from './services/reportsService.js';
 import { generaPdfReport, generaExcelReport } from './services/reportExport.js';
 import { generaPdfVerbaleFirma } from './services/verbaleFirma.js';
+import { contestoTagDocumento, risolviTagDocumento, blocchiDaHtml, generaPdfDocumento, generaDocxDocumento } from './services/generazioneDocumenti.js';
 import { ricercaGlobale } from './services/ricercaGlobaleService.js';
 // §14 — non `new PrismaClient()`: questo client impone il tenant corrente a ogni query,
 // altrimenti le policy RLS non vedono nessun contesto e non restituiscono nulla.
@@ -4652,6 +4653,9 @@ export function buildServer(app: AppPort): FastifyInstance {
             id: true,
             tipo: true,
             fileUrl: true,
+            filePdfUrl: true,
+            fileDocxUrl: true,
+            formatoOrigine: true,
             versione: true,
             createdAt: true,
             caricatoDa: true,
@@ -4699,7 +4703,15 @@ export function buildServer(app: AppPort): FastifyInstance {
           documenti: documenti.map((d) => {
             const firma = firmaPerDocumento.get(d.id);
             // Come /portal/documenti: la firma HMAC degli URL /uploads/ va rinnovata alla lettura.
-            return { ...d, fileUrl: rifirmaUrlUpload(d.fileUrl) as string, firmato: Boolean(firma) || d.tipo === 'firmato', firma };
+            return {
+              ...d,
+              fileUrl: rifirmaUrlUpload(d.fileUrl) as string,
+              // Punto 1 — anche i formati di export hanno URL firmati (null per i documenti storici).
+              filePdfUrl: d.filePdfUrl ? (rifirmaUrlUpload(d.filePdfUrl) as string) : null,
+              fileDocxUrl: d.fileDocxUrl ? (rifirmaUrlUpload(d.fileDocxUrl) as string) : null,
+              firmato: Boolean(firma) || d.tipo === 'firmato',
+              firma,
+            };
           }),
         });
       } catch (err) {
@@ -4794,6 +4806,181 @@ export function buildServer(app: AppPort): FastifyInstance {
       return reply.send({ ok: true, documento: { ...documento, firmato: false, firma: null, richiesteModifica: [] } });
     } catch (err) {
       return reply.code(500).send({ errore: err instanceof Error ? err.message : 'Errore archiviazione documento' });
+    }
+  });
+
+  /**
+   * Punto 1 piano gap — POST /documenti/genera
+   * Genera il documento da template SUL SERVER, in un solo passaggio, in entrambi i formati
+   * (pdfkit → PDF master, docxtemplater → Word di cortesia) dallo stesso merge dati. Prima
+   * questo lavoro lo faceva il browser con jsPDF e il Word era uno stub con testo inventato.
+   * Il PDF è il master: `fileUrl` punta lì e l'hash legale della firma si fissa su quello.
+   */
+  server.post<{
+    Body: {
+      progettoId: string;
+      microvoceProgettoId?: string;
+      modelloId?: string;
+      contenutoHtml?: string;
+      titolo?: string;
+      categoriaDoc?: string;
+      statoDoc?: 'bozza' | 'pubblicato';
+      dataScadenzaDoc?: string;
+    };
+  }>('/documenti/genera', async (req, reply) => {
+    const tenantId = (req as any).tenantId;
+    const userId = (req as any).userId as string | undefined;
+    const { progettoId, microvoceProgettoId, modelloId, contenutoHtml, titolo, categoriaDoc, statoDoc, dataScadenzaDoc } = req.body;
+
+    if (!progettoId) return reply.code(400).send({ errore: 'progettoId è obbligatorio.' });
+    if (!modelloId && !contenutoHtml) {
+      return reply.code(400).send({ errore: 'Indicare il modello (modelloId) o il contenuto HTML del template.' });
+    }
+    if (!userId) return reply.code(401).send({ errore: 'Sessione non valida.' });
+
+    const scadenza = dataScadenzaDoc ? new Date(dataScadenzaDoc) : null;
+    if (dataScadenzaDoc && Number.isNaN(scadenza?.getTime())) {
+      return reply.code(400).send({ errore: 'dataScadenzaDoc non è una data valida.' });
+    }
+
+    try {
+      const progetto = await prisma.progetto.findFirst({
+        where: { id: progettoId, tenantId },
+        select: {
+          id: true,
+          clienteId: true,
+          nome: true,
+          valoreTotale: true,
+          cliente: {
+            select: {
+              nome: true,
+              piva: true,
+              codiceFiscale: true,
+              sedeLegale: true,
+              sdiCode: true,
+              iban: true,
+              cellulare: true,
+              ubo: true,
+              referentiJson: true,
+            },
+          },
+        },
+      });
+      if (!progetto) return reply.code(404).send({ errore: 'Progetto non trovato.' });
+
+      const tenant = await prisma.tenant.findFirst({
+        where: { id: tenantId },
+        select: { ragioneSociale: true, piva: true, sedeLegale: true, iban: true, leadAdvisorNome: true, telefono: true, email: true },
+      });
+
+      // Il template può arrivare come riferimento a un ModelloDocumentoCustom del tenant
+      // oppure come HTML inline (i modelli standard del frontend).
+      let htmlTemplate = contenutoHtml ?? '';
+      let titoloDocumento = titolo?.trim() || '';
+      let categoria = categoriaDoc || '';
+      if (modelloId) {
+        const modello = await prisma.modelloDocumentoCustom.findFirst({ where: { id: modelloId, tenantId } });
+        if (!modello) return reply.code(404).send({ errore: 'Modello documento non trovato.' });
+        htmlTemplate = modello.contenutoHtml || '';
+        titoloDocumento = titoloDocumento || modello.titolo;
+        categoria = categoria || modello.categoria;
+      }
+      if (!htmlTemplate.trim()) {
+        return reply.code(400).send({ errore: 'Il template indicato non ha contenuto.' });
+      }
+
+      const contesto = contestoTagDocumento({ tenant, cliente: progetto.cliente, progetto });
+      const blocchi = blocchiDaHtml(risolviTagDocumento(htmlTemplate, contesto));
+      if (blocchi.length === 0) {
+        return reply.code(400).send({ errore: 'Il template non produce contenuto: verificare i blocchi HTML.' });
+      }
+
+      const slug = (titoloDocumento || 'documento')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '') || 'documento';
+
+      // Due motori dallo stesso merge: il PDF fa fede (master + hash firma), il Word è la
+      // copia per la firma autografa. Se il Word fallisce la generazione non si blocca il
+      // flusso: si pubblica comunque il PDF e l'anomalia resta nell'audit.
+      const pdfBuffer = await generaPdfDocumento(blocchi);
+      let docxBuffer: Buffer | null = null;
+      try {
+        docxBuffer = generaDocxDocumento(blocchi);
+      } catch (errWord) {
+        await recordAudit({
+          tenantId,
+          userId,
+          azione: 'DOCUMENTO_WORD_FALLITO',
+          entita: progettoId,
+          dettagli: `Generazione Word fallita per «${titoloDocumento || slug}»: ${errWord instanceof Error ? errWord.message : String(errWord)}`,
+          ipAddress: req.ip,
+        });
+      }
+
+      const uploadPdf = await uploadDocumento(`${slug}.pdf`, pdfBuffer.toString('base64'));
+      if (!uploadPdf.ok) return reply.code(500).send({ errore: 'Impossibile salvare il PDF generato.' });
+      let uploadDocx: { ok: boolean; url: string; name: string; size: string } | null = null;
+      if (docxBuffer) {
+        uploadDocx = await uploadDocumento(`${slug}.docx`, docxBuffer.toString('base64'));
+        if (!uploadDocx.ok) {
+          uploadDocx = null;
+          await recordAudit({
+            tenantId,
+            userId,
+            azione: 'DOCUMENTO_WORD_FALLITO',
+            entita: progettoId,
+            dettagli: `Upload Word fallito per «${titoloDocumento || slug}»: il documento è pubblicato solo in PDF.`,
+            ipAddress: req.ip,
+          });
+        }
+      }
+
+      const defaultStatoDoc = (statoDoc === 'pubblicato') ? 'pubblicato' : 'bozza';
+
+      // I byte arrivano dai motori di generazione del sistema, non da un attore esterno:
+      // la scansione §28 è superata per costruzione (stessa regola del verbale di firma).
+      const documento = await prisma.documento.create({
+        data: {
+          tenantId,
+          progettoId,
+          microvoceProgettoId,
+          tipo: 'compilato',
+          fileUrl: uploadPdf.url,
+          filePdfUrl: uploadPdf.url,
+          fileDocxUrl: uploadDocx?.url ?? null,
+          formatoOrigine: 'pdf',
+          caricatoDa: userId,
+          categoriaDoc: categoria || 'generico',
+          dataScadenzaDoc: scadenza,
+          statoDoc: defaultStatoDoc,
+          pubblicatoAt: defaultStatoDoc === 'pubblicato' ? new Date() : null,
+          statoScansione: 'pulito',
+          scansionatoAt: new Date(),
+        },
+      });
+
+      await recordAudit({
+        tenantId,
+        userId,
+        azione: 'DOCUMENTO_GENERATO',
+        entita: documento.id,
+        dettagli: `Generato «${uploadPdf.name}» (${uploadPdf.size})${uploadDocx ? ` + Word «${uploadDocx.name}» (${uploadDocx.size})` : ' (solo PDF)'} da template, stato «${defaultStatoDoc}», nel fascicolo del progetto ${progettoId}`,
+        ipAddress: req.ip,
+      });
+
+      if (defaultStatoDoc === 'pubblicato' && progetto.clienteId) {
+        await notificaCliente(tenantId, progetto.clienteId, {
+          tipoEvento: 'documento_da_firmare',
+          oggetto: 'Documento da firmare',
+          corpo: `Lo studio ha pubblicato «${uploadPdf.name}» sul progetto «${progetto.nome}»: accedi al portale per visionarlo e firmarlo.`,
+          link: `/portal/documents`,
+        }).catch(() => {});
+      }
+
+      return reply.send({ ok: true, documento: { ...documento, firmato: false, firma: null, richiesteModifica: [] } });
+    } catch (err) {
+      return reply.code(500).send({ errore: err instanceof Error ? err.message : 'Errore generazione documento' });
     }
   });
 
@@ -5360,6 +5547,9 @@ export function buildServer(app: AppPort): FastifyInstance {
           id: true,
           tipo: true,
           fileUrl: true,
+          filePdfUrl: true,
+          fileDocxUrl: true,
+          formatoOrigine: true,
           versione: true,
           createdAt: true,
           categoriaDoc: true,
@@ -5482,6 +5672,11 @@ export function buildServer(app: AppPort): FastifyInstance {
           // La firma HMAC degli URL /uploads/ scade dopo qualche giorno: si rinnova alla
           // lettura, altrimenti un documento in fascicolo da mesi non si aprirebbe più.
           fileUrl: rifirmaUrlUpload(d.fileUrl) as string,
+          // Punto 1 piano gap — formati di export generati dal server: null per i documenti
+          // storici (pre-migrazione) e per gli allegati, che restano nel formato originale.
+          filePdfUrl: d.filePdfUrl ? (rifirmaUrlUpload(d.filePdfUrl) as string) : null,
+          fileDocxUrl: d.fileDocxUrl ? (rifirmaUrlUpload(d.fileDocxUrl) as string) : null,
+          formatoOrigine: d.formatoOrigine,
           tipo: d.tipo,
           versione: d.versione,
           caricatoIl: d.createdAt,
@@ -5527,6 +5722,9 @@ export function buildServer(app: AppPort): FastifyInstance {
           progetto: null,
           progettoId: null,
           fileUrl: null,
+          filePdfUrl: null,
+          fileDocxUrl: null,
+          formatoOrigine: null,
           tipo: 'firmato',
           versione: null,
           caricatoIl: f.firmatoAt,
@@ -5557,6 +5755,98 @@ export function buildServer(app: AppPort): FastifyInstance {
       // studio non gli abbia caricato niente.
       return reply.code(500).send({
         errore: err instanceof Error ? err.message : 'Errore lettura documenti del fascicolo',
+      });
+    }
+  });
+
+  /**
+   * GET /portal/documenti/:id/download?formato=pdf|docx — Punto 1 piano gap
+   * Il cliente scarica il documento pubblicato nel formato scelto. Il PDF esiste sempre
+   * (è il formato master su cui è fissato l'hash legale della firma); il Word esiste solo
+   * per i documenti generati dal motore server-side — per i documenti storici precedenti
+   * alla migrazione il formato è dichiarato non disponibile, non fabbricato.
+   *
+   * Un documento ancora in scansione o risultato infetto non si scarica (§28): 409.
+   */
+  server.get<{
+    Params: { id: string };
+    Querystring: { formato?: string; clienteId?: string };
+  }>('/portal/documenti/:id/download', async (req, reply) => {
+    const tenantId = (req as any).tenantId;
+    const clienteId = clienteDellaRichiesta(req, req.query?.clienteId);
+    const { id } = req.params;
+    const formato = req.query?.formato === 'docx' ? 'docx' : 'pdf';
+
+    if (!clienteId) {
+      return reply.code(400).send({ errore: 'Cliente non identificato nella sessione.' });
+    }
+
+    try {
+      const documento = await prisma.documento.findFirst({
+        where: {
+          id,
+          tenantId,
+          statoDoc: { in: ['pubblicato', 'in_revisione', 'firmato'] },
+          isArchiviato: false,
+          OR: [
+            { microvoceProgetto: { moduloProgetto: { progetto: { clienteId } } } },
+            { progetto: { clienteId } },
+          ],
+        },
+        select: {
+          id: true,
+          fileUrl: true,
+          filePdfUrl: true,
+          fileDocxUrl: true,
+          statoScansione: true,
+          versione: true,
+          microvoceProgetto: { select: { nome: true } },
+          progetto: { select: { nome: true } },
+        },
+      });
+
+      if (!documento) {
+        return reply.code(404).send({ errore: 'Documento non trovato nel fascicolo del cliente.' });
+      }
+      if (documento.statoScansione !== 'pulito') {
+        return reply.code(409).send({ errore: 'Documento non scaricabile: scansione di sicurezza in corso o con esito negativo.' });
+      }
+
+      // `Documento` non ha un campo titolo: il nome di ripiego segue la stessa regola
+      // dell'elenco del portale (micro-voce → progetto → «Documento») più la versione.
+      const titoloVoce = documento.microvoceProgetto?.nome ?? documento.progetto?.nome ?? 'Documento';
+
+      if (formato === 'docx') {
+        if (!documento.fileDocxUrl) {
+          // Documento storico (pre-migrazione) o allegato caricato: il Word non esiste e
+          // il portale deve dirlo, non inventare un file.
+          return reply.code(404).send({ errore: 'Formato Word non disponibile per questo documento.' });
+        }
+        return reply.send({
+          ok: true,
+          formato,
+          url: rifirmaUrlUpload(documento.fileDocxUrl) as string,
+          filename: nomeFileDaUrl(documento.fileDocxUrl) ?? `${titoloVoce} (v${documento.versione}).docx`,
+          contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        });
+      }
+
+      // PDF: il formato generato se esiste, altrimenti il file originale
+      // (documenti storici e allegati caricati in archivio).
+      const urlPdf = documento.filePdfUrl ?? documento.fileUrl;
+      if (!urlPdf) {
+        return reply.code(404).send({ errore: 'File del documento non disponibile.' });
+      }
+      return reply.send({
+        ok: true,
+        formato,
+        url: rifirmaUrlUpload(urlPdf) as string,
+        filename: nomeFileDaUrl(urlPdf) ?? `${titoloVoce} (v${documento.versione}).pdf`,
+        contentType: 'application/pdf',
+      });
+    } catch (err) {
+      return reply.code(500).send({
+        errore: err instanceof Error ? err.message : 'Errore nella preparazione del download',
       });
     }
   });

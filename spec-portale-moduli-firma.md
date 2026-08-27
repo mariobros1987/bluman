@@ -158,7 +158,7 @@ oppure `richiesta → documento_scaricato → firmato_esterno_caricato → verif
 - **Versionamento documenti**: ogni ripubblicazione crea una nuova riga in `documenti`, mai un update distruttivo — la cronologia delle versioni è così naturale.
 - **Link univoci con token**: scadenza configurabile, mono-uso o multi-uso a seconda del contesto, tracciati in `link_accesso`.
 - **Notifiche multicanale**: astrarre un servizio di notifica con provider intercambiabili (email/SMTP, WhatsApp Business API, Telegram Bot API).
-- **Generazione documento**: motore di template (es. Docxtemplater/Carbone per Word, poi conversione PDF) che unisce dati di `form_risposte` con il template dell'Articolo/Microvoce.
+- **Generazione documento**: motore di template (es. Docxtemplater/Carbone per Word, poi conversione PDF) che unisce dati di `form_risposte` con il template dell'Articolo/Microvoce. — *Realizzato il 27/08/2026 come motore unico server-side `src/services/generazioneDocumenti.ts`: **pdfkit** (PDF) + **docxtemplater** (Word) a partire dallo stesso array di blocchi, senza conversione Word→PDF e senza LibreOffice su Railway; merge dei dati lato server dai record DB (non dallo snapshot del client); hash legale fissato sul PDF master.*
 - Se questo modulo si affianca alla piattaforma **BluMan** già in sviluppo (multi-tenant, Prisma/Fastify), può riutilizzarne l'architettura multi-tenant e il modello a moduli/dipendenze (DAG) già progettato, trattando ogni Microvoce come un "modulo" del catalogo esistente.
 
 ---

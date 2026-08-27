@@ -2465,6 +2465,8 @@ function documentoApiAVista(d: any, projectId: string): any {
     firmato: Boolean(d.firmato),
     formato: /\.png$|\.jpe?g$/i.test(nome) ? 'immagine' : 'pdf',
     url: d.fileUrl,
+    filePdfUrl: d.filePdfUrl ?? null,
+    fileDocxUrl: d.fileDocxUrl ?? null,
   };
 }
 
@@ -2634,6 +2636,13 @@ function DocumentiTab({ project }: { project: Progetto }) {
 
   // Scarica Copia VERA in Word (.doc) Microsoft Office compatibile al 100%
   const handleDownloadDocumentWord = async (doc: any) => {
+    // Punto 1 — se il documento è stato generato lato server ha un .docx reale: scarica
+    // quello invece di fabbricare uno stub .doc dal contenuto ricostruito in locale.
+    if (doc.dbDoc && doc.fileDocxUrl) {
+      const wordName = `${(doc.titolo || doc.nome || 'Documento').replace(/\.(pdf|docx?)$/i, '')}.docx`;
+      await scaricaDocumentoClient(doc.fileDocxUrl, wordName);
+      return;
+    }
     const fullPrintHtml = buildDocumentHtml(doc);
     const safeWordName = `${(doc.titolo || doc.nome || 'Documento').replace(/[^a-zA-Z0-9_-]/g, '_')}.doc`;
     if (doc.dbDoc && doc.url && doc.url !== '#') {

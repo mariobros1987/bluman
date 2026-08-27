@@ -377,6 +377,12 @@ export interface DocumentoProgetto {
   id: string;
   tipo: string;
   fileUrl: string;
+  /** §Punto-1 — URL del PDF master generato dal motore server-side (stesso contenuto del fileUrl per i documenti generati). */
+  filePdfUrl?: string | null;
+  /** §Punto-1 — URL del file Word (.docx) generato dal motore server-side; null se il documento non ha un export Word. */
+  fileDocxUrl?: string | null;
+  /** §Punto-1 — formato del file master caricato ('pdf' per i documenti generati dal motore). */
+  formatoOrigine?: string | null;
   versione: number;
   createdAt: string;
   categoriaDoc: string | null;
@@ -410,7 +416,13 @@ export async function listaDocumentiProgetto(progettoId: string): Promise<Docume
     throw new Error(data.errore ?? 'Errore lettura documenti del progetto');
   }
   const data = await res.json();
-  return (data.documenti ?? []).map((d: DocumentoProgetto) => ({ ...d, fileUrl: urlDocumentoAssoluto(d.fileUrl) }));
+  return (data.documenti ?? []).map((d: DocumentoProgetto) => ({
+    ...d,
+    fileUrl: urlDocumentoAssoluto(d.fileUrl),
+    // §Punto-1 — anche i due formati generati devono puntare a URL assoluti.
+    filePdfUrl: d.filePdfUrl ? urlDocumentoAssoluto(d.filePdfUrl) : d.filePdfUrl ?? null,
+    fileDocxUrl: d.fileDocxUrl ? urlDocumentoAssoluto(d.fileDocxUrl) : d.fileDocxUrl ?? null,
+  }));
 }
 
 export async function salvaDocumentoApi(input: {
@@ -437,6 +449,38 @@ export async function salvaDocumentoApi(input: {
   }
   const data = await res.json();
   return { ...data.documento, fileUrl: urlDocumentoAssoluto(data.documento?.fileUrl) };
+}
+
+// §Punto-1 — generazione server-side di un documento da template: lo stesso merge dati
+// produce PDF (master, sigillo legale) e Word (.docx, copia per firma autografa). Il
+// template viaggia con i placeholder {{...}} irrisolti: la risoluzione avviene sul server
+// dai dati autorevoli di DB (tenant, cliente, progetto), non dallo snapshot localStorage.
+export async function generaDocumentoApi(input: {
+  progettoId: string;
+  microvoceProgettoId?: string;
+  modelloId?: string;
+  contenutoHtml?: string;
+  titolo?: string;
+  categoriaDoc?: string;
+  statoDoc?: 'bozza' | 'pubblicato';
+  dataScadenzaDoc?: string;
+}): Promise<DocumentoProgetto> {
+  const res = await apiFetch(`${API_BASE}/documenti/genera`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.errore ?? 'Errore generazione documento');
+  }
+  const data = await res.json();
+  return {
+    ...data.documento,
+    fileUrl: urlDocumentoAssoluto(data.documento?.fileUrl),
+    filePdfUrl: data.documento?.filePdfUrl ? urlDocumentoAssoluto(data.documento.filePdfUrl) : data.documento?.filePdfUrl ?? null,
+    fileDocxUrl: data.documento?.fileDocxUrl ? urlDocumentoAssoluto(data.documento.fileDocxUrl) : data.documento?.fileDocxUrl ?? null,
+  };
 }
 
 // 'firmato' non è più un valore accettato: lo scrive solo il sigillo di firma sul server
@@ -1989,6 +2033,12 @@ export interface DocumentoPortale {
   progetto: string | null;
   progettoId: string | null;
   fileUrl: string | null;
+  /** §Punto-1 — URL del PDF master generato dal motore server-side (stesso contenuto del fileUrl per i documenti generati). */
+  filePdfUrl?: string | null;
+  /** §Punto-1 — URL del file Word (.docx) generato dal motore server-side; null se il documento non ha un export Word. */
+  fileDocxUrl?: string | null;
+  /** §Punto-1 — formato del file master caricato ('pdf' per i documenti generati dal motore). */
+  formatoOrigine?: string | null;
   tipo: string;
   versione: number | null;
   caricatoIl: string | null;
@@ -2038,6 +2088,47 @@ export async function documentiPortaleApi(clienteId?: string): Promise<{ ok: boo
   const res = await fetchWithTimeout(`${API_BASE}/portal/documenti${query}`, { headers: getAuthHeaders() });
   if (!res.ok) throw await erroreDellaRisposta(res, 'Impossibile leggere i documenti del fascicolo.');
   return await res.json();
+}
+
+/**
+ * §Punto-1 — Scarica un documento del fascicolo nel formato richiesto (PDF o Word) passando
+ * dall'endpoint server `/portal/documenti/:id/download`. Il server risolve il file reale in
+ * archivio (PDF master oppure .docx generato dal motore), ne verifica lo stato di scansione e
+ * restituisce un URL firmato + nome file corretto. Il client scarica quei byte veri: nessun
+ * testo inventato, nessun .doc fabbricato in locale.
+ */
+export async function scaricaDocumentoPortaleApi(
+  documentoId: string,
+  formato: 'pdf' | 'docx',
+  clienteId?: string,
+): Promise<{ ok: boolean } | null> {
+  try {
+    const params = new URLSearchParams({ formato });
+    if (clienteId) params.set('clienteId', clienteId);
+    const res = await fetchWithTimeout(
+      `${API_BASE}/portal/documenti/${encodeURIComponent(documentoId)}/download?${params.toString()}`,
+      { headers: getAuthHeaders() },
+    );
+    if (!res.ok) throw await erroreDellaRisposta(res, 'Download del documento non riuscito.');
+    const body = await res.json();
+    if (!body?.ok || !body?.url) throw new Error('Il server non ha restituito un file scaricabile.');
+
+    const fileRes = await fetch(body.url);
+    if (!fileRes.ok) throw new Error(`HTTP ${fileRes.status}`);
+    const blob = await fileRes.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = objectUrl;
+    link.download = body.filename || `documento.${formato}`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 4000);
+    return { ok: true };
+  } catch (err: any) {
+    alert('Errore download documento: ' + (err?.message || 'errore sconosciuto'));
+    return null;
+  }
 }
 
 export async function requestPortalOtpApi(input: {
@@ -2225,9 +2316,6 @@ export async function scaricaDocumentoClient(fileUrl?: string | null, nomeFile?:
     link.target = '_blank';
     link.rel = 'noreferrer';
     let fallbackName = nomeFile;
-    if (fallbackName && fallbackName.endsWith('.docx')) {
-      fallbackName = fallbackName.replace(/\.docx$/i, '.pdf');
-    }
     if (fallbackName) link.download = fallbackName;
     document.body.appendChild(link);
     link.click();
