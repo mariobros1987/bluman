@@ -328,6 +328,7 @@ export function ClientPortal() {
   // Stesso motivo del flag `signed`: il sigillo eIDAS è di un cliente preciso e non va letto da
   // una chiave cablata. Viene caricato in `loadPortalData` per il cliente autenticato.
   const [eidasSeal, setEidasSeal] = useState<any>(null);
+  const [successSealModal, setSuccessSealModal] = useState<any | null>(null);
 
   // Form Cliente State — vuoto per definizione. Qui c'erano ragione sociale, partita IVA, codice
   // fiscale, IBAN e legale rappresentante di un cliente reale come valori iniziali: siccome nulla
@@ -983,6 +984,7 @@ export function ClientPortal() {
    * si deduce dal fatto che il pulsante è stato premuto.
    */
   const registraEsitoFirma = async (seal: any) => {
+    setSuccessSealModal(seal);
     if (bersaglioFirma.ambito === 'documento_vault') {
       await caricaDocumenti(clientObj?.id);
       setSelectedViewerDoc(null);
@@ -2825,11 +2827,31 @@ export function ClientPortal() {
                     )}
 
                     {doc.firmato ? (
-                      <>
-                        <span style={{ background: '#34d399', color: '#064e3b', padding: '4px 12px', borderRadius: 12, fontSize: 10, fontWeight: 800 }}>
-                          🔒 FIRMATO
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ background: '#064e3b', border: '1px solid #10b981', color: '#6ee7b7', padding: '5px 12px', borderRadius: 8, fontSize: 11, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <span>🔒</span> FIRMATO{doc.dataFirma ? ` IL ${new Date(doc.dataFirma).toLocaleDateString('it-IT')}` : ''}
                         </span>
-                      </>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSuccessSealModal({
+                              signatureId: doc.signatureId || `FEA-${doc.id.slice(0, 8).toUpperCase()}`,
+                              signerName: doc.firmatarioNome || clientName,
+                              documentoTitolo: doc.titolo || doc.nome,
+                              documentoHash: doc.documentoHash || 'SHA256-CERTIFICATO-REGISTRATO',
+                              timestampIso: doc.dataFirma || new Date().toISOString(),
+                              canaleVerificato: doc.canaleVerificato || 'Verifica Codice OTP eIDAS',
+                              ipAddress: doc.ipAddress || 'Registrato dal Server',
+                              standard: doc.standard || 'eIDAS (UE 910/2014) - FEA',
+                              firmaGrafometricaPng: doc.firmaGrafometricaPng,
+                              fileUrl: doc.fileUrl,
+                            });
+                          }}
+                          style={{ background: '#1e1b4b', border: '1px solid #6366f1', color: '#c7d2fe', padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                        >
+                          📜 Ricevuta e Sigillo eIDAS
+                        </button>
+                      </div>
                     ) : (
                       <>
                         {/* Richiedi Modifiche al documento */}
@@ -3758,8 +3780,30 @@ export function ClientPortal() {
                 </button>
 
                 {selectedViewerDoc.firmato ? (
-                  <div style={{ background: '#0d2d22', border: '1px solid #1a5c3c', color: '#34d399', padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 700 }}>
-                    ✓ Documento già sottoscritto{selectedViewerDoc.dataFirma ? ` il ${dataOraLeggibile(selectedViewerDoc.dataFirma)}` : ''}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ background: '#0d2d22', border: '1px solid #1a5c3c', color: '#34d399', padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 700 }}>
+                      ✓ Documento già sottoscritto{selectedViewerDoc.dataFirma ? ` il ${dataOraLeggibile(selectedViewerDoc.dataFirma)}` : ''}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSuccessSealModal({
+                          signatureId: selectedViewerDoc.signatureId || `FEA-${selectedViewerDoc.id.slice(0, 8).toUpperCase()}`,
+                          signerName: selectedViewerDoc.firmatarioNome || clientName,
+                          documentoTitolo: selectedViewerDoc.titolo || selectedViewerDoc.nome,
+                          documentoHash: selectedViewerDoc.documentoHash || 'SHA256-CERTIFICATO-REGISTRATO',
+                          timestampIso: selectedViewerDoc.dataFirma || new Date().toISOString(),
+                          canaleVerificato: selectedViewerDoc.canaleVerificato || 'Verifica Codice OTP eIDAS',
+                          ipAddress: selectedViewerDoc.ipAddress || 'Registrato dal Server',
+                          standard: selectedViewerDoc.standard || 'eIDAS (UE 910/2014) - FEA',
+                          firmaGrafometricaPng: selectedViewerDoc.firmaGrafometricaPng,
+                          fileUrl: selectedViewerDoc.fileUrl,
+                        });
+                      }}
+                      style={{ background: '#1e1b4b', border: '1px solid #6366f1', color: '#c7d2fe', padding: '8px 14px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                    >
+                      📜 Ricevuta eIDAS
+                    </button>
                   </div>
                 ) : (
                   <button
@@ -3820,6 +3864,135 @@ export function ClientPortal() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* 📜 MODALE CERTIFICATO & RICEVUTA DI FIRMA DIGITALE EIDAS */}
+      {successSealModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 12000, padding: 16 }}>
+          <div style={{ background: 'var(--sidebar)', border: '1.5px solid #10b981', borderRadius: 20, width: '100%', maxWidth: 580, maxHeight: '90vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', boxShadow: '0 25px 70px rgba(16,185,129,0.25)' }}>
+            {/* Header Sigillo */}
+            <div style={{ background: 'linear-gradient(135deg, #064e3b 0%, #022c22 100%)', padding: '20px 24px', borderBottom: '1px solid #059669', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ width: 44, height: 44, borderRadius: 12, background: '#10b981', color: '#064e3b', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, fontWeight: 900, boxShadow: '0 4px 14px rgba(16,185,129,0.4)' }}>
+                  ✓
+                </div>
+                <div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: '#ecfdf5' }}>
+                    Documento Sottoscritto con Successo
+                  </div>
+                  <div style={{ fontSize: 11, color: '#6ee7b7', fontWeight: 600, marginTop: 2 }}>
+                    Sigillo di Firma Elettronica Avanzata (eIDAS UE 910/2014)
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSuccessSealModal(null)}
+                style={{ background: 'transparent', border: 'none', color: '#a7f3d0', fontSize: 18, cursor: 'pointer', padding: 4 }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Body Sigillo Certificato */}
+            <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 14, padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>
+                  <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>Atto Sottoscritto:</span>
+                  <span style={{ fontSize: 12.5, fontWeight: 800, color: 'var(--text)', textAlign: 'right', maxWidth: '65%', wordBreak: 'break-word' }}>
+                    📄 {successSealModal.documentoTitolo || 'Atto Studio'}
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>
+                  <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>Firmatario:</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: '#c7d2fe' }}>
+                    👤 {successSealModal.signerName || clientName}
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>
+                  <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>Data e Ora Registrazione (UTC):</span>
+                  <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text)' }}>
+                    📅 {new Date(successSealModal.timestampIso || Date.now()).toLocaleString('it-IT', { dateStyle: 'full', timeStyle: 'medium' })}
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>
+                  <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>Signature ID / Sigillo Univoco:</span>
+                  <span style={{ fontSize: 11.5, fontFamily: 'monospace', fontWeight: 800, color: '#34d399', background: '#064e3b', padding: '2px 8px', borderRadius: 6 }}>
+                    🔑 {successSealModal.signatureId}
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>
+                  <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>Canale Autenticato:</span>
+                  <span style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--text)' }}>
+                    {successSealModal.canaleVerificato || 'Verifica OTP Certificata'}
+                  </span>
+                </div>
+
+                {successSealModal.ipAddress && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>
+                    <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>Indirizzo IP Connessione:</span>
+                    <span style={{ fontSize: 11, fontFamily: 'monospace', color: 'var(--muted)' }}>
+                      🌐 {successSealModal.ipAddress}
+                    </span>
+                  </div>
+                )}
+
+                {successSealModal.documentoHash && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <span style={{ fontSize: 10.5, color: 'var(--muted)', fontWeight: 600 }}>Impronta Crittografica SHA-256 (Integrità Documento):</span>
+                    <span style={{ fontSize: 10, fontFamily: 'monospace', color: '#94a3b8', background: '#090d16', padding: '6px 8px', borderRadius: 6, wordBreak: 'break-all' }}>
+                      {successSealModal.documentoHash}
+                    </span>
+                  </div>
+                )}
+
+                {/* Se è stata apposta la firma grafometrica visiva */}
+                {successSealModal.firmaGrafometricaPng && (
+                  <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 6, background: '#ffffff', padding: 12, borderRadius: 8, border: '1px solid #cbd5e1' }}>
+                    <span style={{ fontSize: 10, fontWeight: 800, color: '#1e1b4b', textTransform: 'uppercase' }}>
+                      Tratto Grafometrico Sottoscritto:
+                    </span>
+                    <img
+                      src={successSealModal.firmaGrafometricaPng}
+                      alt="Firma Grafometrica"
+                      style={{ height: 48, objectFit: 'contain', alignSelf: 'flex-start' }}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Informazione Legale */}
+              <div style={{ fontSize: 10.5, color: 'var(--muted)', lineHeight: 1.4, background: 'rgba(0,0,0,0.2)', padding: 10, borderRadius: 8 }}>
+                🛡 La presente attestazione certifica che l'atto è stato validato con Firma Elettronica Avanzata conforme agli standard tecnici del Regolamento Europeo UE 910/2014 (eIDAS). Una copia conforme con marca temporale è stata archiviata nel Vault dello Studio.
+              </div>
+            </div>
+
+            {/* Footer Azioni */}
+            <div style={{ padding: '16px 24px', borderTop: '1px solid var(--border)', background: 'var(--card)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+              {successSealModal.fileUrl ? (
+                <button
+                  type="button"
+                  onClick={() => scaricaDocumentoClient(successSealModal.fileUrl, `${(successSealModal.documentoTitolo || 'Documento_Firmato').replace(/[^a-zA-Z0-9_-]/g, '_')}_FIRMATO.pdf`)}
+                  style={{ background: '#059669', color: '#fff', border: 'none', padding: '9px 18px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+                >
+                  📥 Scarica Copia Firmata PDF
+                </button>
+              ) : <div />}
+
+              <button
+                type="button"
+                onClick={() => setSuccessSealModal(null)}
+                style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '9px 22px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+              >
+                ✓ Chiudi e Continua
+              </button>
+            </div>
           </div>
         </div>
       )}

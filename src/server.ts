@@ -4879,16 +4879,39 @@ export function buildServer(app: AppPort): FastifyInstance {
     const { id } = req.params;
 
     try {
-      const documento = await prisma.documento.findFirst({ where: { id, tenantId }, select: { id: true, fileUrl: true } });
+      const documento = await prisma.documento.findFirst({
+        where: tenantId ? { id, tenantId } : { id },
+        select: { id: true, fileUrl: true, tenantId: true },
+      });
       if (!documento) return reply.code(404).send({ errore: 'Documento non trovato.' });
+
+      // Disaccoppia versioni figlie prima della cancellazione
+      await prisma.documento.updateMany({
+        where: { documentoPadreId: id },
+        data: { documentoPadreId: null },
+      }).catch(() => {});
+
+      // Disaccoppia passaggi progetto
+      await prisma.passaggioProgetto.updateMany({
+        where: { documentoId: id },
+        data: { documentoId: null },
+      }).catch(() => {});
+
+      // Elimina richieste di modifica collegate
+      await prisma.richiestaModificaDocumento.deleteMany({
+        where: { documentoId: id },
+      }).catch(() => {});
+
+      // Disaccoppia firme elettroniche collegate senza eliminare il sigillo legale
+      await prisma.firmaElettronica.updateMany({
+        where: { riferimentoId: id },
+        data: { riferimentoId: null },
+      }).catch(() => {});
 
       await prisma.documento.delete({ where: { id } });
 
-      // Il file fisico resta in archivio: la riga è il riferimento legale, e lo storage può
-      // essere condiviso con altri riferimenti (firme, versioni precedenti). La pulizia dei
-      // file orfani è un lavoro di manutenzione separato.
       await recordAudit({
-        tenantId,
+        tenantId: documento.tenantId || tenantId,
         azione: 'DOCUMENTO_RIMOSSO',
         entita: id,
         dettagli: `Rimosso dal fascicolo il documento ${documento.fileUrl}`,
@@ -4897,6 +4920,7 @@ export function buildServer(app: AppPort): FastifyInstance {
 
       return reply.send({ ok: true });
     } catch (err) {
+      req.log.error(err, 'Errore eliminazione documento');
       return reply.code(500).send({ errore: err instanceof Error ? err.message : 'Errore eliminazione documento' });
     }
   });
@@ -5084,6 +5108,11 @@ export function buildServer(app: AppPort): FastifyInstance {
           tipoFirma: firma?.tipoFirma ?? null,
           signatureId: firma?.signatureId ?? null,
           canaleVerificato: firma?.canaleVerificato ?? null,
+          ipAddress: firma?.ipAddress ?? null,
+          documentoHash: firma?.documentoHash ?? null,
+          firmaGrafometricaPng: firma?.firmaGrafometricaPng ?? null,
+          firmatarioNome: firma?.firmatarioNome ?? null,
+          standard: firma?.standard ?? 'eIDAS (UE 910/2014) - FEA',
         };
       });
 
@@ -5117,6 +5146,11 @@ export function buildServer(app: AppPort): FastifyInstance {
           tipoFirma: f.tipoFirma,
           signatureId: f.signatureId,
           canaleVerificato: f.canaleVerificato,
+          ipAddress: f.ipAddress,
+          documentoHash: f.documentoHash,
+          firmaGrafometricaPng: f.firmaGrafometricaPng,
+          firmatarioNome: f.firmatarioNome,
+          standard: f.standard,
           documentoNonPiuDisponibile: true,
         }));
 

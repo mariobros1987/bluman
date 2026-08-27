@@ -2628,19 +2628,20 @@ function DocumentiTab({ project }: { project: Progetto }) {
   };
 
   // Eliminazione Documento dal Vault
-  // §2.9 — le riga a database passano da DELETE /documenti/:id; i template generati in
-  // locale (demo) si rimuovono solo dalla lista a schermo come prima.
   const handleDeleteDoc = async (docId: string) => {
     if (!confirm('Vuoi rimuovere questo documento dal Vault del progetto?')) return;
     const doc = docList.find(d => d.id === docId);
     try {
-      if (doc?.dbDoc) await eliminaDocumentoApi(docId);
+      const isLocalTemp = docId.startsWith('doc-tmpl-') || docId.startsWith('d-') || docId.startsWith('local-');
+      if (!isLocalTemp || doc?.dbDoc) {
+        await eliminaDocumentoApi(docId);
+      }
       const updated = docList.filter(d => d.id !== docId);
       setDocList(updated);
-      if (!doc?.dbDoc) {
-        localStorage.setItem(getTenantStorageKey(`bluman_project_documents_${project.id}`), JSON.stringify(updated.filter(d => !d.dbDoc)));
-      }
+      const storageKey = getTenantStorageKey(`bluman_project_documents_${project.id}`);
+      localStorage.setItem(storageKey, JSON.stringify(updated.filter(d => !d.dbDoc)));
       if (selectedPreviewDoc?.id === docId) setSelectedPreviewDoc(null);
+      alert('✓ Documento rimosso con successo dal Vault.');
     } catch (err) {
       console.error(err);
       const motivo = err instanceof Error && err.message ? `: ${err.message}` : '';

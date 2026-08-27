@@ -1953,6 +1953,11 @@ export interface DocumentoPortale {
   tipoFirma: string | null;
   signatureId: string | null;
   canaleVerificato: string | null;
+  ipAddress?: string | null;
+  documentoHash?: string | null;
+  firmaGrafometricaPng?: string | null;
+  firmatarioNome?: string | null;
+  standard?: string | null;
   statoDoc?: 'bozza' | 'pubblicato' | 'in_revisione' | 'firmato';
   pubblicatoAt?: string | null;
   richiesteModifica?: RichiestaModificaDoc[];
