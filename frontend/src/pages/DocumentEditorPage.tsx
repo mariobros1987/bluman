@@ -648,7 +648,7 @@ export function DocumentEditorPage() {
           <div style="min-height: 500px;">${finalHtml}</div>
           <div style="margin-top: 40px; border-top: 1px solid #e2e8f0; padding-top: 10px; display: flex; justify-content: space-between; font-size: 8.5pt; color: #94a3b8;">
             <span>${studioRagioneSociale} • Pratica: ${activeProgetto?.titolo || activeProgetto?.n || 'Incarico Professionale'}</span>
-            <span>Sigillo eIDAS Documentale • Validità Giuridica UE</span>
+            <span>Firma Elettronica Semplice • art. 20 CAD</span>
           </div>
         </div>
       `;
@@ -1413,7 +1413,7 @@ export function DocumentEditorPage() {
               {/* Sheet Footer (Pagination & Legal) */}
               <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: 12, marginTop: 40, display: 'flex', justifyContent: 'space-between', fontSize: 9.5, color: '#94a3b8' }}>
                 <span>Documento Riservato • {tenantInfo?.ragioneSociale || getStudioInfoForTenant(getCurrentTenantId()).ragioneSociale || 'Studio Professionale'} • Pratica: {activeProgetto?.titolo || activeProgetto?.n || 'Incarico Professionale'}</span>
-                <span>Pagina 1 di 1 • Sigillo eIDAS BluMan</span>
+                <span>Pagina 1 di 1 • Firma Elettronica Semplice · art. 20 CAD</span>
               </div>
             </div>
           </div>

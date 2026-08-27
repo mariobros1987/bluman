@@ -78,7 +78,7 @@ export function SettingsPage() {
   const [testingImap, setTestingImap] = useState(false);
   const [imapTestResult, setImapTestResult] = useState<string | null>(null);
 
-  // Firma Digitale & Disclaimer Privacy Email Studio
+  // Firma Elettronica & Disclaimer Privacy Email Studio
   const [emailSignatureHtml, setEmailSignatureHtml] = useState('');
 
   // Form dati azienda (Sede Legale & Operativa)

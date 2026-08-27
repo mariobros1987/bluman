@@ -17,10 +17,10 @@ import { ConfirmDeleteModal } from '../components/ConfirmDeleteModal';
 // handleDownloadDocumentPdf/Word senza essere importate: sul ramo `doc.dbDoc` — cioè
 // proprio i documenti archiviati a database — il click lanciava ReferenceError. Il
 // typecheck del frontend non lo vedeva perché girava su zero file (vedi tsconfig.json).
-import { fetchProgettoDettaglio, emettiFatturaApi, consuntivaMicrovoceApi, assegnaAccessoProgettoApi, salvaProgettoDettaglioApi, archiviaProgettoApi, eliminaProgettoApi, eliminaModuloApi, fetchModuliLibreria, fetchArticoli, inviaComunicazioneApi, ricalcolaProgettoApi, creaPreventivoEAccettaApi, listaDocumentiProgetto, salvaDocumentoApi, eliminaDocumentoApi, richiesteAddendumStudioApi, aggiornaStatoAddendumApi, scaricaDocumentoClient, scaricaDocumentoWordClient } from '../api/client';
+import { fetchProgettoDettaglio, emettiFatturaApi, consuntivaMicrovoceApi, assegnaAccessoProgettoApi, salvaProgettoDettaglioApi, archiviaProgettoApi, eliminaProgettoApi, eliminaModuloApi, fetchModuliLibreria, fetchArticoli, inviaComunicazioneApi, ricalcolaProgettoApi, creaPreventivoEAccettaApi, listaDocumentiProgetto, salvaDocumentoApi, eliminaDocumentoApi, archiviaDocumentoApi, richiesteAddendumStudioApi, aggiornaStatoAddendumApi, scaricaDocumentoClient, scaricaDocumentoWordClient } from '../api/client';
 import type { RichiestaAddendum } from '../api/client';
 import { useTeamMembers } from '../hooks/useTeamMembers';
-import { getCurrentTenantId, getTenantStorageKey, getStudioInfoForTenant, BLUECODE_TENANT_ID } from '../utils/tenant';
+import { getCurrentTenantId, getTenantStorageKey, getStudioInfoForTenant, BLUECODE_TENANT_ID, isAdminStudio } from '../utils/tenant';
 import type { Progetto, ModuloProgetto, MicroVoce, CategoriaModulo, StatoProgetto, StatoModulo, Cliente } from '../types';
 import styles from './ProjectDetail.module.css';
 
@@ -843,7 +843,7 @@ export function ProjectDetail() {
           <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 14, padding: 20 }}>
             <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>📜 Storico Contrattuale & Cronologia Addendum d'Ordine</div>
             <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 20 }}>
-              Registro delle versioni contrattuali, firma digitale ed addendum d'ordine per <strong>{project.cl}</strong> (Incarico: <em>{project.n}</em>).
+              Registro delle versioni contrattuali, firma elettronica semplice ed addendum d'ordine per <strong>{project.cl}</strong> (Incarico: <em>{project.n}</em>).
             </div>
 
             {/* Baseline Contratto Iniziale */}
@@ -872,8 +872,8 @@ export function ProjectDetail() {
                   </div>
                   <div style={{ fontSize: 10, color: project.st === 'pre_project' ? '#fde68a' : '#a7f3d0' }}>
                     {project.st === 'pre_project'
-                      ? `Generata in data ${project.start} · In attesa di validazione e firma digitale 1-Click del cliente`
-                      : `Stipula: ${project.start} · Registrazione eIDAS Validata`}
+                      ? `Generata in data ${project.start} · In attesa di validazione e firma del cliente (OTP)`
+                      : `Stipula: ${project.start} · Firma con OTP verificata`}
                   </div>
                 </div>
                 <div style={{ fontSize: 16, fontWeight: 800, color: project.st === 'pre_project' ? '#f59e0b' : '#34d399' }}>
@@ -2596,7 +2596,7 @@ function DocumentiTab({ project }: { project: Progetto }) {
           <strong>Studio Professionale:</strong> ${studio.ragioneSociale}<br/>
           <strong>Cliente Committente:</strong> ${project.cl} (${project.n})<br/>
           <strong>Categoria Vault:</strong> ${doc.cat || doc.categoria || 'Generale'}<br/>
-          <strong>Stato eIDAS:</strong> ${doc.firmato ? '🔒 Sottoscritto con Sigillo FEA eIDAS UE 910/2014' : 'Bozza Documentale Studio'}
+          <strong>Stato Firma:</strong> ${doc.firmato ? '🔒 Sottoscritto con Firma Elettronica Semplice (OTP verificata · art. 20 CAD)' : 'Bozza Documentale Studio'}
         </div>
       </div>
     `;
@@ -2615,7 +2615,7 @@ function DocumentiTab({ project }: { project: Progetto }) {
         <div>${rawContent}</div>
         <div style="margin-top: 40px; border-top: 1px solid #e2e8f0; padding-top: 10px; display: flex; justify-content: space-between; font-size: 8.5pt; color: #94a3b8;">
           <span>${studio.ragioneSociale} • Pratica: ${project.n}</span>
-          <span>Sigillo eIDAS Documentale • Validità Giuridica UE</span>
+          <span>Firma Elettronica Semplice • art. 20 CAD</span>
         </div>
       </div>
     `;
@@ -2679,45 +2679,73 @@ function DocumentiTab({ project }: { project: Progetto }) {
     }
   };
 
-  // Eliminazione Documento dal Vault
+  // Eliminazione Documento dal Vault — Punto 3 piano gap: un documento firmato dal cliente
+  // non si cancella MAI (il server rifiuta la DELETE con 409). Lo anticipiamo qui: chi gestisce
+  // lo studio può archiviarlo (sparisce dalle liste operative, file e firma restano nello
+  // storico); per tutti gli altri il documento è intoccabile.
   const handleDeleteDoc = async (docId: string) => {
-    if (!confirm('Vuoi rimuovere questo documento dal Vault del progetto?')) return;
     const doc = docList.find(d => d.id === docId);
-    try {
-      const isLocalTemp = docId.startsWith('doc-tmpl-') || docId.startsWith('d-') || docId.startsWith('local-');
-      if (!isLocalTemp || doc?.dbDoc) {
-        await eliminaDocumentoApi(docId);
+    const firmato = Boolean(doc?.firmato);
+
+    if (firmato) {
+      if (!isAdminStudio()) {
+        alert('Questo documento è firmato dal cliente: non può essere eliminato.\nSolo l\'amministratore dello studio può archiviarlo.');
+        return;
       }
-      const updated = docList.filter(d => d.id !== docId);
-      setDocList(updated);
-
-      // La riga va togliata da TUTTE le sorgenti da cui la lista si ricostruisce al mount, non
-      // solo dalla chiave di progetto: prima il registro globale del Vault (scritto da
-      // DocumentEditorPage) e i modelli generati dal codice la riproponevano, quindi il
-      // documento riappariva e la conferma qui sotto era falsa.
-      const storageKey = getTenantStorageKey(`bluman_project_documents_${project.id}`);
-      localStorage.setItem(storageKey, JSON.stringify(updated.filter(d => !d.dbDoc)));
-
-      const allVaultKey = getTenantStorageKey('bluman_all_vault_documents');
+      if (!confirm(
+        'Questo documento è firmato dal cliente e non può essere eliminato.\n' +
+        'Vuoi archiviarlo? Scomparirà dalle liste operative ma il file e la firma restano conservati nello storico.'
+      )) return;
       try {
-        const allVault: unknown = JSON.parse(localStorage.getItem(allVaultKey) || '[]');
-        if (Array.isArray(allVault)) {
-          localStorage.setItem(allVaultKey, JSON.stringify(allVault.filter((d: any) => d?.id !== docId)));
-        }
-      } catch {
-        // Registro globale illeggibile: la chiave di progetto è già stata riscritta e il
-        // documento resta comunque escluso dall'elenco delle rimozioni.
+        await archiviaDocumentoApi(docId);
+      } catch (err) {
+        console.error(err);
+        const motivo = err instanceof Error && err.message ? `: ${err.message}` : '';
+        alert(`Archiviazione non riuscita${motivo}`);
+        return;
       }
-
-      if (!doc?.dbDoc) ricordaDocumentoRimosso(project.id, docId);
-
-      if (selectedPreviewDoc?.id === docId) setSelectedPreviewDoc(null);
-      alert('✓ Documento rimosso con successo dal Vault.');
-    } catch (err) {
-      console.error(err);
-      const motivo = err instanceof Error && err.message ? `: ${err.message}` : '';
-      alert(`Eliminazione non riuscita${motivo}`);
+    } else {
+      if (!confirm('Vuoi rimuovere questo documento dal Vault del progetto?')) return;
+      try {
+        const isLocalTemp = docId.startsWith('doc-tmpl-') || docId.startsWith('d-') || docId.startsWith('local-');
+        if (!isLocalTemp || doc?.dbDoc) {
+          await eliminaDocumentoApi(docId);
+        }
+      } catch (err) {
+        console.error(err);
+        const motivo = err instanceof Error && err.message ? `: ${err.message}` : '';
+        alert(`Eliminazione non riuscita${motivo}`);
+        return;
+      }
     }
+
+    const updated = docList.filter(d => d.id !== docId);
+    setDocList(updated);
+
+    // La riga va togliata da TUTTE le sorgenti da cui la lista si ricostruisce al mount, non
+    // solo dalla chiave di progetto: prima il registro globale del Vault (scritto da
+    // DocumentEditorPage) e i modelli generati dal codice la riproponevano, quindi il
+    // documento riappariva e la conferma qui sotto era falsa.
+    const storageKey = getTenantStorageKey(`bluman_project_documents_${project.id}`);
+    localStorage.setItem(storageKey, JSON.stringify(updated.filter(d => !d.dbDoc)));
+
+    const allVaultKey = getTenantStorageKey('bluman_all_vault_documents');
+    try {
+      const allVault: unknown = JSON.parse(localStorage.getItem(allVaultKey) || '[]');
+      if (Array.isArray(allVault)) {
+        localStorage.setItem(allVaultKey, JSON.stringify(allVault.filter((d: any) => d?.id !== docId)));
+      }
+    } catch {
+      // Registro globale illeggibile: la chiave di progetto è già stata riscritta e il
+      // documento resta comunque escluso dall'elenco delle rimozioni.
+    }
+
+    if (!doc?.dbDoc) ricordaDocumentoRimosso(project.id, docId);
+
+    if (selectedPreviewDoc?.id === docId) setSelectedPreviewDoc(null);
+    alert(firmato
+      ? '✓ Documento archiviato: resta nello storico con la sua firma.'
+      : '✓ Documento rimosso con successo dal Vault.');
   };
 
   // Filtraggio dinamico
@@ -2764,13 +2792,14 @@ STATO PRATICA: ${project.st}
 
 ELENCO DEI DOCUMENTI PRESENTI NEL FASCICOLO DIGITALE:
 
-${docList.map((d, i) => `${i + 1}. [${d.cat || 'Documento'}] ${d.nome || d.titolo} (${d.firmato ? 'Firma FEA eIDAS Verificata' : 'Bozza Documentale Studio'})`).join('\n')}
+${docList.map((d, i) => `${i + 1}. [${d.cat || 'Documento'}] ${d.nome || d.titolo} (${d.firmato ? 'Firma OTP verificata · art. 20 CAD' : 'Bozza Documentale Studio'})`).join('\n')}
 
 ================================================================================
 Note di Conformita:
-I documenti contrattuali sottoscritti con Firma Elettronica Avanzata (FEA)
-sono pienamente conformi al Regolamento UE 910/2014 (eIDAS) con marcatura
-temporale certificata ISO UTC ed impronta crittografica SHA-256.
+I documenti contrattuali sono sottoscritti con Firma Elettronica Semplice
+mediante codice OTP verificato, ai sensi dell'art. 20 del CAD. Il sigillo
+di firma registra data e ora di sottoscrizione e impronta crittografica
+SHA-256 del documento.
 ================================================================================
 `;
 
@@ -2925,7 +2954,7 @@ temporale certificata ISO UTC ed impronta crittografica SHA-256.
                       {isWord ? '📝' : '📄'}
                     </div>
                     <span style={{ fontSize: 9.5, background: doc.firmato ? '#0d2d22' : '#1e1b4b', color: doc.firmato ? '#34d399' : '#818cf8', border: `1px solid ${doc.firmato ? '#059669' : '#4338ca'}`, padding: '2px 8px', borderRadius: 8, fontWeight: 700 }}>
-                      {doc.firmato ? '🔒 eIDAS Firmato' : (isWord ? 'DOCX Word' : 'PDF')}
+                      {doc.firmato ? '🔒 Firmato (OTP)' : (isWord ? 'DOCX Word' : 'PDF')}
                     </span>
                   </div>
 
@@ -3006,7 +3035,7 @@ temporale certificata ISO UTC ed impronta crittografica SHA-256.
                   <th style={{ padding: '10px 12px' }}>Categoria</th>
                   <th style={{ padding: '10px 12px' }}>Dimensione</th>
                   <th style={{ padding: '10px 12px' }}>Data</th>
-                  <th style={{ padding: '10px 12px' }}>Firma eIDAS</th>
+                  <th style={{ padding: '10px 12px' }}>Firma (OTP)</th>
                   <th style={{ padding: '10px 12px', textAlign: 'right' }}>Azioni Cloud Vault</th>
                 </tr>
               </thead>
@@ -3028,7 +3057,7 @@ temporale certificata ISO UTC ed impronta crittografica SHA-256.
                       <td style={{ padding: '12px', color: 'var(--muted)' }}>{doc.data || doc.dataCaricamento || '15/08/2026'}</td>
                       <td style={{ padding: '12px' }}>
                         <span style={{ fontSize: 9.5, background: doc.firmato ? '#0d2d22' : '#2d1a05', color: doc.firmato ? '#34d399' : '#f59e0b', border: `1px solid ${doc.firmato ? '#059669' : '#d97706'}`, padding: '2px 8px', borderRadius: 10, fontWeight: 700 }}>
-                          {doc.firmato ? '🔒 eIDAS Verificato' : '⏳ In attesa di firma'}
+                          {doc.firmato ? '🔒 OTP verificata' : '⏳ In attesa di firma'}
                         </span>
                       </td>
                       <td style={{ padding: '12px', textAlign: 'right' }}>
@@ -3090,7 +3119,7 @@ temporale certificata ISO UTC ed impronta crittografica SHA-256.
                 <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span>📄 {selectedPreviewDoc.titolo || selectedPreviewDoc.nome}</span>
                   <span style={{ fontSize: 10, background: selectedPreviewDoc.firmato ? '#0d2d22' : '#200f40', color: selectedPreviewDoc.firmato ? '#34d399' : '#a78bfa', padding: '2px 8px', borderRadius: 10, border: '1px solid #3730a3' }}>
-                    {selectedPreviewDoc.firmato ? '🔒 eIDAS Sottoscritto' : 'Bozza Legale Studio'}
+                    {selectedPreviewDoc.firmato ? '🔒 Firmato (OTP verificata)' : 'Bozza Legale Studio'}
                   </span>
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 3 }}>
@@ -3143,7 +3172,7 @@ temporale certificata ISO UTC ed impronta crittografica SHA-256.
                       Il presente documento certifica la conformità delle procedure societarie e contrattuali svolte per il Cliente <strong>{project.cl}</strong> nell'ambito dell'incarico <strong>{project.n}</strong>.
                     </p>
                     <p style={{ marginBottom: 12 }}>
-                      Tutti gli atti societari, visure, delibere ed accordi sono archiviati con crittografia end-to-end e valore legale probatorio ai sensi dell'art. 20 del CAD e del Regolamento UE 910/2014 (eIDAS).
+                      Tutti gli atti societari, visure, delibere ed accordi sono archiviati con crittografia end-to-end e valore legale probatorio ai sensi dell'art. 20 del CAD.
                     </p>
                   </div>
                 )}
@@ -3156,7 +3185,7 @@ temporale certificata ISO UTC ed impronta crittografica SHA-256.
                   <div>
                     <div style={{ fontWeight: 700, color: '#475569' }}>Firma Committente:</div>
                     <div style={{ marginTop: 20, fontStyle: 'italic', color: selectedPreviewDoc.firmato ? '#059669' : '#64748b', fontWeight: 700 }}>
-                      {selectedPreviewDoc.firmato ? `✓ FIRMATO DA ${project.cl.toUpperCase()} (FEA eIDAS Validata)` : `(Sottoscrizione per ${project.cl})`}
+                      {selectedPreviewDoc.firmato ? `✓ FIRMATO DA ${project.cl.toUpperCase()} (firma semplice con OTP verificata)` : `(Sottoscrizione per ${project.cl})`}
                     </div>
                   </div>
                 </div>

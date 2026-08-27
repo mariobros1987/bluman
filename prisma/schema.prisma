@@ -373,6 +373,8 @@ model EngagementLetter {
   statoFirma   String     @default("in_attesa") @map("stato_firma") // in_attesa|completata
   linkFirma    String?    @map("link_firma")
   firmatoAt    DateTime?  @map("firmato_at")
+  // Punto 3 piano gap — come per Documento: mai hard-delete, solo archiviazione.
+  isArchiviato Boolean    @default(false) @map("is_archiviato")
 
   @@map("engagement_letter")
 }
@@ -600,6 +602,12 @@ model Documento {
   documentoPadreId    String?           @map("documento_padre_id")
   documentoPadre      Documento?        @relation("VersioniDocumento", fields: [documentoPadreId], references: [id])
   versioni            Documento[]       @relation("VersioniDocumento")
+  // Punto 3 piano gap — un documento firmato (o con sigillo/OTP collegati) non si cancella
+  // mai: viene solo archiviato. Le liste operative escludono isArchiviato=true, lo storico
+  // e l'audit restano leggibili e il riferimento della firma non diventa mai orfano.
+  isArchiviato        Boolean           @default(false) @map("is_archiviato")
+  archiviatoAt        DateTime?         @map("archiviato_at")
+  archiviatoDaId      String?           @map("archiviato_da_id")
 
   passaggioProgetto PassaggioProgetto?
   richiesteModifica RichiestaModificaDocumento[]

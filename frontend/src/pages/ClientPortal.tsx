@@ -298,7 +298,7 @@ export function ClientPortal() {
   const [notifichePortale, setNotifichePortale] = useState<NotificaPortale[]>([]);
   const [notifPortaleOpen, setNotifPortaleOpen] = useState(false);
 
-  // ── FIRMA ELETTRONICA AVANZATA: CANALE, CODICE, MODALITÀ ──────────────────
+  // ── FIRMA ELETTRONICA SEMPLICE: CANALE, CODICE, MODALITÀ ──────────────────
   //
   // I due valori iniziali che stavano qui erano il cellulare di una persona reale e un
   // indirizzo email inventato: comparivano precompilati nei campi di QUALUNQUE cliente, e
@@ -333,7 +333,7 @@ export function ClientPortal() {
    * elemento in più nel verbale.
    */
   const [padGrafometricaAperto, setPadGrafometricaAperto] = useState(false);
-  // Stesso motivo del flag `signed`: il sigillo eIDAS è di un cliente preciso e non va letto da
+  // Stesso motivo del flag `signed`: il sigillo di firma è di un cliente preciso e non va letto da
   // una chiave cablata. Viene caricato in `loadPortalData` per il cliente autenticato.
   const [eidasSeal, setEidasSeal] = useState<any>(null);
   const [successSealModal, setSuccessSealModal] = useState<any | null>(null);
@@ -1066,7 +1066,8 @@ export function ClientPortal() {
   };
 
   /**
-   * Conclusione di un'operazione: la firma è una FEA a tutti gli effetti, con lo stesso flusso
+   * Conclusione di un'operazione: la firma è una firma elettronica semplice (SES) con OTP
+   * verificata, con lo stesso flusso
    * OTP dei documenti del fascicolo. Il server firma i dati canonici del modulo (§2.9) e mette
    * la riga in `FirmaElettronica` — data, hash e IP veri, visibili subito anche allo studio.
    */
@@ -1423,7 +1424,7 @@ export function ClientPortal() {
               {currentStudioInfo.ragioneSociale || 'BluMan Advisory'}
             </h1>
             <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>
-              Portale Riservato Clienti • Consultazione Incarichi & Firma Digitale
+              Portale Riservato Clienti • Consultazione Incarichi & Firma Elettronica Semplice
             </p>
           </div>
 
@@ -1566,7 +1567,7 @@ export function ClientPortal() {
 
           <div style={{ textAlign: 'center', borderTop: '1px solid var(--border)', paddingTop: 14 }}>
             <span style={{ fontSize: 11, color: 'var(--muted)' }}>
-              🔒 Connessione protetta con crittografia end-to-end e firma digitale eIDAS
+              🔒 Connessione protetta con crittografia end-to-end · Firma elettronica semplice (OTP verificata) · art. 20 CAD
             </span>
           </div>
         </div>
@@ -1894,7 +1895,7 @@ export function ClientPortal() {
                         <span style={{ background: '#34d399', color: '#064e3b', fontSize: 10, fontWeight: 800, padding: '3px 8px', borderRadius: 12, textTransform: 'uppercase' }}>
                           🔒 FIRMATO & CONGELATO (v1.0)
                         </span>
-                        {/* Repertorio e marca temporale vengono dal sigillo eIDAS emesso dal server
+                        {/* Repertorio e marca temporale vengono dal sigillo di firma emesso dal server
                             (/portal/verify-otp-and-sign). Prima erano cablati: mostravano data, ora e
                             IP di una firma che non era quella del cliente collegato. */}
                         {eidasSeal?.signatureId && (
@@ -1909,7 +1910,7 @@ export function ClientPortal() {
                         </div>
                       ) : (
                         <div style={{ fontSize: 11, color: '#fbbf24', marginTop: 4 }}>
-                          Firma registrata su questo dispositivo, ma il sigillo eIDAS non è disponibile:
+                          Firma registrata su questo dispositivo, ma il sigillo di firma non è disponibile:
                           non possiamo mostrarne marca temporale né impronta. Richiedi allo studio la copia con evidenza di firma.
                         </div>
                       )}
@@ -1938,7 +1939,7 @@ export function ClientPortal() {
                             </div>
                             <p style="margin-top:20px;line-height:1.6;">Si attesta la stipula ed il congelamento immutabile dell'Engagement Letter professionale per l'avvio delle attività di consulenza patrimoniale.</p>
                           `;
-                          // Le evidenze di firma vengono SOLO dal sigillo eIDAS emesso dal server.
+                          // Le evidenze di firma vengono SOLO dal sigillo di firma emesso dal server.
                           // Prima erano due firmatari cablati con data e indirizzi IP inventati, e la
                           // controfirma dello studio non esiste in nessun registro: il PDF attestava
                           // una firma che nessuno aveva apposto. Senza sigillo il PDF esce senza
@@ -2085,8 +2086,8 @@ export function ClientPortal() {
                       <div style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.4 }}>Ricevi un codice temporaneo a 6 cifre via WhatsApp o Email certificata.</div>
                     </div>
                     <div style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '12px 14px' }}>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: '#34d399', marginBottom: 4 }}>3️⃣ Sigillo FEA eIDAS</div>
-                      <div style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.4 }}>Apponi la firma con pieno valore legale e scarica il certificato PDF.</div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: '#34d399', marginBottom: 4 }}>3️⃣ Firma con OTP verificata</div>
+                      <div style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.4 }}>Apponi la firma elettronica semplice (OTP verificata · art. 20 CAD) e scarica l'attestazione PDF.</div>
                     </div>
                   </div>
                 </div>
@@ -2198,7 +2199,7 @@ export function ClientPortal() {
                         <span>📜 Testo Integrale del Mandato Professionale (Engagement Letter da Esaminare)</span>
                       </div>
                       <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
-                        Leggi attentamente le clausole, i moduli incorporati, i corrispettivi e le condizioni legali prima di apporre la firma digitale.
+                        Leggi attentamente le clausole, i moduli incorporati, i corrispettivi e le condizioni legali prima di apporre la firma.
                       </div>
                     </div>
                     <button
@@ -2242,9 +2243,9 @@ export function ClientPortal() {
                 </div>
 
                 <div style={{ borderTop: '1px solid var(--border)', paddingTop: 20 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>Accettazione & Apposizione Firma Digitale Unificata</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>Accettazione & Apposizione Firma Elettronica Semplice</div>
                   <p style={{ fontSize: 11.5, color: 'var(--muted)', lineHeight: 1.5, marginBottom: 14 }}>
-                    Conferma la proposta contrattuale mediante <strong>Firma Elettronica Avanzata (FEA)</strong> conforme al Regolamento eIDAS UE 910/2014.
+                    Conferma la proposta contrattuale mediante <strong>Firma Elettronica Semplice (OTP verificata)</strong> ai sensi dell'art. 20 del CAD.
                   </p>
 
                   {/* ── COME VUOI FIRMARE (§1.3) ─────────────────────────────────── */}
@@ -2761,7 +2762,7 @@ export function ClientPortal() {
               <div>
                 <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>📎 Vault Documenti Legali e Modelli In Incarico</div>
                 <div style={{ fontSize: 11, color: 'var(--muted)' }}>
-                  Visualizza, scarica, firma con <strong>firma elettronica avanzata</strong> (lettura, codice sul canale che scegli, firma grafometrica) oppure <strong>ricarica il PDF firmato a mano</strong>. Le firme sono registrate a database e visibili allo studio.
+                  Visualizza, scarica, firma con <strong>firma elettronica semplice</strong> (lettura, codice sul canale che scegli, firma grafometrica) oppure <strong>ricarica il PDF firmato a mano</strong>. Le firme sono registrate a database e visibili allo studio.
                 </div>
               </div>
               <button
@@ -2922,21 +2923,23 @@ export function ClientPortal() {
                           type="button"
                           onClick={() => {
                             setSuccessSealModal({
-                              signatureId: doc.signatureId || `FEA-${doc.id.slice(0, 8).toUpperCase()}`,
+                              // Il frontend non inventa evidenze legali: ciò che manca dal sigillo
+                              // server resta vuoto e la ricevuta lo mostra come "non registrato".
+                              signatureId: doc.signatureId || `SIG-${doc.id.slice(0, 8).toUpperCase()}`,
                               signerName: doc.firmatarioNome || clientName,
                               documentoTitolo: doc.titolo || doc.nome,
-                              documentoHash: doc.documentoHash || 'SHA256-CERTIFICATO-REGISTRATO',
-                              timestampIso: doc.dataFirma || new Date().toISOString(),
-                              canaleVerificato: doc.canaleVerificato || 'Verifica Codice OTP eIDAS',
-                              ipAddress: doc.ipAddress || 'Registrato dal Server',
-                              standard: doc.standard || 'eIDAS (UE 910/2014) - FEA',
+                              documentoHash: doc.documentoHash || '',
+                              timestampIso: doc.dataFirma || '',
+                              canaleVerificato: doc.canaleVerificato || 'Verifica codice OTP',
+                              ipAddress: doc.ipAddress || '',
+                              standard: doc.standard || 'Firma Elettronica Semplice (OTP verificata) · art. 20 CAD',
                               firmaGrafometricaPng: doc.firmaGrafometricaPng,
                               fileUrl: doc.fileUrl,
                             });
                           }}
                           style={{ background: '#1e1b4b', border: '1px solid #6366f1', color: '#c7d2fe', padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
                         >
-                          📜 Ricevuta e Sigillo eIDAS
+                          📜 Ricevuta di firma
                         </button>
                       </div>
                     ) : (
@@ -3532,7 +3535,7 @@ export function ClientPortal() {
         )}
       </div>
 
-      {/* 🔐 MODALE DI FIRMA ELETTRONICA AVANZATA (FEA) CON OTP */}
+      {/* 🔐 MODALE DI FIRMA ELETTRONICA SEMPLICE (SES) CON OTP */}
       {otpModalOpen && (
         <div style={{
           position: 'fixed',
@@ -3565,10 +3568,10 @@ export function ClientPortal() {
                 </div>
                 <div>
                   <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: 'var(--text)' }}>
-                    Firma Elettronica Avanzata (FEA)
+                    Firma Elettronica Semplice (OTP verificata)
                   </h3>
                   <span style={{ fontSize: 11, color: '#34d399', fontWeight: 600 }}>
-                    Conforme Regolamento eIDAS UE 910/2014
+                    Art. 20 CAD — validità del documento informatico
                   </span>
                 </div>
               </div>
@@ -3696,7 +3699,7 @@ export function ClientPortal() {
               )}
             </div>
 
-            {/* Note Legali eIDAS — dette come stanno */}
+            {/* Note Legali SES — dette come stanno */}
             <div style={{ fontSize: 10.5, color: 'var(--muted)', lineHeight: 1.45, background: 'rgba(0,0,0,0.2)', padding: 10, borderRadius: 8 }}>
               {/*
                 Il testo precedente dichiarava un "indirizzo IP certificato" e un'associazione
@@ -3710,8 +3713,9 @@ export function ClientPortal() {
               recapitato al tuo <strong>{nomeCanale[otpCanale].toLowerCase()}</strong>, la data e ora UTC,
               l'impronta SHA-256 del testo che stai leggendo, l'indirizzo IP visto dal server (o
               «non registrato», se la rete non lo espone) e il browser usato. La verifica attesta il
-              possesso del recapito registrato nella tua scheda: è una Firma Elettronica Avanzata ai
-              sensi del Regolamento eIDAS UE 910/2014, non una firma qualificata.
+              possesso del recapito registrato nella tua scheda: è una Firma Elettronica Semplice
+              con OTP verificata ai sensi dell'art. 20 del CAD, non una firma elettronica qualificata
+              o avanzata.
             </div>
 
             {/* Azioni */}
@@ -3792,7 +3796,7 @@ export function ClientPortal() {
         </div>
       )}
 
-      {/* ✍️ PAD GRAFOMETRICO DELLA FIRMA FEA — si apre col codice già digitato (§1.11) */}
+      {/* ✍️ PAD GRAFOMETRICO DELLA FIRMA SES — si apre col codice già digitato (§1.11) */}
       {padGrafometricaAperto && (
         <DigitalSignatureModal
           documentTitle={TITOLO_MANDATO}
@@ -3803,7 +3807,7 @@ export function ClientPortal() {
           onClose={() => setPadGrafometricaAperto(false)}
           onSigned={async (firma) => {
             // Il pad si chiude prima della chiamata: se la convalida rifiuta il codice
-            // l'errore va letto nella modale FEA, che è dove sta il campo da correggere.
+            // l'errore va letto nella modale di firma, che è dove sta il campo da correggere.
             setPadGrafometricaAperto(false);
             await confermaFirmaConOtp(firma.signatureImageBase64);
           }}
@@ -3918,21 +3922,22 @@ export function ClientPortal() {
                       type="button"
                       onClick={() => {
                         setSuccessSealModal({
-                          signatureId: selectedViewerDoc.signatureId || `FEA-${selectedViewerDoc.id.slice(0, 8).toUpperCase()}`,
+                          // Stessa regola: niente evidenze inventate dal frontend.
+                          signatureId: selectedViewerDoc.signatureId || `SIG-${selectedViewerDoc.id.slice(0, 8).toUpperCase()}`,
                           signerName: selectedViewerDoc.firmatarioNome || clientName,
                           documentoTitolo: selectedViewerDoc.titolo || selectedViewerDoc.nome,
-                          documentoHash: selectedViewerDoc.documentoHash || 'SHA256-CERTIFICATO-REGISTRATO',
-                          timestampIso: selectedViewerDoc.dataFirma || new Date().toISOString(),
-                          canaleVerificato: selectedViewerDoc.canaleVerificato || 'Verifica Codice OTP eIDAS',
-                          ipAddress: selectedViewerDoc.ipAddress || 'Registrato dal Server',
-                          standard: selectedViewerDoc.standard || 'eIDAS (UE 910/2014) - FEA',
+                          documentoHash: selectedViewerDoc.documentoHash || '',
+                          timestampIso: selectedViewerDoc.dataFirma || '',
+                          canaleVerificato: selectedViewerDoc.canaleVerificato || 'Verifica codice OTP',
+                          ipAddress: selectedViewerDoc.ipAddress || '',
+                          standard: selectedViewerDoc.standard || 'Firma Elettronica Semplice (OTP verificata) · art. 20 CAD',
                           firmaGrafometricaPng: selectedViewerDoc.firmaGrafometricaPng,
                           fileUrl: selectedViewerDoc.fileUrl,
                         });
                       }}
                       style={{ background: '#1e1b4b', border: '1px solid #6366f1', color: '#c7d2fe', padding: '8px 14px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
                     >
-                      📜 Ricevuta eIDAS
+                      📜 Ricevuta di firma
                     </button>
                   </div>
                 ) : (
@@ -3998,7 +4003,7 @@ export function ClientPortal() {
         </div>
       )}
 
-      {/* 📜 MODALE CERTIFICATO & RICEVUTA DI FIRMA DIGITALE EIDAS */}
+      {/* 📜 MODALE ATTESTAZIONE & RICEVUTA DI FIRMA (SES) */}
       {successSealModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 12000, padding: 16 }}>
           <div style={{ background: 'var(--sidebar)', border: '1.5px solid #10b981', borderRadius: 20, width: '100%', maxWidth: 580, maxHeight: '90vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', boxShadow: '0 25px 70px rgba(16,185,129,0.25)' }}>
@@ -4013,7 +4018,7 @@ export function ClientPortal() {
                     Documento Sottoscritto con Successo
                   </div>
                   <div style={{ fontSize: 11, color: '#6ee7b7', fontWeight: 600, marginTop: 2 }}>
-                    Sigillo di Firma Elettronica Avanzata (eIDAS UE 910/2014)
+                    Firma Elettronica Semplice (OTP verificata) · art. 20 CAD
                   </div>
                 </div>
               </div>
@@ -4046,7 +4051,7 @@ export function ClientPortal() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>
                   <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>Data e Ora Registrazione (UTC):</span>
                   <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text)' }}>
-                    📅 {new Date(successSealModal.timestampIso || Date.now()).toLocaleString('it-IT', { dateStyle: 'full', timeStyle: 'medium' })}
+                    📅 {successSealModal.timestampIso ? new Date(successSealModal.timestampIso).toLocaleString('it-IT', { dateStyle: 'full', timeStyle: 'medium' }) : 'Data e ora non registrate'}
                   </span>
                 </div>
 
@@ -4060,7 +4065,7 @@ export function ClientPortal() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>
                   <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>Canale Autenticato:</span>
                   <span style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--text)' }}>
-                    {successSealModal.canaleVerificato || 'Verifica OTP Certificata'}
+                    {successSealModal.canaleVerificato || 'Verifica codice OTP'}
                   </span>
                 </div>
 
@@ -4099,7 +4104,7 @@ export function ClientPortal() {
 
               {/* Informazione Legale */}
               <div style={{ fontSize: 10.5, color: 'var(--muted)', lineHeight: 1.4, background: 'rgba(0,0,0,0.2)', padding: 10, borderRadius: 8 }}>
-                🛡 La presente attestazione certifica che l'atto è stato validato con Firma Elettronica Avanzata conforme agli standard tecnici del Regolamento Europeo UE 910/2014 (eIDAS). Una copia conforme con marca temporale è stata archiviata nel Vault dello Studio.
+                🛡 La presente attestazione documenta che l'atto è stato sottoscritto con firma elettronica semplice mediante codice OTP verificato (art. 20 del CAD). Una copia del documento firmato è conservata nel Vault dello Studio.
               </div>
             </div>
 
@@ -4136,14 +4141,14 @@ export function ClientPortal() {
         </div>
       )}
 
-      {/* ✍️ MODALE FIRMA DIGITALE GRAFICA CON CANVAS & MARCA TEMPORALE */}
+      {/* ✍️ CONFERMA INVIO DOCUMENTO FIRMATO A MANO (firma a penna, §1.3) */}
       {/* 📤 CONFERMA INVIO DEL DOCUMENTO FIRMATO A MANO (§1.3)
           Qui c'era `DigitalSignatureModal`: disegnava la grafometrica, la scriveva in
           `localStorage`, sincronizzava un finto vault di progetto e concludeva con «firmato con
           successo con Sigillo FEA eIDAS UE 910/2014». Nessun codice OTP, nessuna riga in
           `FirmaElettronica`, nessuna impronta del documento: il cliente credeva di aver firmato,
           lo studio non vedeva niente, e su un altro browser il documento risultava da firmare.
-          La firma FEA passa ora dalla modale del codice; questa serve solo alla firma a penna. */}
+          La firma SES passa ora dalla modale del codice; questa serve solo alla firma a penna. */}
       {documentoDaCaricare && fileFirmato && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 120, padding: 16 }}>
           <div style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, padding: 24, width: '100%', maxWidth: 520, display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -4236,7 +4241,7 @@ export function ClientPortal() {
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 800, color: '#34d399' }}>✓ OPERAZIONE CONCLUSA & VALIDATA CON SUCCESSO</div>
                   <div style={{ fontSize: 11, color: '#a7f3d0', marginTop: 2 }}>
-                    Firmato digitalmente da <strong>{moduleSignatures[selectedModule.id].signerName}</strong> in data {moduleSignatures[selectedModule.id].dataFirma} · Sigillo Crittografico eIDAS FEA
+                    Firmato digitalmente da <strong>{moduleSignatures[selectedModule.id].signerName}</strong> in data {moduleSignatures[selectedModule.id].dataFirma} · Firma Elettronica Semplice (OTP verificata) · art. 20 CAD
                   </div>
                 </div>
               </div>
@@ -4358,7 +4363,7 @@ export function ClientPortal() {
                                   )}
                                 </div>
                                 <div style={{ fontSize: 10, color: doc.firmato ? '#34d399' : doc.statoDoc === 'in_revisione' ? '#fbbf24' : '#93c5fd' }}>
-                                  {doc.firmato ? '✓ Firmato con sigillo eIDAS' : doc.statoDoc === 'in_revisione' ? '⚠️ In attesa di riscontro modifica' : '🚀 Pubblicato dallo studio per la firma'}
+                                  {doc.firmato ? '✓ Firmato con OTP verificata' : doc.statoDoc === 'in_revisione' ? '⚠️ In attesa di riscontro modifica' : '🚀 Pubblicato dallo studio per la firma'}
                                 </div>
                                 {doc.versioniPrecedenti && doc.versioniPrecedenti.length > 0 && (
                                   <div style={{ fontSize: 9.5, color: '#93c5fd', marginTop: 2 }}>
@@ -4526,7 +4531,7 @@ export function ClientPortal() {
 
               {moduleSignatures[selectedModule.id]?.firmato ? (
                 <div style={{ fontSize: 12, color: '#34d399', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span>🔒 Conclusione firmata · Sigillo FEA registrato</span>
+                  <span>🔒 Conclusione firmata · firma registrata con OTP verificata</span>
                 </div>
               ) : (
                 <button
@@ -4546,7 +4551,7 @@ export function ClientPortal() {
                     gap: 8,
                   }}
                 >
-                  <span>✍️ Firma la conclusione dell'operazione (FEA con codice OTP)</span>
+                  <span>✍️ Firma la conclusione dell'operazione (firma semplice con codice OTP · art. 20 CAD)</span>
                 </button>
               )}
             </div>

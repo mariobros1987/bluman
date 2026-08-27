@@ -89,13 +89,13 @@ function createPaginatedPages(
     sigDiv.style.borderTop = '1.5px solid #cbd5e1';
     sigDiv.innerHTML = `
       <div style="font-size: 9.5pt; font-weight: 700; color: #4338ca; text-transform: uppercase; margin-bottom: 10px; letter-spacing: 0.5px;">
-        🔒 Sigillo di Firma Digitale eIDAS & Registrazione Marca Temporale
+        🔒 Firma Elettronica Semplice (OTP verificata) · art. 20 CAD
       </div>
       <div style="display: flex; gap: 14px; flex-wrap: wrap;">
         ${signatures.map(sig => `
           <div style="flex: 1; min-width: 220px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 10px; box-sizing: border-box;">
             <div style="font-size: 9.5pt; font-weight: 700; color: #0f172a;">${sig.signerRole}: ${sig.signerName}</div>
-            <div style="font-size: 9pt; color: #166534; font-weight: 700; margin: 3px 0;">✓ FIRMATO DIGITALMENTE (eIDAS UE 910/2014)</div>
+            <div style="font-size: 9pt; color: #166534; font-weight: 700; margin: 3px 0;">✓ FIRMATO CON OTP VERIFICATA (art. 20 CAD)</div>
             ${sig.signatureImageBase64 ? `<img src="${sig.signatureImageBase64}" style="height: 36px; max-width: 160px; margin: 4px 0; object-fit: contain;" />` : ''}
             <div style="font-size: 8pt; color: #64748b; font-family: monospace; margin-top: 3px; line-height: 1.3;">
               Data/Ora: ${sig.timestamp}<br/>
@@ -182,7 +182,7 @@ function createPaginatedPages(
     pageFooter.style.fontSize = '8.5pt';
     pageFooter.style.color = '#94a3b8';
     pageFooter.innerHTML = `
-      <span>BluMan Advisory Platform • Validità Giuridica UE eIDAS</span>
+      <span>BluMan Advisory Platform • Firma elettronica semplice · art. 20 CAD</span>
       <span>Pagina ${idx + 1} di ${totalPages}</span>
     `;
     pageContainer.appendChild(pageFooter);

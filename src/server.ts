@@ -2979,11 +2979,44 @@ export function buildServer(app: AppPort): FastifyInstance {
       );
       if (totaleOreConsuntivate > 0) {
         return reply.code(409).send({
-          errore: `Il modulo «${modulo.nome}» ha ${totaleOreConsuntivate} ore consuntivate e non può essere eliminato. Azzerare prima le ore o archiviare il modulo.`,
+          errore: `Il modulo «${modulo.nome}» ha ${totaleOreConsuntivate} ore consuntivate e non può essere eliminato. Azzerare prima le ore.`,
         });
       }
 
-      await prisma.moduloProgetto.delete({ where: { id: moduloId } });
+      // Un modulo già richiamato in fattura è memoria fiscale: non si elimina.
+      const righeFattura = await prisma.fatturaRiga.count({ where: { moduloProgettoId: moduloId } });
+      if (righeFattura > 0) {
+        return reply.code(409).send({
+          errore: `Il modulo «${modulo.nome}» è richiamato in ${righeFattura} righe di fattura e non può essere eliminato.`,
+        });
+      }
+
+      // Senza questa pulizia il delete moriva con 500: micro-voci, passaggi, accessi e
+      // dipendenze referenziano il modulo con FK senza CASCADE, quindi anche un modulo
+      // appena istanziato (micro-voci a zero ore) non era cancellabile. Si toglie solo lo
+      // scaffolding: i documenti prodotti dai passaggi restano nel fascicolo
+      // (microvoce_progetto_id → NULL via ON DELETE SET NULL), le checklist cascano a DB.
+      try {
+        await prisma.$transaction(async (tx) => {
+          const microvoceIds = modulo.microvoci.map((mv) => mv.id);
+          await tx.accessoRisorsa.deleteMany({
+            where: {
+              OR: [{ moduloProgettoId: moduloId }, ...(microvoceIds.length ? [{ microvoceProgettoId: { in: microvoceIds } }] : [])],
+            },
+          });
+          if (microvoceIds.length) {
+            await tx.passaggioProgetto.deleteMany({ where: { microvoceProgettoId: { in: microvoceIds } } });
+            await tx.microvoceProgetto.deleteMany({ where: { id: { in: microvoceIds } } });
+          }
+          await tx.moduloProgettoDipendenza.deleteMany({
+            where: { OR: [{ moduloProgettoId: moduloId }, { dipendeDaModuloProgettoId: moduloId }] },
+          });
+          await tx.moduloProgetto.delete({ where: { id: moduloId } });
+        });
+      } catch (err) {
+        req.log.error(err, 'Errore eliminazione modulo');
+        return reply.code(500).send({ errore: err instanceof Error ? err.message : 'Errore eliminazione modulo' });
+      }
 
       await recordAudit({
         tenantId,
@@ -4590,11 +4623,11 @@ export function buildServer(app: AppPort): FastifyInstance {
   // vedeva niente, e un altro operatore dello studio non vedeva niente nemmeno lui.
   // Qui l'upload crea la riga in `documento`, agganciata al progetto (o alla micro-voce).
 
-  server.get<{ Querystring: { progettoId?: string; microvoceProgettoId?: string } }>(
+  server.get<{ Querystring: { progettoId?: string; microvoceProgettoId?: string; includiArchiviati?: string } }>(
     '/documenti',
     async (req, reply) => {
       const tenantId = (req as any).tenantId;
-      const { progettoId, microvoceProgettoId } = req.query;
+      const { progettoId, microvoceProgettoId, includiArchiviati } = req.query;
       if (!progettoId && !microvoceProgettoId) {
         return reply.code(400).send({ errore: 'Specificare progettoId o microvoceProgettoId.' });
       }
@@ -4610,6 +4643,9 @@ export function buildServer(app: AppPort): FastifyInstance {
             tenantId,
             ...(progettoId ? { progettoId } : {}),
             ...(microvoceProgettoId ? { microvoceProgettoId } : {}),
+            // Punto 3 piano gap — le liste operative escludono gli archiviati:
+            // lo storico (includiArchiviati=true) li mostra solo su richiesta.
+            ...(includiArchiviati === 'true' ? {} : { isArchiviato: false }),
           },
           select: {
             id: true,
@@ -4626,6 +4662,8 @@ export function buildServer(app: AppPort): FastifyInstance {
             statoDoc: true,
             pubblicatoAt: true,
             documentoPadreId: true,
+            isArchiviato: true,
+            archiviatoAt: true,
             microvoceProgetto: { select: { nome: true } },
             richiesteModifica: {
               select: {
@@ -5094,11 +5132,36 @@ export function buildServer(app: AppPort): FastifyInstance {
       });
       if (!documento) return reply.code(404).send({ errore: 'Documento non trovato.' });
 
-      // §WF-DOC — cancellare un documento firmato è l'atto più distruttivo del ciclo: il file
-      // sparisce e al cliente resta solo la firma orfana. Lo può fare solo l'admin dello studio.
-      if (documento.statoDoc === 'firmato' && !puoSbloccareDocumentoFirmato((req as any).ruolo)) {
+      // Punto 3 piano gap — un documento firmato non si elimina MAI, per nessuno, nemmeno
+      // per l'admin dello studio. Il sigillo FirmaElettronica è un atto legale che referenzia
+      // il documento sottoscritto: cancellarlo lascerebbe una firma orfana, e un atto
+      // sottoscritto non può sparire dal fascicolo. La via prevista è l'archiviazione:
+      // PATCH /documenti/:id/archivia.
+      if (documento.statoDoc === 'firmato') {
         return reply.code(409).send({
-          errore: 'Il documento è firmato dal cliente e non può essere eliminato: solo l\'amministratore dello studio può intervenire su un atto sottoscritto.',
+          errore: 'Il documento è firmato dal cliente: non può essere eliminato, solo archiviato.',
+        });
+      }
+
+      // Un sigillo collegato al documento (anche se lo stato non è tornato 'firmato', per
+      // esempio una firma del Vault) blocca l'eliminazione allo stesso modo; e finché un
+      // codice di firma è pendente la firma potrebbe ancora essere completata.
+      const [firmeCollegate, otpPendenti] = await Promise.all([
+        prisma.firmaElettronica.count({
+          where: { tenantId: documento.tenantId || tenantId, ambito: 'documento_vault', riferimentoId: id },
+        }),
+        prisma.codiceOtp.count({
+          where: { tenantId: documento.tenantId || tenantId, ambito: 'documento_vault', riferimentoId: id, scadenza: { gt: new Date() } },
+        }),
+      ]);
+      if (firmeCollegate > 0) {
+        return reply.code(409).send({
+          errore: 'Al documento è collegata una firma elettronica: non può essere eliminato, solo archiviato.',
+        });
+      }
+      if (otpPendenti > 0) {
+        return reply.code(409).send({
+          errore: 'C\'è un codice di firma in attesa su questo documento: attendere la scadenza del codice o completare la firma prima di eliminarlo.',
         });
       }
 
@@ -5119,11 +5182,9 @@ export function buildServer(app: AppPort): FastifyInstance {
         where: { documentoId: id },
       }).catch(() => {});
 
-      // Disaccoppia firme elettroniche collegate senza eliminare il sigillo legale
-      await prisma.firmaElettronica.updateMany({
-        where: { riferimentoId: id },
-        data: { riferimentoId: null },
-      }).catch(() => {});
+      // Nota: nessun disaccoppiamento di firmaElettronica qui — i guard sopra restituiscono
+      // 409 se esiste un sigillo o un OTP pendente collegato, quindi a questo punto il
+      // documento non ne ha. Il sigillo legale non viene mai reso orfano.
 
       await prisma.documento.delete({ where: { id } });
 
@@ -5139,6 +5200,54 @@ export function buildServer(app: AppPort): FastifyInstance {
     } catch (err) {
       req.log.error(err, 'Errore eliminazione documento');
       return reply.code(500).send({ errore: err instanceof Error ? err.message : 'Errore eliminazione documento' });
+    }
+  });
+
+  // Punto 3 piano gap — ARCHIVIAZIONE: l'unica uscita prevista per un documento firmato
+  // (o comunque non più attuale). L'hard delete è vietato per tutti, admin inclusi; qui
+  // l'atto resta leggibile nello storico e nel portale con il suo sigillo integro, e le
+  // liste operative semplicemente smettono di mostrarlo.
+  server.patch<{ Params: { id: string } }>('/documenti/:id/archivia', async (req, reply) => {
+    const tenantId = (req as any).tenantId;
+    const userId = (req as any).userId as string | undefined;
+    const ruolo = (req as any).ruolo;
+    const { id } = req.params;
+
+    // Archiviare è un atto definitivo sul fascicolo: riservato all'amministratore dello
+    // studio, come lo sblocco di un documento firmato.
+    if (!puoSbloccareDocumentoFirmato(ruolo)) {
+      return reply.code(403).send({ errore: 'Solo l\'amministratore dello studio può archiviare un documento.' });
+    }
+
+    try {
+      const documento = await prisma.documento.findFirst({
+        where: tenantId ? { id, tenantId } : { id },
+        select: { id: true, isArchiviato: true, tenantId: true, fileUrl: true, statoDoc: true },
+      });
+      if (!documento) return reply.code(404).send({ errore: 'Documento non trovato.' });
+
+      // Idempotenza: ri-archiviare un documento già archiviato non è un errore.
+      if (documento.isArchiviato) {
+        return reply.send({ ok: true, messaggio: 'Il documento era già archiviato.' });
+      }
+
+      const aggiornato = await prisma.documento.update({
+        where: { id },
+        data: { isArchiviato: true, archiviatoAt: new Date(), archiviatoDaId: userId ?? null },
+      });
+
+      await recordAudit({
+        tenantId: documento.tenantId || tenantId,
+        azione: 'DOCUMENTO_ARCHIVIATO',
+        entita: id,
+        dettagli: `Archiviato il documento ${documento.fileUrl} (stato ${documento.statoDoc})`,
+        ipAddress: req.ip,
+      });
+
+      return reply.send({ ok: true, documento: aggiornato });
+    } catch (err) {
+      req.log.error(err, 'Errore archiviazione documento');
+      return reply.code(500).send({ errore: err instanceof Error ? err.message : 'Errore archiviazione documento' });
     }
   });
 
@@ -5225,9 +5334,12 @@ export function buildServer(app: AppPort): FastifyInstance {
     try {
       // §2.9 + §WF-DOC — il fascicolo per il cliente contiene solo i documenti con statoDoc
       // 'pubblicato', 'in_revisione' o 'firmato'. I documenti in 'bozza' sono visibili solo all'operatore.
+      // Punto 3 piano gap — i documenti archiviati non compaiono mai nel portale cliente:
+      // restano nello storico dello studio, non nel fascicolo operativo del cliente.
       const documenti = await prisma.documento.findMany({
         where: {
           tenantId,
+          isArchiviato: false,
           statoDoc: { in: ['pubblicato', 'in_revisione', 'firmato'] },
           OR: [
             { microvoceProgetto: { moduloProgetto: { progetto: { clienteId } } } },

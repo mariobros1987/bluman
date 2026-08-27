@@ -63,14 +63,14 @@ di segnaleRischio/oreExtra per singolo modulo nella risposta HTTP — è il dato
 della Dashboard scrive le sue righe.
 
 STATO ATTUALE:
-Abbiamo completato l'autenticazione JWT RBAC, il Portale Cliente con Firma FEA eIDAS OTP (6 Tab con Profilo & Sicurezza Password, e selezione dinamica dei progetti con moduli/micro-voci attivi aggiornati in tempo reale), l'Anagrafica ERP Clienti con modale progetti attivi integrato, la Fatturazione/NC con tracciato XML SDI, il Connettore SDI 1-Click, il Document Studio Word-like con Smart Tags, il Grafo Dipendenze Moduli nel progetto, il Calendario Condiviso con Scadenzario Attività Studio (/calendar), il Cron Worker Scadenze UBO/Marchi ed il Cambio Password Obbligatorio al Primo Accesso per tutti gli utenti dello studio e clienti con reset rapido da parte del Super Admin e Lead Advisor.
+Abbiamo completato l'autenticazione JWT RBAC, il Portale Cliente con Firma Elettronica Semplice (OTP verificata · art. 20 CAD; 6 Tab con Profilo & Sicurezza Password, e selezione dinamica dei progetti con moduli/micro-voci attivi aggiornati in tempo reale), l'Anagrafica ERP Clienti con modale progetti attivi integrato, la Fatturazione/NC con tracciato XML SDI, il Connettore SDI 1-Click, il Document Studio Word-like con Smart Tags, il Grafo Dipendenze Moduli nel progetto, il Calendario Condiviso con Scadenzario Attività Studio (/calendar), il Cron Worker Scadenze UBO/Marchi ed il Cambio Password Obbligatorio al Primo Accesso per tutti gli utenti dello studio e clienti con reset rapido da parte del Super Admin e Lead Advisor.
 Fase 0 di sicurezza chiusa: credenziali cablate rimosse dal sorgente E dal frontend (il bundle Vite su Vercel è pubblico come il repository) e dalle funzioni serverless in api/; guard onRequest che respinge con 401 tutto ciò che non è in un elenco di rotte pubbliche, così una rotta nuova nasce protetta; /admin/tenants riservato al super_admin su tutti e quattro i verbi (RLS non poteva coprirlo: `tenant` è la tabella che contiene gli studi, non una tabella figlia filtrata per tenant_id); colonna tenant.lead_advisor_password eliminata dal database; super_admin riportati a tenant_id NULL con la migrazione 20260819190000 e listaUtenti() tornato di sola lettura (prima riscriveva cinque utenti cablati a ogni GET, spostandoli nel tenant che leggeva); magic link del portale cliente persistiti come SHA-256 in `magic_link` con scadenza a 7 giorni (prima /auth/magic-login accettava qualunque stringa `client_*` e firmava un JWT con tenant ed email cablati: era una sessione `cliente` valida per chiunque, non un controllo debole); GET /uploads/:filename confinata sotto uploads/ e non più anonima (Bearer oppure firma HMAC in query string, perché quegli URL finiscono in `<img src>` che non può inviare header); scrypt + JWT HMAC senza dipendenze native; rate limiting su /auth/*; RLS effettiva e forzata su tutte le 34 tabelle col ruolo `bluman_app` che non può scavalcarla; migrazioni versionate al posto di `db push` nel Dockerfile; variabili Railway puntate a Supabase.
 Fase 1 (Integrazione State Engine) chiusa: `src/domain/stateEngine.ts` (già puro) è ora collegato all'applicazione da `src/services/calcoloService.ts`, che calcola l'avanzamento senza query e lo PERSISTE con `ricalcolaProgetto()`; `GET /progetti` e `GET /progetti/:id` restituiscono `avanzamento` (stato, percentuale, segnaleRischio, oreExtra) per progetto E per singolo modulo; nuova rotta `POST /progetti/:id/ricalcola` (audit `PROGETTO_RICALCOLATO`) che scrive solo le righe divergenti, per non sporcare `updatedAt` a ogni click. Sparite le percentuali cablate: Dashboard.tsx dava 45% a ogni progetto in corso, 10% a ogni altro e 50% a ogni modulo `in_progress`, mentre la barra di ProjectDetail.tsx leggeva `percentualeAvanzamento`, un campo che il backend non ha MAI prodotto — era ferma a zero da sempre. Le percentuali non hanno una colonna e non serviva una migrazione: derivano da `stato`, `orePreventivate` e `oreConsuntivate`, già in riga; si persistono solo gli stati e i segnali di rischio, che una query non ricostruisce. Due cose da non toccare: il tetto a 99 in `percentualeVisibile()` (un modulo al 99.7% non deve dichiarare 100 mentre è `in_progress`) e la guardia sui moduli senza micro-voci, che `calcolaStatoModulo([])` declasserebbe a `pending` cancellando uno stato messo a mano. Gli avvisi tengono separati il ritardo di calendario dallo sforamento di ore, perché hanno rimedi diversi: non riassumerli in un solo messaggio. Diagnostica di sola lettura prima di scrivere sui dati reali: `npx tsx src/scripts/probeAvanzamento.ts`. Suite: 18 file, 230 test.
 Correzione successiva a Fase 1 — il frontend non inventa più i moduli (regola 7). Il Portale Cliente mostrava sempre la stessa lista di moduli qualunque progetto si scegliesse dal selettore: il difetto non era il selettore ma il mappatore, che quando il progetto non aveva moduli a database ripiegava su un elenco costruito per nome cliente. `mapProjectToPortalModules` ora restituisce `[]` e la pagina dichiara il vuoto; i due progetti sintetici di ripiego (valore 28.500 €, giurisdizione Malta) sono spariti da `loadPortalData`. La stessa bugia stava anche nell'ERP: `ProjectDetail.tsx` fabbricava moduli e micro-voci in SEI punti diversi, incluso un ripiego a render time dentro `ModuloBlock` che avrebbe annullato ogni correzione a monte (e le righe inventate erano cliccabili: `consuntivaMicrovoceApi` sarebbe stata chiamata con l'id di una micro-voce inesistente), e un pulsante "Istanzia Subito" che scriveva tre moduli da 23.500 € nel solo `localStorage`, mai a database — violava la regola 3 e adesso rimanda al percorso reale "+ Aggiungi Modulo da Libreria". Il progetto "1234" non ha moduli: il "Modulo Iniziale Incarico Advisory" che si vedeva era inventato dalla pagina, non un dato. Rimosse anche le evidenze di firma cablate: l'Engagement Letter generava un PDF con marca temporale e due indirizzi IP fissi, e una controfirma dello studio che non esiste in nessun registro; ora repertorio, data e impronta vengono dal sigillo eIDAS reale e senza sigillo il PDF esce senza pagina di evidenze. Lo stato di firma era letto da chiavi `localStorage` col nome di un cliente specifico: in un browser dove quel cliente aveva firmato, ogni altro cliente si vedeva "firmato". `POST /progetti/:id/ricalcola` era una scrittura senza controllo di ruolo: ora risponde 403 a chi non è advisor o super_admin, perché il filtro nella UI non è la difesa (regola 1). Ultima cosa, la più sgradevole: il form dati societari della scheda 3 nasceva precompilato con ragione sociale, partita IVA, CODICE FISCALE e IBAN di un cliente reale, e nulla li sovrascriveva — ogni cliente trovava i dati di un terzo nei propri campi, pronti da salvare come propri. Ora si riempie dalla riga del cliente autenticato e i campi assenti restano vuoti.
 Sicurezza Password al Primo Accesso & Profilo Operatore (§27, §23): implementato il modale bloccante `MustChangePasswordModal` per utenti con `stato: 'invitato'`, l'aggiornamento dinamico dello stato sessione da `/auth/me`, il cambio password cifrato scrypt da `POST /auth/change-password` e `POST /portal/change-password`, il modale profilo `UserProfileModal` per lo staff e la scheda `👤 6. Profilo & Password` nel Portale Cliente. Pulsante `🔄 Reset Pass` aggiunto nelle schede collaboratori di `SettingsPage.tsx` e in `SuperAdminPage.tsx`. Assegnate password temporanee monouso a tutti gli utenti con `npm run passwords:assign -- --force`.
 Debiti ancora aperti: due moduli con zero micro-voci su "Struttura Holding — Famiglia Ricci" (stato messo a mano, non verificabile dal motore); due clienti "Holding Beta S.r.l." e due progetti "Struttura Holding — Famiglia Ricci" omonimi, lasciati per decisione del titolare e distinti solo nelle etichette della UI.
 
-DA DOVE RIPARTIRE (aggiornato al 27 agosto 2026, dopo il ciclo §WF-DOC firma/sblocco/tracciabilità):
+DA DOVE RIPARTIRE (aggiornato al 27 agosto 2026, dopo i cicli §WF-DOC firma/sblocco/tracciabilità e Punto 3 del piano gap firma documenti):
 Completato il 27 agosto 2026:
 - la conclusione di un'operazione nel portale è una firma FEA a tutti gli effetti, non più
   una conferma locale: nuovo ambito `modulo_completato` in `/portal/verify-otp-and-sign` e
@@ -102,6 +102,27 @@ Verifiche: `npx tsc --noEmit` in radice verde, `npx tsc -b --force` in frontend/
 `npx vitest run` 281/281 in 22 file, `npm run build` verde.
 Restano aperte le voci non spuntate di `PIANO_DI_MIGLIORAMENTO.md` (0.1-0.5, 0.7, Fase 1+).
 
+Completato il 27 agosto 2026 — secondo ciclo (Punto 3 del `piano-sviluppo-gap-firma-documenti.md`):
+- fix produzione eliminazione moduli (DELETE `/progetti/:id/moduli/:moduloId` rispondeva 500):
+  guard **409** se il modulo ha ore consuntivate o righe fattura collegate e transazione
+  ordinata accessi → passaggi → microvoci → dipendenze → modulo;
+- Punto 3 chiuso: migrazione additiva `20260827180000_archiviazione_documenti_firmati`
+  (`isArchiviato`/`archiviatoAt`/`archiviatoDaId` su `Documento`, `isArchiviato` su
+  `EngagementLetter`), `PATCH /documenti/:id/archivia` (solo admin, audit
+  `DOCUMENTO_ARCHIVIATO`), `DELETE /documenti/:id` rifiutata con **409 per tutti, admin
+  inclusi**, su documento firmato o con firma/OTP pendente collegati; liste operative senza
+  archiviati (`?includiArchiviati=true` per lo storico) e pulsante «📦 Archivia» nella UI;
+  17 test nuovi in `src/archiviazioneDocumentiFirmati.test.ts`;
+- etichette firma declassate a SES: wording «Firma Elettronica Semplice (OTP verificata) ·
+  art. 20 CAD» al posto di FEA/eIDAS/firma digitale nella UI; il sigillo server-side in DB
+  (`generateEidasSignatureSeal()`) e i valori enum interni (`fea_otp`…) non cambiano; le
+  opzioni di firma qualificata esterna (file `.p7m`, provider Aruba/InfoCert/Namirial/SPID)
+  restano.
+Verifiche: `npx tsc --noEmit` in radice verde, `npx tsc -b --force` in frontend/ verde,
+`npx vitest run` verde.
+⚠️ Il deploy Railway deve applicare la migrazione `20260827180000_archiviazione_documenti_firmati`
+(il Dockerfile esegue `prisma migrate deploy`).
+
 PIANO OPERATIVO STORICO (22 agosto 2026) — SUPERATO, conservato per memoria:
 Il piano per fasi in `analisi.txt` (Fase 0/1 chiuse, Fase 2 UI CORE tracking ore 2.1-2.5) è
 una fotografia delle fasi iniziali: i task elencati sono stati nel frattempo completati o
@@ -125,6 +146,19 @@ Decisioni prese dal titolare (27 agosto 2026):
    Il portale rilegge le conclusioni da `GET /firme` filtrato per ambito: la firma fatta su
    un dispositivo è visibile a tutti, studio compreso. La chiave localStorage
    `bluman_module_signatures_…` non è più né scritta né letta.
+4. Etichette firma nella UI: niente più diciture FEA/eIDAS/firma digitale/firma elettronica
+   avanzata — il wording corretto è «Firma Elettronica Semplice (OTP verificata) · art. 20
+   CAD» (SES). Il sigillo server-side in database non cambia; le opzioni di firma qualificata
+   esterna (file `.p7m`, provider Aruba/InfoCert/Namirial/SPID) restano disponibili; gli
+   identificatori interni (`generateEidasSignatureSeal()`, enum `fea_otp`) non si toccano.
+5. Documenti firmati: solo archiviabili, MAI eliminabili. L'hard delete di `Documento`
+   firmato (o con firma/OTP pendente collegati) è vietato a tutti, admin inclusi (409);
+   l'unica uscita è `PATCH /documenti/:id/archivia`.
+6. Ordine operativo del piano gap (`piano-sviluppo-gap-firma-documenti.md`): 3 → 2 → 1 → 4.
+7. Punto 1 (export PDF+Word): due motori dallo stesso merge dati — **Docxtemplater** per il
+   Word e **pdfkit** per il PDF. Niente LibreOffice su Railway. L'hash legale resta sul PDF.
+8. Punto 4 (notifiche): audit del cablaggio esistente + implementazione dei trigger mancanti
+   della matrice, non solo report.
 
 Decisioni che aspettano ancora il titolare del dato, da non prendere da soli:
 1. Nel Vault i documenti allegano l'evidenza di firma solo se esiste; l'IP non c'è più perché
@@ -157,12 +191,12 @@ Leggiti i file .agents/AGENTS.md, README.md ed ISTRUZIONI_INSTALLAZIONE.md prima
 - **`frontend/src/pages/ProjectDetail.tsx`**: Dettaglio Progetto con Grafo Moduli (`GrafoModuliProgettoView`), Comunicazioni Omnichannel, Fatture/NC e Scadenze microvoci.
 - **`frontend/src/pages/DocumentEditorPage.tsx`**: Studio Document Studio (Word WYSIWYG, Smart Tags ERP, Foglio A4, PDF) con selettore micro-voce di destinazione e «Percorso del documento».
 - **`frontend/src/pages/Library.tsx`**: Distinta Base, Catalogo Articoli, Modelli Documenti ed Editing Prezzi Unitari.
-- **`frontend/src/pages/ClientPortal.tsx`**: Portale Cliente a 6 schede (Proposta & Firma 1-Click, Live Progress, Form Societari, Documenti & Contratti, Chat & Comunicazioni, Profilo & Password) con cronologia versioni a ritroso §WF-DOC (`versioniPrecedenti[]`).
+- **`frontend/src/pages/ClientPortal.tsx`**: Portale Cliente a 6 schede (Proposta & Firma con OTP, Live Progress, Form Societari, Documenti & Contratti, Chat & Comunicazioni, Profilo & Password) con cronologia versioni a ritroso §WF-DOC (`versioniPrecedenti[]`).
 - **`frontend/src/pages/InvoicesPage.tsx`**: Registro Fatture/NC ed Export XML SDI FatturaPA.
 - **`frontend/src/pages/PrimaNotaPage.tsx`**: Registro Prima Nota, Movimenti Cassa/Banca e Riconciliazione CSV.
 - **`frontend/src/pages/RetainersPage.tsx`**: Contratti Ricorrenti & Retainer Studio periodici.
 - **`frontend/src/pages/SettingsPage.tsx`**: Impostazioni Studio, Configuratore PDF, Gestione Team con iniziali/hover card, Matrice Permessi RBAC ed Email Suite SMTP/IMAP.
-- **`src/server.ts`**: Server Fastify API con endpoint `/auth/login`, `/auth/magic-login`, `/portal/request-otp`, `/portal/verify-otp-and-sign`, `/portal/documenti` (con `documentoPadreId` + `versioniPrecedenti[]`), `/documenti/:id/sblocca` (solo admin, §WF-DOC), `/progetti/:id/ricalcola`, `/cron/esegui-notifiche-scadenze`, `/invoices/:id/trasmetti-sdi`.
+- **`src/server.ts`**: Server Fastify API con endpoint `/auth/login`, `/auth/magic-login`, `/portal/request-otp`, `/portal/verify-otp-and-sign`, `/portal/documenti` (con `documentoPadreId` + `versioniPrecedenti[]`), `/documenti/:id/sblocca` (solo admin, §WF-DOC), `/documenti/:id/archivia` (soft-delete dei firmati), `DELETE /progetti/:id/moduli/:moduloId` (guard 409 + transazione ordinata), `/progetti/:id/ricalcola`, `/cron/esegui-notifiche-scadenze`, `/invoices/:id/trasmetti-sdi`.
 - **`src/domain/stateEngine.ts`**: Motore di stato §16 in funzioni pure (nessun database, solo `import type`). Non aggiungerci query.
 - **`src/services/calcoloService.ts`**: Unico ponte fra il motore e Prisma — `calcolaAvanzamento()` (in memoria, zero query), `arricchisciProgetti()` e `ricalcolaProgetto()` (persiste la cascata verso l'alto).
 - **`prisma/schema.prisma`**: Schema database Supabase PostgreSQL con RLS isolata per Tenant.

@@ -71,7 +71,7 @@ export function NotificationModal({ notifications, onClose, onMarkAllRead, onSel
       setPushPermission(perm);
       if (perm === 'granted') {
         new Notification('🔔 Notifiche Push Studio BluMan Attive', {
-          body: 'Riceverai avvisi in tempo reale per firme FEA, ritardi e aggiornamenti pratiche.',
+          body: 'Riceverai avvisi in tempo reale per firme, ritardi e aggiornamenti pratiche.',
           icon: '/favicon.ico',
         });
       } else if (perm === 'denied') {

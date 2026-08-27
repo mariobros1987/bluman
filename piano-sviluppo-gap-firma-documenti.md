@@ -15,7 +15,18 @@ Questo piano copre i 4 punti aperti dall'audit, in ordine di priorità operativa
 
 ---
 
-## Punto 3 — Integrità referenziale `ambito` / `riferimentoId`
+## Stato di avanzamento (aggiornato al 27 agosto 2026)
+
+> Sequenza operativa decisa dal titolare: **3 → 2 → 1 → 4**.
+
+- **Punto 3 — ✅ chiuso il 27/08/2026.** Migrazione additiva `20260827180000_archiviazione_documenti_firmati` (`isArchiviato`/`archiviatoAt`/`archiviatoDaId` su `Documento`, `isArchiviato` su `EngagementLetter`); hard delete vietato con **409** su documento firmato o con firma/OTP pendente collegati — **per tutti, admin inclusi**; `PATCH /documenti/:id/archivia` (solo admin, idempotente, audit `DOCUMENTO_ARCHIVIATO`); liste operative senza archiviati (`?includiArchiviati=true` per lo storico); pulsante «📦 Archivia» nella UI; 17 test in `src/archiviazioneDocumentiFirmati.test.ts`. `riferimentoId` resta stringa libera (niente FK tipizzate), come deciso in questo stesso punto.
+- **Punto 2 — ⏳ prossimo.** Verbale di firma come `Documento` con `tipo = 'verbale_firma'`, `statoDoc = 'pubblicato'`, non negoziabile (atto certificativo).
+- **Punto 1 — ⏳ motore definito.** Decisione titolare 27/08/2026: **Docxtemplater (Word) + pdfkit (PDF)** dallo stesso merge dati — **niente LibreOffice su Railway**; hash legale fissato sul PDF.
+- **Punto 4 — ⏳ in coda.** Audit del cablaggio esistente + implementazione dei trigger mancanti (non solo report).
+
+---
+
+## Punto 3 — Integrità referenziale `ambito` / `riferimentoId` — ✅ chiuso il 27/08/2026
 
 ### Problema
 `FirmaElettronica.riferimentoId` e `CodiceOtp.riferimentoId` sono stringhe libere, non FK. Se un `Documento` (o altra entità referenziata) viene cancellato fisicamente, il legame diventa un puntatore a nulla, non rilevabile da Prisma né da un vincolo DB.
@@ -86,8 +97,8 @@ Si mantiene `fileUrl` per non rompere il codice esistente che lo legge; i due nu
 
 ### Logica applicativa
 - Il motore di generazione documento (già esistente per produrre il PDF da template) va esteso per produrre **in un solo passaggio** entrambe le versioni:
-  - Generazione DOCX diretta da template (es. Docxtemplater) → `fileDocxUrl`
-  - Conversione DOCX→PDF (LibreOffice headless o servizio equivalente già eventualmente in uso) → `filePdfUrl`
+  - Generazione Word da template con **Docxtemplater** → `fileDocxUrl`
+  - Generazione PDF dallo stesso merge dati con **pdfkit** (già in uso nel progetto) → `filePdfUrl` — decisione del titolare 27/08/2026: due motori dallo stesso merge dati, **niente LibreOffice su Railway**.
 - Un solo hash di riferimento per `documento_hash` in `FirmaElettronica`: si fissa sul **PDF**, che resta il formato di sigillo legale; il Word è fornito solo come comodità per firma cartacea, non entra nel calcolo del hash probatorio.
 - Endpoint portale cliente: `GET /portal/documenti/:id/download?formato=pdf|docx`
 

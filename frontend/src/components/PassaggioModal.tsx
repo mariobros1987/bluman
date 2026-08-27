@@ -9,6 +9,7 @@ import {
   nuovaVersioneDocumentoApi,
   aggiornaRichiestaModificaDocumentoApi,
   eliminaDocumentoApi,
+  archiviaDocumentoApi,
   sbloccaDocumentoApi,
   scaricaDocumentoClient,
   scaricaDocumentoWordClient,
@@ -78,7 +79,7 @@ const ALL_STUDIO_TEMPLATES: DocumentTemplate[] = [
  */
 function etichettaTipoFirma(tipoFirma?: string | null): string {
   switch (tipoFirma) {
-    case 'fea_otp': return 'firma elettronica avanzata con OTP';
+    case 'fea_otp': return 'firma elettronica semplice con OTP verificata';
     case 'manuale_scansionata': return 'firma autografa scansionata';
     case 'qualificata_esterna': return 'firma digitale qualificata';
     default: return '';
@@ -424,7 +425,7 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
     setConfigFirmaModal(null);
     setShowCatalogModal(false);
 
-    const metodoNome = metodoFirma === 'fea_otp' ? 'FEA OTP' : metodoFirma === 'manuale_scansionata' ? 'Olografa Tradizionale' : metodoFirma === 'qualificata_esterna' ? 'Qualificata QES' : 'Libera';
+    const metodoNome = metodoFirma === 'fea_otp' ? 'Firma semplice (OTP)' : metodoFirma === 'manuale_scansionata' ? 'Olografa Tradizionale' : metodoFirma === 'qualificata_esterna' ? 'Qualificata QES' : 'Libera';
     alert(`✓ Documento "${formattedName}" collegato con successo!\n• Richiede Firma: ${richiedeFirma ? `Sì (${metodoNome})` : 'No (Sola lettura)'}\n• Stato: ${statoDoc === 'pubblicato' ? '🚀 Pubblicato al Cliente' : '🔒 Bozza Interna'}`);
 
     if (effProgettoId) await ricaricaDocumentiDb();
@@ -856,7 +857,7 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
                                   {s.file}
                                 </div>
                                 <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 1 }}>
-                                  {s.stato === 'done' ? '✓ Firmato digitalmente dal cliente' : '✍️ Richiede Firma FEA / eIDAS'}
+                                  {s.stato === 'done' ? '✓ Firmato dal cliente' : '✍️ Richiede firma con OTP'}
                                 </div>
                               </div>
                             </div>
@@ -1284,14 +1285,45 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
                               dell'admin dello studio, che ne registra la motivazione. */}
                           {st === 'firmato' && (
                             isAdminStudio() ? (
-                              <button
-                                type="button"
-                                onClick={() => handleSbloccaDocumento(d.id, d.nome)}
-                                style={{ background: '#3f1d1d', border: '1px solid #b91c1c', color: '#fca5a5', padding: '5px 10px', borderRadius: 6, fontSize: 10.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
-                                title="Riapri in bozza questo documento firmato: la motivazione viene registrata nell'audit e il cliente ne viene informato"
-                              >
-                                🔓 Sblocca per modifiche (admin)
-                              </button>
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => handleSbloccaDocumento(d.id, d.nome)}
+                                  style={{ background: '#3f1d1d', border: '1px solid #b91c1c', color: '#fca5a5', padding: '5px 10px', borderRadius: 6, fontSize: 10.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                                  title="Riapri in bozza questo documento firmato: la motivazione viene registrata nell'audit e il cliente ne viene informato"
+                                >
+                                  🔓 Sblocca per modifiche (admin)
+                                </button>
+                                {/* Punto 3 piano gap — alternativa alla cancellazione vietata:
+                                    l'admin toglie il documento firmato dalle liste operative,
+                                    file e sigillo restano conservati nello storico. */}
+                                {effProgettoId && !d.id.startsWith('d-') && (
+                                  <button
+                                    type="button"
+                                    onClick={async () => {
+                                      if (!confirm(
+                                        `Il documento "${d.nome}" è firmato dal cliente: non può essere eliminato.\n` +
+                                        'Vuoi archiviarlo? Scomparirà dalle liste operative ma il file e la firma restano conservati nello storico.'
+                                      )) return;
+                                      try {
+                                        await archiviaDocumentoApi(d.id);
+                                        const nextDocs = documents.filter(doc => doc.id !== d.id);
+                                        persistDocuments(nextDocs);
+                                      } catch (err: any) {
+                                        console.error('Archiviazione documento non riuscita:', err);
+                                        alert(
+                                          `Archiviazione non riuscita: ${err?.message || 'errore imprevisto'}.\n` +
+                                          'Il documento è ancora presente sul server.'
+                                        );
+                                      }
+                                    }}
+                                    style={{ background: '#1e1b4b', border: '1px solid #4338ca', color: '#a5b4fc', padding: '5px 10px', borderRadius: 6, fontSize: 10.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                                    title="Nascondi questo documento firmato dalle liste operative: il file e la firma restano conservati nello storico"
+                                  >
+                                    🗄 Archivia
+                                  </button>
+                                )}
+                              </>
                             ) : (
                               <span
                                 style={{ fontSize: 10.5, color: 'var(--muted)', fontStyle: 'italic', padding: '5px 8px' }}
@@ -1500,8 +1532,8 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
                         {
                           id: 'fea_otp' as const,
                           icon: '📱',
-                          titolo: 'Firma Elettronica Avanzata FEA (OTP + Pad eIDAS)',
-                          desc: 'Codice OTP via SMS/Email/WhatsApp + Firma Grafometrica con valore probatorio pieno (Regolamento UE 910/2014). Istantanea e guidata.',
+                          titolo: 'Firma Elettronica Semplice (OTP + Pad grafometrico)',
+                          desc: 'Codice OTP via SMS/Email/WhatsApp + Firma Grafometrica ai sensi dell\'art. 20 del CAD. Istantanea e guidata.',
                           tag: 'CONSIGLIATO',
                           tagColor: '#34d399',
                         },

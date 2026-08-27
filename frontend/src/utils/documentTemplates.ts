@@ -16,7 +16,7 @@ export const PREBUILT_TEMPLATES: DocumentTemplate[] = [
     id: 'tmpl-engagement',
     titolo: 'Lettera d\'Incarico Professionale (Engagement Letter)',
     categoria: 'engagement',
-    descrizione: 'Mandato di consulenza patrimoniale e corporate structuring con compenso e firma 1-click.',
+    descrizione: 'Mandato di consulenza patrimoniale e corporate structuring con compenso e firma con OTP verificata.',
     contenutoHtml: `
 <h1 style="text-align: center; color: #1e1b4b; margin-bottom: 20px; font-size: 20px; text-transform: uppercase; letter-spacing: 0.5px;">
   LETTERA D'INCARICO PROFESSIONALE E MANDATO FIDUCIARIO
@@ -64,12 +64,12 @@ export const PREBUILT_TEMPLATES: DocumentTemplate[] = [
   <div style="width: 45%; text-align: center; border-top: 1px dashed #94a3b8; padding-top: 8px; font-size: 11px;">
     <strong>Per Lo Studio:</strong><br/>
     {{studio.ragione_sociale}}<br/>
-    <span style="color: #64748b; font-size: 10px;">(Firma Digitale Autorizzata)</span>
+    <span style="color: #64748b; font-size: 10px;">(Firma Autorizzata)</span>
   </div>
   <div style="width: 45%; text-align: center; border-top: 1px dashed #94a3b8; padding-top: 8px; font-size: 11px;">
     <strong>Per Il Cliente Committente:</strong><br/>
     {{cliente.referente}}<br/>
-    <span style="color: #4338ca; font-weight: 700; font-size: 10px;">[ Sottoscrizione FEA 1-Click eIDAS ]</span>
+    <span style="color: #4338ca; font-weight: 700; font-size: 10px;">[ Sottoscrizione con OTP verificata · art. 20 CAD ]</span>
   </div>
 </div>
 `,

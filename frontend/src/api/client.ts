@@ -542,6 +542,20 @@ export async function eliminaDocumentoApi(id: string) {
   return await res.json();
 }
 
+/** Punto 3 piano gap — un documento firmato non si cancella mai: lo studio lo archivia.
+    Il file e il sigillo legale restano conservati; l'API risponde `{ ok: true, ... }`. */
+export async function archiviaDocumentoApi(id: string) {
+  const res = await apiFetch(`${API_BASE}/documenti/${encodeURIComponent(id)}/archivia`, {
+    method: 'PATCH',
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.errore ?? 'Errore archiviazione documento');
+  }
+  return await res.json();
+}
+
 // ── Blocco 2: portale cliente su database ──────────────────────────────────────────────
 // §2.6 contatti dello studio (lead advisor reale), §2.3 proposte di modifica dei dati
 // fiscali, §2.5 richieste di addendum, §2.11 fatture e stato di pagamento.
@@ -1908,7 +1922,7 @@ export async function creaContoBancarioApi(input: { nomeConto: string; banca: st
   return await res.json();
 }
 
-// ── FIRMA ELETTRONICA AVANZATA: CANALI, OTP, FILE FIRMATO ──────────────────
+// ── FIRMA ELETTRONICA SEMPLICE: CANALI, OTP, FILE FIRMATO ──────────────────
 //
 // Qui c'erano due ripieghi che rendevano la firma una finzione:
 //
@@ -2277,7 +2291,7 @@ export async function scaricaDocumentoWordClient(fileUrl?: string | null, nomeFi
             <strong>Data Elaborazione:</strong> ${new Date().toLocaleDateString('it-IT')}<br/>
             <strong>Formato:</strong> Microsoft Word (.doc) — Valido per consultazione e redazione
           </div>
-          <p>Estratto del documento fascicolo collegato. L'originale firmato e sigillato con valore eIDAS è custodito nel Vault telematico.</p>
+          <p>Estratto del documento fascicolo collegato. L'originale firmato con firma elettronica semplice (OTP verificata · art. 20 CAD) è custodito nel Vault telematico.</p>
         </div>
       `;
       downloadRealWordDoc(cleanWordTitle, docHtml);

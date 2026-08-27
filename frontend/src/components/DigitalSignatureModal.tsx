@@ -9,7 +9,7 @@ interface DigitalSignatureModalProps {
   onSigned: (signature: SignatureData) => void;
   /**
    * Piano di sovrapposizione. Serve quando il pad viene aperto sopra un'altra modale — per
-   * esempio quella della firma FEA, che sta a 9999: col valore predefinito il pad si
+   * esempio quella della firma SES, che sta a 9999: col valore predefinito il pad si
    * disegnerebbe dietro e il cliente vedrebbe soltanto lo sfondo scurirsi.
    */
   zIndex?: number;
@@ -122,7 +122,7 @@ export function DigitalSignatureModal({
       <div style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, padding: 24, width: '100%', maxWidth: 520, display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div>
           <div style={{ fontSize: 16, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span>✍️ Apponi Firma Digitale (eIDAS Compliance)</span>
+            <span>✍️ Apponi Firma Elettronica Semplice (art. 20 CAD)</span>
           </div>
           <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
             Documento: <strong>{documentTitle}</strong> · Firmatario: <strong>{signerName}</strong> ({signerRole})
@@ -196,7 +196,7 @@ export function DigitalSignatureModal({
         {/*
           Diceva "marca temporale ed IP esecutore": l'IP qui non c'è più, perché il browser non
           lo conosce e la costante che stava al suo posto era falsa. Chi apre il pad da un flusso
-          che registra altro (per esempio la firma FEA, dove il codice è già stato convalidato)
+          che registra altro (per esempio la firma SES, dove il codice è già stato convalidato)
           passa la nota giusta con `notaRegistrazione`.
         */}
         <div style={{ background: '#0d2d22', border: '1px solid #1a5c3c', borderRadius: 8, padding: 10, fontSize: 11, color: '#34d399', lineHeight: 1.45 }}>

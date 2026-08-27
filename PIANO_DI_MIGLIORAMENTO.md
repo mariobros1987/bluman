@@ -882,5 +882,5 @@ REDIS_URL=
 
 ---
 
-*Ultimo aggiornamento: 2026-08-27 (ciclo §WF-DOC firma/sblocco/tracciabilità + CI GitHub Actions completa; la conferma di conclusione operazione nel portale è ora una firma FEA vera — ambito `modulo_completato`, impronta server-side, riga `FirmaElettronica` a database; 281 test in 22 file)*
+*Ultimo aggiornamento: 2026-08-27 (secondo ciclo: Punto 3 del piano gap firma documenti chiuso — archiviazione soft dei firmati con migrazione additiva 20260827180000, `PATCH /documenti/:id/archivia`, hard delete vietato anche all'admin con 409, pulsante «📦 Archivia»; fix produzione eliminazione moduli — guard 409 + transazione ordinata; etichette firma declassate a «Firma Elettronica Semplice (OTP verificata) · art. 20 CAD»; più ciclo §WF-DOC firma/sblocco/tracciabilità, firma OTP vera per la conclusione operazione e CI GitHub Actions completa; 298 test in 23 file)*
 *Prossima revisione: dopo completamento Fase 2 (refactoring server.ts)*

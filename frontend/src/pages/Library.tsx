@@ -1697,7 +1697,7 @@ function LibreriaDocumentiEForm() {
         <div>${tmpl.contenutoHtml}</div>
         <div style="margin-top: 40px; border-top: 1px solid #e2e8f0; padding-top: 10px; display: flex; justify-content: space-between; font-size: 8.5pt; color: #94a3b8;">
           <span>${studio.ragioneSociale} • Modello Ufficiale Studio</span>
-          <span>Sigillo eIDAS Documentale • Validità Giuridica UE</span>
+          <span>Firma Elettronica Semplice • art. 20 CAD</span>
         </div>
       </div>
     `;
@@ -1779,7 +1779,7 @@ function LibreriaDocumentiEForm() {
         <div style={{ background: '#0d221c', border: '1px solid #059669', borderRadius: 10, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10, fontSize: 11.5, color: '#34d399' }}>
           <span style={{ fontSize: 16 }}>🛡️</span>
           <div>
-            <strong>Garanzia di Immutabilità Fascicoli & Progetti:</strong> L'archiviazione o l'eliminazione dei modelli master riguarda esclusivamente i nuovi utilizzi. I documenti già generati, firmati digitalmente con sigillo eIDAS e archiviati all'interno dei singoli Progetti del Cliente <strong>rimangono sigillati e congelati alla data di firma</strong>.
+            <strong>Garanzia di Immutabilità Fascicoli & Progetti:</strong> L'archiviazione o l'eliminazione dei modelli master riguarda esclusivamente i nuovi utilizzi. I documenti già generati, firmati con firma elettronica semplice (OTP verificata) e archiviati all'interno dei singoli Progetti del Cliente <strong>rimangono conservati e congelati alla data di firma</strong>.
           </div>
         </div>
 
@@ -1902,7 +1902,7 @@ function LibreriaDocumentiEForm() {
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border)', paddingTop: 10, marginTop: 4, flexWrap: 'wrap', gap: 6 }}>
                 <span style={{ fontSize: 10, color: m.firma ? '#a78bfa' : 'var(--muted)', fontWeight: 600 }}>
-                  {m.firma ? '✍️ Firma eIDAS' : 'ℹ️ Informativo'}
+                  {m.firma ? '✍️ Firma semplice (OTP)' : 'ℹ️ Informativo'}
                 </span>
                 
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -2060,7 +2060,7 @@ function LibreriaDocumentiEForm() {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <input type="checkbox" id="chkSignDoc" checked={docSign} onChange={e => setDocSign(e.target.checked)} />
-              <label htmlFor="chkSignDoc" style={{ fontSize: 11.5, color: 'var(--text)', cursor: 'pointer' }}>Richiede Firma Digitale del Cliente (§22)</label>
+              <label htmlFor="chkSignDoc" style={{ fontSize: 11.5, color: 'var(--text)', cursor: 'pointer' }}>Richiede Firma del Cliente con OTP (§22)</label>
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
               <button type="button" onClick={() => setNewDocOpen(false)} style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '7px 14px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}>Annulla</button>
@@ -2158,7 +2158,7 @@ function LibreriaDocumentiEForm() {
                 </div>
 
                 <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 10, padding: 12, fontSize: 11, color: 'var(--muted)' }}>
-                  ℹ️ Una volta collegato, il cliente visualizzerà il modello nel proprio <strong>Portale Riservato Cliente</strong> e potrà procedere con la compilazione e firma eIDAS o re-upload del PDF.
+                  ℹ️ Una volta collegato, il cliente visualizzerà il modello nel proprio <strong>Portale Riservato Cliente</strong> e potrà procedere con la compilazione e firma elettronica semplice (OTP verificata) o re-upload del PDF.
                 </div>
 
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
