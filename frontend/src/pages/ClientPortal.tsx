@@ -2818,7 +2818,7 @@ export function ClientPortal() {
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 260 }}>
-                    <div style={{ fontSize: 26 }}>{doc.firmato ? '🔒' : '📄'}</div>
+                    <div style={{ fontSize: 26 }}>{doc.tipo === 'verbale_firma' ? '📜' : doc.firmato ? '🔒' : '📄'}</div>
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                         <span style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text)' }}>{doc.nome}</span>
@@ -2848,11 +2848,13 @@ export function ClientPortal() {
                       <div style={{ fontSize: 10.5, color: doc.firmato ? '#a7f3d0' : 'var(--muted)', marginTop: 3 }}>
                         {doc.firmato
                           ? `✓ Firmato${doc.dataFirma ? ` il ${dataOraLeggibile(doc.dataFirma)}` : ''}${doc.canaleVerificato ? ` · ${doc.canaleVerificato}` : ''}`
-                          : doc.statoScansione === 'in_corso'
-                            ? '⏳ Controllo antivirus in corso: disponibile a breve'
-                            : doc.statoScansione === 'infetto'
-                              ? '⛔ Il controllo antivirus ha bloccato questo file: lo studio è stato avvisato'
-                              : 'In attesa di lettura e sottoscrizione'}
+                          : doc.tipo === 'verbale_firma'
+                            ? '📜 Verbale di firma · atto certificativo della sottoscrizione, generato automaticamente'
+                            : doc.statoScansione === 'in_corso'
+                              ? '⏳ Controllo antivirus in corso: disponibile a breve'
+                              : doc.statoScansione === 'infetto'
+                                ? '⛔ Il controllo antivirus ha bloccato questo file: lo studio è stato avvisato'
+                                : 'In attesa di lettura e sottoscrizione'}
                       </div>
                       {doc.documentoNonPiuDisponibile && (
                         <div style={{ fontSize: 10.5, color: '#fbbf24', marginTop: 3 }}>
@@ -2941,6 +2943,12 @@ export function ClientPortal() {
                         >
                           📜 Ricevuta di firma
                         </button>
+                      </div>
+                    ) : doc.tipo === 'verbale_firma' ? (
+                      /* Punto 2 piano gap — il verbale è un atto certificativo generato dal
+                          sistema: si legge e si scarica, ma non si firma e non si manda in revisione. */
+                      <div style={{ fontSize: 11, color: '#a5b4fc', fontWeight: 700, background: '#1e1b4b', border: '1px solid #4338ca', padding: '7px 14px', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        📜 Verbale di firma · atto certificativo della sottoscrizione
                       </div>
                     ) : (
                       <>
@@ -3888,8 +3896,9 @@ export function ClientPortal() {
                   </>
                 )}
 
-                {/* Pulsante Richiedi Modifiche integrato nel visualizzatore */}
-                {!selectedViewerDoc.firmato && (
+                {/* Pulsante Richiedi Modifiche integrato nel visualizzatore.
+                    Il verbale di firma (punto 2 piano gap) non accetta revisioni. */}
+                {!selectedViewerDoc.firmato && selectedViewerDoc.tipo !== 'verbale_firma' && (
                   <button
                     type="button"
                     onClick={() => {
@@ -3939,6 +3948,11 @@ export function ClientPortal() {
                     >
                       📜 Ricevuta di firma
                     </button>
+                  </div>
+                ) : selectedViewerDoc.tipo === 'verbale_firma' ? (
+                  /* Punto 2 piano gap — il verbale non si firma: attesta una firma già apposta. */
+                  <div style={{ background: '#1e1b4b', border: '1px solid #4338ca', color: '#a5b4fc', padding: '8px 16px', borderRadius: 8, fontSize: 11.5, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    📜 Atto certificativo · si consulta e si scarica
                   </div>
                 ) : (
                   <button
@@ -4354,7 +4368,7 @@ export function ClientPortal() {
                             }}
                           >
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                              <span style={{ fontSize: 16 }}>{doc.firmato ? '🔒' : '📄'}</span>
+                              <span style={{ fontSize: 16 }}>{doc.tipo === 'verbale_firma' ? '📜' : doc.firmato ? '🔒' : '📄'}</span>
                               <div>
                                 <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text)' }}>
                                   {doc.nome}
@@ -4362,8 +4376,8 @@ export function ClientPortal() {
                                     <span style={{ marginLeft: 6, fontSize: 9.5, background: 'var(--card)', padding: '1px 5px', borderRadius: 4, color: '#818cf8', fontWeight: 600 }}>v{doc.versione}</span>
                                   )}
                                 </div>
-                                <div style={{ fontSize: 10, color: doc.firmato ? '#34d399' : doc.statoDoc === 'in_revisione' ? '#fbbf24' : '#93c5fd' }}>
-                                  {doc.firmato ? '✓ Firmato con OTP verificata' : doc.statoDoc === 'in_revisione' ? '⚠️ In attesa di riscontro modifica' : '🚀 Pubblicato dallo studio per la firma'}
+                                <div style={{ fontSize: 10, color: doc.tipo === 'verbale_firma' ? '#a5b4fc' : doc.firmato ? '#34d399' : doc.statoDoc === 'in_revisione' ? '#fbbf24' : '#93c5fd' }}>
+                                  {doc.tipo === 'verbale_firma' ? '📜 Verbale di firma · atto certificativo' : doc.firmato ? '✓ Firmato con OTP verificata' : doc.statoDoc === 'in_revisione' ? '⚠️ In attesa di riscontro modifica' : '🚀 Pubblicato dallo studio per la firma'}
                                 </div>
                                 {doc.versioniPrecedenti && doc.versioniPrecedenti.length > 0 && (
                                   <div style={{ fontSize: 9.5, color: '#93c5fd', marginTop: 2 }}>
@@ -4391,7 +4405,7 @@ export function ClientPortal() {
                                   ⬇
                                 </button>
                               )}
-                              {!doc.firmato && (
+                              {!doc.firmato && doc.tipo !== 'verbale_firma' && (
                                 <>
                                   <button
                                     type="button"
@@ -4493,7 +4507,7 @@ export function ClientPortal() {
                           </button>
                         )}
 
-                        {!d.firmato && docReal && (
+                        {!d.firmato && docReal && docReal.tipo !== 'verbale_firma' && (
                           <>
                             <button
                               type="button"

@@ -72,6 +72,10 @@ Realizzare una piattaforma che colleghi:
 7. Sistema registra la Firma (hash del file, timestamp, canale, IP, esito)
    └─ Stato Documento → "firmato"
    └─ Stato Pratica → "completata"
+   └─ Genera automaticamente il Verbale di firma (Documento tipo
+      "verbale_firma", stato "pubblicato", atto certificativo non
+      modificabile né eliminabile) e ne avvisa il cliente
+      (evento "verbale_disponibile") — ✅ implementato 27/08/2026
 
 8. Tutto il percorso (dati, versioni, notifiche, firme) resta
    consultabile nello Storico della Pratica, in modo cronologico

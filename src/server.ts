@@ -43,6 +43,7 @@ import { scanFileBuffer } from './services/securityScanner.js';
 import { arricchisciProgetti, calcolaAvanzamento, ricalcolaProgetto } from './services/calcoloService.js';
 import { costruisciReport, REPORT_DISPONIBILI, type ChiaveReport } from './services/reportsService.js';
 import { generaPdfReport, generaExcelReport } from './services/reportExport.js';
+import { generaPdfVerbaleFirma } from './services/verbaleFirma.js';
 import { ricercaGlobale } from './services/ricercaGlobaleService.js';
 // §14 — non `new PrismaClient()`: questo client impone il tenant corrente a ogni query,
 // altrimenti le policy RLS non vedono nessun contesto e non restituiscono nulla.
@@ -5128,9 +5129,18 @@ export function buildServer(app: AppPort): FastifyInstance {
     try {
       const documento = await prisma.documento.findFirst({
         where: tenantId ? { id, tenantId } : { id },
-        select: { id: true, fileUrl: true, tenantId: true, statoDoc: true },
+        select: { id: true, fileUrl: true, tenantId: true, statoDoc: true, tipo: true },
       });
       if (!documento) return reply.code(404).send({ errore: 'Documento non trovato.' });
+
+      // Punto 2 piano gap — il verbale di firma è un atto certificativo: la FK dalla firma
+      // lo metterebbe solo a NULL, ma il fascicolo perderebbe la memoria leggibile di un
+      // evento probatorio. Come i documenti firmati: solo archiviabile, mai eliminabile.
+      if (documento.tipo === 'verbale_firma') {
+        return reply.code(409).send({
+          errore: 'Il verbale di firma è un atto certificativo: non può essere eliminato, solo archiviato.',
+        });
+      }
 
       // Punto 3 piano gap — un documento firmato non si elimina MAI, per nessuno, nemmeno
       // per l'admin dello studio. Il sigillo FirmaElettronica è un atto legale che referenzia
@@ -5487,7 +5497,9 @@ export function buildServer(app: AppPort): FastifyInstance {
           statoScansione: d.statoScansione,
           scaricabile: d.statoScansione === 'pulito',
           firmato: isFirmato,
-          richiedeFirma: !isFirmato && d.statoScansione === 'pulito' && d.statoDoc !== 'in_revisione',
+          // Punto 2 piano gap — il verbale di firma è un atto certificativo: si legge e si
+          // scarica, ma non si firma e non si manda in revisione.
+          richiedeFirma: !isFirmato && d.statoScansione === 'pulito' && d.statoDoc !== 'in_revisione' && d.tipo !== 'verbale_firma',
           dataFirma: firma?.firmatoAt ?? null,
           tipoFirma: firma?.tipoFirma ?? null,
           signatureId: firma?.signatureId ?? null,
@@ -5588,6 +5600,16 @@ export function buildServer(app: AppPort): FastifyInstance {
 
       if (!documento) {
         return reply.code(404).send({ errore: 'Documento non trovato o non associato al cliente.' });
+      }
+
+      // Punto 2 piano gap — il verbale di firma è un atto certificativo generato dal sistema:
+      // riflette i dati del sigillo, non è un documento dello studio da revisionare. Una
+      // richiesta di modifica porterebbe lo stato a 'in_revisione', facendo dire al fascicolo
+      // il falso su un atto non negoziabile.
+      if (documento.tipo === 'verbale_firma') {
+        return reply.code(409).send({
+          errore: 'Il verbale di firma è un atto certificativo: non è modificabile e non accetta richieste di revisione.',
+        });
       }
 
       // Crea richiesta di modifica a DB
@@ -6437,6 +6459,172 @@ export function buildServer(app: AppPort): FastifyInstance {
     }
   }
 
+  /**
+   * Punto 2 piano gap — il verbale di firma. FirmaElettronica contiene i dati probatori ma
+   * nessun documento umano-leggibile: questa funzione genera il PDF del verbale, lo carica
+   * come Documento (tipo 'verbale_firma') nel fascicolo e collega la firma al documento.
+   *
+   * Stessa logica di segnaDocumentoFirmato: è un effetto collaterale della firma, non un
+   * suo requisito di validità. Se la generazione fallisce (storage, DB, PDF) la firma resta
+   * valida e il sigillo resta nel database; il fallimento va nei log.
+   *
+   * `caricatoDa` è null: il firmatario cliente ha identità `client-<id>` che non è una riga
+   * della tabella user, e attribuire il verbale a un utente dello studio sarebbe
+   * un'attestazione falsa in un atto certificativo.
+   */
+  async function generaVerbaleDiFirma(params: {
+    tenantId: string;
+    clienteId: string;
+    clienteNome: string;
+    firma: {
+      id: string;
+      signatureId: string;
+      tipoFirma: string;
+      standard: string;
+      documentoTitolo: string;
+      documentoHash: string;
+      firmatarioNome: string;
+      firmatarioRuolo: string | null;
+      canaleVerificato: string | null;
+      codiceOtpId: string | null;
+      ipAddress: string | null;
+      userAgent: string | null;
+      firmaGrafometricaPng?: string | null;
+      fileFirmatoHash?: string | null;
+      firmatoAt: Date;
+    };
+    /** Impronta SHA-256 del sigillo: è calcolata dal builder del sigillo, non dalla firma. */
+    sigilloDigest: string;
+    ambito: string;
+    riferimentoId: string | null;
+  }): Promise<void> {
+    const { tenantId, clienteId, clienteNome, firma, sigilloDigest, ambito, riferimentoId } = params;
+    try {
+      // 1. Collocazione nel fascicolo: il verbale segue il documento che certifica. Per il
+      //    Vault copia progetto/microvoce dall'originale; per un modulo risale al progetto;
+      //    altrimenti (engagement_letter, addendum, o riferimento mancante) va nell'ultimo
+      //    progetto del cliente. Il null è l'extrema ratio: il verbale esiste comunque.
+      let progettoId: string | null = null;
+      let microvoceProgettoId: string | null = null;
+      if (ambito === 'documento_vault' && riferimentoId) {
+        const originale = await prisma.documento.findFirst({
+          where: { id: riferimentoId, tenantId },
+          select: { progettoId: true, microvoceProgettoId: true },
+        });
+        progettoId = originale?.progettoId ?? null;
+        microvoceProgettoId = originale?.microvoceProgettoId ?? null;
+      } else if (ambito === 'modulo_completato' && riferimentoId) {
+        const modulo = await (prisma as any).moduloProgetto.findFirst({
+          where: { id: riferimentoId, tenantId },
+          select: { progettoId: true },
+        });
+        progettoId = modulo?.progettoId ?? null;
+      }
+      if (!progettoId && !microvoceProgettoId) {
+        const progetto = await prisma.progetto.findFirst({
+          where: { clienteId },
+          orderBy: { createdAt: 'desc' },
+          select: { id: true },
+        });
+        progettoId = progetto?.id ?? null;
+      }
+
+      // 2. Dettagli OTP: il record di verifica porta canale/target/origine, ma servono anche
+      //    l'ultimo invio e il momento dell'uso — il verbale dice quando il fattore è stato
+      //    consegnato e quando è stato speso.
+      let otp: {
+        canale: string;
+        target: string;
+        targetDichiarato: boolean;
+        targetAnagrafica: string | null;
+        ultimoInvioAt: Date | null;
+        usatoAt: Date | null;
+      } | null = null;
+      if (firma.codiceOtpId) {
+        otp = await (prisma as any).codiceOtp.findFirst({
+          where: { id: firma.codiceOtpId, tenantId },
+          select: {
+            canale: true,
+            target: true,
+            targetDichiarato: true,
+            targetAnagrafica: true,
+            ultimoInvioAt: true,
+            usatoAt: true,
+          },
+        });
+      }
+
+      // 3. Il PDF. compress: false — è un atto che deve restare ispezionabile sul file.
+      const pdf = await generaPdfVerbaleFirma({
+        signatureId: firma.signatureId,
+        tipoFirma: firma.tipoFirma,
+        standard: firma.standard,
+        documentoTitolo: firma.documentoTitolo,
+        documentoHash: firma.documentoHash,
+        firmatarioNome: firma.firmatarioNome,
+        firmatarioRuolo: firma.firmatarioRuolo,
+        clienteNome,
+        canaleVerificato: firma.canaleVerificato,
+        timestampIso: firma.firmatoAt.toISOString(),
+        ipAddress: firma.ipAddress,
+        userAgent: firma.userAgent,
+        sha256Digest: sigilloDigest,
+        otp,
+        firmaGrafometricaPng: firma.firmaGrafometricaPng ?? null,
+        fileFirmatoHash: firma.fileFirmatoHash ?? null,
+      });
+
+      // 4. Upload + riga Documento. statoDoc 'pubblicato': il verbale è visibile subito al
+      //    cliente, non passa da bozza perché non c'è revisione possibile su un atto
+      //    certificativo generato dal sistema.
+      const caricato = await uploadDocumento(`verbale_firma_${firma.signatureId}.pdf`, pdf.toString('base64'));
+      const verbale = await prisma.documento.create({
+        data: {
+          tenantId,
+          progettoId,
+          microvoceProgettoId,
+          tipo: 'verbale_firma',
+          fileUrl: caricato.url,
+          caricatoDa: null,
+          categoriaDoc: 'generico',
+          statoDoc: 'pubblicato',
+          pubblicatoAt: new Date(),
+          statoScansione: 'pulito',
+          scansionatoAt: new Date(),
+        },
+      });
+
+      // 5. Collega la firma al suo verbale: dal fascicolo si può risalire all'evento
+      //    probatorio e viceversa.
+      await (prisma as any).firmaElettronica.update({
+        where: { id: firma.id },
+        data: { verbaleDocumentoId: verbale.id },
+      });
+
+      await recordAudit({
+        tenantId,
+        userId: null,
+        ruolo: null,
+        azione: 'VERBALE_FIRMA_GENERATO',
+        entita: firma.signatureId,
+        dettagli: `Verbale di firma generato automaticamente per ${firma.signatureId} su "${firma.documentoTitolo}". Documento: ${verbale.id}.`,
+        ipAddress: firma.ipAddress,
+      }).catch(() => {});
+
+      // Il cliente deve sapere che l'atto esiste e dove trovarlo.
+      await notificaCliente(tenantId, clienteId, {
+        tipoEvento: 'verbale_disponibile',
+        oggetto: 'Verbale di firma disponibile',
+        corpo: `Il verbale della firma su «${firma.documentoTitolo}» è disponibile nel tuo fascicolo documenti.`,
+        link: '/portal/documents',
+      }).catch(() => {});
+    } catch (err) {
+      // Il verbale è documentazione della firma, non un suo elemento costitutivo: se la
+      // generazione fallisce il sigillo e la firma restano pienamente validi.
+      console.error('Verbale di firma non generato: la firma resta valida', firma.signatureId, err);
+    }
+  }
+
   server.post<{
     Body: {
       otp: string;
@@ -6599,6 +6787,19 @@ export function buildServer(app: AppPort): FastifyInstance {
           // L'attivazione è un effetto collaterale: se salta, la firma resta valida.
         }
       }
+
+      // Punto 2 piano gap — il verbale si genera DOPO l'attivazione del progetto: per
+      // l'engagement_letter il collegamento al fascicolo cerca l'ultimo progetto del
+      // cliente, che a questo punto è già in lavorazione.
+      await generaVerbaleDiFirma({
+        tenantId,
+        clienteId,
+        clienteNome: cliente.nome,
+        firma,
+        sigilloDigest: sigillo.sha256Digest,
+        ambito,
+        riferimentoId: riferimentoId ?? null,
+      });
 
       return reply.send({
         ok: true,
@@ -6794,6 +6995,18 @@ export function buildServer(app: AppPort): FastifyInstance {
         corpo: `Il documento firmato «${documentoTitolo}» è stato registrato correttamente.`,
         link: '/portal/documents',
       }).catch(() => {});
+
+      // Punto 2 piano gap — verbale anche per manuale_scansionata e qualificata_esterna:
+      // qui certifica la ricezione del file e, se l'OTP è stato usato, lo cita.
+      await generaVerbaleDiFirma({
+        tenantId,
+        clienteId,
+        clienteNome: cliente.nome,
+        firma,
+        sigilloDigest: sigillo.sha256Digest,
+        ambito,
+        riferimentoId: riferimentoId ?? null,
+      });
 
       return reply.send({ ok: true, seal: { ...sigillo, id: firma.id, tipoFirma, fileFirmatoUrl: caricato.url } });
     } catch (err) {

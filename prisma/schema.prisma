@@ -582,11 +582,15 @@ model Documento {
   microvoceProgetto   MicrovoceProgetto? @relation(fields: [microvoceProgettoId], references: [id], onDelete: SetNull)
   progettoId          String?           @map("progetto_id")
   progetto            Progetto?         @relation(fields: [progettoId], references: [id], onDelete: SetNull)
-  tipo                String // template_vuoto|compilato|firmato|allegato
+  tipo                String // template_vuoto|compilato|firmato|allegato|verbale_firma
   fileUrl             String            @map("file_url")
   versione             Int              @default(1)
-  caricatoDa          String            @map("caricato_da")
-  caricatoDaUser       User             @relation(fields: [caricatoDa], references: [id])
+  // Chi ha caricato il file. Nullable: i documenti generati automaticamente dalla
+  // piattaforma (verbale_firma, Punto 2 piano gap) non hanno un caricatore umano — il
+  // client firmatario non è una riga User e attribuirlo a un utente dello studio sarebbe
+  // un'attestazione falsa in un atto certificativo.
+  caricatoDa          String?           @map("caricato_da")
+  caricatoDaUser       User?             @relation(fields: [caricatoDa], references: [id])
   createdAt           DateTime          @default(now()) @map("created_at")
   // Sicurezza upload — §28, incluso fin dallo schema iniziale (Fase 1 del piano)
   statoScansione      StatoScansione    @default(in_corso) @map("stato_scansione")
@@ -611,6 +615,7 @@ model Documento {
 
   passaggioProgetto PassaggioProgetto?
   richiesteModifica RichiestaModificaDocumento[]
+  verbaliFirma      FirmaElettronica[]
 
   @@index([progettoId])
   @@index([statoDoc])
@@ -1111,6 +1116,11 @@ model FirmaElettronica {
   standard  String   @map("standard")
   firmatoAt DateTime @default(now()) @map("firmato_at")
   createdAt DateTime @default(now()) @map("created_at")
+  // Punto 2 piano gap — il verbale di firma è un Documento (tipo 'verbale_firma') che
+  // riassume l'evento in forma leggibile. Il collegamento è bidirezionale: dalla firma al
+  // verbale generato, e dal verbale (che resta Documento) alla firma che lo ha prodotto.
+  verbaleDocumentoId String?    @map("verbale_documento_id")
+  verbaleDocumento   Documento? @relation(fields: [verbaleDocumentoId], references: [id])
 
   @@index([clienteId, ambito])
   @@map("firma_elettronica")

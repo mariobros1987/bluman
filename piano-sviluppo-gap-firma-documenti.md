@@ -20,7 +20,7 @@ Questo piano copre i 4 punti aperti dall'audit, in ordine di priorità operativa
 > Sequenza operativa decisa dal titolare: **3 → 2 → 1 → 4**.
 
 - **Punto 3 — ✅ chiuso il 27/08/2026.** Migrazione additiva `20260827180000_archiviazione_documenti_firmati` (`isArchiviato`/`archiviatoAt`/`archiviatoDaId` su `Documento`, `isArchiviato` su `EngagementLetter`); hard delete vietato con **409** su documento firmato o con firma/OTP pendente collegati — **per tutti, admin inclusi**; `PATCH /documenti/:id/archivia` (solo admin, idempotente, audit `DOCUMENTO_ARCHIVIATO`); liste operative senza archiviati (`?includiArchiviati=true` per lo storico); pulsante «📦 Archivia» nella UI; 17 test in `src/archiviazioneDocumentiFirmati.test.ts`. `riferimentoId` resta stringa libera (niente FK tipizzate), come deciso in questo stesso punto.
-- **Punto 2 — ⏳ prossimo.** Verbale di firma come `Documento` con `tipo = 'verbale_firma'`, `statoDoc = 'pubblicato'`, non negoziabile (atto certificativo).
+- **Punto 2 — ✅ chiuso il 27/08/2026.** Migrazione additiva `20260827210000_verbale_documento_id_firma` (`FirmaElettronica.verbaleDocumentoId` nullable + relation verso `Documento`); builder puro `src/services/verbaleFirma.ts` (pdfkit, `compress:false`); hook `generaVerbaleDiFirma` in `server.ts` subito dopo `FirmaElettronica.create` in `POST /portal/verify-otp-and-sign`: genera il PDF, lo carica nello storage, crea un `Documento` tipo `verbale_firma`/statoDoc `pubblicato` nel progetto di origine (fallback: ultimo progetto del cliente), collega la firma al verbale, audit `VERBALE_FIRMA_GENERATO` e notifica cliente `verbale_disponibile`. **Deviazione**: `Documento.caricatoDa` reso nullable perché l'utente del portale ha `userId = client-<id>` senza riga `User`; il verbale ha `caricatoDa = null` (generato dal sistema). Guard 409: il verbale è atto certificativo → niente hard delete (`DELETE /documenti/:id`) né richieste di revisione (`POST /portal/documenti/:id/richiesta-modifica`). Fallimento della generazione (es. storage giù) non invalida la firma. 14 test in `src/verbaleFirma.test.ts` (builder PDF, guard, flusso E2E con mock prisma+storage).
 - **Punto 1 — ⏳ motore definito.** Decisione titolare 27/08/2026: **Docxtemplater (Word) + pdfkit (PDF)** dallo stesso merge dati — **niente LibreOffice su Railway**; hash legale fissato sul PDF.
 - **Punto 4 — ⏳ in coda.** Audit del cablaggio esistente + implementazione dei trigger mancanti (non solo report).
 
@@ -114,7 +114,17 @@ Additiva, nullable, nessun backfill.
 
 ---
 
-## Punto 2 — Verbale di firma (sigillo leggibile)
+## Punto 2 — Verbale di firma (sigillo leggibile) — ✅ chiuso il 27/08/2026
+
+> **Implementazione** — coerente con il modello previsto, con le precisazioni:
+> - `FirmaElettronica.verbaleDocumentoId` (l'aggiunta "opzionale" qui sotto) è stata realizzata: migrazione `20260827210000_verbale_documento_id_firma`.
+> - Template non HTML→PDF ma **pdfkit diretto** (`src/services/verbaleFirma.ts`, funzione pura `generaPdfVerbaleFirma`): A4, sezioni DOCUMENTO SOTTOSCRITTO / FIRMATARIO / MODALITÀ DI SOTTOSCRIZIONE / DATI DELLA REGISTRAZIONE, sezione OTP presente **solo** se un codice è stato usato, recapito sempre mascherato (`mascheraRecapito`), IP/UA mancanti scritti come "non registrato", grafometrica incorporata solo se decodificabile, impronta SHA-256 del sigillo in chiusura.
+> - Generazione **sincrona dentro la richiesta di firma** (niente coda: volumi bassi); un fallimento della generazione (storage, PDF) viene loggato e **non invalida la firma**.
+> - `verbale_disponibile` aggiunto a `EVENTI_NOTIFICA` in `notificheService.ts` (anticipa una riga della matrice del punto 4); audit dedicato `VERBALE_FIRMA_GENERATO` con `userId = 'usr-system'`.
+> - Collocazione nel fascicolo: progetto del documento/modulo firmato; per ambiti senza riferimento (es. engagement letter non ancora proiettata) fallback all'ultimo progetto del cliente; se nemmeno quello esiste il verbale non viene creato (la firma resta valida).
+> - **Deviazione dallo schema**: `Documento.caricatoDa` è ora **nullable** — l'utente del portale ha `userId = client-<clienteId>` che non corrisponde a una riga `User`, quindi il verbale (generato dal sistema) ha `caricatoDa = null`.
+> - Frontend: icona 📜 e badge "atto certificativo" per i verbali nel portale cliente; richiesta-modifica e archiviazione disabilitate lato UI oltre che lato server (409).
+> - Copertura: `src/verbaleFirma.test.ts` — 14 test (contenuto certificativo del PDF decodificando le stringhe esadecimali di pdfkit, guard 409 su delete/revisione, E2E `verify-otp-and-sign` con Prisma e storage mockati).
 
 ### Problema
 `FirmaElettronica` contiene tutti i dati probatori (hash, IP, canale verificato, OTP collegato, eventuale grafometrica) ma non esiste un documento umano-leggibile generato automaticamente che riassuma l'evento di firma — utile sia per lo studio (fascicolo) sia per il cliente (ricevuta).
@@ -175,7 +185,7 @@ model FirmaElettronica {
 | Cliente crea `RichiestaModificaDocumento` | cliente invia richiesta | operatore/advisor assegnato | `messaggio_cliente` |
 | Operatore ripubblica nuova versione dopo modifica | pubblicazione v2 | cliente | `documento_da_firmare` (ri-notifica) |
 | `FirmaElettronica` creata con successo | fine flusso firma | operatore/advisor + cliente (conferma) | `firma_apposta` |
-| Verbale di firma generato (punto 2) | post-generazione | cliente | `documento_pubblicato` (o nuovo tipo `verbale_disponibile`) |
+| Verbale di firma generato (punto 2) — ✅ coperta | post-generazione | cliente | `verbale_disponibile` (valore aggiunto in `EVENTI_NOTIFICA` col punto 2, più la riga studio `firma_apposta`) |
 | `CodiceOtp` inviato | invio OTP | — (non è una Notifica di sistema, è il canale stesso: email/WA/TG con il codice) | n/a |
 | `RichiestaAddendum` cambia stato → pronta | operatore prepara addendum | cliente | evento esistente da verificare |
 | `PropostaDatiFiscale` confermata/rifiutata | operatore decide | cliente | evento esistente da verificare |

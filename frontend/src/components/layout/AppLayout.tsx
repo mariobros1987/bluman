@@ -34,6 +34,7 @@ const TIPO_PER_EVENTO: Record<string, NotificationItem['type']> = {
   messaggio_cliente: 'system',
   documento_da_firmare: 'signature',
   firma_apposta: 'signature',
+  verbale_disponibile: 'signature',
   scadenza_imminente: 'delay',
 };
 

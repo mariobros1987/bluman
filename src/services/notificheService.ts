@@ -34,6 +34,9 @@ export const EVENTI_NOTIFICA = [
   // §WF-DOC — lo studio ha riaperto un documento che il cliente aveva già firmato: il cliente
   // deve saperlo, perché il suo atto non è più l'ultima parola sul fascicolo.
   'documento_sbloccato',
+  // Punto 2 piano gap — il verbale di firma è stato generato: l'atto certificativo che
+  // documenta la firma è disponibile nel fascicolo. Previsto dalla matrice del punto 4.
+  'verbale_disponibile',
 ] as const;
 
 export type TipoEventoNotifica = (typeof EVENTI_NOTIFICA)[number];

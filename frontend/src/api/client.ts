@@ -424,7 +424,7 @@ export async function salvaDocumentoApi(input: {
   // `PassaggioModal` lo passava già, ma non era dichiarato: TypeScript lo segnalava come
   // proprietà sconosciuta (errore invisibile finché il typecheck girava su zero file) e il
   // valore, pur arrivando al server, veniva appiattito su 'allegato'.
-  tipo?: 'template_vuoto' | 'compilato' | 'firmato' | 'allegato';
+  tipo?: 'template_vuoto' | 'compilato' | 'firmato' | 'allegato' | 'verbale_firma';
 }): Promise<DocumentoProgetto> {
   const res = await apiFetch(`${API_BASE}/documenti`, {
     method: 'POST',
