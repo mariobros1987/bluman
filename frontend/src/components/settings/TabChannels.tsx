@@ -1,0 +1,509 @@
+import React from 'react';
+import styles from '../../pages/Settings.module.css';
+
+interface TabChannelsProps {
+  handleSaveCompany: (e?: React.FormEvent) => void;
+  handleTestSmtp: () => void;
+  testingSmtp: boolean;
+  smtpTestResult: string | null;
+  smtpHost: string;
+  setSmtpHost: (v: string) => void;
+  smtpPort: string;
+  setSmtpPort: (v: string) => void;
+  smtpUser: string;
+  setSmtpUser: (v: string) => void;
+  smtpPass: string;
+  setSmtpPass: (v: string) => void;
+  smtpFromEmail: string;
+  setSmtpFromEmail: (v: string) => void;
+  smtpFromName: string;
+  setSmtpFromName: (v: string) => void;
+  smtpReplyTo: string;
+  setSmtpReplyTo: (v: string) => void;
+  smtpBcc: string;
+  setSmtpBcc: (v: string) => void;
+  smtpSecure: boolean;
+  setSmtpSecure: (v: boolean) => void;
+  handleTestImap: () => void;
+  testingImap: boolean;
+  imapTestResult: string | null;
+  imapProtocol: 'imap' | 'pop3';
+  setImapProtocol: (v: 'imap' | 'pop3') => void;
+  imapHost: string;
+  setImapHost: (v: string) => void;
+  imapPort: string;
+  setImapPort: (v: string) => void;
+  imapFolder: string;
+  setImapFolder: (v: string) => void;
+  imapUser: string;
+  setImapUser: (v: string) => void;
+  imapPass: string;
+  setImapPass: (v: string) => void;
+  imapPollInterval: string;
+  setImapPollInterval: (v: string) => void;
+  imapSecure: boolean;
+  setImapSecure: (v: boolean) => void;
+  emailSignatureHtml: string;
+  setEmailSignatureHtml: (v: string) => void;
+  handleTestChannel: (channel: 'whatsapp' | 'telegram' | 'signal') => void;
+  testingChannel: string | null;
+  channelTestResult: Record<string, string>;
+  waPhoneId: string;
+  setWaPhoneId: (v: string) => void;
+  waVerifyToken: string;
+  setWaVerifyToken: (v: string) => void;
+  waAccessToken: string;
+  setWaAccessToken: (v: string) => void;
+  tgBotUsername: string;
+  setTgBotUsername: (v: string) => void;
+  tgBotToken: string;
+  setTgBotToken: (v: string) => void;
+  emailInboundParseUrl: string;
+  setEmailInboundParseUrl: (v: string) => void;
+  signalCliEndpoint: string;
+  setSignalCliEndpoint: (v: string) => void;
+}
+
+// TAB 3: Configurazione Canali Omnichannel (WhatsApp, Telegram, Email, Signal)
+export function TabChannels({
+  handleSaveCompany,
+  handleTestSmtp,
+  testingSmtp,
+  smtpTestResult,
+  smtpHost,
+  setSmtpHost,
+  smtpPort,
+  setSmtpPort,
+  smtpUser,
+  setSmtpUser,
+  smtpPass,
+  setSmtpPass,
+  smtpFromEmail,
+  setSmtpFromEmail,
+  smtpFromName,
+  setSmtpFromName,
+  smtpReplyTo,
+  setSmtpReplyTo,
+  smtpBcc,
+  setSmtpBcc,
+  smtpSecure,
+  setSmtpSecure,
+  handleTestImap,
+  testingImap,
+  imapTestResult,
+  imapProtocol,
+  setImapProtocol,
+  imapHost,
+  setImapHost,
+  imapPort,
+  setImapPort,
+  imapFolder,
+  setImapFolder,
+  imapUser,
+  setImapUser,
+  imapPass,
+  setImapPass,
+  imapPollInterval,
+  setImapPollInterval,
+  imapSecure,
+  setImapSecure,
+  emailSignatureHtml,
+  setEmailSignatureHtml,
+  handleTestChannel,
+  testingChannel,
+  channelTestResult,
+  waPhoneId,
+  setWaPhoneId,
+  waVerifyToken,
+  setWaVerifyToken,
+  waAccessToken,
+  setWaAccessToken,
+  tgBotUsername,
+  setTgBotUsername,
+  tgBotToken,
+  setTgBotToken,
+  emailInboundParseUrl,
+  setEmailInboundParseUrl,
+  signalCliEndpoint,
+  setSignalCliEndpoint,
+}: TabChannelsProps) {
+  return (
+        <form onSubmit={handleSaveCompany} className={styles.sectionBox}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span>💬 Integratore Canali Omnichannel & Credenziali Webhook</span>
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
+            Inserisci i token ed i parametri di connessione per la sincronizzazione automatica delle conversazioni sui Progetti dei Clienti.
+          </div>
+
+          {/* BOX GUIDA INTERATTIVA PASSO-PASSO */}
+          <div style={{ background: '#1a1f3d', border: '1px solid #2d3260', borderRadius: 12, padding: 16, marginTop: 14 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#818cf8', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span>📖 Guida Passo-Passo: Come Funziona l'Associazione Automatica ai Progetti</span>
+            </div>
+            <div style={{ fontSize: 11.5, color: '#cbd5e1', lineHeight: 1.6 }}>
+              <strong>1. Associazione per Numero di Telefono (WhatsApp / Signal):</strong><br />
+              Quando il cliente invia un messaggio o un file da cellulare (es. <code>+39 335 1234567</code>), BluMan cerca il numero nell'anagrafica <strong>Clienti ERP</strong> ed associa la chat al Progetto in corso.<br /><br />
+              <strong>2. Associazione per Indirizzo Email (Email Inbound):</strong><br />
+              Tutte le email ricevute da <code>client@holdingbeta.advisory</code> vengono collegate al progetto. Includendo <code>[INC-2026-089]</code> nell'oggetto si forza l'assegnazione ad uno specifico incarico.<br /><br />
+              <strong>3. Associazione Telegram:</strong><br />
+              L'associazione avviene tramite l'handle registrato in anagrafica (es. <code>@RobertoRossi</code>) o codice incarico.
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20, marginTop: 16 }}>
+            {/* 📧 SERVER EMAIL SMTP TRANSAZIONALE & NOTIFICHE */}
+            <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 16 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#818cf8', marginBottom: 4, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>📧 Server Email SMTP Transazionale & Notifiche Studio</span>
+                <button
+                  type="button"
+                  onClick={handleTestSmtp}
+                  disabled={testingSmtp}
+                  style={{ background: '#3730a3', color: '#fff', border: 'none', padding: '5px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+                >
+                  {testingSmtp ? 'Testing SMTP...' : '🧪 Test Connessione SMTP'}
+                </button>
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 12 }}>
+                Configura i parametri del server di posta in uscita per l'invio dei Magic Link di login cliente, notifiche scadenze e preventivi.
+              </div>
+
+              {smtpTestResult && (
+                <div style={{
+                  padding: '10px 14px',
+                  borderRadius: 8,
+                  fontSize: 12,
+                  marginBottom: 12,
+                  fontWeight: 500,
+                  background: (smtpTestResult.includes('✓') || smtpTestResult.includes('successo') || smtpTestResult.includes('CONNESSO')) ? '#0d2d22' : '#2d0d0d',
+                  color: (smtpTestResult.includes('✓') || smtpTestResult.includes('successo') || smtpTestResult.includes('CONNESSO')) ? '#34d399' : '#f87171',
+                  border: `1px solid ${(smtpTestResult.includes('✓') || smtpTestResult.includes('successo') || smtpTestResult.includes('CONNESSO')) ? '#059669' : '#dc2626'}`
+                }}>
+                  {smtpTestResult}
+                </div>
+              )}
+
+              <div className={styles.grid2}>
+                <div className={styles.field}>
+                  <label>Host Server SMTP *:</label>
+                  <input type="text" value={smtpHost} onChange={e => setSmtpHost(e.target.value)} placeholder="es. smtp.register.it" style={{ fontSize: 12 }} />
+                </div>
+                <div className={styles.field}>
+                  <label>Porta Server SMTP *:</label>
+                  <input type="number" value={smtpPort} onChange={e => setSmtpPort(e.target.value)} placeholder="587" style={{ fontSize: 12 }} />
+                </div>
+              </div>
+
+              <div className={styles.grid2} style={{ marginTop: 10 }}>
+                <div className={styles.field}>
+                  <label>Username / Email Autenticazione *:</label>
+                  <input type="text" value={smtpUser} onChange={e => setSmtpUser(e.target.value)} placeholder="comunicazioni@studio.it" style={{ fontSize: 12 }} />
+                </div>
+                <div className={styles.field}>
+                  <label>Password SMTP / App Key *:</label>
+                  <input type="password" value={smtpPass} onChange={e => setSmtpPass(e.target.value)} placeholder="••••••••••••" style={{ fontSize: 12 }} />
+                </div>
+              </div>
+
+              <div className={styles.grid2} style={{ marginTop: 10 }}>
+                <div className={styles.field}>
+                  <label>Email Mittente Visibile *:</label>
+                  <input type="email" value={smtpFromEmail} onChange={e => setSmtpFromEmail(e.target.value)} placeholder="support@bluecode-ltd.com" style={{ fontSize: 12 }} />
+                </div>
+                <div className={styles.field}>
+                  <label>Nome Mittente Visualizzato *:</label>
+                  <input type="text" value={smtpFromName} onChange={e => setSmtpFromName(e.target.value)} placeholder="BlueCode Advisory & Consulting" style={{ fontSize: 12 }} />
+                </div>
+              </div>
+
+              <div className={styles.grid2} style={{ marginTop: 10 }}>
+                <div className={styles.field}>
+                  <label>Indirizzo di Risposta (Reply-To):</label>
+                  <input type="email" value={smtpReplyTo} onChange={e => setSmtpReplyTo(e.target.value)} placeholder="support@bluecode-ltd.com" style={{ fontSize: 12 }} />
+                </div>
+                <div className={styles.field}>
+                  <label>Copia Conoscenza Nascosta Studio (BCC Archivio):</label>
+                  <input type="email" value={smtpBcc} onChange={e => setSmtpBcc(e.target.value)} placeholder="archivio@bluecode-ltd.com" style={{ fontSize: 12 }} />
+                </div>
+              </div>
+
+              <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: 'var(--muted)' }}>
+                <input type="checkbox" id="smtpSecure" checked={smtpSecure} onChange={e => setSmtpSecure(e.target.checked)} style={{ width: 14, height: 14 }} />
+                <label htmlFor="smtpSecure" style={{ cursor: 'pointer' }}>Usa Connessione Crittografata SSL/TLS (Porta 465 - Consigliata)</label>
+              </div>
+            </div>
+
+            {/* 📥 SERVER EMAIL IMAP / POP3 (POSTA IN ENTRATA & INGESTION FASCICOLI) */}
+            <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 16 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#38bdf8', marginBottom: 4, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>📥 Server Email IMAP / POP3 (Posta in Entrata & Ingestion Fascicoli)</span>
+                <button
+                  type="button"
+                  onClick={handleTestImap}
+                  disabled={testingImap}
+                  style={{ background: '#0369a1', color: '#fff', border: 'none', padding: '5px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+                >
+                  {testingImap ? 'Testing IMAP...' : '🧪 Test Connessione IMAP'}
+                </button>
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 12 }}>
+                Configura i parametri di ricezione per consentire a BluMan di leggere le email inviate dai clienti a <code>support@bluecode-ltd.com</code> ed associarle in tempo reale ai rispettivi progetti.
+              </div>
+
+              {imapTestResult && (
+                <div style={{
+                  padding: '10px 14px',
+                  borderRadius: 8,
+                  fontSize: 12,
+                  marginBottom: 12,
+                  fontWeight: 500,
+                  background: (imapTestResult.includes('✓') || imapTestResult.includes('successo') || imapTestResult.includes('CONNESSO') || imapTestResult.includes('verificata')) ? '#0d2d22' : '#2d0d0d',
+                  color: (imapTestResult.includes('✓') || imapTestResult.includes('successo') || imapTestResult.includes('CONNESSO') || imapTestResult.includes('verificata')) ? '#34d399' : '#f87171',
+                  border: `1px solid ${(imapTestResult.includes('✓') || imapTestResult.includes('successo') || imapTestResult.includes('CONNESSO') || imapTestResult.includes('verificata')) ? '#059669' : '#dc2626'}`
+                }}>
+                  {imapTestResult}
+                </div>
+              )}
+
+              <div className={styles.grid2}>
+                <div className={styles.field}>
+                  <label>Protocollo Ricezione:</label>
+                  <select value={imapProtocol} onChange={e => setImapProtocol(e.target.value as any)} style={{ fontSize: 12, padding: '7px 10px' }}>
+                    <option value="imap">IMAP4 (Sincronizzazione Bidirezionale Multi-Device - Consigliato)</option>
+                    <option value="pop3">POP3 (Download Singolo Posta)</option>
+                  </select>
+                </div>
+                <div className={styles.field}>
+                  <label>Host Server Posta in Entrata *:</label>
+                  <input type="text" value={imapHost} onChange={e => setImapHost(e.target.value)} placeholder="imap.register.it" style={{ fontSize: 12 }} />
+                </div>
+              </div>
+
+              <div className={styles.grid2} style={{ marginTop: 10 }}>
+                <div className={styles.field}>
+                  <label>Porta Server Ricezione *:</label>
+                  <input type="number" value={imapPort} onChange={e => setImapPort(e.target.value)} placeholder="993" style={{ fontSize: 12 }} />
+                </div>
+                <div className={styles.field}>
+                  <label>Cartella Remota da Monitorare:</label>
+                  <input type="text" value={imapFolder} onChange={e => setImapFolder(e.target.value)} placeholder="INBOX" style={{ fontSize: 12 }} />
+                </div>
+              </div>
+
+              <div className={styles.grid2} style={{ marginTop: 10 }}>
+                <div className={styles.field}>
+                  <label>Username / Email Posta in Entrata *:</label>
+                  <input type="text" value={imapUser} onChange={e => setImapUser(e.target.value)} placeholder="support@bluecode-ltd.com" style={{ fontSize: 12 }} />
+                </div>
+                <div className={styles.field}>
+                  <label>Password Casella Posta *:</label>
+                  <input type="password" value={imapPass} onChange={e => setImapPass(e.target.value)} placeholder="••••••••••••" style={{ fontSize: 12 }} />
+                </div>
+              </div>
+
+              <div className={styles.grid2} style={{ marginTop: 10 }}>
+                <div className={styles.field}>
+                  <label>Frequenza Polling Sincronizzazione:</label>
+                  <select value={imapPollInterval} onChange={e => setImapPollInterval(e.target.value)} style={{ fontSize: 12, padding: '7px 10px' }}>
+                    <option value="2m">⚡ Ogni 2 Minuti (Live Ingestion)</option>
+                    <option value="5m">⏱ Ogni 5 Minuti (Standard)</option>
+                    <option value="15m">⏳ Ogni 15 Minuti</option>
+                    <option value="manual">✋ Solo Manuale</option>
+                  </select>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: 'var(--muted)', paddingTop: 20 }}>
+                  <input type="checkbox" id="imapSecure" checked={imapSecure} onChange={e => setImapSecure(e.target.checked)} style={{ width: 14, height: 14 }} />
+                  <label htmlFor="imapSecure" style={{ cursor: 'pointer' }}>Usa Connessione Crittografata SSL/TLS (Porta 993 - Consigliata)</label>
+                </div>
+              </div>
+            </div>
+
+            {/* 🖋️ FIRMA AUTOMATICA & DISCLAIMER PRIVACY EMAIL STUDIO */}
+            <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 16 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#f59e0b', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span>🖋️ Firma Automatica & Disclaimer Privacy GDPR Studio</span>
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 10 }}>
+                Questa firma e clausola legale verranno allegate automaticamente in calce a tutte le email inviate da BluMan ai clienti.
+              </div>
+              <div className={styles.field}>
+                <label>Modello Firma & Disclaimer (Supporta tag: &#123;&#123;nome_operatore&#125;&#125;, &#123;&#123;ruolo_operatore&#125;&#125;, &#123;&#123;sito_web&#125;&#125;):</label>
+                <textarea
+                  value={emailSignatureHtml}
+                  onChange={e => setEmailSignatureHtml(e.target.value)}
+                  rows={4}
+                  style={{ width: '100%', fontSize: 11.5, fontFamily: 'monospace', padding: 10, background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)' }}
+                />
+              </div>
+            </div>
+
+            {/* 🛡️ DIAGNOSTICA RECORD DNS DOMINIO (SPF, DKIM, DMARC, MX) */}
+            <div style={{ background: '#0b132b', border: '1px solid #1c2541', borderRadius: 12, padding: 16 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#60a5fa', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span>🛡️ Configurazione Record DNS Dominio per Register.it (Anti-Spam & Deliverability 100%)</span>
+              </div>
+              <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 12 }}>
+                Per garantire che le email inviate da <code>support@bluecode-ltd.com</code> arrivino nella posta in arrivo dei clienti (senza finire nello spam), assicurati che i record DNS sul pannello di Register.it siano configurati come segue:
+              </div>
+
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11, textAlign: 'left', color: '#e2e8f0' }}>
+                  <thead>
+                    <tr style={{ background: '#1c2541', borderBottom: '1px solid #334155' }}>
+                      <th style={{ padding: '8px 10px' }}>Tipo Record</th>
+                      <th style={{ padding: '8px 10px' }}>Nome / Host</th>
+                      <th style={{ padding: '8px 10px' }}>Valore Raccomandato (Register.it)</th>
+                      <th style={{ padding: '8px 10px' }}>Stato Deliverability</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr style={{ borderBottom: '1px solid #1e293b' }}>
+                      <td style={{ padding: '8px 10px', fontWeight: 700, color: '#38bdf8' }}>TXT (SPF)</td>
+                      <td style={{ padding: '8px 10px', fontFamily: 'monospace' }}>@ (o bluecode-ltd.com)</td>
+                      <td style={{ padding: '8px 10px', fontFamily: 'monospace' }}>v=spf1 include:register.it ~all</td>
+                      <td style={{ padding: '8px 10px', color: '#34d399', fontWeight: 700 }}>✓ Conforme</td>
+                    </tr>
+                    <tr style={{ borderBottom: '1px solid #1e293b' }}>
+                      <td style={{ padding: '8px 10px', fontWeight: 700, color: '#a78bfa' }}>TXT (DMARC)</td>
+                      <td style={{ padding: '8px 10px', fontFamily: 'monospace' }}>_dmarc</td>
+                      <td style={{ padding: '8px 10px', fontFamily: 'monospace' }}>v=DMARC1; p=none; rua=mailto:support@bluecode-ltd.com</td>
+                      <td style={{ padding: '8px 10px', color: '#34d399', fontWeight: 700 }}>✓ Conforme</td>
+                    </tr>
+                    <tr style={{ borderBottom: '1px solid #1e293b' }}>
+                      <td style={{ padding: '8px 10px', fontWeight: 700, color: '#fbbf24' }}>MX (Mail)</td>
+                      <td style={{ padding: '8px 10px', fontFamily: 'monospace' }}>@</td>
+                      <td style={{ padding: '8px 10px', fontFamily: 'monospace' }}>mail.register.it (Priorità 10)</td>
+                      <td style={{ padding: '8px 10px', color: '#34d399', fontWeight: 700 }}>✓ Conforme</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* 🟢 WHATSAPP BUSINESS API */}
+            <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 16 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#34d399', marginBottom: 4, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>🟢 WhatsApp Business API (Meta Cloud Official Integration)</span>
+                <button
+                  type="button"
+                  onClick={() => handleTestChannel('whatsapp')}
+                  disabled={testingChannel === 'whatsapp'}
+                  style={{ background: '#065f46', color: '#fff', border: 'none', padding: '5px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+                >
+                  {testingChannel === 'whatsapp' ? 'Testing...' : '🧪 Test WhatsApp API'}
+                </button>
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 12 }}>
+                Ricezione webhook messaggi e risposte dirette da cellulare. (Primi 1.000 messaggi/mese GRATUITI).
+              </div>
+
+              {channelTestResult['whatsapp'] && (
+                <div style={{ padding: 10, borderRadius: 8, fontSize: 11.5, marginBottom: 12, background: '#0d2d22', color: '#34d399', border: '1px solid #059669' }}>
+                  {channelTestResult['whatsapp']}
+                </div>
+              )}
+
+              <div className={styles.grid2}>
+                <div className={styles.field}>
+                  <label>WhatsApp Phone Number ID (Meta *):</label>
+                  <input type="text" value={waPhoneId} onChange={e => setWaPhoneId(e.target.value)} style={{ fontSize: 12 }} />
+                </div>
+                <div className={styles.field}>
+                  <label>Webhook Verify Token (Secret *):</label>
+                  <input type="text" value={waVerifyToken} onChange={e => setWaVerifyToken(e.target.value)} style={{ fontSize: 12 }} />
+                </div>
+              </div>
+              <div className={styles.field} style={{ marginTop: 10 }}>
+                <label>Meta System User Access Token (Permanent *):</label>
+                <input type="password" value={waAccessToken} onChange={e => setWaAccessToken(e.target.value)} style={{ fontSize: 12 }} />
+              </div>
+            </div>
+
+            {/* ✈️ TELEGRAM BOT API */}
+            <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 16 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#38bdf8', marginBottom: 4, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>✈️ Telegram Bot API (100% GRATUITO)</span>
+                <button
+                  type="button"
+                  onClick={() => handleTestChannel('telegram')}
+                  disabled={testingChannel === 'telegram'}
+                  style={{ background: '#075985', color: '#fff', border: 'none', padding: '5px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+                >
+                  {testingChannel === 'telegram' ? 'Testing...' : '🧪 Test Telegram Bot'}
+                </button>
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 12 }}>
+                Crea un bot con @BotFather ed incolla il Token per ricevere messaggi ed allegati dai clienti.
+              </div>
+
+              {channelTestResult['telegram'] && (
+                <div style={{ padding: 10, borderRadius: 8, fontSize: 11.5, marginBottom: 12, background: '#0c2a3a', color: '#38bdf8', border: '1px solid #0284c7' }}>
+                  {channelTestResult['telegram']}
+                </div>
+              )}
+
+              <div className={styles.grid2}>
+                <div className={styles.field}>
+                  <label>Bot Username Telegram *:</label>
+                  <input type="text" value={tgBotUsername} onChange={e => setTgBotUsername(e.target.value)} style={{ fontSize: 12 }} />
+                </div>
+                <div className={styles.field}>
+                  <label>Bot Access Token (@BotFather *):</label>
+                  <input type="password" value={tgBotToken} onChange={e => setTgBotToken(e.target.value)} style={{ fontSize: 12 }} />
+                </div>
+              </div>
+            </div>
+
+            {/* ✉️ EMAIL INBOUND PARSE */}
+            <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 16 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#818cf8', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span>✉️ Email Inbound Webhook Parse (SendGrid / SMTP)</span>
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 12 }}>
+                Tutte le email inviate all'indirizzo dello studio vengono catturate dal webhook ed collegate al Progetto del Cliente.
+              </div>
+              <div className={styles.field}>
+                <label>Webhook URL Inbound Parse Endpoint:</label>
+                <input type="text" value={emailInboundParseUrl} onChange={e => setEmailInboundParseUrl(e.target.value)} style={{ fontSize: 12 }} readOnly />
+              </div>
+            </div>
+
+            {/* 🔒 SIGNAL END-TO-END */}
+            <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 16 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#a5b4fc', marginBottom: 4, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>🔒 Signal End-to-End Encrypted Daemon</span>
+                <button
+                  type="button"
+                  onClick={() => handleTestChannel('signal')}
+                  disabled={testingChannel === 'signal'}
+                  style={{ background: '#312e81', color: '#fff', border: 'none', padding: '5px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+                >
+                  {testingChannel === 'signal' ? 'Testing...' : '🧪 Test Signal Daemon'}
+                </button>
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 12 }}>
+                Connessione al container Docker `signal-cli-rest-api` per clienti VIP ad altissima riservatezza.
+              </div>
+
+              {channelTestResult['signal'] && (
+                <div style={{ padding: 10, borderRadius: 8, fontSize: 11.5, marginBottom: 12, background: '#1e1b4b', color: '#a5b4fc', border: '1px solid #4338ca' }}>
+                  {channelTestResult['signal']}
+                </div>
+              )}
+
+              <div className={styles.field}>
+                <label>Signal REST Daemon API Endpoint:</label>
+                <input type="text" value={signalCliEndpoint} onChange={e => setSignalCliEndpoint(e.target.value)} style={{ fontSize: 12 }} />
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
+            <button type="submit" className={styles.saveBtn}>
+              💾 Salva Credenziali Canali
+            </button>
+          </div>
+        </form>
+  );
+}
