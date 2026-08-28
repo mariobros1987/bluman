@@ -241,3 +241,9 @@ Aggiungere eventualmente il valore `verbale_disponibile` all'enum informale di `
 1. ✅ **Risolto (Punto 1, 27/08/2026)** — Prima il PDF era fabbricato **client-side** con **jsPDF** (`frontend/src/utils/pdfGenerator.ts`, `generateRealPdfBase64`/`downloadRealPdf`) e il Word era uno stub `.doc` ricostruito dall'HTML (`downloadRealWordDoc`/`scaricaDocumentoWordClient`). Ora la generazione è **server-side**: motore unico `src/services/generazioneDocumenti.ts` con **pdfkit** (PDF) + **docxtemplater** (Word) dallo stesso array di blocchi, invocato da `POST /documenti/genera`. Niente LibreOffice su Railway.
 2. ✅ **Risolto (Punto 2, 27/08/2026)** — Non esiste job/queue asincrono: la generazione del verbale è **sincrona dentro la richiesta di firma** (volumi bassi); un fallimento viene loggato e non invalida la firma.
 3. ✅ **Risolto (Punto 4, 27/08/2026)** — `Notifica` **non ha dispatcher esterni**: il campo `canale` è sempre `'in_app'` (hardcoded in `notificaStudio`/`notificaCliente`/`notificaStudioSilenziosa`). Il DB è la fonte di verità (chi non è connesso ritrova le righe al prossimo accesso), lo stream SSE è la scorciatoia real-time. I canali email/WhatsApp/Telegram esistono **solo per l'OTP** via `otpService` — la riga 6 della matrice è infatti `n/a`.
+
+---
+
+## Prossimo capitolo — Piano Firma Legale (28/08/2026)
+
+I 4 punti operativi sopra sono chiusi. L'audit della **sezione 4 dello spec** (SES/FEA/FEQ) ha però aperto un capitolo nuovo: il backend etichetta ancora come **FEA** firme che sono **SES** (DB, audit log, verbale PDF, email OTP — il frontend è già corretto dal commit `0509f96`). Il piano completo — matrice delle contraddizioni, schema `livelloFirmaRichiesto`/`valoreLegale`, enforcement server-side, fasi FEA/FEQ — è in **`piano-firma-legale-ses-fea-feq.md`**. In attesa delle decisioni del titolare (domande in §6 di quel file).
