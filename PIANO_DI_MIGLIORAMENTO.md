@@ -449,6 +449,28 @@ server.get('/health', async (_req, reply) => {
 
 ---
 
+### 1.5 🔴 Upload documenti microvoce: 413 ingoiato e documento fantasma — ✅ RISOLTO (2026-08-28)
+
+**Problema** (segnalazione del titolare): nel modale della microvoce l'anteprima mostrava «Nessun file fisico collegato o documento generato localmente» e dal portale cliente il file selezionato dall'operatore non risultava mai caricato.
+
+**Causa**: catena di tre guasti, non uno solo.
+1. Fastify aveva il `bodyLimit` di default (1 MiB): gli upload viaggiano come JSON con il file in base64, quindi ogni allegato >~750 KB produceva un corpo >1 MiB e veniva respinto con **413 prima ancora di raggiungere la rotta** (`FST_ERR_CTP_BODY_TOO_LARGE`). Il limite vale per tutti i parser, incluso quello JSON personalizzato con `parseAs: 'string'`.
+2. In `PassaggioModal.tsx`, `eseguiSalvataggioConfigurato` ingoiava l'errore in un `catch` silenzioso (`console.warn`), creava comunque la voce documento in stato locale con `fileUrl: undefined`, e mostrava l'alert «✓ collegato con successo» — un falso successo. La riga a DB non veniva mai creata, quindi il portale cliente restava vuoto.
+3. L'upload su Supabase Storage dichiarava `Content-Type: application/pdf` per ogni file: i .docx e le scansioni .jpg venivano serviti col MIME sbagliato e l'anteprima iframe non riusciva ad aprirli.
+
+Non erano bug: il default `statoDoc: 'bozza'` rende il documento invisibile al portale finché l'operatore non preme «Pubblica al Cliente» (by design).
+
+**Risoluzione**:
+- `src/server.ts`: `bodyLimit: 45 * 1024 * 1024` sull'istanza Fastify. Il vero tetto ai file resta lo scanner di sicurezza (§28: max 30 MB); 45 MiB copre i ~40 MB di corpo base64 di un file da 30 MB più l'involucro JSON.
+- `src/services/storageService.ts`: nuova funzione `mimeDaEstensione()` — il Content-Type dichiarato a Supabase Storage segue l'estensione reale; i tipi non riconosciuti ricadono su `application/octet-stream`. Inoltre `nomeFileSicuro()` ora collassa le sequenze di punti: un nome d'origine come `../../etc/passwd` diventava `.._.._etc_passwd` — caratteri ammessi ma contenente `..`, che `nomeFileValido` rifiuta in lettura, lasciando il file scritto ma irrecuperabile. La divergenza è stata scoperta dai nuovi test `src/services/storageService.test.ts` (che verificano l'invariante scrittura→lettura).
+- `frontend/src/components/PassaggioModal.tsx`: `eseguiSalvataggioConfigurato` ora ha i guard `!effProgettoId` e `!tmpl && !fileBase64` (alert + return), e il `catch` mostra il messaggio reale del backend e si ferma — nessun documento fantasma, nessun alert di falso successo; la finestra di configurazione resta aperta per il retry. `handleFileUploadPassaggio` e `handleFileNuovaVersione` rifiutano subito i file >30 MB prima di codificarli.
+
+**Verifica**: `npx tsc -b` frontend EXIT 0; `npx vitest run` 360/360 (27 file).
+
+**Nota per l'operazione**: su Railway devono essere impostate `SUPABASE_URL` e `SUPABASE_SERVICE_KEY`, altrimenti i file finiscono sul disco effimero del container e si perdono a ogni redeploy. I documenti già salvati come bozza restano invisibili al portale finché non vengono pubblicati (comportamento corretto).
+
+---
+
 ## 4. FASE 2 — Refactoring Archititettrale
 
 > **Obiettivo**: Rendere il codice manutengile e testabile.

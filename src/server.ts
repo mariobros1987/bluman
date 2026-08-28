@@ -71,6 +71,15 @@ export function buildServer(app: AppPort): FastifyInstance {
     // (verificato in produzione: 401 anche al 6° tentativo di login). Fidandosi del proxy,
     // Fastify risolve `req.ip` dal primo salto di `x-forwarded-for`, cioè il client reale.
     trustProxy: process.env.NODE_ENV === 'production',
+    // §21 — il default di Fastify è 1 MiB: ogni corpo più grande viene rifiutato con 413
+    // PRIMA di raggiungere la rotta (vale anche per il parser JSON personalizzato qui
+    // sotto, che eredita il limite dell'istanza). Gli upload dei documenti viaggiano come
+    // JSON con il file in base64: un allegato di 1 MB diventa ~1,4 MB di corpo e veniva
+    // respinto — il frontend incassava il 413 senza dirlo e il documento risultava
+    // «collegato» senza nessun file dietro. Il tetto dello scanner (§28) è 30 MB di file,
+    // che in base64 diventano ~40 MB di corpo: 45 MiB lascia margine per l'involucro
+    // JSON restando la scansione il vero limite ai file.
+    bodyLimit: 45 * 1024 * 1024,
   });
 
   // Supporta body vuoti con Content-Type: application/json (es. richieste DELETE, POST senza payload)

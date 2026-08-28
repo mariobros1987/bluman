@@ -24,9 +24,17 @@ const CARATTERI_VIETATI = /[^a-zA-Z0-9_.-]/;
 // esiti alternati sullo stesso input.
 const CARATTERI_VIETATI_TUTTI = new RegExp(CARATTERI_VIETATI.source, 'g');
 
-/** Sanifica in scrittura: qualunque cosa arrivi, diventa un nome innocuo. */
+/**
+ * Sanifica in scrittura: qualunque cosa arrivi, diventa un nome innocuo.
+ *
+ * Anche le sequenze di punti vengono collassate: il punto è un carattere ammesso, ma
+ * un nome d'origine come `../../etc/passwd` resterebbe `.._.._etc_passwd` — ancora
+ * contenente `..`, che `nomeFileValido` rifiuta in lettura. Il file finirebbe scritto
+ * ma irrecuperabile: la stessa divergenza fra le due metà che questa coppia di funzioni
+ * deve impedire.
+ */
 export function nomeFileSicuro(filename: string): string {
-  return filename.replace(CARATTERI_VIETATI_TUTTI, '_');
+  return filename.replace(CARATTERI_VIETATI_TUTTI, '_').replace(/\.{2,}/g, '_');
 }
 
 /**
@@ -39,6 +47,39 @@ export function nomeFileValido(filename: string): boolean {
   if (!filename || filename.length > 255) return false;
   if (filename.includes('..')) return false;
   return !CARATTERI_VIETATI.test(filename);
+}
+
+/**
+ * §21 — il MIME dichiarato a Supabase Storage in base all'estensione.
+ *
+ * Prima era `application/pdf` per ogni upload: un .docx o una scansione .jpg venivano
+ * custoditi dichiarando di essere PDF, quindi l'URL pubblico li serviva nel formato
+ * sbagliato e l'anteprima del fascicolo non riusciva ad aprirli. I tipi non riconosciuti
+ * ricadono su `application/octet-stream`, che il browser scarica senza tentare di
+ * interpretarli.
+ */
+export function mimeDaEstensione(filename: string): string {
+  const mappa: Record<string, string> = {
+    '.pdf': 'application/pdf',
+    '.doc': 'application/msword',
+    '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    '.xls': 'application/vnd.ms-excel',
+    '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.gif': 'image/gif',
+    '.webp': 'image/webp',
+    '.svg': 'image/svg+xml',
+    '.txt': 'text/plain; charset=utf-8',
+    '.html': 'text/html; charset=utf-8',
+    '.xml': 'application/xml',
+    '.csv': 'text/csv; charset=utf-8',
+    '.p7m': 'application/pkcs7-mime',
+    '.zip': 'application/zip',
+    '.eml': 'message/rfc822',
+  };
+  return mappa[path.extname(filename).toLowerCase()] ?? 'application/octet-stream';
 }
 
 export async function uploadDocumento(filename: string, contentBase64: string): Promise<UploadResult> {
@@ -58,7 +99,7 @@ export async function uploadDocumento(filename: string, contentBase64: string): 
         headers: {
           'Authorization': `Bearer ${supabaseKey}`,
           'apikey': supabaseKey,
-          'Content-Type': 'application/pdf',
+          'Content-Type': mimeDaEstensione(filename),
         },
         body: buffer,
       });

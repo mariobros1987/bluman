@@ -161,48 +161,64 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
     const rawFilename = titolo.trim() || (tmpl ? `${tmpl.titolo} — ${project.cl}.pdf` : file?.name || 'Documento.pdf');
     const formattedName = tmpl ? rawFilename.replace(/\.docx?$/i, '.pdf') : rawFilename;
 
+    // §21 — l'archiviazione a DB non è un dettaglio opzionale: è l'operazione che
+    // l'operatore sta chiedendo. Prima un errore dell'API (file più grande di quanto il
+    // server accettasse, sessione scaduta, API non raggiungibile) veniva ingoiato e il
+    // flusso proseguiva creando una voce locale senza nessun file dietro: l'anteprima
+    // mostrava «Nessun file fisico collegato» e il portale cliente restava vuoto.
+    // Ora il flusso si ferma al primo errore mostrando il motivo riferito dal backend.
+    if (!effProgettoId) {
+      alert('❌ Archiviazione non riuscita: il fascicolo non ha un ID di database.\nRiapri la pratica e riprova; se succede di nuovo verifica la connessione alle API.');
+      return;
+    }
+    if (!tmpl && !fileBase64) {
+      alert('❌ Nessun file da archiviare: scegli un documento dal disco oppure un modello dello studio.');
+      return;
+    }
+
     let dbId: string | undefined;
     let savedFileUrl: string | undefined;
 
-    if (effProgettoId) {
-      try {
-        if (tmpl && !fileBase64) {
-          // §Punto-1 — generazione server-side: lo stesso merge produce PDF (master, sigillo
-          // legale) e Word (.docx, copia per firma autografa). Il template viaggia con i
-          // placeholder {{...}} irrisolti: la risoluzione avviene sul server dai dati
-          // autorevoli di DB (tenant, cliente, progetto), non dallo snapshot localStorage.
-          // `DocumentTemplate` dichiara `contenutoHtml`: `tmpl.html` non esiste.
-          const rawHtml = tmpl.contenutoHtml || '';
-          const salvato = await generaDocumentoApi({
-            progettoId: effProgettoId,
-            microvoceProgettoId: effMicrovoceId,
-            contenutoHtml: rawHtml || `<p>${formattedName.replace(/\.pdf$/i, '')}</p>`,
-            titolo: formattedName.replace(/\.pdf$/i, ''),
-            categoriaDoc: tmpl.categoria || 'Allegati Microvoce',
-            statoDoc,
-            dataScadenzaDoc: dataScadenzaDoc || undefined,
-          });
-          dbId = salvato.id;
-          savedFileUrl = salvato.fileUrl;
-        } else {
-          // Upload manuale di un file dell'operatore: resta nel formato originale (allegato),
-          // senza doppio formato generato.
-          const salvato = await salvaDocumentoApi({
-            progettoId: effProgettoId,
-            microvoceProgettoId: effMicrovoceId,
-            filename: formattedName,
-            contentBase64: fileBase64 || '',
-            categoriaDoc: tmpl?.categoria || 'Allegati Microvoce',
-            statoDoc,
-            dataScadenzaDoc: dataScadenzaDoc || undefined,
-            tipo: richiedeFirma ? 'allegato' : 'compilato',
-          });
-          dbId = salvato.id;
-          savedFileUrl = salvato.fileUrl;
-        }
-      } catch (err: any) {
-        console.warn('Errore salvataggio documento a DB:', err);
+    try {
+      if (tmpl && !fileBase64) {
+        // §Punto-1 — generazione server-side: lo stesso merge produce PDF (master, sigillo
+        // legale) e Word (.docx, copia per firma autografa). Il template viaggia con i
+        // placeholder {{...}} irrisolti: la risoluzione avviene sul server dai dati
+        // autorevoli di DB (tenant, cliente, progetto), non dallo snapshot localStorage.
+        // `DocumentTemplate` dichiara `contenutoHtml`: `tmpl.html` non esiste.
+        const rawHtml = tmpl.contenutoHtml || '';
+        const salvato = await generaDocumentoApi({
+          progettoId: effProgettoId,
+          microvoceProgettoId: effMicrovoceId,
+          contenutoHtml: rawHtml || `<p>${formattedName.replace(/\.pdf$/i, '')}</p>`,
+          titolo: formattedName.replace(/\.pdf$/i, ''),
+          categoriaDoc: tmpl.categoria || 'Allegati Microvoce',
+          statoDoc,
+          dataScadenzaDoc: dataScadenzaDoc || undefined,
+        });
+        dbId = salvato.id;
+        savedFileUrl = salvato.fileUrl;
+      } else {
+        // Upload manuale di un file dell'operatore: resta nel formato originale (allegato),
+        // senza doppio formato generato.
+        const salvato = await salvaDocumentoApi({
+          progettoId: effProgettoId,
+          microvoceProgettoId: effMicrovoceId,
+          filename: formattedName,
+          contentBase64: fileBase64 || '',
+          categoriaDoc: tmpl?.categoria || 'Allegati Microvoce',
+          statoDoc,
+          dataScadenzaDoc: dataScadenzaDoc || undefined,
+          tipo: richiedeFirma ? 'allegato' : 'compilato',
+        });
+        dbId = salvato.id;
+        savedFileUrl = salvato.fileUrl;
       }
+    } catch (err: any) {
+      // §21 — nessun documento fantasma: la finestra di configurazione resta aperta e
+      // l'operatore può riprovare subito (per esempio con un file più piccolo).
+      alert(`❌ Archiviazione del documento non riuscita:\n${err?.message ?? 'Errore sconosciuto'}\n\nIl documento NON è stato collegato al fascicolo.`);
+      return;
     }
 
     const newDoc: DocumentoEntry = {
@@ -414,6 +430,14 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
     const file = e.target.files?.[0];
     if (!file || !versionTargetDocId) return;
     e.target.value = '';
+
+    // §21 — stesso tetto dello scanner di sicurezza lato server (§28): oltre 30 MB il
+    // file verrebbe comunque rifiutato, meglio non spedire ~40 MB di base64 inutilmente.
+    if (file.size > 30 * 1024 * 1024) {
+      alert(`❌ "${file.name}" supera il limite massimo di 30 MB per i documenti del fascicolo.`);
+      return;
+    }
+
     setUploadingDoc(true);
 
     try {
@@ -456,6 +480,14 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = '';
+
+    // §21 — lo scanner di sicurezza lato server rifiuta i file oltre 30 MB (§28):
+    // respingerli qui evita di codificare e spedire inutilmente ~40 MB di base64
+    // che il server scarterebbe comunque.
+    if (file.size > 30 * 1024 * 1024) {
+      alert(`❌ "${file.name}" supera il limite massimo di 30 MB per i documenti del fascicolo.`);
+      return;
+    }
 
     try {
       const base64 = await new Promise<string>((resolve, reject) => {
