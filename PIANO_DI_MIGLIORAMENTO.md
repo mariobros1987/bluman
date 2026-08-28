@@ -550,7 +550,7 @@ Split puramente presentazionale: nessun cambio di comportamento, `App.tsx` invar
 **Progresso**:
 - ✅ `ProjectDetail.tsx` (28/08/2026, commit `8a19b6f`): da 3.377 a 883 righe. La pagina mantiene stato, handler ed effetti; estratti 10 componenti in `frontend/src/components/projectDetail/` (`HeaderProgetto`, `ModuliTab`, `DocumentiTab`, `CalendarioProgettoTab`, `RedditivitaTab`, `StoricoContrattiTab`, `RichiesteAddendumTab`, `GrafoModuliProgettoView`, `ModalAccessiProgetto` + `documentiUtils.ts`). `FatturazioneTab` e `ModuloBlock` erano già stati estratti in `15a630d`. `npx tsc -b` verde.
 - ✅ `Library.tsx` (28/08/2026, commit `dbc8358`): da 2.879 a 449 righe. I 6 componenti già autonomi nel monolite traslocati in `frontend/src/components/library/` (`AssegnaModuloClienteModal`, `ArticoliCatalogView`, `GiurisdizioniView`, `LibreriaDocumentiEForm`, `NuovoArticoloModal`, `CreaModuloForm`); corpi byte-identici, nessun import circolare, `tsc -b` verde. `LibreriaDocumentiEForm` (730 righe) resta candidato a un futuro frazionamento.
-- ⏳ `api/client.ts` — split per dominio con barrel export in corso (28/08/2026).
+- ✅ `api/client.ts` (28/08/2026, commit `f50cc8f`): da 2.792 righe a 13 file dominio + `http.ts` (helper condivisi) in `frontend/src/api/` — `auth`, `clienti`, `progetti`, `documenti`, `libreria`, `fatturazione`, `portale`, `firma`, `tenant`, `notifiche`, `report`, `timesheet`. `client.ts` diventa barrel (14 righe): tutti i 151 export originali conservati, zero import da aggiornare nel resto del codebase. Corpi byte-identici (verifica multiset), `tsc -b` verde.
 - ⏸ Coda: `SettingsPage.tsx`, `PassaggioModal.tsx`, `DocumentEditorPage.tsx`, `ClientsPage.tsx`.
 
 ---
@@ -885,7 +885,7 @@ REDIS_URL=
 ### FASE 2 — Refactoring (1-2 settimane)
 - [x] 2.1 Spezzare server.ts in moduli route (27/08/2026, commit da 246d313 a 05c3d7e)
 - [x] 2.1b Split frontend ClientPortal.tsx (28/08/2026, commit 6aee803)
-- [ ] 2.1c Split frontend altri monoliti (ProjectDetail ✅ 8a19b6f; Library, api/client.ts, SettingsPage, PassaggioModal, DocumentEditorPage, ClientsPage)
+- [ ] 2.1c Split frontend altri monoliti (ProjectDetail ✅ 8a19b6f; Library ✅ dbc8358; api/client.ts ✅ f50cc8f; restano: SettingsPage, PassaggioModal, DocumentEditorPage, ClientsPage)
 - [ ] 2.2 Validazione Zod su tutti gli endpoint
 - [ ] 2.3 Tipizzare FastifyRequest
 - [ ] 2.4 Eliminare `as any` residui
@@ -930,5 +930,5 @@ REDIS_URL=
 
 ---
 
-*Ultimo aggiornamento: 2026-08-28 (split monoliti frontend §2.1c: `ProjectDetail.tsx` da 3.377 a 883 righe con 10 componenti in `components/projectDetail/`, commit `8a19b6f`; `Library.tsx` in corso; deploy frontend aggiornato su Vercel. Precedente: Punto 3 del piano gap firma documenti chiuso — archiviazione soft dei firmati con migrazione additiva 20260827180000, `PATCH /documenti/:id/archivia`, hard delete vietato anche all'admin con 409, pulsante «📦 Archivia»; fix produzione eliminazione moduli — guard 409 + transazione ordinata; etichette firma declassate a «Firma Elettronica Semplice (OTP verificata) · art. 20 CAD»; più ciclo §WF-DOC firma/sblocco/tracciabilità, firma OTP vera per la conclusione operazione e CI GitHub Actions completa; 298 test in 23 file)*
+*Ultimo aggiornamento: 2026-08-28 (split monoliti frontend §2.1c: `ProjectDetail.tsx` commit `8a19b6f`, `Library.tsx` commit `dbc8358`, `api/client.ts` da 2.792 righe a 13 file dominio + barrel con commit `f50cc8f`; restano in coda `SettingsPage`, `PassaggioModal`, `DocumentEditorPage`, `ClientsPage`. Deploy frontend aggiornato su Vercel. Precedente: Punto 3 del piano gap firma documenti chiuso — archiviazione soft dei firmati con migrazione additiva 20260827180000, `PATCH /documenti/:id/archivia`, hard delete vietato anche all'admin con 409, pulsante «📦 Archivia»; fix produzione eliminazione moduli — guard 409 + transazione ordinata; etichette firma declassate a «Firma Elettronica Semplice (OTP verificata) · art. 20 CAD»; più ciclo §WF-DOC firma/sblocco/tracciabilità, firma OTP vera per la conclusione operazione e CI GitHub Actions completa; 298 test in 23 file)*
 *Prossima revisione: dopo completamento Fase 2 (refactoring server.ts)*
