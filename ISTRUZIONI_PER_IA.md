@@ -191,7 +191,7 @@ Leggiti i file .agents/AGENTS.md, README.md ed ISTRUZIONI_INSTALLAZIONE.md prima
 - **`frontend/src/pages/ProjectDetail.tsx`**: Dettaglio Progetto con Grafo Moduli (`GrafoModuliProgettoView`), Comunicazioni Omnichannel, Fatture/NC e Scadenze microvoci.
 - **`frontend/src/pages/DocumentEditorPage.tsx`**: Studio Document Studio (Word WYSIWYG, Smart Tags ERP, Foglio A4, PDF) con selettore micro-voce di destinazione e «Percorso del documento».
 - **`frontend/src/pages/Library.tsx`**: Distinta Base, Catalogo Articoli, Modelli Documenti ed Editing Prezzi Unitari.
-- **`frontend/src/pages/ClientPortal.tsx`**: Portale Cliente a 6 schede (Proposta & Firma con OTP, Live Progress, Form Societari, Documenti & Contratti, Chat & Comunicazioni, Profilo & Password) con cronologia versioni a ritroso §WF-DOC (`versioniPrecedenti[]`).
+- **`frontend/src/pages/ClientPortal.tsx`**: Portale Cliente a 7 schede (Proposta & Firma con OTP, Avanzamento, Form Societari, Documenti & Contratti, Fatture, Chat & Comunicazioni, Profilo & Password) con cronologia versioni a ritroso §WF-DOC (`versioniPrecedenti[]`). Dopo lo split del 28/08/2026 (commit `6aee803`) questo file tiene solo stato, handler ed effetti; il JSX vive nei 18 componenti presentazionali di **`frontend/src/components/portal/`** (login, 7 tab, 6 modali, `types.ts`/`mapPortalModules.ts`/`format.ts`/`styles.ts`).
 - **`frontend/src/pages/InvoicesPage.tsx`**: Registro Fatture/NC ed Export XML SDI FatturaPA.
 - **`frontend/src/pages/PrimaNotaPage.tsx`**: Registro Prima Nota, Movimenti Cassa/Banca e Riconciliazione CSV.
 - **`frontend/src/pages/RetainersPage.tsx`**: Contratti Ricorrenti & Retainer Studio periodici.

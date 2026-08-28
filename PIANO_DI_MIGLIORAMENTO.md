@@ -511,6 +511,44 @@ export async function authGuardPlugin(server: FastifyInstance) {
 
 ---
 
+### 2.1b ✅ Split frontend: `ClientPortal.tsx` — COMPLETATO (28/08/2026)
+
+**Problema**: `frontend/src/pages/ClientPortal.tsx` era il monolite più grande del frontend (4.668 righe): login, 7 tab, 6 modali e tutto lo stato del portale cliente in un solo file.
+
+**Risoluzione**: fatto il 28/08/2026 (commit `6aee803`). `ClientPortal.tsx` è passato da 4.668 a 1.890 righe: mantiene **tutto lo stato** (useState), gli handler async e gli useEffect; il JSX è migrato in 18 componenti presentazionali in `frontend/src/components/portal/`:
+
+```
+components/portal/
+├── types.ts               → tipi condivisi del portale (NotificaPortale, ModuloProposta, PortalTab, BersaglioFirma…)
+├── mapPortalModules.ts    → mapProjectToPortalModules
+├── format.ts              → dataOraLeggibile
+├── styles.ts              → stili condivisi (portalWrapper, topNav, heroBanner, tabsBar, docBox…)
+├── PortalLogin.tsx        → schermata di accesso (credenziali + magic link)
+├── TabProposta.tsx        → tab proposta/incarico + addendum
+├── TabAvanzamento.tsx     → tab avanzamento moduli
+├── TabForm.tsx            → tab form proposta dati
+├── TabDocumenti.tsx       → tab vault documenti + firma
+├── TabFatture.tsx         → tab fatture
+├── TabContatti.tsx        → tab contatti studio
+├── TabProfilo.tsx         → tab profilo + cambio password
+├── FirmaOtpModal.tsx      → modale OTP della firma SES
+├── DocumentViewerModal.tsx→ viewer A4 pre-firma
+├── ModificaDocModal.tsx   → richiesta modifiche documento
+├── SuccessSealModal.tsx   → attestazione/ricevuta di firma
+├── InvioManualeModal.tsx  → conferma invio firma a penna/qualificata esterna
+└── DettaglioModuloModal.tsx→ dettaglio attività modulo + firma conclusione
+```
+
+Split puramente presentazionale: nessun cambio di comportamento, `App.tsx` invariato (`<Route path="/portal" element={<ClientPortal />} />`), `npx tsc -b` verde. Restano da spezzare gli altri monoliti frontend (§2.1c).
+
+### 2.1c ⏳ Split frontend: gli altri monoliti — IN CORSO
+
+**Problema**: restano file frontend sopra le ~1.300 righe: `ProjectDetail.tsx` (3.377), `Library.tsx` (2.879), `api/client.ts` (2.792), `SettingsPage.tsx` (1.905), `PassaggioModal.tsx` (1.801), `DocumentEditorPage.tsx` (1.552), `ClientsPage.tsx` (1.384).
+
+**Approccio**: stesso metodo di §2.1b — estrazione presentazionale (stato e logica restano nel padre), un file alla volta, `npx tsc -b` dopo ogni estrazione. `api/client.ts` è un caso a parte: non è JSX ma un catalogo di funzioni API, si spezza per dominio (clienti, progetti, documenti, portale, firma…) mantenendo la barrel export per non rompere gli import esistenti.
+
+---
+
 ### 2.2 🔴 Validazione input con Zod
 
 **Problema**: La validazione degli input è manuale e sparsa. Ogni endpoint fa i propri controlli `if (!email || !password)`. Manca una validazione strutturata di tipi, lunghezze, formati.
