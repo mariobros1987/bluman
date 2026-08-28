@@ -42,6 +42,11 @@ export function DocumentEditorPage() {
   const [newTmplTitolo, setNewTmplTitolo] = useState('');
   const [newTmplCat, setNewTmplCat] = useState<'societario' | 'contratto' | 'nda' | 'engagement' | 'delega' | 'fiscale' | 'trust' | 'compliance'>('societario');
   const [newTmplDesc, setNewTmplDesc] = useState('');
+  /**
+   * Piano firma §3 — livello legale (ses|fea|feq) che il nuovo Modello Master esigerà.
+   * Di default 'ses': comportamento storico, nessuna sorpresa per l'operatore.
+   */
+  const [newTmplLivello, setNewTmplLivello] = useState<'ses' | 'fea' | 'feq'>('ses');
 
   const [clienti, setClienti] = useState<Cliente[]>([]);
   const [progetti, setProgetti] = useState<Progetto[]>([]);
@@ -72,6 +77,12 @@ export function DocumentEditorPage() {
   const [titoloDocumento, setTitoloDocumento] = useState(initialTmpl.titolo);
   const [categoria, setCategoria] = useState<string>(initialTmpl.categoria);
   const [tagDisplayMode, setTagDisplayMode] = useState<'highlight' | 'plain' | 'raw'>('highlight');
+  /**
+   * Piano firma §3 — livello legale (ses|fea|feq) che il documento corrente esige.
+   * Ereditato dal template selezionato in handleSelectTemplate, salvato su ogni
+   * newVaultDoc/salvaDocumentoApi e su ogni master creato con "Salva come Modello".
+   */
+  const [livelloFirmaDoc, setLivelloFirmaDoc] = useState<'ses' | 'fea' | 'feq'>('ses');
 
   const [salvando, setSalvando] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -347,6 +358,8 @@ export function DocumentEditorPage() {
     setSelectedTemplateId(tmpl.id);
     setTitoloDocumento(tmpl.titolo);
     setCategoria(tmpl.categoria);
+    // Piano firma §3 — il documento eredita il livello legale richiesto dal template.
+    setLivelloFirmaDoc(tmpl.livelloFirmaRichiesto ?? 'ses');
     rawTemplateRef.current = tmpl.contenutoHtml;
     if (editorRef.current) {
       editorRef.current.innerHTML = renderResolvedContent(tmpl.contenutoHtml);
@@ -362,6 +375,8 @@ export function DocumentEditorPage() {
       id: `tmpl-custom-${Date.now()}`,
       titolo: newTmplTitolo.trim(),
       categoria: newTmplCat,
+      // Piano firma §3 — livello scelto dall'operatore nel modale di creazione.
+      livelloFirmaRichiesto: newTmplLivello,
       descrizione: newTmplDesc.trim() || 'Modello master personalizzato salvato nello studio.',
       contenutoHtml: `
 <h1 style="text-align: center; color: #1e1b4b; margin-bottom: 20px; font-size: 19px; text-transform: uppercase;">
@@ -404,6 +419,8 @@ export function DocumentEditorPage() {
       setShowNewTmplModal(false);
       setNewTmplTitolo('');
       setNewTmplDesc('');
+      // Piano firma §3 — il modale riparte sempre dal default legale.
+      setNewTmplLivello('ses');
       setFeedback(`✓ Nuovo Modello Master "${newTmpl.titolo}" creato e salvato con successo!`);
     } catch (err: any) {
       const updated = getAllTemplates();
@@ -424,6 +441,8 @@ export function DocumentEditorPage() {
       id: `tmpl-custom-${Date.now()}`,
       titolo: name.trim(),
       categoria: (categoria as any) || 'societario',
+      // Piano firma §3 — il master eredita il livello legale del documento corrente.
+      livelloFirmaRichiesto: livelloFirmaDoc,
       descrizione: `Modello master derivato da "${titoloDocumento}" salvato in data ${new Date().toLocaleDateString('it-IT')}.`,
       contenutoHtml: currentHtml,
     };
@@ -457,6 +476,8 @@ export function DocumentEditorPage() {
           id: `tmpl-pdf-${Date.now()}`,
           titolo: tmplName,
           categoria: 'societario',
+          // Piano firma §3 — nessuna scelta utente sull'import: default legale esplicito.
+          livelloFirmaRichiesto: 'ses',
           descrizione: `Documento PDF importato: "${file.name}".`,
           contenutoHtml: `
 <div style="font-family: Arial, sans-serif; max-width: 850px; margin: 0 auto; color: #1e293b;">
@@ -511,6 +532,8 @@ export function DocumentEditorPage() {
           id: `tmpl-custom-${Date.now()}`,
           titolo: tmplName,
           categoria: 'societario',
+          // Piano firma §3 — nessuna scelta utente sull'import: default legale esplicito.
+          livelloFirmaRichiesto: 'ses',
           descrizione: `Modello importato da file "${file.name}".`,
           contenutoHtml: content,
         };
@@ -641,6 +664,15 @@ export function DocumentEditorPage() {
         ? `<img src="${logo}" style="max-height: 45px; max-width: 180px; object-fit: contain;" alt="Logo Studio" />`
         : `<div style="font-size: 16pt; font-weight: 800; color: #1e1b4b; display: flex; align-items: center; gap: 8px;">🏛 ${studioRagioneSociale.toUpperCase()}</div>`;
 
+      // Piano firma §3.3 — il footer del PDF dichiara il livello legale che l'atto ESIGE
+      // (etichetta scelta dall'operatore), non quello con cui verrà firmato: il valore
+      // effettivo lo scrive solo il server nel sigillo al momento della firma.
+      const livelloFirmaFooter = livelloFirmaDoc === 'fea'
+        ? 'Firma Elettronica Avanzata Richiesta • eIDAS art. 26'
+        : livelloFirmaDoc === 'feq'
+          ? 'Firma Elettronica Qualificata Richiesta • eIDAS art. 25'
+          : 'Firma Elettronica Semplice • art. 20 CAD';
+
       const fullPrintHtml = `
         <div style="font-family: 'Segoe UI', Helvetica, Arial, sans-serif; color: #0f172a; line-height: 1.6; font-size: 11.5pt; width: 100%;">
           <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #4338ca; padding-bottom: 14px; margin-bottom: 24px;">
@@ -654,7 +686,7 @@ export function DocumentEditorPage() {
           <div style="min-height: 500px;">${finalHtml}</div>
           <div style="margin-top: 40px; border-top: 1px solid #e2e8f0; padding-top: 10px; display: flex; justify-content: space-between; font-size: 8.5pt; color: #94a3b8;">
             <span>${studioRagioneSociale} • Pratica: ${activeProgetto?.titolo || activeProgetto?.n || 'Incarico Professionale'}</span>
-            <span>Firma Elettronica Semplice • art. 20 CAD</span>
+            <span>${livelloFirmaFooter}</span>
           </div>
         </div>
       `;
@@ -754,6 +786,9 @@ export function DocumentEditorPage() {
         contenutoHtml: htmlContent,
         firmato: false,
         richiedeFirma: categoria === 'engagement' || categoria === 'nda',
+        // Piano firma §3 — livello legale (ses|fea|feq) che questo atto esige,
+        // ereditato dal template di partenza e modificabile nella strip dedicata.
+        livelloFirmaRichiesto: livelloFirmaDoc,
         formato: 'word',
         url: `#doc-${Date.now()}`,
       };
@@ -775,6 +810,9 @@ export function DocumentEditorPage() {
           filename,
           contentBase64: base64Data,
           categoriaDoc: categoria,
+          // Piano firma §3 — l'etichetta viaggia con il documento: è quella che il
+          // server userà per applicare l'enforcement (409) sulle rotte di firma.
+          livelloFirmaRichiesto: livelloFirmaDoc,
         });
         // L'id del database diventa l'id del documento anche in locale: è quello che serve per
         // ritrovarlo, pubblicarlo e cancellarlo.
@@ -853,6 +891,60 @@ export function DocumentEditorPage() {
         activeProgetto={activeProgetto}
       />
 
+      {/* Piano firma §3.3 — livello legale richiesto all'atto che l'operatore sta
+          componendo. Ereditato dal template di partenza, resta modificabile finché
+          il documento non è firmato (PATCH /documenti/:id/livello-firma). */}
+      <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 14, padding: '14px 18px' }}>
+        <label style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text)', display: 'block', marginBottom: 8 }}>
+          ⚖️ Livello Legale Richiesto all'Atto — "{titoloDocumento}"
+        </label>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+          {([
+            {
+              id: 'ses' as const,
+              icon: '📱',
+              titolo: 'SES — Semplice',
+              desc: 'Firma elettronica semplice (art. 20 CAD / eIDAS art. 3 n. 10). Il flusso OTP attuale.',
+            },
+            {
+              id: 'fea' as const,
+              icon: '🧠',
+              titolo: 'FEA — Avanzata',
+              desc: 'Firma elettronica avanzata (eIDAS art. 26): richiede misure aggiuntive in Fase 3; per ora il portale la rifiuta.',
+            },
+            {
+              id: 'feq' as const,
+              icon: '🔐',
+              titolo: 'FEQ — Qualificata',
+              desc: 'Firma elettronica qualificata (eIDAS art. 25): solo tramite provider esterno del cliente (file .p7m).',
+            },
+          ]).map((l) => (
+            <button
+              key={l.id}
+              type="button"
+              onClick={() => setLivelloFirmaDoc(l.id)}
+              style={{
+                background: livelloFirmaDoc === l.id ? '#1e1b4b' : 'var(--card)',
+                border: `1.5px solid ${livelloFirmaDoc === l.id ? 'var(--indigo)' : 'var(--border)'}`,
+                borderRadius: 10, padding: '9px 10px', textAlign: 'left', cursor: 'pointer',
+                display: 'flex', flexDirection: 'column', gap: 3
+              }}
+            >
+              <div style={{ fontSize: 11, fontWeight: 700, color: livelloFirmaDoc === l.id ? '#a5b4fc' : 'var(--text)', display: 'flex', alignItems: 'center', gap: 5 }}>
+                <span>{l.icon}</span> {l.titolo}
+              </div>
+              <div style={{ fontSize: 9.5, color: 'var(--muted)', lineHeight: 1.3 }}>{l.desc}</div>
+            </button>
+          ))}
+        </div>
+        {livelloFirmaDoc !== 'ses' && (
+          <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: '#f59e0b18', border: '1px solid #f59e0b50', fontSize: 10, color: 'var(--muted)', lineHeight: 1.4 }}>
+            ⚠️ Con livello {livelloFirmaDoc === 'fea' ? 'FEA' : 'FEQ'} il server <strong>blocca</strong> il flusso OTP:
+            {' '}il cliente riceverà un avviso esplicito e dovrà usare il percorso {livelloFirmaDoc === 'fea' ? 'riservato alla Fase 3 (al momento non disponibile in portale)' : 'con provider di firma digitale qualificata (caricamento del file firmato)'}.
+          </div>
+        )}
+      </div>
+
       {/* Main Studio Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: '290px 1fr', gap: 20, alignItems: 'start' }}>
         
@@ -897,6 +989,8 @@ export function DocumentEditorPage() {
           setNewTmplTitolo={setNewTmplTitolo}
           newTmplCat={newTmplCat}
           setNewTmplCat={setNewTmplCat}
+          newTmplLivello={newTmplLivello}
+          setNewTmplLivello={setNewTmplLivello}
           newTmplDesc={newTmplDesc}
           setNewTmplDesc={setNewTmplDesc}
         />

@@ -3,6 +3,7 @@ import type { DocumentoPortale } from '../../api/client';
 import type { BersaglioFirma } from './types';
 import { dataOraLeggibile } from './format';
 import { docBoxStyle } from './styles';
+import { livelloFirmaEffettivo, ETICHETTA_LIVELLO, AVVISO_LIVELLO } from './livelloFirma';
 
 export interface TabDocumentiProps {
   portalDocs: DocumentoPortale[];
@@ -94,7 +95,12 @@ export function TabDocumenti({
       )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        {portalDocs.map((doc) => (
+        {portalDocs.map((doc) => {
+          /* Piano firma §3 — livello che questo documento esige (ses|fea|feq). Il
+              portale lo usa solo per presentare il percorso giusto: l'enforcement
+              resta al server (409 sulle rotte di firma). */
+          const livelloDoc = livelloFirmaEffettivo(doc.livelloFirmaRichiesto);
+          return (
           <div
             key={doc.id}
             style={{
@@ -116,6 +122,16 @@ export function TabDocumenti({
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                   <span style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text)' }}>{doc.nome}</span>
                   <span style={{ fontSize: 10, background: 'var(--card)', padding: '2px 6px', borderRadius: 6, color: 'var(--muted)', fontWeight: 600 }}>{doc.categoria}</span>
+                  {/* Piano firma §3 — il livello esigito si vede sulla card: solo FEA/FEQ
+                      portano il badge (SES resta il flusso ordinario, senza rumore). */}
+                  {livelloDoc !== 'ses' && (
+                    <span
+                      title={`Livello di firma richiesto da questo documento: ${ETICHETTA_LIVELLO[livelloDoc].nome}`}
+                      style={{ fontSize: 10, padding: '2px 8px', borderRadius: 6, fontWeight: 700, border: `1px solid ${livelloDoc === 'fea' ? '#f59e0b66' : '#7c3aed66'}`, color: livelloDoc === 'fea' ? '#fbbf24' : '#c4b5fd', background: livelloDoc === 'fea' ? '#f59e0b14' : '#7c3aed14' }}
+                    >
+                      {ETICHETTA_LIVELLO[livelloDoc].icona} {ETICHETTA_LIVELLO[livelloDoc].nome} richiesto
+                    </span>
+                  )}
                   {doc.versione && doc.versione > 1 && (
                     doc.versioniPrecedenti && doc.versioniPrecedenti.length > 0 ? (
                       <button
@@ -263,34 +279,73 @@ export function TabDocumenti({
                   </button>
 
                   {/* La firma passa dal backend: codice sul canale scelto, impronta calcolata
-                      dal server sul file in archivio, sigillo scritto a database. */}
-                  <button
-                    type="button"
-                    disabled={!doc.richiedeFirma || otpLoading}
-                    title={doc.richiedeFirma ? undefined : 'Documento non firmabile in questo momento'}
-                    onClick={() => avviaFirmaDocumento(doc)}
-                    style={{ background: doc.richiedeFirma ? 'var(--indigo)' : 'var(--card)', color: doc.richiedeFirma ? '#fff' : 'var(--muted)', border: 'none', padding: '7px 16px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: doc.richiedeFirma && !otpLoading ? 'pointer' : 'default', boxShadow: doc.richiedeFirma ? '0 2px 10px rgba(99,102,241,.3)' : 'none', display: 'flex', alignItems: 'center', gap: 6 }}
-                  >
-                    ✍️ Firma con codice
-                  </button>
+                      dal server sul file in archivio, sigillo scritto a database. Il livello
+                      richiesto (piano firma §3) decide quale canale presentare: FEA e FEQ
+                      non passano dall'OTP — il server le respingerebbe con 409, qui il
+                      portale orienta il cliente sul percorso giusto prima di consumare
+                      un invio di codice. */}
+                  {livelloDoc === 'ses' ? (
+                    <button
+                      type="button"
+                      disabled={!doc.richiedeFirma || otpLoading}
+                      title={doc.richiedeFirma ? undefined : 'Documento non firmabile in questo momento'}
+                      onClick={() => avviaFirmaDocumento(doc)}
+                      style={{ background: doc.richiedeFirma ? 'var(--indigo)' : 'var(--card)', color: doc.richiedeFirma ? '#fff' : 'var(--muted)', border: 'none', padding: '7px 16px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: doc.richiedeFirma && !otpLoading ? 'pointer' : 'default', boxShadow: doc.richiedeFirma ? '0 2px 10px rgba(99,102,241,.3)' : 'none', display: 'flex', alignItems: 'center', gap: 6 }}
+                    >
+                      ✍️ Firma con codice
+                    </button>
+                  ) : (
+                    <span
+                      title={`Firma ${ETICHETTA_LIVELLO[livelloDoc].nome} richiesta dal documento`}
+                      style={{ fontSize: 10.5, lineHeight: 1.45, maxWidth: 340, color: livelloDoc === 'fea' ? '#fbbf24' : '#c4b5fd', border: `1px solid ${livelloDoc === 'fea' ? '#f59e0b50' : '#7c3aed50'}`, background: livelloDoc === 'fea' ? '#f59e0b12' : '#7c3aed12', padding: '7px 12px', borderRadius: 8, display: 'inline-block' }}
+                    >
+                      {AVVISO_LIVELLO[livelloDoc]}
+                    </span>
+                  )}
 
-                  <label style={{ background: '#1a1f3d', border: '1px solid #2d3260', color: '#818cf8', padding: '6px 14px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                    <span>{caricamentoFirmato ? '⏳ Carico…' : '📤 Ricarica Firmato a Mano'}</span>
-                    <input
-                      type="file"
-                      accept=".pdf,.doc,.docx"
-                      style={{ display: 'none' }}
-                      onChange={async e => {
-                        const file = e.target.files?.[0];
-                        if (!file) return;
-                        await leggiFileFirmato(file);
-                        setBersaglioFirma({ ambito: 'documento_vault', titolo: doc.titolo || doc.nome, riferimentoId: doc.id });
-                        setModalitaFirma('manuale_scansionata');
-                        setDocumentoDaCaricare(doc);
-                        e.target.value = '';
-                      }}
-                    />
-                  </label>
+                  {livelloDoc === 'ses' && (
+                    <label style={{ background: '#1a1f3d', border: '1px solid #2d3260', color: '#818cf8', padding: '6px 14px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      <span>{caricamentoFirmato ? '⏳ Carico…' : '📤 Ricarica Firmato a Mano'}</span>
+                      <input
+                        type="file"
+                        accept=".pdf,.doc,.docx"
+                        style={{ display: 'none' }}
+                        onChange={async e => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          await leggiFileFirmato(file);
+                          setBersaglioFirma({ ambito: 'documento_vault', titolo: doc.titolo || doc.nome, riferimentoId: doc.id });
+                          setModalitaFirma('manuale_scansionata');
+                          setDocumentoDaCaricare(doc);
+                          e.target.value = '';
+                        }}
+                      />
+                    </label>
+                  )}
+
+                  {/* FEQ — piano firma §3: l'unico canale che il server accetta è il file
+                      firmato con provider qualificato (qualificata_esterna, valoreLegale
+                      'feq' scritto dal server). La sottoscrizione scansionata non basta
+                      e verrebbe respinta con 409, quindi qui non viene offerta. */}
+                  {livelloDoc === 'feq' && (
+                    <label style={{ background: '#2e1065', border: '1px solid #7c3aed', color: '#c4b5fd', padding: '6px 14px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4, boxShadow: '0 2px 10px rgba(124,58,237,.25)' }}>
+                      <span>{caricamentoFirmato ? '⏳ Carico…' : '🔐 Carica File Firmato Digitalmente'}</span>
+                      <input
+                        type="file"
+                        accept=".pdf,.p7m,.doc,.docx"
+                        style={{ display: 'none' }}
+                        onChange={async e => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          await leggiFileFirmato(file);
+                          setBersaglioFirma({ ambito: 'documento_vault', titolo: doc.titolo || doc.nome, riferimentoId: doc.id });
+                          setModalitaFirma('qualificata_esterna');
+                          setDocumentoDaCaricare(doc);
+                          e.target.value = '';
+                        }}
+                      />
+                    </label>
+                  )}
                 </>
               )}
             </div>
@@ -355,7 +410,8 @@ export function TabDocumenti({
               </div>
             )}
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

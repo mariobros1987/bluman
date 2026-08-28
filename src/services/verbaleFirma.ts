@@ -13,6 +13,7 @@
 
 import PDFDocument from 'pdfkit';
 import { mascheraRecapito } from './otpService.js';
+import { DESCRIZIONE_LIVELLO_FIRMA, normalizzaLivelloFirma } from './livelloFirmaService.js';
 
 export interface DatiOtpVerbale {
   canale: string;
@@ -46,6 +47,12 @@ export interface DatiVerbaleFirma {
   firmaGrafometricaPng?: string | null;
   /** Per manuale_scansionata/qualificata_esterna: impronta del file ricaricato. */
   fileFirmatoHash?: string | null;
+  /**
+   * Piano §3.1 — valore legale effettivo della firma apposta (ses|fea|feq), scritto dal
+   * server al momento della firma. Per le firme storiche precedenti alla migrazione può
+   * mancare: si normalizza su 'ses', che è il valore che hanno sempre avuto.
+   */
+  valoreLegale?: string | null;
 }
 
 /** Descrizione in chiaro del tipo di firma: il valore tecnico da solo non parla. */
@@ -161,6 +168,9 @@ export function generaPdfVerbaleFirma(dati: DatiVerbaleFirma): Promise<Buffer> {
   sezione(doc, 'Modalità di sottoscrizione');
   riga(doc, 'Tipo di firma', descrizioneTipoFirma(dati.tipoFirma));
   riga(doc, 'Standard di riferimento', dati.standard);
+  // Il valore legale è quello effettivo scritto dal server (vincolo 7), mai dichiarato dal
+  // firmatario: normalizzato perché le firme pre-migrazione possono non avere il campo.
+  riga(doc, 'Valore legale della firma', DESCRIZIONE_LIVELLO_FIRMA[normalizzaLivelloFirma(dati.valoreLegale)]);
   if (dati.canaleVerificato) riga(doc, 'Verifica del firmatario', dati.canaleVerificato);
 
   // Dati della registrazione

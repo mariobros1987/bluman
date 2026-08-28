@@ -69,6 +69,8 @@ export interface SigilloFirma {
   id: string;
   signatureId: string;
   tipoFirma: string;
+  /** Piano firma §3 — valore legale effettivo (ses|fea|feq) fissato dal server al momento della firma. */
+  valoreLegale?: string | null;
   signerName: string;
   documentoTitolo: string;
   timestampIso: string;

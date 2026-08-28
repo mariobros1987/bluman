@@ -68,6 +68,7 @@ import { TabDocumenti } from '../components/portal/TabDocumenti';
 import { TabFatture } from '../components/portal/TabFatture';
 import { TabContatti } from '../components/portal/TabContatti';
 import { TabProfilo } from '../components/portal/TabProfilo';
+import { livelloFirmaEffettivo, AVVISO_LIVELLO } from '../components/portal/livelloFirma';
 
 export function ClientPortal() {
   const [searchParams] = useSearchParams();
@@ -929,6 +930,17 @@ export function ClientPortal() {
    * la lettera d'incarico non convalida la firma di un documento, e viceversa.
    */
   const avviaFirmaDocumento = async (doc: DocumentoPortale) => {
+    // Piano firma §3 — guard preventivo: se il documento esige FEA/FEQ, il server
+    // respingerebbe l'OTP con 409. Qui il portale lo dichiara prima di consumare un
+    // invio di codice, aprendo la modale con l'avviso al posto del campo OTP.
+    const livelloDoc = livelloFirmaEffettivo(doc.livelloFirmaRichiesto);
+    if (livelloDoc !== 'ses') {
+      setModalitaFirma('otp');
+      setFileFirmato(null);
+      setOtpError(AVVISO_LIVELLO[livelloDoc]);
+      setOtpModalOpen(true);
+      return;
+    }
     const bersaglio: BersaglioFirma = {
       ambito: 'documento_vault',
       titolo: doc.titolo || doc.nome,
@@ -1866,6 +1878,7 @@ export function ClientPortal() {
           setFileFirmato={setFileFirmato}
           caricamentoFirmato={caricamentoFirmato}
           confermaFirmaConFile={confermaFirmaConFile}
+          livelloRichiesto={livelloFirmaEffettivo(documentoDaCaricare.livelloFirmaRichiesto)}
         />
       )}
 

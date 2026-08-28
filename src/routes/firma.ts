@@ -38,6 +38,12 @@ import { credenzialiCanali, canaliDisponibili, inviaCodiceOtp, recapitiCliente }
 import { notificaStudio, notificaCliente } from '../services/notificheService.js';
 import { scanFileBuffer } from '../services/securityScanner.js';
 import { generaPdfVerbaleFirma } from '../services/verbaleFirma.js';
+import {
+  verificaLivelloFirma,
+  livelloPiuAlto,
+  normalizzaLivelloFirma,
+  type LivelloFirma,
+} from '../services/livelloFirmaService.js';
 import { ipReale, normalizzaGrafometrica, nomeFileDaUrl, clienteDellaRichiesta, recordAudit } from '../util/serverHelpers.js';
 
 // ─── FIRMA ELETTRONICA SEMPLICE (SES · art. 20 CAD) & FIRMA DOCUMENTI ─────────────
@@ -122,6 +128,9 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
           statoScansione: true,
           dataScadenzaDoc: true,
           statoDoc: true,
+          // Piano §3 — il livello che il documento esige: il portale lo usa per il gating
+          // del flusso di firma (con fea/feq niente OTP) e per l'etichetta nel fascicolo.
+          livelloFirmaRichiesto: true,
           pubblicatoAt: true,
           documentoPadreId: true,
           progettoId: true,
@@ -160,6 +169,8 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
           firmaGrafometricaPng: true,
           firmatarioNome: true,
           standard: true,
+          // Piano §3.1 — il valore legale effettivo della firma (scritto dal server).
+          valoreLegale: true,
         },
         orderBy: { firmatoAt: 'desc' },
       });
@@ -248,6 +259,9 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
           caricatoIl: d.createdAt,
           scadenza: d.dataScadenzaDoc,
           statoDoc: d.statoDoc,
+          // Piano §3 — il livello richiesto, normalizzato dal server (un dato sporco non
+          // deve mai bloccare il fascicolo): al portale serve per il gating del flusso.
+          livelloFirmaRichiesto: normalizzaLivelloFirma(d.livelloFirmaRichiesto),
           pubblicatoAt: d.pubblicatoAt,
           // §WF-DOC — da dove viene questa versione: l'id del documento sostituito e la
           // catena completa delle versioni precedenti, per risalire il percorso all'indietro.
@@ -270,6 +284,10 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
           firmaGrafometricaPng: firma?.firmaGrafometricaPng ?? null,
           firmatarioNome: firma?.firmatarioNome ?? null,
           standard: firma?.standard ?? 'Firma Elettronica Semplice (OTP verificata) · art. 20 CAD',
+          // Piano §3.1 — il valore legale effettivo della firma apposta: null finché il
+          // documento non è firmato (le firme storiche precedenti alla migrazione restano
+          // 'ses', che è il comportamento che hanno sempre avuto).
+          valoreLegale: firma?.valoreLegale ?? null,
         };
       });
 
@@ -296,6 +314,9 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
           caricatoIl: f.firmatoAt,
           scadenza: null,
           statoDoc: 'firmato' as const,
+          // Il documento non è più nel fascicolo: il livello che esigeva non si può più
+          // risalire. Il valore legale effettivo invece resta, perché vive nella firma.
+          livelloFirmaRichiesto: null,
           pubblicatoAt: null,
           richiesteModifica: [],
           statoScansione: null,
@@ -311,6 +332,7 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
           firmaGrafometricaPng: f.firmaGrafometricaPng,
           firmatarioNome: f.firmatarioNome,
           standard: f.standard,
+          valoreLegale: f.valoreLegale ?? null,
           documentoNonPiuDisponibile: true,
         }));
 
@@ -617,6 +639,17 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
         return reply.code(400).send({ errore: cosaManca });
       }
 
+      // Enforcement §3.2 — il blocco arriva PRIMA di consumare il codice: se il documento
+      // esige FEA/FEQ il flusso OTP non potrà mai produrre il valore legale richiesto, e
+      // generare il codice (e inviarlo) sarebbe solo spreco e confusione per il cliente.
+      const livelloRichiesto = await livelloRichiestoPerFirma(tenantId, clienteId, ambito, riferimentoId);
+      const esitoLivello = verificaLivelloFirma({ livelloRichiesto, canale: 'otp' });
+      if (!esitoLivello.consentito) {
+        return reply
+          .code(409)
+          .send({ ok: false, errore: esitoLivello.errore, livelloRichiesto: esitoLivello.livelloRichiesto });
+      }
+
       const esito = await creaOtp({
         tenantId,
         clienteId,
@@ -689,7 +722,7 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
     tenantId: string,
     clienteId: string,
     documentoId: string,
-  ): Promise<{ hash: string; titolo: string } | { errore: string; codice: number }> {
+  ): Promise<{ hash: string; titolo: string; livello: LivelloFirma } | { errore: string; codice: number }> {
     const doc = await prisma.documento.findFirst({
       where: {
         id: documentoId,
@@ -705,6 +738,7 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
         fileUrl: true,
         statoScansione: true,
         statoDoc: true,
+        livelloFirmaRichiesto: true,
         microvoceProgetto: { select: { nome: true } },
         progetto: { select: { nome: true } },
       },
@@ -752,6 +786,7 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
     return {
       hash: crypto.createHash('sha256').update(contenuto).digest('hex'),
       titolo: doc.microvoceProgetto?.nome ?? doc.progetto?.nome ?? 'Documento',
+      livello: normalizzaLivelloFirma(doc.livelloFirmaRichiesto),
     };
   }
 
@@ -769,7 +804,7 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
     tenantId: string,
     clienteId: string,
     moduloId: string,
-  ): Promise<{ hash: string; titolo: string } | { errore: string; codice: number }> {
+  ): Promise<{ hash: string; titolo: string; livello: LivelloFirma } | { errore: string; codice: number }> {
     const modulo = await prisma.moduloProgetto.findFirst({
       where: {
         id: moduloId,
@@ -785,7 +820,11 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
         prezzo: true,
         stato: true,
         progetto: { select: { nome: true } },
-        microvoci: { select: { nome: true, stato: true } },
+        // I livelli di firma vivono sui passaggi (decisione Fase 2 del piano §3): il
+        // riferimento della conferma firmata è il modulo, ma il livello che esige è il
+        // MASSIMO dei livelli dei suoi passaggi — basta un passaggio FEQ perché l'intero
+        // modulo lo esiga.
+        microvoci: { select: { nome: true, stato: true, passaggi: { select: { livelloFirmaRichiesto: true } } } },
       },
     });
 
@@ -831,7 +870,53 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
     return {
       hash: crypto.createHash('sha256').update(contenuto).digest('hex'),
       titolo: `${modulo.nome} — ${modulo.progetto.nome}`,
+      // `?? []` perché un dato letto senza la relazione (o una micro-voce senza passaggi)
+      // non deve far esplodere la firma: il livello assente vale ses, com'è sempre stato.
+      livello: livelloPiuAlto(microvoci.flatMap((mv) => (mv.passaggi ?? []).map((p) => p.livelloFirmaRichiesto))),
     };
+  }
+
+  /**
+   * Enforcement §3.2 — SOLO il livello richiesto, senza leggere i file dall'archivio.
+   * `request-otp` deve bloccare il flusso PRIMA di consumare codici OTP e invii, ma in
+   * quel punto l'impronta non serve ancora: l'hash viene calcolato in
+   * `verify-otp-and-sign`. Le due interrogazioni ricalcano i where delle funzioni di
+   * impronta (stesse catene di proprietà, stesso isolamento tenant+cliente).
+   *
+   * `engagement_letter` e `addendum` non hanno colonna di livello nel database: restano
+   * SES (la Fase 2 non cambia ciò che il piano non etichetta).
+   */
+  async function livelloRichiestoPerFirma(
+    tenantId: string,
+    clienteId: string,
+    ambito: string,
+    riferimentoId: string | null | undefined,
+  ): Promise<LivelloFirma> {
+    if (ambito === 'documento_vault' && riferimentoId) {
+      const doc = await prisma.documento.findFirst({
+        where: {
+          id: riferimentoId,
+          tenantId,
+          OR: [
+            { microvoceProgetto: { moduloProgetto: { progetto: { clienteId } } } },
+            { progetto: { clienteId } },
+          ],
+        },
+        select: { livelloFirmaRichiesto: true },
+      });
+      return normalizzaLivelloFirma(doc?.livelloFirmaRichiesto);
+    }
+    if (ambito === 'modulo_completato' && riferimentoId) {
+      const passaggi = await prisma.passaggioProgetto.findMany({
+        where: {
+          tenantId,
+          microvoceProgetto: { moduloProgettoId: riferimentoId, moduloProgetto: { progetto: { clienteId } } },
+        },
+        select: { livelloFirmaRichiesto: true },
+      });
+      return livelloPiuAlto(passaggi.map((p) => p.livelloFirmaRichiesto));
+    }
+    return 'ses';
   }
 
   /**
@@ -889,6 +974,8 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
       userAgent: string | null;
       firmaGrafometricaPng?: string | null;
       fileFirmatoHash?: string | null;
+      /** Piano §3.1 — valore legale effettivo, scritto dal server al momento della firma. */
+      valoreLegale?: string | null;
       firmatoAt: Date;
     };
     /** Impronta SHA-256 del sigillo: è calcolata dal builder del sigillo, non dalla firma. */
@@ -957,6 +1044,7 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
         signatureId: firma.signatureId,
         tipoFirma: firma.tipoFirma,
         standard: firma.standard,
+        valoreLegale: firma.valoreLegale ?? null,
         documentoTitolo: firma.documentoTitolo,
         documentoHash: firma.documentoHash,
         firmatarioNome: firma.firmatarioNome,
@@ -1081,17 +1169,31 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
       // per un file illeggibile costringerebbe il cliente a rifare tutto il giro.
       let improntaFinale = (documentoHash ?? '').trim().toLowerCase();
       let titoloDalFascicolo: string | null = null;
+      let livelloRichiesto: LivelloFirma = 'ses';
       if (vault && riferimentoId) {
         const esito = await improntaDocumentoDelFascicolo(tenantId, clienteId, riferimentoId);
         if ('errore' in esito) return reply.code(esito.codice).send({ errore: esito.errore });
         improntaFinale = esito.hash;
         titoloDalFascicolo = esito.titolo;
+        livelloRichiesto = esito.livello;
       }
       if (moduloCompletato && riferimentoId) {
         const esito = await improntaModuloCompletato(tenantId, clienteId, riferimentoId);
         if ('errore' in esito) return reply.code(esito.codice).send({ errore: esito.errore });
         improntaFinale = esito.hash;
         titoloDalFascicolo = esito.titolo;
+        livelloRichiesto = esito.livello;
+      }
+
+      // Enforcement §3.2 ribadito al momento della firma, non solo alla richiesta del
+      // codice: tra request-otp e verify-otp l'operatore può aver alzato il livello, e il
+      // codice già emesso non rende legittima una firma che il documento ora non ammette.
+      // Il blocco sta PRIMA di verificaOtp proprio per non bruciare il codice monouso.
+      const esitoLivello = verificaLivelloFirma({ livelloRichiesto, canale: 'otp' });
+      if (!esitoLivello.consentito) {
+        return reply
+          .code(409)
+          .send({ ok: false, errore: esitoLivello.errore, livelloRichiesto: esitoLivello.livelloRichiesto });
       }
 
       const verifica = await verificaOtp(clienteId, otp, ambito, riferimentoId ?? null);
@@ -1139,6 +1241,9 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
           userAgent: sigillo.userAgent,
           firmaGrafometricaPng: grafometrica,
           standard: sigillo.standard,
+          // Vincolo 7 — il valore legale effettivo lo scrive il server, mai il frontend:
+          // la rotta OTP produce SEMPRE e solo SES (art. 20 CAD).
+          valoreLegale: 'ses',
           firmatoAt: new Date(sigillo.timestampIso),
         },
       });
@@ -1296,17 +1401,31 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
       // non si appone, e il codice deve restare valido.
       let improntaFinale = (documentoHash ?? '').trim().toLowerCase();
       let titoloDalFascicolo: string | null = null;
+      let livelloRichiesto: LivelloFirma = 'ses';
       if (vault && riferimentoId) {
         const esito = await improntaDocumentoDelFascicolo(tenantId, clienteId, riferimentoId);
         if ('errore' in esito) return reply.code(esito.codice).send({ errore: esito.errore });
         improntaFinale = esito.hash;
         titoloDalFascicolo = esito.titolo;
+        livelloRichiesto = esito.livello;
       }
       if (moduloCompletato && riferimentoId) {
         const esito = await improntaModuloCompletato(tenantId, clienteId, riferimentoId);
         if ('errore' in esito) return reply.code(esito.codice).send({ errore: esito.errore });
         improntaFinale = esito.hash;
         titoloDalFascicolo = esito.titolo;
+        livelloRichiesto = esito.livello;
+      }
+
+      // Enforcement §3.2 — canale `file`: la FEA resta bloccata anche qui (nessun flusso
+      // del portale la produce finché non arriva la Fase 3), mentre per la FEQ conta il
+      // tipoFirma: solo `qualificata_esterna` la soddisfa, la scansione autografa no.
+      // Il blocco sta PRIMA dell'upload e dell'eventuale OTP: nessuna risorsa consumata.
+      const esitoLivello = verificaLivelloFirma({ livelloRichiesto, canale: 'file', tipoFirma });
+      if (!esitoLivello.consentito) {
+        return reply
+          .code(409)
+          .send({ ok: false, errore: esitoLivello.errore, livelloRichiesto: esitoLivello.livelloRichiesto });
       }
 
       if (req.body?.otp) {
@@ -1373,6 +1492,10 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
           fileFirmatoUrl: caricato.url,
           fileFirmatoHash,
           standard: sigillo.standard,
+          // Vincolo 7 — il valore legale effettivo lo scrive il server: il file del
+          // provider esterno è l'unico modo attuale di ottenere FEQ; la scansione
+          // autografa resta SES.
+          valoreLegale: tipoFirma === 'qualificata_esterna' ? 'feq' : 'ses',
           firmatoAt: new Date(sigillo.timestampIso),
         },
       });
@@ -1463,6 +1586,8 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
           fileFirmatoUrl: true,
           fileFirmatoHash: true,
           standard: true,
+          // Piano §3.1 — il valore legale effettivo della firma, scritto dal server.
+          valoreLegale: true,
           firmatoAt: true,
           // La grafometrica è un'immagine e pesa: si scarica dal dettaglio, non in elenco.
           cliente: { select: { id: true, nome: true } },

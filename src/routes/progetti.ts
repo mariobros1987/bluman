@@ -21,6 +21,7 @@ import { notificaStudio } from '../services/notificheService.js';
 import { arricchisciProgetti, calcolaAvanzamento, ricalcolaProgetto } from '../services/calcoloService.js';
 import { ricercaGlobale } from '../services/ricercaGlobaleService.js';
 import { TENANT_DEFAULT, STATI_MICROVOCE, STATI_PROGETTO, recordAudit } from '../util/serverHelpers.js';
+import { livelloFirmaValido } from '../services/livelloFirmaService.js';
 
 // ─── PROGETTI, COMUNICAZIONI, TIMESHEET, CHECKLIST & ESECUZIONE ─────
 export async function registraRotteProgetti(server: FastifyInstance, app: AppPort): Promise<void> {
@@ -505,6 +506,12 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
               const titolo = p.title || p.titolo || `Passaggio ${pIdx + 1}`;
               const docAllegato = p.documentoAllegatoUrl || p.file || null;
               const richiedeFirma = Boolean(p.richiedeFirmaCliente);
+              // Piano firma §3.1 — il livello (ses|fea|feq) che il singolo passaggio esige
+              // per la conferma firmata del modulo. Valori non validi si scartano: un
+              // client che manda dati sporchi non deve sovrascrivere il livello esistente.
+              const livelloRichiesta = typeof p.livelloFirmaRichiesto === 'string' && livelloFirmaValido(p.livelloFirmaRichiesto)
+                ? p.livelloFirmaRichiesto
+                : undefined;
 
               if (pId) {
                 await prisma.passaggioProgetto.upsert({
@@ -518,6 +525,7 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
                     descrizione: p.desc || p.descrizione || null,
                     documentoAllegatoUrl: docAllegato,
                     richiedeFirmaCliente: richiedeFirma,
+                    ...(livelloRichiesta && { livelloFirmaRichiesto: livelloRichiesta }),
                   },
                   create: {
                     id: pId,
@@ -531,6 +539,7 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
                     descrizione: p.desc || p.descrizione || null,
                     documentoAllegatoUrl: docAllegato,
                     richiedeFirmaCliente: richiedeFirma,
+                    livelloFirmaRichiesto: livelloRichiesta ?? 'ses',
                   },
                 });
               } else {
@@ -546,6 +555,7 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
                     descrizione: p.desc || p.descrizione || null,
                     documentoAllegatoUrl: docAllegato,
                     richiedeFirmaCliente: richiedeFirma,
+                    livelloFirmaRichiesto: livelloRichiesta ?? 'ses',
                   },
                 });
               }

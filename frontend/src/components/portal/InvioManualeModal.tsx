@@ -1,4 +1,5 @@
 import type { DocumentoPortale } from '../../api/client';
+import type { LivelloFirmaPortale } from './livelloFirma';
 
 export interface InvioManualeModalProps {
   documentoDaCaricare: DocumentoPortale;
@@ -11,6 +12,13 @@ export interface InvioManualeModalProps {
   setFileFirmato: (file: { nome: string; base64: string } | null) => void;
   caricamentoFirmato: boolean;
   confermaFirmaConFile: () => Promise<boolean>;
+  /**
+   * Piano firma §3 — livello che il documento esige. Con 'feq' la sottoscrizione
+   * scansionata non è ammessa (il server la respingerebbe con 409): il selettore
+   * della modalità resta bloccato su "firma qualificata". Default omesso = ses,
+   * modalità liberamente scelta come oggi.
+   */
+  livelloRichiesto?: LivelloFirmaPortale;
 }
 
 export function InvioManualeModal({
@@ -24,6 +32,7 @@ export function InvioManualeModal({
   setFileFirmato,
   caricamentoFirmato,
   confermaFirmaConFile,
+  livelloRichiesto = 'ses',
 }: InvioManualeModalProps) {
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 120, padding: 16 }}>
@@ -44,14 +53,21 @@ export function InvioManualeModal({
         <label style={{ fontSize: 11.5, color: 'var(--muted)', display: 'flex', flexDirection: 'column', gap: 6 }}>
           Se hai firmato con un provider di firma digitale, indicalo: cambia il valore probatorio scritto accanto alla firma.
           <select
-            value={modalitaFirma === 'qualificata_esterna' ? 'qualificata_esterna' : 'manuale_scansionata'}
+            value={livelloRichiesto === 'feq' ? 'qualificata_esterna' : modalitaFirma === 'qualificata_esterna' ? 'qualificata_esterna' : 'manuale_scansionata'}
             onChange={(e) => setModalitaFirma(e.target.value as 'manuale_scansionata' | 'qualificata_esterna')}
-            style={{ padding: '8px 10px', borderRadius: 8, background: 'var(--card)', color: 'var(--text)', border: '1px solid var(--border)', fontSize: 12 }}
+            disabled={livelloRichiesto === 'feq'}
+            style={{ padding: '8px 10px', borderRadius: 8, background: 'var(--card)', color: 'var(--text)', border: '1px solid var(--border)', fontSize: 12, opacity: livelloRichiesto === 'feq' ? 0.75 : 1 }}
           >
             <option value="manuale_scansionata">Firmato a penna e scansionato</option>
             <option value="qualificata_esterna">Firmato con firma digitale qualificata</option>
           </select>
         </label>
+        {livelloRichiesto === 'feq' && (
+          <div style={{ background: '#2e1065', border: '1px solid #7c3aed', color: '#c4b5fd', borderRadius: 10, padding: 10, fontSize: 11, lineHeight: 1.5 }}>
+            🔐 Questo documento esige Firma Elettronica Qualificata: la sottoscrizione scansionata
+            non è ammessa, quindi la modalità è fissata su firma digitale con provider qualificato.
+          </div>
+        )}
 
         {otpError && (
           <div style={{ background: '#3b1219', border: '1px solid #7f1d1d', color: '#fecaca', borderRadius: 10, padding: 12, fontSize: 11.5 }}>

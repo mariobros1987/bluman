@@ -106,12 +106,12 @@ Decisioni:
 6. ✅ `emailService.ts`: header/footer email OTP → "Firma Elettronica Semplice (OTP) · art. 20 CAD"; corpo "per la firma digitale di" → "per la firma di" (non si promette firma digitale); risposta HTTP di `verify-otp-and-sign` → "Firma Elettronica Semplice registrata (art. 20 CAD)".
 7. ✅ Test: `verbaleFirma.test.ts` aggiornato sulle nuove etichette + nuovo test che il flusso OTP non produca **da nessuna parte** (DB, audit, verbale PDF, notifiche) la parola "Avanzata"; `newFeatures.test.ts` sul prefisso `SIGILLO-SES-`. Suite: 353/353 verdi, `tsc --noEmit` pulito, `verifyAll.ts` 13/13.
 
-### Fase 2 — Etichettatura per tipo documento (migrazione + enforcement)
-1. Migrazione additiva (§3.1) — 4 colonne, tutte con default; `npx prisma generate`.
-2. Enforcement §3.2 sulle due rotte di firma + esposizione nel portale.
-3. UI operatore: scelta livello su template, su documento alla pubblicazione, sul passaggio di modulo; UI portale: gating del pulsante OTP.
-4. Verbale: riga "Valore legale della firma".
-5. Test: documento `livelloFirmaRichiesto: 'feq'` → OTP rifiutata 409, firma-con-file qualificata ammessa; documento `ses` → flusso invariato (regressione sui 352 test verdi).
+### Fase 2 — Etichettatura per tipo documento (migrazione + enforcement) — ✅ completata 28/08/2026
+1. ✅ Migrazione additiva (§3.1) — 4 colonne, tutte con default: `20260828120000_livello_firma_richiesto_e_valore_legale` (DocumentoVault.livelloFirmaRichiesto, ModuloDocumentoPassaggio.livelloFirmaRichiesto, FirmaElettronica.valoreLegale) e `20260828150000_livello_firma_modello_documento_custom` (ModelloDocumentoCustom.livelloFirmaRichiesto); `npx prisma generate`.
+2. ✅ Enforcement §3.2 sulle due rotte di firma (`livelloRichiestoPerFirma` in `src/routes/firma.ts` gestisce entrambi gli ambiti: `documento_vault` legge `doc.livelloFirmaRichiesto`; `modulo_completato` calcola il `livelloPiuAlto` sui passaggi del modulo) + esposizione nel portale (GET /portal/documenti e GET /progetti/:id espongono `livelloFirmaRichiesto` normalizzato).
+3. ✅ UI operatore: scelta livello su template (`ModaleNuovoTemplate`), su documento alla pubblicazione (`DocumentEditorPage`), sul passaggio di modulo (`ModaleConfigFirma`/`PassaggioModal`); UI portale: gating a tre livelli — `TabDocumenti` mostra solo il canale ammesso (badge FEA ambra / FEQ viola), guard preventivo in `avviaFirmaDocumento` (`ClientPortal.tsx`: livello ≠ ses → modale con avviso, nessun invio di codice consumato), `InvioManualeModal` blocca la modalità scansionata quando il documento esige feq; `livelloFirma.ts` condivide le etichette e gli avvisi allineati 1:1 ai 409 del server (`livelloFirmaService.ts`).
+4. ✅ Verbale: riga "Valore legale della firma" (`verbaleFirma.ts`).
+5. ✅ Test: `livelloFirmaService.test.ts` 13 test (messaggi 409, normalizzazione, livelloPiuAlto); regressione piena: **373/373 verdi in 28 file**, `tsc --noEmit` pulito, `npx tsc -b` frontend EXIT 0.
 
 ### Fase 3 — Misure FEA reali (solo se lo studio vuole offrire FEA; decisione del titolare)
 Cosa serve per poter etichettare **onesta** una firma `fea_otp_misurata` come FEA (spec §4: "identity verification, certificato di sessione, log crittografici"):

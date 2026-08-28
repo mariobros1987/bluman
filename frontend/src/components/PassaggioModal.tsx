@@ -141,12 +141,16 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
 
   // Apertura modale configurazione firma per Template
   const apriConfigFirmaTemplate = (tmpl: DocumentTemplate, stepId?: string) => {
+    // Piano firma §3 — il template porta il livello legale che lo studio gli ha etichettato;
+    // l'operatore lo vede nel selettore e può cambiarlo prima di salvare. Default 'ses'.
+    const livelloTemplate = (tmpl as any).livelloFirmaRichiesto as 'ses' | 'fea' | 'feq' | undefined;
     setConfigFirmaModal({
       open: true,
       tmpl,
       stepId,
       titolo: `${tmpl.titolo} — ${project.cl}.pdf`,
       richiedeFirma: true,
+      livelloFirmaRichiesto: livelloTemplate === 'fea' || livelloTemplate === 'feq' ? livelloTemplate : 'ses',
       metodoFirma: 'fea_otp',
       statoDoc: 'bozza',
       dataScadenzaDoc: '',
@@ -156,7 +160,7 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
   // Esecuzione del salvataggio documento con metodo firma configurato
   const eseguiSalvataggioConfigurato = async () => {
     if (!configFirmaModal) return;
-    const { tmpl, file, fileBase64, stepId, titolo, richiedeFirma, metodoFirma, statoDoc, dataScadenzaDoc } = configFirmaModal;
+    const { tmpl, file, fileBase64, stepId, titolo, richiedeFirma, livelloFirmaRichiesto, metodoFirma, statoDoc, dataScadenzaDoc } = configFirmaModal;
 
     const rawFilename = titolo.trim() || (tmpl ? `${tmpl.titolo} — ${project.cl}.pdf` : file?.name || 'Documento.pdf');
     const formattedName = tmpl ? rawFilename.replace(/\.docx?$/i, '.pdf') : rawFilename;
@@ -195,6 +199,9 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
           categoriaDoc: tmpl.categoria || 'Allegati Microvoce',
           statoDoc,
           dataScadenzaDoc: dataScadenzaDoc || undefined,
+          // Piano firma §3 — il livello scelto nel selettore viaggia fino al documento:
+          // il server lo fa rispettare al momento della firma (409 onesto su OTP se fea/feq).
+          livelloFirmaRichiesto,
         });
         dbId = salvato.id;
         savedFileUrl = salvato.fileUrl;
@@ -210,6 +217,9 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
           statoDoc,
           dataScadenzaDoc: dataScadenzaDoc || undefined,
           tipo: richiedeFirma ? 'allegato' : 'compilato',
+          // Piano firma §3 — vale anche per gli allegati caricati a mano: il livello scelto
+          // dal config diventa vincolo del documento, non una speranza del frontend.
+          livelloFirmaRichiesto,
         });
         dbId = salvato.id;
         savedFileUrl = salvato.fileUrl;
@@ -226,6 +236,7 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
       nome: formattedName,
       dimensione: file ? `${Math.round(file.size / 1024)} KB` : '56 KB',
       richiedeFirma,
+      livelloFirmaRichiesto,
       firmato: false,
       dataCaricamento: new Date().toLocaleDateString('it-IT'),
       templateId: tmpl?.id,
@@ -246,6 +257,9 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
           file: formattedName,
           documentoAllegatoUrl: tmpl?.id || savedFileUrl || newDoc.id,
           richiedeFirmaCliente: richiedeFirma,
+          // Piano firma §3 — il passaggio ricorda il livello richiesto dall'atto collegato,
+          // così la checklist lo mostra e il salvataggio del progetto lo riporta a DB.
+          livelloFirmaRichiesto,
         };
       }
       return s;
@@ -290,6 +304,8 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
             versione: d.versione || 1,
             pubblicatoAt: d.pubblicatoAt,
             fileUrl: d.fileUrl,
+            // Piano firma §3 — livello richiesto dall'atto, normalizzato (stringa ignota ⇒ 'ses').
+            livelloFirmaRichiesto: d.livelloFirmaRichiesto === 'fea' || d.livelloFirmaRichiesto === 'feq' ? d.livelloFirmaRichiesto : 'ses',
             richiesteModifica: d.richiesteModifica || [],
           }));
           setDocuments(mapped);
@@ -322,6 +338,7 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
         fileUrl: d.fileUrl,
         filePdfUrl: d.filePdfUrl ?? null,
         fileDocxUrl: d.fileDocxUrl ?? null,
+        livelloFirmaRichiesto: d.livelloFirmaRichiesto === 'fea' || d.livelloFirmaRichiesto === 'feq' ? d.livelloFirmaRichiesto : 'ses',
         richiesteModifica: d.richiesteModifica || [],
         firma: d.firma ?? null,
       }));
@@ -355,6 +372,9 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
           titolo,
           categoriaDoc: tmpl?.categoria || 'Allegati Microvoce',
           statoDoc: 'pubblicato',
+          // Piano firma §3 — il livello scelto nel configuratore viaggia anche quando il
+          // documento viene (ri)generato dal server al momento della pubblicazione.
+          livelloFirmaRichiesto: localDoc?.livelloFirmaRichiesto ?? 'ses',
         });
       };
 
@@ -503,6 +523,7 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
         fileBase64: base64,
         titolo: file.name,
         richiedeFirma: true,
+        livelloFirmaRichiesto: 'ses',
         metodoFirma: 'fea_otp',
         statoDoc: 'bozza',
         dataScadenzaDoc: '',

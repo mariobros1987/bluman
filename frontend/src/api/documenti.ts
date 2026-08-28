@@ -50,8 +50,10 @@ export interface DocumentoProgetto {
   documentoPadreId?: string | null;
   microvoceProgetto?: { nome: string } | null;
   caricatoDa?: { id: string; nome?: string; email?: string } | null;
+  /** Piano firma §3 — livello (ses|fea|feq) che il documento esige; default 'ses'. */
+  livelloFirmaRichiesto?: string | null;
   firmato: boolean;
-  firma: { riferimentoId: string | null; firmatoAt: string | null; signatureId: string | null; tipoFirma: string | null } | null;
+  firma: { riferimentoId: string | null; firmatoAt: string | null; signatureId: string | null; tipoFirma: string | null; valoreLegale?: string | null } | null;
   richiesteModifica?: RichiestaModificaDoc[];
 }
 
@@ -85,6 +87,8 @@ export async function salvaDocumentoApi(input: {
   // proprietà sconosciuta (errore invisibile finché il typecheck girava su zero file) e il
   // valore, pur arrivando al server, veniva appiattito su 'allegato'.
   tipo?: 'template_vuoto' | 'compilato' | 'firmato' | 'allegato' | 'verbale_firma';
+  /** Piano firma §3 — livello richiesto (ses|fea|feq); se assente il server usa 'ses'. */
+  livelloFirmaRichiesto?: 'ses' | 'fea' | 'feq';
 }): Promise<DocumentoProgetto> {
   const res = await apiFetch(`${API_BASE}/documenti`, {
     method: 'POST',
@@ -112,6 +116,8 @@ export async function generaDocumentoApi(input: {
   categoriaDoc?: string;
   statoDoc?: 'bozza' | 'pubblicato';
   dataScadenzaDoc?: string;
+  /** Piano firma §3 — se assente, il server eredita il livello del template (default 'ses'). */
+  livelloFirmaRichiesto?: 'ses' | 'fea' | 'feq';
 }): Promise<DocumentoProgetto> {
   const res = await apiFetch(`${API_BASE}/documenti/genera`, {
     method: 'POST',
@@ -160,6 +166,24 @@ export async function sbloccaDocumentoApi(documentoId: string, motivo: string): 
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
     throw new Error(data.errore ?? 'Errore sblocco documento');
+  }
+  const data = await res.json();
+  return data.documento;
+}
+
+/**
+ * Piano firma §3.3 — cambia il livello richiesto (ses|fea|feq) di un documento NON ancora
+ * firmato. Dopo la firma il server rifiuta: il valore legale è già fissato dal sigillo.
+ */
+export async function aggiornaLivelloFirmaDocumentoApi(documentoId: string, livelloFirmaRichiesto: 'ses' | 'fea' | 'feq'): Promise<DocumentoProgetto> {
+  const res = await apiFetch(`${API_BASE}/documenti/${encodeURIComponent(documentoId)}/livello-firma`, {
+    method: 'PATCH',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ livelloFirmaRichiesto }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.errore ?? 'Errore aggiornamento livello di firma');
   }
   const data = await res.json();
   return data.documento;
@@ -422,7 +446,7 @@ export async function fetchDocumentiTemplateApi() {
   }
 }
 
-export async function creaDocumentoTemplateApi(data: { titolo: string; categoria?: string; descrizione?: string; contenutoHtml: string }) {
+export async function creaDocumentoTemplateApi(data: { titolo: string; categoria?: string; descrizione?: string; contenutoHtml: string; livelloFirmaRichiesto?: 'ses' | 'fea' | 'feq' }) {
   // §3.3 — il fallback fabbricava un template locale in localStorage spacciandolo per
   // salvato sul server. Il salvataggio locale (se voluto) spetta al chiamante; qui
   // l'errore si propaga così la UI può dire la verità.
@@ -435,7 +459,7 @@ export async function creaDocumentoTemplateApi(data: { titolo: string; categoria
   return await res.json();
 }
 
-export async function aggiornaDocumentoTemplateApi(id: string, data: { titolo?: string; categoria?: string; descrizione?: string; contenutoHtml?: string }) {
+export async function aggiornaDocumentoTemplateApi(id: string, data: { titolo?: string; categoria?: string; descrizione?: string; contenutoHtml?: string; livelloFirmaRichiesto?: 'ses' | 'fea' | 'feq' }) {
   // §3.3 — nessun fallback: aggiornamento fallito = il template è ancora com'era.
   const res = await apiFetch(`${API_BASE}/documenti-template/${id}`, {
     method: 'PUT',

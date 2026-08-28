@@ -511,6 +511,10 @@ model PassaggioProgetto {
   risposteFormJson    Json?             @map("risposte_form_json")
   noteOperatoreJson   Json?             @map("note_operatore_json")
   richiedeFirmaCliente Boolean          @default(false) @map("richiede_firma_cliente")
+  // Piano firma §3.1 (Fase 2) — valore legale richiesto (ses|fea|feq) per la conferma
+  // firmata di questo passaggio/modulo. Finché la firma non è apposta resta cambiabile;
+  // dopo diventa storia. Con fea/feq la rotta OTP semplice risponde 409.
+  livelloFirmaRichiesto String          @default("ses") @map("livello_firma_richiesto")
   documentoAllegatoUrl String?          @map("documento_allegato_url")
   formMasterId         String?          @map("form_master_id")
   linkIstruzioni       String?          @map("link_istruzioni")
@@ -526,6 +530,9 @@ model ModelloDocumentoInBianco {
   categoria     String
   fileUrl       String   @map("file_url")
   richiedeFirma Boolean  @default(true) @map("richiede_firma")
+  // Piano firma §3.1 (Fase 2) — livello di valore legale (ses|fea|feq) imposto a ogni
+  // documento generato da questo template. Copiato su Documento alla generazione.
+  livelloFirmaRichiesto String @default("ses") @map("livello_firma_richiesto")
   descrizione   String?
   createdAt     DateTime @default(now()) @map("created_at")
 
@@ -612,6 +619,10 @@ model Documento {
   // Ogni upload parte come bozza: l'operatore pubblica esplicitamente quando il documento è pronto.
   statoDoc            StatoDocumento    @default(bozza) @map("stato_doc")
   pubblicatoAt        DateTime?         @map("pubblicato_at")
+  // Piano firma §3.1 (Fase 2) — valore legale richiesto (ses|fea|feq) per firmare questo
+  // documento. I generati lo ereditano dal template; per gli upload manuali lo sceglie
+  // l'operatore alla pubblicazione. Cambiabile finché la firma non è apposta.
+  livelloFirmaRichiesto String          @default("ses") @map("livello_firma_richiesto")
   // Versioning: documentoPadreId punta alla riga v1 quando si carica una v2 corretta.
   documentoPadreId    String?           @map("documento_padre_id")
   documentoPadre      Documento?        @relation("VersioniDocumento", fields: [documentoPadreId], references: [id])
@@ -983,6 +994,10 @@ model ModelloDocumentoCustom {
   categoria      String   @default("contratto")
   descrizione    String?
   contenutoHtml  String   @map("contenuto_html") @db.Text
+  // Piano firma §3.1 (Fase 2) — livello di valore legale (ses|fea|feq) scelto sul
+  // template del Document Studio: POST /documenti/genera lo copia sul documento
+  // generato, salvo override esplicita dell'operatore nella richiesta.
+  livelloFirmaRichiesto String @default("ses") @map("livello_firma_richiesto")
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
@@ -1099,6 +1114,10 @@ model FirmaElettronica {
   // qualificata_esterna    → firmato con provider di firma digitale del cliente (§1.3)
   // Il tipo non è cosmetico: cambia il valore probatorio, e va scritto accanto alla firma.
   tipoFirma String  @map("tipo_firma")
+  // Piano firma §3.1 (Fase 2) — valore legale EFFETTIVO della firma apposta (ses|fea|feq).
+  // `tipoFirma` dice il meccanismo, questo dice la legge: lo scrivono le rotte di firma al
+  // momento dell'apposizione. Le righe già registrate non si toccano: è un atto probatorio.
+  valoreLegale String @default("ses") @map("valore_legale")
   ambito    String   @map("ambito")
   riferimentoId String? @map("riferimento_id")
   documentoTitolo String @map("documento_titolo")

@@ -13,6 +13,8 @@ export interface DocumentoEntry {
   nome: string;
   dimensione: string;
   richiedeFirma: boolean;
+  /** Piano firma §3 — livello (ses|fea|feq) che il documento esige; default 'ses'. */
+  livelloFirmaRichiesto?: 'ses' | 'fea' | 'feq';
   firmato: boolean;
   dataCaricamento: string;
   templateId?: string;
@@ -31,7 +33,7 @@ export interface DocumentoEntry {
    * prima l'app diceva solo "FIRMATO" e la data era leggibile solo nel portale.
    * Non viene mai ricostruito lato client: se il server non lo manda, non si mostra.
    */
-  firma?: { riferimentoId: string | null; firmatoAt: string | null; signatureId: string | null; tipoFirma: string | null } | null;
+  firma?: { riferimentoId: string | null; firmatoAt: string | null; signatureId: string | null; tipoFirma: string | null; valoreLegale?: string | null } | null;
 }
 
 export interface ConfigFirmaModalState {
@@ -42,6 +44,12 @@ export interface ConfigFirmaModalState {
     stepId?: string;
     titolo: string;
     richiedeFirma: boolean;
+    /**
+     * Piano firma §3 — livello legale (ses|fea|feq) che questo documento esige dal cliente.
+     * Sceglierlo è responsabilità dell'operatore; di default resta 'ses' (comportamento storico).
+     * Il server lo copia sul documento e lo fa rispettare al momento della firma (409 onesto).
+     */
+    livelloFirmaRichiesto: 'ses' | 'fea' | 'feq';
     metodoFirma: 'fea_otp' | 'manuale_scansionata' | 'qualificata_esterna' | 'tutte';
     statoDoc: 'bozza' | 'pubblicato';
     dataScadenzaDoc: string;

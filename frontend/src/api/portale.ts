@@ -210,6 +210,8 @@ export interface DocumentoPortale {
   scaricabile: boolean;
   firmato: boolean;
   richiedeFirma: boolean;
+  /** Piano firma §3 — livello (ses|fea|feq) che il documento esige; normalizzato dal server. */
+  livelloFirmaRichiesto?: 'ses' | 'fea' | 'feq' | null;
   dataFirma: string | null;
   tipoFirma: string | null;
   signatureId: string | null;
@@ -219,6 +221,8 @@ export interface DocumentoPortale {
   firmaGrafometricaPng?: string | null;
   firmatarioNome?: string | null;
   standard?: string | null;
+  /** Piano firma §3 — valore legale effettivo della firma apposta, scritto dal server. */
+  valoreLegale?: 'ses' | 'fea' | 'feq' | null;
   statoDoc?: 'bozza' | 'pubblicato' | 'in_revisione' | 'firmato';
   pubblicatoAt?: string | null;
   richiesteModifica?: RichiestaModificaDoc[];

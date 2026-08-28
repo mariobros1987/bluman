@@ -7,6 +7,8 @@ export function ModaleNuovoTemplate({
   setNewTmplTitolo,
   newTmplCat,
   setNewTmplCat,
+  newTmplLivello,
+  setNewTmplLivello,
   newTmplDesc,
   setNewTmplDesc,
 }: {
@@ -16,6 +18,9 @@ export function ModaleNuovoTemplate({
   setNewTmplTitolo: React.Dispatch<React.SetStateAction<string>>;
   newTmplCat: 'societario' | 'contratto' | 'nda' | 'engagement' | 'delega' | 'fiscale' | 'trust' | 'compliance';
   setNewTmplCat: React.Dispatch<React.SetStateAction<'societario' | 'contratto' | 'nda' | 'engagement' | 'delega' | 'fiscale' | 'trust' | 'compliance'>>;
+  /** Piano firma §3 — livello legale (ses|fea|feq) che il nuovo Modello Master esigerà. */
+  newTmplLivello: 'ses' | 'fea' | 'feq';
+  setNewTmplLivello: React.Dispatch<React.SetStateAction<'ses' | 'fea' | 'feq'>>;
   newTmplDesc: string;
   setNewTmplDesc: React.Dispatch<React.SetStateAction<string>>;
 }) {
@@ -93,6 +98,60 @@ export function ModaleNuovoTemplate({
                   <option value="compliance">Compliance & UBO KYC</option>
                   <option value="fiscale">Fiscale & Tax Planning</option>
                 </select>
+              </div>
+
+              {/* Piano firma §3 — livello legale che il Modello Master esigerà a ogni
+                  generazione: i documenti derivati lo ereditano e il server lo userà
+                  per l'enforcement (409) sulle rotte di firma. */}
+              <div>
+                <label style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text)', display: 'block', marginBottom: 8 }}>
+                  ⚖️ Livello Legale Richiesto all'Atto *
+                </label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                  {([
+                    {
+                      id: 'ses' as const,
+                      icon: '📱',
+                      titolo: 'SES — Semplice',
+                      desc: 'Firma elettronica semplice (art. 20 CAD / eIDAS art. 3 n. 10). Il flusso OTP attuale.',
+                    },
+                    {
+                      id: 'fea' as const,
+                      icon: '🧠',
+                      titolo: 'FEA — Avanzata',
+                      desc: 'Firma elettronica avanzata (eIDAS art. 26): richiede misure aggiuntive in Fase 3; per ora il portale la rifiuta.',
+                    },
+                    {
+                      id: 'feq' as const,
+                      icon: '🔐',
+                      titolo: 'FEQ — Qualificata',
+                      desc: 'Firma elettronica qualificata (eIDAS art. 25): solo tramite provider esterno del cliente (file .p7m).',
+                    },
+                  ]).map((l) => (
+                    <button
+                      key={l.id}
+                      type="button"
+                      onClick={() => setNewTmplLivello(l.id)}
+                      style={{
+                        background: newTmplLivello === l.id ? '#1e1b4b' : 'var(--card)',
+                        border: `1.5px solid ${newTmplLivello === l.id ? 'var(--indigo)' : 'var(--border)'}`,
+                        borderRadius: 10, padding: '9px 10px', textAlign: 'left', cursor: 'pointer',
+                        display: 'flex', flexDirection: 'column', gap: 3
+                      }}
+                    >
+                      <div style={{ fontSize: 11, fontWeight: 700, color: newTmplLivello === l.id ? '#a5b4fc' : 'var(--text)', display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <span>{l.icon}</span> {l.titolo}
+                      </div>
+                      <div style={{ fontSize: 9.5, color: 'var(--muted)', lineHeight: 1.3 }}>{l.desc}</div>
+                    </button>
+                  ))}
+                </div>
+                {newTmplLivello !== 'ses' && (
+                  <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: '#f59e0b18', border: '1px solid #f59e0b50', fontSize: 10, color: 'var(--muted)', lineHeight: 1.4 }}>
+                    ⚠️ Con livello {newTmplLivello === 'fea' ? 'FEA' : 'FEQ'} il server <strong>blocca</strong> il flusso OTP:
+                    {' '}il cliente riceverà un avviso esplicito e dovrà usare il percorso {newTmplLivello === 'fea' ? 'riservato alla Fase 3 (al momento non disponibile in portale)' : 'con provider di firma digitale qualificata (caricamento del file firmato)'}.
+                  </div>
+                )}
               </div>
 
               <div>

@@ -24,6 +24,7 @@ import { scanFileBuffer } from '../services/securityScanner.js';
 import { contestoTagDocumento, risolviTagDocumento, blocchiDaHtml, generaPdfDocumento, generaDocxDocumento } from '../services/generazioneDocumenti.js';
 import { notificaCliente } from '../services/notificheService.js';
 import { recordAudit, ipReale, nomeFileDaUrl } from '../util/serverHelpers.js';
+import { livelloFirmaValido, normalizzaLivelloFirma, type LivelloFirma } from '../services/livelloFirmaService.js';
 
 // ─── DOCUMENTI: MODELLI STUDIO (DOCUMENT STUDIO) & FASCICOLO §2.9 ───
 export async function registraRotteDocumenti(server: FastifyInstance): Promise<void> {
@@ -41,9 +42,12 @@ export async function registraRotteDocumenti(server: FastifyInstance): Promise<v
     }
   });
 
-  server.post<{ Body: { titolo: string; categoria?: string; descrizione?: string; contenutoHtml: string } }>('/documenti-template', async (req, reply) => {
+  server.post<{ Body: { titolo: string; categoria?: string; descrizione?: string; contenutoHtml: string; livelloFirmaRichiesto?: string } }>('/documenti-template', async (req, reply) => {
     const tenantId = (req as any).tenantId;
-    const { titolo, categoria, descrizione, contenutoHtml } = req.body;
+    const { titolo, categoria, descrizione, contenutoHtml, livelloFirmaRichiesto } = req.body;
+    if (livelloFirmaRichiesto !== undefined && !livelloFirmaValido(livelloFirmaRichiesto)) {
+      return reply.code(400).send({ errore: 'livelloFirmaRichiesto non valido: i valori ammessi sono ses, fea, feq.' });
+    }
     try {
       const nuovo = await (prisma as any).modelloDocumentoCustom.create({
         data: {
@@ -52,6 +56,9 @@ export async function registraRotteDocumenti(server: FastifyInstance): Promise<v
           categoria: categoria || 'contratto',
           descrizione: descrizione || '',
           contenutoHtml: contenutoHtml || '',
+          // Piano §3.1 — il livello scelto sul template viene copiato sul documento alla
+          // generazione (POST /documenti/genera); 'ses' se lo studio non lo specifica.
+          livelloFirmaRichiesto: livelloFirmaRichiesto ?? 'ses',
         },
       });
       await recordAudit({
@@ -66,10 +73,13 @@ export async function registraRotteDocumenti(server: FastifyInstance): Promise<v
     }
   });
 
-  server.put<{ Params: { id: string }; Body: { titolo?: string; categoria?: string; descrizione?: string; contenutoHtml?: string } }>('/documenti-template/:id', async (req, reply) => {
+  server.put<{ Params: { id: string }; Body: { titolo?: string; categoria?: string; descrizione?: string; contenutoHtml?: string; livelloFirmaRichiesto?: string } }>('/documenti-template/:id', async (req, reply) => {
     const tenantId = (req as any).tenantId;
     const { id } = req.params;
-    const { titolo, categoria, descrizione, contenutoHtml } = req.body;
+    const { titolo, categoria, descrizione, contenutoHtml, livelloFirmaRichiesto } = req.body;
+    if (livelloFirmaRichiesto !== undefined && !livelloFirmaValido(livelloFirmaRichiesto)) {
+      return reply.code(400).send({ errore: 'livelloFirmaRichiesto non valido: i valori ammessi sono ses, fea, feq.' });
+    }
     try {
       const aggiornato = await (prisma as any).modelloDocumentoCustom.update({
         where: { id },
@@ -78,6 +88,7 @@ export async function registraRotteDocumenti(server: FastifyInstance): Promise<v
           ...(categoria && { categoria }),
           ...(descrizione !== undefined && { descrizione }),
           ...(contenutoHtml !== undefined && { contenutoHtml }),
+          ...(livelloFirmaRichiesto !== undefined && { livelloFirmaRichiesto }),
         },
       });
       return reply.send(aggiornato);
@@ -144,6 +155,9 @@ export async function registraRotteDocumenti(server: FastifyInstance): Promise<v
             progettoId: true,
             microvoceProgettoId: true,
             statoDoc: true,
+            // Piano §3 — il livello che il documento esige, visibile allo studio per
+            // gestirne la pubblicazione e capirne la firmabilità sul portale.
+            livelloFirmaRichiesto: true,
             pubblicatoAt: true,
             documentoPadreId: true,
             isArchiviato: true,
@@ -169,7 +183,7 @@ export async function registraRotteDocumenti(server: FastifyInstance): Promise<v
         // informazione lo studio mostrerebbe «da firmare» un documento già sottoscritto.
         const firme = await prisma.firmaElettronica.findMany({
           where: { tenantId, ambito: 'documento_vault', riferimentoId: { in: documenti.map((d) => d.id) } },
-          select: { riferimentoId: true, firmatoAt: true, signatureId: true, tipoFirma: true },
+          select: { riferimentoId: true, firmatoAt: true, signatureId: true, tipoFirma: true, valoreLegale: true },
           orderBy: { firmatoAt: 'desc' },
         });
         const firmaPerDocumento = new Map<string, (typeof firme)[number]>();
@@ -209,11 +223,12 @@ export async function registraRotteDocumenti(server: FastifyInstance): Promise<v
       categoriaDoc?: string;
       dataScadenzaDoc?: string;
       statoDoc?: 'bozza' | 'pubblicato';
+      livelloFirmaRichiesto?: string;
     };
   }>('/documenti', async (req, reply) => {
     const tenantId = (req as any).tenantId;
     const userId = (req as any).userId as string | undefined;
-    const { progettoId, microvoceProgettoId, filename, contentBase64, tipo, categoriaDoc, dataScadenzaDoc, statoDoc } = req.body;
+    const { progettoId, microvoceProgettoId, filename, contentBase64, tipo, categoriaDoc, dataScadenzaDoc, statoDoc, livelloFirmaRichiesto } = req.body;
 
     if (!progettoId || !filename || !contentBase64) {
       return reply.code(400).send({ errore: 'progettoId, filename e contentBase64 sono obbligatori.' });
@@ -223,6 +238,10 @@ export async function registraRotteDocumenti(server: FastifyInstance): Promise<v
     const scadenza = dataScadenzaDoc ? new Date(dataScadenzaDoc) : null;
     if (dataScadenzaDoc && Number.isNaN(scadenza?.getTime())) {
       return reply.code(400).send({ errore: 'dataScadenzaDoc non è una data valida.' });
+    }
+
+    if (livelloFirmaRichiesto !== undefined && !livelloFirmaValido(livelloFirmaRichiesto)) {
+      return reply.code(400).send({ errore: 'livelloFirmaRichiesto non valido: i valori ammessi sono ses, fea, feq.' });
     }
 
     try {
@@ -257,6 +276,9 @@ export async function registraRotteDocumenti(server: FastifyInstance): Promise<v
           caricatoDa: userId,
           categoriaDoc: categoriaDoc || 'generico',
           dataScadenzaDoc: scadenza,
+          // Piano §3.1 — per gli upload manuali il livello lo sceglie l'operatore alla
+          // pubblicazione; 'ses' se non indicato (comportamento invariato).
+          livelloFirmaRichiesto: livelloFirmaRichiesto ?? 'ses',
           statoDoc: defaultStatoDoc,
           pubblicatoAt: defaultStatoDoc === 'pubblicato' ? new Date() : null,
           statoScansione: 'pulito',
@@ -305,17 +327,21 @@ export async function registraRotteDocumenti(server: FastifyInstance): Promise<v
       categoriaDoc?: string;
       statoDoc?: 'bozza' | 'pubblicato';
       dataScadenzaDoc?: string;
+      livelloFirmaRichiesto?: string;
     };
   }>('/documenti/genera', async (req, reply) => {
     const tenantId = (req as any).tenantId;
     const userId = (req as any).userId as string | undefined;
-    const { progettoId, microvoceProgettoId, modelloId, contenutoHtml, titolo, categoriaDoc, statoDoc, dataScadenzaDoc } = req.body;
+    const { progettoId, microvoceProgettoId, modelloId, contenutoHtml, titolo, categoriaDoc, statoDoc, dataScadenzaDoc, livelloFirmaRichiesto } = req.body;
 
     if (!progettoId) return reply.code(400).send({ errore: 'progettoId è obbligatorio.' });
     if (!modelloId && !contenutoHtml) {
       return reply.code(400).send({ errore: 'Indicare il modello (modelloId) o il contenuto HTML del template.' });
     }
     if (!userId) return reply.code(401).send({ errore: 'Sessione non valida.' });
+    if (livelloFirmaRichiesto !== undefined && !livelloFirmaValido(livelloFirmaRichiesto)) {
+      return reply.code(400).send({ errore: 'livelloFirmaRichiesto non valido: i valori ammessi sono ses, fea, feq.' });
+    }
 
     const scadenza = dataScadenzaDoc ? new Date(dataScadenzaDoc) : null;
     if (dataScadenzaDoc && Number.isNaN(scadenza?.getTime())) {
@@ -357,12 +383,17 @@ export async function registraRotteDocumenti(server: FastifyInstance): Promise<v
       let htmlTemplate = contenutoHtml ?? '';
       let titoloDocumento = titolo?.trim() || '';
       let categoria = categoriaDoc || '';
+      // Piano §3.1 — il livello richiesto dal template è ereditato dal documento generato,
+      // salvo override esplicita dell'operatore nella richiesta (il template impone,
+      // l'operatore può alzare o precisare alla generazione).
+      let livelloFinale: LivelloFirma = livelloFirmaRichiesto ?? 'ses';
       if (modelloId) {
         const modello = await prisma.modelloDocumentoCustom.findFirst({ where: { id: modelloId, tenantId } });
         if (!modello) return reply.code(404).send({ errore: 'Modello documento non trovato.' });
         htmlTemplate = modello.contenutoHtml || '';
         titoloDocumento = titoloDocumento || modello.titolo;
         categoria = categoria || modello.categoria;
+        if (!livelloFirmaRichiesto) livelloFinale = normalizzaLivelloFirma(modello.livelloFirmaRichiesto);
       }
       if (!htmlTemplate.trim()) {
         return reply.code(400).send({ errore: 'Il template indicato non ha contenuto.' });
@@ -432,6 +463,7 @@ export async function registraRotteDocumenti(server: FastifyInstance): Promise<v
           caricatoDa: userId,
           categoriaDoc: categoria || 'generico',
           dataScadenzaDoc: scadenza,
+          livelloFirmaRichiesto: livelloFinale,
           statoDoc: defaultStatoDoc,
           pubblicatoAt: defaultStatoDoc === 'pubblicato' ? new Date() : null,
           statoScansione: 'pulito',
@@ -539,6 +571,59 @@ export async function registraRotteDocumenti(server: FastifyInstance): Promise<v
       return reply.send({ ok: true, documento: updated });
     } catch (err) {
       return reply.code(500).send({ errore: err instanceof Error ? err.message : 'Errore aggiornamento stato documento' });
+    }
+  });
+
+  /**
+   * PATCH /documenti/:id/livello-firma — piano firma §3.3
+   * L'operatore cambia il valore legale che il documento esige (ses|fea|feq) finché il
+   * cliente non lo ha firmato: il livello è un presupposto della sottoscrizione, non un
+   * dato dell'atto. Dopo la firma il sigillo ha già fissato `valoreLegale` e la premessa
+   * non si tocca più — stessa guardia di PATCH /documenti/:id/stato.
+   * Se il livello viene alzato mentre un codice OTP è pendente non si rompe nulla:
+   * verify-otp-and-sign ricontrolla il livello prima di apporre la firma (§3.2).
+   */
+  server.patch<{
+    Params: { id: string };
+    Body: { livelloFirmaRichiesto: string };
+  }>('/documenti/:id/livello-firma', async (req, reply) => {
+    const tenantId = (req as any).tenantId;
+    const { id } = req.params;
+    const { livelloFirmaRichiesto } = req.body;
+
+    if (!livelloFirmaValido(livelloFirmaRichiesto)) {
+      return reply.code(400).send({ errore: 'livelloFirmaRichiesto non valido: i valori ammessi sono ses, fea, feq.' });
+    }
+
+    try {
+      const doc = await prisma.documento.findFirst({
+        where: { id, tenantId },
+        select: { id: true, statoDoc: true, livelloFirmaRichiesto: true },
+      });
+      if (!doc) return reply.code(404).send({ errore: 'Documento non trovato.' });
+
+      if (doc.statoDoc === 'firmato') {
+        return reply.code(409).send({
+          errore: 'Il documento è stato firmato dal cliente: il livello di firma richiesto non è più modificabile.',
+        });
+      }
+
+      const aggiornato = await prisma.documento.update({
+        where: { id },
+        data: { livelloFirmaRichiesto },
+      });
+
+      await recordAudit({
+        tenantId,
+        azione: 'DOCUMENTO_LIVELLO_FIRMA_AGGIORNATO',
+        entita: id,
+        dettagli: `Livello di firma richiesto del documento ${id} aggiornato da «${doc.livelloFirmaRichiesto}» a «${livelloFirmaRichiesto}»`,
+        ipAddress: req.ip,
+      });
+
+      return reply.send({ ok: true, documento: aggiornato });
+    } catch (err) {
+      return reply.code(500).send({ errore: err instanceof Error ? err.message : 'Errore aggiornamento livello firma' });
     }
   });
 

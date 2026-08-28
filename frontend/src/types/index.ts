@@ -89,6 +89,8 @@ export interface Passaggio {
   documentoAllegatoUrl?: string;
   formMasterId?: string;
   linkIstruzioni?: string;
+  /** Piano firma §3 — livello (ses|fea|feq) che l'atto collegato esige; default 'ses'. */
+  livelloFirmaRichiesto?: 'ses' | 'fea' | 'feq';
 }
 
 export interface ModuloProgetto {

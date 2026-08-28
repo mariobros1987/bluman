@@ -9,6 +9,8 @@ export interface DocumentTemplate {
   contenutoHtml: string;
   archiviato?: boolean;
   dataCreazione?: string;
+  /** Piano firma §3 — livello (ses|fea|feq) che i documenti generati da questo modello esigono; default 'ses'. */
+  livelloFirmaRichiesto?: 'ses' | 'fea' | 'feq';
 }
 
 export const PREBUILT_TEMPLATES: DocumentTemplate[] = [
