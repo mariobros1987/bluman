@@ -552,7 +552,8 @@ Split puramente presentazionale: nessun cambio di comportamento, `App.tsx` invar
 - ✅ `Library.tsx` (28/08/2026, commit `dbc8358`): da 2.879 a 449 righe. I 6 componenti già autonomi nel monolite traslocati in `frontend/src/components/library/` (`AssegnaModuloClienteModal`, `ArticoliCatalogView`, `GiurisdizioniView`, `LibreriaDocumentiEForm`, `NuovoArticoloModal`, `CreaModuloForm`); corpi byte-identici, nessun import circolare, `tsc -b` verde. `LibreriaDocumentiEForm` (730 righe) resta candidato a un futuro frazionamento.
 - ✅ `api/client.ts` (28/08/2026, commit `f50cc8f`): da 2.792 righe a 13 file dominio + `http.ts` (helper condivisi) in `frontend/src/api/` — `auth`, `clienti`, `progetti`, `documenti`, `libreria`, `fatturazione`, `portale`, `firma`, `tenant`, `notifiche`, `report`, `timesheet`. `client.ts` diventa barrel (14 righe): tutti i 151 export originali conservati, zero import da aggiornare nel resto del codebase. Corpi byte-identici (verifica multiset), `tsc -b` verde.
 - ✅ `SettingsPage.tsx` (28/08/2026, commit `eaeae7d`): da 1.905 a 661 righe. La pagina mantiene stato (72 useState), effetti, handler e tab bar; estratti 10 componenti presentazionali in `frontend/src/components/settings/` (`TabCompany`, `TabInvoiceDesign`, `InvoicePreviewModal`, `TabChannels`, `TabUsers`, `TabSdi`, `TabManutenzione`, `OperatorDetailModal` traslocato 1:1, `InviteUserModal`, `ResetPasswordModal`). Corpi byte-identici, `tsc -b` verde.
-- ⏸ Coda: `PassaggioModal.tsx`, `DocumentEditorPage.tsx`, `ClientsPage.tsx`.
+- ✅ `ClientsPage.tsx` (28/08/2026, commit `1d291b1`): da 1.384 a 377 righe. I tre modali già autonomi traslocati 1:1 in `frontend/src/components/clients/` (`AnagraficaErpModal` 643 con helper `tabBtn`, `MagicLinkExplainModal` 122, `CredentialsExplainModal` 255); corpi byte-identici (multiset 1273=1273), `tsc -b` verde. `AnagraficaErpModal` candidato a futuro frazionamento.
+- ⏸ Coda: `PassaggioModal.tsx`, `DocumentEditorPage.tsx`.
 
 ---
 
@@ -886,7 +887,7 @@ REDIS_URL=
 ### FASE 2 — Refactoring (1-2 settimane)
 - [x] 2.1 Spezzare server.ts in moduli route (27/08/2026, commit da 246d313 a 05c3d7e)
 - [x] 2.1b Split frontend ClientPortal.tsx (28/08/2026, commit 6aee803)
-- [ ] 2.1c Split frontend altri monoliti (ProjectDetail ✅ 8a19b6f; Library ✅ dbc8358; api/client.ts ✅ f50cc8f; SettingsPage ✅ eaeae7d; restano: PassaggioModal, DocumentEditorPage, ClientsPage)
+- [ ] 2.1c Split frontend altri monoliti (ProjectDetail ✅ 8a19b6f; Library ✅ dbc8358; api/client.ts ✅ f50cc8f; SettingsPage ✅ eaeae7d; ClientsPage ✅ 1d291b1; restano: PassaggioModal, DocumentEditorPage)
 - [ ] 2.2 Validazione Zod su tutti gli endpoint
 - [ ] 2.3 Tipizzare FastifyRequest
 - [ ] 2.4 Eliminare `as any` residui
