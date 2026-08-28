@@ -221,6 +221,19 @@ npx tsx src/index.ts
 cd frontend && npm run dev
 ```
 
+### 🔑 Identità Git e deploy Vercel (IMPORTANTE)
+
+Vercel (piano Hobby, team `fanta-ia`) **blocca il deploy se l'autore del commit non è riconosciuto** come proprietario del progetto ("The deployment was blocked because the commit author did not have contributing access..."). L'email dell'autore DEVE essere quella dell'account GitHub proprietario del repo:
+
+```bash
+git config user.name "Mario Dibenedetto"
+git config user.email "mariobros1987@gmail.com"   # NON mario.dibenedetto87@gmail.com: quella non è mappata sull'account GitHub e blocca Vercel
+```
+
+- Il repo ha già questa configurazione locale (impostata il 28/08/2026 dopo un blocco del deploy).
+- Il progetto root `bluman` si deploya da solo a ogni push su `main` (integrazione GitHub); il progetto `frontend` si deploya manualmente dalla cartella `frontend/` con `npx vercel --prod`.
+- Verifica stato deploy: `npx vercel ls` (CLI già autenticata).
+
 ---
 
 ## ⚡ Connessione Diretta a Supabase tramite CLI & Prisma (IMPORTANTISSIMO)
