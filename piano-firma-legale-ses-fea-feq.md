@@ -135,6 +135,7 @@ Il ri-caricamento di file qualificato (`qualificata_esterna`) copre già il caso
 
 ## 6. Domande aperte per il titolare
 
-1. **Fase 3**: lo studio vuole poter offrire firme FEA "vere" (con riconoscimento del firmatario), o l'offerta resta SES + FEQ-esterna? È la decisione che cambia il perimetro.
-2. Il livello `feq` imposto su un documento deve **bloccare** il portale finché il cliente non firma col proprio provider (comportamento proposto), o degradare a SES con avviso?
-3. Per `engagement_letter` l'hash resta quello del browser (il testo è composto lì): si accetta anche per documenti di livello superiore, o la lettera d'incarico firmabile con FEA/FEQ deve passare dal documento generato server-side (hash server)?
+1. ✅ **Risposta 28/08/2026** — Sì: lo studio vuole offrire firme FEA "vere". La Fase 3 entra nel piano di lavoro (dopo la Fase 2). Complessità valutata media: firmatario da anagrafica/referenti censiti, controllo esclusivo rafforzato (doppio canale o grafometrica obbligatoria), certificato di sessione nel sigillo, flusso `valoreLegale: 'fea'` con audit dedicato. Nessuna integrazione esterna.
+2. ✅ **Risposta 28/08/2026** (implicita nell'approvazione della Fase 2 con enforcement) — Il livello `feq` **blocca** il flusso OTP (409) finché il cliente non firma col proprio provider; niente degradazione silenziosa a SES.
+3. ⚠️ **Regola adottata in implementazione** — Per livelli `fea`/`feq` l'hash deve essere **server-side** (documento generato dal server, `POST /documenti/genera`); l'hash composto dal browser resta ammesso solo per documenti `ses`. Se il titolare vuole diversamente, dirlo e si cambia.
+4. ✅ **Risposta 28/08/2026** (Fase 4) — Niente integrazione diretta con provider: resta il ri-caricamento del file firmato dal cliente (`qualificata_esterna`), già funzionante e onestamente etichettato FEQ dalla Fase 1.
