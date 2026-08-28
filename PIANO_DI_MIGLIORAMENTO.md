@@ -553,7 +553,8 @@ Split puramente presentazionale: nessun cambio di comportamento, `App.tsx` invar
 - ✅ `api/client.ts` (28/08/2026, commit `f50cc8f`): da 2.792 righe a 13 file dominio + `http.ts` (helper condivisi) in `frontend/src/api/` — `auth`, `clienti`, `progetti`, `documenti`, `libreria`, `fatturazione`, `portale`, `firma`, `tenant`, `notifiche`, `report`, `timesheet`. `client.ts` diventa barrel (14 righe): tutti i 151 export originali conservati, zero import da aggiornare nel resto del codebase. Corpi byte-identici (verifica multiset), `tsc -b` verde.
 - ✅ `SettingsPage.tsx` (28/08/2026, commit `eaeae7d`): da 1.905 a 661 righe. La pagina mantiene stato (72 useState), effetti, handler e tab bar; estratti 10 componenti presentazionali in `frontend/src/components/settings/` (`TabCompany`, `TabInvoiceDesign`, `InvoicePreviewModal`, `TabChannels`, `TabUsers`, `TabSdi`, `TabManutenzione`, `OperatorDetailModal` traslocato 1:1, `InviteUserModal`, `ResetPasswordModal`). Corpi byte-identici, `tsc -b` verde.
 - ✅ `ClientsPage.tsx` (28/08/2026, commit `1d291b1`): da 1.384 a 377 righe. I tre modali già autonomi traslocati 1:1 in `frontend/src/components/clients/` (`AnagraficaErpModal` 643 con helper `tabBtn`, `MagicLinkExplainModal` 122, `CredentialsExplainModal` 255); corpi byte-identici (multiset 1273=1273), `tsc -b` verde. `AnagraficaErpModal` candidato a futuro frazionamento.
-- ⏸ Coda: `PassaggioModal.tsx`, `DocumentEditorPage.tsx`.
+- ✅ `PassaggioModal.tsx` (28/08/2026, commit `fa29925`): da 1.801 a 730 righe. Il container mantiene stato (16 useState), tutti gli handler (incluso `eseguiSalvataggioConfigurato`, zona bug #21 lasciata intatta come da piano) e la modale anteprima documento; estratti 5 componenti presentazionali in `frontend/src/components/passaggio/` (`TabPassaggi` 248, `TabNote` 55, `TabDocumenti` 453, `ModaleCatalogo` 79, `ModaleConfigFirma` 239) più moduli di supporto (`catalogoModelliStudio.ts` con `getSmartDocumentRecommendation`, `passaggioUtils.ts` con `etichettaTipoFirma`/`getDefaultPassaggi`/`TYPE_LABEL`/`TYPE_COLOR`, `types.ts` con `NoteEntry`/`DocumentoEntry`/`ConfigFirmaModalState`, `passaggioStyles.ts`). Corpi byte-identici (verifica multiset: perse solo le 12 righe strutturali attese), `tsc -b` verde.
+- ⏸ Coda: `DocumentEditorPage.tsx` (1.552 righe, ultimo monolite).
 
 ---
 
@@ -887,7 +888,7 @@ REDIS_URL=
 ### FASE 2 — Refactoring (1-2 settimane)
 - [x] 2.1 Spezzare server.ts in moduli route (27/08/2026, commit da 246d313 a 05c3d7e)
 - [x] 2.1b Split frontend ClientPortal.tsx (28/08/2026, commit 6aee803)
-- [ ] 2.1c Split frontend altri monoliti (ProjectDetail ✅ 8a19b6f; Library ✅ dbc8358; api/client.ts ✅ f50cc8f; SettingsPage ✅ eaeae7d; ClientsPage ✅ 1d291b1; restano: PassaggioModal, DocumentEditorPage)
+- [ ] 2.1c Split frontend altri monoliti (ProjectDetail ✅ 8a19b6f; Library ✅ dbc8358; api/client.ts ✅ f50cc8f; SettingsPage ✅ eaeae7d; ClientsPage ✅ 1d291b1; PassaggioModal ✅ fa29925; resta: DocumentEditorPage)
 - [ ] 2.2 Validazione Zod su tutti gli endpoint
 - [ ] 2.3 Tipizzare FastifyRequest
 - [ ] 2.4 Eliminare `as any` residui
@@ -932,5 +933,5 @@ REDIS_URL=
 
 ---
 
-*Ultimo aggiornamento: 2026-08-28 (split monoliti frontend §2.1c: `ProjectDetail.tsx` commit `8a19b6f`, `Library.tsx` commit `dbc8358`, `api/client.ts` da 2.792 righe a 13 file dominio + barrel con commit `f50cc8f`; restano in coda `SettingsPage`, `PassaggioModal`, `DocumentEditorPage`, `ClientsPage`. Deploy frontend aggiornato su Vercel. Precedente: Punto 3 del piano gap firma documenti chiuso — archiviazione soft dei firmati con migrazione additiva 20260827180000, `PATCH /documenti/:id/archivia`, hard delete vietato anche all'admin con 409, pulsante «📦 Archivia»; fix produzione eliminazione moduli — guard 409 + transazione ordinata; etichette firma declassate a «Firma Elettronica Semplice (OTP verificata) · art. 20 CAD»; più ciclo §WF-DOC firma/sblocco/tracciabilità, firma OTP vera per la conclusione operazione e CI GitHub Actions completa; 298 test in 23 file)*
+*Ultimo aggiornamento: 2026-08-28 (split monoliti frontend §2.1c: `ProjectDetail.tsx` commit `8a19b6f`, `Library.tsx` commit `dbc8358`, `api/client.ts` da 2.792 righe a 13 file dominio + barrel con commit `f50cc8f`, `SettingsPage.tsx` commit `eaeae7d`, `ClientsPage.tsx` commit `1d291b1`, `PassaggioModal.tsx` da 1.801 a 730 righe con commit `fa29925`; resta in coda solo `DocumentEditorPage.tsx`, poi bug upload microvoce #21 e Firma Fase 2. Deploy frontend aggiornato su Vercel. Precedente: Punto 3 del piano gap firma documenti chiuso — archiviazione soft dei firmati con migrazione additiva 20260827180000, `PATCH /documenti/:id/archivia`, hard delete vietato anche all'admin con 409, pulsante «📦 Archivia»; fix produzione eliminazione moduli — guard 409 + transazione ordinata; etichette firma declassate a «Firma Elettronica Semplice (OTP verificata) · art. 20 CAD»; più ciclo §WF-DOC firma/sblocco/tracciabilità, firma OTP vera per la conclusione operazione e CI GitHub Actions completa; 298 test in 23 file)*
 *Prossima revisione: dopo completamento Fase 2 (refactoring server.ts)*
