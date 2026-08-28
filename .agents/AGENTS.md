@@ -428,3 +428,11 @@ Configurazione: `vitest.config.ts` + `vitest.setup.ts` (isolamento dal DB reale)
    - Il presidio è la lettura: `grep -nE "\|\| *(75|100|3500|28500|20|15)\b"` sulle pagine toccate prima di chiudere una modifica.
 
 
+
+8. **Niente Nuovi Monoliti — Un File = Un Compito**:
+   - Ogni file deve avere la dimensione giusta per il proprio compito. Se i processi al suo interno si possono dividere in sottosezioni mantenibili in futuro, ognuna con il proprio compito, **vanno divise**. Vietato creare nuovi file monolitici e vietato far crescere quelli esistenti aggiungendo sezioni su sezioni.
+   - **Soglie**: sopra ~500 righe si valuta lo split; sopra ~800 righe la pianificazione dello split è **obbligatoria** (non si rimanda alla prossima modifica).
+   - **Strategia frontend** (quella adottata per ClientPortal e ProjectDetail): la pagina/contenitore tiene stato (`useState`), handler ed effetti (`useEffect`); il JSX viene estratto in componenti **presentazionali** tipizzati in `frontend/src/components/<dominio>/` (es. `components/portal/`, `components/projectDetail/`). I figli ricevono props tipizzate, non contengono logica di business e non duplicano stato.
+   - **Strategia backend**: una rotta per dominio in `src/routes/<dominio>.ts`, logica applicativa in `src/services/`, dominio puro in `src/domain/`. Un file di rotte non accumula domini diversi (vedi lo split di `firma.ts`/`documenti.ts`).
+   - **Esecuzione**: un file alla volta; lo split è refactoring **meccanico** senza cambi di comportamento (nessun bugfix o rinomina mescolati); typecheck dopo ogni estrazione (`npx tsc -b` in `frontend/`, `npx tsc --noEmit` alla root); commit separati e revertibili per ogni file splittato.
+   - Fa eccezione solo il codice che è intrinsecamente un blocco unico (es. lo schema Prisma, le migrazioni): in quel caso la dimensione è giustificata dal compito stesso.
