@@ -30,12 +30,12 @@ async function runAllVerificationChecks() {
     }
   }
 
-  // 1. TEST OTP & FEA eIDAS
+  // 1. TEST OTP & FIRMA ELETTRONICA SEMPLICE
   //
   // L'emissione e la verifica del codice ora scrivono su `codice_otp`, quindi non stanno
   // qui: questo script gira senza database e senza contesto RLS. Restano le parti pure,
   // che sono quelle in cui un difetto finisce dentro un verbale di firma.
-  console.log('🔐 [1/4] Test Modulo OTP & Firma Elettronica Avanzata (FEA eIDAS)...');
+  console.log('🔐 [1/4] Test Modulo OTP & Firma Elettronica Semplice (SES · art. 20 CAD)...');
 
   assertTest(
     'Canali OTP offerti = canali che il server sa spedire (nessun SMS fantasma)',
@@ -79,8 +79,9 @@ async function runAllVerificationChecks() {
     }),
   });
   assertTest(
-    'Generazione Sigillo Crittografico eIDAS UE 910/2014',
-    seal.signatureId.startsWith('EIDAS-FEA-') && seal.sha256Digest.length === 64,
+    'Generazione Sigillo Crittografico SES (prefisso SIGILLO-SES, mai "avanzato" per default)',
+    seal.signatureId.startsWith('SIGILLO-SES-') && seal.sha256Digest.length === 64 &&
+      !seal.standard.includes('Avanzata'),
     `ID Sigillo: ${seal.signatureId} | SHA-256: ${seal.sha256Digest.slice(0, 16)}...`,
   );
   assertTest(

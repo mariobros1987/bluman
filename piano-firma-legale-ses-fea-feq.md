@@ -97,14 +97,14 @@ Decisioni:
 
 ## 4. Le fasi
 
-### Fase 1 — Verità nelle etichette (immediata, nessun cambio di comportamento)
-1. `verify-otp-and-sign` passa a `creaSigilloFea` uno `standard` esplicito: `'Firma Elettronica Semplice (SES) · art. 20 CAD — eIDAS UE 910/2014 art. 3 n. 10'`.
-2. `firma-con-file` già sovrascrive `standard` onestamente: invariato.
-3. Default di `creaSigilloFea`: da `…Advanced Electronic Signature (FEA)` a `…Simple Electronic Signature (SES) · art. 20 CAD` (chi non dichiara uno standard ottiene l'etichetta **più prudente**, mai la più forte).
-4. `signatureId`: prefisso per valore legale (`SIGILLO-SES-`, in futuro `SIGILLO-FEA-`/`SIGILLO-FEQ-`); gli id esistenti restano `EIDAS-FEA-…`.
-5. Audit: nuova azione `FIRMA_SES_APPOSTA` (la `FIRMA_FEA_APPOSTA` storica resta leggibile nei log già scritti).
-6. `emailService.ts:304,316`: header/footer email OTP → "Firma Elettronica Semplice (OTP) · art. 20 CAD".
-7. Test: aggiornare `verbaleFirma.test.ts` sulle nuove etichette; nuovo test che il flusso OTP non produca **da nessuna parte** (DB, audit, verbale, email) la parola "Avanzata".
+### Fase 1 — Verità nelle etichette (immediata, nessun cambio di comportamento) — ✅ completata 28/08/2026
+1. ✅ `verify-otp-and-sign` passa a `creaSigilloFea` uno `standard` esplicito: `'Firma Elettronica Semplice (SES) · art. 20 CAD — eIDAS UE 910/2014 art. 3 n. 10'` (costante `STANDARD_SES` in `otpService.ts`).
+2. ✅ `firma-con-file` già sovrascrive `standard` onestamente; ora passa anche `valoreLegale: 'feq'` per il file qualificato esterno, `'ses'` per la scansione autografa.
+3. ✅ Default di `creaSigilloFea`: da `…Advanced Electronic Signature (FEA)` a `STANDARD_SES` (chi non dichiara uno standard ottiene l'etichetta **più prudente**, mai la più forte).
+4. ✅ `signatureId`: prefisso per valore legale (`SIGILLO-SES-`, predisposti `SIGILLO-FEA-`/`SIGILLO-FEQ-`); gli id esistenti restano `EIDAS-FEA-…`.
+5. ✅ Audit: nuova azione `FIRMA_SES_APPOSTA` (la `FIRMA_FEA_APPOSTA` storica resta leggibile nei log già scritti); dettagli senza la parola "Avanzata".
+6. ✅ `emailService.ts`: header/footer email OTP → "Firma Elettronica Semplice (OTP) · art. 20 CAD"; corpo "per la firma digitale di" → "per la firma di" (non si promette firma digitale); risposta HTTP di `verify-otp-and-sign` → "Firma Elettronica Semplice registrata (art. 20 CAD)".
+7. ✅ Test: `verbaleFirma.test.ts` aggiornato sulle nuove etichette + nuovo test che il flusso OTP non produca **da nessuna parte** (DB, audit, verbale PDF, notifiche) la parola "Avanzata"; `newFeatures.test.ts` sul prefisso `SIGILLO-SES-`. Suite: 353/353 verdi, `tsc --noEmit` pulito, `verifyAll.ts` 13/13.
 
 ### Fase 2 — Etichettatura per tipo documento (migrazione + enforcement)
 1. Migrazione additiva (§3.1) — 4 colonne, tutte con default; `npx prisma generate`.

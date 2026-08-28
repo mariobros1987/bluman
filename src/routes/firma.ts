@@ -25,6 +25,7 @@ import {
   verificaOtp,
   annullaOtp,
   creaSigilloFea,
+  STANDARD_SES,
   mascheraRecapito,
   descriviCanaleVerificato,
   canaleValido,
@@ -39,9 +40,9 @@ import { scanFileBuffer } from '../services/securityScanner.js';
 import { generaPdfVerbaleFirma } from '../services/verbaleFirma.js';
 import { ipReale, normalizzaGrafometrica, nomeFileDaUrl, clienteDellaRichiesta, recordAudit } from '../util/serverHelpers.js';
 
-// ─── FIRMA ELETTRONICA AVANZATA (FEA) & FIRMA DOCUMENTI ─────────────
+// ─── FIRMA ELETTRONICA SEMPLICE (SES · art. 20 CAD) & FIRMA DOCUMENTI ─────────────
 export async function registraRotteFirma(server: FastifyInstance): Promise<void> {
-  // ── FIRMA ELETTRONICA AVANZATA (FEA) CON OTP: WHATSAPP / EMAIL / TELEGRAM ──
+  // ── FIRMA ELETTRONICA SEMPLICE (SES) CON OTP: WHATSAPP / EMAIL / TELEGRAM ──
   //
   // Cosa non funzionava, e perché non erano dettagli:
   //   · il recapito era `cellulare || email || '+39 333 5936278'`. Il numero di una persona
@@ -1103,6 +1104,9 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
         req.body?.documentoTitolo?.trim() || titoloDalFascicolo || DESCRIZIONE_AMBITO[ambito];
       const firmatarioNome = req.body?.signerName?.trim() || cliente.nome;
 
+      // L'OTP verificato su recapito in anagrafica è una Firma Elettronica Semplice
+      // (art. 20 CAD): lo standard è dichiarato esplicitamente così il sigillo, il DB,
+      // l'audit e il verbale dicono tutti la stessa cosa — mai "avanzata".
       const sigillo = creaSigilloFea({
         clienteId,
         signerName: firmatarioNome,
@@ -1113,6 +1117,8 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
         ip: ipReale(req),
         userAgent: req.headers['user-agent'] || null,
         canaleVerificato: descriviCanaleVerificato(verifica.record),
+        standard: STANDARD_SES,
+        valoreLegale: 'ses',
       });
 
       const firma = await (prisma as any).firmaElettronica.create({
@@ -1139,14 +1145,16 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
 
       if (vault && riferimentoId) await segnaDocumentoFirmato(tenantId, riferimentoId);
 
+      // `FIRMA_SES_APPOSTA`, non `FIRMA_FEA_APPOSTA`: l'azione di audit dichiara il valore
+      // legale reale. I log storici con l'azione vecchia restano leggibili e intatti.
       await recordAudit({
         tenantId,
         userId: (req as any).userId,
         ruolo: (req as any).ruolo,
-        azione: 'FIRMA_FEA_APPOSTA',
+        azione: 'FIRMA_SES_APPOSTA',
         entita: cliente.nome,
         dettagli:
-          `Firma Elettronica Avanzata ${sigillo.signatureId} su "${documentoTitolo}" da ${firmatarioNome}. ` +
+          `Firma Elettronica Semplice ${sigillo.signatureId} su "${documentoTitolo}" da ${firmatarioNome}. ` +
           `${sigillo.canaleVerificato}. IP: ${sigillo.ipAddress ?? 'non registrato'}.`,
         ipAddress: sigillo.ipAddress,
       });
@@ -1204,7 +1212,7 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
         ok: true,
         seal: { ...sigillo, id: firma.id, tipoFirma: 'fea_otp' },
         progettoAttivato,
-        message: 'Firma elettronica avanzata registrata.',
+        message: 'Firma Elettronica Semplice registrata (art. 20 CAD).',
       });
     } catch (err) {
       return reply.code(500).send({ errore: err instanceof Error ? err.message : 'Errore verifica OTP e firma' });
@@ -1341,6 +1349,9 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
         userAgent: req.headers['user-agent'] || null,
         canaleVerificato,
         standard,
+        // Prefisso onesto: FEQ per il file qualificato del provider esterno (la piattaforma
+        // attesta la ricezione, non valida il certificato), SES per la scansione autografa.
+        valoreLegale: tipoFirma === 'qualificata_esterna' ? 'feq' : 'ses',
       });
 
       const firma = await (prisma as any).firmaElettronica.create({

@@ -27,6 +27,7 @@ const stato = {
   uploadFails: false,
   // Registri per asserire cosa il server ha scritto davvero.
   upload: [] as string[],
+  uploadContenuti: [] as string[],
   firmeCreate: [] as any[],
   firmeAggiornate: [] as any[],
   documentiCreati: [] as any[],
@@ -107,9 +108,10 @@ vi.mock('./services/storageService.js', async importOriginal => {
   const reale = await importOriginal<typeof import('./services/storageService.js')>();
   return {
     ...reale,
-    uploadDocumento: async (filename: string, _contentBase64: string) => {
+    uploadDocumento: async (filename: string, contentBase64: string) => {
       if (stato.uploadFails) throw new Error('storage irraggiungibile (simulato)');
       stato.upload.push(filename);
+      stato.uploadContenuti.push(contentBase64);
       return { ok: true, url: `https://storage.example/${filename}`, name: filename, size: '1 KB' };
     },
   };
@@ -174,9 +176,9 @@ const PNG_1X1 =
 
 function datiVerbaleBase(overrides: Record<string, unknown> = {}) {
   return {
-    signatureId: 'EIDAS-FEA-TEST-0001',
+    signatureId: 'SIGILLO-SES-TEST-0001',
     tipoFirma: 'fea_otp',
-    standard: 'eIDAS UE 910/2014 Advanced Electronic Signature (FEA)',
+    standard: 'Firma Elettronica Semplice (SES) · art. 20 CAD — eIDAS UE 910/2014 art. 3 n. 10',
     documentoTitolo: 'Lettera di incarico 2026',
     documentoHash: 'a'.repeat(64),
     firmatarioNome: 'Mario Rossi',
@@ -220,6 +222,7 @@ beforeEach(() => {
   stato.documento = null;
   stato.uploadFails = false;
   stato.upload = [];
+  stato.uploadContenuti = [];
   stato.firmeCreate = [];
   stato.firmeAggiornate = [];
   stato.documentiCreati = [];
@@ -266,7 +269,7 @@ describe('Punto 2 — generaPdfVerbaleFirma (contenuto certificativo)', () => {
     const testo = testoPdf(pdf); // compress: false → il contenuto è ispezionabile
     expect(pdf.subarray(0, 4).toString()).toBe('%PDF');
     expect(testo).toContain('Verbale di firma elettronica');
-    expect(testo).toContain('EIDAS-FEA-TEST-0001');
+    expect(testo).toContain('SIGILLO-SES-TEST-0001');
     expect(testo).toContain('Lettera di incarico 2026');
     expect(testo).toContain('a'.repeat(64));
     expect(testo).toContain('93.41.10.5');
@@ -448,12 +451,47 @@ describe('Punto 2 — verify-otp-and-sign genera il verbale di firma', () => {
     const auditVerbale = stato.audit.find(a => a.azione === 'VERBALE_FIRMA_GENERATO');
     expect(auditVerbale).toBeTruthy();
     expect(auditVerbale.userId).toBe('usr-system'); // operazione di sistema, non di un utente
-    expect(stato.audit.some(a => a.azione === 'FIRMA_FEA_APPOSTA')).toBe(true);
+    expect(stato.audit.some(a => a.azione === 'FIRMA_SES_APPOSTA')).toBe(true);
     expect(stato.notifiche.some(n => n.tipoEvento === 'firma_apposta' && n.destinatarioTipo === 'cliente')).toBe(true);
     const notificaVerbale = stato.notifiche.find(n => n.tipoEvento === 'verbale_disponibile');
     expect(notificaVerbale).toBeTruthy();
     expect(notificaVerbale.destinatarioClienteId).toBe(CLIENTE_ID);
     expect(notificaVerbale.link).toBe('/portal/documents');
+  });
+
+  it('il flusso OTP non dichiara mai "avanzata": DB, audit, verbale e notifiche dicono SES', async () => {
+    preparaModuloCompletato();
+    const server = serverConToken(tokenCliente());
+    const res = await server.inject({
+      method: 'POST',
+      url: '/portal/verify-otp-and-sign',
+      payload: { otp: CODICE_OTP, ambito: 'modulo_completato', riferimentoId: 'mod-1' },
+    });
+    expect(res.statusCode).toBe(200);
+
+    // DB: lo standard e il signatureId della firma dichiarano SES, non FEA.
+    const firma = stato.firmeCreate[0];
+    expect(firma.standard).not.toMatch(/avanzata|advanced/i);
+    expect(firma.signatureId).toMatch(/^SIGILLO-SES-/);
+
+    // Audit: la nuova azione FIRMA_SES_APPOSTA sostituisce FIRMA_FEA_APPOSTA.
+    const auditFirma = stato.audit.find(a => a.azione === 'FIRMA_SES_APPOSTA');
+    expect(auditFirma).toBeTruthy();
+    expect(auditFirma.dettagli).not.toMatch(/avanzata|advanced/i);
+    expect(stato.audit.some(a => a.azione === 'FIRMA_FEA_APPOSTA')).toBe(false);
+
+    // Verbale PDF: l'atto certificativo non contiene tracce di firma avanzata.
+    expect(stato.uploadContenuti).toHaveLength(1);
+    const contenutoVerbale = stato.uploadContenuti[0] ?? '';
+    const testo = testoPdf(Buffer.from(contenutoVerbale, 'base64'));
+    expect(testo).not.toMatch(/avanzata|advanced/i);
+    expect(testo).toContain('Firma Elettronica Semplice');
+
+    // Notifiche a studio e cliente coerenti con le etichette del portale.
+    expect(stato.notifiche.length).toBeGreaterThan(0);
+    for (const n of stato.notifiche) {
+      expect(n.corpo).not.toMatch(/avanzata|advanced/i);
+    }
   });
 
   it('engagement letter senza progetto agganciato: il verbale va nell\'ultimo progetto del cliente', async () => {

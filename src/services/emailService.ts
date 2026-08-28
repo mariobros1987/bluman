@@ -301,11 +301,11 @@ export async function sendOtpSecurityEmail(
     <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; color: #1e293b;">
       <div style="background-color: #0f172a; padding: 24px; text-align: center;">
         <h1 style="color: #6366f1; margin: 0; font-size: 24px; font-weight: 700;">BluMan Advisory</h1>
-        <p style="color: #94a3b8; margin: 4px 0 0 0; font-size: 13px;">Firma Elettronica Avanzata (FEA) eIDAS</p>
+        <p style="color: #94a3b8; margin: 4px 0 0 0; font-size: 13px;">Firma Elettronica Semplice (OTP) · art. 20 CAD</p>
       </div>
       <div style="padding: 32px 24px; text-align: center;">
         <h2 style="margin-top: 0; font-size: 18px; color: #0f172a;">Gentile ${clienteNome},</h2>
-        <p style="line-height: 1.6; color: #475569;">Ecco il tuo codice di sicurezza monouso (OTP) a 6 cifre per la firma digitale di ${oggetto}:</p>
+        <p style="line-height: 1.6; color: #475569;">Ecco il tuo codice di sicurezza monouso (OTP) a 6 cifre per la firma di ${oggetto}:</p>
         <div style="margin: 28px 0; background: #f1f5f9; padding: 20px; border-radius: 12px; display: inline-block;">
           <span style="font-size: 32px; font-weight: 900; letter-spacing: 8px; color: #4338ca; font-family: monospace;">${otpCode}</span>
         </div>
@@ -313,7 +313,7 @@ export async function sendOtpSecurityEmail(
         <p style="font-size: 12px; color: #94a3b8; margin-top: 24px; line-height: 1.5;">Non condividere questo codice con nessuno. Se non hai richiesto tu la firma, contatta immediatamente il tuo advisor.</p>
       </div>
       <div style="background-color: #f8fafc; padding: 16px 24px; text-align: center; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8;">
-        BluMan Advisory Platform • Sigillo Digitale Conforme eIDAS UE 910/2014
+        BluMan Advisory Platform • Firma Elettronica Semplice (OTP) · art. 20 CAD
       </div>
     </div>
   `;

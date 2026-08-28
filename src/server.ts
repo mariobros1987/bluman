@@ -482,8 +482,8 @@ export function buildServer(app: AppPort): FastifyInstance {
   // stessa registrazione, sempre dentro questo wrapper.
   await registraRotteDocumenti(server);
 
-  // ─── FIRMA ELETTRONICA AVANZATA (FEA) & FIRMA DOCUMENTI ───────────
-  // Rotte firma (FEA con OTP whatsapp/email/telegram: documenti firmabili,
+  // ─── FIRMA ELETTRONICA SEMPLICE (SES · art. 20 CAD) & FIRMA DOCUMENTI ───────────
+  // Rotte firma (SES con OTP whatsapp/email/telegram: documenti firmabili,
   // download, richieste modifica; poi canali-firma, richiesta/verifica OTP,
   // firma con file, elenco firme, firma grafometrica) estratte in
   // src/routes/firma.ts: stessa registrazione, sempre dentro questo wrapper.

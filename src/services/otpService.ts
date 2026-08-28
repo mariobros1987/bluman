@@ -1,5 +1,5 @@
 /**
- * Codici OTP della firma elettronica avanzata (§23bis).
+ * Codici OTP della firma elettronica semplice (SES · art. 20 CAD, §23bis).
  *
  * Prima questo file teneva i codici in una `Map` di processo. Sembrava un dettaglio di
  * implementazione, ma su Railway ogni deploy e ogni restart cancellavano i codici già
@@ -317,6 +317,22 @@ export interface SigilloFea {
 }
 
 /**
+ * Standard di riferimento per la firma semplice: chi costruisce un sigillo senza
+ * dichiarare uno standard ottiene l'etichetta più prudente, mai la più forte.
+ * Un OTP verificato su recapito in anagrafica è una Firma Elettronica Semplice
+ * (art. 20 CAD), non una firma avanzata.
+ */
+export const STANDARD_SES =
+  'Firma Elettronica Semplice (SES) · art. 20 CAD — eIDAS UE 910/2014 art. 3 n. 10';
+
+/** Prefisso del signatureId per valore legale: l'id dichiara cosa il sigillo attesta. */
+const PREFISSI_SIGNATURE_ID: Record<'ses' | 'fea' | 'feq', string> = {
+  ses: 'SIGILLO-SES',
+  fea: 'SIGILLO-FEA',
+  feq: 'SIGILLO-FEQ',
+};
+
+/**
  * Costruisce il sigillo eIDAS.
  *
  * Due cose sono cambiate rispetto a prima. `ipAddress` può essere `null` — l'interfaccia
@@ -324,6 +340,10 @@ export interface SigilloFea {
  * probatorio è un dato falso: nessun firmatario si collega dal loopback del server.
  * E `documentoHash` non ha più il ripiego `'DOC_ORIGINAL_HASH'`: un sigillo che non
  * identifica il testo firmato certifica una volontà su un documento qualunque.
+ *
+ * `valoreLegale` (default `ses`) governa il prefisso del signatureId: il valore legale
+ * EFFETTIVO della firma apposta, distinto dal meccanismo. I sigilli storici restano
+ * `EIDAS-FEA-…`: sono atti già registrati e non si riscrivono.
  */
 export function creaSigilloFea(params: {
   clienteId: string;
@@ -334,10 +354,12 @@ export function creaSigilloFea(params: {
   userAgent?: string | null;
   canaleVerificato: string;
   standard?: string;
+  valoreLegale?: 'ses' | 'fea' | 'feq';
 }): SigilloFea {
   const timestampIso = new Date().toISOString();
   const ipAddress = params.ip && params.ip.trim() ? params.ip.trim() : null;
-  const standard = params.standard || 'eIDAS UE 910/2014 Advanced Electronic Signature (FEA)';
+  const valoreLegale = params.valoreLegale ?? 'ses';
+  const standard = params.standard || STANDARD_SES;
 
   // L'impronta del sigillo lega insieme tutti gli elementi del verbale: cambiarne uno a
   // posteriori la invalida. `ipAddress` entra come 'non-registrato' quando manca, così il
@@ -353,7 +375,7 @@ export function creaSigilloFea(params: {
   ].join('|');
 
   return {
-    signatureId: `EIDAS-FEA-${Date.now().toString(36).toUpperCase()}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`,
+    signatureId: `${PREFISSI_SIGNATURE_ID[valoreLegale]}-${Date.now().toString(36).toUpperCase()}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`,
     signerName: params.signerName,
     documentoTitolo: params.documentoTitolo,
     timestampIso,

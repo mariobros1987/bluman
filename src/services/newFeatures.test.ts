@@ -70,10 +70,13 @@ describe('🧪 Nuove Funzionalità Enterprise — Test Suite di Collaudo', () =>
         canaleVerificato: 'Codice OTP monouso consegnato via email a ma***i@example.com',
       });
 
-      expect(seal.signatureId).toContain('EIDAS-FEA-');
+      // Senza `valoreLegale` esplicito il sigillo è SES: il prefisso e lo standard
+      // dichiarano il valore probatorio reale (art. 20 CAD), mai "avanzato".
+      expect(seal.signatureId).toContain('SIGILLO-SES-');
       expect(seal.signerName).toBe('Roberto Rossi (CEO)');
       expect(seal.sha256Digest).toHaveLength(64);
       expect(seal.standard).toContain('eIDAS UE 910/2014');
+      expect(seal.standard).not.toMatch(/avanzata|advanced/i);
       // Il canale dichiarato è quello usato davvero: prima il sigillo scriveva
       // "OTP SMS/WhatsApp + Token Crittografico" qualunque fosse il canale.
       expect(seal.canaleVerificato).toContain('email');
