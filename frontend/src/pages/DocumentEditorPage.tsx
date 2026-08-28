@@ -17,6 +17,12 @@ import {
   exportTemplatesAsJson,
   type DocumentTemplate,
 } from '../utils/documentTemplates';
+import { HeaderEditor } from '../components/editor/HeaderEditor';
+import { SelettoreDestinazione } from '../components/editor/SelettoreDestinazione';
+import { PannelloTag } from '../components/editor/PannelloTag';
+import { LibreriaTemplate } from '../components/editor/LibreriaTemplate';
+import { EditorCanvas } from '../components/editor/EditorCanvas';
+import { ModaleNuovoTemplate } from '../components/editor/ModaleNuovoTemplate';
 export type { DocumentTemplate };
 export { PREBUILT_TEMPLATES };
 
@@ -818,735 +824,83 @@ export function DocumentEditorPage() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-      {/* Top Header Bar */}
-      <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, padding: '18px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <button
-            type="button"
-            onClick={() => navigate(-1)}
-            style={{ background: 'var(--card2)', border: '1px solid var(--border)', color: 'var(--text)', padding: '8px 14px', borderRadius: 10, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}
-            title="Torna alla pagina precedente"
-          >
-            <span>← Indietro</span>
-          </button>
-          <div>
-            <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span>📝 Studio Document Studio & Contract Builder</span>
-              <span style={{ fontSize: 10, background: '#1e1b4b', color: '#818cf8', padding: '3px 8px', borderRadius: 6, fontWeight: 700, textTransform: 'uppercase' }}>
-                Word WYSIWYG + Smart Tags ERP
-              </span>
-            </div>
-            <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 3 }}>
-              Crea, personalizza ed esporta contratti, NDA, deleghe e engagement letter con intestazione studio, piè di pagina e segnaposto anagrafica live.
-            </div>
-          </div>
-        </div>
+      <HeaderEditor
+        navigate={navigate}
+        tagDisplayMode={tagDisplayMode}
+        setTagDisplayMode={setTagDisplayMode}
+        handleExportPdf={handleExportPdf}
+        handleExportWord={handleExportWord}
+        handleDeleteTemplate={handleDeleteTemplate}
+        selectedTemplateId={selectedTemplateId}
+        titoloDocumento={titoloDocumento}
+        handleSaveToVault={handleSaveToVault}
+        salvando={salvando}
+        feedback={feedback}
+      />
 
-        {/* Action Buttons & Tag Display Switcher */}
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-          <div style={{ display: 'flex', background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
-            <button
-              onClick={() => setTagDisplayMode('highlight')}
-              style={{
-                background: tagDisplayMode === 'highlight' ? '#1e1b4b' : 'transparent',
-                color: tagDisplayMode === 'highlight' ? '#818cf8' : 'var(--muted)',
-                border: 'none',
-                padding: '6px 12px',
-                fontSize: 11.5,
-                fontWeight: 700,
-                cursor: 'pointer',
-              }}
-              title="Mostra i dati anagrafici reali evidenziati come Smart Chip dinamico"
-            >
-              🏷️ Dati Reali (Smart Chip)
-            </button>
-            <button
-              onClick={() => setTagDisplayMode('plain')}
-              style={{
-                background: tagDisplayMode === 'plain' ? '#1e1b4b' : 'transparent',
-                color: tagDisplayMode === 'plain' ? '#818cf8' : 'var(--muted)',
-                border: 'none',
-                padding: '6px 12px',
-                fontSize: 11.5,
-                fontWeight: 700,
-                cursor: 'pointer',
-              }}
-              title="Mostra i dati anagrafici in testo normale non evidenziato"
-            >
-              📄 Testo Naturale
-            </button>
-            <button
-              onClick={() => setTagDisplayMode('raw')}
-              style={{
-                background: tagDisplayMode === 'raw' ? '#1e1b4b' : 'transparent',
-                color: tagDisplayMode === 'raw' ? '#818cf8' : 'var(--muted)',
-                border: 'none',
-                padding: '6px 12px',
-                fontSize: 11.5,
-                fontWeight: 700,
-                cursor: 'pointer',
-              }}
-              title="Mostra i codici grezzi {{tag}}"
-            >
-              🔍 Codici &#123;&#123;Tag&#125;&#125;
-            </button>
-          </div>
-
-          <button
-            onClick={handleExportPdf}
-            style={{ background: '#0d2d22', color: '#34d399', border: '1px solid #059669', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
-            title="Esporta in formato PDF A4 vettoriale"
-          >
-            <span>📥 Esporta PDF A4</span>
-          </button>
-
-          <button
-            onClick={handleExportWord}
-            style={{ background: '#1e1b4b', color: '#93c5fd', border: '1px solid #3b82f6', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
-            title="Esporta in formato Microsoft Word (.doc) apribile"
-          >
-            <span>📝 Esporta Word (.doc)</span>
-          </button>
-
-          <button
-            onClick={(e) => handleDeleteTemplate(selectedTemplateId, titoloDocumento, e)}
-            style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#f87171', border: '1px solid #ef4444', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
-            title="Elimina questo modello master dalla libreria"
-          >
-            <span>🗑️ Elimina Modello Master</span>
-          </button>
-
-          <button
-            onClick={handleSaveToVault}
-            disabled={salvando}
-            style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '7px 18px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 14px rgba(99,102,241,.3)' }}
-          >
-            {salvando ? 'Salvataggio...' : '📁 Salva nel Vault Progetto'}
-          </button>
-        </div>
-      </div>
-
-      {feedback && (
-        <div style={{ padding: '12px 16px', borderRadius: 10, fontSize: 12.5, fontWeight: 600, background: '#0d2d22', color: '#34d399', border: '1px solid #059669', display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span>{feedback}</span>
-        </div>
-      )}
-
-      {/* Target Data Selector Strip */}
-      <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: '12px 16px', display: 'flex', gap: 20, alignItems: 'center', flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <label style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--muted)' }}>👤 Cliente Target ERP:</label>
-          <select
-            value={selectedClienteId}
-            onChange={(e) => setSelectedClienteId(e.target.value)}
-            style={{ fontSize: 12, padding: '5px 10px', borderRadius: 6, background: 'var(--card)', color: 'var(--text)', border: '1px solid var(--border)', fontWeight: 600 }}
-          >
-            {clienti.length === 0 ? (
-              <option value="">(Nessun cliente registrato in questo Studio)</option>
-            ) : (
-              clienti.map(c => (
-                <option key={c.id} value={c.id}>{c.nome} {c.piva || c.codiceFiscale ? `(${c.piva || c.codiceFiscale})` : ''}</option>
-              ))
-            )}
-          </select>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <label style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--muted)' }}>📁 Progetto Collegato:</label>
-          <select
-            value={selectedProgettoId}
-            onChange={(e) => setSelectedProgettoId(e.target.value)}
-            style={{ fontSize: 12, padding: '5px 10px', borderRadius: 6, background: 'var(--card)', color: 'var(--text)', border: '1px solid var(--border)', fontWeight: 600 }}
-          >
-            {progetti.length === 0 ? (
-              <option value="">(Nessun progetto attivo in questo Studio)</option>
-            ) : (
-              progetti.map((p: any) => (
-                <option key={p.id} value={p.id}>{p.titolo || p.n || p.nome || `Progetto #${p.id}`} {p.cl ? `(${p.cl})` : ''}</option>
-              ))
-            )}
-          </select>
-        </div>
-
-        {/* §WF-DOC — micro-voce di destinazione. È il collegamento che nel portale
-            consente al cliente di risalire dal documento al lavoro che l'ha prodotto.
-            Se l'operatore non ne indica una il documento resta di solo fascicolo (§2.9),
-            ma è una scelta esplicita e la pagina lo dice. */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <label style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--muted)' }}>🔖 Micro-voce di Destinazione:</label>
-          <select
-            value={selectedMicrovoceId}
-            onChange={(e) => setSelectedMicrovoceId(e.target.value)}
-            disabled={!effProgettoId || caricandoMicrovoci}
-            style={{ fontSize: 12, padding: '5px 10px', borderRadius: 6, background: 'var(--card)', color: 'var(--text)', border: '1px solid var(--border)', fontWeight: 600, maxWidth: 340 }}
-            title="Il documento verrà agganciato a questa micro-voce: il cliente lo vedrà nel portale sotto la relativa lavorazione"
-          >
-            {caricandoMicrovoci ? (
-              <option value="">Lettura micro-voci…</option>
-            ) : microvoci.length === 0 ? (
-              <option value="">(Nessuna micro-voce a database su questo progetto)</option>
-            ) : (
-              <>
-                <option value="">— Solo fascicolo progetto (nessuna micro-voce) —</option>
-                {microvoci.map(mv => (
-                  <option key={mv.id} value={mv.id}>{mv.modulo} › {mv.nome}</option>
-                ))}
-              </>
-            )}
-          </select>
-        </div>
-      </div>
-
-      {/* Filo logico dichiarato: dove finirà il documento e cosa serve perché il cliente lo veda. */}
-      <div style={{ background: 'var(--card)', border: '1px dashed var(--border)', borderRadius: 10, padding: '9px 14px', fontSize: 11, color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        <span style={{ fontWeight: 700, color: 'var(--text)' }}>Percorso del documento:</span>
-        <span>
-          {effProgettoId
-            ? <>
-                {activeProgetto?.titolo || activeProgetto?.n || activeProgetto?.nome || 'Progetto'}
-                {' › '}
-                {selectedMicrovoceId
-                  ? (microvoci.find(m => m.id === selectedMicrovoceId)?.modulo ?? 'Modulo') + ' › ' + (microvoci.find(m => m.id === selectedMicrovoceId)?.nome ?? 'Micro-voce')
-                  : 'fascicolo progetto'}
-                {' › '}
-                <span style={{ color: '#a1a1aa' }}>bozza interna</span>
-                {' → '}
-                <span style={{ color: '#60a5fa' }}>pubblicazione dalla micro-voce</span>
-                {' → '}
-                <span style={{ color: '#34d399' }}>firma del cliente nel portale</span>
-              </>
-            : 'nessun progetto selezionato — il salvataggio sul server è sospeso'}
-        </span>
-      </div>
+      <SelettoreDestinazione
+        clienti={clienti}
+        selectedClienteId={selectedClienteId}
+        setSelectedClienteId={setSelectedClienteId}
+        progetti={progetti}
+        selectedProgettoId={selectedProgettoId}
+        setSelectedProgettoId={setSelectedProgettoId}
+        microvoci={microvoci}
+        selectedMicrovoceId={selectedMicrovoceId}
+        setSelectedMicrovoceId={setSelectedMicrovoceId}
+        effProgettoId={effProgettoId}
+        caricandoMicrovoci={caricandoMicrovoci}
+        activeProgetto={activeProgetto}
+      />
 
       {/* Main Studio Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: '290px 1fr', gap: 20, alignItems: 'start' }}>
         
         {/* Left Column: Smart Tags & Templates */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {/* Smart Tags Selector (Stile OpenSTAManager) */}
-          <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 14, padding: 16 }}>
-            <div style={{ fontSize: 12.5, fontWeight: 800, color: 'var(--text)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span>🏷 Smart Tags Anagrafica ERP</span>
-            </div>
-            <div style={{ fontSize: 10.5, color: 'var(--muted)', marginBottom: 12 }}>
-              Clicca su un tag per inserirlo nel documento al cursore.
-            </div>
+          <PannelloTag insertSmartTag={insertSmartTag} />
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <span style={{ fontSize: 10, fontWeight: 800, color: 'var(--indigo-l)', textTransform: 'uppercase' }}>Dati Cliente Committente:</span>
-              {[
-                { tag: '{{cliente.ragione_sociale}}', label: 'Ragione Sociale / Nome' },
-                { tag: '{{cliente.partita_iva}}', label: 'Partita IVA' },
-                { tag: '{{cliente.codice_fiscale}}', label: 'Codice Fiscale' },
-                { tag: '{{cliente.sede_legale}}', label: 'Sede Legale' },
-                { tag: '{{cliente.referente}}', label: 'Nome Referente / UBO' },
-                { tag: '{{cliente.pec}}', label: 'Indirizzo PEC' },
-                { tag: '{{cliente.sdi}}', label: 'Codice SDI' },
-                { tag: '{{cliente.cellulare}}', label: 'Cellulare WhatsApp' },
-              ].map(item => (
-                <button
-                  key={item.tag}
-                  type="button"
-                  onClick={() => insertSmartTag(item.tag)}
-                  style={{
-                    background: 'var(--card2)',
-                    border: '1px solid var(--border)',
-                    padding: '5px 10px',
-                    borderRadius: 6,
-                    fontSize: 11,
-                    textAlign: 'left',
-                    color: 'var(--text)',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                  }}
-                  title={`Inserisci ${item.tag}`}
-                >
-                  <span style={{ fontWeight: 600 }}>{item.label}</span>
-                  <code style={{ fontSize: 9.5, color: '#818cf8', background: '#1e1b4b', padding: '1px 5px', borderRadius: 4 }}>+ Tag</code>
-                </button>
-              ))}
-
-              <span style={{ fontSize: 10, fontWeight: 800, color: '#34d399', textTransform: 'uppercase', marginTop: 10 }}>Dati Progetto:</span>
-              {[
-                { tag: '{{progetto.titolo}}', label: 'Titolo Pratica' },
-                { tag: '{{progetto.importo_totale}}', label: 'Compenso Totale (€)' },
-                { tag: '{{data_odierna}}', label: 'Data Odierna' },
-              ].map(item => (
-                <button
-                  key={item.tag}
-                  type="button"
-                  onClick={() => insertSmartTag(item.tag)}
-                  style={{
-                    background: 'var(--card2)',
-                    border: '1px solid var(--border)',
-                    padding: '5px 10px',
-                    borderRadius: 6,
-                    fontSize: 11,
-                    textAlign: 'left',
-                    color: 'var(--text)',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                  }}
-                >
-                  <span style={{ fontWeight: 600 }}>{item.label}</span>
-                  <code style={{ fontSize: 9.5, color: '#34d399', background: '#064e3b', padding: '1px 5px', borderRadius: 4 }}>+ Tag</code>
-                </button>
-              ))}
-
-              <span style={{ fontSize: 10, fontWeight: 800, color: '#f59e0b', textTransform: 'uppercase', marginTop: 10 }}>Dati Studio:</span>
-              {[
-                { tag: '{{studio.ragione_sociale}}', label: 'Nome Studio' },
-                { tag: '{{studio.piva}}', label: 'P.IVA / TIN Studio' },
-                { tag: '{{studio.sede_legale}}', label: 'Sede Legale Studio' },
-                { tag: '{{studio.iban}}', label: 'IBAN Bonifici Studio' },
-              ].map(item => (
-                <button
-                  key={item.tag}
-                  type="button"
-                  onClick={() => insertSmartTag(item.tag)}
-                  style={{
-                    background: 'var(--card2)',
-                    border: '1px solid var(--border)',
-                    padding: '5px 10px',
-                    borderRadius: 6,
-                    fontSize: 11,
-                    textAlign: 'left',
-                    color: 'var(--text)',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                  }}
-                >
-                  <span style={{ fontWeight: 600 }}>{item.label}</span>
-                  <code style={{ fontSize: 9.5, color: '#f59e0b', background: '#451a03', padding: '1px 5px', borderRadius: 4 }}>+ Tag</code>
-                </button>
-              ))}
-            </div>
-          </div>
-
-            {/* Master Templates Studio Library with Import / Export / Creation */}
-            <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 14, padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--text)' }}>📚 Modelli Master ({templatesList.length})</div>
-                  <div style={{ fontSize: 10, color: 'var(--muted)' }}>Libreria template studio</div>
-                </div>
-                <div style={{ display: 'flex', gap: 4 }}>
-                  <button
-                    type="button"
-                    onClick={() => setShowNewTmplModal(true)}
-                    style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: 6, fontSize: 10.5, fontWeight: 700, cursor: 'pointer' }}
-                    title="Crea Nuovo Modello Master da Zero"
-                  >
-                    ➕ Nuovo
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => fileImportRef.current?.click()}
-                    style={{ background: '#1e1b4b', color: '#818cf8', border: '1px solid #4338ca', padding: '4px 8px', borderRadius: 6, fontSize: 10.5, fontWeight: 700, cursor: 'pointer' }}
-                    title="Importa Modello Master da file JSON o HTML"
-                  >
-                    📥
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleExportTemplatesJson}
-                    style={{ background: 'var(--card2)', color: 'var(--muted)', border: '1px solid var(--border)', padding: '4px 6px', borderRadius: 6, fontSize: 10.5, cursor: 'pointer' }}
-                    title="Esporta Bundle Modelli Master in JSON"
-                  >
-                    📤
-                  </button>
-                </div>
-              </div>
-
-              <input
-                type="file"
-                ref={fileImportRef}
-                accept=".json,.html,.htm,.pdf"
-                style={{ display: 'none' }}
-                onChange={handleImportFileTrigger}
-              />
-
-              <button
-                type="button"
-                onClick={handleSaveCurrentAsMasterTemplate}
-                style={{ width: '100%', background: 'rgba(99, 102, 241, 0.1)', border: '1px dashed #6366f1', color: '#818cf8', padding: '6px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
-                title="Salva l'attuale bozza dell'editor come nuovo modello master riutilizzabile"
-              >
-                💾 Salva Bozza Attuale come Master
-              </button>
-
-              {/* Filtri di Ricerca & Stato Sidebar */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <input
-                  type="text"
-                  placeholder="🔍 Cerca modello master..."
-                  value={searchMasterTmplQuery}
-                  onChange={e => setSearchMasterTmplQuery(e.target.value)}
-                  style={{ fontSize: 11, padding: '5px 8px', borderRadius: 6, background: 'var(--card2)', border: '1px solid var(--border)', width: '100%' }}
-                />
-
-                <div style={{ display: 'flex', gap: 4, background: 'var(--card2)', padding: 2, borderRadius: 6 }}>
-                  <button
-                    type="button"
-                    onClick={() => setTmplStatusSidebar('attivi')}
-                    style={{
-                      flex: 1,
-                      background: tmplStatusSidebar === 'attivi' ? '#1e1b4b' : 'transparent',
-                      color: tmplStatusSidebar === 'attivi' ? '#818cf8' : 'var(--muted)',
-                      border: 'none',
-                      padding: '3px 0',
-                      borderRadius: 4,
-                      fontSize: 10,
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Attivi ({templatesList.filter(t => !t.archiviato).length})
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setTmplStatusSidebar('archiviati')}
-                    style={{
-                      flex: 1,
-                      background: tmplStatusSidebar === 'archiviati' ? '#1e1b4b' : 'transparent',
-                      color: tmplStatusSidebar === 'archiviati' ? '#818cf8' : 'var(--muted)',
-                      border: 'none',
-                      padding: '3px 0',
-                      borderRadius: 4,
-                      fontSize: 10,
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Archiviati ({templatesList.filter(t => !!t.archiviato).length})
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setTmplStatusSidebar('tutti')}
-                    style={{
-                      flex: 1,
-                      background: tmplStatusSidebar === 'tutti' ? '#1e1b4b' : 'transparent',
-                      color: tmplStatusSidebar === 'tutti' ? '#818cf8' : 'var(--muted)',
-                      border: 'none',
-                      padding: '3px 0',
-                      borderRadius: 4,
-                      fontSize: 10,
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Tutti ({templatesList.length})
-                  </button>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 380, overflowY: 'auto' }}>
-                {templatesList
-                  .filter(t => {
-                    const matchSearch = !searchMasterTmplQuery || t.titolo.toLowerCase().includes(searchMasterTmplQuery.toLowerCase()) || t.descrizione.toLowerCase().includes(searchMasterTmplQuery.toLowerCase());
-                    const matchStatus = tmplStatusSidebar === 'tutti' || (tmplStatusSidebar === 'archiviati' ? !!t.archiviato : !t.archiviato);
-                    return matchSearch && matchStatus;
-                  })
-                  .map(t => {
-                  const isCustom = t.id.startsWith('tmpl-custom');
-                  const isSelected = selectedTemplateId === t.id;
-                  return (
-                    <div
-                      key={t.id}
-                      onClick={() => handleSelectTemplate(t)}
-                      style={{
-                        background: isSelected ? '#1e1b4b' : 'var(--card2)',
-                        border: `1px solid ${isSelected ? '#6366f1' : t.archiviato ? '#4338ca' : 'var(--border)'}`,
-                        padding: '8px 10px',
-                        borderRadius: 8,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'flex-start',
-                        gap: 6,
-                        opacity: t.archiviato ? 0.8 : 1,
-                      }}
-                    >
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <span style={{ fontWeight: 700, fontSize: 11, color: isSelected ? '#a5b4fc' : 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            {t.titolo}
-                          </span>
-                          {t.archiviato && (
-                            <span style={{ fontSize: 8.5, background: '#312e81', color: '#c7d2fe', padding: '1px 4px', borderRadius: 4, fontWeight: 700 }}>
-                              📦
-                            </span>
-                          )}
-                          {isCustom && (
-                            <span style={{ fontSize: 8.5, background: '#064e3b', color: '#34d399', padding: '1px 4px', borderRadius: 4, fontWeight: 700 }}>
-                              Custom
-                            </span>
-                          )}
-                        </div>
-                        <div style={{ fontSize: 9.5, color: 'var(--muted)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {t.descrizione}
-                        </div>
-                      </div>
-
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-                        {t.archiviato ? (
-                          <button
-                            type="button"
-                            onClick={(e) => handleRestoreTemplate(t.id, t.titolo, e)}
-                            style={{ background: '#064e3b', border: '1px solid #059669', color: '#34d399', fontSize: 10, cursor: 'pointer', padding: '3px 6px', borderRadius: 4, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 2 }}
-                            title="Ripristina modello tra gli attivi"
-                          >
-                            <span>♻️</span>
-                            <span>Ripristina</span>
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={(e) => handleArchiveTemplate(t.id, t.titolo, e)}
-                            style={{ background: 'var(--card)', border: '1px solid var(--border)', color: 'var(--muted)', fontSize: 10, cursor: 'pointer', padding: '3px 6px', borderRadius: 4, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 2 }}
-                            title="Archivia modello master"
-                          >
-                            <span>📦</span>
-                          </button>
-                        )}
-
-                        <button
-                          type="button"
-                          onClick={(e) => handleDeleteTemplate(t.id, t.titolo, e)}
-                          style={{ background: 'rgba(239, 68, 68, 0.15)', border: '1px solid #ef4444', color: '#f87171', fontSize: 10, cursor: 'pointer', padding: '3px 6px', borderRadius: 4, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 2 }}
-                          title="Elimina definitivamente modello master"
-                        >
-                          <span>🗑️</span>
-                          <span>Elimina</span>
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+            <LibreriaTemplate
+              templatesList={templatesList}
+              setShowNewTmplModal={setShowNewTmplModal}
+              fileImportRef={fileImportRef}
+              handleExportTemplatesJson={handleExportTemplatesJson}
+              handleImportFileTrigger={handleImportFileTrigger}
+              handleSaveCurrentAsMasterTemplate={handleSaveCurrentAsMasterTemplate}
+              searchMasterTmplQuery={searchMasterTmplQuery}
+              setSearchMasterTmplQuery={setSearchMasterTmplQuery}
+              tmplStatusSidebar={tmplStatusSidebar}
+              setTmplStatusSidebar={setTmplStatusSidebar}
+              selectedTemplateId={selectedTemplateId}
+              handleSelectTemplate={handleSelectTemplate}
+              handleRestoreTemplate={handleRestoreTemplate}
+              handleArchiveTemplate={handleArchiveTemplate}
+              handleDeleteTemplate={handleDeleteTemplate}
+            />
         </div>
 
-        {/* Right Column: Word-like Editor Canvas with A4 Sheet */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {/* Word Formatting Toolbar */}
-          <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-            <button type="button" onClick={() => executeFormat('undo')} style={toolbarBtnStyle} title="Annulla">↩ Annulla</button>
-            <button type="button" onClick={() => executeFormat('redo')} style={toolbarBtnStyle} title="Ripristina">↪ Ripristina</button>
-            <div style={dividerStyle} />
-            <button type="button" onClick={() => executeFormat('formatBlock', '<h1>')} style={toolbarBtnStyle} title="Titolo 1">H1</button>
-            <button type="button" onClick={() => executeFormat('formatBlock', '<h2>')} style={toolbarBtnStyle} title="Titolo 2">H2</button>
-            <button type="button" onClick={() => executeFormat('formatBlock', '<h3>')} style={toolbarBtnStyle} title="Titolo 3">H3</button>
-            <button type="button" onClick={() => executeFormat('formatBlock', '<p>')} style={toolbarBtnStyle} title="Paragrafo">P</button>
-            <div style={dividerStyle} />
-            <button type="button" onClick={() => executeFormat('bold')} style={{ ...toolbarBtnStyle, fontWeight: 900 }} title="Grassetto">B</button>
-            <button type="button" onClick={() => executeFormat('italic')} style={{ ...toolbarBtnStyle, fontStyle: 'italic' }} title="Corsivo">I</button>
-            <button type="button" onClick={() => executeFormat('underline')} style={{ ...toolbarBtnStyle, textDecoration: 'underline' }} title="Sottolineato">U</button>
-            <button type="button" onClick={() => executeFormat('strikeThrough')} style={{ ...toolbarBtnStyle, textDecoration: 'line-through' }} title="Barrato">S</button>
-            <div style={dividerStyle} />
-            <button type="button" onClick={() => executeFormat('justifyLeft')} style={toolbarBtnStyle} title="Allinea Sinistra">⇤</button>
-            <button type="button" onClick={() => executeFormat('justifyCenter')} style={toolbarBtnStyle} title="Allinea Centro">≡</button>
-            <button type="button" onClick={() => executeFormat('justifyRight')} style={toolbarBtnStyle} title="Allinea Destra">⇥</button>
-            <button type="button" onClick={() => executeFormat('justifyFull')} style={toolbarBtnStyle} title="Giustifica">≣</button>
-            <div style={dividerStyle} />
-            <button type="button" onClick={() => executeFormat('insertUnorderedList')} style={toolbarBtnStyle} title="Elenco Puntato">• List</button>
-            <button type="button" onClick={() => executeFormat('insertOrderedList')} style={toolbarBtnStyle} title="Elenco Numerato">1. List</button>
-            <button type="button" onClick={() => executeFormat('insertHorizontalRule')} style={toolbarBtnStyle} title="Linea Divisoria">— Line</button>
-          </div>
-
-          {/* Realistic A4 White Sheet Container */}
-          <div style={{ background: '#334155', padding: '30px 20px', borderRadius: 14, display: 'flex', justifyContent: 'center', minHeight: '800px', boxShadow: 'inset 0 2px 10px rgba(0,0,0,0.3)' }}>
-            <div style={{ background: '#ffffff', color: '#0f172a', width: '100%', maxWidth: '780px', minHeight: '1050px', padding: '50px 60px', borderRadius: 2, boxShadow: '0 10px 30px rgba(0,0,0,0.4)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', fontFamily: "'Inter', sans-serif" }}>
-              {/* Sheet Header (Studio Logo & Info) */}
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #4338ca', paddingBottom: 14, marginBottom: 30 }}>
-                  {(() => {
-                    const rawLogo = tenantInfo?.logoUrl || localStorage.getItem(getTenantStorageKey('bluman_logo_url'));
-                    if (rawLogo) {
-                      return (
-                        <img
-                          src={getFormattedLogoUrl(rawLogo)}
-                          alt="Logo"
-                          style={{ height: 42, maxWidth: 180, objectFit: 'contain' }}
-                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                        />
-                      );
-                    }
-                    return (
-                      <div style={{ fontSize: 16, fontWeight: 800, color: '#1e1b4b', display: 'flex', alignItems: 'center', gap: 8 }}>
-                        🏛 {(tenantInfo?.ragioneSociale || getStudioInfoForTenant(getCurrentTenantId()).ragioneSociale || 'STUDIO PROFESSIONALE').toUpperCase()}
-                      </div>
-                    );
-                  })()}
-                  <div style={{ textAlign: 'right', fontSize: 10, color: '#64748b', lineHeight: 1.4 }}>
-                    <strong style={{ color: '#1e1b4b', fontSize: 11 }}>{tenantInfo?.ragioneSociale || getStudioInfoForTenant(getCurrentTenantId()).ragioneSociale || 'Studio Professionale'}</strong><br/>
-                    {tenantInfo?.sedeLegale || getStudioInfoForTenant(getCurrentTenantId()).sedeLegale ? <>{tenantInfo?.sedeLegale || getStudioInfoForTenant(getCurrentTenantId()).sedeLegale}<br/></> : null}
-                    {(tenantInfo?.piva || getStudioInfoForTenant(getCurrentTenantId()).piva) ? `P.IVA/TIN: ${tenantInfo?.piva || getStudioInfoForTenant(getCurrentTenantId()).piva}` : ''}{(tenantInfo?.telefono || getStudioInfoForTenant(getCurrentTenantId()).telefono) ? ` | Tel: ${tenantInfo?.telefono || getStudioInfoForTenant(getCurrentTenantId()).telefono}` : ''}
-                  </div>
-                </div>
-
-                {/* Editable Content Area (Word-like Smooth Native Typing) */}
-                <div
-                  ref={editorRef}
-                  contentEditable
-                  suppressContentEditableWarning
-                  onInput={(e) => {
-                    rawTemplateRef.current = (e.target as HTMLElement).innerHTML;
-                  }}
-                  style={{
-                    outline: 'none',
-                    minHeight: '800px',
-                    fontSize: '13px',
-                    lineHeight: '1.6',
-                    color: '#0f172a',
-                  }}
-                />
-              </div>
-
-              {/* Sheet Footer (Pagination & Legal) */}
-              <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: 12, marginTop: 40, display: 'flex', justifyContent: 'space-between', fontSize: 9.5, color: '#94a3b8' }}>
-                <span>Documento Riservato • {tenantInfo?.ragioneSociale || getStudioInfoForTenant(getCurrentTenantId()).ragioneSociale || 'Studio Professionale'} • Pratica: {activeProgetto?.titolo || activeProgetto?.n || 'Incarico Professionale'}</span>
-                <span>Pagina 1 di 1 • Firma Elettronica Semplice · art. 20 CAD</span>
-              </div>
-            </div>
-          </div>
-        </div>
+        <EditorCanvas
+          executeFormat={executeFormat}
+          editorRef={editorRef}
+          rawTemplateRef={rawTemplateRef}
+          tenantInfo={tenantInfo}
+          activeProgetto={activeProgetto}
+        />
       </div>
 
       {/* ➕ MODALE CREAZIONE NUOVO MODELLO MASTER STUDIO */}
       {showNewTmplModal && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.75)',
-            backdropFilter: 'blur(6px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 9999,
-            padding: 20,
-          }}
-          onClick={() => setShowNewTmplModal(false)}
-        >
-          <div
-            style={{
-              background: 'var(--card)',
-              border: '1px solid var(--border)',
-              borderRadius: 16,
-              width: '100%',
-              maxWidth: 520,
-              padding: 24,
-              boxShadow: '0 20px 40px rgba(0,0,0,0.5)',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <div>
-                <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--text)' }}>➕ Crea Nuovo Modello Master Studio</div>
-                <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>Crea un nuovo modello personalizzato con Smart Tags riutilizzabili</div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowNewTmplModal(false)}
-                style={{ background: 'transparent', border: 'none', color: 'var(--muted)', fontSize: 18, cursor: 'pointer' }}
-              >
-                ✕
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateCustomMaster} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <div>
-                <label style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text)', display: 'block', marginBottom: 5 }}>
-                  Titolo Modello Master *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Es. Patto di Riservatezza Dipendenti, Mandato Wealth Management..."
-                  value={newTmplTitolo}
-                  onChange={(e) => setNewTmplTitolo(e.target.value)}
-                  style={{ width: '100%', padding: '9px 12px', borderRadius: 8, background: 'var(--card2)', color: 'var(--text)', border: '1px solid var(--border)', fontSize: 12.5 }}
-                />
-              </div>
-
-              <div>
-                <label style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text)', display: 'block', marginBottom: 5 }}>
-                  Categoria *
-                </label>
-                <select
-                  value={newTmplCat}
-                  onChange={(e) => setNewTmplCat(e.target.value as any)}
-                  style={{ width: '100%', padding: '9px 12px', borderRadius: 8, background: 'var(--card2)', color: 'var(--text)', border: '1px solid var(--border)', fontSize: 12.5 }}
-                >
-                  <option value="societario">Societario & Statuti</option>
-                  <option value="contratto">Contratti & Accordi</option>
-                  <option value="engagement">Engagement Letter & Mandati</option>
-                  <option value="nda">NDA & Riservatezza</option>
-                  <option value="delega">Procure & Deleghe</option>
-                  <option value="trust">Trust & Fiduciaria</option>
-                  <option value="compliance">Compliance & UBO KYC</option>
-                  <option value="fiscale">Fiscale & Tax Planning</option>
-                </select>
-              </div>
-
-              <div>
-                <label style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text)', display: 'block', marginBottom: 5 }}>
-                  Descrizione Modello
-                </label>
-                <textarea
-                  rows={3}
-                  placeholder="Breve descrizione dell'utilizzo pratico e delle condizioni previste dal modello..."
-                  value={newTmplDesc}
-                  onChange={(e) => setNewTmplDesc(e.target.value)}
-                  style={{ width: '100%', padding: '9px 12px', borderRadius: 8, background: 'var(--card2)', color: 'var(--text)', border: '1px solid var(--border)', fontSize: 12 }}
-                />
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 10 }}>
-                <button
-                  type="button"
-                  onClick={() => setShowNewTmplModal(false)}
-                  style={{ background: 'var(--card2)', border: '1px solid var(--border)', color: 'var(--muted)', padding: '8px 16px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}
-                >
-                  Annulla
-                </button>
-                <button
-                  type="submit"
-                  style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '8px 20px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 14px rgba(99,102,241,0.3)' }}
-                >
-                  ✓ Crea e Apri nell'Editor
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <ModaleNuovoTemplate
+          setShowNewTmplModal={setShowNewTmplModal}
+          handleCreateCustomMaster={handleCreateCustomMaster}
+          newTmplTitolo={newTmplTitolo}
+          setNewTmplTitolo={setNewTmplTitolo}
+          newTmplCat={newTmplCat}
+          setNewTmplCat={setNewTmplCat}
+          newTmplDesc={newTmplDesc}
+          setNewTmplDesc={setNewTmplDesc}
+        />
       )}
     </div>
   );
 }
-
-const toolbarBtnStyle: React.CSSProperties = {
-  background: 'var(--card2)',
-  border: '1px solid var(--border)',
-  color: 'var(--text)',
-  padding: '4px 10px',
-  borderRadius: 6,
-  fontSize: 11.5,
-  fontWeight: 700,
-  cursor: 'pointer',
-};
-
-const dividerStyle: React.CSSProperties = {
-  width: 1,
-  height: 18,
-  background: 'var(--border)',
-  margin: '0 4px',
-};
