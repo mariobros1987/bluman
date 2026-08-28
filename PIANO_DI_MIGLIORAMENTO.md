@@ -549,8 +549,9 @@ Split puramente presentazionale: nessun cambio di comportamento, `App.tsx` invar
 
 **Progresso**:
 - ✅ `ProjectDetail.tsx` (28/08/2026, commit `8a19b6f`): da 3.377 a 883 righe. La pagina mantiene stato, handler ed effetti; estratti 10 componenti in `frontend/src/components/projectDetail/` (`HeaderProgetto`, `ModuliTab`, `DocumentiTab`, `CalendarioProgettoTab`, `RedditivitaTab`, `StoricoContrattiTab`, `RichiesteAddendumTab`, `GrafoModuliProgettoView`, `ModalAccessiProgetto` + `documentiUtils.ts`). `FatturazioneTab` e `ModuloBlock` erano già stati estratti in `15a630d`. `npx tsc -b` verde.
-- ⏳ `Library.tsx` — split in corso (28/08/2026).
-- ⏸ Coda: `api/client.ts`, `SettingsPage.tsx`, `PassaggioModal.tsx`, `DocumentEditorPage.tsx`, `ClientsPage.tsx`.
+- ✅ `Library.tsx` (28/08/2026, commit `dbc8358`): da 2.879 a 449 righe. I 6 componenti già autonomi nel monolite traslocati in `frontend/src/components/library/` (`AssegnaModuloClienteModal`, `ArticoliCatalogView`, `GiurisdizioniView`, `LibreriaDocumentiEForm`, `NuovoArticoloModal`, `CreaModuloForm`); corpi byte-identici, nessun import circolare, `tsc -b` verde. `LibreriaDocumentiEForm` (730 righe) resta candidato a un futuro frazionamento.
+- ⏳ `api/client.ts` — split per dominio con barrel export in corso (28/08/2026).
+- ⏸ Coda: `SettingsPage.tsx`, `PassaggioModal.tsx`, `DocumentEditorPage.tsx`, `ClientsPage.tsx`.
 
 ---
 
