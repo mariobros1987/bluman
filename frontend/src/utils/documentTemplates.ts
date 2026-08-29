@@ -66,12 +66,14 @@ export const PREBUILT_TEMPLATES: DocumentTemplate[] = [
   <div style="width: 45%; text-align: center; border-top: 1px dashed #94a3b8; padding-top: 8px; font-size: 11px;">
     <strong>Per Lo Studio:</strong><br/>
     {{studio.ragione_sociale}}<br/>
-    <span style="color: #64748b; font-size: 10px;">(Firma Autorizzata)</span>
+    <span style="color: #64748b; font-size: 10px;">(Firma Autorizzata)</span><br/>
+    {{firma_studio}}
   </div>
   <div style="width: 45%; text-align: center; border-top: 1px dashed #94a3b8; padding-top: 8px; font-size: 11px;">
     <strong>Per Il Cliente Committente:</strong><br/>
     {{cliente.referente}}<br/>
-    <span style="color: #4338ca; font-weight: 700; font-size: 10px;">[ Sottoscrizione con OTP verificata · art. 20 CAD ]</span>
+    <span style="color: #4338ca; font-weight: 700; font-size: 10px;">[ Sottoscrizione con OTP verificata · art. 20 CAD ]</span><br/>
+    {{firma_cliente}}
   </div>
 </div>
 `,
@@ -107,11 +109,13 @@ export const PREBUILT_TEMPLATES: DocumentTemplate[] = [
 <div style="margin-top: 40px; display: flex; justify-content: space-between;">
   <div style="width: 45%; text-align: center; border-top: 1px solid #cbd5e1; padding-top: 8px; font-size: 11px;">
     <strong>Per Lo Studio:</strong><br/>
-    {{studio.ragione_sociale}}
+    {{studio.ragione_sociale}}<br/>
+    {{firma_studio}}
   </div>
   <div style="width: 45%; text-align: center; border-top: 1px solid #cbd5e1; padding-top: 8px; font-size: 11px;">
     <strong>Per Il Cliente:</strong><br/>
-    {{cliente.ragione_sociale}} ({{cliente.referente}})
+    {{cliente.ragione_sociale}} ({{cliente.referente}})<br/>
+    {{firma_cliente}}
   </div>
 </div>
 `,
@@ -187,7 +191,7 @@ export const PREBUILT_TEMPLATES: DocumentTemplate[] = [
 
 <div style="margin-top: 40px; text-align: right;">
   <p style="font-size: 11px; color: #64748b;">Firma del Delegante:</p>
-  <p style="font-size: 12px; font-weight: 700; color: #1e1b4b;">{{cliente.referente}}</p>
+  <p style="font-size: 12px; font-weight: 700; color: #1e1b4b;">{{cliente.referente}}<br/>{{firma_cliente}}</p>
 </div>
 `,
   },
@@ -223,11 +227,13 @@ export const PREBUILT_TEMPLATES: DocumentTemplate[] = [
 <div style="margin-top: 40px; display: flex; justify-content: space-between;">
   <div style="width: 45%; text-align: center; border-top: 1px solid #cbd5e1; padding-top: 8px; font-size: 11px;">
     <strong>The Settlor:</strong><br/>
-    {{cliente.referente}}
+    {{cliente.referente}}<br/>
+    {{firma_cliente}}
   </div>
   <div style="width: 45%; text-align: center; border-top: 1px solid #cbd5e1; padding-top: 8px; font-size: 11px;">
     <strong>Received by Advisory Trustee:</strong><br/>
-    {{studio.ragione_sociale}}
+    {{studio.ragione_sociale}}<br/>
+    {{firma_studio}}
   </div>
 </div>
 `,
@@ -257,7 +263,8 @@ export const PREBUILT_TEMPLATES: DocumentTemplate[] = [
     Data: {{data_odierna}}
   </div>
   <div style="width: 45%; text-align: center; border-top: 1px solid #cbd5e1; padding-top: 8px; font-size: 11px;">
-    Firma UBO: <strong>{{cliente.referente}}</strong>
+    Firma UBO: <strong>{{cliente.referente}}</strong><br/>
+    {{firma_cliente}}
   </div>
 </div>
 `,
@@ -367,6 +374,21 @@ export function resolveDocumentTemplateHtml(
   out = out.replace(/\{\{studio\.lead_advisor\}\}/g, wrapTag(studioLeadAdvisor));
   out = out.replace(/\{\{studio\.telefono\}\}/g, wrapTag(studioTel));
   out = out.replace(/\{\{studio\.email\}\}/g, wrapTag(studioEmail));
+
+  // §36 — Aree firma. Nell'anteprima il segnaposto non è un dato ma uno SPAZIO: il filetto
+  // su cui, alla firma, il server disegnerà la grafometrica dentro il documento. Va reso
+  // come tale e non lasciato letterale, altrimenti l'operatore vede «{{firma_cliente}}»
+  // nel contratto e crede di aver sbagliato a scrivere il tag.
+  //
+  // Nessun nome, nessuna data: qui non c'è ancora nessuna firma, e il frontend non attesta
+  // ciò che il database non ha (regola 7). Lo spazio è vuoto perché vuoto lo è davvero
+  // finché il cliente non firma dal portale.
+  const areaFirma = (etichetta: string) =>
+    `<span style="display:inline-block;min-width:190px;border-bottom:1px dashed #94a3b8;` +
+    `margin-top:26px;padding-bottom:2px;color:#94a3b8;font-size:10px;font-style:italic;">` +
+    `${etichetta}</span>`;
+  out = out.replace(/\{\{firma_cliente\}\}/g, areaFirma('Spazio riservato alla firma del cliente'));
+  out = out.replace(/\{\{firma_studio\}\}/g, areaFirma('Spazio riservato alla firma dello Studio'));
 
   return out;
 }

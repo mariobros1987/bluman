@@ -460,6 +460,10 @@ export async function registraRotteDocumenti(server: FastifyInstance): Promise<v
           filePdfUrl: uploadPdf.url,
           fileDocxUrl: uploadDocx?.url ?? null,
           formatoOrigine: 'pdf',
+          // §36 — i blocchi risolti restano attaccati alla riga: alla firma del cliente
+          // `generaCopiaFirmata` ricompone da qui il documento con la grafometrica dentro
+          // l'area `{{firma_cliente}}`, senza toccare il PDF su cui si fissa il sigillo.
+          contenutoBlocchiJson: blocchi as any,
           caricatoDa: userId,
           categoriaDoc: categoria || 'generico',
           dataScadenzaDoc: scadenza,

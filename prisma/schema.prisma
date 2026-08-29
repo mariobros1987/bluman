@@ -601,6 +601,15 @@ model Documento {
   filePdfUrl          String?           @map("file_pdf_url")
   fileDocxUrl         String?           @map("file_docx_url")
   formatoOrigine      String            @default("pdf") @map("formato_origine") // pdf|docx
+  // §36 — i blocchi risolti da cui il documento è stato composto, così com'erano al momento
+  // della generazione (tag già sostituiti). Servono a una cosa sola: quando il cliente firma,
+  // ricomporre il documento con la grafometrica DENTRO l'area `{{firma_cliente}}`. Il PDF
+  // originale non si può annotare (nessun `pdf-lib` fra le dipendenze) e non si DEVE toccare —
+  // è il file su cui è fissato l'hash del sigillo. La copia firmata è quindi una nuova riga
+  // Documento (tipo='firmato', documentoPadreId → originale) resa da questi stessi blocchi.
+  // Nullable e senza backfill: i documenti generati prima di §36 non hanno i blocchi, e per
+  // loro la copia firmata non si produce (la firma resta valida, sigillo e verbale invariati).
+  contenutoBlocchiJson Json?            @map("contenuto_blocchi_json")
   versione             Int              @default(1)
   // Chi ha caricato il file. Nullable: i documenti generati automaticamente dalla
   // piattaforma (verbale_firma, Punto 2 piano gap) non hanno un caricatore umano — il

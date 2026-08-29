@@ -39,6 +39,7 @@ import { credenzialiCanali, canaliDisponibili, inviaCodiceOtp, recapitiCliente }
 import { notificaStudio, notificaCliente } from '../services/notificheService.js';
 import { scanFileBuffer } from '../services/securityScanner.js';
 import { generaPdfVerbaleFirma } from '../services/verbaleFirma.js';
+import { generaCopiaFirmata } from '../services/copiaFirmata.js';
 import {
   verificaLivelloFirma,
   livelloPiuAlto,
@@ -978,6 +979,53 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
   }
 
   /**
+   * §36 — la copia firmata del documento del Vault: lo stesso atto ricomposto dai blocchi
+   * salvati alla generazione, con la grafometrica disegnata dentro l'area `{{firma_cliente}}`.
+   *
+   * Serve solo alla rotta OTP/FEA: nel canale «file caricato» la sottoscrizione è già dentro
+   * il file che il cliente ha ricaricato (`fileFirmatoUrl`), e ricomporre il documento da
+   * template sostituirebbe la prova con una resa fatta dal server.
+   *
+   * Il servizio ritorna `null` senza sollevare quando la copia non si può o non si deve fare
+   * (documento anteriore a §36, template senza segnaposto, allegato caricato a mano): non è
+   * un errore e non va nell'audit, sarebbe rumore su ogni firma di ogni documento vecchio.
+   */
+  async function archiviaCopiaFirmata(params: {
+    tenantId: string;
+    documentoId: string;
+    firma: {
+      signatureId: string;
+      firmatarioNome: string;
+      firmatoAt: Date;
+      valoreLegale?: string | null;
+      firmaGrafometricaPng?: string | null;
+    };
+    sigilloDigest: string;
+    documentoTitolo: string;
+    ipAddress: string | null;
+  }): Promise<void> {
+    const esito = await generaCopiaFirmata({
+      tenantId: params.tenantId,
+      documentoId: params.documentoId,
+      firma: params.firma,
+      sigilloDigest: params.sigilloDigest,
+    });
+    if (!esito) return;
+    await recordAudit({
+      tenantId: params.tenantId,
+      userId: null,
+      ruolo: null,
+      azione: 'COPIA_FIRMATA_GENERATA',
+      entita: esito.documentoId,
+      dettagli:
+        `Copia firmata «${esito.nome}» generata per ${params.firma.signatureId} su "${params.documentoTitolo}": ` +
+        `la firma di ${params.firma.firmatarioNome} è apposta dentro il documento. ` +
+        `L'originale ${params.documentoId} resta invariato (è il file su cui è fissato l'hash del sigillo).`,
+      ipAddress: params.ipAddress,
+    }).catch(() => {});
+  }
+
+  /**
    * Punto 2 piano gap — il verbale di firma. FirmaElettronica contiene i dati probatori ma
    * nessun documento umano-leggibile: questa funzione genera il PDF del verbale, lo carica
    * come Documento (tipo 'verbale_firma') nel fascicolo e collega la firma al documento.
@@ -1388,7 +1436,25 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
         },
       });
 
-      if (vault && riferimentoId) await segnaDocumentoFirmato(tenantId, riferimentoId);
+      if (vault && riferimentoId) {
+        await segnaDocumentoFirmato(tenantId, riferimentoId);
+        // §36 — la firma entra nel documento. Effetto collaterale, non requisito: se non
+        // esce, l'originale è firmato a tutti gli effetti e il sigillo resta valido.
+        await archiviaCopiaFirmata({
+          tenantId,
+          documentoId: riferimentoId,
+          firma: {
+            signatureId: firma.signatureId,
+            firmatarioNome: firma.firmatarioNome,
+            firmatoAt: firma.firmatoAt,
+            valoreLegale: firma.valoreLegale,
+            firmaGrafometricaPng: grafometrica,
+          },
+          sigilloDigest: sigillo.sha256Digest,
+          documentoTitolo,
+          ipAddress: sigillo.ipAddress,
+        });
+      }
 
       // L'azione di audit dichiara il valore legale REALE della firma apposta:
       // `FIRMA_SES_APPOSTA` per la firma semplice, `FIRMA_FEA_APPOSTA` per il flusso

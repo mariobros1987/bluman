@@ -19,6 +19,18 @@
 import PDFDocument from 'pdfkit';
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
+import {
+  TAG_SLOT_FIRMA,
+  marcatoreSlot,
+  estraiSlotFirma,
+  contieneSlotFirma,
+  bytePngFirma,
+  type SlotFirma,
+  type FirmeDaApporre,
+} from './slotFirma.js';
+
+export type { SlotFirma, FirmaDaApporre, FirmeDaApporre } from './slotFirma.js';
+
 
 // ---------------------------------------------------------------------------
 // Merge dei tag
@@ -183,6 +195,13 @@ export function risolviTagDocumento(html: string, contesto: ContestoTagDocumento
     // essere interpretato come metacarattere.
     out = out.split(`{{${tag}}}`).join(valore);
   }
+  // §36 — i due segnaposto d'area firma non hanno un valore da sostituire: diventano un
+  // marcatore che il parser a blocchi riconosce (vedi `espandiSlotFirma`). Restano qui,
+  // dentro l'unico punto che traduce i tag, perché un template che li usa deve smettere di
+  // mostrarli letterali anche quando nessuno ha ancora firmato.
+  for (const [tag, slot] of Object.entries(TAG_SLOT_FIRMA)) {
+    out = out.split(`{{${tag}}}`).join(marcatoreSlot(slot));
+  }
   return out;
 }
 
@@ -201,6 +220,13 @@ export interface BloccoDocumento {
   /** Solo per tipo 'firma': una colonna per firmatario. */
   colonne?: string[];
   allineamento?: 'sinistra' | 'centro' | 'destra';
+  /**
+   * §36 — parallelo a `colonne`: quale slot di firma occupa ciascuna colonna, `null` se la
+   * colonna è una riga di firma autografa senza segnaposto. Presente solo quando il template
+   * usa `{{firma_cliente}}` / `{{firma_studio}}`; alla firma il motore ci disegna dentro la
+   * grafometrica del firmatario corrispondente.
+   */
+  slotColonne?: (SlotFirma | null)[];
 }
 
 interface ElementoHtml {
@@ -273,6 +299,26 @@ function trovaElementiFigli(html: string): ElementoHtml[] {
   return out;
 }
 
+/**
+ * Un div è l'area firme del template solo se soddisfa tutte e tre le condizioni:
+ *
+ *   1. dichiara `display: flex` — è così che i template mettono i firmatari affiancati;
+ *   2. TUTTI i suoi figli di primo livello sono div — un contenitore che alterna h1, p e div
+ *      è l'involucro del documento, non una riga di firme;
+ *   3. nessuna colonna contiene a sua volta elementi blocco — una colonna di firma porta solo
+ *      markup inline (`strong`, `span`, `br`).
+ *
+ * Il solo «due o più div figli», che era il criterio precedente, prendeva per area firme
+ * l'involucro `<div style="font-family: Arial">` con cui si aprono i 22 modelli di
+ * riorganizzazione: l'intero documento diventava una singola riga di firme a quattro colonne.
+ * Con §36 avrebbe anche attirato lì la grafometrica del cliente.
+ */
+function areaFirmeAColonne(el: ElementoHtml, figli: ElementoHtml[], figliDiv: ElementoHtml[]): boolean {
+  if (figliDiv.length < 2 || figli.length !== figliDiv.length) return false;
+  if (!/display\s*:\s*flex/i.test(el.attrs)) return false;
+  return figliDiv.every((f) => trovaElementiFigli(f.inner).length === 0);
+}
+
 function blocchiDaElemento(el: ElementoHtml): BloccoDocumento[] {
   const allineamento = allineamentoDa(el.attrs);
 
@@ -293,9 +339,7 @@ function blocchiDaElemento(el: ElementoHtml): BloccoDocumento[] {
   const figli = trovaElementiFigli(el.inner);
   const figliDiv = figli.filter((f) => f.tag === 'div');
 
-  if (figliDiv.length >= 2) {
-    // Due o più div affiancati = area firme (flex con space-between nei template):
-    // ogni div figlio diventa una colonna.
+  if (areaFirmeAColonne(el, figli, figliDiv)) {
     const colonne = figliDiv.map((f) => testoDaHtml(f.inner)).filter(Boolean);
     return colonne.length ? [{ tipo: 'firma', colonne }] : [];
   }
@@ -311,6 +355,46 @@ function blocchiDaElemento(el: ElementoHtml): BloccoDocumento[] {
 }
 
 /**
+ * §36 — traduce i marcatori lasciati dal merge in slot di firma veri.
+ *
+ * Due forme, entrambe presenti nei template reali:
+ *   - il segnaposto sta in una COLONNA di un'area firme (due div affiancati): quella colonna
+ *     diventa uno slot, le altre restano righe di firma autografa;
+ *   - il segnaposto sta in un paragrafo suo (`<p>Il Cliente<br/>{{firma_cliente}}</p>`):
+ *     l'intero paragrafo diventa un'area firma a una colonna, e il testo che lo accompagnava
+ *     ne è l'etichetta.
+ *
+ * Il testo attorno al marcatore non viene mai spostato altrove: è l'etichetta della firma
+ * che il template stava scrivendo. Un blocco con due marcatori diversi produce un solo slot
+ * (il primo) e perde il secondo marcatore: due firme nello stesso paragrafo non sono
+ * rappresentabili come una colonna, e inventare una seconda colonna cambierebbe il layout
+ * che il template ha chiesto.
+ */
+function espandiSlotFirma(blocchi: BloccoDocumento[]): BloccoDocumento[] {
+  return blocchi.map((blocco) => {
+    if (blocco.tipo === 'firma') {
+      const colonne = blocco.colonne ?? [];
+      if (!colonne.some((c) => contieneSlotFirma(c))) return blocco;
+      const estratte = colonne.map((c) => estraiSlotFirma(c));
+      return {
+        ...blocco,
+        colonne: estratte.map((e) => e.etichetta),
+        slotColonne: estratte.map((e) => e.slot),
+      };
+    }
+
+    if (!contieneSlotFirma(blocco.testo)) return blocco;
+    const { slot, etichetta } = estraiSlotFirma(blocco.testo ?? '');
+    return {
+      tipo: 'firma',
+      colonne: [etichetta],
+      slotColonne: [slot],
+      ...(blocco.allineamento ? { allineamento: blocco.allineamento } : {}),
+    };
+  });
+}
+
+/**
  * Riduce l'HTML risolto (tag già sostituiti) in blocchi. Se il markup non produce nulla
  * (template con elementi non supportati) ripiega sul testo grezzo, così la generazione
  * non restituisce mai un documento vuoto quando c'è contenuto leggibile.
@@ -321,9 +405,9 @@ export function blocchiDaHtml(html: string): BloccoDocumento[] {
   const pieni = blocchi.filter((b) =>
     b.tipo === 'firma' ? (b.colonne?.length ?? 0) > 0 : Boolean((b.testo ?? '').trim()),
   );
-  if (pieni.length > 0) return pieni;
+  if (pieni.length > 0) return espandiSlotFirma(pieni);
   const grezzo = testoDaHtml(pulito);
-  return grezzo ? [{ tipo: 'paragrafo', testo: grezzo }] : [];
+  return grezzo ? espandiSlotFirma([{ tipo: 'paragrafo', testo: grezzo }]) : [];
 }
 
 // ---------------------------------------------------------------------------
@@ -342,6 +426,8 @@ const ACCENTO = '#4338ca';
 const FILOTTO = '#e2e8f0';
 const FIRMA_LINEA = '#94a3b8';
 const FONDO_EVIDENZA = '#f8fafc';
+/** §36 — altezza riservata alla grafometrica sopra il filetto della firma. */
+const ALTEZZA_IMMAGINE_FIRMA = 40;
 
 function pdfDocToBuffer(doc: PDFKit.PDFDocument): Promise<Buffer> {
   return new Promise((resolve, reject) => {
@@ -413,22 +499,62 @@ function renderizzaEvidenza(doc: PDFKit.PDFDocument, blocco: BloccoDocumento, la
   doc.x = MARGINE;
 }
 
-function renderizzaFirma(doc: PDFKit.PDFDocument, blocco: BloccoDocumento, larghezzaUtile: number): void {
+/**
+ * Area firme. §36 — quando una colonna porta uno slot (`{{firma_cliente}}`) e chi chiama ha
+ * consegnato la firma corrispondente, sopra il filetto compare la grafometrica e sotto
+ * l'etichetta le righe di attestazione. Senza firme (generazione del documento da far
+ * firmare) il disegno è esattamente quello di prima: filetto tratteggiato ed etichetta.
+ */
+function renderizzaFirma(
+  doc: PDFKit.PDFDocument,
+  blocco: BloccoDocumento,
+  larghezzaUtile: number,
+  firme?: FirmeDaApporre,
+): void {
   const colonne = blocco.colonne ?? [];
   if (colonne.length === 0) return;
   const gap = 18;
   const wCol = (larghezzaUtile - gap * (colonne.length - 1)) / colonne.length;
+
+  // Cosa va apposto in ciascuna colonna: solo le colonne con slot possono ricevere una firma.
+  const daApporre = colonne.map((_, i) => {
+    const slot = blocco.slotColonne?.[i] ?? null;
+    return slot ? firme?.[slot] ?? null : null;
+  });
+  const immagini = daApporre.map((d) => bytePngFirma(d?.immaginePng));
+  const spazioImmagine = immagini.some(Boolean) ? ALTEZZA_IMMAGINE_FIRMA + 6 : 0;
 
   const righePerColonna = colonne.map((c) => c.split('\n'));
   doc.font(FONT).fontSize(9);
   const altezzaMax = Math.max(
     ...righePerColonna.map((righe) => righe.reduce((a, r) => a + doc.heightOfString(r || ' ', { width: wCol }), 0)),
   );
-  if (doc.y + altezzaMax + 40 > doc.page.height - MARGINE) doc.addPage();
+  doc.fontSize(7.5);
+  const altezzaAttestazioni = Math.max(
+    0,
+    ...daApporre.map((d) => (d?.righe ?? []).reduce((a, r) => a + doc.heightOfString(r, { width: wCol, lineGap: 1.5 }), 0)),
+  );
+  if (doc.y + spazioImmagine + altezzaMax + altezzaAttestazioni + 40 > doc.page.height - MARGINE) doc.addPage();
 
-  const y = doc.y + 16;
+  const y = doc.y + 16 + spazioImmagine;
   colonne.forEach((testoColonna, i) => {
     const x = MARGINE + i * (wCol + gap);
+    const png = immagini[i];
+    if (png) {
+      try {
+        // `fit` mantiene le proporzioni del tracciato; l'immagine sta SOPRA il filetto, così
+        // la firma tocca la riga come su carta.
+        doc.image(png, x, y - ALTEZZA_IMMAGINE_FIRMA - 2, {
+          fit: [wCol, ALTEZZA_IMMAGINE_FIRMA],
+          align: 'center',
+          valign: 'bottom',
+        });
+      } catch {
+        // Un PNG dai magic byte giusti ma corrotto non deve impedire la copia firmata: le
+        // righe di attestazione qui sotto dicono comunque chi ha firmato, quando e con che
+        // sigillo. L'anomalia la registra chi orchestra (audit), non il renderer.
+      }
+    }
     doc.save();
     doc.moveTo(x, y).lineTo(x + wCol, y).dash(3, { space: 2 }).lineWidth(0.7).stroke(FIRMA_LINEA);
     doc.restore();
@@ -437,13 +563,28 @@ function renderizzaFirma(doc: PDFKit.PDFDocument, blocco: BloccoDocumento, largh
       align: 'center',
       lineGap: 3,
     });
+    const attestazioni = daApporre[i]?.righe ?? [];
+    if (attestazioni.length) {
+      doc.font(FONT).fontSize(7.5).fillColor(GRIGIO).text(attestazioni.join('\n'), x, y + 8 + altezzaMax + 3, {
+        width: wCol,
+        align: 'center',
+        lineGap: 1.5,
+      });
+    }
   });
-  doc.y = y + 8 + altezzaMax + 16;
+  doc.y = y + 8 + altezzaMax + (altezzaAttestazioni ? altezzaAttestazioni + 6 : 0) + 16;
   doc.x = MARGINE;
 }
 
-/** Genera il PDF master del documento a partire dai blocchi. */
-export async function generaPdfDocumento(blocchi: BloccoDocumento[]): Promise<Buffer> {
+/**
+ * Genera il PDF master del documento a partire dai blocchi.
+ *
+ * `firme` è il canale di §36: le grafometriche da apporre negli slot, una per firmatario.
+ * Passarlo NON produce una variante del master ma un documento nuovo — la copia firmata,
+ * che `copiaFirmata.ts` archivia come riga a sé. Il file originale non viene mai riscritto:
+ * è quello su cui è fissato l'hash del sigillo.
+ */
+export async function generaPdfDocumento(blocchi: BloccoDocumento[], firme?: FirmeDaApporre): Promise<Buffer> {
   if (!blocchi.length) throw new Error('Nessun contenuto da generare: il documento è vuoto.');
   const doc = new PDFDocument({ size: 'A4', margin: MARGINE, compress: false, bufferPages: true });
   const larghezzaUtile = doc.page.width - MARGINE * 2;
@@ -460,7 +601,7 @@ export async function generaPdfDocumento(blocchi: BloccoDocumento[]): Promise<Bu
         renderizzaEvidenza(doc, blocco, larghezzaUtile);
         break;
       case 'firma':
-        renderizzaFirma(doc, blocco, larghezzaUtile);
+        renderizzaFirma(doc, blocco, larghezzaUtile, firme);
         break;
       default:
         renderizzaParagrafo(doc, blocco, larghezzaUtile);
@@ -618,9 +759,13 @@ export function paragrafiDocx(blocchi: BloccoDocumento[]): ParagrafoDocx[] {
   const out: ParagrafoDocx[] = [];
   for (const blocco of blocchi) {
     if (blocco.tipo === 'firma') {
-      for (const colonna of blocco.colonne ?? []) {
-        if (colonna.trim()) out.push({ testo: colonna, vFirma: true });
-      }
+      (blocco.colonne ?? []).forEach((colonna, i) => {
+        // §36 — una colonna con segnaposto va emessa anche se l'etichetta è vuota: il
+        // paragrafo `FirmaDoc` è la riga su cui si firma, e ometterlo farebbe sparire
+        // dalla copia Word l'area firma che il template aveva chiesto.
+        const conSlot = (blocco.slotColonne?.[i] ?? null) !== null;
+        if (colonna.trim() || conSlot) out.push({ testo: colonna, vFirma: true });
+      });
       continue;
     }
     const testo = blocco.testo ?? '';

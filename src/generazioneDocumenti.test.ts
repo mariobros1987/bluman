@@ -308,6 +308,40 @@ describe('blocchiDaHtml — parser a blocchi', () => {
     expect(blocchiDaHtml('<p></p>')).toEqual([]);
     expect(blocchiDaHtml('')).toEqual([]);
   });
+
+  // I 22 modelli di riorganizzazione avvolgono tutto il documento in un
+  // `<div style="font-family: Arial">` che contiene intestazione, titolo, corpo e area
+  // firme: quattro div figli. Col vecchio criterio («due o più div figli = area firme»)
+  // l'intero documento usciva come UNA riga di firme a quattro colonne — e con §36 la
+  // grafometrica del cliente sarebbe finita dentro quel blocco.
+  it("l'involucro del documento non è un'area firme, nemmeno con più div figli", () => {
+    const html = [
+      '<div style="font-family: Arial, sans-serif; color: #1e293b;">',
+      '<div style="display: flex; justify-content: space-between;"><div><h2>Studio Alfa</h2><p>P.IVA 123</p></div><div><div>Data: oggi</div><div>Rif. pratica</div></div></div>',
+      '<h1>DICHIARAZIONE</h1>',
+      '<div style="background:#f8fafc">CLIENTE: Rossi Spa</div>',
+      '<div><h3>1. Oggetto</h3><p>Il contenuto della dichiarazione.</p></div>',
+      '<div style="display: flex; justify-content: space-between;"><div><strong>Per Lo Studio:</strong><br/>Studio Alfa</div><div><strong>Per Il Cliente:</strong><br/>Rossi Spa</div></div>',
+      '</div>',
+    ].join('');
+    const blocchi = blocchiDaHtml(html);
+
+    // Una sola area firme, l'ultima: le colonne sono i due firmatari, non il documento.
+    const firme = blocchi.filter((b) => b.tipo === 'firma');
+    expect(firme).toHaveLength(1);
+    expect(firme[0]?.colonne).toEqual(['Per Lo Studio:\nStudio Alfa', 'Per Il Cliente:\nRossi Spa']);
+    // L'intestazione a due colonne (h2 + p dentro i div) resta testo, e il corpo sopravvive.
+    expect(blocchi.find((b) => b.tipo === 'titolo')?.testo).toBe('DICHIARAZIONE');
+    expect(blocchi.some((b) => b.tipo === 'intestazione' && b.testo === 'Studio Alfa')).toBe(true);
+    expect(blocchi.some((b) => b.tipo === 'evidenza' && b.testo === 'CLIENTE: Rossi Spa')).toBe(true);
+    expect(blocchi.some((b) => b.testo === 'Il contenuto della dichiarazione.')).toBe(true);
+  });
+
+  it('due div affiancati senza flex restano testo: le colonne di firma le dichiara il template', () => {
+    const blocchi = blocchiDaHtml('<div><div>Riga A</div><div>Riga B</div></div>');
+    expect(blocchi.every((b) => b.tipo === 'paragrafo')).toBe(true);
+    expect(blocchi.map((b) => b.testo)).toEqual(['Riga A', 'Riga B']);
+  });
 });
 
 describe('paragrafiDocx — bandierine di variante per il loop', () => {
@@ -415,6 +449,14 @@ describe('POST /documenti/genera — doppio formato dallo stesso merge', () => {
     expect(creato.pubblicatoAt).toBeInstanceOf(Date);
     expect(creato.caricatoDa).toBe('usr-advisor');
     expect(creato.categoriaDoc).toBe('generico');
+
+    // §36 — i blocchi risolti restano attaccati alla riga: sono l'unica cosa da cui, alla
+    // firma, si può ricomporre il documento con la grafometrica dentro l'area firma. Il
+    // merge è già avvenuto: nel JSON non ci sono più segnaposto.
+    expect(Array.isArray(creato.contenutoBlocchiJson)).toBe(true);
+    expect(creato.contenutoBlocchiJson).toHaveLength(6);
+    expect(JSON.stringify(creato.contenutoBlocchiJson)).toContain('Rossi Spa');
+    expect(JSON.stringify(creato.contenutoBlocchiJson)).not.toContain('{{');
 
     // Due upload dallo stesso merge, con lo stesso slug.
     const nomi = stato.upload.map((u) => u.filename);

@@ -25,6 +25,8 @@ const stato = {
   progetto: null as any,
   documento: null as any,
   uploadFails: false,
+  /** §36 — byte del file in archivio: servono a `improntaDocumentoDelFascicolo`. */
+  fileArchivio: null as Buffer | null,
   // Registri per asserire cosa il server ha scritto davvero.
   upload: [] as string[],
   uploadContenuti: [] as string[],
@@ -114,6 +116,9 @@ vi.mock('./services/storageService.js', async importOriginal => {
       stato.uploadContenuti.push(contentBase64);
       return { ok: true, url: `https://storage.example/${filename}`, name: filename, size: '1 KB' };
     },
+    // §36 — l'impronta del documento del fascicolo la calcola il server sui byte in
+    // archivio: qui li serve il registro, senza toccare Supabase.
+    leggiFileArchivio: async () => stato.fileArchivio,
   };
 });
 
@@ -221,6 +226,7 @@ beforeEach(() => {
   stato.progetto = null;
   stato.documento = null;
   stato.uploadFails = false;
+  stato.fileArchivio = null;
   stato.upload = [];
   stato.uploadContenuti = [];
   stato.firmeCreate = [];
@@ -545,5 +551,116 @@ describe('Punto 2 — verify-otp-and-sign genera il verbale di firma', () => {
     expect(res.json().ok).toBe(false);
     expect(stato.firmeCreate).toHaveLength(0);
     expect(stato.documentiCreati).toHaveLength(0);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* 4. §36 — la firma dentro il documento del fascicolo                */
+/* ------------------------------------------------------------------ */
+
+/** Blocchi come li salva `POST /documenti/genera`: l'area firma aspetta il cliente. */
+const BLOCCHI_CON_SLOT = [
+  { tipo: 'titolo', testo: 'LETTERA DI INCARICO', allineamento: 'centro' },
+  { tipo: 'paragrafo', testo: "L'incarico è conferito allo Studio alle condizioni che seguono." },
+  { tipo: 'firma', colonne: ['Lo Studio', 'Il Cliente'], slotColonne: [null, 'cliente'] },
+];
+
+/** 1x1 PNG valido: la grafometrica minima che il portale può mandare. */
+const GRAFOMETRICA = PNG_1X1;
+
+function preparaDocumentoVault(blocchi: unknown = BLOCCHI_CON_SLOT) {
+  stato.cliente = { nome: 'Rossi Costruzioni SRL', referentiJson: null };
+  stato.documento = {
+    id: 'doc-1',
+    tipo: 'compilato',
+    fileUrl: 'https://storage.example/1756500000000_lettera-di-incarico.pdf',
+    statoScansione: 'pulito',
+    statoDoc: 'pubblicato',
+    livelloFirmaRichiesto: 'ses',
+    progettoId: 'proj-1',
+    microvoceProgettoId: null,
+    categoriaDoc: 'contratto',
+    contenutoBlocchiJson: blocchi,
+    microvoceProgetto: null,
+    progetto: { nome: 'Incarico consulenza 2026' },
+  };
+  stato.fileArchivio = Buffer.from('%PDF-1.3 contenuto originale del documento');
+  stato.firmaEsistente = null;
+  stato.otp = otpAperto('documento_vault', 'doc-1');
+}
+
+describe('§36 — verify-otp-and-sign incorpora la firma nel documento', () => {
+  it('archivia la copia firmata come riga nuova, senza toccare il file originale', async () => {
+    preparaDocumentoVault();
+    const server = serverConToken(tokenCliente());
+    const res = await server.inject({
+      method: 'POST',
+      url: '/portal/verify-otp-and-sign',
+      payload: {
+        otp: CODICE_OTP,
+        ambito: 'documento_vault',
+        riferimentoId: 'doc-1',
+        firmaGrafometricaPng: GRAFOMETRICA,
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().ok).toBe(true);
+
+    // Due documenti nuovi: la copia firmata (prima) e il verbale (dopo). L'originale
+    // 'doc-1' non è fra i creati e nessuno l'ha riscritto: è il file su cui è fissato
+    // l'hash del sigillo.
+    const copia = stato.documentiCreati.find(d => d.tipo === 'firmato');
+    expect(copia).toBeTruthy();
+    expect(copia.documentoPadreId).toBe('doc-1');
+    expect(copia.progettoId).toBe('proj-1');
+    expect(copia.fileUrl).toBe(copia.filePdfUrl);
+    expect(copia.fileUrl).not.toBe(stato.documento.fileUrl);
+    expect(copia.caricatoDa).toBeNull();
+    expect(copia.statoDoc).toBe('firmato');
+    expect(stato.documentiCreati.some(d => d.tipo === 'verbale_firma')).toBe(true);
+
+    // Il PDF caricato contiene il testo del documento E l'attestazione della firma.
+    const indice = stato.upload.findIndex(n => n === 'lettera-di-incarico-firmato.pdf');
+    expect(indice).toBeGreaterThanOrEqual(0);
+    const testo = testoPdf(Buffer.from(stato.uploadContenuti[indice]!, 'base64'));
+    expect(testo).toContain('LETTERA DI INCARICO');
+    expect(testo).toContain('Il Cliente');
+    expect(testo).toContain('Firmato elettronicamente da Rossi Costruzioni SRL');
+    expect(testo).toContain(stato.firmeCreate[0].signatureId);
+
+    expect(stato.audit.some(a => a.azione === 'COPIA_FIRMATA_GENERATA')).toBe(true);
+  });
+
+  it('documento generato prima di §36: nessuna copia, la firma resta valida', async () => {
+    preparaDocumentoVault(null);
+    const server = serverConToken(tokenCliente());
+    const res = await server.inject({
+      method: 'POST',
+      url: '/portal/verify-otp-and-sign',
+      payload: {
+        otp: CODICE_OTP,
+        ambito: 'documento_vault',
+        riferimentoId: 'doc-1',
+        firmaGrafometricaPng: GRAFOMETRICA,
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(stato.firmeCreate).toHaveLength(1);
+    // Solo il verbale: senza blocchi non c'è nulla da ricomporre.
+    expect(stato.documentiCreati.filter(d => d.tipo === 'firmato')).toHaveLength(0);
+    expect(stato.documentiCreati.some(d => d.tipo === 'verbale_firma')).toBe(true);
+    expect(stato.audit.some(a => a.azione === 'COPIA_FIRMATA_GENERATA')).toBe(false);
+  });
+
+  it('template senza {{firma_cliente}}: nessuna copia doppione nel fascicolo', async () => {
+    preparaDocumentoVault([{ tipo: 'paragrafo', testo: 'Documento senza area firma.' }]);
+    const server = serverConToken(tokenCliente());
+    const res = await server.inject({
+      method: 'POST',
+      url: '/portal/verify-otp-and-sign',
+      payload: { otp: CODICE_OTP, ambito: 'documento_vault', riferimentoId: 'doc-1' },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(stato.documentiCreati.filter(d => d.tipo === 'firmato')).toHaveLength(0);
   });
 });

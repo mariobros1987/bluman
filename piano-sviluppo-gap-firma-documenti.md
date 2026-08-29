@@ -23,6 +23,7 @@ Questo piano copre i 4 punti aperti dall'audit, in ordine di priorità operativa
 - **Punto 2 — ✅ chiuso il 27/08/2026.** Migrazione additiva `20260827210000_verbale_documento_id_firma` (`FirmaElettronica.verbaleDocumentoId` nullable + relation verso `Documento`); builder puro `src/services/verbaleFirma.ts` (pdfkit, `compress:false`); hook `generaVerbaleDiFirma` in `server.ts` subito dopo `FirmaElettronica.create` in `POST /portal/verify-otp-and-sign`: genera il PDF, lo carica nello storage, crea un `Documento` tipo `verbale_firma`/statoDoc `pubblicato` nel progetto di origine (fallback: ultimo progetto del cliente), collega la firma al verbale, audit `VERBALE_FIRMA_GENERATO` e notifica cliente `verbale_disponibile`. **Deviazione**: `Documento.caricatoDa` reso nullable perché l'utente del portale ha `userId = client-<id>` senza riga `User`; il verbale ha `caricatoDa = null` (generato dal sistema). Guard 409: il verbale è atto certificativo → niente hard delete (`DELETE /documenti/:id`) né richieste di revisione (`POST /portal/documenti/:id/richiesta-modifica`). Fallimento della generazione (es. storage giù) non invalida la firma. 14 test in `src/verbaleFirma.test.ts` (builder PDF, guard, flusso E2E con mock prisma+storage).
 - **Punto 1 — ✅ chiuso il 27/08/2026.** Decisione titolare 27/08/2026: **Docxtemplater (Word) + pdfkit (PDF)** dallo stesso merge dati — **niente LibreOffice su Railway**; hash legale fissato sul PDF. Migrazione additiva `20260827230000_export_pdf_word_documenti` (`file_pdf_url`, `file_docx_url`, `formato_origine TEXT NOT NULL DEFAULT 'pdf'` su `Documento`). Motore `src/services/generazioneDocumenti.ts` (21 tag identici client/server, risoluzione server-side da DB; pdfkit `compress:false`; docxtemplater `paragraphLoop+linebreaks`); endpoint `POST /documenti/genera` (template grezzo o `modelloId`, produce e archivia PDF+Word, `tipo='compilato'`, `statoScansione='pulito'`, audit `DOCUMENTO_GENERATO`, notifica `documento_da_firmare` se pubblicato); `GET /portal/documenti/:id/download?formato=pdf|docx`; frontend portale con Word nascosto se `fileDocxUrl` assente; `PassaggioModal`/`ProjectDetail` lato operatore preferiscono il Word reale. 32 test in `src/generazioneDocumenti.test.ts`.
 - **Punto 4 — ✅ chiuso il 27/08/2026.** Audit riga per riga della matrice + implementazione dei trigger mancanti. Evento `messaggio_cliente` riutilizzato per i tre gap cliente→studio (richiesta modifica documento, richiesta addendum, proposta dati); due **eventi nuovi** per i gap studio→cliente: `risposta_addendum` (solo su stati terminali `pronta`/`rifiutata`, mai su `in_preparazione` che resta rumore interno) e `risposta_proposta_dati` (conferma/rifiuto con motivazione). Deep-link cliente `/portal/proposal` e `/portal/avanzamento` gestiti dal portale; etichette campi in chiaro (`IBAN`, non `iban`). Fix collaterale: wording SES sulla notifica `firma_apposta` allineato al commit `0509f96`. Prerequisito 3 risolto: `canale` è solo `in_app`, i canali esterni esistono solo per l'OTP. 8 test in `src/matriceNotifiche.test.ts` (suite ora a 352).
+- **Punto 5 (§36) — ✅ chiuso il 29/08/2026.** La firma entra **dentro** il documento: segnaposto `{{firma_cliente}}` / `{{firma_studio}}` nei template, blocchi risolti persistiti alla generazione (`contenuto_blocchi_json`), ricomposizione in una riga nuova alla firma dal portale. L'originale sigillato non viene mai riscritto. Dettaglio nella sezione qui sotto.
 
 ---
 
@@ -224,6 +225,43 @@ Aggiungere eventualmente il valore `verbale_disponibile` all'enum informale di `
 - Riga 1 della matrice: la pubblicazione notifica **sempre** con `documento_da_firmare` (anche senza firma richiesta) perché il contratto eventi è chiuso e non esiste `documento_pubblicato`; variante documentata qui invece di inventare un undicesimo evento.
 
 **File toccati**: `src/services/notificheService.ts` (2 nuovi eventi commentati), `src/server.ts` (8 punti: include esteso richiesta-modifica, trigger cliente→studio ×3, trigger studio→cliente ×3 con gating, fix wording firma_apposta), `frontend/src/pages/ClientPortal.tsx` (deep-link + icone), `src/matriceNotifiche.test.ts` (nuovo, 8 test: 3 cliente→studio, 3 addendum con il caso negativo `in_preparazione`, 2 proposta dati). Suite a **352 test** verdi; `tsc --noEmit` e `tsc -b` puliti.
+
+---
+
+## Punto 5 — La firma dentro il documento (§36) — ✅ chiuso il 29/08/2026
+
+### Problema
+Il Punto 2 ha reso il sigillo leggibile in un PDF **a parte**. Chi apriva il contratto firmato vedeva però l'area firme vuota, col filetto tratteggiato del template e nient'altro: la prova esisteva altrove (riga `FirmaElettronica`, verbale allegato) e andava cercata. Per il cliente e per un terzo che riceve il contratto, un documento in cui non si vede nessuna firma non è un documento firmato.
+
+### Vincoli che hanno deciso l'architettura
+- **Il PDF originale non si annota.** Fra le dipendenze non c'è una libreria che scriva dentro un PDF esistente (`pdf-lib` non è installato), e soprattutto quel file è quello su cui è fissato `documentoHash` del sigillo: riscriverlo invaliderebbe la prova che si vuole rendere visibile.
+- **Rigenerare dal template non basta**: il merge dei dati è avvenuto alla generazione, e i valori di allora (ragione sociale, importo, referente) possono essere cambiati nell'anagrafica.
+
+Da qui la scelta: **persistere i blocchi risolti** alla generazione e **ricomporre** alla firma in un file nuovo.
+
+### Modifiche allo schema
+Migrazione additiva `20260829200000_blocchi_documento_per_firma_incorporata`: `Documento.contenuto_blocchi_json JSONB` nullable, nessun backfill. Un documento generato prima di §36 resta senza blocchi e alla firma produce solo il verbale, esattamente come prima.
+
+### Logica applicativa
+- `src/services/slotFirma.ts` (nuovo): il vocabolario. Solo `{{firma_cliente}}` e `{{firma_studio}}` sono riconosciuti (un `{{firma_notaio}}` resta letterale invece di diventare un'area firma che nessuno riempirà); il tag diventa il marcatore interno `[[firma:slot]]`, che il parser trasforma in slot conservando come etichetta il testo che il template aveva scritto attorno. `bytePngFirma()` verifica i magic bytes PNG: pdfkit su un buffer che non è né PNG né JPEG solleva **dentro** il rendering.
+- `src/services/generazioneDocumenti.ts`: `BloccoDocumento.slotColonne` parallelo a `colonne`; `generaPdfDocumento(blocchi, firme?)` disegna la grafometrica nello slot e stampa le righe di attestazione — senza `firme` produce byte per byte il documento di prima. Corretto anche il criterio di riconoscimento dell'area firme (vedi sotto).
+- `POST /documenti/genera`: salva i blocchi **già risolti** (`contenutoBlocchiJson`); nel JSON non resta nessun `{{...}}`.
+- `src/services/copiaFirmata.ts` (nuovo): ricompone il PDF con la firma nello slot e lo archivia come riga **nuova** (`tipo: 'firmato'`, `documentoPadreId` → originale, `caricatoDa: null` perché il firmatario del portale non ha riga `User`, `statoDoc: 'firmato'`, `statoScansione: 'pulito'`). `righeAttestazione()` scrive nome, valore legale reale, data **in UTC** (non `toLocaleString`, che dipende dal fuso e dall'ICU della macchina), ID firma e impronta del sigillo.
+- `/portal/verify-otp-and-sign`: `archiviaCopiaFirmata()` dopo `segnaDocumentoFirmato`, con audit `COPIA_FIRMATA_GENERATA`. L'audit sta nella rotta e non nel servizio perché solo la rotta conosce l'IP della richiesta; un esito `null` **non** viene auditato (sarebbe rumore su ogni firma di ogni documento vecchio).
+- Frontend: gruppo «Aree Firma» nel Document Studio (`components/editor/PannelloTag.tsx`), rendering del segnaposto come **spazio** tratteggiato nell'anteprima (`resolveDocumentTemplateHtml`), e i tag inseriti nei modelli che hanno già un'area firme — 5 dei 7 prebuilt e tutti e 22 i modelli di riorganizzazione.
+
+### Difetto trovato per strada (parser)
+Verificando che i 22 modelli di riorganizzazione producessero davvero uno slot cliente è emerso che **non producevano nemmeno un documento leggibile**: il criterio «due o più div figli = area firme» prendeva per riga di firme l'involucro `<div style="font-family: Arial">` con cui quei modelli si aprono, e l'intero documento usciva come una singola area firme a quattro colonne. Ora un div è area firme solo se dichiara `display: flex`, ha **solo** div come figli e nessuna colonna contiene elementi blocco. Dopo il fix i 22 modelli danno 27-39 blocchi ciascuno con **una** area firme a due colonne (`studio`, `cliente`).
+
+### Politica di fallimento
+Identica al verbale (Punto 2): la copia firmata è un effetto collaterale, non un requisito della firma. `generaCopiaFirmata` ritorna `null` senza sollevare quando il documento è antecedente a §36, il template non ha l'area firma del cliente, la riga è già una copia firmata, il documento è di un altro tenant o lo storage è caduto. La firma resta valida e il sigillo intatto in tutti e cinque i casi.
+
+### Limiti dichiarati
+- **Solo PDF.** La copia di cortesia in Word non si rigenera firmata: incorporare un'immagine in un `.docx` richiederebbe il modulo immagini di docxtemplater, che non è una dipendenza del progetto. Il documento che fa fede è il PDF.
+- **Il canale di firma su file caricato resta fuori** (`tipoFirma: 'manuale_scansionata' | 'qualificata_esterna'`): lì la sottoscrizione è già dentro il file che il cliente ha ricaricato (`fileFirmatoUrl`), e ricomporre sostituirebbe la prova con una resa fatta dal server.
+
+### Test
+20 test nuovi: `src/copiaFirmata.test.ts` (17 — vocabolario, resa, primitive, archiviazione e i cinque casi `null`), 3 end-to-end in `src/verbaleFirma.test.ts` attraverso la rotta reale, più il presidio del criterio area firme in `src/generazioneDocumenti.test.ts`. Suite complessiva: **426 test** verdi; `tsc --noEmit` e `tsc -b` in `frontend/` puliti.
 
 ---
 
