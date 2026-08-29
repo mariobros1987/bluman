@@ -60,3 +60,35 @@ describe('rotte inesistenti rispondono 404 anche senza token', () => {
     expect(res.statusCode).not.toBe(404);
   });
 });
+
+/**
+ * §34 — la sonda di deploy su `POST /documenti/genera`.
+ *
+ * In produzione quella POST tornava 404. Il codice qui è corretto e la rotta è
+ * registrata dentro il wrapper autenticato, quindi il guasto sta nel deploy o
+ * nella configurazione, non nella logica: perché quella distinzione si possa
+ * fare da fuori con un `curl`, serve che la risposta della rotta *presente*
+ * senza token sia diversa — nel numero e nel corpo — da quella della rotta
+ * *assente*. Questi test fissano le due forme, così il controllo sul dominio
+ * Railway resta leggibile: 401 `{errore}` ⇒ l'immagine ha la rotta; 404
+ * `{error: 'Not Found'}` ⇒ l'immagine è vecchia; qualunque HTML ⇒ la richiesta
+ * non è mai arrivata al backend (VITE_API_BASE punta al dominio del frontend,
+ * dove il rewrite `/(.*)` di vercel.json serve index.html).
+ */
+describe('§34 — POST /documenti/genera distingue «rotta assente» da «non autenticato»', () => {
+  it('senza token → 401 con corpo JSON dello studio, mai 404', async () => {
+    const res = await server().inject({ method: 'POST', url: '/documenti/genera', payload: {} });
+    expect(res.statusCode).toBe(401);
+    expect(res.json().errore).toBe('Non autenticato');
+    expect(res.headers['content-type']).toContain('application/json');
+  });
+
+  it('una rotta gemella inesistente dà 404 con il corpo di Fastify', async () => {
+    const res = await server().inject({ method: 'POST', url: '/documenti/genera-inesistente', payload: {} });
+    expect(res.statusCode).toBe(404);
+    // Nessun setNotFoundHandler personalizzato: il corpo è quello di Fastify,
+    // e non contiene la chiave `errore` usata dalle rotte dello studio.
+    expect(res.json()).toMatchObject({ error: 'Not Found', statusCode: 404 });
+    expect(res.json().errore).toBeUndefined();
+  });
+});

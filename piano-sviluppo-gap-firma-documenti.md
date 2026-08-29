@@ -25,6 +25,7 @@ Questo piano copre i 4 punti aperti dall'audit, in ordine di priorità operativa
 - **Punto 4 — ✅ chiuso il 27/08/2026.** Audit riga per riga della matrice + implementazione dei trigger mancanti. Evento `messaggio_cliente` riutilizzato per i tre gap cliente→studio (richiesta modifica documento, richiesta addendum, proposta dati); due **eventi nuovi** per i gap studio→cliente: `risposta_addendum` (solo su stati terminali `pronta`/`rifiutata`, mai su `in_preparazione` che resta rumore interno) e `risposta_proposta_dati` (conferma/rifiuto con motivazione). Deep-link cliente `/portal/proposal` e `/portal/avanzamento` gestiti dal portale; etichette campi in chiaro (`IBAN`, non `iban`). Fix collaterale: wording SES sulla notifica `firma_apposta` allineato al commit `0509f96`. Prerequisito 3 risolto: `canale` è solo `in_app`, i canali esterni esistono solo per l'OTP. 8 test in `src/matriceNotifiche.test.ts` (suite ora a 352).
 - **Punto 5 (§36) — ✅ chiuso il 29/08/2026.** La firma entra **dentro** il documento: segnaposto `{{firma_cliente}}` / `{{firma_studio}}` nei template, blocchi risolti persistiti alla generazione (`contenuto_blocchi_json`), ricomposizione in una riga nuova alla firma dal portale. L'originale sigillato non viene mai riscritto. Dettaglio nella sezione qui sotto.
 - **Punto 6 (§37) — ✅ chiuso il 29/08/2026.** Archivio documentale dello studio: `GET /documenti/archivio` (albero Cliente → Progetto con i conteggi, **nessuna migrazione**) e la pagina `/archivio` a cartelle. Il contenuto di una cartella resta a `GET /documenti?progettoId=…`: l'archivio è la mappa, non una seconda verità sui documenti. Dettaglio nella sezione qui sotto.
+- **§34 — 🔶 diagnosi chiusa il 29/08/2026, verifica in campo aperta.** Il 404 in produzione su `POST /documenti/genera` non viene dal codice: la rotta c'è, ed è nel ramo distribuito. Restano tre cause di configurazione o di deploy, distinguibili con un `curl` sul dominio Railway; dal sandbox quell'host non è raggiungibile, quindi la prova finale è del titolare. Aggiunti nel frattempo i presidi che rendono il guasto riconoscibile invece che muto. Dettaglio nella sezione qui sotto.
 
 ---
 
@@ -289,6 +290,35 @@ I documenti dello studio si potevano vedere solo un progetto alla volta: bisogna
 
 ### Test
 9 test in `src/archivioDocumenti.test.ts` con client Prisma finto: 401 senza token, 403 col token cliente, albero restituito anche a documenti zero (e query delle micro-voci che non parte), conteggi per progetto sommati sul cliente con la data corretta, documento risalito dalla micro-voce al progetto, criterio «firmato»/«da firmare», archiviati separati, orfani dichiarati, nessuna carta nella cartella di un altro cliente. Suite complessiva: **435 test** verdi; `tsc --noEmit` e `tsc -b` in `frontend/` puliti.
+
+---
+
+## §34 — Il 404 in produzione su `POST /documenti/genera` — 🔶 diagnosi chiusa il 29/08/2026, verifica in campo aperta
+
+### Che cosa è stato accertato qui
+- La rotta **esiste** in `src/routes/documenti.ts:332` e viene registrata dentro il wrapper autenticato di `buildServer`, quindi risponde a `POST /documenti/genera`.
+- La rotta **esiste anche nel ramo distribuito**: `git grep -c "documenti/genera" origin/main -- src/routes/documenti.ts` dà 3 riscontri.
+- Non esiste alcun `setNotFoundHandler` personalizzato: il 404 di una rotta assente è quello di Fastify, con corpo `{"error":"Not Found","statusCode":404}` e **senza** la chiave `errore` che usano le rotte dello studio.
+- Il 404 quindi non nasce dal codice del server. Non è stato possibile chiuderlo osservandolo: da questo ambiente l'egress verso l'host Railway è negato, quindi la verifica sul dominio vero resta al titolare.
+
+### Le tre cause possibili, e come si distinguono da fuori
+Comando: `curl -i -X POST https://bluman-api-production.up.railway.app/documenti/genera`
+
+| Risposta | Causa | Rimedio |
+|---|---|---|
+| `401` JSON `{"errore":"Non autenticato"}` | L'immagine distribuita **ha** la rotta: il 404 nasce dal percorso richiesto dal browser, non dal server | vedi la barra finale in `VITE_API_BASE` |
+| `404` JSON `{"error":"Not Found"}` | L'immagine su Railway è **più vecchia** della rotta | ridistribuire Railway su `origin/main` |
+| HTML, o `404` di Railway | La richiesta non parla con il backend (dominio sbagliato, servizio spento) | correggere `VITE_API_BASE` / riavviare il servizio |
+
+La stessa POST sul dominio del frontend risponde con l'HTML di `index.html`, perché `vercel.json` riscrive su `/index.html` tutto ciò che non è `/api/send-email` o i due webhook: se `VITE_API_BASE` punta là, nessuna chiamata raggiunge mai Railway.
+
+### Presidi aggiunti (perché il guasto non torni muto)
+- `src/rotteNonTrovate.test.ts` — 2 test nuovi: `POST /documenti/genera` senza token dà **401 JSON dello studio, mai 404**, e una rotta gemella inesistente dà **404 col corpo di Fastify**. Fissano le due forme su cui si basa il `curl` di sopra: se un domani qualcuno spostasse la rotta fuori dal wrapper autenticato, la sonda di deploy smetterebbe di distinguere «assente» da «protetta» e il test diventerebbe rosso.
+- `frontend/src/api/http.ts` — `getApiBase()` ora **taglia la barra finale** di `VITE_API_BASE` (`https://…app/` + `/documenti/genera` faceva `//documenti/genera`, che per il router di Fastify è un altro percorso: 404 con la rotta presente) e **rifiuta una base uguale all'origine della pagina**, tornando a Railway e scrivendolo in console.
+- `frontend/src/api/http.ts` — `apiFetch` solleva un errore parlante quando la risposta è `text/html`: nessuna rotta dell'API risponde HTML, quindi quella pagina è la prova che la richiesta non è arrivata al backend. Prima l'operatore vedeva un errore di lettura JSON, e una pagina HTML con stato 200 passava per salvataggio riuscito (regola 3).
+
+### Da fare, e non è codice
+`origin/main` è a `0096b67`, mentre §35, §36 e §37 sono tre commit **locali non spinti**: qualunque cosa stia girando su Railway e Vercel non li contiene. Prima di provare il rimedio va deciso il push.
 
 ---
 

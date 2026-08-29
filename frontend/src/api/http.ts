@@ -1,14 +1,52 @@
 // API Client per integrare il React Frontend con il backend Fastify + Supabase DB
 import { getCurrentTenantId } from '../utils/tenant';
 
+/** Il backend dello studio: unico posto dove le rotte Fastify esistono davvero. */
+const API_BACKEND_RAILWAY = 'https://bluman-api-production.up.railway.app';
+
+/**
+ * §34 — due modi in cui la base delle API fa sparire una rotta che esiste.
+ *
+ * Il guasto osservato in produzione era un 404 su `POST /documenti/genera`, con la
+ * rotta regolarmente presente nel ramo distribuito. Le due configurazioni che lo
+ * producono senza toccare una riga di codice del server sono qui:
+ *
+ * 1. la barra finale. `VITE_API_BASE=https://…app/` più `${API_BASE}/documenti/genera`
+ *    dà `https://…app//documenti/genera`: per il router di Fastify quel doppio
+ *    slash è un altro percorso, e la risposta è il 404 del gestore not-found;
+ * 2. la base che punta al dominio del frontend. Là `vercel.json` riscrive tutto
+ *    quello che non è `/api/send-email` o i due webhook su `/index.html`: la POST
+ *    non raggiunge mai Railway e quello che torna non è una risposta dell'API.
+ *
+ * Contro la prima si taglia la barra; contro la seconda si rifiuta la base e si
+ * torna a Railway, dicendolo in console — silenziare l'errore significherebbe far
+ * credere all'operatore che il salvataggio sia partito (regola 3).
+ */
+function normalizzaBase(valore: string): string {
+  return valore.trim().replace(/\/+$/, '');
+}
+
 const getApiBase = () => {
-  if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_BASE) {
-    return import.meta.env.VITE_API_BASE;
+  const dichiarata =
+    typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_API_BASE : undefined;
+
+  if (dichiarata) {
+    const base = normalizzaBase(String(dichiarata));
+    const origineDellaPagina = typeof window !== 'undefined' ? normalizzaBase(window.location.origin) : '';
+    if (base && base !== origineDellaPagina) return base;
+    if (base) {
+      // Non è un dettaglio di stile: su questo dominio non esiste nessuna rotta
+      // API, quindi la richiesta tornerebbe muta invece di arrivare al backend.
+      console.error(
+        `[bluman] VITE_API_BASE punta al dominio del frontend (${base}): su quel dominio le rotte API non esistono. Uso ${API_BACKEND_RAILWAY}.`,
+      );
+    }
   }
+
   if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
     return 'http://localhost:3000';
   }
-  return 'https://bluman-api-production.up.railway.app';
+  return API_BACKEND_RAILWAY;
 };
 
 const API_BASE = getApiBase();
@@ -54,9 +92,22 @@ async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutM
  * Il timeout è di sessanta secondi, più lungo di qualunque attesa lato server (il relay email
  * si arrende a quarantacinque): così quello che arriva all'utente è il motivo vero del server,
  * non un timeout del browser che nasconde la risposta in arrivo.
+ *
+ * §34 — se torna una pagina HTML la richiesta non ha mai raggiunto il backend: nessuna rotta
+ * dell'API risponde `text/html`, mentre il rewrite `/(.*)` → `/index.html` di `vercel.json`
+ * risponde così a qualunque percorso. Senza questo controllo l'operatore vedeva un errore di
+ * lettura JSON, cioè un sintomo che non nomina la causa; peggio, una risposta HTML con stato
+ * 200 passava per riuscita.
  */
 async function apiFetch(url: string, options: RequestInit = {}, timeoutMs: number = 60000) {
-  return fetchWithTimeout(url, conCorpoCoerente(options), timeoutMs);
+  const res = await fetchWithTimeout(url, conCorpoCoerente(options), timeoutMs);
+  const tipo = res.headers.get('content-type') || '';
+  if (tipo.includes('text/html')) {
+    throw new Error(
+      `La richiesta non è arrivata al backend: ${url} ha risposto con una pagina HTML (HTTP ${res.status}). Controllare VITE_API_BASE del frontend.`,
+    );
+  }
+  return res;
 }
 
 /**
