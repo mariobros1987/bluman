@@ -48,6 +48,9 @@ export interface DocumentoProgetto {
   statoDoc?: 'bozza' | 'pubblicato' | 'in_revisione' | 'firmato';
   pubblicatoAt?: string | null;
   documentoPadreId?: string | null;
+  /** Punto 3 piano gap — un documento firmato non si cancella: si archivia. Il server lo restituisce sempre. */
+  isArchiviato?: boolean;
+  archiviatoAt?: string | null;
   microvoceProgetto?: { nome: string } | null;
   caricatoDa?: { id: string; nome?: string; email?: string } | null;
   /** Piano firma §3 — livello (ses|fea|feq) che il documento esige; default 'ses'. */
@@ -57,8 +60,12 @@ export interface DocumentoProgetto {
   richiesteModifica?: RichiestaModificaDoc[];
 }
 
-export async function listaDocumentiProgetto(progettoId: string): Promise<DocumentoProgetto[]> {
-  const res = await apiFetch(`${API_BASE}/documenti?progettoId=${encodeURIComponent(progettoId)}`, {
+export async function listaDocumentiProgetto(progettoId: string, includiArchiviati = false): Promise<DocumentoProgetto[]> {
+  // §37 — `includiArchiviati` esiste già lato server (Punto 3 del piano gap): le liste
+  // operative escludono gli archiviati, l'archivio dello studio li mostra su richiesta.
+  const parametri = new URLSearchParams({ progettoId });
+  if (includiArchiviati) parametri.set('includiArchiviati', 'true');
+  const res = await apiFetch(`${API_BASE}/documenti?${parametri.toString()}`, {
     headers: getAuthHeaders(),
   });
   if (!res.ok) {
@@ -270,6 +277,53 @@ export async function archiviaDocumentoApi(id: string) {
     throw new Error(data.errore ?? 'Errore archiviazione documento');
   }
   return await res.json();
+}
+
+// ── §37 — Archivio documentale dello studio: l'albero Cliente → Progetto ──────────────
+// Solo la mappa delle cartelle con i conteggi: le carte dentro un progetto continuano
+// ad arrivare da `listaDocumentiProgetto`, che è l'unico posto che sa rinnovare la firma
+// HMAC degli URL e leggere lo stato di firma.
+
+export interface ContatoriArchivio {
+  documenti: number;
+  firmati: number;
+  daFirmare: number;
+  archiviati: number;
+  /** ISO del caricamento più recente fra i documenti non archiviati; null se la cartella è vuota. */
+  ultimoCaricamento: string | null;
+}
+
+export interface ProgettoArchivio extends ContatoriArchivio {
+  id: string;
+  nome: string;
+  stato: string;
+  numeroContratto: string | null;
+  createdAt: string;
+}
+
+export interface ClienteArchivio extends ContatoriArchivio {
+  id: string;
+  nome: string;
+  tipo: string;
+  progetti: ProgettoArchivio[];
+}
+
+export interface TotaliArchivio {
+  clienti: number;
+  progetti: number;
+  documenti: number;
+  firmati: number;
+  daFirmare: number;
+  archiviati: number;
+  /** Documenti il cui progetto è stato eliminato: esistono, ma non hanno più una cartella. */
+  nonCollocati: number;
+}
+
+export async function archivioDocumentiApi(): Promise<{ clienti: ClienteArchivio[]; totali: TotaliArchivio }> {
+  const res = await apiFetch(`${API_BASE}/documenti/archivio`, { headers: getAuthHeaders() });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, "Errore lettura archivio documenti"));
+  const data = await res.json();
+  return { clienti: data.clienti ?? [], totali: data.totali };
 }
 
 /**

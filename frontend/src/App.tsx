@@ -19,6 +19,7 @@ import { PrimaNotaPage } from './pages/PrimaNotaPage';
 import { BanksPage } from './pages/BanksPage';
 import { RetainersPage } from './pages/RetainersPage';
 import { DocumentEditorPage } from './pages/DocumentEditorPage';
+import { ArchivioDocumentiPage } from './pages/ArchivioDocumentiPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { TimesheetPage } from './pages/TimesheetPage';
 import { getUserPermission } from './utils/rbac';
@@ -155,6 +156,9 @@ function AppContent() {
           <Route path="/payments"      element={<ProtectedModule user={currentUser} moduleKey="banks" element={<PaymentsPage />} />} />
           <Route path="/retainers"     element={<ProtectedModule user={currentUser} moduleKey="retainers" element={<RetainersPage />} />} />
           <Route path="/documents"     element={<ProtectedModule user={currentUser} moduleKey="documents" element={<DocumentEditorPage />} />} />
+          {/* §37 — l'archivio riusa la chiave RBAC `documents`: è la stessa materia, e una
+              chiave nuova sarebbe bloccata per chiunque abbia già una matrice salvata. */}
+          <Route path="/archivio"      element={<ProtectedModule user={currentUser} moduleKey="documents" element={<ArchivioDocumentiPage />} />} />
           <Route path="/audit"         element={<ProtectedModule user={currentUser} moduleKey="audit" element={<AuditLogPage />} />} />
           <Route path="/reports"       element={<ProtectedModule user={currentUser} moduleKey="reports" element={<ReportsPage />} />} />
           <Route path="/timesheet"     element={<ProtectedModule user={currentUser} moduleKey="timesheet" element={<TimesheetPage />} />} />

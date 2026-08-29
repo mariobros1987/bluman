@@ -48,6 +48,9 @@ import { registraRotteContabilita } from './routes/contabilita.js';
 // Rotte documenti (split dei monoliti): la registrazione avviene dentro il
 // wrapper register di buildServer, nello stesso punto di prima.
 import { registraRotteDocumenti } from './routes/documenti.js';
+// Archivio documentale dello studio (§37): albero Cliente → Progetto in sola
+// lettura, file a parte perché routes/documenti.ts è già oltre le 1000 righe.
+import { registraRotteArchivioDocumenti } from './routes/archivioDocumenti.js';
 // Rotte portale cliente (split dei monoliti): la registrazione avviene dentro
 // il wrapper register di buildServer, nello stesso punto di prima.
 import { registraRottePortale } from './routes/portale.js';
@@ -502,6 +505,11 @@ export function buildServer(app: AppPort): FastifyInstance {
   // stato, eliminazione, archiviazione) estratte in src/routes/documenti.ts:
   // stessa registrazione, sempre dentro questo wrapper.
   await registraRotteDocumenti(server);
+
+  // ─── ARCHIVIO DOCUMENTALE DELLO STUDIO (§37) ───────────────────────
+  // Sola lettura, in aggregato: l'albero Cliente → Progetto con i conteggi
+  // delle carte. Il contenuto delle cartelle resta a `GET /documenti`.
+  await registraRotteArchivioDocumenti(server);
 
   // ─── FIRMA ELETTRONICA SEMPLICE (SES · art. 20 CAD) & FIRMA DOCUMENTI ───────────
   // Rotte firma (SES con OTP whatsapp/email/telegram: documenti firmabili,

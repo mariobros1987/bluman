@@ -24,6 +24,7 @@ Questo piano copre i 4 punti aperti dall'audit, in ordine di priorità operativa
 - **Punto 1 — ✅ chiuso il 27/08/2026.** Decisione titolare 27/08/2026: **Docxtemplater (Word) + pdfkit (PDF)** dallo stesso merge dati — **niente LibreOffice su Railway**; hash legale fissato sul PDF. Migrazione additiva `20260827230000_export_pdf_word_documenti` (`file_pdf_url`, `file_docx_url`, `formato_origine TEXT NOT NULL DEFAULT 'pdf'` su `Documento`). Motore `src/services/generazioneDocumenti.ts` (21 tag identici client/server, risoluzione server-side da DB; pdfkit `compress:false`; docxtemplater `paragraphLoop+linebreaks`); endpoint `POST /documenti/genera` (template grezzo o `modelloId`, produce e archivia PDF+Word, `tipo='compilato'`, `statoScansione='pulito'`, audit `DOCUMENTO_GENERATO`, notifica `documento_da_firmare` se pubblicato); `GET /portal/documenti/:id/download?formato=pdf|docx`; frontend portale con Word nascosto se `fileDocxUrl` assente; `PassaggioModal`/`ProjectDetail` lato operatore preferiscono il Word reale. 32 test in `src/generazioneDocumenti.test.ts`.
 - **Punto 4 — ✅ chiuso il 27/08/2026.** Audit riga per riga della matrice + implementazione dei trigger mancanti. Evento `messaggio_cliente` riutilizzato per i tre gap cliente→studio (richiesta modifica documento, richiesta addendum, proposta dati); due **eventi nuovi** per i gap studio→cliente: `risposta_addendum` (solo su stati terminali `pronta`/`rifiutata`, mai su `in_preparazione` che resta rumore interno) e `risposta_proposta_dati` (conferma/rifiuto con motivazione). Deep-link cliente `/portal/proposal` e `/portal/avanzamento` gestiti dal portale; etichette campi in chiaro (`IBAN`, non `iban`). Fix collaterale: wording SES sulla notifica `firma_apposta` allineato al commit `0509f96`. Prerequisito 3 risolto: `canale` è solo `in_app`, i canali esterni esistono solo per l'OTP. 8 test in `src/matriceNotifiche.test.ts` (suite ora a 352).
 - **Punto 5 (§36) — ✅ chiuso il 29/08/2026.** La firma entra **dentro** il documento: segnaposto `{{firma_cliente}}` / `{{firma_studio}}` nei template, blocchi risolti persistiti alla generazione (`contenuto_blocchi_json`), ricomposizione in una riga nuova alla firma dal portale. L'originale sigillato non viene mai riscritto. Dettaglio nella sezione qui sotto.
+- **Punto 6 (§37) — ✅ chiuso il 29/08/2026.** Archivio documentale dello studio: `GET /documenti/archivio` (albero Cliente → Progetto con i conteggi, **nessuna migrazione**) e la pagina `/archivio` a cartelle. Il contenuto di una cartella resta a `GET /documenti?progettoId=…`: l'archivio è la mappa, non una seconda verità sui documenti. Dettaglio nella sezione qui sotto.
 
 ---
 
@@ -262,6 +263,32 @@ Identica al verbale (Punto 2): la copia firmata è un effetto collaterale, non u
 
 ### Test
 20 test nuovi: `src/copiaFirmata.test.ts` (17 — vocabolario, resa, primitive, archiviazione e i cinque casi `null`), 3 end-to-end in `src/verbaleFirma.test.ts` attraverso la rotta reale, più il presidio del criterio area firme in `src/generazioneDocumenti.test.ts`. Suite complessiva: **426 test** verdi; `tsc --noEmit` e `tsc -b` in `frontend/` puliti.
+
+---
+
+## Punto 6 — Archivio documentale dello studio (§37) — ✅ chiuso il 29/08/2026
+
+### Problema
+I documenti dello studio si potevano vedere solo un progetto alla volta: bisognava sapere *quale* cliente e *quale* progetto per arrivare a una carta, aprendo la scheda del progetto e la scheda documenti. Non esisteva un posto da cui rispondere a «quante carte abbiamo», «quali sono pubblicate e ancora non firmate», «dove sta il contratto di quel cliente».
+
+### Vincoli rispettati
+- **Nessuna migrazione.** Ogni numero mostrato è un conteggio di righe che il database ha già (`documento`, `progetto`, `cliente`, `firma_elettronica`). Non è stato aggiunto un campo, e nemmeno una tabella di cache dei conteggi: si sarebbe dovuta mantenere aggiornata a ogni upload, e un conteggio sbagliato in un archivio legale è peggio di un conteggio calcolato ogni volta.
+- **Una sola verità sul documento.** L'archivio *non* restituisce documenti. Le carte di una cartella continuano ad arrivare da `GET /documenti?progettoId=…`, che è l'unico posto che rinnova la firma HMAC degli URL `/uploads/` e legge lo stato di firma dalla tabella dei sigilli. Duplicare quella logica avrebbe prodotto due risposte diverse sullo stesso file.
+- **Regola 8.** `src/routes/documenti.ts` è oltre le 1.000 righe: la rotta nuova sta in `src/routes/archivioDocumenti.ts` (~170 righe), che legge e non scrive. Lato frontend la pagina e la tabella dei documenti sono due file, non uno.
+
+### Logica applicativa
+- `src/routes/archivioDocumenti.ts` — `GET /documenti/archivio`. Restituisce l'albero `clienti[] → progetti[]`, ciascun nodo con `documenti`, `firmati`, `daFirmare`, `archiviati`, `ultimoCaricamento`, più i `totali` di tenant. Quattro letture: clienti con i loro progetti, documenti (select minima, senza `fileUrl`: qui non si scarica niente), le micro-voci **solo** di quei documenti che hanno l'aggancio alla micro-voce e non al progetto, i sigilli dei documenti trovati.
+- **Criterio «firmato»**: identico a `GET /documenti` — un sigillo in `firma_elettronica` con `ambito: 'documento_vault'`, oppure `tipo: 'firmato'` (la copia ricomposta di §36, che nasce già sottoscritta). «Da firmare» è il documento *pubblicato* e non firmato: la bozza non conta, il cliente non l'ha nemmeno vista.
+- **Archiviati a parte**: non entrano in `documenti` e non alzano `ultimoCaricamento`, così una cartella ferma da mesi non sembra viva perché qualcuno vi ha archiviato una vecchia carta.
+- **Un cliente non entra**: `ruolo === 'cliente'` → **403**. RLS isola il tenant, non i clienti fra loro; l'archivio attraversa tutti i clienti dello studio, quindi la separazione la fa la rotta.
+- `frontend/src/pages/ArchivioDocumentiPage.tsx` — la navigazione a cartelle (`/archivio`, voce di sidebar «📂 Archivio Documentale», chiave RBAC riusata `documents`): percorso Archivio / Cliente / Progetto, riquadri dei totali, ricerca, «nascondi le cartelle senza documenti», «mostra anche gli archiviati».
+- `frontend/src/components/documenti/ElencoDocumentiCartella.tsx` — il livello 3: tabella dei documenti con nome file pulito dal prefisso `${Date.now()}_`, tipo, stato, chi ha caricato, apertura e scarico di PDF e Word.
+
+### Documenti senza cartella
+`Documento.progettoId` ha `onDelete: SetNull`: se il progetto viene eliminato, il documento resta e perde il suo posto nell'albero. Non vengono nascosti per far tornare i conti: la rotta li conta in `totali.nonCollocati` e la pagina scrive che il progetto a cui erano agganciati è stato eliminato mentre file e firme restano conservati (regola 7).
+
+### Test
+9 test in `src/archivioDocumenti.test.ts` con client Prisma finto: 401 senza token, 403 col token cliente, albero restituito anche a documenti zero (e query delle micro-voci che non parte), conteggi per progetto sommati sul cliente con la data corretta, documento risalito dalla micro-voce al progetto, criterio «firmato»/«da firmare», archiviati separati, orfani dichiarati, nessuna carta nella cartella di un altro cliente. Suite complessiva: **435 test** verdi; `tsc --noEmit` e `tsc -b` in `frontend/` puliti.
 
 ---
 
