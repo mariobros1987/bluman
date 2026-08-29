@@ -8,10 +8,6 @@
       "destination": "/api/send-email"
     },
     {
-      "source": "/api/send-whatsapp",
-      "destination": "/api/send-whatsapp"
-    },
-    {
       "source": "/webhooks/communications/whatsapp",
       "destination": "/api/webhooks/communications/whatsapp"
     },

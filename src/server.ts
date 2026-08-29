@@ -60,6 +60,10 @@ import { registraRotteNotifiche } from './routes/notifiche.js';
 // Rotte webhook comunicazioni (split dei monoliti): la registrazione avviene
 // dentro il wrapper register di buildServer, nello stesso punto di prima.
 import { registraRotteWebhooks } from './routes/webhooks.js';
+// Invio email/WhatsApp e lettura della posta in arrivo, con le credenziali dello
+// studio lette dal database: prima le faceva il browser chiamando le funzioni
+// serverless con la password SMTP presa da localStorage.
+import { registraRotteComunicazioni } from './routes/comunicazioni.js';
 
 export function buildServer(app: AppPort): FastifyInstance {
   const server = Fastify({
@@ -422,6 +426,14 @@ export function buildServer(app: AppPort): FastifyInstance {
   // Comunicazioni Progetto API (Multicanale Ingestion): le rotte
   // GET/POST /progetti/:id/comunicazioni vivono ora in src/routes/progetti.ts,
   // registrata più sotto nella sezione progetti.
+
+  // ─── COMUNICAZIONI: INVIO EMAIL/WHATSAPP E POSTA IN ARRIVO ────────
+  // Rotte in src/routes/comunicazioni.ts: sostituiscono le chiamate che il
+  // browser faceva alle funzioni serverless `/api/send-email` e
+  // `/api/send-whatsapp` con le credenziali dello studio prese da
+  // `localStorage`. Registrate dentro questo wrapper e assenti da
+  // ROTTE_PUBBLICHE: richiedono un JWT come tutto il resto.
+  await registraRotteComunicazioni(server);
 
   // ─── WEBHOOK COMUNICAZIONI: META WHATSAPP & TELEGRAM ──────────────
   // Rotte webhook (Meta WhatsApp verify+ingestion eventi, Telegram bot

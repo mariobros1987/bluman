@@ -68,26 +68,17 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
           }).catch(() => {});
         }
       }
-      // Se il canale è whatsapp e sono configurati token e phoneId, tenta invio reale Meta Graph API
-      if (body.canale === 'whatsapp' && process.env.WHATSAPP_ACCESS_TOKEN && process.env.WA_PHONE_ID) {
-        const toNum = (body.destinatario || '').replace(/\D/g, '');
-        if (toNum) {
-          fetch(`https://graph.facebook.com/v21.0/${process.env.WA_PHONE_ID}/messages`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              messaging_product: 'whatsapp',
-              recipient_type: 'individual',
-              to: toNum,
-              type: 'text',
-              text: { preview_url: false, body: body.testo },
-            }),
-          }).catch(err => console.warn('Meta WhatsApp API dispatch warning:', err));
-        }
-      }
+      // Qui c'era un secondo invio WhatsApp, fatto di nascosto da questa rotta con
+      // `process.env.WHATSAPP_ACCESS_TOKEN` e `process.env.WA_PHONE_ID`. Tre guasti in venti
+      // righe: il browser spediva già il messaggio per conto suo, quindi al cliente arrivavano
+      // due copie identiche; le credenziali erano quelle dell'ambiente e non quelle della riga
+      // Tenant, cioè su un'installazione multi-studio il messaggio di un cliente partiva dal
+      // numero di un altro studio; e `destinatario` qui è l'etichetta mostrata a schermo
+      // («Referente (numero)»), da cui si ricavavano cifre che non erano un numero di telefono.
+      // L'esito non veniva nemmeno guardato (`.catch(console.warn)`), quindi un rifiuto di Meta
+      // restava invisibile. Questa rotta registra la comunicazione nel fascicolo; la consegna
+      // si chiede a `POST /comunicazioni/invia-whatsapp`, che legge le credenziali dello studio
+      // e risponde con il motivo quando WhatsApp non accetta.
 
       return reply.code(201).send(msg);
     } catch {

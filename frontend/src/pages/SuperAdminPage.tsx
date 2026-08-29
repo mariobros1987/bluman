@@ -294,39 +294,24 @@ export function SuperAdminPage() {
 
   // Invio Email di Benvenuto con Credenziali
   const handleSendCredentialsEmail = async (t: TenantStudio) => {
-    // Senza una password appena emessa non c'è nulla da inviare: il database ne conserva
-    // solo l'hash. Prima qui c'era `t.leadAdvisorPassword || 'Studio2026!'`, che spediva
-    // al gestore una password di default valida per chiunque la indovinasse.
-    if (!passwordEmessa) {
-      alert('ℹ️ Rigenera prima la password: quella attuale non è leggibile, il database ne conserva solo l\'hash.');
-      return;
-    }
+    // §35 — prima il browser chiamava direttamente `/api/send-email` con
+    // `action: 'invite-collaborator'` e nessuna credenziale, contando sul fatto che la
+    // funzione Vercel usasse le variabili d'ambiente della piattaforma: chiunque conoscesse
+    // l'URL poteva spedire email a nome dello studio. Ora è il backend autenticato che
+    // rigenera la password E la spedisce nella stessa chiamata: la password non passa mai
+    // dal browser e l'esito riportato è quello vero (regola 7).
+    if (!confirm(`Inviare le credenziali di accesso a ${t.leadAdvisorEmail}?\n\nViene emessa una nuova password: quella attuale smetterà di funzionare immediatamente.`)) return;
     setSendingInvite(true);
     try {
-      const res = await fetch('/api/send-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          // `invite-collaborator` è l'azione che `api/send-email.ts` implementa davvero.
-          // Qui c'era `send_collaborator_invite`, che nessun ramo gestiva: la richiesta
-          // cadeva nel caso di default e l'email di credenziali non partiva mai, mentre
-          // l'interfaccia dichiarava "inviata con successo".
-          action: 'invite-collaborator',
-          to: t.leadAdvisorEmail,
-          collaboratorName: t.leadAdvisorNome || 'Gestore Studio',
-          collaboratorRole: 'partner',
-          collaboratorSpecialization: `Lead Senior Advisor — ${t.ragioneSociale}`,
-          collaboratorPassword: passwordEmessa,
-        })
-      });
-      const data = await res.json();
-      if (data.ok) {
-        alert(`✓ Email di attivazione e credenziali inviata con successo a ${t.leadAdvisorEmail}!`);
+      const res = await resetPasswordTenantApi(t.id, { invia: true });
+      setPasswordEmessa(res.passwordTemporanea);
+      if (res.invitoInviato) {
+        alert(`✓ Email di attivazione e credenziali inviata a ${res.email || t.leadAdvisorEmail}.`);
       } else {
-        alert(`⚠️ Invio non riuscito: ${data.errore || 'errore SMTP'}. Consegna le credenziali manualmente.`);
+        alert(`⚠️ Password rigenerata ma email non inviata: ${res.invitoErrore || 'errore SMTP'}.\n\nConsegna le credenziali manualmente: ${res.passwordTemporanea}`);
       }
     } catch (e: any) {
-      alert(`⚠️ Invio non riuscito: ${e.message}. Consegna le credenziali manualmente.`);
+      alert(`⚠️ Operazione non riuscita: ${e.message}. Nessuna password è stata emessa.`);
     } finally {
       setSendingInvite(false);
     }
@@ -631,7 +616,7 @@ export function SuperAdminPage() {
                 disabled={sendingInvite}
                 style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '8px 18px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
               >
-                <span>✉️</span> {sendingInvite ? 'Invio in Corso...' : 'Invia Credenziali via Email al Gestore'}
+                <span>✉️</span> {sendingInvite ? 'Invio in Corso...' : 'Rigenera e Invia Credenziali al Gestore'}
               </button>
             </div>
           </div>

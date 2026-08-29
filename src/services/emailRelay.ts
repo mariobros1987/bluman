@@ -133,10 +133,18 @@ async function inviaViaRelay(messaggio: MessaggioEmail, smtp: CredenzialiSmtp): 
   const controller = new AbortController();
   const scadenza = setTimeout(() => controller.abort(), 45000);
 
+  // §35 — la funzione di relay ora rifiuta le chiamate senza questo header quando
+  // `EMAIL_RELAY_SECRET` è impostato su Vercel: serve a distinguere il backend da un browser
+  // qualunque, dato che prima l'endpoint era aperto a tutti (CORS `*`).
+  const intestazioni: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (process.env.EMAIL_RELAY_SECRET) {
+    intestazioni['x-bluman-relay'] = process.env.EMAIL_RELAY_SECRET;
+  }
+
   try {
     const risposta = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: intestazioni,
       signal: controller.signal,
       body: JSON.stringify({
         action: 'send-message',

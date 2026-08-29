@@ -6,7 +6,10 @@ export default defineConfig({
     // si può neutralizzare il DATABASE_URL di `.env` prima che `new PrismaClient()` lo
     // legga (vedi vitest.setup.ts).
     setupFiles: ['./vitest.setup.ts'],
-    include: ['src/**/*.test.ts'],
+    // `api/` è la funzione serverless di relay su Vercel: sta fuori da `src` perché
+    // `tsconfig.json` ha `rootDir: src`, ma è codice che spedisce email a nome dello studio
+    // e i suoi controlli di autorizzazione vanno presidiati come gli altri (§35).
+    include: ['src/**/*.test.ts', 'api/**/*.test.ts'],
     // Ogni query verso il DATABASE_URL irraggiungibile costa ~2s di tentativo di
     // connessione prima di cadere sul fallback in-memory: i 5s di default non bastano
     // per i test che percorrono più rotte di fila.

@@ -62,6 +62,30 @@ interface TabChannelsProps {
   setEmailInboundParseUrl: (v: string) => void;
   signalCliEndpoint: string;
   setSignalCliEndpoint: (v: string) => void;
+  /**
+   * §35 — l'API non restituisce più i valori delle credenziali (regola 6): restituisce
+   * `<chiave>Impostata: boolean`. I campi password quindi arrivano vuoti anche quando la
+   * credenziale è salvata, e questi flag servono a dirlo all'operatore invece di lasciargli
+   * credere che la configurazione sia sparita. Campo lasciato vuoto = credenziale invariata.
+   */
+  segretiImpostati?: {
+    smtpPass?: boolean;
+    imapPass?: boolean;
+    waAccessToken?: boolean;
+    waVerifyToken?: boolean;
+    tgBotToken?: boolean;
+  };
+}
+
+/** Testo sotto un campo credenziale: dice se ce n'è già una salvata sul server. */
+function NotaSegreto({ impostata }: { impostata?: boolean }) {
+  return (
+    <div style={{ fontSize: 10, color: impostata ? '#34d399' : 'var(--muted)', marginTop: 3 }}>
+      {impostata
+        ? '✓ Già salvata sul server. Lascia vuoto per non modificarla.'
+        : 'Nessuna credenziale salvata: il canale non può funzionare finché non la inserisci.'}
+    </div>
+  );
 }
 
 // TAB 3: Configurazione Canali Omnichannel (WhatsApp, Telegram, Email, Signal)
@@ -126,7 +150,9 @@ export function TabChannels({
   setEmailInboundParseUrl,
   signalCliEndpoint,
   setSignalCliEndpoint,
+  segretiImpostati,
 }: TabChannelsProps) {
+  const segreti = segretiImpostati || {};
   return (
         <form onSubmit={handleSaveCompany} className={styles.sectionBox}>
           <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -202,7 +228,8 @@ export function TabChannels({
                 </div>
                 <div className={styles.field}>
                   <label>Password SMTP / App Key *:</label>
-                  <input type="password" value={smtpPass} onChange={e => setSmtpPass(e.target.value)} placeholder="••••••••••••" style={{ fontSize: 12 }} />
+                  <input type="password" value={smtpPass} onChange={e => setSmtpPass(e.target.value)} placeholder="••••••••••••" style={{ fontSize: 12 }} autoComplete="new-password" />
+                  <NotaSegreto impostata={segreti.smtpPass} />
                 </div>
               </div>
 
@@ -298,7 +325,8 @@ export function TabChannels({
                 </div>
                 <div className={styles.field}>
                   <label>Password Casella Posta *:</label>
-                  <input type="password" value={imapPass} onChange={e => setImapPass(e.target.value)} placeholder="••••••••••••" style={{ fontSize: 12 }} />
+                  <input type="password" value={imapPass} onChange={e => setImapPass(e.target.value)} placeholder="••••••••••••" style={{ fontSize: 12 }} autoComplete="new-password" />
+                  <NotaSegreto impostata={segreti.imapPass} />
                 </div>
               </div>
 
@@ -411,12 +439,14 @@ export function TabChannels({
                 </div>
                 <div className={styles.field}>
                   <label>Webhook Verify Token (Secret *):</label>
-                  <input type="text" value={waVerifyToken} onChange={e => setWaVerifyToken(e.target.value)} style={{ fontSize: 12 }} />
+                  <input type="password" value={waVerifyToken} onChange={e => setWaVerifyToken(e.target.value)} placeholder="••••••••••••" style={{ fontSize: 12 }} autoComplete="new-password" />
+                  <NotaSegreto impostata={segreti.waVerifyToken} />
                 </div>
               </div>
               <div className={styles.field} style={{ marginTop: 10 }}>
                 <label>Meta System User Access Token (Permanent *):</label>
-                <input type="password" value={waAccessToken} onChange={e => setWaAccessToken(e.target.value)} style={{ fontSize: 12 }} />
+                <input type="password" value={waAccessToken} onChange={e => setWaAccessToken(e.target.value)} placeholder="••••••••••••" style={{ fontSize: 12 }} autoComplete="new-password" />
+                <NotaSegreto impostata={segreti.waAccessToken} />
               </div>
             </div>
 
@@ -450,7 +480,8 @@ export function TabChannels({
                 </div>
                 <div className={styles.field}>
                   <label>Bot Access Token (@BotFather *):</label>
-                  <input type="password" value={tgBotToken} onChange={e => setTgBotToken(e.target.value)} style={{ fontSize: 12 }} />
+                  <input type="password" value={tgBotToken} onChange={e => setTgBotToken(e.target.value)} placeholder="••••••••••••" style={{ fontSize: 12 }} autoComplete="new-password" />
+                  <NotaSegreto impostata={segreti.tgBotToken} />
                 </div>
               </div>
             </div>

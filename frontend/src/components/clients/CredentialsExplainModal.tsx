@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { resetPasswordClienteApi, sendEmailDirectApi, sendWhatsAppDirectApi } from '../../api/client';
+import { sendEmailDirectApi, sendWhatsAppDirectApi } from '../../api/client';
 import type { Cliente } from '../../types';
 
 // ─── Modal Credenziali Portale Cliente (Email + Password) ─────────
@@ -76,14 +76,13 @@ Password: ${data.passwordChiaro}`;
       );
 
       if (res && res.success) {
-        setEmailStatus(`✓ Email con le credenziali recapitata con successo a ${destEmail}!`);
+        setEmailStatus(`✓ Email con le credenziali recapitata a ${destEmail}${res.via ? ` (via ${res.via})` : ''}.`);
       } else {
-        const resBackend = await resetPasswordClienteApi(data.cliente.id);
-        if (resBackend && resBackend.emailInviata) {
-          setEmailStatus(`✓ Email con le credenziali recapitata con successo a ${destEmail}!`);
-        } else {
-          setEmailStatus(`✓ Invio email eseguito con successo verso ${destEmail}`);
-        }
+        // §35 — qui il ripiego chiamava `resetPasswordClienteApi`, che RIGENERA la password:
+        // la password mostrata in questa modale diventava obsoleta mentre l'interfaccia
+        // annunciava «Invio email eseguito con successo» anche quando non era partito niente.
+        // Un invio non riuscito si dichiara, con il motivo (regola 7).
+        setEmailStatus(`✗ Email NON inviata a ${destEmail} — ${res?.errore || 'il server non ha riportato un motivo'}. Consegna le credenziali a mano o verifica la posta in uscita in Impostazioni Studio.`);
       }
     } catch (err: any) {
       setEmailStatus(`❌ Errore durante l'invio: ${err.message}`);
@@ -106,15 +105,13 @@ Password: ${data.passwordChiaro}`;
     try {
       const res = await sendWhatsAppDirectApi(cleanPhone, credenzialiTesto);
       if (res && res.success) {
-        setWhatsappStatus(`✓ Messaggio WhatsApp inviato direttamente dall'app al numero +${cleanPhone}!`);
+        setWhatsappStatus(`✓ Messaggio WhatsApp con le credenziali inviato al numero +${cleanPhone}.`);
       } else {
-        // Fallback con template garantito Meta Cloud API
-        const tRes = await sendWhatsAppDirectApi(cleanPhone, credenzialiTesto, 'hello_world');
-        if (tRes && tRes.success) {
-          setWhatsappStatus(`✓ Notifica WhatsApp recapitata con successo al numero +${cleanPhone}!`);
-        } else {
-          setWhatsappStatus(`❌ Invio WhatsApp NON riuscito al numero +${cleanPhone}: il canale non ha confermato la consegna. Verifica la configurazione WhatsApp nelle Impostazioni o usa l'email.`);
-        }
+        // §35 — il ripiego spediva il template di esempio `hello_world` e poi dichiarava
+        // «Notifica recapitata»: al cliente arrivava «Hello World» senza credenziali, e
+        // l'operatore non richiamava più. Ora l'errore di Meta si mostra così com'è: fuori
+        // dalla finestra di 24 ore (errore 131047) servono template approvati, non testo libero.
+        setWhatsappStatus(`❌ Invio WhatsApp NON riuscito verso +${cleanPhone}: ${res?.errore || 'il canale non ha riportato un motivo'}. Usa l'email oppure verifica la configurazione WhatsApp in Impostazioni Studio.`);
       }
     } catch (err: any) {
       setWhatsappStatus(`❌ Invio WhatsApp NON riuscito: ${err?.message || 'errore di rete'}. Il messaggio NON è stato consegnato a +${cleanPhone}.`);

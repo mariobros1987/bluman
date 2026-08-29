@@ -63,6 +63,12 @@ const CREDENZIALI_VIETATE = [
   // autenticata una richiesta che non lo era.
   'jwt_advisor_mock_123',
   'jwt_magic_mock_456',
+  // Verify token del webhook WhatsApp di produzione. Era scritto in chiaro in
+  // GUIDA_META_WHATSAPP_INTEGRAZIONE.md e in GUIDA_CONFIGURAZIONE_CANALI.md: chi leggeva il
+  // repository poteva superare l'handshake del webhook al posto nostro. Ora vive solo nel
+  // campo `waVerifyToken` della riga Tenant, e su Meta va rigenerato — la cronologia di git
+  // conserva il valore vecchio.
+  'bluman_wa_secure_token_2026',
 ];
 
 function fileDaControllare(cartella: string, acc: string[] = []): string[] {

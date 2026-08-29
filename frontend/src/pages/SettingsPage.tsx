@@ -123,6 +123,12 @@ export function SettingsPage() {
   const [newUserRole, setNewUserRole] = useState<'super_admin' | 'advisor' | 'operator'>('advisor');
   const [submittingUser, setSubmittingUser] = useState(false);
   const [selectedOperator, setSelectedOperator] = useState<any | null>(null);
+  // §35 — `GET /tenant/info` restituisce le credenziali vuote con il flag `<chiave>Impostata`:
+  // i campi password restano vuoti (lasciarli vuoti = «non modificare») e questi flag dicono
+  // all'operatore che sul server la credenziale c'è già.
+  const [segretiImpostati, setSegretiImpostati] = useState<{
+    smtpPass?: boolean; imapPass?: boolean; waAccessToken?: boolean; waVerifyToken?: boolean; tgBotToken?: boolean;
+  }>({});
   
   const loadTenantData = async () => {
     setLoadingUsers(true);
@@ -197,6 +203,13 @@ export function SettingsPage() {
       setMostraIva(tData.mostraIva !== undefined ? tData.mostraIva : true);
       setEmailInboundParseUrl(tData.emailInboundParseUrl || 'https://bluman.vercel.app/api/webhooks/inbound-email');
       setSignalCliEndpoint(tData.signalCliEndpoint || 'http://localhost:8080/v1/receive');
+      setSegretiImpostati({
+        smtpPass: Boolean(tData.smtpPassImpostata),
+        imapPass: Boolean(tData.imapPassImpostata),
+        waAccessToken: Boolean(tData.waAccessTokenImpostata),
+        waVerifyToken: Boolean(tData.waVerifyTokenImpostata),
+        tgBotToken: Boolean(tData.tgBotTokenImpostata),
+      });
     }
 
     const dbUsers = await fetchUtentiTenant();
@@ -265,7 +278,24 @@ export function SettingsPage() {
     // rete l'handler moriva in silenzio e il banner «Salvato» non compariva né compariva
     // un messaggio. Ora il fallimento è dichiarato (i dati restano in bozza locale).
     try {
-      await updateTenantInfoApi(dataToSave, currentTenantId);
+      const salvato: any = await updateTenantInfoApi(dataToSave, currentTenantId);
+      // §35 — le credenziali appena inserite non tornano indietro dal server: si svuotano i
+      // campi e si aggiornano i flag «già impostata», così il prossimo salvataggio con i campi
+      // vuoti non prova a riscrivere niente.
+      if (salvato && typeof salvato === 'object') {
+        setSegretiImpostati({
+          smtpPass: Boolean(salvato.smtpPassImpostata),
+          imapPass: Boolean(salvato.imapPassImpostata),
+          waAccessToken: Boolean(salvato.waAccessTokenImpostata),
+          waVerifyToken: Boolean(salvato.waVerifyTokenImpostata),
+          tgBotToken: Boolean(salvato.tgBotTokenImpostata),
+        });
+      }
+      if (smtpPass) setSmtpPass('');
+      if (imapPass) setImapPass('');
+      if (waAccessToken) setWaAccessToken('');
+      if (waVerifyToken) setWaVerifyToken('');
+      if (tgBotToken) setTgBotToken('');
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
     } catch (err: any) {
@@ -576,6 +606,7 @@ export function SettingsPage() {
           setEmailInboundParseUrl={setEmailInboundParseUrl}
           signalCliEndpoint={signalCliEndpoint}
           setSignalCliEndpoint={setSignalCliEndpoint}
+          segretiImpostati={segretiImpostati}
         />
       )}
 

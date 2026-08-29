@@ -85,7 +85,10 @@ async function fetchRecentImapEmails(options: {
       {
         host,
         port,
-        rejectUnauthorized: false,
+        // La password IMAP viaggia in questa connessione: `rejectUnauthorized: false` la
+        // offriva a qualunque server sapesse rispondere all'handshake, certificato sbagliato
+        // incluso. Stessa eccezione dichiarata dell'SMTP, stesso nome di variabile.
+        rejectUnauthorized: !tlsInsicuraAmmessa(),
         timeout: 5000,
       },
       () => {}
@@ -211,80 +214,101 @@ async function fetchRecentImapEmails(options: {
   });
 }
 
-// Vercel Serverless Function ultra-rapida per dispatch email SMTP, test e sincronizzazione IMAP
-export default async function handler(req: any, res: any) {
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
-  res.setHeader(
-    'Access-Control-Allow-Headers',
-    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization'
-  );
+/**
+ * Segreto condiviso con il backend. Quando è impostato su Vercel (e nell'ambiente di
+ * Railway) questa funzione accetta SOLO le chiamate che lo presentano.
+ */
+const SEGRETO_RELAY = process.env.EMAIL_RELAY_SECRET || '';
 
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
+/**
+ * Eccezione alla verifica dei certificati TLS, per chi ha un server di posta interno con
+ * certificato self-signed. Il nome canonico è `SMTP_INSECURE_TLS`, lo stesso che usa
+ * `src/services/emailRelay.ts`: due nomi diversi per la stessa eccezione significherebbero
+ * impostarla su Railway e vederla ignorata qui. `SMTP_TLS_INSECURE` resta accettato perché
+ * è il nome con cui è nata questa funzione e potrebbe essere già impostato su Vercel.
+ */
+function tlsInsicuraAmmessa(): boolean {
+  const valori = [process.env.SMTP_INSECURE_TLS, process.env.SMTP_TLS_INSECURE];
+  return valori.some(v => v === '1' || v === 'true');
+}
+
+function relayAutorizzato(req: any): boolean {
+  if (!SEGRETO_RELAY) return false;
+  const inviato = req.headers?.['x-bluman-relay'];
+  const valore = Array.isArray(inviato) ? inviato[0] : inviato;
+  return typeof valore === 'string' && valore.length > 0 && valore === SEGRETO_RELAY;
+}
+
+/**
+ * Relay SMTP/IMAP a uso del backend (§35): la rete di Railway non lascia passare le porte
+ * SMTP verso il provider di posta, quindi il messaggio già composto viene affidato a questa
+ * funzione, che gira su un'altra rete. NON è un endpoint per il browser.
+ */
+export default async function handler(req: any, res: any) {
+  // Niente header CORS. Qui c'era `Access-Control-Allow-Origin: '*'`: qualunque sito aperto
+  // nel browser di chiunque poteva chiamare questa funzione e — grazie al ripiego sulle
+  // variabili d'ambiente — spedire email a nome dello studio senza conoscere una password.
+  // Le chiamate legittime arrivano dal backend (server-to-server), che non ha bisogno di CORS.
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('X-Robots-Tag', 'noindex');
 
   if (req.method !== 'POST') {
-    return res.status(405).json({ errore: 'Metodo non consentito' });
+    return res.status(405).json({ success: false, errore: 'Metodo non consentito' });
+  }
+
+  const autorizzato = relayAutorizzato(req);
+  if (SEGRETO_RELAY && !autorizzato) {
+    return res.status(401).json({
+      success: false,
+      errore: 'Relay non autorizzato: header x-bluman-relay assente o non corrispondente.',
+    });
   }
 
   try {
     const {
-      action = 'test',
-      smtpHost = 'authsmtp.register.it',
+      action = 'send-message',
+      smtpHost = '',
       smtpPort = 465,
-      smtpSecure = true,
-      smtpUser = 'support@bluecode-ltd.com',
+      smtpSecure,
+      smtpUser = '',
       smtpPass = '',
-      smtpFromEmail = 'support@bluecode-ltd.com',
-      smtpFromName = 'BlueCode Advisory & Consulting',
+      smtpFromEmail = '',
+      smtpFromName = '',
       smtpReplyTo = '',
       smtpBcc = '',
       to = '',
       subject = '',
       html = '',
-      collaboratorName = '',
-      collaboratorRole = '',
-      collaboratorSpecialization = '',
-      collaboratorPassword = '',
-      imapHost = 'imap.register.it',
+      imapHost = '',
       imapPort = 993,
-      imapUser = 'support@bluecode-ltd.com',
+      imapUser = '',
       imapPass = '',
       imapFolder = 'INBOX',
       clientEmail = '',
     } = req.body || {};
 
     // ─────────────────────────────────────────────────────────────
-    // AZIONE 1: Test IMAP
-    // ─────────────────────────────────────────────────────────────
-    if (action === 'test-imap') {
-      // Qui si rispondeva `success: true` con «Connessione IMAP verificata con successo»
-      // senza aprire nessuna connessione: un esito inventato, identico con la password
-      // giusta e con quella sbagliata. La verifica vera esiste ed è `POST /tenant/test-imap`
-      // sul backend (login IMAP reale): questa funzione non la duplica e lo dice.
-      return res.status(501).json({
-        success: false,
-        errore:
-          'Il test IMAP non si esegue da questa funzione: usa «Testa connessione IMAP» ' +
-          'nelle impostazioni, che interroga il server di posta per davvero.',
-      });
-    }
-
-    // ─────────────────────────────────────────────────────────────
-    // AZIONE 1b: Fetch Inbound IMAP Emails Reali
+    // AZIONE 1: Lettura della posta in arrivo (IMAP) per conto del backend
     // ─────────────────────────────────────────────────────────────
     if (action === 'fetch-imap-inbound') {
-      const activePass = imapPass || smtpPass;
-      if (!activePass) {
-        return res.status(200).json({ success: true, emails: [] });
+      const activeHost = String(imapHost || '').trim();
+      const activeUser = String(imapUser || smtpUser || '').trim();
+      const activePass = String(imapPass || smtpPass || '').trim();
+      // Prima qui si rispondeva `success: true, emails: []` senza credenziali: la casella
+      // risultava «vuota» invece di «non configurata», e le risposte del cliente sembravano
+      // non essere mai arrivate (regola 7).
+      if (!activeHost || !activeUser || !activePass) {
+        return res.status(400).json({
+          success: false,
+          emails: [],
+          errore: 'Casella in arrivo non configurata: mancano host, utente o password IMAP.',
+        });
       }
 
       const incomingEmails = await fetchRecentImapEmails({
-        host: imapHost || 'imap.register.it',
+        host: activeHost,
         port: Number(imapPort) || 993,
-        user: imapUser || smtpUser,
+        user: activeUser,
         pass: activePass,
         folder: imapFolder || 'INBOX',
         limit: 15,
@@ -301,120 +325,75 @@ export default async function handler(req: any, res: any) {
       });
     }
 
-    // La password della casella arriva dalla richiesta o dall'ambiente, e non ha un
-    // ripiego. Qui c'era la password reale della casella Register.it scritta in chiaro,
-    // cioè su GitHub: chiunque leggesse il repository poteva spedire come lo studio e,
-    // con la stessa credenziale, leggere la posta in arrivo via IMAP. Regola 6 di
-    // `.agents/AGENTS.md`. Senza credenziale questa funzione risponde 400 e non spedisce:
-    // meglio un invio che si ferma di uno che parte da un segreto pubblico.
-    const effectivePass = smtpPass?.trim() || process.env.SMTP_PASS;
-    const effectiveUser = smtpUser?.trim() || process.env.SMTP_USER;
+    if (action !== 'send-message') {
+      // `test-imap` e `invite-collaborator` non esistono più: il test IMAP reale è
+      // `POST /tenant/test-imap` sul backend e l'email di invito la compone
+      // `sendInvitoCollaboratoreEmail` in `src/services/emailService.ts`, che passa da qui
+      // con `send-message`. Un'azione sconosciuta si rifiuta, non si tratta come un test.
+      return res.status(400).json({
+        success: false,
+        errore: `Azione «${action}» non supportata: questa funzione inoltra solo messaggi già composti dal backend.`,
+      });
+    }
 
-    if (!effectivePass || !effectiveUser) {
+    // La password della casella arriva dalla richiesta. Il ripiego sulle variabili
+    // d'ambiente resta solo per le chiamate autenticate dal segreto condiviso: senza quel
+    // vincolo era un open proxy, perché consentiva di spedire come lo studio senza
+    // conoscerne la password. Regola 6 di `.agents/AGENTS.md`.
+    const effectivePass = String(smtpPass || '').trim() || (autorizzato ? process.env.SMTP_PASS : '');
+    const effectiveUser = String(smtpUser || '').trim() || (autorizzato ? process.env.SMTP_USER : '');
+    const effectiveHost = String(smtpHost || '').trim() || (autorizzato ? process.env.SMTP_HOST : '');
+
+    if (!effectivePass || !effectiveUser || !effectiveHost) {
       return res.status(400).json({
         success: false,
         errore:
           'Credenziali SMTP mancanti: nessuna casella configurata nelle impostazioni dello studio ' +
-          'e nessuna variabile SMTP_USER/SMTP_PASS nell\'ambiente della funzione.',
+          'e nessuna variabile SMTP_HOST/SMTP_USER/SMTP_PASS disponibile per questa chiamata.',
       });
     }
 
     const primaryPort = Number(smtpPort) || 465;
-    const primaryHost = smtpHost?.trim() || 'authsmtp.register.it';
+    const primaryHost = effectiveHost;
 
+    // Solo l'host dello studio, con le porte plausibili. Prima la lista conteneva
+    // `authsmtp.register.it`, `smtps.register.it` e `mail.register.it`: le credenziali di uno
+    // studio su Gmail o Microsoft 365 venivano offerte ai server di Register.it, cioè a un
+    // provider terzo che con quello studio non ha niente a che vedere.
     const hostCandidates = [
-      { host: primaryHost, port: primaryPort, secure: primaryPort === 465 },
-      { host: 'authsmtp.register.it', port: 465, secure: true },
-      { host: 'authsmtp.register.it', port: 587, secure: false },
-      { host: 'authsmtp.register.it', port: 25, secure: false },
-      { host: 'smtps.register.it', port: 465, secure: true },
-      { host: 'mail.register.it', port: 465, secure: true },
+      { host: primaryHost, port: primaryPort, secure: typeof smtpSecure === 'boolean' ? smtpSecure : primaryPort === 465 },
+      { host: primaryHost, port: 465, secure: true },
+      { host: primaryHost, port: 587, secure: false },
     ];
 
     const uniqueCandidates = hostCandidates.filter(
       (c, index, self) => index === self.findIndex(t => t.host === c.host && t.port === c.port)
     );
 
-    const recipientEmail = to || effectiveUser;
-    let mailOptions: any;
-
-    if (action === 'invite-collaborator') {
-      const nomeCollab = collaboratorName || 'Dottore / Avvocato';
-      const ruoloCollab = collaboratorRole === 'partner' ? 'Senior Partner' : 'Advisor / Operatore';
-      // §23 — nessun ripiego. Qui c'era una password di default: quando il chiamante non
-      // ne passava una, l'email di benvenuto comunicava al nuovo collaboratore una
-      // password nota, identica per tutti gli studi e leggibile in questo file. La
-      // password la genera il server alla creazione dell'utente (POST /tenant/utenti):
-      // se non è arrivata, l'invito non ha nulla da comunicare e non va spedito.
-      const tempPass = collaboratorPassword;
-      if (!tempPass) {
-        return res.status(400).json({
-          ok: false,
-          errore: 'Password temporanea assente: crea prima l\'utente, il server la genera.',
-        });
-      }
-
-      mailOptions = {
-        from: `"${smtpFromName}" <${smtpFromEmail}>`,
-        to: recipientEmail,
-        subject: `🔑 Invito Ufficiale & Credenziali di Accesso Studio — ${nomeCollab}`,
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
-            <div style="background: #0f172a; padding: 24px; text-align: center; color: #fff;">
-              <h2 style="margin: 0; color: #818cf8;">BLUECODE ADVISORY & CONSULTING</h2>
-              <p style="margin: 4px 0 0 0; font-size: 12px; color: #94a3b8;">Gestionale Studio & Fascicoli</p>
-            </div>
-            <div style="padding: 24px;">
-              <h3>Gentile ${nomeCollab},</h3>
-              <p>Sei stato abilitato come <strong>${ruoloCollab}</strong> (${collaboratorSpecialization || 'Area Legale'}).</p>
-              <div style="background: #f8fafc; padding: 14px; border-radius: 8px; border: 1px solid #e2e8f0;">
-                <p style="margin: 0 0 6px 0;"><strong>Credenziali d'accesso:</strong></p>
-                <p style="margin: 0;">Email: <strong>${recipientEmail}</strong><br>Password: <strong>${tempPass}</strong></p>
-              </div>
-              <p style="margin-top: 20px;"><a href="https://bluman.vercel.app/login" style="background: #4338ca; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 700; display: inline-block;">Accedi al Portale Studio ➔</a></p>
-            </div>
-          </div>
-        `,
-      };
-    } else if (action === 'send-message') {
-      const emailSubject = subject || `💬 Comunicazione Studio BlueCode Advisory`;
-      const emailContent = html || `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
-          <div style="background: #0f172a; padding: 24px; text-align: center; color: #fff;">
-            <h2 style="margin: 0; color: #818cf8;">BLUECODE ADVISORY & CONSULTING</h2>
-            <p style="margin: 4px 0 0 0; font-size: 12px; color: #94a3b8;">Comunicazione Fascicolo Operativo</p>
-          </div>
-          <div style="padding: 24px;">
-            <p style="font-size: 14px; color: #334155; line-height: 1.6;">
-              ${(req.body?.text || '').replace(/\n/g, '<br/>')}
-            </p>
-            <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
-            <p style="font-size: 12px; color: #64748b;">
-              BlueCode Advisory Studio • Canale Ufficiale di Notifica Incarichi
-            </p>
-          </div>
-        </div>
-      `;
-      mailOptions = {
-        from: `"${smtpFromName}" <${smtpFromEmail}>`,
-        to: recipientEmail,
-        subject: emailSubject,
-        html: emailContent,
-      };
-    } else {
-      mailOptions = {
-        from: `"${smtpFromName}" <${smtpFromEmail}>`,
-        to: recipientEmail,
-        subject: subject || `🧪 Test Connessione SMTP BluMan — ${new Date().toLocaleTimeString('it-IT')}`,
-        html: html || `
-          <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #059669; border-radius: 8px; background: #f0fdf4; color: #166534;">
-            <h2 style="margin-top: 0;">✓ Connessione SMTP con Register.it Riuscita!</h2>
-            <p>Questa è un'email reale inviata dai server di Register.it tramite BluMan Advisory Platform.</p>
-            <p><strong>Account verificato:</strong> ${smtpUser} (${new Date().toLocaleString('it-IT')})</p>
-          </div>
-        `,
-      };
+    // Il destinatario deve essere quello chiesto dal backend. Il ripiego era la casella
+    // dello studio (`to || effectiveUser`): un `to` vuoto per un errore a monte spediva la
+    // comunicazione del cliente allo studio stesso, e la risposta diceva «recapitata».
+    const recipientEmail = String(to || '').trim();
+    if (!recipientEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail)) {
+      return res.status(400).json({ success: false, errore: 'Destinatario assente o non valido.' });
     }
+    if (!html) {
+      return res.status(400).json({ success: false, errore: 'Corpo del messaggio assente: il backend lo compone.' });
+    }
+
+    // Il corpo HTML e l'oggetto arrivano già composti dal backend, che conosce lo studio,
+    // il fascicolo e la firma. Qui non si aggiunge intestazione: i modelli cablati in questo
+    // file mostravano «BLUECODE ADVISORY & CONSULTING» ai clienti di qualunque studio.
+    const mittente = String(smtpFromName || '').trim()
+      ? `"${String(smtpFromName).trim()}" <${String(smtpFromEmail || effectiveUser).trim()}>`
+      : String(smtpFromEmail || effectiveUser).trim();
+
+    const mailOptions: any = {
+      from: mittente,
+      to: recipientEmail,
+      subject: String(subject || '').trim() || 'Comunicazione dallo studio',
+      html,
+    };
 
     if (smtpReplyTo) mailOptions.replyTo = smtpReplyTo;
     if (smtpBcc) mailOptions.bcc = smtpBcc;
@@ -444,10 +423,14 @@ export default async function handler(req: any, res: any) {
           port: cand.port,
           secure: cand.secure,
           auth: { user: effectiveUser, pass: effectivePass },
-          tls: { rejectUnauthorized: false },
-          connectionTimeout: 4000,
-          greetingTimeout: 3500,
-          socketTimeout: 4000,
+          // Il certificato si verifica. Qui c'era `rejectUnauthorized: false` fisso: la
+          // password della casella viaggiava verso qualunque server sapesse rispondere
+          // all'handshake, certificato sbagliato incluso. Chi ha un server di posta interno
+          // con certificato self-signed lo dichiara con SMTP_INSECURE_TLS=1.
+          tls: { rejectUnauthorized: !tlsInsicuraAmmessa() },
+          connectionTimeout: 8000,
+          greetingTimeout: 7000,
+          socketTimeout: 15000,
         });
 
         await transporter.sendMail(mailOptions);
@@ -462,13 +445,13 @@ export default async function handler(req: any, res: any) {
     if (success) {
       return res.status(200).json({
         success: true,
-        message: `✓ Email recapitata con successo a ${recipientEmail}! (Server: ${connectedHost})`,
+        message: `✓ Email recapitata a ${recipientEmail} (server ${connectedHost})`,
       });
     }
 
     return res.status(400).json({
       success: false,
-      errore: lastErr?.message || 'Timeout connessione SMTP su Register.it. Verifica la password e la connessione.',
+      errore: lastErr?.message || `Nessuna porta utilizzabile verso ${primaryHost}: verifica host, porta e password della casella.`,
     });
   } catch (err: any) {
     return res.status(400).json({

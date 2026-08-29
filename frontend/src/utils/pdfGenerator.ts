@@ -388,9 +388,14 @@ export async function downloadGuidePdf() {
       <h4 style="margin: 10px 0 3px 0; color: #4338ca;">B. Setup Webhook Ingestion:</h4>
       <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 8px 12px; border-radius: 6px; font-family: monospace; font-size: 10px; margin: 6px 0;">
         Callback URL: https://api.tuostudio.com/webhooks/communications/whatsapp<br/>
-        Verify Token: bluman_wa_secure_token_2026<br/>
+        Verify Token: &lt;valore casuale, condiviso con il backend&gt;<br/>
         Eventi sottoscritti: messages
       </div>
+      <p style="margin: 6px 0 0 0; font-size: 10px; color: #7c2d12;">
+        Il Verify Token è un segreto: si genera a caso, si incolla su Meta e si comunica al
+        tecnico che lo imposta sul backend. Questa guida non lo contiene di proposito — un PDF
+        circola per email, e un token stampato qui sarebbe leggibile da chiunque lo riceva.
+      </p>
     </div>
 
     <h2 style="font-size: 13.5px; color: #1e1b4b; border-bottom: 1px solid #cbd5e1; padding-bottom: 4px; margin-top: 18px;">✈️ 2. Telegram Bot API (100% Gratuito)</h2>

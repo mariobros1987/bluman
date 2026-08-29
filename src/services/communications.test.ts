@@ -1,4 +1,6 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { buildServer } from '../server.js';
+import { InMemoryApp } from '../adapters/inMemoryApp.js';
 
 function validaConfigurazioneSmtp(config: { host?: string; port?: number; user?: string; pass?: string }) {
   if (!config.host || config.host.trim() === '') return { valido: false, errore: 'Host SMTP mancante' };
@@ -45,26 +47,57 @@ describe('Omnichannel Communications & SMTP Verification Suite', () => {
     expect(res.errore).toBe('Host SMTP mancante');
   });
 
-  it('deve validare l handshake di verifica Webhook Meta (GET /webhooks/communications/whatsapp)', () => {
-    const verifyTokenAtteso = 'bluman_wa_secure_token_2026';
-    const hubMode = 'subscribe';
-    const hubVerifyToken = 'bluman_wa_secure_token_2026';
-    const hubChallenge = '1158201444';
+  // L'handshake di verifica del webhook si prova sulla rotta vera, non su due letterali
+  // confrontati fra loro. Prima questi due test erano `'x' === 'x'` con dentro il verify token
+  // di produzione: non toccavano `src/routes/webhooks.ts`, e intanto pubblicavano il segreto.
+  // Il token qui è un valore di prova impostato in `WA_VERIFY_TOKEN` per la durata del test.
+  describe('handshake di verifica del webhook Meta (GET /webhooks/communications/whatsapp)', () => {
+    const TOKEN_DI_PROVA = 'verify-token-solo-per-i-test';
+    let precedente: string | undefined;
 
-    const handshakeValido = hubMode === 'subscribe' && hubVerifyToken === verifyTokenAtteso;
-    expect(handshakeValido).toBe(true);
+    beforeEach(() => {
+      precedente = process.env.WA_VERIFY_TOKEN;
+      process.env.WA_VERIFY_TOKEN = TOKEN_DI_PROVA;
+    });
 
-    const rispostaChallenge = handshakeValido ? hubChallenge : 'Forbidden';
-    expect(rispostaChallenge).toBe('1158201444');
-  });
+    afterEach(() => {
+      if (precedente === undefined) delete process.env.WA_VERIFY_TOKEN;
+      else process.env.WA_VERIFY_TOKEN = precedente;
+    });
 
-  it('deve rifiutare un handshake Webhook Meta con verify_token errato', () => {
-    const verifyTokenAtteso: string = 'bluman_wa_secure_token_2026';
-    const hubMode = 'subscribe';
-    const hubVerifyToken: string = 'token_sbagliato_123';
+    function server() {
+      return buildServer(new InMemoryApp()) as any;
+    }
 
-    const handshakeValido = hubMode === 'subscribe' && hubVerifyToken === verifyTokenAtteso;
-    expect(handshakeValido).toBe(false);
+    it('con il token giusto restituisce la challenge di Meta', async () => {
+      const res = await server().inject({
+        method: 'GET',
+        url: '/webhooks/communications/whatsapp',
+        query: { 'hub.mode': 'subscribe', 'hub.verify_token': TOKEN_DI_PROVA, 'hub.challenge': '1158201444' },
+      });
+      expect(res.statusCode).toBe(200);
+      expect(res.body).toBe('1158201444');
+    });
+
+    it('con il token sbagliato risponde 403 e non restituisce la challenge', async () => {
+      const res = await server().inject({
+        method: 'GET',
+        url: '/webhooks/communications/whatsapp',
+        query: { 'hub.mode': 'subscribe', 'hub.verify_token': 'token-sbagliato', 'hub.challenge': '1158201444' },
+      });
+      expect(res.statusCode).toBe(403);
+      expect(res.body).not.toContain('1158201444');
+    });
+
+    it('senza WA_VERIFY_TOKEN configurato rifiuta invece di accettare chiunque', async () => {
+      delete process.env.WA_VERIFY_TOKEN;
+      const res = await server().inject({
+        method: 'GET',
+        url: '/webhooks/communications/whatsapp',
+        query: { 'hub.mode': 'subscribe', 'hub.verify_token': '', 'hub.challenge': '1158201444' },
+      });
+      expect(res.statusCode).toBe(503);
+    });
   });
 
   it('deve associare correttamente un messaggio WhatsApp entrante al Cliente ERP ed al Progetto', () => {

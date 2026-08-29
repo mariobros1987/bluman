@@ -394,3 +394,82 @@ export async function sendClientCredentialsEmail(
     etichetta: 'credenziali portale',
   });
 }
+
+/**
+ * Invito al nuovo collaboratore dello studio, con la password temporanea generata dal server.
+ *
+ * Prima questa email la faceva partire il browser: `creaUtenteTenantApi` riceveva
+ * `passwordTemporanea` nella risposta di `POST /tenant/utenti` e la rispediva alla funzione
+ * serverless `POST /api/send-email` con `action: 'invite-collaborator'`, insieme alla password
+ * SMTP dello studio letta da `localStorage`. Quindi: una password appena creata faceva un giro
+ * completo attraverso la pagina web e una funzione pubblica, e se l'operatore chiudeva la
+ * schermata nel frattempo l'invito non partiva — con l'utente già creato e nessuno che sapesse
+ * la password.
+ *
+ * Ora la spedisce la rotta che la genera, nella stessa richiesta. Nessun ripiego sulla
+ * password: senza `passwordTemporanea` non c'è nulla da comunicare (regola 6, §23).
+ */
+export async function sendInvitoCollaboratoreEmail(opzioni: {
+  toEmail: string;
+  nome: string;
+  ruolo?: string;
+  specializzazione?: string;
+  passwordTemporanea: string;
+  smtp?: { host?: string; port?: number; secure?: boolean; user?: string; pass?: string };
+  fromEmail?: string;
+  fromName?: string;
+  urlAccesso?: string;
+}): Promise<EsitoEmail> {
+  if (!opzioni.passwordTemporanea) {
+    return { ok: false, errore: 'password temporanea assente: non c\'è nulla da comunicare al collaboratore' };
+  }
+
+  const nomeStudio = opzioni.fromName || 'BluMan Advisory';
+  const url = opzioni.urlAccesso || `${(process.env.APP_BASE_URL || 'https://bluman.vercel.app').replace(/\/+$/, '')}/login`;
+  const ruoloLeggibile =
+    opzioni.ruolo === 'partner'
+      ? 'Senior Partner'
+      : opzioni.ruolo === 'advisor'
+        ? 'Advisor'
+        : opzioni.ruolo === 'super_admin'
+          ? 'Amministratore di sistema'
+          : 'Collaboratore';
+
+  const html = `
+    <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; color: #1e293b;">
+      <div style="background-color: #0f172a; padding: 24px; text-align: center;">
+        <h1 style="color: #818cf8; margin: 0; font-size: 22px; font-weight: 700;">${nomeStudio}</h1>
+        <p style="color: #94a3b8; margin: 4px 0 0 0; font-size: 12px;">Gestionale Studio &amp; Fascicoli</p>
+      </div>
+      <div style="padding: 32px 24px;">
+        <h2 style="margin-top: 0; font-size: 18px; color: #0f172a;">Gentile ${opzioni.nome},</h2>
+        <p style="line-height: 1.6; color: #475569;">
+          È stato attivato il tuo accesso come <strong>${ruoloLeggibile}</strong>${opzioni.specializzazione ? ` (${opzioni.specializzazione})` : ''}.
+        </p>
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 18px 20px; margin: 24px 0;">
+          <p style="margin: 0 0 8px 0; font-size: 13px; color: #64748b;">Email (username): <strong style="color: #0f172a;">${opzioni.toEmail}</strong></p>
+          <p style="margin: 0; font-size: 13px; color: #64748b;">Password temporanea: <strong style="color: #4338ca; font-family: monospace; font-size: 15px;">${opzioni.passwordTemporanea}</strong></p>
+        </div>
+        <div style="text-align: center; margin: 28px 0;">
+          <a href="${url}" style="background-color: #4338ca; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; font-size: 14px; display: inline-block;">Accedi al gestionale ➔</a>
+        </div>
+        <p style="font-size: 12px; color: #94a3b8; line-height: 1.5;">
+          Cambia la password al primo accesso e non condividerla con nessuno.
+        </p>
+      </div>
+      <div style="background-color: #f8fafc; padding: 16px 24px; text-align: center; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8;">
+        ${nomeStudio} • Accesso riservato al team
+      </div>
+    </div>
+  `;
+
+  return inviaEmail({
+    to: opzioni.toEmail,
+    subject: `🔑 Invito e credenziali di accesso — ${nomeStudio}`,
+    html,
+    smtp: opzioni.smtp,
+    fromEmail: opzioni.fromEmail,
+    fromName: opzioni.fromName,
+    etichetta: 'invito collaboratore',
+  });
+}

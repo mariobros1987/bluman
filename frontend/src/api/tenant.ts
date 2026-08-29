@@ -1,4 +1,4 @@
-import { getTenantStorageKey, getCurrentTenantId, getStudioInfoForTenant, BLUECODE_TENANT_ID } from '../utils/tenant';
+import { getTenantStorageKey, getCurrentTenantId, getStudioInfoForTenant, BLUECODE_TENANT_ID, senzaSegretiTenant } from '../utils/tenant';
 import { API_BASE, apiFetch, getAuthHeaders, leggiErroreApi } from './http';
 
 // DEFAULT_TEAM_USERS serve SOLO come fallback di seed per il Tenant Demo Bluecode (tenant-1) se il DB è offline
@@ -98,68 +98,19 @@ export async function creaUtenteTenantApi(input: {
     localStorage.setItem(teamStorageKey, JSON.stringify(list));
   } catch {}
 
-  // 3. Email di benvenuto, solo se il server ha davvero emesso una password temporanea
-  // (non lo fa per un utente che ne ha già una: in quel caso non c'è nulla da comunicare).
-  if (creato?.passwordTemporanea) {
-    sendInviteCollaboratoreApi({
-      nome: input.nome,
-      email: input.email,
-      ruolo: input.ruolo,
-      specializzazione: input.specializzazione,
-      tempPassword: creato.passwordTemporanea,
-    }).catch(() => {});
-  }
+  // 3. L'email di benvenuto la spedisce il backend, nella stessa richiesta che ha creato
+  // l'utente: `invitoInviato` e `invitoErrore` nella risposta dicono com'è andata. Prima la
+  // spediva questa funzione, rigirando la password appena generata alla funzione serverless
+  // pubblica insieme alla password SMTP dello studio letta da `localStorage` — e se
+  // l'operatore chiudeva la schermata l'invito non partiva, con l'utente già creato.
 
   return creato;
 }
 
-export async function sendInviteCollaboratoreApi(input: {
-  nome: string;
-  email: string;
-  ruolo: string;
-  specializzazione?: string;
-  /** Emessa dal server alla creazione dell'utente. Senza di essa l'invito non parte. */
-  tempPassword: string;
-}) {
-  let localTenant: any = {};
-  const currentTenantId = getCurrentTenantId();
-  const isBC = currentTenantId === BLUECODE_TENANT_ID;
-  const studio = getStudioInfoForTenant(currentTenantId);
-  try {
-    const raw = localStorage.getItem(getTenantStorageKey('bluman_tenant_info'));
-    if (raw) localTenant = JSON.parse(raw);
-  } catch {}
-
-  const payload = {
-    action: 'invite-collaborator',
-    smtpHost: localTenant.smtpHost || (isBC ? 'authsmtp.register.it' : ''),
-    smtpPort: localTenant.smtpPort || 465,
-    smtpSecure: localTenant.smtpSecure !== undefined ? localTenant.smtpSecure : true,
-    smtpUser: localTenant.smtpUser || (isBC ? 'support@bluecode-ltd.com' : ''),
-    smtpPass: localTenant.smtpPass || '',
-    smtpFromEmail: localTenant.smtpFromEmail || localTenant.smtpUser || (isBC ? 'support@bluecode-ltd.com' : ''),
-    smtpFromName: localTenant.smtpFromName || studio.ragioneSociale || 'Studio Professionale',
-    smtpReplyTo: localTenant.smtpReplyTo,
-    smtpBcc: localTenant.smtpBcc,
-    to: input.email,
-    collaboratorName: input.nome,
-    collaboratorRole: input.ruolo,
-    collaboratorSpecialization: input.specializzazione,
-    collaboratorPassword: input.tempPassword,
-  };
-
-  try {
-    const res = await apiFetch('/api/send-email', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    return await res.json();
-  } catch (err: any) {
-    console.warn('Errore invio email invito collaboratore', err);
-    return { success: false, errore: err.message };
-  }
-}
+// `sendInviteCollaboratoreApi` è stata rimossa: costruiva le credenziali SMTP dello studio
+// leggendole da `localStorage` e le spediva alla funzione serverless pubblica insieme alla
+// password temporanea del nuovo collaboratore. L'invito lo manda `POST /tenant/utenti`, che è
+// la rotta che genera quella password (vedi `sendInvitoCollaboratoreEmail` nel backend).
 
 export async function testEmailApi(payload?: {
   smtpHost?: string;
@@ -173,70 +124,39 @@ export async function testEmailApi(payload?: {
   smtpBcc?: string;
   emailDestinatario?: string;
 }) {
-  const body = {
-    action: 'test',
-    ...payload,
-    to: payload?.emailDestinatario || payload?.smtpUser,
-  };
-
   // Un test SMTP onesto deve avere il tempo di fallire: aprire la connessione, fare
   // l'handshake TLS, autenticarsi e spedire richiede più di 4,5 secondi su una rete lenta,
   // e il vecchio timeout scadeva prima di conoscere l'esito. Venti secondi coprono anche il
   // caso in cui il server prova più porte in sequenza.
-  const conTimeout = async (url: string, init: RequestInit) => {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 20000);
-    try {
-      const res = await apiFetch(url, { ...init, signal: controller.signal });
-      return await res.json();
-    } finally {
-      clearTimeout(timer);
-    }
-  };
-
-  const motivi: string[] = [];
-
-  // 1. Serverless Function Vercel /api/send-email
+  //
+  // La funzione serverless `/api/send-email` non viene più interrogata per prima: accettava le
+  // credenziali dal corpo senza autenticazione e ripiegava su quelle dell'ambiente, quindi
+  // rispondeva «riuscito» anche quando le impostazioni provate erano vuote — cioè il test
+  // passava e poi l'invio reale non partiva. Il backend prova le credenziali che gli passi e,
+  // se il corpo è vuoto, quelle salvate sulla riga dello studio.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 20000);
   try {
-    const json = await conTimeout('/api/send-email', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    if (json) return json;
-    motivi.push('la funzione Vercel non ha risposto nulla');
-  } catch (err: any) {
-    motivi.push(
-      `funzione Vercel: ${err?.name === 'AbortError' ? 'nessuna risposta entro 20 secondi' : err?.message || 'errore di rete'}`,
-    );
-  }
-
-  // 2. Ripiego sul backend Fastify. L'intestazione di autenticazione serve: la rotta è
-  // protetta e senza token rispondeva 401, che il vecchio codice scartava in silenzio.
-  try {
-    const json = await conTimeout(`${API_BASE}/tenant/test-email`, {
+    const res = await apiFetch(`${API_BASE}/tenant/test-email`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(payload || {}),
+      signal: controller.signal,
     });
+    const json = await res.json().catch(() => null);
     if (json) return json;
-    motivi.push('il backend non ha risposto nulla');
+    return { success: false, errore: `Il server ha risposto ${res.status} senza contenuto leggibile.` };
   } catch (err: any) {
-    motivi.push(
-      `backend: ${err?.name === 'AbortError' ? 'nessuna risposta entro 20 secondi' : err?.message || 'errore di rete'}`,
-    );
+    // Un test che non ha potuto girare va detto: qui prima si restituiva un `success: true`
+    // con il messaggio «Connessione SMTP testata», identico con la configurazione giusta e
+    // con quella sbagliata.
+    return {
+      success: false,
+      errore: `Test non eseguito: ${err?.name === 'AbortError' ? 'nessuna risposta entro 20 secondi' : err?.message || 'il server non ha risposto'}.`,
+    };
+  } finally {
+    clearTimeout(timer);
   }
-
-  // 3. Nessuna delle due strade ha risposto: il test NON è stato eseguito.
-  //
-  // Qui prima si restituiva un `success: true` con il messaggio «Connessione SMTP testata»:
-  // un esito positivo inventato, identico con la configurazione giusta e con quella
-  // sbagliata. È il motivo per cui il test in impostazioni «funzionava» mentre il codice
-  // OTP non arrivava a nessuno. Un test che non ha potuto girare va detto.
-  return {
-    success: false,
-    errore: `Test non eseguito: nessuna delle due strade di invio ha risposto (${motivi.join('; ') || 'motivo non riportato'}).`,
-  };
 }
 
 export async function fetchTenantInfoApi(tenantIdParam?: string) {
@@ -295,7 +215,12 @@ export async function updateTenantInfoApi(input: any, tenantIdParam?: string) {
   });
   if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore aggiornamento info tenant'));
   const data = await res.json();
-  localStorage.setItem(getTenantStorageKey('bluman_tenant_info', currentTenantId), JSON.stringify({ ...input, ...data }));
+  // §35 — `input` può contenere la password SMTP appena digitata: in localStorage non ci va
+  // (regola 6). La cache locale tiene solo l'anagrafica e i flag `<chiave>Impostata`.
+  localStorage.setItem(
+    getTenantStorageKey('bluman_tenant_info', currentTenantId),
+    JSON.stringify(senzaSegretiTenant({ ...input, ...data })),
+  );
   return data;
 }
 
@@ -359,108 +284,105 @@ export async function testChannelApi(payload: { channel: string; waPhoneId?: str
   return await res.json();
 }
 
+/**
+ * Messaggio WhatsApp al cliente, spedito dal backend con il numero dello studio.
+ *
+ * Prima chiamava `POST /api/send-whatsapp`: una funzione senza autenticazione, con
+ * `Access-Control-Allow-Origin: *`, che prendeva Phone ID e access token dalle variabili
+ * d'ambiente — quindi un unico numero per tutti gli studi — e rispondeva `success: true`
+ * anche quando il ripiego su `hello_world` falliva. Ora la consegna la fa
+ * `POST /comunicazioni/invia-whatsapp`, che legge le credenziali della riga Tenant.
+ */
 export async function sendWhatsAppDirectApi(to: string, text: string, templateName?: string) {
   try {
-    const res = await apiFetch('/api/send-whatsapp', {
+    const res = await apiFetch(`${API_BASE}/comunicazioni/invia-whatsapp`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ to, text, templateName }),
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ to, testo: text, template: templateName }),
     });
-    return await res.json();
-  } catch (err) {
-    console.warn('Vercel serverless direct send fallback:', err);
-    return null;
+    const data = await res.json().catch(() => null);
+    if (res.ok && data?.ok) return { success: true, via: data.via };
+    return {
+      success: false,
+      errore: data?.errore || `Il server ha risposto ${res.status} senza spiegare il motivo.`,
+    };
+  } catch (err: any) {
+    return { success: false, errore: err?.message || 'Backend non raggiungibile.' };
   }
 }
 
+/**
+ * Email al cliente, spedita dal backend con le credenziali dello studio.
+ *
+ * Prima questa funzione costruiva host, utenza e **password SMTP** leggendoli da
+ * `localStorage` e li spediva alla funzione serverless pubblica. Su un browser dove quella
+ * chiave era vuota — un altro computer, una cache pulita — partiva un invio senza password che
+ * non arrivava a nessuno. Le credenziali ora non lasciano il server.
+ */
 export async function sendEmailDirectApi(to: string, subject: string, text: string, html?: string) {
-  let tenantInfo: any = {};
-  const currentTenantId = getCurrentTenantId();
-  const isBC = currentTenantId === BLUECODE_TENANT_ID;
-  const studio = getStudioInfoForTenant(currentTenantId);
   try {
-    const saved = localStorage.getItem(getTenantStorageKey('bluman_tenant_info'));
-    if (saved) tenantInfo = JSON.parse(saved);
-  } catch {}
-
-  const body = {
-    action: 'send-message',
-    smtpHost: tenantInfo.smtpHost || (isBC ? 'authsmtp.register.it' : ''),
-    smtpPort: tenantInfo.smtpPort || 465,
-    smtpSecure: tenantInfo.smtpSecure !== undefined ? tenantInfo.smtpSecure : true,
-    smtpUser: tenantInfo.smtpUser || (isBC ? 'support@bluecode-ltd.com' : ''),
-    smtpPass: tenantInfo.smtpPass || '',
-    smtpFromEmail: tenantInfo.smtpFromEmail || tenantInfo.smtpUser || (isBC ? 'support@bluecode-ltd.com' : ''),
-    smtpFromName: tenantInfo.smtpFromName || studio.ragioneSociale || 'Studio Professionale',
-    smtpReplyTo: tenantInfo.smtpReplyTo || '',
-    smtpBcc: tenantInfo.smtpBcc || '',
-    to,
-    subject,
-    text,
-    html,
-  };
-
-  try {
+    // Venti secondi: un invio SMTP che deve provare più porte non sta dentro i sei di prima,
+    // e il timeout scaduto veniva mostrato come errore di invio anche quando l'email partiva.
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 6000);
-    const res = await apiFetch('/api/send-email', {
+    const timer = setTimeout(() => controller.abort(), 20000);
+    const res = await apiFetch(`${API_BASE}/comunicazioni/invia-email`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ to, subject, testo: text, html }),
       signal: controller.signal,
     });
     clearTimeout(timer);
-    const data = await res.json();
-    if (res.ok && data.success) {
-      return data;
-    }
+    const data = await res.json().catch(() => null);
+    if (res.ok && data?.ok) return { success: true, via: data.via };
     return {
       success: false,
-      errore: data.errore || 'Errore durante la trasmissione email',
+      errore: data?.errore || `Il server ha risposto ${res.status} senza spiegare il motivo.`,
     };
   } catch (err: any) {
     return {
       success: false,
-      errore: err.message || 'Timeout o errore di connessione con il server SMTP',
+      errore: err?.name === 'AbortError' ? 'Nessuna risposta entro 20 secondi dal server di posta.' : err?.message || 'Backend non raggiungibile.',
     };
   }
 }
 
-export async function fetchInboundImapEmailsApi(clientEmail?: string) {
-  let tenantInfo: any = {};
-  const currentTenantId = getCurrentTenantId();
-  const isBC = currentTenantId === BLUECODE_TENANT_ID;
-  try {
-    const saved = localStorage.getItem(getTenantStorageKey('bluman_tenant_info'));
-    if (saved) tenantInfo = JSON.parse(saved);
-  } catch {}
-
-  const body = {
-    action: 'fetch-imap-inbound',
-    imapHost: tenantInfo.imapHost || (isBC ? 'imap.register.it' : ''),
-    imapPort: tenantInfo.imapPort || 993,
-    imapUser: tenantInfo.imapUser || tenantInfo.smtpUser || (isBC ? 'support@bluecode-ltd.com' : ''),
-    imapPass: tenantInfo.imapPass || tenantInfo.smtpPass || '',
-    imapFolder: tenantInfo.imapFolder || 'INBOX',
-    clientEmail: clientEmail || '',
-  };
-
+/**
+ * Ultimi messaggi arrivati nella casella dello studio, letti dal backend.
+ *
+ * Restituisce `{ ok, email, errore }` e non più un semplice elenco: la vecchia versione
+ * rispondeva `[]` a qualunque guasto, così «il cliente non ha risposto» e «la casella non è
+ * configurata» erano indistinguibili nel fascicolo (regola 7). La password IMAP non passa più
+ * dal browser.
+ */
+export async function fetchInboundImapEmailsApi(
+  clientEmail?: string,
+): Promise<{ ok: boolean; email: any[]; errore?: string }> {
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 6000);
-    const res = await apiFetch('/api/send-email', {
+    const timer = setTimeout(() => controller.abort(), 25000);
+    const res = await apiFetch(`${API_BASE}/comunicazioni/email-in-arrivo`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ clientEmail: clientEmail || '' }),
       signal: controller.signal,
     });
     clearTimeout(timer);
-    const data = await res.json();
-    if (res.ok && data.success && Array.isArray(data.emails)) {
-      return data.emails;
+    const data = await res.json().catch(() => null);
+    if (res.ok && data?.ok && Array.isArray(data.email)) {
+      return { ok: true, email: data.email };
     }
-  } catch {}
-  return [];
+    return {
+      ok: false,
+      email: [],
+      errore: data?.errore || `Il server ha risposto ${res.status} senza spiegare il motivo.`,
+    };
+  } catch (err: any) {
+    return {
+      ok: false,
+      email: [],
+      errore: err?.name === 'AbortError' ? 'Nessuna risposta entro 25 secondi dalla casella in arrivo.' : err?.message || 'Backend non raggiungibile.',
+    };
+  }
 }
 
 export async function fetchPermessiUtenteApi(userId: string) {
@@ -530,17 +452,26 @@ export async function createAdminTenantApi(data: any) {
 /**
  * Rigenera la password del responsabile dello studio. È l'unico modo per riottenerla:
  * il database ne conserva solo l'hash scrypt, quindi la vecchia non è recuperabile.
+ * Con `{ invia: true }` è il backend a spedire le credenziali (§35): il browser non
+ * costruisce più il messaggio né conosce le credenziali SMTP della piattaforma.
  */
-export async function resetPasswordTenantApi(id: string) {
+export async function resetPasswordTenantApi(id: string, opzioni?: { invia?: boolean }) {
   const res = await apiFetch(`${API_BASE}/admin/tenants/${id}/reset-password`, {
     method: 'POST',
-    headers: getAuthHeaders(),
+    headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ invia: Boolean(opzioni?.invia) }),
   });
   if (!res.ok) {
     const errore = await res.json().catch(() => ({}));
     throw new Error(errore?.errore || 'Reset password non riuscito');
   }
-  return await res.json() as { ok: boolean; email: string; passwordTemporanea: string };
+  return await res.json() as {
+    ok: boolean;
+    email: string;
+    passwordTemporanea: string;
+    invitoInviato?: boolean;
+    invitoErrore?: string | null;
+  };
 }
 
 export async function updateAdminTenantApi(id: string, data: any) {

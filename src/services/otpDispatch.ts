@@ -12,6 +12,7 @@
  */
 import { prisma } from '../util/prismaClient';
 import { sendOtpSecurityEmail } from './emailService';
+import { chiamaGraphWhatsapp } from './whatsappService';
 import type { CanaleOtp } from './otpService';
 import { TTL_OTP_SECONDI } from './otpService';
 
@@ -186,25 +187,10 @@ function templateAutenticazione(): { nome: string; lingua: string } | null {
   return { nome, lingua: process.env.WA_OTP_TEMPLATE_LANG?.trim() || 'it' };
 }
 
-async function chiamaGraph(cred: CredenzialiCanali, corpo: unknown): Promise<{ ok: boolean; motivo?: string }> {
-  const risposta = await fetch(`https://graph.facebook.com/v21.0/${cred.waPhoneId}/messages`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${cred.waAccessToken}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(corpo),
-  });
-
-  if (risposta.ok) return { ok: true };
-
-  const dettaglio: any = await risposta.json().catch(() => null);
-  // Il messaggio di Graph va riportato: "fuori dalla finestra di 24 ore" (131047), "template
-  // non trovato" e "numero non registrato su WhatsApp" sono problemi diversi, con rimedi
-  // diversi, e chi sta firmando deve sapere quale dei tre è.
-  const codice = dettaglio?.error?.code ? ` [${dettaglio.error.code}]` : '';
-  return { ok: false, motivo: `${dettaglio?.error?.message || `HTTP ${risposta.status}`}${codice}` };
-}
+// `chiamaGraph` viveva qui: ora è `chiamaGraphWhatsapp` in `whatsappService.ts`, perché la
+// stessa chiamata serve anche alle comunicazioni del fascicolo e alle credenziali del portale.
+// Tre copie divergenti della stessa richiesta a Meta erano il motivo per cui l'OTP partiva col
+// numero dello studio giusto e le comunicazioni con quello scritto nelle variabili d'ambiente.
 
 async function inviaWhatsapp(
   cred: CredenzialiCanali,
@@ -230,7 +216,7 @@ async function inviaWhatsapp(
     try {
       // Il codice compare due volte per costruzione del formato: una nel corpo del messaggio
       // e una come valore del pulsante «Copia codice». È lo stesso codice, non due invii.
-      const esito = await chiamaGraph(cred, {
+      const esito = await chiamaGraphWhatsapp(cred, {
         messaging_product: 'whatsapp',
         recipient_type: 'individual',
         to: destinatario,
@@ -249,7 +235,7 @@ async function inviaWhatsapp(
 
       // Un template di autenticazione senza pulsante rifiuta il componente `button`. Vale
       // un secondo tentativo con il solo corpo prima di ripiegare sul testo libero.
-      const senzaBottone = await chiamaGraph(cred, {
+      const senzaBottone = await chiamaGraphWhatsapp(cred, {
         messaging_product: 'whatsapp',
         recipient_type: 'individual',
         to: destinatario,
@@ -273,7 +259,7 @@ async function inviaWhatsapp(
   // Resta come ultima possibilità perché in quella finestra recapita, ed è meglio di niente
   // finché il template non è approvato.
   try {
-    const esito = await chiamaGraph(cred, {
+    const esito = await chiamaGraphWhatsapp(cred, {
       messaging_product: 'whatsapp',
       recipient_type: 'individual',
       to: destinatario,

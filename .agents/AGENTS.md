@@ -205,15 +205,24 @@ collaboratore nasca nel tenant di chi lo crea, e che un errore di lettura su
   `POST /admin/tenants` e `POST /admin/tenants/:id/reset-password` la generano con
   `generaPasswordTemporanea()`, ne salvano l'hash scrypt e la restituiscono in chiaro
   **una sola volta** nella risposta. Non è rileggibile dopo: se va perduta si rigenera.
-  Il frontend non ne propone nessuna e non ne conserva nessuna; `api/send-email.ts` si
-  rifiuta di spedire un invito privo di `collaboratorPassword` invece di annunciarne una
-  di ripiego. Una password di default comunicata dall'API è comunque una password valida.
+  Il frontend non ne propone nessuna e non ne conserva nessuna. L'email di invito la compone
+  `sendInvitoCollaboratoreEmail` in `src/services/emailService.ts` e passa dal relay come
+  qualunque altro messaggio: l'azione `invite-collaborator` di `api/send-email.ts`, che
+  poteva annunciare una password di ripiego, non esiste più.
+  Una password di default comunicata dall'API è comunque una password valida.
 - `src/server.test.ts` ha un test di regressione che rifiuta ognuna delle otto vecchie
   coppie email/password: se torna verde per una di esse, la falla è stata reintrodotta.
 - `src/credenziali.test.ts` è il presidio più ampio: scandisce `src/`, `frontend/src/` e
   `api/` e fallisce se una delle vecchie password, dei token finti o del ripiego
   `!password ||` ricompare su una riga non commentata. Copre anche i file `.tsx` del
   frontend e le funzioni serverless, che una ricerca sul solo backend non tocca.
+- Il verify token del webhook WhatsApp di produzione era scritto in chiaro in
+  `GUIDA_META_WHATSAPP_INTEGRAZIONE.md`, in `GUIDA_CONFIGURAZIONE_CANALI.md`, dentro il PDF
+  generato da `frontend/src/utils/pdfGenerator.ts` (una guida che circola per email) e come
+  fixture in `src/services/communications.test.ts`. Ora è nella lista cercata da
+  `src/credenziali.test.ts`, il cui scan copre anche i `.md`. **Va rigenerato su Meta**: la
+  cronologia di git conserva il valore vecchio, e chi lo legge può superare l'handshake al
+  posto nostro e farsi registrare come webhook dello studio.
 
 - **Profilo & Gestione Password**:
   - `POST /auth/change-password`: Cambio password per utenti staff autenticati (imposta `stato: 'attivo'`).
@@ -223,7 +232,9 @@ collaboratore nasca nel tenant di chi lo crea, e che un errore di lettura su
   - `POST /tenant/utenti/:id/reset-password`: Reset password collaboratore da parte di Super Admin / Advisor (imposta `stato: 'invitato'`, genera password temporanea e la restituisce una volta sola).
 - **Progetti**: `GET /progetti`, `GET /progetti/:id`, `DELETE /progetti/:id`, `DELETE /progetti/:id/moduli/:moduloId` (Eliminazione sicura modulo persistita a DB con controllo ruoli; **409** se il modulo ha ore consuntivate o righe fattura collegate; transazione ordinata accessi → passaggi → microvoci → dipendenze → modulo; audit log), `PUT /progetti/:id/stato-completo` (Persistenza totale moduli, microvoci, checklist passaggi e note operative con audit log)
 - **Clienti**: `GET /clienti`, `POST /clienti`, `PUT /clienti/:id` (Salvataggio e recupero completo di tutti i campi ERP, legali, SDI, IBAN, KYC e referentiJson con audit log)
-- **Comunicazioni Omnichannel**: `GET /progetti/:id/comunicazioni`, `POST /progetti/:id/comunicazioni` (Messaggistica bidirezionale live Portale Cliente ⇄ Advisor Hub su tabella PostgreSQL `comunicazione_progetto`, con invio email reale Nodemailer SMTP Register.it e WhatsApp Cloud API)
+- **Comunicazioni Omnichannel**: `GET /progetti/:id/comunicazioni`, `POST /progetti/:id/comunicazioni` (Messaggistica bidirezionale live Portale Cliente ⇄ Advisor Hub su tabella PostgreSQL `comunicazione_progetto`; la riga si scrive qui, la consegna sui canali la fanno le tre rotte sotto)
+- **Canali dal backend (§35)**: `POST /comunicazioni/invia-email`, `POST /comunicazioni/invia-whatsapp`, `POST /comunicazioni/email-in-arrivo` in `src/routes/comunicazioni.ts`. Il corpo contiene solo destinatario, oggetto e testo: host, utenza e password li legge il server dalla riga Tenant della richiesta (`credenzialiCanali`), e non lasciano mai il server. Prima queste tre cose le faceva il browser chiamando le funzioni serverless con la password SMTP letta da `localStorage`; `POST /progetti/:id/comunicazioni` spediva a sua volta il WhatsApp con le variabili d'ambiente, quindi al cliente arrivavano due messaggi identici dal numero di un solo studio. Un canale non configurato o un invio rifiutato risponde **400** con il motivo di Meta o del server di posta, mai `ok: true` (regola 7). Presidio: `src/comunicazioniCanali.test.ts` (16 test).
+  - ⚠️ **Eccezione da sanare — il verify token del webhook.** L'handshake `GET /webhooks/communications/whatsapp` (`src/routes/webhooks.ts:37`) confronta con la variabile d'ambiente `WA_VERIFY_TOKEN`, **non** con la riga Tenant: è una GET pubblica, senza JWT e quindi senza contesto tenant, e risolvere lo studio richiederebbe una lettura cross-tenant che scavalca RLS (vietata fuori da script e bootstrap, regola 1). Intanto **Impostazioni Studio → Canali** mostra un campo *Webhook Verify Token* che `PATCH /tenant/info` salva e che nessuno legge: l'operatore lo compila e crede di aver configurato l'handshake (regola 7). Le due uscite sono togliere il campo dall'interfaccia oppure dare a ogni studio il proprio path di callback, così che il tenant sia deducibile dall'URL. Serve una decisione del titolare: non l'ho scelta io.
 - **Fatturazione & Incassi**: `POST /progetti/:id/fatture` (gestisce sia Fatture `FT` che Note di Credito `NC` con numerazione distinta), `GET /invoices/scadenzario`, `POST /invoices/scadenze/:id/incassi` (Prima Nota) e `GET /invoices/:id/sdi-xml` (Tracciato XML FatturaPA).
 - **Contratti Retainer**: `GET /contratti-ricorrenti`, `POST /contratti-ricorrenti` (collegati sia al Cliente che al Progetto specifico).
 - **Multi-Tenant Piattaforma (solo `super_admin`)**: `GET /admin/tenants`, `POST /admin/tenants` (registra lo studio **e** la riga `user` del responsabile con ruolo `advisor`, restituendo la password temporanea una volta sola), `PATCH /admin/tenants/:id`, `DELETE /admin/tenants/:id`, `POST /admin/tenants/:id/reset-password` (rigenera la password del responsabile: nuovo hash su `user.passwordHash`, chiaro nella sola risposta, imposta `stato: 'invitato'`). Tutti passano da `soloSuperAdmin` → 403 per gli altri ruoli.
@@ -319,7 +330,9 @@ Configurazione: `vitest.config.ts` + `vitest.setup.ts` (isolamento dal DB reale)
 - **`src/services/istanziaProgetto.test.ts`**: Test orchestrazione istanziazione progetto §15.3.
 - **`src/services/esecuzione.test.ts`**: Test orchestrazione consuntivazione ed esecuzione §17.
 - **`src/services/antiDuplication.test.ts`**: Test anti-duplicazione entità.
-- **`src/services/communications.test.ts`**: Test comunicazioni omnichannel.
+- **`src/services/communications.test.ts`**: Test comunicazioni omnichannel. Include l'handshake vero di `GET /webhooks/communications/whatsapp` (token giusto → 200 con la challenge, token sbagliato → 403, `WA_VERIFY_TOKEN` assente → 503): prima erano due letterali confrontati fra loro, che non toccavano la rotta e intanto pubblicavano il verify token di produzione.
+- **`src/comunicazioniCanali.test.ts`**: §35 — i segreti non escono da `GET /tenant/info` (valore vuoto + flag `<chiave>Impostata`), `PATCH /tenant/info` con `smtpPass: ''` non cancella la password salvata mentre `null` la cancella, e le tre rotte `/comunicazioni/*` rispondono 400 col motivo quando il canale non è configurato — mai 200 con un elenco vuoto o un successo inventato. 16 test con client Prisma finto, perché quello che conta è *cosa* viene scritto.
+- **`api/sendEmail.test.ts`**: §35 — il relay su Vercel rifiuta le chiamate senza `x-bluman-relay`, non imposta intestazioni CORS, non spende `process.env.SMTP_PASS` per conto di chi passa, e non ha più le vecchie azioni (`test-imap` → 400). Sta in `api/` perché `tsconfig.json` limita il programma a `src` con `rootDir: src`.
 - **`src/services/catalogDocumentLinkage.test.ts`**: Test collegamento catalogo-documenti.
 - **`src/services/newFeatures.test.ts`**: Test funzionalità aggiunte di recente.
 - **`src/services/pdfService.test.ts`**: Test generazione PDF server-side.
@@ -328,8 +341,7 @@ Configurazione: `vitest.config.ts` + `vitest.setup.ts` (isolamento dal DB reale)
 
 ### ☁️ Serverless Functions (`api/`)
 
-- **`api/send-email.ts`**: Vercel Serverless Function con Nodemailer per invio test SMTP, inviti collaboratori con credenziali e comunicazioni live fascicolo a clienti.
-- **`api/send-whatsapp.ts`**: Vercel Serverless Function per dispatch sicuro e senza CORS verso Meta WhatsApp Cloud API.
+- **`api/send-email.ts`**: **relay** di posta a uso del solo backend, non un endpoint per il browser (§35). Serve perché la rete in uscita di Railway non lascia passare le porte SMTP (ETIMEDOUT misurato su 465, 587 e 25 verso `authsmtp.register.it`): il messaggio arriva già composto da `src/services/emailRelay.ts` e viene consegnato da qui, che gira su un'altra rete, con le credenziali dello studio. Accetta due sole azioni, `send-message` e `fetch-imap-inbound`. Chiuso da: header `x-bluman-relay` confrontato con `EMAIL_RELAY_SECRET`, nessuna intestazione CORS, nessun ripiego su `process.env.SMTP_*` per le chiamate non autorizzate, solo l'host di posta dello studio fra i candidati (prima offriva le credenziali di uno studio su Gmail ai server di Register.it), destinatario obbligatorio e validato, certificati TLS verificati. Presidio: `api/sendEmail.test.ts` (10 test).
 - **`api/webhooks/communications/`**: Webhook per ingestion messaggi da canali esterni (Telegram, WhatsApp).
 
 ### 📦 Migrazioni Database (`prisma/migrations/`)
@@ -409,6 +421,7 @@ Configurazione: `vitest.config.ts` + `vitest.setup.ts` (isolamento dal DB reale)
 5. **Aggiornamento Mappa Grafo (Graphify)**:
    - Dopo modifiche strutturali ai moduli o ai servizi, eseguire `python -m graphify extract . --code-only` e `python -m graphify cluster-only .` per mantenere la mappa delle dipendenze di codice e la documentazione architettonica sempre sincronizzate.
    - ✅ **Grafo AGGIORNATO (27 agosto 2026):** 1492 nodi, 3192 archi, 227 community. Include workflow approvazione/richiesta modifica documenti, generazione PDF binari A4 lato client/server, selettore canali OTP (Email/WhatsApp/SMS) e modal firma interattivo. Generati `graphify-out/graph.json`, `graphify-out/GRAPH_REPORT.md` e `graphify-out/graph.html`.
+   - ⚠️ **Il grafo è indietro rispetto a §35.** L'ultimo `GRAPH_REPORT.md` (anche quello nella cartella datata 29 agosto) dichiara `Built from commit: a9ddaf1e` ed è una rilettura `cluster-only` dello stesso estratto del 27: non contiene `src/routes/comunicazioni.ts`, `src/services/whatsappService.ts`, `src/services/imapInbound.ts` né la riscrittura di `src/services/emailRelay.ts`. Non l'ho potuto rigenerare: in questo ambiente `graphify` non è installato come comando e `python3` non è utilizzabile (il binario di sistema è lo shim di `xcode-select`, che si interrompe con «No developer tools were found»). Va rilanciato su una macchina con i Command Line Tools installati, prima di fidarsi della mappa per orientarsi nei moduli dei canali.
 
 
 6. **Divieto Assoluto di Esposizione Credenziali su GitHub & Persistenza Isolata su DB Tenant**:
@@ -417,6 +430,8 @@ Configurazione: `vitest.config.ts` + `vitest.setup.ts` (isolamento dal DB reale)
    - Le password **degli utenti** non risiedono nemmeno lì: solo come hash scrypt su `user.password_hash`. Nessuna colonna, nessuna risposta API e nessun `localStorage` conserva una password di persona in chiaro.
    - Il divieto vale anche per le credenziali *di ripiego*: un `|| 'password-qualunque'` e un campo password precompilato nella UI sono credenziali cablate a tutti gli effetti, perché il valore che l'API annuncia è il valore con cui si entra. Il presidio automatico è `src/credenziali.test.ts`, che scandisce `src/`, `frontend/src/`, `api/` ed i file `.md` — non solo il backend, perché il bundle frontend è pubblico esattamente come il repository.
    - Un segreto non va documentato nemmeno per spiegare che è stato rimosso: nei commenti si rimanda a `src/credenziali.test.ts`, che lo cerca, invece di trascriverlo.
+   - **Un segreto salvato nel database non torna al browser** (§35). `GET /tenant/info` e `PATCH /tenant/info` sostituiscono `smtpPass`, `imapPass`, `waAccessToken`, `waVerifyToken` e `tgBotToken` con la stringa vuota e aggiungono `<chiave>Impostata: boolean`, che è quello di cui l'interfaccia ha bisogno per distinguere «mascherata» da «mai salvata». Sul giro di ritorno la stringa vuota vale «non toccare» e `null` esplicito vale «cancella»: se valesse «password nuova», salvare la ragione sociale spegnerebbe la posta in uscita dello studio. Chi aggiunge una colonna segreta alla riga Tenant la aggiunge a `CHIAVI_SEGRETE` in `src/routes/tenant.ts` **e** a `CHIAVI_SEGRETE_TENANT` in `frontend/src/utils/tenant.ts`, che è ciò che tiene i segreti fuori da `localStorage`. Presidio: `src/comunicazioniCanali.test.ts`.
+   - **Le credenziali dei canali non passano dal browser** (§35): l'invio email, l'invio WhatsApp e la lettura della posta in arrivo sono tre rotte del backend (`/comunicazioni/*`), e il browser manda solo destinatario, oggetto e testo. Una funzione serverless che spedisce va chiusa con un segreto condiviso (`EMAIL_RELAY_SECRET`, header `x-bluman-relay`) e senza intestazioni CORS: con `Access-Control-Allow-Origin: *` più il ripiego su `process.env.SMTP_PASS`, qualunque pagina aperta nel browser di chiunque poteva spedire a nome dello studio.
    - L'isolamento multi-tenant garantisce che uno studio non possa in alcun modo visualizzare né accedere ai dati, alla posta o ai contratti di un altro studio.
 
 7. **Il Frontend Non Inventa Dati che il Database Non Ha**:

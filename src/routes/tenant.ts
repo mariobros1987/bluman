@@ -11,7 +11,7 @@ import type { FastifyInstance } from 'fastify';
 import { prisma, prismaAmministrativo } from '../util/prismaClient.js';
 import { generaPasswordTemporanea, hashPassword } from '../util/password.js';
 import { rifirmaUrlUpload } from '../services/storageService.js';
-import { verifyAndSendTestSmtp, verifyRealImap, createTransporter } from '../services/emailService.js';
+import { verifyAndSendTestSmtp, verifyRealImap, createTransporter, sendInvitoCollaboratoreEmail } from '../services/emailService.js';
 import { credenzialiCanali } from '../services/otpDispatch.js';
 import { inMemoryTenantStore, recordAudit, senzaHash } from '../util/serverHelpers.js';
 
@@ -29,6 +29,41 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
     const logoUrl = (tenant as any).logoUrl;
     if (typeof logoUrl !== 'string') return tenant;
     return { ...(tenant as any), logoUrl: rifirmaUrlUpload(logoUrl) };
+  }
+
+  /**
+   * Le credenziali dello studio che il browser non deve ricevere.
+   *
+   * `GET /tenant/info` restituiva la riga Tenant intera, quindi la password SMTP, la password
+   * IMAP, l'access token di Meta e il token del bot Telegram arrivavano in chiaro nella
+   * risposta — e `SettingsPage` li salvava in `localStorage`. Chiunque potesse leggere quella
+   * risposta o quello spazio di archiviazione (un'estensione del browser, un computer condiviso,
+   * un XSS) poteva spedire come lo studio (regola 6).
+   */
+  const CHIAVI_SEGRETE = ['smtpPass', 'imapPass', 'waAccessToken', 'waVerifyToken', 'tgBotToken'] as const;
+
+  /**
+   * Sostituisce i segreti con la stringa vuota e aggiunge `<chiave>Impostata: boolean`.
+   *
+   * Il flag serve all'interfaccia: senza di esso il campo password vuoto sarebbe
+   * indistinguibile da «nessuna password salvata», e l'operatore la reinserirebbe ogni volta
+   * temendo di averla perduta.
+   */
+  function senzaSegreti<T>(tenant: T): T {
+    if (!tenant || typeof tenant !== 'object') return tenant;
+    const copia: Record<string, any> = { ...(tenant as any) };
+    for (const chiave of CHIAVI_SEGRETE) {
+      if (chiave in copia) {
+        copia[`${chiave}Impostata`] = Boolean(copia[chiave]);
+        copia[chiave] = '';
+      }
+    }
+    return copia as T;
+  }
+
+  /** Quello che esce verso il browser: logo rifirmato e credenziali mascherate. */
+  function tenantPubblico<T>(tenant: T): T {
+    return senzaSegreti(conFirmaLogo(tenant));
   }
 
   server.get('/tenant/info', async (req) => {
@@ -52,7 +87,7 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
           },
         });
       }
-      return conFirmaLogo(tenant);
+      return tenantPubblico(tenant);
     } catch {
       if (!inMemoryTenantStore.has(tenantId)) {
         inMemoryTenantStore.set(tenantId, {
@@ -62,7 +97,7 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
           stato: 'attivo',
         });
       }
-      return conFirmaLogo(inMemoryTenantStore.get(tenantId));
+      return tenantPubblico(inMemoryTenantStore.get(tenantId));
     }
   });
 
@@ -96,6 +131,17 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
           sanitizedData[key] = rawBody[key] ? Number(rawBody[key]) : null;
         } else if (key === 'smtpSecure' || key === 'imapSecure' || key === 'mostraSdi' || key === 'mostraIva') {
           sanitizedData[key] = Boolean(rawBody[key]);
+        } else if ((CHIAVI_SEGRETE as readonly string[]).includes(key)) {
+          // Il browser riceve i segreti mascherati (stringa vuota) da `GET /tenant/info`: se
+          // li rimandasse indietro tali e quali, il salvataggio delle impostazioni
+          // cancellerebbe la password SMTP vera — cioè premere «Salva» dopo aver cambiato la
+          // ragione sociale spegnerebbe la posta in uscita dello studio.
+          // Stringa vuota = «non toccare»; `null` esplicito = «cancella».
+          if (rawBody[key] === null) {
+            sanitizedData[key] = null;
+          } else if (typeof rawBody[key] !== 'string' || rawBody[key].trim() !== '') {
+            sanitizedData[key] = rawBody[key];
+          }
         } else {
           sanitizedData[key] = rawBody[key];
         }
@@ -121,13 +167,13 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
         entita: 'Anagrafica Studio & Impostazioni',
         dettagli: `Aggiornati e sincronizzati su DB Supabase tutti i parametri dello studio: ${sanitizedData.ragioneSociale || tenantId}`,
       });
-      return reply.send(conFirmaLogo(updated));
+      return reply.send(tenantPubblico(updated));
     } catch (err) {
       console.warn('Prisma tenant upsert fallback to inMemory store:', err);
       const current = inMemoryTenantStore.get(tenantId) || { id: tenantId };
       const updated = { ...current, ...sanitizedData, id: tenantId };
       inMemoryTenantStore.set(tenantId, updated);
-      return reply.send(conFirmaLogo(updated));
+      return reply.send(tenantPubblico(updated));
     }
   });
 
@@ -250,9 +296,39 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
         ipAddress: req.ip,
       });
 
+      // L'invito con la password temporanea parte da qui, nella stessa richiesta che l'ha
+      // generata. Prima lo spediva il browser: la risposta tornava alla pagina, che rigirava
+      // la password appena creata alla funzione serverless pubblica insieme alla password SMTP
+      // dello studio letta da `localStorage`. Se l'operatore chiudeva la schermata nel
+      // frattempo, l'utente restava creato e nessuno conosceva la sua password.
+      let invitoInviato = false;
+      let invitoErrore: string | null = null;
+      if (passwordTemporanea) {
+        const cred = await credenzialiCanali(tenantCorrente);
+        if (!cred.smtp.host || !cred.smtp.user) {
+          invitoErrore =
+            'Posta in uscita non configurata nelle impostazioni dello studio: la password temporanea va consegnata a mano.';
+        } else {
+          const esito = await sendInvitoCollaboratoreEmail({
+            toEmail: emailPulita,
+            nome,
+            ruolo: ruoloFinale,
+            specializzazione: specializzazione || undefined,
+            passwordTemporanea,
+            smtp: cred.smtp,
+            fromEmail: cred.smtpFromEmail ?? undefined,
+            fromName: cred.smtpFromName ?? undefined,
+          });
+          invitoInviato = esito.ok;
+          // Nessun «invito inviato» quando non è partito: la password resta nella risposta,
+          // così il responsabile la può consegnare comunque (regola 7).
+          invitoErrore = esito.ok ? null : esito.errore || 'Invio non riuscito.';
+        }
+      }
+
       // passwordTemporanea è l'unico momento in cui la password è leggibile: non viene
       // salvata in chiaro né rispedita da nessun altro endpoint.
-      return reply.code(201).send({ ...senzaHash(utente), passwordTemporanea });
+      return reply.code(201).send({ ...senzaHash(utente), passwordTemporanea, invitoInviato, invitoErrore });
     } catch (err: any) {
       // P2002 = vincolo di unicità sull'email. Ci si arriva quando la riga esiste ma RLS
       // l'ha nascosta alla `findUnique` qui sopra, perché appartiene a un altro studio o
@@ -440,7 +516,7 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
         ipAddress: req.ip,
       });
 
-      return reply.code(201).send({ ...tenant, passwordTemporanea });
+      return reply.code(201).send({ ...senzaSegreti(tenant), passwordTemporanea });
     } catch (err: any) {
       return reply.code(500).send({ errore: err.message || 'Errore creazione tenant' });
     }
@@ -465,7 +541,7 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
           // POST /admin/tenants/:id/reset-password, che ne salva solo l'hash.
         }
       });
-      return reply.send(updated);
+      return reply.send(senzaSegreti(updated));
     } catch (err: any) {
       return reply.code(500).send({ errore: err.message || 'Errore aggiornamento tenant' });
     }
@@ -475,8 +551,13 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
    * Rigenera la password del responsabile dello studio e la restituisce una volta sola,
    * perché il super admin possa consegnarla. Sostituisce la vecchia pratica di rileggere
    * `leadAdvisorPassword` dal database, che presupponeva di averla conservata in chiaro.
+   *
+   * Con `invia: true` la spedisce anche per email, da qui. Prima l'invio lo faceva la pagina
+   * super admin chiamando `POST /api/send-email` senza nessuna credenziale nel corpo: la
+   * funzione serverless ripiegava su `process.env.SMTP_PASS`, cioè su un unico account valido
+   * per qualunque chiamante — e chiunque, non solo il super admin, poteva chiamarla.
    */
-  server.post<{ Params: { id: string } }>('/admin/tenants/:id/reset-password', async (req, reply) => {
+  server.post<{ Params: { id: string }; Body?: { invia?: boolean } }>('/admin/tenants/:id/reset-password', async (req, reply) => {
     if (!soloSuperAdmin(req, reply)) return reply;
     const { id } = req.params;
     try {
@@ -517,7 +598,32 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
         ipAddress: req.ip,
       });
 
-      return reply.send({ ok: true, email: emailResponsabile, passwordTemporanea });
+      // Le credenziali di posta sono quelle dello studio destinatario quando le ha
+      // configurate; in mancanza `credenzialiCanali` ricade sull'ambiente, che sulla
+      // piattaforma è l'account con cui si spediscono gli inviti.
+      let invitoInviato = false;
+      let invitoErrore: string | null = null;
+      if (req.body?.invia) {
+        const cred = await credenzialiCanali(id);
+        if (!cred.smtp.host || !cred.smtp.user) {
+          invitoErrore = 'Posta in uscita non configurata: consegna la password a mano.';
+        } else {
+          const esito = await sendInvitoCollaboratoreEmail({
+            toEmail: emailResponsabile,
+            nome: tenant.leadAdvisorNome || 'Gestore Studio',
+            ruolo: 'partner',
+            specializzazione: `Lead Senior Advisor — ${tenant.ragioneSociale}`,
+            passwordTemporanea,
+            smtp: cred.smtp,
+            fromEmail: cred.smtpFromEmail ?? undefined,
+            fromName: cred.smtpFromName ?? tenant.ragioneSociale ?? undefined,
+          });
+          invitoInviato = esito.ok;
+          invitoErrore = esito.ok ? null : esito.errore || 'Invio non riuscito.';
+        }
+      }
+
+      return reply.send({ ok: true, email: emailResponsabile, passwordTemporanea, invitoInviato, invitoErrore });
     } catch (err: any) {
       return reply.code(500).send({ errore: err.message || 'Errore reset password' });
     }

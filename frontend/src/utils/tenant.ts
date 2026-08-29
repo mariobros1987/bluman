@@ -229,18 +229,49 @@ export function getStudioInfoForTenant(tenantId?: string): StudioInfo {
 }
 
 /**
+ * Chiavi che non devono MAI finire in localStorage (regola 6 di ISTRUZIONI_PER_IA.md):
+ * il localStorage è leggibile da qualunque script della pagina e sopravvive al logout.
+ * Le credenziali dello studio stanno solo nella riga Tenant del database; il backend le
+ * restituisce già vuote con il flag `<chiave>Impostata`.
+ */
+export const CHIAVI_SEGRETE_TENANT = [
+  'smtpPass',
+  'imapPass',
+  'waAccessToken',
+  'waVerifyToken',
+  'tgBotToken',
+] as const;
+
+/** Copia dell'oggetto tenant senza i valori delle credenziali. */
+export function senzaSegretiTenant<T>(data: T): T {
+  if (!data || typeof data !== 'object') return data;
+  const copia: Record<string, any> = { ...(data as any) };
+  for (const chiave of CHIAVI_SEGRETE_TENANT) {
+    if (chiave in copia) {
+      copia[`${chiave}Impostata`] = Boolean(copia[`${chiave}Impostata`] ?? copia[chiave]);
+      delete copia[chiave];
+    }
+  }
+  return copia as T;
+}
+
+/**
  * Salva i dati di configurazione del Tenant in modo persistente e isolato
  */
 export function saveTenantInfoToStorage(tenantId: string, data: any) {
   try {
-    localStorage.setItem(getTenantStorageKey('bluman_tenant_info', tenantId), JSON.stringify(data));
-    if (data.logoUrl) {
-      localStorage.setItem(getTenantStorageKey('bluman_logo_url', tenantId), data.logoUrl);
+    const pulito = senzaSegretiTenant(data) as any;
+    localStorage.setItem(
+      getTenantStorageKey('bluman_tenant_info', tenantId),
+      JSON.stringify(pulito),
+    );
+    if (pulito.logoUrl) {
+      localStorage.setItem(getTenantStorageKey('bluman_logo_url', tenantId), pulito.logoUrl);
     }
     if (TENANT_STUDIOS[tenantId]) {
       TENANT_STUDIOS[tenantId] = {
         ...TENANT_STUDIOS[tenantId],
-        ...data,
+        ...pulito,
       };
     }
     const customTenantsStr = localStorage.getItem('bluman_all_tenants_admin');

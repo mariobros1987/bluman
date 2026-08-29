@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { fetchComunicazioniApi, inviaComunicazioneApi, fetchClienti, sendWhatsAppDirectApi, sendEmailDirectApi, fetchInboundImapEmailsApi, fetchTenantInfoApi } from '../api/client';
 import { downloadGuidePdf } from '../utils/pdfGenerator';
 import { getCurrentTenantId, getTenantStorageKey, getStudioInfoForTenant, BLUECODE_TENANT_ID } from '../utils/tenant';
@@ -194,8 +194,16 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
   const [loadingMsgs, setLoadingMsgs] = useState(false);
   const [inviando, setInviando] = useState(false);
   const [feedback, setFeedback] = useState<{ tipo: 'ok' | 'err'; testo: string } | null>(null);
+  // §35 — la lettura IMAP passa dal backend e apre una connessione alla casella dello studio:
+  // farla a ogni giro del polling da 5 s significherebbe una sessione IMAP ogni 5 secondi per
+  // ogni scheda aperta. I messaggi già salvati si rileggono a 5 s, la posta in arrivo a 60 s.
+  const ultimaLetturaImap = useRef(0);
+  const [erroreImap, setErroreImap] = useState<string | null>(null);
 
-  const loadComunicazioni = async () => {
+  const loadComunicazioni = async (opzioni: { conImap?: boolean } = {}): Promise<string | null> => {
+    // Restituisce il motivo per cui la posta in arrivo non è stata letta (null se tutto ok):
+    // il chiamante non può leggerlo dallo stato, che nella sua closure è ancora quello vecchio.
+    let motivoImap: string | null = null;
     setLoadingMsgs(true);
     try {
       // 1. Recupero messaggi già salvati su DB Fastify / Supabase
@@ -216,8 +224,16 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
 
       // 2. Ingestion Live IMAP: Controlla risposte reali arrivate alla casella di posta
       const targetEmail = customDestEmail.trim() || contactInfo.email;
-      const inboundEmails = await fetchInboundImapEmailsApi(targetEmail);
-      if (Array.isArray(inboundEmails) && inboundEmails.length > 0) {
+      const adesso = Date.now();
+      const imapDaFare = opzioni.conImap !== false && adesso - ultimaLetturaImap.current >= 60000;
+      if (imapDaFare) {
+        ultimaLetturaImap.current = adesso;
+        // La rotta risponde `{ ok, email, errore }`: quando la casella non è configurata o il
+        // login fallisce il motivo si mostra, non si finge una casella vuota (regola 7).
+        const esito = await fetchInboundImapEmailsApi(targetEmail);
+        motivoImap = esito.ok ? null : (esito.errore || 'Lettura della posta in arrivo non riuscita.');
+        setErroreImap(motivoImap);
+        const inboundEmails = Array.isArray(esito.email) ? esito.email : [];
         for (const mail of inboundEmails) {
           const alreadyExists = currentList.some(
             m => m.testo?.trim() === mail.text?.trim() || m.id === mail.id
@@ -252,8 +268,11 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
         setMessaggi(currentList);
         localStorage.setItem(`bluman_msgs_${progettoId}`, JSON.stringify(currentList));
       }
-    } catch {}
+    } catch (err) {
+      motivoImap = motivoImap || `Sincronizzazione non riuscita: ${err instanceof Error ? err.message : 'errore di rete'}.`;
+    }
     setLoadingMsgs(false);
+    return motivoImap;
   };
 
   useEffect(() => {
@@ -317,7 +336,8 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
         testo: testoDaInviare,
       });
 
-      // 2. Se Email, invio reale tramite Serverless SMTP Nodemailer
+      // 2. Se Email, invio reale tramite la rotta autenticata POST /comunicazioni/invia-email
+      //    (§35: le credenziali SMTP le legge il backend dalla riga Tenant, il browser non le vede)
       if (canaleSelezionato === 'email') {
         // Qui il ripiego era la casella dello studio: senza email in anagrafica il messaggio
         // destinato al cliente arrivava allo studio stesso, e il riscontro diceva «recapitata
@@ -339,7 +359,8 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
           setFeedback({ tipo: 'err', testo: `❌ Errore Invio Email: ${res?.errore || 'Verifica la password SMTP in Impostazioni'}` });
         }
       } else if (canaleSelezionato === 'whatsapp') {
-        // 3. Se WhatsApp, dispatch sicuro tramite Vercel Serverless Function (No CORS)
+        // 3. Se WhatsApp, dispatch tramite POST /comunicazioni/invia-whatsapp: il token Meta
+        // e il phone id sono quelli dello studio corrente, non variabili d'ambiente condivise.
         // Il numero era `|| '393335936278'`: senza cellulare in anagrafica il messaggio del
         // cliente partiva verso un numero scritto nel codice. E quando l'invio falliva, il
         // ripiego spediva il template di esempio `hello_world` e annunciava «Notifica
@@ -460,9 +481,16 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
           ))}
           <button
             onClick={async () => {
-              setLoadingMsgs(true);
-              await loadComunicazioni();
-              setFeedback({ tipo: 'ok', testo: '✓ Sincronizzazione completata con successo: chat e fascicolo aggiornati in tempo reale!' });
+              // Il pulsante manuale forza la lettura della casella (azzera la finestra dei
+              // 60 s) e riporta l'esito vero: prima diceva sempre «sincronizzazione
+              // completata», anche quando la posta in arrivo non era stata letta (regola 7).
+              ultimaLetturaImap.current = 0;
+              const motivo = await loadComunicazioni({ conImap: true });
+              if (motivo) {
+                setFeedback({ tipo: 'err', testo: `Messaggi del fascicolo aggiornati, posta in arrivo no: ${motivo}` });
+              } else {
+                setFeedback({ tipo: 'ok', testo: '✓ Sincronizzazione completata: registro del fascicolo e posta in arrivo aggiornati.' });
+              }
               setTimeout(() => setFeedback(null), 3500);
             }}
             disabled={loadingMsgs}
@@ -685,9 +713,9 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
                   setFeedback({ tipo: 'ok', testo: `Invio notifica WhatsApp in corso verso ${contactInfo.whatsapp}...` });
                   const res = await sendWhatsAppDirectApi(cleanPhone, '', 'hello_world');
                   if (res && res.success) {
-                    setFeedback({ tipo: 'ok', testo: `✓ Notifica WhatsApp di Prova recapitata al numero ${contactInfo.whatsapp}!` });
+                    setFeedback({ tipo: 'ok', testo: `✓ Template di prova «hello_world» accettato da Meta per il numero ${contactInfo.whatsapp}.` });
                   } else {
-                    setFeedback({ tipo: 'err', testo: `Impossibile recapitare notifica: ${res?.error?.message || 'Verifica connessione'}` });
+                    setFeedback({ tipo: 'err', testo: `Test WhatsApp non riuscito verso ${contactInfo.whatsapp}: ${res?.errore || 'motivo non riportato'}` });
                   }
                   setTimeout(() => setFeedback(null), 4000);
                 }}
@@ -707,6 +735,20 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
             )}
           </div>
         </div>
+
+        {erroreImap && (
+          <div style={{
+            padding: '9px 14px',
+            borderRadius: 8,
+            fontSize: 11.5,
+            fontWeight: 600,
+            background: '#3b2a11',
+            color: '#fbbf24',
+            border: '1px solid #b45309',
+          }}>
+            ⚠️ Posta in arrivo non leggibile: {erroreImap} Le risposte del cliente potrebbero non comparire in questo registro finché la casella IMAP non è configurata in Impostazioni Studio.
+          </div>
+        )}
 
         {feedback && (
           <div style={{
