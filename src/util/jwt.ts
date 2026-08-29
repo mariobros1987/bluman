@@ -39,6 +39,12 @@ export interface JwtPayload {
   email: string;
   ruolo: 'super_admin' | 'advisor' | 'collaboratore_interno' | 'collaboratore_esterno' | 'cliente';
   exp?: number;
+  // Fase 3 FEA (misura 3) — certificato di sessione. `iat` è il momento del login, `sid`
+  // l'id univoco della sessione: entrambi finiscono nel digest del sigillo di firma.
+  // Additivi e opzionali: il login operatore non li porta, e i token già emessi senza
+  // restano validi. `signJwt` li propaga con lo spread del payload.
+  iat?: number;
+  sid?: string;
 }
 
 export function signJwt(payload: Omit<JwtPayload, 'exp'>, expiresInMinutes = 60): string {

@@ -7,6 +7,7 @@
 // e l'hook auth onRequest continuano ad applicarsi esattamente come prima
 // (stesso contesto di incapsulamento, nessuna nuova barriera).
 
+import crypto from 'crypto';
 import type { FastifyInstance } from 'fastify';
 import { prisma, prismaAmministrativo, attivaContestoTenant } from '../util/prismaClient.js';
 import { signJwt, verifyJwt, hashMagicToken } from '../util/jwt.js';
@@ -155,11 +156,17 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
     // Il tenant viene dalla riga del cliente, non da una costante: era il secondo guasto di
     // questo endpoint, che firmava sempre il tenant di default qualunque cliente fosse.
     const identitaPortale = `client-${link.clienteId}`;
+    // Fase 3 FEA (misura 3) — certificato di sessione. Ogni login del cliente genera un
+    // session id univoco e registra il momento dell'accesso (`iat`): entrambi finiscono
+    // nel digest del sigillo FEA, a dimostrare che firma e login appartengono alla
+    // stessa sessione verificata. Il login operatore non li porta.
     const token = signJwt({
       userId: identitaPortale,
       tenantId: link.cliente.tenantId,
       email: emailCliente,
       ruolo: 'cliente',
+      sid: crypto.randomUUID(),
+      iat: Math.floor(Date.now() / 1000),
     }, DURATA_SESSIONE_CLIENTE_MINUTI);
 
     await recordAudit({
@@ -226,11 +233,14 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
 
     const emailCliente = cliente.email || cleanEmail;
     const identitaPortale = `client-${cliente.id}`;
+    // Fase 3 FEA (misura 3) — sid/iat come nel magic-login: stesso certificato di sessione.
     const token = signJwt({
       userId: identitaPortale,
       tenantId: cliente.tenantId,
       email: emailCliente,
       ruolo: 'cliente',
+      sid: crypto.randomUUID(),
+      iat: Math.floor(Date.now() / 1000),
     }, DURATA_SESSIONE_CLIENTE_MINUTI);
 
     await recordAudit({

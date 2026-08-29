@@ -314,6 +314,14 @@ export interface SigilloFea {
   userAgent: string | null;
   canaleVerificato: string;
   standard: string;
+  // Fase 3 FEA (misura 3) — certificato di sessione: null quando la firma non proviene
+  // dal flusso FEA o la sessione non li porta (token emessi prima della Fase 3).
+  sessionId: string | null;
+  loginAt: Date | null;
+  // Fase 3 FEA (misura 1) — documento di riconoscimento caricato una tantum dal
+  // firmatario. Raccomandato, non obbligatorio: quando presente l'hash entra nel digest.
+  docRiconoscimentoHash: string | null;
+  docRiconoscimentoTipo: string | null;
 }
 
 /**
@@ -324,6 +332,15 @@ export interface SigilloFea {
  */
 export const STANDARD_SES =
   'Firma Elettronica Semplice (SES) · art. 20 CAD — eIDAS UE 910/2014 art. 3 n. 10';
+
+/**
+ * Fase 3 FEA — standard della firma avanzata misurata: OTP su recapito verificato +
+ * grafometrica obbligatoria + sessione portale certificata nel digest + firmatario
+ * identificato fra i nomi ammessi dall'anagrafica (art. 25 CAD / eIDAS art. 3 n. 2).
+ * Scrivibile SOLO dal flusso OTP misurato di verify-otp-and-sign, mai dal canale file.
+ */
+export const STANDARD_FEA =
+  'Firma Elettronica Avanzata (FEA) · art. 25 CAD — eIDAS UE 910/2014 art. 3 n. 2';
 
 /** Prefisso del signatureId per valore legale: l'id dichiara cosa il sigillo attesta. */
 const PREFISSI_SIGNATURE_ID: Record<'ses' | 'fea' | 'feq', string> = {
@@ -355,15 +372,29 @@ export function creaSigilloFea(params: {
   canaleVerificato: string;
   standard?: string;
   valoreLegale?: 'ses' | 'fea' | 'feq';
+  // Fase 3 FEA — misura 3 (sessione) e misura 1 (doc di riconoscimento). Tutti opzionali:
+  // le chiamate SES esistenti non li passano e i loro sigilli restano identici a prima.
+  sessionId?: string | null;
+  loginAt?: Date | null;
+  docRiconoscimentoHash?: string | null;
+  docRiconoscimentoTipo?: string | null;
 }): SigilloFea {
   const timestampIso = new Date().toISOString();
   const ipAddress = params.ip && params.ip.trim() ? params.ip.trim() : null;
   const valoreLegale = params.valoreLegale ?? 'ses';
   const standard = params.standard || STANDARD_SES;
+  const sessionId = params.sessionId && params.sessionId.trim() ? params.sessionId.trim() : null;
+  const loginAt = params.loginAt instanceof Date ? params.loginAt : null;
+  const docRiconoscimentoHash =
+    params.docRiconoscimentoHash && params.docRiconoscimentoHash.trim()
+      ? params.docRiconoscimentoHash.trim()
+      : null;
 
   // L'impronta del sigillo lega insieme tutti gli elementi del verbale: cambiarne uno a
-  // posteriori la invalida. `ipAddress` entra come 'non-registrato' quando manca, così il
-  // digest resta calcolabile e la sua assenza è essa stessa parte di ciò che è firmato.
+  // posteriori la invalida. Ogni elemento assente entra come 'non-registrato', così il
+  // digest resta calcolabile e la sua assenza è essa stessa parte di ciò che è firmato
+  // (stesso principio già usato per `ipAddress`). Fase 3: la sessione portale e l'hash
+  // del documento di riconoscimento del firmatario entrano nel payload.
   const payload = [
     params.clienteId,
     params.signerName,
@@ -372,6 +403,9 @@ export function creaSigilloFea(params: {
     timestampIso,
     ipAddress ?? 'non-registrato',
     params.canaleVerificato,
+    sessionId ?? 'non-registrato',
+    loginAt ? loginAt.toISOString() : 'non-registrato',
+    docRiconoscimentoHash ?? 'non-registrato',
   ].join('|');
 
   return {
@@ -385,5 +419,9 @@ export function creaSigilloFea(params: {
     userAgent: params.userAgent && params.userAgent.trim() ? params.userAgent.trim() : null,
     canaleVerificato: params.canaleVerificato,
     standard,
+    sessionId,
+    loginAt,
+    docRiconoscimentoHash,
+    docRiconoscimentoTipo: docRiconoscimentoHash ? params.docRiconoscimentoTipo || null : null,
   };
 }

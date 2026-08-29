@@ -4,9 +4,10 @@
  * Tre sono i livelli di valore legale che l'operatore può richiedere per un documento:
  * - `ses` — Firma Elettronica Semplice (art. 20 CAD, eIDAS art. 3 n. 10): il flusso OTP
  *   attuale la soddisfa;
- * - `fea` — Firma Elettronica Avanzata (eIDAS art. 26): finché la Fase 3 del piano non
- *   porta le misure di identificazione del firmatario, nessun flusso del portale la
- *   produce — il documento non è firmabile e la risposta onesta è il blocco;
+ * - `fea` — Firma Elettronica Avanzata (eIDAS art. 26): dalla Fase 3 del piano la produce
+ *   il flusso OTP misurato del portale (identificazione del firmatario + grafometrica
+ *   obbligatoria + sessione certificata); sul canale file la produce anche la firma
+ *   qualificata esterna del cliente, che è un valore legale superiore;
  * - `feq` — Firma Elettronica Qualificata (eIDAS art. 25): oggi si ottiene solo con il
  *   provider esterno del cliente (`qualificata_esterna` su /portal/firma-con-file).
  *
@@ -76,8 +77,11 @@ export type EsitoLivelloFirma =
  * risorse (codici OTP, upload, scritture). Nessuna degradazione silenziosa a SES.
  *
  * - `ses` → tutto come oggi, su entrambe le rotte;
- * - `fea` → 409 su entrambe le rotte: finché la Fase 3 non esiste, un documento `fea`
- *   non è firmabile dal portale (è la risposta onesta del piano);
+ * - `fea` → consentito sul canale OTP: lo produce il flusso misurato della Fase 3
+ *   (verify-otp-and-sign con grafometrica obbligatoria e sessione certificata nel
+ *   digest). Sul canale `file` è ammessa la `qualificata_esterna` — un valore legale
+ *   superiore soddisfa anche un'esigenza inferiore — mentre la scansione autografa
+ *   (`manuale_scansionata`) resta insufficiente;
  * - `feq` → 409 sulla rotta OTP; su `firma-con-file` è ammessa SOLO la
  *   `qualificata_esterna` (l'unico modo attuale di ottenere FEQ), mentre la scansione
  *   autografa (`manuale_scansionata`) resta insufficiente.
@@ -93,13 +97,24 @@ export function verificaLivelloFirma(params: {
   if (livelloRichiesto === 'ses') return { consentito: true, livelloRichiesto };
 
   if (livelloRichiesto === 'fea') {
+    // Canale OTP: la produce il flusso misurato della Fase 3 — in verify-otp-and-sign
+    // la grafometrica diventa obbligatoria per questo livello e la sessione certificata
+    // (sid/iat) entra nel digest del sigillo.
+    if (params.canale === 'otp') {
+      return { consentito: true, livelloRichiesto };
+    }
+    // Canale file: la firma qualificata esterna vale più della FEA e soddisfa anche
+    // un'esigenza inferiore; la sottoscrizione autografa scansionata no.
+    if (params.tipoFirma === 'qualificata_esterna') {
+      return { consentito: true, livelloRichiesto };
+    }
     return {
       consentito: false,
       livelloRichiesto,
       codice: 409,
       errore:
-        'Questo documento richiede Firma Elettronica Avanzata: il flusso OTP semplice non è sufficiente. ' +
-        'Contatta lo studio per concordare la modalità di sottoscrizione.',
+        'Questo documento richiede Firma Elettronica Avanzata: la sottoscrizione autografa scansionata non è sufficiente. ' +
+        'Firma dal portale con il flusso OTP completo, oppure con il tuo provider di firma digitale e carica il file firmato.',
     };
   }
 

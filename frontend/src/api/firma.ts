@@ -32,6 +32,12 @@ export async function canaliFirmaApi(clienteId?: string): Promise<{
   canalePreferito: CanaleOtp | null;
   canali: CanaleFirma[];
   botTelegram: string | null;
+  /**
+   * Fase 3 FEA (misura 1) — l'elenco chiuso dei firmatari che l'anagrafica ammette
+   * (nome del cliente o legale rappresentante in referentiJson). Il server lo espone
+   * per offrirlo come scelta nel selettore, e lo fa rispettare in tutte le rotte di firma.
+   */
+  firmatariAmmessi: string[];
 }> {
   const query = clienteId ? `?clienteId=${encodeURIComponent(clienteId)}` : '';
   const res = await fetchWithTimeout(`${API_BASE}/portal/canali-firma${query}`, { headers: getAuthHeaders() });
@@ -102,6 +108,14 @@ export async function verifyPortalOtpAndSignApi(input: {
   clienteId?: string;
   /** Grafometrica raccolta dopo l'OTP, allegata al sigillo. */
   firmaGrafometricaPng?: string;
+  /**
+   * Fase 3 FEA (misura 1) — documento di riconoscimento caricato una tantum dal
+   * firmatario (data URL base64). Raccomandato per la FEA, non obbligatorio: quando
+   * presente il server lo scandisce, ne calcola l'hash e lo lega al digest del sigillo.
+   */
+  docRiconoscimentoBase64?: string;
+  /** Tipo dichiarato del documento (per il verbale, es. "Carta d'identità"). */
+  docRiconoscimentoTipo?: string;
 }): Promise<{ ok: boolean; seal: SigilloFirma; progettoAttivato: string | null; message: string }> {
   const res = await fetchWithTimeout(
     `${API_BASE}/portal/verify-otp-and-sign`,

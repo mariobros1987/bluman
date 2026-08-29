@@ -53,13 +53,33 @@ export interface DatiVerbaleFirma {
    * mancare: si normalizza su 'ses', che è il valore che hanno sempre avuto.
    */
   valoreLegale?: string | null;
+  // Fase 3 FEA (misura 3) — certificato di sessione: null quando la firma non proviene
+  // dal flusso FEA del portale (firme SES, canale file, righe pre-Fase 3).
+  sessionId?: string | null;
+  /** Momento del login del firmatario sul portale (claim `iat` del token di sessione). */
+  loginAt?: Date | string | null;
+  // Fase 3 FEA (misura 1) — documento di riconoscimento caricato una tantum dal
+  // firmatario: quando presente l'hash è entrato nel digest del sigillo.
+  docRiconoscimentoHash?: string | null;
+  docRiconoscimentoTipo?: string | null;
 }
 
-/** Descrizione in chiaro del tipo di firma: il valore tecnico da solo non parla. */
-export function descrizioneTipoFirma(tipoFirma: string): string {
+/**
+ * Descrizione in chiaro del tipo di firma: il valore tecnico da solo non parla.
+ *
+ * `valoreLegale` è opzionale per retrocompatibilità (le chiamate e i test esistenti
+ * passano solo il meccanismo): senza di esso `fea_otp` continua a dichiararsi SES,
+ * che è il valore che tutte le firme storiche di quel tipo hanno sempre avuto.
+ * Fase 3: lo stesso meccanismo `fea_otp`, percorso dal flusso misurato (grafometrica
+ * obbligatoria + sessione certificata + firmatario identificato), produce FEA — e il
+ * verbale deve dichiarare il valore effettivo scritto dal server, non il meccanismo.
+ */
+export function descrizioneTipoFirma(tipoFirma: string, valoreLegale?: string | null): string {
   switch (tipoFirma) {
     case 'fea_otp':
-      return 'Firma Elettronica Semplice con codice OTP monouso verificato · art. 20 CAD';
+      return valoreLegale === 'fea'
+        ? 'Firma Elettronica Avanzata con codice OTP monouso verificato, firma grafica e sessione certificata · eIDAS art. 26 / art. 25 CAD'
+        : 'Firma Elettronica Semplice con codice OTP monouso verificato · art. 20 CAD';
     case 'manuale_scansionata':
       return 'Sottoscrizione autografa su carta, scansionata e ricaricata dal firmatario';
     case 'qualificata_esterna':
@@ -163,10 +183,18 @@ export function generaPdfVerbaleFirma(dati: DatiVerbaleFirma): Promise<Buffer> {
   riga(doc, 'Nome e cognome', dati.firmatarioNome);
   if (dati.firmatarioRuolo) riga(doc, 'Ruolo dichiarato', dati.firmatarioRuolo);
   if (dati.clienteNome) riga(doc, 'Cliente', dati.clienteNome);
+  // Fase 3 FEA — documento di riconoscimento: citato solo se davvero caricato, stesso
+  // principio delle righe condizionali qui sopra. Le firme SES e quelle storiche non
+  // lo hanno, e la sua assenza non va scritta come "non registrato" in un verbale che
+  // non lo richiede: si omette, come per l'OTP.
+  if (dati.docRiconoscimentoHash) {
+    riga(doc, 'Documento di riconoscimento', dati.docRiconoscimentoTipo || 'caricato dal firmatario');
+    riga(doc, 'Impronta SHA-256 documento di riconoscimento', dati.docRiconoscimentoHash.toLowerCase());
+  }
 
   // Modalità di firma
   sezione(doc, 'Modalità di sottoscrizione');
-  riga(doc, 'Tipo di firma', descrizioneTipoFirma(dati.tipoFirma));
+  riga(doc, 'Tipo di firma', descrizioneTipoFirma(dati.tipoFirma, dati.valoreLegale));
   riga(doc, 'Standard di riferimento', dati.standard);
   // Il valore legale è quello effettivo scritto dal server (vincolo 7), mai dichiarato dal
   // firmatario: normalizzato perché le firme pre-migrazione possono non avere il campo.
@@ -178,6 +206,13 @@ export function generaPdfVerbaleFirma(dati: DatiVerbaleFirma): Promise<Buffer> {
   riga(doc, 'Data e ora (UTC)', formattaData(dati.timestampIso));
   riga(doc, 'Indirizzo IP', dati.ipAddress ?? 'non registrato');
   riga(doc, 'User agent', dati.userAgent ?? 'non registrato');
+  // Fase 3 FEA (misura 3) — certificato di sessione: lega la firma al login verificato
+  // dello stesso firmatario. Solo per le firme prodotte dal flusso misurato del portale;
+  // per le SES e le storiche la coppia non esiste e si omette.
+  if (dati.sessionId) {
+    riga(doc, 'Sessione portale certificata', dati.sessionId);
+    riga(doc, 'Momento del login del firmatario', formattaData(dati.loginAt));
+  }
   riga(doc, 'Impronta SHA-256 del sigillo', dati.sha256Digest.toLowerCase());
 
   // Sezione OTP — solo se un codice è stato davvero usato: per manuale_scansionata e

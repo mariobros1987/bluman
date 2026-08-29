@@ -95,20 +95,31 @@ describe('verificaLivelloFirma — enforcement §3.2', () => {
     });
   });
 
-  it('fea → 409 su ENTRAMBE le rotte: finché la Fase 3 non esiste, il portale non produce FEA', () => {
-    const esitoOtp = verificaLivelloFirma({ livelloRichiesto: 'fea', canale: 'otp' });
-    const esitoFile = verificaLivelloFirma({
+  it('fea + OTP → consentito: lo produce il flusso misurato della Fase 3 (grafometrica obbligatoria + sessione certificata nel digest)', () => {
+    expect(verificaLivelloFirma({ livelloRichiesto: 'fea', canale: 'otp' })).toEqual({
+      consentito: true,
+      livelloRichiesto: 'fea',
+    });
+  });
+
+  it('fea + file + qualificata_esterna → consentito: un valore legale superiore soddisfa anche un\'esigenza inferiore', () => {
+    expect(
+      verificaLivelloFirma({ livelloRichiesto: 'fea', canale: 'file', tipoFirma: 'qualificata_esterna' }),
+    ).toEqual({ consentito: true, livelloRichiesto: 'fea' });
+  });
+
+  it('fea + file + manuale_scansionata → 409: la sottoscrizione autografa scansionata non basta, niente degradazione a SES', () => {
+    const esito = verificaLivelloFirma({
       livelloRichiesto: 'fea',
       canale: 'file',
-      tipoFirma: 'qualificata_esterna',
+      tipoFirma: 'manuale_scansionata',
     });
-    for (const esito of [esitoOtp, esitoFile]) {
-      expect(esito.consentito).toBe(false);
-      if (!esito.consentito) {
-        expect(esito.codice).toBe(409);
-        expect(esito.errore).toContain('Firma Elettronica Avanzata');
-        expect(esito.livelloRichiesto).toBe('fea');
-      }
+    expect(esito.consentito).toBe(false);
+    if (!esito.consentito) {
+      expect(esito.codice).toBe(409);
+      expect(esito.errore).toContain('Firma Elettronica Avanzata');
+      expect(esito.errore).toContain('sottoscrizione autografa scansionata non è sufficiente');
+      expect(esito.livelloRichiesto).toBe('fea');
     }
   });
 

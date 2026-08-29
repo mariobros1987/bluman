@@ -82,7 +82,7 @@ Decisioni:
 
 - `POST /portal/verify-otp-and-sign` e `POST /portal/firma-con-file` risolvono il livello richiesto del documento (da `Documento.livelloFirmaRichiesto`, o dal `PassaggioProgetto` per `modulo_completato`, o dal template per `engagement_letter`):
   - livello richiesto `ses` → tutto come oggi;
-  - livello `fea` → **409**: "Questo documento richiede Firma Elettronica Avanzata: il flusso OTP semplice non è sufficiente" (finché la Fase 3 non esiste, un documento `fea` non è firmabile dal portale — è la risposta onesta);
+  - livello `fea` → OTP **consentito**: il flusso misurato della Fase 3 lo produce (grafometrica obbligatoria + sessione certificata nel digest); firma-con-file solo con `qualificata_esterna` (il valore legale superiore soddisfa anche l'esigenza inferiore), mentre la sottoscrizione autografa scansionata è respinta con 409 "sottoscrizione autografa scansionata non è sufficiente";
   - livello `feq` → **409** sulla rotta OTP; `firma-con-file` con `qualificata_esterna` è ammesso (è l'unico modo attuale di ottenere FEQ).
 - `GET /portal/documenti` espone `livelloFirmaRichiesto`; il frontend nasconde il pulsante firma OTP quando il livello è `fea`/`feq` e mostra il percorso adeguato.
 - L'operatore può cambiare il livello di un documento pubblicato **finché non è firmato**; dopo la firma il campo è immodificabile (stesso principio di `statoDoc: 'firmato'`).
@@ -113,12 +113,13 @@ Decisioni:
 4. ✅ Verbale: riga "Valore legale della firma" (`verbaleFirma.ts`).
 5. ✅ Test: `livelloFirmaService.test.ts` 13 test (messaggi 409, normalizzazione, livelloPiuAlto); regressione piena: **373/373 verdi in 28 file**, `tsc --noEmit` pulito, `npx tsc -b` frontend EXIT 0.
 
-### Fase 3 — Misure FEA reali (solo se lo studio vuole offrire FEA; decisione del titolare)
-Cosa serve per poter etichettare **onesta** una firma `fea_otp_misurata` come FEA (spec §4: "identity verification, certificato di sessione, log crittografici"):
-1. **Identificazione del firmatario**: `firmatarioNome` non più libero dal body — o `cliente.nome` (persona fisica) o un **referente censito in `referentiJson`** scelto da un elenco servito dal server; opzionale (ma raccomandato per la FEA) caricamento una-tantum di documento di riconoscimento del firmatario, con hash allegato al sigillo.
-2. **Rafforzamento del controllo esclusivo**: doppio canale (OTP su due recapiti distinti) oppure OTP + grafometrica obbligatoria (oggi la grafometrica è facoltativa, §1.11).
-3. **Certificato di sessione**: il sigillo lega già IP + UA + canale verificato; aggiungere esplicitamente l'id della sessione portale e il momento del login al payload del digest.
-4. Solo allora: `valoreLegale: 'fea'` scrivibile dal flusso OTP misurato.
+### Fase 3 — Misure FEA reali — ✅ completata 29/08/2026 (approvata dal titolare, §6.1)
+Le quattro misure del §4, tutte attuate senza integrazioni esterne:
+1. ✅ **Identificazione del firmatario**: `firmatariAmmessi(cliente)` in `src/routes/firma.ts` (elenco chiuso: `cliente.nome` per persona fisica o referenti in `referentiJson.legaleRappresentante`), esposto da `GET /portal/canali-firma` come `firmatariAmmessi` e validato in tutte e tre le rotte di firma (request-otp, verify-otp-and-sign, firma-con-file) — niente più nomi liberi nel body. Caricamento una-tantum del documento di riconoscimento: `scanFileBuffer` (securityScanner) + hash nel digest del sigillo; campi `doc_riconoscimento_hash`/`doc_riconoscimento_tipo` sulla `firma_elettronica` (migrazione `20260828180000_firma_fea_sessione_e_identificazione`, solo colonne nullable).
+2. ✅ **Controllo esclusivo rafforzato**: grafometrica **obbligatoria** quando il livello è `fea` — la rotta request-otp risponde 400 *prima* di consumare un invio di codice se il frontend non la imposta (opzione "doppio canale" scartata: OTP su due recapiti è raro nello studio professionale).
+3. ✅ **Certificato di sessione**: `sessionId` (sid del login portale) + `loginAt` (iat) nel payload del digest del sigillo (`otpService.ts` creaSigilloFea, ora 10 elementi) — propagate da `jwt.ts` → `auth.ts` → rotte di firma; campi `session_id`/`login_at` persistiti sulla firma. Le firme SES passano `null` sui 4 parametri FEA → digest **identico** a prima (byte-compatibile).
+4. ✅ `valoreLegale: 'fea'` scritto dal flusso OTP misurato, con audit dedicato `FIRMA_FEA_APPOSTA` (il SES continua con `FIRMA_SES_APPOSTA`); verbale con righe condizionali (documento di riconoscimento, sessione, grafometrica) omesse per le firme SES storiche; `verificaLivelloFirma` Fase 3: fea+otp consentito, fea+file solo `qualificata_esterna`.
+Frontend: `FirmaOtpModal.tsx` (selettore firmatario ammesso, upload documento di riconoscimento, grafica obbligatoria quando fea), `TabDocumenti.tsx` (gating per livello), `ClientPortal.tsx` (`livelloFirmaModale` con un solo punto di verità in `inviaCodiceFirma`), `api/firma.ts` con `firmatariAmmessi` e i campi FEA. Test: suite **375/375 verdi in 28 file**, `tsc --noEmit` pulito, `npx tsc -b` frontend EXIT 0.
 
 ### Fase 4 — FEQ nativa (decisione commerciale, provider esterno)
 Il ri-caricamento di file qualificato (`qualificata_esterna`) copre già il caso FEQ senza integrazioni. Un'integrazione diretta (Aruba/InfoCert/Namirial, SPID/CIE) è un progetto separato: costi, contratto col provider e responsabilità della verifica certificato cambiano. Non è un prerequisito delle Fasi 1–3.
@@ -135,7 +136,7 @@ Il ri-caricamento di file qualificato (`qualificata_esterna`) copre già il caso
 
 ## 6. Domande aperte per il titolare
 
-1. ✅ **Risposta 28/08/2026** — Sì: lo studio vuole offrire firme FEA "vere". La Fase 3 entra nel piano di lavoro (dopo la Fase 2). Complessità valutata media: firmatario da anagrafica/referenti censiti, controllo esclusivo rafforzato (doppio canale o grafometrica obbligatoria), certificato di sessione nel sigillo, flusso `valoreLegale: 'fea'` con audit dedicato. Nessuna integrazione esterna.
+1. ✅ **Risposta 28/08/2026** — Sì: lo studio vuole offrire firme FEA "vere". La Fase 3 è entrata nel piano di lavoro ed è stata **completata il 29/08/2026** (vedi sopra).
 2. ✅ **Risposta 28/08/2026** (implicita nell'approvazione della Fase 2 con enforcement) — Il livello `feq` **blocca** il flusso OTP (409) finché il cliente non firma col proprio provider; niente degradazione silenziosa a SES.
 3. ⚠️ **Regola adottata in implementazione** — Per livelli `fea`/`feq` l'hash deve essere **server-side** (documento generato dal server, `POST /documenti/genera`); l'hash composto dal browser resta ammesso solo per documenti `ses`. Se il titolare vuole diversamente, dirlo e si cambia.
 4. ✅ **Risposta 28/08/2026** (Fase 4) — Niente integrazione diretta con provider: resta il ri-caricamento del file firmato dal cliente (`qualificata_esterna`), già funzionante e onestamente etichettato FEQ dalla Fase 1.

@@ -280,11 +280,13 @@ export function TabDocumenti({
 
                   {/* La firma passa dal backend: codice sul canale scelto, impronta calcolata
                       dal server sul file in archivio, sigillo scritto a database. Il livello
-                      richiesto (piano firma §3) decide quale canale presentare: FEA e FEQ
-                      non passano dall'OTP — il server le respingerebbe con 409, qui il
-                      portale orienta il cliente sul percorso giusto prima di consumare
-                      un invio di codice. */}
-                  {livelloDoc === 'ses' ? (
+                      richiesto (piano firma §3) decide quale canale presentare. Fase 3: la
+                      FEA si ottiene proprio dal flusso OTP misurato del portale (grafometrica
+                      obbligatoria + sessione certificata + firmatario identificato), quindi
+                      SES e FEA aprono entrambe il bottone. Restava solo la FEQ, che il server
+                      respinge con 409: qui il portale orienta il cliente sul percorso giusto
+                      prima di consumare un invio di codice. */}
+                  {livelloDoc !== 'feq' ? (
                     <button
                       type="button"
                       disabled={!doc.richiedeFirma || otpLoading}
@@ -297,7 +299,7 @@ export function TabDocumenti({
                   ) : (
                     <span
                       title={`Firma ${ETICHETTA_LIVELLO[livelloDoc].nome} richiesta dal documento`}
-                      style={{ fontSize: 10.5, lineHeight: 1.45, maxWidth: 340, color: livelloDoc === 'fea' ? '#fbbf24' : '#c4b5fd', border: `1px solid ${livelloDoc === 'fea' ? '#f59e0b50' : '#7c3aed50'}`, background: livelloDoc === 'fea' ? '#f59e0b12' : '#7c3aed12', padding: '7px 12px', borderRadius: 8, display: 'inline-block' }}
+                      style={{ fontSize: 10.5, lineHeight: 1.45, maxWidth: 340, color: '#c4b5fd', border: '1px solid #7c3aed50', background: '#7c3aed12', padding: '7px 12px', borderRadius: 8, display: 'inline-block' }}
                     >
                       {AVVISO_LIVELLO[livelloDoc]}
                     </span>
@@ -323,11 +325,13 @@ export function TabDocumenti({
                     </label>
                   )}
 
-                  {/* FEQ — piano firma §3: l'unico canale che il server accetta è il file
-                      firmato con provider qualificato (qualificata_esterna, valoreLegale
-                      'feq' scritto dal server). La sottoscrizione scansionata non basta
-                      e verrebbe respinta con 409, quindi qui non viene offerta. */}
-                  {livelloDoc === 'feq' && (
+                  {/* FEQ e FEA — piano firma §3: il canale alternativo che il server accetta
+                      è il file firmato con provider qualificato (qualificata_esterna). Per la
+                      FEQ è l'unico consentito (valoreLegale 'feq' scritto dal server); per
+                      la FEA è la via facoltativa accanto al flusso OTP misurato. La
+                      sottoscrizione scansionata non basta per nessuna delle due e verrebbe
+                      respinta con 409, quindi qui non viene offerta. */}
+                  {livelloDoc !== 'ses' && (
                     <label style={{ background: '#2e1065', border: '1px solid #7c3aed', color: '#c4b5fd', padding: '6px 14px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4, boxShadow: '0 2px 10px rgba(124,58,237,.25)' }}>
                       <span>{caricamentoFirmato ? '⏳ Carico…' : '🔐 Carica File Firmato Digitalmente'}</span>
                       <input

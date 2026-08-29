@@ -205,6 +205,29 @@ export function ClientPortal() {
    * elemento in più nel verbale.
    */
   const [padGrafometricaAperto, setPadGrafometricaAperto] = useState(false);
+  /**
+   * Fase 3 FEA (misura 1, §4) — chi firma: l'elenco chiuso dei firmatari che l'anagrafica
+   * ammette (nome del cliente o legale rappresentante in referentiJson), esposto da
+   * `canali-firma` e fatto rispettare dal server in tutte le rotte di firma. Qui il cliente
+   * dichiara con quale identità firma; il nome scelto entra nella richiesta OTP e nel sigillo.
+   */
+  const [firmatariAmmessi, setFirmatariAmmessi] = useState<string[]>([]);
+  const [firmatarioSelezionato, setFirmatarioSelezionato] = useState('');
+  /**
+   * Fase 3 FEA (misura 1, §4) — documento di riconoscimento caricato una tantum dal
+   * firmatario (data URL). Raccomandato per la FEA, non obbligatorio: quando presente il
+   * server lo scandisce, ne calcola l'hash e lo lega al digest del sigillo. Il controllo
+   * di tipo e dimensione (PDF/PNG/JPEG, max 30 MB) resta del server, come per ogni file.
+   */
+  const [docRiconoscimentoBase64, setDocRiconoscimentoBase64] = useState<string | null>(null);
+  const [docRiconoscimentoTipo, setDocRiconoscimentoTipo] = useState<string | null>(null);
+  const [docRiconoscimentoNome, setDocRiconoscimentoNome] = useState<string | null>(null);
+  /**
+   * Fase 3 FEA — il livello che il documento in firma esige ('ses' | 'fea'): la modale lo
+   * usa per titolo, nota legale e firma grafica obbligatoria. Il FEQ non arriva qui: la
+   * lista documenti nasconde il bottone OTP e orienta al provider di firma digitale.
+   */
+  const [livelloFirmaModale, setLivelloFirmaModale] = useState<'ses' | 'fea'>('ses');
   // Stesso motivo del flag `signed`: il sigillo di firma è di un cliente preciso e non va letto da
   // una chiave cablata. Viene caricato in `loadPortalData` per il cliente autenticato.
   const [eidasSeal, setEidasSeal] = useState<any>(null);
@@ -689,6 +712,13 @@ export function ClientPortal() {
         if (annullato) return;
         setCanaliFirma(res.canali || []);
         setBotTelegram(res.botTelegram ?? null);
+        // Fase 3 FEA (misura 1): l'elenco chiuso dei firmatari ammessi dall'anagrafica —
+        // prima voce il nome del cliente, poi l'eventuale legale rappresentante. Si
+        // preseleziona la prima voce, che è la più probabile; la modale lascia comunque
+        // la scelta al firmatario, e il server fa rispettare l'elenco a ogni firma.
+        const firmatari = res.firmatariAmmessi || [];
+        setFirmatariAmmessi(firmatari);
+        setFirmatarioSelezionato(firmatari[0] ?? '');
 
         const disponibili = (res.canali || []).filter((c) => c.disponibile);
         const preferito = disponibili.find((c) => c.canale === res.canalePreferito);
@@ -784,12 +814,64 @@ export function ClientPortal() {
     return impronteDocumento();
   };
 
-  /** Invio o reinvio del codice. Un errore resta un errore, e il cliente legge quale. */
-  const inviaCodiceFirma = async (opzioni: { reinvio?: boolean; bersaglio?: BersaglioFirma; canale?: CanaleOtp } = {}) => {
+  /**
+   * Fase 3 FEA (misura 1, §4) — caricamento del documento di riconoscimento scelto dal
+   * firmatario nella modale. Il file viene letto come data URL e mandato com'è al server:
+   * è lui che scandisce, calcola l'hash e lo lega al digest del sigillo. Qui si rifiutano
+   * solo i file che il server scarterebbe comunque (tipo non ammesso o oltre 30 MB), per
+   * non far perdere al cliente il codice già digitato.
+   */
+  const onCaricaDocRiconoscimento = (file: File) => {
+    const estensioniAmmesse = ['application/pdf', 'image/png', 'image/jpeg'];
+    if (!estensioniAmmesse.includes(file.type)) {
+      setOtpError('Documento di riconoscimento: formato non ammesso. Carica un PDF, PNG o JPEG.');
+      return;
+    }
+    if (file.size > 30 * 1024 * 1024) {
+      setOtpError('Documento di riconoscimento: il file supera i 30 MB consentiti.');
+      return;
+    }
+    const nome = file.name.toLowerCase();
+    const tipo = nome.includes('passaporto')
+      ? 'Passaporto'
+      : nome.includes('patente')
+        ? 'Patente'
+        : 'Carta d\'identità';
+    const reader = new FileReader();
+    reader.onload = () => {
+      setDocRiconoscimentoBase64(typeof reader.result === 'string' ? reader.result : null);
+      setDocRiconoscimentoTipo(tipo);
+      setDocRiconoscimentoNome(file.name);
+      setOtpError(null);
+    };
+    reader.onerror = () => setOtpError('Lettura del documento di riconoscimento non riuscita: riprova.');
+    reader.readAsDataURL(file);
+  };
+
+  /** La rimozione azzera i tre valori: il server riceverà la firma senza documento allegato. */
+  const onRimuoviDocRiconoscimento = () => {
+    setDocRiconoscimentoBase64(null);
+    setDocRiconoscimentoTipo(null);
+    setDocRiconoscimentoNome(null);
+  };
+
+  /**
+   * Invio o reinvio del codice. Un errore resta un errore, e il cliente legge quale.
+   *
+   * `livello` è l'unico punto in cui la modale apprende il valore legale che il documento
+   * esige (Fase 3 FEA, §4): chi avvia la firma lo dichiara — il fascicolo in base all'etichetta
+   * del documento — e il default 'ses' copre engagement letter e moduli, che etichettatura non
+   * hanno. Centralizzarlo qui evita che un 'fea' residuo da una firma precedente sopravviva
+   * a una firma successiva: ogni invio di codice ricalibra la modale sul documento giusto.
+   */
+  const inviaCodiceFirma = async (
+    opzioni: { reinvio?: boolean; bersaglio?: BersaglioFirma; canale?: CanaleOtp; livello?: 'ses' | 'fea' } = {},
+  ) => {
     const bersaglio = opzioni.bersaglio ?? bersaglioFirma;
     const canaleDaUsare = opzioni.canale ?? otpCanale;
     if (opzioni.canale) setOtpCanale(opzioni.canale);
     if (opzioni.bersaglio) setBersaglioFirma(opzioni.bersaglio);
+    setLivelloFirmaModale(opzioni.livello ?? 'ses');
     setOtpLoading(true);
     setOtpError(null);
     setOtpCode('');
@@ -800,7 +882,9 @@ export function ClientPortal() {
         ambito: bersaglio.ambito,
         riferimentoId: bersaglio.riferimentoId,
         recapitoDichiarato: usaRecapitoDiverso && recapitoDichiarato.trim() ? recapitoDichiarato.trim() : undefined,
-        signerName: clientName,
+        // Fase 3 FEA (misura 1): l'identità con cui il cliente dichiara di firmare —
+        // scelta nell'elenco chiuso esposto da canali-firma. Il server la valida.
+        signerName: firmatarioSelezionato || clientName,
         clienteId: clientObj?.id,
       });
 
@@ -838,17 +922,24 @@ export function ClientPortal() {
       const res = await verifyPortalOtpAndSignApi({
         otp: otpCode,
         documentoHash: await improntaDelBersaglio(bersaglioFirma),
-        signerName: clientName,
+        // Fase 3 FEA (misura 1): firma con l'identità scelta nell'elenco chiuso, e con
+        // l'eventuale documento di riconoscimento che il server scandisce e lega al sigillo.
+        signerName: firmatarioSelezionato || clientName,
         documentoTitolo: bersaglioFirma.titolo,
         ambito: bersaglioFirma.ambito,
         riferimentoId: bersaglioFirma.riferimentoId,
         clienteId: clientObj?.id,
         firmaGrafometricaPng,
+        docRiconoscimentoBase64: docRiconoscimentoBase64 ?? undefined,
+        docRiconoscimentoTipo: docRiconoscimentoTipo ?? undefined,
       });
 
       await registraEsitoFirma(res.seal);
       setOtpModalOpen(false);
       setOtpCode('');
+      // Il documento di riconoscimento è una tantum: consumato dalla firma, non
+      // resta in memoria per quella successiva.
+      onRimuoviDocRiconoscimento();
       return true;
     } catch (err: any) {
       setOtpError(err?.message || 'Convalida del codice non riuscita.');
@@ -879,7 +970,9 @@ export function ClientPortal() {
         ambito: bersaglioFirma.ambito,
         riferimentoId: bersaglioFirma.riferimentoId,
         documentoTitolo: bersaglioFirma.titolo,
-        signerName: clientName,
+        // Fase 3 FEA (misura 1): anche nel canale file il firmatario è quello scelto
+        // nell'elenco chiuso, non il generico nome del cliente.
+        signerName: firmatarioSelezionato || clientName,
         clienteId: clientObj?.id,
         otp: otpCode.length === 6 ? otpCode : undefined,
       });
@@ -930,11 +1023,12 @@ export function ClientPortal() {
    * la lettera d'incarico non convalida la firma di un documento, e viceversa.
    */
   const avviaFirmaDocumento = async (doc: DocumentoPortale) => {
-    // Piano firma §3 — guard preventivo: se il documento esige FEA/FEQ, il server
-    // respingerebbe l'OTP con 409. Qui il portale lo dichiara prima di consumare un
-    // invio di codice, aprendo la modale con l'avviso al posto del campo OTP.
+    // Piano firma §3 — guard preventivo: solo il FEQ respinge l'OTP (il server
+    // risponderebbe 409). La FEA al contrario si OTTIENE dal flusso misurato del
+    // portale: grafometrica obbligatoria, sessione certificata e firmatario
+    // identificato (Fase 3, §4). Il livello scelto qui orienta la modale.
     const livelloDoc = livelloFirmaEffettivo(doc.livelloFirmaRichiesto);
-    if (livelloDoc !== 'ses') {
+    if (livelloDoc === 'feq') {
       setModalitaFirma('otp');
       setFileFirmato(null);
       setOtpError(AVVISO_LIVELLO[livelloDoc]);
@@ -948,8 +1042,8 @@ export function ClientPortal() {
     };
     setModalitaFirma('otp');
     setFileFirmato(null);
-    // `inviaCodiceFirma` fissa il bersaglio: qui non serve scriverlo due volte.
-    await inviaCodiceFirma({ bersaglio });
+    // `inviaCodiceFirma` fissa bersaglio e livello: qui non serve scriverli due volte.
+    await inviaCodiceFirma({ bersaglio, livello: livelloDoc === 'fea' ? 'fea' : 'ses' });
   };
 
   /**
@@ -959,6 +1053,8 @@ export function ClientPortal() {
    * la riga in `FirmaElettronica` — data, hash e IP veri, visibili subito anche allo studio.
    */
   const avviaFirmaModulo = async (modulo: { id: string; nome: string }) => {
+    // I moduli non hanno etichettatura FEA: si firmano SES, come sempre —
+    // `inviaCodiceFirma` lo fissa col suo default.
     const bersaglio: BersaglioFirma = {
       ambito: 'modulo_completato',
       titolo: modulo.nome,
@@ -1795,6 +1891,16 @@ export function ClientPortal() {
           loading={loading}
           otpReinviiRimanenti={otpReinviiRimanenti}
           otpAttesaReinvio={otpAttesaReinvio}
+          // Fase 3 FEA (§4) — livello, firmatario identificato e documento di
+          // riconoscimento: tutto ciò che la modale sa del valore legale che
+          // il documento esige passa da qui.
+          livelloFirma={livelloFirmaModale}
+          firmatariAmmessi={firmatariAmmessi}
+          firmatarioSelezionato={firmatarioSelezionato}
+          setFirmatarioSelezionato={setFirmatarioSelezionato}
+          onCaricaDocRiconoscimento={onCaricaDocRiconoscimento}
+          docRiconoscimentoNome={docRiconoscimentoNome}
+          onRimuoviDocRiconoscimento={onRimuoviDocRiconoscimento}
           inviaCodiceFirma={inviaCodiceFirma}
           confermaFirmaConOtp={confermaFirmaConOtp}
           setPadGrafometricaAperto={setPadGrafometricaAperto}

@@ -26,6 +26,7 @@ import {
   annullaOtp,
   creaSigilloFea,
   STANDARD_SES,
+  STANDARD_FEA,
   mascheraRecapito,
   descriviCanaleVerificato,
   canaleValido,
@@ -79,6 +80,17 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
 
   const HASH_SHA256 = /^[a-f0-9]{64}$/i;
 
+  // Fase 3 FEA (misura 1) — chi può apporre la firma per questo cliente: il cliente
+  // stesso o un referente censito in anagrafica (`legaleRappresentante`). L'elenco lo
+  // serve l'anagrafica e le rotte di firma lo fanno rispettare: un nome digitato
+  // liberamente nel body non identifica nessuno.
+  function firmatariAmmessi(cliente: { nome: string; referentiJson?: unknown }): string[] {
+    const legale = (cliente.referentiJson as any)?.legaleRappresentante;
+    return [cliente.nome, legale]
+      .filter((n): n is string => typeof n === 'string' && n.trim() !== '')
+      .map((n) => n.trim());
+  }
+
   /**
    * I documenti del fascicolo del cliente, con lo stato di firma preso dal database (§2.1, §2.9).
    *
@@ -129,7 +141,8 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
           dataScadenzaDoc: true,
           statoDoc: true,
           // Piano §3 — il livello che il documento esige: il portale lo usa per il gating
-          // del flusso di firma (con fea/feq niente OTP) e per l'etichetta nel fascicolo.
+          // del flusso di firma (con feq niente OTP; con fea l'OTP c'è, ma la firma grafica
+          // diventa obbligatoria) e per l'etichetta nel fascicolo.
           livelloFirmaRichiesto: true,
           pubblicatoAt: true,
           documentoPadreId: true,
@@ -578,6 +591,10 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
                 : null,
         })),
         botTelegram: cred.tgBotUsername,
+        // Fase 3 FEA (misura 1) — l'elenco chiuso dei firmatari che l'anagrafica
+        // ammette: il portale lo offre come scelta, e le rotte di firma lo fanno
+        // rispettare.
+        firmatariAmmessi: firmatariAmmessi(cliente),
       });
     } catch (err) {
       return reply.code(500).send({ errore: err instanceof Error ? err.message : 'Errore lettura canali' });
@@ -640,14 +657,32 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
       }
 
       // Enforcement §3.2 — il blocco arriva PRIMA di consumare il codice: se il documento
-      // esige FEA/FEQ il flusso OTP non potrà mai produrre il valore legale richiesto, e
+      // esige FEQ il flusso OTP non potrà mai produrre il valore legale richiesto, e
       // generare il codice (e inviarlo) sarebbe solo spreco e confusione per il cliente.
+      // Fase 3: se esige FEA il flusso OTP invece la PRODUCE (grafometrica obbligatoria
+      // + sessione certificata in verify-otp-and-sign), quindi il codice si genera.
       const livelloRichiesto = await livelloRichiestoPerFirma(tenantId, clienteId, ambito, riferimentoId);
       const esitoLivello = verificaLivelloFirma({ livelloRichiesto, canale: 'otp' });
       if (!esitoLivello.consentito) {
         return reply
           .code(409)
           .send({ ok: false, errore: esitoLivello.errore, livelloRichiesto: esitoLivello.livelloRichiesto });
+      }
+
+      // Fase 3 FEA (misura 1) — il firmatario dichiarato deve essere uno dei nomi che
+      // l'anagrafica ammette (il cliente o il suo legale rappresentante). Il blocco
+      // precede la generazione del codice: nessun invio parte per un nome che non
+      // esiste in scheda, e il codice non si consuma.
+      const nomiAmmessi = firmatariAmmessi(cliente);
+      const firmatarioDichiarato = req.body?.signerName?.trim() || '';
+      if (
+        firmatarioDichiarato &&
+        !nomiAmmessi.some((n) => n.toLowerCase() === firmatarioDichiarato.toLowerCase())
+      ) {
+        return reply.code(400).send({
+          ok: false,
+          errore: `Firmatario non riconosciuto in anagrafica. Ammessi: ${nomiAmmessi.join(', ')}.`,
+        });
       }
 
       const esito = await creaOtp({
@@ -976,6 +1011,13 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
       fileFirmatoHash?: string | null;
       /** Piano §3.1 — valore legale effettivo, scritto dal server al momento della firma. */
       valoreLegale?: string | null;
+      // Fase 3 FEA — sessione certificata e documento di riconoscimento: le colonne sono
+      // nullable additive, quindi il record della firma ne è sempre portatore (a null per
+      // le SES e per il canale file); il verbale li cita solo quando esistono davvero.
+      sessionId?: string | null;
+      loginAt?: Date | null;
+      docRiconoscimentoHash?: string | null;
+      docRiconoscimentoTipo?: string | null;
       firmatoAt: Date;
     };
     /** Impronta SHA-256 del sigillo: è calcolata dal builder del sigillo, non dalla firma. */
@@ -1058,6 +1100,11 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
         otp,
         firmaGrafometricaPng: firma.firmaGrafometricaPng ?? null,
         fileFirmatoHash: firma.fileFirmatoHash ?? null,
+        // Fase 3 FEA — passati al builder che li cita solo se presenti.
+        sessionId: firma.sessionId ?? null,
+        loginAt: firma.loginAt ?? null,
+        docRiconoscimentoHash: firma.docRiconoscimentoHash ?? null,
+        docRiconoscimentoTipo: firma.docRiconoscimentoTipo ?? null,
       });
 
       // 4. Upload + riga Documento. statoDoc 'pubblicato': il verbale è visibile subito al
@@ -1121,8 +1168,16 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
       ambito?: string;
       riferimentoId?: string;
       clienteId?: string;
-      /** Grafometrica raccolta DOPO l'OTP e allegata al sigillo (§1.11). */
+      /**
+       * Grafometrica allegata al sigillo (§1.11). Fase 3: quando il documento esige FEA
+       * è OBBLIGATORIA e viene valutata PRIMA di consumare l'OTP (misura 2); quando il
+       * documento non esige nulla di più resta facoltativa.
+       */
       firmaGrafometricaPng?: string;
+      /** Fase 3 FEA (misura 1) — documento di riconoscimento del firmatario, facoltativo. */
+      docRiconoscimentoBase64?: string;
+      /** Tipo dichiarato del documento (carta d'identità, passaporto…): va nel verbale. */
+      docRiconoscimentoTipo?: string;
     };
   }>('/portal/verify-otp-and-sign', async (req, reply) => {
     const tenantId = (req as any).tenantId;
@@ -1161,7 +1216,9 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
     try {
       const cliente = await prisma.cliente.findFirst({
         where: { id: clienteId, tenantId },
-        select: { nome: true },
+        // Fase 3 FEA (misura 1) — il `referentiJson` porta il legale rappresentante:
+        // da qui nasce l'elenco dei firmatari ammessi.
+        select: { nome: true, referentiJson: true },
       });
       if (!cliente) return reply.code(404).send({ errore: 'Cliente non trovato.' });
 
@@ -1196,19 +1253,87 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
           .send({ ok: false, errore: esitoLivello.errore, livelloRichiesto: esitoLivello.livelloRichiesto });
       }
 
+      // Fase 3 FEA (misura 1) — chi firma deve essere uno dei nomi che l'anagrafica
+      // ammette (il cliente o il suo legale rappresentante). Il blocco precede
+      // verificaOtp come quello del livello: il codice è monouso e bruciarlo per un
+      // firmatario non riconosciuto costringerebbe il cliente a rifare il giro.
+      const nomiAmmessi = firmatariAmmessi(cliente);
+      const firmatarioDichiarato = req.body?.signerName?.trim() || '';
+      if (
+        firmatarioDichiarato &&
+        !nomiAmmessi.some((n) => n.toLowerCase() === firmatarioDichiarato.toLowerCase())
+      ) {
+        return reply.code(400).send({
+          ok: false,
+          errore: `Firmatario non riconosciuto in anagrafica. Ammessi: ${nomiAmmessi.join(', ')}.`,
+        });
+      }
+
+      // Fase 3 FEA (misura 2) — rafforzamento del controllo esclusivo: quando il documento
+      // esige FEA la firma grafica (grafometrica) è obbligatoria, perché lega l'apposizione
+      // al gesto del firmatario specifico. Il rifiuto sta PRIMA di verificaOtp, come quelli
+      // sopra: il codice è monouso e non va bruciato per una firma che non si può apporre.
+      const grafometrica = normalizzaGrafometrica(firmaGrafometricaPng);
+      if (livelloRichiesto === 'fea' && !grafometrica) {
+        return reply.code(400).send({
+          ok: false,
+          errore:
+            "Questo documento richiede Firma Elettronica Avanzata: l'apposizione della firma grafica è obbligatoria.",
+        });
+      }
+
+      // Fase 3 FEA (misura 1) — documento di riconoscimento del firmatario, caricato una
+      // tantum quando firma (raccomandato, non obbligatorio). L'hash NON lo dichiara il
+      // client (regola §6.3 del piano): arriva il file, lo scannerizza il server e lo
+      // SHA-256 lo calcola il server. Anche questo sta PRIMA di verificaOtp: un file
+      // rifiutato non deve consumare il codice.
+      let docRiconoscimentoHash: string | null = null;
+      const docRiconoscimentoBase64 = (req.body?.docRiconoscimentoBase64 || '').trim();
+      if (docRiconoscimentoBase64) {
+        const docRiconoscimento = Buffer.from(
+          docRiconoscimentoBase64.replace(/^data:[^;]+;base64,/, ''),
+          'base64',
+        );
+        if (docRiconoscimento.length === 0) {
+          return reply
+            .code(400)
+            .send({ ok: false, errore: 'Documento di riconoscimento vuoto o illeggibile.' });
+        }
+        const scanDoc = scanFileBuffer(docRiconoscimento, 'documento-di-riconoscimento');
+        if (!scanDoc.safe) {
+          return reply.code(400).send({
+            ok: false,
+            errore: `Documento di riconoscimento non ammesso: ${scanDoc.reason || 'contenuto non sicuro'}.`,
+          });
+        }
+        docRiconoscimentoHash = crypto.createHash('sha256').update(docRiconoscimento).digest('hex');
+      }
+      const docRiconoscimentoTipo = docRiconoscimentoHash
+        ? req.body?.docRiconoscimentoTipo?.trim() || null
+        : null;
+
+      // Fase 3 FEA (misura 3) — certificato di sessione: il sid e l'iat del login del
+      // portale finiscono nel digest del sigillo, a legare la firma alla sessione
+      // verificata. Assenti nei token emessi prima della Fase 3 (login operatore o vecchi
+      // magic link): il sigillo li registra come 'non-registrato', senza inventarli.
+      const sidSessione = (req as any).user?.sid ?? null;
+      const loginAt = typeof (req as any).user?.iat === 'number' ? new Date((req as any).user.iat * 1000) : null;
+
       const verifica = await verificaOtp(clienteId, otp, ambito, riferimentoId ?? null);
       if (!verifica.valido || !verifica.record) {
         return reply.code(400).send({ ok: false, errore: verifica.motivo });
       }
-
-      const grafometrica = normalizzaGrafometrica(firmaGrafometricaPng);
       const documentoTitolo =
         req.body?.documentoTitolo?.trim() || titoloDalFascicolo || DESCRIZIONE_AMBITO[ambito];
       const firmatarioNome = req.body?.signerName?.trim() || cliente.nome;
 
-      // L'OTP verificato su recapito in anagrafica è una Firma Elettronica Semplice
-      // (art. 20 CAD): lo standard è dichiarato esplicitamente così il sigillo, il DB,
-      // l'audit e il verbale dicono tutti la stessa cosa — mai "avanzata".
+      // Quando il documento non esige nulla di più, l'OTP verificato su recapito in
+      // anagrafica è una Firma Elettronica Semplice (art. 20 CAD) e lo standard va
+      // dichiarato esplicitamente — il sigillo, il DB, l'audit e il verbale devono dire
+      // tutti la stessa cosa. Fase 3: quando invece esige FEA, questo flusso misurato la
+      // produce davvero (grafometrica obbligatoria, sessione certificata, firmatario
+      // identificato), e il sigillo dichiara il livello reale di quel ramo.
+      const isFea = livelloRichiesto === 'fea';
       const sigillo = creaSigilloFea({
         clienteId,
         signerName: firmatarioNome,
@@ -1219,8 +1344,15 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
         ip: ipReale(req),
         userAgent: req.headers['user-agent'] || null,
         canaleVerificato: descriviCanaleVerificato(verifica.record),
-        standard: STANDARD_SES,
-        valoreLegale: 'ses',
+        standard: isFea ? STANDARD_FEA : STANDARD_SES,
+        valoreLegale: isFea ? 'fea' : 'ses',
+        // Fase 3 FEA (misure 1 e 3) — sessione certificata e documento di riconoscimento
+        // entrano nel digest SOLO nel ramo FEA: le firme SES restano byte-identiche a
+        // prima, e i loro sigilli dicono 'non-registrato' come hanno sempre fatto.
+        sessionId: isFea ? sidSessione : null,
+        loginAt: isFea ? loginAt : null,
+        docRiconoscimentoHash: isFea ? docRiconoscimentoHash : null,
+        docRiconoscimentoTipo: isFea ? docRiconoscimentoTipo : null,
       });
 
       const firma = await (prisma as any).firmaElettronica.create({
@@ -1241,36 +1373,52 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
           userAgent: sigillo.userAgent,
           firmaGrafometricaPng: grafometrica,
           standard: sigillo.standard,
-          // Vincolo 7 — il valore legale effettivo lo scrive il server, mai il frontend:
-          // la rotta OTP produce SEMPRE e solo SES (art. 20 CAD).
-          valoreLegale: 'ses',
+          // Vincolo 7 — il valore legale effettivo lo scrive il server, mai il frontend.
+          // Fase 3: se il documento esige FEA il flusso misurato di questa rotta la
+          // produce davvero, e qui finisce 'fea'; per tutto il resto la rotta produce
+          // SES (art. 20 CAD), come ha sempre fatto.
+          valoreLegale: isFea ? 'fea' : 'ses',
+          // Fase 3 FEA — persist di sessione certificata e documento di riconoscimento
+          // (colonne nullable additive: restano vuote per le firme SES).
+          sessionId: sigillo.sessionId,
+          loginAt: sigillo.loginAt,
+          docRiconoscimentoHash: sigillo.docRiconoscimentoHash,
+          docRiconoscimentoTipo: sigillo.docRiconoscimentoTipo,
           firmatoAt: new Date(sigillo.timestampIso),
         },
       });
 
       if (vault && riferimentoId) await segnaDocumentoFirmato(tenantId, riferimentoId);
 
-      // `FIRMA_SES_APPOSTA`, non `FIRMA_FEA_APPOSTA`: l'azione di audit dichiara il valore
-      // legale reale. I log storici con l'azione vecchia restano leggibili e intatti.
+      // L'azione di audit dichiara il valore legale REALE della firma apposta:
+      // `FIRMA_SES_APPOSTA` per la firma semplice, `FIRMA_FEA_APPOSTA` per il flusso
+      // misurato della Fase 3. I log storici con l'azione SES restano leggibili e intatti.
       await recordAudit({
         tenantId,
         userId: (req as any).userId,
         ruolo: (req as any).ruolo,
-        azione: 'FIRMA_SES_APPOSTA',
+        azione: isFea ? 'FIRMA_FEA_APPOSTA' : 'FIRMA_SES_APPOSTA',
         entita: cliente.nome,
-        dettagli:
-          `Firma Elettronica Semplice ${sigillo.signatureId} su "${documentoTitolo}" da ${firmatarioNome}. ` +
-          `${sigillo.canaleVerificato}. IP: ${sigillo.ipAddress ?? 'non registrato'}.`,
+        dettagli: isFea
+          ? `Firma Elettronica Avanzata ${sigillo.signatureId} su "${documentoTitolo}" da ${firmatarioNome}. ` +
+            `${sigillo.canaleVerificato}. Sessione portale: ${sidSessione ?? 'non registrata'}. ` +
+            `Documento di riconoscimento: ${docRiconoscimentoHash ? `caricato (SHA-256 ${docRiconoscimentoHash.slice(0, 16)}…)` : 'non caricato'}. ` +
+            `IP: ${sigillo.ipAddress ?? 'non registrato'}.`
+          : `Firma Elettronica Semplice ${sigillo.signatureId} su "${documentoTitolo}" da ${firmatarioNome}. ` +
+            `${sigillo.canaleVerificato}. IP: ${sigillo.ipAddress ?? 'non registrato'}.`,
         ipAddress: sigillo.ipAddress,
       });
 
       // Blocco 3 — firma apposta: lo studio lo vede subito, il cliente ne ha conferma.
-      // Wording allineato alle etichette SES del portale (commit 0509f96): l'OTP verificato
-      // è una Firma Elettronica Semplice ex art. 20 CAD, non una firma «avanzata».
+      // Wording allineato al valore legale reale (commit 0509f96): SES quando il flusso
+      // OTP produce la firma semplice ex art. 20 CAD, FEA quando il documento esigeva il
+      // flusso misurato della Fase 3.
       await notificaStudio(tenantId, {
         tipoEvento: 'firma_apposta',
         oggetto: 'Firma apposta',
-        corpo: `${firmatarioNome} (${cliente.nome}) ha firmato «${documentoTitolo}» con Firma Elettronica Semplice (OTP verificata · art. 20 CAD).`,
+        corpo: isFea
+          ? `${firmatarioNome} (${cliente.nome}) ha firmato «${documentoTitolo}» con Firma Elettronica Avanzata (OTP verificata + firma grafica · eIDAS art. 26).`
+          : `${firmatarioNome} (${cliente.nome}) ha firmato «${documentoTitolo}» con Firma Elettronica Semplice (OTP verificata · art. 20 CAD).`,
         link: null,
       }).catch(() => {});
       await notificaCliente(tenantId, clienteId, {
@@ -1317,7 +1465,9 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
         ok: true,
         seal: { ...sigillo, id: firma.id, tipoFirma: 'fea_otp' },
         progettoAttivato,
-        message: 'Firma Elettronica Semplice registrata (art. 20 CAD).',
+        message: isFea
+          ? 'Firma Elettronica Avanzata registrata (eIDAS art. 26 · art. 25 CAD).'
+          : 'Firma Elettronica Semplice registrata (art. 20 CAD).',
       });
     } catch (err) {
       return reply.code(500).send({ errore: err instanceof Error ? err.message : 'Errore verifica OTP e firma' });
@@ -1382,7 +1532,9 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
     try {
       const cliente = await prisma.cliente.findFirst({
         where: { id: clienteId, tenantId },
-        select: { nome: true },
+        // Fase 3 FEA (misura 1) — il `referentiJson` porta il legale rappresentante:
+        // anche su questo canale l'elenco dei firmatari ammessi nasce dall'anagrafica.
+        select: { nome: true, referentiJson: true },
       });
       if (!cliente) return reply.code(404).send({ errore: 'Cliente non trovato.' });
 
@@ -1417,15 +1569,32 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
         livelloRichiesto = esito.livello;
       }
 
-      // Enforcement §3.2 — canale `file`: la FEA resta bloccata anche qui (nessun flusso
-      // del portale la produce finché non arriva la Fase 3), mentre per la FEQ conta il
-      // tipoFirma: solo `qualificata_esterna` la soddisfa, la scansione autografa no.
-      // Il blocco sta PRIMA dell'upload e dell'eventuale OTP: nessuna risorsa consumata.
+      // Enforcement §3.2 — canale `file`: chi firma con il proprio provider di firma
+      // digitale (`qualificata_esterna`) produce un valore legale SUPERIORE, che soddisfa
+      // sia la FEQ sia la FEA; la sottoscrizione autografa scansionata non ne produce
+      // nessuno dei due e resta 409. Il blocco sta PRIMA dell'upload e dell'eventuale
+      // OTP: nessuna risorsa consumata.
       const esitoLivello = verificaLivelloFirma({ livelloRichiesto, canale: 'file', tipoFirma });
       if (!esitoLivello.consentito) {
         return reply
           .code(409)
           .send({ ok: false, errore: esitoLivello.errore, livelloRichiesto: esitoLivello.livelloRichiesto });
+      }
+
+      // Fase 3 FEA (misura 1) — chi firma deve essere uno dei nomi che l'anagrafica
+      // ammette (il cliente o il suo legale rappresentante): anche su questo canale
+      // un nome digitato liberamente non identifica il firmatario. Il blocco precede
+      // l'upload e l'eventuale OTP, come quello del livello.
+      const nomiAmmessi = firmatariAmmessi(cliente);
+      const firmatarioDichiarato = req.body?.signerName?.trim() || '';
+      if (
+        firmatarioDichiarato &&
+        !nomiAmmessi.some((n) => n.toLowerCase() === firmatarioDichiarato.toLowerCase())
+      ) {
+        return reply.code(400).send({
+          ok: false,
+          errore: `Firmatario non riconosciuto in anagrafica. Ammessi: ${nomiAmmessi.join(', ')}.`,
+        });
       }
 
       if (req.body?.otp) {

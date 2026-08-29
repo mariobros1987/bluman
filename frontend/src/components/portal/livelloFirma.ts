@@ -27,11 +27,16 @@ export const ETICHETTA_LIVELLO: Record<LivelloFirmaPortale, { icona: string; nom
  * Messaggi con cui il portale rifiusta in anticipo il flusso OTP. Sono allineati a
  * quelli che il server risponde con 409 (verificaLivelloFirma): chi li vede qui non
  * arriverà a fare una richiesta che verrebbe respinta con le stesse parole.
+ *
+ * Fase 3: il ramo FEA non respinge più l'OTP — il flusso misurato del portale
+ * (grafometrica obbligatoria + sessione certificata + firmatario identificato) la
+ * PRODUCE. L'avviso resta per l'unico percorso che il server respinge: la
+ * sottoscrizione autografa scansionata, insufficiente per la FEA.
  */
 export const AVVISO_LIVELLO: Record<LivelloFirmaPortale, string> = {
   ses: '',
   fea:
-    'Questo documento richiede Firma Elettronica Avanzata: il flusso OTP semplice non è sufficiente. Contatta lo studio per concordare la modalità di sottoscrizione.',
+    'Questo documento richiede Firma Elettronica Avanzata: la sottoscrizione autografa scansionata non è sufficiente. Firma dal portale con il flusso OTP completo (con firma grafica), oppure con il tuo provider di firma digitale e carica il file firmato.',
   feq:
     'Questo documento richiede Firma Elettronica Qualificata: il codice OTP non è sufficiente. Firma il documento con il tuo provider di firma digitale e carica il file firmato.',
 };

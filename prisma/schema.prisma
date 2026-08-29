@@ -1135,6 +1135,16 @@ model FirmaElettronica {
   // Verificato)': un indirizzo cablato in un sigillo probatorio è una dichiarazione falsa.
   ipAddress String? @map("ip_address")
   userAgent String? @map("user_agent")
+  // Fase 3 FEA (misura 3) — certificato di sessione: l'id della sessione portale e il
+  // momento del login entrano nel payload del digest del sigillo. Null quando la firma
+  // non proviene dal flusso FEA o la sessione non li porta.
+  sessionId String?   @map("session_id")
+  loginAt   DateTime? @map("login_at")
+  // Fase 3 FEA (misura 1) — identificazione: hash e tipo del documento di riconoscimento
+  // del firmatario caricato una tantum. Raccomandato (non obbligatorio) per FEA: quando
+  // presente, l'hash entra nel digest del sigillo.
+  docRiconoscimentoHash String? @map("doc_riconoscimento_hash")
+  docRiconoscimentoTipo String? @map("doc_riconoscimento_tipo")
   // La grafometrica sta nella riga, come data URL, non in storage: `uploads/` su Railway
   // è effimero e il file sparirebbe al deploy successivo, lasciando un sigillo che
   // rimanda a un'immagine inesistente. Un PNG di firma sta in poche decine di KB.
