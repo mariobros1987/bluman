@@ -394,7 +394,8 @@ Configurazione: `vitest.config.ts` + `vitest.setup.ts` (isolamento dal DB reale)
 
 - **`.github/workflows/ci.yml`**: Workflow di Continuous Integration GitHub Actions per build e test automatici ad ogni push.
 - **`Dockerfile`** + **`docker-compose.yml`**: Containerizzazione backend.
-- **`railway.json`**: Configurazione deployment Railway.
+- **`railway.json`**: Configurazione deployment Railway. Builder Dockerfile; il `CMD` è `npx prisma migrate deploy && npx tsx src/index.ts`, quindi **le migrazioni si applicano all'avvio del container** e non vanno lanciate a mano.
+- **`scripts/distribuisci.sh`**: distribuzione da riga di comando delle due metà. Esiste perché si distribuiscono in due modi diversi e la differenza non è visibile da nessuna parte: **Railway non è collegato a GitHub**, quindi `git push` aggiorna solo il frontend su Vercel e lascia il backend all'immagine precedente — chi spingeva e poi provava la correzione la provava contro il codice vecchio. Lo script verifica prima (`tsc --noEmit`, `npm run typecheck`, `vitest run`), rifiuta di spingere con l'albero sporco, poi `git push origin main` e `railway up --detach`. Autenticazione: il push su HTTPS chiede un **Personal Access Token** di GitHub incollato nel terminale (nessun browser); `railway login` apre il browser, `railway login --browserless` stampa un codice da incollare a mano.
 - **`vercel.json`**: Configurazione deployment Vercel (serverless functions + frontend).
 - **`.agents/skills/meta-whatsapp-integration/SKILL.md`**: Skill e runbook per l'integrazione WhatsApp Business Cloud API & Remote MCP Meta DevTools.
 - **`prisma/seed.ts`**: Script di seed master completo e idempotente per popolare Supabase/PostgreSQL (utenti studio, giurisdizioni, articoli distinta base, moduli template e clienti ERP).
