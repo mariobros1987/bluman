@@ -318,7 +318,7 @@ La stessa POST sul dominio del frontend risponde con l'HTML di `index.html`, per
 - `frontend/src/api/http.ts` — `apiFetch` solleva un errore parlante quando la risposta è `text/html`: nessuna rotta dell'API risponde HTML, quindi quella pagina è la prova che la richiesta non è arrivata al backend. Prima l'operatore vedeva un errore di lettura JSON, e una pagina HTML con stato 200 passava per salvataggio riuscito (regola 3).
 
 ### Da fare, e non è codice
-`origin/main` è a `0096b67`, mentre §35, §36 e §37 sono tre commit **locali non spinti**: qualunque cosa stia girando su Railway e Vercel non li contiene. Prima di provare il rimedio va deciso il push.
+`origin/main` è a `711f265` (ultimo stato noto: da questo ambiente l'egress verso `github.com:443` è negato, quindi il riferimento non è aggiornabile con un `fetch`). Non spinto: `9b78cc5`, l'addendum «il nome del certificato è un campo, non l'host». Un push aggiorna **solo** il frontend su Vercel: il backend su Railway non è collegato a GitHub e si distribuisce con `railway up`.
 
 ---
 
