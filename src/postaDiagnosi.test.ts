@@ -25,6 +25,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, extname, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { diagnosiPosta, spiegaErrorePosta } from './services/diagnosiPosta.js';
+import { soloCodice } from './util/soloCodice.js';
 
 const RADICE = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -244,8 +245,15 @@ describe('§35 — diagnosiPosta traduce l\'errore di rete in un intervento', ()
  *
  * Il controllo guarda le posizioni di codice: i commenti che raccontano la correzione devono
  * poter nominare quei server, il codice no.
+ *
+ * `frontend/src` è entrato nell'elenco dopo il secondo giro: il modulo Canali proponeva
+ * `es. smtp.register.it` e `imap.register.it` come segnaposto e intestava la tabella dei record
+ * DNS «per Register.it», con SPF e MX di quel provider e la casella di un solo studio. È il modo
+ * in cui quei nomi tornano dentro senza che nessuno li scriva nel backend: l'operatore li copia
+ * dal segnaposto. La scansione è insensibile alle maiuscole perché nel testo JSX il nome era
+ * scritto «Register.it».
  */
-const CARTELLE_DA_ISPEZIONARE = ['src', 'api'];
+const CARTELLE_DA_ISPEZIONARE = ['src', 'api', 'frontend/src'];
 
 /** Server di posta di altri: non devono comparire in nessuna posizione di codice. */
 const SERVER_DI_TERZI = ['register.it', 'bluecode-ltd.com', 'securemail.pro'];
@@ -265,85 +273,9 @@ const MODULI_DELLA_POSTA = [
 ];
 
 /**
- * Toglie commenti di riga e di blocco, lasciando intatte le stringhe.
- *
- * Riconosce anche i letterali regex: `replace(/([\\"])/g, …)` in `emailService.ts` contiene una
- * virgoletta, e senza questo passaggio la scansione la prendeva per l'inizio di una stringa —
- * da lì in poi i commenti risultavano codice e il controllo segnalava le proprie spiegazioni.
+ * Toglie commenti di riga e di blocco, lasciando intatte le stringhe: vive in
+ * `src/util/soloCodice.ts` perché lo usa anche il presidio dei record DNS.
  */
-function soloCodice(sorgente: string): string {
-  let fuori = '';
-  let i = 0;
-  let apice: string | null = null;
-  /** Ultimo carattere significativo di codice: dice se una `/` apre una regex o divide. */
-  let precedente = '';
-
-  while (i < sorgente.length) {
-    const c = sorgente[i];
-    const d = sorgente[i + 1];
-
-    if (apice) {
-      if (c === '\\') {
-        fuori += c + (d ?? '');
-        i += 2;
-        continue;
-      }
-      if (c === apice) apice = null;
-      fuori += c;
-      i += 1;
-      continue;
-    }
-
-    if (c === "'" || c === '"' || c === '`') {
-      apice = c;
-      precedente = c;
-      fuori += c;
-      i += 1;
-      continue;
-    }
-
-    if (c === '/' && d === '/') {
-      while (i < sorgente.length && sorgente[i] !== '\n') i += 1;
-      continue;
-    }
-
-    if (c === '/' && d === '*') {
-      i += 2;
-      while (i < sorgente.length && !(sorgente[i] === '*' && sorgente[i + 1] === '/')) i += 1;
-      i += 2;
-      continue;
-    }
-
-    if (c === '/' && (precedente === '' || '(,=:[!&|?{};+-*%^<>~'.includes(precedente))) {
-      i += 1;
-      let dentroClasse = false;
-      while (i < sorgente.length) {
-        const r = sorgente[i];
-        if (r === '\\') {
-          i += 2;
-          continue;
-        }
-        if (r === '\n') break;
-        if (r === '[') dentroClasse = true;
-        else if (r === ']') dentroClasse = false;
-        else if (r === '/' && !dentroClasse) {
-          i += 1;
-          break;
-        }
-        i += 1;
-      }
-      precedente = '/';
-      continue;
-    }
-
-    fuori += c;
-    if (c && !/\s/.test(c)) precedente = c;
-    i += 1;
-  }
-
-  return fuori;
-}
-
 function fileDaIspezionare(cartella: string, raccolti: string[] = []): string[] {
   for (const voce of readdirSync(cartella)) {
     if (voce === 'node_modules' || voce === 'dist' || voce === '.git') continue;
@@ -360,12 +292,12 @@ function fileDaIspezionare(cartella: string, raccolti: string[] = []): string[] 
 }
 
 describe('§35 — nessun server di posta di terzi scritto nel codice', () => {
-  it('src/ e api/ non contengono nomi di provider fuori dai commenti', () => {
+  it('src/, api/ e frontend/src non contengono nomi di provider fuori dai commenti', () => {
     const colpevoli: string[] = [];
 
     for (const cartella of CARTELLE_DA_ISPEZIONARE) {
       for (const file of fileDaIspezionare(join(RADICE, cartella))) {
-        const codice = soloCodice(readFileSync(file, 'utf8'));
+        const codice = soloCodice(readFileSync(file, 'utf8')).toLowerCase();
         for (const nome of SERVER_DI_TERZI) {
           if (codice.includes(nome)) {
             colpevoli.push(`${file.replace(RADICE + '/', '')} contiene «${nome}»`);

@@ -407,11 +407,55 @@ relay in uscita e in arrivo, la precedenza Tenant/ambiente, il divieto di `dns.l
 +1 (il campo provato e non ignorato), `api/sendEmail.test.ts` +2 (il nome fino a nodemailer nel relay).
 Suite completa: **473 test, 35 file, verde**; `npx tsc --noEmit` e `npm run typecheck` puliti.
 
+### Terzo giro (30/08/2026) — il modulo insegnava il provider sbagliato, e dichiarava conforme quello che non aveva letto
+
+Il rimedio diceva «correggi il campo "Server posta in arrivo (IMAP)"» e la `<label>` del modulo diceva
+«Host Server Posta in Entrata»: due nomi per lo stesso campo, e chi leggeva doveva indovinare quale
+fosse. Corretto in `diagnosiPosta.ts` — i rimedi ora nominano i campi **verbatim dalle `<label>`** — e
+legato da tre test che le etichette le leggono da `TabChannels.tsx` invece di riscriverle: rinominare un
+campo nell'interfaccia senza aggiornare il rimedio diventa rosso lì, non un'istruzione che rimanda a un
+campo inesistente.
+
+Guardando il modulo per ricavarne le etichette sono venuti fuori due difetti più gravi, entrambi nella
+stessa scheda:
+
+- **I segnaposto insegnavano il provider di un altro studio.** `es. smtp.register.it`,
+  `imap.register.it`, `support@bluecode-ltd.com`, `archivio@bluecode-ltd.com`,
+  «BlueCode Advisory & Consulting». Un segnaposto è un'istruzione, e questa è la via per cui quei nomi
+  rientrano senza che nessuno li scriva nel backend: l'operatore li copia. È anche il modo in cui
+  `imap.register.it` è finito nel campo host di una casella che su quel provider non sta.
+  Il presidio sui nomi di terzi non li vedeva perché ispezionava solo `src/` e `api/`: adesso comprende
+  `frontend/src`, con confronto insensibile alle maiuscole (nel testo JSX era scritto «Register.it»).
+- **La tabella dei record DNS dichiarava «✓ Conforme» senza aver letto niente** (regola 7). Era
+  intestata «Configurazione Record DNS Dominio per Register.it (Anti-Spam & Deliverability 100%)», con
+  SPF `include:register.it`, MX `mail.register.it` e il dominio di un solo studio come istruzioni per
+  tutti — chi era su Gmail o Microsoft 365 e le seguiva si rompeva la posta. La colonna «Stato
+  Deliverability» portava tre spunte verdi che erano letterali nel JSX: restavano verdi a dominio
+  scaduto e zero record pubblicati, cioè proprio nei casi in cui quel pannello serviva.
+
+  Estratta in `frontend/src/components/settings/PannelloRecordDns.tsx` (regola 8: `TabChannels.tsx` era
+  a 581 righe, ora 547). Il dominio si ricava dagli indirizzi che lo studio ha configurato
+  (`src/util/dominioMittente.ts`, funzione pura importata anche dal presidio in radice), le righe dicono
+  quali record devono esistere e con quale forma, e i valori che solo il provider conosce sono nominati
+  come tali: un `include:` SPF indovinato autorizza i server sbagliati e peggiora il recapito rispetto a
+  non avere il record. Lo stato non c'è, e una riga dice perché — BluMan il DNS non lo legge. Se un
+  giorno lo stato serve, si prende da una rotta che risolve TXT e MX: allora la parola «conforme» potrà
+  tornare, insieme al dato che la sostiene.
+
+**Presidi aggiunti**: `src/postaRecordDns.test.ts` (11 test) — nessuna dichiarazione di conformità, la
+derivazione del dominio compresi i casi che **non** producono un dominio, SPF/DKIM/MX che rimandano al
+provider, nessun segnaposto che nomini un provider o uno studio. `src/postaDiagnosi.test.ts` +3 (i campi
+citati dai rimedi esistono nel modulo, letti dalle `<label>`) e guardia estesa a `frontend/src`.
+`src/util/soloCodice.ts`: lo scanner dei presidi strutturali, una copia sola per due presidi, che non
+prende più `</div>` per l'inizio di una regex — su un `.tsx` si mangiava il testo JSX fino a fine riga,
+cioè proprio quello da controllare. Suite completa: **487 test, 36 file, verde**; `npx tsc --noEmit`,
+`npm run typecheck` e `vite build` puliti.
+
 ### Da fare, e non è codice
 1. **Correggere l'host della posta in uscita nella riga Tenant** (Impostazioni → Posta, oppure `PUT /tenant/settings`). Dalla sonda DNS/TLS eseguita dal titolare: `mail.bluecode-ltd.com` **non risolve**; `smtp.securemail.pro` risolve su `81.88.48.66`, che è lo **stesso indirizzo** di `authsmtp.register.it`, ed è fra i nomi coperti dal certificato che quel server presenta sulla 465 — quindi è il nome che funziona con la verifica TLS attiva.
 
    Qui sta anche la risposta a **«prima arrivava il codice OTP della firma, adesso neanche quello arriva»**: prima di §35 ogni invio partiva da `process.env.SMTP_*`, cioè dalla casella della piattaforma, per tutti i tenant. Ora vince la riga Tenant (deliberato: su un'installazione multi-studio spedire il codice di firma di un cliente dalla casella di un altro studio è un guasto silenzioso, regola 1), e la riga Tenant contiene `mail.bluecode-ltd.com`, che non esiste nel DNS. `inviaEmail` fallisce su entrambe le strade — il relay risolve lo stesso nome, l'SMTP diretto dà `ENOTFOUND` — quindi nessun codice esce. **Non è un guasto del percorso OTP**: correggere il campo «Server SMTP» rimette in funzione OTP, magic link e credenziali portale insieme.
-2. **Configurare la posta in arrivo con i due nomi.** `imap.register.it` risolve ma presenta un certificato per `*.securemail.pro`, e `imap.securemail.pro` è coperto dal certificato ma non ha record DNS: nessun campo «Server» da solo basta. Va tenuto l'indirizzo che risolve nel campo «Server posta in arrivo (IMAP)» e scritto `imap.securemail.pro` nel campo «Nome nel certificato». Il nome esatto resta da confermare col provider — se ne pubblica uno che risolve **ed** è coperto, quello va nel campo «Server» e il secondo campo torna vuoto. Disattivare la verifica non è la via d'uscita: la password della casella viaggia in quella connessione (§3.4).
+2. **Configurare la posta in arrivo con i due nomi, e non scambiarli.** `imap.register.it` risolve ma presenta un certificato per `*.securemail.pro`, e `imap.securemail.pro` è coperto dal certificato ma non ha record DNS: nessun campo «Host» da solo basta. Va tenuto l'indirizzo che **risolve** in «Host Server Posta in Entrata» e scritto `imap.securemail.pro` in «Nome nel certificato». Nella configurazione letta il 30/08 i due valori erano **invertiti** — `imap.securemail.pro` nell'host e «Nome nel certificato» vuoto — ed è per questo che il test risponde `ENOTFOUND`: quel nome non ha record DNS, e nell'host serve un nome che ne abbia uno. Il nome esatto resta da confermare col provider: se ne pubblica uno che risolve **ed** è coperto, quello va nell'host e il secondo campo torna vuoto. Da confermare anche **chi ospita la posta di `support@bluecode-ltd.com`**: che sia Register.it/securemail.pro è dedotto dalla sonda su quei nomi, non verificato sul dominio della casella — si legge nel record MX o nel pannello del provider. Disattivare la verifica non è la via d'uscita: la password della casella viaggia in quella connessione (§3.4).
 3. **Verificare che `EMAIL_RELAY_SECRET` sia identico su Railway e su Vercel**: se differiscono, il relay risponde 401 e la posta ripiega sull'SMTP diretto, cioè sulle porte bloccate.
 4. **Distribuire il backend**: Railway non è collegato a GitHub, quindi un push su `main` aggiorna solo il frontend su Vercel. Le modifiche di questo addendum arrivano in produzione con `railway up`, che da questo ambiente non è eseguibile (egress verso `backboard.railway.com` e `github.com` negato). Le due metà si distribuiscono in un colpo con `./scripts/distribuisci.sh`, che prima verifica (`tsc`, `typecheck`, suite) e rifiuta di partire con l'albero sporco. Le migrazioni **non** vanno lanciate a mano: il `CMD` del Dockerfile è `npx prisma migrate deploy && npx tsx src/index.ts`, quindi `20260830120000_nome_certificato_posta` si applica all'avvio del container.
 

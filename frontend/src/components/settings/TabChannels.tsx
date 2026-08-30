@@ -1,5 +1,6 @@
 import React from 'react';
 import styles from '../../pages/Settings.module.css';
+import { PannelloRecordDns } from './PannelloRecordDns';
 
 interface TabChannelsProps {
   handleSaveCompany: (e?: React.FormEvent) => void;
@@ -230,7 +231,7 @@ export function TabChannels({
               <div className={styles.grid2}>
                 <div className={styles.field}>
                   <label>Host Server SMTP *:</label>
-                  <input type="text" value={smtpHost} onChange={e => setSmtpHost(e.target.value)} placeholder="es. smtp.register.it" style={{ fontSize: 12 }} />
+                  <input type="text" value={smtpHost} onChange={e => setSmtpHost(e.target.value)} placeholder="es. smtp.iltuoprovider.it" style={{ fontSize: 12 }} />
                 </div>
                 <div className={styles.field}>
                   <label>Porta Server SMTP *:</label>
@@ -262,25 +263,25 @@ export function TabChannels({
                 </div>
                 <div className={styles.field}>
                   <label>Email Mittente Visibile *:</label>
-                  <input type="email" value={smtpFromEmail} onChange={e => setSmtpFromEmail(e.target.value)} placeholder="support@bluecode-ltd.com" style={{ fontSize: 12 }} />
+                  <input type="email" value={smtpFromEmail} onChange={e => setSmtpFromEmail(e.target.value)} placeholder="comunicazioni@iltuostudio.it" style={{ fontSize: 12 }} />
                 </div>
               </div>
 
               <div className={styles.grid2} style={{ marginTop: 10 }}>
                 <div className={styles.field}>
                   <label>Nome Mittente Visualizzato *:</label>
-                  <input type="text" value={smtpFromName} onChange={e => setSmtpFromName(e.target.value)} placeholder="BlueCode Advisory & Consulting" style={{ fontSize: 12 }} />
+                  <input type="text" value={smtpFromName} onChange={e => setSmtpFromName(e.target.value)} placeholder="Nome dello Studio, come lo leggono i clienti" style={{ fontSize: 12 }} />
                 </div>
                 <div className={styles.field}>
                   <label>Indirizzo di Risposta (Reply-To):</label>
-                  <input type="email" value={smtpReplyTo} onChange={e => setSmtpReplyTo(e.target.value)} placeholder="support@bluecode-ltd.com" style={{ fontSize: 12 }} />
+                  <input type="email" value={smtpReplyTo} onChange={e => setSmtpReplyTo(e.target.value)} placeholder="comunicazioni@iltuostudio.it" style={{ fontSize: 12 }} />
                 </div>
               </div>
 
               <div className={styles.grid2} style={{ marginTop: 10 }}>
                 <div className={styles.field}>
                   <label>Copia Conoscenza Nascosta Studio (BCC Archivio):</label>
-                  <input type="email" value={smtpBcc} onChange={e => setSmtpBcc(e.target.value)} placeholder="archivio@bluecode-ltd.com" style={{ fontSize: 12 }} />
+                  <input type="email" value={smtpBcc} onChange={e => setSmtpBcc(e.target.value)} placeholder="archivio@iltuostudio.it" style={{ fontSize: 12 }} />
                 </div>
               </div>
 
@@ -304,7 +305,12 @@ export function TabChannels({
                 </button>
               </div>
               <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 12 }}>
-                Configura i parametri di ricezione per consentire a BluMan di leggere le email inviate dai clienti a <code>support@bluecode-ltd.com</code> ed associarle in tempo reale ai rispettivi progetti.
+                {/* La casella è quella configurata qui sotto, non una scritta nel codice: prima
+                    questa riga nominava la casella di un solo studio, e ogni altro studio leggeva
+                    che BluMan legge la posta di qualcun altro. */}
+                Configura i parametri di ricezione per consentire a BluMan di leggere le email che i clienti
+                scrivono {imapUser.trim() ? <>alla casella <code>{imapUser.trim()}</code></> : <>alla casella dello studio</>} ed
+                associarle in tempo reale ai rispettivi progetti.
               </div>
 
               {imapTestResult && (
@@ -332,7 +338,7 @@ export function TabChannels({
                 </div>
                 <div className={styles.field}>
                   <label>Host Server Posta in Entrata *:</label>
-                  <input type="text" value={imapHost} onChange={e => setImapHost(e.target.value)} placeholder="imap.register.it" style={{ fontSize: 12 }} />
+                  <input type="text" value={imapHost} onChange={e => setImapHost(e.target.value)} placeholder="es. imap.iltuoprovider.it" style={{ fontSize: 12 }} />
                 </div>
               </div>
 
@@ -362,7 +368,7 @@ export function TabChannels({
               <div className={styles.grid2} style={{ marginTop: 10 }}>
                 <div className={styles.field}>
                   <label>Username / Email Posta in Entrata *:</label>
-                  <input type="text" value={imapUser} onChange={e => setImapUser(e.target.value)} placeholder="support@bluecode-ltd.com" style={{ fontSize: 12 }} />
+                  <input type="text" value={imapUser} onChange={e => setImapUser(e.target.value)} placeholder="posta@iltuostudio.it" style={{ fontSize: 12 }} />
                 </div>
                 <div className={styles.field}>
                   <label>Password Casella Posta *:</label>
@@ -407,48 +413,8 @@ export function TabChannels({
               </div>
             </div>
 
-            {/* 🛡️ DIAGNOSTICA RECORD DNS DOMINIO (SPF, DKIM, DMARC, MX) */}
-            <div style={{ background: '#0b132b', border: '1px solid #1c2541', borderRadius: 12, padding: 16 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#60a5fa', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span>🛡️ Configurazione Record DNS Dominio per Register.it (Anti-Spam & Deliverability 100%)</span>
-              </div>
-              <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 12 }}>
-                Per garantire che le email inviate da <code>support@bluecode-ltd.com</code> arrivino nella posta in arrivo dei clienti (senza finire nello spam), assicurati che i record DNS sul pannello di Register.it siano configurati come segue:
-              </div>
-
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11, textAlign: 'left', color: '#e2e8f0' }}>
-                  <thead>
-                    <tr style={{ background: '#1c2541', borderBottom: '1px solid #334155' }}>
-                      <th style={{ padding: '8px 10px' }}>Tipo Record</th>
-                      <th style={{ padding: '8px 10px' }}>Nome / Host</th>
-                      <th style={{ padding: '8px 10px' }}>Valore Raccomandato (Register.it)</th>
-                      <th style={{ padding: '8px 10px' }}>Stato Deliverability</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr style={{ borderBottom: '1px solid #1e293b' }}>
-                      <td style={{ padding: '8px 10px', fontWeight: 700, color: '#38bdf8' }}>TXT (SPF)</td>
-                      <td style={{ padding: '8px 10px', fontFamily: 'monospace' }}>@ (o bluecode-ltd.com)</td>
-                      <td style={{ padding: '8px 10px', fontFamily: 'monospace' }}>v=spf1 include:register.it ~all</td>
-                      <td style={{ padding: '8px 10px', color: '#34d399', fontWeight: 700 }}>✓ Conforme</td>
-                    </tr>
-                    <tr style={{ borderBottom: '1px solid #1e293b' }}>
-                      <td style={{ padding: '8px 10px', fontWeight: 700, color: '#a78bfa' }}>TXT (DMARC)</td>
-                      <td style={{ padding: '8px 10px', fontFamily: 'monospace' }}>_dmarc</td>
-                      <td style={{ padding: '8px 10px', fontFamily: 'monospace' }}>v=DMARC1; p=none; rua=mailto:support@bluecode-ltd.com</td>
-                      <td style={{ padding: '8px 10px', color: '#34d399', fontWeight: 700 }}>✓ Conforme</td>
-                    </tr>
-                    <tr style={{ borderBottom: '1px solid #1e293b' }}>
-                      <td style={{ padding: '8px 10px', fontWeight: 700, color: '#fbbf24' }}>MX (Mail)</td>
-                      <td style={{ padding: '8px 10px', fontFamily: 'monospace' }}>@</td>
-                      <td style={{ padding: '8px 10px', fontFamily: 'monospace' }}>mail.register.it (Priorità 10)</td>
-                      <td style={{ padding: '8px 10px', color: '#34d399', fontWeight: 700 }}>✓ Conforme</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
+            {/* 🛡️ RECORD DNS DEL DOMINIO (SPF, DKIM, DMARC, MX) — vedi PannelloRecordDns.tsx */}
+            <PannelloRecordDns smtpFromEmail={smtpFromEmail} imapUser={imapUser} smtpHost={smtpHost} />
 
             {/* 🟢 WHATSAPP BUSINESS API */}
             <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 16 }}>
