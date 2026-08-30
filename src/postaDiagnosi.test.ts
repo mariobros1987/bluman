@@ -68,7 +68,7 @@ describe('§35 — diagnosiPosta traduce l\'errore di rete in un intervento', ()
     // La prima etichetta resta `imap`: è quella che dice a quale servizio si sta parlando.
     expect(d.hostSuggerito).toBe('imap.securemail.pro');
     expect(d.rimedio).toContain('imap.securemail.pro');
-    expect(d.rimedio).toMatch(/Server posta in arrivo/);
+    expect(d.rimedio).toMatch(/Host Server Posta in Entrata/);
     // §3.4 — la via d'uscita non è spegnere la verifica: la password della casella passa da lì.
     expect(d.rimedio).toMatch(/non disattivare la verifica/i);
   });
@@ -123,7 +123,7 @@ describe('§35 — diagnosiPosta traduce l\'errore di rete in un intervento', ()
     // dichiarato se non lo pubblica — in quel caso non serve che risolva.
     expect(d.nomeCertificatoSuggerito).toBe('imap.securemail.pro');
     expect(d.rimedio).toMatch(/Nome nel certificato/);
-    expect(d.rimedio).toMatch(/Server posta in arrivo \(IMAP\)/);
+    expect(d.rimedio).toMatch(/Host Server Posta in Entrata/);
     // La seconda strada non è «disattiva la verifica»: il certificato resta verificato (§3.4).
     expect(d.rimedio).toMatch(/certificato resta verificato/i);
     expect(d.rimedio).not.toMatch(/SMTP_INSECURE_TLS/);
@@ -388,5 +388,63 @@ describe('§35 — nessun server di posta di terzi scritto nel codice', () => {
     }
 
     expect(colpevoli).toEqual([]);
+  });
+});
+
+/**
+ * I campi nominati dal rimedio devono esistere nel modulo con quel nome.
+ *
+ * Il guasto è stato misurato: il rimedio diceva «correggi il campo "Server posta in arrivo (IMAP)"»
+ * mentre la `<label>` del modulo diceva «Host Server Posta in Entrata». Chi leggeva doveva
+ * indovinare quale dei campi fosse — e il senso di `diagnosiPosta` è che non si debba indovinare
+ * niente. Il controllo lega le due parti: rinominare un campo nell'interfaccia senza aggiornare il
+ * rimedio (o viceversa) diventa rosso qui, non un'istruzione che rimanda a un campo inesistente.
+ */
+describe('§35 — il rimedio nomina i campi come sono scritti nel modulo', () => {
+  const MODULO = 'frontend/src/components/settings/TabChannels.tsx';
+
+  /** Le etichette come le legge l'operatore, ricavate dal modulo e non riscritte a mano. */
+  const etichette = (() => {
+    const sorgente = readFileSync(join(RADICE, MODULO), 'utf8');
+    return [...sorgente.matchAll(/<label[^>]*>([^<]+)<\/label>/g)].map(m => (m[1] ?? '').trim());
+  })();
+
+  /** Vero se una `<label>` del modulo comincia con il nome che il rimedio ha usato. */
+  function esisteCampo(nome: string): boolean {
+    return etichette.some(e => e.startsWith(nome));
+  }
+
+  it('il modulo espone le etichette che i rimedi citano', () => {
+    // Se questa cade, è il modulo che è cambiato: l'elenco qui sotto va riallineato insieme a
+    // `campo` in `diagnosiPosta.ts`, non aggirato.
+    expect(esisteCampo('Host Server SMTP')).toBe(true);
+    expect(esisteCampo('Host Server Posta in Entrata')).toBe(true);
+    expect(esisteCampo('Nome nel certificato')).toBe(true);
+  });
+
+  it('SMTP: il campo citato dal rimedio è uno dei campi del modulo', () => {
+    const d = diagnosiPosta({
+      protocollo: 'SMTP',
+      host: 'mail.non-esiste.example',
+      codice: 'ENOTFOUND',
+      messaggio: 'getaddrinfo ENOTFOUND mail.non-esiste.example',
+    });
+
+    for (const citato of [...d.rimedio.matchAll(/«([^»]+)»/g)].map(m => m[1] ?? '')) {
+      // Le virgolette portano sia nomi di host sia nomi di campo: si controllano solo i secondi,
+      // riconosciuti dal fatto che il modulo li espone come etichetta.
+      if (/^(Host|Nome|Porta|Password|Username)/.test(citato)) expect(esisteCampo(citato)).toBe(true);
+    }
+    expect(d.rimedio).toContain('Host Server SMTP');
+  });
+
+  it('IMAP: il rimedio del certificato manda su due campi che esistono entrambi', () => {
+    const d = diagnosiPosta({ protocollo: 'IMAP', host: 'imap.register.it', porta: 993, messaggio: ERRORE_CERT_IMAP });
+
+    expect(d.rimedio).toContain('Host Server Posta in Entrata');
+    expect(d.rimedio).toContain('Nome nel certificato');
+    for (const citato of [...d.rimedio.matchAll(/«([^»]+)»/g)].map(m => m[1] ?? '')) {
+      if (/^(Host|Nome|Porta|Password|Username)/.test(citato)) expect(esisteCampo(citato)).toBe(true);
+    }
   });
 });

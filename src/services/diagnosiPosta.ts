@@ -121,7 +121,11 @@ export function diagnosiPosta(contesto: ContestoErrorePosta): DiagnosiPosta {
   const minuscolo = testo.toLowerCase();
   const host = normalizzaNome(contesto.host || '');
   const dove = host || 'il server configurato';
-  const campo = contesto.protocollo === 'IMAP' ? 'Server posta in arrivo (IMAP)' : 'Server SMTP';
+  // I nomi sono quelli che l'operatore legge in Impostazioni → Canali, verbatim dalle `<label>`
+  // di `TabChannels.tsx`. Un rimedio che nomina un campo con parole proprie («Server posta in
+  // arrivo (IMAP)») costringe chi legge a indovinare quale sia fra quelli del modulo, e il senso
+  // di questo file è che non debba indovinare niente.
+  const campo = contesto.protocollo === 'IMAP' ? 'Host Server Posta in Entrata' : 'Host Server SMTP';
 
   if (/enotfound|eai_again|getaddrinfo|dns lookup/i.test(testo)) {
     return {
