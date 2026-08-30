@@ -353,9 +353,65 @@ Sono **tre guasti diversi** che chiedono tre interventi diversi, e nessuna delle
 - `src/postaProveRotte.test.ts` (8 test) — le due rotte di prova su una casella non configurata: 400 con l'elenco di cosa manca, 401 senza token, e con `SMTP_USER`/`SMTP_PASS` nell'ambiente la prova **non** ricade su quelle credenziali.
 - Suite completa: **460 test, 34 file, verde**; `npx tsc --noEmit` e `npm run typecheck` in `frontend/` puliti.
 
+### Secondo giro (30/08/2026) — il nome a cui collegarsi e il nome che il certificato attesta sono due cose
+
+Il punto 2 di «Da fare» sopra diceva che la posta in arrivo era ferma perché non esiste un nome insieme
+risolvibile e coperto dal certificato. Era vero, ed era vero anche che **nessun singolo campo «Server»
+poteva soddisfare entrambe le condizioni**: la sonda del titolare misura `imap.register.it` →
+`195.110.124.132` con certificato per `*.securemail.pro`, e `imap.securemail.pro` coperto dal
+certificato ma **senza record DNS**. Chi scriveva il nome che risolve leggeva
+«is not in the cert's altnames», chi scriveva quello del certificato leggeva `ENOTFOUND`. L'operatore
+alternava i due errori senza poter uscire.
+
+**Il tentativo che non poteva funzionare** (commit `711f265`): risolvere il nome sul backend con
+`dns.lookup` e collegarsi all'IP ottenuto. Un nome senza record A non risolve da Railway più di quanto
+risolva da Vercel — il DNS è lo stesso. In più, collegarsi a un indirizzo fisso toglie al provider la
+possibilità di spostare o bilanciare il servizio. Quel codice è stato rimosso e il suo ritorno è
+presidiato da un test che rifiuta `dns.(lookup|promises|resolve)` in posizione di codice nei tre moduli
+della posta.
+
+**La correzione**: separare i due nomi. `host` è l'indirizzo a cui si apre la connessione, `servername`
+il nome che il certificato deve attestare — `tls.connect({ host, servername })` per IMAP,
+`tls: { servername }` per nodemailer. Due colonne nuove sulla riga Tenant
+(migrazione `20260830120000_nome_certificato_posta`):
+
+| Colonna | Campo nell'interfaccia | Vuota significa |
+|---|---|---|
+| `smtp_servername` | Posta in uscita → «Nome nel certificato (solo se diverso dall'host)» | si verifica il certificato contro l'host |
+| `imap_servername` | Posta in arrivo → «Nome nel certificato (solo se diverso dall'host)» | si verifica il certificato contro l'host |
+
+Quello che questo campo **non** è: un modo per non verificare il certificato. `rejectUnauthorized`
+resta `tlsRejectUnauthorized()` in ogni percorso (§3.4); cambia il nome con cui il certificato viene
+confrontato, non il fatto che venga confrontato. Il nome lo dichiara l'operatore: non viene mai letto
+dal certificato che il server presenta, perché un certificato non fidato non può decidere contro quale
+nome essere verificato. Precedenza deliberata: **riga Tenant prima di `SMTP_SERVERNAME`** — su
+un'installazione multi-studio l'ambiente è di uno solo, e verificare il certificato di uno studio
+contro il nome di un altro è un guasto silenzioso.
+
+Il nome viaggia su **tutte** le strade, non solo su quella che si prova per prima: corpo del relay
+(`smtpServername`, `imapServername`), SMTP diretto di ripiego, `api/send-email.ts` fino a nodemailer, e
+le due rotte di prova. Se si fermasse al relay, la correzione funzionerebbe solo sul ripiego, cioè
+quasi mai; se si fermasse alla prova, il pulsante «Testa» misurerebbe una connessione diversa da quella
+degli invii veri.
+
+`diagnosiPosta` ora offre **due strade in ordine** invece di una: (1) scrivere il nome coerente col
+certificato nel campo «Server», che chiude il caso quando il provider lo pubblica nel DNS; (2) se quel
+nome non risolve, lasciare l'host che risolve e scrivere il nome nel campo «Nome nel certificato». Il
+campo `nomeCertificatoSuggerito` porta la proposta per la seconda strada, e il ramo `ENOTFOUND` rimanda
+al campo dedicato invece di far tornare l'operatore al punto di partenza.
+
+**Presidi aggiunti**: `src/postaNomeCertificato.test.ts` (8 test) — il nome che arriva a
+`tls.servername` con `rejectUnauthorized` vero, il campo vuoto che non aggiunge nulla, i corpi del
+relay in uscita e in arrivo, la precedenza Tenant/ambiente, il divieto di `dns.lookup`.
+`src/postaDiagnosi.test.ts` +2 (le due strade, il nome che non risolve), `src/postaProveRotte.test.ts`
++1 (il campo provato e non ignorato), `api/sendEmail.test.ts` +2 (il nome fino a nodemailer nel relay).
+Suite completa: **473 test, 35 file, verde**; `npx tsc --noEmit` e `npm run typecheck` puliti.
+
 ### Da fare, e non è codice
 1. **Correggere l'host della posta in uscita nella riga Tenant** (Impostazioni → Posta, oppure `PUT /tenant/settings`). Dalla sonda DNS/TLS eseguita dal titolare: `mail.bluecode-ltd.com` **non risolve**; `smtp.securemail.pro` risolve su `81.88.48.66`, che è lo **stesso indirizzo** di `authsmtp.register.it`, ed è fra i nomi coperti dal certificato che quel server presenta sulla 465 — quindi è il nome che funziona con la verifica TLS attiva.
-2. **Chiedere al provider il nome esatto del server IMAP**: `imap.register.it` presenta un certificato per `*.securemail.pro` e `imap.securemail.pro` **non risolve**, quindi dall'evidenza raccolta non esiste un nome che sia insieme verificabile e pubblicato. Finché non c'è, la posta in arrivo resta ferma: disattivare la verifica non è la via d'uscita, perché la password della casella viaggia in quella connessione.
+
+   Qui sta anche la risposta a **«prima arrivava il codice OTP della firma, adesso neanche quello arriva»**: prima di §35 ogni invio partiva da `process.env.SMTP_*`, cioè dalla casella della piattaforma, per tutti i tenant. Ora vince la riga Tenant (deliberato: su un'installazione multi-studio spedire il codice di firma di un cliente dalla casella di un altro studio è un guasto silenzioso, regola 1), e la riga Tenant contiene `mail.bluecode-ltd.com`, che non esiste nel DNS. `inviaEmail` fallisce su entrambe le strade — il relay risolve lo stesso nome, l'SMTP diretto dà `ENOTFOUND` — quindi nessun codice esce. **Non è un guasto del percorso OTP**: correggere il campo «Server SMTP» rimette in funzione OTP, magic link e credenziali portale insieme.
+2. **Configurare la posta in arrivo con i due nomi.** `imap.register.it` risolve ma presenta un certificato per `*.securemail.pro`, e `imap.securemail.pro` è coperto dal certificato ma non ha record DNS: nessun campo «Server» da solo basta. Va tenuto l'indirizzo che risolve nel campo «Server posta in arrivo (IMAP)» e scritto `imap.securemail.pro` nel campo «Nome nel certificato». Il nome esatto resta da confermare col provider — se ne pubblica uno che risolve **ed** è coperto, quello va nel campo «Server» e il secondo campo torna vuoto. Disattivare la verifica non è la via d'uscita: la password della casella viaggia in quella connessione (§3.4).
 3. **Verificare che `EMAIL_RELAY_SECRET` sia identico su Railway e su Vercel**: se differiscono, il relay risponde 401 e la posta ripiega sull'SMTP diretto, cioè sulle porte bloccate.
 4. **Distribuire il backend**: Railway non è collegato a GitHub, quindi un push su `main` aggiorna solo il frontend su Vercel. Le modifiche di questo addendum arrivano in produzione con `railway up`, che da questo ambiente non è eseguibile (egress negato).
 

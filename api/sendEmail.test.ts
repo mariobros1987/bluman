@@ -17,6 +17,22 @@
  */
 import { describe, it, expect, beforeEach, afterAll, vi } from 'vitest';
 
+/**
+ * Opzioni con cui il relay ha costruito il trasporto: serve a verificare che il nome dichiarato
+ * per il certificato arrivi fino a nodemailer, invece di fermarsi al corpo della richiesta.
+ * Senza il finto, questi scenari aprirebbero una connessione SMTP vera.
+ */
+const trasporti: any[] = [];
+
+vi.mock('nodemailer', () => ({
+  default: {
+    createTransport: (opzioni: any) => {
+      trasporti.push(opzioni);
+      return { sendMail: async () => ({ messageId: 'finto' }), verify: async () => true };
+    },
+  },
+}));
+
 /** Non è una credenziale: è il valore con cui questo test finge di essere il backend. */
 const SEGRETO = 'segreto-relay-di-prova';
 
@@ -72,6 +88,7 @@ const ambienteOriginale = new Map<string, string | undefined>();
 for (const chiave of AMBIENTE_DA_SVUOTARE) ambienteOriginale.set(chiave, process.env[chiave]);
 
 beforeEach(() => {
+  trasporti.length = 0;
   for (const chiave of AMBIENTE_DA_SVUOTARE) delete process.env[chiave];
 });
 
@@ -228,5 +245,40 @@ describe('§35 — il contratto delle risposte', () => {
     expect(stato.corpo.success).toBe(false);
     expect(stato.corpo.emails).toEqual([]);
     expect(stato.corpo.errore).toMatch(/non configurata/i);
+  });
+});
+
+describe('§35 — il nome dichiarato per il certificato non si perde nel relay', () => {
+  it('`smtpServername` arriva a nodemailer come `tls.servername`', async () => {
+    // Il relay è la strada normale degli invii in produzione: se il nome si fermasse qui, la
+    // correzione funzionerebbe solo sul ripiego SMTP diretto, cioè quasi mai.
+    const gestore = await caricaGestore({ segreto: SEGRETO });
+    const { res, stato } = rispostaFinta();
+
+    await gestore(
+      richiesta({
+        headers: { 'x-bluman-relay': SEGRETO },
+        body: { ...CORPO_VALIDO, smtpServername: 'authsmtp.certificato.test' },
+      }),
+      res,
+    );
+
+    expect(stato.codice).toBe(200);
+    expect(trasporti).toHaveLength(1);
+    expect(trasporti[0].host).toBe('smtp.esempio.test');
+    expect(trasporti[0].tls.servername).toBe('authsmtp.certificato.test');
+    // §3.4 — il nome cambia il confronto, non lo elimina.
+    expect(trasporti[0].tls.rejectUnauthorized).toBe(true);
+  });
+
+  it('senza `smtpServername` il certificato si verifica contro l\'host, come di norma', async () => {
+    const gestore = await caricaGestore({ segreto: SEGRETO });
+    const { res, stato } = rispostaFinta();
+
+    await gestore(richiesta({ headers: { 'x-bluman-relay': SEGRETO }, body: CORPO_VALIDO }), res);
+
+    expect(stato.codice).toBe(200);
+    expect(trasporti[0].tls).not.toHaveProperty('servername');
+    expect(trasporti[0].tls.rejectUnauthorized).toBe(true);
   });
 });

@@ -483,6 +483,7 @@ export async function registraRotteContabilita(server: FastifyInstance, app: App
         `,
         smtp: studio?.smtpHost && studio?.smtpUser && studio?.smtpPass ? {
           host: studio.smtpHost,
+          servername: studio.smtpServername || undefined,
           port: studio.smtpPort || 465,
           secure: studio.smtpSecure ?? true,
           user: studio.smtpUser,

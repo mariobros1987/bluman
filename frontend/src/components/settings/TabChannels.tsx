@@ -8,6 +8,16 @@ interface TabChannelsProps {
   smtpTestResult: string | null;
   smtpHost: string;
   setSmtpHost: (v: string) => void;
+  /**
+   * Nome che il certificato del server deve attestare, quando è diverso dall'host.
+   *
+   * Serve al caso misurato sulla casella dello studio: il nome coperto dal certificato non ha
+   * record DNS, e l'indirizzo che risolve ne attesta un altro. Vuoto — il caso normale — si
+   * verifica contro l'host. Non è un modo per disattivare la verifica: il certificato viene
+   * comunque validato, cambia solo il nome con cui viene confrontato.
+   */
+  smtpServername: string;
+  setSmtpServername: (v: string) => void;
   smtpPort: string;
   setSmtpPort: (v: string) => void;
   smtpUser: string;
@@ -31,6 +41,9 @@ interface TabChannelsProps {
   setImapProtocol: (v: 'imap' | 'pop3') => void;
   imapHost: string;
   setImapHost: (v: string) => void;
+  /** Come `smtpServername`, per il server di posta in entrata. */
+  imapServername: string;
+  setImapServername: (v: string) => void;
   imapPort: string;
   setImapPort: (v: string) => void;
   imapFolder: string;
@@ -96,6 +109,8 @@ export function TabChannels({
   smtpTestResult,
   smtpHost,
   setSmtpHost,
+  smtpServername,
+  setSmtpServername,
   smtpPort,
   setSmtpPort,
   smtpUser,
@@ -119,6 +134,8 @@ export function TabChannels({
   setImapProtocol,
   imapHost,
   setImapHost,
+  imapServername,
+  setImapServername,
   imapPort,
   setImapPort,
   imapFolder,
@@ -223,32 +240,44 @@ export function TabChannels({
 
               <div className={styles.grid2} style={{ marginTop: 10 }}>
                 <div className={styles.field}>
+                  <label>Nome nel certificato (solo se diverso dall'host):</label>
+                  <input type="text" value={smtpServername} onChange={e => setSmtpServername(e.target.value)} placeholder="lascia vuoto: si verifica l'host" style={{ fontSize: 12 }} />
+                  <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 3 }}>
+                    Da compilare solo se il provider dice che il certificato è intestato a un nome
+                    diverso da quello a cui ci si collega. Il certificato resta verificato: cambia
+                    il nome con cui viene confrontato, non il fatto che venga controllato.
+                  </div>
+                </div>
+                <div className={styles.field}>
                   <label>Username / Email Autenticazione *:</label>
                   <input type="text" value={smtpUser} onChange={e => setSmtpUser(e.target.value)} placeholder="comunicazioni@studio.it" style={{ fontSize: 12 }} />
                 </div>
+              </div>
+
+              <div className={styles.grid2} style={{ marginTop: 10 }}>
                 <div className={styles.field}>
                   <label>Password SMTP / App Key *:</label>
                   <input type="password" value={smtpPass} onChange={e => setSmtpPass(e.target.value)} placeholder="••••••••••••" style={{ fontSize: 12 }} autoComplete="new-password" />
                   <NotaSegreto impostata={segreti.smtpPass} />
                 </div>
-              </div>
-
-              <div className={styles.grid2} style={{ marginTop: 10 }}>
                 <div className={styles.field}>
                   <label>Email Mittente Visibile *:</label>
                   <input type="email" value={smtpFromEmail} onChange={e => setSmtpFromEmail(e.target.value)} placeholder="support@bluecode-ltd.com" style={{ fontSize: 12 }} />
                 </div>
-                <div className={styles.field}>
-                  <label>Nome Mittente Visualizzato *:</label>
-                  <input type="text" value={smtpFromName} onChange={e => setSmtpFromName(e.target.value)} placeholder="BlueCode Advisory & Consulting" style={{ fontSize: 12 }} />
-                </div>
               </div>
 
               <div className={styles.grid2} style={{ marginTop: 10 }}>
                 <div className={styles.field}>
+                  <label>Nome Mittente Visualizzato *:</label>
+                  <input type="text" value={smtpFromName} onChange={e => setSmtpFromName(e.target.value)} placeholder="BlueCode Advisory & Consulting" style={{ fontSize: 12 }} />
+                </div>
+                <div className={styles.field}>
                   <label>Indirizzo di Risposta (Reply-To):</label>
                   <input type="email" value={smtpReplyTo} onChange={e => setSmtpReplyTo(e.target.value)} placeholder="support@bluecode-ltd.com" style={{ fontSize: 12 }} />
                 </div>
+              </div>
+
+              <div className={styles.grid2} style={{ marginTop: 10 }}>
                 <div className={styles.field}>
                   <label>Copia Conoscenza Nascosta Studio (BCC Archivio):</label>
                   <input type="email" value={smtpBcc} onChange={e => setSmtpBcc(e.target.value)} placeholder="archivio@bluecode-ltd.com" style={{ fontSize: 12 }} />
@@ -312,6 +341,18 @@ export function TabChannels({
                   <label>Porta Server Ricezione *:</label>
                   <input type="number" value={imapPort} onChange={e => setImapPort(e.target.value)} placeholder="993" style={{ fontSize: 12 }} />
                 </div>
+                <div className={styles.field}>
+                  <label>Nome nel certificato (solo se diverso dall'host):</label>
+                  <input type="text" value={imapServername} onChange={e => setImapServername(e.target.value)} placeholder="lascia vuoto: si verifica l'host" style={{ fontSize: 12 }} />
+                  <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 3 }}>
+                    Serve quando il test risponde «il nome dell'host non è tra quelli del
+                    certificato» e il nome corretto non è raggiungibile: qui si dichiara il nome che
+                    il certificato attesta, lasciando nell'host l'indirizzo a cui collegarsi.
+                  </div>
+                </div>
+              </div>
+
+              <div className={styles.grid2} style={{ marginTop: 10 }}>
                 <div className={styles.field}>
                   <label>Cartella Remota da Monitorare:</label>
                   <input type="text" value={imapFolder} onChange={e => setImapFolder(e.target.value)} placeholder="INBOX" style={{ fontSize: 12 }} />

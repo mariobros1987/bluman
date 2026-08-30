@@ -63,6 +63,9 @@ export function SettingsPage() {
 
   // SMTP Server Credentials (Posta in Uscita)
   const [smtpHost, setSmtpHost] = useState('');
+  // Nome che il certificato del server deve attestare quando è diverso dall'host: vuoto, si
+  // verifica l'host. Nessuna scorciatoia sulla verifica TLS, solo il nome con cui confrontarla.
+  const [smtpServername, setSmtpServername] = useState('');
   const [smtpPort, setSmtpPort] = useState('465');
   const [smtpSecure, setSmtpSecure] = useState(true);
   const [smtpUser, setSmtpUser] = useState('');
@@ -77,6 +80,9 @@ export function SettingsPage() {
   // IMAP / POP3 Server Credentials (Posta in Entrata & Ingestion)
   const [imapProtocol, setImapProtocol] = useState<'imap' | 'pop3'>('imap');
   const [imapHost, setImapHost] = useState('');
+  // Gemello del campo SMTP: qui serve al caso in cui il nome coperto dal certificato non ha
+  // record DNS, e nessun singolo valore nel campo «Host» può soddisfare DNS e certificato.
+  const [imapServername, setImapServername] = useState('');
   const [imapPort, setImapPort] = useState('993');
   const [imapSecure, setImapSecure] = useState(true);
   const [imapUser, setImapUser] = useState('');
@@ -179,6 +185,7 @@ export function SettingsPage() {
       setTgBotToken(tData.tgBotToken || '');
       setTgBotUsername(tData.tgBotUsername || '');
       setSmtpHost(tData.smtpHost || '');
+      setSmtpServername(tData.smtpServername || '');
       setSmtpPort(tData.smtpPort ? String(tData.smtpPort) : '465');
       setSmtpSecure(tData.smtpSecure != null ? tData.smtpSecure : true);
       setSmtpUser(tData.smtpUser || '');
@@ -189,6 +196,7 @@ export function SettingsPage() {
       setSmtpBcc(tData.smtpBcc || '');
       setImapProtocol(tData.imapProtocol || 'imap');
       setImapHost(tData.imapHost || '');
+      setImapServername(tData.imapServername || '');
       setImapPort(tData.imapPort ? String(tData.imapPort) : '993');
       setImapSecure(tData.imapSecure != null ? tData.imapSecure : true);
       setImapUser(tData.imapUser || '');
@@ -254,6 +262,7 @@ export function SettingsPage() {
       tgBotToken,
       tgBotUsername,
       smtpHost,
+      smtpServername,
       smtpPort: Number(smtpPort) || 465,
       smtpSecure,
       smtpUser,
@@ -264,6 +273,7 @@ export function SettingsPage() {
       smtpBcc,
       imapProtocol,
       imapHost,
+      imapServername,
       imapPort: Number(imapPort) || 993,
       imapSecure,
       imapUser,
@@ -309,6 +319,7 @@ export function SettingsPage() {
     try {
       const json = await testEmailApi({
         smtpHost,
+        smtpServername,
         smtpPort: Number(smtpPort) || 465,
         smtpSecure,
         smtpUser,
@@ -339,6 +350,7 @@ export function SettingsPage() {
     try {
       const json = await testImapApi({
         imapHost,
+        imapServername,
         imapPort: Number(imapPort) || 993,
         imapSecure,
         imapUser,
@@ -556,6 +568,8 @@ export function SettingsPage() {
           smtpTestResult={smtpTestResult}
           smtpHost={smtpHost}
           setSmtpHost={setSmtpHost}
+          smtpServername={smtpServername}
+          setSmtpServername={setSmtpServername}
           smtpPort={smtpPort}
           setSmtpPort={setSmtpPort}
           smtpUser={smtpUser}
@@ -579,6 +593,8 @@ export function SettingsPage() {
           setImapProtocol={setImapProtocol}
           imapHost={imapHost}
           setImapHost={setImapHost}
+          imapServername={imapServername}
+          setImapServername={setImapServername}
           imapPort={imapPort}
           setImapPort={setImapPort}
           imapFolder={imapFolder}

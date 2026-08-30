@@ -114,6 +114,8 @@ export async function creaUtenteTenantApi(input: {
 
 export async function testEmailApi(payload?: {
   smtpHost?: string;
+  /** Nome che il certificato deve attestare, se diverso dall'host. Vuoto: si verifica l'host. */
+  smtpServername?: string;
   smtpPort?: number;
   smtpSecure?: boolean;
   smtpUser?: string;
@@ -248,6 +250,8 @@ export async function createAuditLogApi(input: { azione: string; entita: string;
 
 export async function testImapApi(payload: {
   imapHost?: string;
+  /** Nome che il certificato deve attestare, se diverso dall'host. Vuoto: si verifica l'host. */
+  imapServername?: string;
   imapPort?: number;
   imapSecure?: boolean;
   imapUser?: string;

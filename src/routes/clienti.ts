@@ -68,6 +68,7 @@ export async function registraRotteClienti(server: FastifyInstance, app: AppPort
       const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
       const customSmtp = tenant?.smtpHost && tenant?.smtpUser && tenant?.smtpPass ? {
         host: tenant.smtpHost,
+        servername: tenant.smtpServername || undefined,
         port: tenant.smtpPort || 465,
         secure: tenant.smtpSecure ?? true,
         user: tenant.smtpUser,
@@ -319,6 +320,7 @@ export async function registraRotteClienti(server: FastifyInstance, app: AppPort
           const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
           const customSmtp = tenant?.smtpHost && tenant?.smtpUser && tenant?.smtpPass ? {
             host: tenant.smtpHost,
+            servername: tenant.smtpServername || undefined,
             port: tenant.smtpPort || 465,
             secure: tenant.smtpSecure ?? true,
             user: tenant.smtpUser,

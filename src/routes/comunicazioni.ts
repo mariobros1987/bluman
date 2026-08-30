@@ -55,6 +55,7 @@ async function credenzialiImap(tenantId: string): Promise<CredenzialiImap> {
       where: { id: tenantId },
       select: {
         imapHost: true,
+        imapServername: true,
         imapPort: true,
         imapUser: true,
         imapPass: true,
@@ -70,6 +71,7 @@ async function credenzialiImap(tenantId: string): Promise<CredenzialiImap> {
 
   return {
     host: t?.imapHost || undefined,
+    servername: t?.imapServername || undefined,
     port: t?.imapPort || undefined,
     user: t?.imapUser || t?.smtpUser || undefined,
     pass: t?.imapPass || t?.smtpPass || undefined,

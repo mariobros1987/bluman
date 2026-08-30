@@ -47,6 +47,9 @@ model Tenant {
   tgBotToken        String?  @map("tg_bot_token")
   tgBotUsername     String?  @map("tg_bot_username")
   smtpHost          String?  @map("smtp_host")
+  /// Nome che il certificato del server SMTP deve attestare, quando è diverso dall'host a cui
+  /// si collega (SNI dichiarato). Vuoto: si verifica contro `smtpHost`, come di norma.
+  smtpServername    String?  @map("smtp_servername")
   smtpPort          Int?     @map("smtp_port")
   smtpSecure        Boolean? @default(false) @map("smtp_secure")
   smtpUser          String?  @map("smtp_user")
@@ -56,6 +59,10 @@ model Tenant {
   smtpReplyTo       String?  @map("smtp_reply_to")
   smtpBcc           String?  @map("smtp_bcc")
   imapHost          String?  @map("imap_host")
+  /// Nome che il certificato del server IMAP deve attestare. Serve dove il nome coperto dal
+  /// certificato non ha record DNS e l'indirizzo raggiungibile ne ha un altro: la connessione
+  /// va all'host, la verifica al nome dichiarato qui. Vuoto: si verifica contro `imapHost`.
+  imapServername    String?  @map("imap_servername")
   imapPort          Int?     @map("imap_port")
   imapSecure        Boolean? @default(true) @map("imap_secure")
   imapUser          String?  @map("imap_user")

@@ -21,6 +21,16 @@ import { spiegaErrorePosta } from './diagnosiPosta.js';
 
 export interface CredenzialiImap {
   host?: string;
+  /**
+   * Nome che il certificato del server deve attestare, quando è diverso dall'host.
+   *
+   * Il caso misurato: l'indirizzo raggiungibile presenta un certificato emesso per un nome che
+   * non ha record DNS. Con un solo campo le due condizioni non stanno insieme — con l'uno la
+   * verifica TLS interrompe, con l'altro non si stabilisce nemmeno la connessione. Qui la
+   * connessione va all'host e la verifica al nome dichiarato dallo studio; il certificato
+   * viene verificato in entrambi i casi (§3.4).
+   */
+  servername?: string;
   port?: number;
   user?: string;
   pass?: string;
@@ -76,21 +86,14 @@ async function leggiViaRelay(imap: CredenzialiImap, clientEmail?: string): Promi
     return { ok: false, email: [], errore: `relay rifiutato: ${url} non è HTTPS e trasporterebbe la password in chiaro` };
   }
 
-  // Se il nome IMAP non risolve in DNS su Vercel (nome coperto dal certificato wildcard ma
-  // senza record A/AAAA), risolviamo l'IP qui sul backend — dove il server di posta è
-  // raggiungibile — e lo passiamo al relay come imapNetworkHost. Il relay usa l'IP per TCP
-  // e il nome originale come SNI TLS: verifica del certificato attiva, nessun nome cablato.
-  let imapNetworkHost = imap.host || '';
-  if (imap.host) {
-    try {
-      const { lookup } = await import('node:dns/promises');
-      const { address } = await lookup(imap.host);
-      imapNetworkHost = address;
-    } catch {
-      // Se fallisce anche qui l'errore sarà chiaro nel relay: stesso ENOTFOUND, diagnosticabile.
-    }
-  }
-
+  // Qui c'era una risoluzione DNS del nome configurato, fatta sul backend per passare l'IP al
+  // relay come host di rete. Non poteva funzionare per il caso che l'ha motivata: un nome senza
+  // record A non risolve dal backend più di quanto risolva da Vercel — il DNS interrogato è lo
+  // stesso — quindi la `lookup` falliva, si ricadeva sul nome originale e il relay riportava lo
+  // stesso ENOTFOUND. Dove invece il nome risolveva, mandare l'IP al posto del nome toglieva al
+  // provider la possibilità di spostare il servizio o di bilanciarlo su più indirizzi.
+  // L'indirizzo a cui collegarsi e il nome da verificare sono due informazioni distinte e
+  // adesso sono due campi distinti delle impostazioni: nessuno dei due si deduce dall'altro.
   const controller = new AbortController();
   const scadenza = setTimeout(() => controller.abort(), 20000);
   try {
@@ -104,7 +107,7 @@ async function leggiViaRelay(imap: CredenzialiImap, clientEmail?: string): Promi
       body: JSON.stringify({
         action: 'fetch-imap-inbound',
         imapHost: imap.host,
-        imapNetworkHost,
+        imapServername: imap.servername,
         imapPort: imap.port,
         imapUser: imap.user,
         imapPass: imap.pass,
@@ -205,7 +208,14 @@ function leggiViaImap(imap: CredenzialiImap, limite: number): Promise<EsitoPosta
     let buffer = '';
     let concluso = false;
 
-    const socket = tls.connect({ host, port: porta, rejectUnauthorized: tlsRejectUnauthorized() });
+    // `servername` sposta la verifica sul nome dichiarato nelle impostazioni; senza di esso
+    // Node verifica contro l'host, che è il comportamento voluto quando il campo è vuoto.
+    const socket = tls.connect({
+      host,
+      port: porta,
+      rejectUnauthorized: tlsRejectUnauthorized(),
+      ...(imap.servername ? { servername: imap.servername } : {}),
+    });
 
     const chiudi = (esito: EsitoPostaInArrivo) => {
       if (concluso) return;

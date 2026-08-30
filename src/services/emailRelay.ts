@@ -47,6 +47,16 @@ export function tlsRejectUnauthorized(): boolean {
 
 export interface CredenzialiSmtp {
   host?: string;
+  /**
+   * Nome che il certificato deve attestare, quando è diverso dall'host a cui si collega.
+   *
+   * Non è un'eccezione alla verifica (§3.4): il certificato viene verificato, e lo si verifica
+   * contro questo nome invece che contro l'host. Serve dove il nome coperto dal certificato non
+   * ha record DNS e l'indirizzo raggiungibile ne ha un altro — la coppia misurata sulla casella
+   * dello studio è nella migrazione `20260830120000_nome_certificato_posta`. Vuoto, cioè il caso
+   * normale, la verifica avviene contro l'host.
+   */
+  servername?: string;
   port?: number;
   secure?: boolean;
   user?: string;
@@ -150,6 +160,7 @@ async function inviaViaRelay(messaggio: MessaggioEmail, smtp: CredenzialiSmtp): 
       body: JSON.stringify({
         action: 'send-message',
         smtpHost: smtp.host,
+        smtpServername: smtp.servername,
         smtpPort: smtp.port,
         smtpSecure: smtp.secure,
         smtpUser: smtp.user,
@@ -203,7 +214,10 @@ async function inviaViaSmtp(
         port: cand.port,
         secure: cand.secure,
         auth: { user: smtp.user, pass: smtp.pass },
-        tls: { rejectUnauthorized: tlsRejectUnauthorized() },
+        // `servername` cambia il nome contro cui si verifica il certificato, non il fatto che
+        // lo si verifichi: senza di esso nodemailer usa l'host, che è quello che vogliamo
+        // quando il campo è vuoto.
+        tls: { rejectUnauthorized: tlsRejectUnauthorized(), ...(smtp.servername ? { servername: smtp.servername } : {}) },
         connectionTimeout: timeoutMs,
         greetingTimeout: timeoutMs,
       });
@@ -242,6 +256,7 @@ async function inviaViaSmtp(
 export async function inviaEmail(messaggio: MessaggioEmail): Promise<EsitoEmail> {
   const smtp: CredenzialiSmtp = {
     host: messaggio.smtp?.host || process.env.SMTP_HOST,
+    servername: messaggio.smtp?.servername || process.env.SMTP_SERVERNAME || undefined,
     port: messaggio.smtp?.port || Number(process.env.SMTP_PORT ?? 465),
     secure: messaggio.smtp?.secure,
     user: messaggio.smtp?.user || process.env.SMTP_USER,

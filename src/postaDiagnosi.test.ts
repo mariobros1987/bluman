@@ -105,7 +105,44 @@ describe('§35 — diagnosiPosta traduce l\'errore di rete in un intervento', ()
 
     expect(d.causa).toBe('certificato-altro-nome');
     expect(d.hostSuggerito).toBeUndefined();
+    expect(d.nomeCertificatoSuggerito).toBeUndefined();
     expect(d.rimedio).toMatch(/chiedi al provider/i);
+    // Anche senza proposta la seconda strada va nominata: è quella che risolve il caso in cui il
+    // nome del certificato non è raggiungibile.
+    expect(d.rimedio).toMatch(/Nome nel certificato/);
+  });
+
+  it('certificato per un altro nome: propone le due strade, host oppure nome dichiarato', () => {
+    // È il caso misurato: `imap.register.it` risolve ma presenta `*.securemail.pro`, e
+    // `imap.securemail.pro` è coperto dal certificato ma non ha record DNS. La prima strada
+    // (cambiare l'host) lì non basta, e il rimedio deve dirlo prima che l'operatore ci sbatta.
+    const d = diagnosiPosta({ protocollo: 'IMAP', host: 'imap.register.it', porta: 993, messaggio: ERRORE_CERT_IMAP });
+
+    expect(d.hostSuggerito).toBe('imap.securemail.pro');
+    // Lo stesso nome serve alle due strade: come host se il provider lo pubblica, come nome
+    // dichiarato se non lo pubblica — in quel caso non serve che risolva.
+    expect(d.nomeCertificatoSuggerito).toBe('imap.securemail.pro');
+    expect(d.rimedio).toMatch(/Nome nel certificato/);
+    expect(d.rimedio).toMatch(/Server posta in arrivo \(IMAP\)/);
+    // La seconda strada non è «disattiva la verifica»: il certificato resta verificato (§3.4).
+    expect(d.rimedio).toMatch(/certificato resta verificato/i);
+    expect(d.rimedio).not.toMatch(/SMTP_INSECURE_TLS/);
+  });
+
+  it('nome del certificato che non risolve: rimanda al campo dedicato, non a un altro host', () => {
+    // Quello che accade seguendo la prima strada quando il provider non pubblica quel nome:
+    // senza questa indicazione l'operatore torna al punto di partenza e alterna i due errori.
+    const d = diagnosiPosta({
+      protocollo: 'IMAP',
+      host: 'imap.securemail.pro',
+      porta: 993,
+      codice: 'ENOTFOUND',
+      messaggio: 'getaddrinfo ENOTFOUND imap.securemail.pro',
+    });
+
+    expect(d.causa).toBe('nome-inesistente');
+    expect(d.rimedio).toMatch(/Nome nel certificato/);
+    expect(d.rimedio).toContain('imap.securemail.pro');
   });
 
   it('porta che non risponde: nomina il blocco dell\'hosting e il relay', () => {

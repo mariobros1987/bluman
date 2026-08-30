@@ -110,9 +110,9 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
       'logoUrl', 'coloreTemaFattura', 'notePieFattura', 'titoloIntestazione',
       'iban', 'email', 'pec', 'telefono',
       'waPhoneId', 'waAccessToken', 'waVerifyToken', 'tgBotToken', 'tgBotUsername',
-      'smtpHost', 'smtpPort', 'smtpSecure', 'smtpUser', 'smtpPass',
+      'smtpHost', 'smtpServername', 'smtpPort', 'smtpSecure', 'smtpUser', 'smtpPass',
       'smtpFromEmail', 'smtpFromName', 'smtpReplyTo', 'smtpBcc',
-      'imapHost', 'imapPort', 'imapSecure', 'imapUser', 'imapPass',
+      'imapHost', 'imapServername', 'imapPort', 'imapSecure', 'imapUser', 'imapPass',
       'imapFolder', 'imapPollInterval', 'imapProtocol', 'emailSignatureHtml',
       'regimeFiscale', 'capitaleSociale', 'regImprese', 'mostraSdi', 'mostraIva',
       'emailInboundParseUrl', 'signalCliEndpoint',
@@ -649,7 +649,7 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
    * uno studio con l'host sbagliato vedeva l'errore di un server che non aveva mai indicato.
    * Ora si prova esattamente quello che c'è: corpo della richiesta, altrimenti riga Tenant.
    */
-  server.post<{ Body: { smtpHost?: string; smtpPort?: number; smtpSecure?: boolean; smtpUser?: string; smtpPass?: string; smtpFromEmail?: string; smtpFromName?: string; emailDestinatario?: string } }>('/tenant/test-email', async (req, reply) => {
+  server.post<{ Body: { smtpHost?: string; smtpServername?: string; smtpPort?: number; smtpSecure?: boolean; smtpUser?: string; smtpPass?: string; smtpFromEmail?: string; smtpFromName?: string; emailDestinatario?: string } }>('/tenant/test-email', async (req, reply) => {
     const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
     let dbTenant: any = null;
     try {
@@ -658,6 +658,9 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
 
     const body = req.body || {};
     const host = body.smtpHost || dbTenant?.smtpHost || '';
+    // Il nome del certificato fa parte della configurazione da provare: se la prova lo
+    // ignorasse, passerebbe (o fallirebbe) su una connessione diversa da quella degli invii.
+    const servername = body.smtpServername ?? dbTenant?.smtpServername ?? '';
     const port = Number(body.smtpPort) || Number(dbTenant?.smtpPort) || 465;
     const secure = body.smtpSecure !== undefined ? Boolean(body.smtpSecure) : (dbTenant?.smtpSecure !== undefined ? Boolean(dbTenant.smtpSecure) : port === 465);
     const user = body.smtpUser || dbTenant?.smtpUser || '';
@@ -668,7 +671,7 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
     const fromName = body.smtpFromName || dbTenant?.smtpFromName || dbTenant?.ragioneSociale || '';
     const toEmail = body.emailDestinatario || user;
 
-    const res = await provaPostaInUscita({ host, port, secure, user, pass, fromEmail, fromName, toEmail });
+    const res = await provaPostaInUscita({ host, servername, port, secure, user, pass, fromEmail, fromName, toEmail });
 
     if (!res.success) {
       return reply.code(400).send(res);
@@ -676,7 +679,7 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
     return reply.send(res);
   });
 
-  server.post<{ Body: { imapHost?: string; imapPort?: number; imapUser?: string; imapPass?: string; imapSecure?: boolean } }>('/tenant/test-imap', async (req, reply) => {
+  server.post<{ Body: { imapHost?: string; imapServername?: string; imapPort?: number; imapUser?: string; imapPass?: string; imapSecure?: boolean } }>('/tenant/test-imap', async (req, reply) => {
     const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
     let dbTenant: any = null;
     try {
@@ -685,6 +688,11 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
 
     const body = req.body || {};
     const host = body.imapHost || dbTenant?.imapHost || '';
+    // Qui il nome dichiarato è il punto della questione: è il caso in cui l'indirizzo a cui si
+    // collega e il nome che il certificato attesta non coincidono, e senza provarlo la prova
+    // fallirebbe con «Hostname/IP does not match certificate's altnames» pur essendo la
+    // configurazione corretta.
+    const servername = body.imapServername ?? dbTenant?.imapServername ?? '';
     const port = Number(body.imapPort) || Number(dbTenant?.imapPort) || 993;
     const secure = body.imapSecure !== undefined ? Boolean(body.imapSecure) : (dbTenant?.imapSecure !== undefined ? Boolean(dbTenant.imapSecure) : port === 993);
     const user = body.imapUser || dbTenant?.imapUser || '';
@@ -692,7 +700,7 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
     // se non c'è nemmeno quella, la prova lo dice invece di collegarsi a una casella altrui.
     const pass = body.imapPass || dbTenant?.imapPass || dbTenant?.smtpPass || '';
 
-    const res = await provaPostaInArrivo({ host, port, secure, user, pass });
+    const res = await provaPostaInArrivo({ host, servername, port, secure, user, pass });
 
     if (!res.success) {
       return reply.code(400).send(res);

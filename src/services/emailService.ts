@@ -41,6 +41,8 @@ export interface EsitoProvaPosta {
  */
 export async function provaPostaInUscita(options: {
   host?: string;
+  /** Nome che il certificato deve attestare, se lo studio lo ha dichiarato. */
+  servername?: string;
   port?: number;
   secure?: boolean;
   user?: string;
@@ -50,6 +52,7 @@ export async function provaPostaInUscita(options: {
   toEmail?: string;
 }): Promise<EsitoProvaPosta> {
   const host = (options.host || '').trim();
+  const servername = (options.servername || '').trim();
   const user = (options.user || '').trim();
   const pass = options.pass || '';
 
@@ -81,12 +84,13 @@ export async function provaPostaInUscita(options: {
         </p>
         <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px 18px; margin: 20px 0; font-size: 13px; color: #475569;">
           <p style="margin: 0 0 6px 0;">Server: <code>${host}:${porta}</code></p>
+          ${servername ? `<p style="margin: 0 0 6px 0;">Nome verificato nel certificato: <code>${servername}</code></p>` : ''}
           <p style="margin: 0 0 6px 0;">Utenza: <code>${user}</code></p>
           <p style="margin: 0;">Data della prova: <code>${new Date().toLocaleString('it-IT')}</code></p>
         </div>
       </div>
     `,
-    smtp: { host, port: porta, secure: options.secure ?? porta === 465, user, pass },
+    smtp: { host, servername: servername || undefined, port: porta, secure: options.secure ?? porta === 465, user, pass },
     fromEmail: options.fromEmail || user,
     fromName: nomeMittente || undefined,
     etichetta: 'prova configurazione',
@@ -121,12 +125,15 @@ export async function provaPostaInUscita(options: {
  */
 export async function provaPostaInArrivo(options: {
   host?: string;
+  /** Nome che il certificato deve attestare, se lo studio lo ha dichiarato. */
+  servername?: string;
   port?: number;
   secure?: boolean;
   user?: string;
   pass?: string;
 }): Promise<EsitoProvaPosta> {
   const host = (options.host || '').trim();
+  const servername = (options.servername || '').trim();
   const user = (options.user || '').trim();
   const pass = options.pass || '';
   const port = Number(options.port) || 993;
@@ -161,9 +168,19 @@ export async function provaPostaInArrivo(options: {
 
     try {
       const socket = secure
-        ? tls.connect({ host, port, rejectUnauthorized: tlsRejectUnauthorized() }, () => {
-            // Handshake TLS completato
-          })
+        ? tls.connect(
+            {
+              host,
+              port,
+              rejectUnauthorized: tlsRejectUnauthorized(),
+              // Nome dichiarato nelle impostazioni: la verifica si sposta su di lui, non si
+              // spegne. Vuoto, si verifica contro l'host.
+              ...(servername ? { servername } : {}),
+            },
+            () => {
+              // Handshake TLS completato
+            },
+          )
         : net.connect({ host, port }, () => {
             // Handshake senza cifratura: il provider non offre IMAPS su questa porta
           });
@@ -183,7 +200,9 @@ export async function provaPostaInArrivo(options: {
           onDone({
             success: true,
             via: `${host}:${port}`,
-            message: `✓ Casella in arrivo raggiunta e credenziali accettate su ${host}:${port} per ${user}.`,
+            message:
+              `✓ Casella in arrivo raggiunta e credenziali accettate su ${host}:${port} per ${user}.` +
+              (servername ? ` Certificato verificato per «${servername}».` : ''),
           });
         } else if (str.includes('A01 NO') || str.includes('A01 BAD')) {
           clearTimeout(timer);
@@ -209,6 +228,7 @@ export async function sendMagicLinkEmail(
   magicUrl: string,
   customConfig?: {
     host?: string;
+    servername?: string;
     port?: number;
     secure?: boolean;
     user?: string;
@@ -222,6 +242,7 @@ export async function sendMagicLinkEmail(
   // l'invio fallisce comunque, solo senza dire perché. Senza host `inviaEmail` risponde «SMTP
   // non configurato», che è l'informazione vera.
   const host = customConfig?.host || process.env.SMTP_HOST;
+  const servername = customConfig?.servername || process.env.SMTP_SERVERNAME || undefined;
   const port = customConfig?.port || Number(process.env.SMTP_PORT ?? 465);
   const secure = customConfig?.secure !== undefined ? customConfig.secure : (port === 465);
   const user = customConfig?.user || process.env.SMTP_USER;
@@ -253,7 +274,7 @@ export async function sendMagicLinkEmail(
     to: toEmail,
     subject: `🔑 Accesso al Portale Cliente — ${clienteNome}`,
     html,
-    smtp: { host, port, secure, user, pass },
+    smtp: { host, servername, port, secure, user, pass },
     fromEmail,
     fromName,
     etichetta: 'Magic Link',
@@ -336,6 +357,7 @@ export async function sendClientCredentialsEmail(
   portalUrl?: string,
   customConfig?: {
     host?: string;
+    servername?: string;
     port?: number;
     secure?: boolean;
     user?: string;
@@ -347,6 +369,7 @@ export async function sendClientCredentialsEmail(
   // Nessun host cablato, per lo stesso motivo di `sendMagicLinkEmail`: senza host questa
   // email non parte, e va detto invece di provare il server di un altro provider.
   const host = customConfig?.host || process.env.SMTP_HOST;
+  const servername = customConfig?.servername || process.env.SMTP_SERVERNAME || undefined;
   const port = customConfig?.port || Number(process.env.SMTP_PORT ?? 465);
   const secure = customConfig?.secure !== undefined ? customConfig.secure : (port === 465);
   const user = customConfig?.user || process.env.SMTP_USER;
@@ -383,7 +406,7 @@ export async function sendClientCredentialsEmail(
     to: toEmail,
     subject: `🔑 Credenziali di Accesso al Portale — ${clienteNome}`,
     html,
-    smtp: { host, port, secure, user, pass },
+    smtp: { host, servername, port, secure, user, pass },
     fromEmail,
     fromName,
     etichetta: 'credenziali portale',

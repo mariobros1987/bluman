@@ -63,8 +63,8 @@ function cleanRawEmailBody(raw: string): string {
 // Helper per scaricare le email reali dalla casella IMAP
 async function fetchRecentImapEmails(options: {
   host?: string;
-  /** IP o hostname di rete alternativo per la connessione TCP (SNI pass-through). */
-  networkHost?: string;
+  /** Nome che il certificato deve attestare, quando è diverso dall'host. */
+  servername?: string;
   port?: number;
   user: string;
   pass: string;
@@ -76,26 +76,26 @@ async function fetchRecentImapEmails(options: {
     // host si collegasse al server di un provider qualunque con le credenziali di questo
     // studio. Il backend manda sempre l'host della casella, e la chiamata senza host viene
     // rifiutata prima di arrivare qui.
-    // Se il nome non ha un record DNS autonomo (ad es. imap.securemail.pro → NXDOMAIN)
-    // ma il suo IP è noto, il backend passa anche imapServername per il SNI TLS esplicito:
-    // la connessione TCP usa l'IP, la verifica del certificato usa il nome logico.
-    const nominalHost = options.host || '';
-    const networkHost = options.networkHost || nominalHost;
+    // `host` è l'indirizzo a cui collegarsi, `servername` il nome che il certificato deve
+    // attestare: sono due informazioni distinte perché l'indirizzo raggiungibile e il nome
+    // coperto dal certificato possono non coincidere. Il certificato si verifica in ogni caso.
+    const host = options.host || '';
+    const servername = options.servername || '';
     const port = options.port || 993;
     const user = options.user;
     const pass = options.pass;
     const folder = options.folder || 'INBOX';
     const limit = options.limit || 10;
 
-    if (!nominalHost || !user || !pass) {
+    if (!host || !user || !pass) {
       return resolve([]);
     }
 
     const socket = tls.connect(
       {
-        host: networkHost,
+        host,
         port,
-        servername: nominalHost,
+        ...(servername ? { servername } : {}),
         rejectUnauthorized: !tlsInsicuraAmmessa(),
         timeout: 5000,
       },
@@ -276,6 +276,11 @@ export default async function handler(req: any, res: any) {
     const {
       action = 'send-message',
       smtpHost = '',
+      /**
+       * Nome che il certificato SMTP deve attestare, quando è diverso dall'host. Il
+       * certificato si verifica comunque: cambia solo il nome contro cui lo si confronta.
+       */
+      smtpServername = '',
       smtpPort = 465,
       smtpSecure,
       smtpUser = '',
@@ -292,7 +297,14 @@ export default async function handler(req: any, res: any) {
       imapUser = '',
       imapPass = '',
       imapFolder = 'INBOX',
-      /** IP di rete alternativo quando il nome IMAP non ha record DNS (SNI pass-through). */
+      /** Nome che il certificato IMAP deve attestare, quando è diverso dall'host. */
+      imapServername = '',
+      /**
+       * Forma precedente della stessa richiesta: il backend risolveva l'IP e lo mandava qui
+       * come host di rete, tenendo `imapHost` come nome da verificare. Resta accettata perché
+       * questa funzione e il backend si distribuiscono separatamente — Vercel al push, Railway
+       * con `railway up` — e per qualche minuto le due versioni convivono.
+       */
       imapNetworkHost = '',
       clientEmail = '',
     } = req.body || {};
@@ -301,8 +313,12 @@ export default async function handler(req: any, res: any) {
     // AZIONE 1: Lettura della posta in arrivo (IMAP) per conto del backend
     // ─────────────────────────────────────────────────────────────
     if (action === 'fetch-imap-inbound') {
-      const activeHost = String(imapHost || '').trim();
-      const activeNetworkHost = String(imapNetworkHost || '').trim();
+      const nomeDichiarato = String(imapServername || '').trim();
+      const hostVecchiaForma = String(imapNetworkHost || '').trim();
+      // Nella forma nuova `imapHost` è l'indirizzo e `imapServername` il nome da verificare;
+      // nella precedente era l'inverso, con l'IP in `imapNetworkHost`.
+      const activeHost = (hostVecchiaForma && !nomeDichiarato ? hostVecchiaForma : String(imapHost || '')).trim();
+      const activeServername = nomeDichiarato || (hostVecchiaForma ? String(imapHost || '').trim() : '');
       const activeUser = String(imapUser || smtpUser || '').trim();
       const activePass = String(imapPass || smtpPass || '').trim();
       // Prima qui si rispondeva `success: true, emails: []` senza credenziali: la casella
@@ -318,7 +334,7 @@ export default async function handler(req: any, res: any) {
 
       const incomingEmails = await fetchRecentImapEmails({
         host: activeHost,
-        networkHost: activeNetworkHost || activeHost,
+        servername: activeServername,
         port: Number(imapPort) || 993,
         user: activeUser,
         pass: activePass,
@@ -367,6 +383,8 @@ export default async function handler(req: any, res: any) {
 
     const primaryPort = Number(smtpPort) || 465;
     const primaryHost = effectiveHost;
+    // Vale per tutte le porte provate: è una proprietà della casella, non del tentativo.
+    const nomeCertificato = String(smtpServername || '').trim();
 
     // Solo l'host dello studio, con le porte plausibili. Prima la lista conteneva
     // `authsmtp.register.it`, `smtps.register.it` e `mail.register.it`: le credenziali di uno
@@ -439,7 +457,12 @@ export default async function handler(req: any, res: any) {
           // password della casella viaggiava verso qualunque server sapesse rispondere
           // all'handshake, certificato sbagliato incluso. Chi ha un server di posta interno
           // con certificato self-signed lo dichiara con SMTP_INSECURE_TLS=1.
-          tls: { rejectUnauthorized: !tlsInsicuraAmmessa() },
+          // `servername`, quando lo studio lo ha dichiarato, sposta la verifica su quel nome:
+          // il certificato deve comunque essere valido e coprirlo.
+          tls: {
+            rejectUnauthorized: !tlsInsicuraAmmessa(),
+            ...(nomeCertificato ? { servername: nomeCertificato } : {}),
+          },
           connectionTimeout: 8000,
           greetingTimeout: 7000,
           socketTimeout: 15000,

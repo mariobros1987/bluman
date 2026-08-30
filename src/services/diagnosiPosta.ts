@@ -44,6 +44,15 @@ export interface DiagnosiPosta {
   nomiDelCertificato?: string[];
   /** Nome coerente col certificato, con la stessa funzione dell'host configurato. */
   hostSuggerito?: string;
+  /**
+   * Nome da dichiarare nel campo «Nome nel certificato» tenendo l'host così com'è.
+   *
+   * È la seconda strada, e per la posta in arrivo di register.it è l'unica: `imap.register.it`
+   * risolve ma presenta `*.securemail.pro`, mentre `imap.securemail.pro` è coperto dal
+   * certificato e non ha record DNS. Nessun singolo valore nel campo «Server» soddisfa insieme
+   * DNS e certificato, quindi i due nomi vanno separati invece di scegliere quale sacrificare.
+   */
+  nomeCertificatoSuggerito?: string;
 }
 
 function normalizzaNome(valore: string): string {
@@ -120,7 +129,12 @@ export function diagnosiPosta(contesto: ContestoErrorePosta): DiagnosiPosta {
       rimedio:
         `il nome «${dove}» non esiste nel DNS: nessun server risponde a quell'indirizzo, quindi ` +
         `non è una questione di password. Correggi il campo «${campo}» nelle impostazioni dello ` +
-        `studio con il nome che il provider della casella pubblica nel suo pannello.`,
+        `studio con il nome che il provider della casella pubblica nel suo pannello. ` +
+        // Il caso non è teorico: è quello che accade seguendo la prima strada suggerita
+        // dall'errore di certificato quando il nome coerente non è pubblicato nel DNS.
+        `Se «${dove}» è il nome che il certificato attesta ma il provider non lo pubblica, non va ` +
+        `qui: rimetti nel campo «${campo}» l'indirizzo che risolve e scrivi «${dove}» nel campo ` +
+        `«Nome nel certificato».`,
     };
   }
 
@@ -128,19 +142,29 @@ export function diagnosiPosta(contesto: ContestoErrorePosta): DiagnosiPosta {
     const nomiDelCertificato = nomiDalMessaggio(contesto.messaggio || '');
     const hostSuggerito = hostCoerente(host, nomiDelCertificato);
     const elenco = nomiDelCertificato.length ? nomiDelCertificato.join(', ') : 'altri nomi';
+    // Lo stesso nome serve alle due strade: come host, se il provider lo pubblica nel DNS;
+    // come nome dichiarato, quando non lo pubblica. Nel secondo caso non serve che risolva —
+    // ci si collega all'host configurato e si verifica il certificato contro questo nome.
+    const nomeCertificatoSuggerito = hostSuggerito;
     return {
       causa: 'certificato-altro-nome',
       nomiDelCertificato: nomiDelCertificato.length ? nomiDelCertificato : undefined,
       hostSuggerito,
+      nomeCertificatoSuggerito,
       rimedio:
         `«${dove}» risponde presentando un certificato valido per ${elenco}: la connessione viene ` +
         `interrotta perché non c'è modo di verificare di stare parlando col server giusto, e la ` +
         `password della casella passerebbe da lì. ` +
         (hostSuggerito
-          ? `Prova «${hostSuggerito}» nel campo «${campo}»: è il nome coerente col certificato. Se ` +
-            `non risolve, chiedi al provider il nome esatto del server — non disattivare la verifica.`
-          : `Chiedi al provider quale nome usare per collegarsi a questa casella: è quello che va ` +
-            `nel campo «${campo}».`),
+          ? `Due strade, in quest'ordine: (1) scrivi «${hostSuggerito}» nel campo «${campo}», che è ` +
+            `il nome coerente col certificato — se il provider lo pubblica nel DNS finisce qui; ` +
+            `(2) se rispondesse che quel nome non esiste, lascia «${dove}» nel campo «${campo}» e ` +
+            `scrivi «${hostSuggerito}» nel campo «Nome nel certificato»: la connessione va ` +
+            `all'indirizzo che risolve e il certificato resta verificato, contro il nome che ` +
+            `attesta davvero. Non disattivare la verifica.`
+          : `Chiedi al provider due cose: il nome a cui collegarsi e il nome intestato al ` +
+            `certificato. Il primo va nel campo «${campo}», il secondo — solo se diverso — nel ` +
+            `campo «Nome nel certificato».`),
     };
   }
 

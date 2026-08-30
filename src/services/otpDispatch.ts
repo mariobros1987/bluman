@@ -12,6 +12,7 @@
  */
 import { prisma } from '../util/prismaClient';
 import { sendOtpSecurityEmail } from './emailService';
+import type { CredenzialiSmtp } from './emailRelay';
 import { chiamaGraphWhatsapp } from './whatsappService';
 import type { CanaleOtp } from './otpService';
 import { TTL_OTP_SECONDI } from './otpService';
@@ -26,7 +27,9 @@ export interface CredenzialiCanali {
   waAccessToken: string | null;
   tgBotToken: string | null;
   tgBotUsername: string | null;
-  smtp: { host?: string; port?: number; secure?: boolean; user?: string; pass?: string };
+  // Lo stesso tipo che `inviaEmail` riceve: `servername` compreso. Ricopiarne i campi a mano
+  // significava che una colonna aggiunta qui non arrivava all'invio e nessun typecheck lo diceva.
+  smtp: CredenzialiSmtp;
   smtpFromEmail: string | null;
   smtpFromName: string | null;
 }
@@ -50,6 +53,7 @@ export async function credenzialiCanali(tenantId: string): Promise<CredenzialiCa
         tgBotToken: true,
         tgBotUsername: true,
         smtpHost: true,
+        smtpServername: true,
         smtpPort: true,
         smtpSecure: true,
         smtpUser: true,
@@ -70,6 +74,7 @@ export async function credenzialiCanali(tenantId: string): Promise<CredenzialiCa
     tgBotUsername: t?.tgBotUsername || process.env.TELEGRAM_BOT_USERNAME || null,
     smtp: {
       host: t?.smtpHost || undefined,
+      servername: t?.smtpServername || undefined,
       port: t?.smtpPort || undefined,
       secure: t?.smtpSecure ?? undefined,
       user: t?.smtpUser || undefined,

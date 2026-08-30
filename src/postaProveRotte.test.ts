@@ -110,6 +110,41 @@ describe('§35 — POST /tenant/test-email', () => {
     const res = await server().inject({ method: 'POST', url: '/tenant/test-email', payload: {} });
     expect(res.statusCode).toBe(401);
   });
+
+  it('il nome del certificato indicato nel modulo viene provato, non ignorato', async () => {
+    // Se la prova ignorasse questo campo verificherebbe una connessione diversa da quella degli
+    // invii veri: passerebbe dove la posta non parte, o fallirebbe su una configurazione buona.
+    stato.tenant = {
+      id: TENANT,
+      smtpHost: 'authsmtp.esempio.test',
+      smtpUser: 'studio@esempio.test',
+      smtpPass: 'password-di-prova-non-reale',
+    };
+    process.env.EMAIL_RELAY_URL = 'https://esempio.test/api/send-email';
+
+    const corpi: any[] = [];
+    const fetchPrecedente = global.fetch;
+    global.fetch = (async (_url: any, opzioni: any) => {
+      corpi.push(JSON.parse(String(opzioni?.body ?? '{}')));
+      return { ok: true, status: 200, json: async () => ({ success: true }) } as any;
+    }) as any;
+
+    try {
+      const res = await server().inject({
+        method: 'POST',
+        url: '/tenant/test-email',
+        headers: auth(),
+        payload: { smtpServername: 'authsmtp.certificato.test' },
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(corpi).toHaveLength(1);
+      expect(corpi[0].smtpHost).toBe('authsmtp.esempio.test');
+      expect(corpi[0].smtpServername).toBe('authsmtp.certificato.test');
+    } finally {
+      global.fetch = fetchPrecedente;
+    }
+  });
 });
 
 describe('§35 — POST /tenant/test-imap', () => {
