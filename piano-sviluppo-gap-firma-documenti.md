@@ -322,6 +322,45 @@ La stessa POST sul dominio del frontend risponde con l'HTML di `index.html`, per
 
 ---
 
+## §35 (addendum posta) — «le mail non partono e non arrivano» — ✅ codice chiuso il 30/08/2026, intervento sulle impostazioni aperto
+
+### Il sintomo, e le tre righe lette in produzione
+```
+❌ Errore SMTP: getaddrinfo ENOTFOUND mail.bluecode-ltd.com
+❌ Errore IMAP: Hostname/IP does not match certificate's altnames:
+   Host: imap.register.it. is not in the cert's altnames: DNS:*.securemail.pro, DNS:securemail.pro
+dalle impostazioni neanche il test passa
+```
+Sono **tre guasti diversi** che chiedono tre interventi diversi, e nessuna delle tre righe lo dice. Chi le legge conclude «la posta è rotta» e cambia la password, che è l'unica cosa che non c'entra.
+
+| Riga | Causa vera | Intervento |
+|---|---|---|
+| `ENOTFOUND` | Il nome nel campo «Server SMTP» della riga Tenant non esiste nel DNS | correggere il campo con il nome che il provider pubblica |
+| `altnames` | Il server risponde ma presenta un certificato emesso per altri nomi | usare il nome coerente col certificato, **non** disattivare la verifica |
+| «neanche il test passa» | La prova percorreva solo l'**SMTP diretto**, cioè le porte che Railway blocca in uscita, mentre gli invii veri passavano dal relay e riuscivano | la prova deve percorrere la strada degli invii veri |
+
+### Che cosa è cambiato nel codice
+- **`src/services/diagnosiPosta.ts` (nuovo)** — l'unico posto che traduce un errore di posta in un intervento: sei cause riconosciute dal **testo** (non solo da `err.code`, che si perde quando il guasto arriva di seconda mano dal relay), i nomi che il certificato copre davvero, e la proposta del nome coerente conservando la prima etichetta. Ordine di riconoscimento deliberato — DNS, certificato, timeout, credenziali — perché su Railway il timeout delle porte chiuse compare **insieme** alla causa vera e non deve coprirla. Non propone mai di disattivare la verifica dei certificati (§3.4).
+- **`src/services/emailService.ts`** — `verifyAndSendTestSmtp` (quattordici coppie host/porta, cinque delle quali **server di altri**, messaggio di prova con mittente e intestazione di un solo studio) sostituita da `provaPostaInUscita()`, che compone e consegna a `inviaEmail()`: stessa strada degli invii veri, relay compreso, e `via` nella risposta dice da dove è passata. `verifyRealImap` → `provaPostaInArrivo()`, con ogni guasto tradotto. Rimossi i due ripieghi su un host e un'utenza di terzi in `sendMagicLinkEmail` e `sendClientCredentialsEmail`; rimossa l'esportazione `createTransporter`.
+- **`src/routes/tenant.ts`** — `POST /tenant/test-email`, `POST /tenant/test-imap` e il ramo email di `POST /tenant/test-channel` provano **esattamente quello che c'è** (corpo della richiesta, altrimenti riga Tenant) e non completano più la configurazione mancante con `process.env.SMTP_*` né con host e utenza cablati: una casella non configurata risponde 400 «non configurata», non un successo ottenuto con la casella della piattaforma.
+- **`src/services/imapInbound.ts`**, **`api/send-email.ts`** — via il ripiego sull'host IMAP di un provider: senza host la lettura si rifiuta invece di collegarsi al server di qualcun altro con le credenziali di questo studio.
+- **`src/services/imapFetcher.ts` — eliminato**: 157 righe di secondo client IMAP scritto a mano, senza nessun importatore, con l'host di un provider come ripiego.
+- **`frontend/src/pages/SettingsPage.tsx`** — «✓ CONNESSO!» solo con `success: true`. Prima bastava che il messaggio — scritto dal server — contenesse «successo» o «verificata» (regola 7).
+- **`src/routes/tenant.ts`, `POST /audit-logs`** — l'attore lo dice il token, non il corpo della richiesta: c'erano il nome e l'indirizzo di una persona reale come ripiego, attribuiti a chiunque chiamasse la rotta senza indicarsi. In un registro immutabile un attore inventato è peggio di un attore ignoto.
+
+### Presidi
+- `src/postaDiagnosi.test.ts` (15 test) — la traduzione sui messaggi verbatim di produzione, il punto finale del nome DNS (`imap.register.it.`, com'è scritto da Node), il certificato che non copre nessun nome utilizzabile (nessuna proposta inventata), la stringa composta da `inviaEmail` dove il timeout non deve coprire il certificato, e il presidio strutturale: **nessun nome di server di terzi in posizione di codice** in `src/` e `api/`, nessun mittente cablato nei moduli della posta.
+- `src/postaProveRotte.test.ts` (8 test) — le due rotte di prova su una casella non configurata: 400 con l'elenco di cosa manca, 401 senza token, e con `SMTP_USER`/`SMTP_PASS` nell'ambiente la prova **non** ricade su quelle credenziali.
+- Suite completa: **460 test, 34 file, verde**; `npx tsc --noEmit` e `npm run typecheck` in `frontend/` puliti.
+
+### Da fare, e non è codice
+1. **Correggere l'host della posta in uscita nella riga Tenant** (Impostazioni → Posta, oppure `PUT /tenant/settings`). Dalla sonda DNS/TLS eseguita dal titolare: `mail.bluecode-ltd.com` **non risolve**; `smtp.securemail.pro` risolve su `81.88.48.66`, che è lo **stesso indirizzo** di `authsmtp.register.it`, ed è fra i nomi coperti dal certificato che quel server presenta sulla 465 — quindi è il nome che funziona con la verifica TLS attiva.
+2. **Chiedere al provider il nome esatto del server IMAP**: `imap.register.it` presenta un certificato per `*.securemail.pro` e `imap.securemail.pro` **non risolve**, quindi dall'evidenza raccolta non esiste un nome che sia insieme verificabile e pubblicato. Finché non c'è, la posta in arrivo resta ferma: disattivare la verifica non è la via d'uscita, perché la password della casella viaggia in quella connessione.
+3. **Verificare che `EMAIL_RELAY_SECRET` sia identico su Railway e su Vercel**: se differiscono, il relay risponde 401 e la posta ripiega sull'SMTP diretto, cioè sulle porte bloccate.
+4. **Distribuire il backend**: Railway non è collegato a GitHub, quindi un push su `main` aggiorna solo il frontend su Vercel. Le modifiche di questo addendum arrivano in produzione con `railway up`, che da questo ambiente non è eseguibile (egress negato).
+
+---
+
 ## Riepilogo effort complessivo
 
 | Punto | Stima |

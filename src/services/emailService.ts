@@ -1,7 +1,7 @@
-import nodemailer from 'nodemailer';
 import tls from 'tls';
 import net from 'net';
 import { inviaEmail, tlsRejectUnauthorized, type EsitoEmail } from './emailRelay.js';
+import { spiegaErrorePosta } from './diagnosiPosta.js';
 
 export type { EsitoEmail } from './emailRelay.js';
 export { inviaEmail } from './emailRelay.js';
@@ -12,204 +12,193 @@ export interface EmailOptions {
   html: string;
 }
 
-export function createTransporter(customConfig?: {
+export interface EsitoProvaPosta {
+  success: boolean;
+  /** Frase pronta per l'interfaccia: cosa è successo e, se è andata male, cosa fare. */
+  message: string;
+  errore?: string;
+  /** Strada che ha funzionato: `relay <url>` oppure `host:porta`. */
+  via?: string;
+}
+
+/**
+ * Prova reale della posta in uscita, sulla strada che percorrono gli invii veri.
+ *
+ * Questa funzione provava solo l'SMTP diretto: quattordici coppie host/porta aperte a mano,
+ * cioè esattamente la strada che la rete in uscita di Railway non lascia percorrere (il
+ * perché è documentato in `emailRelay.ts`). Da qui il sintomo riportato dallo studio — «dalle
+ * impostazioni neanche il test passa» — su una casella che intanto spediva OTP e Magic Link
+ * senza problemi: il test scadeva sulle porte chiuse, gli invii veri passavano dal relay.
+ *
+ * Cinque di quelle coppie erano poi host di altri: `authsmtp.register.it`,
+ * `smtps.register.it`, `mail.register.it`, `mail.bluecode-ltd.com`. Le credenziali di uno
+ * studio su Gmail o Microsoft 365 venivano offerte ai server di Register.it, cioè a un
+ * provider che con quello studio non ha niente a che vedere: è la stessa correzione già
+ * fatta in `api/send-email.ts` (regola 6).
+ *
+ * Ora la prova chiama `inviaEmail`, l'unico punto di uscita della posta: quello che passa qui
+ * è l'invio reale, e quello che non passa dice da dove ha provato e cosa fare.
+ */
+export async function provaPostaInUscita(options: {
   host?: string;
   port?: number;
   secure?: boolean;
   user?: string;
   pass?: string;
-}) {
-  const host = customConfig?.host || process.env.SMTP_HOST;
-  const port = customConfig?.port || Number(process.env.SMTP_PORT ?? 465);
-  const secure = customConfig?.secure !== undefined ? customConfig.secure : port === 465;
-  const user = customConfig?.user || process.env.SMTP_USER;
-  const pass = customConfig?.pass || process.env.SMTP_PASS;
-
-  if (!host || !user || !pass) {
-    return null; // Fallback modalità simulazione
-  }
-
-  return nodemailer.createTransport({
-    host,
-    port,
-    secure,
-    auth: { user, pass },
-    tls: {
-      rejectUnauthorized: tlsRejectUnauthorized(),
-    },
-    connectionTimeout: 10000,
-  });
-}
-
-export async function verifyAndSendTestSmtp(options: {
-  host: string;
-  port: number;
-  secure: boolean;
-  user: string;
-  pass: string;
   fromEmail?: string;
   fromName?: string;
   toEmail?: string;
-}): Promise<{ success: boolean; message: string; errore?: string }> {
-  const candidates: Array<{ host: string; port: number; secure: boolean }> = [
-    { host: options.host, port: options.port, secure: options.secure },
-    { host: options.host, port: 465, secure: true },
-    { host: options.host, port: 587, secure: false },
-    { host: 'authsmtp.register.it', port: 465, secure: true },
-    { host: 'authsmtp.register.it', port: 587, secure: false },
-    { host: 'authsmtp.register.it', port: 25, secure: false },
-    { host: 'smtps.register.it', port: 465, secure: true },
-    { host: 'smtps.register.it', port: 587, secure: false },
-    { host: 'smtp.register.it', port: 465, secure: true },
-    { host: 'smtp.register.it', port: 587, secure: false },
-    { host: 'mail.register.it', port: 465, secure: true },
-    { host: 'mail.register.it', port: 587, secure: false },
-    { host: 'mail.bluecode-ltd.com', port: 465, secure: true },
-    { host: 'mail.bluecode-ltd.com', port: 587, secure: false },
-  ];
+}): Promise<EsitoProvaPosta> {
+  const host = (options.host || '').trim();
+  const user = (options.user || '').trim();
+  const pass = options.pass || '';
 
-  const uniqueCandidates = candidates.filter(
-    (c, index, self) => index === self.findIndex(t => t.host === c.host && t.port === c.port)
-  );
-
-  const targetEmail = options.toEmail || options.user;
-  const from = options.fromEmail || options.user;
-  const senderName = options.fromName || 'BlueCode Advisory';
-
-  let lastError: any = null;
-
-  for (const cand of uniqueCandidates) {
-    try {
-      const transporter = nodemailer.createTransport({
-        host: cand.host,
-        port: cand.port,
-        secure: cand.secure,
-        auth: {
-          user: options.user,
-          pass: options.pass,
-        },
-        tls: {
-          rejectUnauthorized: tlsRejectUnauthorized(),
-        },
-        connectionTimeout: 8000,
-      });
-
-      await transporter.sendMail({
-        from: `"${senderName}" <${from}>`,
-        to: targetEmail,
-        subject: `🧪 Test Connessione SMTP BluMan — ${new Date().toLocaleTimeString('it-IT')}`,
-        html: `
-          <div style="font-family: Arial, sans-serif; padding: 24px; border: 1px solid #059669; border-radius: 12px; background: #f0fdf4; color: #166534; max-width: 600px; margin: 0 auto;">
-            <h2 style="margin-top: 0; color: #047857;">✓ Connessione SMTP con Register.it Riuscita!</h2>
-            <p style="font-size: 14px; line-height: 1.5; color: #065f46;">
-              Questa è un'email reale inviata dai server di <strong>Register.it</strong> tramite BluMan Advisory Platform.
-            </p>
-            <div style="background: #ffffff; border: 1px solid #a7f3d0; padding: 14px; border-radius: 8px; margin: 16px 0; font-size: 13px;">
-              <p style="margin: 0 0 6px 0;"><strong>Dettagli configurazione verificata:</strong></p>
-              <ul style="margin: 0; padding-left: 20px;">
-                <li>Account Autenticato: <code>${options.user}</code></li>
-                <li>Data/Ora: <code>${new Date().toLocaleString('it-IT')}</code></li>
-              </ul>
-            </div>
-            <p style="font-size: 12px; color: #059669; margin-bottom: 0;">
-              Il sistema è ora pronto per inviare inviti collaboratori, Magic Link, OTP di firma FEA e fatture.
-            </p>
-          </div>
-        `,
-      });
-
-      return {
-        success: true,
-        message: `✓ Connessione SMTP verificata ed email reale di test recapitata con successo a ${targetEmail}! (Host: ${cand.host}:${cand.port})`,
-      };
-    } catch (err: any) {
-      lastError = err;
-    }
+  // Nessun ripiego su un host cablato né sulle variabili d'ambiente: un test che passa grazie
+  // alla casella di un altro dichiara funzionante una posta che non è configurata (regola 7).
+  const mancanti = [!host && 'il server SMTP', !user && "l'utenza", !pass && 'la password'].filter(Boolean);
+  if (mancanti.length > 0) {
+    const errore = `Posta in uscita non configurata: ${mancanti.join(', ')} nelle impostazioni dello studio ${mancanti.length > 1 ? 'sono vuoti' : 'è vuoto'}.`;
+    return { success: false, message: `❌ ${errore}`, errore };
   }
 
-  console.error('[SMTP Real Test Error]', lastError);
-  return {
-    success: false,
-    message: `❌ Errore SMTP: ${lastError?.message || 'Autenticazione o connessione fallita su Register.it'}`,
-    errore: lastError?.message,
-  };
+  const destinatario = (options.toEmail || user).trim();
+  const porta = Number(options.port) || 465;
+  const nomeMittente = (options.fromName || '').trim();
+
+  const esito = await inviaEmail({
+    to: destinatario,
+    subject: `Prova di configurazione della posta — ${new Date().toLocaleTimeString('it-IT')}`,
+    // Nessun nome di provider e nessun nome di studio cablati nel modello: il messaggio
+    // riporta la configurazione che è stata provata, che è l'unica cosa che serve a chi lo
+    // riceve per capire se è quella giusta.
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; color: #1e293b;">
+        <h2 style="margin-top: 0; font-size: 18px;">Prova di configurazione della posta in uscita</h2>
+        <p style="line-height: 1.6; color: #475569;">
+          Se stai leggendo questo messaggio, la posta in uscita configurata nelle impostazioni dello
+          studio funziona: le comunicazioni ai clienti, i codici di firma e i link di accesso al
+          portale partono da questa casella.
+        </p>
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px 18px; margin: 20px 0; font-size: 13px; color: #475569;">
+          <p style="margin: 0 0 6px 0;">Server: <code>${host}:${porta}</code></p>
+          <p style="margin: 0 0 6px 0;">Utenza: <code>${user}</code></p>
+          <p style="margin: 0;">Data della prova: <code>${new Date().toLocaleString('it-IT')}</code></p>
+        </div>
+      </div>
+    `,
+    smtp: { host, port: porta, secure: options.secure ?? porta === 465, user, pass },
+    fromEmail: options.fromEmail || user,
+    fromName: nomeMittente || undefined,
+    etichetta: 'prova configurazione',
+  });
+
+  if (esito.ok) {
+    return {
+      success: true,
+      via: esito.via,
+      message:
+        `✓ Messaggio di prova recapitato a ${destinatario}${esito.via ? ` (${esito.via})` : ''}. ` +
+        `La posta in uscita dello studio è funzionante.`,
+    };
+  }
+
+  // `inviaEmail` alla stringa tecnica ha già aggiunto l'istruzione: qui non si riscrive, si
+  // riporta. Riformularla significherebbe farne due versioni che divergono.
+  const errore = esito.errore || 'invio non riuscito, motivo non riportato dal server';
+  return { success: false, errore, message: `❌ Prova non riuscita: ${errore}` };
 }
 
-export async function verifyRealImap(options: {
-  host: string;
-  port: number;
-  secure: boolean;
-  user: string;
-  pass: string;
-}): Promise<{ success: boolean; message: string; errore?: string }> {
-  return new Promise((resolve) => {
+/**
+ * Prova reale della casella in arrivo: LOGIN IMAP sul socket, niente di simulato.
+ *
+ * Due cose sono cambiate rispetto a `verifyRealImap`. La prima: host, utenza e password sono
+ * obbligatori qui, perché la rotta non li completa più con `imap.register.it` e la casella
+ * della piattaforma — con quel ripiego un tenant senza configurazione vedeva la prova
+ * riuscire sulla casella di un altro. La seconda: l'errore del socket non è più solo il
+ * messaggio di Node. «Hostname/IP does not match certificate's altnames» era la riga che
+ * l'operatore vedeva, e non c'è nulla in quella riga che indichi cosa fare — la password
+ * risulta sospettata, mentre il guasto sta nel nome del server (`diagnosiPosta.ts`).
+ */
+export async function provaPostaInArrivo(options: {
+  host?: string;
+  port?: number;
+  secure?: boolean;
+  user?: string;
+  pass?: string;
+}): Promise<EsitoProvaPosta> {
+  const host = (options.host || '').trim();
+  const user = (options.user || '').trim();
+  const pass = options.pass || '';
+  const port = Number(options.port) || 993;
+  const secure = options.secure ?? port === 993;
+
+  const mancanti = [!host && 'il server IMAP', !user && "l'utenza", !pass && 'la password'].filter(Boolean);
+  if (mancanti.length > 0) {
+    const errore = `Casella in arrivo non configurata: ${mancanti.join(', ')} nelle impostazioni dello studio ${mancanti.length > 1 ? 'sono vuoti' : 'è vuoto'}.`;
+    return { success: false, message: `❌ ${errore}`, errore };
+  }
+
+  return new Promise(resolve => {
     const timeoutMs = 12000;
     let finished = false;
 
-    const onDone = (res: { success: boolean; message: string; errore?: string }) => {
+    const onDone = (res: EsitoProvaPosta) => {
       if (!finished) {
         finished = true;
         resolve(res);
       }
     };
 
+    /** Ogni fallimento passa da qui: messaggio tecnico più istruzione, una volta sola. */
+    const fallisci = (messaggio: string) => {
+      const spiegato = spiegaErrorePosta({ protocollo: 'IMAP', host, porta: port, messaggio });
+      onDone({ success: false, message: `❌ ${spiegato}`, errore: spiegato });
+    };
+
     const timer = setTimeout(() => {
-      onDone({
-        success: false,
-        message: `❌ Timeout connessione IMAP a ${options.host}:${options.port} dopo 12s`,
-        errore: 'Connection Timeout',
-      });
+      fallisci(`ETIMEDOUT: nessuna risposta da ${host}:${port} entro ${timeoutMs / 1000} secondi`);
     }, timeoutMs);
 
     try {
-      const socket = options.secure
-        ? tls.connect({ host: options.host, port: options.port, rejectUnauthorized: tlsRejectUnauthorized() }, () => {
+      const socket = secure
+        ? tls.connect({ host, port, rejectUnauthorized: tlsRejectUnauthorized() }, () => {
             // Handshake TLS completato
           })
-        : net.connect({ host: options.host, port: options.port }, () => {
-            // Handshake Plain completato
+        : net.connect({ host, port }, () => {
+            // Handshake senza cifratura: il provider non offre IMAPS su questa porta
           });
 
       socket.setTimeout(timeoutMs);
 
-      socket.on('data', (data) => {
+      socket.on('data', data => {
         const str = data.toString();
         if (str.includes('* OK')) {
-          // Banner IMAP di Register.it ricevuto, inviamo comando di autenticazione LOGIN
-          socket.write(`A01 LOGIN "${options.user}" "${options.pass}"\r\n`);
+          // Banner del server ricevuto: si autentica. Le virgolette nelle credenziali vanno
+          // protette, altrimenti spezzano il comando.
+          const esc = (v: string) => v.replace(/([\\"])/g, '\\$1');
+          socket.write(`A01 LOGIN "${esc(user)}" "${esc(pass)}"\r\n`);
         } else if (str.includes('A01 OK')) {
           clearTimeout(timer);
           socket.end();
           onDone({
             success: true,
-            message: `✓ Connessione IMAP e autenticazione RIUSCITE su ${options.host}:${options.port} per ${options.user}! Servizio posta in entrata attivo.`,
+            via: `${host}:${port}`,
+            message: `✓ Casella in arrivo raggiunta e credenziali accettate su ${host}:${port} per ${user}.`,
           });
         } else if (str.includes('A01 NO') || str.includes('A01 BAD')) {
           clearTimeout(timer);
           socket.end();
-          onDone({
-            success: false,
-            message: `❌ Errore autenticazione IMAP da ${options.host}: Password o Username errati (${str.trim()})`,
-            errore: str.trim(),
-          });
+          fallisci(`A01 NO: ${host} ha rifiutato utenza o password (${str.trim()})`);
         }
       });
 
-      socket.on('error', (err) => {
+      socket.on('error', err => {
         clearTimeout(timer);
-        onDone({
-          success: false,
-          message: `❌ Errore socket IMAP (${options.host}:${options.port}): ${err.message}`,
-          errore: err.message,
-        });
+        fallisci(`${(err as any)?.code ? `${(err as any).code}: ` : ''}${err.message}`);
       });
     } catch (err: any) {
       clearTimeout(timer);
-      onDone({
-        success: false,
-        message: `❌ Impossibile stabilire socket IMAP: ${err.message}`,
-        errore: err.message,
-      });
+      fallisci(`${err?.code ? `${err.code}: ` : ''}${err?.message || 'socket non stabilito'}`);
     }
   });
 }
@@ -228,7 +217,11 @@ export async function sendMagicLinkEmail(
     fromName?: string;
   }
 ): Promise<EsitoEmail> {
-  const host = customConfig?.host || process.env.SMTP_HOST || 'authsmtp.register.it';
+  // Nessun host cablato. Il ripiego su `authsmtp.register.it` mandava le credenziali di questo
+  // studio al server di un provider che potrebbe non essere il suo; e con l'host sbagliato
+  // l'invio fallisce comunque, solo senza dire perché. Senza host `inviaEmail` risponde «SMTP
+  // non configurato», che è l'informazione vera.
+  const host = customConfig?.host || process.env.SMTP_HOST;
   const port = customConfig?.port || Number(process.env.SMTP_PORT ?? 465);
   const secure = customConfig?.secure !== undefined ? customConfig.secure : (port === 465);
   const user = customConfig?.user || process.env.SMTP_USER;
@@ -351,7 +344,9 @@ export async function sendClientCredentialsEmail(
     fromName?: string;
   }
 ): Promise<EsitoEmail> {
-  const host = customConfig?.host || process.env.SMTP_HOST || 'authsmtp.register.it';
+  // Nessun host cablato, per lo stesso motivo di `sendMagicLinkEmail`: senza host questa
+  // email non parte, e va detto invece di provare il server di un altro provider.
+  const host = customConfig?.host || process.env.SMTP_HOST;
   const port = customConfig?.port || Number(process.env.SMTP_PORT ?? 465);
   const secure = customConfig?.secure !== undefined ? customConfig.secure : (port === 465);
   const user = customConfig?.user || process.env.SMTP_USER;

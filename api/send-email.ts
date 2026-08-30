@@ -70,14 +70,18 @@ async function fetchRecentImapEmails(options: {
   limit?: number;
 }): Promise<Array<{ id: string; from: string; subject: string; date: string; text: string }>> {
   return new Promise((resolve) => {
-    const host = options.host || 'imap.register.it';
+    // Nessun host cablato: il ripiego su `imap.register.it` faceva sì che una chiamata senza
+    // host si collegasse al server di un provider qualunque con le credenziali di questo
+    // studio. Il backend manda sempre l'host della casella, e la chiamata senza host viene
+    // rifiutata prima di arrivare qui.
+    const host = options.host || '';
     const port = options.port || 993;
     const user = options.user;
     const pass = options.pass;
     const folder = options.folder || 'INBOX';
     const limit = options.limit || 10;
 
-    if (!user || !pass) {
+    if (!host || !user || !pass) {
       return resolve([]);
     }
 

@@ -11,7 +11,7 @@ import type { FastifyInstance } from 'fastify';
 import { prisma, prismaAmministrativo } from '../util/prismaClient.js';
 import { generaPasswordTemporanea, hashPassword } from '../util/password.js';
 import { rifirmaUrlUpload } from '../services/storageService.js';
-import { verifyAndSendTestSmtp, verifyRealImap, createTransporter, sendInvitoCollaboratoreEmail } from '../services/emailService.js';
+import { provaPostaInUscita, provaPostaInArrivo, sendInvitoCollaboratoreEmail } from '../services/emailService.js';
 import { credenzialiCanali } from '../services/otpDispatch.js';
 import { inMemoryTenantStore, recordAudit, senzaHash } from '../util/serverHelpers.js';
 
@@ -640,6 +640,15 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
     }
   });
 
+  /**
+   * §35 — la prova della posta in uscita usa la strada della posta vera.
+   *
+   * Prima questa rotta completava la configurazione mancante con `process.env.SMTP_*` e, in
+   * ultima istanza, con un host e un'utenza scritti nel codice. Due conseguenze: uno studio
+   * senza posta configurata vedeva la prova riuscire (con la casella della piattaforma), e
+   * uno studio con l'host sbagliato vedeva l'errore di un server che non aveva mai indicato.
+   * Ora si prova esattamente quello che c'è: corpo della richiesta, altrimenti riga Tenant.
+   */
   server.post<{ Body: { smtpHost?: string; smtpPort?: number; smtpSecure?: boolean; smtpUser?: string; smtpPass?: string; smtpFromEmail?: string; smtpFromName?: string; emailDestinatario?: string } }>('/tenant/test-email', async (req, reply) => {
     const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
     let dbTenant: any = null;
@@ -648,25 +657,18 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
     } catch {}
 
     const body = req.body || {};
-    const host = body.smtpHost || dbTenant?.smtpHost || process.env.SMTP_HOST || 'authsmtp.register.it';
-    const port = Number(body.smtpPort) || Number(dbTenant?.smtpPort) || Number(process.env.SMTP_PORT) || 465;
+    const host = body.smtpHost || dbTenant?.smtpHost || '';
+    const port = Number(body.smtpPort) || Number(dbTenant?.smtpPort) || 465;
     const secure = body.smtpSecure !== undefined ? Boolean(body.smtpSecure) : (dbTenant?.smtpSecure !== undefined ? Boolean(dbTenant.smtpSecure) : port === 465);
-    const user = body.smtpUser || dbTenant?.smtpUser || process.env.SMTP_USER || 'info@bluecode.advisory';
-    const pass = body.smtpPass || dbTenant?.smtpPass || process.env.SMTP_PASS || '';
+    const user = body.smtpUser || dbTenant?.smtpUser || '';
+    // La password può arrivare vuota dal modulo perché `GET /tenant/info` la maschera: in quel
+    // caso si prova quella salvata, che è quella con cui la posta parte davvero.
+    const pass = body.smtpPass || dbTenant?.smtpPass || '';
     const fromEmail = body.smtpFromEmail || dbTenant?.smtpFromEmail || user;
-    const fromName = body.smtpFromName || dbTenant?.smtpFromName || 'BlueCode Advisory';
+    const fromName = body.smtpFromName || dbTenant?.smtpFromName || dbTenant?.ragioneSociale || '';
     const toEmail = body.emailDestinatario || user;
 
-    const res = await verifyAndSendTestSmtp({
-      host,
-      port,
-      secure,
-      user,
-      pass,
-      fromEmail,
-      fromName,
-      toEmail,
-    });
+    const res = await provaPostaInUscita({ host, port, secure, user, pass, fromEmail, fromName, toEmail });
 
     if (!res.success) {
       return reply.code(400).send(res);
@@ -682,19 +684,15 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
     } catch {}
 
     const body = req.body || {};
-    const host = body.imapHost || dbTenant?.imapHost || 'imap.register.it';
+    const host = body.imapHost || dbTenant?.imapHost || '';
     const port = Number(body.imapPort) || Number(dbTenant?.imapPort) || 993;
     const secure = body.imapSecure !== undefined ? Boolean(body.imapSecure) : (dbTenant?.imapSecure !== undefined ? Boolean(dbTenant.imapSecure) : port === 993);
-    const user = body.imapUser || dbTenant?.imapUser || 'info@bluecode.advisory';
+    const user = body.imapUser || dbTenant?.imapUser || '';
+    // La password IMAP ricade su quella SMTP perché su molti provider la casella è la stessa;
+    // se non c'è nemmeno quella, la prova lo dice invece di collegarsi a una casella altrui.
     const pass = body.imapPass || dbTenant?.imapPass || dbTenant?.smtpPass || '';
 
-    const res = await verifyRealImap({
-      host,
-      port,
-      secure,
-      user,
-      pass,
-    });
+    const res = await provaPostaInArrivo({ host, port, secure, user, pass });
 
     if (!res.success) {
       return reply.code(400).send(res);
@@ -762,13 +760,16 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
       }
 
       if (canale === 'email' || canale === 'smtp') {
-        const trasporto = createTransporter(cred.smtp);
-        if (!trasporto) return esito(false, 'SMTP non impostato: mancano host, utenza o password.');
-        await trasporto.verify();
-        return esito(
-          true,
-          `Server SMTP raggiungibile e credenziali accettate${cred.smtpFromEmail ? ` (mittente ${cred.smtpFromEmail})` : ''}.`,
-        );
+        // `createTransporter(...).verify()` apriva una connessione SMTP diretta: sulla rete di
+        // Railway quella connessione scade sempre, quindi il pulsante rispondeva «non
+        // raggiungibile» su configurazioni perfettamente funzionanti. La prova è la stessa di
+        // `/tenant/test-email` — relay compreso — perché è quella la strada degli invii veri.
+        const prova = await provaPostaInUscita({
+          ...cred.smtp,
+          fromEmail: cred.smtpFromEmail ?? undefined,
+          fromName: cred.smtpFromName ?? undefined,
+        });
+        return esito(prova.success, prova.message);
       }
 
       // A «signal» rispondeva «Daemon Signal REST API v1 in ascolto sul container Docker»:
@@ -799,14 +800,23 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
   server.post<{ Body: Record<string, any> }>('/audit-logs', async (req, reply) => {
     const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
     const body = (req.body || {}) as Record<string, any>;
+    // Chi ha fatto l'operazione lo dice il token, non il corpo della richiesta: qui c'erano
+    // `body.userEmail || 'joe@…'` e `body.userNome || 'Joe Disabato'`, cioè il nome di una
+    // persona reale attribuito a chiunque chiamasse la rotta senza indicarsi. In un registro
+    // immutabile un attore inventato è peggio di un attore ignoto (regola 7), e il corpo della
+    // richiesta non è una prova di identità: prevale sempre l'utenza autenticata. Le colonne
+    // sono NOT NULL, quindi in mancanza di token — che il guard non consente su questa rotta —
+    // resta un segnaposto che si dichiara tale.
+    const autenticato = (req as any).user || null;
+    const IGNOTO = 'utenza-non-identificata';
     try {
       const log = await prisma.auditLog.create({
         data: {
           tenantId,
-          userId: body.userId || 'usr-01',
-          userEmail: body.userEmail || 'joe@bluecode.advisory',
-          userNome: body.userNome || 'Joe Disabato',
-          ruolo: body.ruolo || 'advisor',
+          userId: autenticato?.userId || body.userId || IGNOTO,
+          userEmail: autenticato?.email || body.userEmail || IGNOTO,
+          userNome: body.userNome || autenticato?.email || 'Utenza non identificata',
+          ruolo: (req as any).ruolo || body.ruolo || IGNOTO,
           azione: body.azione,
           entita: body.entita,
           dettagli: body.dettagli,

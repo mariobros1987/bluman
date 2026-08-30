@@ -317,10 +317,14 @@ export function SettingsPage() {
         smtpFromName,
         emailDestinatario: smtpUser || email,
       });
-      if (json && (json.success || String(json.message || '').includes('successo'))) {
-        setSmtpTestResult(`✓ CONNESSO! ${json.message || `Email di prova inviata con successo a ${smtpUser || email}`}`);
+      // Riuscita è solo `success: true`. Prima bastava che il messaggio contenesse «successo»,
+      // e il messaggio lo scrive il server: una risposta di errore che diceva «la prova non è
+      // riuscita, riprova con successo» — o un testo cambiato nel backend — veniva mostrata
+      // come «✓ CONNESSO!». Il messaggio si legge, non si interpreta (regola 7).
+      if (json?.success) {
+        setSmtpTestResult(`✓ CONNESSO! ${json.message || `Email di prova inviata a ${smtpUser || email}`}`);
       } else {
-        setSmtpTestResult(`❌ Errore SMTP: ${json?.errore || json?.message || 'Impossibile connettersi al server SMTP'}`);
+        setSmtpTestResult(`❌ ${json?.errore || json?.message || 'Prova SMTP non riuscita: il server non ha riportato il motivo.'}`);
       }
     } catch (err: any) {
       setSmtpTestResult(`❌ Errore di connessione: ${err.message}`);
@@ -340,10 +344,10 @@ export function SettingsPage() {
         imapUser,
         imapPass,
       });
-      if (json && (json.success || String(json.message || '').includes('successo') || String(json.message || '').includes('verificata'))) {
+      if (json?.success) {
         setImapTestResult(`✓ CONNESSO! ${json.message || `Connessione IMAP verificata su ${imapHost}:${imapPort}`}`);
       } else {
-        setImapTestResult(`❌ Errore IMAP: ${json?.errore || json?.message || 'Impossibile connettersi al server IMAP'}`);
+        setImapTestResult(`❌ ${json?.errore || json?.message || 'Prova IMAP non riuscita: il server non ha riportato il motivo.'}`);
       }
     } catch (err: any) {
       setImapTestResult(`❌ Errore di connessione IMAP: ${err.message}`);

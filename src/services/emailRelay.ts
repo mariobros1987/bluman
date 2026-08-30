@@ -27,6 +27,7 @@
  *   tecnico di entrambe le strade, e chi ha chiamato lo riporta a chi sta firmando.
  */
 import nodemailer from 'nodemailer';
+import { spiegaErrorePosta } from './diagnosiPosta.js';
 
 /**
  * §3.4 — verifica dei certificati TLS per SMTP/IMAP. Prima era disattivata ovunque
@@ -275,8 +276,11 @@ export async function inviaEmail(messaggio: MessaggioEmail): Promise<EsitoEmail>
     if (esitoSmtp) return esitoSmtp;
 
     // Entrambi i motivi, perché richiedono interventi diversi: un rifiuto del relay si
-    // risolve nelle impostazioni della casella, le porte chiuse sull'hosting.
-    const errore = `${esitoRelay.errore}; nessuna porta utilizzabile verso ${smtp.host} (${errori.join('; ')})`;
+    // risolve nelle impostazioni della casella, le porte chiuse sull'hosting. In coda
+    // l'istruzione: «ENOTFOUND» e «altnames» sono due guasti distinti che il titolare dello
+    // studio non può distinguere da sé, e per uno dei due la password non c'entra (§35).
+    const tecnico = `${esitoRelay.errore}; nessuna porta utilizzabile verso ${smtp.host} (${errori.join('; ')})`;
+    const errore = spiegaErrorePosta({ protocollo: 'SMTP', host: smtp.host, porta: smtp.port, messaggio: tecnico });
     console.error(`[Email ${etichetta}] invio non riuscito: ${errore}`);
     return { ok: false, errore };
   }
@@ -284,9 +288,10 @@ export async function inviaEmail(messaggio: MessaggioEmail): Promise<EsitoEmail>
   const esitoSmtp = await inviaViaSmtp(messaggio, smtp, mittente, etichetta, errori, 10000);
   if (esitoSmtp) return esitoSmtp;
 
-  const errore =
+  const tecnico =
     `nessuna porta utilizzabile verso ${smtp.host} (${errori.join('; ')}); ` +
     'nessun relay configurato (EMAIL_RELAY_URL o APP_BASE_URL assenti)';
+  const errore = spiegaErrorePosta({ protocollo: 'SMTP', host: smtp.host, porta: smtp.port, messaggio: tecnico });
   console.error(`[Email ${etichetta}] invio non riuscito: ${errore}`);
   return { ok: false, errore };
 }

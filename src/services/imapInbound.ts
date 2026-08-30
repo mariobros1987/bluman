@@ -17,6 +17,7 @@
  */
 import tls from 'tls';
 import { tlsRejectUnauthorized } from './emailRelay.js';
+import { spiegaErrorePosta } from './diagnosiPosta.js';
 
 export interface CredenzialiImap {
   host?: string;
@@ -173,7 +174,10 @@ export function ripulisciCorpoEmail(grezzo: string): string {
  */
 function leggiViaImap(imap: CredenzialiImap, limite: number): Promise<EsitoPostaInArrivo> {
   return new Promise(resolve => {
-    const host = imap.host || 'imap.register.it';
+    // Nessun ripiego su `imap.register.it`: con quel nome cablato uno studio che non ha
+    // configurato la casella si collegava — o tentava di collegarsi — al server di un
+    // provider che non è il suo, e l'errore che leggeva riguardava quel server.
+    const host = imap.host || '';
     const porta = imap.port || 993;
     const cartella = imap.folder || 'INBOX';
     const utente = imap.user || '';
@@ -200,9 +204,29 @@ function leggiViaImap(imap: CredenzialiImap, limite: number): Promise<EsitoPosta
     };
 
     socket.setTimeout(timeoutMs, () =>
-      chiudi({ ok: false, email, errore: `nessuna risposta da ${host}:${porta} entro ${timeoutMs / 1000} secondi` }),
+      chiudi({
+        ok: false,
+        email,
+        errore: spiegaErrorePosta({
+          protocollo: 'IMAP',
+          host,
+          porta,
+          messaggio: `ETIMEDOUT: nessuna risposta da ${host}:${porta} entro ${timeoutMs / 1000} secondi`,
+        }),
+      }),
     );
-    socket.on('error', err => chiudi({ ok: false, email, errore: `${host}:${porta} — ${err.message}` }));
+    socket.on('error', err =>
+      chiudi({
+        ok: false,
+        email,
+        errore: spiegaErrorePosta({
+          protocollo: 'IMAP',
+          host,
+          porta,
+          messaggio: `${(err as any)?.code ? `${(err as any).code}: ` : ''}${err.message}`,
+        }),
+      }),
+    );
 
     socket.on('data', dati => {
       buffer += dati.toString('latin1');
@@ -291,11 +315,12 @@ export async function leggiPostaInArrivo(
 ): Promise<EsitoPostaInArrivo> {
   const limite = Math.min(Math.max(opzioni.limite ?? 15, 1), 50);
 
-  if (!imap.user || !imap.pass) {
+  if (!imap.host || !imap.user || !imap.pass) {
+    const mancanti = [!imap.host && 'il server IMAP', !imap.user && "l'utenza", !imap.pass && 'la password'].filter(Boolean);
     return {
       ok: false,
       email: [],
-      errore: 'Casella in arrivo non configurata: mancano utenza o password IMAP nelle impostazioni dello studio.',
+      errore: `Casella in arrivo non configurata: ${mancanti.join(', ')} nelle impostazioni dello studio ${mancanti.length > 1 ? 'sono vuoti' : 'è vuoto'}.`,
     };
   }
 
