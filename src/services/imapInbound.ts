@@ -76,6 +76,21 @@ async function leggiViaRelay(imap: CredenzialiImap, clientEmail?: string): Promi
     return { ok: false, email: [], errore: `relay rifiutato: ${url} non è HTTPS e trasporterebbe la password in chiaro` };
   }
 
+  // Se il nome IMAP non risolve in DNS su Vercel (nome coperto dal certificato wildcard ma
+  // senza record A/AAAA), risolviamo l'IP qui sul backend — dove il server di posta è
+  // raggiungibile — e lo passiamo al relay come imapNetworkHost. Il relay usa l'IP per TCP
+  // e il nome originale come SNI TLS: verifica del certificato attiva, nessun nome cablato.
+  let imapNetworkHost = imap.host || '';
+  if (imap.host) {
+    try {
+      const { lookup } = await import('node:dns/promises');
+      const { address } = await lookup(imap.host);
+      imapNetworkHost = address;
+    } catch {
+      // Se fallisce anche qui l'errore sarà chiaro nel relay: stesso ENOTFOUND, diagnosticabile.
+    }
+  }
+
   const controller = new AbortController();
   const scadenza = setTimeout(() => controller.abort(), 20000);
   try {
@@ -89,6 +104,7 @@ async function leggiViaRelay(imap: CredenzialiImap, clientEmail?: string): Promi
       body: JSON.stringify({
         action: 'fetch-imap-inbound',
         imapHost: imap.host,
+        imapNetworkHost,
         imapPort: imap.port,
         imapUser: imap.user,
         imapPass: imap.pass,

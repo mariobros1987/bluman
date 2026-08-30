@@ -60,9 +60,11 @@ function cleanRawEmailBody(raw: string): string {
   return cleanLines.join('\n').trim();
 }
 
-// Helper per scaricare le email reali dalla casella IMAP INBOX di Register.it
+// Helper per scaricare le email reali dalla casella IMAP
 async function fetchRecentImapEmails(options: {
   host?: string;
+  /** IP o hostname di rete alternativo per la connessione TCP (SNI pass-through). */
+  networkHost?: string;
   port?: number;
   user: string;
   pass: string;
@@ -70,28 +72,30 @@ async function fetchRecentImapEmails(options: {
   limit?: number;
 }): Promise<Array<{ id: string; from: string; subject: string; date: string; text: string }>> {
   return new Promise((resolve) => {
-    // Nessun host cablato: il ripiego su `imap.register.it` faceva sì che una chiamata senza
+    // Nessun host cablato: il ripiego su imap.register.it faceva sì che una chiamata senza
     // host si collegasse al server di un provider qualunque con le credenziali di questo
     // studio. Il backend manda sempre l'host della casella, e la chiamata senza host viene
     // rifiutata prima di arrivare qui.
-    const host = options.host || '';
+    // Se il nome non ha un record DNS autonomo (ad es. imap.securemail.pro → NXDOMAIN)
+    // ma il suo IP è noto, il backend passa anche imapServername per il SNI TLS esplicito:
+    // la connessione TCP usa l'IP, la verifica del certificato usa il nome logico.
+    const nominalHost = options.host || '';
+    const networkHost = options.networkHost || nominalHost;
     const port = options.port || 993;
     const user = options.user;
     const pass = options.pass;
     const folder = options.folder || 'INBOX';
     const limit = options.limit || 10;
 
-    if (!host || !user || !pass) {
+    if (!nominalHost || !user || !pass) {
       return resolve([]);
     }
 
     const socket = tls.connect(
       {
-        host,
+        host: networkHost,
         port,
-        // La password IMAP viaggia in questa connessione: `rejectUnauthorized: false` la
-        // offriva a qualunque server sapesse rispondere all'handshake, certificato sbagliato
-        // incluso. Stessa eccezione dichiarata dell'SMTP, stesso nome di variabile.
+        servername: nominalHost,
         rejectUnauthorized: !tlsInsicuraAmmessa(),
         timeout: 5000,
       },
@@ -288,6 +292,8 @@ export default async function handler(req: any, res: any) {
       imapUser = '',
       imapPass = '',
       imapFolder = 'INBOX',
+      /** IP di rete alternativo quando il nome IMAP non ha record DNS (SNI pass-through). */
+      imapNetworkHost = '',
       clientEmail = '',
     } = req.body || {};
 
@@ -296,6 +302,7 @@ export default async function handler(req: any, res: any) {
     // ─────────────────────────────────────────────────────────────
     if (action === 'fetch-imap-inbound') {
       const activeHost = String(imapHost || '').trim();
+      const activeNetworkHost = String(imapNetworkHost || '').trim();
       const activeUser = String(imapUser || smtpUser || '').trim();
       const activePass = String(imapPass || smtpPass || '').trim();
       // Prima qui si rispondeva `success: true, emails: []` senza credenziali: la casella
@@ -311,6 +318,7 @@ export default async function handler(req: any, res: any) {
 
       const incomingEmails = await fetchRecentImapEmails({
         host: activeHost,
+        networkHost: activeNetworkHost || activeHost,
         port: Number(imapPort) || 993,
         user: activeUser,
         pass: activePass,
