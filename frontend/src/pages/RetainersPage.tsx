@@ -1,13 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { fetchContrattiRicorrentiApi, creaContrattoRicorrenteApi, fetchClienti, generaFatturaRetainerApi } from '../api/client';
-import { getCurrentTenantId, getTenantStorageKey } from '../utils/tenant';
+import {
+  fetchContrattiRicorrentiApi,
+  creaContrattoRicorrenteApi,
+  generaFatturaRetainerApi,
+  fetchClienti,
+  fetchProgetti,
+} from '../api/client';
 import { fmt } from '../utils';
 
 export function RetainersPage() {
-  const navigate = useNavigate();
   const [contratti, setContratti] = useState<any[]>([]);
   const [clienti, setClienti] = useState<any[]>([]);
+  const [progetti, setProgetti] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
 
@@ -20,30 +24,24 @@ export function RetainersPage() {
   const [prossimaFatturazione, setProssimaFatturazione] = useState('');
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
+  const [generatingId, setGeneratingId] = useState<string | null>(null);
 
   const loadData = async () => {
     setLoading(true);
-    const currentTenantId = getCurrentTenantId();
-    const [cData, clData] = await Promise.all([
-      fetchContrattiRicorrentiApi(),
-      fetchClienti(),
-    ]);
-
-    const apiContratti = (cData || []).filter((c: any) => !c.tenantId || c.tenantId === currentTenantId);
-    const retStorageKey = getTenantStorageKey('bluman_retainer_contracts', currentTenantId);
-    const savedStr = localStorage.getItem(retStorageKey);
-    const localContratti: any[] = savedStr ? JSON.parse(savedStr) : [];
-
-    // Evita duplicati per ID
-    const mergedMap = new Map();
-    [...apiContratti, ...localContratti].forEach(item => {
-      if (item && item.id) mergedMap.set(item.id, item);
-    });
-
-    setContratti(Array.from(mergedMap.values()));
-    const filteredClients = (clData || []).filter((c: any) => !c.tenantId || c.tenantId === currentTenantId);
-    setClienti(filteredClients);
-    setLoading(false);
+    try {
+      const [cData, clData, prData] = await Promise.all([
+        fetchContrattiRicorrentiApi(),
+        fetchClienti(),
+        fetchProgetti(),
+      ]);
+      setContratti(cData || []);
+      setClienti(clData || []);
+      setProgetti(prData || []);
+    } catch (err) {
+      console.warn('Errore lettura contratti retainer:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -54,367 +52,319 @@ export function RetainersPage() {
     e.preventDefault();
     if (!clienteId || !titolo || !importoEuro || !prossimaFatturazione) return;
     setSaving(true);
-    const currentTenantId = getCurrentTenantId();
     const importoCentesimi = Math.round(parseFloat(importoEuro) * 100);
 
-    // §3.3 — local-first: la bozza va comunque in localStorage, poi si sincronizza col
-    // server. Se l'API fallisce l'alert lo dice: prima annunciava "attivato" comunque.
-    const draftLocale = {
-      id: `cnt-${Date.now()}`,
-      tenantId: currentTenantId,
-      clienteId,
-      progettoId,
-      titolo,
-      frequenza,
-      importoCentesimi,
-      prossimaFatturazione,
-      stato: 'attivo',
-      cliente: clienti.find(c => c.id === clienteId) || { nome: 'Cliente Studio' },
-    };
-    const retStorageKey = getTenantStorageKey('bluman_retainer_contracts', currentTenantId);
-    const salvaInLocale = (contratto: any) => {
-      const savedStr = localStorage.getItem(retStorageKey);
-      const savedArr: any[] = savedStr ? JSON.parse(savedStr) : [];
-      localStorage.setItem(retStorageKey, JSON.stringify([contratto, ...savedArr]));
-    };
-
     try {
-      const res = await creaContrattoRicorrenteApi({
+      await creaContrattoRicorrenteApi({
         clienteId,
         progettoId: progettoId || undefined,
         titolo,
         frequenza,
         importoCentesimi,
         prossimaFatturazione,
-        note,
+        note: note || undefined,
       });
-      salvaInLocale(res || draftLocale);
-      alert('✓ Contratto Ricorrente attivato con successo!');
+      alert('✓ Contratto Ricorrente (Retainer) attivato con successo a database!');
+      setShowModal(false);
+      setTitolo('');
+      setImportoEuro('');
+      setProssimaFatturazione('');
+      setNote('');
+      await loadData();
     } catch (err: any) {
-      salvaInLocale(draftLocale);
-      alert(`Contratto "${titolo}" salvato in LOCALE ma NON sincronizzato col server: ${err?.message || 'errore di rete'}. Risulterà visibile solo su questo dispositivo finché la sincronizzazione non andrà a buon fine.`);
+      alert(`Errore creazione contratto: ${err.message}`);
     } finally {
       setSaving(false);
     }
-    setShowModal(false);
-    setTitolo('');
-    setImportoEuro('');
-    setProgettoId('');
-    loadData();
   };
 
   const handleGeneraFattura = async (contrattoId: string) => {
-    if (!confirm('Confermi l\'emissione automatica della Fattura e la creazione della rata nello Scadenzario per questo canone?')) return;
-    setLoading(true);
-
-    const targetContratto = contratti.find(c => String(c.id) === String(contrattoId));
-
-    // §3.3 — emissione fiscale del canone: la fattura DEVE esistere sul server. Se l'API
-    // fallisce non si fabbrica nulla in locale (prima finiva nel registro fatture e nello
-    // scadenzario un numero casuale 'FT-<anno>-000N' senza alcuna emissione reale).
-    let res: any = null;
+    if (!confirm('Vuoi generare subito la fattura di questo periodo per il contratto retainer?')) return;
+    setGeneratingId(contrattoId);
     try {
-      res = await generaFatturaRetainerApi(contrattoId);
+      const res = await generaFatturaRetainerApi(contrattoId);
+      alert(res.messaggio || '✓ Fattura retainer emessa e inserita nello Scadenzario Incassi!');
+      await loadData();
     } catch (err: any) {
-      setLoading(false);
-      alert(`⚠️ Emissione fattura NON riuscita: ${err?.message || 'errore di rete'}. Nessuna fattura è stata creata e nessuna rata inserita nello Scadenzario: riprova.`);
-      return;
+      alert(`Errore generazione fattura: ${err.message}`);
+    } finally {
+      setGeneratingId(null);
     }
-
-    // Specchio locale per visibilità immediata in Fatture/Scadenzario (dati dalla risposta server)
-    const numeroFattura = res?.fattura?.numero || '(numero non comunicato dal server)';
-    const importoEurVal = (targetContratto?.importoCentesimi || 150000) / 100;
-
-    const nuovaFatturaLocal = {
-      id: res?.fattura?.id || `ft-ret-${Date.now()}`,
-      numero: numeroFattura,
-      tipo_documento: 'fattura',
-      serie: 'FT',
-      importo: importoEurVal,
-      data: new Date().toLocaleDateString('it-IT'),
-      stato: 'emessa',
-      progetto: targetContratto?.progetto ? {
-        id: targetContratto.progetto.id,
-        nome: targetContratto.progetto.nome || targetContratto.progetto.n,
-        cliente: targetContratto.cliente || { nome: 'Cliente Studio' },
-      } : {
-        id: 'prj-retainer',
-        nome: `Canone: ${targetContratto?.titolo || 'Retainer'}`,
-        cliente: targetContratto?.cliente || { nome: 'Cliente Studio' },
-      },
-      righe: [{ descrizione: targetContratto?.titolo || 'Canone Retainer Studio', importo: importoEurVal }],
-    };
-
-    // 1. Salva nel registro fatture locali
-    const savedInvoicesStr = localStorage.getItem('bluman_custom_invoices');
-    const savedInvoicesArr: any[] = savedInvoicesStr ? JSON.parse(savedInvoicesStr) : [];
-    localStorage.setItem('bluman_custom_invoices', JSON.stringify([nuovaFatturaLocal, ...savedInvoicesArr]));
-
-    // 2. Salva nello scadenzario locale
-    const nuovaScadenzaLocal = {
-      id: `scad-ret-${Date.now()}`,
-      numeroRata: 1,
-      dataScadenza: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-      importoCentesimi: targetContratto?.importoCentesimi || 150000,
-      stato: 'in_attesa',
-      fattura: nuovaFatturaLocal,
-    };
-    const savedScadStr = localStorage.getItem('bluman_custom_scadenze');
-    const savedScadArr: any[] = savedScadStr ? JSON.parse(savedScadStr) : [];
-    localStorage.setItem('bluman_custom_scadenze', JSON.stringify([nuovaScadenzaLocal, ...savedScadArr]));
-
-    // 3. Aggiorna lo stato del contratto localmente
-    const updatedContratti = contratti.map(c => {
-      if (String(c.id) === String(contrattoId)) {
-        const prox = new Date(c.prossimaFatturazione || Date.now());
-        prox.setMonth(prox.getMonth() + 1);
-        return { ...c, stato: 'fatturato', prossimaFatturazione: prox.toISOString() };
-      }
-      return c;
-    });
-    setContratti(updatedContratti);
-    localStorage.setItem('bluman_retainer_contracts', JSON.stringify(updatedContratti));
-
-    setLoading(false);
-    alert(`✓ Fattura ${numeroFattura} emessa con successo!\nStato contratto aggiornato ad "Inviato" ed inserito in Scadenzario Incassi.`);
   };
 
+  const totalMonthlyRunRateCentesimi = contratti.reduce((acc, c) => {
+    const val = c.importoCentesimi || 0;
+    if (c.frequenza === 'mensile') return acc + val;
+    if (c.frequenza === 'trimestrale') return acc + Math.round(val / 3);
+    if (c.frequenza === 'semestrale') return acc + Math.round(val / 6);
+    if (c.frequenza === 'annuale') return acc + Math.round(val / 12);
+    return acc + val;
+  }, 0);
+
+  const filteredProgetti = progettoId ? progetti : progetti.filter((p) => !clienteId || p.clienteId === clienteId);
+
   return (
-    <div style={{ padding: '2rem', maxWidth: 1200, margin: '0 auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+    <div style={{ padding: '2rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: 24, fontWeight: 700 }}>Contratti Ricorrenti & Retainer Studio</h2>
-          <p style={{ margin: '4px 0 0', color: 'var(--muted)', fontSize: 13 }}>
-            Pianificazione canoni continui di Advisory, Governance e Compliance con generazione automatica fatture e scadenze
+          <h2 style={{ margin: 0 }}>🔄 Contratti Ricorrenti & Retainer Studio</h2>
+          <p style={{ color: 'var(--muted)', margin: '4px 0 0 0', fontSize: 14 }}>
+            Pianificazione canoni continuativi di assistenza, fatturazione automatica periodica e scadenzario rate
           </p>
         </div>
+
         <button
           onClick={() => setShowModal(true)}
-          style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '10px 18px', borderRadius: 8, fontWeight: 600, cursor: 'pointer' }}
+          style={{
+            padding: '10px 18px',
+            borderRadius: 8,
+            border: 'none',
+            background: 'var(--primary)',
+            color: '#fff',
+            fontWeight: 700,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+          }}
         >
           + Nuovo Contratto Retainer
         </button>
       </div>
 
-      <div style={{ background: 'var(--card)', borderRadius: 12, border: '1px solid var(--border)', overflow: 'hidden' }}>
-        {loading ? (
-          <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--muted)' }}>Caricamento contratti retainer...</div>
-        ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, textAlign: 'left' }}>
-            <thead>
-              <tr style={{ background: 'var(--card2)', borderBottom: '1px solid var(--border)', color: 'var(--muted)' }}>
-                <th style={{ padding: '12px 16px' }}>Oggetto Canone</th>
-                <th style={{ padding: '12px 8px' }}>Cliente Incarico</th>
-                <th style={{ padding: '12px 8px' }}>Progetto Collegato</th>
-                <th style={{ padding: '12px 8px' }}>Frequenza</th>
-                <th style={{ padding: '12px 8px' }}>Canone Ricorrente</th>
-                <th style={{ padding: '12px 8px' }}>Prossima Fatturazione</th>
-                <th style={{ padding: '12px 8px' }}>Stato</th>
-                <th style={{ padding: '12px 16px', textAlign: 'right' }}>Azioni 1-Click</th>
-              </tr>
-            </thead>
-            <tbody>
-              {contratti.length === 0 ? (
-                <tr>
-                  <td colSpan={8} style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted)' }}>
-                    Nessun contratto ricorrente attivo. Clicca su "+ Nuovo Contratto Retainer" per crearne uno.
-                  </td>
-                </tr>
-              ) : (
-                contratti.map((c) => (
-                  <tr key={c.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                    <td style={{ padding: '16px' }}>
-                      <div style={{ fontWeight: 700, color: 'var(--text)' }}>📑 {c.titolo}</div>
-                      {c.note && <div style={{ fontSize: 10.5, color: 'var(--muted)', marginTop: 2 }}>{c.note}</div>}
-                    </td>
-                    <td style={{ padding: '16px 8px' }}>
-                      {c.cliente?.nome || 'Cliente Studio'}
-                    </td>
-                    <td style={{ padding: '16px 8px' }}>
-                      {c.progetto ? (
-                        <button
-                          onClick={() => navigate(`/projects/${c.progetto.id}`)}
-                          style={{ background: 'none', border: 'none', color: '#6366f1', textDecoration: 'underline', cursor: 'pointer', fontWeight: 600, padding: 0 }}
-                        >
-                          📁 {c.progetto.nome} ↗
-                        </button>
-                      ) : (
-                        <span style={{ color: 'var(--muted)', fontSize: 12 }}>— Canone Studio —</span>
-                      )}
-                    </td>
-                    <td style={{ padding: '16px 8px', textTransform: 'capitalize' }}>
-                      ⏳ {c.frequenza}
-                    </td>
-                    <td style={{ padding: '16px 8px', fontWeight: 700, color: '#6ee7b7' }}>
-                      💶 {fmt((c.importoCentesimi || 0) / 100)}
-                    </td>
-                    <td style={{ padding: '16px 8px', color: 'var(--indigo-l)' }}>
-                      📅 {new Date(c.prossimaFatturazione).toLocaleDateString()}
-                    </td>
-                    <td style={{ padding: '16px 8px' }}>
-                      <span style={{ padding: '4px 8px', borderRadius: 12, fontSize: 11, fontWeight: 600, background: '#064e3b', color: '#6ee7b7' }}>
-                        ✓ {c.stato || 'attivo'}
-                      </span>
-                    </td>
-                    <td style={{ padding: '16px', textAlign: 'right' }}>
-                      <button
-                        onClick={() => handleGeneraFattura(c.id)}
-                        style={{ background: '#4338ca', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer', boxShadow: '0 2px 8px rgba(67,56,202,.3)' }}
-                        title="Emetti immediatamente la Fattura Fiscale e registra la partita aperta nello Scadenzario Incassi"
-                      >
-                        🧾 Emetti Fattura 1-Click
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        )}
+      {/* KPI Run-Rate */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16, marginBottom: '2rem' }}>
+        <div style={{ background: '#1e3a8a', padding: 20, borderRadius: 12 }}>
+          <div style={{ fontSize: 13, color: '#93c5fd', textTransform: 'uppercase', fontWeight: 600 }}>Monthly Recurring Revenue (MRR)</div>
+          <div style={{ fontSize: 28, fontWeight: 800, color: 'white', marginTop: 8 }}>💶 {fmt(totalMonthlyRunRateCentesimi / 100)} / mese</div>
+        </div>
+        <div style={{ background: 'var(--card)', padding: 20, borderRadius: 12, border: '1px solid var(--border)' }}>
+          <div style={{ fontSize: 13, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 600 }}>Contratti Ricorrenti Attivi</div>
+          <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--text)', marginTop: 8 }}>📄 {contratti.length}</div>
+        </div>
       </div>
 
-      {showModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <form onSubmit={handleCreate} style={{ background: 'var(--card)', padding: '2rem', borderRadius: 12, width: 480, border: '1px solid var(--border)' }}>
-            <h3 style={{ marginTop: 0 }}>Nuovo Contratto Retainer Ricorrente</h3>
-            
-            <div style={{ marginBottom: '1rem' }}>
-              <label style={{ display: 'block', fontSize: 12, marginBottom: 4, fontWeight: 600 }}>Cliente Incarico *</label>
-              <select
-                required
-                value={clienteId}
-                onChange={(e) => setClienteId(e.target.value)}
-                style={{ width: '100%', padding: '8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
-              >
-                <option value="">Seleziona Cliente...</option>
-                {clienti.map(cl => (
-                  <option key={cl.id} value={cl.id}>{cl.nome}</option>
-                ))}
-              </select>
-            </div>
-
-            <div style={{ marginBottom: '1rem' }}>
-              <label style={{ display: 'block', fontSize: 12, marginBottom: 4, fontWeight: 600 }}>Progetto Collegato (Opzionale)</label>
-              <select
-                value={progettoId}
-                onChange={(e) => setProgettoId(e.target.value)}
-                disabled={!clienteId}
-                style={{ width: '100%', padding: '8px', borderRadius: 6, border: '1px solid var(--border)', background: !clienteId ? 'var(--card2)' : 'var(--bg)', color: 'var(--text)', opacity: !clienteId ? 0.6 : 1 }}
-              >
-                <option value="">
-                  {!clienteId
-                    ? '⚠️ Seleziona prima un cliente...'
-                    : 'Nessun progetto specifico (Canone Generico Studio)'}
-                </option>
-                {(() => {
-                  const selClienteObj = clienti.find(c => c.id === clienteId);
-                  const nomeCliente = selClienteObj?.nome?.toLowerCase() || '';
-
-                  // Estrai progetti dal LocalStorage (progetti custom/locally-synced). Il
-                  // precedente riferimento a un seed `PROJECTS` puntava a una costante mai
-                  // esistita: ReferenceError a runtime. Allineato a ScadenzarioPage.
-                  const localStr = localStorage.getItem('bluman_custom_projects');
-                  const localProjs: any[] = localStr ? JSON.parse(localStr) : [];
-                  const allAvailable = [...localProjs];
-
-                  const filtered = allAvailable.filter(p => {
-                    if (!clienteId) return false;
-                    if (p.clienteId === clienteId || p.cliente_id === clienteId) return true;
-                    if (nomeCliente && (p.cl?.toLowerCase().includes(nomeCliente) || p.cliente?.nome?.toLowerCase().includes(nomeCliente))) return true;
-                    return false;
-                  });
-
-                  // Rimuovi duplicati per ID o Nome
-                  const uniqueProjs = new Map();
-                  filtered.forEach(p => uniqueProjs.set(p.id || p.n, p));
-
-                  return Array.from(uniqueProjs.values()).map(p => (
-                    <option key={p.id || p.n} value={String(p.id)}>
-                      📁 {p.n || p.nome}
-                    </option>
-                  ));
-                })()}
-              </select>
-            </div>
-
-            <div style={{ marginBottom: '1rem' }}>
-              <label style={{ display: 'block', fontSize: 12, marginBottom: 4, fontWeight: 600 }}>Titolo / Oggetto del Canone *</label>
-              <input
-                type="text"
-                required
-                placeholder="es. Canone Advisory & Corporate Governance 2026"
-                value={titolo}
-                onChange={(e) => setTitolo(e.target.value)}
-                style={{ width: '100%', padding: '8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
-              />
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: '1rem' }}>
+      {/* Griglia Contratti */}
+      {loading ? (
+        <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted)' }}>Caricamento contratti dal database...</div>
+      ) : contratti.length === 0 ? (
+        <div style={{ padding: '3rem', textAlign: 'center', background: 'var(--card)', borderRadius: 12, border: '1px solid var(--border)' }}>
+          <div style={{ fontSize: 48, marginBottom: 12 }}>🔄</div>
+          <h3 style={{ margin: '0 0 8px 0' }}>Nessun contratto ricorrente attivo</h3>
+          <p style={{ color: 'var(--muted)', fontSize: 14, margin: '0 0 1.5rem 0' }}>
+            Attiva contratti di assistenza e retainer mensili o trimestrali per automatizzare l'emissione delle parcelle periodiche.
+          </p>
+          <button
+            onClick={() => setShowModal(true)}
+            style={{ padding: '10px 20px', borderRadius: 8, border: 'none', background: 'var(--primary)', color: '#fff', fontWeight: 700, cursor: 'pointer' }}
+          >
+            + Crea Primo Retainer
+          </button>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 16 }}>
+          {contratti.map((c) => (
+            <div
+              key={c.id}
+              style={{
+                background: 'var(--card)',
+                borderRadius: 14,
+                padding: '1.5rem',
+                border: '1px solid var(--border)',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+              }}
+            >
               <div>
-                <label style={{ display: 'block', fontSize: 12, marginBottom: 4, fontWeight: 600 }}>Frequenza</label>
-                <select
-                  value={frequenza}
-                  onChange={(e) => setFrequenza(e.target.value)}
-                  style={{ width: '100%', padding: '8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: 16 }}>{c.titolo}</h3>
+                    <div style={{ fontSize: 12, color: 'var(--primary)', fontWeight: 600, marginTop: 4 }}>
+                      👤 {c.cliente?.nome || 'Cliente'}
+                    </div>
+                  </div>
+                  <span
+                    style={{
+                      padding: '3px 8px',
+                      borderRadius: 6,
+                      background: '#064e3b',
+                      color: '#6ee7b7',
+                      fontSize: 11,
+                      fontWeight: 700,
+                      textTransform: 'uppercase',
+                    }}
+                  >
+                    {c.frequenza}
+                  </span>
+                </div>
+
+                {c.progetto?.nome && (
+                  <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>
+                    📁 Progetto: <strong>{c.progetto.nome}</strong>
+                  </div>
+                )}
+
+                <div style={{ background: 'var(--bg)', padding: 12, borderRadius: 8, margin: '14px 0' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <span style={{ fontSize: 12, color: 'var(--muted)' }}>Canone Periodico:</span>
+                    <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>{fmt((c.importoCentesimi || 0) / 100)}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: 12, color: 'var(--muted)' }}>Prossima Fattura:</span>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: '#fcd34d' }}>
+                      {c.prossimaFatturazione ? new Date(c.prossimaFatturazione).toLocaleDateString('it-IT') : '—'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12, display: 'flex', justifyContent: 'flex-end' }}>
+                <button
+                  onClick={() => handleGeneraFattura(c.id)}
+                  disabled={generatingId === c.id}
+                  style={{
+                    padding: '8px 14px',
+                    borderRadius: 8,
+                    border: 'none',
+                    background: '#059669',
+                    color: 'white',
+                    fontWeight: 700,
+                    fontSize: 12,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                  }}
                 >
-                  <option value="mensile">Mensile</option>
-                  <option value="trimestrale">Trimestrale</option>
-                  <option value="semestrale">Semestrale</option>
-                  <option value="annuale">Annuale</option>
+                  {generatingId === c.id ? 'Emissione...' : '🚀 Genera Fattura Ora'}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Modal Nuovo Retainer */}
+      {showModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
+          <div style={{ background: 'var(--card)', borderRadius: 16, padding: '2rem', width: '100%', maxWidth: 520, border: '1px solid var(--border)' }}>
+            <h3 style={{ margin: '0 0 1.5rem 0' }}>Nuovo Contratto Ricorrente (Retainer)</h3>
+            <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div>
+                <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Cliente Committente *</label>
+                <select
+                  required
+                  value={clienteId}
+                  onChange={(e) => setClienteId(e.target.value)}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
+                >
+                  <option value="">Seleziona cliente...</option>
+                  {clienti.map((cl) => (
+                    <option key={cl.id} value={cl.id}>
+                      {cl.nome}
+                    </option>
+                  ))}
                 </select>
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: 12, marginBottom: 4, fontWeight: 600 }}>Canone (€) *</label>
+                <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Progetto / Incarico Collegato (Opzionale)</label>
+                <select
+                  value={progettoId}
+                  onChange={(e) => setProgettoId(e.target.value)}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
+                >
+                  <option value="">Nessuno / Retainer Generale Studio</option>
+                  {filteredProgetti.map((pr) => (
+                    <option key={pr.id} value={pr.id}>
+                      {pr.nome} ({pr.cliente?.nome || 'Cliente'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Titolo Contratto / Servizio Continuativo *</label>
                 <input
-                  type="number"
-                  step="0.01"
+                  type="text"
                   required
-                  placeholder="1500"
-                  value={importoEuro}
-                  onChange={(e) => setImportoEuro(e.target.value)}
-                  style={{ width: '100%', padding: '8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
+                  placeholder="Es. Advisory Continuativa e Gestione Societaria 2026"
+                  value={titolo}
+                  onChange={(e) => setTitolo(e.target.value)}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
                 />
               </div>
-            </div>
 
-            <div style={{ marginBottom: '1rem' }}>
-              <label style={{ display: 'block', fontSize: 12, marginBottom: 4, fontWeight: 600 }}>Data Prossima Fatturazione *</label>
-              <input
-                type="date"
-                required
-                value={prossimaFatturazione}
-                onChange={(e) => setProssimaFatturazione(e.target.value)}
-                style={{ width: '100%', padding: '8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
-              />
-            </div>
+              <div style={{ display: 'flex', gap: 12 }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Frequenza Fatturazione</label>
+                  <select
+                    value={frequenza}
+                    onChange={(e) => setFrequenza(e.target.value)}
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
+                  >
+                    <option value="mensile">Mensile</option>
+                    <option value="trimestrale">Trimestrale</option>
+                    <option value="semestrale">Semestrale</option>
+                    <option value="annuale">Annuale</option>
+                  </select>
+                </div>
 
-            <div style={{ marginBottom: '1.5rem' }}>
-              <label style={{ display: 'block', fontSize: 12, marginBottom: 4, fontWeight: 600 }}>Note / Note a piè fattura</label>
-              <textarea
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                style={{ width: '100%', padding: '8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', height: 60 }}
-              />
-            </div>
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Canone (€) *</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    required
+                    placeholder="2500.00"
+                    value={importoEuro}
+                    onChange={(e) => setImportoEuro(e.target.value)}
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
+                  />
+                </div>
+              </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
-              <button
-                type="button"
-                onClick={() => setShowModal(false)}
-                style={{ padding: '8px 16px', borderRadius: 6, border: '1px solid var(--border)', background: 'transparent', color: 'white', cursor: 'pointer' }}
-              >
-                Annulla
-              </button>
-              <button
-                type="submit"
-                disabled={saving}
-                style={{ padding: '8px 16px', borderRadius: 6, border: 'none', background: 'var(--indigo)', color: 'white', cursor: 'pointer', fontWeight: 600 }}
-              >
-                {saving ? 'Salvataggio...' : '✓ Attiva Contratto'}
-              </button>
-            </div>
-          </form>
+              <div>
+                <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Data Prima Fatturazione *</label>
+                <input
+                  type="date"
+                  required
+                  value={prossimaFatturazione}
+                  onChange={(e) => setProssimaFatturazione(e.target.value)}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Note / Clausole (Opzionale)</label>
+                <textarea
+                  rows={2}
+                  placeholder="Note operative o coordinate del contratto..."
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 12 }}>
+                <button
+                  type="button"
+                  onClick={() => setShowModal(false)}
+                  style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)', cursor: 'pointer' }}
+                >
+                  Annulla
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  style={{ padding: '8px 18px', borderRadius: 8, border: 'none', background: 'var(--primary)', color: 'white', fontWeight: 700, cursor: 'pointer' }}
+                >
+                  {saving ? 'Attivazione...' : 'Attiva Contratto'}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>
