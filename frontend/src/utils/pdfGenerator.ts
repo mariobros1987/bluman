@@ -1,5 +1,7 @@
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import { A4_MM, A4_PX } from '../../../src/util/paginaA4';
+import { creaPagineA4 } from './pdfA4';
 
 export interface SignatureData {
   signerName: string;
@@ -14,80 +16,35 @@ export interface SignatureData {
 }
 
 /**
- * Specifiche Standard ISO 216 / DIN 5008 A4 per Documenti Legali e Consulenza Direzionale:
- * - Larghezza Foglio A4: 210 mm (794 px a 96 DPI)
- * - Altezza Foglio A4: 297 mm (1123 px a 96 DPI)
- * - Margine Superiore (Top): 20 mm (76 px)
- * - Margine Inferiore (Bottom): 20 mm (76 px)
- * - Margine Sinistro (Left): 20 mm (76 px)
- * - Margine Destro (Right): 20 mm (76 px)
- * - Area Stampabile Effettiva: 170 mm x 257 mm (642 px x 971 px)
+ * §38 — La geometria del foglio e la scelta di dove finisce una pagina non stanno più qui.
+ *
+ * I millimetri e la distribuzione dei blocchi sono in `src/util/paginaA4.ts` (aritmetica pura,
+ * presidiata da `src/paginazioneA4.test.ts`); la misura nel DOM è in `./pdfA4.ts`. Questo file è
+ * tornato a essere quello che dice di essere: il driver che porta i fogli in un PDF binario e in
+ * un .doc. Prima teneva anche `A4_SPECS` e un impaginatore che spezzava solo tra i figli diretti
+ * dell'HTML ricevuto — e i chiamanti passano tutti un unico `<div>` che avvolge il documento,
+ * quindi non spezzava niente e il testo finiva disegnato fino al bordo del foglio.
  */
-export const A4_SPECS = {
-  widthMm: 210,
-  heightMm: 297,
-  marginTopMm: 20,
-  marginBottomMm: 20,
-  marginLeftMm: 20,
-  marginRightMm: 20,
-  printableWidthMm: 170,
-  printableHeightMm: 257,
-  widthPx: 794,
-  heightPx: 1123,
-  marginPx: 76,
-  printableWidthPx: 642,
-  printableHeightPx: 971,
-};
+
+/** Il piè di pagina di ogni foglio: conosce il numero di pagina perché lo riceve. */
+function piedeStandard(pagina: number, totale: number): string {
+  return `
+      <span>BluMan Advisory Platform • Firma elettronica semplice · art. 20 CAD</span>
+      <span>Pagina ${pagina} di ${totale}</span>
+  `;
+}
 
 /**
- * Paginatore intelligente che suddivide il testo HTML in singole pagine A4 fisiche separate,
- * evitando tagli orizzontali di riga e garantendo margini perfetti su ciascun foglio.
+ * §36 — il blocco delle firme, in coda al contenuto.
+ *
+ * Non è un elemento a parte per l'impaginatore: entra nel flusso come tutto il resto e finisce sul
+ * foglio dove c'è posto. Prima veniva accodato a mano alla pagina corrente con lo stesso calcolo
+ * approssimato del contenuto, e su documenti pieni scavalcava il margine inferiore.
  */
-function createPaginatedPages(
-  contentHtml: string,
-  signatures: SignatureData[] = [],
-): HTMLElement[] {
-  // 1. Container temporaneo di misura
-  const measureContainer = document.createElement('div');
-  measureContainer.style.position = 'fixed';
-  measureContainer.style.top = '0';
-  measureContainer.style.left = '-9999px';
-  measureContainer.style.width = `${A4_SPECS.printableWidthPx}px`;
-  measureContainer.style.fontFamily = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
-  measureContainer.style.fontSize = '10.5pt';
-  measureContainer.style.lineHeight = '1.6';
-  measureContainer.style.color = '#1e293b';
-  measureContainer.innerHTML = contentHtml;
-  document.body.appendChild(measureContainer);
-
-  const rawElements = Array.from(measureContainer.children) as HTMLElement[];
-  const maxPageContentHeight = 900; // Altezza massima contenuti per foglio A4 (lascia spazio a margini e footer)
-
-  const pagesData: HTMLElement[][] = [[]];
-  let currentAccumulatedHeight = 0;
-  let currentPageIndex = 0;
-
-  for (const el of rawElements) {
-    const elHeight = el.offsetHeight || 30;
-    
-    // Se l'elemento supera l'altezza disponibile e la pagina corrente non è vuota, passa al foglio successivo
-    if (currentAccumulatedHeight + elHeight > maxPageContentHeight && pagesData[currentPageIndex].length > 0) {
-      currentPageIndex++;
-      pagesData[currentPageIndex] = [];
-      currentAccumulatedHeight = 0;
-    }
-
-    pagesData[currentPageIndex].push(el.cloneNode(true) as HTMLElement);
-    currentAccumulatedHeight += elHeight;
-  }
-
-  // Aggiunta blocco firme se presenti
-  if (signatures && signatures.length > 0) {
-    const sigDiv = document.createElement('div');
-    sigDiv.style.marginTop = '28px';
-    sigDiv.style.paddingTop = '14px';
-    sigDiv.style.borderTop = '1.5px solid #cbd5e1';
-    sigDiv.innerHTML = `
+function htmlFirme(signatures: SignatureData[]): string {
+  if (!signatures || signatures.length === 0) return '';
+  return `
+    <div style="margin-top: 28px; padding-top: 14px; border-top: 1.5px solid #cbd5e1;">
       <div style="font-size: 9.5pt; font-weight: 700; color: #4338ca; text-transform: uppercase; margin-bottom: 10px; letter-spacing: 0.5px;">
         🔒 Firma Elettronica Semplice (OTP verificata) · art. 20 CAD
       </div>
@@ -105,94 +62,15 @@ function createPaginatedPages(
           </div>
         `).join('')}
       </div>
-    `;
-
-    measureContainer.innerHTML = '';
-    measureContainer.appendChild(sigDiv);
-    const sigHeight = sigDiv.offsetHeight || 140;
-
-    if (currentAccumulatedHeight + sigHeight > maxPageContentHeight && pagesData[currentPageIndex].length > 0) {
-      currentPageIndex++;
-      pagesData[currentPageIndex] = [sigDiv];
-    } else {
-      pagesData[currentPageIndex].push(sigDiv);
-    }
-  }
-
-  document.body.removeChild(measureContainer);
-
-  const totalPages = pagesData.length;
-  const pageDomElements: HTMLElement[] = [];
-
-  // 2. Costruzione dei singoli fogli A4 reali (210mm x 297mm) con margini esatti di 20mm
-  pagesData.forEach((pageItems, idx) => {
-    const pageContainer = document.createElement('div');
-    pageContainer.className = 'bluman-a4-physical-page';
-    pageContainer.style.position = 'fixed';
-    pageContainer.style.top = '0';
-    pageContainer.style.left = `${idx * 850}px`; // Distanziati fuori dal viewport
-    pageContainer.style.width = `${A4_SPECS.widthPx}px`; // 794px (210mm)
-    pageContainer.style.height = `${A4_SPECS.heightPx}px`; // 1123px (297mm)
-    pageContainer.style.padding = `${A4_SPECS.marginPx}px`; // 20mm (76px) esatti su tutti i 4 lati
-    pageContainer.style.boxSizing = 'border-box';
-    pageContainer.style.background = '#ffffff';
-    pageContainer.style.color = '#1e293b';
-    pageContainer.style.fontFamily = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
-    pageContainer.style.fontSize = '10.5pt';
-    pageContainer.style.lineHeight = '1.6';
-    pageContainer.style.zIndex = '-9999';
-    pageContainer.style.opacity = '1';
-    pageContainer.style.display = 'flex';
-    pageContainer.style.flexDirection = 'column';
-    pageContainer.style.justifyContent = 'space-between';
-
-    // Stili globali del documento
-    const styleEl = document.createElement('style');
-    styleEl.textContent = `
-      .bluman-a4-physical-page p { margin: 0 0 10px 0; text-align: justify; text-justify: inter-word; line-height: 1.6; }
-      .bluman-a4-physical-page h1 { font-size: 16pt; font-weight: 800; color: #1e1b4b; margin: 10px 0 16px 0; text-align: center; text-transform: uppercase; letter-spacing: 0.5px; line-height: 1.3; }
-      .bluman-a4-physical-page h2 { font-size: 12.5pt; font-weight: 700; color: #1e1b4b; margin: 14px 0 8px 0; line-height: 1.35; }
-      .bluman-a4-physical-page h3 { font-size: 11pt; font-weight: 700; color: #1e1b4b; margin: 12px 0 6px 0; line-height: 1.4; }
-      .bluman-a4-physical-page h4 { font-size: 10pt; font-weight: 700; color: #4338ca; margin: 10px 0 4px 0; }
-      .bluman-a4-physical-page ul, .bluman-a4-physical-page ol { margin: 0 0 10px 0; padding-left: 20px; }
-      .bluman-a4-physical-page li { margin-bottom: 4px; line-height: 1.5; }
-      .bluman-a4-physical-page table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 9pt; }
-      .bluman-a4-physical-page th, .bluman-a4-physical-page td { padding: 6px 8px; border: 1px solid #cbd5e1; vertical-align: top; }
-      .bluman-a4-physical-page th { background: #f1f5f9; font-weight: 700; color: #1e1b4b; text-align: left; }
-      .bluman-a4-physical-page strong { font-weight: 700; color: #0f172a; }
-      .bluman-a4-physical-page code { font-family: monospace; background: #f1f5f9; padding: 1px 4px; border-radius: 4px; font-size: 9pt; }
-    `;
-    pageContainer.appendChild(styleEl);
-
-    // Contenitore contenuti pagina
-    const pageBody = document.createElement('div');
-    pageBody.style.flex = '1';
-    pageBody.style.width = '100%';
-    pageItems.forEach(item => pageBody.appendChild(item));
-    pageContainer.appendChild(pageBody);
-
-    // Piè di pagina elegante A4 su ogni singolo foglio
-    const pageFooter = document.createElement('div');
-    pageFooter.style.borderTop = '1px solid #e2e8f0';
-    pageFooter.style.paddingTop = '8px';
-    pageFooter.style.marginTop = '16px';
-    pageFooter.style.display = 'flex';
-    pageFooter.style.justifyContent = 'space-between';
-    pageFooter.style.alignItems = 'center';
-    pageFooter.style.fontSize = '8.5pt';
-    pageFooter.style.color = '#94a3b8';
-    pageFooter.innerHTML = `
-      <span>BluMan Advisory Platform • Firma elettronica semplice · art. 20 CAD</span>
-      <span>Pagina ${idx + 1} di ${totalPages}</span>
-    `;
-    pageContainer.appendChild(pageFooter);
-
-    document.body.appendChild(pageContainer);
-    pageDomElements.push(pageContainer);
-  });
-
-  return pageDomElements;
+    </div>
+  `;
 }
+
+/** I fogli A4 fisici pronti da rendere: contenuto, firme in coda, piè di pagina numerato. */
+function preparaFogli(contentHtml: string, signatures: SignatureData[]): HTMLElement[] {
+  return creaPagineA4(`${contentHtml}${htmlFirme(signatures)}`, { piede: piedeStandard });
+}
+
 
 /**
  * Genera e scarica direttamente un VERO file binary .pdf A4 conforme agli standard ISO 216
@@ -210,7 +88,7 @@ export async function downloadRealPdf(
   }
 
   const rawHtml = typeof elementOrHtml === 'string' ? elementOrHtml : elementOrHtml.innerHTML;
-  const pageDomElements = createPaginatedPages(rawHtml, signatures);
+  const pageDomElements = preparaFogli(rawHtml, signatures);
 
   try {
     // 1. Converti tutte le immagini in Base64 Data URL sincroni per html2canvas
@@ -258,7 +136,7 @@ export async function downloadRealPdf(
         allowTaint: true,
         logging: false,
         backgroundColor: '#ffffff',
-        windowWidth: A4_SPECS.widthPx,
+        windowWidth: A4_PX.larghezza,
       });
 
       const imgData = canvas.toDataURL('image/png');
@@ -267,7 +145,7 @@ export async function downloadRealPdf(
         pdf.addPage();
       }
 
-      pdf.addImage(imgData, 'PNG', 0, 0, A4_SPECS.widthMm, A4_SPECS.heightMm);
+      pdf.addImage(imgData, 'PNG', 0, 0, A4_MM.larghezza, A4_MM.altezza);
     }
 
     const cleanFileName = fileName.endsWith('.pdf') ? fileName : `${fileName}.pdf`;
@@ -295,7 +173,7 @@ export async function generateRealPdfBase64(
   signatures: SignatureData[] = []
 ): Promise<string> {
   const rawHtml = typeof elementOrHtml === 'string' ? elementOrHtml : elementOrHtml.innerHTML;
-  const pageDomElements = createPaginatedPages(rawHtml, signatures);
+  const pageDomElements = preparaFogli(rawHtml, signatures);
 
   try {
     for (const pageEl of pageDomElements) {
@@ -338,12 +216,12 @@ export async function generateRealPdfBase64(
         allowTaint: true,
         logging: false,
         backgroundColor: '#ffffff',
-        windowWidth: A4_SPECS.widthPx,
+        windowWidth: A4_PX.larghezza,
       });
 
       const imgData = canvas.toDataURL('image/png');
       if (i > 0) pdf.addPage();
-      pdf.addImage(imgData, 'PNG', 0, 0, A4_SPECS.widthMm, A4_SPECS.heightMm);
+      pdf.addImage(imgData, 'PNG', 0, 0, A4_MM.larghezza, A4_MM.altezza);
     }
 
     const dataUri = pdf.output('datauristring');
