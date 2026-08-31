@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { fetchClienti, fetchProgetti, fetchProgettoDettaglio, fetchTenantInfoApi, salvaDocumentoApi, creaDocumentoTemplateApi, eliminaDocumentoTemplateApi } from '../api/client';
+import { fetchClienti, fetchProgetti, fetchProgettoDettaglio, fetchTenantInfoApi, salvaDocumentoApi } from '../api/client';
 import { getFormattedLogoUrl } from '../utils';
 import { downloadRealPdf, downloadRealWordDoc } from '../utils/pdfGenerator';
 import { getCurrentTenantId, getTenantStorageKey, getStudioInfoForTenant } from '../utils/tenant';
@@ -10,15 +10,13 @@ import type { Cliente, Progetto } from '../types';
 
 import {
   PREBUILT_TEMPLATES,
-  getAllTemplates,
-  saveCustomTemplate,
-  deleteTemplate,
-  archiveTemplate,
-  restoreTemplate,
-  importTemplatesFromJson,
   exportTemplatesAsJson,
   type DocumentTemplate,
 } from '../utils/documentTemplates';
+// §41 — I gesti sui modelli (crea, modifica, revisiona, archivia, elimina, importa) passano
+// tutti da qui: prima il server, poi l'elenco. Prima metà finivano in `localStorage`, quindi
+// valevano per questo browser e per nessun altro.
+import { useCartellaTemplate } from '../hooks/useCartellaTemplate';
 import { HeaderEditor } from '../components/editor/HeaderEditor';
 import { SelettoreDestinazione } from '../components/editor/SelettoreDestinazione';
 import { PannelloTag } from '../components/editor/PannelloTag';
@@ -36,7 +34,12 @@ export function DocumentEditorPage() {
   const queryDocId = searchParams.get('docId') || '';
   const queryTmplId = searchParams.get('tmplId') || 'tmpl-engagement';
 
-  const [templatesList, setTemplatesList] = useState<DocumentTemplate[]>(() => getAllTemplates(true));
+  // §41 — L'elenco dei modelli arriva dalla cartella dello studio (database), non più da
+  // `localStorage`: un modello creato su un computer si vede su tutti gli altri, e
+  // l'archiviazione vale per lo studio. `erroreCartella` esiste perché un guasto di lettura
+  // non si travesta da «lo studio ha solo i modelli di serie».
+  const cartella = useCartellaTemplate();
+  const templatesList = cartella.modelli;
   const [searchMasterTmplQuery, setSearchMasterTmplQuery] = useState('');
   const [tmplStatusSidebar, setTmplStatusSidebar] = useState<'attivi' | 'archiviati' | 'tutti'>('attivi');
 
@@ -104,6 +107,18 @@ export function DocumentEditorPage() {
   const editorRef = useRef<HTMLDivElement>(null);
   const fileImportRef = useRef<HTMLInputElement>(null);
   const rawTemplateRef = useRef<string>(initialTmpl.contenutoHtml);
+  /**
+   * §41 — Quale modello sta effettivamente nell'editor.
+   *
+   * Non coincide con `selectedTemplateId` nel primo istante di vita della pagina: entrando da
+   * `/documents?tmplId=<id>` (per esempio dalla Cartella Modelli) l'id chiesto è già selezionato,
+   * ma la cartella dello studio arriva dal server dopo il primo render, quindi il testo caricato è
+   * quello del primo modello disponibile. Questo riferimento dice cosa c'è davvero sotto le mani,
+   * così l'effetto sotto può caricare il modello giusto una volta sola e senza sovrascrivere
+   * quello che l'operatore ha scelto dopo.
+   */
+  const modelloCaricatoRef = useRef<string>(initialTmpl.id);
+  const modelloDaUrlApplicato = useRef(false);
 
   // Caricamento Dati Completi (DB + LocalStorage + Default Studio)
   useEffect(() => {
@@ -413,18 +428,47 @@ export function DocumentEditorPage() {
     setIntestazionePropria(parti.intestazione);
     setPiedeProprio(parti.piede);
     rawTemplateRef.current = parti.corpo;
+    modelloCaricatoRef.current = tmpl.id;
     if (editorRef.current) {
       editorRef.current.innerHTML = renderResolvedContent(parti.corpo);
     }
   };
+
+  /**
+   * §41 — Carica il modello chiesto nell'indirizzo appena la cartella dello studio arriva.
+   *
+   * Serve perché i modelli dello studio stanno a database: al primo render l'elenco contiene solo
+   * la dotazione di serie, quindi entrando con `?tmplId=<id di una carta dello studio>` la pagina
+   * mostrava il testo di un altro modello mentre la barra laterale segnava selezionato quello
+   * giusto — si apriva «Lettera d'incarico» e si leggeva un altro contratto.
+   *
+   * Si applica una volta sola e solo se sotto le mani c'è ancora un modello diverso: se l'operatore
+   * ha già scelto o modificato qualcosa, la sua scelta non viene sovrascritta.
+   */
+  useEffect(() => {
+    if (queryDocId) return; // si sta aprendo un documento salvato, non un modello
+    if (modelloDaUrlApplicato.current) return;
+    if (!cartella.letto) return;
+    if (modelloCaricatoRef.current === queryTmplId) {
+      modelloDaUrlApplicato.current = true;
+      return;
+    }
+    const chiesto = templatesList.find((t) => t.id === queryTmplId);
+    if (!chiesto) return;
+    modelloDaUrlApplicato.current = true;
+    handleSelectTemplate(chiesto);
+  }, [cartella.letto, templatesList, queryTmplId, queryDocId]);
 
   // Creazione Nuovo Modello Master da Zero
   const handleCreateCustomMaster = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTmplTitolo.trim()) return;
 
-    const newTmpl: DocumentTemplate = {
-      id: `tmpl-custom-${Date.now()}`,
+    // §41 — nessun id inventato dal browser: l'id è quello della riga che risponde il server.
+    // Prima era `tmpl-custom-${Date.now()}`, che la POST non mandava e il database non
+    // conosceva: le due carte avevano id diversi e archiviarle o eliminarle sul server non
+    // poteva funzionare per costruzione.
+    const bozza = {
       titolo: newTmplTitolo.trim(),
       categoria: newTmplCat,
       // Piano firma §3 — livello scelto dall'operatore nel modale di creazione.
@@ -460,25 +504,20 @@ export function DocumentEditorPage() {
       `,
     };
 
-    saveCustomTemplate(newTmpl);
-    // §3.3 — il salvataggio locale resta immediato (bozza disponibile), ma il feedback
-    // deve dire la verità sul sync col server: prima il successo era annunciato comunque.
-    try {
-      await creaDocumentoTemplateApi(newTmpl);
-      const updated = getAllTemplates();
-      setTemplatesList(updated);
-      handleSelectTemplate(newTmpl);
+    // §41 — prima il server, poi l'elenco. Il modello compare in libreria solo se la riga
+    // esiste: prima veniva scritto in `localStorage` e mostrato anche quando la POST era
+    // fallita, con l'avviso «salvato in LOCALE» accanto a una carta che nessun altro vedeva.
+    const esito = await cartella.crea(bozza);
+    if (esito.ok && esito.modello) {
+      handleSelectTemplate(esito.modello);
       setShowNewTmplModal(false);
       setNewTmplTitolo('');
       setNewTmplDesc('');
       // Piano firma §3 — il modale riparte sempre dal default legale.
       setNewTmplLivello('ses');
-      setFeedback(`✓ Nuovo Modello Master "${newTmpl.titolo}" creato e salvato con successo!`);
-    } catch (err: any) {
-      const updated = getAllTemplates();
-      setTemplatesList(updated);
-      handleSelectTemplate(newTmpl);
-      setFeedback(`⚠️ Modello "${newTmpl.titolo}" salvato in LOCALE ma NON sincronizzato col server: ${err?.message || 'errore di rete'}`);
+      setFeedback(`✓ ${esito.messaggio}`);
+    } else {
+      setFeedback(`⚠️ ${esito.messaggio}`);
     }
     setTimeout(() => setFeedback(null), 4000);
   };
@@ -495,28 +534,16 @@ export function DocumentEditorPage() {
     const name = prompt('Inserisci il nome per questo nuovo Modello Master Studio:', `${titoloDocumento} (Copia Master)`);
     if (!name || !name.trim()) return;
 
-    const newTmpl: DocumentTemplate = {
-      id: `tmpl-custom-${Date.now()}`,
+    const esito = await cartella.crea({
       titolo: name.trim(),
       categoria: (categoria as any) || 'societario',
       // Piano firma §3 — il master eredita il livello legale del documento corrente.
       livelloFirmaRichiesto: livelloFirmaDoc,
       descrizione: `Modello master derivato da "${titoloDocumento}" salvato in data ${new Date().toLocaleDateString('it-IT')}.`,
       contenutoHtml: currentHtml,
-    };
-
-    saveCustomTemplate(newTmpl);
-    // §3.3 — come sopra: il template resta in locale, il feedback dipende dal sync server.
-    try {
-      await creaDocumentoTemplateApi(newTmpl);
-      setTemplatesList(getAllTemplates());
-      handleSelectTemplate(newTmpl);
-      setFeedback(`✓ Modello Master "${newTmpl.titolo}" salvato permanentemente nello studio!`);
-    } catch (err: any) {
-      setTemplatesList(getAllTemplates());
-      handleSelectTemplate(newTmpl);
-      setFeedback(`⚠️ Modello "${newTmpl.titolo}" salvato in LOCALE ma NON sincronizzato col server: ${err?.message || 'errore di rete'}`);
-    }
+    });
+    if (esito.ok && esito.modello) handleSelectTemplate(esito.modello);
+    setFeedback(`${esito.ok ? '✓' : '⚠️'} ${esito.messaggio}`);
     setTimeout(() => setFeedback(null), 4000);
   };
 
@@ -530,8 +557,7 @@ export function DocumentEditorPage() {
       reader.onload = async (event) => {
         const dataUrl = event.target?.result as string;
         const tmplName = file.name.replace(/\.[^/.]+$/, "");
-        const newTmpl: DocumentTemplate = {
-          id: `tmpl-pdf-${Date.now()}`,
+        const esito = await cartella.crea({
           titolo: tmplName,
           categoria: 'societario',
           // Piano firma §3 — nessuna scelta utente sull'import: default legale esplicito.
@@ -549,21 +575,9 @@ export function DocumentEditorPage() {
   <iframe src="${dataUrl}" style="width: 100%; height: 850px; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff;" title="${file.name}"></iframe>
 </div>
           `.trim(),
-        };
-        saveCustomTemplate(newTmpl);
-        // §3.3 — idem: import locale immediato, feedback onesto sul sync server.
-        try {
-          await creaDocumentoTemplateApi(newTmpl);
-          const updated = getAllTemplates();
-          setTemplatesList(updated);
-          handleSelectTemplate(newTmpl);
-          setFeedback(`✓ Documento PDF "${file.name}" importato con visualizzatore integrato!`);
-        } catch (err: any) {
-          const updated = getAllTemplates();
-          setTemplatesList(updated);
-          handleSelectTemplate(newTmpl);
-          setFeedback(`⚠️ PDF "${file.name}" salvato in LOCALE ma NON sincronizzato col server: ${err?.message || 'errore di rete'}`);
-        }
+        });
+        if (esito.ok && esito.modello) handleSelectTemplate(esito.modello);
+        setFeedback(`${esito.ok ? '✓' : '⚠️'} ${esito.messaggio}`);
         setTimeout(() => setFeedback(null), 4000);
       };
       reader.readAsDataURL(file);
@@ -575,40 +589,22 @@ export function DocumentEditorPage() {
     reader.onload = async (event) => {
       const content = event.target?.result as string;
       if (file.name.endsWith('.json')) {
-        const res = importTemplatesFromJson(content);
-        if (res.success) {
-          const updated = getAllTemplates();
-          setTemplatesList(updated);
-          handleSelectTemplate(updated[0]);
-          setFeedback(`✓ ${res.count} Modello/i Master importati con successo dal file JSON!`);
-        } else {
-          alert('Errore importazione JSON: ' + (res.error || 'Formato non valido'));
-        }
+        // §41 — l'import passa dal server modello per modello: il conteggio dice quanti sono
+        // arrivati nell'archivio dello studio, non quanti erano nel file.
+        const esito = await cartella.importaDaJson(content);
+        setFeedback(`${esito.ok ? '✓' : '⚠️'} ${esito.messaggio}`);
       } else {
         const tmplName = file.name.replace(/\.[^/.]+$/, "");
-        const newTmpl: DocumentTemplate = {
-          id: `tmpl-custom-${Date.now()}`,
+        const esito = await cartella.crea({
           titolo: tmplName,
           categoria: 'societario',
           // Piano firma §3 — nessuna scelta utente sull'import: default legale esplicito.
           livelloFirmaRichiesto: 'ses',
           descrizione: `Modello importato da file "${file.name}".`,
           contenutoHtml: content,
-        };
-        saveCustomTemplate(newTmpl);
-        // §3.3 — idem: import locale immediato, feedback onesto sul sync server.
-        try {
-          await creaDocumentoTemplateApi(newTmpl);
-          const updated = getAllTemplates();
-          setTemplatesList(updated);
-          handleSelectTemplate(newTmpl);
-          setFeedback(`✓ File "${file.name}" importato come Modello Master!`);
-        } catch (err: any) {
-          const updated = getAllTemplates();
-          setTemplatesList(updated);
-          handleSelectTemplate(newTmpl);
-          setFeedback(`⚠️ File "${file.name}" salvato in LOCALE ma NON sincronizzato col server: ${err?.message || 'errore di rete'}`);
-        }
+        });
+        if (esito.ok && esito.modello) handleSelectTemplate(esito.modello);
+        setFeedback(`${esito.ok ? '✓' : '⚠️'} ${esito.messaggio}`);
       }
       setTimeout(() => setFeedback(null), 4000);
     };
@@ -632,47 +628,49 @@ export function DocumentEditorPage() {
     setTimeout(() => setFeedback(null), 4000);
   };
 
-  // Archiviazione Modello Master
-  const handleArchiveTemplate = (tmplId: string, tmplTitolo: string, e: React.MouseEvent) => {
+  // Archiviazione Modello Master — §41: a database, quindi vale per tutto lo studio.
+  const handleArchiveTemplate = async (tmplId: string, tmplTitolo: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    archiveTemplate(tmplId);
-    const updated = getAllTemplates(true);
-    setTemplatesList(updated);
-    setFeedback(`📦 Modello "${tmplTitolo}" archiviato con successo.`);
+    const tmpl = templatesList.find((t) => t.id === tmplId);
+    if (!tmpl) {
+      setFeedback(`⚠️ Il modello "${tmplTitolo}" non è più in elenco: ricarica la cartella modelli.`);
+      setTimeout(() => setFeedback(null), 4000);
+      return;
+    }
+    const esito = await cartella.archivia(tmpl, true);
+    setFeedback(`${esito.ok ? '📦' : '⚠️'} ${esito.messaggio}`);
     setTimeout(() => setFeedback(null), 4000);
   };
 
   // Ripristino Modello Master
-  const handleRestoreTemplate = (tmplId: string, tmplTitolo: string, e: React.MouseEvent) => {
+  const handleRestoreTemplate = async (tmplId: string, tmplTitolo: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    restoreTemplate(tmplId);
-    const updated = getAllTemplates(true);
-    setTemplatesList(updated);
-    setFeedback(`♻️ Modello "${tmplTitolo}" ripristinato tra i modelli attivi.`);
+    const tmpl = templatesList.find((t) => t.id === tmplId);
+    if (!tmpl) {
+      setFeedback(`⚠️ Il modello "${tmplTitolo}" non è più in elenco: ricarica la cartella modelli.`);
+      setTimeout(() => setFeedback(null), 4000);
+      return;
+    }
+    const esito = await cartella.archivia(tmpl, false);
+    setFeedback(`${esito.ok ? '♻️' : '⚠️'} ${esito.messaggio}`);
     setTimeout(() => setFeedback(null), 4000);
   };
 
   // Eliminazione Modello Master
   const handleDeleteTemplate = async (tmplId: string, tmplTitolo: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    const tmpl = templatesList.find((t) => t.id === tmplId);
+    if (!tmpl) return;
     if (!confirm(`Sei sicuro di voler eliminare definitivamente il Modello Master "${tmplTitolo}"?\n\n(I documenti già salvati o firmati nei progetti rimangono perfettamente congelati e integri).`)) return;
-    // §3.3 — prima il server, poi lo stato locale: il catch vuoto dichiarava sempre
-    // successo anche con l'eliminazione fallita. Il modello sparisce solo se confermato.
-    try {
-      await eliminaDocumentoTemplateApi(tmplId);
-    } catch (err: any) {
-      setFeedback(`⚠️ Eliminazione di "${tmplTitolo}" NON riuscita: ${err?.message || 'errore di rete'}. Il modello NON è stato rimosso.`);
-      setTimeout(() => setFeedback(null), 4000);
-      return;
+    // §3.3 / §41 — prima il server, poi lo stato locale: il modello sparisce dall'elenco solo
+    // se il server ha confermato l'eliminazione.
+    const esito = await cartella.elimina(tmpl);
+    if (esito.ok && selectedTemplateId === tmplId) {
+      const restanti = cartella.modelli.filter((t) => t.id !== tmplId);
+      const primoAttivo = restanti.find((t) => !t.archiviato) || restanti[0];
+      if (primoAttivo) handleSelectTemplate(primoAttivo);
     }
-    deleteTemplate(tmplId);
-    const updated = getAllTemplates(true);
-    setTemplatesList(updated);
-    if (selectedTemplateId === tmplId) {
-      const firstActive = updated.find(t => !t.archiviato) || updated[0];
-      if (firstActive) handleSelectTemplate(firstActive);
-    }
-    setFeedback(`🗑️ Modello "${tmplTitolo}" eliminato dai Modelli Master.`);
+    setFeedback(`${esito.ok ? '🗑️' : '⚠️'} ${esito.messaggio}`);
     setTimeout(() => setFeedback(null), 4000);
   };
 
@@ -1000,6 +998,8 @@ export function DocumentEditorPage() {
               handleRestoreTemplate={handleRestoreTemplate}
               handleArchiveTemplate={handleArchiveTemplate}
               handleDeleteTemplate={handleDeleteTemplate}
+              erroreLettura={cartella.erroreLettura}
+              onApriCartella={() => navigate('/modelli')}
             />
         </div>
 

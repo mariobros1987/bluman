@@ -19,6 +19,8 @@ const TITLES: Record<string, string> = {
   '/settings':  'Impostazioni',
   '/invoices':  'Fatture & Pagamenti',
   '/documents': 'Document Studio (Word & Contratti)',
+  '/modelli':   'Cartella Modelli dello Studio',
+  '/archivio':  'Archivio Documentale',
   '/audit':     'Log Audit Studio',
   '/timesheet': 'Timesheet Settimanale Ore',
 };

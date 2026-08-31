@@ -1,5 +1,6 @@
 import React from 'react';
 import type { DocumentTemplate } from '../../utils/documentTemplates';
+import { BadgeRevisione } from '../ui/BadgeRevisione';
 
 export function LibreriaTemplate({
   templatesList,
@@ -17,6 +18,8 @@ export function LibreriaTemplate({
   handleRestoreTemplate,
   handleArchiveTemplate,
   handleDeleteTemplate,
+  erroreLettura,
+  onApriCartella,
 }: {
   templatesList: DocumentTemplate[];
   setShowNewTmplModal: React.Dispatch<React.SetStateAction<boolean>>;
@@ -33,6 +36,10 @@ export function LibreriaTemplate({
   handleRestoreTemplate: (tmplId: string, tmplTitolo: string, e: React.MouseEvent) => void;
   handleArchiveTemplate: (tmplId: string, tmplTitolo: string, e: React.MouseEvent) => void;
   handleDeleteTemplate: (tmplId: string, tmplTitolo: string, e: React.MouseEvent) => void;
+  /** §41 — valorizzato se la lettura dei modelli dello studio non è riuscita: l'elenco può essere incompleto. */
+  erroreLettura?: string | null;
+  /** §41 — porta alla Cartella Modelli, dove gli stessi modelli si revisionano e si organizzano. */
+  onApriCartella: () => void;
 }) {
   return (
     <>
@@ -41,9 +48,18 @@ export function LibreriaTemplate({
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--text)' }}>📚 Modelli Master ({templatesList.length})</div>
-                  <div style={{ fontSize: 10, color: 'var(--muted)' }}>Libreria template studio</div>
+                  {/* §41 — la libreria è la cartella dello studio letta dal database: si dice da dove viene. */}
+                  <div style={{ fontSize: 10, color: 'var(--muted)' }}>Cartella modelli dello studio</div>
                 </div>
                 <div style={{ display: 'flex', gap: 4 }}>
+                  <button
+                    type="button"
+                    onClick={onApriCartella}
+                    style={{ background: 'var(--card2)', color: 'var(--muted)', border: '1px solid var(--border)', padding: '4px 6px', borderRadius: 6, fontSize: 10.5, cursor: 'pointer' }}
+                    title="Apri la Cartella Modelli: categorie, stato di revisione, archivio"
+                  >
+                    🗂
+                  </button>
                   <button
                     type="button"
                     onClick={() => setShowNewTmplModal(true)}
@@ -70,6 +86,13 @@ export function LibreriaTemplate({
                   </button>
                 </div>
               </div>
+
+              {/* §41 / regola 7 — un guasto di lettura non si traveste da «lo studio ha solo questi». */}
+              {erroreLettura && (
+                <div style={{ fontSize: 10, color: '#fca5a5', background: '#2a1218', border: '1px solid #5b2130', borderRadius: 6, padding: '5px 7px', lineHeight: 1.4 }}>
+                  ⚠️ Elenco possibilmente incompleto: {erroreLettura}
+                </div>
+              )}
 
               <input
                 type="file"
@@ -161,8 +184,11 @@ export function LibreriaTemplate({
                     return matchSearch && matchStatus;
                   })
                   .map(t => {
-                  const isCustom = t.id.startsWith('tmpl-custom');
                   const isSelected = selectedTemplateId === t.id;
+                  // §41 — un modello rimasto solo in questo browser non ha una riga a database:
+                  // archiviarlo o eliminarlo dal server non ha niente su cui agire. Si recupera
+                  // dalla Cartella Modelli, che lo porta a database prima di toccarlo.
+                  const soloLocale = Boolean(t.soloLocale);
                   return (
                     <div
                       key={t.id}
@@ -190,9 +216,16 @@ export function LibreriaTemplate({
                               📦
                             </span>
                           )}
-                          {isCustom && (
-                            <span style={{ fontSize: 8.5, background: '#064e3b', color: '#34d399', padding: '1px 4px', borderRadius: 4, fontWeight: 700 }}>
-                              Custom
+                          {/* §41 — al posto della vecchia targhetta «Custom» (che leggeva il prefisso di un
+                              identificativo inventato dal browser, e con gli id di database non era mai vera)
+                              si mostra lo stato di revisione: è un dato che sta davvero nella riga. */}
+                          <BadgeRevisione modello={t} compatto />
+                          {soloLocale && (
+                            <span
+                              style={{ fontSize: 8.5, background: '#2d2000', color: '#f59e0b', padding: '1px 4px', borderRadius: 4, fontWeight: 700 }}
+                              title="Questo modello è rimasto solo in questo browser: dalla Cartella Modelli lo puoi portare nell'archivio dello studio."
+                            >
+                              ⚠ Locale
                             </span>
                           )}
                         </div>
@@ -202,7 +235,16 @@ export function LibreriaTemplate({
                       </div>
 
                       <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-                        {t.archiviato ? (
+                        {soloLocale ? (
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); onApriCartella(); }}
+                            style={{ background: '#2d2000', border: '1px solid #713f12', color: '#f59e0b', fontSize: 10, cursor: 'pointer', padding: '3px 6px', borderRadius: 4, fontWeight: 700 }}
+                            title="Portalo nell'archivio dello studio dalla Cartella Modelli"
+                          >
+                            🗂 Recupera
+                          </button>
+                        ) : t.archiviato ? (
                           <button
                             type="button"
                             onClick={(e) => handleRestoreTemplate(t.id, t.titolo, e)}
@@ -223,15 +265,21 @@ export function LibreriaTemplate({
                           </button>
                         )}
 
-                        <button
-                          type="button"
-                          onClick={(e) => handleDeleteTemplate(t.id, t.titolo, e)}
-                          style={{ background: 'rgba(239, 68, 68, 0.15)', border: '1px solid #ef4444', color: '#f87171', fontSize: 10, cursor: 'pointer', padding: '3px 6px', borderRadius: 4, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 2 }}
-                          title="Elimina definitivamente modello master"
-                        >
-                          <span>🗑️</span>
-                          <span>Elimina</span>
-                        </button>
+                        {/* §41 — «Elimina» compare solo dove c'è qualcosa da eliminare: una carta di serie
+                            sta nel codice e ricomparirebbe al ricaricamento (si archivia), e una rimasta in
+                            questo browser non ha nessuna riga a database. Offrire il pulsante lo stesso
+                            significherebbe promettere un gesto che il server rifiuta. */}
+                        {!t.diSerie && !soloLocale && (
+                          <button
+                            type="button"
+                            onClick={(e) => handleDeleteTemplate(t.id, t.titolo, e)}
+                            style={{ background: 'rgba(239, 68, 68, 0.15)', border: '1px solid #ef4444', color: '#f87171', fontSize: 10, cursor: 'pointer', padding: '3px 6px', borderRadius: 4, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 2 }}
+                            title="Elimina definitivamente modello master"
+                          >
+                            <span>🗑️</span>
+                            <span>Elimina</span>
+                          </button>
+                        )}
                       </div>
                     </div>
                   );

@@ -11,7 +11,96 @@ export interface DocumentTemplate {
   dataCreazione?: string;
   /** Piano firma §3 — livello (ses|fea|feq) che i documenti generati da questo modello esigono; default 'ses'. */
   livelloFirmaRichiesto?: 'ses' | 'fea' | 'feq';
+  // §41 — Cartella modelli dello studio. Questi campi arrivano dalla riga a database e
+  // servono a rispondere a «questo testo l'ha già riletto qualcuno?».
+  /**
+   * Lo stato di revisione, oppure `null` per un modello **di serie** non ancora adottato:
+   * quello non ha una riga, quindi nessuno ha mai espresso un giudizio su di esso. Scrivere
+   * «bozza» al suo posto attribuirebbe allo studio una valutazione che non ha dato.
+   */
+  statoRevisione?: 'bozza' | 'in_revisione' | 'approvato' | null;
+  versione?: number;
+  noteRevisione?: string | null;
+  revisionatoDaNome?: string | null;
+  revisionatoAt?: string | null;
+  /** Vero per i modelli scritti nel codice e uguali per tutti gli studi, finché nessuno li adotta. */
+  diSerie?: boolean;
+  /** L'id del modello di serie da cui questo modello dello studio è stato adottato. */
+  riferimentoSerie?: string | null;
+  /**
+   * Vero per i modelli trovati soltanto in `localStorage` di questo browser: esistevano prima
+   * di §41 e non hanno una riga a database. Non sono modelli dello studio — sono modelli di
+   * questo computer — e la cartella deve dirlo, non contarli fra gli altri.
+   */
+  soloLocale?: boolean;
 }
+
+// ─── §41 — La cartella dei modelli: la fonte è il database, non il browser ──────────────
+//
+// Com'era prima. `getAllTemplates()` costruiva l'elenco da tre chiavi di `localStorage`
+// (`bluman_custom_document_templates`, `bluman_archived_template_ids`,
+// `bluman_deleted_template_ids`) e non chiamava mai il server. Conseguenze osservabili:
+// un modello creato sul computer del titolare non compariva su nessun altro — anche se la
+// riga a database c'era, perché `creaDocumentoTemplateApi` la scriveva; l'archiviazione
+// valeva per un solo browser; svuotare la cache faceva sparire la libreria dello studio.
+// Regola 3 (tutto ciò che si aggiunge nell'interfaccia deve stare a database) e regola 7
+// (un pulsante che scrive solo in localStorage non ha salvato niente).
+//
+// C'era anche un difetto meno visibile: i modelli nascevano con un id inventato dal browser
+// (`tmpl-custom-${Date.now()}`), che la POST non mandava e che il database non conosceva. Le
+// due righe avevano id diversi, quindi archiviare o eliminare «quel» modello sul server non
+// poteva funzionare per costruzione. Ora l'id è quello che risponde il server.
+//
+// Com'è adesso. Questo modulo tiene la copia di lavoro dei modelli letti dal server e la
+// fonde con i modelli di serie; le chiamate di rete stanno in `hooks/useCartellaTemplate.ts`,
+// perché un modulo di `utils/` che apre connessioni non è più un'utilità. `getAllTemplates()`
+// resta sincrona: la chiamano decine di punti, anche dentro `useState(() => ...)`.
+
+/** I modelli dello studio come li ha risposti il server. `null` = non ancora letti. */
+let modelliStudio: DocumentTemplate[] | null = null;
+let statoLettura: 'mai' | 'ok' | 'errore' = 'mai';
+let erroreLettura: string | null = null;
+
+/**
+ * Stato della lettura, perché l'interfaccia possa distinguere tre cose che prima erano una
+ * sola: «lo studio non ha modelli propri», «non ho ancora letto» e «la lettura è fallita».
+ */
+export function statoCartellaModelli(): { stato: 'mai' | 'ok' | 'errore'; errore: string | null } {
+  return { stato: statoLettura, errore: erroreLettura };
+}
+
+/** Chiamata dal hook dopo una lettura riuscita: da qui in poi l'elenco è quello dello studio. */
+export function impostaModelliStudio(modelli: DocumentTemplate[]): void {
+  modelliStudio = modelli;
+  statoLettura = 'ok';
+  erroreLettura = null;
+}
+
+/** Chiamata dal hook quando la lettura non riesce. Non si inventa un elenco al suo posto. */
+export function segnalaLetturaModelliFallita(messaggio: string): void {
+  statoLettura = 'errore';
+  erroreLettura = messaggio;
+}
+
+/**
+ * Aggiorna la copia di lavoro con un modello confermato dal server (creato, modificato,
+ * revisionato o archiviato). Va chiamata DOPO la risposta, mai prima: un modello in elenco
+ * che il server non ha accettato è un modello che non esiste.
+ */
+export function registraModelloStudio(modello: DocumentTemplate): DocumentTemplate[] {
+  const attuali = modelliStudio ?? [];
+  const esiste = attuali.some((t) => t.id === modello.id);
+  modelliStudio = esiste ? attuali.map((t) => (t.id === modello.id ? modello : t)) : [modello, ...attuali];
+  statoLettura = 'ok';
+  return getAllTemplates(true);
+}
+
+/** Toglie dalla copia di lavoro un modello che il server ha confermato di aver eliminato. */
+export function dimenticaModelloStudio(id: string): DocumentTemplate[] {
+  modelliStudio = (modelliStudio ?? []).filter((t) => t.id !== id);
+  return getAllTemplates(true);
+}
+
 
 export const PREBUILT_TEMPLATES: DocumentTemplate[] = [
   {
@@ -469,153 +558,129 @@ export function getTemplateForVoce(voceTitle: string, category: string = ''): Do
 }
 
 /**
- * Restituisce tutti i modelli (Predefiniti + Modelli Master Personalizzati creati o importati dallo studio)
- * Parametro includeArchived: se false, esclude i modelli contrassegnati come archiviati.
- * 
- * GARANZIA IMMUTABILITÀ: I documenti già istanziati, firmati o salvati all'interno dei singoli Progetti
- * sono copie indipendenti e congelate alla data della firma. Modificare, archiviare o eliminare un modello
- * nella Libreria NON altera in alcun modo i documenti storici dei Progetti.
+ * Restituisce tutti i modelli visibili nella cartella dello studio:
+ *   1. i modelli dello studio letti dal server (autorevoli: hanno una riga, un id e uno stato);
+ *   2. i modelli **di serie** scritti nel codice che nessuno ha ancora adottato, marcati
+ *      `diSerie: true` e con `statoRevisione: null` — nessuno li ha riletti in questo studio;
+ *   3. i modelli rimasti soltanto in questo browser (§41, `modelliSoloLocali`), marcati
+ *      `soloLocale: true` perché la cartella possa dire che non sono dello studio.
+ *
+ * Un modello di serie già adottato NON compare due volte: la riga dello studio lo sostituisce,
+ * riconosciuta dal campo `riferimentoSerie`.
+ *
+ * `includeArchived: false` esclude gli archiviati. Restano a database: archiviare non elimina.
+ *
+ * GARANZIA IMMUTABILITÀ: I documenti già istanziati, firmati o salvati all'interno dei singoli
+ * Progetti sono copie indipendenti e congelate alla data della firma. Modificare, archiviare o
+ * eliminare un modello nella Libreria NON altera in alcun modo i documenti storici dei Progetti.
  */
 export function getAllTemplates(includeArchived: boolean = true): DocumentTemplate[] {
+  const studio = modelliStudio ?? [];
+  const serieAdottate = new Set(studio.map((t) => t.riferimentoSerie).filter(Boolean) as string[]);
+
+  const diSerie: DocumentTemplate[] = PREBUILT_TEMPLATES.filter((p) => !serieAdottate.has(p.id)).map((p) => ({
+    ...p,
+    diSerie: true,
+    statoRevisione: null,
+    riferimentoSerie: p.id,
+  }));
+
+  const combined = [...studio, ...diSerie, ...modelliSoloLocali()];
+  return includeArchived ? combined : combined.filter((t) => !t.archiviato);
+}
+
+/**
+ * §41 — I modelli rimasti soltanto in questo browser, da recuperare.
+ *
+ * Prima di §41 esistevano due modi di creare un modello: il pulsante del Document Studio, che
+ * scriveva in localStorage E chiamava l'API, e l'importazione da JSON, che scriveva SOLO in
+ * localStorage. I secondi non hanno una riga a database: se questa funzione non li mostrasse,
+ * passando alla lettura dal server sparirebbero dall'elenco senza che nessuno li abbia
+ * eliminati — e sparire in silenzio è peggio che restare segnalati come da sistemare.
+ *
+ * Il confronto è sul titolo e non sull'id perché gli id non coincidono: la POST non mandava
+ * l'id inventato dal browser, e il database ne generava uno proprio.
+ */
+export function modelliSoloLocali(): DocumentTemplate[] {
   try {
-    const archivedIdsStr = localStorage.getItem(getTenantStorageKey('bluman_archived_template_ids'));
-    const archivedIds = new Set<string>(archivedIdsStr ? JSON.parse(archivedIdsStr) : []);
-
-    const deletedIdsStr = localStorage.getItem(getTenantStorageKey('bluman_deleted_template_ids'));
-    const deletedIds = new Set<string>(deletedIdsStr ? JSON.parse(deletedIdsStr) : []);
-
     const customStr = localStorage.getItem(getTenantStorageKey('bluman_custom_document_templates'));
-    const customArr: DocumentTemplate[] = customStr ? JSON.parse(customStr) : [];
-    const prebuiltFiltered = PREBUILT_TEMPLATES.filter(p => !deletedIds.has(p.id));
-    const prebuiltIds = new Set(prebuiltFiltered.map(t => t.id));
-    const uniqueCustom = customArr.filter(c => !prebuiltIds.has(c.id) && !deletedIds.has(c.id));
+    if (!customStr) return [];
+    const locali: DocumentTemplate[] = JSON.parse(customStr);
+    if (!Array.isArray(locali)) return [];
 
-    const combined: DocumentTemplate[] = [...prebuiltFiltered, ...uniqueCustom].map(t => ({
-      ...t,
-      archiviato: archivedIds.has(t.id) || !!t.archiviato,
-    }));
+    // Finché non si è letto il server non si può dire quali siano «solo locali»: dirlo
+    // basandosi su un elenco mai letto sarebbe una diagnosi senza esame.
+    if (statoLettura !== 'ok') return [];
 
-    if (!includeArchived) {
-      return combined.filter(t => !t.archiviato);
-    }
-    return combined;
+    const titoliStudio = new Set((modelliStudio ?? []).map((t) => (t.titolo || '').trim().toLowerCase()));
+    const idSerie = new Set(PREBUILT_TEMPLATES.map((p) => p.id));
+    return locali
+      .filter((t) => t && t.titolo && !idSerie.has(t.id))
+      .filter((t) => !titoliStudio.has(t.titolo.trim().toLowerCase()))
+      .map((t) => ({ ...t, soloLocale: true, statoRevisione: null }));
   } catch {
-    return PREBUILT_TEMPLATES;
+    return [];
   }
 }
 
 /**
- * Salva o aggiorna un Modello Master personalizzato nello storage persistente dello studio
+ * §41 — Dimentica il residuo locale di un modello dopo che è stato portato a database.
+ * Si chiama solo a recupero confermato: cancellare prima perderebbe il testo.
  */
-export function saveCustomTemplate(tmpl: DocumentTemplate): DocumentTemplate[] {
-  const current = getAllTemplates(true);
-  const exists = current.some(t => t.id === tmpl.id);
-  const updated = exists ? current.map(t => t.id === tmpl.id ? tmpl : t) : [tmpl, ...current];
-  
-  // Salva solo i modelli custom nel local storage
-  const customOnly = updated.filter(t => !PREBUILT_TEMPLATES.some(p => p.id === t.id));
-  localStorage.setItem(getTenantStorageKey('bluman_custom_document_templates'), JSON.stringify(customOnly));
-  return updated;
-}
-
-/**
- * Archivia un Modello Master (sia prebuilt che custom).
- * NOTA: Non cancella i dati, ma imposta lo stato su archiviato nascondendolo dai menu operativi predefiniti.
- */
-export function archiveTemplate(templateId: string): DocumentTemplate[] {
+export function scartaResiduoLocale(titolo: string): void {
   try {
-    const archivedIdsStr = localStorage.getItem(getTenantStorageKey('bluman_archived_template_ids'));
-    const archivedIds: string[] = archivedIdsStr ? JSON.parse(archivedIdsStr) : [];
-    if (!archivedIds.includes(templateId)) {
-      archivedIds.push(templateId);
-      localStorage.setItem(getTenantStorageKey('bluman_archived_template_ids'), JSON.stringify(archivedIds));
-    }
-    return getAllTemplates(true);
+    const chiave = getTenantStorageKey('bluman_custom_document_templates');
+    const customStr = localStorage.getItem(chiave);
+    if (!customStr) return;
+    const locali: DocumentTemplate[] = JSON.parse(customStr);
+    if (!Array.isArray(locali)) return;
+    const atteso = (titolo || '').trim().toLowerCase();
+    localStorage.setItem(chiave, JSON.stringify(locali.filter((t) => (t?.titolo || '').trim().toLowerCase() !== atteso)));
   } catch {
-    return getAllTemplates(true);
+    // Il residuo resta: verrà riproposto al prossimo giro. Nessun dato perso.
   }
 }
 
 /**
- * Ripristina un Modello Master precedentemente archiviato.
+ * §41 — Legge i modelli da un file JSON esportato, senza salvarli.
+ *
+ * Prima questa funzione si chiamava `importTemplatesFromJson`, scriveva direttamente in
+ * localStorage e dichiarava `success: true`: i modelli importati non arrivavano al database,
+ * quindi «importati» valeva per quel browser. Ora si limita a leggere e validare; a salvarli
+ * ci pensa `useCartellaTemplate.importaDaJson`, che passa dal server e riferisce come è andata.
  */
-export function restoreTemplate(templateId: string): DocumentTemplate[] {
-  try {
-    const archivedIdsStr = localStorage.getItem(getTenantStorageKey('bluman_archived_template_ids'));
-    const archivedIds: string[] = archivedIdsStr ? JSON.parse(archivedIdsStr) : [];
-    const filtered = archivedIds.filter(id => id !== templateId);
-    localStorage.setItem(getTenantStorageKey('bluman_archived_template_ids'), JSON.stringify(filtered));
-    return getAllTemplates(true);
-  } catch {
-    return getAllTemplates(true);
-  }
-}
-
-/**
- * Elimina definitivamente un Modello Master.
- * NOTA FONDAMENTALE: Non tocca né altera i documenti già congelati/firmati nei progetti.
- */
-export function deleteCustomTemplate(templateId: string): DocumentTemplate[] {
-  try {
-    // 1. Rimuovi dai custom
-    const customStr = localStorage.getItem(getTenantStorageKey('bluman_custom_document_templates'));
-    const customArr: DocumentTemplate[] = customStr ? JSON.parse(customStr) : [];
-    const filteredCustom = customArr.filter(t => t.id !== templateId);
-    localStorage.setItem(getTenantStorageKey('bluman_custom_document_templates'), JSON.stringify(filteredCustom));
-
-    // 2. Se era un prebuilt, segnalo come eliminato
-    const deletedPrebuiltStr = localStorage.getItem(getTenantStorageKey('bluman_deleted_template_ids'));
-    const deletedPrebuilt: string[] = deletedPrebuiltStr ? JSON.parse(deletedPrebuiltStr) : [];
-    if (!deletedPrebuilt.includes(templateId)) {
-      deletedPrebuilt.push(templateId);
-      localStorage.setItem(getTenantStorageKey('bluman_deleted_template_ids'), JSON.stringify(deletedPrebuilt));
-    }
-
-    return getAllTemplates(true);
-  } catch {
-    return getAllTemplates(true);
-  }
-}
-
-export const deleteTemplate = deleteCustomTemplate;
-
-/**
- * Importa un bundle JSON o singolo Modello Master
- */
-export function importTemplatesFromJson(jsonString: string): { success: boolean; count: number; error?: string } {
+export function leggiModelliDaJson(jsonString: string): { ok: boolean; modelli: DocumentTemplate[]; errore?: string } {
   try {
     const parsed = JSON.parse(jsonString);
     const incoming: DocumentTemplate[] = Array.isArray(parsed) ? parsed : [parsed];
-    if (incoming.length === 0 || !incoming[0].titolo) {
-      return { success: false, count: 0, error: 'Formato file JSON non valido. Richiesto titolo e contenutoHtml.' };
+    if (incoming.length === 0 || !incoming[0]?.titolo) {
+      return { ok: false, modelli: [], errore: 'Formato file JSON non valido. Richiesto titolo e contenutoHtml.' };
     }
-    
-    let addedCount = 0;
-    incoming.forEach(tmpl => {
-      const formatted: DocumentTemplate = {
-        id: tmpl.id || `tmpl-custom-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-        titolo: tmpl.titolo || 'Nuovo Modello Master Importato',
-        categoria: (tmpl.categoria as any) || 'societario',
-        descrizione: tmpl.descrizione || 'Modello master importato nel Vault Studio.',
-        contenutoHtml: tmpl.contenutoHtml || '<h1>Modello Master</h1><p>Inserisci testo...</p>',
-        archiviato: !!tmpl.archiviato,
-      };
-      saveCustomTemplate(formatted);
-      addedCount++;
-    });
-
-    return { success: true, count: addedCount };
+    const modelli = incoming.map((tmpl) => ({
+      // L'id lo assegna il database alla creazione: qui resta vuoto perché un id inventato dal
+      // browser non corrisponderebbe a nessuna riga (è il difetto che §41 chiude).
+      id: '',
+      titolo: tmpl.titolo || 'Nuovo Modello Master Importato',
+      categoria: (tmpl.categoria as DocumentTemplate['categoria']) || 'societario',
+      descrizione: tmpl.descrizione || 'Modello master importato nel Vault Studio.',
+      contenutoHtml: tmpl.contenutoHtml || '<h1>Modello Master</h1><p>Inserisci testo...</p>',
+      livelloFirmaRichiesto: tmpl.livelloFirmaRichiesto ?? ('ses' as const),
+    }));
+    return { ok: true, modelli };
   } catch (err: any) {
-    return { success: false, count: 0, error: err.message || 'Errore di decodifica JSON' };
+    return { ok: false, modelli: [], errore: err?.message || 'Errore di decodifica JSON' };
   }
 }
 
 /**
- * Esporta tutti i Modelli Master correnti in formato JSON scaricabile
+ * Esporta tutti i Modelli Master correnti in formato JSON scaricabile.
+ * Esporta quello che c'è in elenco: se la lettura dal server non è riuscita, l'elenco contiene
+ * i soli modelli di serie, e il file lo rispecchia invece di far finta di essere un backup.
  */
 export function exportTemplatesAsJson(): string {
   const all = getAllTemplates(true);
   return JSON.stringify(all, null, 2);
 }
+
 
 

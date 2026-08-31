@@ -4,6 +4,8 @@ export * from './auth';
 export * from './clienti';
 export * from './progetti';
 export * from './documenti';
+// §41 — cartella modelli dello studio: `/documenti-template` e lo stato di revisione.
+export * from './modelliDocumento';
 export * from './libreria';
 export * from './fatturazione';
 export * from './portale';

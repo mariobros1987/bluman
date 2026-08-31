@@ -2,9 +2,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CatBadge } from '../ui/CatBadge';
 import { downloadRealPdf } from '../../utils/pdfGenerator';
-import { PREBUILT_TEMPLATES, getAllTemplates, saveCustomTemplate, deleteTemplate, archiveTemplate, restoreTemplate, importTemplatesFromJson, exportTemplatesAsJson, type DocumentTemplate } from '../../utils/documentTemplates';
+import { PREBUILT_TEMPLATES, exportTemplatesAsJson } from '../../utils/documentTemplates';
 import { getStudioInfoForTenant } from '../../utils/tenant';
-import { uploadFileApi, fetchClienti, fetchProgetti, creaDocumentoTemplateApi, eliminaDocumentoTemplateApi } from '../../api/client';
+import { uploadFileApi, fetchClienti, fetchProgetti } from '../../api/client';
+// §41 — l'elenco dei modelli e i gesti su di essi passano dalla cartella dello studio
+// (database). Prima archiviazione ed eliminazione scrivevano in `localStorage`: valevano per
+// questo browser, e un modello archiviato dal titolare restava attivo per tutti gli altri.
+import { useCartellaTemplate } from '../../hooks/useCartellaTemplate';
 
 // ─── Componente Libreria Documenti in Bianco & Form Master ────────
 export function LibreriaDocumentiEForm() {
@@ -15,21 +19,30 @@ export function LibreriaDocumentiEForm() {
   const [selectedCatFilter, setSelectedCatFilter] = useState('TUTTI');
   const [statusFilter, setStatusFilter] = useState<'attivi' | 'archiviati' | 'tutti'>('attivi');
 
-  const [docModels, setDocModels] = useState<Array<{ id: string; nome: string; cat: string; firma: boolean; desc: string; url?: string; templateId?: string; archiviato?: boolean }>>(() => {
-    return getAllTemplates(true).map(t => ({
-      id: t.id,
-      templateId: t.id,
-      nome: `${t.titolo}.docx`,
-      cat: t.categoria === 'engagement' || t.categoria === 'nda' ? 'Contratti' :
-           t.categoria === 'societario' ? 'Societario' :
-           t.categoria === 'trust' ? 'Trust' :
-           t.categoria === 'compliance' ? 'Compliance' :
-           t.categoria === 'delega' ? 'Societario' : 'Contratti',
-      firma: t.id === 'tmpl-engagement' || t.id === 'tmpl-nda' || t.id === 'tmpl-delega' || t.id === 'tmpl-compliance',
-      desc: t.descrizione,
-      archiviato: !!t.archiviato,
-    }));
-  });
+  // §41 — la libreria dei modelli è quella dello studio, letta dal database. `docModels` era
+  // uno stato riempito da `localStorage`; ora è derivato dalla cartella, così un modello creato
+  // o archiviato altrove si vede anche qui senza ricaricare la pagina.
+  const cartella = useCartellaTemplate();
+  const docModels = React.useMemo(
+    () =>
+      cartella.modelli.map((t) => ({
+        id: t.id,
+        templateId: t.id,
+        nome: `${t.titolo}.docx`,
+        cat: t.categoria === 'engagement' || t.categoria === 'nda' ? 'Contratti' :
+             t.categoria === 'societario' ? 'Societario' :
+             t.categoria === 'trust' ? 'Trust' :
+             t.categoria === 'compliance' ? 'Compliance' :
+             t.categoria === 'delega' ? 'Societario' : 'Contratti',
+        firma: t.riferimentoSerie === 'tmpl-engagement' || t.riferimentoSerie === 'tmpl-nda' ||
+               t.riferimentoSerie === 'tmpl-delega' || t.riferimentoSerie === 'tmpl-compliance' ||
+               t.id === 'tmpl-engagement' || t.id === 'tmpl-nda' || t.id === 'tmpl-delega' || t.id === 'tmpl-compliance',
+        desc: t.descrizione,
+        url: undefined as string | undefined,
+        archiviato: !!t.archiviato,
+      })),
+    [cartella.modelli],
+  );
 
   const [formMasters, setFormMasters] = useState([
     { id: 'f1', nome: 'Form Dati Societari & Legale Rappresentante', campi: ['Ragione Sociale', 'P.IVA / VAT', 'Codice Fiscale', 'Indirizzo Sede Legale', 'Legale Rappresentante'] },
@@ -50,48 +63,43 @@ export function LibreriaDocumentiEForm() {
   const [fileToUpload, setFileToUpload] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
 
-  const reloadDocModels = () => {
-    const all = getAllTemplates(true);
-    setDocModels(all.map(t => ({
-      id: t.id,
-      templateId: t.id,
-      nome: `${t.titolo}.docx`,
-      cat: t.categoria === 'engagement' || t.categoria === 'nda' ? 'Contratti' :
-           t.categoria === 'societario' ? 'Societario' :
-           t.categoria === 'trust' ? 'Trust' :
-           t.categoria === 'compliance' ? 'Compliance' :
-           t.categoria === 'delega' ? 'Societario' : 'Contratti',
-      firma: t.id === 'tmpl-engagement' || t.id === 'tmpl-nda' || t.id === 'tmpl-delega' || t.id === 'tmpl-compliance',
-      desc: t.descrizione,
-      archiviato: !!t.archiviato,
-    })));
+  const handleArchiveDoc = async (templateId: string, nome: string) => {
+    const tmpl = cartella.modelli.find((t) => t.id === templateId);
+    if (!tmpl) {
+      alert(`Il modello "${nome}" non è più in elenco: ricarica la libreria.`);
+      return;
+    }
+    // §41 — l'archiviazione va a database: vale per tutto lo studio, non per questo browser.
+    const esito = await cartella.archivia(tmpl, true);
+    alert(
+      esito.ok
+        ? `📦 ${esito.messaggio} (I documenti storici già presenti nei progetti rimangono inalterati).`
+        : `⚠️ ${esito.messaggio}`,
+    );
   };
 
-  const handleArchiveDoc = (templateId: string, nome: string) => {
-    archiveTemplate(templateId);
-    reloadDocModels();
-    alert(`📦 Modello "${nome}" archiviato con successo. (I documenti storici già presenti nei progetti rimangono inalterati).`);
-  };
-
-  const handleRestoreDoc = (templateId: string, nome: string) => {
-    restoreTemplate(templateId);
-    reloadDocModels();
-    alert(`♻️ Modello "${nome}" ripristinato tra i modelli attivi dello studio.`);
+  const handleRestoreDoc = async (templateId: string, nome: string) => {
+    const tmpl = cartella.modelli.find((t) => t.id === templateId);
+    if (!tmpl) {
+      alert(`Il modello "${nome}" non è più in elenco: ricarica la libreria.`);
+      return;
+    }
+    const esito = await cartella.archivia(tmpl, false);
+    alert(`${esito.ok ? '♻️' : '⚠️'} ${esito.messaggio}`);
   };
 
   const handleDeleteDoc = async (templateId: string, nome: string) => {
-    if (!confirm(`Sei sicuro di voler eliminare definitivamente il modello master "${nome}"?\n\nI documenti già firmati o salvati nei progetti del cliente rimarranno comunque congelati e perfettamente integri.`)) return;
-    // §3.3 — prima la rimozione locale avveniva PRIMA della chiamata e il `catch {}`
-    // vuoto annunciava comunque «eliminato»: il modello spariva dalla lista ma restava
-    // a database (e riappariva al reload). Ora si cancella in locale solo a conferma avvenuta.
-    try {
-      await eliminaDocumentoTemplateApi(templateId);
-      deleteTemplate(templateId);
-      reloadDocModels();
-      alert(`🗑️ Modello "${nome}" eliminato dalla libreria master.`);
-    } catch (err: any) {
-      alert(`Eliminazione del modello "${nome}" non riuscita: ${err?.message || 'errore di rete'}. Il modello NON è stato rimosso.`);
+    const tmpl = cartella.modelli.find((t) => t.id === templateId);
+    if (!tmpl) {
+      alert(`Il modello "${nome}" non è più in elenco: ricarica la libreria.`);
+      return;
     }
+    if (!confirm(`Sei sicuro di voler eliminare definitivamente il modello master "${nome}"?\n\nI documenti già firmati o salvati nei progetti del cliente rimarranno comunque congelati e perfettamente integri.`)) return;
+    // §3.3 / §41 — prima il server, poi l'elenco: il modello sparisce dalla libreria solo a
+    // eliminazione confermata. Prima si cancellava in locale e il `catch {}` vuoto annunciava
+    // comunque «eliminato», con il modello che riappariva al reload.
+    const esito = await cartella.elimina(tmpl);
+    alert(`${esito.ok ? '🗑️' : '⚠️'} ${esito.messaggio}`);
   };
 
   const handleAddDoc = async (e: React.FormEvent) => {
@@ -101,7 +109,6 @@ export function LibreriaDocumentiEForm() {
     const nameToUse = docName.trim() || (fileToUpload ? fileToUpload.name : 'Documento.docx');
 
     try {
-      let fileText = '';
       if (fileToUpload) {
         const reader = new FileReader();
         const base64Promise = new Promise<string>((resolve) => {
@@ -112,29 +119,22 @@ export function LibreriaDocumentiEForm() {
         await uploadFileApi(nameToUse, base64Data);
       }
 
-      const customTmpl: DocumentTemplate = {
-        id: `tmpl-custom-${Date.now()}`,
+      // §41 — nessun id inventato dal browser e nessuna scrittura in `localStorage`: l'id è
+      // quello della riga creata dal server, che è anche l'unico con cui si potrà archiviarlo
+      // o eliminarlo dopo.
+      const esito = await cartella.crea({
         titolo: nameToUse.replace(/\.[^/.]+$/, ""),
         categoria: (docCat.toLowerCase() as any) || 'societario',
         descrizione: docDesc || 'Modello master personalizzato caricato nella libreria studio.',
-        contenutoHtml: fileText || `<h1>${nameToUse}</h1><p>Bozza modello master studio...</p>`,
-      };
-
-      saveCustomTemplate(customTmpl);
-      // §3.3 — il vecchio catch faceva solo console.error: upload o salvataggio falliti
-      // sparivano in silenzio con lo spinner che si fermava come se tutto fosse andato bene.
-      try {
-        await creaDocumentoTemplateApi(customTmpl);
-        reloadDocModels();
+        contenutoHtml: `<h1>${nameToUse}</h1><p>Bozza modello master studio...</p>`,
+      });
+      if (esito.ok) {
         setDocName('');
         setDocDesc('');
         setFileToUpload(null);
         setNewDocOpen(false);
-        alert(`✓ Nuovo Modello Master "${customTmpl.titolo}" aggiunto con successo!`);
-      } catch (err: any) {
-        reloadDocModels();
-        alert(`Modello "${customTmpl.titolo}" salvato in LOCALE ma NON sincronizzato col server: ${err?.message || 'errore di rete'}.`);
       }
+      alert(`${esito.ok ? '✓' : '⚠️'} ${esito.messaggio}`);
     } catch (err: any) {
       // Upload del file fallito: niente è stato salvato, né in locale né sul server.
       alert(`Caricamento del documento non riuscito: ${err?.message || 'errore di rete'}. Il file NON è stato salvato.`);
@@ -151,30 +151,18 @@ export function LibreriaDocumentiEForm() {
     reader.onload = async (event) => {
       const content = event.target?.result as string;
       if (file.name.endsWith('.json')) {
-        const res = importTemplatesFromJson(content);
-        if (res.success) {
-          reloadDocModels();
-          alert(`✓ ${res.count} Modelli Master importati con successo nel Vault Studio!`);
-        } else {
-          alert('Errore importazione: ' + res.error);
-        }
+        // §41 — ogni modello del bundle passa dal server: il conteggio dice quanti sono
+        // arrivati nell'archivio dello studio, non quanti erano nel file.
+        const esito = await cartella.importaDaJson(content);
+        alert(`${esito.ok ? '✓' : '⚠️'} ${esito.messaggio}`);
       } else {
-        const customTmpl: DocumentTemplate = {
-          id: `tmpl-custom-${Date.now()}`,
+        const esito = await cartella.crea({
           titolo: file.name.replace(/\.[^/.]+$/, ""),
           categoria: 'societario',
           descrizione: `Modello importato da "${file.name}"`,
           contenutoHtml: content,
-        };
-        saveCustomTemplate(customTmpl);
-        // §3.3 — l'import da file non deve annunciare successi se il server non conferma.
-        try {
-          await creaDocumentoTemplateApi(customTmpl);
-          reloadDocModels();
-          alert(`✓ Modello "${customTmpl.titolo}" importato con successo!`);
-        } catch (err: any) {
-          alert(`Modello "${customTmpl.titolo}" salvato in LOCALE ma NON sincronizzato col server: ${err?.message || 'errore di rete'}.`);
-        }
+        });
+        alert(`${esito.ok ? '✓' : '⚠️'} ${esito.messaggio}`);
       }
     };
     reader.readAsText(file);
@@ -236,7 +224,7 @@ export function LibreriaDocumentiEForm() {
 
   const handleDownloadTemplatePdf = async (m: any) => {
     const studio = getStudioInfoForTenant();
-    const tmpl = getAllTemplates(true).find(t => t.id === m.templateId || t.id === m.id) || PREBUILT_TEMPLATES[0];
+    const tmpl = cartella.modelli.find(t => t.id === m.templateId || t.id === m.id) || PREBUILT_TEMPLATES[0];
     const htmlContent = `
       <div style="font-family: 'Segoe UI', Arial, sans-serif; padding: 20px; color: #0f172a;">
         <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #4338ca; padding-bottom: 14px; margin-bottom: 24px;">

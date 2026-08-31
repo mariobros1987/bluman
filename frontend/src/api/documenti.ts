@@ -535,50 +535,9 @@ export async function calcolaHashSha256(contenuto: string | ArrayBuffer): Promis
     .join('');
 }
 
-export async function fetchDocumentiTemplateApi() {
-  try {
-    const res = await apiFetch(`${API_BASE}/documenti-template`, { headers: getAuthHeaders() });
-    if (!res.ok) throw new Error('Errore recupero template documenti');
-    return await res.json();
-  } catch (err) {
-    console.warn('Recupero template documenti fallback local:', err);
-    const local = localStorage.getItem('bluman_custom_document_templates');
-    return local ? JSON.parse(local) : [];
-  }
-}
+// §41 — Le quattro funzioni `*DocumentoTemplateApi*` (i modelli dello studio) stavano qui e
+// sono in `api/modelliDocumento.ts`, insieme alla revisione, all'archiviazione e all'adozione.
+// I chiamanti importano da `api/client`, che ri-esporta entrambi i moduli: nessuna firma è
+// cambiata, tranne `fetchDocumentiTemplateApi`, che non restituisce più i dati di localStorage
+// travestiti da risposta del server.
 
-export async function creaDocumentoTemplateApi(data: { titolo: string; categoria?: string; descrizione?: string; contenutoHtml: string; livelloFirmaRichiesto?: 'ses' | 'fea' | 'feq' }) {
-  // §3.3 — il fallback fabbricava un template locale in localStorage spacciandolo per
-  // salvato sul server. Il salvataggio locale (se voluto) spetta al chiamante; qui
-  // l'errore si propaga così la UI può dire la verità.
-  const res = await apiFetch(`${API_BASE}/documenti-template`, {
-    method: 'POST',
-    headers: getAuthHeaders(),
-    body: JSON.stringify(data),
-  });
-  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore salvataggio template'));
-  return await res.json();
-}
-
-export async function aggiornaDocumentoTemplateApi(id: string, data: { titolo?: string; categoria?: string; descrizione?: string; contenutoHtml?: string; livelloFirmaRichiesto?: 'ses' | 'fea' | 'feq' }) {
-  // §3.3 — nessun fallback: aggiornamento fallito = il template è ancora com'era.
-  const res = await apiFetch(`${API_BASE}/documenti-template/${id}`, {
-    method: 'PUT',
-    headers: getAuthHeaders(),
-    body: JSON.stringify(data),
-  });
-  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore aggiornamento template'));
-  return await res.json();
-}
-
-export async function eliminaDocumentoTemplateApi(id: string) {
-  // §3.3 — il fallback eliminava il template da localStorage e rispondeva ok anche se
-  // il server non lo aveva cancellato: al reload il template riappariva. L'errore si
-  // propaga; la rimozione locale spetta al chiamante solo DOPO la conferma del server.
-  const res = await apiFetch(`${API_BASE}/documenti-template/${id}`, {
-    method: 'DELETE',
-    headers: getAuthHeaders(),
-  });
-  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore eliminazione template'));
-  return await res.json();
-}

@@ -20,6 +20,7 @@ import { BanksPage } from './pages/BanksPage';
 import { RetainersPage } from './pages/RetainersPage';
 import { DocumentEditorPage } from './pages/DocumentEditorPage';
 import { ArchivioDocumentiPage } from './pages/ArchivioDocumentiPage';
+import { CartellaModelliPage } from './pages/CartellaModelliPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { TimesheetPage } from './pages/TimesheetPage';
 import { getUserPermission } from './utils/rbac';
@@ -159,6 +160,9 @@ function AppContent() {
           {/* §37 — l'archivio riusa la chiave RBAC `documents`: è la stessa materia, e una
               chiave nuova sarebbe bloccata per chiunque abbia già una matrice salvata. */}
           <Route path="/archivio"      element={<ProtectedModule user={currentUser} moduleKey="documents" element={<ArchivioDocumentiPage />} />} />
+          {/* §41 — la cartella dei modelli dello studio: stessa materia di Document Studio, quindi
+              stessa chiave RBAC `documents`. È da qui che Document Studio pesca i modelli. */}
+          <Route path="/modelli"       element={<ProtectedModule user={currentUser} moduleKey="documents" element={<CartellaModelliPage />} />} />
           <Route path="/audit"         element={<ProtectedModule user={currentUser} moduleKey="audit" element={<AuditLogPage />} />} />
           <Route path="/reports"       element={<ProtectedModule user={currentUser} moduleKey="reports" element={<ReportsPage />} />} />
           <Route path="/timesheet"     element={<ProtectedModule user={currentUser} moduleKey="timesheet" element={<TimesheetPage />} />} />

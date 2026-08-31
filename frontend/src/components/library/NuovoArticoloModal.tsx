@@ -1,6 +1,9 @@
 import React, { useState, useRef } from 'react';
-import { getAllTemplates, saveCustomTemplate, importTemplatesFromJson, type DocumentTemplate } from '../../utils/documentTemplates';
-import { creaArticoloApi, creaDocumentoTemplateApi } from '../../api/client';
+import { creaArticoloApi } from '../../api/client';
+// §41 — i modelli allacciabili vengono dalla cartella dello studio (database), non da
+// `localStorage`, e l'id da allacciare è quello che risponde il server.
+import { useCartellaTemplate } from '../../hooks/useCartellaTemplate';
+import { BadgeRevisione } from '../ui/BadgeRevisione';
 import type { CategoriaModulo, Giurisdizione } from '../../types';
 
 // ─── Componente Nuovo Articolo Modal ──────────────────────────────
@@ -14,19 +17,19 @@ export function NuovoArticoloModal({ giurList, onClose, onCreated }: { giurList:
 
   const fileInputNewArtRef = useRef<HTMLInputElement>(null);
   const [searchNewArtTmpl, setSearchNewArtTmpl] = useState('');
-  const [allMasterTemplates, setAllMasterTemplates] = useState<DocumentTemplate[]>(() => getAllTemplates());
+  const cartella = useCartellaTemplate();
+  // Gli archiviati non si allacciano: sono carte che lo studio ha messo da parte.
+  const allMasterTemplates = React.useMemo(
+    () => cartella.modelli.filter(t => !t.archiviato),
+    [cartella.modelli],
+  );
   const [selectedDocIds, setSelectedDocIds] = useState<string[]>(['tmpl-engagement']);
-
-  const reloadMasterTemplates = () => {
-    setAllMasterTemplates(getAllTemplates());
-  };
 
   const handleCreateNewWordForNewArt = async () => {
     const title = prompt('Inserisci il nome del nuovo Modello Word per questo articolo:', `${nome || 'Documento'} - Modello Word`);
     if (!title || !title.trim()) return;
 
-    const newTmpl: DocumentTemplate = {
-      id: `tmpl-custom-${Date.now()}`,
+    const esito = await cartella.crea({
       titolo: title.trim(),
       categoria: (cat.toLowerCase() as any) || 'societario',
       descrizione: `Modello Word personalizzato per la nuova prestazione "${nome}".`,
@@ -39,19 +42,14 @@ export function NuovoArticoloModal({ giurList, onClose, onCreated }: { giurList:
 </div>
 <p style="font-size: 11.5px; line-height: 1.6;">Testo e condizioni operative per la prestazione ${nome}...</p>
       `,
-    };
+    });
 
-    saveCustomTemplate(newTmpl);
-    // §3.3 — salvataggio locale immediato, esito del sync col server comunicato onestamente.
-    try {
-      await creaDocumentoTemplateApi(newTmpl);
-      reloadMasterTemplates();
-      setSelectedDocIds(prev => [...prev, newTmpl.id]);
-      alert(`✓ Nuovo Modello Word "${newTmpl.titolo}" creato e collegato all'articolo!`);
-    } catch (err: any) {
-      alert(`Modello "${newTmpl.titolo}" salvato in LOCALE ma NON sincronizzato col server: ${err?.message || 'errore di rete'}.`);
-      setSelectedDocIds(prev => [...prev, newTmpl.id]);
+    if (!esito.ok || !esito.modello) {
+      alert(`⚠️ ${esito.messaggio}\n\nNessun modello è stato collegato all'articolo.`);
+      return;
     }
+    setSelectedDocIds(prev => [...prev, esito.modello!.id]);
+    alert(`✓ ${esito.messaggio}\nCollegato a questo articolo.`);
   };
 
   const handleImportDocFileForNewArt = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -61,40 +59,31 @@ export function NuovoArticoloModal({ giurList, onClose, onCreated }: { giurList:
     const reader = new FileReader();
     reader.onload = async (event) => {
       const content = event.target?.result as string;
-      let htmlBody = '';
+
       if (file.name.endsWith('.json')) {
-        const res = importTemplatesFromJson(content);
-        if (res.success) {
-          reloadMasterTemplates();
-          const first = getAllTemplates()[0];
-          if (first) setSelectedDocIds(prev => [...prev, first.id]);
-          alert(`✓ Modello importato da file JSON e allacciato all'articolo!`);
-          return;
-        }
-      } else {
-        htmlBody = content || `<h1>${file.name}</h1><p>Documento importato da PC per ${nome}...</p>`;
+        // §41 — ogni modello del bundle va a database; si collegano SOLO quelli confermati.
+        const esito = await cartella.importaDaJson(content);
+        const creati = esito.modelli || [];
+        if (creati.length > 0) setSelectedDocIds(prev => [...prev, ...creati.map(m => m.id)]);
+        alert(`${esito.ok ? '✓' : '⚠️'} ${esito.messaggio}${creati.length > 0 ? `\n${creati.length} collegati a questo articolo.` : ''}`);
+        return;
       }
 
+      const htmlBody = content || `<h1>${file.name}</h1><p>Documento importato da PC per ${nome}...</p>`;
       const docNameClean = file.name.replace(/\.[^/.]+$/, "");
-      const newTmpl: DocumentTemplate = {
-        id: `tmpl-custom-${Date.now()}`,
+      const esito = await cartella.crea({
         titolo: docNameClean,
         categoria: (cat.toLowerCase() as any) || 'societario',
         descrizione: `Documento caricato da PC (${file.name}) per la prestazione "${nome}".`,
         contenutoHtml: htmlBody,
-      };
+      });
 
-      saveCustomTemplate(newTmpl);
-      // §3.3 — stesso pattern: locale subito, sync col server dichiarato onestamente.
-      try {
-        await creaDocumentoTemplateApi(newTmpl);
-        reloadMasterTemplates();
-        setSelectedDocIds(prev => [...prev, newTmpl.id]);
-        alert(`✓ File "${file.name}" importato dal PC e allacciato con successo!`);
-      } catch (err: any) {
-        alert(`File "${file.name}" salvato in LOCALE ma NON sincronizzato col server: ${err?.message || 'errore di rete'}.`);
-        setSelectedDocIds(prev => [...prev, newTmpl.id]);
+      if (!esito.ok || !esito.modello) {
+        alert(`⚠️ ${esito.messaggio}\n\nIl file "${file.name}" NON è stato collegato.`);
+        return;
       }
+      setSelectedDocIds(prev => [...prev, esito.modello!.id]);
+      alert(`✓ File "${file.name}" importato nell'archivio dello studio e collegato all'articolo.`);
     };
     reader.readAsText(file);
     e.target.value = '';
@@ -245,13 +234,18 @@ export function NuovoArticoloModal({ giurList, onClose, onCreated }: { giurList:
             style={{ fontSize: 11, padding: '4px 8px', borderRadius: 6, background: 'var(--card)', border: '1px solid var(--border)', width: '100%' }}
           />
 
-          {/* Lista Modelli in Memoria */}
+          {/* Lista dei modelli della cartella dello studio */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 6, maxHeight: 150, overflowY: 'auto', background: 'var(--card)', padding: 8, borderRadius: 8, border: '1px solid var(--border)' }}>
+            {/* §41 — se la lettura dal server non è riuscita l'elenco può essere incompleto: si dice. */}
+            {cartella.erroreLettura && (
+              <div style={{ fontSize: 10, color: '#fca5a5', background: '#2a1218', border: '1px solid #5b2130', borderRadius: 6, padding: '4px 6px' }}>
+                ⚠️ Elenco possibilmente incompleto: {cartella.erroreLettura}
+              </div>
+            )}
             {allMasterTemplates
               .filter(item => !searchNewArtTmpl || item.titolo.toLowerCase().includes(searchNewArtTmpl.toLowerCase()) || item.categoria.toLowerCase().includes(searchNewArtTmpl.toLowerCase()))
               .map(item => {
               const checked = selectedDocIds.includes(item.id);
-              const isCustom = item.id.startsWith('tmpl-custom');
               return (
                 <label
                   key={item.id}
@@ -285,11 +279,9 @@ export function NuovoArticoloModal({ giurList, onClose, onCreated }: { giurList:
                     </span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-                    {isCustom && (
-                      <span style={{ fontSize: 8.5, background: '#064e3b', color: '#34d399', padding: '1px 4px', borderRadius: 4, fontWeight: 700 }}>
-                        Custom
-                      </span>
-                    )}
+                    {/* §41 — lo stato di revisione accanto al modello, così chi lo collega sa
+                        se quella carta è già stata riletta in studio. */}
+                    <BadgeRevisione modello={item} compatto />
                     <span style={{ fontSize: 8.5, background: 'var(--card2)', color: 'var(--muted)', padding: '1px 4px', borderRadius: 4, textTransform: 'uppercase' }}>
                       {item.categoria}
                     </span>

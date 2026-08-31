@@ -1,9 +1,14 @@
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CatBadge } from '../ui/CatBadge';
+import { BadgeRevisione } from '../ui/BadgeRevisione';
 import { fmt } from '../../utils';
-import { getAllTemplates, saveCustomTemplate, importTemplatesFromJson, type DocumentTemplate } from '../../utils/documentTemplates';
-import { updateArticoloPrezzoApi, creaDocumentoTemplateApi } from '../../api/client';
+import { updateArticoloPrezzoApi } from '../../api/client';
+// §41 — i modelli allacciabili sono quelli della cartella dello studio, letta dal database.
+// Prima l'elenco veniva da `localStorage` e un modello nuovo nasceva con un id inventato dal
+// browser (`tmpl-custom-<timestamp>`) che il server scartava: l'articolo restava allacciato a
+// un identificativo che a database non esisteva, e da un altro computer non si vedeva niente.
+import { useCartellaTemplate } from '../../hooks/useCartellaTemplate';
 import type { Articolo } from '../../types';
 
 // ─── Componente Catalogo Articoli & Distinta Base ──────────────────
@@ -11,11 +16,12 @@ export function ArticoliCatalogView({ articoliList, onOpenNew, onDisattiva }: { 
   const [selectedCat, setSelectedCat] = useState<string>('TUTTI');
   const navigate = useNavigate();
   const editArtFileImportRef = useRef<HTMLInputElement>(null);
-  const [allMasterTemplates, setAllMasterTemplates] = useState<DocumentTemplate[]>(() => getAllTemplates());
-
-  const reloadMasterTemplates = () => {
-    setAllMasterTemplates(getAllTemplates());
-  };
+  const cartella = useCartellaTemplate();
+  // Gli archiviati non si allacciano: sono carte che lo studio ha messo da parte.
+  const allMasterTemplates = React.useMemo(
+    () => cartella.modelli.filter(t => !t.archiviato),
+    [cartella.modelli],
+  );
 
   const resolveTemplateName = (mId: string) => {
     if (mId === 'm1') return 'Accordo NDA Riservatezza';
@@ -30,8 +36,8 @@ export function ArticoliCatalogView({ articoliList, onOpenNew, onDisattiva }: { 
     const title = prompt('Inserisci il nome del nuovo Modello Word per questa prestazione:', `${editName || 'Documento'} - Modello Word`);
     if (!title || !title.trim()) return;
 
-    const newTmpl: DocumentTemplate = {
-      id: `tmpl-custom-${Date.now()}`,
+    // §41 — il modello nasce a database e l'id da allacciare è quello che torna dal server.
+    const esito = await cartella.crea({
       titolo: title.trim(),
       categoria: (editingArt?.cat.toLowerCase() as any) || 'societario',
       descrizione: `Modello Word personalizzato creato per la prestazione "${editName}".`,
@@ -44,20 +50,14 @@ export function ArticoliCatalogView({ articoliList, onOpenNew, onDisattiva }: { 
 </div>
 <p style="font-size: 11.5px; line-height: 1.6;">Testo e condizioni operative per la prestazione ${editName}...</p>
       `,
-    };
+    });
 
-    saveCustomTemplate(newTmpl);
-    // §3.3 — se il server non conferma, il modello esiste solo in localStorage: va detto,
-    // non mostrato come «creato» e basta (al cambio dispositivo sparirebbe).
-    try {
-      await creaDocumentoTemplateApi(newTmpl);
-      reloadMasterTemplates();
-      setEditDocModels(prev => [...prev, newTmpl.id]);
-      alert(`✓ Nuovo Modello Word "${newTmpl.titolo}" creato e allacciato all'articolo!`);
-    } catch (err: any) {
-      alert(`Modello "${newTmpl.titolo}" salvato in LOCALE ma NON sincronizzato col server: ${err?.message || 'errore di rete'}. Al prossimo reload da un altro dispositivo non sarà visibile.`);
-      setEditDocModels(prev => [...prev, newTmpl.id]);
+    if (!esito.ok || !esito.modello) {
+      alert(`⚠️ ${esito.messaggio}\n\nNessun modello è stato allacciato alla prestazione.`);
+      return;
     }
+    setEditDocModels(prev => [...prev, esito.modello!.id]);
+    alert(`✓ ${esito.messaggio}\nAllacciato a questa prestazione.`);
   };
 
   const handleImportDocFileForArticle = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -67,40 +67,31 @@ export function ArticoliCatalogView({ articoliList, onOpenNew, onDisattiva }: { 
     const reader = new FileReader();
     reader.onload = async (event) => {
       const content = event.target?.result as string;
-      let htmlBody = '';
+
       if (file.name.endsWith('.json')) {
-        const res = importTemplatesFromJson(content);
-        if (res.success) {
-          reloadMasterTemplates();
-          const first = getAllTemplates()[0];
-          if (first) setEditDocModels(prev => [...prev, first.id]);
-          alert(`✓ Modello importato da file JSON e allacciato all'articolo!`);
-          return;
-        }
-      } else {
-        htmlBody = content || `<h1>${file.name}</h1><p>Documento importato da PC per ${editName}...</p>`;
+        // §41 — l'importazione porta ogni modello a database e allaccia SOLO quelli confermati.
+        const esito = await cartella.importaDaJson(content);
+        const creati = esito.modelli || [];
+        if (creati.length > 0) setEditDocModels(prev => [...prev, ...creati.map(m => m.id)]);
+        alert(`${esito.ok ? '✓' : '⚠️'} ${esito.messaggio}${creati.length > 0 ? `\n${creati.length} allacciati a questa prestazione.` : ''}`);
+        return;
       }
 
+      const htmlBody = content || `<h1>${file.name}</h1><p>Documento importato da PC per ${editName}...</p>`;
       const docNameClean = file.name.replace(/\.[^/.]+$/, "");
-      const newTmpl: DocumentTemplate = {
-        id: `tmpl-custom-${Date.now()}`,
+      const esito = await cartella.crea({
         titolo: docNameClean,
         categoria: (editingArt?.cat.toLowerCase() as any) || 'societario',
         descrizione: `Documento caricato da PC (${file.name}) per la prestazione "${editName}".`,
         contenutoHtml: htmlBody,
-      };
+      });
 
-      saveCustomTemplate(newTmpl);
-      // §3.3 — come sopra: salvataggio locale subito, ma la verità sul sync col server.
-      try {
-        await creaDocumentoTemplateApi(newTmpl);
-        reloadMasterTemplates();
-        setEditDocModels(prev => [...prev, newTmpl.id]);
-        alert(`✓ File "${file.name}" importato dal PC e allacciato con successo!`);
-      } catch (err: any) {
-        alert(`File "${file.name}" salvato in LOCALE ma NON sincronizzato col server: ${err?.message || 'errore di rete'}.`);
-        setEditDocModels(prev => [...prev, newTmpl.id]);
+      if (!esito.ok || !esito.modello) {
+        alert(`⚠️ ${esito.messaggio}\n\nIl file "${file.name}" NON è stato allacciato.`);
+        return;
       }
+      setEditDocModels(prev => [...prev, esito.modello!.id]);
+      alert(`✓ File "${file.name}" importato nell'archivio dello studio e allacciato alla prestazione.`);
     };
     reader.readAsText(file);
     e.target.value = '';
@@ -128,7 +119,9 @@ export function ArticoliCatalogView({ articoliList, onOpenNew, onDisattiva }: { 
   const avgPrezzo = articoliList.length > 0 ? Math.round(articoliList.reduce((sum, a) => sum + a.p, 0) / articoliList.length) : 0;
 
   const handleStartEdit = (art: Articolo) => {
-    reloadMasterTemplates();
+    // §41 — si rilegge la cartella dello studio, non la copia di questo browser: se un collega
+    // ha aggiunto o archiviato un modello, l'elenco allacciabile lo mostra già aggiornato.
+    void cartella.sincronizza();
     setEditingArt(art);
     setEditPrice(art.p);
     setEditHours(art.h);
@@ -391,13 +384,19 @@ export function ArticoliCatalogView({ articoliList, onOpenNew, onDisattiva }: { 
                 style={{ fontSize: 11, padding: '4px 8px', borderRadius: 6, background: 'var(--card)', border: '1px solid var(--border)', width: '100%' }}
               />
 
-              {/* Grid di selezione di tutti i modelli in memoria */}
+              {/* Grid di selezione dei modelli della cartella dello studio */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 6, maxHeight: 180, overflowY: 'auto', background: 'var(--card)', padding: 8, borderRadius: 8, border: '1px solid var(--border)' }}>
+                {/* §41 — se la lettura dal server non è riuscita l'elenco può essere incompleto:
+                    si dice, invece di far passare i modelli di serie per la libreria dello studio. */}
+                {cartella.erroreLettura && (
+                  <div style={{ fontSize: 10, color: '#fca5a5', background: '#2a1218', border: '1px solid #5b2130', borderRadius: 6, padding: '4px 6px' }}>
+                    ⚠️ Elenco possibilmente incompleto: {cartella.erroreLettura}
+                  </div>
+                )}
                 {allMasterTemplates
                   .filter(item => !searchEditArtTmpl || item.titolo.toLowerCase().includes(searchEditArtTmpl.toLowerCase()) || item.categoria.toLowerCase().includes(searchEditArtTmpl.toLowerCase()))
                   .map(item => {
                   const checked = editDocModels.includes(item.id);
-                  const isCustom = item.id.startsWith('tmpl-custom');
                   return (
                     <label
                       key={item.id}
@@ -431,11 +430,9 @@ export function ArticoliCatalogView({ articoliList, onOpenNew, onDisattiva }: { 
                         </span>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-                        {isCustom && (
-                          <span style={{ fontSize: 8.5, background: '#064e3b', color: '#34d399', padding: '1px 4px', borderRadius: 4, fontWeight: 700 }}>
-                            Custom
-                          </span>
-                        )}
+                        {/* §41 — lo stato di revisione sta accanto al modello: chi allaccia una
+                            carta a una prestazione sa se quella carta è stata riletta. */}
+                        <BadgeRevisione modello={item} compatto />
                         <span style={{ fontSize: 8.5, background: 'var(--card2)', color: 'var(--muted)', padding: '1px 4px', borderRadius: 4, textTransform: 'uppercase' }}>
                           {item.categoria}
                         </span>

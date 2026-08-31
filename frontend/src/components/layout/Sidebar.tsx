@@ -15,6 +15,8 @@ const NAV = [
   { path: '/banks',      moduleKey: 'banks',       label: 'Banche & Conti',         icon: '🏦' },
   { path: '/retainers',  moduleKey: 'retainers',   label: 'Contratti Retainer',    icon: '🔄' },
   { path: '/documents',  moduleKey: 'documents',   label: 'Document Studio (Word)', icon: '📝' },
+  // §41 — la cartella dei modelli: stessa chiave RBAC, è la libreria da cui Document Studio pesca.
+  { path: '/modelli',    moduleKey: 'documents',   label: 'Cartella Modelli',       icon: '🗂' },
   // §37 — stessa chiave RBAC di Document Studio: chi vede i documenti vede l'archivio.
   { path: '/archivio',   moduleKey: 'documents',   label: 'Archivio Documentale',   icon: '📂' },
   { path: '/reports',    moduleKey: 'reports',     label: 'Report & Analytics',     icon: '📈' },
