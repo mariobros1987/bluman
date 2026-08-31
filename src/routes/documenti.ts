@@ -1,13 +1,9 @@
-// Rotte documenti: modelli/template custom dello studio (Document Studio) e
-// fascicolo documentale del progetto (§2.9) — upload, generazione da template,
-// versioni, richieste modifica, sblocco, stato, eliminazione, archiviazione.
+// Rotte documenti: fascicolo documentale del progetto (§2.9) — upload, generazione da
+// template, versioni, richieste modifica, sblocco, stato, eliminazione, archiviazione.
 //
 // Estratte da `src/server.ts` (split dei monoliti, 27/08/2026) SENZA cambio di
 // comportamento: stesse identiche implementazioni, solo spostate qui perché il
-// monolite resti leggibile. Nel monolite i due sotto-blocchi erano contigui —
-// modelli studio (subito dopo i puntatori della sezione progetti) e fascicolo
-// §2.9 di seguito, fino alla sezione firma: qui restano nell'ordine di
-// registrazione originale.
+// monolite resti leggibile.
 // NB: l'helper `nomeFileDaUrl` viveva nella sezione FEA del monolite (DOPO
 // questo blocco) ed era visibile solo per hoisting delle function declaration;
 // con lo split è stato spostato in `src/util/serverHelpers.ts` perché usato
@@ -16,6 +12,11 @@
 // `server.register(...)` di `buildServer`, quindi il rate-limit e l'hook auth
 // onRequest continuano ad applicarsi esattamente come prima (stesso contesto di
 // incapsulamento, nessuna nuova barriera).
+//
+// §41 — le quattro rotte `/documenti-template` (i modelli dello studio) stavano in testa a
+// questo file e sono in `src/routes/modelliDocumento.ts`: questo file era a ~1080 righe
+// (regola 8) e la cartella dei modelli è un altro mestiere — lì i modelli hanno uno stato di
+// revisione, qui i documenti stanno in un fascicolo. I percorsi non sono cambiati.
 
 import type { FastifyInstance } from 'fastify';
 import { prisma } from '../util/prismaClient.js';
@@ -29,87 +30,8 @@ import { livelloFirmaValido, normalizzaLivelloFirma, type LivelloFirma } from '.
 // service a parte, presidiato, e la usano sia questo upload sia PATCH /documenti/:id/collegamento.
 import { decidiCollocazione } from '../services/collocazioneDocumento.js';
 
-// ─── DOCUMENTI: MODELLI STUDIO (DOCUMENT STUDIO) & FASCICOLO §2.9 ───
+// ─── DOCUMENTI: FASCICOLO DOCUMENTALE DEL PROGETTO (§2.9) ───
 export async function registraRotteDocumenti(server: FastifyInstance): Promise<void> {
-  // ── MODELLI DOCUMENTI & CONTRATTI CUSTOM STUDIO (DOCUMENT STUDIO) ──
-  server.get('/documenti-template', async (req, reply) => {
-    const tenantId = (req as any).tenantId;
-    try {
-      const modelli = await (prisma as any).modelloDocumentoCustom.findMany({
-        where: { tenantId },
-        orderBy: { createdAt: 'desc' },
-      });
-      return reply.send(modelli);
-    } catch {
-      return reply.send([]);
-    }
-  });
-
-  server.post<{ Body: { titolo: string; categoria?: string; descrizione?: string; contenutoHtml: string; livelloFirmaRichiesto?: string } }>('/documenti-template', async (req, reply) => {
-    const tenantId = (req as any).tenantId;
-    const { titolo, categoria, descrizione, contenutoHtml, livelloFirmaRichiesto } = req.body;
-    if (livelloFirmaRichiesto !== undefined && !livelloFirmaValido(livelloFirmaRichiesto)) {
-      return reply.code(400).send({ errore: 'livelloFirmaRichiesto non valido: i valori ammessi sono ses, fea, feq.' });
-    }
-    try {
-      const nuovo = await (prisma as any).modelloDocumentoCustom.create({
-        data: {
-          tenantId,
-          titolo: titolo || 'Nuovo Modello Documento',
-          categoria: categoria || 'contratto',
-          descrizione: descrizione || '',
-          contenutoHtml: contenutoHtml || '',
-          // Piano §3.1 — il livello scelto sul template viene copiato sul documento alla
-          // generazione (POST /documenti/genera); 'ses' se lo studio non lo specifica.
-          livelloFirmaRichiesto: livelloFirmaRichiesto ?? 'ses',
-        },
-      });
-      await recordAudit({
-        tenantId,
-        azione: 'MODELLO_DOCUMENTO_CREATO',
-        entita: `Modello #${nuovo.id}`,
-        dettagli: `Creato nuovo modello contrattuale "${titolo}" nel Document Studio`,
-      });
-      return reply.code(201).send(nuovo);
-    } catch (err) {
-      return reply.code(500).send({ errore: err instanceof Error ? err.message : 'Errore creazione modello' });
-    }
-  });
-
-  server.put<{ Params: { id: string }; Body: { titolo?: string; categoria?: string; descrizione?: string; contenutoHtml?: string; livelloFirmaRichiesto?: string } }>('/documenti-template/:id', async (req, reply) => {
-    const tenantId = (req as any).tenantId;
-    const { id } = req.params;
-    const { titolo, categoria, descrizione, contenutoHtml, livelloFirmaRichiesto } = req.body;
-    if (livelloFirmaRichiesto !== undefined && !livelloFirmaValido(livelloFirmaRichiesto)) {
-      return reply.code(400).send({ errore: 'livelloFirmaRichiesto non valido: i valori ammessi sono ses, fea, feq.' });
-    }
-    try {
-      const aggiornato = await (prisma as any).modelloDocumentoCustom.update({
-        where: { id },
-        data: {
-          ...(titolo && { titolo }),
-          ...(categoria && { categoria }),
-          ...(descrizione !== undefined && { descrizione }),
-          ...(contenutoHtml !== undefined && { contenutoHtml }),
-          ...(livelloFirmaRichiesto !== undefined && { livelloFirmaRichiesto }),
-        },
-      });
-      return reply.send(aggiornato);
-    } catch (err) {
-      return reply.code(500).send({ errore: err instanceof Error ? err.message : 'Errore aggiornamento modello' });
-    }
-  });
-
-  server.delete<{ Params: { id: string } }>('/documenti-template/:id', async (req, reply) => {
-    const { id } = req.params;
-    try {
-      await (prisma as any).modelloDocumentoCustom.delete({ where: { id } });
-      return reply.send({ ok: true });
-    } catch (err) {
-      return reply.code(500).send({ errore: err instanceof Error ? err.message : 'Errore eliminazione modello' });
-    }
-  });
-
   // ── §2.9 — Fascicolo documentale del progetto: le scritture vanno a database ──────────
   //
   // Prima di questo blocco l'upload dello studio salvava il file sul server (POST /upload)

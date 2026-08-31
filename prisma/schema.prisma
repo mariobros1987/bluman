@@ -1014,9 +1014,35 @@ model ModelloDocumentoCustom {
   // template del Document Studio: POST /documenti/genera lo copia sul documento
   // generato, salvo override esplicita dell'operatore nella richiesta.
   livelloFirmaRichiesto String @default("ses") @map("livello_firma_richiesto")
+  // §41 — Cartella template dello studio: stato di revisione del modello.
+  //
+  // Serve a rispondere alla domanda che l'operatore si pone davanti a un modello: «questo
+  // testo l'ha già riletto qualcuno?». Prima non c'era modo di saperlo, e un modello appena
+  // abbozzato e uno approvato dal titolare erano indistinguibili nell'elenco.
+  //
+  // `stato_revisione`: bozza | in_revisione | approvato (l'insieme sta in
+  // `src/services/revisioneModello.ts`, che è anche l'unico posto che decide i passaggi).
+  // `versione` sale quando il TESTO di un modello approvato cambia: un'approvazione che
+  // resta appesa a un contenuto diverso da quello approvato non attesta niente.
+  statoRevisione      String    @default("bozza") @map("stato_revisione")
+  versione            Int       @default(1)
+  noteRevisione       String?   @map("note_revisione")
+  // Chi ha deciso lo stato, denormalizzato come in `audit_log`: il nome sulla riga resta
+  // leggibile anche se l'utenza viene disattivata o rinominata.
+  revisionatoDaUserId String?   @map("revisionato_da_user_id")
+  revisionatoDaNome   String?   @map("revisionato_da_nome")
+  revisionatoAt       DateTime? @map("revisionato_at")
+  // Archiviare non è eliminare: il modello esce dagli elenchi operativi e resta a database
+  // (i documenti già generati sono copie congelate e non ne dipendono).
+  archiviatoAt        DateTime? @map("archiviato_at")
+  // Se il modello nasce adottando uno dei modelli di serie del codice, qui resta l'id di
+  // quel modello: l'adozione diventa idempotente e la cartella non mostra due volte la
+  // stessa carta. Nullo per i modelli scritti dallo studio.
+  riferimentoSerie    String?   @map("riferimento_serie")
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
+  @@unique([tenantId, riferimentoSerie], map: "modello_documento_custom_tenant_serie_key")
   @@map("modello_documento_custom")
 }
 

@@ -55,6 +55,10 @@ import { registraRotteArchivioDocumenti } from './routes/archivioDocumenti.js';
 // micro-voce, e l'elenco di quelli rimasti senza cartella. Sposta le carte, quindi
 // sta fuori dall'archivio in sola lettura.
 import { registraRotteCollegamentoDocumenti } from './routes/collegamentoDocumenti.js';
+// §41 — Cartella dei modelli dello studio: le quattro rotte `/documenti-template` (spostate
+// da routes/documenti.ts, che era oltre le 1000 righe) più lo stato di revisione,
+// l'archiviazione a database e l'adozione dei modelli di serie.
+import { registraRotteModelliDocumento } from './routes/modelliDocumento.js';
 // Rotte portale cliente (split dei monoliti): la registrazione avviene dentro
 // il wrapper register di buildServer, nello stesso punto di prima.
 import { registraRottePortale } from './routes/portale.js';
@@ -503,12 +507,19 @@ export function buildServer(app: AppPort): FastifyInstance {
   // ── §17 — Esecuzione (microvoci, ritardi, passaggi) ───────────────
   // Rotte estratte in src/routes/progetti.ts, registrata nella sezione progetti.
 
-  // ─── DOCUMENTI: MODELLI STUDIO (DOCUMENT STUDIO) & FASCICOLO §2.9 ─
-  // Rotte documenti (modelli/template custom studio + fascicolo documentale
-  // del progetto: upload, generazione, versioni, richieste modifica, sblocco,
-  // stato, eliminazione, archiviazione) estratte in src/routes/documenti.ts:
-  // stessa registrazione, sempre dentro questo wrapper.
+  // ─── DOCUMENTI: FASCICOLO DOCUMENTALE DEL PROGETTO (§2.9) ─────────
+  // Rotte documenti (fascicolo documentale del progetto: upload, generazione,
+  // versioni, richieste modifica, sblocco, stato, eliminazione, archiviazione)
+  // estratte in src/routes/documenti.ts: stessa registrazione, sempre dentro
+  // questo wrapper.
   await registraRotteDocumenti(server);
+
+  // ─── CARTELLA MODELLI DELLO STUDIO (§41) ───────────────────────────
+  // Le rotte `/documenti-template` da cui pesca il Document Studio, con lo stato
+  // di revisione di ogni modello. Stesso wrapper delle altre, quindi stesso hook
+  // di autenticazione e stesso rate-limit: i percorsi non sono cambiati, sono
+  // soltanto usciti da routes/documenti.ts (regola 8).
+  await registraRotteModelliDocumento(server);
 
   // ─── ARCHIVIO DOCUMENTALE DELLO STUDIO (§37) ───────────────────────
   // Sola lettura, in aggregato: l'albero Cliente → Progetto con i conteggi
