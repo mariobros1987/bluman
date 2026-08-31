@@ -108,6 +108,11 @@ model Tenant {
   proposteDatiFiscale PropostaDatiFiscale[]
   richiesteAddendum   RichiestaAddendum[]
   oreTimesheet    OraTimesheet[]
+  auditLogFatture AuditLogFattura[]
+  fornitori       Fornitore[]
+  fattureRicevute FatturaRicevuta[]
+  liquidazioniIva LiquidazioneIva[]
+  movimentiPrimaNota MovimentoPrimaNota[]
 
   @@map("tenant")
 }
@@ -200,6 +205,8 @@ model Cliente {
   richiesteAddendum   RichiestaAddendum[]
   richiesteModificaDoc RichiestaModificaDocumento[] @relation("RichiesteModificaDocumento")
   notifiche    Notifica[]
+  fatture      Fattura[]
+  movimentiPrimaNota MovimentoPrimaNota[]
 
   @@map("cliente")
 }
@@ -229,6 +236,7 @@ model Articolo {
   righeDistinta      RigaDistinta[]
   passaggiTemplate   PassaggioTemplate[]
   microvociProgetto  MicrovoceProgetto[]
+  fattureRiga        FatturaRiga[]
 
   // §Blocco 7 (fix) — anti-duplicato: stesso tenant non può avere due articoli
   // con lo stesso nome alla stessa versione (i doppioni seed/UI sono stati
@@ -368,6 +376,7 @@ model Preventivo {
   createdAt    DateTime        @default(now()) @map("created_at")
 
   engagementLetter EngagementLetter?
+  fatture          Fattura[]
 
   @@map("preventivo")
 }
@@ -721,12 +730,13 @@ model ContrattoRicorrente {
   stato                StatoContrattoRicorrente @default(attivo)
   note                 String?
   createdAt            DateTime                 @default(now()) @map("created_at")
+  fatture              Fattura[]
 
   @@map("contratto_ricorrente")
 }
 
 // ─────────────────────────────────────────────────────────────────
-// FATTURAZIONE & NOTE DI CREDITO — §12, §18, §26 (SDI)
+// FATTURAZIONE, CONTABILITÀ & SDI — §12, §18, §26 (OPENSTAMANAGER ENGINE)
 // ─────────────────────────────────────────────────────────────────
 
 enum TipoDocumentoFiscale {
@@ -760,31 +770,114 @@ enum StatoSdi {
   mancata_consegna
 }
 
-model Fattura {
-  id                     String               @id @default(uuid())
-  tenantId               String               @map("tenant_id")
-  progettoId             String               @map("progetto_id")
-  progetto               Progetto             @relation(fields: [progettoId], references: [id], onDelete: Cascade)
-  tipoDocumento          TipoDocumentoFiscale @default(fattura) @map("tipo_documento")
-  serie                  String               @default("FT") // "FT" per Fatture, "NC" per Note di Credito (Numerazione Distinta!)
-  numeroProgressivoSerie Int                  @default(1) @map("numero_progressivo_serie")
-  numero                 String?              // es. "FT-2026/001" o "NC-2026/001"
-  data                   DateTime?
-  stato                  StatoFattura         @default(bozza)
-  fatturaRiferimentoId   String?              @map("fattura_riferimento_id") // ID fattura rettificata se trattasi di Nota di Credito
-  causaNotaCredito       String?              @map("causa_nota_credito")
-  // Campi SDI — §26, presenti dallo schema iniziale per evitare migrazione dolorosa a metà sviluppo
-  tipoClienteFiscale     TipoClienteFiscale   @map("tipo_cliente_fiscale")
-  partitaIva             String?              @map("partita_iva")
-  codiceFiscale          String?              @map("codice_fiscale")
-  numeroProgressivo      String?              @unique @map("numero_progressivo")
-  // generato in transazione con lock — mai concorrente/ottimistico, §26
-  canale                 CanaleFattura
-  statoSdi               StatoSdi             @default(n_a) @map("stato_sdi")
-  righe                  FatturaRiga[]
-  scadenzeIncasso        ScadenzaIncasso[]
-  registrazioniIncasso   RegistrazioneIncasso[]
+enum CondizionePagamento {
+  immediato
+  bonifico_30gg
+  bonifico_60gg
+  bonifico_30_60gg
+  bonifico_fine_mese
+  personalizzato
+}
 
+enum TipoCassaPrevidenziale {
+  nessuna
+  inps_gestione_separata // TC22 - 4%
+  cassa_commercialisti   // TC03 - 4%
+  cassa_forense          // TC01 - 4%
+  inarcassa              // TC04 - 4%
+}
+
+enum EsigibilitaIva {
+  immediata   // "I" - regime ordinario
+  differita   // "D" - art. 6 DPR 633/72
+  split       // "S" - scissione dei pagamenti (PA)
+}
+
+enum MotivoNotaCredito {
+  errore_esposizione
+  reso_merce
+  sconto_post_fattura
+  abbuono
+  annullo_totale
+  correzione_dati
+}
+
+model Fattura {
+  id                        String                 @id @default(uuid())
+  tenantId                  String                 @map("tenant_id")
+  progettoId                String?                @map("progetto_id")
+  progetto                  Progetto?              @relation(fields: [progettoId], references: [id], onDelete: SetNull)
+  clienteId                 String                 @map("cliente_id")
+  cliente                   Cliente                @relation(fields: [clienteId], references: [id])
+  preventivoId              String?                @map("preventivo_id")
+  preventivo                Preventivo?            @relation(fields: [preventivoId], references: [id], onDelete: SetNull)
+  contrattoRicorrenteId     String?                @map("contratto_ricorrente_id")
+  contrattoRicorrente       ContrattoRicorrente?   @relation(fields: [contrattoRicorrenteId], references: [id], onDelete: SetNull)
+
+  tipoDocumento             TipoDocumentoFiscale   @default(fattura) @map("tipo_documento")
+  serie                     String                 @default("FT") // "FT" per Fatture, "NC" per Note di Credito
+  numeroProgressivoSerie    Int                    @default(1) @map("numero_progressivo_serie")
+  numero                    String?                // es. "FT-2026/001" o "NC-2026/001"
+  data                      DateTime?              @default(now())
+  stato                     StatoFattura           @default(bozza)
+  fatturaRiferimentoId      String?                @map("fattura_riferimento_id") // ID fattura rettificata se trattasi di Nota di Credito
+  causaNotaCredito          String?                @map("causa_nota_credito")
+
+  // Campi SDI & Fiscali
+  tipoClienteFiscale        TipoClienteFiscale     @default(business_italia) @map("tipo_cliente_fiscale")
+  partitaIva                String?                @map("partita_iva")
+  codiceFiscale             String?                @map("codice_fiscale")
+  numeroProgressivo         String?                @unique @map("numero_progressivo")
+  canale                    CanaleFattura          @default(sdi)
+  statoSdi                  StatoSdi               @default(n_a) @map("stato_sdi")
+
+  // Condizioni Commerciali & Fiscali
+  condizionePagamento       CondizionePagamento    @default(bonifico_30gg) @map("condizione_pagamento")
+  metodoPagamento           MetodoPagamento        @default(bonifico) @map("metodo_pagamento")
+  contoAccreditoId          String?                @map("conto_accredito_id")
+  contoAccredito            ContoBancario?         @relation(fields: [contoAccreditoId], references: [id], onDelete: SetNull)
+
+  tipoCassa                 TipoCassaPrevidenziale @default(nessuna) @map("tipo_cassa")
+  aliquotaCassa             Float                  @default(0) @map("aliquota_cassa")
+  aliquotaRitenuta          Float                  @default(0) @map("aliquota_ritenuta") // es. 20.0
+  esigibilitaIva            EsigibilitaIva         @default(immediata) @map("esigibilita_iva")
+
+  // Totali Calcolati (in centesimi per precisione assoluta)
+  totaleImponibileCentesimi Int                    @default(0) @map("totale_imponibile_centesimi")
+  totaleCassaCentesimi      Int                    @default(0) @map("totale_cassa_centesimi")
+  totaleIvaCentesimi        Int                    @default(0) @map("totale_iva_centesimi")
+  totaleRitenutaCentesimi   Int                    @default(0) @map("totale_ritenuta_centesimi")
+  totaleBolloCentesimi      Int                    @default(0) @map("totale_bollo_centesimi") // €2 se op. esenti/escluse > 77,47€
+  totaleDocumentoCentesimi  Int                    @default(0) @map("totale_documento_centesimi")
+  nettoAPagareCentesimi     Int                    @default(0) @map("netto_a_pagare_centesimi")
+
+  // Correzioni post-emissione: SOLO tramite Nota di Credito
+  fatturaOrigineId          String?                @map("fattura_origine_id")
+  fatturaOrigine            Fattura?               @relation("NotaCreditoDiFattura", fields: [fatturaOrigineId], references: [id], onDelete: SetNull)
+  noteCredito               Fattura[]              @relation("NotaCreditoDiFattura")
+  motivoNotaCredito         MotivoNotaCredito?     @map("motivo_nota_credito")
+
+  // Conservazione sostitutiva a norma (10 anni)
+  conservazioneRiferimento  String?                @map("conservazione_riferimento")
+  conservazioneDataInvio    DateTime?              @map("conservazione_data_invio")
+
+  note                      String?
+  notePiePagina             String?                @map("note_pie_pagina")
+  codiceDestinatario        String?                @map("codice_destinatario")
+  pecDestinatario           String?                @map("pec_destinatario")
+  esitoSdiDettagli          String?                @map("esito_sdi_dettagli")
+
+  righe                     FatturaRiga[]
+  scadenzeIncasso           ScadenzaIncasso[]
+  registrazioniIncasso      RegistrazioneIncasso[]
+  movimentiPrimaNota        MovimentoPrimaNota[]
+  auditLogFatture           AuditLogFattura[]
+
+  createdAt                 DateTime               @default(now()) @map("created_at")
+  updatedAt                 DateTime               @updatedAt @map("updated_at")
+
+  @@index([tenantId, clienteId])
+  @@index([tenantId, progettoId])
   @@map("fattura")
 }
 
@@ -820,17 +913,17 @@ enum MetodoPagamento {
 }
 
 model RegistrazioneIncasso {
-  id                      String           @id @default(uuid())
-  tenantId                String           @map("tenant_id")
-  scadenzaIncassoId       String?          @map("scadenza_incasso_id")
-  scadenzaIncasso         ScadenzaIncasso? @relation(fields: [scadenzaIncassoId], references: [id])
-  fatturaId               String           @map("fattura_id")
-  fattura                 Fattura          @relation(fields: [fatturaId], references: [id], onDelete: Cascade)
-  importoIncassatoCentesimi Int            @map("importo_incassato_centesimi")
-  dataIncasso             DateTime         @default(now()) @map("data_incasso")
-  metodoPagamento         MetodoPagamento  @default(bonifico) @map("metodo_pagamento")
-  riferimentoTransazione  String?          @map("riferimento_transazione")
-  noteOperatore           String?          @map("note_operatore")
+  id                        String           @id @default(uuid())
+  tenantId                  String           @map("tenant_id")
+  scadenzaIncassoId         String?          @map("scadenza_incasso_id")
+  scadenzaIncasso           ScadenzaIncasso? @relation(fields: [scadenzaIncassoId], references: [id])
+  fatturaId                 String           @map("fattura_id")
+  fattura                   Fattura          @relation(fields: [fatturaId], references: [id], onDelete: Cascade)
+  importoIncassatoCentesimi Int              @map("importo_incassato_centesimi")
+  dataIncasso               DateTime         @default(now()) @map("data_incasso")
+  metodoPagamento           MetodoPagamento  @default(bonifico) @map("metodo_pagamento")
+  riferimentoTransazione    String?          @map("riferimento_transazione")
+  noteOperatore             String?          @map("note_operatore")
 
   @@map("registrazione_incasso")
 }
@@ -842,18 +935,160 @@ enum TipoFatturaRiga {
 }
 
 model FatturaRiga {
-  id               String          @id @default(uuid())
-  tenantId         String          @map("tenant_id")
-  fatturaId        String          @map("fattura_id")
-  fattura          Fattura         @relation(fields: [fatturaId], references: [id])
-  tipo             TipoFatturaRiga
-  moduloProgettoId String?         @map("modulo_progetto_id") // nullable, null se milestone_libera
-  moduloProgetto   ModuloProgetto? @relation(fields: [moduloProgettoId], references: [id])
-  percentuale      Int? // usato solo se tipo=modulo_parziale
-  importo          Int
-  descrizione      String
+  id                  String          @id @default(uuid())
+  tenantId            String          @map("tenant_id")
+  fatturaId           String          @map("fattura_id")
+  fattura             Fattura         @relation(fields: [fatturaId], references: [id], onDelete: Cascade)
+  tipo                TipoFatturaRiga @default(milestone_libera)
+  moduloProgettoId    String?         @map("modulo_progetto_id")
+  moduloProgetto      ModuloProgetto? @relation(fields: [moduloProgettoId], references: [id], onDelete: SetNull)
+  articoloId          String?         @map("articolo_id")
+  articolo            Articolo?       @relation(fields: [articoloId], references: [id], onDelete: SetNull)
+  percentuale         Int? // usato se tipo=modulo_parziale
+  importo             Int             @default(0) // compatibilità retroattiva centesimi
+  descrizione         String
+
+  quantita            Float           @default(1.0)
+  unitaMisura         String          @default("ore") @map("unita_misura")
+  prezzoUnitarioCent  Int             @default(0) @map("prezzo_unitario_cent")
+  scontoPercentuale   Float           @default(0) @map("sconto_percentuale")
+
+  aliquotaIva         Int             @default(22) @map("aliquota_iva")
+  naturaEsenzione     String?         @map("natura_esenzione")
+  applicaCassa        Boolean         @default(true) @map("applica_cassa")
+  applicaRitenuta     Boolean         @default(true) @map("applica_ritenuta")
+  applicaBollo        Boolean         @default(false) @map("applica_bollo")
+
+  imponibileCentesimi Int             @default(0) @map("imponibile_centesimi")
+  ivaCentesimi        Int             @default(0) @map("iva_centesimi")
+  totaleRigaCentesimi Int             @default(0) @map("totale_riga_centesimi")
+  ordine              Int             @default(1)
 
   @@map("fattura_riga")
+}
+
+model AuditLogFattura {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  fatturaId   String   @map("fattura_id")
+  fattura     Fattura  @relation(fields: [fatturaId], references: [id], onDelete: Cascade)
+  utenteId    String?  @map("utente_id")
+  azione      String   // "emissione", "annullo_bozza", "nota_credito", "incasso", "storno_incasso", "invio_sdi"
+  dettagli    Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, fatturaId])
+  @@map("audit_log_fattura")
+}
+
+model Fornitore {
+  id             String            @id @default(uuid())
+  tenantId       String            @map("tenant_id")
+  tenant         Tenant            @relation(fields: [tenantId], references: [id])
+  ragioneSociale String            @map("ragione_sociale")
+  partitaIva     String?           @map("partita_iva")
+  codiceFiscale  String?           @map("codice_fiscale")
+  email          String?
+  pec            String?
+  sdiCode        String?           @map("sdi_code")
+  indirizzo      String?
+  citta          String?
+  cap            String?
+  nazione        String?           @default("IT")
+  iban           String?
+  note           String?
+  createdAt      DateTime          @default(now()) @map("created_at")
+
+  fattureRicevute    FatturaRicevuta[]
+  movimentiPrimaNota MovimentoPrimaNota[]
+
+  @@index([tenantId])
+  @@map("fornitore")
+}
+
+model FatturaRicevuta {
+  id                  String         @id @default(uuid())
+  tenantId            String         @map("tenant_id")
+  tenant              Tenant         @relation(fields: [tenantId], references: [id])
+  fornitoreId         String         @map("fornitore_id")
+  fornitore           Fornitore      @relation(fields: [fornitoreId], references: [id])
+  numero              String
+  data                DateTime
+  imponibileCentesimi Int            @map("imponibile_centesimi")
+  ivaCentesimi        Int            @map("iva_centesimi")
+  totaleCentesimi     Int            @map("totale_centesimi")
+  esigibilitaIva      EsigibilitaIva @default(immediata) @map("esigibilita_iva")
+  pagata              Boolean        @default(false)
+  dataPagamento       DateTime?      @map("data_pagamento")
+  xmlSdiRaw           String?        @map("xml_sdi_raw") @db.Text
+  createdAt           DateTime       @default(now()) @map("created_at")
+
+  movimentiPrimaNota  MovimentoPrimaNota[]
+
+  @@index([tenantId, fornitoreId])
+  @@map("fattura_ricevuta")
+}
+
+model LiquidazioneIva {
+  id                  String    @id @default(uuid())
+  tenantId            String    @map("tenant_id")
+  tenant              Tenant    @relation(fields: [tenantId], references: [id])
+  periodo             String    // "2026-Q3" o "2026-09"
+  ivaDebitoCentesimi  Int       @default(0) @map("iva_debito_centesimi")
+  ivaCreditoCentesimi Int       @default(0) @map("iva_credito_centesimi")
+  saldoCentesimi      Int       @default(0) @map("saldo_centesimi")
+  versata             Boolean   @default(false)
+  dataVersamento      DateTime? @map("data_versamento")
+  createdAt           DateTime  @default(now()) @map("created_at")
+
+  @@unique([tenantId, periodo])
+  @@map("liquidazione_iva")
+}
+
+enum TipoMovimentoPrimaNota {
+  entrata
+  uscita
+}
+
+enum CategoriaPrimaNota {
+  incasso_fattura
+  pagamento_fornitore
+  imposta_tasse
+  stipendi_compensi
+  spese_generali
+  giroconto
+  altro
+}
+
+model MovimentoPrimaNota {
+  id                     String                 @id @default(uuid())
+  tenantId               String                 @map("tenant_id")
+  tenant                 Tenant                 @relation(fields: [tenantId], references: [id])
+  contoBancarioId        String?                @map("conto_bancario_id")
+  contoBancario          ContoBancario?         @relation(fields: [contoBancarioId], references: [id], onDelete: SetNull)
+  fatturaId              String?                @map("fattura_id")
+  fattura                Fattura?               @relation(fields: [fatturaId], references: [id], onDelete: SetNull)
+  fatturaRicevutaId      String?                @map("fattura_ricevuta_id")
+  fatturaRicevuta        FatturaRicevuta?       @relation(fields: [fatturaRicevutaId], references: [id], onDelete: SetNull)
+  clienteId              String?                @map("cliente_id")
+  cliente                Cliente?               @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+  fornitoreId            String?                @map("fornitore_id")
+  fornitore              Fornitore?             @relation(fields: [fornitoreId], references: [id], onDelete: SetNull)
+
+  data                   DateTime               @default(now())
+  tipo                   TipoMovimentoPrimaNota @default(entrata)
+  categoria              CategoriaPrimaNota     @default(incasso_fattura)
+  descrizione            String
+  importoCentesimi       Int                    @map("importo_centesimi")
+  metodoPagamento        MetodoPagamento        @default(bonifico) @map("metodo_pagamento")
+  riferimentoTransazione String?                @map("riferimento_transazione") // CRO, TRN
+  note                   String?
+  createdAt              DateTime               @default(now()) @map("created_at")
+
+  @@index([tenantId, data])
+  @@index([tenantId, fatturaId])
+  @@map("movimento_prima_nota")
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -998,6 +1233,8 @@ model ContoBancario {
   saldoAttuale  Int      @default(0) @map("saldo_attuale") // centesimi
   isDefault     Boolean  @default(false) @map("is_default")
   createdAt     DateTime @default(now()) @map("created_at")
+  fatture       Fattura[]
+  movimentiPrimaNota MovimentoPrimaNota[]
 
   @@map("conto_bancario")
 }

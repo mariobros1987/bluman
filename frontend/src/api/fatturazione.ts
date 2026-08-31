@@ -222,3 +222,118 @@ export async function preparaInvioManualeSdiApi(fatturaId: string) {
   if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore preparazione invio manuale'));
   return await res.json();
 }
+
+// ─── NUOVE FUNZIONI CONTABILITÀ INTEGRATA OPENSTAMANAGER ─────────────
+export async function createInvoiceApi(input: any) {
+  const res = await apiFetch(`${API_BASE}/invoices`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore creazione bozza fattura'));
+  return await res.json();
+}
+
+export async function updateInvoiceApi(id: string, input: any) {
+  const res = await apiFetch(`${API_BASE}/invoices/${id}`, {
+    method: 'PUT',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore modifica fattura'));
+  return await res.json();
+}
+
+export async function deleteInvoiceApi(id: string) {
+  const res = await apiFetch(`${API_BASE}/invoices/${id}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore eliminazione bozza fattura'));
+  return await res.json();
+}
+
+export async function emettiInvoiceApi(id: string) {
+  const res = await apiFetch(`${API_BASE}/invoices/${id}/emetti`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore emissione fattura'));
+  return await res.json();
+}
+
+export async function emettiNotaCreditoApi(id: string, input: { motivo: string; note?: string }) {
+  const res = await apiFetch(`${API_BASE}/invoices/${id}/nota-credito`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore emissione nota di credito'));
+  return await res.json();
+}
+
+export async function importFromProjectApi(progettoId: string, moduliIds?: string[], percentuale?: number) {
+  const res = await apiFetch(`${API_BASE}/fatture/da-progetto`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ progettoId, moduliIds, percentuale }),
+  });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore importazione da progetto'));
+  return await res.json();
+}
+
+export async function importFromPreventivoApi(preventivoId: string) {
+  const res = await apiFetch(`${API_BASE}/fatture/da-preventivo`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ preventivoId }),
+  });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore importazione da preventivo'));
+  return await res.json();
+}
+
+export async function importFromTimesheetApi(progettoId: string, operatoreId?: string, tariffaOrariaCent?: number) {
+  const res = await apiFetch(`${API_BASE}/fatture/da-timesheet`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ progettoId, operatoreId, tariffaOrariaCent }),
+  });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore importazione da timesheet'));
+  return await res.json();
+}
+
+export async function fetchPrimaNotaApi() {
+  const res = await apiFetch(`${API_BASE}/prima-nota`, { headers: getAuthHeaders() });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore lettura prima nota'));
+  return await res.json();
+}
+
+export async function createPrimaNotaApi(input: any) {
+  const res = await apiFetch(`${API_BASE}/prima-nota`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore registrazione prima nota'));
+  return await res.json();
+}
+
+export async function importCsvPrimaNotaApi(csvContent: string, contoBancarioId?: string) {
+  const res = await apiFetch(`${API_BASE}/prima-nota/import-csv`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ csvContent, contoBancarioId }),
+  });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore importazione CSV'));
+  return await res.json();
+}
+
+export async function deletePrimaNotaApi(id: string) {
+  const res = await apiFetch(`${API_BASE}/prima-nota/${id}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore eliminazione movimento'));
+  return await res.json();
+}
+

@@ -536,6 +536,8 @@ export class PrismaApp implements AppPort {
       descrizione: string;
     }>;
   }) {
+    const prog = await this.prisma.progetto.findUnique({ where: { id: input.progettoId } });
+    const clienteId = prog?.clienteId || '';
     const countFatture = await this.prisma.fattura.count({ where: { tenantId: this.tenantId } });
     const numeroProgressivo = `FT-2026-${(countFatture + 1).toString().padStart(4, '0')}`;
     const totale = input.righe.reduce((acc, r) => acc + r.importo, 0);
@@ -543,6 +545,7 @@ export class PrismaApp implements AppPort {
     const fattura = await this.prisma.fattura.create({
       data: {
         tenantId: this.tenantId,
+        clienteId,
         progettoId: input.progettoId,
         numero: numeroProgressivo,
         numeroProgressivo,
@@ -552,11 +555,6 @@ export class PrismaApp implements AppPort {
         partitaIva: input.partitaIva || null,
         codiceFiscale: input.codiceFiscale || null,
         canale: input.canale,
-        // §3.5 — all'emissione nulla è stato ancora trasmesso a SdI (nessun provider
-        // collegato: l'invio è manuale). Prima qui si scriveva 'consegnata' per il solo
-        // fatto di aver scelto il canale sdi: una fattura «consegnata» senza esserlo è
-        // un falso. statoSdi diventa consegnata/scartata solo con l'esito reale via
-        // webhook; l'intenzione di invio resta nel campo `canale`.
         statoSdi: 'n_a',
         righe: {
           create: input.righe.map((r) => ({

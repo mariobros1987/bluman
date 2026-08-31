@@ -79,7 +79,7 @@ export async function runDailyNotificationCron(tenantId?: string): Promise<CronR
     //    la query falliva sempre e il blocco catch la nascondeva.
     const scadenzeAperte = await prisma.scadenzaIncasso.findMany({
       where: { tenantId, stato: 'in_attesa' },
-      include: { fattura: { include: { progetto: { include: { cliente: true } } } } },
+      include: { fattura: { include: { progetto: { include: { cliente: true } }, cliente: true } } },
     });
 
     for (const sc of scadenzeAperte) {
@@ -88,7 +88,7 @@ export async function runDailyNotificationCron(tenantId?: string): Promise<CronR
 
       // Notifica a -7 giorni (preavviso) o a 0 giorni (scadenza oggi) o +3 giorni (sollecito cortesia)
       if (diffDays === 7 || diffDays === 0 || diffDays === -3) {
-        const clNome = sc.fattura.progetto.cliente.nome || 'Cliente';
+        const clNome = sc.fattura.cliente?.nome || sc.fattura.progetto?.cliente?.nome || 'Cliente';
         const importo = (sc.importoCentesimi / 100).toLocaleString('it-IT');
         const quando = new Date(sc.dataScadenza).toLocaleDateString('it-IT');
         const tono = diffDays === -3 ? 'scaduta' : diffDays === 0 ? 'in scadenza oggi' : 'in scadenza';

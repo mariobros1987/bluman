@@ -333,7 +333,7 @@ export async function reportScadenzario(tenantId: string): Promise<ReportTabella
   const scadenze = await prisma.scadenzaIncasso.findMany({
     where: { tenantId, stato: { in: ['in_attesa', 'parziale', 'scaduto'] } },
     include: {
-      fattura: { include: { progetto: { include: { cliente: { select: { nome: true } } } } } },
+      fattura: { include: { progetto: { include: { cliente: { select: { nome: true } } } }, cliente: { select: { nome: true } } } },
       registrazioniRegistrate: { select: { importoIncassatoCentesimi: true } },
     },
     orderBy: { dataScadenza: 'asc' },
@@ -360,7 +360,7 @@ export async function reportScadenzario(tenantId: string): Promise<ReportTabella
 
     righe.push([
       new Date(s.dataScadenza).toLocaleDateString('it-IT'),
-      s.fattura.progetto.cliente.nome,
+      s.fattura.cliente?.nome || s.fattura.progetto?.cliente?.nome || 'Cliente',
       s.fattura.numero || `${s.fattura.serie}-${s.fattura.numeroProgressivoSerie}`,
       `Rata ${s.numeroRata}`,
       euro(s.importoCentesimi),

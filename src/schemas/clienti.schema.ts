@@ -3,7 +3,7 @@ import { z } from 'zod';
 export const CreaClienteSchema = z.object({
   nome: z.string().min(1, 'Nome cliente obbligatorio').max(255),
   tipo: z.enum(['individual', 'company'], {
-    errorMap: () => ({ message: "Il tipo cliente è obbligatorio: 'individual' o 'company'" }),
+    message: "Il tipo cliente è obbligatorio: 'individual' o 'company'",
   }),
   email: z.string().email('Formato email non valido').optional().nullable(),
   cellulare: z.string().optional().nullable(),
