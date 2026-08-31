@@ -10,6 +10,8 @@ import { PREBUILT_TEMPLATES, resolveDocumentTemplateHtml } from '../../utils/doc
 // typecheck del frontend non lo vedeva perché girava su zero file (vedi tsconfig.json).
 import { listaDocumentiProgetto, salvaDocumentoApi, eliminaDocumentoApi, archiviaDocumentoApi, scaricaDocumentoClient, scaricaDocumentoWordClient } from '../../api/client';
 import { getCurrentTenantId, getTenantStorageKey, getStudioInfoForTenant, BLUECODE_TENANT_ID, isAdminStudio } from '../../utils/tenant';
+import { FoglioA4 } from '../documenti/FoglioA4';
+import { scomponiDocumento } from '../../../../src/util/intestazionePiede';
 import type { Progetto } from '../../types';
 import { documentoApiAVista, documentiRimossi, ricordaDocumentoRimosso } from './documentiUtils';
 
@@ -22,6 +24,13 @@ export function DocumentiTab({ project }: { project: Progetto }) {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [uploading, setUploading] = useState(false);
   const [selectedPreviewDoc, setSelectedPreviewDoc] = useState<any | null>(null);
+
+  // §39 — l'HTML archiviato può portare intestazione e piede propri, marcati dentro il documento
+  // al salvataggio: qui si separano per rimetterli al loro posto sul foglio A4 dell'anteprima.
+  // Un documento salvato prima di §39 non li ha: torna tutto come corpo, come si vedeva prima.
+  const partiAnteprima = selectedPreviewDoc?.contenutoHtml
+    ? scomponiDocumento(selectedPreviewDoc.contenutoHtml)
+    : null;
 
   // Caricamento Documenti dal Vault Locale e Cloud (Sincronizzati 1-a-1 con i Modelli Word Studio)
   const [docList, setDocList] = useState<any[]>(() => {
@@ -647,7 +656,10 @@ SHA-256 del documento.
                   </span>
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 3 }}>
-                  Pratica: <strong>{project.n}</strong> · Cliente: <strong>{project.cl}</strong> · Dimensione: {selectedPreviewDoc.dimensione || '32 KB'}
+                  Pratica: <strong>{project.n}</strong> · Cliente: <strong>{project.cl}</strong>
+                  {/* La dimensione si scrive solo se l'archivio la conosce: «32 KB» era un numero
+                      di comodo, e un peso inventato è un dato inventato (regola 7). */}
+                  {selectedPreviewDoc.dimensione ? <> · Dimensione: {selectedPreviewDoc.dimensione}</> : null}
                 </div>
               </div>
               <button
@@ -658,62 +670,46 @@ SHA-256 del documento.
               </button>
             </div>
 
-            {/* Document Content Rendering */}
-            <div style={{ flex: 1, padding: 24, overflowY: 'auto', background: '#0a0d14' }}>
-              <div style={{ background: '#fff', color: '#1e293b', borderRadius: 8, padding: 32, fontFamily: 'serif', boxShadow: '0 10px 30px rgba(0,0,0,.5)', border: '1px solid #cbd5e1', lineHeight: 1.6 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #0284c7', paddingBottom: 14, marginBottom: 20 }}>
-                  <div>
-                    <div style={{ fontSize: 18, fontWeight: 800, color: '#0369a1', fontFamily: 'sans-serif' }}>BLUMAN ADVISORY SERVICES</div>
-                    <div style={{ fontSize: 10, color: '#64748b', fontFamily: 'sans-serif' }}>Corporate Structuring & Cross-Border Wealth Planning</div>
-                  </div>
-                  <div style={{ textAlign: 'right', fontSize: 10, color: '#64748b', fontFamily: 'sans-serif' }}>
-                    Rif. Incarico: #{project.id}<br />
-                    Data: {selectedPreviewDoc.data || selectedPreviewDoc.dataCaricamento || '2026'}
-                  </div>
-                </div>
-
-                <div style={{ textAlign: 'center', fontSize: 16, fontWeight: 700, marginBottom: 18, color: '#0f172a', textTransform: 'uppercase' }}>
-                  {selectedPreviewDoc.titolo || selectedPreviewDoc.nome}
-                </div>
-
-                {selectedPreviewDoc.contenutoHtml ? (
-                  <div dangerouslySetInnerHTML={{ __html: selectedPreviewDoc.contenutoHtml }} />
-                ) : selectedPreviewDoc.dbDoc && selectedPreviewDoc.url && selectedPreviewDoc.url !== '#' ? (
-                  // §2.9 — file reale archiviato nel fascicolo: anteprima del PDF/immagine caricato
-                  <div style={{ fontFamily: 'sans-serif' }}>
-                    {/\.(png|jpe?g)$/i.test(selectedPreviewDoc.nome || '') ? (
-                      <img src={selectedPreviewDoc.url} alt={selectedPreviewDoc.nome} style={{ maxWidth: '100%', borderRadius: 6 }} />
-                    ) : (
-                      <iframe src={selectedPreviewDoc.url} title={selectedPreviewDoc.nome || 'Documento'} style={{ width: '100%', height: 480, border: '1px solid #cbd5e1', borderRadius: 6, background: '#f1f5f9' }} />
-                    )}
-                    <div style={{ marginTop: 12, textAlign: 'center', fontSize: 12 }}>
-                      <a href={selectedPreviewDoc.url} target="_blank" rel="noreferrer" style={{ color: '#0284c7', fontWeight: 700 }}>↗ Apri il file originale</a>
-                    </div>
-                  </div>
-                ) : (
-                  <div style={{ fontSize: 12, color: '#334155', textAlign: 'justify' }}>
-                    <p style={{ marginBottom: 12 }}>
-                      Il presente documento certifica la conformità delle procedure societarie e contrattuali svolte per il Cliente <strong>{project.cl}</strong> nell'ambito dell'incarico <strong>{project.n}</strong>.
-                    </p>
-                    <p style={{ marginBottom: 12 }}>
-                      Tutti gli atti societari, visure, delibere ed accordi sono archiviati con crittografia end-to-end e valore legale probatorio ai sensi dell'art. 20 del CAD.
-                    </p>
-                  </div>
-                )}
-
-                <div style={{ marginTop: 40, paddingTop: 16, borderTop: '1px dashed #cbd5e1', display: 'flex', justifyContent: 'space-between', fontSize: 10, fontFamily: 'sans-serif' }}>
-                  <div>
-                    <div style={{ fontWeight: 700, color: '#475569' }}>BluMan Advisory Firm:</div>
-                    <div style={{ marginTop: 20, fontStyle: 'italic', color: '#0284c7', fontWeight: 600 }}>Joe Disabato (Senior Partner)</div>
-                  </div>
-                  <div>
-                    <div style={{ fontWeight: 700, color: '#475569' }}>Firma Committente:</div>
-                    <div style={{ marginTop: 20, fontStyle: 'italic', color: selectedPreviewDoc.firmato ? '#059669' : '#64748b', fontWeight: 700 }}>
-                      {selectedPreviewDoc.firmato ? `✓ FIRMATO DA ${project.cl.toUpperCase()} (firma semplice con OTP verificata)` : `(Sottoscrizione per ${project.cl})`}
-                    </div>
+            {/*
+              §39 — L'anteprima mostra il foglio A4 con i margini di stampa, e mostra il documento.
+              Prima disegnava attorno al contenuto un'intestazione cablata («BLUMAN ADVISORY
+              SERVICES») e un blocco firme con il nome di una persona: in un'applicazione
+              multi-tenant era l'identità di un altro studio stampata sopra l'atto di chiunque, e
+              una firma che nessuno aveva apposto (regola 7). Ora si vede l'intestazione che il
+              documento porta con sé — quella che l'operatore ha bloccato o modificato in Document
+              Studio — e se non ne porta nessuna non se ne inventa una.
+            */}
+            <div style={{ flex: 1, padding: 18, overflowY: 'auto', background: '#0a0d14' }}>
+              {partiAnteprima ? (
+                <FoglioA4
+                  sfondo="#0a0d14"
+                  intestazione={partiAnteprima.intestazione ? { html: partiAnteprima.intestazione, etichetta: 'Intestazione' } : undefined}
+                  piede={partiAnteprima.piede ? { html: partiAnteprima.piede, etichetta: 'Piè di pagina' } : undefined}
+                >
+                  <div style={{ fontSize: 13, lineHeight: 1.6 }} dangerouslySetInnerHTML={{ __html: partiAnteprima.corpo }} />
+                </FoglioA4>
+              ) : selectedPreviewDoc.dbDoc && selectedPreviewDoc.url && selectedPreviewDoc.url !== '#' ? (
+                // §2.9 — file reale archiviato nel fascicolo: anteprima del PDF/immagine caricato.
+                // Qui i margini sono quelli del file, non li decide questa pagina.
+                <div style={{ fontFamily: 'sans-serif', background: '#fff', borderRadius: 8, padding: 16 }}>
+                  {/\.(png|jpe?g)$/i.test(selectedPreviewDoc.nome || '') ? (
+                    <img src={selectedPreviewDoc.url} alt={selectedPreviewDoc.nome} style={{ maxWidth: '100%', borderRadius: 6 }} />
+                  ) : (
+                    <iframe src={selectedPreviewDoc.url} title={selectedPreviewDoc.nome || 'Documento'} style={{ width: '100%', height: 520, border: '1px solid #cbd5e1', borderRadius: 6, background: '#f1f5f9' }} />
+                  )}
+                  <div style={{ marginTop: 12, textAlign: 'center', fontSize: 12 }}>
+                    <a href={selectedPreviewDoc.url} target="_blank" rel="noreferrer" style={{ color: '#0284c7', fontWeight: 700 }}>↗ Apri il file originale</a>
                   </div>
                 </div>
-              </div>
+              ) : (
+                // Niente HTML e niente file: si dice, invece di riempire il foglio con un testo
+                // di circostanza che sembrava il contenuto del documento.
+                <div style={{ background: '#fff', color: '#334155', borderRadius: 8, padding: 28, fontSize: 12.5, lineHeight: 1.6, fontFamily: 'sans-serif' }}>
+                  <strong>Nessun contenuto da mostrare.</strong> Di questo documento l'archivio non conserva né il testo
+                  né il file: c'è solo la scheda. Aprilo in Document Studio per comporne il testo, oppure ricarica il
+                  file originale dalla scheda del passaggio.
+                </div>
+              )}
             </div>
 
             {/* Modal Actions Footer */}

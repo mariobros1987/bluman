@@ -66,9 +66,22 @@ function htmlFirme(signatures: SignatureData[]): string {
   `;
 }
 
+/**
+ * §39 — Chi stampa può portare il proprio piè di pagina.
+ *
+ * Document Studio ha un piè di pagina che l'operatore può sbloccare e modificare: deve finire su
+ * ogni foglio del PDF, come fa il piede standard. Senza questo parametro l'unico modo era accodarlo
+ * al contenuto, e allora compariva una volta sola — in fondo all'ultima pagina — mentre in cima al
+ * foglio ne restava stampato un altro, quello di serie: due piedi diversi nello stesso documento.
+ */
+export interface OpzioniStampa {
+  /** Il piè di pagina di ogni foglio; riceve numero e totale delle pagine. */
+  piede?: (pagina: number, totale: number) => string;
+}
+
 /** I fogli A4 fisici pronti da rendere: contenuto, firme in coda, piè di pagina numerato. */
-function preparaFogli(contentHtml: string, signatures: SignatureData[]): HTMLElement[] {
-  return creaPagineA4(`${contentHtml}${htmlFirme(signatures)}`, { piede: piedeStandard });
+function preparaFogli(contentHtml: string, signatures: SignatureData[], opzioni: OpzioniStampa = {}): HTMLElement[] {
+  return creaPagineA4(`${contentHtml}${htmlFirme(signatures)}`, { piede: opzioni.piede ?? piedeStandard });
 }
 
 
@@ -78,7 +91,8 @@ function preparaFogli(contentHtml: string, signatures: SignatureData[]): HTMLEle
 export async function downloadRealPdf(
   fileName: string,
   elementOrHtml: HTMLElement | string,
-  signatures: SignatureData[] = []
+  signatures: SignatureData[] = [],
+  opzioni: OpzioniStampa = {}
 ) {
   // Protezione automatica se gli argomenti sono invertiti (HTML nel primo parametro)
   if (typeof fileName === 'string' && fileName.includes('<') && (typeof elementOrHtml === 'string' && !elementOrHtml.includes('<'))) {
@@ -88,7 +102,7 @@ export async function downloadRealPdf(
   }
 
   const rawHtml = typeof elementOrHtml === 'string' ? elementOrHtml : elementOrHtml.innerHTML;
-  const pageDomElements = preparaFogli(rawHtml, signatures);
+  const pageDomElements = preparaFogli(rawHtml, signatures, opzioni);
 
   try {
     // 1. Converti tutte le immagini in Base64 Data URL sincroni per html2canvas

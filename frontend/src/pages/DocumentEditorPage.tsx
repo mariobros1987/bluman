@@ -4,6 +4,8 @@ import { fetchClienti, fetchProgetti, fetchProgettoDettaglio, fetchTenantInfoApi
 import { getFormattedLogoUrl } from '../utils';
 import { downloadRealPdf, downloadRealWordDoc } from '../utils/pdfGenerator';
 import { getCurrentTenantId, getTenantStorageKey, getStudioInfoForTenant } from '../utils/tenant';
+import { componiDocumento, scomponiDocumento } from '../../../src/util/intestazionePiede';
+import { intestazioneStudioHtml, piedeStudioHtml } from '../utils/intestazioneStudio';
 import type { Cliente, Progetto } from '../types';
 
 import {
@@ -83,6 +85,18 @@ export function DocumentEditorPage() {
    * newVaultDoc/salvaDocumentoApi e su ogni master creato con "Salva come Modello".
    */
   const [livelloFirmaDoc, setLivelloFirmaDoc] = useState<'ses' | 'fea' | 'feq'>('ses');
+
+  /**
+   * §39 — Intestazione e piè di pagina propri di QUESTO documento.
+   *
+   * `null` significa «quelli dello studio»: è il caso normale, e i documenti salvati prima di §39
+   * ricadono lì senza cambiare aspetto. Diventano una stringa solo quando l'operatore li sblocca
+   * con un doppio clic e li modifica; da quel momento viaggiano dentro l'HTML salvato
+   * (`componiDocumento`), tornano alla riapertura (`scomponiDocumento`) e finiscono nel PDF e nel
+   * .doc. Un blocco modificato che vivesse solo nel DOM non sarebbe salvato (regola 3).
+   */
+  const [intestazionePropria, setIntestazionePropria] = useState<string | null>(null);
+  const [piedeProprio, setPiedeProprio] = useState<string | null>(null);
 
   const [salvando, setSalvando] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -197,9 +211,15 @@ export function DocumentEditorPage() {
           if (foundDoc.titolo) setTitoloDocumento(foundDoc.titolo);
           if (foundDoc.categoria) setCategoria(foundDoc.categoria);
           if (foundDoc.contenutoHtml) {
-            rawTemplateRef.current = foundDoc.contenutoHtml;
+            // §39 — l'HTML salvato può portare intestazione e piede propri: si rimettono al loro
+            // posto, e nell'area editabile va solo il corpo. Un documento salvato prima di §39 non
+            // ha marcatori e torna tutto come corpo, esattamente come prima.
+            const parti = scomponiDocumento(foundDoc.contenutoHtml);
+            setIntestazionePropria(parti.intestazione);
+            setPiedeProprio(parti.piede);
+            rawTemplateRef.current = parti.corpo;
             if (editorRef.current) {
-              editorRef.current.innerHTML = foundDoc.contenutoHtml;
+              editorRef.current.innerHTML = parti.corpo;
             }
           }
         }
@@ -240,6 +260,33 @@ export function DocumentEditorPage() {
    * in quel caso non si salva niente sul server, invece di inventare un id (§7).
    */
   const effProgettoId = String(selectedProgettoId || activeProgetto?.id || '');
+
+  /**
+   * §39 — L'intestazione e il piede che il foglio mostra ADESSO.
+   *
+   * Sono quelli propri del documento se l'operatore li ha sbloccati e modificati, altrimenti quelli
+   * dello studio costruiti dagli stessi dati. Uno solo per l'editor, il PDF, il .doc e il documento
+   * salvato: prima erano tre HTML somiglianti scritti in tre punti diversi, ed è per questo che si
+   * vedeva una cosa e si stampava un'altra.
+   */
+  const studioCorrente = getStudioInfoForTenant(getCurrentTenantId());
+  const ragioneSocialeFoglio = tenantInfo?.ragioneSociale || studioCorrente.ragioneSociale || 'Studio Professionale';
+  const logoFoglio = (() => {
+    const raw = tenantInfo?.logoUrl || localStorage.getItem(getTenantStorageKey('bluman_logo_url'));
+    return raw ? getFormattedLogoUrl(raw) : '';
+  })();
+  const intestazioneEffettiva = intestazionePropria ?? intestazioneStudioHtml({
+    ragioneSociale: ragioneSocialeFoglio,
+    sedeLegale: tenantInfo?.sedeLegale || studioCorrente.sedeLegale || '',
+    piva: tenantInfo?.piva || studioCorrente.piva || '',
+    telefono: tenantInfo?.telefono || studioCorrente.telefono || '',
+    logo: logoFoglio,
+  });
+  const piedeEffettivo = piedeProprio ?? piedeStudioHtml({
+    ragioneSociale: ragioneSocialeFoglio,
+    pratica: activeProgetto?.titolo || activeProgetto?.n || activeProgetto?.nome || 'Incarico Professionale',
+    livelloFirma: livelloFirmaDoc,
+  });
 
   // §WF-DOC — micro-voci del progetto scelto, lette dal database (GET /progetti/:id
   // restituisce moduli → microvoci con gli id veri). Nessun elenco cablato: se il
@@ -360,9 +407,14 @@ export function DocumentEditorPage() {
     setCategoria(tmpl.categoria);
     // Piano firma §3 — il documento eredita il livello legale richiesto dal template.
     setLivelloFirmaDoc(tmpl.livelloFirmaRichiesto ?? 'ses');
-    rawTemplateRef.current = tmpl.contenutoHtml;
+    // §39 — un modello nato da un documento può portarsi dietro intestazione e piede propri: si
+    // adottano insieme al testo, invece di essere scambiati per corpo e stampati due volte.
+    const parti = scomponiDocumento(tmpl.contenutoHtml);
+    setIntestazionePropria(parti.intestazione);
+    setPiedeProprio(parti.piede);
+    rawTemplateRef.current = parti.corpo;
     if (editorRef.current) {
-      editorRef.current.innerHTML = renderResolvedContent(tmpl.contenutoHtml);
+      editorRef.current.innerHTML = renderResolvedContent(parti.corpo);
     }
   };
 
@@ -433,7 +485,13 @@ export function DocumentEditorPage() {
 
   // Salva l'attuale bozza dell'editor come Nuovo Modello Master
   const handleSaveCurrentAsMasterTemplate = async () => {
-    const currentHtml = editorRef.current?.innerHTML || rawTemplateRef.current;
+    // §39 — il modello si porta dietro anche l'intestazione e il piede propri, se ci sono: sono
+    // parte dell'atto quanto il testo.
+    const currentHtml = componiDocumento({
+      intestazione: intestazionePropria,
+      corpo: editorRef.current?.innerHTML || rawTemplateRef.current,
+      piede: piedeProprio,
+    });
     const name = prompt('Inserisci il nome per questo nuovo Modello Master Studio:', `${titoloDocumento} (Copia Master)`);
     if (!name || !name.trim()) return;
 
@@ -645,54 +703,30 @@ export function DocumentEditorPage() {
   const handleExportPdf = async () => {
     setFeedback('⏳ Generazione file PDF ad alta risoluzione in corso...');
     try {
-      const currentTenantId = getCurrentTenantId();
-      const studioInfo = getStudioInfoForTenant(currentTenantId);
-
-      const studioRagioneSociale = tenantInfo?.ragioneSociale || studioInfo.ragioneSociale || 'Studio Professionale';
-      const studioSede = tenantInfo?.sedeLegale || studioInfo.sedeLegale || '';
-      const studioPiva = tenantInfo?.piva || studioInfo.piva || '';
-      const studioTel = tenantInfo?.telefono || studioInfo.telefono || '';
-
-      const rawLogo = tenantInfo?.logoUrl || localStorage.getItem(getTenantStorageKey('bluman_logo_url'));
-      const logo = rawLogo ? getFormattedLogoUrl(rawLogo) : '';
-
       const currentHtml = editorRef.current?.innerHTML || rawTemplateRef.current;
       // Risolvi in modalità Stampa/PDF (senza smart chips, 100% testo pulito)
       const finalHtml = renderResolvedContent(currentHtml, true);
 
-      const logoOrBadgeHtml = logo
-        ? `<img src="${logo}" style="max-height: 45px; max-width: 180px; object-fit: contain;" alt="Logo Studio" />`
-        : `<div style="font-size: 16pt; font-weight: 800; color: #1e1b4b; display: flex; align-items: center; gap: 8px;">🏛 ${studioRagioneSociale.toUpperCase()}</div>`;
-
-      // Piano firma §3.3 — il footer del PDF dichiara il livello legale che l'atto ESIGE
-      // (etichetta scelta dall'operatore), non quello con cui verrà firmato: il valore
-      // effettivo lo scrive solo il server nel sigillo al momento della firma.
-      const livelloFirmaFooter = livelloFirmaDoc === 'fea'
-        ? 'Firma Elettronica Avanzata Richiesta • eIDAS art. 26'
-        : livelloFirmaDoc === 'feq'
-          ? 'Firma Elettronica Qualificata Richiesta • eIDAS art. 25'
-          : 'Firma Elettronica Semplice • art. 20 CAD';
-
+      // §39 — intestazione e piede sono quelli che si vedono nel foglio, non due HTML ricostruiti
+      // qui: se l'operatore li ha modificati, il PDF esce con le sue modifiche. L'intestazione entra
+      // nel flusso (compare sul primo foglio, come sulla carta intestata), il piede viene ristampato
+      // in fondo a ogni foglio dall'impaginatore, con il numero di pagina.
       const fullPrintHtml = `
         <div style="font-family: 'Segoe UI', Helvetica, Arial, sans-serif; color: #0f172a; line-height: 1.6; font-size: 11.5pt; width: 100%;">
-          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #4338ca; padding-bottom: 14px; margin-bottom: 24px;">
-            ${logoOrBadgeHtml}
-            <div style="text-align: right; font-size: 9pt; color: #64748b;">
-              <strong style="color: #1e1b4b;">${studioRagioneSociale}</strong><br/>
-              ${studioSede ? `${studioSede}<br/>` : ''}
-              ${studioPiva ? `P.IVA: ${studioPiva}` : ''} ${studioTel ? `| Tel: ${studioTel}` : ''}
-            </div>
-          </div>
-          <div style="min-height: 500px;">${finalHtml}</div>
-          <div style="margin-top: 40px; border-top: 1px solid #e2e8f0; padding-top: 10px; display: flex; justify-content: space-between; font-size: 8.5pt; color: #94a3b8;">
-            <span>${studioRagioneSociale} • Pratica: ${activeProgetto?.titolo || activeProgetto?.n || 'Incarico Professionale'}</span>
-            <span>${livelloFirmaFooter}</span>
-          </div>
+          ${intestazioneEffettiva}
+          <div>${finalHtml}</div>
         </div>
       `;
 
       const safeFileName = `${titoloDocumento.replace(/[^a-zA-Z0-9_-]/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`;
-      await downloadRealPdf(safeFileName, fullPrintHtml);
+      await downloadRealPdf(safeFileName, fullPrintHtml, [], {
+        piede: (pagina, totale) => `
+          <div style="width: 100%;">
+            ${piedeEffettivo}
+            <div style="text-align: right; font-size: 8pt; color: #94a3b8; margin-top: 3px;">Pagina ${pagina} di ${totale}</div>
+          </div>
+        `,
+      });
       setFeedback(`✓ File PDF "${safeFileName}" generato e scaricato con successo!`);
       setTimeout(() => setFeedback(null), 5000);
     } catch (err: any) {
@@ -705,31 +739,16 @@ export function DocumentEditorPage() {
   // Esportazione VERO File Word (.doc) Microsoft Office compatibile al 100%
   const handleExportWord = () => {
     try {
-      const currentTenantId = getCurrentTenantId();
-      const studioInfo = getStudioInfoForTenant(currentTenantId);
-
-      const studioRagioneSociale = tenantInfo?.ragioneSociale || studioInfo.ragioneSociale || 'Studio Professionale';
-      const studioSede = tenantInfo?.sedeLegale || studioInfo.sedeLegale || '';
-      const studioPiva = tenantInfo?.piva || studioInfo.piva || '';
-      const studioTel = tenantInfo?.telefono || studioInfo.telefono || '';
-
       const currentHtml = editorRef.current?.innerHTML || rawTemplateRef.current;
       const finalHtml = renderResolvedContent(currentHtml, true);
 
+      // §39 — le stesse due fasce del foglio e del PDF. Word non ha un impaginatore nostro, quindi
+      // il piede compare una volta in fondo: è il comportamento di sempre per il .doc.
       const fullPrintHtml = `
         <div style="font-family: 'Calibri', 'Segoe UI', Arial, sans-serif; color: #0f172a; line-height: 1.6; font-size: 11pt;">
-          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #4338ca; padding-bottom: 14px; margin-bottom: 24px;">
-            <div style="font-size: 16pt; font-weight: bold; color: #1e1b4b;">🏛 ${studioRagioneSociale.toUpperCase()}</div>
-            <div style="text-align: right; font-size: 9pt; color: #64748b;">
-              <strong>${studioRagioneSociale}</strong><br/>
-              ${studioSede ? `${studioSede}<br/>` : ''}
-              ${studioPiva ? `P.IVA: ${studioPiva}` : ''} ${studioTel ? `| Tel: ${studioTel}` : ''}
-            </div>
-          </div>
-          <div style="min-height: 400px;">${finalHtml}</div>
-          <div style="margin-top: 40px; border-top: 1px solid #e2e8f0; padding-top: 10px; font-size: 8.5pt; color: #94a3b8;">
-            ${studioRagioneSociale} • Pratica: ${activeProgetto?.titolo || activeProgetto?.n || 'Incarico Professionale'} • Validità Giuridica UE
-          </div>
+          ${intestazioneEffettiva}
+          <div>${finalHtml}</div>
+          <div style="margin-top: 40px;">${piedeEffettivo}</div>
         </div>
       `;
 
@@ -750,7 +769,20 @@ export function DocumentEditorPage() {
     setFeedback(null);
     try {
       const currentHtml = editorRef.current?.innerHTML || rawTemplateRef.current;
-      const htmlContent = renderResolvedContent(currentHtml);
+      /**
+       * §39 — Si archivia il foglio intero: intestazione, corpo e piede, marcati dentro l'HTML.
+       *
+       * Qui si salvano le fasce EFFETTIVE, non solo quelle modificate a mano: il file archiviato è
+       * quello che il cliente riceve, e deve essere completo di carta intestata da solo. Salvarle
+       * congela anche la carta intestata al momento dell'atto — se lo studio cambia sede domani, un
+       * atto del 2026 non deve cambiare intestazione. (Il «Salva come Modello» fa il contrario, e di
+       * proposito: un modello deve adattarsi allo studio che lo usa.)
+       */
+      const htmlContent = componiDocumento({
+        intestazione: intestazioneEffettiva,
+        corpo: renderResolvedContent(currentHtml),
+        piede: piedeEffettivo,
+      });
       const safeTitle = titoloDocumento.replace(/[^a-zA-Z0-9_\-]/g, '_');
       const filename = `${safeTitle}_${new Date().toISOString().slice(0, 10)}.docx`;
       const base64Data = btoa(unescape(encodeURIComponent(htmlContent)));
@@ -975,8 +1007,10 @@ export function DocumentEditorPage() {
           executeFormat={executeFormat}
           editorRef={editorRef}
           rawTemplateRef={rawTemplateRef}
-          tenantInfo={tenantInfo}
-          activeProgetto={activeProgetto}
+          intestazioneHtml={intestazioneEffettiva}
+          setIntestazioneHtml={setIntestazionePropria}
+          piedeHtml={piedeEffettivo}
+          setPiedeHtml={setPiedeProprio}
         />
       </div>
 

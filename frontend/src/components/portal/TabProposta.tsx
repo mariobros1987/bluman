@@ -1,6 +1,8 @@
 import { CatBadge } from '../ui/CatBadge';
 import { fmt } from '../../utils';
 import { downloadRealPdf } from '../../utils/pdfGenerator';
+import { FoglioA4 } from '../documenti/FoglioA4';
+import { scomponiDocumento } from '../../../../src/util/intestazionePiede';
 import { getStudioInfoForTenant, getCurrentTenantId, getTenantStorageKey, BLUECODE_TENANT_ID } from '../../utils/tenant';
 import type { CanaleOtp, CanaleFirma, RichiestaAddendum } from '../../api/client';
 import type { ModuloProposta, BersaglioFirma } from './types';
@@ -90,6 +92,11 @@ export function TabProposta({
   confermaFirmaConFile,
   caricamentoFirmato,
 }: TabPropostaProps) {
+  // §39 — l'HTML del mandato può portare l'intestazione e il piede propri dello studio, marcati
+  // dentro il documento al momento del salvataggio: qui si rimettono al loro posto sul foglio.
+  // Un mandato salvato prima di §39 non li ha: torna tutto come corpo, come si vedeva prima.
+  const partiProposta = scomponiDocumento(getResolvedEngagementHtml());
+
   return (
     <div style={docBoxStyle}>
       {signed ? (
@@ -432,21 +439,25 @@ export function TabProposta({
               </button>
             </div>
 
-            {/* Foglio A4 Renderizzato */}
-            <div
-              style={{
-                background: '#ffffff',
-                color: '#0f172a',
-                borderRadius: 12,
-                padding: '36px 32px',
-                boxShadow: '0 8px 30px rgba(0,0,0,0.35)',
-                border: '1px solid #cbd5e1',
-                maxHeight: 520,
-                overflowY: 'auto',
-                fontFamily: "'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-              }}
-              dangerouslySetInnerHTML={{ __html: getResolvedEngagementHtml() }}
-            />
+            {/*
+              §39 — Il foglio A4 vero, non un riquadro bianco qualunque.
+              Prima era un `div` con `padding: 36px 32px` e larghezza a fisarmonica: il cliente
+              leggeva un testo che andava a capo in punti diversi da quelli del PDF che poi firmava.
+              Ora la larghezza e i margini sono quelli della stampa (`src/util/paginaA4.ts`), e
+              l'intestazione e il piede che il documento porta con sé finiscono al loro posto —
+              qui non si sbloccano, perché nel portale non c'è nessun posto in cui salvarli.
+            */}
+            <div style={{ maxHeight: 640, overflowY: 'auto', borderRadius: 14 }}>
+              <FoglioA4
+                intestazione={partiProposta.intestazione ? { html: partiProposta.intestazione, etichetta: 'Intestazione' } : undefined}
+                piede={partiProposta.piede ? { html: partiProposta.piede, etichetta: 'Piè di pagina' } : undefined}
+              >
+                <div
+                  style={{ fontFamily: "'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}
+                  dangerouslySetInnerHTML={{ __html: partiProposta.corpo }}
+                />
+              </FoglioA4>
+            </div>
           </div>
 
           <div style={{ borderTop: '1px solid var(--border)', paddingTop: 20 }}>
