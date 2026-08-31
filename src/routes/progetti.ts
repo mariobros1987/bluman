@@ -38,7 +38,7 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
   });
 
   server.post<{ Params: { id: string }; Body: Record<string, any> }>('/progetti/:id/comunicazioni', async (req, reply) => {
-    const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
+    const tenantId = req.tenantId || '00000000-0000-0000-0000-000000000001';
     const body = (req.body || {}) as Record<string, any>;
     try {
       const msg = await prisma.comunicazioneProgetto.create({
@@ -87,7 +87,7 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
   });
 
   server.get('/progetti', async (req) => {
-    const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
+    const tenantId = req.tenantId || '00000000-0000-0000-0000-000000000001';
     try {
       const projs = await prisma.progetto.findMany({
         where: { tenantId },
@@ -136,7 +136,7 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
   }
 
   server.post<{ Body: { clienteId: string; nome: string; giurisdizioneId?: string; giurisdizionePrimariaId?: string; dataInizio?: string; dataScadenza?: string } }>('/progetti', async (req, reply) => {
-    const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
+    const tenantId = req.tenantId || '00000000-0000-0000-0000-000000000001';
     const { clienteId, nome, giurisdizioneId, giurisdizionePrimariaId } = req.body;
     if (!clienteId || !nome) return reply.code(400).send({ errore: 'clienteId e nome sono obbligatori' });
 
@@ -196,9 +196,9 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
   // distruttive (es. /progetti/:id/ricalcola) è riservata a chi risponde dello studio.
   server.delete<{ Params: { id: string } }>('/progetti/:id', async (req, reply) => {
     const { id } = req.params;
-    const tenantId = (req as any).tenantId || TENANT_DEFAULT;
+    const tenantId = req.tenantId || TENANT_DEFAULT;
 
-    const ruoloRichiedente = (req as any).ruolo as string | undefined;
+    const ruoloRichiedente = req.ruolo as string | undefined;
     if (ruoloRichiedente !== 'super_admin' && ruoloRichiedente !== 'advisor') {
       return reply
         .code(403)
@@ -209,8 +209,8 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
 
     await recordAudit({
       tenantId,
-      userId: (req as any).user?.userId,
-      userEmail: (req as any).user?.email,
+      userId: req.user?.userId,
+      userEmail: req.user?.email,
       ruolo: ruoloRichiedente,
       azione: 'PROGETTO_ELIMINATO',
       entita: 'Progetto',
@@ -232,8 +232,8 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
     '/progetti/:id/moduli/:moduloId',
     async (req, reply) => {
       const { id, moduloId } = req.params;
-      const tenantId = (req as any).tenantId || TENANT_DEFAULT;
-      const ruoloRichiedente = (req as any).ruolo as string | undefined;
+      const tenantId = req.tenantId || TENANT_DEFAULT;
+      const ruoloRichiedente = req.ruolo as string | undefined;
 
       if (ruoloRichiedente !== 'super_admin' && ruoloRichiedente !== 'advisor') {
         return reply.code(403).send({ errore: 'Solo advisor e super_admin possono eliminare moduli da un progetto.' });
@@ -297,8 +297,8 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
 
       await recordAudit({
         tenantId,
-        userId: (req as any).userId,
-        userEmail: (req as any).user?.email,
+        userId: req.userId,
+        userEmail: req.user?.email,
         ruolo: ruoloRichiedente,
         azione: 'MODULO_ELIMINATO',
         entita: 'ModuloProgetto',
@@ -322,14 +322,14 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
    */
   server.post<{ Params: { id: string } }>('/progetti/:id/ricalcola', async (req, reply) => {
     const { id } = req.params;
-    const tenantId = (req as any).tenantId || TENANT_DEFAULT;
+    const tenantId = req.tenantId || TENANT_DEFAULT;
 
     // Il ricalcolo SCRIVE (stati di moduli e micro-voci): non è una lettura e non lo autorizza
     // il fatto di essere entrati. RLS confina la scrittura al tenant, ma dentro il tenant
     // qualunque collaboratore potrebbe riallineare gli stati del progetto di un altro: qui
     // decide chi risponde dello studio. Il filtro nel frontend (pulsante nascosto in
     // ProjectDetail.tsx) è solo cortesia di interfaccia, non è questa difesa.
-    const ruoloRichiedente = (req as any).ruolo as string | undefined;
+    const ruoloRichiedente = req.ruolo as string | undefined;
     if (ruoloRichiedente !== 'super_admin' && ruoloRichiedente !== 'advisor') {
       return reply
         .code(403)
@@ -381,7 +381,7 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
   server.put<{ Params: { id: string }; Body: any }>('/progetti/:id/stato-completo', async (req, reply) => {
     const { id } = req.params;
     const body: any = req.body || {};
-    const tenantId = (req as any).tenantId || TENANT_DEFAULT;
+    const tenantId = req.tenantId || TENANT_DEFAULT;
 
     const progetto = await prisma.progetto.findUnique({
       where: { id },
@@ -656,9 +656,9 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
   const isoData = (d: Date): string => d.toISOString().slice(0, 10);
 
   server.get<{ Querystring: { inizio?: string } }>('/timesheet', async (req, reply) => {
-    const tenantId = (req as any).tenantId;
-    const userId = (req as any).userId as string | undefined;
-    const ruolo = (req as any).ruolo as string | undefined;
+    const tenantId = req.tenantId;
+    const userId = req.userId as string | undefined;
+    const ruolo = req.ruolo as string | undefined;
     const inizio = lunediSettimana(req.query.inizio);
     if (!inizio) {
       return reply.code(400).send({ errore: 'Parametro inizio non valido: usare una data YYYY-MM-DD' });
@@ -727,8 +727,8 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
   // può correggere. L'unicità (tenant, utente, giorno) rende l'operazione
   // idempotente sulla stessa cella.
   server.post<{ Body: { giorno?: string; minuti?: number; nota?: string; progettoId?: string | null } }>('/timesheet', async (req, reply) => {
-    const tenantId = (req as any).tenantId;
-    const userId = (req as any).userId as string | undefined;
+    const tenantId = req.tenantId;
+    const userId = req.userId as string | undefined;
     if (!userId) {
       return reply.code(401).send({ errore: 'Non autenticato' });
     }
@@ -792,9 +792,9 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
   };
 
   server.post<{ Params: { id: string } }>('/timesheet/:id/approva', async (req, reply) => {
-    if (!soloChiApprova((req as any).ruolo as string | undefined, reply)) return;
-    const tenantId = (req as any).tenantId;
-    const userId = (req as any).userId as string | undefined;
+    if (!soloChiApprova(req.ruolo as string | undefined, reply)) return;
+    const tenantId = req.tenantId;
+    const userId = req.userId as string | undefined;
     try {
       // RLS limita già al tenant: una riga di un altro tenant qui non arriva.
       const voce = await prisma.oraTimesheet.findUnique({ where: { id: req.params.id } });
@@ -816,9 +816,9 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
   });
 
   server.post<{ Params: { id: string }; Body: { motivo?: string } }>('/timesheet/:id/rifiuta', async (req, reply) => {
-    if (!soloChiApprova((req as any).ruolo as string | undefined, reply)) return;
-    const tenantId = (req as any).tenantId;
-    const userId = (req as any).userId as string | undefined;
+    if (!soloChiApprova(req.ruolo as string | undefined, reply)) return;
+    const tenantId = req.tenantId;
+    const userId = req.userId as string | undefined;
     try {
       const voce = await prisma.oraTimesheet.findUnique({ where: { id: req.params.id } });
       if (!voce || voce.tenantId !== tenantId) {
@@ -846,9 +846,9 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
   // Approvazione in blocco di tutte le bozze della settimana (opzionalmente di
   // un solo membro): è il bottone "approva settimana" della griglia.
   server.post<{ Body: { inizio?: string; userId?: string } }>('/timesheet/approva-settimana', async (req, reply) => {
-    if (!soloChiApprova((req as any).ruolo as string | undefined, reply)) return;
-    const tenantId = (req as any).tenantId;
-    const userIdRichiedente = (req as any).userId as string | undefined;
+    if (!soloChiApprova(req.ruolo as string | undefined, reply)) return;
+    const tenantId = req.tenantId;
+    const userIdRichiedente = req.userId as string | undefined;
     const inizio = lunediSettimana(req.body?.inizio);
     if (!inizio) {
       return reply.code(400).send({ errore: 'Parametro inizio non valido: usare una data YYYY-MM-DD' });
@@ -878,7 +878,7 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
   // voci aperte già assegnate. Nessun dato inventato: se il tenant non ha
   // utenti la risposta è un elenco vuoto.
   server.get<{ Querystring: { categoria?: string } }>('/operatori-suggeriti', async (req, reply) => {
-    const tenantId = (req as any).tenantId;
+    const tenantId = req.tenantId;
     const categoria = (req.query.categoria || '').trim().toLowerCase();
     try {
       const inizio = lunediSettimana();
@@ -947,7 +947,7 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
   // limitata al tenant della richiesta. Minimo 2 caratteri per evitare
   // scansioni inutili su prefissi di un solo carattere.
   server.get<{ Querystring: { q?: string } }>('/search', async (req, reply) => {
-    const tenantId = (req as any).tenantId;
+    const tenantId = req.tenantId;
     const q = (req.query.q || '').trim();
     if (q.length < 2) {
       return reply.code(400).send({ errore: 'Inserisci almeno 2 caratteri per la ricerca' });
@@ -965,7 +965,7 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
   // ── CHECKLIST SOP COMPLIANCE (STYLE OPENSTAMANAGER) ───────────────
   server.get<{ Params: { passaggioId: string } }>('/passaggi/:passaggioId/checklist', async (req, reply) => {
     try {
-      const voci = await (prisma as any).checklistVoce.findMany({
+      const voci = await prisma.checklistVoce.findMany({
         where: { passaggioProgettoId: req.params.passaggioId },
         orderBy: { titolo: 'asc' },
       });
@@ -979,14 +979,14 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
     Params: { passaggioId: string };
     Body: { titolo: string; obbligatorio?: boolean };
   }>('/passaggi/:passaggioId/checklist', async (req, reply) => {
-    const tenantId = (req as any).tenantId;
+    const tenantId = req.tenantId;
     const { passaggioId } = req.params;
     const { titolo, obbligatorio } = req.body;
 
     if (!titolo) return reply.code(400).send({ errore: 'Titolo voce checklist obbligatorio' });
 
     try {
-      const voce = await (prisma as any).checklistVoce.create({
+      const voce = await prisma.checklistVoce.create({
         data: {
           tenantId,
           passaggioProgettoId: passaggioId,
@@ -1002,10 +1002,10 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
 
   server.patch<{ Params: { id: string } }>('/checklist/:id/toggle', async (req, reply) => {
     try {
-      const voce = await (prisma as any).checklistVoce.findUnique({ where: { id: req.params.id } });
+      const voce = await prisma.checklistVoce.findUnique({ where: { id: req.params.id } });
       if (!voce) return reply.code(404).send({ errore: 'Voce non trovata' });
 
-      const updated = await (prisma as any).checklistVoce.update({
+      const updated = await prisma.checklistVoce.update({
         where: { id: req.params.id },
         data: {
           completato: !voce.completato,

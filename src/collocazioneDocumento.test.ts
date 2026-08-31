@@ -144,8 +144,8 @@ describe('§40 — le rotte che scrivono il collegamento usano la decisione pres
     // «Sistema / Operatore», e un registro che non sa chi ha spostato una carta non è una traccia.
     expect(codiceRotta).toContain("azione: 'DOCUMENTO_RICOLLEGATO'");
     expect(codiceRotta).toContain('descriviSpostamento(');
-    expect(codiceRotta).toMatch(/userId:\s*\(req as any\)\.userId/);
-    expect(codiceRotta).toMatch(/ruolo:\s*\(req as any\)\.ruolo/);
+    expect(codiceRotta).toMatch(/userId:\s*(?:\(req as any\)\.)?req\.userId/);
+    expect(codiceRotta).toMatch(/ruolo:\s*(?:\(req as any\)\.)?req\.ruolo/);
   });
 
   it('l\'archivio dello studio non si apre al token di un cliente', () => {

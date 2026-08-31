@@ -67,7 +67,7 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
   }
 
   server.get('/tenant/info', async (req) => {
-    const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
+    const tenantId = req.tenantId || '00000000-0000-0000-0000-000000000001';
     const defaultNames: Record<string, string> = {
       '00000000-0000-0000-0000-000000000001': 'Studio Advisory & Legal Partners',
       '00000000-0000-0000-0000-000000000002': 'Advisory Italia S.r.l. (Milano)',
@@ -102,7 +102,7 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
   });
 
   server.patch<{ Body: Record<string, any> }>('/tenant/info', async (req, reply) => {
-    const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
+    const tenantId = req.tenantId || '00000000-0000-0000-0000-000000000001';
     const rawBody = (req.body || {}) as Record<string, any>;
 
     const allowedKeys = [
@@ -183,8 +183,8 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
   // collaboratori appartengono al tenant da cui sono stati creati e non creano utenti.
 
   server.get('/tenant/utenti', async (req, reply) => {
-    const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
-    const ruoloRichiedente = (req as any).ruolo as string | undefined;
+    const tenantId = req.tenantId || '00000000-0000-0000-0000-000000000001';
+    const ruoloRichiedente = req.ruolo as string | undefined;
 
     try {
       const utenti = await prisma.user.findMany({
@@ -208,8 +208,8 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
   server.post<{
     Body: { nome?: string; email?: string; ruolo?: string; specializzazione?: string; costoOrarioCentesimi?: number };
   }>('/tenant/utenti', async (req, reply) => {
-    const tenantCorrente = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
-    const ruoloRichiedente = (req as any).ruolo as string | undefined;
+    const tenantCorrente = req.tenantId || '00000000-0000-0000-0000-000000000001';
+    const ruoloRichiedente = req.ruolo as string | undefined;
 
     // Solo super_admin (qualunque tenant) e advisor (il proprio) ampliano il team.
     if (ruoloRichiedente !== 'super_admin' && ruoloRichiedente !== 'advisor') {
@@ -347,8 +347,8 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
    * Riservato a Super Admin e Lead Advisor dello Studio.
    */
   server.post<{ Params: { id: string } }>('/tenant/utenti/:id/reset-password', async (req, reply) => {
-    const ruoloRichiedente = (req as any).ruolo as string | undefined;
-    const tenantCorrente = (req as any).tenantId as string;
+    const ruoloRichiedente = req.ruolo as string | undefined;
+    const tenantCorrente = req.tenantId as string;
     const { id } = req.params;
 
     if (ruoloRichiedente !== 'super_admin' && ruoloRichiedente !== 'advisor') {
@@ -650,7 +650,7 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
    * Ora si prova esattamente quello che c'è: corpo della richiesta, altrimenti riga Tenant.
    */
   server.post<{ Body: { smtpHost?: string; smtpServername?: string; smtpPort?: number; smtpSecure?: boolean; smtpUser?: string; smtpPass?: string; smtpFromEmail?: string; smtpFromName?: string; emailDestinatario?: string } }>('/tenant/test-email', async (req, reply) => {
-    const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
+    const tenantId = req.tenantId || '00000000-0000-0000-0000-000000000001';
     let dbTenant: any = null;
     try {
       dbTenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
@@ -680,7 +680,7 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
   });
 
   server.post<{ Body: { imapHost?: string; imapServername?: string; imapPort?: number; imapUser?: string; imapPass?: string; imapSecure?: boolean } }>('/tenant/test-imap', async (req, reply) => {
-    const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
+    const tenantId = req.tenantId || '00000000-0000-0000-0000-000000000001';
     let dbTenant: any = null;
     try {
       dbTenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
@@ -719,7 +719,7 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
    * Meta, Telegram o il server SMTP: un canale rotto risponde 400.
    */
   server.post<{ Body: { channel?: string; waPhoneId?: string; waAccessToken?: string } }>('/tenant/test-channel', async (req, reply) => {
-    const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
+    const tenantId = req.tenantId || '00000000-0000-0000-0000-000000000001';
     const canale = (req.body?.channel || '').toLowerCase();
     const cred = await credenzialiCanali(tenantId);
 
@@ -794,7 +794,7 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
 
   // Audit Logs API (Isolato per Tenant)
   server.get('/audit-logs', async (req) => {
-    const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
+    const tenantId = req.tenantId || '00000000-0000-0000-0000-000000000001';
     try {
       return await prisma.auditLog.findMany({
         where: { tenantId },
@@ -806,7 +806,7 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
   });
 
   server.post<{ Body: Record<string, any> }>('/audit-logs', async (req, reply) => {
-    const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
+    const tenantId = req.tenantId || '00000000-0000-0000-0000-000000000001';
     const body = (req.body || {}) as Record<string, any>;
     // Chi ha fatto l'operazione lo dice il token, non il corpo della richiesta: qui c'erano
     // `body.userEmail || 'joe@…'` e `body.userNome || 'Joe Disabato'`, cioè il nome di una
@@ -815,7 +815,7 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
     // richiesta non è una prova di identità: prevale sempre l'utenza autenticata. Le colonne
     // sono NOT NULL, quindi in mancanza di token — che il guard non consente su questa rotta —
     // resta un segnaposto che si dichiara tale.
-    const autenticato = (req as any).user || null;
+    const autenticato = req.user || null;
     const IGNOTO = 'utenza-non-identificata';
     try {
       const log = await prisma.auditLog.create({
@@ -824,7 +824,7 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
           userId: autenticato?.userId || body.userId || IGNOTO,
           userEmail: autenticato?.email || body.userEmail || IGNOTO,
           userNome: body.userNome || autenticato?.email || 'Utenza non identificata',
-          ruolo: (req as any).ruolo || body.ruolo || IGNOTO,
+          ruolo: req.ruolo || body.ruolo || IGNOTO,
           azione: body.azione,
           entita: body.entita,
           dettagli: body.dettagli,
@@ -842,10 +842,10 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
 
   // ── GESTIONE PERMESSI GRANULARI MODULI & SEZIONI (STYLE OPENSTAMANAGER) ─
   server.get<{ Params: { userId: string } }>('/tenant/utenti/:userId/permessi', async (req, reply) => {
-    const tenantId = (req as any).tenantId;
+    const tenantId = req.tenantId;
     const { userId } = req.params;
     try {
-      const permessi = await (prisma as any).permessoModulo.findMany({
+      const permessi = await prisma.permessoModulo.findMany({
         where: { tenantId, userId },
       });
       return reply.send(permessi);
@@ -858,7 +858,7 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
     Params: { userId: string };
     Body: { permessi: Array<{ moduloChiave: string; livello: 'denied' | 'read' | 'write' }> };
   }>('/tenant/utenti/:userId/permessi', async (req, reply) => {
-    const tenantId = (req as any).tenantId;
+    const tenantId = req.tenantId;
     const { userId } = req.params;
     const { permessi } = req.body;
 
@@ -868,7 +868,7 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
 
     try {
       for (const p of permessi) {
-        await (prisma as any).permessoModulo.upsert({
+        await prisma.permessoModulo.upsert({
           where: {
             tenantId_userId_moduloChiave: {
               tenantId,

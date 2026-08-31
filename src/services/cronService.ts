@@ -8,6 +8,7 @@
 // ritrova nella campanella al prossimo accesso — il DB è la fonte di verità.
 import { prisma } from '../util/prismaClient.js';
 import { notificaStudioSilenziosa } from './notificheService.js';
+import { recordAudit } from '../util/serverHelpers.js';
 
 export interface CronReport {
   timestamp: string;
@@ -107,13 +108,11 @@ export async function runDailyNotificationCron(tenantId?: string): Promise<CronR
 
     // 3. Registrazione Audit Log del Cron
     try {
-      await (prisma as any).auditLog.create({
-        data: {
-          tenantId,
-          azione: 'CRON_NOTIFICHE_SCADENZE_ESEGUITO',
-          entita: 'Cron Worker Background',
-          dettagli: `Completata scansione: ${report.notificheInviate} notifiche create (${report.scadenzeUboTrovate} UBO, ${report.fattureScaduteTrovate} fatture)`,
-        },
+      await recordAudit({
+        tenantId,
+        azione: 'CRON_NOTIFICHE_SCADENZE_ESEGUITO',
+        entita: 'Cron Worker Background',
+        dettagli: `Completata scansione: ${report.notificheInviate} notifiche create (${report.scadenzeUboTrovate} UBO, ${report.fattureScaduteTrovate} fatture)`,
       });
     } catch {}
 

@@ -41,12 +41,12 @@ function sommaIn(acc: ContatoriCartella, altro: ContatoriCartella): void {
 
 export async function registraRotteArchivioDocumenti(server: FastifyInstance): Promise<void> {
   server.get('/documenti/archivio', async (req, reply) => {
-    const tenantId = (req as any).tenantId;
+    const tenantId = req.tenantId;
 
     // L'archivio attraversa TUTTI i clienti del tenant: il token di un cliente non ci
     // entra, altrimenti dal portale si leggerebbero i nomi degli altri clienti dello
     // studio. RLS isola il tenant, non i clienti fra loro: la separazione la fa qui.
-    if ((req as any).ruolo === 'cliente') return reply.code(403).send({ errore: 'Non autorizzato.' });
+    if (req.ruolo === 'cliente') return reply.code(403).send({ errore: 'Non autorizzato.' });
 
     try {
       const clienti = await prisma.cliente.findMany({

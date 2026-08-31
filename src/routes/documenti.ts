@@ -43,7 +43,7 @@ export async function registraRotteDocumenti(server: FastifyInstance): Promise<v
   server.get<{ Querystring: { progettoId?: string; microvoceProgettoId?: string; includiArchiviati?: string } }>(
     '/documenti',
     async (req, reply) => {
-      const tenantId = (req as any).tenantId;
+      const tenantId = req.tenantId;
       const { progettoId, microvoceProgettoId, includiArchiviati } = req.query;
       if (!progettoId && !microvoceProgettoId) {
         return reply.code(400).send({ errore: 'Specificare progettoId o microvoceProgettoId.' });
@@ -151,8 +151,8 @@ export async function registraRotteDocumenti(server: FastifyInstance): Promise<v
       livelloFirmaRichiesto?: string;
     };
   }>('/documenti', async (req, reply) => {
-    const tenantId = (req as any).tenantId;
-    const userId = (req as any).userId as string | undefined;
+    const tenantId = req.tenantId;
+    const userId = req.userId as string | undefined;
     const { progettoId, microvoceProgettoId, filename, contentBase64, tipo, categoriaDoc, dataScadenzaDoc, statoDoc, livelloFirmaRichiesto } = req.body;
 
     if (!progettoId || !filename || !contentBase64) {
@@ -237,8 +237,8 @@ export async function registraRotteDocumenti(server: FastifyInstance): Promise<v
         // «Sistema / Operatore», e un registro che non sa chi ha caricato una carta non è una
         // traccia. L'utente c'è già (`userId` è verificato sopra, la rotta esige la sessione).
         userId,
-        userEmail: (req as any).user?.email,
-        ruolo: (req as any).ruolo,
+        userEmail: req.user?.email,
+        ruolo: req.ruolo,
         azione: 'DOCUMENTO_ARCHIVIATO',
         entita: documento.id,
         dettagli:
@@ -285,8 +285,8 @@ export async function registraRotteDocumenti(server: FastifyInstance): Promise<v
       livelloFirmaRichiesto?: string;
     };
   }>('/documenti/genera', async (req, reply) => {
-    const tenantId = (req as any).tenantId;
-    const userId = (req as any).userId as string | undefined;
+    const tenantId = req.tenantId;
+    const userId = req.userId as string | undefined;
     const { progettoId, microvoceProgettoId, modelloId, contenutoHtml, titolo, categoriaDoc, statoDoc, dataScadenzaDoc, livelloFirmaRichiesto } = req.body;
 
     if (!progettoId) return reply.code(400).send({ errore: 'progettoId è obbligatorio.' });
@@ -453,8 +453,8 @@ export async function registraRotteDocumenti(server: FastifyInstance): Promise<v
       await recordAudit({
         tenantId,
         userId,
-        userEmail: (req as any).user?.email,
-        ruolo: (req as any).ruolo,
+        userEmail: req.user?.email,
+        ruolo: req.ruolo,
         azione: 'DOCUMENTO_GENERATO',
         entita: documento.id,
         dettagli:
@@ -500,7 +500,7 @@ export async function registraRotteDocumenti(server: FastifyInstance): Promise<v
     Params: { id: string };
     Body: { statoDoc: 'bozza' | 'pubblicato' | 'in_revisione' };
   }>('/documenti/:id/stato', async (req, reply) => {
-    const tenantId = (req as any).tenantId;
+    const tenantId = req.tenantId;
     const { id } = req.params;
     const { statoDoc } = req.body;
 
@@ -572,7 +572,7 @@ export async function registraRotteDocumenti(server: FastifyInstance): Promise<v
     Params: { id: string };
     Body: { livelloFirmaRichiesto: string };
   }>('/documenti/:id/livello-firma', async (req, reply) => {
-    const tenantId = (req as any).tenantId;
+    const tenantId = req.tenantId;
     const { id } = req.params;
     const { livelloFirmaRichiesto } = req.body;
 
@@ -626,9 +626,9 @@ export async function registraRotteDocumenti(server: FastifyInstance): Promise<v
     Params: { id: string };
     Body: { motivo?: string };
   }>('/documenti/:id/sblocca', async (req, reply) => {
-    const tenantId = (req as any).tenantId;
-    const userId = (req as any).userId as string | undefined;
-    const ruolo = (req as any).ruolo as string | undefined;
+    const tenantId = req.tenantId;
+    const userId = req.userId as string | undefined;
+    const ruolo = req.ruolo as string | undefined;
     const { id } = req.params;
     const motivo = (req.body?.motivo ?? '').trim();
 
@@ -705,8 +705,8 @@ export async function registraRotteDocumenti(server: FastifyInstance): Promise<v
       pubblicaSubito?: boolean;
     };
   }>('/documenti/:id/nuova-versione', async (req, reply) => {
-    const tenantId = (req as any).tenantId;
-    const userId = (req as any).userId as string | undefined;
+    const tenantId = req.tenantId;
+    const userId = req.userId as string | undefined;
     const { id } = req.params;
     const { filename, contentBase64, categoriaDoc, pubblicaSubito } = req.body;
 
@@ -728,7 +728,7 @@ export async function registraRotteDocumenti(server: FastifyInstance): Promise<v
       // §WF-DOC — su un atto firmato non si carica una v2 a piacere: prima l'admin dello studio
       // lo sblocca motivando. Senza questo controllo la versione sottoscritta dal cliente
       // verrebbe superata da un documento che il cliente non ha mai visto né approvato.
-      if (docPadre.statoDoc === 'firmato' && !puoSbloccareDocumentoFirmato((req as any).ruolo)) {
+      if (docPadre.statoDoc === 'firmato' && !puoSbloccareDocumentoFirmato(req.ruolo)) {
         return reply.code(409).send({
           errore: 'Il documento è firmato dal cliente: per caricarne una nuova versione serve prima lo sblocco dell\'amministratore dello studio.',
         });
@@ -813,7 +813,7 @@ export async function registraRotteDocumenti(server: FastifyInstance): Promise<v
    * Elenco richieste di modifica per un dato documento.
    */
   server.get<{ Params: { id: string } }>('/documenti/:id/richieste-modifica', async (req, reply) => {
-    const tenantId = (req as any).tenantId;
+    const tenantId = req.tenantId;
     const { id } = req.params;
 
     try {
@@ -836,7 +836,7 @@ export async function registraRotteDocumenti(server: FastifyInstance): Promise<v
     Params: { rid: string };
     Body: { stato?: string; rispostaStudio?: string };
   }>('/documenti/richieste-modifica/:rid', async (req, reply) => {
-    const tenantId = (req as any).tenantId;
+    const tenantId = req.tenantId;
     const { rid } = req.params;
     const { stato, rispostaStudio } = req.body;
 
@@ -859,7 +859,7 @@ export async function registraRotteDocumenti(server: FastifyInstance): Promise<v
   });
 
   server.delete<{ Params: { id: string } }>('/documenti/:id', async (req, reply) => {
-    const tenantId = (req as any).tenantId;
+    const tenantId = req.tenantId;
     const { id } = req.params;
 
     try {
@@ -954,9 +954,9 @@ export async function registraRotteDocumenti(server: FastifyInstance): Promise<v
   // l'atto resta leggibile nello storico e nel portale con il suo sigillo integro, e le
   // liste operative semplicemente smettono di mostrarlo.
   server.patch<{ Params: { id: string } }>('/documenti/:id/archivia', async (req, reply) => {
-    const tenantId = (req as any).tenantId;
-    const userId = (req as any).userId as string | undefined;
-    const ruolo = (req as any).ruolo;
+    const tenantId = req.tenantId;
+    const userId = req.userId as string | undefined;
+    const ruolo = req.ruolo;
     const { id } = req.params;
 
     // Archiviare è un atto definitivo sul fascicolo: riservato all'amministratore dello

@@ -69,7 +69,7 @@ function generaCodice(): string {
 
 /** La riga di firma ancora viva per quell'ambito, se c'è. */
 async function sessioneAperta(clienteId: string, ambito: AmbitoOtp, riferimentoId?: string | null) {
-  return (prisma as any).codiceOtp.findFirst({
+  return prisma.codiceOtp.findFirst({
     where: {
       clienteId,
       ambito,
@@ -120,7 +120,7 @@ export async function creaOtp(richiesta: RichiestaOtp): Promise<EsitoCreazioneOt
 
   if (aperta) {
     // Tentativi azzerati: il codice è nuovo, gli errori sul precedente non lo riguardano.
-    const aggiornata = await (prisma as any).codiceOtp.update({
+    const aggiornata = await prisma.codiceOtp.update({
       where: { id: aperta.id },
       data: {
         codiceHash,
@@ -145,7 +145,7 @@ export async function creaOtp(richiesta: RichiestaOtp): Promise<EsitoCreazioneOt
     };
   }
 
-  const creata = await (prisma as any).codiceOtp.create({
+  const creata = await prisma.codiceOtp.create({
     data: {
       tenantId: richiesta.tenantId,
       clienteId: richiesta.clienteId,
@@ -175,7 +175,7 @@ export async function creaOtp(richiesta: RichiestaOtp): Promise<EsitoCreazioneOt
  */
 export async function annullaOtp(otpId: string): Promise<void> {
   try {
-    await (prisma as any).codiceOtp.update({
+    await prisma.codiceOtp.update({
       where: { id: otpId },
       data: { scadenza: new Date(Date.now() - 1000) },
     });
@@ -231,7 +231,7 @@ export async function verificaOtp(
   }
 
   if (!verificaCodiceOtp(codiceInserito.trim(), clienteId, record.codiceHash)) {
-    const dopo = await (prisma as any).codiceOtp.update({
+    const dopo = await prisma.codiceOtp.update({
       where: { id: record.id },
       data: { tentativi: { increment: 1 } },
     });
@@ -246,7 +246,7 @@ export async function verificaOtp(
   }
 
   // Consumato: `usatoAt` chiude la sessione, quindi lo stesso codice non firma due volte.
-  await (prisma as any).codiceOtp.update({
+  await prisma.codiceOtp.update({
     where: { id: record.id },
     data: { usatoAt: new Date() },
   });

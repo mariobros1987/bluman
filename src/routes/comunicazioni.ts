@@ -89,7 +89,7 @@ export async function registraRotteComunicazioni(server: FastifyInstance): Promi
   server.post<{
     Body: { to?: string; subject?: string; testo?: string; text?: string; html?: string; etichetta?: string };
   }>('/comunicazioni/invia-email', async (req, reply) => {
-    const tenantId = (req as any).tenantId as string;
+    const tenantId = req.tenantId as string;
     const body = req.body || {};
 
     const destinatario = (body.to || '').trim();
@@ -144,7 +144,7 @@ export async function registraRotteComunicazioni(server: FastifyInstance): Promi
   server.post<{
     Body: { to?: string; testo?: string; text?: string; template?: string; templateName?: string; lingua?: string; parametri?: string[] };
   }>('/comunicazioni/invia-whatsapp', async (req, reply) => {
-    const tenantId = (req as any).tenantId as string;
+    const tenantId = req.tenantId as string;
     const body = req.body || {};
 
     const numero = (body.to || '').trim();
@@ -175,7 +175,7 @@ export async function registraRotteComunicazioni(server: FastifyInstance): Promi
   server.post<{ Body: { clientEmail?: string; limite?: number } }>(
     '/comunicazioni/email-in-arrivo',
     async (req, reply) => {
-      const tenantId = (req as any).tenantId as string;
+      const tenantId = req.tenantId as string;
       const body = req.body || {};
 
       const imap = await credenzialiImap(tenantId);

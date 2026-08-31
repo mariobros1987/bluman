@@ -303,7 +303,7 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
     Body: { currentPassword?: string; newPassword?: string };
   }>('/auth/change-password', async (req, reply) => {
     const { currentPassword, newPassword } = req.body || {};
-    const authUser = (req as any).user;
+    const authUser = req.user;
     const userId = authUser?.userId;
 
     if (!userId) {
@@ -355,7 +355,7 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
   });
 
   server.get('/auth/profilo', async (req, reply) => {
-    const authUser = (req as any).user;
+    const authUser = req.user;
     const userId = authUser?.userId;
     if (!userId) return reply.code(401).send({ errore: 'Non autenticato' });
 
@@ -374,7 +374,7 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
   server.put<{
     Body: { nome?: string; specializzazione?: string };
   }>('/auth/profilo', async (req, reply) => {
-    const authUser = (req as any).user;
+    const authUser = req.user;
     const userId = authUser?.userId;
     if (!userId) return reply.code(401).send({ errore: 'Non autenticato' });
 
@@ -397,7 +397,7 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
     Body: { currentPassword?: string; newPassword?: string; clienteId?: string; email?: string };
   }>('/portal/change-password', async (req, reply) => {
     const { currentPassword, newPassword, clienteId, email } = req.body || {};
-    const authUser = (req as any).user;
+    const authUser = req.user;
 
     if (!newPassword || newPassword.length < 6) {
       return reply.code(400).send({ errore: 'La nuova password deve contenere almeno 6 caratteri.' });

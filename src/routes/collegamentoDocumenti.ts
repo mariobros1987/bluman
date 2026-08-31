@@ -39,10 +39,10 @@ export async function registraRotteCollegamentoDocumenti(server: FastifyInstance
    * numero e si fermava lì: da qui si possono elencare e ricollocare uno per uno.
    */
   server.get('/documenti/non-collocati', async (req, reply) => {
-    const tenantId = (req as any).tenantId;
+    const tenantId = req.tenantId;
     // Come `/documenti/archivio`: il token di un cliente non entra nell'archivio dello studio,
     // altrimenti dal portale si leggerebbero le carte degli altri clienti.
-    if ((req as any).ruolo === 'cliente') return reply.code(403).send({ errore: 'Non autorizzato.' });
+    if (req.ruolo === 'cliente') return reply.code(403).send({ errore: 'Non autorizzato.' });
 
     try {
       const documenti = await prisma.documento.findMany({
@@ -94,8 +94,8 @@ export async function registraRotteCollegamentoDocumenti(server: FastifyInstance
     Params: { id: string };
     Body: { progettoId?: string | null; microvoceProgettoId?: string | null };
   }>('/documenti/:id/collegamento', async (req, reply) => {
-    const tenantId = (req as any).tenantId;
-    if ((req as any).ruolo === 'cliente') return reply.code(403).send({ errore: 'Non autorizzato.' });
+    const tenantId = req.tenantId;
+    if (req.ruolo === 'cliente') return reply.code(403).send({ errore: 'Non autorizzato.' });
 
     const { id } = req.params;
     const { progettoId, microvoceProgettoId } = req.body ?? {};
@@ -157,9 +157,9 @@ export async function registraRotteCollegamentoDocumenti(server: FastifyInstance
       const nome = nomeLeggibile(documento.fileUrl);
       await recordAudit({
         tenantId,
-        userId: (req as any).userId,
-        userEmail: (req as any).user?.email,
-        ruolo: (req as any).ruolo,
+        userId: req.userId,
+        userEmail: req.user?.email,
+        ruolo: req.ruolo,
         azione: 'DOCUMENTO_RICOLLEGATO',
         entita: documento.id,
         dettagli:

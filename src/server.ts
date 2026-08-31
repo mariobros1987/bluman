@@ -328,10 +328,10 @@ export function buildServer(app: AppPort): FastifyInstance {
     if (tenantRichiesto && ruolo === 'super_admin') {
       tenantId = tenantRichiesto as string;
     }
-    (req as any).tenantId = tenantId;
-    (req as any).ruolo = ruolo;
-    (req as any).user = payload;
-    (req as any).userId = payload?.userId;
+    req.tenantId = tenantId;
+    req.ruolo = ruolo;
+    req.user = payload;
+    req.userId = payload?.userId;
     // §14 — da qui in poi ogni query di questa richiesta viaggia con il tenant impostato
     // come variabile di sessione, che è ciò su cui filtrano le policy RLS. Senza questa
     // riga il ruolo `bluman_app` non vedrebbe nessuna riga: il guasto è immediato, non

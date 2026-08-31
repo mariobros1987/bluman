@@ -44,7 +44,7 @@ export async function registraRotteNotifiche(server: FastifyInstance): Promise<v
   });
 
   server.post<{ Body: Record<string, any> }>('/notifiche', async (req, reply) => {
-    const tenantId = (req as any).tenantId as string;
+    const tenantId = req.tenantId as string;
     const body = (req.body || {}) as Record<string, any>;
     // Nessuna scorciatoia tipo `destinatarioId || 'usr-01'`: una notifica senza
     // destinatario reale è solo rumore che nessuno leggerà mai.

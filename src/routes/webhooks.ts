@@ -51,7 +51,7 @@ export async function registraRotteWebhooks(server: FastifyInstance): Promise<vo
     '/webhooks/communications/whatsapp',
     async (req, reply) => {
       const body = req.body || {};
-      const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
+      const tenantId = req.tenantId || '00000000-0000-0000-0000-000000000001';
 
       try {
         const entry = body.entry?.[0];
@@ -155,8 +155,8 @@ export async function registraRotteWebhooks(server: FastifyInstance): Promise<vo
       // Registra la comunicazione nel database
       try {
         const tenantId = matchedCliente?.tenantId || (await prisma.tenant.findFirst())?.id;
-        if (tenantId) {
-          await (prisma as any).comunicazioneProgetto?.create({
+        if (tenantId && matchedProgettoId) {
+          await prisma.comunicazioneProgetto.create({
             data: {
               tenantId,
               progettoId: matchedProgettoId,
@@ -164,10 +164,7 @@ export async function registraRotteWebhooks(server: FastifyInstance): Promise<vo
               direzione: 'entrata',
               mittente: fromName,
               destinatario: 'Studio Bluecode Ltd',
-              oggetto: 'Messaggio Telegram Bot in entrata',
-              corpo: text,
-              dataInvio: new Date(),
-              stato: 'ricevuto',
+              testo: text,
             },
           });
           // Blocco 3 — stesso evento degli altri canali: messaggio cliente → studio.

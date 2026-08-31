@@ -59,9 +59,9 @@ export async function registraRotteContabilita(server: FastifyInstance, app: App
 
   // ── INCASSI, SCADENZARIO & PRIMA NOTA (STYLE OPENSTAMANAGER) ───────
   server.get('/invoices/scadenzario', async (req, reply) => {
-    const tenantId = (req as any).tenantId;
+    const tenantId = req.tenantId;
     try {
-      const scadenze = await (prisma as any).scadenzaIncasso.findMany({
+      const scadenze = await prisma.scadenzaIncasso.findMany({
         where: { tenantId },
         include: {
           fattura: {
@@ -90,12 +90,12 @@ export async function registraRotteContabilita(server: FastifyInstance, app: App
       noteOperatore?: string;
     };
   }>('/invoices/scadenze/:id/incassi', async (req, reply) => {
-    const tenantId = (req as any).tenantId;
+    const tenantId = req.tenantId;
     const { id } = req.params;
     const { importoIncassatoCentesimi, metodoPagamento, riferimentoTransazione, noteOperatore } = req.body;
 
     try {
-      const scadenza = await (prisma as any).scadenzaIncasso.findUnique({
+      const scadenza = await prisma.scadenzaIncasso.findUnique({
         where: { id },
         include: { registrazioniRegistrate: true },
       });
@@ -104,7 +104,7 @@ export async function registraRotteContabilita(server: FastifyInstance, app: App
         return reply.code(404).send({ errore: 'Scadenza incasso non trovata' });
       }
 
-      const registrazione = await (prisma as any).registrazioneIncasso.create({
+      const registrazione = await prisma.registrazioneIncasso.create({
         data: {
           tenantId,
           scadenzaIncassoId: id,
@@ -119,14 +119,14 @@ export async function registraRotteContabilita(server: FastifyInstance, app: App
       const totaleIncassato = scadenza.registrazioniRegistrate.reduce((acc: number, r: any) => acc + r.importoIncassatoCentesimi, 0) + importoIncassatoCentesimi;
       const nuovoStatoScadenza = totaleIncassato >= scadenza.importoCentesimi ? 'incassato' : 'parziale';
 
-      await (prisma as any).scadenzaIncasso.update({
+      await prisma.scadenzaIncasso.update({
         where: { id },
         data: { stato: nuovoStatoScadenza },
       });
 
       // ── LOGICA OPENSTAMANAGER: Mastrino::aggiornaScadenzario ──────
       // Verifichiamo se TUTTE le scadenze della Fattura sono state incassate
-      const tutteScadenzeFattura = await (prisma as any).scadenzaIncasso.findMany({
+      const tutteScadenzeFattura = await prisma.scadenzaIncasso.findMany({
         where: { fatturaId: scadenza.fatturaId },
       });
 
@@ -163,12 +163,12 @@ export async function registraRotteContabilita(server: FastifyInstance, app: App
       }
 
       // ── LOGICA OPENSTAMANAGER: Accredito su Conto Bancario ────────
-      const contoPredefinito = await (prisma as any).contoBancario.findFirst({
+      const contoPredefinito = await prisma.contoBancario.findFirst({
         where: { tenantId, isDefault: true },
       });
 
       if (contoPredefinito) {
-        await (prisma as any).contoBancario.update({
+        await prisma.contoBancario.update({
           where: { id: contoPredefinito.id },
           data: { saldoAttuale: { increment: importoIncassatoCentesimi } },
         });
@@ -189,15 +189,15 @@ export async function registraRotteContabilita(server: FastifyInstance, app: App
 
   // ── REGISTRO FATTURE STUDIO (STYLE OPENSTAMANAGER) ───────────────
   server.get('/invoices', async (req, reply) => {
-    const tenantId = (req as any).tenantId;
+    const tenantId = req.tenantId;
     try {
-      const fatture = await (prisma as any).fattura.findMany({
+      const fatture = await prisma.fattura.findMany({
         where: { tenantId },
         include: {
           righe: true,
           progetto: { include: { cliente: true } },
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy: { numeroProgressivoSerie: 'desc' },
       });
       return reply.send(fatture);
     } catch {
@@ -273,9 +273,9 @@ export async function registraRotteContabilita(server: FastifyInstance, app: App
 
   // ── MODULO BANCHE & CONTI CORRENTI STUDIO ─────────────────────────
   server.get('/conti-bancari', async (req, reply) => {
-    const tenantId = (req as any).tenantId;
+    const tenantId = req.tenantId;
     try {
-      const conti = await (prisma as any).contoBancario.findMany({
+      const conti = await prisma.contoBancario.findMany({
         where: { tenantId },
         orderBy: { isDefault: 'desc' },
       });
@@ -292,12 +292,12 @@ export async function registraRotteContabilita(server: FastifyInstance, app: App
   server.post<{ Body: { nomeConto: string; banca: string; iban?: string; bicSwift?: string; saldoInizialeEur: number; isDefault?: boolean } }>(
     '/conti-bancari',
     async (req, reply) => {
-      const tenantId = (req as any).tenantId;
+      const tenantId = req.tenantId;
       const { nomeConto, banca, iban, bicSwift, saldoInizialeEur, isDefault } = req.body;
       const saldoCentesimi = Math.round((saldoInizialeEur || 0) * 100);
 
       try {
-        const nuovoConto = await (prisma as any).contoBancario.create({
+        const nuovoConto = await prisma.contoBancario.create({
           data: {
             tenantId,
             nomeConto,
@@ -331,7 +331,7 @@ export async function registraRotteContabilita(server: FastifyInstance, app: App
   // `GET /reports/:tipo` → JSON (struttura tabellare per il frontend).
   // `GET /reports/:tipo/export?formato=pdf|xlsx&anno=NNNN` → file allegato.
   server.get<{ Params: { tipo: string }; Querystring: { anno?: string } }>('/reports/:tipo', async (req, reply) => {
-    const tenantId = (req as any).tenantId;
+    const tenantId = req.tenantId;
     const { tipo } = req.params;
     if (!REPORT_DISPONIBILI.includes(tipo as ChiaveReport)) {
       return reply.code(404).send({ errore: `Report "${tipo}" non disponibile. Disponibili: ${REPORT_DISPONIBILI.join(', ')}` });
@@ -350,7 +350,7 @@ export async function registraRotteContabilita(server: FastifyInstance, app: App
   });
 
   server.get<{ Params: { tipo: string }; Querystring: { formato?: string; anno?: string } }>('/reports/:tipo/export', async (req, reply) => {
-    const tenantId = (req as any).tenantId;
+    const tenantId = req.tenantId;
     const { tipo } = req.params;
     if (!REPORT_DISPONIBILI.includes(tipo as ChiaveReport)) {
       return reply.code(404).send({ errore: `Report "${tipo}" non disponibile` });
@@ -384,7 +384,7 @@ export async function registraRotteContabilita(server: FastifyInstance, app: App
 
   // ── GENERATORE PDF SERVER-SIDE & EMAIL NODEMAILER ──────────────────
   server.get<{ Params: { id: string } }>('/invoices/:id/pdf', async (req, reply) => {
-    const tenantId = (req as any).tenantId;
+    const tenantId = req.tenantId;
     try {
       const fattura = await prisma.fattura.findUnique({
         where: { id: req.params.id },
@@ -420,7 +420,7 @@ export async function registraRotteContabilita(server: FastifyInstance, app: App
   });
 
   server.post<{ Params: { id: string }; Body: { emailDestinatario?: string } }>('/invoices/:id/invia-email', async (req, reply) => {
-    const tenantId = (req as any).tenantId;
+    const tenantId = req.tenantId;
     try {
       const fattura = await prisma.fattura.findUnique({
         where: { id: req.params.id },
@@ -551,9 +551,9 @@ export async function registraRotteContabilita(server: FastifyInstance, app: App
 
   // ── CONTRATTI RICORRENTI & RETAINER (STYLE OPENSTAMANAGER) ────────
   server.get('/contratti-ricorrenti', async (req, reply) => {
-    const tenantId = (req as any).tenantId;
+    const tenantId = req.tenantId;
     try {
-      const contratti = await (prisma as any).contrattoRicorrente.findMany({
+      const contratti = await prisma.contrattoRicorrente.findMany({
         where: { tenantId },
         include: { cliente: true, progetto: true },
         orderBy: { prossimaFatturazione: 'asc' },
@@ -575,7 +575,7 @@ export async function registraRotteContabilita(server: FastifyInstance, app: App
       note?: string;
     };
   }>('/contratti-ricorrenti', async (req, reply) => {
-    const tenantId = (req as any).tenantId;
+    const tenantId = req.tenantId;
     const { clienteId, progettoId, titolo, frequenza, importoCentesimi, prossimaFatturazione, note } = req.body;
 
     if (!clienteId || !titolo || !importoCentesimi) {
@@ -583,7 +583,7 @@ export async function registraRotteContabilita(server: FastifyInstance, app: App
     }
 
     try {
-      const contratto = await (prisma as any).contrattoRicorrente.create({
+      const contratto = await prisma.contrattoRicorrente.create({
         data: {
           tenantId,
           clienteId,
@@ -612,11 +612,11 @@ export async function registraRotteContabilita(server: FastifyInstance, app: App
 
   // Genera Fattura 1-Click da Contratto Retainer Ricorrente (Stile OpenSTAManager)
   server.post<{ Params: { id: string } }>('/contratti-ricorrenti/:id/genera-fattura', async (req, reply) => {
-    const tenantId = (req as any).tenantId;
+    const tenantId = req.tenantId;
     const { id } = req.params;
 
     try {
-      const contratto = await (prisma as any).contrattoRicorrente.findUnique({
+      const contratto = await prisma.contrattoRicorrente.findUnique({
         where: { id },
         include: { cliente: true, progetto: true },
       });
@@ -624,7 +624,7 @@ export async function registraRotteContabilita(server: FastifyInstance, app: App
       if (!contratto) return reply.code(404).send({ errore: 'Contratto non trovato' });
 
       // 1. Genera Numero Progressivo Fattura (Serie FT)
-      const lastFattura = await (prisma as any).fattura.findFirst({
+      const lastFattura = await prisma.fattura.findFirst({
         where: { tenantId, tipoDocumento: 'fattura', serie: 'FT' },
         orderBy: { numeroProgressivoSerie: 'desc' },
       });
@@ -633,20 +633,22 @@ export async function registraRotteContabilita(server: FastifyInstance, app: App
       const numeroFattura = `FT-${annoCorrente}-${String(prossimoProgressivo).padStart(4, '0')}`;
 
       // 2. Crea Fattura a DB con RigaFattura per l'importo del Canone Retainer
-      const nuovaFattura = await (prisma as any).fattura.create({
+      const nuovaFattura = await prisma.fattura.create({
         data: {
           tenantId,
-          progettoId: contratto.progettoId || null,
+          progettoId: contratto.progettoId || '',
           tipoDocumento: 'fattura',
           serie: 'FT',
           numeroProgressivoSerie: prossimoProgressivo,
           numero: numeroFattura,
-          importoCentesimi: contratto.importoCentesimi,
+          tipoClienteFiscale: 'business_italia',
+          canale: 'standard',
           stato: 'emessa',
-          note: `Fatturazione canone retainer ricorrente: ${contratto.titolo} (${contratto.frequenza})`,
           righe: {
             create: [
               {
+                tenantId,
+                tipo: 'milestone_libera',
                 descrizione: `Canone Retainer: ${contratto.titolo} (${contratto.frequenza})`,
                 importo: contratto.importoCentesimi,
               }
@@ -657,14 +659,14 @@ export async function registraRotteContabilita(server: FastifyInstance, app: App
       });
 
       // 3. Genera Scadenza Incasso nello Scadenzario
-      const scadenza = await (prisma as any).scadenzaFattura.create({
+      const scadenza = await prisma.scadenzaIncasso.create({
         data: {
           tenantId,
           fatturaId: nuovaFattura.id,
           numeroRata: 1,
           importoCentesimi: contratto.importoCentesimi,
           dataScadenza: new Date(),
-          stato: 'aperta',
+          stato: 'in_attesa',
         },
       });
 
@@ -675,7 +677,7 @@ export async function registraRotteContabilita(server: FastifyInstance, app: App
       else if (contratto.frequenza === 'semestrale') prossimaData.setMonth(prossimaData.getMonth() + 6);
       else if (contratto.frequenza === 'annuale') prossimaData.setFullYear(prossimaData.getFullYear() + 1);
 
-      await (prisma as any).contrattoRicorrente.update({
+      await prisma.contrattoRicorrente.update({
         where: { id },
         data: { prossimaFatturazione: prossimaData },
       });
@@ -701,7 +703,7 @@ export async function registraRotteContabilita(server: FastifyInstance, app: App
 
   // ── WORKER CRON SCADENZE & RINNOVI AUTOMATICI UBO/MFSA/SDI ──────────
   server.post('/cron/esegui-notifiche-scadenze', async (req, reply) => {
-    const tenantId = (req as any).tenantId;
+    const tenantId = req.tenantId;
     try {
       const report = await runDailyNotificationCron(tenantId);
       return reply.send({
@@ -718,18 +720,18 @@ export async function registraRotteContabilita(server: FastifyInstance, app: App
   // Il sistema prepara l'XML; la trasmissione la fa l'operatore tramite il portale
   // «Fatture & Corrispettivi» o il proprio intermediario. L'esito vero arriva via webhook.
   server.post<{ Params: { id: string } }>('/invoices/:id/prepara-invio-manuale', async (req, reply) => {
-    const tenantId = (req as any).tenantId;
+    const tenantId = req.tenantId;
     const { id } = req.params;
     try {
       let fattura = null;
       try {
-        fattura = await (prisma as any).fattura.findUnique({
+        fattura = await prisma.fattura.findUnique({
           where: { id },
           include: { progetto: { include: { cliente: true } } },
         });
       } catch {}
 
-      const numFattura = fattura?.numeroProgressivoSerie || `FT-2026-${id.slice(0, 3)}`;
+      const numFattura = fattura?.numeroProgressivoSerie ? String(fattura.numeroProgressivoSerie) : `FT-2026-${id.slice(0, 3)}`;
       const result = await preparaFatturaPerInvioManuale({
         fatturaId: id,
         numeroProgressivo: numFattura,

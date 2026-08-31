@@ -32,7 +32,7 @@ export async function registraRottePortale(server: FastifyInstance): Promise<voi
   // e il frontend lo mostra senza inventare presenze.
   // ────────────────────────────────────────────────────────────────
   server.get('/portal/contatti', async (req, reply) => {
-    const tenantId = (req as any).tenantId;
+    const tenantId = req.tenantId;
     const clienteId = clienteDellaRichiesta(req, (req.query as any)?.clienteId);
     if (!clienteId) {
       return reply.code(400).send({ errore: 'Cliente non identificato nella sessione.' });
@@ -85,7 +85,7 @@ export async function registraRottePortale(server: FastifyInstance): Promise<voi
   // del cliente. L'importo è la somma delle righe (centesimi, mai float per il denaro).
   // ────────────────────────────────────────────────────────────────
   server.get('/portal/fatture', async (req, reply) => {
-    const tenantId = (req as any).tenantId;
+    const tenantId = req.tenantId;
     const clienteId = clienteDellaRichiesta(req, (req.query as any)?.clienteId);
     if (!clienteId) return reply.code(400).send({ errore: 'Cliente non identificato nella sessione.' });
     try {
@@ -205,7 +205,7 @@ export async function registraRottePortale(server: FastifyInstance): Promise<voi
 
   // Lato cliente: legge le proprie proposte (per mostrare lo stato di quelle inviate).
   server.get('/portal/proposte-dati', async (req, reply) => {
-    const tenantId = (req as any).tenantId;
+    const tenantId = req.tenantId;
     const clienteId = clienteDellaRichiesta(req, (req.query as any)?.clienteId);
     if (!clienteId) return reply.code(400).send({ errore: 'Cliente non identificato nella sessione.' });
     try {
@@ -221,7 +221,7 @@ export async function registraRottePortale(server: FastifyInstance): Promise<voi
 
   // Lato cliente: invia (o sostituisce, se già pendente) una proposta per un campo.
   server.post<{ Body: { campo: string; valoreProposto: string; notaCliente?: string; clienteId?: string } }>('/portal/proposte-dati', async (req, reply) => {
-    const tenantId = (req as any).tenantId;
+    const tenantId = req.tenantId;
     const clienteId = clienteDellaRichiesta(req, req.body?.clienteId);
     if (!clienteId) return reply.code(400).send({ errore: 'Cliente non identificato nella sessione.' });
 
@@ -255,7 +255,7 @@ export async function registraRottePortale(server: FastifyInstance): Promise<voi
         valoreAttuale: attuale,
         valoreProposto: valore,
         notaCliente: (notaCliente ?? '').trim() || null,
-        richiestoDaId: (req as any).user?.userId ?? null,
+        richiestoDaId: req.user?.userId ?? null,
       };
       const proposta = pendente
         ? await prisma.propostaDatiFiscale.update({ where: { id: pendente.id }, data: { valoreAttuale: attuale, valoreProposto: valore, notaCliente: dati.notaCliente } })
@@ -263,7 +263,7 @@ export async function registraRottePortale(server: FastifyInstance): Promise<voi
 
       await recordAudit({
         tenantId,
-        userId: (req as any).user?.userId ?? null,
+        userId: req.user?.userId ?? null,
         azione: 'PROPOSTA_DATO_FISCALE',
         entita: proposta.id,
         dettagli: `Proposta modifica ${campo} per cliente ${clienteId}`,
@@ -287,8 +287,8 @@ export async function registraRottePortale(server: FastifyInstance): Promise<voi
 
   // Lato studio: elenca le proposte del tenant (filtrabili per cliente e stato).
   server.get('/proposte-dati', async (req, reply) => {
-    if ((req as any).ruolo === 'cliente') return reply.code(403).send({ errore: 'Non autorizzato.' });
-    const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
+    if (req.ruolo === 'cliente') return reply.code(403).send({ errore: 'Non autorizzato.' });
+    const tenantId = req.tenantId || '00000000-0000-0000-0000-000000000001';
     const query = req.query as any;
     try {
       const proposte = await prisma.propostaDatiFiscale.findMany({
@@ -308,8 +308,8 @@ export async function registraRottePortale(server: FastifyInstance): Promise<voi
 
   // Lato studio: conferma una proposta e applica il valore alla riga del cliente.
   server.post<{ Params: { id: string } }>('/proposte-dati/:id/conferma', async (req, reply) => {
-    if ((req as any).ruolo === 'cliente') return reply.code(403).send({ errore: 'Non autorizzato.' });
-    const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
+    if (req.ruolo === 'cliente') return reply.code(403).send({ errore: 'Non autorizzato.' });
+    const tenantId = req.tenantId || '00000000-0000-0000-0000-000000000001';
     const { id } = req.params;
     try {
       const proposta = await prisma.propostaDatiFiscale.findFirst({
@@ -331,12 +331,12 @@ export async function registraRottePortale(server: FastifyInstance): Promise<voi
       await prisma.cliente.update({ where: { id: proposta.clienteId }, data: update });
       const confermata = await prisma.propostaDatiFiscale.update({
         where: { id: proposta.id },
-        data: { stato: 'confermata', gestitoDaId: (req as any).user?.userId ?? null },
+        data: { stato: 'confermata', gestitoDaId: req.user?.userId ?? null },
       });
 
       await recordAudit({
         tenantId,
-        userId: (req as any).user?.userId ?? null,
+        userId: req.user?.userId ?? null,
         azione: 'DATO_FISCALE_CONFERMATO',
         entita: proposta.id,
         dettagli: `Confermata modifica ${proposta.campo} per cliente ${proposta.clienteId}`,
@@ -360,8 +360,8 @@ export async function registraRottePortale(server: FastifyInstance): Promise<voi
 
   // Lato studio: rifiuta una proposta, con motivazione facoltativa.
   server.post<{ Params: { id: string }; Body: { notaStudio?: string } }>('/proposte-dati/:id/rifiuta', async (req, reply) => {
-    if ((req as any).ruolo === 'cliente') return reply.code(403).send({ errore: 'Non autorizzato.' });
-    const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
+    if (req.ruolo === 'cliente') return reply.code(403).send({ errore: 'Non autorizzato.' });
+    const tenantId = req.tenantId || '00000000-0000-0000-0000-000000000001';
     const { id } = req.params;
     try {
       const proposta = await prisma.propostaDatiFiscale.findFirst({ where: { id, tenantId } });
@@ -374,12 +374,12 @@ export async function registraRottePortale(server: FastifyInstance): Promise<voi
         data: {
           stato: 'rifiutata',
           notaStudio: (req.body?.notaStudio ?? '').trim() || null,
-          gestitoDaId: (req as any).user?.userId ?? null,
+          gestitoDaId: req.user?.userId ?? null,
         },
       });
       await recordAudit({
         tenantId,
-        userId: (req as any).user?.userId ?? null,
+        userId: req.user?.userId ?? null,
         azione: 'DATO_FISCALE_RIFIUTATO',
         entita: proposta.id,
         dettagli: `Rifiutata modifica ${proposta.campo} per cliente ${proposta.clienteId}`,
@@ -411,7 +411,7 @@ export async function registraRottePortale(server: FastifyInstance): Promise<voi
 
   // Lato cliente: elenca le proprie richieste di addendum.
   server.get('/portal/addendum', async (req, reply) => {
-    const tenantId = (req as any).tenantId;
+    const tenantId = req.tenantId;
     const clienteId = clienteDellaRichiesta(req, (req.query as any)?.clienteId);
     if (!clienteId) return reply.code(400).send({ errore: 'Cliente non identificato nella sessione.' });
     try {
@@ -432,7 +432,7 @@ export async function registraRottePortale(server: FastifyInstance): Promise<voi
 
   // Lato cliente: invia una richiesta di addendum su un progetto.
   server.post<{ Body: { progettoId?: string; testoRichiesta: string; clienteId?: string } }>('/portal/addendum', async (req, reply) => {
-    const tenantId = (req as any).tenantId;
+    const tenantId = req.tenantId;
     const clienteId = clienteDellaRichiesta(req, req.body?.clienteId);
     if (!clienteId) return reply.code(400).send({ errore: 'Cliente non identificato nella sessione.' });
 
@@ -463,14 +463,14 @@ export async function registraRottePortale(server: FastifyInstance): Promise<voi
           progettoId: progetto.id,
           testoRichiesta: testo,
           stato: 'richiesta',
-          richiestoDaId: (req as any).user?.userId ?? null,
+          richiestoDaId: req.user?.userId ?? null,
         },
         include: { progetto: { select: { id: true, nome: true } } },
       });
 
       await recordAudit({
         tenantId,
-        userId: (req as any).user?.userId ?? null,
+        userId: req.user?.userId ?? null,
         azione: 'RICHIESTA_ADDENDUM',
         entita: richiesta.id,
         dettagli: `Richiesta addendum del cliente ${clienteId} sul progetto ${progetto.id}`,
@@ -494,8 +494,8 @@ export async function registraRottePortale(server: FastifyInstance): Promise<voi
 
   // Lato studio: elenca le richieste di addendum del tenant (filtrabili per progetto/stato).
   server.get('/addendum', async (req, reply) => {
-    if ((req as any).ruolo === 'cliente') return reply.code(403).send({ errore: 'Non autorizzato.' });
-    const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
+    if (req.ruolo === 'cliente') return reply.code(403).send({ errore: 'Non autorizzato.' });
+    const tenantId = req.tenantId || '00000000-0000-0000-0000-000000000001';
     const query = req.query as any;
     try {
       const richieste = await prisma.richiestaAddendum.findMany({
@@ -519,8 +519,8 @@ export async function registraRottePortale(server: FastifyInstance): Promise<voi
   // Lato studio: aggiorna lo stato di una richiesta (in lavorazione / pronta / rifiutata)
   // e allega la risposta per il cliente.
   server.post<{ Params: { id: string }; Body: { stato?: string; rispostaStudio?: string } }>('/addendum/:id/stato', async (req, reply) => {
-    if ((req as any).ruolo === 'cliente') return reply.code(403).send({ errore: 'Non autorizzato.' });
-    const tenantId = (req as any).tenantId || '00000000-0000-0000-0000-000000000001';
+    if (req.ruolo === 'cliente') return reply.code(403).send({ errore: 'Non autorizzato.' });
+    const tenantId = req.tenantId || '00000000-0000-0000-0000-000000000001';
     const { id } = req.params;
     const STATI_ADDENDUM = ['richiesta', 'in_preparazione', 'pronta', 'rifiutata'];
     const nuovoStato = req.body?.stato;
@@ -535,13 +535,13 @@ export async function registraRottePortale(server: FastifyInstance): Promise<voi
         data: {
           ...(nuovoStato ? { stato: nuovoStato as any } : {}),
           ...(req.body?.rispostaStudio !== undefined ? { rispostaStudio: (req.body.rispostaStudio ?? '').trim() || null } : {}),
-          gestitoDaId: (req as any).user?.userId ?? null,
+          gestitoDaId: req.user?.userId ?? null,
         },
         include: { cliente: { select: { id: true, nome: true } }, progetto: { select: { id: true, nome: true } } },
       });
       await recordAudit({
         tenantId,
-        userId: (req as any).user?.userId ?? null,
+        userId: req.user?.userId ?? null,
         azione: 'STATO_ADDENDUM',
         entita: richiesta.id,
         dettagli: `Stato addendum ${richiesta.id} -> ${nuovoStato ?? 'invariato'}`,

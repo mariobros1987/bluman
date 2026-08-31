@@ -78,8 +78,8 @@ export async function registraRotteModelliDocumento(server: FastifyInstance): Pr
    * (regola 7): chi legge questa rotta deve poter distinguere il vuoto dal silenzio.
    */
   server.get<{ Querystring: { includiArchiviati?: string } }>('/documenti-template', async (req, reply) => {
-    const tenantId = (req as any).tenantId;
-    if ((req as any).ruolo === 'cliente') return reply.code(403).send({ errore: 'Non autorizzato.' });
+    const tenantId = req.tenantId;
+    if (req.ruolo === 'cliente') return reply.code(403).send({ errore: 'Non autorizzato.' });
 
     const includiArchiviati = req.query?.includiArchiviati === '1' || req.query?.includiArchiviati === 'true';
     try {
@@ -104,8 +104,8 @@ export async function registraRotteModelliDocumento(server: FastifyInstance): Pr
       riferimentoSerie?: string | null;
     };
   }>('/documenti-template', async (req, reply) => {
-    const tenantId = (req as any).tenantId;
-    if ((req as any).ruolo === 'cliente') return reply.code(403).send({ errore: 'Non autorizzato.' });
+    const tenantId = req.tenantId;
+    if (req.ruolo === 'cliente') return reply.code(403).send({ errore: 'Non autorizzato.' });
 
     const { titolo, categoria, descrizione, contenutoHtml, livelloFirmaRichiesto, riferimentoSerie } = req.body;
     if (livelloFirmaRichiesto !== undefined && !livelloFirmaValido(livelloFirmaRichiesto)) {
@@ -130,10 +130,10 @@ export async function registraRotteModelliDocumento(server: FastifyInstance): Pr
       });
       await recordAudit({
         tenantId,
-        userId: (req as any).userId,
-        userEmail: (req as any).user?.email,
-        userNome: await nomeOperatore((req as any).userId),
-        ruolo: (req as any).ruolo,
+        userId: req.userId,
+        userEmail: req.user?.email,
+        userNome: await nomeOperatore(req.userId),
+        ruolo: req.ruolo,
         azione: 'MODELLO_DOCUMENTO_CREATO',
         entita: `Modello #${nuovo.id}`,
         dettagli: `Creato nuovo modello «${nuovo.titolo}» nella cartella modelli dello studio (stato ${etichettaStato('bozza')})`,
@@ -160,8 +160,8 @@ export async function registraRotteModelliDocumento(server: FastifyInstance): Pr
     Params: { id: string };
     Body: { titolo?: string; categoria?: string; descrizione?: string; contenutoHtml?: string; livelloFirmaRichiesto?: string };
   }>('/documenti-template/:id', async (req, reply) => {
-    const tenantId = (req as any).tenantId;
-    if ((req as any).ruolo === 'cliente') return reply.code(403).send({ errore: 'Non autorizzato.' });
+    const tenantId = req.tenantId;
+    if (req.ruolo === 'cliente') return reply.code(403).send({ errore: 'Non autorizzato.' });
 
     const { id } = req.params;
     const { titolo, categoria, descrizione, contenutoHtml, livelloFirmaRichiesto } = req.body;
@@ -210,10 +210,10 @@ export async function registraRotteModelliDocumento(server: FastifyInstance): Pr
       if (effetto.approvazioneDecaduta) {
         await recordAudit({
           tenantId,
-          userId: (req as any).userId,
-          userEmail: (req as any).user?.email,
-          userNome: await nomeOperatore((req as any).userId),
-          ruolo: (req as any).ruolo,
+          userId: req.userId,
+          userEmail: req.user?.email,
+          userNome: await nomeOperatore(req.userId),
+          ruolo: req.ruolo,
           azione: 'MODELLO_DOCUMENTO_APPROVAZIONE_DECADUTA',
           entita: `Modello #${aggiornato.id}`,
           dettagli: descriviDecadenza(aggiornato.titolo, effetto.versione),
@@ -236,8 +236,8 @@ export async function registraRotteModelliDocumento(server: FastifyInstance): Pr
   server.patch<{ Params: { id: string }; Body: { stato?: string; note?: string | null } }>(
     '/documenti-template/:id/revisione',
     async (req, reply) => {
-      const tenantId = (req as any).tenantId;
-      if ((req as any).ruolo === 'cliente') return reply.code(403).send({ errore: 'Non autorizzato.' });
+      const tenantId = req.tenantId;
+      if (req.ruolo === 'cliente') return reply.code(403).send({ errore: 'Non autorizzato.' });
 
       const { id } = req.params;
       const { stato, note } = req.body ?? {};
@@ -251,14 +251,14 @@ export async function registraRotteModelliDocumento(server: FastifyInstance): Pr
         const esito = decidiRevisione(attuale.statoRevisione, stato);
         if (!esito.ok || !esito.stato) return reply.code(esito.codice ?? 400).send({ errore: esito.errore });
 
-        const nome = await nomeOperatore((req as any).userId);
+        const nome = await nomeOperatore(req.userId);
         const noteRipulite = (note ?? '').trim() || null;
         const aggiornato = await prisma.modelloDocumentoCustom.update({
           where: { id: attuale.id },
           data: {
             statoRevisione: esito.stato,
             noteRevisione: noteRipulite,
-            revisionatoDaUserId: (req as any).userId ?? null,
+            revisionatoDaUserId: req.userId ?? null,
             revisionatoDaNome: nome,
             revisionatoAt: new Date(),
           },
@@ -267,10 +267,10 @@ export async function registraRotteModelliDocumento(server: FastifyInstance): Pr
 
         await recordAudit({
           tenantId,
-          userId: (req as any).userId,
-          userEmail: (req as any).user?.email,
+          userId: req.userId,
+          userEmail: req.user?.email,
           userNome: nome,
-          ruolo: (req as any).ruolo,
+          ruolo: req.ruolo,
           azione: 'MODELLO_DOCUMENTO_REVISIONATO',
           entita: `Modello #${aggiornato.id}`,
           dettagli: descriviRevisione({ titolo: aggiornato.titolo, da: attuale.statoRevisione, a: esito.stato, note: noteRipulite }),
@@ -293,8 +293,8 @@ export async function registraRotteModelliDocumento(server: FastifyInstance): Pr
   server.patch<{ Params: { id: string }; Body: { archiviato?: boolean } }>(
     '/documenti-template/:id/archiviazione',
     async (req, reply) => {
-      const tenantId = (req as any).tenantId;
-      if ((req as any).ruolo === 'cliente') return reply.code(403).send({ errore: 'Non autorizzato.' });
+      const tenantId = req.tenantId;
+      if (req.ruolo === 'cliente') return reply.code(403).send({ errore: 'Non autorizzato.' });
 
       const { id } = req.params;
       const archiviato = req.body?.archiviato;
@@ -325,10 +325,10 @@ export async function registraRotteModelliDocumento(server: FastifyInstance): Pr
 
         await recordAudit({
           tenantId,
-          userId: (req as any).userId,
-          userEmail: (req as any).user?.email,
-          userNome: await nomeOperatore((req as any).userId),
-          ruolo: (req as any).ruolo,
+          userId: req.userId,
+          userEmail: req.user?.email,
+          userNome: await nomeOperatore(req.userId),
+          ruolo: req.ruolo,
           azione: archiviato ? 'MODELLO_DOCUMENTO_ARCHIVIATO' : 'MODELLO_DOCUMENTO_RIPRISTINATO',
           entita: `Modello #${aggiornato.id}`,
           dettagli: archiviato
@@ -367,8 +367,8 @@ export async function registraRotteModelliDocumento(server: FastifyInstance): Pr
       livelloFirmaRichiesto?: string;
     };
   }>('/documenti-template/adotta', async (req, reply) => {
-    const tenantId = (req as any).tenantId;
-    if ((req as any).ruolo === 'cliente') return reply.code(403).send({ errore: 'Non autorizzato.' });
+    const tenantId = req.tenantId;
+    if (req.ruolo === 'cliente') return reply.code(403).send({ errore: 'Non autorizzato.' });
 
     const { riferimentoSerie, titolo, categoria, descrizione, contenutoHtml, livelloFirmaRichiesto } = req.body ?? ({} as any);
     const riferimento = (riferimentoSerie ?? '').trim();
@@ -406,10 +406,10 @@ export async function registraRotteModelliDocumento(server: FastifyInstance): Pr
 
       await recordAudit({
         tenantId,
-        userId: (req as any).userId,
-        userEmail: (req as any).user?.email,
-        userNome: await nomeOperatore((req as any).userId),
-        ruolo: (req as any).ruolo,
+        userId: req.userId,
+        userEmail: req.user?.email,
+        userNome: await nomeOperatore(req.userId),
+        ruolo: req.ruolo,
         azione: 'MODELLO_DOCUMENTO_ADOTTATO',
         entita: `Modello #${nuovo.id}`,
         dettagli: `Modello di serie «${nuovo.titolo}» (${riferimento}) adottato nella cartella modelli dello studio`,
@@ -441,8 +441,8 @@ export async function registraRotteModelliDocumento(server: FastifyInstance): Pr
    * progetti sono copie indipendenti e non ne risentono in nessun caso.
    */
   server.delete<{ Params: { id: string } }>('/documenti-template/:id', async (req, reply) => {
-    const tenantId = (req as any).tenantId;
-    if ((req as any).ruolo === 'cliente') return reply.code(403).send({ errore: 'Non autorizzato.' });
+    const tenantId = req.tenantId;
+    if (req.ruolo === 'cliente') return reply.code(403).send({ errore: 'Non autorizzato.' });
 
     const { id } = req.params;
     try {
@@ -456,10 +456,10 @@ export async function registraRotteModelliDocumento(server: FastifyInstance): Pr
 
       await recordAudit({
         tenantId,
-        userId: (req as any).userId,
-        userEmail: (req as any).user?.email,
-        userNome: await nomeOperatore((req as any).userId),
-        ruolo: (req as any).ruolo,
+        userId: req.userId,
+        userEmail: req.user?.email,
+        userNome: await nomeOperatore(req.userId),
+        ruolo: req.ruolo,
         azione: 'MODELLO_DOCUMENTO_ELIMINATO',
         entita: `Modello #${attuale.id}`,
         dettagli:

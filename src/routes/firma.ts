@@ -107,7 +107,7 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
    * risposta è un elenco vuoto: il portale lo dichiara, non lo riempie.
    */
   server.get('/portal/documenti', async (req, reply) => {
-    const tenantId = (req as any).tenantId;
+    const tenantId = req.tenantId;
     const clienteId = clienteDellaRichiesta(req, (req.query as any)?.clienteId);
     if (!clienteId) {
       return reply.code(400).send({ errore: 'Cliente non identificato nella sessione.' });
@@ -374,7 +374,7 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
     Params: { id: string };
     Querystring: { formato?: string; clienteId?: string };
   }>('/portal/documenti/:id/download', async (req, reply) => {
-    const tenantId = (req as any).tenantId;
+    const tenantId = req.tenantId;
     const clienteId = clienteDellaRichiesta(req, req.query?.clienteId);
     const { id } = req.params;
     const formato = req.query?.formato === 'docx' ? 'docx' : 'pdf';
@@ -461,7 +461,7 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
     Params: { id: string };
     Body: { commento: string; clienteId?: string };
   }>('/portal/documenti/:id/richiesta-modifica', async (req, reply) => {
-    const tenantId = (req as any).tenantId;
+    const tenantId = req.tenantId;
     const clienteId = clienteDellaRichiesta(req, req.body?.clienteId);
     const { id } = req.params;
     const { commento } = req.body;
@@ -549,7 +549,7 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
   });
 
   server.get('/portal/canali-firma', async (req, reply) => {
-    const tenantId = (req as any).tenantId;
+    const tenantId = req.tenantId;
     const clienteId = clienteDellaRichiesta(req, (req.query as any)?.clienteId);
     if (!clienteId) {
       return reply.code(400).send({ errore: 'Cliente non identificato nella sessione.' });
@@ -613,7 +613,7 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
       signerName?: string;
     };
   }>('/portal/request-otp', async (req, reply) => {
-    const tenantId = (req as any).tenantId;
+    const tenantId = req.tenantId;
     const { canale, ambito = 'engagement_letter', riferimentoId, recapitoDichiarato } = req.body || {};
     const clienteId = clienteDellaRichiesta(req, req.body?.clienteId);
 
@@ -720,8 +720,8 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
 
       await recordAudit({
         tenantId,
-        userId: (req as any).userId,
-        ruolo: (req as any).ruolo,
+        userId: req.userId,
+        ruolo: req.ruolo,
         azione: 'FIRMA_OTP_RICHIESTO',
         entita: cliente.nome,
         dettagli:
@@ -879,7 +879,7 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
 
     // Un modulo già confermato non si rifirma: due sigilli sullo stesso atto lascerebbero
     // il dubbio su quale faccia fede.
-    const giaFirmato = await (prisma as any).firmaElettronica.findFirst({
+    const giaFirmato = await prisma.firmaElettronica.findFirst({
       where: { tenantId, clienteId, ambito: 'modulo_completato', riferimentoId: moduloId },
       select: { id: true },
     });
@@ -1089,7 +1089,7 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
         progettoId = originale?.progettoId ?? null;
         microvoceProgettoId = originale?.microvoceProgettoId ?? null;
       } else if (ambito === 'modulo_completato' && riferimentoId) {
-        const modulo = await (prisma as any).moduloProgetto.findFirst({
+        const modulo = await prisma.moduloProgetto.findFirst({
           where: { id: riferimentoId, tenantId },
           select: { progettoId: true },
         });
@@ -1116,7 +1116,7 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
         usatoAt: Date | null;
       } | null = null;
       if (firma.codiceOtpId) {
-        otp = await (prisma as any).codiceOtp.findFirst({
+        otp = await prisma.codiceOtp.findFirst({
           where: { id: firma.codiceOtpId, tenantId },
           select: {
             canale: true,
@@ -1177,7 +1177,7 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
 
       // 5. Collega la firma al suo verbale: dal fascicolo si può risalire all'evento
       //    probatorio e viceversa.
-      await (prisma as any).firmaElettronica.update({
+      await prisma.firmaElettronica.update({
         where: { id: firma.id },
         data: { verbaleDocumentoId: verbale.id },
       });
@@ -1228,7 +1228,7 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
       docRiconoscimentoTipo?: string;
     };
   }>('/portal/verify-otp-and-sign', async (req, reply) => {
-    const tenantId = (req as any).tenantId;
+    const tenantId = req.tenantId;
     const { otp, ambito = 'engagement_letter', riferimentoId, documentoHash, firmaGrafometricaPng } = req.body || {};
     const clienteId = clienteDellaRichiesta(req, req.body?.clienteId);
 
@@ -1364,8 +1364,8 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
       // portale finiscono nel digest del sigillo, a legare la firma alla sessione
       // verificata. Assenti nei token emessi prima della Fase 3 (login operatore o vecchi
       // magic link): il sigillo li registra come 'non-registrato', senza inventarli.
-      const sidSessione = (req as any).user?.sid ?? null;
-      const loginAt = typeof (req as any).user?.iat === 'number' ? new Date((req as any).user.iat * 1000) : null;
+      const sidSessione = req.user?.sid ?? null;
+      const loginAt = typeof req.user?.iat === 'number' ? new Date(req.user.iat * 1000) : null;
 
       const verifica = await verificaOtp(clienteId, otp, ambito, riferimentoId ?? null);
       if (!verifica.valido || !verifica.record) {
@@ -1403,7 +1403,7 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
         docRiconoscimentoTipo: isFea ? docRiconoscimentoTipo : null,
       });
 
-      const firma = await (prisma as any).firmaElettronica.create({
+      const firma = await prisma.firmaElettronica.create({
         data: {
           tenantId,
           clienteId,
@@ -1461,8 +1461,8 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
       // misurato della Fase 3. I log storici con l'azione SES restano leggibili e intatti.
       await recordAudit({
         tenantId,
-        userId: (req as any).userId,
-        ruolo: (req as any).ruolo,
+        userId: req.userId,
+        ruolo: req.ruolo,
         azione: isFea ? 'FIRMA_FEA_APPOSTA' : 'FIRMA_SES_APPOSTA',
         entita: cliente.nome,
         dettagli: isFea
@@ -1563,7 +1563,7 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
       otp?: string;
     };
   }>('/portal/firma-con-file', async (req, reply) => {
-    const tenantId = (req as any).tenantId;
+    const tenantId = req.tenantId;
     const { tipoFirma, ambito = 'engagement_letter', riferimentoId, documentoHash, filename, contentBase64 } =
       req.body || {};
     const clienteId = clienteDellaRichiesta(req, req.body?.clienteId);
@@ -1708,7 +1708,7 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
         valoreLegale: tipoFirma === 'qualificata_esterna' ? 'feq' : 'ses',
       });
 
-      const firma = await (prisma as any).firmaElettronica.create({
+      const firma = await prisma.firmaElettronica.create({
         data: {
           tenantId,
           clienteId,
@@ -1739,8 +1739,8 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
 
       await recordAudit({
         tenantId,
-        userId: (req as any).userId,
-        ruolo: (req as any).ruolo,
+        userId: req.userId,
+        ruolo: req.ruolo,
         azione: 'FIRMA_FILE_CARICATO',
         entita: cliente.nome,
         dettagli:
@@ -1788,8 +1788,8 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
    * esisteva da nessuna parte.
    */
   server.get<{ Querystring: { clienteId?: string; ambito?: string } }>('/firme', async (req, reply) => {
-    const tenantId = (req as any).tenantId;
-    const soloProprie = (req as any).ruolo === 'cliente';
+    const tenantId = req.tenantId;
+    const soloProprie = req.ruolo === 'cliente';
     const clienteId = soloProprie
       ? clienteDellaRichiesta(req)
       : req.query?.clienteId?.trim() || undefined;
@@ -1799,7 +1799,7 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
     }
 
     try {
-      const firme = await (prisma as any).firmaElettronica.findMany({
+      const firme = await prisma.firmaElettronica.findMany({
         where: {
           tenantId,
           ...(clienteId ? { clienteId } : {}),
@@ -1835,9 +1835,9 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
   });
 
   server.get<{ Params: { id: string } }>('/firme/:id/grafometrica', async (req, reply) => {
-    const tenantId = (req as any).tenantId;
+    const tenantId = req.tenantId;
     try {
-      const firma = await (prisma as any).firmaElettronica.findFirst({
+      const firma = await prisma.firmaElettronica.findFirst({
         where: { id: req.params.id, tenantId },
         select: { firmaGrafometricaPng: true, clienteId: true },
       });
@@ -1845,7 +1845,7 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
 
       // Un cliente non deve poter chiedere la grafometrica di un altro cliente dello stesso
       // studio: RLS isola il tenant, non i clienti fra loro.
-      if ((req as any).ruolo === 'cliente' && clienteDellaRichiesta(req) !== firma.clienteId) {
+      if (req.ruolo === 'cliente' && clienteDellaRichiesta(req) !== firma.clienteId) {
         return reply.code(403).send({ errore: 'Firma non accessibile.' });
       }
       if (!firma.firmaGrafometricaPng) {
