@@ -353,7 +353,7 @@ export async function registraRotteModelliDocumento(server: FastifyInstance): Pr
    * serie, mai revisionato», non «bozza», che sarebbe uno stato inventato.
    *
    * Adottare significa farne una carta dello studio: da quel momento ha una riga, una versione
-   * e un revisore. L'operazione è idempotenteper via del vincolo unico
+   * e un revisore. L'operazione è idempotente per via del vincolo unico
    * (tenant_id, riferimento_serie): due operatori che adottano lo stesso modello nello stesso
    * momento ottengono la stessa riga, non due copie.
    */
