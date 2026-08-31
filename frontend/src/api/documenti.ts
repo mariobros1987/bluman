@@ -326,6 +326,53 @@ export async function archivioDocumentiApi(): Promise<{ clienti: ClienteArchivio
   return { clienti: data.clienti ?? [], totali: data.totali };
 }
 
+// ── §40 — Collocare un documento: collegarlo al progetto e alla micro-voce ─────────────
+// L'archivio (§37) sapeva solo leggere e dichiarava «N documenti non compaiono in nessuna
+// cartella» senza offrire un rimedio. Queste due chiamate sono il rimedio: elencano quei
+// documenti e li spostano. Ogni spostamento è verbalizzato dal server nell'audit.
+
+export interface DocumentoNonCollocato {
+  id: string;
+  tipo: string;
+  /** Il nome del file già ripulito dal prefisso `${Date.now()}_` (lo fa il server). */
+  nome: string;
+  categoriaDoc: string | null;
+  statoDoc: string | null;
+  isArchiviato: boolean;
+  versione: number;
+  createdAt: string;
+  caricatoDa: string | null;
+}
+
+export async function documentiNonCollocatiApi(): Promise<DocumentoNonCollocato[]> {
+  const res = await apiFetch(`${API_BASE}/documenti/non-collocati`, { headers: getAuthHeaders() });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore lettura documenti non collocati'));
+  const data = await res.json();
+  return data.documenti ?? [];
+}
+
+/**
+ * Sposta il documento nel progetto indicato e, dentro quello, sulla micro-voce indicata.
+ *
+ * `microvoceProgettoId: null` stacca la micro-voce lasciando il documento nel fascicolo del
+ * progetto. Il progetto non si può togliere: un documento senza progetto non compare in nessuna
+ * cartella, e il server rifiuta con 400 — la cartella «non collocati» nasce da un progetto
+ * eliminato, non da una scelta.
+ */
+export async function collegaDocumentoApi(
+  documentoId: string,
+  input: { progettoId?: string | null; microvoceProgettoId?: string | null },
+): Promise<{ id: string; progettoId: string | null; microvoceProgettoId: string | null; progetto: string | null; microvoce: string | null }> {
+  const res = await apiFetch(`${API_BASE}/documenti/${encodeURIComponent(documentoId)}/collegamento`, {
+    method: 'PATCH',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore collegamento documento'));
+  const data = await res.json();
+  return data.documento;
+}
+
 /**
  * URL con cui il browser può davvero aprire un file dell'archivio.
  *

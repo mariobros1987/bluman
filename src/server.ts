@@ -51,6 +51,10 @@ import { registraRotteDocumenti } from './routes/documenti.js';
 // Archivio documentale dello studio (§37): albero Cliente → Progetto in sola
 // lettura, file a parte perché routes/documenti.ts è già oltre le 1000 righe.
 import { registraRotteArchivioDocumenti } from './routes/archivioDocumenti.js';
+// §40 — Collocazione di un documento nell'archivio: collegarlo al progetto e alla
+// micro-voce, e l'elenco di quelli rimasti senza cartella. Sposta le carte, quindi
+// sta fuori dall'archivio in sola lettura.
+import { registraRotteCollegamentoDocumenti } from './routes/collegamentoDocumenti.js';
 // Rotte portale cliente (split dei monoliti): la registrazione avviene dentro
 // il wrapper register di buildServer, nello stesso punto di prima.
 import { registraRottePortale } from './routes/portale.js';
@@ -510,6 +514,11 @@ export function buildServer(app: AppPort): FastifyInstance {
   // Sola lettura, in aggregato: l'albero Cliente → Progetto con i conteggi
   // delle carte. Il contenuto delle cartelle resta a `GET /documenti`.
   await registraRotteArchivioDocumenti(server);
+
+  // §40 — Le scritture dell'archivio: collegare un documento al progetto e alla
+  // micro-voce, e ritrovare quelli rimasti senza cartella. Stesso wrapper, quindi
+  // stesso hook di autenticazione e stesso rate-limit.
+  await registraRotteCollegamentoDocumenti(server);
 
   // ─── FIRMA ELETTRONICA SEMPLICE (SES · art. 20 CAD) & FIRMA DOCUMENTI ───────────
   // Rotte firma (SES con OTP whatsapp/email/telegram: documenti firmabili,

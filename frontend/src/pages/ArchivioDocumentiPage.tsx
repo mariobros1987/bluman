@@ -5,11 +5,17 @@
 // Nessuna migrazione e nessun nuovo dato: ogni numero mostrato qui è una riga che il
 // database ha già. Niente conteggi ricostruiti da localStorage — se l'API non risponde la
 // pagina lo dice, invece di mostrare un archivio vuoto che sembra vero (regola 7).
+//
+// §40 — L'archivio scrive: dentro una cartella si carica un documento già collocato, e da ogni
+// riga si aggancia la micro-voce o si sposta la carta in un altro progetto. I documenti rimasti
+// senza cartella (progetto eliminato) hanno la loro vista, raggiungibile dall'avviso in testa.
 
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { archivioDocumentiApi, type ClienteArchivio, type ProgettoArchivio, type TotaliArchivio } from '../api/client';
 import { ElencoDocumentiCartella } from '../components/documenti/ElencoDocumentiCartella';
+import { ElencoNonCollocati } from '../components/documenti/ElencoNonCollocati';
+import type { ProgettoScelta } from '../components/documenti/ModaleCollegaDocumento';
 
 const STATO_PROGETTO: Record<string, string> = {
   pre_project: 'Pre-progetto',
@@ -92,6 +98,12 @@ export function ArchivioDocumentiPage() {
   const [ricerca, setRicerca] = useState('');
   const [includiArchiviati, setIncludiArchiviati] = useState(false);
   const [nascondiVuote, setNascondiVuote] = useState(true);
+  // §40 — la vista dei documenti rimasti senza cartella: si apre dall'avviso in testa.
+  const [vistaNonCollocati, setVistaNonCollocati] = useState(false);
+
+  // §40 — dopo un caricamento o uno spostamento i conteggi delle cartelle non sono più quelli:
+  // si rileggono dal server invece di aggiustarli a mano qui (che è come si inventano i numeri).
+  const [ricaricaArchivio, setRicaricaArchivio] = useState(0);
 
   useEffect(() => {
     let annullato = false;
@@ -110,11 +122,21 @@ export function ArchivioDocumentiPage() {
     return () => {
       annullato = true;
     };
-  }, []);
+  }, [ricaricaArchivio]);
 
   const filtro = ricerca.trim().toLowerCase();
   const cliente = clienteId ? clienti.find((c) => c.id === clienteId) ?? null : null;
   const progetto: ProgettoArchivio | null = progettoId ? cliente?.progetti.find((p) => p.id === progettoId) ?? null : null;
+
+  // §40 — tutte le cartelle in cui un documento può essere spostato, col nome del cliente
+  // accanto: due progetti omonimi di clienti diversi sono indistinguibili senza.
+  const progettiScelta = useMemo<ProgettoScelta[]>(
+    () =>
+      clienti.flatMap((c) =>
+        c.progetti.map((p) => ({ id: p.id, nome: p.numeroContratto ? `${p.nome} (${p.numeroContratto})` : p.nome, cliente: c.nome })),
+      ),
+    [clienti],
+  );
 
   const clientiVisibili = useMemo(() => {
     return clienti.filter((c) => {
@@ -149,11 +171,18 @@ export function ArchivioDocumentiPage() {
           onClick={() => {
             setClienteId(null);
             setProgettoId(null);
+            setVistaNonCollocati(false);
           }}
-          style={{ background: 'transparent', border: 'none', color: clienteId ? '#60a5fa' : 'var(--text)', fontWeight: 700, cursor: 'pointer', padding: 0, fontSize: 13 }}
+          style={{ background: 'transparent', border: 'none', color: clienteId || vistaNonCollocati ? '#60a5fa' : 'var(--text)', fontWeight: 700, cursor: 'pointer', padding: 0, fontSize: 13 }}
         >
           Archivio
         </button>
+        {vistaNonCollocati && (
+          <>
+            <span style={{ color: 'var(--muted)' }}>/</span>
+            <span style={{ fontWeight: 700 }}>Documenti senza cartella</span>
+          </>
+        )}
         {cliente && (
           <>
             <span style={{ color: 'var(--muted)' }}>/</span>
@@ -191,51 +220,81 @@ export function ArchivioDocumentiPage() {
         </div>
       )}
 
-      {totali && totali.nonCollocati > 0 && (
-        <div style={{ padding: '10px 14px', borderRadius: 10, background: 'rgba(251,191,36,0.08)', border: '1px solid #b45309', color: '#fcd34d', fontSize: 12.5, marginBottom: '1.25rem' }}>
-          🗂 {totali.nonCollocati} document{totali.nonCollocati === 1 ? 'o' : 'i'} non compare in nessuna cartella: il progetto a cui era
-          agganciato è stato eliminato. Il file e le firme restano conservati a database.
+      {totali && totali.nonCollocati > 0 && !vistaNonCollocati && (
+        <div style={{ padding: '10px 14px', borderRadius: 10, background: 'rgba(251,191,36,0.08)', border: '1px solid #b45309', color: '#fcd34d', fontSize: 12.5, marginBottom: '1.25rem', display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+          <span style={{ flex: 1, minWidth: 240 }}>
+            🗂 {totali.nonCollocati} document{totali.nonCollocati === 1 ? 'o' : 'i'} non compare in nessuna cartella: il progetto a cui era
+            agganciato è stato eliminato. Il file e le firme restano conservati a database.
+          </span>
+          {/* §40 — l'avviso ora porta al rimedio: prima si poteva solo leggerlo. */}
+          <button
+            onClick={() => {
+              setVistaNonCollocati(true);
+              setClienteId(null);
+              setProgettoId(null);
+            }}
+            style={{ background: '#b45309', border: 'none', color: '#fff', padding: '7px 13px', borderRadius: 7, cursor: 'pointer', fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap' }}
+          >
+            Ricollocali →
+          </button>
         </div>
       )}
 
       <div style={{ background: 'var(--card)', borderRadius: 12, padding: '1.5rem', border: '1px solid var(--border)' }}>
-        <div style={{ display: 'flex', gap: 16, marginBottom: '1.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
-          <input
-            type="text"
-            placeholder={progetto ? 'Cerca un documento in questa cartella…' : 'Cerca un cliente o un progetto…'}
-            value={ricerca}
-            onChange={(e) => setRicerca(e.target.value)}
-            style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', flex: 1, minWidth: 220 }}
-          />
-          {progetto ? (
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: 'var(--muted)', cursor: 'pointer' }}>
-              <input type="checkbox" checked={includiArchiviati} onChange={(e) => setIncludiArchiviati(e.target.checked)} />
-              Mostra anche gli archiviati
-            </label>
-          ) : (
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: 'var(--muted)', cursor: 'pointer' }}>
-              <input type="checkbox" checked={nascondiVuote} onChange={(e) => setNascondiVuote(e.target.checked)} />
-              Nascondi le cartelle senza documenti
-            </label>
-          )}
-          {progetto && (
+        {vistaNonCollocati ? (
+          <div style={{ display: 'flex', gap: 16, marginBottom: '1.5rem', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ fontWeight: 700, fontSize: 14 }}>🗂 Documenti senza cartella</div>
             <button
-              onClick={() => navigate(`/projects/${progetto.id}`)}
-              style={{ background: 'var(--indigo)', border: 'none', color: '#fff', padding: '8px 14px', borderRadius: 8, cursor: 'pointer', fontSize: 12.5, fontWeight: 600 }}
+              onClick={() => setVistaNonCollocati(false)}
+              style={{ background: 'var(--card2)', border: '1px solid var(--border)', color: 'var(--text)', padding: '8px 14px', borderRadius: 8, cursor: 'pointer', fontSize: 12.5 }}
             >
-              Scheda progetto ↗
+              ← Torna alle cartelle
             </button>
-          )}
-        </div>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', gap: 16, marginBottom: '1.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+            <input
+              type="text"
+              placeholder={progetto ? 'Cerca un documento in questa cartella…' : 'Cerca un cliente o un progetto…'}
+              value={ricerca}
+              onChange={(e) => setRicerca(e.target.value)}
+              style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', flex: 1, minWidth: 220 }}
+            />
+            {progetto ? (
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: 'var(--muted)', cursor: 'pointer' }}>
+                <input type="checkbox" checked={includiArchiviati} onChange={(e) => setIncludiArchiviati(e.target.checked)} />
+                Mostra anche gli archiviati
+              </label>
+            ) : (
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: 'var(--muted)', cursor: 'pointer' }}>
+                <input type="checkbox" checked={nascondiVuote} onChange={(e) => setNascondiVuote(e.target.checked)} />
+                Nascondi le cartelle senza documenti
+              </label>
+            )}
+            {progetto && (
+              <button
+                onClick={() => navigate(`/projects/${progetto.id}`)}
+                style={{ background: 'var(--indigo)', border: 'none', color: '#fff', padding: '8px 14px', borderRadius: 8, cursor: 'pointer', fontSize: 12.5, fontWeight: 600 }}
+              >
+                Scheda progetto ↗
+              </button>
+            )}
+          </div>
+        )}
 
         {caricamento ? (
           <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted)' }}>Lettura dell'archivio documentale…</div>
+        ) : vistaNonCollocati ? (
+          <ElencoNonCollocati progetti={progettiScelta} onArchivioCambiato={() => setRicaricaArchivio((n) => n + 1)} />
         ) : progetto ? (
           <ElencoDocumentiCartella
             progettoId={progetto.id}
+            nomeProgetto={progetto.nome}
+            progetti={progettiScelta}
             includiArchiviati={includiArchiviati}
             ricerca={filtro}
             onApriProgetto={() => navigate(`/projects/${progetto.id}`)}
+            onArchivioCambiato={() => setRicaricaArchivio((n) => n + 1)}
           />
         ) : cliente ? (
           progettiVisibili.length === 0 ? (

@@ -25,6 +25,9 @@ import { contestoTagDocumento, risolviTagDocumento, blocchiDaHtml, generaPdfDocu
 import { notificaCliente } from '../services/notificheService.js';
 import { recordAudit, ipReale, nomeFileDaUrl } from '../util/serverHelpers.js';
 import { livelloFirmaValido, normalizzaLivelloFirma, type LivelloFirma } from '../services/livelloFirmaService.js';
+// §40 — la micro-voce indicata deve appartenere al progetto indicato: la decisione sta in un
+// service a parte, presidiato, e la usano sia questo upload sia PATCH /documenti/:id/collegamento.
+import { decidiCollocazione } from '../services/collocazioneDocumento.js';
 
 // ─── DOCUMENTI: MODELLI STUDIO (DOCUMENT STUDIO) & FASCICOLO §2.9 ───
 export async function registraRotteDocumenti(server: FastifyInstance): Promise<void> {
@@ -248,6 +251,25 @@ export async function registraRotteDocumenti(server: FastifyInstance): Promise<v
       const progetto = await prisma.progetto.findFirst({ where: { id: progettoId, tenantId }, select: { id: true, clienteId: true, nome: true } });
       if (!progetto) return reply.code(404).send({ errore: 'Progetto non trovato.' });
 
+      // §40 — La micro-voce si verifica, non si scrive perché è arrivata. Prima il valore
+      // ricevuto finiva sulla riga senza controlli: una tendina non aggiornata dopo il cambio
+      // di progetto agganciava l'atto alla micro-voce di un'ALTRA pratica, e da quel momento il
+      // documento compariva nel fascicolo di un progetto e nella lavorazione di un altro.
+      const microvoce = microvoceProgettoId
+        ? await prisma.microvoceProgetto.findFirst({
+            where: { id: microvoceProgettoId, tenantId },
+            select: { id: true, nome: true, moduloProgetto: { select: { progettoId: true } } },
+          })
+        : null;
+      const collocazione = decidiCollocazione(
+        { progettoId, microvoceProgettoId },
+        {
+          progettoEsiste: true,
+          progettoDellaMicrovoce: microvoceProgettoId ? microvoce?.moduloProgetto.progettoId ?? undefined : undefined,
+        },
+      );
+      if (!collocazione.ok) return reply.code(collocazione.codice ?? 400).send({ errore: collocazione.errore });
+
       // §28 — la scansione avviene PRIMA di scrivere qualunque cosa: un file bocciato non
       // arriva né nell'archivio né nella tabella.
       const buffer = Buffer.from(contentBase64.replace(/^data:[^;]+;base64,/, ''), 'base64');
@@ -270,7 +292,8 @@ export async function registraRotteDocumenti(server: FastifyInstance): Promise<v
         data: {
           tenantId,
           progettoId,
-          microvoceProgettoId,
+          // §40 — il valore verificato, non quello ricevuto.
+          microvoceProgettoId: collocazione.microvoceProgettoId,
           tipo: tipoFinale,
           fileUrl: archiviato.url,
           caricatoDa: userId,
@@ -288,9 +311,19 @@ export async function registraRotteDocumenti(server: FastifyInstance): Promise<v
 
       await recordAudit({
         tenantId,
+        // §40 — la traccia dice CHI ha archiviato: senza questi campi `recordAudit` scrive
+        // «Sistema / Operatore», e un registro che non sa chi ha caricato una carta non è una
+        // traccia. L'utente c'è già (`userId` è verificato sopra, la rotta esige la sessione).
+        userId,
+        userEmail: (req as any).user?.email,
+        ruolo: (req as any).ruolo,
         azione: 'DOCUMENTO_ARCHIVIATO',
         entita: documento.id,
-        dettagli: `Archiviato «${filename}» (${archiviato.size}) stato «${defaultStatoDoc}» nel fascicolo del progetto ${progettoId}`,
+        dettagli:
+          `Archiviato «${filename}» (${archiviato.size}) stato «${defaultStatoDoc}» nel fascicolo del progetto «${progetto.nome}» (${progettoId})` +
+          // §40 — anche la micro-voce va nominata: è il collegamento che dice a quale
+          // lavorazione la carta appartiene, e prima non compariva da nessuna parte nel registro.
+          (microvoce ? `, micro-voce «${microvoce.nome}» (${microvoce.id})` : ', senza micro-voce'),
         ipAddress: req.ip,
       });
 
@@ -373,6 +406,26 @@ export async function registraRotteDocumenti(server: FastifyInstance): Promise<v
       });
       if (!progetto) return reply.code(404).send({ errore: 'Progetto non trovato.' });
 
+      // §40 — Come nell'upload: la micro-voce si verifica prima di generare. Il controllo sta
+      // qui, PRIMA della produzione dei file, perché un PDF archiviato per la micro-voce
+      // sbagliata poi non si cancella (Punto 3 piano gap: si può solo archiviare).
+      const microvoceGenerata = microvoceProgettoId
+        ? await prisma.microvoceProgetto.findFirst({
+            where: { id: microvoceProgettoId, tenantId },
+            select: { id: true, nome: true, moduloProgetto: { select: { progettoId: true } } },
+          })
+        : null;
+      const collocazioneGenerata = decidiCollocazione(
+        { progettoId, microvoceProgettoId },
+        {
+          progettoEsiste: true,
+          progettoDellaMicrovoce: microvoceProgettoId ? microvoceGenerata?.moduloProgetto.progettoId ?? undefined : undefined,
+        },
+      );
+      if (!collocazioneGenerata.ok) {
+        return reply.code(collocazioneGenerata.codice ?? 400).send({ errore: collocazioneGenerata.errore });
+      }
+
       const tenant = await prisma.tenant.findFirst({
         where: { id: tenantId },
         select: { ragioneSociale: true, piva: true, sedeLegale: true, iban: true, leadAdvisorNome: true, telefono: true, email: true },
@@ -454,7 +507,7 @@ export async function registraRotteDocumenti(server: FastifyInstance): Promise<v
         data: {
           tenantId,
           progettoId,
-          microvoceProgettoId,
+          microvoceProgettoId: collocazioneGenerata.microvoceProgettoId,
           tipo: 'compilato',
           fileUrl: uploadPdf.url,
           filePdfUrl: uploadPdf.url,
@@ -478,9 +531,15 @@ export async function registraRotteDocumenti(server: FastifyInstance): Promise<v
       await recordAudit({
         tenantId,
         userId,
+        userEmail: (req as any).user?.email,
+        ruolo: (req as any).ruolo,
         azione: 'DOCUMENTO_GENERATO',
         entita: documento.id,
-        dettagli: `Generato «${uploadPdf.name}» (${uploadPdf.size})${uploadDocx ? ` + Word «${uploadDocx.name}» (${uploadDocx.size})` : ' (solo PDF)'} da template, stato «${defaultStatoDoc}», nel fascicolo del progetto ${progettoId}`,
+        dettagli:
+          `Generato «${uploadPdf.name}» (${uploadPdf.size})${uploadDocx ? ` + Word «${uploadDocx.name}» (${uploadDocx.size})` : ' (solo PDF)'} da template, stato «${defaultStatoDoc}», nel fascicolo del progetto «${progetto.nome}» (${progettoId})` +
+          // §40 — la micro-voce nel registro: è il collegamento che dice a quale lavorazione
+          // l'atto appartiene, e la traccia deve poterlo dire senza aprire l'interfaccia.
+          (microvoceGenerata ? `, micro-voce «${microvoceGenerata.nome}» (${microvoceGenerata.id})` : ', senza micro-voce'),
         ipAddress: req.ip,
       });
 
