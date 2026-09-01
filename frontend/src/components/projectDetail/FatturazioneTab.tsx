@@ -34,7 +34,7 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
       const resFattura: any = await emettiFatturaApi({
         progettoId: rawDbProject.id,
         tipoClienteFiscale: tipoFiscale,
-        partitaIva: 'IT01234567890',
+        partitaIva: rawDbProject.cliente?.piva || rawDbProject.cliente?.codiceFiscale || undefined,
         canale,
         righe: [
           {
@@ -47,31 +47,12 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
         ],
       });
 
-      if (resFattura && resFattura.id) {
-        const nuovaFatturaLocal = {
-          id: resFattura.id,
-          numero: resFattura.numero || resFattura.numeroProgressivo || `FT-${Date.now()}`,
-          desc: tipoDocFiscale === 'nota_credito' ? `[NOTA DI CREDITO] ${desc}` : desc,
-          importo: (tipoDocFiscale === 'nota_credito' ? -1 : 1) * Math.abs(Number(importoEur)),
-          data: new Date().toLocaleDateString('it-IT'),
-          stato: 'emessa' as const,
-        };
-
-        const updatedProject = {
-          ...project,
-          fatture: [nuovaFatturaLocal, ...(project.fatture || [])],
-        };
-
-        const savedStr = localStorage.getItem(getTenantStorageKey('bluman_custom_projects'));
-        const savedArr: any[] = savedStr ? JSON.parse(savedStr) : [];
-        const updatedArr = [updatedProject, ...savedArr.filter(p => String(p.id) !== String(project.id))];
-        localStorage.setItem(getTenantStorageKey('bluman_custom_projects'), JSON.stringify(updatedArr));
-      }
-
       setModalOpen(false);
       onRefresh();
-    } catch (err) {
+      alert(`✓ Documento ${resFattura?.numero || 'fiscale'} emesso con successo a database!`);
+    } catch (err: any) {
       console.error(err);
+      alert(`Errore emissione fattura: ${err?.message || 'Impossibile completare la richiesta'}`);
     } finally {
       setSubmitting(false);
     }

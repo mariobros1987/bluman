@@ -47,11 +47,15 @@ export async function registraRotteContabilita(server: FastifyInstance, app: App
       }>;
     };
   }>('/progetti/:id/fatture', async (req, reply) => {
-    const fattura = await app.emettiFattura({
-      progettoId: req.params.id,
-      ...req.body,
-    });
-    return reply.code(201).send(fattura);
+    try {
+      const fattura = await app.emettiFattura({
+        progettoId: req.params.id,
+        ...req.body,
+      });
+      return reply.code(201).send(fattura);
+    } catch (err: any) {
+      return reply.code(500).send({ errore: err?.message || 'Errore emissione fattura progetto' });
+    }
   });
 
   // ─── REGISTRO FATTURE (OPENSTAMANAGER ENGINE) ──────────────────────

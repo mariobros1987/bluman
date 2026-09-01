@@ -554,53 +554,111 @@ export class PrismaApp implements AppPort {
       descrizione: string;
     }>;
   }) {
-    const prog = await this.prisma.progetto.findUnique({ where: { id: input.progettoId } });
+    const prog = await this.prisma.progetto.findUnique({ where: { id: input.progettoId }, include: { cliente: true } });
     const clienteId = prog?.clienteId || '';
-    const countFatture = await this.prisma.fattura.count({ where: { tenantId: this.tenantId } });
-    const numeroProgressivo = `FT-2026-${(countFatture + 1).toString().padStart(4, '0')}`;
-    const totale = input.righe.reduce((acc, r) => acc + r.importo, 0);
+    if (!clienteId) throw new Error('Cliente del progetto non trovato');
+
+    const dataEmissione = new Date();
+    const anno = dataEmissione.getFullYear();
+    const lastFattura = await this.prisma.fattura.findFirst({
+      where: { tenantId: this.tenantId, serie: 'FT', stato: { not: 'bozza' } },
+      orderBy: { numeroProgressivoSerie: 'desc' },
+    });
+    const nextProgressivo = (lastFattura?.numeroProgressivoSerie || 0) + 1;
+    const numeroUfficiale = `FT-${anno}/${nextProgressivo.toString().padStart(3, '0')}`;
+
+    // Calcolo righe e scorporo IVA 22%
+    const righeCalcolate = input.righe.map((r, idx) => {
+      const totRiga = Math.abs(r.importo);
+      const impRiga = Math.round(totRiga / 1.22);
+      const ivaRiga = totRiga - impRiga;
+      return {
+        tenantId: this.tenantId,
+        tipo: r.tipo,
+        moduloProgettoId: r.moduloProgettoId || null,
+        percentuale: r.percentuale || null,
+        importo: totRiga,
+        descrizione: r.descrizione,
+        quantita: 1,
+        unitaMisura: 'forfait',
+        prezzoUnitarioCent: impRiga,
+        scontoPercentuale: 0,
+        aliquotaIva: 22,
+        naturaEsenzione: null,
+        applicaCassa: false,
+        applicaRitenuta: false,
+        applicaBollo: false,
+        imponibileCentesimi: impRiga,
+        ivaCentesimi: ivaRiga,
+        totaleRigaCentesimi: totRiga,
+        ordine: idx + 1,
+      };
+    });
+
+    const totDocCent = righeCalcolate.reduce((acc, r) => acc + r.totaleRigaCentesimi, 0);
+    const totImpCent = righeCalcolate.reduce((acc, r) => acc + r.imponibileCentesimi, 0);
+    const totIvaCent = righeCalcolate.reduce((acc, r) => acc + r.ivaCentesimi, 0);
+
+    const dataScadenza = new Date();
+    dataScadenza.setDate(dataScadenza.getDate() + 30);
 
     const fattura = await this.prisma.fattura.create({
       data: {
         tenantId: this.tenantId,
         clienteId,
         progettoId: input.progettoId,
-        numero: numeroProgressivo,
-        numeroProgressivo,
-        data: new Date(),
+        tipoDocumento: 'fattura',
+        serie: 'FT',
+        numeroProgressivoSerie: nextProgressivo,
+        numero: numeroUfficiale,
+        numeroProgressivo: numeroUfficiale,
+        data: dataEmissione,
         stato: 'emessa',
         tipoClienteFiscale: input.tipoClienteFiscale,
-        partitaIva: input.partitaIva || null,
-        codiceFiscale: input.codiceFiscale || null,
+        partitaIva: input.partitaIva || prog?.cliente?.piva || null,
+        codiceFiscale: input.codiceFiscale || prog?.cliente?.codiceFiscale || null,
         canale: input.canale,
         statoSdi: 'n_a',
+        condizionePagamento: 'bonifico_30gg',
+        metodoPagamento: 'bonifico',
+        tipoCassa: 'nessuna',
+        aliquotaCassa: 0,
+        aliquotaRitenuta: 0,
+        esigibilitaIva: 'immediata',
+        totaleImponibileCentesimi: totImpCent,
+        totaleCassaCentesimi: 0,
+        totaleIvaCentesimi: totIvaCent,
+        totaleRitenutaCentesimi: 0,
+        totaleBolloCentesimi: 0,
+        totaleDocumentoCentesimi: totDocCent,
+        nettoAPagareCentesimi: totDocCent,
+        codiceDestinatario: prog?.cliente?.sdiCode || '0000000',
         righe: {
-          create: input.righe.map((r) => ({
+          create: righeCalcolate,
+        },
+        scadenzeIncasso: {
+          create: [
+            {
+              tenantId: this.tenantId,
+              numeroRata: 1,
+              importoCentesimi: totDocCent,
+              dataScadenza,
+              stato: 'in_attesa',
+            },
+          ],
+        },
+        auditLogFatture: {
+          create: {
             tenantId: this.tenantId,
-            tipo: r.tipo,
-            moduloProgettoId: r.moduloProgettoId || null,
-            percentuale: r.percentuale || null,
-            importo: r.importo,
-            descrizione: r.descrizione,
-          })),
+            azione: 'emissione',
+            dettagli: {
+              numero: numeroUfficiale,
+              totaleDocumentoCentesimi: totDocCent,
+            },
+          },
         },
       },
-      include: { righe: true },
-    });
-
-    // ── OpenSTAManager Model: Generazione automatica Scadenzario Incasso a 30gg ──
-    const dataScadenza = new Date();
-    dataScadenza.setDate(dataScadenza.getDate() + 30);
-
-    await (this.prisma as any).scadenzaIncasso.create({
-      data: {
-        tenantId: this.tenantId,
-        fatturaId: fattura.id,
-        numeroRata: 1,
-        importoCentesimi: totale,
-        dataScadenza,
-        stato: 'in_attesa',
-      },
+      include: { righe: true, scadenzeIncasso: true, cliente: true, progetto: true },
     });
 
     return fattura;
