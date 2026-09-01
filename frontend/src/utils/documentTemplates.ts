@@ -358,6 +358,145 @@ export const PREBUILT_TEMPLATES: DocumentTemplate[] = [
 </div>
 `,
   },
+  {
+    id: 'tmpl-avviso-parcella',
+    titolo: 'Avviso di Parcella / Fattura Proforma',
+    categoria: 'fiscale',
+    descrizione: 'Modello per emissione avviso di parcella proforma per onorari professionali e spese anticipate.',
+    contenutoHtml: `
+<div style="display: flex; justify-content: space-between; border-bottom: 2px solid #1e3a8a; padding-bottom: 12px; margin-bottom: 20px;">
+  <div>
+    <h1 style="color: #1e3a8a; font-size: 20px; font-weight: 800; margin: 0 0 4px 0;">AVVISO DI PARCELLA PROFORMA</h1>
+    <p style="font-size: 11px; color: #64748b; margin: 0;">Documento non valido ai fini fiscali — La fattura definitiva sarà emessa all'atto del pagamento (Art. 6 DPR 633/72)</p>
+  </div>
+  <div style="text-align: right; font-size: 11px;">
+    <strong>Data:</strong> {{data_odierna}}<br/>
+    <strong>Pratica:</strong> {{progetto.titolo}}
+  </div>
+</div>
+
+<div style="display: flex; justify-content: space-between; gap: 20px; margin-bottom: 24px;">
+  <div style="flex: 1; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px; font-size: 11.5px;">
+    <strong style="color: #1e3a8a; text-transform: uppercase; font-size: 11px; display: block; margin-bottom: 6px;">Professionista Emittente</strong>
+    <strong>{{studio.ragione_sociale}}</strong><br/>
+    Sede: {{studio.sede_legale}}<br/>
+    P.IVA / C.F.: {{studio.piva}}<br/>
+    Email: {{studio.email}} · Tel: {{studio.telefono}}
+  </div>
+  <div style="flex: 1; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px; font-size: 11.5px;">
+    <strong style="color: #1e3a8a; text-transform: uppercase; font-size: 11px; display: block; margin-bottom: 6px;">Spettabile Committente</strong>
+    <strong>{{cliente.ragione_sociale}}</strong><br/>
+    Indirizzo: {{cliente.sede_legale}}<br/>
+    P.IVA: {{cliente.partita_iva}} · C.F.: {{cliente.codice_fiscale}}<br/>
+    C.U. / SDI: {{cliente.sdi}} · All'att.ne di: {{cliente.referente}}
+  </div>
+</div>
+
+<h3 style="color: #1e1b4b; font-size: 13px; margin: 16px 0 8px 0; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px;">OGGETTO: PRESTAZIONI PROFESSIONALI RESE</h3>
+<p style="font-size: 11.5px; line-height: 1.6; margin-bottom: 16px;">
+  Si rimette il presente prospetto proforma relativo ai compensi professionali maturati per lo svolgimento dell'incarico fiduciario <strong>{{progetto.titolo}}</strong>.
+</p>
+
+<table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 11.5px;">
+  <thead>
+    <tr style="background: #1e3a8a; color: white;">
+      <th style="padding: 8px; text-align: left;">Descrizione Prestazione / Fase</th>
+      <th style="padding: 8px; text-align: right; width: 120px;">Importo</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr style="border-bottom: 1px solid #e2e8f0;">
+      <td style="padding: 10px 8px;">Onorari professionali per dossier <strong>{{progetto.titolo}}</strong></td>
+      <td style="padding: 10px 8px; text-align: right; font-weight: 600;">{{progetto.importo_totale}}</td>
+    </tr>
+  </tbody>
+</table>
+
+<div style="display: flex; justify-content: space-between; gap: 20px; margin-top: 20px;">
+  <div style="flex: 1; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 12px; font-size: 11px;">
+    <strong style="color: #1e40af;">MODALITÀ DI SALDO</strong><br/>
+    Si prega di corrispondere il saldo a mezzo bonifico bancario:<br/>
+    <strong>IBAN:</strong> {{studio.iban}}<br/>
+    <strong>Beneficiario:</strong> {{studio.ragione_sociale}}<br/>
+    <strong>Causale:</strong> Saldo Avviso Parcella - {{progetto.titolo}}
+  </div>
+  <div style="width: 220px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px; font-size: 12px;">
+    <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+      <span>Imponibile:</span>
+      <strong>{{progetto.importo_totale}}</strong>
+    </div>
+    <div style="display: flex; justify-content: space-between; border-top: 1px solid #cbd5e1; padding-top: 6px; font-size: 13px; color: #1e3a8a;">
+      <strong>Totale Dovuto:</strong>
+      <strong>{{progetto.importo_totale}}</strong>
+    </div>
+  </div>
+</div>
+
+<div style="margin-top: 35px; text-align: right;">
+  <p style="font-size: 11px; color: #64748b; margin-bottom: 4px;">Per lo Studio Professionale:</p>
+  <p style="font-size: 12px; font-weight: 700; color: #1e1b4b;">{{studio.ragione_sociale}}<br/>{{firma_studio}}</p>
+</div>
+`,
+  },
+  {
+    id: 'tmpl-rendiconto-prestazioni',
+    titolo: 'Rendiconto Prestazioni & Prospetto Onorari',
+    categoria: 'fiscale',
+    descrizione: 'Riepilogo analitico delle attività svolte per commessa con valorizzazione ore e costi vivi.',
+    contenutoHtml: `
+<h1 style="text-align: center; color: #1e1b4b; margin-bottom: 6px; font-size: 18px; text-transform: uppercase;">
+  RENDICONTO ATTIVITÀ & PROSPETTO ONORARI
+</h1>
+<p style="text-align: center; color: #64748b; font-size: 11px; margin-bottom: 24px;">
+  Commessa: <strong>{{progetto.titolo}}</strong> · Data di rendicontazione: {{data_odierna}}
+</p>
+
+<p style="font-size: 11.5px; line-height: 1.6; text-align: justify; margin-bottom: 16px;">
+  Il presente prospetto attesta le prestazioni professionali e le attività di advisory prestate da <strong>{{studio.ragione_sociale}}</strong> a favore di <strong>{{cliente.ragione_sociale}}</strong> (P.IVA {{cliente.partita_iva}}), con riferimento al dossier <strong>{{progetto.titolo}}</strong>.
+</p>
+
+<table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 11px;">
+  <thead>
+    <tr style="background: #0f172a; color: white;">
+      <th style="padding: 8px; text-align: left;">Voce di Attività / Deliverable</th>
+      <th style="padding: 8px; text-align: center; width: 80px;">Stato</th>
+      <th style="padding: 8px; text-align: right; width: 110px;">Valore (€)</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr style="border-bottom: 1px solid #e2e8f0;">
+      <td style="padding: 8px;">Consulenza specialistica e redazione atti dossier <strong>{{progetto.titolo}}</strong></td>
+      <td style="padding: 8px; text-align: center; color: #16a34a; font-weight: 600;">Eseguito</td>
+      <td style="padding: 8px; text-align: right; font-weight: 600;">{{progetto.importo_totale}}</td>
+    </tr>
+  </tbody>
+  <tfoot>
+    <tr style="background: #f8fafc; font-weight: 700; font-size: 12px;">
+      <td style="padding: 10px 8px;" colspan="2">Totale Compensi Maturati:</td>
+      <td style="padding: 10px 8px; text-align: right; color: #0f172a;">{{progetto.importo_totale}}</td>
+    </tr>
+  </tfoot>
+</table>
+
+<div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px; font-size: 11px; margin-bottom: 24px;">
+  <strong>Coordinate per il regolamento finanziario:</strong><br/>
+  Accredito c/o: <strong>{{studio.iban}}</strong> · Intestato a: <strong>{{studio.ragione_sociale}}</strong>
+</div>
+
+<div style="display: flex; justify-content: space-between; margin-top: 30px;">
+  <div style="width: 45%; text-align: center; border-top: 1px solid #cbd5e1; padding-top: 8px; font-size: 11px;">
+    <strong>Per il Committente (per presa visione):</strong><br/>
+    {{cliente.referente}}<br/>
+    {{firma_cliente}}
+  </div>
+  <div style="width: 45%; text-align: center; border-top: 1px solid #cbd5e1; padding-top: 8px; font-size: 11px;">
+    <strong>Per lo Studio Professionale:</strong><br/>
+    {{studio.ragione_sociale}}<br/>
+    {{firma_studio}}
+  </div>
+</div>
+`,
+  },
   ...REORGANIZATION_TEMPLATES,
 ];
 

@@ -48,10 +48,21 @@ export async function registraRotteContabilita(server: FastifyInstance, app: App
     };
   }>('/progetti/:id/fatture', async (req, reply) => {
     try {
-      const fattura = await app.emettiFattura({
+      const fattura: any = await app.emettiFattura({
         progettoId: req.params.id,
         ...req.body,
       });
+
+      await recordAudit({
+        tenantId: req.tenantId,
+        userId: req.userId,
+        ruolo: req.ruolo,
+        azione: 'FATTURA_EMESSA',
+        entita: fattura.numero || `Fattura Progetto`,
+        dettagli: `Fattura ${fattura.numero || ''} emessa per importo €${((fattura.totaleDocumentoCentesimi || 0) / 100).toFixed(2)} da scheda progetto`,
+        ipAddress: req.ip,
+      });
+
       return reply.code(201).send(fattura);
     } catch (err: any) {
       return reply.code(500).send({ errore: err?.message || 'Errore emissione fattura progetto' });

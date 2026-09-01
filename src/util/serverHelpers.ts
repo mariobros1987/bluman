@@ -154,15 +154,35 @@ export async function recordAudit(params: {
   ipAddress?: string | null;
 }) {
   try {
+    let email = params.userEmail;
+    let nome = params.userNome;
+    let ruolo = params.ruolo;
+
+    if (params.userId && params.userId !== 'usr-system' && (!email || !nome || !ruolo)) {
+      try {
+        const u = await prismaAmministrativo().user.findUnique({
+          where: { id: params.userId },
+          select: { nome: true, email: true, ruolo: true },
+        });
+        if (u) {
+          if (!email) email = u.email;
+          if (!nome) nome = u.nome;
+          if (!ruolo) ruolo = u.ruolo;
+        }
+      } catch {
+        // Nessun blocco se la query utente fallisce
+      }
+    }
+
     await prismaAmministrativo().auditLog.create({
       data: {
         tenantId: params.tenantId,
         // I ripieghi qui sotto identificano operazioni di sistema senza utente
         // (avvio, seed, processi automatici), non utenti reali.
         userId: params.userId ?? 'usr-system',
-        userEmail: params.userEmail ?? 'system@bluecode.advisory',
-        userNome: params.userNome ?? 'Sistema / Operatore',
-        ruolo: params.ruolo ?? 'operator',
+        userEmail: email ?? 'system@bluecode.advisory',
+        userNome: nome ?? 'Sistema / Operatore',
+        ruolo: ruolo ?? 'operator',
         azione: params.azione,
         entita: params.entita,
         dettagli: params.dettagli,

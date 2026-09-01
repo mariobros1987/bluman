@@ -102,12 +102,30 @@ export function AuditLogPage() {
     const loadAuditLogs = async () => {
       const dbLogs = await fetchAuditLogsApi();
       if (dbLogs && Array.isArray(dbLogs) && dbLogs.length > 0) {
-        setLogs(dbLogs.map((l: any) => ({
-          ...l,
-          tenantName: l.tenantName || 'Bluecode Ltd (Malta HQ)',
-          categoria: l.categoria || 'DOCUMENTI',
-          dataOra: l.createdAt ? new Date(l.createdAt).toLocaleString('it-IT') : l.dataOra,
-        })));
+        setLogs(dbLogs.map((l: any) => {
+          const az = (l.azione || '').toUpperCase();
+          let cat: 'AUTH' | 'PROGETTO' | 'DOCUMENTI' | 'FATTURAZIONE' | 'KYC' | 'PERMESSI' | 'TENANT' = 'DOCUMENTI';
+          if (az.includes('FATTURA') || az.includes('INCASSO') || az.includes('SDI') || az.includes('PRIMA_NOTA') || az.includes('CONTRATTO')) {
+            cat = 'FATTURAZIONE';
+          } else if (az.includes('PROGETTO') || az.includes('ORE') || az.includes('MODULO') || az.includes('PREVENTIVO')) {
+            cat = 'PROGETTO';
+          } else if (az.includes('TENANT') || az.includes('UTENTE') || az.includes('STUDIO')) {
+            cat = 'TENANT';
+          } else if (az.includes('LOGIN') || az.includes('AUTH') || az.includes('PASSWORD')) {
+            cat = 'AUTH';
+          } else if (az.includes('PERMESSI')) {
+            cat = 'PERMESSI';
+          } else if (az.includes('KYC')) {
+            cat = 'KYC';
+          }
+
+          return {
+            ...l,
+            tenantName: l.tenantName || 'Studio Advisory',
+            categoria: l.categoria || cat,
+            dataOra: l.createdAt ? new Date(l.createdAt).toLocaleString('it-IT') : l.dataOra,
+          };
+        }));
       }
     };
     loadAuditLogs();
