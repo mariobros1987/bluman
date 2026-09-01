@@ -562,7 +562,7 @@ export function InvoicesPage() {
                           {/* Apri in Document Studio */}
                           {inv.progettoId && (
                             <button
-                              onClick={() => navigate(`/editor?projId=${inv.progettoId}&tmplId=tmpl-avviso-parcella`)}
+                              onClick={() => navigate(`/documents?projId=${inv.progettoId}&tmplId=tmpl-avviso-parcella`)}
                               style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg)', cursor: 'pointer', fontSize: 12 }}
                               title="Apri modello Avviso di Parcella / Proforma in Document Studio per questo progetto"
                             >

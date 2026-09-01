@@ -208,7 +208,15 @@ export function DocumentEditorPage() {
       const allNormalizedProjects = Array.from(projMap.values());
       setProgetti(allNormalizedProjects);
       if (queryProjId && projMap.has(queryProjId)) {
+        const foundProj = projMap.get(queryProjId);
         setSelectedProgettoId(queryProjId);
+        if (foundProj?.clienteId) {
+          const c = allClients.find(cl => cl.id === foundProj.clienteId || cl.nome.toLowerCase() === (foundProj.cl || '').toLowerCase());
+          if (c) setSelectedClienteId(c.id);
+        } else if (foundProj?.cl) {
+          const c = allClients.find(cl => cl.nome.toLowerCase() === foundProj.cl.toLowerCase());
+          if (c) setSelectedClienteId(c.id);
+        }
       } else if (allNormalizedProjects.length > 0) {
         setSelectedProgettoId(allNormalizedProjects[0].id);
       } else {

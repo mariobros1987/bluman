@@ -157,6 +157,7 @@ function AppContent() {
           <Route path="/payments"      element={<ProtectedModule user={currentUser} moduleKey="banks" element={<PaymentsPage />} />} />
           <Route path="/retainers"     element={<ProtectedModule user={currentUser} moduleKey="retainers" element={<RetainersPage />} />} />
           <Route path="/documents"     element={<ProtectedModule user={currentUser} moduleKey="documents" element={<DocumentEditorPage />} />} />
+          <Route path="/editor"        element={<ProtectedModule user={currentUser} moduleKey="documents" element={<DocumentEditorPage />} />} />
           {/* §37 — l'archivio riusa la chiave RBAC `documents`: è la stessa materia, e una
               chiave nuova sarebbe bloccata per chiunque abbia già una matrice salvata. */}
           <Route path="/archivio"      element={<ProtectedModule user={currentUser} moduleKey="documents" element={<ArchivioDocumentiPage />} />} />

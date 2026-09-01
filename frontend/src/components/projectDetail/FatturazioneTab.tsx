@@ -163,7 +163,7 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
     }));
 
     setModalOpen(false);
-    navigate(`/editor?projId=${effId}&tmplId=tmpl-avviso-parcella`);
+    navigate(`/documents?projId=${effId}&tmplId=tmpl-avviso-parcella`);
   };
 
   // Raggruppa voci per modulo per la visualizzazione ad albero
