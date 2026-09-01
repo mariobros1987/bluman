@@ -16,6 +16,12 @@ export interface VoceFatturabile {
   oreConsuntivate: number;
   importo: number;
   selezionato: boolean;
+  giaFatturata?: boolean;
+  dettaglioFattura?: {
+    numero: string;
+    data?: string;
+    importo?: number;
+  };
 }
 
 // ─── Fatturazione Tab ─────────────────────────────────────────────
@@ -36,38 +42,80 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
 
   const [vociFatturabili, setVociFatturabili] = useState<VoceFatturabile[]>([]);
 
-  // Inizializza le voci dai moduli e microvoci del progetto
+  // Inizializza le voci dai moduli e microvoci del progetto, identificando quelle già fatturate
   const initVoci = () => {
     const list: VoceFatturabile[] = [];
+
+    // Mappa per tracciare tutte le microvoci e moduli già presenti in fatture emesse (escluse annullate)
+    const fattureValide: any[] = (rawDbProject?.fatture || []).filter((f: any) => f.stato !== 'annullata');
+    const righeFatturateMap = new Map<string, { numero: string; data?: string; importo?: number }>();
+
+    fattureValide.forEach((f: any) => {
+      (f.righe || []).forEach((r: any) => {
+        const desc = (r.descrizione || '').trim().toLowerCase();
+        const info = {
+          numero: f.numero || 'Fattura Emessa',
+          data: f.data,
+          importo: r.totaleRigaCentesimi ? r.totaleRigaCentesimi / 100 : r.importo,
+        };
+        righeFatturateMap.set(desc, info);
+        if (r.moduloProgettoId) {
+          righeFatturateMap.set(`mod-${r.moduloProgettoId}`, info);
+        }
+      });
+    });
+
     (project.mods || []).forEach((m, mIdx) => {
       const numV = (m.v || []).length;
       const baseVal = (m as any).val ? Math.round((m as any).val / (numV || 1)) : 400;
+      const modNome = m.n || 'Modulo';
+
       (m.v || []).forEach((mv, vIdx) => {
         const anyMv = mv as any;
         const st = anyMv.s || anyMv.st || (anyMv.done ? 'done' : 'pending');
         const ore = anyMv.hA || anyMv.a || 0;
         const imp = ore > 0 ? ore * 120 : baseVal;
+        const tit = mv.n || 'Micro-voce operativa';
+
+        // Match su descrizione fattura: `[NomeModulo] TitoloMicrovoce` o `TitoloMicrovoce`
+        const descKey1 = `[${modNome.trim().toLowerCase()}] ${tit.trim().toLowerCase()}`;
+        const descKey2 = tit.trim().toLowerCase();
+        const dettaglioFattura = righeFatturateMap.get(descKey1) || righeFatturateMap.get(descKey2);
+        const giaFatturata = Boolean(dettaglioFattura);
+
         list.push({
           key: `${m.id || mIdx}-${mv.id || vIdx}`,
           moduloId: String(m.id || mIdx),
-          moduloNome: m.n || 'Modulo',
-          titolo: mv.n || 'Micro-voce operativa',
+          moduloNome: modNome,
+          titolo: tit,
           stato: st,
           oreConsuntivate: ore,
           importo: imp,
-          selezionato: st === 'done' || anyMv.done === true, // pre-seleziona in automatico quelle completate
+          giaFatturata,
+          dettaglioFattura,
+          // PREVENZIONE DOPPIA FATTURAZIONE: Se è già fatturata, parte SEMPRE deselezionata!
+          selezionato: !giaFatturata && (st === 'done' || anyMv.done === true),
         });
       });
+
       if (numV === 0) {
+        const descKey1 = `[${modNome.trim().toLowerCase()}] ${modNome.trim().toLowerCase()}`;
+        const descKey2 = modNome.trim().toLowerCase();
+        const modKeyId = String(m.id || mIdx);
+        const dettaglioFattura = righeFatturateMap.get(`mod-${m.id || mIdx}`) || righeFatturateMap.get(descKey1) || righeFatturateMap.get(descKey2);
+        const giaFatturata = Boolean(dettaglioFattura);
+
         list.push({
           key: `mod-${m.id || mIdx}`,
-          moduloId: String(m.id || mIdx),
-          moduloNome: m.n || 'Modulo',
-          titolo: m.n || 'Modulo completo',
+          moduloId: modKeyId,
+          moduloNome: modNome,
+          titolo: modNome,
           stato: m.st || 'pending',
           oreConsuntivate: (m as any).a || 0,
           importo: (m as any).val || 1000,
-          selezionato: m.st === 'done',
+          giaFatturata,
+          dettaglioFattura,
+          selezionato: !giaFatturata && m.st === 'done',
         });
       }
     });
@@ -86,11 +134,11 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
   const totaleDocumento = totaleImponibile + totaleIva;
 
   const selezionaSoloCompletate = () => {
-    setVociFatturabili(prev => prev.map(v => ({ ...v, selezionato: v.stato === 'done' })));
+    setVociFatturabili(prev => prev.map(v => ({ ...v, selezionato: !v.giaFatturata && v.stato === 'done' })));
   };
 
   const selezionaTutte = () => {
-    setVociFatturabili(prev => prev.map(v => ({ ...v, selezionato: true })));
+    setVociFatturabili(prev => prev.map(v => ({ ...v, selezionato: !v.giaFatturata })));
   };
 
   const deselezionaTutte = () => {
@@ -98,9 +146,15 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
   };
 
   const toggleModulo = (modNome: string) => {
-    const vociDelMod = vociFatturabili.filter(v => v.moduloNome === modNome);
-    const tutteSel = vociDelMod.every(v => v.selezionato);
-    setVociFatturabili(prev => prev.map(v => v.moduloNome === modNome ? { ...v, selezionato: !tutteSel } : v));
+    const vociDelMod = vociFatturabili.filter(v => v.moduloNome === modNome && !v.giaFatturata);
+    const tutteSel = vociDelMod.length > 0 && vociDelMod.every(v => v.selezionato);
+    setVociFatturabili(prev => prev.map(v => {
+      if (v.moduloNome === modNome) {
+        if (v.giaFatturata) return v;
+        return { ...v, selezionato: !tutteSel };
+      }
+      return v;
+    }));
   };
 
   const updateVoceImporto = (key: string, importo: number) => {
@@ -169,6 +223,47 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
   // Raggruppa voci per modulo per la visualizzazione ad albero
   const modNomiUnici = Array.from(new Set(vociFatturabili.map(v => v.moduloNome)));
 
+  // Calcolo avanzato microvoci completate e non ancora fatturate per il box riassuntivo
+  const fattureEmesseGlobali: any[] = (rawDbProject?.fatture || []).filter((f: any) => f.stato !== 'annullata');
+  const fatturateDescSet = new Set<string>();
+  fattureEmesseGlobali.forEach((f: any) => {
+    (f.righe || []).forEach((r: any) => {
+      const desc = (r.descrizione || '').trim().toLowerCase();
+      fatturateDescSet.add(desc);
+      if (r.moduloProgettoId) fatturateDescSet.add(`mod-${r.moduloProgettoId}`);
+    });
+  });
+
+  let vociDaFatturareCount = 0;
+  let importoDaFatturareTotale = 0;
+  (project.mods || []).forEach((m, mIdx) => {
+    const numV = (m.v || []).length;
+    const baseVal = (m as any).val ? Math.round((m as any).val / (numV || 1)) : 400;
+    const modNome = m.n || 'Modulo';
+    (m.v || []).forEach((mv) => {
+      const anyMv = mv as any;
+      const st = anyMv.s || anyMv.st || (anyMv.done ? 'done' : 'pending');
+      const ore = anyMv.hA || anyMv.a || 0;
+      const imp = ore > 0 ? ore * 120 : baseVal;
+      const tit = mv.n || 'Micro-voce operativa';
+      const k1 = `[${modNome.trim().toLowerCase()}] ${tit.trim().toLowerCase()}`;
+      const k2 = tit.trim().toLowerCase();
+      const isFatturata = fatturateDescSet.has(k1) || fatturateDescSet.has(k2);
+      if ((st === 'done' || anyMv.done === true) && !isFatturata) {
+        vociDaFatturareCount++;
+        importoDaFatturareTotale += imp;
+      }
+    });
+    if (numV === 0 && m.st === 'done') {
+      const k1 = `[${modNome.trim().toLowerCase()}] ${modNome.trim().toLowerCase()}`;
+      const isFatturata = fatturateDescSet.has(`mod-${m.id || mIdx}`) || fatturateDescSet.has(k1);
+      if (!isFatturata) {
+        vociDaFatturareCount++;
+        importoDaFatturareTotale += (m as any).val || 1000;
+      }
+    }
+  });
+
   return (
     <div>
       <div className={styles.summaryBox}>
@@ -208,6 +303,48 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
           💳 Registro Incassi Progetto
         </button>
       </div>
+
+      {/* Banner Microvoci pronte per la fatturazione */}
+      {vociDaFatturareCount > 0 && (
+        <div style={{
+          background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(6, 78, 59, 0.2))',
+          border: '1px solid #10b981',
+          borderRadius: 10,
+          padding: 14,
+          marginTop: 14,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}>
+          <div>
+            <div style={{ fontSize: 11, color: '#34d399', fontWeight: 700, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 6 }}>
+              ✨ Deliverable & Micro-voci Completate da Fatturare
+            </div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#ffffff', marginTop: 2 }}>
+              {vociDaFatturareCount} voci pronte per un valore stimato di {fmt(importoDaFatturareTotale)}
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
+              Nessuna duplicazione: il sistema esclude in automatico le microvoci già presenti in fatture emesse.
+            </div>
+          </div>
+          <button
+            onClick={handleOpenModal}
+            style={{
+              background: '#059669',
+              color: '#ffffff',
+              border: 'none',
+              padding: '8px 16px',
+              borderRadius: 8,
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: 'pointer',
+              boxShadow: '0 4px 12px rgba(5, 150, 105, 0.3)',
+            }}
+          >
+            ⚡ Fattura Microvoci ({vociDaFatturareCount})
+          </button>
+        </div>
+      )}
 
       <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
         {project.fatture.length === 0 ? (
@@ -493,12 +630,19 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
 
             {/* Toolbar di Selezione Rapida */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--card2)', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)' }}>
-              <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)' }}>Selezione rapida:</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11 }}>
+                <span style={{ fontWeight: 600, color: 'var(--muted)' }}>Filtri:</span>
+                <span style={{ color: '#34d399', fontWeight: 600 }}>🟢 {vociFatturabili.filter(v => !v.giaFatturata).length} da fatturare</span>
+                {vociFatturabili.filter(v => v.giaFatturata).length > 0 && (
+                  <span style={{ color: '#38bdf8', fontWeight: 600 }}>· 🔒 {vociFatturabili.filter(v => v.giaFatturata).length} già fatturate</span>
+                )}
+              </div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button
                   type="button"
                   onClick={selezionaSoloCompletate}
                   style={{ background: '#064e3b', border: '1px solid #059669', color: '#6ee7b7', padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+                  title="Seleziona solo le microvoci completate che NON sono ancora state fatturate"
                 >
                   ✨ Solo Completate (Done)
                 </button>
@@ -506,8 +650,9 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
                   type="button"
                   onClick={selezionaTutte}
                   style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)', padding: '4px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer' }}
+                  title="Seleziona tutte le microvoci non ancora fatturate"
                 >
-                  ☑️ Seleziona Tutto
+                  ☑️ Tutte da Fatturare
                 </button>
                 <button
                   type="button"
@@ -528,21 +673,27 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
               ) : (
                 modNomiUnici.map((modNome) => {
                   const vociDelMod = vociFatturabili.filter(v => v.moduloNome === modNome);
-                  const tutteSel = vociDelMod.every(v => v.selezionato);
+                  const nonFatturateDelMod = vociDelMod.filter(v => !v.giaFatturata);
+                  const tutteSel = nonFatturateDelMod.length > 0 && nonFatturateDelMod.every(v => v.selezionato);
                   return (
                     <div key={modNome} style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10, padding: 10 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', paddingBottom: 6, marginBottom: 8 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--indigo-l)' }}>📁 {modNome}</span>
-                          <span style={{ fontSize: 10, color: 'var(--muted)' }}>({vociDelMod.filter(v => v.selezionato).length}/{vociDelMod.length} selezionate)</span>
+                          <span style={{ fontSize: 10, color: 'var(--muted)' }}>
+                            ({vociDelMod.filter(v => v.selezionato).length}/{vociDelMod.length} selezionate
+                            {vociDelMod.filter(v => v.giaFatturata).length > 0 ? ` · ${vociDelMod.filter(v => v.giaFatturata).length} già a bilancio` : ''})
+                          </span>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => toggleModulo(modNome)}
-                          style={{ background: 'transparent', border: 'none', color: tutteSel ? '#f87171' : 'var(--indigo-l)', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}
-                        >
-                          {tutteSel ? 'Deseleziona Modulo' : 'Seleziona Tutto il Modulo'}
-                        </button>
+                        {nonFatturateDelMod.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => toggleModulo(modNome)}
+                            style={{ background: 'transparent', border: 'none', color: tutteSel ? '#f87171' : 'var(--indigo-l)', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}
+                          >
+                            {tutteSel ? 'Deseleziona Modulo' : 'Seleziona Tutto il Modulo'}
+                          </button>
+                        )}
                       </div>
 
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -554,65 +705,91 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
                               key={v.key}
                               style={{
                                 display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                                background: v.selezionato ? 'rgba(99, 102, 241, 0.08)' : 'transparent',
-                                border: `1px solid ${v.selezionato ? 'rgba(99, 102, 241, 0.3)' : 'transparent'}`,
+                                flexDirection: 'column',
+                                gap: 2,
+                                background: v.selezionato ? 'rgba(99, 102, 241, 0.08)' : (v.giaFatturata ? 'rgba(14, 165, 233, 0.03)' : 'transparent'),
+                                border: `1px solid ${v.selezionato ? 'rgba(99, 102, 241, 0.3)' : (v.giaFatturata ? 'rgba(14, 165, 233, 0.2)' : 'transparent')}`,
                                 borderRadius: 6,
                                 padding: '6px 8px',
                               }}
                             >
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
-                                <input
-                                  type="checkbox"
-                                  checked={v.selezionato}
-                                  onChange={() => toggleVoce(v.key)}
-                                  style={{ cursor: 'pointer', width: 16, height: 16 }}
-                                />
-                                <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                  <span style={{ fontSize: 12, fontWeight: v.selezionato ? 600 : 400, color: v.selezionato ? 'var(--text)' : 'var(--muted)' }}>
-                                    {v.titolo}
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
+                                  <input
+                                    type="checkbox"
+                                    checked={v.selezionato}
+                                    onChange={() => toggleVoce(v.key)}
+                                    style={{ cursor: 'pointer', width: 16, height: 16 }}
+                                  />
+                                  <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    <span style={{ fontSize: 12, fontWeight: v.selezionato ? 600 : 400, color: v.selezionato ? 'var(--text)' : 'var(--muted)' }}>
+                                      {v.titolo}
+                                    </span>
+                                  </div>
+                                  <span
+                                    style={{
+                                      fontSize: 10,
+                                      padding: '2px 6px',
+                                      borderRadius: 4,
+                                      fontWeight: 600,
+                                      background: isDone ? '#064e3b' : isInProg ? '#1e3a8a' : '#334155',
+                                      color: isDone ? '#6ee7b7' : isInProg ? '#93c5fd' : '#94a3b8',
+                                    }}
+                                  >
+                                    {isDone ? '✓ Fatto' : isInProg ? '⏳ In Corso' : '⚪ Da Fare'}
                                   </span>
+
+                                  {v.giaFatturata && (
+                                    <span
+                                      style={{
+                                        fontSize: 10,
+                                        padding: '2px 6px',
+                                        borderRadius: 4,
+                                        fontWeight: 700,
+                                        background: '#0c4a6e',
+                                        color: '#38bdf8',
+                                        border: '1px solid #0284c7',
+                                      }}
+                                      title={`Già presente nel documento ${v.dettaglioFattura?.numero || ''}`}
+                                    >
+                                      🔒 Già Fatturata ({v.dettaglioFattura?.numero})
+                                    </span>
+                                  )}
+
+                                  {v.oreConsuntivate > 0 && (
+                                    <span style={{ fontSize: 10, color: '#f59e0b', fontWeight: 600 }}>
+                                      ⏱️ {v.oreConsuntivate}h
+                                    </span>
+                                  )}
                                 </div>
-                                <span
-                                  style={{
-                                    fontSize: 10,
-                                    padding: '2px 6px',
-                                    borderRadius: 4,
-                                    fontWeight: 600,
-                                    background: isDone ? '#064e3b' : isInProg ? '#1e3a8a' : '#334155',
-                                    color: isDone ? '#6ee7b7' : isInProg ? '#93c5fd' : '#94a3b8',
-                                  }}
-                                >
-                                  {isDone ? '✓ Fatto' : isInProg ? '⏳ In Corso' : '⚪ Da Fare'}
-                                </span>
-                                {v.oreConsuntivate > 0 && (
-                                  <span style={{ fontSize: 10, color: '#f59e0b', fontWeight: 600 }}>
-                                    ⏱️ {v.oreConsuntivate}h
-                                  </span>
-                                )}
+
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 12 }}>
+                                  <span style={{ fontSize: 11, color: 'var(--muted)' }}>€</span>
+                                  <input
+                                    type="number"
+                                    value={v.importo}
+                                    onChange={e => updateVoceImporto(v.key, Number(e.target.value))}
+                                    disabled={!v.selezionato}
+                                    style={{
+                                      width: 85,
+                                      padding: '3px 6px',
+                                      fontSize: 11,
+                                      fontWeight: 600,
+                                      textAlign: 'right',
+                                      borderRadius: 4,
+                                      border: '1px solid var(--border)',
+                                      background: v.selezionato ? 'var(--bg)' : 'var(--card)',
+                                      color: v.selezionato ? 'var(--text)' : 'var(--muted)',
+                                    }}
+                                  />
+                                </div>
                               </div>
 
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 12 }}>
-                                <span style={{ fontSize: 11, color: 'var(--muted)' }}>€</span>
-                                <input
-                                  type="number"
-                                  value={v.importo}
-                                  onChange={e => updateVoceImporto(v.key, Number(e.target.value))}
-                                  disabled={!v.selezionato}
-                                  style={{
-                                    width: 85,
-                                    padding: '3px 6px',
-                                    fontSize: 11,
-                                    fontWeight: 600,
-                                    textAlign: 'right',
-                                    borderRadius: 4,
-                                    border: '1px solid var(--border)',
-                                    background: v.selezionato ? 'var(--bg)' : 'var(--card)',
-                                    color: v.selezionato ? 'var(--text)' : 'var(--muted)',
-                                  }}
-                                />
-                              </div>
+                              {v.giaFatturata && v.selezionato && (
+                                <div style={{ fontSize: 10, color: '#f59e0b', paddingLeft: 26, paddingTop: 2 }}>
+                                  ⚠️ Voce già presente nella fattura {v.dettaglioFattura?.numero}. Verrà inclusa come fatturazione aggiuntiva/integrazione.
+                                </div>
+                              )}
                             </div>
                           );
                         })}
