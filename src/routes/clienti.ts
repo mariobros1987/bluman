@@ -133,8 +133,8 @@ export async function registraRotteClienti(server: FastifyInstance, app: AppPort
         };
       });
     } catch {
-      // Database non raggiungibile: si serve la porta applicativa, come fanno già
-      // /progetti e /preventivi. Restituire [] silenziosamente nascondeva il guasto.
+      // Database non raggiungibile: si serve la porta applicativa. Restituire []
+      // silenziosamente nascondeva il guasto.
       return (await app.listaClienti()) || [];
     }
   });

@@ -217,6 +217,16 @@ export class FakeIstanziazionePort implements IstanziazionePort, EsecuzionePort 
     if (!p) throw new Error(`Passaggio non trovato: ${id}`);
     this.db.passaggiProgetto.set(id, { ...p, ...updates });
   }
+
+  async getProgetto(id: string): Promise<{ id: string; stato: string } | null> {
+    const stato = this.db.progettiStato.get(id);
+    if (!stato) return null;
+    return { id, stato };
+  }
+
+  async aggiornaProgetto(id: string, updates: { stato: string }): Promise<void> {
+    this.db.progettiStato.set(id, updates.stato);
+  }
 }
 
 export class FakeNotificationPort {

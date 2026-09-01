@@ -3,8 +3,9 @@
 // cron scadenze, SDI manuale, Prima Nota e importatori sorgente (OpenSTAManager Engine).
 
 import type { FastifyInstance } from 'fastify';
+import { Prisma } from '@prisma/client';
 import type { AppPort } from '../services/appPort.js';
-import { prisma } from '../util/prismaClient.js';
+import { prisma, conContestoInTransazione, riprovaSuConflitto } from '../util/prismaClient.js';
 import { inviaEmail } from '../services/emailService.js';
 import { generateInvoicePdfBuffer } from '../services/pdfService.js';
 import { runDailyNotificationCron } from '../services/cronService.js';
@@ -22,6 +23,7 @@ import { costruisciReport, REPORT_DISPONIBILI, type ChiaveReport } from '../serv
 import { generaPdfReport, generaExcelReport } from '../services/reportExport.js';
 import { notificaStudio, notificaCliente } from '../services/notificheService.js';
 import { recordAudit } from '../util/serverHelpers.js';
+import { TransizioneNonValidaError } from '../adapters/appErrors.js';
 
 export async function registraRotteContabilita(server: FastifyInstance, app: AppPort): Promise<void> {
   // ─── COMPATIBILITÀ ROTTE PRECEDENTI ────────────────────────────────
@@ -185,87 +187,99 @@ export async function registraRotteContabilita(server: FastifyInstance, app: App
 
       const serie = body.serie || (body.tipoDocumento === 'nota_credito' ? 'NC' : 'FT');
 
-      // Trova l'ultimo progressivo provvisorio di bozza
-      const lastFattura = await prisma.fattura.findFirst({
-        where: { tenantId, serie },
-        orderBy: { numeroProgressivoSerie: 'desc' },
-      });
-      const nextProgressivo = (lastFattura?.numeroProgressivoSerie || 0) + 1;
-      const numeroProvvisorio = `BOZZA-${serie}-${nextProgressivo}`;
+      // Numerazione progressiva e creazione in un'unica transazione Serializable:
+      // due richieste contemporanee che creano bozze nella stessa serie vengono
+      // serializzate, così non possono leggere lo stesso "ultimo progressivo" e
+      // assegnarlo a entrambe. In caso di conflitto la tx abortisce (P2034) e
+      // `riprovaSuConflitto` rilancia con i progressivi aggiornati dell'altra.
+      const nuovaFattura = await riprovaSuConflitto(() =>
+        prisma.$transaction(
+          async (tx) =>
+            conContestoInTransazione(tx, async () => {
+              const lastFattura = await tx.fattura.findFirst({
+                where: { tenantId, serie },
+                orderBy: { numeroProgressivoSerie: 'desc' },
+              });
+              const nextProgressivo = (lastFattura?.numeroProgressivoSerie || 0) + 1;
+              const numeroProvvisorio = `BOZZA-${serie}-${nextProgressivo}`;
 
-      const nuovaFattura = await prisma.fattura.create({
-        data: {
-          tenantId,
-          clienteId: cliente.id,
-          progettoId: body.progettoId || null,
-          preventivoId: body.preventivoId || null,
-          contrattoRicorrenteId: body.contrattoRicorrenteId || null,
-          tipoDocumento: body.tipoDocumento || 'fattura',
-          serie,
-          numeroProgressivoSerie: nextProgressivo,
-          numero: numeroProvvisorio,
-          data: new Date(),
-          stato: 'bozza',
-          tipoClienteFiscale: cliente.tipo === 'company' ? 'business_italia' : 'privato_italia',
-          partitaIva: cliente.piva || null,
-          codiceFiscale: cliente.codiceFiscale || null,
-          canale: 'sdi',
-          condizionePagamento: body.condizionePagamento || 'bonifico_30gg',
-          metodoPagamento: body.metodoPagamento || 'bonifico',
-          contoAccreditoId: body.contoAccreditoId || null,
-          tipoCassa: body.tipoCassa || 'nessuna',
-          aliquotaCassa: opzioni.aliquotaCassa || 0,
-          aliquotaRitenuta: opzioni.aliquotaRitenuta || 0,
-          esigibilitaIva: opzioni.esigibilitaIva || 'immediata',
-          totaleImponibileCentesimi: calcolo.totaleImponibileCentesimi,
-          totaleCassaCentesimi: calcolo.totaleCassaCentesimi,
-          totaleIvaCentesimi: calcolo.totaleIvaCentesimi,
-          totaleRitenutaCentesimi: calcolo.totaleRitenutaCentesimi,
-          totaleBolloCentesimi: calcolo.totaleBolloCentesimi,
-          totaleDocumentoCentesimi: calcolo.totaleDocumentoCentesimi,
-          nettoAPagareCentesimi: calcolo.nettoAPagareCentesimi,
-          note: body.note || null,
-          notePiePagina: body.notePiePagina || null,
-          codiceDestinatario: body.codiceDestinatario || cliente.sdiCode || '0000000',
-          pecDestinatario: body.pecDestinatario || null,
-          righe: {
-            create: calcolo.righe.map((r, idx) => ({
-              tenantId,
-              tipo: r.tipo || 'milestone_libera',
-              moduloProgettoId: r.moduloProgettoId || null,
-              articoloId: r.articoloId || null,
-              percentuale: r.percentuale || null,
-              importo: r.totaleRigaCentesimi,
-              descrizione: r.descrizione,
-              quantita: r.quantita,
-              unitaMisura: r.unitaMisura,
-              prezzoUnitarioCent: r.prezzoUnitarioCent,
-              scontoPercentuale: r.scontoPercentuale,
-              aliquotaIva: r.aliquotaIva,
-              naturaEsenzione: r.naturaEsenzione || null,
-              applicaCassa: r.applicaCassa,
-              applicaRitenuta: r.applicaRitenuta,
-              applicaBollo: r.applicaBollo,
-              imponibileCentesimi: r.imponibileCentesimi,
-              ivaCentesimi: r.ivaCentesimi,
-              totaleRigaCentesimi: r.totaleRigaCentesimi,
-              ordine: idx + 1,
-            })),
-          },
-        },
-        include: {
-          righe: true,
-          cliente: true,
-          progetto: true,
-        },
-      });
+              return tx.fattura.create({
+                data: {
+                  tenantId,
+                  clienteId: cliente.id,
+                  progettoId: body.progettoId || null,
+                  preventivoId: body.preventivoId || null,
+                  contrattoRicorrenteId: body.contrattoRicorrenteId || null,
+                  tipoDocumento: body.tipoDocumento || 'fattura',
+                  serie,
+                  numeroProgressivoSerie: nextProgressivo,
+                  numero: numeroProvvisorio,
+                  data: new Date(),
+                  stato: 'bozza',
+                  tipoClienteFiscale: cliente.tipo === 'company' ? 'business_italia' : 'privato_italia',
+                  partitaIva: cliente.piva || null,
+                  codiceFiscale: cliente.codiceFiscale || null,
+                  canale: 'sdi',
+                  condizionePagamento: body.condizionePagamento || 'bonifico_30gg',
+                  metodoPagamento: body.metodoPagamento || 'bonifico',
+                  contoAccreditoId: body.contoAccreditoId || null,
+                  tipoCassa: body.tipoCassa || 'nessuna',
+                  aliquotaCassa: opzioni.aliquotaCassa || 0,
+                  aliquotaRitenuta: opzioni.aliquotaRitenuta || 0,
+                  esigibilitaIva: opzioni.esigibilitaIva || 'immediata',
+                  totaleImponibileCentesimi: calcolo.totaleImponibileCentesimi,
+                  totaleCassaCentesimi: calcolo.totaleCassaCentesimi,
+                  totaleIvaCentesimi: calcolo.totaleIvaCentesimi,
+                  totaleRitenutaCentesimi: calcolo.totaleRitenutaCentesimi,
+                  totaleBolloCentesimi: calcolo.totaleBolloCentesimi,
+                  totaleDocumentoCentesimi: calcolo.totaleDocumentoCentesimi,
+                  nettoAPagareCentesimi: calcolo.nettoAPagareCentesimi,
+                  note: body.note || null,
+                  notePiePagina: body.notePiePagina || null,
+                  codiceDestinatario: body.codiceDestinatario || cliente.sdiCode || '0000000',
+                  pecDestinatario: body.pecDestinatario || null,
+                  righe: {
+                    create: calcolo.righe.map((r, idx) => ({
+                      tenantId,
+                      tipo: r.tipo || 'milestone_libera',
+                      moduloProgettoId: r.moduloProgettoId || null,
+                      articoloId: r.articoloId || null,
+                      percentuale: r.percentuale || null,
+                      importo: r.totaleRigaCentesimi,
+                      descrizione: r.descrizione,
+                      quantita: r.quantita,
+                      unitaMisura: r.unitaMisura,
+                      prezzoUnitarioCent: r.prezzoUnitarioCent,
+                      scontoPercentuale: r.scontoPercentuale,
+                      aliquotaIva: r.aliquotaIva,
+                      naturaEsenzione: r.naturaEsenzione || null,
+                      applicaCassa: r.applicaCassa,
+                      applicaRitenuta: r.applicaRitenuta,
+                      applicaBollo: r.applicaBollo,
+                      imponibileCentesimi: r.imponibileCentesimi,
+                      ivaCentesimi: r.ivaCentesimi,
+                      totaleRigaCentesimi: r.totaleRigaCentesimi,
+                      ordine: idx + 1,
+                    })),
+                  },
+                },
+                include: {
+                  righe: true,
+                  cliente: true,
+                  progetto: true,
+                },
+              });
+            }),
+          { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+        ),
+      );
 
       await recordAudit({
         tenantId,
         userId: req.userId,
         ruolo: req.ruolo,
         azione: 'FATTURA_BOZZA_CREATA',
-        entita: `Bozza ${numeroProvvisorio}`,
+        entita: nuovaFattura.numero || `Bozza`,
         dettagli: `Creata bozza fattura per ${cliente.nome} di importo €${(calcolo.nettoAPagareCentesimi / 100).toFixed(2)}`,
         ipAddress: req.ip,
       });
@@ -411,69 +425,84 @@ export async function registraRotteContabilita(server: FastifyInstance, app: App
     const { id } = req.params;
 
     try {
-      const fattura = await prisma.fattura.findFirst({
-        where: { id, tenantId },
-        include: { cliente: true, righe: true },
-      });
-      if (!fattura) return reply.code(404).send({ errore: 'Fattura non trovata' });
-      if (fattura.stato !== 'bozza') {
-        return reply.code(400).send({ errore: `La fattura è già in stato '${fattura.stato}'` });
-      }
+      const { fatturaEmessa, numeroUfficiale, rateCount, nettoAPagareCent } = await riprovaSuConflitto(() =>
+        prisma.$transaction(
+          async (tx) =>
+            conContestoInTransazione(tx, async () => {
+              const fattura = await tx.fattura.findFirst({
+                where: { id, tenantId },
+                include: { cliente: true, righe: true },
+              });
+              if (!fattura) throw new Error('Fattura non trovata');
+              if (fattura.stato !== 'bozza') {
+                throw new Error(`La fattura è già in stato '${fattura.stato}'`);
+              }
 
-      // Numerazione progressiva ufficiale atomica per serie (FT o NC)
-      const dataEmissione = new Date();
-      const lastEmessa = await prisma.fattura.findFirst({
-        where: { tenantId, serie: fattura.serie, stato: { not: 'bozza' } },
-        orderBy: { numeroProgressivoSerie: 'desc' },
-      });
-      const progressivoSerie = (lastEmessa?.numeroProgressivoSerie || 0) + 1;
-      const numeroUfficiale = formattaNumeroDocumento(fattura.serie, progressivoSerie, dataEmissione);
+              // Numerazione progressiva ufficiale atomica per serie (FT o NC)
+              const dataEmissione = new Date();
+              const lastEmessa = await tx.fattura.findFirst({
+                where: { tenantId, serie: fattura.serie, stato: { not: 'bozza' } },
+                orderBy: { numeroProgressivoSerie: 'desc' },
+              });
+              const progressivoSerie = (lastEmessa?.numeroProgressivoSerie || 0) + 1;
+              const numeroUff = formattaNumeroDocumento(fattura.serie, progressivoSerie, dataEmissione);
 
-      // Generazione piano scadenze nello Scadenzario
-      const rateCalcolate = generaPianoScadenze(
-        fattura.nettoAPagareCentesimi,
-        fattura.condizionePagamento,
-        dataEmissione
+              // Generazione piano scadenze nello Scadenzario
+              const rateCalcolate = generaPianoScadenze(
+                fattura.nettoAPagareCentesimi,
+                fattura.condizionePagamento,
+                dataEmissione
+              );
+
+              // Aggiornamento atomico stato fattura e generazione scadenze
+              const aggiornata = await tx.fattura.update({
+                where: { id },
+                data: {
+                  stato: 'emessa',
+                  numeroProgressivoSerie: progressivoSerie,
+                  numero: numeroUff,
+                  data: dataEmissione,
+                  scadenzeIncasso: {
+                    create: rateCalcolate.map((r) => ({
+                      tenantId,
+                      numeroRata: r.numeroRata,
+                      importoCentesimi: r.importoCentesimi,
+                      dataScadenza: r.dataScadenza,
+                      stato: 'in_attesa',
+                      note: r.note,
+                    })),
+                  },
+                  auditLogFatture: {
+                    create: {
+                      tenantId,
+                      utenteId: req.userId || null,
+                      azione: 'emissione',
+                      dettagli: {
+                        numero: numeroUff,
+                        nettoAPagareCentesimi: fattura.nettoAPagareCentesimi,
+                        rate: rateCalcolate.length,
+                      },
+                    },
+                  },
+                },
+                include: {
+                  righe: true,
+                  cliente: true,
+                  progetto: true,
+                  scadenzeIncasso: true,
+                },
+              });
+
+              return {
+                fatturaEmessa: aggiornata,
+                numeroUfficiale: numeroUff,
+                rateCount: rateCalcolate.length,
+                nettoAPagareCent: fattura.nettoAPagareCentesimi,
+              };
+            }),
+          { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+        ),
       );
-
-      // Aggiornamento atomico stato fattura e generazione scadenze
-      const fatturaEmessa = await prisma.fattura.update({
-        where: { id },
-        data: {
-          stato: 'emessa',
-          numeroProgressivoSerie: progressivoSerie,
-          numero: numeroUfficiale,
-          data: dataEmissione,
-          scadenzeIncasso: {
-            create: rateCalcolate.map((r) => ({
-              tenantId,
-              numeroRata: r.numeroRata,
-              importoCentesimi: r.importoCentesimi,
-              dataScadenza: r.dataScadenza,
-              stato: 'in_attesa',
-              note: r.note,
-            })),
-          },
-          auditLogFatture: {
-            create: {
-              tenantId,
-              utenteId: req.userId || null,
-              azione: 'emissione',
-              dettagli: {
-                numero: numeroUfficiale,
-                nettoAPagareCentesimi: fattura.nettoAPagareCentesimi,
-                rate: rateCalcolate.length,
-              },
-            },
-          },
-        },
-        include: {
-          righe: true,
-          cliente: true,
-          progetto: true,
-          scadenzeIncasso: true,
-        },
-      });
 
       await recordAudit({
         tenantId,
@@ -481,16 +510,22 @@ export async function registraRotteContabilita(server: FastifyInstance, app: App
         ruolo: req.ruolo,
         azione: 'FATTURA_EMESSA',
         entita: numeroUfficiale,
-        dettagli: `Fattura ${numeroUfficiale} emessa definitivamente per €${(fattura.nettoAPagareCentesimi / 100).toFixed(2)} con ${rateCalcolate.length} rate generate nello scadenzario`,
+        dettagli: `Fattura ${numeroUfficiale} emessa definitivamente per €${(nettoAPagareCent / 100).toFixed(2)} con ${rateCount} rate generate nello scadenzario`,
         ipAddress: req.ip,
       });
 
       return reply.send({
         ok: true,
         fattura: fatturaEmessa,
-        message: `Fattura ${numeroUfficiale} emessa con successo. Generate ${rateCalcolate.length} rate nello scadenzario.`,
+        message: `Fattura ${numeroUfficiale} emessa con successo. Generate ${rateCount} rate nello scadenzario.`,
       });
     } catch (err: any) {
+      if (err?.message === 'Fattura non trovata') {
+        return reply.code(404).send({ errore: 'Fattura non trovata' });
+      }
+      if (err?.message?.includes('già in stato')) {
+        return reply.code(400).send({ errore: err.message });
+      }
       return reply.code(500).send({ errore: err?.message || 'Errore durante l\'emissione della fattura' });
     }
   });
@@ -508,123 +543,137 @@ export async function registraRotteContabilita(server: FastifyInstance, app: App
     const { motivo, note } = req.body;
 
     try {
-      const fatturaOrigine = await prisma.fattura.findFirst({
-        where: { id, tenantId },
-        include: { righe: true, cliente: true, scadenzeIncasso: { include: { registrazioniRegistrate: true } } },
-      });
-      if (!fatturaOrigine) return reply.code(404).send({ errore: 'Fattura origine non trovata' });
-      if (fatturaOrigine.stato === 'bozza' || fatturaOrigine.stato === 'annullata') {
-        return reply.code(400).send({ errore: 'Impossibile emettere nota di credito per una fattura in bozza o già annullata' });
-      }
+      const { notaCredito, numeroNC, numeroOrigine } = await riprovaSuConflitto(() =>
+        prisma.$transaction(
+          async (tx) =>
+            conContestoInTransazione(tx, async () => {
+              const fatturaOrigine = await tx.fattura.findFirst({
+                where: { id, tenantId },
+                include: { righe: true, cliente: true, scadenzeIncasso: { include: { registrazioniRegistrate: true } } },
+              });
+              if (!fatturaOrigine) throw new Error('Fattura origine non trovata');
+              if (fatturaOrigine.stato === 'bozza' || fatturaOrigine.stato === 'annullata') {
+                throw new Error('Impossibile emettere nota di credito per una fattura in bozza o già annullata');
+              }
 
-      const dataEmissione = new Date();
-      const lastNC = await prisma.fattura.findFirst({
-        where: { tenantId, serie: 'NC', stato: { not: 'bozza' } },
-        orderBy: { numeroProgressivoSerie: 'desc' },
-      });
-      const progressivoNC = (lastNC?.numeroProgressivoSerie || 0) + 1;
-      const numeroNC = formattaNumeroDocumento('NC', progressivoNC, dataEmissione);
+              const dataEmissione = new Date();
+              const lastNC = await tx.fattura.findFirst({
+                where: { tenantId, serie: 'NC', stato: { not: 'bozza' } },
+                orderBy: { numeroProgressivoSerie: 'desc' },
+              });
+              const progressivoNC = (lastNC?.numeroProgressivoSerie || 0) + 1;
+              const numNC = formattaNumeroDocumento('NC', progressivoNC, dataEmissione);
 
-      // Crea Nota di Credito collegata (TD04)
-      const notaCredito = await prisma.fattura.create({
-        data: {
-          tenantId,
-          clienteId: fatturaOrigine.clienteId,
-          progettoId: fatturaOrigine.progettoId,
-          tipoDocumento: 'nota_credito',
-          serie: 'NC',
-          numeroProgressivoSerie: progressivoNC,
-          numero: numeroNC,
-          data: dataEmissione,
-          stato: 'emessa',
-          fatturaOrigineId: fatturaOrigine.id,
-          motivoNotaCredito: motivo || 'annullo_totale',
-          tipoClienteFiscale: fatturaOrigine.tipoClienteFiscale,
-          partitaIva: fatturaOrigine.partitaIva,
-          codiceFiscale: fatturaOrigine.codiceFiscale,
-          canale: fatturaOrigine.canale,
-          condizionePagamento: 'immediato',
-          metodoPagamento: fatturaOrigine.metodoPagamento,
-          contoAccreditoId: fatturaOrigine.contoAccreditoId,
-          tipoCassa: fatturaOrigine.tipoCassa,
-          aliquotaCassa: fatturaOrigine.aliquotaCassa,
-          aliquotaRitenuta: fatturaOrigine.aliquotaRitenuta,
-          esigibilitaIva: fatturaOrigine.esigibilitaIva,
-          totaleImponibileCentesimi: fatturaOrigine.totaleImponibileCentesimi,
-          totaleCassaCentesimi: fatturaOrigine.totaleCassaCentesimi,
-          totaleIvaCentesimi: fatturaOrigine.totaleIvaCentesimi,
-          totaleRitenutaCentesimi: fatturaOrigine.totaleRitenutaCentesimi,
-          totaleBolloCentesimi: fatturaOrigine.totaleBolloCentesimi,
-          totaleDocumentoCentesimi: fatturaOrigine.totaleDocumentoCentesimi,
-          nettoAPagareCentesimi: fatturaOrigine.nettoAPagareCentesimi,
-          note: note || `Storno totale a storno della fattura ${fatturaOrigine.numero}`,
-          righe: {
-            create: fatturaOrigine.righe.map((r, idx) => ({
-              tenantId,
-              tipo: r.tipo,
-              moduloProgettoId: r.moduloProgettoId,
-              articoloId: r.articoloId,
-              importo: r.importo,
-              descrizione: `Storno: ${r.descrizione}`,
-              quantita: r.quantita,
-              unitaMisura: r.unitaMisura,
-              prezzoUnitarioCent: r.prezzoUnitarioCent,
-              scontoPercentuale: r.scontoPercentuale,
-              aliquotaIva: r.aliquotaIva,
-              naturaEsenzione: r.naturaEsenzione,
-              applicaCassa: r.applicaCassa,
-              applicaRitenuta: r.applicaRitenuta,
-              applicaBollo: r.applicaBollo,
-              imponibileCentesimi: r.imponibileCentesimi,
-              ivaCentesimi: r.ivaCentesimi,
-              totaleRigaCentesimi: r.totaleRigaCentesimi,
-              ordine: idx + 1,
-            })),
-          },
-          auditLogFatture: {
-            create: {
-              tenantId,
-              utenteId: req.userId || null,
-              azione: 'nota_credito',
-              dettagli: {
-                fatturaOrigineId: fatturaOrigine.id,
+              // Crea Nota di Credito collegata (TD04)
+              const nc = await tx.fattura.create({
+                data: {
+                  tenantId,
+                  clienteId: fatturaOrigine.clienteId,
+                  progettoId: fatturaOrigine.progettoId,
+                  tipoDocumento: 'nota_credito',
+                  serie: 'NC',
+                  numeroProgressivoSerie: progressivoNC,
+                  numero: numNC,
+                  data: dataEmissione,
+                  stato: 'emessa',
+                  fatturaOrigineId: fatturaOrigine.id,
+                  motivoNotaCredito: motivo || 'annullo_totale',
+                  tipoClienteFiscale: fatturaOrigine.tipoClienteFiscale,
+                  partitaIva: fatturaOrigine.partitaIva,
+                  codiceFiscale: fatturaOrigine.codiceFiscale,
+                  canale: fatturaOrigine.canale,
+                  condizionePagamento: 'immediato',
+                  metodoPagamento: fatturaOrigine.metodoPagamento,
+                  contoAccreditoId: fatturaOrigine.contoAccreditoId,
+                  tipoCassa: fatturaOrigine.tipoCassa,
+                  aliquotaCassa: fatturaOrigine.aliquotaCassa,
+                  aliquotaRitenuta: fatturaOrigine.aliquotaRitenuta,
+                  esigibilitaIva: fatturaOrigine.esigibilitaIva,
+                  totaleImponibileCentesimi: fatturaOrigine.totaleImponibileCentesimi,
+                  totaleCassaCentesimi: fatturaOrigine.totaleCassaCentesimi,
+                  totaleIvaCentesimi: fatturaOrigine.totaleIvaCentesimi,
+                  totaleRitenutaCentesimi: fatturaOrigine.totaleRitenutaCentesimi,
+                  totaleBolloCentesimi: fatturaOrigine.totaleBolloCentesimi,
+                  totaleDocumentoCentesimi: fatturaOrigine.totaleDocumentoCentesimi,
+                  nettoAPagareCentesimi: fatturaOrigine.nettoAPagareCentesimi,
+                  note: note || `Storno totale a storno della fattura ${fatturaOrigine.numero}`,
+                  righe: {
+                    create: fatturaOrigine.righe.map((r, idx) => ({
+                      tenantId,
+                      tipo: r.tipo,
+                      moduloProgettoId: r.moduloProgettoId,
+                      articoloId: r.articoloId,
+                      importo: r.importo,
+                      descrizione: `Storno: ${r.descrizione}`,
+                      quantita: r.quantita,
+                      unitaMisura: r.unitaMisura,
+                      prezzoUnitarioCent: r.prezzoUnitarioCent,
+                      scontoPercentuale: r.scontoPercentuale,
+                      aliquotaIva: r.aliquotaIva,
+                      naturaEsenzione: r.naturaEsenzione,
+                      applicaCassa: r.applicaCassa,
+                      applicaRitenuta: r.applicaRitenuta,
+                      applicaBollo: r.applicaBollo,
+                      imponibileCentesimi: r.imponibileCentesimi,
+                      ivaCentesimi: r.ivaCentesimi,
+                      totaleRigaCentesimi: r.totaleRigaCentesimi,
+                      ordine: idx + 1,
+                    })),
+                  },
+                  auditLogFatture: {
+                    create: {
+                      tenantId,
+                      utenteId: req.userId || null,
+                      azione: 'nota_credito',
+                      dettagli: {
+                        fatturaOrigineId: fatturaOrigine.id,
+                        numeroOrigine: fatturaOrigine.numero,
+                        motivo,
+                      },
+                    },
+                  },
+                },
+                include: { righe: true, cliente: true, progetto: true },
+              });
+
+              // Annulla o storno le scadenze non incassate della fattura origine
+              await tx.scadenzaIncasso.updateMany({
+                where: { fatturaId: fatturaOrigine.id, stato: 'in_attesa' },
+                data: { stato: 'parziale', note: `Annullata per emissione Nota di Credito ${numNC}` },
+              });
+
+              // Se la fattura era già stata incassata, genera un movimento di uscita storno in Prima Nota
+              const totaleIncassato = fatturaOrigine.scadenzeIncasso.flatMap((s) => s.registrazioniRegistrate).reduce((acc, r) => acc + r.importoIncassatoCentesimi, 0);
+              if (totaleIncassato > 0) {
+                await tx.movimentoPrimaNota.create({
+                  data: {
+                    tenantId,
+                    contoBancarioId: fatturaOrigine.contoAccreditoId,
+                    fatturaId: nc.id,
+                    clienteId: fatturaOrigine.clienteId,
+                    tipo: 'uscita',
+                    categoria: 'altro',
+                    descrizione: `Storno rimborso Nota di Credito ${numNC} su fattura ${fatturaOrigine.numero}`,
+                    importoCentesimi: totaleIncassato,
+                    metodoPagamento: fatturaOrigine.metodoPagamento,
+                  },
+                });
+              }
+
+              await tx.fattura.update({
+                where: { id: fatturaOrigine.id },
+                data: { stato: 'annullata' },
+              });
+
+              return {
+                notaCredito: nc,
+                numeroNC: numNC,
                 numeroOrigine: fatturaOrigine.numero,
-                motivo,
-              },
-            },
-          },
-        },
-        include: { righe: true, cliente: true, progetto: true },
-      });
-
-      // Annulla o storno le scadenze non incassate della fattura origine
-      await prisma.scadenzaIncasso.updateMany({
-        where: { fatturaId: fatturaOrigine.id, stato: 'in_attesa' },
-        data: { stato: 'parziale', note: `Annullata per emissione Nota di Credito ${numeroNC}` },
-      });
-
-      // Se la fattura era già stata incassata, genera un movimento di uscita storno in Prima Nota
-      const totaleIncassato = fatturaOrigine.scadenzeIncasso.flatMap((s) => s.registrazioniRegistrate).reduce((acc, r) => acc + r.importoIncassatoCentesimi, 0);
-      if (totaleIncassato > 0) {
-        await prisma.movimentoPrimaNota.create({
-          data: {
-            tenantId,
-            contoBancarioId: fatturaOrigine.contoAccreditoId,
-            fatturaId: notaCredito.id,
-            clienteId: fatturaOrigine.clienteId,
-            tipo: 'uscita',
-            categoria: 'altro',
-            descrizione: `Storno rimborso Nota di Credito ${numeroNC} su fattura ${fatturaOrigine.numero}`,
-            importoCentesimi: totaleIncassato,
-            metodoPagamento: fatturaOrigine.metodoPagamento,
-          },
-        });
-      }
-
-      await prisma.fattura.update({
-        where: { id: fatturaOrigine.id },
-        data: { stato: 'annullata' },
-      });
+              };
+            }),
+          { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+        ),
+      );
 
       await recordAudit({
         tenantId,
@@ -632,16 +681,22 @@ export async function registraRotteContabilita(server: FastifyInstance, app: App
         ruolo: req.ruolo,
         azione: 'NOTA_CREDITO_EMESSA',
         entita: numeroNC,
-        dettagli: `Emessa Nota di Credito ${numeroNC} a storno della fattura ${fatturaOrigine.numero}`,
+        dettagli: `Emessa Nota di Credito ${numeroNC} a storno della fattura ${numeroOrigine}`,
         ipAddress: req.ip,
       });
 
       return reply.send({
         ok: true,
         notaCredito,
-        message: `Nota di credito ${numeroNC} emessa con successo a storno della fattura ${fatturaOrigine.numero}`,
+        message: `Nota di credito ${numeroNC} emessa con successo a storno della fattura ${numeroOrigine}`,
       });
     } catch (err: any) {
+      if (err?.message === 'Fattura origine non trovata') {
+        return reply.code(404).send({ errore: 'Fattura origine non trovata' });
+      }
+      if (err?.message?.includes('Impossibile emettere nota di credito')) {
+        return reply.code(400).send({ errore: err.message });
+      }
       return reply.code(500).send({ errore: err?.message || 'Errore emissione nota di credito' });
     }
   });

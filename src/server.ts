@@ -13,6 +13,7 @@ import {
   PreventivoNonTrovatoError,
   ModuloNonTrovatoError,
   TransizioneNonValidaError,
+  DipendenzaCiclicaError,
 } from './adapters/appErrors.js';
 
 import { signJwt, verifyJwt } from './util/jwt.js';
@@ -251,6 +252,12 @@ export function buildServer(app: AppPort): FastifyInstance {
     }
     if (err instanceof TransizioneNonValidaError || err instanceof ProceduraIncompletaError) {
       return reply.code(409).send({ errore: err.message });
+    }
+    // §7ter — ciclo nelle dipendenze: la modifica chiesta non è valida, è lo
+    // stesso 400 che dà la rotta PUT quando lo rileva prima della transazione.
+    // Qui arriva il lancio dalla porta applicativa (script, uso programmatico).
+    if (err instanceof DipendenzaCiclicaError) {
+      return reply.code(400).send({ errore: `Ciclo nelle dipendenze (§7ter): ${err.message}` });
     }
     // Errori che nascono già con un codice HTTP (il 429 di @fastify/rate-limit,
     // i 4xx standard di Fastify): il codice va rispettato, non sepolto in un 500.

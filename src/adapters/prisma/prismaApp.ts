@@ -26,7 +26,9 @@ import {
   PreventivoNonTrovatoError,
   ModuloNonTrovatoError,
   TransizioneNonValidaError,
+  DipendenzaCiclicaError,
 } from '../appErrors.js';
+import { trovaCicloDipendenze } from '../../services/dipendenzeModuli.js';
 
 /** Notifiche via console.log — stub in attesa del servizio email reale (§10, §22). */
 class ConsoleNotificationPort implements NotificationPort {
@@ -136,8 +138,10 @@ export class PrismaApp implements AppPort {
           articoloVersione: art.versione,
           ordine: idx + 1,
           quantita: r.quantita || 1,
-          overrideOre: r.overrideOre || null,
-          overridePrezzo: r.overridePrezzo || null,
+          // Come nelle rotte: lo zero è un override legittimo
+          // («ore incluse: 0»), || null lo cancellava di nascosto.
+          overrideOre: r.overrideOre ?? null,
+          overridePrezzo: r.overridePrezzo ?? null,
         },
       });
     }
@@ -198,14 +202,28 @@ export class PrismaApp implements AppPort {
                 articoloVersione: art.versione,
                 ordine: idx + 1,
                 quantita: r.quantita || 1,
-                overrideOre: r.overrideOre || null,
-                overridePrezzo: r.overridePrezzo || null,
+                // Come nelle rotte: lo zero è un override legittimo
+                // («ore incluse: 0»), || null lo cancellava di nascosto.
+                overrideOre: r.overrideOre ?? null,
+                overridePrezzo: r.overridePrezzo ?? null,
               },
             });
           }
         }
 
         if (input.dipendenzeDaIds) {
+          // §7ter — il grafo dev'essere un DAG anche su questa porta: la rotta
+          // PUT verifica prima della transazione, ma chi scrive qui senza passare
+          // da lì (script, import, uso programmatico) ha la stessa garanzia.
+          // La lettura viaggia dentro la transazione: il grafo letto è quello
+          // su cui sta per scrivere la deleteMany qui sotto.
+          const archi = await tx.moduloDipendenzaTemplate.findMany({
+            where: { tenantId: this.tenantId },
+            select: { moduloTemplateId: true, dipendeDaModuloTemplateId: true },
+          });
+          const ciclo = trovaCicloDipendenze(archi, id, input.dipendenzeDaIds);
+          if (ciclo) throw new DipendenzaCiclicaError(ciclo.join(' → '));
+
           await tx.moduloDipendenzaTemplate.deleteMany({ where: { tenantId: this.tenantId, moduloTemplateId: id } });
           for (const depId of input.dipendenzeDaIds) {
             await tx.moduloDipendenzaTemplate.create({

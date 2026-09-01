@@ -7,3 +7,6 @@ export class ProgettoNonTrovatoError extends Error {}
 export class PreventivoNonTrovatoError extends Error {}
 export class ModuloNonTrovatoError extends Error {}
 export class TransizioneNonValidaError extends Error {}
+
+/** §7ter — la modifica delle dipendenze chiuderebbe un ciclo (A→B→A) nel grafo. */
+export class DipendenzaCiclicaError extends Error {}

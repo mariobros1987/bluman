@@ -96,6 +96,27 @@ export async function conContestoInTransazione<T>(
   return dentroTransazioneConTenant.run(true, fn);
 }
 
+/**
+ * Ritenta un'operazione quando Postgres abortisce la transazione per un conflitto
+ * (Prisma P2034). Con `isolationLevel: Serializable` due richieste contemporanee
+ * che assegnano lo stesso progressivo (numerazione fatture) vengono serializzate:
+ * una delle due fallisce qui e, al tentativo successivo, rilegge i progressivi
+ * già scritti dall'altra. Gli errori diversi da P2034 non si ritentano: non sono
+ * conflitti ma guasti veri, che riprovare non ripara.
+ */
+export async function riprovaSuConflitto<T>(operazione: () => Promise<T>, tentativi = 3): Promise<T> {
+  for (let tentativo = 1; ; tentativo++) {
+    try {
+      return await operazione();
+    } catch (err: any) {
+      if (err?.code !== 'P2034' || tentativo >= tentativi) throw err;
+      // Pausa crescente: dà alla transazione concorrente il tempo di committare,
+      // così il tentativo successivo parte da una fotografia aggiornata.
+      await new Promise((risolvi) => setTimeout(risolvi, 25 * tentativo));
+    }
+  }
+}
+
 let clientAmministrativo: PrismaClient | null = null;
 
 /**

@@ -27,14 +27,10 @@ import { livelloFirmaValido } from '../services/livelloFirmaService.js';
 export async function registraRotteProgetti(server: FastifyInstance, app: AppPort): Promise<void> {
   // Comunicazioni Progetto API (Multicanale Ingestion)
   server.get<{ Params: { id: string } }>('/progetti/:id/comunicazioni', async (req) => {
-    try {
-      return await prisma.comunicazioneProgetto.findMany({
-        where: { progettoId: req.params.id },
-        orderBy: { createdAt: 'asc' },
-      });
-    } catch {
-      return [];
-    }
+    return await prisma.comunicazioneProgetto.findMany({
+      where: { progettoId: req.params.id },
+      orderBy: { createdAt: 'asc' },
+    });
   });
 
   server.post<{ Params: { id: string }; Body: Record<string, any> }>('/progetti/:id/comunicazioni', async (req, reply) => {
@@ -81,34 +77,35 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
       // e risponde con il motivo quando WhatsApp non accetta.
 
       return reply.code(201).send(msg);
-    } catch {
-      return reply.code(201).send({ ok: true, ...body });
+    } catch (err: any) {
+      // progettoId inesistente: niente fascicolo in cui registrare, non un 201 fasullo.
+      if (err?.code === 'P2003') {
+        return reply.code(404).send({ errore: 'Progetto non trovato' });
+      }
+      throw err;
     }
   });
 
   server.get('/progetti', async (req) => {
     const tenantId = req.tenantId || '00000000-0000-0000-0000-000000000001';
-    try {
-      const projs = await prisma.progetto.findMany({
-        where: { tenantId },
-        include: {
-          cliente: true,
-          giurisdizionePrimaria: true,
-          moduli: {
-            include: {
-              microvoci: true,
-            }
+    const projs = await prisma.progetto.findMany({
+      where: { tenantId },
+      include: {
+        cliente: true,
+        giurisdizionePrimaria: true,
+        moduli: {
+          include: {
+            microvoci: true,
           }
-        },
-        orderBy: { createdAt: 'desc' },
-      });
-      // §16 — l'avanzamento viaggia già calcolato: il client lo legge, non lo deduce.
-      // `arricchisciProgetti` non emette query, lavora sui moduli e micro-voci appena letti.
-      if (projs && projs.length > 0) return arricchisciProgetti(projs);
-      return (app as any).listaProgetti?.() || [];
-    } catch {
-      return (app as any).listaProgetti?.() || [];
-    }
+        }
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    // §16 — l'avanzamento viaggia già calcolato: il client lo legge, non lo deduce.
+    // `arricchisciProgetti` non emette query, lavora sui moduli e micro-voci appena letti.
+    // Una lista vuota è legittima (studio senza progetti): prima scatenava il ripiego
+    // in-memory e la rotta fingeva progetti che non esistono.
+    return arricchisciProgetti(projs);
   });
 
   /**
@@ -159,9 +156,13 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
         include: { cliente: true, giurisdizionePrimaria: true }
       });
       return reply.code(201).send(progetto);
-    } catch {
-      const progetto = await app.creaProgetto({ clienteId, nome });
-      return reply.code(201).send(progetto);
+    } catch (err: any) {
+      // clienteId (o giurisdizione) inesistente: il progetto non ha un titolare a cui
+      // appartenere, non un 201 costruito in memoria.
+      if (err?.code === 'P2003') {
+        return reply.code(400).send({ errore: 'Il cliente indicato non esiste' });
+      }
+      throw err;
     }
   });
 
@@ -177,14 +178,9 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
    */
   server.get<{ Params: { id: string } }>('/progetti/:id', async (req, reply) => {
     const { id } = req.params;
-    try {
-      const dbProj: any = await app.getProgetto(id);
-      if (!dbProj) return reply.code(404).send({ errore: `Progetto ${id} non trovato` });
-      return reply.send({ ...dbProj, avanzamento: calcolaAvanzamento(dbProj) });
-    } catch (err) {
-      console.warn(`Lettura progetto ${id} non riuscita:`, err);
-      return reply.code(404).send({ errore: 'Progetto non trovato' });
-    }
+    const dbProj: any = await app.getProgetto(id);
+    if (!dbProj) return reply.code(404).send({ errore: `Progetto ${id} non trovato` });
+    return reply.send({ ...dbProj, avanzamento: calcolaAvanzamento(dbProj) });
   });
 
   // §1.1 (PIANO_DI_MIGLIORAMENTO) — l'eliminazione transazionale esisteva già
@@ -963,16 +959,13 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
   });
 
   // ── CHECKLIST SOP COMPLIANCE (STYLE OPENSTAMANAGER) ───────────────
-  server.get<{ Params: { passaggioId: string } }>('/passaggi/:passaggioId/checklist', async (req, reply) => {
-    try {
-      const voci = await prisma.checklistVoce.findMany({
-        where: { passaggioProgettoId: req.params.passaggioId },
-        orderBy: { titolo: 'asc' },
-      });
-      return reply.send(voci);
-    } catch {
-      return reply.send([]);
-    }
+  server.get<{ Params: { passaggioId: string } }>('/passaggi/:passaggioId/checklist', async (req) => {
+    // Lista vuota = passaggio senza voci: è un dato legittimo, non un errore da
+    // mascherare con `[]` quando la lettura fallisce.
+    return await prisma.checklistVoce.findMany({
+      where: { passaggioProgettoId: req.params.passaggioId },
+      orderBy: { titolo: 'asc' },
+    });
   });
 
   server.post<{
@@ -995,8 +988,12 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
         },
       });
       return reply.code(201).send(voce);
-    } catch (err) {
-      return reply.code(500).send({ errore: 'Errore creazione voce checklist' });
+    } catch (err: any) {
+      // passaggioId inesistente: la voce non ha un passaggio a cui appartenere.
+      if (err?.code === 'P2003') {
+        return reply.code(404).send({ errore: 'Passaggio non trovato' });
+      }
+      throw err;
     }
   });
 
@@ -1013,8 +1010,12 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
         },
       });
       return reply.send(updated);
-    } catch (err) {
-      return reply.code(500).send({ errore: 'Errore aggiornamento checklist' });
+    } catch (err: any) {
+      // id inesistente fra la lettura e la scrittura: la voce è sparita.
+      if (err?.code === 'P2025') {
+        return reply.code(404).send({ errore: 'Voce non trovata' });
+      }
+      throw err;
     }
   });
 

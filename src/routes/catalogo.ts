@@ -13,53 +13,39 @@ import { prisma, conContestoInTransazione } from '../util/prismaClient.js';
 import { uploadDocumento, CARTELLA_UPLOADS, nomeFileValido } from '../services/storageService.js';
 import { verificaFirmaDownload } from '../util/jwt.js';
 import { recordAudit } from '../util/serverHelpers.js';
+import { trovaCicloDipendenze } from '../services/dipendenzeModuli.js';
 
 // ─── ARTICOLI & PRESTAZIONI API (§Prisma Persistenza Cloud) ───────
 export async function registraRotteCatalogo(server: FastifyInstance, app: AppPort): Promise<void> {
   // ─── GIURISDIZIONI API (§8 Estensione) ───────────────────────────
   server.get('/giurisdizioni', async (req) => {
     const tenantId = req.tenantId || '00000000-0000-0000-0000-000000000001';
-    try {
-      const items = await prisma.giurisdizione.findMany({
-        where: { tenantId },
-        orderBy: { nome: 'asc' },
-      });
-      return items;
-    } catch {
-      return [
-        { id: 'giur-mt', nome: 'Malta', codice: 'MT', tipo: 'ue', note: 'Repubblica di Malta' },
-        { id: 'giur-gi', nome: 'Gibilterra', codice: 'GI', tipo: 'extra_ue', note: 'Territorio d Oltremare Britannico' },
-        { id: 'giur-fl', nome: 'Florida (USA)', codice: 'US-FL', tipo: 'stato_usa', note: 'Stato della Florida' },
-        { id: 'giur-de', nome: 'Delaware (USA)', codice: 'US-DE', tipo: 'stato_usa', note: 'Stato del Delaware' },
-        { id: 'giur-ae', nome: 'Emirati Arabi Uniti', codice: 'AE', tipo: 'extra_ue', note: 'Dubai / Abu Dhabi Free Zones' },
-      ];
-    }
+    return prisma.giurisdizione.findMany({
+      where: { tenantId },
+      orderBy: { nome: 'asc' },
+    });
   });
 
   server.post<{ Body: { nome: string; codice: string; tipo: 'ue' | 'extra_ue' | 'stato_usa' | 'altro'; note?: string } }>('/giurisdizioni', async (req, reply) => {
     const tenantId = req.tenantId || '00000000-0000-0000-0000-000000000001';
     const body = req.body || {};
-    try {
-      const item = await prisma.giurisdizione.create({
-        data: {
-          tenantId,
-          nome: body.nome,
-          codice: body.codice,
-          tipo: body.tipo || 'ue',
-          note: body.note,
-        },
-      });
-      await recordAudit({
+    const item = await prisma.giurisdizione.create({
+      data: {
         tenantId,
-        azione: 'GIURISDIZIONE_CREATA',
-        entita: body.nome,
-        dettagli: `Aggiunta nuova giurisdizione ${body.nome} (${body.codice})`,
-        ipAddress: req.ip,
-      });
-      return reply.code(201).send(item);
-    } catch {
-      return reply.code(201).send({ id: `giur-${Date.now()}`, tenantId, ...body });
-    }
+        nome: body.nome,
+        codice: body.codice,
+        tipo: body.tipo || 'ue',
+        note: body.note,
+      },
+    });
+    await recordAudit({
+      tenantId,
+      azione: 'GIURISDIZIONE_CREATA',
+      entita: body.nome,
+      dettagli: `Aggiunta nuova giurisdizione ${body.nome} (${body.codice})`,
+      ipAddress: req.ip,
+    });
+    return reply.code(201).send(item);
   });
 
   server.put<{ Params: { id: string }; Body: { nome?: string; codice?: string; tipo?: 'ue' | 'extra_ue' | 'stato_usa' | 'altro'; note?: string } }>('/giurisdizioni/:id', async (req, reply) => {
@@ -85,7 +71,11 @@ export async function registraRotteCatalogo(server: FastifyInstance, app: AppPor
       });
       return reply.send(updated);
     } catch (err: any) {
-      return reply.code(400).send({ errore: err.message || 'Errore aggiornamento giurisdizione' });
+      // RLS rende invisibile la giurisdizione di un altro tenant: 404, non 400.
+      if (err?.code === 'P2025') {
+        return reply.code(404).send({ errore: 'Giurisdizione non trovata' });
+      }
+      throw err;
     }
   });
 
@@ -103,60 +93,60 @@ export async function registraRotteCatalogo(server: FastifyInstance, app: AppPor
       });
       return reply.send({ success: true });
     } catch (err: any) {
-      return reply.code(400).send({ errore: err.message || 'Errore eliminazione giurisdizione' });
+      // RLS rende invisibile la giurisdizione di un altro tenant: 404, non 400.
+      if (err?.code === 'P2025') {
+        return reply.code(404).send({ errore: 'Giurisdizione non trovata' });
+      }
+      // FK referenziata da moduli template o progetti: non eliminabile finché
+      // qualcuno la usa. 409 conflitto, con un messaggio che dice quale vincolo.
+      if (err?.code === 'P2003') {
+        return reply.code(409).send({ errore: 'Giurisdizione referenziata da moduli o progetti: impossibile eliminarla' });
+      }
+      throw err;
     }
   });
 
   server.get<{ Querystring: { giurisdizioneId?: string } }>('/moduli', async (req) => {
     const { giurisdizioneId } = req.query || {};
     const tenantId = req.tenantId || '00000000-0000-0000-0000-000000000001';
-    try {
-      if (giurisdizioneId) {
-        // Restituisce i moduli specifici di quella giurisdizione PIÙ quelli generici (giurisdizioneId null)
-        const dbModuli = await prisma.moduloTemplate.findMany({
-          where: {
-            tenantId,
-            isAttivo: true,
-            OR: [
-              { giurisdizioneId: giurisdizioneId },
-              { giurisdizioneId: null },
-            ],
-          },
-          include: {
-            giurisdizione: true,
-            dipendenze: true,
-            righeDistinta: { include: { articolo: true } },
-          },
-        });
-        return dbModuli;
-      }
+    if (giurisdizioneId) {
+      // Restituisce i moduli specifici di quella giurisdizione PIÙ quelli generici (giurisdizioneId null)
       return await prisma.moduloTemplate.findMany({
-        where: { tenantId, isAttivo: true },
+        where: {
+          tenantId,
+          isAttivo: true,
+          OR: [
+            { giurisdizioneId: giurisdizioneId },
+            { giurisdizioneId: null },
+          ],
+        },
         include: {
           giurisdizione: true,
           dipendenze: true,
           righeDistinta: { include: { articolo: true } },
         },
       });
-    } catch {
-      return app.listaModuli();
     }
+    return await prisma.moduloTemplate.findMany({
+      where: { tenantId, isAttivo: true },
+      include: {
+        giurisdizione: true,
+        dipendenze: true,
+        righeDistinta: { include: { articolo: true } },
+      },
+    });
   });
 
   // ─── ARTICOLI & PRESTAZIONI API (§Prisma Persistenza Cloud) ───────
   server.get('/articoli', async (req) => {
     const tenantId = req.tenantId || '00000000-0000-0000-0000-000000000001';
-    try {
-      // Una lista vuota è una risposta legittima (studio appena iscritto senza
-      // catalogo): prima veniva scambiata per un errore e sostituita coi dati
-      // dell'adapter in-memory. Il ripiego resta solo se il DB non risponde.
-      return await prisma.articolo.findMany({
-        where: { tenantId, isAttivo: true },
-        orderBy: { nome: 'asc' },
-      });
-    } catch {
-      return app.listaArticoli();
-    }
+    // Una lista vuota è una risposta legittima (studio appena iscritto senza
+    // catalogo): prima veniva scambiata per un errore e sostituita coi dati
+    // dell'adapter in-memory, fingendo un catalogo che non esiste.
+    return await prisma.articolo.findMany({
+      where: { tenantId, isAttivo: true },
+      orderBy: { nome: 'asc' },
+    });
   });
 
   // Upload Documento Endpoint (Base64 file upload & static download)
@@ -287,28 +277,23 @@ export async function registraRotteCatalogo(server: FastifyInstance, app: AppPor
     if (!nome || !categoria) {
       return reply.code(400).send({ errore: 'nome e categoria sono obbligatori' });
     }
-    try {
-      const art = await prisma.articolo.create({
-        data: {
-          tenantId,
-          nome,
-          categoria,
-          oreDefault: oreDefault || 1,
-          prezzoDefault: prezzoDefault || 0,
-        },
-      });
-      await recordAudit({
+    const art = await prisma.articolo.create({
+      data: {
         tenantId,
-        azione: 'ARTICOLO_CREATO',
-        entita: art.nome,
-        dettagli: `Creato articolo prestazione ${art.nome} (${art.categoria}) - €${art.prezzoDefault/100}`,
-        ipAddress: req.ip,
-      });
-      return reply.code(201).send(art);
-    } catch {
-      const articolo = await app.creaArticolo(req.body);
-      return reply.code(201).send(articolo);
-    }
+        nome,
+        categoria,
+        oreDefault: oreDefault || 1,
+        prezzoDefault: prezzoDefault || 0,
+      },
+    });
+    await recordAudit({
+      tenantId,
+      azione: 'ARTICOLO_CREATO',
+      entita: art.nome,
+      dettagli: `Creato articolo prestazione ${art.nome} (${art.categoria}) - €${art.prezzoDefault/100}`,
+      ipAddress: req.ip,
+    });
+    return reply.code(201).send(art);
   });
 
   server.post<{
@@ -372,12 +357,19 @@ export async function registraRotteCatalogo(server: FastifyInstance, app: AppPor
                 articoloVersione: art.versione,
                 ordine: idx + 1,
                 quantita: r.quantita || 1,
-                overrideOre: r.overrideOre || null,
-                overridePrezzo: r.overridePrezzo || null,
+                // Lo zero è un override legittimo («ore incluse: 0»): con || chi
+                // azzera un campo vedeva il default riemergere nel salvataggio.
+                overrideOre: r.overrideOre ?? null,
+                overridePrezzo: r.overridePrezzo ?? null,
               },
             });
           }
 
+          // §7ter — qui il grafo non può chiudere cicli PER COSTRUZIONE: il modulo
+          // è nuovo (id generato ora dal DB), quindi nessun arco esistente può
+          // puntare a lui. Il check anti-ciclo è necessario solo nella modifica
+          // (PUT): lì un modulo già referenziato può diventare prerequisito del
+          // proprio prerequisito.
           for (const depId of dipendenzeDaIds || []) {
             await tx.moduloDipendenzaTemplate.create({
               data: {
@@ -409,9 +401,7 @@ export async function registraRotteCatalogo(server: FastifyInstance, app: AppPor
       if (err?.code === 'P2025' || err?.code === 'P2003') {
         return reply.code(400).send({ errore: 'Un riferimento della distinta non è più valido' });
       }
-      // Modalità test/demo senza DB raggiungibile: stesso ripiego in-memory di POST /articoli.
-      const modulo = await app.creaModuloTemplate(req.body);
-      return reply.code(201).send(modulo);
+      throw err;
     }
   });
 
@@ -450,6 +440,30 @@ export async function registraRotteCatalogo(server: FastifyInstance, app: AppPor
         return reply.code(400).send({ errore: 'La distinta non può essere vuota' });
       }
 
+      // §7ter — il grafo delle dipendenze dev'essere un DAG: rifiutare qui la
+      // modifica che chiuderebbe un ciclo (A→B→A). Letto fuori dalla
+      // transazione, come le altre validazioni 400. La verifica è chirurgica:
+      // si rifiuta solo se È QUESTA modifica a chiudere il ciclo che passa per
+      // il modulo editato — un ciclo già presente altrove (dati corrotti) non
+      // viene attribuito a chi edita, così resta sempre possibile ripararlo
+      // svuotando le dipendenze con [].
+      if (body.dipendenzeDaIds) {
+        const archi = await prisma.moduloDipendenzaTemplate.findMany({
+          where: { tenantId },
+          select: { moduloTemplateId: true, dipendeDaModuloTemplateId: true },
+        });
+        const ciclo = trovaCicloDipendenze(archi, id, body.dipendenzeDaIds);
+        if (ciclo) {
+          const nomi = await prisma.moduloTemplate.findMany({
+            where: { id: { in: Array.from(new Set(ciclo)) } },
+            select: { id: true, nome: true },
+          });
+          const nomeDi = new Map(nomi.map((n) => [n.id, n.nome] as const));
+          const descrizione = ciclo.map((mid) => nomeDi.get(mid) ?? mid).join(' → ');
+          return reply.code(400).send({ errore: `Ciclo nelle dipendenze (§7ter): ${descrizione}` });
+        }
+      }
+
       // §14 — come per la creazione: prisma diretto col tenant della richiesta,
       // non app.aggiornaModuloTemplate() che è legato a un tenant fisso.
       const aggiornato = await prisma.$transaction(async (tx) =>
@@ -473,8 +487,10 @@ export async function registraRotteCatalogo(server: FastifyInstance, app: AppPor
                   articoloVersione: art.versione,
                   ordine: idx + 1,
                   quantita: r.quantita || 1,
-                  overrideOre: r.overrideOre || null,
-                  overridePrezzo: r.overridePrezzo || null,
+                  // Come nella creazione: lo zero è un override legittimo
+                  // («ore incluse: 0»), || null lo cancellava di nascosto.
+                  overrideOre: r.overrideOre ?? null,
+                  overridePrezzo: r.overridePrezzo ?? null,
                 },
               });
             }
@@ -511,8 +527,7 @@ export async function registraRotteCatalogo(server: FastifyInstance, app: AppPor
       if (err?.code === 'P2003') {
         return reply.code(400).send({ errore: 'Un riferimento di distinta o dipendenza non è valido' });
       }
-      // Modalità test/demo senza DB raggiungibile: ripiego in-memory.
-      return reply.send(await app.aggiornaModuloTemplate(id, body));
+      throw err;
     }
   });
 
@@ -541,8 +556,7 @@ export async function registraRotteCatalogo(server: FastifyInstance, app: AppPor
       if (err?.code === 'P2025') {
         return reply.code(404).send({ errore: 'Modulo non trovato' });
       }
-      // Modalità test/demo senza DB raggiungibile: ripiego in-memory.
-      return reply.send(app.disattivaModuloTemplate(id));
+      throw err;
     }
   });
 
@@ -569,8 +583,7 @@ export async function registraRotteCatalogo(server: FastifyInstance, app: AppPor
       if (err?.code === 'P2025') {
         return reply.code(404).send({ errore: 'Articolo non trovato' });
       }
-      // Modalità test/demo senza DB raggiungibile: ripiego in-memory.
-      return reply.send(app.disattivaArticolo(id));
+      throw err;
     }
   });
 }

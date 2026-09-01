@@ -239,6 +239,16 @@ export class PrismaIstanziazionePort implements IstanziazionePort, EsecuzionePor
     await this.prisma.passaggioProgetto.update({ where: { id }, data: updates });
   }
 
+  async getProgetto(id: string) {
+    const p = await this.prisma.progetto.findUnique({ where: { id }, select: { id: true, stato: true } });
+    if (!p) return null;
+    return { id: p.id, stato: p.stato || 'in_progress' };
+  }
+
+  async aggiornaProgetto(id: string, updates: { stato: string }) {
+    await this.prisma.progetto.update({ where: { id }, data: { stato: updates.stato as any } });
+  }
+
   // Blocco 3 — il modulo è diventato 'done': avvisa lo studio in tempo reale.
   async notificaModuloCompletato(moduloProgettoId: string) {
     const modulo = await this.prisma.moduloProgetto.findUnique({

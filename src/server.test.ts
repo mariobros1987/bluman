@@ -67,27 +67,32 @@ describe('server — /health e /moduli', () => {
     expect(res.json()).toEqual({ stato: 'degradato', db: 'irraggiungibile' });
   });
 
-  it('GET /moduli elenca la libreria', async () => {
+  it('GET /moduli risponde 500 onesto senza DB, non una libreria finta', async () => {
+    // La rotta legge moduloTemplate da Prisma. Senza DB il vecchio catch rispondeva
+    // 200 con la libreria dell'adapter, mascherando il guasto; ora l'errore reale
+    // arriva all'errorHandler (modello del test /health). L'elencazione con dati
+    // veri è presidiata da calcoloService.test.ts, che mocka il client Prisma.
     const { server } = nuovoServer();
     const res = await server.inject({ method: 'GET', url: '/moduli' });
-    expect(res.statusCode).toBe(200);
-    expect(res.json().length).toBeGreaterThanOrEqual(1);
-    expect(res.json().some((m: any) => m.nome === 'Analisi patrimoniale iniziale')).toBe(true);
+    expect(res.statusCode).toBe(500);
+    expect(typeof res.json().errore).toBe('string');
   });
 });
 
 describe('server — flusso completo cliente → progetto → preventivo → accettazione', () => {
   it('esegue l\'intero ciclo end-to-end tramite HTTP', async () => {
-    const { server } = nuovoServer();
+    const { app, server } = nuovoServer();
 
     const cliente = await server.inject({ method: 'POST', url: '/clienti', payload: { nome: 'Marco Ricci', tipo: 'individual' } });
     expect(cliente.statusCode).toBe(201);
     const clienteId = cliente.json().id;
 
-    const progetto = await server.inject({ method: 'POST', url: '/progetti', payload: { clienteId, nome: 'Struttura Holding' } });
-    expect(progetto.statusCode).toBe(201);
-    expect(progetto.json().stato).toBe('pre_project');
-    const progettoId = progetto.json().id;
+    // POST /progetti è prisma-diretta e senza DB risponderebbe 500: si crea il
+    // progetto dall'AppPort — ciò che la rotta stessa faceva prima della migrazione —
+    // così il resto del ciclo (preventivo, accettazione, rilettura) resta end-to-end.
+    const progetto = app.creaProgetto({ clienteId, nome: 'Struttura Holding' });
+    expect(progetto.stato).toBe('pre_project');
+    const progettoId = progetto.id;
 
     const preventivo = await server.inject({
       method: 'POST',
@@ -125,13 +130,15 @@ describe('server — flusso completo cliente → progetto → preventivo → acc
   });
 
   it('409 se si tenta di accettare due volte lo stesso preventivo', async () => {
-    const { server } = nuovoServer();
+    const { app, server } = nuovoServer();
     const cliente = await server.inject({ method: 'POST', url: '/clienti', payload: { nome: 'Test', tipo: 'individual' } });
-    const progetto = await server.inject({ method: 'POST', url: '/progetti', payload: { clienteId: cliente.json().id, nome: 'P' } });
+    // POST /progetti è prisma-diretta e senza DB risponde 500: si crea il progetto
+    // dall'AppPort, come faceva la rotta prima della migrazione.
+    const progetto = app.creaProgetto({ clienteId: cliente.json().id, nome: 'P' });
     const preventivo = await server.inject({
       method: 'POST',
       url: '/preventivi',
-      payload: { clienteId: cliente.json().id, progettoId: progetto.json().id, righe: [{ moduloTemplateId: 'M01', moduloTemplateVersione: 1 }] },
+      payload: { clienteId: cliente.json().id, progettoId: progetto.id, righe: [{ moduloTemplateId: 'M01', moduloTemplateVersione: 1 }] },
     });
     const preventivoId = preventivo.json().id;
 
@@ -143,13 +150,13 @@ describe('server — flusso completo cliente → progetto → preventivo → acc
   });
 
   it('404 con messaggio chiaro se un modulo del preventivo non esiste in libreria', async () => {
-    const { server } = nuovoServer();
+    const { app, server } = nuovoServer();
     const cliente = await server.inject({ method: 'POST', url: '/clienti', payload: { nome: 'Test', tipo: 'individual' } });
-    const progetto = await server.inject({ method: 'POST', url: '/progetti', payload: { clienteId: cliente.json().id, nome: 'P' } });
+    const progetto = app.creaProgetto({ clienteId: cliente.json().id, nome: 'P' });
     const res = await server.inject({
       method: 'POST',
       url: '/preventivi',
-      payload: { clienteId: cliente.json().id, progettoId: progetto.json().id, righe: [{ moduloTemplateId: 'INESISTENTE', moduloTemplateVersione: 1 }] },
+      payload: { clienteId: cliente.json().id, progettoId: progetto.id, righe: [{ moduloTemplateId: 'INESISTENTE', moduloTemplateVersione: 1 }] },
     });
     expect(res.statusCode).toBe(404);
   });
@@ -165,35 +172,37 @@ describe('server — elenchi (per il frontend)', () => {
     expect(res.json()).toHaveLength(2);
   });
 
-  it('GET /progetti elenca i progetti creati', async () => {
+  it('GET /progetti risponde 500 onesto senza DB, non un elenco finto', async () => {
+    // La rotta legge progetto da Prisma: senza DB l'errore reale arriva
+    // all'errorHandler invece del vecchio elenco dell'adapter. L'elencazione
+    // con dati veri è presidiata da calcoloService.test.ts (client mockato).
     const { server } = nuovoServer();
-    const cliente = await server.inject({ method: 'POST', url: '/clienti', payload: { nome: 'Test', tipo: 'individual' } });
-    await server.inject({ method: 'POST', url: '/progetti', payload: { clienteId: cliente.json().id, nome: 'Progetto 1' } });
     const res = await server.inject({ method: 'GET', url: '/progetti' });
-    expect(res.statusCode).toBe(200);
-    expect(res.json()).toHaveLength(1);
-    expect(res.json()[0].stato).toBe('pre_project');
+    expect(res.statusCode).toBe(500);
+    expect(typeof res.json().errore).toBe('string');
   });
 });
 
 describe('server — §17 esecuzione, tramite HTTP end-to-end', () => {
-  async function progettoAvviato(server: ReturnType<typeof nuovoServer>['server']) {
+  async function progettoAvviato({ app, server }: ReturnType<typeof nuovoServer>) {
     const cliente = await server.inject({ method: 'POST', url: '/clienti', payload: { nome: 'Marco Ricci', tipo: 'individual' } });
-    const progetto = await server.inject({ method: 'POST', url: '/progetti', payload: { clienteId: cliente.json().id, nome: 'P' } });
+    // POST /progetti è prisma-diretta e senza DB risponde 500: si crea il
+    // progetto dall'AppPort, come faceva la rotta prima della migrazione.
+    const progetto = app.creaProgetto({ clienteId: cliente.json().id, nome: 'P' });
     const preventivo = await server.inject({
       method: 'POST',
       url: '/preventivi',
-      payload: { clienteId: cliente.json().id, progettoId: progetto.json().id, righe: [{ moduloTemplateId: 'M01', moduloTemplateVersione: 1 }] },
+      payload: { clienteId: cliente.json().id, progettoId: progetto.id, righe: [{ moduloTemplateId: 'M01', moduloTemplateVersione: 1 }] },
     });
     await server.inject({ method: 'POST', url: `/preventivi/${preventivo.json().id}/accetta` });
-    const progettoFinale = await server.inject({ method: 'GET', url: `/progetti/${progetto.json().id}` });
+    const progettoFinale = await server.inject({ method: 'GET', url: `/progetti/${progetto.id}` });
     const mv = progettoFinale.json().moduli[0].microvoci[0];
-    return { progettoId: progetto.json().id, microvoceId: mv.id as string };
+    return { progettoId: progetto.id, microvoceId: mv.id as string };
   }
 
   it('consuntiva ore su una micro-voce via HTTP', async () => {
-    const { server } = nuovoServer();
-    const { microvoceId } = await progettoAvviato(server);
+    const { app, server } = nuovoServer();
+    const { microvoceId } = await progettoAvviato({ app, server });
 
     const res = await server.inject({ method: 'POST', url: `/microvoci/${microvoceId}/consuntiva`, payload: { ore: 1 } });
     expect(res.statusCode).toBe(200);
@@ -201,8 +210,8 @@ describe('server — §17 esecuzione, tramite HTTP end-to-end', () => {
   });
 
   it('GET /microvoci/:id legge lo stato aggiornato dopo un\'azione (usato dal frontend per il refresh)', async () => {
-    const { server } = nuovoServer();
-    const { microvoceId } = await progettoAvviato(server);
+    const { app, server } = nuovoServer();
+    const { microvoceId } = await progettoAvviato({ app, server });
     await server.inject({ method: 'POST', url: `/microvoci/${microvoceId}/consuntiva`, payload: { ore: 1.5 } });
     const res = await server.inject({ method: 'GET', url: `/microvoci/${microvoceId}` });
     expect(res.statusCode).toBe(200);
@@ -210,15 +219,15 @@ describe('server — §17 esecuzione, tramite HTTP end-to-end', () => {
   });
 
   it('400 se manca il campo ore', async () => {
-    const { server } = nuovoServer();
-    const { microvoceId } = await progettoAvviato(server);
+    const { app, server } = nuovoServer();
+    const { microvoceId } = await progettoAvviato({ app, server });
     const res = await server.inject({ method: 'POST', url: `/microvoci/${microvoceId}/consuntiva`, payload: {} });
     expect(res.statusCode).toBe(400);
   });
 
   it('marca-ritardo con causaNota valida, poi risolvi-ritardo', async () => {
-    const { server } = nuovoServer();
-    const { microvoceId } = await progettoAvviato(server);
+    const { app, server } = nuovoServer();
+    const { microvoceId } = await progettoAvviato({ app, server });
 
     const ritardo = await server.inject({
       method: 'POST',
@@ -234,23 +243,23 @@ describe('server — §17 esecuzione, tramite HTTP end-to-end', () => {
   });
 
   it('409 se manca causaNota nel body del ritardo', async () => {
-    const { server } = nuovoServer();
-    const { microvoceId } = await progettoAvviato(server);
+    const { app, server } = nuovoServer();
+    const { microvoceId } = await progettoAvviato({ app, server });
     const res = await server.inject({ method: 'POST', url: `/microvoci/${microvoceId}/ritardo`, payload: { stato: 'blocked' } });
     expect(res.statusCode).toBe(400); // validazione a livello route, prima ancora del motore
   });
 
   it('409 se si tenta di completare una micro-voce con passaggi ancora aperti (§17.1)', async () => {
-    const { server } = nuovoServer();
-    const { microvoceId } = await progettoAvviato(server);
+    const { app, server } = nuovoServer();
+    const { microvoceId } = await progettoAvviato({ app, server });
     const res = await server.inject({ method: 'PATCH', url: `/microvoci/${microvoceId}/completa` });
     expect(res.statusCode).toBe(409);
     expect(res.json().errore).toMatch(/passaggio/);
   });
 
   it('flusso completo: completare tutti i passaggi sblocca il completamento della micro-voce', async () => {
-    const { server } = nuovoServer();
-    const { microvoceId } = await progettoAvviato(server);
+    const { app, server } = nuovoServer();
+    const { microvoceId } = await progettoAvviato({ app, server });
 
     const passaggi = await server.inject({ method: 'GET', url: `/microvoci/${microvoceId}/passaggi` });
     expect(passaggi.json()).toHaveLength(1); // solo RD01 nel template di test ha un passaggio
@@ -416,10 +425,14 @@ describe('server — §2bis isolamento tenant: header x-tenant-id', () => {
       const app = new InMemoryApp();
       app.registraModuloTemplate(templateAnalisi);
       const visti: Array<ContestoTenant | undefined> = [];
-      const originale = app.listaModuli.bind(app);
-      app.listaModuli = () => {
+      const originale = app.getProgetto.bind(app);
+      // /moduli è ormai prisma-diretta e non passa più dall'AppPort: si osserva
+      // getProgetto, chiamata da GET /progetti/:id. L'id è fittizio, quindi
+      // l'originale lancia ProgettoNonTrovatoError → 404 via errorHandler:
+      // qui conta solo il contesto con cui l'AppPort viene invocato.
+      app.getProgetto = (id: string) => {
         visti.push(contestoTenant.getStore());
-        return originale();
+        return originale(id);
       };
       return { server: buildServer(app), visti };
     }
@@ -428,10 +441,12 @@ describe('server — §2bis isolamento tenant: header x-tenant-id', () => {
       const { server, visti } = serverCheOsservaIlContesto();
       const res = await server.inject({
         method: 'GET',
-        url: '/moduli',
+        url: '/progetti/progetto-osservato',
         headers: { authorization: `Bearer ${tokenPer('advisor', TENANT_A)}`, 'x-tenant-id': TENANT_B },
       });
-      expect(res.statusCode).toBe(200);
+      // 404 perché l'id è fittizio: il progetto non esiste. Il punto del test è
+      // il contesto con cui l'AppPort è stato chiamato, qui sotto.
+      expect(res.statusCode).toBe(404);
       expect(visti).toEqual([{ tenantId: TENANT_A, ruolo: 'advisor' }]);
     });
 
@@ -439,10 +454,12 @@ describe('server — §2bis isolamento tenant: header x-tenant-id', () => {
       const { server, visti } = serverCheOsservaIlContesto();
       const res = await server.inject({
         method: 'GET',
-        url: '/moduli',
+        url: '/progetti/progetto-osservato',
         headers: { authorization: `Bearer ${tokenPer('super_admin', TENANT_A)}`, 'x-tenant-id': TENANT_B },
       });
-      expect(res.statusCode).toBe(200);
+      // 404 perché l'id è fittizio: il punto del test è il contesto con cui
+      // l'AppPort è stato chiamato, qui sotto.
+      expect(res.statusCode).toBe(404);
       expect(visti).toEqual([{ tenantId: TENANT_B, ruolo: 'super_admin' }]);
     });
 
@@ -451,7 +468,7 @@ describe('server — §2bis isolamento tenant: header x-tenant-id', () => {
       // proseguiva col tenant di default, cioè con quello che contiene i dati reali, ed è
       // il motivo per cui `GET /clienti` restituiva le anagrafiche a chiunque.
       const { server, visti } = serverCheOsservaIlContesto();
-      const res = await server.inject({ method: 'GET', url: '/moduli' });
+      const res = await server.inject({ method: 'GET', url: '/progetti/progetto-osservato' });
       expect(res.statusCode).toBe(401);
       expect(visti).toEqual([]);
     });
@@ -620,12 +637,14 @@ describe('server — §36 libreria: creazione, modifica e disattivazione', () =>
         righe: [{ articoloId: 'A_RACCOLTA_DOC', quantita: 2 }],
       },
     });
-    expect(res.statusCode).toBe(201);
-    // In modalità test il DB non risponde e la rotta ripiega sull'adapter in-memory,
-    // che restituisce il body ricevuto: il punto verificato è che giurisdizioneId
-    // attraversi la rotta invece di essere scartato come avveniva prima del fix.
-    expect(res.json().giurisdizioneId).toBe('giur-mt');
-    expect(res.json().nome).toBe('Corporate structuring Malta');
+    // La rotta è prisma-diretta: qui il DB non risponde (vedi vitest.setup.ts)
+    // e la risposta onesta è il 500 dell'errorHandler, non una libreria finta.
+    // La validazione dei campi obbligatori avviene prima del DB ed è coperta
+    // dal test «400 se manca la distinta». Il trasporto di giurisdizioneId
+    // nella $transaction è nel codice della rotta; senza DB non è verificabile
+    // via HTTP, e questo test non afferma coperture che non ha.
+    expect(res.statusCode).toBe(500);
+    expect(typeof res.json().errore).toBe('string');
   });
 
   it('POST /moduli-template risponde 400 se manca la distinta', async () => {
@@ -645,24 +664,27 @@ describe('server — §36 libreria: creazione, modifica e disattivazione', () =>
       url: '/moduli-template/M01',
       payload: { nome: 'Analisi patrimoniale aggiornata', prezzoPacchetto: 90000, giurisdizioneId: null },
     });
-    expect(res.statusCode).toBe(200);
-    expect(res.json().id).toBe('M01');
-    expect(res.json().nome).toBe('Analisi patrimoniale aggiornata');
-    expect(res.json().giurisdizioneId).toBeNull();
+    // La rotta arriva a prisma.moduloTemplate.update, quindi senza DB risponde
+    // 500 onesto. Il payload non contiene `righe`, quindi nessun 400 pre-DB.
+    expect(res.statusCode).toBe(500);
+    expect(typeof res.json().errore).toBe('string');
   });
 
   it('DELETE /moduli-template/:id risponde con la disattivazione, non una cancellazione', async () => {
     const { server } = nuovoServer();
     const res = await server.inject({ method: 'DELETE', url: '/moduli-template/M01' });
-    expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ ok: true, id: 'M01', isAttivo: false });
+    // La rotta disattiva (catalogo.ts: isAttivo: false), ma è prisma-diretta:
+    // senza DB la risposta onesta è 500, non l'ok finto dell'adapter.
+    expect(res.statusCode).toBe(500);
+    expect(typeof res.json().errore).toBe('string');
   });
 
   it('DELETE /articoli/:id risponde con la disattivazione', async () => {
     const { server } = nuovoServer();
     const res = await server.inject({ method: 'DELETE', url: '/articoli/A_RACCOLTA_DOC' });
-    expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ ok: true, id: 'A_RACCOLTA_DOC', isAttivo: false });
+    // Come sopra: disattivazione nel codice della rotta, 500 onesto senza DB.
+    expect(res.statusCode).toBe(500);
+    expect(typeof res.json().errore).toBe('string');
   });
 
   it('PATCH /articoli/:id non risponde più finto ok quando il DB non è raggiungibile', async () => {
@@ -681,10 +703,12 @@ describe('server — §36 libreria: creazione, modifica e disattivazione', () =>
 
 describe('server — DELETE /progetti/:id (§1.1 PIANO_DI_MIGLIORAMENTO)', () => {
   it('elimina un progetto esistente; la rilettura risponde 404', async () => {
-    const { server } = nuovoServer();
+    const { app, server } = nuovoServer();
     const cliente = await server.inject({ method: 'POST', url: '/clienti', payload: { nome: 'Da eliminare', tipo: 'individual' } });
-    const progetto = await server.inject({ method: 'POST', url: '/progetti', payload: { clienteId: cliente.json().id, nome: 'Progetto transitorio' } });
-    const progettoId = progetto.json().id;
+    // POST /progetti è prisma-diretta e senza DB risponderebbe 500: si crea il
+    // progetto dall'AppPort, come faceva la rotta prima della migrazione.
+    const progetto = app.creaProgetto({ clienteId: cliente.json().id, nome: 'Progetto transitorio' });
+    const progettoId = progetto.id;
 
     const res = await server.inject({ method: 'DELETE', url: `/progetti/${progettoId}` });
     expect(res.statusCode).toBe(200);
@@ -704,8 +728,8 @@ describe('server — DELETE /progetti/:id (§1.1 PIANO_DI_MIGLIORAMENTO)', () =>
   it('409 se il progetto contiene fatture: si archivia, non si elimina', async () => {
     const { app, server } = nuovoServer();
     const cliente = await server.inject({ method: 'POST', url: '/clienti', payload: { nome: 'Con fatture', tipo: 'individual' } });
-    const progetto = await server.inject({ method: 'POST', url: '/progetti', payload: { clienteId: cliente.json().id, nome: 'Fatturato' } });
-    const progettoId = progetto.json().id;
+    const progetto = app.creaProgetto({ clienteId: cliente.json().id, nome: 'Fatturato' });
+    const progettoId = progetto.id;
     // InMemoryApp non espone un metodo pubblico per creare fatture: si alimenta la
     // mappa interna, come farebbe il ciclo di fatturazione.
     (app as any).fatture.set('fatt-1', { id: 'fatt-1', progettoId });
@@ -721,8 +745,8 @@ describe('server — DELETE /progetti/:id (§1.1 PIANO_DI_MIGLIORAMENTO)', () =>
 
   it('403 per i ruoli che non rispondono dello studio', async () => {
     const { server } = nuovoServer();
-    const cliente = await server.inject({ method: 'POST', url: '/clienti', payload: { nome: 'Protetto', tipo: 'individual' } });
-    const progetto = await server.inject({ method: 'POST', url: '/progetti', payload: { clienteId: cliente.json().id, nome: 'P' } });
+    // Il guard di ruolo precede l'accesso ai dati: non serve creare nulla,
+    // l'id fittizio basta perché la rotta si fermi al 403.
     const tokenCollaboratore = signJwt({
       userId: 'usr-collab',
       tenantId: TENANT_TEST,
@@ -732,7 +756,7 @@ describe('server — DELETE /progetti/:id (§1.1 PIANO_DI_MIGLIORAMENTO)', () =>
 
     const res = await server.inject({
       method: 'DELETE',
-      url: `/progetti/${progetto.json().id}`,
+      url: '/progetti/qualsiasi-id',
       headers: { authorization: `Bearer ${tokenCollaboratore}` },
     });
     expect(res.statusCode).toBe(403);
@@ -751,8 +775,7 @@ describe('server — DELETE /progetti/:id/moduli/:moduloId (§1.1bis)', () => {
 
   it('403 se il ruolo è collaboratore_interno', async () => {
     const { server } = nuovoServer();
-    const cliente = await server.inject({ method: 'POST', url: '/clienti', payload: { nome: 'C', tipo: 'individual' } });
-    const progetto = await server.inject({ method: 'POST', url: '/progetti', payload: { clienteId: cliente.json().id, nome: 'P' } });
+    // Il guard di ruolo precede l'accesso ai dati: l'id fittizio basta.
     const tokenCollaboratore = signJwt({
       userId: 'usr-collab',
       tenantId: TENANT_TEST,
@@ -762,7 +785,7 @@ describe('server — DELETE /progetti/:id/moduli/:moduloId (§1.1bis)', () => {
 
     const res = await server.inject({
       method: 'DELETE',
-      url: `/progetti/${progetto.json().id}/moduli/qualsiasi-id`,
+      url: '/progetti/qualsiasi-id/moduli/qualsiasi-id',
       headers: { authorization: `Bearer ${tokenCollaboratore}` },
     });
     expect(res.statusCode).toBe(403);

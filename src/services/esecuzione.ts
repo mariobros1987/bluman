@@ -5,6 +5,7 @@
 import {
   valutaSegnaleRischio,
   calcolaStatoModulo,
+  calcolaStatoProgetto,
   marcaRitardoManuale as marcaRitardoManualePuro,
   risolviRitardoManuale as risolviRitardoManualePuro,
   risolviDipendenze,
@@ -119,6 +120,18 @@ async function ricalcolaModuloECascata(moduloProgettoId: string, port: Esecuzion
       // ricalcola anche il suo stato (diventerà 'pending', pronto per essere preso in carico)
       const microvociAggiornate = await port.getMicrovociDelModulo(moduloSbloccatoId);
       await port.aggiornaModulo(moduloSbloccatoId, { stato: calcolaStatoModulo(microvociAggiornate) });
+    }
+  }
+
+  // Derivazione automatica stato progetto a database (evita stato stantio)
+  if (port.aggiornaProgetto) {
+    const progetto = await port.getProgetto?.(modulo.progettoId);
+    if (progetto && progetto.stato !== 'pre_project') {
+      const tuttiModuli = await port.getModuliDelProgettoConDipendenze(modulo.progettoId);
+      const nuovoStatoProgetto = calcolaStatoProgetto(tuttiModuli as any);
+      if (progetto.stato !== nuovoStatoProgetto) {
+        await port.aggiornaProgetto(modulo.progettoId, { stato: nuovoStatoProgetto });
+      }
     }
   }
 }
