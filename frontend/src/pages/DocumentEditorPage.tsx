@@ -374,6 +374,29 @@ export function DocumentEditorPage() {
     const clientCell = activeCliente?.cellulare || '';
     const clientUbo = activeCliente?.ubo || activeCliente?.referenteNome || 'Titolare Effettivo (UBO)';
 
+    let customRowsHtml = '';
+    let customTotalEur: number | null = null;
+    const savedRowsStr = sessionStorage.getItem('bluman_proforma_table_rows');
+    if (savedRowsStr) {
+      try {
+        const parsed = JSON.parse(savedRowsStr);
+        if (String(parsed.projId) === String(effProgettoId) && Array.isArray(parsed.rows) && parsed.rows.length > 0) {
+          customTotalEur = parsed.totalEur;
+          customRowsHtml = parsed.rows.map((r: any) => `
+            <tr style="border-bottom: 1px solid #e2e8f0;">
+              <td style="padding: 10px 8px;">
+                <strong style="color: #1e3a8a;">[${r.moduloNome || 'Prestazione'}]</strong> ${r.titolo}
+                ${r.oreConsuntivate > 0 ? `<div style="font-size: 10px; color: #64748b;">Consuntivo: ${r.oreConsuntivate}h</div>` : ''}
+              </td>
+              <td style="padding: 10px 8px; text-align: right; font-weight: 600;">€ ${Number(r.importo).toLocaleString('it-IT', { minimumFractionDigits: 2 })}</td>
+            </tr>
+          `).join('');
+        }
+      } catch (e) {}
+    }
+
+    const effImporto = customTotalEur !== null ? customTotalEur : projImporto;
+
     // Se in anteprima bozza e modalità 'highlight', evidenzia il dato reale con un elegante Smart Chip ERP
     const wrapTag = (value: string, tagCode: string) => {
       if (isForPrintOrExport || tagDisplayMode === 'plain') return value || `[${tagCode}]`;
@@ -381,6 +404,12 @@ export function DocumentEditorPage() {
     };
 
     let out = htmlContent;
+
+    // Se sono state iniettate microvoci specifiche dal compositore fatture, sostituisci la riga di esempio
+    if (customRowsHtml) {
+      out = out.replace(/<tr style="border-bottom: 1px solid #e2e8f0;">\s*<td style="padding: 10px 8px;">Onorari professionali per dossier <strong>\{\{progetto\.titolo\}\}<\/strong><\/td>\s*<td style="padding: 10px 8px; text-align: right; font-weight: 600;">\{\{progetto\.importo_totale\}\}<\/td>\s*<\/tr>/, customRowsHtml);
+    }
+
     out = out.replace(/\{\{data_odierna\}\}/g, wrapTag(dataOggi, 'data_odierna'));
     out = out.replace(/\{\{cliente\.ragione_sociale\}\}/g, wrapTag(clientNome, 'cliente.ragione_sociale'));
     out = out.replace(/\{\{cliente\.nome\}\}/g, wrapTag(clientNome, 'cliente.nome'));
@@ -395,7 +424,7 @@ export function DocumentEditorPage() {
     out = out.replace(/\{\{cliente\.ubo\}\}/g, wrapTag(clientUbo, 'cliente.ubo'));
 
     out = out.replace(/\{\{progetto\.titolo\}\}/g, wrapTag(projTitolo, 'progetto.titolo'));
-    out = out.replace(/\{\{progetto\.importo_totale\}\}/g, wrapTag(projImporto ? `€ ${Number(projImporto).toLocaleString('it-IT')},00` : '€ 0,00', 'progetto.importo_totale'));
+    out = out.replace(/\{\{progetto\.importo_totale\}\}/g, wrapTag(effImporto ? `€ ${Number(effImporto).toLocaleString('it-IT')},00` : '€ 0,00', 'progetto.importo_totale'));
 
     out = out.replace(/\{\{studio\.ragione_sociale\}\}/g, wrapTag(studioRagioneSociale, 'studio.ragione_sociale'));
     out = out.replace(/\{\{studio\.piva\}\}/g, wrapTag(studioPiva, 'studio.piva'));
