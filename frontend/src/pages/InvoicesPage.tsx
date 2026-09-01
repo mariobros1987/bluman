@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   fetchTutteFattureStudioApi,
   createInvoiceApi,
@@ -18,6 +19,7 @@ import {
 import { fmt } from '../utils';
 
 export function InvoicesPage() {
+  const navigate = useNavigate();
   const [invoices, setInvoices] = useState<any[]>([]);
   const [clienti, setClienti] = useState<any[]>([]);
   const [progetti, setProgetti] = useState<any[]>([]);
@@ -556,6 +558,17 @@ export function InvoicesPage() {
                           >
                             ✉️ Email
                           </button>
+
+                          {/* Apri in Document Studio */}
+                          {inv.progettoId && (
+                            <button
+                              onClick={() => navigate(`/editor?projId=${inv.progettoId}&tmplId=tmpl-avviso-parcella`)}
+                              style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg)', cursor: 'pointer', fontSize: 12 }}
+                              title="Apri modello Avviso di Parcella / Proforma in Document Studio per questo progetto"
+                            >
+                              📝 Proforma
+                            </button>
+                          )}
 
                           {/* Se Bozza: Emetti o Elimina */}
                           {isBozza && (

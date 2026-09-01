@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { fmt, getFormattedLogoUrl } from '../../utils';
 import { downloadRealPdf } from '../../utils/pdfGenerator';
 import { emettiFatturaApi } from '../../api/client';
@@ -8,6 +9,7 @@ import styles from '../../pages/ProjectDetail.module.css';
 
 // ─── Fatturazione Tab ─────────────────────────────────────────────
 export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project: Progetto; rawDbProject?: any; onRefresh: () => void }) {
+  const navigate = useNavigate();
   const totFatturato = project.fatture.reduce((a, f) => a + f.importo, 0);
   const residuo = project.val - totFatturato;
 
@@ -132,9 +134,30 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
         )}
       </div>
 
-      <button className={styles.addFatturaBtn} onClick={() => setModalOpen(true)}>
-        + Emetti nuova fattura / XML SDI
-      </button>
+      <div style={{ display: 'flex', gap: 10, marginTop: 12, flexWrap: 'wrap' }}>
+        <button className={styles.addFatturaBtn} style={{ flex: 1, minWidth: 220 }} onClick={() => setModalOpen(true)}>
+          + Emetti nuova fattura / XML SDI
+        </button>
+        <button
+          onClick={() => navigate(`/editor?projId=${project.id}&tmplId=tmpl-avviso-parcella`)}
+          style={{
+            background: 'var(--card2)',
+            border: '1px solid var(--border)',
+            color: 'var(--text)',
+            borderRadius: 10,
+            padding: '10px 16px',
+            fontSize: 12,
+            fontWeight: 700,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+          }}
+          title="Apri in Document Studio per redigere avviso proforma o rendiconto personalizzato"
+        >
+          📝 Redigi Proforma in Document Studio
+        </button>
+      </div>
 
       {/* Modal Anteprima Stampa / PDF Fattura */}
       {previewFattura && (
