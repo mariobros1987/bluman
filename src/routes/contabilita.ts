@@ -5,12 +5,19 @@
 import type { FastifyInstance } from 'fastify';
 import { Prisma } from '@prisma/client';
 import type { AppPort } from '../services/appPort.js';
-import { prisma, conContestoInTransazione, riprovaSuConflitto } from '../util/prismaClient.js';
+import {
+  prisma,
+  prismaAmministrativo,
+  attivaContestoTenant,
+  conContestoInTransazione,
+  riprovaSuConflitto,
+} from '../util/prismaClient.js';
 import { inviaEmail } from '../services/emailService.js';
 import { generateInvoicePdfBuffer } from '../services/pdfService.js';
 import { runDailyNotificationCron } from '../services/cronService.js';
 import { preparaFatturaPerInvioManuale } from '../services/sdiService.js';
 import { generaFatturaElettronicaXml } from '../services/sdiXmlGenerator.js';
+import { timingSafeEqual } from 'node:crypto';
 import {
   calcolaTotaliFattura,
   generaPianoScadenze,
@@ -910,88 +917,111 @@ export async function registraRotteContabilita(server: FastifyInstance, app: App
     const { importoIncassatoCentesimi, metodoPagamento, riferimentoTransazione, contoBancarioId, noteOperatore } = req.body;
 
     try {
-      const scadenza = await prisma.scadenzaIncasso.findUnique({
-        where: { id },
-        include: {
-          registrazioniRegistrate: true,
-          fattura: { include: { cliente: true, progetto: { include: { cliente: true } } } },
-        },
-      });
+      // L'incasso è UNA sola operazione contabile: registrazione, stato della
+      // rata, stato della fattura, movimento in Prima Nota e saldo del conto
+      // devono muoversi insieme. Da separate, un processo morto a metà lasciava
+      // l'incasso registrato senza scritta in Prima Nota e senza saldo, con la
+      // contabilità del tenant squilibrata. Con Serializable due incassi
+      // simultanei sulla stessa rata vengono serializzati: quello che perde il
+      // conflitto (P2034) viene rilanciato da `riprovaSuConflitto`, che rilegge
+      // qui dentro i totali già aggiornati dall'altro.
+      const esito = await riprovaSuConflitto(() =>
+        prisma.$transaction(
+          async (tx) =>
+            conContestoInTransazione(tx, async () => {
+              const scadenza = await tx.scadenzaIncasso.findUnique({
+                where: { id },
+                include: {
+                  registrazioniRegistrate: true,
+                  fattura: { include: { cliente: true, progetto: { include: { cliente: true } } } },
+                },
+              });
+              if (!scadenza) return { nonTrovata: true as const };
 
-      if (!scadenza) {
+              // 1. Registra l'incasso della rata
+              const registrazione = await tx.registrazioneIncasso.create({
+                data: {
+                  tenantId,
+                  scadenzaIncassoId: id,
+                  fatturaId: scadenza.fatturaId,
+                  importoIncassatoCentesimi,
+                  metodoPagamento: metodoPagamento || 'bonifico',
+                  riferimentoTransazione,
+                  noteOperatore,
+                },
+              });
+
+              // 2. Aggiorna stato della rata
+              const totaleIncassatoRata = scadenza.registrazioniRegistrate.reduce((acc, r) => acc + r.importoIncassatoCentesimi, 0) + importoIncassatoCentesimi;
+              const nuovoStatoScadenza = totaleIncassatoRata >= scadenza.importoCentesimi ? 'incassato' : 'parziale';
+
+              await tx.scadenzaIncasso.update({
+                where: { id },
+                data: { stato: nuovoStatoScadenza },
+              });
+
+              // 3. Verifica se tutte le rate della fattura sono saldate
+              const tutteScadenzeFattura = await tx.scadenzaIncasso.findMany({
+                where: { fatturaId: scadenza.fatturaId },
+              });
+              const tutteSaldate = tutteScadenzeFattura.every((s) => s.id === id ? nuovoStatoScadenza === 'incassato' : s.stato === 'incassato');
+
+              await tx.fattura.update({
+                where: { id: scadenza.fatturaId },
+                data: { stato: tutteSaldate ? 'incassata' : 'emessa' },
+              });
+
+              // 4. Generazione Movimento Automatico in Prima Nota (OpenSTAManager Engine)
+              const targetContoId = contoBancarioId || scadenza.fattura.contoAccreditoId;
+              await tx.movimentoPrimaNota.create({
+                data: {
+                  tenantId,
+                  contoBancarioId: targetContoId || null,
+                  fatturaId: scadenza.fatturaId,
+                  clienteId: scadenza.fattura.clienteId,
+                  tipo: 'entrata',
+                  categoria: 'incasso_fattura',
+                  descrizione: `Incasso rata #${scadenza.numeroRata} fattura ${scadenza.fattura.numero || scadenza.fatturaId}`,
+                  importoCentesimi: importoIncassatoCentesimi,
+                  metodoPagamento: metodoPagamento || 'bonifico',
+                  riferimentoTransazione: riferimentoTransazione || null,
+                  note: noteOperatore || null,
+                },
+              });
+
+              // 5. Accredito Saldo Conto Bancario
+              if (targetContoId) {
+                await tx.contoBancario.update({
+                  where: { id: targetContoId },
+                  data: { saldoAttuale: { increment: importoIncassatoCentesimi } },
+                });
+              } else {
+                const contoPredefinito = await tx.contoBancario.findFirst({
+                  where: { tenantId, isDefault: true },
+                });
+                if (contoPredefinito) {
+                  await tx.contoBancario.update({
+                    where: { id: contoPredefinito.id },
+                    data: { saldoAttuale: { increment: importoIncassatoCentesimi } },
+                  });
+                }
+              }
+
+              return { registrazione, tutteSaldate, scadenza };
+            }),
+          { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+        ),
+      );
+
+      if ('nonTrovata' in esito) {
         return reply.code(404).send({ errore: 'Scadenza incasso non trovata' });
       }
 
-      // 1. Registra l'incasso della rata
-      const registrazione = await prisma.registrazioneIncasso.create({
-        data: {
-          tenantId,
-          scadenzaIncassoId: id,
-          fatturaId: scadenza.fatturaId,
-          importoIncassatoCentesimi,
-          metodoPagamento: metodoPagamento || 'bonifico',
-          riferimentoTransazione,
-          noteOperatore,
-        },
-      });
+      const { registrazione, tutteSaldate, scadenza } = esito;
 
-      // 2. Aggiorna stato della rata
-      const totaleIncassatoRata = scadenza.registrazioniRegistrate.reduce((acc, r) => acc + r.importoIncassatoCentesimi, 0) + importoIncassatoCentesimi;
-      const nuovoStatoScadenza = totaleIncassatoRata >= scadenza.importoCentesimi ? 'incassato' : 'parziale';
-
-      await prisma.scadenzaIncasso.update({
-        where: { id },
-        data: { stato: nuovoStatoScadenza },
-      });
-
-      // 3. Verifica se tutte le rate della fattura sono saldate
-      const tutteScadenzeFattura = await prisma.scadenzaIncasso.findMany({
-        where: { fatturaId: scadenza.fatturaId },
-      });
-      const tutteSaldate = tutteScadenzeFattura.every((s) => s.id === id ? nuovoStatoScadenza === 'incassato' : s.stato === 'incassato');
-
-      await prisma.fattura.update({
-        where: { id: scadenza.fatturaId },
-        data: { stato: tutteSaldate ? 'incassata' : 'emessa' },
-      });
-
-      // 4. Generazione Movimento Automatico in Prima Nota (OpenSTAManager Engine)
-      const targetContoId = contoBancarioId || scadenza.fattura.contoAccreditoId;
-      await prisma.movimentoPrimaNota.create({
-        data: {
-          tenantId,
-          contoBancarioId: targetContoId || null,
-          fatturaId: scadenza.fatturaId,
-          clienteId: scadenza.fattura.clienteId,
-          tipo: 'entrata',
-          categoria: 'incasso_fattura',
-          descrizione: `Incasso rata #${scadenza.numeroRata} fattura ${scadenza.fattura.numero || scadenza.fatturaId}`,
-          importoCentesimi: importoIncassatoCentesimi,
-          metodoPagamento: metodoPagamento || 'bonifico',
-          riferimentoTransazione: riferimentoTransazione || null,
-          note: noteOperatore || null,
-        },
-      });
-
-      // 5. Accredito Saldo Conto Bancario
-      if (targetContoId) {
-        await prisma.contoBancario.update({
-          where: { id: targetContoId },
-          data: { saldoAttuale: { increment: importoIncassatoCentesimi } },
-        });
-      } else {
-        const contoPredefinito = await prisma.contoBancario.findFirst({
-          where: { tenantId, isDefault: true },
-        });
-        if (contoPredefinito) {
-          await prisma.contoBancario.update({
-            where: { id: contoPredefinito.id },
-            data: { saldoAttuale: { increment: importoIncassatoCentesimi } },
-          });
-        }
-      }
-
-      // 6. Notifiche Studio e Cliente se saldata
+      // 6. Notifiche Studio e Cliente se saldata. Fuori dalla transazione e con
+      // il proprio catch: un guasto di notifica non deve riportare indietro
+      // una contabilità già scritta.
       if (tutteSaldate) {
         const etichetta = scadenza.fattura.numero || `FT-${scadenza.fattura.numeroProgressivoSerie}`;
         const importo = `€ ${(scadenza.importoCentesimi / 100).toLocaleString('it-IT')}`;
@@ -1584,11 +1614,51 @@ export async function registraRotteContabilita(server: FastifyInstance, app: App
   });
 
   // ─── WEBHOOK ESITI SDI ─────────────────────────────────────────────
-  server.post<{ Body: { fatturaId: string; statoSdi: 'consegnata' | 'scartata' | 'mancata_consegna'; note?: string } }>(
+  // La rotta è pubblica nel guard JWT (server.ts) perché SdI non può portare
+  // un nostro token, ma "pubblica" non significa "aperta": l'esito arriva con
+  // un secret condiviso (`WEBHOOK_SECRET_SDI`) che solo il chiamante legittimo
+  // conosce. Il confronto usa timingSafeEqual sulla stessa lunghezza, così il
+  // tempo di risposta non rivela quanto del secret sia giusto. Senza secret
+  // configurato la rotta rifiuta tutto: in produzione un webhook non
+  // autenticabile non deve essere in ascolto.
+  server.post<{
+    Body: { fatturaId: string; statoSdi: 'consegnata' | 'scartata' | 'mancata_consegna'; note?: string; secret?: string };
+  }>(
     '/webhooks/sdi',
     async (req, reply) => {
       const { fatturaId, statoSdi, note } = req.body;
       if (!fatturaId || !statoSdi) return reply.code(400).send({ errore: 'fatturaId e statoSdi sono obbligatori' });
+
+      const secretAtteso = process.env.WEBHOOK_SECRET_SDI;
+      const secretRicevuto = req.body.secret || req.headers['x-webhook-secret'];
+      const secretRicevutoStr = Array.isArray(secretRicevuto) ? secretRicevuto[0] : secretRicevuto;
+      if (!secretAtteso) {
+        return reply.code(503).send({ errore: 'Webhook SDI non configurato: impostare WEBHOOK_SECRET_SDI' });
+      }
+      if (
+        typeof secretRicevutoStr !== 'string' ||
+        secretRicevutoStr.length !== secretAtteso.length ||
+        !timingSafeEqual(Buffer.from(secretRicevutoStr), Buffer.from(secretAtteso))
+      ) {
+        return reply.code(401).send({ errore: 'Secret webhook SDI non valido' });
+      }
+
+      // Il tenant non è ancora noto: la rotta è anonima e il tenant si scopre
+      // dalla riga fattura stessa. Come per il magic token (§23), è il secret
+      // verificato sopra a delimitare cosa questa query può trovare, quindi il
+      // client amministrativo è legittimo SOLO per questa lettura.
+      const prismaAdmin = prismaAmministrativo();
+      const fatturaTrovata = await prismaAdmin.fattura.findUnique({
+        where: { id: fatturaId },
+        select: { id: true, tenantId: true },
+      });
+      if (!fatturaTrovata) {
+        return reply.code(404).send({ errore: 'Fattura non trovata' });
+      }
+
+      // Da qui il contesto tenant è quello della fattura: l'update e l'audit
+      // viaggiano col client normale, quindi con le policy RLS attive.
+      attivaContestoTenant({ tenantId: fatturaTrovata.tenantId });
 
       try {
         const fattura = await prisma.fattura.update({
@@ -1835,15 +1905,27 @@ export async function registraRotteContabilita(server: FastifyInstance, app: App
     const tenantId = req.tenantId;
     const { id } = req.params;
     try {
-      let fattura = null;
-      try {
-        fattura = await prisma.fattura.findUnique({
-          where: { id },
-          include: { progetto: { include: { cliente: true } } },
+      // Nessun catch vuoto: se la query fallisce l'errore va al catch esterno (500),
+      // e se la fattura non esiste ci si ferma qui. Procedere con una fattura
+      // inesistente significherebbe scrivere nell'audit un riferimento a una
+      // fattura che non c'è.
+      const fattura = await prisma.fattura.findUnique({
+        where: { id },
+        include: { progetto: { include: { cliente: true } } },
+      });
+      if (!fattura) {
+        return reply.code(404).send({ errore: 'Fattura non trovata' });
+      }
+      // Solo il numero vero, mai uno inventato: per SdI si prepara una fattura
+      // emessa, e una fattura senza numero non lo è. `numero` è il campo
+      // formattato ("FT-2026/001"); il progressivo Int darebbe solo "12".
+      if (!fattura.numero) {
+        return reply.code(400).send({
+          errore: 'La fattura non ha ancora un numero di emissione: emettila prima di prepararla per l\'invio SdI',
         });
-      } catch {}
+      }
+      const numFattura = fattura.numero;
 
-      const numFattura = fattura?.numeroProgressivoSerie ? String(fattura.numeroProgressivoSerie) : `FT-2026-${id.slice(0, 3)}`;
       const result = await preparaFatturaPerInvioManuale({
         fatturaId: id,
         numeroProgressivo: numFattura,
