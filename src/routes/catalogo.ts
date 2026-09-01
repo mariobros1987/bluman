@@ -14,6 +14,7 @@ import { uploadDocumento, CARTELLA_UPLOADS, nomeFileValido } from '../services/s
 import { verificaFirmaDownload } from '../util/jwt.js';
 import { recordAudit } from '../util/serverHelpers.js';
 import { trovaCicloDipendenze } from '../services/dipendenzeModuli.js';
+import { condizioneModuliPerGiurisdizione } from '../domain/giurisdizioni.js';
 
 // ─── ARTICOLI & PRESTAZIONI API (§Prisma Persistenza Cloud) ───────
 export async function registraRotteCatalogo(server: FastifyInstance, app: AppPort): Promise<void> {
@@ -108,27 +109,9 @@ export async function registraRotteCatalogo(server: FastifyInstance, app: AppPor
 
   server.get<{ Querystring: { giurisdizioneId?: string } }>('/moduli', async (req) => {
     const { giurisdizioneId } = req.query || {};
-    const tenantId = req.tenantId || '00000000-0000-0000-0000-000000000001';
-    if (giurisdizioneId) {
-      // Restituisce i moduli specifici di quella giurisdizione PIÙ quelli generici (giurisdizioneId null)
-      return await prisma.moduloTemplate.findMany({
-        where: {
-          tenantId,
-          isAttivo: true,
-          OR: [
-            { giurisdizioneId: giurisdizioneId },
-            { giurisdizioneId: null },
-          ],
-        },
-        include: {
-          giurisdizione: true,
-          dipendenze: true,
-          righeDistinta: { include: { articolo: true } },
-        },
-      });
-    }
+    const { tenantId } = req;
     return await prisma.moduloTemplate.findMany({
-      where: { tenantId, isAttivo: true },
+      where: condizioneModuliPerGiurisdizione(tenantId, giurisdizioneId),
       include: {
         giurisdizione: true,
         dipendenze: true,
