@@ -554,9 +554,21 @@ export class PrismaApp implements AppPort {
       descrizione: string;
     }>;
   }) {
-    const prog = await this.prisma.progetto.findUnique({ where: { id: input.progettoId }, include: { cliente: true } });
-    const clienteId = prog?.clienteId || '';
+    let prog = await this.prisma.progetto.findUnique({ where: { id: input.progettoId }, include: { cliente: true, moduli: true } });
+    if (!prog) {
+      prog = await this.prisma.progetto.findFirst({
+        where: { tenantId: this.tenantId, OR: [{ id: input.progettoId }, { nome: { contains: input.progettoId, mode: 'insensitive' } }] },
+        include: { cliente: true, moduli: true },
+      });
+    }
+    let clienteId = prog?.clienteId || '';
+    if (!clienteId) {
+      const primoCliente = await this.prisma.cliente.findFirst({ where: { tenantId: this.tenantId } });
+      clienteId = primoCliente?.id || '';
+    }
     if (!clienteId) throw new Error('Cliente del progetto non trovato');
+
+    const validModuliIds = new Set((prog?.moduli || []).map(m => m.id));
 
     const dataEmissione = new Date();
     const anno = dataEmissione.getFullYear();
@@ -572,10 +584,11 @@ export class PrismaApp implements AppPort {
       const totRiga = Math.abs(r.importo);
       const impRiga = Math.round(totRiga / 1.22);
       const ivaRiga = totRiga - impRiga;
+      const safeModuloId = (r.moduloProgettoId && validModuliIds.has(r.moduloProgettoId)) ? r.moduloProgettoId : null;
       return {
         tenantId: this.tenantId,
         tipo: r.tipo,
-        moduloProgettoId: r.moduloProgettoId || null,
+        moduloProgettoId: safeModuloId,
         percentuale: r.percentuale || null,
         importo: totRiga,
         descrizione: r.descrizione,
@@ -606,12 +619,11 @@ export class PrismaApp implements AppPort {
       data: {
         tenantId: this.tenantId,
         clienteId,
-        progettoId: input.progettoId,
+        progettoId: prog?.id || input.progettoId,
         tipoDocumento: 'fattura',
         serie: 'FT',
         numeroProgressivoSerie: nextProgressivo,
         numero: numeroUfficiale,
-        numeroProgressivo: numeroUfficiale,
         data: dataEmissione,
         stato: 'emessa',
         tipoClienteFiscale: input.tipoClienteFiscale,

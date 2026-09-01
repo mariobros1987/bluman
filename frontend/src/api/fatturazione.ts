@@ -43,7 +43,10 @@ export async function emettiFatturaApi(input: {
     headers: getAuthHeaders(),
     body: JSON.stringify(input),
   });
-  if (!res.ok) throw new Error('Errore emissione fattura');
+  if (!res.ok) {
+    const msg = await leggiErroreApi(res, 'Errore emissione fattura');
+    throw new Error(msg);
+  }
   return await res.json();
 }
 
