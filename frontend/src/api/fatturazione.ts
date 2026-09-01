@@ -81,15 +81,15 @@ export async function registraIncassoApi(scadenzaId: string, input: { importoInc
   return await res.json();
 }
 
-export async function downloadFatturaXmlApi(fatturaId: string) {
+export async function downloadFatturaXmlApi(fatturaId: string, numero?: string) {
   try {
     const res = await apiFetch(`${API_BASE}/invoices/${fatturaId}/sdi-xml`, { headers: getAuthHeaders() });
-    if (!res.ok) throw new Error('Errore durante la generazione dell\'XML');
+    if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore durante la generazione dell\'XML'));
     const blob = await res.blob();
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `Fattura_${fatturaId}.xml`;
+    a.download = `Fattura_${numero || fatturaId}.xml`;
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -113,9 +113,6 @@ export async function fetchContrattiRicorrentiApi() {
 }
 
 export async function creaContrattoRicorrenteApi(input: { clienteId: string; progettoId?: string; titolo: string; frequenza?: string; importoCentesimi: number; prossimaFatturazione: string; note?: string }) {
-  // §3.3 — un canone ricorrente genera fatture automatiche: se la creazione non arriva a
-  // database il contratto non esiste. Prima il `null` scatenava la creazione di un contratto
-  // finto in localStorage sul chiamante, con tanto di alert «attivato con successo».
   const res = await apiFetch(`${API_BASE}/contratti-ricorrenti`, {
     method: 'POST',
     headers: getAuthHeaders(),
@@ -126,9 +123,6 @@ export async function creaContrattoRicorrenteApi(input: { clienteId: string; pro
 }
 
 export async function generaFatturaRetainerApi(contrattoId: string) {
-  // §3.3 — l'emissione di una fattura è un atto fiscale: se il backend non la crea, la fattura
-  // non esiste. Prima il `null` faceva fabbricare al chiamante una fattura locale con numero
-  // inventato (`FT-<anno>-000N` casuale), mostrata in elenco come vera.
   const res = await apiFetch(`${API_BASE}/contratti-ricorrenti/${contrattoId}/genera-fattura`, {
     method: 'POST',
     headers: getAuthHeaders(),
@@ -137,22 +131,22 @@ export async function generaFatturaRetainerApi(contrattoId: string) {
   return await res.json();
 }
 
-export async function downloadFatturaPdfServerApi(fatturaId: string) {
+export async function downloadFatturaPdfServerApi(fatturaId: string, numero?: string) {
   try {
     const res = await apiFetch(`${API_BASE}/invoices/${fatturaId}/pdf`, { headers: getAuthHeaders() });
-    if (!res.ok) throw new Error('Errore generazione PDF server');
+    if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore generazione PDF server'));
     const blob = await res.blob();
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `Fattura_Server_${fatturaId}.pdf`;
+    a.download = `Fattura_${numero || fatturaId}.pdf`;
     document.body.appendChild(a);
     a.click();
     a.remove();
     window.URL.revokeObjectURL(url);
     return { ok: true };
   } catch (err: any) {
-    alert('Errore download PDF Server: ' + err.message);
+    alert('Errore download PDF: ' + err.message);
     return null;
   }
 }

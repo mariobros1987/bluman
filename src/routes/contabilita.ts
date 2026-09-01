@@ -1398,7 +1398,7 @@ export async function registraRotteContabilita(server: FastifyInstance, app: App
 
       const totaleCentesimi = fattura.totaleDocumentoCentesimi || fattura.righe.reduce((acc, r) => acc + r.importo, 0);
 
-      const pdfBuffer = generateInvoicePdfBuffer({
+      const pdfBuffer = await generateInvoicePdfBuffer({
         numero: fattura.numero || `FT-${fattura.numeroProgressivoSerie}`,
         data: (fattura.data || new Date()).toLocaleDateString('it-IT'),
         tipoDocumento: fattura.tipoDocumento,
@@ -1470,7 +1470,7 @@ export async function registraRotteContabilita(server: FastifyInstance, app: App
       const studio = await prisma.tenant.findUnique({ where: { id: tenantId } });
       const totaleCentesimi = fattura.totaleDocumentoCentesimi || fattura.righe.reduce((acc, r) => acc + r.importo, 0);
 
-      const pdfBuffer = generateInvoicePdfBuffer({
+      const pdfBuffer = await generateInvoicePdfBuffer({
         numero: fattura.numero || `FT-${fattura.numeroProgressivoSerie}`,
         data: (fattura.data || new Date()).toLocaleDateString('it-IT'),
         tipoDocumento: fattura.tipoDocumento,

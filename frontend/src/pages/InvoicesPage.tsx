@@ -529,7 +529,7 @@ export function InvoicesPage() {
                         <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
                           {/* Scarica PDF */}
                           <button
-                            onClick={() => downloadFatturaPdfServerApi(inv.id)}
+                            onClick={() => downloadFatturaPdfServerApi(inv.id, inv.numero)}
                             style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg)', cursor: 'pointer', fontSize: 12 }}
                             title="Scarica PDF Ufficiale"
                           >
@@ -538,7 +538,7 @@ export function InvoicesPage() {
 
                           {/* Scarica XML SDI */}
                           <button
-                            onClick={() => downloadFatturaXmlApi(inv.id)}
+                            onClick={() => downloadFatturaXmlApi(inv.id, inv.numero)}
                             style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid #1e40af', background: '#1e3a8a', color: '#93c5fd', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
                             title="Scarica tracciato XML FatturaPA 1.2 conforme"
                           >
