@@ -2,17 +2,17 @@ import { z } from 'zod';
 
 export const CreaFornitoreSchema = z.object({
   ragioneSociale: z.string().min(1, 'La ragione sociale del fornitore è obbligatoria').max(255),
-  partitaIva: z.string().max(50).optional().nullable(),
-  codiceFiscale: z.string().max(50).optional().nullable(),
-  email: z.string().email('Formato email non valido').optional().nullable(),
-  pec: z.string().email('Formato PEC non valido').optional().nullable(),
-  sdiCode: z.string().max(20).optional().nullable(),
-  indirizzo: z.string().max(255).optional().nullable(),
-  citta: z.string().max(100).optional().nullable(),
-  cap: z.string().max(10).optional().nullable(),
-  nazione: z.string().max(10).default('IT').optional(),
-  iban: z.string().max(50).optional().nullable(),
-  note: z.string().max(2000).optional().nullable(),
+  partitaIva: z.string().max(50).optional().nullable().transform((val) => (val && val.trim() ? val.trim() : null)),
+  codiceFiscale: z.string().max(50).optional().nullable().transform((val) => (val && val.trim() ? val.trim() : null)),
+  email: z.string().max(255).optional().nullable().transform((val) => (val && val.trim() ? val.trim() : null)),
+  pec: z.string().max(255).optional().nullable().transform((val) => (val && val.trim() ? val.trim() : null)),
+  sdiCode: z.string().max(20).optional().nullable().transform((val) => (val && val.trim() ? val.trim() : '0000000')),
+  indirizzo: z.string().max(255).optional().nullable().transform((val) => (val && val.trim() ? val.trim() : null)),
+  citta: z.string().max(100).optional().nullable().transform((val) => (val && val.trim() ? val.trim() : null)),
+  cap: z.string().max(10).optional().nullable().transform((val) => (val && val.trim() ? val.trim() : null)),
+  nazione: z.string().max(10).default('IT').optional().transform((val) => (val && val.trim() ? val.trim() : 'IT')),
+  iban: z.string().max(50).optional().nullable().transform((val) => (val && val.trim() ? val.trim().replace(/\s/g, '').toUpperCase() : null)),
+  note: z.string().max(2000).optional().nullable().transform((val) => (val && val.trim() ? val.trim() : null)),
 }).passthrough();
 
 export const AggiornaFornitoreSchema = CreaFornitoreSchema.partial();
