@@ -219,34 +219,18 @@ export function ScadenzarioPage() {
                         {!isIncassata && (
                           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
                             <button
+                              type="button"
+                              className="btn btn-sm btn-secondary"
                               onClick={() => setScadenzaDaSollecitare(s)}
-                              style={{
-                                padding: '6px 10px',
-                                borderRadius: 6,
-                                border: '1px solid var(--border)',
-                                background: 'var(--card)',
-                                color: isScaduta ? '#f87171' : 'var(--text)',
-                                fontWeight: 600,
-                                fontSize: 12,
-                                cursor: 'pointer',
-                              }}
                             >
                               📩 Sollecita
                             </button>
                             <button
+                              type="button"
+                              className="btn btn-sm btn-success"
                               onClick={() => {
                                 setSelectedScadenza(s);
                                 setImportoIncasso(((s.importoCentesimi || 0) / 100).toFixed(2));
-                              }}
-                              style={{
-                                padding: '6px 12px',
-                                borderRadius: 6,
-                                border: 'none',
-                                background: '#059669',
-                                color: 'white',
-                                fontWeight: 700,
-                                fontSize: 12,
-                                cursor: 'pointer',
                               }}
                             >
                               📥 Registra Incasso
@@ -324,15 +308,15 @@ export function ScadenzarioPage() {
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 10 }}>
                 <button
                   type="button"
+                  className="btn btn-secondary"
                   onClick={() => setSelectedScadenza(null)}
-                  style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)', cursor: 'pointer' }}
                 >
                   Annulla
                 </button>
                 <button
                   type="submit"
+                  className="btn btn-success"
                   disabled={savingIncasso}
-                  style={{ padding: '8px 18px', borderRadius: 8, border: 'none', background: '#059669', color: 'white', fontWeight: 700, cursor: 'pointer' }}
                 >
                   {savingIncasso ? 'Registrazione...' : 'Conferma & Scrivi in Prima Nota'}
                 </button>
