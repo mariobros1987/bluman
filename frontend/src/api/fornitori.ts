@@ -73,11 +73,14 @@ export async function eliminaFornitoreApi(id: string): Promise<{ ok: boolean; me
   return await res.json();
 }
 
-export async function fetchFattureRicevuteApi(): Promise<FatturaRicevuta[]> {
-  const res = await apiFetch(`${API_BASE}/fatture-ricevute`, { headers: getAuthHeaders() });
+export async function fetchFattureRicevuteApi(fornitoreId?: string): Promise<FatturaRicevuta[]> {
+  const url = fornitoreId ? `${API_BASE}/fatture-ricevute?fornitoreId=${fornitoreId}` : `${API_BASE}/fatture-ricevute`;
+  const res = await apiFetch(url, { headers: getAuthHeaders() });
   if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore recupero fatture passive'));
   return await res.json();
 }
+
+export const fetchFatturePassiveApi = fetchFattureRicevuteApi;
 
 export async function registraFatturaRicevutaApi(dati: any): Promise<FatturaRicevuta> {
   const res = await apiFetch(`${API_BASE}/fatture-ricevute`, {
@@ -89,17 +92,32 @@ export async function registraFatturaRicevutaApi(dati: any): Promise<FatturaRice
   return await res.json();
 }
 
-export async function importaXmlFatturaRicevutaApi(xmlContent: string): Promise<FatturaRicevuta> {
+export const registraFatturaPassivaApi = registraFatturaRicevutaApi;
+
+export async function importaXmlFatturaRicevutaApi(dati: {
+  xmlContent: string;
+  pagata?: boolean;
+  dataPagamento?: string;
+  contoBancarioId?: string;
+}): Promise<{ ok: boolean; fattura: FatturaRicevuta }> {
   const res = await apiFetch(`${API_BASE}/fatture-ricevute/import-xml`, {
     method: 'POST',
     headers: getAuthHeaders(),
-    body: JSON.stringify({ xmlContent }),
+    body: JSON.stringify(dati),
   });
   if (!res.ok) throw new Error(await leggiErroreApi(res, "Errore importazione XML fattura d'acquisto"));
   return await res.json();
 }
 
-export async function pagaFatturaRicevutaApi(id: string, dati: any): Promise<any> {
+export const importaFatturaPassivaXmlApi = importaXmlFatturaRicevutaApi;
+
+export async function pagaFatturaRicevutaApi(id: string, dati: {
+  dataPagamento: string;
+  metodoPagamento?: string | null;
+  contoBancarioId?: string | null;
+  riferimentoTransazione?: string | null;
+  note?: string | null;
+}): Promise<any> {
   const res = await apiFetch(`${API_BASE}/fatture-ricevute/${id}/paga`, {
     method: 'POST',
     headers: getAuthHeaders(),
