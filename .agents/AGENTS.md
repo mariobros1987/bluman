@@ -495,3 +495,13 @@ Configurazione: `vitest.config.ts` + `vitest.setup.ts` (isolamento dal DB reale)
    - **Strategia backend**: una rotta per dominio in `src/routes/<dominio>.ts`, logica applicativa in `src/services/`, dominio puro in `src/domain/`. Un file di rotte non accumula domini diversi (vedi lo split di `firma.ts`/`documenti.ts`).
    - **Esecuzione**: un file alla volta; lo split è refactoring **meccanico** senza cambi di comportamento (nessun bugfix o rinomina mescolati); typecheck dopo ogni estrazione (`npx tsc -b` in `frontend/`, `npx tsc --noEmit` alla root); commit separati e revertibili per ogni file splittato.
    - Fa eccezione solo il codice che è intrinsecamente un blocco unico (es. lo schema Prisma, le migrazioni): in quel caso la dimensione è giustificata dal compito stesso.
+
+9. **Distribuzione Doppia Obbligatoria (Railway CLI per Backend + Git Push per Vercel)**:
+   - **Railway NON è collegato al webhook automatico di GitHub**: un semplice `git push origin main` aggiorna il frontend su Vercel ma **non aggiorna il backend** su Railway.
+   - Per rilasciare le modifiche del backend in produzione è **tassativo** lanciare il comando:
+     ```bash
+     npx --yes @railway/cli up --detach
+     ```
+   - In alternativa, eseguire lo script unificato `./scripts/distribuisci.sh` che esegue i controlli di integrità, il push su GitHub per il frontend e il `railway up` per il backend.
+   - Dopo ogni deploy backend, verificare sempre con una chiamata live che le nuove rotte rispondano correttamente e non con `404 Not Found`.
+
