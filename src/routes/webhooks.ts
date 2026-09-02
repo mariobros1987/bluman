@@ -51,7 +51,7 @@ export async function registraRotteWebhooks(server: FastifyInstance): Promise<vo
     '/webhooks/communications/whatsapp',
     async (req, reply) => {
       const body = req.body || {};
-      const tenantId = req.tenantId || '00000000-0000-0000-0000-000000000001';
+      const tenantId = req.tenantId;
 
       try {
         const entry = body.entry?.[0];

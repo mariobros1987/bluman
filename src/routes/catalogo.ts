@@ -20,7 +20,7 @@ import { condizioneModuliPerGiurisdizione } from '../domain/giurisdizioni.js';
 export async function registraRotteCatalogo(server: FastifyInstance, app: AppPort): Promise<void> {
   // ─── GIURISDIZIONI API (§8 Estensione) ───────────────────────────
   server.get('/giurisdizioni', async (req) => {
-    const tenantId = req.tenantId || '00000000-0000-0000-0000-000000000001';
+    const tenantId = req.tenantId;
     return prisma.giurisdizione.findMany({
       where: { tenantId },
       orderBy: { nome: 'asc' },
@@ -28,7 +28,7 @@ export async function registraRotteCatalogo(server: FastifyInstance, app: AppPor
   });
 
   server.post<{ Body: { nome: string; codice: string; tipo: 'ue' | 'extra_ue' | 'stato_usa' | 'altro'; note?: string } }>('/giurisdizioni', async (req, reply) => {
-    const tenantId = req.tenantId || '00000000-0000-0000-0000-000000000001';
+    const tenantId = req.tenantId;
     const body = req.body || {};
     const item = await prisma.giurisdizione.create({
       data: {
@@ -50,7 +50,7 @@ export async function registraRotteCatalogo(server: FastifyInstance, app: AppPor
   });
 
   server.put<{ Params: { id: string }; Body: { nome?: string; codice?: string; tipo?: 'ue' | 'extra_ue' | 'stato_usa' | 'altro'; note?: string } }>('/giurisdizioni/:id', async (req, reply) => {
-    const tenantId = req.tenantId || '00000000-0000-0000-0000-000000000001';
+    const tenantId = req.tenantId;
     const { id } = req.params;
     const body = req.body || {};
     try {
@@ -81,7 +81,7 @@ export async function registraRotteCatalogo(server: FastifyInstance, app: AppPor
   });
 
   server.delete<{ Params: { id: string } }>('/giurisdizioni/:id', async (req, reply) => {
-    const tenantId = req.tenantId || '00000000-0000-0000-0000-000000000001';
+    const tenantId = req.tenantId;
     const { id } = req.params;
     try {
       await prisma.giurisdizione.delete({ where: { id } });
@@ -122,7 +122,7 @@ export async function registraRotteCatalogo(server: FastifyInstance, app: AppPor
 
   // ─── ARTICOLI & PRESTAZIONI API (§Prisma Persistenza Cloud) ───────
   server.get('/articoli', async (req) => {
-    const tenantId = req.tenantId || '00000000-0000-0000-0000-000000000001';
+    const tenantId = req.tenantId;
     // Una lista vuota è una risposta legittima (studio appena iscritto senza
     // catalogo): prima veniva scambiata per un errore e sostituita coi dati
     // dell'adapter in-memory, fingendo un catalogo che non esiste.
@@ -217,7 +217,7 @@ export async function registraRotteCatalogo(server: FastifyInstance, app: AppPor
   }>('/articoli/:id', async (req, reply) => {
     const { id } = req.params;
     const { prezzoDefault, oreDefault, nome } = req.body;
-    const tenantId = req.tenantId || '00000000-0000-0000-0000-000000000001';
+    const tenantId = req.tenantId;
     try {
       const updated = await prisma.articolo.update({
         where: { id },
@@ -256,7 +256,7 @@ export async function registraRotteCatalogo(server: FastifyInstance, app: AppPor
     };
   }>('/articoli', async (req, reply) => {
     const { nome, categoria, oreDefault, prezzoDefault, passaggi } = req.body;
-    const tenantId = req.tenantId || '00000000-0000-0000-0000-000000000001';
+    const tenantId = req.tenantId;
     if (!nome || !categoria) {
       return reply.code(400).send({ errore: 'nome e categoria sono obbligatori' });
     }
@@ -293,7 +293,7 @@ export async function registraRotteCatalogo(server: FastifyInstance, app: AppPor
     // §14 — il tenant è quello della richiesta (JWT), NON un valore fisso: prima la
     // creazione passava da app.creaModuloTemplate() che è legato al tenant Bluecode,
     // quindi per ogni altro studio l'inserimento veniva rifiutato dalle policy RLS.
-    const tenantId = req.tenantId || '00000000-0000-0000-0000-000000000001';
+    const tenantId = req.tenantId;
     if (!nome || !categoria || !righe || righe.length === 0) {
       return reply.code(400).send({ errore: 'nome, categoria e almeno un articolo nella distinta sono obbligatori' });
     }
@@ -405,7 +405,7 @@ export async function registraRotteCatalogo(server: FastifyInstance, app: AppPor
   }>('/moduli-template/:id', async (req, reply) => {
     const { id } = req.params;
     const body = req.body || {};
-    const tenantId = req.tenantId || '00000000-0000-0000-0000-000000000001';
+    const tenantId = req.tenantId;
     try {
       const esistente = await prisma.moduloTemplate.findUnique({ where: { id } });
       // RLS rende invisibili i moduli degli altri tenant: chi prova a modificarne
@@ -520,7 +520,7 @@ export async function registraRotteCatalogo(server: FastifyInstance, app: AppPor
   // senza rompere lo storico.
   server.delete<{ Params: { id: string } }>('/moduli-template/:id', async (req, reply) => {
     const { id } = req.params;
-    const tenantId = req.tenantId || '00000000-0000-0000-0000-000000000001';
+    const tenantId = req.tenantId;
     try {
       const esistente = await prisma.moduloTemplate.findUnique({ where: { id } });
       if (!esistente) {
@@ -547,7 +547,7 @@ export async function registraRotteCatalogo(server: FastifyInstance, app: AppPor
   // distinte e le microvoci dei progetti continuano a referenziarlo.
   server.delete<{ Params: { id: string } }>('/articoli/:id', async (req, reply) => {
     const { id } = req.params;
-    const tenantId = req.tenantId || '00000000-0000-0000-0000-000000000001';
+    const tenantId = req.tenantId;
     try {
       const esistente = await prisma.articolo.findUnique({ where: { id } });
       if (!esistente) {

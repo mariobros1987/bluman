@@ -67,7 +67,7 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
   }
 
   server.get('/tenant/info', async (req) => {
-    const tenantId = req.tenantId || '00000000-0000-0000-0000-000000000001';
+    const tenantId = req.tenantId;
     const defaultNames: Record<string, string> = {
       '00000000-0000-0000-0000-000000000001': 'Studio Advisory & Legal Partners',
       '00000000-0000-0000-0000-000000000002': 'Advisory Italia S.r.l. (Milano)',
@@ -102,7 +102,7 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
   });
 
   server.patch<{ Body: Record<string, any> }>('/tenant/info', async (req, reply) => {
-    const tenantId = req.tenantId || '00000000-0000-0000-0000-000000000001';
+    const tenantId = req.tenantId;
     const rawBody = (req.body || {}) as Record<string, any>;
 
     const allowedKeys = [
@@ -183,7 +183,7 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
   // collaboratori appartengono al tenant da cui sono stati creati e non creano utenti.
 
   server.get('/tenant/utenti', async (req, reply) => {
-    const tenantId = req.tenantId || '00000000-0000-0000-0000-000000000001';
+    const tenantId = req.tenantId;
     const ruoloRichiedente = req.ruolo as string | undefined;
 
     try {
@@ -208,7 +208,7 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
   server.post<{
     Body: { nome?: string; email?: string; ruolo?: string; specializzazione?: string; costoOrarioCentesimi?: number };
   }>('/tenant/utenti', async (req, reply) => {
-    const tenantCorrente = req.tenantId || '00000000-0000-0000-0000-000000000001';
+    const tenantCorrente = req.tenantId;
     const ruoloRichiedente = req.ruolo as string | undefined;
 
     // Solo super_admin (qualunque tenant) e advisor (il proprio) ampliano il team.
@@ -650,7 +650,7 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
    * Ora si prova esattamente quello che c'è: corpo della richiesta, altrimenti riga Tenant.
    */
   server.post<{ Body: { smtpHost?: string; smtpServername?: string; smtpPort?: number; smtpSecure?: boolean; smtpUser?: string; smtpPass?: string; smtpFromEmail?: string; smtpFromName?: string; emailDestinatario?: string } }>('/tenant/test-email', async (req, reply) => {
-    const tenantId = req.tenantId || '00000000-0000-0000-0000-000000000001';
+    const tenantId = req.tenantId;
     let dbTenant: any = null;
     try {
       dbTenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
@@ -680,7 +680,7 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
   });
 
   server.post<{ Body: { imapHost?: string; imapServername?: string; imapPort?: number; imapUser?: string; imapPass?: string; imapSecure?: boolean } }>('/tenant/test-imap', async (req, reply) => {
-    const tenantId = req.tenantId || '00000000-0000-0000-0000-000000000001';
+    const tenantId = req.tenantId;
     let dbTenant: any = null;
     try {
       dbTenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
@@ -719,7 +719,7 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
    * Meta, Telegram o il server SMTP: un canale rotto risponde 400.
    */
   server.post<{ Body: { channel?: string; waPhoneId?: string; waAccessToken?: string } }>('/tenant/test-channel', async (req, reply) => {
-    const tenantId = req.tenantId || '00000000-0000-0000-0000-000000000001';
+    const tenantId = req.tenantId;
     const canale = (req.body?.channel || '').toLowerCase();
     const cred = await credenzialiCanali(tenantId);
 
@@ -794,7 +794,7 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
 
   // Audit Logs API (Isolato per Tenant)
   server.get('/audit-logs', async (req) => {
-    const tenantId = req.tenantId || '00000000-0000-0000-0000-000000000001';
+    const tenantId = req.tenantId;
     try {
       return await prisma.auditLog.findMany({
         where: { tenantId },
@@ -806,7 +806,7 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
   });
 
   server.post<{ Body: Record<string, any> }>('/audit-logs', async (req, reply) => {
-    const tenantId = req.tenantId || '00000000-0000-0000-0000-000000000001';
+    const tenantId = req.tenantId;
     const body = (req.body || {}) as Record<string, any>;
     // Chi ha fatto l'operazione lo dice il token, non il corpo della richiesta: qui c'erano
     // `body.userEmail || 'joe@…'` e `body.userNome || 'Joe Disabato'`, cioè il nome di una

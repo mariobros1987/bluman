@@ -105,7 +105,7 @@ export async function registraRotteClienti(server: FastifyInstance, app: AppPort
 
   // ─── ANAGRAFICA CLIENTI ERP API (§2, §14) ─────────────────────────
   server.get('/clienti', async (req) => {
-    const tenantId = req.tenantId || '00000000-0000-0000-0000-000000000001';
+    const tenantId = req.tenantId;
     try {
       const clienti = await prisma.cliente.findMany({
         where: { tenantId },
@@ -140,7 +140,7 @@ export async function registraRotteClienti(server: FastifyInstance, app: AppPort
   });
 
   server.post<{ Body: Record<string, any> }>('/clienti', async (req, reply) => {
-    const tenantId = req.tenantId || '00000000-0000-0000-0000-000000000001';
+    const tenantId = req.tenantId;
     const b = (req.body || {}) as Record<string, any>;
     if (!b.nome) return reply.code(400).send({ errore: 'Il nome del cliente è obbligatorio' });
 
@@ -221,7 +221,7 @@ export async function registraRotteClienti(server: FastifyInstance, app: AppPort
   });
 
   server.put<{ Params: { id: string }; Body: Record<string, any> }>('/clienti/:id', async (req, reply) => {
-    const tenantId = req.tenantId || '00000000-0000-0000-0000-000000000001';
+    const tenantId = req.tenantId;
     const { id } = req.params;
     const b = (req.body || {}) as Record<string, any>;
 

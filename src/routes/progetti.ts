@@ -20,7 +20,7 @@ import { notificaStudio } from '../services/notificheService.js';
 // §16 — le percentuali e gli stati aggregati arrivano da qui, non dal frontend.
 import { arricchisciProgetti, calcolaAvanzamento, ricalcolaProgetto } from '../services/calcoloService.js';
 import { ricercaGlobale } from '../services/ricercaGlobaleService.js';
-import { TENANT_DEFAULT, STATI_MICROVOCE, STATI_PROGETTO, recordAudit } from '../util/serverHelpers.js';
+import { STATI_MICROVOCE, STATI_PROGETTO, recordAudit } from '../util/serverHelpers.js';
 import { livelloFirmaValido } from '../services/livelloFirmaService.js';
 
 // ─── PROGETTI, COMUNICAZIONI, TIMESHEET, CHECKLIST & ESECUZIONE ─────
@@ -34,7 +34,7 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
   });
 
   server.post<{ Params: { id: string }; Body: Record<string, any> }>('/progetti/:id/comunicazioni', async (req, reply) => {
-    const tenantId = req.tenantId || '00000000-0000-0000-0000-000000000001';
+    const tenantId = req.tenantId;
     const body = (req.body || {}) as Record<string, any>;
     try {
       const msg = await prisma.comunicazioneProgetto.create({
@@ -87,7 +87,7 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
   });
 
   server.get('/progetti', async (req) => {
-    const tenantId = req.tenantId || '00000000-0000-0000-0000-000000000001';
+    const tenantId = req.tenantId;
     const projs = await prisma.progetto.findMany({
       where: { tenantId },
       include: {
@@ -133,7 +133,7 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
   }
 
   server.post<{ Body: { clienteId: string; nome: string; giurisdizioneId?: string; giurisdizionePrimariaId?: string; dataInizio?: string; dataScadenza?: string } }>('/progetti', async (req, reply) => {
-    const tenantId = req.tenantId || '00000000-0000-0000-0000-000000000001';
+    const tenantId = req.tenantId;
     const { clienteId, nome, giurisdizioneId, giurisdizionePrimariaId } = req.body;
     if (!clienteId || !nome) return reply.code(400).send({ errore: 'clienteId e nome sono obbligatori' });
 
@@ -192,7 +192,7 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
   // distruttive (es. /progetti/:id/ricalcola) è riservata a chi risponde dello studio.
   server.delete<{ Params: { id: string } }>('/progetti/:id', async (req, reply) => {
     const { id } = req.params;
-    const tenantId = req.tenantId || TENANT_DEFAULT;
+    const tenantId = req.tenantId;
 
     const ruoloRichiedente = req.ruolo as string | undefined;
     if (ruoloRichiedente !== 'super_admin' && ruoloRichiedente !== 'advisor') {
@@ -228,7 +228,7 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
     '/progetti/:id/moduli/:moduloId',
     async (req, reply) => {
       const { id, moduloId } = req.params;
-      const tenantId = req.tenantId || TENANT_DEFAULT;
+      const tenantId = req.tenantId;
       const ruoloRichiedente = req.ruolo as string | undefined;
 
       if (ruoloRichiedente !== 'super_admin' && ruoloRichiedente !== 'advisor') {
@@ -318,7 +318,7 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
    */
   server.post<{ Params: { id: string } }>('/progetti/:id/ricalcola', async (req, reply) => {
     const { id } = req.params;
-    const tenantId = req.tenantId || TENANT_DEFAULT;
+    const tenantId = req.tenantId;
 
     // Il ricalcolo SCRIVE (stati di moduli e micro-voci): non è una lettura e non lo autorizza
     // il fatto di essere entrati. RLS confina la scrittura al tenant, ma dentro il tenant
@@ -377,7 +377,7 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
   server.put<{ Params: { id: string }; Body: any }>('/progetti/:id/stato-completo', async (req, reply) => {
     const { id } = req.params;
     const body: any = req.body || {};
-    const tenantId = req.tenantId || TENANT_DEFAULT;
+    const tenantId = req.tenantId;
 
     const progetto = await prisma.progetto.findUnique({
       where: { id },

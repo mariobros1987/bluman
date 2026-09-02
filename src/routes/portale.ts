@@ -288,7 +288,7 @@ export async function registraRottePortale(server: FastifyInstance): Promise<voi
   // Lato studio: elenca le proposte del tenant (filtrabili per cliente e stato).
   server.get('/proposte-dati', async (req, reply) => {
     if (req.ruolo === 'cliente') return reply.code(403).send({ errore: 'Non autorizzato.' });
-    const tenantId = req.tenantId || '00000000-0000-0000-0000-000000000001';
+    const tenantId = req.tenantId;
     const query = req.query as any;
     try {
       const proposte = await prisma.propostaDatiFiscale.findMany({
@@ -309,7 +309,7 @@ export async function registraRottePortale(server: FastifyInstance): Promise<voi
   // Lato studio: conferma una proposta e applica il valore alla riga del cliente.
   server.post<{ Params: { id: string } }>('/proposte-dati/:id/conferma', async (req, reply) => {
     if (req.ruolo === 'cliente') return reply.code(403).send({ errore: 'Non autorizzato.' });
-    const tenantId = req.tenantId || '00000000-0000-0000-0000-000000000001';
+    const tenantId = req.tenantId;
     const { id } = req.params;
     try {
       const proposta = await prisma.propostaDatiFiscale.findFirst({
@@ -361,7 +361,7 @@ export async function registraRottePortale(server: FastifyInstance): Promise<voi
   // Lato studio: rifiuta una proposta, con motivazione facoltativa.
   server.post<{ Params: { id: string }; Body: { notaStudio?: string } }>('/proposte-dati/:id/rifiuta', async (req, reply) => {
     if (req.ruolo === 'cliente') return reply.code(403).send({ errore: 'Non autorizzato.' });
-    const tenantId = req.tenantId || '00000000-0000-0000-0000-000000000001';
+    const tenantId = req.tenantId;
     const { id } = req.params;
     try {
       const proposta = await prisma.propostaDatiFiscale.findFirst({ where: { id, tenantId } });
@@ -495,7 +495,7 @@ export async function registraRottePortale(server: FastifyInstance): Promise<voi
   // Lato studio: elenca le richieste di addendum del tenant (filtrabili per progetto/stato).
   server.get('/addendum', async (req, reply) => {
     if (req.ruolo === 'cliente') return reply.code(403).send({ errore: 'Non autorizzato.' });
-    const tenantId = req.tenantId || '00000000-0000-0000-0000-000000000001';
+    const tenantId = req.tenantId;
     const query = req.query as any;
     try {
       const richieste = await prisma.richiestaAddendum.findMany({
@@ -520,7 +520,7 @@ export async function registraRottePortale(server: FastifyInstance): Promise<voi
   // e allega la risposta per il cliente.
   server.post<{ Params: { id: string }; Body: { stato?: string; rispostaStudio?: string } }>('/addendum/:id/stato', async (req, reply) => {
     if (req.ruolo === 'cliente') return reply.code(403).send({ errore: 'Non autorizzato.' });
-    const tenantId = req.tenantId || '00000000-0000-0000-0000-000000000001';
+    const tenantId = req.tenantId;
     const { id } = req.params;
     const STATI_ADDENDUM = ['richiesta', 'in_preparazione', 'pronta', 'rifiutata'];
     const nuovoStato = req.body?.stato;
