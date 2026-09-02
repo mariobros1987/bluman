@@ -136,8 +136,15 @@ export async function registraRotteSolleciti(server: FastifyInstance): Promise<v
         return reply.code(400).send({ errore: parseResult.error.issues[0]?.message || 'Dati sollecito non validi' });
       }
 
-      const { livello, emailDestinatario, oggettoPersonalizzato, testoPersonalizzato, saggioInteresse } =
-        parseResult.data;
+      const {
+        livello,
+        canale = 'email',
+        emailDestinatario,
+        telefonoDestinatario,
+        oggettoPersonalizzato,
+        testoPersonalizzato,
+        saggioInteresse,
+      } = parseResult.data;
 
       try {
         const scadenza = await prisma.scadenzaIncasso.findFirst({
@@ -157,7 +164,7 @@ export async function registraRotteSolleciti(server: FastifyInstance): Promise<v
         const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
         const destinatario = emailDestinatario || scadenza.fattura.cliente.email;
 
-        if (!destinatario) {
+        if ((canale === 'email' || canale === 'entrambi') && !destinatario) {
           return reply.code(400).send({
             errore: "Nessun indirizzo email specificato né presente nell'anagrafica del cliente.",
           });
@@ -205,8 +212,7 @@ export async function registraRotteSolleciti(server: FastifyInstance): Promise<v
         // 2. Invio WhatsApp se richiesto
         if (canale === 'whatsapp' || canale === 'entrambi') {
           const referenti = scadenza.fattura.cliente.referentiJson as any;
-          const telefono = parseResult.data.telefonoDestinatario ||
-            scadenza.fattura.cliente.telefono ||
+          const telefono = telefonoDestinatario ||
             (Array.isArray(referenti) ? referenti[0]?.telefono || referenti[0]?.whatsapp : referenti?.telefono || referenti?.whatsapp);
 
           if (!telefono) {
