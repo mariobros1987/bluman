@@ -254,6 +254,27 @@ al posto del dato mancante, rendendo l'inventato indistinguibile dal reale.
 - [x] `Fattura`: Gestione distinta per `tipoDocumento` (`fattura` | `nota_credito`), serie autonoma (`FT` vs `NC`), `numeroProgressivoSerie` e campi tracciato SDI Comped.
 - [x] `PassaggioProgetto`: `noteOperatoreJson`, `richiedeFirmaCliente`, `documentoAllegatoUrl`.
 
+### FASE 3 — Ciclo Passivo, Fornitori ERP, Liquidazione IVA (LIPE) & Solleciti di Pagamento (2 Settembre 2026)
+- [x] **Anagrafica Fornitori ERP (`/fornitori`)**:
+  - Tabella `fornitore` in PostgreSQL con isolamento multi-tenant (`tenantId`) e indici.
+  - Modale ERP `AnagraficaFornitoreErpModal.tsx` a 5 schede (Dati Fiscali & SDI, Sede & Recapiti, Pagamenti & IBAN, Storico Acquisti, Note Interne).
+  - API `GET /fornitori`, `POST /fornitori`, `PUT /fornitori/:id`, `DELETE /fornitori/:id` con validazione tollerante Zod.
+- [x] **Registrazione Fatture d'Acquisto / Ciclo Passivo**:
+  - Modello `fattura_ricevuta` con scorporo imponibile/IVA, esigibilità immediata/differita/split-payment e parsing XML SDI automatico (`src/services/fatturaPassivaParser.ts`).
+  - Modale `RegistraFatturaPassivaModal.tsx` con righe spese multiple e registrazione automatica dell'uscita in Prima Nota Cassa/Banca.
+- [x] **Liquidazione IVA Periodica (LIPE) & Prospetto F24 (`/liquidazione-iva`)**:
+  - Motore di calcolo deterministico `src/services/lipeEngine.ts` conforme DPR 633/72 con aggregazione mensile/trimestrale, scorporo split-payment, interesse 1% trimestrale e calcolo automatico codici tributo F24 (6001-6012, 6031-6034).
+  - API `GET /liquidazione-iva` e `POST /liquidazione-iva/salva`.
+  - Frontend `LiquidazioneIvaPage.tsx` con simulazione live e riepilogo F24.
+- [x] **Solleciti di Pagamento & Calcolo Interessi di Mora (D.Lgs. 231/2002)**:
+  - Motore deterministico `src/services/sollecitiEngine.ts` con 3 livelli di sollecito, calcolo giorni ritardo, maggiorazione BCE +8% e rimborso forfettario spese 40€ (art. 6).
+  - Rotte `src/routes/solleciti.ts` (`POST /invoices/solleciti/invia`, `GET /invoices/solleciti/insoluti`).
+  - Componente `InviaSollecitoModal.tsx` integrato in `ScadenzarioPage.tsx` con dispatch Email e WhatsApp.
+- [x] **Validazione Pervasiva Zod**:
+  - Schemi Zod implementati per tutti i payload in ingresso in `src/schemas/`.
+- [x] **Regola 9 di Distribuzione Doppia (Railway CLI + Vercel)**:
+  - Documentata ed estesa in `AGENTS.md` e `ISTRUZIONI_PER_IA.md`.
+
 ### FASE 2 — Frontend UI & Portale Cliente Passwordless
 - [x] **Dashboard (`/`)**: KPI portafoglio, avvisi ritardo, navigazione deep-link ai clienti ed ai progetti.
 - [x] **Anagrafica Clienti ERP (`/clients`)**: Modal `AnagraficaErpModal` a 4 schede per dati legali, sedi, fatturazione SDI e fascicolo KYC/AML con persistenza bidirezionale garantita (PostgreSQL `prisma.cliente` + `referentiJson`).

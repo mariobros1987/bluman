@@ -20,9 +20,11 @@ Questo file serve come indice rapido per l'IA ed i collaboratori per identificar
   - `📊 Redditività & Margini` (Analisi Margine Lordo Commessa, Semaforo Budget Live, Resa Oraria Reale ed Export Rendiconto Economico CSV). Le ore reali sono quelle **consuntivate** (`m.a`), non interpolate dalla percentuale: senza consuntivazione la riga scrive `—` e "⚪ Nessuna ora consuntivata", non "🟡 In Target".
   - `📄 Documenti & Vault Legale` (Cloud Vault Google Drive Style ed Export Fascicolo Completo ZIP 1-Click)
 - **`pages/InvoicesPage.tsx`**: Registro Fiscale Fatture, Note di Credito, Aliquote, Export XML SDI ed **Export Registro Fiscale per Commercialista (CSV / Excel)**.
+- **`pages/FornitoriPage.tsx`**: Ciclo Passivo & Gestione Fornitori ERP (Anagrafica Fornitori OpenSTAManager-grade, Registrazione Fatture d'Acquisto, Scorporo IVA, Import XML SDI e Collegamento Prima Nota).
+- **`pages/LiquidazioneIvaPage.tsx`**: Liquidazione IVA Periodica (LIPE) & Prospetto F24 (Calcolo debito/credito IVA mensile/trimestrale conforme DPR 633/72, esclusione Split Payment e codici tributo F24 6001-6012, 6031-6034).
 - **`pages/PrimaNotaPage.tsx`**: Registro Prima Nota, Transazioni Cassa/Banca, CRO/TRN, Import & Riconciliazione Estratto Conto Bancario ed **Export Contabile Commercialista (CSV / Excel)** compatibile con Zucchetti, TeamSystem, Datev e Profis.
 - **`pages/PaymentsPage.tsx`**: Registrazione Incassi & Scadenzario Pagamenti con filtri stato/cliente/ricerca, modal registrazione incasso in Prima Nota con collegamento a banca e fattura, e aggiornamento stato scadenza (pagata/parziale/insoluta).
-- **`pages/ScadenzarioPage.tsx`**: Scadenzario Incassi, Partite Aperte & Solleciti Clienti con Link al Progetto.
+- **`pages/ScadenzarioPage.tsx`**: Scadenzario Incassi, Partite Aperte & Solleciti Clienti con Link al Progetto e Calcolo Interessi di Mora D.Lgs. 231/2002.
 - **`pages/BanksPage.tsx`**: Gestione Banche, Conti Correnti Studio, IBAN & Riconciliazione Liquidità.
 - **`pages/RetainersPage.tsx`**: Contratti Ricorrenti & Retainer Studio per la fatturazione periodica pianificata, collegato ai Progetti specifici con filtraggio clienti a cascata e link 1-Click `📁 Nome Progetto ↗`.
 - **`pages/DocumentEditorPage.tsx`**: Studio Document Studio & Contract Builder (Editor Word WYSIWYG, Smart Tags ERP, Intestazione/Piè di Pagina A4 ed Export PDF). Il selettore **micro-voce di destinazione** carica solo le micro-voci reali del progetto scelto (`fetchProgettoDettaglio`) e passa `microvoceProgettoId` a `salvaDocumentoApi`, con fascia informativa «Percorso del documento» che spiega dove finirà il documento; nessun id inventato lato client.
@@ -49,6 +51,9 @@ Questo file serve come indice rapido per l'IA ed i collaboratori per identificar
 - **`components/DigitalSignatureModal.tsx`**: Modal Firma Elettronica Semplice (OTP verificata · art. 20 CAD) con pad firma; IP e timestamp ISO li registra il server nel sigillo, mai il browser.
 - **`components/DocumentEditorModal.tsx`**: Modal wrapper per apertura rapida dell'editor documenti da contesti esterni.
 - **`components/NotificationModal.tsx`**: Modal sistema notifiche e avvisi operatore.
+- **`components/fornitori/AnagraficaFornitoreErpModal.tsx`**: Modal Anagrafica Fornitore ERP OpenSTAManager-grade a 5 schede (Dati Fiscali & SDI, Sede & Recapiti, Pagamenti & IBAN, Storico Acquisti, Note Interne).
+- **`components/fornitori/RegistraFatturaPassivaModal.tsx`**: Modal Registrazione Fattura Passiva con righe spesa multiple, scorporo IVA, esigibilità (immediata/differita/split) e scrittura automatica in Prima Nota Cassa/Banca.
+- **`components/solleciti/InviaSollecitoModal.tsx`**: Modal Solleciti di Pagamento con calcolo automatico interessi di mora (D.Lgs. 231/2002) e dispatch multicanale Email & WhatsApp.
 - **`components/documenti/ElencoDocumentiCartella.tsx`**: §37 — il contenuto di una cartella dell'archivio: la tabella dei documenti di un progetto (nome file senza il prefisso `${Date.now()}_`, tipo, stato, caricamento, apertura/scarico PDF e Word). Legge da `listaDocumentiProgetto(progettoId, includiArchiviati)`: nessun badge «firmato» che non venga dal sigillo a database, e «errore di lettura» resta distinto da «cartella vuota».
 
 ### 🏗 Layout (`components/layout/`)
