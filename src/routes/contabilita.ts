@@ -17,6 +17,7 @@ import { generateInvoicePdfBuffer } from '../services/pdfService.js';
 import { runDailyNotificationCron } from '../services/cronService.js';
 import { preparaFatturaPerInvioManuale } from '../services/sdiService.js';
 import { generaFatturaElettronicaXml } from '../services/sdiXmlGenerator.js';
+import { costruisciDatiFatturaSdi } from '../services/mappaturaFatturaSdi.js';
 import { timingSafeEqual } from 'node:crypto';
 import {
   calcolaTotaliFattura,
@@ -1272,54 +1273,21 @@ export async function registraRotteContabilita(server: FastifyInstance, app: App
 
       if (!cliente) return reply.code(400).send({ errore: 'Cliente non associato alla fattura' });
 
-      const xmlString = generaFatturaElettronicaXml({
-        progressivoInvio: String(fattura.numeroProgressivoSerie || '1').padStart(5, '0'),
-        codiceDestinatario: fattura.codiceDestinatario || cliente.sdiCode || '0000000',
-        pecDestinatario: fattura.pecDestinatario,
-        cedenteDenominazione: studio?.ragioneSociale || 'Studio Advisory',
-        cedentePiva: studio?.piva,
-        cedenteCodiceFiscale: studio?.codiceFiscale || studio?.piva,
-        cedenteSedeIndirizzo: studio?.sedeLegale || 'Via Roma 1',
-        cedenteRegimeFiscale: studio?.regimeFiscale || 'RF01',
-        cessionarioDenominazione: cliente.nome,
-        cessionarioPiva: cliente.piva,
-        cessionarioCodiceFiscale: cliente.codiceFiscale,
-        cessionarioIndirizzo: cliente.sedeLegale,
-        tipoDocumento: fattura.tipoDocumento === 'nota_credito' ? 'TD04' : 'TD01',
-        data: (fattura.data || new Date()).toISOString().split('T')[0] || '',
-        numero: fattura.numero || `FT-${fattura.numeroProgressivoSerie}`,
-        importoTotaleDocumento: (fattura.totaleDocumentoCentesimi || 0) / 100,
-        tipoCassa: fattura.tipoCassa !== 'nessuna' ? 'TC22' : undefined,
-        aliquotaCassa: fattura.aliquotaCassa || undefined,
-        importoContributoCassa: fattura.totaleCassaCentesimi ? fattura.totaleCassaCentesimi / 100 : undefined,
-        tipoRitenuta: 'RT01',
-        importoRitenuta: fattura.totaleRitenutaCentesimi ? fattura.totaleRitenutaCentesimi / 100 : undefined,
-        aliquotaRitenuta: fattura.aliquotaRitenuta || undefined,
-        bolloVirtuale: (fattura.totaleBolloCentesimi || 0) > 0,
-        importoBollo: (fattura.totaleBolloCentesimi || 0) / 100,
-        linee: fattura.righe.map((r, idx) => ({
-          numeroLinea: idx + 1,
-          descrizione: r.descrizione,
-          quantita: r.quantita,
-          unitaMisura: r.unitaMisura,
-          prezzoUnitario: (r.prezzoUnitarioCent || r.importo) / 100,
-          prezzoTotale: (r.imponibileCentesimi || r.importo) / 100,
-          aliquotaIva: r.aliquotaIva,
-          natura: r.naturaEsenzione,
-          ritenuta: r.applicaRitenuta,
-        })),
-        riepilogoIva: [
-          {
-            aliquotaIva: 22,
-            imponibileImporto: (fattura.totaleImponibileCentesimi || 0) / 100,
-            imposta: (fattura.totaleIvaCentesimi || 0) / 100,
-            esigibilitaIva: (fattura.esigibilitaIva === 'split' ? 'S' : fattura.esigibilitaIva === 'differita' ? 'D' : 'I'),
-          },
-        ],
-        fatturaCollegataNumero: fattura.fatturaOrigine?.numero,
-        fatturaCollegataData: fattura.fatturaOrigine?.data ? fattura.fatturaOrigine.data.toISOString().split('T')[0] : undefined,
-        iban: fattura.contoAccredito?.iban || studio?.iban,
-      });
+      // La mappatura vive in src/services/mappaturaFatturaSdi.ts perché il fascicolo ZIP
+      // per il commercialista deve produrre lo STESSO XML di questa rotta. Il riepilogo IVA
+      // era cablato qui su un'unica riga al 22%: ora si raggruppa per (aliquota, natura)
+      // dalle righe reali, quindi una parcella esente non dichiara più imposta al 22%.
+      const xmlString = generaFatturaElettronicaXml(
+        costruisciDatiFatturaSdi({
+          fattura,
+          righe: fattura.righe,
+          cliente,
+          studio,
+          ibanAccredito: fattura.contoAccredito?.iban,
+          fatturaOrigineNumero: fattura.fatturaOrigine?.numero,
+          fatturaOrigineData: fattura.fatturaOrigine?.data,
+        }),
+      );
 
       reply.header('Content-Type', 'application/xml');
       reply.header('Content-Disposition', `attachment; filename="${fattura.numero || 'Fattura'}.xml"`);

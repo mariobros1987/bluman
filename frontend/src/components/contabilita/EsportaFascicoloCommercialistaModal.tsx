@@ -191,9 +191,31 @@ export function EsportaFascicoloCommercialistaModal({ isOpen, onClose }: Props) 
                   <span>🟢 <b>01_Fatture_Attive_Vendite</b> (XML SDI + CSV)</span>
                   <span style={{ fontWeight: 700 }}>{anteprima.conteggioFattureAttive} fatture (€ {anteprima.totaleImponibileVenditeEuro.toFixed(2)})</span>
                 </div>
+                {/* Il conteggio delle fatture non è il conteggio degli XML: una bozza non ha
+                    numerazione definitiva né trasmissione, quindi resta nel registro CSV ma
+                    non fra i file XML. Dirlo qui evita che lo studio scopra la differenza
+                    dopo aver mandato lo ZIP al commercialista. */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', paddingBottom: 6, color: 'var(--muted)', fontSize: 11.5 }}>
+                  <span style={{ paddingLeft: 18 }}>↳ file XML FatturaPA inclusi</span>
+                  <span>
+                    {anteprima.conteggioXmlAttiviGenerati} XML
+                    {anteprima.conteggioBozzeEscluseDaXml > 0
+                      ? ` · ${anteprima.conteggioBozzeEscluseDaXml} in bozza solo nel CSV`
+                      : ''}
+                  </span>
+                </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', paddingBottom: 6 }}>
                   <span>🔵 <b>02_Fatture_Passive_Acquisti</b> (XML + CSV)</span>
                   <span style={{ fontWeight: 700 }}>{anteprima.conteggioFatturePassive} fatture (€ {anteprima.totaleImponibileAcquistiEuro.toFixed(2)})</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', paddingBottom: 6, color: 'var(--muted)', fontSize: 11.5 }}>
+                  <span style={{ paddingLeft: 18 }}>↳ XML originali del fornitore allegati</span>
+                  <span>
+                    {anteprima.conteggioXmlPassiviAllegati} su {anteprima.conteggioFatturePassive}
+                    {anteprima.conteggioFatturePassive - anteprima.conteggioXmlPassiviAllegati > 0
+                      ? ` · ${anteprima.conteggioFatturePassive - anteprima.conteggioXmlPassiviAllegati} senza file`
+                      : ''}
+                  </span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', paddingBottom: 6 }}>
                   <span>📊 <b>03_Liquidazione_IVA_LIPE</b> (F24 CSV + TXT)</span>

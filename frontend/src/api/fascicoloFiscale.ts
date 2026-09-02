@@ -12,6 +12,11 @@ export interface AnteprimaFascicoloFiscale {
   conteggioFattureAttive: number;
   conteggioFatturePassive: number;
   conteggioMovimentiPrimaNota: number;
+  /** XML che finiranno davvero nello ZIP: le bozze non ne hanno. */
+  conteggioXmlAttiviGenerati: number;
+  conteggioBozzeEscluseDaXml: number;
+  /** XML d'acquisto allegati: solo quelli trasmessi dal fornitore, non ricostruiti. */
+  conteggioXmlPassiviAllegati: number;
   totaleImponibileVenditeEuro: number;
   totaleIvaVenditeEuro: number;
   totaleImponibileAcquistiEuro: number;

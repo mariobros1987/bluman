@@ -1,6 +1,28 @@
 import PizZip from 'pizzip';
 import { prisma } from '../util/prismaClient.js';
 import { calcolaLiquidazioneIvaPeriodo, getCodiceTributoIva } from './lipeEngine.js';
+import { generaFatturaElettronicaXml } from './sdiXmlGenerator.js';
+import { costruisciDatiFatturaSdi } from './mappaturaFatturaSdi.js';
+
+/**
+ * Escape per i campi CSV.
+ *
+ * Le virgolette raddoppiate non bastano: un valore che comincia con `=`, `+`, `-` o `@`
+ * viene interpretato come formula da Excel e da LibreOffice quando il commercialista
+ * apre il file. Una descrizione di riga può cominciare con `-` in perfetta buona fede, e
+ * `=cmd|…` in cattiva fede. Si premette un apice, che i fogli di calcolo trattano come
+ * «questo è testo».
+ */
+function campoCsv(valore: string | null | undefined): string {
+  const testo = (valore ?? '').replace(/\r?\n/g, ' ');
+  const disinnescato = /^[=+\-@\t\r]/.test(testo) ? `'${testo}` : testo;
+  return `"${disinnescato.replace(/"/g, '""')}"`;
+}
+
+/** Nome file sicuro dentro lo ZIP: nessun separatore, nessun `..`, niente accenti. */
+function nomeFileSicuro(valore: string, lunghezzaMax = 40): string {
+  return (valore || 'documento').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, lunghezzaMax) || 'documento';
+}
 
 export interface ParametriFascicoloFiscale {
   tenantId: string;
@@ -16,6 +38,11 @@ export interface RisultatoFascicoloFiscale {
   conteggioFattureAttive: number;
   conteggioFatturePassive: number;
   conteggioMovimentiPrimaNota: number;
+  /** XML del ciclo attivo effettivamente scritti nello ZIP (le bozze non ne hanno). */
+  conteggioXmlAttiviGenerati: number;
+  conteggioBozzeEscluseDaXml: number;
+  /** XML d'acquisto allegati: solo quelli che il fornitore ci ha trasmesso davvero. */
+  conteggioXmlPassiviAllegati: number;
   totaleImponibileVenditeEuro: number;
   totaleIvaVenditeEuro: number;
   totaleImponibileAcquistiEuro: number;
@@ -23,7 +50,19 @@ export interface RisultatoFascicoloFiscale {
   saldoIvaEuro: number;
 }
 
-export async function generaFascicoloFiscaleZip(params: ParametriFascicoloFiscale): Promise<RisultatoFascicoloFiscale> {
+/** L'anteprima è lo stesso conto senza lo ZIP: nessun XML generato, nessun DEFLATE. */
+export type AnteprimaFascicoloFiscale = Omit<RisultatoFascicoloFiscale, 'buffer'>;
+
+/**
+ * Raccolta dei dati: intervallo, query, LIPE, totali, conteggi.
+ *
+ * Sta in una funzione a parte perché l'anteprima ha bisogno esattamente di questi numeri
+ * e di nient'altro: prima chiamava `generaFascicoloFiscaleZip` e ne scartava il `buffer`,
+ * cioè rigenerava ogni XML FatturaPA e comprimeva in DEFLATE un archivio intero per poi
+ * buttarlo via. Su un export annuale è lavoro sprecato proporzionale al numero di fatture,
+ * ripetibile da chiunque abbia il token semplicemente ricaricando la pagina.
+ */
+async function raccogliDatiFascicolo(params: ParametriFascicoloFiscale) {
   const { tenantId, anno, tipo, mese, trimestre } = params;
 
   // 1. Calcola intervallo temporale
@@ -131,63 +170,95 @@ export async function generaFascicoloFiscaleZip(params: ParametriFascicoloFiscal
     ? lipeResult.importoDaVersareCent / 100
     : -(lipeResult.creditoRiportabileCent / 100);
 
+  // Il nome del file si calcola qui perché anche l'anteprima lo mostra: una sola copia
+  // della regola di sanificazione, così il nome annunciato è quello scaricato.
+  const nomeFile = `Fascicolo_Fiscale_${studioNome.replace(/[^a-zA-Z0-9_-]/g, '_')}_${etichettaPeriodo}.zip`;
+
+  return {
+    dataInizio,
+    dataFine,
+    etichettaPeriodo,
+    tenant,
+    studioNome,
+    studioPiva,
+    studioCf,
+    nomeFile,
+    fattureAttive,
+    fatturePassive,
+    movimenti,
+    lipeResult,
+    codiceTributoF24,
+    scadenzaVersamento,
+    totaleImponibileVenditeEuro,
+    totaleIvaVenditeEuro,
+    totaleImponibileAcquistiEuro,
+    totaleIvaAcquistiEuro,
+    saldoIvaEuro,
+  };
+}
+
+/**
+ * Conteggi e totali del periodo senza costruire l'archivio: è quello che serve alla rotta
+ * `GET /contabilita/anteprima-fascicolo-commercialista`.
+ */
+export async function calcolaAnteprimaFascicoloFiscale(
+  params: ParametriFascicoloFiscale,
+): Promise<AnteprimaFascicoloFiscale> {
+  const d = await raccogliDatiFascicolo(params);
+
+  // Gli stessi criteri applicati dal builder, espressi come filtri: una bozza non ha XML
+  // (non è un documento fiscale) e una fattura senza cliente risolvibile non è mappabile
+  // su FatturaPA. Se questi criteri cambiano lì, vanno cambiati anche qui.
+  const bozze = d.fattureAttive.filter((f) => f.stato === 'bozza').length;
+  const attiveConXml = d.fattureAttive.filter(
+    (f) => f.stato !== 'bozza' && Boolean(f.cliente || f.progetto?.cliente),
+  ).length;
+
+  return {
+    nomeFile: d.nomeFile,
+    conteggioFattureAttive: d.fattureAttive.length,
+    conteggioFatturePassive: d.fatturePassive.length,
+    conteggioMovimentiPrimaNota: d.movimenti.length,
+    conteggioXmlAttiviGenerati: attiveConXml,
+    conteggioBozzeEscluseDaXml: bozze,
+    conteggioXmlPassiviAllegati: d.fatturePassive.filter((fp) => Boolean(fp.xmlSdiRaw)).length,
+    totaleImponibileVenditeEuro: d.totaleImponibileVenditeEuro,
+    totaleIvaVenditeEuro: d.totaleIvaVenditeEuro,
+    totaleImponibileAcquistiEuro: d.totaleImponibileAcquistiEuro,
+    totaleIvaAcquistiEuro: d.totaleIvaAcquistiEuro,
+    saldoIvaEuro: d.saldoIvaEuro,
+  };
+}
+
+export async function generaFascicoloFiscaleZip(
+  params: ParametriFascicoloFiscale,
+): Promise<RisultatoFascicoloFiscale> {
+  const { anno } = params;
+  const {
+    dataInizio, dataFine, etichettaPeriodo, tenant, studioNome, studioPiva, studioCf, nomeFile,
+    fattureAttive, fatturePassive, movimenti, lipeResult, codiceTributoF24, scadenzaVersamento,
+    totaleImponibileVenditeEuro, totaleIvaVenditeEuro, totaleImponibileAcquistiEuro,
+    totaleIvaAcquistiEuro, saldoIvaEuro,
+  } = await raccogliDatiFascicolo(params);
+
   // 8. Creazione ZIP
   const zip = new PizZip();
 
-  // ─── 00_INDICE_FASCICOLO_FISCALE.txt ─────────────────────────────────
-  const indiceTesto = [
-    `================================================================================`,
-    `FASCICOLO FISCALE & CONTABILE UNIFICATO PER IL COMMERCIALISTA`,
-    `BLUMAN ADVISORY PLATFORM — ERP GRADE COMPLIANCE`,
-    `================================================================================`,
-    `Studio Professionale:  ${studioNome}`,
-    `Partita IVA:           ${studioPiva}`,
-    `Codice Fiscale:        ${studioCf}`,
-    `Periodo Fiscale:       ${etichettaPeriodo}`,
-    `Intervallo Date:       ${dataInizio.toISOString().split('T')[0]} ➔ ${dataFine.toISOString().split('T')[0]}`,
-    `Data Generazione ZIP:  ${new Date().toISOString()}`,
-    `================================================================================`,
-    ``,
-    `RIASSUNTO FISCALE DI PERIODO:`,
-    `--------------------------------------------------------------------------------`,
-    `• FATTURE ATTIVE (VENDITE):        N. ${fattureAttive.length}`,
-    `  - Totale Imponibile:             € ${totaleImponibileVenditeEuro.toFixed(2)}`,
-    `  - Totale IVA a Debito:           € ${totaleIvaVenditeEuro.toFixed(2)}`,
-    ``,
-    `• FATTURE PASSIVE (ACQUISTI):      N. ${fatturePassive.length}`,
-    `  - Totale Imponibile:             € ${totaleImponibileAcquistiEuro.toFixed(2)}`,
-    `  - Totale IVA Detraibile:         € ${totaleIvaAcquistiEuro.toFixed(2)}`,
-    ``,
-    `• LIQUIDAZIONE IVA & PROSPETTO F24:`,
-    `  - IVA a Debito:                  € ${(lipeResult.ivaDebitoCent / 100).toFixed(2)}`,
-    `  - IVA Detraibile:                € ${(lipeResult.ivaCreditoCent / 100).toFixed(2)}`,
-    `  - Esito Liquidazione:            ${lipeResult.stato.toUpperCase()}`,
-    `  - Importo Saldo:                 € ${(lipeResult.saldoIvaCent / 100).toFixed(2)}`,
-    `  - TOTALE F24 DA VERSARE:         € ${(lipeResult.importoDaVersareCent / 100).toFixed(2)}`,
-    `  - Codice Tributo F24 Suggerito:  ${codiceTributoF24}`,
-    `  - Scadenza Versamento Ordinaria: ${scadenzaVersamento}`,
-    ``,
-    `• REGISTRO PRIMA NOTA:`,
-    `  - Numero Movimenti Riconciliati: ${movimenti.length}`,
-    ``,
-    `STRUTTURA CARTELLE ARCHIVIO ZIP:`,
-    `--------------------------------------------------------------------------------`,
-    `01_Fatture_Attive_Vendite/     -> File XML SDI e Registro Vendite CSV`,
-    `02_Fatture_Passive_Acquisti/   -> File XML SDI fornitore e Registro Acquisti CSV`,
-    `03_Liquidazione_IVA_LIPE/      -> Prospetto LIPE e Modello F24 (CSV e TXT)`,
-    `04_Prima_Nota_Cassa_Banca/     -> Registro Cassa/Banca compatibile Zucchetti/TeamSystem`,
-    `================================================================================`,
-  ].filter(Boolean).join('\r\n');
-
-  zip.file('00_INDICE_FASCICOLO_FISCALE.txt', indiceTesto);
+  // L'indice si compila in fondo (§ «00_INDICE» più sotto), quando i conteggi degli XML
+  // effettivamente scritti sono noti: un indice che promette N file XML e ne consegna N-3
+  // è peggio di nessun indice, perché il commercialista non sa quali mancano.
 
   // ─── 01_Fatture_Attive_Vendite ───────────────────────────────────────
   const csvAttiveRighe = [
     ['Data', 'Tipo', 'Serie', 'Numero', 'Cliente', 'P.IVA/CF', 'Imponibile_EUR', 'IVA_EUR', 'Totale_EUR', 'Stato'].join(';'),
   ];
+  let xmlAttiveGenerati = 0;
+  let bozzeEscluseDaXml = 0;
+
   for (const f of fattureAttive) {
-    const nomeCli = f.cliente?.nome || f.progetto?.cliente?.nome || 'Cliente';
-    const pivaCli = f.cliente?.piva || f.progetto?.cliente?.piva || f.cliente?.codiceFiscale || '';
+    const clienteFattura = f.cliente || f.progetto?.cliente || null;
+    const nomeCli = clienteFattura?.nome || 'Cliente';
+    const pivaCli = clienteFattura?.piva || clienteFattura?.codiceFiscale || '';
     const imp = ((f.totaleImponibileCentesimi || 0) / 100).toFixed(2);
     const iva = ((f.totaleIvaCentesimi || 0) / 100).toFixed(2);
     const tot = ((f.totaleDocumentoCentesimi || 0) / 100).toFixed(2);
@@ -196,28 +267,41 @@ export async function generaFascicoloFiscaleZip(params: ParametriFascicoloFiscal
       dataStr,
       f.tipoDocumento,
       f.serie,
-      f.numeroProgressivoSerie,
-      `"${nomeCli.replace(/"/g, '""')}"`,
-      `"${pivaCli}"`,
+      String(f.numeroProgressivoSerie),
+      campoCsv(nomeCli),
+      campoCsv(pivaCli),
       imp,
       iva,
       tot,
       f.stato,
     ].join(';'));
 
-    const nomeFileXml = `Fattura_${f.serie}_${String(f.numeroProgressivoSerie).padStart(4, '0')}.xml`;
-    const xmlContenuto = `<?xml version="1.0" encoding="UTF-8"?>
-<p:FatturaElettronica xmlns:p="http://ivaservizi.agenziaentrate.gov.it/docs/xsd/fatture/v1.2" versione="FPR12">
-  <FatturaElettronicaHeader>
-    <CedentePrestatore><DatiAnagrafici><IdFiscaleIVA><IdPaese>IT</IdPaese><IdCodice>${studioPiva}</IdCodice></IdFiscaleIVA><Anagrafica><Denominazione>${studioNome}</Denominazione></Anagrafica></DatiAnagrafici></CedentePrestatore>
-    <CessionarioCommittente><DatiAnagrafici><IdFiscaleIVA><IdPaese>IT</IdPaese><IdCodice>${pivaCli}</IdCodice></IdFiscaleIVA><Anagrafica><Denominazione>${nomeCli}</Denominazione></Anagrafica></DatiAnagrafici></CessionarioCommittente>
-  </FatturaElettronicaHeader>
-  <FatturaElettronicaBody>
-    <DatiGenerali><DatiGeneraliDocumento><TipoDocumento>TD01</TipoDocumento><Divisa>EUR</Divisa><Data>${dataStr}</Data><Numero>${f.numeroProgressivoSerie}</Numero><ImportoTotaleDocumento>${tot}</ImportoTotaleDocumento></DatiGeneraliDocumento></DatiGenerali>
-    <DatiBeniServizi><DatiRiepilogo><AliquotaIVA>22.00</AliquotaIVA><ImponibileImporto>${imp}</ImponibileImporto><Imposta>${iva}</Imposta></DatiRiepilogo></DatiBeniServizi>
-  </FatturaElettronicaBody>
-</p:FatturaElettronica>`;
+    // Una bozza non è un documento fiscale: non ha numerazione definitiva e non è stata
+    // trasmessa. Metterne l'XML nella cartella delle fatture emesse la farebbe sembrare
+    // tale al commercialista. Resta nel CSV, con la sua colonna `Stato`, dove è leggibile
+    // per quello che è.
+    if (f.stato === 'bozza') {
+      bozzeEscluseDaXml += 1;
+      continue;
+    }
+
+    // L'XML NON si scrive a mano qui. Prima lo era, con TipoDocumento fisso a TD01,
+    // AliquotaIVA fissa a 22.00, nessun DettaglioLinee e nessun escape delle entità:
+    // una nota di credito veniva esportata come fattura e un'esenzione come 22%. Ora
+    // passa dallo stesso generatore della rotta `GET /invoices/:id/sdi-xml`.
+    if (!clienteFattura) continue;
+
+    const xmlContenuto = generaFatturaElettronicaXml(
+      costruisciDatiFatturaSdi({
+        fattura: f,
+        righe: f.righe,
+        cliente: clienteFattura,
+        studio: tenant,
+      }),
+    );
+    const nomeFileXml = `${f.serie === 'NC' ? 'NotaCredito' : 'Fattura'}_${nomeFileSicuro(f.serie, 8)}_${String(f.numeroProgressivoSerie).padStart(4, '0')}.xml`;
     zip.file(`01_Fatture_Attive_Vendite/${nomeFileXml}`, xmlContenuto);
+    xmlAttiveGenerati += 1;
   }
   zip.file('01_Fatture_Attive_Vendite/Registro_Fatture_Vendite.csv', csvAttiveRighe.join('\r\n'));
 
@@ -225,6 +309,8 @@ export async function generaFascicoloFiscaleZip(params: ParametriFascicoloFiscal
   const csvPassiveRighe = [
     ['Data', 'Numero', 'Fornitore', 'P.IVA/CF', 'Imponibile_EUR', 'IVA_EUR', 'Totale_EUR', 'Esigibilita_IVA', 'Pagata'].join(';'),
   ];
+  let xmlPassiveAllegati = 0;
+
   for (const fp of fatturePassive) {
     const nomeForn = fp.fornitore?.ragioneSociale || 'Fornitore';
     const pivaForn = fp.fornitore?.partitaIva || fp.fornitore?.codiceFiscale || '';
@@ -234,9 +320,9 @@ export async function generaFascicoloFiscaleZip(params: ParametriFascicoloFiscal
     const dataStr = fp.data ? fp.data.toISOString().split('T')[0] : '';
     csvPassiveRighe.push([
       dataStr,
-      `"${fp.numero.replace(/"/g, '""')}"`,
-      `"${nomeForn.replace(/"/g, '""')}"`,
-      `"${pivaForn}"`,
+      campoCsv(fp.numero),
+      campoCsv(nomeForn),
+      campoCsv(pivaForn),
       imp,
       iva,
       tot,
@@ -244,10 +330,15 @@ export async function generaFascicoloFiscaleZip(params: ParametriFascicoloFiscal
       fp.pagata ? 'SI' : 'NO',
     ].join(';'));
 
+    // Il ciclo passivo allega l'XML SOLO se il fornitore ce l'ha mandato davvero: qui non
+    // si ricostruisce niente, perché un XML d'acquisto sintetizzato da noi non sarebbe il
+    // documento che il fornitore ha trasmesso a SdI.
     if (fp.xmlSdiRaw) {
-      const sanitizedNum = fp.numero.replace(/[^a-zA-Z0-9_-]/g, '_');
-      const sanitizedForn = nomeForn.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 20);
-      zip.file(`02_Fatture_Passive_Acquisti/Acquisto_${sanitizedNum}_${sanitizedForn}.xml`, fp.xmlSdiRaw);
+      zip.file(
+        `02_Fatture_Passive_Acquisti/Acquisto_${nomeFileSicuro(fp.numero, 30)}_${nomeFileSicuro(nomeForn, 20)}.xml`,
+        fp.xmlSdiRaw,
+      );
+      xmlPassiveAllegati += 1;
     }
   }
   zip.file('02_Fatture_Passive_Acquisti/Registro_Fatture_Acquisti.csv', csvPassiveRighe.join('\r\n'));
@@ -260,7 +351,9 @@ export async function generaFascicoloFiscaleZip(params: ParametriFascicoloFiscal
     ['VP6', 'IVA dovuta / (credito del periodo)', (lipeResult.saldoIvaCent / 100).toFixed(2)].join(';'),
     ['F24_VERSAMENTO', 'TOTALE DA VERSARE A DEBITO', (lipeResult.importoDaVersareCent / 100).toFixed(2)].join(';'),
     ['F24_CREDITO', 'TOTALE CREDITO IVA DA RIPORTARE', (lipeResult.creditoRiportabileCent / 100).toFixed(2)].join(';'),
-    ['F24_CODICE_TRIBUTO', 'Codice tributo Modello F24', codiceTributoF24],
+    // Qui mancava `.join(';')`: la riga finiva nel CSV separata da virgole invece che da
+    // punto e virgola, cioè in una sola cella per chi apriva il file.
+    ['F24_CODICE_TRIBUTO', 'Codice tributo Modello F24', codiceTributoF24].join(';'),
     ['F24_ANNO', 'Anno di riferimento F24', String(anno)].join(';'),
     ['F24_SCADENZA', 'Data scadenza versamento', scadenzaVersamento].join(';'),
   ];
@@ -286,30 +379,82 @@ export async function generaFascicoloFiscaleZip(params: ParametriFascicoloFiscal
   const csvPrimaNota = [
     ['Data', 'Tipo', 'Conto_Banca', 'Descrizione', 'Entrata_EUR', 'Uscita_EUR', 'Metodo', 'CRO_TRN', 'Riferimento_Fattura'].join(';'),
   ];
+  let totaleEntrateCent = 0;
+  let totaleUsciteCent = 0;
+
   for (const m of movimenti) {
     const dataStr = m.data ? m.data.toISOString().split('T')[0] : '';
     const conto = m.contoBancario?.nomeConto || 'Cassa Studio';
     const entrata = m.tipo === 'entrata' ? ((m.importoCentesimi || 0) / 100).toFixed(2) : '0.00';
     const uscita = m.tipo === 'uscita' ? ((m.importoCentesimi || 0) / 100).toFixed(2) : '0.00';
+    if (m.tipo === 'entrata') totaleEntrateCent += m.importoCentesimi || 0;
+    if (m.tipo === 'uscita') totaleUsciteCent += m.importoCentesimi || 0;
     const rif = m.fattura ? `FT ${m.fattura.serie}/${m.fattura.numeroProgressivoSerie}` : m.fatturaRicevuta ? `Fatt. Acquisto ${m.fatturaRicevuta.numero}` : '';
     csvPrimaNota.push([
       dataStr,
       m.tipo,
-      `"${conto}"`,
-      `"${(m.descrizione || '').replace(/"/g, '""')}"`,
+      campoCsv(conto),
+      campoCsv(m.descrizione),
       entrata,
       uscita,
-      m.metodoPagamento || 'bonifico',
-      `"${m.riferimentoTransazione || ''}"`,
-      `"${rif}"`,
+      // `metodoPagamento` è un enum NOT NULL con default `bonifico` in schema.prisma: il
+      // vecchio `|| 'bonifico'` non poteva scattare e lasciava credere il contrario.
+      m.metodoPagamento,
+      campoCsv(m.riferimentoTransazione),
+      campoCsv(rif),
     ].join(';'));
   }
   zip.file(`04_Prima_Nota_Cassa_Banca/Prima_Nota_${etichettaPeriodo}.csv`, csvPrimaNota.join('\r\n'));
 
+  // ─── 00_INDICE ───────────────────────────────────────────────────────
+  // Si compila qui in fondo perché solo adesso i conteggi sono un fatto e non una promessa.
+  const passiveSenzaXml = fatturePassive.length - xmlPassiveAllegati;
+  const indiceTesto = [
+    'FASCICOLO FISCALE PER IL COMMERCIALISTA',
+    '='.repeat(80),
+    `Studio:         ${studioNome}`,
+    `Partita IVA:    ${studioPiva}`,
+    `Codice Fiscale: ${studioCf}`,
+    `Periodo:        ${etichettaPeriodo}  (dal ${dataInizio.toISOString().slice(0, 10)} al ${dataFine.toISOString().slice(0, 10)})`,
+    `Generato il:    ${new Date().toISOString().slice(0, 19).replace('T', ' ')} UTC`,
+    '',
+    '01_Fatture_Attive_Vendite/',
+    `  Registro_Fatture_Vendite.csv — ${fattureAttive.length} documenti registrati nel periodo`,
+    `  ${xmlAttiveGenerati} file XML in formato FatturaPA 1.2`,
+    bozzeEscluseDaXml > 0
+      ? `  ${bozzeEscluseDaXml} documento/i in stato «bozza» stanno nel CSV ma NON hanno XML: senza numerazione definitiva e senza trasmissione non sono documenti fiscali.`
+      : '  Nessun documento in bozza nel periodo.',
+    '  Gli XML sono rigenerati dai dati a database con lo stesso generatore usato per la',
+    '  trasmissione a SdI: rappresentano il documento registrato, non sostituiscono la',
+    '  copia conservata a norma.',
+    '',
+    '02_Fatture_Passive_Acquisti/',
+    `  Registro_Fatture_Acquisti.csv — ${fatturePassive.length} fatture ricevute nel periodo`,
+    `  ${xmlPassiveAllegati} XML originali del fornitore allegati`,
+    passiveSenzaXml > 0
+      ? `  ${passiveSenzaXml} fattura/e senza XML allegato, perché il file del fornitore non è a sistema. Non viene ricostruito: un XML d'acquisto sintetizzato da noi non sarebbe il documento trasmesso a SdI.`
+      : "  Tutte le fatture ricevute hanno l'XML originale allegato.",
+    '',
+    '03_Liquidazione_IVA_LIPE/',
+    `  Prospetto_LIPE_F24_${etichettaPeriodo}.csv  /  .txt`,
+    `  IVA a debito (VP4):  € ${(lipeResult.ivaDebitoCent / 100).toFixed(2)}`,
+    `  IVA a credito (VP5): € ${(lipeResult.ivaCreditoCent / 100).toFixed(2)}`,
+    `  Saldo del periodo:   € ${(lipeResult.saldoIvaCent / 100).toFixed(2)} (${lipeResult.stato})`,
+    `  Da versare in F24:   € ${(lipeResult.importoDaVersareCent / 100).toFixed(2)}`,
+    `  Credito riportabile: € ${(lipeResult.creditoRiportabileCent / 100).toFixed(2)}`,
+    `  Codice tributo F24:  ${codiceTributoF24} — scadenza ${scadenzaVersamento}`,
+    '',
+    '04_Prima_Nota_Cassa_Banca/',
+    `  Prima_Nota_${etichettaPeriodo}.csv — ${movimenti.length} movimenti`,
+    `  Totale entrate: € ${(totaleEntrateCent / 100).toFixed(2)}  —  Totale uscite: € ${(totaleUsciteCent / 100).toFixed(2)}`,
+    '',
+    '='.repeat(80),
+    'Documento generato automaticamente dalla piattaforma Bluman Advisory.',
+  ].join('\r\n');
+  zip.file('00_INDICE_FASCICOLO_FISCALE.txt', indiceTesto);
+
   // Genera buffer ZIP
   const buffer = zip.generate({ type: 'nodebuffer', compression: 'DEFLATE' });
-  const sanitizedStudio = studioNome.replace(/[^a-zA-Z0-9_-]/g, '_');
-  const nomeFile = `Fascicolo_Fiscale_${sanitizedStudio}_${etichettaPeriodo}.zip`;
 
   return {
     buffer,
@@ -317,6 +462,9 @@ export async function generaFascicoloFiscaleZip(params: ParametriFascicoloFiscal
     conteggioFattureAttive: fattureAttive.length,
     conteggioFatturePassive: fatturePassive.length,
     conteggioMovimentiPrimaNota: movimenti.length,
+    conteggioXmlAttiviGenerati: xmlAttiveGenerati,
+    conteggioBozzeEscluseDaXml: bozzeEscluseDaXml,
+    conteggioXmlPassiviAllegati: xmlPassiveAllegati,
     totaleImponibileVenditeEuro,
     totaleIvaVenditeEuro,
     totaleImponibileAcquistiEuro,
