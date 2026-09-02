@@ -63,6 +63,7 @@ import { registraRotteModelliDocumento } from './routes/modelliDocumento.js';
 import { registraRotteFornitori } from './routes/fornitori.js';
 import { registraRotteLiquidazioneIva } from './routes/liquidazioneIva.js';
 import { registraRotteSolleciti } from './routes/solleciti.js';
+import { registraRotteFascicoloFiscale } from './routes/fascicoloFiscale.js';
 // Rotte portale cliente (split dei monoliti): la registrazione avviene dentro
 // il wrapper register di buildServer, nello stesso punto di prima.
 import { registraRottePortale } from './routes/portale.js';
@@ -275,7 +276,7 @@ export function buildServer(app: AppPort): FastifyInstance {
 
   server.setNotFoundHandler((req, reply) => {
     console.warn(`[404 NOT FOUND] ${req.method} ${req.url} (ip: ${req.ip}, auth: ${Boolean(req.headers.authorization)})`);
-    return reply.code(404).send({ errore: `Percorso non trovato: ${req.method} ${req.url}` });
+    return reply.code(404).send({ message: `Route ${req.method}:${req.url} not found`, error: 'Not Found', statusCode: 404 });
   });
 
   // §23 — la protezione brute-force sugli endpoint che verificano credenziali è
@@ -493,6 +494,7 @@ export function buildServer(app: AppPort): FastifyInstance {
   await registraRotteFornitori(server);
   await registraRotteLiquidazioneIva(server);
   await registraRotteSolleciti(server);
+  await registraRotteFascicoloFiscale(server);
 
   // ── INCASSI, SCADENZARIO & PRIMA NOTA (STYLE OPENSTAMANAGER) ──────
   // Rotte estratte in src/routes/contabilita.ts, registrata nella sezione contabilità.

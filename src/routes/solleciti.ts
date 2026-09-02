@@ -4,6 +4,7 @@ import type { FastifyInstance } from 'fastify';
 import { prisma } from '../util/prismaClient.js';
 import { recordAudit } from '../util/serverHelpers.js';
 import { inviaEmail } from '../services/emailService.js';
+import { inviaTestoWhatsapp } from '../services/whatsappService.js';
 import {
   calcolaInteressiMora,
   generaTestoSollecito,
@@ -184,13 +185,52 @@ export async function registraRotteSolleciti(server: FastifyInstance): Promise<v
 
         const oggettoFinale = oggettoPersonalizzato || sollecitoDefault.oggettoEmail;
         const testoFinale = testoPersonalizzato || sollecitoDefault.corpoTesto;
+        const canaliInviati: string[] = [];
 
-        // Invio Email reale
-        await inviaEmail({
-          to: destinatario,
-          subject: oggettoFinale,
-          html: `<pre style="font-family: sans-serif; white-space: pre-wrap; font-size: 14px; line-height: 1.5;">${testoFinale}</pre>`,
-        });
+        // 1. Invio Email se richiesto
+        if (canale === 'email' || canale === 'entrambi') {
+          if (!destinatario) {
+            return reply.code(400).send({
+              errore: "Nessun indirizzo email specificato né presente nell'anagrafica del cliente.",
+            });
+          }
+          await inviaEmail({
+            to: destinatario,
+            subject: oggettoFinale,
+            html: `<pre style="font-family: sans-serif; white-space: pre-wrap; font-size: 14px; line-height: 1.5;">${testoFinale}</pre>`,
+          });
+          canaliInviati.push(`Email a ${destinatario}`);
+        }
+
+        // 2. Invio WhatsApp se richiesto
+        if (canale === 'whatsapp' || canale === 'entrambi') {
+          const referenti = scadenza.fattura.cliente.referentiJson as any;
+          const telefono = parseResult.data.telefonoDestinatario ||
+            scadenza.fattura.cliente.telefono ||
+            (Array.isArray(referenti) ? referenti[0]?.telefono || referenti[0]?.whatsapp : referenti?.telefono || referenti?.whatsapp);
+
+          if (!telefono) {
+            return reply.code(400).send({
+              errore: "Nessun numero di telefono/WhatsApp specificato né presente nell'anagrafica del cliente.",
+            });
+          }
+
+          const waCred = {
+            waPhoneId: tenant?.waPhoneId || null,
+            waAccessToken: tenant?.waAccessToken || null,
+          };
+
+          const esitoWa = await inviaTestoWhatsapp(waCred, telefono, testoFinale);
+          if (!esitoWa.ok) {
+            console.warn(`[SOLLECITI WA WARN] Invio WhatsApp non riuscito: ${esitoWa.errore}`);
+            // Se il canale era solo WhatsApp, restituisci errore parlante
+            if (canale === 'whatsapp') {
+              return reply.code(400).send({ errore: esitoWa.errore || 'Errore invio WhatsApp' });
+            }
+          } else {
+            canaliInviati.push(`WhatsApp a ${telefono}`);
+          }
+        }
 
         // Aggiorniamo stato scadenza se non ancora marcata come scaduta
         await prisma.scadenzaIncasso.update({
@@ -198,19 +238,21 @@ export async function registraRotteSolleciti(server: FastifyInstance): Promise<v
           data: { stato: 'scaduto' },
         });
 
+        const canaliStr = canaliInviati.join(' e ') || 'Canale specificato';
+
         await recordAudit({
           tenantId,
           userId: req.userId,
           ruolo: req.ruolo,
           azione: 'SOLLECITO_PAGAMENTO_INVIATO',
           entita: `SOLLECITO-FT-${scadenza.fattura.numero}-RATA-${scadenza.numeroRata}`,
-          dettagli: `Inviato sollecito (${livello}) a ${destinatario} per rata n. ${scadenza.numeroRata} di €${(capitaleResiduo / 100).toFixed(2)} (totale con mora: €${(sollecitoDefault.calcoloMora.totaleDovutoCent / 100).toFixed(2)})`,
+          dettagli: `Inviato sollecito (${livello}) via ${canaliStr} per rata n. ${scadenza.numeroRata} di €${(capitaleResiduo / 100).toFixed(2)} (totale con mora: €${(sollecitoDefault.calcoloMora.totaleDovutoCent / 100).toFixed(2)})`,
           ipAddress: req.ip,
         });
 
         return reply.send({
           ok: true,
-          messaggio: `Sollecito inviato con successo a ${destinatario}`,
+          messaggio: `Sollecito inviato con successo via ${canaliStr}`,
           calcoloMora: sollecitoDefault.calcoloMora,
         });
       } catch (err: any) {

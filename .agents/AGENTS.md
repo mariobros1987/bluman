@@ -54,6 +54,7 @@ Questo file serve come indice rapido per l'IA ed i collaboratori per identificar
 - **`components/fornitori/AnagraficaFornitoreErpModal.tsx`**: Modal Anagrafica Fornitore ERP OpenSTAManager-grade a 5 schede (Dati Fiscali & SDI, Sede & Recapiti, Pagamenti & IBAN, Storico Acquisti, Note Interne).
 - **`components/fornitori/RegistraFatturaPassivaModal.tsx`**: Modal Registrazione Fattura Passiva con righe spesa multiple, scorporo IVA, esigibilità (immediata/differita/split) e scrittura automatica in Prima Nota Cassa/Banca.
 - **`components/solleciti/InviaSollecitoModal.tsx`**: Modal Solleciti di Pagamento con calcolo automatico interessi di mora (D.Lgs. 231/2002) e dispatch multicanale Email & WhatsApp.
+- **`components/contabilita/EsportaFascicoloCommercialistaModal.tsx`**: Modal Export Fascicolo per Commercialista: generazione e download archivio ZIP strutturato con XML SDI attive/passive, LIPE, F24 e Prima Nota.
 - **`components/documenti/ElencoDocumentiCartella.tsx`**: §37 — il contenuto di una cartella dell'archivio: la tabella dei documenti di un progetto (nome file senza il prefisso `${Date.now()}_`, tipo, stato, caricamento, apertura/scarico PDF e Word). Legge da `listaDocumentiProgetto(progettoId, includiArchiviati)`: nessun badge «firmato» che non venga dal sigillo a database, e «errore di lettura» resta distinto da «cartella vuota».
 
 ### 🏗 Layout (`components/layout/`)

@@ -17,6 +17,7 @@ import {
   importFromTimesheetApi,
 } from '../api/client';
 import { fmt } from '../utils';
+import { EsportaFascicoloCommercialistaModal } from '../components/contabilita/EsportaFascicoloCommercialistaModal';
 
 export function InvoicesPage() {
   const navigate = useNavigate();
@@ -27,6 +28,7 @@ export function InvoicesPage() {
   const [loading, setLoading] = useState(true);
   const [filterStato, setFilterStato] = useState('tutte');
   const [searchTerm, setSearchTerm] = useState('');
+  const [showExportFascicoloZipModal, setShowExportFascicoloZipModal] = useState(false);
 
   // Modali
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -409,6 +411,15 @@ export function InvoicesPage() {
             }}
           >
             📊 Export Commercialista (CSV / Excel)
+          </button>
+
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => setShowExportFascicoloZipModal(true)}
+            style={{ padding: '10px 18px', fontWeight: 700 }}
+          >
+            📦 Esporta Fascicolo Commercialista (ZIP)
           </button>
 
           <button
@@ -1080,6 +1091,12 @@ export function InvoicesPage() {
           </div>
         </div>
       )}
+
+      {/* MODAL EXPORT FASCICOLO COMMERCIALISTA ZIP */}
+      <EsportaFascicoloCommercialistaModal
+        isOpen={showExportFascicoloZipModal}
+        onClose={() => setShowExportFascicoloZipModal(false)}
+      />
     </div>
   );
 }

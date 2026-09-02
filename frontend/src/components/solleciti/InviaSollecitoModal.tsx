@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import type { LivelloSollecito, AnteprimaSollecitoResponse } from '../../api/solleciti';
 import { anteprimaSollecitoApi, inviaSollecitoApi } from '../../api/solleciti';
 
@@ -11,16 +11,18 @@ interface InviaSollecitoModalProps {
   clienteNome: string;
 }
 
-export const InviaSollecitoModal: React.FC<InviaSollecitoModalProps> = ({
+export function InviaSollecitoModal({
   isOpen,
   onClose,
   onSuccess,
   scadenzaId,
   numeroFattura,
   clienteNome,
-}) => {
+}: InviaSollecitoModalProps) {
   const [livello, setLivello] = useState<LivelloSollecito>('1_avviso_bonario');
+  const [canale, setCanale] = useState<'email' | 'whatsapp' | 'entrambi'>('email');
   const [emailDestinatario, setEmailDestinatario] = useState('');
+  const [telefonoDestinatario, setTelefonoDestinatario] = useState('');
   const [oggetto, setOggetto] = useState('');
   const [testo, setTesto] = useState('');
   const [anteprima, setAnteprima] = useState<AnteprimaSollecitoResponse | null>(null);
@@ -56,8 +58,12 @@ export const InviaSollecitoModal: React.FC<InviaSollecitoModalProps> = ({
 
   const handleInvia = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!emailDestinatario.trim()) {
-      setErrore("L'indirizzo email del destinatario è obbligatorio.");
+    if ((canale === 'email' || canale === 'entrambi') && !emailDestinatario.trim()) {
+      setErrore("L'indirizzo email del destinatario è obbligatorio per l'invio via Email.");
+      return;
+    }
+    if ((canale === 'whatsapp' || canale === 'entrambi') && !telefonoDestinatario.trim()) {
+      setErrore("Il numero di cellulare con prefisso internazionale è obbligatorio per l'invio via WhatsApp.");
       return;
     }
 
@@ -66,7 +72,9 @@ export const InviaSollecitoModal: React.FC<InviaSollecitoModalProps> = ({
     try {
       const res = await inviaSollecitoApi(scadenzaId, {
         livello,
-        emailDestinatario: emailDestinatario.trim(),
+        canale,
+        emailDestinatario: emailDestinatario.trim() || undefined,
+        telefonoDestinatario: telefonoDestinatario.trim() || undefined,
         oggettoPersonalizzato: oggetto.trim(),
         testoPersonalizzato: testo.trim(),
       });
@@ -80,171 +88,187 @@ export const InviaSollecitoModal: React.FC<InviaSollecitoModalProps> = ({
   };
 
   return (
-    <div className="modal-overlay" style={{ zIndex: 1100 }}>
-      <div className="modal-container" style={{ maxWidth: '680px', width: '90%' }}>
+    <div className="modal-overlay">
+      <div className="modal-container" style={{ maxWidth: '750px', width: '100%', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+        {/* Header */}
         <div className="modal-header">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '1.4rem' }}>📩</span>
-            <h3 style={{ margin: 0, fontWeight: 700 }}>
-              Invia Sollecito Pagamento — {clienteNome} ({numeroFattura})
+          <div>
+            <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700 }}>
+              📩 Invia Sollecito di Pagamento — {numeroFattura}
             </h3>
+            <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+              Cliente: <b>{clienteNome}</b> · Calcolo mora e spese forfettarie D.Lgs. 231/2002
+            </p>
           </div>
-          <button className="btn-close" onClick={onClose} disabled={loadingInvio}>
+          <button type="button" className="btn-close" onClick={onClose}>
             ✕
           </button>
         </div>
 
-        <form onSubmit={handleInvia} style={{ padding: '20px 24px' }}>
-          {errore && (
-            <div
-              style={{
-                padding: '10px 14px',
-                background: 'rgba(239, 68, 68, 0.1)',
-                border: '1px solid #ef4444',
-                color: '#ef4444',
-                borderRadius: '8px',
-                marginBottom: '16px',
-                fontSize: '0.9rem',
-              }}
-            >
-              ⚠️ {errore}
-            </div>
-          )}
-
-          {/* Livello Selector */}
-          <div style={{ marginBottom: '16px' }}>
-            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px' }}>
-              Livello Sollecito & Gravità:
-            </label>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
-              <button
-                type="button"
-                className={`btn btn-sm ${livello === '1_avviso_bonario' ? 'btn-primary' : 'btn-secondary'}`}
-                onClick={() => setLivello('1_avviso_bonario')}
-                style={{ padding: '8px 10px', fontSize: '0.8rem' }}
-              >
-                1️⃣ Avviso Bonario
-              </button>
-              <button
-                type="button"
-                className={`btn btn-sm ${livello === '2_sollecito_mora' ? 'btn-primary' : 'btn-secondary'}`}
-                onClick={() => setLivello('2_sollecito_mora')}
-                style={{ padding: '8px 10px', fontSize: '0.8rem' }}
-              >
-                2️⃣ Sollecito con Mora
-              </button>
-              <button
-                type="button"
-                className={`btn btn-sm ${livello === '3_diffida_legale' ? 'btn-primary' : 'btn-secondary'}`}
-                onClick={() => setLivello('3_diffida_legale')}
-                style={{ padding: '8px 10px', fontSize: '0.8rem', color: livello === '3_diffida_legale' ? '#fff' : '#ef4444' }}
-              >
-                3️⃣ Diffida Legale
-              </button>
-            </div>
-          </div>
-
-          {/* Box Dettaglio Mora Calcolata */}
-          {anteprima?.sollecito.calcoloMora && (
-            <div
-              style={{
-                background: 'var(--bg-secondary)',
-                padding: '12px 16px',
-                borderRadius: '8px',
-                border: '1px solid var(--border)',
-                marginBottom: '16px',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                flexWrap: 'wrap',
-                gap: '10px',
-              }}
-            >
-              <div>
-                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                  Ritardo: <strong>{anteprima.sollecito.calcoloMora.giorniRitardo} giorni</strong> | Capitale: €
-                  {(anteprima.sollecito.calcoloMora.importoCapitaleCent / 100).toFixed(2)}
-                </div>
-                {livello !== '1_avviso_bonario' && (
-                  <div style={{ fontSize: '0.8rem', color: '#ef4444', fontWeight: 600, marginTop: '2px' }}>
-                    + Interessi mora (12%): €{(anteprima.sollecito.calcoloMora.interessiMoraCent / 100).toFixed(2)} | Spese recupero: €
-                    {(anteprima.sollecito.calcoloMora.speseForfettarieRecuperoCent / 100).toFixed(2)}
-                  </div>
-                )}
+        {/* Form Body */}
+        <form onSubmit={handleInvia} style={{ display: 'flex', flexDirection: 'column', overflowY: 'auto', flex: 1 }}>
+          <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {errore && (
+              <div style={{ padding: '10px 14px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid #ef4444', color: '#ef4444', borderRadius: '6px', fontSize: '0.85rem' }}>
+                ⚠️ {errore}
               </div>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Totale Richiesto:</div>
-                <div style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--primary)' }}>
-                  €{(anteprima.sollecito.calcoloMora.totaleDovutoCent / 100).toFixed(2)}
-                </div>
-              </div>
-            </div>
-          )}
+            )}
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '12px' }}>
+            {/* Canale di Invio */}
             <div>
-              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '4px' }}>
-                Email Destinatario *
+              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px' }}>
+                Canale di Trasmissione:
               </label>
-              <input
-                type="email"
-                className="input-field"
-                required
-                value={emailDestinatario}
-                onChange={(e) => setEmailDestinatario(e.target.value)}
-                placeholder="cliente@azienda.com"
-                style={{ width: '100%' }}
-              />
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  type="button"
+                  className={`btn btn-sm ${canale === 'email' ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => setCanale('email')}
+                >
+                  📧 Solo Email
+                </button>
+                <button
+                  type="button"
+                  className={`btn btn-sm ${canale === 'whatsapp' ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => setCanale('whatsapp')}
+                >
+                  💬 Solo WhatsApp
+                </button>
+                <button
+                  type="button"
+                  className={`btn btn-sm ${canale === 'entrambi' ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => setCanale('entrambi')}
+                >
+                  🚀 Entrambi (Email + WhatsApp)
+                </button>
+              </div>
             </div>
 
+            {/* Scelta Livello */}
             <div>
-              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '4px' }}>
-                Oggetto Email *
+              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px' }}>
+                Livello e Tipologia Sollecito:
+              </label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+                <button
+                  type="button"
+                  className={`btn btn-sm ${livello === '1_avviso_bonario' ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => setLivello('1_avviso_bonario')}
+                >
+                  🟢 1. Avviso Bonario
+                </button>
+                <button
+                  type="button"
+                  className={`btn btn-sm ${livello === '2_sollecito_mora' ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => setLivello('2_sollecito_mora')}
+                >
+                  🟡 2. Sollecito con Mora
+                </button>
+                <button
+                  type="button"
+                  className={`btn btn-sm ${livello === '3_diffida_legale' ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => setLivello('3_diffida_legale')}
+                >
+                  🔴 3. Diffida ad Adempiere
+                </button>
+              </div>
+            </div>
+
+            {/* Recapiti Destinatario */}
+            <div style={{ display: 'grid', gridTemplateColumns: (canale === 'entrambi') ? '1fr 1fr' : '1fr', gap: '12px' }}>
+              {(canale === 'email' || canale === 'entrambi') && (
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                    Email Destinatario:
+                  </label>
+                  <input
+                    type="email"
+                    value={emailDestinatario}
+                    onChange={(e) => setEmailDestinatario(e.target.value)}
+                    placeholder="amministrazione@cliente.it"
+                  />
+                </div>
+              )}
+
+              {(canale === 'whatsapp' || canale === 'entrambi') && (
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                    Cellulare / WhatsApp (+39...):
+                  </label>
+                  <input
+                    type="tel"
+                    value={telefonoDestinatario}
+                    onChange={(e) => setTelefonoDestinatario(e.target.value)}
+                    placeholder="393351234567"
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Oggetto */}
+            <div>
+              <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                Oggetto / Intestazione:
               </label>
               <input
                 type="text"
-                className="input-field"
-                required
                 value={oggetto}
                 onChange={(e) => setOggetto(e.target.value)}
-                style={{ width: '100%' }}
               />
             </div>
 
+            {/* Corpo Testo */}
             <div>
-              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '4px' }}>
-                Testo Formale del Sollecito *
+              <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                Corpo del Messaggio:
               </label>
               <textarea
-                className="input-field"
-                rows={9}
-                required
                 value={testo}
                 onChange={(e) => setTesto(e.target.value)}
-                style={{ width: '100%', fontSize: '0.85rem', lineHeight: 1.5 }}
+                rows={10}
+                style={{ fontSize: '0.82rem', fontFamily: 'monospace' }}
               />
             </div>
+
+            {/* Card Calcolo Mora */}
+            {anteprima?.sollecito?.calcoloMora && (
+              <div style={{ padding: '12px 16px', background: 'var(--card2)', borderRadius: '8px', border: '1px solid var(--border)', fontSize: '0.85rem' }}>
+                <div style={{ fontWeight: 600, color: 'var(--indigo-l)', marginBottom: '6px' }}>
+                  📊 Dettaglio Conteggio Legale (D.Lgs. 231/2002)
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+                  <div>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>Ritardo:</span>
+                    <div><b>{anteprima.sollecito.calcoloMora.giorniRitardo} giorni</b></div>
+                  </div>
+                  <div>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>Interessi Mora:</span>
+                    <div><b>€ {(anteprima.sollecito.calcoloMora.interessiMoraCent / 100).toFixed(2)}</b></div>
+                  </div>
+                  <div>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>Spese Forfettarie:</span>
+                    <div><b>€ {(anteprima.sollecito.calcoloMora.speseForfettarieRecuperoCent / 100).toFixed(2)}</b></div>
+                  </div>
+                  <div>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>Totale Dovuto:</span>
+                    <div style={{ color: '#ef4444', fontWeight: 700 }}>€ {(anteprima.sollecito.calcoloMora.totaleDovutoCent / 100).toFixed(2)}</div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'flex-end',
-              gap: '10px',
-              marginTop: '20px',
-              borderTop: '1px solid var(--border)',
-              paddingTop: '16px',
-            }}
-          >
+          {/* Footer */}
+          <div style={{ padding: '12px 16px', background: 'var(--card)', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
             <button type="button" className="btn btn-secondary" onClick={onClose} disabled={loadingInvio}>
               Annulla
             </button>
             <button type="submit" className="btn btn-primary" disabled={loadingInvio || loadingAnteprima}>
-              {loadingInvio ? 'Invio in corso...' : '✉️ Invia Sollecito al Cliente'}
+              {loadingInvio ? 'Invio in corso...' : '⚡ Invia Sollecito Ufficiale'}
             </button>
           </div>
         </form>
       </div>
     </div>
   );
-};
+}

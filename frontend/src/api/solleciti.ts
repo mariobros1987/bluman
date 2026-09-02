@@ -65,7 +65,9 @@ export async function inviaSollecitoApi(
   scadenzaId: string,
   dati: {
     livello: LivelloSollecito;
+    canale?: 'email' | 'whatsapp' | 'entrambi';
     emailDestinatario?: string | null;
+    telefonoDestinatario?: string | null;
     oggettoPersonalizzato?: string | null;
     testoPersonalizzato?: string | null;
     saggioInteresse?: number;

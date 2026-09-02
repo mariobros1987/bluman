@@ -9,6 +9,7 @@ import {
   salvaLipeApi,
   marcaVersataLipeApi,
 } from '../api/liquidazioneIva';
+import { EsportaFascicoloCommercialistaModal } from '../components/contabilita/EsportaFascicoloCommercialistaModal';
 
 export const LiquidazioneIvaPage: React.FC = () => {
   const currentYear = new Date().getFullYear();
@@ -26,6 +27,7 @@ export const LiquidazioneIvaPage: React.FC = () => {
   const [loadingAzione, setLoadingAzione] = useState(false);
   const [errore, setErrore] = useState<string | null>(null);
   const [messaggioSuccesso, setMessaggioSuccesso] = useState<string | null>(null);
+  const [showExportModal, setShowExportModal] = useState(false);
 
   // Modal versamento
   const [isModalVersamentoOpen, setIsModalVersamentoOpen] = useState(false);
@@ -230,6 +232,15 @@ export const LiquidazioneIvaPage: React.FC = () => {
             disabled={loadingCalcolo}
           >
             {loadingCalcolo ? '🔄...' : '🔄 Ricalcola'}
+          </button>
+
+          <button
+            type="button"
+            className="btn btn-primary btn-sm"
+            onClick={() => setShowExportModal(true)}
+            style={{ fontWeight: 600 }}
+          >
+            📦 Esporta Fascicolo Commercialista (ZIP)
           </button>
         </div>
       </div>
@@ -566,6 +577,12 @@ export const LiquidazioneIvaPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* MODAL EXPORT FASCICOLO COMMERICALISTA ZIP */}
+      <EsportaFascicoloCommercialistaModal
+        isOpen={showExportModal}
+        onClose={() => setShowExportModal(false)}
+      />
     </div>
   );
 };

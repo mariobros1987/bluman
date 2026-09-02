@@ -8,6 +8,7 @@ import {
   fetchContiBancariApi,
 } from '../api/client';
 import { fmt } from '../utils';
+import { EsportaFascicoloCommercialistaModal } from '../components/contabilita/EsportaFascicoloCommercialistaModal';
 
 export function PrimaNotaPage() {
   const [movimenti, setMovimenti] = useState<any[]>([]);
@@ -17,6 +18,7 @@ export function PrimaNotaPage() {
   const [selectedTipo, setSelectedTipo] = useState('tutti');
   const [selectedMetodo, setSelectedMetodo] = useState('tutti');
   const [searchTerm, setSearchTerm] = useState('');
+  const [showExportModal, setShowExportModal] = useState(false);
 
   // Modal Nuova Registrazione Prima Nota
   const [showAddModal, setShowAddModal] = useState(false);
@@ -156,6 +158,15 @@ export function PrimaNotaPage() {
             }}
           >
             📥 Importa Estratto Conto (CSV)
+          </button>
+
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => setShowExportModal(true)}
+            style={{ padding: '10px 18px', fontWeight: 700 }}
+          >
+            📦 Esporta Fascicolo Commercialista (ZIP)
           </button>
 
           <button
@@ -527,6 +538,12 @@ export function PrimaNotaPage() {
           </div>
         </div>
       )}
+
+      {/* MODAL EXPORT FASCICOLO COMMERICALISTA ZIP */}
+      <EsportaFascicoloCommercialistaModal
+        isOpen={showExportModal}
+        onClose={() => setShowExportModal(false)}
+      />
     </div>
   );
 }
