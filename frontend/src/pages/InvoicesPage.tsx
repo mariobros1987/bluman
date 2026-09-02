@@ -349,6 +349,20 @@ export function InvoicesPage() {
 
         <div style={{ display: 'flex', gap: 10 }}>
           <button
+            onClick={() => navigate('/fornitori')}
+            className="btn btn-secondary"
+            style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+          >
+            🏢 Fatture Passive & Fornitori ↗
+          </button>
+          <button
+            onClick={() => navigate('/liquidazione-iva')}
+            className="btn btn-secondary"
+            style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+          >
+            📑 Liquidazione IVA ↗
+          </button>
+          <button
             onClick={() => {
               if (invoices.length === 0) {
                 alert('Nessuna fattura presente nel registro da esportare.');
