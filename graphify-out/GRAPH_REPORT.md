@@ -1,95 +1,141 @@
-# Graph Report - bluman  (2026-08-29)
+# Graph Report - bluman  (2026-09-02)
 
 ## Corpus Check
 - cluster-only mode — file stats not available
 
 ## Summary
-- 1777 nodes · 4198 edges · 233 communities (75 shown, 158 thin omitted)
-- Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 60 edges (avg confidence: 0.79)
+- 2231 nodes · 5216 edges · 277 communities (108 shown, 169 thin omitted)
+- Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 56 edges (avg confidence: 0.78)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `a485aaee`
+- Built from commit: `c5b22747`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
 ## Community Hubs (Navigation)
+- pdfA4.ts
+- ProjectDetail.tsx
 - DocumentEditorPage.tsx
-- ClientPortal.tsx
+- contabilita.ts
 - getTenantStorageKey
-- fmt
-- istanziazionePort.ts
+- leggiErroreApi
+- types/index.ts
 - BluMan Advisory Platform — Analisi Professionale & Piano Esecutivo
 - prismaClient.ts
-- AppPort
-- serverHelpers.ts
-- scripts
-- PrismaApp
-- jwt.ts
-- registraRotteFirma
-- ProjectDetail.tsx
-- calcoloService.ts
-- react
-- inMemoryApp.ts
-- InMemoryApp
-- server.ts
-- routes/firma.ts
-- notificheService.ts
-- getAuthHeaders
-- generazioneDocumenti.ts
-- esecuzione.test.ts
-- apiFetch
-- reportsService.ts
-- Projects.tsx
-- compilerOptions
-- ClientPortal
-- AppLayout.tsx
-- compilerOptions
-- http.ts
-- api/progetti.ts
-- compilerOptions
 - client.ts
-- leggiErroreApi
-- otpDispatch.ts
+- generazioneDocumenti.ts
 - dependencies
-- AnagraficaErpModal.tsx
+- server.ts
+- storageService.ts
+- calcoloService.ts
+- routes/firma.ts
+- AppPort
+- PassaggioModal.tsx
+- getAuthHeaders
+- react
+- InMemoryApp
+- PrismaApp
+- buildServer
+- apiFetch
+- serverHelpers.ts
+- esecuzione.test.ts
+- api/portale.ts
+- ClientPortal.tsx
+- documentTemplates.ts
+- compilerOptions
+- api/documenti.ts
+- notificheService.ts
+- api/fornitori.ts
+- http.ts
+- compilerOptions
+- prisma
+- FakeIstanziazionePort
+- dependencies
+- DocumentTemplate
+- portal/types.ts
+- emailService.ts
+- istanziazionePort.ts
+- ArchivioDocumentiPage.tsx
+- compilerOptions
+- routes/documenti.ts
+- PrismaIstanziazionePort
 - 📖 BluMan — Guida Dettagliata Configurazione Canali Multicanale & Associazione Automatica Progetti
 - devDependencies
-- devDependencies
+- routes/liquidazioneIva.ts
+- diagnosiPosta.ts
+- registraRotteFirma
+- sendEmail.test.ts
+- ClientPortal
 - 🎯 Stato del Progetto & Componenti Verificati
-- password.ts
-- EsecuzionePort
+- comunicazioni.ts
+- routes/solleciti.ts
+- otpDispatch.ts
+- FirmaOtpModal.tsx
 - TimesheetPage.tsx
+- scripts
+- verbaleFirma.test.ts
 - ConfirmDeleteModal.tsx
-- PrismaIstanziazionePort
+- api/liquidazioneIva.ts
+- api/solleciti.ts
 - 🏛 BluMan Advisory Platform — Istruzioni di Installazione & Avvio sul Nuovo PC
 - pulizia-duplicati-catalogo.mjs
-- verbaleFirma.test.ts
+- routes/fornitori.ts
+- salvaDocumentoApi
+- istanziaProgetto.ts
+- imapInbound.ts
+- verbaleFirma.ts
+- portal/TabDocumenti.tsx
+- comunicazioniCanali.test.ts
+- postaNomeCertificato.test.ts
+- copiaFirmata.ts
+- emailRelay.ts
+- IstanziazioneTransazione
 - 🎯 Stato di Avanzamento Fasi (Aggiornato)
 - .oxlintrc.json
 - TabManutenzione.tsx
+- SimpleZipBuilder
 - 🤖 Istruzioni & Context Prompt per l'IA (Nuovo PC)
+- ModuloTemplateConDistinta
+- copiaFirmata.test.ts
 - credenziali.test.ts
+- postaProveRotte.test.ts
+- collegamentoDocumenti.ts
+- paginazioneHelper.ts
 - BluMan Advisory Platform — Mappa Architetturale & Regole Sviluppo
+- BadgeRevisione.tsx
+- NotificationModal.tsx
 - railway.json
-- scripts
+- matriceNotifiche.test.ts
+- contabilita.schema.ts
 - pulizia-blocco7.mjs
 - reset-dati-prova.mjs
-- frontend/package.json
-- testTenantDb.ts
+- accessoCliente.test.ts
+- archivioDocumenti.test.ts
+- TabContatti.tsx
+- package.json
+- distribuisci.sh
 - teamAnalytics.test.ts
 - vercel.json
-- send-email.ts
 - React + TypeScript + Vite
+- DigitalSignatureModal.tsx
+- PortalLogin.tsx
 - backfill-recapiti-clienti.mjs
+- NotificationPort
+- auth.schema.ts
 - antiDuplication.test.ts
 - frontend/tsconfig.json
 - stato-database.mjs
-- giurisdizioni.test.ts
+- documenti.schema.ts
+- progetti.schema.ts
 - checkRls.ts
 - verificaAccessi.ts
 - catalogDocumentLinkage.test.ts
+- exceljs
+- @fastify/rate-limit
+- zod
 - ispezione-blocco7.mjs
+- clienti.schema.ts
 - API\Interfaces\CreateInterface
 - API\Interfaces\DeleteInterface
 - API\Interfaces\RetrieveInterface
@@ -240,317 +286,457 @@
 - WrapperInterface
 
 ## God Nodes (most connected - your core abstractions)
-1. `getAuthHeaders()` - 127 edges
-2. `apiFetch()` - 127 edges
-3. `react` - 76 edges
-4. `getTenantStorageKey()` - 68 edges
-5. `getCurrentTenantId()` - 62 edges
-6. `fmt()` - 57 edges
-7. `AppPort` - 40 edges
-8. `leggiErroreApi()` - 40 edges
+1. `getAuthHeaders()` - 167 edges
+2. `apiFetch()` - 163 edges
+3. `react` - 94 edges
+4. `leggiErroreApi()` - 81 edges
+5. `fmt()` - 57 edges
+6. `getTenantStorageKey()` - 52 edges
+7. `getCurrentTenantId()` - 49 edges
+8. `AppPort` - 39 edges
 9. `PrismaApp` - 39 edges
-10. `InMemoryApp` - 37 edges
+10. `InMemoryApp` - 38 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `conFirmaLogo()` --calls--> `rifirmaUrlUpload()`  [EXTRACTED]
-  src/routes/tenant.ts → src/services/storageService.ts
-- `hookFinto()` --calls--> `attivaContestoTenant()`  [EXTRACTED]
-  src/util/prismaClient.test.ts → src/util/prismaClient.ts
-- `loadOperatorStats()` --calls--> `fetchProgetti()`  [EXTRACTED]
-  frontend/src/components/settings/OperatorDetailModal.tsx → frontend/src/api/progetti.ts
-- `fetchAccessiProgetto()` --calls--> `apiFetch()`  [EXTRACTED]
-  frontend/src/api/progetti.ts → frontend/src/api/http.ts
-- `loadClientData()` --calls--> `fetchClienti()`  [EXTRACTED]
-  frontend/src/components/library/AssegnaModuloClienteModal.tsx → frontend/src/api/clienti.ts
+- `FoglioA4()` --calls--> `altezzaUtile()`  [EXTRACTED]
+  frontend/src/components/documenti/FoglioA4.tsx → src/util/paginaA4.ts
+- `TabProposta()` --calls--> `scomponiDocumento()`  [EXTRACTED]
+  frontend/src/components/portal/TabProposta.tsx → src/util/intestazionePiede.ts
+- `DocumentViewerModalProps` --references--> `DocumentoPortale`  [EXTRACTED]
+  frontend/src/components/portal/DocumentViewerModal.tsx → frontend/src/api/portale.ts
+- `creaPagineA4()` --calls--> `altezzaUtile()`  [EXTRACTED]
+  frontend/src/utils/pdfA4.ts → src/util/paginaA4.ts
+- `creaPagineA4()` --calls--> `impagina()`  [EXTRACTED]
+  frontend/src/utils/pdfA4.ts → src/util/paginaA4.ts
 
 ## Import Cycles
 - None detected.
 
-## Communities (233 total, 158 thin omitted)
+## Communities (277 total, 169 thin omitted)
 
-### Community 0 - "DocumentEditorPage.tsx"
-Cohesion: 0.06
-Nodes (68): creaDocumentoTemplateApi(), eliminaDocumentoTemplateApi(), generaDocumentoApi(), listaDocumentiProgetto(), nuovaVersioneDocumentoApi(), RichiestaModificaDoc, salvaDocumentoApi(), scaricaDocumentoClient() (+60 more)
-
-### Community 1 - "ClientPortal.tsx"
+### Community 0 - "pdfA4.ts"
 Cohesion: 0.05
-Nodes (66): urlFileArchivio(), FatturaPortale, AmbitoFirma, CanaleFirma, CanaleOtp, ContattiStudio, DocumentoPortale, PropostaDatiFiscale (+58 more)
+Nodes (53): BloccoBloccabile, ProprietaFoglioA4, CELLA, MONO, PannelloRecordDns(), Props, TabChannelsProps, altezzaConMargini() (+45 more)
 
-### Community 2 - "getTenantStorageKey"
+### Community 1 - "ProjectDetail.tsx"
+Cohesion: 0.07
+Nodes (45): fetchProgetti(), AssignOperatorModal(), AssignOperatorModalProps, CalendarPreviewModalProps, loadProjects(), DettaglioModuloModal(), CalendarioProgettoTab(), GrafoModuliProgettoView() (+37 more)
+
+### Community 2 - "DocumentEditorPage.tsx"
+Cohesion: 0.07
+Nodes (38): uploadFileApi(), DocumentEditorModalProps, FoglioA4(), EditorCanvas(), dividerStyle, toolbarBtnStyle, HeaderEditor(), ModaleNuovoTemplate() (+30 more)
+
+### Community 3 - "contabilita.ts"
 Cohesion: 0.08
-Nodes (53): creaUtenteTenantApi(), DEFAULT_TEAM_USERS, fetchInboundImapEmailsApi(), fetchTenantInfoApi(), fetchUtentiTenant(), sendEmailDirectApi(), sendInviteCollaboratoreApi(), testChannelApi() (+45 more)
+Nodes (44): registraRotteContabilita(), assertFatturaModificabile(), calcolaTotaliFattura(), formattaNumeroDocumento(), generaPianoScadenze(), IMPORTO_BOLLO_CENTESIMI, OpzioniCalcoloFattura, RiepilogoIva (+36 more)
 
-### Community 3 - "fmt"
-Cohesion: 0.13
-Nodes (34): AssegnaModuloClienteModal(), loadClientData(), loadProjects(), CreaModuloForm(), GiurisdizioniView(), closeBtnStyle, labelStyle, NewProjectWizard() (+26 more)
+### Community 4 - "getTenantStorageKey"
+Cohesion: 0.09
+Nodes (37): creaUtenteTenantApi(), fetchTenantInfoApi(), fetchUtentiTenant(), updateTenantInfoApi(), NAV, Sidebar(), SidebarProps, TabProposta() (+29 more)
 
-### Community 4 - "istanziazionePort.ts"
+### Community 5 - "leggiErroreApi"
 Cohesion: 0.10
-Nodes (17): clonaDb(), DbState, FakeIstanziazionePort, MicrovoceStored, ModuloStored, nuovoId(), PassaggioStored, IstanziazionePort (+9 more)
+Nodes (43): archivioDocumentiApi(), collegaDocumentoApi(), documentiNonCollocatiApi(), creaContoBancarioApi(), creaContrattoRicorrenteApi(), createInvoiceApi(), createPrimaNotaApi(), deleteInvoiceApi() (+35 more)
 
-### Community 5 - "BluMan Advisory Platform — Analisi Professionale & Piano Esecutivo"
+### Community 6 - "types/index.ts"
+Cohesion: 0.12
+Nodes (33): salvaProgettoDettaglioApi(), ArticoliCatalogView(), AssegnaModuloClienteModal(), CreaModuloForm(), GiurisdizioniView(), NuovoArticoloModal(), closeBtnStyle, labelStyle (+25 more)
+
+### Community 7 - "BluMan Advisory Platform — Analisi Professionale & Piano Esecutivo"
 Cohesion: 0.04
 Nodes (44): 10. Primo Passo Concreto, 1. Contesto e Perimetro, 2. Stato Attuale del Codice, 3. Il Processo Produttivo Completo — Creazione/Spostamento di un'Azienda, 4. Architettura Tecnica Scelta, 5. Piano di Sviluppo Esecutivo — Ordine di Priorità, 6. Diagramma del Flusso Progetto, 7. Decisioni da Confermare Prima di Procedere (+36 more)
 
-### Community 6 - "prismaClient.ts"
-Cohesion: 0.05
-Nodes (18): datiCanaliSeed, hashPassword(), main(), prisma, prisma, stato, stato, SUPER_ADMIN_CON_TENANT (+10 more)
+### Community 8 - "prismaClient.ts"
+Cohesion: 0.06
+Nodes (22): datiCanaliSeed, hashPassword(), main(), prisma, prisma, stato, prisma, NOMI_DI_TEST (+14 more)
 
-### Community 7 - "AppPort"
-Cohesion: 0.07
-Nodes (12): registraRotteCatalogo(), registraRotteProgetti(), lunediSettimana(), parseDataIso(), AppPort, dataIt(), escapeILIKE(), GruppoRicerca (+4 more)
-
-### Community 8 - "serverHelpers.ts"
+### Community 9 - "client.ts"
 Cohesion: 0.10
-Nodes (36): registraRotteClienti(), registraRotteTenant(), conFirmaLogo(), AllegatoEmail, candidatiSmtp(), CredenzialiSmtp, EsitoEmail, inviaEmail() (+28 more)
+Nodes (30): sendEmailDirectApi(), sendWhatsAppDirectApi(), CredentialsExplainModal(), MagicLinkExplainModal(), cleanDisplayEmailText(), ComunicazioniTab(), ComunicazioniTabProps, MessaggioComunicazione (+22 more)
 
-### Community 9 - "scripts"
-Cohesion: 0.05
-Nodes (40): docxtemplater, dotenv, exceljs, fastify, @fastify/cors, @fastify/rate-limit, nodemailer, dependencies (+32 more)
-
-### Community 10 - "PrismaApp"
-Cohesion: 0.07
-Nodes (3): PrismaApp, Cliente, Preventivo
-
-### Community 11 - "jwt.ts"
+### Community 10 - "generazioneDocumenti.ts"
 Cohesion: 0.09
-Nodes (21): stato, CLIENTE_BASE, PROGETTO_BASE, stato, CONTENUTO, PERCORSO, CARATTERI_VIETATI_TUTTI, CARTELLA_UPLOADS (+13 more)
+Nodes (35): contestoFisso(), stato, TEMPLATE_HTML, allineamentoDa(), allineamentoPdf(), areaFirmeAColonne(), blocchiDaElemento(), blocchiDaHtml() (+27 more)
 
-### Community 12 - "registraRotteFirma"
-Cohesion: 0.10
-Nodes (30): registraRotteDocumenti(), registraRotteFirma(), improntaDocumentoDelFascicolo(), improntaModuloCompletato(), livelloRichiestoPerFirma(), risolviTagDocumento(), CanaleFirma, DESCRIZIONE_LIVELLO_FIRMA (+22 more)
+### Community 11 - "dependencies"
+Cohesion: 0.05
+Nodes (38): dependencies, html2canvas, jspdf, react, react-dom, react-router-dom, @supabase/supabase-js, @types/jspdf (+30 more)
 
-### Community 13 - "ProjectDetail.tsx"
+### Community 12 - "server.ts"
 Cohesion: 0.11
-Nodes (21): CalendarioProgettoTab(), GrafoModuliProgettoView(), HeaderProgetto(), ModalAccessiProgetto(), ModuliTab(), ModuloBlock(), RedditivitaTab(), RichiesteAddendumTab() (+13 more)
+Nodes (22): ClienteNonTrovatoError, DipendenzaCiclicaError, ModuloNonTrovatoError, PreventivoNonTrovatoError, ProgettoNonTrovatoError, TransizioneNonValidaError, Cliente, Preventivo (+14 more)
+
+### Community 13 - "storageService.ts"
+Cohesion: 0.10
+Nodes (23): condizioneModuliPerGiurisdizione(), GiurisdizioneInput, ModuloTemplateMock, registraRotteCatalogo(), ArcoDipendenza, push(), trovaCicloDipendenze(), CONTENUTO (+15 more)
 
 ### Community 14 - "calcoloService.ts"
 Cohesion: 0.14
 Nodes (29): calcolaPercentualeMicrovoce(), calcolaPercentualeModulo(), calcolaPercentualeProgetto(), calcolaStatoModulo(), calcolaStatoProgetto(), marcaRitardoManuale(), ModuloConDipendenze, registraConsuntivazione() (+21 more)
 
-### Community 15 - "react"
-Cohesion: 0.09
-Nodes (21): fetchAuditLogsApi(), App(), ProtectedModule(), InviteUserModal(), InviteUserModalProps, TabChannelsProps, TabCompany(), TabCompanyProps (+13 more)
-
-### Community 16 - "inMemoryApp.ts"
-Cohesion: 0.12
-Nodes (21): ClienteNonTrovatoError, ModuloNonTrovatoError, PreventivoNonTrovatoError, ProgettoNonTrovatoError, TransizioneNonValidaError, Cliente, Preventivo, Progetto (+13 more)
-
-### Community 18 - "server.ts"
-Cohesion: 0.13
-Nodes (22): app, porta, server, nuovoServer(), TOKEN_TEST_CLIENTE, start(), registraRotteAuth(), registraRotteNotifiche() (+14 more)
-
-### Community 19 - "routes/firma.ts"
-Cohesion: 0.15
-Nodes (26): runAllVerificationChecks(), AmbitoOtp, annullaOtp(), ATTESA_REINVIO_SECONDI, canaleValido(), CANALI_OTP, creaOtp(), creaSigilloFea() (+18 more)
-
-### Community 20 - "notificheService.ts"
-Cohesion: 0.12
-Nodes (21): registraRotteContabilita(), generaVerbaleDiFirma(), registraRottePortale(), CronReport, giaNotificataOggi(), runDailyNotificationCron(), ConnessioneSse, connessioni (+13 more)
-
-### Community 21 - "getAuthHeaders"
-Cohesion: 0.12
-Nodes (28): aggiornaDocumentoTemplateApi(), aggiornaLivelloFirmaDocumentoApi(), aggiornaRichiestaModificaDocumentoApi(), aggiornaStatoDocumentoApi(), archiviaDocumentoApi(), DocumentoProgetto, eliminaDocumentoApi(), fetchDocumentiTemplateApi() (+20 more)
-
-### Community 22 - "generazioneDocumenti.ts"
-Cohesion: 0.13
-Nodes (23): contestoFisso(), stato, TEMPLATE_HTML, allineamentoDa(), allineamentoPdf(), blocchiDaElemento(), blocchiDaHtml(), BloccoDocumento (+15 more)
-
-### Community 23 - "esecuzione.test.ts"
-Cohesion: 0.11
-Nodes (19): main(), prisma, seedModulo(), moduloAnalisiPatrimoniale, moduloCorporateStructuring, ProceduraIncompletaError, setupProgettoConDueModuli(), templateDipendente() (+11 more)
-
-### Community 24 - "apiFetch"
+### Community 15 - "routes/firma.ts"
 Cohesion: 0.14
-Nodes (25): aggiornaProfiloUtenteApi(), cambiaPasswordClienteApi(), cambiaPasswordStaffApi(), clientLoginApi(), fetchMeApi(), fetchProfiloUtenteApi(), loginApi(), magicLoginApi() (+17 more)
+Nodes (28): runAllVerificationChecks(), AmbitoOtp, ATTESA_REINVIO_SECONDI, canaleValido(), CANALI_OTP, creaOtp(), creaSigilloFea(), descriviCanaleVerificato() (+20 more)
 
-### Community 25 - "reportsService.ts"
-Cohesion: 0.16
-Nodes (24): applicaFormatoExcel(), calcolaLarghezze(), disegnaIntestazioni(), disegnaRiga(), disegnaTestata(), generaExcelReport(), generaPdfReport(), pdfDocToBuffer() (+16 more)
+### Community 16 - "AppPort"
+Cohesion: 0.08
+Nodes (4): registraRotteProgetti(), lunediSettimana(), parseDataIso(), AppPort
 
-### Community 26 - "Projects.tsx"
+### Community 17 - "PassaggioModal.tsx"
+Cohesion: 0.12
+Nodes (26): archiviaDocumentoApi(), eliminaDocumentoApi(), RichiestaModificaDoc, scaricaDocumentoWordClient(), ALL_STUDIO_TEMPLATES, getSmartDocumentRecommendation(), RecommendationResult, ModaleCatalogo() (+18 more)
+
+### Community 18 - "getAuthHeaders"
+Cohesion: 0.12
+Nodes (30): getAuthHeaders(), aggiornaModuloTemplateApi(), creaArticoloApi(), creaGiurisdizioneApi(), creaModuloTemplateApi(), disattivaArticoloApi(), disattivaModuloTemplateApi(), fetchArticoli() (+22 more)
+
+### Community 19 - "react"
+Cohesion: 0.10
+Nodes (18): App(), ProtectedModule(), closeBtnStyle, AuditEntry, AuditLogPage(), BanksPage(), LoginPage(), LoginPageProps (+10 more)
+
+### Community 20 - "InMemoryApp"
+Cohesion: 0.07
+Nodes (3): InMemoryApp, progettoAvviato(), calcolaPrezzoModulo()
+
+### Community 22 - "buildServer"
+Cohesion: 0.11
+Nodes (19): nuovoServer(), TOKEN_TEST_CLIENTE, start(), registraRotteAuth(), buildServer(), nuovoServer(), nuovoServerConLimiter(), serverCheOsservaIlContesto() (+11 more)
+
+### Community 23 - "apiFetch"
+Cohesion: 0.14
+Nodes (27): aggiornaProfiloUtenteApi(), cambiaPasswordClienteApi(), cambiaPasswordStaffApi(), clientLoginApi(), fetchMeApi(), fetchProfiloUtenteApi(), loginApi(), magicLoginApi() (+19 more)
+
+### Community 24 - "serverHelpers.ts"
+Cohesion: 0.14
+Nodes (22): main(), prisma, registraRotteClienti(), main(), prisma, sendClientCredentialsEmail(), sendMagicLinkEmail(), generateMagicToken() (+14 more)
+
+### Community 25 - "esecuzione.test.ts"
 Cohesion: 0.15
-Nodes (20): AssignOperatorModal(), AssignOperatorModalProps, CalendarPreviewModalProps, Avatar(), AvatarGroup(), AvatarGroupProps, AvatarProps, apiUserToTeamMember() (+12 more)
+Nodes (14): completaMicrovoce(), completaPassaggioDocumento(), completaPassaggioForm(), marcaPassaggioCompletato(), marcaRitardo(), ProceduraIncompletaError, registraConsuntivazione(), ricalcolaModuloECascata() (+6 more)
 
-### Community 27 - "compilerOptions"
+### Community 26 - "api/portale.ts"
+Cohesion: 0.10
+Nodes (23): aggiornaClienteApi(), creaClienteApi(), fetchClienti(), fetchOperatoriSuggeriti(), generaMagicLinkApi(), OperatoreSuggeritoApi, resetPasswordClienteApi(), aggiornaStatoAddendumApi() (+15 more)
+
+### Community 27 - "ClientPortal.tsx"
+Cohesion: 0.15
+Nodes (19): FatturaPortale, PropostaDatiFiscale, bodyStyle, containerStyle, docBoxStyle, heroBannerStyle, portalWrapperStyle, tabBtnStyle() (+11 more)
+
+### Community 28 - "documentTemplates.ts"
+Cohesion: 0.22
+Nodes (20): adottaModelloSerieApi(), aggiornaDocumentoTemplateApi(), archiviaModelloApi(), creaDocumentoTemplateApi(), eliminaDocumentoTemplateApi(), fetchDocumentiTemplateApi(), ModelloStudioApi, revisionaModelloApi() (+12 more)
+
+### Community 29 - "compilerOptions"
 Cohesion: 0.08
 Nodes (23): compilerOptions, allowArbitraryExtensions, allowImportingTsExtensions, erasableSyntaxOnly, jsx, lib, module, moduleDetection (+15 more)
 
-### Community 28 - "ClientPortal"
-Cohesion: 0.20
-Nodes (20): calcolaHashSha256(), canaliFirmaApi(), elencoFirmeApi(), firmaConFileApi(), grafometricaFirmaApi(), requestPortalOtpApi(), SigilloFirma, verifyPortalOtpAndSignApi() (+12 more)
+### Community 30 - "api/documenti.ts"
+Cohesion: 0.17
+Nodes (20): aggiornaRichiestaModificaDocumentoApi(), aggiornaStatoDocumentoApi(), ClienteArchivio, ContatoriArchivio, DocumentoProgetto, generaDocumentoApi(), listaDocumentiProgetto(), nuovaVersioneDocumentoApi() (+12 more)
 
-### Community 29 - "AppLayout.tsx"
-Cohesion: 0.13
-Nodes (18): apriStreamNotifiche(), NotificaStreamEvent, AppLayout(), AppLayoutProps, INITIAL_NOTIFICATIONS, mapNotificaBackend(), notificaDesktop(), TIPO_PER_EVENTO (+10 more)
+### Community 31 - "notificheService.ts"
+Cohesion: 0.14
+Nodes (16): registraRottePortale(), registraRotteWebhooks(), apriStreamSse(), ConnessioneSse, connessioni, DatiEvento, destinataA(), EVENTI_NOTIFICA (+8 more)
 
-### Community 30 - "compilerOptions"
+### Community 32 - "api/fornitori.ts"
+Cohesion: 0.23
+Nodes (17): aggiornaFornitoreApi(), creaFornitoreApi(), eliminaFornitoreApi(), FatturaRicevuta, fetchFattureRicevuteApi(), fetchFornitoriApi(), Fornitore, importaXmlFatturaRicevutaApi() (+9 more)
+
+### Community 33 - "http.ts"
+Cohesion: 0.12
+Nodes (16): API_BASE, conCorpoCoerente(), getApiBase(), normalizzaBase(), fetchNotificheApi(), markNotificheReadApi(), NotificaStreamEvent, CellaReport (+8 more)
+
+### Community 34 - "compilerOptions"
 Cohesion: 0.10
 Nodes (19): compilerOptions, allowImportingTsExtensions, erasableSyntaxOnly, lib, module, moduleDetection, noEmit, noFallthroughCasesInSwitch (+11 more)
 
-### Community 31 - "http.ts"
+### Community 35 - "prisma"
 Cohesion: 0.13
-Nodes (13): API_BASE, conCorpoCoerente(), fetchNotificheApi(), markNotificheReadApi(), CellaReport, CHIAVI_REPORT, downloadReportApi(), fetchReportApi() (+5 more)
+Nodes (16): app, porta, server, ContatoriCartella, contatoriVuoti(), registraRotteArchivioDocumenti(), sommaIn(), registraRotteNotifiche() (+8 more)
 
-### Community 32 - "api/progetti.ts"
+### Community 36 - "FakeIstanziazionePort"
+Cohesion: 0.14
+Nodes (6): clonaDb(), FakeIstanziazionePort, nuovoId(), MicrovoceRecord, ModuloRecord, PassaggioRecord
+
+### Community 37 - "dependencies"
+Cohesion: 0.11
+Nodes (19): docxtemplater, dotenv, fastify, @fastify/cors, nodemailer, dependencies, docxtemplater, dotenv (+11 more)
+
+### Community 38 - "DocumentTemplate"
+Cohesion: 0.15
+Nodes (15): ModaleRevisioneModello(), Props, SPIEGA, Stato, stileCampo, bottone, ETICHETTA_FIRMA, Props (+7 more)
+
+### Community 39 - "portal/types.ts"
 Cohesion: 0.18
-Nodes (16): archiviaProgettoApi(), assegnaAccessoProgettoApi(), consuntivaMicrovoceApi(), creaPreventivoEAccettaApi(), creaProgettoApi(), eliminaModuloApi(), eliminaProgettoApi(), fetchAccessiProgetto() (+8 more)
+Nodes (14): AmbitoFirma, DocumentoPortale, DettaglioModuloModalProps, mapProjectToPortalModules(), ModificaDocModal(), ModificaDocModalProps, TabAvanzamento(), TabAvanzamentoProps (+6 more)
 
-### Community 33 - "compilerOptions"
+### Community 40 - "emailService.ts"
+Cohesion: 0.18
+Nodes (15): registraRotteTenant(), conFirmaLogo(), senzaSegreti(), tenantPubblico(), EsitoEmail, tlsRejectUnauthorized(), EmailOptions, EsitoEmailOtp (+7 more)
+
+### Community 41 - "istanziazionePort.ts"
+Cohesion: 0.17
+Nodes (11): DbState, FakeNotificationPort, MicrovoceStored, ModuloStored, PassaggioStored, ModuloConDipendenzeRuntime, NuovaMicrovoceProgettoInput, NuovoModuloProgettoInput (+3 more)
+
+### Community 42 - "ArchivioDocumentiPage.tsx"
+Cohesion: 0.17
+Nodes (13): DocumentoNonCollocato, TotaliArchivio, Props, ElencoNonCollocati(), Props, ModaleCollegaDocumento(), ProgettoScelta, Props (+5 more)
+
+### Community 43 - "compilerOptions"
 Cohesion: 0.12
 Nodes (16): src/adapters/prisma, compilerOptions, esModuleInterop, module, moduleResolution, noUncheckedIndexedAccess, outDir, rootDir (+8 more)
 
-### Community 34 - "client.ts"
+### Community 44 - "routes/documenti.ts"
 Cohesion: 0.24
-Nodes (11): resetPasswordClienteApi(), sendWhatsAppDirectApi(), CredentialsExplainModal(), MagicLinkExplainModal(), cleanDisplayEmailText(), ComunicazioniTab(), ComunicazioniTabProps, MessaggioComunicazione (+3 more)
+Nodes (13): registraRotteDocumenti(), livelloRichiestoPerFirma(), CanaleFirma, DESCRIZIONE_LIVELLO_FIRMA, EsitoLivelloFirma, LIVELLI_FIRMA, LivelloFirma, livelloFirmaValido() (+5 more)
 
-### Community 35 - "leggiErroreApi"
-Cohesion: 0.17
-Nodes (15): leggiErroreApi(), createAuditLogApi(), deleteAdminTenantApi(), salvaPermessiUtenteApi(), triggerCronScadenzeApi(), updateAdminTenantApi(), approvaSettimanaTimesheet(), approvaVoceTimesheet() (+7 more)
-
-### Community 36 - "otpDispatch.ts"
-Cohesion: 0.21
-Nodes (14): sendOtpSecurityEmail(), canaliDisponibili(), chiamaGraph(), CredenzialiCanali, EsitoInvio, inviaCodiceOtp(), inviaTelegram(), inviaWhatsapp() (+6 more)
-
-### Community 37 - "dependencies"
-Cohesion: 0.13
-Nodes (15): dependencies, html2canvas, jspdf, react, react-dom, react-router-dom, @supabase/supabase-js, @types/jspdf (+7 more)
-
-### Community 38 - "AnagraficaErpModal.tsx"
-Cohesion: 0.22
-Nodes (13): aggiornaClienteApi(), creaClienteApi(), fetchClienti(), fetchOperatoriSuggeriti(), generaMagicLinkApi(), OperatoreSuggeritoApi, confermaPropostaDatiApi(), proposteDatiStudioApi() (+5 more)
-
-### Community 39 - "📖 BluMan — Guida Dettagliata Configurazione Canali Multicanale & Associazione Automatica Progetti"
+### Community 46 - "📖 BluMan — Guida Dettagliata Configurazione Canali Multicanale & Associazione Automatica Progetti"
 Cohesion: 0.14
 Nodes (14): 🟢 1. WhatsApp Business API (Official Meta Cloud API), ✈️ 2. Telegram Bot API (100% Gratuito), ✉️ 3. Email Inbound Webhook Parse (SendGrid / SMTP / PEC), 🔒 4. Signal End-to-End Encrypted (Clienti VIP), A. Configurazione Inbound Parse, A. Creare il Bot dello Studio con @BotFather, A. Ottenere le Credenziali da Meta Developers, A. Setup Daemon REST API (+6 more)
 
-### Community 40 - "devDependencies"
-Cohesion: 0.14
-Nodes (14): devDependencies, oxlint, @types/node, @types/react, @types/react-dom, vite, @vitejs/plugin-react, oxlint (+6 more)
+### Community 47 - "devDependencies"
+Cohesion: 0.13
+Nodes (15): devDependencies, prisma, tsx, @types/node, @types/pdfkit, @types/pizzip, typescript, vitest (+7 more)
 
-### Community 41 - "devDependencies"
-Cohesion: 0.14
-Nodes (14): typescript, devDependencies, prisma, tsx, @types/pdfkit, @types/pizzip, typescript, vitest (+6 more)
+### Community 48 - "routes/liquidazioneIva.ts"
+Cohesion: 0.25
+Nodes (11): registraRotteLiquidazioneIva(), CalcolaLipeQuerySchema, MarcaVersataLipeSchema, SalvaLipeSchema, calcolaLiquidazioneIvaPeriodo(), determinaPeriodoFiscale(), getCodiceTributoIva(), PeriodoFiscale (+3 more)
 
-### Community 42 - "🎯 Stato del Progetto & Componenti Verificati"
+### Community 49 - "diagnosiPosta.ts"
+Cohesion: 0.20
+Nodes (11): CARTELLE_DA_ISPEZIONARE, MODULI_DELLA_POSTA, RADICE, SERVER_DI_TERZI, CausaPosta, ContestoErrorePosta, DiagnosiPosta, hostCoerente() (+3 more)
+
+### Community 50 - "registraRotteFirma"
+Cohesion: 0.18
+Nodes (11): registraRotteFirma(), archiviaCopiaFirmata(), generaVerbaleDiFirma(), improntaDocumentoDelFascicolo(), improntaModuloCompletato(), CronReport, giaNotificataOggi(), runDailyNotificationCron() (+3 more)
+
+### Community 51 - "sendEmail.test.ts"
+Cohesion: 0.21
+Nodes (10): cleanRawEmailBody(), fetchRecentImapEmails(), handler(), relayAutorizzato(), tlsInsicuraAmmessa(), AMBIENTE_DA_SVUOTARE, ambienteOriginale, caricaGestore() (+2 more)
+
+### Community 52 - "ClientPortal"
+Cohesion: 0.33
+Nodes (13): calcolaHashSha256(), canaliFirmaApi(), elencoFirmeApi(), firmaConFileApi(), grafometricaFirmaApi(), requestPortalOtpApi(), SigilloFirma, verifyPortalOtpAndSignApi() (+5 more)
+
+### Community 53 - "🎯 Stato del Progetto & Componenti Verificati"
 Cohesion: 0.14
 Nodes (13): 📋 Anagrafica Master Cliente ERP (4 Schede), 🗄 Archiviazione & Eliminazione Sicura, 🔍 AUDIT SCHIETTO: Cosa Manca per la Produzione A-Z (Enterprise Checklist), 🏛 BluMan Advisory Platform — Architettura & Guida Produzione, 🔑 Credenziali Ufficiali di Accesso (Ruoli Staff & Cliente), 💶 Fatturazione & Note di Credito (Numerazione Sequenziale Distinta), 👥 Gestione Team & Timesheet Live Operatori (`/settings`), 🕸 Grafo & Dipendenze Moduli nel Progetto (+5 more)
 
-### Community 43 - "password.ts"
-Cohesion: 0.30
-Nodes (9): main(), prisma, registraRotteWebhooks(), main(), prisma, confrontoTokenCostante(), generaPasswordTemporanea(), hashPassword() (+1 more)
+### Community 54 - "comunicazioni.ts"
+Cohesion: 0.29
+Nodes (12): credenzialiImap(), registraRotteComunicazioni(), testoInHtml(), CredenzialiImap, CredenzialiCanali, chiamaGraphWhatsapp(), CredenzialiWhatsapp, EsitoWhatsapp (+4 more)
 
-### Community 44 - "EsecuzionePort"
-Cohesion: 0.30
-Nodes (6): completaMicrovoce(), marcaRitardo(), registraConsuntivazione(), ricalcolaModuloECascata(), risolviRitardo(), EsecuzionePort
+### Community 55 - "routes/solleciti.ts"
+Cohesion: 0.25
+Nodes (10): registraRotteSolleciti(), InviaSollecitoSchema, calcolaInteressiMora(), CalcoloMoraResult, DatiSollecitoInput, generaTestoSollecito(), LivelloSollecito, SAGGIO_MORA_DEFAULT_PERCENTUALE (+2 more)
 
-### Community 45 - "TimesheetPage.tsx"
+### Community 56 - "otpDispatch.ts"
+Cohesion: 0.23
+Nodes (12): sendOtpSecurityEmail(), canaliDisponibili(), EsitoInvio, inviaCodiceOtp(), inviaTelegram(), inviaWhatsapp(), RecapitiCliente, RichiestaInvio (+4 more)
+
+### Community 57 - "FirmaOtpModal.tsx"
+Cohesion: 0.21
+Nodes (10): CanaleFirma, CanaleOtp, FirmaOtpModal(), FirmaOtpModalProps, InvioManualeModal(), InvioManualeModalProps, AVVISO_LIVELLO, ETICHETTA_LIVELLO (+2 more)
+
+### Community 58 - "TimesheetPage.tsx"
 Cohesion: 0.24
 Nodes (12): aggiungiGiorni(), COLORI_STATO, EditorCella(), fmtOre(), lunediDi(), NOMI_GIORNI, parseIso(), STILE_TD (+4 more)
 
-### Community 46 - "ConfirmDeleteModal.tsx"
+### Community 59 - "scripts"
+Cohesion: 0.15
+Nodes (13): scripts, bootstrap, build, cleanup:test-data, dev, passwords:assign, prisma:generate, prisma:migrate (+5 more)
+
+### Community 60 - "verbaleFirma.test.ts"
+Cohesion: 0.18
+Nodes (5): BLOCCHI_CON_SLOT, otpAperto(), preparaDocumentoVault(), preparaModuloCompletato(), stato
+
+### Community 61 - "ConfirmDeleteModal.tsx"
 Cohesion: 0.17
 Nodes (11): closeBtnStyle, ConfirmDeleteModal(), ConfirmDeleteModalProps, contentStyle, footerStyle, formGroupStyle, headerStyle, modalStyle (+3 more)
 
-### Community 47 - "PrismaIstanziazionePort"
-Cohesion: 0.08
-Nodes (5): PrismaIstanziazionePort, IstanziazioneTransazione, StatoMicrovoceIniziale, conContestoInTransazione(), PrismaConContesto
+### Community 62 - "api/liquidazioneIva.ts"
+Cohesion: 0.36
+Nodes (9): calcolaLipeApi(), CalcoloLipeResponse, fetchLiquidazioniIvaApi(), LiquidazioneIvaRecord, marcaVersataLipeApi(), ProspettoF24, RigoTributoF24, salvaLipeApi() (+1 more)
 
-### Community 48 - "🏛 BluMan Advisory Platform — Istruzioni di Installazione & Avvio sul Nuovo PC"
+### Community 63 - "api/solleciti.ts"
+Cohesion: 0.29
+Nodes (9): anteprimaSollecitoApi(), AnteprimaSollecitoResponse, CalcoloMora, fetchScadenzeInsoluteApi(), inviaSollecitoApi(), LivelloSollecito, ScadenzaInsoluta, InviaSollecitoModal() (+1 more)
+
+### Community 64 - "🏛 BluMan Advisory Platform — Istruzioni di Installazione & Avvio sul Nuovo PC"
 Cohesion: 0.18
 Nodes (10): 1. Prerequisiti, 2. Installazione sul NUOVO PC, 3. Avvio dei Server, 4. Connessione a Supabase PostgreSQL via CLI (Produzione), 🏛 BluMan Advisory Platform — Istruzioni di Installazione & Avvio sul Nuovo PC, Opzione A: Da Repository GitHub (Consigliato), Opzione B: Da archivio ZIP (`bluman-api-backup.zip`), Step 1: Avvia il Backend Fastify API (:3000) (+2 more)
 
-### Community 49 - "pulizia-duplicati-catalogo.mjs"
+### Community 65 - "pulizia-duplicati-catalogo.mjs"
 Cohesion: 0.20
 Nodes (7): APPLICA, chiaveDiGruppo(), gruppiArticoli, gruppiModuli, piano, prisma, raggruppa()
 
-### Community 50 - "verbaleFirma.test.ts"
-Cohesion: 0.20
-Nodes (3): otpAperto(), preparaModuloCompletato(), stato
+### Community 66 - "routes/fornitori.ts"
+Cohesion: 0.31
+Nodes (8): registraRotteFornitori(), AggiornaFornitoreSchema, CreaFornitoreSchema, PagaFatturaRicevutaSchema, RegistraFatturaRicevutaSchema, DatiFatturaPassivaEstratti, estraiTag(), parseXmlFatturaPassiva()
 
-### Community 51 - "🎯 Stato di Avanzamento Fasi (Aggiornato)"
+### Community 67 - "salvaDocumentoApi"
+Cohesion: 0.31
+Nodes (8): salvaDocumentoApi(), leggiBase64(), ModaleCaricaNellArchivio(), Props, stileCampo, appiattisci(), MicrovoceScelta, useMicrovociProgetto()
+
+### Community 68 - "istanziaProgetto.ts"
+Cohesion: 0.22
+Nodes (7): calcolaOreModulo(), IstanziaProgettoInput, IstanziaProgettoRisultato, ModuloCreatoInfo, RigaPreventivoAccettato, IstanziazionePort, StatoMicrovoceIniziale
+
+### Community 69 - "imapInbound.ts"
+Cohesion: 0.36
+Nodes (9): spiegaErrorePosta(), EmailInArrivo, EsitoPostaInArrivo, leggiPostaInArrivo(), leggiViaImap(), leggiViaRelay(), ripulisciCorpoEmail(), soloDi() (+1 more)
+
+### Community 70 - "verbaleFirma.ts"
+Cohesion: 0.33
+Nodes (9): dataUrlABuffer(), DatiOtpVerbale, DatiVerbaleFirma, descrizioneTipoFirma(), formattaData(), generaPdfVerbaleFirma(), pdfDocToBuffer(), riga() (+1 more)
+
+### Community 71 - "portal/TabDocumenti.tsx"
+Cohesion: 0.36
+Nodes (6): DocumentViewerModal(), DocumentViewerModalProps, dataOraLeggibile(), livelloFirmaEffettivo(), TabDocumenti(), TabDocumentiProps
+
+### Community 72 - "comunicazioniCanali.test.ts"
+Cohesion: 0.22
+Nodes (6): AMBIENTE_DA_SVUOTARE, ambienteOriginale, SEGRETI, stato, TENANT_CONFIGURATO, TOKEN
+
+### Community 73 - "postaNomeCertificato.test.ts"
+Cohesion: 0.22
+Nodes (6): AMBIENTE, ambienteOriginale, CASELLA, corpiRelay, MESSAGGIO, trasporti
+
+### Community 74 - "copiaFirmata.ts"
+Cohesion: 0.36
+Nodes (8): blocchiSalvati(), EsitoCopiaFirmata, generaCopiaFirmata(), haSlotFirma(), nomeCopia(), righeAttestazione(), TIPI_BLOCCO, nomeFileDaUrl()
+
+### Community 75 - "emailRelay.ts"
+Cohesion: 0.36
+Nodes (8): AllegatoEmail, candidatiSmtp(), CredenzialiSmtp, inviaEmail(), inviaViaRelay(), inviaViaSmtp(), MessaggioEmail, urlRelay()
+
+### Community 77 - "🎯 Stato di Avanzamento Fasi (Aggiornato)"
 Cohesion: 0.25
 Nodes (7): BluMan — Piano di Sviluppo & Stato Avanzamento Produzione, 🔍 Checklist per il Rilascio in Produzione A-Z (Enterprise Readiness), FASE 0 — Setup e Fondamenta Progetto, FASE 1 — Schema Database PostgreSQL & Prisma (`prisma/schema.prisma`), FASE 2 — Autenticazione RBAC & Permessi Attori (§2bis, §23), FASE 2 — Frontend UI & Portale Cliente Passwordless, 🎯 Stato di Avanzamento Fasi (Aggiornato)
 
-### Community 52 - ".oxlintrc.json"
+### Community 78 - ".oxlintrc.json"
 Cohesion: 0.25
 Nodes (7): plugins, rules, react/only-export-components, react/rules-of-hooks, $schema, oxc, warn
 
-### Community 53 - "TabManutenzione.tsx"
+### Community 79 - "TabManutenzione.tsx"
 Cohesion: 0.43
 Nodes (6): TabManutenzione(), TabManutenzioneProps, chiaviDatiLocali(), RESTANO_ESATTE, RESTANO_PREFISSI, svuotaDatiLocali()
 
-### Community 54 - "🤖 Istruzioni & Context Prompt per l'IA (Nuovo PC)"
+### Community 81 - "🤖 Istruzioni & Context Prompt per l'IA (Nuovo PC)"
 Cohesion: 0.25
 Nodes (7): 1. Configurazione Variabile `.env` Database URL:, 2. Collegamento Supabase CLI & Migrazioni Prisma:, ⚙️ Comandi di Avvio sul Nuovo PC, ⚡ Connessione Diretta a Supabase tramite CLI & Prisma (IMPORTANTISSIMO), 🤖 Istruzioni & Context Prompt per l'IA (Nuovo PC), 🏛 Mappa Architetturale Rapida, 📋 PROMPT DA COPIARE ED INCOLLARE ALLA NUOVA IA:
 
-### Community 55 - "credenziali.test.ts"
+### Community 82 - "ModuloTemplateConDistinta"
+Cohesion: 0.39
+Nodes (6): main(), prisma, seedModulo(), moduloAnalisiPatrimoniale, moduloCorporateStructuring, ModuloTemplateConDistinta
+
+### Community 83 - "copiaFirmata.test.ts"
+Cohesion: 0.32
+Nodes (5): blocchiConSlot(), contesto(), HTML_CON_SLOT, originaleConBlocchi(), stato
+
+### Community 84 - "credenziali.test.ts"
 Cohesion: 0.25
 Nodes (6): CARTELLE_DA_ISPEZIONARE, CARTELLE_DA_SALTARE, CREDENZIALI_VIETATE, DOC_DA_ISPEZIONARE, ESTENSIONI, RADICE
 
-### Community 56 - "BluMan Advisory Platform — Mappa Architetturale & Regole Sviluppo"
+### Community 85 - "postaProveRotte.test.ts"
+Cohesion: 0.25
+Nodes (5): AMBIENTE_DA_SVUOTARE, ambienteOriginale, NOMI_DI_ALTRI, stato, TOKEN
+
+### Community 86 - "collegamentoDocumenti.ts"
+Cohesion: 0.43
+Nodes (6): nomeLeggibile(), registraRotteCollegamentoDocumenti(), decidiCollocazione(), descriviSpostamento(), EsitoCollocazione, RigheTrovate
+
+### Community 87 - "paginazioneHelper.ts"
+Cohesion: 0.29
+Nodes (4): PaginazioneQuery, PaginazioneQuerySchema, MetaPaginazione, RisultatoPaginato
+
+### Community 88 - "BluMan Advisory Platform — Mappa Architetturale & Regole Sviluppo"
 Cohesion: 0.29
 Nodes (6): 🏛 1. Mappa dei Componenti Frontend (`frontend/src/`), 🔌 2. API Backend Fastify (`src/server.ts`) & API Client (`frontend/src/api/client.ts`), 🗄 3. Database Schema (`prisma/schema.prisma`), BluMan Advisory Platform — Mappa Architetturale & Regole Sviluppo, 🚨 REGOLE TASSATIVE DI SVILUPPO (MANDATORY AGENT & DEV RULES), 🔑 Tabella Credenziali di Accesso Ufficiali
 
-### Community 57 - "railway.json"
+### Community 89 - "BadgeRevisione.tsx"
+Cohesion: 0.38
+Nodes (5): LibreriaTemplate(), BadgeRevisione(), COLORI, DatiRevisione, dettaglio()
+
+### Community 90 - "NotificationModal.tsx"
+Cohesion: 0.38
+Nodes (6): etichettaGiorno(), NotificationItem, NotificationModal(), NotificationModalProps, STILE_TIPO, tempoRelativo()
+
+### Community 91 - "railway.json"
 Cohesion: 0.29
 Nodes (6): build, builder, deploy, restartPolicyMaxRetries, restartPolicyType, $schema
 
-### Community 58 - "scripts"
-Cohesion: 0.33
-Nodes (6): scripts, build, dev, lint, preview, typecheck
+### Community 92 - "matriceNotifiche.test.ts"
+Cohesion: 0.29
+Nodes (3): CLIENTE_BASE, PROGETTO_BASE, stato
 
-### Community 59 - "pulizia-blocco7.mjs"
+### Community 93 - "contabilita.schema.ts"
+Cohesion: 0.29
+Nodes (6): CreaContoBancarioSchema, CreaContrattoRicorrenteSchema, CreaMovimentoPrimaNotaSchema, EmettiFatturaSchema, RegistraIncassoSchema, RigaFatturaInputSchema
+
+### Community 94 - "pulizia-blocco7.mjs"
 Cohesion: 0.33
 Nodes (4): APPLICA, COPPIE, prisma, TENANT_RINOMINA
 
-### Community 60 - "reset-dati-prova.mjs"
+### Community 95 - "reset-dati-prova.mjs"
 Cohesion: 0.33
 Nodes (5): ancheAudit, DA_CANCELLARE, DA_TENERE, esegui, prisma
 
-### Community 61 - "frontend/package.json"
+### Community 98 - "TabContatti.tsx"
+Cohesion: 0.60
+Nodes (4): ContattiStudio, inviaComunicazioneApi(), TabContatti(), TabContattiProps
+
+### Community 99 - "package.json"
 Cohesion: 0.40
-Nodes (4): name, private, type, version
+Nodes (4): description, name, type, version
 
-### Community 62 - "testTenantDb.ts"
-Cohesion: 0.50
-Nodes (4): CAMPI_SEGRETI, maschera(), prisma, testTenantAllFields()
+### Community 100 - "distribuisci.sh"
+Cohesion: 0.70
+Nodes (4): avviso(), distribuisci.sh script, successo(), titolo()
 
-### Community 63 - "teamAnalytics.test.ts"
+### Community 101 - "teamAnalytics.test.ts"
 Cohesion: 0.40
 Nodes (3): Modulo, Progetto, Task
 
-### Community 64 - "vercel.json"
+### Community 102 - "vercel.json"
 Cohesion: 0.40
 Nodes (4): buildCommand, framework, outputDirectory, rewrites
 
-### Community 65 - "send-email.ts"
-Cohesion: 0.83
-Nodes (3): cleanRawEmailBody(), fetchRecentImapEmails(), handler()
-
-### Community 66 - "React + TypeScript + Vite"
+### Community 103 - "React + TypeScript + Vite"
 Cohesion: 0.50
 Nodes (3): Expanding the Oxlint configuration, React Compiler, React + TypeScript + Vite
 
+### Community 104 - "DigitalSignatureModal.tsx"
+Cohesion: 0.67
+Nodes (3): DigitalSignatureModal(), DigitalSignatureModalProps, SignatureData
+
+### Community 105 - "PortalLogin.tsx"
+Cohesion: 0.67
+Nodes (3): PortalLogin(), PortalLoginProps, StudioInfo
+
+### Community 108 - "auth.schema.ts"
+Cohesion: 0.50
+Nodes (3): ChangePasswordSchema, LoginSchema, MagicLoginSchema
+
 ## Knowledge Gaps
-- **415 isolated node(s):** `DocumentEditorModalProps`, `ZipEntry`, `NotificationModalProps`, `SuccessSealModalProps`, `DatiSocietari` (+410 more)
+- **545 isolated node(s):** `BloccoBloccabile`, `ProprietaFoglioA4`, `BloccoPiatto`, `OpzioniPagine`, `BloccoMisurato` (+540 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **158 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **169 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `InMemoryApp` connect `InMemoryApp` to `inMemoryApp.ts`, `server.ts`, `AppPort`?**
-  _High betweenness centrality (0.021) - this node is a cross-community bridge._
-- **Why does `react` connect `react` to `DocumentEditorPage.tsx`, `ClientPortal.tsx`, `client.ts`, `getTenantStorageKey`, `fmt`, `AnagraficaErpModal.tsx`, `ProjectDetail.tsx`, `ConfirmDeleteModal.tsx`, `TimesheetPage.tsx`, `.oxlintrc.json`, `Projects.tsx`, `AppLayout.tsx`?**
-  _High betweenness centrality (0.016) - this node is a cross-community bridge._
-- **Why does `AppPort` connect `AppPort` to `serverHelpers.ts`, `PrismaApp`, `jwt.ts`, `inMemoryApp.ts`, `InMemoryApp`, `server.ts`, `notificheService.ts`?**
-  _High betweenness centrality (0.015) - this node is a cross-community bridge._
-- **What connects `DocumentEditorModalProps`, `ZipEntry`, `NotificationModalProps` to the rest of the system?**
-  _415 weakly-connected nodes found - possible documentation gaps or missing edges._
+- **Why does `soloCodice()` connect `pdfA4.ts` to `diagnosiPosta.ts`, `DocumentEditorPage.tsx`?**
+  _High betweenness centrality (0.154) - this node is a cross-community bridge._
+- **Why does `scomponiDocumento()` connect `DocumentEditorPage.tsx` to `getTenantStorageKey`?**
+  _High betweenness centrality (0.117) - this node is a cross-community bridge._
+- **Why does `react` connect `react` to `pdfA4.ts`, `ProjectDetail.tsx`, `DocumentEditorPage.tsx`, `getTenantStorageKey`, `leggiErroreApi`, `types/index.ts`, `client.ts`, `PassaggioModal.tsx`, `getAuthHeaders`, `api/portale.ts`, `ClientPortal.tsx`, `documentTemplates.ts`, `api/documenti.ts`, `api/fornitori.ts`, `DocumentTemplate`, `portal/types.ts`, `ArchivioDocumentiPage.tsx`, `TimesheetPage.tsx`, `ConfirmDeleteModal.tsx`, `api/liquidazioneIva.ts`, `api/solleciti.ts`, `salvaDocumentoApi`, `.oxlintrc.json`, `BadgeRevisione.tsx`, `NotificationModal.tsx`, `DigitalSignatureModal.tsx`, `PortalLogin.tsx`?**
+  _High betweenness centrality (0.073) - this node is a cross-community bridge._
+- **What connects `BloccoBloccabile`, `ProprietaFoglioA4`, `BloccoPiatto` to the rest of the system?**
+  _545 weakly-connected nodes found - possible documentation gaps or missing edges._
+- **Should `pdfA4.ts` be split into smaller, more focused modules?**
+  _Cohesion score 0.053994732221246705 - nodes in this community are weakly interconnected._
+- **Should `ProjectDetail.tsx` be split into smaller, more focused modules?**
+  _Cohesion score 0.07270865335381464 - nodes in this community are weakly interconnected._
 - **Should `DocumentEditorPage.tsx` be split into smaller, more focused modules?**
-  _Cohesion score 0.05772005772005772 - nodes in this community are weakly interconnected._
-- **Should `ClientPortal.tsx` be split into smaller, more focused modules?**
-  _Cohesion score 0.05292702485966319 - nodes in this community are weakly interconnected._
-- **Should `getTenantStorageKey` be split into smaller, more focused modules?**
-  _Cohesion score 0.0782472613458529 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.07142857142857142 - nodes in this community are weakly interconnected._

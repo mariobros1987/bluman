@@ -14,3 +14,6 @@ export * from './tenant';
 export * from './notifiche';
 export * from './report';
 export * from './timesheet';
+export * from './fornitori';
+export * from './liquidazioneIva';
+export * from './solleciti';

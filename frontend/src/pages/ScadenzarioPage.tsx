@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { fetchScadenzarioIncassiApi, registraIncassoApi, fetchClienti } from '../api/client';
 import { fmt } from '../utils';
+import { InviaSollecitoModal } from '../components/solleciti/InviaSollecitoModal';
 
 export function ScadenzarioPage() {
   const [scadenze, setScadenze] = useState<any[]>([]);
@@ -9,6 +10,9 @@ export function ScadenzarioPage() {
   const [filterStato, setFilterStato] = useState('tutte');
   const [selectedCliente, setSelectedCliente] = useState('tutti');
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Modal Sollecito
+  const [scadenzaDaSollecitare, setScadenzaDaSollecitare] = useState<any>(null);
 
   // Modal Registrazione Incasso
   const [selectedScadenza, setSelectedScadenza] = useState<any>(null);
@@ -213,24 +217,41 @@ export function ScadenzarioPage() {
                       </td>
                       <td style={{ padding: '14px 8px', textAlign: 'right' }}>
                         {!isIncassata && (
-                          <button
-                            onClick={() => {
-                              setSelectedScadenza(s);
-                              setImportoIncasso(((s.importoCentesimi || 0) / 100).toFixed(2));
-                            }}
-                            style={{
-                              padding: '6px 12px',
-                              borderRadius: 6,
-                              border: 'none',
-                              background: '#059669',
-                              color: 'white',
-                              fontWeight: 700,
-                              fontSize: 12,
-                              cursor: 'pointer',
-                            }}
-                          >
-                            📥 Registra Incasso
-                          </button>
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
+                            <button
+                              onClick={() => setScadenzaDaSollecitare(s)}
+                              style={{
+                                padding: '6px 10px',
+                                borderRadius: 6,
+                                border: '1px solid var(--border)',
+                                background: 'var(--card)',
+                                color: isScaduta ? '#f87171' : 'var(--text)',
+                                fontWeight: 600,
+                                fontSize: 12,
+                                cursor: 'pointer',
+                              }}
+                            >
+                              📩 Sollecita
+                            </button>
+                            <button
+                              onClick={() => {
+                                setSelectedScadenza(s);
+                                setImportoIncasso(((s.importoCentesimi || 0) / 100).toFixed(2));
+                              }}
+                              style={{
+                                padding: '6px 12px',
+                                borderRadius: 6,
+                                border: 'none',
+                                background: '#059669',
+                                color: 'white',
+                                fontWeight: 700,
+                                fontSize: 12,
+                                cursor: 'pointer',
+                              }}
+                            >
+                              📥 Registra Incasso
+                            </button>
+                          </div>
                         )}
                       </td>
                     </tr>
@@ -320,6 +341,18 @@ export function ScadenzarioPage() {
           </div>
         </div>
       )}
+      {/* MODAL SOLLECITO */}
+      <InviaSollecitoModal
+        isOpen={!!scadenzaDaSollecitare}
+        onClose={() => setScadenzaDaSollecitare(null)}
+        onSuccess={(msg) => {
+          alert(`✓ ${msg}`);
+          loadData();
+        }}
+        scadenzaId={scadenzaDaSollecitare?.id || null}
+        numeroFattura={scadenzaDaSollecitare?.fattura?.numero || 'Fattura'}
+        clienteNome={scadenzaDaSollecitare?.fattura?.cliente?.nome || scadenzaDaSollecitare?.fattura?.progetto?.cliente?.nome || 'Cliente'}
+      />
     </div>
   );
 }

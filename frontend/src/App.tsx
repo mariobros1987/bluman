@@ -13,6 +13,8 @@ import { CalendarPage } from './pages/CalendarPage';
 import { SuperAdminPage } from './pages/SuperAdminPage';
 import { AuditLogPage } from './pages/AuditLogPage';
 import { InvoicesPage } from './pages/InvoicesPage';
+import { FornitoriPage } from './pages/FornitoriPage';
+import { LiquidazioneIvaPage } from './pages/LiquidazioneIvaPage';
 import { PaymentsPage } from './pages/PaymentsPage';
 import { ScadenzarioPage } from './pages/ScadenzarioPage';
 import { PrimaNotaPage } from './pages/PrimaNotaPage';
@@ -151,6 +153,8 @@ function AppContent() {
           <Route path="/clients"       element={<ProtectedModule user={currentUser} moduleKey="clients" element={<ClientsPage />} />} />
           <Route path="/calendar"      element={<ProtectedModule user={currentUser} moduleKey="calendar" element={<CalendarPage />} />} />
           <Route path="/invoices"      element={<ProtectedModule user={currentUser} moduleKey="invoices" element={<InvoicesPage />} />} />
+          <Route path="/fornitori"     element={<ProtectedModule user={currentUser} moduleKey="invoices" element={<FornitoriPage />} />} />
+          <Route path="/liquidazione-iva" element={<ProtectedModule user={currentUser} moduleKey="invoices" element={<LiquidazioneIvaPage />} />} />
           <Route path="/scadenzario"   element={<ProtectedModule user={currentUser} moduleKey="scadenzario" element={<ScadenzarioPage />} />} />
           <Route path="/primanota"     element={<ProtectedModule user={currentUser} moduleKey="primanota" element={<PrimaNotaPage />} />} />
           <Route path="/banks"         element={<ProtectedModule user={currentUser} moduleKey="banks" element={<BanksPage />} />} />

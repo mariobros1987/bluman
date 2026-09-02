@@ -60,6 +60,9 @@ import { registraRotteCollegamentoDocumenti } from './routes/collegamentoDocumen
 // da routes/documenti.ts, che era oltre le 1000 righe) più lo stato di revisione,
 // l'archiviazione a database e l'adozione dei modelli di serie.
 import { registraRotteModelliDocumento } from './routes/modelliDocumento.js';
+import { registraRotteFornitori } from './routes/fornitori.js';
+import { registraRotteLiquidazioneIva } from './routes/liquidazioneIva.js';
+import { registraRotteSolleciti } from './routes/solleciti.js';
 // Rotte portale cliente (split dei monoliti): la registrazione avviene dentro
 // il wrapper register di buildServer, nello stesso punto di prima.
 import { registraRottePortale } from './routes/portale.js';
@@ -482,6 +485,9 @@ export function buildServer(app: AppPort): FastifyInstance {
   // esiti SDI, contratti ricorrenti, cron scadenze, SDI manuale) estratte in
   // src/routes/contabilita.ts: stessa registrazione, sempre dentro questo wrapper.
   await registraRotteContabilita(server, app);
+  await registraRotteFornitori(server);
+  await registraRotteLiquidazioneIva(server);
+  await registraRotteSolleciti(server);
 
   // ── INCASSI, SCADENZARIO & PRIMA NOTA (STYLE OPENSTAMANAGER) ──────
   // Rotte estratte in src/routes/contabilita.ts, registrata nella sezione contabilità.

@@ -10,6 +10,8 @@ const NAV = [
   { path: '/clients',    moduleKey: 'clients',     label: 'Clienti',                icon: '👥' },
   { path: '/calendar',   moduleKey: 'calendar',    label: 'Calendario',             icon: '📅' },
   { path: '/invoices',   moduleKey: 'invoices',    label: 'Fatture & SDI',          icon: '💶' },
+  { path: '/fornitori',  moduleKey: 'invoices',    label: 'Fornitori & Acquisti',   icon: '🏢' },
+  { path: '/liquidazione-iva', moduleKey: 'invoices', label: 'Liquidazione IVA',   icon: '📑' },
   { path: '/scadenzario',moduleKey: 'scadenzario', label: 'Scadenzario Incassi',    icon: '📅' },
   { path: '/primanota',  moduleKey: 'primanota',   label: 'Registro Prima Nota',    icon: '💰' },
   { path: '/banks',      moduleKey: 'banks',       label: 'Banche & Conti',         icon: '🏦' },
