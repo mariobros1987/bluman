@@ -273,6 +273,11 @@ export function buildServer(app: AppPort): FastifyInstance {
     return reply.code(500).send({ errore: err instanceof Error ? err.message : 'Errore interno' });
   });
 
+  server.setNotFoundHandler((req, reply) => {
+    console.warn(`[404 NOT FOUND] ${req.method} ${req.url} (ip: ${req.ip}, auth: ${Boolean(req.headers.authorization)})`);
+    return reply.code(404).send({ errore: `Percorso non trovato: ${req.method} ${req.url}` });
+  });
+
   // §23 — la protezione brute-force sugli endpoint che verificano credenziali è
   // demandata a @fastify/rate-limit (config per-route: 5 richieste/min per IP,
   // registrata sopra insieme al limite globale). Un solo meccanismo, header
