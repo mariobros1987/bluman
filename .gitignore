@@ -1,0 +1,45 @@
+# Environment & Secrets (NON PUSHARE MAI SU GITHUB)
+.env
+.env.local
+.env.*.local
+secrets/
+.secrets/
+*.secret.*
+# Password del ruolo applicativo generata da 20260819_rls_effettiva.sql
+.bluman_app_pw.tmp
+*.pw.tmp
+
+# Node
+node_modules/
+frontend/node_modules/
+dist/
+frontend/dist/
+build/
+uploads/
+*.zip
+
+# Documenti generati (fatture, lettere, guide): non vanno versionati (§3.6)
+*.pdf
+
+# TypeScript
+*.tsbuildinfo
+
+# Supabase local
+supabase/.temp/
+supabase/functions/.deploy/
+
+# OS
+.DS_Store
+
+.vercel
+openstamanager_source/
+openstamanager-reference/
+scratch/
+*.log
+
+# Configurazione locale dell'assistente CLI
+.claude/
+
+# Python Virtual Env
+.venv/
+__pycache__/
