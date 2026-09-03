@@ -29,8 +29,20 @@ export function etichettaLivelloFirma(livello: 'ses' | 'fea' | 'feq'): string {
 
 /** La fascia in testa al foglio: logo (o nome) a sinistra, recapiti dello studio a destra. */
 export function intestazioneStudioHtml(dati: DatiIntestazioneStudio): string {
+  // Un `logoUrl` che non carica non deve svuotare la fascia: ad agosto 2026 il tenant di
+  // produzione si è ritrovato un logo con un URL che non ha mai potuto funzionare
+  // (scritto dalla suite di test girata senza isolamento) e ogni documento ha perso il
+  // marchio, perché questo ramo disegnava un `<img>` vuoto senza via d'uscita. Se il logo
+  // non arriva, si torna a `/logo.png`, l'asset reale di frontend/public — e il ripiego
+  // vale per tutti e quattro i contesti §39 (canvas dell'editor, PDF, .doc, documento
+  // salvato) perché l'onerror inline scatta ovunque il browser parsi questo HTML, compresi
+  // i fogli off-screen che pdfA4 appende a document.body per misurare e impaginare.
+  // `this.onerror=null` viene PRIMA del cambio di src: se anche /logo.png mancasse, il
+  // gestore scatta una volta sola invece di loopare. Nel .doc l'attributo arriva tal
+  // quale ma è inerte — Word non esegue script — e l'immagine rotta mostra l'alt
+  // «Logo studio» esattamente come faceva prima.
   const marchio = dati.logo
-    ? `<img src="${dati.logo}" alt="Logo studio" style="max-height: 45px; max-width: 180px; object-fit: contain;" />`
+    ? `<img src="${dati.logo}" alt="Logo studio" onerror="this.onerror=null; this.src='/logo.png';" style="max-height: 45px; max-width: 180px; object-fit: contain;" />`
     : `<div style="font-size: 16px; font-weight: 800; color: #1e1b4b;">🏛 ${(dati.ragioneSociale || 'STUDIO PROFESSIONALE').toUpperCase()}</div>`;
 
   const righe = [
