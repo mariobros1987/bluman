@@ -483,26 +483,60 @@ describe('server — /tenant/info persistenza logo e impostazioni studio', () =>
     const getRes = await server.inject({ method: 'GET', url: '/tenant/info' });
     expect(getRes.statusCode).toBe(200);
 
-    // 2. PATCH aggiornamento logo e sedi
+    // 2. PATCH aggiornamento logo e sedi. `/logo.png` è il valore del seed: un percorso
+    // relativo, indipendente dall'ambiente, che `rifirmaUrlUpload` lascia invariato.
     const patchRes = await server.inject({
       method: 'PATCH',
       url: '/tenant/info',
       payload: {
         ragioneSociale: 'Bluecode Advisory Malta Ltd',
-        logoUrl: 'https://supabase.co/storage/v1/object/public/logos/studio-logo.png',
+        logoUrl: '/logo.png',
         sedeLegale: 'Level 4, Valuation Centre, Sliema, Malta',
         waPhoneId: '102938475610293',
       },
     });
     expect(patchRes.statusCode).toBe(200);
     expect(patchRes.json().ragioneSociale).toBe('Bluecode Advisory Malta Ltd');
-    expect(patchRes.json().logoUrl).toBe('https://supabase.co/storage/v1/object/public/logos/studio-logo.png');
+    expect(patchRes.json().logoUrl).toBe('/logo.png');
 
     // 3. Verifica persistenza con nuova GET
     const getFinal = await server.inject({ method: 'GET', url: '/tenant/info' });
     expect(getFinal.statusCode).toBe(200);
-    expect(getFinal.json().logoUrl).toBe('https://supabase.co/storage/v1/object/public/logos/studio-logo.png');
+    expect(getFinal.json().logoUrl).toBe('/logo.png');
     expect(getFinal.json().waPhoneId).toBe('102938475610293');
+  });
+
+  it('respinge un logoUrl https che non punta allo storage del project', async () => {
+    // È l'URL esatto con cui questo stesso test, girato senza isolamento fra il 15 e il
+    // 19 agosto 2026, ha sovrascritto il logo del tenant di produzione: l'host
+    // `supabase.co` senza il sottodominio del project non risponde a niente, e da quel
+    // giorno la fascia dell'intestazione restava vuota. Il PATCH ora lo respinge con
+    // 400 prima di toccare il database.
+    const { server } = nuovoServer();
+    const patchRes = await server.inject({
+      method: 'PATCH',
+      url: '/tenant/info',
+      payload: { logoUrl: 'https://supabase.co/storage/v1/object/public/logos/studio-logo.png' },
+    });
+    expect(patchRes.statusCode).toBe(400);
+    expect(patchRes.json().errore).toContain('logoUrl non valido');
+  });
+
+  it('respinge un logoUrl con metacaratteri HTML, anche se il percorso è relativo', async () => {
+    // Il logo finisce non escapato in `<img src="${dati.logo}">` in intestazioneStudio.ts:
+    // una virgoletta chiude l'attributo e inietta HTML nella fascia di ogni documento
+    // (canvas, PDF, .doc, documento salvato) — raggiungibile da qualunque utente del
+    // tenant via PATCH. Nessun valore legittimo contiene virgolette, angolari o spazi
+    // — base64 dei data: URL, safeFilename dei percorsi /uploads/, URL https — quindi
+    // il PATCH respinge la stringa grezza prima ancora di considerarne la forma.
+    const { server } = nuovoServer();
+    const patchRes = await server.inject({
+      method: 'PATCH',
+      url: '/tenant/info',
+      payload: { logoUrl: '/logo.png" onerror="alert(1)' },
+    });
+    expect(patchRes.statusCode).toBe(400);
+    expect(patchRes.json().errore).toContain('logoUrl non valido');
   });
 });
 
