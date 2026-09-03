@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: bluman
+      POSTGRES_PASSWORD: bluman_dev_password
+      POSTGRES_DB: bluman
+    ports:
+      - "5432:5432"
+    volumes:
+      - bluman_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bluman"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  bluman_pgdata:

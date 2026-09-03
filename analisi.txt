@@ -1,0 +1,1049 @@
+================================================================================
+⚠️ DOCUMENTO STORICO — aggiornato alle fasi iniziali del progetto (agosto 2026).
+Non è più il piano operativo corrente: i task elencati qui sotto (Fase 0, Fase 1,
+Fase 2) sono stati completati o assorbiti dall'evoluzione dell'app.
+Il piano corrente sta in ISTRUZIONI_PER_IA.md (sezione «DA DOVE RIPARTIRE») e in
+PIANO_DI_MIGLIORAMENTO.md. NON aggiungere task nuovi in questo file.
+================================================================================
+
+ 0.4 │ Attivare RLS su          │ Migration SQL manuale                 │ psql -c "SELECT * FROM pg_policies WHERE          │   
+  │     │ PostgreSQL               │                                       │ tablename='cliente';" → policy attiva             │   
+  ├─────┼──────────────────────────┼───────────────────────────────────────┼───────────────────────────────────────────────────┤   
+  │ 0.5 │ Rate limiting auth       │ src/server.ts /auth/*                 │ 5 req/min su /login, /magic-link                  │   
+  │     │ endpoints                │                                       │                                                   │   
+  ├─────┼──────────────────────────┼───────────────────────────────────────┼───────────────────────────────────────────────────┤   
+  │ 0.6 │ Audit: rimuovere         │ grep -r "password|secret|token" src/  │ Nessun leak in log                                │   
+  │     │ console.log sensibili    │ --include="*.ts"                      │                                                   │   
+  └─────┴──────────────────────────┴───────────────────────────────────────┴───────────────────────────────────────────────────┘   
+
+  ▎ ⚠️ Non procedere alla Fase 1 finché0.1-0.4 non sono FATTI e VERIFICATI.
+
+  ---
+
+  🟠 FASE 1: INTEGRAZIONE STATE ENGINE (Giorni 4-8)
+
+  ┌─────┬────────────────────────────────┬──────────────────────────────────────┬──────────────────────────────────────────────┐   
+  │  #  │              Task              │                 File                 │                   Verifica                   │   
+  ├─────┼────────────────────────────────┼──────────────────────────────────────┼──────────────────────────────────────────────┤   
+  │ 1.1 │ Esportare funzioni calcolo da  │ src/domain/stateEngine.ts            │ export { calcolaPercentualeProgetto,         │   
+  │     │ stateEngine                    │                                      │ calcolaStatoModulo, valutaSegnaleRischio }   │   
+  ├─────┼────────────────────────────────┼──────────────────────────────────────┼──────────────────────────────────────────────┤   
+  │ 1.2 │ Creare service calcolo lato    │ src/services/calcoloService.ts       │ Wrapper che chiama stateEngine + persiste    │   
+  │     │ backend                        │                                      │ stati su DB                                  │   
+  ├─────┼────────────────────────────────┼──────────────────────────────────────┼──────────────────────────────────────────────┤   
+  │ 1.3 │ Endpoint                       │ src/server.ts                        │ POST ricalcola tutto il progetto, ritorna    │   
+  │     │ /projects/:id/recalculate      │                                      │ stato aggiornato                             │   
+  ├─────┼────────────────────────────────┼──────────────────────────────────────┼──────────────────────────────────────────────┤   
+  │ 1.4 │ Dashboard usa calcolo reale    │ frontend/src/pages/Dashboard.tsx     │ pct viene da calcolaPercentualeProgetto(),   │   
+  │     │                                │                                      │ non hardcoded 45%                            │   
+  ├─────┼────────────────────────────────┼──────────────────────────────────────┼──────────────────────────────────────────────┤   
+  │ 1.5 │ Stato moduli calcolato da      │ frontend/src/pages/ProjectDetail.tsx │ stato deriva da                              │   
+  │     │ microvoci                      │                                      │ calcolaStatoModulo(microvoci)                │   
+  ├─────┼────────────────────────────────┼──────────────────────────────────────┼──────────────────────────────────────────────┤   
+  │ 1.6 │ Alert ritardi basati su        │ Dashboard.tsx + calcoloService       │ valutaSegnaleRischio() → alert banner        │   
+  │     │ segnaleRischio                 │                                      │ accurati                                     │   
+  ├─────┼────────────────────────────────┼──────────────────────────────────────┼──────────────────────────────────────────────┤   
+  │ 1.7 │ Test unitari stateEngine       │ src/domain/stateEngine.test.ts       │ npm test → 100% coverage funzioni pure       │   
+  └─────┴────────────────────────────────┴──────────────────────────────────────┴──────────────────────────────────────────────┘   
+
+  ---
+
+  🟠 FASE 2: UI CORE — TRACKING ORE (Giorni 9-14)
+
+  ┌─────┬─────────────────────────────────┬──────────────────────────────────────────┬─────────────────────────────────────────┐   
+  │  #  │              Task               │                   File                   │                Verifica                 │   
+  ├─────┼─────────────────────────────────┼──────────────────────────────────────────┼─────────────────────────────────────────┤   
+  │ 2.1 │ Componente MicrovoceRow con     │ frontend/src/components/MicrovoceRow.tsx │ Click → modal/input → PATCH             │   
+  │     │ input ore                       │                                          │ /microvoci/:id/consuntivazione          │   
+  ├─────┼─────────────────────────────────┼──────────────────────────────────────────┼─────────────────────────────────────────┤   
+  │     │ API POST                        │                                          │ Chiama registraConsuntivazione(),       │   
+  │ 2.2 │ /microvoci/:id/consuntivazione  │ src/server.ts                            │ aggiorna oreConsuntivate, stato,        │   
+  │     │                                 │                                          │ segnaleRischio                          │   
+  ├─────┼─────────────────────────────────┼──────────────────────────────────────────┼─────────────────────────────────────────┤   
+  │ 2.3 │ Timer start/stop opzionale      │ MicrovoceRow.tsx                         │ LocalStorage timer per utente, sync su  │   
+  │     │                                 │                                          │ stop                                    │   
+  ├─────┼─────────────────────────────────┼──────────────────────────────────────────┼─────────────────────────────────────────┤   
+  │ 2.4 │ Vista settimanale ore per team  │ frontend/src/pages/TeamHours.tsx         │ Tabella: membro × giorno → ore, totale  │   
+  │     │ member                          │                                          │ settimanale                             │   
+  ├─────┼─────────────────────────────────┼──────────────────────────────────────────┼─────────────────────────────────────────┤   
+  │ 2.5 │ Aggiornamento stato progetto    │ ProjectDetail.tsx + SSE                  │ Cambio ore → stato modulo/progetto      │   
+  │     │ real-time                       │                                          │ aggiornato senza refresh                │   
+  └─────┴─────────────────────────────────┴──────────────────────────────────────────┴─────────────────────────────────────────┘   
+
+  ---
+
+  🟠 FASE 3: PORTAL CLIENTE MVP (Giorni 15-22)
+
+  ┌─────┬───────────────────────────────────┬────────────────────────────────────────┬─────────────────────────────────────────┐   
+  │  #  │               Task                │                  File                  │                Verifica                 │   
+  ├─────┼───────────────────────────────────┼────────────────────────────────────────┼─────────────────────────────────────────┤   
+  │ 3.1 │ Route /client-portal/:token       │ frontend/src/pages/ClientPortal.tsx    │ Accesso via magic link (già in backend) │   
+  ├─────┼───────────────────────────────────┼────────────────────────────────────────┼─────────────────────────────────────────┤   
+  │ 3.2 │ Vista progresso progetti cliente  │ ClientPortal.tsx                       │ Lista progetti → % completamento,       │   
+  │     │                                   │                                        │ prossimi step                           │   
+  ├─────┼───────────────────────────────────┼────────────────────────────────────────┼─────────────────────────────────────────┤   
+  │ 3.3 │ Upload documenti richiesti        │ ClientPortal.tsx + POST                │ Drag&drop, validazione tipo, scan       │   
+  │     │                                   │ /documents/upload                      │ antivirus (statoScansione)              │   
+  ├─────┼───────────────────────────────────┼────────────────────────────────────────┼─────────────────────────────────────────┤   
+  │ 3.4 │ Firma engagement letter OTP       │ ClientPortal.tsx + POST /otp/verify    │ Flusso: email OTP → inserimento codice  │   
+  │     │                                   │                                        │ → firma digitale                        │   
+  ├─────┼───────────────────────────────────┼────────────────────────────────────────┼─────────────────────────────────────────┤   
+  │ 3.5 │ Comunicazioni cliente ↔ team      │ ClientPortal.tsx + GET/POST            │ Thread per progetto, notifiche email    │   
+  │     │                                   │ /comunicazioni                         │ automatiche                             │   
+  ├─────┼───────────────────────────────────┼────────────────────────────────────────┼─────────────────────────────────────────┤   
+  │ 3.6 │ Notifica email automatica su      │ src/services/emailService.ts           │ Template "Nuovo documento caricato da   │   
+  │     │ nuovi documenti                   │                                        │ [cliente]"                              │   
+  └─────┴───────────────────────────────────┴────────────────────────────────────────┴─────────────────────────────────────────┘   
+
+  ---
+
+  🟠 FASE 4: FATTURAZIONE UI (Giorni 23-30)
+
+  ┌─────┬─────────────────────────────┬──────────────────────────────────────────┬─────────────────────────────────────────────┐   
+  │  #  │            Task             │                   File                   │                  Verifica                   │   
+  ├─────┼─────────────────────────────┼──────────────────────────────────────────┼─────────────────────────────────────────────┤   
+  │ 4.1 │ Lista fatture per progetto  │ frontend/src/pages/InvoicesPage.tsx      │ Tabella: numero, data, stato, importo,      │   
+  │     │                             │                                          │ canale SDI                                  │   
+  ├─────┼─────────────────────────────┼──────────────────────────────────────────┼─────────────────────────────────────────────┤   
+  │ 4.2 │ Creazione fattura da modulo │ InvoicesPage.tsx + POST /invoices        │ Seleziona modulo done → genera bozza        │   
+  │     │  completato                 │                                          │ fattura                                     │   
+  ├─────┼─────────────────────────────┼──────────────────────────────────────────┼─────────────────────────────────────────────┤   
+  │ 4.3 │ Emissione fattura + SDI     │ InvoicesPage.tsx + POST                  │ Genera XML → invia SDI → aggiorna statoSdi  │   
+  │     │                             │ /invoices/:id/emit                       │                                             │   
+  ├─────┼─────────────────────────────┼──────────────────────────────────────────┼─────────────────────────────────────────────┤   
+  │ 4.4 │ Visualizzazione stato SDI   │ InvoicesPage.tsx                         │ Badge: inviata/consegnata/scartata con      │   
+  │     │                             │                                          │ dettagli errore                             │   
+  ├─────┼─────────────────────────────┼──────────────────────────────────────────┼─────────────────────────────────────────────┤   
+  │ 4.5 │ Scadenzario incassi UI      │ frontend/src/pages/ScadenzarioPage.tsx   │ Lista rate, filtro stato, registrazione     │   
+  │     │                             │                                          │ incasso rapida                              │   
+  ├─────┼─────────────────────────────┼──────────────────────────────────────────┼─────────────────────────────────────────────┤   
+  │ 4.6 │ Registrazione incasso       │ ScadenzarioPage.tsx + POST /incassi      │ Importo, data, metodo, riferimento →        │   
+  │     │                             │                                          │ aggiorna saldo conto                        │   
+  └─────┴─────────────────────────────┴──────────────────────────────────────────┴─────────────────────────────────────────────┘   
+
+  ---
+
+  🟠 FASE 5: NOTIFICHE & ACTIVITY FEED (Giorni 31-38)
+
+  ┌─────┬──────────────────────┬─────────────────────────────────────────────┬─────────────────────────────────────────────────┐   
+  │  #  │         Task         │                    File                     │                    Verifica                     │   
+  ├─────┼──────────────────────┼─────────────────────────────────────────────┼─────────────────────────────────────────────────┤   
+  │ 5.1 │ SSE connection per   │ frontend/src/hooks/useNotifications.ts      │ EventSource su /api/notifications/stream        │   
+  │     │ notifiche            │                                             │                                                 │   
+  ├─────┼──────────────────────┼─────────────────────────────────────────────┼─────────────────────────────────────────────────┤   
+  │ 5.2 │ Backend SSE endpoint │ src/server.ts                               │ GET /notifications/stream → push su nuovi       │   
+  │     │                      │                                             │ eventi                                          │   
+  ├─────┼──────────────────────┼─────────────────────────────────────────────┼─────────────────────────────────────────────────┤   
+  │ 5.3 │ Badge counter        │ frontend/src/components/layout/Sidebar.tsx  │ Contatore non lette, click → dropdown notifiche │   
+  │     │ sidebar              │                                             │                                                 │   
+  ├─────┼──────────────────────┼─────────────────────────────────────────────┼─────────────────────────────────────────────────┤   
+  │ 5.4 │ Activity feed per    │ frontend/src/components/ProjectTimeline.tsx │ Timeline: azioni, documenti, stati,             │   
+  │     │ progetto             │                                             │ comunicazioni                                   │   
+  ├─────┼──────────────────────┼─────────────────────────────────────────────┼─────────────────────────────────────────────────┤   
+  │ 5.5 │ Trigger notifiche    │ src/services/notificationService.ts         │ Su: assegnazione, ritardo, scadenza, nuovo      │   
+  │     │ automatiche          │                                             │ documento, firma completata                     │   
+  └─────┴──────────────────────┴─────────────────────────────────────────────┴─────────────────────────────────────────────────┘   
+
+  ---
+
+  🟢 FASE 6: RICERCA & EXPORT (Giorni 39-45)
+
+  ┌─────┬───────────────────────┬──────────────────────────────────────────┬───────────────────────────────────────────────────┐   
+  │  #  │         Task          │                   File                   │                     Verifica                      │   
+  ├─────┼───────────────────────┼──────────────────────────────────────────┼───────────────────────────────────────────────────┤   
+  │ 6.1 │ Ricerca globale       │ frontend/src/components/GlobalSearch.tsx │ Cmd+K → cerca clienti, progetti, documenti,       │   
+  │     │ header                │                                          │ fatture                                           │   
+  ├─────┼───────────────────────┼──────────────────────────────────────────┼───────────────────────────────────────────────────┤   
+  │ 6.2 │ Backend search        │ src/server.ts                            │ GET /search?q= → ritorna risultati tipizzati per  │   
+  │     │ endpoint              │                                          │ entità                                            │   
+  ├─────┼───────────────────────┼──────────────────────────────────────────┼───────────────────────────────────────────────────┤   
+  │ 6.3 │ Export CSV fatture    │ InvoicesPage.tsx + GET /invoices/export  │ CSV con: numero, data, cliente, importo, stato,   │   
+  │     │                       │                                          │ SDI                                               │   
+  ├─────┼───────────────────────┼──────────────────────────────────────────┼───────────────────────────────────────────────────┤   
+  │ 6.4 │ Export CSV            │ ScadenzarioPage.tsx                      │ CSV: rata, cliente, importo, scadenza, stato,     │   
+  │     │ scadenzario           │                                          │ incassato                                         │   
+  ├─────┼───────────────────────┼──────────────────────────────────────────┼───────────────────────────────────────────────────┤   
+  │ 6.5 │ Export ore team       │ TeamHours.tsx                            │ CSV: membro, progetto, modulo, microvoce, data,   │   
+  │     │                       │                                          │ ore                                               │   
+  └─────┴───────────────────────┴──────────────────────────────────────────┴───────────────────────────────────────────────────┘   
+
+  ---
+
+  🟢 FASE 7: CALENDARIO & REPORT (Giorni 46-60)
+
+  ┌─────┬────────────────────────────┬─────────────────────────────────────┬───────────────────────────────────────────────────┐   
+  │  #  │            Task            │                File                 │                     Verifica                      │   
+  ├─────┼────────────────────────────┼─────────────────────────────────────┼───────────────────────────────────────────────────┤   
+  │ 7.1 │ Calendario vista           │ frontend/src/pages/CalendarPage.tsx │ FullCalendar.js o componente custom               │   
+  │     │ mese/settimana             │                                     │                                                   │   
+  ├─────┼────────────────────────────┼─────────────────────────────────────┼───────────────────────────────────────────────────┤   
+  │ 7.2 │ Eventi da DB + scadenze    │ CalendarPage.tsx                    │ Merge EventoCalendario + dataScadenza             │   
+  │     │ progetti                   │                                     │ moduli/fatture                                    │   
+  ├─────┼────────────────────────────┼─────────────────────────────────────┼───────────────────────────────────────────────────┤   
+  │ 7.3 │ Sync Google Calendar       │ src/services/googleCalendar.ts      │ OAuth → push/pull eventi                          │   
+  │     │ (opzionale)                │                                     │                                                   │   
+  ├─────┼────────────────────────────┼─────────────────────────────────────┼───────────────────────────────────────────────────┤   
+  │ 7.4 │ Report ore per team member │ frontend/src/pages/ReportsPage.tsx  │ Tabella: membro, ore previste/consuntivate,       │   
+  │     │                            │                                     │ delta, % utilizzo                                 │   
+  ├─────┼────────────────────────────┼─────────────────────────────────────┼───────────────────────────────────────────────────┤   
+  │ 7.5 │ Report profitto per        │ ReportsPage.tsx                     │ Ricavo - (ore × costo orario) = margine netto     │   
+  │     │ progetto                   │                                     │                                                   │   
+  ├─────┼────────────────────────────┼─────────────────────────────────────┼───────────────────────────────────────────────────┤   
+  │ 7.6 │ Trend fatturato mensile    │ ReportsPage.tsx                     │ Grafico: fatturato, incassato, da incassare per   │   
+  │     │                            │                                     │ mese                                              │   
+  └─────┴────────────────────────────┴─────────────────────────────────────┴───────────────────────────────────────────────────┘   
+
+  ---
+
+  🟢 FASE 8: AUTOMATION & POLISH (Giorni 61-90)
+
+  ┌─────┬───────────────────────────────┬───────────────────────────────────────┬──────────────────────────────────────────────┐   
+  │  #  │             Task              │                 File                  │                   Verifica                   │   
+  ├─────┼───────────────────────────────┼───────────────────────────────────────┼──────────────────────────────────────────────┤   
+  │ 8.1 │ Cron fatturazione contratti   │ src/services/cronService.ts           │ Giornaliero: verifica prossimaFatturazione → │   
+  │     │ ricorrenti                    │                                       │  crea fattura                                │   
+  ├─────┼───────────────────────────────┼───────────────────────────────────────┼──────────────────────────────────────────────┤   
+  │ 8.2 │ Cron notifiche scadenze       │ cronService.ts                        │ Giornaliero: scadenze a 7/3/1 giorni → email │   
+  │     │                               │                                       │  + notifica                                  │   
+  ├─────┼───────────────────────────────┼───────────────────────────────────────┼──────────────────────────────────────────────┤   
+  │ 8.3 │ Auto-assegnazione task per    │ src/services/assignmentService.ts     │ Regole: "se modulo X done → assegna M05 a    │   
+  │     │ regole                        │                                       │ banking team"                                │   
+  ├─────┼───────────────────────────────┼───────────────────────────────────────┼──────────────────────────────────────────────┤   
+  │ 8.4 │ PWA / Mobile responsive       │ vite.config.ts + CSS                  │ npm run build → installabile,                │   
+  │     │                               │                                       │ offline-capable                              │   
+  ├─────┼───────────────────────────────┼───────────────────────────────────────┼──────────────────────────────────────────────┤   
+  │ 8.5 │ Tema personalizzabile per     │ frontend/src/styles/theme.css +       │ Colori, logo, footer per tenant              │   
+  │     │ tenant                        │ Settings                              │                                              │   
+  ├─────┼───────────────────────────────┼───────────────────────────────────────┼──────────────────────────────────────────────┤   
+  │ 8.6 │ E2E tests critici             │ cypress/e2e/*.cy.ts                   │ Login → crea progetto → registra ore →       │   
+  │     │                               │                                       │ emetti fattura → incassa                     │   
+  └─────┴───────────────────────────────┴───────────────────────────────────────┴──────────────────────────────────────────────┘   
+
+  ---
+
+  📅 Riepilogo Temporale
+
+  Giorni 1-3   ████████████ FASE 0: Sicurezza (BLOCCANTE)
+  Giorni 4-8   ████████      FASE 1: State Engine Integration
+  Giorni 9-14  ████████      FASE 2: Tracking Ore
+  Giorni 15-22 ████████████  FASE 3: Portal Cliente
+  Giorni 23-30 ████████      FASE 4: Fatturazione UI
+  Giorni 31-38 ████████      FASE 5: Notifiche & Activity Feed
+  Giorni 39-45 ████████      FASE 6: Ricerca & Export
+  Giorni 46-60 ████████████  FASE 7: Calendario & Report
+  Giorni 61-90 ████████████  FASE 8: Automation & Polish
+
+  ---
+
+  🎯 Regole di Esecuzione
+
+  1. Una fase alla volta — Non iniziare Fase N+1 se Fase N ha task "In Progress"
+  2. Definition of Done per task:
+     - Codice scritto + test passa (unit/integration)
+     - Funziona in locale (npm run dev)
+     - Nessun regressione su funzioni esistenti
+  3. Commit atomici — Un commit per task, messaggio: fix: [FASE.N] descrizione
+  4. Daily standup mentale — Ogni mattina: "Cosa ho chiuso ieri? Cosa chiudo oggi? Bloccanti?"
+  5. Demo settimanale — Venerdì: gira l'app, verifica flusso utente completo
+
+  ---
+
+  🛠️ Setup Iniziale (Oggi, prima di Fase 0)
+
+  # 1. Variabili ambiente
+  cp .env.example .env
+  # Modifica: DATABASE_URL, JWT_SECRET (openssl rand -base64 32), SMTP_*, WA_*, TG_*
+
+  # 2. Dipendenze sicurezza
+  npm i bcrypt @types/bcrypt jsonwebtoken @types/jsonwebtoken
+
+  # 3. Test runner
+  npm i -D vitest @vitest/ui
+
+  # 4. Database migration + RLS
+  npx prisma migrate dev --name init_rls
+  # Poi esegui SQL RLS manuale (vedi schema.prisma fondo file)
+
+  # 5. Seed utenti reali (no hardcoded)
+  npx prisma db seed
+
+  ---
+
+  📌 Prossimo Step Immediato
+
+  Inizia da Task 0.1 — Apri src/server.ts, individua l'oggetto USERS e la costante JWT_SECRET, rimuovili completamente. Sostituisci
+  con lookup su DB + bcrypt. Questo sblocca tutto il resto.
+
+  Vuoi che inizi io con la Task 0.1 (rimozione credenziali hardcoded) mostrando il diff esatto?
+
+✻ Cogitated for 1m 57s
+
+❯ ok fase 0 pero leggi prima le regole del progetto, non duplicare codice vedi se è proprio necessarrio, controlla se è stato gia  
+  fatto aggiorna il grafo, vedi i test che sono all'interno del progetto nel caso creane altri, alla fine aggiorna git hub vercel  
+  railway supabase se hai bisogno aggiorna e leggi i file md e fammi delle domande per procedere
+
+  Thought for 3m 5s, searched for 9 patterns, read 13 files (ctrl+o to expand)
+
+● Bash(npx prisma migrate status 2>&1)
+  ⎿  Error: Exit code 1
+     Environment variables loaded from .env
+     Prisma schema loaded from prisma\schema.prisma
+     Datasource "db": PostgreSQL database "postgres", schema "public" at "aws-1-eu-west-1.pooler.supabase.com:5432"
+
+     No migration found in prisma/migrations
+     The current database is not managed by Prisma Migrate.
+
+     Read more about how to baseline an existing production database:
+     https://pris.ly/d/migrate-baseline
+
+● I have everything I need to start Phase 0. No more questions needed to get started on the first step.
+
+  The environment variables are already set up in .env with a real Supabase database connection and a temporary JWT_SECRET. The    
+  hardcoded credentials are right there in src/server.ts.
+
+  I will now fix the critical security issue (Task 0.1, 0.2, 0.3) by removing the hardcoded credentials in src/server.ts, moving to
+  bcrypt, and reading the JWT_SECRET strictly from the environment.
+
+  🔴 Fix Task 0.1 & 0.2 & 0.3 (Sicurezza)
+  ⎿  Error: No such tool available: bash
+  };
+  const JWT_SECRET = 'bluman-secret-key-change-in-production-2026';
+  Impatto: Chiunque abbia accesso al repo vede le password di tutti gli utenti e il JWT secret. In produzione è una vulnerabilità
+  critica.
+  Fix: Rimuovere completamente, usare solo DB + bcrypt, generare JWT_SECRET da env vars random.
+
+  2. RLS Non Attivato 🔴🔴🔴
+
+  Lo schema Prisma dice chiaramente:
+  
+  ▎ "Row-Level Security su tenant_id: da attivare via migrazione SQL manuale dopo il primo prisma migrate dev"
+  ▎ Impatto: Senza RLS, una query malevola o un bug nel middleware può accedere ai dati di altri tenant. Il tenant isolation è solo
+  ▎ applicativo, non a livello DB.
+  ▎ Fix: Creare migration SQL con RLS policies per ogni tabella.
+  
+  3. Dashboard Non Usa lo State Engine 🔴🔴
+  
+  // Dashboard.tsx — Calcolo percentuale HARDCODED
+  pct: rp.stato === 'completed' ? 100 : rp.stato === 'in_progress' ? 45 : 10,
+  Impatto: Il45% è inventato. Il保的真实 progresso dei progetti non è mai calcolato dalle microvoci reali. L'utente consulente vede
+  dati falsi.
+  Fix: Integrare calcolaPercentualeProgetto() dallo stateEngine.
+
+  4. Client API: Sistema di Fallback Triplice 🔴🔴
+  
+  // client.ts — 3 livelli di fallback
+  try { /* Backend API */ }
+  catch { try { /* localStorage */ }
+  catch { /* mock/seed data */ } }
+  Impatto: Quando il backend è down, l'utente vede dati stale o mock senza saperlo. Non c'è indicatore chiaro di "stai guardando
+  dati offline". I dati possono divergere tra fonti.
+  Fix: Un solo source of truth (backend), con indicatori chiari di stato offline.
+  
+  5. Graphify HTML Completamente Scollegato dalla React App 🔴🔴
+
+  Il prototipo HTML (870+ righe) e la React app non condividono:
+  - Nessuna logica di business
+  - Nessun componente riutilizzabile
+  - Nessun dato in comune
+    Impatto: Il prototipo dimostra funzionalità (grafo moduli, vista procedura, wizard) che non esistono nella React app.
+    Fix: Migrare le features chiave del prototipo nella React app.
+
+  6. Nessun Test 🔴
+
+  Zero file di test trovati nel progetto. Il stateEngine è puro e testabile, ma non è testato.
+  Impatto: Qualsiasi refactor può rompere silenziosamente la logica di calcolo dello stato.
+  Fix: Almeno test unitari per stateEngine.ts + test integrazione per le API principali.
+
+  ---
+
+  🟠 P1: Funzioni che Aumentano il Valore (per un Utente Quotidiano)
+
+  1. Tracking Ore Rapido ⏱️
+
+  Il consulente deve poter registrare ore su una micro-voce in 2 click. Attualmente non c'è UI per aggiornare oreConsuntivate.     
+  Serve:
+  - Pulsante "Registra ore" su ogni micro-voce
+  - Timer stop/start opzionale
+  - Input ore con conferma rapida
+  - Aggiornamento automatico stato modulo (da active → done se ore >= previste)
+
+  2. Portal Cliente 🧑‍💼
+
+  Il cliente deve poter:
+  - Vedere il progresso dei propri progetti
+  - Caricare documenti richiesti (dal wizard procedura)
+  - Firmare engagement letter (OTP/eIDAS già implementato nel backend)
+  - Comunicare con il team (WhatsApp/Email già collegati)
+  - Attualmente: solo placeholder "Il cliente vede solo i passaggi che richiedono la sua azione"
+
+  3. Notifiche Real-Time 🔔
+
+  Il sistema Notifica esiste nel DB ma non c'è:
+  - WebSocket/SSE per notifiche push nel browser
+  - Notifiche per assegnazioni, ritardi, scadenze
+  - Notifiche email automatiche per eventi critici
+  - Badge counter sulla sidebar
+
+  4. Ricerca Globale 🔍
+
+  Il consulente deve poter cercare:
+  - Per nome cliente across tutti i progetti
+  - Per nome articolo/modulo
+  - Per documento caricato
+  - Per data scadenza
+  - Attualmente: solo ricerca progetti nella Dashboard
+
+  5. Anteprima Documenti 📄
+
+  Il consulente deve poter vedere i documenti caricati senza scaricarli. Serve:
+  - Viewer PDF inline
+  - Preview immagini
+  - Lista documenti per micro-voce con download singolo
+  - Attualmente: solo conteggio "📎 N file"
+
+  6. Calendario Reale 📅
+
+  Il componente Calendar esiste come route ma non è implementato. Serve:
+  - Vista mese/settimana/giorno
+  - Eventi da EventoCalendario (DB) e da progetti
+  - Drag & drop per riordinare
+  - Sync con Google Calendar / Outlook (API già pronte nel backend)
+
+  7. Report e Analytics 📊
+
+  Il consulente deve poter vedere:
+  - Ore consuntivate per team member
+  - Profitto per progetto (ore × costo orario)
+  - Utilizzo team (quanto è carico ogni membro)
+  - Trend fatturato mensile/trimenstrale
+  - Attualmente: solo KPI base nella Dashboard
+
+  8. Email Templates 📧
+
+  Il backend ha SMTP/IMAP collegato, ma manca:
+  - Template predefiniti per comunicazioni comuni
+  - Invio massivo a clienti di un progetto
+  - Tracciamento email inviate/ricevute per progetto
+  - Attualmente: solo invio diretto senza template
+
+  9. Bulk Operations 📋
+
+  Il consulente deve poter:
+  - Generare fatture multiple per moduli completati
+  - Aggiornare stato di più microvoci
+  - Archiviare più progetti
+  - Esportare dati in Excel/CSV
+
+  10. Activity Feed / Timeline 📜
+
+  Per ogni progetto, serve una timeline di:
+  - Azioni del team (chi ha fatto cosa e quando)
+  - Documenti caricati
+  - Stati cambiati
+  - Comunicazioni inviate/ricevute
+  - Attualmente: solo AuditLog nel backend senza UI
+
+  ---
+
+  🟢 P2: Funzioni Premium (Evoluzione)
+
+  1. AI Risk Prediction 🤖
+
+  Usare i dati storici per:
+  - Predire ritardi basandosi su pattern passati
+  - Suggerire riallocazione risorse
+  - Alert automatici su progetti a rischio
+  - Il segnaleRischio nel stateEngine è il punto di partenza
+
+  2. Client Portal con SSO 🔐
+
+  - White-label per ogni tenant
+  - Login con Google/Microsoft SSO
+  - Dashboard cliente personalizzata
+  - Comunicazioni integrate
+
+  3. Integrazioni Esterne 🔗
+
+  - Xero/QuickBooks per contabilità
+  - Stripe per pagamenti online
+  - DocuSign per firme digitali
+  - Google Calendar / Outlook per eventi
+
+  4. Mobile App 📱
+
+  - React Native companion
+  - Timer ore mobile
+  - Notifiche push
+  - Foto documenti da mobile
+
+  5. Workflow Automation ⚡
+
+  - Auto-assegnazione task per regole
+  - Notifiche automatiche a scadenza
+  - Fatturazione automatica per contratti ricorrenti
+  - Approvazioni multi-level
+
+  6. Multi-Language 🌍
+
+  - Interfaccia in italiano + inglese + maltese
+  - Documenti bilingue
+  - Notifiche localizzate
+
+  7. White-Label 🎨
+
+  - Temi personalizzati per tenant
+  - Logo e colori custom
+  - Dominio personalizzato
+  - Footer e email branding
+
+  ---
+
+  📊 Analisi del Grafo Graphify
+
+  Moduli e Dipendenze
+
+  M01: Analisi patrimoniale iniziale (Analisi) ← BASE ├→ M02: Corporate structuring Malta (Societario, pkg €11.500)
+    │   ├→ M05: Apertura conti correnti (Banking)
+    │   ├→ M06: Contratti intra-societari (Legale)
+    │   ├→ M07: Contratti con terzi (Legale)
+    │   ├→ M08: Gestione marchi e IP (IP)
+    │   ├→ M09: Tax planning internazionale (Fiscale)
+    │   └→ M10: Compliance e KYC (Compliance)
+    ├→ M03: Holding internazionale (Societario)
+    └→ M04: Struttura Trust (Trust)
+
+  Cosa manca nel grafo rispetto al backend:
+
+  1. Nessun modulo "Fatturazione" — il backend ha un sistema completo ma non è un modulo template
+  2. Nessun modulo "Comunicazioni" — WhatsApp/Email/Telegram non sono moduli ma servizi trasversali
+  3. Nessun modulo "Audit" — l'audit logging è trasversale, non un modulo
+  4. Le giurisdizioni (Malta, Gibilterra, Florida, Delaware, EAU) sono hardcoded nel mock, non nel DB
+
+  Buchi architetturali nel grafo:
+
+  1. M03 e M04 non hanno dipendenze downstream — non sbloccano nulla, sono foglie morte
+  2. Nessun modulo ricorrente — il sistema ha contratti ricorrenti ma nessun modulo template per "Compliance annuale" ricorrente   
+  3. Nessun modulo "Chiusura progetto" — manca un fase finale di wrap-up
+
+  ---
+
+  ##🧑‍Simulazione: Utente Consulente Quotidiano
+
+  Scenari tipici e cosa manca:
+
+  ┌───────────────────────────┬──────────────────────────────────────┬─────────────────────────────────────────────────────────┐   
+  │         Scenario          │            Cosa funziona             │                       Cosa manca                        │   
+  ├───────────────────────────┼──────────────────────────────────────┼─────────────────────────────────────────────────────────┤   
+  │ Mattina: aprire la        │ KPI base, alert ritardi              │ Notifiche overnight, actividad feed, vista "cosa devo   │   
+  │ dashboard                 │                                      │ fare oggi"                                              │   
+  ├───────────────────────────┼──────────────────────────────────────┼─────────────────────────────────────────────────────────┤   
+  │ Creare nuovo progetto     │ Wizard a 3 step nel prototipo        │ Wizard non implementato nella React app                 │   
+  ├───────────────────────────┼──────────────────────────────────────┼─────────────────────────────────────────────────────────┤   
+  │ Segnare ore lavorate      │ State engine ha                      │ Nessuna UI per registrare ore                           │   
+  │                           │ registraConsuntivazione              │                                                         │   
+  ├───────────────────────────┼──────────────────────────────────────┼─────────────────────────────────────────────────────────┤   
+  │ Caricare documento        │ Backend ha upload + scanning         │ Nessuna UI upload nella React app                       │   
+  ├───────────────────────────┼──────────────────────────────────────┼─────────────────────────────────────────────────────────┤   
+  │ Inviare fattura SDI       │ Backend completo (XML, SDI, email)   │ Nessuna UI per creare/emettere fatture                  │   
+  ├───────────────────────────┼──────────────────────────────────────┼─────────────────────────────────────────────────────────┤   
+  │ Controllare incassi       │ Scadenzario + registrazioni nel DB   │ Nessuna UI per registrare incassi                       │   
+  ├───────────────────────────┼──────────────────────────────────────┼─────────────────────────────────────────────────────────┤   
+  │ Comunicare con cliente    │ WhatsApp/Email/Telegram hooks        │ Nessuna UI comunicazioni integrata                      │   
+  ├───────────────────────────┼──────────────────────────────────────┼─────────────────────────────────────────────────────────┤   
+  │ Firmare engagement letter │ eIDAS + OTP nel backend              │ Nessuna UI firma nel frontend                           │   
+  ├───────────────────────────┼──────────────────────────────────────┼─────────────────────────────────────────────────────────┤   
+  │ Vedere progresso team     │ Avatar + ore nel prototipo           │ Nessuna vista utilizzo team                             │   
+  ├───────────────────────────┼──────────────────────────────────────┼─────────────────────────────────────────────────────────┤   
+  │ Esportare report          │ Dati nel DB                          │ Nessuna funzionalità export                             │   
+  └───────────────────────────┴──────────────────────────────────────┴─────────────────────────────────────────────────────────┘   
+
+  ---
+
+  🗺️ Roadmap 30/60/90 Giorni
+
+  🔴 Primi 30 Giorni — Fondamenta Sicurezza e Funzionalità Base1. Sicurezza (settimana 1):
+
+  - Rimuovere credenziali hardcoded
+  - Attivare RLS su tutte le tabelle
+  - JWT_SECRET da env vars
+  - Rate limiting sulle API auth
+
+  2. Integrazione State Engine (settimana 2):
+     - Dashboard usa calcolaPercentualeProgetto() reale
+     - Stato moduli calcolato da microvoci, non hardcoded
+     - Alert ritardi basati su valutaSegnaleRischio()
+  3. UI Tracking Ore (settimana 3):
+     - Componente "Registra ore" per micro-voce
+     - Aggiornamento stato automatico
+     - Vista settimanale ore per team member
+  4. UI Fatturazione Base (settimana 4):
+     - Lista fatture per progetto
+     - Creazione fattura da modulo completato
+     - Visualizzazione stato SDI
+
+  🟠 Giorni 31-60 — Esperienza Utente Quotidiana
+
+  5. Portal Cliente MVP (settimana 5-6):
+     - Login passwordless (magic link già nel backend)
+     - Vista progresso progetti
+     - Upload documenti richiesti
+     - Firma engagement letter
+  6. Notifiche e Activity Feed (settimana 7):
+     - SSE/WebSocket per notifiche real-time
+     - Timeline azioni per progetto
+     - Badge counter notifiche
+  7. Ricerca e Filtri (settimana 8):
+     - Ricerca globale clienti/progetti/documenti
+     - Filtri avanzati su lista fatture
+     - Export CSV/Excel base
+
+  🟢 Giorni 61-90 — Premium e Ottimizzazione
+
+  8. Calendario Completo (settimana 9-10):
+     - Vista mese/settimana/giorno
+     - Eventi da DB + progetti
+     - Sync Google Calendar
+  9. Report Analytics (settimana 11):
+     - Ore per team member
+     - Profitto per progetto
+     - Trend fatturato
+  10. Workflow Automation (settimana 12):
+      - Fatturazione automatica contratti ricorrenti
+      - Notifiche automatiche scadenze
+      - Auto-assegnazione task
+
+  ---
+
+  📈 Priorità per Utente Consulente
+
+  ┌──────────┬────────────────────────────────┬────────────────────────┐
+  │ Priorità │            Funzione            │  Impatto Giornaliero   │
+  ├──────────┼────────────────────────────────┼────────────────────────┤
+  │ 🔴 P0    │ Tracking ore rapido            │ Ogni giorno, 10+ volte │
+  ├──────────┼────────────────────────────────┼────────────────────────┤
+  │ 🔴 P0    │ Dashboard con dati reali       │ Ogni mattina           │
+  ├──────────┼────────────────────────────────┼────────────────────────┤
+  │ 🔴 P0    │ Sicurezza (no hardcoded creds) │ Sempre                 │
+  ├──────────┼────────────────────────────────┼────────────────────────┤
+  │ 🟠 P1    │ Portal cliente                 │ 3-5 volte/giorno       │
+  ├──────────┼────────────────────────────────┼────────────────────────┤
+  │ 🟠 P1    │ Notifiche real-time            │ Continuo               │
+  ├──────────┼────────────────────────────────┼────────────────────────┤
+  │ 🟠 P1    │ UI Fatturazione                │ 2-3 volte/settimana    │
+  ├──────────┼────────────────────────────────┼────────────────────────┤
+  │ 🟠 P1    │ Ricerca globale                │ 5+ volte/giorno        │
+  ├──────────┼────────────────────────────────┼────────────────────────┤
+  │ 🟢 P2    │ Calendario                     │ 2-3 volte/giorno       │
+  ├──────────┼────────────────────────────────┼────────────────────────┤
+  │ 🟢 P2    │ Report                         │ 1 volta/settimana      │
+  ├──────────┼────────────────────────────────┼────────────────────────┤
+  │ 🟢 P2    │ Mobile app                     │ 5+ volte/giorno        │
+  └──────────┴────────────────────────────────┴────────────────────────┘
+
+  ---
+
+  🎯 Conclusione
+
+  BluMan ha un'architettura di dominio eccezionale — il modello microvoce→modulo→progetto con state engine puro è raro trovare in  
+  app di consulenza. Il database è completo e ben pensato. Il backend Fastify ha quasi tutte le API necessarie.
+
+  Il gap principale è che il frontend è al 40% di quanto il backend può fare. La React app ha route vuote, dati mock hardcoded, e  
+  non integra lo state engine. Il prototipo HTML dimostra features che non sono mai state migrate.
+
+  Il piano è chiaro: sicurezza → integrazione state engine → UI tracking ore → portal cliente → notifiche → report. In 90 giorni,  
+  con execution disciplinata, BluMan può passare da 6.5 a 8.5/10.
+
+✻ Churned for 5m 37s
+
+❯ come consigli di procedere fai un piano con una scaletta per correggere gli errori piu importatinti prima e poi procedere con le 
+  implementazioni
+
+  Thought for 1m 31s (ctrl+o to expand)
+
+● 📋 Piano Operativo BluMan — Scaletta Prioritizzata
+
+  ---
+
+  🔴 FASE 0: SICUREZZA CRITICA (Giorni 1-3) — Bloccante per tutto il resto
+
+  ┌─────┬──────────────────────────┬───────────────────────────────────────┬───────────────────────────────────────────────────┐   
+  │  #  │           Task           │             File/Comando              │                     Verifica                      │   
+  ├─────┼──────────────────────────┼───────────────────────────────────────┼───────────────────────────────────────────────────┤   
+  │ 0.1 │ Rimuovere credenziali    │ src/server.ts righe ~100-130          │ grep -n "password:" src/server.ts → 0 risultati   │   
+  │     │ hardcoded                │                                       │                                                   │   
+  ├─────┼──────────────────────────┼───────────────────────────────────────┼───────────────────────────────────────────────────┤   
+  │ 0.2 │ Generare JWT_SECRET      │ .env + src/server.ts                  │ JWT_SECRET letto da process.env.JWT_SECRET        │   
+  │     │ random                   │                                       │                                                   │   
+  ├─────┼──────────────────────────┼───────────────────────────────────────┼───────────────────────────────────────────────────┤   
+  │ 0.3 │ Aggiungere bcrypt per    │ npm i bcrypt @types/bcrypt            │ Hash in DB, non plain text                        │   
+  │     │ password                 │                                       │                                                   │   
+  ├─────┼──────────────────────────┼───────────────────────────────────────┼───────────────────────────────────────────────────┤   
+  │ 0.4 │ Attivare RLS su          │ Migration SQL manuale                 │ psql -c "SELECT * FROM pg_policies WHERE          │   
+  │     │ PostgreSQL               │                                       │ tablename='cliente';" → policy attiva             │   
+  ├─────┼──────────────────────────┼───────────────────────────────────────┼───────────────────────────────────────────────────┤   
+  │ 0.5 │ Rate limiting auth       │ src/server.ts /auth/*                 │ 5 req/min su /login, /magic-link                  │   
+  │     │ endpoints                │                                       │                                                   │   
+  ├─────┼──────────────────────────┼───────────────────────────────────────┼───────────────────────────────────────────────────┤   
+  │ 0.6 │ Audit: rimuovere         │ grep -r "password|secret|token" src/  │ Nessun leak in log                                │   
+  │     │ console.log sensibili    │ --include="*.ts"                      │                                                   │   
+  └─────┴──────────────────────────┴───────────────────────────────────────┴───────────────────────────────────────────────────┘   
+
+  ▎ ⚠️ Non procedere alla Fase 1 finché0.1-0.4 non sono FATTI e VERIFICATI.
+
+  ---
+
+  🟠 FASE 1: INTEGRAZIONE STATE ENGINE (Giorni 4-8)
+
+  ┌─────┬────────────────────────────────┬──────────────────────────────────────┬──────────────────────────────────────────────┐   
+  │  #  │              Task              │                 File                 │                   Verifica                   │   
+  ├─────┼────────────────────────────────┼──────────────────────────────────────┼──────────────────────────────────────────────┤   
+  │ 1.1 │ Esportare funzioni calcolo da  │ src/domain/stateEngine.ts            │ export { calcolaPercentualeProgetto,         │   
+  │     │ stateEngine                    │                                      │ calcolaStatoModulo, valutaSegnaleRischio }   │   
+  ├─────┼────────────────────────────────┼──────────────────────────────────────┼──────────────────────────────────────────────┤   
+  │ 1.2 │ Creare service calcolo lato    │ src/services/calcoloService.ts       │ Wrapper che chiama stateEngine + persiste    │   
+  │     │ backend                        │                                      │ stati su DB                                  │   
+  ├─────┼────────────────────────────────┼──────────────────────────────────────┼──────────────────────────────────────────────┤   
+  │ 1.3 │ Endpoint                       │ src/server.ts                        │ POST ricalcola tutto il progetto, ritorna    │   
+  │     │ /projects/:id/recalculate      │                                      │ stato aggiornato                             │   
+  ├─────┼────────────────────────────────┼──────────────────────────────────────┼──────────────────────────────────────────────┤   
+  │ 1.4 │ Dashboard usa calcolo reale    │ frontend/src/pages/Dashboard.tsx     │ pct viene da calcolaPercentualeProgetto(),   │   
+  │     │                                │                                      │ non hardcoded 45%                            │   
+  ├─────┼────────────────────────────────┼──────────────────────────────────────┼──────────────────────────────────────────────┤   
+  │ 1.5 │ Stato moduli calcolato da      │ frontend/src/pages/ProjectDetail.tsx │ stato deriva da                              │   
+  │     │ microvoci                      │                                      │ calcolaStatoModulo(microvoci)                │   
+  ├─────┼────────────────────────────────┼──────────────────────────────────────┼──────────────────────────────────────────────┤   
+  │ 1.6 │ Alert ritardi basati su        │ Dashboard.tsx + calcoloService       │ valutaSegnaleRischio() → alert banner        │   
+  │     │ segnaleRischio                 │                                      │ accurati                                     │   
+  ├─────┼────────────────────────────────┼──────────────────────────────────────┼──────────────────────────────────────────────┤   
+  │ 1.7 │ Test unitari stateEngine       │ src/domain/stateEngine.test.ts       │ npm test → 100% coverage funzioni pure       │   
+  └─────┴────────────────────────────────┴──────────────────────────────────────┴──────────────────────────────────────────────┘   
+
+  ---
+
+  🟠 FASE 2: UI CORE — TRACKING ORE (Giorni 9-14)
+
+  ┌─────┬─────────────────────────────────┬──────────────────────────────────────────┬─────────────────────────────────────────┐   
+  │  #  │              Task               │                   File                   │                Verifica                 │   
+  ├─────┼─────────────────────────────────┼──────────────────────────────────────────┼─────────────────────────────────────────┤   
+  │ 2.1 │ Componente MicrovoceRow con     │ frontend/src/components/MicrovoceRow.tsx │ Click → modal/input → PATCH             │   
+  │     │ input ore                       │                                          │ /microvoci/:id/consuntivazione          │   
+  ├─────┼─────────────────────────────────┼──────────────────────────────────────────┼─────────────────────────────────────────┤   
+  │     │ API POST                        │                                          │ Chiama registraConsuntivazione(),       │   
+  │ 2.2 │ /microvoci/:id/consuntivazione  │ src/server.ts                            │ aggiorna oreConsuntivate, stato,        │   
+  │     │                                 │                                          │ segnaleRischio                          │   
+  ├─────┼─────────────────────────────────┼──────────────────────────────────────────┼─────────────────────────────────────────┤   
+  │ 2.3 │ Timer start/stop opzionale      │ MicrovoceRow.tsx                         │ LocalStorage timer per utente, sync su  │   
+  │     │                                 │                                          │ stop                                    │   
+  ├─────┼─────────────────────────────────┼──────────────────────────────────────────┼─────────────────────────────────────────┤   
+  │ 2.4 │ Vista settimanale ore per team  │ frontend/src/pages/TeamHours.tsx         │ Tabella: membro × giorno → ore, totale  │   
+  │     │ member                          │                                          │ settimanale                             │   
+  ├─────┼─────────────────────────────────┼──────────────────────────────────────────┼─────────────────────────────────────────┤   
+  │ 2.5 │ Aggiornamento stato progetto    │ ProjectDetail.tsx + SSE                  │ Cambio ore → stato modulo/progetto      │   
+  │     │ real-time                       │                                          │ aggiornato senza refresh                │   
+  └─────┴─────────────────────────────────┴──────────────────────────────────────────┴─────────────────────────────────────────┘   
+
+  ---
+
+  🟠 FASE 3: PORTAL CLIENTE MVP (Giorni 15-22)
+
+  ┌─────┬───────────────────────────────────┬────────────────────────────────────────┬─────────────────────────────────────────┐   
+  │  #  │               Task                │                  File                  │                Verifica                 │   
+  ├─────┼───────────────────────────────────┼────────────────────────────────────────┼─────────────────────────────────────────┤   
+  │ 3.1 │ Route /client-portal/:token       │ frontend/src/pages/ClientPortal.tsx    │ Accesso via magic link (già in backend) │   
+  ├─────┼───────────────────────────────────┼────────────────────────────────────────┼─────────────────────────────────────────┤   
+  │ 3.2 │ Vista progresso progetti cliente  │ ClientPortal.tsx                       │ Lista progetti → % completamento,       │   
+  │     │                                   │                                        │ prossimi step                           │   
+  ├─────┼───────────────────────────────────┼────────────────────────────────────────┼─────────────────────────────────────────┤   
+  │ 3.3 │ Upload documenti richiesti        │ ClientPortal.tsx + POST                │ Drag&drop, validazione tipo, scan       │   
+  │     │                                   │ /documents/upload                      │ antivirus (statoScansione)              │   
+  ├─────┼───────────────────────────────────┼────────────────────────────────────────┼─────────────────────────────────────────┤   
+  │ 3.4 │ Firma engagement letter OTP       │ ClientPortal.tsx + POST /otp/verify    │ Flusso: email OTP → inserimento codice  │   
+  │     │                                   │                                        │ → firma digitale                        │   
+  ├─────┼───────────────────────────────────┼────────────────────────────────────────┼─────────────────────────────────────────┤   
+  │ 3.5 │ Comunicazioni cliente ↔ team      │ ClientPortal.tsx + GET/POST            │ Thread per progetto, notifiche email    │   
+  │     │                                   │ /comunicazioni                         │ automatiche                             │   
+  ├─────┼───────────────────────────────────┼────────────────────────────────────────┼─────────────────────────────────────────┤   
+  │ 3.6 │ Notifica email automatica su      │ src/services/emailService.ts           │ Template "Nuovo documento caricato da   │   
+  │     │ nuovi documenti                   │                                        │ [cliente]"                              │   
+  └─────┴───────────────────────────────────┴────────────────────────────────────────┴─────────────────────────────────────────┘   
+
+  ---
+
+  🟠 FASE 4: FATTURAZIONE UI (Giorni 23-30)
+
+  ┌─────┬─────────────────────────────┬──────────────────────────────────────────┬─────────────────────────────────────────────┐   
+  │  #  │            Task             │                   File                   │                  Verifica                   │   
+  ├─────┼─────────────────────────────┼──────────────────────────────────────────┼─────────────────────────────────────────────┤   
+  │ 4.1 │ Lista fatture per progetto  │ frontend/src/pages/InvoicesPage.tsx      │ Tabella: numero, data, stato, importo,      │   
+  │     │                             │                                          │ canale SDI                                  │   
+  ├─────┼─────────────────────────────┼──────────────────────────────────────────┼─────────────────────────────────────────────┤   
+  │ 4.2 │ Creazione fattura da modulo │ InvoicesPage.tsx + POST /invoices        │ Seleziona modulo done → genera bozza        │   
+  │     │  completato                 │                                          │ fattura                                     │   
+  ├─────┼─────────────────────────────┼──────────────────────────────────────────┼─────────────────────────────────────────────┤   
+  │ 4.3 │ Emissione fattura + SDI     │ InvoicesPage.tsx + POST                  │ Genera XML → invia SDI → aggiorna statoSdi  │   
+  │     │                             │ /invoices/:id/emit                       │                                             │   
+  ├─────┼─────────────────────────────┼──────────────────────────────────────────┼─────────────────────────────────────────────┤   
+  │ 4.4 │ Visualizzazione stato SDI   │ InvoicesPage.tsx                         │ Badge: inviata/consegnata/scartata con      │   
+  │     │                             │                                          │ dettagli errore                             │   
+  ├─────┼─────────────────────────────┼──────────────────────────────────────────┼─────────────────────────────────────────────┤   
+  │ 4.5 │ Scadenzario incassi UI      │ frontend/src/pages/ScadenzarioPage.tsx   │ Lista rate, filtro stato, registrazione     │   
+  │     │                             │                                          │ incasso rapida                              │   
+  ├─────┼─────────────────────────────┼──────────────────────────────────────────┼─────────────────────────────────────────────┤   
+  │ 4.6 │ Registrazione incasso       │ ScadenzarioPage.tsx + POST /incassi      │ Importo, data, metodo, riferimento →        │   
+  │     │                             │                                          │ aggiorna saldo conto                        │   
+  └─────┴─────────────────────────────┴──────────────────────────────────────────┴─────────────────────────────────────────────┘   
+
+  ---
+
+  🟠 FASE 5: NOTIFICHE & ACTIVITY FEED (Giorni 31-38)
+
+  ┌─────┬──────────────────────┬─────────────────────────────────────────────┬─────────────────────────────────────────────────┐   
+  │  #  │         Task         │                    File                     │                    Verifica                     │   
+  ├─────┼──────────────────────┼─────────────────────────────────────────────┼─────────────────────────────────────────────────┤   
+  │ 5.1 │ SSE connection per   │ frontend/src/hooks/useNotifications.ts      │ EventSource su /api/notifications/stream        │   
+  │     │ notifiche            │                                             │                                                 │   
+  ├─────┼──────────────────────┼─────────────────────────────────────────────┼─────────────────────────────────────────────────┤   
+  │ 5.2 │ Backend SSE endpoint │ src/server.ts                               │ GET /notifications/stream → push su nuovi       │   
+  │     │                      │                                             │ eventi                                          │   
+  ├─────┼──────────────────────┼─────────────────────────────────────────────┼─────────────────────────────────────────────────┤   
+  │ 5.3 │ Badge counter        │ frontend/src/components/layout/Sidebar.tsx  │ Contatore non lette, click → dropdown notifiche │   
+  │     │ sidebar              │                                             │                                                 │   
+  ├─────┼──────────────────────┼─────────────────────────────────────────────┼─────────────────────────────────────────────────┤   
+  │ 5.4 │ Activity feed per    │ frontend/src/components/ProjectTimeline.tsx │ Timeline: azioni, documenti, stati,             │   
+  │     │ progetto             │                                             │ comunicazioni                                   │   
+  ├─────┼──────────────────────┼─────────────────────────────────────────────┼─────────────────────────────────────────────────┤   
+  │ 5.5 │ Trigger notifiche    │ src/services/notificationService.ts         │ Su: assegnazione, ritardo, scadenza, nuovo      │   
+  │     │ automatiche          │                                             │ documento, firma completata                     │   
+  └─────┴──────────────────────┴─────────────────────────────────────────────┴─────────────────────────────────────────────────┘   
+
+  ---
+
+  🟢 FASE 6: RICERCA & EXPORT (Giorni 39-45)
+
+  ┌─────┬───────────────────────┬──────────────────────────────────────────┬───────────────────────────────────────────────────┐   
+  │  #  │         Task          │                   File                   │                     Verifica                      │   
+  ├─────┼───────────────────────┼──────────────────────────────────────────┼───────────────────────────────────────────────────┤   
+  │ 6.1 │ Ricerca globale       │ frontend/src/components/GlobalSearch.tsx │ Cmd+K → cerca clienti, progetti, documenti,       │   
+  │     │ header                │                                          │ fatture                                           │   
+  ├─────┼───────────────────────┼──────────────────────────────────────────┼───────────────────────────────────────────────────┤   
+  │ 6.2 │ Backend search        │ src/server.ts                            │ GET /search?q= → ritorna risultati tipizzati per  │   
+  │     │ endpoint              │                                          │ entità                                            │   
+  ├─────┼───────────────────────┼──────────────────────────────────────────┼───────────────────────────────────────────────────┤   
+  │ 6.3 │ Export CSV fatture    │ InvoicesPage.tsx + GET /invoices/export  │ CSV con: numero, data, cliente, importo, stato,   │   
+  │     │                       │                                          │ SDI                                               │   
+  ├─────┼───────────────────────┼──────────────────────────────────────────┼───────────────────────────────────────────────────┤   
+  │ 6.4 │ Export CSV            │ ScadenzarioPage.tsx                      │ CSV: rata, cliente, importo, scadenza, stato,     │   
+  │     │ scadenzario           │                                          │ incassato                                         │   
+  ├─────┼───────────────────────┼──────────────────────────────────────────┼───────────────────────────────────────────────────┤   
+  │ 6.5 │ Export ore team       │ TeamHours.tsx                            │ CSV: membro, progetto, modulo, microvoce, data,   │   
+  │     │                       │                                          │ ore                                               │   
+  └─────┴───────────────────────┴──────────────────────────────────────────┴───────────────────────────────────────────────────┘   
+
+  ---
+
+  🟢 FASE 7: CALENDARIO & REPORT (Giorni 46-60)
+
+  ┌─────┬────────────────────────────┬─────────────────────────────────────┬───────────────────────────────────────────────────┐   
+  │  #  │            Task            │                File                 │                     Verifica                      │   
+  ├─────┼────────────────────────────┼─────────────────────────────────────┼───────────────────────────────────────────────────┤   
+  │ 7.1 │ Calendario vista           │ frontend/src/pages/CalendarPage.tsx │ FullCalendar.js o componente custom               │   
+  │     │ mese/settimana             │                                     │                                                   │   
+  ├─────┼────────────────────────────┼─────────────────────────────────────┼───────────────────────────────────────────────────┤   
+  │ 7.2 │ Eventi da DB + scadenze    │ CalendarPage.tsx                    │ Merge EventoCalendario + dataScadenza             │   
+  │     │ progetti                   │                                     │ moduli/fatture                                    │   
+  ├─────┼────────────────────────────┼─────────────────────────────────────┼───────────────────────────────────────────────────┤   
+  │ 7.3 │ Sync Google Calendar       │ src/services/googleCalendar.ts      │ OAuth → push/pull eventi                          │   
+  │     │ (opzionale)                │                                     │                                                   │   
+  ├─────┼────────────────────────────┼─────────────────────────────────────┼───────────────────────────────────────────────────┤   
+  │ 7.4 │ Report ore per team member │ frontend/src/pages/ReportsPage.tsx  │ Tabella: membro, ore previste/consuntivate,       │   
+  │     │                            │                                     │ delta, % utilizzo                                 │   
+  ├─────┼────────────────────────────┼─────────────────────────────────────┼───────────────────────────────────────────────────┤   
+  │ 7.5 │ Report profitto per        │ ReportsPage.tsx                     │ Ricavo - (ore × costo orario) = margine netto     │   
+  │     │ progetto                   │                                     │                                                   │   
+  ├─────┼────────────────────────────┼─────────────────────────────────────┼───────────────────────────────────────────────────┤   
+  │ 7.6 │ Trend fatturato mensile    │ ReportsPage.tsx                     │ Grafico: fatturato, incassato, da incassare per   │   
+  │     │                            │                                     │ mese                                              │   
+  └─────┴────────────────────────────┴─────────────────────────────────────┴───────────────────────────────────────────────────┘   
+
+  ---
+
+  🟢 FASE 8: AUTOMATION & POLISH (Giorni 61-90)
+
+  ┌─────┬───────────────────────────────┬───────────────────────────────────────┬──────────────────────────────────────────────┐   
+  │  #  │             Task              │                 File                  │                   Verifica                   │   
+  ├─────┼───────────────────────────────┼───────────────────────────────────────┼──────────────────────────────────────────────┤   
+  │ 8.1 │ Cron fatturazione contratti   │ src/services/cronService.ts           │ Giornaliero: verifica prossimaFatturazione → │   
+  │     │ ricorrenti                    │                                       │  crea fattura                                │   
+  ├─────┼───────────────────────────────┼───────────────────────────────────────┼──────────────────────────────────────────────┤   
+  │ 8.2 │ Cron notifiche scadenze       │ cronService.ts                        │ Giornaliero: scadenze a 7/3/1 giorni → email │   
+  │     │                               │                                       │  + notifica                                  │   
+  ├─────┼───────────────────────────────┼───────────────────────────────────────┼──────────────────────────────────────────────┤   
+  │ 8.3 │ Auto-assegnazione task per    │ src/services/assignmentService.ts     │ Regole: "se modulo X done → assegna M05 a    │   
+  │     │ regole                        │                                       │ banking team"                                │   
+  ├─────┼───────────────────────────────┼───────────────────────────────────────┼──────────────────────────────────────────────┤   
+  │ 8.4 │ PWA / Mobile responsive       │ vite.config.ts + CSS                  │ npm run build → installabile,                │   
+  │     │                               │                                       │ offline-capable                              │   
+  ├─────┼───────────────────────────────┼───────────────────────────────────────┼──────────────────────────────────────────────┤   
+  │ 8.5 │ Tema personalizzabile per     │ frontend/src/styles/theme.css +       │ Colori, logo, footer per tenant              │   
+  │     │ tenant                        │ Settings                              │                                              │   
+  ├─────┼───────────────────────────────┼───────────────────────────────────────┼──────────────────────────────────────────────┤   
+  │ 8.6 │ E2E tests critici             │ cypress/e2e/*.cy.ts                   │ Login → crea progetto → registra ore →       │   
+  │     │                               │                                       │ emetti fattura → incassa                     │   
+  └─────┴───────────────────────────────┴───────────────────────────────────────┴──────────────────────────────────────────────┘   
+
+  ---
+
+  📅 Riepilogo Temporale
+
+  Giorni 1-3   ████████████ FASE 0: Sicurezza (BLOCCANTE)
+  Giorni 4-8   ████████      FASE 1: State Engine Integration
+  Giorni 9-14  ████████      FASE 2: Tracking Ore
+  Giorni 15-22 ████████████  FASE 3: Portal Cliente
+  Giorni 23-30 ████████      FASE 4: Fatturazione UI
+  Giorni 31-38 ████████      FASE 5: Notifiche & Activity Feed
+  Giorni 39-45 ████████      FASE 6: Ricerca & Export
+  Giorni 46-60 ████████████  FASE 7: Calendario & Report
+  Giorni 61-90 ████████████  FASE 8: Automation & Polish
+
+  ---
+
+  🎯 Regole di Esecuzione
+
+  1. Una fase alla volta — Non iniziare Fase N+1 se Fase N ha task "In Progress"
+  2. Definition of Done per task:
+     - Codice scritto + test passa (unit/integration)
+     - Funziona in locale (npm run dev)
+     - Nessun regressione su funzioni esistenti
+  3. Commit atomici — Un commit per task, messaggio: fix: [FASE.N] descrizione
+  4. Daily standup mentale — Ogni mattina: "Cosa ho chiuso ieri? Cosa chiudo oggi? Bloccanti?"
+  5. Demo settimanale — Venerdì: gira l'app, verifica flusso utente completo
+
+  ---
+
+  🛠️ Setup Iniziale (Oggi, prima di Fase 0)
+
+  # 1. Variabili ambiente
+  cp .env.example .env
+  # Modifica: DATABASE_URL, JWT_SECRET (openssl rand -base64 32), SMTP_*, WA_*, TG_*
+
+  # 2. Dipendenze sicurezza
+  npm i bcrypt @types/bcrypt jsonwebtoken @types/jsonwebtoken
+
+  # 3. Test runner
+  npm i -D vitest @vitest/ui
+
+  # 4. Database migration + RLS
+  npx prisma migrate dev --name init_rls
+  # Poi esegui SQL RLS manuale (vedi schema.prisma fondo file)
+
+  # 5. Seed utenti reali (no hardcoded)
+  npx prisma db seed
+
+  ---
+
+  📌 Prossimo Step Immediato
+
+  Inizia da Task 0.1 — Apri src/server.ts, individua l'oggetto USERS e la costante JWT_SECRET, rimuovili completamente. Sostituisci
+  con lookup su DB + bcrypt. Questo sblocca tutto il resto.
+
+  Vuoi che inizi io con la Task 0.1 (rimozione credenziali hardcoded) mostrando il diff esatto?
+
+✻ Crunched for 1m 57s
+
+❯ ok fase 0 pero leggi prima le regole del progetto, non duplicare codice vedi se è proprio necessarrio, controlla se è stato gia  
+  fatto aggiorna il grafo, vedi i test che sono all'interno del progetto nel caso creane altri, alla fine aggiorna git hub vercel  
+  railway supabase se hai bisogno aggiorna e leggi i file md e fammi delle domande per procedere
+
+  Thought for 3m 5s, searched for 9 patterns, read 13 files (ctrl+o to expand)
+
+● Bash(npx prisma migrate status 2>&1)
+  ⎿  Error: Exit code 1
+     Environment variables loaded from .env
+     Prisma schema loaded from prisma\schema.prisma
+     Datasource "db": PostgreSQL database "postgres", schema "public" at "aws-1-eu-west-1.pooler.supabase.com:5432"
+
+     No migration found in prisma/migrations
+     The current database is not managed by Prisma Migrate.
+
+     Read more about how to baseline an existing production database:
+     https://pris.ly/d/migrate-baseline
+
+● I have everything I need to start Phase 0. No more questions needed to get started on the first step.
+
+  The environment variables are already set up in .env with a real Supabase database connection and a temporary JWT_SECRET. The    
+  hardcoded credentials are right there in src/server.ts.
+
+  I will now fix the critical security issue (Task 0.1, 0.2, 0.3) by removing the hardcoded credentials in src/server.ts, moving to
+  bcrypt, and reading the JWT_SECRET strictly from the environment.
+
+  🔴 Fix Task 0.1 & 0.2 & 0.3 (Sicurezza)
+  ⎿  Error: No such tool available: bash
+  ⎿  Error: No such tool available: bash
+  ⎿  Error: No such tool available: bash
+
+  Thought for 2m 13s (ctrl+o to expand)
+
+● Bash(npm i bcrypt @types/bcrypt jsonwebtoken @types/jsonwebtoken)
+  ⎿  added 19 packages, removed 47 packages, and audited 84 packages in 5s
+
+     found 0 vulnerabilities
+     … +8 lines (ctrl+o to expand)
+
+  Thought for 10m 0s, searched for 2 patterns (ctrl+o to expand)
+
+❯ continua
+
+  Thought for 8m 40s, read 1 file (ctrl+o to expand)
+
+● API Error: 400 [github/claude-haiku-4.5] [400]: The requested model is not supported. (reset after 2m)
+❯ continua
+
+  Thought for 8m 40s, read 1 file (ctrl+o to expand)
+
+● API Error: 400 [github/claude-haiku-4.5] [400]: The requested model is not supported. (reset after 2m)
+  [chatgpt-web/gpt-5.6-pro (413), chatgpt-web/gpt-5.5-pro-extended (413), github/gpt-5.3-codex (400), github/gpt-5.3-codex
+  (400), github/kimi-k2.7-code (400)... (+9)]
+
+✻ Crunched for 33m 51s
+
+
+● API Error: 400 [github/gemini-3.5-flash] [400]: The requested model is not supported. (reset after 2m)
+  [chatgpt-web/gpt-5.6-pro (413), chatgpt-web/gpt-5.5-pro (413), github/gemini-3.1-pro-preview (400), github/claude-opus-5
+  (400), github/gpt-5.3-codex (400)... (+13)]
+
+✻ Sautéed for 13m 26s
+
+❯ continua
+
+● API Error: 400 [github/gemini-3.5-flash] [400]: The requested model is not supported. (reset after 2m)
+  [chatgpt-web/gpt-5.6-pro (413), github/claude-opus-4.7 (400), github/claude-opus-4.8 (400), github/claude-sonnet-4.6
+  (400), github/gpt-5.3-codex (400)... (+4)]
+
+✻ Worked for 7m 56s
+
+※ recap: Obiettivo: portare BluMan da 6.5 a 8.5/10 in 90 giorni. Fase corrente: 0 — Sicurezza critica. Prossima azione: rimuovere  
+  credenziali hardcoded e JWT_SECRET da `src/server.ts`, sostituire con lookup DB + bcrypt. (disable recaps in /config)
+
+❯ salva la conversazione dopo dobbiamo riprendere da qui
+
+● API Error: 400 [github/gemini-3.5-flash] [400]: The requested model is not supported. (reset after 2m)
+  [github/gpt-5.6-luna (400), github/gpt-5.6-sol (400), github/gpt-5.4 (400), github/gpt-5.5 (400), github/gpt-5.6-terra
+  (400)... (+10)]
+
+✻ Sautéed for 8m 1s
+
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯  
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Press Ctrl-C again to exit                                                                                0% until auto-compact  
+
+Resume this session with:
+claude --resume 894d415e-e96b-431d-a8a6-ed4bcbd7ae83
+PS C:\Users\dibenedettom\Downloads\bluman> npx omniroute launch --profile smart --model auto
+  📋 Loaded env from C:\Users\dibenedettom\.omniroute\.env
+  📋 Loaded env from C:\Users\dibenedettom\Downloads\bluman\.env
+  📋 Loaded env from C:\Users\dibenedettom\.npm-global\node_modules\omniroute\.env
+(node:19420) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+
+PS C:\Users\dibenedettom\Downloads\bluman> 

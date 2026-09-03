@@ -1,0 +1,34 @@
+# Cosa la CLI Railway non deve caricare con `railway up`.
+#
+# `railway up` invia i file della cartella locale, non quelli di un commit: senza questo
+# elenco salirebbe anche `.env` con le credenziali reali di database e posta. Le variabili
+# d'ambiente del servizio le gestisce Railway, quindi il file non serve mai lassù.
+
+# Segreti
+.env
+.env.local
+.env.*.local
+secrets/
+.secrets/
+*.secret.*
+
+# Dipendenze e build: li rifà il container
+node_modules
+frontend/node_modules
+dist
+build
+frontend/dist
+
+# Il frontend gira su Vercel, non in questo servizio
+frontend
+
+# Materiale di lavoro locale
+scratch/
+uploads/
+*.log
+openstamanager_source/
+openstamanager-reference/
+graphify-out/
+*.zip
+.claude/
+.vercel

@@ -1,0 +1,43 @@
+{
+  "name": "bluman-api",
+  "version": "0.1.0",
+  "description": "BluMan (Bluecode Advisory Platform) — backend API. Fase 1 (schema) + Fase 5 (motore di calcolo stati) del piano di sviluppo.",
+  "type": "module",
+  "dependencies": {
+    "@fastify/cors": "^11.3.0",
+    "@fastify/rate-limit": "^11.2.0",
+    "@prisma/client": "^5.20.0",
+    "@types/nodemailer": "^8.0.1",
+    "docxtemplater": "^3.69.3",
+    "dotenv": "^16.4.5",
+    "exceljs": "^4.4.0",
+    "fastify": "^5.0.0",
+    "nodemailer": "^9.0.5",
+    "pdfkit": "^0.20.1",
+    "pizzip": "^3.2.0",
+    "zod": "^4.5.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.0",
+    "@types/pdfkit": "^0.17.6",
+    "@types/pizzip": "^3.0.5",
+    "prisma": "^5.20.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "bootstrap": "tsx src/adapters/prisma/bootstrap.ts",
+    "passwords:assign": "tsx src/scripts/assignPasswords.ts",
+    "cleanup:test-data": "tsx src/scripts/cleanupTestData.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx watch src/index.ts",
+    "start:db": "tsx watch src/adapters/prisma/index.ts",
+    "seed": "tsx src/adapters/prisma/seed.ts"
+  }
+}

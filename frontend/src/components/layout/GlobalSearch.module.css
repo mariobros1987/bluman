@@ -1,0 +1,147 @@
+.contenitore {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.campo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 4px 12px;
+  transition: border-color var(--t);
+}
+
+.campo:focus-within {
+  border-color: var(--indigo);
+}
+
+.lente {
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.campo input {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font-size: 12px;
+  width: 200px;
+  padding: 2px 0;
+}
+
+.campo input::placeholder {
+  color: var(--muted);
+}
+
+.pulisci {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+}
+
+.pulisci:hover {
+  color: var(--text);
+}
+
+.pannello {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  width: 340px;
+  max-height: 420px;
+  overflow-y: auto;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  z-index: 60;
+  padding: 6px;
+}
+
+.gruppo {
+  margin-bottom: 4px;
+}
+
+.intestazioneGruppo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  padding: 6px 8px 3px;
+}
+
+.contatore {
+  margin-left: auto;
+  font-size: 9.5px;
+  background: var(--sidebar);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0 6px;
+  color: var(--muted);
+}
+
+.risultato {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 8px;
+  cursor: pointer;
+  transition: background var(--t);
+}
+
+.risultatoAttivo,
+.risultato:hover {
+  background: var(--sidebar);
+}
+
+.titolo {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sottotitolo {
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 1px;
+}
+
+.statoVuoto,
+.statoErrore {
+  padding: 12px 10px;
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.statoErrore {
+  color: #f87171;
+}
+
+@media (max-width: 900px) {
+  .campo input {
+    width: 120px;
+  }
+}

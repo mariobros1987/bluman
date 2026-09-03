@@ -39,7 +39,3 @@ scratch/
 
 # Configurazione locale dell'assistente CLI
 .claude/
-
-# Python Virtual Env
-.venv/
-__pycache__/

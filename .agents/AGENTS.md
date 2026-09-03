@@ -1,213 +1,513 @@
-# AGENTS.md — BluMan (Bluecode Advisory Platform)
+# BluMan Advisory Platform — Mappa Architetturale & Regole Sviluppo
 
-Regole di progetto lette automaticamente dall'AI ad ogni sessione.
-**Non modificare senza discutere con il team.**
-
----
-
-## 1. Cos'è BluMan
-
-BluMan è una piattaforma SaaS **multi-tenant** per studi di consulenza patrimoniale (primo tenant: Bluecode Ltd, Malta). Gestisce l'intero ciclo di vita di un progetto di consulenza: preventivo -> engagement letter -> esecuzione -> fatturazione -> chiusura.
-
-Il prototipo HTML di riferimento si trova in:
-`c:\Users\casad\Downloads\bluman platform\260523 BluMan platform.html`
-
-L'analisi di processo completa (specifica funzionale) si trova in:
-`c:\Users\casad\Downloads\bluman platform\BluMan_analisi_di_processo.md`
+Questo file serve come indice rapido per l'IA ed i collaboratori per identificare i file responsabili ed evitare scansioni complete dell'intera codebase.
 
 ---
 
-## 2. Stack Tecnologico — RISPETTA SEMPRE QUESTO STACK
+## 🏛 1. Mappa dei Componenti Frontend (`frontend/src/`)
 
-| Layer | Tecnologia | Note |
-|---|---|---|
-| Frontend | **React + Vite** | TypeScript, no Next.js |
-| Backend | **Python + FastAPI** | Async, Pydantic v2 |
-| Database | **PostgreSQL via Supabase** | Row-Level Security abilitata |
-| Auth | **Supabase Auth** | JWT, app_metadata per ruoli/tenant |
-| Storage | **Supabase Storage** | Per documenti clienti |
-| Hosting backend | **Railway** (nixpacks.toml) | Come FantaAI |
-| Firma digitale | **DocuSign** | python-docusign-esign |
-| Email | **Postmark** | postmarker lib |
-| CSS | **Vanilla CSS** | No Tailwind, no MUI, no styled-components |
-| Colori | Dark mode, palette indigo #6366f1 | Come il prototipo HTML |
-| Font | **DM Sans** da Google Fonts | Come il prototipo HTML |
+### 📄 Pagine (`pages/`)
 
-**Non proporre mai tecnologie alternative a queste senza chiedere esplicitamente.**
+- **`pages/Dashboard.tsx`**: Dashboard principale con KPI portafoglio, avvisi ritardo e progetti in corso.
+- **`pages/Projects.tsx`**: Gestione Avanzata Progetti & Fascicoli Operativi con 3 viste switchabili (Schede Operatore con consuntivazione ore & checklist microvoci, Tabella ERP Matrice ad alta densità, Kanban Pipeline a 4 fasi di workflow) e Executive KPI Strip.
+- **`pages/ClientsPage.tsx`**: Anagrafica Clienti ERP con salvataggio bidirezionale completo, disimballo campi `referentiJson`, Magic Link passwordless e modal `AnagraficaErpModal` a 4 schede.
+- **`pages/CalendarPage.tsx`**: Calendario Condiviso & Scadenzario Attività Studio (Vista Mese, Lista Scadenzario, Filtro Categorie e Modal Nuovo Evento).
+- **`pages/ProjectDetail.tsx`**: Vista dettagliata del progetto con tab. Nell'intestazione, accanto a "👥 Accessi Progetto", il pulsante **"🔄 Ricalcola avanzamento"** (`ricalcolaProgettoApi`, visibile solo ad advisor e super_admin, con conferma: è una scrittura). La pagina **non fabbrica** moduli né micro-voci — vedi regola 7: se il progetto non ne ha a database, ogni tab lo dichiara. Tab:
+  - `🗂 Moduli & Microvoci` (Checklist passaggi, note operative, consuntivazione ore e notifiche milestone automatiche via WhatsApp/Email)
+  - `🕸 Grafo & Dipendenze Moduli` (`GrafoModuliProgettoView`)
+  - `💬 Comunicazioni & Ingestion Hub` (`ComunicazioniTab` con sincronizzazione live, chat interattiva e binding recapiti WhatsApp, Email, Telegram, Signal dall'Anagrafica Cliente ERP)
+  - `💶 Fatturazione & SDI` (Emissione FT/NC e tracciato XML)
+  - `📊 Redditività & Margini` (Analisi Margine Lordo Commessa, Semaforo Budget Live, Resa Oraria Reale ed Export Rendiconto Economico CSV). Le ore reali sono quelle **consuntivate** (`m.a`), non interpolate dalla percentuale: senza consuntivazione la riga scrive `—` e "⚪ Nessuna ora consuntivata", non "🟡 In Target".
+  - `📄 Documenti & Vault Legale` (Cloud Vault Google Drive Style ed Export Fascicolo Completo ZIP 1-Click)
+- **`pages/InvoicesPage.tsx`**: Registro Fiscale Fatture, Note di Credito, Aliquote, Export XML SDI ed **Export Registro Fiscale per Commercialista (CSV / Excel)**.
+- **`pages/FornitoriPage.tsx`**: Ciclo Passivo & Gestione Fornitori ERP (Anagrafica Fornitori OpenSTAManager-grade, Registrazione Fatture d'Acquisto, Scorporo IVA, Import XML SDI e Collegamento Prima Nota).
+- **`pages/LiquidazioneIvaPage.tsx`**: Liquidazione IVA Periodica (LIPE) & Prospetto F24 (Calcolo debito/credito IVA mensile/trimestrale conforme DPR 633/72, esclusione Split Payment e codici tributo F24 6001-6012, 6031-6034).
+- **`pages/PrimaNotaPage.tsx`**: Registro Prima Nota, Transazioni Cassa/Banca, CRO/TRN, Import & Riconciliazione Estratto Conto Bancario ed **Export Contabile Commercialista (CSV / Excel)** compatibile con Zucchetti, TeamSystem, Datev e Profis.
+- **`pages/PaymentsPage.tsx`**: Registrazione Incassi & Scadenzario Pagamenti con filtri stato/cliente/ricerca, modal registrazione incasso in Prima Nota con collegamento a banca e fattura, e aggiornamento stato scadenza (pagata/parziale/insoluta).
+- **`pages/ScadenzarioPage.tsx`**: Scadenzario Incassi, Partite Aperte & Solleciti Clienti con Link al Progetto e Calcolo Interessi di Mora D.Lgs. 231/2002.
+- **`pages/BanksPage.tsx`**: Gestione Banche, Conti Correnti Studio, IBAN & Riconciliazione Liquidità.
+- **`pages/RetainersPage.tsx`**: Contratti Ricorrenti & Retainer Studio per la fatturazione periodica pianificata, collegato ai Progetti specifici con filtraggio clienti a cascata e link 1-Click `📁 Nome Progetto ↗`.
+- **`pages/DocumentEditorPage.tsx`**: Studio Document Studio & Contract Builder (Editor Word WYSIWYG, Smart Tags ERP, Intestazione/Piè di Pagina A4 ed Export PDF). Il selettore **micro-voce di destinazione** carica solo le micro-voci reali del progetto scelto (`fetchProgettoDettaglio`) e passa `microvoceProgettoId` a `salvaDocumentoApi`, con fascia informativa «Percorso del documento» che spiega dove finirà il documento; nessun id inventato lato client.
+- **`pages/Library.tsx`**: Gestione Distinta Base, Costruttore Moduli Template, Catalogo Articoli e Modelli Documenti in Bianco.
+- **`pages/ArchivioDocumentiPage.tsx`**: §37 — Archivio Documentale Studio (`/archivio`), navigazione a cartelle Cliente → Progetto → Documenti in stile Drive. L'albero e i conteggi vengono da `GET /documenti/archivio`; le carte di una cartella dal componente `components/documenti/ElencoDocumentiCartella.tsx`, che chiama `listaDocumentiProgetto`. Nessuna migrazione e nessun conteggio ricostruito da `localStorage`: se la lettura non riesce la pagina lo dichiara invece di mostrare un archivio vuoto che sembra vero (regola 7). Filtri: ricerca su clienti/progetti (o sui documenti quando si è dentro una cartella), «nascondi le cartelle senza documenti», «mostra anche gli archiviati» (che passa `includiArchiviati=true` al server). I documenti il cui progetto è stato eliminato non vengono nascosti: la pagina li conta a parte e spiega perché non hanno una cartella. Chiave RBAC riusata: `documents`.
+- **`pages/ClientPortal.tsx`**: Portale Cliente a 6 schede (Proposta & Firma con OTP, Live Progress, Form Societari, Documenti, Live Chat & Comunicazioni con Advisor, **Profilo & Password**). `mapProjectToPortalModules()` mappa **solo** i moduli del progetto scelto e restituisce `[]` quando non ce ne sono: i moduli e le micro-voci cambiano dinamicamente in base al progetto selezionato dal menu a tendina. Stato di firma e dati del sigillo server-side si risolvono sul cliente **autenticato**, e il form societario si riempie dalla riga del cliente. La conferma di conclusione operazione è una **firma OTP vera** (flusso OTP con ambito `modulo_completato`, impronta server-side): le conclusioni si rileggono da `GET /firme`, niente `localStorage`. La Tab 6 permette al cliente di aggiornare anagrafica, telefono e password personale. §WF-DOC: i documenti con `versione > 1` espongono la **cronologia versioni a ritroso** (`versioniPrecedenti[]` ricostruita dal server via `documentoPadreId`) — pulsante 🕘 nella scheda documento con pannello espandibile che mostra caricamento e firma di ogni versione precedente fino a quella eventualmente firmata; richiami compatti nelle schede moduli e deliverable. A documento firmato i pulsanti di firma spariscono e restano visibili data/riferimento firma e ricevuta di firma semplice (OTP verificata · art. 20 CAD).
+- **`pages/SettingsPage.tsx`**: Anagrafica Studio, Sede Legale/Operativa, Configuratore PDF Fatture con Logo, Gestione Team con 4 Professionisti Ufficiali, Matrice Permessi Granulari RBAC con pulsante **`🔄 Reset Pass`** per rigenerare password temporanee monouso per qualsiasi membro del team, ed **Email Suite Completa** (SMTP Outbound + Reply-To + BCC, IMAP/POP3 Inbound + Cartelle + Polling Live, Firma Automatica HTML con Smart Tags e Diagnostica DNS Register.it SPF/DMARC/MX con Test Socket TLS Reali).
+- **`pages/SuperAdminPage.tsx`**: Dashboard Super Admin & Gestione Multi-Tenant Studi (`/admin/tenants`). La password del responsabile non è più un campo del form: la emette il server alla creazione dello studio e il modale la mostra **una volta sola**, tenendola in un `useState` che muore alla chiusura. Se va perduta, il pulsante `🔄 Rigenera Password di Accesso` chiama `POST /admin/tenants/:id/reset-password` e imposta `stato: 'invitato'`. L'invio delle credenziali per email si rifiuta di partire senza una password appena emessa, e riporta gli errori invece di dichiarare comunque il successo.
+- **`pages/LoginPage.tsx`**: Pagina di accesso staff. Campi vuoti e nessuna scorciatoia. Il ruolo lo determina il backend leggendo la riga `user`. All'autenticazione, se `mustChangePassword === true` o `stato === 'invitato'`, l'applicazione blocca l'accesso e richiede obbligatoriamente l'impostazione di una nuova password permanente.
+- **`pages/AuditLogPage.tsx`**: Registro Audit Super Dettagliato & Tracciamento Attività Operatori per Tenant (`/audit`).
+- **`pages/Placeholders.tsx`**: Pagine placeholder (Clienti, Calendario, Impostazioni) per sezioni in corso di sviluppo — export nominati `Clients`, `Calendar`, `Settings`.
 
----
+### 🧩 Componenti (`components/`)
 
-## 3. Architettura Multi-Tenant — REGOLA FONDAMENTALE
+- **`components/MustChangePasswordModal.tsx`**: Modale di blocco schermo per il primo accesso / password reset. Non chiudibile: obbliga l'utente a digitare la password provvisoria ricevuta e a impostare una nuova password personale sicura (con misuratore di robustezza live conforme ISO/IEC 27001). Al salvataggio aggiorna `stato: 'attivo'` e sblocca l'app.
+- **`components/UserProfileModal.tsx`**: Modale profilo utente per collaboratori e advisor: modifica rapida di nome, titolo/specializzazione professionale e cambio password permanente cifrata con scrypt.
+- **`components/QuickTimeTracker.tsx`**: Timer orario fluttuante (Stopwatch 1-Click) integrato nella topbar con selezione rapida commessa/microvoce, calcolo automatico tariffa oraria e consuntivazione immediata a database.
+- **`components/NewProjectWizard.tsx`**: Wizard multi-step per la creazione di un nuovo progetto: selezione/creazione cliente, scelta giurisdizione, composizione preventivo da catalogo moduli template, accettazione e istanziazione progetto con API backend.
+- **`components/PassaggioModal.tsx`**: Modal dettagliato per singolo passaggio/microvoce del progetto: checklist operativa, note operatore, consuntivazione ore, upload documenti, generazione PDF da template (precostruiti e riorganizzazione societaria), integrazione firma elettronica del cliente con scelta del tipo (`fea_otp` firma semplice con OTP, `manuale_scansionata`, `qualificata_esterna`). §WF-DOC: a documento **firmato** il pannello mostra data/riferimento della firma e nasconde i pulsanti Elimina e Nuova Versione; lo **sblocco** per ulteriori modifiche è riservato all'admin del tenant (pulsante visibile solo con `isAdminStudio()`), richiede una motivazione di almeno 10 caratteri e chiama `PATCH /documenti/:id/sblocca`.
+- **`components/ComunicazioniTab.tsx`**: Tab comunicazioni omnichannel standalone: chat interattiva bidirezionale Advisor ⇄ Cliente, binding recapiti WhatsApp/Email/Telegram/Signal, invio messaggi via canali multipli con sincronizzazione live.
+- **`components/AssignOperatorModal.tsx`**: Modal per assegnazione rapida di un operatore del team a un modulo/microvoce del progetto.
+- **`components/CalendarPreviewModal.tsx`**: Modal anteprima calendario con dettaglio eventi e scadenze del progetto.
+- **`components/ConfirmDeleteModal.tsx`**: Modal generico di conferma eliminazione con protezione da cancellazioni accidentali.
+- **`components/DigitalSignatureModal.tsx`**: Modal Firma Elettronica Semplice (OTP verificata · art. 20 CAD) con pad firma; IP e timestamp ISO li registra il server nel sigillo, mai il browser.
+- **`components/DocumentEditorModal.tsx`**: Modal wrapper per apertura rapida dell'editor documenti da contesti esterni.
+- **`components/NotificationModal.tsx`**: Modal sistema notifiche e avvisi operatore.
+- **`components/fornitori/AnagraficaFornitoreErpModal.tsx`**: Modal Anagrafica Fornitore ERP OpenSTAManager-grade a 5 schede (Dati Fiscali & SDI, Sede & Recapiti, Pagamenti & IBAN, Storico Acquisti, Note Interne).
+- **`components/fornitori/RegistraFatturaPassivaModal.tsx`**: Modal Registrazione Fattura Passiva con righe spesa multiple, scorporo IVA, esigibilità (immediata/differita/split) e scrittura automatica in Prima Nota Cassa/Banca.
+- **`components/solleciti/InviaSollecitoModal.tsx`**: Modal Solleciti di Pagamento con calcolo automatico interessi di mora (D.Lgs. 231/2002) e dispatch multicanale Email & WhatsApp.
+- **`components/contabilita/EsportaFascicoloCommercialistaModal.tsx`**: Modal Export Fascicolo per Commercialista: generazione e download archivio ZIP strutturato con XML SDI attive/passive, LIPE, F24 e Prima Nota.
+- **`components/documenti/ElencoDocumentiCartella.tsx`**: §37 — il contenuto di una cartella dell'archivio: la tabella dei documenti di un progetto (nome file senza il prefisso `${Date.now()}_`, tipo, stato, caricamento, apertura/scarico PDF e Word). Legge da `listaDocumentiProgetto(progettoId, includiArchiviati)`: nessun badge «firmato» che non venga dal sigillo a database, e «errore di lettura» resta distinto da «cartella vuota».
 
-- **Ogni tabella del DB porta tenant_id** (tranne tenant e user quando is_super_admin = true).
-- Il backend usa **sempre** il tenant_id estratto dal JWT per filtrare i dati — mai fidarsi di tenant_id passato dal client nel body.
-- La dependency FastAPI get_current_user legge tenant_id da app_metadata del JWT Supabase.
-- Il **Super Admin** non ha tenant_id: ha is_super_admin = true in app_metadata e vede tutti i tenant.
-- **Row-Level Security (RLS)** e abilitata su Supabase per ogni tabella. Il backend usa service_role key (bypassa RLS) e applica il filtro tenant a livello applicativo nelle query.
+### 🏗 Layout (`components/layout/`)
 
----
+- **`components/layout/AppLayout.tsx`**: Layout principale dell'applicazione con topbar (logo, tenant switcher per super_admin, QuickTimeTracker, avatar utente), area contenuto e integrazione Sidebar.
+- **`components/layout/Sidebar.tsx`**: Sidebar navigazione principale con voci dinamiche filtrate da RBAC (permessi modulo `denied` / `read` / `write`), badge contatori e indicatore sezione attiva.
 
-## 4. Flusso di Business — NON CAMBIARE SENZA CONSENSO
+### 🎨 Componenti UI (`components/ui/`)
 
-PREVENTIVO (bozza -> inviato -> accettato)
-    [su accettazione: azione automatica del sistema]
-ENGAGEMENT LETTER generata + PROGETTO creato (stato: pre_project)
-    [cliente firma su DocuSign]
-PROGETTO passa a in_progress
-    -> ESECUZIONE: team lavora sulle micro-voci, consuntiva ore, carica documenti
-    -> FATTURAZIONE: per modulo completato / % avanzamento / milestone libera
-    -> CHIUSURA: tutti i moduli completed -> progetto completed -> archiviato
+- **`components/ui/Avatar.tsx`**: Componente avatar fluttuante con iniziali operatore e card di anteprima (nome completo, ruolo, punto di stato) al passaggio del mouse (hover).
+- **`components/ui/Badge.tsx`**: Badge generico con stile e colore configurabili.
+- **`components/ui/CatBadge.tsx`**: Badge colorato per categoria modulo (Analisi, Societario, Trust, Banking, Fiscale, Legale, IP, Compliance).
+- **`components/ui/ProgressBar.tsx`**: Barra di progresso animata con percentuale.
 
-### Entita separate: Preventivo != Progetto
-- preventivo e progetto sono **tabelle distinte** — non usare solo lo stato pre_project per rappresentare un preventivo.
-- Il progetto nasce solo quando il preventivo e **accettato**.
-- progetto.preventivo_id referenzia il preventivo di origine.
+### 🔧 Utilities Frontend (`utils/`)
 
----
+- **`utils/index.ts`**: Utility helpers condivisi: formatter valuta (`fmt`), URL logo (`getFormattedLogoUrl`), colori categoria modulo (`catCls`), helpers modulo (`moduloH`, `moduloP`).
+- **`utils/tenant.ts`**: Modulo di gestione e isolamento dati multi-tenant lato client. `StudioInfo`, `getCurrentTenantId()`, `getTenantStorageKey()`, `getStudioInfoForTenant()`, gestione localStorage isolata per tenant e costante `BLUECODE_TENANT_ID`.
+- **`utils/rbac.ts`**: Motore di sicurezza e controllo accessi RBAC granulare a 12 moduli (filtra Sidebar e Route Guards per moduli `denied` / `read` / `write`).
+- **`utils/pdfGenerator.ts`**: Generatore PDF client-side con jsPDF + html2canvas per documenti A4 conformi ISO 216 / DIN 5008, supporto firma elettronica, intestazione/piè di pagina e export da HTML.
+- **`utils/documentTemplates.ts`**: Catalogo template documenti precostruiti (contratti, NDA, engagement letter, societario, deleghe, fiscale, trust, compliance) con risoluzione Smart Tags ERP e supporto template custom da database. `resolveDocumentTemplateHtml()` serve **solo** l'anteprima e la resa locale: quello che arriva al server è l'HTML grezzo coi tag (`PassaggioModal` → `generaDocumentoApi`). I 5 modelli con area firme portano `{{firma_cliente}}` / `{{firma_studio}}` (§36), che in anteprima diventano uno spazio tratteggiato.
+- **`utils/reorganizationTemplates.ts`**: Collezione di 22 modelli contrattuali e verbali Word per operazioni di riorganizzazione societaria (Cessioni quote, trasformazioni, holding, trust, conferimenti) integrati nativamente in Document Studio con Smart Tags ERP. Tutti e 22 chiudono con la stessa area firme a due colonne, che da §36 porta `{{firma_studio}}` e `{{firma_cliente}}`.
+- **`utils/zipBuilder.ts`**: Modulo ZIP client-side autonomo a zero dipendenze per l'esportazione in 1-Click del fascicolo digitale completo in cartelle ordinate (`/01_Contratti`, `/02_Societario`, `/03_KYC`, `/04_Fatture`, `INDICE_FASCICOLO.txt`).
 
-## 5. Modello Dati — Schema DB (PostgreSQL/Supabase)
+### 🪝 Hooks (`hooks/`)
 
-Tabelle:
-  tenant, user, cliente,
-  modulo_template, microvoce_template,
-  modulo_dipendenza_template,
-  preventivo, engagement_letter,
-  progetto, modulo_progetto, microvoce_progetto,
-  modulo_progetto_dipendenza,
-  documento, fattura, fattura_riga,
-  evento_calendario, notifica
+- **`hooks/useTeamMembers.ts`**: Hook React centralizzato e performante per interrogare gli operatori live dal database via API `GET /tenant/utenti` con calcolo dinamico delle iniziali reali (`MD`, `JD`, `LM`, `ER`, `FD`) e supporto personalizzazione colori.
 
-Regole schema:
-- Ogni PK e UUID (gen_random_uuid()), non serial integer.
-- Ogni tabella ha created_at TIMESTAMPTZ DEFAULT now() e updated_at TIMESTAMPTZ.
-- tenant_id UUID NOT NULL REFERENCES tenant(id) su ogni tabella (tranne tenant, user quando super_admin).
-- Enum PostgreSQL per stati (non stringhe libere).
+### 📦 Store (`store/`)
 
-### Stati micro-voce (enum stato_microvoce)
-  pending | attesa_dipendenza | active | at_risk | delayed | blocked | done
+- **`store/mockData.ts`**: ✅ **RIMOSSO.** Il file di dati mock statici (giurisdizioni, team, articoli, moduli template, progetti) e l'intera cartella `store/` non esistono più: `NewProjectWizard` e `utils/index.ts` leggono dalle API live. I dati demo legittimi per il tenant demo Bluecode restano solo in `utils/tenant.ts`. Residuo storico del leak cross-tenant descritto in `PIANO_DI_MIGLIORAMENTO.md`.
 
-- attesa_dipendenza = blocco strutturale (modulo precedente non completato)
-- at_risk = calcolato automaticamente dal sistema quando ore_consuntivate > ore_preventivate
-- delayed e blocked = inseriti manualmente con nota obbligatoria
+### 🎨 Stili CSS Modulari
 
-### Fattura riga — tre tipi
-1. modulo_completo
-2. modulo_parziale (con campo percentuale)
-3. milestone_libera (non referenzia modulo)
-
----
-
-## 6. Struttura del Progetto
-
-  c:\BluMan\
-  backend\
-    app\
-      main.py
-      config.py
-      api\         (auth, clienti, preventivi, progetti, moduli, microVoci, fatture, documenti, notifiche, libreria, superadmin)
-      models\      (Pydantic schemas)
-      db\
-        client.py  (Supabase singleton service_role)
-        auth.py    (JWT decode + dependencies)
-      services\
-        stati.py       (motore calcolo stati)
-        docusign.py    (integrazione DocuSign)
-        email.py       (Postmark)
-        preventivo.py  (logica accettazione -> crea progetto)
-    migrations\  (001_initial.sql, 002_..., numerati)
-    nixpacks.toml
-    requirements.txt
-    .env (NON committare mai)
-  frontend\
-    src\
-      pages\    (Dashboard, Progetti, Clienti, Calendario, Libreria, Impostazioni, SuperAdmin)
-      portale\  (portale cliente /portale/*)
-      components\
-        ui\      (Button, Badge, Card, Modal)
-        layout\  (Sidebar, Topbar, Layout)
-        shared\  (ProgressBar, StatusBadge, AvatarGroup)
-      hooks\   (useAuth, useProjects, useClients)
-      api\     (funzioni fetch verso FastAPI)
-      stores\  (Zustand stores)
-      assets\
+- `pages/Dashboard.module.css`, `pages/ClientsPage.module.css`, `pages/Library.module.css`, `pages/ProjectDetail.module.css`, `pages/Settings.module.css`: CSS Modules per le pagine principali.
+- `components/layout/AppLayout.module.css`, `components/layout/Sidebar.module.css`: CSS Modules per layout e sidebar.
 
 ---
 
-## 7. Convenzioni di Codice
+## 🔌 2. API Backend Fastify (`src/server.ts` + `src/routes/`) & API Client (`frontend/src/api/client.ts`)
 
-### Backend (Python/FastAPI)
-- Async ovunque: tutte le route e funzioni DB sono async def.
-- Pydantic v2: usare model_validator, field_validator.
-- Nomi: snake_case per variabili/funzioni, PascalCase per classi Pydantic.
-- Errori: HTTPException con status code precisi. Messaggi in italiano.
-- Tenant isolation: ogni funzione DB riceve tenant_id come parametro esplicito.
-- Response models: definire sempre response_model= nelle route.
-- Migrations: numerati, MAI modificare un migration gia applicato.
+- **Autenticazione & Permessi RBAC**: `POST /auth/login`, `POST /auth/magic-login`, `GET /auth/me`, `GET /tenant/utenti/:userId/permessi`, `PUT /tenant/utenti/:userId/permessi` (Token JWT 15 min + Magic Link + Matrice Permessi Sezioni).
+- **Dove il frontend crede che stia il backend** (`frontend/src/api/http.ts`): `getApiBase()` legge `VITE_API_BASE`, altrimenti `http://localhost:3000` in sviluppo, altrimenti l'host Railway. Da §34 quella lettura è difensiva, perché due configurazioni facevano sparire una rotta che esiste: la **barra finale** (`https://…app/` + `/documenti/genera` = `//documenti/genera`, un altro percorso per il router di Fastify → 404) viene tagliata, e una base **uguale all'origine della pagina** viene rifiutata con un errore in console — su quel dominio `vercel.json` riscrive tutto su `/index.html` e nessuna chiamata raggiungerebbe mai il backend. Per lo stesso motivo `apiFetch` solleva un errore parlante se la risposta è `text/html`: nessuna rotta dell'API risponde HTML, quindi quella pagina è la prova che la richiesta non è arrivata al server (e una pagina HTML con stato 200 passava per salvataggio riuscito).
 
-### Frontend (React/TypeScript)
-- TypeScript strict: niente any, tipi espliciti ovunque.
-- Componenti funzionali con hooks, niente class components.
-- CSS: file .css separato per ogni componente.
-- Design system: usare variabili CSS da index.css, niente colori hardcoded.
-- API calls: tutte in src/api/, niente fetch diretto nei componenti.
-- Nomi file: PascalCase per componenti, camelCase per utils/hooks.
+### 🗂 Struttura del backend dopo lo split dei monoliti (27/08/2026)
+
+`src/server.ts` (prima ~4.570 righe, ora ~510) tiene solo ciò che deve avvolgere TUTTE le rotte: i middleware Fastify, l'hook `onRequest` di autenticazione (§23), lo stream SSE `/stream`, health/refresh del token, l'error handler centrale che mappa le sei classi errore applicative agli status HTTP, e la chiusura del wrapper `server.register(...)` con rate-limit. Le rotte vivono in `src/routes/`, un modulo per dominio, ciascuna esportata come `registraRotte*(server)` (o `registraRotte*(server, app)` quando usa la porta `AppPort`):
+
+- **`auth.ts`**: login, magic login, `GET /auth/me`, refresh.
+- **`tenant.ts`**: team/utenti, ruoli, matrice permessi, audit, dati tenant.
+- **`catalogo.ts`**: giurisdizioni, `/moduli`, articoli catalogo, listini.
+- **`clienti.ts`**: anagrafica clienti, lead, accesso cliente.
+- **`progetti.ts`**: progetti, preventivi, esecuzione (§17), timesheet, ricalcoli.
+- **`contabilita.ts`**: fatture, incassi/scadenzario/prima nota, registro fatture, banche, reportistica, generatore PDF+email, webhook esiti SDI, contratti ricorrenti, cron scadenze, SDI manuale.
+- **`documenti.ts`**: modelli studio (Document Studio) e fascicolo documentale del progetto (§2.9).
+- **`archivioDocumenti.ts`**: §37 — `GET /documenti/archivio`, sola lettura in aggregato: l'albero Cliente → Progetto con i conteggi (documenti attivi, firmati, pubblicati da firmare, archiviati, data dell'ultimo caricamento). File a parte perché `documenti.ts` è oltre le 1.000 righe e fa il mestiere opposto (scrive). **Non restituisce documenti**: il contenuto di una cartella resta a `GET /documenti?progettoId=…`, che è l'unico posto che rinnova la firma HMAC degli URL e legge lo stato di firma. Il token `cliente` riceve 403: RLS isola il tenant, non i clienti fra loro, e l'archivio attraversa tutti i clienti dello studio.
+- **`portale.ts`**: portale cliente — contatti (§2.6), fatture (§2.11), dati fiscali (§2.3), addendum (§2.5).
+- **`firma.ts`**: FEA (OTP, canali verificati, sigillo) e firma elettronica avanzata (sessione, grafometrica, verbale, esito).
+- **`notifiche.ts`**: `/stream-notifications`, segna-letto, impostazioni.
+- **`webhooks.ts`**: webhook di canale WhatsApp e Telegram.
+
+Le `registraRotte*` sono chiamate SEMPRE dentro il wrapper `register` di `buildServer`, quindi hook auth e rate-limit si applicano esattamente come prima dello split (stesso contesto di incapsulamento, nessuna nuova barriera). Lo split è stato meccanico: stesse identiche implementazioni, zero cambi di comportamento; ogni modulo è un commit separato e revertibile (serie "Split monoliti 1/9…9/9").
+
+### 🚧 Il guard di autenticazione: elenco di rotte pubbliche, non di rotte protette (§23)
+
+L'hook `onRequest` di `src/server.ts` respinge con `401 { errore: 'Non autenticato' }`
+qualunque richiesta senza un JWT verificabile. L'elenco codificato è quello delle rotte
+**pubbliche** (`/health`, `/auth/login`, `/auth/magic-login`, i webhook di canale, il
+portale cliente passwordless): tutto il resto è protetto per difetto. È deliberato ed è il
+punto centrale della correzione — con l'elenco opposto, una rotta nuova sarebbe nata
+aperta e nessuno se ne sarebbe accorto.
+
+Il confronto avviene sul *pattern* di rotta (`req.routeOptions.url`), non sull'URL grezzo,
+perché `onRequest` gira dopo il routing: `/progetti/abc-123` risulta `/progetti/:id`.
+
+Attenzione a non confondere due controlli distinti:
+
+- **RLS** protegge uno studio dall'altro. Non protegge da "non serve autenticarsi": una
+  richiesta anonima che porta il tenant di default corrisponde legittimamente alle policy.
+- **Il guard** decide *se* la richiesta esiste. Senza di lui RLS lavorava correttamente
+  sul tenant sbagliato.
+
+Un secondo controllo copre `/admin/tenants`: la funzione `soloSuperAdmin` risponde 403 a
+chiunque non sia `super_admin` su tutti e quattro i verbi. Anche questo non è un compito
+che RLS possa svolgere — `tenant` è la tabella che *contiene* gli studi, non una tabella
+figlia filtrata per `tenant_id`, quindi le policy non le danno alcuna protezione. Prima del
+guard un collaboratore interno poteva elencare ogni studio della piattaforma con ragione
+sociale, P.IVA ed email del responsabile, registrarne di nuovi, sospenderli e cancellarli.
+
+`src/server.test.ts` presidia entrambi: per ognuna delle dieci rotte di `ROTTE_PROTETTE`
+verifica 401 senza token e **non** 401 con un token valido, controlla che le rotte
+pubbliche restino raggiungibili e che il preflight CORS non venga respinto.
+
+### 🔑 Accesso & Gerarchia dei Ruoli (§2bis, §23)
+
+**Non esistono credenziali precaricate e non vanno reintrodotte.** Fino alla Fase 0
+`src/server.ts` conteneva una tabella di sette utenti con password nel sorgente e accettava
+qualunque password come jolly: chiunque leggesse il repository pubblico poteva autenticarsi
+in produzione. La tabella che stava qui elencava proprio quelle coppie, in violazione della
+regola 6 più in basso — motivo per cui non le si trascrive nemmeno per raccontare che sono
+state rimosse: l'elenco esatto vive solo in `src/credenziali.test.ts`, che le cerca.
+L'unica fonte di verità è ora la tabella `user` del database.
+
+| Ruolo | Ambito | Accesso |
+| :--- | :--- | :--- |
+| 👑 `super_admin` | Gestisce tutto e vede tutti i tenant (`tenant_id` NULL); può cambiare studio corrente via header `x-tenant-id` | JWT |
+| 👨‍💼 `advisor` | Responsabile del **solo proprio** tenant; crea e gestisce i collaboratori del proprio studio | JWT |
+| 👷 `collaboratore_interno` / `collaboratore_esterno` | Appartengono al tenant da cui vengono creati e non ne escono | JWT |
+| 🔑 `cliente` | Passwordless: solo Magic Link su `/portal`, mai `/auth/login` | Magic Link |
+
+- Primo `super_admin` su database vuoto: `npm run bootstrap` (§27), stampa la password
+  temporanea **una sola volta**.
+- Utenti già in database senza `password_hash`: `npm run passwords:assign`.
+- Nuovi collaboratori: `POST /tenant/utenti`, riservato a `super_admin` e `advisor`. Un
+  `advisor` non può creare un `super_admin`; un'email registrata presso un altro studio
+  viene rifiutata con 409 invece di cambiare tenant; la risposta non contiene mai
+  `passwordHash`.
+
+#### ⚠️ `super_admin` ha `tenant_id` NULL, e non è una finezza di modellazione
+
+È l'invariante su cui si appoggia la policy RLS di `public."user"`:
+
+```sql
+USING (tenant_id = app_tenant_corrente()
+       OR (tenant_id IS NULL AND app_ruolo_corrente() = 'super_admin'))
+```
+
+cioè la policy dà per assodato che i super_admin *siano* le righe senza tenant. Il database
+non lo rispettava: `seedFull.ts` creava i due super_admin con `tenantId = TENANT_ID`, e
+`prismaApp.listaUtenti()` li riassegnava al tenant che stava leggendo. Risultavano quindi
+membri ordinari dello studio di default.
+
+La conseguenza era concreta. Il controllo che impedisce di rubare un utente a un altro
+studio confronta `esistente.tenant_id` col tenant corrente; per un super_admin finito nel
+tenant dell'advisor quel confronto era vero, il 409 non scattava, e l'`update` successivo
+riscriveva `ruolo` a `collaboratore_interno`. **Un advisor poteva declassare il super admin
+della piattaforma** — e con due sole righe di quel tipo, lasciarla senza.
+
+Le tre correzioni, in ordine di robustezza:
+
+1. `prisma/migrations/20260819190000_super_admin_senza_tenant` rimette a NULL i `tenant_id`
+   dei super_admin esistenti. Con NULL è **RLS** a nascondere la riga all'advisor: la
+   difesa torna al motore, non a un confronto applicativo (regola 1).
+2. `prismaApp.listaUtenti()` è ora di sola lettura. Prima riscriveva cinque utenti cablati
+   a ogni chiamata: spostava righe altrui nel tenant che leggeva, riportava il super_admin
+   dentro un tenant e creava utenti senza `password_hash` con email divergenti da quelle
+   vere. Una GET che scrive è un effetto collaterale che nessun chiamante si aspetta.
+3. `POST /tenant/utenti` respinge con 403 la modifica di una riga il cui ruolo *esistente*
+   è `super_admin`, se chi chiede non è super_admin. Serve come difesa in profondità: regge
+   anche se un domani una riga tornasse fuori invariante.
+
+Presidio: `src/gerarchiaRuoli.test.ts` (8 test). Verifica il 403 **e** che l'`update` non
+venga nemmeno tentato, che un super_admin creato nasca con `tenantId: null`, che un
+collaboratore nasca nel tenant di chi lo crea, e che un errore di lettura su
+`GET /tenant/utenti` produca 503 invece di un elenco vuoto.
+
+- **La password la emette sempre il server, mai il client.** `POST /tenant/utenti`,
+  `POST /admin/tenants` e `POST /admin/tenants/:id/reset-password` la generano con
+  `generaPasswordTemporanea()`, ne salvano l'hash scrypt e la restituiscono in chiaro
+  **una sola volta** nella risposta. Non è rileggibile dopo: se va perduta si rigenera.
+  Il frontend non ne propone nessuna e non ne conserva nessuna. L'email di invito la compone
+  `sendInvitoCollaboratoreEmail` in `src/services/emailService.ts` e passa dal relay come
+  qualunque altro messaggio: l'azione `invite-collaborator` di `api/send-email.ts`, che
+  poteva annunciare una password di ripiego, non esiste più.
+  Una password di default comunicata dall'API è comunque una password valida.
+- `src/server.test.ts` ha un test di regressione che rifiuta ognuna delle otto vecchie
+  coppie email/password: se torna verde per una di esse, la falla è stata reintrodotta.
+- `src/credenziali.test.ts` è il presidio più ampio: scandisce `src/`, `frontend/src/` e
+  `api/` e fallisce se una delle vecchie password, dei token finti o del ripiego
+  `!password ||` ricompare su una riga non commentata. Copre anche i file `.tsx` del
+  frontend e le funzioni serverless, che una ricerca sul solo backend non tocca.
+- Il verify token del webhook WhatsApp di produzione era scritto in chiaro in
+  `GUIDA_META_WHATSAPP_INTEGRAZIONE.md`, in `GUIDA_CONFIGURAZIONE_CANALI.md`, dentro il PDF
+  generato da `frontend/src/utils/pdfGenerator.ts` (una guida che circola per email) e come
+  fixture in `src/services/communications.test.ts`. Ora è nella lista cercata da
+  `src/credenziali.test.ts`, il cui scan copre anche i `.md`. **Va rigenerato su Meta**: la
+  cronologia di git conserva il valore vecchio, e chi lo legge può superare l'handshake al
+  posto nostro e farsi registrare come webhook dello studio.
+
+- **Profilo & Gestione Password**:
+  - `POST /auth/change-password`: Cambio password per utenti staff autenticati (imposta `stato: 'attivo'`).
+  - `GET /auth/profilo`: Recupero nome, specializzazione e ruolo dell'utente connesso.
+  - `PUT /auth/profilo`: Aggiornamento dati profilo operatore.
+  - `POST /portal/change-password`: Cambio password per il cliente autenticato nel portale.
+  - `POST /tenant/utenti/:id/reset-password`: Reset password collaboratore da parte di Super Admin / Advisor (imposta `stato: 'invitato'`, genera password temporanea e la restituisce una volta sola).
+- **Progetti**: `GET /progetti`, `GET /progetti/:id`, `DELETE /progetti/:id`, `DELETE /progetti/:id/moduli/:moduloId` (Eliminazione sicura modulo persistita a DB con controllo ruoli; **409** se il modulo ha ore consuntivate o righe fattura collegate; transazione ordinata accessi → passaggi → microvoci → dipendenze → modulo; audit log), `PUT /progetti/:id/stato-completo` (Persistenza totale moduli, microvoci, checklist passaggi e note operative con audit log)
+- **Clienti**: `GET /clienti`, `POST /clienti`, `PUT /clienti/:id` (Salvataggio e recupero completo di tutti i campi ERP, legali, SDI, IBAN, KYC e referentiJson con audit log)
+- **Comunicazioni Omnichannel**: `GET /progetti/:id/comunicazioni`, `POST /progetti/:id/comunicazioni` (Messaggistica bidirezionale live Portale Cliente ⇄ Advisor Hub su tabella PostgreSQL `comunicazione_progetto`; la riga si scrive qui, la consegna sui canali la fanno le tre rotte sotto)
+- **Canali dal backend (§35)**: `POST /comunicazioni/invia-email`, `POST /comunicazioni/invia-whatsapp`, `POST /comunicazioni/email-in-arrivo` in `src/routes/comunicazioni.ts`. Il corpo contiene solo destinatario, oggetto e testo: host, utenza e password li legge il server dalla riga Tenant della richiesta (`credenzialiCanali`), e non lasciano mai il server. Prima queste tre cose le faceva il browser chiamando le funzioni serverless con la password SMTP letta da `localStorage`; `POST /progetti/:id/comunicazioni` spediva a sua volta il WhatsApp con le variabili d'ambiente, quindi al cliente arrivavano due messaggi identici dal numero di un solo studio. Un canale non configurato o un invio rifiutato risponde **400** con il motivo di Meta o del server di posta, mai `ok: true` (regola 7). Presidio: `src/comunicazioniCanali.test.ts` (16 test).
+  - ⚠️ **Eccezione da sanare — il verify token del webhook.** L'handshake `GET /webhooks/communications/whatsapp` (`src/routes/webhooks.ts:37`) confronta con la variabile d'ambiente `WA_VERIFY_TOKEN`, **non** con la riga Tenant: è una GET pubblica, senza JWT e quindi senza contesto tenant, e risolvere lo studio richiederebbe una lettura cross-tenant che scavalca RLS (vietata fuori da script e bootstrap, regola 1). Intanto **Impostazioni Studio → Canali** mostra un campo *Webhook Verify Token* che `PATCH /tenant/info` salva e che nessuno legge: l'operatore lo compila e crede di aver configurato l'handshake (regola 7). Le due uscite sono togliere il campo dall'interfaccia oppure dare a ogni studio il proprio path di callback, così che il tenant sia deducibile dall'URL. Serve una decisione del titolare: non l'ho scelta io.
+- **Fatturazione & Incassi**: `POST /progetti/:id/fatture` (gestisce sia Fatture `FT` che Note di Credito `NC` con numerazione distinta), `GET /invoices/scadenzario`, `POST /invoices/scadenze/:id/incassi` (Prima Nota) e `GET /invoices/:id/sdi-xml` (Tracciato XML FatturaPA).
+- **Contratti Retainer**: `GET /contratti-ricorrenti`, `POST /contratti-ricorrenti` (collegati sia al Cliente che al Progetto specifico).
+- **Multi-Tenant Piattaforma (solo `super_admin`)**: `GET /admin/tenants`, `POST /admin/tenants` (registra lo studio **e** la riga `user` del responsabile con ruolo `advisor`, restituendo la password temporanea una volta sola), `PATCH /admin/tenants/:id`, `DELETE /admin/tenants/:id`, `POST /admin/tenants/:id/reset-password` (rigenera la password del responsabile: nuovo hash su `user.passwordHash`, chiaro nella sola risposta, imposta `stato: 'invitato'`). Tutti passano da `soloSuperAdmin` → 403 per gli altri ruoli.
+- **Documenti & Workflow Bidirezionale Operatore ⇄ Cliente (§WF-DOC)**:
+  - `GET /documenti`: Lettura fascicolo con stato workflow (`bozza` | `pubblicato` | `in_revisione` | `firmato`), versione, richieste di modifica associate e firma.
+  - `POST /documenti`: Caricamento documento da computer/template nel fascicolo/microvoce (stato iniziale `bozza` con notifica condizionale).
+  - `PATCH /documenti/:id/stato`: Transizione di stato (`bozza` ⇄ `pubblicato`) con notifica automatica al cliente. **Rifiutata con 409 su documento `firmato`**: la firma è uno stato terminale.
+  - `POST /documenti/:id/nuova-versione`: Caricamento v2, v3... mantenendo il link `documentoPadreId` al documento padre e risolvendo le note aperte. **Rifiutata con 409 su documento `firmato`**.
+  - `PATCH /documenti/:id/sblocca`: Riapertura in `bozza` di un documento firmato, **riservata all'admin del tenant** (`advisor` / `super_admin`) e solo con motivazione di almeno 10 caratteri che resta a audit log (`DOCUMENTO_SBLOCCATO`) + notifica `documento_sbloccato` al cliente. La riga `firmaElettronica` non viene cancellata: lo storico della sottoscrizione resta ripercorribile.
+  - `GET /portal/documenti`: Documenti visibili al cliente (solo `pubblicato`, `in_revisione`, `firmato`; le bozze restano protette). Restituisce anche `documentoPadreId` e `versioniPrecedenti[]` (id, versione, caricatoIl, statoDoc, firmatoAt per ogni antenato, fino a 12 salti) perché il cliente possa sempre ripercorrere il documento all'indietro fino alla versione firmata.
+  - `POST /portal/documenti/:id/richiesta-modifica`: Richiesta di rettifica inviata dal cliente con note e commenti prima della firma OTP.
+  - `GET /documenti/:id/richieste-modifica` & `PATCH /documenti/richieste-modifica/:rid`: Gestione note di revisione e riscontri advisor.
+  - `DELETE /documenti/:id`: Eliminazione documento con audit log. **Rifiutata con 409 su documento `firmato` per tutti, admin inclusi** (decisione del titolare 27/08/2026): un atto sottoscritto non si elimina mai, al più lo si archivia o — per correggerlo — lo si sblocca (admin) e lo si sostituisce con una nuova versione.
+  - `PATCH /documenti/:id/archivia`: Archiviazione soft (`isArchiviato`, `archiviatoAt`, `archiviatoDaId`) con audit `DOCUMENTO_ARCHIVIATO` — il modo per togliere un documento firmato dalle liste operative, che lo escludono di default (`?includiArchiviati=true` per lo storico). Il file e la firma restano intatti e consultabili.
+- **Upload Documenti**: `POST /upload` (riceve base64 e salva in `./uploads/`), `GET /uploads/:filename` — confinata sotto `uploads/` e non anonima: nome rifiutato con 400 se non è `[a-zA-Z0-9_.-]` senza `..`, poi verifica sul percorso *risolto*; serve il file solo con Bearer **oppure** firma HMAC `?firma=&scad=`, perché quegli URL finiscono in `<img src>` che non può inviare header.
+### 🧠 Domain Layer (`src/domain/`)
+
+Moduli di dominio **puri**: nessuna chiamata a DB/HTTP. Ricevono entità, restituiscono valori nuovi. Il service layer chiama queste funzioni e persiste il risultato.
+
+- **`src/domain/types.ts`**: Tipi di dominio fondamentali: `StatoMicrovoce` (`pending` | `in_corso` | `completata` | `bloccata` | `attesa_dipendenza`), `StatoModulo`, `StatoProgetto`, `MicrovoceInput`.
+- **`src/domain/stateEngine.ts`**: Motore di calcolo stati (§16). Funzioni pure per: segnale rischio ore (`valutaSegnaleRischio`), cascata stato micro-voce → modulo → progetto (`calcolaStatoModulo`, `calcolaStatoProgetto`), ritardo manuale (`marcaRitardoManuale`, `risolviRitardoManuale`), risoluzione dipendenze modulo (`risolviDipendenze`). Le funzioni ricalcolano **solo verso l'alto** — §16.6.
+
+### 🔌 Porte & Interfacce (`src/services/`)
+
+Separano l'orchestrazione dal driver DB — la logica si tipizza e si testa senza `PrismaClient`.
+
+- **`src/services/appPort.ts`**: Interfaccia comune che `src/server.ts` usa per tutte le operazioni CRUD su clienti, progetti, preventivi, fatture e articoli. Non sa se sotto c'è `InMemoryApp` o `PrismaApp`. Definisce `Cliente`, `ProgettoBase`, `Preventivo`, `AppPort`.
+- **`src/services/istanziazionePort.ts`**: Interfacce (porte) per la transazione di istanziazione (§15.3) e per le operazioni di esecuzione del progetto (§17): `IstanziazionePort`, `IstanziazioneTransazione`, `EsecuzionePort`, `NotificationPort`. Definisce anche i tipi di input per passaggi template, righe distinta e moduli template con distinta.
+- **`src/services/fakeIstanziazionePort.ts`**: Implementazione in-memory delle porte di istanziazione, esecuzione e notifica — usata dall'adapter `InMemoryApp` e dai test.
+
+### ⚙️ Servizi di Orchestrazione (`src/services/`)
+
+- **`src/services/istanziaProgetto.ts`**: Orchestrazione §15.3 — cosa succede alla firma dell'engagement letter. Scrive il grafo di entità in una transazione atomica: crea moduli istanziati, micro-voci, passaggi template, calcola prezzo da distinta base.
+- **`src/services/esecuzione.ts`**: Orchestrazione §17 — consuntivazione ore, ritardo/blocco, procedura guidata, completamento micro-voce e passaggio, sblocco dipendenze. Chiama le funzioni pure di `stateEngine.ts` e persiste via `EsecuzionePort`.
+- **`src/services/calcoloService.ts`**: Orchestrazione §16 — unico punto che traduce le funzioni pure di `stateEngine.ts` in letture e scritture Prisma. `calcolaAvanzamento()` calcola stato, percentuale, segnale di rischio e ore extra di progetto e moduli **senza emettere query** (lavora su righe già caricate); `arricchisciProgetti()` allega l'avanzamento a un elenco; `ricalcolaProgetto()` persiste la cascata micro-voce → modulo → progetto. Due regole di scrittura non ovvie: **le percentuali non si persistono** (derivano da campi già in riga, una colonna in più potrebbe divergere dai propri ingredienti) e **un modulo senza micro-voci non si tocca** (`calcolaStatoModulo([])` risponde `pending`, che declasserebbe un modulo chiuso a mano — con zero micro-voci la riga è l'unica informazione esistente).
+- **`src/services/pdfService.ts`**: Generazione PDF server-side nativi per fatture e documenti (Buffer PDF senza dipendenze browser).
+- **`src/services/emailService.ts`**: le email trasazionali dello studio (Magic Link, credenziali cliente, invito collaboratore, notifica scadenze) e le due prove delle impostazioni, `provaPostaInUscita()` e `provaPostaInArrivo()`. Non apre più connessioni SMTP da sé: compone il messaggio e lo consegna a `inviaEmail()` di `emailRelay.ts`, cioè alla stessa strada degli invii veri — era il difetto di «dalle impostazioni neanche il test passa», perché `verifyAndSendTestSmtp` provava solo l'SMTP diretto (la strada che Railway blocca) su **quattordici** coppie host/porta, cinque delle quali server di altri. Senza host, utenza o password la prova risponde «non configurata» invece di ripiegare su `process.env` (regola 6).
+- **`src/services/emailRelay.ts`**: `inviaEmail()`, unico punto d'uscita della posta. In produzione prova **prima il relay** (`POST /api/send-email` su Vercel, HTTPS, header `x-bluman-relay`) e poi l'SMTP diretto come ripiego, perché la rete in uscita di Railway non lascia passare 465, 587 e 25; in sviluppo l'ordine si inverte. Porta `host` e `servername` come **due cose distinte**: il primo è l'indirizzo a cui si apre la connessione, il secondo il nome che il certificato deve attestare (`tls: { servername }`). Il nome viaggia su entrambe le strade — se si fermasse al relay la correzione funzionerebbe solo sul ripiego, cioè quasi mai. `rejectUnauthorized` resta `tlsRejectUnauthorized()` in ogni caso (§3.4): il nome dichiarato cambia il confronto, non lo elimina. Precedenza: riga Tenant, poi `SMTP_SERVERNAME` — su un'installazione multi-studio l'ambiente è di uno solo. Presidio: `src/postaNomeCertificato.test.ts`.
+- **`src/services/diagnosiPosta.ts`**: §35 — traduce l'errore di rete in un intervento. `diagnosiPosta()` riconosce sei cause (`nome-inesistente`, `certificato-altro-nome`, `certificato-non-fidato`, `porta-non-raggiungibile`, `credenziali-rifiutate`, `ignota`) leggendo il **testo** e non solo `err.code`, perché metà dei guasti arriva di seconda mano (il relay restituisce il `message` di nodemailer dentro un JSON, e `inviaEmail` compone la stringa dei due tentativi). Per il certificato che non corrisponde elenca i nomi che copre davvero e propone quello coerente conservando la prima etichetta (`imap.…` resta `imap.…`). L'ordine di riconoscimento è deliberato — DNS, certificato, timeout, credenziali — perché su Railway il timeout delle porte chiuse compare **insieme** alla causa vera e non deve coprirla. Offre **due strade in ordine**, perché la prima non basta sempre: (1) scrivere il nome coerente nel campo «Server», che chiude il caso se il provider lo pubblica nel DNS; (2) se quel nome non risolve, lasciare l'host che risolve e scriverlo nel campo «Nome nel certificato» — `nomeCertificatoSuggerito` porta la proposta, e il ramo `ENOTFOUND` rimanda allo stesso campo invece di far tornare l'operatore al punto di partenza. Quello che per scelta non fa: proporre di disattivare la verifica dei certificati (§3.4). `spiegaErrorePosta()` restituisce `«motivo tecnico» — «cosa fare»`: il primo serve al provider e ai log, il secondo a chi deve rimettere in funzione la posta. Presidio: `src/postaDiagnosi.test.ts`.
+- **`src/services/imapInbound.ts`**: lettura della posta in arrivo dal backend (relay-first in produzione, IMAP diretto come ripiego e strada normale in sviluppo), con i certificati verificati e ogni guasto passato da `spiegaErrorePosta`. `tls.connect({ host, servername })`: l'host è l'indirizzo che risolve, il `servername` il nome che il certificato attesta — è la casella in arrivo il caso per cui quella distinzione esiste (`imap.register.it` risolve ma presenta `*.securemail.pro`; `imap.securemail.pro` è coperto e non ha record DNS). Non risolve nomi da sé: `dns.lookup` più connessione all'IP è il tentativo che non poteva funzionare (un nome senza record A non risolve dal backend più che dal browser) e un test lo vieta in posizione di codice. Senza credenziali risponde `ok: false` col motivo, non un elenco vuoto: «nessuna risposta dal cliente» e «la casella non è configurata» erano indistinguibili nel fascicolo.
+- **`src/services/otpService.ts`**: Gestione codice OTP a tempo (5 min), rate limiting e sigillo server-side della firma (OTP verificata · art. 20 CAD). `generateEidasSignatureSeal()` è **l'unica fonte legittima** di marca temporale, `signatureId`, impronta SHA-256 e indirizzo IP di una firma: l'IP arriva da `req.ip`, che solo il server conosce. Il frontend non li fabbrica (regola 7).
+- **`src/services/cronService.ts`**: Worker automatico background scansione rinnovi UBO Malta, marchi EUIPO e solleciti fatture.
+- **`src/services/sdiService.ts`**: Trasmissione diretta 1-Click della Fattura Elettronica XML a SdI Agenzia delle Entrate.
+- **`src/services/securityScanner.ts`**: Validazione Magic-Bytes e sanitizzazione PDF nel Vault Documenti.
+- **`src/services/storageService.ts`**: Archiviazione Cloud S3/Supabase Storage con Presigned URL. Contiene il punto di verità per i nomi file: `nomeFileSicuro()` sanifica in scrittura, `nomeFileValido()` rifiuta in lettura (la divergenza fra le due metà *era* il path traversal), `urlUploadFirmato()` e `rifirmaUrlUpload()` emettono e rinnovano la firma HMAC dei download.
+- **`src/services/generazioneDocumenti.ts`**: Il motore di `POST /documenti/genera`. Una sola sostituzione dei tag (`risolviTagDocumento`), un solo modello a blocchi (`blocchiDaHtml` → `BloccoDocumento[]`) e due rese che leggono gli stessi blocchi: `generaPdfDocumento()` con pdfkit (il PDF è il **master**: `fileUrl` e `filePdfUrl` coincidono ed è il file su cui si fissa l'hash del sigillo) e `paragrafiDocx()` con docxtemplater per la copia di cortesia in Word. Un'area firme è tale solo se il `div` dichiara `display: flex`, ha **solo** div come figli e nessuna colonna contiene elementi blocco: il criterio precedente («due o più div figli») prendeva per riga di firme l'involucro `<div style="font-family: Arial">` dei 22 modelli di riorganizzazione, e l'intero documento usciva come una firma a quattro colonne.
+- **`src/services/slotFirma.ts`**: §36 — il vocabolario del segnaposto di firma, senza dipendenze dal motore di resa (importa `generazioneDocumenti.ts`, non il contrario: nessun ciclo, regola 8). `TAG_SLOT_FIRMA` riconosce **solo** `{{firma_cliente}}` e `{{firma_studio}}` (un `{{firma_notaio}}` resta letterale invece di diventare un'area firma che nessuno riempirà), `marcatoreSlot`/`estraiSlotFirma` traducono il tag nel marcatore interno `[[firma:slot]]` e ne ricavano l'etichetta, `bytePngFirma()` verifica i magic bytes PNG perché pdfkit su un buffer che non è né PNG né JPEG solleva **dentro** il rendering.
+- **`src/services/copiaFirmata.ts`**: §36 — alla firma del cliente ricompone il documento con la grafometrica dentro l'area `{{firma_cliente}}` e lo archivia come riga **nuova** (`tipo: 'firmato'`, `documentoPadreId` → originale, `caricatoDa: null`, `statoDoc: 'firmato'`). Non annota il PDF originale per due ragioni indipendenti: fra le dipendenze non c'è una libreria che scriva dentro un PDF esistente (`pdf-lib` non è installato) e quel file è quello su cui è fissato `documentoHash` del sigillo — riscriverlo invaliderebbe la prova che si vuole rendere visibile. `righeAttestazione()` compone nome, valore legale, data **in UTC** (non `toLocaleString`, che dipende dal fuso della macchina), ID firma e impronta del sigillo. Ritorna `null` senza sollevare in tutti i casi in cui la copia non si fa (documento generato prima di §36 e quindi senza `contenutoBlocchiJson`, template senza area firma del cliente, riga già firmata, altro tenant, storage caduto): un effetto collaterale non può invalidare una firma valida.
+- **`src/services/verbaleFirma.ts`**: Il verbale di firma allegato — PDF a sé con la grafometrica, il sigillo e le evidenze legali. È il fratello di `copiaFirmata.ts` e ne ha dettato la politica di fallimento: si registra l'errore e la firma resta valida.
+
+### ✍️ §36 — La firma dentro il documento
+
+Prima di §36 il documento firmato non conteneva la firma: il sigillo stava nella riga `FirmaElettronica`, la grafometrica nel verbale allegato, e l'area firme del contratto restava vuota. La catena, oggi:
+
+1. **Il template dichiara dove**: `{{firma_cliente}}` / `{{firma_studio}}` nei modelli (7 modelli prebuilt in `frontend/src/utils/documentTemplates.ts`, 22 in `reorganizationTemplates.ts`, e il gruppo «Aree Firma» del Document Studio in `frontend/src/components/editor/PannelloTag.tsx`). Nell'anteprima il tag diventa uno **spazio** tratteggiato: nessun nome e nessuna data, perché nessuno ha ancora firmato (regola 7).
+2. **La generazione persiste i blocchi**: `POST /documenti/genera` salva in `documento.contenuto_blocchi_json` i blocchi **già risolti** (nessun `{{...}}` residuo). Sono l'unica cosa da cui si può ricomporre il documento senza rigenerare il merge — e senza toccare il PDF sigillato.
+3. **La firma ricompone**: `/portal/verify-otp-and-sign` chiama `archiviaCopiaFirmata()` (in `src/routes/firma.ts`), che genera un PDF nuovo con la grafometrica nello slot e lo archivia accanto all'originale. L'audit `COPIA_FIRMATA_GENERATA` lo registra la rotta, non il servizio: solo la rotta conosce l'IP della richiesta. Un esito `null` **non** viene auditato — sarebbe rumore su ogni firma di ogni documento vecchio.
+
+Tre invarianti da non rompere:
+
+- **L'originale non si riscrive mai.** La copia firmata è una riga in più, figlia dell'originale. Il file su cui è fissato l'hash del sigillo resta byte per byte quello certificato.
+- **La copia firmata è solo PDF.** La copia di cortesia in Word non si rigenera firmata: incorporare un'immagine in un `.docx` richiederebbe il modulo immagini di docxtemplater, che non è una dipendenza del progetto. Il documento che fa fede è il PDF.
+- **Il canale di firma su file caricato resta fuori.** Con `tipoFirma: 'manuale_scansionata' | 'qualificata_esterna'` la sottoscrizione è già dentro il file che il cliente ha ricaricato (`fileFirmatoUrl`): ricomporre lì sostituirebbe la prova con una resa fatta dal server.
+
+### 🔩 Adapters (`src/adapters/`)
+
+Implementazioni concrete delle porte di dominio.
+
+- **`src/adapters/inMemoryApp.ts`**: App in-memory — quick start senza database. Usa la stessa logica di dominio testata (`istanziaProgetto`, `stateEngine`), con persistenza solo in RAM. Si azzera ad ogni riavvio del processo. Per la persistenza vera: `src/adapters/prisma/`.
+- **`src/adapters/appErrors.ts`**: Errori applicativi condivisi (`ClienteNonTrovatoError`, `ProgettoNonTrovatoError`, `PreventivoNonTrovatoError`, `ModuloNonTrovatoError`, `TransizioneNonValidaError`). Sia `InMemoryApp` che `PrismaApp` li lanciano, `server.ts` li mappa agli status HTTP giusti.
+- **`src/adapters/prisma/prismaApp.ts`**: Adapter Prisma completo per PostgreSQL/Supabase. Implementa `AppPort` con tutte le operazioni CRUD reali via Prisma, inclusa `listaUtenti()` (ora di sola lettura — prima riscriveva utenti cablati ad ogni chiamata).
+- **`src/adapters/prisma/prismaIstanziazionePort.ts`**: Implementazione Prisma delle porte `IstanziazionePort` e `EsecuzionePort` — transazioni atomiche reali su PostgreSQL.
+- **`src/adapters/prisma/bootstrap.ts`**: Bootstrap del sistema (§27). Crea il primo `super_admin` con `tenantId: null`. Va lanciato **una sola volta** con `npm run bootstrap`, mai come endpoint HTTP.
+- **`src/adapters/prisma/seed.ts`**: Script di seed leggero esportato come modulo.
+- **`src/adapters/prisma/seedFull.ts`**: Seed completo di produzione per popolare Supabase/PostgreSQL (utenti studio, giurisdizioni, articoli distinta base, moduli template e clienti ERP).
+- **`src/adapters/prisma/applyRls.ts`**: ⚠️ **SUPERATO** — non applicare più da qui. Documentazione del perché il vecchio `20260815_enable_rls.sql` è stato sostituito. La migrazione nuova si applica solo con `psql` diretto.
+- **`src/adapters/prisma/index.ts`**: Re-export del modulo adapter Prisma.
+
+### 🔑 Utilities Backend (`src/util/`)
+
+- **`src/util/prismaClient.ts`**: I tre client Prisma e il contesto tenant per richiesta (§14). `prisma` è il client applicativo: impone `app.current_tenant_id` a ogni query, così le policy RLS hanno qualcosa su cui filtrare. `prismaAmministrativo()` scavalca RLS e va usato **solo** per script, seed, bootstrap, backup, la ricerca dell'utente per email al login e la verifica del magic token (richieste anonime per definizione, dove il tenant si scopre dalla riga cercata). `conContestoInTransazione()` reimposta la variabile dentro una transazione interattiva, che gira su una connessione propria.
+- **`src/util/password.ts`**: Hashing password con scrypt di `node:crypto` (§23) — nessuna dipendenza con binding nativi. `hashPassword()`, `verifyPassword()` con `timingSafeEqual`, `generaPasswordTemporanea()` con `randomBytes`.
+- **`src/util/jwt.ts`**: Gestione token JWT (generazione, verifica, estrazione claims), firma HMAC per download (`firmaDownload`, `verificaFirmaDownload`), generazione e hash magic token (`generateMagicToken`, `hashMagicToken`).
+- **`src/util/serverHelpers.ts`**: Costanti e helper condivisi estratti da `src/server.ts` (split dei monoliti): costanti tenant/sessione (`TENANT_DEFAULT`, `DURATA_SESSIONE_*`, `SOGLIA_RINNOVO`, `GIORNI_VALIDITA_MAGIC_LINK`, stati micro-voce/progetto), `ipReale()`, `recordAudit()`, `normalizzaGrafometrica()`, `nomeFileDaUrl()`, `clienteDellaRichiesta()`, `senzaHash()`, `baseUrlApplicazione()`, validazione recapiti OTP. Sono importati da `server.ts` e dai moduli `src/routes/` che ne hanno bisogno.
+- **`src/util/soloCodice.ts`**: toglie da un sorgente commenti di riga, commenti di blocco e letterali regex, lasciando intatte le stringhe. Lo usano i presidi strutturali — quelli che verificano che un nome (un server di posta di terzi, la casella di un solo studio) non compaia in **posizione di codice**: i commenti che raccontano una correzione devono poter nominare quello che è stato corretto. `<` non conta come inizio di regex, perché nei `.tsx` apre un tag di chiusura e `</div>` faceva saltare il resto della riga di testo JSX; `>` sì, perché `x => /re/.test(y)` esiste. Sta in `src/util/` e non dentro un file di test perché lo importano due presidi diversi, e la copia divergente era il modo più rapido per avere due scansioni che non concordano.
+- **`src/util/dominioMittente.ts`**: `dominioDaIndirizzo()` — il dominio su cui vanno pubblicati i record DNS della posta, ricavato dal primo indirizzo configurato che ne contenga uno utilizzabile (mittente SMTP, poi casella IMAP). Funzione pura, senza React: la importa il `.tsx` del pannello dei record DNS **e** il presidio in radice, perché `vitest.config.ts` esclude `frontend/**` (il frontend ha la sua toolchain Vite e nessun runner di test). Un indirizzo senza `@`, senza punto o con il punto ai bordi non produce un dominio: meglio `null` — e il pannello che chiede di compilare il campo — di una stringa che sembra un dominio e finisce in istruzioni da seguire nel pannello del registrar.
+
+### 🛠 Script di Manutenzione (`src/scripts/`)
+
+- **`src/scripts/backupDb.ts`**: Backup e snapshot JSON di tutte le tabelle del database BluMan multi-tenant.
+- **`src/scripts/verifyAll.ts`**: Test runner completo per il collaudo automatico della test suite end-to-end.
+- **`src/scripts/verificaAccessi.ts`**: Diagnostica read-only di chi può effettivamente autenticarsi, da lanciare **prima** di un rilascio che chiude l'autenticazione: elenca ruolo, tenant e presenza/assenza di `password_hash` (mai l'hash) e fallisce con exit 1 se non esiste un `super_admin` attivo con password.
+- **`src/scripts/checkRls.ts`**: Diagnostica read-only dell'isolamento reale — ruolo di connessione, `bypassrls`, RLS attivo/forzato per tabella e prova pratica con un tenant inesistente (deve restituire 0 righe).
+- **`src/scripts/probeAvanzamento.ts`**: Diagnostica read-only del motore di stato (§16) su tutti i tenant: per ogni progetto confronta lo stato in riga con quello calcolato e dice **quali righe un `POST /progetti/:id/ricalcola` cambierebbe, prima di eseguirlo**. Segnala a parte i moduli senza micro-voci, il cui stato non è verificabile né correggibile.
+- **`src/scripts/assignPasswords.ts`**: Assegnazione password iniziali agli utenti senza `password_hash` (`npm run passwords:assign`). Complementare a bootstrap (§27). Le password sono stampate **una sola volta**, mai salvate né inviate.
+- **`src/scripts/testTenantDb.ts`**: Verifica di andata e ritorno delle impostazioni studio su database. Pretende `TEST_TENANT_ID` e si rifiuta di girare senza (scriveva sul tenant di produzione), usa valori segnaposto `.invalid` e maschera i campi segreti (`smtpPass`, `imapPass`, `waAccessToken`, `waVerifyToken`, `tgBotToken`) invece di stamparli.
+- **`src/scripts/cleanupTestData.ts`**: Rimozione artefatti lasciati nel database reale da run di vitest precedenti all'isolamento. Dry-run di default, `--conferma` per cancellare. Criteri di sicurezza: nome cablato nei test, UUID generato (non id parlanti del seed), nessun progetto/preventivo collegato.
+- **`src/scripts/mapTenantTables.ts`**: Diagnostica read-only: classifica le tabelle di `public` in base a come si legano al tenant (colonna diretta `tenant_id` vs risalita al padre). Serve a scrivere le policy RLS corrette.
+- **`src/scripts/inspectDb.ts`**: Ispezione rapida dello stato del database.
+- **`src/scripts/seedData.ts`**: Seed dati di supporto.
+
+### 🧪 Test Suite (`src/` — Vitest)
+
+Configurazione: `vitest.config.ts` + `vitest.setup.ts` (isolamento dal DB reale).
+
+- **`src/server.test.ts`**: Test end-to-end del server Fastify — guard di autenticazione (401 sulle rotte protette, raggiungibilità rotte pubbliche, preflight CORS), regressione sulle vecchie credenziali cablate.
+- **`src/credenziali.test.ts`**: Presidio che scandisce `src/`, `frontend/src/` e `api/` alla ricerca delle vecchie password cablate, dei token finti e del ripiego `!password ||`. Non elenca le credenziali per documentarle: le cerca per impedirne il ritorno.
+- **`src/accessoCliente.test.ts`**: Presidio dell'accesso del cliente al portale — magic token inventato, assente o scaduto → 401 con lo stesso messaggio; token valido → JWT col `tenantId` dalla riga; in tabella solo SHA-256; `..%2f` su `/uploads` → 400; `/uploads` senza Bearer né firma → 401; firma manomessa, di altro file o scaduta → 401.
+- **`src/gerarchiaRuoli.test.ts`**: Presidio della gerarchia §2bis con client Prisma finto — copre il 403 sulla modifica riga `super_admin`, `tenantId: null` del super_admin, tenant di chi crea per i collaboratori, e 503 (non elenco vuoto) su errore lettura team.
+- **`src/calcoloService.test.ts`**: Presidio del service layer del motore di stato §16 (22 test). Verifica le percentuali *mostrate* — compreso il tetto a 99 quando la media pesata arrotonderebbe a 100 su un progetto non chiuso — la media pesata sulle ore anziché sul numero di moduli, i segnali di rischio, e soprattutto **quali righe vengono scritte e quali no**: nessuna scrittura se lo stato calcolato coincide con quello in riga, nessuna scrittura sullo `stato` di una micro-voce (la cascata sale, non scende), nessun declassamento di un modulo senza micro-voci, `pre_project` mai promosso per calcolo. Copre anche la rotta via HTTP: 200 con avanzamento, 404 su id inesistente, 401 senza token, `avanzamento` presente in `GET /progetti`.
+- **`src/util/password.test.ts`**: Test hashing/verifica password scrypt, salt casuale, e gestione valori malformati.
+- **`src/util/prismaClient.test.ts`**: Test del client Prisma e contesto tenant.
+- **`src/domain/stateEngine.test.ts`**: Test del motore di calcolo stati — cascata micro-voce → modulo → progetto, segnali rischio, ritardi, dipendenze.
+- **`src/domain/giurisdizioni.test.ts`**: Test sulla coerenza dei dati giurisdizioni.
+- **`src/services/istanziaProgetto.test.ts`**: Test orchestrazione istanziazione progetto §15.3.
+- **`src/services/esecuzione.test.ts`**: Test orchestrazione consuntivazione ed esecuzione §17.
+- **`src/services/antiDuplication.test.ts`**: Test anti-duplicazione entità.
+- **`src/services/communications.test.ts`**: Test comunicazioni omnichannel. Include l'handshake vero di `GET /webhooks/communications/whatsapp` (token giusto → 200 con la challenge, token sbagliato → 403, `WA_VERIFY_TOKEN` assente → 503): prima erano due letterali confrontati fra loro, che non toccavano la rotta e intanto pubblicavano il verify token di produzione.
+- **`src/comunicazioniCanali.test.ts`**: §35 — i segreti non escono da `GET /tenant/info` (valore vuoto + flag `<chiave>Impostata`), `PATCH /tenant/info` con `smtpPass: ''` non cancella la password salvata mentre `null` la cancella, e le tre rotte `/comunicazioni/*` rispondono 400 col motivo quando il canale non è configurato — mai 200 con un elenco vuoto o un successo inventato. 16 test con client Prisma finto, perché quello che conta è *cosa* viene scritto.
+- **`api/sendEmail.test.ts`**: §35 — il relay su Vercel rifiuta le chiamate senza `x-bluman-relay`, non imposta intestazioni CORS, non spende `process.env.SMTP_PASS` per conto di chi passa, non ha più le vecchie azioni (`test-imap` → 400), e porta `smtpServername` fino a `tls.servername` di nodemailer con `rejectUnauthorized` vero. Sta in `api/` perché `tsconfig.json` limita il programma a `src` con `rootDir: src`. 12 test.
+- **`src/postaDiagnosi.test.ts`**: §35 — la traduzione da errore tecnico a intervento, sui tre messaggi che lo studio ha letto in produzione presi verbatim: `ENOTFOUND mail.bluecode-ltd.com` deve dire che il nome non esiste nel DNS **e che non è la password**, il certificato di `imap.register.it` deve elencare `*.securemail.pro, securemail.pro` e proporre `imap.securemail.pro`, quello di `authsmtp.register.it` deve proporre `authsmtp.securemail.pro`, e nessun rimedio deve suggerire di disattivare la verifica. Include il caso del punto finale del nome DNS (`imap.register.it.`, com'è scritto da Node), quello del certificato che non copre nessun nome utilizzabile (nessuna proposta inventata) e la stringa composta da `inviaEmail`, dove il timeout delle porte chiuse su Railway non deve coprire la causa vera. Chiude con il presidio strutturale: **nessun nome di server di terzi in posizione di codice** in `src/` e `api/` — i commenti che raccontano la correzione possono nominarli, il codice no — e nessun mittente cablato nei moduli della posta. Lo scanner salta commenti *e letterali regex*, perché `replace(/([\\"])/g, …)` contiene una virgoletta e senza quel passaggio la scansione prendeva per stringa tutto il commento che seguiva. Le cartelle ispezionate sono `src/`, `api/` **e `frontend/src`**: il modulo Canali proponeva `es. smtp.register.it` e `imap.register.it` come segnaposto, ed è il modo in cui quei nomi rientrano senza che nessuno li scriva nel backend — l'operatore li copia dal segnaposto. Confronto insensibile alle maiuscole, perché nel testo JSX il nome era scritto «Register.it». 20 test.
+- **`src/postaRecordDns.test.ts`**: §35 — il pannello dei record DNS non dichiara uno stato che nessuno ha verificato. La tabella in `TabChannels.tsx` era intestata «Configurazione Record DNS Dominio per Register.it (Anti-Spam & Deliverability 100%)» e portava una colonna «Stato Deliverability» con «✓ Conforme» su tutte le righe: **spunte letterali nel JSX**, verdi anche a dominio scaduto e zero record pubblicati, cioè proprio nei casi in cui il pannello sarebbe servito (regola 7). Il presidio verifica che «Conforme» e «Stato Deliverability» non tornino, che il pannello dica di non leggere il DNS, che il dominio si ricavi dagli indirizzi configurati (`dominioDaIndirizzo`, quattro casi compreso quello che **non** produce un dominio) e che SPF, DKIM e MX rimandino al provider invece di proporre un valore — un `include:` SPF sbagliato autorizza i server sbagliati e peggiora il recapito. Chiude sui segnaposto del modulo: nessuno può nominare un provider o uno studio. 11 test.
+- **`src/postaNomeCertificato.test.ts`**: §35 — il nome dichiarato per il certificato arriva davvero sul filo, su tutte le strade. Verifica che `smtpServername` compaia nel corpo del relay accanto a `smtpHost`, che l'SMTP diretto riceva `tls.servername` con `rejectUnauthorized` **vero** (§3.4: il nome cambia il confronto, non lo elimina), che il campo vuoto non aggiunga nulla (`not.toHaveProperty('servername')`), che dopo un relay rifiutato il nome resti su entrambi i tentativi, che la riga Tenant vinca su `SMTP_SERVERNAME`, e che la lettura IMAP porti `imapServername`. Chiude con il presidio strutturale che **vieta `dns.(lookup|promises|resolve)`** in posizione di codice nei tre moduli della posta: era il tentativo di `711f265`, e non poteva funzionare perché un nome senza record A non risolve dal backend più di quanto risolva dal browser. Nessun test apre un socket: `nodemailer` e `fetch` sono finti e si osserva cosa ricevono. 8 test.
+- **`src/postaProveRotte.test.ts`**: §35 — `POST /tenant/test-email` e `POST /tenant/test-imap` su una casella non configurata: 400 con l'elenco di cosa manca, `message` che dice che è andata male, nessun nome di provider nella risposta e 401 senza token. Il test che conta: con `SMTP_USER`/`SMTP_PASS` impostati nell'ambiente e la riga Tenant vuota la prova **non** ricade su quelle credenziali — prima ricadeva, e uno studio senza posta configurata vedeva il test riuscire con la casella della piattaforma. Nessuno di questi rami apre un socket, quindi non dipende dalla rete. 9 test, incluso quello che verifica che il campo «Nome nel certificato» indicato nel modulo venga **provato e non ignorato**: se la prova lo scartasse misurerebbe una connessione diversa da quella degli invii veri.
+- **`src/services/catalogDocumentLinkage.test.ts`**: Test collegamento catalogo-documenti.
+- **`src/services/newFeatures.test.ts`**: Test funzionalità aggiunte di recente.
+- **`src/services/pdfService.test.ts`**: Test generazione PDF server-side.
+- **`src/services/auditAccounting.test.ts`**: Test audit contabile.
+- **`src/services/teamAnalytics.test.ts`**: Test analytics team operatori.
+- **`src/generazioneDocumenti.test.ts`**: `POST /documenti/genera` dal template al file (34 test): merge dei tag, parser a blocchi, le due rese, `fileUrl === filePdfUrl` (l'hash della firma si fisserà lì), i blocchi risolti persistiti in `contenutoBlocchiJson` per §36, il PDF che esce anche se il Word fallisce, audit e notifica `documento_da_firmare` solo se pubblicato. Presidia anche il criterio dell'area firme: l'involucro del documento con più div figli **non** è una riga di firme.
+- **`src/copiaFirmata.test.ts`**: §36 — la catena della firma dentro il documento (17 test): il tag diventa marcatore e poi slot con l'etichetta del template, `generaPdfDocumento` senza `firme` produce lo stesso documento di prima, con `firme` stampa le righe di attestazione e non cade su una grafometrica corrotta, `righeAttestazione` scrive la data in UTC, e il servizio crea **una** riga nuova (`tipo: 'firmato'`, `documentoPadreId`) senza toccare l'originale. Copre i cinque casi in cui la copia non si fa e ritorna `null` senza sollevare.
+- **`src/verbaleFirma.test.ts`**: Il verbale di firma allegato e, da §36, i tre percorsi end-to-end attraverso `/portal/verify-otp-and-sign`: firma su documento con area firma → copia firmata + verbale + audit `COPIA_FIRMATA_GENERATA`; documento generato prima di §36 → solo il verbale; template senza area firma del cliente → nessuna riga duplicata.
+- **`src/archivioDocumenti.test.ts`**: §37 — `GET /documenti/archivio` con client Prisma finto (9 test): 401 senza token e **403 col token cliente** (l'archivio elenca tutti i clienti dello studio), l'albero restituito anche a documenti zero, i conteggi per progetto sommati sul cliente con la data dell'ultimo caricamento, il documento agganciato alla sola micro-voce risalito al progetto (e la query delle micro-voci che non parte quando non serve), «firmato» = sigillo a database **oppure** copia `tipo: 'firmato'` di §36, gli archiviati in un contatore a parte che non alza la data, i documenti orfani di progetto dichiarati in `nonCollocati` invece di sparire.
+- **`src/rotteNonTrovate.test.ts`**: la differenza fra «la rotta non c'è» e «la rotta c'è ed è protetta» (6 test). Nasce dal difetto per cui l'hook di autenticazione girava anche sul gestore not-found e rispondeva 401 a qualunque URL, cancellando il 404. Da §34 presidia anche la sonda di deploy: `POST /documenti/genera` senza token dà **401 con corpo `{errore}`**, mai 404, mentre una rotta gemella inesistente dà **404 col corpo di Fastify** (`{error: 'Not Found'}`, senza la chiave `errore`). È la coppia di forme su cui si legge un `curl` contro il dominio Railway per capire se l'immagine distribuita contiene la rotta.
+
+### ☁️ Serverless Functions (`api/`)
+
+- **`api/send-email.ts`**: **relay** di posta a uso del solo backend, non un endpoint per il browser (§35). Serve perché la rete in uscita di Railway non lascia passare le porte SMTP (ETIMEDOUT misurato su 465, 587 e 25 verso `authsmtp.register.it`): il messaggio arriva già composto da `src/services/emailRelay.ts` e viene consegnato da qui, che gira su un'altra rete, con le credenziali dello studio. Accetta due sole azioni, `send-message` e `fetch-imap-inbound`. Chiuso da: header `x-bluman-relay` confrontato con `EMAIL_RELAY_SECRET`, nessuna intestazione CORS, nessun ripiego su `process.env.SMTP_*` per le chiamate non autorizzate, solo l'host di posta dello studio fra i candidati (prima offriva le credenziali di uno studio su Gmail ai server di Register.it), destinatario obbligatorio e validato, certificati TLS verificati. Accetta `smtpServername`/`imapServername` e li passa come `tls.servername` senza toccare `rejectUnauthorized`. Presidio: `api/sendEmail.test.ts` (12 test).
+- **`api/webhooks/communications/`**: Webhook per ingestion messaggi da canali esterni (Telegram, WhatsApp).
+
+### 📦 Migrazioni Database (`prisma/migrations/`)
+
+- `0_init/`: Schema iniziale completo.
+- `20260819120000_rimozione_password_chiaro_tenant/`: DROP della colonna `lead_advisor_password` da `Tenant`.
+- `20260819190000_super_admin_senza_tenant/`: Rimette a NULL i `tenant_id` dei super_admin.
+- `20260819210000_magic_link_persistito/`: Crea la tabella `MagicLink` con policy RLS incorporata.
+- `20260827180000_archiviazione_documenti_firmati/`: Aggiunge `isArchiviato`, `archiviatoAt`, `archiviatoDaId` a `Documento` e `isArchiviato` a `EngagementLetter` (additiva: nessun dato toccato). I documenti firmati non si eliminano più: si archiviano.
+- `20260829200000_blocchi_documento_per_firma_incorporata/`: §36 — aggiunge `contenuto_blocchi_json` (JSONB, nullable) a `Documento`. Additiva e senza backfill: i documenti generati prima restano senza blocchi e alla firma producono solo il verbale, come prima.
+
+### 🔒 Migrazioni RLS Supabase (`supabase/migrations/`)
+
+- **`20260819_rls_effettiva.sql`**: Ruolo `bluman_app` (senza `BYPASSRLS`), policy `isolamento_tenant` su tutte le tabelle, `FORCE ROW LEVEL SECURITY`. Si applica con `psql` (usa `\gexec` per non stampare la password). Sostituisce `20260815_enable_rls.sql`.
+- `20260815_enable_rls.sql`: ⚠️ **INERTE** — le sue policy PERMISSIVE si sommerebbero in OR a quelle nuove, vanificandole. Non riapplicare.
+
+### 🏗 Infrastruttura & CI
+
+- **`.github/workflows/ci.yml`**: Workflow di Continuous Integration GitHub Actions per build e test automatici ad ogni push.
+- **`Dockerfile`** + **`docker-compose.yml`**: Containerizzazione backend.
+- **`railway.json`**: Configurazione deployment Railway. Builder Dockerfile; il `CMD` è `npx prisma migrate deploy && npx tsx src/index.ts`, quindi **le migrazioni si applicano all'avvio del container** e non vanno lanciate a mano.
+- **`scripts/distribuisci.sh`**: distribuzione da riga di comando delle due metà. Esiste perché si distribuiscono in due modi diversi e la differenza non è visibile da nessuna parte: **Railway non è collegato a GitHub**, quindi `git push` aggiorna solo il frontend su Vercel e lascia il backend all'immagine precedente — chi spingeva e poi provava la correzione la provava contro il codice vecchio. Lo script verifica prima (`tsc --noEmit`, `npm run typecheck`, `vitest run`), rifiuta di spingere con l'albero sporco, poi `git push origin main` e `railway up --detach`. Autenticazione: il push su HTTPS chiede un **Personal Access Token** di GitHub incollato nel terminale (nessun browser); `railway login` apre il browser, `railway login --browserless` stampa un codice da incollare a mano.
+- **`vercel.json`**: Configurazione deployment Vercel (serverless functions + frontend).
+- **`.agents/skills/meta-whatsapp-integration/SKILL.md`**: Skill e runbook per l'integrazione WhatsApp Business Cloud API & Remote MCP Meta DevTools.
+- **`prisma/seed.ts`**: Script di seed master completo e idempotente per popolare Supabase/PostgreSQL (utenti studio, giurisdizioni, articoli distinta base, moduli template e clienti ERP).
+- **Firma Elettronica Semplice & OTP**: `POST /portal/request-otp`, `POST /portal/verify-otp-and-sign` (Sigillo SHA-256 e Timestamp ISO), `POST /portal/firma-con-file` (firma a penna/qualificata ricaricata), `GET /firme` (il cliente vede solo le proprie). Ambiti OTP: `engagement_letter`, `documento_vault`, `modulo_completato` (conclusione di un'operazione: impronta calcolata dal server sui dati del modulo via `improntaModuloCompletato`, mai dal browser; 409 se il modulo non è `done` o è già firmato), `addendum`.
+- **Cron Scadenze**: `POST /cron/esegui-notifiche-scadenze` (Scansione UBO, KYC, fatture e solleciti automatici).
+- **Telegram Bot Webhook**: `POST /webhooks/communications/telegram`, `POST /tenant/telegram-webhook-setup` (Ingestion live nei progetti).
+- **Trasmissione SDI 1-Click**: `POST /invoices/:id/trasmetti-sdi` (Invio diretto e tracciatura SdI).
+- **Articoli & Listino**: `GET /articoli`, `POST /articoli`, `PATCH /articoli/:id` (Modifica Prezzo & Ore Admin)
+- **Document Studio & Template Contratti**: `GET /documenti-template`, `POST /documenti-template`, `PUT /documenti-template/:id`, `DELETE /documenti-template/:id` (Salvataggio modelli con Smart Tags ERP)
 
 ---
 
-## 8. Design — Regole Estetiche
+## 🗄 3. Database Schema (`prisma/schema.prisma`)
 
-- Dark mode: background #0f1117, sidebar #161822, card #1e2030
-- Accent: indigo #6366f1 (primary), verde #10b981 (success), ambra #f59e0b (warning), rosso #ef4444 (blocked)
-- Font: DM Sans (Google Fonts) — weights 300, 400, 500, 600
-- Border radius: 8px small, 12px card, 16px modal
-- Il prototipo HTML e il riferimento visivo — replicare fedelmente l'estetica
-- Transizioni 0.15s su hover
-
----
-
-## 9. Sicurezza — Regole Assolute
-
-- MAI esporre SUPABASE_SERVICE_KEY al frontend.
-- MAI fare query senza tenant_id filter lato backend.
-- MAI fidarsi di tenant_id passato dal client nel body/params.
-- MAI committare file .env.
-- DocuSign private key: sempre come file esterno da variabile d'ambiente.
-
----
-
-## 10. Ordine di Sviluppo (MVP)
-
-- [x] Struttura progetto (cartelle, config, nixpacks)
-- [x] Migrations SQL — schema DB completo (001_initial.sql)
-- [x] config.py, db/client.py, db/auth.py (middleware JWT + tenant isolation)
-- [x] main.py (FastAPI app con tutti i router)
-- [x] services/preventivo.py — logica accettazione (crea progetto + moduli + dipendenze + EL)
-- [x] services/docusign.py — integrazione DocuSign (JWT auth, envelope, signing URL)
-- [x] api/preventivi.py — CRUD + /invia + /accetta + /rifiuta
-- [x] api/progetti.py — lista/dettaglio/update + webhook DocuSign firma
-- [x] Auth multi-tenant (Supabase Auth + ruoli in app_metadata) — api/auth.py
-- [x] API Clienti (CRUD) — api/clienti.py
-- [x] API Libreria Moduli (CRUD template + dipendenze) — api/libreria.py
-- [x] API Moduli Progetto (stato, team, avanzamento) — api/moduli.py
-- [x] API Micro-voci (consuntivazione ore, cambio stato con nota) — api/micro_voci.py
-- [x] Motore stati (at_risk automatico, propagazione delayed/blocked) — services/stati.py
-- [x] API Fatture (3 tipi riga) — api/fatture.py
-- [x] API Documenti (upload Supabase Storage) — api/documenti.py
-- [x] Super Admin — api/superadmin.py
-- [ ] Frontend React — Layout + Auth
-- [ ] Frontend — Dashboard, Progetti, Wizard, Libreria
-- [ ] Portale cliente (/portale)
-- [x] Notifiche email (Postmark) — services/email.py
-
-## V2 (dopo MVP)
-- [ ] Logica blocco/sblocco automatico grafo dipendenze
-- [ ] Portale cliente: firma digitale in-app
-- [ ] Calendario condiviso team
+- **`Tenant`**: Dati studio, Sede Legale, Sede Operativa, P.IVA, Logo URL, Colore Tema PDF, credenziali SMTP (`smtp_pass`) e IMAP (`imap_pass`) isolate per tenant, più `smtp_servername`/`imap_servername` — il nome che il certificato deve attestare quando è diverso dall'host a cui si collega (vuoto: si verifica l'host).
+  - ⚠️ La colonna `lead_advisor_password` **non esiste più**: rimossa dalla migrazione `prisma/migrations/20260819120000_rimozione_password_chiaro_tenant/`. Conteneva la password del responsabile in chiaro, era restituita da `GET /admin/tenants`, era scrivibile da qualunque utente del tenant via `PATCH /tenant/info` e finiva in ogni backup. Le password dello staff vivono solo come hash scrypt su `user.password_hash`. La DROP è volutamente irreversibile: non c'è nulla da recuperare, solo qualcosa da non ricreare.
+- **`Cliente`**: Dati ERP, Partita IVA, Codice Fiscale, Sede Legale, Codice SDI, IBAN, Rischio AML, UBO, Fonte Patrimonio, Data KYC, `referentiJson`.
+- **`User`**: `tenantId` **nullable**, e la nullità è semantica: `NULL` significa `super_admin`, cioè un utente di piattaforma che non appartiene a nessuno studio (§2bis). La policy RLS di `public."user"` concede la visione delle righe senza tenant al solo `super_admin`, quindi un `super_admin` con `tenant_id` valorizzato diventa un utente ordinario di quello studio — modificabile dal suo advisor. Ripristinato da `prisma/migrations/20260819190000_super_admin_senza_tenant/`; dettagli e conseguenze nella sezione «Accesso & Gerarchia dei Ruoli» qui sopra. Password solo come hash scrypt su `password_hash`; `stato` è `StatoUtente` (`attivo` | `invitato` | `disattivato`), non un booleano.
+- **`ComunicazioneProgetto`**: `progettoId`, `canale` (`email`, `whatsapp`, `telegram`, `signal`), `mittente`, `direzione` (`entrata`, `uscita`), `testo`, `allegatiJson`.
+- **`ContrattoRicorrente`**: `clienteId`, `progettoId` (opzionale con FK), `frequenza`, `importoCentesimi`, `prossimaFatturazione`.
+- **`ModelloDocumentoCustom`**: `tenantId`, `titolo`, `categoria`, `descrizione`, `contenutoHtml` (persistenza template Word-like studio).
+- **`MagicLink`**: I token di accesso passwordless del cliente al portale (§23), aggiunta da `prisma/migrations/20260819210000_magic_link_persistito/`. `tenantId`, `clienteId` (FK `Cliente`, `ON DELETE CASCADE`), `tokenHash` **unique**, `scadenza`, `email` del destinatario, `usatoAt`.
+  - In riga va lo **SHA-256** del token, mai il token: chi legge il database non deve poter entrare al posto del cliente. SHA-256 e non scrypt perché il token ha già 128 bit da `crypto.randomBytes` — scrypt difende dalle password indovinabili, e qui non c'è niente da indovinare.
+  - `email` sta qui e non su `Cliente`, che non ha una colonna email: serve all'audit (una credenziale di accesso senza traccia di dove è finita non è verificabile) e dà un indirizzo al JWT di sessione, che prima era cablato nel sorgente.
+  - Il link è **riutilizzabile** fino a scadenza — un cliente riapre il proprio link più di una volta, e invalidarlo al primo accesso lo chiuderebbe fuori. `usatoAt` registra il primo uso per l'audit; la revoca è la cancellazione della riga.
+  - La migrazione porta **la propria policy RLS** (`ENABLE` + `FORCE` + `isolamento_tenant`), non solo il `CREATE TABLE`: `supabase/migrations/20260819_rls_effettiva.sql` lo applica una persona con `psql`, mentre `migrate deploy` gira senza nessuno davanti a ogni deploy. Se la policy vivesse solo là, la tabella nascerebbe scoperta su ogni database nuovo. I GRANT non servono: `ALTER DEFAULT PRIVILEGES` copre già le tabelle future.
+- **`PermessoModulo`**: Matrice isolata per `tenantId`, `userId`, `moduloChiave` con livello (`denied` | `read` | `write`).
+- **`Fattura`**: `tipoDocumento` (`fattura` | `nota_credito`), `serie` (`FT` | `NC`), `numeroProgressivoSerie`, `causaNotaCredito`.
+- **`PassaggioProgetto`**: `noteOperatoreJson`, `richiedeFirmaCliente`, `documentoAllegatoUrl`.
+- **`Documento`** (§WF-DOC): Vault documentale con `statoDoc` (`bozza` | `pubblicato` | `in_revisione` | `firmato`), `versione`, `documentoPadreId` (catena versioni), `firmatoAt`; archiviazione soft con `isArchiviato`, `archiviatoAt`, `archiviatoDaId`: i documenti firmati non si eliminano mai (409 anche per admin), si archiviano. Anche `EngagementLetter` ha `isArchiviato`.
 
 ---
 
-## 11. Riferimenti Chiave
+## 🚨 REGOLE TASSATIVE DI SVILUPPO (MANDATORY AGENT & DEV RULES)
 
-- Analisi di processo: c:\Users\casad\Downloads\bluman platform\BluMan_analisi_di_processo.md
-- Prototipo UI: c:\Users\casad\Downloads\bluman platform\260523 BluMan platform.html
-- Schema DB: vedere paragrafo 14 del documento di analisi
+1. **Isolamento Multi-Tenant Tassativo (`tenant_id`)**:
+   - I dati tra i vari Tenant/Studi **NON SI DEVONO ASSOLUTAMENTE MISCHIARE**.
+   - Ogni query, rotta API e tabella PostgreSQL **DEVE essere rigorosamente isolata** tramite `tenant_id` ed a livello database con PostgreSQL Row-Level Security (RLS).
+   - Il filtro applicativo su `tenant_id` **non basta e non è la difesa**: è RLS che lo è. Il runtime si connette col ruolo `bluman_app`, che non può scavalcare le policy, e il contesto tenant viene impostato per ogni richiesta dall'hook `onRequest` di `src/server.ts`. Non usare `new PrismaClient()` in codice che serve una richiesta HTTP: usa `prisma` da `src/util/prismaClient.ts`, altrimenti la query parte senza contesto e non vede nulla.
+   - `prismaAmministrativo()` scavalca RLS. È ammesso solo in script di manutenzione, seed, bootstrap, backup, nella ricerca dell'utente per email al login e nella verifica del magic token in `POST /auth/magic-login` (in entrambi i casi la richiesta è anonima per definizione: non porta un contesto tenant, e il tenant si scopre proprio dalla riga che si sta cercando — nel magic-login è il token da 128 bit a delimitare cosa la query può trovare, non il contesto). **Ogni altro uso riapre esattamente il buco che le policy chiudono.**
+   - Verifica sul database reale: `npx tsx src/scripts/checkRls.ts`.
+
+2. **Migrazioni Versionate, Mai `db push` su Dati Reali**:
+   - Lo schema si cambia con `prisma migrate dev` in sviluppo e `prisma migrate deploy` in produzione, mai con `prisma db push --accept-data-loss`: quest'ultimo riallinea il database al file cancellando in silenzio colonne e tabelle non presenti. Era il comando di avvio del container su Railway.
+   - Le migrazioni girano su `DIRECT_URL` (ruolo proprietario dello schema); il server usa `DATABASE_URL` (ruolo `bluman_app`, che non ha `CREATE` su `public` di proposito).
+   - Vale anche per le correzioni di **dati**, non solo di schema: la riparazione dei `tenant_id` dei super_admin è la migrazione `20260819190000_super_admin_senza_tenant`, scritta idempotente (`WHERE tenant_id IS NOT NULL`), non una `UPDATE` lanciata a mano da una console. Una correzione fuori dalle migrazioni non arriva sugli altri ambienti e non lascia traccia del perché.
+
+3. **Sincronizzazione Schema Database & Persistenza Cloud Obbligatoria (Prisma & Fastify DB)**:
+   - **TUTTO QUELLO CHE VIENE AGGIUNTO O MODIFICATO NELL'INTERFACCIA E NEI MODULI (spunte, passaggi, microvoci, note, scadenze, assegnazioni operatori, clienti, comunicazioni) DEVE ESSERE TASSATIVAMENTE SALVABILE E COLLEGATO AL DATABASE POSTGRESQL/PRISMA VIA API FASTIFY.**
+   - **NON POSSIAMO PERMETTERCI DI PERDERE DATI.** Ogni stato o azione deve persistere su Database Server in modo che, spegnendo il PC o collegandosi da qualsiasi altra postazione/dispositivo, lo storico rimanga al 100% integro ed accessibile.
+   - Ogni nuova funzionalità o campo form aggiunto **DEVE essere istantaneamente mappato** in `prisma/schema.prisma` ed allineato al backend. NESSUN dato deve essere mantenuto solo in RAM o registrato solo temporaneamente.
+   - Eseguire sempre `npx prisma generate` ad ogni variazione dello schema.
+
+4. **Aggiornamento Documentazione Markdown (`.md`)**:
+   - Dopo ogni modifica importante, refactoring o cambio codice, tutti i file di documentazione (`README.md`, `BluMan_piano_di_sviluppo.md`, `ISTRUZIONI_INSTALLAZIONE.md`, `.agents/AGENTS.md`) **DEVONO essere tassativamente aggiornati ed allineati**.
+
+5. **Aggiornamento Mappa Grafo (Graphify)**:
+   - Dopo modifiche strutturali ai moduli o ai servizi, eseguire `python -m graphify extract . --code-only` e `python -m graphify cluster-only .` per mantenere la mappa delle dipendenze di codice e la documentazione architettonica sempre sincronizzate.
+   - ✅ **Grafo AGGIORNATO (27 agosto 2026):** 1492 nodi, 3192 archi, 227 community. Include workflow approvazione/richiesta modifica documenti, generazione PDF binari A4 lato client/server, selettore canali OTP (Email/WhatsApp/SMS) e modal firma interattivo. Generati `graphify-out/graph.json`, `graphify-out/GRAPH_REPORT.md` e `graphify-out/graph.html`.
+   - ⚠️ **Il grafo è indietro rispetto a §35, §36 e §37.** L'ultimo `GRAPH_REPORT.md` (anche quello nella cartella datata 29 agosto) dichiara `Built from commit: a9ddaf1e` ed è una rilettura `cluster-only` dello stesso estratto del 27: non contiene `src/routes/comunicazioni.ts`, `src/services/whatsappService.ts`, `src/services/imapInbound.ts`, la riscrittura di `src/services/emailRelay.ts`, i moduli di §36 (`src/services/slotFirma.ts`, `src/services/copiaFirmata.ts`) né quelli di §37 (`src/routes/archivioDocumenti.ts`, `frontend/src/pages/ArchivioDocumentiPage.tsx`, `frontend/src/components/documenti/ElencoDocumentiCartella.tsx`). Non l'ho potuto rigenerare: in questo ambiente `graphify` non è installato come comando e `python3` non è utilizzabile (il binario di sistema è lo shim di `xcode-select`, che si interrompe con «No developer tools were found»). Va rilanciato su una macchina con i Command Line Tools installati, prima di fidarsi della mappa per orientarsi nei moduli dei canali, della firma e dell'archivio.
+
+
+6. **Divieto Assoluto di Esposizione Credenziali su GitHub & Persistenza Isolata su DB Tenant**:
+   - **NESSUNA credenziale reale (password email SMTP/IMAP, token segreti, chiavi API o password di database) deve MAI essere scritta in chiaro nel codice versionato su GitHub o nei file `.md`**.
+   - Tutte le password e credenziali dello studio DEVONO risiedere rigorosamente nel Database PostgreSQL collegate al singolo `Tenant` (`prisma.tenant.smtpPass`, `prisma.tenant.imapPass`, ecc.) e gestite in modo protetto via API (`PUT /tenant/settings`).
+   - Le password **degli utenti** non risiedono nemmeno lì: solo come hash scrypt su `user.password_hash`. Nessuna colonna, nessuna risposta API e nessun `localStorage` conserva una password di persona in chiaro.
+   - Il divieto vale anche per le credenziali *di ripiego*: un `|| 'password-qualunque'` e un campo password precompilato nella UI sono credenziali cablate a tutti gli effetti, perché il valore che l'API annuncia è il valore con cui si entra. Il presidio automatico è `src/credenziali.test.ts`, che scandisce `src/`, `frontend/src/`, `api/` ed i file `.md` — non solo il backend, perché il bundle frontend è pubblico esattamente come il repository.
+   - Un segreto non va documentato nemmeno per spiegare che è stato rimosso: nei commenti si rimanda a `src/credenziali.test.ts`, che lo cerca, invece di trascriverlo.
+   - **Un segreto salvato nel database non torna al browser** (§35). `GET /tenant/info` e `PATCH /tenant/info` sostituiscono `smtpPass`, `imapPass`, `waAccessToken`, `waVerifyToken` e `tgBotToken` con la stringa vuota e aggiungono `<chiave>Impostata: boolean`, che è quello di cui l'interfaccia ha bisogno per distinguere «mascherata» da «mai salvata». Sul giro di ritorno la stringa vuota vale «non toccare» e `null` esplicito vale «cancella»: se valesse «password nuova», salvare la ragione sociale spegnerebbe la posta in uscita dello studio. Chi aggiunge una colonna segreta alla riga Tenant la aggiunge a `CHIAVI_SEGRETE` in `src/routes/tenant.ts` **e** a `CHIAVI_SEGRETE_TENANT` in `frontend/src/utils/tenant.ts`, che è ciò che tiene i segreti fuori da `localStorage`. Presidio: `src/comunicazioniCanali.test.ts`.
+   - **Le credenziali dei canali non passano dal browser** (§35): l'invio email, l'invio WhatsApp e la lettura della posta in arrivo sono tre rotte del backend (`/comunicazioni/*`), e il browser manda solo destinatario, oggetto e testo. Una funzione serverless che spedisce va chiusa con un segreto condiviso (`EMAIL_RELAY_SECRET`, header `x-bluman-relay`) e senza intestazioni CORS: con `Access-Control-Allow-Origin: *` più il ripiego su `process.env.SMTP_PASS`, qualunque pagina aperta nel browser di chiunque poteva spedire a nome dello studio.
+   - **Nessun server di posta di altri fra i candidati** (§35). `verifyAndSendTestSmtp` provava quattordici coppie host/porta, cinque delle quali erano server di terzi (`authsmtp.register.it`, `smtps.register.it`, `mail.register.it`, `mail.bluecode-ltd.com`): le credenziali di uno studio su Gmail o Microsoft 365 venivano offerte a un provider che con quello studio non ha niente a che vedere, ed è una fuga di credenziali anche se il tentativo non riesce. Si prova **solo l'host dello studio**, sulle porte plausibili; una casella non configurata risponde «non configurata» e non ripiega su `process.env`. Presidi: `src/postaDiagnosi.test.ts`, `src/postaProveRotte.test.ts`.
+   - **La riga Tenant vince su `process.env.SMTP_*`, e questo si vede** (§35, `credenzialiCanali`). L'ordine è deliberato: con l'ambiente davanti, su un'installazione multi-studio il codice di firma di un cliente parte dalla casella di un altro studio (regola 1). La conseguenza operativa da sapere prima di aprire un'indagine: se la riga Tenant ha un host sbagliato, **tutta** la posta di quello studio si ferma anche se `SMTP_HOST` in ambiente è corretto — è il caso di «prima arrivava il codice OTP della firma, adesso neanche quello arriva», dove la riga Tenant conteneva `mail.bluecode-ltd.com`, che non esiste nel DNS. Non è un guasto del percorso OTP: si corregge il campo «Server SMTP» e rientrano OTP, magic link e credenziali portale insieme.
+   - **La prova di una configurazione deve percorrere la strada degli invii veri** (§35). Il pulsante «Testa» rispondeva «non riuscito» su configurazioni funzionanti perché provava l'SMTP diretto — le porte che Railway blocca in uscita — mentre OTP e Magic Link partivano dal relay: «dalle impostazioni neanche il test passa» era vero e non significava niente. Ogni prova passa da `inviaEmail()` e riporta in `via` da dove è passata.
+   - **Un guasto di rete si traduce in un intervento** (§35, `src/services/diagnosiPosta.ts`). `getaddrinfo ENOTFOUND …` e `Hostname/IP does not match certificate's altnames …` sono due interventi diversi — correggere il campo «Server» nelle impostazioni, chiedere al provider il nome giusto — e chi legge il messaggio grezzo cambia la password, che è l'unica cosa che non c'entra. La via d'uscita da un certificato che non corrisponde **non** è disattivare la verifica: la password della casella viaggia in quella connessione e un certificato per un altro nome è indistinguibile da un intercettatore (§3.4).
+   - **Il nome a cui collegarsi e il nome che il certificato attesta sono due campi** (§35, colonne `smtp_servername`/`imap_servername`). Esistono perché nel caso misurato nessun valore unico li soddisfaceva entrambi: `imap.register.it` risolve e presenta `*.securemail.pro`, `imap.securemail.pro` è coperto dal certificato e non ha record DNS — l'operatore alternava «is not in the cert's altnames» e `ENOTFOUND` senza uscirne. `host` è l'indirizzo, `servername` il nome verificato: `rejectUnauthorized` resta `tlsRejectUnauthorized()` su tutte le strade (relay, SMTP diretto, IMAP diretto, rotte di prova). Il nome lo **dichiara l'operatore** e non si legge mai dal certificato che il server presenta: un certificato non fidato non può decidere contro quale nome essere verificato. Non si risolvono nomi nel backend per aggirare il problema (`dns.lookup` + connessione all'IP era il tentativo di `711f265`: il DNS è lo stesso da Railway e da Vercel, e un IP fisso toglie al provider la possibilità di spostare il servizio). Presidio: `src/postaNomeCertificato.test.ts`.
+   - L'isolamento multi-tenant garantisce che uno studio non possa in alcun modo visualizzare né accedere ai dati, alla posta o ai contratti di un altro studio.
+
+7. **Il Frontend Non Inventa Dati che il Database Non Ha**:
+   - Se un progetto non ha moduli, la pagina **dichiara il vuoto**. Non mostra un elenco di ripiego, non lo costruisce da una libreria di esempi e non lo deduce dal nome del cliente.
+   - Vietati i ripieghi che riempiono un buco con un valore verosimile: `|| 75` su una percentuale, `|| 3500` su un prezzo, `|| 20` su delle ore, `|| 'Senior Advisor'` su un operatore, un elenco di micro-voci costruito a *render time*. Il danno non è estetico: rendono l'inventato indistinguibile dal reale, e così nessuno si accorge più che il dato manca. Un ripiego a render time è il peggiore, perché annulla in silenzio ogni correzione fatta a monte — ed erano righe **cliccabili**, che avrebbero chiamato `consuntivaMicrovoceApi` con l'id di una micro-voce inesistente.
+   - **Le evidenze legali si prendono solo dal server**: marca temporale, numero di repertorio, impronta SHA-256 e indirizzo IP vengono dal sigillo emesso da `/portal/verify-otp-and-sign` (`generateEidasSignatureSeal()`), che l'IP lo legge dalla richiesta. Il browser **non conosce il proprio IP pubblico** e non può attestarlo. Senza sigillo il PDF esce senza pagina di evidenze: una firma che nessuno ha apposto non si disegna, e una controfirma dello studio che non esiste in nessun registro non si aggiunge "per completezza".
+   - **Niente etichette che promettono più di quello che è accaduto**: un `alert` non annuncia un "Sigillo FEA eIDAS UE 910/2014" se non c'è stata nessuna chiamata al server; un `catch` non scrive "completata" su un'operazione fallita; un pulsante che scrive solo in `localStorage` non ha salvato niente (regola 3) e non dice "salvato".
+   - **Un'area firma vuota è vuota** (§36). Nell'anteprima `{{firma_cliente}}` diventa un filetto tratteggiato con la dicitura «Spazio riservato alla firma del cliente»: nessun nome, nessuna data, nessuna attestazione. Il nome del firmatario, l'ora e l'impronta li scrive **solo** il server quando ricompone la copia firmata, e li prende dal sigillo — non dal template.
+   - **Nessun dato di un cliente reale come valore iniziale di un form**: i valori d'esempio nello `useState` di un form si vedono a *tutti* finché qualcosa non li sovrascrive — ed è successo con partita IVA, codice fiscale e IBAN di un cliente vero, che ogni altro cliente trovava nei propri campi pronti da salvare come propri. I campi si riempiono dalla riga del cliente autenticato, oppure restano vuoti.
+   - **Nessuno stato «conforme» dichiarato senza averlo letto** (§35, `frontend/src/components/settings/PannelloRecordDns.tsx`). Il pannello dei record DNS del dominio portava una colonna «Stato Deliverability» con «✓ Conforme» su SPF, DMARC e MX: spunte scritte nel JSX, nessuna interrogazione del DNS. Restavano verdi con il dominio scaduto e zero record pubblicati, cioè esattamente nei casi in cui quel pannello serviva. Ora le righe dicono quali record devono esistere e con quale forma, il dominio si ricava dagli indirizzi che lo studio ha configurato (`dominioDaIndirizzo`), i valori che solo il provider conosce sono nominati come tali — un `include:` SPF indovinato autorizza i server sbagliati e peggiora il recapito — e una riga dice a chiare lettere che BluMan il DNS non lo legge. Vale anche per i **segnaposto**: `placeholder="imap.register.it"` è un'istruzione, ed è il modo in cui quel nome è finito nel campo host di una casella che non sta su quel provider (regola 6). Presidio: `src/postaRecordDns.test.ts`.
+   - Il presidio è la lettura: `grep -nE "\|\| *(75|100|3500|28500|20|15)\b"` sulle pagine toccate prima di chiudere una modifica.
+
+
+
+8. **Niente Nuovi Monoliti — Un File = Un Compito**:
+   - Ogni file deve avere la dimensione giusta per il proprio compito. Se i processi al suo interno si possono dividere in sottosezioni mantenibili in futuro, ognuna con il proprio compito, **vanno divise**. Vietato creare nuovi file monolitici e vietato far crescere quelli esistenti aggiungendo sezioni su sezioni.
+   - **Soglie**: sopra ~500 righe si valuta lo split; sopra ~800 righe la pianificazione dello split è **obbligatoria** (non si rimanda alla prossima modifica).
+   - **Strategia frontend** (quella adottata per ClientPortal e ProjectDetail): la pagina/contenitore tiene stato (`useState`), handler ed effetti (`useEffect`); il JSX viene estratto in componenti **presentazionali** tipizzati in `frontend/src/components/<dominio>/` (es. `components/portal/`, `components/projectDetail/`). I figli ricevono props tipizzate, non contengono logica di business e non duplicano stato.
+   - **Strategia backend**: una rotta per dominio in `src/routes/<dominio>.ts`, logica applicativa in `src/services/`, dominio puro in `src/domain/`. Un file di rotte non accumula domini diversi (vedi lo split di `firma.ts`/`documenti.ts`).
+   - **Esecuzione**: un file alla volta; lo split è refactoring **meccanico** senza cambi di comportamento (nessun bugfix o rinomina mescolati); typecheck dopo ogni estrazione (`npx tsc -b` in `frontend/`, `npx tsc --noEmit` alla root); commit separati e revertibili per ogni file splittato.
+   - Fa eccezione solo il codice che è intrinsecamente un blocco unico (es. lo schema Prisma, le migrazioni): in quel caso la dimensione è giustificata dal compito stesso.
+
+9. **Distribuzione Doppia Obbligatoria (Railway CLI per Backend + Git Push per Vercel)**:
+   - **Railway NON è collegato al webhook automatico di GitHub**: un semplice `git push origin main` aggiorna il frontend su Vercel ma **non aggiorna il backend** su Railway.
+   - Per rilasciare le modifiche del backend in produzione è **tassativo** lanciare il comando:
+     ```bash
+     npx --yes @railway/cli up --detach
+     ```
+   - In alternativa, eseguire lo script unificato `./scripts/distribuisci.sh` che esegue i controlli di integrità, il push su GitHub per il frontend e il `railway up` per il backend.
+   - Dopo ogni deploy backend, verificare sempre con una chiamata live che le nuove rotte rispondano correttamente e non con `404 Not Found`.
+

@@ -1,0 +1,170 @@
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.kpiCard {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 16px;
+  transition: all var(--t);
+}
+.kpiCard:hover { border-color: var(--indigo); transform: translateY(-1px); }
+
+.kpiIcon {
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; margin-bottom: 8px;
+}
+
+.kpiValue { font-size: 20px; font-weight: 700; }
+.kpiLabel { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.searchBox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 12px;
+  flex: 1;
+  max-width: 380px;
+}
+
+.searchBox input {
+  border: none;
+  background: transparent;
+  padding: 0;
+  font-size: 12.5px;
+}
+.searchBox input:focus { border: none; outline: none; }
+
+.filterGroup {
+  display: flex;
+  gap: 6px;
+}
+
+.filterBtn {
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 11.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--t);
+}
+.filterBtn:hover { color: var(--text); border-color: var(--indigo); }
+.filterBtnActive { background: '#1a1f3d' !important; color: var(--indigo-l) !important; border-color: var(--indigo) !important; }
+
+.clientGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 14px;
+}
+
+.clientCard {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: all var(--t);
+}
+.clientCard:hover {
+  border-color: var(--indigo);
+  background: var(--card2);
+  transform: translateY(-2px);
+}
+
+.clientHeader {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.avatarBox {
+  width: 42px; height: 42px;
+  border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; flex-shrink: 0;
+}
+
+.clientName {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 3px;
+}
+
+.clientTypeBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 20px;
+}
+
+.clientMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--muted);
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 12px;
+}
+
+.metaRow {
+  display: flex;
+  justify-content: space-between;
+}
+
+.clientActions {
+  display: flex;
+  gap: 8px;
+}
+
+.btnAction {
+  flex: 1;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  padding: 7px;
+  border-radius: 8px;
+  font-size: 11.5px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: center;
+  transition: all var(--t);
+}
+.btnAction:hover {
+  border-color: var(--indigo);
+  color: var(--indigo-l);
+  background: #1a1f3d;
+}

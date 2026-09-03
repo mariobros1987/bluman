@@ -1,0 +1,1585 @@
+// BluMan — Schema database
+// Fonte: BluMan_specifica_di_sviluppo_v2.3.docx §14, con estensioni §19 (accesso_risorsa a 3 FK),
+// §26 (campi SDI su fattura) e §28 (sicurezza upload su documento) incluse fin dall'inizio —
+// vedi piano di sviluppo, Fase 1: evitare una migrazione dolorosa a metà sviluppo.
+//
+// Row-Level Security su tenant_id: attiva. Le policy stanno in
+// supabase/migrations/20260819_rls_effettiva.sql e si applicano con psql (usano \gexec).
+// Vedi § "Note operative" a fondo file e src/util/prismaClient.ts per il lato applicativo.
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native"]
+}
+
+datasource db {
+  provider = "postgresql"
+  // Runtime: ruolo `bluman_app`, soggetto alle policy RLS.
+  url      = env("DATABASE_URL")
+  // Migrazioni e introspezione: ruolo proprietario dello schema. Serve separato perché
+  // `bluman_app` non ha CREATE su public — di proposito, così lo schema lo cambiano solo
+  // le migrazioni. Senza questa riga `prisma migrate deploy` fallirebbe sui permessi.
+  directUrl = env("DIRECT_URL")
+}
+
+// ─────────────────────────────────────────────────────────────────
+// FONDAMENTA — §2bis, §14
+// ─────────────────────────────────────────────────────────────────
+
+model Tenant {
+  id                String   @id @default(uuid())
+  ragioneSociale    String   @map("ragione_sociale")
+  piva              String?  @map("piva")
+  codiceFiscale     String?  @map("codice_fiscale")
+  sedeLegale        String?  @map("sede_legale")
+  sedeOperativa     String?  @map("sede_operativa")
+  logoUrl           String?  @map("logo_url")
+  coloreTemaFattura String?  @map("colore_tema_fattura")
+  notePieFattura    String?  @map("note_pie_fattura")
+  titoloIntestazione String? @map("titolo_intestazione")
+  iban              String?  @map("iban")
+  email             String?  @map("email")
+  pec               String?  @map("pec")
+  telefono          String?  @map("telefono")
+  waPhoneId         String?  @map("wa_phone_id")
+  waAccessToken     String?  @map("wa_access_token")
+  waVerifyToken     String?  @map("wa_verify_token")
+  tgBotToken        String?  @map("tg_bot_token")
+  tgBotUsername     String?  @map("tg_bot_username")
+  smtpHost          String?  @map("smtp_host")
+  /// Nome che il certificato del server SMTP deve attestare, quando è diverso dall'host a cui
+  /// si collega (SNI dichiarato). Vuoto: si verifica contro `smtpHost`, come di norma.
+  smtpServername    String?  @map("smtp_servername")
+  smtpPort          Int?     @map("smtp_port")
+  smtpSecure        Boolean? @default(false) @map("smtp_secure")
+  smtpUser          String?  @map("smtp_user")
+  smtpPass          String?  @map("smtp_pass")
+  smtpFromEmail     String?  @map("smtp_from_email")
+  smtpFromName      String?  @map("smtp_from_name")
+  smtpReplyTo       String?  @map("smtp_reply_to")
+  smtpBcc           String?  @map("smtp_bcc")
+  imapHost          String?  @map("imap_host")
+  /// Nome che il certificato del server IMAP deve attestare. Serve dove il nome coperto dal
+  /// certificato non ha record DNS e l'indirizzo raggiungibile ne ha un altro: la connessione
+  /// va all'host, la verifica al nome dichiarato qui. Vuoto: si verifica contro `imapHost`.
+  imapServername    String?  @map("imap_servername")
+  imapPort          Int?     @map("imap_port")
+  imapSecure        Boolean? @default(true) @map("imap_secure")
+  imapUser          String?  @map("imap_user")
+  imapPass          String?  @map("imap_pass")
+  imapFolder        String?  @default("INBOX") @map("imap_folder")
+  imapPollInterval  String?  @default("5m") @map("imap_poll_interval")
+  imapProtocol      String?  @default("imap") @map("imap_protocol")
+  emailSignatureHtml String? @map("email_signature_html")
+  regimeFiscale     String?  @map("regime_fiscale")
+  capitaleSociale   String?  @map("capitale_sociale")
+  regImprese        String?  @map("reg_imprese")
+  mostraSdi         Boolean? @default(true) @map("mostra_sdi")
+  mostraIva         Boolean? @default(true) @map("mostra_iva")
+  emailInboundParseUrl String? @map("email_inbound_parse_url")
+  signalCliEndpoint String?  @map("signal_cli_endpoint")
+  leadAdvisorNome   String?  @map("lead_advisor_nome")
+  leadAdvisorEmail  String?  @map("lead_advisor_email")
+  // `lead_advisor_password` è stata eliminata dalla migrazione
+  // 20260819_rimozione_password_chiaro_tenant: conteneva la password del responsabile
+  // dello studio in chiaro. Le password sono solo hash scrypt su `user.password_hash`.
+  giurisdizione     String?  @map("giurisdizione")
+  durataMesi        Int?     @default(12) @map("durata_mesi")
+  dataAttivazione   String?  @map("data_attivazione")
+  dataScadenza      String?  @map("data_scadenza")
+  piano             String   @default("enterprise")
+  stato             String   @default("attivo") // attivo|sospeso|trial
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  users         User[]
+  clienti       Cliente[]
+  articoli      Articolo[]
+  moduli        ModuloTemplate[]
+  giurisdizioni Giurisdizione[]
+  auditLogs     AuditLog[]
+  comunicazioni ComunicazioneProgetto[]
+  contrattiRicorrenti ContrattoRicorrente[]
+  contiBancari  ContoBancario[]
+  permessiModuli PermessoModulo[]
+  modelliDocumenti ModelloDocumentoCustom[]
+  magicLinks    MagicLink[]
+  codiciOtp     CodiceOtp[]
+  firme         FirmaElettronica[]
+  proposteDatiFiscale PropostaDatiFiscale[]
+  richiesteAddendum   RichiestaAddendum[]
+  oreTimesheet    OraTimesheet[]
+  auditLogFatture AuditLogFattura[]
+  fornitori       Fornitore[]
+  fattureRicevute FatturaRicevuta[]
+  liquidazioniIva LiquidazioneIva[]
+  movimentiPrimaNota MovimentoPrimaNota[]
+
+  @@map("tenant")
+}
+
+enum RuoloUtente {
+  super_admin
+  advisor
+  collaboratore_interno
+  collaboratore_esterno
+  cliente
+}
+
+enum StatoUtente {
+  attivo
+  invitato
+  disattivato
+}
+
+model User {
+  id           String      @id @default(uuid())
+  tenantId     String?     @map("tenant_id") // nullable SOLO se ruolo=super_admin — vedi §2bis
+  tenant       Tenant?     @relation(fields: [tenantId], references: [id])
+  nome         String
+  email        String      @unique
+  ruolo        RuoloUtente
+  stato        StatoUtente @default(invitato)
+  // §23 — nullable perché il cliente è passwordless (accesso solo a magic link);
+  // solo advisor/collaboratore_interno/collaboratore_esterno/super_admin ne hanno una
+  passwordHash String?     @map("password_hash")
+  // §23 — obbligatorio per ruolo=super_admin prima di poter fare qualunque azione oltre al login
+  totpSecret   String?     @map("totp_secret")
+  specializzazione String? @map("specializzazione")
+  costoOrarioCentesimi Int? @default(3000) @map("costo_orario_centesimi") // Costo orario interno studio per margine netto
+  createdAt    DateTime    @default(now()) @map("created_at")
+
+  microvociAssegnate MicrovoceProgetto[] @relation("RisorsaAssegnata")
+  eventiCreati       EventoCalendario[]
+  accessiRicevuti    AccessoRisorsa[]    @relation("AccessoUtente")
+  accessiInvitati    AccessoRisorsa[]    @relation("AccessoInvitatoDa")
+  notificheRicevute  Notifica[]
+  permessiModuli     PermessoModulo[]
+  documentiCaricati  Documento[]
+  // §Blocco 6.1 — registro ore settimanale: righe registrate, approvate o rifiutate
+  oreRegistrate      OraTimesheet[]      @relation("TimesheetUtente")
+  oreApprovate       OraTimesheet[]      @relation("TimesheetApprovatore")
+  oreRifiutate       OraTimesheet[]      @relation("TimesheetRifiutante")
+
+  @@map("user")
+}
+
+model Cliente {
+  id              String   @id @default(uuid())
+  tenantId        String   @map("tenant_id")
+  tenant          Tenant   @relation(fields: [tenantId], references: [id])
+  nome            String
+  tipo            String // individual|company — §2
+  email           String?  @map("email")
+  // Recapiti a cui può arrivare il codice OTP di firma. Prima non esistevano in anagrafica:
+  // il portale teneva il numero del firmatario cablato nel sorgente, quindi l'OTP di
+  // qualunque cliente partiva verso lo stesso telefono. Il recapito è un dato del cliente,
+  // non una costante del frontend.
+  cellulare       String?  @map("cellulare")
+  // Chat id numerica, non lo @username: sendMessage vuole la chat, e la chat esiste solo
+  // dopo che il cliente ha scritto almeno una volta al bot dello studio.
+  telegramChatId  String?  @map("telegram_chat_id")
+  // whatsapp|email|telegram — solo la preselezione. La scelta del canale resta del
+  // firmatario a ogni firma; null significa "nessuna preferenza registrata".
+  canaleOtpPreferito String? @map("canale_otp_preferito")
+  passwordHash    String?  @map("password_hash")
+  piva            String?  @map("piva")
+  codiceFiscale   String?  @map("codice_fiscale")
+  giurisdizione   String?  @map("giurisdizione")
+  sedeLegale      String?  @map("sede_legale")
+  sdiCode         String?  @map("sdi_code")
+  iban            String?  @map("iban")
+  rischioAml      String?  @map("rischio_aml")
+  ubo             String?  @map("ubo")
+  fontePatrimonio String?  @map("fonte_patrimonio")
+  dataKyc         String?  @map("data_kyc")
+  referentiJson   Json?    @map("referenti_json")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  progetti   Progetto[]
+  preventivi Preventivo[]
+  contrattiRicorrenti ContrattoRicorrente[]
+  magicLinks MagicLink[]
+  codiciOtp  CodiceOtp[]
+  firme      FirmaElettronica[]
+  proposteDatiFiscale PropostaDatiFiscale[]
+  richiesteAddendum   RichiestaAddendum[]
+  richiesteModificaDoc RichiestaModificaDocumento[] @relation("RichiesteModificaDocumento")
+  notifiche    Notifica[]
+  fatture      Fattura[]
+  movimentiPrimaNota MovimentoPrimaNota[]
+
+  @@map("cliente")
+}
+
+// ─────────────────────────────────────────────────────────────────
+// LIBRERIA — DISTINTA BASE (§3bis, §30)
+// Solo creazione in MVP: niente endpoint di modifica contenuto,
+// versionamento vero e ripubblicazione rimandati a V2 (§30).
+// ─────────────────────────────────────────────────────────────────
+
+model Articolo {
+  id               String   @id @default(uuid())
+  tenantId         String   @map("tenant_id")
+  tenant           Tenant   @relation(fields: [tenantId], references: [id])
+  nome             String
+  categoria        String
+  versione         Int      @default(1)
+  oreDefault       Int      @map("ore_default")
+  prezzoDefault    Int      @map("prezzo_default") // in centesimi, mai float per denaro
+  documentoAllegatoUrl String? @map("documento_allegato_url")
+  formMasterId         String? @map("form_master_id")
+  linkIstruzioni       String? @map("link_istruzioni")
+  isUltimaVersione Boolean  @default(true) @map("is_ultima_versione")
+  isAttivo         Boolean  @default(true) @map("is_attivo") // §30: disattiva, non elimina
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  righeDistinta      RigaDistinta[]
+  passaggiTemplate   PassaggioTemplate[]
+  microvociProgetto  MicrovoceProgetto[]
+  fattureRiga        FatturaRiga[]
+
+  // §Blocco 7 (fix) — anti-duplicato: stesso tenant non può avere due articoli
+  // con lo stesso nome alla stessa versione (i doppioni seed/UI sono stati
+  // ripuliti con scripts/pulizia-duplicati-catalogo.mjs).
+  @@unique([tenantId, nome, versione])
+  @@map("articolo")
+}
+
+model ModuloTemplate {
+  id               String   @id @default(uuid())
+  tenantId         String   @map("tenant_id")
+  tenant           Tenant   @relation(fields: [tenantId], references: [id])
+  nome             String
+  categoria        String
+  versione         Int      @default(1)
+  prezzoPacchetto  Int?     @map("prezzo_pacchetto") // override della somma righe, §3bis/§7
+  isUltimaVersione Boolean  @default(true) @map("is_ultima_versione")
+  isAttivo         Boolean  @default(true) @map("is_attivo")
+  giurisdizioneId  String?  @map("giurisdizione_id")
+  giurisdizione    Giurisdizione? @relation(fields: [giurisdizioneId], references: [id])
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  righeDistinta RigaDistinta[]
+  dipendenze    ModuloDipendenzaTemplate[] @relation("ModuloDipendente")
+  dipendenzeDi  ModuloDipendenzaTemplate[] @relation("ModuloDaCuiDipende")
+  moduliProgetto ModuloProgetto[]
+
+  // §Blocco 7 (fix) — anti-duplicato: stesso tenant non può avere due moduli
+  // con lo stesso nome alla stessa versione.
+  @@unique([tenantId, nome, versione])
+  @@map("modulo_template")
+}
+
+enum TipoGiurisdizione {
+  ue
+  extra_ue
+  stato_usa
+  altro
+}
+
+model Giurisdizione {
+  id        String            @id @default(uuid())
+  tenantId  String            @map("tenant_id")
+  tenant    Tenant            @relation(fields: [tenantId], references: [id])
+  nome      String
+  codice    String
+  tipo      TipoGiurisdizione @default(ue)
+  note      String?
+  createdAt DateTime          @default(now()) @map("created_at")
+
+  moduli   ModuloTemplate[]
+  progetti Progetto[]
+
+  @@map("giurisdizione")
+}
+
+model RigaDistinta {
+  id               String         @id @default(uuid())
+  tenantId         String         @map("tenant_id")
+  moduloTemplateId String         @map("modulo_template_id")
+  moduloTemplate   ModuloTemplate @relation(fields: [moduloTemplateId], references: [id])
+  articoloId       String         @map("articolo_id")
+  articolo         Articolo       @relation(fields: [articoloId], references: [id])
+  articoloVersione Int            @map("articolo_versione") // pinned alla pubblicazione, §3bis
+  ordine           Int
+  quantita         Int            @default(1)
+  overrideOre      Int?           @map("override_ore")
+  overridePrezzo   Int?           @map("override_prezzo")
+  obbligatorio     Boolean        @default(true)
+
+  microvociGenerate MicrovoceProgetto[]
+
+  @@map("riga_distinta")
+}
+
+enum TipoPassaggio {
+  info
+  documento
+  form
+  verifica
+}
+
+enum ChiPassaggio {
+  operatore
+  cliente
+}
+
+model PassaggioTemplate {
+  id            String        @id @default(uuid())
+  articoloId    String        @map("articolo_id")
+  articolo      Articolo      @relation(fields: [articoloId], references: [id])
+  titolo        String
+  tipo          TipoPassaggio
+  chi           ChiPassaggio
+  ordine        Int
+  descrizione   String?
+  campiFormJson Json?         @map("campi_form_json")
+
+  @@map("passaggio_template")
+}
+
+model ModuloDipendenzaTemplate {
+  id                       String         @id @default(uuid())
+  tenantId                 String         @map("tenant_id")
+  moduloTemplateId         String         @map("modulo_template_id")
+  moduloTemplate           ModuloTemplate @relation("ModuloDipendente", fields: [moduloTemplateId], references: [id])
+  dipendeDaModuloTemplateId String        @map("dipende_da_modulo_template_id")
+  dipendeDaModuloTemplate   ModuloTemplate @relation("ModuloDaCuiDipende", fields: [dipendeDaModuloTemplateId], references: [id])
+  // Verifica anti-ciclo: applicativa, non esprimibile come vincolo DB semplice — §7ter, §30
+
+  @@map("modulo_dipendenza_template")
+}
+
+// ─────────────────────────────────────────────────────────────────
+// PRE-PROGETTO — §15
+// ─────────────────────────────────────────────────────────────────
+
+enum StatoPreventivo {
+  bozza
+  inviato
+  accettato
+  rifiutato
+}
+
+model Preventivo {
+  id           String          @id @default(uuid())
+  tenantId     String          @map("tenant_id")
+  clienteId    String          @map("cliente_id")
+  cliente      Cliente         @relation(fields: [clienteId], references: [id])
+  // §15.2 richiede progetto_id nel body di creazione ma §14 non lo includeva nello schema
+  // originale — incoerenza trovata implementando l'adapter Prisma, corretta qui.
+  progettoId   String          @map("progetto_id")
+  progetto     Progetto        @relation(fields: [progettoId], references: [id], onDelete: Cascade)
+  stato        StatoPreventivo @default(bozza)
+  righeJson    Json            @map("righe_json") // [{moduloTemplateId, moduloTemplateVersione}]
+  valoreTotale Int             @map("valore_totale")
+  createdAt    DateTime        @default(now()) @map("created_at")
+
+  engagementLetter EngagementLetter?
+  fatture          Fattura[]
+
+  @@map("preventivo")
+}
+
+model EngagementLetter {
+  id           String     @id @default(uuid())
+  tenantId     String     @map("tenant_id")
+  preventivoId String     @unique @map("preventivo_id")
+  preventivo   Preventivo @relation(fields: [preventivoId], references: [id])
+  statoFirma   String     @default("in_attesa") @map("stato_firma") // in_attesa|completata
+  linkFirma    String?    @map("link_firma")
+  firmatoAt    DateTime?  @map("firmato_at")
+  // Punto 3 piano gap — come per Documento: mai hard-delete, solo archiviazione.
+  isArchiviato Boolean    @default(false) @map("is_archiviato")
+
+  @@map("engagement_letter")
+}
+
+// ─────────────────────────────────────────────────────────────────
+// PROGETTO ATTIVO — §14, §15.3, §16
+// ─────────────────────────────────────────────────────────────────
+
+enum StatoProgetto {
+  pre_project
+  in_progress
+  completed
+  archived
+}
+
+model Progetto {
+  id                      String        @id @default(uuid())
+  tenantId                String        @map("tenant_id")
+  clienteId               String        @map("cliente_id")
+  cliente                 Cliente       @relation(fields: [clienteId], references: [id])
+  nome                    String
+  stato                   StatoProgetto @default(pre_project)
+  dataInizio              DateTime?     @map("data_inizio")
+  dataScadenza            DateTime?     @map("data_scadenza")
+  valoreTotale            Int           @map("valore_totale")
+  giurisdizionePrimariaId String?       @map("giurisdizione_primaria_id")
+  giurisdizionePrimaria   Giurisdizione? @relation(fields: [giurisdizionePrimariaId], references: [id])
+  // §2.8 — numero progressivo della lettera d'incarico (EL-<anno>-<seq>), assegnato dal
+  // backend alla creazione e unico nel tenant per anno. Prima il portale mostrava a tutti
+  // lo stesso numero cablato (EL-2026-089).
+  numeroContratto         String?       @map("numero_contratto")
+  createdAt               DateTime      @default(now()) @map("created_at")
+
+  moduli         ModuloProgetto[]
+  preventivi     Preventivo[]
+  documenti      Documento[]
+  fatture        Fattura[]
+  eventi         EventoCalendario[]
+  accessiRisorsa AccessoRisorsa[] @relation("AccessoProgetto")
+  comunicazioni  ComunicazioneProgetto[]
+  contrattiRicorrenti ContrattoRicorrente[]
+  richiesteAddendum   RichiestaAddendum[]
+  oreTimesheet   OraTimesheet[]
+
+  @@map("progetto")
+}
+
+enum StatoModulo {
+  pending
+  attesa_dipendenza
+  in_progress
+  delayed
+  blocked
+  done
+}
+
+model ModuloProgetto {
+  id                     String         @id @default(uuid())
+  tenantId               String         @map("tenant_id")
+  progettoId             String         @map("progetto_id")
+  progetto               Progetto       @relation(fields: [progettoId], references: [id], onDelete: Cascade)
+  moduloTemplateId       String         @map("modulo_template_id")
+  moduloTemplate         ModuloTemplate @relation(fields: [moduloTemplateId], references: [id])
+  moduloTemplateVersione Int            @map("modulo_template_versione") // congelata alla creazione, §15.3
+  nome                   String
+  categoria              String
+  prezzo                 Int
+  orePreventivate        Int            @map("ore_preventivate")
+  oreConsuntivate        Int            @default(0) @map("ore_consuntivate")
+  stato                  StatoModulo    @default(pending)
+  // stato calcolato da calcolaStatoModulo (§16.2) — mai scritto manualmente
+  // salvo eccezione esplicita e tracciata (§16.6)
+
+  microvoci        MicrovoceProgetto[]
+  dipendenze       ModuloProgettoDipendenza[] @relation("ModuloProgettoDipendente")
+  dipendenzeDi     ModuloProgettoDipendenza[] @relation("ModuloProgettoDaCuiDipende")
+  fattureRiga      FatturaRiga[]
+  accessiRisorsa   AccessoRisorsa[]           @relation("AccessoModulo")
+
+  @@map("modulo_progetto")
+}
+
+enum StatoMicrovoce {
+  pending
+  attesa_dipendenza
+  active
+  delayed
+  blocked
+  done
+}
+
+model MicrovoceProgetto {
+  id               String            @id @default(uuid())
+  tenantId         String            @map("tenant_id")
+  moduloProgettoId String            @map("modulo_progetto_id")
+  moduloProgetto   ModuloProgetto    @relation(fields: [moduloProgettoId], references: [id])
+  articoloId       String            @map("articolo_id")
+  articolo         Articolo          @relation(fields: [articoloId], references: [id])
+  articoloVersione Int               @map("articolo_versione") // congelata, §15.3
+  rigaDistintaId   String            @map("riga_distinta_id") // traccia la riga di origine — utile con quantità > 1
+  rigaDistinta     RigaDistinta      @relation(fields: [rigaDistintaId], references: [id])
+  nome             String // denormalizzato da articolo.nome
+  orePreventivate  Int               @map("ore_preventivate")
+  oreConsuntivate  Int               @default(0) @map("ore_consuntivate")
+  stato            StatoMicrovoce    @default(pending)
+  segnaleRischio   Boolean           @default(false) @map("segnale_rischio") // calcolato, §16.1 — non è uno stato
+  oreExtra         Int               @default(0) @map("ore_extra")
+  causaNota        String?           @map("causa_nota") // obbligatoria quando stato passa a delayed/blocked, §7bis
+  risorsaId        String?           @map("risorsa_id")
+  risorsa          User?             @relation("RisorsaAssegnata", fields: [risorsaId], references: [id])
+  ordine           Int
+
+  passaggi       PassaggioProgetto[]
+  documenti      Documento[]
+  accessiRisorsa AccessoRisorsa[]    @relation("AccessoMicrovoce")
+
+  @@map("microvoce_progetto")
+}
+
+model PassaggioProgetto {
+  id                  String            @id @default(uuid())
+  tenantId            String            @map("tenant_id")
+  microvoceProgettoId String            @map("microvoce_progetto_id")
+  microvoceProgetto   MicrovoceProgetto @relation(fields: [microvoceProgettoId], references: [id])
+  titolo              String
+  tipo                TipoPassaggio
+  chi                 ChiPassaggio
+  ordine              Int // liberamente riordinabile per questa istanza, mai sul template
+  descrizione         String?
+  campiFormJson       Json?             @map("campi_form_json")
+  stato               String            @default("pending") // pending|done
+  documentoId         String?           @unique @map("documento_id")
+  documento           Documento?        @relation(fields: [documentoId], references: [id])
+  risposteFormJson    Json?             @map("risposte_form_json")
+  noteOperatoreJson   Json?             @map("note_operatore_json")
+  richiedeFirmaCliente Boolean          @default(false) @map("richiede_firma_cliente")
+  // Piano firma §3.1 (Fase 2) — valore legale richiesto (ses|fea|feq) per la conferma
+  // firmata di questo passaggio/modulo. Finché la firma non è apposta resta cambiabile;
+  // dopo diventa storia. Con fea/feq la rotta OTP semplice risponde 409.
+  livelloFirmaRichiesto String          @default("ses") @map("livello_firma_richiesto")
+  documentoAllegatoUrl String?          @map("documento_allegato_url")
+  formMasterId         String?          @map("form_master_id")
+  linkIstruzioni       String?          @map("link_istruzioni")
+  checklistVoci        ChecklistVoce[]
+
+  @@map("passaggio_progetto")
+}
+
+model ModelloDocumentoInBianco {
+  id            String   @id @default(uuid())
+  tenantId      String   @map("tenant_id")
+  nome          String
+  categoria     String
+  fileUrl       String   @map("file_url")
+  richiedeFirma Boolean  @default(true) @map("richiede_firma")
+  // Piano firma §3.1 (Fase 2) — livello di valore legale (ses|fea|feq) imposto a ogni
+  // documento generato da questo template. Copiato su Documento alla generazione.
+  livelloFirmaRichiesto String @default("ses") @map("livello_firma_richiesto")
+  descrizione   String?
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@map("modello_documento_in_bianco")
+}
+
+model FormMaster {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  nome      String
+  campiJson Json     @map("campi_json")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("form_master")
+}
+
+model ModuloProgettoDipendenza {
+  id                      String         @id @default(uuid())
+  tenantId                String         @map("tenant_id")
+  moduloProgettoId        String         @map("modulo_progetto_id")
+  moduloProgetto          ModuloProgetto @relation("ModuloProgettoDipendente", fields: [moduloProgettoId], references: [id])
+  dipendeDaModuloProgettoId String       @map("dipende_da_modulo_progetto_id")
+  dipendeDaModuloProgetto   ModuloProgetto @relation("ModuloProgettoDaCuiDipende", fields: [dipendeDaModuloProgettoId], references: [id])
+  // copia congelata delle dipendenze del template al momento dell'istanziazione, §15.3
+
+  @@map("modulo_progetto_dipendenza")
+}
+
+enum StatoScansione {
+  in_corso
+  pulito
+  infetto
+}
+
+/// §WF-DOC — Ciclo di vita del documento nel workflow operatore-cliente.
+/// bozza: visibile solo all'operatore.
+/// pubblicato: il cliente può vedere, firmare o chiedere modifiche.
+/// in_revisione: il cliente ha richiesto una modifica (torna a bozza dopo upload v2).
+/// firmato: il cliente ha firmato via OTP — stato terminale positivo.
+enum StatoDocumento {
+  bozza
+  pubblicato
+  in_revisione
+  firmato
+}
+
+model Documento {
+  id                  String            @id @default(uuid())
+  tenantId            String            @map("tenant_id")
+  // §2.9 — i file caricati dallo studio appartengono al fascicolo del progetto, non per
+  // forza a una micro-voce (che può non esistere ancora: upload prima dell'istanziazione).
+  // Almeno uno dei due collegamenti è sempre valorizzato.
+  microvoceProgettoId String?           @map("microvoce_progetto_id")
+  microvoceProgetto   MicrovoceProgetto? @relation(fields: [microvoceProgettoId], references: [id], onDelete: SetNull)
+  progettoId          String?           @map("progetto_id")
+  progetto            Progetto?         @relation(fields: [progettoId], references: [id], onDelete: SetNull)
+  tipo                String // template_vuoto|compilato|firmato|allegato|verbale_firma
+  // Punto 1 piano gap — export contestuale PDF + Word. `fileUrl` resta il master
+  // (retrocompatibilità: tutto il codice esistente, incluso l'hash legale della firma
+  // calcolato da `leggiFileArchivio(fileUrl)`, continua a puntare qui). I due campi
+  // sotto indicano la disponibilità del doppio formato e si popolano solo per i
+  // documenti prodotti dal motore di generazione (tipo=`compilato`), non per gli
+  // `allegato` caricati manualmente nel loro formato originale. `formatoOrigine`
+  // dichiara qual è il master: per i generati è sempre 'pdf' (sigillo legale sul PDF).
+  fileUrl             String            @map("file_url")
+  filePdfUrl          String?           @map("file_pdf_url")
+  fileDocxUrl         String?           @map("file_docx_url")
+  formatoOrigine      String            @default("pdf") @map("formato_origine") // pdf|docx
+  // §36 — i blocchi risolti da cui il documento è stato composto, così com'erano al momento
+  // della generazione (tag già sostituiti). Servono a una cosa sola: quando il cliente firma,
+  // ricomporre il documento con la grafometrica DENTRO l'area `{{firma_cliente}}`. Il PDF
+  // originale non si può annotare (nessun `pdf-lib` fra le dipendenze) e non si DEVE toccare —
+  // è il file su cui è fissato l'hash del sigillo. La copia firmata è quindi una nuova riga
+  // Documento (tipo='firmato', documentoPadreId → originale) resa da questi stessi blocchi.
+  // Nullable e senza backfill: i documenti generati prima di §36 non hanno i blocchi, e per
+  // loro la copia firmata non si produce (la firma resta valida, sigillo e verbale invariati).
+  contenutoBlocchiJson Json?            @map("contenuto_blocchi_json")
+  versione             Int              @default(1)
+  // Chi ha caricato il file. Nullable: i documenti generati automaticamente dalla
+  // piattaforma (verbale_firma, Punto 2 piano gap) non hanno un caricatore umano — il
+  // client firmatario non è una riga User e attribuirlo a un utente dello studio sarebbe
+  // un'attestazione falsa in un atto certificativo.
+  caricatoDa          String?           @map("caricato_da")
+  caricatoDaUser       User?             @relation(fields: [caricatoDa], references: [id])
+  createdAt           DateTime          @default(now()) @map("created_at")
+  // Sicurezza upload — §28, incluso fin dallo schema iniziale (Fase 1 del piano)
+  statoScansione      StatoScansione    @default(in_corso) @map("stato_scansione")
+  scansionatoAt       DateTime?         @map("scansionato_at")
+  dataScadenzaDoc     DateTime?         @map("data_scadenza_doc")
+  categoriaDoc        String?           @default("generico") @map("categoria_doc") // identita|visura|contratto|generico
+  avvisoScadenzaInviato Boolean         @default(false) @map("avviso_scadenza_inviato")
+  // §WF-DOC — Workflow operatore → cliente.
+  // Ogni upload parte come bozza: l'operatore pubblica esplicitamente quando il documento è pronto.
+  statoDoc            StatoDocumento    @default(bozza) @map("stato_doc")
+  pubblicatoAt        DateTime?         @map("pubblicato_at")
+  // Piano firma §3.1 (Fase 2) — valore legale richiesto (ses|fea|feq) per firmare questo
+  // documento. I generati lo ereditano dal template; per gli upload manuali lo sceglie
+  // l'operatore alla pubblicazione. Cambiabile finché la firma non è apposta.
+  livelloFirmaRichiesto String          @default("ses") @map("livello_firma_richiesto")
+  // Versioning: documentoPadreId punta alla riga v1 quando si carica una v2 corretta.
+  documentoPadreId    String?           @map("documento_padre_id")
+  documentoPadre      Documento?        @relation("VersioniDocumento", fields: [documentoPadreId], references: [id])
+  versioni            Documento[]       @relation("VersioniDocumento")
+  // Punto 3 piano gap — un documento firmato (o con sigillo/OTP collegati) non si cancella
+  // mai: viene solo archiviato. Le liste operative escludono isArchiviato=true, lo storico
+  // e l'audit restano leggibili e il riferimento della firma non diventa mai orfano.
+  isArchiviato        Boolean           @default(false) @map("is_archiviato")
+  archiviatoAt        DateTime?         @map("archiviato_at")
+  archiviatoDaId      String?           @map("archiviato_da_id")
+
+  passaggioProgetto PassaggioProgetto?
+  richiesteModifica RichiestaModificaDocumento[]
+  verbaliFirma      FirmaElettronica[]
+
+  @@index([progettoId])
+  @@index([statoDoc])
+  @@map("documento")
+}
+
+/// §WF-DOC — Richiesta di modifica inviata dal cliente su un documento pubblicato.
+/// Ogni richiesta è registrata a DB e visibile all'advisor nella scheda del documento.
+model RichiestaModificaDocumento {
+  id             String    @id @default(uuid())
+  tenantId       String    @map("tenant_id")
+  documentoId    String    @map("documento_id")
+  documento      Documento @relation(fields: [documentoId], references: [id], onDelete: Cascade)
+  clienteId      String    @map("cliente_id")
+  cliente        Cliente   @relation("RichiesteModificaDocumento", fields: [clienteId], references: [id])
+  commento       String    // testo libero del cliente
+  stato          String    @default("aperta") // aperta | risolta
+  creatoAt       DateTime  @default(now()) @map("creato_at")
+  rispostoAt     DateTime? @map("risposto_at")
+  rispostaStudio String?   @map("risposta_studio")
+
+  @@index([documentoId])
+  @@index([tenantId, stato])
+  @@map("richiesta_modifica_documento")
+}
+
+model ChecklistVoce {
+  id                  String            @id @default(uuid())
+  tenantId            String            @map("tenant_id")
+  passaggioProgettoId String            @map("passaggio_progetto_id")
+  passaggioProgetto   PassaggioProgetto @relation(fields: [passaggioProgettoId], references: [id], onDelete: Cascade)
+  titolo              String
+  obbligatorio        Boolean           @default(false)
+  completato          Boolean           @default(false)
+  completatoDa        String?           @map("completato_da")
+  completatoAt        DateTime?         @map("completato_at")
+
+  @@map("checklist_voce")
+}
+
+enum FrequenzaContratto {
+  mensile
+  trimestrale
+  semestrale
+  annuale
+}
+
+enum StatoContrattoRicorrente {
+  attivo
+  sospeso
+  concluso
+}
+
+model ContrattoRicorrente {
+  id                   String                   @id @default(uuid())
+  tenantId             String                   @map("tenant_id")
+  tenant               Tenant                   @relation(fields: [tenantId], references: [id])
+  clienteId            String                   @map("cliente_id")
+  cliente              Cliente                  @relation(fields: [clienteId], references: [id])
+  progettoId           String?                  @map("progetto_id")
+  progetto             Progetto?                @relation(fields: [progettoId], references: [id], onDelete: SetNull)
+  titolo               String
+  frequenza            FrequenzaContratto       @default(mensile)
+  importoCentesimi     Int                      @map("importo_centesimi")
+  prossimaFatturazione DateTime                 @map("prossima_fatturazione")
+  stato                StatoContrattoRicorrente @default(attivo)
+  note                 String?
+  createdAt            DateTime                 @default(now()) @map("created_at")
+  fatture              Fattura[]
+
+  @@map("contratto_ricorrente")
+}
+
+// ─────────────────────────────────────────────────────────────────
+// FATTURAZIONE, CONTABILITÀ & SDI — §12, §18, §26 (OPENSTAMANAGER ENGINE)
+// ─────────────────────────────────────────────────────────────────
+
+enum TipoDocumentoFiscale {
+  fattura
+  nota_credito
+}
+
+enum StatoFattura {
+  bozza
+  emessa
+  incassata
+  annullata
+}
+
+enum TipoClienteFiscale {
+  privato_italia
+  business_italia
+  estero
+}
+
+enum CanaleFattura {
+  sdi
+  standard
+}
+
+enum StatoSdi {
+  n_a
+  inviata
+  consegnata
+  scartata
+  mancata_consegna
+}
+
+enum CondizionePagamento {
+  immediato
+  bonifico_30gg
+  bonifico_60gg
+  bonifico_30_60gg
+  bonifico_fine_mese
+  personalizzato
+}
+
+enum TipoCassaPrevidenziale {
+  nessuna
+  inps_gestione_separata // TC22 - 4%
+  cassa_commercialisti   // TC03 - 4%
+  cassa_forense          // TC01 - 4%
+  inarcassa              // TC04 - 4%
+}
+
+enum EsigibilitaIva {
+  immediata   // "I" - regime ordinario
+  differita   // "D" - art. 6 DPR 633/72
+  split       // "S" - scissione dei pagamenti (PA)
+}
+
+enum MotivoNotaCredito {
+  errore_esposizione
+  reso_merce
+  sconto_post_fattura
+  abbuono
+  annullo_totale
+  correzione_dati
+}
+
+model Fattura {
+  id                        String                 @id @default(uuid())
+  tenantId                  String                 @map("tenant_id")
+  progettoId                String?                @map("progetto_id")
+  progetto                  Progetto?              @relation(fields: [progettoId], references: [id], onDelete: SetNull)
+  clienteId                 String                 @map("cliente_id")
+  cliente                   Cliente                @relation(fields: [clienteId], references: [id])
+  preventivoId              String?                @map("preventivo_id")
+  preventivo                Preventivo?            @relation(fields: [preventivoId], references: [id], onDelete: SetNull)
+  contrattoRicorrenteId     String?                @map("contratto_ricorrente_id")
+  contrattoRicorrente       ContrattoRicorrente?   @relation(fields: [contrattoRicorrenteId], references: [id], onDelete: SetNull)
+
+  tipoDocumento             TipoDocumentoFiscale   @default(fattura) @map("tipo_documento")
+  serie                     String                 @default("FT") // "FT" per Fatture, "NC" per Note di Credito
+  numeroProgressivoSerie    Int                    @default(1) @map("numero_progressivo_serie")
+  numero                    String?                // es. "FT-2026/001" o "NC-2026/001"
+  data                      DateTime?              @default(now())
+  stato                     StatoFattura           @default(bozza)
+  fatturaRiferimentoId      String?                @map("fattura_riferimento_id") // ID fattura rettificata se trattasi di Nota di Credito
+  causaNotaCredito          String?                @map("causa_nota_credito")
+
+  // Campi SDI & Fiscali
+  tipoClienteFiscale        TipoClienteFiscale     @default(business_italia) @map("tipo_cliente_fiscale")
+  partitaIva                String?                @map("partita_iva")
+  codiceFiscale             String?                @map("codice_fiscale")
+  numeroProgressivo         String?                @unique @map("numero_progressivo")
+  canale                    CanaleFattura          @default(sdi)
+  statoSdi                  StatoSdi               @default(n_a) @map("stato_sdi")
+
+  // Condizioni Commerciali & Fiscali
+  condizionePagamento       CondizionePagamento    @default(bonifico_30gg) @map("condizione_pagamento")
+  metodoPagamento           MetodoPagamento        @default(bonifico) @map("metodo_pagamento")
+  contoAccreditoId          String?                @map("conto_accredito_id")
+  contoAccredito            ContoBancario?         @relation(fields: [contoAccreditoId], references: [id], onDelete: SetNull)
+
+  tipoCassa                 TipoCassaPrevidenziale @default(nessuna) @map("tipo_cassa")
+  aliquotaCassa             Float                  @default(0) @map("aliquota_cassa")
+  aliquotaRitenuta          Float                  @default(0) @map("aliquota_ritenuta") // es. 20.0
+  esigibilitaIva            EsigibilitaIva         @default(immediata) @map("esigibilita_iva")
+
+  // Totali Calcolati (in centesimi per precisione assoluta)
+  totaleImponibileCentesimi Int                    @default(0) @map("totale_imponibile_centesimi")
+  totaleCassaCentesimi      Int                    @default(0) @map("totale_cassa_centesimi")
+  totaleIvaCentesimi        Int                    @default(0) @map("totale_iva_centesimi")
+  totaleRitenutaCentesimi   Int                    @default(0) @map("totale_ritenuta_centesimi")
+  totaleBolloCentesimi      Int                    @default(0) @map("totale_bollo_centesimi") // €2 se op. esenti/escluse > 77,47€
+  totaleDocumentoCentesimi  Int                    @default(0) @map("totale_documento_centesimi")
+  nettoAPagareCentesimi     Int                    @default(0) @map("netto_a_pagare_centesimi")
+
+  // Correzioni post-emissione: SOLO tramite Nota di Credito
+  fatturaOrigineId          String?                @map("fattura_origine_id")
+  fatturaOrigine            Fattura?               @relation("NotaCreditoDiFattura", fields: [fatturaOrigineId], references: [id], onDelete: SetNull)
+  noteCredito               Fattura[]              @relation("NotaCreditoDiFattura")
+  motivoNotaCredito         MotivoNotaCredito?     @map("motivo_nota_credito")
+
+  // Conservazione sostitutiva a norma (10 anni)
+  conservazioneRiferimento  String?                @map("conservazione_riferimento")
+  conservazioneDataInvio    DateTime?              @map("conservazione_data_invio")
+
+  note                      String?
+  notePiePagina             String?                @map("note_pie_pagina")
+  codiceDestinatario        String?                @map("codice_destinatario")
+  pecDestinatario           String?                @map("pec_destinatario")
+  esitoSdiDettagli          String?                @map("esito_sdi_dettagli")
+
+  righe                     FatturaRiga[]
+  scadenzeIncasso           ScadenzaIncasso[]
+  registrazioniIncasso      RegistrazioneIncasso[]
+  movimentiPrimaNota        MovimentoPrimaNota[]
+  auditLogFatture           AuditLogFattura[]
+
+  createdAt                 DateTime               @default(now()) @map("created_at")
+  updatedAt                 DateTime               @updatedAt @map("updated_at")
+
+  @@index([tenantId, clienteId])
+  @@index([tenantId, progettoId])
+  @@map("fattura")
+}
+
+enum StatoScadenzaIncasso {
+  in_attesa
+  incassato
+  parziale
+  scaduto
+}
+
+model ScadenzaIncasso {
+  id               String               @id @default(uuid())
+  tenantId         String               @map("tenant_id")
+  fatturaId        String               @map("fattura_id")
+  fattura          Fattura              @relation(fields: [fatturaId], references: [id], onDelete: Cascade)
+  numeroRata       Int                  @default(1) @map("numero_rata")
+  importoCentesimi Int                  @map("importo_centesimi")
+  dataScadenza     DateTime             @map("data_scadenza")
+  stato            StatoScadenzaIncasso @default(in_attesa)
+  note             String?
+
+  registrazioniRegistrate RegistrazioneIncasso[]
+
+  @@map("scadenza_incasso")
+}
+
+enum MetodoPagamento {
+  bonifico
+  carta
+  assegno
+  contanti
+  stripe
+}
+
+model RegistrazioneIncasso {
+  id                        String           @id @default(uuid())
+  tenantId                  String           @map("tenant_id")
+  scadenzaIncassoId         String?          @map("scadenza_incasso_id")
+  scadenzaIncasso           ScadenzaIncasso? @relation(fields: [scadenzaIncassoId], references: [id])
+  fatturaId                 String           @map("fattura_id")
+  fattura                   Fattura          @relation(fields: [fatturaId], references: [id], onDelete: Cascade)
+  importoIncassatoCentesimi Int              @map("importo_incassato_centesimi")
+  dataIncasso               DateTime         @default(now()) @map("data_incasso")
+  metodoPagamento           MetodoPagamento  @default(bonifico) @map("metodo_pagamento")
+  riferimentoTransazione    String?          @map("riferimento_transazione")
+  noteOperatore             String?          @map("note_operatore")
+
+  @@map("registrazione_incasso")
+}
+
+enum TipoFatturaRiga {
+  modulo_completo
+  modulo_parziale
+  milestone_libera
+}
+
+model FatturaRiga {
+  id                  String          @id @default(uuid())
+  tenantId            String          @map("tenant_id")
+  fatturaId           String          @map("fattura_id")
+  fattura             Fattura         @relation(fields: [fatturaId], references: [id], onDelete: Cascade)
+  tipo                TipoFatturaRiga @default(milestone_libera)
+  moduloProgettoId    String?         @map("modulo_progetto_id")
+  moduloProgetto      ModuloProgetto? @relation(fields: [moduloProgettoId], references: [id], onDelete: SetNull)
+  articoloId          String?         @map("articolo_id")
+  articolo            Articolo?       @relation(fields: [articoloId], references: [id], onDelete: SetNull)
+  percentuale         Int? // usato se tipo=modulo_parziale
+  importo             Int             @default(0) // compatibilità retroattiva centesimi
+  descrizione         String
+
+  quantita            Float           @default(1.0)
+  unitaMisura         String          @default("ore") @map("unita_misura")
+  prezzoUnitarioCent  Int             @default(0) @map("prezzo_unitario_cent")
+  scontoPercentuale   Float           @default(0) @map("sconto_percentuale")
+
+  aliquotaIva         Int             @default(22) @map("aliquota_iva")
+  naturaEsenzione     String?         @map("natura_esenzione")
+  applicaCassa        Boolean         @default(true) @map("applica_cassa")
+  applicaRitenuta     Boolean         @default(true) @map("applica_ritenuta")
+  applicaBollo        Boolean         @default(false) @map("applica_bollo")
+
+  imponibileCentesimi Int             @default(0) @map("imponibile_centesimi")
+  ivaCentesimi        Int             @default(0) @map("iva_centesimi")
+  totaleRigaCentesimi Int             @default(0) @map("totale_riga_centesimi")
+  ordine              Int             @default(1)
+
+  @@map("fattura_riga")
+}
+
+model AuditLogFattura {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  fatturaId   String   @map("fattura_id")
+  fattura     Fattura  @relation(fields: [fatturaId], references: [id], onDelete: Cascade)
+  utenteId    String?  @map("utente_id")
+  azione      String   // "emissione", "annullo_bozza", "nota_credito", "incasso", "storno_incasso", "invio_sdi"
+  dettagli    Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, fatturaId])
+  @@map("audit_log_fattura")
+}
+
+model Fornitore {
+  id             String            @id @default(uuid())
+  tenantId       String            @map("tenant_id")
+  tenant         Tenant            @relation(fields: [tenantId], references: [id])
+  ragioneSociale String            @map("ragione_sociale")
+  partitaIva     String?           @map("partita_iva")
+  codiceFiscale  String?           @map("codice_fiscale")
+  email          String?
+  pec            String?
+  sdiCode        String?           @map("sdi_code")
+  indirizzo      String?
+  citta          String?
+  cap            String?
+  nazione        String?           @default("IT")
+  iban           String?
+  note           String?
+  createdAt      DateTime          @default(now()) @map("created_at")
+
+  fattureRicevute    FatturaRicevuta[]
+  movimentiPrimaNota MovimentoPrimaNota[]
+
+  @@index([tenantId])
+  @@map("fornitore")
+}
+
+model FatturaRicevuta {
+  id                  String         @id @default(uuid())
+  tenantId            String         @map("tenant_id")
+  tenant              Tenant         @relation(fields: [tenantId], references: [id])
+  fornitoreId         String         @map("fornitore_id")
+  fornitore           Fornitore      @relation(fields: [fornitoreId], references: [id])
+  numero              String
+  data                DateTime
+  imponibileCentesimi Int            @map("imponibile_centesimi")
+  ivaCentesimi        Int            @map("iva_centesimi")
+  totaleCentesimi     Int            @map("totale_centesimi")
+  esigibilitaIva      EsigibilitaIva @default(immediata) @map("esigibilita_iva")
+  pagata              Boolean        @default(false)
+  dataPagamento       DateTime?      @map("data_pagamento")
+  xmlSdiRaw           String?        @map("xml_sdi_raw") @db.Text
+  createdAt           DateTime       @default(now()) @map("created_at")
+
+  movimentiPrimaNota  MovimentoPrimaNota[]
+
+  @@index([tenantId, fornitoreId])
+  @@map("fattura_ricevuta")
+}
+
+model LiquidazioneIva {
+  id                  String    @id @default(uuid())
+  tenantId            String    @map("tenant_id")
+  tenant              Tenant    @relation(fields: [tenantId], references: [id])
+  periodo             String    // "2026-Q3" o "2026-09"
+  ivaDebitoCentesimi  Int       @default(0) @map("iva_debito_centesimi")
+  ivaCreditoCentesimi Int       @default(0) @map("iva_credito_centesimi")
+  saldoCentesimi      Int       @default(0) @map("saldo_centesimi")
+  versata             Boolean   @default(false)
+  dataVersamento      DateTime? @map("data_versamento")
+  createdAt           DateTime  @default(now()) @map("created_at")
+
+  @@unique([tenantId, periodo])
+  @@map("liquidazione_iva")
+}
+
+enum TipoMovimentoPrimaNota {
+  entrata
+  uscita
+}
+
+enum CategoriaPrimaNota {
+  incasso_fattura
+  pagamento_fornitore
+  imposta_tasse
+  stipendi_compensi
+  spese_generali
+  giroconto
+  altro
+}
+
+model MovimentoPrimaNota {
+  id                     String                 @id @default(uuid())
+  tenantId               String                 @map("tenant_id")
+  tenant                 Tenant                 @relation(fields: [tenantId], references: [id])
+  contoBancarioId        String?                @map("conto_bancario_id")
+  contoBancario          ContoBancario?         @relation(fields: [contoBancarioId], references: [id], onDelete: SetNull)
+  fatturaId              String?                @map("fattura_id")
+  fattura                Fattura?               @relation(fields: [fatturaId], references: [id], onDelete: SetNull)
+  fatturaRicevutaId      String?                @map("fattura_ricevuta_id")
+  fatturaRicevuta        FatturaRicevuta?       @relation(fields: [fatturaRicevutaId], references: [id], onDelete: SetNull)
+  clienteId              String?                @map("cliente_id")
+  cliente                Cliente?               @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+  fornitoreId            String?                @map("fornitore_id")
+  fornitore              Fornitore?             @relation(fields: [fornitoreId], references: [id], onDelete: SetNull)
+
+  data                   DateTime               @default(now())
+  tipo                   TipoMovimentoPrimaNota @default(entrata)
+  categoria              CategoriaPrimaNota     @default(incasso_fattura)
+  descrizione            String
+  importoCentesimi       Int                    @map("importo_centesimi")
+  metodoPagamento        MetodoPagamento        @default(bonifico) @map("metodo_pagamento")
+  riferimentoTransazione String?                @map("riferimento_transazione") // CRO, TRN
+  note                   String?
+  createdAt              DateTime               @default(now()) @map("created_at")
+
+  @@index([tenantId, data])
+  @@index([tenantId, fatturaId])
+  @@map("movimento_prima_nota")
+}
+
+// ─────────────────────────────────────────────────────────────────
+// TRASVERSALI — §19, §20, §21
+// ─────────────────────────────────────────────────────────────────
+
+model EventoCalendario {
+  id          String    @id @default(uuid())
+  tenantId    String    @map("tenant_id")
+  userId      String    @map("user_id")
+  user        User      @relation(fields: [userId], references: [id])
+  progettoId  String?   @map("progetto_id")
+  progetto    Progetto? @relation(fields: [progettoId], references: [id], onDelete: Cascade)
+  titolo      String
+  dataInizio  DateTime  @map("data_inizio")
+  dataFine    DateTime  @map("data_fine")
+
+  @@map("evento_calendario")
+}
+
+enum LivelloAccesso {
+  lettura
+  scrittura
+}
+
+model AccessoRisorsa {
+  id                String          @id @default(uuid())
+  tenantId          String          @map("tenant_id")
+  userId            String          @map("user_id")
+  user              User            @relation("AccessoUtente", fields: [userId], references: [id])
+  // §19 + fix trovato disegnando lo schema ER: 3 FK nullable con vincolo "esattamente una
+  // valorizzata", NON un riferimento polimorfico tipo_risorsa+risorsa_id (non verificabile a
+  // livello di database — su una tabella di permessi l'integrità reale conta più della compattezza)
+  progettoId        String?         @map("progetto_id")
+  progetto          Progetto?       @relation("AccessoProgetto", fields: [progettoId], references: [id])
+  moduloProgettoId  String?         @map("modulo_progetto_id")
+  moduloProgetto    ModuloProgetto? @relation("AccessoModulo", fields: [moduloProgettoId], references: [id])
+  microvoceProgettoId String?       @map("microvoce_progetto_id")
+  microvoceProgetto MicrovoceProgetto? @relation("AccessoMicrovoce", fields: [microvoceProgettoId], references: [id])
+  livello           LivelloAccesso
+  invitatoDa        String          @map("invitato_da")
+  invitatoDaUser    User            @relation("AccessoInvitatoDa", fields: [invitatoDa], references: [id])
+  createdAt         DateTime        @default(now()) @map("created_at")
+
+  // Vincolo "esattamente una risorsa valorizzata" — Prisma non esprime CHECK multi-colonna
+  // nativamente: va aggiunto con una migrazione SQL manuale dopo `prisma migrate dev`.
+  // Vedi Note operative a fondo file.
+
+  @@map("accesso_risorsa")
+}
+
+enum PermessoLivello {
+  denied
+  read
+  write
+}
+
+model PermessoModulo {
+  id           String          @id @default(uuid())
+  tenantId     String          @map("tenant_id")
+  tenant       Tenant          @relation(fields: [tenantId], references: [id])
+  userId       String          @map("user_id")
+  user         User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  moduloChiave String          @map("modulo_chiave") // 'projects'|'clients'|'invoices'|'scadenzario'|'primanota'|'banks'|'retainers'|'audit'
+  livello      PermessoLivello @default(write)
+  createdAt    DateTime        @default(now()) @map("created_at")
+
+  @@unique([tenantId, userId, moduloChiave])
+  @@map("permesso_modulo")
+}
+
+model Notifica {
+  id               String    @id @default(uuid())
+  tenantId         String    @map("tenant_id")
+  // Blocco 3: il destinatario è un utente dello studio OPPURE un cliente del portale.
+  // I due FK sono entrambi opzionali: esattamente uno dei due è valorizzato.
+  destinatarioId   String?   @map("destinatario_id")
+  destinatarioUser User?     @relation(fields: [destinatarioId], references: [id])
+  destinatarioClienteId String? @map("destinatario_cliente_id")
+  destinatarioCliente Cliente? @relation(fields: [destinatarioClienteId], references: [id])
+  destinatarioTipo String    @map("destinatario_tipo") // user|cliente
+  // Evento origine (Blocco 3): modulo_completato|documento_da_firmare|messaggio_cliente|
+  // scadenza_imminente|fattura_incassata|firma_apposta. Null per notifiche legacy/generiche.
+  tipoEvento       String?   @map("tipo_evento")
+  link             String?   // deep-link frontend (es. /projects/123, /portal)
+  canale           String    @default("email")
+  oggetto          String
+  corpo            String
+  statoLettura      String   @default("non_letta") @map("stato_lettura")
+  inviataAt        DateTime? @map("inviata_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  @@index([tenantId, destinatarioId])
+  @@index([tenantId, destinatarioClienteId])
+  @@map("notifica")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  tenantId   String   @map("tenant_id")
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
+  userId     String   @map("user_id")
+  userEmail  String   @map("user_email")
+  userNome   String   @map("user_nome")
+  ruolo      String   @map("ruolo")
+  azione     String   // es. "DOCUMENTO_CARICATO", "DOCUMENTO_ELIMINATO", "FATTURA_EMESSA"
+  entita     String   // es. "Fascicolo_KYC.pdf", "Progetto #1"
+  dettagli   String   @map("dettagli")
+  ipAddress  String?  @map("ip_address")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@map("audit_log")
+}
+
+model ComunicazioneProgetto {
+  id           String   @id @default(uuid())
+  tenantId     String   @map("tenant_id")
+  tenant       Tenant   @relation(fields: [tenantId], references: [id])
+  progettoId   String   @map("progetto_id")
+  progetto     Progetto @relation(fields: [progettoId], references: [id], onDelete: Cascade)
+  canale       String   // email | whatsapp | telegram | signal
+  mittente     String
+  destinatario String
+  direzione    String   @default("entrata") // entrata | uscita
+  testo        String
+  allegatiJson String?  @map("allegati_json")
+  externalId   String?  @map("external_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@map("comunicazione_progetto")
+}
+
+model ContoBancario {
+  id            String   @id @default(uuid())
+  tenantId      String   @map("tenant_id")
+  tenant        Tenant   @relation(fields: [tenantId], references: [id])
+  nomeConto     String   @map("nome_conto")
+  banca         String
+  iban          String?
+  bicSwift      String?  @map("bic_swift")
+  saldoIniziale Int      @default(0) @map("saldo_iniziale") // centesimi
+  saldoAttuale  Int      @default(0) @map("saldo_attuale") // centesimi
+  isDefault     Boolean  @default(false) @map("is_default")
+  createdAt     DateTime @default(now()) @map("created_at")
+  fatture       Fattura[]
+  movimentiPrimaNota MovimentoPrimaNota[]
+
+  @@map("conto_bancario")
+}
+
+model ModelloDocumentoCustom {
+  id             String   @id @default(uuid())
+  tenantId       String   @map("tenant_id")
+  tenant         Tenant   @relation(fields: [tenantId], references: [id])
+  titolo         String
+  categoria      String   @default("contratto")
+  descrizione    String?
+  contenutoHtml  String   @map("contenuto_html") @db.Text
+  // Piano firma §3.1 (Fase 2) — livello di valore legale (ses|fea|feq) scelto sul
+  // template del Document Studio: POST /documenti/genera lo copia sul documento
+  // generato, salvo override esplicita dell'operatore nella richiesta.
+  livelloFirmaRichiesto String @default("ses") @map("livello_firma_richiesto")
+  // §41 — Cartella template dello studio: stato di revisione del modello.
+  //
+  // Serve a rispondere alla domanda che l'operatore si pone davanti a un modello: «questo
+  // testo l'ha già riletto qualcuno?». Prima non c'era modo di saperlo, e un modello appena
+  // abbozzato e uno approvato dal titolare erano indistinguibili nell'elenco.
+  //
+  // `stato_revisione`: bozza | in_revisione | approvato (l'insieme sta in
+  // `src/services/revisioneModello.ts`, che è anche l'unico posto che decide i passaggi).
+  // `versione` sale quando il TESTO di un modello approvato cambia: un'approvazione che
+  // resta appesa a un contenuto diverso da quello approvato non attesta niente.
+  statoRevisione      String    @default("bozza") @map("stato_revisione")
+  versione            Int       @default(1)
+  noteRevisione       String?   @map("note_revisione")
+  // Chi ha deciso lo stato, denormalizzato come in `audit_log`: il nome sulla riga resta
+  // leggibile anche se l'utenza viene disattivata o rinominata.
+  revisionatoDaUserId String?   @map("revisionato_da_user_id")
+  revisionatoDaNome   String?   @map("revisionato_da_nome")
+  revisionatoAt       DateTime? @map("revisionato_at")
+  // Archiviare non è eliminare: il modello esce dagli elenchi operativi e resta a database
+  // (i documenti già generati sono copie congelate e non ne dipendono).
+  archiviatoAt        DateTime? @map("archiviato_at")
+  // Se il modello nasce adottando uno dei modelli di serie del codice, qui resta l'id di
+  // quel modello: l'adozione diventa idempotente e la cartella non mostra due volte la
+  // stessa carta. Nullo per i modelli scritti dallo studio.
+  riferimentoSerie    String?   @map("riferimento_serie")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, riferimentoSerie], map: "modello_documento_custom_tenant_serie_key")
+  @@map("modello_documento_custom")
+}
+
+// ─────────────────────────────────────────────────────────────────
+// MAGIC LINK — accesso passwordless del cliente al portale (§23)
+// ─────────────────────────────────────────────────────────────────
+// Prima di questa tabella /auth/magic-login accettava qualunque stringa che iniziasse
+// per `client_` e in cambio firmava un JWT con tenant ed email cablati: non c'era
+// niente da verificare, perché i token non venivano persistiti da nessuna parte. Il
+// rate limiting non c'entrava — non era un problema di brute force, non c'era nulla
+// da indovinare.
+
+model MagicLink {
+  id        String    @id @default(uuid())
+  tenantId  String    @map("tenant_id")
+  tenant    Tenant    @relation(fields: [tenantId], references: [id])
+  clienteId String    @map("cliente_id")
+  cliente   Cliente   @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  // In tabella va lo SHA-256 del token, non il token: chi legge il database non deve
+  // poter entrare al posto del cliente. SHA-256 e non scrypt perché il token ha già
+  // 128 bit da crypto.randomBytes — scrypt difende dalle password indovinabili, e qui
+  // non c'è niente da indovinare.
+  tokenHash String    @unique @map("token_hash")
+  scadenza  DateTime  @map("scadenza")
+  // Indirizzo a cui il link è stato inviato. Serve all'audit — un credenziale di accesso
+  // senza traccia di dove è finita non è verificabile — e dà un'email al JWT di sessione:
+  // `Cliente` non ne ha una, e prima l'endpoint ne cablava una nel sorgente.
+  email     String?   @map("email")
+  // Primo utilizzo, per l'audit. Il link resta valido fino a scadenza: un cliente
+  // riapre il proprio link più di una volta, e invalidarlo al primo accesso lo
+  // chiuderebbe fuori. La revoca è la cancellazione della riga.
+  usatoAt   DateTime? @map("usato_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@map("magic_link")
+}
+
+// ─────────────────────────────────────────────────────────────────
+// CODICE OTP — secondo fattore della firma elettronica avanzata (§23bis)
+// ─────────────────────────────────────────────────────────────────
+// Prima i codici vivevano in una `Map` in memoria dentro otpService: bastava un restart
+// di Railway — o il secondo processo di un deploy a due istanze — perché il cliente si
+// trovasse "codice non valido" dopo averlo appena ricevuto. Un secondo fattore che non
+// sopravvive al riavvio del server non è un secondo fattore.
+
+model CodiceOtp {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  clienteId String   @map("cliente_id")
+  cliente   Cliente  @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  // HMAC-SHA-256 del codice, non il codice: vedi `hashCodiceOtp` in src/util/jwt.ts.
+  // Sei cifre sotto un hash veloce sono un milione di voci precalcolabili, quindi serve
+  // un segreto che nel database non c'è.
+  codiceHash String  @map("codice_hash")
+  // whatsapp|email|telegram. Niente SMS: nessun provider è collegato, e un canale che
+  // non spedisce ma compare nell'interfaccia è un modo di far fallire una firma.
+  canale    String   @map("canale")
+  // Recapito a cui il codice è stato effettivamente spedito, in chiaro e per intero.
+  // L'audit di una firma deve poter dire dove è finito il fattore di autenticazione;
+  // il mascheramento è una scelta di presentazione, si fa in risposta all'API.
+  target    String   @map("target")
+  // Il firmatario può indicare un recapito diverso da quello in anagrafica (§1.2). Quando
+  // lo fa va a verbale: `targetAnagrafica` conserva il valore su scheda, e il sigillo dirà
+  // che il fattore è stato consegnato a un recapito dichiarato in fase di firma. Senza
+  // questi due campi la deviazione sarebbe invisibile a posteriori.
+  targetDichiarato Boolean @default(false) @map("target_dichiarato")
+  targetAnagrafica String? @map("target_anagrafica")
+  // Cos'è che si sta autorizzando: engagement_letter|documento_vault|modulo_completato|addendum.
+  // Un codice emesso per firmare un addendum non deve valere per un documento del Vault.
+  ambito    String   @map("ambito")
+  riferimentoId String? @map("riferimento_id")
+  scadenza  DateTime @map("scadenza")
+  // Tentativi di inserimento errati. Al terzo il codice muore: va richiesto un reinvio.
+  tentativi Int      @default(0) @map("tentativi")
+  // Reinvii già concessi, massimo 3, non prima di 60 secondi dall'ultimo (§1.5).
+  reinvii   Int      @default(0) @map("reinvii")
+  ultimoInvioAt DateTime @map("ultimo_invio_at")
+  // IP reale del richiedente, null quando il proxy non lo espone: è il "non registrato"
+  // dell'interfaccia. Un IP inventato in un verbale di firma è peggio di un IP assente.
+  ipRichiesta String? @map("ip_richiesta")
+  usatoAt   DateTime? @map("usato_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  firme     FirmaElettronica[]
+
+  // La verifica cerca l'ultimo codice vivo di quel cliente per quell'ambito.
+  @@index([clienteId, ambito, scadenza])
+  @@map("codice_otp")
+}
+
+// ─────────────────────────────────────────────────────────────────
+// FIRMA ELETTRONICA — il sigillo, persistito (§23bis)
+// ─────────────────────────────────────────────────────────────────
+// Il sigillo eIDAS veniva costruito in memoria, restituito al browser e poi buttato: lo
+// studio non aveva modo di dimostrare che una firma fosse stata apposta, perché in
+// database non ne restava traccia. `engagement_letter.stato_firma = 'firmato'` dice che
+// è successo, non cosa è successo — e non regge una contestazione.
+
+model FirmaElettronica {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  clienteId String   @map("cliente_id")
+  cliente   Cliente  @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  // Identificativo mostrato al firmatario e citato nel PDF. Unico perché è la chiave con
+  // cui una firma viene richiamata da fuori.
+  signatureId String @unique @map("signature_id")
+  // fea_otp                → firma avanzata: lettura, OTP su canale scelto, grafometrica
+  // manuale_scansionata    → il cliente scarica, firma a penna, ricarica il file (§1.3)
+  // qualificata_esterna    → firmato con provider di firma digitale del cliente (§1.3)
+  // Il tipo non è cosmetico: cambia il valore probatorio, e va scritto accanto alla firma.
+  tipoFirma String  @map("tipo_firma")
+  // Piano firma §3.1 (Fase 2) — valore legale EFFETTIVO della firma apposta (ses|fea|feq).
+  // `tipoFirma` dice il meccanismo, questo dice la legge: lo scrivono le rotte di firma al
+  // momento dell'apposizione. Le righe già registrate non si toccano: è un atto probatorio.
+  valoreLegale String @default("ses") @map("valore_legale")
+  ambito    String   @map("ambito")
+  riferimentoId String? @map("riferimento_id")
+  documentoTitolo String @map("documento_titolo")
+  firmatarioNome  String @map("firmatario_nome")
+  firmatarioRuolo String? @map("firmatario_ruolo")
+  // SHA-256 del contenuto firmato. È il legame fra sigillo e documento: senza, il sigillo
+  // certifica un atto di volontà su un testo che nessuno può più identificare.
+  documentoHash String @map("documento_hash")
+  // Come è stato verificato il firmatario, in chiaro: "OTP via WhatsApp al +39…".
+  // Prima diceva "OTP SMS/WhatsApp + Token Crittografico" a prescindere dal canale usato.
+  canaleVerificato String? @map("canale_verificato")
+  codiceOtpId String? @map("codice_otp_id")
+  codiceOtp   CodiceOtp? @relation(fields: [codiceOtpId], references: [id])
+  // Null quando l'IP non è disponibile. Il frontend scriveva '83.211.12.94 (eIDAS
+  // Verificato)': un indirizzo cablato in un sigillo probatorio è una dichiarazione falsa.
+  ipAddress String? @map("ip_address")
+  userAgent String? @map("user_agent")
+  // Fase 3 FEA (misura 3) — certificato di sessione: l'id della sessione portale e il
+  // momento del login entrano nel payload del digest del sigillo. Null quando la firma
+  // non proviene dal flusso FEA o la sessione non li porta.
+  sessionId String?   @map("session_id")
+  loginAt   DateTime? @map("login_at")
+  // Fase 3 FEA (misura 1) — identificazione: hash e tipo del documento di riconoscimento
+  // del firmatario caricato una tantum. Raccomandato (non obbligatorio) per FEA: quando
+  // presente, l'hash entra nel digest del sigillo.
+  docRiconoscimentoHash String? @map("doc_riconoscimento_hash")
+  docRiconoscimentoTipo String? @map("doc_riconoscimento_tipo")
+  // La grafometrica sta nella riga, come data URL, non in storage: `uploads/` su Railway
+  // è effimero e il file sparirebbe al deploy successivo, lasciando un sigillo che
+  // rimanda a un'immagine inesistente. Un PNG di firma sta in poche decine di KB.
+  firmaGrafometricaPng String? @map("firma_grafometrica_png")
+  // Per i due tipi non-FEA: il file caricato dal cliente e la sua impronta.
+  fileFirmatoUrl  String? @map("file_firmato_url")
+  fileFirmatoHash String? @map("file_firmato_hash")
+  standard  String   @map("standard")
+  firmatoAt DateTime @default(now()) @map("firmato_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  // Punto 2 piano gap — il verbale di firma è un Documento (tipo 'verbale_firma') che
+  // riassume l'evento in forma leggibile. Il collegamento è bidirezionale: dalla firma al
+  // verbale generato, e dal verbale (che resta Documento) alla firma che lo ha prodotto.
+  verbaleDocumentoId String?    @map("verbale_documento_id")
+  verbaleDocumento   Documento? @relation(fields: [verbaleDocumentoId], references: [id])
+
+  @@index([clienteId, ambito])
+  @@map("firma_elettronica")
+}
+
+// ─────────────────────────────────────────────────────────────────
+// PORTALE CLIENTE — §2.3, §2.5
+// ─────────────────────────────────────────────────────────────────
+
+// §2.3 — I dati fiscali (P.IVA, codice fiscale, IBAN, titolare effettivo…) il cliente li
+// PROPONE e lo studio li CONFERMA: la riga del cliente cambia solo quando lo studio
+// approva, così un errore di digitazione del cliente non finisce mai in anagrafica da solo.
+enum StatoPropostaDati {
+  in_attesa
+  confermata
+  rifiutata
+}
+
+model PropostaDatiFiscale {
+  id          String            @id @default(uuid())
+  tenantId    String            @map("tenant_id")
+  tenant      Tenant            @relation(fields: [tenantId], references: [id])
+  clienteId   String            @map("cliente_id")
+  cliente     Cliente           @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  // piva|codiceFiscale|iban|titolareEffettivo|legaleRappresentante|ragioneSociale|sedeLegale
+  campo       String            @map("campo")
+  valoreAttuale  String?        @map("valore_attuale")
+  valoreProposto String         @map("valore_proposto")
+  notaCliente String?           @map("nota_cliente")
+  notaStudio  String?           @map("nota_studio")
+  stato       StatoPropostaDati @default(in_attesa)
+  // Id di chi ha chiesto e di chi ha deciso: colonne semplici, non FK — l'utente può
+  // essere disattivato e la proposta deve restare leggibile come storico.
+  richiestoDaId String?         @map("richiesto_da_id")
+  gestitoDaId   String?         @map("gestito_da_id")
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
+
+  // Una sola proposta pendente per campo: il cliente che ridigita sostituisce la sua
+  // richiesta, non ne accumula.
+  @@index([clienteId, campo, stato])
+  @@map("proposta_dati_fiscale")
+}
+
+// §2.5 — L'addendum lo chiede il cliente con una richiesta libera; lo studio prepara il
+// documento e la prestazione aggiuntiva. Prima la "cronologia addendum" viveva nel
+// localStorage del browser del cliente: nessun altro la vedeva, e bastava cambiare
+// dispositivo perché sparisse.
+enum StatoRichiestaAddendum {
+  richiesta
+  in_preparazione
+  pronta
+  rifiutata
+}
+
+model RichiestaAddendum {
+  id             String                 @id @default(uuid())
+  tenantId       String                 @map("tenant_id")
+  tenant         Tenant                 @relation(fields: [tenantId], references: [id])
+  clienteId      String                 @map("cliente_id")
+  cliente        Cliente                @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  progettoId     String                 @map("progetto_id")
+  progetto       Progetto               @relation(fields: [progettoId], references: [id], onDelete: Cascade)
+  testoRichiesta String                 @map("testo_richiesta")
+  stato          StatoRichiestaAddendum @default(richiesta)
+  // Cosa risponde lo studio: motivazione del rifiuto, oppure istruzioni e riferimento al
+  // documento predisposto quando la richiesta è pronta.
+  rispostaStudio String?                @map("risposta_studio")
+  richiestoDaId  String?                @map("richiesto_da_id")
+  gestitoDaId    String?                @map("gestito_da_id")
+  createdAt      DateTime               @default(now()) @map("created_at")
+  updatedAt      DateTime               @updatedAt @map("updated_at")
+
+  @@index([progettoId, stato])
+  @@map("richiesta_addendum")
+}
+
+// ─────────────────────────────────────────────────────────────────
+// BLOCCO 6.1 — TIMESHEET SETTIMANALE (§ consuntivazione oraria)
+// Una riga per operatore per giorno (chiave unica tenant+utente+giorno).
+// L'operatore registra le ore in stato `bozza`; advisor/super_admin le
+// approvano o le rifiutano. Solo le ore `approvato` alimentano il report
+// "Ore per Operatore" (Blocco 5): le bozze sono auto-dichiarazioni non
+// verificate e non entrano nella reportistica direzionale.
+// ─────────────────────────────────────────────────────────────────
+
+enum StatoTimesheet {
+  bozza
+  approvato
+  rifiutato
+}
+
+model OraTimesheet {
+  id            String         @id @default(uuid())
+  tenantId      String         @map("tenant_id")
+  tenant        Tenant         @relation(fields: [tenantId], references: [id])
+  userId        String         @map("user_id")
+  utente        User           @relation("TimesheetUtente", fields: [userId], references: [id], onDelete: Cascade)
+  giorno        DateTime       @db.Date
+  minuti        Int            // durata registrata nella giornata, in minuti
+  progettoId    String?        @map("progetto_id")
+  progetto      Progetto?      @relation(fields: [progettoId], references: [id], onDelete: SetNull)
+  nota          String?
+  stato         StatoTimesheet @default(bozza)
+  approvatoDaId String?        @map("approvato_da_id")
+  approvatoDa   User?          @relation("TimesheetApprovatore", fields: [approvatoDaId], references: [id], onDelete: SetNull)
+  approvatoAt   DateTime?      @map("approvato_at")
+  motivoRifiuto String?        @map("motivo_rifiuto")
+  rifiutatoDaId String?        @map("rifiutato_da_id")
+  rifiutatoDa   User?          @relation("TimesheetRifiutante", fields: [rifiutatoDaId], references: [id], onDelete: SetNull)
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+
+  // Una registrazione per membro per giorno: la griglia settimanale ha una
+  // cella sola per incrocio, e l'upsert dell'API si appoggia a questa chiave.
+  @@unique([tenantId, userId, giorno])
+  @@index([tenantId, giorno])
+  @@map("ora_timesheet")
+}
+
+// ─────────────────────────────────────────────────────────────────
+// NOTE OPERATIVE — da fare a mano dopo `prisma migrate dev`, Prisma non le genera:
+//
+// 1. Row-Level Security su tenant_id (§14):
+//      NON si scrive una policy per tabella a mano. La sezione 3 di
+//      supabase/migrations/20260819_rls_effettiva.sql cicla per introspezione su ogni
+//      tabella che abbia una colonna `tenant_id` NOT NULL e le applica ENABLE + FORCE
+//      ROW LEVEL SECURITY più la policy `isolamento_tenant`. Dopo aver aggiunto un
+//      modello con `tenantId`, la procedura è rieseguire quel blocco (o la migrazione
+//      dedicata che lo richiama) e controllare la query di verifica in fondo al file,
+//      che elenca le tabelle raggiungibili da `bluman_app` rimaste senza policy.
+//      Il super_admin usa un ruolo DB separato che bypassa la policy (§2bis).
+//
+// 2. CHECK "esattamente una risorsa valorizzata" su accesso_risorsa (§19):
+//      ALTER TABLE accesso_risorsa ADD CONSTRAINT chk_una_risorsa CHECK (
+//        (progetto_id IS NOT NULL)::int +
+//        (modulo_progetto_id IS NOT NULL)::int +
+//        (microvoce_progetto_id IS NOT NULL)::int = 1
+//      );
+//
+// 3. Verifica anti-ciclo su modulo_dipendenza_template / modulo_progetto_dipendenza (§7ter):
+//      applicativa, non un vincolo SQL — va implementata nel service layer
+//      prima dell'INSERT (percorso DFS sul grafo esistente + candidato).
+// ─────────────────────────────────────────────────────────────────

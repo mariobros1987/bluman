@@ -1,0 +1,24 @@
+-- §2bis — ripristina l'invariante «il super_admin non appartiene a nessun tenant».
+--
+-- Perché serve. La policy RLS di `public."user"` concede la visione delle righe senza
+-- tenant al solo super_admin:
+--
+--   USING (tenant_id = app_tenant_corrente()
+--          OR (tenant_id IS NULL AND app_ruolo_corrente() = 'super_admin'))
+--
+-- cioè presuppone che i super_admin siano proprio le righe con `tenant_id IS NULL`. Il
+-- database non rispettava quel presupposto: `seedFull.ts` creava i due super_admin con
+-- `tenantId = TENANT_ID`, e `prismaApp.listaUtenti()` li riassegnava al tenant che stava
+-- leggendo. Le due righe risultavano quindi membri ordinari dello studio di default.
+--
+-- La conseguenza non era teorica. `POST /tenant/utenti` respinge la modifica di un utente
+-- di un altro studio confrontando `esistente.tenant_id` col tenant corrente; per un
+-- super_admin finito nel tenant dell'advisor quel confronto era vero, il controllo passava
+-- e l'update riscriveva `ruolo` a `collaboratore_interno`. Un advisor poteva declassare il
+-- super admin della piattaforma — e con due sole righe di questo tipo, lasciarla senza.
+--
+-- Con `tenant_id` NULL la difesa torna a essere RLS e non un confronto applicativo: la
+-- riga è invisibile all'advisor, quindi nessuna query che parta da lui la può toccare.
+--
+-- Idempotente: la seconda esecuzione trova zero righe da aggiornare.
+UPDATE "user" SET "tenant_id" = NULL WHERE "ruolo" = 'super_admin' AND "tenant_id" IS NOT NULL;

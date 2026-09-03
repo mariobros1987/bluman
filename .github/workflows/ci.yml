@@ -1,0 +1,58 @@
+name: BluMan CI / Automated Verification
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            frontend/package-lock.json
+
+      - name: Install Root Dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      # Presidio 1: il backend deve superare il controllo tipi PRIMA dei test.
+      - name: Backend Typecheck
+        run: npx tsc --noEmit
+
+      # Presidio 2: suite completa (regole, servizi, rotte, credenziali.test).
+      # Non servono credenziali DB reali: i test che toccano il database lo
+      # simulano o usano il client amministrativo isolato.
+      - name: Backend & Domain Tests
+        run: npx vitest run
+
+      # Presidio 2b: anche l'emissione del compilato deve riuscire.
+      - name: Backend Build
+        run: npm run build
+
+      - name: Install Frontend Dependencies
+        run: npm ci
+        working-directory: frontend
+
+      # Presidio 3: il frontend si valida con `tsc -b` (project references),
+      # NON con `tsc --noEmit` che sul tsconfig con "files": [] non verifica nulla.
+      - name: Frontend Typecheck
+        run: npx tsc -b --force
+        working-directory: frontend
+
+      - name: Build Frontend
+        run: npm run build
+        working-directory: frontend

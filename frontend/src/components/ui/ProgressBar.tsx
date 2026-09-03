@@ -1,36 +1,17 @@
-import React from 'react';
-import './ProgressBar.css';
-import clsx from 'clsx';
-
 interface ProgressBarProps {
-  progress: number;
-  label?: string;
-  className?: string;
-  colorClass?: string;
+  value: number;       // 0-100
+  color?: string;
+  height?: number;
 }
 
-export const ProgressBar: React.FC<ProgressBarProps> = ({ 
-  progress, 
-  label, 
-  className,
-  colorClass = 'bg-primary'
-}) => {
-  const safeProgress = Math.min(Math.max(progress, 0), 100);
-  
+export function ProgressBar({ value, color = '#6366f1', height = 4 }: ProgressBarProps) {
   return (
-    <div className={clsx('progress-wrapper', className)}>
-      {label && (
-        <div className="progress-label">
-          <span>{label}</span>
-          <span>{Math.round(safeProgress)}%</span>
-        </div>
-      )}
-      <div className="progress-track">
-        <div 
-          className={clsx('progress-fill', colorClass)} 
-          style={{ width: `${safeProgress}%` }}
-        />
-      </div>
+    <div style={{ height, background: 'var(--border)', borderRadius: 2 }}>
+      <div style={{
+        height, width: `${Math.min(100, Math.max(0, value))}%`,
+        background: color, borderRadius: 2,
+        transition: 'width .3s ease',
+      }} />
     </div>
   );
-};
+}

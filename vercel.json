@@ -1,0 +1,23 @@
+{
+  "framework": "vite",
+  "buildCommand": "cd frontend && npm install && npm run build",
+  "outputDirectory": "frontend/dist",
+  "rewrites": [
+    {
+      "source": "/api/send-email",
+      "destination": "/api/send-email"
+    },
+    {
+      "source": "/webhooks/communications/whatsapp",
+      "destination": "/api/webhooks/communications/whatsapp"
+    },
+    {
+      "source": "/webhooks/communications/telegram",
+      "destination": "/api/webhooks/communications/telegram"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}

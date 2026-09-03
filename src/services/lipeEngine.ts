@@ -1,0 +1,224 @@
+/**
+ * Motore di Calcolo Fiscale per la Liquidazione IVA Periodica (LIPE), Prospetto F24 e Certificazione Unica (CU).
+ */
+
+export interface PeriodoFiscale {
+  tipo: 'mensile' | 'trimestrale';
+  anno: number;
+  mese?: number; // 1-12 se mensile
+  trimestre?: number; // 1-4 se trimestrale
+  codicePeriodo: string; // es. "2026-09" o "2026-Q3"
+  dataInizio: Date;
+  dataFine: Date;
+}
+
+export interface RiepilogoIvaPeriodo {
+  periodo: PeriodoFiscale;
+  totaleImponibileVenditeCent: number;
+  ivaDebitoCent: number;
+  totaleImponibileAcquistiCent: number;
+  ivaCreditoCent: number;
+  saldoIvaCent: number; // ivaDebito - ivaCredito (positivo = debito da versare, negativo = credito)
+  stato: 'debito' | 'credito' | 'a_pareggio';
+  importoDaVersareCent: number;
+  creditoRiportabileCent: number;
+  prospettoF24: ProspettoF24;
+}
+
+export interface RigoTributoF24 {
+  sezione: 'ERARIO';
+  codiceTributo: string;
+  rateazione?: string;
+  annoRiferimento: number;
+  importoDebitoCent: number;
+  importoCreditoCent: number;
+  descrizione: string;
+}
+
+export interface ProspettoF24 {
+  annoRiferimento: number;
+  periodoRiferimento: string;
+  righe: RigoTributoF24[];
+  totaleDebitoCent: number;
+  totaleCreditoCent: number;
+  saldoFinaleCent: number;
+}
+
+export function determinaPeriodoFiscale(periodoStr: string): PeriodoFiscale {
+  const str = periodoStr.trim().toUpperCase();
+
+  // Caso Trimestrale: es. "2026-Q3" o "2026-T3"
+  const matchTrimestre = str.match(/^(\d{4})[-_]?(Q|T)([1-4])$/);
+  if (matchTrimestre && matchTrimestre[1] && matchTrimestre[3]) {
+    const anno = parseInt(matchTrimestre[1], 10);
+    const trimestre = parseInt(matchTrimestre[3], 10);
+    const meseInizio = (trimestre - 1) * 3;
+    const meseFine = meseInizio + 2;
+
+    const dataInizio = new Date(Date.UTC(anno, meseInizio, 1, 0, 0, 0, 0));
+    const dataFine = new Date(Date.UTC(anno, meseFine + 1, 0, 23, 59, 59, 999));
+
+    return {
+      tipo: 'trimestrale',
+      anno,
+      trimestre,
+      codicePeriodo: `${anno}-Q${trimestre}`,
+      dataInizio,
+      dataFine,
+    };
+  }
+
+  // Caso Mensile: es. "2026-09" o "2026-9"
+  const matchMese = str.match(/^(\d{4})[-_]?(\d{1,2})$/);
+  if (matchMese && matchMese[1] && matchMese[2]) {
+    const anno = parseInt(matchMese[1], 10);
+    const mese = parseInt(matchMese[2], 10);
+    if (mese < 1 || mese > 12) {
+      throw new Error(`Mese non valido: ${mese}`);
+    }
+
+    const dataInizio = new Date(Date.UTC(anno, mese - 1, 1, 0, 0, 0, 0));
+    const dataFine = new Date(Date.UTC(anno, mese, 0, 23, 59, 59, 999));
+
+    return {
+      tipo: 'mensile',
+      anno,
+      mese,
+      codicePeriodo: `${anno}-${String(mese).padStart(2, '0')}`,
+      dataInizio,
+      dataFine,
+    };
+  }
+
+  throw new Error(`Formato periodo non valido: "${periodoStr}". Usa "AAAA-MM" per mensile (es. 2026-09) o "AAAA-QX" per trimestrale (es. 2026-Q3).`);
+}
+
+/**
+ * Mappa il codice tributo erario F24 per il versamento IVA periodica.
+ */
+export function getCodiceTributoIva(periodo: PeriodoFiscale): { codice: string; descrizione: string } {
+  if (periodo.tipo === 'trimestrale') {
+    switch (periodo.trimestre) {
+      case 1:
+        return { codice: '6031', descrizione: 'Versamento IVA 1° trimestre' };
+      case 2:
+        return { codice: '6032', descrizione: 'Versamento IVA 2° trimestre' };
+      case 3:
+        return { codice: '6033', descrizione: 'Versamento IVA 3° trimestre' };
+      case 4:
+        return { codice: '6034', descrizione: 'Versamento IVA 4° trimestre / Conguaglio annuale' };
+      default:
+        return { codice: '6099', descrizione: 'Versamento IVA periodica' };
+    }
+  } else {
+    const codiciMensili: Record<number, string> = {
+      1: '6001',
+      2: '6002',
+      3: '6003',
+      4: '6004',
+      5: '6005',
+      6: '6006',
+      7: '6007',
+      8: '6008',
+      9: '6009',
+      10: '6010',
+      11: '6011',
+      12: '6012',
+    };
+    const codice = codiciMensili[periodo.mese || 1] || '6001';
+    return { codice, descrizione: `Versamento IVA mese ${periodo.mese}` };
+  }
+}
+
+/**
+ * Calcola la Liquidazione IVA Periodica su un insieme di fatture attive e passive.
+ */
+export function calcolaLiquidazioneIvaPeriodo(
+  periodoStr: string,
+  fattureAttive: Array<{
+    totaleImponibileCentesimi: number;
+    totaleIvaCentesimi: number;
+    esigibilitaIva?: string | null;
+    stato?: string;
+  }>,
+  fatturePassive: Array<{
+    imponibileCentesimi: number;
+    ivaCentesimi: number;
+  }>,
+  creditoIvaPrecedenteCent: number = 0,
+): RiepilogoIvaPeriodo {
+  const periodo = determinaPeriodoFiscale(periodoStr);
+
+  // 1. Somma IVA a Debito (escludendo split payment verso PA dove l'IVA non è incassata dallo studio)
+  let totaleImponibileVenditeCent = 0;
+  let ivaDebitoCent = 0;
+
+  for (const f of fattureAttive) {
+    if (f.stato === 'bozza') continue; // le bozze non concorrono
+    if (f.esigibilitaIva === 'split') continue; // split payment escluso dal debito IVA periodico
+
+    totaleImponibileVenditeCent += f.totaleImponibileCentesimi || 0;
+    ivaDebitoCent += f.totaleIvaCentesimi || 0;
+  }
+
+  // 2. Somma IVA a Credito da acquisti
+  let totaleImponibileAcquistiCent = 0;
+  let ivaCreditoCent = 0;
+
+  for (const f of fatturePassive) {
+    totaleImponibileAcquistiCent += f.imponibileCentesimi || 0;
+    ivaCreditoCent += f.ivaCentesimi || 0;
+  }
+
+  const ivaCreditoTotaleCent = ivaCreditoCent + creditoIvaPrecedenteCent;
+  const saldoIvaCent = ivaDebitoCent - ivaCreditoTotaleCent;
+
+  let stato: 'debito' | 'credito' | 'a_pareggio' = 'a_pareggio';
+  let importoDaVersareCent = 0;
+  let creditoRiportabileCent = 0;
+
+  if (saldoIvaCent > 0) {
+    stato = 'debito';
+    importoDaVersareCent = saldoIvaCent;
+  } else if (saldoIvaCent < 0) {
+    stato = 'credito';
+    creditoRiportabileCent = Math.abs(saldoIvaCent);
+  }
+
+  // 3. Compilazione Prospetto F24
+  const tributoIva = getCodiceTributoIva(periodo);
+  const righeF24: RigoTributoF24[] = [];
+
+  if (importoDaVersareCent > 0) {
+    righeF24.push({
+      sezione: 'ERARIO',
+      codiceTributo: tributoIva.codice,
+      annoRiferimento: periodo.anno,
+      importoDebitoCent: importoDaVersareCent,
+      importoCreditoCent: 0,
+      descrizione: tributoIva.descrizione,
+    });
+  }
+
+  const prospettoF24: ProspettoF24 = {
+    annoRiferimento: periodo.anno,
+    periodoRiferimento: periodo.codicePeriodo,
+    righe: righeF24,
+    totaleDebitoCent: importoDaVersareCent,
+    totaleCreditoCent: 0,
+    saldoFinaleCent: importoDaVersareCent,
+  };
+
+  return {
+    periodo,
+    totaleImponibileVenditeCent,
+    ivaDebitoCent,
+    totaleImponibileAcquistiCent,
+    ivaCreditoCent,
+    saldoIvaCent,
+    stato,
+    importoDaVersareCent,
+    creditoRiportabileCent,
+    prospettoF24,
+  };
+}
