@@ -14,8 +14,6 @@ import {
   firmaConFileApi,
   calcolaHashSha256,
   magicLoginApi,
-  clientLoginApi,
-  cambiaPasswordClienteApi,
   documentiPortaleApi,
   scaricaDocumentoClient,
   scaricaDocumentoPortaleApi,
@@ -68,19 +66,11 @@ import { TabFatture } from '../components/portal/TabFatture';
 import { TabContatti } from '../components/portal/TabContatti';
 import { TabProfilo } from '../components/portal/TabProfilo';
 import { livelloFirmaEffettivo, AVVISO_LIVELLO } from '../components/portal/livelloFirma';
+import { usePortalAuth } from '../components/portal/usePortalAuth';
 
 export function ClientPortal() {
   const [searchParams] = useSearchParams();
   const token = searchParams.get('magic_token') || '';
-
-  // Stati di autenticazione per Portale Cliente (Email + Password e Magic Link)
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [loginEmail, setLoginEmail] = useState('');
-  const [loginPassword, setLoginPassword] = useState('');
-  const [loginLoading, setLoginLoading] = useState(false);
-  const [loginError, setLoginError] = useState<string | null>(null);
-  const [authMode, setAuthMode] = useState<'credentials' | 'magic'>('credentials');
-  const [manualMagicToken, setManualMagicToken] = useState('');
 
   const [activeTab, setActiveTab] = useState<PortalTab>('proposta');
   const [clientObj, setClientObj] = useState<any>(null);
@@ -95,13 +85,6 @@ export function ClientPortal() {
   // qualunque altro cliente. Si risolve in `loadPortalData` sul nome del cliente autenticato.
   const [signed, setSigned] = useState<boolean>(false);
 
-  // Stati Gestione Password Personale Cliente
-  const [clientPassCurrent, setClientPassCurrent] = useState('');
-  const [clientPassNew, setClientPassNew] = useState('');
-  const [clientPassConfirm, setClientPassConfirm] = useState('');
-  const [clientPassShow, setClientPassShow] = useState(false);
-  const [clientPassLoading, setClientPassLoading] = useState(false);
-  const [clientPassMsg, setClientPassMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   // Le richieste di integrazione dell'incarico (§2.5) vivono a database, agganciate al
   // progetto, e lo studio le vede. Prima stavano in `localStorage` sotto una chiave col nome
   // del cliente: invisibili allo studio e perse al cambio dispositivo. Si leggono e si
@@ -114,7 +97,6 @@ export function ClientPortal() {
   const [addendumMsg, setAddendumMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const [loading, setLoading] = useState(false);
   const [pageLoading, setPageLoading] = useState(true);
-  const [accessoNegato, setAccessoNegato] = useState<string | null>(null);
 
   /**
    * Documenti del fascicolo, letti da `GET /portal/documenti`.
@@ -629,6 +611,43 @@ export function ClientPortal() {
     }
   };
 
+  // Stati di autenticazione del portale (credenziali, magic link e gestione della password
+  // personale) e i quattro handler collegati: estratti in `usePortalAuth`. La chiamata sta
+  // qui perché l'hook riceve `loadPortalData`, dichiarata qui sopra; a sua volta
+  // `loadPortalData` usa `setIsAuthenticated`/`setAccessoNegato` per closure, e le uscite
+  // servono già agli useEffect sottostanti e al render.
+  const {
+    isAuthenticated,
+    setIsAuthenticated,
+    accessoNegato,
+    setAccessoNegato,
+    loginEmail,
+    setLoginEmail,
+    loginPassword,
+    setLoginPassword,
+    loginLoading,
+    loginError,
+    setLoginError,
+    authMode,
+    setAuthMode,
+    manualMagicToken,
+    setManualMagicToken,
+    clientPassCurrent,
+    setClientPassCurrent,
+    clientPassNew,
+    setClientPassNew,
+    clientPassConfirm,
+    setClientPassConfirm,
+    clientPassShow,
+    setClientPassShow,
+    clientPassLoading,
+    clientPassMsg,
+    handleClientLogin,
+    handleClientLogout,
+    handleManualMagicSubmit,
+    handleSaveClientPassword,
+  } = usePortalAuth({ loadPortalData, clientObj, setClientObj });
+
   useEffect(() => {
     loadPortalData();
   }, [token]);
@@ -1079,65 +1098,6 @@ export function ClientPortal() {
       reader.readAsDataURL(file);
     });
 
-  const handleClientLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoginError('');
-    if (!loginEmail || !loginPassword) {
-      setLoginError('Inserisci sia email che password');
-      return;
-    }
-    setLoginLoading(true);
-    try {
-      const res = await clientLoginApi(loginEmail.trim(), loginPassword);
-      if (res && res.token) {
-        localStorage.setItem('bluman_jwt_token', res.token);
-        if (res.user) {
-          localStorage.setItem('bluman_client_user', JSON.stringify(res.user));
-        }
-        setIsAuthenticated(true);
-        setAccessoNegato(null);
-        await loadPortalData(res.user?.clienteId);
-      } else {
-        setLoginError('Credenziali non valide o utente non trovato');
-      }
-    } catch (err: any) {
-      setLoginError(err.message || 'Credenziali non valide');
-    } finally {
-      setLoginLoading(false);
-    }
-  };
-
-  const handleClientLogout = () => {
-    localStorage.removeItem('bluman_jwt_token');
-    localStorage.removeItem('bluman_client_user');
-    setIsAuthenticated(false);
-  };
-
-  const handleManualMagicSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoginError(null);
-    if (!manualMagicToken.trim()) {
-      setLoginError('Inserisci un Magic Token valido');
-      return;
-    }
-    setLoginLoading(true);
-    try {
-      const sessione = await magicLoginApi(manualMagicToken.trim());
-      if (!sessione?.token) throw new Error('Magic Token non valido o scaduto');
-      localStorage.setItem('bluman_jwt_token', sessione.token);
-      if (sessione.user) {
-        localStorage.setItem('bluman_client_user', JSON.stringify(sessione.user));
-      }
-      setIsAuthenticated(true);
-      setAccessoNegato(null);
-      await loadPortalData(sessione.user?.clienteId);
-    } catch (err: any) {
-      setLoginError(err.message || 'Magic Token non valido o scaduto');
-    } finally {
-      setLoginLoading(false);
-    }
-  };
-
   const handleSelectProject = (pId: string, availableProjects?: any[]) => {
     const projs = availableProjects || clientProjects;
     setSelectedProjectId(pId);
@@ -1279,34 +1239,6 @@ export function ClientPortal() {
       setAddendumMsg({ text: err?.message || 'Errore durante l\'invio della richiesta.', type: 'error' });
     } finally {
       setInvioAddendum(false);
-    }
-  };
-
-  const handleSaveClientPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setClientPassMsg(null);
-    if (clientPassNew.length < 6) {
-      setClientPassMsg({ text: 'La nuova password deve contenere almeno 6 caratteri.', type: 'error' });
-      return;
-    }
-    if (clientPassNew !== clientPassConfirm) {
-      setClientPassMsg({ text: 'Le due password non coincidono.', type: 'error' });
-      return;
-    }
-    setClientPassLoading(true);
-    try {
-      await cambiaPasswordClienteApi(clientPassNew, clientPassCurrent, clientObj?.id, clientObj?.email || loginEmail);
-      setClientPassMsg({ text: '✓ Password salvata con successo! Ora puoi accedere al portale anche con la tua email e questa password.', type: 'success' });
-      setClientPassCurrent('');
-      setClientPassNew('');
-      setClientPassConfirm('');
-      if (clientObj) {
-        setClientObj({ ...clientObj, hasPassword: true });
-      }
-    } catch (err: any) {
-      setClientPassMsg({ text: err.message || 'Errore durante il salvataggio della password', type: 'error' });
-    } finally {
-      setClientPassLoading(false);
     }
   };
 
