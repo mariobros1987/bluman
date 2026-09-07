@@ -47,13 +47,13 @@ import { dataOraLeggibile, mascheraIban, mascheraUbo } from '../components/porta
 import {
   portalWrapperStyle,
   containerStyle,
-  heroBannerStyle,
   tabsBarStyle,
   tabBtnStyle,
   bodyStyle,
 } from '../components/portal/styles';
 import { PortalLogin } from '../components/portal/PortalLogin';
 import { PortalTopNav } from '../components/portal/PortalTopNav';
+import { PortalHeroBanner } from '../components/portal/PortalHeroBanner';
 import { FirmaOtpModal } from '../components/portal/FirmaOtpModal';
 import { DocumentViewerModal } from '../components/portal/DocumentViewerModal';
 import { ModificaDocModal } from '../components/portal/ModificaDocModal';
@@ -1460,25 +1460,10 @@ export function ClientPortal() {
       )}
 
       {/* Hero Welcome Banner */}
-      <div style={heroBannerStyle}>
-        <div>
-          <div style={{ fontSize: 11, color: 'var(--indigo-l)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.5px' }}>
-            PORTALE DEDICATO ED ASSISTENZA PROFESSIONALE
-          </div>
-          <h1 style={{ fontSize: 20, fontWeight: 800, margin: '4px 0 6px' }}>
-            {progettoAttivo?.nome || 'Nessun incarico aperto'}
-          </h1>
-          <div style={{ fontSize: 12, color: 'var(--muted)' }}>
-            Benvenuto nel tuo portale. Qui puoi consultare l'avanzamento dei lavori, compilare i dati societari e sottoscrivere i contratti.
-          </div>
-        </div>
-        <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, padding: '10px 16px', textAlign: 'right' }}>
-          <div style={{ fontSize: 10, color: 'var(--muted)' }}>Stato Incarico</div>
-          <div style={{ fontSize: 13, fontWeight: 700, color: signed ? '#34d399' : 'var(--amber)', marginTop: 2 }}>
-            {signed ? '✓ Progetto Attivo (In Lavorazione)' : '✍️ In Attesa di Accettazione'}
-          </div>
-        </div>
-      </div>
+      <PortalHeroBanner
+        progettoAttivo={progettoAttivo}
+        signed={signed}
+      />
 
       {/* Portal Tabs Bar */}
       <div style={tabsBarStyle}>
