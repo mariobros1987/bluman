@@ -53,6 +53,7 @@ import { PortalLogin } from '../components/portal/PortalLogin';
 import { PortalTopNav } from '../components/portal/PortalTopNav';
 import { PortalHeroBanner } from '../components/portal/PortalHeroBanner';
 import { PortalTabsBar } from '../components/portal/PortalTabsBar';
+import { PortalStudioPreviewBanner } from '../components/portal/PortalStudioPreviewBanner';
 import { FirmaOtpModal } from '../components/portal/FirmaOtpModal';
 import { DocumentViewerModal } from '../components/portal/DocumentViewerModal';
 import { ModificaDocModal } from '../components/portal/ModificaDocModal';
@@ -1410,23 +1411,12 @@ export function ClientPortal() {
       {/* §2.10 — Banner anteprima: un utente dello studio sta guardando il portale di un
           cliente. I dati non sono i suoi e ogni azione va letta come simulazione. */}
       {isStudioPreview && (
-        <div style={{ margin: '0 0 12px', background: '#2a1f0d', border: '1px solid #b45309', borderRadius: 10, padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-          <div style={{ color: '#fcd34d', fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
-            👁 ANTEPRIMA STUDIO — Stai visualizzando il portale di <strong>{clientName}</strong>. Nessuna modifica è reale.
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ color: '#fcd34d', fontSize: 11 }}>Cliente:</span>
-            <select
-              value={clientObj?.id || ''}
-              onChange={(e) => handleSelectPreviewClient(e.target.value)}
-              style={{ background: '#1c1608', color: '#fde68a', border: '1px solid #b45309', borderRadius: 8, padding: '5px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
-            >
-              {elencoClienti.map((c: any) => (
-                <option key={c.id} value={c.id} style={{ background: '#1c1608', color: '#fde68a' }}>{c.nome}</option>
-              ))}
-            </select>
-          </div>
-        </div>
+        <PortalStudioPreviewBanner
+          clientName={clientName}
+          clientObj={clientObj}
+          elencoClienti={elencoClienti}
+          handleSelectPreviewClient={handleSelectPreviewClient}
+        />
       )}
 
       {/* Top Navbar Header */}
