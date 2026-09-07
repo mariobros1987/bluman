@@ -44,7 +44,7 @@ import type {
 import { tempoRelativo } from '../components/NotificationModal';
 import type { NotificaPortale, ModuloProposta, PortalTab, BersaglioFirma } from '../components/portal/types';
 import { mapProjectToPortalModules } from '../components/portal/mapPortalModules';
-import { dataOraLeggibile } from '../components/portal/format';
+import { dataOraLeggibile, mascheraIban, mascheraUbo } from '../components/portal/format';
 import {
   portalWrapperStyle,
   containerStyle,
@@ -1215,16 +1215,6 @@ export function ClientPortal() {
       setLoading(false);
     }
   };
-
-  /** §2.4 — Maschera l'IBAN lasciando visibili solo gli ultimi caratteri. */
-  const mascheraIban = (iban: string) => {
-    const compatto = (iban || '').replace(/\s+/g, '');
-    if (!compatto) return '';
-    return `•••• ${compatto.slice(-8)}`;
-  };
-
-  /** §2.4 — Maschera il titolare effettivo: il nome intero si vede solo scoprendo il dato. */
-  const mascheraUbo = (nome: string) => ((nome || '').trim() ? '••••••••' : '');
 
   /**
    * §2.3 — Invio delle proposte di modifica dei dati fiscali.
