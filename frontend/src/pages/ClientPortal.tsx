@@ -47,13 +47,12 @@ import { dataOraLeggibile, mascheraIban, mascheraUbo } from '../components/porta
 import {
   portalWrapperStyle,
   containerStyle,
-  tabsBarStyle,
-  tabBtnStyle,
   bodyStyle,
 } from '../components/portal/styles';
 import { PortalLogin } from '../components/portal/PortalLogin';
 import { PortalTopNav } from '../components/portal/PortalTopNav';
 import { PortalHeroBanner } from '../components/portal/PortalHeroBanner';
+import { PortalTabsBar } from '../components/portal/PortalTabsBar';
 import { FirmaOtpModal } from '../components/portal/FirmaOtpModal';
 import { DocumentViewerModal } from '../components/portal/DocumentViewerModal';
 import { ModificaDocModal } from '../components/portal/ModificaDocModal';
@@ -1466,50 +1465,10 @@ export function ClientPortal() {
       />
 
       {/* Portal Tabs Bar */}
-      <div style={tabsBarStyle}>
-        <button
-          onClick={() => setActiveTab('proposta')}
-          style={tabBtnStyle(activeTab === 'proposta')}
-        >
-          ✍️ 1. Proposta d'Ordine & Firma
-        </button>
-        <button
-          onClick={() => setActiveTab('avanzamento')}
-          style={tabBtnStyle(activeTab === 'avanzamento')}
-        >
-          📊 2. Avanzamento Live Lavori
-        </button>
-        <button
-          onClick={() => setActiveTab('form')}
-          style={tabBtnStyle(activeTab === 'form')}
-        >
-          📋 3. Form Dati Societari
-        </button>
-        <button
-          onClick={() => setActiveTab('documenti')}
-          style={tabBtnStyle(activeTab === 'documenti')}
-        >
-          📎 4. Documenti & Contratti
-        </button>
-        <button
-          onClick={() => setActiveTab('fatture')}
-          style={tabBtnStyle(activeTab === 'fatture')}
-        >
-          💳 5. Fatture & Pagamenti
-        </button>
-        <button
-          onClick={() => setActiveTab('contatti')}
-          style={tabBtnStyle(activeTab === 'contatti')}
-        >
-          💬 6. Contatto Advisor
-        </button>
-        <button
-          onClick={() => setActiveTab('profilo')}
-          style={tabBtnStyle(activeTab === 'profilo')}
-        >
-          👤 7. Profilo & Password
-        </button>
-      </div>
+      <PortalTabsBar
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+      />
 
       {/* Main Body Content */}
       <div style={bodyStyle}>
