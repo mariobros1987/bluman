@@ -183,7 +183,10 @@ export function usePortalFirma({
 
     (async () => {
       try {
-        const res = await canaliFirmaApi();
+        // Il clienteId va detto esplicitamente: in anteprima studio il token è quello
+        // dello studio e `clienteDellaRichiesta` risolve il cliente solo dal parametro,
+        // senza il quale il backend risponde 400 e la sezione resta senza canali.
+        const res = await canaliFirmaApi(clientObj?.id);
         if (annullato) return;
         setCanaliFirma(res.canali || []);
         setBotTelegram(res.botTelegram ?? null);
