@@ -495,14 +495,43 @@ export function ClientPortal() {
         setBozzaDati(valoriCliente);
       }
 
-      // Ripristina lo stato di firma persistito in memoria, SOLO per il cliente autenticato.
-      const isSignedLocal = localStorage.getItem(`bluman_portal_signed_${resolvedClientName}`) === 'true';
-      setSigned(isSignedLocal);
-      const savedSeal = isSignedLocal ? localStorage.getItem(`bluman_seal_${resolvedClientName}`) : null;
-      if (savedSeal) {
-        try { setEidasSeal(JSON.parse(savedSeal)); } catch (e) { setEidasSeal(null); }
-      } else {
-        setEidasSeal(null);
+      // Lo stato di firma della lettera d'incarico si rilegge da database, come documenti (§2.9) e
+      // addendum (§2.5): la firma è una riga `FirmaElettronica` emessa da `/portal/verify-otp-and-sign`,
+      // con sigillo, hash e IP. Prima viveva in `bluman_portal_signed_<cliente>`/`bluman_seal_<cliente>`:
+      // firmata su un browser voleva dire da firmare su un altro, e lo studio non ne vedeva traccia.
+      try {
+        const resFirme = await elencoFirmeApi({ clienteId: clienteIdRisolto ?? undefined, ambito: 'engagement_letter' });
+        const firmeEl = Array.isArray(resFirme?.firme) ? resFirme.firme : [];
+        // L'elenco arriva già ordinato dal più recente: la prima riga dell'ambito è quella buona.
+        // Il filtro sul cliente è difensivo — per le sessioni cliente lo impone già il server —
+        // e in anteprima studio evita di mostrare la lettera d'un altro come firmata.
+        const firmaEl = firmeEl.find((f) => !clienteIdRisolto || f.cliente?.id === clienteIdRisolto);
+        if (firmaEl) {
+          setSigned(true);
+          setEidasSeal({
+            id: firmaEl.id,
+            signatureId: firmaEl.signatureId,
+            tipoFirma: firmaEl.tipoFirma,
+            signerName: firmaEl.firmatarioNome || resolvedClientName,
+            documentoTitolo: firmaEl.documentoTitolo,
+            timestampIso: firmaEl.firmatoAt,
+            documentoHash: firmaEl.documentoHash,
+            sha256Digest: firmaEl.fileFirmatoHash ?? firmaEl.documentoHash,
+            ipAddress: firmaEl.ipAddress ?? null,
+            // Il GET /firme non espone lo user-agent: non lo si ricostruisce a caso (regola 7).
+            userAgent: null,
+            canaleVerificato: firmaEl.canaleVerificato,
+            standard: firmaEl.standard,
+            fileFirmatoUrl: firmaEl.fileFirmatoUrl,
+          });
+        } else {
+          setSigned(false);
+          setEidasSeal(null);
+        }
+      } catch (err) {
+        // «Non riesco a leggere» non è «non c'è»: l'errore si vede in console, lo stato resta
+        // quello di partenza e la lettura successiva ci riprova.
+        console.warn('Errore recupero firma lettera d\'incarico:', err);
       }
 
       // §2.5 — le richieste di integrazione dell'incarico si rileggono da database, non più da

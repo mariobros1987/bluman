@@ -484,9 +484,11 @@ export function usePortalFirma({
       return;
     }
 
+    // La riga `FirmaElettronica` con sigillo, hash e IP l'ha già scritta il backend: qui si aggiorna
+    // solo la vista. Lo stato si riconcilia dal database al prossimo accesso (`loadPortalData`),
+    // come documenti e addendum — niente `localStorage`, che non arriva agli altri dispositivi né
+    // allo studio.
     setEidasSeal(seal);
-    localStorage.setItem(`bluman_seal_${clientName}`, JSON.stringify(seal));
-    localStorage.setItem(`bluman_portal_signed_${clientName}`, 'true');
     setSigned(true);
     await ricaricaDopoFirma();
   };
