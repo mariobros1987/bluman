@@ -105,6 +105,52 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
     const tenantId = req.tenantId;
     const rawBody = (req.body || {}) as Record<string, any>;
 
+    // `logoUrl` finisce in un `<img src>` generato lato server: un valore che non punta
+    // a niente svuota la fascia dell'intestazione invece di lasciar vedere il marchio.
+    // Le uniche forme ammesse sono quelle che l'app produce davvero: percorso relativo
+    // (`/logo.png` del seed, `/uploads/…?firma=…` del ripiego locale di uploadDocumento),
+    // `data:image…` (SettingsPage quando l'upload restituisce solo il base64) e https
+    // sull'host del project Supabase — l'host di `SUPABASE_URL`, letto qui dentro e non
+    // a livello di modulo. Tutto il resto, incluso `https://supabase.co/…` senza il
+    // sottodominio del project (il valore con cui la suite di test, girata senza
+    // isolamento, ha sovrascritto il logo in produzione), è respinto prima di toccare
+    // il database. `null` e stringa vuota restano ammessi: sono il reset del logo.
+    const logoUrlBody = rawBody.logoUrl;
+    if (logoUrlBody !== undefined && logoUrlBody !== null && logoUrlBody !== '') {
+      let logoValido = false;
+      if (typeof logoUrlBody === 'string') {
+        // Metacaratteri HTML, sulla stringa grezza e prima di ogni altro controllo: il
+        // valore finisce non escapato in `<img src="${dati.logo}">` (intestazioneStudio.ts),
+        // quindi una virgoletta chiuderebbe l'attributo e inietterebbe markup nella fascia
+        // di ogni documento — pure partendo da un percorso relativo o da un URL https
+        // legittimo, perché `new URL` percent-encoda virgolette e spazi nel path senza
+        // lanciare e il controllo sull'host qui sotto non se ne accorgerebbe. Nessun
+        // valore legittimo contiene questi caratteri: né il base64 dei data: URL, né i
+        // safeFilename dei percorsi /uploads/, né i percorsi relativi.
+        const conMetacaratteri = /["'<>\s]/.test(logoUrlBody);
+        if (!conMetacaratteri) {
+          if (logoUrlBody.startsWith('/') || logoUrlBody.startsWith('data:image')) {
+            logoValido = true;
+          } else if (logoUrlBody.startsWith('https://')) {
+            try {
+              const supabaseUrl = process.env.SUPABASE_URL;
+              // SUPABASE_URL assente o non parsabile: nessun https è legittimo.
+              if (supabaseUrl && new URL(logoUrlBody).host === new URL(supabaseUrl).host) {
+                logoValido = true;
+              }
+            } catch {
+              // logoUrl o SUPABASE_URL non si lasciano parsare: non è legittimo.
+            }
+          }
+        }
+      }
+      if (!logoValido) {
+        return reply.code(400).send({
+          errore: 'logoUrl non valido: ammessi un percorso relativo (/…), un data:image…, oppure un URL https dello storage del progetto',
+        });
+      }
+    }
+
     const allowedKeys = [
       'ragioneSociale', 'piva', 'codiceFiscale', 'sedeLegale', 'sedeOperativa',
       'logoUrl', 'coloreTemaFattura', 'notePieFattura', 'titoloIntestazione',

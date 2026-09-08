@@ -2,6 +2,25 @@
 # BLUMAN ADVISORY PLATFORM — SINGLE SERVER DEPLOYMENT (DOCKER COMPOSE)
 # Ideale per VPS Oracle Cloud (Free Tier ARM/x86), AWS EC2, Hetzner, OVH
 # ═════════════════════════════════════════════════════════════════════
+#
+# Regola 6 — i segreti si dichiarano con `${VAR:?...}`, mai con `${VAR:-valore}`.
+# La differenza non è stilistica: `:-` fa partire lo stack con il segreto scritto nel
+# repository, cioè con una password di database e un JWT_SECRET che chiunque legga
+# questo file conosce. Con un JWT_SECRET noto si firma un token per qualsiasi tenant e
+# qualsiasi ruolo, e l'isolamento RLS cade con lui, perché `app_tenant_corrente()` si
+# fida del tenant che sta nel token. `:?` invece fa fallire `docker compose up` con un
+# messaggio: fallisce chiuso e in modo rumoroso, che è l'unico modo accettabile.
+#
+# Prima del primo avvio serve un file `.env` accanto a questo (non versionato):
+#   POSTGRES_USER=…            POSTGRES_DB=…
+#   POSTGRES_PASSWORD=$(openssl rand -base64 32)
+#   JWT_SECRET=$(openssl rand -hex 32)
+#   WEBHOOK_SECRET_SDI=$(openssl rand -hex 32)   # opzionale, vedi .env.example
+#
+# Questo stack è l'alternativa «tutto su un server» al deployment corrente. La
+# distribuzione ufficiale resta quella della regola 9 di .agents/AGENTS.md — backend su
+# Railway con `npx --yes @railway/cli up --detach`, frontend su Vercel con il push —
+# perché Railway non è agganciato al webhook di GitHub.
 
 services:
   # 1. DATABASE POSTGRESQL 16 CON ISOLAMENTO RLS
@@ -10,13 +29,15 @@ services:
     container_name: bluman_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-bluman}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-bluman_secure_pass_2026}
-      POSTGRES_DB: ${POSTGRES_DB:-bluman_prod}
+      # Valori fra doppi apici: il messaggio di `:?` contiene un due punti seguito da
+      # spazio, che in uno scalare YAML non quotato verrebbe letto come una mappa.
+      POSTGRES_USER: "${POSTGRES_USER:?manca POSTGRES_USER nel file .env}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?manca POSTGRES_PASSWORD nel file .env — generala con openssl rand -base64 32}"
+      POSTGRES_DB: "${POSTGRES_DB:?manca POSTGRES_DB nel file .env}"
     volumes:
       - bluman_pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bluman} -d ${POSTGRES_DB:-bluman_prod}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -37,9 +58,15 @@ services:
       NODE_ENV: production
       PORT: 3000
       HOST: 0.0.0.0
-      DATABASE_URL: postgresql://${POSTGRES_USER:-bluman}:${POSTGRES_PASSWORD:-bluman_secure_pass_2026}@postgres:5432/${POSTGRES_DB:-bluman_prod}?schema=public
-      DIRECT_URL: postgresql://${POSTGRES_USER:-bluman}:${POSTGRES_PASSWORD:-bluman_secure_pass_2026}@postgres:5432/${POSTGRES_DB:-bluman_prod}?schema=public
-      JWT_SECRET: ${JWT_SECRET:-bluman_super_secret_jwt_key_change_in_production}
+      # `DATABASE_URL` è il ruolo applicativo soggetto a RLS, `DIRECT_URL` il proprietario
+      # dello schema che esegue `prisma migrate deploy` (vedi prisma/schema.prisma). In
+      # questo stack single-server coincidono; su Supabase sono due ruoli distinti.
+      DATABASE_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public"
+      DIRECT_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public"
+      JWT_SECRET: "${JWT_SECRET:?manca JWT_SECRET nel file .env — generalo con openssl rand -hex 32}"
+      # Vuoto = webhook SDI disattivato, e la rotta risponde 503 invece di accettare
+      # chiamate non firmate (vedi .env.example).
+      WEBHOOK_SECRET_SDI: "${WEBHOOK_SECRET_SDI:-}"
     volumes:
       - bluman_uploads:/app/uploads
     networks:
@@ -58,8 +85,17 @@ services:
       - "443:443"
     volumes:
       - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      # Corpo condiviso dei server block :80 e :443. Estensione `.inc` e non `.conf`:
+      # nginx carica da solo tutti i `*.conf` di conf.d/, e un secondo `.conf` con un
+      # `location` fuori da un `server` farebbe fallire l'avvio.
+      - ./nginx_bluman_app.inc:/etc/nginx/conf.d/bluman_app.inc:ro
       - ./frontend/dist:/usr/share/nginx/html:ro
-      - bluman_uploads:/usr/share/nginx/html/uploads:ro
+      # Il volume `bluman_uploads` NON si monta qui. Serviti da nginx come file statici, i
+      # documenti del vault sarebbero scaricabili da chiunque conoscesse il nome del file:
+      # nessun token, nessun tenant, nessuna firma. `GET /uploads/:filename` in
+      # src/routes/catalogo.ts pretende il Bearer oppure una firma HMAC a scadenza e
+      # verifica il percorso risolto contro il path traversal — quindi /uploads/ va
+      # proxato all'API come ogni altra rotta (vedi nginx.conf).
       - ./certbot/conf:/etc/letsencrypt:ro
       - ./certbot/www:/var/www/certbot:ro
     networks:
