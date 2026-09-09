@@ -108,7 +108,10 @@ export async function registraRotteDocumenti(server: FastifyInstance): Promise<v
         // informazione lo studio mostrerebbe «da firmare» un documento già sottoscritto.
         const firme = await prisma.firmaElettronica.findMany({
           where: { tenantId, ambito: 'documento_vault', riferimentoId: { in: documenti.map((d) => d.id) } },
-          select: { riferimentoId: true, firmatoAt: true, signatureId: true, tipoFirma: true, valoreLegale: true },
+          // `fileFirmatoUrl` e `standard`: l'atto come sottoscritto (canale SES manuale /
+          // FEQ) e il livello dichiarato dal server, perché lo studio possa offrire il
+          // download del file firmato dal fascicolo (§36) senza inventarsi etichette.
+          select: { riferimentoId: true, firmatoAt: true, signatureId: true, tipoFirma: true, valoreLegale: true, fileFirmatoUrl: true, standard: true },
           orderBy: { firmatoAt: 'desc' },
         });
         const firmaPerDocumento = new Map<string, (typeof firme)[number]>();
@@ -128,7 +131,16 @@ export async function registraRotteDocumenti(server: FastifyInstance): Promise<v
               filePdfUrl: d.filePdfUrl ? (rifirmaUrlUpload(d.filePdfUrl) as string) : null,
               fileDocxUrl: d.fileDocxUrl ? (rifirmaUrlUpload(d.fileDocxUrl) as string) : null,
               firmato: Boolean(firma) || d.tipo === 'firmato',
-              firma,
+              // Il file firmato è un URL /uploads/ come gli altri: va rinnovato alla
+              // lettura, o lo scaricamento dallo studio parte con una firma già scaduta.
+              firma: firma
+                ? {
+                    ...firma,
+                    fileFirmatoUrl: firma.fileFirmatoUrl
+                      ? (rifirmaUrlUpload(firma.fileFirmatoUrl) as string)
+                      : null,
+                  }
+                : null,
             };
           }),
         });

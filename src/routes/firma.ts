@@ -39,7 +39,7 @@ import { credenzialiCanali, canaliDisponibili, inviaCodiceOtp, recapitiCliente }
 import { notificaStudio, notificaCliente } from '../services/notificheService.js';
 import { scanFileBuffer } from '../services/securityScanner.js';
 import { generaPdfVerbaleFirma } from '../services/verbaleFirma.js';
-import { generaCopiaFirmata } from '../services/copiaFirmata.js';
+import { generaCopiaFirmata, type EsitoCopiaFirmata } from '../services/copiaFirmata.js';
 import {
   verificaLivelloFirma,
   livelloPiuAlto,
@@ -185,6 +185,10 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
           standard: true,
           // Piano §3.1 — il valore legale effettivo della firma (scritto dal server).
           valoreLegale: true,
+          // Il file ricaricato firmato (canale manuale_scansionata / qualificata_esterna):
+          // è l'atto sottoscritto vero. Senza questo campo il portale può offrire solo il
+          // master pre-firma anche a firma avvenuta.
+          fileFirmatoUrl: true,
         },
         orderBy: { firmatoAt: 'desc' },
       });
@@ -240,7 +244,15 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
       };
 
       const elenco = documenti.map((d) => {
-        const firma = firmaPerDocumento.get(d.id) ?? null;
+        // §36 — la firma della copia firmata non punta alla copia ma all'originale che
+        // l'ha generata (`riferimentoId` = documentoPadreId): senza questa risalita la
+        // copia risulterebbe «firmata» con tutti i dati di firma a null. L'originale
+        // legge la propria firma; la copia eredita quella del padre.
+        const firma =
+          firmaPerDocumento.get(d.id) ??
+          (d.tipo === 'firmato' && d.documentoPadreId
+            ? (firmaPerDocumento.get(d.documentoPadreId) ?? null)
+            : null);
         // I documenti a livello progetto (§2.9) non hanno micro-voce: titolo, modulo e
         // progetto si ripiegano sul collegamento diretto al progetto.
         const nomeProgetto = d.microvoceProgetto?.moduloProgetto.progetto?.nome ?? d.progetto?.nome ?? null;
@@ -297,7 +309,13 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
           documentoHash: firma?.documentoHash ?? null,
           firmaGrafometricaPng: firma?.firmaGrafometricaPng ?? null,
           firmatarioNome: firma?.firmatarioNome ?? null,
-          standard: firma?.standard ?? 'Firma Elettronica Semplice (OTP verificata) · art. 20 CAD',
+          // Regola 5 — niente standard di riserva: se il dato manca, il portale dichiara
+          // «non registrato» invece di spacciare una SES OTP che il server non ha inciso.
+          standard: firma?.standard ?? null,
+          // Il file firmato ricaricato dal cliente (firma con file): URL rinnovato alla
+          // lettura come gli altri. Null per le firme OTP, il cui atto sottoscritto è la
+          // copia §36 — che si scarica dal `fileUrl` della propria riga.
+          fileFirmatoUrl: firma?.fileFirmatoUrl ? (rifirmaUrlUpload(firma.fileFirmatoUrl) as string) : null,
           // Piano §3.1 — il valore legale effettivo della firma apposta: null finché il
           // documento non è firmato (le firme storiche precedenti alla migrazione restano
           // 'ses', che è il comportamento che hanno sempre avuto).
@@ -346,6 +364,10 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
           firmaGrafometricaPng: f.firmaGrafometricaPng,
           firmatarioNome: f.firmatarioNome,
           standard: f.standard,
+          // L'atto firmato sopravvive alla scomparsa del master: vive nella riga della
+          // firma, non in quella del documento. Rinnovato perché il portale può offrirlo
+          // in download anche quando il file originale non c'è più.
+          fileFirmatoUrl: f.fileFirmatoUrl ? (rifirmaUrlUpload(f.fileFirmatoUrl) as string) : null,
           valoreLegale: f.valoreLegale ?? null,
           documentoNonPiuDisponibile: true,
         }));
@@ -362,11 +384,17 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
   });
 
   /**
-   * GET /portal/documenti/:id/download?formato=pdf|docx — Punto 1 piano gap
+   * GET /portal/documenti/:id/download?formato=pdf|docx|firmato — Punto 1 piano gap
    * Il cliente scarica il documento pubblicato nel formato scelto. Il PDF esiste sempre
    * (è il formato master su cui è fissato l'hash legale della firma); il Word esiste solo
    * per i documenti generati dal motore server-side — per i documenti storici precedenti
    * alla migrazione il formato è dichiarato non disponibile, non fabbricato.
+   *
+   * `formato=firmato` serve l'atto come sottoscritto (§36): il file firmato caricato dal
+   * cliente (SES manuale / FEQ di provider) oppure, in mancanza, la copia ricomposta dal
+   * motore con la firma dentro. Il master resta scaricabile com'è: i due file sono
+   * distinti e il cliente può prendere entrambi — scaricare deve restituire il documento
+   * firmato, non solo la certificazione della firma.
    *
    * Un documento ancora in scansione o risultato infetto non si scarica (§28): 409.
    */
@@ -377,7 +405,8 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
     const tenantId = req.tenantId;
     const clienteId = clienteDellaRichiesta(req, req.query?.clienteId);
     const { id } = req.params;
-    const formato = req.query?.formato === 'docx' ? 'docx' : 'pdf';
+    const formato =
+      req.query?.formato === 'docx' ? 'docx' : req.query?.formato === 'firmato' ? 'firmato' : 'pdf';
 
     if (!clienteId) {
       return reply.code(400).send({ errore: 'Cliente non identificato nella sessione.' });
@@ -430,6 +459,49 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
           url: rifirmaUrlUpload(documento.fileDocxUrl) as string,
           filename: nomeFileDaUrl(documento.fileDocxUrl) ?? `${titoloVoce} (v${documento.versione}).docx`,
           contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        });
+      }
+
+      // §36 — l'atto come sottoscritto, distinto dal PDF master (che resta scaricabile
+      // com'è). Prima il file firmato caricato dal cliente (SES manuale / FEQ di
+      // provider), altrimenti la copia ricomposta dal motore con la firma dentro. Se
+      // non esiste nessuno dei due (firma OTP su documento pre-§36 o template senza
+      // segnaposto) il formato è dichiarato non disponibile, non rimpiazzato col
+      // master: servire il master qui farebbe passare un file non firmato per l'atto
+      // sottoscritto.
+      if (formato === 'firmato') {
+        const firma = await prisma.firmaElettronica.findFirst({
+          where: { tenantId, clienteId, ambito: 'documento_vault', riferimentoId: id },
+          select: { fileFirmatoUrl: true },
+          orderBy: { firmatoAt: 'desc' },
+        });
+        if (firma?.fileFirmatoUrl) {
+          return reply.send({
+            ok: true,
+            formato,
+            url: rifirmaUrlUpload(firma.fileFirmatoUrl) as string,
+            filename: nomeFileDaUrl(firma.fileFirmatoUrl) ?? `${titoloVoce} (v${documento.versione}) firmato`,
+            // L'estensione può non essere .pdf (.p7m, .docx): il filename vero la dice,
+            // un content type presunto no.
+            contentType: 'application/octet-stream',
+          });
+        }
+        const copia = await prisma.documento.findFirst({
+          where: { tenantId, documentoPadreId: id, tipo: 'firmato', isArchiviato: false },
+          select: { fileUrl: true, filePdfUrl: true },
+        });
+        const urlCopia = copia?.filePdfUrl ?? copia?.fileUrl ?? null;
+        if (urlCopia) {
+          return reply.send({
+            ok: true,
+            formato,
+            url: rifirmaUrlUpload(urlCopia) as string,
+            filename: nomeFileDaUrl(urlCopia) ?? `${titoloVoce} (v${documento.versione}) firmato.pdf`,
+            contentType: 'application/pdf',
+          });
+        }
+        return reply.code(404).send({
+          errore: 'Nessuna copia firmata separata per questo documento: scarica il PDF master e la ricevuta di firma.',
         });
       }
 
@@ -989,6 +1061,9 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
    * Il servizio ritorna `null` senza sollevare quando la copia non si può o non si deve fare
    * (documento anteriore a §36, template senza segnaposto, allegato caricato a mano): non è
    * un errore e non va nell'audit, sarebbe rumore su ogni firma di ogni documento vecchio.
+   *
+   * L'esito risale al chiamante e da lì al sigillo di risposta: la ricevuta del cliente
+   * può offrire il PDF firmato appena generato invece del master pre-firma.
    */
   async function archiviaCopiaFirmata(params: {
     tenantId: string;
@@ -1003,14 +1078,14 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
     sigilloDigest: string;
     documentoTitolo: string;
     ipAddress: string | null;
-  }): Promise<void> {
+  }): Promise<EsitoCopiaFirmata | null> {
     const esito = await generaCopiaFirmata({
       tenantId: params.tenantId,
       documentoId: params.documentoId,
       firma: params.firma,
       sigilloDigest: params.sigilloDigest,
     });
-    if (!esito) return;
+    if (!esito) return null;
     await recordAudit({
       tenantId: params.tenantId,
       userId: null,
@@ -1023,6 +1098,7 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
         `L'originale ${params.documentoId} resta invariato (è il file su cui è fissato l'hash del sigillo).`,
       ipAddress: params.ipAddress,
     }).catch(() => {});
+    return esito;
   }
 
   /**
@@ -1436,11 +1512,14 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
         },
       });
 
+      // L'esito della copia §36 serve al sigillo di risposta («scarica il PDF firmato»):
+      // sta fuori dal blocco perché il seal si costruisce più avanti, dopo il verbale.
+      let esitoCopia: EsitoCopiaFirmata | null = null;
       if (vault && riferimentoId) {
         await segnaDocumentoFirmato(tenantId, riferimentoId);
         // §36 — la firma entra nel documento. Effetto collaterale, non requisito: se non
         // esce, l'originale è firmato a tutti gli effetti e il sigillo resta valido.
-        await archiviaCopiaFirmata({
+        esitoCopia = await archiviaCopiaFirmata({
           tenantId,
           documentoId: riferimentoId,
           firma: {
@@ -1529,7 +1608,16 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
 
       return reply.send({
         ok: true,
-        seal: { ...sigillo, id: firma.id, tipoFirma: 'fea_otp' },
+        seal: {
+          ...sigillo,
+          id: firma.id,
+          tipoFirma: 'fea_otp',
+          // Il PDF con la firma DENTRO (copia §36): il cliente scarica l'atto sottoscritto,
+          // non solo la certificazione. Null se la copia non è uscita (documento pre-§36,
+          // template senza segnaposto): la ricevuta non offre ciò che non esiste.
+          fileUrl: esitoCopia ? (rifirmaUrlUpload(esitoCopia.url) as string) : null,
+          documentoFirmatoId: esitoCopia?.documentoId ?? null,
+        },
         progettoAttivato,
         message: isFea
           ? 'Firma Elettronica Avanzata registrata (eIDAS art. 26 · art. 25 CAD).'
@@ -1776,7 +1864,19 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
         riferimentoId: riferimentoId ?? null,
       });
 
-      return reply.send({ ok: true, seal: { ...sigillo, id: firma.id, tipoFirma, fileFirmatoUrl: caricato.url } });
+      return reply.send({
+        ok: true,
+        seal: {
+          ...sigillo,
+          id: firma.id,
+          tipoFirma,
+          // Il file con la firma dentro è quello appena caricato dal cliente: oltre
+          // all'URL nudo (uso interno), il seal espone `fileUrl` rinnovato perché la
+          // ricevuta lo offra in download come atto sottoscritto.
+          fileFirmatoUrl: caricato.url,
+          fileUrl: rifirmaUrlUpload(caricato.url) as string,
+        },
+      });
     } catch (err) {
       return reply.code(500).send({ errore: err instanceof Error ? err.message : 'Errore firma con file' });
     }
