@@ -1,3 +1,5 @@
+import { livelloDaStandard, SOTTOTITOLO_RICEVUTA, NOTA_LEGALE_RICEVUTA } from './livelloFirma';
+
 export interface SuccessSealModalProps {
   successSealModal: any;
   clientName: string;
@@ -13,6 +15,10 @@ export function SuccessSealModal({
   scaricaDocumentoClient,
   scaricaDocumentoPortaleApi,
 }: SuccessSealModalProps) {
+  // Il livello si deriva dallo standard inciso dal server nel sigillo: copre il
+  // flusso OTP, la firma con file (FEQ) e la ricevuta riaperta dai documenti.
+  const livello = livelloDaStandard(successSealModal.standard);
+
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 12000, padding: 16 }}>
       <div style={{ background: 'var(--sidebar)', border: '1.5px solid #10b981', borderRadius: 20, width: '100%', maxWidth: 580, maxHeight: '90vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', boxShadow: '0 25px 70px rgba(16,185,129,0.25)' }}>
@@ -27,7 +33,7 @@ export function SuccessSealModal({
                 Documento Sottoscritto con Successo
               </div>
               <div style={{ fontSize: 11, color: '#6ee7b7', fontWeight: 600, marginTop: 2 }}>
-                Firma Elettronica Semplice (OTP verificata) · art. 20 CAD
+                {SOTTOTITOLO_RICEVUTA[livello]}
               </div>
             </div>
           </div>
@@ -113,7 +119,7 @@ export function SuccessSealModal({
 
           {/* Informazione Legale */}
           <div style={{ fontSize: 10.5, color: 'var(--muted)', lineHeight: 1.4, background: 'rgba(0,0,0,0.2)', padding: 10, borderRadius: 8 }}>
-            🛡 La presente attestazione documenta che l'atto è stato sottoscritto con firma elettronica semplice mediante codice OTP verificato (art. 20 del CAD). Una copia del documento firmato è conservata nel Vault dello Studio.
+            {NOTA_LEGALE_RICEVUTA[livello]}
           </div>
         </div>
 
