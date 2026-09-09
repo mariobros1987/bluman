@@ -1,36 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { fmt } from '../utils';
 import { DigitalSignatureModal } from '../components/DigitalSignatureModal';
 import { resolveDocumentTemplateHtml, PREBUILT_TEMPLATES } from '../utils/documentTemplates';
 import { getStudioInfoForTenant } from '../utils/tenant';
 import {
-  fetchProgetti,
-  fetchClienti,
   fetchComunicazioniApi,
-  magicLoginApi,
-  documentiPortaleApi,
   scaricaDocumentoClient,
   scaricaDocumentoPortaleApi,
-  contattiPortaleApi,
-  proposteDatiPortaleApi,
   inviaPropostaDatiApi,
-  richiesteAddendumPortaleApi,
   inviaRichiestaAddendumApi,
-  fatturePortaleApi,
   richiediModificaDocumentoApi,
-  elencoFirmeApi,
 } from '../api/client';
-import type {
-  DocumentoPortale,
-  ContattiStudio,
-  PropostaDatiFiscale,
-  RichiestaAddendum,
-  FatturaPortale,
-} from '../api/client';
+import type { DocumentoPortale } from '../api/client';
 import type { ModuloProposta, PortalTab } from '../components/portal/types';
 import { mapProjectToPortalModules } from '../components/portal/mapPortalModules';
-import { dataOraLeggibile, mascheraIban, mascheraUbo } from '../components/portal/format';
+import { mascheraIban, mascheraUbo } from '../components/portal/format';
 import {
   portalWrapperStyle,
   containerStyle,
@@ -58,49 +43,51 @@ import { livelloFirmaEffettivo } from '../components/portal/livelloFirma';
 import { usePortalAuth } from '../components/portal/usePortalAuth';
 import { usePortalNotifiche } from '../components/portal/usePortalNotifiche';
 import { usePortalFirma } from '../components/portal/usePortalFirma';
+import { usePortalData } from '../components/portal/usePortalData';
 
 export function ClientPortal() {
   const [searchParams] = useSearchParams();
   const token = searchParams.get('magic_token') || '';
 
   const [activeTab, setActiveTab] = useState<PortalTab>('proposta');
-  const [clientObj, setClientObj] = useState<any>(null);
-  const [clientName, setClientName] = useState('Cliente Studio');
-  const [clientProjects, setClientProjects] = useState<any[]>([]);
-  const [selectedProjectId, setSelectedProjectId] = useState<string>('');
-  const [moduliProposti, setModuliProposti] = useState<ModuloProposta[]>([]);
-  const [selectedModule, setSelectedModule] = useState<ModuloProposta | null>(null);
-  const [moduleSignatures, setModuleSignatures] = useState<Record<string, { firmato: boolean; dataFirma: string; signerName: string }>>({});
-  // Lo stato di firma NON si inizializza da una chiave cablata: la chiave conteneva il nome di un
-  // cliente specifico, quindi un browser in cui quel cliente aveva firmato mostrava "firmato" a
-  // qualunque altro cliente. Si risolve in `loadPortalData` sul nome del cliente autenticato.
-  const [signed, setSigned] = useState<boolean>(false);
 
-  // Le richieste di integrazione dell'incarico (§2.5) vivono a database, agganciate al
-  // progetto, e lo studio le vede. Prima stavano in `localStorage` sotto una chiave col nome
-  // del cliente: invisibili allo studio e perse al cambio dispositivo. Si leggono e si
-  // scrivono via API in `loadPortalData` e nella sezione dedicata del contratto firmato.
-  const [addendums, setAddendums] = useState<RichiestaAddendum[]>([]);
-  const [addendumErrore, setAddendumErrore] = useState<string | null>(null);
-  /** Testo libero della nuova richiesta di addendum che il cliente sta scrivendo. */
+  // Ref bridge per la dipendenza circolare tra i due hook: `loadPortalData` vive in
+  // `usePortalData` ma deve poter aggiornare `setIsAuthenticated`/`setAccessoNegato`,
+  // che nascono in `usePortalAuth` — il quale a sua volta riceve `loadPortalData`
+  // da qui. I thunk delegano a questo ref, popolato con i setter veri appena la
+  // destrutturazione di `usePortalAuth` (sotto) è disponibile: nel primo rendering
+  // trovano i no-op iniziali, ma `loadPortalData` non viene mai invocata durante
+  // il render — solo dentro effetti ed handler — quindi delega sempre a un
+  // setter già valido.
+  const authSettersRef = useRef<{
+    setIsAuthenticated: (v: boolean) => void;
+    setAccessoNegato: (v: string | null) => void;
+  }>({
+    setIsAuthenticated: () => {},
+    setAccessoNegato: () => {},
+  });
+
+  const {
+    clientObj, setClientObj, clientName, clientProjects, selectedProjectId, setSelectedProjectId,
+    progettoId, setProgettoId, moduliProposti, setModuliProposti, messaggi, setMessaggi,
+    moduleSignatures, signed, setSigned, eidasSeal, setEidasSeal, addendums, addendumErrore,
+    pageLoading, portalDocs, portalDocsErrore, portalDocsCaricamento, formData, bozzaDati,
+    setBozzaDati, proposteDati, contattiStudio, fatturePortale, fattureCaricamento,
+    fattureErrore, isStudioPreview, elencoClienti, caricaDocumenti, caricaFirmeModuli,
+    caricaAddendum, caricaProposteDati, caricaFatturePortale,
+    ricaricaProgetti, loadPortalData,
+  } = usePortalData({
+    token,
+    setIsAuthenticated: (v) => authSettersRef.current.setIsAuthenticated(v),
+    setAccessoNegato: (v) => authSettersRef.current.setAccessoNegato(v),
+  });
+  const [selectedModule, setSelectedModule] = useState<ModuloProposta | null>(null);
+/** Testo libero della nuova richiesta di addendum che il cliente sta scrivendo. */
   const [nuovaRichiestaAddendum, setNuovaRichiestaAddendum] = useState('');
   const [invioAddendum, setInvioAddendum] = useState(false);
   const [addendumMsg, setAddendumMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const [loading, setLoading] = useState(false);
-  const [pageLoading, setPageLoading] = useState(true);
 
-  /**
-   * Documenti del fascicolo, letti da `GET /portal/documenti`.
-   *
-   * Qui c'erano quattro documenti scritti nel codice: un NDA «firmato il 15/08/2026 01:44:12», uno
-   * statuto maltese, una dichiarazione UBO e una letter of wishes per un trust. Nessuno esisteva a
-   * database, per nessun cliente, e la data di firma del primo era inventata: ogni cliente che
-   * apriva il portale vedeva quei quattro atti come se fossero i suoi, con uno già sottoscritto.
-   * Ora l'elenco è quello vero e, quando è vuoto, la sezione lo dichiara (§2.1).
-   */
-  const [portalDocs, setPortalDocs] = useState<DocumentoPortale[]>([]);
-  const [portalDocsErrore, setPortalDocsErrore] = useState<string | null>(null);
-  const [portalDocsCaricamento, setPortalDocsCaricamento] = useState(false);
   /** Documento del fascicolo per cui il cliente ha scelto un file firmato a mano, da confermare. */
   const [documentoDaCaricare, setDocumentoDaCaricare] = useState<DocumentoPortale | null>(null);
   /**
@@ -135,41 +122,7 @@ export function ClientPortal() {
     }
   };
 
-  // Stesso motivo del flag `signed`: il sigillo di firma è di un cliente preciso e non va letto da
-  // una chiave cablata. Viene caricato in `loadPortalData` per il cliente autenticato.
-  const [eidasSeal, setEidasSeal] = useState<any>(null);
-
-  // Form Cliente State — vuoto per definizione. Qui c'erano ragione sociale, partita IVA, codice
-  // fiscale, IBAN e legale rappresentante di un cliente reale come valori iniziali: siccome nulla
-  // li sovrascriveva, QUALUNQUE cliente apriva la scheda 3 e trovava i dati di un terzo nei propri
-  // campi. Vengono riempiti in `loadPortalData` con la riga del cliente autenticato, se c'è.
-  //
-  // §2.3: questi sono i valori ATTUALI a database (sola lettura). Le modifiche passano da una
-  // proposta che lo studio conferma: il campo non si scrive qui, si invia via
-  // `inviaPropostaDatiApi`. `bozzaDati` contiene i valori digitati, `proposteDati` lo stato
-  // delle richieste già inviate.
-  const [formData, setFormData] = useState({
-    ragioneSociale: '',
-    piva: '',
-    legaleRappresentante: '',
-    codiceFiscale: '',
-    iban: '',
-    titolareEffettivo: '',
-    sedeLegale: '',
-  });
   const [formSaved, setFormSaved] = useState(false);
-  /** Valori digitati dal cliente, campo per campo: diventano proposte solo all'invio. */
-  const [bozzaDati, setBozzaDati] = useState({
-    ragioneSociale: '',
-    piva: '',
-    legaleRappresentante: '',
-    codiceFiscale: '',
-    iban: '',
-    titolareEffettivo: '',
-    sedeLegale: '',
-  });
-  /** Proposte di modifica dei dati fiscali inviate dal cliente, col loro stato. */
-  const [proposteDati, setProposteDati] = useState<PropostaDatiFiscale[]>([]);
   const [invioProposta, setInvioProposta] = useState(false);
   const [propostaMsg, setPropostaMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   /**
@@ -180,30 +133,6 @@ export function ClientPortal() {
    */
   const [mostraDatiSensibili, setMostraDatiSensibili] = useState(false);
 
-  /**
-   * §2.6: i recapiti dello studio (lead advisor reale) arrivano dal backend. Prima la scheda
-   * mostrava a tutti un nome proprio, un indirizzo email e un telefono scritti a mano nel
-   * codice — e il pallino verde "Advisor Online", che non riflette la presenza di nessuno.
-   */
-  const [contattiStudio, setContattiStudio] = useState<ContattiStudio | null>(null);
-
-  /** §2.11: fatture e stato di pagamento dei progetti del cliente. */
-  const [fatturePortale, setFatturePortale] = useState<FatturaPortale[]>([]);
-  const [fattureCaricamento, setFattureCaricamento] = useState(false);
-  const [fattureErrore, setFattureErrore] = useState<string | null>(null);
-
-  /**
-   * §2.10: anteprima del portale aperta da un utente dello studio. Quando è vera il portale
-   * mostra un selettore del cliente e un banner «anteprima», perché i dati che si vedono non
-   * sono di chi sta guardando ma del cliente scelto.
-   */
-  const [isStudioPreview, setIsStudioPreview] = useState(false);
-  /** Elenco completo dei clienti, per il selettore dell'anteprima studio. */
-  const [elencoClienti, setElencoClienti] = useState<any[]>([]);
-
-  // Comunicazioni State
-  const [progettoId, setProgettoId] = useState<string>('proj-001');
-  const [messaggi, setMessaggi] = useState<any[]>([]);
   const [nuovoMessaggio, setNuovoMessaggio] = useState('');
   const [canaleMessaggio, setCanaleMessaggio] = useState<'whatsapp' | 'email' | 'telegram' | 'portal'>('portal');
   const [inviandoMessaggio, setInviandoMessaggio] = useState(false);
@@ -214,362 +143,11 @@ export function ClientPortal() {
    */
   const [erroreRicarica, setErroreRicarica] = useState<string | null>(null);
 
-  /**
-   * Rilegge dal database i progetti del cliente autenticato e allinea moduli e messaggi.
-   *
-   * Vive fuori da `loadPortalData` perché serve anche subito dopo la firma: ripassare da tutto
-   * il caricamento significherebbe riconsumare il magic token (con un secondo
-   * `MAGIC_LINK_USATO` nell'audit), rileggere l'elenco clienti e azzerare la scelta del
-   * progetto. Qui serve solo il dato che la firma ha cambiato.
-   *
-   * `preferisciId` mantiene selezionato il progetto che il cliente sta guardando, quando esiste
-   * ancora dopo la rilettura.
-   */
-  const ricaricaProgetti = async (
-    clienteIdSessione: string | null,
-    nomeCliente: string,
-    preferisciId?: string,
-  ) => {
-    const progettiRes = await fetchProgetti();
-    const elenco: any[] = Array.isArray(progettiRes) ? progettiRes : [];
-
-    // Cerca i progetti associati ESCLUSIVAMENTE al cliente corrente.
-    const matched = elenco.filter((p: any) => {
-      const byId = clienteIdSessione && (p.clienteId === clienteIdSessione || p.cliente?.id === clienteIdSessione);
-      const byName = nomeCliente && p.cliente?.nome && p.cliente.nome.trim().toLowerCase() === nomeCliente.trim().toLowerCase();
-      // Nessun confronto per email: il modello `Cliente` non ha una colonna email (le
-      // referenze stanno in `referentiJson`), quindi `p.cliente.email` è sempre
-      // undefined e il ramo non poteva mai essere vero.
-      return byId || byName;
-    });
-
-    // Nessun progetto di ripiego. Se il cliente non ha progetti a database l'elenco resta
-    // vuoto e il portale lo dichiara. Prima entrambi i rami fabbricavano un "Progetto
-    // Consulenza & Structuring per <nome>" da 28.500 € in Malta, stato in_progress: un
-    // incarico inesistente con un prezzo inventato, mostrato AL CLIENTE come se fosse il
-    // suo. Da lì il mapper ci attaccava anche i moduli, perché quel finto progetto non ha
-    // moduli a database.
-    setClientProjects(matched);
-
-    if (matched.length === 0) {
-      setSelectedProjectId('');
-      setProgettoId('');
-      setModuliProposti([]);
-      return;
-    }
-
-    // Non il più recente in assoluto, ma il più recente CON moduli a database.
-    // `GET /progetti` ordina per data discendente e prima si prendeva `matched[0]`:
-    // se lo studio aveva aperto un secondo incarico per lo stesso cliente e non lo
-    // aveva ancora istanziato, il portale mostrava quello — vuoto — e il cliente
-    // vedeva zero moduli pur avendone due sull'incarico precedente. Da qui l'idea
-    // che servisse prima firmare: la firma non c'entra, l'elenco puntava al
-    // progetto sbagliato.
-    const preferito = preferisciId ? matched.find((p: any) => String(p.id) === String(preferisciId)) : undefined;
-    const conModuli = matched.find((p: any) => Array.isArray(p.moduli) && p.moduli.length > 0);
-    const activeProj = preferito ?? conModuli ?? matched[0];
-    const pId = String(activeProj.id);
-    setSelectedProjectId(pId);
-    setProgettoId(pId);
-    setModuliProposti(mapProjectToPortalModules(activeProj));
-    const msgs = await fetchComunicazioniApi(pId);
-    if (msgs && Array.isArray(msgs)) {
-      setMessaggi(msgs);
-    }
-  };
-
-  /**
-   * Rilegge i documenti del fascicolo con il loro stato di firma a database.
-   *
-   * Serve anche dopo una firma: il sigillo lo emette il backend, quindi l'unico modo di sapere
-   * che un documento è firmato è richiederlo. Un errore di lettura viene mostrato: prima l'elenco
-   * era finto e non poteva fallire, ora può, e «non riesco a leggere i documenti» non deve
-   * assomigliare a «non ci sono documenti».
-   */
-  const caricaDocumenti = async (clienteIdSessione?: string | null) => {
-    setPortalDocsCaricamento(true);
-    setPortalDocsErrore(null);
-    try {
-      const res = await documentiPortaleApi(clienteIdSessione ?? undefined);
-      setPortalDocs(Array.isArray(res?.documenti) ? res.documenti : []);
-    } catch (err: any) {
-      setPortalDocs([]);
-      setPortalDocsErrore(err?.message || 'Impossibile leggere i documenti del fascicolo.');
-    } finally {
-      setPortalDocsCaricamento(false);
-    }
-  };
-
-  /**
-   * Le firme di conclusione delle operazioni (ambito `modulo_completato`).
-   *
-   * Prima la conferma viveva in `localStorage` (`bluman_module_signatures_…`): firmata su un
-   * browser voleva dire non firmata su un altro, e lo studio non ne aveva traccia. Ora arriva da
-   * database come le firme dei documenti (§2.9): ogni conferma è una riga `FirmaElettronica`
-   * emessa da `/portal/verify-otp-and-sign`, con data, hash e IP del momento della firma.
-   */
-  const caricaFirmeModuli = async (clienteIdSessione?: string | null) => {
-    try {
-      const res = await elencoFirmeApi({ clienteId: clienteIdSessione ?? undefined, ambito: 'modulo_completato' });
-      const firme = Array.isArray(res?.firme) ? res.firme : [];
-      const mappa: Record<string, { firmato: boolean; dataFirma: string; signerName: string }> = {};
-      for (const f of firme) {
-        // L'elenco arriva già ordinato dal più recente: la prima riga per modulo è quella buona.
-        if (f.riferimentoId && !mappa[f.riferimentoId]) {
-          mappa[f.riferimentoId] = {
-            firmato: true,
-            dataFirma: dataOraLeggibile(f.firmatoAt),
-            signerName: f.firmatarioNome || clientName,
-          };
-        }
-      }
-      setModuleSignatures(mappa);
-    } catch {
-      setModuleSignatures({});
-    }
-  };
-
-  /**
-   * §2.5 — Rilegge da database le richieste di integrazione dell'incarico.
-   *
-   * Prima venivano da `localStorage`: lo studio non le vedeva mai e un cambio dispositivo le
-   * perdeva. Un errore di lettura viene dichiarato, non mascherato da elenco vuoto.
-   */
-  const caricaAddendum = async (clienteIdSessione?: string | null) => {
-    setAddendumErrore(null);
-    try {
-      const res = await richiesteAddendumPortaleApi(clienteIdSessione ?? undefined);
-      setAddendums(Array.isArray(res) ? res : []);
-    } catch (err: any) {
-      setAddendums([]);
-      setAddendumErrore(err?.message || 'Impossibile leggere le richieste di integrazione.');
-    }
-  };
-
-  /** §2.3 — Rilegge le proposte di modifica dei dati fiscali inviate dal cliente. */
-  const caricaProposteDati = async (clienteIdSessione?: string | null) => {
-    try {
-      const res = await proposteDatiPortaleApi(clienteIdSessione ?? undefined);
-      setProposteDati(Array.isArray(res) ? res : []);
-    } catch {
-      setProposteDati([]);
-    }
-  };
-
-  /** §2.6 — Recapiti reali dello studio (lead advisor) dalla riga del tenant. */
-  const caricaContattiStudio = async (clienteIdSessione?: string | null) => {
-    try {
-      const res = await contattiPortaleApi(clienteIdSessione ?? undefined);
-      setContattiStudio(res);
-    } catch {
-      setContattiStudio(null);
-    }
-  };
-
-  /** §2.11 — Fatture e stato di pagamento dei progetti del cliente. */
-  const caricaFatturePortale = async (clienteIdSessione?: string | null) => {
-    setFattureCaricamento(true);
-    setFattureErrore(null);
-    try {
-      const res = await fatturePortaleApi(clienteIdSessione ?? undefined);
-      setFatturePortale(Array.isArray(res) ? res : []);
-    } catch (err: any) {
-      setFatturePortale([]);
-      setFattureErrore(err?.message || 'Impossibile leggere le fatture.');
-    } finally {
-      setFattureCaricamento(false);
-    }
-  };
-
-  const loadPortalData = async (clienteIdParam?: string) => {
-    setPageLoading(true);
-    let resolvedClientName = clientName;
-    let clienteIdSessione: string | null = clienteIdParam || null;
-    // §2.10: vero solo quando chi apre il portale è un utente dello studio (nessuna sessione
-    // cliente). In quel caso i dati mostrati sono del cliente scelto nel selettore, non di chi
-    // guarda, e la pagina lo dichiara con il banner «anteprima».
-    let anteprimaStudio = false;
-
-    if (token) {
-      try {
-        const sessione = await magicLoginApi(token);
-        if (!sessione?.token) throw new Error('Magic Link non valido o scaduto');
-        localStorage.setItem('bluman_jwt_token', sessione.token);
-        if (sessione.user) {
-          localStorage.setItem('bluman_client_user', JSON.stringify(sessione.user));
-        }
-        clienteIdSessione = sessione.user?.clienteId ?? null;
-        setIsAuthenticated(true);
-        setAccessoNegato(null);
-      } catch (err: any) {
-        console.warn('Magic login non riuscito', err);
-        setAccessoNegato(err.message || 'Link di accesso non valido o scaduto.');
-        setIsAuthenticated(false);
-        setPageLoading(false);
-        return;
-      }
-    } else if (clienteIdParam) {
-      clienteIdSessione = clienteIdParam;
-      // Se non c'è una sessione cliente salvata ma c'è un utente studio, il `clienteIdParam`
-      // è la scelta di un'anteprima, non la sessione di quel cliente.
-      anteprimaStudio = !localStorage.getItem('bluman_client_user') && Boolean(localStorage.getItem('bluman_user'));
-      setIsAuthenticated(true);
-      setAccessoNegato(null);
-    } else {
-      const existingToken = localStorage.getItem('bluman_jwt_token');
-      const savedClientUser = localStorage.getItem('bluman_client_user');
-      const savedStudioUser = localStorage.getItem('bluman_user');
-      if (existingToken && savedClientUser) {
-        try {
-          const parsed = JSON.parse(savedClientUser);
-          if (parsed.ruolo === 'cliente' && parsed.clienteId) {
-            clienteIdSessione = parsed.clienteId;
-            setIsAuthenticated(true);
-            setAccessoNegato(null);
-          } else {
-            setIsAuthenticated(false);
-            setPageLoading(false);
-            return;
-          }
-        } catch {
-          setIsAuthenticated(false);
-          setPageLoading(false);
-          return;
-        }
-      } else if (existingToken && savedStudioUser) {
-        // Advisor o membro dello studio che apre l'anteprima portale
-        anteprimaStudio = true;
-        setIsAuthenticated(true);
-        setAccessoNegato(null);
-      } else {
-        setIsAuthenticated(false);
-        setPageLoading(false);
-        return;
-      }
-    }
-    setIsStudioPreview(anteprimaStudio);
-
-    try {
-      // Id del cliente di cui si stanno guardando i dati: quello della sessione, oppure quello
-      // scelto nell'anteprima dello studio. Serve alle rotte del portale, che per un utente
-      // studio non possono dedurlo dal token.
-      let clienteIdRisolto: string | null = clienteIdSessione;
-      const clientiRes = await fetchClienti();
-      if (clientiRes && Array.isArray(clientiRes) && clientiRes.length > 0) {
-        // §2.10: l'elenco completo serve al selettore dell'anteprima studio.
-        setElencoClienti(clientiRes);
-        const found = clienteIdSessione
-          ? clientiRes.find(c => c.id === clienteIdSessione)
-          : undefined;
-        // Con una sessione cliente il ripiego su `clientiRes[0]` non è ammesso: se l'id della
-        // sessione non compare nell'elenco, il portale apriva l'anagrafica di UN ALTRO cliente
-        // — nome, partita IVA, IBAN e titolare effettivo compresi — e da lì proseguiva con i
-        // suoi progetti. Meglio negare l'accesso: è un dato che non torna, non un dettaglio.
-        if (clienteIdSessione && !found) {
-          setAccessoNegato('La tua anagrafica non risulta più disponibile. Contatta lo studio.');
-          setIsAuthenticated(false);
-          setPageLoading(false);
-          return;
-        }
-        // Senza id di sessione siamo nell'anteprima aperta da uno studio autenticato: lì
-        // `clientiRes[0]` è una scelta, non un travisamento (§2.10 prevede un selettore).
-        const risolto: any = found || clientiRes[0];
-        clienteIdRisolto = risolto.id ?? clienteIdSessione;
-        setClientObj(risolto);
-        setClientName(risolto.nome);
-        resolvedClientName = risolto.nome;
-        // Il form societario si riempie con la riga del cliente, non con valori d'esempio: i campi
-        // che il database non ha restano vuoti perché è il cliente a doverli compilare.
-        const referenti: any = risolto.referentiJson || {};
-        const valoriCliente = {
-          ragioneSociale: risolto.nome || '',
-          piva: risolto.piva || '',
-          legaleRappresentante: referenti.legaleRappresentante || '',
-          codiceFiscale: risolto.codiceFiscale || '',
-          iban: risolto.iban || '',
-          titolareEffettivo: risolto.ubo || '',
-          sedeLegale: risolto.sedeLegale || '',
-        };
-        setFormData(valoriCliente);
-        // La bozza parte dai valori attuali: il cliente digita solo ciò che vuole cambiare (§2.3).
-        setBozzaDati(valoriCliente);
-      }
-
-      // Lo stato di firma della lettera d'incarico si rilegge da database, come documenti (§2.9) e
-      // addendum (§2.5): la firma è una riga `FirmaElettronica` emessa da `/portal/verify-otp-and-sign`,
-      // con sigillo, hash e IP. Prima viveva in `bluman_portal_signed_<cliente>`/`bluman_seal_<cliente>`:
-      // firmata su un browser voleva dire da firmare su un altro, e lo studio non ne vedeva traccia.
-      try {
-        const resFirme = await elencoFirmeApi({ clienteId: clienteIdRisolto ?? undefined, ambito: 'engagement_letter' });
-        const firmeEl = Array.isArray(resFirme?.firme) ? resFirme.firme : [];
-        // L'elenco arriva già ordinato dal più recente: la prima riga dell'ambito è quella buona.
-        // Il filtro sul cliente è difensivo — per le sessioni cliente lo impone già il server —
-        // e in anteprima studio evita di mostrare la lettera d'un altro come firmata.
-        const firmaEl = firmeEl.find((f) => !clienteIdRisolto || f.cliente?.id === clienteIdRisolto);
-        if (firmaEl) {
-          setSigned(true);
-          setEidasSeal({
-            id: firmaEl.id,
-            signatureId: firmaEl.signatureId,
-            tipoFirma: firmaEl.tipoFirma,
-            signerName: firmaEl.firmatarioNome || resolvedClientName,
-            documentoTitolo: firmaEl.documentoTitolo,
-            timestampIso: firmaEl.firmatoAt,
-            documentoHash: firmaEl.documentoHash,
-            sha256Digest: firmaEl.fileFirmatoHash ?? firmaEl.documentoHash,
-            ipAddress: firmaEl.ipAddress ?? null,
-            // Il GET /firme non espone lo user-agent: non lo si ricostruisce a caso (regola 7).
-            userAgent: null,
-            canaleVerificato: firmaEl.canaleVerificato,
-            standard: firmaEl.standard,
-            fileFirmatoUrl: firmaEl.fileFirmatoUrl,
-          });
-        } else {
-          setSigned(false);
-          setEidasSeal(null);
-        }
-      } catch (err) {
-        // «Non riesco a leggere» non è «non c'è»: l'errore si vede in console, lo stato resta
-        // quello di partenza e la lettura successiva ci riprova.
-        console.warn('Errore recupero firma lettera d\'incarico:', err);
-      }
-
-      // §2.5 — le richieste di integrazione dell'incarico si rileggono da database, non più da
-      // `localStorage`: lo studio le vede e non vanno perse al cambio dispositivo.
-      await caricaAddendum(clienteIdRisolto);
-      // §2.3 proposte dati fiscali, §2.6 contatti studio, §2.11 fatture. Sono letture
-      // indipendenti: un errore su una non blocca le altre.
-      await caricaProposteDati(clienteIdRisolto);
-      await caricaContattiStudio(clienteIdRisolto);
-      await caricaFatturePortale(clienteIdRisolto);
-
-      // I documenti firmati NON si rileggono più da `localStorage`. La firma di un documento
-      // stava in `bluman_signed_docs_<cliente>`: firmato su un browser voleva dire non firmato
-      // su un altro, e lo studio non ne vedeva traccia. Ora arriva da database (§2.9).
-      await caricaDocumenti(clienteIdRisolto);
-
-      // Le firme di conclusione delle operazioni, come tutto il resto del portale, arrivano dal
-      // database (righe FirmaElettronica con ambito `modulo_completato`): firmate su qualsiasi
-      // dispositivo sono subito visibili qui e allo studio.
-      await caricaFirmeModuli(clienteIdSessione);
-
-      try {
-        await ricaricaProgetti(clienteIdSessione, resolvedClientName);
-      } catch (err) {
-        console.warn('Errore recupero progetti portale:', err);
-      }
-    } catch (err) {
-      console.warn('Errore caricamento dati portale:', err);
-    } finally {
-      setPageLoading(false);
-    }
-  };
-
   // Stati di autenticazione del portale (credenziali, magic link e gestione della password
-  // personale) e i quattro handler collegati: estratti in `usePortalAuth`. La chiamata sta
-  // qui perché l'hook riceve `loadPortalData`, dichiarata qui sopra; a sua volta
-  // `loadPortalData` usa `setIsAuthenticated`/`setAccessoNegato` per closure, e le uscite
-  // servono già agli useEffect sottostanti e al render.
+  // personale) e i quattro handler collegati: estratti in `usePortalAuth`. La chiamata riceve
+  // `loadPortalData`, `clientObj` e `setClientObj` da `usePortalData` (l'hook invocato sopra),
+  // e i suoi setter `setIsAuthenticated`/`setAccessoNegato` tornano nel ref bridge collegato
+  // subito sotto; le uscite servono già agli useEffect sottostanti e al render.
   const {
     isAuthenticated,
     setIsAuthenticated,
@@ -601,6 +179,12 @@ export function ClientPortal() {
     handleManualMagicSubmit,
     handleSaveClientPassword,
   } = usePortalAuth({ loadPortalData, clientObj, setClientObj });
+
+  // Il ref bridge si collega ai setter veri di `usePortalAuth`: i setter di `useState`
+  // sono referenzialmente stabili, l'assegnamento è idempotente e `loadPortalData`
+  // non viene mai invocata durante il render, quindi i thunk delegano sempre a un
+  // setter già valido.
+  authSettersRef.current = { setIsAuthenticated, setAccessoNegato };
 
   useEffect(() => {
     loadPortalData();
