@@ -176,6 +176,23 @@ export function DocumentiTab({ project }: { project: Progetto }) {
     downloadRealWordDoc(safeWordName, fullPrintHtml);
   };
 
+  // Fix firma — l'atto come sottoscritto: il file firmato caricato dal cliente (flusso
+  // FEQ/SES con file), distinto dal PDF master di `doc.url`. Esiste come file separato
+  // solo in quel flusso: le copie §36 (tipo 'firmato') hanno già la firma incastonata
+  // nel proprio PDF, e il verbale (tipo 'verbale_firma') attesta, non sottoscrive.
+  const mostraAttoFirmato = (doc: any) =>
+    Boolean(doc.fileFirmatoUrl) && doc.tipo !== 'verbale_firma' && doc.tipo !== 'firmato';
+
+  const handleDownloadAttoFirmato = async (doc: any) => {
+    const urlFirmato = doc.fileFirmatoUrl;
+    if (!urlFirmato) return;
+    // L'estensione è quella vera del file firmato (.p7m/.docx/…), dedotta dall'URL:
+    // non si dà per scontato che sia un PDF.
+    const estensione = (urlFirmato.split('?')[0].match(/\.([a-zA-Z0-9]+)$/) || [])[1]?.toLowerCase() || '';
+    const nomeBase = ((doc.titolo || doc.nome || 'Documento').replace(/\.[^/.]+$/, '') || 'Documento').replace(/[^a-zA-Z0-9_-]/g, '_');
+    await scaricaDocumentoClient(urlFirmato, estensione ? `${nomeBase}_firmato.${estensione}` : `${nomeBase}_firmato`);
+  };
+
   // Caricamento File da Disco nel Vault Progetto
   // §2.9 — il file va nel fascicolo del progetto a database (tabella `documento`): prima
   // la scansione lato server (§28), poi la riga visibile al portale cliente e agli altri
@@ -533,6 +550,17 @@ SHA-256 del documento.
                     📥 PDF
                   </button>
 
+                  {mostraAttoFirmato(doc) && (
+                    <button
+                      type="button"
+                      onClick={() => handleDownloadAttoFirmato(doc)}
+                      style={{ background: '#059669', border: '1px solid #10b981', color: '#fff', padding: '5px 7px', borderRadius: 6, fontSize: 10.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}
+                      title="Scarica l'atto come sottoscritto (file firmato), distinto dal PDF master e dal verbale di firma"
+                    >
+                      ✍️ Firmato
+                    </button>
+                  )}
+
                   <button
                     type="button"
                     onClick={() => handleDownloadDocumentWord(doc)}
@@ -617,6 +645,16 @@ SHA-256 del documento.
                           >
                             📥 PDF
                           </button>
+                          {mostraAttoFirmato(doc) && (
+                            <button
+                              type="button"
+                              onClick={() => handleDownloadAttoFirmato(doc)}
+                              style={{ background: '#059669', border: '1px solid #10b981', color: '#fff', padding: '4px 8px', borderRadius: 6, fontSize: 10.5, cursor: 'pointer', fontWeight: 700 }}
+                              title="Scarica l'atto come sottoscritto (file firmato), distinto dal PDF master e dal verbale di firma"
+                            >
+                              ✍️ Firmato
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={() => handleDownloadDocumentWord(doc)}

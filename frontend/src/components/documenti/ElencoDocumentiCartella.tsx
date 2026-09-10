@@ -196,6 +196,11 @@ export function ElencoDocumentiCartella({ progettoId, nomeProgetto, progetti, in
             const nome = nomeFileDocumento(d);
             const urlPdf = urlFileArchivio(d.filePdfUrl || d.fileUrl);
             const urlDocx = urlFileArchivio(d.fileDocxUrl);
+            // Fix firma — l'atto sottoscritto esiste come file separato solo nel flusso con
+            // file caricato (FEQ/SES manuale): per le copie §36 (tipo 'firmato') il PDF È
+            // l'atto firmato, e il verbale (tipo 'verbale_firma') attesta, non sottoscrive.
+            const urlAttoFirmato = d.firma?.fileFirmatoUrl ?? null;
+            const mostraAttoFirmato = Boolean(urlAttoFirmato) && d.tipo !== 'verbale_firma' && d.tipo !== 'firmato';
             return (
               <tr key={d.id} style={{ borderBottom: '1px solid var(--border)' }}>
                 <td style={{ padding: '14px 8px' }}>
@@ -236,6 +241,22 @@ export function ElencoDocumentiCartella({ progettoId, nomeProgetto, progetti, in
                         style={{ background: 'var(--card2)', border: '1px solid var(--border)', color: 'var(--text)', padding: '6px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer' }}
                       >
                         ⬇ PDF
+                      </button>
+                    )}
+                    {/* Fix firma — l'atto come sottoscritto, distinto dal PDF master e dal
+                        verbale: il file firmato caricato (FEQ/SES), con l'estensione vera
+                        dedotta dall'URL (.p7m/.docx/…), non arbitrariamente .pdf. */}
+                    {mostraAttoFirmato && urlAttoFirmato && (
+                      <button
+                        onClick={() => {
+                          const estensione = (urlAttoFirmato.split('?')[0].match(/\.([a-zA-Z0-9]+)$/) || [])[1]?.toLowerCase() || '';
+                          const nomeBase = (nome.replace(/\.[^/.]+$/, '') || 'Documento').replace(/[^a-zA-Z0-9_-]/g, '_');
+                          void scaricaDocumentoClient(urlAttoFirmato, estensione ? `${nomeBase}_firmato.${estensione}` : `${nomeBase}_firmato`);
+                        }}
+                        title="L'atto come sottoscritto (file firmato), distinto dal PDF master e dal verbale di firma"
+                        style={{ background: '#059669', border: 'none', color: '#fff', padding: '6px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+                      >
+                        ✍️ Atto firmato
                       </button>
                     )}
                     {urlDocx && (

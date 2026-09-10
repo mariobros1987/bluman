@@ -121,7 +121,11 @@ function AppContent() {
             }
           }
         })
-        .catch(() => {});
+        .catch((err) => {
+          if (err instanceof Error && (err.message.includes('401') || err.message.includes('Non autenticato'))) {
+            handleLogout();
+          }
+        });
     }
   }, [token]);
 

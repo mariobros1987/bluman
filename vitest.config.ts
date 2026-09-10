@@ -1,6 +1,11 @@
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
+  css: {
+    postcss: {
+      plugins: [],
+    },
+  },
   test: {
     // `setupFiles` gira prima dell'import dei moduli applicativi: è l'unico punto in cui
     // si può neutralizzare il DATABASE_URL di `.env` prima che `new PrismaClient()` lo

@@ -768,6 +768,7 @@ export function ClientPortal() {
         <DocumentViewerModal
           selectedViewerDoc={selectedViewerDoc}
           clientName={clientName}
+          clienteId={clientObj?.id}
           otpLoading={otpLoading}
           setSelectedViewerDoc={setSelectedViewerDoc}
           setModificaDocTarget={setModificaDocTarget}
@@ -795,6 +796,7 @@ export function ClientPortal() {
         <SuccessSealModal
           successSealModal={successSealModal}
           clientName={clientName}
+          clienteId={clientObj?.id}
           setSuccessSealModal={setSuccessSealModal}
           scaricaDocumentoClient={scaricaDocumentoClient}
           scaricaDocumentoPortaleApi={scaricaDocumentoPortaleApi}

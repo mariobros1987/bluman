@@ -3,14 +3,16 @@ import { livelloDaStandard, SOTTOTITOLO_RICEVUTA, NOTA_LEGALE_RICEVUTA } from '.
 export interface SuccessSealModalProps {
   successSealModal: any;
   clientName: string;
+  clienteId?: string;
   setSuccessSealModal: (valore: any) => void;
   scaricaDocumentoClient: (fileUrl?: string | null, nomeFile?: string) => Promise<void>;
-  scaricaDocumentoPortaleApi: (documentoId: string, formato: 'pdf' | 'docx' | 'firmato') => Promise<{ ok: boolean } | null>;
+  scaricaDocumentoPortaleApi: (documentoId: string, formato: 'pdf' | 'docx' | 'firmato', clienteId?: string) => Promise<{ ok: boolean } | null>;
 }
 
 export function SuccessSealModal({
   successSealModal,
   clientName,
+  clienteId,
   setSuccessSealModal,
   scaricaDocumentoClient,
   scaricaDocumentoPortaleApi,
@@ -138,7 +140,7 @@ export function SuccessSealModal({
                   // scontata: si deduce dal fileUrl, se c'è, altrimenti resta il titolo.
                   const idRotta = typeof successSealModal.documentoId === 'string' && !successSealModal.documentoId.startsWith('firma-');
                   if (idRotta) {
-                    const esito = await scaricaDocumentoPortaleApi(successSealModal.documentoId, 'firmato');
+                    const esito = await scaricaDocumentoPortaleApi(successSealModal.documentoId, 'firmato', clienteId || successSealModal.clienteId);
                     if (esito?.ok) return;
                   }
                   const estensione = (successSealModal.fileUrl.split('?')[0].match(/\.([a-zA-Z0-9]+)$/) || [])[1]?.toLowerCase() || '';
@@ -154,7 +156,7 @@ export function SuccessSealModal({
               {successSealModal.documentoId && successSealModal.fileDocxUrl && (
                 <button
                   type="button"
-                  onClick={() => scaricaDocumentoPortaleApi(successSealModal.documentoId, 'docx')}
+                  onClick={() => scaricaDocumentoPortaleApi(successSealModal.documentoId, 'docx', clienteId || successSealModal.clienteId)}
                   style={{ background: '#1e1b4b', border: '1px solid #3b82f6', color: '#93c5fd', padding: '9px 16px', borderRadius: 10, fontSize: 11.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
                 >
                   📝 Copia Word (.docx)

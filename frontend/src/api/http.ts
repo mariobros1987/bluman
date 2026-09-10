@@ -68,7 +68,7 @@ async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutM
       localStorage.setItem('bluman_jwt_token', rinnovato);
     }
 
-    if (res.status === 401 && typeof window !== 'undefined' && !url.includes('/auth/') && !window.location.pathname.startsWith('/portal')) {
+    if (res.status === 401 && typeof window !== 'undefined' && !url.includes('/auth/login') && !url.includes('/auth/magic-login') && !window.location.pathname.startsWith('/portal')) {
       window.dispatchEvent(new Event('bluman_unauthorized'));
     }
     return res;

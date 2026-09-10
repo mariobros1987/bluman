@@ -56,7 +56,22 @@ export interface DocumentoProgetto {
   /** Piano firma §3 — livello (ses|fea|feq) che il documento esige; default 'ses'. */
   livelloFirmaRichiesto?: string | null;
   firmato: boolean;
-  firma: { riferimentoId: string | null; firmatoAt: string | null; signatureId: string | null; tipoFirma: string | null; valoreLegale?: string | null } | null;
+  firma: {
+    riferimentoId: string | null;
+    firmatoAt: string | null;
+    signatureId: string | null;
+    tipoFirma: string | null;
+    valoreLegale?: string | null;
+    /**
+     * Fix firma — URL dell'atto effettivamente sottoscritto: il file firmato caricato
+     * (FEQ/SES manuale). Rinnovato dal server a ogni lettura perché la firma HMAC sugli
+     * URL /uploads/ scade. Null per le firme OTP/FEA: l'atto sottoscritto è la copia §36
+     * (tipo 'firmato'), il cui PDF è già il file firmato.
+     */
+    fileFirmatoUrl?: string | null;
+    /** Standard del sigillo inciso dal server (per distinguere SES/FEA/FEQ senza inventarlo). */
+    standard?: string | null;
+  } | null;
   richiesteModifica?: RichiestaModificaDoc[];
 }
 

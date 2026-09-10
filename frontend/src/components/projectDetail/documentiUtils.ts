@@ -20,6 +20,14 @@ export function documentoApiAVista(d: any, projectId: string): any {
     url: d.fileUrl,
     filePdfUrl: d.filePdfUrl ?? null,
     fileDocxUrl: d.fileDocxUrl ?? null,
+    // Fix firma — il tipo e i dati del sigillo reale, così la scheda può offrire l'atto
+    // sottoscritto e dichiarare lo standard vero senza dedurlo (regola 5): l'atto firmato
+    // come file separato esiste solo nel flusso con file caricato (FEQ/SES manuale).
+    tipo: d.tipo,
+    fileFirmatoUrl: d.firma?.fileFirmatoUrl ?? null,
+    firmaStandard: d.firma?.standard ?? null,
+    tipoFirma: d.firma?.tipoFirma ?? null,
+    dataFirma: d.firma?.firmatoAt ?? null,
   };
 }
 

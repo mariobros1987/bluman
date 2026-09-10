@@ -5,18 +5,20 @@ import { dataOraLeggibile } from './format';
 export interface DocumentViewerModalProps {
   selectedViewerDoc: any;
   clientName: string;
+  clienteId?: string;
   otpLoading: boolean;
   setSelectedViewerDoc: (doc: any | null) => void;
   setModificaDocTarget: (doc: DocumentoPortale | null) => void;
   setModificaDocTesto: (testo: string) => void;
   setSuccessSealModal: (valore: any) => void;
-  scaricaDocumentoPortaleApi: (documentoId: string, formato: 'pdf' | 'docx' | 'firmato') => Promise<{ ok: boolean } | null>;
+  scaricaDocumentoPortaleApi: (documentoId: string, formato: 'pdf' | 'docx' | 'firmato', clienteId?: string) => Promise<{ ok: boolean } | null>;
   avviaFirmaDocumento: (doc: DocumentoPortale) => Promise<void>;
 }
 
 export function DocumentViewerModal({
   selectedViewerDoc,
   clientName,
+  clienteId,
   otpLoading,
   setSelectedViewerDoc,
   setModificaDocTarget,
@@ -83,16 +85,16 @@ export function DocumentViewerModal({
               <>
                 <button
                   type="button"
-                  onClick={() => scaricaDocumentoPortaleApi(selectedViewerDoc.id, 'pdf')}
+                  onClick={() => scaricaDocumentoPortaleApi(selectedViewerDoc.id, 'pdf', clienteId)}
                   style={{ background: '#1a1f3d', border: '1px solid #4338ca', color: '#c7d2fe', padding: '8px 14px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
-                  title="Scarica il PDF master generato dal motore (lo stesso file su cui è fissata l'impronta di firma)"
+                  title="Scarica the PDF master generato dal motore (lo stesso file su cui è fissata l'impronta di firma)"
                 >
                   📥 Scarica PDF A4
                 </button>
                 {selectedViewerDoc.fileDocxUrl && (
                   <button
                     type="button"
-                    onClick={() => scaricaDocumentoPortaleApi(selectedViewerDoc.id, 'docx')}
+                    onClick={() => scaricaDocumentoPortaleApi(selectedViewerDoc.id, 'docx', clienteId)}
                     style={{ background: '#1e1b4b', border: '1px solid #3b82f6', color: '#93c5fd', padding: '8px 14px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
                     title="Scarica la copia Word (.docx) generata dal motore server-side"
                   >
@@ -140,7 +142,7 @@ export function DocumentViewerModal({
                 {selectedViewerDoc.tipo !== 'verbale_firma' && selectedViewerDoc.tipo !== 'firmato' && (
                   <button
                     type="button"
-                    onClick={() => scaricaDocumentoPortaleApi(selectedViewerDoc.id, 'firmato')}
+                    onClick={() => scaricaDocumentoPortaleApi(selectedViewerDoc.id, 'firmato', clienteId)}
                     style={{ background: '#059669', color: '#fff', border: 'none', padding: '8px 14px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
                     title="Scarica l'atto come sottoscritto (file firmato caricato oppure copia con la firma incastonata), distinto dal PDF master e dalla ricevuta di firma"
                   >
@@ -154,7 +156,7 @@ export function DocumentViewerModal({
                       // Stessa regola: niente evidenze inventate dal frontend. Ciò che il
                       // sigillo del server non ha inciso resta "non registrato", e il file
                       // offerto dalla ricevuta è l'atto sottoscritto (fileFirmatoUrl), non
-                      // il master: il cliente scarica ciò che ha firmato, non la bozza.
+                      // le master: il cliente scarica ciò che ha firmato, non la bozza.
                       signatureId: selectedViewerDoc.signatureId || '— non registrato —',
                       signerName: selectedViewerDoc.firmatarioNome || clientName,
                       documentoTitolo: selectedViewerDoc.titolo || selectedViewerDoc.nome,
@@ -167,6 +169,7 @@ export function DocumentViewerModal({
                       fileUrl: selectedViewerDoc.fileFirmatoUrl,
                       documentoId: selectedViewerDoc.id,
                       fileDocxUrl: selectedViewerDoc.fileDocxUrl,
+                      clienteId: clienteId,
                     });
                   }}
                   style={{ background: '#1e1b4b', border: '1px solid #6366f1', color: '#c7d2fe', padding: '8px 14px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
