@@ -767,6 +767,19 @@ SHA-256 del documento.
                 >
                   📝 Scarica Word (.doc)
                 </button>
+                {/* Fix firma — l'atto come sottoscritto, distinto dal PDF master e dal verbale
+                    di firma: il file firmato caricato (FEQ/SES), con l'estensione vera
+                    dedotta dall'URL (.p7m/.docx/…), non arbitrariamente .pdf. */}
+                {mostraAttoFirmato(selectedPreviewDoc) && (
+                  <button
+                    type="button"
+                    onClick={() => handleDownloadAttoFirmato(selectedPreviewDoc)}
+                    style={{ background: '#059669', border: '1px solid #10b981', color: '#fff', padding: '8px 14px', borderRadius: 8, fontSize: 11.5, cursor: 'pointer', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}
+                    title="L'atto come sottoscritto (file firmato), distinto dal PDF master e dal verbale di firma"
+                  >
+                    ✍️ Scarica atto firmato
+                  </button>
+                )}
               </div>
 
               <div style={{ display: 'flex', gap: 10 }}>
