@@ -10,7 +10,7 @@ export interface DocumentViewerModalProps {
   setModificaDocTarget: (doc: DocumentoPortale | null) => void;
   setModificaDocTesto: (testo: string) => void;
   setSuccessSealModal: (valore: any) => void;
-  scaricaDocumentoPortaleApi: (documentoId: string, formato: 'pdf' | 'docx') => Promise<{ ok: boolean } | null>;
+  scaricaDocumentoPortaleApi: (documentoId: string, formato: 'pdf' | 'docx' | 'firmato') => Promise<{ ok: boolean } | null>;
   avviaFirmaDocumento: (doc: DocumentoPortale) => Promise<void>;
 }
 
@@ -133,21 +133,38 @@ export function DocumentViewerModal({
                 <div style={{ background: '#0d2d22', border: '1px solid #1a5c3c', color: '#34d399', padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 700 }}>
                   ✓ Documento già sottoscritto{selectedViewerDoc.dataFirma ? ` il ${dataOraLeggibile(selectedViewerDoc.dataFirma)}` : ''}
                 </div>
+                {/* Fix firma — l'atto sottoscritto, distinto dal PDF master: la rotta
+                    formato=firmato serve il file firmato caricato oppure la copia con la
+                    firma incastonata. Escluso il verbale (attesta, non è l'atto) e la
+                    copia già firmata (il suo PDF È l'atto firmato). */}
+                {selectedViewerDoc.tipo !== 'verbale_firma' && selectedViewerDoc.tipo !== 'firmato' && (
+                  <button
+                    type="button"
+                    onClick={() => scaricaDocumentoPortaleApi(selectedViewerDoc.id, 'firmato')}
+                    style={{ background: '#059669', color: '#fff', border: 'none', padding: '8px 14px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                    title="Scarica l'atto come sottoscritto (file firmato caricato oppure copia con la firma incastonata), distinto dal PDF master e dalla ricevuta di firma"
+                  >
+                    ✍️ Atto firmato
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => {
                     setSuccessSealModal({
-                      // Stessa regola: niente evidenze inventate dal frontend.
-                      signatureId: selectedViewerDoc.signatureId || `SIG-${selectedViewerDoc.id.slice(0, 8).toUpperCase()}`,
+                      // Stessa regola: niente evidenze inventate dal frontend. Ciò che il
+                      // sigillo del server non ha inciso resta "non registrato", e il file
+                      // offerto dalla ricevuta è l'atto sottoscritto (fileFirmatoUrl), non
+                      // il master: il cliente scarica ciò che ha firmato, non la bozza.
+                      signatureId: selectedViewerDoc.signatureId || '— non registrato —',
                       signerName: selectedViewerDoc.firmatarioNome || clientName,
                       documentoTitolo: selectedViewerDoc.titolo || selectedViewerDoc.nome,
                       documentoHash: selectedViewerDoc.documentoHash || '',
                       timestampIso: selectedViewerDoc.dataFirma || '',
-                      canaleVerificato: selectedViewerDoc.canaleVerificato || 'Verifica codice OTP',
+                      canaleVerificato: selectedViewerDoc.canaleVerificato || '— non registrato —',
                       ipAddress: selectedViewerDoc.ipAddress || '',
-                      standard: selectedViewerDoc.standard || 'Firma Elettronica Semplice (OTP verificata) · art. 20 CAD',
+                      standard: selectedViewerDoc.standard || null,
                       firmaGrafometricaPng: selectedViewerDoc.firmaGrafometricaPng,
-                      fileUrl: selectedViewerDoc.fileUrl,
+                      fileUrl: selectedViewerDoc.fileFirmatoUrl,
                       documentoId: selectedViewerDoc.id,
                       fileDocxUrl: selectedViewerDoc.fileDocxUrl,
                     });

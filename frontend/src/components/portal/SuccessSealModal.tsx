@@ -5,7 +5,7 @@ export interface SuccessSealModalProps {
   clientName: string;
   setSuccessSealModal: (valore: any) => void;
   scaricaDocumentoClient: (fileUrl?: string | null, nomeFile?: string) => Promise<void>;
-  scaricaDocumentoPortaleApi: (documentoId: string, formato: 'pdf' | 'docx') => Promise<{ ok: boolean } | null>;
+  scaricaDocumentoPortaleApi: (documentoId: string, formato: 'pdf' | 'docx' | 'firmato') => Promise<{ ok: boolean } | null>;
 }
 
 export function SuccessSealModal({
@@ -80,7 +80,7 @@ export function SuccessSealModal({
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>
               <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>Canale Autenticato:</span>
               <span style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--text)' }}>
-                {successSealModal.canaleVerificato || 'Verifica codice OTP'}
+                {successSealModal.canaleVerificato || '— non registrato —'}
               </span>
             </div>
 
@@ -129,10 +129,25 @@ export function SuccessSealModal({
             <div style={{ display: 'flex', gap: 8 }}>
               <button
                 type="button"
-                onClick={() => scaricaDocumentoClient(successSealModal.fileUrl, `${(successSealModal.documentoTitolo || 'Documento_Firmato').replace(/[^a-zA-Z0-9_-]/g, '_')}_FIRMATO.pdf`)}
+                onClick={async () => {
+                  // Fix firma — l'atto sottoscritto si scarica dalla rotta del portale quando
+                  // il documento sta nel fascicolo: il server restituisce il nome file vero
+                  // con l'estensione giusta (.p7m/.docx compresi). Il download diretto resta
+                  // per le firme orfane (id "firma-…" che la rotta non può risolvere) e come
+                  // ripiego se la rotta non risponde; in quel caso l'estensione non si dà per
+                  // scontata: si deduce dal fileUrl, se c'è, altrimenti resta il titolo.
+                  const idRotta = typeof successSealModal.documentoId === 'string' && !successSealModal.documentoId.startsWith('firma-');
+                  if (idRotta) {
+                    const esito = await scaricaDocumentoPortaleApi(successSealModal.documentoId, 'firmato');
+                    if (esito?.ok) return;
+                  }
+                  const estensione = (successSealModal.fileUrl.split('?')[0].match(/\.([a-zA-Z0-9]+)$/) || [])[1]?.toLowerCase() || '';
+                  const nomeBase = (successSealModal.documentoTitolo || 'Documento_Firmato').replace(/[^a-zA-Z0-9_-]/g, '_');
+                  await scaricaDocumentoClient(successSealModal.fileUrl, estensione ? `${nomeBase}.${estensione}` : `${nomeBase}_firmato`);
+                }}
                 style={{ background: '#059669', color: '#fff', border: 'none', padding: '9px 16px', borderRadius: 10, fontSize: 11.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
               >
-                📥 Copia PDF Firmata
+                ✍️ Atto firmato
               </button>
               {/* §Punto-1 — la copia Word ha senso solo se esiste un .docx reale generato dal
                   motore: prima qui veniva fabbricato un .doc stub con testo inventato. */}

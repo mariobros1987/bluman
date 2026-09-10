@@ -200,6 +200,14 @@ export interface DocumentoPortale {
   filePdfUrl?: string | null;
   /** §Punto-1 — URL del file Word (.docx) generato dal motore server-side; null se il documento non ha un export Word. */
   fileDocxUrl?: string | null;
+  /**
+   * Fix firma — URL dell'atto effettivamente sottoscritto: il file firmato caricato
+   * (FEQ/SES manuale) oppure la copia §36 con la firma grafica incastonata (OTP/FEA).
+   * Rinnovato dal server a ogni lettura perché la firma HMAC sugli URL /uploads/ scade.
+   * Per le firme OTP è null: l'atto sottoscritto è la copia §36, che la rotta download
+   * serve con formato=firmato.
+   */
+  fileFirmatoUrl?: string | null;
   /** §Punto-1 — formato del file master caricato ('pdf' per i documenti generati dal motore). */
   formatoOrigine?: string | null;
   tipo: string;
@@ -258,15 +266,19 @@ export async function documentiPortaleApi(clienteId?: string): Promise<{ ok: boo
 }
 
 /**
- * §Punto-1 — Scarica un documento del fascicolo nel formato richiesto (PDF o Word) passando
- * dall'endpoint server `/portal/documenti/:id/download`. Il server risolve il file reale in
- * archivio (PDF master oppure .docx generato dal motore), ne verifica lo stato di scansione e
- * restituisce un URL firmato + nome file corretto. Il client scarica quei byte veri: nessun
- * testo inventato, nessun .doc fabbricato in locale.
+ * §Punto-1 / Fix firma — Scarica un documento del fascicolo nel formato richiesto passando
+ * dall'endpoint server `/portal/documenti/:id/download`: 'pdf' è il PDF master generato dal
+ * motore (il file su cui è fissata l'impronta di firma), 'docx' la copia Word del motore,
+ * 'firmato' l'atto effettivamente sottoscritto — il file firmato caricato (FEQ/SES manuale)
+ * oppure la copia con la firma grafica incastonata (OTP/FEA) — distinto dal master e dal
+ * verbale di firma. Il server risolve il file reale in archivio, ne verifica lo stato di
+ * scansione e restituisce un URL firmato + nome file con l'estensione vera (.p7m/.docx
+ * compresi). Il client scarica quei byte veri: nessun testo inventato, nessun file
+ * fabbricato in locale.
  */
 export async function scaricaDocumentoPortaleApi(
   documentoId: string,
-  formato: 'pdf' | 'docx',
+  formato: 'pdf' | 'docx' | 'firmato',
   clienteId?: string,
 ): Promise<{ ok: boolean } | null> {
   try {

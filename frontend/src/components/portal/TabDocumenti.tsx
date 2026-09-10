@@ -14,7 +14,7 @@ export interface TabDocumentiProps {
   storicoVersioniAperto: string | null;
   setStoricoVersioniAperto: (docId: string | null) => void;
   setSelectedViewerDoc: (doc: any | null) => void;
-  scaricaDocumentoPortaleApi: (documentoId: string, formato: 'pdf' | 'docx') => Promise<{ ok: boolean } | null>;
+  scaricaDocumentoPortaleApi: (documentoId: string, formato: 'pdf' | 'docx' | 'firmato') => Promise<{ ok: boolean } | null>;
   setSuccessSealModal: (valore: any) => void;
   clientName: string;
   setModificaDocTarget: (doc: DocumentoPortale | null) => void;
@@ -117,7 +117,9 @@ export function TabDocumenti({
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 260 }}>
-              <div style={{ fontSize: 26 }}>{doc.tipo === 'verbale_firma' ? '📜' : doc.firmato ? '🔒' : '📄'}</div>
+              {/* Fix firma — la copia firmata (file firmato caricato) si riconosce
+                  dall'icona: non è il master e non è il verbale. */}
+              <div style={{ fontSize: 26 }}>{doc.tipo === 'verbale_firma' ? '📜' : doc.tipo === 'firmato' ? '✍️' : doc.firmato ? '🔒' : '📄'}</div>
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                   <span style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text)' }}>{doc.nome}</span>
@@ -232,22 +234,39 @@ export function TabDocumenti({
                   <span style={{ background: '#064e3b', border: '1px solid #10b981', color: '#6ee7b7', padding: '5px 12px', borderRadius: 8, fontSize: 11, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 4 }}>
                     <span>🔒</span> FIRMATO{doc.dataFirma ? ` IL ${new Date(doc.dataFirma).toLocaleDateString('it-IT')}` : ''}
                   </span>
+                  {/* Fix firma — l'atto sottoscritto, distinto dal PDF master: la rotta
+                      formato=firmato serve il file firmato caricato oppure la copia con
+                      la firma incastonata. Escluso il verbale (attesta, non è l'atto), la
+                      copia già firmata (il suo PDF è l'atto firmato) e le firme orfane,
+                      che qui sono già il file firmato e si scaricano direttamente. */}
+                  {doc.tipo !== 'verbale_firma' && doc.tipo !== 'firmato' && (
+                    <button
+                      type="button"
+                      onClick={() => scaricaDocumentoPortaleApi(doc.id, 'firmato')}
+                      style={{ background: '#059669', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                      title="Scarica l'atto come sottoscritto (file firmato caricato oppure copia con la firma incastonata), distinto dal PDF master e dalla ricevuta di firma"
+                    >
+                      ✍️ Atto firmato
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => {
                       setSuccessSealModal({
                         // Il frontend non inventa evidenze legali: ciò che manca dal sigillo
-                        // server resta vuoto e la ricevuta lo mostra come "non registrato".
-                        signatureId: doc.signatureId || `SIG-${doc.id.slice(0, 8).toUpperCase()}`,
+                        // server resta "non registrato", e il file offerto dalla ricevuta è
+                        // l'atto sottoscritto (fileFirmatoUrl), non il master: il cliente
+                        // scarica ciò che ha firmato, non la bozza.
+                        signatureId: doc.signatureId || '— non registrato —',
                         signerName: doc.firmatarioNome || clientName,
                         documentoTitolo: doc.titolo || doc.nome,
                         documentoHash: doc.documentoHash || '',
                         timestampIso: doc.dataFirma || '',
-                        canaleVerificato: doc.canaleVerificato || 'Verifica codice OTP',
+                        canaleVerificato: doc.canaleVerificato || '— non registrato —',
                         ipAddress: doc.ipAddress || '',
-                        standard: doc.standard || 'Firma Elettronica Semplice (OTP verificata) · art. 20 CAD',
+                        standard: doc.standard || null,
                         firmaGrafometricaPng: doc.firmaGrafometricaPng,
-                        fileUrl: doc.fileUrl,
+                        fileUrl: doc.fileFirmatoUrl,
                         documentoId: doc.id,
                         fileDocxUrl: doc.fileDocxUrl,
                       });
