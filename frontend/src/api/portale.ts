@@ -1,4 +1,5 @@
 import type { RichiestaModificaDoc } from './documenti';
+import { urlFileArchivio } from './documenti';
 import { API_BASE, apiFetch, erroreDellaRisposta, fetchWithTimeout, getAuthHeaders } from './http';
 
 // ── Blocco 2: portale cliente su database ──────────────────────────────────────────────
@@ -292,7 +293,14 @@ export async function scaricaDocumentoPortaleApi(
     const body = await res.json();
     if (!body?.ok || !body?.url) throw new Error('Il server non ha restituito un file scaricabile.');
 
-    const fileRes = await fetch(body.url);
+    // L'endpoint rifirma gli URL di archivio, ma per i file sul disco dell'API restituisce
+    // percorsi relativi `/uploads/…`: un fetch diretto li risolverebbe contro l'origine del
+    // portale (Vercel), dove quel file non esiste. Li risolviamo verso l'host dell'API,
+    // come fa già l'app operatore con urlFileArchivio. Gli URL Supabase sono già assoluti
+    // e passano invariati.
+    const urlFile = urlFileArchivio(typeof body.url === 'string' ? body.url : null);
+    if (!urlFile) throw new Error('Il server non ha restituito un file scaricabile.');
+    const fileRes = await fetch(urlFile);
     if (!fileRes.ok) throw new Error(`HTTP ${fileRes.status}`);
     const blob = await fileRes.blob();
     const objectUrl = URL.createObjectURL(blob);
