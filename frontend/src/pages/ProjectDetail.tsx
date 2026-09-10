@@ -284,7 +284,10 @@ export function ProjectDetail() {
               proc: mv.proc || (mv.passaggi?.length ? mv.passaggi.map((p: any) => ({
                 id: p.id,
                 title: p.titolo,
-                type: p.tipo,
+                // Il database enumera il tipo con i valori Prisma («documento», «verifica»);
+                // la UI parla «doc»/«check». La traduzione avviene qui al confine, così il
+                // rendering (bottone allegato, etichette, colori) riconosce la riga.
+                type: p.tipo === 'documento' ? 'doc' : p.tipo === 'verifica' ? 'check' : p.tipo,
                 who: p.chi,
                 stato: p.stato,
                 desc: p.descrizione,

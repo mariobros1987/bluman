@@ -483,23 +483,37 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
 
         // Persistenza dei passaggi checklist e documenti allegati alla micro-voce
         if (Array.isArray(mv.proc) && mv.proc.length > 0) {
-          try {
-            for (let pIdx = 0; pIdx < mv.proc.length; pIdx++) {
-              const p = mv.proc[pIdx];
-              const pId = p.id && !String(p.id).startsWith('p-') && p.id.length > 10 ? p.id : undefined;
-              const tipo = ['documento', 'form', 'info', 'check'].includes(p.type || p.tipo) ? (p.type || p.tipo) : 'check';
-              const chi = ['operatore', 'cliente'].includes(p.who || p.chi) ? (p.who || p.chi) : 'operatore';
-              const statoP = p.stato === 'done' ? 'done' : 'pending';
-              const titolo = p.title || p.titolo || `Passaggio ${pIdx + 1}`;
-              const docAllegato = p.documentoAllegatoUrl || p.file || null;
-              const richiedeFirma = Boolean(p.richiedeFirmaCliente);
-              // Piano firma §3.1 — il livello (ses|fea|feq) che il singolo passaggio esige
-              // per la conferma firmata del modulo. Valori non validi si scartano: un
-              // client che manda dati sporchi non deve sovrascrivere il livello esistente.
-              const livelloRichiesta = typeof p.livelloFirmaRichiesto === 'string' && livelloFirmaValido(p.livelloFirmaRichiesto)
-                ? p.livelloFirmaRichiesto
-                : undefined;
+          for (let pIdx = 0; pIdx < mv.proc.length; pIdx++) {
+            const p = mv.proc[pIdx];
+            const pId = p.id && !String(p.id).startsWith('p-') && p.id.length > 10 ? p.id : undefined;
+            // Il tipo deve finire nell'enum `TipoPassaggio` (info|documento|form|verifica).
+            // Il frontend parla un vocabolario interno ridotto («doc», «check») e si
+            // traduce qui, al confine, senza toccare il rendering. Il vecchio fallback era
+            // «check», che nell'enum non esiste: Prisma rifiutava la riga
+            // (PrismaClientValidationError) e la risposta diceva comunque ok: true.
+            const tipoGrezzo = String(p.type || p.tipo || '');
+            const tipo: 'info' | 'documento' | 'form' | 'verifica' =
+              tipoGrezzo === 'info' ? 'info'
+              : tipoGrezzo === 'form' ? 'form'
+              : tipoGrezzo === 'doc' || tipoGrezzo === 'documento' ? 'documento'
+              : 'verifica';
+            const chi = ['operatore', 'cliente'].includes(p.who || p.chi) ? (p.who || p.chi) : 'operatore';
+            const statoP = p.stato === 'done' ? 'done' : 'pending';
+            const titolo = p.title || p.titolo || `Passaggio ${pIdx + 1}`;
+            const docAllegato = p.documentoAllegatoUrl || p.file || null;
+            const richiedeFirma = Boolean(p.richiedeFirmaCliente);
+            // Piano firma §3.1 — il livello (ses|fea|feq) che il singolo passaggio esige
+            // per la conferma firmata del modulo. Valori non validi si scartano: un
+            // client che manda dati sporchi non deve sovrascrivere il livello esistente.
+            const livelloRichiesta = typeof p.livelloFirmaRichiesto === 'string' && livelloFirmaValido(p.livelloFirmaRichiesto)
+              ? p.livelloFirmaRichiesto
+              : undefined;
 
+            // Ogni passaggio si salva per conto suo: il vecchio catch avvolgeva l'intero
+            // ciclo, quindi il primo errore trascinava nel silenzio tutti i passaggi
+            // successivi. Chi fallisce si dichiara in «nonSalvate», che la risposta
+            // riporta e la UI mostra già (regola 5).
+            try {
               if (pId) {
                 await prisma.passaggioProgetto.upsert({
                   where: { id: pId },
@@ -546,9 +560,10 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
                   },
                 });
               }
+            } catch (errPassaggio) {
+              console.warn(`Errore salvataggio passaggio «${titolo}» per micro-voce ${rigaMv.id}:`, errPassaggio);
+              nonSalvate.push(`micro-voce «${rigaMv.nome}»: passaggio «${titolo}» non salvato`);
             }
-          } catch (errPassaggi) {
-            console.warn(`Errore salvataggio passaggi per micro-voce ${rigaMv.id}:`, errPassaggi);
           }
         }
       }
