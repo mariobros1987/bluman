@@ -6,7 +6,7 @@ import type { Cliente } from '../types';
 
 export interface MessaggioComunicazione {
   id: string;
-  canale: 'email' | 'whatsapp' | 'telegram' | 'signal';
+  canale: 'email' | 'whatsapp' | 'telegram' | 'signal' | 'portal';
   mittente: string;
   destinatario: string;
   direzione: 'entrata' | 'uscita';
@@ -188,7 +188,7 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
   });
 
   const [nuovoTesto, setNuovoTesto] = useState('');
-  const [canaleSelezionato, setCanaleSelezionato] = useState<'email' | 'whatsapp' | 'telegram' | 'signal'>('whatsapp');
+  const [canaleSelezionato, setCanaleSelezionato] = useState<'email' | 'whatsapp' | 'telegram' | 'signal' | 'portal'>('whatsapp');
   const [filtroCanale, setFiltroCanale] = useState<string>('TUTTI');
   const [customDestEmail, setCustomDestEmail] = useState('');
   const [loadingMsgs, setLoadingMsgs] = useState(false);
@@ -309,6 +309,9 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
       case 'signal':
         destinatario = `${contactInfo.referente} (${contactInfo.signal})`;
         break;
+      case 'portal':
+        destinatario = contactInfo.referente || nomeCliente;
+        break;
       default:
         destinatario = `Cliente (${nomeCliente})`;
     }
@@ -377,6 +380,12 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
         } else {
           setFeedback({ tipo: 'err', testo: `WhatsApp non ha accettato l'invio verso ${contactInfo.whatsapp}: ${res?.errore || 'motivo non riportato'}. Il messaggio resta nel registro del fascicolo.` });
         }
+      } else if (canaleSelezionato === 'portal') {
+        // 4. Portale Riservato: il messaggio è già stato persistito a database al punto 1.
+        // Non serve nessun dispatch esterno: il polling del TabContatti (5 s) lo mostrerà
+        // al cliente senza che ricarichi la pagina. Il badge del canale lo distingue dagli
+        // altri nella timeline.
+        setFeedback({ tipo: 'ok', testo: `✓ Messaggio inviato sul Portale Riservato di ${contactInfo.referente || nomeCliente}: visibile al cliente entro 5 secondi.` });
       } else {
         setFeedback({ tipo: 'ok', testo: `✓ Messaggio registrato e notificato via ${canaleSelezionato.toUpperCase()} al cliente!` });
       }
@@ -397,6 +406,7 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
       case 'whatsapp': return { icon: '🟢', label: 'WhatsApp Business', bg: '#064e3b', color: '#34d399' };
       case 'telegram': return { icon: '✈️', label: 'Telegram Bot Webhook', bg: '#0369a1', color: '#38bdf8' };
       case 'signal': return { icon: '🔒', label: 'Signal End-to-End Cifrato', bg: '#312e81', color: '#a5b4fc' };
+      case 'portal': return { icon: '🌐', label: 'Portale Riservato', bg: '#1a2744', color: '#6366f1' };
       default: return { icon: '💬', label: canale, bg: 'var(--card2)', color: 'var(--muted)' };
     }
   };
@@ -439,6 +449,15 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
           color: '#a5b4fc',
           bg: '#312e81',
         };
+      case 'portal':
+        return {
+          icon: '🌐',
+          title: 'Portale Riservato',
+          val: contactInfo.referente,
+          desc: `Messaggio diretto sul Portale Cliente sicuro`,
+          color: '#6366f1',
+          bg: '#1a2744',
+        };
     }
   };
 
@@ -454,13 +473,13 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
             <span>💬 Omnichannel Communications Vault & Ingestion Hub</span>
           </div>
           <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 3 }}>
-            Tutte le comunicazioni scambiate con <strong>{nomeCliente}</strong> (Email, WhatsApp, Telegram, Signal) centralizzate ed associate a questo Progetto.
+            Tutte le comunicazioni scambiate con <strong>{nomeCliente}</strong> (Email, WhatsApp, Telegram, Signal, Portale Riservato) centralizzate ed associate a questo Progetto.
           </div>
         </div>
 
         {/* Filtri Canali & Refresh */}
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          {['TUTTI', 'email', 'whatsapp', 'telegram', 'signal'].map(cat => (
+          {['TUTTI', 'email', 'whatsapp', 'telegram', 'signal', 'portal'].map(cat => (
             <button
               key={cat}
               onClick={() => setFiltroCanale(cat)}
@@ -476,7 +495,7 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
                 textTransform: 'capitalize',
               }}
             >
-              {cat === 'TUTTI' ? 'Tutti i Canali' : cat}
+              {cat === 'TUTTI' ? 'Tutti i Canali' : cat === 'portal' ? '🌐 Portale' : cat}
             </button>
           ))}
           <button
@@ -645,6 +664,7 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
                 <option value="email">✉️ Email Ufficiale Studio ({studioChannels.email})</option>
                 <option value="telegram">✈️ Telegram Bot Studio ({studioChannels.telegram})</option>
                 <option value="signal">🔒 Signal Studio Cifrato ({studioChannels.signal})</option>
+                <option value="portal">🌐 Portale Riservato (Canale Diretto Sicuro)</option>
               </select>
             </div>
 

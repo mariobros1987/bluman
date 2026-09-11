@@ -1,4 +1,5 @@
-import { inviaComunicazioneApi } from '../../api/client';
+import { useEffect, useRef } from 'react';
+import { inviaComunicazioneApi, fetchComunicazioniApi } from '../../api/client';
 import type { ContattiStudio } from '../../api/client';
 import { getStudioInfoForTenant } from '../../utils/tenant';
 import { docBoxStyle } from './styles';
@@ -32,6 +33,28 @@ export function TabContatti({
   clientObj,
   progettoId,
 }: TabContattiProps) {
+  // Polling 5 s: così la risposta dell'advisor appare senza dover ricaricare la pagina.
+  // Identico all'interval di ComunicazioniTab sul lato operatore. Se progettoId non è
+  // ancora disponibile (progetto non ancora selezionato) il polling non parte.
+  const setMessaggiRef = useRef(setMessaggi);
+  setMessaggiRef.current = setMessaggi;
+
+  useEffect(() => {
+    if (!progettoId) return;
+    const aggiorna = () => {
+      fetchComunicazioniApi(progettoId)
+        .then(msgs => {
+          if (msgs && Array.isArray(msgs) && msgs.length > 0) {
+            setMessaggiRef.current(() => msgs);
+          }
+        })
+        .catch(() => {});
+    };
+    aggiorna();
+    const id = setInterval(aggiorna, 5000);
+    return () => clearInterval(id);
+  }, [progettoId]);
+
   return (
     <div style={docBoxStyle}>
       <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>💬 Assistenza Dedicata & Comunicazioni Dirette Studio</div>
