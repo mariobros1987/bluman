@@ -139,6 +139,42 @@ export async function registraRotteWebhooks(server: FastifyInstance): Promise<vo
         const changes = entry?.changes?.[0];
         const value = changes?.value;
         const messages = value?.messages;
+        const statuses = value?.statuses;
+
+        // Gestione ricevute di consegna e lettura WhatsApp (spunte ✓✓ e ✓✓ azzurre)
+        if (statuses && Array.isArray(statuses) && statuses.length > 0) {
+          for (const s of statuses) {
+            const wamid = s.id;
+            const waStatus = s.status; // 'sent' | 'delivered' | 'read'
+            const statoNorm = waStatus === 'read' ? 'letto' : waStatus === 'delivered' ? 'consegnato' : 'inviato';
+
+            const trovato = await prisma.comunicazioneProgetto.findFirst({
+              where: {
+                canale: 'whatsapp',
+                OR: [
+                  { externalId: { contains: wamid } },
+                  { externalId: wamid },
+                ],
+              },
+            });
+
+            if (trovato) {
+              let meta: any = {};
+              try {
+                meta = JSON.parse(trovato.externalId || '{}');
+              } catch {
+                meta = { wamid };
+              }
+              meta.stato = statoNorm;
+              if (statoNorm === 'letto') meta.lettoAt = new Date().toISOString();
+              if (statoNorm === 'consegnato' && !meta.consegnatoAt) meta.consegnatoAt = new Date().toISOString();
+              await prisma.comunicazioneProgetto.update({
+                where: { id: trovato.id },
+                data: { externalId: JSON.stringify(meta) },
+              });
+            }
+          }
+        }
 
         if (messages && messages.length > 0) {
           const msg = messages[0];

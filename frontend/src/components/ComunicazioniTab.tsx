@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { fetchComunicazioniApi, inviaComunicazioneApi, fetchClienti, sendWhatsAppDirectApi, sendEmailDirectApi, fetchInboundImapEmailsApi, fetchInboundImapAllegatiApi, fetchTenantInfoApi, uploadFileApi, urlDocumentoAssoluto } from '../api/client';
+import { fetchComunicazioniApi, inviaComunicazioneApi, segnaComunicazioniLetteApi, fetchClienti, sendWhatsAppDirectApi, sendEmailDirectApi, fetchInboundImapEmailsApi, fetchInboundImapAllegatiApi, fetchTenantInfoApi, uploadFileApi, urlDocumentoAssoluto } from '../api/client';
 import { downloadGuidePdf } from '../utils/pdfGenerator';
 import { getCurrentTenantId, getTenantStorageKey, getStudioInfoForTenant, BLUECODE_TENANT_ID } from '../utils/tenant';
 import type { Cliente } from '../types';
@@ -13,6 +13,9 @@ export interface MessaggioComunicazione {
   testo: string;
   dataOra: string;
   allegati?: { nome: string; url: string; dimensione: string }[];
+  stato?: 'inviato' | 'consegnato' | 'letto';
+  lettoAt?: string | null;
+  consegnatoAt?: string | null;
 }
 
 export interface ComunicazioniTabProps {
@@ -205,6 +208,13 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
   const [sincronizzandoAllegati, setSincronizzandoAllegati] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Smart Chat Scroll & Unread Marker
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const unreadMarkerRef = useRef<HTMLDivElement>(null);
+  const [showScrollBottom, setShowScrollBottom] = useState(false);
+  const [initialScrollDone, setInitialScrollDone] = useState(false);
+
   const loadComunicazioni = async (opzioni: { conImap?: boolean } = {}): Promise<string | null> => {
     // Restituisce il motivo per cui la posta in arrivo non è stata letta (null se tutto ok):
     // il chiamante non può leggerlo dallo stato, che nella sua closure è ancora quello vecchio.
@@ -219,6 +229,9 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
           ...m,
           dataOra: m.createdAt ? new Date(m.createdAt).toLocaleString('it-IT') : (m.dataOra || 'Oggi'),
           allegati: m.allegatiJson ? (typeof m.allegatiJson === 'string' ? JSON.parse(m.allegatiJson) : m.allegatiJson) : m.allegati,
+          stato: m.stato || 'consegnato',
+          lettoAt: m.lettoAt || null,
+          consegnatoAt: m.consegnatoAt || null,
         }));
       } else {
         const saved = localStorage.getItem(`bluman_msgs_${progettoId}`);
@@ -253,6 +266,7 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
               direzione: 'entrata',
               testo: mail.text,
               dataOra: mail.date,
+              stato: 'consegnato',
             };
 
             currentList.push(newInboundMsg);
@@ -272,6 +286,12 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
       if (currentList.length > 0) {
         setMessaggi(currentList);
         localStorage.setItem(`bluman_msgs_${progettoId}`, JSON.stringify(currentList));
+
+        // Segna automaticamente come letti i messaggi in entrata visualizzati dall'operatore
+        const haDaLeggere = currentList.some(m => m.direzione === 'entrata' && m.stato !== 'letto');
+        if (haDaLeggere) {
+          segnaComunicazioniLetteApi(String(progettoId), 'entrata').catch(() => {});
+        }
       }
     } catch (err) {
       motivoImap = motivoImap || `Sincronizzazione non riuscita: ${err instanceof Error ? err.message : 'errore di rete'}.`;
@@ -287,6 +307,31 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
     }, 5000);
     return () => clearInterval(interval);
   }, [progettoId]);
+
+  useEffect(() => {
+    if (!chatContainerRef.current || messaggi.length === 0) return;
+    if (!initialScrollDone) {
+      if (unreadMarkerRef.current) {
+        unreadMarkerRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } else {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+      }
+      setInitialScrollDone(true);
+    } else {
+      const el = chatContainerRef.current;
+      const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+      if (distFromBottom < 160) {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+  }, [messaggi.length]);
+
+  const handleChatScroll = () => {
+    if (!chatContainerRef.current) return;
+    const el = chatContainerRef.current;
+    const isUp = el.scrollHeight - el.scrollTop - el.clientHeight > 140;
+    setShowScrollBottom(isUp);
+  };
 
   const sincronizzaAllegatiImap = async () => {
     setSincronizzandoAllegati(true);
@@ -535,6 +580,13 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
 
   const channelDetail = getCurrentChannelDetails();
   const messaggiFiltrati = messaggi.filter(m => filtroCanale === 'TUTTI' || m.canale === filtroCanale);
+  const primoNonLettoId = useMemo(() => {
+    const primo = messaggiFiltrati.find(m => m.direzione === 'entrata' && m.stato !== 'letto');
+    return primo ? primo.id : null;
+  }, [messaggiFiltrati]);
+  const nuoviNonLettiCount = useMemo(() => {
+    return messaggi.filter(m => m.direzione === 'entrata' && m.stato !== 'letto').length;
+  }, [messaggi]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -645,38 +697,63 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
         </button>
       </div>
 
-      {/* Timeline Chat Comunicazioni */}
-      <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 16, padding: 20, display: 'flex', flexDirection: 'column', gap: 14, maxHeight: 520, overflowY: 'auto' }}>
-        {messaggiFiltrati.map(m => {
-          const badge = getCanaleBadge(m.canale);
-          const isUscita = m.direzione === 'uscita';
-          return (
-            <div
-              key={m.id}
-              style={{
-                alignSelf: isUscita ? 'flex-end' : 'flex-start',
-                maxWidth: '82%',
-                background: isUscita ? '#1e1b4b' : 'var(--card)',
-                border: `1px solid ${isUscita ? 'var(--indigo)' : 'var(--border)'}`,
-                borderRadius: 14,
-                padding: 14,
-                boxShadow: '0 4px 14px rgba(0,0,0,.2)',
-              }}
-            >
-              {/* Info Messaggio Header */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 6 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10, background: badge.bg, color: badge.color }}>
-                    {badge.icon} {badge.label}
-                  </span>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text)' }}>
-                    {m.mittente}
-                  </span>
-                </div>
-                <span style={{ fontSize: 10, color: 'var(--muted)', fontFamily: 'monospace' }}>
-                  {m.dataOra}
-                </span>
-              </div>
+      {/* Timeline Chat Comunicazioni con Smart Scroll e Ricevute di Stato */}
+      <div style={{ position: 'relative' }}>
+        <div
+          ref={chatContainerRef}
+          onScroll={handleChatScroll}
+          style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 16, padding: 20, display: 'flex', flexDirection: 'column', gap: 14, maxHeight: 520, overflowY: 'auto' }}
+        >
+          {messaggiFiltrati.map(m => {
+            const badge = getCanaleBadge(m.canale);
+            const isUscita = m.direzione === 'uscita';
+            const isFirstUnread = m.id === primoNonLettoId;
+            return (
+              <React.Fragment key={m.id}>
+                {isFirstUnread && (
+                  <div ref={unreadMarkerRef} style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '8px 0', opacity: 0.95 }}>
+                    <div style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, transparent, #6366f1)' }} />
+                    <span style={{ fontSize: 10.5, fontWeight: 700, color: '#a5b4fc', background: '#1e1b4b', border: '1px solid #4338ca', padding: '3px 12px', borderRadius: 12, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                      <span>🔔</span>
+                      <span>Nuovi messaggi non letti</span>
+                    </span>
+                    <div style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, #6366f1, transparent)' }} />
+                  </div>
+                )}
+                <div
+                  style={{
+                    alignSelf: isUscita ? 'flex-end' : 'flex-start',
+                    maxWidth: '82%',
+                    background: isUscita ? '#1e1b4b' : 'var(--card)',
+                    border: `1px solid ${isUscita ? 'var(--indigo)' : 'var(--border)'}`,
+                    borderRadius: 14,
+                    padding: 14,
+                    boxShadow: '0 4px 14px rgba(0,0,0,.2)',
+                  }}
+                >
+                  {/* Info Messaggio Header */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 6 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10, background: badge.bg, color: badge.color }}>
+                        {badge.icon} {badge.label}
+                      </span>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text)' }}>
+                        {m.mittente}
+                      </span>
+                    </div>
+                    <span style={{ fontSize: 10, color: 'var(--muted)', fontFamily: 'monospace', display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <span>{m.dataOra}</span>
+                      {isUscita && (
+                        m.stato === 'letto' ? (
+                          <span title={m.lettoAt ? `Letto il ${new Date(m.lettoAt).toLocaleString('it-IT')}` : 'Letto dal destinatario'} style={{ color: '#38bdf8', fontWeight: 800, fontSize: 13, letterSpacing: -1, lineHeight: 1 }}>✓✓</span>
+                        ) : m.stato === 'inviato' ? (
+                          <span title="Inviato al server" style={{ color: 'var(--muted)', fontWeight: 700, fontSize: 13, lineHeight: 1 }}>✓</span>
+                        ) : (
+                          <span title={m.consegnatoAt ? `Consegnato il ${new Date(m.consegnatoAt).toLocaleString('it-IT')}` : 'Consegnato'} style={{ color: 'var(--muted)', fontWeight: 700, fontSize: 13, letterSpacing: -1, lineHeight: 1 }}>✓✓</span>
+                        )
+                      )}
+                    </span>
+                  </div>
 
               {/* Destinatario Info */}
               <div style={{ fontSize: 10.5, color: 'var(--muted)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -733,8 +810,43 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
                 </div>
               )}
             </div>
-          );
-        })}
+              </React.Fragment>
+            );
+          })}
+          <div ref={messagesEndRef} />
+        </div>
+
+        {showScrollBottom && (
+          <button
+            type="button"
+            onClick={() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })}
+            style={{
+              position: 'absolute',
+              bottom: 16,
+              right: 24,
+              background: 'var(--indigo)',
+              color: '#fff',
+              border: '1px solid rgba(255,255,255,0.25)',
+              borderRadius: 24,
+              padding: '7px 16px',
+              fontSize: 11.5,
+              fontWeight: 700,
+              boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              zIndex: 10,
+            }}
+          >
+            <span>⬇️ Scorri all'ultimo</span>
+            {nuoviNonLettiCount > 0 && (
+              <span style={{ background: '#ef4444', color: '#fff', borderRadius: '50%', fontSize: 9.5, padding: '1px 6px', fontWeight: 800 }}>
+                {nuoviNonLettiCount}
+              </span>
+            )}
+          </button>
+        )}
       </div>
 
       {/* Form Invio Messaggio Multicanale con Dati Anagrafica Live */}

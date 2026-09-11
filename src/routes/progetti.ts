@@ -28,10 +28,73 @@ import { CreaProgettoSchema, ConsuntivaOreSchema } from '../schemas/progetti.sch
 export async function registraRotteProgetti(server: FastifyInstance, app: AppPort): Promise<void> {
   // Comunicazioni Progetto API (Multicanale Ingestion)
   server.get<{ Params: { id: string } }>('/progetti/:id/comunicazioni', async (req) => {
-    return await prisma.comunicazioneProgetto.findMany({
+    const msgs = await prisma.comunicazioneProgetto.findMany({
       where: { progettoId: req.params.id },
       orderBy: { createdAt: 'asc' },
     });
+    return msgs.map((m) => {
+      let meta: any = {};
+      if (m.externalId) {
+        try {
+          meta = typeof m.externalId === 'string' && m.externalId.startsWith('{')
+            ? JSON.parse(m.externalId)
+            : { stato: m.externalId };
+        } catch {
+          meta = { stato: m.externalId };
+        }
+      }
+      return {
+        ...m,
+        stato: meta.stato || 'consegnato',
+        lettoAt: meta.lettoAt || null,
+        consegnatoAt: meta.consegnatoAt || m.createdAt,
+      };
+    });
+  });
+
+  server.patch<{
+    Params: { id: string };
+    Body: { direzioneDaSegnare?: 'entrata' | 'uscita' };
+  }>('/progetti/:id/comunicazioni/segna-lette', async (req, reply) => {
+    const { direzioneDaSegnare } = req.body || {};
+    const targetDirezione = direzioneDaSegnare || 'entrata';
+    const adesso = new Date().toISOString();
+
+    const daAggiornare = await prisma.comunicazioneProgetto.findMany({
+      where: {
+        progettoId: req.params.id,
+        direzione: targetDirezione,
+      },
+    });
+
+    let aggiornati = 0;
+    for (const m of daAggiornare) {
+      let meta: any = {};
+      if (m.externalId) {
+        try {
+          meta = typeof m.externalId === 'string' && m.externalId.startsWith('{')
+            ? JSON.parse(m.externalId)
+            : { stato: m.externalId };
+        } catch {
+          meta = { stato: m.externalId };
+        }
+      }
+      if (meta.stato !== 'letto') {
+        const nuovoMeta = {
+          ...meta,
+          stato: 'letto',
+          lettoAt: adesso,
+          consegnatoAt: meta.consegnatoAt || m.createdAt.toISOString(),
+        };
+        await prisma.comunicazioneProgetto.update({
+          where: { id: m.id },
+          data: { externalId: JSON.stringify(nuovoMeta) },
+        });
+        aggiornati++;
+      }
+    }
+
+    return reply.send({ ok: true, aggiornati });
   });
 
   server.post<{ Params: { id: string }; Body: Record<string, any> }>('/progetti/:id/comunicazioni', async (req, reply) => {
@@ -48,6 +111,10 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
           direzione: body.direzione || 'uscita',
           testo: body.testo,
           allegatiJson: body.allegatiJson ? (typeof body.allegatiJson === 'string' ? body.allegatiJson : JSON.stringify(body.allegatiJson)) : null,
+          externalId: JSON.stringify({
+            stato: 'consegnato',
+            consegnatoAt: new Date().toISOString(),
+          }),
         },
       });
       // Blocco 3 — messaggio in arrivo dal cliente: lo studio viene avvisato subito.

@@ -213,6 +213,21 @@ export async function inviaComunicazioneApi(progettoId: string, input: { canale:
   return await res.json();
 }
 
+export async function segnaComunicazioniLetteApi(progettoId: string, direzioneDaSegnare: 'entrata' | 'uscita') {
+  try {
+    const res = await apiFetch(`${API_BASE}/progetti/${progettoId}/comunicazioni/segna-lette`, {
+      method: 'PATCH',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ direzioneDaSegnare }),
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (err) {
+    console.warn('Errore segna comunicazioni lette:', err);
+    return null;
+  }
+}
+
 export async function fetchChecklistPassaggioApi(passaggioId: string) {
   try {
     const res = await apiFetch(`${API_BASE}/passaggi/${passaggioId}/checklist`, { headers: getAuthHeaders() });

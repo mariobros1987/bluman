@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { inviaComunicazioneApi, fetchComunicazioniApi } from '../../api/client';
+import { useEffect, useRef, useState, useMemo } from 'react';
+import { inviaComunicazioneApi, fetchComunicazioniApi, segnaComunicazioniLetteApi } from '../../api/client';
 import { uploadFileApi, urlDocumentoAssoluto } from '../../api/documenti';
 import type { ContattiStudio } from '../../api/client';
 import { getStudioInfoForTenant } from '../../utils/tenant';
@@ -38,6 +38,13 @@ export function TabContatti({
   const [caricandoFile, setCaricandoFile] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Smart Chat Scroll & Unread Marker
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const unreadMarkerRef = useRef<HTMLDivElement>(null);
+  const [showScrollBottom, setShowScrollBottom] = useState(false);
+  const [initialScrollDone, setInitialScrollDone] = useState(false);
+
   // Polling 5 s: così la risposta dell'advisor appare senza dover ricaricare la pagina.
   // Identico all'interval di ComunicazioniTab sul lato operatore. Se progettoId non è
   // ancora disponibile (progetto non ancora selezionato) il polling non parte.
@@ -56,8 +63,17 @@ export function TabContatti({
               allegati: m.allegatiJson
                 ? (typeof m.allegatiJson === 'string' ? (() => { try { return JSON.parse(m.allegatiJson); } catch { return []; } })() : m.allegatiJson)
                 : (m.allegati || []),
+              stato: m.stato || 'consegnato',
+              lettoAt: m.lettoAt || null,
+              consegnatoAt: m.consegnatoAt || null,
             }));
             setMessaggiRef.current(() => normalizzati);
+
+            // Se ci sono messaggi inviati dallo studio non ancora letti dal cliente, li segna come letti
+            const daLeggere = normalizzati.some((m: any) => m.direzione === 'uscita' && m.stato !== 'letto');
+            if (daLeggere) {
+              segnaComunicazioniLetteApi(progettoId, 'uscita').catch(() => {});
+            }
           }
         })
         .catch(() => {});
@@ -66,6 +82,40 @@ export function TabContatti({
     const id = setInterval(aggiorna, 5000);
     return () => clearInterval(id);
   }, [progettoId]);
+
+  useEffect(() => {
+    if (!chatContainerRef.current || messaggi.length === 0) return;
+    if (!initialScrollDone) {
+      if (unreadMarkerRef.current) {
+        unreadMarkerRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } else {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+      }
+      setInitialScrollDone(true);
+    } else {
+      const el = chatContainerRef.current;
+      const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+      if (distFromBottom < 140) {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+  }, [messaggi.length]);
+
+  const handleChatScroll = () => {
+    if (!chatContainerRef.current) return;
+    const el = chatContainerRef.current;
+    const isUp = el.scrollHeight - el.scrollTop - el.clientHeight > 100;
+    setShowScrollBottom(isUp);
+  };
+
+  const primoNonLettoId = useMemo(() => {
+    const primo = messaggi.find((m: any) => m.direzione === 'uscita' && m.stato !== 'letto');
+    return primo ? (primo.id || primo.createdAt) : null;
+  }, [messaggi]);
+
+  const nuoviNonLettiCount = useMemo(() => {
+    return messaggi.filter((m: any) => m.direzione === 'uscita' && m.stato !== 'letto').length;
+  }, [messaggi]);
 
   return (
     <div style={docBoxStyle}>
@@ -102,85 +152,144 @@ export function TabContatti({
         </div>
       </div>
 
-      {/* Live Chat Timeline */}
-      <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 14, padding: 16, display: 'flex', flexDirection: 'column', gap: 12, maxHeight: 360, overflowY: 'auto', marginBottom: 18 }}>
-        {messaggi.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '24px 10px', color: 'var(--muted)', fontSize: 12 }}>
-            💬 Nessun messaggio scambiato finora. Scrivi qui sotto per contattare il tuo Advisor.
-          </div>
-        ) : (
-          messaggi.map((m: any, idx: number) => {
-            const isCliente = m.direzione === 'entrata' || (m.mittente && m.mittente.includes('Cliente'));
-            return (
-              <div
-                key={m.id || idx}
-                style={{
-                  alignSelf: isCliente ? 'flex-end' : 'flex-start',
-                  maxWidth: '85%',
-                  background: isCliente ? '#1e1b4b' : 'var(--card2)',
-                  border: `1px solid ${isCliente ? '#4338ca' : 'var(--border)'}`,
-                  borderRadius: 12,
-                  padding: '10px 14px',
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 4 }}>
-                  <span style={{ fontSize: 10, fontWeight: 700, color: isCliente ? '#a5b4fc' : 'var(--indigo-l)' }}>
-                    {/* §2.6: il mittente dello studio prende il nome vero se c'è, senza
-                        inventare una persona. */}
-                    {isCliente ? 'Tu (Cliente)' : (m.mittente || contattiStudio?.advisorNome || 'Studio (Advisor)')}
-                  </span>
-                  <span style={{ fontSize: 9.5, color: 'var(--muted)' }}>
-                    {m.createdAt ? new Date(m.createdAt).toLocaleString('it-IT') : (m.dataOra || 'Oggi')}
-                  </span>
-                </div>
-                <div style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.4, whiteSpace: 'pre-wrap' }}>
-                  {m.testo}
-                </div>
-
-                {/* Allegati allegati al messaggio */}
-                {m.allegati && m.allegati.length > 0 && (
-                  <div style={{ marginTop: 8, borderTop: `1px solid ${isCliente ? 'rgba(255,255,255,0.15)' : 'var(--border)'}`, paddingTop: 6, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <div style={{ fontSize: 9.5, color: isCliente ? '#c7d2fe' : 'var(--muted)', fontWeight: 700, textTransform: 'uppercase' }}>
-                      📎 Allegati ({m.allegati.length}):
+      {/* Live Chat Timeline con Smart Scroll e Spunte di Stato */}
+      <div style={{ position: 'relative' }}>
+        <div
+          ref={chatContainerRef}
+          onScroll={handleChatScroll}
+          style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 14, padding: 16, display: 'flex', flexDirection: 'column', gap: 12, maxHeight: 360, overflowY: 'auto', marginBottom: 18 }}
+        >
+          {messaggi.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '24px 10px', color: 'var(--muted)', fontSize: 12 }}>
+              💬 Nessun messaggio scambiato finora. Scrivi qui sotto per contattare il tuo Advisor.
+            </div>
+          ) : (
+            messaggi.map((m: any, idx: number) => {
+              const isCliente = m.direzione === 'entrata' || (m.mittente && m.mittente.includes('Cliente'));
+              const isFirstUnread = (m.id || m.createdAt) === primoNonLettoId;
+              return (
+                <div key={m.id || idx} style={{ display: 'flex', flexDirection: 'column' }}>
+                  {isFirstUnread && (
+                    <div ref={unreadMarkerRef} style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '8px 0', opacity: 0.95 }}>
+                      <div style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, transparent, #6366f1)' }} />
+                      <span style={{ fontSize: 10, fontWeight: 700, color: '#a5b4fc', background: '#1e1b4b', border: '1px solid #4338ca', padding: '2px 10px', borderRadius: 12, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        <span>🔔</span>
+                        <span>Nuovi messaggi dallo Studio</span>
+                      </span>
+                      <div style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, #6366f1, transparent)' }} />
                     </div>
-                    {m.allegati.map((att: any, attIdx: number) => {
-                      const downloadUrl = urlDocumentoAssoluto(att.url || '#');
-                      return (
-                        <div key={attIdx} style={{ background: isCliente ? 'rgba(0,0,0,0.25)' : 'var(--card)', border: `1px solid ${isCliente ? 'rgba(255,255,255,0.15)' : 'var(--border)'}`, borderRadius: 6, padding: '6px 10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-                            <span>📄</span>
-                            <div style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              <div style={{ fontWeight: 600, fontSize: 11, color: isCliente ? '#fff' : 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis' }}>{att.nome}</div>
-                              {att.dimensione && <div style={{ fontSize: 9, color: isCliente ? '#a5b4fc' : 'var(--muted)' }}>{att.dimensione}</div>}
-                            </div>
-                          </div>
-                          <a
-                            href={downloadUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            download={att.nome}
-                            style={{
-                              background: isCliente ? '#4f46e5' : 'var(--card2)',
-                              color: '#fff',
-                              border: '1px solid rgba(255,255,255,0.2)',
-                              padding: '3px 8px',
-                              borderRadius: 4,
-                              fontSize: 10,
-                              fontWeight: 600,
-                              textDecoration: 'none',
-                              whiteSpace: 'nowrap',
-                            }}
-                          >
-                            ⬇️ Scarica
-                          </a>
+                  )}
+                  <div
+                    style={{
+                      alignSelf: isCliente ? 'flex-end' : 'flex-start',
+                      maxWidth: '85%',
+                      background: isCliente ? '#1e1b4b' : 'var(--card2)',
+                      border: `1px solid ${isCliente ? '#4338ca' : 'var(--border)'}`,
+                      borderRadius: 12,
+                      padding: '10px 14px',
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 4 }}>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: isCliente ? '#a5b4fc' : 'var(--indigo-l)' }}>
+                        {/* §2.6: il mittente dello studio prende il nome vero se c'è, senza inventare una persona. */}
+                        {isCliente ? 'Tu (Cliente)' : (m.mittente || contattiStudio?.advisorNome || 'Studio (Advisor)')}
+                      </span>
+                      <span style={{ fontSize: 9.5, color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <span>{m.createdAt ? new Date(m.createdAt).toLocaleString('it-IT') : (m.dataOra || 'Oggi')}</span>
+                        {isCliente && (
+                          m.stato === 'letto' ? (
+                            <span title={m.lettoAt ? `Letto dall'Advisor il ${new Date(m.lettoAt).toLocaleString('it-IT')}` : 'Letto dall\'Advisor'} style={{ color: '#38bdf8', fontWeight: 800, fontSize: 13, letterSpacing: -1, lineHeight: 1 }}>✓✓</span>
+                          ) : m.stato === 'inviato' ? (
+                            <span title="Inviato" style={{ color: 'var(--muted)', fontWeight: 700, fontSize: 13, lineHeight: 1 }}>✓</span>
+                          ) : (
+                            <span title={m.consegnatoAt ? `Consegnato allo Studio il ${new Date(m.consegnatoAt).toLocaleString('it-IT')}` : 'Consegnato allo Studio'} style={{ color: 'var(--muted)', fontWeight: 700, fontSize: 13, letterSpacing: -1, lineHeight: 1 }}>✓✓</span>
+                          )
+                        )}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.4, whiteSpace: 'pre-wrap' }}>
+                      {m.testo}
+                    </div>
+
+                    {/* Allegati allegati al messaggio */}
+                    {m.allegati && m.allegati.length > 0 && (
+                      <div style={{ marginTop: 8, borderTop: `1px solid ${isCliente ? 'rgba(255,255,255,0.15)' : 'var(--border)'}`, paddingTop: 6, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        <div style={{ fontSize: 9.5, color: isCliente ? '#c7d2fe' : 'var(--muted)', fontWeight: 700, textTransform: 'uppercase' }}>
+                          📎 Allegati ({m.allegati.length}):
                         </div>
-                      );
-                    })}
+                        {m.allegati.map((att: any, attIdx: number) => {
+                          const downloadUrl = urlDocumentoAssoluto(att.url || '#');
+                          return (
+                            <div key={attIdx} style={{ background: isCliente ? 'rgba(0,0,0,0.25)' : 'var(--card)', border: `1px solid ${isCliente ? 'rgba(255,255,255,0.15)' : 'var(--border)'}`, borderRadius: 6, padding: '6px 10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                                <span>📄</span>
+                                <div style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  <div style={{ fontWeight: 600, fontSize: 11, color: isCliente ? '#fff' : 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis' }}>{att.nome}</div>
+                                  {att.dimensione && <div style={{ fontSize: 9, color: isCliente ? '#a5b4fc' : 'var(--muted)' }}>{att.dimensione}</div>}
+                                </div>
+                              </div>
+                              <a
+                                href={downloadUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                download={att.nome}
+                                style={{
+                                  background: isCliente ? '#4f46e5' : 'var(--card2)',
+                                  color: '#fff',
+                                  border: '1px solid rgba(255,255,255,0.2)',
+                                  padding: '3px 8px',
+                                  borderRadius: 4,
+                                  fontSize: 10,
+                                  fontWeight: 600,
+                                  textDecoration: 'none',
+                                  whiteSpace: 'nowrap',
+                                }}
+                              >
+                                ⬇️ Scarica
+                              </a>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            );
-          })
+                </div>
+              );
+            })
+          )}
+          <div ref={messagesEndRef} />
+        </div>
+
+        {showScrollBottom && (
+          <button
+            type="button"
+            onClick={() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })}
+            style={{
+              position: 'absolute',
+              bottom: 26,
+              right: 20,
+              background: 'var(--indigo)',
+              color: '#fff',
+              border: '1px solid rgba(255,255,255,0.25)',
+              borderRadius: 20,
+              padding: '6px 14px',
+              fontSize: 11,
+              fontWeight: 700,
+              boxShadow: '0 4px 14px rgba(0,0,0,0.4)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              zIndex: 10,
+            }}
+          >
+            <span>⬇️ Scorri all'ultimo</span>
+            {nuoviNonLettiCount > 0 && (
+              <span style={{ background: '#ef4444', color: '#fff', borderRadius: '50%', fontSize: 9, padding: '1px 5px', fontWeight: 800 }}>
+                {nuoviNonLettiCount}
+              </span>
+            )}
+          </button>
         )}
       </div>
 
