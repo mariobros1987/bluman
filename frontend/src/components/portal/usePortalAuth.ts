@@ -76,7 +76,7 @@ export function usePortalAuth({ loadPortalData, clientObj, setClientObj }: UsePo
     try {
       const res = await clientLoginApi(loginEmail.trim(), loginPassword);
       if (res && res.token) {
-        localStorage.setItem('bluman_jwt_token', res.token);
+        localStorage.setItem('bluman_portal_token', res.token);
         if (res.user) {
           localStorage.setItem('bluman_client_user', JSON.stringify(res.user));
         }
@@ -94,7 +94,7 @@ export function usePortalAuth({ loadPortalData, clientObj, setClientObj }: UsePo
   };
 
   const handleClientLogout = () => {
-    localStorage.removeItem('bluman_jwt_token');
+    localStorage.removeItem('bluman_portal_token');
     localStorage.removeItem('bluman_client_user');
     setIsAuthenticated(false);
   };
@@ -110,7 +110,7 @@ export function usePortalAuth({ loadPortalData, clientObj, setClientObj }: UsePo
     try {
       const sessione = await magicLoginApi(manualMagicToken.trim());
       if (!sessione?.token) throw new Error('Magic Token non valido o scaduto');
-      localStorage.setItem('bluman_jwt_token', sessione.token);
+      localStorage.setItem('bluman_portal_token', sessione.token);
       if (sessione.user) {
         localStorage.setItem('bluman_client_user', JSON.stringify(sessione.user));
       }

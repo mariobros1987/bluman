@@ -65,7 +65,9 @@ async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutM
     // a metà giornata ogni salvataggio tornava 401.
     const rinnovato = res.headers.get('X-Bluman-Token');
     if (rinnovato && typeof localStorage !== 'undefined') {
-      localStorage.setItem('bluman_jwt_token', rinnovato);
+      const isPortal = typeof window !== 'undefined' && window.location.pathname.startsWith('/portal');
+      const storageKey = isPortal ? 'bluman_portal_token' : 'bluman_jwt_token';
+      localStorage.setItem(storageKey, rinnovato);
     }
 
     if (res.status === 401 && typeof window !== 'undefined' && !url.includes('/auth/login') && !url.includes('/auth/magic-login') && !window.location.pathname.startsWith('/portal')) {
@@ -152,7 +154,14 @@ export function getAuthHeaders() {
   // stringa che non è un JWT: il backend non poteva verificarla, ne ricavava un ruolo
   // indefinito e trattava la richiesta come non autenticata. Meglio non mandare affatto
   // l'header: la risposta è un 401 esplicito invece di un comportamento inspiegabile.
-  const token = typeof localStorage !== 'undefined' ? localStorage.getItem('bluman_jwt_token') : null;
+  //
+  // Separazione token: nel portale cliente (/portal) leggiamo bluman_portal_token
+  // (con fallback a bluman_jwt_token per sessioni esistenti), così da evitare
+  // collisioni con la sessione dell'operatore/advisor.
+  const isPortal = typeof window !== 'undefined' && window.location.pathname.startsWith('/portal');
+  const token = typeof localStorage !== 'undefined'
+    ? (isPortal ? (localStorage.getItem('bluman_portal_token') || localStorage.getItem('bluman_jwt_token')) : localStorage.getItem('bluman_jwt_token'))
+    : null;
   const tenantId = getCurrentTenantId();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',

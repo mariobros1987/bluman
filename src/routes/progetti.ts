@@ -20,14 +20,21 @@ import { notificaStudio } from '../services/notificheService.js';
 // §16 — le percentuali e gli stati aggregati arrivano da qui, non dal frontend.
 import { arricchisciProgetti, calcolaAvanzamento, ricalcolaProgetto } from '../services/calcoloService.js';
 import { ricercaGlobale } from '../services/ricercaGlobaleService.js';
-import { STATI_MICROVOCE, STATI_PROGETTO, recordAudit } from '../util/serverHelpers.js';
+import { STATI_MICROVOCE, STATI_PROGETTO, recordAudit, clienteDellaRichiesta } from '../util/serverHelpers.js';
 import { livelloFirmaValido } from '../services/livelloFirmaService.js';
 import { CreaProgettoSchema, ConsuntivaOreSchema } from '../schemas/progetti.schema.js';
 
 // ─── PROGETTI, COMUNICAZIONI, TIMESHEET, CHECKLIST & ESECUZIONE ─────
 export async function registraRotteProgetti(server: FastifyInstance, app: AppPort): Promise<void> {
   // Comunicazioni Progetto API (Multicanale Ingestion)
-  server.get<{ Params: { id: string } }>('/progetti/:id/comunicazioni', async (req) => {
+  server.get<{ Params: { id: string } }>('/progetti/:id/comunicazioni', async (req, reply) => {
+    if (req.ruolo === 'cliente') {
+      const clienteId = clienteDellaRichiesta(req);
+      const proj: any = await app.getProgetto(req.params.id);
+      if (!proj || proj.clienteId !== clienteId) {
+        return reply.code(404).send({ errore: 'Progetto non trovato' });
+      }
+    }
     const msgs = await prisma.comunicazioneProgetto.findMany({
       where: { progettoId: req.params.id },
       orderBy: { createdAt: 'asc' },
@@ -56,6 +63,13 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
     Params: { id: string };
     Body: { direzioneDaSegnare?: 'entrata' | 'uscita' };
   }>('/progetti/:id/comunicazioni/segna-lette', async (req, reply) => {
+    if (req.ruolo === 'cliente') {
+      const clienteId = clienteDellaRichiesta(req);
+      const proj: any = await app.getProgetto(req.params.id);
+      if (!proj || proj.clienteId !== clienteId) {
+        return reply.code(404).send({ errore: 'Progetto non trovato' });
+      }
+    }
     const { direzioneDaSegnare } = req.body || {};
     const targetDirezione = direzioneDaSegnare || 'entrata';
     const adesso = new Date().toISOString();
@@ -99,6 +113,13 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
 
   server.post<{ Params: { id: string }; Body: Record<string, any> }>('/progetti/:id/comunicazioni', async (req, reply) => {
     const tenantId = req.tenantId;
+    if (req.ruolo === 'cliente') {
+      const clienteId = clienteDellaRichiesta(req);
+      const proj: any = await app.getProgetto(req.params.id);
+      if (!proj || proj.clienteId !== clienteId) {
+        return reply.code(404).send({ errore: 'Progetto non trovato' });
+      }
+    }
     const body = (req.body || {}) as Record<string, any>;
     try {
       const msg = await prisma.comunicazioneProgetto.create({
@@ -154,10 +175,25 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
     }
   });
 
-  server.get('/progetti', async (req) => {
+  server.get('/progetti', async (req, reply) => {
     const tenantId = req.tenantId;
+    // Il token del portale cliente (`ruolo: 'cliente'`) non deve vedere il parco
+    // progetti di TUTTI i clienti dello studio: fino a oggi la lista era filtrata
+    // solo per tenantId e la sessione del portale leggeva i fascicoli altrui.
+    // Il cliente vede ora solo il proprio fascicolo; l'operatore dello studio
+    // continua a vedere tutto il parco. Il cliente è ricavato dalla sessione
+    // (`client-<clienteId>`), lo stesso criterio che la firma elettronica usa
+    // da sempre per capire per conto di chi si sta agendo.
+    const where: { tenantId: string; clienteId?: string } = { tenantId };
+    if (req.ruolo === 'cliente') {
+      const clienteId = clienteDellaRichiesta(req);
+      if (!clienteId) {
+        return reply.code(400).send({ errore: 'Cliente non identificato nella sessione.' });
+      }
+      where.clienteId = clienteId;
+    }
     const projs = await prisma.progetto.findMany({
-      where: { tenantId },
+      where,
       include: {
         cliente: true,
         giurisdizionePrimaria: true,
@@ -251,6 +287,12 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
     const { id } = req.params;
     const dbProj: any = await app.getProgetto(id);
     if (!dbProj) return reply.code(404).send({ errore: `Progetto ${id} non trovato` });
+    if (req.ruolo === 'cliente') {
+      const clienteId = clienteDellaRichiesta(req);
+      if (!clienteId || dbProj.clienteId !== clienteId) {
+        return reply.code(404).send({ errore: `Progetto ${id} non trovato` });
+      }
+    }
     return reply.send({ ...dbProj, avanzamento: calcolaAvanzamento(dbProj) });
   });
 

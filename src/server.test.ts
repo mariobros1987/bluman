@@ -838,3 +838,61 @@ describe('server — DELETE /progetti/:id/moduli/:moduloId (§1.1bis)', () => {
     expect(res.statusCode).toBe(401);
   });
 });
+
+describe('server — isolamento progetti per ruolo cliente (Fix 4b)', () => {
+  const TENANT_TEST = '00000000-0000-0000-0000-000000000001';
+
+  it('GET /progetti rifiuta con 400 un token cliente privo di identita valida client-<clienteId>', async () => {
+    const { server } = nuovoServer();
+    const tokenClienteInvalido = signJwt({
+      userId: 'senza-prefisso-client',
+      tenantId: TENANT_TEST,
+      email: 'cliente@test.it',
+      ruolo: 'cliente',
+    });
+
+    const res = await server.inject({
+      method: 'GET',
+      url: '/progetti',
+      headers: { authorization: `Bearer ${tokenClienteInvalido}` },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().errore).toMatch(/Cliente non identificato/i);
+  });
+
+  it('GET /progetti/:id risponde 404 se un cliente tenta di accedere al progetto di un altro cliente', async () => {
+    const { server } = nuovoServer();
+    const tokenCliente1 = signJwt({
+      userId: 'client-cliente-1',
+      tenantId: TENANT_TEST,
+      email: 'cliente1@test.it',
+      ruolo: 'cliente',
+    });
+
+    const res = await server.inject({
+      method: 'GET',
+      url: '/progetti/proj-del-cliente-2',
+      headers: { authorization: `Bearer ${tokenCliente1}` },
+    });
+    // Sia che il progetto non esista o appartenga a un altro cliente, la risposta è un 404 sicuro
+    expect(res.statusCode).toBe(404);
+  });
+
+  it('GET /progetti/:id/comunicazioni risponde 404 se il progetto non appartiene al cliente', async () => {
+    const { server } = nuovoServer();
+    const tokenCliente1 = signJwt({
+      userId: 'client-cliente-1',
+      tenantId: TENANT_TEST,
+      email: 'cliente1@test.it',
+      ruolo: 'cliente',
+    });
+
+    const res = await server.inject({
+      method: 'GET',
+      url: '/progetti/proj-del-cliente-2/comunicazioni',
+      headers: { authorization: `Bearer ${tokenCliente1}` },
+    });
+    expect(res.statusCode).toBe(404);
+  });
+});
+

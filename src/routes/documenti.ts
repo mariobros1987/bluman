@@ -24,7 +24,7 @@ import { uploadDocumento, rifirmaUrlUpload } from '../services/storageService.js
 import { scanFileBuffer } from '../services/securityScanner.js';
 import { contestoTagDocumento, risolviTagDocumento, blocchiDaHtml, generaPdfDocumento, generaDocxDocumento } from '../services/generazioneDocumenti.js';
 import { notificaCliente } from '../services/notificheService.js';
-import { recordAudit, ipReale, nomeFileDaUrl } from '../util/serverHelpers.js';
+import { recordAudit, ipReale, nomeFileDaUrl, clienteDellaRichiesta } from '../util/serverHelpers.js';
 import { livelloFirmaValido, normalizzaLivelloFirma, type LivelloFirma } from '../services/livelloFirmaService.js';
 // §40 — la micro-voce indicata deve appartenere al progetto indicato: la decisione sta in un
 // service a parte, presidiato, e la usano sia questo upload sia PATCH /documenti/:id/collegamento.
@@ -52,8 +52,14 @@ export async function registraRotteDocumenti(server: FastifyInstance): Promise<v
 
       try {
         if (progettoId) {
-          const progetto = await prisma.progetto.findFirst({ where: { id: progettoId, tenantId }, select: { id: true } });
+          const progetto = await prisma.progetto.findFirst({ where: { id: progettoId, tenantId }, select: { id: true, clienteId: true } });
           if (!progetto) return reply.code(404).send({ errore: 'Progetto non trovato.' });
+          if (req.ruolo === 'cliente') {
+            const clienteId = clienteDellaRichiesta(req);
+            if (!clienteId || progetto.clienteId !== clienteId) {
+              return reply.code(404).send({ errore: 'Progetto non trovato.' });
+            }
+          }
         }
 
         const documenti = await prisma.documento.findMany({
@@ -185,6 +191,12 @@ export async function registraRotteDocumenti(server: FastifyInstance): Promise<v
     try {
       const progetto = await prisma.progetto.findFirst({ where: { id: progettoId, tenantId }, select: { id: true, clienteId: true, nome: true } });
       if (!progetto) return reply.code(404).send({ errore: 'Progetto non trovato.' });
+      if (req.ruolo === 'cliente') {
+        const clienteId = clienteDellaRichiesta(req);
+        if (!clienteId || progetto.clienteId !== clienteId) {
+          return reply.code(403).send({ errore: 'Non autorizzato a caricare documenti su questo progetto.' });
+        }
+      }
 
       // §40 — La micro-voce si verifica, non si scrive perché è arrivata. Prima il valore
       // ricevuto finiva sulla riga senza controlli: una tendina non aggiornata dopo il cambio

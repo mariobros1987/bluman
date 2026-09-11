@@ -21,6 +21,7 @@
 /** Chiavi esatte che sopravvivono. */
 const RESTANO_ESATTE = [
   'bluman_jwt_token',       // sessione operatore
+  'bluman_portal_token',    // sessione del portale cliente
   'bluman_token',           // sessione (nome storico)
   'bluman_user',            // utente collegato
   'bluman_client_user',     // sessione del portale cliente

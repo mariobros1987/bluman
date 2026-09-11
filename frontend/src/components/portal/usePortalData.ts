@@ -354,7 +354,7 @@ export function usePortalData({ token, setIsAuthenticated, setAccessoNegato }: U
       try {
         const sessione = await magicLoginApi(token);
         if (!sessione?.token) throw new Error('Magic Link non valido o scaduto');
-        localStorage.setItem('bluman_jwt_token', sessione.token);
+        localStorage.setItem('bluman_portal_token', sessione.token);
         if (sessione.user) {
           localStorage.setItem('bluman_client_user', JSON.stringify(sessione.user));
         }
@@ -376,7 +376,7 @@ export function usePortalData({ token, setIsAuthenticated, setAccessoNegato }: U
       setIsAuthenticated(true);
       setAccessoNegato(null);
     } else {
-      const existingToken = localStorage.getItem('bluman_jwt_token');
+      const existingToken = localStorage.getItem('bluman_portal_token') || localStorage.getItem('bluman_jwt_token');
       const savedClientUser = localStorage.getItem('bluman_client_user');
       const savedStudioUser = localStorage.getItem('bluman_user');
       if (existingToken && savedClientUser) {
