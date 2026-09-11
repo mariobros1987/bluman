@@ -1,11 +1,11 @@
 import { z } from 'zod';
 
 export const CreaClienteSchema = z.object({
-  nome: z.string().min(1, 'Nome cliente obbligatorio').max(255),
+  nome: z.string('Il nome del cliente è obbligatorio').min(1, 'Il nome del cliente è obbligatorio').max(255),
   tipo: z.enum(['individual', 'company'], {
     message: "Il tipo cliente è obbligatorio: 'individual' o 'company'",
   }),
-  email: z.string().email('Formato email non valido').optional().nullable(),
+  email: z.string().email('Formato email non valido').optional().nullable().or(z.literal('')),
   cellulare: z.string().optional().nullable(),
   canaleOtpPreferito: z.enum(['whatsapp', 'email', 'telegram']).optional().nullable(),
   password: z.string().min(6).optional().nullable(),

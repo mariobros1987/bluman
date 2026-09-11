@@ -22,6 +22,7 @@ import { arricchisciProgetti, calcolaAvanzamento, ricalcolaProgetto } from '../s
 import { ricercaGlobale } from '../services/ricercaGlobaleService.js';
 import { STATI_MICROVOCE, STATI_PROGETTO, recordAudit } from '../util/serverHelpers.js';
 import { livelloFirmaValido } from '../services/livelloFirmaService.js';
+import { CreaProgettoSchema } from '../schemas/progetti.schema.js';
 
 // ─── PROGETTI, COMUNICAZIONI, TIMESHEET, CHECKLIST & ESECUZIONE ─────
 export async function registraRotteProgetti(server: FastifyInstance, app: AppPort): Promise<void> {
@@ -134,8 +135,11 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
 
   server.post<{ Body: { clienteId: string; nome: string; giurisdizioneId?: string; giurisdizionePrimariaId?: string; dataInizio?: string; dataScadenza?: string } }>('/progetti', async (req, reply) => {
     const tenantId = req.tenantId;
-    const { clienteId, nome, giurisdizioneId, giurisdizionePrimariaId } = req.body;
-    if (!clienteId || !nome) return reply.code(400).send({ errore: 'clienteId e nome sono obbligatori' });
+    const parseResult = CreaProgettoSchema.safeParse(req.body || {});
+    if (!parseResult.success) {
+      return reply.code(400).send({ errore: parseResult.error.issues[0]?.message || 'clienteId e nome sono obbligatori' });
+    }
+    const { clienteId, nome, giurisdizioneId, giurisdizionePrimariaId } = parseResult.data;
 
     const jurId = giurisdizionePrimariaId || giurisdizioneId || null;
 

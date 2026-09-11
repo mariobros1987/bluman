@@ -23,6 +23,7 @@ import {
   baseUrlApplicazione,
   recordAudit,
 } from '../util/serverHelpers.js';
+import { CreaClienteSchema } from '../schemas/clienti.schema.js';
 
 // ─── DETTAGLIO CLIENTE & MAGIC LINK (coda dell'ex blocco ARTICOLI) ──
 export async function registraRotteClienti(server: FastifyInstance, app: AppPort): Promise<void> {
@@ -141,15 +142,11 @@ export async function registraRotteClienti(server: FastifyInstance, app: AppPort
 
   server.post<{ Body: Record<string, any> }>('/clienti', async (req, reply) => {
     const tenantId = req.tenantId;
-    const b = (req.body || {}) as Record<string, any>;
-    if (!b.nome) return reply.code(400).send({ errore: 'Il nome del cliente è obbligatorio' });
-
-    // `tipo` non ha un default: da persona fisica o società dipendono AML, regime
-    // fiscale e fatturazione. Cadere silenziosamente su 'company' significava
-    // classificare male il cliente senza che nessuno se ne accorgesse.
-    if (b.tipo !== 'individual' && b.tipo !== 'company') {
-      return reply.code(400).send({ errore: "Il tipo cliente è obbligatorio: 'individual' o 'company'" });
+    const parseResult = CreaClienteSchema.safeParse(req.body || {});
+    if (!parseResult.success) {
+      return reply.code(400).send({ errore: parseResult.error.issues[0]?.message || 'Dati cliente non validi' });
     }
+    const b = parseResult.data as Record<string, any>;
 
     const referentiObj = b.referentiJson
       ? (typeof b.referentiJson === 'string' ? JSON.parse(b.referentiJson) : b.referentiJson)

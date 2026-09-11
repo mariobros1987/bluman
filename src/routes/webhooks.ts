@@ -14,10 +14,91 @@
 // onRequest continuano ad applicarsi esattamente come prima (stesso contesto di
 // incapsulamento, nessuna nuova barriera).
 
+/**
+ * Webhook WhatsApp e Telegram: ingestion messaggi in ingresso dai canali di comunicazione.
+ *
+ * Entrambi i webhook sono pubblici (nessun JWT richiesto) perché i provider di messaggistica
+ * non inviano un token Bearer: la verifica dell'autenticità usa invece il token di verifica
+ * Meta (GET) e la signature HMAC-SHA256 del payload (POST, Telegram non usa firma ma è
+ * identificato dall'URL segreto del bot).
+ *
+ * §WA-MEDIA — Allegati WhatsApp in ingresso:
+ * Quando il cliente invia un documento o un'immagine, Meta consegna un `media_id` nel payload
+ * webhook. Per ottenerlo si chiama GET /v21.0/{media_id} per avere l'URL temporaneo firmato
+ * (valido ~5 min), poi si scarica il binario e lo si carica su storage tramite `uploadDocumento`
+ * già esistente. Il risultato viene salvato in `allegatiJson` della riga comunicazione.
+ * Se il download o l'upload falliscono, la comunicazione viene comunque registrata con
+ * `textBody` che descrive il tipo di media — nessun messaggio viene perso.
+ */
+
 import type { FastifyInstance } from 'fastify';
 import { prisma } from '../util/prismaClient.js';
 import { notificaStudio } from '../services/notificheService.js';
 import { confrontoTokenCostante } from '../util/password.js';
+import { uploadDocumento, mimeDaEstensione } from '../services/storageService.js';
+import { credenzialiCanali } from '../services/otpDispatch.js';
+
+/**
+ * Scarica un media WhatsApp (documento/immagine) dalla Meta Graph API e lo carica su storage.
+ *
+ * Restituisce `null` se il download fallisce: il chiamante registra ugualmente la
+ * comunicazione con il testo descrittivo, senza che il guasto blocchi l'ingestion.
+ */
+async function scaricaMediaWhatsapp(
+  mediaId: string,
+  accessToken: string,
+  nomeFile?: string,
+): Promise<{ url: string; nome: string; dimensione: string; mime: string } | null> {
+  try {
+    // Step 1: risolvi l'URL temporaneo firmato dal media_id
+    const metaRes = await fetch(`https://graph.facebook.com/v21.0/${encodeURIComponent(mediaId)}`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!metaRes.ok) {
+      console.warn(`[WA Media] Meta ha risposto ${metaRes.status} per media_id=${mediaId}`);
+      return null;
+    }
+    const metaJson: any = await metaRes.json();
+    const mediaUrl: string | undefined = metaJson.url;
+    const mimeType: string = metaJson.mime_type || 'application/octet-stream';
+    if (!mediaUrl) return null;
+
+    // Step 2: scarica il binario dall'URL firmato (valido ~5 min)
+    const binRes = await fetch(mediaUrl, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!binRes.ok) {
+      console.warn(`[WA Media] Download binario fallito (${binRes.status}) per ${mediaUrl}`);
+      return null;
+    }
+
+    const MAX_BYTES = 15 * 1024 * 1024;
+    const contentLength = Number(binRes.headers.get('content-length') || 0);
+    if (contentLength > MAX_BYTES) {
+      console.warn(`[WA Media] File troppo grande (${contentLength} B > 15 MB): ignorato.`);
+      return null;
+    }
+
+    const arrayBuf = await binRes.arrayBuffer();
+    if (arrayBuf.byteLength > MAX_BYTES) return null;
+
+    // Step 3: carica su Supabase Storage / fallback locale
+    const estensione = mimeType.split('/')[1]?.split(';')[0] || 'bin';
+    const nome = nomeFile || `wa_${mediaId.slice(-8)}.${estensione}`;
+    const base64 = `data:${mimeType};base64,${Buffer.from(arrayBuf).toString('base64')}`;
+    const esito = await uploadDocumento(nome, base64);
+
+    if (!esito.ok) {
+      console.warn(`[WA Media] uploadDocumento fallito per ${nome}`);
+      return null;
+    }
+
+    return { url: esito.url, nome, dimensione: esito.size, mime: mimeType };
+  } catch (err) {
+    console.warn('[WA Media] Errore imprevisto nel download media:', err);
+    return null;
+  }
+}
 
 // ─── WEBHOOK COMUNICAZIONI: META WHATSAPP & TELEGRAM ────────────────
 export async function registraRotteWebhooks(server: FastifyInstance): Promise<void> {
@@ -62,7 +143,13 @@ export async function registraRotteWebhooks(server: FastifyInstance): Promise<vo
         if (messages && messages.length > 0) {
           const msg = messages[0];
           const fromNumber = msg.from; // es. 393351234567
-          const textBody = msg.text?.body || (msg.type === 'image' ? '[Immagine ricevuta]' : msg.type === 'document' ? '[Documento PDF ricevuto]' : '[Messaggio multimediale]');
+          const isMedia = msg.type === 'image' || msg.type === 'document' || msg.type === 'video' || msg.type === 'audio';
+          const textBody = msg.text?.body
+            || (msg.type === 'image' ? '[Immagine ricevuta]'
+              : msg.type === 'document' ? `[Documento: ${msg.document?.filename || 'file'}]`
+              : msg.type === 'video' ? '[Video ricevuto]'
+              : msg.type === 'audio' ? '[Messaggio vocale]'
+              : '[Messaggio multimediale]');
 
           const cleanFrom = fromNumber.replace(/\D/g, '');
           const clienti = await prisma.cliente.findMany({ where: { tenantId } });
@@ -92,6 +179,35 @@ export async function registraRotteWebhooks(server: FastifyInstance): Promise<vo
           }
 
           if (activeProj) {
+            // §WA-MEDIA — Prova a scaricare l'allegato dalla Media API di Meta.
+            // Se manca il token o il download fallisce, la comunicazione viene registrata
+            // ugualmente con il testo descrittivo: nessun messaggio va perso.
+            let allegatiJson: string | null = null;
+            if (isMedia) {
+              const mediaId: string | undefined =
+                msg.document?.id || msg.image?.id || msg.video?.id || msg.audio?.id;
+              if (mediaId) {
+                // Recupera il token dello studio: il tenant potrebbe avere il proprio WA_ACCESS_TOKEN.
+                // Ricade sulla variabile d'ambiente globale se non è configurata a DB.
+                let accessToken: string | undefined;
+                try {
+                  const cred = await credenzialiCanali(tenantId);
+                  accessToken = cred.waAccessToken || process.env.WA_ACCESS_TOKEN || undefined;
+                } catch {
+                  accessToken = process.env.WA_ACCESS_TOKEN || undefined;
+                }
+                if (accessToken) {
+                  const nomefile = msg.document?.filename
+                    || msg.image?.id
+                    || undefined;
+                  const allegato = await scaricaMediaWhatsapp(mediaId, accessToken, nomefile);
+                  if (allegato) {
+                    allegatiJson = JSON.stringify([allegato]);
+                  }
+                }
+              }
+            }
+
             await prisma.comunicazioneProgetto.create({
               data: {
                 tenantId,
@@ -101,6 +217,7 @@ export async function registraRotteWebhooks(server: FastifyInstance): Promise<vo
                 destinatario: `BluMan WhatsApp Studio (+39 378 092 6461)`,
                 direzione: 'entrata',
                 testo: textBody,
+                ...(allegatiJson ? { allegatiJson } : {}),
               },
             });
             // Blocco 3 — il messaggio WhatsApp del cliente arriva allo studio in tempo reale.

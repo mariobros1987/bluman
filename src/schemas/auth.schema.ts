@@ -6,10 +6,10 @@ export const LoginSchema = z.object({
 });
 
 export const MagicLoginSchema = z.object({
-  token: z.string().min(10, 'Token non valido').max(500),
+  magicToken: z.string().min(10, 'Token non valido').max(500),
 });
 
 export const ChangePasswordSchema = z.object({
-  oldPassword: z.string().min(1, 'Vecchia password richiesta'),
+  currentPassword: z.string().optional(),
   newPassword: z.string().min(8, 'La nuova password deve contenere almeno 8 caratteri').max(256),
 });

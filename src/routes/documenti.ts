@@ -29,6 +29,7 @@ import { livelloFirmaValido, normalizzaLivelloFirma, type LivelloFirma } from '.
 // §40 — la micro-voce indicata deve appartenere al progetto indicato: la decisione sta in un
 // service a parte, presidiato, e la usano sia questo upload sia PATCH /documenti/:id/collegamento.
 import { decidiCollocazione } from '../services/collocazioneDocumento.js';
+import { GeneraDocumentoSchema } from '../schemas/documenti.schema.js';
 
 // ─── DOCUMENTI: FASCICOLO DOCUMENTALE DEL PROGETTO (§2.9) ───
 export async function registraRotteDocumenti(server: FastifyInstance): Promise<void> {
@@ -299,14 +300,26 @@ export async function registraRotteDocumenti(server: FastifyInstance): Promise<v
   }>('/documenti/genera', async (req, reply) => {
     const tenantId = req.tenantId;
     const userId = req.userId as string | undefined;
-    const { progettoId, microvoceProgettoId, modelloId, contenutoHtml, titolo, categoriaDoc, statoDoc, dataScadenzaDoc, livelloFirmaRichiesto } = req.body;
-
-    if (!progettoId) return reply.code(400).send({ errore: 'progettoId è obbligatorio.' });
-    if (!modelloId && !contenutoHtml) {
-      return reply.code(400).send({ errore: 'Indicare il modello (modelloId) o il contenuto HTML del template.' });
+    const parseResult = GeneraDocumentoSchema.safeParse(req.body || {});
+    if (!parseResult.success) {
+      return reply.code(400).send({ errore: parseResult.error.issues[0]?.message || 'Dati generazione documento non validi' });
     }
+    const {
+      progettoId,
+      microvoceProgettoId: requestedMicrovoceId,
+      modelloId: rawModelloId,
+      templateId,
+      contenutoHtml,
+      titolo,
+      categoriaDoc,
+      statoDoc,
+      dataScadenzaDoc,
+      livelloFirmaRichiesto,
+    } = parseResult.data;
+    const modelloId = rawModelloId || templateId || undefined;
+
     if (!userId) return reply.code(401).send({ errore: 'Sessione non valida.' });
-    if (livelloFirmaRichiesto !== undefined && !livelloFirmaValido(livelloFirmaRichiesto)) {
+    if (livelloFirmaRichiesto !== undefined && livelloFirmaRichiesto !== null && !livelloFirmaValido(livelloFirmaRichiesto)) {
       return reply.code(400).send({ errore: 'livelloFirmaRichiesto non valido: i valori ammessi sono ses, fea, feq.' });
     }
 
@@ -343,17 +356,17 @@ export async function registraRotteDocumenti(server: FastifyInstance): Promise<v
       // §40 — Come nell'upload: la micro-voce si verifica prima di generare. Il controllo sta
       // qui, PRIMA della produzione dei file, perché un PDF archiviato per la micro-voce
       // sbagliata poi non si cancella (Punto 3 piano gap: si può solo archiviare).
-      const microvoceGenerata = microvoceProgettoId
+      const microvoceGenerata = requestedMicrovoceId
         ? await prisma.microvoceProgetto.findFirst({
-            where: { id: microvoceProgettoId, tenantId },
+            where: { id: requestedMicrovoceId, tenantId },
             select: { id: true, nome: true, moduloProgetto: { select: { progettoId: true } } },
           })
         : null;
       const collocazioneGenerata = decidiCollocazione(
-        { progettoId, microvoceProgettoId },
+        { progettoId, microvoceProgettoId: requestedMicrovoceId },
         {
           progettoEsiste: true,
-          progettoDellaMicrovoce: microvoceProgettoId ? microvoceGenerata?.moduloProgetto.progettoId ?? undefined : undefined,
+          progettoDellaMicrovoce: requestedMicrovoceId ? microvoceGenerata?.moduloProgetto.progettoId ?? undefined : undefined,
         },
       );
       if (!collocazioneGenerata.ok) {

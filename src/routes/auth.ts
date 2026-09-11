@@ -19,19 +19,18 @@ import {
   recordAudit,
   senzaHash,
 } from '../util/serverHelpers.js';
+import { LoginSchema, MagicLoginSchema, ChangePasswordSchema } from '../schemas/auth.schema.js';
 
 // ─── AUTH ENDPOINTS & RBAC PERMISSIONS (§2bis, §23) ───────────────
 export async function registraRotteAuth(server: FastifyInstance): Promise<void> {
   server.post<{
     Body: { email?: string; password?: string };
   }>('/auth/login', { config: { rateLimit: { max: 5, timeWindow: '1 minute' } } }, async (req, reply) => {
-    const { email, password } = req.body || {};
-
-    if (!email || !password) {
-      return reply.code(400).send({ errore: 'Email e password sono obbligatorie' });
+    const result = LoginSchema.safeParse(req.body || {});
+    if (!result.success) {
+      return reply.code(400).send({ ok: false, errore: result.error.issues.map(i => i.message).join('; ') });
     }
-
-    const cleanEmail = email.toLowerCase().trim();
+    const { email: cleanEmail, password } = result.data;
 
     // §23 — l'unica fonte di verità per le credenziali è la tabella user: nessun utente
     // hardcoded, nessuna password accettata come jolly. Il primo super_admin nasce da
@@ -115,8 +114,6 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
   server.post<{
     Body: { magicToken: string };
   }>('/auth/magic-login', { config: { rateLimit: { max: 5, timeWindow: '1 minute' } } }, async (req, reply) => {
-    const magicToken = req.body?.magicToken;
-
     // §23 — il token si confronta con uno che abbiamo emesso e che non è scaduto.
     //
     // Prima della tabella `magic_link` qui bastava una stringa che iniziasse per `client_`,
@@ -130,9 +127,11 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
     // cercando. È il caso ammesso dalla regola 1, lo stesso della ricerca utente per email
     // al login, non una scorciatoia per aggirare le policy.
     const rifiuto = { errore: 'Magic Token non valido o scaduto' };
-    if (!magicToken || typeof magicToken !== 'string') {
+    const mlResult = MagicLoginSchema.safeParse(req.body || {});
+    if (!mlResult.success) {
       return reply.code(401).send(rifiuto);
     }
+    const { magicToken } = mlResult.data;
 
     const db = prismaAmministrativo();
     const link = await db.magicLink.findUnique({
@@ -302,15 +301,16 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
   server.post<{
     Body: { currentPassword?: string; newPassword?: string };
   }>('/auth/change-password', async (req, reply) => {
-    const { currentPassword, newPassword } = req.body || {};
+    const cpResult = ChangePasswordSchema.safeParse(req.body || {});
+    if (!cpResult.success) {
+      return reply.code(400).send({ ok: false, errore: cpResult.error.issues.map(i => i.message).join('; ') });
+    }
+    const { currentPassword, newPassword } = cpResult.data;
     const authUser = req.user;
     const userId = authUser?.userId;
 
     if (!userId) {
       return reply.code(401).send({ errore: 'Non autenticato' });
-    }
-    if (!newPassword || newPassword.length < 8) {
-      return reply.code(400).send({ errore: 'La nuova password deve contenere almeno 8 caratteri.' });
     }
 
     try {

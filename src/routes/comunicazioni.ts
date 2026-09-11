@@ -30,6 +30,7 @@ import { inviaEmail } from '../services/emailRelay.js';
 import { credenzialiCanali } from '../services/otpDispatch.js';
 import { inviaTestoWhatsapp, inviaTemplateWhatsapp } from '../services/whatsappService.js';
 import { leggiPostaInArrivo, type CredenzialiImap } from '../services/imapInbound.js';
+import { leggiAllegatiImap } from '../services/imapflowAllegati.js';
 
 /** Il testo battuto dall'operatore diventa HTML senza che `<` o `&` rompano il messaggio. */
 function testoInHtml(testo: string): string {
@@ -190,6 +191,40 @@ export async function registraRotteComunicazioni(server: FastifyInstance): Promi
         return reply.code(400).send({ ok: false, email: [], errore: esito.errore });
       }
       return reply.send({ ok: true, email: esito.email, via: esito.via });
+    },
+  );
+
+  /**
+   * Legge le ultime email con allegati via `imapflow` e li carica su storage.
+   *
+   * Rotta separata da `email-in-arrivo` perché il download allegati è pesante (fino a 15 MB
+   * per file, fino a 5 email) e non deve rallentare il polling del testo semplice. Il
+   * frontend la chiama solo quando l'operatore preme «Sincronizza allegati email»: non è
+   * automatica ogni 60 secondi come il polling del testo.
+   *
+   * La risposta include gli URL firmati già pronti da mostrare in `ComunicazioniTab.tsx`
+   * nel blocco allegati della timeline (righe 581-620): nessuna logica aggiuntiva lato
+   * client necessaria.
+   *
+   * Il parser grezzo di `imapInbound.ts` non viene modificato: continua a gestire il
+   * testo semplice senza regressioni.
+   */
+  server.post<{ Body: { clientEmail?: string; limite?: number } }>(
+    '/comunicazioni/poll-imap-allegati',
+    async (req, reply) => {
+      const tenantId = req.tenantId as string;
+      const body = req.body || {};
+
+      const imap = await credenzialiImap(tenantId);
+      const esito = await leggiAllegatiImap(imap, {
+        clientEmail: (body.clientEmail || '').trim() || undefined,
+        limite: Number(body.limite) || undefined,
+      });
+
+      if (!esito.ok) {
+        return reply.code(400).send({ ok: false, email: [], errore: esito.errore });
+      }
+      return reply.send({ ok: true, email: esito.email });
     },
   );
 }

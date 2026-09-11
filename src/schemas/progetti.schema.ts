@@ -1,8 +1,9 @@
 import { z } from 'zod';
 
 export const CreaProgettoSchema = z.object({
-  clienteId: z.string().min(1, 'Cliente obbligatorio'),
-  nome: z.string().min(1, 'Nome progetto obbligatorio').max(255),
+  clienteId: z.string('clienteId e nome sono obbligatori').min(1, 'clienteId e nome sono obbligatori'),
+  nome: z.string('clienteId e nome sono obbligatori').min(1, 'clienteId e nome sono obbligatori').max(255),
+  giurisdizioneId: z.string().optional().nullable(),
   giurisdizionePrimariaId: z.string().optional().nullable(),
   dataInizio: z.string().or(z.date()).optional().nullable(),
   dataScadenza: z.string().or(z.date()).optional().nullable(),
