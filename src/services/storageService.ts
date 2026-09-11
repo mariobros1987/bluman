@@ -108,6 +108,12 @@ export async function uploadDocumento(filename: string, contentBase64: string): 
         const publicUrl = `${supabaseUrl}/storage/v1/object/public/bluman-documents/${safeFilename}`;
         return { ok: true, url: publicUrl, name: filename, size: sizeKb };
       }
+      // Regola 5: una risposta non-ok non solleva eccezione, quindi prima di questa
+      // riga finiva nel fallback locale in totale silenzio — per tutto agosto
+      // Supabase Storage ha fallito così, senza che nessun log dicesse perché.
+      console.warn(
+        `[Storage Warning] Supabase storage ha risposto ${response.status} per ${safeFilename}: uso local storage fallback.`,
+      );
     } catch (err) {
       console.warn('[Storage Warning] Supabase storage non disponibile, uso local storage fallback:', err);
     }

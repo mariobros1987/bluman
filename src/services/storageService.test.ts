@@ -1,5 +1,13 @@
-import { describe, it, expect } from 'vitest';
-import { mimeDaEstensione, nomeFileSicuro, nomeFileValido } from './storageService.js';
+import fs from 'fs';
+import path from 'path';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  CARTELLA_UPLOADS,
+  mimeDaEstensione,
+  nomeFileSicuro,
+  nomeFileValido,
+  uploadDocumento,
+} from './storageService.js';
 
 // §21 — il MIME dichiarato a Supabase Storage segue l'estensione reale del file:
 // prima era `application/pdf` per ogni upload e le anteprime dei formati diversi
@@ -68,5 +76,58 @@ describe('coppia scrittura/lettura dei nomi file', () => {
     // scritto resterebbe irrecuperabile.
     expect(nomeFileSicuro('../../etc/passwd')).not.toContain('..');
     expect(nomeFileSicuro('report..finale.pdf')).not.toContain('..');
+  });
+});
+
+// Regola 5: nessun ripiego in silenzio. Per tutto agosto Supabase Storage ha risposto
+// non-ok e `uploadDocumento` scivolava nel fallback locale senza una riga di log: i
+// file finivano sul disco dell'API e nessuno sapeva perché il bucket restasse vuoto.
+// Questo test blinda il warn che ora accompagna quel passaggio — senza status HTTP nei
+// log, l'incidente si ripresenterebbe uguale a sé stesso.
+describe('uploadDocumento — il fallback locale non è più silenzioso', () => {
+  let warnSpy: ReturnType<typeof vi.spyOn>;
+  let fileScritto: string | null = null;
+
+  beforeEach(() => {
+    // Chiavi configurate ma Storage che risponde non-ok: la forma esatta del guasto
+    // di agosto, che non solleva eccezione e prima cadeva nel ripiego senza dirlo.
+    vi.stubEnv('SUPABASE_URL', 'https://test-supabase.local');
+    vi.stubEnv('SUPABASE_SERVICE_KEY', 'chiave-di-test');
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 507 }));
+    warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    // Il fallback scrive davvero su disco: portiamo via il file di prova e ripristiniamo
+    // env, fetch e spy, così nessun altro test vede il mondo di questo.
+    if (fileScritto) {
+      fs.rmSync(path.join(CARTELLA_UPLOADS, fileScritto), { force: true });
+      fileScritto = null;
+    }
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('quando Storage risponde non-ok, lo dice nei log e il file va sul fallback locale', async () => {
+    const contenuto = Buffer.from('contenuto di prova per il fallback');
+    const risultato = await uploadDocumento('test-fallback.pdf', contenuto.toString('base64'));
+
+    // Il ripiego funziona come sempre: URL relativo già firmato e nome d'origine preservato.
+    expect(risultato.ok).toBe(true);
+    expect(risultato.name).toBe('test-fallback.pdf');
+    expect(risultato.url).toMatch(/^\/uploads\/\d+_test-fallback\.pdf\?firma=[0-9a-f]{64}&scad=\d+$/);
+
+    // La parte nuova: il warn onesto, con lo status HTTP e il nome del file.
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('507'));
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('test-fallback.pdf'));
+
+    // Il file è caduto davvero sul disco, con i byte giusti — non basta l'URL perché sia vero.
+    // (Il toMatch sopra garantisce la forma dell'URL: la catena opzionale non è mai vuota qui.)
+    const nome = risultato.url.split('/uploads/')[1]?.split('?')[0] ?? '';
+    fileScritto = nome;
+    const percorso = path.join(CARTELLA_UPLOADS, nome);
+    expect(fs.existsSync(percorso)).toBe(true);
+    expect(fs.readFileSync(percorso).equals(contenuto)).toBe(true);
   });
 });
