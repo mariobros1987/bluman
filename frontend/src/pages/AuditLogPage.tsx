@@ -1,5 +1,9 @@
 import { useState, useEffect } from 'react';
 import { fetchAuditLogsApi } from '../api/client';
+import { Paginatore } from '../components/ui/Paginatore';
+import { isRispostaPaginata, type MetaPaginazione } from '../api/paginazione';
+
+const META_INIZIALE: MetaPaginazione = { page: 1, limit: 50, totale: 0, pagine: 0 };
 
 export interface AuditEntry {
   id: string;
@@ -21,90 +25,37 @@ export function AuditLogPage() {
   const currentUser = currentUserStr ? JSON.parse(currentUserStr) : { ruolo: 'super_admin', tenantId: '00000000-0000-0000-0000-000000000001' };
   const isSuperAdmin = currentUser.ruolo === 'super_admin';
 
-  const [logs, setLogs] = useState<AuditEntry[]>([
-    {
-      id: 'log-001',
-      tenantId: '00000000-0000-0000-0000-000000000001',
-      tenantName: 'Bluecode Ltd (Malta HQ)',
-      userEmail: 'joe@bluecode.advisory',
-      userNome: 'Joe Disabato',
-      ruolo: 'advisor',
-      azione: 'DOCUMENTO_CARICATO',
-      categoria: 'DOCUMENTI',
-      entita: 'Accordo_Firma_Cliente_HoldingBeta.pdf',
-      dettagli: 'Caricato documento contrattuale con richiesta firma del cliente (OTP)',
-      ipAddress: '83.211.12.94',
-      dataOra: '15/08/2026 00:45:12',
-    },
-    {
-      id: 'log-002',
-      tenantId: '00000000-0000-0000-0000-000000000001',
-      tenantName: 'Bluecode Ltd (Malta HQ)',
-      userEmail: 'joe@bluecode.advisory',
-      userNome: 'Joe Disabato',
-      ruolo: 'advisor',
-      azione: 'FATTURA_EMESSA',
-      categoria: 'FATTURAZIONE',
-      entita: 'Fattura FT-2026-001 (€ 5.000,00)',
-      dettagli: 'Generato XML FatturaPA e preparato per invio manuale a SdI (codice destinatario SUBM70N)',
-      ipAddress: '83.211.12.94',
-      dataOra: '15/08/2026 00:30:40',
-    },
-    {
-      id: 'log-003',
-      tenantId: '00000000-0000-0000-0000-000000000001',
-      tenantName: 'Bluecode Ltd (Malta HQ)',
-      userEmail: 'operator@bluecode.advisory',
-      userNome: 'Francesca Disabato',
-      ruolo: 'collaboratore_interno',
-      azione: 'ORE_CONSUNTIVATE',
-      categoria: 'PROGETTO',
-      entita: 'Microvoce: Deposito marchio EUIPO',
-      dettagli: 'Registrate +3.5 ore di consuntivo su progetto IP Holding Beta',
-      ipAddress: '151.48.90.10',
-      dataOra: '14/08/2026 18:20:05',
-    },
-    {
-      id: 'log-004',
-      tenantId: '00000000-0000-0000-0000-000000000001',
-      tenantName: 'Bluecode Ltd (Malta HQ)',
-      userEmail: 'client@holdingbeta.advisory',
-      userNome: 'Ing. Roberto Rossi (Cliente)',
-      ruolo: 'cliente',
-      azione: 'FIRMA_ENGAGEMENT_LETTER',
-      categoria: 'DOCUMENTI',
-      entita: 'Engagement Letter — Holding Beta S.r.l.',
-      dettagli: 'Firma con OTP verificata accettata dal Portale Cliente con tracciamento IP e User-Agent',
-      ipAddress: '2.234.190.44',
-      dataOra: '14/08/2026 16:10:00',
-    },
-    {
-      id: 'log-005',
-      tenantId: '00000000-0000-0000-0000-000000000002',
-      tenantName: 'Advisory Italia S.r.l.',
-      userEmail: 'admin@bluecode.advisory',
-      userNome: 'Super Admin System',
-      ruolo: 'super_admin',
-      azione: 'TENANT_CREATO',
-      categoria: 'TENANT',
-      entita: 'Tenant: Swiss Wealth Management SA',
-      dettagli: 'Istanziato nuovo tenant studio con isolamento PostgreSQL Row-Level Security',
-      ipAddress: '93.35.100.12',
-      dataOra: '14/08/2026 14:00:22',
-    },
-  ]);
-
+  const [logs, setLogs] = useState<AuditEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [errore, setErrore] = useState('');
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(50);
+  const [meta, setMeta] = useState<MetaPaginazione>(META_INIZIALE);
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchDebounced, setSearchDebounced] = useState('');
   const [filterRuolo, setFilterRuolo] = useState<string>('TUTTI');
   const [filterCat, setFilterCat] = useState<string>('TUTTI');
 
   useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      setPage(1);
+      setSearchDebounced(searchQuery.trim());
+    }, 300);
+    return () => window.clearTimeout(timeout);
+  }, [searchQuery]);
+
+  useEffect(() => {
     const loadAuditLogs = async () => {
-      const dbLogs = await fetchAuditLogsApi();
-      if (dbLogs && Array.isArray(dbLogs) && dbLogs.length > 0) {
-        setLogs(dbLogs.map((l: any) => {
+      setLoading(true);
+      setErrore('');
+      try {
+        const risposta = await fetchAuditLogsApi({ page, limit, search: searchDebounced, sortBy: 'createdAt', sortOrder: 'desc' });
+        if (!isRispostaPaginata<any>(risposta)) throw new Error('Risposta audit log non valida');
+        setMeta(risposta.meta);
+        if (risposta.meta.pagine > 0 && page > risposta.meta.pagine) setPage(risposta.meta.pagine);
+        setLogs(risposta.data.map((l: any) => {
           const az = (l.azione || '').toUpperCase();
-          let cat: 'AUTH' | 'PROGETTO' | 'DOCUMENTI' | 'FATTURAZIONE' | 'KYC' | 'PERMESSI' | 'TENANT' = 'DOCUMENTI';
+          let cat: AuditEntry['categoria'] = 'DOCUMENTI';
           if (az.includes('FATTURA') || az.includes('INCASSO') || az.includes('SDI') || az.includes('PRIMA_NOTA') || az.includes('CONTRATTO')) {
             cat = 'FATTURAZIONE';
           } else if (az.includes('PROGETTO') || az.includes('ORE') || az.includes('MODULO') || az.includes('PREVENTIVO')) {
@@ -126,22 +77,19 @@ export function AuditLogPage() {
             dataOra: l.createdAt ? new Date(l.createdAt).toLocaleString('it-IT') : l.dataOra,
           };
         }));
+      } catch (err) {
+        setLogs([]);
+        setErrore(err instanceof Error ? err.message : 'Errore caricamento audit log');
+      } finally {
+        setLoading(false);
       }
     };
     loadAuditLogs();
-  }, []);
+  }, [page, limit, searchDebounced]);
 
-  // Filtra per tenant (SuperAdmin vede tutti i tenant, gli altri vedono SOLO il proprio tenant)
-  const tenantFilteredLogs = logs.filter(l => {
-    if (isSuperAdmin) return true;
-    return l.tenantId === currentUser.tenantId;
-  });
-
-  const filteredLogs = tenantFilteredLogs.filter(l => {
-    const matchSearch = l.userNome.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                        l.azione.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                        l.entita.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                        l.dettagli.toLowerCase().includes(searchQuery.toLowerCase());
+  // L'endpoint è già isolato sul tenant della sessione; questi filtri agiscono sulla pagina corrente.
+  const filteredLogs = logs.filter(l => {
+    const matchSearch = true;
     const matchRuolo = filterRuolo === 'TUTTI' || l.ruolo === filterRuolo;
     const matchCat = filterCat === 'TUTTI' || l.categoria === filterCat;
     return matchSearch && matchRuolo && matchCat;
@@ -177,7 +125,7 @@ export function AuditLogPage() {
           </div>
           <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 3 }}>
             Tracciamento in tempo reale di tutte le azioni eseguite da Advisors, Operatori e Clienti nello Studio.
-            {isSuperAdmin ? ' (Vista globale SuperAdmin)' : ' (Isolato per il tuo Studio)'}
+            {' (Vista isolata sul tenant corrente)'}
           </div>
         </div>
 
@@ -197,16 +145,16 @@ export function AuditLogPage() {
             style={{ width: 260, fontSize: 12 }}
           />
 
-          <select value={filterRuolo} onChange={e => setFilterRuolo(e.target.value)} style={{ padding: 8, fontSize: 12 }}>
-            <option value="TUTTI">Tutti i Ruoli Attore</option>
+          <select value={filterRuolo} onChange={e => { setFilterRuolo(e.target.value); setPage(1); }} style={{ padding: 8, fontSize: 12 }}>
+            <option value="TUTTI">Tutti i Ruoli Attore (pagina corrente)</option>
             <option value="super_admin">👑 Super Admin</option>
             <option value="advisor">👨‍💼 Advisor Senior</option>
             <option value="collaboratore_interno">👷 Operatore Studio</option>
             <option value="cliente">🔑 Cliente</option>
           </select>
 
-          <select value={filterCat} onChange={e => setFilterCat(e.target.value)} style={{ padding: 8, fontSize: 12 }}>
-            <option value="TUTTI">Tutte le Categorie Azione</option>
+          <select value={filterCat} onChange={e => { setFilterCat(e.target.value); setPage(1); }} style={{ padding: 8, fontSize: 12 }}>
+            <option value="TUTTI">Tutte le Categorie Azione (pagina corrente)</option>
             <option value="DOCUMENTI">📄 Documenti & File</option>
             <option value="FATTURAZIONE">💶 Fatturazione & SDI</option>
             <option value="PROGETTO">🗂 Progetti & Ore</option>
@@ -215,13 +163,16 @@ export function AuditLogPage() {
         </div>
 
         <div style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600 }}>
-          {filteredLogs.length} Eventi Tracciati
+          {meta.totale} Eventi Tracciati
         </div>
       </div>
 
       {/* Log Table */}
       <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 16, padding: 20 }}>
-        <div style={{ overflowX: 'auto' }}>
+        {errore && <div style={{ padding: 12, marginBottom: 12, borderRadius: 8, background: '#7f1d1d', color: '#fecaca' }}>{errore}</div>}
+        {loading ? (
+          <div style={{ padding: 24, textAlign: 'center', color: 'var(--muted)' }}>Caricamento registro audit...</div>
+        ) : <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
             <thead>
               <tr style={{ borderBottom: '1px solid var(--border)', color: 'var(--muted)', textAlign: 'left' }}>
@@ -285,7 +236,12 @@ export function AuditLogPage() {
               )}
             </tbody>
           </table>
-        </div>
+        </div>}
+        <Paginatore
+          meta={meta}
+          onPageChange={setPage}
+          onLimitChange={(nuovoLimite) => { setLimit(nuovoLimite); setPage(1); }}
+        />
       </div>
     </div>
   );

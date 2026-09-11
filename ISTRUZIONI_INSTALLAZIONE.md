@@ -263,6 +263,18 @@ clienti visibili** con un tenant inesistente.
 
 ---
 
+### Railway Cron per le notifiche quotidiane (configurazione prevista)
+
+Le notifiche in-app sulle scadenze dovranno essere generate da un **servizio Railway Cron separato** dal processo web. Non avviare timer nel server Fastify: restart, sleep e repliche potrebbero perdere o duplicare esecuzioni.
+
+Il worker tenant-scoped è disponibile in `src/services/cronService.ts`; il runner CLI è `src/scripts/runDailyNotificationCron.ts` e si avvia con `npm run cron:notifiche`. Il comando elabora tutti i tenant attivi e può creare notifiche persistenti: provarlo su un ambiente controllato prima di abilitarne la pianificazione in produzione.
+
+Configurare un secondo servizio dallo stesso repository con le medesime `DATABASE_URL`, `DIRECT_URL` e `ADMIN_DATABASE_URL` del backend, impostare come start command `npm run cron:notifiche` e pianificarlo ogni giorno alle **08:00 Europe/Rome**. Railway usa espressioni cron in UTC: verificare l’orario UTC desiderato quando cambia l’ora legale.
+
+Il runner amministrativo legge soltanto i tenant con `stato: 'attivo'`; ogni tenant viene poi elaborato tramite il client Prisma condiviso dentro un contesto RLS esplicito. Se almeno un tenant fallisce, il comando termina con exit code non zero e Railway registra l’esecuzione come fallita. Le notifiche prodotte sono persistite in-app; la futura coda email/WhatsApp con retry è un’attività separata e non va considerata già implementata.
+
+---
+
 ## 6. Avanzamento dei Progetti: Verifica e Ricalcolo (§16)
 
 Stati e percentuali non li decide più il frontend. `GET /progetti` e `GET /progetti/:id`

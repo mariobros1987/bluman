@@ -18,6 +18,17 @@ import {
 } from '../api/client';
 import { fmt } from '../utils';
 import { EsportaFascicoloCommercialistaModal } from '../components/contabilita/EsportaFascicoloCommercialistaModal';
+import { Paginatore } from '../components/ui/Paginatore';
+import { isRispostaPaginata, type MetaPaginazione } from '../api/paginazione';
+
+const META_INIZIALE: MetaPaginazione = { page: 1, limit: 50, totale: 0, pagine: 0 };
+interface RiepilogoFatture {
+  totaleEmessoCentesimi: number;
+  totaleIncassatoCentesimi: number;
+  totaleSospesoCentesimi: number;
+  totaleNoteCreditoCentesimi: number;
+}
+const RIEPILOGO_INIZIALE: RiepilogoFatture = { totaleEmessoCentesimi: 0, totaleIncassatoCentesimi: 0, totaleSospesoCentesimi: 0, totaleNoteCreditoCentesimi: 0 };
 
 export function InvoicesPage() {
   const navigate = useNavigate();
@@ -26,8 +37,14 @@ export function InvoicesPage() {
   const [progetti, setProgetti] = useState<any[]>([]);
   const [contiBancari, setContiBancari] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [errore, setErrore] = useState('');
+  const [meta, setMeta] = useState<MetaPaginazione>(META_INIZIALE);
+  const [riepilogo, setRiepilogo] = useState<RiepilogoFatture>(RIEPILOGO_INIZIALE);
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(50);
   const [filterStato, setFilterStato] = useState('tutte');
   const [searchTerm, setSearchTerm] = useState('');
+  const [searchDebounced, setSearchDebounced] = useState('');
   const [showExportFascicoloZipModal, setShowExportFascicoloZipModal] = useState(false);
 
   // Modali
@@ -78,18 +95,32 @@ export function InvoicesPage() {
 
   const loadData = async () => {
     setLoading(true);
+    setErrore('');
     try {
       const [invData, clData, prData, cbData] = await Promise.all([
-        fetchTutteFattureStudioApi(),
+        fetchTutteFattureStudioApi({
+          page,
+          limit,
+          search: searchDebounced,
+          sortBy: 'numeroProgressivoSerie',
+          sortOrder: 'desc',
+          stato: filterStato === 'tutte' ? undefined : filterStato,
+        }),
         fetchClienti(),
         fetchProgetti(),
         fetchContiBancariApi(),
       ]);
-      setInvoices(invData || []);
+      if (!isRispostaPaginata<any>(invData)) throw new Error('Risposta fatture non valida');
+      setInvoices(invData.data);
+      setMeta(invData.meta);
+      if (invData.meta.pagine > 0 && page > invData.meta.pagine) setPage(invData.meta.pagine);
+      setRiepilogo((invData.riepilogo as RiepilogoFatture | undefined) || RIEPILOGO_INIZIALE);
       setClienti(clData || []);
       setProgetti(prData || []);
       setContiBancari(cbData || []);
     } catch (err) {
+      setErrore(err instanceof Error ? err.message : 'Errore caricamento registro fatture');
+      setInvoices([]);
       console.warn('Errore caricamento registro fatture:', err);
     } finally {
       setLoading(false);
@@ -97,8 +128,16 @@ export function InvoicesPage() {
   };
 
   useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      setPage(1);
+      setSearchDebounced(searchTerm.trim());
+    }, 300);
+    return () => window.clearTimeout(timeout);
+  }, [searchTerm]);
+
+  useEffect(() => {
     loadData();
-  }, []);
+  }, [page, limit, searchDebounced, filterStato]);
 
   // Calcolo Totali Real-Time nel Form
   const calcolaTotaliForm = () => {
@@ -327,17 +366,12 @@ export function InvoicesPage() {
   };
 
   // Metriche
-  const totalEmessoCent = invoices.filter((f) => f.tipoDocumento === 'fattura' && f.stato !== 'bozza').reduce((acc, f) => acc + (f.totaleDocumentoCentesimi || 0), 0);
-  const totalIncassatoCent = invoices.filter((f) => f.tipoDocumento === 'fattura' && f.stato === 'incassata').reduce((acc, f) => acc + (f.totaleDocumentoCentesimi || 0), 0);
-  const totalSospesoCent = invoices.filter((f) => f.tipoDocumento === 'fattura' && f.stato === 'emessa').reduce((acc, f) => acc + (f.totaleDocumentoCentesimi || 0), 0);
-  const totalNcCent = invoices.filter((f) => f.tipoDocumento === 'nota_credito').reduce((acc, f) => acc + (f.totaleDocumentoCentesimi || 0), 0);
+  const totalEmessoCent = riepilogo.totaleEmessoCentesimi;
+  const totalIncassatoCent = riepilogo.totaleIncassatoCentesimi;
+  const totalSospesoCent = riepilogo.totaleSospesoCentesimi;
+  const totalNcCent = riepilogo.totaleNoteCreditoCentesimi;
 
-  const filteredInvoices = invoices.filter((f) => {
-    if (filterStato !== 'tutte' && f.stato !== filterStato) return false;
-    const searchString = `${f.numero} ${f.cliente?.nome || ''} ${f.progetto?.nome || ''}`.toLowerCase();
-    if (searchTerm && !searchString.includes(searchTerm.toLowerCase())) return false;
-    return true;
-  });
+  const filteredInvoices = invoices;
 
   return (
     <div style={{ padding: '2rem' }}>
@@ -474,7 +508,7 @@ export function InvoicesPage() {
           />
           <select
             value={filterStato}
-            onChange={(e) => setFilterStato(e.target.value)}
+            onChange={(e) => { setFilterStato(e.target.value); setPage(1); }}
             style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', width: 180 }}
           >
             <option value="tutte">Tutti gli stati</option>
@@ -485,6 +519,7 @@ export function InvoicesPage() {
           </select>
         </div>
 
+        {errore && <div style={{ padding: 12, marginBottom: 12, borderRadius: 8, background: '#7f1d1d', color: '#fecaca' }}>{errore}</div>}
         {loading ? (
           <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted)' }}>Caricamento registro fatture dal database...</div>
         ) : (
@@ -654,6 +689,11 @@ export function InvoicesPage() {
             </tbody>
           </table>
         )}
+        <Paginatore
+          meta={meta}
+          onPageChange={setPage}
+          onLimitChange={(nuovoLimite) => { setLimit(nuovoLimite); setPage(1); }}
+        />
       </div>
 
       {/* MODAL CREAZIONE FATTURA / BOZZA */}

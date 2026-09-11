@@ -1,4 +1,5 @@
 import { API_BASE, apiFetch, getAuthHeaders, leggiErroreApi } from './http';
+import { queryPaginazione, type ParametriListaPaginata } from './paginazione';
 
 export interface FatturaPortale {
   id: string;
@@ -50,12 +51,13 @@ export async function emettiFatturaApi(input: {
   return await res.json();
 }
 
-export async function fetchTutteFattureStudioApi() {
+export async function fetchTutteFattureStudioApi(parametri?: ParametriListaPaginata) {
   try {
-    const res = await apiFetch(`${API_BASE}/invoices`, { headers: getAuthHeaders() });
-    if (!res.ok) throw new Error('Errore recupero fatture studio');
+    const res = await apiFetch(`${API_BASE}/invoices${queryPaginazione(parametri)}`, { headers: getAuthHeaders() });
+    if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore recupero fatture studio'));
     return await res.json();
   } catch (err) {
+    if (parametri) throw err;
     console.warn('Fetch tutte le fatture API fallback', err);
     return [];
   }
@@ -299,8 +301,8 @@ export async function importFromTimesheetApi(progettoId: string, operatoreId?: s
   return await res.json();
 }
 
-export async function fetchPrimaNotaApi() {
-  const res = await apiFetch(`${API_BASE}/prima-nota`, { headers: getAuthHeaders() });
+export async function fetchPrimaNotaApi(parametri?: ParametriListaPaginata) {
+  const res = await apiFetch(`${API_BASE}/prima-nota${queryPaginazione(parametri)}`, { headers: getAuthHeaders() });
   if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore lettura prima nota'));
   return await res.json();
 }

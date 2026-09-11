@@ -242,7 +242,7 @@ non una tabella figlia filtrata per `tenant_id`, quindi le policy non le danno p
 `src/server.test.ts` verifica, rotta per rotta, 401 senza token e non-401 con un token
 valido; `src/gerarchiaRuoli.test.ts` presidia la gerarchia dei ruoli; `src/accessoCliente.test.ts`
 presidia il Magic Link e `GET /uploads/:filename`; `src/calcoloService.test.ts` presidia il
-motore di stato e ciò che il ricalcolo scrive a database (`npx vitest run` → 18 file, 226 test).
+motore di stato e ciò che il ricalcolo scrive a database (`npm test` → 51 file, 645 test nella verifica completa del 2026-09-11).
 
 ### 🔑 Il portale cliente non si apre con una stringa qualsiasi
 

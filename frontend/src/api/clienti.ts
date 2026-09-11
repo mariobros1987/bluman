@@ -1,11 +1,13 @@
 import { API_BASE, apiFetch, getAuthHeaders, leggiErroreApi } from './http';
+import { queryPaginazione, type ParametriListaPaginata } from './paginazione';
 
-export async function fetchClienti() {
+export async function fetchClienti(parametri?: ParametriListaPaginata) {
   try {
-    const res = await apiFetch(`${API_BASE}/clienti`, { headers: getAuthHeaders() });
-    if (!res.ok) throw new Error('Errore nel recupero clienti');
+    const res = await apiFetch(`${API_BASE}/clienti${queryPaginazione(parametri)}`, { headers: getAuthHeaders() });
+    if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore nel recupero clienti'));
     return await res.json();
   } catch (err) {
+    if (parametri) throw err;
     console.warn('Backend API offline', err);
     return null;
   }

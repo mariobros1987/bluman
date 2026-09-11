@@ -9,6 +9,10 @@ import { useTeamMembers } from '../hooks/useTeamMembers';
 import { NewProjectWizard } from '../components/NewProjectWizard';
 import { getTenantStorageKey, getTenantSeedData, getCurrentTenantId, BLUECODE_TENANT_ID } from '../utils/tenant';
 import type { Progetto } from '../types';
+import { Paginatore } from '../components/ui/Paginatore';
+import { isRispostaPaginata, type MetaPaginazione } from '../api/paginazione';
+
+const META_INIZIALE: MetaPaginazione = { page: 1, limit: 50, totale: 0, pagine: 0 };
 
 type ViewMode = 'cards' | 'table' | 'kanban';
 type FilterStatus = 'all' | 'in_progress' | 'delayed' | 'pending_signature' | 'completed' | 'archived';
@@ -18,10 +22,15 @@ export function Projects() {
   const { team: teamList } = useTeamMembers();
   const [projectList, setProjectList] = useState<Progetto[]>([]);
   const [loading, setLoading] = useState(true);
+  const [errore, setErrore] = useState('');
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(50);
+  const [meta, setMeta] = useState<MetaPaginazione>(META_INIZIALE);
   const [wizardOpen, setWizardOpen] = useState(false);
 
   // Filtri e visualizzazione
   const [searchTerm, setSearchTerm] = useState('');
+  const [searchDebounced, setSearchDebounced] = useState('');
   const [statusFilter, setStatusFilter] = useState<FilterStatus>('all');
   const [catFilter, setCatFilter] = useState<string>('ALL');
   const [selectedAdvisorId, setSelectedAdvisorId] = useState<string>('ALL');
@@ -29,7 +38,10 @@ export function Projects() {
   const [sortBy, setSortBy] = useState<'due' | 'pct' | 'val' | 'name'>('due');
 
   const loadProjects = async () => {
+    setLoading(true);
+    setErrore('');
     let combined: Progetto[] = [];
+    let apiDisponibile = false;
     const currentTenantId = getCurrentTenantId();
     const storageKey = getTenantStorageKey('bluman_custom_projects', currentTenantId);
 
@@ -55,9 +67,12 @@ export function Projects() {
     // si aggiornano» segnalato. Dove il dato non c'è si mostra zero: un preventivo mai fatto
     // vale zero, non 15.000 €.
     try {
-      const remote = await fetchProgetti();
-      if (remote && Array.isArray(remote)) {
-        const dbProjs: Progetto[] = remote
+      const remote = await fetchProgetti({ page, limit, search: searchDebounced, sortBy: 'createdAt', sortOrder: 'desc' });
+      if (isRispostaPaginata<any>(remote)) {
+        apiDisponibile = true;
+        setMeta(remote.meta);
+        if (remote.meta.pagine > 0 && page > remote.meta.pagine) setPage(remote.meta.pagine);
+        const dbProjs: Progetto[] = remote.data
           .filter((rp: any) => rp.tenantId === currentTenantId)
           .map((rp: any) => {
             const avanzamento = rp.avanzamento;
@@ -115,24 +130,37 @@ export function Projects() {
               mods: rpMods,
             };
           });
-        // Quando lo stesso progetto esiste sia a database sia nella copia locale, vince il
-        // database. Prima vinceva `localStorage`: la copia locale veniva inserita per prima e il
-        // progetto vero dal DB scartato come duplicato, quindi l'elenco mostrava una fotografia
-        // vecchia — moduli, ore e avanzamento congelati al momento in cui quel browser li aveva
-        // scritti — e nessun ricalcolo del server riusciva più a farsi vedere. La copia locale
-        // resta solo per i progetti che a database non esistono (quelli creati prima che la
-        // creazione passasse dal server).
-        const idsDb = new Set(dbProjs.map(p => String(p.id)));
-        combined = [...dbProjs, ...combined.filter(p => !idsDb.has(String(p.id)))];
+        // Una risposta paginata valida è l'intero dataset della pagina: non va fusa con
+        // copie locali o seed, altrimenti limite, totale e navigazione non coincidono.
+        combined = dbProjs;
+      } else {
+        throw new Error('Risposta progetti non valida');
       }
     } catch (err) {
+      setErrore(err instanceof Error ? err.message : 'Errore caricamento progetti');
       console.warn('Fetch DB fallback:', err);
     }
 
     // 3. Se e solo se è il tenant demo Bluecode Ltd e non ci sono progetti salvati, carica i progetti di seed
-    if (combined.length === 0 && currentTenantId === BLUECODE_TENANT_ID) {
+    if (!apiDisponibile && combined.length === 0 && currentTenantId === BLUECODE_TENANT_ID) {
       const seedData = getTenantSeedData(currentTenantId);
       combined.push(...seedData.projects);
+    }
+
+    if (!apiDisponibile) {
+      const filtroLocale = searchDebounced.toLowerCase();
+      combined = combined.filter(p =>
+        !filtroLocale ||
+        p.n?.toLowerCase().includes(filtroLocale) ||
+        p.cl?.toLowerCase().includes(filtroLocale) ||
+        (p.mods || []).some(m => m.n?.toLowerCase().includes(filtroLocale)),
+      );
+      const totale = combined.length;
+      const pagine = totale === 0 ? 0 : Math.ceil(totale / limit);
+      const paginaEffettiva = pagine === 0 ? 1 : Math.min(page, pagine);
+      if (paginaEffettiva !== page) setPage(paginaEffettiva);
+      setMeta({ page: paginaEffettiva, limit, totale, pagine });
+      combined = combined.slice((paginaEffettiva - 1) * limit, paginaEffettiva * limit);
     }
 
     setProjectList(combined);
@@ -140,11 +168,19 @@ export function Projects() {
   };
 
   useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      setPage(1);
+      setSearchDebounced(searchTerm.trim());
+    }, 300);
+    return () => window.clearTimeout(timeout);
+  }, [searchTerm]);
+
+  useEffect(() => {
     loadProjects();
-  }, []);
+  }, [page, limit, searchDebounced]);
 
   // ── Statistiche KPI Operative ─────────────────────────────────────────
-  const totalProjects = projectList.length;
+  const totalProjects = meta.totale || projectList.length;
   const activeProjects = projectList.filter(p => p.st === 'in_progress' || (p.st as any) === 'active').length;
   const delayedProjects = projectList.filter(p => p.delay || (p.st as any) === 'delayed' || (p.st as any) === 'blocked').length;
   const completedProjects = projectList.filter(p => p.st === 'completed' || (p.st as any) === 'done').length;
@@ -170,13 +206,8 @@ export function Projects() {
 
   // ── Filtraggio e Ordinamento ──────────────────────────────────────────
   const filteredProjects = projectList.filter(p => {
-    // 1. Ricerca testo
-    const query = searchTerm.toLowerCase();
-    const matchSearch = !query || 
-      p.n.toLowerCase().includes(query) || 
-      p.cl.toLowerCase().includes(query) || 
-      String(p.id).includes(query) ||
-      (p.mods || []).some(m => m.n.toLowerCase().includes(query));
+    // 1. La ricerca testuale è applicata dal server prima della paginazione.
+    const matchSearch = true;
 
     // 2. Filtro Stato
     let matchStatus = true;
@@ -195,8 +226,9 @@ export function Projects() {
     // 4. Filtro Advisor
     let matchAdvisor = true;
     if (selectedAdvisorId !== 'ALL') {
-      const advId = Number(selectedAdvisorId);
-      matchAdvisor = (p.mods || []).some(m => (m.team || []).includes(advId));
+      matchAdvisor = (p.mods || []).some(m =>
+        (m.v || []).some(v => String(v.as ?? '') === selectedAdvisorId),
+      );
     }
 
     return matchSearch && matchStatus && matchCat && matchAdvisor;
@@ -273,35 +305,35 @@ export function Projects() {
         {/* KPI Cards per l'Operatore */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, borderTop: '1px solid var(--border)', paddingTop: 16 }}>
           <div style={{ background: 'var(--card2)', padding: '12px 14px', borderRadius: 10, border: '1px solid var(--border)' }}>
-            <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>💼 Pratiche Attive</div>
+            <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>💼 Pratiche Attive (pagina corrente)</div>
             <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)', marginTop: 4 }}>
               {activeProjects} <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 500 }}>/ {totalProjects} totali</span>
             </div>
           </div>
 
           <div style={{ background: 'var(--card2)', padding: '12px 14px', borderRadius: 10, border: '1px solid var(--border)' }}>
-            <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>⏱ Consuntivo Ore Studio</div>
+            <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>⏱ Consuntivo Ore (pagina corrente)</div>
             <div style={{ fontSize: 18, fontWeight: 800, color: '#818cf8', marginTop: 4 }}>
               {totalOreConsuntivate.toFixed(1)}h <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 500 }}>/ {totalOrePreventivate}h stimate</span>
             </div>
           </div>
 
           <div style={{ background: 'var(--card2)', padding: '12px 14px', borderRadius: 10, border: '1px solid var(--border)' }}>
-            <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>📋 Checklist Microvoci</div>
+            <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>📋 Checklist Microvoci (pagina corrente)</div>
             <div style={{ fontSize: 18, fontWeight: 800, color: '#34d399', marginTop: 4 }}>
               {totalMicrovociDone} <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 500 }}>/ {totalMicrovociCount} step eseguiti</span>
             </div>
           </div>
 
           <div style={{ background: 'var(--card2)', padding: '12px 14px', borderRadius: 10, border: '1px solid var(--border)' }}>
-            <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>💶 Valore Portafoglio</div>
+            <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>💶 Valore Portafoglio (pagina corrente)</div>
             <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--indigo-l)', marginTop: 4 }}>
               {fmt(totalPortafoglioVal)}
             </div>
           </div>
 
           <div style={{ background: delayedProjects > 0 ? 'rgba(239, 68, 68, 0.1)' : 'var(--card2)', padding: '12px 14px', borderRadius: 10, border: `1px solid ${delayedProjects > 0 ? '#ef4444' : 'var(--border)'}` }}>
-            <div style={{ fontSize: 11, color: delayedProjects > 0 ? '#f87171' : 'var(--muted)', fontWeight: 600 }}>⚠️ Alert Ritardi</div>
+            <div style={{ fontSize: 11, color: delayedProjects > 0 ? '#f87171' : 'var(--muted)', fontWeight: 600 }}>⚠️ Alert Ritardi (pagina corrente)</div>
             <div style={{ fontSize: 18, fontWeight: 800, color: delayedProjects > 0 ? '#f87171' : 'var(--text)', marginTop: 4 }}>
               {delayedProjects} pratiche critiche
             </div>
@@ -315,10 +347,10 @@ export function Projects() {
           {/* Tabs Stato */}
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {[
-              { id: 'all', label: `Tutti (${totalProjects})` },
-              { id: 'in_progress', label: `🚀 In Corso (${activeProjects})` },
-              { id: 'delayed', label: `⚠️ In Ritardo (${delayedProjects})` },
-              { id: 'completed', label: `✅ Conclusi (${completedProjects})` },
+              { id: 'all', label: `Tutti (${projectList.length} nella pagina)` },
+              { id: 'in_progress', label: `🚀 In Corso (${activeProjects} nella pagina)` },
+              { id: 'delayed', label: `⚠️ In Ritardo (${delayedProjects} nella pagina)` },
+              { id: 'completed', label: `✅ Conclusi (${completedProjects} nella pagina)` },
             ].map(tab => (
               <button
                 key={tab.id}
@@ -421,7 +453,7 @@ export function Projects() {
               onChange={e => setCatFilter(e.target.value)}
               style={{ fontSize: 11.5, padding: '6px 10px', borderRadius: 8, background: 'var(--card2)', border: '1px solid var(--border)', color: 'var(--text)' }}
             >
-              <option value="ALL">🌐 Tutte le Aree / Categorie</option>
+              <option value="ALL">🌐 Tutte le Aree / Categorie (pagina corrente)</option>
               <option value="Societario">🏛️ Societario & Holding</option>
               <option value="Analisi">📊 Analisi & Advisory</option>
               <option value="Trust">🛡️ Trust & Fiduciario</option>
@@ -437,7 +469,7 @@ export function Projects() {
               onChange={e => setSelectedAdvisorId(e.target.value)}
               style={{ fontSize: 11.5, padding: '6px 10px', borderRadius: 8, background: 'var(--card2)', border: '1px solid var(--border)', color: 'var(--text)' }}
             >
-              <option value="ALL">👤 Tutti gli Operatori</option>
+              <option value="ALL">👤 Tutti gli Operatori (pagina corrente)</option>
               {teamList.map(t => (
                 <option key={t.id} value={t.id}>{t.n} ({t.r})</option>
               ))}
@@ -445,7 +477,7 @@ export function Projects() {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>Ordina:</span>
+            <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>Ordina la pagina:</span>
             <select
               value={sortBy}
               onChange={e => setSortBy(e.target.value as any)}
@@ -461,6 +493,7 @@ export function Projects() {
       </div>
 
       {/* ── 3. Contenuto Principale: Visualizzazione Selezionata ─────────── */}
+      {errore && <div style={{ padding: 12, borderRadius: 8, background: '#7f1d1d', color: '#fecaca' }}>{errore}</div>}
       {filteredProjects.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '60px 20px', background: 'var(--card)', borderRadius: 16, border: '1px solid var(--border)', color: 'var(--muted)' }}>
           <div style={{ fontSize: 44, marginBottom: 12 }}>📁</div>
@@ -816,6 +849,12 @@ export function Projects() {
           ))}
         </div>
       )}
+
+      <Paginatore
+        meta={meta}
+        onPageChange={setPage}
+        onLimitChange={(nuovoLimite) => { setLimit(nuovoLimite); setPage(1); }}
+      />
 
       {/* ── Modal Nuovo Progetto Wizard ────────────────────────────────── */}
       {wizardOpen && (

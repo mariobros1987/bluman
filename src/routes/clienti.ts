@@ -24,13 +24,44 @@ import {
   recordAudit,
 } from '../util/serverHelpers.js';
 import { CreaClienteSchema } from '../schemas/clienti.schema.js';
+import { campoOrdinamento, creaMetaPaginazione, leggiPaginazione } from '../util/paginazione.js';
 
 // ─── DETTAGLIO CLIENTE & MAGIC LINK (coda dell'ex blocco ARTICOLI) ──
 export async function registraRotteClienti(server: FastifyInstance, app: AppPort): Promise<void> {
+  const sanitizzaReferenti = (valore: unknown): Record<string, any> => {
+    if (!valore || typeof valore !== 'object' || Array.isArray(valore)) return {};
+    const { passwordHash: _passwordHash, password: _password, ...referenti } = valore as Record<string, any>;
+    return referenti;
+  };
+
+  const serializzaCliente = (cliente: any) => {
+    const referenti = sanitizzaReferenti(cliente.referentiJson);
+    const { passwordHash: _passwordHash, password: _password, ...clienteSicuro } = cliente;
+    return {
+      ...referenti,
+      ...clienteSicuro,
+      referentiJson: referenti,
+      email: cliente.email || referenti.email || '',
+      hasPassword: Boolean(cliente.passwordHash),
+      codiceFiscale: cliente.codiceFiscale || referenti.codiceFiscale || referenti.codFisc,
+      codFisc: cliente.codiceFiscale || referenti.codiceFiscale || referenti.codFisc,
+      sdiCode: cliente.sdiCode || referenti.sdiCode || referenti.codiceSdi || '',
+      codiceSdi: cliente.sdiCode || referenti.sdiCode || referenti.codiceSdi || '',
+      iban: cliente.iban || referenti.iban,
+      piva: cliente.piva || referenti.piva,
+      sedeLegale: cliente.sedeLegale || referenti.sedeLegale,
+      giurisdizione: cliente.giurisdizione || referenti.giurisdizione,
+      rischioAml: cliente.rischioAml || referenti.rischioAml || 'medio',
+      ubo: cliente.ubo || referenti.ubo,
+      fontePatrimonio: cliente.fontePatrimonio || referenti.fontePatrimonio,
+      dataKyc: cliente.dataKyc || referenti.dataKyc,
+    };
+  };
+
   server.get<{ Params: { id: string } }>('/clienti/:id', async (req, reply) => {
     try {
       const c = await prisma.cliente.findUnique({ where: { id: req.params.id } });
-      if (c) return reply.send(c);
+      if (c) return reply.send(serializzaCliente(c));
       return app.getCliente(req.params.id);
     } catch {
       return app.getCliente(req.params.id);
@@ -105,37 +136,53 @@ export async function registraRotteClienti(server: FastifyInstance, app: AppPort
   });
 
   // ─── ANAGRAFICA CLIENTI ERP API (§2, §14) ─────────────────────────
-  server.get('/clienti', async (req) => {
+  server.get('/clienti', async (req, reply) => {
     const tenantId = req.tenantId;
+    const paginazione = leggiPaginazione(req.query);
+    if (paginazione.paginata && 'errore' in paginazione) {
+      return reply.code(400).send({ errore: paginazione.errore });
+    }
+
     try {
-      const clienti = await prisma.cliente.findMany({
-        where: { tenantId },
-        orderBy: { createdAt: 'desc' },
+      if (!paginazione.paginata) {
+        const clienti = await prisma.cliente.findMany({ where: { tenantId }, orderBy: { createdAt: 'desc' } });
+        return clienti.map(serializzaCliente);
+      }
+
+      const { page, limit, search, sortBy, sortOrder, tipo, skip } = paginazione.parametri;
+      const campo = campoOrdinamento(sortBy, ['createdAt', 'nome', 'tipo', 'rischioAml'] as const, 'createdAt');
+      if (!campo) return reply.code(400).send({ errore: 'Campo di ordinamento clienti non valido' });
+      const tipiConsentiti = ['company', 'individual'] as const;
+      if (tipo && !tipiConsentiti.includes(tipo as typeof tipiConsentiti[number])) {
+        return reply.code(400).send({ errore: 'Tipo cliente non valido' });
+      }
+      const where = {
+        tenantId,
+        ...(tipo ? { tipo: tipo as typeof tipiConsentiti[number] } : {}),
+        ...(search ? {
+          OR: [
+            { nome: { contains: search, mode: 'insensitive' as const } },
+            { email: { contains: search, mode: 'insensitive' as const } },
+            { piva: { contains: search, mode: 'insensitive' as const } },
+            { codiceFiscale: { contains: search, mode: 'insensitive' as const } },
+          ],
+        } : {}),
+      };
+      const [clienti, totale, societa, persone] = await Promise.all([
+        prisma.cliente.findMany({ where, skip, take: limit, orderBy: { [campo]: sortOrder } }),
+        prisma.cliente.count({ where }),
+        prisma.cliente.count({ where: { ...where, tipo: 'company' } }),
+        prisma.cliente.count({ where: { ...where, tipo: 'individual' } }),
+      ]);
+      return reply.send({
+        data: clienti.map(serializzaCliente),
+        meta: creaMetaPaginazione(page, limit, totale),
+        riepilogo: { societa, persone },
       });
-      return clienti.map(c => {
-        const ref = c.referentiJson && typeof c.referentiJson === 'object' ? (c.referentiJson as any) : {};
-        return {
-          ...ref,
-          ...c,
-          email: c.email || ref.email || '',
-          hasPassword: Boolean(c.passwordHash),
-          codiceFiscale: c.codiceFiscale || ref.codiceFiscale || ref.codFisc,
-          codFisc: c.codiceFiscale || ref.codiceFiscale || ref.codFisc,
-          sdiCode: c.sdiCode || ref.sdiCode || ref.codiceSdi || 'SUBM70N',
-          codiceSdi: c.sdiCode || ref.sdiCode || ref.codiceSdi || 'SUBM70N',
-          iban: c.iban || ref.iban,
-          piva: c.piva || ref.piva,
-          sedeLegale: c.sedeLegale || ref.sedeLegale,
-          giurisdizione: c.giurisdizione || ref.giurisdizione,
-          rischioAml: c.rischioAml || ref.rischioAml || 'medio',
-          ubo: c.ubo || ref.ubo,
-          fontePatrimonio: c.fontePatrimonio || ref.fontePatrimonio,
-          dataKyc: c.dataKyc || ref.dataKyc,
-        };
-      });
-    } catch {
-      // Database non raggiungibile: si serve la porta applicativa. Restituire []
-      // silenziosamente nascondeva il guasto.
+    } catch (err: any) {
+      if (paginazione.paginata) {
+        return reply.code(503).send({ errore: err?.message || 'Database clienti non raggiungibile' });
+      }
       return (await app.listaClienti()) || [];
     }
   });
@@ -148,7 +195,7 @@ export async function registraRotteClienti(server: FastifyInstance, app: AppPort
     }
     const b = parseResult.data as Record<string, any>;
 
-    const referentiObj = b.referentiJson
+    const referentiObj = sanitizzaReferenti(b.referentiJson
       ? (typeof b.referentiJson === 'string' ? JSON.parse(b.referentiJson) : b.referentiJson)
       : {
           capitale: b.capitale,
@@ -161,7 +208,7 @@ export async function registraRotteClienti(server: FastifyInstance, app: AppPort
           telefono: b.telefono,
           email: b.email,
           regimeFiscale: b.regimeFiscale,
-        };
+        });
 
     const clientEmail = b.email ? b.email.trim().toLowerCase() : (referentiObj?.email ? String(referentiObj.email).trim().toLowerCase() : null);
     // Il cellulare non veniva scritto in colonna da nessuna delle due rotte: la scheda cliente
@@ -187,7 +234,7 @@ export async function registraRotteClienti(server: FastifyInstance, app: AppPort
           codiceFiscale: b.codiceFiscale || b.codFisc || null,
           giurisdizione: b.giurisdizione || null,
           sedeLegale: b.sedeLegale || b.sede || null,
-          sdiCode: b.sdiCode || b.codiceSdi || 'SUBM70N',
+          sdiCode: b.sdiCode || b.codiceSdi || null,
           iban: b.iban || null,
           rischioAml: b.rischioAml || 'medio',
           ubo: b.ubo || null,
@@ -203,7 +250,7 @@ export async function registraRotteClienti(server: FastifyInstance, app: AppPort
         dettagli: `Creata anagrafica cliente ERP ${cliente.nome} (P.IVA: ${cliente.piva || 'N/D'})`,
         ipAddress: req.ip,
       });
-      return reply.code(201).send({ ...referentiObj, ...cliente, hasPassword: Boolean(cliente.passwordHash) });
+      return reply.code(201).send(serializzaCliente(cliente));
     } catch (err: any) {
       // Database non raggiungibile: si crea il cliente sulla porta applicativa, così il
       // resto del flusso (progetto → preventivo → esecuzione) resta percorribile.
@@ -222,7 +269,7 @@ export async function registraRotteClienti(server: FastifyInstance, app: AppPort
     const { id } = req.params;
     const b = (req.body || {}) as Record<string, any>;
 
-    const referentiObj = b.referentiJson !== undefined
+    const referentiObj = sanitizzaReferenti(b.referentiJson !== undefined
       ? (typeof b.referentiJson === 'string' ? JSON.parse(b.referentiJson) : b.referentiJson)
       : {
           capitale: b.capitale,
@@ -235,7 +282,7 @@ export async function registraRotteClienti(server: FastifyInstance, app: AppPort
           telefono: b.telefono,
           email: b.email,
           regimeFiscale: b.regimeFiscale,
-        };
+        });
 
     const clientEmail = b.email !== undefined
       ? (b.email ? b.email.trim().toLowerCase() : null)
@@ -280,7 +327,7 @@ export async function registraRotteClienti(server: FastifyInstance, app: AppPort
         dettagli: `Aggiornati dati legali/fiscali cliente ${updated.nome} (P.IVA: ${updated.piva})`,
         ipAddress: req.ip,
       });
-      return reply.send({ ...referentiObj, ...updated, hasPassword: Boolean(updated.passwordHash) });
+      return reply.send(serializzaCliente(updated));
     } catch (err: any) {
       console.error('Errore aggiornamento cliente DB:', err);
       return reply.code(500).send({ errore: err.message || 'Errore aggiornamento cliente' });

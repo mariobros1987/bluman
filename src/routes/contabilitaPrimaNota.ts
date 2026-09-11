@@ -8,23 +8,73 @@ import type { AppPort } from '../services/appPort.js';
 import { prisma } from '../util/prismaClient.js';
 import { recordAudit } from '../util/serverHelpers.js';
 import { CreaMovimentoPrimaNotaSchema } from '../schemas/contabilita.schema.js';
+import { campoOrdinamento, creaMetaPaginazione, leggiPaginazione } from '../util/paginazione.js';
 
 export async function registraRotteContabilitaPrimaNota(server: FastifyInstance, app: AppPort): Promise<void> {
   // ─── PRIMA NOTA INTEGRATA A DATABASE (ZERO LOCALSTORAGE) ───────────
   server.get('/prima-nota', async (req, reply) => {
     const tenantId = req.tenantId;
+    const paginazione = leggiPaginazione(req.query);
+    if (paginazione.paginata && 'errore' in paginazione) {
+      return reply.code(400).send({ errore: paginazione.errore });
+    }
+
     try {
-      const movimenti = await prisma.movimentoPrimaNota.findMany({
-        where: { tenantId },
-        include: {
-          contoBancario: true,
-          fattura: { include: { cliente: true, progetto: true } },
-          cliente: true,
-          fornitore: true,
+      const include = {
+        contoBancario: true,
+        fattura: { include: { cliente: true, progetto: true } },
+        cliente: true,
+        fornitore: true,
+      };
+      if (!paginazione.paginata) {
+        const movimenti = await prisma.movimentoPrimaNota.findMany({
+          where: { tenantId },
+          include,
+          orderBy: { data: 'desc' },
+        });
+        return reply.send(movimenti);
+      }
+
+      const { page, limit, search, sortBy, sortOrder, tipo, metodo, skip } = paginazione.parametri;
+      const campo = campoOrdinamento(sortBy, ['data', 'importoCentesimi', 'descrizione', 'createdAt'] as const, 'data');
+      if (!campo) return reply.code(400).send({ errore: 'Campo di ordinamento Prima Nota non valido' });
+      const tipiConsentiti = ['entrata', 'uscita'] as const;
+      const metodiConsentiti = ['bonifico', 'carta', 'assegno', 'contanti', 'stripe'] as const;
+      if (tipo && !tipiConsentiti.includes(tipo as typeof tipiConsentiti[number])) {
+        return reply.code(400).send({ errore: 'Tipo movimento non valido' });
+      }
+      if (metodo && !metodiConsentiti.includes(metodo as typeof metodiConsentiti[number])) {
+        return reply.code(400).send({ errore: 'Metodo di pagamento non valido' });
+      }
+      const where = {
+        tenantId,
+        ...(tipo ? { tipo: tipo as typeof tipiConsentiti[number] } : {}),
+        ...(metodo ? { metodoPagamento: metodo as typeof metodiConsentiti[number] } : {}),
+        ...(search ? {
+          OR: [
+            { descrizione: { contains: search, mode: 'insensitive' as const } },
+            { riferimentoTransazione: { contains: search, mode: 'insensitive' as const } },
+            { cliente: { nome: { contains: search, mode: 'insensitive' as const } } },
+          ],
+        } : {}),
+      };
+      const [movimenti, totale, entrate, uscite] = await Promise.all([
+        prisma.movimentoPrimaNota.findMany({ where, include, skip, take: limit, orderBy: { [campo]: sortOrder } }),
+        prisma.movimentoPrimaNota.count({ where }),
+        prisma.movimentoPrimaNota.aggregate({ where: { ...where, tipo: 'entrata' }, _sum: { importoCentesimi: true } }),
+        prisma.movimentoPrimaNota.aggregate({ where: { ...where, tipo: 'uscita' }, _sum: { importoCentesimi: true } }),
+      ]);
+      const totaleEntrateCentesimi = entrate._sum.importoCentesimi ?? 0;
+      const totaleUsciteCentesimi = uscite._sum.importoCentesimi ?? 0;
+      return reply.send({
+        data: movimenti,
+        meta: creaMetaPaginazione(page, limit, totale),
+        riepilogo: {
+          totaleEntrateCentesimi,
+          totaleUsciteCentesimi,
+          saldoCentesimi: totaleEntrateCentesimi - totaleUsciteCentesimi,
         },
-        orderBy: { data: 'desc' },
       });
-      return reply.send(movimenti);
     } catch (err: any) {
       return reply.code(500).send({ errore: err?.message || 'Errore lettura Prima Nota' });
     }

@@ -1,11 +1,13 @@
 import { API_BASE, apiFetch, fetchWithTimeout, getAuthHeaders, leggiErroreApi } from './http';
+import { queryPaginazione, type ParametriListaPaginata } from './paginazione';
 
-export async function fetchProgetti() {
+export async function fetchProgetti(parametri?: ParametriListaPaginata) {
   try {
-    const res = await fetchWithTimeout(`${API_BASE}/progetti`, { headers: getAuthHeaders() }, 6000);
-    if (!res.ok) throw new Error('Errore nel recupero progetti');
+    const res = await fetchWithTimeout(`${API_BASE}/progetti${queryPaginazione(parametri)}`, { headers: getAuthHeaders() }, 6000);
+    if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore nel recupero progetti'));
     return await res.json();
   } catch (err) {
+    if (parametri) throw err;
     console.warn('Backend API offline o in latenza, uso il caricamento istantaneo locale', err);
     return null;
   }

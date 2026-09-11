@@ -13,6 +13,7 @@
 // l'hook auth onRequest continuano ad applicarsi esattamente come prima
 // (stesso contesto di incapsulamento, nessuna nuova barriera).
 
+import type { Prisma } from '@prisma/client';
 import type { FastifyInstance } from 'fastify';
 import type { AppPort } from '../services/appPort.js';
 import { prisma } from '../util/prismaClient.js';
@@ -23,6 +24,7 @@ import { ricercaGlobale } from '../services/ricercaGlobaleService.js';
 import { STATI_MICROVOCE, STATI_PROGETTO, recordAudit, clienteDellaRichiesta } from '../util/serverHelpers.js';
 import { livelloFirmaValido } from '../services/livelloFirmaService.js';
 import { CreaProgettoSchema, ConsuntivaOreSchema } from '../schemas/progetti.schema.js';
+import { campoOrdinamento, creaMetaPaginazione, leggiPaginazione } from '../util/paginazione.js';
 
 // ─── PROGETTI, COMUNICAZIONI, TIMESHEET, CHECKLIST & ESECUZIONE ─────
 export async function registraRotteProgetti(server: FastifyInstance, app: AppPort): Promise<void> {
@@ -177,14 +179,14 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
 
   server.get('/progetti', async (req, reply) => {
     const tenantId = req.tenantId;
+    const paginazione = leggiPaginazione(req.query);
+    if (paginazione.paginata && 'errore' in paginazione) {
+      return reply.code(400).send({ errore: paginazione.errore });
+    }
     // Il token del portale cliente (`ruolo: 'cliente'`) non deve vedere il parco
-    // progetti di TUTTI i clienti dello studio: fino a oggi la lista era filtrata
-    // solo per tenantId e la sessione del portale leggeva i fascicoli altrui.
-    // Il cliente vede ora solo il proprio fascicolo; l'operatore dello studio
-    // continua a vedere tutto il parco. Il cliente è ricavato dalla sessione
-    // (`client-<clienteId>`), lo stesso criterio che la firma elettronica usa
-    // da sempre per capire per conto di chi si sta agendo.
-    const where: { tenantId: string; clienteId?: string } = { tenantId };
+    // progetti di TUTTI i clienti dello studio: il filtro cliente resta nel `where`
+    // usato sia dalla lettura sia dal conteggio paginato.
+    const where: Prisma.ProgettoWhereInput = { tenantId };
     if (req.ruolo === 'cliente') {
       const clienteId = clienteDellaRichiesta(req);
       if (!clienteId) {
@@ -192,24 +194,34 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
       }
       where.clienteId = clienteId;
     }
-    const projs = await prisma.progetto.findMany({
-      where,
-      include: {
-        cliente: true,
-        giurisdizionePrimaria: true,
-        moduli: {
-          include: {
-            microvoci: true,
-          }
-        }
-      },
-      orderBy: { createdAt: 'desc' },
+
+    const include = {
+      cliente: true,
+      giurisdizionePrimaria: true,
+      moduli: { include: { microvoci: true } },
+    };
+    if (!paginazione.paginata) {
+      const projs = await prisma.progetto.findMany({ where, include, orderBy: { createdAt: 'desc' } });
+      return arricchisciProgetti(projs);
+    }
+
+    const { page, limit, search, sortBy, sortOrder, skip } = paginazione.parametri;
+    const campo = campoOrdinamento(sortBy, ['createdAt', 'dataScadenza', 'nome', 'valoreTotale', 'stato'] as const, 'createdAt');
+    if (!campo) return reply.code(400).send({ errore: 'Campo di ordinamento progetti non valido' });
+    if (search) {
+      where.OR = [
+        { nome: { contains: search, mode: 'insensitive' } },
+        { cliente: { nome: { contains: search, mode: 'insensitive' } } },
+      ];
+    }
+    const [projs, totale] = await Promise.all([
+      prisma.progetto.findMany({ where, include, skip, take: limit, orderBy: { [campo]: sortOrder } }),
+      prisma.progetto.count({ where }),
+    ]);
+    return reply.send({
+      data: arricchisciProgetti(projs),
+      meta: creaMetaPaginazione(page, limit, totale),
     });
-    // §16 — l'avanzamento viaggia già calcolato: il client lo legge, non lo deduce.
-    // `arricchisciProgetti` non emette query, lavora sui moduli e micro-voci appena letti.
-    // Una lista vuota è legittima (studio senza progetti): prima scatenava il ripiego
-    // in-memory e la rotta fingeva progetti che non esistono.
-    return arricchisciProgetti(projs);
   });
 
   /**

@@ -1,5 +1,6 @@
 import { getTenantStorageKey, getCurrentTenantId, getStudioInfoForTenant, BLUECODE_TENANT_ID, senzaSegretiTenant } from '../utils/tenant';
 import { API_BASE, apiFetch, getAuthHeaders, leggiErroreApi } from './http';
+import { queryPaginazione, type ParametriListaPaginata } from './paginazione';
 
 // DEFAULT_TEAM_USERS serve SOLO come fallback di seed per il Tenant Demo Bluecode (tenant-1) se il DB è offline
 export const DEFAULT_TEAM_USERS = [
@@ -226,12 +227,13 @@ export async function updateTenantInfoApi(input: any, tenantIdParam?: string) {
   return data;
 }
 
-export async function fetchAuditLogsApi() {
+export async function fetchAuditLogsApi(parametri?: ParametriListaPaginata) {
   try {
-    const res = await apiFetch(`${API_BASE}/audit-logs`, { headers: getAuthHeaders() });
-    if (!res.ok) throw new Error('Errore recupero audit logs');
+    const res = await apiFetch(`${API_BASE}/audit-logs${queryPaginazione(parametri)}`, { headers: getAuthHeaders() });
+    if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore recupero audit logs'));
     return await res.json();
   } catch (err) {
+    if (parametri) throw err;
     console.warn('Backend API offline', err);
     return null;
   }

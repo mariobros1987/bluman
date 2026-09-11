@@ -6,6 +6,9 @@ export const PaginazioneQuerySchema = z.object({
   search: z.string().max(255).optional(),
   sortBy: z.string().max(50).optional(),
   sortOrder: z.enum(['asc', 'desc']).default('desc').optional(),
+  stato: z.string().max(50).optional(),
+  tipo: z.string().max(50).optional(),
+  metodo: z.string().max(50).optional(),
 });
 
 export type PaginazioneQuery = z.infer<typeof PaginazioneQuerySchema>;

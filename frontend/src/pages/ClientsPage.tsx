@@ -6,6 +6,10 @@ import styles from './ClientsPage.module.css';
 import { AnagraficaErpModal } from '../components/clients/AnagraficaErpModal';
 import { MagicLinkExplainModal } from '../components/clients/MagicLinkExplainModal';
 import { CredentialsExplainModal } from '../components/clients/CredentialsExplainModal';
+import { Paginatore } from '../components/ui/Paginatore';
+import { isRispostaPaginata, type MetaPaginazione } from '../api/paginazione';
+
+const META_INIZIALE: MetaPaginazione = { page: 1, limit: 50, totale: 0, pagine: 0 };
 
 import { useSearchParams } from 'react-router-dom';
 
@@ -15,7 +19,13 @@ export function ClientsPage() {
 
   const [clienti, setClienti] = useState<Cliente[]>([]);
   const [loading, setLoading] = useState(true);
+  const [errore, setErrore] = useState('');
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(50);
+  const [meta, setMeta] = useState<MetaPaginazione>(META_INIZIALE);
+  const [riepilogo, setRiepilogo] = useState({ societa: 0, persone: 0 });
   const [search, setSearch] = useState(targetClientQuery);
+  const [searchDebounced, setSearchDebounced] = useState(targetClientQuery);
   const [filterType, setFilterType] = useState<'all' | 'individual' | 'company'>('all');
   const [editClientModal, setEditClientModal] = useState<Cliente | null>(null);
   const [, setEditClientName] = useState('');
@@ -66,14 +76,27 @@ export function ClientsPage() {
 
   const loadClienti = async () => {
     setLoading(true);
+    setErrore('');
     const currentTenantId = getCurrentTenantId();
     let apiList: Cliente[] = [];
+    let apiDisponibile = false;
     try {
-      const res = await fetchClienti();
-      if (res && Array.isArray(res)) {
-        apiList = res.filter((c: any) => !c.tenantId || c.tenantId === currentTenantId);
-      }
+      const res = await fetchClienti({
+        page,
+        limit,
+        search: searchDebounced,
+        sortBy: 'createdAt',
+        sortOrder: 'desc',
+        tipo: filterType === 'all' ? undefined : filterType,
+      });
+      if (!isRispostaPaginata<Cliente>(res)) throw new Error('Risposta clienti non valida');
+      apiList = res.data.filter((c: any) => !c.tenantId || c.tenantId === currentTenantId);
+      apiDisponibile = true;
+      setMeta(res.meta);
+      if (res.meta.pagine > 0 && page > res.meta.pagine) setPage(res.meta.pagine);
+      setRiepilogo((res.riepilogo as { societa: number; persone: number } | undefined) || { societa: 0, persone: 0 });
     } catch (err) {
+      setErrore(err instanceof Error ? err.message : 'Errore caricamento clienti');
       console.warn('Errore fetch clienti DB:', err);
     }
 
@@ -114,8 +137,11 @@ export function ClientsPage() {
     const localClients: Cliente[] = localClientsStr ? JSON.parse(localClientsStr) : [];
 
     const mergedMap = new Map();
-    // Inserisci prima i default e i progetti estratti, poi apiList (DB) e localClients SOVRASCRIVONO tutto garantendo persistenza totale!
-    [...defaultClients, ...extractedClients, ...apiList, ...localClients].forEach(c => {
+    // Una pagina DB valida resta una pagina DB: i fallback locali si usano solo se l'API non è disponibile.
+    const fontiLocali = !apiDisponibile
+      ? [...defaultClients, ...extractedClients, ...localClients]
+      : [];
+    [...fontiLocali, ...apiList].forEach(c => {
       if (c && c.nome) {
         const key = c.nome.toLowerCase().trim();
         const existing = mergedMap.get(key) || {};
@@ -123,11 +149,30 @@ export function ClientsPage() {
       }
     });
 
-    const finalClients = Array.from(mergedMap.values());
-    setClienti(finalClients);
+    const finalClients = Array.from(mergedMap.values()) as Cliente[];
+    let visibleClients = finalClients;
+    if (!apiDisponibile) {
+      const filtroLocale = searchDebounced.toLowerCase();
+      visibleClients = finalClients.filter(c => {
+        const corrispondeRicerca = !filtroLocale || c.nome.toLowerCase().includes(filtroLocale);
+        const corrispondeTipo = filterType === 'all' || c.tipo === filterType;
+        return corrispondeRicerca && corrispondeTipo;
+      });
+      const totale = visibleClients.length;
+      const pagine = totale === 0 ? 0 : Math.ceil(totale / limit);
+      const paginaEffettiva = pagine === 0 ? 1 : Math.min(page, pagine);
+      if (paginaEffettiva !== page) setPage(paginaEffettiva);
+      setMeta({ page: paginaEffettiva, limit, totale, pagine });
+      setRiepilogo({
+        societa: visibleClients.filter(c => c.tipo === 'company').length,
+        persone: visibleClients.filter(c => c.tipo === 'individual').length,
+      });
+      visibleClients = visibleClients.slice((paginaEffettiva - 1) * limit, paginaEffettiva * limit);
+    }
+    setClienti(visibleClients);
 
     if (targetClientQuery) {
-      const found = finalClients.find(c => c.nome.toLowerCase().includes(targetClientQuery.toLowerCase()) || c.id.includes(targetClientQuery));
+      const found = visibleClients.find(c => c.nome.toLowerCase().includes(targetClientQuery.toLowerCase()) || c.id.includes(targetClientQuery));
       if (found) {
         setMagicLinkModal(found);
       }
@@ -136,8 +181,16 @@ export function ClientsPage() {
   };
 
   useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      setPage(1);
+      setSearchDebounced(search.trim());
+    }, 300);
+    return () => window.clearTimeout(timeout);
+  }, [search]);
+
+  useEffect(() => {
     loadClienti();
-  }, [targetClientQuery]);
+  }, [targetClientQuery, page, limit, searchDebounced, filterType]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -176,14 +229,10 @@ export function ClientsPage() {
     loadClienti();
   };
 
-  const filtered = clienti.filter(c => {
-    const matchSearch = c.nome.toLowerCase().includes(search.toLowerCase());
-    const matchType = filterType === 'all' || c.tipo === filterType;
-    return matchSearch && matchType;
-  });
+  const filtered = clienti;
 
-  const totalCompanies = clienti.filter(c => c.tipo === 'company').length;
-  const totalIndividuals = clienti.filter(c => c.tipo === 'individual').length;
+  const totalCompanies = riepilogo.societa;
+  const totalIndividuals = riepilogo.persone;
 
   return (
     <div className={styles.wrapper}>
@@ -191,7 +240,7 @@ export function ClientsPage() {
       <div className={styles.kpiGrid}>
         <div className={styles.kpiCard}>
           <div className={styles.kpiIcon} style={{ background: '#1a1f3d' }}>👥</div>
-          <div className={styles.kpiValue}>{clienti.length}</div>
+          <div className={styles.kpiValue}>{meta.totale}</div>
           <div className={styles.kpiLabel}>Totale Clienti in Anagrafica</div>
         </div>
         <div className={styles.kpiCard}>
@@ -222,19 +271,19 @@ export function ClientsPage() {
           <div className={styles.filterGroup}>
             <button
               className={`${styles.filterBtn} ${filterType === 'all' ? styles.filterBtnActive : ''}`}
-              onClick={() => setFilterType('all')}
+              onClick={() => { setFilterType('all'); setPage(1); }}
             >
               Tutti
             </button>
             <button
               className={`${styles.filterBtn} ${filterType === 'individual' ? styles.filterBtnActive : ''}`}
-              onClick={() => setFilterType('individual')}
+              onClick={() => { setFilterType('individual'); setPage(1); }}
             >
               👤 Persone Fisiche
             </button>
             <button
               className={`${styles.filterBtn} ${filterType === 'company' ? styles.filterBtnActive : ''}`}
-              onClick={() => setFilterType('company')}
+              onClick={() => { setFilterType('company'); setPage(1); }}
             >
               🏢 Società
             </button>
@@ -250,11 +299,12 @@ export function ClientsPage() {
       </div>
 
       {/* Client Cards Grid */}
+      {errore && <div style={{ padding: 12, borderRadius: 8, background: '#7f1d1d', color: '#fecaca' }}>{errore}</div>}
       {loading ? (
         <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)', fontSize: 12 }}>Caricamento anagrafica clienti...</div>
       ) : filtered.length === 0 ? (
         <div style={{ padding: 40, textAlign: 'center', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, color: 'var(--muted)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-          <div>Nessun cliente trovato con i filtri correnti ({clienti.length} totali in anagrafica).</div>
+          <div>Nessun cliente trovato con i filtri correnti ({meta.totale} totali in anagrafica).</div>
           <button
             onClick={() => { setSearch(''); setFilterType('all'); }}
             style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', boxShadow: '0 4px 12px rgba(99,102,241,.3)' }}
@@ -319,6 +369,12 @@ export function ClientsPage() {
           ))}
         </div>
       )}
+
+      <Paginatore
+        meta={meta}
+        onPageChange={setPage}
+        onLimitChange={(nuovoLimite) => { setLimit(nuovoLimite); setPage(1); }}
+      />
 
       {/* Modal Nuovo Cliente */}
       {modalOpen && (

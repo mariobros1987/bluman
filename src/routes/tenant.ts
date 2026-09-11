@@ -14,6 +14,7 @@ import { rifirmaUrlUpload } from '../services/storageService.js';
 import { provaPostaInUscita, provaPostaInArrivo, sendInvitoCollaboratoreEmail } from '../services/emailService.js';
 import { credenzialiCanali } from '../services/otpDispatch.js';
 import { inMemoryTenantStore, recordAudit, senzaHash } from '../util/serverHelpers.js';
+import { campoOrdinamento, creaMetaPaginazione, leggiPaginazione } from '../util/paginazione.js';
 
 // ─── TENANT, TEAM & ADMIN (§2bis: impostazioni studio, team, super admin) ──
 export async function registraRotteTenant(server: FastifyInstance): Promise<void> {
@@ -839,15 +840,39 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
   });
 
   // Audit Logs API (Isolato per Tenant)
-  server.get('/audit-logs', async (req) => {
+  server.get('/audit-logs', async (req, reply) => {
     const tenantId = req.tenantId;
+    const paginazione = leggiPaginazione(req.query);
+    if (paginazione.paginata && 'errore' in paginazione) {
+      return reply.code(400).send({ errore: paginazione.errore });
+    }
+
     try {
-      return await prisma.auditLog.findMany({
-        where: { tenantId },
-        orderBy: { createdAt: 'desc' },
-      });
-    } catch {
-      return [];
+      if (!paginazione.paginata) {
+        return await prisma.auditLog.findMany({ where: { tenantId }, orderBy: { createdAt: 'desc' } });
+      }
+      const { page, limit, search, sortBy, sortOrder, skip } = paginazione.parametri;
+      const campo = campoOrdinamento(sortBy, ['createdAt', 'azione', 'ruolo', 'userNome'] as const, 'createdAt');
+      if (!campo) return reply.code(400).send({ errore: 'Campo di ordinamento audit non valido' });
+      const where = {
+        tenantId,
+        ...(search ? {
+          OR: [
+            { userNome: { contains: search, mode: 'insensitive' as const } },
+            { userEmail: { contains: search, mode: 'insensitive' as const } },
+            { azione: { contains: search, mode: 'insensitive' as const } },
+            { entita: { contains: search, mode: 'insensitive' as const } },
+            { dettagli: { contains: search, mode: 'insensitive' as const } },
+          ],
+        } : {}),
+      };
+      const [logs, totale] = await Promise.all([
+        prisma.auditLog.findMany({ where, skip, take: limit, orderBy: { [campo]: sortOrder } }),
+        prisma.auditLog.count({ where }),
+      ]);
+      return reply.send({ data: logs, meta: creaMetaPaginazione(page, limit, totale) });
+    } catch (err: any) {
+      return reply.code(503).send({ errore: err?.message || 'Registro audit non disponibile' });
     }
   });
 

@@ -13,6 +13,7 @@ export * from './firma';
 export * from './tenant';
 export * from './notifiche';
 export * from './report';
+export * from './paginazione';
 export * from './timesheet';
 export * from './fornitori';
 export * from './liquidazioneIva';

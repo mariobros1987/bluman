@@ -2,7 +2,7 @@
 
 > **Versione**: 3.0 — Master Plan di Sviluppo & Consolidamento Enterprise  
 > **Data di Riferimento**: 2026-09-11  
-> **Stato Codebase**: 614/614 Test Vitest Verdi (47 Suite) • Zero Errori TypeScript Frontend & Backend • Deploy Attivo su Vercel & Railway  
+> **Stato Codebase**: 645/645 Test Vitest Verdi (51 Suite) • Zero Errori TypeScript Frontend & Backend • Deploy Attivo su Vercel & Railway
 > **Autore**: Mario Dibenedetto & Team di Ingegneria AI  
 
 ---
@@ -48,7 +48,7 @@ La piattaforma BluMan ha completato con successo le fasi critiche di sicurezza e
 | ID | Modulo / Task | Priorità | Rischio Attuale | Tempo Stimato | Dipendenze |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **F1** | Paginazione unificata 5 liste pesanti | 🟠 ALTA | Degrado performance con volumi crescenti di record | 1.5 giorni | Nessuna |
-| **F2** | Scheduler notturno in-process per Cron scadenze | 🟠 ALTA | Mancata notifica automatica scadenze se non invocato via HTTP | 0.5 giorni | Nessuna |
+| **F2** | Railway Cron separato per notifiche quotidiane | 🟠 ALTA | Mancata notifica automatica scadenze se non invocato via HTTP | 0.5 giorni | Nessuna |
 | **F3** | Logging strutturato Pino su Fastify | 🟡 MEDIA | Difficoltà nel debug e correlazione log su Railway | 1 giorno | Nessuna |
 | **F4** | Script Audit Integrità Progetti & Bonifica | 🟡 MEDIA | Incongruenze storiche su moduli vuoti o divergenze calcoli | 1 giorno | Nessuna |
 | **F5** | Backup programmato & Drill di restore | 🟡 MEDIA | Rischio mancata procedura validata di Disaster Recovery | 1 giorno | Backup script esistente |
@@ -66,7 +66,7 @@ Attualmente le 5 liste principali restituiscono tutti i record del tenant senza 
 2. `GET /prima-nota` (Movimenti finanziari, cassa e banche)
 3. `GET /progetti` (Fascicoli e commesse studio)
 4. `GET /clienti` (Anagrafica clienti ERP)
-5. `GET /audit` (Registro tracciamento attività operatori)
+5. `GET /audit-logs` (Registro tracciamento attività operatori)
 
 Con la crescita dello studio, il payload JSON e il consumo di RAM crescono linearmente, rallentando sia il rendering del frontend che il database.
 
@@ -85,9 +85,9 @@ export const PaginazioneQuerySchema = z.object({
 ```
 
 #### Standard di Risposta Retrocompatibile
-Per non rompere i componenti frontend che si aspettano un array diretto, supportare:
-- Chiamate senza parametri di paginazione: continuano a restituire l'array (o con default `limit: 50` + metadati).
-- Formato strutturato con metadati:
+Per non rompere dashboard, modali, portale e selettori che si aspettano un array diretto:
+- una chiamata senza `page`, `limit`, `search`, `sortBy` e `sortOrder` continua temporaneamente a restituire l'array legacy;
+- la presenza di almeno uno di questi parametri attiva la modalità paginata e il formato strutturato con metadati:
 ```json
 {
   "data": [ ... ],
@@ -100,36 +100,19 @@ Per non rompere i componenti frontend che si aspettano un array diretto, support
 }
 ```
 
-#### Esempio Endpoint `GET /invoices` in `src/routes/contabilita.ts`:
-```typescript
-const parsed = PaginazioneQuerySchema.safeParse(req.query);
-const { page = 1, limit = 50, search, sortBy = 'dataEmissione', sortOrder = 'desc' } = parsed.success ? parsed.data : {};
-const skip = (page - 1) * limit;
+#### Endpoint `GET /invoices` in `src/routes/contabilitaRegistro.ts`
 
-const where: any = { tenantId: req.tenantId };
-if (search) {
-  where.OR = [
-    { numero: { contains: search, mode: 'insensitive' } },
-    { cliente: { nome: { contains: search, mode: 'insensitive' } } }
-  ];
+L'implementazione riusa `src/util/paginazione.ts`: valida la query con Zod, rifiuta parametri non validi con HTTP 400, calcola `skip`/`take`, applica una allowlist specifica per `sortBy` ed esegue `findMany` e `count` con lo stesso `where`. Non inoltra mai a Prisma un nome campo arbitrario.
+
+Formato di riferimento:
+```json
+{
+  "data": [],
+  "meta": { "page": 1, "limit": 50, "totale": 0, "pagine": 0 }
 }
-
-const [fatture, totale] = await Promise.all([
-  prisma.fattura.findMany({
-    where,
-    skip,
-    take: limit,
-    orderBy: { [sortBy]: sortOrder },
-    include: { cliente: true, righe: true }
-  }),
-  prisma.fattura.count({ where })
-]);
-
-return reply.send({
-  data: fatture,
-  meta: { page, limit, totale, pagine: Math.ceil(totale / limit) }
-});
 ```
+
+Le allowlist reali dipendono dalla rotta: per le fatture, per esempio, sono ammessi `numeroProgressivoSerie`, `data`, `stato`, `totaleDocumentoCentesimi` e `createdAt`.
 
 #### Interventi Frontend
 - `pages/InvoicesPage.tsx`: Integrazione componente paginatore in calce alla tabella con selettore pagine (1, 2, 3...) e numero elementi per pagina.
@@ -147,37 +130,16 @@ La business logic per l'analisi delle scadenze è già completata in [`src/servi
 
 ### 2.2 Implementazione Tecnica
 
-#### Scheduler In-Process Automatico
-Creare un modulo autonomo `src/services/cronScheduler.ts` basato su `node-cron` (o timer nativo robusto) avviato da `src/server.ts`:
-```typescript
-// src/services/cronScheduler.ts
-import cron from 'node-cron';
-import { prismaAmministrativo } from '../util/prismaClient.js';
-import { runDailyNotificationCron } from './cronService.js';
+#### Railway Cron separato dal processo web
+Creare `src/scripts/runDailyNotificationCron.ts` e un comando npm dedicato. Railway esegue il comando una volta al giorno in un servizio Cron distinto; non si aggiungono `node-cron`, timer o hook di avvio a Fastify.
 
-export function avviaSchedulerNotifiche(server: FastifyInstance) {
-  // Ogni giorno alle 08:00 (Europe/Rome)
-  cron.schedule('0 8 * * *', async () => {
-    server.log.info('[CRON] Avvio scansione quotidiana scadenze tenant...');
-    try {
-      const tenants = await prismaAmministrativo().tenant.findMany({
-        where: { attivo: true },
-        select: { id: true, nome: true },
-      });
+Il runner:
+1. usa `prismaAmministrativo()` esclusivamente per elencare i tenant con `stato: 'attivo'`;
+2. esegue ciascun tenant dentro `contestoTenant.run({ tenantId, ruolo: 'super_admin' }, ...)` usando poi il client condiviso soggetto a RLS;
+3. registra `notificheInviate` ed eventuali errori per tenant;
+4. termina con exit code non zero se almeno un tenant fallisce, così Railway rende il guasto osservabile.
 
-      for (const t of tenants) {
-        server.log.info(`[CRON] Elaborazione scadenze tenant ${t.nome} (${t.id})...`);
-        const res = await runDailyNotificationCron(t.id);
-        server.log.info(`[CRON] Tenant ${t.id} completato: generate ${res.notificheGenerate} notifiche.`);
-      }
-    } catch (err: any) {
-      server.log.error('[CRON ERROR] Errore durante l\'esecuzione del cron quotidiano:', err);
-    }
-  }, {
-    timezone: 'Europe/Rome'
-  });
-}
-```
+La pianificazione operativa è documentata in `ISTRUZIONI_INSTALLAZIONE.md`. La business logic conserva la deduplicazione esistente delle notifiche persistite in-app.
 
 #### Coda di Dispatch Asincrono con Retry (Email & WhatsApp)
 - Creare `src/services/notificationQueue.ts`:
@@ -232,21 +194,21 @@ const server = Fastify({
 ### 4.1 Motivazione e Problema
 Nel corso dell'evoluzione della piattaforma, alcuni progetti storici possono contenere anomalie strutturali:
 - Moduli template istanziati privi di microvoci o passaggi operativi.
-- Progetti con disallineamento tra la percentuale calcolata dallo `stateEngine` e il campo memorizzato su DB.
+- Stati persistiti non più coerenti con il risultato derivato da `stateEngine`.
 - Potenziali dipendenze cicliche tra moduli (Modulo A dipende da B che dipende da A).
 - Omonimie clienti non gestite.
 
 ### 4.2 Implementazione Tecnica
 
-Creare `src/scripts/auditIntegritaProgetti.ts` (estendendo `probeAvanzamento.ts`):
+Creare `src/scripts/auditIntegritaProgetti.ts` estendendo `probeAvanzamento.ts` e riusando la logica di dominio esistente:
 1. **Verifica Grafi Ciclici (DAG)**:
-   - Algoritmo di rilevamento cicli con DFS (Depth-First Search) sulle dipendenze `dipendenzeDa` di ogni modulo progetto.
+   - Riutilizzare il rilevamento che produce `DipendenzaCiclicaError`; non introdurre un secondo DFS destinato a divergere dalle regole applicative.
 2. **Rilevamento Moduli e Microvoci Vuote**:
-   - Segnalazione progetti con moduli a 0 microvoci (es. caso storico "Struttura Holding Ricci").
+   - Segnalazione progetti con moduli a 0 microvoci.
 3. **Controllo Coerenza Avanzamento**:
-   - Confronto tra `calcolaAvanzamento(progetto)` e `progetto.avanzamentoPercentuale`.
+   - Confrontare gli stati persistiti con `calcolaAvanzamento(progetto)`. La percentuale è derivata dinamicamente da stato e ore e non esiste una colonna `avanzamentoPercentuale` da sincronizzare.
 4. **Bonifica Assistita**:
-   - Script `src/scripts/bonificaDatiProgetti.ts` che esegue `ricalcolaProgetto()` in modalità controllata per ogni pratica disallineata con log dettagliato dei campi aggiornati.
+   - Script `src/scripts/bonificaDatiProgetti.ts` che invoca `ricalcolaProgetto()` in modalità controllata per ogni pratica disallineata, con log dettagliato dei soli campi realmente aggiornati.
 
 ---
 
@@ -318,18 +280,21 @@ Creare test end-to-end automatizzati (con database di test isolato o mock comple
 ## 11. Checklist Operativa di Avanzamento
 
 ### 🚀 Sprint 1 — Scalabilità & Automazione Immediata (Priorità 🟠 ALTA)
-- [ ] **1.1** Applicare `PaginazioneQuerySchema` a `GET /invoices` con metadati di paginazione.
-- [ ] **1.2** Applicare paginazione a `GET /prima-nota`.
-- [ ] **1.3** Applicare paginazione a `GET /progetti`.
-- [ ] **1.4** Applicare paginazione a `GET /clienti`.
-- [ ] **1.5** Applicare paginazione a `GET /audit`.
-- [ ] **2.1** Creare scheduler notturno in-process in `src/services/cronScheduler.ts` per l'invio scadenze quotidiane.
-- [ ] **2.2** Integrare scheduler nell'avvio del server in `src/server.ts`.
+- [x] **1.1** Applicare il contratto paginato retrocompatibile a `GET /invoices` con metadati e allowlist di ordinamento.
+- [x] **1.2** Applicare paginazione a `GET /prima-nota` con riepilogo aggregato globale.
+- [x] **1.3** Applicare paginazione a `GET /progetti`, preservando il vincolo del ruolo cliente.
+- [x] **1.4** Applicare paginazione a `GET /clienti` senza esporre `passwordHash`.
+- [x] **1.5** Applicare paginazione a `GET /audit-logs` con errori DB espliciti.
+- [x] **1.6** Collegare e verificare le cinque pagine frontend con debounce, metadati e paginatore riusabile.
+- [x] **1.7** Completare i test mirati e la validazione integrale: 51 suite, 645 test, build TypeScript backend, typecheck/lint/build frontend verdi (restano warning lint e build non bloccanti già documentati).
+- [x] **2.1** Creare e verificare il runner CLI `src/scripts/runDailyNotificationCron.ts` per un Railway Cron separato e RLS-safe.
+- [ ] **2.2** Configurare su Railway il servizio Cron quotidiano con `npm run cron:notifiche`.
+- [ ] **2.3** Implementare la coda asincrona email/WhatsApp con retry e persistenza degli errori di invio.
 
 ### 🛡️ Sprint 2 — Integrità & Osservabilità (Priorità 🟡 MEDIA)
 - [ ] **3.1** Abilitare logger Pino con formattazione JSON strutturata in `src/server.ts`.
 - [ ] **3.2** Sanitizzazione automatica campi sensibili nei log (password, token, OTP).
-- [ ] **4.1** Creare script `src/scripts/auditIntegritaProgetti.ts` con algoritmo DFS per cicli DAG.
+- [ ] **4.1** Creare `src/scripts/auditIntegritaProgetti.ts` riusando il rilevamento cicli che produce `DipendenzaCiclicaError`.
 - [ ] **4.2** Eseguire script di audit in sola lettura e generare report anomalie progetti.
 - [ ] **4.3** Bonifica assistita dei progetti con divergenze avanzamento o moduli vuoti.
 

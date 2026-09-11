@@ -7,6 +7,7 @@ import type { FastifyInstance } from 'fastify';
 import type { AppPort } from '../services/appPort.js';
 import { prisma } from '../util/prismaClient.js';
 import { recordAudit } from '../util/serverHelpers.js';
+import { campoOrdinamento, creaMetaPaginazione, leggiPaginazione } from '../util/paginazione.js';
 
 export async function registraRotteContabilitaRegistro(server: FastifyInstance, app: AppPort): Promise<void> {
   // ─── COMPATIBILITÀ ROTTE PRECEDENTI ────────────────────────────────
@@ -55,25 +56,82 @@ export async function registraRotteContabilitaRegistro(server: FastifyInstance, 
   // ─── REGISTRO FATTURE (OPENSTAMANAGER ENGINE) ──────────────────────
   server.get('/invoices', async (req, reply) => {
     const tenantId = req.tenantId;
+    const paginazione = leggiPaginazione(req.query);
+    if (paginazione.paginata && 'errore' in paginazione) {
+      return reply.code(400).send({ errore: paginazione.errore });
+    }
+
     try {
-      const fatture = await prisma.fattura.findMany({
-        where: { tenantId },
-        include: {
-          righe: {
-            include: { moduloProgetto: true, articolo: true },
-            orderBy: { ordine: 'asc' },
-          },
-          progetto: { include: { cliente: true } },
-          cliente: true,
-          scadenzeIncasso: {
-            include: { registrazioniRegistrate: true },
-            orderBy: { numeroRata: 'asc' },
-          },
-          contoAccredito: true,
+      const include = {
+        righe: {
+          include: { moduloProgetto: true, articolo: true },
+          orderBy: { ordine: 'asc' as const },
         },
-        orderBy: { numeroProgressivoSerie: 'desc' },
+        progetto: { include: { cliente: true } },
+        cliente: true,
+        scadenzeIncasso: {
+          include: { registrazioniRegistrate: true },
+          orderBy: { numeroRata: 'asc' as const },
+        },
+        contoAccredito: true,
+      };
+
+      if (!paginazione.paginata) {
+        const fatture = await prisma.fattura.findMany({
+          where: { tenantId },
+          include,
+          orderBy: { numeroProgressivoSerie: 'desc' },
+        });
+        return reply.send(fatture);
+      }
+
+      const { page, limit, search, sortBy, sortOrder, stato, skip } = paginazione.parametri;
+      const campo = campoOrdinamento(sortBy, ['numeroProgressivoSerie', 'data', 'stato', 'totaleDocumentoCentesimi', 'createdAt'] as const, 'numeroProgressivoSerie');
+      if (!campo) return reply.code(400).send({ errore: 'Campo di ordinamento fatture non valido' });
+      const statiConsentiti = ['bozza', 'emessa', 'incassata', 'annullata'] as const;
+      if (stato && !statiConsentiti.includes(stato as typeof statiConsentiti[number])) {
+        return reply.code(400).send({ errore: 'Stato fattura non valido' });
+      }
+      const where = {
+        tenantId,
+        ...(stato ? { stato: stato as typeof statiConsentiti[number] } : {}),
+        ...(search ? {
+          OR: [
+            { numero: { contains: search, mode: 'insensitive' as const } },
+            { cliente: { nome: { contains: search, mode: 'insensitive' as const } } },
+          ],
+        } : {}),
+      };
+      const [fatture, totale, emesso, incassato, sospeso, noteCredito] = await Promise.all([
+        prisma.fattura.findMany({ where, include, skip, take: limit, orderBy: { [campo]: sortOrder } }),
+        prisma.fattura.count({ where }),
+        prisma.fattura.aggregate({
+          where: { ...where, tipoDocumento: 'fattura', stato: { not: 'bozza' } },
+          _sum: { totaleDocumentoCentesimi: true },
+        }),
+        prisma.fattura.aggregate({
+          where: { ...where, tipoDocumento: 'fattura', stato: 'incassata' },
+          _sum: { totaleDocumentoCentesimi: true },
+        }),
+        prisma.fattura.aggregate({
+          where: { ...where, tipoDocumento: 'fattura', stato: 'emessa' },
+          _sum: { totaleDocumentoCentesimi: true },
+        }),
+        prisma.fattura.aggregate({
+          where: { ...where, tipoDocumento: 'nota_credito' },
+          _sum: { totaleDocumentoCentesimi: true },
+        }),
+      ]);
+      return reply.send({
+        data: fatture,
+        meta: creaMetaPaginazione(page, limit, totale),
+        riepilogo: {
+          totaleEmessoCentesimi: emesso._sum.totaleDocumentoCentesimi ?? 0,
+          totaleIncassatoCentesimi: incassato._sum.totaleDocumentoCentesimi ?? 0,
+          totaleSospesoCentesimi: sospeso._sum.totaleDocumentoCentesimi ?? 0,
+          totaleNoteCreditoCentesimi: noteCredito._sum.totaleDocumentoCentesimi ?? 0,
+        },
       });
-      return reply.send(fatture);
     } catch (err: any) {
       return reply.code(500).send({ errore: err?.message || 'Errore lettura registro fatture' });
     }

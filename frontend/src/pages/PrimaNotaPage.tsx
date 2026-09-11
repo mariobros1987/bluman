@@ -9,15 +9,30 @@ import {
 } from '../api/client';
 import { fmt } from '../utils';
 import { EsportaFascicoloCommercialistaModal } from '../components/contabilita/EsportaFascicoloCommercialistaModal';
+import { Paginatore } from '../components/ui/Paginatore';
+import { isRispostaPaginata, type MetaPaginazione } from '../api/paginazione';
+
+interface RiepilogoPrimaNota {
+  totaleEntrateCentesimi: number;
+  totaleUsciteCentesimi: number;
+  saldoCentesimi: number;
+}
+const META_INIZIALE: MetaPaginazione = { page: 1, limit: 50, totale: 0, pagine: 0 };
 
 export function PrimaNotaPage() {
   const [movimenti, setMovimenti] = useState<any[]>([]);
   const [clienti, setClienti] = useState<any[]>([]);
   const [contiBancari, setContiBancari] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [errore, setErrore] = useState('');
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(50);
+  const [meta, setMeta] = useState<MetaPaginazione>(META_INIZIALE);
+  const [riepilogo, setRiepilogo] = useState<RiepilogoPrimaNota>({ totaleEntrateCentesimi: 0, totaleUsciteCentesimi: 0, saldoCentesimi: 0 });
   const [selectedTipo, setSelectedTipo] = useState('tutti');
   const [selectedMetodo, setSelectedMetodo] = useState('tutti');
   const [searchTerm, setSearchTerm] = useState('');
+  const [searchDebounced, setSearchDebounced] = useState('');
   const [showExportModal, setShowExportModal] = useState(false);
 
   // Modal Nuova Registrazione Prima Nota
@@ -39,16 +54,31 @@ export function PrimaNotaPage() {
 
   const loadData = async () => {
     setLoading(true);
+    setErrore('');
     try {
       const [pnRes, clRes, contiRes] = await Promise.all([
-        fetchPrimaNotaApi(),
+        fetchPrimaNotaApi({
+          page,
+          limit,
+          search: searchDebounced,
+          sortBy: 'data',
+          sortOrder: 'desc',
+          tipo: selectedTipo === 'tutti' ? undefined : selectedTipo,
+          metodo: selectedMetodo === 'tutti' ? undefined : selectedMetodo,
+        }),
         fetchClienti(),
         fetchContiBancariApi(),
       ]);
-      setMovimenti(pnRes || []);
+      if (!isRispostaPaginata<any>(pnRes)) throw new Error('Risposta Prima Nota non valida');
+      setMovimenti(pnRes.data);
+      setMeta(pnRes.meta);
+      if (pnRes.meta.pagine > 0 && page > pnRes.meta.pagine) setPage(pnRes.meta.pagine);
+      setRiepilogo((pnRes.riepilogo as RiepilogoPrimaNota | undefined) || { totaleEntrateCentesimi: 0, totaleUsciteCentesimi: 0, saldoCentesimi: 0 });
       setClienti(clRes || []);
       setContiBancari(contiRes || []);
     } catch (err) {
+      setErrore(err instanceof Error ? err.message : 'Errore caricamento Prima Nota');
+      setMovimenti([]);
       console.warn('Errore caricamento Prima Nota:', err);
     } finally {
       setLoading(false);
@@ -56,8 +86,16 @@ export function PrimaNotaPage() {
   };
 
   useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      setPage(1);
+      setSearchDebounced(searchTerm.trim());
+    }, 300);
+    return () => window.clearTimeout(timeout);
+  }, [searchTerm]);
+
+  useEffect(() => {
     loadData();
-  }, []);
+  }, [page, limit, searchDebounced, selectedTipo, selectedMetodo]);
 
   const handleImportCsv = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -119,17 +157,11 @@ export function PrimaNotaPage() {
   };
 
   // Metriche
-  const totalEntrateCent = movimenti.filter((m) => m.tipo === 'entrata').reduce((acc, m) => acc + (m.importoCentesimi || 0), 0);
-  const totalUsciteCent = movimenti.filter((m) => m.tipo === 'uscita').reduce((acc, m) => acc + (m.importoCentesimi || 0), 0);
-  const saldoPeriodoCent = totalEntrateCent - totalUsciteCent;
+  const totalEntrateCent = riepilogo.totaleEntrateCentesimi;
+  const totalUsciteCent = riepilogo.totaleUsciteCentesimi;
+  const saldoPeriodoCent = riepilogo.saldoCentesimi;
 
-  const filteredMovimenti = movimenti.filter((m) => {
-    if (selectedTipo !== 'tutti' && m.tipo !== selectedTipo) return false;
-    if (selectedMetodo !== 'tutti' && m.metodoPagamento !== selectedMetodo) return false;
-    const searchString = `${m.descrizione} ${m.cliente?.nome || ''} ${m.riferimentoTransazione || ''} ${m.contoBancario?.nomeConto || ''}`.toLowerCase();
-    if (searchTerm && !searchString.includes(searchTerm.toLowerCase())) return false;
-    return true;
-  });
+  const filteredMovimenti = movimenti;
 
   return (
     <div style={{ padding: '2rem' }}>
@@ -205,7 +237,7 @@ export function PrimaNotaPage() {
         </div>
         <div style={{ background: 'var(--card)', padding: 20, borderRadius: 12, border: '1px solid var(--border)' }}>
           <div style={{ fontSize: 13, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 600 }}>Movimenti Registrati</div>
-          <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--text)', marginTop: 8 }}>📊 {movimenti.length}</div>
+          <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--text)', marginTop: 8 }}>📊 {meta.totale}</div>
         </div>
       </div>
 
@@ -221,7 +253,7 @@ export function PrimaNotaPage() {
           />
           <select
             value={selectedTipo}
-            onChange={(e) => setSelectedTipo(e.target.value)}
+            onChange={(e) => { setSelectedTipo(e.target.value); setPage(1); }}
             style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', width: 160 }}
           >
             <option value="tutti">Tutti i tipi</option>
@@ -230,7 +262,7 @@ export function PrimaNotaPage() {
           </select>
           <select
             value={selectedMetodo}
-            onChange={(e) => setSelectedMetodo(e.target.value)}
+            onChange={(e) => { setSelectedMetodo(e.target.value); setPage(1); }}
             style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', width: 160 }}
           >
             <option value="tutti">Tutti i metodi</option>
@@ -241,6 +273,7 @@ export function PrimaNotaPage() {
           </select>
         </div>
 
+        {errore && <div style={{ padding: 12, marginBottom: 12, borderRadius: 8, background: '#7f1d1d', color: '#fecaca' }}>{errore}</div>}
         {loading ? (
           <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted)' }}>Caricamento Prima Nota a database...</div>
         ) : (
@@ -329,6 +362,11 @@ export function PrimaNotaPage() {
             </tbody>
           </table>
         )}
+        <Paginatore
+          meta={meta}
+          onPageChange={setPage}
+          onLimitChange={(nuovoLimite) => { setLimit(nuovoLimite); setPage(1); }}
+        />
       </div>
 
       {/* MODAL NUOVA REGISTRAZIONE */}
