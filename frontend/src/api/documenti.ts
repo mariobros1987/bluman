@@ -442,7 +442,18 @@ export async function scaricaDocumentoClient(fileUrl?: string | null, nomeFile?:
     link.click();
     document.body.removeChild(link);
     setTimeout(() => URL.revokeObjectURL(objectUrl), 4000);
-  } catch {
+  } catch (err) {
+    // Regola 5: un errore HTTP del backend non è un blocco di fetch, e confonderli era
+    // l'«errore download» dell'incidente — un 401 o un 404 del catalogo finiva aperto in
+    // una scheda col JSON d'errore, che all'operatore sembra un file rotto. Se il server
+    // ha risposto, lo diciamo con lo status vero; la navigazione in una scheda resta solo
+    // per quando la fetch è davvero bloccata (rete/CORS), l'unico caso in cui provarci
+    // ha senso perché il browser può ancora scaricare direttamente.
+    const messaggio = err instanceof Error ? err.message : '';
+    if (/^HTTP \d+$/.test(messaggio)) {
+      alert(`Errore download documento: il server ha risposto ${messaggio} per «${nomeFile || 'documento'}»`);
+      return;
+    }
     // Fallback con navigazione link se la fetch diretta è bloccata
     const link = document.createElement('a');
     link.href = url;
