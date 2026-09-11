@@ -9,6 +9,7 @@ import type { AppPort } from '../services/appPort.js';
 import { prisma, conContestoInTransazione, riprovaSuConflitto } from '../util/prismaClient.js';
 import { notificaStudio, notificaCliente } from '../services/notificheService.js';
 import { recordAudit } from '../util/serverHelpers.js';
+import { RegistraIncassoSchema } from '../schemas/contabilita.schema.js';
 
 export async function registraRotteContabilitaScadenzario(server: FastifyInstance, app: AppPort): Promise<void> {
   // ─── SCADENZARIO & REGISTRAZIONE INCASSI CON PRIMA NOTA AUTOMATICA ──
@@ -46,7 +47,11 @@ export async function registraRotteContabilitaScadenzario(server: FastifyInstanc
   }>('/invoices/scadenze/:id/incassi', async (req, reply) => {
     const tenantId = req.tenantId;
     const { id } = req.params;
-    const { importoIncassatoCentesimi, metodoPagamento, riferimentoTransazione, contoBancarioId, noteOperatore } = req.body;
+    const parseResult = RegistraIncassoSchema.safeParse(req.body || {});
+    if (!parseResult.success) {
+      return reply.code(400).send({ errore: parseResult.error.issues[0]?.message || 'Dati incasso non validi' });
+    }
+    const { importoIncassatoCentesimi, metodoPagamento, riferimentoTransazione, contoBancarioId, noteOperatore } = parseResult.data;
 
     try {
       // L'incasso è UNA sola operazione contabile: registrazione, stato della

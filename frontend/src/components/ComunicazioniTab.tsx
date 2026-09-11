@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { fetchComunicazioniApi, inviaComunicazioneApi, fetchClienti, sendWhatsAppDirectApi, sendEmailDirectApi, fetchInboundImapEmailsApi, fetchTenantInfoApi } from '../api/client';
+import { fetchComunicazioniApi, inviaComunicazioneApi, fetchClienti, sendWhatsAppDirectApi, sendEmailDirectApi, fetchInboundImapEmailsApi, fetchInboundImapAllegatiApi, fetchTenantInfoApi, uploadFileApi, urlDocumentoAssoluto } from '../api/client';
 import { downloadGuidePdf } from '../utils/pdfGenerator';
 import { getCurrentTenantId, getTenantStorageKey, getStudioInfoForTenant, BLUECODE_TENANT_ID } from '../utils/tenant';
 import type { Cliente } from '../types';
@@ -200,6 +200,10 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
   // ogni scheda aperta. I messaggi già salvati si rileggono a 5 s, la posta in arrivo a 60 s.
   const ultimaLetturaImap = useRef(0);
   const [erroreImap, setErroreImap] = useState<string | null>(null);
+  const [fileAllegato, setFileAllegato] = useState<{ nome: string; base64: string; sizeStr: string; mime: string } | null>(null);
+  const [caricandoFile, setCaricandoFile] = useState(false);
+  const [sincronizzandoAllegati, setSincronizzandoAllegati] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadComunicazioni = async (opzioni: { conImap?: boolean } = {}): Promise<string | null> => {
     // Restituisce il motivo per cui la posta in arrivo non è stata letta (null se tutto ok):
@@ -284,13 +288,76 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
     return () => clearInterval(interval);
   }, [progettoId]);
 
+  const sincronizzaAllegatiImap = async () => {
+    setSincronizzandoAllegati(true);
+    try {
+      const targetEmail = customDestEmail.trim() || contactInfo.email;
+      const esito = await fetchInboundImapAllegatiApi(targetEmail);
+      if (!esito.ok) {
+        setFeedback({ tipo: 'err', testo: `Allegati IMAP: ${esito.errore || 'lettura non riuscita'}` });
+        setTimeout(() => setFeedback(null), 5000);
+        return;
+      }
+      if (!esito.email || esito.email.length === 0) {
+        setFeedback({ tipo: 'ok', testo: 'Nessuna nuova email con allegati trovata nella casella.' });
+        setTimeout(() => setFeedback(null), 3500);
+        return;
+      }
+      let contatoreNuovi = 0;
+      for (const item of esito.email) {
+        const alreadyExists = messaggi.some(
+          m => m.testo?.trim() === item.text?.trim() || m.id === item.id
+        );
+        if (!alreadyExists && item.allegati?.length) {
+          await inviaComunicazioneApi(String(progettoId), {
+            canale: 'email',
+            mittente: item.from,
+            destinatario: item.to || targetEmail || "Casella dello studio",
+            direzione: 'entrata',
+            testo: item.text,
+            allegatiJson: item.allegati,
+          });
+          contatoreNuovi++;
+        }
+      }
+      await loadComunicazioni({ conImap: false });
+      setFeedback({ tipo: 'ok', testo: `✓ Sincronizzazione allegati: ${contatoreNuovi} email con allegati importate!` });
+      setTimeout(() => setFeedback(null), 4000);
+    } catch (e: any) {
+      setFeedback({ tipo: 'err', testo: `Errore allegati IMAP: ${e?.message || 'errore imprevisto'}` });
+      setTimeout(() => setFeedback(null), 5000);
+    } finally {
+      setSincronizzandoAllegati(false);
+    }
+  };
+
   const handleInviaMessaggio = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!nuovoTesto.trim() || inviando) return;
+    if ((!nuovoTesto.trim() && !fileAllegato) || inviando || caricandoFile) return;
     setInviando(true);
     setFeedback(null);
 
-    const testoDaInviare = nuovoTesto.trim();
+    let allegatiCaricati: any[] | undefined;
+    if (fileAllegato) {
+      setCaricandoFile(true);
+      try {
+        const resUpload = await uploadFileApi(fileAllegato.nome, fileAllegato.base64);
+        if (resUpload && resUpload.url) {
+          allegatiCaricati = [{
+            nome: resUpload.name || fileAllegato.nome,
+            url: resUpload.url,
+            dimensione: resUpload.size || fileAllegato.sizeStr,
+            mime: fileAllegato.mime,
+          }];
+        }
+      } catch (errUp) {
+        console.warn('Errore upload allegato:', errUp);
+      } finally {
+        setCaricandoFile(false);
+      }
+    }
+
+    const testoDaInviare = nuovoTesto.trim() || (allegatiCaricati ? `[Allegato: ${allegatiCaricati[0].nome}]` : '');
     // Chi ha fatto l'accesso, non 'Joe Disabato (Senior Advisor)' scritto nel codice: il
     // registro delle comunicazioni attribuiva a lui ogni messaggio, da qualunque operatore.
     const utenteStr = typeof window !== 'undefined' ? localStorage.getItem('bluman_user') : null;
@@ -325,10 +392,13 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
       direzione: 'uscita',
       testo: testoDaInviare,
       dataOra: new Date().toLocaleString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+      allegati: allegatiCaricati || [],
     };
 
     setMessaggi(prev => [...prev, nuovoMsg]);
     setNuovoTesto('');
+    setFileAllegato(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
 
     try {
       // 1. Persistenza su Backend Fastify / Supabase
@@ -338,6 +408,7 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
         destinatario,
         direzione: 'uscita',
         testo: testoDaInviare,
+        ...(allegatiCaricati ? { allegatiJson: allegatiCaricati } : {}),
       });
 
       // 2. Se Email, invio reale tramite la rotta autenticata POST /comunicazioni/invia-email
@@ -531,6 +602,23 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
           >
             {loadingMsgs ? '⏳ Sincronizzazione...' : '🔄 Sincronizza Live'}
           </button>
+          <button
+            onClick={sincronizzaAllegatiImap}
+            disabled={sincronizzandoAllegati}
+            title="Scarica gli allegati email via IMAP e li associa al fascicolo"
+            style={{
+              background: 'var(--card2)',
+              color: '#38bdf8',
+              border: '1px solid var(--border)',
+              padding: '5px 12px',
+              borderRadius: 20,
+              fontSize: 11,
+              fontWeight: 700,
+              cursor: 'pointer',
+            }}
+          >
+            {sincronizzandoAllegati ? '⏳ Scarico Allegati...' : '📎 Sincronizza Allegati Email'}
+          </button>
         </div>
       </div>
 
@@ -618,7 +706,7 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
                       </div>
                       <div style={{ display: 'flex', gap: 6 }}>
                         <a
-                          href={att.url || '#'}
+                          href={urlDocumentoAssoluto(att.url || '#')}
                           download={att.nome}
                           target="_blank"
                           rel="noreferrer"
@@ -792,32 +880,97 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
           </div>
         )}
 
-        <div style={{ display: 'flex', gap: 10 }}>
+        {fileAllegato && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#1e1b4b', border: '1px solid #4338ca', borderRadius: 8, padding: '6px 12px', fontSize: 11, color: '#c7d2fe', width: 'fit-content' }}>
+            <span>📎 {fileAllegato.nome}</span>
+            <span style={{ fontSize: 9.5, opacity: 0.8 }}>({fileAllegato.sizeStr})</span>
+            <button
+              type="button"
+              onClick={() => {
+                setFileAllegato(null);
+                if (fileInputRef.current) fileInputRef.current.value = '';
+              }}
+              style={{ background: 'transparent', border: 'none', color: '#f87171', cursor: 'pointer', fontWeight: 700, padding: '0 4px', fontSize: 12 }}
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
+        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end' }}>
           <textarea
             value={nuovoTesto}
             onChange={e => setNuovoTesto(e.target.value)}
-            disabled={inviando}
+            disabled={inviando || caricandoFile}
             placeholder={`Scrivi un messaggio per ${contactInfo.referente} da inviare via ${canaleSelezionato.toUpperCase()} (${channelDetail.val})...`}
             rows={2}
             style={{ flex: 1, fontSize: 12.5, borderRadius: 10, padding: 10, resize: 'none' }}
           />
+
+          {/* Hidden file input */}
+          <input
+            type="file"
+            ref={fileInputRef}
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              if (file.size > 15 * 1024 * 1024) {
+                alert('Il file selezionato supera il limite di 15 MB.');
+                return;
+              }
+              const reader = new FileReader();
+              reader.onload = () => {
+                setFileAllegato({
+                  nome: file.name,
+                  base64: reader.result as string,
+                  sizeStr: `${(file.size / 1024).toFixed(0)} KB`,
+                  mime: file.type || 'application/octet-stream',
+                });
+              };
+              reader.readAsDataURL(file);
+            }}
+          />
+
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            title="Allega un documento o file"
+            style={{
+              background: 'var(--card)',
+              color: 'var(--text)',
+              border: '1px solid var(--border)',
+              padding: '8px 12px',
+              borderRadius: 10,
+              fontSize: 14,
+              cursor: 'pointer',
+              height: 44,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            📎
+          </button>
+
           <button
             type="submit"
-            disabled={inviando || !nuovoTesto.trim()}
+            disabled={inviando || caricandoFile || (!nuovoTesto.trim() && !fileAllegato)}
             style={{
-              background: inviando ? '#4338ca' : 'var(--indigo)',
+              background: inviando || caricandoFile ? '#4338ca' : 'var(--indigo)',
               color: '#fff',
               border: 'none',
               padding: '0 24px',
               borderRadius: 10,
               fontSize: 13,
               fontWeight: 700,
-              cursor: inviando ? 'not-allowed' : 'pointer',
+              height: 44,
+              cursor: inviando || caricandoFile ? 'not-allowed' : 'pointer',
               boxShadow: '0 4px 14px rgba(99,102,241,.3)',
-              opacity: inviando || !nuovoTesto.trim() ? 0.7 : 1,
+              opacity: inviando || caricandoFile || (!nuovoTesto.trim() && !fileAllegato) ? 0.7 : 1,
             }}
           >
-            {inviando ? 'Invio in corso...' : 'Invia Ora →'}
+            {inviando || caricandoFile ? 'Invio in corso...' : 'Invia Ora →'}
           </button>
         </div>
       </form>

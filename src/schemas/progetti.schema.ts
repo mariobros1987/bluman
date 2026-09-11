@@ -15,6 +15,9 @@ export const CreaProgettoSchema = z.object({
 }).passthrough();
 
 export const ConsuntivaOreSchema = z.object({
-  ore: z.number().positive('Le ore devono essere maggiori di 0'),
+  ore: z.number().positive('Le ore devono essere maggiori di 0').optional(),
+  oreAggiunte: z.number().positive('Le ore devono essere maggiori di 0').optional(),
   nota: z.string().max(1000).optional(),
+}).refine(data => data.ore !== undefined || data.oreAggiunte !== undefined, {
+  message: 'Il campo ore (o oreAggiunte) è obbligatorio',
 });

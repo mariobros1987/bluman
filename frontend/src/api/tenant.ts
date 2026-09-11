@@ -389,6 +389,40 @@ export async function fetchInboundImapEmailsApi(
   }
 }
 
+/**
+ * Legge le ultime email con allegati dalla casella dello studio via IMAP e restituisce gli allegati caricati su storage.
+ */
+export async function fetchInboundImapAllegatiApi(
+  clientEmail?: string,
+): Promise<{ ok: boolean; email: any[]; errore?: string }> {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 60000);
+    const res = await apiFetch(`${API_BASE}/comunicazioni/poll-imap-allegati`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ clientEmail: clientEmail || '' }),
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    const data = await res.json().catch(() => null);
+    if (res.ok && data?.ok && Array.isArray(data.email)) {
+      return { ok: true, email: data.email };
+    }
+    return {
+      ok: false,
+      email: [],
+      errore: data?.errore || `Il server ha risposto ${res.status} senza spiegare il motivo.`,
+    };
+  } catch (err: any) {
+    return {
+      ok: false,
+      email: [],
+      errore: err?.name === 'AbortError' ? 'Timeout sincronizzazione allegati IMAP.' : err?.message || 'Backend non raggiungibile.',
+    };
+  }
+}
+
 export async function fetchPermessiUtenteApi(userId: string) {
   try {
     const res = await apiFetch(`${API_BASE}/tenant/utenti/${userId}/permessi`, { headers: getAuthHeaders() });

@@ -1,5 +1,6 @@
 import { downloadRealPdf, downloadRealWordDoc } from '../utils/pdfGenerator';
 import { API_BASE, apiFetch, getAuthHeaders, leggiErroreApi, urlDocumentoAssoluto } from './http';
+export { urlDocumentoAssoluto };
 
 export async function uploadFileApi(filename: string, contentBase64: string) {
   // §3.3 — prima il `catch` restituiva `{ ok: true, url: '<API>/uploads/<nome>', size: '450 KB' }`:

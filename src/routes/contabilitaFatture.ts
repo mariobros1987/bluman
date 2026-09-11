@@ -22,6 +22,7 @@ import {
   type OpzioniCalcoloFattura,
 } from '../services/fatturaEngine.js';
 import { recordAudit } from '../util/serverHelpers.js';
+import { EmettiFatturaSchema } from '../schemas/contabilita.schema.js';
 
 export async function registraRotteContabilitaFatture(server: FastifyInstance, app: AppPort): Promise<void> {
   // ─── CREAZIONE NUOVA FATTURA O BOZZA ───────────────────────────────
@@ -48,14 +49,11 @@ export async function registraRotteContabilitaFatture(server: FastifyInstance, a
     };
   }>('/invoices', async (req, reply) => {
     const tenantId = req.tenantId;
+    const parseResult = EmettiFatturaSchema.safeParse(req.body || {});
+    if (!parseResult.success) {
+      return reply.code(400).send({ errore: parseResult.error.issues[0]?.message || 'Dati fattura non validi' });
+    }
     const body = req.body;
-
-    if (!body.clienteId) {
-      return reply.code(400).send({ errore: 'Il cliente è obbligatorio' });
-    }
-    if (!body.righe || !Array.isArray(body.righe) || body.righe.length === 0) {
-      return reply.code(400).send({ errore: 'È richiesta almeno una riga prestazione/articolo' });
-    }
 
     try {
       const cliente = await prisma.cliente.findFirst({

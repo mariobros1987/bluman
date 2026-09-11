@@ -1,5 +1,6 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { inviaComunicazioneApi, fetchComunicazioniApi } from '../../api/client';
+import { uploadFileApi, urlDocumentoAssoluto } from '../../api/documenti';
 import type { ContattiStudio } from '../../api/client';
 import { getStudioInfoForTenant } from '../../utils/tenant';
 import { docBoxStyle } from './styles';
@@ -33,6 +34,10 @@ export function TabContatti({
   clientObj,
   progettoId,
 }: TabContattiProps) {
+  const [fileAllegato, setFileAllegato] = useState<{ nome: string; base64: string; sizeStr: string; mime: string } | null>(null);
+  const [caricandoFile, setCaricandoFile] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   // Polling 5 s: così la risposta dell'advisor appare senza dover ricaricare la pagina.
   // Identico all'interval di ComunicazioniTab sul lato operatore. Se progettoId non è
   // ancora disponibile (progetto non ancora selezionato) il polling non parte.
@@ -45,7 +50,14 @@ export function TabContatti({
       fetchComunicazioniApi(progettoId)
         .then(msgs => {
           if (msgs && Array.isArray(msgs) && msgs.length > 0) {
-            setMessaggiRef.current(() => msgs);
+            const normalizzati = msgs.map((m: any) => ({
+              ...m,
+              dataOra: m.createdAt ? new Date(m.createdAt).toLocaleString('it-IT') : (m.dataOra || 'Oggi'),
+              allegati: m.allegatiJson
+                ? (typeof m.allegatiJson === 'string' ? (() => { try { return JSON.parse(m.allegatiJson); } catch { return []; } })() : m.allegatiJson)
+                : (m.allegati || []),
+            }));
+            setMessaggiRef.current(() => normalizzati);
           }
         })
         .catch(() => {});
@@ -124,24 +136,87 @@ export function TabContatti({
                 <div style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.4, whiteSpace: 'pre-wrap' }}>
                   {m.testo}
                 </div>
+
+                {/* Allegati allegati al messaggio */}
+                {m.allegati && m.allegati.length > 0 && (
+                  <div style={{ marginTop: 8, borderTop: `1px solid ${isCliente ? 'rgba(255,255,255,0.15)' : 'var(--border)'}`, paddingTop: 6, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <div style={{ fontSize: 9.5, color: isCliente ? '#c7d2fe' : 'var(--muted)', fontWeight: 700, textTransform: 'uppercase' }}>
+                      📎 Allegati ({m.allegati.length}):
+                    </div>
+                    {m.allegati.map((att: any, attIdx: number) => {
+                      const downloadUrl = urlDocumentoAssoluto(att.url || '#');
+                      return (
+                        <div key={attIdx} style={{ background: isCliente ? 'rgba(0,0,0,0.25)' : 'var(--card)', border: `1px solid ${isCliente ? 'rgba(255,255,255,0.15)' : 'var(--border)'}`, borderRadius: 6, padding: '6px 10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                            <span>📄</span>
+                            <div style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              <div style={{ fontWeight: 600, fontSize: 11, color: isCliente ? '#fff' : 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis' }}>{att.nome}</div>
+                              {att.dimensione && <div style={{ fontSize: 9, color: isCliente ? '#a5b4fc' : 'var(--muted)' }}>{att.dimensione}</div>}
+                            </div>
+                          </div>
+                          <a
+                            href={downloadUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            download={att.nome}
+                            style={{
+                              background: isCliente ? '#4f46e5' : 'var(--card2)',
+                              color: '#fff',
+                              border: '1px solid rgba(255,255,255,0.2)',
+                              padding: '3px 8px',
+                              borderRadius: 4,
+                              fontSize: 10,
+                              fontWeight: 600,
+                              textDecoration: 'none',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            ⬇️ Scarica
+                          </a>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             );
           })
         )}
       </div>
 
-      {/* Live Message Sender Form */}
+      {/* Live Message Sender Form con Supporto Allegati */}
       <form
         onSubmit={async (e) => {
           e.preventDefault();
-          if (!nuovoMessaggio.trim() || inviandoMessaggio) return;
+          if ((!nuovoMessaggio.trim() && !fileAllegato) || inviandoMessaggio || caricandoFile) return;
           setInviandoMessaggio(true);
 
-          // §2.6: il destinatario è lo studio reale (e il suo advisor se c'è), non un
-          // nome cablato.
+          // §2.6: il destinatario è lo studio reale (e il suo advisor se c'è), non un nome cablato.
           const destinatarioStudio = contattiStudio?.advisorNome
             ? `${contattiStudio.studio || 'Studio'} (${contattiStudio.advisorNome})`
             : (contattiStudio?.studio || 'Studio');
+
+          let allegatiCaricati: any[] | undefined;
+          if (fileAllegato) {
+            setCaricandoFile(true);
+            try {
+              const resUpload = await uploadFileApi(fileAllegato.nome, fileAllegato.base64);
+              if (resUpload && resUpload.url) {
+                allegatiCaricati = [{
+                  nome: resUpload.name || fileAllegato.nome,
+                  url: resUpload.url,
+                  dimensione: resUpload.size || fileAllegato.sizeStr,
+                  mime: fileAllegato.mime,
+                }];
+              }
+            } catch (errUp) {
+              console.warn('Errore upload allegato portale:', errUp);
+            } finally {
+              setCaricandoFile(false);
+            }
+          }
+
+          const testoFinale = nuovoMessaggio.trim() || (allegatiCaricati ? `[Allegato: ${allegatiCaricati[0].nome}]` : '');
 
           const msgObj = {
             id: `msg-${Date.now()}`,
@@ -149,8 +224,9 @@ export function TabContatti({
             mittente: `${clientName} (Cliente)`,
             destinatario: destinatarioStudio,
             direzione: 'entrata',
-            testo: nuovoMessaggio.trim(),
+            testo: testoFinale,
             dataOra: new Date().toLocaleString('it-IT'),
+            allegati: allegatiCaricati || [],
           };
 
           setMessaggi(prev => [...prev, msgObj]);
@@ -161,13 +237,16 @@ export function TabContatti({
               mittente: `${clientName} (Cliente)`,
               destinatario: destinatarioStudio,
               direzione: 'entrata',
-              testo: nuovoMessaggio.trim(),
+              testo: testoFinale,
+              ...(allegatiCaricati ? { allegatiJson: allegatiCaricati } : {}),
             });
           } catch (err) {
             console.warn('Errore invio messaggio portale:', err);
           }
 
           setNuovoMessaggio('');
+          setFileAllegato(null);
+          if (fileInputRef.current) fileInputRef.current.value = '';
           setInviandoMessaggio(false);
         }}
         style={{ display: 'flex', flexDirection: 'column', gap: 10, background: 'var(--card2)', padding: 14, borderRadius: 12, border: '1px solid var(--border)' }}
@@ -181,13 +260,6 @@ export function TabContatti({
               onChange={(e) => setCanaleMessaggio(e.target.value as any)}
               style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, background: 'var(--card)', color: 'var(--text)', border: '1px solid var(--border)' }}
             >
-              {/*
-                I tre ripieghi che stavano qui — un cellulare di una persona reale, un
-                indirizzo inventato e una @ costruita dal nome del cliente — comparivano
-                nella tendina di qualunque cliente che non avesse quel recapito in
-                anagrafica, e sceglierli significava chiedere l'invio a un estraneo. Ora
-                il canale senza recapito si vede spento e non è selezionabile.
-              */}
               <option value="portal">🌐 Portale Riservato (Sicuro)</option>
               {(() => {
                 const referenti = (clientObj as any)?.referentiJson || {};
@@ -206,7 +278,25 @@ export function TabContatti({
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: 10 }}>
+        {/* Chip file allegato in anteprima */}
+        {fileAllegato && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#1e1b4b', border: '1px solid #4338ca', borderRadius: 8, padding: '6px 12px', fontSize: 11, color: '#c7d2fe', width: 'fit-content' }}>
+            <span>📎 {fileAllegato.nome}</span>
+            <span style={{ fontSize: 9.5, opacity: 0.8 }}>({fileAllegato.sizeStr})</span>
+            <button
+              type="button"
+              onClick={() => {
+                setFileAllegato(null);
+                if (fileInputRef.current) fileInputRef.current.value = '';
+              }}
+              style={{ background: 'transparent', border: 'none', color: '#f87171', cursor: 'pointer', fontWeight: 700, padding: '0 4px', fontSize: 12 }}
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
+        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end' }}>
           <textarea
             value={nuovoMessaggio}
             onChange={(e) => setNuovoMessaggio(e.target.value)}
@@ -214,9 +304,56 @@ export function TabContatti({
             rows={2}
             style={{ flex: 1, fontSize: 12, padding: 10, borderRadius: 8, background: 'var(--bg)', color: 'var(--text)', border: '1px solid var(--border)', resize: 'none' }}
           />
+
+          {/* Hidden file input */}
+          <input
+            type="file"
+            ref={fileInputRef}
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              if (file.size > 15 * 1024 * 1024) {
+                alert('Il file selezionato supera il limite di 15 MB.');
+                return;
+              }
+              const reader = new FileReader();
+              reader.onload = () => {
+                setFileAllegato({
+                  nome: file.name,
+                  base64: reader.result as string,
+                  sizeStr: `${(file.size / 1024).toFixed(0)} KB`,
+                  mime: file.type || 'application/octet-stream',
+                });
+              };
+              reader.readAsDataURL(file);
+            }}
+          />
+
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            title="Allega un documento o file"
+            style={{
+              background: 'var(--card)',
+              color: 'var(--text)',
+              border: '1px solid var(--border)',
+              padding: '8px 12px',
+              borderRadius: 8,
+              fontSize: 13,
+              cursor: 'pointer',
+              height: 42,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+            }}
+          >
+            📎
+          </button>
+
           <button
             type="submit"
-            disabled={inviandoMessaggio || !nuovoMessaggio.trim()}
+            disabled={inviandoMessaggio || caricandoFile || (!nuovoMessaggio.trim() && !fileAllegato)}
             style={{
               background: 'var(--indigo)',
               color: '#fff',
@@ -226,10 +363,11 @@ export function TabContatti({
               fontSize: 12,
               fontWeight: 700,
               cursor: 'pointer',
-              opacity: (!nuovoMessaggio.trim() || inviandoMessaggio) ? 0.6 : 1,
+              height: 42,
+              opacity: (!nuovoMessaggio.trim() && !fileAllegato) || inviandoMessaggio || caricandoFile ? 0.6 : 1,
             }}
           >
-            {inviandoMessaggio ? 'Invio...' : 'Invia →'}
+            {inviandoMessaggio || caricandoFile ? 'Invio...' : 'Invia →'}
           </button>
         </div>
       </form>

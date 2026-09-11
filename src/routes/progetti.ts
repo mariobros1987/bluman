@@ -22,7 +22,7 @@ import { arricchisciProgetti, calcolaAvanzamento, ricalcolaProgetto } from '../s
 import { ricercaGlobale } from '../services/ricercaGlobaleService.js';
 import { STATI_MICROVOCE, STATI_PROGETTO, recordAudit } from '../util/serverHelpers.js';
 import { livelloFirmaValido } from '../services/livelloFirmaService.js';
-import { CreaProgettoSchema } from '../schemas/progetti.schema.js';
+import { CreaProgettoSchema, ConsuntivaOreSchema } from '../schemas/progetti.schema.js';
 
 // ─── PROGETTI, COMUNICAZIONI, TIMESHEET, CHECKLIST & ESECUZIONE ─────
 export async function registraRotteProgetti(server: FastifyInstance, app: AppPort): Promise<void> {
@@ -47,7 +47,7 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
           destinatario: body.destinatario,
           direzione: body.direzione || 'uscita',
           testo: body.testo,
-          allegatiJson: body.allegatiJson ? JSON.stringify(body.allegatiJson) : null,
+          allegatiJson: body.allegatiJson ? (typeof body.allegatiJson === 'string' ? body.allegatiJson : JSON.stringify(body.allegatiJson)) : null,
         },
       });
       // Blocco 3 — messaggio in arrivo dal cliente: lo studio viene avvisato subito.
@@ -1042,10 +1042,11 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
     Params: { id: string };
     Body: { oreAggiunte?: number; ore?: number };
   }>('/microvoci/:id/consuntiva', async (req, reply) => {
-    const ore = req.body?.oreAggiunte ?? req.body?.ore;
-    if (ore === undefined || typeof ore !== 'number') {
-      return reply.code(400).send({ errore: 'Il campo ore (o oreAggiunte) è obbligatorio' });
+    const parseResult = ConsuntivaOreSchema.safeParse(req.body || {});
+    if (!parseResult.success) {
+      return reply.code(400).send({ errore: parseResult.error.issues[0]?.message || 'Il campo ore (o oreAggiunte) è obbligatorio' });
     }
+    const ore = parseResult.data.oreAggiunte ?? parseResult.data.ore!;
     await app.consuntivaMicrovoce({ microvoceId: req.params.id, oreAggiunte: ore });
     return { ok: true, oreConsuntivate: ore };
   });

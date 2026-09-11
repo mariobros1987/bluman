@@ -13,6 +13,7 @@ import {
   type OpzioniCalcoloFattura,
 } from '../services/fatturaEngine.js';
 import { recordAudit } from '../util/serverHelpers.js';
+import { CreaContrattoRicorrenteSchema } from '../schemas/contabilita.schema.js';
 
 export async function registraRotteContabilitaContratti(server: FastifyInstance, app: AppPort): Promise<void> {
   // ─── CONTRATTI RICORRENTI & RETAINER ───────────────────────────────
@@ -42,11 +43,11 @@ export async function registraRotteContabilitaContratti(server: FastifyInstance,
     };
   }>('/contratti-ricorrenti', async (req, reply) => {
     const tenantId = req.tenantId;
-    const { clienteId, progettoId, titolo, frequenza, importoCentesimi, prossimaFatturazione, note } = req.body;
-
-    if (!clienteId || !titolo || !importoCentesimi) {
-      return reply.code(400).send({ errore: 'clienteId, titolo e importoCentesimi sono obbligatori' });
+    const parseResult = CreaContrattoRicorrenteSchema.safeParse(req.body || {});
+    if (!parseResult.success) {
+      return reply.code(400).send({ errore: parseResult.error.issues[0]?.message || 'clienteId, titolo e importoCentesimi sono obbligatori' });
     }
+    const { clienteId, progettoId, titolo, frequenza, importoCentesimi, prossimaFatturazione, note } = parseResult.data as any;
 
     try {
       const contratto = await prisma.contrattoRicorrente.create({

@@ -7,6 +7,7 @@ import type { FastifyInstance } from 'fastify';
 import type { AppPort } from '../services/appPort.js';
 import { prisma } from '../util/prismaClient.js';
 import { recordAudit } from '../util/serverHelpers.js';
+import { CreaMovimentoPrimaNotaSchema } from '../schemas/contabilita.schema.js';
 
 export async function registraRotteContabilitaPrimaNota(server: FastifyInstance, app: AppPort): Promise<void> {
   // ─── PRIMA NOTA INTEGRATA A DATABASE (ZERO LOCALSTORAGE) ───────────
@@ -46,11 +47,11 @@ export async function registraRotteContabilitaPrimaNota(server: FastifyInstance,
     };
   }>('/prima-nota', async (req, reply) => {
     const tenantId = req.tenantId;
-    const body = req.body;
-
-    if (!body.descrizione || !body.importoCentesimi || body.importoCentesimi <= 0) {
-      return reply.code(400).send({ errore: 'Descrizione e importo maggiori di 0 sono obbligatori' });
+    const parseResult = CreaMovimentoPrimaNotaSchema.safeParse(req.body || {});
+    if (!parseResult.success) {
+      return reply.code(400).send({ errore: parseResult.error.issues[0]?.message || 'Descrizione e importo maggiori di 0 sono obbligatori' });
     }
+    const body = parseResult.data as any;
 
     try {
       const movimento = await prisma.movimentoPrimaNota.create({
