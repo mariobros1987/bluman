@@ -104,6 +104,7 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
       email: tenantSettings?.smtpFromEmail || tenantSettings?.email || studio.email || (isBC ? 'comunicazioni@bluecode.advisory' : ''),
       telegram: tenantSettings?.tgBotUsername || (isBC ? '@BluManStudioBot' : ''),
       signal: tenantSettings?.telefono || studio.telefono || (isBC ? '+39 378 092 6461' : ''),
+      portal: 'portal',
     };
   }, [tenantSettings]);
 
@@ -452,9 +453,9 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
       case 'portal':
         return {
           icon: '🌐',
-          title: 'Portale Riservato',
-          val: contactInfo.referente,
-          desc: `Messaggio diretto sul Portale Cliente sicuro`,
+          title: 'Portale Riservato Studio (portal)',
+          val: contactInfo.referente || 'portal',
+          desc: `Messaggio diretto sul Portale Cliente sicuro (portal)`,
           color: '#6366f1',
           bg: '#1a2744',
         };
@@ -482,7 +483,12 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
           {['TUTTI', 'email', 'whatsapp', 'telegram', 'signal', 'portal'].map(cat => (
             <button
               key={cat}
-              onClick={() => setFiltroCanale(cat)}
+              onClick={() => {
+                setFiltroCanale(cat);
+                if (cat !== 'TUTTI') {
+                  setCanaleSelezionato(cat as any);
+                }
+              }}
               style={{
                 background: filtroCanale === cat ? 'var(--indigo)' : 'var(--card2)',
                 color: filtroCanale === cat ? '#fff' : 'var(--muted)',
@@ -492,10 +498,9 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
                 fontSize: 11,
                 fontWeight: 600,
                 cursor: 'pointer',
-                textTransform: 'capitalize',
               }}
             >
-              {cat === 'TUTTI' ? 'Tutti i Canali' : cat === 'portal' ? '🌐 Portale' : cat}
+              {cat === 'TUTTI' ? 'Tutti i Canali' : cat === 'portal' ? '🌐 portal' : cat.toUpperCase()}
             </button>
           ))}
           <button
@@ -532,7 +537,7 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
       {/* Info Banner Regole di Associazione Automatica con Dati Anagrafici Reali */}
       <div style={{ background: '#0d2d22', border: '1px solid #1a5c3c', borderRadius: 12, padding: 14, fontSize: 11.5, color: '#34d399', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
         <div style={{ flex: 1, minWidth: 280 }}>
-          <strong>🔗 Associazione Automatica Attiva:</strong> I messaggi inviati da Email <code>{contactInfo.email}</code>, WhatsApp <code>{contactInfo.whatsapp}</code> e Telegram <code>{contactInfo.telegram}</code> (dati anagrafici di <strong>{nomeCliente}</strong>) confluiscono automaticamente in questo fascicolo e gli allegati vengono archiviati nel Vault.
+          <strong>🔗 Associazione Automatica Attiva:</strong> I messaggi scambiati via Portale Riservato (<code>portal</code>), Email <code>{contactInfo.email}</code>, WhatsApp <code>{contactInfo.whatsapp}</code> e Telegram <code>{contactInfo.telegram}</code> (dati anagrafici di <strong>{nomeCliente}</strong>) confluiscono automaticamente in questo fascicolo e gli allegati vengono archiviati nel Vault.
         </div>
         <button
           onClick={() => downloadGuidePdf()}
@@ -664,7 +669,7 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
                 <option value="email">✉️ Email Ufficiale Studio ({studioChannels.email})</option>
                 <option value="telegram">✈️ Telegram Bot Studio ({studioChannels.telegram})</option>
                 <option value="signal">🔒 Signal Studio Cifrato ({studioChannels.signal})</option>
-                <option value="portal">🌐 Portale Riservato (Canale Diretto Sicuro)</option>
+                <option value="portal">🌐 Portale Riservato Studio ({studioChannels.portal})</option>
               </select>
             </div>
 
