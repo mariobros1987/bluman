@@ -913,7 +913,9 @@ REDIS_URL=
 - [x] 2.1 Spezzare server.ts in moduli route (27/08/2026, commit da 246d313 a 05c3d7e)
 - [x] 2.1b Split frontend ClientPortal.tsx (28/08/2026, commit 6aee803)
 - [x] 2.1c Split frontend altri monoliti (ProjectDetail ✅ 8a19b6f; Library ✅ dbc8358; api/client.ts ✅ f50cc8f; SettingsPage ✅ eaeae7d; ClientsPage ✅ 1d291b1; PassaggioModal ✅ fa29925; DocumentEditorPage ✅ 124623e)
-- [ ] 2.2 Validazione Zod su tutti gli endpoint
+- [x] 2.2 Validazione Zod su tutti gli endpoint principali (collegati schemi su auth, clienti, progetti, documenti, contabilità, fornitori, liquidazioneIva, solleciti)
+- [x] 2.2b Fix Sicurezza & Sessione Multi-Tenant (Fix 4: separazione token portale `bluman_portal_token` e filtro `GET /progetti` su `clienteId` per token portale)
+- [x] 2.2c Hub Comunicazioni Multicanale (allegati WhatsApp e IMAP Inbound con imapflow, spunte stato WhatsApp-style `✓`/`✓✓`, smart scroll chat)
 - [ ] 2.3 Tipizzare FastifyRequest
 - [ ] 2.4 Eliminare `as any` residui
 
@@ -923,12 +925,12 @@ REDIS_URL=
 - [ ] 3.3 OpenAPI/Swagger
 
 ### FASE 4 — Performance (1 settimana)
-- [ ] 4.1 Paginazione liste
+- [ ] 4.1 Paginazione liste (PaginazioneQuerySchema su fatture, prima nota, progetti, clienti, audit)
 - [ ] 4.2 Rate limit Redis
 - [ ] 4.3 Indici DB
 
 ### FASE 5 — Funzionalità (2-3 settimane)
-- [ ] 5.1 Cron schedulato reale
+- [ ] 5.1 Cron schedulato reale (esecuzione notturna in-process `node-cron` per scadenze UBO/KYC)
 - [ ] 5.2 Coda notifiche con retry
 - [ ] 5.3 TOTP super_admin
 - [ ] 5.4 Backup DB schedulato
@@ -957,5 +959,5 @@ REDIS_URL=
 
 ---
 
-*Ultimo aggiornamento: 2026-08-29 (aperta e completata **Firma Fase 3: misure FEA reali** — migrazione additiva `20260828180000_firma_fea_sessione_e_identificazione` (session_id/login_at/doc_riconoscimento_hash/doc_riconoscimento_tipo nullable su firma_elettronica); identificazione del firmatario con elenco chiuso `firmatariAmmessi` (cliente o legaleRappresentante in referentiJson) esposto da `GET /portal/canali-firma` e validato nelle 3 rotte di firma; grafometrica obbligatoria quando livello fea (400 prima di consumare l'OTP); caricamento una-tantum documento di riconoscimento con `scanFileBuffer` + hash nel digest; certificato di sessione (sid+iat del login) nel digest del sigillo e persistito sulla firma; `valoreLegale: 'fea'` dal flusso OTP misurato con audit `FIRMA_FEA_APPOSTA`; verbale con righe condizionali; frontend `FirmaOtpModal`/`TabDocumenti`/`ClientPortal` (livelloFirmaModale, un punto di verità in inviaCodiceFirma); firme SES byte-identiche (parametri FEA null → digest invariato); suite **375/375 in 28 file** con `livelloFirmaService.test.ts` riscritto sulla semantica Fase 3, `tsc --noEmit` pulito, `npx tsc -b` frontend EXIT 0. Precedente: chiuso bug upload microvoce §21 con commit `fa4ede9` — 413 ingoiato, MIME sbagliato, documento fantasma; aperta e completata **Firma Fase 2: etichettatura SES/FEA/FEQ per tipo documento** — migrazioni additive `20260828120000` (livelloFirmaRichiesto su DocumentoVault e ModuloDocumentoPassaggio, valoreLegale su FirmaElettronica) e `20260828150000` (livelloFirmaRichiesto su ModelloDocumentoCustom), enforcement 409 server-side su entrambe le rotte di firma via `livelloRichiestoPerFirma` con `livelloFirmaService.ts`, esposizione nel portale, UI operatore su template/documento/passaggio di modulo, gating portale a tre livelli — canale ammesso in `TabDocumenti`, guard preventivo in `avviaFirmaDocumento`, selettore bloccato in `InvioManualeModal` con `livelloFirma.ts` condiviso — riga «Valore legale della firma» nel verbale, `PATCH /documenti/:id/livello-firma`; split monoliti frontend §2.1c completato — `ProjectDetail.tsx` `8a19b6f`, `Library.tsx` `dbc8358`, `api/client.ts` da 2.792 righe a 13 file dominio + barrel `f50cc8f`, `SettingsPage.tsx` `eaeae7d`, `ClientsPage.tsx` `1d291b1`, `PassaggioModal.tsx` da 1.801 a 730 `fa29925`, `DocumentEditorPage.tsx` da 1.552 a 906 `124623e`; archiviazione soft dei firmati migrazione 20260827180000, hard delete vietato anche all'admin, ciclo §WF-DOC firma/sblocco/tracciabilità, CI GitHub Actions completa)*
-*Prossima revisione: dopo il rilascio del lavoro su catena documento operatore→cliente (posizionamento firma nel documento, anteprima, export Word/PDF) e sezione admin documenti del tenant*
+*Ultimo aggiornamento: 2026-09-11 (Completato **Fix 4**: isolamento fascicoli per ruolo cliente su `GET /progetti` e comunicazioni, separazione sessione portale con `bluman_portal_token`; completata validazione Zod su tutti gli endpoint chiave `auth`, `clienti`, `progetti`, `contabilita`, `documenti`; completata pipeline allegati multicanale per IMAP inbound e WhatsApp Cloud API con spunte di stato stile WhatsApp `✓`/`✓✓` e smart scroll con ancoraggio non letti; suite di test a **614/614 verdi in 47 file**, `npx tsc --noEmit` e `npm run typecheck` a 0 errori, deploy in produzione su Vercel e Railway completato).*
+*Prossima priorità operativa: Fase 3 Paginazione unificata sulle 5 liste pesanti (`GET /invoices`, `GET /prima-nota`, `GET /progetti`, `GET /clienti`, `GET /audit`) tramite `PaginazioneQuerySchema`, attivazione scheduler notturno in-process per il Cron scadenze e script di audit integrità progetti.*

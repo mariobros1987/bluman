@@ -9,7 +9,7 @@ Prima di iniziare, l'audit della codebase ha evidenziato che **diverse component
 | Componente | File Esistente | Stato Attuale | Lavoro Residuo per l'Informatico |
 | :--- | :--- | :--- | :--- |
 | **Audit Progetti** | `src/scripts/probeAvanzamento.ts` | ✅ Copre già il 70%: scansiona in sola lettura progetti, divergenze stato calcolato vs salvato, moduli orfani e segnali rischio | Integrare verifica dipendenze cicliche, passaggi orfani e omonimie clienti |
-| **Schemi Zod** | `src/schemas/*.schema.ts` (9 file) | ✅ Già scritti: `auth`, `clienti`, `progetti`, `contabilita`, `documenti`, `paginazione`, `fornitori`, `liquidazioneIva`, `solleciti` | Solo 3 route li usano (`fornitori`, `liquidazioneIva`, `solleciti`). Mancano da collegare a `auth.ts`, `clienti.ts`, `progetti.ts`, `contabilita.ts`, `documenti.ts` |
+| **Schemi Zod** | `src/schemas/*.schema.ts` (9 file) | ✅ **COMPLETATO AL 100%**: Collegati e attivi su tutte le route (`auth`, `clienti`, `progetti`, `contabilita`, `documenti`, `fornitori`, `liquidazioneIva`, `solleciti`) con `safeParse` | Mantenimento ed estensione a nuove route future |
 | **Tipizzazione Fastify** | `src/types/fastify.d.ts` | ✅ Estende già `FastifyRequest` con `tenantId`, `userId`, `ruolo`, `user`, `clienteId` | Verificare e rimuovere i pochi cast residui |
 | **Paginazione Schema** | `src/schemas/paginazione.schema.ts` | ✅ `PaginazioneQuerySchema` pronto con `page`, `limit`, `search`, `sortBy`, `sortOrder` | Applicare alle 5 rotte elenco su Prisma |
 | **Cron Scadenze** | `src/services/cronService.ts` | ✅ Business logic completa: KYC/UBO annual return, rate aperte, deduplica 20h, notifiche DB | Attivare scheduler automatico in-process (`node-cron`), attualmente solo su rotta HTTP manuale |
@@ -80,21 +80,15 @@ const server = Fastify({
 
 ## FASE 2 — Validazione Zod e Tipi 🟠 ALTA
 
-### 2.1 Collegare gli schemi Zod già pronti alle rotte
-- **Stato attuale**: gli schemi sono già scritti e disponibili in:
-  - `src/schemas/auth.schema.ts`
-  - `src/schemas/clienti.schema.ts`
-  - `src/schemas/progetti.schema.ts`
-  - `src/schemas/contabilita.schema.ts`
-  - `src/schemas/documenti.schema.ts`
-- **Task**: importare e validare i payload nelle rispettive rotte:
-  - `src/routes/auth.ts`: validazione credenziali login e magic-login
-  - `src/routes/clienti.ts`: validazione creazione/modifica cliente
-  - `src/routes/progetti.ts`: validazione creazione progetto e aggiornamento passaggi
-  - `src/routes/contabilita.ts`: validazione emissione fattura e incassi
-  - `src/routes/documenti.ts`: validazione salvataggio documento
-- **Criterio di accettazione**: nessun endpoint accetta payload non conformi; le richieste non valide restituiscono HTTP 400 con dettaglio dell'errore Zod, mai HTTP 500
-- **Stima**: 1.5 giorni (gli schemi sono già pronti, serve solo l'allacciamento)
+### 2.1 Collegare gli schemi Zod già pronti alle rotte — ✅ COMPLETATO (2026-09-11)
+- **Stato completato**: tutti gli schemi Zod sono stati importati, collegati e validati con `safeParse` ritornando HTTP 400 con dettaglio di validazione Zod su tutte le rotte:
+  - `src/routes/auth.ts`: `LoginSchema`, `ChangePasswordSchema`, `MagicLoginSchema`
+  - `src/routes/clienti.ts`: `CreaClienteSchema`
+  - `src/routes/progetti.ts`: `CreaProgettoSchema`, `ConsuntivaOreSchema`
+  - `src/routes/contabilita.ts`: `EmettiFatturaSchema`, `RegistraIncassoSchema`
+  - `src/routes/documenti.ts`: `GeneraDocumentoSchema`
+  - `src/routes/fornitori.ts`, `liquidazioneIva.ts`, `solleciti.ts`: già validati
+- **Esito**: verificato con suite completa di test (614/614 verdi) e rilasciato in produzione.
 
 ### 2.2 Consolidare FastifyRequest tipizzata
 - **Stato attuale**: `src/types/fastify.d.ts` esiste già e dichiara `tenantId`, `userId`, `ruolo`, `user`, `clienteId`.
@@ -229,17 +223,19 @@ cron.schedule('0 8 * * *', async () => {
 
 ---
 
-## Sequenza Operativa Immediata (Roadmap Prioritaria)
+## Sequenza Operativa Immediata (Roadmap Prioritaria Aggiornata)
 
 ```
-STEP 1 (Oggi)        ➜ FASE 0.1: Esecuzione Script Audit Integrità Progetti (in sola lettura)
-STEP 2 (Oggi)        ➜ FASE 0.2: Bonifica dati noti (Holding Ricci, Dibenedetto, utenti inerti)
-STEP 3 (Settimana 1) ➜ FASE 1: Attivazione Logging Pino strutturato su Fastify
-STEP 4 (Settimana 1) ➜ FASE 2: Allacciamento schemi Zod già pronti alle route principali
-STEP 5 (Settimana 1) ➜ FASE 4.1: Scheduler notturno automatico per il Cron scadenze
-STEP 6 (Settimana 2) ➜ FASE 3: Paginazione unificata sulle 5 liste pesanti
-STEP 7 (Settimana 2) ➜ FASE 5.4 & 5.3: Configurazione Staging e test di restore backup
-STEP 8 (Settimana 3) ➜ FASE 7: Test E2E sui flussi legali/fiscali critici
+STEP 0 (Completato) ➜ FASE 2.1: Allacciamento schemi Zod già pronti alle route principali ✅ FATTO
+STEP 0b (Completato)➜ Fix 4: Separazione sessione portale (`bluman_portal_token`) e isolamento progetti cliente ✅ FATTO
+STEP 0c (Completato)➜ Hub Comunicazioni: Allegati IMAP/WhatsApp e Spunte stato WhatsApp-style ✅ FATTO
+
+STEP 1 (Prioritario)➜ FASE 3: Paginazione unificata sulle 5 liste pesanti (GET /invoices, /prima-nota, /progetti, /clienti, /audit)
+STEP 2 (Prioritario)➜ FASE 4.1: Scheduler notturno automatico in-process per il Cron scadenze (node-cron)
+STEP 3 (Prossimo)   ➜ FASE 1: Attivazione Logging Pino strutturato su Fastify
+STEP 4 (Prossimo)   ➜ FASE 0.1 & 0.2: Script Audit Integrità Progetti e bonifica dati noti
+STEP 5 (A seguire)  ➜ FASE 5.4 & 5.3: Configurazione Staging e test di restore backup
+STEP 6 (A seguire)  ➜ FASE 7: Test E2E sui flussi legali/fiscali critici
 ```
 
 ---
