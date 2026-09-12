@@ -171,7 +171,7 @@ function tokenCliente() {
 }
 
 function serverConToken(token?: string) {
-  const server = buildServer({ app: new InMemoryApp() });
+  const server = buildServer(new InMemoryApp());
   return {
     inject: (opts: any) => {
       const headers = { ...(opts.headers || {}) };
