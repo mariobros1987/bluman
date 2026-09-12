@@ -327,6 +327,8 @@ export interface OpzioniEmailOtp {
   minutiValidita?: number;
   /** Cosa si sta firmando. Il testo diceva sempre "Engagement Letter", anche per un addendum. */
   oggettoFirma?: string;
+  /** Livello di firma (ses, fea, feq): adatta testo, intestazioni e oggetto. */
+  livelloFirma?: 'ses' | 'fea' | 'feq';
 }
 
 export interface EsitoEmailOtp {
@@ -347,12 +349,25 @@ export async function sendOtpSecurityEmail(
   const fromName = opzioni.fromName || 'BluMan Security';
   const minuti = opzioni.minutiValidita ?? 5;
   const oggetto = opzioni.oggettoFirma || 'il documento in attesa di firma';
+  const livello = opzioni.livelloFirma ?? 'ses';
+  const etichettaValore =
+    livello === 'feq'
+      ? 'Firma Elettronica Qualificata (FEQ)'
+      : livello === 'fea'
+        ? 'Firma Elettronica Avanzata (FEA OTP)'
+        : 'Firma Elettronica Semplice (OTP) · art. 20 CAD';
+  const oggettoEmail =
+    livello === 'fea'
+      ? '🔐 Codice di sicurezza per Firma Avanzata (FEA) — BluMan'
+      : livello === 'feq'
+        ? '🔐 Codice di sicurezza per Firma Qualificata (FEQ) — BluMan'
+        : '🔐 Codice di sicurezza per la firma — BluMan';
 
   const html = `
     <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; color: #1e293b;">
       <div style="background-color: #0f172a; padding: 24px; text-align: center;">
         <h1 style="color: #6366f1; margin: 0; font-size: 24px; font-weight: 700;">BluMan Advisory</h1>
-        <p style="color: #94a3b8; margin: 4px 0 0 0; font-size: 13px;">Firma Elettronica Semplice (OTP) · art. 20 CAD</p>
+        <p style="color: #94a3b8; margin: 4px 0 0 0; font-size: 13px;">${etichettaValore}</p>
       </div>
       <div style="padding: 32px 24px; text-align: center;">
         <h2 style="margin-top: 0; font-size: 18px; color: #0f172a;">Gentile ${clienteNome},</h2>
@@ -364,7 +379,7 @@ export async function sendOtpSecurityEmail(
         <p style="font-size: 12px; color: #94a3b8; margin-top: 24px; line-height: 1.5;">Non condividere questo codice con nessuno. Se non hai richiesto tu la firma, contatta immediatamente il tuo advisor.</p>
       </div>
       <div style="background-color: #f8fafc; padding: 16px 24px; text-align: center; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8;">
-        BluMan Advisory Platform • Firma Elettronica Semplice (OTP) · art. 20 CAD
+        BluMan Advisory Platform • ${etichettaValore}
       </div>
     </div>
   `;
@@ -378,7 +393,7 @@ export async function sendOtpSecurityEmail(
     to: toEmail,
     // Il codice NON va nell'oggetto: l'oggetto è la riga che le notifiche mostrano sulla
     // schermata bloccata del telefono e che i log dei server di posta conservano in chiaro.
-    subject: '🔐 Codice di sicurezza per la firma — BluMan',
+    subject: oggettoEmail,
     html,
     smtp: opzioni.smtp,
     fromEmail,

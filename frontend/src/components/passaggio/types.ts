@@ -26,6 +26,10 @@ export interface DocumentoEntry {
   filePdfUrl?: string | null;
   /** §Punto-1 — URL del Word (.docx) generato dal motore server-side; null se assente. */
   fileDocxUrl?: string | null;
+  /** Atto firmato (copia ricomposta con grafometrica o file firmato caricato). */
+  fileFirmatoUrl?: string | null;
+  /** Bozza originale pre-firma per verifiche probatorie. */
+  fileBozzaUrl?: string | null;
   richiesteModifica?: RichiestaModificaDoc[];
   /**
    * §WF-DOC — sigillo di firma restituito dal server (data, id firma, tipo).

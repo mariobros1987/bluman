@@ -210,11 +210,11 @@ export function TabDocumenti({
                 <div style={{ display: 'flex', gap: 6 }}>
                   <button
                     type="button"
-                    onClick={() => scaricaDocumentoPortaleApi(doc.id, 'pdf', clientObj?.id)}
-                    style={{ background: '#1a1f3d', border: '1px solid #4338ca', color: '#c7d2fe', padding: '6px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
-                    title="Scarica il PDF master generato dal motore (lo stesso file su cui è fissata l'impronta di firma)"
+                    onClick={() => scaricaDocumentoPortaleApi(doc.id, doc.firmato ? 'firmato' : 'pdf', clientObj?.id)}
+                    style={{ background: doc.firmato ? '#064e3b' : '#1a1f3d', border: doc.firmato ? '1px solid #10b981' : '1px solid #4338ca', color: doc.firmato ? '#6ee7b7' : '#c7d2fe', padding: '6px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                    title={doc.firmato ? "Scarica l'atto con la firma del cliente" : "Scarica il PDF master generato dal motore (lo stesso file su cui è fissata l'impronta di firma)"}
                   >
-                    📥 PDF
+                    {doc.firmato ? '📥 PDF Firmato' : '📥 PDF'}
                   </button>
                   {doc.fileDocxUrl && (
                     <button

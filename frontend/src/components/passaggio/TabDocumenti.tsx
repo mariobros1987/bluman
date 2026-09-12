@@ -293,11 +293,11 @@ export function TabDocumenti({
                             <>
                               <button
                                 type="button"
-                                onClick={() => scaricaDocumentoClient(d.fileUrl, d.nome)}
-                                style={{ background: '#0d2d22', border: '1px solid #059669', color: '#34d399', padding: '5px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 3 }}
-                                title="Scarica in formato PDF A4"
+                                onClick={() => scaricaDocumentoClient(d.fileFirmatoUrl || d.filePdfUrl || d.fileUrl, d.nome)}
+                                style={{ background: st === 'firmato' || d.firmato ? '#064e3b' : '#0d2d22', border: st === 'firmato' || d.firmato ? '1px solid #10b981' : '1px solid #059669', color: '#34d399', padding: '5px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 3 }}
+                                title={st === 'firmato' || d.firmato ? "Scarica l'atto con la firma del cliente" : "Scarica in formato PDF A4"}
                               >
-                                📥 PDF
+                                {st === 'firmato' || d.firmato ? '📥 PDF Firmato' : '📥 PDF'}
                               </button>
                               <button
                                 type="button"

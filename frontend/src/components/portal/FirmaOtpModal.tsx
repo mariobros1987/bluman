@@ -75,7 +75,7 @@ export function FirmaOtpModal({
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      zIndex: 9999,
+      zIndex: 11000,
       padding: 20,
     }}>
       <div style={{

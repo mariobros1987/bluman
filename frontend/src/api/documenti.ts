@@ -37,6 +37,10 @@ export interface DocumentoProgetto {
   filePdfUrl?: string | null;
   /** §Punto-1 — URL del file Word (.docx) generato dal motore server-side; null se il documento non ha un export Word. */
   fileDocxUrl?: string | null;
+  /** Atto firmato (copia ricomposta con grafometrica o file firmato caricato). */
+  fileFirmatoUrl?: string | null;
+  /** Bozza originale pre-firma per verifiche probatorie. */
+  fileBozzaUrl?: string | null;
   /** §Punto-1 — formato del file master caricato ('pdf' per i documenti generati dal motore). */
   formatoOrigine?: string | null;
   versione: number;

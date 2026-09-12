@@ -127,25 +127,58 @@ export async function registraRotteDocumenti(server: FastifyInstance): Promise<v
           if (f.riferimentoId && !firmaPerDocumento.has(f.riferimentoId)) firmaPerDocumento.set(f.riferimentoId, f);
         }
 
+        // §36 — Copie firmate generate dal motore con grafometrica incastonata:
+        // servono all'operatore per visualizzare e scaricare direttamente l'atto firmato.
+        const copieFirmate = await prisma.documento.findMany({
+          where: {
+            tenantId,
+            documentoPadreId: { in: documenti.map((d) => d.id) },
+            tipo: 'firmato',
+            isArchiviato: false,
+          },
+          select: { documentoPadreId: true, fileUrl: true, filePdfUrl: true },
+        });
+        const copiaPerPadre = new Map<string, { fileUrl: string; filePdfUrl: string | null }>();
+        for (const c of copieFirmate) {
+          if (c.documentoPadreId && !copiaPerPadre.has(c.documentoPadreId)) {
+            copiaPerPadre.set(c.documentoPadreId, c);
+          }
+        }
+
         return reply.send({
           ok: true,
           documenti: documenti.map((d) => {
             const firma = firmaPerDocumento.get(d.id);
+            const copia = copiaPerPadre.get(d.id);
+            const isFirmato = Boolean(firma) || d.tipo === 'firmato' || d.statoDoc === 'firmato';
+            const urlAttoFirmato =
+              firma?.fileFirmatoUrl ||
+              copia?.filePdfUrl ||
+              copia?.fileUrl ||
+              (d.tipo === 'firmato' ? d.filePdfUrl || d.fileUrl : null);
+            const urlPdfEffettivo = isFirmato && urlAttoFirmato ? urlAttoFirmato : (d.filePdfUrl || d.fileUrl);
+
             // Come /portal/documenti: la firma HMAC degli URL /uploads/ va rinnovata alla lettura.
             return {
               ...d,
-              fileUrl: rifirmaUrlUpload(d.fileUrl) as string,
+              fileUrl: rifirmaUrlUpload(urlPdfEffettivo) as string,
               // Punto 1 — anche i formati di export hanno URL firmati (null per i documenti storici).
-              filePdfUrl: d.filePdfUrl ? (rifirmaUrlUpload(d.filePdfUrl) as string) : null,
+              filePdfUrl: urlPdfEffettivo ? (rifirmaUrlUpload(urlPdfEffettivo) as string) : null,
               fileDocxUrl: d.fileDocxUrl ? (rifirmaUrlUpload(d.fileDocxUrl) as string) : null,
-              firmato: Boolean(firma) || d.tipo === 'firmato',
+              fileBozzaUrl: d.fileUrl ? (rifirmaUrlUpload(d.fileUrl) as string) : null,
+              fileFirmatoUrl: urlAttoFirmato ? (rifirmaUrlUpload(urlAttoFirmato) as string) : null,
+              firmato: isFirmato,
               // Il file firmato è un URL /uploads/ come gli altri: va rinnovato alla
               // lettura, o lo scaricamento dallo studio parte con una firma già scaduta.
-              firma: firma
+              firma: firma || isFirmato
                 ? {
-                    ...firma,
-                    fileFirmatoUrl: firma.fileFirmatoUrl
-                      ? (rifirmaUrlUpload(firma.fileFirmatoUrl) as string)
+                    signatureId: firma?.signatureId ?? null,
+                    tipoFirma: firma?.tipoFirma ?? null,
+                    firmatoAt: firma?.firmatoAt ?? null,
+                    valoreLegale: firma?.valoreLegale ?? null,
+                    standard: firma?.standard ?? null,
+                    fileFirmatoUrl: urlAttoFirmato
+                      ? (rifirmaUrlUpload(urlAttoFirmato) as string)
                       : null,
                   }
                 : null,

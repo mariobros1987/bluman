@@ -194,12 +194,9 @@ export function ElencoDocumentiCartella({ progettoId, nomeProgetto, progetti, in
         <tbody>
           {filtrati.map((d) => {
             const nome = nomeFileDocumento(d);
-            const urlPdf = urlFileArchivio(d.filePdfUrl || d.fileUrl);
+            const urlAttoFirmato = d.fileFirmatoUrl || d.firma?.fileFirmatoUrl || null;
+            const urlPdf = urlFileArchivio(urlAttoFirmato || d.filePdfUrl || d.fileUrl);
             const urlDocx = urlFileArchivio(d.fileDocxUrl);
-            // Fix firma — l'atto sottoscritto esiste come file separato solo nel flusso con
-            // file caricato (FEQ/SES manuale): per le copie §36 (tipo 'firmato') il PDF È
-            // l'atto firmato, e il verbale (tipo 'verbale_firma') attesta, non sottoscrive.
-            const urlAttoFirmato = d.firma?.fileFirmatoUrl ?? null;
             const mostraAttoFirmato = Boolean(urlAttoFirmato) && d.tipo !== 'verbale_firma' && d.tipo !== 'firmato';
             return (
               <tr key={d.id} style={{ borderBottom: '1px solid var(--border)' }}>
@@ -237,10 +234,10 @@ export function ElencoDocumentiCartella({ progettoId, nomeProgetto, progetti, in
                     )}
                     {urlPdf && (
                       <button
-                        onClick={() => scaricaDocumentoClient(d.filePdfUrl || d.fileUrl, nome)}
-                        style={{ background: 'var(--card2)', border: '1px solid var(--border)', color: 'var(--text)', padding: '6px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer' }}
+                        onClick={() => scaricaDocumentoClient(urlAttoFirmato || d.filePdfUrl || d.fileUrl, d.firmato && !nome.toLowerCase().includes('firmato') ? `${nome.replace(/\.[^/.]+$/, '')}_firmato.pdf` : nome)}
+                        style={{ background: d.firmato ? '#064e3b' : 'var(--card2)', border: d.firmato ? '1px solid #10b981' : '1px solid var(--border)', color: d.firmato ? '#6ee7b7' : 'var(--text)', padding: '6px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer' }}
                       >
-                        ⬇ PDF
+                        {d.firmato ? '⬇ PDF Firmato' : '⬇ PDF'}
                       </button>
                     )}
                     {/* Fix firma — l'atto come sottoscritto, distinto dal PDF master e dal

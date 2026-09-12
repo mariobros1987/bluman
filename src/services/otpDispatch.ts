@@ -312,6 +312,8 @@ export interface RichiestaInvio {
   codice: string;
   nomeFirmatario: string;
   oggettoFirma: string;
+  /** Livello di firma (ses, fea, feq): adatta il testo e l'oggetto delle email. */
+  livelloFirma?: 'ses' | 'fea' | 'feq';
   /** Credenziali già lette, per non interrogare `tenant` due volte nella stessa richiesta. */
   credenziali?: CredenzialiCanali;
 }
@@ -335,6 +337,7 @@ export async function inviaCodiceOtp(richiesta: RichiestaInvio): Promise<EsitoIn
         fromName: cred.smtpFromName ?? undefined,
         minutiValidita: minuti,
         oggettoFirma: richiesta.oggettoFirma,
+        livelloFirma: richiesta.livelloFirma,
       });
       // Il motivo tecnico viene riportato invece del vecchio "controlla la configurazione
       // SMTP": le impostazioni possono essere giuste e l'invio fallire comunque perché

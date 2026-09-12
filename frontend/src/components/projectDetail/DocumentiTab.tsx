@@ -150,8 +150,13 @@ export function DocumentiTab({ project }: { project: Progetto }) {
 
   // Scarica Copia VERA in PDF A4
   const handleDownloadDocumentPdf = async (doc: any) => {
-    if (doc.dbDoc && doc.url && doc.url !== '#') {
-      await scaricaDocumentoClient(doc.url, doc.nome || doc.titolo);
+    const urlDaScaricare = doc.fileFirmatoUrl || doc.filePdfUrl || doc.url;
+    if (doc.dbDoc && urlDaScaricare && urlDaScaricare !== '#') {
+      const nomeBase = doc.nome || doc.titolo || 'Documento';
+      const safeName = doc.firmato && !nomeBase.toLowerCase().includes('firmato')
+        ? `${nomeBase.replace(/\.[^/.]+$/, '')}_firmato.pdf`
+        : nomeBase;
+      await scaricaDocumentoClient(urlDaScaricare, safeName);
       return;
     }
     const fullPrintHtml = buildDocumentHtml(doc);

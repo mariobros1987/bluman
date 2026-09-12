@@ -28,7 +28,7 @@ export function DocumentViewerModal({
   avviaFirmaDocumento,
 }: DocumentViewerModalProps) {
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 11000, padding: 20 }}>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000, padding: 20 }}>
       <div style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, width: '100%', maxWidth: 880, maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,.6)' }}>
         {/* Top Modal Bar */}
         <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--card)' }}>
@@ -50,13 +50,10 @@ export function DocumentViewerModal({
         </div>
 
         {/* Il file dell'archivio, mostrato per quello che è.
-            Qui prima c'era l'HTML composto da `getResolvedDocumentHtml`: articoli e premesse
-            inventati dal portale, mostrati al posto del documento che il cliente stava per
-            firmare. Il browser mostra da sé i PDF e le immagini; per gli altri formati non si
-            finge un'anteprima, si dice che va scaricato. */}
+            Se firmato, mostra la copia sottoscritta con la firma incastonata. */}
         <div style={{ flex: 1, overflow: 'hidden', padding: 16, background: '#0f172a', display: 'flex', justifyContent: 'center' }}>
           {(() => {
-            const url = urlFileArchivio(selectedViewerDoc.fileUrl);
+            const url = urlFileArchivio(selectedViewerDoc.fileFirmatoUrl || selectedViewerDoc.filePdfUrl || selectedViewerDoc.fileUrl);
 
             if (!url) {
               return (
@@ -81,15 +78,15 @@ export function DocumentViewerModal({
         {/* Bottom Modal Actions */}
         <div style={{ padding: '14px 20px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, background: 'var(--card)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            {urlFileArchivio(selectedViewerDoc.fileUrl) && (
+            {urlFileArchivio(selectedViewerDoc.fileFirmatoUrl || selectedViewerDoc.filePdfUrl || selectedViewerDoc.fileUrl) && (
               <>
                 <button
                   type="button"
-                  onClick={() => scaricaDocumentoPortaleApi(selectedViewerDoc.id, 'pdf', clienteId)}
-                  style={{ background: '#1a1f3d', border: '1px solid #4338ca', color: '#c7d2fe', padding: '8px 14px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
-                  title="Scarica the PDF master generato dal motore (lo stesso file su cui è fissata l'impronta di firma)"
+                  onClick={() => scaricaDocumentoPortaleApi(selectedViewerDoc.id, selectedViewerDoc.firmato ? 'firmato' : 'pdf', clienteId)}
+                  style={{ background: selectedViewerDoc.firmato ? '#064e3b' : '#1a1f3d', border: selectedViewerDoc.firmato ? '1px solid #10b981' : '1px solid #4338ca', color: selectedViewerDoc.firmato ? '#6ee7b7' : '#c7d2fe', padding: '8px 14px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+                  title={selectedViewerDoc.firmato ? "Scarica l'atto sottoscritto con la firma del cliente" : "Scarica il PDF master generato dal motore"}
                 >
-                  📥 Scarica PDF A4
+                  {selectedViewerDoc.firmato ? '📥 Scarica Atto Firmato (PDF)' : '📥 Scarica PDF A4'}
                 </button>
                 {selectedViewerDoc.fileDocxUrl && (
                   <button

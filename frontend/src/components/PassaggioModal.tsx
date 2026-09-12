@@ -303,7 +303,11 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
             statoDoc: d.statoDoc || 'bozza',
             versione: d.versione || 1,
             pubblicatoAt: d.pubblicatoAt,
-            fileUrl: d.fileUrl,
+            fileUrl: d.fileFirmatoUrl || d.filePdfUrl || d.fileUrl,
+            filePdfUrl: d.fileFirmatoUrl || d.filePdfUrl || null,
+            fileDocxUrl: d.fileDocxUrl ?? null,
+            fileFirmatoUrl: d.fileFirmatoUrl ?? null,
+            fileBozzaUrl: d.fileBozzaUrl ?? d.fileUrl ?? null,
             // Piano firma §3 — livello richiesto dall'atto, normalizzato (stringa ignota ⇒ 'ses').
             livelloFirmaRichiesto: d.livelloFirmaRichiesto === 'fea' || d.livelloFirmaRichiesto === 'feq' ? d.livelloFirmaRichiesto : 'ses',
             richiesteModifica: d.richiesteModifica || [],
@@ -335,9 +339,11 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
         statoDoc: d.statoDoc || 'bozza',
         versione: d.versione || 1,
         pubblicatoAt: d.pubblicatoAt,
-        fileUrl: d.fileUrl,
-        filePdfUrl: d.filePdfUrl ?? null,
+        fileUrl: d.fileFirmatoUrl || d.filePdfUrl || d.fileUrl,
+        filePdfUrl: d.fileFirmatoUrl || d.filePdfUrl || null,
         fileDocxUrl: d.fileDocxUrl ?? null,
+        fileFirmatoUrl: d.fileFirmatoUrl ?? null,
+        fileBozzaUrl: d.fileBozzaUrl ?? d.fileUrl ?? null,
         livelloFirmaRichiesto: d.livelloFirmaRichiesto === 'fea' || d.livelloFirmaRichiesto === 'feq' ? d.livelloFirmaRichiesto : 'ses',
         richiesteModifica: d.richiesteModifica || [],
         firma: d.firma ?? null,
@@ -720,10 +726,10 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
                   <>
                     <button
                       type="button"
-                      onClick={() => scaricaDocumentoClient(selectedDocPreview.fileUrl, selectedDocPreview.nome)}
+                      onClick={() => scaricaDocumentoClient(selectedDocPreview.fileFirmatoUrl || selectedDocPreview.filePdfUrl || selectedDocPreview.fileUrl, selectedDocPreview.nome)}
                       style={{ background: '#0d2d22', border: '1px solid #059669', color: '#34d399', padding: '7px 14px', borderRadius: 8, fontSize: 11.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
                     >
-                      📥 Scarica PDF A4
+                      {selectedDocPreview.firmato ? '📥 Scarica PDF Firmato' : '📥 Scarica PDF A4'}
                     </button>
                     <button
                       type="button"

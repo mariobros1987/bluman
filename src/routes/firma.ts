@@ -200,6 +200,24 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
         if (f.riferimentoId && !firmaPerDocumento.has(f.riferimentoId)) firmaPerDocumento.set(f.riferimentoId, f);
       }
 
+      // §36 — Copie firmate generate dal motore con la grafometrica dentro (tipo: 'firmato' e documentoPadreId):
+      // servono per offrire direttamente l'atto sottoscritto al cliente invece della bozza master vuota.
+      const copieFirmate = await prisma.documento.findMany({
+        where: {
+          tenantId,
+          documentoPadreId: { in: documenti.map((d) => d.id) },
+          tipo: 'firmato',
+          isArchiviato: false,
+        },
+        select: { documentoPadreId: true, fileUrl: true, filePdfUrl: true },
+      });
+      const copiaPerPadre = new Map<string, { fileUrl: string; filePdfUrl: string | null }>();
+      for (const c of copieFirmate) {
+        if (c.documentoPadreId && !copiaPerPadre.has(c.documentoPadreId)) {
+          copiaPerPadre.set(c.documentoPadreId, c);
+        }
+      }
+
       // §WF-DOC — storico delle versioni, risalendo la catena `documentoPadreId`.
       //
       // Il campo era già a database e veniva perfino selezionato qui, ma non usciva dalla
@@ -260,9 +278,17 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
         const moduloProgettoId = d.microvoceProgetto?.moduloProgetto.id ?? null;
         const titoloVoce = d.microvoceProgetto?.nome ?? d.progetto?.nome ?? 'Documento';
         const isFirmato = Boolean(firma) || d.tipo === 'firmato' || d.statoDoc === 'firmato';
+        const copia = copiaPerPadre.get(d.id);
+        const urlAttoFirmato =
+          firma?.fileFirmatoUrl ||
+          copia?.filePdfUrl ||
+          copia?.fileUrl ||
+          (d.tipo === 'firmato' ? d.filePdfUrl || d.fileUrl : null);
+        const urlPdfEffettivo = isFirmato && urlAttoFirmato ? urlAttoFirmato : (d.filePdfUrl || d.fileUrl);
+
         return {
           id: d.id,
-          nome: nomeFileDaUrl(d.fileUrl) ?? `${titoloVoce} (v${d.versione})`,
+          nome: nomeFileDaUrl(urlPdfEffettivo) ?? `${titoloVoce} (v${d.versione})`,
           titolo: titoloVoce,
           categoria: d.categoriaDoc || 'generico',
           modulo: d.microvoceProgetto?.moduloProgetto.nome ?? null,
@@ -274,11 +300,12 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
           progettoId,
           // La firma HMAC degli URL /uploads/ scade dopo qualche giorno: si rinnova alla
           // lettura, altrimenti un documento in fascicolo da mesi non si aprirebbe più.
-          fileUrl: rifirmaUrlUpload(d.fileUrl) as string,
+          fileUrl: rifirmaUrlUpload(urlPdfEffettivo) as string,
           // Punto 1 piano gap — formati di export generati dal server: null per i documenti
           // storici (pre-migrazione) e per gli allegati, che restano nel formato originale.
-          filePdfUrl: d.filePdfUrl ? (rifirmaUrlUpload(d.filePdfUrl) as string) : null,
+          filePdfUrl: urlPdfEffettivo ? (rifirmaUrlUpload(urlPdfEffettivo) as string) : null,
           fileDocxUrl: d.fileDocxUrl ? (rifirmaUrlUpload(d.fileDocxUrl) as string) : null,
+          fileBozzaUrl: d.fileUrl ? (rifirmaUrlUpload(d.fileUrl) as string) : null,
           formatoOrigine: d.formatoOrigine,
           tipo: d.tipo,
           versione: d.versione,
@@ -312,10 +339,7 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
           // Regola 5 — niente standard di riserva: se il dato manca, il portale dichiara
           // «non registrato» invece di spacciare una SES OTP che il server non ha inciso.
           standard: firma?.standard ?? null,
-          // Il file firmato ricaricato dal cliente (firma con file): URL rinnovato alla
-          // lettura come gli altri. Null per le firme OTP, il cui atto sottoscritto è la
-          // copia §36 — che si scarica dal `fileUrl` della propria riga.
-          fileFirmatoUrl: firma?.fileFirmatoUrl ? (rifirmaUrlUpload(firma.fileFirmatoUrl) as string) : null,
+          fileFirmatoUrl: urlAttoFirmato ? (rifirmaUrlUpload(urlAttoFirmato) as string) : null,
           // Piano §3.1 — il valore legale effettivo della firma apposta: null finché il
           // documento non è firmato (le firme storiche precedenti alla migrazione restano
           // 'ses', che è il comportamento che hanno sempre avuto).
@@ -426,6 +450,8 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
         },
         select: {
           id: true,
+          statoDoc: true,
+          tipo: true,
           fileUrl: true,
           filePdfUrl: true,
           fileDocxUrl: true,
@@ -462,14 +488,11 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
         });
       }
 
-      // §36 — l'atto come sottoscritto, distinto dal PDF master (che resta scaricabile
-      // com'è). Prima il file firmato caricato dal cliente (SES manuale / FEQ di
-      // provider), altrimenti la copia ricomposta dal motore con la firma dentro. Se
-      // non esiste nessuno dei due (firma OTP su documento pre-§36 o template senza
-      // segnaposto) il formato è dichiarato non disponibile, non rimpiazzato col
-      // master: servire il master qui farebbe passare un file non firmato per l'atto
-      // sottoscritto.
-      if (formato === 'firmato') {
+      // §36 — l'atto come sottoscritto: se il cliente richiede esplicitamente `formato=firmato`,
+      // oppure `formato=pdf` su un documento che è già stato firmato, deve essere servito
+      // l'atto con la firma dentro (file firmato caricato FEQ/SES o copia PDF ricomposta con grafometrica).
+      const isFirmato = documento.statoDoc === 'firmato' || documento.tipo === 'firmato';
+      if (formato === 'firmato' || (formato === 'pdf' && isFirmato)) {
         const firma = await prisma.firmaElettronica.findFirst({
           where: { tenantId, clienteId, ambito: 'documento_vault', riferimentoId: id },
           select: { fileFirmatoUrl: true },
@@ -478,12 +501,10 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
         if (firma?.fileFirmatoUrl) {
           return reply.send({
             ok: true,
-            formato,
+            formato: formato === 'firmato' ? 'firmato' : 'pdf',
             url: rifirmaUrlUpload(firma.fileFirmatoUrl) as string,
-            filename: nomeFileDaUrl(firma.fileFirmatoUrl) ?? `${titoloVoce} (v${documento.versione}) firmato`,
-            // L'estensione può non essere .pdf (.p7m, .docx): il filename vero la dice,
-            // un content type presunto no.
-            contentType: 'application/octet-stream',
+            filename: nomeFileDaUrl(firma.fileFirmatoUrl) ?? `${titoloVoce} (v${documento.versione}) firmato.pdf`,
+            contentType: firma.fileFirmatoUrl.endsWith('.p7m') ? 'application/octet-stream' : 'application/pdf',
           });
         }
         const copia = await prisma.documento.findFirst({
@@ -494,15 +515,27 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
         if (urlCopia) {
           return reply.send({
             ok: true,
-            formato,
+            formato: formato === 'firmato' ? 'firmato' : 'pdf',
             url: rifirmaUrlUpload(urlCopia) as string,
             filename: nomeFileDaUrl(urlCopia) ?? `${titoloVoce} (v${documento.versione}) firmato.pdf`,
             contentType: 'application/pdf',
           });
         }
-        return reply.code(404).send({
-          errore: 'Nessuna copia firmata separata per questo documento: scarica il PDF master e la ricevuta di firma.',
-        });
+        if (documento.tipo === 'firmato' && (documento.filePdfUrl || documento.fileUrl)) {
+          const urlFirm = (documento.filePdfUrl ?? documento.fileUrl)!;
+          return reply.send({
+            ok: true,
+            formato: formato === 'firmato' ? 'firmato' : 'pdf',
+            url: rifirmaUrlUpload(urlFirm) as string,
+            filename: nomeFileDaUrl(urlFirm) ?? `${titoloVoce} (v${documento.versione}) firmato.pdf`,
+            contentType: 'application/pdf',
+          });
+        }
+        if (formato === 'firmato') {
+          return reply.code(404).send({
+            errore: 'Nessuna copia firmata separata per questo documento: scarica il PDF master e la ricevuta di firma.',
+          });
+        }
       }
 
       // PDF: il formato generato se esiste, altrimenti il file originale
@@ -781,6 +814,7 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
         codice: esito.codice,
         nomeFirmatario: req.body?.signerName?.trim() || cliente.nome,
         oggettoFirma: DESCRIZIONE_AMBITO[ambito],
+        livelloFirma: livelloRichiesto === 'fea' ? 'fea' : 'ses',
       });
 
       if (!invio.ok) {
@@ -1533,6 +1567,12 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
           documentoTitolo,
           ipAddress: sigillo.ipAddress,
         });
+        if (esitoCopia?.url) {
+          await prisma.firmaElettronica.update({
+            where: { id: firma.id },
+            data: { fileFirmatoUrl: esitoCopia.url },
+          }).catch(() => {});
+        }
       }
 
       // L'azione di audit dichiara il valore legale REALE della firma apposta:

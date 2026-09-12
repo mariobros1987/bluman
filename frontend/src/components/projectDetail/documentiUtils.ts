@@ -17,14 +17,14 @@ export function documentoApiAVista(d: any, projectId: string): any {
     progettoId: projectId,
     firmato: Boolean(d.firmato),
     formato: /\.png$|\.jpe?g$/i.test(nome) ? 'immagine' : 'pdf',
-    url: d.fileUrl,
-    filePdfUrl: d.filePdfUrl ?? null,
+    url: d.fileFirmatoUrl || d.filePdfUrl || d.fileUrl,
+    filePdfUrl: d.fileFirmatoUrl || d.filePdfUrl || null,
     fileDocxUrl: d.fileDocxUrl ?? null,
+    fileBozzaUrl: d.fileBozzaUrl ?? d.fileUrl ?? null,
     // Fix firma — il tipo e i dati del sigillo reale, così la scheda può offrire l'atto
-    // sottoscritto e dichiarare lo standard vero senza dedurlo (regola 5): l'atto firmato
-    // come file separato esiste solo nel flusso con file caricato (FEQ/SES manuale).
+    // sottoscritto e dichiarare lo standard vero senza dedurlo (regola 5).
     tipo: d.tipo,
-    fileFirmatoUrl: d.firma?.fileFirmatoUrl ?? null,
+    fileFirmatoUrl: d.fileFirmatoUrl || d.firma?.fileFirmatoUrl || null,
     firmaStandard: d.firma?.standard ?? null,
     tipoFirma: d.firma?.tipoFirma ?? null,
     dataFirma: d.firma?.firmatoAt ?? null,
