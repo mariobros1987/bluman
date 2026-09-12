@@ -169,3 +169,87 @@ export async function resetPasswordUtenteApi(userId: string) {
   }
   return data;
 }
+
+// ─── §6.1 TOTP 2FA ──────────────────────────────────────────────────────────
+
+/**
+ * Legge lo stato corrente del 2FA TOTP per il super_admin autenticato.
+ * Restituisce { totpAbilitato: boolean }.
+ */
+export async function statoTotpApi(): Promise<{ ok: boolean; totpAbilitato: boolean }> {
+  const res = await apiFetch(`${API_BASE}/auth/totp/stato`, {
+    headers: getAuthHeaders(),
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(data?.errore || 'Errore lettura stato 2FA');
+  return data;
+}
+
+/**
+ * Step 1 attivazione: genera il segreto TOTP, lo cifra e salva sul DB.
+ * Restituisce { qrUri, qrUrl, segreto, backupCodes, hint }.
+ * I backupCodes vanno mostrati UNA SOLA VOLTA e salvati dall'utente.
+ */
+export async function attivaTotpApi(): Promise<{
+  ok: boolean;
+  qrUri: string;
+  qrUrl: string;
+  segreto: string;
+  backupCodes: string[];
+  hint: string;
+}> {
+  const res = await apiFetch(`${API_BASE}/auth/totp/attiva`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(data?.errore || 'Errore durante l\'attivazione del 2FA');
+  return data;
+}
+
+/**
+ * Step 2 attivazione: verifica il primo codice a 6 cifre dall'app authenticator.
+ * Se corretto imposta totpAbilitato=true sul DB.
+ */
+export async function confermaTotpApi(codiceTotp: string): Promise<{ ok: boolean; messaggio: string }> {
+  const res = await apiFetch(`${API_BASE}/auth/totp/conferma`, {
+    method: 'POST',
+    headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ codiceTotp }),
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(data?.errore || 'Codice TOTP non valido');
+  return data;
+}
+
+/**
+ * Disabilita il 2FA TOTP. Richiede la password corrente come secondo fattore
+ * di sicurezza. Elimina segreto e backup codes dal DB.
+ */
+export async function disabilitaTotpApi(password: string): Promise<{ ok: boolean; messaggio: string }> {
+  const res = await apiFetch(`${API_BASE}/auth/totp/disabilita`, {
+    method: 'POST',
+    headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password }),
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(data?.errore || 'Errore durante la disabilitazione del 2FA');
+  return data;
+}
+
+/**
+ * Step finale login con 2FA: scambia il preToken (2 min) + codice TOTP (o backup code)
+ * con il JWT definitivo di sessione.
+ */
+export async function verificaTotpApi(preToken: string, codiceTotp: string) {
+  const res = await apiFetch(`${API_BASE}/auth/totp/verifica`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ preToken, codiceTotp }),
+  });
+  if (res.status === 429) throw new Error('Troppi tentativi. Riprova tra un minuto.');
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(data?.errore || 'Codice non valido o sessione scaduta.');
+  return data;
+}
+

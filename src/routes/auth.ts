@@ -60,7 +60,7 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
     try {
       utente = await prismaAmministrativo().user.findFirst({ where: { email: cleanEmail } });
     } catch (err) {
-      console.error('Login: database non raggiungibile —', err instanceof Error ? err.message : err);
+      req.log.error({ err: err instanceof Error ? err.message : err }, 'Login — database non raggiungibile');
       return reply.code(503).send({ errore: 'Servizio di autenticazione non disponibile. Riprova tra poco.' });
     }
 
@@ -261,7 +261,7 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
         },
       });
     } catch (err) {
-      console.error('Client login DB lookup error:', err);
+      req.log.warn({ err: err instanceof Error ? err.message : err }, 'Client login — errore ricerca DB');
     }
 
     // Qui c'era un ripiego su `app.getClienti()`: un metodo che AppPort non dichiara e che nessuna
@@ -650,6 +650,77 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
     });
 
     return reply.send({ ok: true, messaggio: 'Autenticazione a due fattori attivata con successo.' });
+  });
+
+  /**
+   * POST /auth/totp/disabilita
+   * Riservato al super_admin autenticato. Richiede la password corrente come
+   * secondo fattore di sicurezza. Rimuove totpSecret, totpAbilitato e i backup codes.
+   */
+  server.post<{ Body: { password?: string } }>('/auth/totp/disabilita', {
+    config: { rateLimit: { max: 5, timeWindow: '1 minute' } },
+  }, async (req, reply) => {
+    if (req.ruolo !== 'super_admin') {
+      return reply.code(403).send({ errore: 'Solo il super_admin può disabilitare il 2FA TOTP.' });
+    }
+
+    const { password } = req.body ?? {};
+    if (!password) return reply.code(400).send({ errore: 'La password corrente è obbligatoria per disabilitare il 2FA.' });
+
+    const db = prismaAmministrativo();
+    const utente = await db.user.findUnique({ where: { id: req.userId } });
+    if (!utente) return reply.code(404).send({ errore: 'Utente non trovato.' });
+
+    if (!(utente as any).totpAbilitato) {
+      return reply.code(409).send({ errore: 'Il 2FA TOTP non è attualmente abilitato.' });
+    }
+
+    if (!verifyPassword(password, utente.passwordHash)) {
+      return reply.code(401).send({ errore: 'Password corrente non corretta.' });
+    }
+
+    await db.user.update({
+      where: { id: req.userId },
+      data: ({
+        totpSecret: null,
+        totpAbilitato: false,
+        totpBackupCodes: [],
+      }) as any,
+    });
+
+    await recordAudit({
+      tenantId: req.tenantId || TENANT_DEFAULT,
+      userId: req.userId,
+      userEmail: utente.email,
+      userNome: utente.nome,
+      ruolo: 'super_admin',
+      azione: 'TOTP_DISABILITATO',
+      entita: 'Sicurezza Account',
+      dettagli: 'Autenticazione a due fattori TOTP disabilitata. Segreto e codici di backup eliminati.',
+      ipAddress: req.ip || '127.0.0.1',
+    });
+
+    return reply.send({ ok: true, messaggio: 'Autenticazione a due fattori disabilitata con successo.' });
+  });
+
+  /**
+   * GET /auth/totp/stato
+   * Restituisce se il 2FA TOTP è attivo sull'account del super_admin corrente.
+   * Usato dal frontend per mostrare lo stato nel pannello sicurezza.
+   */
+  server.get('/auth/totp/stato', async (req, reply) => {
+    if (req.ruolo !== 'super_admin') {
+      return reply.code(403).send({ errore: 'Riservato al super_admin.' });
+    }
+    const db = prismaAmministrativo();
+    const utente = await db.user.findUnique({
+      where: { id: req.userId },
+      select: { id: true } as any,
+    });
+    if (!utente) return reply.code(404).send({ errore: 'Utente non trovato.' });
+
+    const totpAbilitato = Boolean((utente as any).totpAbilitato);
+    return reply.send({ ok: true, totpAbilitato });
   });
 
   /**

@@ -17,7 +17,7 @@ export async function registraRotteFornitori(server: FastifyInstance): Promise<v
   // GET /fornitori — Lista fornitori con conteggio fatture
   server.get('/fornitori', async (req, reply) => {
     const tenantId = req.tenantId as string;
-    console.log(`[API FORNITORI] GET /fornitori (tenant: ${tenantId}, user: ${req.userId})`);
+    req.log.info({ tenantId, userId: req.userId }, 'GET /fornitori');
     try {
       const fornitori = await prisma.fornitore.findMany({
         where: { tenantId },
@@ -30,7 +30,7 @@ export async function registraRotteFornitori(server: FastifyInstance): Promise<v
       });
       return reply.send(fornitori);
     } catch (err: any) {
-      console.error(`[API FORNITORI ERROR] GET /fornitori (tenant: ${tenantId}):`, err);
+      req.log.error({ tenantId, err: err?.message }, 'GET /fornitori — errore DB');
       return reply.code(500).send({ errore: err?.message || 'Errore recupero lista fornitori' });
     }
   });
@@ -38,7 +38,7 @@ export async function registraRotteFornitori(server: FastifyInstance): Promise<v
   // GET /fornitori/:id — Dettaglio fornitore con fatture ricevute
   server.get<{ Params: { id: string } }>('/fornitori/:id', async (req, reply) => {
     const tenantId = req.tenantId as string;
-    console.log(`[API FORNITORI] GET /fornitori/${req.params.id} (tenant: ${tenantId})`);
+    req.log.info({ tenantId, fornitoreId: req.params.id }, 'GET /fornitori/:id');
     try {
       const fornitore = await prisma.fornitore.findFirst({
         where: { id: req.params.id, tenantId },
@@ -53,7 +53,7 @@ export async function registraRotteFornitori(server: FastifyInstance): Promise<v
       }
       return reply.send(fornitore);
     } catch (err: any) {
-      console.error(`[API FORNITORI ERROR] GET /fornitori/${req.params.id}:`, err);
+      req.log.error({ tenantId, fornitoreId: req.params.id, err: err?.message }, 'GET /fornitori/:id — errore DB');
       return reply.code(500).send({ errore: err?.message || 'Errore recupero fornitore' });
     }
   });
@@ -61,11 +61,10 @@ export async function registraRotteFornitori(server: FastifyInstance): Promise<v
   // POST /fornitori — Crea nuovo fornitore
   server.post<{ Body: any }>('/fornitori', async (req, reply) => {
     const tenantId = req.tenantId as string;
-    console.log(`[API FORNITORI] POST /fornitori (tenant: ${tenantId}, user: ${req.userId}) payload:`, req.body);
     const parseResult = CreaFornitoreSchema.safeParse(req.body);
     if (!parseResult.success) {
       const msg = parseResult.error.issues[0]?.message || 'Dati fornitore non validi';
-      console.warn(`[API FORNITORI WARN] Validazione fallita: ${msg}`, parseResult.error.issues);
+      req.log.warn({ tenantId, issues: parseResult.error.issues }, 'POST /fornitori — validazione fallita');
       return reply.code(400).send({ errore: msg });
     }
 
@@ -77,7 +76,7 @@ export async function registraRotteFornitori(server: FastifyInstance): Promise<v
         },
       });
 
-      console.log(`[API FORNITORI SUCCESS] Creato fornitore ID: ${fornitore.id} (${fornitore.ragioneSociale})`);
+      req.log.info({ tenantId, fornitoreId: fornitore.id, ragioneSociale: fornitore.ragioneSociale }, 'POST /fornitori — fornitore creato');
 
       await recordAudit({
         tenantId,
@@ -91,7 +90,7 @@ export async function registraRotteFornitori(server: FastifyInstance): Promise<v
 
       return reply.code(201).send(fornitore);
     } catch (err: any) {
-      console.error(`[API FORNITORI ERROR] Errore creazione fornitore nel DB:`, err);
+      req.log.error({ tenantId, err: err?.message }, 'POST /fornitori — errore DB');
       return reply.code(500).send({ errore: err?.message || 'Errore creazione fornitore' });
     }
   });
@@ -174,7 +173,7 @@ export async function registraRotteFornitori(server: FastifyInstance): Promise<v
   // GET /fatture-ricevute — Elenco fatture d'acquisto
   server.get('/fatture-ricevute', async (req, reply) => {
     const tenantId = req.tenantId as string;
-    console.log(`[API FORNITORI] GET /fatture-ricevute (tenant: ${tenantId})`);
+    req.log.info({ tenantId }, 'GET /fatture-ricevute');
     try {
       const fatture = await prisma.fatturaRicevuta.findMany({
         where: { tenantId },
@@ -186,7 +185,7 @@ export async function registraRotteFornitori(server: FastifyInstance): Promise<v
       });
       return reply.send(fatture);
     } catch (err: any) {
-      console.error(`[API FORNITORI ERROR] GET /fatture-ricevute (tenant: ${tenantId}):`, err);
+      req.log.error({ tenantId, err: err?.message }, 'GET /fatture-ricevute — errore DB');
       return reply.code(500).send({ errore: err?.message || 'Errore recupero fatture passive' });
     }
   });
@@ -194,11 +193,10 @@ export async function registraRotteFornitori(server: FastifyInstance): Promise<v
   // POST /fatture-ricevute — Registra nuova fattura d'acquisto
   server.post<{ Body: any }>('/fatture-ricevute', async (req, reply) => {
     const tenantId = req.tenantId as string;
-    console.log(`[API FORNITORI] POST /fatture-ricevute (tenant: ${tenantId}, user: ${req.userId}) payload:`, req.body);
     const parseResult = RegistraFatturaRicevutaSchema.safeParse(req.body);
     if (!parseResult.success) {
       const msg = parseResult.error.issues[0]?.message || 'Dati fattura passiva non validi';
-      console.warn(`[API FORNITORI WARN] Validazione fattura fallita: ${msg}`, parseResult.error.issues);
+      req.log.warn({ tenantId, issues: parseResult.error.issues }, 'POST /fatture-ricevute — validazione fallita');
       return reply.code(400).send({ errore: msg });
     }
 

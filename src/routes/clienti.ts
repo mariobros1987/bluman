@@ -142,7 +142,7 @@ export async function registraRotteClienti(server: FastifyInstance, app: AppPort
         scadenza: scadenza.toISOString(),
       };
     } catch (err: any) {
-      console.error('Errore generazione magic link:', err);
+      req.log.error({ tenantId: req.tenantId, err: err instanceof Error ? err.message : err }, 'GET /clienti — errore generazione magic link');
       return reply.code(500).send({ errore: err.message || 'Errore generazione Magic Link' });
     }
   });
@@ -270,7 +270,7 @@ export async function registraRotteClienti(server: FastifyInstance, app: AppPort
         const cliente = await app.creaCliente({ nome: b.nome, tipo: b.tipo });
         return reply.code(201).send({ ...referentiObj, ...cliente });
       } catch {
-        console.error('Errore creazione cliente DB:', err);
+        req.log.error({ tenantId: req.tenantId, err: err instanceof Error ? err.message : err }, 'POST /clienti — errore creazione DB');
         return reply.code(500).send({ errore: err.message || 'Errore salvataggio cliente' });
       }
     }
@@ -346,7 +346,7 @@ export async function registraRotteClienti(server: FastifyInstance, app: AppPort
       });
       return reply.send(serializzaCliente(updated));
     } catch (err: any) {
-      console.error('Errore aggiornamento cliente DB:', err);
+      req.log.error({ tenantId: req.tenantId, err: err instanceof Error ? err.message : err }, 'PATCH /clienti/:id — errore aggiornamento DB');
       return reply.code(500).send({ errore: err.message || 'Errore aggiornamento cliente' });
     }
   });
@@ -427,7 +427,7 @@ export async function registraRotteClienti(server: FastifyInstance, app: AppPort
         email: destEmail || '',
       });
     } catch (err: any) {
-      console.error('Errore reset password cliente:', err);
+      req.log.error({ tenantId: req.tenantId, err: err instanceof Error ? err.message : err }, 'POST /clienti/reset-password — errore DB');
       return reply.code(500).send({ errore: err.message || 'Errore generazione credenziali cliente' });
     }
   });

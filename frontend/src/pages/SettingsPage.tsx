@@ -11,14 +11,18 @@ import { TabChannels } from '../components/settings/TabChannels';
 import { TabUsers } from '../components/settings/TabUsers';
 import { TabSdi } from '../components/settings/TabSdi';
 import { TabManutenzione } from '../components/settings/TabManutenzione';
+import { TabSicurezza } from '../components/settings/TabSicurezza';
 import { InviteUserModal } from '../components/settings/InviteUserModal';
 import { ResetPasswordModal } from '../components/settings/ResetPasswordModal';
 import styles from './Settings.module.css';
 
-type Tab = 'company' | 'users' | 'sdi' | 'invoice_design' | 'channels' | 'manutenzione';
+type Tab = 'company' | 'users' | 'sdi' | 'invoice_design' | 'channels' | 'manutenzione' | 'sicurezza';
 
 export function SettingsPage() {
   const [tab, setTab] = useState<Tab>('company');
+  // Ruolo dell'utente corrente — serve a TabSicurezza per mostrare la sezione 2FA
+  const currentUser = (() => { try { return JSON.parse(localStorage.getItem('bluman_user') || '{}'); } catch { return {}; } })();
+  const currentRuolo: string = currentUser?.ruolo || '';
   const [saved, setSaved] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
 
@@ -482,6 +486,14 @@ export function SettingsPage() {
         >
           🧹 Manutenzione Dati Locali
         </button>
+        {currentRuolo === 'super_admin' && (
+          <button
+            className={`${styles.tab} ${tab === 'sicurezza' ? styles.tabActive : ''}`}
+            onClick={() => setTab('sicurezza')}
+          >
+            🔐 Sicurezza Account
+          </button>
+        )}
       </div>
 
       {saved && (
@@ -662,6 +674,11 @@ export function SettingsPage() {
           setConfermaSvuota={setConfermaSvuota}
         />
       )}
+      {/* TAB 6: Sicurezza Account (2FA TOTP — solo super_admin) */}
+      {tab === 'sicurezza' && (
+        <TabSicurezza ruolo={currentRuolo} />
+      )}
+
       {modalUserOpen && (
         <InviteUserModal
           handleAddUser={handleAddUser}
