@@ -3,6 +3,7 @@ import path from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   CARTELLA_UPLOADS,
+  decodificaBase64Documento,
   mimeDaEstensione,
   nomeFileSicuro,
   nomeFileValido,
@@ -35,9 +36,24 @@ describe('mimeDaEstensione — il MIME dichiarato segue l\'estensione', () => {
     expect(mimeDaEstensione('foto.JPG')).toBe('image/jpeg');
   });
 
-  it('i tipi sconosciuti ricadono su octet-stream: il browser li scarica senza interpretarli', () => {
+  it('i tipi attivi e sconosciuti ricadono su octet-stream: non sono mai dichiarati eseguibili', () => {
+    expect(mimeDaEstensione('pagina.html')).toBe('application/octet-stream');
+    expect(mimeDaEstensione('immagine.svg')).toBe('application/octet-stream');
     expect(mimeDaEstensione('archivio.bin')).toBe('application/octet-stream');
     expect(mimeDaEstensione('senzaestensione')).toBe('application/octet-stream');
+  });
+});
+
+describe('decodificaBase64Documento — parsing rigoroso', () => {
+  it('accetta base64 canonico e data URL', () => {
+    expect(decodificaBase64Documento('YQ==').toString()).toBe('a');
+    expect(decodificaBase64Documento('data:text/plain;base64,YQ==').toString()).toBe('a');
+  });
+
+  it('rifiuta input vuoto, caratteri estranei e padding non canonico', () => {
+    expect(() => decodificaBase64Documento('')).toThrow('base64');
+    expect(() => decodificaBase64Documento('!!!!')).toThrow('base64');
+    expect(() => decodificaBase64Documento('YQ===')).toThrow('base64');
   });
 });
 
@@ -110,7 +126,7 @@ describe('uploadDocumento — il fallback locale non è più silenzioso', () => 
   });
 
   it('quando Storage risponde non-ok, lo dice nei log e il file va sul fallback locale', async () => {
-    const contenuto = Buffer.from('contenuto di prova per il fallback');
+    const contenuto = Buffer.from('%PDF-1.7\ncontenuto di prova per il fallback\n%%EOF');
     const risultato = await uploadDocumento('test-fallback.pdf', contenuto.toString('base64'));
 
     // Il ripiego funziona come sempre: URL relativo già firmato e nome d'origine preservato.

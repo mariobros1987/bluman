@@ -35,7 +35,18 @@ vi.mock('./util/prismaClient.js', async importOriginal => {
 
   const utente = {
     findUnique: async () => stato.esistente,
-    findFirst: async () => stato.esistente,
+    findFirst: async (args: any) => {
+      const id = args?.where?.id;
+      const ruoliPerId: Record<string, string> = {
+        'usr-super_admin': 'super_admin',
+        'usr-advisor': 'advisor',
+        'usr-collaboratore_interno': 'collaboratore_interno',
+      };
+      const ruolo = ruoliPerId[id];
+      return ruolo
+        ? { id, tenantId: ruolo === 'super_admin' ? null : TENANT, ruolo, stato: 'attivo', sessionVersion: 0 }
+        : null;
+    },
     findMany: async () => {
       if (stato.findManyEsplode) throw new Error('database irraggiungibile (simulato)');
       return stato.esistente ? [stato.esistente] : [];
@@ -68,7 +79,13 @@ const { signJwt } = await import('./util/jwt.js');
 const TENANT = '00000000-0000-0000-0000-000000000001';
 
 function token(ruolo: 'super_admin' | 'advisor' | 'collaboratore_interno') {
-  return signJwt({ userId: `usr-${ruolo}`, tenantId: TENANT, email: `${ruolo}@studio.example`, ruolo });
+  return signJwt({
+    userId: `usr-${ruolo}`,
+    tenantId: TENANT,
+    email: `${ruolo}@studio.example`,
+    ruolo,
+    sessionVersion: 0,
+  });
 }
 
 function server() {

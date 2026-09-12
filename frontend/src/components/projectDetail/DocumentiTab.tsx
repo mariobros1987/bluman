@@ -12,6 +12,7 @@ import { listaDocumentiProgetto, salvaDocumentoApi, eliminaDocumentoApi, archivi
 import { getCurrentTenantId, getTenantStorageKey, getStudioInfoForTenant, BLUECODE_TENANT_ID, isAdminStudio } from '../../utils/tenant';
 import { FoglioA4 } from '../documenti/FoglioA4';
 import { scomponiDocumento } from '../../../../src/util/intestazionePiede';
+import { escapeHtmlTesto, sanitizzaHtmlDocumento } from '../../../../src/util/htmlSanitizer';
 import type { Progetto } from '../../types';
 import { documentoApiAVista, documentiRimossi, ricordaDocumentoRimosso } from './documentiUtils';
 
@@ -29,7 +30,7 @@ export function DocumentiTab({ project }: { project: Progetto }) {
   // al salvataggio: qui si separano per rimetterli al loro posto sul foglio A4 dell'anteprima.
   // Un documento salvato prima di §39 non li ha: torna tutto come corpo, come si vedeva prima.
   const partiAnteprima = selectedPreviewDoc?.contenutoHtml
-    ? scomponiDocumento(selectedPreviewDoc.contenutoHtml)
+    ? scomponiDocumento(sanitizzaHtmlDocumento(selectedPreviewDoc.contenutoHtml))
     : null;
 
   // Caricamento Documenti dal Vault Locale e Cloud (Sincronizzati 1-a-1 con i Modelli Word Studio)
@@ -113,38 +114,38 @@ export function DocumentiTab({ project }: { project: Progetto }) {
   // Helper per costruire il layout HTML A4 formattato con Header/Footer Studio
   const buildDocumentHtml = (doc: any) => {
     const studio = getStudioInfoForTenant();
-    const rawContent = doc.contenutoHtml || `
+    const rawContent = sanitizzaHtmlDocumento(doc.contenutoHtml || `
       <div style="font-family: 'Segoe UI', Arial, sans-serif; color: #0f172a; line-height: 1.6; font-size: 11pt; padding: 10px;">
         <h1 style="color: #1e1b4b; text-align: center; text-transform: uppercase; font-size: 18pt; border-bottom: 2px solid #4338ca; padding-bottom: 10px; margin-bottom: 20px;">
-          ${doc.titolo || doc.nome}
+          ${escapeHtmlTesto(doc.titolo || doc.nome)}
         </h1>
         <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-size: 10pt;">
-          <strong>Studio Professionale:</strong> ${studio.ragioneSociale}<br/>
-          <strong>Cliente Committente:</strong> ${project.cl} (${project.n})<br/>
-          <strong>Categoria Vault:</strong> ${doc.cat || doc.categoria || 'Generale'}<br/>
-          <strong>Stato Firma:</strong> ${doc.firmato ? '🔒 Sottoscritto con Firma Elettronica Semplice (OTP verificata · art. 20 CAD)' : 'Bozza Documentale Studio'}
+          <strong>Studio Professionale:</strong> ${escapeHtmlTesto(studio.ragioneSociale)}<br/>
+          <strong>Cliente Committente:</strong> ${escapeHtmlTesto(project.cl)} (${escapeHtmlTesto(project.n)})<br/>
+          <strong>Categoria Vault:</strong> ${escapeHtmlTesto(doc.cat || doc.categoria || 'Generale')}<br/>
+          <strong>Stato Firma:</strong> ${doc.firmato ? 'Sottoscritto con Firma Elettronica Semplice (OTP verificata · art. 20 CAD)' : 'Bozza Documentale Studio'}
         </div>
       </div>
-    `;
+    `);
 
-    return `
+    return sanitizzaHtmlDocumento(`
       <div style="font-family: 'Segoe UI', Arial, sans-serif; color: #0f172a; line-height: 1.6; padding: 20px;">
         <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #4338ca; padding-bottom: 14px; margin-bottom: 24px;">
           <div>
-            <div style="font-size: 16pt; font-weight: 800; color: #1e1b4b;">${studio.ragioneSociale.toUpperCase()} — ADVISORY SERVICES</div>
-            <div style="font-size: 9pt; color: #64748b;">${studio.sedeLegale} · P.IVA ${studio.piva}</div>
+            <div style="font-size: 16pt; font-weight: 800; color: #1e1b4b;">${escapeHtmlTesto(studio.ragioneSociale.toUpperCase())} — ADVISORY SERVICES</div>
+            <div style="font-size: 9pt; color: #64748b;">${escapeHtmlTesto(studio.sedeLegale)} · P.IVA ${escapeHtmlTesto(studio.piva)}</div>
           </div>
           <div style="text-align: right; font-size: 8.5pt; color: #64748b;">
-            Rif. Incarico: #${project.id}<br/>Data: ${doc.data || doc.dataCaricamento || '2026'}
+            Rif. Incarico: #${escapeHtmlTesto(project.id)}<br/>Data: ${escapeHtmlTesto(doc.data || doc.dataCaricamento || '2026')}
           </div>
         </div>
         <div>${rawContent}</div>
         <div style="margin-top: 40px; border-top: 1px solid #e2e8f0; padding-top: 10px; display: flex; justify-content: space-between; font-size: 8.5pt; color: #94a3b8;">
-          <span>${studio.ragioneSociale} • Pratica: ${project.n}</span>
+          <span>${escapeHtmlTesto(studio.ragioneSociale)} • Pratica: ${escapeHtmlTesto(project.n)}</span>
           <span>Firma Elettronica Semplice • art. 20 CAD</span>
         </div>
       </div>
-    `;
+    `);
   };
 
   // Scarica Copia VERA in PDF A4
@@ -200,6 +201,11 @@ export function DocumentiTab({ project }: { project: Progetto }) {
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (/\.(?:html?|xhtml|svg|xml|mhtml|js)$/i.test(file.name)) {
+      alert('Formato non ammesso: HTML, SVG, XML e contenuti web attivi non possono essere archiviati.');
+      e.target.value = '';
+      return;
+    }
     setUploading(true);
 
     try {
@@ -368,7 +374,7 @@ SHA-256 del documento.
                 }
 
                 const fileName = (d.nome || `${d.titolo}.html`).replace(/[^a-zA-Z0-9._-]/g, '_');
-                const docHtmlContent = d.contenutoHtml || `<h1>${d.titolo || d.nome}</h1><p>Documento del fascicolo ${project.n} - ${project.cl}</p>`;
+                const docHtmlContent = sanitizzaHtmlDocumento(d.contenutoHtml || `<h1>${escapeHtmlTesto(d.titolo || d.nome)}</h1><p>Documento del fascicolo ${escapeHtmlTesto(project.n)} - ${escapeHtmlTesto(project.cl)}</p>`);
                 zip.addTextFile(`${folder}/${fileName.replace(/\.docx?$/, '.html')}`, docHtmlContent);
               });
 
@@ -416,7 +422,7 @@ SHA-256 del documento.
 
           <label style={{ background: 'var(--card2)', border: '1px solid var(--border)', color: 'var(--text)', padding: '8px 16px', borderRadius: 10, fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, boxShadow: '0 2px 8px rgba(0,0,0,.1)' }}>
             <span>{uploading ? 'Caricamento in corso...' : '📤 Carica File da Disco'}</span>
-            <input type="file" onChange={handleFileUpload} disabled={uploading} style={{ display: 'none' }} />
+            <input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.gif,.webp,.zip,.p7m,.eml,.txt,.csv" onChange={handleFileUpload} disabled={uploading} style={{ display: 'none' }} />
           </label>
         </div>
       </div>
@@ -727,16 +733,12 @@ SHA-256 del documento.
                   <div style={{ fontSize: 13, lineHeight: 1.6 }} dangerouslySetInnerHTML={{ __html: partiAnteprima.corpo }} />
                 </FoglioA4>
               ) : selectedPreviewDoc.dbDoc && selectedPreviewDoc.url && selectedPreviewDoc.url !== '#' ? (
-                // §2.9 — file reale archiviato nel fascicolo: anteprima del PDF/immagine caricato.
-                // Qui i margini sono quelli del file, non li decide questa pagina.
-                <div style={{ fontFamily: 'sans-serif', background: '#fff', borderRadius: 8, padding: 16 }}>
-                  {/\.(png|jpe?g)$/i.test(selectedPreviewDoc.nome || '') ? (
-                    <img src={selectedPreviewDoc.url} alt={selectedPreviewDoc.nome} style={{ maxWidth: '100%', borderRadius: 6 }} />
-                  ) : (
-                    <iframe src={selectedPreviewDoc.url} title={selectedPreviewDoc.nome || 'Documento'} style={{ width: '100%', height: 520, border: '1px solid #cbd5e1', borderRadius: 6, background: '#f1f5f9' }} />
-                  )}
-                  <div style={{ marginTop: 12, textAlign: 'center', fontSize: 12 }}>
-                    <a href={selectedPreviewDoc.url} target="_blank" rel="noreferrer" style={{ color: '#0284c7', fontWeight: 700 }}>↗ Apri il file originale</a>
+                // Gli URL archivio sono attachment: niente iframe nel contesto autenticato.
+                <div style={{ fontFamily: 'sans-serif', background: '#fff', color: '#334155', borderRadius: 8, padding: 28, textAlign: 'center' }}>
+                  <strong>Anteprima incorporata disabilitata per sicurezza.</strong>
+                  <div style={{ marginTop: 8, fontSize: 12 }}>Scarica il file per aprirlo con l'applicazione associata.</div>
+                  <div style={{ marginTop: 12, fontSize: 12 }}>
+                    <a href={selectedPreviewDoc.url} download style={{ color: '#0284c7', fontWeight: 700 }}>Scarica il file originale</a>
                   </div>
                 </div>
               ) : (

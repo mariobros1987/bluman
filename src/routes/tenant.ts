@@ -15,6 +15,14 @@ import { provaPostaInUscita, provaPostaInArrivo, sendInvitoCollaboratoreEmail } 
 import { credenzialiCanali } from '../services/otpDispatch.js';
 import { inMemoryTenantStore, recordAudit, senzaHash } from '../util/serverHelpers.js';
 import { campoOrdinamento, creaMetaPaginazione, leggiPaginazione } from '../util/paginazione.js';
+import {
+  validaCartellaImap,
+  validaEmail,
+  validaHost,
+  validaPorta,
+  validaServername,
+  vietaControlli,
+} from '../util/networkPolicy.js';
 
 // ─── TENANT, TEAM & ADMIN (§2bis: impostazioni studio, team, super admin) ──
 export async function registraRotteTenant(server: FastifyInstance): Promise<void> {
@@ -102,9 +110,27 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
     }
   });
 
+  function soloGestoriCanali(req: any, reply: any): boolean {
+    if (req.ruolo !== 'advisor' && req.ruolo !== 'super_admin') {
+      reply.code(403).send({ errore: 'Configurazione e prove dei canali riservate al responsabile dello studio o al super admin.' });
+      return false;
+    }
+    return true;
+  }
+
+  const CHIAVI_CANALI = new Set([
+    'waPhoneId', 'waAccessToken', 'waVerifyToken', 'tgBotToken', 'tgBotUsername',
+    'smtpHost', 'smtpServername', 'smtpPort', 'smtpSecure', 'smtpUser', 'smtpPass',
+    'smtpFromEmail', 'smtpFromName', 'smtpReplyTo', 'smtpBcc',
+    'imapHost', 'imapServername', 'imapPort', 'imapSecure', 'imapUser', 'imapPass',
+    'imapFolder', 'imapPollInterval', 'imapProtocol', 'emailSignatureHtml',
+    'emailInboundParseUrl', 'signalCliEndpoint',
+  ]);
+
   server.patch<{ Body: Record<string, any> }>('/tenant/info', async (req, reply) => {
     const tenantId = req.tenantId;
     const rawBody = (req.body || {}) as Record<string, any>;
+    if (Object.keys(rawBody).some(key => CHIAVI_CANALI.has(key)) && !soloGestoriCanali(req, reply)) return reply;
 
     // `logoUrl` finisce in un `<img src>` generato lato server: un valore che non punta
     // a niente svuota la fascia dell'intestazione invece di lasciar vedere il marchio.
@@ -172,27 +198,39 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
     ];
 
     const sanitizedData: Record<string, any> = {};
-    for (const key of allowedKeys) {
-      if (rawBody[key] !== undefined) {
-        if (key === 'smtpPort' || key === 'imapPort' || key === 'durataMesi') {
+    try {
+      for (const key of allowedKeys) {
+        if (rawBody[key] === undefined) continue;
+        if (key === 'smtpPort' || key === 'imapPort') {
+          sanitizedData[key] = rawBody[key] === null || rawBody[key] === '' ? null : validaPorta(rawBody[key], key);
+        } else if (key === 'durataMesi') {
           sanitizedData[key] = rawBody[key] ? Number(rawBody[key]) : null;
+        } else if (key === 'smtpHost' || key === 'imapHost') {
+          sanitizedData[key] = rawBody[key] === null || rawBody[key] === '' ? null : validaHost(rawBody[key], key);
+        } else if (key === 'smtpServername' || key === 'imapServername') {
+          sanitizedData[key] = rawBody[key] === null || rawBody[key] === '' ? null : validaServername(rawBody[key]);
+        } else if (['smtpFromEmail', 'smtpReplyTo', 'smtpBcc'].includes(key)) {
+          sanitizedData[key] = rawBody[key] === null || rawBody[key] === '' ? null : validaEmail(rawBody[key], key);
+        } else if (key === 'imapUser') {
+          sanitizedData[key] = rawBody[key] === null || rawBody[key] === '' ? null : validaEmail(rawBody[key], key);
+        } else if (key === 'imapFolder') {
+          sanitizedData[key] = rawBody[key] === null || rawBody[key] === '' ? null : validaCartellaImap(rawBody[key]);
+        } else if (key === 'smtpUser') {
+          sanitizedData[key] = rawBody[key] === null || rawBody[key] === '' ? null : vietaControlli(rawBody[key], key, 254).trim();
         } else if (key === 'smtpSecure' || key === 'imapSecure' || key === 'mostraSdi' || key === 'mostraIva') {
           sanitizedData[key] = Boolean(rawBody[key]);
         } else if ((CHIAVI_SEGRETE as readonly string[]).includes(key)) {
-          // Il browser riceve i segreti mascherati (stringa vuota) da `GET /tenant/info`: se
-          // li rimandasse indietro tali e quali, il salvataggio delle impostazioni
-          // cancellerebbe la password SMTP vera — cioè premere «Salva» dopo aver cambiato la
-          // ragione sociale spegnerebbe la posta in uscita dello studio.
-          // Stringa vuota = «non toccare»; `null` esplicito = «cancella».
           if (rawBody[key] === null) {
             sanitizedData[key] = null;
           } else if (typeof rawBody[key] !== 'string' || rawBody[key].trim() !== '') {
-            sanitizedData[key] = rawBody[key];
+            sanitizedData[key] = vietaControlli(rawBody[key], key, 2048);
           }
         } else {
           sanitizedData[key] = rawBody[key];
         }
       }
+    } catch (err) {
+      return reply.code(400).send({ errore: err instanceof Error ? err.message : 'Configurazione canali non valida.' });
     }
 
     try {
@@ -421,11 +459,12 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
       const passwordTemporanea = generaPasswordTemporanea();
       const passwordHash = hashPassword(passwordTemporanea);
 
-      await prismaAmministrativo().user.update({
+      await prisma.user.update({
         where: { id: utente.id },
         data: {
           passwordHash,
           stato: 'invitato', // Imposta 'invitato' per obbligare il cambio password al primo accesso
+          sessionVersion: { increment: 1 },
         },
       });
 
@@ -621,7 +660,10 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
       const esistente = await prisma.user.findUnique({ where: { email: emailResponsabile } });
 
       if (esistente) {
-        await prisma.user.update({ where: { id: esistente.id }, data: { passwordHash, stato: 'invitato' } });
+        await prisma.user.update({
+          where: { id: esistente.id },
+          data: { passwordHash, stato: 'invitato', sessionVersion: { increment: 1 } },
+        });
       } else {
         await prisma.user.create({
           data: {
@@ -697,6 +739,7 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
    * Ora si prova esattamente quello che c'è: corpo della richiesta, altrimenti riga Tenant.
    */
   server.post<{ Body: { smtpHost?: string; smtpServername?: string; smtpPort?: number; smtpSecure?: boolean; smtpUser?: string; smtpPass?: string; smtpFromEmail?: string; smtpFromName?: string; emailDestinatario?: string } }>('/tenant/test-email', async (req, reply) => {
+    if (!soloGestoriCanali(req, reply)) return reply;
     const tenantId = req.tenantId;
     let dbTenant: any = null;
     try {
@@ -708,7 +751,9 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
     // Il nome del certificato fa parte della configurazione da provare: se la prova lo
     // ignorasse, passerebbe (o fallirebbe) su una connessione diversa da quella degli invii.
     const servername = body.smtpServername ?? dbTenant?.smtpServername ?? '';
-    const port = Number(body.smtpPort) || Number(dbTenant?.smtpPort) || 465;
+    const port = body.smtpPort !== undefined
+      ? body.smtpPort
+      : (dbTenant?.smtpPort !== undefined && dbTenant?.smtpPort !== null ? dbTenant.smtpPort : 465);
     const secure = body.smtpSecure !== undefined ? Boolean(body.smtpSecure) : (dbTenant?.smtpSecure !== undefined ? Boolean(dbTenant.smtpSecure) : port === 465);
     const user = body.smtpUser || dbTenant?.smtpUser || '';
     // La password può arrivare vuota dal modulo perché `GET /tenant/info` la maschera: in quel
@@ -727,6 +772,7 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
   });
 
   server.post<{ Body: { imapHost?: string; imapServername?: string; imapPort?: number; imapUser?: string; imapPass?: string; imapSecure?: boolean } }>('/tenant/test-imap', async (req, reply) => {
+    if (!soloGestoriCanali(req, reply)) return reply;
     const tenantId = req.tenantId;
     let dbTenant: any = null;
     try {
@@ -740,7 +786,9 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
     // fallirebbe con «Hostname/IP does not match certificate's altnames» pur essendo la
     // configurazione corretta.
     const servername = body.imapServername ?? dbTenant?.imapServername ?? '';
-    const port = Number(body.imapPort) || Number(dbTenant?.imapPort) || 993;
+    const port = body.imapPort !== undefined
+      ? body.imapPort
+      : (dbTenant?.imapPort !== undefined && dbTenant?.imapPort !== null ? dbTenant.imapPort : 993);
     const secure = body.imapSecure !== undefined ? Boolean(body.imapSecure) : (dbTenant?.imapSecure !== undefined ? Boolean(dbTenant.imapSecure) : port === 993);
     const user = body.imapUser || dbTenant?.imapUser || '';
     // La password IMAP ricade su quella SMTP perché su molti provider la casella è la stessa;
@@ -766,6 +814,7 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
    * Meta, Telegram o il server SMTP: un canale rotto risponde 400.
    */
   server.post<{ Body: { channel?: string; waPhoneId?: string; waAccessToken?: string } }>('/tenant/test-channel', async (req, reply) => {
+    if (!soloGestoriCanali(req, reply)) return reply;
     const tenantId = req.tenantId;
     const canale = (req.body?.channel || '').toLowerCase();
     const cred = await credenzialiCanali(tenantId);
@@ -779,11 +828,21 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
       success ? reply.send({ success, message }) : reply.code(400).send({ success, message });
 
     try {
+      const fetchConTimeout = async (url: string, init: RequestInit = {}) => {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 8000);
+        try {
+          return await fetch(url, { ...init, signal: controller.signal });
+        } finally {
+          clearTimeout(timer);
+        }
+      };
+
       if (canale === 'whatsapp') {
         if (!waPhoneId || !waAccessToken) {
           return esito(false, 'Phone Number ID o Access Token di WhatsApp non impostati.');
         }
-        const r = await fetch(
+        const r = await fetchConTimeout(
           `https://graph.facebook.com/v21.0/${encodeURIComponent(waPhoneId)}?fields=display_phone_number,verified_name,quality_rating`,
           { headers: { Authorization: `Bearer ${waAccessToken}` } },
         );
@@ -801,7 +860,7 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
 
       if (canale === 'telegram') {
         if (!cred.tgBotToken) return esito(false, 'Token del bot Telegram non impostato.');
-        const r = await fetch(`https://api.telegram.org/bot${cred.tgBotToken}/getMe`);
+        const r = await fetchConTimeout(`https://api.telegram.org/bot${cred.tgBotToken}/getMe`);
         const dati: any = await r.json().catch(() => ({}));
         if (!r.ok || !dati?.ok) {
           return esito(false, `Telegram ha rifiutato il token: ${dati?.description || `HTTP ${r.status}`}`);

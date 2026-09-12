@@ -13,6 +13,14 @@ export async function fetchClienti(parametri?: ParametriListaPaginata) {
   }
 }
 
+export async function fetchCliente(id: string) {
+  const res = await apiFetch(`${API_BASE}/clienti/${encodeURIComponent(id)}`, {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore nel recupero cliente'));
+  return await res.json();
+}
+
 export async function creaClienteApi(input: { nome: string; tipo?: 'individual' | 'company'; [key: string]: any }) {
   const res = await apiFetch(`${API_BASE}/clienti`, {
     method: 'POST',

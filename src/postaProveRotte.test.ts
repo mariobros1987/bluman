@@ -21,6 +21,16 @@ const stato: { tenant: any } = { tenant: null };
 vi.mock('./util/prismaClient.js', async importOriginal => {
   const reale = await importOriginal<typeof import('./util/prismaClient.js')>();
 
+  const utente = (args: any) => {
+    const id = args?.where?.id;
+    if (id === 'usr-advisor') {
+      return { id, tenantId: TENANT, ruolo: 'advisor', stato: 'attivo', sessionVersion: 0 };
+    }
+    if (id === 'usr-collaboratore') {
+      return { id, tenantId: TENANT, ruolo: 'collaboratore_interno', stato: 'attivo', sessionVersion: 0 };
+    }
+    return null;
+  };
   const finto: any = {
     tenant: {
       findUnique: async () => stato.tenant,
@@ -31,7 +41,7 @@ vi.mock('./util/prismaClient.js', async importOriginal => {
       },
     },
     auditLog: { create: async () => ({}) },
-    user: { findUnique: async () => null, findFirst: async () => null, findMany: async () => [] },
+    user: { findUnique: async (args: any) => utente(args), findFirst: async (args: any) => utente(args), findMany: async () => [] },
   };
 
   return { ...reale, prisma: finto, prismaAmministrativo: () => finto };
@@ -42,10 +52,34 @@ const { InMemoryApp } = await import('./adapters/inMemoryApp.js');
 const { signJwt } = await import('./util/jwt.js');
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
-const TOKEN = signJwt({ userId: 'usr-advisor', tenantId: TENANT, email: 'advisor@studio.example', ruolo: 'advisor' });
+const TOKEN = signJwt({
+  userId: 'usr-advisor', tenantId: TENANT, email: 'advisor@studio.example', ruolo: 'advisor', sessionVersion: 0,
+});
+const TOKEN_COLLABORATORE = signJwt({
+  userId: 'usr-collaboratore',
+  tenantId: TENANT,
+  email: 'collaboratore@studio.example',
+  ruolo: 'collaboratore_interno',
+  sessionVersion: 0,
+});
+
+const TENANT_CONFIGURATO = {
+  id: TENANT,
+  ragioneSociale: 'Studio di Prova',
+  smtpHost: 'smtp.esempio.test',
+  smtpPort: 465,
+  smtpUser: 'studio@esempio.test',
+  smtpPass: 'password-smtp-di-prova',
+  smtpFromEmail: 'studio@esempio.test',
+  imapHost: 'imap.esempio.test',
+  imapPort: 993,
+  imapUser: 'studio@esempio.test',
+  imapPass: 'password-imap-di-prova',
+};
 
 const server = () => buildServer(new InMemoryApp()) as any;
 const auth = () => ({ authorization: `Bearer ${TOKEN}` });
+const authCollaboratore = () => ({ authorization: `Bearer ${TOKEN_COLLABORATORE}` });
 
 /** Nomi che non devono comparire in una risposta: sono server e mittenti di altri. */
 const NOMI_DI_ALTRI = ['register.it', 'bluecode-ltd.com', 'securemail.pro', 'bluecode.advisory', 'BlueCode'];
@@ -109,6 +143,27 @@ describe('§35 — POST /tenant/test-email', () => {
   it('la rotta resta protetta: senza token 401', async () => {
     const res = await server().inject({ method: 'POST', url: '/tenant/test-email', payload: {} });
     expect(res.statusCode).toBe(401);
+  });
+
+  it('un collaboratore autenticato non può provare o leggere credenziali SMTP', async () => {
+    stato.tenant = { ...TENANT_CONFIGURATO };
+    const res = await server().inject({ method: 'POST', url: '/tenant/test-email', headers: authCollaboratore(), payload: {} });
+    expect(res.statusCode).toBe(403);
+  });
+
+  it('rifiuta porta non valida e CRLF prima della rete', async () => {
+    stato.tenant = { ...TENANT_CONFIGURATO };
+    const porta = await server().inject({
+      method: 'POST', url: '/tenant/test-email', headers: auth(), payload: { smtpPort: 70000 },
+    });
+    expect(porta.statusCode).toBe(400);
+    expect(porta.json().errore).toMatch(/porta/i);
+
+    const crlf = await server().inject({
+      method: 'POST', url: '/tenant/test-email', headers: auth(), payload: { smtpUser: 'x@example.com\r\nBcc: altro@example.com' },
+    });
+    expect(crlf.statusCode).toBe(400);
+    expect(crlf.json().errore).toMatch(/controllo/i);
   });
 
   it('il nome del certificato indicato nel modulo viene provato, non ignorato', async () => {
@@ -181,6 +236,30 @@ describe('§35 — POST /tenant/test-imap', () => {
     const res = await server().inject({ method: 'POST', url: '/tenant/test-imap', payload: {} });
     expect(res.statusCode).toBe(401);
   });
+
+  it('un collaboratore non può provare IMAP', async () => {
+    stato.tenant = { ...TENANT_CONFIGURATO };
+    const res = await server().inject({ method: 'POST', url: '/tenant/test-imap', headers: authCollaboratore(), payload: {} });
+    expect(res.statusCode).toBe(403);
+  });
+
+  it('blocca loopback e CRLF prima di aprire il socket', async () => {
+    stato.tenant = {
+      ...TENANT_CONFIGURATO,
+      imapHost: '127.0.0.1',
+      imapUser: 'studio@example.com',
+      imapPass: 'password-di-prova',
+    };
+    const loopback = await server().inject({ method: 'POST', url: '/tenant/test-imap', headers: auth(), payload: {} });
+    expect(loopback.statusCode).toBe(400);
+    expect(loopback.json().errore).toMatch(/non pubblico|riservato/i);
+
+    const crlf = await server().inject({
+      method: 'POST', url: '/tenant/test-imap', headers: auth(), payload: { imapPass: 'x\r\nA02 LOGOUT' },
+    });
+    expect(crlf.statusCode).toBe(400);
+    expect(crlf.json().errore).toMatch(/controllo/i);
+  });
 });
 
 describe('§35 — POST /tenant/test-channel, canale email', () => {
@@ -200,5 +279,15 @@ describe('§35 — POST /tenant/test-channel, canale email', () => {
     expect(body.ok ?? body.success).toBe(false);
     expect(JSON.stringify(body)).toMatch(/non configurata/i);
     for (const nome of NOMI_DI_ALTRI) expect(res.body).not.toContain(nome);
+  });
+
+  it('è riservata ad advisor e super admin', async () => {
+    const res = await server().inject({
+      method: 'POST',
+      url: '/tenant/test-channel',
+      headers: authCollaboratore(),
+      payload: { channel: 'email' },
+    });
+    expect(res.statusCode).toBe(403);
   });
 });

@@ -1,4 +1,18 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+
+vi.mock('./util/prismaClient.js', async importOriginal => {
+  const reale = await importOriginal<typeof import('./util/prismaClient.js')>();
+  const finto = {
+    ...(reale.prisma as any),
+    user: {
+      ...(reale.prisma as any).user,
+      findFirst: async (args: any) => args?.where?.id === 'admin-1'
+        ? { ruolo: 'advisor', stato: 'attivo', sessionVersion: 0 }
+        : (reale.prisma as any).user.findFirst(args),
+    },
+  } as any;
+  return { ...reale, prisma: finto };
+});
 import { parseXmlFatturaPassiva } from './services/fatturaPassivaParser.js';
 import { buildServer } from './server.js';
 import { signJwt } from './util/jwt.js';
@@ -85,6 +99,7 @@ describe('🧪 Ciclo Passivo & Fornitori — Test Suite', () => {
         tenantId: 'tenant-test',
         ruolo: 'advisor',
         email: 'advisor@test.it',
+        sessionVersion: 0,
       });
 
       const res = await server.inject({
@@ -110,6 +125,7 @@ describe('🧪 Ciclo Passivo & Fornitori — Test Suite', () => {
         tenantId: 'tenant-test',
         ruolo: 'advisor',
         email: 'advisor@test.it',
+        sessionVersion: 0,
       });
 
       const res = await server.inject({

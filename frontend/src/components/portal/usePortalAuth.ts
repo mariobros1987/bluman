@@ -127,8 +127,8 @@ export function usePortalAuth({ loadPortalData, clientObj, setClientObj }: UsePo
   const handleSaveClientPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setClientPassMsg(null);
-    if (clientPassNew.length < 6) {
-      setClientPassMsg({ text: 'La nuova password deve contenere almeno 6 caratteri.', type: 'error' });
+    if (clientPassNew.length < 8) {
+      setClientPassMsg({ text: 'La nuova password deve contenere almeno 8 caratteri.', type: 'error' });
       return;
     }
     if (clientPassNew !== clientPassConfirm) {
@@ -137,7 +137,7 @@ export function usePortalAuth({ loadPortalData, clientObj, setClientObj }: UsePo
     }
     setClientPassLoading(true);
     try {
-      await cambiaPasswordClienteApi(clientPassNew, clientPassCurrent, clientObj?.id, clientObj?.email || loginEmail);
+      await cambiaPasswordClienteApi(clientPassNew, clientPassCurrent);
       setClientPassMsg({ text: '✓ Password salvata con successo! Ora puoi accedere al portale anche con la tua email e questa password.', type: 'success' });
       setClientPassCurrent('');
       setClientPassNew('');

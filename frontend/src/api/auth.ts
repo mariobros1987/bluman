@@ -89,21 +89,27 @@ export async function cambiaPasswordStaffApi(currentPassword: string, newPasswor
   if (!res.ok) {
     throw new Error(data?.errore || 'Errore durante l\'aggiornamento della password');
   }
+  if (data?.token && typeof localStorage !== 'undefined') {
+    localStorage.setItem('bluman_jwt_token', data.token);
+  }
   return data;
 }
 
 /**
  * Impostazione o Modifica Password per il Cliente del Portale
  */
-export async function cambiaPasswordClienteApi(newPassword: string, currentPassword?: string, clienteId?: string, email?: string) {
+export async function cambiaPasswordClienteApi(newPassword: string, currentPassword?: string) {
   const res = await apiFetch(`${API_BASE}/portal/change-password`, {
     method: 'POST',
     headers: getAuthHeaders(),
-    body: JSON.stringify({ newPassword, currentPassword, clienteId, email }),
+    body: JSON.stringify({ newPassword, currentPassword }),
   });
   const data = await res.json().catch(() => null);
   if (!res.ok) {
     throw new Error(data?.errore || 'Errore durante il salvataggio della password');
+  }
+  if (data?.token && typeof localStorage !== 'undefined') {
+    localStorage.setItem('bluman_portal_token', data.token);
   }
   return data;
 }

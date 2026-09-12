@@ -73,7 +73,11 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
       }
     }
     const { direzioneDaSegnare } = req.body || {};
-    const targetDirezione = direzioneDaSegnare || 'entrata';
+    // Il cliente può marcare come lette soltanto le comunicazioni inviate dallo studio.
+    // La direzione non è quindi una scelta fidata del browser del portale.
+    const targetDirezione = req.ruolo === 'cliente'
+      ? 'uscita'
+      : direzioneDaSegnare || 'entrata';
     const adesso = new Date().toISOString();
 
     const daAggiornare = await prisma.comunicazioneProgetto.findMany({
@@ -123,16 +127,37 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
       }
     }
     const body = (req.body || {}) as Record<string, any>;
+    const clienteId = req.ruolo === 'cliente' ? clienteDellaRichiesta(req) : null;
+    const canale = typeof body.canale === 'string' ? body.canale.trim().slice(0, 50) : '';
+    const testo = typeof body.testo === 'string' ? body.testo.trim() : '';
+    if (!canale || !testo) {
+      return reply.code(400).send({ errore: 'Canale e testo sono obbligatori.' });
+    }
     try {
+      // Per il portale identità e direzione vengono imposte dal server: un cliente non può
+      // presentarsi come advisor né creare una falsa comunicazione in uscita dallo studio.
+      let mittente = typeof body.mittente === 'string' ? body.mittente : '';
+      let destinatario = typeof body.destinatario === 'string' ? body.destinatario : '';
+      let direzione = body.direzione || 'uscita';
+      if (clienteId) {
+        const cliente = await prisma.cliente.findFirst({
+          where: { id: clienteId, tenantId },
+          select: { nome: true },
+        });
+        if (!cliente) return reply.code(404).send({ errore: 'Cliente non trovato.' });
+        mittente = `${cliente.nome} (Cliente)`;
+        destinatario = 'Studio';
+        direzione = 'entrata';
+      }
       const msg = await prisma.comunicazioneProgetto.create({
         data: {
           tenantId,
           progettoId: req.params.id,
-          canale: body.canale,
-          mittente: body.mittente,
-          destinatario: body.destinatario,
-          direzione: body.direzione || 'uscita',
-          testo: body.testo,
+          canale,
+          mittente,
+          destinatario,
+          direzione,
+          testo,
           allegatiJson: body.allegatiJson ? (typeof body.allegatiJson === 'string' ? body.allegatiJson : JSON.stringify(body.allegatiJson)) : null,
           externalId: JSON.stringify({
             stato: 'consegnato',
@@ -141,7 +166,7 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
         },
       });
       // Blocco 3 — messaggio in arrivo dal cliente: lo studio viene avvisato subito.
-      if (body.direzione === 'entrata' || body.direzione === 'ingresso') {
+      if (direzione === 'entrata' || direzione === 'ingresso') {
         const progetto = await prisma.progetto.findUnique({
           where: { id: req.params.id },
           include: { cliente: { select: { nome: true } } },

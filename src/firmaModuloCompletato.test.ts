@@ -13,9 +13,10 @@
  * le validazioni si fermano sulla prima lettura Prisma con un 500 — ed è proprio questo che
  * dimostra il passaggio dal guard, perché il 400 dell'impronta non arriva.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { buildServer } from './server.js';
 import { InMemoryApp } from './adapters/inMemoryApp.js';
+import { prisma } from './util/prismaClient.js';
 import { signJwt } from './util/jwt.js';
 
 const TENANT_TEST = '00000000-0000-0000-0000-000000000001';
@@ -27,6 +28,13 @@ const TOKEN_TEST_CLIENTE = signJwt({
   tenantId: TENANT_TEST,
   email: 'cliente@firma.example',
   ruolo: 'cliente',
+  sessionVersion: 0,
+});
+
+const findFirstClienteReale = prisma.cliente.findFirst.bind(prisma.cliente);
+vi.spyOn(prisma.cliente as any, 'findFirst').mockImplementation(async (args: any) => {
+  if (args?.where?.id === CLIENTE_TEST && args?.select?.sessionVersion) return { sessionVersion: 0 } as any;
+  return findFirstClienteReale(args as any);
 });
 
 function nuovoServer() {

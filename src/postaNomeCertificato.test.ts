@@ -25,6 +25,18 @@ const trasporti: any[] = [];
 /** Corpi JSON inviati al relay, già decodificati. */
 const corpiRelay: any[] = [];
 
+vi.mock('./util/networkPolicy.js', async importOriginal => {
+  const reale = await importOriginal<typeof import('./util/networkPolicy.js')>();
+  return {
+    ...reale,
+    risolviEndpointPubblico: async (hostInput: unknown, servernameInput?: unknown) => {
+      const host = reale.validaHost(hostInput);
+      const servername = servernameInput ? reale.validaServername(servernameInput) : host;
+      return { host, address: '203.1.2.3', family: 4 as const, servername };
+    },
+  };
+});
+
 vi.mock('nodemailer', () => ({
   default: {
     createTransport: (opzioni: any) => {
@@ -121,7 +133,7 @@ describe('§35 — posta in uscita: il nome del certificato viaggia con la richi
 
     expect(esito.ok).toBe(true);
     expect(trasporti).toHaveLength(1);
-    expect(trasporti[0].host).toBe('authsmtp.esempio.test');
+    expect(trasporti[0].host).toBe('203.1.2.3');
     expect(trasporti[0].tls.servername).toBe('authsmtp.certificato.test');
     // §3.4 — il nome dichiarato non è un'eccezione alla verifica.
     expect(trasporti[0].tls.rejectUnauthorized).toBe(true);
@@ -131,7 +143,7 @@ describe('§35 — posta in uscita: il nome del certificato viaggia con la richi
     const esito = await inviaEmail({ ...MESSAGGIO, smtp: { ...CASELLA, servername: undefined } });
 
     expect(esito.ok).toBe(true);
-    expect(trasporti[0].tls).not.toHaveProperty('servername');
+    expect(trasporti[0].tls.servername).toBe('authsmtp.esempio.test');
     expect(trasporti[0].tls.rejectUnauthorized).toBe(true);
   });
 
@@ -191,18 +203,20 @@ describe('§35 — posta in arrivo: il nome del certificato arriva al relay', ()
   });
 });
 
-describe('§35 — il backend non risolve nomi al posto del DNS', () => {
-  it('nessun modulo della posta usa `dns.lookup` per sostituire l\'host con un IP', async () => {
-    // Il tentativo precedente faceva questo, e non poteva funzionare: un nome senza record A non
-    // risolve dal backend più di quanto risolva da Vercel. Inoltre collegarsi a un IP fisso toglie
-    // al provider la possibilità di spostare o bilanciare il servizio.
+describe('§35 — il backend fissa l’indirizzo verificato', () => {
+  it('la risoluzione e la policy vivono nel modulo centralizzato, non nei servizi posta', async () => {
+    // Le connessioni dirette passano da `networkPolicy`: lì ogni risposta DNS viene verificata e
+    // viene restituito un solo IP, che i servizi usano senza una seconda risoluzione (TOCTOU).
     const { readFileSync } = await import('node:fs');
-    for (const file of ['src/services/imapInbound.ts', 'src/services/emailRelay.ts', 'api/send-email.ts']) {
-      const codice = readFileSync(file, 'utf8')
-        .split('\n')
-        .filter(riga => !riga.trimStart().startsWith('//') && !riga.trimStart().startsWith('*'))
-        .join('\n');
-      expect(codice).not.toMatch(/dns\.(lookup|promises|resolve)/);
+    const policy = readFileSync('src/util/networkPolicy.ts', 'utf8');
+    expect(policy).toMatch(/node:dns\/promises/);
+    expect(policy).toMatch(/indirizzoVietato/);
+    expect(policy).toMatch(/address:\s*primo\.address/);
+
+    for (const file of ['src/services/imapInbound.ts', 'src/services/emailRelay.ts']) {
+      const codice = readFileSync(file, 'utf8');
+      expect(codice).toMatch(/risolviEndpointPubblico/);
+      expect(codice).toMatch(/host:\s*endpoint\.address/);
     }
   });
 });

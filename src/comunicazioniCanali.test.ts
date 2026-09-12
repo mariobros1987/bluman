@@ -46,10 +46,20 @@ vi.mock('./util/prismaClient.js', async importOriginal => {
     },
   };
 
+  const utente = (args: any) => {
+    const id = args?.where?.id;
+    if (id === 'usr-advisor') {
+      return { id, tenantId: TENANT, ruolo: 'advisor', stato: 'attivo', sessionVersion: 0 };
+    }
+    if (id === 'usr-collaboratore') {
+      return { id, tenantId: TENANT, ruolo: 'collaboratore_interno', stato: 'attivo', sessionVersion: 0 };
+    }
+    return null;
+  };
   const finto: any = {
     tenant,
     auditLog: { create: async () => ({}) },
-    user: { findUnique: async () => null, findFirst: async () => null, findMany: async () => [] },
+    user: { findUnique: async (args: any) => utente(args), findFirst: async (args: any) => utente(args), findMany: async () => [] },
   };
 
   return { ...reale, prisma: finto, prismaAmministrativo: () => finto };
@@ -66,6 +76,14 @@ const TOKEN = signJwt({
   tenantId: TENANT,
   email: 'advisor@studio.example',
   ruolo: 'advisor',
+  sessionVersion: 0,
+});
+const TOKEN_COLLABORATORE = signJwt({
+  userId: 'usr-collaboratore',
+  tenantId: TENANT,
+  email: 'collaboratore@studio.example',
+  ruolo: 'collaboratore_interno',
+  sessionVersion: 0,
 });
 
 function server() {
@@ -74,6 +92,10 @@ function server() {
 
 function auth() {
   return { authorization: `Bearer ${TOKEN}` };
+}
+
+function authCollaboratore() {
+  return { authorization: `Bearer ${TOKEN_COLLABORATORE}` };
 }
 
 /** I valori che non devono comparire in nessuna risposta. Nessuno è una credenziale reale. */
@@ -230,6 +252,34 @@ describe('§35 — PATCH /tenant/info: la stringa vuota non cancella la password
 
     expect(stato.upsert[0].update.smtpPass).toBeNull();
     expect(stato.upsert[0].update.waAccessToken).toBeNull();
+  });
+
+  it('un collaboratore può aggiornare l’anagrafica ma non i canali', async () => {
+    stato.tenant = { ...TENANT_CONFIGURATO };
+    const canale = await server().inject({
+      method: 'PATCH', url: '/tenant/info', headers: authCollaboratore(), payload: { smtpHost: 'smtp.example.com' },
+    });
+    expect(canale.statusCode).toBe(403);
+    expect(stato.upsert).toHaveLength(0);
+
+    const anagrafica = await server().inject({
+      method: 'PATCH', url: '/tenant/info', headers: authCollaboratore(), payload: { ragioneSociale: 'Studio Rinominato' },
+    });
+    expect(anagrafica.statusCode).toBe(200);
+  });
+
+  it('rifiuta configurazioni SMTP/IMAP non valide prima del database', async () => {
+    stato.tenant = { ...TENANT_CONFIGURATO };
+    const porta = await server().inject({
+      method: 'PATCH', url: '/tenant/info', headers: auth(), payload: { smtpPort: 0 },
+    });
+    expect(porta.statusCode).toBe(400);
+
+    const cartella = await server().inject({
+      method: 'PATCH', url: '/tenant/info', headers: auth(), payload: { imapFolder: 'INBOX\r\nA9 LOGOUT' },
+    });
+    expect(cartella.statusCode).toBe(400);
+    expect(stato.upsert).toHaveLength(0);
   });
 });
 

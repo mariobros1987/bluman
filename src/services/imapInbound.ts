@@ -18,6 +18,15 @@
 import tls from 'tls';
 import { tlsRejectUnauthorized } from './emailRelay.js';
 import { spiegaErrorePosta } from './diagnosiPosta.js';
+import {
+  risolviEndpointPubblico,
+  validaCartellaImap,
+  validaEmail,
+  validaHost,
+  validaPorta,
+  validaServername,
+  vietaControlli,
+} from '../util/networkPolicy.js';
 
 export interface CredenzialiImap {
   host?: string;
@@ -95,7 +104,8 @@ async function leggiViaRelay(imap: CredenzialiImap, clientEmail?: string): Promi
   // L'indirizzo a cui collegarsi e il nome da verificare sono due informazioni distinte e
   // adesso sono due campi distinti delle impostazioni: nessuno dei due si deduce dall'altro.
   const controller = new AbortController();
-  const scadenza = setTimeout(() => controller.abort(), 20000);
+  const timeoutMs = 10000;
+  const scadenza = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const risposta = await fetch(url, {
       method: 'POST',
@@ -123,7 +133,7 @@ async function leggiViaRelay(imap: CredenzialiImap, clientEmail?: string): Promi
     const lista: EmailInArrivo[] = Array.isArray(dettaglio?.emails) ? dettaglio.emails : [];
     return { ok: true, email: lista, via: `relay ${url}` };
   } catch (err: any) {
-    const motivo = err?.name === 'AbortError' ? 'nessuna risposta entro 20 secondi' : err?.message || 'errore di rete';
+    const motivo = err?.name === 'AbortError' ? `nessuna risposta entro ${timeoutMs / 1000} secondi` : err?.message || 'errore di rete';
     return { ok: false, email: [], errore: `relay: ${motivo}` };
   } finally {
     clearTimeout(scadenza);
@@ -191,17 +201,16 @@ export function ripulisciCorpoEmail(grezzo: string): string {
  * serverless, il certificato del server viene verificato (`tlsRejectUnauthorized`): la
  * password della casella non va consegnata a chiunque sappia intercettare la connessione.
  */
-function leggiViaImap(imap: CredenzialiImap, limite: number): Promise<EsitoPostaInArrivo> {
+async function leggiViaImap(imap: CredenzialiImap, limite: number): Promise<EsitoPostaInArrivo> {
+  const host = validaHost(imap.host, 'Host IMAP');
+  const porta = validaPorta(imap.port ?? 993, 'Porta IMAP');
+  const cartella = validaCartellaImap(imap.folder || 'INBOX');
+  const utente = vietaControlli(imap.user, 'Utenza IMAP', 254).trim();
+  const password = vietaControlli(imap.pass, 'Password IMAP', 1024);
+  const endpoint = await risolviEndpointPubblico(host, imap.servername);
+
   return new Promise(resolve => {
-    // Nessun ripiego su `imap.register.it`: con quel nome cablato uno studio che non ha
-    // configurato la casella si collegava — o tentava di collegarsi — al server di un
-    // provider che non è il suo, e l'errore che leggeva riguardava quel server.
-    const host = imap.host || '';
-    const porta = imap.port || 993;
-    const cartella = imap.folder || 'INBOX';
-    const utente = imap.user || '';
-    const password = imap.pass || '';
-    const timeoutMs = 12000;
+    const timeoutMs = 8000;
 
     const email: EmailInArrivo[] = [];
     let passo = 0;
@@ -211,10 +220,10 @@ function leggiViaImap(imap: CredenzialiImap, limite: number): Promise<EsitoPosta
     // `servername` sposta la verifica sul nome dichiarato nelle impostazioni; senza di esso
     // Node verifica contro l'host, che è il comportamento voluto quando il campo è vuoto.
     const socket = tls.connect({
-      host,
+      host: endpoint.address,
       port: porta,
       rejectUnauthorized: tlsRejectUnauthorized(),
-      ...(imap.servername ? { servername: imap.servername } : {}),
+      ...(endpoint.servername ? { servername: endpoint.servername } : {}),
     });
 
     const chiudi = (esito: EsitoPostaInArrivo) => {
@@ -271,7 +280,8 @@ function leggiViaImap(imap: CredenzialiImap, limite: number): Promise<EsitoPosta
         if (buffer.includes('A1 OK')) {
           passo = 2;
           buffer = '';
-          socket.write(`A2 SELECT "${cartella}"\r\n`);
+          const esc = (v: string) => v.replace(/([\\"])/g, '\\$1');
+          socket.write(`A2 SELECT "${esc(cartella)}"\r\n`);
           return;
         }
         if (buffer.includes('A1 NO') || buffer.includes('A1 BAD')) {
@@ -350,17 +360,38 @@ export async function leggiPostaInArrivo(
     };
   }
 
+  let configurazione: CredenzialiImap;
+  let clientEmail: string | undefined;
+  try {
+    configurazione = {
+      ...imap,
+      host: validaHost(imap.host, 'Host IMAP'),
+      servername: imap.servername ? validaServername(imap.servername) : undefined,
+      port: validaPorta(imap.port ?? 993, 'Porta IMAP'),
+      user: vietaControlli(imap.user, 'Utenza IMAP', 254).trim(),
+      pass: vietaControlli(imap.pass, 'Password IMAP', 1024),
+      folder: validaCartellaImap(imap.folder || 'INBOX'),
+    };
+    clientEmail = opzioni.clientEmail ? validaEmail(opzioni.clientEmail, 'Email cliente') : undefined;
+  } catch (err) {
+    return { ok: false, email: [], errore: err instanceof Error ? err.message : 'Configurazione IMAP non valida.' };
+  }
+
   const motivi: string[] = [];
 
   if (urlRelay()) {
-    const viaRelay = await leggiViaRelay(imap, opzioni.clientEmail);
-    if (viaRelay.ok) return { ...viaRelay, email: soloDi(viaRelay.email, opzioni.clientEmail) };
+    const viaRelay = await leggiViaRelay(configurazione, clientEmail);
+    if (viaRelay.ok) return { ...viaRelay, email: soloDi(viaRelay.email, clientEmail) };
     motivi.push(viaRelay.errore || 'relay non disponibile');
   }
 
-  const diretto = await leggiViaImap(imap, limite);
-  if (diretto.ok) return { ...diretto, email: soloDi(diretto.email, opzioni.clientEmail) };
-  motivi.push(diretto.errore || 'IMAP diretto non disponibile');
+  try {
+    const diretto = await leggiViaImap(configurazione, limite);
+    if (diretto.ok) return { ...diretto, email: soloDi(diretto.email, clientEmail) };
+    motivi.push(diretto.errore || 'IMAP diretto non disponibile');
+  } catch (err) {
+    motivi.push(err instanceof Error ? err.message : 'Host IMAP non consentito');
+  }
 
   return { ok: false, email: [], errore: motivi.join('; ') };
 }

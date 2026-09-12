@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import type { Ruolo } from './authorization.js';
 
 const LUNGHEZZA_MINIMA_SEGRETO = 32;
 
@@ -37,7 +38,9 @@ export interface JwtPayload {
   userId: string;
   tenantId: string;
   email: string;
-  ruolo: 'super_admin' | 'advisor' | 'collaboratore_interno' | 'collaboratore_esterno' | 'cliente';
+  ruolo: Ruolo;
+  /** Versione persistita dell'identità: ogni incremento revoca questo token. */
+  sessionVersion?: number;
   exp?: number;
   // Fase 3 FEA (misura 3) — certificato di sessione. `iat` è il momento del login, `sid`
   // l'id univoco della sessione: entrambi finiscono nel digest del sigillo di firma.
@@ -76,9 +79,18 @@ export function verifyJwt(token: string): JwtPayload | null {
       .update(`${base64Header}.${base64Payload}`)
       .digest('base64url');
 
-    if (signature !== expectedSignature) return null;
+    const ricevuta = Buffer.from(signature, 'utf8');
+    const attesa = Buffer.from(expectedSignature, 'utf8');
+    if (ricevuta.length !== attesa.length || !crypto.timingSafeEqual(ricevuta, attesa)) return null;
 
     const payload: JwtPayload = JSON.parse(Buffer.from(base64Payload, 'base64url').toString('utf8'));
+    if (
+      !payload ||
+      typeof payload.userId !== 'string' ||
+      typeof payload.tenantId !== 'string' ||
+      typeof payload.email !== 'string' ||
+      typeof payload.ruolo !== 'string'
+    ) return null;
     if (payload.exp && Math.floor(Date.now() / 1000) > payload.exp) {
       return null; // Scaduto
     }

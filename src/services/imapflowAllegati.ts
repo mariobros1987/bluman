@@ -22,6 +22,13 @@
 import { ImapFlow } from 'imapflow';
 import { uploadDocumento, mimeDaEstensione } from './storageService.js';
 import type { CredenzialiImap } from './imapInbound.js';
+import {
+  risolviEndpointPubblico,
+  validaCartellaImap,
+  validaEmail,
+  validaPorta,
+  vietaControlli,
+} from '../util/networkPolicy.js';
 
 export interface AllegatoEmail {
   nome: string;
@@ -94,22 +101,42 @@ export async function leggiAllegatiImap(
     };
   }
 
+  let endpoint;
+  let porta: number;
+  let cartella: string;
+  let user: string;
+  let pass: string;
+  let clientEmail: string | undefined;
+  try {
+    endpoint = await risolviEndpointPubblico(imap.host, imap.servername);
+    porta = validaPorta(imap.port ?? 993, 'Porta IMAP');
+    cartella = validaCartellaImap(imap.folder || 'INBOX');
+    user = vietaControlli(imap.user, 'Utenza IMAP', 254).trim();
+    pass = vietaControlli(imap.pass, 'Password IMAP', 1024);
+    clientEmail = opzioni.clientEmail ? validaEmail(opzioni.clientEmail, 'Email cliente') : undefined;
+  } catch (err) {
+    return { ok: false, email: [], errore: err instanceof Error ? err.message : 'Configurazione IMAP non valida.' };
+  }
+
   const client = new ImapFlow({
-    host: imap.host,
-    port: imap.port || 993,
+    // ImapFlow non espone un hook DNS: si usa l'IP già verificato e si conserva il nome TLS.
+    host: endpoint.address,
+    port: porta,
     secure: true,
-    // `servername` per TLS SNI quando l'host non coincide col certificato.
-    ...(imap.servername ? { servername: imap.servername } : {}),
+    ...(endpoint.servername ? { servername: endpoint.servername } : {}),
     auth: {
-      user: imap.user,
-      pass: imap.pass,
+      user,
+      pass,
     },
-    logger: false, // evita spam in produzione
-    connectionTimeout: 15000,
-    greetingTimeout: 10000,
-    socketTimeout: 20000,
+    logger: false,
+    connectionTimeout: 8000,
+    greetingTimeout: 8000,
+    socketTimeout: 12000,
+    maxLineLength: 1024 * 1024,
+    maxLiteralSize: MAX_ALLEGATO_BYTES + 1024,
+    maxResponseSize: MAX_ALLEGATO_BYTES + (2 * 1024 * 1024),
     tls: {
-      rejectUnauthorized: process.env.NODE_ENV !== 'test',
+      rejectUnauthorized: true,
     },
   });
 
@@ -118,15 +145,15 @@ export async function leggiAllegatiImap(
   try {
     await client.connect();
 
-    const mailbox = await client.mailboxOpen(imap.folder || 'INBOX');
+    const mailbox = await client.mailboxOpen(cartella);
     if (mailbox.exists === 0) {
       await client.logout();
       return { ok: true, email: [] };
     }
 
     // Cerca l'ultimo `limite` messaggi con almeno un allegato (MIME type ≠ text/plain e ≠ text/html).
-    const cerca = opzioni.clientEmail
-      ? await client.search({ from: opzioni.clientEmail })
+    const cerca = clientEmail
+      ? await client.search({ from: clientEmail })
       : await client.search({ all: true });
 
     const uid_list = (Array.isArray(cerca) ? cerca : []).slice(-limite * 3); // un po' di margine per filtrare poi

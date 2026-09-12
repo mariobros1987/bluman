@@ -21,6 +21,12 @@ import { apriStreamSse } from './services/notificheService.js';
 // §14 — non `new PrismaClient()`: questo client impone il tenant corrente a ogni query,
 // altrimenti le policy RLS non vedono nessun contesto e non restituiscono nulla.
 import { prisma, attivaContestoTenant } from './util/prismaClient.js';
+import {
+  clienteIdDalJwt,
+  ruoloValido,
+  rottaConsentitaAlCliente,
+  type Ruolo,
+} from './util/authorization.js';
 
 // Helper condivisi (costanti di sessione, audit, recapiti, IP reale): estratti in
 // src/util/serverHelpers.ts dallo split dei monoliti — stesse identiche implementazioni.
@@ -142,7 +148,6 @@ export function buildServer(app: AppPort): FastifyInstance {
     'POST /auth/login',
     'POST /auth/magic-login',
     'POST /auth/client-login',
-    'POST /portal/change-password',
     // Chiamate da Meta, Telegram e SdI, che non possono portare un nostro JWT. Si
     // autenticano col proprio meccanismo: hub.verify_token (WhatsApp), il segreto
     // del bot (Telegram) e il secret condiviso WEBHOOK_SECRET_SDI confrontato
@@ -288,55 +293,81 @@ export function buildServer(app: AppPort): FastifyInstance {
   // ─── MULTI-TENANT CONTEXT MIDDLEWARE (§14, §23) ───────────────────
   server.addHook('onRequest', async (req, reply) => {
     let tenantId = TENANT_DEFAULT; // Default Studio Tenant
-    let ruolo: string | undefined;
+    let ruolo: Ruolo | undefined;
     let autenticato = false;
-    let payload: any = null;
+    let payload = null as ReturnType<typeof verifyJwt>;
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.split(' ')[1];
       if (token) {
-        payload = verifyJwt(token);
-        if (payload) {
-          autenticato = true;
-          ruolo = payload.ruolo;
-          if (payload.tenantId) {
-            tenantId = payload.tenantId;
+        const verificato = verifyJwt(token);
+        if (verificato && ruoloValido(verificato.ruolo) && Number.isInteger(verificato.sessionVersion)) {
+          payload = verificato;
+          ruolo = verificato.ruolo;
+          if (verificato.tenantId) tenantId = verificato.tenantId;
+
+          // Un JWT firmato non basta per rinnovare o accedere: l'identità deve ancora esistere,
+          // essere attiva (o invitata nei flussi staff) e avere la stessa versione di sessione.
+          try {
+            if (ruolo === 'cliente') {
+              const clienteId = clienteIdDalJwt(verificato);
+              if (clienteId) {
+                attivaContestoTenant({ tenantId, ruolo });
+                const cliente = await prisma.cliente.findFirst({
+                  where: { id: clienteId, tenantId },
+                  select: { sessionVersion: true },
+                });
+                autenticato = Boolean(cliente && cliente.sessionVersion === verificato.sessionVersion);
+              }
+            } else {
+              attivaContestoTenant({ tenantId, ruolo });
+              const utente = await prisma.user.findFirst({
+                where: { id: verificato.userId, ...(ruolo === 'super_admin' ? {} : { tenantId }) },
+                select: { ruolo: true, stato: true, sessionVersion: true },
+              });
+              autenticato = Boolean(
+                utente &&
+                utente.ruolo === ruolo &&
+                utente.stato !== 'disattivato' &&
+                utente.sessionVersion === verificato.sessionVersion,
+              );
+            }
+          } catch (err) {
+            // Verifica identità fail-closed: un DB irraggiungibile non trasforma un token
+            // non verificabile in una sessione valida e non produce rinnovi.
+            console.error('Verifica sessione JWT fallita:', err instanceof Error ? err.message : err);
+            autenticato = false;
           }
 
-          // Rinnovo scorrevole: superata metà della vita del token se ne restituisce uno nuovo
-          // nell'header della risposta. Vale solo per un token ancora valido — `verifyJwt` ha
-          // già respinto quelli scaduti — quindi non è un modo di rientrare, è un modo di non
-          // uscire mentre si sta lavorando.
-          const durataMinuti =
-            payload.ruolo === 'cliente' ? DURATA_SESSIONE_CLIENTE_MINUTI : DURATA_SESSIONE_OPERATORE_MINUTI;
-          const adesso = Math.floor(Date.now() / 1000);
-          const rimanenti = (payload.exp ?? 0) - adesso;
-          if (rimanenti > 0 && rimanenti < durataMinuti * 60 * SOGLIA_RINNOVO) {
-            const { exp: _scaduto, ...contenuto } = payload;
-            reply.header('X-Bluman-Token', signJwt(contenuto, durataMinuti));
-            // Senza questo il browser non legge l'header: le risposte cross-origin espongono
-            // solo gli header elencati qui.
-            reply.header('Access-Control-Expose-Headers', 'X-Bluman-Token');
+          if (autenticato) {
+            const durataMinuti =
+              ruolo === 'cliente' ? DURATA_SESSIONE_CLIENTE_MINUTI : DURATA_SESSIONE_OPERATORE_MINUTI;
+            const adesso = Math.floor(Date.now() / 1000);
+            const rimanenti = (verificato.exp ?? 0) - adesso;
+            if (rimanenti > 0 && rimanenti < durataMinuti * 60 * SOGLIA_RINNOVO) {
+              const { exp: _scaduto, ...contenuto } = verificato;
+              reply.header('X-Bluman-Token', signJwt(contenuto, durataMinuti));
+              reply.header('Access-Control-Expose-Headers', 'X-Bluman-Token');
+            }
           }
         }
       }
     }
 
-    // §23 — il controllo di autenticazione. Va qui e non su ogni singola rotta perché
-    // sono 87: un elenco di rotte da proteggere si dimentica di aggiornare, un elenco
-    // di rotte pubbliche no — una rotta nuova è protetta perché non è nell'insieme.
-    // Le preflight CORS non portano header Authorization e vanno lasciate passare,
-    // altrimenti il browser non arriva nemmeno a inviare la richiesta vera.
-    //
-    // Attenzione però: questo hook gira anche sul gestore not-found. Se rispondesse
-    // 401 pure lì, una rotta inesistente diventerebbe indistinguibile da una rotta
-    // esistente ma protetta (il 404 scomparirebbe del tutto). Quando la richiesta
-    // non ha matching, routeOptions non ha né url né method: la si lascia passare
-    // e Fastify risponde il 404 corretto.
-    const chiaveRotta = `${req.method} ${req.routeOptions?.url ?? req.url}`;
-    const rottaEsistente = req.routeOptions?.url !== undefined;
+    const patternRotta = req.routeOptions?.url;
+    const chiaveRotta = `${req.method} ${patternRotta ?? req.url}`;
+    const rottaEsistente = patternRotta !== undefined;
     if (req.method !== 'OPTIONS' && rottaEsistente && !autenticato && !ROTTE_PUBBLICHE.has(chiaveRotta)) {
       return reply.code(401).send({ errore: 'Non autenticato' });
+    }
+    if (
+      req.method !== 'OPTIONS' &&
+      rottaEsistente &&
+      autenticato &&
+      ruolo === 'cliente' &&
+      !rottaConsentitaAlCliente(req.method, patternRotta)
+    ) {
+      return reply.code(403).send({ errore: 'Non autorizzato per il portale cliente.' });
     }
 
     // §2bis — solo il super_admin può spostarsi tra tenant. Onorare questo header per

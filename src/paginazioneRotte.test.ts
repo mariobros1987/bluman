@@ -1,4 +1,5 @@
 import Fastify from 'fastify';
+import type { Ruolo } from './util/authorization.js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const chiamate = { progetto: [] as any[], fattura: [] as any[], movimento: [] as any[], cliente: [] as any[], audit: [] as any[] };
@@ -48,7 +49,10 @@ vi.mock('./util/prismaClient.js', async importOriginal => {
     cliente,
     auditLog: { ...modello('audit'), create: async (args: any) => ({ id: 'audit-1', ...args.data }) },
     tenant: { findUnique: async () => null },
+    magicLink: { updateMany: async () => ({ count: 0 }) },
+    $executeRaw: async () => 1,
   };
+  finto.$transaction = async (fn: any) => fn(finto);
   return { ...reale, prisma: finto, prismaAmministrativo: () => finto };
 });
 
@@ -59,7 +63,7 @@ const { registraRotteContabilitaPrimaNota } = await import('./routes/contabilita
 const { registraRotteTenant } = await import('./routes/tenant.js');
 const TENANT = '00000000-0000-0000-0000-000000000001';
 
-async function serverCon(registra: (server: any, app?: any) => Promise<void>, identita?: { ruolo: string; userId: string }) {
+async function serverCon(registra: (server: any, app?: any) => Promise<void>, identita?: { ruolo: Ruolo; userId: string }) {
   const server = Fastify();
   server.addHook('onRequest', async req => {
     req.tenantId = TENANT;
@@ -125,15 +129,34 @@ describe('rotte paginate', () => {
     expect(createArgs.data.sdiCode).toBeNull();
     expect(createArgs.data.referentiJson).toEqual({ email: 'INFO@EXAMPLE.TEST' });
 
-    const aggiornato = await server.inject({ method: 'PUT', url: '/clienti/c1', payload });
+    const { password: _password, ...datiAnagrafici } = payload;
+    const aggiornato = await server.inject({ method: 'PUT', url: '/clienti/c1', payload: datiAnagrafici });
     expect(aggiornato.statusCode).toBe(200);
     expect(aggiornato.json().passwordHash).toBeUndefined();
     expect(aggiornato.json().password).toBeUndefined();
     expect(aggiornato.json().referentiJson).toEqual({ email: 'INFO@EXAMPLE.TEST' });
     const updateArgs = chiamate.cliente.find(([metodo]) => metodo === 'update')?.[1];
+    expect(updateArgs.data).not.toHaveProperty('passwordHash');
     expect(updateArgs.data.referentiJson).toEqual({ email: 'INFO@EXAMPLE.TEST' });
     await server.close();
   });
+
+  it.each(['collaboratore_interno', 'collaboratore_esterno'] as const)(
+    'PUT /clienti rifiuta il cambio password richiesto da %s senza tentare scritture',
+    async ruolo => {
+      const server = await serverCon(registraRotteClienti, { ruolo, userId: `usr-${ruolo}` });
+      const res = await server.inject({
+        method: 'PUT',
+        url: '/clienti/c1',
+        payload: { nome: 'Alfa aggiornata', password: 'PasswordControllata!2026' },
+      });
+
+      expect(res.statusCode).toBe(400);
+      expect(res.json().errore).toMatch(/procedura dedicata/i);
+      expect(chiamate.cliente.some(([metodo]) => metodo === 'update')).toBe(false);
+      await server.close();
+    },
+  );
 
   it('GET /clienti senza parametri mantiene l array legacy e non esegue count', async () => {
     righe.cliente.push({ id: 'c1', nome: 'Alfa', tipo: 'company', referentiJson: {} });

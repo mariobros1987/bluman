@@ -43,19 +43,35 @@ vi.mock('./util/prismaClient.js', async importOriginal => {
         stato.magicLinkCreati.push(args.data);
         return { id: 'ml-1', ...args.data };
       },
-      update: async (args: any) => {
+      updateMany: async (args: any) => {
+        if (!stato.magicLink || stato.magicLink.usatoAt || stato.magicLink.scadenza <= new Date()) return { count: 0 };
         stato.magicLinkAggiornati.push(args);
-        return { ...stato.magicLink, ...args.data };
+        stato.magicLink = { ...stato.magicLink, ...args.data };
+        return { count: 1 };
       },
     },
     cliente: {
       findUnique: async () => stato.cliente,
       findFirst: async () => stato.cliente,
-      update: async (args: any) => ({ ...stato.cliente, ...args.data }),
+      update: async (args: any) => {
+        const dati = { ...args.data };
+        if (dati.sessionVersion?.increment) {
+          dati.sessionVersion = (stato.cliente?.sessionVersion ?? 0) + dati.sessionVersion.increment;
+        }
+        stato.cliente = { ...stato.cliente, ...dati };
+        return stato.cliente;
+      },
     },
     auditLog: { create: async () => ({}) },
+    user: {
+      findFirst: async (args: any) => args?.where?.id === 'usr-advisor'
+        ? { id: 'usr-advisor', ruolo: 'advisor', stato: 'attivo', tenantId: TENANT_STUDIO, sessionVersion: 0 }
+        : null,
+    },
     tenant: { findUnique: async () => null, create: async (a: any) => a.data, upsert: async (a: any) => a.update },
+    $executeRaw: async () => 1,
   };
+  finto.$transaction = async (fn: any) => fn(finto);
 
   return { ...reale, prisma: finto, prismaAmministrativo: () => finto };
 });
@@ -75,7 +91,11 @@ function server() {
 }
 
 function tokenAdvisor(tenantId = TENANT_STUDIO) {
-  return signJwt({ userId: 'usr-advisor', tenantId, email: 'advisor@studio.example', ruolo: 'advisor' });
+  return signJwt({ userId: 'usr-advisor', tenantId, email: 'advisor@studio.example', ruolo: 'advisor', sessionVersion: 0 });
+}
+
+function tokenCollaboratore(ruolo: 'collaboratore_interno' | 'collaboratore_esterno') {
+  return signJwt({ userId: `usr-${ruolo}`, tenantId: TENANT_STUDIO, email: `${ruolo}@studio.example`, ruolo, sessionVersion: 0 });
 }
 
 /** Riga `magic_link` valida per un cliente del tenant indicato. */
@@ -90,7 +110,7 @@ function linkValido(token: string, opzioni: { scadenza?: Date; tenantId?: string
     email: 'cliente@esempio.it',
     usatoAt: opzioni.usatoAt ?? null,
     createdAt: new Date(),
-    cliente: { id: 'cli-42', tenantId, nome: 'Holding Beta S.r.l.' },
+    cliente: { id: 'cli-42', tenantId, nome: 'Holding Beta S.r.l.', sessionVersion: 0 },
   };
 }
 
@@ -104,6 +124,52 @@ beforeEach(() => {
   stato.magicLinkCreati = [];
   stato.magicLinkAggiornati = [];
   stato.cliente = null;
+});
+
+describe('§23 deny-by-default e sessioni cliente', () => {
+  it('nega una rotta staff a un JWT cliente valido', async () => {
+    stato.cliente = { id: 'cli-42', tenantId: TENANT_STUDIO, nome: 'Cliente', sessionVersion: 0 };
+    const token = signJwt({
+      userId: 'client-cli-42', tenantId: TENANT_STUDIO, email: 'cliente@example.test', ruolo: 'cliente', sessionVersion: 0,
+    });
+    const res = await server().inject({ method: 'GET', url: '/tenant/info', headers: { authorization: `Bearer ${token}` } });
+    expect(res.statusCode).toBe(403);
+  });
+
+  it('nega token cliente senza versione o con versione revocata', async () => {
+    stato.cliente = { id: 'cli-42', tenantId: TENANT_STUDIO, nome: 'Cliente', sessionVersion: 2 };
+    const senzaVersione = signJwt({
+      userId: 'client-cli-42', tenantId: TENANT_STUDIO, email: 'cliente@example.test', ruolo: 'cliente',
+    });
+    const versioneVecchia = signJwt({
+      userId: 'client-cli-42', tenantId: TENANT_STUDIO, email: 'cliente@example.test', ruolo: 'cliente', sessionVersion: 1,
+    });
+    expect((await server().inject({ method: 'GET', url: '/auth/me', headers: { authorization: `Bearer ${senzaVersione}` } })).statusCode).toBe(401);
+    expect((await server().inject({ method: 'GET', url: '/auth/me', headers: { authorization: `Bearer ${versioneVecchia}` } })).statusCode).toBe(401);
+  });
+
+  it('cambia password solo per il soggetto JWT, revoca sessioni e link, e restituisce un token nuovo', async () => {
+    stato.cliente = {
+      id: 'cli-42', tenantId: TENANT_STUDIO, nome: 'Cliente', email: 'cliente@example.test',
+      passwordHash: null, sessionVersion: 0,
+    };
+    stato.magicLink = linkValido('client_cli-42_' + crypto.randomBytes(16).toString('hex'), { tenantId: TENANT_STUDIO });
+    const vecchioToken = signJwt({
+      userId: 'client-cli-42', tenantId: TENANT_STUDIO, email: 'cliente@example.test', ruolo: 'cliente', sessionVersion: 0,
+    });
+    const res = await server().inject({
+      method: 'POST', url: '/portal/change-password', headers: { authorization: `Bearer ${vecchioToken}` },
+      payload: { newPassword: 'NuovaPassword123!', clienteId: 'cli-altrui', email: 'altro@example.test' },
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.token).toBeTruthy();
+    expect(payloadJwt(body.token).userId).toBe('client-cli-42');
+    expect(payloadJwt(body.token).sessionVersion).toBe(1);
+    expect(stato.cliente.id).toBe('cli-42');
+    expect(stato.magicLink?.usatoAt).toBeInstanceOf(Date);
+    expect((await server().inject({ method: 'GET', url: '/auth/me', headers: { authorization: `Bearer ${vecchioToken}` } })).statusCode).toBe(401);
+  });
 });
 
 describe('§23 POST /auth/magic-login — solo i token che abbiamo emesso', () => {
@@ -180,7 +246,7 @@ describe('§23 POST /auth/magic-login — solo i token che abbiamo emesso', () =
     expect(corpo.user.clienteId).toBe('cli-42');
   });
 
-  it('registra il primo utilizzo e resta valido per i successivi', async () => {
+  it('consuma il link atomicamente e rifiuta ogni riuso', async () => {
     const token = 'client_cli-42_' + crypto.randomBytes(16).toString('hex');
     stato.magicLink = linkValido(token);
 
@@ -190,11 +256,10 @@ describe('§23 POST /auth/magic-login — solo i token che abbiamo emesso', () =
     expect(stato.magicLinkAggiornati).toHaveLength(1);
     expect(stato.magicLinkAggiornati[0].data.usatoAt).toBeInstanceOf(Date);
 
-    // Un cliente riapre il proprio link: invalidarlo al primo accesso lo chiuderebbe fuori.
-    stato.magicLink = { ...stato.magicLink, usatoAt: new Date() };
+    // Il link è monouso: il consumo atomico impedisce anche due login concorrenti.
     const secondo = await app.inject({ method: 'POST', url: '/auth/magic-login', payload: { magicToken: token } });
-    expect(secondo.statusCode).toBe(200);
-    expect(stato.magicLinkAggiornati).toHaveLength(1); // non riscrive `usatoAt`
+    expect(secondo.statusCode).toBe(401);
+    expect(stato.magicLinkAggiornati).toHaveLength(1);
   });
 });
 

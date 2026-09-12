@@ -30,6 +30,7 @@ import { livelloFirmaValido, normalizzaLivelloFirma, type LivelloFirma } from '.
 // service a parte, presidiato, e la usano sia questo upload sia PATCH /documenti/:id/collegamento.
 import { decidiCollocazione } from '../services/collocazioneDocumento.js';
 import { GeneraDocumentoSchema } from '../schemas/documenti.schema.js';
+import { sanitizzaHtmlDocumento } from '../util/htmlSanitizer.js';
 
 // ─── DOCUMENTI: FASCICOLO DOCUMENTALE DEL PROGETTO (§2.9) ───
 export async function registraRotteDocumenti(server: FastifyInstance): Promise<void> {
@@ -410,9 +411,13 @@ export async function registraRotteDocumenti(server: FastifyInstance): Promise<v
       if (!htmlTemplate.trim()) {
         return reply.code(400).send({ errore: 'Il template indicato non ha contenuto.' });
       }
+      htmlTemplate = sanitizzaHtmlDocumento(htmlTemplate);
+      if (!htmlTemplate.trim()) {
+        return reply.code(400).send({ errore: 'Il template contiene solo markup non consentito.' });
+      }
 
       const contesto = contestoTagDocumento({ tenant, cliente: progetto.cliente, progetto });
-      const blocchi = blocchiDaHtml(risolviTagDocumento(htmlTemplate, contesto));
+      const blocchi = blocchiDaHtml(sanitizzaHtmlDocumento(risolviTagDocumento(htmlTemplate, contesto)));
       if (blocchi.length === 0) {
         return reply.code(400).send({ errore: 'Il template non produce contenuto: verificare i blocchi HTML.' });
       }

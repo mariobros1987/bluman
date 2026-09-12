@@ -70,8 +70,10 @@ curl -s -X POST http://127.0.0.1:3000/clienti/<ID_CLIENTE>/magic-link \
 
 Dall'interfaccia: **Clienti → riga del cliente → Magic Link**, inserendo l'indirizzo a cui
 inviarlo. Il token in chiaro esiste solo in quella risposta e nell'email: in tabella
-(`magic_link`) c'è il suo SHA-256, quindi non è recuperabile dopo. Vale 7 giorni, si riapre
-quante volte serve, e si revoca cancellando la riga.
+(`magic_link`) c'è il suo SHA-256, quindi non è recuperabile dopo. Scade dopo 7 giorni e il
+primo login valido lo consuma atomicamente; riaperture, link scaduti o revocati vengono
+rifiutati. Cambio e reset password revocano inoltre i link ancora attivi e invalidano le
+sessioni precedenti incrementando `sessionVersion`.
 
 ---
 
@@ -214,6 +216,11 @@ Dal browser non serve nulla di manuale: la pagina di login lo ottiene e lo mette
 > di avvio del container su Railway: ora il `Dockerfile` esegue `prisma migrate deploy`, che
 > applica solo le migrazioni versionate in `prisma/migrations/` e si ferma se il database è
 > in uno stato che non riconosce.
+>
+> Le migrazioni P0 per `sessionVersion` e `WebhookInbox` sono presenti nel repository ma non
+> risultano applicate. Eseguire prima backup e prova in staging, verificare login operatore e
+> cliente, revoca delle sessioni, consumo monouso dei Magic Link e webhook firmati; solo dopo
+> promuovere le stesse migrazioni in produzione con un'autorizzazione operativa separata.
 
 ---
 

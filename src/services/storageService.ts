@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { firmaDownload } from '../util/jwt.js';
+import { scanFileBuffer } from './securityScanner.js';
 
 export interface UploadResult {
   ok: boolean;
@@ -70,10 +71,7 @@ export function mimeDaEstensione(filename: string): string {
     '.jpeg': 'image/jpeg',
     '.gif': 'image/gif',
     '.webp': 'image/webp',
-    '.svg': 'image/svg+xml',
     '.txt': 'text/plain; charset=utf-8',
-    '.html': 'text/html; charset=utf-8',
-    '.xml': 'application/xml',
     '.csv': 'text/csv; charset=utf-8',
     '.p7m': 'application/pkcs7-mime',
     '.zip': 'application/zip',
@@ -82,12 +80,25 @@ export function mimeDaEstensione(filename: string): string {
   return mappa[path.extname(filename).toLowerCase()] ?? 'application/octet-stream';
 }
 
+export function decodificaBase64Documento(contentBase64: string): Buffer {
+  if (typeof contentBase64 !== 'string') throw new Error('Contenuto base64 non valido');
+  const cleanBase64 = contentBase64.replace(/^data:[^;]+;base64,/, '').replace(/\s+/g, '');
+  if (!cleanBase64 || cleanBase64.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/.test(cleanBase64)) {
+    throw new Error('Contenuto base64 non valido');
+  }
+  const buffer = Buffer.from(cleanBase64, 'base64');
+  const normalizzato = cleanBase64.replace(/=+$/, '');
+  if (buffer.toString('base64').replace(/=+$/, '') !== normalizzato) throw new Error('Contenuto base64 non valido');
+  return buffer;
+}
+
 export async function uploadDocumento(filename: string, contentBase64: string): Promise<UploadResult> {
   const supabaseUrl = process.env.SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
 
-  const cleanBase64 = contentBase64.replace(/^data:[^;]+;base64,/, '');
-  const buffer = Buffer.from(cleanBase64, 'base64');
+  const buffer = decodificaBase64Documento(contentBase64);
+  const scansione = scanFileBuffer(buffer, filename);
+  if (!scansione.safe) throw new Error(scansione.reason ?? 'File non ammesso');
   const safeFilename = `${Date.now()}_${nomeFileSicuro(filename)}`;
   const sizeKb = `${Math.round(buffer.length / 1024)} KB`;
 
@@ -101,7 +112,7 @@ export async function uploadDocumento(filename: string, contentBase64: string): 
           'apikey': supabaseKey,
           'Content-Type': mimeDaEstensione(filename),
         },
-        body: buffer,
+        body: new Uint8Array(buffer),
       });
 
       if (response.ok) {
@@ -162,9 +173,12 @@ export async function leggiFileArchivio(url: string): Promise<Buffer | null> {
   if (typeof url !== 'string' || url.trim() === '') return null;
   const pulito = url.trim();
 
-  if (pulito.startsWith('/uploads/') || pulito.includes('/uploads/')) {
-    const nome = pulito.split('?')[0]?.split('/uploads/').pop();
-    if (!nome || !nomeFileValido(nome)) return null;
+  if (pulito.startsWith('/uploads/')) {
+    const nomeCodificato = pulito.split('?')[0]?.slice('/uploads/'.length);
+    if (!nomeCodificato) return null;
+    let nome: string;
+    try { nome = decodeURIComponent(nomeCodificato); } catch { return null; }
+    if (!nomeFileValido(nome)) return null;
     const percorso = path.join(CARTELLA_UPLOADS, nome);
     try {
       return await fs.promises.readFile(percorso);
@@ -173,18 +187,26 @@ export async function leggiFileArchivio(url: string): Promise<Buffer | null> {
     }
   }
 
-  if (!/^https?:\/\//i.test(pulito)) return null;
+  const supabase = process.env.SUPABASE_URL;
+  if (!supabase) return null;
+  let archivio: URL;
+  let atteso: URL;
+  try {
+    archivio = new URL(pulito);
+    atteso = new URL(supabase);
+  } catch {
+    return null;
+  }
+  if (archivio.origin !== atteso.origin || archivio.username || archivio.password) return null;
+  const percorsoBucket = /^\/storage\/v1\/object\/(?:public\/)?bluman-documents\/[^/]+$/;
+  if (!percorsoBucket.test(archivio.pathname)) return null;
 
   try {
-    // La chiave di servizio serve per i bucket non pubblici: sull'URL pubblico è ignorata,
-    // su quello privato è l'unica cosa che fa rispondere 200 invece di 400.
     const chiave = process.env.SUPABASE_SERVICE_KEY;
-    const supabase = process.env.SUPABASE_URL;
-    const intestazioni: Record<string, string> =
-      chiave && supabase && pulito.startsWith(supabase)
-        ? { Authorization: `Bearer ${chiave}`, apikey: chiave }
-        : {};
-    const risposta = await fetch(pulito, { headers: intestazioni });
+    const intestazioni: Record<string, string> = chiave
+      ? { Authorization: `Bearer ${chiave}`, apikey: chiave }
+      : {};
+    const risposta = await fetch(archivio, { headers: intestazioni, redirect: 'error' });
     if (!risposta.ok) return null;
     return Buffer.from(await risposta.arrayBuffer());
   } catch {

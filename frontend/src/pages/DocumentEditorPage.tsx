@@ -5,6 +5,7 @@ import { getFormattedLogoUrl } from '../utils';
 import { downloadRealPdf, downloadRealWordDoc } from '../utils/pdfGenerator';
 import { getCurrentTenantId, getTenantStorageKey, getStudioInfoForTenant } from '../utils/tenant';
 import { componiDocumento, scomponiDocumento } from '../../../src/util/intestazionePiede';
+import { escapeHtmlTesto, sanitizzaHtmlDocumento } from '../../../src/util/htmlSanitizer';
 import { intestazioneStudioHtml, piedeStudioHtml } from '../utils/intestazioneStudio';
 import type { Cliente, Progetto } from '../types';
 
@@ -237,12 +238,12 @@ export function DocumentEditorPage() {
             // §39 — l'HTML salvato può portare intestazione e piede propri: si rimettono al loro
             // posto, e nell'area editabile va solo il corpo. Un documento salvato prima di §39 non
             // ha marcatori e torna tutto come corpo, esattamente come prima.
-            const parti = scomponiDocumento(foundDoc.contenutoHtml);
-            setIntestazionePropria(parti.intestazione);
-            setPiedeProprio(parti.piede);
-            rawTemplateRef.current = parti.corpo;
+            const parti = scomponiDocumento(sanitizzaHtmlDocumento(foundDoc.contenutoHtml));
+            setIntestazionePropria(sanitizzaHtmlDocumento(parti.intestazione));
+            setPiedeProprio(sanitizzaHtmlDocumento(parti.piede));
+            rawTemplateRef.current = sanitizzaHtmlDocumento(parti.corpo);
             if (editorRef.current) {
-              editorRef.current.innerHTML = parti.corpo;
+              editorRef.current.innerHTML = rawTemplateRef.current;
             }
           }
         }
@@ -350,7 +351,8 @@ export function DocumentEditorPage() {
 
   // Sostituzione dinamica delle variabili Smart Tags (Mail Merge) con Smart Chips interattivi
   const renderResolvedContent = (htmlContent: string, isForPrintOrExport: boolean = false) => {
-    if (tagDisplayMode === 'raw' && !isForPrintOrExport) return htmlContent;
+    const htmlSicuro = sanitizzaHtmlDocumento(htmlContent);
+    if (tagDisplayMode === 'raw' && !isForPrintOrExport) return htmlSicuro;
 
     const currentTenantId = getCurrentTenantId();
     const studioInfo = getStudioInfoForTenant(currentTenantId);
@@ -393,25 +395,26 @@ export function DocumentEditorPage() {
           customRowsHtml = parsed.rows.map((r: any) => `
             <tr style="border-bottom: 1px solid #e2e8f0;">
               <td style="padding: 10px 8px;">
-                <strong style="color: #1e3a8a;">[${r.moduloNome || 'Prestazione'}]</strong> ${r.titolo}
-                ${r.oreConsuntivate > 0 ? `<div style="font-size: 10px; color: #64748b;">Consuntivo: ${r.oreConsuntivate}h</div>` : ''}
+                <strong style="color: #1e3a8a;">[${escapeHtmlTesto(r.moduloNome || 'Prestazione')}]</strong> ${escapeHtmlTesto(r.titolo)}
+                ${r.oreConsuntivate > 0 ? `<div style="font-size: 10px; color: #64748b;">Consuntivo: ${Number(r.oreConsuntivate)}h</div>` : ''}
               </td>
               <td style="padding: 10px 8px; text-align: right; font-weight: 600;">€ ${Number(r.importo).toLocaleString('it-IT', { minimumFractionDigits: 2 })}</td>
             </tr>
           `).join('');
         }
-      } catch (e) {}
+      } catch {}
     }
 
     const effImporto = customTotalEur !== null ? customTotalEur : projImporto;
 
     // Se in anteprima bozza e modalità 'highlight', evidenzia il dato reale con un elegante Smart Chip ERP
     const wrapTag = (value: string, tagCode: string) => {
-      if (isForPrintOrExport || tagDisplayMode === 'plain') return value || `[${tagCode}]`;
-      return `<span class="bluman-smart-chip" title="Smart Tag ERP: {{${tagCode}}}" style="background: rgba(99, 102, 241, 0.14); color: #4338ca; border: 1px solid rgba(99, 102, 241, 0.35); border-bottom: 2px solid #4f46e5; border-radius: 4px; padding: 1px 6px; font-weight: 600; cursor: help; display: inline-block; box-shadow: 0 1px 3px rgba(99,102,241,0.12);">🏷️ ${value || `[${tagCode}]`}</span>`;
+      const valoreSicuro = escapeHtmlTesto(value || `[${tagCode}]`);
+      if (isForPrintOrExport || tagDisplayMode === 'plain') return valoreSicuro;
+      return `<span class="bluman-smart-chip" title="Smart Tag ERP: {{${tagCode}}}" style="background: rgba(99, 102, 241, 0.14); color: #4338ca; border: 1px solid rgba(99, 102, 241, 0.35); border-bottom: 2px solid #4f46e5; border-radius: 4px; padding: 1px 6px; font-weight: 600; cursor: help; display: inline-block; box-shadow: 0 1px 3px rgba(99,102,241,0.12);">${valoreSicuro}</span>`;
     };
 
-    let out = htmlContent;
+    let out = htmlSicuro;
 
     // Se sono state iniettate microvoci specifiche dal compositore fatture, sostituisci la riga di esempio
     if (customRowsHtml) {
@@ -442,7 +445,7 @@ export function DocumentEditorPage() {
     out = out.replace(/\{\{studio\.telefono\}\}/g, wrapTag(studioTel, 'studio.telefono'));
     out = out.replace(/\{\{studio\.email\}\}/g, wrapTag(studioEmail, 'studio.email'));
 
-    return out;
+    return sanitizzaHtmlDocumento(out);
   };
 
   // Sincronizzazione automatica dell'editor con i dati reali del tenant/cliente/progetto attivo
@@ -461,10 +464,10 @@ export function DocumentEditorPage() {
     setLivelloFirmaDoc(tmpl.livelloFirmaRichiesto ?? 'ses');
     // §39 — un modello nato da un documento può portarsi dietro intestazione e piede propri: si
     // adottano insieme al testo, invece di essere scambiati per corpo e stampati due volte.
-    const parti = scomponiDocumento(tmpl.contenutoHtml);
-    setIntestazionePropria(parti.intestazione);
-    setPiedeProprio(parti.piede);
-    rawTemplateRef.current = parti.corpo;
+    const parti = scomponiDocumento(sanitizzaHtmlDocumento(tmpl.contenutoHtml));
+    setIntestazionePropria(sanitizzaHtmlDocumento(parti.intestazione));
+    setPiedeProprio(sanitizzaHtmlDocumento(parti.piede));
+    rawTemplateRef.current = sanitizzaHtmlDocumento(parti.corpo);
     modelloCaricatoRef.current = tmpl.id;
     if (editorRef.current) {
       editorRef.current.innerHTML = renderResolvedContent(parti.corpo);
@@ -513,7 +516,7 @@ export function DocumentEditorPage() {
       descrizione: newTmplDesc.trim() || 'Modello master personalizzato salvato nello studio.',
       contenutoHtml: `
 <h1 style="text-align: center; color: #1e1b4b; margin-bottom: 20px; font-size: 19px; text-transform: uppercase;">
-  ${newTmplTitolo.toUpperCase()}
+  ${escapeHtmlTesto(newTmplTitolo.toUpperCase())}
 </h1>
 
 <p style="text-align: right; color: #64748b; font-size: 11px; margin-bottom: 20px;">
@@ -563,11 +566,11 @@ export function DocumentEditorPage() {
   const handleSaveCurrentAsMasterTemplate = async () => {
     // §39 — il modello si porta dietro anche l'intestazione e il piede propri, se ci sono: sono
     // parte dell'atto quanto il testo.
-    const currentHtml = componiDocumento({
+    const currentHtml = sanitizzaHtmlDocumento(componiDocumento({
       intestazione: intestazionePropria,
-      corpo: editorRef.current?.innerHTML || rawTemplateRef.current,
+      corpo: sanitizzaHtmlDocumento(editorRef.current?.innerHTML || rawTemplateRef.current),
       piede: piedeProprio,
-    });
+    }));
     const name = prompt('Inserisci il nome per questo nuovo Modello Master Studio:', `${titoloDocumento} (Copia Master)`);
     if (!name || !name.trim()) return;
 
@@ -590,34 +593,8 @@ export function DocumentEditorPage() {
     if (!file) return;
 
     if (file.name.toLowerCase().endsWith('.pdf')) {
-      const reader = new FileReader();
-      reader.onload = async (event) => {
-        const dataUrl = event.target?.result as string;
-        const tmplName = file.name.replace(/\.[^/.]+$/, "");
-        const esito = await cartella.crea({
-          titolo: tmplName,
-          categoria: 'societario',
-          // Piano firma §3 — nessuna scelta utente sull'import: default legale esplicito.
-          livelloFirmaRichiesto: 'ses',
-          descrizione: `Documento PDF importato: "${file.name}".`,
-          contenutoHtml: `
-<div style="font-family: Arial, sans-serif; max-width: 850px; margin: 0 auto; color: #1e293b;">
-  <div style="background: #0f172a; color: #fff; padding: 14px 18px; border-radius: 8px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center;">
-    <div>
-      <div style="font-size: 13px; font-weight: 700; color: #818cf8;">📄 ${file.name}</div>
-      <div style="font-size: 11px; color: #94a3b8;">Documento PDF importato nel Vault Document Studio</div>
-    </div>
-    <a href="${dataUrl}" download="${file.name}" style="background: #4338ca; color: #fff; text-decoration: none; padding: 6px 14px; border-radius: 6px; font-size: 11.5px; font-weight: 700;">📥 Scarica PDF</a>
-  </div>
-  <iframe src="${dataUrl}" style="width: 100%; height: 850px; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff;" title="${file.name}"></iframe>
-</div>
-          `.trim(),
-        });
-        if (esito.ok && esito.modello) handleSelectTemplate(esito.modello);
-        setFeedback(`${esito.ok ? '✓' : '⚠️'} ${esito.messaggio}`);
-        setTimeout(() => setFeedback(null), 4000);
-      };
-      reader.readAsDataURL(file);
+      setFeedback('Import PDF come modello disabilitato: carica il PDF nel fascicolo, senza incorporarlo nell’HTML.');
+      setTimeout(() => setFeedback(null), 5000);
       e.target.value = '';
       return;
     }
@@ -638,7 +615,7 @@ export function DocumentEditorPage() {
           // Piano firma §3 — nessuna scelta utente sull'import: default legale esplicito.
           livelloFirmaRichiesto: 'ses',
           descrizione: `Modello importato da file "${file.name}".`,
-          contenutoHtml: content,
+          contenutoHtml: sanitizzaHtmlDocumento(content),
         });
         if (esito.ok && esito.modello) handleSelectTemplate(esito.modello);
         setFeedback(`${esito.ok ? '✓' : '⚠️'} ${esito.messaggio}`);
@@ -738,7 +715,7 @@ export function DocumentEditorPage() {
   const handleExportPdf = async () => {
     setFeedback('⏳ Generazione file PDF ad alta risoluzione in corso...');
     try {
-      const currentHtml = editorRef.current?.innerHTML || rawTemplateRef.current;
+      const currentHtml = sanitizzaHtmlDocumento(editorRef.current?.innerHTML || rawTemplateRef.current);
       // Risolvi in modalità Stampa/PDF (senza smart chips, 100% testo pulito)
       const finalHtml = renderResolvedContent(currentHtml, true);
 
@@ -746,21 +723,21 @@ export function DocumentEditorPage() {
       // qui: se l'operatore li ha modificati, il PDF esce con le sue modifiche. L'intestazione entra
       // nel flusso (compare sul primo foglio, come sulla carta intestata), il piede viene ristampato
       // in fondo a ogni foglio dall'impaginatore, con il numero di pagina.
-      const fullPrintHtml = `
+      const fullPrintHtml = sanitizzaHtmlDocumento(`
         <div style="font-family: 'Segoe UI', Helvetica, Arial, sans-serif; color: #0f172a; line-height: 1.6; font-size: 11.5pt; width: 100%;">
           ${intestazioneEffettiva}
           <div>${finalHtml}</div>
         </div>
-      `;
+      `);
 
       const safeFileName = `${titoloDocumento.replace(/[^a-zA-Z0-9_-]/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`;
       await downloadRealPdf(safeFileName, fullPrintHtml, [], {
-        piede: (pagina, totale) => `
+        piede: (pagina, totale) => sanitizzaHtmlDocumento(`
           <div style="width: 100%;">
             ${piedeEffettivo}
-            <div style="text-align: right; font-size: 8pt; color: #94a3b8; margin-top: 3px;">Pagina ${pagina} di ${totale}</div>
+            <div style="text-align: right; font-size: 8pt; color: #94a3b8; margin-top: 3px;">Pagina ${Number(pagina)} di ${Number(totale)}</div>
           </div>
-        `,
+        `),
       });
       setFeedback(`✓ File PDF "${safeFileName}" generato e scaricato con successo!`);
       setTimeout(() => setFeedback(null), 5000);
@@ -774,18 +751,18 @@ export function DocumentEditorPage() {
   // Esportazione VERO File Word (.doc) Microsoft Office compatibile al 100%
   const handleExportWord = () => {
     try {
-      const currentHtml = editorRef.current?.innerHTML || rawTemplateRef.current;
+      const currentHtml = sanitizzaHtmlDocumento(editorRef.current?.innerHTML || rawTemplateRef.current);
       const finalHtml = renderResolvedContent(currentHtml, true);
 
       // §39 — le stesse due fasce del foglio e del PDF. Word non ha un impaginatore nostro, quindi
       // il piede compare una volta in fondo: è il comportamento di sempre per il .doc.
-      const fullPrintHtml = `
+      const fullPrintHtml = sanitizzaHtmlDocumento(`
         <div style="font-family: 'Calibri', 'Segoe UI', Arial, sans-serif; color: #0f172a; line-height: 1.6; font-size: 11pt;">
           ${intestazioneEffettiva}
           <div>${finalHtml}</div>
           <div style="margin-top: 40px;">${piedeEffettivo}</div>
         </div>
-      `;
+      `);
 
       const safeFileName = `${titoloDocumento.replace(/[^a-zA-Z0-9_-]/g, '_')}_${new Date().toISOString().slice(0, 10)}.doc`;
       downloadRealWordDoc(safeFileName, fullPrintHtml);
@@ -803,7 +780,7 @@ export function DocumentEditorPage() {
     setSalvando(true);
     setFeedback(null);
     try {
-      const currentHtml = editorRef.current?.innerHTML || rawTemplateRef.current;
+      const currentHtml = sanitizzaHtmlDocumento(editorRef.current?.innerHTML || rawTemplateRef.current);
       /**
        * §39 — Si archivia il foglio intero: intestazione, corpo e piede, marcati dentro l'HTML.
        *
@@ -813,12 +790,12 @@ export function DocumentEditorPage() {
        * atto del 2026 non deve cambiare intestazione. (Il «Salva come Modello» fa il contrario, e di
        * proposito: un modello deve adattarsi allo studio che lo usa.)
        */
-      const htmlContent = componiDocumento({
+      const htmlContent = sanitizzaHtmlDocumento(componiDocumento({
         intestazione: intestazioneEffettiva,
         corpo: renderResolvedContent(currentHtml),
         piede: piedeEffettivo,
-      });
-      const safeTitle = titoloDocumento.replace(/[^a-zA-Z0-9_\-]/g, '_');
+      }));
+      const safeTitle = titoloDocumento.replace(/[^a-zA-Z0-9_-]/g, '_');
       const filename = `${safeTitle}_${new Date().toISOString().slice(0, 10)}.docx`;
       const base64Data = btoa(unescape(encodeURIComponent(htmlContent)));
 

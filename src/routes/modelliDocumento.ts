@@ -20,6 +20,7 @@ import type { FastifyInstance } from 'fastify';
 import { prisma } from '../util/prismaClient.js';
 import { recordAudit } from '../util/serverHelpers.js';
 import { livelloFirmaValido } from '../services/livelloFirmaService.js';
+import { sanitizzaHtmlDocumento } from '../util/htmlSanitizer.js';
 import {
   decidiRevisione,
   descriviRevisione,
@@ -108,6 +109,7 @@ export async function registraRotteModelliDocumento(server: FastifyInstance): Pr
     if (req.ruolo === 'cliente') return reply.code(403).send({ errore: 'Non autorizzato.' });
 
     const { titolo, categoria, descrizione, contenutoHtml, livelloFirmaRichiesto, riferimentoSerie } = req.body;
+    const contenutoSanitizzato = sanitizzaHtmlDocumento(contenutoHtml || '');
     if (livelloFirmaRichiesto !== undefined && !livelloFirmaValido(livelloFirmaRichiesto)) {
       return reply.code(400).send({ errore: 'livelloFirmaRichiesto non valido: i valori ammessi sono ses, fea, feq.' });
     }
@@ -118,7 +120,7 @@ export async function registraRotteModelliDocumento(server: FastifyInstance): Pr
           titolo: titolo || 'Nuovo Modello Documento',
           categoria: categoria || 'contratto',
           descrizione: descrizione || '',
-          contenutoHtml: contenutoHtml || '',
+          contenutoHtml: contenutoSanitizzato,
           // Piano §3.1 — il livello scelto sul template viene copiato sul documento alla
           // generazione (POST /documenti/genera); 'ses' se lo studio non lo specifica.
           livelloFirmaRichiesto: livelloFirmaRichiesto ?? 'ses',
@@ -165,6 +167,7 @@ export async function registraRotteModelliDocumento(server: FastifyInstance): Pr
 
     const { id } = req.params;
     const { titolo, categoria, descrizione, contenutoHtml, livelloFirmaRichiesto } = req.body;
+    const contenutoSanitizzato = contenutoHtml === undefined ? undefined : sanitizzaHtmlDocumento(contenutoHtml);
     if (livelloFirmaRichiesto !== undefined && !livelloFirmaValido(livelloFirmaRichiesto)) {
       return reply.code(400).send({ errore: 'livelloFirmaRichiesto non valido: i valori ammessi sono ses, fea, feq.' });
     }
@@ -175,7 +178,7 @@ export async function registraRotteModelliDocumento(server: FastifyInstance): Pr
       });
       if (!attuale) return reply.code(404).send({ errore: 'Modello non trovato.' });
 
-      const contenutoCambiato = contenutoHtml !== undefined && contenutoHtml !== attuale.contenutoHtml;
+      const contenutoCambiato = contenutoSanitizzato !== undefined && contenutoSanitizzato !== attuale.contenutoHtml;
       const effetto = effettoModifica({
         statoAttuale: attuale.statoRevisione,
         versioneAttuale: attuale.versione,
@@ -188,7 +191,7 @@ export async function registraRotteModelliDocumento(server: FastifyInstance): Pr
           ...(titolo && { titolo }),
           ...(categoria && { categoria }),
           ...(descrizione !== undefined && { descrizione }),
-          ...(contenutoHtml !== undefined && { contenutoHtml }),
+          ...(contenutoSanitizzato !== undefined && { contenutoHtml: contenutoSanitizzato }),
           ...(livelloFirmaRichiesto !== undefined && { livelloFirmaRichiesto }),
           ...(effetto.approvazioneDecaduta
             ? {
@@ -371,12 +374,13 @@ export async function registraRotteModelliDocumento(server: FastifyInstance): Pr
     if (req.ruolo === 'cliente') return reply.code(403).send({ errore: 'Non autorizzato.' });
 
     const { riferimentoSerie, titolo, categoria, descrizione, contenutoHtml, livelloFirmaRichiesto } = req.body ?? ({} as any);
+    const contenutoSanitizzato = sanitizzaHtmlDocumento(contenutoHtml || '');
     const riferimento = (riferimentoSerie ?? '').trim();
     if (!riferimento) {
       return reply.code(400).send({ errore: 'Indicare `riferimentoSerie`: è l\'identificativo del modello di serie da adottare.' });
     }
-    if (!contenutoHtml || !contenutoHtml.trim()) {
-      return reply.code(400).send({ errore: 'Il modello da adottare non ha testo: non c\'è niente da conservare.' });
+    if (!contenutoSanitizzato.trim()) {
+      return reply.code(400).send({ errore: 'Il modello da adottare non ha testo consentito: non c\'è niente da conservare.' });
     }
     if (livelloFirmaRichiesto !== undefined && !livelloFirmaValido(livelloFirmaRichiesto)) {
       return reply.code(400).send({ errore: 'livelloFirmaRichiesto non valido: i valori ammessi sono ses, fea, feq.' });
@@ -397,7 +401,7 @@ export async function registraRotteModelliDocumento(server: FastifyInstance): Pr
           titolo: titolo || 'Modello di serie',
           categoria: categoria || 'contratto',
           descrizione: descrizione || '',
-          contenutoHtml,
+          contenutoHtml: contenutoSanitizzato,
           livelloFirmaRichiesto: livelloFirmaRichiesto ?? 'ses',
           riferimentoSerie: riferimento,
         },

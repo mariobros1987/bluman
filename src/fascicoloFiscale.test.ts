@@ -11,6 +11,18 @@ import { signJwt } from './util/jwt.js';
 // Mock di Prisma e CalcolaLiquidazioneIvaPeriodo
 vi.mock('./util/prismaClient.js', () => ({
   prisma: {
+    user: {
+      findFirst: vi.fn(async (args: any) =>
+        args?.where?.id === 'admin-1'
+          ? { ruolo: 'advisor', stato: 'attivo', sessionVersion: 0 }
+          : null,
+      ),
+    },
+    cliente: {
+      findFirst: vi.fn(async (args: any) =>
+        args?.where?.id === 'cli-1' ? { sessionVersion: 0 } : null,
+      ),
+    },
     tenant: {
       findUnique: vi.fn().mockResolvedValue({
         id: 'tenant-commercialista-test',
@@ -207,6 +219,7 @@ describe('📦 Motore Fascicolo Fiscale ZIP per Commercialista', () => {
       tenantId: 'tenant-commercialista-test',
       ruolo: 'advisor',
       email: 'advisor@studio.it',
+      sessionVersion: 0,
     });
 
     const response = await server.inject({
@@ -244,10 +257,11 @@ describe('📦 Motore Fascicolo Fiscale ZIP per Commercialista', () => {
     await server.ready();
 
     const tokenCliente = signJwt({
-      userId: 'cli-1',
+      userId: 'client-cli-1',
       tenantId: 'tenant-commercialista-test',
       ruolo: 'cliente',
       email: 'cliente@esterno.it',
+      sessionVersion: 0,
     });
 
     for (const rotta of [
@@ -274,6 +288,7 @@ describe('📦 Motore Fascicolo Fiscale ZIP per Commercialista', () => {
       tenantId: 'tenant-commercialista-test',
       ruolo: 'advisor',
       email: 'advisor@studio.it',
+      sessionVersion: 0,
     });
 
     for (const query of ['anno=pippo', 'anno=2026&tipo=mensile&mese=13', 'anno=2026&tipo=inventato']) {

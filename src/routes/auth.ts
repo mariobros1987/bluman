@@ -9,7 +9,13 @@
 
 import crypto from 'crypto';
 import type { FastifyInstance } from 'fastify';
-import { prisma, prismaAmministrativo, attivaContestoTenant } from '../util/prismaClient.js';
+import {
+  prisma,
+  prismaAmministrativo,
+  attivaContestoTenant,
+  conContestoInTransazione,
+} from '../util/prismaClient.js';
+import { clienteIdDalJwt } from '../util/authorization.js';
 import { signJwt, verifyJwt, hashMagicToken } from '../util/jwt.js';
 import { verifyPassword, hashPassword } from '../util/password.js';
 import {
@@ -80,6 +86,7 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
       tenantId: userTenantId,
       email: cleanEmail,
       ruolo: utente.ruolo,
+      sessionVersion: utente.sessionVersion,
     }, DURATA_SESSIONE_OPERATORE_MINUTI);
 
     // Per il super_admin `utente.tenantId` è null (→ userTenantId ''): l'audit di
@@ -134,22 +141,23 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
     const { magicToken } = mlResult.data;
 
     const db = prismaAmministrativo();
+    const tokenHash = hashMagicToken(magicToken);
     const link = await db.magicLink.findUnique({
-      where: { tokenHash: hashMagicToken(magicToken) },
+      where: { tokenHash },
       include: { cliente: true },
     });
 
-    // Un unico messaggio per token inesistente, scaduto o cliente cancellato: distinguerli
-    // direbbe a chi prova se un token è mai esistito.
-    if (!link || !link.cliente || link.scadenza.getTime() < Date.now()) {
+    // Un unico messaggio per token inesistente, scaduto, già usato o cliente cancellato.
+    if (!link || !link.cliente || link.usatoAt || link.scadenza.getTime() < Date.now()) {
       return reply.code(401).send(rifiuto);
     }
 
-    // Primo utilizzo registrato per l'audit; il link resta valido fino a scadenza perché un
-    // cliente riapre il proprio link più di una volta.
-    if (!link.usatoAt) {
-      await db.magicLink.update({ where: { id: link.id }, data: { usatoAt: new Date() } });
-    }
+    // Consumo atomico: solo una richiesta concorrente può cambiare usatoAt da NULL.
+    const consumato = await db.magicLink.updateMany({
+      where: { id: link.id, usatoAt: null, scadenza: { gt: new Date() } },
+      data: { usatoAt: new Date() },
+    });
+    if (consumato.count !== 1) return reply.code(401).send(rifiuto);
 
     const emailCliente = link.email ?? '';
     // Il tenant viene dalla riga del cliente, non da una costante: era il secondo guasto di
@@ -164,6 +172,7 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
       tenantId: link.cliente.tenantId,
       email: emailCliente,
       ruolo: 'cliente',
+      sessionVersion: link.cliente.sessionVersion,
       sid: crypto.randomUUID(),
       iat: Math.floor(Date.now() / 1000),
     }, DURATA_SESSIONE_CLIENTE_MINUTI);
@@ -238,6 +247,7 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
       tenantId: cliente.tenantId,
       email: emailCliente,
       ruolo: 'cliente',
+      sessionVersion: cliente.sessionVersion,
       sid: crypto.randomUUID(),
       iat: Math.floor(Date.now() / 1000),
     }, DURATA_SESSIONE_CLIENTE_MINUTI);
@@ -265,37 +275,41 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
   });
 
   server.get('/auth/me', async (req, reply) => {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return reply.code(401).send({ errore: 'Non autenticato' });
-    }
-    const token = authHeader.split(' ')[1];
-    if (!token) {
-      return reply.code(401).send({ errore: 'Non autenticato' });
-    }
-    const payload = verifyJwt(token);
-    if (!payload) {
-      return reply.code(401).send({ errore: 'Token non valido o scaduto' });
-    }
+    const authUser = req.user;
+    if (!authUser) return reply.code(401).send({ errore: 'Non autenticato' });
 
-    let stato = 'attivo';
-    try {
-      if (payload.userId && !payload.userId.startsWith('client-')) {
-        const u = await prismaAmministrativo().user.findUnique({ where: { id: payload.userId } });
-        if (u) {
-          stato = u.stato;
+    if (authUser.ruolo === 'cliente') {
+      const clienteId = clienteIdDalJwt(authUser);
+      if (!clienteId) return reply.code(401).send({ errore: 'Sessione cliente non valida' });
+      try {
+        const cliente = await prisma.cliente.findFirst({
+          where: { id: clienteId, tenantId: req.tenantId },
+          select: { id: true, sessionVersion: true },
+        });
+        if (!cliente || cliente.sessionVersion !== authUser.sessionVersion) {
+          return reply.code(401).send({ errore: 'Sessione revocata' });
         }
+        return reply.send({ ok: true, user: { ...authUser, clienteId, stato: 'attivo', mustChangePassword: false } });
+      } catch {
+        return reply.code(503).send({ errore: 'Servizio di autenticazione non disponibile. Riprova tra poco.' });
       }
-    } catch {}
+    }
 
-    return {
-      ok: true,
-      user: {
-        ...payload,
-        stato,
-        mustChangePassword: stato === 'invitato',
-      },
-    };
+    try {
+      const utente = await prisma.user.findFirst({
+        where: { id: authUser.userId, ...(authUser.ruolo === 'super_admin' ? {} : { tenantId: req.tenantId }) },
+        select: { stato: true, sessionVersion: true },
+      });
+      if (!utente || utente.stato === 'disattivato' || utente.sessionVersion !== authUser.sessionVersion) {
+        return reply.code(401).send({ errore: 'Sessione revocata o utenza disattivata' });
+      }
+      return reply.send({
+        ok: true,
+        user: { ...authUser, stato: utente.stato, mustChangePassword: utente.stato === 'invitato' },
+      });
+    } catch {
+      return reply.code(503).send({ errore: 'Servizio di autenticazione non disponibile. Riprova tra poco.' });
+    }
   });
 
   server.post<{
@@ -309,13 +323,18 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
     const authUser = req.user;
     const userId = authUser?.userId;
 
-    if (!userId) {
+    if (!authUser || authUser.ruolo === 'cliente' || !userId) {
       return reply.code(401).send({ errore: 'Non autenticato' });
     }
 
     try {
-      const utente = await prismaAmministrativo().user.findUnique({ where: { id: userId } });
-      if (!utente) {
+      const utente = await prisma.user.findFirst({
+        where: {
+          id: userId,
+          ...(authUser.ruolo === 'super_admin' ? {} : { tenantId: req.tenantId }),
+        },
+      });
+      if (!utente || utente.stato === 'disattivato') {
         return reply.code(404).send({ errore: 'Utente non trovato' });
       }
 
@@ -330,13 +349,21 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
       }
 
       const newHash = hashPassword(newPassword);
-      await prismaAmministrativo().user.update({
+      const aggiornato = await prisma.user.update({
         where: { id: utente.id },
         data: {
           passwordHash: newHash,
           stato: 'attivo',
+          sessionVersion: { increment: 1 },
         },
       });
+      const token = signJwt({
+        userId: aggiornato.id,
+        tenantId: aggiornato.tenantId || '',
+        email: aggiornato.email,
+        ruolo: aggiornato.ruolo,
+        sessionVersion: aggiornato.sessionVersion,
+      }, DURATA_SESSIONE_OPERATORE_MINUTI);
 
       await recordAudit({
         tenantId: utente.tenantId || TENANT_DEFAULT,
@@ -348,7 +375,7 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
         ipAddress: req.ip,
       });
 
-      return reply.send({ ok: true, messaggio: 'Password aggiornata con successo!' });
+      return reply.send({ ok: true, token, messaggio: 'Password aggiornata con successo!' });
     } catch (err: any) {
       return reply.code(500).send({ errore: err.message || 'Errore aggiornamento password' });
     }
@@ -360,8 +387,11 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
     if (!userId) return reply.code(401).send({ errore: 'Non autenticato' });
 
     try {
-      const utente = await prismaAmministrativo().user.findUnique({
-        where: { id: userId },
+      const utente = await prisma.user.findFirst({
+        where: {
+          id: userId,
+          ...(authUser.ruolo === 'super_admin' ? {} : { tenantId: req.tenantId }),
+        },
         include: { tenant: true },
       });
       if (!utente) return reply.code(404).send({ errore: 'Utente non trovato' });
@@ -380,7 +410,7 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
 
     const { nome, specializzazione } = req.body || {};
     try {
-      const updated = await prismaAmministrativo().user.update({
+      const updated = await prisma.user.update({
         where: { id: userId },
         data: {
           ...(nome ? { nome: nome.trim() } : {}),
@@ -394,60 +424,74 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
   });
 
   server.post<{
-    Body: { currentPassword?: string; newPassword?: string; clienteId?: string; email?: string };
+    Body: { currentPassword?: string; newPassword?: string };
   }>('/portal/change-password', async (req, reply) => {
-    const { currentPassword, newPassword, clienteId, email } = req.body || {};
+    const { currentPassword, newPassword } = req.body || {};
     const authUser = req.user;
+    const targetClienteId = clienteIdDalJwt(authUser);
 
-    if (!newPassword || newPassword.length < 6) {
-      return reply.code(400).send({ errore: 'La nuova password deve contenere almeno 6 caratteri.' });
+    if (!authUser || authUser.ruolo !== 'cliente' || !targetClienteId) {
+      return reply.code(401).send({ errore: 'Sessione cliente non valida.' });
+    }
+    if (!newPassword || newPassword.length < 8) {
+      return reply.code(400).send({ errore: 'La nuova password deve contenere almeno 8 caratteri.' });
     }
 
-    const cleanEmail = (email || authUser?.email || '').trim().toLowerCase();
-    const targetClienteId = clienteId || (authUser?.userId?.startsWith('client-') ? authUser.userId.replace('client-', '') : null);
-
     try {
-      let cliente: any = null;
-      if (targetClienteId) {
-        cliente = await prismaAmministrativo().cliente.findUnique({ where: { id: targetClienteId } });
-      }
-      if (!cliente && cleanEmail) {
-        cliente = await prismaAmministrativo().cliente.findFirst({
-          where: {
-            OR: [
-              { email: { equals: cleanEmail, mode: 'insensitive' } },
-              { referentiJson: { path: ['email'], equals: cleanEmail } },
-            ],
-          },
-        });
-      }
+      const cliente = await prisma.cliente.findFirst({
+        where: { id: targetClienteId, tenantId: req.tenantId },
+      });
+      if (!cliente) return reply.code(404).send({ errore: 'Cliente non trovato' });
 
-      if (!cliente) {
-        return reply.code(404).send({ errore: 'Cliente non trovato' });
-      }
-
-      // Se il cliente ha già una password attiva e la sta cambiando, verifica quella attuale
-      if (cliente.passwordHash && currentPassword) {
+      if (cliente.passwordHash) {
+        if (!currentPassword) {
+          return reply.code(400).send({ errore: 'Inserisci la password attuale per confermare la modifica.' });
+        }
         if (!verifyPassword(currentPassword, cliente.passwordHash)) {
           return reply.code(401).send({ errore: 'La password attuale inserita non è corretta.' });
         }
       }
 
       const newHash = hashPassword(newPassword);
-      await prismaAmministrativo().cliente.update({
-        where: { id: cliente.id },
-        data: { passwordHash: newHash },
-      });
+      const aggiornato = await prisma.$transaction(async (tx) =>
+        conContestoInTransazione(tx, async () => {
+          const clienteAggiornato = await tx.cliente.update({
+            where: { id: cliente.id },
+            data: {
+              passwordHash: newHash,
+              sessionVersion: { increment: 1 },
+            },
+          });
+          await tx.magicLink.updateMany({
+            where: { clienteId: cliente.id, usatoAt: null },
+            data: { usatoAt: new Date() },
+          });
+          return clienteAggiornato;
+        }),
+      );
+      const token = signJwt({
+        userId: `client-${aggiornato.id}`,
+        tenantId: aggiornato.tenantId,
+        email: aggiornato.email || authUser.email,
+        ruolo: 'cliente',
+        sessionVersion: aggiornato.sessionVersion,
+        sid: crypto.randomUUID(),
+        iat: Math.floor(Date.now() / 1000),
+      }, DURATA_SESSIONE_CLIENTE_MINUTI);
 
       await recordAudit({
-        tenantId: cliente.tenantId,
+        tenantId: aggiornato.tenantId,
         azione: 'CLIENTE_PASSWORD_MODIFICATA',
-        entita: cliente.nome,
-        dettagli: `Password del portale cliente aggiornata con successo per ${cliente.nome}`,
+        entita: aggiornato.nome,
+        dettagli: `Password del portale cliente aggiornata con successo per ${aggiornato.nome}`,
         ipAddress: req.ip || '127.0.0.1',
       });
 
-      return reply.send({ ok: true, messaggio: 'Password del portale impostata con successo!' });
+      return reply.send({
+        ok: true,
+        token,
+        messaggio: 'Password del portale impostata con successo!',
+      });
     } catch (err: any) {
       return reply.code(500).send({ errore: err.message || 'Errore aggiornamento password portale' });
     }

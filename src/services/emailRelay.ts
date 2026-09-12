@@ -28,6 +28,14 @@
  */
 import nodemailer from 'nodemailer';
 import { spiegaErrorePosta } from './diagnosiPosta.js';
+import {
+  risolviEndpointPubblico,
+  validaEmail,
+  validaHost,
+  validaPorta,
+  validaServername,
+  vietaControlli,
+} from '../util/networkPolicy.js';
 
 /**
  * §3.4 — verifica dei certificati TLS per SMTP/IMAP. Prima era disattivata ovunque
@@ -119,14 +127,19 @@ function candidatiSmtp(smtp?: CredenzialiSmtp): Array<{ host: string; port: numb
   const host = smtp?.host || process.env.SMTP_HOST;
   if (!host) return [];
 
-  const porta = smtp?.port || Number(process.env.SMTP_PORT ?? 465);
+  const porta = validaPorta(smtp?.port ?? process.env.SMTP_PORT ?? 465, 'Porta SMTP');
+  const produzione = process.env.NODE_ENV === 'production';
 
   return [
     { host, port: porta, secure: smtp?.secure ?? porta === 465 },
     { host, port: 465, secure: true },
-    { host, port: 587, secure: false },
-    { host, port: 25, secure: false },
-  ].filter((c, i, arr) => arr.findIndex(x => x.host === c.host && x.port === c.port) === i);
+    // In produzione niente connessioni SMTP in chiaro: il relay HTTPS o SMTPS sono gli unici
+    // percorsi ammessi. In sviluppo restano disponibili le porte STARTTLS storiche.
+    ...(!produzione ? [
+      { host, port: 587, secure: false },
+      { host, port: 25, secure: false },
+    ] : []),
+  ].filter((c, i, arr) => (!produzione || c.secure) && arr.findIndex(x => x.host === c.host && x.port === c.port) === i);
 }
 
 async function inviaViaRelay(messaggio: MessaggioEmail, smtp: CredenzialiSmtp): Promise<EsitoEmail> {
@@ -142,7 +155,8 @@ async function inviaViaRelay(messaggio: MessaggioEmail, smtp: CredenzialiSmtp): 
   }
 
   const controller = new AbortController();
-  const scadenza = setTimeout(() => controller.abort(), 45000);
+  const timeoutMs = 10000;
+  const scadenza = setTimeout(() => controller.abort(), timeoutMs);
 
   // §35 — la funzione di relay ora rifiuta le chiamate senza questo header quando
   // `EMAIL_RELAY_SECRET` è impostato su Vercel: serve a distinguere il backend da un browser
@@ -190,7 +204,7 @@ async function inviaViaRelay(messaggio: MessaggioEmail, smtp: CredenzialiSmtp): 
 
     return { ok: true, via: `relay ${url}` };
   } catch (err: any) {
-    const motivo = err?.name === 'AbortError' ? 'nessuna risposta entro 45 secondi' : err?.message || 'errore di rete';
+    const motivo = err?.name === 'AbortError' ? `nessuna risposta entro ${timeoutMs / 1000} secondi` : err?.message || 'errore di rete';
     return { ok: false, errore: `relay: ${motivo}` };
   } finally {
     clearTimeout(scadenza);
@@ -209,17 +223,22 @@ async function inviaViaSmtp(
   for (const cand of candidatiSmtp(smtp)) {
     const iniziato = Date.now();
     try {
+      // Si connette all'IP appena validato, non risolve una seconda volta il nome: così un cambio
+      // DNS fra controllo e socket non può spostare la connessione verso una rete interna.
+      const endpoint = await risolviEndpointPubblico(cand.host, smtp.servername);
       const trasporto = nodemailer.createTransport({
-        host: cand.host,
+        host: endpoint.address,
         port: cand.port,
         secure: cand.secure,
         auth: { user: smtp.user, pass: smtp.pass },
-        // `servername` cambia il nome contro cui si verifica il certificato, non il fatto che
-        // lo si verifichi: senza di esso nodemailer usa l'host, che è quello che vogliamo
-        // quando il campo è vuoto.
-        tls: { rejectUnauthorized: tlsRejectUnauthorized(), ...(smtp.servername ? { servername: smtp.servername } : {}) },
+        tls: {
+          rejectUnauthorized: tlsRejectUnauthorized(),
+          ...(endpoint.servername ? { servername: endpoint.servername } : {}),
+        },
         connectionTimeout: timeoutMs,
         greetingTimeout: timeoutMs,
+        socketTimeout: timeoutMs,
+        dnsTimeout: timeoutMs,
       });
 
       await trasporto.sendMail({
@@ -272,7 +291,20 @@ export async function inviaEmail(messaggio: MessaggioEmail): Promise<EsitoEmail>
     };
   }
 
-  const mittente = `"${messaggio.fromName || 'BluMan Advisory'}" <${messaggio.fromEmail || smtp.user}>`;
+  try {
+    smtp.host = validaHost(smtp.host, 'Host SMTP');
+    smtp.servername = smtp.servername ? validaServername(smtp.servername) : undefined;
+    smtp.port = validaPorta(smtp.port ?? 465, 'Porta SMTP');
+    smtp.user = vietaControlli(smtp.user, 'Utenza SMTP', 254).trim();
+    smtp.pass = vietaControlli(smtp.pass, 'Password SMTP', 1024);
+    messaggio.to = validaEmail(messaggio.to, 'Destinatario');
+    messaggio.fromEmail = validaEmail(messaggio.fromEmail || smtp.user, 'Mittente');
+    vietaControlli(messaggio.subject, 'Oggetto email', 998);
+  } catch (err) {
+    return { ok: false, errore: err instanceof Error ? err.message : 'Configurazione SMTP non valida.' };
+  }
+
+  const mittente = `"${vietaControlli(messaggio.fromName || 'BluMan Advisory', 'Nome mittente', 200)}" <${messaggio.fromEmail}>`;
   const errori: string[] = [];
   const relayDisponibile = Boolean(urlRelay());
 

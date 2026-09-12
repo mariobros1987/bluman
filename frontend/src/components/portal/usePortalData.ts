@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type React from 'react';
 import {
   fetchProgetti,
+  fetchCliente,
   fetchClienti,
   fetchComunicazioniApi,
   magicLoginApi,
@@ -414,7 +415,9 @@ export function usePortalData({ token, setIsAuthenticated, setAccessoNegato }: U
       // scelto nell'anteprima dello studio. Serve alle rotte del portale, che per un utente
       // studio non possono dedurlo dal token.
       let clienteIdRisolto: string | null = clienteIdSessione;
-      const clientiRes = await fetchClienti();
+      const clientiRes = anteprimaStudio
+        ? await fetchClienti()
+        : (clienteIdSessione ? [await fetchCliente(clienteIdSessione)] : []);
       if (clientiRes && Array.isArray(clientiRes) && clientiRes.length > 0) {
         // §2.10: l'elenco completo serve al selettore dell'anteprima studio.
         setElencoClienti(clientiRes);

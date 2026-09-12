@@ -43,7 +43,12 @@ vi.mock('./util/prismaClient.js', async importOriginal => {
   const reale = await importOriginal<typeof import('./util/prismaClient.js')>();
 
   const finto: any = {
-    cliente: { findFirst: async () => stato.cliente },
+    cliente: {
+      findFirst: async (args: any) =>
+        args?.select?.sessionVersion && args?.where?.id === CLIENTE_ID
+          ? { id: CLIENTE_ID, tenantId: TENANT_STUDIO, sessionVersion: 0 }
+          : stato.cliente,
+    },
     documento: {
       findFirst: async () => stato.documento,
       create: async (args: any) => {
@@ -86,7 +91,19 @@ vi.mock('./util/prismaClient.js', async importOriginal => {
       },
       deleteMany: async () => ({ count: 0 }),
     },
-    user: { findMany: async () => [] },
+    user: {
+      findFirst: async (args: any) => {
+        const id = args?.where?.id;
+        if (id === 'usr-advisor') {
+          return { id, tenantId: TENANT_STUDIO, ruolo: 'advisor', stato: 'attivo', sessionVersion: 0 };
+        }
+        if (id === 'usr-super') {
+          return { id, tenantId: null, ruolo: 'super_admin', stato: 'attivo', sessionVersion: 0 };
+        }
+        return null;
+      },
+      findMany: async () => [],
+    },
     notifica: {
       create: async (args: any) => {
         stato.notifiche.push(args.data);
@@ -138,15 +155,28 @@ function tokenCliente() {
     tenantId: TENANT_STUDIO,
     email: 'cliente@esempio.it',
     ruolo: 'cliente',
+    sessionVersion: 0,
   });
 }
 
 function tokenAdvisor() {
-  return signJwt({ userId: 'usr-advisor', tenantId: TENANT_STUDIO, email: 'advisor@studio.example', ruolo: 'advisor' });
+  return signJwt({
+    userId: 'usr-advisor',
+    tenantId: TENANT_STUDIO,
+    email: 'advisor@studio.example',
+    ruolo: 'advisor',
+    sessionVersion: 0,
+  });
 }
 
 function tokenSuperAdmin() {
-  return signJwt({ userId: 'usr-super', tenantId: TENANT_STUDIO, email: 'super@studio.example', ruolo: 'super_admin' });
+  return signJwt({
+    userId: 'usr-super',
+    tenantId: TENANT_STUDIO,
+    email: 'super@studio.example',
+    ruolo: 'super_admin',
+    sessionVersion: 0,
+  });
 }
 
 function serverConToken(token: string | null) {

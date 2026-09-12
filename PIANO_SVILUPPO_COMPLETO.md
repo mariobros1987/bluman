@@ -1,9 +1,9 @@
 # 🗺️ BluMan Advisory Platform — Piano di Sviluppo Completo & Dettagliato
 
-> **Versione**: 3.0 — Master Plan di Sviluppo & Consolidamento Enterprise  
-> **Data di Riferimento**: 2026-09-11  
-> **Stato Codebase**: 645/645 Test Vitest Verdi (51 Suite) • Zero Errori TypeScript Frontend & Backend • Deploy Attivo su Vercel & Railway
-> **Autore**: Mario Dibenedetto & Team di Ingegneria AI  
+> **Versione**: 3.1 — Master Plan di Sviluppo & Consolidamento Enterprise
+> **Data di Riferimento**: 2026-09-12
+> **Stato Codebase**: 707/707 test Vitest verdi (58 file) • Build TypeScript backend, typecheck/lint/build frontend riusciti • P0 verificato localmente, non ancora committato, migrato o distribuito
+> **Autore**: Mario Dibenedetto & Team di Ingegneria AI
 
 ---
 
@@ -40,6 +40,19 @@ La piattaforma BluMan ha completato con successo le fasi critiche di sicurezza e
 - ✅ **Workflow Documentale & Firma Elettronica Legale (§WF-DOC)**:
   - Ciclo di vita a 4 stati (bozza ⇄ pubblicato ⇄ revisione ⇄ firmato), blocco modifiche a 409 con sblocco motivato riservato ad admin studio.
   - Firma OTP con generazione del sigillo crittografico lato server (SHA-256, timestamp, IP pubblico reale verificato, evidenze forensi).
+- ✅ **Hardening P0 verificato localmente (2026-09-12)**:
+  - Guard RBAC centralizzato e JWT cliente deny-by-default con allowlist metodo/route e ownership sulle risorse del portale.
+  - `sessionVersion` su operatori e clienti, revoca dei JWT precedenti a cambio/reset password e Magic Link monouso consumati atomicamente.
+  - Webhook WhatsApp/Telegram autenticati, risoluzione tenant fail-closed e replay protection atomica tramite `WebhookInbox`.
+  - Sanitizzazione HTML persistito, controllo rigoroso upload e download come `attachment` con `nosniff` e CSP sandbox.
+  - Policy SSRF per SMTP/IMAP, controllo di tutte le risposte DNS e connessione fissata all'IP verificato con `servername` TLS.
+  - Verifica corrente: 58 file di test e 707 test superati; build backend, typecheck/lint/build frontend e `git diff --check` riusciti.
+
+> **Confine operativo:** il batch P0 è nel working tree locale. Le migrazioni
+> `20260911120000_session_version_auth` e `20260912120000_webhook_inbox` non sono state
+> applicate; non sono stati eseguiti commit, push, deploy o rotazioni di segreti. Prima del
+> rilascio servono staging, smoke test per ruolo e autorizzazione specifica per le operazioni
+> esterne.
 
 ---
 
@@ -279,6 +292,20 @@ Creare test end-to-end automatizzati (con database di test isolato o mock comple
 
 ## 11. Checklist Operativa di Avanzamento
 
+### 🛡️ Sprint P0 — Confini di Fiducia (implementato e verificato localmente)
+- [x] **P0.1** Centralizzare RBAC e policy cliente deny-by-default; completare ownership sulle route portale consentite.
+- [x] **P0.2** Rendere cambio/reset password non targettabile dal body; aggiungere `sessionVersion` e revoca delle sessioni.
+- [x] **P0.3** Rendere i Magic Link casuali, hashati, atomici, monouso e revocabili.
+- [x] **P0.4** Autenticare webhook WhatsApp/Telegram, rimuovere fallback arbitrari e aggiungere `WebhookInbox` transazionale.
+- [x] **P0.5** Sanitizzare HTML persistito; validare base64, MIME e magic bytes; irrobustire download e accesso storage.
+- [x] **P0.6** Limitare SMTP/IMAP ai ruoli privilegiati e applicare policy SSRF/DNS/TLS.
+- [x] **P0.7** Validazione locale: 58/58 file e 707/707 test, build backend, typecheck/lint/build frontend, schema Prisma valido e `git diff --check` pulito.
+- [x] **P0.8** Ridurre il churn solo-formattazione di `prisma/schema.prisma` e rieseguire smoke test locale rappresentativi per anonimo/cliente/collaboratore/advisor/super admin (8 file, 156 test verdi).
+- [ ] **P0.9** Completare un audit statico finale indipendente: i tentativi delegati del 2026-09-12 non hanno prodotto un rapporto verificabile per errori del servizio/watchdog.
+- [ ] **P0.10** Applicare le migrazioni prima in staging e promuovere il batch con autorizzazioni separate per commit, push e deploy.
+
+**Debito residuo esplicito:** ZIP/DOCX/XLSX non sono ancora ispezionati internamente per macro o payload attivi; audio/video fuori allowlist vengono rifiutati. La queue persistente, backup/restore, staging, osservabilità, Sentry, uptime, TOTP, Swagger ed E2E restano fasi successive.
+
 ### 🚀 Sprint 1 — Scalabilità & Automazione Immediata (Priorità 🟠 ALTA)
 - [x] **1.1** Applicare il contratto paginato retrocompatibile a `GET /invoices` con metadati e allowlist di ordinamento.
 - [x] **1.2** Applicare paginazione a `GET /prima-nota` con riepilogo aggregato globale.
@@ -286,7 +313,7 @@ Creare test end-to-end automatizzati (con database di test isolato o mock comple
 - [x] **1.4** Applicare paginazione a `GET /clienti` senza esporre `passwordHash`.
 - [x] **1.5** Applicare paginazione a `GET /audit-logs` con errori DB espliciti.
 - [x] **1.6** Collegare e verificare le cinque pagine frontend con debounce, metadati e paginatore riusabile.
-- [x] **1.7** Completare i test mirati e la validazione integrale: 51 suite, 645 test, build TypeScript backend, typecheck/lint/build frontend verdi (restano warning lint e build non bloccanti già documentati).
+- [x] **1.7** Completare i test mirati e la validazione integrale: verifica corrente 58 file, 707 test, build TypeScript backend, typecheck/lint/build frontend verdi (restano warning lint, versione Node e dimensione bundle non bloccanti già documentati).
 - [x] **2.1** Creare e verificare il runner CLI `src/scripts/runDailyNotificationCron.ts` per un Railway Cron separato e RLS-safe.
 - [ ] **2.2** Configurare su Railway il servizio Cron quotidiano con `npm run cron:notifiche`.
 - [ ] **2.3** Implementare la coda asincrona email/WhatsApp con retry e persistenza degli errori di invio.

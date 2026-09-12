@@ -39,6 +39,12 @@ vi.mock('./util/prismaClient.js', async importOriginal => {
       },
     },
     auditLog: { create: async () => ({}) },
+    user: {
+      findFirst: async (args: any) =>
+        args?.where?.id === 'usr-advisor'
+          ? { ruolo: 'advisor', stato: 'attivo', sessionVersion: 0 }
+          : null,
+    },
     tenant: { findUnique: async () => null, create: async (a: any) => a.data, upsert: async (a: any) => a.update },
   };
 
@@ -62,6 +68,7 @@ function tokenAdvisor() {
     tenantId: TENANT_STUDIO,
     email: 'advisor@studio.example',
     ruolo: 'advisor',
+    sessionVersion: 0,
   });
 }
 

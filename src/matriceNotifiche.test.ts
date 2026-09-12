@@ -37,7 +37,10 @@ vi.mock('./util/prismaClient.js', async importOriginal => {
 
   const finto: any = {
     cliente: {
-      findFirst: async () => stato.cliente,
+      findFirst: async (args: any) =>
+        args?.select?.sessionVersion && args?.where?.id === CLIENTE_ID
+          ? { id: CLIENTE_ID, tenantId: TENANT_STUDIO, sessionVersion: 0 }
+          : stato.cliente,
       update: async (args: any) => ({ ...stato.cliente, ...args.data }),
     },
     documento: {
@@ -59,7 +62,13 @@ vi.mock('./util/prismaClient.js', async importOriginal => {
       create: async (args: any) => ({ ...args.data, id: 'rm-1' }),
     },
     // Un utente attivo del tenant: senza, notificaStudio uscirebbe subito senza scrivere.
-    user: { findMany: async () => [{ id: 'usr-advisor' }] },
+    user: {
+      findFirst: async (args: any) =>
+        args?.where?.id === 'usr-advisor'
+          ? { id: 'usr-advisor', tenantId: TENANT_STUDIO, ruolo: 'advisor', stato: 'attivo', sessionVersion: 0 }
+          : null,
+      findMany: async () => [{ id: 'usr-advisor' }],
+    },
     notifica: {
       create: async (args: any) => {
         stato.notifiche.push(args.data);
@@ -106,11 +115,18 @@ function tokenCliente() {
     tenantId: TENANT_STUDIO,
     email: 'cliente@esempio.it',
     ruolo: 'cliente',
+    sessionVersion: 0,
   });
 }
 
 function tokenAdvisor() {
-  return signJwt({ userId: 'usr-advisor', tenantId: TENANT_STUDIO, email: 'advisor@studio.example', ruolo: 'advisor' });
+  return signJwt({
+    userId: 'usr-advisor',
+    tenantId: TENANT_STUDIO,
+    email: 'advisor@studio.example',
+    ruolo: 'advisor',
+    sessionVersion: 0,
+  });
 }
 
 function serverConToken(token: string) {

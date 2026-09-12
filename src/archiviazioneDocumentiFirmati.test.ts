@@ -29,7 +29,28 @@ const stato = {
 vi.mock('./util/prismaClient.js', async importOriginal => {
   const reale = await importOriginal<typeof import('./util/prismaClient.js')>();
 
+  const identitaStaff = (args: any) => {
+    if (!args?.select?.sessionVersion || !args?.select?.ruolo || !args?.select?.stato) return null;
+    const identita: Record<string, any> = {
+      'usr-advisor': { id: 'usr-advisor', tenantId: '00000000-0000-0000-0000-000000000001', ruolo: 'advisor', stato: 'attivo', sessionVersion: 0 },
+      'usr-super': { id: 'usr-super', tenantId: null, ruolo: 'super_admin', stato: 'attivo', sessionVersion: 0 },
+      'usr-oper': { id: 'usr-oper', tenantId: '00000000-0000-0000-0000-000000000001', ruolo: 'collaboratore_interno', stato: 'attivo', sessionVersion: 0 },
+    };
+    const utente = identita[args?.where?.id];
+    if (!utente || (args.where.tenantId && args.where.tenantId !== utente.tenantId)) return null;
+    return utente;
+  };
+
   const finto: any = {
+    user: { findFirst: async (args: any) => identitaStaff(args) },
+    cliente: {
+      findFirst: async (args: any) =>
+        args?.select?.sessionVersion &&
+        args?.where?.id === 'cli-42' &&
+        args?.where?.tenantId === '00000000-0000-0000-0000-000000000001'
+          ? { sessionVersion: 0 }
+          : null,
+    },
     documento: {
       findFirst: async () => stato.documento,
       update: async (args: any) => {
@@ -86,13 +107,13 @@ const { signJwt } = await import('./util/jwt.js');
 const TENANT_STUDIO = '00000000-0000-0000-0000-000000000001';
 
 function tokenAdvisor() {
-  return signJwt({ userId: 'usr-advisor', tenantId: TENANT_STUDIO, email: 'advisor@studio.example', ruolo: 'advisor' });
+  return signJwt({ userId: 'usr-advisor', tenantId: TENANT_STUDIO, email: 'advisor@studio.example', ruolo: 'advisor', sessionVersion: 0 });
 }
 
 function tokenSuperAdmin() {
   // In produzione il super_admin ha tenant_id NULL a database, ma il JWT porta comunque
   // un tenantId (l'hook di autenticazione dei super_admin usa il tenant di default).
-  return signJwt({ userId: 'usr-super', tenantId: TENANT_STUDIO, email: 'super@studio.example', ruolo: 'super_admin' });
+  return signJwt({ userId: 'usr-super', tenantId: TENANT_STUDIO, email: 'super@studio.example', ruolo: 'super_admin', sessionVersion: 0 });
 }
 
 function tokenCliente() {
@@ -101,6 +122,7 @@ function tokenCliente() {
     tenantId: TENANT_STUDIO,
     email: 'cliente@esempio.it',
     ruolo: 'cliente',
+    sessionVersion: 0,
   });
 }
 
@@ -207,7 +229,7 @@ describe('Punto 3 — PATCH /documenti/:id/archivia', () => {
     const server = serverConToken(tokenCliente());
     const res = await server.inject({ method: 'PATCH', url: '/documenti/doc-1/archivia' });
     expect(res.statusCode).toBe(403);
-    expect(res.json().errore).toBe("Solo l'amministratore dello studio può archiviare un documento.");
+    expect(res.json().errore).toBe('Non autorizzato per il portale cliente.');
     expect(stato.documentiAggiornati).toHaveLength(0);
   });
 
@@ -218,6 +240,7 @@ describe('Punto 3 — PATCH /documenti/:id/archivia', () => {
       tenantId: TENANT_STUDIO,
       email: 'operatore@studio.example',
       ruolo: 'collaboratore_interno',
+      sessionVersion: 0,
     });
     const server = serverConToken(tokenOperatore);
     const res = await server.inject({ method: 'PATCH', url: '/documenti/doc-1/archivia' });

@@ -2,6 +2,14 @@ import tls from 'tls';
 import net from 'net';
 import { inviaEmail, tlsRejectUnauthorized, type EsitoEmail } from './emailRelay.js';
 import { spiegaErrorePosta } from './diagnosiPosta.js';
+import {
+  risolviEndpointPubblico,
+  validaEmail,
+  validaHost,
+  validaPorta,
+  validaServername,
+  vietaControlli,
+} from '../util/networkPolicy.js';
 
 export type { EsitoEmail } from './emailRelay.js';
 export { inviaEmail } from './emailRelay.js';
@@ -51,22 +59,35 @@ export async function provaPostaInUscita(options: {
   fromName?: string;
   toEmail?: string;
 }): Promise<EsitoProvaPosta> {
-  const host = (options.host || '').trim();
-  const servername = (options.servername || '').trim();
-  const user = (options.user || '').trim();
-  const pass = options.pass || '';
-
-  // Nessun ripiego su un host cablato né sulle variabili d'ambiente: un test che passa grazie
-  // alla casella di un altro dichiara funzionante una posta che non è configurata (regola 7).
-  const mancanti = [!host && 'il server SMTP', !user && "l'utenza", !pass && 'la password'].filter(Boolean);
+  const mancanti = [!options.host && 'il server SMTP', !options.user && "l'utenza", !options.pass && 'la password'].filter(Boolean);
   if (mancanti.length > 0) {
     const errore = `Posta in uscita non configurata: ${mancanti.join(', ')} nelle impostazioni dello studio ${mancanti.length > 1 ? 'sono vuoti' : 'è vuoto'}.`;
     return { success: false, message: `❌ ${errore}`, errore };
   }
 
-  const destinatario = (options.toEmail || user).trim();
-  const porta = Number(options.port) || 465;
-  const nomeMittente = (options.fromName || '').trim();
+  let host: string;
+  let servername: string;
+  let user: string;
+  let pass: string;
+  let destinatario: string;
+  let porta: number;
+  let nomeMittente: string;
+  let fromEmail: string;
+  try {
+    host = validaHost(options.host || '', 'Host SMTP');
+    servername = options.servername ? validaServername(options.servername) : '';
+    user = vietaControlli(options.user || '', 'Utenza SMTP', 254).trim();
+    pass = vietaControlli(options.pass || '', 'Password SMTP', 1024);
+    porta = validaPorta(options.port ?? 465, 'Porta SMTP');
+    destinatario = validaEmail(options.toEmail || user, 'Destinatario');
+    fromEmail = validaEmail(options.fromEmail || user, 'Mittente');
+    nomeMittente = vietaControlli(options.fromName || '', 'Nome mittente', 200).trim();
+  } catch (err) {
+    const errore = err instanceof Error ? err.message : 'Configurazione SMTP non valida.';
+    return { success: false, message: `❌ ${errore}`, errore };
+  }
+
+  const h = (v: string) => v.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
   const esito = await inviaEmail({
     to: destinatario,
@@ -83,15 +104,15 @@ export async function provaPostaInUscita(options: {
           portale partono da questa casella.
         </p>
         <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px 18px; margin: 20px 0; font-size: 13px; color: #475569;">
-          <p style="margin: 0 0 6px 0;">Server: <code>${host}:${porta}</code></p>
-          ${servername ? `<p style="margin: 0 0 6px 0;">Nome verificato nel certificato: <code>${servername}</code></p>` : ''}
-          <p style="margin: 0 0 6px 0;">Utenza: <code>${user}</code></p>
+          <p style="margin: 0 0 6px 0;">Server: <code>${h(host)}:${porta}</code></p>
+          ${servername ? `<p style="margin: 0 0 6px 0;">Nome verificato nel certificato: <code>${h(servername)}</code></p>` : ''}
+          <p style="margin: 0 0 6px 0;">Utenza: <code>${h(user)}</code></p>
           <p style="margin: 0;">Data della prova: <code>${new Date().toLocaleString('it-IT')}</code></p>
         </div>
       </div>
     `,
     smtp: { host, servername: servername || undefined, port: porta, secure: options.secure ?? porta === 465, user, pass },
-    fromEmail: options.fromEmail || user,
+    fromEmail,
     fromName: nomeMittente || undefined,
     etichetta: 'prova configurazione',
   });
@@ -132,21 +153,39 @@ export async function provaPostaInArrivo(options: {
   user?: string;
   pass?: string;
 }): Promise<EsitoProvaPosta> {
-  const host = (options.host || '').trim();
-  const servername = (options.servername || '').trim();
-  const user = (options.user || '').trim();
-  const pass = options.pass || '';
-  const port = Number(options.port) || 993;
-  const secure = options.secure ?? port === 993;
-
-  const mancanti = [!host && 'il server IMAP', !user && "l'utenza", !pass && 'la password'].filter(Boolean);
+  const mancanti = [!options.host && 'il server IMAP', !options.user && "l'utenza", !options.pass && 'la password'].filter(Boolean);
   if (mancanti.length > 0) {
     const errore = `Casella in arrivo non configurata: ${mancanti.join(', ')} nelle impostazioni dello studio ${mancanti.length > 1 ? 'sono vuoti' : 'è vuoto'}.`;
     return { success: false, message: `❌ ${errore}`, errore };
   }
 
+  let host: string;
+  let servername: string;
+  let user: string;
+  let pass: string;
+  let port: number;
+  try {
+    host = validaHost(options.host || '', 'Host IMAP');
+    servername = options.servername ? validaServername(options.servername) : '';
+    user = vietaControlli(options.user || '', 'Utenza IMAP', 254).trim();
+    pass = vietaControlli(options.pass || '', 'Password IMAP', 1024);
+    port = validaPorta(options.port ?? 993, 'Porta IMAP');
+  } catch (err) {
+    const errore = err instanceof Error ? err.message : 'Configurazione IMAP non valida.';
+    return { success: false, message: `❌ ${errore}`, errore };
+  }
+  const secure = process.env.NODE_ENV === 'production' ? true : (options.secure ?? port === 993);
+
+  let endpoint;
+  try {
+    endpoint = await risolviEndpointPubblico(host, servername || undefined);
+  } catch (err) {
+    const errore = err instanceof Error ? err.message : 'Host IMAP non consentito.';
+    return { success: false, message: `❌ ${errore}`, errore };
+  }
+
   return new Promise(resolve => {
-    const timeoutMs = 12000;
+    const timeoutMs = 8000;
     let finished = false;
 
     const onDone = (res: EsitoProvaPosta) => {
@@ -170,18 +209,16 @@ export async function provaPostaInArrivo(options: {
       const socket = secure
         ? tls.connect(
             {
-              host,
+              host: endpoint.address,
               port,
               rejectUnauthorized: tlsRejectUnauthorized(),
-              // Nome dichiarato nelle impostazioni: la verifica si sposta su di lui, non si
-              // spegne. Vuoto, si verifica contro l'host.
-              ...(servername ? { servername } : {}),
+              ...(endpoint.servername ? { servername: endpoint.servername } : {}),
             },
             () => {
               // Handshake TLS completato
             },
           )
-        : net.connect({ host, port }, () => {
+        : net.connect({ host: endpoint.address, port }, () => {
             // Handshake senza cifratura: il provider non offre IMAPS su questa porta
           });
 

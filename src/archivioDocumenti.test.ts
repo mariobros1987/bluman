@@ -26,7 +26,25 @@ vi.mock('./util/prismaClient.js', async importOriginal => {
   const reale = await importOriginal<typeof import('./util/prismaClient.js')>();
 
   const finto: any = {
-    cliente: { findMany: async () => stato.clienti },
+    user: {
+      findFirst: async (args: any) =>
+        args?.select?.sessionVersion &&
+        args?.select?.ruolo &&
+        args?.select?.stato &&
+        args?.where?.id === 'usr-advisor' &&
+        args?.where?.tenantId === '00000000-0000-0000-0000-000000000001'
+          ? { id: 'usr-advisor', tenantId: args.where.tenantId, ruolo: 'advisor', stato: 'attivo', sessionVersion: 0 }
+          : null,
+    },
+    cliente: {
+      findFirst: async (args: any) =>
+        args?.select?.sessionVersion &&
+        args?.where?.id === 'cli-1' &&
+        args?.where?.tenantId === '00000000-0000-0000-0000-000000000001'
+          ? { sessionVersion: 0 }
+          : null,
+      findMany: async () => stato.clienti,
+    },
     documento: { findMany: async () => stato.documenti },
     microvoceProgetto: {
       findMany: async (args: any) => {
@@ -61,11 +79,11 @@ function serverConToken(token: string | null) {
 }
 
 function tokenAdvisor() {
-  return signJwt({ userId: 'usr-advisor', tenantId: TENANT_STUDIO, email: 'advisor@studio.example', ruolo: 'advisor' });
+  return signJwt({ userId: 'usr-advisor', tenantId: TENANT_STUDIO, email: 'advisor@studio.example', ruolo: 'advisor', sessionVersion: 0 });
 }
 
 function tokenCliente() {
-  return signJwt({ userId: 'client-cli-1', tenantId: TENANT_STUDIO, email: 'cliente@esempio.it', ruolo: 'cliente' });
+  return signJwt({ userId: 'client-cli-1', tenantId: TENANT_STUDIO, email: 'cliente@esempio.it', ruolo: 'cliente', sessionVersion: 0 });
 }
 
 function documento(overrides: Record<string, unknown> = {}) {
@@ -109,7 +127,7 @@ describe('§37 — GET /documenti/archivio', () => {
   it("il token di un cliente non entra: l'archivio elenca tutti i clienti dello studio", async () => {
     const res = await serverConToken(tokenCliente()).inject({ method: 'GET', url: '/documenti/archivio' });
     expect(res.statusCode).toBe(403);
-    expect(res.json().errore).toBe('Non autorizzato.');
+    expect(res.json().errore).toBe('Non autorizzato per il portale cliente.');
   });
 
   it('restituisce l\'albero cliente → progetto anche quando non c\'è nessun documento', async () => {

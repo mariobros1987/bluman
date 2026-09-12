@@ -242,7 +242,8 @@ non una tabella figlia filtrata per `tenant_id`, quindi le policy non le danno p
 `src/server.test.ts` verifica, rotta per rotta, 401 senza token e non-401 con un token
 valido; `src/gerarchiaRuoli.test.ts` presidia la gerarchia dei ruoli; `src/accessoCliente.test.ts`
 presidia il Magic Link e `GET /uploads/:filename`; `src/calcoloService.test.ts` presidia il
-motore di stato e ciò che il ricalcolo scrive a database (`npm test` → 51 file, 645 test nella verifica completa del 2026-09-11).
+motore di stato e ciò che il ricalcolo scrive a database (`npm test` → 58 file, 707 test
+nella verifica completa locale del 2026-09-12).
 
 ### 🔑 Il portale cliente non si apre con una stringa qualsiasi
 
@@ -253,10 +254,11 @@ cui confrontarli — il rate limiting non lo copriva, non c'era niente da indovi
 
 Ora ogni link vive come riga in `magic_link`, con lo **SHA-256** del token (chi legge il
 database non entra al posto del cliente), scadenza a 7 giorni, indirizzo del destinatario e
-`usato_at` per l'audit. Il token lo genera il server con 16 byte da `crypto.randomBytes`, e
-`tenantId` ed email del JWT vengono dalla riga trovata, non da una costante. Il link resta
-valido fino a scadenza — un cliente riapre il proprio link più di una volta — e si revoca
-cancellando la riga.
+`usato_at` per il consumo. Il token lo genera il server con 16 byte da `crypto.randomBytes`, e
+`tenantId` ed email del JWT vengono dalla riga trovata, non da una costante. Il primo login
+valido marca il link come usato con un aggiornamento atomico: tentativi successivi, link
+scaduti o revocati vengono rifiutati. Cambio e reset password incrementano `sessionVersion`,
+revocano i Magic Link attivi e invalidano i JWT precedenti.
 
 ### 📎 `GET /uploads/:filename` è confinata, e non più anonima
 
@@ -290,14 +292,22 @@ una riga che già lo è. Verifica prima di un rilascio:
 
 ---
 
-## 🛡 Sicurezza & Architettura Enterprise in Produzione
+## 🛡 Sicurezza & Architettura Enterprise
 
-1. **🔑 Autenticazione JWT & Sessioni Protette**: Firma JWT HMAC SHA-256 e verifica payload Bearer Header su tutte le rotte Fastify con blocco categorico per utenti non autorizzati. `JWT_SECRET` obbligatorio (minimo 32 caratteri): con `NODE_ENV=production` il server si rifiuta di partire senza. Il guard `onRequest` lavora su un elenco di rotte *pubbliche*, quindi ogni rotta nuova nasce protetta; `/admin/tenants` ha in più il controllo di ruolo `soloSuperAdmin` (403 per chiunque altro).
-2. **📧 Provider Email SMTP Reale (Register.it / SendGrid / Nodemailer)**: Suite email integrata per invio notifiche, Magic Link e comunicazioni transazionali.
-3. **📦 Storage Cloud (Supabase Storage / AWS S3)**: Archiviazione documenti crittografata con URL pre-firmati e validazione binaria Magic-Bytes.
-4. **🛡 Row-Level Security (RLS) PostgreSQL**: Isolamento multi-tenant imposto dal motore database, non dal codice applicativo. Il runtime si connette col ruolo `bluman_app`, che **non può scavalcare le policy**, e ogni richiesta HTTP imposta `app.current_tenant_id` come variabile di transazione. RLS è attivo **e forzato** su tutte le tabelle, con una policy per ciascuna. Se il contesto tenant manca, la query non vede nulla: un errore di programmazione produce un guasto immediato invece di una fuga silenziosa di dati. Policy in `supabase/migrations/20260819_rls_effettiva.sql`, lato applicativo in `src/util/prismaClient.ts`, verifica con `npx tsx src/scripts/checkRls.ts`.
-5. **📜 Firma Elettronica Avanzata (FEA) eIDAS**: Generazione codice OTP a 6 cifre (WhatsApp/Email/SMS) e apposizione del sigillo digitale (SHA-256 Digest, Timestamp ISO UTC e IP certificato).
-6. **⏰ Worker Cron Schedulato**: Scansione automatica per il rinnovo UBO Registry Malta (MFSA), marchi EUIPO e solleciti rate fatture.
-7. **🚀 Connettore SDI 1-Click**: Trasmissione diretta dei tracciati XML FatturaPA all'Agenzia delle Entrate con tracking esiti.
-8. **📝 Studio Document Studio**: Editor WYSIWYG stile Word con Smart Tags ERP (Mail Merge) ed esportazione PDF Vettoriale A4.
+> **Stato operativo (2026-09-12):** le difese P0 descritte di seguito sono implementate e
+> verificate localmente, ma questo batch non è ancora stato committato o distribuito e le
+> relative migrazioni Prisma non sono state applicate ad alcun database.
+
+1. **🔑 Autenticazione JWT, RBAC e Sessioni Revocabili**: firma JWT HMAC SHA-256 con confronto timing-safe, `JWT_SECRET` obbligatorio (minimo 32 caratteri) e protezione per difetto delle route. I JWT cliente hanno una allowlist esplicita metodo/route e restano soggetti ai controlli di ownership. `sessionVersion` viene verificata a ogni sessione e incrementata a cambio/reset password, invalidando i token precedenti.
+2. **🔗 Magic Link Monouso**: il token casuale è persistito solo come hash SHA-256, ha scadenza e viene consumato atomicamente al primo login; cambio/reset password revocano i link attivi. Emissione e reset cliente richiedono `advisor` del tenant o `super_admin`.
+3. **📨 Webhook Autenticati e Idempotenti**: WhatsApp verifica i byte raw con `X-Hub-Signature-256`; Telegram verifica `X-Telegram-Bot-Api-Secret-Token`. Tenant, mittente e progetto devono essere risolti senza ambiguità. `WebhookInbox` deduplica messaggi, status e update con vincolo persistente composto e transazione atomica.
+4. **🧾 HTML, Upload e Download Irrigiditi**: l'HTML persistito è sanitizzato con allowlist lato backend e difesa aggiuntiva nei sink frontend. Upload con base64 canonico, MIME/estensione/magic bytes coerenti e blocco dei formati attivi; download non esplicitamente sicuri come `attachment` con `nosniff` e CSP sandbox. ZIP/DOCX/XLSX non sono ancora ispezionati internamente per macro o payload attivi.
+5. **🌐 SMTP/IMAP Protetti da SSRF**: configurazione e test sono limitati ad `advisor`/`super_admin`; host e porte vengono validati, tutte le risposte DNS controllate e le reti non pubbliche bloccate. La connessione viene fissata all'IP verificato mantenendo il `servername` TLS. Il backend garantisce HTTPS verso l'eventuale relay; il TLS tra relay remoto e server di posta dipende dal relay.
+6. **🛡 Row-Level Security (RLS) PostgreSQL**: isolamento multi-tenant imposto dal motore database. Il runtime usa il ruolo `bluman_app`, ogni richiesta imposta il contesto tenant e le tabelle tenant-scoped applicano RLS forzata. Le nuove migrazioni `sessionVersion` e `WebhookInbox` devono essere validate e applicate prima in staging.
+7. **📧 Provider Email SMTP Reale (Register.it / SendGrid / Nodemailer)**: suite email integrata per notifiche, Magic Link e comunicazioni transazionali.
+8. **📦 Storage Cloud (Supabase Storage / AWS S3)**: archiviazione documenti con accesso confinato agli origin e bucket configurati.
+9. **📜 Firma Elettronica Avanzata (FEA) eIDAS**: generazione OTP a 6 cifre e sigillo digitale con SHA-256, timestamp UTC e IP certificato.
+10. **⏰ Worker Cron Disponibile**: il runner RLS-safe per le notifiche è implementato; la pianificazione come servizio Railway Cron separato non è ancora configurata.
+11. **🚀 Connettore SDI**: generazione e trasmissione dei tracciati XML FatturaPA con tracking esiti; il completamento fiscale verso provider e conservazione resta una fase separata.
+12. **📝 Studio Document Studio**: editor WYSIWYG con Smart Tags ERP ed esportazione PDF A4.
 

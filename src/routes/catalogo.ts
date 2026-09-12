@@ -10,7 +10,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { AppPort } from '../services/appPort.js';
 import { prisma, conContestoInTransazione } from '../util/prismaClient.js';
-import { uploadDocumento, CARTELLA_UPLOADS, nomeFileValido } from '../services/storageService.js';
+import { uploadDocumento, CARTELLA_UPLOADS, nomeFileValido, mimeDaEstensione } from '../services/storageService.js';
 import { verificaFirmaDownload } from '../util/jwt.js';
 import { recordAudit } from '../util/serverHelpers.js';
 import { trovaCicloDipendenze } from '../services/dipendenzeModuli.js';
@@ -185,25 +185,13 @@ export async function registraRotteCatalogo(server: FastifyInstance, app: AppPor
       if (!fs.existsSync(filePath)) {
         return reply.code(404).send({ errore: 'File non trovato' });
       }
-      const ext = path.extname(filename).toLowerCase();
-      let mimeType = 'application/octet-stream';
-      if (ext === '.png') mimeType = 'image/png';
-      else if (ext === '.jpg' || ext === '.jpeg') mimeType = 'image/jpeg';
-      else if (ext === '.webp') mimeType = 'image/webp';
-      else if (ext === '.svg') mimeType = 'image/svg+xml';
-      else if (ext === '.pdf') mimeType = 'application/pdf';
-      else if (ext === '.docx') mimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-      else if (ext === '.doc') mimeType = 'application/msword';
-      else if (ext === '.xlsx') mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-      else if (ext === '.xls') mimeType = 'application/vnd.ms-excel';
-      else if (ext === '.zip') mimeType = 'application/zip';
-      else if (ext === '.txt') mimeType = 'text/plain; charset=utf-8';
-      else if (ext === '.html') mimeType = 'text/html; charset=utf-8';
-
-      const nomePulito = filename.replace(/^\d+_/, '') || filename;
-      const isAnteprima = ext === '.png' || ext === '.jpg' || ext === '.jpeg' || ext === '.webp' || ext === '.svg' || ext === '.pdf';
-      const disposition = isAnteprima ? `inline; filename="${nomePulito}"` : `attachment; filename="${nomePulito}"`;
-      reply.header('Content-Disposition', disposition);
+      // Tutti i file dell'archivio sono download: niente rendering nel contesto dell'app.
+      // `nosniff` impedisce al browser di reinterpretare un octet-stream come HTML attivo.
+      const mimeType = mimeDaEstensione(filename);
+      const nomePulito = (filename.replace(/^\d+_/, '') || filename).replace(/["\\\r\n]/g, '_');
+      reply.header('X-Content-Type-Options', 'nosniff');
+      reply.header('Content-Disposition', `attachment; filename="${nomePulito}"`);
+      reply.header('Content-Security-Policy', "default-src 'none'; sandbox");
 
       const fileStream = fs.createReadStream(filePath);
       return reply.type(mimeType).send(fileStream);

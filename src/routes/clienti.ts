@@ -12,7 +12,7 @@
 
 import type { FastifyInstance } from 'fastify';
 import type { AppPort } from '../services/appPort.js';
-import { prisma } from '../util/prismaClient.js';
+import { prisma, conContestoInTransazione } from '../util/prismaClient.js';
 import { generateMagicToken, hashMagicToken } from '../util/jwt.js';
 import { hashPassword, generaPasswordTemporanea } from '../util/password.js';
 import { sendMagicLinkEmail, sendClientCredentialsEmail } from '../services/emailService.js';
@@ -24,6 +24,7 @@ import {
   recordAudit,
 } from '../util/serverHelpers.js';
 import { CreaClienteSchema } from '../schemas/clienti.schema.js';
+import { clienteIdDalJwt, richiediRuolo } from '../util/authorization.js';
 import { campoOrdinamento, creaMetaPaginazione, leggiPaginazione } from '../util/paginazione.js';
 
 // ─── DETTAGLIO CLIENTE & MAGIC LINK (coda dell'ex blocco ARTICOLI) ──
@@ -59,16 +60,27 @@ export async function registraRotteClienti(server: FastifyInstance, app: AppPort
   };
 
   server.get<{ Params: { id: string } }>('/clienti/:id', async (req, reply) => {
+    if (req.ruolo === 'cliente') {
+      const clienteId = clienteIdDalJwt(req.user);
+      if (!clienteId || req.params.id !== clienteId) {
+        return reply.code(404).send({ errore: 'Cliente non trovato' });
+      }
+    }
     try {
-      const c = await prisma.cliente.findUnique({ where: { id: req.params.id } });
+      const c = await prisma.cliente.findFirst({
+        where: { id: req.params.id, tenantId: req.tenantId },
+      });
       if (c) return reply.send(serializzaCliente(c));
+      if (req.ruolo === 'cliente') return reply.code(404).send({ errore: 'Cliente non trovato' });
       return app.getCliente(req.params.id);
     } catch {
+      if (req.ruolo === 'cliente') return reply.code(503).send({ errore: 'Anagrafica non disponibile' });
       return app.getCliente(req.params.id);
     }
   });
 
   server.post<{ Params: { id: string }; Body: { email?: string } }>('/clienti/:id/magic-link', async (req, reply) => {
+    if (!richiediRuolo(req, reply, ['advisor', 'super_admin'])) return reply;
     const tenantId = req.tenantId as string;
 
     try {
@@ -268,6 +280,14 @@ export async function registraRotteClienti(server: FastifyInstance, app: AppPort
     const tenantId = req.tenantId;
     const { id } = req.params;
     const b = (req.body || {}) as Record<string, any>;
+    // Le credenziali non fanno parte dell'anagrafica generica: altrimenti un ruolo che può
+    // aggiornare i dati del cliente potrebbe anche prenderne il controllo. Il reset passa
+    // esclusivamente dalla rotta dedicata, riservata ad advisor e super_admin.
+    if (Object.prototype.hasOwnProperty.call(b, 'password')) {
+      return reply.code(400).send({
+        errore: 'La password può essere modificata solo tramite la procedura dedicata.',
+      });
+    }
 
     const referentiObj = sanitizzaReferenti(b.referentiJson !== undefined
       ? (typeof b.referentiJson === 'string' ? JSON.parse(b.referentiJson) : b.referentiJson)
@@ -295,8 +315,6 @@ export async function registraRotteClienti(server: FastifyInstance, app: AppPort
       ? pulisciRecapito(b.cellulare)
       : (pulisciRecapito(referentiObj?.cellulare) ?? pulisciRecapito(referentiObj?.whatsapp) ?? undefined);
 
-    const passwordHash = b.password ? hashPassword(b.password) : undefined;
-
     try {
       const updated = await prisma.cliente.update({
         where: { id },
@@ -306,7 +324,6 @@ export async function registraRotteClienti(server: FastifyInstance, app: AppPort
           email: clientEmail,
           cellulare: clientCellulare,
           canaleOtpPreferito: canaleOtpValido(b.canaleOtpPreferito) ? b.canaleOtpPreferito : undefined,
-          passwordHash: passwordHash,
           piva: b.piva !== undefined ? b.piva : undefined,
           codiceFiscale: b.codiceFiscale !== undefined ? b.codiceFiscale : (b.codFisc !== undefined ? b.codFisc : undefined),
           giurisdizione: b.giurisdizione !== undefined ? b.giurisdizione : undefined,
@@ -335,11 +352,12 @@ export async function registraRotteClienti(server: FastifyInstance, app: AppPort
   });
 
   server.post<{ Params: { id: string } }>('/clienti/:id/reset-password', async (req, reply) => {
+    if (!richiediRuolo(req, reply, ['advisor', 'super_admin'])) return reply;
     const tenantId = req.tenantId as string;
     const { id } = req.params;
 
     try {
-      const cliente = await prisma.cliente.findUnique({ where: { id } });
+      const cliente = await prisma.cliente.findFirst({ where: { id, tenantId } });
       if (!cliente) {
         return reply.code(404).send({ errore: 'Cliente non trovato' });
       }
@@ -347,12 +365,21 @@ export async function registraRotteClienti(server: FastifyInstance, app: AppPort
       const nuovaPassword = generaPasswordTemporanea();
       const nuovoHash = hashPassword(nuovaPassword);
 
-      await prisma.cliente.update({
-        where: { id },
-        data: {
-          passwordHash: nuovoHash,
-        },
-      });
+      await prisma.$transaction(async (tx) =>
+        conContestoInTransazione(tx, async () => {
+          await tx.cliente.update({
+            where: { id },
+            data: {
+              passwordHash: nuovoHash,
+              sessionVersion: { increment: 1 },
+            },
+          });
+          await tx.magicLink.updateMany({
+            where: { clienteId: id, usatoAt: null },
+            data: { usatoAt: new Date() },
+          });
+        }),
+      );
 
       const ref = cliente.referentiJson && typeof cliente.referentiJson === 'object' ? (cliente.referentiJson as any) : {};
       const destEmail = cliente.email || ref.email;

@@ -8,7 +8,7 @@
  * quindi l'impronta si calcola qui — e se il file non è leggibile la firma non si appone,
  * invece di ripiegare su un'impronta presa da fuori.
  */
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
@@ -32,6 +32,11 @@ describe('leggiFileArchivio', () => {
     }
   });
 
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
   it('legge il file del ripiego locale a partire dal suo URL firmato', async () => {
     const contenuto = await leggiFileArchivio(urlUploadFirmato(NOME));
     expect(contenuto).not.toBeNull();
@@ -53,6 +58,29 @@ describe('leggiFileArchivio', () => {
 
   it('ritorna null quando il file non c è, invece di un buffer vuoto', async () => {
     expect(await leggiFileArchivio('/uploads/questo_file_non_esiste_mai.pdf')).toBeNull();
+  });
+
+  it('non esegue fetch verso origin esterni o path storage inattesi', async () => {
+    vi.stubEnv('SUPABASE_URL', 'https://storage.example.test');
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    expect(await leggiFileArchivio('https://evil.example.test/storage/v1/object/public/bluman-documents/a.pdf')).toBeNull();
+    expect(await leggiFileArchivio('https://storage.example.test.evil.test/storage/v1/object/public/bluman-documents/a.pdf')).toBeNull();
+    expect(await leggiFileArchivio('https://storage.example.test/rest/v1/bluman-documents/a.pdf')).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('legge solo il bucket documentale sull origin Supabase esatto senza seguire redirect', async () => {
+    vi.stubEnv('SUPABASE_URL', 'https://storage.example.test');
+    vi.stubEnv('SUPABASE_SERVICE_KEY', 'service-test');
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, arrayBuffer: async () => Uint8Array.from([1, 2, 3]).buffer });
+    vi.stubGlobal('fetch', fetchMock);
+    const contenuto = await leggiFileArchivio('https://storage.example.test/storage/v1/object/public/bluman-documents/a.pdf');
+    expect(Array.from(contenuto ?? [])).toEqual([1, 2, 3]);
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.objectContaining({ origin: 'https://storage.example.test' }),
+      expect.objectContaining({ redirect: 'error', headers: { Authorization: 'Bearer service-test', apikey: 'service-test' } }),
+    );
   });
 
   it('rifiuta gli URL che non sono né locali né http', async () => {

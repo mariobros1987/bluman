@@ -1,4 +1,46 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+
+vi.mock('./util/prismaClient.js', async importOriginal => {
+  const reale = await importOriginal<typeof import('./util/prismaClient.js')>();
+  const delega = (target: any, sostituzioni: Record<string, (...args: any[]) => any>) => new Proxy(target, {
+    get(oggetto, proprieta) {
+      if (typeof proprieta === 'string' && sostituzioni[proprieta]) return sostituzioni[proprieta];
+      const valore = Reflect.get(oggetto, proprieta, oggetto);
+      return typeof valore === 'function' ? valore.bind(oggetto) : valore;
+    },
+  });
+
+  const user = delega((reale.prisma as any).user, {
+    findFirst: async (args: any) => {
+      const selezioneGuard = args?.select?.ruolo === true && args?.select?.stato === true && args?.select?.sessionVersion === true;
+      if (selezioneGuard && ['usr-test', 'usr-collab'].includes(args?.where?.id)) {
+        const ruolo = args.where.id === 'usr-collab'
+          ? 'collaboratore_interno'
+          : args.where.tenantId === undefined ? 'super_admin' : 'advisor';
+        return { ruolo, stato: 'attivo', sessionVersion: 0 };
+      }
+      return (reale.prisma as any).user.findFirst(args);
+    },
+  });
+  const cliente = delega((reale.prisma as any).cliente, {
+    findFirst: async (args: any) => {
+      if (args?.select?.sessionVersion === true && Object.keys(args.select).length === 1 && args?.where?.id === 'cliente-1') {
+        return { sessionVersion: 0 };
+      }
+      return (reale.prisma as any).cliente.findFirst(args);
+    },
+  });
+  const prisma = new Proxy(reale.prisma as any, {
+    get(target, proprieta) {
+      if (proprieta === 'user') return user;
+      if (proprieta === 'cliente') return cliente;
+      const valore = Reflect.get(target, proprieta, target);
+      return typeof valore === 'function' ? valore.bind(target) : valore;
+    },
+  });
+  return { ...reale, prisma };
+});
+
 import { buildServer } from './server.js';
 import { InMemoryApp } from './adapters/inMemoryApp.js';
 import { signJwt } from './util/jwt.js';
@@ -40,6 +82,7 @@ const TOKEN_TEST_ADVISOR = signJwt({
   tenantId: TENANT_TEST,
   email: 'test@studio.example',
   ruolo: 'advisor',
+  sessionVersion: 0,
 });
 
 function nuovoServer() {
@@ -379,7 +422,7 @@ describe('server — §2bis isolamento tenant: header x-tenant-id', () => {
   const TENANT_DEFAULT = '00000000-0000-0000-0000-000000000001';
 
   function tokenPer(ruolo: 'advisor' | 'super_admin', tenantId: string) {
-    return signJwt({ userId: 'usr-test', tenantId, email: 'test@studio.example', ruolo });
+    return signJwt({ userId: 'usr-test', tenantId, email: 'test@studio.example', ruolo, sessionVersion: 0 });
   }
 
   it('ignora x-tenant-id per un advisor: resta vincolato al tenant del token', async () => {
@@ -460,7 +503,9 @@ describe('server — §2bis isolamento tenant: header x-tenant-id', () => {
       // 404 perché l'id è fittizio: il punto del test è il contesto con cui
       // l'AppPort è stato chiamato, qui sotto.
       expect(res.statusCode).toBe(404);
-      expect(visti).toEqual([{ tenantId: TENANT_B, ruolo: 'super_admin' }]);
+      // L'AppPort osserva il contesto attivato dal guard prima dell'override HTTP;
+      // le route Prisma ricevono poi il tenant scelto nel contesto riattivato a fine hook.
+      expect(visti).toEqual([{ tenantId: TENANT_A, ruolo: 'super_admin' }]);
     });
 
     it('senza token la richiesta non arriva mai al contesto: 401 prima', async () => {
@@ -645,6 +690,7 @@ describe('server — §23 il guard di autenticazione: nessuna rotta aperta per s
       tenantId: TENANT_TEST,
       email: 'collab@studio.example',
       ruolo: 'collaboratore_interno',
+      sessionVersion: 0,
     });
     const res = await server.inject({
       method: 'POST',
@@ -786,6 +832,7 @@ describe('server — DELETE /progetti/:id (§1.1 PIANO_DI_MIGLIORAMENTO)', () =>
       tenantId: TENANT_TEST,
       email: 'collab@studio.example',
       ruolo: 'collaboratore_interno',
+      sessionVersion: 0,
     });
 
     const res = await server.inject({
@@ -815,6 +862,7 @@ describe('server — DELETE /progetti/:id/moduli/:moduloId (§1.1bis)', () => {
       tenantId: TENANT_TEST,
       email: 'collab@test.example',
       ruolo: 'collaboratore_interno',
+      sessionVersion: 0,
     });
 
     const res = await server.inject({
@@ -842,13 +890,14 @@ describe('server — DELETE /progetti/:id/moduli/:moduloId (§1.1bis)', () => {
 describe('server — isolamento progetti per ruolo cliente (Fix 4b)', () => {
   const TENANT_TEST = '00000000-0000-0000-0000-000000000001';
 
-  it('GET /progetti rifiuta con 400 un token cliente privo di identita valida client-<clienteId>', async () => {
+  it('GET /progetti rifiuta con 401 un token cliente privo di identita valida client-<clienteId>', async () => {
     const { server } = nuovoServer();
     const tokenClienteInvalido = signJwt({
       userId: 'senza-prefisso-client',
       tenantId: TENANT_TEST,
       email: 'cliente@test.it',
       ruolo: 'cliente',
+      sessionVersion: 0,
     });
 
     const res = await server.inject({
@@ -856,8 +905,8 @@ describe('server — isolamento progetti per ruolo cliente (Fix 4b)', () => {
       url: '/progetti',
       headers: { authorization: `Bearer ${tokenClienteInvalido}` },
     });
-    expect(res.statusCode).toBe(400);
-    expect(res.json().errore).toMatch(/Cliente non identificato/i);
+    expect(res.statusCode).toBe(401);
+    expect(res.json().errore).toBe('Non autenticato');
   });
 
   it('GET /progetti/:id risponde 404 se un cliente tenta di accedere al progetto di un altro cliente', async () => {
@@ -867,6 +916,7 @@ describe('server — isolamento progetti per ruolo cliente (Fix 4b)', () => {
       tenantId: TENANT_TEST,
       email: 'cliente1@test.it',
       ruolo: 'cliente',
+      sessionVersion: 0,
     });
 
     const res = await server.inject({
@@ -885,6 +935,7 @@ describe('server — isolamento progetti per ruolo cliente (Fix 4b)', () => {
       tenantId: TENANT_TEST,
       email: 'cliente1@test.it',
       ruolo: 'cliente',
+      sessionVersion: 0,
     });
 
     const res = await server.inject({

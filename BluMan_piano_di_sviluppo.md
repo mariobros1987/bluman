@@ -470,11 +470,12 @@ Elencati qui perché non chiuderli è una scelta, non una dimenticanza.
   i dati. Il rate limiting non lo copriva: non c'era niente da indovinare. Ora esiste la
   tabella `magic_link` (migrazione `20260819210000_magic_link_persistito`, con la propria
   policy RLS): in riga va lo **SHA-256** del token — chi legge il database non entra al posto
-  del cliente — con scadenza a 7 giorni, email del destinatario e `usato_at` per l'audit. Il
-  token lo genera `generateMagicToken()` con 16 byte da `crypto.randomBytes`, non più
-  `Date.now()`; `tenantId` ed email del JWT vengono **dalla riga**. Link riutilizzabile fino a
-  scadenza (un cliente riapre il proprio link), revoca = cancellazione della riga. Il lookup
-  usa `prismaAmministrativo()` perché la richiesta è anonima per definizione e il tenant si
+  del cliente — con scadenza a 7 giorni, email del destinatario e `usato_at` per il consumo.
+  Il token lo genera `generateMagicToken()` con 16 byte da `crypto.randomBytes`, non più
+  `Date.now()`; `tenantId` ed email del JWT vengono **dalla riga**. Il primo login valido
+  valorizza `usato_at` con un aggiornamento condizionale atomico e ogni riuso viene rifiutato;
+  cambio/reset password revocano i link attivi e incrementano `sessionVersion`, invalidando i
+  JWT precedenti. Il lookup usa `prismaAmministrativo()` perché la richiesta è anonima per
   scopre proprio dalla riga cercata: è il caso ammesso dalla regola 1, come la ricerca utente
   al login. Lato frontend spariscono le due fabbricazioni di token nel browser
   (`ClientsPage.tsx`, `ClientPortal.tsx`) e il default `client_demo`.
