@@ -1,14 +1,23 @@
 import { API_BASE, apiFetch, getAuthHeaders, leggiErroreApi } from './http';
+import { cachedQuery, invalidateCache } from './cache';
+import { getCurrentTenantId } from '../utils/tenant';
 
-export async function fetchNotificheApi() {
-  try {
-    const res = await apiFetch(`${API_BASE}/notifiche`, { headers: getAuthHeaders() });
-    if (!res.ok) throw new Error('Errore recupero notifiche');
-    return await res.json();
-  } catch (err) {
-    console.warn('Fetch notifiche API fallback', err);
-    return null;
-  }
+export async function fetchNotificheApi(options?: { forceRefresh?: boolean }) {
+  const currentTenantId = getCurrentTenantId();
+  return cachedQuery(
+    `notifiche_${currentTenantId}`,
+    async () => {
+      try {
+        const res = await apiFetch(`${API_BASE}/notifiche`, { headers: getAuthHeaders() });
+        if (!res.ok) throw new Error('Errore recupero notifiche');
+        return await res.json();
+      } catch (err) {
+        console.warn('Fetch notifiche API fallback', err);
+        return null;
+      }
+    },
+    { ttlMs: 15_000, forceRefresh: options?.forceRefresh }
+  );
 }
 
 /** Riga notifica come arriva dal backend (GET /notifiche e stream SSE). */
@@ -105,5 +114,6 @@ export async function markNotificheReadApi() {
     headers: getAuthHeaders(),
   });
   if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore aggiornamento notifiche'));
+  invalidateCache('notifiche');
   return await res.json();
 }

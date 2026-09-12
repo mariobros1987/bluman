@@ -6,7 +6,7 @@ import { AvatarGroup } from '../components/ui/Avatar';
 import { CatBadge } from '../components/ui/CatBadge';
 import { fmt, progressColor } from '../utils';
 import { NewProjectWizard } from '../components/NewProjectWizard';
-import { fetchProgetti } from '../api/client';
+import { fetchProgetti, isRispostaPaginata } from '../api/client';
 import { getCurrentTenantId, getTenantStorageKey, getTenantSeedData, BLUECODE_TENANT_ID } from '../utils/tenant';
 import type { Progetto } from '../types';
 import styles from './Dashboard.module.css';
@@ -38,9 +38,10 @@ export function Dashboard() {
 
     // 2. Carica progetti remoti dal backend Fastify/DB se presenti (filtrati per tenantId)
     try {
-      const remote = await fetchProgetti();
-      if (remote && Array.isArray(remote)) {
-        const dbProjs: Progetto[] = remote
+      const remote = await fetchProgetti({ page: 1, limit: 50, sortBy: 'createdAt', sortOrder: 'desc' });
+      const rawList = isRispostaPaginata<any>(remote) ? remote.data : (Array.isArray(remote) ? remote : []);
+      if (rawList.length > 0) {
+        const dbProjs: Progetto[] = rawList
           .filter((rp: any) => rp.tenantId === currentTenantId)
           .map((rp: any) => {
             // §16 — stato e percentuali arrivano calcolati dal backend (`avanzamento`), che è

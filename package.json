@@ -15,12 +15,14 @@
     "exceljs": "^4.4.0",
     "fastify": "^5.0.0",
     "imapflow": "^2.0.2",
+    "ioredis": "^6.0.0",
     "nodemailer": "^9.0.5",
     "pdfkit": "^0.20.1",
     "pizzip": "^3.2.0",
     "zod": "^4.5.4"
   },
   "devDependencies": {
+    "@types/ioredis": "^4.28.10",
     "@types/node": "^22.7.0",
     "@types/pdfkit": "^0.17.6",
     "@types/pizzip": "^3.0.5",
@@ -38,6 +40,8 @@
     "passwords:assign": "tsx src/scripts/assignPasswords.ts",
     "cleanup:test-data": "tsx src/scripts/cleanupTestData.ts",
     "cron:notifiche": "tsx src/scripts/runDailyNotificationCron.ts",
+    "backup:db": "tsx src/scripts/backupDb.ts",
+    "backup:scheduled": "tsx src/scripts/runScheduledBackup.ts",
     "audit:progetti": "tsx src/scripts/auditIntegritaProgetti.ts",
     "restore:test": "tsx src/scripts/restoreDbTest.ts",
     "build": "tsc",

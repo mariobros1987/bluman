@@ -440,6 +440,12 @@ model Progetto {
   richiesteAddendum   RichiestaAddendum[]
   oreTimesheet   OraTimesheet[]
 
+  @@index([tenantId, clienteId])
+  // Indici performance (migrazione 20260912150000_indici_performance):
+  // dashboard "progetti in ritardo": WHERE tenant_id=? AND stato IN ('in_corso','bloccato')
+  @@index([tenantId, stato])
+  // paginazione GET /progetti: WHERE tenant_id=? ORDER BY created_at DESC
+  @@index([tenantId, createdAt(sort: Desc)])
   @@map("progetto")
 }
 
@@ -1186,8 +1192,16 @@ model Notifica {
   inviataAt        DateTime? @map("inviata_at")
   createdAt        DateTime  @default(now()) @map("created_at")
 
+  // Indici esistenti (per FK lookup):
   @@index([tenantId, destinatarioId])
   @@index([tenantId, destinatarioClienteId])
+  // Indici performance (migrazione 20260912150000_indici_performance):
+  // badge "non lette" nella topbar: WHERE tenant_id=? AND destinatario_id=? AND stato_lettura='non_letta'
+  @@index([tenantId, destinatarioId, statoLettura])
+  // badge portale cliente: WHERE tenant_id=? AND destinatario_cliente_id=? AND stato_lettura='non_letta'
+  @@index([tenantId, destinatarioClienteId, statoLettura])
+  // lista notifiche ordinata per data: WHERE tenant_id=? AND destinatario_id=? ORDER BY created_at DESC
+  @@index([tenantId, destinatarioId, createdAt(sort: Desc)])
   @@map("notifica")
 }
 
@@ -1205,6 +1219,11 @@ model AuditLog {
   ipAddress  String?  @map("ip_address")
   createdAt  DateTime @default(now()) @map("created_at")
 
+  // Indici performance (migrazione 20260912150000_indici_performance):
+  // query paginata GET /audit-logs: WHERE tenant_id=? ORDER BY created_at DESC
+  @@index([tenantId, createdAt(sort: Desc)])
+  // ricerca per tipo azione: WHERE tenant_id=? AND azione=? ORDER BY created_at DESC
+  @@index([tenantId, azione, createdAt(sort: Desc)])
   @@map("audit_log")
 }
 

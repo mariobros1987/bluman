@@ -15,16 +15,19 @@ import { verificaFirmaDownload } from '../util/jwt.js';
 import { recordAudit } from '../util/serverHelpers.js';
 import { trovaCicloDipendenze } from '../services/dipendenzeModuli.js';
 import { condizioneModuliPerGiurisdizione } from '../domain/giurisdizioni.js';
+import { leggiDaCacheOCalcola, invalidaCachePrefisso } from '../services/backendCache.js';
 
 // ─── ARTICOLI & PRESTAZIONI API (§Prisma Persistenza Cloud) ───────
 export async function registraRotteCatalogo(server: FastifyInstance, app: AppPort): Promise<void> {
   // ─── GIURISDIZIONI API (§8 Estensione) ───────────────────────────
   server.get('/giurisdizioni', async (req) => {
     const tenantId = req.tenantId;
-    return prisma.giurisdizione.findMany({
-      where: { tenantId },
-      orderBy: { nome: 'asc' },
-    });
+    return leggiDaCacheOCalcola(`giurisdizioni:${tenantId}`, () =>
+      prisma.giurisdizione.findMany({
+        where: { tenantId },
+        orderBy: { nome: 'asc' },
+      }),
+    );
   });
 
   server.post<{ Body: { nome: string; codice: string; tipo: 'ue' | 'extra_ue' | 'stato_usa' | 'altro'; note?: string } }>('/giurisdizioni', async (req, reply) => {
@@ -39,6 +42,8 @@ export async function registraRotteCatalogo(server: FastifyInstance, app: AppPor
         note: body.note,
       },
     });
+    await invalidaCachePrefisso(`giurisdizioni:${tenantId}`);
+    await invalidaCachePrefisso(`moduli:${tenantId}`);
     await recordAudit({
       tenantId,
       azione: 'GIURISDIZIONE_CREATA',
@@ -70,6 +75,8 @@ export async function registraRotteCatalogo(server: FastifyInstance, app: AppPor
         dettagli: `Modificata giurisdizione ${updated.nome} (${updated.codice})`,
         ipAddress: req.ip,
       });
+      await invalidaCachePrefisso(`giurisdizioni:${tenantId}`);
+      await invalidaCachePrefisso(`moduli:${tenantId}`);
       return reply.send(updated);
     } catch (err: any) {
       // RLS rende invisibile la giurisdizione di un altro tenant: 404, non 400.
@@ -85,6 +92,8 @@ export async function registraRotteCatalogo(server: FastifyInstance, app: AppPor
     const { id } = req.params;
     try {
       await prisma.giurisdizione.delete({ where: { id } });
+      await invalidaCachePrefisso(`giurisdizioni:${tenantId}`);
+      await invalidaCachePrefisso(`moduli:${tenantId}`);
       await recordAudit({
         tenantId,
         azione: 'GIURISDIZIONE_ELIMINATA',
@@ -110,14 +119,16 @@ export async function registraRotteCatalogo(server: FastifyInstance, app: AppPor
   server.get<{ Querystring: { giurisdizioneId?: string } }>('/moduli', async (req) => {
     const { giurisdizioneId } = req.query || {};
     const { tenantId } = req;
-    return await prisma.moduloTemplate.findMany({
-      where: condizioneModuliPerGiurisdizione(tenantId, giurisdizioneId),
-      include: {
-        giurisdizione: true,
-        dipendenze: true,
-        righeDistinta: { include: { articolo: true } },
-      },
-    });
+    return leggiDaCacheOCalcola(`moduli:${tenantId}:${giurisdizioneId || 'all'}`, () =>
+      prisma.moduloTemplate.findMany({
+        where: condizioneModuliPerGiurisdizione(tenantId, giurisdizioneId),
+        include: {
+          giurisdizione: true,
+          dipendenze: true,
+          righeDistinta: { include: { articolo: true } },
+        },
+      }),
+    );
   });
 
   // ─── ARTICOLI & PRESTAZIONI API (§Prisma Persistenza Cloud) ───────
@@ -126,10 +137,12 @@ export async function registraRotteCatalogo(server: FastifyInstance, app: AppPor
     // Una lista vuota è una risposta legittima (studio appena iscritto senza
     // catalogo): prima veniva scambiata per un errore e sostituita coi dati
     // dell'adapter in-memory, fingendo un catalogo che non esiste.
-    return await prisma.articolo.findMany({
-      where: { tenantId, isAttivo: true },
-      orderBy: { nome: 'asc' },
-    });
+    return leggiDaCacheOCalcola(`articoli:${tenantId}`, () =>
+      prisma.articolo.findMany({
+        where: { tenantId, isAttivo: true },
+        orderBy: { nome: 'asc' },
+      }),
+    );
   });
 
   // Upload Documento Endpoint (Base64 file upload & static download)
@@ -222,6 +235,8 @@ export async function registraRotteCatalogo(server: FastifyInstance, app: AppPor
         dettagli: `Aggiornato prezzo (€${(updated.prezzoDefault || 0)/100}) e ore (${updated.oreDefault}h)`,
         ipAddress: req.ip,
       });
+      await invalidaCachePrefisso(`articoli:${tenantId}`);
+      await invalidaCachePrefisso(`moduli:${tenantId}`);
       return reply.send(updated);
     } catch (err: any) {
       // §3.3 — il catch rispondeva { ok: true } anche quando l'aggiornamento non
@@ -257,6 +272,8 @@ export async function registraRotteCatalogo(server: FastifyInstance, app: AppPor
         prezzoDefault: prezzoDefault || 0,
       },
     });
+    await invalidaCachePrefisso(`articoli:${tenantId}`);
+    await invalidaCachePrefisso(`moduli:${tenantId}`);
     await recordAudit({
       tenantId,
       azione: 'ARTICOLO_CREATO',
@@ -365,6 +382,7 @@ export async function registraRotteCatalogo(server: FastifyInstance, app: AppPor
         dettagli: `Creato modulo libreria ${nome} (${categoria}) con ${righe.length} articoli in distinta`,
         ipAddress: req.ip,
       });
+      await invalidaCachePrefisso(`moduli:${tenantId}`);
       return reply.code(201).send(modulo);
     } catch (err: any) {
       // Errori di vincolo (articolo/giurisdizione spariti fra validazione e
@@ -490,6 +508,7 @@ export async function registraRotteCatalogo(server: FastifyInstance, app: AppPor
         dettagli: `Aggiornato modulo libreria ${id}` + (body.righe ? ` con nuova distinta di ${body.righe.length} articoli` : ''),
         ipAddress: req.ip,
       });
+      await invalidaCachePrefisso(`moduli:${tenantId}`);
       return reply.send(aggiornato);
     } catch (err: any) {
       if (err?.code === 'P2025') {
@@ -515,6 +534,7 @@ export async function registraRotteCatalogo(server: FastifyInstance, app: AppPor
         return reply.code(404).send({ errore: 'Modulo non trovato' });
       }
       await prisma.moduloTemplate.update({ where: { id }, data: { isAttivo: false } });
+      await invalidaCachePrefisso(`moduli:${tenantId}`);
       await recordAudit({
         tenantId,
         azione: 'MODULO_TEMPLATE_DISATTIVATO',
@@ -542,6 +562,8 @@ export async function registraRotteCatalogo(server: FastifyInstance, app: AppPor
         return reply.code(404).send({ errore: 'Articolo non trovato' });
       }
       await prisma.articolo.update({ where: { id }, data: { isAttivo: false } });
+      await invalidaCachePrefisso(`articoli:${tenantId}`);
+      await invalidaCachePrefisso(`moduli:${tenantId}`);
       await recordAudit({
         tenantId,
         azione: 'ARTICOLO_DISATTIVATO',

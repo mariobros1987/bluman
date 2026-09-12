@@ -916,24 +916,24 @@ REDIS_URL=
 - [x] 2.2 Validazione Zod su tutti gli endpoint principali (collegati schemi su auth, clienti, progetti, documenti, contabilità, fornitori, liquidazioneIva, solleciti)
 - [x] 2.2b Fix Sicurezza & Sessione Multi-Tenant (Fix 4: separazione token portale `bluman_portal_token` e filtro `GET /progetti` su `clienteId` per token portale)
 - [x] 2.2c Hub Comunicazioni Multicanale (allegati WhatsApp e IMAP Inbound con imapflow, spunte stato WhatsApp-style `✓`/`✓✓`, smart scroll chat)
-- [ ] 2.3 Tipizzare FastifyRequest
-- [ ] 2.4 Eliminare `as any` residui
+- [x] 2.3 Tipizzare FastifyRequest (12/09/2026, tipizzazione route Fastify, generic params e AppPort)
+- [x] 2.4 Eliminare `as any` residui (12/09/2026, FASE 8.1 — zero `as any` in tutte le route)
 
 ### FASE 3 — Qualità (1 settimana)
-- [ ] 3.1 Logging Pino strutturato
-- [ ] 3.2 Test E2E flusso critico
-- [ ] 3.3 OpenAPI/Swagger
+- [x] 3.1 Logging Pino strutturato (FASE 3 — Pino JSON con censura dati sensibili e serializzatore req)
+- [x] 3.2 Test E2E flusso critico (FASE 7 — `src/e2eFlussiCritici.test.ts` su creazione progetto, firma FEA e SDI)
+- [x] 3.3 OpenAPI/Swagger (12/09/2026, FASE 6.2 — `@fastify/swagger` + `@fastify/swagger-ui` su `/docs`)
 
 ### FASE 4 — Performance (1 settimana)
-- [ ] 4.1 Paginazione liste (PaginazioneQuerySchema su fatture, prima nota, progetti, clienti, audit)
-- [ ] 4.2 Rate limit Redis
-- [ ] 4.3 Indici DB
+- [x] 4.1 Paginazione liste (FASE 1 — PaginazioneQuerySchema su fatture, prima nota, progetti, clienti, audit)
+- [x] 4.2 Rate limit Redis & Cache Backend Distribuita (2026-09-12: provisioning database Redis su Railway, client `src/util/redis.ts`, rate limit distribuito `@fastify/rate-limit`, cache multi-layer `src/services/backendCache.ts` per giurisdizioni, moduli catalogo e articoli con abbattimento overhead RLS, suite `src/backendCache.test.ts`)
+- [x] 4.3 Indici DB (migrazione 20260912150000_indici_performance: 7 indici compositi su AuditLog, Notifica, Progetto e MovimentoPrimaNota con CONCURRENTLY IF NOT EXISTS)
 
 ### FASE 5 — Funzionalità (2-3 settimane)
-- [ ] 5.1 Cron schedulato reale (esecuzione notturna in-process `node-cron` per scadenze UBO/KYC)
-- [ ] 5.2 Coda notifiche con retry
-- [ ] 5.3 TOTP super_admin
-- [ ] 5.4 Backup DB schedulato
+- [x] 5.1 Cron schedulato reale (FASE 2.1 — runner CLI `runDailyNotificationCron.ts` e test dedicato)
+- [x] 5.2 Coda notifiche con retry (FASE 2.3 — `src/services/notificationQueue.ts` con backoff esponenziale)
+- [x] 5.3 TOTP super_admin (2026-09-12, `src/util/totp.ts` — RFC 6238 puro crypto nativo, cifratura AES-GCM segreto, 8 backup codes, 3 endpoint `/auth/totp/*`, 10 test)
+- [x] 5.4 Backup DB schedulato (2026-09-12, `src/scripts/runScheduledBackup.ts` — AES-256-GCM, retention 14gg, multi-tenant, script npm `backup:scheduled`, 6 test)
 
 ### FASE 6 — DevOps (1 settimana)
 - [x] 6.1 CI/CD GitHub Actions

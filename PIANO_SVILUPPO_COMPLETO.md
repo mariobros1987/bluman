@@ -1,6 +1,6 @@
 # 🗺️ BluMan Advisory Platform — Piano di Sviluppo Completo & Dettagliato
 
-> **Versione**: 3.5 — OpenAPI Swagger UI (FASE 6.2) & Pulizia Tipizzazione Route (FASE 8.1)
+> **Versione**: 3.6 — Sincronizzazione Completa Roadmap (Fiscale, Debiti Noti & Infrastruttura)
 > **Data di Riferimento**: 2026-09-12
 > **Stato Codebase**: 750/750 test Vitest verdi (66 file) • Build TypeScript backend, typecheck/build frontend riusciti
 > **Autore**: Mario Dibenedetto & Team di Ingegneria AI
@@ -355,16 +355,34 @@ Creare test end-to-end automatizzati (con database di test isolato o mock comple
 - [x] **4.3** Bonifica assistita dei progetti con divergenze avanzamento o moduli vuoti (`--fix` e `npm run audit:progetti`).
 
 ### 🔒 Sprint 3 — Resilienza, Disaster Recovery & Sicurezza (Priorità 🟡/🟢)
-- [x] **5.1** Creare e testare script `src/scripts/restoreDbTest.ts` su database di test con rispetto dei vincoli referenziali e dry-run (`npm run restore:test`).
-- [ ] **5.2** Schedulare backup periodico su storage cloud.
-- [ ] **6.1** Implementare 2FA TOTP con `otplib` per gli utenti con ruolo `super_admin`.
-- [x] **6.2** Configurare documentazione interattiva OpenAPI / Swagger (`@fastify/swagger` + `@fastify/swagger-ui` su `/docs`).
+- [x] **5.1** Creare e testare script `src/scripts/restoreDbTest.ts` sur database di test con rispetto dei vincoli referenziali e dry-run (`npm run restore:test`).
+- [x] **5.2** `src/scripts/runScheduledBackup.ts` — cifratura AES-256-GCM (IV 12B || AuthTag 16B || CT), retention 14 giorni, export per tutti i tenant attivi via `contestoTenant.run()`, exit code ≠0 su errore. Script npm `backup:scheduled`. 6 test in `src/scripts/runScheduledBackup.test.ts` (2026-09-12).
+- [x] **6.1** TOTP RFC 6238 in `src/util/totp.ts` — implementazione pura crypto nativo, finestra ±1 step, cifratura segreto AES-GCM con HKDF da JWT_SECRET, 8 backup codes monouso constant-time. Endpoint: `POST /auth/totp/attiva`, `/auth/totp/conferma`, `/auth/totp/verifica` (preToken 2min). 10 test in `src/totp.test.ts` (2026-09-12).
+- [x] **6.2a** Configurare documentazione interattiva OpenAPI / Swagger (`@fastify/swagger` + `@fastify/swagger-ui` su `/docs`).
+- [x] **6.2b** `JWT_PREVIOUS_SECRETS` dual-key rotation zero-downtime in `src/util/jwt.ts` — `risolviSegreti()` legge corrente + precedenti separati da virgola; `signJwt` firma sempre con `JWT_SEGRETI[0]`; `verifyJwt` prova in sequenza constant-time; 5 test in `src/jwtRotation.test.ts`. Runbook in `docs/rotazione_segreti.md` (2026-09-12).
 - [x] **7.1** Test E2E sul flusso creazione progetto e transazione atomica (`src/e2eFlussiCritici.test.ts`).
 - [x] **7.2** Test E2E sul ciclo firma OTP e sigillo forense (`src/e2eFlussiCritici.test.ts`).
 - [x] **7.3** Test E2E sulla generazione XML FatturaPA SDI e Prima Nota (`src/e2eFlussiCritici.test.ts`).
 - [x] **8.1** Rimozione sistematica dei cast `as any` residui nelle route Fastify e tipizzazione rigorosa.
 
+### 🏛️ Sprint 4 — Fiscale Avanzato & Adempimenti (da `piano-debiti-noti-fiscale-e-split.md`)
+- [ ] **FIS-1** Conservazione Sostitutiva a norma (art. 2220 c.c.): rotta e logica per annotare riferimento/data invio e predisposizione integrazione conservatore accreditato AgID.
+- [ ] **FIS-2** Generatore file F24 telematico a posizioni fisse conforme standard Agenzia delle Entrate per invio diretto Entratel / F24 web.
+- [ ] **FIS-3** Certificazione Unica (CU): motore di estrazione ritenute d'acconto dell'anno e generazione tracciato telematico (scadenza annuale marzo).
+- [ ] **FIS-4** Integrazione Provider SDI Automatico (decisione strategica): oggi attivo in modalità manuale onesta con download XML e webhook esiti; eventuale collegamento API diretta (Aruba / SDI hub).
+
+### ⚙️ Sprint 5 — Infrastruttura & Scalabilità (da `PIANO_DI_MIGLIORAMENTO.md`)
+- [x] **INF-1** Rate Limiting distribuito tramite store Redis per `@fastify/rate-limit` (provisioning Redis database su Railway, variabile `REDIS_URL` collegata a `bluman-api`, client `src/util/redis.ts` con fallback in-memory, cache backend `src/services/backendCache.ts` per giurisdizioni/moduli/articoli) (2026-09-12).
+- [x] **INF-2** Ottimizzazione indici DB compositi su tabelle a crescita rapida (`AuditLog`, `MovimentoPrimaNota`, `Notifica`, `Progetto`) — migrazione `20260912150000_indici_performance` con 7 indici `CONCURRENTLY IF NOT EXISTS` (2026-09-12).
+- [ ] **INF-3** Monitoraggio errori centralizzato con Sentry e health/uptime alert su Railway.
+- [ ] **INF-4** File `.env.example` documentato e sincronizzato con tutte le variabili d'ambiente (DB, JWT, Storage, 2FA, Sentry, SMTP, WhatsApp, Cron).
+
+### 🧹 Manutenzione & Bonifica Dati Storici
+- [ ] **DAT-1** Bonifica delle 2 utenze di seed residue senza password (`francesca@...` e `lorenzo@...`) previa verifica referenze con script dedicato.
+- [ ] **DAT-2** Consolidamento o archiviazione clienti/progetti omonimi storici di test (`Holding Beta S.r.l.`, `Struttura Holding — Famiglia Ricci`).
+- [ ] **DAT-3** Rigenerazione mappa del grafo architetturale con Graphify (`graphify extract`).
+
 ---
 
 *Documento creato, versionato e sincronizzato con il repository ufficiale BluMan.*  
-*Ogni avanzamento operativo verrà tracciato aggiornando la presente checklist.*
+*Ogni avanzamento operativo viene tracciato aggiornando la presente checklist come unica fonte di verità.*

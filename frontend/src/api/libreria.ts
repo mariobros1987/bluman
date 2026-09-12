@@ -1,50 +1,73 @@
 import { API_BASE, apiFetch, getAuthHeaders, leggiErroreApi } from './http';
+import { cachedQuery, invalidateCache } from './cache';
+import { getCurrentTenantId } from '../utils/tenant';
 
-export async function fetchModuliLibreria(giurisdizioneId?: string) {
-  try {
-    const url = giurisdizioneId ? `${API_BASE}/moduli?giurisdizioneId=${encodeURIComponent(giurisdizioneId)}` : `${API_BASE}/moduli`;
-    const res = await apiFetch(url, { headers: getAuthHeaders() });
-    if (!res.ok) throw new Error('Errore nel recupero moduli');
-    return await res.json();
-  } catch (err) {
-    console.warn('Backend API offline, uso fallback locale', err);
-    return null;
-  }
+export async function fetchModuliLibreria(giurisdizioneId?: string, options?: { forceRefresh?: boolean }) {
+  const currentTenantId = getCurrentTenantId();
+  const cacheKey = `moduli_${currentTenantId}_${giurisdizioneId || 'all'}`;
+
+  return cachedQuery(
+    cacheKey,
+    async () => {
+      try {
+        const url = giurisdizioneId ? `${API_BASE}/moduli?giurisdizioneId=${encodeURIComponent(giurisdizioneId)}` : `${API_BASE}/moduli`;
+        const res = await apiFetch(url, { headers: getAuthHeaders() });
+        if (!res.ok) throw new Error('Errore nel recupero moduli');
+        return await res.json();
+      } catch (err) {
+        console.warn('Backend API offline, uso fallback locale', err);
+        return null;
+      }
+    },
+    { ttlMs: 120_000, forceRefresh: options?.forceRefresh }
+  );
 }
 
-export async function fetchGiurisdizioniApi() {
-  try {
-    const res = await apiFetch(`${API_BASE}/giurisdizioni`, { headers: getAuthHeaders() });
-    if (!res.ok) throw new Error('Errore nel recupero giurisdizioni');
-    return await res.json();
-  } catch (err) {
-    console.warn('Backend API offline giurisdizioni fallback', err);
-    return null;
-  }
+export async function fetchGiurisdizioniApi(options?: { forceRefresh?: boolean }) {
+  const currentTenantId = getCurrentTenantId();
+  return cachedQuery(
+    `giurisdizioni_${currentTenantId}`,
+    async () => {
+      try {
+        const res = await apiFetch(`${API_BASE}/giurisdizioni`, { headers: getAuthHeaders() });
+        if (!res.ok) throw new Error('Errore nel recupero giurisdizioni');
+        return await res.json();
+      } catch (err) {
+        console.warn('Backend API offline giurisdizioni fallback', err);
+        return null;
+      }
+    },
+    { ttlMs: 120_000, forceRefresh: options?.forceRefresh }
+  );
 }
 
 export async function creaGiurisdizioneApi(input: { nome: string; codice: string; tipo: 'ue' | 'extra_ue' | 'stato_usa' | 'altro'; note?: string }) {
-  // §3.3 — prima il `catch` inventava `{ id: 'giur-<timestamp>', ...input }`: la riga
-  // compariva in lista con un id mai esistito a database e le successive letture la
-  // perdevano. Una scrittura rifiutata o non consegnata è un errore, non una creazione.
   const res = await apiFetch(`${API_BASE}/giurisdizioni`, {
     method: 'POST',
     headers: getAuthHeaders(),
     body: JSON.stringify(input),
   });
   if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore creazione giurisdizione'));
+  invalidateCache('giurisdizioni');
   return await res.json();
 }
 
-export async function fetchArticoli() {
-  try {
-    const res = await apiFetch(`${API_BASE}/articoli`, { headers: getAuthHeaders() });
-    if (!res.ok) throw new Error('Errore nel recupero articoli');
-    return await res.json();
-  } catch (err) {
-    console.warn('Backend API offline, uso fallback locale', err);
-    return null;
-  }
+export async function fetchArticoli(options?: { forceRefresh?: boolean }) {
+  const currentTenantId = getCurrentTenantId();
+  return cachedQuery(
+    `articoli_${currentTenantId}`,
+    async () => {
+      try {
+        const res = await apiFetch(`${API_BASE}/articoli`, { headers: getAuthHeaders() });
+        if (!res.ok) throw new Error('Errore nel recupero articoli');
+        return await res.json();
+      } catch (err) {
+        console.warn('Backend API offline, uso fallback locale', err);
+        return null;
+      }
+    },
+    { ttlMs: 120_000, forceRefresh: options?.forceRefresh }
+  );
 }
 
 export async function updateArticoloPrezzoApi(id: string, input: { prezzoDefault?: number; oreDefault?: number; nome?: string }) {
@@ -56,6 +79,7 @@ export async function updateArticoloPrezzoApi(id: string, input: { prezzoDefault
     body: JSON.stringify(input),
   });
   if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore aggiornamento articolo'));
+  invalidateCache('articoli');
   return await res.json();
 }
 
@@ -73,6 +97,7 @@ export async function creaArticoloApi(input: {
     body: JSON.stringify(input),
   });
   if (!res.ok) throw new Error('Errore creazione articolo');
+  invalidateCache('articoli');
   return await res.json();
 }
 
@@ -89,7 +114,8 @@ export async function creaModuloTemplateApi(input: {
     headers: getAuthHeaders(),
     body: JSON.stringify(input),
   });
-  if (!res.ok) throw new Error('Errore creazione modulo template');
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore creazione modulo template'));
+  invalidateCache('moduli');
   return await res.json();
 }
 

@@ -18,3 +18,4 @@ export * from './timesheet';
 export * from './fornitori';
 export * from './liquidazioneIva';
 export * from './solleciti';
+export * from './cache';

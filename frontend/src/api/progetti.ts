@@ -1,27 +1,47 @@
-import { API_BASE, apiFetch, fetchWithTimeout, getAuthHeaders, leggiErroreApi } from './http';
+import { API_BASE, apiFetch, getAuthHeaders, leggiErroreApi } from './http';
 import { queryPaginazione, type ParametriListaPaginata } from './paginazione';
+import { cachedQuery, invalidateCache } from './cache';
+import { getCurrentTenantId } from '../utils/tenant';
 
-export async function fetchProgetti(parametri?: ParametriListaPaginata) {
-  try {
-    const res = await fetchWithTimeout(`${API_BASE}/progetti${queryPaginazione(parametri)}`, { headers: getAuthHeaders() }, 6000);
-    if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore nel recupero progetti'));
-    return await res.json();
-  } catch (err) {
-    if (parametri) throw err;
-    console.warn('Backend API offline o in latenza, uso il caricamento istantaneo locale', err);
-    return null;
-  }
+export async function fetchProgetti(parametri?: ParametriListaPaginata, options?: { forceRefresh?: boolean }) {
+  const currentTenantId = getCurrentTenantId();
+  const cacheKey = `progetti_${currentTenantId}_${JSON.stringify(parametri || {})}`;
+
+  return cachedQuery(
+    cacheKey,
+    async () => {
+      try {
+        const res = await apiFetch(`${API_BASE}/progetti${queryPaginazione(parametri)}`, { headers: getAuthHeaders() }, 15000);
+        if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore nel recupero progetti'));
+        return await res.json();
+      } catch (err) {
+        if (parametri) throw err;
+        console.warn('Backend API offline o in latenza, uso il caricamento istantaneo locale', err);
+        return null;
+      }
+    },
+    { ttlMs: 30_000, forceRefresh: options?.forceRefresh }
+  );
 }
 
-export async function fetchProgettoDettaglio(id: string) {
-  try {
-    const res = await apiFetch(`${API_BASE}/progetti/${id}`, { headers: getAuthHeaders() });
-    if (!res.ok) throw new Error('Errore nel recupero dettaglio progetto');
-    return await res.json();
-  } catch (err) {
-    console.warn('Backend API offline, uso fallback locale', err);
-    return null;
-  }
+export async function fetchProgettoDettaglio(id: string, options?: { forceRefresh?: boolean }) {
+  const currentTenantId = getCurrentTenantId();
+  const cacheKey = `progetto_detail_${currentTenantId}_${id}`;
+
+  return cachedQuery(
+    cacheKey,
+    async () => {
+      try {
+        const res = await apiFetch(`${API_BASE}/progetti/${id}`, { headers: getAuthHeaders() });
+        if (!res.ok) throw new Error('Errore nel recupero dettaglio progetto');
+        return await res.json();
+      } catch (err) {
+        console.warn('Backend API offline, uso fallback locale', err);
+        return null;
+      }
+    },
+    { ttlMs: 30_000, forceRefresh: options?.forceRefresh }
+  );
 }
 
 export async function creaProgettoApi(input: { clienteId: string; nome: string }) {
@@ -31,6 +51,7 @@ export async function creaProgettoApi(input: { clienteId: string; nome: string }
     body: JSON.stringify(input),
   });
   if (!res.ok) throw new Error('Errore creazione progetto');
+  invalidateCache('progett');
   return await res.json();
 }
 
@@ -43,6 +64,7 @@ export async function eliminaProgettoApi(id: string) {
     const err = await res.json();
     throw new Error(err.errore || 'Errore eliminazione progetto');
   }
+  invalidateCache('progett');
   return await res.json();
 }
 
@@ -56,6 +78,7 @@ export async function eliminaModuloApi(progettoId: string, moduloId: string): Pr
     const data = await res.json().catch(() => ({}));
     throw new Error((data as any).errore ?? 'Eliminazione modulo non riuscita.');
   }
+  invalidateCache('progett');
 }
 
 export async function archiviaProgettoApi(id: string, archiviato: boolean) {
@@ -118,6 +141,7 @@ export async function creaPreventivoEAccettaApi(input: {
         `Il preventivo ${prev.id} è stato creato ma i moduli non sono stati istanziati.`,
     );
   }
+  invalidateCache('progett');
   return await resAccetta.json();
 }
 
@@ -132,6 +156,7 @@ export async function consuntivaMicrovoceApi(input: {
     body: JSON.stringify(input),
   });
   if (!res.ok) throw new Error('Errore consuntivazione microvoce');
+  invalidateCache('progett');
   return await res.json();
 }
 
@@ -146,6 +171,7 @@ export async function ricalcolaProgettoApi(progettoId: string) {
     headers: getAuthHeaders(),
   });
   if (!res.ok) throw new Error('Errore ricalcolo avanzamento progetto');
+  invalidateCache('progett');
   return await res.json();
 }
 
@@ -168,6 +194,7 @@ export async function salvaProgettoDettaglioApi(progettoId: string, data: any) {
     }
     throw new Error(dett?.errore || `Salvataggio non riuscito (HTTP ${res.status}).`);
   }
+  invalidateCache('progett');
   return await res.json();
 }
 

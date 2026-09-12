@@ -17,6 +17,16 @@ import {
 } from '../util/prismaClient.js';
 import { clienteIdDalJwt } from '../util/authorization.js';
 import { signJwt, verifyJwt, hashMagicToken } from '../util/jwt.js';
+import {
+  generaSegreto,
+  verificaTotp,
+  cifraSegretoTotp,
+  decifraSegretoTotp,
+  generaQrPayload,
+  generaBackupCodes,
+  hashBackupCode,
+  verificaBackupCode,
+} from '../util/totp.js';
 import { verifyPassword, hashPassword } from '../util/password.js';
 import {
   TENANT_DEFAULT,
@@ -80,6 +90,35 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
     // diverso da quello di default. (§0.6: l'audit vero e proprio ora passa dal
     // client amministrativo e logga gli errori invece di ingoiarli.)
     attivaContestoTenant({ tenantId: userTenantId || TENANT_DEFAULT, ruolo: utente.ruolo });
+
+    // §6.1 — 2FA TOTP: se il super_admin ha il TOTP abilitato, non rilasciamo ancora
+    // il JWT definitivo. Emettiamo un preToken a vita breve (2 minuti) con il claim
+    // `totpPending: true` e restituiamo { totpRequired: true, preToken }.
+    // Il frontend mostra il campo per il codice e chiama POST /auth/totp/verifica.
+    // Advisor, collaboratori e clienti non sono toccati da questo ramo.
+    if (utente.ruolo === 'super_admin' && (utente as any).totpAbilitato === true) {
+      const preToken = signJwt({
+        userId: utente.id,
+        tenantId: userTenantId,
+        email: cleanEmail,
+        ruolo: utente.ruolo,
+        sessionVersion: utente.sessionVersion,
+      }, 2); // 2 minuti — solo per la fase TOTP
+
+      await recordAudit({
+        tenantId: userTenantId || TENANT_DEFAULT,
+        userId: utente.id,
+        userEmail: cleanEmail,
+        userNome: utente.nome,
+        ruolo: utente.ruolo,
+        azione: 'TOTP_RICHIESTO',
+        entita: 'Sessione Studio',
+        dettagli: 'Login password verificata, in attesa del codice TOTP per il super_admin',
+        ipAddress: req.ip || '127.0.0.1',
+      });
+
+      return reply.send({ ok: true, totpRequired: true, preToken });
+    }
 
     const token = signJwt({
       userId: utente.id,
@@ -495,5 +534,214 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
     } catch (err: any) {
       return reply.code(500).send({ errore: err.message || 'Errore aggiornamento password portale' });
     }
+  });
+
+  // ─── §6.1 TOTP — Endpoint 2FA per super_admin ────────────────────────────────
+
+  /**
+   * POST /auth/totp/attiva
+   * Riservato al super_admin autenticato. Genera il segreto TOTP, lo cifra e lo
+   * salva nel DB con totpAbilitato=false (non ancora confermato dall'app authenticator).
+   * Restituisce il QR URI e i backup codes — UNA SOLA VOLTA.
+   */
+  server.post('/auth/totp/attiva', {
+    config: { rateLimit: { max: 5, timeWindow: '1 minute' } },
+  }, async (req, reply) => {
+    if (req.ruolo !== 'super_admin') {
+      return reply.code(403).send({ errore: 'Solo il super_admin può attivare il 2FA TOTP.' });
+    }
+
+    const db = prismaAmministrativo();
+    const utente = await db.user.findUnique({ where: { id: req.userId } });
+    if (!utente) return reply.code(404).send({ errore: 'Utente non trovato.' });
+
+    if ((utente as any).totpAbilitato === true) {
+      return reply.code(409).send({ errore: 'Il 2FA TOTP è già attivo. Disattivalo prima di rigenerarlo.' });
+    }
+
+    const segretoBase32 = generaSegreto();
+    const secretoCifrato = cifraSegretoTotp(segretoBase32);
+    const backupCodes = generaBackupCodes();
+    const backupHashes = backupCodes.map(hashBackupCode);
+
+    await db.user.update({
+      where: { id: req.userId },
+      data: ({
+        totpSecret: secretoCifrato,
+        totpAbilitato: false,
+        totpBackupCodes: backupHashes,
+      }) as any,
+    });
+
+    const qr = generaQrPayload(segretoBase32, utente.email, 'BluMan');
+
+    await recordAudit({
+      tenantId: req.tenantId || TENANT_DEFAULT,
+      userId: req.userId,
+      userEmail: utente.email,
+      userNome: utente.nome,
+      ruolo: 'super_admin',
+      azione: 'TOTP_ATTIVAZIONE_INIZIATA',
+      entita: 'Sicurezza Account',
+      dettagli: 'Generazione segreto TOTP — in attesa della conferma con il primo codice.',
+      ipAddress: req.ip,
+    });
+
+    return reply.send({
+      ok: true,
+      qrUri: qr.uri,
+      qrUrl: qr.qrUrl,
+      segreto: segretoBase32, // Solo per inserimento manuale nell'app authenticator
+      backupCodes,            // Mostrare UNA SOLA VOLTA, poi l'utente deve salvarli
+      hint: qr.svgHint,
+    });
+  });
+
+  /**
+   * POST /auth/totp/conferma
+   * Verifica il primo codice a 6 cifre dall'app authenticator.
+   * Se corretto imposta totpAbilitato=true.
+   */
+  server.post<{ Body: { codiceTotp?: string } }>('/auth/totp/conferma', {
+    config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+  }, async (req, reply) => {
+    if (req.ruolo !== 'super_admin') {
+      return reply.code(403).send({ errore: 'Solo il super_admin può confermare il 2FA TOTP.' });
+    }
+
+    const { codiceTotp } = req.body ?? {};
+    if (!codiceTotp) return reply.code(400).send({ errore: 'Il campo codiceTotp è obbligatorio.' });
+
+    const db = prismaAmministrativo();
+    const utente = await db.user.findUnique({ where: { id: req.userId } });
+    if (!utente || !utente.totpSecret) {
+      return reply.code(400).send({ errore: 'Nessun segreto TOTP in sospeso. Prima chiama POST /auth/totp/attiva.' });
+    }
+    if ((utente as any).totpAbilitato === true) {
+      return reply.code(409).send({ errore: 'Il 2FA è già confermato e attivo.' });
+    }
+
+    let segretoBase32: string;
+    try {
+      segretoBase32 = decifraSegretoTotp(utente.totpSecret);
+    } catch {
+      return reply.code(500).send({ errore: 'Errore interno nella lettura del segreto TOTP.' });
+    }
+
+    if (!verificaTotp(segretoBase32, codiceTotp)) {
+      return reply.code(400).send({ errore: 'Codice TOTP non valido. Riprova o rigenera il segreto.' });
+    }
+
+    await db.user.update({
+      where: { id: req.userId },
+      data: ({ totpAbilitato: true }) as any,
+    });
+
+    await recordAudit({
+      tenantId: req.tenantId || TENANT_DEFAULT,
+      userId: req.userId,
+      userEmail: utente.email,
+      userNome: utente.nome,
+      ruolo: 'super_admin',
+      azione: 'TOTP_ATTIVATO',
+      entita: 'Sicurezza Account',
+      dettagli: 'Autenticazione a due fattori TOTP attivata con successo.',
+      ipAddress: req.ip,
+    });
+
+    return reply.send({ ok: true, messaggio: 'Autenticazione a due fattori attivata con successo.' });
+  });
+
+  /**
+   * POST /auth/totp/verifica
+   * Endpoint pubblico (rate-limit aggressivo). Riceve preToken (2min) + codiceTotp.
+   * Se il codice è valido (TOTP o backup code), emette il JWT definitivo.
+   */
+  server.post<{ Body: { preToken?: string; codiceTotp?: string } }>('/auth/totp/verifica', {
+    config: { rateLimit: { max: 5, timeWindow: '1 minute' } },
+  }, async (req, reply) => {
+    const { preToken, codiceTotp } = req.body ?? {};
+    const erroreGenerico = { errore: 'Codice non valido o sessione scaduta.' };
+
+    if (!preToken || !codiceTotp) return reply.code(400).send(erroreGenerico);
+
+    // Verifica il preToken (2 min, stesso meccanismo del JWT normale)
+    const payload = verifyJwt(preToken);
+    if (!payload || payload.ruolo !== 'super_admin') {
+      return reply.code(401).send(erroreGenerico);
+    }
+
+    const db = prismaAmministrativo();
+    const utente = await db.user.findUnique({ where: { id: payload.userId } });
+    if (!utente || !utente.totpSecret || !(utente as any).totpAbilitato) {
+      return reply.code(401).send(erroreGenerico);
+    }
+    if (utente.sessionVersion !== payload.sessionVersion) {
+      return reply.code(401).send(erroreGenerico);
+    }
+
+    let segretoBase32: string;
+    try {
+      segretoBase32 = decifraSegretoTotp(utente.totpSecret);
+    } catch {
+      return reply.code(500).send({ errore: 'Errore interno nella lettura del segreto TOTP.' });
+    }
+
+    let autenticatoConBackup = false;
+
+    if (verificaTotp(segretoBase32, codiceTotp)) {
+      // Codice TOTP corrente — OK
+    } else {
+      // Tenta come backup code
+      const backupHashes: string[] = (utente as any).totpBackupCodes ?? [];
+      const indice = verificaBackupCode(codiceTotp, backupHashes);
+      if (indice === -1) {
+        return reply.code(401).send(erroreGenerico);
+      }
+      // Invalida il backup code usato (rimuove dall'array)
+      const nuoviHashes = backupHashes.filter((_, i) => i !== indice);
+      await db.user.update({
+        where: { id: utente.id },
+        data: ({ totpBackupCodes: nuoviHashes }) as any,
+      });
+      autenticatoConBackup = true;
+    }
+
+    const userTenantId = utente.tenantId || '';
+    const token = signJwt({
+      userId: utente.id,
+      tenantId: userTenantId,
+      email: utente.email,
+      ruolo: utente.ruolo,
+      sessionVersion: utente.sessionVersion,
+    }, DURATA_SESSIONE_OPERATORE_MINUTI);
+
+    await recordAudit({
+      tenantId: userTenantId || TENANT_DEFAULT,
+      userId: utente.id,
+      userEmail: utente.email,
+      userNome: utente.nome,
+      ruolo: 'super_admin',
+      azione: 'AUTENTICAZIONE_LOGIN',
+      entita: 'Sessione Studio',
+      dettagli: autenticatoConBackup
+        ? 'Login 2FA completato con codice di recupero monouso.'
+        : 'Login 2FA completato con codice TOTP.',
+      ipAddress: req.ip || '127.0.0.1',
+    });
+
+    return reply.send({
+      ok: true,
+      token,
+      user: {
+        id: utente.id,
+        nome: utente.nome,
+        email: utente.email,
+        ruolo: utente.ruolo,
+        tenantId: userTenantId,
+        stato: utente.stato,
+        mustChangePassword: utente.stato === 'invitato',
+      },
+    });
   });
 }

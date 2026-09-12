@@ -21,6 +21,7 @@ import { apriStreamSse } from './services/notificheService.js';
 // §14 — non `new PrismaClient()`: questo client impone il tenant corrente a ogni query,
 // altrimenti le policy RLS non vedono nessun contesto e non restituiscono nulla.
 import { prisma, attivaContestoTenant } from './util/prismaClient.js';
+import { getRedisClient } from './util/redis.js';
 import {
   clienteIdDalJwt,
   ruoloValido,
@@ -277,10 +278,12 @@ export function buildServer(app: AppPort): FastifyInstance {
   // In NODE_ENV=test il plugin non viene registrato: la suite esegue centinaia
   // di inject dalla stessa 'IP' e il limite falserebbe i test.
   if (abilitaRateLimit) {
+    const redisClient = getRedisClient();
     await server.register(rateLimit, {
       global: true,
       max: 300,
       timeWindow: '1 minute',
+      ...(redisClient ? { redis: redisClient } : {}),
       // I probe dell'orchestratore su /health non devono mai consumare budget.
       allowList: (req) => req.url === '/health',
       errorResponseBuilder: (_req, context) => {

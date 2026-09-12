@@ -3,36 +3,55 @@ import type { Ruolo } from './authorization.js';
 
 const LUNGHEZZA_MINIMA_SEGRETO = 32;
 
-// §23 — il segreto di firma non ha mai un valore di default: un fallback hardcoded nel
-// repo equivale a nessuna autenticazione, perché chiunque legga il codice può forgiare
-// un token con qualunque tenantId e ruolo. In produzione l'assenza è un errore fatale;
-// in sviluppo si usa un segreto casuale valido solo per il processo corrente.
-function risolviSegreto(): string {
-  const daEnv = process.env.JWT_SECRET;
+// §6.2b — Rotazione dual-key / multi-key zero-downtime.
+//
+// Problema: ogni volta che JWT_SECRET viene cambiato in produzione, tutti i token già
+// emessi diventano istantaneamente invalidi e tutti gli utenti vengono disconnessi.
+//
+// Soluzione: `JWT_PREVIOUS_SECRETS` è una lista di segreti precedenti separati da
+// virgola. `signJwt` firma sempre con il segreto corrente (primo della lista).
+// `verifyJwt` prova in sequenza tutti i segreti: il token è valido se almeno uno
+// passa la verifica. Quando tutti gli utenti si sono ri-autenticati (dopo un TTL di
+// sessione completo), `JWT_PREVIOUS_SECRETS` può essere rimossa dall'env.
+//
+// Procedura di rotazione (vedi anche docs/rotazione_segreti.md):
+//   1. Genera un nuovo segreto:
+//      node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+//   2. Su Railway: imposta JWT_SECRET=<NUOVO>, JWT_PREVIOUS_SECRETS=<VECCHIO>
+//   3. Redeploy → i token vecchi restano validi durante il periodo di grazia.
+//   4. Dopo DURATA_SESSIONE_OPERATORE_MINUTI (o al più dopo il TTL massimo): rimuovi JWT_PREVIOUS_SECRETS.
+function risolviSegreti(): string[] {
+  const corrente = process.env.JWT_SECRET;
 
-  if (daEnv && daEnv.length >= LUNGHEZZA_MINIMA_SEGRETO) return daEnv;
-
-  if (process.env.NODE_ENV === 'production') {
-    throw new Error(
-      `JWT_SECRET mancante o più corto di ${LUNGHEZZA_MINIMA_SEGRETO} caratteri. ` +
-        'Generane uno con: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'base64\'))"',
-    );
+  if (!corrente || corrente.length < LUNGHEZZA_MINIMA_SEGRETO) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error(
+        `JWT_SECRET mancante o più corto di ${LUNGHEZZA_MINIMA_SEGRETO} caratteri. ` +
+          'Generane uno con: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'base64\'))"',
+      );
+    }
+    if (corrente) {
+      console.warn(
+        `⚠️  JWT_SECRET più corto di ${LUNGHEZZA_MINIMA_SEGRETO} caratteri: accettato solo perché NODE_ENV non è production.`,
+      );
+      return [corrente];
+    }
+    // I token firmati con questo segreto non sopravvivono a un restart: è voluto.
+    console.warn('⚠️  JWT_SECRET non impostato: uso un segreto casuale valido solo per questo processo.');
+    return [crypto.randomBytes(32).toString('hex')];
   }
 
-  if (daEnv) {
-    console.warn(
-      `⚠️  JWT_SECRET più corto di ${LUNGHEZZA_MINIMA_SEGRETO} caratteri: accettato solo perché NODE_ENV non è production.`,
-    );
-    return daEnv;
-  }
+  // Segreti precedenti: separati da virgola, ignorati se vuoti.
+  const precedenti = (process.env.JWT_PREVIOUS_SECRETS ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => s.length >= LUNGHEZZA_MINIMA_SEGRETO);
 
-  // I token firmati con questo segreto non sopravvivono a un restart: è voluto —
-  // un logout in sviluppo costa meno di un segreto noto committato nel repo.
-  console.warn('⚠️  JWT_SECRET non impostato: uso un segreto casuale valido solo per questo processo.');
-  return crypto.randomBytes(32).toString('hex');
+  return [corrente, ...precedenti];
 }
 
-const JWT_SECRET = risolviSegreto();
+// Lista segreti: [corrente, ...precedenti]. Immutabile per il ciclo di vita del processo.
+const JWT_SEGRETI = risolviSegreti();
 
 export interface JwtPayload {
   userId: string;
@@ -58,8 +77,9 @@ export function signJwt(payload: Omit<JwtPayload, 'exp'>, expiresInMinutes = 60)
   const base64Header = Buffer.from(JSON.stringify(header)).toString('base64url');
   const base64Payload = Buffer.from(JSON.stringify(fullPayload)).toString('base64url');
 
+  // Firma sempre con il segreto corrente (primo della lista, §6.2b).
   const signature = crypto
-    .createHmac('sha256', JWT_SECRET)
+    .createHmac('sha256', JWT_SEGRETI[0]!)
     .update(`${base64Header}.${base64Payload}`)
     .digest('base64url');
 
@@ -74,14 +94,23 @@ export function verifyJwt(token: string): JwtPayload | null {
     const [base64Header, base64Payload, signature] = parts;
     if (!base64Header || !base64Payload || !signature) return null;
 
-    const expectedSignature = crypto
-      .createHmac('sha256', JWT_SECRET)
-      .update(`${base64Header}.${base64Payload}`)
-      .digest('base64url');
-
+    // §6.2b — prova ogni segreto in ordine: corrente, poi precedenti.
+    // Il primo che produce una firma valida vince. Se nessuno passa: null.
+    // Confronto a tempo costante per evitare timing attack.
     const ricevuta = Buffer.from(signature, 'utf8');
-    const attesa = Buffer.from(expectedSignature, 'utf8');
-    if (ricevuta.length !== attesa.length || !crypto.timingSafeEqual(ricevuta, attesa)) return null;
+    let payloadVerificato = false;
+    for (const segreto of JWT_SEGRETI) {
+      const expectedSignature = crypto
+        .createHmac('sha256', segreto)
+        .update(`${base64Header}.${base64Payload}`)
+        .digest('base64url');
+      const attesa = Buffer.from(expectedSignature, 'utf8');
+      if (ricevuta.length === attesa.length && crypto.timingSafeEqual(ricevuta, attesa)) {
+        payloadVerificato = true;
+        break;
+      }
+    }
+    if (!payloadVerificato) return null;
 
     const payload: JwtPayload = JSON.parse(Buffer.from(base64Payload, 'base64url').toString('utf8'));
     if (
@@ -136,7 +165,7 @@ export function hashMagicToken(token: string): string {
  * riutilizzabile su un'altra riga.
  */
 export function hashCodiceOtp(codice: string, clienteId: string): string {
-  return crypto.createHmac('sha256', JWT_SECRET).update(`otp:${clienteId}:${codice}`).digest('hex');
+  return crypto.createHmac('sha256', JWT_SEGRETI[0]!).update(`otp:${clienteId}:${codice}`).digest('hex');
 }
 
 /** Confronto a tempo costante fra il codice digitato e il digest in tabella. */
@@ -158,7 +187,7 @@ export function verificaCodiceOtp(codice: string, clienteId: string, hashAtteso:
 const TTL_FIRMA_DOWNLOAD_SECONDI = 7 * 24 * 60 * 60;
 
 function calcolaFirmaDownload(filename: string, scadenza: number): string {
-  return crypto.createHmac('sha256', JWT_SECRET).update(`${filename}|${scadenza}`).digest('hex');
+  return crypto.createHmac('sha256', JWT_SEGRETI[0]!).update(`${filename}|${scadenza}`).digest('hex');
 }
 
 /** Firma e scadenza da appendere all'URL di un file servito da `/uploads/`. */

@@ -1,6 +1,7 @@
 import { getTenantStorageKey, getCurrentTenantId, getStudioInfoForTenant, BLUECODE_TENANT_ID, senzaSegretiTenant } from '../utils/tenant';
 import { API_BASE, apiFetch, getAuthHeaders, leggiErroreApi } from './http';
 import { queryPaginazione, type ParametriListaPaginata } from './paginazione';
+import { cachedQuery, invalidateCache } from './cache';
 
 // DEFAULT_TEAM_USERS serve SOLO come fallback di seed per il Tenant Demo Bluecode (tenant-1) se il DB è offline
 export const DEFAULT_TEAM_USERS = [
@@ -11,50 +12,56 @@ export const DEFAULT_TEAM_USERS = [
   { id: 'usr-05', nome: 'Avv. Mario Dibenedetto', email: 'mario.dibenedetto@bluecode.advisory', ruolo: 'advisor', specializzazione: 'Legal Counsel — Diritto Societario, Contrattualistica & Trust', tenantId: '00000000-0000-0000-0000-000000000001' },
 ];
 
-export async function fetchUtentiTenant() {
+export async function fetchUtentiTenant(options?: { forceRefresh?: boolean }) {
   const currentTenantId = getCurrentTenantId();
-  const teamStorageKey = getTenantStorageKey('bluman_custom_team_users', currentTenantId);
+  return cachedQuery(
+    `team_utenti_${currentTenantId}`,
+    async () => {
+      const teamStorageKey = getTenantStorageKey('bluman_custom_team_users', currentTenantId);
 
-  // Carica eventuali collaboratori salvati localmente per questo specifico tenant
-  let customList: any[] = [];
-  try {
-    const customStr = localStorage.getItem(teamStorageKey);
-    if (customStr) customList = JSON.parse(customStr);
-  } catch {}
+      // Carica eventuali collaboratori salvati localmente per questo specifico tenant
+      let customList: any[] = [];
+      try {
+        const customStr = localStorage.getItem(teamStorageKey);
+        if (customStr) customList = JSON.parse(customStr);
+      } catch {}
 
-  // 1. Prova a caricare dal backend Fastify/DB — la rotta filtra già per x-tenant-id
-  try {
-    const res = await apiFetch(`${API_BASE}/tenant/utenti`, { headers: getAuthHeaders() });
-    if (res.ok) {
-      const dbUsers = await res.json();
-      if (Array.isArray(dbUsers) && dbUsers.length > 0) {
-        // Aggiungi solo eventuali custom locali non già presenti nel DB
-        const existingEmails = new Set(dbUsers.map((u: any) => (u.email || '').toLowerCase()));
-        const fullList = [...dbUsers];
-        for (const cust of customList) {
-          if (cust.email && !existingEmails.has(cust.email.toLowerCase())) {
-            fullList.push(cust);
+      // 1. Prova a caricare dal backend Fastify/DB — la rotta filtra già per x-tenant-id
+      try {
+        const res = await apiFetch(`${API_BASE}/tenant/utenti`, { headers: getAuthHeaders() });
+        if (res.ok) {
+          const dbUsers = await res.json();
+          if (Array.isArray(dbUsers) && dbUsers.length > 0) {
+            // Aggiungi solo eventuali custom locali non già presenti nel DB
+            const existingEmails = new Set(dbUsers.map((u: any) => (u.email || '').toLowerCase()));
+            const fullList = [...dbUsers];
+            for (const cust of customList) {
+              if (cust.email && !existingEmails.has(cust.email.toLowerCase())) {
+                fullList.push(cust);
+              }
+            }
+            return fullList;
           }
         }
-        return fullList;
+      } catch (err) {
+        console.warn('Backend API offline / fallback team locale per tenant', err);
       }
-    }
-  } catch (err) {
-    console.warn('Backend API offline / fallback team locale per tenant', err);
-  }
 
-  // 2. Fallback offline: custom locali salvati per questo tenant
-  if (customList.length > 0) {
-    return customList;
-  }
+      // 2. Fallback offline: custom locali salvati per questo tenant
+      if (customList.length > 0) {
+        return customList;
+      }
 
-  // 3. Fallback solo per il Tenant Demo Bluecode Ltd
-  if (currentTenantId === BLUECODE_TENANT_ID) {
-    return DEFAULT_TEAM_USERS;
-  }
+      // 3. Fallback solo per il Tenant Demo Bluecode Ltd
+      if (currentTenantId === BLUECODE_TENANT_ID) {
+        return DEFAULT_TEAM_USERS;
+      }
 
-  // 4. Per qualsiasi altro tenant senza dati: lista vuota (l'admin dello studio aggiungerà i propri collaboratori)
-  return [];
+      // 4. Per qualsiasi altro tenant senza dati: lista vuota (l'admin dello studio aggiungerà i propri collaboratori)
+      return [];
+    },
+    { ttlMs: 60_000, forceRefresh: options?.forceRefresh }
+  );
 }
 
 export async function creaUtenteTenantApi(input: {
@@ -105,6 +112,7 @@ export async function creaUtenteTenantApi(input: {
   // pubblica insieme alla password SMTP dello studio letta da `localStorage` — e se
   // l'operatore chiudeva la schermata l'invito non partiva, con l'utente già creato.
 
+  invalidateCache('team_utenti');
   return creato;
 }
 

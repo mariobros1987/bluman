@@ -1,16 +1,27 @@
 import { API_BASE, apiFetch, getAuthHeaders, leggiErroreApi } from './http';
 import { queryPaginazione, type ParametriListaPaginata } from './paginazione';
+import { cachedQuery, invalidateCache } from './cache';
+import { getCurrentTenantId } from '../utils/tenant';
 
-export async function fetchClienti(parametri?: ParametriListaPaginata) {
-  try {
-    const res = await apiFetch(`${API_BASE}/clienti${queryPaginazione(parametri)}`, { headers: getAuthHeaders() });
-    if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore nel recupero clienti'));
-    return await res.json();
-  } catch (err) {
-    if (parametri) throw err;
-    console.warn('Backend API offline', err);
-    return null;
-  }
+export async function fetchClienti(parametri?: ParametriListaPaginata, options?: { forceRefresh?: boolean }) {
+  const currentTenantId = getCurrentTenantId();
+  const cacheKey = `clienti_${currentTenantId}_${JSON.stringify(parametri || {})}`;
+
+  return cachedQuery(
+    cacheKey,
+    async () => {
+      try {
+        const res = await apiFetch(`${API_BASE}/clienti${queryPaginazione(parametri)}`, { headers: getAuthHeaders() });
+        if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore nel recupero clienti'));
+        return await res.json();
+      } catch (err) {
+        if (parametri) throw err;
+        console.warn('Backend API offline', err);
+        return null;
+      }
+    },
+    { ttlMs: 30_000, forceRefresh: options?.forceRefresh }
+  );
 }
 
 export async function fetchCliente(id: string) {
@@ -28,6 +39,7 @@ export async function creaClienteApi(input: { nome: string; tipo?: 'individual' 
     body: JSON.stringify(input),
   });
   if (!res.ok) throw new Error('Errore creazione cliente');
+  invalidateCache('clienti');
   return await res.json();
 }
 
@@ -38,6 +50,7 @@ export async function aggiornaClienteApi(id: string, input: Record<string, any>)
     body: JSON.stringify(input),
   });
   if (!res.ok) throw new Error('Errore aggiornamento cliente');
+  invalidateCache('clienti');
   return await res.json();
 }
 

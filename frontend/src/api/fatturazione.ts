@@ -1,5 +1,7 @@
 import { API_BASE, apiFetch, getAuthHeaders, leggiErroreApi } from './http';
 import { queryPaginazione, type ParametriListaPaginata } from './paginazione';
+import { cachedQuery, invalidateCache } from './cache';
+import { getCurrentTenantId } from '../utils/tenant';
 
 export interface FatturaPortale {
   id: string;
@@ -48,41 +50,61 @@ export async function emettiFatturaApi(input: {
     const msg = await leggiErroreApi(res, 'Errore emissione fattura');
     throw new Error(msg);
   }
+  invalidateCache('fattur');
+  invalidateCache('scadenz');
+  invalidateCache('progett');
   return await res.json();
 }
 
-export async function fetchTutteFattureStudioApi(parametri?: ParametriListaPaginata) {
-  try {
-    const res = await apiFetch(`${API_BASE}/invoices${queryPaginazione(parametri)}`, { headers: getAuthHeaders() });
-    if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore recupero fatture studio'));
-    return await res.json();
-  } catch (err) {
-    if (parametri) throw err;
-    console.warn('Fetch tutte le fatture API fallback', err);
-    return [];
-  }
+export async function fetchTutteFattureStudioApi(parametri?: ParametriListaPaginata, options?: { forceRefresh?: boolean }) {
+  const currentTenantId = getCurrentTenantId();
+  const key = `fatture_${currentTenantId}_${JSON.stringify(parametri || {})}`;
+
+  return cachedQuery(
+    key,
+    async () => {
+      try {
+        const res = await apiFetch(`${API_BASE}/invoices${queryPaginazione(parametri)}`, { headers: getAuthHeaders() });
+        if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore recupero fatture studio'));
+        return await res.json();
+      } catch (err) {
+        if (parametri) throw err;
+        console.warn('Fetch tutte le fatture API fallback', err);
+        return [];
+      }
+    },
+    { ttlMs: 30_000, forceRefresh: options?.forceRefresh }
+  );
 }
 
-export async function fetchScadenzarioIncassiApi() {
-  try {
-    const res = await apiFetch(`${API_BASE}/invoices/scadenzario`, { headers: getAuthHeaders() });
-    if (!res.ok) throw new Error('Errore recupero scadenzario incassi');
-    return await res.json();
-  } catch (err) {
-    console.warn('Scadenzario incassi API fallback', err);
-    return null;
-  }
+export async function fetchScadenzarioIncassiApi(options?: { forceRefresh?: boolean }) {
+  const currentTenantId = getCurrentTenantId();
+  return cachedQuery(
+    `scadenzario_${currentTenantId}`,
+    async () => {
+      try {
+        const res = await apiFetch(`${API_BASE}/invoices/scadenzario`, { headers: getAuthHeaders() });
+        if (!res.ok) throw new Error('Errore recupero scadenzario incassi');
+        return await res.json();
+      } catch (err) {
+        console.warn('Scadenzario incassi API fallback', err);
+        return null;
+      }
+    },
+    { ttlMs: 30_000, forceRefresh: options?.forceRefresh }
+  );
 }
 
 export async function registraIncassoApi(scadenzaId: string, input: { importoIncassatoCentesimi: number; metodoPagamento?: string; riferimentoTransazione?: string; noteOperatore?: string }) {
-  // §3.3 — registrare un incasso muove la Prima Nota: un fallimento restituito come `null`
-  // lasciava l'operatore senza conferma né errore, con la rata ancora «aperta» a database.
   const res = await apiFetch(`${API_BASE}/invoices/scadenze/${scadenzaId}/incassi`, {
     method: 'POST',
     headers: getAuthHeaders(),
     body: JSON.stringify(input),
   });
   if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore durante la registrazione dell\'incasso'));
+  invalidateCache('fattur');
+  invalidateCache('scadenz');
+  invalidateCache('prima_nota');
   return await res.json();
 }
 
@@ -230,6 +252,8 @@ export async function createInvoiceApi(input: any) {
     body: JSON.stringify(input),
   });
   if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore creazione bozza fattura'));
+  invalidateCache('fattur');
+  invalidateCache('scadenz');
   return await res.json();
 }
 
@@ -240,6 +264,8 @@ export async function updateInvoiceApi(id: string, input: any) {
     body: JSON.stringify(input),
   });
   if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore modifica fattura'));
+  invalidateCache('fattur');
+  invalidateCache('scadenz');
   return await res.json();
 }
 
@@ -249,6 +275,8 @@ export async function deleteInvoiceApi(id: string) {
     headers: getAuthHeaders(),
   });
   if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore eliminazione bozza fattura'));
+  invalidateCache('fattur');
+  invalidateCache('scadenz');
   return await res.json();
 }
 
@@ -258,6 +286,8 @@ export async function emettiInvoiceApi(id: string) {
     headers: getAuthHeaders(),
   });
   if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore emissione fattura'));
+  invalidateCache('fattur');
+  invalidateCache('scadenz');
   return await res.json();
 }
 
@@ -268,6 +298,8 @@ export async function emettiNotaCreditoApi(id: string, input: { motivo: string; 
     body: JSON.stringify(input),
   });
   if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore emissione nota di credito'));
+  invalidateCache('fattur');
+  invalidateCache('scadenz');
   return await res.json();
 }
 
@@ -278,6 +310,8 @@ export async function importFromProjectApi(progettoId: string, moduliIds?: strin
     body: JSON.stringify({ progettoId, moduliIds, percentuale }),
   });
   if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore importazione da progetto'));
+  invalidateCache('fattur');
+  invalidateCache('scadenz');
   return await res.json();
 }
 
@@ -288,6 +322,8 @@ export async function importFromPreventivoApi(preventivoId: string) {
     body: JSON.stringify({ preventivoId }),
   });
   if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore importazione da preventivo'));
+  invalidateCache('fattur');
+  invalidateCache('scadenz');
   return await res.json();
 }
 
@@ -298,13 +334,24 @@ export async function importFromTimesheetApi(progettoId: string, operatoreId?: s
     body: JSON.stringify({ progettoId, operatoreId, tariffaOrariaCent }),
   });
   if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore importazione da timesheet'));
+  invalidateCache('fattur');
+  invalidateCache('scadenz');
   return await res.json();
 }
 
-export async function fetchPrimaNotaApi(parametri?: ParametriListaPaginata) {
-  const res = await apiFetch(`${API_BASE}/prima-nota${queryPaginazione(parametri)}`, { headers: getAuthHeaders() });
-  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore lettura prima nota'));
-  return await res.json();
+export async function fetchPrimaNotaApi(parametri?: ParametriListaPaginata, options?: { forceRefresh?: boolean }) {
+  const currentTenantId = getCurrentTenantId();
+  const key = `prima_nota_${currentTenantId}_${JSON.stringify(parametri || {})}`;
+
+  return cachedQuery(
+    key,
+    async () => {
+      const res = await apiFetch(`${API_BASE}/prima-nota${queryPaginazione(parametri)}`, { headers: getAuthHeaders() });
+      if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore lettura prima nota'));
+      return await res.json();
+    },
+    { ttlMs: 30_000, forceRefresh: options?.forceRefresh }
+  );
 }
 
 export async function createPrimaNotaApi(input: any) {
@@ -314,6 +361,7 @@ export async function createPrimaNotaApi(input: any) {
     body: JSON.stringify(input),
   });
   if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore registrazione prima nota'));
+  invalidateCache('prima_nota');
   return await res.json();
 }
 
@@ -324,6 +372,7 @@ export async function importCsvPrimaNotaApi(csvContent: string, contoBancarioId?
     body: JSON.stringify({ csvContent, contoBancarioId }),
   });
   if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore importazione CSV'));
+  invalidateCache('prima_nota');
   return await res.json();
 }
 
@@ -333,6 +382,7 @@ export async function deletePrimaNotaApi(id: string) {
     headers: getAuthHeaders(),
   });
   if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore eliminazione movimento'));
+  invalidateCache('prima_nota');
   return await res.json();
 }
 
