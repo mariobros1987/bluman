@@ -381,8 +381,10 @@ export async function registraRotteClienti(server: FastifyInstance, app: AppPort
         }),
       );
 
-      const ref = cliente.referentiJson && typeof cliente.referentiJson === 'object' ? (cliente.referentiJson as any) : {};
-      const destEmail = cliente.email || ref.email;
+      const ref = cliente.referentiJson && typeof cliente.referentiJson === 'object'
+        ? (cliente.referentiJson as Record<string, unknown>)
+        : {};
+      const destEmail = cliente.email || (typeof ref.email === 'string' ? ref.email : undefined);
 
       let emailInviata = false;
       let erroreInvioEmail: string | undefined;

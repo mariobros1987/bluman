@@ -101,7 +101,7 @@ export async function registraRotteContabilitaPrimaNota(server: FastifyInstance,
     if (!parseResult.success) {
       return reply.code(400).send({ errore: parseResult.error.issues[0]?.message || 'Descrizione e importo maggiori di 0 sono obbligatori' });
     }
-    const body = parseResult.data as any;
+    const body = parseResult.data;
 
     try {
       const movimento = await prisma.movimentoPrimaNota.create({

@@ -211,9 +211,14 @@ export async function registraRotteSolleciti(server: FastifyInstance): Promise<v
 
         // 2. Invio WhatsApp se richiesto
         if (canale === 'whatsapp' || canale === 'entrambi') {
-          const referenti = scadenza.fattura.cliente.referentiJson as any;
-          const telefono = telefonoDestinatario ||
-            (Array.isArray(referenti) ? referenti[0]?.telefono || referenti[0]?.whatsapp : referenti?.telefono || referenti?.whatsapp);
+          const rawRef = scadenza.fattura.cliente.referentiJson;
+          const referenti = (rawRef && typeof rawRef === 'object')
+            ? (rawRef as Record<string, unknown> | Array<Record<string, unknown>>)
+            : null;
+          const telDaRef = Array.isArray(referenti)
+            ? (referenti[0]?.telefono || referenti[0]?.whatsapp)
+            : (referenti?.telefono || referenti?.whatsapp);
+          const telefono = telefonoDestinatario || (typeof telDaRef === 'string' ? telDaRef : undefined);
 
           if (!telefono) {
             return reply.code(400).send({

@@ -91,6 +91,8 @@ export interface AppPort {
   // tenantId opzionale: se omesso l'implementazione usa il tenant del costruttore;
   // le rotte HTTP passano SEMPRE quello del token JWT (§14, §2bis).
   eliminaProgetto(id: string, tenantId?: string): Promise<void>;
+  listaAccessiProgetto(progettoId: string): Promise<unknown[]>;
+  assegnaAccessoProgetto(progettoId: string, userId: string, livello?: string): Promise<unknown>;
   listaFattureTutte(): Promise<unknown[]>;
   creaPreventivo(input: { clienteId: string; progettoId: string; righe: RigaPreventivoInput[] }): Preventivo | Promise<Preventivo>;
   getPreventivo(id: string): Preventivo | Promise<Preventivo>;

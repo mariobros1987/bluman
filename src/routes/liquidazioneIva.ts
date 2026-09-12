@@ -77,7 +77,7 @@ export async function registraRotteLiquidazioneIva(server: FastifyInstance): Pro
       // 3. Calcolo LIPE deterministico
       const riepilogo = calcolaLiquidazioneIvaPeriodo(
         periodo,
-        fattureAttive as any,
+        fattureAttive,
         fatturePassive,
         creditoPrecedenteCent || 0,
       );
@@ -142,7 +142,7 @@ export async function registraRotteLiquidazioneIva(server: FastifyInstance): Pro
 
       const riepilogo = calcolaLiquidazioneIvaPeriodo(
         periodo,
-        fattureAttive as any,
+        fattureAttive,
         fatturePassive,
         creditoPrecedenteCent || 0,
       );

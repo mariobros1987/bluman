@@ -17,6 +17,7 @@
 // incapsulamento, nessuna nuova barriera).
 
 import type { FastifyInstance } from 'fastify';
+import { type StatoPropostaDati } from '@prisma/client';
 import { prisma } from '../util/prismaClient.js';
 import { notificaStudio, notificaCliente } from '../services/notificheService.js';
 import { recordAudit, clienteDellaRichiesta } from '../util/serverHelpers.js';
@@ -31,9 +32,9 @@ export async function registraRottePortale(server: FastifyInstance): Promise<voi
   // Qui si restituisce il recapito vero del responsabile dello studio, letto dal tenant,
   // e il frontend lo mostra senza inventare presenze.
   // ────────────────────────────────────────────────────────────────
-  server.get('/portal/contatti', async (req, reply) => {
+  server.get<{ Querystring: { clienteId?: string } }>('/portal/contatti', async (req, reply) => {
     const tenantId = req.tenantId;
-    const clienteId = clienteDellaRichiesta(req, (req.query as any)?.clienteId);
+    const clienteId = clienteDellaRichiesta(req, req.query?.clienteId);
     if (!clienteId) {
       return reply.code(400).send({ errore: 'Cliente non identificato nella sessione.' });
     }
@@ -84,9 +85,9 @@ export async function registraRottePortale(server: FastifyInstance): Promise<voi
   // pagamento. Le bozze restano allo studio — una fattura non emessa non è un documento
   // del cliente. L'importo è la somma delle righe (centesimi, mai float per il denaro).
   // ────────────────────────────────────────────────────────────────
-  server.get('/portal/fatture', async (req, reply) => {
+  server.get<{ Querystring: { clienteId?: string } }>('/portal/fatture', async (req, reply) => {
     const tenantId = req.tenantId;
-    const clienteId = clienteDellaRichiesta(req, (req.query as any)?.clienteId);
+    const clienteId = clienteDellaRichiesta(req, req.query?.clienteId);
     if (!clienteId) return reply.code(400).send({ errore: 'Cliente non identificato nella sessione.' });
     try {
       const fatture = await prisma.fattura.findMany({
@@ -204,9 +205,9 @@ export async function registraRottePortale(server: FastifyInstance): Promise<voi
   }
 
   // Lato cliente: legge le proprie proposte (per mostrare lo stato di quelle inviate).
-  server.get('/portal/proposte-dati', async (req, reply) => {
+  server.get<{ Querystring: { clienteId?: string } }>('/portal/proposte-dati', async (req, reply) => {
     const tenantId = req.tenantId;
-    const clienteId = clienteDellaRichiesta(req, (req.query as any)?.clienteId);
+    const clienteId = clienteDellaRichiesta(req, req.query?.clienteId);
     if (!clienteId) return reply.code(400).send({ errore: 'Cliente non identificato nella sessione.' });
     try {
       const proposte = await prisma.propostaDatiFiscale.findMany({
@@ -286,16 +287,16 @@ export async function registraRottePortale(server: FastifyInstance): Promise<voi
   });
 
   // Lato studio: elenca le proposte del tenant (filtrabili per cliente e stato).
-  server.get('/proposte-dati', async (req, reply) => {
+  server.get<{ Querystring: { clienteId?: string; stato?: StatoPropostaDati } }>('/proposte-dati', async (req, reply) => {
     if (req.ruolo === 'cliente') return reply.code(403).send({ errore: 'Non autorizzato.' });
     const tenantId = req.tenantId;
-    const query = req.query as any;
+    const query = req.query || {};
     try {
       const proposte = await prisma.propostaDatiFiscale.findMany({
         where: {
           tenantId,
-          ...(query.clienteId ? { clienteId: String(query.clienteId) } : {}),
-          ...(query.stato ? { stato: String(query.stato) as any } : {}),
+          ...(query.clienteId ? { clienteId: query.clienteId } : {}),
+          ...(query.stato ? { stato: query.stato } : {}),
         },
         include: { cliente: { select: { id: true, nome: true } } },
         orderBy: { createdAt: 'desc' },
@@ -410,16 +411,16 @@ export async function registraRottePortale(server: FastifyInstance): Promise<voi
   // ────────────────────────────────────────────────────────────────
 
   // Lato cliente: elenca le proprie richieste di addendum.
-  server.get('/portal/addendum', async (req, reply) => {
+  server.get<{ Querystring: { clienteId?: string; progettoId?: string } }>('/portal/addendum', async (req, reply) => {
     const tenantId = req.tenantId;
-    const clienteId = clienteDellaRichiesta(req, (req.query as any)?.clienteId);
+    const clienteId = clienteDellaRichiesta(req, req.query?.clienteId);
     if (!clienteId) return reply.code(400).send({ errore: 'Cliente non identificato nella sessione.' });
     try {
       const richieste = await prisma.richiestaAddendum.findMany({
         where: {
           tenantId,
           clienteId,
-          ...((req.query as any)?.progettoId ? { progettoId: String((req.query as any).progettoId) } : {}),
+          ...(req.query?.progettoId ? { progettoId: req.query.progettoId } : {}),
         },
         include: { progetto: { select: { id: true, nome: true } } },
         orderBy: { createdAt: 'desc' },
@@ -493,16 +494,16 @@ export async function registraRottePortale(server: FastifyInstance): Promise<voi
   });
 
   // Lato studio: elenca le richieste di addendum del tenant (filtrabili per progetto/stato).
-  server.get('/addendum', async (req, reply) => {
+  server.get<{ Querystring: { progettoId?: string; stato?: 'richiesta' | 'in_preparazione' | 'pronta' | 'rifiutata' } }>('/addendum', async (req, reply) => {
     if (req.ruolo === 'cliente') return reply.code(403).send({ errore: 'Non autorizzato.' });
     const tenantId = req.tenantId;
-    const query = req.query as any;
+    const query = req.query || {};
     try {
       const richieste = await prisma.richiestaAddendum.findMany({
         where: {
           tenantId,
-          ...(query.progettoId ? { progettoId: String(query.progettoId) } : {}),
-          ...(query.stato ? { stato: String(query.stato) as any } : {}),
+          ...(query.progettoId ? { progettoId: query.progettoId } : {}),
+          ...(query.stato ? { stato: query.stato } : {}),
         },
         include: {
           cliente: { select: { id: true, nome: true } },
@@ -518,11 +519,13 @@ export async function registraRottePortale(server: FastifyInstance): Promise<voi
 
   // Lato studio: aggiorna lo stato di una richiesta (in lavorazione / pronta / rifiutata)
   // e allega la risposta per il cliente.
-  server.post<{ Params: { id: string }; Body: { stato?: string; rispostaStudio?: string } }>('/addendum/:id/stato', async (req, reply) => {
+  const STATI_ADDENDUM = ['richiesta', 'in_preparazione', 'pronta', 'rifiutata'] as const;
+  type StatoAddendum = (typeof STATI_ADDENDUM)[number];
+
+  server.post<{ Params: { id: string }; Body: { stato?: StatoAddendum; rispostaStudio?: string } }>('/addendum/:id/stato', async (req, reply) => {
     if (req.ruolo === 'cliente') return reply.code(403).send({ errore: 'Non autorizzato.' });
     const tenantId = req.tenantId;
     const { id } = req.params;
-    const STATI_ADDENDUM = ['richiesta', 'in_preparazione', 'pronta', 'rifiutata'];
     const nuovoStato = req.body?.stato;
     if (nuovoStato && !STATI_ADDENDUM.includes(nuovoStato)) {
       return reply.code(400).send({ errore: 'Stato non valido.' });
@@ -533,7 +536,7 @@ export async function registraRottePortale(server: FastifyInstance): Promise<voi
       const aggiornata = await prisma.richiestaAddendum.update({
         where: { id: richiesta.id },
         data: {
-          ...(nuovoStato ? { stato: nuovoStato as any } : {}),
+          ...(nuovoStato ? { stato: nuovoStato } : {}),
           ...(req.body?.rispostaStudio !== undefined ? { rispostaStudio: (req.body.rispostaStudio ?? '').trim() || null } : {}),
           gestitoDaId: req.user?.userId ?? null,
         },

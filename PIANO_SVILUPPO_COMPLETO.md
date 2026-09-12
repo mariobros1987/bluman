@@ -1,8 +1,8 @@
 # 🗺️ BluMan Advisory Platform — Piano di Sviluppo Completo & Dettagliato
 
-> **Versione**: 3.4 — Suite E2E Flussi Critici (FASE 7) & Restore Drill Disaster Recovery (FASE 5)
+> **Versione**: 3.5 — OpenAPI Swagger UI (FASE 6.2) & Pulizia Tipizzazione Route (FASE 8.1)
 > **Data di Riferimento**: 2026-09-12
-> **Stato Codebase**: 745/745 test Vitest verdi (65 file) • Build TypeScript backend, typecheck/build frontend riusciti
+> **Stato Codebase**: 750/750 test Vitest verdi (66 file) • Build TypeScript backend, typecheck/build frontend riusciti
 > **Autore**: Mario Dibenedetto & Team di Ingegneria AI
 
 ---
@@ -358,11 +358,11 @@ Creare test end-to-end automatizzati (con database di test isolato o mock comple
 - [x] **5.1** Creare e testare script `src/scripts/restoreDbTest.ts` su database di test con rispetto dei vincoli referenziali e dry-run (`npm run restore:test`).
 - [ ] **5.2** Schedulare backup periodico su storage cloud.
 - [ ] **6.1** Implementare 2FA TOTP con `otplib` per gli utenti con ruolo `super_admin`.
-- [ ] **6.2** Configurare documentazione interattiva OpenAPI / Swagger (`@fastify/swagger`).
+- [x] **6.2** Configurare documentazione interattiva OpenAPI / Swagger (`@fastify/swagger` + `@fastify/swagger-ui` su `/docs`).
 - [x] **7.1** Test E2E sul flusso creazione progetto e transazione atomica (`src/e2eFlussiCritici.test.ts`).
 - [x] **7.2** Test E2E sul ciclo firma OTP e sigillo forense (`src/e2eFlussiCritici.test.ts`).
 - [x] **7.3** Test E2E sulla generazione XML FatturaPA SDI e Prima Nota (`src/e2eFlussiCritici.test.ts`).
-- [ ] **8.1** Rimozione cast `as any` residui nelle route Fastify.
+- [x] **8.1** Rimozione sistematica dei cast `as any` residui nelle route Fastify e tipizzazione rigorosa.
 
 ---
 

@@ -20,6 +20,7 @@
 
 import { createHash, randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../util/prismaClient.js';
 import { uploadDocumento, rifirmaUrlUpload } from '../services/storageService.js';
 import { scanFileBuffer } from '../services/securityScanner.js';
@@ -548,7 +549,7 @@ export async function registraRotteDocumenti(server: FastifyInstance): Promise<v
           // §36 — i blocchi risolti restano attaccati alla riga: alla firma del cliente
           // `generaCopiaFirmata` ricompone da qui il documento con la grafometrica dentro
           // l'area `{{firma_cliente}}`, senza toccare il PDF su cui si fissa il sigillo.
-          contenutoBlocchiJson: blocchi as any,
+          contenutoBlocchiJson: blocchi as unknown as Prisma.InputJsonValue,
           caricatoDa: userId,
           categoriaDoc: categoria || 'generico',
           dataScadenzaDoc: scadenza,

@@ -279,6 +279,14 @@ export class InMemoryApp implements AppPort {
     return { ok: true, id, isAttivo: false };
   }
 
+  async listaAccessiProgetto(_progettoId: string): Promise<unknown[]> {
+    return [];
+  }
+
+  async assegnaAccessoProgetto(progettoId: string, userId: string, livello: string = 'scrittura'): Promise<unknown> {
+    return { id: randomUUID(), progettoId, userId, livello };
+  }
+
   emettiFattura(input: any): unknown {
     return { id: randomUUID(), ...input, stato: 'emessa' };
   }

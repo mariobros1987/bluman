@@ -87,7 +87,10 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
   // serve l'anagrafica e le rotte di firma lo fanno rispettare: un nome digitato
   // liberamente nel body non identifica nessuno.
   function firmatariAmmessi(cliente: { nome: string; referentiJson?: unknown }): string[] {
-    const legale = (cliente.referentiJson as any)?.legaleRappresentante;
+    const referenti = cliente.referentiJson && typeof cliente.referentiJson === 'object'
+      ? (cliente.referentiJson as Record<string, unknown>)
+      : null;
+    const legale = typeof referenti?.legaleRappresentante === 'string' ? referenti.legaleRappresentante : undefined;
     return [cliente.nome, legale]
       .filter((n): n is string => typeof n === 'string' && n.trim() !== '')
       .map((n) => n.trim());
@@ -107,9 +110,9 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
    * «firmato» significa che esiste una riga in `FirmaElettronica`. Quando il fascicolo è vuoto la
    * risposta è un elenco vuoto: il portale lo dichiara, non lo riempie.
    */
-  server.get('/portal/documenti', async (req, reply) => {
+  server.get<{ Querystring: { clienteId?: string } }>('/portal/documenti', async (req, reply) => {
     const tenantId = req.tenantId;
-    const clienteId = clienteDellaRichiesta(req, (req.query as any)?.clienteId);
+    const clienteId = clienteDellaRichiesta(req, req.query?.clienteId);
     if (!clienteId) {
       return reply.code(400).send({ errore: 'Cliente non identificato nella sessione.' });
     }
@@ -676,9 +679,9 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
     }
   });
 
-  server.get('/portal/canali-firma', async (req, reply) => {
+  server.get<{ Querystring: { clienteId?: string } }>('/portal/canali-firma', async (req, reply) => {
     const tenantId = req.tenantId;
-    const clienteId = clienteDellaRichiesta(req, (req.query as any)?.clienteId);
+    const clienteId = clienteDellaRichiesta(req, req.query?.clienteId);
     if (!clienteId) {
       return reply.code(400).send({ errore: 'Cliente non identificato nella sessione.' });
     }

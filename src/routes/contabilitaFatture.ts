@@ -207,10 +207,10 @@ export async function registraRotteContabilitaFatture(server: FastifyInstance, a
       assertFatturaModificabile(fattura.stato);
 
       const opzioni: OpzioniCalcoloFattura = {
-        tipoCassa: body.tipoCassa !== undefined ? body.tipoCassa : (fattura.tipoCassa as any),
+        tipoCassa: (body.tipoCassa !== undefined ? body.tipoCassa : (fattura.tipoCassa || 'nessuna')) as OpzioniCalcoloFattura['tipoCassa'],
         aliquotaCassa: body.aliquotaCassa !== undefined ? body.aliquotaCassa : fattura.aliquotaCassa,
         aliquotaRitenuta: body.aliquotaRitenuta !== undefined ? body.aliquotaRitenuta : fattura.aliquotaRitenuta,
-        esigibilitaIva: body.esigibilitaIva || (fattura.esigibilitaIva as any) || 'immediata',
+        esigibilitaIva: (body.esigibilitaIva || fattura.esigibilitaIva || 'immediata') as OpzioniCalcoloFattura['esigibilitaIva'],
       };
       const calcolo = calcolaTotaliFattura(body.righe, opzioni);
 
@@ -649,7 +649,12 @@ export async function registraRotteContabilitaFatture(server: FastifyInstance, a
       });
       if (!prev) return reply.code(404).send({ errore: 'Preventivo non trovato' });
 
-      const righeJson = Array.isArray(prev.righeJson) ? (prev.righeJson as any[]) : [];
+      interface RigaPreventivoJsonItem {
+        moduloTemplateId?: string;
+        prezzo?: number;
+        [key: string]: unknown;
+      }
+      const righeJson: RigaPreventivoJsonItem[] = Array.isArray(prev.righeJson) ? (prev.righeJson as unknown as RigaPreventivoJsonItem[]) : [];
       const righeSuggerite: RigaFatturaInput[] = [];
 
       for (const r of righeJson) {
@@ -663,7 +668,7 @@ export async function registraRotteContabilitaFatture(server: FastifyInstance, a
           descrizione: nomeModulo,
           quantita: 1,
           unitaMisura: 'forfait',
-          prezzoUnitarioCent: r.prezzo || Math.round(prev.valoreTotale / Math.max(1, righeJson.length)),
+          prezzoUnitarioCent: typeof r.prezzo === 'number' ? r.prezzo : Math.round(prev.valoreTotale / Math.max(1, righeJson.length)),
           aliquotaIva: 22,
           applicaCassa: true,
           applicaRitenuta: true,

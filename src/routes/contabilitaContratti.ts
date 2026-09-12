@@ -47,7 +47,7 @@ export async function registraRotteContabilitaContratti(server: FastifyInstance,
     if (!parseResult.success) {
       return reply.code(400).send({ errore: parseResult.error.issues[0]?.message || 'clienteId, titolo e importoCentesimi sono obbligatori' });
     }
-    const { clienteId, progettoId, titolo, frequenza, importoCentesimi, prossimaFatturazione, note } = parseResult.data as any;
+    const { clienteId, progettoId, titolo, frequenza, importoCentesimi, prossimaFatturazione, note } = parseResult.data;
 
     try {
       const contratto = await prisma.contrattoRicorrente.create({
@@ -58,7 +58,7 @@ export async function registraRotteContabilitaContratti(server: FastifyInstance,
           titolo,
           frequenza: frequenza || 'mensile',
           importoCentesimi,
-          prossimaFatturazione: new Date(prossimaFatturazione),
+          prossimaFatturazione: prossimaFatturazione || new Date(),
           note,
         },
         include: { cliente: true, progetto: true },
@@ -94,8 +94,7 @@ export async function registraRotteContabilitaContratti(server: FastifyInstance,
 
       const opzioni: OpzioniCalcoloFattura = {
         tipoCassa: 'nessuna',
-        aliquotaIva: 22,
-      } as any;
+      };
       const righeInput: RigaFatturaInput[] = [
         {
           tipo: 'milestone_libera',

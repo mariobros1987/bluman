@@ -8,6 +8,7 @@
 // incapsulamento, nessuna nuova barriera).
 
 import type { FastifyInstance } from 'fastify';
+import { RuoloUtente } from '@prisma/client';
 import { prisma, prismaAmministrativo } from '../util/prismaClient.js';
 import { generaPasswordTemporanea, hashPassword } from '../util/password.js';
 import { rifirmaUrlUpload } from '../services/storageService.js';
@@ -35,9 +36,10 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
    */
   function conFirmaLogo<T>(tenant: T): T {
     if (!tenant || typeof tenant !== 'object') return tenant;
-    const logoUrl = (tenant as any).logoUrl;
+    const record = tenant as Record<string, unknown>;
+    const logoUrl = record.logoUrl;
     if (typeof logoUrl !== 'string') return tenant;
-    return { ...(tenant as any), logoUrl: rifirmaUrlUpload(logoUrl) };
+    return { ...record, logoUrl: rifirmaUrlUpload(logoUrl) } as T;
   }
 
   /**
@@ -60,7 +62,7 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
    */
   function senzaSegreti<T>(tenant: T): T {
     if (!tenant || typeof tenant !== 'object') return tenant;
-    const copia: Record<string, any> = { ...(tenant as any) };
+    const copia: Record<string, unknown> = { ...(tenant as Record<string, unknown>) };
     for (const chiave of CHIAVI_SEGRETE) {
       if (chiave in copia) {
         copia[`${chiave}Impostata`] = Boolean(copia[chiave]);
@@ -353,7 +355,7 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
 
       const datiComuni = {
         nome,
-        ruolo: ruoloFinale as any,
+        ruolo: ruoloFinale as RuoloUtente,
         specializzazione: specializzazione || undefined,
         costoOrarioCentesimi: costoOrarioCentesimi || undefined,
         tenantId: tenantAssegnato,
@@ -535,8 +537,8 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
         durataMesi: t.durataMesi || 12,
         dataAttivazione: t.dataAttivazione || new Date(t.createdAt).toLocaleDateString('it-IT'),
         dataScadenza: t.dataScadenza || '',
-        utentiCount: (t as any)._count?.users || 1,
-        progettiCount: (t as any)._count?.clienti || 0,
+        utentiCount: t._count?.users || 1,
+        progettiCount: t._count?.clienti || 0,
         fatturatoMensile: 0,
       })));
     } catch {
@@ -583,7 +585,7 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
             data: {
               email: emailResponsabile,
               nome: b.leadAdvisorNome || 'Lead Senior Advisor',
-              ruolo: 'advisor' as any,
+              ruolo: 'advisor',
               tenantId: tenant.id,
               specializzazione: `Lead Partner — ${tenant.ragioneSociale}`,
               passwordHash: hashPassword(passwordTemporanea),
@@ -669,7 +671,7 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
           data: {
             email: emailResponsabile,
             nome: tenant.leadAdvisorNome || 'Lead Senior Advisor',
-            ruolo: 'advisor' as any,
+            ruolo: 'advisor',
             tenantId: tenant.id,
             specializzazione: `Lead Partner — ${tenant.ragioneSociale}`,
             passwordHash,

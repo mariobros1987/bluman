@@ -17,6 +17,7 @@
 // parte e senza database. Qui si leggono le righe, si scrive e si verbalizza.
 
 import type { FastifyInstance } from 'fastify';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../util/prismaClient.js';
 import { recordAudit } from '../util/serverHelpers.js';
 import { livelloFirmaValido } from '../services/livelloFirmaService.js';
@@ -27,6 +28,7 @@ import {
   descriviDecadenza,
   effettoModifica,
   etichettaStato,
+  type StatoRevisione,
 } from '../services/revisioneModello.js';
 
 /** I campi che l'interfaccia legge di un modello. Il testo completo c'è: serve all'editor. */
@@ -373,7 +375,8 @@ export async function registraRotteModelliDocumento(server: FastifyInstance): Pr
     const tenantId = req.tenantId;
     if (req.ruolo === 'cliente') return reply.code(403).send({ errore: 'Non autorizzato.' });
 
-    const { riferimentoSerie, titolo, categoria, descrizione, contenutoHtml, livelloFirmaRichiesto } = req.body ?? ({} as any);
+    const body = req.body || { riferimentoSerie: '', titolo: '', contenutoHtml: '' };
+    const { riferimentoSerie, titolo, categoria, descrizione, contenutoHtml, livelloFirmaRichiesto } = body;
     const contenutoSanitizzato = sanitizzaHtmlDocumento(contenutoHtml || '');
     const riferimento = (riferimentoSerie ?? '').trim();
     if (!riferimento) {
@@ -425,7 +428,7 @@ export async function registraRotteModelliDocumento(server: FastifyInstance): Pr
       // Corsa fra due adozioni simultanee: il vincolo unico (tenant_id, riferimento_serie) ha
       // fatto il suo lavoro. Si rilegge la riga vincente invece di restituire un errore, che
       // per l'operatore sarebbe incomprensibile — il modello, dopo tutto, adesso c'è.
-      const codice = (err as any)?.code;
+      const codice = err instanceof Prisma.PrismaClientKnownRequestError ? err.code : (typeof err === 'object' && err !== null && 'code' in err ? String((err as { code: unknown }).code) : undefined);
       if (codice === 'P2002') {
         const vincente = await prisma.modelloDocumentoCustom.findFirst({
           where: { tenantId, riferimentoSerie: riferimento },
@@ -468,7 +471,7 @@ export async function registraRotteModelliDocumento(server: FastifyInstance): Pr
         entita: `Modello #${attuale.id}`,
         dettagli:
           `Modello «${attuale.titolo}» eliminato definitivamente ` +
-          `(stato ${etichettaStato(attuale.statoRevisione as any)}, versione ${attuale.versione}). ` +
+          `(stato ${etichettaStato(attuale.statoRevisione as StatoRevisione)}, versione ${attuale.versione}). ` +
           'I documenti già generati nei progetti restano invariati.',
         ipAddress: req.ip,
       });

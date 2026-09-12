@@ -12,7 +12,7 @@ import { campoOrdinamento, creaMetaPaginazione, leggiPaginazione } from '../util
 export async function registraRotteContabilitaRegistro(server: FastifyInstance, app: AppPort): Promise<void> {
   // ─── COMPATIBILITÀ ROTTE PRECEDENTI ────────────────────────────────
   server.get('/fatture/tutte', async () => {
-    return (app as any).listaFattureTutte();
+    return app.listaFattureTutte();
   });
 
   server.post<{

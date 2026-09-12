@@ -86,6 +86,7 @@ import { registraRotteWebhooks } from './routes/webhooks.js';
 // studio lette dal database: prima le faceva il browser chiamando le funzioni
 // serverless con la password SMTP presa da localStorage.
 import { registraRotteComunicazioni } from './routes/comunicazioni.js';
+import { registraSwagger } from './plugins/swagger.js';
 
 const isTestEnv = process.env.NODE_ENV === 'test';
 const isProdEnv = process.env.NODE_ENV === 'production';
@@ -323,6 +324,9 @@ export function buildServer(app: AppPort): FastifyInstance {
     return reply.code(404).send({ message: `Route ${req.method}:${req.url} not found`, error: 'Not Found', statusCode: 404 });
   });
 
+  // ─── OPENAPI & SWAGGER UI (§6.2) ───────────────────────────────────
+  await registraSwagger(server);
+
   // §23 — la protezione brute-force sugli endpoint che verificano credenziali è
   // demandata a @fastify/rate-limit (config per-route: 5 richieste/min per IP,
   // registrata sopra insieme al limite globale). Un solo meccanismo, header
@@ -336,64 +340,87 @@ export function buildServer(app: AppPort): FastifyInstance {
     let autenticato = false;
     let payload = null as ReturnType<typeof verifyJwt>;
     const authHeader = req.headers.authorization;
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      const token = authHeader.split(' ')[1];
-      if (token) {
-        const verificato = verifyJwt(token);
-        if (verificato && ruoloValido(verificato.ruolo) && Number.isInteger(verificato.sessionVersion)) {
-          payload = verificato;
-          ruolo = verificato.ruolo;
-          if (verificato.tenantId) tenantId = verificato.tenantId;
+    let token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : undefined;
 
-          // Un JWT firmato non basta per rinnovare o accedere: l'identità deve ancora esistere,
-          // essere attiva (o invitata nei flussi staff) e avere la stessa versione di sessione.
-          try {
-            if (ruolo === 'cliente') {
-              const clienteId = clienteIdDalJwt(verificato);
-              if (clienteId) {
-                attivaContestoTenant({ tenantId, ruolo });
-                const cliente = await prisma.cliente.findFirst({
-                  where: { id: clienteId, tenantId },
-                  select: { sessionVersion: true },
-                });
-                autenticato = Boolean(cliente && cliente.sessionVersion === verificato.sessionVersion);
-              }
-            } else {
+    // Per la documentazione Swagger UI (/docs) permettiamo anche l'autenticazione tramite query string ?token=
+    const patternRotta = req.routeOptions?.url;
+    const urlSenzaQuery = (req.url || '').split('?')[0] || '';
+    const isDocsRoute = (patternRotta?.startsWith('/docs') || urlSenzaQuery.startsWith('/docs')) ?? false;
+    if (!token && isDocsRoute) {
+      try {
+        const parsedUrl = new URL(req.url, 'http://localhost');
+        token = parsedUrl.searchParams.get('token') || undefined;
+      } catch {
+        // query non standard
+      }
+    }
+
+    if (token) {
+      const verificato = verifyJwt(token);
+      if (verificato && ruoloValido(verificato.ruolo) && Number.isInteger(verificato.sessionVersion)) {
+        payload = verificato;
+        ruolo = verificato.ruolo;
+        if (verificato.tenantId) tenantId = verificato.tenantId;
+
+        // Un JWT firmato non basta per rinnovare o accedere: l'identità deve ancora esistere,
+        // essere attiva (o invitata nei flussi staff) e avere la stessa versione di sessione.
+        try {
+          if (ruolo === 'cliente') {
+            const clienteId = clienteIdDalJwt(verificato);
+            if (clienteId) {
               attivaContestoTenant({ tenantId, ruolo });
-              const utente = await prisma.user.findFirst({
-                where: { id: verificato.userId, ...(ruolo === 'super_admin' ? {} : { tenantId }) },
-                select: { ruolo: true, stato: true, sessionVersion: true },
+              const cliente = await prisma.cliente.findFirst({
+                where: { id: clienteId, tenantId },
+                select: { sessionVersion: true },
               });
-              autenticato = Boolean(
-                utente &&
-                utente.ruolo === ruolo &&
-                utente.stato !== 'disattivato' &&
-                utente.sessionVersion === verificato.sessionVersion,
-              );
+              autenticato = Boolean(cliente && cliente.sessionVersion === verificato.sessionVersion);
             }
-          } catch (err) {
-            // Verifica identità fail-closed: un DB irraggiungibile non trasforma un token
-            // non verificabile in una sessione valida e non produce rinnovi.
-            console.error('Verifica sessione JWT fallita:', err instanceof Error ? err.message : err);
-            autenticato = false;
+          } else {
+            attivaContestoTenant({ tenantId, ruolo });
+            const utente = await prisma.user.findFirst({
+              where: { id: verificato.userId, ...(ruolo === 'super_admin' ? {} : { tenantId }) },
+              select: { ruolo: true, stato: true, sessionVersion: true },
+            });
+            autenticato = Boolean(
+              utente &&
+              utente.ruolo === ruolo &&
+              utente.stato !== 'disattivato' &&
+              utente.sessionVersion === verificato.sessionVersion,
+            );
           }
+        } catch (err) {
+          // Verifica identità fail-closed: un DB irraggiungibile non trasforma un token
+          // non verificabile in una sessione valida e non produce rinnovi.
+          console.error('Verifica sessione JWT fallita:', err instanceof Error ? err.message : err);
+          autenticato = false;
+        }
 
-          if (autenticato) {
-            const durataMinuti =
-              ruolo === 'cliente' ? DURATA_SESSIONE_CLIENTE_MINUTI : DURATA_SESSIONE_OPERATORE_MINUTI;
-            const adesso = Math.floor(Date.now() / 1000);
-            const rimanenti = (verificato.exp ?? 0) - adesso;
-            if (rimanenti > 0 && rimanenti < durataMinuti * 60 * SOGLIA_RINNOVO) {
-              const { exp: _scaduto, ...contenuto } = verificato;
-              reply.header('X-Bluman-Token', signJwt(contenuto, durataMinuti));
-              reply.header('Access-Control-Expose-Headers', 'X-Bluman-Token');
-            }
+        if (autenticato) {
+          const durataMinuti =
+            ruolo === 'cliente' ? DURATA_SESSIONE_CLIENTE_MINUTI : DURATA_SESSIONE_OPERATORE_MINUTI;
+          const adesso = Math.floor(Date.now() / 1000);
+          const rimanenti = (verificato.exp ?? 0) - adesso;
+          if (rimanenti > 0 && rimanenti < durataMinuti * 60 * SOGLIA_RINNOVO) {
+            const { exp: _scaduto, ...contenuto } = verificato;
+            reply.header('X-Bluman-Token', signJwt(contenuto, durataMinuti));
+            reply.header('Access-Control-Expose-Headers', 'X-Bluman-Token');
           }
         }
       }
     }
 
-    const patternRotta = req.routeOptions?.url;
+    if (isDocsRoute) {
+      if (process.env.NODE_ENV === 'production') {
+        if (!autenticato) {
+          return reply.code(401).send({ errore: 'Accesso alla documentazione API riservato agli operatori autenticati.' });
+        }
+        if (ruolo !== 'advisor' && ruolo !== 'super_admin') {
+          return reply.code(403).send({ errore: 'Accesso alla documentazione API riservato ad advisor e super_admin.' });
+        }
+      }
+      return;
+    }
+
     const chiaveRotta = `${req.method} ${patternRotta ?? req.url}`;
     const rottaEsistente = patternRotta !== undefined;
     if (req.method !== 'OPTIONS' && rottaEsistente && !autenticato && !ROTTE_PUBBLICHE.has(chiaveRotta)) {
@@ -483,10 +510,9 @@ export function buildServer(app: AppPort): FastifyInstance {
   // suo tenant/identità. Ping ogni 25 s per tenere vivo il collegamento
   // attraverso i proxy (Railway in testa).
   server.get('/stream', async (req, reply) => {
-    const auth = req as any;
-    const tenantId = auth.tenantId as string;
-    const userId = auth.userId as string | undefined;
-    const isCliente = auth.ruolo === 'cliente' || (userId || '').startsWith('client-');
+    const tenantId = req.tenantId;
+    const userId = req.userId;
+    const isCliente = req.ruolo === 'cliente' || (userId || '').startsWith('client-');
 
     const requestOrigin = (req.headers.origin as string) || '';
     const allowOrigin = requestOrigin && origineInWhitelist(requestOrigin) ? requestOrigin : (requestOrigin || 'https://bluman.vercel.app');

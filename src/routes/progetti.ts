@@ -766,13 +766,13 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
   });
 
   server.get<{ Params: { id: string } }>('/progetti/:id/accessi', async (req) => {
-    return (app as any).listaAccessiProgetto(req.params.id);
+    return app.listaAccessiProgetto(req.params.id);
   });
 
   server.post<{ Params: { id: string }; Body: { userId: string; livello?: string } }>('/progetti/:id/accessi', async (req, reply) => {
     const { userId, livello } = req.body;
     if (!userId) return reply.code(400).send({ errore: 'userId è obbligatorio' });
-    const accesso = await (app as any).assegnaAccessoProgetto(req.params.id, userId, livello || 'write');
+    const accesso = await app.assegnaAccessoProgetto(req.params.id, userId, livello || 'write');
     return reply.code(201).send(accesso);
   });
 

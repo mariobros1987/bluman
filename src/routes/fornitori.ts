@@ -236,7 +236,7 @@ export async function registraRotteFornitori(server: FastifyInstance): Promise<v
           imponibileCentesimi,
           ivaCentesimi,
           totaleCentesimi,
-          esigibilitaIva: (esigibilitaIva as any) || 'immediata',
+          esigibilitaIva: esigibilitaIva || 'immediata',
           pagata: !!pagata,
           dataPagamento: pagata ? dataPagamento || new Date() : null,
           xmlSdiRaw,
@@ -257,7 +257,7 @@ export async function registraRotteFornitori(server: FastifyInstance): Promise<v
             categoria: 'pagamento_fornitore',
             descrizione: `Pagamento fattura passiva n. ${numero} (${fornitore.ragioneSociale})`,
             importoCentesimi: totaleCentesimi,
-            metodoPagamento: (metodoPagamento as any) || 'bonifico',
+            metodoPagamento: metodoPagamento || 'bonifico',
             riferimentoTransazione,
           },
         });
