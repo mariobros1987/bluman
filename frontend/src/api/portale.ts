@@ -218,6 +218,16 @@ export interface DocumentoPortale {
   statoScansione: 'in_corso' | 'pulito' | 'infetto' | null;
   scaricabile: boolean;
   firmato: boolean;
+  firmatoDaCliente?: boolean;
+  firmatoDaStudio?: boolean;
+  firmaStudio?: {
+    signatureId: string;
+    firmatarioNome: string;
+    firmatarioRuolo?: string | null;
+    valoreLegale: string;
+    firmatoAt: string | null;
+    standard?: string | null;
+  } | null;
   richiedeFirma: boolean;
   /** Piano firma §3 — livello (ses|fea|feq) che il documento esige; normalizzato dal server. */
   livelloFirmaRichiesto?: 'ses' | 'fea' | 'feq' | null;

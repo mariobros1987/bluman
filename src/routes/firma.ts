@@ -194,11 +194,17 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
         orderBy: { firmatoAt: 'desc' },
       });
 
-      // Una firma per documento: la più recente. Le successive sono rifirme dello stesso atto e
-      // non vanno mostrate come documenti distinti.
-      const firmaPerDocumento = new Map<string, (typeof firme)[number]>();
+      // Una firma per documento: distinguiamo tra la firma del cliente e la firma dello studio
+      const firmaClientePerDocumento = new Map<string, (typeof firme)[number]>();
+      const firmaStudioPerDocumento = new Map<string, (typeof firme)[number]>();
       for (const f of firme) {
-        if (f.riferimentoId && !firmaPerDocumento.has(f.riferimentoId)) firmaPerDocumento.set(f.riferimentoId, f);
+        if (f.riferimentoId) {
+          if (f.tipoFirma === 'studio') {
+            if (!firmaStudioPerDocumento.has(f.riferimentoId)) firmaStudioPerDocumento.set(f.riferimentoId, f);
+          } else {
+            if (!firmaClientePerDocumento.has(f.riferimentoId)) firmaClientePerDocumento.set(f.riferimentoId, f);
+          }
+        }
       }
 
       // §36 — Copie firmate generate dal motore con la grafometrica dentro (tipo: 'firmato' e documentoPadreId):
@@ -249,7 +255,7 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
         for (let salto = 0; salto < 12 && corrente; salto++) {
           const nodo = antenati.get(corrente);
           if (!nodo) break;
-          const firmaAntenato = firmaPerDocumento.get(nodo.id) ?? null;
+          const firmaAntenato = firmaClientePerDocumento.get(nodo.id) ?? null;
           catena.push({
             id: nodo.id,
             versione: nodo.versione,
@@ -268,9 +274,14 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
         // copia risulterebbe «firmata» con tutti i dati di firma a null. L'originale
         // legge la propria firma; la copia eredita quella del padre.
         const firma =
-          firmaPerDocumento.get(d.id) ??
+          firmaClientePerDocumento.get(d.id) ??
           (d.tipo === 'firmato' && d.documentoPadreId
-            ? (firmaPerDocumento.get(d.documentoPadreId) ?? null)
+            ? (firmaClientePerDocumento.get(d.documentoPadreId) ?? null)
+            : null);
+        const firmaStudio =
+          firmaStudioPerDocumento.get(d.id) ??
+          (d.tipo === 'firmato' && d.documentoPadreId
+            ? (firmaStudioPerDocumento.get(d.documentoPadreId) ?? null)
             : null);
         // I documenti a livello progetto (§2.9) non hanno micro-voce: titolo, modulo e
         // progetto si ripiegano sul collegamento diretto al progetto.
@@ -278,14 +289,16 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
         const progettoId = d.microvoceProgetto?.moduloProgetto.progettoId ?? d.progettoId ?? null;
         const moduloProgettoId = d.microvoceProgetto?.moduloProgetto.id ?? null;
         const titoloVoce = d.microvoceProgetto?.nome ?? d.progetto?.nome ?? 'Documento';
-        const isFirmato = Boolean(firma) || d.tipo === 'firmato' || d.statoDoc === 'firmato';
+        const firmatoDaCliente = Boolean(firma) || d.statoDoc === 'firmato';
+        const firmatoDaStudio = Boolean(firmaStudio);
+        const isFirmato = firmatoDaCliente;
         const copia = copiaPerPadre.get(d.id);
         const urlAttoFirmato =
           firma?.fileFirmatoUrl ||
           copia?.filePdfUrl ||
           copia?.fileUrl ||
           (d.tipo === 'firmato' ? d.filePdfUrl || d.fileUrl : null);
-        const urlPdfEffettivo = isFirmato && urlAttoFirmato ? urlAttoFirmato : (d.filePdfUrl || d.fileUrl);
+        const urlPdfEffettivo = urlAttoFirmato || (d.filePdfUrl || d.fileUrl);
 
         return {
           id: d.id,
@@ -326,6 +339,15 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
           statoScansione: d.statoScansione,
           scaricabile: d.statoScansione === 'pulito',
           firmato: isFirmato,
+          firmatoDaCliente,
+          firmatoDaStudio,
+          firmaStudio: firmaStudio ? {
+            signatureId: firmaStudio.signatureId,
+            firmatarioNome: firmaStudio.firmatarioNome,
+            valoreLegale: firmaStudio.valoreLegale,
+            firmatoAt: firmaStudio.firmatoAt ? firmaStudio.firmatoAt.toISOString() : null,
+            standard: firmaStudio.standard,
+          } : null,
           // Punto 2 piano gap — il verbale di firma è un atto certificativo: si legge e si
           // scarica, ma non si firma e non si manda in revisione.
           richiedeFirma: !isFirmato && d.statoScansione === 'pulito' && d.statoDoc !== 'in_revisione' && d.tipo !== 'verbale_firma',
@@ -353,7 +375,7 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
       // vista perché il file a cui puntava non c'è più.
       const idPresenti = new Set(documenti.map((d) => d.id));
       const orfane = firme
-        .filter((f) => !f.riferimentoId || !idPresenti.has(f.riferimentoId))
+        .filter((f) => f.tipoFirma !== 'studio' && (!f.riferimentoId || !idPresenti.has(f.riferimentoId)))
         .map((f) => ({
           id: `firma-${f.signatureId}`,
           nome: f.documentoTitolo,

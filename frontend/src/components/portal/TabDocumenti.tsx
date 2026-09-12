@@ -124,6 +124,14 @@ export function TabDocumenti({
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                   <span style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text)' }}>{doc.nome}</span>
                   <span style={{ fontSize: 10, background: 'var(--card)', padding: '2px 6px', borderRadius: 6, color: 'var(--muted)', fontWeight: 600 }}>{doc.categoria}</span>
+                  {doc.firmatoDaStudio && (
+                    <span
+                      title={`Documento controfirmato dallo Studio: ${doc.firmaStudio?.firmatarioNome || 'Advisor'} (${doc.firmaStudio?.valoreLegale?.toUpperCase() || 'SES'})`}
+                      style={{ fontSize: 10, background: '#0c4a6e', border: '1px solid #0284c7', padding: '2px 8px', borderRadius: 6, color: '#38bdf8', fontWeight: 700 }}
+                    >
+                      🏛️ Controfirmato Studio
+                    </span>
+                  )}
                   {/* Piano firma §3 — il livello esigito si vede sulla card: solo FEA/FEQ
                       portano il badge (SES resta il flusso ordinario, senza rumore). */}
                   {livelloDoc !== 'ses' && (
@@ -158,15 +166,27 @@ export function TabDocumenti({
                 )}
                 <div style={{ fontSize: 10.5, color: doc.firmato ? '#a7f3d0' : 'var(--muted)', marginTop: 3 }}>
                   {doc.firmato
-                    ? `✓ Firmato${doc.dataFirma ? ` il ${dataOraLeggibile(doc.dataFirma)}` : ''}${doc.canaleVerificato ? ` · ${doc.canaleVerificato}` : ''}`
+                    ? `✓ Firmato da te${doc.dataFirma ? ` il ${dataOraLeggibile(doc.dataFirma)}` : ''}${doc.canaleVerificato ? ` · ${doc.canaleVerificato}` : ''}`
                     : doc.tipo === 'verbale_firma'
                       ? '📜 Verbale di firma · atto certificativo della sottoscrizione, generato automaticamente'
                       : doc.statoScansione === 'in_corso'
                         ? '⏳ Controllo antivirus in corso: disponibile a breve'
                         : doc.statoScansione === 'infetto'
                           ? '⛔ Il controllo antivirus ha bloccato questo file: lo studio è stato avvisato'
-                          : 'In attesa di lettura e sottoscrizione'}
+                          : doc.firmatoDaStudio
+                            ? '⏳ In attesa della tua firma (lo Studio ha già controfirmato l\'atto)'
+                            : 'In attesa di lettura e sottoscrizione'}
                 </div>
+                {doc.firmatoDaStudio && (
+                  <div style={{ fontSize: 10.5, color: '#38bdf8', marginTop: 3, display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <span>🏛️</span>
+                    <span>
+                      <strong>Firmato dallo Studio:</strong> {doc.firmaStudio?.firmatarioNome || 'Professionista Studio'}
+                      {doc.firmaStudio?.firmatoAt ? ` · ${dataOraLeggibile(doc.firmaStudio.firmatoAt)}` : ''}
+                      {doc.firmaStudio?.valoreLegale ? ` (${doc.firmaStudio.valoreLegale.toUpperCase()})` : ''}
+                    </span>
+                  </div>
+                )}
                 {doc.documentoNonPiuDisponibile && (
                   <div style={{ fontSize: 10.5, color: '#fbbf24', marginTop: 3 }}>
                     Firma registrata: il file a cui si riferisce non è più nel fascicolo.

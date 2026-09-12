@@ -127,6 +127,12 @@ export function DocumentViewerModal({
               Chiudi Lettura
             </button>
 
+            {selectedViewerDoc.firmatoDaStudio && (
+              <div style={{ background: '#0c4a6e', border: '1px solid #0284c7', color: '#38bdf8', padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+                🏛️ Firmato dallo Studio: {selectedViewerDoc.firmaStudio?.firmatarioNome || 'Advisor'}
+              </div>
+            )}
+
             {selectedViewerDoc.firmato ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <div style={{ background: '#0d2d22', border: '1px solid #1a5c3c', color: '#34d399', padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 700 }}>
