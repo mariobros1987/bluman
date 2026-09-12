@@ -1,8 +1,8 @@
 # 🗺️ BluMan Advisory Platform — Piano di Sviluppo Completo & Dettagliato
 
-> **Versione**: 3.2 — Sottoscrizione Documenti Studio / Operatore (4 Modalità Legali) & Master Plan Enterprise
+> **Versione**: 3.3 — Coda Notifiche Asincrona, Logging Pino & Audit Integrità Progetti (Completati F2.3, F3, F4)
 > **Data di Riferimento**: 2026-09-12
-> **Stato Codebase**: 722/722 test Vitest verdi (60 file) • Build TypeScript backend, typecheck/build frontend riusciti
+> **Stato Codebase**: 734/734 test Vitest verdi (63 file) • Build TypeScript backend, typecheck/build frontend riusciti
 > **Autore**: Mario Dibenedetto & Team di Ingegneria AI
 
 ---
@@ -50,6 +50,12 @@ La piattaforma BluMan ha completato con successo le fasi critiche di sicurezza e
   - **Controfirma Bi-direzionale (Studio + Cliente)**: `copiaFirmata.ts` ricompone il PDF incorporando entrambe le firme (slot `cliente` e slot `studio`) senza sovrascrivere o perdere la firma preesistente.
   - **Frontend Integrato**: componente `FirmaStudioModal.tsx` integrato sia nella scheda micro-voci (`TabDocumenti.tsx`) che nel Vault Documentale di Progetto (`DocumentiTab.tsx`) con badge di stato e dettagli di sottoscrizione.
   - **Collaudo 100%**: suite `src/firmaStudio.test.ts` (9 test) e collaudo slot `src/copiaFirmata.test.ts` (18 test) verdi.
+- ✅ **Coda di Dispatch Asincrono Notifiche con Retry (FASE 2.3)**:
+  - Implementata in `src/services/notificationQueue.ts`: dispatch asincrono per canali Email e WhatsApp, 3 tentativi con backoff esponenziale (1s, 5s, 25s), tracciamento stati job, isolamento multi-tenant e audit log persistente su fallimento. Suite `src/notificationQueue.test.ts` (5 test) 100% verde.
+- ✅ **Logging Strutturato Pino & Sanitizzazione Dati Sensibili (FASE 3)**:
+  - Abilitato Pino nativo su Fastify in `src/server.ts` con output JSON in produzione, serializzatore `req` (method, url, path, ip, tenantId, userId, ruolo) e censura automatica (redaction) dei campi sensibili (password, token, jwt, OTP, segreti, credenziali SMTP/IMAP/WhatsApp). Suite `src/logger.test.ts` (3 test) 100% verde.
+- ✅ **Audit Integrità Dati, Rilevamento Cicli DAG & Bonifica Assistita (FASE 4)**:
+  - Script CLI `src/scripts/auditIntegritaProgetti.ts` per l'analisi proattiva dell'integrità dei progetti su tutti i tenant. Rileva moduli vuoti privi di microvoci, individua cicli nelle dipendenze tra moduli riusando il DAG check (`trovaCicloDipendenze`), segnala divergenze avanzamento/stato rispetto a `stateEngine` e include modalità correttiva `--fix` che invoca `ricalcolaProgetto()` in sicurezza RLS (`contestoTenant.run`). Suite `src/scripts/auditIntegritaProgetti.test.ts` (4 test) 100% verde.
 - ✅ **Hardening P0 verificato localmente (2026-09-12)**:
   - Guard RBAC centralizzato e JWT cliente deny-by-default con allowlist metodo/route e ownership sulle risorse del portale.
   - `sessionVersion` su operatori e clienti, revoca dei JWT precedenti a cambio/reset password e Magic Link monouso consumati atomicamente.
@@ -332,14 +338,14 @@ Creare test end-to-end automatizzati (con database di test isolato o mock comple
 - [x] **1.7** Completare i test mirati e la validazione integrale: verifica corrente 58 file, 707 test, build TypeScript backend, typecheck/lint/build frontend verdi (restano warning lint, versione Node e dimensione bundle non bloccanti già documentati).
 - [x] **2.1** Creare e verificare il runner CLI `src/scripts/runDailyNotificationCron.ts` per un Railway Cron separato e RLS-safe.
 - [ ] **2.2** Configurare su Railway il servizio Cron quotidiano con `npm run cron:notifiche`.
-- [ ] **2.3** Implementare la coda asincrona email/WhatsApp con retry e persistenza degli errori di invio.
+- [x] **2.3** Implementare la coda asincrona email/WhatsApp con retry e persistenza degli errori di invio (`src/services/notificationQueue.ts`).
 
 ### 🛡️ Sprint 2 — Integrità & Osservabilità (Priorità 🟡 MEDIA)
-- [ ] **3.1** Abilitare logger Pino con formattazione JSON strutturata in `src/server.ts`.
-- [ ] **3.2** Sanitizzazione automatica campi sensibili nei log (password, token, OTP).
-- [ ] **4.1** Creare `src/scripts/auditIntegritaProgetti.ts` riusando il rilevamento cicli che produce `DipendenzaCiclicaError`.
-- [ ] **4.2** Eseguire script di audit in sola lettura e generare report anomalie progetti.
-- [ ] **4.3** Bonifica assistita dei progetti con divergenze avanzamento o moduli vuoti.
+- [x] **3.1** Abilitare logger Pino con formattazione JSON strutturata in `src/server.ts`.
+- [x] **3.2** Sanitizzazione automatica campi sensibili nei log (password, token, OTP, segreti).
+- [x] **4.1** Creare `src/scripts/auditIntegritaProgetti.ts` riusando il rilevamento cicli che produce `DipendenzaCiclicaError`.
+- [x] **4.2** Eseguire script di audit in sola lettura e generare report anomalie progetti (`--dry-run`).
+- [x] **4.3** Bonifica assistita dei progetti con divergenze avanzamento o moduli vuoti (`--fix` e `npm run audit:progetti`).
 
 ### 🔒 Sprint 3 — Resilienza, Disaster Recovery & Sicurezza (Priorità 🟡/🟢)
 - [ ] **5.1** Creare e testare script `src/scripts/restoreDbTest.ts` su database di test.

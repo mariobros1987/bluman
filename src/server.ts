@@ -87,9 +87,48 @@ import { registraRotteWebhooks } from './routes/webhooks.js';
 // serverless con la password SMTP presa da localStorage.
 import { registraRotteComunicazioni } from './routes/comunicazioni.js';
 
+const isTestEnv = process.env.NODE_ENV === 'test';
+const isProdEnv = process.env.NODE_ENV === 'production';
+
+export function ottieniConfigurazioneLogger() {
+  if (isTestEnv && !process.env.TEST_LOG) {
+    return false;
+  }
+  return {
+    level: process.env.LOG_LEVEL || (isProdEnv ? 'info' : 'debug'),
+    redact: [
+      'req.headers.authorization',
+      'req.headers.cookie',
+      'req.headers["x-bluman-token"]',
+      '*.password',
+      '*.passwordHash',
+      '*.token',
+      '*.jwt',
+      '*.codiceOtp',
+      '*.waAccessToken',
+      '*.smtpPass',
+      '*.secret',
+    ],
+    serializers: {
+      req(req: any) {
+        return {
+          id: req.id,
+          method: req.method,
+          url: req.url,
+          path: req.routeOptions?.url || req.routerPath,
+          ip: req.ip,
+          tenantId: req.tenantId,
+          userId: req.userId,
+          ruolo: req.ruolo,
+        };
+      },
+    },
+  };
+}
+
 export function buildServer(app: AppPort): FastifyInstance {
   const server = Fastify({
-    logger: false,
+    logger: ottieniConfigurazioneLogger() as any,
     // Dietro il proxy di Railway (NODE_ENV=production) `req.ip` senza questa opzione è
     // l'indirizzo interno del load balancer, che cambia da connessione a connessione.
     // @fastify/rate-limit tiene i contatori per-IP usando proprio `req.ip`: con IP
