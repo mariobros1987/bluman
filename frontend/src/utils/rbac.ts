@@ -1,4 +1,4 @@
-// Utility RBAC - Controllo Granulare Accessi e Permessi Moduli Stile OpenSTAManager
+import { getTenantStorageKey } from './tenant';
 
 export type PermissionLevel = 'denied' | 'read' | 'write';
 
@@ -11,10 +11,14 @@ export function getUserPermission(user: any, moduleKey: string): PermissionLevel
   const emailKey = (user.email || '').toLowerCase().trim();
 
   // 1. Controlla gli override specifici salvati nella Matrice Permessi per questo specifico utente
+  // Prima le chiavi isolate per tenant (usate da OperatorDetailModal), poi i fallback legacy
   const candidateKeys = [
-    `bluman_rbac_permissions_${emailKey}`,
-    `bluman_rbac_permissions_usr-${emailKey}`,
-    `bluman_rbac_permissions_${userKey}`,
+    emailKey ? getTenantStorageKey(`bluman_rbac_permissions_${emailKey}`) : '',
+    emailKey ? getTenantStorageKey(`bluman_rbac_permissions_usr-${emailKey}`) : '',
+    userKey ? getTenantStorageKey(`bluman_rbac_permissions_${userKey}`) : '',
+    emailKey ? `bluman_rbac_permissions_${emailKey}` : '',
+    emailKey ? `bluman_rbac_permissions_usr-${emailKey}` : '',
+    userKey ? `bluman_rbac_permissions_${userKey}` : '',
   ].filter(Boolean);
 
   for (const k of candidateKeys) {
@@ -48,5 +52,12 @@ export function getUserPermission(user: any, moduleKey: string): PermissionLevel
     return 'denied'; // Invoices, Banche, Prima Nota, Scadenzario, Retainers, Audit, Settings bloccati
   }
 
-  return 'write';
+  if (user.ruolo === 'collaboratore_esterno') {
+    if (['projects', 'calendar', 'timesheet'].includes(moduleKey)) return 'write';
+    if (['documents'].includes(moduleKey)) return 'read';
+    return 'denied'; // Accesso solo ai documenti e progetti assegnati; clienti, fatture e contabilità bloccati
+  }
+
+  return 'denied';
 }
+
