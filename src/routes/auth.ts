@@ -675,7 +675,7 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
       return reply.code(409).send({ errore: 'Il 2FA TOTP non è attualmente abilitato.' });
     }
 
-    if (!verifyPassword(password, utente.passwordHash)) {
+    if (!utente.passwordHash || !verifyPassword(password, utente.passwordHash)) {
       return reply.code(401).send({ errore: 'Password corrente non corretta.' });
     }
 
