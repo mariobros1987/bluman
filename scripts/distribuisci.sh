@@ -16,7 +16,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-RAILWAY="${RAILWAY_BIN:-$HOME/.railway/bin/railway}"
+RAILWAY="${RAILWAY_BIN:-$(command -v railway 2>/dev/null || echo "$HOME/.railway/bin/railway")}"
 REQUIRED_GIT_EMAIL="mario.dibenedetto87@gmail.com"
 REQUIRED_GIT_NAME="Mario Dibenedetto"
 
