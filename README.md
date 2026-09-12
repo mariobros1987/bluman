@@ -144,6 +144,17 @@ graph TD
 - **Binding Dinamico Anagrafica ERP**: Scansione del numero mittente su Supabase ed inserimento automatico nella chat del progetto attivo del cliente.
 - **Guida Operativa Dettagliata**: Consulta [`GUIDA_META_WHATSAPP_INTEGRAZIONE.md`](file:///Volumes/Macintosh%20HD/Users/mariodibenedetto/Downloads/bluman-api/GUIDA_META_WHATSAPP_INTEGRAZIONE.md).
 
+### ⚡ Performance, Caching & Scalabilità Distribuita (§4.2, §INF-1, §INF-2)
+- **Rate Limiting Distribuito su Redis (`src/util/redis.ts`)**: Provisioning database Redis dedicato su Railway (`REDIS_URL`) integrato nativamente con `@fastify/rate-limit`. Supporta scalabilità orizzontale multi-container e fallback aggraziato in-memory per sviluppo/test.
+- **Cache Backend Multi-Layer (`src/services/backendCache.ts`)**: Cache memoria di processo + Redis con TTL (60s) per `GET /giurisdizioni`, `GET /moduli`, `GET /articoli`. Abbina invalidazione reattiva sulle mutazioni ed azzera i 4 roundtrip PostgreSQL RLS per ciascuna richiesta.
+- **Cache & Deduplicazione Frontend (`frontend/src/api/cache.ts`)**: Cache in-memory client-side con TTL e deduplicazione delle chiamate HTTP concorrenti (0ms per cambi tab Dashboard/Progetti/Clienti).
+- **Indici DB Compositi ad Alte Prestazioni (`prisma/migrations/20260912150000_indici_performance`)**: 7 indici compositi `CONCURRENTLY` su `AuditLog`, `Notifica`, `Progetto` e `MovimentoPrimaNota` per velocizzare il caricamento dashboard e registri ad alto volume.
+
+### 🛡️ Disaster Recovery, 2FA TOTP & Rotazione Segreti (§5.2, §6.1, §6.2b)
+- **Autenticazione a Due Fattori (2FA TOTP RFC 6238)**: Algoritmo HMAC-SHA1 nativo con tolleranza clock-skew ±1 step, segreto cifrato con AES-256-GCM nel DB, gate login con `preToken` a 2 minuti per i `super_admin` e 8 codici di recupero monouso constant-time (`src/util/totp.ts`).
+- **Disaster Recovery & Backup Cifrato AES-256-GCM (`src/scripts/runScheduledBackup.ts`)**: Script schedulabile per export cifrato multi-tenant isolato con `contestoTenant.run()`, sanitizzazione delle credenziali e retention a 14 giorni (`npm run backup:scheduled`).
+- **Rotazione Chiavi JWT Zero-Downtime (`src/util/jwt.ts`, `docs/rotazione_segreti.md`)**: Supporto dual-key con variabile `JWT_PREVIOUS_SECRETS` per rotazione trasparente delle chiavi crittografiche senza disconnettere gli operatori.
+
 ### 👥 Gestione Team & Timesheet Live Operatori (`/settings`)
 - **Scheda Performance Operatore 1-Click**: Cliccando su qualsiasi collaboratore (*Francesca Disabato*, *Joe Disabato*, *Avv. Lorenzo Marino*, *Dr. Elena Russo*, *Avv. Mario Dibenedetto*) si apre la scheda analitica con ore consuntivate, incarichi gestiti e diario timesheet live.
 - **📧 Server Email SMTP Transazionale & Omnichannel**: Form credenziali SMTP + 4 Pulsanti di Test 1-Click per WhatsApp, Telegram Bot, Signal Daemon ed Email.

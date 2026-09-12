@@ -324,3 +324,26 @@ Due cose che il ricalcolo **non** fa, di proposito:
   probe li segnala a parte (`0 micro-voci: non ricalcolabile, riga preservata`) proprio
   perché il loro stato non ha alcuna copertura di controllo — se ne trovi, la correzione è
   aggiungere le micro-voci, non ricalcolare.
+
+---
+
+## 7. Disaster Recovery & Backup Schedulato Cifrato AES-256-GCM (§5.2)
+
+Per eseguire l'esportazione di emergenza o il backup schedulato di tutti i tenant attivi con cifratura AES-256-GCM:
+
+```bash
+# Esecuzione del backup schedulato cifrato con retention a 14 giorni
+npm run backup:scheduled
+```
+
+- Salva file protetti `.enc` in `backups/` con struttura crittografica: `IV (12 byte) || AuthTag (16 byte) || Ciphertext`.
+- Esclude gli hash password degli utenti (conserva solo dati operativi e contabili).
+- In ambiente di produzione richiede la variabile d'ambiente `BACKUP_ENCRYPTION_KEY` (stringa esadecimale a 64 caratteri, 32 byte).
+
+---
+
+## 8. Redis & Rate Limiting Distribuito (§4.2, §INF-1)
+
+Il backend Fastify supporta la scalabilità orizzontale multi-container tramite Redis:
+- Impostando `REDIS_URL` (es. `redis://default:password@host:6379`), `@fastify/rate-limit` utilizza lo store distribuito Redis e la cache multi-layer di catalogo (`src/services/backendCache.ts`).
+- Se `REDIS_URL` non è valorizzata (sviluppo locale), il server effettua il fallback trasparente in-memory senza richiedere configurazioni aggiuntive.
