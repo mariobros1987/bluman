@@ -37,6 +37,7 @@
     "cleanup:test-data": "tsx src/scripts/cleanupTestData.ts",
     "cron:notifiche": "tsx src/scripts/runDailyNotificationCron.ts",
     "audit:progetti": "tsx src/scripts/auditIntegritaProgetti.ts",
+    "restore:test": "tsx src/scripts/restoreDbTest.ts",
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "tsx watch src/index.ts",

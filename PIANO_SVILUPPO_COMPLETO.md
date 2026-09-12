@@ -1,8 +1,8 @@
 # 🗺️ BluMan Advisory Platform — Piano di Sviluppo Completo & Dettagliato
 
-> **Versione**: 3.3 — Coda Notifiche Asincrona, Logging Pino & Audit Integrità Progetti (Completati F2.3, F3, F4)
+> **Versione**: 3.4 — Suite E2E Flussi Critici (FASE 7) & Restore Drill Disaster Recovery (FASE 5)
 > **Data di Riferimento**: 2026-09-12
-> **Stato Codebase**: 734/734 test Vitest verdi (63 file) • Build TypeScript backend, typecheck/build frontend riusciti
+> **Stato Codebase**: 745/745 test Vitest verdi (65 file) • Build TypeScript backend, typecheck/build frontend riusciti
 > **Autore**: Mario Dibenedetto & Team di Ingegneria AI
 
 ---
@@ -56,6 +56,13 @@ La piattaforma BluMan ha completato con successo le fasi critiche di sicurezza e
   - Abilitato Pino nativo su Fastify in `src/server.ts` con output JSON in produzione, serializzatore `req` (method, url, path, ip, tenantId, userId, ruolo) e censura automatica (redaction) dei campi sensibili (password, token, jwt, OTP, segreti, credenziali SMTP/IMAP/WhatsApp). Suite `src/logger.test.ts` (3 test) 100% verde.
 - ✅ **Audit Integrità Dati, Rilevamento Cicli DAG & Bonifica Assistita (FASE 4)**:
   - Script CLI `src/scripts/auditIntegritaProgetti.ts` per l'analisi proattiva dell'integrità dei progetti su tutti i tenant. Rileva moduli vuoti privi di microvoci, individua cicli nelle dipendenze tra moduli riusando il DAG check (`trovaCicloDipendenze`), segnala divergenze avanzamento/stato rispetto a `stateEngine` e include modalità correttiva `--fix` che invoca `ricalcolaProgetto()` in sicurezza RLS (`contestoTenant.run`). Suite `src/scripts/auditIntegritaProgetti.test.ts` (4 test) 100% verde.
+- ✅ **Suite di Collaudo E2E sui 3 Flussi Legali/Fiscali Critici (FASE 7)**:
+  - Implementata in `src/e2eFlussiCritici.test.ts` (6 test):
+    1. *Flusso Creazione Progetto & Contrattualizzazione*: istanziazione atomica da distinta base, generazione moduli/microvoci/passaggi, risoluzione grafo dipendenze runtime tra moduli e verifica rollback totale su eccezione.
+    2. *Flusso Workflow Documentale & Controfirma Forense*: emissione sigillo forense FEA (IP reale, digest SHA-256, marca temporale), generazione copia firmata cliente, controfirma dello studio su copia unica, immutabilità legale e sblocco motivato (>= 10 caratteri).
+    3. *Flusso Ciclo Fiscale, SdI & Prima Nota*: calcolo imposte con fiscalità mista (IVA 22%, art. 15 esente, cassa, ritenuta), bollo virtuale DPR 642/72 automatico per esenti > €77,47, generazione tracciato XML conforme SdI FatturaPA v1.2.2 (con gestione standard e Split Payment 'S'), ripartizione scadenze rate e registrazione incasso con scrittura in Prima Nota.
+- ✅ **Resilienza Dati & Script di Restore Drill (FASE 5.1)**:
+  - Implementato in `src/scripts/restoreDbTest.ts` con script npm `npm run restore:test`: ripristino ordinato secondo l'ordine topologico delle chiavi esterne (Tenant → User → Giurisdizioni → Articoli → PassaggiTemplate → ModuliTemplate → RigheDistinta → Clienti → Progetti → Moduli → Microvoci → Passaggi → Fatture → Scadenze → Comunicazioni → Contratti → Modelli). Supporta modalità `--dry-run`, rimappatura `--target-tenant` (per test in staging) e upsert idempotente. Suite `src/scripts/restoreDbTest.test.ts` (5 test) 100% verde.
 - ✅ **Hardening P0 verificato localmente (2026-09-12)**:
   - Guard RBAC centralizzato e JWT cliente deny-by-default con allowlist metodo/route e ownership sulle risorse del portale.
   - `sessionVersion` su operatori e clienti, revoca dei JWT precedenti a cambio/reset password e Magic Link monouso consumati atomicamente.
@@ -348,13 +355,13 @@ Creare test end-to-end automatizzati (con database di test isolato o mock comple
 - [x] **4.3** Bonifica assistita dei progetti con divergenze avanzamento o moduli vuoti (`--fix` e `npm run audit:progetti`).
 
 ### 🔒 Sprint 3 — Resilienza, Disaster Recovery & Sicurezza (Priorità 🟡/🟢)
-- [ ] **5.1** Creare e testare script `src/scripts/restoreDbTest.ts` su database di test.
+- [x] **5.1** Creare e testare script `src/scripts/restoreDbTest.ts` su database di test con rispetto dei vincoli referenziali e dry-run (`npm run restore:test`).
 - [ ] **5.2** Schedulare backup periodico su storage cloud.
 - [ ] **6.1** Implementare 2FA TOTP con `otplib` per gli utenti con ruolo `super_admin`.
 - [ ] **6.2** Configurare documentazione interattiva OpenAPI / Swagger (`@fastify/swagger`).
-- [ ] **7.1** Test E2E sul flusso creazione progetto e transazione atomica.
-- [ ] **7.2** Test E2E sul ciclo firma OTP e sigillo forense.
-- [ ] **7.3** Test E2E sulla generazione XML FatturaPA SDI.
+- [x] **7.1** Test E2E sul flusso creazione progetto e transazione atomica (`src/e2eFlussiCritici.test.ts`).
+- [x] **7.2** Test E2E sul ciclo firma OTP e sigillo forense (`src/e2eFlussiCritici.test.ts`).
+- [x] **7.3** Test E2E sulla generazione XML FatturaPA SDI e Prima Nota (`src/e2eFlussiCritici.test.ts`).
 - [ ] **8.1** Rimozione cast `as any` residui nelle route Fastify.
 
 ---
