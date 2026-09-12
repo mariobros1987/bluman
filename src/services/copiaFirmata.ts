@@ -52,7 +52,12 @@ export function blocchiSalvati(valore: unknown): BloccoDocumento[] | null {
 
 /** Vero se fra i blocchi c'è un'area firma che aspetta proprio quel firmatario. */
 export function haSlotFirma(blocchi: BloccoDocumento[], slot: SlotFirma): boolean {
-  return blocchi.some((b) => b.tipo === 'firma' && (b.slotColonne ?? []).includes(slot));
+  return blocchi.some((b) => {
+    if (b.tipo !== 'firma') return false;
+    if (Array.isArray(b.slotColonne)) return b.slotColonne.includes(slot);
+    if (b.slotColonne && typeof b.slotColonne === 'object') return slot in b.slotColonne;
+    return false;
+  });
 }
 
 /**
@@ -124,8 +129,10 @@ export async function generaCopiaFirmata(params: {
     firmaGrafometricaPng?: string | null;
   };
   sigilloDigest: string;
+  slot?: 'cliente' | 'studio';
+  userId?: string | null;
 }): Promise<EsitoCopiaFirmata | null> {
-  const { tenantId, documentoId, firma, sigilloDigest } = params;
+  const { tenantId, documentoId, firma, sigilloDigest, slot = 'cliente', userId } = params;
   try {
     const originale = await prisma.documento.findFirst({
       where: { id: documentoId, tenantId },
@@ -143,53 +150,141 @@ export async function generaCopiaFirmata(params: {
     if (!originale || originale.tipo === 'firmato') return null;
 
     const blocchi = blocchiSalvati(originale.contenutoBlocchiJson);
-    if (!blocchi || !haSlotFirma(blocchi, 'cliente')) return null;
+    if (!blocchi) return null;
 
-    const pdf = await generaPdfDocumento(blocchi, {
-      cliente: {
-        immaginePng: firma.firmaGrafometricaPng ?? null,
-        righe: righeAttestazione({
-          firmatarioNome: firma.firmatarioNome,
-          valoreLegale: firma.valoreLegale ?? null,
-          signatureId: firma.signatureId,
-          firmatoAt: firma.firmatoAt,
-          sigilloDigest,
-        }),
-      },
-    });
+    const hasClienteSlot = haSlotFirma(blocchi, 'cliente');
+    const hasStudioSlot = haSlotFirma(blocchi, 'studio');
+    if (!hasClienteSlot && !hasStudioSlot) return null;
+
+    // Recupera eventuali altre firme già apposte sul documento (es. controfirma)
+    let firmeDb: any[] = [];
+    try {
+      if (prisma.firmaElettronica?.findMany) {
+        firmeDb = await prisma.firmaElettronica.findMany({
+          where: { tenantId, ambito: 'documento_vault', riferimentoId: documentoId },
+          orderBy: { firmatoAt: 'desc' },
+        });
+      }
+    } catch {}
+
+    const firmeDaApporre: { cliente?: any; studio?: any } = {};
+
+    // Slot Studio
+    if (hasStudioSlot) {
+      if (slot === 'studio') {
+        firmeDaApporre.studio = {
+          immaginePng: firma.firmaGrafometricaPng ?? null,
+          righe: righeAttestazione({
+            firmatarioNome: firma.firmatarioNome,
+            valoreLegale: firma.valoreLegale ?? null,
+            signatureId: firma.signatureId,
+            firmatoAt: firma.firmatoAt,
+            sigilloDigest,
+          }),
+        };
+      } else {
+        const firmaStudioDb = firmeDb.find((f) => f.tipoFirma === 'studio' || f.canaleVerificato?.includes('Studio'));
+        if (firmaStudioDb) {
+          firmeDaApporre.studio = {
+            immaginePng: firmaStudioDb.firmaGrafometricaPng ?? null,
+            righe: righeAttestazione({
+              firmatarioNome: firmaStudioDb.firmatarioNome,
+              valoreLegale: firmaStudioDb.valoreLegale ?? null,
+              signatureId: firmaStudioDb.signatureId,
+              firmatoAt: firmaStudioDb.firmatoAt,
+              sigilloDigest: firmaStudioDb.sigilloDigest || sigilloDigest,
+            }),
+          };
+        }
+      }
+    }
+
+    // Slot Cliente
+    if (hasClienteSlot) {
+      if (slot === 'cliente') {
+        firmeDaApporre.cliente = {
+          immaginePng: firma.firmaGrafometricaPng ?? null,
+          righe: righeAttestazione({
+            firmatarioNome: firma.firmatarioNome,
+            valoreLegale: firma.valoreLegale ?? null,
+            signatureId: firma.signatureId,
+            firmatoAt: firma.firmatoAt,
+            sigilloDigest,
+          }),
+        };
+      } else {
+        const firmaClienteDb = firmeDb.find((f) => f.tipoFirma !== 'studio' && !f.canaleVerificato?.includes('Studio'));
+        if (firmaClienteDb) {
+          firmeDaApporre.cliente = {
+            immaginePng: firmaClienteDb.firmaGrafometricaPng ?? null,
+            righe: righeAttestazione({
+              firmatarioNome: firmaClienteDb.firmatarioNome,
+              valoreLegale: firmaClienteDb.valoreLegale ?? null,
+              signatureId: firmaClienteDb.signatureId,
+              firmatoAt: firmaClienteDb.firmatoAt,
+              sigilloDigest: firmaClienteDb.sigilloDigest || sigilloDigest,
+            }),
+          };
+        }
+      }
+    }
+
+    // Se per lo slot richiesto non abbiamo dati da apporre, esci
+    if (slot === 'cliente' && !firmeDaApporre.cliente) return null;
+    if (slot === 'studio' && !firmeDaApporre.studio) return null;
+
+    const pdf = await generaPdfDocumento(blocchi, firmeDaApporre);
 
     const nome = nomeCopia(nomeFileDaUrl(originale.fileUrl), firma.signatureId);
     const caricato = await uploadDocumento(nome, pdf.toString('base64'));
 
-    // `caricatoDa: null` come il verbale: il firmatario cliente non è una riga `user` e
-    // attribuire la copia a un utente dello studio sarebbe un'attestazione falsa.
-    // `statoDoc: 'firmato'` è lo stato vero del file e lo tiene fuori dal workflow di
-    // pubblicazione; `pubblicatoAt` valorizzato perché il cliente lo deve vedere subito.
-    const copia = await prisma.documento.create({
-      data: {
-        tenantId,
-        progettoId: originale.progettoId,
-        microvoceProgettoId: originale.microvoceProgettoId,
-        tipo: 'firmato',
-        fileUrl: caricato.url,
-        filePdfUrl: caricato.url,
-        formatoOrigine: 'pdf',
-        documentoPadreId: originale.id,
-        caricatoDa: null,
-        categoriaDoc: originale.categoriaDoc ?? 'generico',
-        livelloFirmaRichiesto: originale.livelloFirmaRichiesto,
-        statoDoc: 'firmato',
-        pubblicatoAt: new Date(),
-        statoScansione: 'pulito',
-        scansionatoAt: new Date(),
-      },
-    });
+    // Verifica se esiste già una copia firmata da aggiornare
+    let copiaEsistente: any = null;
+    try {
+      if (prisma.documento?.findFirst) {
+        const trovata = await prisma.documento.findFirst({
+          where: { tenantId, documentoPadreId: originale.id, tipo: 'firmato' },
+        });
+        if (trovata && trovata.id !== originale.id && trovata.tipo === 'firmato') {
+          copiaEsistente = trovata;
+        }
+      }
+    } catch {}
+
+    let copia: any;
+    if (copiaEsistente && prisma.documento?.update) {
+      copia = await prisma.documento.update({
+        where: { id: copiaEsistente.id },
+        data: {
+          fileUrl: caricato.url,
+          filePdfUrl: caricato.url,
+          scansionatoAt: new Date(),
+        },
+      });
+    } else {
+      copia = await prisma.documento.create({
+        data: {
+          tenantId,
+          progettoId: originale.progettoId,
+          microvoceProgettoId: originale.microvoceProgettoId,
+          tipo: 'firmato',
+          fileUrl: caricato.url,
+          filePdfUrl: caricato.url,
+          formatoOrigine: 'pdf',
+          documentoPadreId: originale.id,
+          caricatoDa: slot === 'studio' ? (userId ?? null) : null,
+          categoriaDoc: originale.categoriaDoc ?? 'generico',
+          livelloFirmaRichiesto: originale.livelloFirmaRichiesto,
+          statoDoc: 'firmato',
+          pubblicatoAt: new Date(),
+          statoScansione: 'pulito',
+          scansionatoAt: new Date(),
+        },
+      });
+    }
 
     return { documentoId: copia.id, url: caricato.url, nome };
   } catch (err) {
-    // Come il verbale: la copia è la resa leggibile della firma, non la firma. Se non esce,
-    // il sigillo e la riga FirmaElettronica restano intatti e il documento originale è
-    // ancora là, firmato a tutti gli effetti di legge.
     console.error('Copia firmata non generata: la firma resta valida', firma.signatureId, err);
     return null;
   }

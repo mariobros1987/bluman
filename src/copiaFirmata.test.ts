@@ -372,4 +372,24 @@ describe('generaCopiaFirmata', () => {
     expect(esito).toBeTruthy();
     expect(testoPdf(stato.upload[0]!.buffer)).toContain('Firmato elettronicamente da Luigi Bianchi');
   });
+
+  it('appone la firma dello studio nello slot studio quando richiesto', async () => {
+    stato.documento = originaleConBlocchi();
+    const esito = await generaCopiaFirmata({
+      tenantId: TENANT,
+      documentoId: 'doc-orig-1',
+      firma: firmaFinta({ firmatarioNome: 'Avv. Mario Rossi (Studio BluMan)' }),
+      sigilloDigest: 's'.repeat(64),
+      slot: 'studio',
+      userId: 'usr-advisor-1',
+    });
+
+    expect(esito).toBeTruthy();
+    expect(stato.creati).toHaveLength(1);
+    const copia = stato.creati[0];
+    expect(copia.tipo).toBe('firmato');
+    expect(copia.caricatoDa).toBe('usr-advisor-1');
+    const testo = testoPdf(stato.upload[0]!.buffer);
+    expect(testo).toContain('Avv. Mario Rossi (Studio BluMan)');
+  });
 });

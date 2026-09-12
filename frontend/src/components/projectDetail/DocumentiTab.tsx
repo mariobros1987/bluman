@@ -15,6 +15,7 @@ import { scomponiDocumento } from '../../../../src/util/intestazionePiede';
 import { escapeHtmlTesto, sanitizzaHtmlDocumento } from '../../../../src/util/htmlSanitizer';
 import type { Progetto } from '../../types';
 import { documentoApiAVista, documentiRimossi, ricordaDocumentoRimosso } from './documentiUtils';
+import { FirmaStudioModal } from '../documenti/FirmaStudioModal';
 
 // ─── Componente Documenti & Vault Legale Progetto ──────────────────
 // ─── Componente Documenti & Vault Legale Progetto (Google Drive / Cloud Vault) ───
@@ -25,6 +26,7 @@ export function DocumentiTab({ project }: { project: Progetto }) {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [uploading, setUploading] = useState(false);
   const [selectedPreviewDoc, setSelectedPreviewDoc] = useState<any | null>(null);
+  const [docPerFirmaStudio, setDocPerFirmaStudio] = useState<any | null>(null);
 
   // §39 — l'HTML archiviato può portare intestazione e piede propri, marcati dentro il documento
   // al salvataggio: qui si separano per rimetterli al loro posto sul foglio A4 dell'anteprima.
@@ -514,9 +516,23 @@ SHA-256 del documento.
                     <div style={{ fontSize: 28 }}>
                       {isWord ? '📝' : '📄'}
                     </div>
-                    <span style={{ fontSize: 9.5, background: doc.firmato ? '#0d2d22' : '#1e1b4b', color: doc.firmato ? '#34d399' : '#818cf8', border: `1px solid ${doc.firmato ? '#059669' : '#4338ca'}`, padding: '2px 8px', borderRadius: 8, fontWeight: 700 }}>
-                      {doc.firmato ? '🔒 Firmato (OTP)' : (isWord ? 'DOCX Word' : 'PDF')}
-                    </span>
+                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                      {doc.firmato && (
+                        <span style={{ fontSize: 9.5, background: '#0d2d22', color: '#34d399', border: '1px solid #059669', padding: '2px 6px', borderRadius: 8, fontWeight: 700 }}>
+                          🔒 Firmato
+                        </span>
+                      )}
+                      {doc.dbDoc?.firmatoDaStudio && (
+                        <span style={{ fontSize: 9.5, background: '#1e1b4b', color: '#818cf8', border: '1px solid #6366f1', padding: '2px 6px', borderRadius: 8, fontWeight: 700 }}>
+                          🏛️ Studio
+                        </span>
+                      )}
+                      {!doc.firmato && !doc.dbDoc?.firmatoDaStudio && (
+                        <span style={{ fontSize: 9.5, background: '#1e1b4b', color: '#818cf8', border: '1px solid #4338ca', padding: '2px 8px', borderRadius: 8, fontWeight: 700 }}>
+                          {isWord ? 'DOCX Word' : 'PDF'}
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', lineHeight: 1.4, wordBreak: 'break-word' }}>
@@ -551,6 +567,17 @@ SHA-256 del documento.
                   >
                     ✏️ Studio
                   </button>
+
+                  {doc.dbDoc && !doc.dbDoc.firmatoDaStudio && (
+                    <button
+                      type="button"
+                      onClick={() => setDocPerFirmaStudio(doc.dbDoc)}
+                      style={{ background: '#312e81', border: '1px solid #6366f1', color: '#c7d2fe', padding: '5px 7px', borderRadius: 6, fontSize: 10.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}
+                      title="Apponi la firma dello studio / professionista incaricato sul documento"
+                    >
+                      ✍️ Firma Studio
+                    </button>
+                  )}
 
                   <button
                     type="button"
@@ -628,12 +655,29 @@ SHA-256 del documento.
                       <td style={{ padding: '12px', color: 'var(--muted)' }}>{doc.dimensione || '24 KB'}</td>
                       <td style={{ padding: '12px', color: 'var(--muted)' }}>{doc.data || doc.dataCaricamento || '15/08/2026'}</td>
                       <td style={{ padding: '12px' }}>
-                        <span style={{ fontSize: 9.5, background: doc.firmato ? '#0d2d22' : '#2d1a05', color: doc.firmato ? '#34d399' : '#f59e0b', border: `1px solid ${doc.firmato ? '#059669' : '#d97706'}`, padding: '2px 8px', borderRadius: 10, fontWeight: 700 }}>
-                          {doc.firmato ? '🔒 OTP verificata' : '⏳ In attesa di firma'}
-                        </span>
+                        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: 9.5, background: doc.firmato ? '#0d2d22' : '#2d1a05', color: doc.firmato ? '#34d399' : '#f59e0b', border: `1px solid ${doc.firmato ? '#059669' : '#d97706'}`, padding: '2px 8px', borderRadius: 10, fontWeight: 700 }}>
+                            {doc.firmato ? '🔒 OTP verificata' : '⏳ In attesa di firma'}
+                          </span>
+                          {doc.dbDoc?.firmatoDaStudio && (
+                            <span style={{ fontSize: 9.5, background: '#1e1b4b', color: '#818cf8', border: '1px solid #6366f1', padding: '2px 8px', borderRadius: 10, fontWeight: 700 }}>
+                              🏛️ Studio
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td style={{ padding: '12px', textAlign: 'right' }}>
-                        <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                        <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                          {doc.dbDoc && !doc.dbDoc.firmatoDaStudio && (
+                            <button
+                              type="button"
+                              onClick={() => setDocPerFirmaStudio(doc.dbDoc)}
+                              style={{ background: '#312e81', border: '1px solid #6366f1', color: '#c7d2fe', padding: '4px 8px', borderRadius: 6, fontSize: 10.5, cursor: 'pointer', fontWeight: 700 }}
+                              title="Apponi la firma dello studio / professionista incaricato sul documento"
+                            >
+                              ✍️ Firma Studio
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={() => setSelectedPreviewDoc(doc)}
@@ -810,6 +854,26 @@ SHA-256 del documento.
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal Firma Studio */}
+      {docPerFirmaStudio && (
+        <FirmaStudioModal
+          doc={docPerFirmaStudio}
+          onClose={() => setDocPerFirmaStudio(null)}
+          onSigned={() => {
+            setDocPerFirmaStudio(null);
+            listaDocumentiProgetto(String(project.id))
+              .then((dbDocs) => {
+                const vista = dbDocs.map((d) => documentoApiAVista(d, String(project.id)));
+                setDocList((prev) => {
+                  const idsDb = new Set(vista.map((d) => d.id));
+                  return [...vista, ...prev.filter((d) => !idsDb.has(d.id))];
+                });
+              })
+              .catch(() => {});
+          }}
+        />
       )}
     </div>
   );

@@ -77,6 +77,7 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
     documento_vault: 'un documento del tuo archivio riservato',
     modulo_completato: 'la conferma di un modulo completato',
     addendum: 'un addendum al mandato',
+    documento_vault_studio: 'un documento per conto dello studio',
   };
 
   const HASH_SHA256 = /^[a-f0-9]{64}$/i;

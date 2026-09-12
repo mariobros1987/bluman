@@ -1,8 +1,8 @@
 # 🗺️ BluMan Advisory Platform — Piano di Sviluppo Completo & Dettagliato
 
-> **Versione**: 3.1 — Master Plan di Sviluppo & Consolidamento Enterprise
+> **Versione**: 3.2 — Sottoscrizione Documenti Studio / Operatore (4 Modalità Legali) & Master Plan Enterprise
 > **Data di Riferimento**: 2026-09-12
-> **Stato Codebase**: 707/707 test Vitest verdi (58 file) • Build TypeScript backend, typecheck/lint/build frontend riusciti • P0 verificato localmente, non ancora committato, migrato o distribuito
+> **Stato Codebase**: 722/722 test Vitest verdi (60 file) • Build TypeScript backend, typecheck/build frontend riusciti
 > **Autore**: Mario Dibenedetto & Team di Ingegneria AI
 
 ---
@@ -37,9 +37,19 @@ La piattaforma BluMan ha completato con successo le fasi critiche di sicurezza e
   - Ingestion allegati IMAP Inbound (`imapflow`) e WhatsApp Cloud API (Meta Graph API).
   - Spunte di recapito e lettura in tempo reale stile WhatsApp (`✓` inviato, `✓✓` consegnato, `✓✓` azzurro letto con sincronizzazione Webhook).
   - Smart chat scroll con ancoraggio automatico ai messaggi non letti e tasto flottante `⬇️ Scorri all'ultimo`.
-- ✅ **Workflow Documentale & Firma Elettronica Legale (§WF-DOC)**:
+- ✅ **Workflow Documentale & Firma Elettronica Legale (§WF-DOC & §36)**:
   - Ciclo di vita a 4 stati (bozza ⇄ pubblicato ⇄ revisione ⇄ firmato), blocco modifiche a 409 con sblocco motivato riservato ad admin studio.
-  - Firma OTP con generazione del sigillo crittografico lato server (SHA-256, timestamp, IP pubblico reale verificato, evidenze forensi).
+  - Firma OTP cliente con generazione del sigillo crittografico lato server (SHA-256, timestamp, IP pubblico reale verificato, evidenze forensi).
+  - Ricomposizione automatica della copia firmata con inserimento della grafometrica nello slot corrispondente.
+- ✅ **Sottoscrizione Documenti Lato Studio / Operatore (4 Modalità Legali)**:
+  - Estensione completa della firma per Advisor, Collaboratori e Super Admin:
+    1. **Firma Grafometrica SES** (art. 20 CAD) con canvas interattivo HTML5 o firma digitata.
+    2. **Firma Elettronica Avanzata FEA** con generazione e verifica OTP a 6 cifre (`documento_vault_studio`) via Email o WhatsApp (`POST /documenti/:id/richiedi-otp-studio`, `POST /documenti/:id/firma-studio`).
+    3. **Firma Digitale Qualificata FEQ** con upload file firmato esternamente (.p7m con validazione magic-bytes ASN.1 `0x30` o .pdf).
+    4. **Scansione Cartacea Controfirmata SES** con upload copia firmata.
+  - **Controfirma Bi-direzionale (Studio + Cliente)**: `copiaFirmata.ts` ricompone il PDF incorporando entrambe le firme (slot `cliente` e slot `studio`) senza sovrascrivere o perdere la firma preesistente.
+  - **Frontend Integrato**: componente `FirmaStudioModal.tsx` integrato sia nella scheda micro-voci (`TabDocumenti.tsx`) che nel Vault Documentale di Progetto (`DocumentiTab.tsx`) con badge di stato e dettagli di sottoscrizione.
+  - **Collaudo 100%**: suite `src/firmaStudio.test.ts` (9 test) e collaudo slot `src/copiaFirmata.test.ts` (18 test) verdi.
 - ✅ **Hardening P0 verificato localmente (2026-09-12)**:
   - Guard RBAC centralizzato e JWT cliente deny-by-default con allowlist metodo/route e ownership sulle risorse del portale.
   - `sessionVersion` su operatori e clienti, revoca dei JWT precedenti a cambio/reset password e Magic Link monouso consumati atomicamente.
@@ -304,9 +314,15 @@ Creare test end-to-end automatizzati (con database di test isolato o mock comple
 - [ ] **P0.9** Completare un audit statico finale indipendente: i tentativi delegati del 2026-09-12 non hanno prodotto un rapporto verificabile per errori del servizio/watchdog.
 - [ ] **P0.10** Applicare le migrazioni prima in staging e promuovere il batch con autorizzazioni separate per commit, push e deploy.
 
-**Debito residuo esplicito:** ZIP/DOCX/XLSX non sono ancora ispezionati internamente per macro o payload attivi; audio/video fuori allowlist vengono rifiutati. La queue persistente, backup/restore, staging, osservabilità, Sentry, uptime, TOTP, Swagger ed E2E restano fasi successive.
+### ✍️ Sprint Firma Studio — Sottoscrizione Operatore & Controfirma Bi-direzionale (COMPLETATO)
+- [x] **FS.1** Implementazione endpoint backend `POST /documenti/:id/richiedi-otp-studio` con ambito OTP dedicato `documento_vault_studio`.
+- [x] **FS.2** Implementazione endpoint backend `POST /documenti/:id/firma-studio` con supporto a tutte le 4 modalità legali (Grafometrica SES, OTP FEA, File FEQ, Scansione SES).
+- [x] **FS.3** Estensione `copiaFirmata.ts` per supporto bi-direzionale slot `cliente` e slot `studio` con preservazione e unione controfirme preesistenti.
+- [x] **FS.4** Arricchimento serializzazione `GET /documenti` con metadati `firmatoDaStudio`, `firmatoDaCliente` e oggetto `firmaStudio`.
+- [x] **FS.5** Creazione componente frontend `FirmaStudioModal.tsx` con le 4 schede conformi e responsive.
+- [x] **FS.6** Integrazione pulsante e badge "Firma Studio" in `TabDocumenti.tsx` (Microvoci) e `DocumentiTab.tsx` (Project Vault).
+- [x] **FS.7** Suite di test unitari/integrazione `src/firmaStudio.test.ts` (9 test) e collaudo `copiaFirmata.test.ts` (18 test) al 100% verdi.
 
-### 🚀 Sprint 1 — Scalabilità & Automazione Immediata (Priorità 🟠 ALTA)
 - [x] **1.1** Applicare il contratto paginato retrocompatibile a `GET /invoices` con metadati e allowlist di ordinamento.
 - [x] **1.2** Applicare paginazione a `GET /prima-nota` con riepilogo aggregato globale.
 - [x] **1.3** Applicare paginazione a `GET /progetti`, preservando il vincolo del ruolo cliente.

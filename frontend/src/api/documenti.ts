@@ -61,6 +61,17 @@ export interface DocumentoProgetto {
   /** Piano firma §3 — livello (ses|fea|feq) che il documento esige; default 'ses'. */
   livelloFirmaRichiesto?: string | null;
   firmato: boolean;
+  firmatoDaStudio?: boolean;
+  firmatoDaCliente?: boolean;
+  firmaStudio?: {
+    signatureId: string | null;
+    firmatarioNome: string | null;
+    firmatarioRuolo?: string | null;
+    firmatoAt: string | null;
+    tipoFirma: string | null;
+    valoreLegale?: string | null;
+    standard?: string | null;
+  } | null;
   firma: {
     riferimentoId: string | null;
     firmatoAt: string | null;
@@ -571,4 +582,47 @@ export async function calcolaHashSha256(contenuto: string | ArrayBuffer): Promis
 // I chiamanti importano da `api/client`, che ri-esporta entrambi i moduli: nessuna firma è
 // cambiata, tranne `fetchDocumentiTemplateApi`, che non restituisce più i dati di localStorage
 // travestiti da risposta del server.
+
+export interface FirmaStudioPayload {
+  modalita: 'grafometrica' | 'fea_otp' | 'manuale_scansionata' | 'qualificata_esterna';
+  firmaGrafometricaPng?: string;
+  otp?: string;
+  ruoloDichiarato?: string;
+  filename?: string;
+  contentBase64?: string;
+}
+
+export async function richiediOtpStudioApi(
+  docId: string,
+  canale: 'email' | 'whatsapp',
+  cellulare?: string,
+): Promise<{ ok: boolean; canale: string; recapitoMascherato: string }> {
+  const res = await apiFetch(`${API_BASE}/documenti/${docId}/richiedi-otp-studio`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ canale, cellulare }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.errore || 'Errore richiesta OTP Studio');
+  }
+  return await res.json();
+}
+
+export async function firmaStudioDocumentoApi(
+  docId: string,
+  payload: FirmaStudioPayload,
+): Promise<{ ok: boolean; firma: any; fileFirmatoUrl?: string }> {
+  const res = await apiFetch(`${API_BASE}/documenti/${docId}/firma-studio`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.errore || 'Errore apposizione firma Studio');
+  }
+  return await res.json();
+}
+
 

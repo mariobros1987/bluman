@@ -23,7 +23,7 @@ import { hashCodiceOtp, verificaCodiceOtp } from '../util/jwt';
 export type CanaleOtp = 'whatsapp' | 'email' | 'telegram';
 
 /** Cosa autorizza il codice. Un OTP per un addendum non vale per un documento del Vault. */
-export type AmbitoOtp = 'engagement_letter' | 'documento_vault' | 'modulo_completato' | 'addendum';
+export type AmbitoOtp = 'engagement_letter' | 'documento_vault' | 'modulo_completato' | 'addendum' | 'documento_vault_studio';
 
 export const TTL_OTP_SECONDI = 300;
 export const MAX_TENTATIVI = 3;

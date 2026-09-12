@@ -31,12 +31,18 @@ export interface DocumentoEntry {
   /** Bozza originale pre-firma per verifiche probatorie. */
   fileBozzaUrl?: string | null;
   richiesteModifica?: RichiestaModificaDoc[];
-  /**
-   * §WF-DOC — sigillo di firma restituito dal server (data, id firma, tipo).
-   * Serve per mostrare all'operatore *quando* e *come* il cliente ha firmato:
-   * prima l'app diceva solo "FIRMATO" e la data era leggibile solo nel portale.
-   * Non viene mai ricostruito lato client: se il server non lo manda, non si mostra.
-   */
+  firmatoDaStudio?: boolean;
+  firmatoDaCliente?: boolean;
+  firmaStudio?: {
+    riferimentoId?: string | null;
+    signatureId: string | null;
+    firmatarioNome: string | null;
+    firmatarioRuolo?: string | null;
+    firmatoAt: string | null;
+    tipoFirma: string | null;
+    valoreLegale?: string | null;
+    standard?: string | null;
+  } | null;
   firma?: { riferimentoId: string | null; firmatoAt: string | null; signatureId: string | null; tipoFirma: string | null; valoreLegale?: string | null } | null;
 }
 

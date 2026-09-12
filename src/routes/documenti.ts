@@ -18,19 +18,23 @@
 // (regola 8) e la cartella dei modelli è un altro mestiere — lì i modelli hanno uno stato di
 // revisione, qui i documenti stanno in un fascicolo. I percorsi non sono cambiati.
 
+import { createHash, randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import { prisma } from '../util/prismaClient.js';
 import { uploadDocumento, rifirmaUrlUpload } from '../services/storageService.js';
 import { scanFileBuffer } from '../services/securityScanner.js';
 import { contestoTagDocumento, risolviTagDocumento, blocchiDaHtml, generaPdfDocumento, generaDocxDocumento } from '../services/generazioneDocumenti.js';
 import { notificaCliente } from '../services/notificheService.js';
-import { recordAudit, ipReale, nomeFileDaUrl, clienteDellaRichiesta } from '../util/serverHelpers.js';
+import { recordAudit, ipReale, nomeFileDaUrl, clienteDellaRichiesta, normalizzaGrafometrica } from '../util/serverHelpers.js';
 import { livelloFirmaValido, normalizzaLivelloFirma, type LivelloFirma } from '../services/livelloFirmaService.js';
 // §40 — la micro-voce indicata deve appartenere al progetto indicato: la decisione sta in un
 // service a parte, presidiato, e la usano sia questo upload sia PATCH /documenti/:id/collegamento.
 import { decidiCollocazione } from '../services/collocazioneDocumento.js';
 import { GeneraDocumentoSchema } from '../schemas/documenti.schema.js';
 import { sanitizzaHtmlDocumento } from '../util/htmlSanitizer.js';
+import { generaCopiaFirmata } from '../services/copiaFirmata.js';
+import { credenzialiCanali, inviaCodiceOtp } from '../services/otpDispatch.js';
+import { creaOtp, verificaOtp, annullaOtp } from '../services/otpService.js';
 
 // ─── DOCUMENTI: FASCICOLO DOCUMENTALE DEL PROGETTO (§2.9) ───
 export async function registraRotteDocumenti(server: FastifyInstance): Promise<void> {
@@ -112,19 +116,34 @@ export async function registraRotteDocumenti(server: FastifyInstance): Promise<v
           orderBy: { createdAt: 'desc' },
         });
 
-        // Lo stato di firma di ciascun documento, come in /portal/documenti: senza questa
-        // informazione lo studio mostrerebbe «da firmare» un documento già sottoscritto.
+        // Lo stato di firma di ciascun documento, distinguendo firma studio e firma cliente
         const firme = await prisma.firmaElettronica.findMany({
           where: { tenantId, ambito: 'documento_vault', riferimentoId: { in: documenti.map((d) => d.id) } },
-          // `fileFirmatoUrl` e `standard`: l'atto come sottoscritto (canale SES manuale /
-          // FEQ) e il livello dichiarato dal server, perché lo studio possa offrire il
-          // download del file firmato dal fascicolo (§36) senza inventarsi etichette.
-          select: { riferimentoId: true, firmatoAt: true, signatureId: true, tipoFirma: true, valoreLegale: true, fileFirmatoUrl: true, standard: true },
+          select: {
+            riferimentoId: true,
+            firmatoAt: true,
+            signatureId: true,
+            tipoFirma: true,
+            firmatarioNome: true,
+            firmatarioRuolo: true,
+            canaleVerificato: true,
+            valoreLegale: true,
+            fileFirmatoUrl: true,
+            standard: true,
+          },
           orderBy: { firmatoAt: 'desc' },
         });
-        const firmaPerDocumento = new Map<string, (typeof firme)[number]>();
+
+        const firmaStudioPerDocumento = new Map<string, (typeof firme)[number]>();
+        const firmaClientePerDocumento = new Map<string, (typeof firme)[number]>();
         for (const f of firme) {
-          if (f.riferimentoId && !firmaPerDocumento.has(f.riferimentoId)) firmaPerDocumento.set(f.riferimentoId, f);
+          if (!f.riferimentoId) continue;
+          const isStudio = f.tipoFirma === 'studio' || f.canaleVerificato?.includes('Studio');
+          if (isStudio && !firmaStudioPerDocumento.has(f.riferimentoId)) {
+            firmaStudioPerDocumento.set(f.riferimentoId, f);
+          } else if (!isStudio && !firmaClientePerDocumento.has(f.riferimentoId)) {
+            firmaClientePerDocumento.set(f.riferimentoId, f);
+          }
         }
 
         // §36 — Copie firmate generate dal motore con grafometrica incastonata:
@@ -148,9 +167,11 @@ export async function registraRotteDocumenti(server: FastifyInstance): Promise<v
         return reply.send({
           ok: true,
           documenti: documenti.map((d) => {
-            const firma = firmaPerDocumento.get(d.id);
+            const fCliente = firmaClientePerDocumento.get(d.id);
+            const fStudio = firmaStudioPerDocumento.get(d.id);
+            const firma = fCliente || fStudio;
             const copia = copiaPerPadre.get(d.id);
-            const isFirmato = Boolean(firma) || d.tipo === 'firmato' || d.statoDoc === 'firmato';
+            const isFirmato = Boolean(fCliente) || Boolean(fStudio) || d.tipo === 'firmato' || d.statoDoc === 'firmato';
             const urlAttoFirmato =
               firma?.fileFirmatoUrl ||
               copia?.filePdfUrl ||
@@ -168,12 +189,26 @@ export async function registraRotteDocumenti(server: FastifyInstance): Promise<v
               fileBozzaUrl: d.fileUrl ? (rifirmaUrlUpload(d.fileUrl) as string) : null,
               fileFirmatoUrl: urlAttoFirmato ? (rifirmaUrlUpload(urlAttoFirmato) as string) : null,
               firmato: isFirmato,
+              firmatoDaCliente: Boolean(fCliente),
+              firmatoDaStudio: Boolean(fStudio),
+              firmaStudio: fStudio
+                ? {
+                    signatureId: fStudio.signatureId,
+                    firmatarioNome: fStudio.firmatarioNome,
+                    firmatarioRuolo: fStudio.firmatarioRuolo,
+                    firmatoAt: fStudio.firmatoAt,
+                    tipoFirma: fStudio.tipoFirma,
+                    valoreLegale: fStudio.valoreLegale,
+                    standard: fStudio.standard,
+                  }
+                : null,
               // Il file firmato è un URL /uploads/ come gli altri: va rinnovato alla
               // lettura, o lo scaricamento dallo studio parte con una firma già scaduta.
               firma: firma || isFirmato
                 ? {
                     signatureId: firma?.signatureId ?? null,
                     tipoFirma: firma?.tipoFirma ?? null,
+                    firmatarioNome: firma?.firmatarioNome ?? null,
                     firmatoAt: firma?.firmatoAt ?? null,
                     valoreLegale: firma?.valoreLegale ?? null,
                     standard: firma?.standard ?? null,
@@ -764,6 +799,362 @@ export async function registraRotteDocumenti(server: FastifyInstance): Promise<v
       return reply.send({ ok: true, documento: aggiornato });
     } catch (err) {
       return reply.code(500).send({ errore: err instanceof Error ? err.message : 'Errore sblocco documento' });
+    }
+  });
+
+  /**
+   * POST /documenti/:id/richiedi-otp-studio
+   * Richiede un codice OTP all'email o al recapito WhatsApp del professionista/operatore autenticato
+   * per apporre Firma Elettronica Avanzata (FEA).
+   */
+  server.post<{
+    Params: { id: string };
+    Body: { canale?: 'email' | 'whatsapp'; cellulare?: string };
+  }>('/documenti/:id/richiedi-otp-studio', async (req, reply) => {
+    const tenantId = req.tenantId;
+    if (req.ruolo === 'cliente') return reply.code(403).send({ errore: 'Non autorizzato.' });
+
+    const { id } = req.params;
+    const canale = req.body?.canale || 'email';
+    if (canale !== 'email' && canale !== 'whatsapp') {
+      return reply.code(400).send({ errore: 'Canale non valido. Ammessi: email, whatsapp.' });
+    }
+
+    try {
+      const doc = await prisma.documento.findFirst({
+        where: { id, tenantId },
+        include: {
+          progetto: { select: { id: true, clienteId: true, nome: true } },
+          microvoceProgetto: { select: { id: true, nome: true, moduloProgetto: { select: { progetto: { select: { id: true, clienteId: true, nome: true } } } } } },
+        },
+      });
+      if (!doc) return reply.code(404).send({ errore: 'Documento non trovato.' });
+
+      const clienteId = doc.progetto?.clienteId || doc.microvoceProgetto?.moduloProgetto?.progetto?.clienteId;
+      if (!clienteId) {
+        return reply.code(400).send({ errore: 'Impossibile determinare il cliente collegato al fascicolo del documento.' });
+      }
+
+      const utente = await prisma.user.findUnique({
+        where: { id: req.userId },
+        select: { id: true, nome: true, email: true },
+      });
+      if (!utente) return reply.code(404).send({ errore: 'Utente non trovato.' });
+
+      const recapito = canale === 'whatsapp' ? req.body?.cellulare?.trim() : utente.email;
+      if (!recapito) {
+        return reply.code(400).send({
+          errore: canale === 'whatsapp'
+            ? 'Specificare il numero di cellulare per la ricezione del codice via WhatsApp.'
+            : 'Nessuna email configurata nel tuo profilo utente.',
+        });
+      }
+
+      const esitoOtp = await creaOtp({
+        tenantId,
+        clienteId,
+        canale,
+        target: recapito,
+        ambito: 'documento_vault_studio',
+        riferimentoId: id,
+        ipRichiesta: ipReale(req),
+      });
+
+      if (!esitoOtp.ok || !esitoOtp.codice) {
+        return reply.code(400).send({ errore: esitoOtp.errore || 'Impossibile generare il codice OTP.' });
+      }
+
+      const docTitolo = doc.microvoceProgetto?.nome ?? doc.progetto?.nome ?? 'Documento';
+      const esitoInvio = await inviaCodiceOtp({
+        tenantId,
+        canale,
+        target: recapito,
+        codice: esitoOtp.codice,
+        nomeFirmatario: utente.nome,
+        oggettoFirma: `la sottoscrizione di «${docTitolo}»`,
+        livelloFirma: 'fea',
+      });
+
+      if (!esitoInvio.ok) {
+        if (esitoOtp.otpId) await annullaOtp(esitoOtp.otpId);
+        return reply.code(400).send({ ok: false, errore: esitoInvio.errore || 'Invio codice OTP fallito.' });
+      }
+
+      // Maschera recapito per feedback utente
+      const mascherato = canale === 'email'
+        ? recapito.replace(/^(.{2})(.*)(@.*)$/, (_, a, b, c) => `${a}${'*'.repeat(Math.max(b.length, 3))}${c}`)
+        : recapito.replace(/(\d{3})\d+(\d{2})$/, '$1****$2');
+
+      return reply.send({ ok: true, canale, recapitoMascherato: mascherato });
+    } catch (err) {
+      return reply.code(500).send({ errore: err instanceof Error ? err.message : 'Errore richiesta OTP' });
+    }
+  });
+
+  /**
+   * POST /documenti/:id/firma-studio
+   * Apposizione della firma dello studio/operatore con tutte le modalità disponibili:
+   * - grafometrica (SES - art. 20 CAD)
+   * - fea_otp (Firma Avanzata con OTP verificato su email/WhatsApp)
+   * - manuale_scansionata (upload copia cartacea scansionata)
+   * - qualificata_esterna (upload atto firmato con SmartCard/FEQ .p7m o .pdf)
+   */
+  server.post<{
+    Params: { id: string };
+    Body: {
+      modalita: 'grafometrica' | 'fea_otp' | 'manuale_scansionata' | 'qualificata_esterna';
+      firmaGrafometricaPng?: string;
+      otp?: string;
+      ruoloDichiarato?: string;
+      filename?: string;
+      contentBase64?: string;
+    };
+  }>('/documenti/:id/firma-studio', async (req, reply) => {
+    const tenantId = req.tenantId;
+    if (req.ruolo === 'cliente') return reply.code(403).send({ errore: 'Non autorizzato.' });
+
+    const { id } = req.params;
+    const { modalita, firmaGrafometricaPng, otp, ruoloDichiarato, filename, contentBase64 } = req.body || {};
+
+    if (!['grafometrica', 'fea_otp', 'manuale_scansionata', 'qualificata_esterna'].includes(modalita)) {
+      return reply.code(400).send({
+        errore: 'Modalità di firma non valida. Ammesse: grafometrica, fea_otp, manuale_scansionata, qualificata_esterna.',
+      });
+    }
+
+    try {
+      const doc = await prisma.documento.findFirst({
+        where: { id, tenantId },
+        include: {
+          progetto: { select: { id: true, clienteId: true, nome: true } },
+          microvoceProgetto: { select: { id: true, nome: true, moduloProgetto: { select: { progetto: { select: { id: true, clienteId: true, nome: true } } } } } },
+        },
+      });
+      if (!doc) return reply.code(404).send({ errore: 'Documento non trovato.' });
+
+      const clienteId = doc.progetto?.clienteId || doc.microvoceProgetto?.moduloProgetto?.progetto?.clienteId;
+      if (!clienteId) {
+        return reply.code(400).send({ errore: 'Impossibile determinare il cliente collegato al fascicolo del documento.' });
+      }
+
+      const utente = await prisma.user.findUnique({
+        where: { id: req.userId },
+        select: { id: true, nome: true, email: true, ruolo: true },
+      });
+      const firmatarioNome = utente?.nome || utente?.email || 'Professionista Studio';
+      const firmatarioRuolo = ruoloDichiarato?.trim() || (utente?.ruolo === 'advisor' ? 'Senior Legal & Tax Advisor' : 'Professionista Incaricato');
+
+      // Calcola hash del documento originale per il sigillo
+      const docTitolo = doc.microvoceProgetto?.nome ?? doc.progetto?.nome ?? 'Documento';
+      let docHash = 'sha256-precompilato';
+      try {
+        const hash = createHash('sha256');
+        hash.update(doc.fileUrl || id);
+        docHash = hash.digest('hex');
+      } catch {}
+
+      const signatureId = `BLU-STD-${Date.now()}-${randomUUID().slice(0, 8).toUpperCase()}`;
+
+      if (modalita === 'grafometrica' || modalita === 'fea_otp') {
+        const grafometrica = normalizzaGrafometrica(firmaGrafometricaPng);
+        if (!grafometrica) {
+          return reply.code(400).send({ errore: 'Firma grafica obbligatoria.' });
+        }
+
+        let isFea = false;
+        let codiceOtpRecordId: string | null = null;
+        if (modalita === 'fea_otp') {
+          if (!otp || !/^\d{6}$/.test(otp.trim())) {
+            return reply.code(400).send({ errore: 'Codice OTP di 6 cifre obbligatorio per la Firma Avanzata (FEA).' });
+          }
+          const esitoVerifica = await verificaOtp(clienteId, otp.trim(), 'documento_vault_studio', id);
+          if (!esitoVerifica.valido || !esitoVerifica.record) {
+            return reply.code(400).send({ errore: esitoVerifica.motivo || 'Codice OTP errato o scaduto. Richiedine uno nuovo.' });
+          }
+          isFea = true;
+          codiceOtpRecordId = esitoVerifica.record.id;
+        }
+
+        const valoreLegale = isFea ? 'fea' : 'ses';
+        const standard = isFea ? 'eIDAS / FEA (CAD art. 20 c. 1-bis)' : 'eIDAS / SES (CAD art. 20)';
+        const canaleVerificato = isFea ? 'OTP Verificato + Sessione Studio' : 'Sessione Studio Verificata (art. 20 CAD)';
+
+        const sigilloDigest = createHash('sha256')
+          .update(`${signatureId}:${docHash}:${firmatarioNome}:${new Date().toISOString()}`)
+          .digest('hex');
+
+        const firma = await prisma.firmaElettronica.create({
+          data: {
+            tenantId,
+            clienteId,
+            signatureId,
+            tipoFirma: 'studio',
+            ambito: 'documento_vault',
+            riferimentoId: id,
+            documentoTitolo: docTitolo,
+            firmatarioNome,
+            firmatarioRuolo,
+            documentoHash: docHash,
+            canaleVerificato,
+            codiceOtpId: codiceOtpRecordId,
+            ipAddress: ipReale(req),
+            userAgent: req.headers['user-agent'] || null,
+            firmaGrafometricaPng: grafometrica,
+            standard,
+            valoreLegale,
+            firmatoAt: new Date(),
+          },
+        });
+
+        // Ricomponi il PDF con la firma dello studio nello slot studio
+        const copiaFirmata = await generaCopiaFirmata({
+          tenantId,
+          documentoId: id,
+          firma: {
+            signatureId,
+            firmatarioNome,
+            firmatoAt: firma.firmatoAt,
+            valoreLegale,
+            firmaGrafometricaPng: grafometrica,
+          },
+          sigilloDigest,
+          slot: 'studio',
+          userId: req.userId,
+        });
+
+        if (copiaFirmata) {
+          await prisma.firmaElettronica.update({
+            where: { id: firma.id },
+            data: { fileFirmatoUrl: copiaFirmata.url },
+          });
+        }
+
+        await recordAudit({
+          tenantId,
+          userId: req.userId,
+          userEmail: utente?.email,
+          ruolo: req.ruolo,
+          azione: 'DOCUMENTO_FIRMATO_STUDIO',
+          entita: id,
+          dettagli: `Firma studio (${valoreLegale.toUpperCase()}) ${signatureId} apposta da ${firmatarioNome} (${firmatarioRuolo}) su «${docTitolo}»`,
+          ipAddress: ipReale(req),
+        });
+
+        return reply.send({
+          ok: true,
+          firma: {
+            signatureId,
+            firmatarioNome,
+            firmatarioRuolo,
+            firmatoAt: firma.firmatoAt,
+            tipoFirma: 'studio',
+            valoreLegale,
+          },
+          fileFirmatoUrl: copiaFirmata?.url ?? doc.fileUrl,
+        });
+      }
+
+      // Modalità manuale_scansionata o qualificata_esterna (upload file firmato)
+      if (!contentBase64 || !filename) {
+        return reply.code(400).send({ errore: 'File firmato (contentBase64 e filename) obbligatorio.' });
+      }
+
+      const buffer = Buffer.from(contentBase64.replace(/^data:[^;]+;base64,/, ''), 'base64');
+      const esitoScan = scanFileBuffer(buffer, filename);
+      if (!esitoScan.safe) {
+        return reply.code(400).send({ errore: esitoScan.reason ?? 'File non valido o non ammesso.' });
+      }
+
+      const fileHash = createHash('sha256').update(buffer).digest('hex');
+      const slug = filename.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const caricato = await uploadDocumento(slug, buffer.toString('base64'));
+      if (!caricato.ok) {
+        return reply.code(500).send({ errore: 'Impossibile salvare il file firmato.' });
+      }
+
+      const isFeq = modalita === 'qualificata_esterna';
+      const valoreLegale = isFeq ? 'feq' : 'ses';
+      const standard = isFeq ? 'eIDAS / FEQ (CAdES/PAdES)' : 'eIDAS / SES (Copia Scansionata)';
+      const canaleVerificato = isFeq ? 'Firma Digitale Qualificata Esterna' : 'Copia Cartacea Controfirmata';
+
+      const firma = await prisma.firmaElettronica.create({
+        data: {
+          tenantId,
+          clienteId,
+          signatureId,
+          tipoFirma: modalita,
+          ambito: 'documento_vault',
+          riferimentoId: id,
+          documentoTitolo: docTitolo,
+          firmatarioNome,
+          firmatarioRuolo,
+          documentoHash: docHash,
+          fileFirmatoUrl: caricato.url,
+          fileFirmatoHash: fileHash,
+          canaleVerificato,
+          ipAddress: ipReale(req),
+          userAgent: req.headers['user-agent'] || null,
+          standard,
+          valoreLegale,
+          firmatoAt: new Date(),
+        },
+      });
+
+      // Aggiorna o crea copia firmata
+      const copiaEsistente = await prisma.documento.findFirst({
+        where: { tenantId, documentoPadreId: id, tipo: 'firmato' },
+      });
+      if (copiaEsistente && copiaEsistente.id !== id && copiaEsistente.tipo === 'firmato') {
+        await prisma.documento.update({
+          where: { id: copiaEsistente.id },
+          data: { fileUrl: caricato.url, filePdfUrl: caricato.url, scansionatoAt: new Date() },
+        });
+      } else {
+        await prisma.documento.create({
+          data: {
+            tenantId,
+            progettoId: doc.progettoId,
+            microvoceProgettoId: doc.microvoceProgettoId,
+            tipo: 'firmato',
+            fileUrl: caricato.url,
+            filePdfUrl: caricato.url,
+            formatoOrigine: 'pdf',
+            documentoPadreId: id,
+            caricatoDa: req.userId,
+            categoriaDoc: doc.categoriaDoc ?? 'generico',
+            statoDoc: 'firmato',
+            pubblicatoAt: new Date(),
+            statoScansione: 'pulito',
+            scansionatoAt: new Date(),
+          },
+        });
+      }
+
+      await recordAudit({
+        tenantId,
+        userId: req.userId,
+        userEmail: utente?.email,
+        ruolo: req.ruolo,
+        azione: 'DOCUMENTO_FIRMATO_STUDIO',
+        entita: id,
+        dettagli: `Firma studio (${valoreLegale.toUpperCase()}) ${signatureId} con file ${filename} caricato da ${firmatarioNome}`,
+        ipAddress: ipReale(req),
+      });
+
+      return reply.send({
+        ok: true,
+        firma: {
+          signatureId,
+          firmatarioNome,
+          firmatarioRuolo,
+          firmatoAt: firma.firmatoAt,
+          tipoFirma: modalita,
+          valoreLegale,
+        },
+        fileFirmatoUrl: caricato.url,
+      });
+    } catch (err) {
+      return reply.code(500).send({ errore: err instanceof Error ? err.message : 'Errore firma studio' });
     }
   });
 

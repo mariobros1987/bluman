@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   eliminaDocumentoApi,
   archiviaDocumentoApi,
@@ -10,6 +10,7 @@ import type { DocumentTemplate } from '../../utils/documentTemplates';
 import type { DocumentoEntry } from './types';
 import type { RecommendationResult } from './catalogoModelliStudio';
 import { etichettaTipoFirma } from './passaggioUtils';
+import { FirmaStudioModal } from '../documenti/FirmaStudioModal';
 
 // ─── Tab 3: Documenti & Pre-screening AI ───────────────────────────────
 export function TabDocumenti({
@@ -47,6 +48,8 @@ export function TabDocumenti({
   uploadingDoc: boolean;
   handleFileUploadPassaggio: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }) {
+  const [docPerFirmaStudio, setDocPerFirmaStudio] = useState<DocumentoEntry | null>(null);
+
   return (
           <div style={{ flex: 1, overflowY: 'auto', padding: 20, display: 'flex', flexDirection: 'column', gap: 18 }}>
             {/* Box Pre-screening & Suggerimento Modello Intelligente */}
@@ -185,16 +188,18 @@ export function TabDocumenti({
                                 {/* §WF-DOC / regola 7 — l'etichetta dice il tipo di firma che c'è stato
                                     davvero: prima diceva "CON OTP" anche su una firma qualificata
                                     esterna o su un cartaceo scansionato, promettendo più del vero. */}
-                                ✅ FIRMATO{etichettaTipoFirma(d.firma?.tipoFirma) ? ` — ${etichettaTipoFirma(d.firma?.tipoFirma)}` : ''}
+                                ✅ FIRMATO CLIENTE{etichettaTipoFirma(d.firma?.tipoFirma) ? ` — ${etichettaTipoFirma(d.firma?.tipoFirma)}` : ''}
+                              </span>
+                            )}
+                            {d.firmatoDaStudio && (
+                              <span style={{ background: '#1e1b4b50', color: '#818cf8', border: '1px solid #4f46e5', padding: '3px 8px', borderRadius: 12, fontSize: 10, fontWeight: 700 }}>
+                                🏛️ FIRMATO STUDIO ({d.firmaStudio?.firmatarioNome || 'Professionista'})
                               </span>
                             )}
                           </div>
                         </div>
 
-                        {/* §WF-DOC — sigillo di firma: chi guarda la micro-voce nell'app deve
-                            vedere le stesse informazioni che vede il cliente nel portale, senza
-                            doverci arrivare per deduzione. Data, tipo e id firma vengono dal
-                            server (`creaSigilloFea`): qui non si ricostruisce nulla. */}
+                        {/* §WF-DOC — sigillo di firma cliente */}
                         {st === 'firmato' && (
                           <div style={{ background: '#064e3b25', border: '1px solid #059669', borderRadius: 8, padding: '9px 12px', display: 'flex', flexDirection: 'column', gap: 3 }}>
                             <div style={{ fontSize: 11.5, fontWeight: 700, color: '#34d399' }}>
@@ -210,6 +215,21 @@ export function TabDocumenti({
                               Stato terminale: pubblicazione, nuove versioni ed eliminazione sono bloccate.
                               {' '}Solo l'amministratore dello studio può riaprirlo, motivando lo sblocco.
                             </div>
+                          </div>
+                        )}
+
+                        {/* Sigillo di firma Studio / Professionista */}
+                        {d.firmatoDaStudio && (
+                          <div style={{ background: '#1e1b4b30', border: '1px solid #6366f1', borderRadius: 8, padding: '9px 12px', display: 'flex', flexDirection: 'column', gap: 3 }}>
+                            <div style={{ fontSize: 11.5, fontWeight: 700, color: '#a5b4fc' }}>
+                              🏛️ Sottoscritto dallo Studio: {d.firmaStudio?.firmatarioNome} {d.firmaStudio?.firmatarioRuolo ? `(${d.firmaStudio.firmatarioRuolo})` : ''}
+                              {d.firmaStudio?.firmatoAt ? ` il ${new Date(d.firmaStudio.firmatoAt).toLocaleString('it-IT')}` : ''}
+                            </div>
+                            {d.firmaStudio?.signatureId && (
+                              <div style={{ fontSize: 10, color: 'var(--muted)' }}>
+                                Sigillo Studio: <code style={{ fontSize: 9.5 }}>{d.firmaStudio.signatureId}</code> ({d.firmaStudio.valoreLegale?.toUpperCase() || 'SES'})
+                              </div>
+                            )}
                           </div>
                         )}
 
@@ -257,6 +277,18 @@ export function TabDocumenti({
                               title="Pubblica questo documento nel portale cliente per consentirne la visione e la firma"
                             >
                               🚀 Pubblica al Cliente
+                            </button>
+                          )}
+
+                          {/* Pulsante Firma Studio */}
+                          {!d.firmatoDaStudio && (
+                            <button
+                              type="button"
+                              onClick={() => setDocPerFirmaStudio(d)}
+                              style={{ background: '#312e81', border: '1px solid #6366f1', color: '#c7d2fe', padding: '5px 10px', borderRadius: 6, fontSize: 10.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                              title="Apponi la firma dello studio / professionista incaricato sul documento"
+                            >
+                              ✍️ Firma Studio
                             </button>
                           )}
 
@@ -448,6 +480,48 @@ export function TabDocumenti({
                 />
               </label>
             </div>
+
+            {/* Modal Firma Studio */}
+            {docPerFirmaStudio && (
+              <FirmaStudioModal
+                doc={{
+                  id: docPerFirmaStudio.id,
+                  tipo: 'compilato',
+                  fileUrl: docPerFirmaStudio.fileUrl || '',
+                  versione: docPerFirmaStudio.versione || 1,
+                  createdAt: docPerFirmaStudio.dataCaricamento || '',
+                  categoriaDoc: null,
+                  statoScansione: 'pulito',
+                  dataScadenzaDoc: null,
+                  progettoId: effProgettoId || null,
+                  microvoceProgettoId: null,
+                  firmato: docPerFirmaStudio.firmato,
+                  firmatoDaStudio: docPerFirmaStudio.firmatoDaStudio,
+                  firmatoDaCliente: docPerFirmaStudio.firmatoDaCliente,
+                  firmaStudio: docPerFirmaStudio.firmaStudio,
+                  firma: docPerFirmaStudio.firma as any,
+                }}
+                onClose={() => setDocPerFirmaStudio(null)}
+                onSigned={(updated) => {
+                  setDocPerFirmaStudio(null);
+                  if (updated) {
+                    persistDocuments(
+                      documents.map((x) =>
+                        x.id === updated.id
+                          ? {
+                              ...x,
+                              firmato: true,
+                              firmatoDaStudio: true,
+                              firmaStudio: updated.firmaStudio,
+                              fileFirmatoUrl: updated.fileFirmatoUrl || x.fileFirmatoUrl,
+                            }
+                          : x
+                      )
+                    );
+                  }
+                }}
+              />
+            )}
           </div>
   );
 }
