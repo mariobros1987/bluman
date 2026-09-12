@@ -217,10 +217,7 @@ Dal browser non serve nulla di manuale: la pagina di login lo ottiene e lo mette
 > applica solo le migrazioni versionate in `prisma/migrations/` e si ferma se il database è
 > in uno stato che non riconosce.
 >
-> Le migrazioni P0 per `sessionVersion` e `WebhookInbox` sono presenti nel repository ma non
-> risultano applicate. Eseguire prima backup e prova in staging, verificare login operatore e
-> cliente, revoca delle sessioni, consumo monouso dei Magic Link e webhook firmati; solo dopo
-> promuovere le stesse migrazioni in produzione con un'autorizzazione operativa separata.
+> Le migrazioni per `sessionVersion`, `WebhookInbox`, e i due blocchi di indici di performance (`20260912150000_indici_performance` e `20260912160000_indici_performance_globale`) sono versionate in `prisma/migrations/` e applicate con successo in produzione via `prisma migrate deploy`.
 
 ---
 

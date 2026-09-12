@@ -213,6 +213,8 @@ model Cliente {
   fatture      Fattura[]
   movimentiPrimaNota MovimentoPrimaNota[]
 
+  @@index([tenantId, createdAt(sort: Desc)])
+  @@index([tenantId, nome])
   @@map("cliente")
 }
 
@@ -676,6 +678,8 @@ model Documento {
 
   @@index([progettoId])
   @@index([statoDoc])
+  @@index([tenantId, progettoId, isArchiviato])
+  @@index([tenantId, createdAt(sort: Desc)])
   @@map("documento")
 }
 
@@ -743,6 +747,8 @@ model ContrattoRicorrente {
   createdAt            DateTime                 @default(now()) @map("created_at")
   fatture              Fattura[]
 
+  @@index([tenantId, clienteId])
+  @@index([tenantId, prossimaFatturazione])
   @@map("contratto_ricorrente")
 }
 
@@ -889,6 +895,9 @@ model Fattura {
 
   @@index([tenantId, clienteId])
   @@index([tenantId, progettoId])
+  @@index([tenantId, numeroProgressivoSerie(sort: Desc)])
+  @@index([tenantId, stato])
+  @@index([tenantId, tipoDocumento, stato])
   @@map("fattura")
 }
 
@@ -912,6 +921,7 @@ model ScadenzaIncasso {
 
   registrazioniRegistrate RegistrazioneIncasso[]
 
+  @@index([tenantId, fatturaId])
   @@map("scadenza_incasso")
 }
 
@@ -975,6 +985,7 @@ model FatturaRiga {
   totaleRigaCentesimi Int             @default(0) @map("totale_riga_centesimi")
   ordine              Int             @default(1)
 
+  @@index([tenantId, fatturaId])
   @@map("fattura_riga")
 }
 
@@ -1015,6 +1026,7 @@ model Fornitore {
   movimentiPrimaNota MovimentoPrimaNota[]
 
   @@index([tenantId])
+  @@index([tenantId, ragioneSociale])
   @@map("fornitore")
 }
 
@@ -1038,6 +1050,8 @@ model FatturaRicevuta {
   movimentiPrimaNota  MovimentoPrimaNota[]
 
   @@index([tenantId, fornitoreId])
+  @@index([tenantId, data(sort: Desc)])
+  @@index([tenantId, pagata])
   @@map("fattura_ricevuta")
 }
 

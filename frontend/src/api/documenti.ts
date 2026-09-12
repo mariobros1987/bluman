@@ -1,5 +1,7 @@
 import { downloadRealPdf, downloadRealWordDoc } from '../utils/pdfGenerator';
 import { API_BASE, apiFetch, getAuthHeaders, leggiErroreApi, urlDocumentoAssoluto } from './http';
+import { cachedQuery, invalidateCache } from './cache';
+import { getCurrentTenantId } from '../utils/tenant';
 export { urlDocumentoAssoluto };
 
 export async function uploadFileApi(filename: string, contentBase64: string) {
@@ -91,26 +93,35 @@ export interface DocumentoProgetto {
   richiesteModifica?: RichiestaModificaDoc[];
 }
 
-export async function listaDocumentiProgetto(progettoId: string, includiArchiviati = false): Promise<DocumentoProgetto[]> {
-  // §37 — `includiArchiviati` esiste già lato server (Punto 3 del piano gap): le liste
-  // operative escludono gli archiviati, l'archivio dello studio li mostra su richiesta.
-  const parametri = new URLSearchParams({ progettoId });
-  if (includiArchiviati) parametri.set('includiArchiviati', 'true');
-  const res = await apiFetch(`${API_BASE}/documenti?${parametri.toString()}`, {
-    headers: getAuthHeaders(),
-  });
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.errore ?? 'Errore lettura documenti del progetto');
-  }
-  const data = await res.json();
-  return (data.documenti ?? []).map((d: DocumentoProgetto) => ({
-    ...d,
-    fileUrl: urlDocumentoAssoluto(d.fileUrl),
-    // §Punto-1 — anche i due formati generati devono puntare a URL assoluti.
-    filePdfUrl: d.filePdfUrl ? urlDocumentoAssoluto(d.filePdfUrl) : d.filePdfUrl ?? null,
-    fileDocxUrl: d.fileDocxUrl ? urlDocumentoAssoluto(d.fileDocxUrl) : d.fileDocxUrl ?? null,
-  }));
+export async function listaDocumentiProgetto(progettoId: string, includiArchiviati = false, options?: { forceRefresh?: boolean }): Promise<DocumentoProgetto[]> {
+  const currentTenantId = getCurrentTenantId();
+  const cacheKey = `documenti_progetto_${currentTenantId}_${progettoId}_${includiArchiviati}`;
+
+  return cachedQuery(
+    cacheKey,
+    async () => {
+      // §37 — `includiArchiviati` esiste già lato server (Punto 3 del piano gap): le liste
+      // operative escludono gli archiviati, l'archivio dello studio li mostra su richiesta.
+      const parametri = new URLSearchParams({ progettoId });
+      if (includiArchiviati) parametri.set('includiArchiviati', 'true');
+      const res = await apiFetch(`${API_BASE}/documenti?${parametri.toString()}`, {
+        headers: getAuthHeaders(),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.errore ?? 'Errore lettura documenti del progetto');
+      }
+      const data = await res.json();
+      return (data.documenti ?? []).map((d: DocumentoProgetto) => ({
+        ...d,
+        fileUrl: urlDocumentoAssoluto(d.fileUrl),
+        // §Punto-1 — anche i due formati generati devono puntare a URL assoluti.
+        filePdfUrl: d.filePdfUrl ? urlDocumentoAssoluto(d.filePdfUrl) : d.filePdfUrl ?? null,
+        fileDocxUrl: d.fileDocxUrl ? urlDocumentoAssoluto(d.fileDocxUrl) : d.fileDocxUrl ?? null,
+      }));
+    },
+    { ttlMs: 30_000, forceRefresh: options?.forceRefresh }
+  );
 }
 
 export async function salvaDocumentoApi(input: {
@@ -137,6 +148,8 @@ export async function salvaDocumentoApi(input: {
     const data = await res.json().catch(() => ({}));
     throw new Error(data.errore ?? 'Errore archiviazione documento');
   }
+  invalidateCache('documenti');
+  invalidateCache('archivio_doc');
   const data = await res.json();
   return { ...data.documento, fileUrl: urlDocumentoAssoluto(data.documento?.fileUrl) };
 }
@@ -166,6 +179,8 @@ export async function generaDocumentoApi(input: {
     const data = await res.json().catch(() => ({}));
     throw new Error(data.errore ?? 'Errore generazione documento');
   }
+  invalidateCache('documenti');
+  invalidateCache('archivio_doc');
   const data = await res.json();
   return {
     ...data.documento,
@@ -187,6 +202,8 @@ export async function aggiornaStatoDocumentoApi(documentoId: string, statoDoc: '
     const data = await res.json().catch(() => ({}));
     throw new Error(data.errore ?? 'Errore aggiornamento stato documento');
   }
+  invalidateCache('documenti');
+  invalidateCache('archivio_doc');
   return await res.json();
 }
 
@@ -205,6 +222,8 @@ export async function sbloccaDocumentoApi(documentoId: string, motivo: string): 
     const data = await res.json().catch(() => ({}));
     throw new Error(data.errore ?? 'Errore sblocco documento');
   }
+  invalidateCache('documenti');
+  invalidateCache('archivio_doc');
   const data = await res.json();
   return data.documento;
 }
@@ -223,6 +242,8 @@ export async function aggiornaLivelloFirmaDocumentoApi(documentoId: string, live
     const data = await res.json().catch(() => ({}));
     throw new Error(data.errore ?? 'Errore aggiornamento livello di firma');
   }
+  invalidateCache('documenti');
+  invalidateCache('archivio_doc');
   const data = await res.json();
   return data.documento;
 }
@@ -242,6 +263,8 @@ export async function nuovaVersioneDocumentoApi(documentoId: string, input: {
     const data = await res.json().catch(() => ({}));
     throw new Error(data.errore ?? 'Errore caricamento nuova versione');
   }
+  invalidateCache('documenti');
+  invalidateCache('archivio_doc');
   const data = await res.json();
   return { ...data.documento, fileUrl: urlDocumentoAssoluto(data.documento?.fileUrl) };
 }
@@ -293,6 +316,8 @@ export async function eliminaDocumentoApi(id: string) {
     const data = await res.json().catch(() => ({}));
     throw new Error(data.errore ?? 'Errore eliminazione documento');
   }
+  invalidateCache('documenti');
+  invalidateCache('archivio_doc');
   return await res.json();
 }
 
@@ -307,6 +332,8 @@ export async function archiviaDocumentoApi(id: string) {
     const data = await res.json().catch(() => ({}));
     throw new Error(data.errore ?? 'Errore archiviazione documento');
   }
+  invalidateCache('documenti');
+  invalidateCache('archivio_doc');
   return await res.json();
 }
 
@@ -350,11 +377,18 @@ export interface TotaliArchivio {
   nonCollocati: number;
 }
 
-export async function archivioDocumentiApi(): Promise<{ clienti: ClienteArchivio[]; totali: TotaliArchivio }> {
-  const res = await apiFetch(`${API_BASE}/documenti/archivio`, { headers: getAuthHeaders() });
-  if (!res.ok) throw new Error(await leggiErroreApi(res, "Errore lettura archivio documenti"));
-  const data = await res.json();
-  return { clienti: data.clienti ?? [], totali: data.totali };
+export async function archivioDocumentiApi(options?: { forceRefresh?: boolean }): Promise<{ clienti: ClienteArchivio[]; totali: TotaliArchivio }> {
+  const currentTenantId = getCurrentTenantId();
+  return cachedQuery(
+    `archivio_doc_${currentTenantId}`,
+    async () => {
+      const res = await apiFetch(`${API_BASE}/documenti/archivio`, { headers: getAuthHeaders() });
+      if (!res.ok) throw new Error(await leggiErroreApi(res, "Errore lettura archivio documenti"));
+      const data = await res.json();
+      return { clienti: data.clienti ?? [], totali: data.totali };
+    },
+    { ttlMs: 30_000, forceRefresh: options?.forceRefresh }
+  );
 }
 
 // ── §40 — Collocare un documento: collegarlo al progetto e alla micro-voce ─────────────
@@ -375,11 +409,18 @@ export interface DocumentoNonCollocato {
   caricatoDa: string | null;
 }
 
-export async function documentiNonCollocatiApi(): Promise<DocumentoNonCollocato[]> {
-  const res = await apiFetch(`${API_BASE}/documenti/non-collocati`, { headers: getAuthHeaders() });
-  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore lettura documenti non collocati'));
-  const data = await res.json();
-  return data.documenti ?? [];
+export async function documentiNonCollocatiApi(options?: { forceRefresh?: boolean }): Promise<DocumentoNonCollocato[]> {
+  const currentTenantId = getCurrentTenantId();
+  return cachedQuery(
+    `documenti_non_collocati_${currentTenantId}`,
+    async () => {
+      const res = await apiFetch(`${API_BASE}/documenti/non-collocati`, { headers: getAuthHeaders() });
+      if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore lettura documenti non collocati'));
+      const data = await res.json();
+      return data.documenti ?? [];
+    },
+    { ttlMs: 30_000, forceRefresh: options?.forceRefresh }
+  );
 }
 
 /**
@@ -400,6 +441,8 @@ export async function collegaDocumentoApi(
     body: JSON.stringify(input),
   });
   if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore collegamento documento'));
+  invalidateCache('documenti');
+  invalidateCache('archivio_doc');
   const data = await res.json();
   return data.documento;
 }
@@ -622,6 +665,8 @@ export async function firmaStudioDocumentoApi(
     const err = await res.json().catch(() => ({}));
     throw new Error(err.errore || 'Errore apposizione firma Studio');
   }
+  invalidateCache('documenti');
+  invalidateCache('archivio_doc');
   return await res.json();
 }
 

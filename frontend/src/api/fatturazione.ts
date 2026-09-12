@@ -128,15 +128,22 @@ export async function downloadFatturaXmlApi(fatturaId: string, numero?: string) 
   }
 }
 
-export async function fetchContrattiRicorrentiApi() {
-  try {
-    const res = await apiFetch(`${API_BASE}/contratti-ricorrenti`, { headers: getAuthHeaders() });
-    if (!res.ok) throw new Error('Errore recupero contratti');
-    return await res.json();
-  } catch (err) {
-    console.warn('Contratti ricorrenti API fallback', err);
-    return null;
-  }
+export async function fetchContrattiRicorrentiApi(options?: { forceRefresh?: boolean }) {
+  const currentTenantId = getCurrentTenantId();
+  return cachedQuery(
+    `contratti_ricorrenti_${currentTenantId}`,
+    async () => {
+      try {
+        const res = await apiFetch(`${API_BASE}/contratti-ricorrenti`, { headers: getAuthHeaders() });
+        if (!res.ok) throw new Error('Errore recupero contratti');
+        return await res.json();
+      } catch (err) {
+        console.warn('Contratti ricorrenti API fallback', err);
+        return null;
+      }
+    },
+    { ttlMs: 30_000, forceRefresh: options?.forceRefresh }
+  );
 }
 
 export async function creaContrattoRicorrenteApi(input: { clienteId: string; progettoId?: string; titolo: string; frequenza?: string; importoCentesimi: number; prossimaFatturazione: string; note?: string }) {
@@ -146,6 +153,7 @@ export async function creaContrattoRicorrenteApi(input: { clienteId: string; pro
     body: JSON.stringify(input),
   });
   if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore creazione contratto'));
+  invalidateCache('contratti_ricorrenti');
   return await res.json();
 }
 
@@ -155,6 +163,8 @@ export async function generaFatturaRetainerApi(contrattoId: string) {
     headers: getAuthHeaders(),
   });
   if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore generazione fattura retainer'));
+  invalidateCache('contratti_ricorrenti');
+  invalidateCache('fattur');
   return await res.json();
 }
 
@@ -205,18 +215,25 @@ export async function inviaWebhookSdiApi(fatturaId: string, statoSdi: 'consegnat
   return await res.json();
 }
 
-export async function fetchContiBancariApi() {
-  try {
-    const res = await apiFetch(`${API_BASE}/conti-bancari`, { headers: getAuthHeaders() });
-    if (!res.ok) throw new Error('Errore recupero conti bancari');
-    return await res.json();
-  } catch (err) {
-    // §3.3 — prima il fallback restituiva QUATTRO conti bancari inventati (IBAN fittizi, saldi
-    // a 7 cifre, Unicredit/Intesa/Stripe/Cassa) spacciandoli per reali in una schermata
-    // finanziaria. Una lettura che fallisce restituisce lista vuota, non un bilancio immaginario.
-    console.warn('Conti bancari API non disponibile:', err);
-    return [];
-  }
+export async function fetchContiBancariApi(options?: { forceRefresh?: boolean }) {
+  const currentTenantId = getCurrentTenantId();
+  return cachedQuery(
+    `conti_bancari_${currentTenantId}`,
+    async () => {
+      try {
+        const res = await apiFetch(`${API_BASE}/conti-bancari`, { headers: getAuthHeaders() });
+        if (!res.ok) throw new Error('Errore recupero conti bancari');
+        return await res.json();
+      } catch (err) {
+        // §3.3 — prima il fallback restituiva QUATTRO conti bancari inventati (IBAN fittizi, saldi
+        // a 7 cifre, Unicredit/Intesa/Stripe/Cassa) spacciandoli per reali in una schermata
+        // finanziaria. Una lettura che fallisce restituisce lista vuota, non un bilancio immaginario.
+        console.warn('Conti bancari API non disponibile:', err);
+        return [];
+      }
+    },
+    { ttlMs: 60_000, forceRefresh: options?.forceRefresh }
+  );
 }
 
 export async function creaContoBancarioApi(input: { nomeConto: string; banca: string; iban?: string; bicSwift?: string; saldoInizialeEur: number; isDefault?: boolean }) {
@@ -228,6 +245,7 @@ export async function creaContoBancarioApi(input: { nomeConto: string; banca: st
     body: JSON.stringify(input),
   });
   if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore creazione conto bancario'));
+  invalidateCache('conti_bancari');
   return await res.json();
 }
 

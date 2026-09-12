@@ -373,7 +373,7 @@ Creare test end-to-end automatizzati (con database di test isolato o mock comple
 
 ### ⚙️ Sprint 5 — Infrastruttura & Scalabilità (da `PIANO_DI_MIGLIORAMENTO.md`)
 - [x] **INF-1** Rate Limiting distribuito tramite store Redis per `@fastify/rate-limit` (provisioning Redis database su Railway, variabile `REDIS_URL` collegata a `bluman-api`, client `src/util/redis.ts` con fallback in-memory, cache backend `src/services/backendCache.ts` per giurisdizioni/moduli/articoli) (2026-09-12).
-- [x] **INF-2** Ottimizzazione indici DB compositi su tabelle a crescita rapida (`AuditLog`, `MovimentoPrimaNota`, `Notifica`, `Progetto`) — migrazione `20260912150000_indici_performance` con 7 indici `CONCURRENTLY IF NOT EXISTS` (2026-09-12).
+- [x] **INF-2** Ottimizzazione indici DB compositi su tabelle a crescita rapida e relazioni ERP (`AuditLog`, `MovimentoPrimaNota`, `Notifica`, `Progetto`, `Cliente`, `Fattura`, `FatturaRiga`, `ScadenzaIncasso`, `Fornitore`, `FatturaRicevuta`, `Documento`, `ContrattoRicorrente`) — migrazioni `20260912150000_indici_performance` e `20260912160000_indici_performance_globale` applicate su PostgreSQL/Supabase; caching client-side 0ms esteso a tutti i moduli ERP (2026-09-12).
 - [ ] **INF-3** Monitoraggio errori centralizzato con Sentry e health/uptime alert su Railway.
 - [ ] **INF-4** File `.env.example` documentato e sincronizzato con tutte le variabili d'ambiente (DB, JWT, Storage, 2FA, Sentry, SMTP, WhatsApp, Cron).
 

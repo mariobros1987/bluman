@@ -24,12 +24,20 @@ export async function fetchClienti(parametri?: ParametriListaPaginata, options?:
   );
 }
 
-export async function fetchCliente(id: string) {
-  const res = await apiFetch(`${API_BASE}/clienti/${encodeURIComponent(id)}`, {
-    headers: getAuthHeaders(),
-  });
-  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore nel recupero cliente'));
-  return await res.json();
+export async function fetchCliente(id: string, options?: { forceRefresh?: boolean }) {
+  const currentTenantId = getCurrentTenantId();
+  const cacheKey = `cliente_${currentTenantId}_${id}`;
+  return cachedQuery(
+    cacheKey,
+    async () => {
+      const res = await apiFetch(`${API_BASE}/clienti/${encodeURIComponent(id)}`, {
+        headers: getAuthHeaders(),
+      });
+      if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore nel recupero cliente'));
+      return await res.json();
+    },
+    { ttlMs: 30_000, forceRefresh: options?.forceRefresh }
+  );
 }
 
 export async function creaClienteApi(input: { nome: string; tipo?: 'individual' | 'company'; [key: string]: any }) {

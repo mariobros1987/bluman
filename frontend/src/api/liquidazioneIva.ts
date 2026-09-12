@@ -1,4 +1,6 @@
 import { API_BASE, apiFetch, getAuthHeaders, leggiErroreApi } from './http';
+import { cachedQuery, invalidateCache } from './cache';
+import { getCurrentTenantId } from '../utils/tenant';
 
 export interface LiquidazioneIvaRecord {
   id: string;
@@ -53,10 +55,17 @@ export interface CalcoloLipeResponse {
   registrazioneEsistente?: LiquidazioneIvaRecord | null;
 }
 
-export async function fetchLiquidazioniIvaApi(): Promise<LiquidazioneIvaRecord[]> {
-  const res = await apiFetch(`${API_BASE}/liquidazione-iva`, { headers: getAuthHeaders() });
-  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore recupero storico liquidazioni IVA'));
-  return await res.json();
+export async function fetchLiquidazioniIvaApi(options?: { forceRefresh?: boolean }): Promise<LiquidazioneIvaRecord[]> {
+  const currentTenantId = getCurrentTenantId();
+  return cachedQuery(
+    `liquidazioni_iva_${currentTenantId}`,
+    async () => {
+      const res = await apiFetch(`${API_BASE}/liquidazione-iva`, { headers: getAuthHeaders() });
+      if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore recupero storico liquidazioni IVA'));
+      return await res.json();
+    },
+    { ttlMs: 30_000, forceRefresh: options?.forceRefresh }
+  );
 }
 
 export async function calcolaLipeApi(periodo: string, creditoPrecedenteCent: number = 0): Promise<CalcoloLipeResponse> {
@@ -76,6 +85,7 @@ export async function salvaLipeApi(periodo: string, creditoPrecedenteCent: numbe
     body: JSON.stringify({ periodo, creditoPrecedenteCent }),
   });
   if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore salvataggio liquidazione IVA'));
+  invalidateCache('liquidazioni_iva');
   return await res.json();
 }
 
@@ -92,5 +102,7 @@ export async function marcaVersataLipeApi(periodo: string, dati: {
     body: JSON.stringify(dati),
   });
   if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore registrazione versamento F24'));
+  invalidateCache('liquidazioni_iva');
+  invalidateCache('prima_nota');
   return await res.json();
 }

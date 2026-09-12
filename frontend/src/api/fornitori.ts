@@ -1,4 +1,6 @@
 import { API_BASE, apiFetch, getAuthHeaders, leggiErroreApi } from './http';
+import { cachedQuery, invalidateCache } from './cache';
+import { getCurrentTenantId } from '../utils/tenant';
 
 export interface Fornitore {
   id: string;
@@ -38,10 +40,17 @@ export interface FatturaRicevuta {
   createdAt: string;
 }
 
-export async function fetchFornitoriApi(): Promise<Fornitore[]> {
-  const res = await apiFetch(`${API_BASE}/fornitori`, { headers: getAuthHeaders() });
-  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore recupero lista fornitori'));
-  return await res.json();
+export async function fetchFornitoriApi(options?: { forceRefresh?: boolean }): Promise<Fornitore[]> {
+  const currentTenantId = getCurrentTenantId();
+  return cachedQuery(
+    `fornitori_${currentTenantId}`,
+    async () => {
+      const res = await apiFetch(`${API_BASE}/fornitori`, { headers: getAuthHeaders() });
+      if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore recupero lista fornitori'));
+      return await res.json();
+    },
+    { ttlMs: 30_000, forceRefresh: options?.forceRefresh }
+  );
 }
 
 export async function creaFornitoreApi(dati: Partial<Fornitore>): Promise<Fornitore> {
@@ -51,6 +60,7 @@ export async function creaFornitoreApi(dati: Partial<Fornitore>): Promise<Fornit
     body: JSON.stringify(dati),
   });
   if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore creazione fornitore'));
+  invalidateCache('fornitori');
   return await res.json();
 }
 
@@ -61,6 +71,7 @@ export async function aggiornaFornitoreApi(id: string, dati: Partial<Fornitore>)
     body: JSON.stringify(dati),
   });
   if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore aggiornamento fornitore'));
+  invalidateCache('fornitori');
   return await res.json();
 }
 
@@ -70,14 +81,23 @@ export async function eliminaFornitoreApi(id: string): Promise<{ ok: boolean; me
     headers: getAuthHeaders(),
   });
   if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore eliminazione fornitore'));
+  invalidateCache('fornitori');
   return await res.json();
 }
 
-export async function fetchFattureRicevuteApi(fornitoreId?: string): Promise<FatturaRicevuta[]> {
-  const url = fornitoreId ? `${API_BASE}/fatture-ricevute?fornitoreId=${fornitoreId}` : `${API_BASE}/fatture-ricevute`;
-  const res = await apiFetch(url, { headers: getAuthHeaders() });
-  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore recupero fatture passive'));
-  return await res.json();
+export async function fetchFattureRicevuteApi(fornitoreId?: string, options?: { forceRefresh?: boolean }): Promise<FatturaRicevuta[]> {
+  const currentTenantId = getCurrentTenantId();
+  const cacheKey = `fatture_ricevute_${currentTenantId}_${fornitoreId || 'tutte'}`;
+  return cachedQuery(
+    cacheKey,
+    async () => {
+      const url = fornitoreId ? `${API_BASE}/fatture-ricevute?fornitoreId=${fornitoreId}` : `${API_BASE}/fatture-ricevute`;
+      const res = await apiFetch(url, { headers: getAuthHeaders() });
+      if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore recupero fatture passive'));
+      return await res.json();
+    },
+    { ttlMs: 30_000, forceRefresh: options?.forceRefresh }
+  );
 }
 
 export const fetchFatturePassiveApi = fetchFattureRicevuteApi;
@@ -89,6 +109,9 @@ export async function registraFatturaRicevutaApi(dati: any): Promise<FatturaRice
     body: JSON.stringify(dati),
   });
   if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore registrazione fattura passiva'));
+  invalidateCache('fatture_ricevute');
+  invalidateCache('fornitori');
+  invalidateCache('prima_nota');
   return await res.json();
 }
 
@@ -106,6 +129,9 @@ export async function importaXmlFatturaRicevutaApi(dati: {
     body: JSON.stringify(dati),
   });
   if (!res.ok) throw new Error(await leggiErroreApi(res, "Errore importazione XML fattura d'acquisto"));
+  invalidateCache('fatture_ricevute');
+  invalidateCache('fornitori');
+  invalidateCache('prima_nota');
   return await res.json();
 }
 
@@ -124,5 +150,7 @@ export async function pagaFatturaRicevutaApi(id: string, dati: {
     body: JSON.stringify(dati),
   });
   if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore registrazione pagamento fattura passiva'));
+  invalidateCache('fatture_ricevute');
+  invalidateCache('prima_nota');
   return await res.json();
 }

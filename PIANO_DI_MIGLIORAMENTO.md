@@ -927,7 +927,7 @@ REDIS_URL=
 ### FASE 4 — Performance (1 settimana)
 - [x] 4.1 Paginazione liste (FASE 1 — PaginazioneQuerySchema su fatture, prima nota, progetti, clienti, audit)
 - [x] 4.2 Rate limit Redis & Cache Backend Distribuita (2026-09-12: provisioning database Redis su Railway, client `src/util/redis.ts`, rate limit distribuito `@fastify/rate-limit`, cache multi-layer `src/services/backendCache.ts` per giurisdizioni, moduli catalogo e articoli con abbattimento overhead RLS, suite `src/backendCache.test.ts`)
-- [x] 4.3 Indici DB (migrazione 20260912150000_indici_performance: 7 indici compositi su AuditLog, Notifica, Progetto e MovimentoPrimaNota con CONCURRENTLY IF NOT EXISTS)
+- [x] 4.3 Indici DB & Caching Globale Piattaforma (migrazioni `20260912150000_indici_performance` e `20260912160000_indici_performance_globale`: indici compositi su AuditLog, Notifica, Progetto, MovimentoPrimaNota, Cliente, Fattura, FatturaRiga, ScadenzaIncasso, Fornitore, FatturaRicevuta, Documento e ContrattoRicorrente; estensione cache client-side 0ms a Archivio Documenti, Fornitori, Conti Bancari, Retainers e LIPE)
 
 ### FASE 5 — Funzionalità (2-3 settimane)
 - [x] 5.1 Cron schedulato reale (FASE 2.1 — runner CLI `runDailyNotificationCron.ts` e test dedicato)
