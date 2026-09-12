@@ -17,7 +17,6 @@ export function TabSicurezza({ ruolo }: TabSicurezzaProps) {
   // Flusso attivazione 2FA
   const [faseAttivazione, setFaseAttivazione] = useState<FaseAttivazioneTotp>('idle');
   const [qrUrl, setQrUrl] = useState('');
-  const [qrUri, setQrUri] = useState('');
   const [segretoManuale, setSegretoManuale] = useState('');
   const [backupCodes, setBackupCodes] = useState<string[]>([]);
   const [codiceConferma, setCodiceConferma] = useState('');
@@ -47,7 +46,6 @@ export function TabSicurezza({ ruolo }: TabSicurezzaProps) {
     try {
       const res = await attivaTotpApi();
       setQrUrl(res.qrUrl);
-      setQrUri(res.qrUri);
       setSegretoManuale(res.segreto);
       setBackupCodes(res.backupCodes);
       setCodiceConferma('');
