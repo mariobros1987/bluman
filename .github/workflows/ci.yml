@@ -47,6 +47,18 @@ jobs:
         run: npm ci
         working-directory: frontend
 
+      # Presidio 3b: lint (oxlint con regole react) — configurato da sempre in
+      # frontend/.oxlintrc.json ma mai eseguito dalla CI prima di questo step.
+      - name: Frontend Lint (oxlint)
+        run: npm run lint
+        working-directory: frontend
+
+      # Presidio 3c: unit e component test del frontend (Vitest + Testing Library,
+      # jsdom). Runner separato da quello backend: vedi frontend/vite.config.ts.
+      - name: Frontend Tests (Vitest)
+        run: npm test
+        working-directory: frontend
+
       # Presidio 3: il frontend si valida con `tsc -b` (project references),
       # NON con `tsc --noEmit` che sul tsconfig con "files": [] non verifica nulla.
       - name: Frontend Typecheck

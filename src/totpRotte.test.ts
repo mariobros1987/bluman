@@ -37,6 +37,18 @@ vi.mock('./util/prismaClient.js', async (importOriginal) => {
           sessionVersion: 0,
         };
       }
+      // Il collaboratore serve ai test dell'estensione: l'hook di sessione legge la riga
+      // utente a ogni richiesta, e senza di essa la risposta sarebbe 401 (sessione non
+      // risolvibile) invece del 403 di ruolo che il test vuole osservare.
+      if (id === 'usr-collab') {
+        return {
+          id: 'usr-collab',
+          tenantId: TENANT,
+          ruolo: 'collaboratore_interno',
+          stato: 'attivo',
+          sessionVersion: 0,
+        };
+      }
       return null;
     },
     update: async (args: any) => {
@@ -306,6 +318,97 @@ describe('§6.1 — Rotte HTTP TOTP 2FA End-to-End', () => {
     const body = JSON.parse(res.payload);
     expect(body.ok).toBe(true);
     expect(stato.utente.totpIpFidati).toEqual([]);
+  });
+});
+
+// §6.1 esteso — il 2FA TOTP non è più solo del super_admin: l'advisor gestisce i fascicoli
+// di tutti i clienti dello studio ed è lo stesso profilo a rischio. Questo blocco presidia
+// che le rotte accettino l'advisor e continuino a rifiutare i collaboratori.
+describe('§6.1 — TOTP per advisor (estensione)', () => {
+  let server: any;
+
+  function tokenAdvisor() {
+    return signJwt({
+      userId: 'usr-advisor',
+      tenantId: TENANT,
+      email: 'advisor@studio.it',
+      ruolo: 'advisor',
+      sessionVersion: 0,
+    });
+  }
+
+  function tokenCollaboratore() {
+    return signJwt({
+      userId: 'usr-collab',
+      tenantId: TENANT,
+      email: 'collab@studio.it',
+      ruolo: 'collaboratore_interno',
+      sessionVersion: 0,
+    });
+  }
+
+  beforeEach(async () => {
+    stato.update = [];
+    stato.utente = {
+      id: 'usr-advisor',
+      email: 'advisor@studio.it',
+      nome: 'Advisor Studio',
+      ruolo: 'advisor',
+      stato: 'attivo',
+      sessionVersion: 0,
+      passwordHash: hashPassword('PasswordSicura123!'),
+      totpSecret: null,
+      totpAbilitato: false,
+      totpBackupCodes: [],
+    };
+    server = await buildServer(new InMemoryApp());
+  });
+
+  it("l'advisor può attivare e confermare il TOTP", async () => {
+    const resAttiva = await server.inject({
+      method: 'POST',
+      url: '/auth/totp/attiva',
+      headers: { authorization: `Bearer ${tokenAdvisor()}` },
+    });
+    expect(resAttiva.statusCode).toBe(200);
+    const { segreto } = JSON.parse(resAttiva.payload);
+
+    const resConferma = await server.inject({
+      method: 'POST',
+      url: '/auth/totp/conferma',
+      headers: { authorization: `Bearer ${tokenAdvisor()}` },
+      payload: { codiceTotp: calcolaTotp(segreto) },
+    });
+    expect(resConferma.statusCode).toBe(200);
+    expect(stato.utente.totpAbilitato).toBe(true);
+  });
+
+  it('il collaboratore interno resta fuori: 403 su attiva e stato', async () => {
+    for (const url of ['/auth/totp/attiva', '/auth/totp/stato', '/auth/totp/dimentica-ip']) {
+      const res = await server.inject({
+        method: url === '/auth/totp/stato' ? 'GET' : 'POST',
+        url,
+        headers: { authorization: `Bearer ${tokenCollaboratore()}` },
+      });
+      expect(res.statusCode, url).toBe(403);
+    }
+  });
+
+  it("il login dell'advisor con TOTP attivo passa dallo step-2 con preToken", async () => {
+    stato.utente.totpAbilitato = true;
+    stato.utente.totpSecret = 'segreto-finto';
+    stato.utente.totpIpFidati = [];
+
+    const res = await server.inject({
+      method: 'POST',
+      url: '/auth/login',
+      payload: { email: 'advisor@studio.it', password: 'PasswordSicura123!' },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.payload);
+    expect(body.totpRequired).toBe(true);
+    expect(body.preToken).toBeDefined();
   });
 });
 

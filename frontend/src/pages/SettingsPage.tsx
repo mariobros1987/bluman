@@ -674,7 +674,7 @@ export function SettingsPage() {
           setConfermaSvuota={setConfermaSvuota}
         />
       )}
-      {/* TAB 6: Sicurezza Account (2FA TOTP — solo super_admin) */}
+      {/* TAB 6: Sicurezza Account (2FA TOTP — super_admin e advisor) */}
       {tab === 'sicurezza' && (
         <TabSicurezza ruolo={currentRuolo} />
       )}

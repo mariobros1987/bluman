@@ -92,14 +92,38 @@ export function decodificaBase64Documento(contentBase64: string): Buffer {
   return buffer;
 }
 
-export async function uploadDocumento(filename: string, contentBase64: string): Promise<UploadResult> {
+/**
+ * Il tenant proprietario del file, quando il nome lo dichiara.
+ *
+ * I file caricati da quando esiste l'isolamento portano un prefisso `<tenantId>_` prima
+ * del timestamp. I file storici (solo `<timestamp>_<nome>`) non dichiarano nessun tenant:
+ * chi li legge non può sapere a chi appartengono, e restano soggetti alle regole di prima.
+ */
+export function tenantDaNomeFile(filename: string): string | null {
+  // UUID v4 standard (36 caratteri) seguito da `_`. Il match comprende l'underscore:
+  // il tenant è tutto ciò che sta prima.
+  const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}_/;
+  const match = UUID.exec(filename);
+  return match ? match[0].slice(0, -1) : null;
+}
+
+export async function uploadDocumento(
+  filename: string,
+  contentBase64: string,
+  tenantId?: string,
+): Promise<UploadResult> {
   const supabaseUrl = process.env.SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
 
   const buffer = decodificaBase64Documento(contentBase64);
   const scansione = scanFileBuffer(buffer, filename);
   if (!scansione.safe) throw new Error(scansione.reason ?? 'File non ammesso');
-  const safeFilename = `${Date.now()}_${nomeFileSicuro(filename)}`;
+  // Il nome porta il tenant che ha caricato il file: è l'unica chiave che `GET /uploads`
+  // ha per rifiutare a uno studio il file di un altro senza una tabella di registro.
+  // Senza `tenantId` (chiamate senza contesto, es. alcuni script) il nome resta nella
+  // forma storica e il file segue le regole di prima.
+  const prefissoTenant = tenantId ? `${tenantId}_` : '';
+  const safeFilename = `${prefissoTenant}${Date.now()}_${nomeFileSicuro(filename)}`;
   const sizeKb = `${Math.round(buffer.length / 1024)} KB`;
 
   // 1. Supabase Storage API Integration (Se le chiavi sono configurate)
@@ -116,8 +140,13 @@ export async function uploadDocumento(filename: string, contentBase64: string): 
       });
 
       if (response.ok) {
-        const publicUrl = `${supabaseUrl}/storage/v1/object/public/bluman-documents/${safeFilename}`;
-        return { ok: true, url: publicUrl, name: filename, size: sizeKb };
+        // URL FIRMATO, non pubblico. Prima qui finiva `object/public/...`: chiunque
+        // conoscesse l'URL scaricava atti societari e documenti KYC senza autenticazione,
+        // perché il bucket era raggiungibile senza titolo. Il token firmato scade
+        // (TTL sotto), quindi l'URL che resta nelle tabelle non è permanente: chi deve
+        // rileggere il file passa da `urlSupabaseFirmato()`, che lo rifirma al volo.
+        const url = await urlSupabaseFirmato(safeFilename);
+        return { ok: true, url, name: filename, size: sizeKb };
       }
       // Regola 5: una risposta non-ok non solleva eccezione, quindi prima di questa
       // riga finiva nel fallback locale in totale silenzio — per tutto agosto
@@ -156,6 +185,61 @@ export async function uploadDocumento(filename: string, contentBase64: string): 
 export function urlUploadFirmato(safeFilename: string): string {
   const { firma, scad } = firmaDownload(safeFilename);
   return `/uploads/${safeFilename}?firma=${firma}&scad=${scad}`;
+}
+
+/**
+ * TTL dei token firmati Supabase. Una settimana come la firma HMAC dei download locali:
+ * gli URL finiscono in `logoUrl` e in `fileUrl` che restano in tabella per anni, e senza
+ * un rinnovo alla lettura il contenuto sparirebbe dopo la scadenza. `rifirmaUrlUpload`
+ * fa per questi URL ciò che fa per `/uploads/`.
+ */
+const TTL_URL_SUPABASE_SECONDI = 7 * 24 * 60 * 60;
+
+/**
+ * URL firmato per un oggetto del bucket Supabase (`bluman-documents`).
+ *
+ * Serve la service key: è l'unico modo di firmare un oggetto di uno storage privato senza
+ * passare dalle policy per-utente di Supabase (che qui non esistono: gli utenti di BluMan
+ * non sono utenti di Supabase). Se la firma non riesce — storage giù, chiave girata —
+ * ritorna l'URL NON firmato come ripiego: meglio un file che la service key può ancora
+ * leggere via `leggiFileArchivio` che un `null` che il chiamante tratterebbe come errore
+ * di upload per un file che in realtà è già stato scritto.
+ */
+export async function urlSupabaseFirmato(safeFilename: string): Promise<string> {
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
+  const base = `${supabaseUrl}/storage/v1/object/bluman-documents/${safeFilename}`;
+  if (!supabaseUrl || !supabaseKey) return base;
+  try {
+    const risposta = await fetch(`${supabaseUrl}/storage/v1/object/sign/bluman-documents/${safeFilename}`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${supabaseKey}`,
+        apikey: supabaseKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ expiresIn: TTL_URL_SUPABASE_SECONDI }),
+    });
+    if (!risposta.ok) {
+      console.warn(`[Storage Warning] Firma URL Supabase ha risposto ${risposta.status} per ${safeFilename}.`);
+      return base;
+    }
+    const json = (await risposta.json()) as { signedURL?: string };
+    if (!json?.signedURL) return base;
+    return `${supabaseUrl}/storage/v1${json.signedURL.replace(/^\/?storage\/v1/, '')}`;
+  } catch (err) {
+    console.warn('[Storage Warning] Firma URL Supabase non riuscita:', err);
+    return base;
+  }
+}
+
+/**
+ * Il nome oggetto Supabase dentro un URL, qualunque sia la forma (firmato o pubblica).
+ * `null` se l'URL non è del nostro bucket.
+ */
+function nomeOggettoSupabaseDaUrl(url: string): string | null {
+  const match = /^\/?storage\/v1\/object\/(?:sign|public)?\/?bluman-documents\/([^?/]+)/.exec(url);
+  return match?.[1] ?? null;
 }
 
 /**
@@ -198,7 +282,10 @@ export async function leggiFileArchivio(url: string): Promise<Buffer | null> {
     return null;
   }
   if (archivio.origin !== atteso.origin || archivio.username || archivio.password) return null;
-  const percorsoBucket = /^\/storage\/v1\/object\/(?:public\/)?bluman-documents\/[^/]+$/;
+  // Accetta la forma pubblica storica e quella firmata (`/object/sign/…?token=…`):
+  // la chiave service legge comunque via API autenticata qui sotto, il token in query
+  // non serve a questa funzione.
+  const percorsoBucket = /^\/storage\/v1\/object\/(?:public\/|sign\/)?bluman-documents\/[^/]+$/;
   if (!percorsoBucket.test(archivio.pathname)) return null;
 
   try {
@@ -219,8 +306,10 @@ export async function leggiFileArchivio(url: string): Promise<Buffer | null> {
  *
  * Serve perché la firma scade e i valori come `tenant.logoUrl` restano in tabella per anni:
  * senza rifirmare alla lettura il logo dello studio smetterebbe di caricarsi dopo sette
- * giorni. Gli URL di Supabase Storage e quelli esterni passano invariati — non sono nostri
- * da firmare. Riconosce anche i valori scritti prima di questa modifica, che erano URL
+ * giorni. Gli URL di Supabase Storage e quelli esterni passano invariati: i token firmati
+ * di Supabase si rinnovano con `rinnovaUrlSupabaseSeServe` dove il file va davvero
+ * riletto, perché la firma è una chiamata di rete e non tutte le letture la meritano.
+ * Riconosce anche i valori scritti prima di questa modifica, che erano URL
  * assoluti verso `http://127.0.0.1:3000/uploads/...`.
  */
 export function rifirmaUrlUpload(url: unknown): unknown {
@@ -232,4 +321,20 @@ export function rifirmaUrlUpload(url: unknown): unknown {
   if (!nome || !nomeFileValido(nome)) return url;
 
   return urlUploadFirmato(nome);
+}
+
+/**
+ * Rinnova il token di un URL Supabase Storage firmato, quando l'URL è nostro e firmato.
+ *
+ * Gli altri casi passano invariati: URL pubblici (non scadono), URL locali `/uploads/`
+ * (li firma `rifirmaUrlUpload`), URL esterni (non sono nostri). È asincrona perché firmare
+ * è una chiamata a Supabase: si usa dove il file viene davvero riletto o mostrato, non su
+ * ogni serializzazione.
+ */
+export async function rinnovaUrlSupabaseSeServe(url: unknown): Promise<unknown> {
+  if (typeof url !== 'string' || !url.includes('?')) return url;
+  const senzaQuery = url.split('?')[0] ?? '';
+  const nome = nomeOggettoSupabaseDaUrl(senzaQuery.replace(/^https?:\/\/[^/]+/, ''));
+  if (!nome) return url;
+  return urlSupabaseFirmato(nome);
 }

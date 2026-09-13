@@ -9,6 +9,12 @@
 import { conContestoInTransazione, type PrismaConContesto } from '../../util/prismaClient.js';
 import { PrismaIstanziazionePort } from './prismaIstanziazionePort.js';
 import { istanziaProgetto, calcolaPrezzoModulo } from '../../services/istanziaProgetto.js';
+// La notifica di avvio progetto usa il servizio reale (righe Notifica in-app per gli
+// operatori attivi dello studio). Prima questo adapter portava uno stub a console.log
+// «in attesa del servizio email reale» — che esiste già da §35: emailService/emailRelay.
+// Si usa la variante *silenziosa*: l'istanziazione è una transazione riuscita, e una
+// notifica che non parte non deve farla sembrare fallita. L'errore resta nel log.
+import { notificaStudioSilenziosa } from '../../services/notificheService.js';
 import {
   registraConsuntivazione,
   marcaRitardo,
@@ -30,21 +36,44 @@ import {
 } from '../appErrors.js';
 import { trovaCicloDipendenze } from '../../services/dipendenzeModuli.js';
 
-/** Notifiche via console.log — stub in attesa del servizio email reale (§10, §22). */
-class ConsoleNotificationPort implements NotificationPort {
+/**
+ * Notifica di avvio progetto (§10, §22) — righe Notifica in-app per gli operatori
+ * attivi dello studio, via `notificaStudioSilenziosa`. Il fallback a console.log resta
+ * per quando il database non risponde: la notifica non deve mai rompere l'avvio.
+ */
+class NotificheStudioPort implements NotificationPort {
+  constructor(private readonly tenantId: string) {}
+
   async notificaProgettoAvviato(input: { progettoId: string; clienteId: string; moduliProgettoIds: string[] }): Promise<void> {
-    console.log('[notifica] Progetto avviato:', input.progettoId, '— moduli:', input.moduliProgettoIds.length);
+    try {
+      const inviate = await notificaStudioSilenziosa(this.tenantId, {
+        // 'modulo_completato' qui non c'entra, ma è l'unico evento della matrice che
+        // parla di lavoro in corso sul fascicolo: la lista è chiusa per scelta
+        // (EVENTI_NOTIFICA, «niente inventario aperto»), e un tipo fuori lista
+        // romperebbe la campanella del frontend che filtra proprio su questi valori.
+        tipoEvento: 'modulo_completato',
+        oggetto: 'Nuovo progetto avviato',
+        corpo: `Il progetto è stato istanziato con ${input.moduliProgettoIds.length} moduli per il cliente ${input.clienteId}.`,
+        link: `/progetti/${input.progettoId}`,
+      });
+      if (inviate === 0) {
+        console.log('[notifica] Progetto avviato, nessun operatore attivo da notificare:', input.progettoId);
+      }
+    } catch (err) {
+      console.warn('[notifica] Notifica avvio progetto non registrata:', err instanceof Error ? err.message : err);
+    }
   }
 }
 
 export class PrismaApp implements AppPort {
   private readonly istanziazione: PrismaIstanziazionePort;
-  private readonly notifiche = new ConsoleNotificationPort();
+  private readonly notifiche: NotificationPort;
   private readonly tenantId: string;
 
   constructor(private readonly prisma: PrismaConContesto, tenantId: string) {
     this.tenantId = tenantId;
     this.istanziazione = new PrismaIstanziazionePort(prisma, tenantId);
+    this.notifiche = new NotificheStudioPort(tenantId);
   }
 
   async listaModuli(): Promise<any[]> {

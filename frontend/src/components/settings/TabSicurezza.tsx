@@ -4,7 +4,7 @@ import { statoTotpApi, attivaTotpApi, confermaTotpApi, disabilitaTotpApi, diment
 type FaseAttivazioneTotp = 'idle' | 'qr' | 'backup_codes' | 'conferma';
 
 interface TabSicurezzaProps {
-  /** Solo il super_admin vede questa tab */
+  /** Il 2FA TOTP è per super_admin e advisor: entrambi gestiscono i fascicoli clienti */
   ruolo?: string;
 }
 
@@ -34,11 +34,11 @@ export function TabSicurezza({ ruolo }: TabSicurezzaProps) {
   const [passwordDisabilita, setPasswordDisabilita] = useState('');
   const [disabilitando, setDisabilitando] = useState(false);
 
-  const isSuperAdmin = ruolo === 'super_admin';
+  const abilitatoTotp = ruolo === 'super_admin' || ruolo === 'advisor';
 
   // Carica stato TOTP all'apertura della tab
   useEffect(() => {
-    if (!isSuperAdmin) { setLoading(false); return; }
+    if (!abilitatoTotp) { setLoading(false); return; }
     statoTotpApi()
       .then(r => {
         setTotpAbilitato(r.totpAbilitato);
@@ -47,7 +47,7 @@ export function TabSicurezza({ ruolo }: TabSicurezzaProps) {
       })
       .catch(() => setTotpAbilitato(false))
       .finally(() => setLoading(false));
-  }, [isSuperAdmin]);
+  }, [abilitatoTotp]);
 
   const avviaAttivazione2Fa = async () => {
     setErrore(null);
@@ -171,12 +171,12 @@ export function TabSicurezza({ ruolo }: TabSicurezzaProps) {
     fontWeight: 700,
   };
 
-  if (!isSuperAdmin) {
+  if (!abilitatoTotp) {
     return (
       <div style={sCard}>
         <div style={{ textAlign: 'center', color: 'var(--muted)', padding: '40px 0' }}>
           <div style={{ fontSize: 36, marginBottom: 12 }}>🔐</div>
-          <div style={{ fontSize: 14 }}>Le impostazioni di sicurezza avanzate sono riservate al Super Admin.</div>
+          <div style={{ fontSize: 14 }}>Le impostazioni di sicurezza avanzate sono riservate a Super Admin e Advisor.</div>
         </div>
       </div>
     );

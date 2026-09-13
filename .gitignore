@@ -39,3 +39,5 @@ scratch/
 
 # Configurazione locale dell'assistente CLI
 .claude/
+
+# Relitti del vecchio backend Python: mai più nel repo

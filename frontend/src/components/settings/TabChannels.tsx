@@ -445,9 +445,14 @@ export function TabChannels({
                   <input type="text" value={waPhoneId} onChange={e => setWaPhoneId(e.target.value)} style={{ fontSize: 12 }} />
                 </div>
                 <div className={styles.field}>
-                  <label>Webhook Verify Token (Secret *):</label>
+                  <label>Webhook Verify Token (solo invii, non l'handshake):</label>
                   <input type="password" value={waVerifyToken} onChange={e => setWaVerifyToken(e.target.value)} placeholder="••••••••••••" style={{ fontSize: 12 }} autoComplete="new-password" />
                   <NotaSegreto impostata={segreti.waVerifyToken} />
+                  <div style={{ fontSize: 10.5, color: '#f59e0b', marginTop: 4 }}>
+                    ⚠️ Il verify token dell'handshake webhook (il controllo che Meta fa sulla GET di verifica) è uno solo per
+                    tutta la piattaforma e sta nella variabile d'ambiente WA_VERIFY_TOKEN del server: NON si configura da qui.
+                    Questo campo serve solo alle chiamate in uscita verso Meta.
+                  </div>
                 </div>
               </div>
               <div className={styles.field} style={{ marginTop: 10 }}>

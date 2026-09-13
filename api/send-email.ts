@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import tls from 'tls';
+import nodeCrypto from 'crypto';
 
 function cleanRawEmailBody(raw: string): string {
   if (!raw) return '';
@@ -244,7 +245,12 @@ function relayAutorizzato(req: any): boolean {
   if (!SEGRETO_RELAY) return false;
   const inviato = req.headers?.['x-bluman-relay'];
   const valore = Array.isArray(inviato) ? inviato[0] : inviato;
-  return typeof valore === 'string' && valore.length > 0 && valore === SEGRETO_RELAY;
+  if (typeof valore !== 'string' || valore.length === 0) return false;
+  // Confronto timing-safe: si confrontano gli SHA-256 dei due valori (stessa lunghezza
+  // per costruzione) invece delle stringhe, perché `===` si ferma al primo byte diverso
+  // e il tempo di risposta diventa un oracolo su quanta parte del segreto è giusta.
+  const hash = (s: string) => nodeCrypto.createHash('sha256').update(s, 'utf8').digest();
+  return nodeCrypto.timingSafeEqual(hash(valore), hash(SEGRETO_RELAY));
 }
 
 /**

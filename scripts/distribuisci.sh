@@ -3,9 +3,15 @@
 # Distribuzione completa da riga di comando: frontend su Vercel (push + CLI) e backend su Railway.
 #
 # Regole & Sicurezza:
-# - Autore/Committer Git OBBLIGATORIO: Mario Dibenedetto <mario.dibenedetto87@gmail.com> (richiesto da Vercel)
-# - Validazione preliminare: typecheck TS backend/frontend, build Vite e test Vitest (100% verdi).
-# - Railway up per il backend e Vercel deploy per il frontend.
+# - Autore/Committer Git: l'ultimo commit deve avere l'identità attesa da Vercel. La verifica
+#   è BLOCCANTE (errore + uscita): il vecchio `git commit --amend` automatico riscriveva la
+#   storia senza chiedere, e un amend involontario su un commit già spinto crea problemi che
+#   si scoprono troppo tardi. Se l'autore è sbagliato, lo si corregge a mano con
+#   `git commit --amend --author="Nome <email>"` sapendo cosa si sta facendo.
+# - Validazione preliminare: typecheck TS backend/frontend, lint frontend, build Vite e test
+#   Vitest (100% verdi).
+# - Railway up per il backend e Vercel deploy per il frontend, con verifica post-deploy
+#   dell'health e della sonda rotta sul dominio di produzione.
 #
 # Uso:
 #   ./scripts/distribuisci.sh              # verifica, push, vercel deploy, railway up
@@ -17,6 +23,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 RAILWAY="${RAILWAY_BIN:-$(command -v railway 2>/dev/null || echo "$HOME/.railway/bin/railway")}"
+API_BASE="${API_BASE:-https://bluman-api-production.up.railway.app}"
 REQUIRED_GIT_EMAIL="mario.dibenedetto87@gmail.com"
 REQUIRED_GIT_NAME="Mario Dibenedetto"
 
@@ -34,7 +41,8 @@ titolo() { printf '\n\033[1;34m== %s\033[0m\n' "$1"; }
 successo() { printf '\033[1;32m✔ %s\033[0m\n' "$1"; }
 avviso() { printf '\033[1;33m⚠ %s\033[0m\n' "$1"; }
 
-# 1. Configurazione automatica identità Git corretta
+# 1. Identità Git: si CONFIGURA, non si corregge a posteriori. Il config locale vale per i
+# commit FUTURI di questo repo; la verifica sull'ultimo commit (punto 3) è bloccante.
 git config user.email "$REQUIRED_GIT_EMAIL"
 git config user.name "$REQUIRED_GIT_NAME"
 
@@ -46,6 +54,10 @@ successo "Typecheck Backend superato."
 echo "• Controllo Typecheck Frontend..."
 (cd frontend && npm run typecheck)
 successo "Typecheck Frontend superato."
+
+echo "• Lint Frontend (oxlint)..."
+(cd frontend && npm run lint)
+successo "Lint Frontend superato."
 
 echo "• Build Bundle Frontend..."
 (cd frontend && npm run build)
@@ -62,20 +74,23 @@ if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
   exit 1
 fi
 
-# 3. Controllo Autore e Committer sugli ultimi commit da spingere
+# 3. Controllo Autore e Committer sull'ultimo commit da spingere — BLOCCANTE, niente amend
+#    automatico: riscrivere la storia in uno script è un'azione che nessuno vede.
 titolo "2. Verifica Autore Git per Vercel"
 ULTIMO_AUTORE=$(git log -1 --format="%ae")
 ULTIMO_COMMITTER=$(git log -1 --format="%ce")
 
 if [ "$ULTIMO_AUTORE" != "$REQUIRED_GIT_EMAIL" ] || [ "$ULTIMO_COMMITTER" != "$REQUIRED_GIT_EMAIL" ]; then
-  avviso "L'ultimo commit ha un autore ($ULTIMO_AUTORE) o committer ($ULTIMO_COMMITTER) diverso da $REQUIRED_GIT_EMAIL."
-  echo "• Correzione automatica dell'ultimo commit con l'autore corretto..."
-  GIT_COMMITTER_NAME="$REQUIRED_GIT_NAME" GIT_COMMITTER_EMAIL="$REQUIRED_GIT_EMAIL" \
-    git commit --amend --no-edit --author="$REQUIRED_GIT_NAME <$REQUIRED_GIT_EMAIL>"
-  successo "Autore e Committer riallineati a $REQUIRED_GIT_NAME <$REQUIRED_GIT_EMAIL>."
-else
-  successo "Autore Git verificato: $REQUIRED_GIT_NAME <$REQUIRED_GIT_EMAIL>."
+  echo "ERRORE: l'ultimo commit ha autore ($ULTIMO_AUTORE) o committer ($ULTIMO_COMMITTER)" >&2
+  echo "diversi da $REQUIRED_GIT_EMAIL, richiesti da Vercel." >&2
+  echo "" >&2
+  echo "Correggi A MANO se sei consapevole di cosa comporta:" >&2
+  echo "  git commit --amend --no-edit --author=\"$REQUIRED_GIT_NAME <$REQUIRED_GIT_EMAIL>\"" >&2
+  echo "" >&2
+  echo "e rilancia lo script. Lo script non riscrive la storia da solo." >&2
+  exit 1
 fi
+successo "Autore Git verificato: $REQUIRED_GIT_NAME <$REQUIRED_GIT_EMAIL>."
 
 # 4. Frontend — Push GitHub & Vercel
 if [ "$SOLO_API" -eq 0 ]; then
@@ -104,8 +119,41 @@ if [ "$SOLO_PUSH" -eq 0 ]; then
   "$RAILWAY" up --detach
   successo "Backend inviato a Railway (build avviata in background)."
   echo "• Puoi monitorare i log con: $RAILWAY logs"
+
+  # 6. Verifica post-deploy: l'health DEVE rispondere sul dominio di produzione. La build
+  #    Railway gira in background (--detach): si attende che il nuovo container risponda,
+  #    con un tetto di ~5 minuti. Il fallimento NON è silenzioso.
+  titolo "5. Verifica post-deploy su $API_BASE"
+  echo "• In attesa del nuovo deploy (health check, max 5 minuti)..."
+  HEALTH_OK=0
+  for i in $(seq 1 30); do
+    if curl -fsS --max-time 10 "$API_BASE/health" >/dev/null 2>&1; then
+      HEALTH_OK=1
+      break
+    fi
+    sleep 10
+  done
+  if [ "$HEALTH_OK" -eq 1 ]; then
+    successo "Health check di produzione raggiungibile."
+  else
+    avviso "Health check NON raggiungibile dopo 5 minuti: controlla '$RAILWAY logs' — il deploy potrebbe essere fallito."
+    exit 1
+  fi
+
+  # Sonda rotta (pattern presidiato da src/rotteNonTrovate.test.ts): una rotta vera senza
+  # token deve dare 401 con corpo {errore}, mai 404. Un 404 qui significa che l'immagine
+  # distribuita non contiene la rotta — il caso tipico del deploy dimenticato.
+  echo "• Sonda rotta: POST /documenti/genera senza token deve dare 401, non 404..."
+  CODICE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 -X POST "$API_BASE/documenti/genera" \
+    -H 'Content-Type: application/json' -d '{}' || echo "000")
+  if [ "$CODICE" = "401" ]; then
+    successo "Sonda rotta: 401 come atteso."
+  else
+    avviso "Sonda rotta ha risposto $CODICE (atteso 401): se 404, l'immagine in produzione è vecchia."
+    exit 1
+  fi
 fi
 
 titolo "🎉 Distribuzione Completata con Successo!"
 echo "🌐 Frontend: https://bluman.vercel.app"
-echo "⚙️ Backend API: https://bluman-api-production.up.railway.app"
+echo "⚙️ Backend API: $API_BASE"

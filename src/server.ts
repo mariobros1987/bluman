@@ -4,6 +4,7 @@
 
 import Fastify, { type FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
+import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import type { AppPort } from './services/appPort.js';
 import { ProceduraIncompletaError } from './services/esecuzione.js';
@@ -56,6 +57,9 @@ import { registraRotteContabilita } from './routes/contabilita.js';
 // Rotte documenti (split dei monoliti): la registrazione avviene dentro il
 // wrapper register di buildServer, nello stesso punto di prima.
 import { registraRotteDocumenti } from './routes/documenti.js';
+// Split di documenti.ts (regola 8, settembre 2026): la sottoscrizione lato studio,
+// le nuove versioni e le richieste di modifica stanno qui, il fascicolo resta in documenti.ts.
+import { registraRotteDocumentiFirmaStudio } from './routes/documentiFirmaStudio.js';
 // Archivio documentale dello studio (§37): albero Cliente → Progetto in sola
 // lettura, file a parte perché routes/documenti.ts è già oltre le 1000 righe.
 import { registraRotteArchivioDocumenti } from './routes/archivioDocumenti.js';
@@ -254,6 +258,24 @@ export function buildServer(app: AppPort): FastifyInstance {
     strictPreflight: false,
   });
 
+  // Header di sicurezza su OGNI risposta, anche dove non c'è nginx a metterli. Il deploy
+  // self-hosted li riceve da `nginx_bluman_app.inc`, ma su Railway il container è esposto
+  // direttamente: senza helmet nessuna risposta API portava X-Content-Type-Options,
+  // X-Frame-Options o una CSP. La CSP qui è la stessa della rotta uploads (`default-src
+  // 'none'`): un'API che serve JSON non ha legittimità di caricare risorse. Swagger UI
+  // (/docs) ha il suo cocktail di header: non si tocca. Come `cors`, si registra senza
+  // await: buildServer è sincrono e il wrapper qui sotto attende i plugin prima delle rotte.
+  server.register(helmet, {
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'none'"],
+      },
+    },
+    // I download da `/uploads` espongono il proprio Content-Disposition/CSP nel handler:
+    // helmet non li deve sovrascrivere con una policy diversa.
+    enableCSPNonces: false,
+  });
+
   // Fase 1 — da qui in poi (rate-limit, error handler, hook di autenticazione e
   // tutte le rotte) vive dentro un plugin registrato sulla root. Il motivo è
   // @fastify/rate-limit: applica i limiti con un hook `onRoute`, che vede solo le
@@ -296,7 +318,7 @@ export function buildServer(app: AppPort): FastifyInstance {
     });
   }
 
-  server.setErrorHandler((err: any, _req, reply) => {
+  server.setErrorHandler((err: any, req, reply) => {
     if (
       err instanceof ClienteNonTrovatoError ||
       err instanceof ProgettoNonTrovatoError ||
@@ -319,7 +341,14 @@ export function buildServer(app: AppPort): FastifyInstance {
     if (typeof err?.statusCode === 'number' && err.statusCode >= 400 && err.statusCode < 500) {
       return reply.code(err.statusCode).send({ errore: err.errore || err.message });
     }
-    console.error('Fastify route error:', err);
+    // Il 500 non mostra al client il messaggio interno: gli errori di Prisma e delle
+    // dipendenze portano dettagli dello schema e delle query («Invalid `prisma.user.update()`
+    // invocation…»), che fuori dall'infrastruttura sono solo informazioni regalate. Il
+    // dettaglio resta nel log, dove lo si può davvero usare.
+    req.log.error({ err }, 'Errore interno non gestito');
+    if (isProdEnv) {
+      return reply.code(500).send({ errore: 'Errore interno del server. Riprova tra poco.' });
+    }
     return reply.code(500).send({ errore: err instanceof Error ? err.message : 'Errore interno' });
   });
 
@@ -635,6 +664,7 @@ export function buildServer(app: AppPort): FastifyInstance {
   // estratte in src/routes/documenti.ts: stessa registrazione, sempre dentro
   // questo wrapper.
   await registraRotteDocumenti(server);
+  await registraRotteDocumentiFirmaStudio(server);
 
   // ─── CARTELLA MODELLI DELLO STUDIO (§41) ───────────────────────────
   // Le rotte `/documenti-template` da cui pesca il Document Studio, con lo stato

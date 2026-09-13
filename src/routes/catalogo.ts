@@ -10,10 +10,11 @@
 import type { FastifyInstance } from 'fastify';
 import type { AppPort } from '../services/appPort.js';
 import { prisma, conContestoInTransazione } from '../util/prismaClient.js';
-import { uploadDocumento, CARTELLA_UPLOADS, nomeFileValido, mimeDaEstensione } from '../services/storageService.js';
+import { uploadDocumento, CARTELLA_UPLOADS, nomeFileValido, mimeDaEstensione, tenantDaNomeFile } from '../services/storageService.js';
 import { verificaFirmaDownload } from '../util/jwt.js';
 import { recordAudit } from '../util/serverHelpers.js';
 import { trovaCicloDipendenze } from '../services/dipendenzeModuli.js';
+import { UploadSchema } from '../schemas/upload.schema.js';
 import { condizioneModuliPerGiurisdizione } from '../domain/giurisdizioni.js';
 import { leggiDaCacheOCalcola, invalidaCachePrefisso } from '../services/backendCache.js';
 
@@ -148,9 +149,16 @@ export async function registraRotteCatalogo(server: FastifyInstance, app: AppPor
   // Upload Documento Endpoint (Base64 file upload & static download)
   server.post<{
     Body: { filename: string; contentBase64: string };
-  }>('/upload', async (req) => {
-    const { filename, contentBase64 } = req.body;
-    const res = await uploadDocumento(filename, contentBase64);
+  }>('/upload', async (req, reply) => {
+    const validato = UploadSchema.safeParse(req.body || {});
+    if (!validato.success) {
+      return reply.code(400).send({ errore: validato.error.issues.map(i => i.message).join('; ') });
+    }
+    const { filename, contentBase64 } = validato.data;
+    // Il tenant della sessione entra nel nome del file: `GET /uploads` lo rilegge per
+    // rifiutare allo studio A il file caricato dallo studio B. Regola 1: l'isolamento
+    // non è un dettaglio, è la difesa.
+    const res = await uploadDocumento(filename, contentBase64, req.tenantId);
     await recordAudit({
       tenantId: req.tenantId,
       azione: 'DOCUMENTO_CARICATO',
@@ -184,6 +192,23 @@ export async function registraRotteCatalogo(server: FastifyInstance, app: AppPor
       const firmato = verificaFirmaDownload(filename, req.query?.firma, req.query?.scad);
       if (!autenticato && !firmato) {
         return reply.code(401).send({ errore: 'Accesso al file non autorizzato' });
+      }
+
+      // 2b. Il file appartiene a chi lo chiede. Il nome dei file caricati da `POST /upload`
+      // dichiara il tenant (`<tenantId>_<timestamp>_<nome>`): un operatore autenticato
+      // dello studio A che indovini l'URL di un file dello studio B riceve 404, non il
+      // contenuto. RLS protegge le righe di database, ma questi file stanno su disco dove
+      // non esistono policy: il prefisso è l'unica chiave disponibile in lettura.
+      // Le eccezioni sono deliberate:
+      //   - la firma HMAC viene emessa dal server al tenant giusto e non porta un contesto
+      //     utente: vale per se stessa (indovinarla equivale a indovinare il segreto dei JWT);
+      //   - i file storici senza prefisso non dichiarano nessun tenant e seguono le regole
+      //     di prima — negarli romperebbe loghi e allegati caricati prima dell'isolamento;
+      //   - il super_admin vede tutti i tenant per costruzione (tenant_id NULL, §2bis).
+      const tenantDelFile = tenantDaNomeFile(filename);
+      const superAdmin = req.ruolo === 'super_admin';
+      if (autenticato && !superAdmin && tenantDelFile && tenantDelFile !== req.tenantId) {
+        return reply.code(404).send({ errore: 'File non trovato' });
       }
 
       const filePath = path.join(CARTELLA_UPLOADS, filename);

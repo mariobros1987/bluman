@@ -9,6 +9,13 @@ RUN npm ci
 COPY . .
 RUN npx prisma generate
 
+# Il processo non gira come root. `uploads/` è l'unica cartella che il server scrive
+# a runtime (fallback locale quando Supabase Storage non è configurato): la si dà
+# all'utente `node` prima di abbassare i privilegi. Senza questo passo il server
+# partirebbe e cadrebbe al primo upload con EACCES.
+RUN mkdir -p uploads && chown -R node:node /app
+USER node
+
 EXPOSE 3000
 
 # §14 — `migrate deploy` applica solo le migrazioni versionate in prisma/migrations e si

@@ -219,6 +219,9 @@ export async function registraRotteComunicazioni(server: FastifyInstance): Promi
       const esito = await leggiAllegatiImap(imap, {
         clientEmail: (body.clientEmail || '').trim() || undefined,
         limite: Number(body.limite) || undefined,
+        // Il tenant entra nel nome file caricato: è la chiave che `GET /uploads` usa per
+        // non servire a uno studio gli allegati della casella di un altro.
+        tenantId,
       });
 
       if (!esito.ok) {

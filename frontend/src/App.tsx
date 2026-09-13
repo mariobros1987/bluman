@@ -27,6 +27,7 @@ import { ReportsPage } from './pages/ReportsPage';
 import { TimesheetPage } from './pages/TimesheetPage';
 import { getUserPermission } from './utils/rbac';
 import { fetchMeApi } from './api/client';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import './styles/tokens.css';
 
 function ProtectedModule({ user, moduleKey, element }: { user: any; moduleKey: string; element: React.ReactElement }) {
@@ -189,8 +190,10 @@ function AppContent() {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <AppContent />
-    </BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <AppContent />
+      </BrowserRouter>
+    </ErrorBoundary>
   );
 }

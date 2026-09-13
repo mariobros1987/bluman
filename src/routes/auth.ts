@@ -1,7 +1,7 @@
-// Rotte di autenticazione e gestione password — §2bis, §23.
+﻿// Rotte di autenticazione e gestione password â€” Â§2bis, Â§23.
 //
 // Estratte da `src/server.ts` (split dei monoliti, 27/08/2026) SENZA cambio di
-// comportamento: stesse identiche implementazioni, solo spostate qui perché il
+// comportamento: stesse identiche implementazioni, solo spostate qui perchÃ© il
 // monolite resti leggibile. `registraRotteAuth` viene chiamata DENTRO il wrapper
 // `server.register(...)` di `buildServer`, quindi il rate-limit dedicato dei login
 // e l'hook auth onRequest continuano ad applicarsi esattamente come prima
@@ -35,9 +35,23 @@ import {
   recordAudit,
   senzaHash,
 } from '../util/serverHelpers.js';
-import { LoginSchema, MagicLoginSchema, ChangePasswordSchema } from '../schemas/auth.schema.js';
+import { LoginSchema, MagicLoginSchema, ChangePasswordSchema, ProfiloSchema } from '../schemas/auth.schema.js';
 
-// ─── AUTH ENDPOINTS & RBAC PERMISSIONS (§2bis, §23) ───────────────
+// â”€â”€â”€ AUTH ENDPOINTS & RBAC PERMISSIONS (Â§2bis, Â§23) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+/**
+ * Ruoli che possono attivare il 2FA TOTP (Â§6.1). Super_admin e advisor: entrambi
+ * gestiscono dati di tutti i clienti dello studio. Estendere l'elenco Ã¨ la strada per
+ * dare il secondo fattore anche ai collaboratori, il giorno che il titolare lo chieda.
+ */
+function ruoliAbilitatiTotp(): string[] {
+  return ['super_admin', 'advisor'];
+}
+
+function ruoloAbilitatoTotp(ruolo: string | undefined): boolean {
+  return Boolean(ruolo) && ruoliAbilitatiTotp().includes(ruolo!);
+}
+
 export async function registraRotteAuth(server: FastifyInstance): Promise<void> {
   server.post<{
     Body: { email?: string; password?: string };
@@ -48,19 +62,19 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
     }
     const { email: cleanEmail, password } = result.data;
 
-    // §23 — l'unica fonte di verità per le credenziali è la tabella user: nessun utente
+    // Â§23 â€” l'unica fonte di veritÃ  per le credenziali Ã¨ la tabella user: nessun utente
     // hardcoded, nessuna password accettata come jolly. Il primo super_admin nasce da
-    // `npm run bootstrap` (§27), le password del team esistente da `npm run passwords:assign`.
+    // `npm run bootstrap` (Â§27), le password del team esistente da `npm run passwords:assign`.
     //
-    // Unico punto dell'applicazione che usa il client amministrativo: qui il tenant non è
-    // ancora noto — si scopre proprio dalla riga che stiamo cercando — quindi non può
-    // essere un vincolo della query che la trova. La ricerca è per email esatta, non
-    // restituisce niente di più della riga a cui l'utente sta provando ad accedere.
+    // Unico punto dell'applicazione che usa il client amministrativo: qui il tenant non Ã¨
+    // ancora noto â€” si scopre proprio dalla riga che stiamo cercando â€” quindi non puÃ²
+    // essere un vincolo della query che la trova. La ricerca Ã¨ per email esatta, non
+    // restituisce niente di piÃ¹ della riga a cui l'utente sta provando ad accedere.
     let utente: Awaited<ReturnType<typeof prisma.user.findFirst>> = null;
     try {
       utente = await prismaAmministrativo().user.findFirst({ where: { email: cleanEmail } });
     } catch (err) {
-      req.log.error({ err: err instanceof Error ? err.message : err }, 'Login — database non raggiungibile');
+      req.log.error({ err: err instanceof Error ? err.message : err }, 'Login â€” database non raggiungibile');
       return reply.code(503).send({ errore: 'Servizio di autenticazione non disponibile. Riprova tra poco.' });
     }
 
@@ -68,7 +82,7 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
     // distinguerli permetterebbe di enumerare le email registrate nello studio.
     const nonValide = { errore: 'Credenziali non valide.' };
 
-    // Il cliente è passwordless (§23): accede solo via magic link, mai da questo endpoint.
+    // Il cliente Ã¨ passwordless (Â§23): accede solo via magic link, mai da questo endpoint.
     if (!utente || !utente.passwordHash || utente.ruolo === 'cliente') {
       return reply.code(401).send(nonValide);
     }
@@ -79,32 +93,36 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
       return reply.code(403).send({ errore: 'Utenza disattivata. Contatta il super admin dello studio.' });
     }
 
-    // §2bis — il tenant è quello registrato sull'utente, non dedotto dal dominio dell'email.
-    // Per il super_admin è null: sceglie il tenant corrente via header x-tenant-id.
+    // Â§2bis â€” il tenant Ã¨ quello registrato sull'utente, non dedotto dal dominio dell'email.
+    // Per il super_admin Ã¨ null: sceglie il tenant corrente via header x-tenant-id.
     const userTenantId = utente.tenantId || '';
 
-    // §14 — l'hook onRequest ha impostato il tenant di default (questa richiesta non
-    // portava ancora un token): ora il tenant è noto, e va attivato prima delle query
+    // Â§14 â€” l'hook onRequest ha impostato il tenant di default (questa richiesta non
+    // portava ancora un token): ora il tenant Ã¨ noto, e va attivato prima delle query
     // di questa richiesta. Senza questa riga le letture vincolate a RLS verrebbero
     // rifiutate dal WITH CHECK delle policy per chiunque appartenga a uno studio
-    // diverso da quello di default. (§0.6: l'audit vero e proprio ora passa dal
+    // diverso da quello di default. (Â§0.6: l'audit vero e proprio ora passa dal
     // client amministrativo e logga gli errori invece di ingoiarli.)
     attivaContestoTenant({ tenantId: userTenantId || TENANT_DEFAULT, ruolo: utente.ruolo });
 
-    // §6.1 — 2FA TOTP: se il super_admin ha il TOTP abilitato, verifichiamo se l'IP è già fidato.
-    // Se l'IP è già stato verificato in precedenza, non richiediamo nuovamente il codice TOTP.
-    // Solo se l'IP è nuovo viene emesso il preToken a 2 minuti per lo Step-2.
+    // Â§6.1 â€” 2FA TOTP: se l'utente ha il TOTP abilitato, verifichiamo se l'IP Ã¨ giÃ  fidato.
+    // Esteso da super_admin a advisor: chi entra nel fascicolo dei clienti con credenziali
+    // della piattaforma Ã¨ lo stesso profilo a rischio, e il meccanismo Ã¨ identico per
+    // costruzione (il check Ã¨ sul campo utente, non sul ruolo). I collaboratori restano
+    // fuori: il titolare ha chiesto il secondo fattore per gli account con poteri di
+    // gestione, non per tutti.
+    const ruoliConTotp = ruoliAbilitatiTotp();
     const ipRichiesta = (req.ip || '127.0.0.1').trim();
     const ipFidato = Boolean(ipRichiesta && utente.totpIpFidati?.includes(ipRichiesta));
 
-    if (utente.ruolo === 'super_admin' && utente.totpAbilitato === true && !ipFidato) {
+    if (ruoliConTotp.includes(utente.ruolo) && utente.totpAbilitato === true && !ipFidato) {
       const preToken = signJwt({
         userId: utente.id,
         tenantId: userTenantId,
         email: cleanEmail,
         ruolo: utente.ruolo,
         sessionVersion: utente.sessionVersion,
-      }, 2); // 2 minuti — solo per la fase TOTP
+      }, 2); // 2 minuti â€” solo per la fase TOTP
 
       await recordAudit({
         tenantId: userTenantId || TENANT_DEFAULT,
@@ -129,7 +147,7 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
       sessionVersion: utente.sessionVersion,
     }, DURATA_SESSIONE_OPERATORE_MINUTI);
 
-    // Per il super_admin `utente.tenantId` è null (→ userTenantId ''): l'audit di
+    // Per il super_admin `utente.tenantId` Ã¨ null (â†’ userTenantId ''): l'audit di
     // login va comunque attribuito al tenant di default, non a una stringa vuota.
     await recordAudit({
       tenantId: userTenantId || TENANT_DEFAULT,
@@ -161,17 +179,17 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
   server.post<{
     Body: { magicToken: string };
   }>('/auth/magic-login', { config: { rateLimit: { max: 5, timeWindow: '1 minute' } } }, async (req, reply) => {
-    // §23 — il token si confronta con uno che abbiamo emesso e che non è scaduto.
+    // Â§23 â€” il token si confronta con uno che abbiamo emesso e che non Ã¨ scaduto.
     //
     // Prima della tabella `magic_link` qui bastava una stringa che iniziasse per `client_`,
     // e il JWT restituito portava tenant ed email cablati nel sorgente: un curl con
     // {"magicToken":"client_x"} otteneva una sessione valida di ruolo `cliente` sul tenant
-    // che contiene i dati. Non era un controllo debole da irrobustire, era assente — e il
-    // rate limiting qui sopra non lo sostituiva, perché non c'era niente da indovinare.
+    // che contiene i dati. Non era un controllo debole da irrobustire, era assente â€” e il
+    // rate limiting qui sopra non lo sostituiva, perchÃ© non c'era niente da indovinare.
     //
-    // Il lookup usa `prismaAmministrativo()` perché la richiesta è anonima per definizione:
+    // Il lookup usa `prismaAmministrativo()` perchÃ© la richiesta Ã¨ anonima per definizione:
     // non porta un contesto tenant, e il tenant si scopre proprio dalla riga che stiamo
-    // cercando. È il caso ammesso dalla regola 1, lo stesso della ricerca utente per email
+    // cercando. Ãˆ il caso ammesso dalla regola 1, lo stesso della ricerca utente per email
     // al login, non una scorciatoia per aggirare le policy.
     const rifiuto = { errore: 'Magic Token non valido o scaduto' };
     const mlResult = MagicLoginSchema.safeParse(req.body || {});
@@ -187,12 +205,12 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
       include: { cliente: true },
     });
 
-    // Un unico messaggio per token inesistente, scaduto, già usato o cliente cancellato.
+    // Un unico messaggio per token inesistente, scaduto, giÃ  usato o cliente cancellato.
     if (!link || !link.cliente || link.usatoAt || link.scadenza.getTime() < Date.now()) {
       return reply.code(401).send(rifiuto);
     }
 
-    // Consumo atomico: solo una richiesta concorrente può cambiare usatoAt da NULL.
+    // Consumo atomico: solo una richiesta concorrente puÃ² cambiare usatoAt da NULL.
     const consumato = await db.magicLink.updateMany({
       where: { id: link.id, usatoAt: null, scadenza: { gt: new Date() } },
       data: { usatoAt: new Date() },
@@ -203,7 +221,7 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
     // Il tenant viene dalla riga del cliente, non da una costante: era il secondo guasto di
     // questo endpoint, che firmava sempre il tenant di default qualunque cliente fosse.
     const identitaPortale = `client-${link.clienteId}`;
-    // Fase 3 FEA (misura 3) — certificato di sessione. Ogni login del cliente genera un
+    // Fase 3 FEA (misura 3) â€” certificato di sessione. Ogni login del cliente genera un
     // session id univoco e registra il momento dell'accesso (`iat`): entrambi finiscono
     // nel digest del sigillo FEA, a dimostrare che firma e login appartengono alla
     // stessa sessione verificata. Il login operatore non li porta.
@@ -262,14 +280,14 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
         },
       });
     } catch (err) {
-      req.log.warn({ err: err instanceof Error ? err.message : err }, 'Client login — errore ricerca DB');
+      req.log.warn({ err: err instanceof Error ? err.message : err }, 'Client login â€” errore ricerca DB');
     }
 
     // Qui c'era un ripiego su `app.getClienti()`: un metodo che AppPort non dichiara e che nessuna
-    // implementazione definisce, quindi `'getClienti' in app` era sempre falso e il ramo non è mai
+    // implementazione definisce, quindi `'getClienti' in app` era sempre falso e il ramo non Ã¨ mai
     // stato eseguito. Rimosso senza cambiare comportamento (era anche l'unico errore di `tsc` in
-    // radice: TS restringe la proprietà a `unknown` e non la si può chiamare). Se serve un ripiego
-    // in memoria, il metodo del port è `listaClienti()` — ma attivarlo cambia l'autenticazione.
+    // radice: TS restringe la proprietÃ  a `unknown` e non la si puÃ² chiamare). Se serve un ripiego
+    // in memoria, il metodo del port Ã¨ `listaClienti()` â€” ma attivarlo cambia l'autenticazione.
 
     if (!cliente || !cliente.passwordHash) {
       return reply.code(401).send(nonValide);
@@ -281,7 +299,7 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
 
     const emailCliente = cliente.email || cleanEmail;
     const identitaPortale = `client-${cliente.id}`;
-    // Fase 3 FEA (misura 3) — sid/iat come nel magic-login: stesso certificato di sessione.
+    // Fase 3 FEA (misura 3) â€” sid/iat come nel magic-login: stesso certificato di sessione.
     const token = signJwt({
       userId: identitaPortale,
       tenantId: cliente.tenantId,
@@ -378,13 +396,13 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
         return reply.code(404).send({ errore: 'Utente non trovato' });
       }
 
-      // Se l'utente ha già una password, verifica quella attuale
+      // Se l'utente ha giÃ  una password, verifica quella attuale
       if (utente.passwordHash) {
         if (!currentPassword) {
           return reply.code(400).send({ errore: 'Inserisci la password attuale per confermare la modifica.' });
         }
         if (!verifyPassword(currentPassword, utente.passwordHash)) {
-          return reply.code(401).send({ errore: 'La password attuale non è corretta.' });
+          return reply.code(401).send({ errore: 'La password attuale non Ã¨ corretta.' });
         }
       }
 
@@ -417,7 +435,10 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
 
       return reply.send({ ok: true, token, messaggio: 'Password aggiornata con successo!' });
     } catch (err: any) {
-      return reply.code(500).send({ errore: err.message || 'Errore aggiornamento password' });
+      // Il messaggio dell'errore non esce dal server: puÃ² portare dettagli di schema e
+      // query. Il dettaglio va nel log, al client resta il motivo generico.
+      req.log.error({ err }, 'Cambio password â€” errore interno');
+      return reply.code(500).send({ errore: 'Errore aggiornamento password' });
     }
   });
 
@@ -437,7 +458,8 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
       if (!utente) return reply.code(404).send({ errore: 'Utente non trovato' });
       return reply.send(senzaHash(utente));
     } catch (err: any) {
-      return reply.code(500).send({ errore: err.message || 'Errore recupero profilo' });
+      req.log.error({ err }, 'Recupero profilo â€” errore interno');
+      return reply.code(500).send({ errore: 'Errore recupero profilo' });
     }
   });
 
@@ -448,7 +470,11 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
     const userId = authUser?.userId;
     if (!userId) return reply.code(401).send({ errore: 'Non autenticato' });
 
-    const { nome, specializzazione } = req.body || {};
+    const validato = ProfiloSchema.safeParse(req.body || {});
+    if (!validato.success) {
+      return reply.code(400).send({ errore: validato.error.issues.map(i => i.message).join('; ') });
+    }
+    const { nome, specializzazione } = validato.data;
     try {
       const updated = await prisma.user.update({
         where: { id: userId },
@@ -459,7 +485,8 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
       });
       return reply.send(senzaHash(updated));
     } catch (err: any) {
-      return reply.code(500).send({ errore: err.message || 'Errore salvataggio profilo' });
+      req.log.error({ err }, 'Salvataggio profilo â€” errore interno');
+      return reply.code(500).send({ errore: 'Errore salvataggio profilo' });
     }
   });
 
@@ -488,7 +515,7 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
           return reply.code(400).send({ errore: 'Inserisci la password attuale per confermare la modifica.' });
         }
         if (!verifyPassword(currentPassword, cliente.passwordHash)) {
-          return reply.code(401).send({ errore: 'La password attuale inserita non è corretta.' });
+          return reply.code(401).send({ errore: 'La password attuale inserita non Ã¨ corretta.' });
         }
       }
 
@@ -533,23 +560,24 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
         messaggio: 'Password del portale impostata con successo!',
       });
     } catch (err: any) {
-      return reply.code(500).send({ errore: err.message || 'Errore aggiornamento password portale' });
+      req.log.error({ err }, 'Cambio password portale â€” errore interno');
+      return reply.code(500).send({ errore: 'Errore aggiornamento password portale' });
     }
   });
 
-  // ─── §6.1 TOTP — Endpoint 2FA per super_admin ────────────────────────────────
+  // â”€â”€â”€ Â§6.1 TOTP â€” Endpoint 2FA per super_admin â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   /**
    * POST /auth/totp/attiva
    * Riservato al super_admin autenticato. Genera il segreto TOTP, lo cifra e lo
    * salva nel DB con totpAbilitato=false (non ancora confermato dall'app authenticator).
-   * Restituisce il QR URI e i backup codes — UNA SOLA VOLTA.
+   * Restituisce il QR URI e i backup codes â€” UNA SOLA VOLTA.
    */
   server.post('/auth/totp/attiva', {
     config: { rateLimit: { max: 5, timeWindow: '1 minute' } },
   }, async (req, reply) => {
-    if (req.ruolo !== 'super_admin') {
-      return reply.code(403).send({ errore: 'Solo il super_admin può attivare il 2FA TOTP.' });
+    if (!ruoloAbilitatoTotp(req.ruolo)) {
+      return reply.code(403).send({ errore: 'Il 2FA TOTP Ã¨ riservato a super_admin e advisor.' });
     }
 
     const db = prismaAmministrativo();
@@ -557,7 +585,7 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
     if (!utente) return reply.code(404).send({ errore: 'Utente non trovato.' });
 
     if (utente.totpAbilitato === true) {
-      return reply.code(409).send({ errore: 'Il 2FA TOTP è già attivo. Disattivalo prima di rigenerarlo.' });
+      return reply.code(409).send({ errore: 'Il 2FA TOTP Ã¨ giÃ  attivo. Disattivalo prima di rigenerarlo.' });
     }
 
     const segretoBase32 = generaSegreto();
@@ -581,10 +609,10 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
       userId: req.userId,
       userEmail: utente.email,
       userNome: utente.nome,
-      ruolo: 'super_admin',
+      ruolo: req.ruolo,
       azione: 'TOTP_ATTIVAZIONE_INIZIATA',
       entita: 'Sicurezza Account',
-      dettagli: 'Generazione segreto TOTP — in attesa della conferma con il primo codice.',
+      dettagli: 'Generazione segreto TOTP â€” in attesa della conferma con il primo codice.',
       ipAddress: req.ip,
     });
 
@@ -606,12 +634,12 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
   server.post<{ Body: { codiceTotp?: string } }>('/auth/totp/conferma', {
     config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
   }, async (req, reply) => {
-    if (req.ruolo !== 'super_admin') {
-      return reply.code(403).send({ errore: 'Solo il super_admin può confermare il 2FA TOTP.' });
+    if (!ruoloAbilitatoTotp(req.ruolo)) {
+      return reply.code(403).send({ errore: 'Il 2FA TOTP Ã¨ riservato a super_admin e advisor.' });
     }
 
     const { codiceTotp } = req.body ?? {};
-    if (!codiceTotp) return reply.code(400).send({ errore: 'Il campo codiceTotp è obbligatorio.' });
+    if (!codiceTotp) return reply.code(400).send({ errore: 'Il campo codiceTotp Ã¨ obbligatorio.' });
 
     const db = prismaAmministrativo();
     const utente = await db.user.findUnique({ where: { id: req.userId } });
@@ -619,7 +647,7 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
       return reply.code(400).send({ errore: 'Nessun segreto TOTP in sospeso. Prima chiama POST /auth/totp/attiva.' });
     }
     if (utente.totpAbilitato === true) {
-      return reply.code(409).send({ errore: 'Il 2FA è già confermato e attivo.' });
+      return reply.code(409).send({ errore: 'Il 2FA Ã¨ giÃ  confermato e attivo.' });
     }
 
     let segretoBase32: string;
@@ -650,7 +678,7 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
       userId: req.userId,
       userEmail: utente.email,
       userNome: utente.nome,
-      ruolo: 'super_admin',
+      ruolo: req.ruolo,
       azione: 'TOTP_ATTIVATO',
       entita: 'Sicurezza Account',
       dettagli: 'Autenticazione a due fattori TOTP attivata con successo.',
@@ -668,19 +696,19 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
   server.post<{ Body: { password?: string } }>('/auth/totp/disabilita', {
     config: { rateLimit: { max: 5, timeWindow: '1 minute' } },
   }, async (req, reply) => {
-    if (req.ruolo !== 'super_admin') {
-      return reply.code(403).send({ errore: 'Solo il super_admin può disabilitare il 2FA TOTP.' });
+    if (!ruoloAbilitatoTotp(req.ruolo)) {
+      return reply.code(403).send({ errore: 'Il 2FA TOTP Ã¨ riservato a super_admin e advisor.' });
     }
 
     const { password } = req.body ?? {};
-    if (!password) return reply.code(400).send({ errore: 'La password corrente è obbligatoria per disabilitare il 2FA.' });
+    if (!password) return reply.code(400).send({ errore: 'La password corrente Ã¨ obbligatoria per disabilitare il 2FA.' });
 
     const db = prismaAmministrativo();
     const utente = await db.user.findUnique({ where: { id: req.userId } });
     if (!utente) return reply.code(404).send({ errore: 'Utente non trovato.' });
 
     if (!utente.totpAbilitato) {
-      return reply.code(409).send({ errore: 'Il 2FA TOTP non è attualmente abilitato.' });
+      return reply.code(409).send({ errore: 'Il 2FA TOTP non Ã¨ attualmente abilitato.' });
     }
 
     if (!utente.passwordHash || !verifyPassword(password, utente.passwordHash)) {
@@ -702,7 +730,7 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
       userId: req.userId,
       userEmail: utente.email,
       userNome: utente.nome,
-      ruolo: 'super_admin',
+      ruolo: req.ruolo,
       azione: 'TOTP_DISABILITATO',
       entita: 'Sicurezza Account',
       dettagli: 'Autenticazione a due fattori TOTP disabilitata. Segreto e codici di backup eliminati.',
@@ -714,12 +742,12 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
 
   /**
    * GET /auth/totp/stato
-   * Restituisce se il 2FA TOTP è attivo sull'account del super_admin corrente.
+   * Restituisce se il 2FA TOTP Ã¨ attivo sull'account corrente.
    * Usato dal frontend per mostrare lo stato nel pannello sicurezza.
    */
   server.get('/auth/totp/stato', async (req, reply) => {
-    if (req.ruolo !== 'super_admin') {
-      return reply.code(403).send({ errore: 'Riservato al super_admin.' });
+    if (!ruoloAbilitatoTotp(req.ruolo)) {
+      return reply.code(403).send({ errore: 'Il 2FA TOTP Ã¨ riservato a super_admin e advisor.' });
     }
     const db = prismaAmministrativo();
     const utente = await db.user.findUnique({
@@ -743,21 +771,21 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
   });
 
   server.post('/auth/totp/dimentica-ip', async (req, reply) => {
-    if (req.ruolo !== 'super_admin') {
-      return reply.code(403).send({ errore: 'Riservato al super_admin.' });
+    if (!ruoloAbilitatoTotp(req.ruolo)) {
+      return reply.code(403).send({ errore: 'Il 2FA TOTP Ã¨ riservato a super_admin e advisor.' });
     }
     const db = prismaAmministrativo();
     await db.user.update({
       where: { id: req.userId },
       data: { totpIpFidati: [] },
     });
-    return reply.send({ ok: true, messaggio: 'Elenco IP fidati azzerato con successo. Al prossimo accesso verrà richiesto il codice TOTP.' });
+    return reply.send({ ok: true, messaggio: 'Elenco IP fidati azzerato con successo. Al prossimo accesso verrÃ  richiesto il codice TOTP.' });
   });
 
   /**
    * POST /auth/totp/verifica
    * Endpoint pubblico (rate-limit aggressivo). Riceve preToken (2min) + codiceTotp.
-   * Se il codice è valido (TOTP o backup code), emette il JWT definitivo.
+   * Se il codice Ã¨ valido (TOTP o backup code), emette il JWT definitivo.
    */
   server.post<{ Body: { preToken?: string; codiceTotp?: string } }>('/auth/totp/verifica', {
     config: { rateLimit: { max: 5, timeWindow: '1 minute' } },
@@ -769,7 +797,7 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
 
     // Verifica il preToken (2 min, stesso meccanismo del JWT normale)
     const payload = verifyJwt(preToken);
-    if (!payload || payload.ruolo !== 'super_admin') {
+    if (!payload || !ruoloAbilitatoTotp(payload.ruolo)) {
       return reply.code(401).send(erroreGenerico);
     }
 
@@ -793,7 +821,7 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
     let nuoviHashes: string[] = [];
 
     if (verificaTotp(segretoBase32, codiceTotp)) {
-      // Codice TOTP corrente — OK
+      // Codice TOTP corrente â€” OK
     } else {
       // Tenta come backup code
       const backupHashes: string[] = utente.totpBackupCodes ?? [];
@@ -832,7 +860,7 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
       userId: utente.id,
       userEmail: utente.email,
       userNome: utente.nome,
-      ruolo: 'super_admin',
+      ruolo: req.ruolo,
       azione: 'AUTENTICAZIONE_LOGIN',
       entita: 'Sessione Studio',
       dettagli: autenticatoConBackup

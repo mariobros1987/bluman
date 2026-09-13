@@ -84,7 +84,7 @@ const MAX_EMAIL = 5;
  */
 export async function leggiAllegatiImap(
   imap: CredenzialiImap,
-  opzioni: { clientEmail?: string; limite?: number } = {},
+  opzioni: { clientEmail?: string; limite?: number; tenantId?: string } = {},
 ): Promise<EsitoImapAllegati> {
   const limite = Math.min(Math.max(opzioni.limite ?? MAX_EMAIL, 1), MAX_EMAIL);
 
@@ -231,7 +231,7 @@ export async function leggiAllegatiImap(
         const buffer = Buffer.concat(chunks);
         const base64 = `data:${mimeEffettivo};base64,${buffer.toString('base64')}`;
 
-        const esitoUpload = await uploadDocumento(nomefile, base64);
+        const esitoUpload = await uploadDocumento(nomefile, base64, opzioni.tenantId);
         if (!esitoUpload.ok) {
           console.warn(`[IMAP Allegati] Upload fallito per ${nomefile}: ${esitoUpload.url}`);
           continue;

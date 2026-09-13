@@ -214,11 +214,17 @@ export function nomeFileDaUrl(url: string): string | null {
   const ultimo = pulito.split('/').filter(Boolean).pop();
   if (!ultimo) return null;
   try {
-    // uploadDocumento prefissa `${Date.now()}_` per evitare omonimie in archivio:
-    // all'utente si mostra il nome originale del file.
-    return decodeURIComponent(ultimo).replace(/^\d{13}_/, '');
+    // uploadDocumento prefissa `<tenantId>_` (isolamento upload) e `${Date.now()}_`
+    // (omonimie in archivio) davanti al nome originale: all'utente si mostra solo
+    // quest'ultimo. I due prefissi sono opzionali e indipendenti — i file storici
+    // non hanno il tenant, e chi chiama senza contesto non lo scrive.
+    return decodeURIComponent(ultimo)
+      .replace(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}_/, '')
+      .replace(/^\d{13}_/, '');
   } catch {
-    return ultimo.replace(/^\d{13}_/, '');
+    return ultimo
+      .replace(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}_/, '')
+      .replace(/^\d{13}_/, '');
   }
 }
 

@@ -5,6 +5,7 @@
   "type": "module",
   "dependencies": {
     "@fastify/cors": "^11.3.0",
+    "@fastify/helmet": "^13.1.1",
     "@fastify/rate-limit": "^11.2.0",
     "@fastify/swagger": "^9.8.1",
     "@fastify/swagger-ui": "^6.1.1",
@@ -28,7 +29,9 @@
     "@types/pdfkit": "^0.17.6",
     "@types/pizzip": "^3.0.5",
     "@types/qrcode": "^1.5.6",
+    "lint-staged": "^17.5.1",
     "prisma": "^5.20.0",
+    "simple-git-hooks": "^2.14.0",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0",
     "vitest": "^2.1.0"
@@ -50,6 +53,18 @@
     "start": "node dist/index.js",
     "dev": "tsx watch src/index.ts",
     "start:db": "tsx watch src/adapters/prisma/index.ts",
-    "seed": "tsx src/adapters/prisma/seed.ts"
+    "seed": "tsx src/adapters/prisma/seed.ts",
+    "prepare": "simple-git-hooks"
+  },
+  "simple-git-hooks": {
+    "pre-commit": "npx lint-staged"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "bash -c 'npx tsc --noEmit'"
+    ],
+    "frontend/**/*.{ts,tsx}": [
+      "npx --prefix frontend oxlint --fix"
+    ]
   }
 }

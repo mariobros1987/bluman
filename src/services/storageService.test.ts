@@ -7,7 +7,10 @@ import {
   mimeDaEstensione,
   nomeFileSicuro,
   nomeFileValido,
+  tenantDaNomeFile,
   uploadDocumento,
+  urlSupabaseFirmato,
+  rinnovaUrlSupabaseSeServe,
 } from './storageService.js';
 
 // §21 — il MIME dichiarato a Supabase Storage segue l'estensione reale del file:
@@ -145,5 +148,109 @@ describe('uploadDocumento — il fallback locale non è più silenzioso', () => 
     const percorso = path.join(CARTELLA_UPLOADS, nome);
     expect(fs.existsSync(percorso)).toBe(true);
     expect(fs.readFileSync(percorso).equals(contenuto)).toBe(true);
+  });
+});
+
+// §Sicurezza upload — il bucket Supabase non deve esporre più URL pubblici: chi conosce
+// l'URL di un atto societario o di un documento KYC non deve poterlo scaricare senza
+// titolo. `uploadDocumento` chiede ora un URL FIRMATO subito dopo la scrittura, e la
+// firma ha lo stesso TTL della firma HMAC dei download locali (7 giorni). Questo test
+// blinda che la stringa `object/public` non torni: il fallback silenzioso verso il
+// pubblico era la forma esatta del difetto.
+describe('uploadDocumento — nessun URL pubblico per il bucket Supabase', () => {
+  let fetchSpy: ReturnType<typeof vi.fn>;
+
+  const PDF = Buffer.from('%PDF-1.7\ncontenuto di prova supabase\n%%EOF');
+
+  beforeEach(() => {
+    vi.stubEnv('SUPABASE_URL', 'https://test-supabase.local');
+    vi.stubEnv('SUPABASE_SERVICE_KEY', 'chiave-di-test');
+    // Il POST di scrittura riesce; il POST di firma risponde un signedURL relativo
+    // che riporta lo stesso oggetto richiesto — la forma reale dell'API Supabase
+    // (`/object/sign/<bucket>/<nome>?token=…`).
+    fetchSpy = vi.fn(async (input: any) => {
+      const url = String(input);
+      if (url.includes('/object/sign/')) {
+        const nome = url.split('/object/sign/bluman-documents/')[1] ?? 'prova.pdf';
+        return { ok: true, json: async () => ({ signedURL: `/object/sign/bluman-documents/${nome}?token=abc123` }) };
+      }
+      return { ok: true };
+    });
+    vi.stubGlobal('fetch', fetchSpy);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('restituisce un URL firmato: mai object/public', async () => {
+    const risultato = await uploadDocumento('prova.pdf', PDF.toString('base64'), '00000000-0000-0000-0000-000000000002');
+
+    expect(risultato.ok).toBe(true);
+    expect(risultato.url).toContain('/object/sign/');
+    expect(risultato.url).toContain('token=');
+    expect(risultato.url).not.toContain('/object/public/');
+    // Il nome del file porta il tenant che ha caricato (isolamento upload).
+    expect(risultato.url).toContain('00000000-0000-0000-0000-000000000002');
+  });
+
+  it('la firma viene chiesta all\'endpoint sign con la TTL di una settimana', async () => {
+    await uploadDocumento('prova.pdf', PDF.toString('base64'));
+
+    const chiamataSign = fetchSpy.mock.calls.find(([u]) => String(u).includes('/object/sign/'));
+    expect(chiamataSign).toBeTruthy();
+    expect(JSON.parse(String(chiamataSign![1]?.body)).expiresIn).toBe(7 * 24 * 60 * 60);
+  });
+});
+
+describe('rinnovaUrlSupabaseSeServe — il token scaduto si rinnova, il resto non si tocca', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('rifirma un URL Supabase con token in query string', async () => {
+    vi.stubEnv('SUPABASE_URL', 'https://test-supabase.local');
+    vi.stubEnv('SUPABASE_SERVICE_KEY', 'chiave');
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ signedURL: '/object/sign/bluman-documents/atto.pdf?token=nuovo' }),
+    }));
+
+    const rinnovato = await rinnovaUrlSupabaseSeServe(
+      'https://test-supabase.local/storage/v1/object/sign/bluman-documents/atto.pdf?token=vecchio',
+    );
+    expect(rinnovato).toBe('https://test-supabase.local/storage/v1/object/sign/bluman-documents/atto.pdf?token=nuovo');
+  });
+
+  it('lascia intatti URL senza query, locali e di altri domini', async () => {
+    const urlPubblico = 'https://test-supabase.local/storage/v1/object/public/bluman-documents/atto.pdf';
+    const urlLocale = '/uploads/123_logo.png?firma=abc&scad=999';
+    const urlEsterno = 'https://altro-dominio.example/file.pdf?token=x';
+
+    expect(await rinnovaUrlSupabaseSeServe(urlPubblico)).toBe(urlPubblico);
+    expect(await rinnovaUrlSupabaseSeServe(urlLocale)).toBe(urlLocale);
+    expect(await rinnovaUrlSupabaseSeServe(urlEsterno)).toBe(urlEsterno);
+  });
+});
+
+// L'isolamento tenant sul nome file: uploadDocumento scrive il prefisso, tenantDaNomeFile
+// lo rilegge. È la coppia che tiene allineate scrittura e lettura, come nomeFileSicuro /
+// nomeFileValido per i caratteri.
+describe('prefisso tenant nel nome file', () => {
+  it('il nome prodotto con tenantId dichiara il tenant', () => {
+    const TENANT = '11111111-2222-3333-4444-555555555555';
+    const nome = `${TENANT}_${Date.now()}_${nomeFileSicuro('atto.pdf')}`;
+    expect(tenantDaNomeFile(nome)).toBe(TENANT);
+    // E il nome così composto resta valido per il handler di lettura.
+    expect(nomeFileValido(nome)).toBe(true);
+  });
+
+  it('senza tenantId il nome resta nella forma storica, senza proprietario', () => {
+    const nome = `${Date.now()}_${nomeFileSicuro('atto.pdf')}`;
+    expect(tenantDaNomeFile(nome)).toBeNull();
   });
 });

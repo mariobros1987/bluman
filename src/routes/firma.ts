@@ -1294,7 +1294,7 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
       // 4. Upload + riga Documento. statoDoc 'pubblicato': il verbale è visibile subito al
       //    cliente, non passa da bozza perché non c'è revisione possibile su un atto
       //    certificativo generato dal sistema.
-      const caricato = await uploadDocumento(`verbale_firma_${firma.signatureId}.pdf`, pdf.toString('base64'));
+      const caricato = await uploadDocumento(`verbale_firma_${firma.signatureId}.pdf`, pdf.toString('base64'), tenantId);
       const verbale = await prisma.documento.create({
         data: {
           tenantId,
@@ -1826,7 +1826,7 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
         descrizioneOtp = ` ${descriviCanaleVerificato(verifica.record)}.`;
       }
 
-      const caricato = await uploadDocumento(filename, contentBase64);
+      const caricato = await uploadDocumento(filename, contentBase64, tenantId);
       const fileFirmatoHash = crypto.createHash('sha256').update(buffer).digest('hex');
 
       const documentoTitolo =

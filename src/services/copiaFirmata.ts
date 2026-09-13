@@ -236,7 +236,7 @@ export async function generaCopiaFirmata(params: {
     const pdf = await generaPdfDocumento(blocchi, firmeDaApporre);
 
     const nome = nomeCopia(nomeFileDaUrl(originale.fileUrl), firma.signatureId);
-    const caricato = await uploadDocumento(nome, pdf.toString('base64'));
+    const caricato = await uploadDocumento(nome, pdf.toString('base64'), tenantId);
 
     // Verifica se esiste già una copia firmata da aggiornare
     let copiaEsistente: any = null;

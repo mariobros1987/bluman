@@ -126,6 +126,7 @@ async function transazioneWebhook<T>(
 async function scaricaMediaWhatsapp(
   mediaId: string,
   accessToken: string,
+  tenantId: string,
   nomeFile?: string,
 ): Promise<{ url: string; nome: string; dimensione: string; mime: string } | null> {
   try {
@@ -165,7 +166,7 @@ async function scaricaMediaWhatsapp(
     const estensione = mimeType.split('/')[1]?.split(';')[0] || 'bin';
     const nome = nomeFile || `wa_${mediaId.slice(-8)}.${estensione}`;
     const base64 = `data:${mimeType};base64,${Buffer.from(arrayBuf).toString('base64')}`;
-    const esito = await uploadDocumento(nome, base64);
+    const esito = await uploadDocumento(nome, base64, tenantId);
 
     if (!esito.ok) {
       console.warn(`[WA Media] uploadDocumento fallito per ${nome}`);
@@ -319,7 +320,7 @@ export async function registraRotteWebhooks(server: FastifyInstance): Promise<vo
               const cred = await credenzialiCanali(tenantId).catch(() => null);
               const accessToken = cred?.waAccessToken || process.env.WA_ACCESS_TOKEN || undefined;
               if (accessToken) {
-                const allegato = await scaricaMediaWhatsapp(mediaId, accessToken, msg.document?.filename || undefined);
+                const allegato = await scaricaMediaWhatsapp(mediaId, accessToken, tenantId, msg.document?.filename || undefined);
                 if (allegato) allegatiJson = JSON.stringify([allegato]);
               }
             }
