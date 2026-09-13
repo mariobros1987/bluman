@@ -932,7 +932,7 @@ REDIS_URL=
 ### FASE 5 — Funzionalità (2-3 settimane)
 - [x] 5.1 Cron schedulato reale (FASE 2.1 — runner CLI `runDailyNotificationCron.ts` e test dedicato)
 - [x] 5.2 Coda notifiche con retry (FASE 2.3 — `src/services/notificationQueue.ts` con backoff esponenziale)
-- [x] 5.3 TOTP super_admin (2026-09-12, `src/util/totp.ts` — RFC 6238 puro crypto nativo, cifratura AES-GCM segreto, 8 backup codes, 3 endpoint `/auth/totp/*`, 10 test)
+- [x] 5.3 TOTP super_admin (2026-09-12/13, `src/util/totp.ts` — RFC 6238 puro crypto nativo, cifratura AES-GCM segreto, 8 backup codes, migrazione `20260913133000_totp_campi_user`, 5 endpoint `/auth/totp/*`, 17 test totali tra unit e rotte HTTP, frontend completo `TabSicurezza.tsx` e `LoginPage.tsx`)
 - [x] 5.4 Backup DB schedulato (2026-09-12, `src/scripts/runScheduledBackup.ts` — AES-256-GCM, retention 14gg, multi-tenant, script npm `backup:scheduled`, 6 test)
 
 ### FASE 6 — DevOps (1 settimana)

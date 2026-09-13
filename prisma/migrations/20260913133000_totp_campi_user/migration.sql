@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "user" ADD COLUMN IF NOT EXISTS "totp_abilitato" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "user" ADD COLUMN IF NOT EXISTS "totp_backup_codes" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[];

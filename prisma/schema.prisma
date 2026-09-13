@@ -147,6 +147,8 @@ model User {
   sessionVersion Int       @default(0) @map("session_version")
   // §23 — obbligatorio per ruolo=super_admin prima di poter fare qualunque azione oltre al login
   totpSecret   String?     @map("totp_secret")
+  totpAbilitato Boolean    @default(false) @map("totp_abilitato")
+  totpBackupCodes String[] @default([]) @map("totp_backup_codes")
   specializzazione String? @map("specializzazione")
   costoOrarioCentesimi Int? @default(3000) @map("costo_orario_centesimi") // Costo orario interno studio per margine netto
   createdAt    DateTime    @default(now()) @map("created_at")

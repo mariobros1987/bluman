@@ -96,7 +96,7 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
     // `totpPending: true` e restituiamo { totpRequired: true, preToken }.
     // Il frontend mostra il campo per il codice e chiama POST /auth/totp/verifica.
     // Advisor, collaboratori e clienti non sono toccati da questo ramo.
-    if (utente.ruolo === 'super_admin' && (utente as any).totpAbilitato === true) {
+    if (utente.ruolo === 'super_admin' && utente.totpAbilitato === true) {
       const preToken = signJwt({
         userId: utente.id,
         tenantId: userTenantId,
@@ -555,7 +555,7 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
     const utente = await db.user.findUnique({ where: { id: req.userId } });
     if (!utente) return reply.code(404).send({ errore: 'Utente non trovato.' });
 
-    if ((utente as any).totpAbilitato === true) {
+    if (utente.totpAbilitato === true) {
       return reply.code(409).send({ errore: 'Il 2FA TOTP è già attivo. Disattivalo prima di rigenerarlo.' });
     }
 
@@ -566,11 +566,11 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
 
     await db.user.update({
       where: { id: req.userId },
-      data: ({
+      data: {
         totpSecret: secretoCifrato,
         totpAbilitato: false,
         totpBackupCodes: backupHashes,
-      }) as any,
+      },
     });
 
     const qr = generaQrPayload(segretoBase32, utente.email, 'BluMan');
@@ -617,7 +617,7 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
     if (!utente || !utente.totpSecret) {
       return reply.code(400).send({ errore: 'Nessun segreto TOTP in sospeso. Prima chiama POST /auth/totp/attiva.' });
     }
-    if ((utente as any).totpAbilitato === true) {
+    if (utente.totpAbilitato === true) {
       return reply.code(409).send({ errore: 'Il 2FA è già confermato e attivo.' });
     }
 
@@ -634,7 +634,7 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
 
     await db.user.update({
       where: { id: req.userId },
-      data: ({ totpAbilitato: true }) as any,
+      data: { totpAbilitato: true },
     });
 
     await recordAudit({
@@ -671,7 +671,7 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
     const utente = await db.user.findUnique({ where: { id: req.userId } });
     if (!utente) return reply.code(404).send({ errore: 'Utente non trovato.' });
 
-    if (!(utente as any).totpAbilitato) {
+    if (!utente.totpAbilitato) {
       return reply.code(409).send({ errore: 'Il 2FA TOTP non è attualmente abilitato.' });
     }
 
@@ -681,11 +681,11 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
 
     await db.user.update({
       where: { id: req.userId },
-      data: ({
+      data: {
         totpSecret: null,
         totpAbilitato: false,
         totpBackupCodes: [],
-      }) as any,
+      },
     });
 
     await recordAudit({
@@ -715,11 +715,11 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
     const db = prismaAmministrativo();
     const utente = await db.user.findUnique({
       where: { id: req.userId },
-      select: { id: true } as any,
+      select: { id: true, totpAbilitato: true },
     });
     if (!utente) return reply.code(404).send({ errore: 'Utente non trovato.' });
 
-    const totpAbilitato = Boolean((utente as any).totpAbilitato);
+    const totpAbilitato = Boolean(utente.totpAbilitato);
     return reply.send({ ok: true, totpAbilitato });
   });
 
@@ -744,7 +744,7 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
 
     const db = prismaAmministrativo();
     const utente = await db.user.findUnique({ where: { id: payload.userId } });
-    if (!utente || !utente.totpSecret || !(utente as any).totpAbilitato) {
+    if (!utente || !utente.totpSecret || !utente.totpAbilitato) {
       return reply.code(401).send(erroreGenerico);
     }
     if (utente.sessionVersion !== payload.sessionVersion) {
@@ -764,7 +764,7 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
       // Codice TOTP corrente — OK
     } else {
       // Tenta come backup code
-      const backupHashes: string[] = (utente as any).totpBackupCodes ?? [];
+      const backupHashes: string[] = utente.totpBackupCodes ?? [];
       const indice = verificaBackupCode(codiceTotp, backupHashes);
       if (indice === -1) {
         return reply.code(401).send(erroreGenerico);
@@ -773,7 +773,7 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
       const nuoviHashes = backupHashes.filter((_, i) => i !== indice);
       await db.user.update({
         where: { id: utente.id },
-        data: ({ totpBackupCodes: nuoviHashes }) as any,
+        data: { totpBackupCodes: nuoviHashes },
       });
       autenticatoConBackup = true;
     }

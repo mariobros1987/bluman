@@ -189,6 +189,7 @@ export function buildServer(app: AppPort): FastifyInstance {
     'POST /auth/login',
     'POST /auth/magic-login',
     'POST /auth/client-login',
+    'POST /auth/totp/verifica',
     // Chiamate da Meta, Telegram e SdI, che non possono portare un nostro JWT. Si
     // autenticano col proprio meccanismo: hub.verify_token (WhatsApp), il segreto
     // del bot (Telegram) e il secret condiviso WEBHOOK_SECRET_SDI confrontato

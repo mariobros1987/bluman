@@ -151,7 +151,7 @@ graph TD
 - **Indici DB Compositi ad Alte Prestazioni (`prisma/migrations/20260912150000_indici_performance` & `20260912160000_indici_performance_globale`)**: Indici compositi ottimizzati a copertura totale di tutti i moduli ERP: `AuditLog`, `Notifica`, `Progetto`, `MovimentoPrimaNota`, `Cliente`, `Fattura`, `FatturaRiga`, `ScadenzaIncasso`, `Fornitore`, `FatturaRicevuta`, `Documento` e `ContrattoRicorrente`.
 
 ### 🛡️ Disaster Recovery, 2FA TOTP & Rotazione Segreti (§5.2, §6.1, §6.2b)
-- **Autenticazione a Due Fattori (2FA TOTP RFC 6238)**: Algoritmo HMAC-SHA1 nativo con tolleranza clock-skew ±1 step, segreto cifrato con AES-256-GCM nel DB, gate login con `preToken` a 2 minuti per i `super_admin` e 8 codici di recupero monouso constant-time (`src/util/totp.ts`).
+- **Autenticazione a Due Fattori (2FA TOTP RFC 6238)**: Algoritmo HMAC-SHA1 nativo con tolleranza clock-skew ±1 step, segreto cifrato con AES-256-GCM nel DB (colonne `totp_abilitato` e `totp_backup_codes` con migrazione `20260913133000_totp_campi_user`), gate login con `preToken` a 2 minuti per i `super_admin` e 8 codici di recupero monouso constant-time (`src/util/totp.ts`, `src/routes/auth.ts`, frontend `TabSicurezza.tsx` e `LoginPage.tsx`).
 - **Disaster Recovery & Backup Cifrato AES-256-GCM (`src/scripts/runScheduledBackup.ts`)**: Script schedulabile per export cifrato multi-tenant isolato con `contestoTenant.run()`, sanitizzazione delle credenziali e retention a 14 giorni (`npm run backup:scheduled`).
 - **Rotazione Chiavi JWT Zero-Downtime (`src/util/jwt.ts`, `docs/rotazione_segreti.md`)**: Supporto dual-key con variabile `JWT_PREVIOUS_SECRETS` per rotazione trasparente delle chiavi crittografiche senza disconnettere gli operatori.
 
