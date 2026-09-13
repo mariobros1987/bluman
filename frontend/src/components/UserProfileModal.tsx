@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { cambiaPasswordStaffApi, fetchProfiloUtenteApi, aggiornaProfiloUtenteApi } from '../api/client';
 import { getCurrentTenantId, getStudioInfoForTenant } from '../utils/tenant';
+import { TabSicurezza } from './settings/TabSicurezza';
 
 interface UserProfileModalProps {
   user: any;
@@ -9,7 +10,7 @@ interface UserProfileModalProps {
 }
 
 export function UserProfileModal({ user, onClose, onUserUpdated }: UserProfileModalProps) {
-  const [tab, setTab] = useState<'profilo' | 'password' | 'sessione'>('profilo');
+  const [tab, setTab] = useState<'profilo' | 'password' | 'sessione' | '2fa'>('profilo');
 
   // Profilo state
   // `user` è `any`: senza il tipo esplicito lo stato diventa `any` e ogni callback
@@ -271,6 +272,24 @@ export function UserProfileModal({ user, onClose, onUserUpdated }: UserProfileMo
           >
             🏛 Studio & Sessione
           </button>
+          {(user?.ruolo === 'super_admin' || user?.role === 'super_admin') && (
+            <button
+              onClick={() => setTab('2fa')}
+              style={{
+                flex: 1,
+                padding: '12px 8px',
+                border: 'none',
+                background: tab === '2fa' ? 'var(--card2)' : 'transparent',
+                color: tab === '2fa' ? 'var(--indigo-l)' : 'var(--muted)',
+                fontWeight: tab === '2fa' ? 700 : 500,
+                fontSize: 12,
+                cursor: 'pointer',
+                borderBottom: tab === '2fa' ? '2px solid var(--indigo)' : 'none',
+              }}
+            >
+              📱 2FA TOTP
+            </button>
+          )}
         </div>
 
         {/* Modal Body */}
@@ -575,6 +594,11 @@ export function UserProfileModal({ user, onClose, onUserUpdated }: UserProfileMo
                 </div>
               </div>
             </div>
+          )}
+
+          {/* TAB 4: 2FA TOTP (solo Super Admin) */}
+          {tab === '2fa' && (
+            <TabSicurezza ruolo={user?.ruolo || user?.role} />
           )}
         </div>
       </div>
