@@ -11,6 +11,7 @@
 //   3. Al prossimo login: password ok → preToken 2min → POST /auth/totp/verifica → JWT definitivo.
 
 import crypto from 'crypto';
+import QRCode from 'qrcode';
 
 // ─── Costanti ─────────────────────────────────────────────────────────────────
 
@@ -142,24 +143,33 @@ export function generaOtpauthUri(segretoBase32: string, email: string, issuer = 
 // Il segreto grezzo NON viene mai esposto nelle risorse pubbliche — solo nell'URI
 // otpauth:// che viaggia su HTTPS verso l'admin autenticato.
 
-export function generaQrPayload(segretoBase32: string, email: string, issuer = 'BluMan'): {
+export async function generaQrPayload(segretoBase32: string, email: string, issuer = 'BluMan'): Promise<{
   uri: string;
   qrUrl: string;
   svgHint: string;
-} {
+}> {
   const uri = generaOtpauthUri(segretoBase32, email, issuer);
-  const isDev = process.env.NODE_ENV !== 'production';
+
+  // Generazione locale del QR Code in DataURL PNG base64: 100% offline, nessuna fuga verso terze parti.
+  let qrUrl = '';
+  try {
+    qrUrl = await QRCode.toDataURL(uri, {
+      errorCorrectionLevel: 'M',
+      margin: 2,
+      width: 220,
+      color: {
+        dark: '#000000',
+        light: '#ffffff',
+      },
+    });
+  } catch (err) {
+    console.error('Errore generazione QR Code:', err);
+  }
 
   return {
     uri,
-    // URL Google Charts: usabile solo in sviluppo (leak dell'URI a Google in prod sarebbe inaccettabile)
-    qrUrl: isDev
-      ? `https://chart.googleapis.com/chart?chs=200x200&chld=M|0&cht=qr&chl=${encodeURIComponent(uri)}`
-      : '',
-    // Suggerimento per il frontend: aprire un generatore QR locale con l'URI
-    svgHint: isDev
-      ? 'Usa qrUrl in sviluppo. In produzione: usa una libreria QR client-side (qrcode.js) con uri.'
-      : 'Usa la libreria qrcode.js lato client con il campo uri per generare il QR localmente.',
+    qrUrl,
+    svgHint: 'DataURL PNG base64 offline',
   };
 }
 

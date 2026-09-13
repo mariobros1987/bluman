@@ -573,7 +573,7 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
       },
     });
 
-    const qr = generaQrPayload(segretoBase32, utente.email, 'BluMan');
+    const qr = await generaQrPayload(segretoBase32, utente.email, 'BluMan');
 
     await recordAudit({
       tenantId: req.tenantId || TENANT_DEFAULT,
