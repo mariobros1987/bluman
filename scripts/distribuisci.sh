@@ -98,9 +98,39 @@ if [ "$SOLO_API" -eq 0 ]; then
   git push origin main
   successo "Push su GitHub (main) completato."
 
-  echo "• Trigger diretto deploy di produzione su Vercel..."
-  npx vercel --prod --scope fanta-ia --yes || avviso "Deploy Vercel via CLI non riuscito o già in corso da webhook GitHub."
-  successo "Frontend rilasciato su https://bluman.vercel.app"
+  # La CLI Vercel senza credenziali parte in interactive login e appende lo script per
+  # sempre: si verifica PRIMA, e chi lancia sa cosa fare (vercel login apre il browser).
+  if npx vercel whoami >/dev/null 2>&1; then
+    echo "• Deploy di produzione su Vercel via CLI..."
+    if npx vercel --prod --scope fanta-ia --yes; then
+      successo "Frontend rilasciato via CLI."
+    else
+      avviso "Deploy CLI non riuscito: resta il deploy del webhook GitHub (vedi dashboard Vercel)."
+    fi
+  else
+    avviso "CLI Vercel non autenticata: salto il deploy CLI. Il webhook GitHub ha comunque avviato un deploy. Per abilitarlo: npx vercel login"
+  fi
+
+  # Il webhook GitHub a volte resta appeso: deployment UNKNOWN, build 0ms, zero log.
+  # Si aspetta che l'ULTIMO deployment di produzione diventi Ready, con un tetto di
+  # 4 minuti; se resta UNKNOWN è il deployment appeso e serve l'intervento manuale.
+  echo "• In attesa che il deployment di produzione sia Ready (max 4 minuti)..."
+  ATTESA_OK=0
+  for i in $(seq 1 24); do
+    ULTIMO_URL=$(npx vercel ls --prod 2>/dev/null | awk '/fanta-ia\.vercel\.app/ {print $NF=="" ? $(NF-1) : $NF; exit}')
+    if [ -n "$ULTIMO_URL" ] && [ "$ULTIMO_URL" != "-" ]; then
+      STATO=$(npx vercel inspect "$ULTIMO_URL" 2>/dev/null | awk -F'\t' '/status/ {print $2}' | tr -d ' ' | head -1)
+      if [ "$STATO" = "READY" ]; then ATTESA_OK=1; break; fi
+    fi
+    sleep 10
+  done
+  if [ "$ATTESA_OK" -eq 1 ]; then
+    successo "Deployment Vercel di produzione Ready: $ULTIMO_URL"
+  else
+    avviso "Il deployment Vercel non risulta Ready dopo 4 minuti (stato: ${STATO:-sconosciuto})."
+    echo "  Controlla https://vercel.com/fanta-ia/bluman — se è UNKNOWN con build a 0ms è"
+    echo "  il deployment appeso: rimuovilo dalla dashboard e rilancia 'npx vercel --prod --scope fanta-ia'."
+  fi
 fi
 
 # 5. Backend — Railway Up

@@ -10,6 +10,7 @@
     "@fastify/swagger": "^9.8.1",
     "@fastify/swagger-ui": "^6.1.1",
     "@prisma/client": "^5.20.0",
+    "@sentry/node": "^10.74.0",
     "@types/nodemailer": "^8.0.1",
     "docxtemplater": "^3.69.3",
     "dotenv": "^16.4.5",

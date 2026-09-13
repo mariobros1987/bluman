@@ -275,6 +275,14 @@ Il worker tenant-scoped è disponibile in `src/services/cronService.ts`; il runn
 
 Configurare un secondo servizio dallo stesso repository con le medesime `DATABASE_URL`, `DIRECT_URL` e `ADMIN_DATABASE_URL` del backend, impostare come start command `npm run cron:notifiche` e pianificarlo ogni giorno alle **08:00 Europe/Rome**. Railway usa espressioni cron in UTC: verificare l’orario UTC desiderato quando cambia l’ora legale.
 
+Passi concreti dalla dashboard Railway (la CLI non crea servizi in modalità non interattiva):
+
+1. Nel progetto BluMan: **New Service → GitHub Repo** → repository `mariobros1987/bluman` (lo stesso del backend).
+2. Nel servizio nuovo: scheda **Settings → Deploy** → schedula con **Cron Scheduler**, espressione `0 6 * * *` (06:00 UTC = 08:00 Europe/Rome in ora legale; in inverno `0 7 * * *`).
+3. Scheda **Variables**: copiare dal servizio `bluman-api` le variabili `DATABASE_URL`, `DIRECT_URL`, `ADMIN_DATABASE_URL` e `NODE_ENV=production`.
+4. Scheda **Settings → Deploy → Custom Start Command**: `npm run cron:notifiche`.
+5. Prima esecuzione manuale (scheda **Deployments → Trigger**) e lettura dei log: il runner stampa il report per tenant (`tenantAttivi`, `notificheInviate`, `tenantFalliti`).
+
 Il runner amministrativo legge soltanto i tenant con `stato: 'attivo'`; ogni tenant viene poi elaborato tramite il client Prisma condiviso dentro un contesto RLS esplicito. Se almeno un tenant fallisce, il comando termina con exit code non zero e Railway registra l’esecuzione come fallita. Le notifiche prodotte sono persistite in-app; la futura coda email/WhatsApp con retry è un’attività separata e non va considerata già implementata.
 
 ---

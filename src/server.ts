@@ -92,6 +92,8 @@ import { registraRotteWebhooks } from './routes/webhooks.js';
 // serverless con la password SMTP presa da localStorage.
 import { registraRotteComunicazioni } from './routes/comunicazioni.js';
 import { registraSwagger } from './plugins/swagger.js';
+// Voce 6.2 — error tracking. No-op senza SENTRY_DSN: attivarlo è una variabile d'ambiente.
+import { registraSentry } from './plugins/sentry.js';
 
 const isTestEnv = process.env.NODE_ENV === 'test';
 const isProdEnv = process.env.NODE_ENV === 'production';
@@ -359,6 +361,7 @@ export function buildServer(app: AppPort): FastifyInstance {
 
   // ─── OPENAPI & SWAGGER UI (§6.2) ───────────────────────────────────
   await registraSwagger(server);
+  await registraSentry(server);
 
   // §23 — la protezione brute-force sugli endpoint che verificano credenziali è
   // demandata a @fastify/rate-limit (config per-route: 5 richieste/min per IP,
