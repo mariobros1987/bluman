@@ -217,7 +217,7 @@ Dal browser non serve nulla di manuale: la pagina di login lo ottiene e lo mette
 > applica solo le migrazioni versionate in `prisma/migrations/` e si ferma se il database è
 > in uno stato che non riconosce.
 >
-> Le migrazioni per `sessionVersion`, `WebhookInbox`, i due blocchi di indici di performance (`20260912150000_indici_performance` e `20260912160000_indici_performance_globale`) e i campi 2FA (`20260913133000_totp_campi_user`) sono versionate in `prisma/migrations/` e applicate con successo in produzione via `prisma migrate deploy`.
+> Le migrazioni per `sessionVersion`, `WebhookInbox`, i due blocchi di indici di performance (`20260912150000_indici_performance` e `20260912160000_indici_performance_globale`), i campi 2FA (`20260913133000_totp_campi_user`) e gli IP fidati 2FA (`20260913150000_totp_ip_fidati`) sono versionate in `prisma/migrations/` e applicate con successo in produzione via `prisma migrate deploy`.
 
 ---
 

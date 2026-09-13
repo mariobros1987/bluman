@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { statoTotpApi, attivaTotpApi, confermaTotpApi, disabilitaTotpApi } from '../../api/auth';
+import { statoTotpApi, attivaTotpApi, confermaTotpApi, disabilitaTotpApi, dimenticaIpFidatiApi } from '../../api/auth';
 
 type FaseAttivazioneTotp = 'idle' | 'qr' | 'backup_codes' | 'conferma';
 
@@ -13,6 +13,11 @@ export function TabSicurezza({ ruolo }: TabSicurezzaProps) {
   const [loading, setLoading] = useState(true);
   const [errore, setErrore] = useState<string | null>(null);
   const [successo, setSuccesso] = useState<string | null>(null);
+
+  // IP Fidati (ricorda postazione)
+  const [ipFidatiCount, setIpFidatiCount] = useState<number>(0);
+  const [ipCorrenteFidato, setIpCorrenteFidato] = useState<boolean>(false);
+  const [resettandoIp, setResettandoIp] = useState(false);
 
   // Flusso attivazione 2FA
   const [faseAttivazione, setFaseAttivazione] = useState<FaseAttivazioneTotp>('idle');
@@ -35,7 +40,11 @@ export function TabSicurezza({ ruolo }: TabSicurezzaProps) {
   useEffect(() => {
     if (!isSuperAdmin) { setLoading(false); return; }
     statoTotpApi()
-      .then(r => setTotpAbilitato(r.totpAbilitato))
+      .then(r => {
+        setTotpAbilitato(r.totpAbilitato);
+        setIpFidatiCount(r.ipFidatiCount || 0);
+        setIpCorrenteFidato(Boolean(r.ipCorrenteFidato));
+      })
       .catch(() => setTotpAbilitato(false))
       .finally(() => setLoading(false));
   }, [isSuperAdmin]);
@@ -102,6 +111,22 @@ export function TabSicurezza({ ruolo }: TabSicurezzaProps) {
       setErrore(err.message || 'Errore durante la disabilitazione del 2FA');
     } finally {
       setDisabilitando(false);
+    }
+  };
+
+  const dimenticaIp = async () => {
+    setResettandoIp(true);
+    setErrore(null);
+    try {
+      await dimenticaIpFidatiApi();
+      setIpFidatiCount(0);
+      setIpCorrenteFidato(false);
+      setSuccesso('Tutte le postazioni fidate sono state rimosse. Al prossimo accesso verrà richiesto il codice 2FA.');
+      setTimeout(() => setSuccesso(null), 5000);
+    } catch (err: any) {
+      setErrore(err.message || 'Errore durante il reset delle postazioni fidate');
+    } finally {
+      setResettandoIp(false);
     }
   };
 
@@ -184,8 +209,8 @@ export function TabSicurezza({ ruolo }: TabSicurezzaProps) {
                 : <span style={sBadgeInactive}>○ Non attiva</span>
               }
             </div>
-            <p style={{ fontSize: 12, color: 'var(--muted)', margin: 0, maxWidth: 520, lineHeight: 1.6 }}>
-              Aggiunge un secondo livello di sicurezza all'accesso del Super Admin. Dopo aver inserito la password, sarà richiesto un codice TOTP generato da un'app authenticator (Google Authenticator, 1Password, Bitwarden, ecc.).
+            <p style={{ fontSize: 12, color: 'var(--muted)', margin: 0, maxWidth: 540, lineHeight: 1.6 }}>
+              Aggiunge un secondo livello di sicurezza all'accesso del Super Admin. Pienamente compatibile con <strong style={{ color: 'var(--text)' }}>Password di Apple (Portachiavi iCloud)</strong>, Google Authenticator, 1Password, Bitwarden e app compatibili RFC 6238.
             </p>
           </div>
 
@@ -214,7 +239,7 @@ export function TabSicurezza({ ruolo }: TabSicurezzaProps) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div style={{ background: 'rgba(99,102,241,.08)', border: '1px solid rgba(99,102,241,.25)', borderRadius: 10, padding: 16 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 12 }}>
-                📷 Passo 1 di 2 — Scansiona il codice QR con la tua app authenticator
+                📷 Passo 1 di 2 — Scansiona il codice QR con la tua app authenticator o Password di Apple
               </div>
 
               <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', alignItems: 'flex-start' }}>
@@ -231,7 +256,7 @@ export function TabSicurezza({ ruolo }: TabSicurezzaProps) {
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10, flex: 1, minWidth: 200 }}>
                   <p style={{ fontSize: 12, color: 'var(--muted)', margin: 0, lineHeight: 1.6 }}>
-                    Apri la tua app authenticator, tocca il pulsante <strong style={{ color: 'var(--text)' }}>+</strong> e scansiona il codice QR.
+                    Apri la tua app authenticator (su iPhone puoi usare direttamente la <strong style={{ color: 'var(--text)' }}>Fotocamera</strong> o <strong style={{ color: 'var(--text)' }}>Password di Apple / Portachiavi iCloud</strong>, oppure Google Authenticator / 1Password) e scansiona il codice QR.
                   </p>
 
                   {/* Inserimento manuale */}
@@ -319,7 +344,7 @@ export function TabSicurezza({ ruolo }: TabSicurezzaProps) {
                 ⚠️ Salva questi codici di recupero — non li vedrai più!
               </div>
               <p style={{ fontSize: 12, color: 'var(--muted)', margin: '0 0 14px', lineHeight: 1.6 }}>
-                Conservali in un posto sicuro (gestore password, stampa, cassaforte). Ognuno può essere usato una sola volta al posto del codice TOTP in caso di perdita del dispositivo.
+                Conservali in un posto sicuro (Password di Apple, 1Password, stampa). Ognuno può essere usato una sola volta al posto del codice TOTP in caso di perdita del dispositivo.
               </p>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, marginBottom: 14 }}>
@@ -353,16 +378,64 @@ export function TabSicurezza({ ruolo }: TabSicurezzaProps) {
         )}
       </div>
 
+      {/* ── Card Postazioni e IP Fidati (Ricorda Postazione) ── */}
+      {totpAbilitato && faseAttivazione === 'idle' && (
+        <div style={sCard}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+                <span style={{ fontSize: 20 }}>🌐</span>
+                <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>Postazioni e Reti Fidate (Ricorda IP)</span>
+                {ipCorrenteFidato ? (
+                  <span style={sBadgeActive}>✓ IP Corrente Riconosciuto</span>
+                ) : (
+                  <span style={sBadgeInactive}>○ Nuovo IP / Da verificare al login</span>
+                )}
+              </div>
+              <p style={{ fontSize: 12, color: 'var(--muted)', margin: 0, maxWidth: 540, lineHeight: 1.6 }}>
+                Se accedi dallo stesso indirizzo IP, il codice 2FA viene chiesto solo la prima volta. Nei successivi accessi da questa stessa postazione o rete fidata il login è immediato. Se invece ti colleghi da un nuovo IP o rete sconosciuta, il codice 2FA verrà richiesto per proteggere il tuo account.
+              </p>
+              <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 8 }}>
+                Postazioni/reti registrate: <strong style={{ color: 'var(--text)' }}>{ipFidatiCount}</strong>
+              </div>
+            </div>
+
+            {ipFidatiCount > 0 && (
+              <button
+                type="button"
+                onClick={dimenticaIp}
+                disabled={resettandoIp}
+                style={{
+                  background: 'rgba(239,68,68,.12)',
+                  border: '1px solid rgba(239,68,68,.3)',
+                  color: '#f87171',
+                  padding: '8px 14px',
+                  borderRadius: 8,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  opacity: resettandoIp ? 0.6 : 1,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {resettandoIp ? 'Rimozione...' : '🗑️ Dimentica postazioni fidate'}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* ── Card Informazioni Aggiuntive ── */}
       {totpAbilitato && faseAttivazione === 'idle' && (
         <div style={{ ...sCard, background: 'rgba(52,211,153,.04)', border: '1px solid rgba(52,211,153,.15)' }}>
           <div style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.8 }}>
-            <div style={{ fontWeight: 600, color: '#34d399', marginBottom: 6 }}>🛡️ Il 2FA è attivo sul tuo account</div>
+            <div style={{ fontWeight: 600, color: '#34d399', marginBottom: 6 }}>🛡️ Dettagli Sicurezza 2FA Attiva</div>
             <ul style={{ margin: 0, paddingLeft: 18 }}>
-              <li>Ad ogni login sarà richiesto il codice a 6 cifre dalla tua app authenticator</li>
-              <li>In caso di perdita del dispositivo puoi usare un codice di recupero</li>
-              <li>Per rigenerate i codici QR e backup, disabilita e riabilita il 2FA</li>
-              <li>La disabilitazione richiede la conferma della tua password corrente</li>
+              <li><strong>Compatibilità Apple Passwords:</strong> Puoi salvare l'account direttamente nel Portachiavi iCloud di iPhone, iPad e Mac per la compilazione automatica con Face ID / Touch ID.</li>
+              <li><strong>Ricorda IP:</strong> Chi effettua il login dallo stesso IP autenticato accede direttamente con password senza dover ridigitare il TOTP ad ogni sessione.</li>
+              <li><strong>Accessi da nuove reti:</strong> Al cambio di connessione WiFi, rete dati cellulare o nuovo IP, il sistema richiede tempestivamente il codice TOTP a 6 cifre.</li>
+              <li><strong>Codici di recupero:</strong> In caso di emergenza o smarrimento del telefono, puoi inserire uno degli 8 codici di backup generati all'attivazione.</li>
+              <li><strong>Disabilitazione protetta:</strong> Disattivare il 2FA richiede la verifica della tua password attuale.</li>
             </ul>
           </div>
         </div>

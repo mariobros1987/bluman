@@ -176,12 +176,28 @@ export async function resetPasswordUtenteApi(userId: string) {
  * Legge lo stato corrente del 2FA TOTP per il super_admin autenticato.
  * Restituisce { totpAbilitato: boolean }.
  */
-export async function statoTotpApi(): Promise<{ ok: boolean; totpAbilitato: boolean }> {
+export async function statoTotpApi(): Promise<{
+  ok: boolean;
+  totpAbilitato: boolean;
+  ipFidatiCount?: number;
+  ipCorrente?: string;
+  ipCorrenteFidato?: boolean;
+}> {
   const res = await apiFetch(`${API_BASE}/auth/totp/stato`, {
     headers: getAuthHeaders(),
   });
   const data = await res.json().catch(() => null);
   if (!res.ok) throw new Error(data?.errore || 'Errore lettura stato 2FA');
+  return data;
+}
+
+export async function dimenticaIpFidatiApi(): Promise<{ ok: boolean; messaggio: string }> {
+  const res = await apiFetch(`${API_BASE}/auth/totp/dimentica-ip`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(data?.errore || 'Errore reset IP fidati');
   return data;
 }
 

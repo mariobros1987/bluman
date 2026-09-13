@@ -24,6 +24,10 @@ vi.mock('./util/prismaClient.js', async (importOriginal) => {
     },
     findFirst: async (args: any) => {
       const id = args?.where?.id;
+      const email = args?.where?.email;
+      if (stato.utente && (id === stato.utente.id || email === stato.utente.email)) {
+        return { ...stato.utente };
+      }
       if (id === 'usr-super_admin') {
         return {
           id: 'usr-super_admin',
@@ -250,4 +254,58 @@ describe('§6.1 — Rotte HTTP TOTP 2FA End-to-End', () => {
     expect(stato.utente.totpAbilitato).toBe(false);
     expect(stato.utente.totpSecret).toBeNull();
   });
+
+  it('POST /auth/login salta il 2FA se l\'indirizzo IP è già registrato come fidato', async () => {
+    stato.utente.totpAbilitato = true;
+    stato.utente.totpSecret = 'qualcosa';
+    stato.utente.totpIpFidati = ['127.0.0.1'];
+
+    // Login da 127.0.0.1 (IP fidato) -> accesso diretto con token
+    const resIpFidato = await server.inject({
+      method: 'POST',
+      url: '/auth/login',
+      payload: {
+        email: 'admin@studio.it',
+        password: 'PasswordSicura123!',
+      },
+    });
+
+    expect(resIpFidato.statusCode).toBe(200);
+    const bodyFidato = JSON.parse(resIpFidato.payload);
+    expect(bodyFidato.token).toBeDefined();
+    expect(bodyFidato.totpRequired).toBeUndefined();
+
+    // Login da nuovo IP -> richiede TOTP step 2
+    stato.utente.totpIpFidati = ['192.168.1.50']; // 127.0.0.1 non è nell'elenco
+    const resNuovoIp = await server.inject({
+      method: 'POST',
+      url: '/auth/login',
+      payload: {
+        email: 'admin@studio.it',
+        password: 'PasswordSicura123!',
+      },
+    });
+
+    expect(resNuovoIp.statusCode).toBe(200);
+    const bodyNuovoIp = JSON.parse(resNuovoIp.payload);
+    expect(bodyNuovoIp.totpRequired).toBe(true);
+    expect(bodyNuovoIp.preToken).toBeDefined();
+  });
+
+  it('POST /auth/totp/dimentica-ip svuota gli IP fidati memorizzati', async () => {
+    stato.utente.totpAbilitato = true;
+    stato.utente.totpIpFidati = ['127.0.0.1', '10.0.0.1'];
+
+    const res = await server.inject({
+      method: 'POST',
+      url: '/auth/totp/dimentica-ip',
+      headers: { authorization: `Bearer ${tokenAdmin()}` },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.payload);
+    expect(body.ok).toBe(true);
+    expect(stato.utente.totpIpFidati).toEqual([]);
+  });
 });
+

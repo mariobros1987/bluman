@@ -91,12 +91,13 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
     // client amministrativo e logga gli errori invece di ingoiarli.)
     attivaContestoTenant({ tenantId: userTenantId || TENANT_DEFAULT, ruolo: utente.ruolo });
 
-    // §6.1 — 2FA TOTP: se il super_admin ha il TOTP abilitato, non rilasciamo ancora
-    // il JWT definitivo. Emettiamo un preToken a vita breve (2 minuti) con il claim
-    // `totpPending: true` e restituiamo { totpRequired: true, preToken }.
-    // Il frontend mostra il campo per il codice e chiama POST /auth/totp/verifica.
-    // Advisor, collaboratori e clienti non sono toccati da questo ramo.
-    if (utente.ruolo === 'super_admin' && utente.totpAbilitato === true) {
+    // §6.1 — 2FA TOTP: se il super_admin ha il TOTP abilitato, verifichiamo se l'IP è già fidato.
+    // Se l'IP è già stato verificato in precedenza, non richiediamo nuovamente il codice TOTP.
+    // Solo se l'IP è nuovo viene emesso il preToken a 2 minuti per lo Step-2.
+    const ipRichiesta = (req.ip || '127.0.0.1').trim();
+    const ipFidato = Boolean(ipRichiesta && utente.totpIpFidati?.includes(ipRichiesta));
+
+    if (utente.ruolo === 'super_admin' && utente.totpAbilitato === true && !ipFidato) {
       const preToken = signJwt({
         userId: utente.id,
         tenantId: userTenantId,
@@ -113,8 +114,8 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
         ruolo: utente.ruolo,
         azione: 'TOTP_RICHIESTO',
         entita: 'Sessione Studio',
-        dettagli: 'Login password verificata, in attesa del codice TOTP per il super_admin',
-        ipAddress: req.ip || '127.0.0.1',
+        dettagli: `Login password verificata, in attesa del codice TOTP per nuovo IP (${ipRichiesta})`,
+        ipAddress: ipRichiesta,
       });
 
       return reply.send({ ok: true, totpRequired: true, preToken });
@@ -632,9 +633,16 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
       return reply.code(400).send({ errore: 'Codice TOTP non valido. Riprova o rigenera il segreto.' });
     }
 
+    const ipRichiesta = (req.ip || '127.0.0.1').trim();
+    const ipEsistenti = utente.totpIpFidati ?? [];
+    const ipAggiornati = Array.from(new Set([...ipEsistenti, ipRichiesta])).slice(-10);
+
     await db.user.update({
       where: { id: req.userId },
-      data: { totpAbilitato: true },
+      data: {
+        totpAbilitato: true,
+        totpIpFidati: ipAggiornati,
+      },
     });
 
     await recordAudit({
@@ -685,6 +693,7 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
         totpSecret: null,
         totpAbilitato: false,
         totpBackupCodes: [],
+        totpIpFidati: [],
       },
     });
 
@@ -715,12 +724,34 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
     const db = prismaAmministrativo();
     const utente = await db.user.findUnique({
       where: { id: req.userId },
-      select: { id: true, totpAbilitato: true },
+      select: { id: true, totpAbilitato: true, totpIpFidati: true },
     });
     if (!utente) return reply.code(404).send({ errore: 'Utente non trovato.' });
 
     const totpAbilitato = Boolean(utente.totpAbilitato);
-    return reply.send({ ok: true, totpAbilitato });
+    const ipFidati = utente.totpIpFidati ?? [];
+    const ipCorrente = (req.ip || '127.0.0.1').trim();
+    const ipCorrenteFidato = ipFidati.includes(ipCorrente);
+
+    return reply.send({
+      ok: true,
+      totpAbilitato,
+      ipFidatiCount: ipFidati.length,
+      ipCorrente,
+      ipCorrenteFidato,
+    });
+  });
+
+  server.post('/auth/totp/dimentica-ip', async (req, reply) => {
+    if (req.ruolo !== 'super_admin') {
+      return reply.code(403).send({ errore: 'Riservato al super_admin.' });
+    }
+    const db = prismaAmministrativo();
+    await db.user.update({
+      where: { id: req.userId },
+      data: { totpIpFidati: [] },
+    });
+    return reply.send({ ok: true, messaggio: 'Elenco IP fidati azzerato con successo. Al prossimo accesso verrà richiesto il codice TOTP.' });
   });
 
   /**
@@ -759,6 +790,7 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
     }
 
     let autenticatoConBackup = false;
+    let nuoviHashes: string[] = [];
 
     if (verificaTotp(segretoBase32, codiceTotp)) {
       // Codice TOTP corrente — OK
@@ -770,13 +802,21 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
         return reply.code(401).send(erroreGenerico);
       }
       // Invalida il backup code usato (rimuove dall'array)
-      const nuoviHashes = backupHashes.filter((_, i) => i !== indice);
-      await db.user.update({
-        where: { id: utente.id },
-        data: { totpBackupCodes: nuoviHashes },
-      });
+      nuoviHashes = backupHashes.filter((_, i) => i !== indice);
       autenticatoConBackup = true;
     }
+
+    const ipRichiesta = (req.ip || '127.0.0.1').trim();
+    const ipEsistenti = utente.totpIpFidati ?? [];
+    const ipAggiornati = Array.from(new Set([...ipEsistenti, ipRichiesta])).slice(-10);
+
+    await db.user.update({
+      where: { id: utente.id },
+      data: {
+        ...(autenticatoConBackup ? { totpBackupCodes: nuoviHashes } : {}),
+        totpIpFidati: ipAggiornati,
+      },
+    });
 
     const userTenantId = utente.tenantId || '';
     const token = signJwt({

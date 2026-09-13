@@ -149,6 +149,7 @@ model User {
   totpSecret   String?     @map("totp_secret")
   totpAbilitato Boolean    @default(false) @map("totp_abilitato")
   totpBackupCodes String[] @default([]) @map("totp_backup_codes")
+  totpIpFidati String[]    @default([]) @map("totp_ip_fidati")
   specializzazione String? @map("specializzazione")
   costoOrarioCentesimi Int? @default(3000) @map("costo_orario_centesimi") // Costo orario interno studio per margine netto
   createdAt    DateTime    @default(now()) @map("created_at")

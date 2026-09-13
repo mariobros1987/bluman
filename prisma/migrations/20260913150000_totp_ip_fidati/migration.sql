@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "user" ADD COLUMN IF NOT EXISTS "totp_ip_fidati" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[];
