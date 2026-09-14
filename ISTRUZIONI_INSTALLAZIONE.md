@@ -265,6 +265,25 @@ Deve mostrare `current_user: bluman_app`, `bypassa_rls: false`, RLS attivo **e f
 tutte e 34 le tabelle applicative (`_prisma_migrations` esclusa, correttamente) e **0
 clienti visibili** con un tenant inesistente.
 
+### Error tracking Sentry (opzionale, backend + frontend)
+
+L'integrazione è **opt-in per costruzione** su entrambi i lati: senza DSN il codice è
+inerte (nessuna chiamata di rete, nessun chunk in più scaricato dal browser). Per attivarla:
+
+1. Crea l'account su [sentry.io](https://sentry.io) e **due progetti**: uno di tipo
+   *Node.js* (backend) e uno di tipo *React* (frontend). Servono due DSN diversi.
+2. **Backend** → Railway, variabile `SENTRY_DSN` sul servizio `bluman-api` (vedi §5 per
+   il comando `railway variable set` e l'avvertenza sul BOM di PowerShell). Arrivano gli
+   errori non gestiti e i 500, con tenant, utente e rotta — mai body, query o header.
+3. **Frontend** → Vercel, progetto `bluman` → Settings → Environment Variables →
+   `VITE_SENTRY_DSN` (il DSN del progetto React). Attenzione: Vite la incorpora nel
+   bundle **a build time**, quindi dopo averla impostata serve un redeploy perché abbia
+   effetto. Arrivano gli errori di render (dall'`ErrorBoundary`, con lo stack dei
+   componenti) e quelli non gestiti del browser.
+
+Entrambi i lati inviano solo l'errore e i metadati minimi (`sendDefaultPii: false`,
+nessun performance monitoring): i dati dei clienti non lasciano l'infrastruttura.
+
 ---
 
 ### Railway Cron per le notifiche quotidiane (configurazione prevista)

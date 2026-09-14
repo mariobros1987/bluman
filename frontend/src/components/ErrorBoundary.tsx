@@ -1,4 +1,5 @@
 import React from 'react';
+import { captureException } from '../utils/sentry';
 
 interface ErrorBoundaryProps {
   children: React.ReactNode;
@@ -30,6 +31,12 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
   componentDidCatch(errore: Error, info: React.ErrorInfo) {
     // In console con il componente stack: chi sviluppa lo vede subito.
     console.error('[ErrorBoundary] Errore di render non gestito:', errore, info.componentStack);
+    // Su Sentry (se configurato) con lo stack dei componenti come extra: dice
+    // QUALE pagina è esplosa, non solo l'errore. No-op senza VITE_SENTRY_DSN.
+    captureException(errore, {
+      tags: { contesto: 'ErrorBoundary' },
+      extra: info.componentStack ? { componentStack: info.componentStack } : undefined,
+    });
   }
 
   render() {

@@ -79,6 +79,7 @@ Questo file serve come indice rapido per l'IA ed i collaboratori per identificar
 - **`utils/documentTemplates.ts`**: Catalogo template documenti precostruiti (contratti, NDA, engagement letter, societario, deleghe, fiscale, trust, compliance) con risoluzione Smart Tags ERP e supporto template custom da database. `resolveDocumentTemplateHtml()` serve **solo** l'anteprima e la resa locale: quello che arriva al server è l'HTML grezzo coi tag (`PassaggioModal` → `generaDocumentoApi`). I 5 modelli con area firme portano `{{firma_cliente}}` / `{{firma_studio}}` (§36), che in anteprima diventano uno spazio tratteggiato.
 - **`utils/reorganizationTemplates.ts`**: Collezione di 22 modelli contrattuali e verbali Word per operazioni di riorganizzazione societaria (Cessioni quote, trasformazioni, holding, trust, conferimenti) integrati nativamente in Document Studio con Smart Tags ERP. Tutti e 22 chiudono con la stessa area firme a due colonne, che da §36 porta `{{firma_studio}}` e `{{firma_cliente}}`.
 - **`utils/zipBuilder.ts`**: Modulo ZIP client-side autonomo a zero dipendenze per l'esportazione in 1-Click del fascicolo digitale completo in cartelle ordinate (`/01_Contratti`, `/02_Societario`, `/03_KYC`, `/04_Fatture`, `INDICE_FASCICOLO.txt`).
+- **`utils/sentry.ts`**: Error tracking Sentry del frontend, speculare a `src/plugins/sentry.ts` del backend. Opt-in per costruzione: senza `VITE_SENTRY_DSN` (si imposta su Vercel, non in `.env` del backend) l'SDK non viene nemmeno caricato — l'import dinamico lo tiene in un chunk separato che il browser scarica solo quando il DSN esiste. Con il DSN attivo, `initSentry()` (chiamata da `main.tsx`, idempotente sotto StrictMode) installa i global handler di Sentry e `captureException()` inoltra gli errori di render dell'`ErrorBoundary` con `componentStack` e tag `contesto`. Stessa privacy del backend: `sendDefaultPii: false`, niente performance monitoring (`tracesSampleRate: 0`). Presidio: `utils/sentry.test.ts`.
 
 ### 🪝 Hooks (`hooks/`)
 
@@ -488,7 +489,7 @@ Configurazione: `vitest.config.ts` + `vitest.setup.ts` (isolamento dal DB reale)
 
 5. **Aggiornamento Mappa Grafo (Graphify)**:
    - Dopo modifiche strutturali ai moduli o ai servizi, eseguire `graphify extract . --code-only` e `graphify cluster-only .` per mantenere la mappa delle dipendenze di codice e la documentazione architetturale sempre sincronizzate.
-   - ✅ **Grafo AGGIORNATO (14 settembre 2026):** 2675 nodi, 6681 archi, 293 community. Generati `graphify-out/graph.json`, `graphify-out/GRAPH_REPORT.md` e `graphify-out/graph.html` sulla postazione Windows, dove la CLI `graphify` 0.9.34 risulta installata su Python 3.12 (comando `graphify` in PATH, non serve `python -m`). Include §35-§37 e tutto l'hardening di settembre 2026.
+   - ✅ **Grafo AGGIORNATO (14 settembre 2026, dopo l'aggiunta di `utils/sentry.ts`):** 2687 nodi, 6686 archi, 301 community. Generati `graphify-out/graph.json`, `graphify-out/GRAPH_REPORT.md` e `graphify-out/graph.html` sulla postazione Windows, dove la CLI `graphify` 0.9.44 risulta installata su Python 3.12 (comando `py -m graphify`, non serve `python -m`; il comando nudo `graphify` non è in PATH). Include §35-§37 e tutto l'hardening di settembre 2026.
 
 
 6. **Divieto Assoluto di Esposizione Credenziali su GitHub & Persistenza Isolata su DB Tenant**:
