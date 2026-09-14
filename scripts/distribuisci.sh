@@ -107,29 +107,29 @@ if [ "$SOLO_API" -eq 0 ]; then
     else
       avviso "Deploy CLI non riuscito: resta il deploy del webhook GitHub (vedi dashboard Vercel)."
     fi
-  else
-    avviso "CLI Vercel non autenticata: salto il deploy CLI. Il webhook GitHub ha comunque avviato un deploy. Per abilitarlo: npx vercel login"
-  fi
 
-  # Il webhook GitHub a volte resta appeso: deployment UNKNOWN, build 0ms, zero log.
-  # Si aspetta che l'ULTIMO deployment di produzione diventi Ready, con un tetto di
-  # 4 minuti; se resta UNKNOWN è il deployment appeso e serve l'intervento manuale.
-  echo "• In attesa che il deployment di produzione sia Ready (max 4 minuti)..."
-  ATTESA_OK=0
-  for i in $(seq 1 24); do
-    ULTIMO_URL=$(npx vercel ls --prod 2>/dev/null | awk '/fanta-ia\.vercel\.app/ {print $NF=="" ? $(NF-1) : $NF; exit}')
-    if [ -n "$ULTIMO_URL" ] && [ "$ULTIMO_URL" != "-" ]; then
-      STATO=$(npx vercel inspect "$ULTIMO_URL" 2>/dev/null | awk -F'\t' '/status/ {print $2}' | tr -d ' ' | head -1)
-      if [ "$STATO" = "READY" ]; then ATTESA_OK=1; break; fi
+    # Il webhook GitHub a volte resta appeso: deployment UNKNOWN, build 0ms, zero log.
+    # Si aspetta che l'ULTIMO deployment di produzione diventi Ready, con un tetto di
+    # 4 minuti; se resta UNKNOWN è il deployment appeso e serve l'intervento manuale.
+    echo "• In attesa che il deployment di produzione sia Ready (max 4 minuti)..."
+    ATTESA_OK=0
+    for i in $(seq 1 24); do
+      ULTIMO_URL=$((npx vercel ls --prod 2>/dev/null || true) | awk '/fanta-ia\.vercel\.app/ {print $NF=="" ? $(NF-1) : $NF; exit}')
+      if [ -n "$ULTIMO_URL" ] && [ "$ULTIMO_URL" != "-" ]; then
+        STATO=$((npx vercel inspect "$ULTIMO_URL" 2>/dev/null || true) | awk -F'\t' '/status/ {print $2}' | tr -d ' ' | head -1)
+        if [ "$STATO" = "READY" ]; then ATTESA_OK=1; break; fi
+      fi
+      sleep 10
+    done
+    if [ "$ATTESA_OK" -eq 1 ]; then
+      successo "Deployment Vercel di produzione Ready: $ULTIMO_URL"
+    else
+      avviso "Il deployment Vercel non risulta Ready dopo 4 minuti (stato: ${STATO:-sconosciuto})."
+      echo "  Controlla https://vercel.com/fanta-ia/bluman — se è UNKNOWN con build a 0ms è"
+      echo "  il deployment appeso: rimuovilo dalla dashboard e rilancia 'npx vercel --prod --scope fanta-ia'."
     fi
-    sleep 10
-  done
-  if [ "$ATTESA_OK" -eq 1 ]; then
-    successo "Deployment Vercel di produzione Ready: $ULTIMO_URL"
   else
-    avviso "Il deployment Vercel non risulta Ready dopo 4 minuti (stato: ${STATO:-sconosciuto})."
-    echo "  Controlla https://vercel.com/fanta-ia/bluman — se è UNKNOWN con build a 0ms è"
-    echo "  il deployment appeso: rimuovilo dalla dashboard e rilancia 'npx vercel --prod --scope fanta-ia'."
+    avviso "CLI Vercel non autenticata: salto il deploy e il monitoraggio CLI. Il webhook GitHub ha comunque avviato un deploy. Per abilitarlo: npx vercel login"
   fi
 fi
 
