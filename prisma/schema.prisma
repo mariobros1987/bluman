@@ -836,6 +836,10 @@ model Fattura {
 
   tipoDocumento             TipoDocumentoFiscale   @default(fattura) @map("tipo_documento")
   serie                     String                 @default("FT") // "FT" per Fatture, "NC" per Note di Credito
+  // Numerazione: unica tra le EMESSE per (tenant, serie, progressivo) — garantita
+  // dall'indice parziale `fattura_emesse_tenant_serie_prog_key` (solo DB: gli indici
+  // parziali non si esprimono in schema.prisma, come i trgm). Le bozze restano fuori
+  // dal vincolo perché il numero legale si assegna all'emissione.
   numeroProgressivoSerie    Int                    @default(1) @map("numero_progressivo_serie")
   numero                    String?                // es. "FT-2026/001" o "NC-2026/001"
   data                      DateTime?              @default(now())

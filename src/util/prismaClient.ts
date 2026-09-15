@@ -103,13 +103,25 @@ export async function conContestoInTransazione<T>(
  * una delle due fallisce qui e, al tentativo successivo, rilegge i progressivi
  * già scritti dall'altra. Gli errori diversi da P2034 non si ritentano: non sono
  * conflitti ma guasti veri, che riprovare non ripara.
+ *
+ * Con `ancheViolazioniUniche` si ritenta anche la P2002 (violazione di vincolo
+ * UNIQUE): ha senso SOLO per le operazioni che ricalcolano il valore da zero a
+ * ogni tentativo (la numerazione «max+1» delle fatture). L'indice UNIQUE parziale
+ * `fattura_emesse_tenant_serie_prog_key` è la rete di sicurezza che trasforma un
+ * numero doppio in un errore immediato invece che in una fattura corrotta; questo
+ * retry lo trasforma in un secondo tentativo con il progressivo aggiornato.
  */
-export async function riprovaSuConflitto<T>(operazione: () => Promise<T>, tentativi = 3): Promise<T> {
+export async function riprovaSuConflitto<T>(
+  operazione: () => Promise<T>,
+  tentativi = 3,
+  ancheViolazioniUniche = false,
+): Promise<T> {
   for (let tentativo = 1; ; tentativo++) {
     try {
       return await operazione();
     } catch (err: any) {
-      if (err?.code !== 'P2034' || tentativo >= tentativi) throw err;
+      const conflitto = err?.code === 'P2034' || (ancheViolazioniUniche && err?.code === 'P2002');
+      if (!conflitto || tentativo >= tentativi) throw err;
       // Pausa crescente: dà alla transazione concorrente il tempo di committare,
       // così il tentativo successivo parte da una fotografia aggiornata.
       await new Promise((risolvi) => setTimeout(risolvi, 25 * tentativo));

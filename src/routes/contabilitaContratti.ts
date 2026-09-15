@@ -197,6 +197,9 @@ export async function registraRotteContabilitaContratti(server: FastifyInstance,
             }),
           { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
         ),
+        // `true`: ritenta anche sulla P2002 dell'indice UNIQUE della numerazione
+        3,
+        true,
       );
 
       await recordAudit({

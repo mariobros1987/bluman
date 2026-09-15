@@ -6,6 +6,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { AppPort } from '../services/appPort.js';
 import { prisma } from '../util/prismaClient.js';
+import { riprovaSuConflitto } from '../util/prismaClient.js';
 import { recordAudit } from '../util/serverHelpers.js';
 import { campoOrdinamento, creaMetaPaginazione, leggiPaginazione } from '../util/paginazione.js';
 
@@ -32,10 +33,21 @@ export async function registraRotteContabilitaRegistro(server: FastifyInstance, 
     };
   }>('/progetti/:id/fatture', async (req, reply) => {
     try {
-      const fattura: any = await app.emettiFattura({
-        progettoId: req.params.id,
-        ...req.body,
-      });
+      // La numerazione dentro l'adapter non gira in Serializable: con due
+      // emissioni concorrenti l'indice UNIQUE della numerazione può alzare
+      // P2002 — si ritenta e il secondo tentativo rilegge il progressivo
+      // già scritto dall'altro. InMemoryApp non solleva mai P2002, il retry
+      // per lei è un no-op.
+      const fattura: any = await riprovaSuConflitto(
+        // `async`: il port dichiara `unknown | Promise<unknown>`, il retry vuole una Promise
+        async () =>
+          await app.emettiFattura({
+            progettoId: req.params.id,
+            ...req.body,
+          }),
+        3,
+        true,
+      );
 
       await recordAudit({
         tenantId: req.tenantId,

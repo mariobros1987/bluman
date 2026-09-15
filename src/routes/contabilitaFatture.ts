@@ -78,8 +78,7 @@ export async function registraRotteContabilitaFatture(server: FastifyInstance, a
       // assegnarlo a entrambe. In caso di conflitto la tx abortisce (P2034) e
       // `riprovaSuConflitto` rilancia con i progressivi aggiornati dell'altra.
       const nuovaFattura = await riprovaSuConflitto(() =>
-        prisma.$transaction(
-          async (tx) =>
+        prisma.$transaction(          async (tx) =>
             conContestoInTransazione(tx, async () => {
               const lastFattura = await tx.fattura.findFirst({
                 where: { tenantId, serie },
@@ -157,6 +156,9 @@ export async function registraRotteContabilitaFatture(server: FastifyInstance, a
             }),
           { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
         ),
+        // `true`: ritenta anche sulla P2002 dell'indice UNIQUE della numerazione
+        3,
+        true,
       );
 
       await recordAudit({
@@ -387,6 +389,9 @@ export async function registraRotteContabilitaFatture(server: FastifyInstance, a
             }),
           { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
         ),
+        // `true`: ritenta anche sulla P2002 dell'indice UNIQUE della numerazione
+        3,
+        true,
       );
 
       await recordAudit({
@@ -558,6 +563,9 @@ export async function registraRotteContabilitaFatture(server: FastifyInstance, a
             }),
           { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
         ),
+        // `true`: ritenta anche sulla P2002 dell'indice UNIQUE della numerazione
+        3,
+        true,
       );
 
       await recordAudit({
