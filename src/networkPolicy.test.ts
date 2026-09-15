@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi, afterEach } from 'vitest';
 import {
   indirizzoVietato,
   risolviEndpointPubblico,
@@ -70,4 +70,28 @@ describe('policy rete SMTP/IMAP', () => {
     });
     expect(chiamate).toBe(1);
   });
+
+  it("l'eccezione di sviluppo PERMETTI_ENDPOINT_LOCALI ammette il loopback, ma solo con NODE_ENV=development", async () => {
+    const resolver = async () => [{ address: '127.0.0.1', family: 4 }];
+
+    // Senza la variabile (produzione e sviluppo normale): fail-closed.
+    vi.stubEnv('NODE_ENV', 'development');
+    delete process.env.PERMETTI_ENDPOINT_LOCALI;
+    await expect(risolviEndpointPubblico('mail.example.com', undefined, resolver)).rejects.toThrow(/non pubblico/i);
+
+    // Con la variabile ma in produzione: l'eccezione non scatta.
+    vi.stubEnv('PERMETTI_ENDPOINT_LOCALI', '1');
+    vi.stubEnv('NODE_ENV', 'production');
+    await expect(risolviEndpointPubblico('mail.example.com', undefined, resolver)).rejects.toThrow(/non pubblico/i);
+
+    // Con entrambe le condizioni: il loopback è ammesso (Mailpit degli E2E).
+    vi.stubEnv('NODE_ENV', 'development');
+    await expect(risolviEndpointPubblico('mail.example.com', undefined, resolver)).resolves.toMatchObject({
+      address: '127.0.0.1',
+    });
+  });
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
 });

@@ -25,6 +25,7 @@
     "zod": "^4.5.4"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@types/ioredis": "^4.28.10",
     "@types/node": "^22.7.0",
     "@types/pdfkit": "^0.17.6",
@@ -55,6 +56,8 @@
     "dev": "tsx watch src/index.ts",
     "start:db": "tsx watch src/adapters/prisma/index.ts",
     "seed": "tsx src/adapters/prisma/seed.ts",
+    "e2e:prepara": "node scripts/e2e/prepara.mjs",
+    "test:e2e": "node scripts/e2e/prepara.mjs && playwright test",
     "prepare": "simple-git-hooks"
   },
   "simple-git-hooks": {

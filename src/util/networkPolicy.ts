@@ -126,6 +126,18 @@ export function indirizzoVietato(address: string): boolean {
   return tuttiZero || loopback || mapped || linkLocal || privata || multicast || documentazione;
 }
 
+/**
+ * Consenso esplicito agli endpoint di rete locale (loopback e range privati),
+ * valido solo in sviluppo. Serve a chi sviluppa con un server di posta interno
+ * e alla suite E2E, il cui Mailpit gira in un container Docker sulla macchina
+ * di chi testa. Stesso spirito di SMTP_INSECURE_TLS: un'eccezione dichiarata,
+ * ristretta a NODE_ENV=development — in produzione la variabile non è impostata
+ * e la protezione SSRF resta integra (fail-closed).
+ */
+export function endpointLocaliConsentiti(): boolean {
+  return process.env.NODE_ENV === 'development' && process.env.PERMETTI_ENDPOINT_LOCALI === '1';
+}
+
 export async function risolviEndpointPubblico(
   hostInput: unknown,
   servernameInput?: unknown,
@@ -135,8 +147,9 @@ export async function risolviEndpointPubblico(
   const servername = servernameInput ? validaServername(servernameInput) : (isIP(host) ? undefined : host);
   const risolti = isIP(host) ? [{ address: host, family: isIP(host) }] : await resolver(host, { all: true, verbatim: true });
   if (!risolti.length) throw new ErrorePolicyRete(`Host ${host} senza indirizzi DNS.`);
+  const localiAmmessi = endpointLocaliConsentiti();
   for (const r of risolti) {
-    if ((r.family !== 4 && r.family !== 6) || indirizzoVietato(r.address)) {
+    if ((r.family !== 4 && r.family !== 6) || (!localiAmmessi && indirizzoVietato(r.address))) {
       throw new ErrorePolicyRete(`Host ${host} risolve a un indirizzo non pubblico o riservato.`);
     }
   }

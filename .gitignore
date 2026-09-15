@@ -41,3 +41,7 @@ scratch/
 .claude/
 
 # Relitti del vecchio backend Python: mai più nel repo
+
+# Artefatti Playwright (E2E)
+test-results/
+playwright-report/
