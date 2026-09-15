@@ -98,25 +98,22 @@ if [ "$SOLO_API" -eq 0 ]; then
   git push origin main
   successo "Push su GitHub (main) completato."
 
-  # La CLI Vercel senza credenziali parte in interactive login e appende lo script per
-  # sempre: si verifica PRIMA, e chi lancia sa cosa fare (vercel login apre il browser).
-  if npx vercel whoami >/dev/null 2>&1; then
-    echo "• Deploy di produzione su Vercel via CLI..."
-    if npx vercel --prod --scope fanta-ia --yes; then
-      successo "Frontend rilasciato via CLI."
-    else
-      avviso "Deploy CLI non riuscito: resta il deploy del webhook GitHub (vedi dashboard Vercel)."
-    fi
-
-    # Il webhook GitHub a volte resta appeso: deployment UNKNOWN, build 0ms, zero log.
-    # Si aspetta che l'ULTIMO deployment di produzione diventi Ready, con un tetto di
-    # 4 minuti; se resta UNKNOWN è il deployment appeso e serve l'intervento manuale.
+  # Attende che l'ultimo deployment di produzione diventi Ready. Serve solo quando il
+  # deploy è partito dal webhook GitHub, che a volte resta appeso (UNKNOWN, build 0ms,
+  # zero log): in quel caso bisogna saperlo, perché la dashboard serve l'intervento.
+  # NB sul parsing: `vercel inspect` stampa la sua tabella su STDERR, non su stdout —
+  # con «2>/dev/null | awk» l'awk riceveva sempre input vuoto e lo stato risultava
+  # «sconosciuto» anche a deploy verde (il falso allarme del 14/09). Qui si legge con
+  # 2>&1, e con FS di default $NF è l'ultima parola («Ready»/«UNKNOWN»): il simbolo ●
+  # non entra nel confronto perché gsub lo toglie.
+  attendi_vercel_ready() {
     echo "• In attesa che il deployment di produzione sia Ready (max 4 minuti)..."
     ATTESA_OK=0
+    STATO=""
     for i in $(seq 1 24); do
-      ULTIMO_URL=$((npx vercel ls --prod 2>/dev/null || true) | awk '/fanta-ia\.vercel\.app/ {print $NF=="" ? $(NF-1) : $NF; exit}')
+      ULTIMO_URL=$((npx vercel ls --prod 2>&1 || true) | awk '/fanta-ia\.vercel\.app/ {print $NF; exit}')
       if [ -n "$ULTIMO_URL" ] && [ "$ULTIMO_URL" != "-" ]; then
-        STATO=$((npx vercel inspect "$ULTIMO_URL" 2>/dev/null || true) | awk -F'\t' '/status/ {print $2}' | tr -d ' ' | head -1)
+        STATO=$((npx vercel inspect "$ULTIMO_URL" 2>&1 || true) | awk '/^[[:space:]]*status/ {s=$NF; gsub(/[^A-Za-z]/,"",s); print toupper(s); exit}')
         if [ "$STATO" = "READY" ]; then ATTESA_OK=1; break; fi
       fi
       sleep 10
@@ -128,8 +125,25 @@ if [ "$SOLO_API" -eq 0 ]; then
       echo "  Controlla https://vercel.com/fanta-ia/bluman — se è UNKNOWN con build a 0ms è"
       echo "  il deployment appeso: rimuovilo dalla dashboard e rilancia 'npx vercel --prod --scope fanta-ia'."
     fi
+  }
+
+  # La CLI Vercel senza credenziali parte in interactive login e appende lo script per
+  # sempre: si verifica PRIMA, e chi lancia sa cosa fare (vercel login apre il browser).
+  if npx vercel whoami >/dev/null 2>&1; then
+    echo "• Deploy di produzione su Vercel via CLI..."
+    if npx vercel --prod --scope fanta-ia --yes; then
+      # La CLI attende da sé la readiness e risponde con readyState: READY: il frontend
+      # È online. Il giro di attesa qui sotto sarebbe solo 4 minuti sprecati su uno
+      # stato già noto — e la sua unica mansione (sorvegliare il webhook appeso) non
+      # esiste quando il deploy l'abbiamo fatto noi.
+      successo "Frontend rilasciato e Ready via CLI."
+    else
+      avviso "Deploy CLI non riuscito: si aspetta il deploy avviato dal webhook GitHub."
+      attendi_vercel_ready
+    fi
   else
-    avviso "CLI Vercel non autenticata: salto il deploy e il monitoraggio CLI. Il webhook GitHub ha comunque avviato un deploy. Per abilitarlo: npx vercel login"
+    avviso "CLI Vercel non autenticata: salto il deploy CLI. Il webhook GitHub ha comunque avviato un deploy. Per abilitarlo: npx vercel login"
+    attendi_vercel_ready
   fi
 fi
 

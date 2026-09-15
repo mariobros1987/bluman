@@ -411,6 +411,15 @@ Per la messa in produzione professionale ed il passaggio ad un ambiente live:
 
 Elencati qui perché non chiuderli è una scelta, non una dimenticanza.
 
+> **Aggiornamento 14 settembre 2026** — i debiti 1, 2, 3 e 4 sono **chiusi**:
+> il grafo Graphify è stato rigenerato (2675 nodi, 6681 archi, 293 community —
+> la CLI era installata sulla postazione Windows); le righe `user` residue, i moduli
+> senza micro-voci e la riga da riallineare non esistono più nel database attuale
+> (verificato con `verificaAccessi.ts` e `probeAvanzamento.ts`: 7 utenti tutti con
+> password, 0 righe da ricalcolare, 0 moduli non verificabili — il database è stato
+> ricreato con dati di collaudo dopo la stesura di questa sezione). Restano aperti i
+> debiti da 5 in poi.
+
 1. **Mappa Graphify STALE**: l'ultima estrazione è del **17 agosto**, quindi *nessuna*
    correzione di Fase 0 è nel grafo — compresi il modello `MagicLink` e le funzioni nuove di
    `src/util/jwt.ts` e `src/services/storageService.ts` — né la Fase 1, che aggiunge
