@@ -24,6 +24,22 @@ import type { ModuloProposta } from './types';
 import { mapProjectToPortalModules } from './mapPortalModules';
 import { dataOraLeggibile } from './format';
 
+// Chiamata magic-login in corso per un certo token: chi ne fa un'altra con lo
+// stesso token mentre la prima è in volo riceve la STESSA promise, non una
+// seconda richiesta HTTP. Il magic link è monouso, quindi due chiamate
+// concorrenti («StrictMode» monta gli effect due volte in sviluppo) farebbero
+// consumare il token alla prima e fallire la seconda con 401, con l'ordine di
+// completamento a decidere cosa resta sullo schermo. Una sola promise lo rende
+// deterministico.
+let magicLoginInCorso: Promise<Awaited<ReturnType<typeof magicLoginApi>>> | null = null;
+
+function magicLoginDeduplicato(token: string): Promise<Awaited<ReturnType<typeof magicLoginApi>>> {
+  magicLoginInCorso ??= magicLoginApi(token).finally(() => {
+    magicLoginInCorso = null;
+  });
+  return magicLoginInCorso;
+}
+
 /**
  * Hook React con i dati del portale cliente: anagrafica, progetti, documenti, firme,
  * richieste di addendum, proposte fiscali, recapiti dello studio, fatture e messaggi,
@@ -353,7 +369,7 @@ export function usePortalData({ token, setIsAuthenticated, setAccessoNegato }: U
 
     if (token) {
       try {
-        const sessione = await magicLoginApi(token);
+        const sessione = await magicLoginDeduplicato(token);
         if (!sessione?.token) throw new Error('Magic Link non valido o scaduto');
         localStorage.setItem('bluman_portal_token', sessione.token);
         if (sessione.user) {
@@ -364,10 +380,35 @@ export function usePortalData({ token, setIsAuthenticated, setAccessoNegato }: U
         setAccessoNegato(null);
       } catch (err: any) {
         console.warn('Magic login non riuscito', err);
-        setAccessoNegato(err.message || 'Link di accesso non valido o scaduto.');
-        setIsAuthenticated(false);
-        setPageLoading(false);
-        return;
+        // Il magic link è monouso: la prima chiamata lo consuma, e ogni chiamata
+        // successiva con lo stesso token riceve 401. Succede in due modi — il doppio
+        // mount degli effect in sviluppo (StrictMode) e il cliente che riapre lo
+        // stesso link, per un reload o una seconda occhiata all'email — e in entrambi
+        // i casi respingere chi ha una sessione portale ancora valida in localStorage
+        // sarebbe un rifiuto a chi è regolarmente autenticato. La sessione salvata
+        // dalla prima chiamata vince; l'errore resta solo quando non c'è.
+        const sessioneSalvata = localStorage.getItem('bluman_portal_token');
+        const utenteSalvato = localStorage.getItem('bluman_client_user');
+        let ripristinata = false;
+        if (sessioneSalvata && utenteSalvato) {
+          try {
+            const parsed = JSON.parse(utenteSalvato);
+            if (parsed.ruolo === 'cliente' && parsed.clienteId) {
+              clienteIdSessione = parsed.clienteId;
+              setIsAuthenticated(true);
+              setAccessoNegato(null);
+              ripristinata = true;
+            }
+          } catch {
+            // localStorage corrotto: si procede con l'errore originale.
+          }
+        }
+        if (!ripristinata) {
+          setAccessoNegato(err.message || 'Link di accesso non valido o scaduto.');
+          setIsAuthenticated(false);
+          setPageLoading(false);
+          return;
+        }
       }
     } else if (clienteIdParam) {
       clienteIdSessione = clienteIdParam;
