@@ -29,6 +29,8 @@ import {
   rottaConsentitaAlCliente,
   type Ruolo,
 } from './util/authorization.js';
+// Mappa rotta → chiave modulo per l'enforcement della Matrice Permessi (RBAC).
+import { moduloDellaRotta } from './util/rbacModuli.js';
 
 // Helper condivisi (costanti di sessione, audit, recapiti, IP reale): estratti in
 // src/util/serverHelpers.ts dallo split dei monoliti — stesse identiche implementazioni.
@@ -470,6 +472,54 @@ export function buildServer(app: AppPort): FastifyInstance {
       !rottaConsentitaAlCliente(req.method, patternRotta)
     ) {
       return reply.code(403).send({ errore: 'Non autorizzato per il portale cliente.' });
+    }
+
+    // ─── RBAC: ENFORCEMENT DELLA MATRICE PERMESSI (PermessoModulo) ────
+    // Fino a oggi la matrice era client-side only: Sidebar e App nascondevano
+    // le pagine, ma l'API restava aperta a chiunque avesse un JWT valido — un
+    // collaboratore con «invoices: denied» poteva emettere fatture con curl.
+    // Semantica allineata al frontend (getUserPermission di rbac.ts):
+    // - super_admin bypassa sempre; il cliente ha il suo guard qui sopra;
+    // - nessuna riga sulla matrice = accesso (default permissivo: così la
+    //   matrice resta un pannello di restringimento, e chi non l'ha mai
+    //   toccata non perde nulla);
+    // - «denied» blocca tutto il modulo; «read» lascia le sole letture.
+    // Fail-open SOLO sull'errore di lettura della matrice: se il database non
+    // risponde si lascia passare (con log) — la sessione è comunque stata
+    // verificata sullo stesso database un attimo prima, quindi il fail-closed
+    // qui non comprerebbe sicurezza, solo un'API che va in 403 a raffica.
+    if (
+      req.method !== 'OPTIONS' &&
+      rottaEsistente &&
+      autenticato &&
+      ruolo !== 'super_admin' &&
+      ruolo !== 'cliente' &&
+      payload?.userId
+    ) {
+      const modulo = moduloDellaRotta(patternRotta);
+      if (modulo) {
+        let livello: string | undefined;
+        try {
+          const permesso = await prisma.permessoModulo.findUnique({
+            where: {
+              tenantId_userId_moduloChiave: {
+                tenantId,
+                userId: payload.userId,
+                moduloChiave: modulo,
+              },
+            },
+            select: { livello: true },
+          });
+          livello = permesso?.livello;
+        } catch (err) {
+          console.error('Verifica permesso modulo fallita:', err instanceof Error ? err.message : err);
+        }
+        if (livello === 'denied' || (livello === 'read' && req.method !== 'GET' && req.method !== 'HEAD')) {
+          return reply.code(403).send({
+            errore: `Permesso insufficiente sul modulo '${modulo}' (livello: ${livello}).`,
+          });
+        }
+      }
     }
 
     // §2bis — solo il super_admin può spostarsi tra tenant. Onorare questo header per
