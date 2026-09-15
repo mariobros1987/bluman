@@ -252,6 +252,23 @@ git config user.email "mariobros1987@gmail.com"   # NON mario.dibenedetto87@gmai
 - Il progetto root `bluman` si deploya da solo a ogni push su `main` (integrazione GitHub); il progetto `frontend` si deploya manualmente dalla cartella `frontend/` con `npx vercel --prod`.
 - Verifica stato deploy: `npx vercel ls` (CLI già autenticata).
 
+### 🎭 Suite E2E Playwright (mai sul DB di produzione)
+
+```bash
+npm run test:e2e     # prepara l'ambiente (container, migrazioni, seed) e gira i 3 flussi critici
+npm run e2e:prepara  # sola preparazione, senza test
+```
+
+I tre flussi critici (login+cambio password, firma SES da portale con OTP email, fattura dal
+compositore) girano su container Docker usa-e-getta: `bluman-e2e-pg` (Postgres 16, porta
+**5433**) e `bluman-e2e-mailpit` (SMTP 1025, API 8025). **Non toccano mai Supabase**:
+`scripts/e2e/avvia-backend.mjs` cabla le URL su localhost:5433 prima del `.env`,
+`reuseExistingServer: false` per il backend, e `src/scripts/seedE2E.ts` rifiuta URL
+non-localhost. Prerequisiti: Docker Desktop e `npx playwright install chromium` (una volta).
+`workers: 1` obbligatorio (flussi condividono DB e consumano magic link/OTP). La preparazione
+svuota la coda di Mailpit a ogni corsa (i container sopravvivono tra le esecuzioni).
+Documentazione completa: `e2e/README.md`. Pulizia: `docker rm -f bluman-e2e-pg bluman-e2e-mailpit`.
+
 ---
 
 ## ⚡ Connessione Diretta a Supabase tramite CLI & Prisma (IMPORTANTISSIMO)

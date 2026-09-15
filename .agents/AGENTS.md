@@ -406,6 +406,17 @@ Configurazione: `vitest.config.ts` + `vitest.setup.ts` (isolamento dal DB reale)
 - **`src/scripts/restoreDbTest.test.ts`**: FASE 5 — Suite di test per il restore drill del database (5 test): validazione integrità payload dump JSON, calcolo conteggi senza scritture in modalità `--dry-run`, rispetto dell'ordine topologico referenziale degli upsert, rimappatura del tenant su ambiente target/staging, e tolleranza controllata agli errori parziali.
 - **`src/swagger.test.ts`**: FASE 6.2 — Suite di test per OpenAPI e Swagger UI (5 test): generazione della specifica OpenAPI 3.0.3 su `GET /docs/json`, rendering dell'interfaccia interattiva su `GET /docs`, accesso consentito in development/test e restrizione d'accesso fail-closed in produzione con verifica del ruolo autorizzato (`advisor` / `super_admin`).
 
+### 🎭 E2E Playwright (`e2e/` + `scripts/e2e/`)
+
+Suite end-to-end dei tre flussi critici (login con cambio password, firma SES da portale con OTP email, fattura dal compositore). **Non è vitest**: gira su un ambiente usa-e-getta con Docker, mai sul DB Supabase di produzione. Documentazione completa: `e2e/README.md`; comandi `npm run test:e2e` (prepara + gira) e `npm run e2e:prepara` (solo preparazione). Punti tassativi:
+
+- I container `bluman-e2e-pg` (Postgres 16, porta 5433) e `bluman-e2e-mailpit` (SMTP 1025, API 8025) sono l'unico database/SMTP che i test possono toccare. `scripts/e2e/avvia-backend.mjs` cabla le URL su localhost:5433 prima che dotenv carichi il `.env` di produzione, `playwright.config.ts` usa `reuseExistingServer: false` per il backend, e `src/scripts/seedE2E.ts` legge solo da `E2E_DATABASE_URL` rifiutando gli URL non-localhost.
+- `src/scripts/seedE2E.ts` richiede `E2E_PASSWORD` dall'ambiente (il default cablato violerebbe la regola 6: il presidio `src/credenziali.test.ts` scandisce anche `src/scripts/`). Il default vive in `scripts/e2e/prepara.mjs`, fuori dai percorsi scansionati.
+- La preparazione svuota la coda di Mailpit a ogni corsa: i container sopravvivono tra le esecuzioni e un flush mancante lascerebbe OTP stantii leggibili dagli helper.
+- `leggiOtpDaMailpit` (`e2e/helpers.ts`) riconosce l'email di firma dall'oggetto «Codice di sicurezza» e legge il codice dallo span monospace dell'HTML — l'invio è solo HTML e la riga «Codice di firma BluMan:» esiste solo nel testo WhatsApp.
+- `workers: 1` obbligatorio: i flussi condividono il database e quello del portale consuma magic link e OTP soggetti ad anti-abuso.
+- La suite costruisce il database **dalle sole migrazioni versionate**: ogni drift schema/migrazioni (il caso delle tre FK di `20260915172000_allinea_fk_fatture_e_documenti`) emerge qui prima che in produzione.
+
 ### ☁️ Serverless Functions (`api/`)
 
 - **`api/send-email.ts`**: **relay** di posta a uso del solo backend, non un endpoint per il browser (§35). Serve perché la rete in uscita di Railway non lascia passare le porte SMTP (ETIMEDOUT misurato su 465, 587 e 25 verso `authsmtp.register.it`): il messaggio arriva già composto da `src/services/emailRelay.ts` e viene consegnato da qui, che gira su un'altra rete, con le credenziali dello studio. Accetta due sole azioni, `send-message` e `fetch-imap-inbound`. Chiuso da: header `x-bluman-relay` confrontato con `EMAIL_RELAY_SECRET`, nessuna intestazione CORS, nessun ripiego su `process.env.SMTP_*` per le chiamate non autorizzate, solo l'host di posta dello studio fra i candidati (prima offriva le credenziali di uno studio su Gmail ai server di Register.it), destinatario obbligatorio e validato, certificati TLS verificati. Accetta `smtpServername`/`imapServername` e li passa come `tls.servername` senza toccare `rejectUnauthorized`. Presidio: `api/sendEmail.test.ts` (12 test).
@@ -419,6 +430,7 @@ Configurazione: `vitest.config.ts` + `vitest.setup.ts` (isolamento dal DB reale)
 - `20260819210000_magic_link_persistito/`: Crea la tabella `MagicLink` con policy RLS incorporata.
 - `20260827180000_archiviazione_documenti_firmati/`: Aggiunge `isArchiviato`, `archiviatoAt`, `archiviatoDaId` a `Documento` e `isArchiviato` a `EngagementLetter` (additiva: nessun dato toccato). I documenti firmati non si eliminano più: si archiviano.
 - `20260829200000_blocchi_documento_per_firma_incorporata/`: §36 — aggiunge `contenuto_blocchi_json` (JSONB, nullable) a `Documento`. Additiva e senza backfill: i documenti generati prima restano senza blocchi e alla firma producono solo il verbale, come prima.
+- `20260915172000_allinea_fk_fatture_e_documenti/`: Riporta nel database tre `ON DELETE` già dichiarati da `schema.prisma` mai applicati (drift emerso dalla suite E2E, che costruisce il DB dalle sole migrazioni): `fattura_riga → fattura` passa a CASCADE (senza, `DELETE /invoices/:id` sulle bozze falliva con P2003: le bozze nascono già con le righe), `fattura → progetto` a SET NULL (difesa in profondità: il guard fiscale di `eliminaProgetto` blocca già la cancellazione di progetti con fatture), `documento → user` a SET NULL (il documento sopravvive all'operatore che lo ha caricato).
 
 ### 🔒 Migrazioni RLS Supabase (`supabase/migrations/`)
 
@@ -535,4 +547,14 @@ Configurazione: `vitest.config.ts` + `vitest.setup.ts` (isolamento dal DB reale)
      ```
    - In alternativa, eseguire lo script unificato `./scripts/distribuisci.sh` che esegue i controlli di integrità, il push su GitHub per il frontend e il `railway up` per il backend.
    - Dopo ogni deploy backend, verificare sempre con una chiamata live che le nuove rotte rispondano correttamente e non con `404 Not Found`.
+
+10. **I Test E2E Girano solo sull'Ambiente Usa-e-Getta, Mai su Supabase**:
+   - La suite Playwright (`npm run test:e2e`) gira su container Docker locali (`bluman-e2e-pg` porta 5433, `bluman-e2e-mailpit` 1025/8025) creati da `scripts/e2e/prepara.mjs`. Il database Supabase di produzione non viene mai toccato: né query, né seed, né `migrate`.
+   - Le protezioni sono in ordine di esecuzione: `scripts/e2e/avvia-backend.mjs` cabla le URL su `localhost:5433` prima che dotenv carichi il `.env`; `reuseExistingServer: false` rifiuta un backend avviato a mano; `src/scripts/seedE2E.ts` legge solo `E2E_DATABASE_URL` e rifiuta gli URL non-localhost. Non vanno indebolite per «fare prima».
+   - `PERMETTI_ENDPOINT_LOCALI=1` (l'eccezione anti-SSRF che permette SMTP verso Mailpit) è valida solo con `NODE_ENV=development`: in produzione la variabile non esiste e la policy resta fail-closed (regola 6 di `networkPolicy.ts`, presidiata da `src/networkPolicy.test.ts`).
+   - La suite costruisce il database dalle sole migrazioni versionate: se un test E2E fallisce con errori di schema/FK (es. P2003), prima di tutto verificare il drift schema/migrazioni con `npx prisma migrate diff` — è la fotografia fedele di ciò che avrà produzione al prossimo deploy.
+
+11. **Nessuna Operazione Distruttiva sul Database di Produzione Senza Chiedere**:
+   - Il DB Supabase contiene i dati reali dello studio e dei clienti (o, in fase di collaudo, i dati di prova del titolare): `DELETE`, `TRUNCATE`, `DROP`, `db push --accept-data-loss` e reset di qualunque tipo vanno **proposti e approvati dal titolare prima dell'esecuzione**, sempre con un dry-run o un backup alle spalle.
+   - Le prove e i reset automatizzati appartengono all'ambiente E2E (regola 10): se serve cancellare qualcosa su Supabase, si chiede. La scrittura di codice e migrazioni **addittive** non richiede autorizzazione preventiva.
 
