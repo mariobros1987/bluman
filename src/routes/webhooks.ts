@@ -48,6 +48,7 @@ import { gestisciAvvio, leggiRichiestaAvvio } from '../services/avvioTelegram.js
 import { confrontoTokenCostante } from '../util/password.js';
 import { uploadDocumento } from '../services/storageService.js';
 import { credenzialiCanali } from '../services/otpDispatch.js';
+import { usernameBotTelegram } from '../services/telegramService.js';
 import { vietaControlli } from '../util/networkPolicy.js';
 // `isProgettoAttivo` vive nel dominio: era scritta due volte qui e, con Signal, ne serviva una
 // terza copia in `signalInbound.ts`. Il criterio di «progetto su cui instradare un messaggio» è
@@ -735,19 +736,37 @@ export async function registraRotteWebhooks(server: FastifyInstance): Promise<vo
         // «bot non configurato» mentre il bot funziona: un guasto invisibile, che è il tipo di cosa
         // questa rotta esiste per non fare più.
         //
-        // Si scrive **solo se manca**: se lo studio l'ha compilato a mano, quel valore resta. E un
-        // `getMe` non riuscito non fa fallire la configurazione — il webhook è già registrato, ed è
-        // quello che conta: il link si potrà comporre dalla prossima volta.
+        // **Telegram è la fonte, e la colonna è la sua copia.** Un valore diverso da quello che
+        // risponde `getMe` con *questo* token non è una scelta dello studio: il link `t.me/<bot>`
+        // deve puntare al bot che riceve i messaggi, cioè a quello del token qui sopra, e non esiste
+        // un caso in cui i due debbano differire. Fino al 16/09/2026 questo ramo scriveva **solo se
+        // il campo era vuoto**: così l'id numerico del bot — copiato a mano in «Bot Username» — è
+        // rimasto in colonna, e il link composto apriva «questo utente non esiste» mentre il bot
+        // funzionava benissimo. Il confronto è senza maiuscole e senza chiocciola, perché Telegram
+        // non distingue i due casi e chi compila il campo li scrive in entrambi i modi.
+        //
+        // Un `getMe` non riuscito non fa fallire la configurazione: il webhook è già registrato, ed è
+        // quello che conta. Il campo si correggerà alla prima registrazione che riesce.
         const usernameBot = await leggiUsernameBot(botToken);
+        let usernameCorretto = false;
         if (usernameBot) {
           const attuale = await prisma.tenant.findUnique({
             where: { id: req.tenantId },
             select: { tgBotUsername: true },
           });
-          if (!attuale?.tgBotUsername?.trim()) {
-            await prisma.tenant
-              .update({ where: { id: req.tenantId }, data: { tgBotUsername: usernameBot } })
-              .catch(() => {});
+          const salvato = usernameBotTelegram(attuale?.tgBotUsername);
+          if (salvato?.toLowerCase() !== usernameBot.toLowerCase()) {
+            try {
+              await prisma.tenant.update({
+                where: { id: req.tenantId },
+                data: { tgBotUsername: usernameBot },
+              });
+              usernameCorretto = true;
+            } catch {
+              // La lettura da Telegram è riuscita e la scrittura no: il webhook è registrato
+              // comunque e il campo resta da correggere a mano. Non è un motivo per rispondere
+              // «configurazione fallita» a una configurazione che è riuscita.
+            }
           }
         }
 
@@ -755,7 +774,15 @@ export async function registraRotteWebhooks(server: FastifyInstance): Promise<vo
           ok: true,
           telegramResponse: tgJson,
           botUsername: usernameBot,
-          message: 'Webhook Telegram configurato ed attivato con successo!',
+          // Il browser tiene lo username in un campo di modulo: senza questo avviso la pagina
+          // risalverebbe il valore vecchio alla prima modifica di un altro canale, disfacendo la
+          // correzione appena fatta.
+          usernameCorretto,
+          message: usernameCorretto
+            ? 'Webhook Telegram configurato. Lo @username salvato non era quello di questo bot: è '
+              + `stato corretto in @${usernameBot}, perché il link per collegare la chat di un `
+              + 'cliente a una pratica avrebbe altrimenti puntato a un utente inesistente.'
+            : 'Webhook Telegram configurato ed attivato con successo!',
         });
       } finally {
         clearTimeout(timer);

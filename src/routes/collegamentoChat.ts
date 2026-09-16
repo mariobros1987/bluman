@@ -21,7 +21,7 @@ import { prisma } from '../util/prismaClient.js';
 import { credenzialiCanali, recapitiCliente } from '../services/otpDispatch.js';
 import { inviaEmail } from '../services/emailRelay.js';
 import { inviaTestoWhatsapp } from '../services/whatsappService.js';
-import { urlCollegamentoTelegram, usernameBotTelegram } from '../services/telegramService.js';
+import { urlCollegamentoTelegram, usernameBotUsabile } from '../services/telegramService.js';
 import { creaPayloadCollegamento } from '../util/webhookSecurity.js';
 import { elencaCollegamentiProgetto, scollegaPerId } from '../services/collegamentoChat.js';
 import { recordAudit } from '../util/serverHelpers.js';
@@ -39,10 +39,17 @@ interface LinkPronto {
 /**
  * Il link per una pratica, o il motivo per cui non si compone.
  *
- * Due modi distinti di non farcela, e vanno tenuti distinti perché i rimedi sono diversi: il bot
- * dello studio non è configurato (Impostazioni → Canali), oppure lo `@username` non è ancora noto
- * perché `setWebhook` non è mai stato eseguito. Il secondo si risolve premendo «Registra webhook»
- * nella scheda Telegram, e dirglielo è più utile che rispondere «non configurato».
+ * Tre modi distinti di non farcela, e vanno tenuti distinti perché i rimedi sono diversi: il bot
+ * dello studio non è configurato (Impostazioni → Canali), lo `@username` non è ancora noto perché
+ * `setWebhook` non è mai stato eseguito, oppure il campo contiene un valore che non è uno username —
+ * l'id numerico del bot, tipicamente. Il secondo si risolve premendo «Registra webhook» nella scheda
+ * Telegram; il terzo pure, perché quella rotta rilegge lo username da Telegram e corregge il campo.
+ * Dirgli quale dei tre è più utile che rispondere «non configurato» a tutti e tre.
+ *
+ * L'ultimo caso non è teorico: il campo `tgBotUsername` dello studio conteneva l'id numerico del
+ * bot — non lo username — e il link composto apriva «questo utente non esiste» sul telefono del
+ * cliente. Prima di questa distinzione la rotta avrebbe detto «manca lo @username»: falso, il campo
+ * era pieno, e il rimedio indicato sarebbe stato inutile.
  */
 async function componiLink(
   tenantId: string,
@@ -66,20 +73,23 @@ async function componiLink(
     };
   }
 
-  const username = usernameBotTelegram(cred.tgBotUsername);
+  // `usernameBotUsabile` e non un semplice `if (!username)`: il valore presente ma sbagliato (l'id
+  // del bot) e il valore assente hanno rimedi diversi, e solo la funzione li sa distinguere.
+  const bot = usernameBotUsabile(cred.tgBotUsername);
+  if (!bot.ok) return { ok: false, stato: 400, errore: bot.errore };
+
   const url = urlCollegamentoTelegram(
-    username,
+    bot.username,
     creaPayloadCollegamento(tenantId, progettoId, masterSecret),
   );
-  if (!url || !username) {
+  if (!url) {
     return {
       ok: false,
       stato: 400,
-      errore: 'Manca lo @username del bot, quindi il link non si compone: premi «Registra webhook» nella '
-        + 'scheda Telegram delle impostazioni (lo legge da Telegram e lo salva).',
+      errore: 'Il link non si compone: lo username del bot non è utilizzabile in un indirizzo.',
     };
   }
-  return { ok: true, link: { url, botUsername: username } };
+  return { ok: true, link: { url, botUsername: bot.username } };
 }
 
 /**

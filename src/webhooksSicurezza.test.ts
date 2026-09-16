@@ -9,7 +9,7 @@
  */
 import { createHmac } from 'node:crypto';
 import Fastify from 'fastify';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Il parametro è dichiarato anche se l'implementazione non lo usa: senza, il tipo della chiamata
 // registrata è una tupla vuota e `calls[0][0]` non compila — cioè proprio l'argomento che questi
@@ -37,6 +37,10 @@ const tenantFindUnique = vi.fn<any>(async () => ({
   id: '00000000-0000-4000-8000-000000000001',
   tgBotToken: '12345:token-lungo-valido',
 }));
+// La scrittura dello username del bot durante la registrazione del webhook: è il punto in cui la
+// colonna viene allineata a ciò che risponde `getMe`. Il tipo si lascia dedurre dall'implementazione
+// (`vi.fn<any>` renderebbe le chiamate `unknown[][]`, e `calls[0][0].data` non compilerebbe).
+const tenantUpdate = vi.fn(async (args: any) => ({ ...args?.data }));
 const clienteFindMany = vi.fn<any>(async () => [{
   id: 'cli-1', nome: 'Cliente Uno', cellulare: '+39 335 123 4567', referentiJson: null,
 }]);
@@ -53,7 +57,7 @@ const collegamentoUpsert = vi.fn<any>(async () => ({}));
 const inviaTestoTelegram = vi.fn<any>(async () => ({ ok: true }));
 
 const prismaFinto: any = {
-  tenant: { findMany: tenantFindMany, findUnique: tenantFindUnique },
+  tenant: { findMany: tenantFindMany, findUnique: tenantFindUnique, update: tenantUpdate },
   cliente: { findMany: clienteFindMany },
   progetto: { findMany: progettoFindMany, findFirst: progettoFindFirst },
   collegamentoChatProgetto: { findUnique: collegamentoFindUnique, upsert: collegamentoUpsert },
@@ -73,7 +77,14 @@ vi.mock('./services/notificheService.js', () => ({ notificaStudio: vi.fn(async (
 vi.mock('./services/otpDispatch.js', () => ({ credenzialiCanali: vi.fn(async () => ({})) }));
 vi.mock('./services/storageService.js', () => ({ uploadDocumento: vi.fn() }));
 vi.mock('./util/networkPolicy.js', () => ({ vietaControlli: (x: string) => x }));
-vi.mock('./services/telegramService.js', () => ({ inviaTestoTelegram }));
+// Si sostituisce **solo** l'invio: il resto di `telegramService` (la forma dello username, per
+// esempio) serve a `webhooks.ts` vero. Con un finto che espone la sola `inviaTestoTelegram`, le
+// altre funzioni importate sono `undefined` e la rotta che le chiama esplode — o, peggio, un
+// controllo che dovrebbe rifiutare qualcosa smette di essere eseguito e il test resta verde.
+vi.mock('./services/telegramService.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./services/telegramService.js')>()),
+  inviaTestoTelegram,
+}));
 
 const { registraRotteWebhooks } = await import('./routes/webhooks.js');
 const { creaSegretoTelegram, creaPayloadCollegamento } = await import('./util/webhookSecurity.js');
@@ -123,6 +134,13 @@ beforeEach(() => {
   inviaTestoTelegram.mockResolvedValue({ ok: true });
   findComunicazioni.mockResolvedValue([]);
   eventiInbox.clear();
+  tenantUpdate.mockResolvedValue({});
+});
+
+afterEach(() => {
+  // La registrazione del webhook parla con `api.telegram.org`: senza questo, il finto `fetch` di un
+  // test resterebbe installato per i successivi.
+  vi.unstubAllGlobals();
 });
 
 describe('webhook WhatsApp per studio', () => {
@@ -529,5 +547,90 @@ describe('collegamento chat → pratica (link Telegram)', () => {
     expect(create.mock.calls[0]![0].data.canale).toBe('telegram');
     expect(clienteFindMany).toHaveBeenCalled();
     await server.close();
+  });
+});
+
+/**
+ * La registrazione del webhook allinea lo `@username` del bot a ciò che risponde `getMe`.
+ *
+ * È il rimedio del guasto del 16/09/2026: in `tgBotUsername` era finito l'**id** del bot, e il link
+ * per collegare la chat di un cliente a una pratica apriva «questo utente non esiste» mentre il bot
+ * funzionava. La colonna non era vuota, quindi il ramo che scriveva «solo se manca» non la toccava:
+ * un valore sbagliato restava lì per sempre. Telegram è la fonte — il link deve puntare al bot che
+ * riceve i messaggi, cioè quello di questo token — e la colonna è la sua copia.
+ */
+describe('registrazione webhook: lo username del bot viene da Telegram', () => {
+  // Forma valida per la rotta (`^\d{5,20}:[A-Za-z0-9_-]{20,200}$`). Nessun valore reale.
+  const TOKEN_FINTO = `12345:${'a'.repeat(30)}`;
+
+  const risposta = (corpo: unknown, stato = 200) => ({
+    ok: stato < 400,
+    status: stato,
+    json: async () => corpo,
+  }) as unknown as Response;
+
+  /** Telegram: `setWebhook` accettato, e `getMe` che risponde (o no) con lo username vero. */
+  function telegramFinto(username: string | null, getMeOk = true) {
+    return vi.fn(async (url: string) => {
+      if (String(url).includes('/setWebhook')) return risposta({ ok: true, result: true });
+      return risposta(getMeOk ? { ok: true, result: { id: 87654321, username } } : { ok: false, description: 'Unauthorized' });
+    });
+  }
+
+  /** Il server con l'identità che l'hook di autenticazione vera metterebbe sulla richiesta. */
+  async function appStudio() {
+    const server = Fastify();
+    server.addHook('preHandler', async (req) => {
+      (req as any).ruolo = 'advisor';
+      (req as any).tenantId = TENANT;
+    });
+    await server.register(registraRotteWebhooks);
+    return server;
+  }
+
+  const registra = (server: Awaited<ReturnType<typeof appStudio>>) =>
+    server.inject({
+      method: 'POST',
+      url: '/tenant/telegram-webhook-setup',
+      payload: { botToken: TOKEN_FINTO, webhookUrl: 'https://esempio.test/webhooks/telegram' },
+    });
+
+  it("corregge in colonna un valore che non è lo username di questo token", async () => {
+    tenantFindUnique.mockResolvedValue({ id: TENANT, tgBotToken: TOKEN_FINTO, tgBotUsername: '87654321' });
+    vi.stubGlobal('fetch', telegramFinto('StudioDiProvaBot'));
+
+    const res = await registra(await appStudio());
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().botUsername).toBe('StudioDiProvaBot');
+    expect(res.json().usernameCorretto).toBe(true);
+    expect(tenantUpdate).toHaveBeenCalledTimes(1);
+    expect(tenantUpdate.mock.calls[0]![0].data).toEqual({ tgBotUsername: 'StudioDiProvaBot' });
+    // Il token non esce dalla risposta, nemmeno adesso che la rotta scrive una colonna che lo riguarda.
+    expect(res.body).not.toContain('a'.repeat(30));
+  });
+
+  it('un campo già giusto non viene riscritto: chiocciola e maiuscole non contano per Telegram', async () => {
+    tenantFindUnique.mockResolvedValue({ id: TENANT, tgBotToken: TOKEN_FINTO, tgBotUsername: '@studiodiprovabot' });
+    vi.stubGlobal('fetch', telegramFinto('StudioDiProvaBot'));
+
+    const res = await registra(await appStudio());
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().usernameCorretto).toBe(false);
+    expect(tenantUpdate).not.toHaveBeenCalled();
+  });
+
+  it('se `getMe` non risponde il webhook resta registrato, e il campo non si tocca', async () => {
+    // Il webhook è già registrato: è quello che conta. Non sapere lo username è un'informazione che
+    // manca, non una configurazione fallita — rispondere «errore» manderebbe a rifare tutto.
+    tenantFindUnique.mockResolvedValue({ id: TENANT, tgBotToken: TOKEN_FINTO, tgBotUsername: '87654321' });
+    vi.stubGlobal('fetch', telegramFinto(null, false));
+
+    const res = await registra(await appStudio());
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().usernameCorretto).toBe(false);
+    expect(tenantUpdate).not.toHaveBeenCalled();
   });
 });

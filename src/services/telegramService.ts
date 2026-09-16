@@ -69,7 +69,56 @@ export function idDelBot(token: string | null | undefined): string | null {
  */
 export function usernameBotTelegram(valore: string | null | undefined): string | null {
   const pulito = String(valore ?? '').trim().replace(/^@+/, '');
+  // Un valore di sole cifre **non** è uno username: Telegram non ne assegna. È l'id del bot —
+  // quello che `getMe` restituisce in `result.id`, e che si legge anche nella prima metà del
+  // token. La forma di Telegram lo accetterebbe (è alfanumerico e sta nei 5-32 caratteri), quindi
+  // senza questa riga il link si compone e `t.me/<numero>` apre la pagina «questo utente non
+  // esiste»: il guasto vero capitato sul campo `tgBotUsername` dello studio, con l'id copiato al
+  // posto dello username. Rifiutandolo qui, il link **non** si compone e la rotta dice cosa
+  // correggere. (Il valore vero non compare in questo commento: è la prima metà del token.)
+  if (/^\d+$/.test(pulito)) return null;
   return /^[A-Za-z0-9_]{5,32}$/.test(pulito) ? pulito : null;
+}
+
+/**
+ * Lo username del bot se è utilizzabile, altrimenti il motivo in una frase che dice cosa correggere.
+ *
+ * Esiste perché «manca lo username» e «c'è scritto un'altra cosa» portano a rimedi diversi, e la
+ * rotta che compone il link li confondeva in un messaggio solo: davanti all'id del bot, «premi
+ * Registra webhook» non spiega cos'è sbagliato. Torna un'unione e non `string | null` perché chi
+ * chiama ha bisogno di **entrambe** le cose, e con due funzioni separate il tipo dello username
+ * andrebbe asserito (`!` o `as string`) proprio dove la regola è stata appena verificata.
+ *
+ * Il valore di partenza **non** viene ripetuto nel messaggio: se è l'id del bot, è la prima metà del
+ * token, e un pezzo di token non torna al browser (regola 6) — nemmeno per spiegare un errore.
+ */
+export function usernameBotUsabile(
+  valore: string | null | undefined,
+): { ok: true; username: string } | { ok: false; errore: string } {
+  const username = usernameBotTelegram(valore);
+  if (username) return { ok: true, username };
+  const grezzo = String(valore ?? '').trim().replace(/^@+/, '');
+  if (!grezzo) {
+    return {
+      ok: false,
+      errore: 'Manca lo @username del bot, quindi il link non si compone: premi «Registra webhook» '
+        + 'nella scheda Telegram delle impostazioni (lo legge da Telegram e lo salva).',
+    };
+  }
+  if (/^\d+$/.test(grezzo)) {
+    return {
+      ok: false,
+      errore: 'Nel campo «Bot Username» c\'è l\'id numerico del bot, non il suo username: Telegram '
+        + 'non assegna username di sole cifre, e `t.me/<numero>` è un utente inesistente. Lo username '
+        + 'è quello che @BotFather ha dato al bot (nella forma `@qualcosa_bot`): premi «Registra '
+        + 'webhook», che lo rilegge da Telegram e corregge il campo.',
+    };
+  }
+  return {
+    ok: false,
+    errore: 'Il valore nel campo «Bot Username» non è uno username Telegram valido: servono 5-32 '
+      + 'caratteri fra lettere, cifre e `_`. Quello vero è quello che @BotFather ha dato al bot.',
+  };
 }
 
 /**

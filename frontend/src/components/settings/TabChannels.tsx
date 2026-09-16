@@ -613,7 +613,7 @@ export function TabChannels({
                   >
                     {testingChannel === 'telegram' ? 'Testing...' : '🧪 Test Bot'}
                   </button>
-                  <PannelloWebhookTelegram segreti={segreti} />
+                  <PannelloWebhookTelegram segreti={segreti} onUsername={setTgBotUsername} />
                 </div>
               </div>
               <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 12 }}>
@@ -632,6 +632,15 @@ export function TabChannels({
                 <div className={styles.field}>
                   <label>Bot Username Telegram *:</label>
                   <input type="text" value={tgBotUsername} onChange={e => setTgBotUsername(e.target.value)} style={{ fontSize: 12 }} />
+                  {/* Il campo è testo libero, e un numero ci sta dentro senza protestare: il
+                      16/09/2026 ci è finito l'id del bot, e il link per collegare la chat di un
+                      cliente a una pratica apriva «questo utente non esiste». Qui si dice cosa ci
+                      va e chi è la fonte — Telegram, non chi compila. */}
+                  <div style={{ fontSize: 10.5, color: 'var(--muted)', marginTop: 4 }}>
+                    Lo username che @BotFather ha dato al bot, nella forma <code>@qualcosa_bot</code> —
+                    <strong> non</strong> l'id numerico: quello non è un destinatario, e <code>t.me/&lt;numero&gt;</code> non
+                    esiste. «Registra Webhook» lo rilegge da Telegram e corregge questo campo se è sbagliato.
+                  </div>
                 </div>
                 <div className={styles.field}>
                   <label>Bot Access Token (@BotFather *):</label>

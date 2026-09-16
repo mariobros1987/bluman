@@ -23,7 +23,21 @@ import {
   type WebhookInfoTelegram,
 } from '../../api/tenant';
 
-export function PannelloWebhookTelegram({ segreti }: { segreti: { tgBotToken?: boolean } }) {
+export function PannelloWebhookTelegram({
+  segreti,
+  onUsername,
+}: {
+  segreti: { tgBotToken?: boolean };
+  /**
+   * Riceve lo username che la registrazione ha **corretto** in colonna.
+   *
+   * Serve perché la pagina tiene lo stesso valore in un campo di modulo: senza riallinearlo, il
+   * primo «Salva» di un altro canale riscriverebbe il valore vecchio e disferebbe la correzione.
+   * Si chiama solo quando la correzione c'è stata, così un campo compilato a mano non viene
+   * riscritto quando è già giusto.
+   */
+  onUsername?: (username: string) => void;
+}) {
   const [info, setInfo] = useState<WebhookInfoTelegram | null>(null);
   const [loading, setLoading] = useState(false);
   const [registrando, setRegistrando] = useState(false);
@@ -47,6 +61,9 @@ export function PannelloWebhookTelegram({ segreti }: { segreti: { tgBotToken?: b
     const r = await registraWebhookTelegramApi();
     setRegistrando(false);
     setEsito({ ok: r.ok, testo: r.ok ? (r.messaggio || 'Webhook registrato.') : (r.errore || 'Errore.') });
+    // Il campo «Bot Username» nella pagina è ancora quello vecchio: la rotta lo ha corretto in
+    // colonna leggendolo da Telegram, e lo stato del modulo va portato lì dov'è il database.
+    if (r.ok && r.usernameCorretto && r.botUsername) onUsername?.(r.botUsername);
     if (r.ok) await aggiorna();
   };
 

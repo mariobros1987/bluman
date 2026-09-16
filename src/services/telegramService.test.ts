@@ -7,7 +7,7 @@
  * ogni rifiuto abbia un motivo e che nessuna richiesta parta prima dei controlli.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { chatIdTelegram, idDelBot, inviaTestoTelegram, spiegaErroreTelegram, telegramConfigurato } from './telegramService.js';
+import { chatIdTelegram, idDelBot, inviaTestoTelegram, spiegaErroreTelegram, telegramConfigurato, usernameBotTelegram, usernameBotUsabile } from './telegramService.js';
 
 const BOT = { tgBotToken: '123456:token-di-prova', tgBotUsername: 'studio_bot' };
 
@@ -204,5 +204,65 @@ describe('spiegaErroreTelegram — la risposta di Telegram tradotta in cosa fare
 
     expect(esito.ok).toBe(false);
     expect(esito.errore).toMatch(/chat id configurata è quella del bot/i);
+  });
+});
+
+describe('usernameBotTelegram — lo username del bot, non il suo id', () => {
+  it("accetta lo username e toglie la chiocciola, che nell'anagrafica c'è o non c'è", () => {
+    expect(usernameBotTelegram('studio_bot')).toBe('studio_bot');
+    expect(usernameBotTelegram('@studio_bot')).toBe('studio_bot');
+    expect(usernameBotTelegram('  @StudioDiProvaBot  ')).toBe('StudioDiProvaBot');
+  });
+
+  it("rifiuta un numero: è l'id del bot, e t.me/<numero> è un utente inesistente", () => {
+    // Il guasto vero del 16/09/2026. `getMe` risponde con **due** cose — `id` e `username` — e
+    // l'id, copiato nel campo «Bot Username», passava la forma di Telegram senza protestare:
+    // alfanumerico, dieci caratteri, dentro i 5-32 ammessi. Il link si componeva, e sul telefono
+    // del cliente si apriva «questo utente non esiste» mentre il bot funzionava benissimo.
+    expect(usernameBotTelegram('87654321')).toBeNull();
+    expect(usernameBotTelegram('12345')).toBeNull();
+    expect(usernameBotTelegram('1234567890123')).toBeNull();
+  });
+
+  it('rifiuta le forme che Telegram non assegna', () => {
+    expect(usernameBotTelegram('abc')).toBeNull(); // sotto i 5 caratteri
+    expect(usernameBotTelegram('a'.repeat(33))).toBeNull(); // sopra i 32
+    expect(usernameBotTelegram('studio bot')).toBeNull(); // lo spazio non è ammesso
+    expect(usernameBotTelegram('studio-bot')).toBeNull(); // nemmeno il trattino
+    expect(usernameBotTelegram('')).toBeNull();
+    expect(usernameBotTelegram(null)).toBeNull();
+    expect(usernameBotTelegram(undefined)).toBeNull();
+  });
+});
+
+describe('usernameBotUsabile — il motivo, non il silenzio', () => {
+  it("quando va bene torna lo username, con la chiocciola tolta", () => {
+    expect(usernameBotUsabile('@StudioDiProvaBot')).toEqual({ ok: true, username: 'StudioDiProvaBot' });
+  });
+
+  it("dice che è l'id del bot, e non lo ripete nel messaggio", () => {
+    const esito = usernameBotUsabile('87654321');
+
+    expect(esito.ok).toBe(false);
+    if (esito.ok) throw new Error('atteso un rifiuto');
+    expect(esito.errore).toMatch(/id numerico/i);
+    expect(esito.errore).toMatch(/Registra webhook/i);
+    // Regola 6, e non è un dettaglio: se il valore è l'id del bot, è la **prima metà del token**.
+    // Ripeterlo nel messaggio d'errore lo manderebbe al browser per spiegare un guasto, cioè
+    // proprio ciò che la regola vieta.
+    expect(esito.errore).not.toContain('87654321');
+  });
+
+  it('campo vuoto e campo sbagliato hanno messaggi diversi, perché i rimedi sono diversi', () => {
+    // Un messaggio solo per entrambi («manca lo username») manderebbe a compilare a mano un campo
+    // che «Registra webhook» riempie da solo — e non spiegherebbe cosa c'era di sbagliato.
+    const vuoto = usernameBotUsabile('   ');
+    const sbagliato = usernameBotUsabile('studio bot');
+
+    expect(vuoto.ok).toBe(false);
+    expect(sbagliato.ok).toBe(false);
+    if (vuoto.ok || sbagliato.ok) throw new Error('attesi due rifiuti');
+    expect(vuoto.errore).toMatch(/Manca lo @username/);
+    expect(sbagliato.errore).toMatch(/non è uno username Telegram valido/);
   });
 });

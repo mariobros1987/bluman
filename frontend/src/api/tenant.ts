@@ -342,8 +342,21 @@ export async function rigeneraSlugWhatsappApi(): Promise<{ ok: boolean; waCallba
  *
  * La rotta server-side legge il bot token salvato: il browser non lo conosce mai dopo
  * il salvataggio (regola 6). Il chiamante non deve passare nessun token.
+ *
+ * `botUsername` e `usernameCorretto` tornano perché la rotta **corregge** in colonna lo username
+ * quando non è quello che risponde `getMe` con questo token (era il guasto del 16/09/2026: l'id
+ * numerico del bot nel campo «Bot Username», e un link che apriva «questo utente non esiste»). Il
+ * campo di modulo nella pagina tiene ancora il valore vecchio: chi chiama questa funzione deve
+ * riportarlo nello stato, altrimenti il primo «Salva» di un altro canale riscrive il valore
+ * sbagliato e disfa la correzione.
  */
-export async function registraWebhookTelegramApi(): Promise<{ ok: boolean; messaggio?: string; errore?: string }> {
+export async function registraWebhookTelegramApi(): Promise<{
+  ok: boolean;
+  messaggio?: string;
+  errore?: string;
+  botUsername?: string;
+  usernameCorretto?: boolean;
+}> {
   try {
     const res = await apiFetch(`${API_BASE}/tenant/telegram-webhook-setup`, {
       method: 'POST',
@@ -354,7 +367,12 @@ export async function registraWebhookTelegramApi(): Promise<{ ok: boolean; messa
     if (!res.ok) {
       return { ok: false, errore: dati?.errore || `Il server ha risposto ${res.status}.` };
     }
-    return { ok: true, messaggio: dati?.message || 'Webhook registrato.' };
+    return {
+      ok: true,
+      messaggio: dati?.message || 'Webhook registrato.',
+      botUsername: typeof dati?.botUsername === 'string' ? dati.botUsername : undefined,
+      usernameCorretto: dati?.usernameCorretto === true,
+    };
   } catch (err: any) {
     return { ok: false, errore: err?.message || 'Backend non raggiungibile.' };
   }

@@ -105,7 +105,12 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
     return {
       whatsapp: tenantSettings?.telefono || studio.telefono || (isBC ? '+39 378 092 6461' : ''),
       email: tenantSettings?.smtpFromEmail || tenantSettings?.email || studio.email || (isBC ? 'comunicazioni@bluecode.advisory' : ''),
-      telegram: tenantSettings?.tgBotUsername || (isBC ? '@BluManStudioBot' : ''),
+      // Niente ripiego scritto in duro: qui c'era `'@BluManStudioBot'`, e quel nome su Telegram **non
+      // esiste** (verificato: `t.me/BluManStudioBot` non risolve). L'etichetta della tendina lo
+      // mostrava come se fosse il bot dello studio, e un operatore che lo legge può dettarlo a un
+      // cliente: è la stessa bugia del link rotto, un passo prima. Se lo studio non ha lo username
+      // salvato, la riga resta vuota — che è la verità (regola 7).
+      telegram: tenantSettings?.tgBotUsername || '',
       signal: tenantSettings?.telefono || studio.telefono || (isBC ? '+39 378 092 6461' : ''),
       portal: 'portal',
     };

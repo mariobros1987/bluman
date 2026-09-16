@@ -16,6 +16,7 @@ import { rifirmaUrlUpload } from '../services/storageService.js';
 import { provaPostaInUscita, provaPostaInArrivo, sendInvitoCollaboratoreEmail } from '../services/emailService.js';
 import { credenzialiCanali } from '../services/otpDispatch.js';
 import { numeroSignal, statoSignal } from '../services/signalService.js';
+import { usernameBotTelegram } from '../services/telegramService.js';
 import { inMemoryTenantStore, recordAudit, senzaHash } from '../util/serverHelpers.js';
 import { urlWebhookWhatsapp } from '../util/urlPubblica.js';
 import { campoOrdinamento, creaMetaPaginazione, leggiPaginazione } from '../util/paginazione.js';
@@ -1062,9 +1063,23 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
         if (!r.ok || !dati?.ok) {
           return esito(false, `Telegram ha rifiutato il token: ${dati?.description || `HTTP ${r.status}`}`);
         }
+        // Questa rotta è l'unico posto in cui lo studio vede lo username **vero** del proprio bot:
+        // `getMe` risponde con quello che Telegram conosce. Se in colonna ce n'è un altro, il link
+        // per collegare la chat di un cliente a una pratica punta a un utente inesistente — ed è il
+        // guasto vero del 16/09/2026, con l'id numerico del bot finito nel campo «Bot Username».
+        // Dirlo qui costa una riga e lo rende visibile nel momento in cui lo si sta guardando.
+        const usernameVero = String(dati.result?.username ?? '').trim();
+        const salvato = usernameBotTelegram(cred.tgBotUsername);
+        const discordante = Boolean(usernameVero) && salvato?.toLowerCase() !== usernameVero.toLowerCase();
         return esito(
           true,
-          `Bot raggiungibile: @${dati.result?.username}. Perché il canale sia utilizzabile ogni ` +
+          `Bot raggiungibile: @${usernameVero}. ` +
+            (discordante
+              ? 'Attenzione: lo username salvato in Impostazioni → Canali non è questo, quindi il link '
+                + 'per collegare la chat di un cliente a una pratica punterebbe a un utente '
+                + 'inesistente. Premi «Registra webhook»: lo rilegge da Telegram e corregge il campo. '
+              : '') +
+            `Perché il canale sia utilizzabile ogni ` +
             `cliente deve scrivere al bot almeno una volta: è Telegram a non permettere il ` +
             `contrario, e finché non lo fa non esiste una chat su cui spedire.`,
         );

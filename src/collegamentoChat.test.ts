@@ -191,6 +191,31 @@ describe('GET /progetti/:id/link-telegram', () => {
     expect(res.json().errore).toMatch(/Registra webhook/i);
   });
 
+  it("con l'id numerico del bot nel campo non compone nulla, e dice cosa c'è dentro", async () => {
+    // Il guasto vero del 16/09/2026: l'id numerico del bot in `tgBotUsername`, e il link composto
+    // apriva «questo utente non esiste» sul telefono del cliente. Il campo era **pieno**, quindi
+    // «manca lo username» sarebbe stato falso e il rimedio indicato inutile.
+    stato.tenant = { ...TENANT_CON_BOT, tgBotUsername: '87654321' };
+
+    const res = await server().inject({ method: 'GET', url: `/progetti/${PROGETTO}/link-telegram`, headers: auth() });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json().errore).toMatch(/id numerico/i);
+    expect(res.json().errore).not.toMatch(/Manca lo @username/);
+    // Regola 6: l'id del bot è la prima metà del token, e non esce nemmeno per spiegare un errore.
+    expect(res.body).not.toContain('87654321');
+    expect(res.body).not.toContain(TENANT_CON_BOT.tgBotToken);
+  });
+
+  it('un valore che non è nemmeno uno username lo dice, invece di provare a comporre il link', async () => {
+    stato.tenant = { ...TENANT_CON_BOT, tgBotUsername: 'studio bot' };
+
+    const res = await server().inject({ method: 'GET', url: `/progetti/${PROGETTO}/link-telegram`, headers: auth() });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json().errore).toMatch(/non è uno username Telegram valido/);
+  });
+
   it('senza TELEGRAM_WEBHOOK_SECRET risponde 503: il link non si firma con niente', async () => {
     delete process.env.TELEGRAM_WEBHOOK_SECRET;
 
