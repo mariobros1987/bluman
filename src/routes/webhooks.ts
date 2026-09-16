@@ -42,6 +42,7 @@ import type { Prisma } from '@prisma/client';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { prisma, prismaAmministrativo, attivaContestoTenant, conContestoInTransazione } from '../util/prismaClient.js';
 import { notificaStudio } from '../services/notificheService.js';
+import { registraIngressoSenzaFascicolo } from '../services/ingressoSenzaFascicolo.js';
 import { confrontoTokenCostante } from '../util/password.js';
 import { uploadDocumento } from '../services/storageService.js';
 import { credenzialiCanali } from '../services/otpDispatch.js';
@@ -466,18 +467,37 @@ export async function registraRotteWebhooks(server: FastifyInstance): Promise<vo
       if (clienti.length !== 1) return reply.status(202).send({ ok: true, ignored: 'sender_not_unique' });
       const cliente = clienti[0];
       if (!cliente) return reply.status(202).send({ ok: true, ignored: 'sender_not_unique' });
+
+      // Il testo si compone prima di instradare: se il messaggio non trova un fascicolo, è
+      // questo che va all'operatore — calcolarlo dopo significherebbe averlo già perso.
+      const text = msg.text || (msg.caption ? `[Allegato]: ${msg.caption}` : '[Allegato / File Ricevuto]');
+
       const progetti = await prisma.progetto.findMany({
         where: { tenantId: tenant.id, clienteId: cliente.id, stato: 'in_progress' },
-        select: { id: true, stato: true },
-        take: 2,
+        select: { id: true, nome: true, stato: true },
       });
       const attivi = progetti.filter(p => isProgettoAttivo(p.stato));
-      if (attivi.length !== 1) return reply.status(202).send({ ok: true, ignored: 'project_not_unique' });
-
+      if (attivi.length !== 1) {
+        // Il cliente ha scritto, si sa chi è e cosa ha scritto, ma non a quale pratica si
+        // riferisse: con più di un progetto aperto qualunque scelta sarebbe un'invenzione.
+        // Non si sceglie — ma non si butta nemmeno. Prima questa riga rispondeva «ok» a
+        // Telegram e il messaggio spariva: Telegram consegnava, il fascicolo restava vuoto e
+        // nessuno poteva accorgersene.
+        await registraIngressoSenzaFascicolo(tenant.id, 'telegram', updateId, {
+          mittente: cliente.nome,
+          testo: text,
+          motivo: attivi.length === 0
+            ? 'Non ha nessun progetto aperto: aprine uno, oppure scrivi al cliente da qui.'
+            : `Ha ${attivi.length} progetti aperti (${attivi.map(p => p.nome).join(', ')}): `
+              + 'chiudi quelli conclusi così i prossimi messaggi entrano da soli.',
+        });
+        return reply.status(202).send({ ok: true, ignored: 'project_not_unique' });
+      }
       const progetto = attivi[0];
+      // Irraggiungibile: sopra si è già usciti quando `attivi.length !== 1`. Resta perché il
+      // tipo di `attivi[0]` è `Progetto | undefined` e il resto della rotta usa `progetto.id`.
       if (!progetto) return reply.status(202).send({ ok: true, ignored: 'project_not_unique' });
 
-      const text = msg.text || (msg.caption ? `[Allegato]: ${msg.caption}` : '[Allegato / File Ricevuto]');
       try {
         await transazioneWebhook(async (tx) => {
           await tx.webhookInbox.create({

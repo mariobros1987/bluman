@@ -46,6 +46,20 @@ export function chatIdTelegram(valore: string | null | undefined): string | null
 }
 
 /**
+ * L'identificativo del bot, letto dal token stesso.
+ *
+ * Il token di Telegram è `<id-del-bot>:<segreto>`: l'id è nella prima metà, quindi si conosce
+ * senza chiamare `getMe` e senza conservarlo in una colonna. Serve a riconoscere il caso in cui
+ * la chat id configurata è quella del bot: Telegram risponde «the bot can't send messages to the
+ * bot», e riconoscerlo qui trasforma un giro di rete e un errore in inglese in una frase che
+ * dice cosa correggere.
+ */
+export function idDelBot(token: string | null | undefined): string | null {
+  const id = String(token ?? '').trim().split(':')[0] ?? '';
+  return /^\d{5,20}$/.test(id) ? id : null;
+}
+
+/**
  * Traduce la risposta di Telegram in una frase che dice cosa fare.
  *
  * Telegram risponde in inglese e in gergo: «Forbidden: the bot can't send messages to the bot»
@@ -111,6 +125,20 @@ export async function inviaTestoTelegram(
     };
   }
   if (!testo.trim()) return { ok: false, errore: 'Nessun testo da spedire.' };
+
+  // Il destinatario è il bot stesso: un bot non può scrivere a se stesso, e Telegram lo
+  // rifiuterebbe con una frase che non fa pensare all'identificativo. Qui lo si dice prima di
+  // partire — è il guasto vero capitato in produzione il 16/09/2026, con l'id di `getMe`
+  // copiato nell'anagrafica al posto di quello della conversazione.
+  if (destinatario === idDelBot(token)) {
+    return {
+      ok: false,
+      errore:
+        'La chat Telegram configurata è quella del bot stesso: un bot non può scrivere a se stesso. '
+        + 'Nell\'anagrafica del cliente va il `chat.id` che compare in `getUpdates` dopo che il '
+        + 'cliente ha scritto al bot — non l\'identificativo che risponde `getMe`, che è del bot.',
+    };
+  }
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);

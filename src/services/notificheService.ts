@@ -44,6 +44,11 @@ export const EVENTI_NOTIFICA = [
   // Punto 4 piano gap, riga 8 matrice — lo studio ha confermato o rifiutato la proposta di
   // modifica dei dati inviata dal cliente: l'esito cambia (o no) l'anagrafica e va comunicato.
   'risposta_proposta_dati',
+  // Un cliente ha scritto a un canale dello studio (Telegram, WhatsApp, Signal) e il messaggio
+  // non si è potuto archiviare in un fascicolo — di solito perché il cliente ha più di un
+  // progetto aperto e non c'è modo di sapere a quale si riferisse. Prima finiva nel nulla: la
+  // rotta rispondeva «ok» al provider e il messaggio spariva senza che nessuno lo sapesse.
+  'messaggio_non_instradabile',
 ] as const;
 
 export type TipoEventoNotifica = (typeof EVENTI_NOTIFICA)[number];

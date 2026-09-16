@@ -7,7 +7,7 @@
  * ogni rifiuto abbia un motivo e che nessuna richiesta parta prima dei controlli.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { chatIdTelegram, inviaTestoTelegram, spiegaErroreTelegram, telegramConfigurato } from './telegramService.js';
+import { chatIdTelegram, idDelBot, inviaTestoTelegram, spiegaErroreTelegram, telegramConfigurato } from './telegramService.js';
 
 const BOT = { tgBotToken: '123456:token-di-prova', tgBotUsername: 'studio_bot' };
 
@@ -78,6 +78,44 @@ describe('inviaTestoTelegram — nessun successo inventato', () => {
     expect(testo.errore).toMatch(/Nessun testo/i);
 
     expect(fetchFinto).not.toHaveBeenCalled();
+  });
+});
+
+describe('idDelBot — l\'identificativo del bot letto dal token', () => {
+  it('il token è `<id-del-bot>:<segreto>`: l\'id è la prima metà', () => {
+    expect(idDelBot('8973080750:AAH-segreto')).toBe('8973080750');
+    expect(idDelBot('  123456:xyz  ')).toBe('123456');
+  });
+
+  it('un token che non ha quella forma non produce un id inventato', () => {
+    expect(idDelBot('non-un-token')).toBeNull();
+    expect(idDelBot('abc:xyz')).toBeNull();
+    expect(idDelBot(':xyz')).toBeNull();
+    expect(idDelBot('')).toBeNull();
+    expect(idDelBot(null)).toBeNull();
+  });
+});
+
+describe('inviaTestoTelegram — la chat del bot viene riconosciuta prima della rete', () => {
+  it('chat id uguale all\'id del bot: lo dice, e non contatta Telegram', async () => {
+    // Il guasto vero del 16/09/2026: nell'anagrafica era finito l'id che risponde `getMe`.
+    // Riconoscerlo dal token evita un giro di rete e restituisce una frase che dice cosa
+    // correggere, invece dell'inglese di Telegram.
+    const esito = await inviaTestoTelegram(BOT, '123456', 'ciao');
+
+    expect(esito.ok).toBe(false);
+    expect(esito.errore).toMatch(/chat Telegram configurata è quella del bot stesso/i);
+    expect(esito.errore).toMatch(/getUpdates/);
+    expect(fetchFinto).not.toHaveBeenCalled();
+  });
+
+  it('una chat id diversa da quella del bot si spedisce normalmente', async () => {
+    fetchFinto.mockResolvedValueOnce(risposta({ ok: true, result: { message_id: 9 } }));
+
+    const esito = await inviaTestoTelegram(BOT, '245520495', 'ciao');
+
+    expect(esito.ok).toBe(true);
+    expect(fetchFinto).toHaveBeenCalledTimes(1);
   });
 });
 
