@@ -445,16 +445,46 @@ export class PrismaApp implements AppPort {
 
         // 2. Eliminazione progetto e dipendenze, nell'ordine che evita le FK.
         try {
-          // Elimina manualmente prima le dipendenze note per sicurezza se non c'è cascade ovunque
-          const moduli = await tx.moduloProgetto.findMany({ where: { progettoId: id } });
-          for (const m of moduli) {
-            await tx.moduloProgettoDipendenza.deleteMany({ where: { dipendeDaModuloProgettoId: m.id } });
-            await tx.moduloProgettoDipendenza.deleteMany({ where: { moduloProgettoId: m.id } });
-            const microvoci = await tx.microvoceProgetto.findMany({ where: { moduloProgettoId: m.id } });
-            for (const mv of microvoci) {
-              await tx.passaggioProgetto.deleteMany({ where: { microvoceProgettoId: mv.id } });
+          // Le dipendenze si raccolgono con due letture e si cancellano con poche
+          // `deleteMany ... in`, invece che con tre cicli annidati e una `deleteMany`
+          // per modulo e per micro-voce. Il numero di andate e ritorni al database non
+          // dipende più da quanto è grande il progetto.
+          //
+          // Non era solo lentezza: Prisma chiude d'ufficio le transazioni interattive
+          // dopo 5 secondi, e su un progetto con abbastanza moduli la vecchia versione
+          // li superava. La transazione veniva chiusa a metà, la query successiva
+          // falliva con P2028, e l'eliminazione non arrivava mai in fondo.
+          const moduli = await tx.moduloProgetto.findMany({
+            where: { progettoId: id },
+            select: { id: true },
+          });
+          const moduliIds = moduli.map((m) => m.id);
+
+          if (moduliIds.length > 0) {
+            const microvoci = await tx.microvoceProgetto.findMany({
+              where: { moduloProgettoId: { in: moduliIds } },
+              select: { id: true },
+            });
+            const microvociIds = microvoci.map((mv) => mv.id);
+
+            if (microvociIds.length > 0) {
+              await tx.passaggioProgetto.deleteMany({
+                where: { microvoceProgettoId: { in: microvociIds } },
+              });
             }
-            await tx.microvoceProgetto.deleteMany({ where: { moduloProgettoId: m.id } });
+            await tx.microvoceProgetto.deleteMany({
+              where: { moduloProgettoId: { in: moduliIds } },
+            });
+            // Le due direzioni della dipendenza in una sola passata: prima erano due
+            // deleteMany per ogni modulo.
+            await tx.moduloProgettoDipendenza.deleteMany({
+              where: {
+                OR: [
+                  { dipendeDaModuloProgettoId: { in: moduliIds } },
+                  { moduloProgettoId: { in: moduliIds } },
+                ],
+              },
+            });
           }
           await tx.moduloProgetto.deleteMany({ where: { progettoId: id } });
 
@@ -478,10 +508,24 @@ export class PrismaApp implements AppPort {
           // ProgettoNonTrovatoError va rilanciato com'è: il gestore centrale degli
           // errori lo traduce in 404; mascherarlo qui produrrebbe un 409 fuorviante.
           if (err instanceof TransizioneNonValidaError || err instanceof ProgettoNonTrovatoError) throw err;
+          // Solo la violazione di chiave esterna significa davvero «record collegati»:
+          // è l'unico caso in cui questa spiegazione è vera. Un tempo ci finiva dentro
+          // QUALUNQUE errore, e così un timeout di transazione (P2028) si presentava
+          // all'operatore come un progetto con record collegati che non esistevano —
+          // una diagnosi inventata, che manda a cercare la causa nel posto sbagliato.
+          // Il caso «ci sono fatture» ha già il suo ramo esplicito qui sopra; tutto il
+          // resto esce com'è, il gestore centrale lo traduce in 500 e il log dice la verità.
           console.error('Errore durante eliminazione progetto:', err);
-          throw new TransizioneNonValidaError('Impossibile eliminare il progetto a causa di record collegati nel database.');
+          if (err?.code === 'P2003') {
+            throw new TransizioneNonValidaError('Impossibile eliminare il progetto a causa di record collegati nel database.');
+          }
+          throw err;
         }
       }),
+      // Il tetto esplicito è largo di proposito: qui dentro si leggono e si cancellano
+      // decine di righe, e il default di Prisma (5 secondi) non basta su un progetto
+      // grande. Una transazione lunga è meglio di un'eliminazione che fallisce a metà.
+      { timeout: 60_000, maxWait: 10_000 },
     );
   }
 
