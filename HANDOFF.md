@@ -4,8 +4,8 @@
 > un altro PC. Va cancellato quando il lavoro è chiuso.
 
 **Ramo:** `feat/canali-per-studio` (creato da `main`).
-**Ultimo commit:** `629912d` — *feat(canali): Signal e Telegram realmente inviabili, credenziali per studio*.
-**Stato al momento della scrittura:** il resto del lavoro frontend è **non committato** in questo ramo.
+**Ultimo commit:** `21c4bcc` — *fix(telegram): la risposta di Telegram tradotta in cosa fare*.
+**Stato:** distribuito in produzione il 16/09/2026 (frontend Vercel + backend Railway + migrazioni).
 
 ---
 
@@ -18,6 +18,9 @@ git pull
 # poi, dentro Claude Code:
 #   leggi HANDOFF.md e riprendi da dove è rimasto
 ```
+
+Il ramo è **già unito a `main`** (commit di merge `7eb9bdb`): per riprendere, `main` va bene
+quanto il ramo.
 
 Prima di toccare qualcosa, rifai il punto:
 
@@ -103,6 +106,14 @@ l'interfaccia dà per funzionante e che il server non sa fare**:
 ---
 
 ## ⚠️ L'ordine del deploy non è indifferente
+
+> **Fatto il 16/09/2026.** Le due migrazioni sono state applicate a produzione *prima* del
+> deploy, con questo stesso ordine. Le colonne `signal_endpoint`, `signal_token`,
+> `signal_number`, `wa_app_id`, `wa_app_secret`, `wa_webhook_slug`, `wa_otp_template`,
+> `wa_otp_template_lang` esistono in produzione; `signal_cli_endpoint` è ancora lì, come
+> previsto. Lo studio reale (Bluecode Advisory Malta) ha SMTP, IMAP, WhatsApp, Telegram e
+> Signal configurati, quindi la catena della posta non è stata toccata. La sezione resta
+> perché la trappola vale per il prossimo deploy con migrazioni in attesa.
 
 `./scripts/distribuisci.sh` fa `git push` → Vercel → `railway up` → health check, ma **non esegue
 `prisma migrate deploy`**. Le migrazioni le applica il cron `cron-notifiche` alle 07:00 UTC.
