@@ -236,6 +236,7 @@ export function usePortalFirma({
     whatsapp: 'WhatsApp',
     email: 'Email',
     telegram: 'Telegram',
+    signal: 'Signal',
   };
 
   /**

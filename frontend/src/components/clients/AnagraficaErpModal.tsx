@@ -106,7 +106,11 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
   const [pec, setPec] = useState((client as any).pec || refJson.pec || '');
   const [telefono, setTelefono] = useState(client.telefono || refJson.telefono || '');
   const [cellulare, setCellulare] = useState((client as any).cellulare || refJson.cellulare || refJson.whatsapp || client.telefono || '');
-  const [telegram, setTelegram] = useState((client as any).telegram || refJson.telegram || '');
+  // L'identificativo numerico della chat, non lo `@username`: `sendMessage` vuole il primo e
+  // il backend lo cerca nella colonna `telegramChatId`. Lo `@username` che le versioni
+  // precedenti salvavano qui non è un recapito utilizzabile — mostrarlo nel campo darebbe per
+  // configurato un canale che l'invio rifiuta, ed è il difetto che questa passata sana.
+  const [telegram, setTelegram] = useState((client as any).telegramChatId || refJson.telegramChatId || '');
   const [signal, setSignal] = useState((client as any).signal || refJson.signal || '');
   const [referenteNome, setReferenteNome] = useState((client as any).referenteNome || refJson.referenteNome || refJson.referente || '');
 
@@ -139,6 +143,9 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
       cellulare,
       whatsapp: cellulare,
       telegram,
+      // Ridondante rispetto a `telegram`, ma è il nome che `recapitiCliente` legge dal JSON
+      // quando la colonna non basta: scriverlo qui evita che i due si allontanino.
+      telegramChatId: telegram,
       signal,
       referenteNome,
       referente: referenteNome,
@@ -176,6 +183,7 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
       telefono,
       cellulare,
       telegram,
+      telegramChatId: telegram,
       signal,
       referenteNome,
       capitale,
@@ -545,15 +553,24 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
                   <input value={cellulare} onChange={e => setCellulare(e.target.value)} placeholder="+39 333 5936278" required />
                 </div>
                 <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>✈️ Account Telegram (Username / Link)</label>
-                  <input value={telegram} onChange={e => setTelegram(e.target.value)} placeholder="@RobertoRossi" />
+                  <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>✈️ Chat ID Telegram</label>
+                  <input value={telegram} onChange={e => setTelegram(e.target.value)} placeholder="es. 123456789" inputMode="numeric" />
+                  <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 3 }}>
+                    Solo il numero: lo <code>@nomeutente</code> non funziona sui clienti. Il cliente scrive
+                    una volta al bot dello studio e la chat id compare fra gli aggiornamenti ricevuti.
+                  </div>
                 </div>
               </div>
 
               <div style={{ display: 'flex', gap: 12 }}>
                 <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>🔒 Numero Signal Cifrato</label>
-                  <input value={signal} onChange={e => setSignal(e.target.value)} placeholder="+39 333 5936278" />
+                  <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>🔒 Numero Signal (col prefisso)</label>
+                  <input value={signal} onChange={e => setSignal(e.target.value)} placeholder="+393335936278" />
+                  <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 3 }}>
+                    Deve essere un numero registrato su Signal e va scritto in forma internazionale:
+                    un cellulare che non ha Signal non riceve niente, e senza <code>+39</code> il
+                    demone dello studio rifiuta l'invio.
+                  </div>
                 </div>
                 <div style={{ flex: 1 }}>
                   <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>👤 Nome Referente / Contatto Diretto</label>

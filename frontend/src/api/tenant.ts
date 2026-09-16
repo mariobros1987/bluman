@@ -289,7 +289,16 @@ export async function testImapApi(payload: {
   }
 }
 
-export async function testChannelApi(payload: { channel: string; waPhoneId?: string; waAccessToken?: string; tgBotToken?: string; signalCliEndpoint?: string }) {
+export async function testChannelApi(payload: {
+  channel: string;
+  waPhoneId?: string;
+  waAccessToken?: string;
+  tgBotToken?: string;
+  /** Signal: indirizzo del demone, token del proxy e numero registrato sopra (il mittente). */
+  signalEndpoint?: string;
+  signalToken?: string;
+  signalNumber?: string;
+}) {
   const res = await apiFetch(`${API_BASE}/tenant/test-channel`, {
     method: 'POST',
     headers: getAuthHeaders(),

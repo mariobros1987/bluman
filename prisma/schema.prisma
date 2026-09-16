@@ -92,9 +92,10 @@ model Tenant {
   mostraIva         Boolean? @default(true) @map("mostra_iva")
   emailInboundParseUrl String? @map("email_inbound_parse_url")
   /// Indirizzo base del `signal-cli-rest-api` **dello studio** (es. `https://signal.studio.it`).
-  /// Era `signal_cli_endpoint`: la migrazione `20260916190000_signal_per_studio` l'ha rinominata
-  /// perché il valore è lo stesso e il nome nuovo dice cosa contiene. Era un campo che
-  /// l'interfaccia salvava e nessuna riga di codice leggeva.
+  /// Prima si chiamava `signal_cli_endpoint`: la migrazione `20260916190000_signal_per_studio`
+  /// aggiunge questa colonna e ci copia il valore, poi si potrà togliere la vecchia. Non è una
+  /// rinomina in un colpo solo perché il backend già in esecuzione legge `signal_cli_endpoint`
+  /// in molte query senza `select`, e rinominarla durante il deploy le farebbe fallire tutte.
   signalEndpoint    String?  @map("signal_endpoint")
   /// Token del reverse proxy che espone il demone. `signal-cli-rest-api` non ha autenticazione
   /// propria: senza un proxy che la imponga, chiunque raggiunga l'indirizzo può leggere e

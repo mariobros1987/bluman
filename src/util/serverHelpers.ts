@@ -6,6 +6,7 @@
 // monolite. `server.ts` le re-importa da questo modulo.
 
 import { prismaAmministrativo } from './prismaClient.js';
+import { canaleValido, type CanaleOtp } from '../services/otpService.js';
 
 export const inMemoryTenantStore = new Map<string, any>();
 
@@ -21,9 +22,16 @@ export function pulisciRecapito(v: unknown): string | null {
   return s.length > 0 ? s : null;
 }
 
-/** I tre canali su cui può viaggiare il codice di firma; qualunque altra cosa non è una scelta. */
-export function canaleOtpValido(v: unknown): v is 'whatsapp' | 'email' | 'telegram' {
-  return v === 'whatsapp' || v === 'email' || v === 'telegram';
+/**
+ * I canali su cui può viaggiare il codice di firma; qualunque altra cosa non è una scelta.
+ *
+ * L'elenco vive in `otpService.ts` (`CANALI_OTP`) e qui si delega, invece di ripeterlo: la
+ * copia scritta a mano era rimasta a tre voci quando Signal è diventato un canale vero, e
+ * il suo effetto era che il canale preferito di un cliente non poteva essere Signal — la
+ * firma lo offriva nel selettore e l'anagrafica lo scartava in silenzio.
+ */
+export function canaleOtpValido(v: unknown): v is CanaleOtp {
+  return canaleValido(v);
 }
 
 /**
