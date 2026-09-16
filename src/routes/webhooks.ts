@@ -46,6 +46,10 @@ import { confrontoTokenCostante } from '../util/password.js';
 import { uploadDocumento } from '../services/storageService.js';
 import { credenzialiCanali } from '../services/otpDispatch.js';
 import { vietaControlli } from '../util/networkPolicy.js';
+// `isProgettoAttivo` vive nel dominio: era scritta due volte qui e, con Signal, ne serviva una
+// terza copia in `signalInbound.ts`. Il criterio di «progetto su cui instradare un messaggio» è
+// uno solo, e chi aggiunge uno stato al ciclo di vita lo cambia in un punto solo.
+import { isProgettoAttivo } from '../domain/stateEngine.js';
 import { ROTTA_TG, ROTTA_WA, slugValido, urlWebhookTelegram } from '../util/urlPubblica.js';
 import {
   creaSegretoTelegram,
@@ -122,10 +126,6 @@ async function tenantDaSlugWhatsapp(slug: string): Promise<{ id: string; waAppSe
   return trovati.length === 1 ? trovati[0] ?? null : null;
 }
 
-
-function isProgettoAttivo(stato: string): boolean {
-  return stato === 'in_progress';
-}
 
 function isReplayWebhook(err: unknown): err is Prisma.PrismaClientKnownRequestError {
   if (typeof err !== 'object' || err === null || !('code' in err)

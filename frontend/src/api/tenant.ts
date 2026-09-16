@@ -463,6 +463,134 @@ export async function fetchInboundImapAllegatiApi(
   }
 }
 
+/**
+ * Messaggio Signal al cliente, spedito dal demone dello studio.
+ *
+ * Questa funzione non esisteva, e la chat del fascicolo ne faceva a meno: Signal era una voce
+ * dell'elenco dei canali e, scegliendola, il messaggio veniva registrato nel fascicolo con un
+ * riscontro verde — «notificato via SIGNAL» — senza che nessuno contattasse un demone. Il
+ * cliente non riceveva niente. Ora l'invio o avviene, o risponde con il motivo del rifiuto.
+ *
+ * Il recapito deve essere già in forma internazionale (`+39335…`): il backend lo rifiuta
+ * altrimenti, invece di indovinare il paese e spedire a un estraneo.
+ */
+export async function sendSignalDirectApi(
+  to: string,
+  text: string,
+  allegati?: Array<{ nome: string; base64: string }>,
+) {
+  try {
+    const controller = new AbortController();
+    // Più lungo degli altri canali: il corpo può portare un allegato, e il demone dello studio
+    // è un servizio che qualcuno ospita e sorveglia, non l'infrastruttura di Meta.
+    const timer = setTimeout(() => controller.abort(), 45000);
+    const res = await apiFetch(`${API_BASE}/comunicazioni/invia-signal`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ to, testo: text, ...(allegati && allegati.length > 0 ? { allegati } : {}) }),
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    const data = await res.json().catch(() => null);
+    if (res.ok && data?.ok) return { success: true, via: data.via };
+    return {
+      success: false,
+      errore: data?.errore || `Il server ha risposto ${res.status} senza spiegare il motivo.`,
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      errore:
+        err?.name === 'AbortError'
+          ? 'Nessuna risposta entro 45 secondi dal demone Signal dello studio.'
+          : err?.message || 'Backend non raggiungibile.',
+    };
+  }
+}
+
+/**
+ * Messaggio Telegram al cliente, spedito col bot dello studio.
+ *
+ * Come per Signal, questa funzione non esisteva e la chat del fascicolo ci suppliva con un
+ * riscontro verde: «notificato via TELEGRAM al cliente» senza che partisse niente. La chiamata
+ * viveva privata dentro il servizio OTP, quindi la rotta delle comunicazioni non poteva usarla.
+ *
+ * Il destinatario è l'identificativo numerico della chat (`telegramChatId` in anagrafica), non
+ * uno `@username`: Telegram accetta il nome solo per i canali pubblici.
+ */
+export async function sendTelegramDirectApi(to: string, text: string) {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 25000);
+    const res = await apiFetch(`${API_BASE}/comunicazioni/invia-telegram`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ to, testo: text }),
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    const data = await res.json().catch(() => null);
+    if (res.ok && data?.ok) return { success: true, via: data.via };
+    return {
+      success: false,
+      errore: data?.errore || `Il server ha risposto ${res.status} senza spiegare il motivo.`,
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      errore:
+        err?.name === 'AbortError'
+          ? 'Nessuna risposta entro 25 secondi da Telegram.'
+          : err?.message || 'Backend non raggiungibile.',
+    };
+  }
+}
+
+/**
+ * Preleva i messaggi Signal arrivati al demone dello studio.
+ *
+ * La lettura sul demone è distruttiva — i messaggi escono dalla sua coda — quindi va chiamata
+ * quando l'operatore apre il fascicolo o preme «Sincronizza», non a intervalli: due schede
+ * aperte sullo stesso fascicolo non si rubano i messaggi solo perché la prima scrittura vince.
+ *
+ * `ok: false` con il motivo quando Signal non è configurato: «non configurato» e «il cliente
+ * non ha scritto» sono due cose diverse, e mostrarle uguali è l'errore che teneva nascosto il
+ * guasto del canale email.
+ */
+export async function fetchSignalInArrivoApi(): Promise<{
+  ok: boolean;
+  letti: number;
+  registrati: number;
+  scartati: number;
+  errore?: string;
+}> {
+  const vuoto = { letti: 0, registrati: 0, scartati: 0 };
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 30000);
+    const res = await apiFetch(`${API_BASE}/comunicazioni/signal-in-arrivo`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    const data = await res.json().catch(() => null);
+    if (res.ok && data?.ok) {
+      return { ok: true, letti: data.letti ?? 0, registrati: data.registrati ?? 0, scartati: data.scartati ?? 0 };
+    }
+    return { ...vuoto, ok: false, errore: data?.errore || `Il server ha risposto ${res.status} senza spiegare il motivo.` };
+  } catch (err: any) {
+    return {
+      ...vuoto,
+      ok: false,
+      errore:
+        err?.name === 'AbortError'
+          ? 'Nessuna risposta entro 30 secondi dal demone Signal dello studio.'
+          : err?.message || 'Backend non raggiungibile.',
+    };
+  }
+}
+
 export async function fetchPermessiUtenteApi(userId: string) {
   try {
     const res = await apiFetch(`${API_BASE}/tenant/utenti/${userId}/permessi`, { headers: getAuthHeaders() });

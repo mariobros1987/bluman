@@ -3,12 +3,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const {
   mockTenantFindMany,
   mockCron,
+  mockSignal,
   mockPrismaDisconnect,
   mockAdminDisconnect,
   contesti,
 } = vi.hoisted(() => ({
   mockTenantFindMany: vi.fn(),
   mockCron: vi.fn(),
+  mockSignal: vi.fn(),
   mockPrismaDisconnect: vi.fn(),
   mockAdminDisconnect: vi.fn(),
   contesti: [] as Array<{ tenantId: string; ruolo?: string }>,
@@ -38,6 +40,14 @@ vi.mock('../services/cronService.js', () => ({
   runDailyNotificationCron: mockCron,
 }));
 
+// La ricezione Signal ha un mock suo perché il suo trasporto (demone HTTP, storage degli
+// allegati) non ha niente a che vedere con quello che questo test verifica: qui interessa solo
+// che il giro la chiami una volta per studio e che il suo esito non venga confuso con quello
+// delle notifiche.
+vi.mock('../services/signalInbound.js', () => ({
+  riceviMessaggiSignal: mockSignal,
+}));
+
 import {
   ErroreRunnerCron,
   eseguiCronPerTenantAttivi,
@@ -62,6 +72,7 @@ describe('runner cron notifiche multi-tenant', () => {
     contesti.length = 0;
     mockPrismaDisconnect.mockResolvedValue(undefined);
     mockAdminDisconnect.mockResolvedValue(undefined);
+    mockSignal.mockResolvedValue({ nonConfigurato: true, letti: 0, registrati: 0, scartati: 0 });
   });
 
   it('seleziona soltanto tenant attivi ed esegue ogni worker nel relativo contesto RLS', async () => {
@@ -80,12 +91,36 @@ describe('runner cron notifiche multi-tenant', () => {
       { tenantId: 'tenant-b', ruolo: 'super_admin' },
     ]);
     expect(mockCron.mock.calls).toEqual([['tenant-a'], ['tenant-b']]);
+    expect(mockSignal.mock.calls).toEqual([['tenant-a'], ['tenant-b']]);
     expect(esito).toMatchObject({
       tenantAttivi: 2,
       tenantCompletati: 2,
       tenantFalliti: 0,
       notificheInviate: 5,
+      messaggiSignal: 0,
     });
+  });
+
+  it('somma i messaggi Signal registrati e non fa fallire il giro se il demone è spento', async () => {
+    mockTenantFindMany.mockResolvedValue([{ id: 'tenant-a' }, { id: 'tenant-b' }]);
+    mockCron.mockResolvedValue(report(1));
+    mockSignal
+      .mockResolvedValueOnce({ letti: 3, registrati: 2, scartati: 1 })
+      .mockRejectedValueOnce(new Error('demone Signal non raggiungibile'));
+
+    const esito = await eseguiCronPerTenantAttivi();
+
+    // Il demone spento di uno studio non è un cron fallito: le scadenze sono state notificate
+    // comunque, e il guasto va letto accanto al canale, non al posto delle notifiche.
+    expect(esito).toMatchObject({
+      tenantCompletati: 2,
+      tenantFalliti: 0,
+      notificheInviate: 2,
+      messaggiSignal: 2,
+    });
+    expect(esito.esiti[0]?.signal).toEqual({ letti: 3, registrati: 2, scartati: 1 });
+    expect(esito.esiti[1]?.signal).toMatchObject({ errore: 'demone Signal non raggiungibile' });
+    expect(esito.esiti[1]?.ok).toBe(true);
   });
 
   it('continua dopo il fallimento di un tenant e conserva gli esiti separati', async () => {

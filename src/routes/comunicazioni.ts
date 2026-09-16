@@ -31,6 +31,9 @@ import { credenzialiCanali } from '../services/otpDispatch.js';
 import { inviaTestoWhatsapp, inviaTemplateWhatsapp } from '../services/whatsappService.js';
 import { leggiPostaInArrivo, type CredenzialiImap } from '../services/imapInbound.js';
 import { leggiAllegatiImap } from '../services/imapflowAllegati.js';
+import { inviaSignal, inviaSignalConAllegati, numeroSignal } from '../services/signalService.js';
+import { inviaTestoTelegram } from '../services/telegramService.js';
+import { riceviMessaggiSignal } from '../services/signalInbound.js';
 
 /** Il testo battuto dall'operatore diventa HTML senza che `<` o `&` rompano il messaggio. */
 function testoInHtml(testo: string): string {
@@ -168,6 +171,106 @@ export async function registraRotteComunicazioni(server: FastifyInstance): Promi
   });
 
   /**
+   * Messaggio Signal con il numero dello studio.
+   *
+   * Questa rotta mancava, e la sua assenza era il guasto più visibile di tutti: `ComunicazioniTab`
+   * offre Signal fra i canali della chat, e scegliendolo il messaggio veniva registrato nel
+   * fascicolo e poi il riscontro diceva «Messaggio registrato e notificato via SIGNAL al
+   * cliente!» — mentre nessuna riga di codice contattava un demone. Il cliente non riceveva
+   * nulla e l'operatore credeva di averglielo mandato (regola 7).
+   *
+   * Gli allegati viaggiano nel corpo, in base64, perché Signal li recapita: è l'unico dei tre
+   * canali di messaggistica che accetta un documento senza template né finestre di 24 ore, ed è
+   * il motivo per cui uno studio lo sceglie per un cliente riservato. Il tetto è quello del
+   * Vault (15 MB per file) e viene controllato **prima** di contattare il demone: un 45 MiB di
+   * `bodyLimit` non è una dimensione che si spedisce a un telefono.
+   */
+  server.post<{
+    Body: { to?: string; testo?: string; text?: string; allegati?: Array<{ nome?: string; base64?: string }> };
+  }>('/comunicazioni/invia-signal', async (req, reply) => {
+    const tenantId = req.tenantId as string;
+    const body = req.body || {};
+
+    const destinatario = (body.to || '').trim();
+    if (!destinatario) {
+      return reply.code(400).send({ ok: false, errore: 'Numero Signal del destinatario assente.' });
+    }
+    // Il numero si valida qui e non si normalizza in silenzio: `+3351234567` è un numero
+    // francese, e un destinatario scritto senza prefisso diventerebbe quello di un estraneo.
+    if (!numeroSignal(destinatario)) {
+      return reply.code(400).send({
+        ok: false,
+        errore: 'Il numero Signal del destinatario non è in forma internazionale: serve il prefisso, per esempio +393351234567.',
+      });
+    }
+
+    const testo = (body.testo ?? body.text ?? '').toString();
+    const allegati = (Array.isArray(body.allegati) ? body.allegati : [])
+      .map(a => ({ nome: String(a?.nome ?? '').trim() || 'allegato', base64: String(a?.base64 ?? '') }))
+      .filter(a => a.base64.length > 0);
+
+    if (!testo.trim() && allegati.length === 0) {
+      return reply.code(400).send({ ok: false, errore: 'Nessun contenuto da spedire.' });
+    }
+
+    const MAX_BYTES = 15 * 1024 * 1024;
+    // Il base64 gonfia di un terzo: si misura il peso decodificato, che è quello del file.
+    const pesoStimato = allegati.reduce((somma, a) => somma + Math.floor((a.base64.length * 3) / 4), 0);
+    if (pesoStimato > MAX_BYTES) {
+      return reply.code(400).send({
+        ok: false,
+        errore: 'Allegato troppo grande per Signal (oltre 15 MB): caricalo nel Vault del fascicolo e invia al cliente il collegamento.',
+      });
+    }
+
+    const cred = await credenzialiCanali(tenantId);
+    const esito = allegati.length > 0
+      ? await inviaSignalConAllegati(cred, destinatario, testo, allegati)
+      : await inviaSignal(cred, destinatario, testo);
+
+    if (!esito.ok) {
+      return reply.code(400).send({ ok: false, errore: esito.errore || 'Invio Signal non riuscito.' });
+    }
+    return reply.send({ ok: true, via: allegati.length > 0 ? 'testo e allegati' : 'testo' });
+  });
+
+  /**
+   * Messaggio Telegram con il bot dello studio.
+   *
+   * Mancava anche questa, e anche qui la chat del fascicolo ci suppliva con un riscontro verde:
+   * «notificato via TELEGRAM al cliente» senza che partisse niente. La chiamata era privata
+   * dentro `otpDispatch.ts`, quindi non raggiungibile da qui: ora sta in `telegramService.ts`.
+   *
+   * Il destinatario è l'identificativo numerico della chat, non un `@nomeutente`: Telegram
+   * accetta il nome solo per i canali pubblici, e per un cliente il valore giusto è quello che
+   * il bot riceve quando la persona gli scrive. Se in anagrafica c'è altro, si dice.
+   */
+  server.post<{ Body: { to?: string; testo?: string; text?: string } }>(
+    '/comunicazioni/invia-telegram',
+    async (req, reply) => {
+      const tenantId = req.tenantId as string;
+      const body = req.body || {};
+
+      const chatId = (body.to || '').trim();
+      if (!chatId) {
+        return reply.code(400).send({ ok: false, errore: 'Chat Telegram del destinatario assente.' });
+      }
+
+      const testo = (body.testo ?? body.text ?? '').toString();
+      if (!testo.trim()) {
+        return reply.code(400).send({ ok: false, errore: 'Nessun contenuto da spedire.' });
+      }
+
+      const cred = await credenzialiCanali(tenantId);
+      const esito = await inviaTestoTelegram(cred, chatId, testo);
+      if (!esito.ok) {
+        return reply.code(400).send({ ok: false, errore: esito.errore || 'Invio Telegram non riuscito.' });
+      }
+      return reply.send({ ok: true, via: 'testo' });
+    },
+  );
+
+  /**
    * Ultimi messaggi arrivati nella casella dello studio, filtrati sul mittente quando serve.
    *
    * È un POST e non un GET perché l'indirizzo del cliente sta nel corpo invece che nell'URL:
@@ -230,4 +333,44 @@ export async function registraRotteComunicazioni(server: FastifyInstance): Promi
       return reply.send({ ok: true, email: esito.email });
     },
   );
+
+  /**
+   * Preleva i messaggi Signal arrivati al demone dello studio e li registra nei fascicoli.
+   *
+   * Perché una rotta e non un webhook: Signal non ha un servizio centrale che chiami questa
+   * piattaforma — il demone `signal-cli-rest-api` è dello studio e la coda resta dentro di lui.
+   * Il cron notturno la preleva come rete di sicurezza, ma un giro al giorno è troppo lento per
+   * una chat che l'operatore sta guardando: questa rotta è la stessa cosa su richiesta, come
+   * `email-in-arrivo` per la posta, e il frontend la chiama quando l'operatore apre il fascicolo
+   * o preme «Sincronizza».
+   *
+   * **La lettura è distruttiva** (`GET /v1/receive/{number}` toglie i messaggi dalla coda del
+   * demone): chi legge ha una sola occasione, quindi la scrittura avviene subito e l'idempotenza
+   * su `webhook_inbox` protegge dalle riletture — non dalla perdita. È detto qui perché è la
+   * differenza vera rispetto a WhatsApp e Telegram, che ricevono una chiamata e vengono
+   * ritentati finché non rispondono 200.
+   *
+   * 400 e non 200 quando il canale non è configurato: «Signal non è impostato» e «il cliente non
+   * ha scritto» sono due cose diverse, e presentare la prima come la seconda è l'errore che
+   * teneva nascosto il guasto del canale email.
+   */
+  server.post('/comunicazioni/signal-in-arrivo', async (req, reply) => {
+    const tenantId = req.tenantId as string;
+
+    const esito = await riceviMessaggiSignal(tenantId);
+    if (esito.nonConfigurato) {
+      return reply.code(400).send({
+        ok: false,
+        errore:
+          'Signal non è configurato per questo studio: servono l\'indirizzo del demone e il numero registrato (Impostazioni → Canali).',
+        letti: 0,
+        registrati: 0,
+        scartati: 0,
+      });
+    }
+    if (esito.errore) {
+      return reply.code(400).send({ ok: false, errore: esito.errore, letti: esito.letti, registrati: esito.registrati, scartati: esito.scartati });
+    }
+    return reply.send({ ok: true, ...esito });
+  });
 }

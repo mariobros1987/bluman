@@ -105,6 +105,7 @@ const SEGRETI = {
   waAccessToken: 'segreto-meta-di-prova',
   waVerifyToken: 'segreto-verifica-di-prova',
   tgBotToken: 'segreto-telegram-di-prova',
+  signalToken: 'segreto-signal-di-prova',
 };
 
 const TENANT_CONFIGURATO = {
@@ -280,6 +281,267 @@ describe('§35 — PATCH /tenant/info: la stringa vuota non cancella la password
     });
     expect(cartella.statusCode).toBe(400);
     expect(stato.upsert).toHaveLength(0);
+  });
+});
+
+describe('§35 — Signal: configurato davvero, o dichiarato spento', () => {
+  it('il token del demone è un segreto come gli altri: non esce dal server', async () => {
+    stato.tenant = { ...TENANT_CONFIGURATO };
+
+    const res = await server().inject({ method: 'GET', url: '/tenant/info', headers: auth() });
+
+    expect(res.json().signalToken).toBe('');
+    expect(res.json().signalTokenImpostata).toBe(true);
+    expect(res.body).not.toContain(SEGRETI.signalToken);
+  });
+
+  it('il numero si salva normalizzato: un «0039 335 1234567» diventa la forma che il demone vuole', async () => {
+    stato.tenant = { ...TENANT_CONFIGURATO };
+
+    const res = await server().inject({
+      method: 'PATCH',
+      url: '/tenant/info',
+      headers: auth(),
+      payload: {
+        signalEndpoint: 'https://signal.studio.example/',
+        signalNumber: '0039 335 123 4567',
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const scritto = stato.upsert[0].update;
+    // La barra finale è rumore: `signalService` compone i percorsi da sé.
+    expect(scritto.signalEndpoint).toBe('https://signal.studio.example');
+    expect(scritto.signalNumber).toBe('+393351234567');
+  });
+
+  it('un numero senza prefisso internazionale è respinto con il motivo, prima del database', async () => {
+    stato.tenant = { ...TENANT_CONFIGURATO };
+
+    const res = await server().inject({
+      method: 'PATCH',
+      url: '/tenant/info',
+      headers: auth(),
+      payload: { signalNumber: '3351234567' },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json().errore).toMatch(/prefisso/i);
+    expect(stato.upsert).toHaveLength(0);
+  });
+
+  it('un indirizzo con credenziali dentro, o con parametri, è respinto', async () => {
+    stato.tenant = { ...TENANT_CONFIGURATO };
+
+    for (const signalEndpoint of [
+      'https://utente:password@signal.studio.example',
+      'https://signal.studio.example?token=abc',
+      'non-un-indirizzo',
+    ]) {
+      const res = await server().inject({
+        method: 'PATCH', url: '/tenant/info', headers: auth(), payload: { signalEndpoint },
+      });
+      expect(res.statusCode, signalEndpoint).toBe(400);
+    }
+    expect(stato.upsert).toHaveLength(0);
+  });
+
+  it('il campo morto `emailInboundParseUrl` non si scrive più: puntava a una rotta che non esiste', async () => {
+    stato.tenant = { ...TENANT_CONFIGURATO };
+
+    await server().inject({
+      method: 'PATCH',
+      url: '/tenant/info',
+      headers: auth(),
+      payload: { emailInboundParseUrl: 'https://esempio.test/api/webhooks/inbound-email' },
+    });
+
+    expect('emailInboundParseUrl' in (stato.upsert[0]?.update ?? {})).toBe(false);
+  });
+
+  it('la prova del canale senza configurazione dice cosa manca, non «demone in ascolto»', async () => {
+    // Era la bugia da sanare: la rotta rispondeva «Daemon Signal REST API v1 in ascolto sul
+    // container Docker» senza aver contattato nessuno, e quel demone non esisteva.
+    stato.tenant = { id: TENANT, ragioneSociale: 'Studio Senza Signal' };
+
+    const res = await server().inject({
+      method: 'POST', url: '/tenant/test-channel', headers: auth(), payload: { channel: 'signal' },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json().success).toBe(false);
+    expect(res.json().message).toMatch(/indirizzo del demone/i);
+    expect(res.body).not.toMatch(/in ascolto/i);
+  });
+
+  it('senza numero registrato la prova si ferma: il numero è il mittente', async () => {
+    stato.tenant = { ...TENANT_CONFIGURATO, signalEndpoint: 'https://signal.studio.example', signalNumber: null };
+
+    const res = await server().inject({
+      method: 'POST', url: '/tenant/test-channel', headers: auth(), payload: { channel: 'signal' },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json().message).toMatch(/numero Signal dello studio/i);
+  });
+
+  it('la lettura dei messaggi senza canale configurato risponde 400, non 200 con lista vuota', async () => {
+    stato.tenant = { id: TENANT, ragioneSociale: 'Studio Senza Signal' };
+
+    const res = await server().inject({
+      method: 'POST', url: '/comunicazioni/signal-in-arrivo', headers: auth(),
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json().ok).toBe(false);
+    expect(res.json().errore).toMatch(/non è configurato/i);
+  });
+
+  it('le due rotte Signal restano protette: senza token 401', async () => {
+    const prova = await server().inject({
+      method: 'POST', url: '/tenant/test-channel', payload: { channel: 'signal' },
+    });
+    expect(prova.statusCode).toBe(401);
+
+    const lettura = await server().inject({ method: 'POST', url: '/comunicazioni/signal-in-arrivo' });
+    expect(lettura.statusCode).toBe(401);
+  });
+});
+
+/**
+ * La rotta che mancava. `ComunicazioniTab` offriva Signal fra i canali della chat e, scegliendolo,
+ * il messaggio finiva nel registro del fascicolo con un riscontro verde — «notificato via SIGNAL» —
+ * senza che nessuno contattasse un demone. Questi test presidiano che ora l'invio o avviene
+ * davvero, o risponde 400 col motivo.
+ */
+describe('§35 — POST /comunicazioni/invia-signal', () => {
+  it('senza canale configurato risponde 400 col motivo, non un successo inventato', async () => {
+    stato.tenant = { id: TENANT, ragioneSociale: 'Studio Senza Signal' };
+
+    const res = await server().inject({
+      method: 'POST',
+      url: '/comunicazioni/invia-signal',
+      headers: auth(),
+      payload: { to: '+393351111111', testo: 'Buongiorno.' },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json().ok).toBe(false);
+    expect(res.json().errore).toMatch(/indirizzo del demone/i);
+  });
+
+  it('un destinatario senza prefisso internazionale è respinto prima del demone', async () => {
+    // `3351234567` non è «un numero italiano senza +39»: è un numero di cui non si conosce il
+    // paese, e normalizzarlo lo farebbe partire verso un estraneo.
+    stato.tenant = { ...TENANT_CONFIGURATO };
+
+    const res = await server().inject({
+      method: 'POST',
+      url: '/comunicazioni/invia-signal',
+      headers: auth(),
+      payload: { to: '3351234567', testo: 'Buongiorno.' },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json().errore).toMatch(/prefisso/i);
+  });
+
+  it('senza numero del destinatario e senza contenuto non si spedisce niente', async () => {
+    stato.tenant = { ...TENANT_CONFIGURATO };
+
+    const senzaNumero = await server().inject({
+      method: 'POST', url: '/comunicazioni/invia-signal', headers: auth(), payload: { testo: 'Buongiorno.' },
+    });
+    expect(senzaNumero.statusCode).toBe(400);
+    expect(senzaNumero.json().errore).toMatch(/destinatario/i);
+
+    const senzaTesto = await server().inject({
+      method: 'POST', url: '/comunicazioni/invia-signal', headers: auth(), payload: { to: '+393351111111', testo: '   ' },
+    });
+    expect(senzaTesto.statusCode).toBe(400);
+    expect(senzaTesto.json().errore).toMatch(/contenuto/i);
+  });
+
+  it('un allegato oltre il tetto del Vault è respinto prima di contattare il demone', async () => {
+    // L'indirizzo è di loopback, che la policy di rete rifiuta: se il controllo di dimensione non
+    // venisse per primo, la risposta parlerebbe di indirizzo non pubblico invece che di peso.
+    stato.tenant = { ...TENANT_CONFIGURATO, signalEndpoint: 'https://127.0.0.1', signalNumber: '+393350000000' };
+
+    const res = await server().inject({
+      method: 'POST',
+      url: '/comunicazioni/invia-signal',
+      headers: auth(),
+      payload: { to: '+393351111111', testo: 'Ecco il documento.', allegati: [{ nome: 'visura.pdf', base64: 'A'.repeat(21_000_000) }] },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json().errore).toMatch(/troppo grande/i);
+  });
+
+  it('la rotta è protetta: senza token 401', async () => {
+    const res = await server().inject({
+      method: 'POST', url: '/comunicazioni/invia-signal', payload: { to: '+393351111111', testo: 'x' },
+    });
+    expect(res.statusCode).toBe(401);
+  });
+});
+
+/**
+ * Stessa storia della rotta Signal: la chat del fascicolo offriva Telegram e il messaggio
+ * finiva nel registro con un riscontro verde, mentre la chiamata a Telegram era privata dentro
+ * `otpDispatch.ts` e nessuno la raggiungeva.
+ */
+describe('§35 — POST /comunicazioni/invia-telegram', () => {
+  it('senza bot configurato risponde 400 col motivo, e non contatta Telegram', async () => {
+    stato.tenant = { id: TENANT, ragioneSociale: 'Studio Senza Bot' };
+
+    const res = await server().inject({
+      method: 'POST',
+      url: '/comunicazioni/invia-telegram',
+      headers: auth(),
+      payload: { to: '123456789', testo: 'Buongiorno.' },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json().ok).toBe(false);
+    expect(res.json().errore).toMatch(/bot Telegram non è configurato/i);
+  });
+
+  it('una chat id che non è numerica è respinta: un @nomeutente non è un destinatario', async () => {
+    stato.tenant = { ...TENANT_CONFIGURATO };
+
+    const res = await server().inject({
+      method: 'POST',
+      url: '/comunicazioni/invia-telegram',
+      headers: auth(),
+      payload: { to: '@mario', testo: 'Buongiorno.' },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json().errore).toMatch(/identificativo numerico/i);
+  });
+
+  it('senza destinatario o senza contenuto non si spedisce niente', async () => {
+    stato.tenant = { ...TENANT_CONFIGURATO };
+
+    const senzaChat = await server().inject({
+      method: 'POST', url: '/comunicazioni/invia-telegram', headers: auth(), payload: { testo: 'Buongiorno.' },
+    });
+    expect(senzaChat.statusCode).toBe(400);
+    expect(senzaChat.json().errore).toMatch(/Chat Telegram/i);
+
+    const senzaTesto = await server().inject({
+      method: 'POST', url: '/comunicazioni/invia-telegram', headers: auth(), payload: { to: '123456789', testo: '  ' },
+    });
+    expect(senzaTesto.statusCode).toBe(400);
+    expect(senzaTesto.json().errore).toMatch(/contenuto/i);
+  });
+
+  it('la rotta è protetta: senza token 401', async () => {
+    const res = await server().inject({
+      method: 'POST', url: '/comunicazioni/invia-telegram', payload: { to: '123456789', testo: 'x' },
+    });
+    expect(res.statusCode).toBe(401);
   });
 });
 

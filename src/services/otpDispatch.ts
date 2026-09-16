@@ -14,6 +14,8 @@ import { prisma } from '../util/prismaClient';
 import { sendOtpSecurityEmail } from './emailService';
 import type { CredenzialiSmtp } from './emailRelay';
 import { chiamaGraphWhatsapp } from './whatsappService';
+import { inviaSignal, numeroSignal, signalConfigurato } from './signalService';
+import { inviaTestoTelegram, telegramConfigurato } from './telegramService';
 import type { CanaleOtp } from './otpService';
 import { TTL_OTP_SECONDI } from './otpService';
 
@@ -37,6 +39,14 @@ export interface CredenzialiCanali {
   waOtpTemplateLang: string | null;
   tgBotToken: string | null;
   tgBotUsername: string | null;
+  /**
+   * Signal: indirizzo del demone `signal-cli-rest-api` **dello studio**, token del proxy che lo
+   * espone e numero registrato sopra. Non esiste un Signal di piattaforma con cui ripiegare —
+   * non c'è un servizio centrale da chiamare — quindi un canale non configurato resta spento.
+   */
+  signalEndpoint: string | null;
+  signalToken: string | null;
+  signalNumber: string | null;
   // Lo stesso tipo che `inviaEmail` riceve: `servername` compreso. Ricopiarne i campi a mano
   // significava che una colonna aggiunta qui non arrivava all'invio e nessun typecheck lo diceva.
   smtp: CredenzialiSmtp;
@@ -67,6 +77,9 @@ export async function credenzialiCanali(tenantId: string): Promise<CredenzialiCa
         waOtpTemplateLang: true,
         tgBotToken: true,
         tgBotUsername: true,
+        signalEndpoint: true,
+        signalToken: true,
+        signalNumber: true,
         smtpHost: true,
         smtpServername: true,
         smtpPort: true,
@@ -90,6 +103,9 @@ export async function credenzialiCanali(tenantId: string): Promise<CredenzialiCa
     waOtpTemplateLang: t?.waOtpTemplateLang || null,
     tgBotToken: t?.tgBotToken || null,
     tgBotUsername: t?.tgBotUsername || null,
+    signalEndpoint: t?.signalEndpoint || null,
+    signalToken: t?.signalToken || null,
+    signalNumber: t?.signalNumber || null,
     smtp: {
       host: t?.smtpHost || undefined,
       servername: t?.smtpServername || undefined,
@@ -107,6 +123,8 @@ export interface RecapitiCliente {
   email: string | null;
   cellulare: string | null;
   telegramChatId: string | null;
+  /** Numero Signal del cliente: colonna dedicata o `referentiJson.signal`. */
+  signal: string | null;
 }
 
 /**
@@ -145,13 +163,18 @@ export function recapitiCliente(cliente: {
     email: valore(cliente.email) ?? valore(ref.email) ?? valore(ref.emailPrincipale),
     cellulare: valore(cliente.cellulare) ?? valore(ref.cellulare) ?? valore(ref.whatsapp),
     telegramChatId: valore(cliente.telegramChatId) ?? valore(ref.telegramChatId),
+    // Signal non ha una colonna sua sull'anagrafica: il recapito vive in `referentiJson.signal`,
+    // che è il campo che la scheda cliente mostra per questo canale. Non si ripiega su
+    // `cellulare`: Signal non è l'SMS di un numero qualsiasi — quel numero deve avere un account
+    // Signal, e presumere che ce l'abbia manda il codice di firma nel vuoto.
+    signal: valore(ref.signal),
   };
 }
 
 /** Quali canali sono realmente utilizzabili per questo cliente, e perché no quando no. */
 export function canaliDisponibili(
   cred: CredenzialiCanali,
-  cliente: { cellulare?: string | null; email?: string | null; telegramChatId?: string | null },
+  cliente: { cellulare?: string | null; email?: string | null; telegramChatId?: string | null; signal?: string | null },
 ): Array<{ canale: CanaleOtp; disponibile: boolean; motivo?: string }> {
   // Solo le credenziali dello studio: con il ripiego sull'ambiente, uno studio senza casella
   // configurata risultava «disponibile» e il codice partiva verso l'account di piattaforma.
@@ -178,12 +201,26 @@ export function canaliDisponibili(
     },
     {
       canale: 'telegram',
-      disponibile: Boolean(cred.tgBotToken && cliente.telegramChatId),
-      motivo: !cred.tgBotToken
+      disponibile: Boolean(telegramConfigurato(cred) && cliente.telegramChatId),
+      motivo: !telegramConfigurato(cred)
         ? 'Bot Telegram non configurato nelle impostazioni dello studio'
         : !cliente.telegramChatId
           ? `Il cliente deve prima scrivere al bot${cred.tgBotUsername ? ` @${cred.tgBotUsername}` : ''} per attivare il canale`
           : undefined,
+    },
+    {
+      canale: 'signal',
+      // La disponibilità si misura sul numero *utilizzabile*, non sulla presenza di una stringa:
+      // un recapito scritto senza prefisso internazionale non è un canale su cui si può spedire,
+      // e dirlo qui evita che il cliente lo scelga e riceva un rifiuto dopo.
+      disponibile: Boolean(signalConfigurato(cred) && numeroSignal(cliente.signal)),
+      motivo: !signalConfigurato(cred)
+        ? 'Signal non configurato nelle impostazioni dello studio: servono indirizzo del demone e numero'
+        : !cliente.signal
+          ? 'Nessun numero Signal in anagrafica, fra i referenti del cliente'
+          : !numeroSignal(cliente.signal)
+            ? 'Il numero Signal in anagrafica non è in forma internazionale: serve il prefisso, per esempio +393351234567'
+            : undefined,
     },
   ];
 }
@@ -306,27 +343,9 @@ async function inviaWhatsapp(
 }
 
 async function inviaTelegram(cred: CredenzialiCanali, chatId: string, testo: string): Promise<EsitoInvio> {
-  if (!cred.tgBotToken) {
-    return { ok: false, errore: 'Il bot Telegram non è configurato nelle impostazioni dello studio.' };
-  }
-
-  try {
-    const risposta = await fetch(`https://api.telegram.org/bot${cred.tgBotToken}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: chatId, text: testo, disable_web_page_preview: true }),
-    });
-
-    const dettaglio: any = await risposta.json().catch(() => null);
-    if (!risposta.ok || dettaglio?.ok === false) {
-      const motivo = dettaglio?.description || `HTTP ${risposta.status}`;
-      return { ok: false, errore: `Telegram non ha accettato l'invio: ${motivo}` };
-    }
-
-    return { ok: true };
-  } catch (err) {
-    return { ok: false, errore: `Invio Telegram non riuscito: ${err instanceof Error ? err.message : 'errore di rete'}` };
-  }
+  // La chiamata vive in `telegramService.ts`: la usa anche l'invio dal fascicolo, e la copia
+  // privata che stava qui era il motivo per cui quella rotta non poteva esistere.
+  return inviaTestoTelegram(cred, chatId, testo);
 }
 
 export interface RichiestaInvio {
@@ -354,6 +373,9 @@ export async function inviaCodiceOtp(richiesta: RichiestaInvio): Promise<EsitoIn
 
     case 'telegram':
       return inviaTelegram(cred, richiesta.target, testo);
+
+    case 'signal':
+      return inviaSignal(cred, richiesta.target, testo);
 
     case 'email': {
       const esito = await sendOtpSecurityEmail(richiesta.target, richiesta.nomeFirmatario, richiesta.codice, {

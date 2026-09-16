@@ -91,7 +91,19 @@ model Tenant {
   mostraSdi         Boolean? @default(true) @map("mostra_sdi")
   mostraIva         Boolean? @default(true) @map("mostra_iva")
   emailInboundParseUrl String? @map("email_inbound_parse_url")
-  signalCliEndpoint String?  @map("signal_cli_endpoint")
+  /// Indirizzo base del `signal-cli-rest-api` **dello studio** (es. `https://signal.studio.it`).
+  /// Era `signal_cli_endpoint`: la migrazione `20260916190000_signal_per_studio` l'ha rinominata
+  /// perché il valore è lo stesso e il nome nuovo dice cosa contiene. Era un campo che
+  /// l'interfaccia salvava e nessuna riga di codice leggeva.
+  signalEndpoint    String?  @map("signal_endpoint")
+  /// Token del reverse proxy che espone il demone. `signal-cli-rest-api` non ha autenticazione
+  /// propria: senza un proxy che la imponga, chiunque raggiunga l'indirizzo può leggere e
+  /// spedire i messaggi del numero dello studio. Se il campo è vuoto si prova comunque (un
+  /// demone su rete privata può non averne bisogno), ma l'interfaccia lo dichiara.
+  signalToken       String?  @map("signal_token")
+  /// Numero Signal registrato su quel demone: è il *mittente*, e per la ricezione è anche la
+  /// casella da leggere (`GET /v1/receive/{number}`).
+  signalNumber      String?  @map("signal_number")
   leadAdvisorNome   String?  @map("lead_advisor_nome")
   leadAdvisorEmail  String?  @map("lead_advisor_email")
   // `lead_advisor_password` è stata eliminata dalla migrazione

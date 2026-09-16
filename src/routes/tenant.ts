@@ -15,6 +15,7 @@ import { generaPasswordTemporanea, hashPassword } from '../util/password.js';
 import { rifirmaUrlUpload } from '../services/storageService.js';
 import { provaPostaInUscita, provaPostaInArrivo, sendInvitoCollaboratoreEmail } from '../services/emailService.js';
 import { credenzialiCanali } from '../services/otpDispatch.js';
+import { numeroSignal, statoSignal } from '../services/signalService.js';
 import { inMemoryTenantStore, recordAudit, senzaHash } from '../util/serverHelpers.js';
 import { urlWebhookWhatsapp } from '../util/urlPubblica.js';
 import { campoOrdinamento, creaMetaPaginazione, leggiPaginazione } from '../util/paginazione.js';
@@ -53,7 +54,7 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
    * risposta o quello spazio di archiviazione (un'estensione del browser, un computer condiviso,
    * un XSS) poteva spedire come lo studio (regola 6).
    */
-  const CHIAVI_SEGRETE = ['smtpPass', 'imapPass', 'waAccessToken', 'waVerifyToken', 'waAppSecret', 'tgBotToken'] as const;
+  const CHIAVI_SEGRETE = ['smtpPass', 'imapPass', 'waAccessToken', 'waVerifyToken', 'waAppSecret', 'tgBotToken', 'signalToken'] as const;
 
   /**
    * Sostituisce i segreti con la stringa vuota e aggiunge `<chiave>Impostata: boolean`.
@@ -178,6 +179,33 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
     return true;
   }
 
+  /**
+   * Forma dell'indirizzo del demone Signal, controllata al salvataggio.
+   *
+   * Non è `validaUrlServizio` e non la sostituisce: quella risolve il nome, rifiuta gli indirizzi
+   * privati ed è asincrona, e viene applicata quando si contatta davvero il demone
+   * (`signalService.prepara()`). Qui si rifiuta solo ciò che è evidentemente sbagliato — schema
+   * assente, credenziali dentro l'URL, parametri o frammenti — perché l'operatore lo sappia
+   * mentre scrive, invece di scoprirlo dal primo invio fallito.
+   */
+  function formaIndirizzoDemone(valore: unknown): string {
+    const grezzo = vietaControlli(valore, 'signalEndpoint', 2048).trim();
+    let url: URL;
+    try {
+      url = new URL(grezzo);
+    } catch {
+      throw new Error('signalEndpoint non valido: serve un indirizzo completo, per esempio https://signal.studio.it.');
+    }
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') {
+      throw new Error('signalEndpoint non valido: sono ammessi solo indirizzi http o https.');
+    }
+    if (url.username || url.password || url.search || url.hash) {
+      throw new Error('signalEndpoint non valido: niente credenziali, parametri o frammenti nell\'indirizzo (il token ha un campo suo).');
+    }
+    // La barra finale è superflua: `signalService` compone i percorsi da sé.
+    return grezzo.replace(/\/+$/, '');
+  }
+
   // `waWebhookSlug` non è qui di proposito: non si scrive dal browser. Lo genera il server
   // (bootstrap dello studio, o rotazione esplicita via `POST /tenant/whatsapp-slug`), perché è
   // il discriminante che separa i webhook di uno studio da quelli di un altro: lasciarlo
@@ -189,7 +217,13 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
     'smtpFromEmail', 'smtpFromName', 'smtpReplyTo', 'smtpBcc',
     'imapHost', 'imapServername', 'imapPort', 'imapSecure', 'imapUser', 'imapPass',
     'imapFolder', 'imapPollInterval', 'imapProtocol', 'emailSignatureHtml',
-    'emailInboundParseUrl', 'signalCliEndpoint',
+    // Signal è per studio come gli altri: il demone `signal-cli-rest-api` con il numero
+    // registrato sopra è infrastruttura dello studio, non della piattaforma.
+    'signalEndpoint', 'signalToken', 'signalNumber',
+    // `emailInboundParseUrl` è sparito: puntava a `api/webhooks/inbound-email`, una rotta che in
+    // questo progetto non esiste, e nessuna riga di codice l'ha mai letta. Un campo che si salva
+    // e non fa niente è peggio di un campo assente — l'operatore crede di aver configurato
+    // qualcosa (regola 7).
   ]);
 
   server.patch<{ Body: Record<string, any> }>('/tenant/info', async (req, reply) => {
@@ -253,8 +287,8 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
       'smtpFromEmail', 'smtpFromName', 'smtpReplyTo', 'smtpBcc',
       'imapHost', 'imapServername', 'imapPort', 'imapSecure', 'imapUser', 'imapPass',
       'imapFolder', 'imapPollInterval', 'imapProtocol', 'emailSignatureHtml',
+      'signalEndpoint', 'signalToken', 'signalNumber',
       'regimeFiscale', 'capitaleSociale', 'regImprese', 'mostraSdi', 'mostraIva',
-      'emailInboundParseUrl', 'signalCliEndpoint',
       // `leadAdvisorPassword` è stato rimosso: era una password in chiaro sulla riga
       // Tenant, scrivibile da qualunque utente del tenant via questa rotta. Le password
       // vivono solo come hash scrypt su `user.passwordHash` (§23).
@@ -283,6 +317,22 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
           sanitizedData[key] = rawBody[key] === null || rawBody[key] === '' ? null : validaCartellaImap(rawBody[key]);
         } else if (key === 'smtpUser') {
           sanitizedData[key] = rawBody[key] === null || rawBody[key] === '' ? null : vietaControlli(rawBody[key], key, 254).trim();
+        } else if (key === 'signalEndpoint') {
+          sanitizedData[key] = rawBody[key] === null || rawBody[key] === '' ? null : formaIndirizzoDemone(rawBody[key]);
+        } else if (key === 'signalNumber') {
+          if (rawBody[key] === null || rawBody[key] === '') {
+            sanitizedData[key] = null;
+          } else {
+            const numero = numeroSignal(vietaControlli(rawBody[key], key, 32).trim());
+            if (!numero) {
+              throw new Error(
+                'signalNumber non valido: serve il numero in forma internazionale, con il prefisso (es. +393351234567).',
+              );
+            }
+            // Si salva la forma normalizzata: è quella che il demone pretende, e averla già in
+            // tabella significa che un numero scritto «0039 335 1234567» non fa fallire l'invio.
+            sanitizedData[key] = numero;
+          }
         } else if (key === 'smtpSecure' || key === 'imapSecure' || key === 'mostraSdi' || key === 'mostraIva') {
           sanitizedData[key] = Boolean(rawBody[key]);
         } else if ((CHIAVI_SEGRETE as readonly string[]).includes(key)) {
@@ -946,7 +996,16 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
    * firma. Ora ogni canale viene interrogato per davvero e l'esito è quello che rispondono
    * Meta, Telegram o il server SMTP: un canale rotto risponde 400.
    */
-  server.post<{ Body: { channel?: string; waPhoneId?: string; waAccessToken?: string } }>('/tenant/test-channel', async (req, reply) => {
+  server.post<{
+    Body: {
+      channel?: string;
+      waPhoneId?: string;
+      waAccessToken?: string;
+      signalEndpoint?: string;
+      signalToken?: string;
+      signalNumber?: string;
+    };
+  }>('/tenant/test-channel', async (req, reply) => {
     if (!soloGestoriCanali(req, reply)) return reply;
     const tenantId = req.tenantId;
     const canale = (req.body?.channel || '').toLowerCase();
@@ -1025,8 +1084,32 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
       }
 
       // A «signal» rispondeva «Daemon Signal REST API v1 in ascolto sul container Docker»:
-      // quel demone non esiste in questo progetto e non c'è una riga di codice che lo
-      // contatti. Dichiararlo in ascolto era inventare un'infrastruttura.
+      // quel demone non esiste in questo progetto e nessuna riga di codice lo contattava.
+      // Dichiararlo in ascolto era inventare un'infrastruttura. Ora il demone è quello dello
+      // studio e si interroga per davvero: `statoSignal` chiede versione e modalità a
+      // `/v1/about` e verifica che il numero dello studio sia fra quelli registrati su
+      // `/v1/accounts` — un demone raggiungibile senza quel numero risponde alla sonda e poi
+      // rifiuta ogni invio, ed è esattamente il guasto che si vuole far emergere qui.
+      if (canale === 'signal') {
+        const signalEndpoint = req.body?.signalEndpoint || cred.signalEndpoint;
+        const signalToken = req.body?.signalToken || cred.signalToken;
+        const signalNumber = req.body?.signalNumber || cred.signalNumber;
+
+        if (!signalEndpoint) {
+          return esito(
+            false,
+            'Indirizzo del demone Signal non impostato: serve l\'URL del `signal-cli-rest-api` ' +
+              'dello studio, raggiungibile in https.',
+          );
+        }
+        if (!signalNumber) {
+          return esito(false, 'Numero Signal dello studio non impostato: è il mittente, e senza non si può spedire.');
+        }
+
+        const stato = await statoSignal({ signalEndpoint, signalToken, signalNumber });
+        return esito(stato.ok, stato.messaggio);
+      }
+
       return esito(
         false,
         `Canale «${canale || 'non indicato'}» non gestito: la piattaforma non ha un invio da provare per questo canale.`,

@@ -156,3 +156,93 @@ export async function risolviEndpointPubblico(
   const primo = risolti[0]!;
   return { host, address: primo.address, family: primo.family as 4 | 6, servername };
 }
+
+export interface EndpointServizio {
+  /** URL base normalizzato, senza barra finale: `https://signal.studio.it`. */
+  url: string;
+  host: string;
+  address: string;
+  porta: number;
+  https: boolean;
+}
+
+/**
+ * L'indirizzo di un servizio che **lo studio** indica nelle impostazioni (oggi Signal).
+ *
+ * Perché serve un controllo e non basta `new URL(...)`. Questo indirizzo lo scrive l'operatore
+ * di uno studio e il backend lo chiama: senza filtro, `http://169.254.169.254/…` o
+ * `http://railway-internal:5432` trasformano una richiesta dello studio in una richiesta
+ * dell'infrastruttura — è la classe di guasti che la policy di rete di questo file esiste per
+ * impedire. La stessa risoluzione che protegge l'SMTP vale qui: si risolve il nome, si rifiuta
+ * ogni indirizzo non pubblico, e vale l'eccezione dichiarata `endpointLocaliConsentiti()`
+ * (sviluppo ed E2E, dove il demone sta in un container sulla macchina di chi testa).
+ *
+ * Cosa questo controllo **non** chiude, detto perché non lo si creda chiuso: la risoluzione
+ * serve a decidere, poi è `fetch` a risolvere di nuovo per contattare. Fra i due momenti un DNS
+ * che cambia risposta può spostare la connessione (TOCTOU). Chiuderlo richiede di fissare la
+ * connessione all'indirizzo già validato, che `fetch` non permette e che qui non si è fatto.
+ * Il perimetro che resta scoperto è quello di uno studio che attacca l'infrastruttura da cui
+ * è ospitato, ed è tracciato: l'indirizzo è un campo della sua riga, e ogni chiamata è sua.
+ *
+ * In produzione è richiesto `https`: il token del proxy e i messaggi viaggiano su quella
+ * connessione. `http` è ammesso solo dove `endpointLocaliConsentiti()` è vero.
+ */
+export async function validaUrlServizio(
+  valore: unknown,
+  campo: string,
+  resolver: RisolutoreDns = lookupDns as RisolutoreDns,
+): Promise<EndpointServizio> {
+  const grezzo = vietaControlli(valore, campo, 2048).trim();
+  if (!grezzo) throw new ErrorePolicyRete(`${campo} non configurato.`);
+
+  let url: URL;
+  try {
+    url = new URL(grezzo);
+  } catch {
+    throw new ErrorePolicyRete(`${campo} non è un indirizzo valido: serve la forma completa, ` +
+      `per esempio https://signal.studiotuo.it`);
+  }
+
+  const https = url.protocol === 'https:';
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') {
+    throw new ErrorePolicyRete(`${campo} deve essere http o https, non «${url.protocol.replace(':', '')}».`);
+  }
+  if (url.hash) throw new ErrorePolicyRete(`${campo} non può contenere un frammento (#…).`);
+  if (url.search) {
+    throw new ErrorePolicyRete(`${campo} non può contenere parametri nella query: il token del proxy ` +
+      `ha un campo suo e una credenziale nella query finisce nei log di ogni proxy che attraversa.`);
+  }
+  // `https://utente:password@host` mette la credenziale nell'URL: stessa ragione, e in più
+  // finirebbe in chiaro nel report dell'audit log.
+  if (url.username || url.password) {
+    throw new ErrorePolicyRete(`${campo} non può contenere utente e password nell'indirizzo.`);
+  }
+  if (/\.\./.test(url.pathname)) throw new ErrorePolicyRete(`${campo} non può contenere «..» nel percorso.`);
+
+  const hostGrezzo = url.hostname.replace(/^\[|\]$/g, '');
+  const porta = url.port ? Number(url.port) : (https ? 443 : 80);
+  if (!Number.isInteger(porta) || porta < 1 || porta > 65535) {
+    throw new ErrorePolicyRete(`${campo}: porta non valida.`);
+  }
+
+  if (endpointLocaliConsentiti()) {
+    // Sviluppo ed E2E: il demone può stare in un container sulla stessa macchina, raggiungibile
+    // per nome di servizio (`http://signal-cli:8080`) — un nome che non ha un punto e che
+    // `validaHost` rifiuterebbe. Qui non c'è infrastruttura da proteggere da sé stessa.
+    return { url: url.origin + url.pathname.replace(/\/+$/, ''), host: hostGrezzo, address: hostGrezzo, porta, https };
+  }
+
+  if (!https) {
+    throw new ErrorePolicyRete(`${campo} deve essere in https: il token e i messaggi viaggiano su ` +
+      `quella connessione, e in chiaro li legge ogni nodo che attraversa.`);
+  }
+
+  const endpoint = await risolviEndpointPubblico(hostGrezzo, undefined, resolver);
+  return {
+    url: url.origin + url.pathname.replace(/\/+$/, ''),
+    host: endpoint.host,
+    address: endpoint.address,
+    porta,
+    https,
+  };
+}
