@@ -135,10 +135,29 @@ export async function riceviMessaggiSignal(tenantId: string): Promise<EsitoRicez
         }
         return recapiti.some(recapito => normalizzaTelefono(recapito) === messaggio.mittente);
       });
+      // Il testo serve a entrambi gli avvisi possibili: si compone una volta, prima di
+      // qualunque uscita — dopo, il messaggio sarebbe già perso.
+      const testoMsg = messaggio.testo.trim()
+        || (messaggio.allegati.length ? `[Allegato: ${messaggio.allegati[0]?.nome || 'file'}]` : '[Messaggio Signal]');
+
       // Zero corrispondenze: mittente sconosciuto. Più di una: l'anagrafica è ambigua e
       // attribuire il messaggio al cliente sbagliato è peggio che non attribuirlo.
       if (corrispondenze.length !== 1) {
         esitoFinale.scartati += 1;
+        // Era la stessa porta silenziosa di Telegram: il ciclo scartava e proseguiva senza
+        // che nessuno sapesse che un messaggio era esistito. Non si sceglie il cliente —
+        // ma non si butta nemmeno.
+        await registraIngressoSenzaFascicolo(tenantId, 'signal', messaggio.eventId, {
+          mittente: messaggio.mittente ?? 'Mittente Signal non identificato',
+          testo: testoMsg,
+          motivo: corrispondenze.length === 0
+            ? `Il numero ${messaggio.mittente} non è in nessuna scheda cliente: aggiungilo `
+              + 'come cellulare, o come recapito Signal, del cliente.'
+            : `Il numero ${messaggio.mittente} corrisponde a ${corrispondenze.length} clienti: `
+              + `risolvi l'ambiguità.`,
+        }).catch((err) => {
+          console.warn('[Signal] registraIngressoSenzaFascicolo fallita:', err);
+        });
         continue;
       }
       const cliente = corrispondenze[0]!;
@@ -154,9 +173,6 @@ export async function riceviMessaggiSignal(tenantId: string): Promise<EsitoRicez
       const attivi = progetti.filter(p => isProgettoAttivo(p.stato));
       if (attivi.length !== 1) {
         esitoFinale.scartati += 1;
-        // Il testo serve per l'avviso allo studio: lo componiamo prima di uscire.
-        const testoMsg = messaggio.testo.trim()
-          || (messaggio.allegati.length ? `[Allegato: ${messaggio.allegati[0]?.nome || 'file'}]` : '[Messaggio Signal]');
         await registraIngressoSenzaFascicolo(tenantId, 'signal', messaggio.eventId, {
           mittente: cliente.nome,
           testo: testoMsg,

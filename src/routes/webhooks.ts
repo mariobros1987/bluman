@@ -487,18 +487,39 @@ export async function registraRotteWebhooks(server: FastifyInstance): Promise<vo
       const chatId = String(msg.chat?.id || '');
       if (!chatId) return reply.status(400).send({ errore: 'chat.id mancante' });
 
+      // Il testo si compone una volta sola, prima di instradare: serve sia alla comunicazione
+      // che entra nel fascicolo sia all'avviso di messaggio non archiviato, e va calcolato
+      // prima di qualunque uscita — dopo, il messaggio sarebbe già perso.
+      const text = msg.text || (msg.caption ? `[Allegato]: ${msg.caption}` : '[Allegato / File Ricevuto]');
+
+      // Niente `take`: il motivo dell'avviso qui sotto conta le corrispondenze, e una
+      // lettura troncata lo farebbe mentire sul loro numero.
       const clienti = await prisma.cliente.findMany({
         where: { tenantId: tenant.id, telegramChatId: chatId },
         select: { id: true, nome: true },
-        take: 2,
       });
-      if (clienti.length !== 1) return reply.status(202).send({ ok: true, ignored: 'sender_not_unique' });
+      if (clienti.length !== 1) {
+        // Il chat id non identifica un cliente solo — tipicamente non ne identifica nessuno,
+        // perché la scheda del cliente non porta ancora il suo «Telegram chat id».
+        //
+        // Questa era la seconda porta del guasto del 16/09/2026, e la più silenziosa: la
+        // rotta rispondeva 202 «ok» a Telegram senza scrivere niente e senza avvisare
+        // nessuno. WhatsApp aveva lo stesso ramo ed è stato collegato; questo era rimasto
+        // indietro. Per chi scriveva al bot da un chat id non ancora in anagrafica il
+        // risultato era che non arrivava nulla — mentre l'invio dall'app funzionava, perché
+        // quello non dipende dall'anagrafica. Il guasto sembrava quindi «solo in ricezione».
+        await registraIngressoSenzaFascicolo(tenant.id, 'telegram', updateId, {
+          mittente: `Chat Telegram ${chatId}`,
+          testo: text,
+          motivo: clienti.length === 0
+            ? `Il chat id ${chatId} non è in nessuna scheda cliente: aprine una (o la sua) e `
+              + 'incolla questo numero nel campo «Telegram chat id».'
+            : `Il chat id ${chatId} è in ${clienti.length} schede cliente: tienilo in una sola.`,
+        });
+        return reply.status(202).send({ ok: true, ignored: 'sender_not_unique' });
+      }
       const cliente = clienti[0];
       if (!cliente) return reply.status(202).send({ ok: true, ignored: 'sender_not_unique' });
-
-      // Il testo si compone prima di instradare: se il messaggio non trova un fascicolo, è
-      // questo che va all'operatore — calcolarlo dopo significherebbe averlo già perso.
-      const text = msg.text || (msg.caption ? `[Allegato]: ${msg.caption}` : '[Allegato / File Ricevuto]');
 
       const progetti = await prisma.progetto.findMany({
         where: { tenantId: tenant.id, clienteId: cliente.id, stato: 'in_progress' },
