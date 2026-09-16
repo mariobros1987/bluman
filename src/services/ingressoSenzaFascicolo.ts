@@ -48,11 +48,24 @@ export async function registraIngressoSenzaFascicolo(
   }
 
   const nome = canale.charAt(0).toUpperCase() + canale.slice(1);
-  await notificaStudio(tenantId, {
-    tipoEvento: 'messaggio_non_instradabile',
-    oggetto: `Messaggio ${nome} non archiviato — ${dati.mittente}`,
-    corpo: `${dati.mittente} ha scritto su ${nome} e il messaggio non è entrato in nessun `
-      + `fascicolo. ${dati.motivo} Testo ricevuto: «${dati.testo.slice(0, 500)}»`,
-    link: null,
-  });
+  try {
+    await notificaStudio(tenantId, {
+      tipoEvento: 'messaggio_non_instradabile',
+      oggetto: `Messaggio ${nome} non archiviato — ${dati.mittente}`,
+      corpo: `${dati.mittente} ha scritto su ${nome} e il messaggio non è entrato in nessun `
+        + `fascicolo. ${dati.motivo} Testo ricevuto: «${dati.testo.slice(0, 500)}»`,
+      link: null,
+    });
+  } catch (err) {
+    // La riga di idempotenza è già in tabella, ma l'avviso non è partito. Lasciarla lì
+    // sarebbe peggio del guasto originale: al rinvio del provider la `create` troverebbe
+    // P2002, la funzione uscirebbe in silenzio e il messaggio sparirebbe senza che nessuno
+    // lo abbia mai visto — lo stesso esito di prima, per una porta più stretta.
+    // Si toglie la riga e si rilancia: la rotta risponde 500, il provider riprova, e
+    // l'avviso con lui. `deleteMany` non lancia se la riga non c'è più.
+    await prisma.webhookInbox.deleteMany({
+      where: { tenantId, provider: `${canale}_update`, eventId },
+    }).catch(() => {});
+    throw err;
+  }
 }

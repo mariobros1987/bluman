@@ -350,27 +350,55 @@ export async function registraRotteWebhooks(server: FastifyInstance): Promise<vo
             }
             return recapiti.some(recapito => normalizzaTelefono(recapito) === fromNumber);
           });
-          if (corrispondenze.length !== 1) continue;
-          const matchingClient = corrispondenze[0];
-          if (!matchingClient) continue;
-
-          const progetti = await prisma.progetto.findMany({
-            where: { tenantId, clienteId: matchingClient.id, stato: 'in_progress' },
-            select: { id: true, stato: true },
-            take: 2,
-          });
-          const attivi = progetti.filter(p => isProgettoAttivo(p.stato));
-          if (attivi.length !== 1) continue;
-          const activeProj = attivi[0];
-          if (!activeProj) continue;
-
-          const isMedia = ['image', 'document', 'video', 'audio'].includes(msg.type);
+          // Il testo si compone una volta sola, prima di instradare: serve sia alla
+          // comunicazione che entra nel fascicolo sia all'avviso di messaggio non archiviato,
+          // e in entrambi i casi dev'essere la stessa descrizione leggibile (non `msg.type`,
+          // che all'operatore mostrerebbe il tipo grezzo del provider).
           const textBody = msg.text?.body
             || (msg.type === 'image' ? '[Immagine ricevuta]'
               : msg.type === 'document' ? `[Documento: ${msg.document?.filename || 'file'}]`
               : msg.type === 'video' ? '[Video ricevuto]'
               : msg.type === 'audio' ? '[Messaggio vocale]'
               : '[Messaggio multimediale]');
+
+          if (corrispondenze.length !== 1) {
+            // Mittente sconosciuto o anagrafica ambigua: non si può attribuire il messaggio.
+            // Non si scarta in silenzio: si avvisa lo studio.
+            await registraIngressoSenzaFascicolo(tenantId, 'whatsapp', providerId, {
+              mittente: `+${fromNumber}`,
+              testo: textBody,
+              motivo: corrispondenze.length === 0
+                ? 'Il numero non è presente in anagrafica: aggiungilo come cliente.'
+                : `Il numero corrisponde a ${corrispondenze.length} clienti in anagrafica: risolvi l'ambiguità.`,
+            });
+            continue;
+          }
+          const matchingClient = corrispondenze[0];
+          if (!matchingClient) continue;
+
+          // Niente `take`: il motivo dell'avviso nomina i progetti e ne conta quanti sono,
+          // quindi una lettura troncata lo farebbe mentire («Ha 5 progetti aperti» quando
+          // sono otto). Come il ramo Telegram, che non tronca.
+          const progetti = await prisma.progetto.findMany({
+            where: { tenantId, clienteId: matchingClient.id, stato: 'in_progress' },
+            select: { id: true, nome: true, stato: true },
+          });
+          const attivi = progetti.filter(p => isProgettoAttivo(p.stato));
+          if (attivi.length !== 1) {
+            await registraIngressoSenzaFascicolo(tenantId, 'whatsapp', providerId, {
+              mittente: matchingClient.nome,
+              testo: textBody,
+              motivo: attivi.length === 0
+                ? 'Non ha nessun progetto aperto: aprine uno, oppure scrivi al cliente da qui.'
+                : `Ha ${attivi.length} progetti aperti (${attivi.map(p => p.nome).join(', ')}): `
+                  + 'chiudi quelli conclusi così i prossimi messaggi entrano da soli.',
+            });
+            continue;
+          }
+          const activeProj = attivi[0];
+          if (!activeProj) continue;
+
+          const isMedia = ['image', 'document', 'video', 'audio'].includes(msg.type);
           let allegatiJson: string | null = null;
           if (isMedia) {
             const mediaId: string | undefined = msg.document?.id || msg.image?.id || msg.video?.id || msg.audio?.id;
@@ -533,20 +561,32 @@ export async function registraRotteWebhooks(server: FastifyInstance): Promise<vo
     }
   });
 
-  server.post<{ Body: { botToken: string; webhookUrl?: string } }>('/tenant/telegram-webhook-setup', async (req, reply) => {
+  server.post<{ Body: { botToken?: string; webhookUrl?: string } }>('/tenant/telegram-webhook-setup', async (req, reply) => {
     if (req.ruolo !== 'advisor' && req.ruolo !== 'super_admin') {
       return reply.code(403).send({ errore: 'Configurazione webhook riservata al responsabile dello studio o al super admin.' });
     }
+    if (!req.tenantId) {
+      return reply.code(400).send({ errore: 'Tenant autenticato mancante' });
+    }
     try {
-      const botToken = vietaControlli(req.body?.botToken || '', 'Bot Token', 256).trim();
+      // Il bot token NON torna mai al browser dopo il salvataggio (regola 6).
+      // Se il corpo non lo porta, usiamo quello salvato in DB.
+      let botToken = vietaControlli(req.body?.botToken || '', 'Bot Token', 256).trim();
+      if (!botToken) {
+        const tenant = await prisma.tenant.findUnique({
+          where: { id: req.tenantId },
+          select: { tgBotToken: true },
+        });
+        botToken = tenant?.tgBotToken?.trim() || '';
+      }
+      if (!botToken || !/^\d{5,20}:[A-Za-z0-9_-]{20,200}$/.test(botToken)) {
+        return reply.code(400).send({ errore: 'Bot Token Telegram non configurato. Salvalo prima nelle impostazioni studio.' });
+      }
       const webhookUrl = vietaControlli(
         req.body?.webhookUrl || urlWebhookTelegram(),
         'URL webhook',
         2048,
       );
-      if (!botToken || !/^\d{5,20}:[A-Za-z0-9_-]{20,200}$/.test(botToken)) {
-        return reply.code(400).send({ errore: 'Bot Token mancante o non valido' });
-      }
       let webhook;
       try {
         webhook = new URL(webhookUrl);
@@ -560,9 +600,6 @@ export async function registraRotteWebhooks(server: FastifyInstance): Promise<vo
       const masterSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
       if (!masterSecret) {
         return reply.code(503).send({ errore: 'TELEGRAM_WEBHOOK_SECRET non configurato' });
-      }
-      if (!req.tenantId) {
-        return reply.code(400).send({ errore: 'Tenant autenticato mancante' });
       }
       const secretToken = creaSegretoTelegram(req.tenantId, botToken, masterSecret);
 
@@ -593,6 +630,60 @@ export async function registraRotteWebhooks(server: FastifyInstance): Promise<vo
       return reply.code(timeout ? 504 : 400).send({
         errore: timeout ? 'Telegram non ha risposto entro 8 secondi' : (err instanceof Error ? err.message : 'Errore configurazione Telegram'),
       });
+    }
+  });
+
+  /**
+   * Restituisce lo stato del webhook Telegram dello studio (getWebhookInfo).
+   *
+   * La prima cosa da guardare quando «i messaggi non arrivano»:
+   * - `url`: se è vuoto, il webhook non è registrato;
+   * - `pending_update_count`: messaggi fermi in attesa di consegna;
+   * - `last_error_message`: ultimo errore che Telegram ha ricevuto tentando la consegna.
+   *
+   * Nota: `testChannelApi` con channel='telegram' chiama getMe e NON dice niente sulla
+   * ricezione — un token valido con webhook non registrato passa quel test. Questa rotta
+   * è la prova vera.
+   */
+  server.get('/tenant/telegram-webhook-info', async (req, reply) => {
+    if (req.ruolo !== 'advisor' && req.ruolo !== 'super_admin') {
+      return reply.code(403).send({ errore: 'Riservato al responsabile dello studio o al super admin.' });
+    }
+    if (!req.tenantId) {
+      return reply.code(400).send({ errore: 'Tenant autenticato mancante' });
+    }
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: req.tenantId },
+      select: { tgBotToken: true },
+    });
+    const botToken = tenant?.tgBotToken?.trim() || '';
+    if (!botToken) {
+      return reply.code(400).send({ errore: 'Bot Token Telegram non configurato.' });
+    }
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    try {
+      const tgRes = await fetch(
+        `https://api.telegram.org/bot${botToken}/getWebhookInfo`,
+        { signal: controller.signal },
+      );
+      const tgJson: any = await tgRes.json().catch(() => ({}));
+      if (!tgRes.ok || !tgJson?.ok) {
+        return reply.code(400).send({ errore: tgJson?.description || `Telegram ha risposto HTTP ${tgRes.status}` });
+      }
+      // Restituiamo solo i campi utili per l'interfaccia: mai il bot token, mai il secret.
+      const info = tgJson.result || {};
+      return reply.send({
+        ok: true,
+        webhookUrl: info.url || '',
+        pendingUpdateCount: info.pending_update_count ?? 0,
+        lastErrorDate: info.last_error_date ?? null,
+        lastErrorMessage: info.last_error_message ?? null,
+        maxConnections: info.max_connections ?? null,
+        allowedUpdates: info.allowed_updates ?? [],
+      });
+    } finally {
+      clearTimeout(timer);
     }
   });
 }

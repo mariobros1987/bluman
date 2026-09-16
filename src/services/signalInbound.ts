@@ -21,6 +21,7 @@ import { notificaStudio } from './notificheService';
 import { isProgettoAttivo } from '../domain/stateEngine';
 import { uploadDocumento } from './storageService';
 import { credenzialiCanali } from './otpDispatch.js';
+import { registraIngressoSenzaFascicolo } from './ingressoSenzaFascicolo.js';
 import {
   riceviSignal,
   scaricaAllegatoSignal,
@@ -142,14 +143,32 @@ export async function riceviMessaggiSignal(tenantId: string): Promise<EsitoRicez
       }
       const cliente = corrispondenze[0]!;
 
+      // Come gli altri due canali: si legge solo ciò che può essere attivo (il filtro
+      // `isProgettoAttivo` qui sotto scarta comunque tutto il resto, quindi il `where` non
+      // cambia l'esito) e senza `take`, perché il motivo dell'avviso conta e nomina i
+      // progetti: una lettura troncata lo farebbe mentire sul loro numero.
       const progetti = await prisma.progetto.findMany({
-        where: { tenantId, clienteId: cliente.id },
-        select: { id: true, stato: true },
-        take: 5,
+        where: { tenantId, clienteId: cliente.id, stato: 'in_progress' },
+        select: { id: true, nome: true, stato: true },
       });
       const attivi = progetti.filter(p => isProgettoAttivo(p.stato));
       if (attivi.length !== 1) {
         esitoFinale.scartati += 1;
+        // Il testo serve per l'avviso allo studio: lo componiamo prima di uscire.
+        const testoMsg = messaggio.testo.trim()
+          || (messaggio.allegati.length ? `[Allegato: ${messaggio.allegati[0]?.nome || 'file'}]` : '[Messaggio Signal]');
+        await registraIngressoSenzaFascicolo(tenantId, 'signal', messaggio.eventId, {
+          mittente: cliente.nome,
+          testo: testoMsg,
+          motivo: attivi.length === 0
+            ? 'Non ha nessun progetto aperto: aprine uno, oppure scrivi al cliente da qui.'
+            : `Ha ${attivi.length} progetti aperti (${attivi.map(p => p.nome).join(', ')}): `
+              + 'chiudi quelli conclusi così i prossimi messaggi entrano da soli.',
+        }).catch((err) => {
+          // L'avviso non deve fermare il ciclo: se fallisce, il conteggio scartati è
+          // già stato incrementato e il caller vede che il messaggio non è entrato.
+          console.warn('[Signal] registraIngressoSenzaFascicolo fallita:', err);
+        });
         continue;
       }
       const progetto = attivi[0]!;

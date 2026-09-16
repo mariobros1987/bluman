@@ -338,6 +338,60 @@ export async function rigeneraSlugWhatsappApi(): Promise<{ ok: boolean; waCallba
 }
 
 /**
+ * Registra il webhook Telegram dello studio presso i server di Telegram.
+ *
+ * La rotta server-side legge il bot token salvato: il browser non lo conosce mai dopo
+ * il salvataggio (regola 6). Il chiamante non deve passare nessun token.
+ */
+export async function registraWebhookTelegramApi(): Promise<{ ok: boolean; messaggio?: string; errore?: string }> {
+  try {
+    const res = await apiFetch(`${API_BASE}/tenant/telegram-webhook-setup`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({}),
+    });
+    const dati = await res.json().catch(() => null);
+    if (!res.ok) {
+      return { ok: false, errore: dati?.errore || `Il server ha risposto ${res.status}.` };
+    }
+    return { ok: true, messaggio: dati?.message || 'Webhook registrato.' };
+  } catch (err: any) {
+    return { ok: false, errore: err?.message || 'Backend non raggiungibile.' };
+  }
+}
+
+export interface WebhookInfoTelegram {
+  webhookUrl: string;
+  pendingUpdateCount: number;
+  lastErrorDate: number | null;
+  lastErrorMessage: string | null;
+  maxConnections: number | null;
+  allowedUpdates: string[];
+}
+
+/**
+ * Legge lo stato del webhook Telegram direttamente da Telegram (getWebhookInfo).
+ *
+ * È la prova vera che la ricezione funziona: mostra URL registrato, messaggi in coda
+ * e l'ultimo errore di consegna. `testChannelApi` con channel='telegram' chiama solo
+ * getMe e non dice nulla sulla ricezione.
+ */
+export async function fetchWebhookInfoTelegramApi(): Promise<{ ok: boolean; info?: WebhookInfoTelegram; errore?: string }> {
+  try {
+    const res = await apiFetch(`${API_BASE}/tenant/telegram-webhook-info`, {
+      headers: getAuthHeaders(),
+    });
+    const dati = await res.json().catch(() => null);
+    if (!res.ok) {
+      return { ok: false, errore: dati?.errore || `Il server ha risposto ${res.status}.` };
+    }
+    return { ok: true, info: dati as WebhookInfoTelegram };
+  } catch (err: any) {
+    return { ok: false, errore: err?.message || 'Backend non raggiungibile.' };
+  }
+}
+
+/**
  * Messaggio WhatsApp al cliente, spedito dal backend con il numero dello studio.
  *
  * Prima chiamava `POST /api/send-whatsapp`: una funzione senza autenticazione, con
