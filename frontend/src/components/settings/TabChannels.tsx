@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import styles from '../../pages/Settings.module.css';
 import { PannelloRecordDns } from './PannelloRecordDns';
-import { registraWebhookTelegramApi, fetchWebhookInfoTelegramApi, type WebhookInfoTelegram } from '../../api/tenant';
+import { PannelloWebhookTelegram } from './PannelloWebhookTelegram';
 
 interface TabChannelsProps {
   handleSaveCompany: (e?: React.FormEvent) => void;
@@ -124,89 +124,6 @@ function NotaSegreto({ impostata }: { impostata?: boolean }) {
         ? '✓ Già salvata sul server. Lascia vuoto per non modificarla.'
         : 'Nessuna credenziale salvata: il canale non può funzionare finché non la inserisci.'}
     </div>
-  );
-}
-
-/** Pannello stato webhook + pulsante di registrazione per la scheda Telegram. */
-function TelegramWebhookPanel({ segreti }: { segreti: { tgBotToken?: boolean } }) {
-  const [info, setInfo] = useState<WebhookInfoTelegram | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [registrando, setRegistrando] = useState(false);
-  const [esito, setEsito] = useState<{ ok: boolean; testo: string } | null>(null);
-
-  const aggiorna = async () => {
-    setLoading(true);
-    setEsito(null);
-    const r = await fetchWebhookInfoTelegramApi();
-    setLoading(false);
-    if (r.ok && r.info) {
-      setInfo(r.info);
-    } else {
-      setEsito({ ok: false, testo: r.errore || 'Errore lettura stato webhook.' });
-    }
-  };
-
-  const registra = async () => {
-    setRegistrando(true);
-    setEsito(null);
-    const r = await registraWebhookTelegramApi();
-    setRegistrando(false);
-    setEsito({ ok: r.ok, testo: r.ok ? (r.messaggio || 'Webhook registrato.') : (r.errore || 'Errore.') });
-    if (r.ok) await aggiorna();
-  };
-
-  const webhookAttivo = info && info.webhookUrl !== '';
-
-  return (
-    <>
-      <button
-        type="button"
-        onClick={aggiorna}
-        disabled={loading || !segreti.tgBotToken}
-        title={!segreti.tgBotToken ? 'Salva prima il Bot Token' : 'Leggi stato ricezione da Telegram'}
-        style={{ background: '#0e4d78', color: '#fff', border: 'none', padding: '5px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
-      >
-        {loading ? '⏳' : '📡 Stato Webhook'}
-      </button>
-      <button
-        type="button"
-        onClick={registra}
-        disabled={registrando || !segreti.tgBotToken}
-        title={!segreti.tgBotToken ? 'Salva prima il Bot Token' : 'Registra (o aggiorna) il webhook presso Telegram'}
-        style={{ background: webhookAttivo ? '#065f46' : '#7c2d12', color: '#fff', border: 'none', padding: '5px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
-      >
-        {registrando ? 'Registrando...' : webhookAttivo ? '🔄 Aggiorna Webhook' : '🔗 Registra Webhook'}
-      </button>
-
-      {esito && (
-        <div style={{ marginTop: 8, padding: '8px 12px', borderRadius: 8, fontSize: 11.5, background: esito.ok ? '#052e16' : '#450a0a', color: esito.ok ? '#34d399' : '#fca5a5', border: `1px solid ${esito.ok ? '#166534' : '#991b1b'}` }}>
-          {esito.testo}
-        </div>
-      )}
-
-      {info && (
-        <div style={{ marginTop: 8, padding: '10px 12px', borderRadius: 8, fontSize: 11, background: '#0c1a2e', border: '1px solid #1e3a5f' }}>
-          <div style={{ marginBottom: 4, fontWeight: 700, color: '#38bdf8' }}>Stato webhook Telegram</div>
-          <div>
-            <span style={{ color: 'var(--muted)' }}>URL registrato: </span>
-            {info.webhookUrl
-              ? <span style={{ color: '#34d399' }}>✅ {info.webhookUrl}</span>
-              : <span style={{ color: '#f87171' }}>❌ Non registrato — i messaggi non arriveranno</span>}
-          </div>
-          <div>
-            <span style={{ color: 'var(--muted)' }}>Messaggi in coda: </span>
-            <span style={{ color: info.pendingUpdateCount > 0 ? '#fbbf24' : '#34d399' }}>{info.pendingUpdateCount}</span>
-            {info.pendingUpdateCount > 0 && <span style={{ color: '#fbbf24' }}> — Telegram li consegnerà al prossimo aggiornamento</span>}
-          </div>
-          {info.lastErrorMessage && (
-            <div style={{ marginTop: 4, color: '#f87171' }}>
-              ⚠️ Ultimo errore: {info.lastErrorMessage}
-              {info.lastErrorDate && <span style={{ color: 'var(--muted)', marginLeft: 4 }}>({new Date(info.lastErrorDate * 1000).toLocaleString('it-IT')})</span>}
-            </div>
-          )}
-        </div>
-      )}
-    </>
   );
 }
 
@@ -696,7 +613,7 @@ export function TabChannels({
                   >
                     {testingChannel === 'telegram' ? 'Testing...' : '🧪 Test Bot'}
                   </button>
-                  <TelegramWebhookPanel segreti={segreti} />
+                  <PannelloWebhookTelegram segreti={segreti} />
                 </div>
               </div>
               <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 12 }}>
