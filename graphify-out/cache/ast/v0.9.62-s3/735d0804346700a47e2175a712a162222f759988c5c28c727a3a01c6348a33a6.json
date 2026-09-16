@@ -1,0 +1,1 @@
+{"nodes": [{"id": "$graphify-root$_prisma_migrations_20260902120000_rls_tabelle_fiscali_erp_migration_sql", "label": "migration.sql", "file_type": "code", "source_file": "prisma/migrations/20260902120000_rls_tabelle_fiscali_erp/migration.sql", "source_location": null}], "edges": []}
