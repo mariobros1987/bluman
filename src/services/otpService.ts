@@ -20,7 +20,7 @@ import { hashCodiceOtp, verificaCodiceOtp } from '../util/jwt';
  * cioè una firma che non si può completare. Un canale che non spedisce va tolto, non
  * mostrato.
  */
-export type CanaleOtp = 'whatsapp' | 'email' | 'telegram';
+export type CanaleOtp = 'whatsapp' | 'email' | 'telegram' | 'signal';
 
 /** Cosa autorizza il codice. Un OTP per un addendum non vale per un documento del Vault. */
 export type AmbitoOtp = 'engagement_letter' | 'documento_vault' | 'modulo_completato' | 'addendum' | 'documento_vault_studio';
@@ -30,7 +30,7 @@ export const MAX_TENTATIVI = 3;
 export const MAX_REINVII = 3;
 export const ATTESA_REINVIO_SECONDI = 60;
 
-export const CANALI_OTP: CanaleOtp[] = ['whatsapp', 'email', 'telegram'];
+export const CANALI_OTP: CanaleOtp[] = ['whatsapp', 'email', 'telegram', 'signal'];
 
 export function canaleValido(valore: unknown): valore is CanaleOtp {
   return typeof valore === 'string' && (CANALI_OTP as string[]).includes(valore);

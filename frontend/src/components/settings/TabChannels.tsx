@@ -86,10 +86,18 @@ interface TabChannelsProps {
   setTgBotUsername: (v: string) => void;
   tgBotToken: string;
   setTgBotToken: (v: string) => void;
-  emailInboundParseUrl: string;
-  setEmailInboundParseUrl: (v: string) => void;
-  signalCliEndpoint: string;
-  setSignalCliEndpoint: (v: string) => void;
+  /**
+   * Signal: indirizzo del demone `signal-cli-rest-api` **dello studio**, token del proxy che lo
+   * espone e numero registrato sopra. Prima c'era un solo campo (`signalCliEndpoint`) che si
+   * salvava e nessuna riga di codice leggeva: il pulsante di prova rispondeva «daemon in ascolto»
+   * senza aver contattato nessuno.
+   */
+  signalEndpoint: string;
+  setSignalEndpoint: (v: string) => void;
+  signalToken: string;
+  setSignalToken: (v: string) => void;
+  signalNumber: string;
+  setSignalNumber: (v: string) => void;
   /**
    * §35 — l'API non restituisce più i valori delle credenziali (regola 6): restituisce
    * `<chiave>Impostata: boolean`. I campi password quindi arrivano vuoti anche quando la
@@ -103,6 +111,7 @@ interface TabChannelsProps {
     waVerifyToken?: boolean;
     waAppSecret?: boolean;
     tgBotToken?: boolean;
+    signalToken?: boolean;
   };
 }
 
@@ -190,10 +199,12 @@ export function TabChannels({
   setTgBotUsername,
   tgBotToken,
   setTgBotToken,
-  emailInboundParseUrl,
-  setEmailInboundParseUrl,
-  signalCliEndpoint,
-  setSignalCliEndpoint,
+  signalEndpoint,
+  setSignalEndpoint,
+  signalToken,
+  setSignalToken,
+  signalNumber,
+  setSignalNumber,
   segretiImpostati,
 }: TabChannelsProps) {
   const segreti = segretiImpostati || {};
@@ -233,11 +244,13 @@ export function TabChannels({
             </div>
             <div style={{ fontSize: 11.5, color: '#cbd5e1', lineHeight: 1.6 }}>
               <strong>1. Associazione per Numero di Telefono (WhatsApp / Signal):</strong><br />
-              Quando il cliente invia un messaggio o un file da cellulare (es. <code>+39 335 1234567</code>), BluMan cerca il numero nell'anagrafica <strong>Clienti ERP</strong> ed associa la chat al Progetto in corso.<br /><br />
+              Quando il cliente invia un messaggio o un file da cellulare (es. <code>+39 335 1234567</code>), BluMan cerca il numero nell'anagrafica <strong>Clienti ERP</strong> ed associa la chat al Progetto in corso. Per Signal il numero va indicato fra i referenti del cliente, in forma internazionale.<br /><br />
               <strong>2. Associazione per Indirizzo Email (Email Inbound):</strong><br />
-              Tutte le email ricevute da <code>client@holdingbeta.advisory</code> vengono collegate al progetto. Includendo <code>[INC-2026-089]</code> nell'oggetto si forza l'assegnazione ad uno specifico incarico.<br /><br />
+              Le email ricevute nella casella configurata qui sopra vengono collegate al progetto del mittente. Includendo il codice dell'incarico nell'oggetto si forza l'assegnazione a uno specifico progetto.<br /><br />
               <strong>3. Associazione Telegram:</strong><br />
-              L'associazione avviene tramite l'handle registrato in anagrafica (es. <code>@RobertoRossi</code>) o codice incarico.
+              Avviene tramite l'<strong>identificativo numerico della chat</strong> (es. <code>123456789</code>), quello che il bot riceve quando il cliente gli scrive: Telegram accetta uno <code>@nomeutente</code> solo per i canali pubblici, e su un cliente non funziona.<br /><br />
+              <strong>4. Canale interno dell'app (Portale Riservato):</strong><br />
+              Non passa da nessun servizio esterno e non ha credenziali: il messaggio resta nella piattaforma e il cliente lo legge nel suo portale, se ha un accesso attivo.
             </div>
           </div>
 
@@ -622,35 +635,24 @@ export function TabChannels({
               </div>
             </div>
 
-            {/* ✉️ EMAIL INBOUND PARSE */}
-            <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 16 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#818cf8', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span>✉️ Email Inbound Webhook Parse (SendGrid / SMTP)</span>
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 12 }}>
-                Tutte le email inviate all'indirizzo dello studio vengono catturate dal webhook ed collegate al Progetto del Cliente.
-              </div>
-              <div className={styles.field}>
-                <label>Webhook URL Inbound Parse Endpoint:</label>
-                <input type="text" value={emailInboundParseUrl} onChange={e => setEmailInboundParseUrl(e.target.value)} style={{ fontSize: 12 }} readOnly />
-              </div>
-            </div>
-
-            {/* 🔒 SIGNAL END-TO-END */}
+            {/* 🔒 SIGNAL — IL DEMONE È DELLO STUDIO */}
             <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 16 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: '#a5b4fc', marginBottom: 4, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>🔒 Signal End-to-End Encrypted Daemon</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>🔒 Signal (demone dello studio)</span>
                 <button
                   type="button"
                   onClick={() => handleTestChannel('signal')}
                   disabled={testingChannel === 'signal'}
                   style={{ background: '#312e81', color: '#fff', border: 'none', padding: '5px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
                 >
-                  {testingChannel === 'signal' ? 'Testing...' : '🧪 Test Signal Daemon'}
+                  {testingChannel === 'signal' ? 'Testing...' : '🧪 Test Signal'}
                 </button>
               </div>
               <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 12 }}>
-                Connessione al container Docker `signal-cli-rest-api` per clienti VIP ad altissima riservatezza.
+                Signal non ha un servizio centrale da chiamare con un token: serve un demone
+                <code> signal-cli-rest-api</code> <strong>tuo</strong>, con un numero registrato sopra,
+                raggiungibile in https. I messaggi dei clienti si leggono dal demone quando apri il
+                fascicolo o premi «Sincronizza» — non c'è nessun indirizzo da registrare presso Signal.
               </div>
 
               {channelTestResult['signal'] && (
@@ -659,9 +661,66 @@ export function TabChannels({
                 </div>
               )}
 
-              <div className={styles.field}>
-                <label>Signal REST Daemon API Endpoint:</label>
-                <input type="text" value={signalCliEndpoint} onChange={e => setSignalCliEndpoint(e.target.value)} style={{ fontSize: 12 }} />
+              <div className={styles.grid2}>
+                <div className={styles.field}>
+                  <label>Indirizzo del demone Signal *:</label>
+                  <input
+                    type="text"
+                    value={signalEndpoint}
+                    onChange={e => setSignalEndpoint(e.target.value)}
+                    placeholder="es. https://signal.iltuostudio.it"
+                    style={{ fontSize: 12 }}
+                  />
+                  <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 3 }}>
+                    Deve essere in <code>https</code>: da qui passano il token e i messaggi dei clienti.
+                    Indirizzi interni o di rete privata vengono rifiutati.
+                  </div>
+                </div>
+                <div className={styles.field}>
+                  <label>Numero Signal dello studio *:</label>
+                  <input
+                    type="text"
+                    value={signalNumber}
+                    onChange={e => setSignalNumber(e.target.value)}
+                    placeholder="es. +393351234567"
+                    style={{ fontSize: 12 }}
+                  />
+                  <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 3 }}>
+                    È il mittente, e deve essere <strong>registrato sul tuo demone</strong>. Serve il
+                    prefisso internazionale: senza, <code>3351234567</code> diventerebbe un numero
+                    francese e il messaggio partirebbe verso un estraneo.
+                  </div>
+                </div>
+                <div className={styles.field}>
+                  <label>Token del demone (se il proxy lo richiede):</label>
+                  <input type="password" value={signalToken} onChange={e => setSignalToken(e.target.value)} placeholder="••••••••••••" style={{ fontSize: 12 }} autoComplete="new-password" />
+                  <NotaSegreto impostata={segreti.signalToken} />
+                  <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 3 }}>
+                    Viaggia nell'intestazione <code>Authorization</code>, mai nell'indirizzo.
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 🌐 CANALE INTERNO DELL'APP (Portale Riservato) */}
+            <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 16 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#6366f1', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span>🌐 Canale interno dell'app (Portale Riservato)</span>
+                <span style={{ fontSize: 10, fontWeight: 600, color: '#34d399', background: '#0d2d22', border: '1px solid #059669', borderRadius: 20, padding: '2px 8px' }}>
+                  sempre attivo
+                </span>
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+                È il canale della piattaforma: l'operatore scrive dal fascicolo e il cliente legge nel
+                suo Portale Riservato, senza che nulla esca verso un servizio esterno. <strong>Non ha
+                credenziali da configurare</strong> — niente token, niente server da ospitare — ed è per
+                questo che è l'unico che non può essere spento da un campo vuoto.
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 8 }}>
+                Perché funzioni serve una cosa sola, che non si configura qui: il cliente deve avere un{' '}
+                <strong>accesso al portale</strong> (email e password, o un Magic Link). Se non ce l'ha, il
+                messaggio resta nel fascicolo ma non lo legge nessuno. Le credenziali del portale si
+                creano dalla scheda del cliente.
               </div>
             </div>
           </div>

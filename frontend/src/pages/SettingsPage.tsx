@@ -70,8 +70,11 @@ export function SettingsPage() {
   const [waCallbackUrl, setWaCallbackUrl] = useState<string | null>(null);
   const [tgBotToken, setTgBotToken] = useState('');
   const [tgBotUsername, setTgBotUsername] = useState('');
-  const [emailInboundParseUrl, setEmailInboundParseUrl] = useState('');
-  const [signalCliEndpoint, setSignalCliEndpoint] = useState('');
+  // Signal: il demone è dello studio, quindi indirizzo, token e numero sono suoi. Il campo
+  // `signalCliEndpoint` che stava qui si salvava e nessuno lo leggeva.
+  const [signalEndpoint, setSignalEndpoint] = useState('');
+  const [signalToken, setSignalToken] = useState('');
+  const [signalNumber, setSignalNumber] = useState('');
 
   // SMTP Server Credentials (Posta in Uscita)
   const [smtpHost, setSmtpHost] = useState('');
@@ -145,7 +148,7 @@ export function SettingsPage() {
   // i campi password restano vuoti (lasciarli vuoti = «non modificare») e questi flag dicono
   // all'operatore che sul server la credenziale c'è già.
   const [segretiImpostati, setSegretiImpostati] = useState<{
-    smtpPass?: boolean; imapPass?: boolean; waAccessToken?: boolean; waVerifyToken?: boolean; waAppSecret?: boolean; tgBotToken?: boolean;
+    smtpPass?: boolean; imapPass?: boolean; waAccessToken?: boolean; waVerifyToken?: boolean; waAppSecret?: boolean; tgBotToken?: boolean; signalToken?: boolean;
   }>({});
   
   const loadTenantData = async () => {
@@ -226,8 +229,8 @@ export function SettingsPage() {
       setRegImprese(tData.regImprese || '');
       setMostraSdi(tData.mostraSdi !== undefined ? tData.mostraSdi : true);
       setMostraIva(tData.mostraIva !== undefined ? tData.mostraIva : true);
-      setEmailInboundParseUrl(tData.emailInboundParseUrl || 'https://bluman.vercel.app/api/webhooks/inbound-email');
-      setSignalCliEndpoint(tData.signalCliEndpoint || 'http://localhost:8080/v1/receive');
+      setSignalEndpoint(tData.signalEndpoint || '');
+      setSignalNumber(tData.signalNumber || '');
       setSegretiImpostati({
         smtpPass: Boolean(tData.smtpPassImpostata),
         imapPass: Boolean(tData.imapPassImpostata),
@@ -235,6 +238,7 @@ export function SettingsPage() {
         waVerifyToken: Boolean(tData.waVerifyTokenImpostata),
         waAppSecret: Boolean(tData.waAppSecretImpostata),
         tgBotToken: Boolean(tData.tgBotTokenImpostata),
+        signalToken: Boolean(tData.signalTokenImpostata),
       });
     }
 
@@ -272,8 +276,11 @@ export function SettingsPage() {
       titoloIntestazione,
       mostraSdi,
       mostraIva,
-      emailInboundParseUrl,
-      signalCliEndpoint,
+      // `emailInboundParseUrl` non si manda più: puntava a una rotta inesistente e il backend
+      // non lo accetta più. La posta in arrivo si legge dalla casella IMAP configurata sopra.
+      signalEndpoint,
+      signalToken,
+      signalNumber,
       waPhoneId,
       waAccessToken,
       waVerifyToken,
@@ -322,6 +329,7 @@ export function SettingsPage() {
           waVerifyToken: Boolean(salvato.waVerifyTokenImpostata),
           waAppSecret: Boolean(salvato.waAppSecretImpostata),
           tgBotToken: Boolean(salvato.tgBotTokenImpostata),
+          signalToken: Boolean(salvato.signalTokenImpostata),
         });
         // Lo slug nasce al primo salvataggio della configurazione WhatsApp: la Callback URL
         // che il server ha appena calcolato è quella da incollare in Meta, e senza aggiornarla
@@ -334,6 +342,7 @@ export function SettingsPage() {
       if (waVerifyToken) setWaVerifyToken('');
       if (waAppSecret) setWaAppSecret('');
       if (tgBotToken) setTgBotToken('');
+      if (signalToken) setSignalToken('');
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
     } catch (err: any) {
@@ -403,7 +412,17 @@ export function SettingsPage() {
   const handleTestChannel = async (channel: 'whatsapp' | 'telegram' | 'signal') => {
     setTestingChannel(channel);
     try {
-      const json = await testChannelApi({ channel, waPhoneId, waAccessToken, tgBotToken, signalCliEndpoint });
+      // La prova Signal non manda più `signalCliEndpoint` (un campo che il server non conosceva):
+      // servono indirizzo **e** numero, perché il numero è il mittente e senza non si spedisce.
+      const json = await testChannelApi({
+        channel,
+        waPhoneId,
+        waAccessToken,
+        tgBotToken,
+        signalEndpoint,
+        signalToken,
+        signalNumber,
+      });
       if (json && json.success) {
         setChannelTestResult(prev => ({ ...prev, [channel]: `✓ ${json.message}` }));
       } else {
@@ -707,10 +726,12 @@ export function SettingsPage() {
           setTgBotUsername={setTgBotUsername}
           tgBotToken={tgBotToken}
           setTgBotToken={setTgBotToken}
-          emailInboundParseUrl={emailInboundParseUrl}
-          setEmailInboundParseUrl={setEmailInboundParseUrl}
-          signalCliEndpoint={signalCliEndpoint}
-          setSignalCliEndpoint={setSignalCliEndpoint}
+          signalEndpoint={signalEndpoint}
+          setSignalEndpoint={setSignalEndpoint}
+          signalToken={signalToken}
+          setSignalToken={setSignalToken}
+          signalNumber={signalNumber}
+          setSignalNumber={setSignalNumber}
           segretiImpostati={segretiImpostati}
         />
       )}

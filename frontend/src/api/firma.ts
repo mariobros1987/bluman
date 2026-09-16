@@ -16,7 +16,7 @@ import { API_BASE, erroreDellaRisposta, fetchWithTimeout, getAuthHeaders } from 
 // Ora un errore è un errore. Se il backend non risponde la firma non avviene, e il
 // cliente legge perché.
 
-export type CanaleOtp = 'whatsapp' | 'email' | 'telegram';
+export type CanaleOtp = 'whatsapp' | 'email' | 'telegram' | 'signal';
 export type AmbitoFirma = 'engagement_letter' | 'documento_vault' | 'modulo_completato' | 'addendum';
 
 export interface CanaleFirma {

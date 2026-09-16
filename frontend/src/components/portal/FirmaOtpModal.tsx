@@ -202,17 +202,20 @@ export function FirmaOtpModal({
           </div>
         )}
 
-        {/* Selettore Canale di Recapito OTP (Switch immediato tra Email, WhatsApp e Telegram) */}
+        {/* Selettore Canale di Recapito OTP — solo i canali che lo studio ha davvero configurato:
+            l'elenco lo decide il backend con `canaliFirmaApi`, e un canale spento arriva qui con
+            `disponibile: false` e il motivo, invece di far scegliere e poi fallire. */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span>Scegli o cambia il canale di ricezione codice:</span>
             <span style={{ color: '#818cf8', fontWeight: 800 }}>{nomeCanale[otpCanale]}</span>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
             {[
               { id: 'email' as const, label: '✉️ Email' },
               { id: 'whatsapp' as const, label: '📱 WhatsApp' },
               { id: 'telegram' as const, label: '✈️ Telegram' },
+              { id: 'signal' as const, label: '🔒 Signal' },
             ].map((c) => {
               const isSelected = otpCanale === c.id;
               return (
@@ -271,7 +274,7 @@ export function FirmaOtpModal({
           </div>
           {otpTarget && (
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12, fontWeight: 700, color: '#a5b4fc', gap: 10 }}>
-              <span>{otpCanale === 'email' ? '📬 Inviato a:' : otpCanale === 'telegram' ? '✈️ Inviato a:' : '📱 Inviato a:'}</span>
+              <span>{otpCanale === 'email' ? '📬 Inviato a:' : otpCanale === 'telegram' ? '✈️ Inviato a:' : otpCanale === 'signal' ? '🔒 Inviato a:' : '📱 Inviato a:'}</span>
               <span>{otpTarget}</span>
             </div>
           )}

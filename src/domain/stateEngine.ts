@@ -10,6 +10,18 @@
 
 import type { MicrovoceInput, StatoMicrovoce, StatoModulo, StatoProgetto } from './types.js';
 
+/**
+ * Il progetto è in corso, cioè è quello su cui instradare un messaggio in arrivo.
+ *
+ * Vive qui e non nei percorsi di ingestione perché è una regola di dominio, e perché era scritta
+ * tre volte — due in `src/routes/webhooks.ts` e, per Signal, servirebbe una terza. Chi aggiunge
+ * uno stato al ciclo di vita del progetto lo aggiunge qui, e i tre canali lo seguono insieme:
+ * è esattamente il genere di regola che, duplicata, diverge.
+ */
+export function isProgettoAttivo(stato: string | null | undefined): boolean {
+  return stato === 'in_progress';
+}
+
 // ── §16.1 — Funzioni sulla micro-voce ──────────────────────────────────────
 
 export interface SegnaleRischio {

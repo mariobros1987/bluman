@@ -26,6 +26,17 @@ export interface Cliente {
   pec?: string;
   telefono?: string;
   cellulare?: string;
+  /**
+   * Chat id numerica del bot dello studio: è quello che `sendMessage` vuole, e la chat esiste
+   * solo dopo che il cliente ha scritto almeno una volta al bot. È una colonna del cliente.
+   */
+  telegramChatId?: string;
+  /**
+   * `telegram` e `signal` non sono colonne: `serializzaCliente` distende il `referentiJson`
+   * sanificato nella risposta, quindi arrivano da lì. Per Signal è anche l'unico posto in cui il
+   * recapito vive — `recapitiCliente` lato server legge `referentiJson.signal` e non ripiega sul
+   * cellulare, perché un numero Signal non è un numero qualsiasi.
+   */
   telegram?: string;
   signal?: string;
   referenteNome?: string;

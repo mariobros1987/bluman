@@ -24,6 +24,7 @@ import {
   recordAudit,
 } from '../util/serverHelpers.js';
 import { CreaClienteSchema } from '../schemas/clienti.schema.js';
+import { chatIdTelegram } from '../services/telegramService.js';
 import { clienteIdDalJwt, richiediRuolo } from '../util/authorization.js';
 import { campoOrdinamento, creaMetaPaginazione, leggiPaginazione } from '../util/paginazione.js';
 
@@ -227,9 +228,16 @@ export async function registraRotteClienti(server: FastifyInstance, app: AppPort
     // lo inviava, finiva solo dentro `referentiJson`, e `cliente.cellulare` restava NULL per
     // tutti. Conseguenza: il canale WhatsApp del portale risultava indisponibile con il motivo
     // «Nessun cellulare in anagrafica» anche per chi il numero ce l'aveva.
-    // `telegram` NON diventa `telegramChatId`: quello del form è lo @username, la chat id la
-    // produce il bot quando il cliente gli scrive.
     const clientCellulare = pulisciRecapito(b.cellulare) ?? pulisciRecapito(referentiObj?.cellulare) ?? pulisciRecapito(referentiObj?.whatsapp);
+    // Stessa storia, peggiore: `telegramChatId` era letto da quattro punti — l'OTP di firma, la
+    // scheda cliente, i webhook e `recapitiCliente` — e non lo scriveva nessuno. Il campo del
+    // form salvava uno `@username`, che `sendMessage` rifiuta: il canale risultava configurato
+    // in anagrafica e restava per sempre indisponibile all'invio. Qui si tiene solo ciò che
+    // `chatIdTelegram` riconosce come chat id; un username non diventa una chat id inventata.
+    const clientTelegramChatId = chatIdTelegram(b.telegramChatId)
+      ?? chatIdTelegram(referentiObj?.telegramChatId)
+      ?? chatIdTelegram(b.telegram)
+      ?? chatIdTelegram(referentiObj?.telegram);
     const passwordHash = b.password ? hashPassword(b.password) : null;
 
     try {
@@ -240,6 +248,7 @@ export async function registraRotteClienti(server: FastifyInstance, app: AppPort
           tipo: b.tipo,
           email: clientEmail,
           cellulare: clientCellulare,
+          telegramChatId: clientTelegramChatId,
           canaleOtpPreferito: canaleOtpValido(b.canaleOtpPreferito) ? b.canaleOtpPreferito : null,
           passwordHash,
           piva: b.piva || null,
@@ -315,6 +324,14 @@ export async function registraRotteClienti(server: FastifyInstance, app: AppPort
       ? pulisciRecapito(b.cellulare)
       : (pulisciRecapito(referentiObj?.cellulare) ?? pulisciRecapito(referentiObj?.whatsapp) ?? undefined);
 
+    // Come per il cellulare: `undefined` quando la richiesta non parla di Telegram, così una
+    // modifica parziale non cancella una chat id già registrata. Un valore presente ma non
+    // numerico diventa `null`, che è il modo di dire «toglila»: lasciare la vecchia
+    // significherebbe continuare a spedire a una chat che l'operatore ha appena svuotato.
+    const clientTelegramChatId = (b.telegramChatId !== undefined || b.telegram !== undefined)
+      ? chatIdTelegram(b.telegramChatId ?? b.telegram)
+      : (chatIdTelegram(referentiObj?.telegramChatId) ?? chatIdTelegram(referentiObj?.telegram) ?? undefined);
+
     try {
       const updated = await prisma.cliente.update({
         where: { id },
@@ -323,6 +340,7 @@ export async function registraRotteClienti(server: FastifyInstance, app: AppPort
           tipo: b.tipo !== undefined ? b.tipo : undefined,
           email: clientEmail,
           cellulare: clientCellulare,
+          telegramChatId: clientTelegramChatId,
           canaleOtpPreferito: canaleOtpValido(b.canaleOtpPreferito) ? b.canaleOtpPreferito : undefined,
           piva: b.piva !== undefined ? b.piva : undefined,
           codiceFiscale: b.codiceFiscale !== undefined ? b.codiceFiscale : (b.codFisc !== undefined ? b.codFisc : undefined),

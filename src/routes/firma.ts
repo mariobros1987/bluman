@@ -30,6 +30,7 @@ import {
   mascheraRecapito,
   descriviCanaleVerificato,
   canaleValido,
+  CANALI_OTP,
   TTL_OTP_SECONDI,
   ATTESA_REINVIO_SECONDI,
   type CanaleOtp,
@@ -702,6 +703,7 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
         whatsapp: recapiti.cellulare,
         email: recapiti.email,
         telegram: recapiti.telegramChatId,
+        signal: recapiti.signal,
       };
 
       return reply.send({
@@ -750,7 +752,10 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
 
     if (!clienteId) return reply.code(400).send({ errore: 'Cliente non identificato nella sessione.' });
     if (!canaleValido(canale)) {
-      return reply.code(400).send({ errore: 'Canale non valido. Ammessi: whatsapp, email, telegram.' });
+      // L'elenco si compone da `CANALI_OTP`: scritto a mano, diceva «whatsapp, email, telegram»
+      // anche quando il server ne accettava già altri, e il cliente leggeva un rifiuto che
+      // elencava canali diversi da quelli realmente disponibili.
+      return reply.code(400).send({ errore: `Canale non valido. Ammessi: ${CANALI_OTP.join(', ')}.` });
     }
     if (!ambitoValido(ambito)) {
       return reply.code(400).send({ errore: 'Ambito di firma non valido.' });
@@ -771,6 +776,7 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
         whatsapp: risolti.cellulare,
         email: risolti.email,
         telegram: risolti.telegramChatId,
+        signal: risolti.signal,
       };
 
       // Telegram è l'unico canale dove il recapito non si può dichiarare: la chat id non è
@@ -784,7 +790,9 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
             ? 'Nessun cellulare in anagrafica: indica un numero o scegli un altro canale.'
             : canale === 'email'
               ? 'Nessuna email in anagrafica: indica un indirizzo o scegli un altro canale.'
-              : 'Canale Telegram non collegato: scrivi prima al bot dello studio.';
+              : canale === 'signal'
+                ? 'Nessun numero Signal in anagrafica: indicalo, oppure scegli un altro canale.'
+                : 'Canale Telegram non collegato: scrivi prima al bot dello studio.';
         return reply.code(400).send({ errore: cosaManca });
       }
 

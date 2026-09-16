@@ -37,9 +37,16 @@ async function runAllVerificationChecks() {
   // che sono quelle in cui un difetto finisce dentro un verbale di firma.
   console.log('🔐 [1/4] Test Modulo OTP & Firma Elettronica Semplice (SES · art. 20 CAD)...');
 
+  // I quattro canali hanno una rotta di invio vera (`invioCodiceOtp` li copre tutti); `sms`
+  // resta fuori perché nel server non esiste nessun provider che lo spedisca. Prima qui
+  // c'era `length === 3`, che era la fotografia di un elenco e non una condizione: quando
+  // Signal è diventato un canale vero il presidio è diventato rosso senza che niente fosse
+  // rotto. Scritto per nome, dice cosa deve essere vero.
   assertTest(
     'Canali OTP offerti = canali che il server sa spedire (nessun SMS fantasma)',
-    CANALI_OTP.length === 3 && !canaleValido('sms') && canaleValido('whatsapp'),
+    CANALI_OTP.length === 4
+      && canaleValido('whatsapp') && canaleValido('email') && canaleValido('telegram') && canaleValido('signal')
+      && !canaleValido('sms'),
     `Canali: ${CANALI_OTP.join(', ')}`,
   );
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { fetchComunicazioniApi, inviaComunicazioneApi, segnaComunicazioniLetteApi, fetchClienti, sendWhatsAppDirectApi, sendEmailDirectApi, fetchInboundImapEmailsApi, fetchInboundImapAllegatiApi, fetchTenantInfoApi, uploadFileApi, urlDocumentoAssoluto } from '../api/client';
+import { fetchComunicazioniApi, inviaComunicazioneApi, segnaComunicazioniLetteApi, fetchClienti, sendWhatsAppDirectApi, sendEmailDirectApi, sendSignalDirectApi, sendTelegramDirectApi, fetchInboundImapEmailsApi, fetchInboundImapAllegatiApi, fetchTenantInfoApi, uploadFileApi, urlDocumentoAssoluto } from '../api/client';
 import { downloadGuidePdf } from '../utils/pdfGenerator';
 import { getCurrentTenantId, getTenantStorageKey, getStudioInfoForTenant, BLUECODE_TENANT_ID } from '../utils/tenant';
 import type { Cliente } from '../types';
@@ -159,9 +159,18 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
     // verso quei recapiti, cioè verso persone estranee al fascicolo, e l'interfaccia diceva
     // «recapitato con successo». Un recapito che non c'è resta vuoto e blocca l'invio.
     const email = clientData?.email || refJson.email || emailCliente || '';
-    const whatsapp = clientData?.cellulare || refJson.cellulare || refJson.whatsapp || clientData?.telefono || refJson.telefono || '';
-    const telegram = clientData?.telegram || refJson.telegram || '';
-    const signal = clientData?.signal || refJson.signal || clientData?.cellulare || refJson.cellulare || clientData?.telefono || refJson.telefono || '';
+    // Gli stessi recapiti che legge il backend, o il canale risulta disponibile qui e non là.
+    // `telefono` non è un numero WhatsApp — può essere un fisso, e il backend lo rifiuta per
+    // questo: lasciarlo passare qui significava offrire un canale che Meta avrebbe respinto.
+    const whatsapp = clientData?.cellulare || refJson.cellulare || refJson.whatsapp || '';
+    // La chat id, non `@username`: è quello che `sendMessage` vuole, ed è il campo che
+    // l'anagrafica ha davvero (`telegramChatId`).
+    const telegram = clientData?.telegramChatId || refJson.telegramChatId || '';
+    // Signal non ha una colonna sua: il recapito vive in `referentiJson.signal`, come legge
+    // `recapitiCliente` lato server. Non ricade su cellulare e telefono: il numero deve avere un
+    // account Signal, e presumere che ce l'abbia manda il messaggio nel vuoto — o a chi quel
+    // numero lo ha come normale SIM.
+    const signal = refJson.signal || '';
     const referente = clientData?.referenteNome || refJson.referenteNome || refJson.referente || clientData?.ubo || nomeCliente || 'Referente Incarico';
 
     return {
@@ -497,14 +506,62 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
         } else {
           setFeedback({ tipo: 'err', testo: `WhatsApp non ha accettato l'invio verso ${contactInfo.whatsapp}: ${res?.errore || 'motivo non riportato'}. Il messaggio resta nel registro del fascicolo.` });
         }
+      } else if (canaleSelezionato === 'signal') {
+        // 4. Signal: dispatch tramite POST /comunicazioni/invia-signal, col demone dello studio.
+        // Questo ramo non c'era, e la sua assenza era il difetto peggiore della chat: Signal era
+        // una voce dell'elenco e sceglierlo faceva cadere il flusso nell'`else` finale, che
+        // rispondeva «Messaggio registrato e notificato via SIGNAL al cliente!». Nessun demone
+        // veniva contattato: il cliente non riceveva niente e l'operatore credeva di sì.
+        const destSignal = (contactInfo.signal || '').trim();
+        if (!destSignal) {
+          setFeedback({ tipo: 'err', testo: `Nessun numero Signal per ${nomeCliente || 'il cliente'}: indicane uno in forma internazionale fra i referenti dell'anagrafica.` });
+          setInviando(false);
+          return;
+        }
+        if (!/^(\+|00)[1-9][\d\s.\-()]{6,}$/.test(destSignal)) {
+          // Il backend rifiuta comunque un numero senza prefisso, ma qui si dice *prima*: senza
+          // il `+39`, `3351234567` diventerebbe `+3351234567`, cioè un numero francese.
+          setFeedback({ tipo: 'err', testo: `Il numero Signal ${destSignal} non è in forma internazionale: serve il prefisso, per esempio +393351234567.` });
+          setInviando(false);
+          return;
+        }
+        const resSignal = await sendSignalDirectApi(
+          destSignal,
+          testoDaInviare,
+          fileAllegato ? [{ nome: fileAllegato.nome, base64: fileAllegato.base64 }] : undefined,
+        );
+        if (resSignal && resSignal.success) {
+          setFeedback({ tipo: 'ok', testo: `✓ Messaggio Signal recapitato a ${destSignal}` });
+        } else {
+          setFeedback({ tipo: 'err', testo: `Signal non ha accettato l'invio verso ${destSignal}: ${resSignal?.errore || 'motivo non riportato'}. Il messaggio resta nel registro del fascicolo.` });
+        }
+      } else if (canaleSelezionato === 'telegram') {
+        // 5. Telegram: stessa storia di Signal. La chiamata al Bot API era privata dentro
+        // `otpDispatch.ts`, quindi non raggiungibile da qui, e il ramo mancante finiva nell'`else`
+        // che annunciava la consegna. Ora la chiamata sta in `telegramService.ts` e c'è una rotta.
+        const destTelegram = (contactInfo.telegram || '').trim();
+        if (!destTelegram) {
+          setFeedback({ tipo: 'err', testo: `Nessuna chat Telegram per ${nomeCliente || 'il cliente'}: il cliente deve prima scrivere al bot dello studio, poi la chat id va in anagrafica.` });
+          setInviando(false);
+          return;
+        }
+        if (!/^-?\d{5,20}$/.test(destTelegram)) {
+          setFeedback({ tipo: 'err', testo: `«${destTelegram}» non è una chat Telegram: serve l'identificativo numerico, quello che il bot riceve quando il cliente gli scrive.` });
+          setInviando(false);
+          return;
+        }
+        const resTelegram = await sendTelegramDirectApi(destTelegram, testoDaInviare);
+        if (resTelegram && resTelegram.success) {
+          setFeedback({ tipo: 'ok', testo: `✓ Messaggio Telegram recapitato alla chat ${destTelegram}` });
+        } else {
+          setFeedback({ tipo: 'err', testo: `Telegram non ha accettato l'invio: ${resTelegram?.errore || 'motivo non riportato'}. Il messaggio resta nel registro del fascicolo.` });
+        }
       } else if (canaleSelezionato === 'portal') {
-        // 4. Portale Riservato: il messaggio è già stato persistito a database al punto 1.
+        // 6. Portale Riservato: il messaggio è già stato persistito a database al punto 1.
         // Non serve nessun dispatch esterno: il polling del TabContatti (5 s) lo mostrerà
         // al cliente senza che ricarichi la pagina. Il badge del canale lo distingue dagli
         // altri nella timeline.
         setFeedback({ tipo: 'ok', testo: `✓ Messaggio inviato sul Portale Riservato di ${contactInfo.referente || nomeCliente}: visibile al cliente entro 5 secondi.` });
-      } else {
-        setFeedback({ tipo: 'ok', testo: `✓ Messaggio registrato e notificato via ${canaleSelezionato.toUpperCase()} al cliente!` });
       }
     } catch (err) {
       // Prima ogni errore diventava «✓ Messaggio salvato nel registro del progetto!»: il

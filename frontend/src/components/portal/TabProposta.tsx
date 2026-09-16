@@ -525,6 +525,7 @@ export function TabProposta({
                           whatsapp: { icona: '🟢', sfondo: '#0d2d22', bordo: '#059669', testo: '#34d399' },
                           email: { icona: '✉️', sfondo: '#1e1b4b', bordo: '#6366f1', testo: '#818cf8' },
                           telegram: { icona: '✈️', sfondo: '#0c2b3f', bordo: '#0ea5e9', testo: '#38bdf8' },
+                          signal: { icona: '🔒', sfondo: '#1e1b4b', bordo: '#4338ca', testo: '#a5b4fc' },
                         };
                         const s = stile[c.canale];
                         const scelto = otpCanale === c.canale;

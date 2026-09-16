@@ -22,9 +22,16 @@ describe('🧪 Nuove Funzionalità Enterprise — Test Suite di Collaudo', () =>
     it('non offre canali che il server non sa spedire', () => {
       // Il canale SMS era nell'interfaccia e nel tipo senza nessun provider dietro:
       // sceglierlo produceva un codice mai consegnato e una firma impossibile da chiudere.
-      expect(CANALI_OTP).toEqual(['whatsapp', 'email', 'telegram']);
+      //
+      // `signal` è in elenco per la ragione opposta, e va tenuto tale: è stato aggiunto solo
+      // dopo che `inviaCodiceOtp` ha avuto un ramo vero che parla col demone dello studio
+      // (`signalService.ts`) e dopo che `canaliDisponibili` ha saputo dire quando è spento.
+      // Se un giorno quel ramo sparisse lasciando la voce in elenco, questo test non se ne
+      // accorgerebbe — lo presidia `signalService.test.ts`, che verifica il rifiuto motivato.
+      expect(CANALI_OTP).toEqual(['whatsapp', 'email', 'telegram', 'signal']);
       expect(canaleValido('sms')).toBe(false);
       expect(canaleValido('whatsapp')).toBe(true);
+      expect(canaleValido('signal')).toBe(true);
       expect(canaleValido('')).toBe(false);
       expect(canaleValido(undefined)).toBe(false);
     });
