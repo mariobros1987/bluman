@@ -1,7 +1,8 @@
 # 🛠️ BluMan — Piano di Miglioramento e Implementazione
 
-> **Data**: 2025-07-14 (creazione) — ultimo aggiornamento in calce
-> **Stato**: Fasi 0 e 1 completate, 6.1 CI/CD completata; Fasi 2-5 e resto Fase 6 in attesa
+> **Data**: 2025-07-14 (creazione) — ultimo aggiornamento al 2026-09-16
+> **Stato**: Fasi 0 e 1 completate, 6.1 CI/CD completata; Fasi 2-5 e resto Fase 6 in attesa.
+> **I lavori aperti del momento stanno nella sezione [1bis](#1bis-lavori-aperti--stato-al-16092026)** — è lì che si scrive cosa manca.
 > **Autore**: Analisi AI completa del codebase
 > **Priorità**: 🔴 Critica (sicurezza) → 🟠 Alta → 🟡 Media → 🟢 Bassa
 
@@ -46,6 +47,37 @@
 | 10 | Nessuna validazione input strutturata | Injection, dati malformati | 2.2 |
 | 11 | Nessuna paginazione | Performance con dati crescenti | 4.1 |
 | 12 | Rate limit in-memory | Inefficace con più repliche | 4.2 |
+
+---
+
+## 1bis. Lavori aperti — stato al 16/09/2026
+
+> Questa sezione è il posto dove si scrive cosa **manca**, perché il grafo (`graphify-out/`) è
+> generato e non può ospitarlo. Va tenuta corta e cancellata man mano che le voci si chiudono.
+
+### Canali di comunicazione per studio
+
+**Fatto.** WhatsApp, Telegram e Signal instradano il messaggio nel fascicolo solo quando
+mittente e progetto sono univoci; negli altri casi scrivono la riga di idempotenza e avvisano
+lo studio con `tipoEvento: 'messaggio_non_instradabile'`
+(`src/services/ingressoSenzaFascicolo.ts`). La scheda Telegram ha il pulsante che registra il
+webhook e il pannello che ne legge lo stato da `getWebhookInfo`.
+
+**Lezione da non perdere.** Ogni rotta di ingresso scarta il messaggio in **due** punti —
+mittente non attribuibile e progetto non univoco — e la prima correzione ne aveva collegato
+uno solo per canale. WhatsApp li aveva entrambi, Telegram e Signal no: da qui un guasto che
+sembrava inspiegabile, con l'invio funzionante e la ricezione no. **Quando si tocca uno dei
+due rami, si tocchi anche l'altro**, in tutti i canali.
+
+### Da fare
+
+| # | Cosa | Dove | Come si chiude |
+|---|------|------|----------------|
+| 1 | **Verifica in ricezione Telegram** | produzione | Scrivere al bot `@BlueCodeStudio_Bot` e controllare che il messaggio compaia nel fascicolo, o che arrivi l'avviso «Messaggio Telegram non archiviato» |
+| 2 | **Le migrazioni non le applica nessuno** | `scripts/distribuisci.sh` | Lo script contiene zero occorrenze di `migrate`: ogni migrazione è un passo manuale che nessun automatismo ricorda. Aggiungere `prisma migrate deploy` al percorso di distribuzione, o un promemoria esplicito |
+| 3 | **Migrazioni del 16/09 da confermare in produzione** | `prisma/migrations/` | `20260916180000_whatsapp_app_per_studio` e `20260916190000_signal_per_studio`. Se non applicate, le colonne `wa_app_id`, `signal_endpoint` e le altre non esistono e le schede Signal/WhatsApp-per-studio falliscono |
+| 4 | **Il ramo WhatsApp ha ancora uno scarto silenzioso** | `src/routes/webhooks.ts` | `if (!providerId || !fromNumber) continue;` — messaggio senza id o senza mittente. Non c'è modo di costruire una chiave di idempotenza, quindi l'avviso non si può mandare come gli altri: va deciso se registrare l'evento in altro modo o lasciarlo |
+| 5 | **La cache del grafo è versionata** | `graphify-out/cache/` | 72 file che cambiano a ogni estrazione, e a ogni aggiornamento di CLI la directory viene rinominata lasciando indietro la vecchia. Vale la pena toglierla dal versionamento (`.gitignore` + `git rm -r --cached`) |
 
 ---
 
