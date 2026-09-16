@@ -46,6 +46,46 @@ export function chatIdTelegram(valore: string | null | undefined): string | null
 }
 
 /**
+ * Traduce la risposta di Telegram in una frase che dice cosa fare.
+ *
+ * Telegram risponde in inglese e in gergo: «Forbidden: the bot can't send messages to the bot»
+ * non fa pensare all'identificativo sbagliato, e chi lo legge va a cercare il difetto nel posto
+ * sbagliato — è successo davvero, ed è il motivo per cui questa funzione esiste. Il testo
+ * originale resta in coda, perché chi conosce l'API lo cerca.
+ *
+ * I casi tradotti sono quelli che si incontrano configurando uno studio: la chat id presa da
+ * `getMe` invece che dalla conversazione, un cliente che non ha mai scritto al bot, un bot
+ * bloccato. Il resto esce com'è: inventare una spiegazione per un errore che non si conosce è
+ * peggio che riportarlo.
+ */
+export function spiegaErroreTelegram(descrizione: string): string {
+  const d = descrizione.toLowerCase();
+  const originale = ` (Telegram: «${descrizione}»)`;
+
+  // L'identificativo è quello del bot stesso. Capita leggendo `getMe`, o `getUpdates` prima che
+  // il cliente scriva: `getMe` risponde con l'id del bot, ed è quello che viene copiato.
+  if (d.includes("can't send messages to the bot") || d.includes('can not send messages to the bot')) {
+    return 'la chat id configurata è quella del bot stesso, non del cliente. Non usare l\'identificativo '
+      + 'che risponde `getMe`: serve il `chat.id` (o `message.from.id`) che compare in `getUpdates` '
+      + 'dopo che il cliente ha scritto al bot.' + originale;
+  }
+  if (d.includes('chat not found')) {
+    return 'quella chat non esiste, oppure il cliente non ha mai scritto al bot. Telegram permette al bot '
+      + 'di scrivere solo a chi gli ha scritto almeno una volta: chiedi al cliente di aprire il bot e '
+      + 'premere Avvio, poi riprova.' + originale;
+  }
+  if (d.includes('bot was blocked by the user') || d.includes('user is deactivated')) {
+    return 'il destinatario ha bloccato il bot, oppure l\'account non esiste più. Il messaggio non '
+      + 'arriverà finché non sblocca.' + originale;
+  }
+  if (d.includes('not enough rights') || d.includes('have no rights')) {
+    return 'il bot non ha il permesso di scrivere in quella chat: in un gruppo serve che sia stato '
+      + 'promosso, o che i permessi di invio non siano limitati.' + originale;
+  }
+  return descrizione;
+}
+
+/**
  * Spedisce un messaggio di testo.
  *
  * Telegram non ha la finestra di 24 ore di WhatsApp: il bot può scrivere a chi gli ha scritto
@@ -85,7 +125,7 @@ export async function inviaTestoTelegram(
     const dettaglio: any = await risposta.json().catch(() => null);
     if (!risposta.ok || dettaglio?.ok === false) {
       const motivo = dettaglio?.description || `HTTP ${risposta.status}`;
-      return { ok: false, errore: `Telegram non ha accettato l'invio: ${motivo}` };
+      return { ok: false, errore: `Telegram non ha accettato l'invio: ${spiegaErroreTelegram(motivo)}` };
     }
 
     return { ok: true };

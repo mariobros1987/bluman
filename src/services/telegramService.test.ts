@@ -7,7 +7,7 @@
  * ogni rifiuto abbia un motivo e che nessuna richiesta parta prima dei controlli.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { chatIdTelegram, inviaTestoTelegram, telegramConfigurato } from './telegramService.js';
+import { chatIdTelegram, inviaTestoTelegram, spiegaErroreTelegram, telegramConfigurato } from './telegramService.js';
 
 const BOT = { tgBotToken: '123456:token-di-prova', tgBotUsername: 'studio_bot' };
 
@@ -124,5 +124,47 @@ describe('inviaTestoTelegram — la richiesta', () => {
 
     expect(esito.ok).toBe(false);
     expect(esito.errore).toMatch(/Invio Telegram non riuscito/i);
+  });
+});
+
+describe('spiegaErroreTelegram — la risposta di Telegram tradotta in cosa fare', () => {
+  /**
+   * Il caso vero, capitato in produzione il 16/09/2026: la chat id configurata era quella del
+   * bot, e Telegram aveva risposto «Forbidden: the bot can't send messages to the bot». Il
+   * messaggio è arrivato intatto all'utente, che ha dovuto indovinare cosa significasse.
+   */
+  it('la chat id del bot: dice quale identificativo serve invece di quello', () => {
+    const spiegazione = spiegaErroreTelegram("Forbidden: the bot can't send messages to the bot");
+
+    expect(spiegazione).toMatch(/chat id configurata è quella del bot/i);
+    expect(spiegazione).toMatch(/getMe/);
+    expect(spiegazione).toMatch(/getUpdates/);
+    // L'originale resta: chi conosce l'API lo cerca, e senza non saprebbe cosa ha risposto.
+    expect(spiegazione).toContain("the bot can't send messages to the bot");
+  });
+
+  it('chat not found: la causa vera è che il cliente non ha mai scritto al bot', () => {
+    const spiegazione = spiegaErroreTelegram('Bad Request: chat not found');
+
+    expect(spiegazione).toMatch(/non ha mai scritto al bot/i);
+    expect(spiegazione).toMatch(/Avvio/i);
+  });
+
+  it('bot bloccato dal destinatario', () => {
+    expect(spiegaErroreTelegram('Forbidden: bot was blocked by the user')).toMatch(/ha bloccato il bot/i);
+  });
+
+  it('un errore che non si conosce esce com\'è, senza spiegazioni inventate', () => {
+    // Inventare una causa per un errore non previsto manderebbe a cercare il difetto altrove.
+    expect(spiegaErroreTelegram('Bad Request: something entirely new')).toBe('Bad Request: something entirely new');
+  });
+
+  it('l\'invio fallito porta la spiegazione, non il solo testo di Telegram', async () => {
+    fetchFinto.mockResolvedValueOnce(risposta({ ok: false, description: "Forbidden: the bot can't send messages to the bot" }));
+
+    const esito = await inviaTestoTelegram(BOT, '123456789', 'ciao');
+
+    expect(esito.ok).toBe(false);
+    expect(esito.errore).toMatch(/chat id configurata è quella del bot/i);
   });
 });

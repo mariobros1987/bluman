@@ -558,6 +558,8 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
                   <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 3 }}>
                     Solo il numero: lo <code>@nomeutente</code> non funziona sui clienti. Il cliente scrive
                     una volta al bot dello studio e la chat id compare fra gli aggiornamenti ricevuti.
+                    <strong> Non è</strong> l'identificativo che risponde <code>getMe</code>: quello è del
+                    bot, e Telegram risponde «the bot can't send messages to the bot».
                   </div>
                 </div>
               </div>
