@@ -160,9 +160,12 @@ if [ "$SOLO_PUSH" -eq 0 ]; then
     exit 1
   fi
 
-  "$RAILWAY" up --detach
+  # --service bluman-api è OBBLIGATORIO: il servizio linkato alla CLI dipende
+  # dalla macchina (qui è cron-notifiche, residuo della configurazione cron) e
+  # senza il flag il backend finisce sul servizio sbagliato — successo del 16/09/2026.
+  "$RAILWAY" up --service bluman-api --detach
   successo "Backend inviato a Railway (build avviata in background)."
-  echo "• Puoi monitorare i log con: $RAILWAY logs"
+  echo "• Puoi monitorare i log con: $RAILWAY logs --service bluman-api"
 
   # 6. Verifica post-deploy: l'health DEVE rispondere sul dominio di produzione. La build
   #    Railway gira in background (--detach): si attende che il nuovo container risponda,
