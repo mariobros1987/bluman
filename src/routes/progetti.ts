@@ -368,6 +368,59 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
   });
 
   /**
+   * PUT /progetti/:id/archivia — archivia un progetto, o lo ripristina.
+   *
+   * È il ripiego che la rotta di eliminazione stessa indica quando il progetto ha
+   * fatture o note di credito («È necessario archiviarlo»), quindi dev'essere **sempre**
+   * disponibile: l'unica condizione è il ruolo. Il contratto è: si elimina solo un
+   * progetto senza fatture né note di credito; archiviare si può sempre.
+   *
+   * Questa rotta **mancava**. Il port dichiarava `archiviaProgetto`, entrambi gli
+   * adattatori la implementavano e il frontend la chiamava da `ProjectDetail.tsx`
+   * (`archiviaProgettoApi` → `PUT /progetti/:id/archivia`), ma nessuno la esponeva:
+   * il pulsante prendeva un 404 e l'archiviazione non era raggiungibile da nessuna
+   * parte. Il ripiego esisteva in tre pezzi su quattro.
+   */
+  server.put<{ Params: { id: string }; Body: { archiviato?: unknown } }>(
+    '/progetti/:id/archivia',
+    async (req, reply) => {
+      const { id } = req.params;
+      const tenantId = req.tenantId;
+      const ruoloRichiedente = req.ruolo as string | undefined;
+
+      if (ruoloRichiedente !== 'super_admin' && ruoloRichiedente !== 'advisor') {
+        return reply
+          .code(403)
+          .send({ errore: 'Solo il responsabile dello studio può archiviare un progetto.' });
+      }
+
+      // Nessun valore di ripiego: il verso dell'operazione lo decide il chiamante, e
+      // indovinarlo qui archivierebbe (o ripristinerebbe) un progetto per sbaglio.
+      const archiviato = req.body?.archiviato;
+      if (typeof archiviato !== 'boolean') {
+        return reply
+          .code(400)
+          .send({ errore: 'Campo «archiviato» mancante o non booleano.' });
+      }
+
+      await app.archiviaProgetto(id, archiviato, tenantId);
+
+      await recordAudit({
+        tenantId,
+        userId: req.user?.userId,
+        userEmail: req.user?.email,
+        ruolo: ruoloRichiedente,
+        azione: archiviato ? 'PROGETTO_ARCHIVIATO' : 'PROGETTO_RIPRISTINATO',
+        entita: 'Progetto',
+        dettagli: `Progetto ${id} ${archiviato ? 'archiviato' : 'ripristinato'}`,
+        ipAddress: req.ip,
+      });
+
+      return reply.send({ ok: true, id, archiviato });
+    },
+  );
+
+  /**
    * DELETE /progetti/:id/moduli/:moduloId — §1.1bis
    *
    * Rimuove un singolo modulo (con tutte le sue micro-voci e documenti) da un progetto.

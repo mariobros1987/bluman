@@ -413,9 +413,25 @@ export class PrismaApp implements AppPort {
     return progetti;
   }
 
-  async archiviaProgetto(id: string, archiviato: boolean): Promise<void> {
+  async archiviaProgetto(id: string, archiviato: boolean, tenantId?: string): Promise<void> {
+    // Stesso schema di `eliminaProgetto`: il tenant della richiesta può differire da
+    // quello del costruttore (super_admin che opera su un altro studio via X-Tenant-Id,
+    // §2bis), quindi se è passato prevale.
+    //
+    // L'appartenenza si verifica con un `findFirst` e non filtrando la `update`:
+    // `Progetto` ha `id` come unico campo unico, e un `where: { id, tenantId }` sulla
+    // update non è affidabile quanto un filtro esplicito — è la stessa ragione per cui
+    // `eliminaProgetto` lo fa così. L'isolamento lo doppia comunque la RLS.
+    const tenantEffettivo = tenantId ?? this.tenantId;
+    const esistente = await this.prisma.progetto.findFirst({
+      where: { id, tenantId: tenantEffettivo },
+      select: { id: true },
+    });
+    if (!esistente) {
+      throw new ProgettoNonTrovatoError(`Progetto ${id} non trovato in questo studio.`);
+    }
     await this.prisma.progetto.update({
-      where: { id, tenantId: this.tenantId },
+      where: { id },
       data: { stato: (archiviato ? 'archived' : 'in_progress') as any },
     });
   }

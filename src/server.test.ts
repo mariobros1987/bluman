@@ -844,6 +844,112 @@ describe('server — DELETE /progetti/:id (§1.1 PIANO_DI_MIGLIORAMENTO)', () =>
   });
 });
 
+/**
+ * Il contratto dei due esiti, che è quello che il titolare ha chiesto esplicitamente:
+ * si elimina solo un progetto senza fatture né note di credito, mentre archiviare si
+ * può **sempre**. La rotta di archiviazione mancava del tutto: il port dichiarava
+ * `archiviaProgetto`, entrambi gli adattatori la implementavano e il frontend la
+ * chiamava, ma nessuno la esponeva — il pulsante prendeva un 404.
+ */
+describe('server — PUT /progetti/:id/archivia', () => {
+  it('archivia un progetto aperto e lo toglie dagli attivi', async () => {
+    const { app, server } = nuovoServer();
+    const cliente = await server.inject({ method: 'POST', url: '/clienti', payload: { nome: 'Da archiviare', tipo: 'individual' } });
+    const progetto = app.creaProgetto({ clienteId: cliente.json().id, nome: 'Progetto da archiviare' });
+    const progettoId = progetto.id;
+
+    const res = await server.inject({
+      method: 'PUT',
+      url: `/progetti/${progettoId}/archivia`,
+      payload: { archiviato: true },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ ok: true, id: progettoId, archiviato: true });
+
+    // È il punto che conta per l'instradamento dei messaggi: `isProgettoAttivo` è
+    // `stato === 'in_progress'`, quindi un progetto archiviato smette di contare come
+    // aperto e i messaggi del cliente tornano a entrare da soli nel fascicolo.
+    expect((app as any).progetti.get(progettoId).stato).toBe('archived');
+  });
+
+  it('ripristina un progetto archiviato', async () => {
+    const { app, server } = nuovoServer();
+    const cliente = await server.inject({ method: 'POST', url: '/clienti', payload: { nome: 'Da ripristinare', tipo: 'individual' } });
+    const progetto = app.creaProgetto({ clienteId: cliente.json().id, nome: 'Progetto da ripristinare' });
+    const progettoId = progetto.id;
+
+    await server.inject({ method: 'PUT', url: `/progetti/${progettoId}/archivia`, payload: { archiviato: true } });
+    const res = await server.inject({ method: 'PUT', url: `/progetti/${progettoId}/archivia`, payload: { archiviato: false } });
+
+    expect(res.statusCode).toBe(200);
+    expect((app as any).progetti.get(progettoId).stato).toBe('in_progress');
+  });
+
+  it('archivia un progetto che ha fatture: il blocco fiscale vale solo per l\'eliminazione', async () => {
+    const { app, server } = nuovoServer();
+    const cliente = await server.inject({ method: 'POST', url: '/clienti', payload: { nome: 'Fatturato', tipo: 'individual' } });
+    const progetto = app.creaProgetto({ clienteId: cliente.json().id, nome: 'Fatturato' });
+    const progettoId = progetto.id;
+    (app as any).fatture.set('fatt-1', { id: 'fatt-1', progettoId });
+
+    // L'eliminazione è bloccata…
+    const eliminazione = await server.inject({ method: 'DELETE', url: `/progetti/${progettoId}` });
+    expect(eliminazione.statusCode).toBe(409);
+
+    // …e l'archiviazione no: è il ripiego che la rotta di eliminazione stessa indica.
+    const archiviazione = await server.inject({
+      method: 'PUT',
+      url: `/progetti/${progettoId}/archivia`,
+      payload: { archiviato: true },
+    });
+    expect(archiviazione.statusCode).toBe(200);
+    expect((app as any).progetti.get(progettoId).stato).toBe('archived');
+  });
+
+  it('400 se «archiviato» manca o non è booleano, invece di indovinare il verso', async () => {
+    const { server } = nuovoServer();
+
+    const senzaCampo = await server.inject({ method: 'PUT', url: '/progetti/qualsiasi-id/archivia', payload: {} });
+    expect(senzaCampo.statusCode).toBe(400);
+
+    const nonBooleano = await server.inject({
+      method: 'PUT',
+      url: '/progetti/qualsiasi-id/archivia',
+      payload: { archiviato: 'si' },
+    });
+    expect(nonBooleano.statusCode).toBe(400);
+  });
+
+  it('404 su progetto inesistente', async () => {
+    const { server } = nuovoServer();
+    const res = await server.inject({
+      method: 'PUT',
+      url: '/progetti/non-esiste/archivia',
+      payload: { archiviato: true },
+    });
+    expect(res.statusCode).toBe(404);
+  });
+
+  it('403 per i ruoli che non rispondono dello studio', async () => {
+    const { server } = nuovoServer();
+    const tokenCollaboratore = signJwt({
+      userId: 'usr-collab',
+      tenantId: TENANT_TEST,
+      email: 'collab@studio.example',
+      ruolo: 'collaboratore_interno',
+      sessionVersion: 0,
+    });
+
+    const res = await server.inject({
+      method: 'PUT',
+      url: '/progetti/qualsiasi-id/archivia',
+      payload: { archiviato: true },
+      headers: { authorization: `Bearer ${tokenCollaboratore}` },
+    });
+    expect(res.statusCode).toBe(403);
+  });
+});
+
 describe('server — DELETE /progetti/:id/moduli/:moduloId (§1.1bis)', () => {
   it('guard di ruolo: advisor passa il check (il DB non è disponibile nei test)', async () => {
     // Nei test il DB Prisma non è raggiungibile: la rotta arriva al guard di ruolo

@@ -87,9 +87,9 @@ export interface AppPort {
   creaProgetto(input: { clienteId: string; nome: string }): ProgettoBase | Promise<ProgettoBase>;
   getProgetto(id: string): unknown | Promise<unknown>; // forma esatta (con moduli/microvoci) definita dall'implementazione
   listaProgetti(): unknown[] | Promise<unknown[]>;
-  archiviaProgetto(id: string, archiviato: boolean): Promise<void>;
-  // tenantId opzionale: se omesso l'implementazione usa il tenant del costruttore;
-  // le rotte HTTP passano SEMPRE quello del token JWT (§14, §2bis).
+  // tenantId opzionale su entrambe: se omesso l'implementazione usa il tenant del
+  // costruttore; le rotte HTTP passano SEMPRE quello del token JWT (§14, §2bis).
+  archiviaProgetto(id: string, archiviato: boolean, tenantId?: string): Promise<void>;
   eliminaProgetto(id: string, tenantId?: string): Promise<void>;
   listaAccessiProgetto(progettoId: string): Promise<unknown[]>;
   assegnaAccessoProgetto(progettoId: string, userId: string, livello?: string): Promise<unknown>;

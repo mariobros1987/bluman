@@ -122,7 +122,7 @@ export class InMemoryApp implements AppPort {
     return [...this.progetti.values()].map((p) => ({ id: p.id, clienteId: p.clienteId, nome: p.nome, stato: p.stato }));
   }
 
-  async archiviaProgetto(id: string, archiviato: boolean): Promise<void> {
+  async archiviaProgetto(id: string, archiviato: boolean, _tenantId?: string): Promise<void> {
     const p = this.progetti.get(id);
     if (!p) throw new ProgettoNonTrovatoError();
     p.stato = archiviato ? 'archived' : 'in_progress';
