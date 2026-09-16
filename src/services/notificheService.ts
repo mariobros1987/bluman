@@ -49,6 +49,12 @@ export const EVENTI_NOTIFICA = [
   // progetto aperto e non c'è modo di sapere a quale si riferisse. Prima finiva nel nulla: la
   // rotta rispondeva «ok» al provider e il messaggio spariva senza che nessuno lo sapesse.
   'messaggio_non_instradabile',
+  // Un cliente ha toccato il link di una pratica e ha collegato la sua chat Telegram a quel
+  // fascicolo. È la conferma che il link mandato ha funzionato: da quel momento i messaggi di
+  // quella chat entrano da soli, senza passare per l'euristica che li scartava quando il cliente
+  // aveva due progetti aperti. Senza questa notifica l'operatore non saprebbe che il problema che
+  // lo aveva spinto a mandare il link è rientrato.
+  'chat_collegata_progetto',
 ] as const;
 
 export type TipoEventoNotifica = (typeof EVENTI_NOTIFICA)[number];

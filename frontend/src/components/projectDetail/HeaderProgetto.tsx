@@ -1,5 +1,6 @@
 import { Badge } from '../ui/Badge';
 import { ProgressBar } from '../ui/ProgressBar';
+import { LinkTelegramProgetto } from './LinkTelegramProgetto';
 import { fmt } from '../../utils';
 import type { Progetto } from '../../types';
 import styles from '../../pages/ProjectDetail.module.css';
@@ -89,6 +90,10 @@ export function HeaderProgetto({
           >
             {project.st === 'archived' ? '↩️ Ripristina' : '📁 Archivia'}
           </button>
+          {/* Il link con cui il cliente aggancia la propria chat Telegram a questa pratica. Sta
+              nella testata perché è un'azione sulla pratica, non un contenuto di una scheda: serve
+              quando il messaggio di quel cliente non riesce a entrare da solo nel fascicolo. */}
+          <LinkTelegramProgetto progettoId={String(project.id)} />
           <button
             onClick={onElimina}
             style={{ background: '#7f1d1d', border: '1px solid #991b1b', color: '#fca5a5', padding: '4px 10px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer', marginLeft: 8 }}

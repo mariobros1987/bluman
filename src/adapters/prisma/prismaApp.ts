@@ -509,6 +509,11 @@ export class PrismaApp implements AppPort {
           await tx.eventoCalendario.deleteMany({ where: { progettoId: id } });
           await tx.accessoRisorsa.deleteMany({ where: { progettoId: id } });
           await tx.comunicazioneProgetto.deleteMany({ where: { progettoId: id } });
+          // La chat di un cliente agganciata a questa pratica. Il cascade sulla FK la
+          // porterebbe via comunque: la riga esplicita è qui perché l'elenco è il
+          // contratto di questo metodo — chi aggiunge una tabella che punta a
+          // `progetto` la trova qui invece di scoprirla da un P2003 in produzione.
+          await tx.collegamentoChatProgetto.deleteMany({ where: { progettoId: id } });
 
           // Prisma accetta solo campi unique nel where della delete (e `id` è
           // l'unico unique di Progetto): il vecchio `{ id, tenantId }` lanciava

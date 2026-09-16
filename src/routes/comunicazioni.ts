@@ -34,15 +34,7 @@ import { leggiAllegatiImap } from '../services/imapflowAllegati.js';
 import { inviaSignal, inviaSignalConAllegati, numeroSignal } from '../services/signalService.js';
 import { inviaTestoTelegram } from '../services/telegramService.js';
 import { riceviMessaggiSignal } from '../services/signalInbound.js';
-
-/** Il testo battuto dall'operatore diventa HTML senza che `<` o `&` rompano il messaggio. */
-function testoInHtml(testo: string): string {
-  const protetto = testo
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
-  return `<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;font-size:15px;line-height:1.55;color:#1f2937;white-space:pre-wrap">${protetto}</div>`;
-}
+import { testoInHtml } from '../util/testoInHtml.js';
 
 /**
  * Credenziali della casella in arrivo, dalla riga Tenant.

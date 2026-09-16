@@ -38,6 +38,11 @@ const TIPO_PER_EVENTO: Record<string, NotificationItem['type']> = {
   firma_apposta: 'signature',
   verbale_disponibile: 'signature',
   scadenza_imminente: 'delay',
+  // Un messaggio che non è potuto entrare in nessun fascicolo è un guasto, non una
+  // scadenza: senza questa riga ricadeva nell'euristica qui sotto e si colorava come
+  // un ritardo, cioè con l'icona che dice «aspetta», su una cosa che chiede di agire.
+  messaggio_non_instradabile: 'blocked',
+  chat_collegata_progetto: 'system',
 };
 
 function mapNotificaBackend(n: any): NotificationItem {

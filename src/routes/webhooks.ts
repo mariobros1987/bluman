@@ -43,6 +43,8 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { prisma, prismaAmministrativo, attivaContestoTenant, conContestoInTransazione } from '../util/prismaClient.js';
 import { notificaStudio } from '../services/notificheService.js';
 import { registraIngressoSenzaFascicolo } from '../services/ingressoSenzaFascicolo.js';
+import { progettoChiuso, risolviFascicoloDaChat } from '../services/collegamentoChat.js';
+import { gestisciAvvio, leggiRichiestaAvvio } from '../services/avvioTelegram.js';
 import { confrontoTokenCostante } from '../util/password.js';
 import { uploadDocumento } from '../services/storageService.js';
 import { credenzialiCanali } from '../services/otpDispatch.js';
@@ -159,6 +161,77 @@ async function transazioneWebhook<T>(
   return prisma.$transaction((tx) =>
     conContestoInTransazione(tx, () => operazione(tx)),
   );
+}
+
+/**
+ * Lo `@username` del bot, letto da Telegram. `null` se non si riesce a leggerlo.
+ *
+ * Non lancia e non fa fallire il chiamante: serve a compilare un campo, non a decidere se una
+ * configurazione è riuscita.
+ */
+async function leggiUsernameBot(botToken: string): Promise<string | null> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 5000);
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${botToken}/getMe`, { signal: controller.signal });
+    const json: any = await res.json().catch(() => ({}));
+    return json?.ok ? (json.result?.username ?? null) : null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Mette il messaggio Telegram nel fascicolo, con l'idempotenza e l'avviso allo studio.
+ *
+ * Estratto perché i percorsi che portano qui sono diventati **due** — la chat collegata a una
+ * pratica e la chat instradata dall'anagrafica — e la coda era una sola. Duplicarla avrebbe
+ * significato che una correzione a una delle due (l'ordine fra riga di idempotenza e comunicazione,
+ * il testo dell'avviso, il `link` della notifica) lasciava l'altra indietro: è esattamente il modo
+ * in cui il ramo Telegram era rimasto indietro rispetto a WhatsApp.
+ *
+ * Restituisce `'duplicato'` quando l'update era già stato visto, così il chiamante risponde a
+ * Telegram senza riprocessare: un rinvio del provider non deve produrre un secondo messaggio nel
+ * fascicolo né una seconda notifica.
+ */
+async function archiviaInFascicolo(
+  tenantId: string,
+  cliente: { id: string; nome: string },
+  progetto: { id: string; nome: string },
+  updateId: string,
+  text: string,
+): Promise<'archiviato' | 'duplicato'> {
+  try {
+    await transazioneWebhook(async (tx) => {
+      await tx.webhookInbox.create({
+        data: { tenantId, provider: 'telegram_update', eventId: updateId },
+      });
+      await tx.comunicazioneProgetto.create({
+        data: {
+          tenantId,
+          progettoId: progetto.id,
+          canale: 'telegram',
+          direzione: 'entrata',
+          mittente: cliente.nome,
+          destinatario: 'Studio',
+          testo: text,
+          externalId: idEsterno('telegram', updateId),
+        },
+      });
+    });
+  } catch (err) {
+    if (isReplayWebhook(err)) return 'duplicato';
+    throw err;
+  }
+  await notificaStudio(tenantId, {
+    tipoEvento: 'messaggio_cliente',
+    oggetto: 'Nuovo messaggio Telegram',
+    corpo: `${cliente.nome} ha scritto al bot Telegram: ${(text || '').slice(0, 120)}`,
+    link: `/projects/${progetto.id}`,
+  }).catch(() => {});
+  return 'archiviato';
 }
 
 /**
@@ -492,6 +565,51 @@ export async function registraRotteWebhooks(server: FastifyInstance): Promise<vo
       // prima di qualunque uscita — dopo, il messaggio sarebbe già perso.
       const text = msg.text || (msg.caption ? `[Allegato]: ${msg.caption}` : '[Allegato / File Ricevuto]');
 
+      // ── 1. `/start`: il cliente ha toccato il link di una pratica ──────────────────────
+      // Va per primo perché è l'unico caso in cui il messaggio **non** è un messaggio: è una
+      // richiesta di collegamento, e non deve finire in nessun fascicolo. Senza questo ramo,
+      // `/start <payload>` sarebbe stato archiviato come testo scritto dal cliente — nel
+      // fascicolo indovinato dall'anagrafica, che è esattamente ciò che il link serve a evitare.
+      const avvio = leggiRichiestaAvvio(text);
+      if (avvio) {
+        const esito = await gestisciAvvio(
+          tenant.id,
+          chatId,
+          updateId,
+          avvio.payload,
+          process.env.TELEGRAM_WEBHOOK_SECRET,
+        );
+        return reply.send({ ok: true, avvio: esito.stato });
+      }
+
+      // ── 2. La chat è collegata a una pratica: il collegamento ha la precedenza ─────────
+      // Il cliente ha detto lui dove vuole scrivere, toccando un link. Le due euristiche qui
+      // sotto servono a indovinare quando nessuno l'ha detto: applicarle anche a chi l'ha detto
+      // significherebbe scartare un'informazione certa per una dedotta.
+      const collegato = await risolviFascicoloDaChat(tenant.id, 'telegram', chatId);
+      if (collegato) {
+        if (progettoChiuso(collegato.progetto.stato)) {
+          await registraIngressoSenzaFascicolo(tenant.id, 'telegram', updateId, {
+            mittente: collegato.cliente.nome,
+            testo: text,
+            motivo: `Questa chat è collegata alla pratica «${collegato.progetto.nome}», che è `
+              + `${collegato.progetto.stato === 'archived' ? 'archiviata' : 'conclusa'}: `
+              + 'non raccoglie più messaggi. Ripristinala, oppure manda al cliente il link di una '
+              + 'pratica aperta — toccandolo, questa chat passerà lì.',
+          });
+          return reply.status(202).send({ ok: true, ignored: 'progetto_chiuso' });
+        }
+        const esito = await archiviaInFascicolo(
+          tenant.id,
+          collegato.cliente,
+          collegato.progetto,
+          updateId,
+          text,
+        );
+        return reply.send(esito === 'duplicato' ? { ok: true, duplicate: true } : { ok: true });
+      }
+
+      // ── 3. Nessun collegamento: si instrada dall'anagrafica (il ripiego di sempre) ─────
       // Niente `take`: il motivo dell'avviso qui sotto conta le corrispondenze, e una
       // lettura troncata lo farebbe mentire sul loro numero.
       const clienti = await prisma.cliente.findMany({
@@ -547,35 +665,8 @@ export async function registraRotteWebhooks(server: FastifyInstance): Promise<vo
       // tipo di `attivi[0]` è `Progetto | undefined` e il resto della rotta usa `progetto.id`.
       if (!progetto) return reply.status(202).send({ ok: true, ignored: 'project_not_unique' });
 
-      try {
-        await transazioneWebhook(async (tx) => {
-          await tx.webhookInbox.create({
-            data: { tenantId: tenant.id, provider: 'telegram_update', eventId: updateId },
-          });
-          await tx.comunicazioneProgetto.create({
-            data: {
-              tenantId: tenant.id,
-              progettoId: progetto.id,
-              canale: 'telegram',
-              direzione: 'entrata',
-              mittente: cliente.nome,
-              destinatario: 'Studio',
-              testo: text,
-              externalId: idEsterno('telegram', updateId),
-            },
-          });
-        });
-      } catch (err) {
-        if (isReplayWebhook(err)) return reply.send({ ok: true, duplicate: true });
-        throw err;
-      }
-      await notificaStudio(tenant.id, {
-        tipoEvento: 'messaggio_cliente',
-        oggetto: 'Nuovo messaggio Telegram',
-        corpo: `${cliente.nome} ha scritto al bot Telegram: ${(text || '').slice(0, 120)}`,
-        link: `/projects/${progetto.id}`,
-      }).catch(() => {});
-      return reply.send({ ok: true });
+      const esito = await archiviaInFascicolo(tenant.id, cliente, progetto, updateId, text);
+      return reply.send(esito === 'duplicato' ? { ok: true, duplicate: true } : { ok: true });
     } catch (err) {
       console.warn('[Telegram Webhook Error]', err);
       return reply.status(500).send({ errore: 'Elaborazione webhook fallita' });
@@ -638,9 +729,32 @@ export async function registraRotteWebhooks(server: FastifyInstance): Promise<vo
         if (!tgRes.ok || !tgJson?.ok) {
           return reply.code(400).send({ errore: tgJson?.description || `Telegram ha risposto HTTP ${tgRes.status}` });
         }
+
+        // Lo username del bot serve a comporre i link per progetto (`t.me/<bot>?start=…`), e
+        // `setWebhook` non lo restituisce. Senza questa lettura il pulsante «Link Telegram» direbbe
+        // «bot non configurato» mentre il bot funziona: un guasto invisibile, che è il tipo di cosa
+        // questa rotta esiste per non fare più.
+        //
+        // Si scrive **solo se manca**: se lo studio l'ha compilato a mano, quel valore resta. E un
+        // `getMe` non riuscito non fa fallire la configurazione — il webhook è già registrato, ed è
+        // quello che conta: il link si potrà comporre dalla prossima volta.
+        const usernameBot = await leggiUsernameBot(botToken);
+        if (usernameBot) {
+          const attuale = await prisma.tenant.findUnique({
+            where: { id: req.tenantId },
+            select: { tgBotUsername: true },
+          });
+          if (!attuale?.tgBotUsername?.trim()) {
+            await prisma.tenant
+              .update({ where: { id: req.tenantId }, data: { tgBotUsername: usernameBot } })
+              .catch(() => {});
+          }
+        }
+
         return reply.send({
           ok: true,
           telegramResponse: tgJson,
+          botUsername: usernameBot,
           message: 'Webhook Telegram configurato ed attivato con successo!',
         });
       } finally {

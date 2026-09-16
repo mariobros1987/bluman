@@ -93,6 +93,9 @@ import { registraRotteWebhooks } from './routes/webhooks.js';
 // studio lette dal database: prima le faceva il browser chiamando le funzioni
 // serverless con la password SMTP presa da localStorage.
 import { registraRotteComunicazioni } from './routes/comunicazioni.js';
+// Il link che collega la chat di un cliente alla sua pratica. Registrato dentro il
+// wrapper register di buildServer, accanto alle rotte progetti: richiede un JWT.
+import { registraRotteCollegamentoChat } from './routes/collegamentoChat.js';
 import { registraSwagger } from './plugins/swagger.js';
 // Voce 6.2 — error tracking. No-op senza SENTRY_DSN: attivarlo è una variabile d'ambiente.
 import { registraSentry } from './plugins/sentry.js';
@@ -674,6 +677,12 @@ export function buildServer(app: AppPort): FastifyInstance {
   // estratte in src/routes/progetti.ts: stessa registrazione, sempre dentro
   // questo wrapper.
   await registraRotteProgetti(server, app);
+
+  // ─── COLLEGAMENTO CHAT → PRATICA (LINK TELEGRAM) ──────────────────
+  // Rotte in src/routes/collegamentoChat.ts: il link firmato per agganciare la chat
+  // di un cliente a una pratica, l'invio dell'invito via email/WhatsApp, l'elenco
+  // delle chat collegate e la revoca. Stessa registrazione, dentro questo wrapper.
+  await registraRotteCollegamentoChat(server);
 
   // ─── FATTURE & CONTABILITÀ (ex blocchi F1-F10) ────────────────────
   // Rotte contabilità (emissione fatture, incassi/scadenzario/prima nota,

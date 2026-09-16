@@ -11,7 +11,10 @@ import { createHmac } from 'node:crypto';
 import Fastify from 'fastify';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const create = vi.fn(async () => ({ id: 'com-1' }));
+// Il parametro è dichiarato anche se l'implementazione non lo usa: senza, il tipo della chiamata
+// registrata è una tupla vuota e `calls[0][0]` non compila — cioè proprio l'argomento che questi
+// test devono ispezionare per dire in quale pratica è finito il messaggio.
+const create = vi.fn(async (_args: any) => ({ id: 'com-1' }));
 const update = vi.fn(async () => ({}));
 const findComunicazioni = vi.fn<any>(async () => []);
 const eventiInbox = new Set<string>();
@@ -38,11 +41,22 @@ const clienteFindMany = vi.fn<any>(async () => [{
   id: 'cli-1', nome: 'Cliente Uno', cellulare: '+39 335 123 4567', referentiJson: null,
 }]);
 const progettoFindMany = vi.fn<any>(async () => [{ id: 'proj-1', stato: 'in_progress' }]);
+// La pratica del link: `findFirst` è ciò che `collegaChatAProgetto` legge prima di scrivere il
+// collegamento, e `findMany` resta la lettura dell'euristica di ripiego.
+const progettoFindFirst = vi.fn<any>(async () => null);
+// Il collegamento chat → pratica: `findUnique` è la lettura che la rotta fa a ogni messaggio,
+// `upsert` la scrittura del `/start`.
+const collegamentoFindUnique = vi.fn<any>(async () => null);
+const collegamentoUpsert = vi.fn<any>(async () => ({}));
+// Il bot che risponde al cliente. Mockato perché la risposta a un `/start` è una chiamata HTTP
+// verso api.telegram.org: senza il finto, i test qui sotto contatterebbero Telegram per davvero.
+const inviaTestoTelegram = vi.fn<any>(async () => ({ ok: true }));
 
 const prismaFinto: any = {
   tenant: { findMany: tenantFindMany, findUnique: tenantFindUnique },
   cliente: { findMany: clienteFindMany },
-  progetto: { findMany: progettoFindMany },
+  progetto: { findMany: progettoFindMany, findFirst: progettoFindFirst },
+  collegamentoChatProgetto: { findUnique: collegamentoFindUnique, upsert: collegamentoUpsert },
   comunicazioneProgetto: { findMany: findComunicazioni, create, update },
   webhookInbox: { create: webhookInboxCreate },
   $executeRaw: vi.fn(async () => 1),
@@ -59,9 +73,11 @@ vi.mock('./services/notificheService.js', () => ({ notificaStudio: vi.fn(async (
 vi.mock('./services/otpDispatch.js', () => ({ credenzialiCanali: vi.fn(async () => ({})) }));
 vi.mock('./services/storageService.js', () => ({ uploadDocumento: vi.fn() }));
 vi.mock('./util/networkPolicy.js', () => ({ vietaControlli: (x: string) => x }));
+vi.mock('./services/telegramService.js', () => ({ inviaTestoTelegram }));
 
 const { registraRotteWebhooks } = await import('./routes/webhooks.js');
-const { creaSegretoTelegram } = await import('./util/webhookSecurity.js');
+const { creaSegretoTelegram, creaPayloadCollegamento } = await import('./util/webhookSecurity.js');
+const { notificaStudio } = await import('./services/notificheService.js');
 const TENANT = '00000000-0000-4000-8000-000000000001';
 /** Slug dello studio: 32 caratteri, la forma che `gen_random_uuid()` produce senza trattini. */
 const SLUG = 'a'.repeat(32);
@@ -101,6 +117,10 @@ beforeEach(() => {
   tenantFindUnique.mockResolvedValue({ id: TENANT, tgBotToken: '12345:token-lungo-valido' });
   clienteFindMany.mockResolvedValue([{ id: 'cli-1', nome: 'Cliente Uno', cellulare: '+39 335 123 4567', referentiJson: null }]);
   progettoFindMany.mockResolvedValue([{ id: 'proj-1', stato: 'in_progress' }]);
+  progettoFindFirst.mockResolvedValue(null);
+  collegamentoFindUnique.mockResolvedValue(null);
+  collegamentoUpsert.mockResolvedValue({});
+  inviaTestoTelegram.mockResolvedValue({ ok: true });
   findComunicazioni.mockResolvedValue([]);
   eventiInbox.clear();
 });
@@ -347,6 +367,167 @@ describe('webhook Telegram fail-closed', () => {
     });
     expect(res.statusCode).toBe(500);
     expect(res.json()).toEqual({ errore: 'Elaborazione webhook fallita' });
+    await server.close();
+  });
+});
+
+/**
+ * Il collegamento esplicito chat → pratica (`t.me/<Bot>?start=<payload>`).
+ *
+ * Il caso che questi test presidiano è quello che l'euristica **non** sa risolvere: un cliente con
+ * due pratiche aperte. Prima del link, il suo messaggio non poteva entrare in nessun fascicolo e
+ * diventava un avviso — corretto, ma inutile per chi aveva scritto. Qui si verifica che il
+ * collegamento scritto dal cliente abbia la precedenza sulla deduzione, che un payload manomesso
+ * non colleghi niente, e che una chat collegata a una pratica chiusa lo dica invece di archiviare
+ * in silenzio.
+ */
+describe('collegamento chat → pratica (link Telegram)', () => {
+  const ROTTA_TG_LOCALE = '/webhooks/communications/telegram';
+  const CHAT = '99';
+  /** La pratica del link: un UUID vero, perché il payload lo pretende in forma compatta. */
+  const PROGETTO = '00000000-0000-4000-8000-0000000000a1';
+  const NOME_PROGETTO = 'Emirati Arabi 123';
+
+  const secret = () => creaSegretoTelegram(TENANT, '12345:token-lungo-valido', 'tg-master');
+  const invia = (server: any, updateId: number, testo: string) => server.inject({
+    method: 'POST',
+    url: ROTTA_TG_LOCALE,
+    headers: { 'x-telegram-bot-api-secret-token': secret() },
+    payload: { update_id: updateId, message: { chat: { id: CHAT }, text: testo } },
+  });
+
+  /** Lo stato in cui la chat ha già un collegamento verso la pratica indicata. */
+  const collegaLaChat = (stato: string) => {
+    collegamentoFindUnique.mockResolvedValue({
+      id: 'coll-1',
+      cliente: { id: 'cli-1', nome: 'Mario Emirati' },
+      progetto: { id: PROGETTO, nome: NOME_PROGETTO, stato },
+    });
+  };
+
+  it('un /start con payload valido collega la chat e conferma, senza archiviare il testo', async () => {
+    progettoFindFirst.mockResolvedValue({
+      id: PROGETTO, nome: NOME_PROGETTO, stato: 'pre_project', cliente: { id: 'cli-1', nome: 'Mario Emirati' },
+    });
+    const server = await app();
+    const res = await invia(server, 500, `/start ${creaPayloadCollegamento(TENANT, PROGETTO, 'tg-master')}`);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ ok: true, avvio: 'collegato' });
+
+    // Il collegamento si scrive sulla chiave unica della chat: è quella che rende lo spostamento
+    // possibile e impedisce che una chat scriva in due pratiche.
+    expect(collegamentoUpsert).toHaveBeenCalledWith(expect.objectContaining({
+      where: { tenantId_canale_chatId: { tenantId: TENANT, canale: 'telegram', chatId: CHAT } },
+      create: expect.objectContaining({ tenantId: TENANT, canale: 'telegram', chatId: CHAT, progettoId: PROGETTO }),
+    }));
+
+    // `/start ...` non è un messaggio del cliente: non deve finire nel fascicolo come se lo fosse.
+    expect(create).not.toHaveBeenCalled();
+
+    // Il cliente riceve la conferma, e la conferma nomina la pratica.
+    expect(inviaTestoTelegram).toHaveBeenCalledTimes(1);
+    expect(String(inviaTestoTelegram.mock.calls[0]![2])).toContain(NOME_PROGETTO);
+
+    // Lo studio sa che il link ha funzionato.
+    expect(notificaStudio).toHaveBeenCalledWith(TENANT, expect.objectContaining({
+      tipoEvento: 'chat_collegata_progetto',
+      link: `/projects/${PROGETTO}`,
+    }));
+    await server.close();
+  });
+
+  it('un /start con payload manomesso non collega niente e non archivia niente', async () => {
+    const server = await app();
+    // Il primo carattere del MAC si cambia in modo deterministico: sostituire l'ultimo con una
+    // lettera fissa lascerebbe il payload intatto una volta su sessantaquattro.
+    const valido = creaPayloadCollegamento(TENANT, PROGETTO, 'tg-master');
+    // Il payload è sempre `<uuid-compatto>_<mac>`: due parti, garantite da `creaPayloadCollegamento`.
+    const [idCompatto, mac] = valido.split('_') as [string, string];
+    const manomesso = `${idCompatto}_${mac[0] === 'A' ? 'B' : 'A'}${mac.slice(1)}`;
+    const res = await invia(server, 501, `/start ${manomesso}`);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ ok: true, avvio: 'payload_non_valido' });
+    expect(collegamentoUpsert).not.toHaveBeenCalled();
+    expect(create).not.toHaveBeenCalled();
+    // Al cliente si risponde spiegando cosa fare: senza, avrebbe toccato un link e non avrebbe
+    // visto succedere nulla.
+    expect(inviaTestoTelegram).toHaveBeenCalledTimes(1);
+    await server.close();
+  });
+
+  it('una chat collegata instrada anche quando il cliente ha due pratiche aperte', async () => {
+    collegaLaChat('in_progress');
+    // Le due condizioni che oggi fanno fallire l'euristica: due pratiche aperte per quel cliente.
+    clienteFindMany.mockResolvedValue([{ id: 'cli-1', nome: 'Mario Emirati' }]);
+    progettoFindMany.mockResolvedValue([
+      { id: PROGETTO, nome: NOME_PROGETTO, stato: 'in_progress' },
+      { id: '00000000-0000-4000-8000-0000000000a2', nome: 'Ciaociao', stato: 'in_progress' },
+    ]);
+    const server = await app();
+    const res = await invia(server, 502, 'Buongiorno, novità?');
+
+    expect(res.statusCode).toBe(200);
+    expect(create).toHaveBeenCalledTimes(1);
+    // La prova del fix: il messaggio è finito nella pratica del **collegamento**, non in quella
+    // che l'euristica avrebbe dovuto indovinare (e che, con due aperte, non avrebbe scelto).
+    expect(create.mock.calls[0]![0].data.progettoId).toBe(PROGETTO);
+    // E l'euristica non è stata nemmeno interrogata: chi ha detto dove scrivere non si indovina.
+    expect(clienteFindMany).not.toHaveBeenCalled();
+    await server.close();
+  });
+
+  it('una chat collegata a una pratica archiviata avvisa lo studio invece di archiviare', async () => {
+    collegaLaChat('archived');
+    const server = await app();
+    const res = await invia(server, 503, 'Ci siete?');
+
+    expect(res.statusCode).toBe(202);
+    expect(res.json()).toEqual({ ok: true, ignored: 'progetto_chiuso' });
+    expect(create).not.toHaveBeenCalled();
+    expect(notificaStudio).toHaveBeenCalledWith(TENANT, expect.objectContaining({
+      tipoEvento: 'messaggio_non_instradabile',
+    }));
+    // Il motivo dice *quale* pratica è chiusa: senza il nome, l'operatore non saprebbe quale
+    // riaprire fra le pratiche di quel cliente.
+    const corpo = String(vi.mocked(notificaStudio).mock.calls[0]![1].corpo);
+    expect(corpo).toContain(NOME_PROGETTO);
+    expect(corpo).toContain('archiviata');
+    await server.close();
+  });
+
+  it('senza payload il bot spiega come collegarsi, e non archivia il /start', async () => {
+    const server = await app();
+    const res = await invia(server, 504, '/start');
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ ok: true, avvio: 'senza_payload' });
+    expect(create).not.toHaveBeenCalled();
+    expect(inviaTestoTelegram).toHaveBeenCalledTimes(1);
+    await server.close();
+  });
+
+  it('un link di un altro studio non collega nulla, anche con lo stesso master secret', async () => {
+    const ALTRO = '00000000-0000-4000-8000-0000000000ff';
+    const server = await app();
+    // Firmato per un altro studio: il MAC copre il tenant, quindi non è spendibile qui.
+    const res = await invia(server, 505, `/start ${creaPayloadCollegamento(ALTRO, PROGETTO, 'tg-master')}`);
+
+    expect(res.json()).toEqual({ ok: true, avvio: 'payload_non_valido' });
+    expect(collegamentoUpsert).not.toHaveBeenCalled();
+    expect(create).not.toHaveBeenCalled();
+    await server.close();
+  });
+
+  it('un messaggio da una chat non collegata segue ancora l\'euristica di sempre', async () => {
+    const server = await app();
+    const res = await invia(server, 506, 'Salve');
+
+    expect(res.statusCode).toBe(200);
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(create.mock.calls[0]![0].data.canale).toBe('telegram');
+    expect(clienteFindMany).toHaveBeenCalled();
     await server.close();
   });
 });

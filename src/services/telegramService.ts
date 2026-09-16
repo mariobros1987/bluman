@@ -60,6 +60,35 @@ export function idDelBot(token: string | null | undefined): string | null {
 }
 
 /**
+ * Lo `@username` del bot nella forma che serve a comporre un link, o `null`.
+ *
+ * Toglie la chiocciola perché nella riga `Tenant` il campo si trova scritta in entrambi i modi
+ * (`@StudioBot` e `StudioBot` a seconda di chi l'ha compilata), e `https://t.me/@@StudioBot` è un
+ * link rotto che non dice perché. La forma ammessa è quella di Telegram: 5-32 caratteri
+ * alfanumerici o `_`. Un valore che non la rispetta è `null` e non un link da provare.
+ */
+export function usernameBotTelegram(valore: string | null | undefined): string | null {
+  const pulito = String(valore ?? '').trim().replace(/^@+/, '');
+  return /^[A-Za-z0-9_]{5,32}$/.test(pulito) ? pulito : null;
+}
+
+/**
+ * Il link con cui un cliente collega la propria chat a una pratica (`t.me/<Bot>?start=<payload>`).
+ *
+ * Il payload è firmato e lo compone `creaPayloadCollegamento`: qui si compone solo l'indirizzo.
+ * `null` quando il bot non ha uno username utilizzabile — cioè quando il link non si può proprio
+ * costruire, che è diverso dal costruirne uno che non funziona.
+ */
+export function urlCollegamentoTelegram(
+  botUsername: string | null | undefined,
+  payload: string,
+): string | null {
+  const username = usernameBotTelegram(botUsername);
+  if (!username || !payload) return null;
+  return `https://t.me/${username}?start=${payload}`;
+}
+
+/**
  * Traduce la risposta di Telegram in una frase che dice cosa fare.
  *
  * Telegram risponde in inglese e in gergo: «Forbidden: the bot can't send messages to the bot»

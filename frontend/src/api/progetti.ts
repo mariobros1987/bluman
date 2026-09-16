@@ -92,6 +92,65 @@ export async function archiviaProgettoApi(id: string, archiviato: boolean) {
 }
 
 /**
+ * Il link firmato che collega la chat Telegram di un cliente a questa pratica.
+ *
+ * Il link si compone sul server e non qui: la firma è un HMAC con il segreto del webhook, che
+ * non esiste nel browser (regola 6). Il motivo per cui non si compone si riporta com'è — «bot non
+ * configurato» e «manca lo @username» si risolvono in due punti diversi delle impostazioni.
+ */
+export async function fetchLinkTelegramApi(progettoId: string): Promise<{ url: string; botUsername: string }> {
+  const res = await apiFetch(`${API_BASE}/progetti/${encodeURIComponent(progettoId)}/link-telegram`, {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Link Telegram non disponibile'));
+  return await res.json();
+}
+
+/**
+ * Spedisce l'invito al cliente. Il server registra la comunicazione in uscita nel fascicolo,
+ * quindi questa non è una notifica di comodo: è un messaggio che entra nella storia della pratica.
+ */
+export async function inviaLinkTelegramApi(
+  progettoId: string,
+  canale: 'email' | 'whatsapp',
+): Promise<{ via: string; destinatario: string }> {
+  const res = await apiFetch(`${API_BASE}/progetti/${encodeURIComponent(progettoId)}/link-telegram/invia`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ canale }),
+  });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Invio del link non riuscito'));
+  return await res.json();
+}
+
+export interface CollegamentoChat {
+  id: string;
+  canale: string;
+  chatId: string;
+  creatoAt: string;
+  creatoDa: string;
+}
+
+/** Le chat agganciate a questa pratica: da qui si vedono (e si revocano) i collegamenti. */
+export async function fetchCollegamentiChatApi(progettoId: string): Promise<CollegamentoChat[]> {
+  const res = await apiFetch(`${API_BASE}/progetti/${encodeURIComponent(progettoId)}/collegamenti`, {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Elenco dei collegamenti non disponibile'));
+  const dati = await res.json();
+  return Array.isArray(dati?.collegamenti) ? dati.collegamenti : [];
+}
+
+/** Revoca un collegamento: quella chat non scriverà più in questa pratica. */
+export async function revocaCollegamentoChatApi(progettoId: string, collegamentoId: string): Promise<void> {
+  const res = await apiFetch(
+    `${API_BASE}/progetti/${encodeURIComponent(progettoId)}/collegamenti/${encodeURIComponent(collegamentoId)}`,
+    { method: 'DELETE', headers: getAuthHeaders() },
+  );
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Revoca non riuscita'));
+}
+
+/**
  * Crea il preventivo con i moduli scelti e lo accetta subito: è l'unico percorso che
  * istanzia i moduli del progetto a database (§15.3 — con versioni di template e articoli
  * congelate, microvoci, passaggi e dipendenze, tutto in una transazione).

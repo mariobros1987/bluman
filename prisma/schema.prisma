@@ -141,6 +141,7 @@ model Tenant {
   fattureRicevute FatturaRicevuta[]
   liquidazioniIva LiquidazioneIva[]
   movimentiPrimaNota MovimentoPrimaNota[]
+  collegamentiChat CollegamentoChatProgetto[]
 
   @@map("tenant")
 }
@@ -242,6 +243,7 @@ model Cliente {
   notifiche    Notifica[]
   fatture      Fattura[]
   movimentiPrimaNota MovimentoPrimaNota[]
+  collegamentiChat CollegamentoChatProgetto[]
 
   @@index([tenantId, createdAt(sort: Desc)])
   @@index([tenantId, nome])
@@ -471,6 +473,7 @@ model Progetto {
   contrattiRicorrenti ContrattoRicorrente[]
   richiesteAddendum   RichiestaAddendum[]
   oreTimesheet   OraTimesheet[]
+  collegamentiChat CollegamentoChatProgetto[]
 
   @@index([tenantId, clienteId])
   // Indici performance (migrazione 20260912150000_indici_performance):
@@ -1230,7 +1233,8 @@ model Notifica {
   destinatarioCliente Cliente? @relation(fields: [destinatarioClienteId], references: [id])
   destinatarioTipo String    @map("destinatario_tipo") // user|cliente
   // Evento origine (Blocco 3): modulo_completato|documento_da_firmare|messaggio_cliente|
-  // scadenza_imminente|fattura_incassata|firma_apposta. Null per notifiche legacy/generiche.
+  // scadenza_imminente|fattura_incassata|firma_apposta|messaggio_non_instradabile|
+  // chat_collegata_progetto. Null per notifiche legacy/generiche.
   tipoEvento       String?   @map("tipo_evento")
   link             String?   // deep-link frontend (es. /projects/123, /portal)
   canale           String    @default("email")
@@ -1291,6 +1295,46 @@ model ComunicazioneProgetto {
   createdAt    DateTime @default(now()) @map("created_at")
 
   @@map("comunicazione_progetto")
+}
+
+/// La chat di un canale agganciata a una pratica.
+///
+/// Nasce dal link per progetto (`t.me/<Bot>?start=<payload>`): chi lo tocca manda al bot un
+/// `/start` con un payload firmato che dice a quale pratica appartiene quella chat. Da lì in poi i
+/// messaggi di quella chat entrano in quel fascicolo **senza doverlo dedurre** dall'anagrafica.
+///
+/// Perché serve. L'instradamento precedente pretendeva che il `chat_id` fosse in una sola scheda
+/// cliente **e** che quel cliente avesse un solo progetto aperto: due condizioni che nella realtà
+/// degli studi cadono spesso (un cliente con due pratiche aperte, una persona che scrive per due
+/// clienti). Quando cadevano, il messaggio non poteva entrare in nessun fascicolo e diventava un
+/// avviso. Il collegamento esplicito toglie l'ambiguità invece di indovinare meglio.
+///
+/// La chiave unica è sulla **chat**, non sulla pratica: una chat scrive in una sola pratica, e un
+/// secondo `/start` dalla stessa chat **sposta** il collegamento — è anche la via d'uscita se il
+/// cliente ha toccato il link sbagliato. Più chat possono invece puntare alla stessa pratica.
+///
+/// `canale` esiste perché WhatsApp e Signal non hanno un deep link con payload, ma la tabella non
+/// vada rifatta quando ne avranno uno: oggi solo Telegram la usa.
+model CollegamentoChatProgetto {
+  id         String   @id @default(uuid())
+  tenantId   String   @map("tenant_id")
+  canale     String   // telegram | whatsapp | signal
+  chatId     String   @map("chat_id")
+  clienteId  String   @map("cliente_id")
+  progettoId String   @map("progetto_id")
+  creatoAt   DateTime @default(now()) @map("creato_at")
+  creatoDa   String   @default("link") @map("creato_da") // link | operatore
+
+  // `onDelete: Cascade` sul progetto non è cosmetico: senza, un progetto collegato diventerebbe
+  // non cancellabile con P2003 — cioè il guasto appena risolto su `eliminaProgetto`, per una via
+  // nuova. Stesso precedente di `ComunicazioneProgetto.progetto`.
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  cliente  Cliente  @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  progetto Progetto @relation(fields: [progettoId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, canale, chatId])
+  @@index([tenantId, progettoId])
+  @@map("collegamento_chat_progetto")
 }
 
 /// Inbox idempotente dei provider: la chiave composta rende atomico il rifiuto dei replay.
