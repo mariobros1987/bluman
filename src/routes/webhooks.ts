@@ -22,6 +22,13 @@
  * Meta (GET) e la signature HMAC-SHA256 del payload (POST, Telegram non usa firma ma è
  * identificato dall'URL segreto del bot).
  *
+ * **Le credenziali sono quelle dello studio, non della piattaforma.** Il path di callback
+ * WhatsApp porta lo slug dello studio (`…/whatsapp/<slug>`) e da lì si leggono il suo Verify
+ * Token e il suo App Secret: sono valori della *sua* app Meta, perché Meta li configura per
+ * applicazione. Telegram usa già `tgBotToken` per derivare il segreto del webhook. Nessuna
+ * variabile d'ambiente interviene come ripiego: uno studio senza credenziali non ha un webhook
+ * attivo, che è diverso dall'averne uno che risponde a nome di un altro studio.
+ *
  * §WA-MEDIA — Allegati WhatsApp in ingresso:
  * Quando il cliente invia un documento o un'immagine, Meta consegna un `media_id` nel payload
  * webhook. Per ottenerlo si chiama GET /v21.0/{media_id} per avere l'URL temporaneo firmato
@@ -39,6 +46,7 @@ import { confrontoTokenCostante } from '../util/password.js';
 import { uploadDocumento } from '../services/storageService.js';
 import { credenzialiCanali } from '../services/otpDispatch.js';
 import { vietaControlli } from '../util/networkPolicy.js';
+import { ROTTA_TG, ROTTA_WA, slugValido, urlWebhookTelegram } from '../util/urlPubblica.js';
 import {
   creaSegretoTelegram,
   normalizzaTelefono,
@@ -47,9 +55,21 @@ import {
   verificaSegretoTelegram,
 } from '../util/webhookSecurity.js';
 
-const ROTTA_WA = '/webhooks/communications/whatsapp';
-const ROTTA_TG = '/webhooks/communications/telegram';
 const rawBodyWhatsapp = new WeakMap<object, Buffer>();
+
+/**
+ * Trattiene il corpo grezzo delle richieste WhatsApp, che serve a verificare la firma HMAC.
+ *
+ * Il confronto è per **prefisso** e non per uguaglianza: il path di callback porta lo slug dello
+ * studio (`…/whatsapp/<slug>`), quindi l'uguaglianza esatta non lo intercetterebbe più e la
+ * firma risulterebbe «non disponibile» su ogni messaggio in ingresso. Il prefisso è la costante
+ * con la barra finale, così che un path diverso che inizia per le stesse lettere
+ * (`…/whatsapp-qualcosa`) non venga trattenuto: di quel corpo non c'è nulla da verificare.
+ */
+function isRottaWhatsapp(url: string): boolean {
+  const percorso = url.split('?')[0] || '';
+  return percorso === ROTTA_WA || percorso.startsWith(`${ROTTA_WA}/`);
+}
 
 function installaParserRawWhatsapp(server: FastifyInstance): void {
   const parsers = ['application/json', 'application/*+json'];
@@ -58,7 +78,7 @@ function installaParserRawWhatsapp(server: FastifyInstance): void {
     server.addContentTypeParser(contentType, { parseAs: 'buffer' }, (req, payload, done) => {
       try {
         const raw = Buffer.isBuffer(payload) ? payload : Buffer.from(payload);
-        if (req.url.split('?')[0] === ROTTA_WA) rawBodyWhatsapp.set(req, raw);
+        if (isRottaWhatsapp(req.url)) rawBodyWhatsapp.set(req, raw);
         done(null, JSON.parse(raw.toString('utf8')));
       } catch (err) {
         done(err as Error, undefined);
@@ -79,6 +99,29 @@ function rawBodyOriginale(req: FastifyRequest): Buffer | null {
 function idEsterno(provider: 'whatsapp' | 'telegram', id: string): string {
   return `${provider}:${id}`;
 }
+
+/**
+ * Lo studio a cui appartiene una callback WhatsApp, dedotto dallo slug nel path.
+ *
+ * La lettura passa da `prismaAmministrativo` perché a questo punto della richiesta il contesto
+ * RLS non esiste ancora: il tenant **è** ciò che si sta cercando. È la stessa eccezione di
+ * bootstrap già in uso per `waPhoneId`, e non è una lettura ampia: la colonna è unica, la
+ * ricerca restituisce una riga sola e il chiamante attiva subito il contesto di quello studio.
+ *
+ * Non si ripiega su nessun tenant predefinito. Uno slug che non corrisponde a nessuno è un 404:
+ * attribuire l'evento allo studio sbagliato sarebbe peggio che non registrarlo.
+ */
+async function tenantDaSlugWhatsapp(slug: string): Promise<{ id: string; waAppSecret: string | null; waVerifyToken: string | null; waPhoneId: string | null } | null> {
+  const valido = slugValido(slug);
+  if (!valido) return null;
+  const trovati = await prismaAmministrativo().tenant.findMany({
+    where: { waWebhookSlug: valido },
+    select: { id: true, waAppSecret: true, waVerifyToken: true, waPhoneId: true },
+    take: 2,
+  });
+  return trovati.length === 1 ? trovati[0] ?? null : null;
+}
+
 
 function isProgettoAttivo(stato: string): boolean {
   return stato === 'in_progress';
@@ -184,23 +227,27 @@ async function scaricaMediaWhatsapp(
 export async function registraRotteWebhooks(server: FastifyInstance): Promise<void> {
   installaParserRawWhatsapp(server);
   // ─── META WHATSAPP BUSINESS WEBHOOK & DISPATCH API ────────────────
-  server.get<{ Querystring: { 'hub.mode'?: string; 'hub.verify_token'?: string; 'hub.challenge'?: string } }>(
-    '/webhooks/communications/whatsapp',
+  // L'handshake di Meta, per studio. Il path porta lo slug dello studio perché il Verify Token
+  // appartiene alla **sua** app: Meta lo configura per applicazione, non per numero, quindi non
+  // esiste un token di piattaforma con cui rispondere a un handshake che non nomina lo studio.
+  //
+  // Qui c'era un token scritto in chiaro nel sorgente, cioè pubblicato su GitHub: chi lo leggeva
+  // poteva superare l'handshake e far registrare il proprio endpoint come webhook dello studio,
+  // ricevendo i messaggi WhatsApp dei clienti (regola 6 di `.agents/AGENTS.md`). Ora non c'è
+  // nessun valore cablato e nessuna variabile d'ambiente: solo il token dello studio, e uno
+  // studio che non ne ha uno non può essere sottoscritto da nessuno.
+  server.get<{ Params: { slug: string }; Querystring: { 'hub.mode'?: string; 'hub.verify_token'?: string; 'hub.challenge'?: string } }>(
+    `${ROTTA_WA}/:slug`,
     async (req, reply) => {
       const mode = req.query['hub.mode'];
       const token = req.query['hub.verify_token'];
       const challenge = req.query['hub.challenge'];
-      // Nessun ripiego cablato: qui c'era il token di verifica scritto in chiaro, cioè
-      // pubblicato su GitHub. Chi lo leggeva poteva superare l'handshake di Meta e far
-      // registrare il proprio endpoint come webhook dello studio, ricevendo i messaggi
-      // WhatsApp dei clienti. Regola 6 di `.agents/AGENTS.md`. Senza la variabile
-      // d'ambiente l'handshake viene rifiutato: meglio un webhook da riconfigurare di uno
-      // che accetta chiunque conosca una stringa pubblica.
-      const verifyToken = process.env.WA_VERIFY_TOKEN;
 
-      if (!verifyToken) {
-        return reply.status(503).send('WA_VERIFY_TOKEN non configurato');
-      }
+      const tenant = await tenantDaSlugWhatsapp(req.params.slug).catch(() => null);
+      if (!tenant) return reply.status(404).send('Not Found');
+
+      const verifyToken = tenant.waVerifyToken?.trim();
+      if (!verifyToken) return reply.status(503).send('Verify Token non configurato per questo studio');
 
       if (mode === 'subscribe' && confrontoTokenCostante(token, verifyToken)) {
         return reply.status(200).send(challenge);
@@ -209,13 +256,24 @@ export async function registraRotteWebhooks(server: FastifyInstance): Promise<vo
     }
   );
 
-  server.post<{ Body: Record<string, any> }>(
-    ROTTA_WA,
+  server.post<{ Params: { slug: string }; Body: Record<string, any> }>(
+    `${ROTTA_WA}/:slug`,
     async (req, reply) => {
       const rawBody = rawBodyOriginale(req);
       if (!rawBody) return reply.status(500).send({ errore: 'Raw body webhook non disponibile' });
-      const autenticita = verificaFirmaWhatsapp(rawBody, header(req, 'x-hub-signature-256'), process.env.WA_APP_SECRET);
-      if (autenticita === 'secret_missing') return reply.status(503).send({ errore: 'WA_APP_SECRET non configurato' });
+
+      // L'ordine è invertito rispetto a prima, e deve esserlo: la firma si verifica con l'App
+      // Secret dello studio, che si conosce solo dopo aver risolto lo studio. Dedurlo dal
+      // `phone_number_id` nel corpo non è un'alternativa: sarebbe leggere un dato non ancora
+      // autenticato per decidere con quale chiave autenticarlo, cioè la definizione di un
+      // ragionamento circolare. Lo slug nel path è invece una credenziale di instradamento:
+      // non prova nulla sulla paternità del messaggio, e infatti la firma si controlla lo stesso.
+      const tenant = await tenantDaSlugWhatsapp(req.params.slug).catch(() => null);
+      if (!tenant) return reply.status(404).send({ errore: 'Studio non riconosciuto' });
+      attivaContestoTenant({ tenantId: tenant.id });
+
+      const autenticita = verificaFirmaWhatsapp(rawBody, header(req, 'x-hub-signature-256'), tenant.waAppSecret || undefined);
+      if (autenticita === 'secret_missing') return reply.status(503).send({ errore: 'App Secret non configurato per questo studio' });
       if (autenticita !== 'ok') return reply.status(401).send({ errore: 'Firma webhook non valida' });
 
       const body = req.body || {};
@@ -223,15 +281,14 @@ export async function registraRotteWebhooks(server: FastifyInstance): Promise<vo
       const phoneNumberId = String(value?.metadata?.phone_number_id || '').trim();
       if (!phoneNumberId) return reply.status(400).send({ errore: 'metadata.phone_number_id mancante' });
 
-      const tenantCandidati = await prismaAmministrativo().tenant.findMany({
-        where: { waPhoneId: phoneNumberId },
-        select: { id: true },
-        take: 2,
-      });
-      if (tenantCandidati.length !== 1) return reply.status(404).send({ errore: 'Tenant webhook non identificabile univocamente' });
-      const tenantId = tenantCandidati[0]?.id;
-      if (!tenantId) return reply.status(404).send({ errore: 'Tenant webhook non identificabile univocamente' });
-      attivaContestoTenant({ tenantId });
+      // La firma prova che il messaggio viene dall'app dello studio; questo controllo prova che
+      // riguarda il numero che lo studio ha dichiarato. Senza, un evento del numero A verrebbe
+      // registrato sul fascicolo sbagliato ogni volta che lo studio cambia numero in Meta e non
+      // aggiorna le impostazioni.
+      if (tenant.waPhoneId && tenant.waPhoneId !== phoneNumberId) {
+        return reply.status(409).send({ errore: 'Il numero del messaggio non è quello configurato dallo studio' });
+      }
+      const tenantId = tenant.id;
 
       try {
         const messages = Array.isArray(value?.messages) ? value.messages : [];
@@ -318,7 +375,7 @@ export async function registraRotteWebhooks(server: FastifyInstance): Promise<vo
             const mediaId: string | undefined = msg.document?.id || msg.image?.id || msg.video?.id || msg.audio?.id;
             if (mediaId) {
               const cred = await credenzialiCanali(tenantId).catch(() => null);
-              const accessToken = cred?.waAccessToken || process.env.WA_ACCESS_TOKEN || undefined;
+              const accessToken = cred?.waAccessToken || undefined;
               if (accessToken) {
                 const allegato = await scaricaMediaWhatsapp(mediaId, accessToken, tenantId, msg.document?.filename || undefined);
                 if (allegato) allegatiJson = JSON.stringify([allegato]);
@@ -463,7 +520,7 @@ export async function registraRotteWebhooks(server: FastifyInstance): Promise<vo
     try {
       const botToken = vietaControlli(req.body?.botToken || '', 'Bot Token', 256).trim();
       const webhookUrl = vietaControlli(
-        req.body?.webhookUrl || 'https://bluman.vercel.app/api/webhooks/communications/telegram',
+        req.body?.webhookUrl || urlWebhookTelegram(),
         'URL webhook',
         2048,
       );

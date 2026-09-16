@@ -265,28 +265,50 @@ export async function downloadGuidePdf() {
       </div>
       <div style="text-align: right; font-size: 10px; color: #64748b; line-height: 1.4;">
         <div>Data: ${new Date().toLocaleDateString('it-IT')}</div>
-        <div>Versione: v2.4 (Cloud Multi-Tenant)</div>
+        <div>Versione: v2.5 (Cloud Multi-Tenant — credenziali per studio)</div>
       </div>
     </div>
 
     <h2 style="font-size: 13.5px; color: #1e1b4b; border-bottom: 1px solid #cbd5e1; padding-bottom: 4px; margin-top: 16px;">🟢 1. WhatsApp Business API (Meta Cloud API)</h2>
     <div style="font-size: 10.5px; color: #334155;">
-      <h4 style="margin: 6px 0 3px 0; color: #4338ca;">A. Credenziali Meta Developers:</h4>
+      <p style="margin: 0 0 6px 0;">
+        Il canale WhatsApp si configura con la <strong>tua app Meta</strong>: le credenziali sono dello studio e
+        non sono condivise con altri studi. Servono due metà, entrambe in
+        <em>Impostazioni → Canali Omnichannel</em>.
+      </p>
+
+      <h4 style="margin: 10px 0 3px 0; color: #4338ca;">A. La tua app Meta (una volta sola):</h4>
       <ol style="margin: 0; padding-left: 18px;">
-        <li>Accedi a <strong>developers.facebook.com</strong> con l'account aziendale.</li>
-        <li>Crea un'applicazione di tipo <strong>Business</strong> ed aggiungi il prodotto <strong>WhatsApp</strong>.</li>
-        <li>Copia il <strong>Phone Number ID</strong> ed il <strong>System User Permanent Access Token</strong>.</li>
+        <li>Accedi a <strong>developers.facebook.com</strong> con l'account aziendale dello studio.</li>
+        <li>Crea un'applicazione di tipo <strong>Business</strong> e aggiungi il prodotto <strong>WhatsApp</strong>.</li>
+        <li>Prendi nota dell'<strong>App ID</strong> e dell'<strong>App Secret</strong> (Impostazioni → Base dell'app).</li>
       </ol>
-      <h4 style="margin: 10px 0 3px 0; color: #4338ca;">B. Setup Webhook Ingestion:</h4>
-      <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 8px 12px; border-radius: 6px; font-family: monospace; font-size: 10px; margin: 6px 0;">
-        Callback URL: https://api.tuostudio.com/webhooks/communications/whatsapp<br/>
-        Verify Token: &lt;valore casuale, condiviso con il backend&gt;<br/>
-        Eventi sottoscritti: messages
-      </div>
-      <p style="margin: 6px 0 0 0; font-size: 10px; color: #7c2d12;">
-        Il Verify Token è un segreto: si genera a caso, si incolla su Meta e si comunica al
-        tecnico che lo imposta sul backend. Questa guida non lo contiene di proposito — un PDF
-        circola per email, e un token stampato qui sarebbe leggibile da chiunque lo riceva.
+
+      <h4 style="margin: 10px 0 3px 0; color: #4338ca;">B. Metà in uscita (invio dei messaggi):</h4>
+      <ol style="margin: 0; padding-left: 18px;">
+        <li>Copia il <strong>Phone Number ID</strong> del numero dello studio.</li>
+        <li>Crea un <strong>System User Permanent Access Token</strong> con i permessi WhatsApp.</li>
+        <li>Incolla i due valori nei campi corrispondenti in <em>Impostazioni → Canali</em> e premi «Test WhatsApp API».</li>
+      </ol>
+
+      <h4 style="margin: 10px 0 3px 0; color: #4338ca;">C. Metà in ingresso (i messaggi dei clienti):</h4>
+      <ol style="margin: 0; padding-left: 18px;">
+        <li>Nella configurazione WhatsApp della tua app, sezione <strong>Webhook</strong>, incolla la
+            <strong>Callback URL</strong> che leggi nel campo in sola lettura in <em>Impostazioni → Canali</em>.</li>
+        <li>Inventa un <strong>Verify Token</strong> (una stringa casuale lunga) e incollalo in Meta <em>e</em> nel campo
+            «Webhook Verify Token» in <em>Impostazioni → Canali</em>: i due valori devono coincidere, altrimenti Meta
+            rifiuta di attivare il webhook.</li>
+        <li>Incolla anche l'<strong>App Secret</strong> nel campo «Meta App Secret»: è la chiave con cui il server
+            verifica che i messaggi arrivino davvero da Meta.</li>
+        <li>Sottoscrivi l'evento <code>messages</code>, poi premi <strong>Verifica e salva</strong> in Meta.</li>
+      </ol>
+
+      <p style="margin: 8px 0 0 0; font-size: 10px; color: #7c2d12;">
+        ⚠️ La Callback URL contiene un codice casuale che identifica il tuo studio, e il Verify Token e l'App Secret
+        sono credenziali: nessuno dei tre compare in questo PDF. Non incollarli in guide, email o chat condivise.
+        Se la Callback URL finisce dove non dovrebbe, il pulsante «Rigenera» in
+        <em>Impostazioni → Canali</em> ne produce una nuova — ricordando che i messaggi smettono di arrivare finché
+        non aggiorni Meta con l'indirizzo nuovo.
       </p>
     </div>
 
@@ -299,12 +321,26 @@ export async function downloadGuidePdf() {
       </ol>
     </div>
 
-    <h2 style="font-size: 13.5px; color: #1e1b4b; border-bottom: 1px solid #cbd5e1; padding-bottom: 4px; margin-top: 18px;">✉️ 3. Email Inbound Webhook Parse (SendGrid / PEC / SMTP)</h2>
+    <h2 style="font-size: 13.5px; color: #1e1b4b; border-bottom: 1px solid #cbd5e1; padding-bottom: 4px; margin-top: 18px;">✉️ 3. Posta in uscita e in arrivo (SMTP / IMAP)</h2>
     <div style="font-size: 10.5px; color: #334155;">
-      <p style="margin: 0 0 6px 0;">Configura l'Inbound Parse sul tuo provider DNS o SendGrid verso:</p>
-      <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 8px 12px; border-radius: 6px; font-family: monospace; font-size: 10px;">
-        https://api.tuostudio.com/webhooks/communications/email
-      </div>
+      <p style="margin: 0 0 6px 0;">
+        La casella dello studio si configura in <em>Impostazioni → Canali</em>, in due blocchi distinti:
+        <strong>SMTP</strong> per la posta in uscita (codici di firma, credenziali del portale, comunicazioni ai
+        clienti) e <strong>IMAP</strong> per leggere la posta in arrivo.
+      </p>
+      <p style="margin: 0 0 6px 0;">
+        Entrambi i blocchi hanno un pulsante di prova che si collega davvero al server: se la prova fallisce il
+        motivo è quello che ha risposto il server di posta, non un messaggio generico.
+      </p>
+      <p style="margin: 0; font-size: 10px; color: #7c2d12;">
+        ⚠️ Le credenziali sono quelle dello studio: se la casella non è configurata, la posta non parte e il
+        canale risulta spento. Non esiste un account di piattaforma che spedisca al posto dello studio.
+      </p>
+      <p style="margin: 6px 0 0 0; font-size: 10px; color: #334155;">
+        La posta in arrivo si legge dalla scheda <em>Comunicazioni</em> del progetto, che interroga la casella
+        IMAP dello studio. Non c'è nessun webhook da configurare presso il provider: non serve alcun «Inbound
+        Parse».
+      </p>
     </div>
 
     <h2 style="font-size: 13.5px; color: #1e1b4b; border-bottom: 1px solid #cbd5e1; padding-bottom: 4px; margin-top: 18px;">🔒 4. Regola Tassativa di Associazione Automatica al Progetto</h2>

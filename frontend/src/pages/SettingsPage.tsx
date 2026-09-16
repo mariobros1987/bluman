@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { fetchUtentiTenant, creaUtenteTenantApi, uploadFileApi, fetchTenantInfoApi, updateTenantInfoApi, testEmailApi, testImapApi, testChannelApi, resetPasswordUtenteApi } from '../api/client';
+import { fetchUtentiTenant, creaUtenteTenantApi, uploadFileApi, fetchTenantInfoApi, updateTenantInfoApi, testEmailApi, testImapApi, testChannelApi, resetPasswordUtenteApi, rigeneraSlugWhatsappApi } from '../api/client';
 import { chiaviDatiLocali } from '../utils/datiLocali';
 import { getCurrentTenantId, getTenantStorageKey, getStudioInfoForTenant, saveTenantInfoToStorage } from '../utils/tenant';
 import { UserProfileModal } from '../components/UserProfileModal';
@@ -60,6 +60,14 @@ export function SettingsPage() {
   const [waPhoneId, setWaPhoneId] = useState('');
   const [waAccessToken, setWaAccessToken] = useState('');
   const [waVerifyToken, setWaVerifyToken] = useState('');
+  // App Meta **dello studio**: l'App Secret è la chiave con cui il backend verifica la firma
+  // dei messaggi in ingresso, quindi è un segreto e non torna mai indietro dal server.
+  const [waAppId, setWaAppId] = useState('');
+  const [waAppSecret, setWaAppSecret] = useState('');
+  const [waOtpTemplate, setWaOtpTemplate] = useState('');
+  const [waOtpTemplateLang, setWaOtpTemplateLang] = useState('');
+  // Calcolata dal server dallo slug dello studio: non si scrive e non si salva, si legge.
+  const [waCallbackUrl, setWaCallbackUrl] = useState<string | null>(null);
   const [tgBotToken, setTgBotToken] = useState('');
   const [tgBotUsername, setTgBotUsername] = useState('');
   const [emailInboundParseUrl, setEmailInboundParseUrl] = useState('');
@@ -137,7 +145,7 @@ export function SettingsPage() {
   // i campi password restano vuoti (lasciarli vuoti = «non modificare») e questi flag dicono
   // all'operatore che sul server la credenziale c'è già.
   const [segretiImpostati, setSegretiImpostati] = useState<{
-    smtpPass?: boolean; imapPass?: boolean; waAccessToken?: boolean; waVerifyToken?: boolean; tgBotToken?: boolean;
+    smtpPass?: boolean; imapPass?: boolean; waAccessToken?: boolean; waVerifyToken?: boolean; waAppSecret?: boolean; tgBotToken?: boolean;
   }>({});
   
   const loadTenantData = async () => {
@@ -186,6 +194,11 @@ export function SettingsPage() {
       setWaPhoneId(tData.waPhoneId || '');
       setWaAccessToken(tData.waAccessToken || '');
       setWaVerifyToken(tData.waVerifyToken || '');
+      setWaAppId(tData.waAppId || '');
+      setWaAppSecret(tData.waAppSecret || '');
+      setWaOtpTemplate(tData.waOtpTemplate || '');
+      setWaOtpTemplateLang(tData.waOtpTemplateLang || 'it');
+      setWaCallbackUrl(tData.waCallbackUrl || null);
       setTgBotToken(tData.tgBotToken || '');
       setTgBotUsername(tData.tgBotUsername || '');
       setSmtpHost(tData.smtpHost || '');
@@ -220,6 +233,7 @@ export function SettingsPage() {
         imapPass: Boolean(tData.imapPassImpostata),
         waAccessToken: Boolean(tData.waAccessTokenImpostata),
         waVerifyToken: Boolean(tData.waVerifyTokenImpostata),
+        waAppSecret: Boolean(tData.waAppSecretImpostata),
         tgBotToken: Boolean(tData.tgBotTokenImpostata),
       });
     }
@@ -263,6 +277,10 @@ export function SettingsPage() {
       waPhoneId,
       waAccessToken,
       waVerifyToken,
+      waAppId,
+      waAppSecret,
+      waOtpTemplate,
+      waOtpTemplateLang,
       tgBotToken,
       tgBotUsername,
       smtpHost,
@@ -302,13 +320,19 @@ export function SettingsPage() {
           imapPass: Boolean(salvato.imapPassImpostata),
           waAccessToken: Boolean(salvato.waAccessTokenImpostata),
           waVerifyToken: Boolean(salvato.waVerifyTokenImpostata),
+          waAppSecret: Boolean(salvato.waAppSecretImpostata),
           tgBotToken: Boolean(salvato.tgBotTokenImpostata),
         });
+        // Lo slug nasce al primo salvataggio della configurazione WhatsApp: la Callback URL
+        // che il server ha appena calcolato è quella da incollare in Meta, e senza aggiornarla
+        // qui l'operatore continuerebbe a vedere il campo vuoto fino al ricaricamento.
+        if (typeof salvato.waCallbackUrl === 'string') setWaCallbackUrl(salvato.waCallbackUrl);
       }
       if (smtpPass) setSmtpPass('');
       if (imapPass) setImapPass('');
       if (waAccessToken) setWaAccessToken('');
       if (waVerifyToken) setWaVerifyToken('');
+      if (waAppSecret) setWaAppSecret('');
       if (tgBotToken) setTgBotToken('');
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
@@ -374,6 +398,7 @@ export function SettingsPage() {
 
   const [testingChannel, setTestingChannel] = useState<string | null>(null);
   const [channelTestResult, setChannelTestResult] = useState<Record<string, string>>({});
+  const [rigenerandoSlug, setRigenerandoSlug] = useState(false);
 
   const handleTestChannel = async (channel: 'whatsapp' | 'telegram' | 'signal') => {
     setTestingChannel(channel);
@@ -382,15 +407,52 @@ export function SettingsPage() {
       if (json && json.success) {
         setChannelTestResult(prev => ({ ...prev, [channel]: `✓ ${json.message}` }));
       } else {
-        setChannelTestResult(prev => ({ ...prev, [channel]: `❌ Errore ${channel.toUpperCase()}: ${json?.errore || 'Connessione fallita'}` }));
+        // Il motivo sta in `message`: il server risponde `{success, message}` in entrambi i casi
+        // (è la stessa funzione `esito`), mentre qui si leggeva `json.errore` — che non esiste.
+        // L'operatore vedeva «Connessione fallita» anche quando il server aveva spiegato per
+        // esteso che Meta aveva rifiutato le credenziali, e non aveva modo di correggere nulla.
+        setChannelTestResult(prev => ({ ...prev, [channel]: `❌ ${json?.message || `${channel.toUpperCase()}: il server ha risposto ${json?.status || 'senza spiegare il motivo'}`}` }));
       }
-    } catch {
+    } catch (err: any) {
+      // Prima qui c'era «Modalità Simulatore: connessione verificata con successo in ambiente
+      // dev»: con il backend irraggiungibile l'operatore leggeva un successo verde. Un canale
+      // non provato non è un canale funzionante (regola 7).
       setChannelTestResult(prev => ({
         ...prev,
-        [channel]: `ℹ️ Modalità Simulatore: Webhook e connessione ${channel.toUpperCase()} verificati con successo in ambiente dev!`,
+        [channel]: `❌ Prova non eseguita: ${err?.message || 'backend non raggiungibile'}. Il canale non è stato verificato.`,
       }));
     } finally {
       setTestingChannel(null);
+    }
+  };
+
+  /**
+   * Rotazione del path di callback WhatsApp.
+   *
+   * La conferma è doppia perché la conseguenza è un'interruzione: finché la Callback URL in Meta
+   * non viene aggiornata, Meta chiama il path vecchio e quel path risponde 404 — i messaggi dei
+   * clienti non entrano più. Meglio un dialogo in più che un canale spento senza che nessuno
+   * colleghi il fatto al pulsante premuto.
+   */
+  const handleRigeneraSlugWhatsapp = async () => {
+    const conferma = window.confirm(
+      'Rigenerare il path di callback WhatsApp?\n\n' +
+      'I messaggi dei clienti NON verranno più ricevuti finché non aggiorni la Callback URL ' +
+      'nella dashboard Meta con il nuovo indirizzo. L\'operazione non si annulla.',
+    );
+    if (!conferma) return;
+
+    setRigenerandoSlug(true);
+    try {
+      const esito = await rigeneraSlugWhatsappApi();
+      if (!esito.ok) {
+        alert(`Rotazione non riuscita: ${esito.errore || 'errore non specificato'}`);
+        return;
+      }
+      if (esito.waCallbackUrl) setWaCallbackUrl(esito.waCallbackUrl);
+      alert('Nuovo path generato. Aggiorna la Callback URL in Meta con l\'indirizzo mostrato qui sopra.');
+    } finally {
+      setRigenerandoSlug(false);
     }
   };
 
@@ -628,6 +690,17 @@ export function SettingsPage() {
           setWaPhoneId={setWaPhoneId}
           waVerifyToken={waVerifyToken}
           setWaVerifyToken={setWaVerifyToken}
+          waAppId={waAppId}
+          setWaAppId={setWaAppId}
+          waAppSecret={waAppSecret}
+          setWaAppSecret={setWaAppSecret}
+          waOtpTemplate={waOtpTemplate}
+          setWaOtpTemplate={setWaOtpTemplate}
+          waOtpTemplateLang={waOtpTemplateLang}
+          setWaOtpTemplateLang={setWaOtpTemplateLang}
+          waCallbackUrl={waCallbackUrl}
+          onRigeneraSlug={handleRigeneraSlugWhatsapp}
+          rigenerandoSlug={rigenerandoSlug}
           waAccessToken={waAccessToken}
           setWaAccessToken={setWaAccessToken}
           tgBotUsername={tgBotUsername}

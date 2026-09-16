@@ -25,6 +25,16 @@ export interface EsitoInvio {
 export interface CredenzialiCanali {
   waPhoneId: string | null;
   waAccessToken: string | null;
+  /**
+   * Nome e lingua del template di autenticazione approvato.
+   *
+   * Stanno qui e non in una variabile d'ambiente perché il template vive nell'app Meta dello
+   * studio: è la sua app che lo ha fatto approvare, e un nome approvato per un'app non esiste
+   * per un'altra. Un template di piattaforma avrebbe fatto partire il messaggio di uno studio
+   * dall'app di un altro — o, più spesso, con un nome che la sua app non conosce.
+   */
+  waOtpTemplate: string | null;
+  waOtpTemplateLang: string | null;
   tgBotToken: string | null;
   tgBotUsername: string | null;
   // Lo stesso tipo che `inviaEmail` riceve: `servername` compreso. Ricopiarne i campi a mano
@@ -35,12 +45,15 @@ export interface CredenzialiCanali {
 }
 
 /**
- * Credenziali dello studio, con l'ambiente come ripiego.
+ * Credenziali del canale, SOLO dalla riga dello studio.
  *
- * L'ordine è questo e non l'inverso: i campi su `tenant` esistono da tempo e la schermata
- * impostazioni li scrive, ma nessun invio li leggeva — tutto partiva dalle variabili
- * d'ambiente, cioè dall'account di un solo studio per tutti i tenant. Su un'installazione
- * multi-studio è il messaggio di firma di un cliente spedito dal numero di un altro.
+ * I campi su `tenant` esistono da tempo e la schermata impostazioni li scrive; prima nessun
+ * invio li leggeva e tutto partiva dalle variabili d'ambiente, cioè dall'account di un solo
+ * studio per tutti i tenant — su un'installazione multi-studio, il messaggio di firma di un
+ * cliente spedito dal numero di un altro. L'ordine è stato invertito, ma era rimasto un
+ * ripiego: uno studio senza credenziali proprie inviava comunque, con l'identità della
+ * piattaforma, e l'interfaccia lo presentava come configurato. Un canale non configurato deve
+ * risultare spento, non funzionare per conto di qualcun altro: qui non si ripiega su nulla.
  */
 export async function credenzialiCanali(tenantId: string): Promise<CredenzialiCanali> {
   let t: any = null;
@@ -50,6 +63,8 @@ export async function credenzialiCanali(tenantId: string): Promise<CredenzialiCa
       select: {
         waPhoneId: true,
         waAccessToken: true,
+        waOtpTemplate: true,
+        waOtpTemplateLang: true,
         tgBotToken: true,
         tgBotUsername: true,
         smtpHost: true,
@@ -63,15 +78,18 @@ export async function credenzialiCanali(tenantId: string): Promise<CredenzialiCa
       },
     });
   } catch {
-    // Il tenant può non essere leggibile (contesto RLS assente in uno script): si ricade
-    // sull'ambiente invece di far fallire la spedizione.
+    // Lo studio può non essere leggibile (contesto RLS assente in uno script). Non si ripiega
+    // su nessuna credenziale di piattaforma: si restituisce «non configurato» e l'invio si
+    // ferma con un motivo, invece di partire a nome di un altro studio.
   }
 
   return {
-    waPhoneId: t?.waPhoneId || process.env.WA_PHONE_ID || null,
-    waAccessToken: t?.waAccessToken || process.env.WHATSAPP_ACCESS_TOKEN || null,
-    tgBotToken: t?.tgBotToken || process.env.TELEGRAM_BOT_TOKEN || null,
-    tgBotUsername: t?.tgBotUsername || process.env.TELEGRAM_BOT_USERNAME || null,
+    waPhoneId: t?.waPhoneId || null,
+    waAccessToken: t?.waAccessToken || null,
+    waOtpTemplate: t?.waOtpTemplate || null,
+    waOtpTemplateLang: t?.waOtpTemplateLang || null,
+    tgBotToken: t?.tgBotToken || null,
+    tgBotUsername: t?.tgBotUsername || null,
     smtp: {
       host: t?.smtpHost || undefined,
       servername: t?.smtpServername || undefined,
@@ -135,7 +153,9 @@ export function canaliDisponibili(
   cred: CredenzialiCanali,
   cliente: { cellulare?: string | null; email?: string | null; telegramChatId?: string | null },
 ): Array<{ canale: CanaleOtp; disponibile: boolean; motivo?: string }> {
-  const smtpConfigurato = Boolean((cred.smtp.host || process.env.SMTP_HOST) && (cred.smtp.user || process.env.SMTP_USER));
+  // Solo le credenziali dello studio: con il ripiego sull'ambiente, uno studio senza casella
+  // configurata risultava «disponibile» e il codice partiva verso l'account di piattaforma.
+  const smtpConfigurato = Boolean(cred.smtp.host && cred.smtp.user);
 
   return [
     {
@@ -178,18 +198,23 @@ function testoMessaggio(codice: string, oggettoFirma: string, minuti: number): s
 }
 
 /**
- * Il template di autenticazione approvato su Meta, con la lingua in cui è stato approvato.
+ * Il template di autenticazione approvato nell'app Meta **dello studio**, con la lingua in cui
+ * è stato approvato.
  *
  * Serve perché WhatsApp non consegna testo libero a un numero che non ha scritto allo studio
  * nelle ultime 24 ore: Graph accetta la richiesta o la rifiuta con l'errore 131047, e in
  * entrambi i casi il codice non arriva. I template di categoria «Authentication» sono l'unica
  * forma che WhatsApp recapita sempre, e in più il destinatario vede un pulsante «Copia
  * codice» invece di dover selezionare sei cifre dentro un messaggio.
+ *
+ * Prima nome e lingua venivano da `WA_OTP_TEMPLATE` / `WA_OTP_TEMPLATE_LANG`, cioè da un
+ * template di piattaforma. Non poteva funzionare per più di uno studio: i template si fanno
+ * approvare dentro un'app, e l'app ora è quella dello studio.
  */
-function templateAutenticazione(): { nome: string; lingua: string } | null {
-  const nome = process.env.WA_OTP_TEMPLATE?.trim();
+function templateAutenticazione(cred: CredenzialiCanali): { nome: string; lingua: string } | null {
+  const nome = cred.waOtpTemplate?.trim();
   if (!nome) return null;
-  return { nome, lingua: process.env.WA_OTP_TEMPLATE_LANG?.trim() || 'it' };
+  return { nome, lingua: cred.waOtpTemplateLang?.trim() || 'it' };
 }
 
 // `chiamaGraph` viveva qui: ora è `chiamaGraphWhatsapp` in `whatsappService.ts`, perché la
@@ -215,7 +240,7 @@ async function inviaWhatsapp(
   }
 
   const motivi: string[] = [];
-  const template = templateAutenticazione();
+  const template = templateAutenticazione(cred);
 
   if (template) {
     try {
@@ -257,7 +282,7 @@ async function inviaWhatsapp(
       motivi.push(`template: ${err instanceof Error ? err.message : 'errore di rete'}`);
     }
   } else {
-    motivi.push('nessun template di autenticazione configurato (WA_OTP_TEMPLATE)');
+    motivi.push('nessun template di autenticazione configurato nelle impostazioni dello studio');
   }
 
   // Testo libero: funziona solo se il cliente ha scritto allo studio nelle ultime 24 ore.

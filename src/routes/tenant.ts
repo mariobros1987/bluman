@@ -8,6 +8,7 @@
 // incapsulamento, nessuna nuova barriera).
 
 import type { FastifyInstance } from 'fastify';
+import { randomBytes } from 'node:crypto';
 import { RuoloUtente } from '@prisma/client';
 import { prisma, prismaAmministrativo } from '../util/prismaClient.js';
 import { generaPasswordTemporanea, hashPassword } from '../util/password.js';
@@ -15,6 +16,7 @@ import { rifirmaUrlUpload } from '../services/storageService.js';
 import { provaPostaInUscita, provaPostaInArrivo, sendInvitoCollaboratoreEmail } from '../services/emailService.js';
 import { credenzialiCanali } from '../services/otpDispatch.js';
 import { inMemoryTenantStore, recordAudit, senzaHash } from '../util/serverHelpers.js';
+import { urlWebhookWhatsapp } from '../util/urlPubblica.js';
 import { campoOrdinamento, creaMetaPaginazione, leggiPaginazione } from '../util/paginazione.js';
 import {
   validaCartellaImap,
@@ -51,7 +53,7 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
    * risposta o quello spazio di archiviazione (un'estensione del browser, un computer condiviso,
    * un XSS) poteva spedire come lo studio (regola 6).
    */
-  const CHIAVI_SEGRETE = ['smtpPass', 'imapPass', 'waAccessToken', 'waVerifyToken', 'tgBotToken'] as const;
+  const CHIAVI_SEGRETE = ['smtpPass', 'imapPass', 'waAccessToken', 'waVerifyToken', 'waAppSecret', 'tgBotToken'] as const;
 
   /**
    * Sostituisce i segreti con la stringa vuota e aggiunge `<chiave>Impostata: boolean`.
@@ -72,9 +74,65 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
     return copia as T;
   }
 
-  /** Quello che esce verso il browser: logo rifirmato e credenziali mascherate. */
+  /**
+   * Quello che esce verso il browser: logo rifirmato, credenziali mascherate e la Callback URL
+   * di WhatsApp **calcolata**, non memorizzata.
+   *
+   * La Callback URL non è un dato dello studio ma una conseguenza del suo slug e dell'indirizzo
+   * di questo backend: derivarla qui significa che non può divergere. Se fosse un campo salvato,
+   * uno studio che cambia slug continuerebbe a leggere nell'interfaccia l'indirizzo vecchio e lo
+   * incollerebbe in Meta, dove risponderebbe 404 — un guasto silenzioso che si scopre solo
+   * quando un cliente scrive e nessuno riceve (regola 7).
+   */
   function tenantPubblico<T>(tenant: T): T {
-    return senzaSegreti(conFirmaLogo(tenant));
+    const pulito = senzaSegreti(conFirmaLogo(tenant)) as Record<string, unknown>;
+    if (pulito && typeof pulito === 'object') {
+      pulito.waCallbackUrl = urlWebhookWhatsapp(pulito.waWebhookSlug);
+    }
+    return pulito as T;
+  }
+
+  /**
+   * Un discriminante nuovo per il path di callback: 32 caratteri da 16 byte casuali.
+   *
+   * `randomBytes` e non `Math.random()`: questo valore è l'unica cosa che separa l'endpoint di
+   * uno studio da quello di un altro, e chi lo indovinasse potrebbe far passare un proprio
+   * payload come se fosse di quello studio. La collisione è impossibile in pratica (2^128), ma
+   * l'indice unico sul database è comunque l'arbitro: se scattasse, si rigenera invece di
+   * scrivere due studi sullo stesso path.
+   */
+  function generaSlugWhatsapp(): string {
+    return randomBytes(16).toString('hex');
+  }
+
+  /**
+   * Se la metà **in ingresso** del canale WhatsApp è configurata, e cosa manca quando non lo è.
+   *
+   * Non si prova con una chiamata: Meta non offre un endpoint che dica «il tuo webhook è
+   * registrato e risponde». Si legge la configurazione dello studio, che è ciò da cui dipende
+   * l'ingresso, e si nominano i pezzi mancanti — un «ingresso non configurato» senza motivo
+   * costringerebbe l'operatore a indovinare quale dei tre campi manca.
+   */
+  async function statoIngressoWhatsapp(tenantId: string): Promise<string> {
+    let t: { waAppId?: string | null; waAppSecret?: string | null; waVerifyToken?: string | null; waWebhookSlug?: string | null } | null = null;
+    try {
+      t = await prisma.tenant.findUnique({
+        where: { id: tenantId },
+        select: { waAppId: true, waAppSecret: true, waVerifyToken: true, waWebhookSlug: true },
+      });
+    } catch {
+      t = null;
+    }
+
+    const mancanti: string[] = [];
+    if (!t?.waAppSecret) mancanti.push('App Secret');
+    if (!t?.waVerifyToken) mancanti.push('Verify Token');
+    if (!t?.waWebhookSlug) mancanti.push('Callback URL');
+    if (mancanti.length) return `non configurato — mancano ${mancanti.join(', ')}`;
+
+    // L'App ID non serve a nessuna chiamata: è il riferimento con cui l'operatore ritrova la sua
+    // app nella dashboard Meta. Mancante non blocca l'ingresso, quindi si segnala e basta.
+    return t?.waAppId ? 'configurato' : 'configurato (App ID non indicato: serve solo per la guida Meta)';
   }
 
   server.get('/tenant/info', async (req) => {
@@ -120,8 +178,13 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
     return true;
   }
 
+  // `waWebhookSlug` non è qui di proposito: non si scrive dal browser. Lo genera il server
+  // (bootstrap dello studio, o rotazione esplicita via `POST /tenant/whatsapp-slug`), perché è
+  // il discriminante che separa i webhook di uno studio da quelli di un altro: lasciarlo
+  // digitare significherebbe ammettere «scegli il path di un altro studio».
   const CHIAVI_CANALI = new Set([
-    'waPhoneId', 'waAccessToken', 'waVerifyToken', 'tgBotToken', 'tgBotUsername',
+    'waPhoneId', 'waAccessToken', 'waVerifyToken', 'waAppId', 'waAppSecret',
+    'waOtpTemplate', 'waOtpTemplateLang', 'tgBotToken', 'tgBotUsername',
     'smtpHost', 'smtpServername', 'smtpPort', 'smtpSecure', 'smtpUser', 'smtpPass',
     'smtpFromEmail', 'smtpFromName', 'smtpReplyTo', 'smtpBcc',
     'imapHost', 'imapServername', 'imapPort', 'imapSecure', 'imapUser', 'imapPass',
@@ -184,7 +247,8 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
       'ragioneSociale', 'piva', 'codiceFiscale', 'sedeLegale', 'sedeOperativa',
       'logoUrl', 'coloreTemaFattura', 'notePieFattura', 'titoloIntestazione',
       'iban', 'email', 'pec', 'telefono',
-      'waPhoneId', 'waAccessToken', 'waVerifyToken', 'tgBotToken', 'tgBotUsername',
+      'waPhoneId', 'waAccessToken', 'waVerifyToken', 'waAppId', 'waAppSecret',
+      'waOtpTemplate', 'waOtpTemplateLang', 'tgBotToken', 'tgBotUsername',
       'smtpHost', 'smtpServername', 'smtpPort', 'smtpSecure', 'smtpUser', 'smtpPass',
       'smtpFromEmail', 'smtpFromName', 'smtpReplyTo', 'smtpBcc',
       'imapHost', 'imapServername', 'imapPort', 'imapSecure', 'imapUser', 'imapPass',
@@ -235,6 +299,25 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
       return reply.code(400).send({ errore: err instanceof Error ? err.message : 'Configurazione canali non valida.' });
     }
 
+    // Primo salvataggio della configurazione WhatsApp: allo studio serve il suo discriminante.
+    // Lo slug non si scrive dal browser (vedi `CHIAVI_CANALI`), nasce qui una volta sola e da
+    // quel momento è il path che lo studio incolla in Meta. Toccare un campo `wa*` è la
+    // definizione di «questo studio usa WhatsApp», quindi è il momento giusto per crearlo: senza
+    // slug l'interfaccia non avrebbe nessuna Callback URL da mostrare e la guida Meta resterebbe
+    // un'istruzione incompleta.
+    if (Object.keys(sanitizedData).some(chiave => chiave.startsWith('wa'))) {
+      let slugEsistente: string | null = null;
+      try {
+        const corrente = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { waWebhookSlug: true } });
+        slugEsistente = corrente?.waWebhookSlug ?? null;
+      } catch {
+        slugEsistente = (inMemoryTenantStore.get(tenantId) as { waWebhookSlug?: string } | undefined)?.waWebhookSlug ?? null;
+      }
+      // Una lettura fallita non deve far fallire il salvataggio: le credenziali sono quello che
+      // l'operatore ha chiesto di scrivere, e lo slug si crea al salvataggio successivo.
+      if (!slugEsistente) sanitizedData.waWebhookSlug = generaSlugWhatsapp();
+    }
+
     try {
       const updated = await prisma.tenant.upsert({
         where: { id: tenantId },
@@ -262,6 +345,53 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
       inMemoryTenantStore.set(tenantId, updated);
       return reply.send(tenantPubblico(updated));
     }
+  });
+
+  /**
+   * Rotazione del discriminante del path di callback WhatsApp.
+   *
+   * Serve perché lo slug è l'unica cosa che separa il webhook di uno studio da quello di un
+   * altro: se finisce in un log, in uno screenshot o in una pagina condivisa, lo studio deve
+   * poterlo cambiare senza aspettare che qualcuno tocchi il database.
+   *
+   * `conferma: true` è obbligatorio, e non è una formalità: cambiare lo slug **smette di
+   * ricevere** i messaggi finché la Callback URL in Meta non viene aggiornata, perché Meta
+   * continua a chiamare il path vecchio e quel path ora risponde 404. È un'interruzione
+   * voluta, quindi va chiesta due volte invece che una.
+   */
+  server.post<{ Body: { conferma?: boolean } }>('/tenant/whatsapp-slug', async (req, reply) => {
+    if (!soloGestoriCanali(req, reply)) return reply;
+    if (req.body?.conferma !== true) {
+      return reply.code(400).send({
+        errore: 'Rotazione non confermata. Cambiare lo slug interrompe la ricezione dei messaggi WhatsApp finché la Callback URL non viene aggiornata in Meta.',
+      });
+    }
+
+    const tenantId = req.tenantId;
+    // Un secondo tentativo sull'indice unico: la collisione è praticamente impossibile
+    // (2^128), ma se accadesse il vincolo la segnala e rigenerare costa nulla.
+    for (let tentativo = 0; tentativo < 2; tentativo++) {
+      const slug = generaSlugWhatsapp();
+      try {
+        const aggiornato = await prisma.tenant.update({
+          where: { id: tenantId },
+          data: { waWebhookSlug: slug },
+        });
+        await recordAudit({
+          tenantId,
+          azione: 'WHATSAPP_SLUG_RUOTATO',
+          entita: 'Canali di comunicazione',
+          dettagli: 'Nuovo path di callback WhatsApp generato: la Callback URL in Meta va aggiornata.',
+        });
+        return reply.send(tenantPubblico(aggiornato));
+      } catch (err) {
+        const codice = (err as { code?: string }).code;
+        if (codice === 'P2002' && tentativo === 0) continue;
+        console.error('POST /tenant/whatsapp-slug —', err instanceof Error ? err.message : err);
+        return reply.code(503).send({ errore: 'Rotazione non riuscita. Riprova tra poco.' });
+      }
+    }
+    return reply.code(503).send({ errore: 'Rotazione non riuscita. Riprova tra poco.' });
   });
 
   // ── GESTIONE UTENTI TEAM TENANT ───────────────────────────────────
@@ -689,9 +819,10 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
         ipAddress: req.ip,
       });
 
-      // Le credenziali di posta sono quelle dello studio destinatario quando le ha
-      // configurate; in mancanza `credenzialiCanali` ricade sull'ambiente, che sulla
-      // piattaforma è l'account con cui si spediscono gli inviti.
+      // Le credenziali di posta sono quelle dello studio destinatario: `credenzialiCanali` legge
+      // solo la sua riga e non ripiega su nessun account di piattaforma, quindi uno studio senza
+      // casella configurata non spedisce l'invito — e lo dice, invece di spedirlo a nome di un
+      // altro studio.
       let invitoInviato = false;
       let invitoErrore: string | null = null;
       if (req.body?.invia) {
@@ -852,11 +983,16 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
         if (!r.ok) {
           return esito(false, `Meta ha rifiutato le credenziali (HTTP ${r.status}): ${dati?.error?.message || 'errore non specificato'}`);
         }
+        // La prova di Graph copre solo la metà in uscita. Dire «WhatsApp attivo» dopo aver
+        // verificato solo quella era la bugia che ha lasciato credere per mesi che i messaggi
+        // dei clienti arrivassero: l'ingresso dipende da App Secret, Verify Token e Callback
+        // URL, che Graph non conferma e che si leggono dalla configurazione dello studio.
         return esito(
           true,
-          `WhatsApp attivo sul numero ${dati.display_phone_number || waPhoneId}` +
+          `Invio attivo sul numero ${dati.display_phone_number || waPhoneId}` +
             `${dati.verified_name ? ` — ${dati.verified_name}` : ''}` +
-            `${dati.quality_rating ? ` (qualità: ${dati.quality_rating})` : ''}.`,
+            `${dati.quality_rating ? ` (qualità: ${dati.quality_rating})` : ''}. ` +
+            `Ingresso (messaggi dai clienti): ${await statoIngressoWhatsapp(tenantId)}.`,
         );
       }
 

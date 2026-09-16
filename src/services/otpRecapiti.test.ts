@@ -13,6 +13,8 @@ import { recapitiCliente, canaliDisponibili, type CredenzialiCanali } from './ot
 const credenzialiComplete: CredenzialiCanali = {
   waPhoneId: '123',
   waAccessToken: 'token',
+  waOtpTemplate: 'codice_accesso',
+  waOtpTemplateLang: 'it',
   tgBotToken: 'bot',
   tgBotUsername: 'studio_bot',
   smtp: { host: 'authsmtp.register.it', port: 465, secure: true, user: 'studio@example.com', pass: 'x' },

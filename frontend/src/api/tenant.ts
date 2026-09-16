@@ -299,6 +299,36 @@ export async function testChannelApi(payload: { channel: string; waPhoneId?: str
 }
 
 /**
+ * Rotazione del path di callback WhatsApp dello studio.
+ *
+ * Il discriminante nel path è l'unica cosa che separa il webhook di uno studio da quello di un
+ * altro: se finisce in un log o in una pagina condivisa, deve poter essere cambiato senza
+ * aspettare che qualcuno apra il database. Il server esige `conferma: true` perché la rotazione
+ * **interrompe** la ricezione finché la Callback URL non viene aggiornata in Meta: chi la chiede
+ * dal pulsante ha già letto l'avviso, e un pulsante premuto per sbaglio non deve poter spegnere
+ * il canale in silenzio.
+ */
+export async function rigeneraSlugWhatsappApi(): Promise<{ ok: boolean; waCallbackUrl?: string | null; errore?: string }> {
+  try {
+    const res = await apiFetch(`${API_BASE}/tenant/whatsapp-slug`, {
+      method: 'POST',
+      headers: {
+        ...getAuthHeaders(),
+        'x-tenant-id': getCurrentTenantId(),
+      },
+      body: JSON.stringify({ conferma: true }),
+    });
+    const dati = await res.json().catch(() => null);
+    if (!res.ok) {
+      return { ok: false, errore: dati?.errore || `Il server ha risposto ${res.status} senza spiegare il motivo.` };
+    }
+    return { ok: true, waCallbackUrl: dati?.waCallbackUrl ?? null };
+  } catch (err: any) {
+    return { ok: false, errore: err?.message || 'Backend non raggiungibile.' };
+  }
+}
+
+/**
  * Messaggio WhatsApp al cliente, spedito dal backend con il numero dello studio.
  *
  * Prima chiamava `POST /api/send-whatsapp`: una funzione senza autenticazione, con

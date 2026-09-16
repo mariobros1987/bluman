@@ -1,3 +1,12 @@
+/**
+ * Presidio di sicurezza dei webhook in ingresso, sul modello **per studio**.
+ *
+ * Le credenziali non sono più di piattaforma: lo studio si deduce dallo slug nel path e da lì si
+ * leggono il suo App Secret e il suo Verify Token. Questo file verifica le proprietà che rendono
+ * l'inversione sicura invece che pericolosa — che uno slug ignoto non risolva nulla, che la firma
+ * si verifichi **prima** di toccare i dati, e soprattutto che il segreto di uno studio non possa
+ * autenticare un messaggio destinato a un altro.
+ */
 import { createHmac } from 'node:crypto';
 import Fastify from 'fastify';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -15,7 +24,12 @@ const webhookInboxCreate = vi.fn(async ({ data }: any) => {
   eventiInbox.add(chiave);
   return { id: `inbox-${eventiInbox.size}`, ...data };
 });
-const tenantFindMany = vi.fn<any>(async () => [{ id: '00000000-0000-4000-8000-000000000001' }]);
+const tenantFindMany = vi.fn<any>(async () => [{
+  id: '00000000-0000-4000-8000-000000000001',
+  waAppSecret: 'segreto-dello-studio',
+  waVerifyToken: 'verify-dello-studio',
+  waPhoneId: 'wa-phone',
+}]);
 const tenantFindUnique = vi.fn<any>(async () => ({
   id: '00000000-0000-4000-8000-000000000001',
   tgBotToken: '12345:token-lungo-valido',
@@ -49,6 +63,12 @@ vi.mock('./util/networkPolicy.js', () => ({ vietaControlli: (x: string) => x }))
 const { registraRotteWebhooks } = await import('./routes/webhooks.js');
 const { creaSegretoTelegram } = await import('./util/webhookSecurity.js');
 const TENANT = '00000000-0000-4000-8000-000000000001';
+/** Slug dello studio: 32 caratteri, la forma che `gen_random_uuid()` produce senza trattini. */
+const SLUG = 'a'.repeat(32);
+const ROTTA = `/webhooks/communications/whatsapp/${SLUG}`;
+
+const SEGRETO_STUDIO = 'segreto-dello-studio';
+const VERIFY_STUDIO = 'verify-dello-studio';
 
 async function app() {
   const server = Fastify();
@@ -56,11 +76,28 @@ async function app() {
   return server;
 }
 
+/** La firma che Meta produce davvero: HMAC-SHA256 sui byte grezzi, in esadecimale. */
+function firmaDi(raw: string, segreto: string): string {
+  return `sha256=${createHmac('sha256', segreto).update(raw).digest('hex')}`;
+}
+
+const tenantWhatsapp = (extra: Record<string, unknown> = {}) => [{
+  id: TENANT,
+  waAppSecret: SEGRETO_STUDIO,
+  waVerifyToken: VERIFY_STUDIO,
+  waPhoneId: 'wa-phone',
+  ...extra,
+}];
+
 beforeEach(() => {
   vi.clearAllMocks();
-  process.env.WA_APP_SECRET = 'wa-secret';
   process.env.TELEGRAM_WEBHOOK_SECRET = 'tg-master';
-  tenantFindMany.mockResolvedValue([{ id: TENANT }]);
+  // Deliberatamente presenti e **diversi** da quelli dello studio: il modello precedente li
+  // leggeva come credenziali di piattaforma. Se ricomparissero come ripiego, i test qui sotto
+  // che si aspettano 401 e 503 passerebbero a 200 e se ne accorgerebbero.
+  process.env.WA_APP_SECRET = 'segreto-di-piattaforma';
+  process.env.WA_VERIFY_TOKEN = 'verify-di-piattaforma';
+  tenantFindMany.mockResolvedValue(tenantWhatsapp());
   tenantFindUnique.mockResolvedValue({ id: TENANT, tgBotToken: '12345:token-lungo-valido' });
   clienteFindMany.mockResolvedValue([{ id: 'cli-1', nome: 'Cliente Uno', cellulare: '+39 335 123 4567', referentiJson: null }]);
   progettoFindMany.mockResolvedValue([{ id: 'proj-1', stato: 'in_progress' }]);
@@ -68,43 +105,110 @@ beforeEach(() => {
   eventiInbox.clear();
 });
 
-describe('webhook WhatsApp fail-closed', () => {
+describe('webhook WhatsApp per studio', () => {
   const payload = { entry: [{ changes: [{ value: { metadata: { phone_number_id: 'wa-phone' }, messages: [{ id: 'wamid.1', from: '393351234567', type: 'text', text: { body: 'ciao' } }] } }] }] };
 
-  it('rifiuta firma assente o errata prima di interrogare il tenant', async () => {
+  it('uno slug ignoto non risolve nessuno studio e non elabora nulla', async () => {
+    tenantFindMany.mockResolvedValue([]);
     const server = await app();
-    const assente = await server.inject({ method: 'POST', url: '/webhooks/communications/whatsapp', payload });
-    const errata = await server.inject({ method: 'POST', url: '/webhooks/communications/whatsapp', headers: { 'x-hub-signature-256': `sha256=${'0'.repeat(64)}` }, payload });
-    expect([assente.statusCode, errata.statusCode]).toEqual([401, 401]);
+    const res = await server.inject({
+      method: 'POST',
+      url: ROTTA,
+      headers: { 'content-type': 'application/json', 'x-hub-signature-256': firmaDi(JSON.stringify(payload), SEGRETO_STUDIO) },
+      payload: JSON.stringify(payload),
+    });
+    expect(res.statusCode).toBe(404);
+    expect(create).not.toHaveBeenCalled();
+    await server.close();
+  });
+
+  it('uno slug malformato non interroga nemmeno il database', async () => {
+    const server = await app();
+    // `../` non è nell'alfabeto ammesso: se passasse, comporrebbe un path diverso da quello inteso.
+    const res = await server.inject({ method: 'POST', url: '/webhooks/communications/whatsapp/..%2F..%2Fadmin', payload });
+    expect(res.statusCode).toBe(404);
     expect(tenantFindMany).not.toHaveBeenCalled();
     await server.close();
   });
 
-  it('firma i byte raw e rifiuta tenant sconosciuto', async () => {
-    tenantFindMany.mockResolvedValue([]);
+  it('firma assente o errata è respinta prima di toccare i dati', async () => {
     const server = await app();
+    const assente = await server.inject({ method: 'POST', url: ROTTA, payload });
+    const errata = await server.inject({
+      method: 'POST', url: ROTTA,
+      headers: { 'x-hub-signature-256': `sha256=${'0'.repeat(64)}` }, payload,
+    });
+    expect([assente.statusCode, errata.statusCode]).toEqual([401, 401]);
+    expect(create).not.toHaveBeenCalled();
+    await server.close();
+  });
+
+  it('la firma si verifica con l\'App Secret dello studio, non con quello di piattaforma', async () => {
     const raw = JSON.stringify(payload);
-    const signature = `sha256=${createHmac('sha256', 'wa-secret').update(raw).digest('hex')}`;
-    const res = await server.inject({ method: 'POST', url: '/webhooks/communications/whatsapp', headers: { 'content-type': 'application/json', 'x-hub-signature-256': signature }, payload: raw });
-    expect(res.statusCode).toBe(404);
+    const server = await app();
+
+    // Firmato con il segreto di piattaforma: la piattaforma non è lo studio, quindi 401.
+    const conPiattaforma = await server.inject({
+      method: 'POST', url: ROTTA,
+      headers: { 'content-type': 'application/json', 'x-hub-signature-256': firmaDi(raw, 'segreto-di-piattaforma') },
+      payload: raw,
+    });
+    expect(conPiattaforma.statusCode).toBe(401);
+    expect(create).not.toHaveBeenCalled();
+
+    // Firmato con il segreto dello studio: è l'unica firma valida.
+    const conStudio = await server.inject({
+      method: 'POST', url: ROTTA,
+      headers: { 'content-type': 'application/json', 'x-hub-signature-256': firmaDi(raw, SEGRETO_STUDIO) },
+      payload: raw,
+    });
+    expect(conStudio.statusCode).toBe(200);
+    expect(create).toHaveBeenCalledTimes(1);
+    await server.close();
+  });
+
+  it('lo studio senza App Secret non può ricevere messaggi (fail-closed)', async () => {
+    tenantFindMany.mockResolvedValue(tenantWhatsapp({ waAppSecret: null }));
+    const raw = JSON.stringify(payload);
+    const server = await app();
+    const res = await server.inject({
+      method: 'POST', url: ROTTA,
+      headers: { 'content-type': 'application/json', 'x-hub-signature-256': firmaDi(raw, SEGRETO_STUDIO) },
+      payload: raw,
+    });
+    expect(res.statusCode).toBe(503);
+    expect(create).not.toHaveBeenCalled();
+    await server.close();
+  });
+
+  it('un messaggio per un numero diverso da quello dichiarato non entra nel fascicolo', async () => {
+    tenantFindMany.mockResolvedValue(tenantWhatsapp({ waPhoneId: 'altro-numero' }));
+    const raw = JSON.stringify(payload);
+    const server = await app();
+    const res = await server.inject({
+      method: 'POST', url: ROTTA,
+      headers: { 'content-type': 'application/json', 'x-hub-signature-256': firmaDi(raw, SEGRETO_STUDIO) },
+      payload: raw,
+    });
+    expect(res.statusCode).toBe(409);
     expect(create).not.toHaveBeenCalled();
     await server.close();
   });
 
   it('non persiste sender ambiguo e ignora replay con claim atomico', async () => {
     const raw = JSON.stringify(payload);
-    const signature = `sha256=${createHmac('sha256', 'wa-secret').update(raw).digest('hex')}`;
+    const firma = firmaDi(raw, SEGRETO_STUDIO);
     const server = await app();
     clienteFindMany.mockResolvedValueOnce([
       { id: 'cli-1', nome: 'Uno', cellulare: '+393351234567', referentiJson: null },
       { id: 'cli-2', nome: 'Due', cellulare: '+393351234567', referentiJson: null },
     ]);
-    await server.inject({ method: 'POST', url: '/webhooks/communications/whatsapp', headers: { 'content-type': 'application/json', 'x-hub-signature-256': signature }, payload: raw });
+    await server.inject({ method: 'POST', url: ROTTA, headers: { 'content-type': 'application/json', 'x-hub-signature-256': firma }, payload: raw });
     expect(create).not.toHaveBeenCalled();
 
     const [prima, seconda] = await Promise.all([
-      server.inject({ method: 'POST', url: '/webhooks/communications/whatsapp', headers: { 'content-type': 'application/json', 'x-hub-signature-256': signature }, payload: raw }),
-      server.inject({ method: 'POST', url: '/webhooks/communications/whatsapp', headers: { 'content-type': 'application/json', 'x-hub-signature-256': signature }, payload: raw }),
+      server.inject({ method: 'POST', url: ROTTA, headers: { 'content-type': 'application/json', 'x-hub-signature-256': firma }, payload: raw }),
+      server.inject({ method: 'POST', url: ROTTA, headers: { 'content-type': 'application/json', 'x-hub-signature-256': firma }, payload: raw }),
     ]);
     expect([prima.statusCode, seconda.statusCode]).toEqual([200, 200]);
     expect(create).toHaveBeenCalledTimes(1);
@@ -120,14 +224,14 @@ describe('webhook WhatsApp fail-closed', () => {
       statuses: [{ id: 'wamid.out.1', status: 'delivered' }],
     } }] }] };
     const raw = JSON.stringify(ricevuta);
-    const signature = `sha256=${createHmac('sha256', 'wa-secret').update(raw).digest('hex')}`;
+    const firma = firmaDi(raw, SEGRETO_STUDIO);
     findComunicazioni.mockResolvedValue([{ id: 'com-out-1' }]);
     const server = await app();
 
     const richiesta = () => server.inject({
       method: 'POST',
-      url: '/webhooks/communications/whatsapp',
-      headers: { 'content-type': 'application/json', 'x-hub-signature-256': signature },
+      url: ROTTA,
+      headers: { 'content-type': 'application/json', 'x-hub-signature-256': firma },
       payload: raw,
     });
     const [prima, seconda] = await Promise.all([richiesta(), richiesta()]);
@@ -137,6 +241,45 @@ describe('webhook WhatsApp fail-closed', () => {
     expect(webhookInboxCreate).toHaveBeenCalledWith({
       data: { tenantId: TENANT, provider: 'whatsapp_status', eventId: 'wamid.out.1:delivered' },
     });
+    await server.close();
+  });
+});
+
+describe('handshake WhatsApp per studio', () => {
+  const query = (token?: string) => ({
+    method: 'GET' as const,
+    url: `${ROTTA}?hub.mode=subscribe&hub.challenge=1234${token === undefined ? '' : `&hub.verify_token=${encodeURIComponent(token)}`}`,
+  });
+
+  it('risponde con la challenge solo al Verify Token dello studio', async () => {
+    const server = await app();
+    const giusto = await server.inject(query(VERIFY_STUDIO));
+    expect(giusto.statusCode).toBe(200);
+    expect(giusto.body).toBe('1234');
+    await server.close();
+  });
+
+  it('rifiuta il token di piattaforma e un token qualsiasi', async () => {
+    const server = await app();
+    const piattaforma = await server.inject(query('verify-di-piattaforma'));
+    const inventato = await server.inject(query('token-a-caso'));
+    expect([piattaforma.statusCode, inventato.statusCode]).toEqual([403, 403]);
+    await server.close();
+  });
+
+  it('uno studio senza Verify Token non è sottoscrivibile da nessuno', async () => {
+    tenantFindMany.mockResolvedValue(tenantWhatsapp({ waVerifyToken: null }));
+    const server = await app();
+    const res = await server.inject(query('qualsiasi'));
+    expect(res.statusCode).toBe(503);
+    await server.close();
+  });
+
+  it('uno slug ignoto risponde 404 prima di guardare il token', async () => {
+    tenantFindMany.mockResolvedValue([]);
+    const server = await app();
+    const res = await server.inject(query(VERIFY_STUDIO));
+    expect(res.statusCode).toBe(404);
     await server.close();
   });
 });

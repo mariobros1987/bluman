@@ -370,20 +370,21 @@ export default async function handler(req: any, res: any) {
       });
     }
 
-    // La password della casella arriva dalla richiesta. Il ripiego sulle variabili
-    // d'ambiente resta solo per le chiamate autenticate dal segreto condiviso: senza quel
-    // vincolo era un open proxy, perché consentiva di spedire come lo studio senza
-    // conoscerne la password. Regola 6 di `.agents/AGENTS.md`.
-    const effectivePass = String(smtpPass || '').trim() || (autorizzato ? process.env.SMTP_PASS : '');
-    const effectiveUser = String(smtpUser || '').trim() || (autorizzato ? process.env.SMTP_USER : '');
-    const effectiveHost = String(smtpHost || '').trim() || (autorizzato ? process.env.SMTP_HOST : '');
+    // La password della casella arriva dalla richiesta: è quella dello studio, letta dal
+    // backend dalla sua riga. Qui non si ripiega più su `process.env.SMTP_*`: quel ripiego
+    // esisteva per le chiamate autenticate dal segreto condiviso, ma il backend manda sempre
+    // le credenziali dello studio, quindi serviva solo a far partire la posta di uno studio
+    // che non ne aveva, dall'account di piattaforma. Regola 6 di `.agents/AGENTS.md`.
+    const effectivePass = String(smtpPass || '').trim();
+    const effectiveUser = String(smtpUser || '').trim();
+    const effectiveHost = String(smtpHost || '').trim();
 
     if (!effectivePass || !effectiveUser || !effectiveHost) {
       return res.status(400).json({
         success: false,
         errore:
           'Credenziali SMTP mancanti: nessuna casella configurata nelle impostazioni dello studio ' +
-          'e nessuna variabile SMTP_HOST/SMTP_USER/SMTP_PASS disponibile per questa chiamata.',
+          '(host, utenza e password si impostano da Impostazioni → Canali).',
       });
     }
 

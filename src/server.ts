@@ -199,11 +199,19 @@ export function buildServer(app: AppPort): FastifyInstance {
     'POST /auth/client-login',
     'POST /auth/totp/verifica',
     // Chiamate da Meta, Telegram e SdI, che non possono portare un nostro JWT. Si
-    // autenticano col proprio meccanismo: hub.verify_token (WhatsApp), il segreto
-    // del bot (Telegram) e il secret condiviso WEBHOOK_SECRET_SDI confrontato
+    // autenticano col proprio meccanismo: l'handshake `hub.verify_token` di Meta e la firma
+    // `X-Hub-Signature-256` verificata con l'App Secret **dello studio** (WhatsApp), il
+    // segreto del bot (Telegram) e il secret condiviso WEBHOOK_SECRET_SDI confrontato
     // col timing-safe comparison nel handler (SdI).
-    'GET /webhooks/communications/whatsapp',
-    'POST /webhooks/communications/whatsapp',
+    //
+    // Il path WhatsApp porta lo slug dello studio: la chiave è il **pattern** di rotta, quindi
+    // va scritta col parametro `:slug` e non con un valore. Elencare il path senza slug lasciava
+    // la rotta fuori da questo insieme e l'hook rispondeva 401 prima ancora di arrivare al
+    // gestore: Meta avrebbe ricevuto un rifiuto per ogni messaggio, e nessun test sui soli
+    // gestori se ne sarebbe accorto — la scoperta è arrivata da un test che monta il server
+    // intero. Se un giorno il path cambia forma, questo elenco va cambiato con lui.
+    'GET /webhooks/communications/whatsapp/:slug',
+    'POST /webhooks/communications/whatsapp/:slug',
     'POST /webhooks/communications/telegram',
     'POST /webhooks/sdi',
     // Qui "pubblica" significa "il guard non la controlla, la controlla il handler": i file

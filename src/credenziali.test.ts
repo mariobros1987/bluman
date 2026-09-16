@@ -65,9 +65,16 @@ const CREDENZIALI_VIETATE = [
   'jwt_magic_mock_456',
   // Verify token del webhook WhatsApp di produzione. Era scritto in chiaro in
   // GUIDA_META_WHATSAPP_INTEGRAZIONE.md e in GUIDA_CONFIGURAZIONE_CANALI.md: chi leggeva il
-  // repository poteva superare l'handshake del webhook al posto nostro. Ora vive solo nel
-  // campo `waVerifyToken` della riga Tenant, e su Meta va rigenerato — la cronologia di git
-  // conserva il valore vecchio.
+  // repository poteva superare l'handshake del webhook al posto nostro.
+  //
+  // Verificato il 16/09/2026: la stringa è ancora **sia** nella cronologia di git **sia** nel
+  // campo `waVerifyToken` di uno studio reale in produzione — quest'ultima parte smentisce il
+  // commento che stava qui prima («vive solo nel campo waVerifyToken»), il quale descriveva una
+  // situazione che non si era mai verificata. Da allora il token di verifica non è più una
+  // variabile d'ambiente né un valore unico: è per studio, e l'handshake legge quello della
+  // riga Tenant dello studio nominato dallo slug (`src/routes/webhooks.ts`). Il valore qui
+  // sotto resta come stringa da cercare perché la cronologia di git non si riscrive: serve a
+  // impedire che qualcuno lo reintroduca, non a dire che sia ancora in uso.
   'bluman_wa_secure_token_2026',
 ];
 

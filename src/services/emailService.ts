@@ -278,13 +278,15 @@ export async function sendMagicLinkEmail(
   // studio al server di un provider che potrebbe non essere il suo; e con l'host sbagliato
   // l'invio fallisce comunque, solo senza dire perché. Senza host `inviaEmail` risponde «SMTP
   // non configurato», che è l'informazione vera.
-  const host = customConfig?.host || process.env.SMTP_HOST;
-  const servername = customConfig?.servername || process.env.SMTP_SERVERNAME || undefined;
-  const port = customConfig?.port || Number(process.env.SMTP_PORT ?? 465);
+  // Nessun ripiego nemmeno sulle variabili `SMTP_*` di piattaforma: con quelle, uno studio
+  // senza casella propria spediva il magic link ai suoi clienti dall'account di un altro.
+  const host = customConfig?.host;
+  const servername = customConfig?.servername || undefined;
+  const port = customConfig?.port || 465;
   const secure = customConfig?.secure !== undefined ? customConfig.secure : (port === 465);
-  const user = customConfig?.user || process.env.SMTP_USER;
-  const pass = customConfig?.pass || process.env.SMTP_PASS;
-  const fromEmail = customConfig?.fromEmail || user || process.env.SMTP_FROM;
+  const user = customConfig?.user;
+  const pass = customConfig?.pass;
+  const fromEmail = customConfig?.fromEmail || user;
   const fromName = customConfig?.fromName || 'BluMan Advisory';
 
   const html = `
@@ -345,7 +347,9 @@ export async function sendOtpSecurityEmail(
   otpCode: string,
   opzioni: OpzioniEmailOtp = {},
 ): Promise<EsitoEmailOtp> {
-  const fromEmail = opzioni.fromEmail || process.env.SMTP_FROM;
+  // Solo il mittente dichiarato dallo studio: il ripiego su `SMTP_FROM` faceva uscire la mail
+  // del codice di firma dall'indirizzo di piattaforma invece che da quello dello studio.
+  const fromEmail = opzioni.fromEmail;
   const fromName = opzioni.fromName || 'BluMan Security';
   const minuti = opzioni.minutiValidita ?? 5;
   const oggetto = opzioni.oggettoFirma || 'il documento in attesa di firma';
@@ -419,14 +423,16 @@ export async function sendClientCredentialsEmail(
   }
 ): Promise<EsitoEmail> {
   // Nessun host cablato, per lo stesso motivo di `sendMagicLinkEmail`: senza host questa
-  // email non parte, e va detto invece di provare il server di un altro provider.
-  const host = customConfig?.host || process.env.SMTP_HOST;
-  const servername = customConfig?.servername || process.env.SMTP_SERVERNAME || undefined;
-  const port = customConfig?.port || Number(process.env.SMTP_PORT ?? 465);
+  // email non parte, e va detto invece di provare il server di un altro provider. E nessun
+  // ripiego sulle variabili `SMTP_*` di piattaforma, per lo stesso motivo: sarebbero le
+  // credenziali di un altro studio.
+  const host = customConfig?.host;
+  const servername = customConfig?.servername || undefined;
+  const port = customConfig?.port || 465;
   const secure = customConfig?.secure !== undefined ? customConfig.secure : (port === 465);
-  const user = customConfig?.user || process.env.SMTP_USER;
-  const pass = customConfig?.pass || process.env.SMTP_PASS;
-  const fromEmail = customConfig?.fromEmail || user || process.env.SMTP_FROM;
+  const user = customConfig?.user;
+  const pass = customConfig?.pass;
+  const fromEmail = customConfig?.fromEmail || user;
   const fromName = customConfig?.fromName || 'BluMan Advisory';
   const url = portalUrl || 'https://bluman.vercel.app/portal';
 

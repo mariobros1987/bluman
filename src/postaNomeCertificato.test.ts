@@ -158,7 +158,7 @@ describe('§35 — posta in uscita: il nome del certificato viaggia con la richi
     expect(trasporti[0].tls.servername).toBe('authsmtp.certificato.test');
   });
 
-  it('`SMTP_SERVERNAME` serve solo dove lo studio non ha dichiarato niente', async () => {
+  it('`SMTP_SERVERNAME` non esiste più: il nome lo dichiara solo lo studio', async () => {
     process.env.SMTP_SERVERNAME = 'nome.di-ambiente.test';
 
     await inviaEmail({ ...MESSAGGIO, smtp: CASELLA });
@@ -168,7 +168,12 @@ describe('§35 — posta in uscita: il nome del certificato viaggia con la richi
 
     trasporti.length = 0;
     await inviaEmail({ ...MESSAGGIO, smtp: { ...CASELLA, servername: undefined } });
-    expect(trasporti[0].tls.servername).toBe('nome.di-ambiente.test');
+    // E non c'è nessun ripiego: senza nome dichiarato dallo studio si verifica l'host, che è il
+    // comportamento di norma (`risolviEndpointPubblico`). Fino al 16/09/2026 qui si leggeva
+    // `SMTP_SERVERNAME`, e l'asserzione era che vincesse l'ambiente quando la riga Tenant taceva:
+    // la variabile non è più letta da nessuna parte, e il presidio che lo impedisce è
+    // `src/ripieghiCredenziali.test.ts`.
+    expect(trasporti[0].tls.servername).toBe(CASELLA.host);
   });
 });
 

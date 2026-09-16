@@ -124,10 +124,11 @@ function urlRelay(): string | null {
  * ne provava uno.
  */
 function candidatiSmtp(smtp?: CredenzialiSmtp): Array<{ host: string; port: number; secure: boolean }> {
-  const host = smtp?.host || process.env.SMTP_HOST;
+  // Solo l'host dello studio, nessun ripiego sull'ambiente: per lo stesso motivo di `inviaEmail`.
+  const host = smtp?.host;
   if (!host) return [];
 
-  const porta = validaPorta(smtp?.port ?? process.env.SMTP_PORT ?? 465, 'Porta SMTP');
+  const porta = validaPorta(smtp?.port ?? 465, 'Porta SMTP');
   const produzione = process.env.NODE_ENV === 'production';
 
   return [
@@ -273,13 +274,18 @@ async function inviaViaSmtp(
  * - **senza relay** (la macchina di chi sviluppa) c'è solo l'SMTP diretto, che lì funziona.
  */
 export async function inviaEmail(messaggio: MessaggioEmail): Promise<EsitoEmail> {
+  // Le credenziali sono SOLO quelle dello studio, quelle che `credenzialiCanali` ha letto
+  // dalla sua riga. Il ripiego sulle variabili `SMTP_*` faceva partire la posta di uno studio
+  // che non ne aveva, dall'account di piattaforma: il controllo qui sotto lo intercettava, ma
+  // solo quando la piattaforma non aveva a sua volta una casella configurata. Un canale non
+  // configurato deve fermarsi con un motivo, non funzionare per conto di qualcun altro.
   const smtp: CredenzialiSmtp = {
-    host: messaggio.smtp?.host || process.env.SMTP_HOST,
-    servername: messaggio.smtp?.servername || process.env.SMTP_SERVERNAME || undefined,
-    port: messaggio.smtp?.port || Number(process.env.SMTP_PORT ?? 465),
+    host: messaggio.smtp?.host,
+    servername: messaggio.smtp?.servername || undefined,
+    port: messaggio.smtp?.port || 465,
     secure: messaggio.smtp?.secure,
-    user: messaggio.smtp?.user || process.env.SMTP_USER,
-    pass: messaggio.smtp?.pass || process.env.SMTP_PASS,
+    user: messaggio.smtp?.user,
+    pass: messaggio.smtp?.pass,
   };
 
   const etichetta = messaggio.etichetta || 'email';

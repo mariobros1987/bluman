@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import styles from '../../pages/Settings.module.css';
 import { PannelloRecordDns } from './PannelloRecordDns';
 
@@ -68,6 +68,20 @@ interface TabChannelsProps {
   setWaVerifyToken: (v: string) => void;
   waAccessToken: string;
   setWaAccessToken: (v: string) => void;
+  /** App Meta **dello studio**: App ID (riferimento nella dashboard) e App Secret (firma HMAC). */
+  waAppId: string;
+  setWaAppId: (v: string) => void;
+  waAppSecret: string;
+  setWaAppSecret: (v: string) => void;
+  /** Template di autenticazione approvato nell'app dello studio, con la lingua approvata. */
+  waOtpTemplate: string;
+  setWaOtpTemplate: (v: string) => void;
+  waOtpTemplateLang: string;
+  setWaOtpTemplateLang: (v: string) => void;
+  /** Callback URL calcolata dal server dallo slug dello studio. `null` finché non ne ha uno. */
+  waCallbackUrl: string | null;
+  onRigeneraSlug: () => void;
+  rigenerandoSlug: boolean;
   tgBotUsername: string;
   setTgBotUsername: (v: string) => void;
   tgBotToken: string;
@@ -87,6 +101,7 @@ interface TabChannelsProps {
     imapPass?: boolean;
     waAccessToken?: boolean;
     waVerifyToken?: boolean;
+    waAppSecret?: boolean;
     tgBotToken?: boolean;
   };
 }
@@ -160,6 +175,17 @@ export function TabChannels({
   setWaVerifyToken,
   waAccessToken,
   setWaAccessToken,
+  waAppId,
+  setWaAppId,
+  waAppSecret,
+  setWaAppSecret,
+  waOtpTemplate,
+  setWaOtpTemplate,
+  waOtpTemplateLang,
+  setWaOtpTemplateLang,
+  waCallbackUrl,
+  onRigeneraSlug,
+  rigenerandoSlug,
   tgBotUsername,
   setTgBotUsername,
   tgBotToken,
@@ -171,6 +197,26 @@ export function TabChannels({
   segretiImpostati,
 }: TabChannelsProps) {
   const segreti = segretiImpostati || {};
+  const [copiatoCallback, setCopiatoCallback] = useState(false);
+
+  const copiaCallback = async () => {
+    if (!waCallbackUrl) return;
+    try {
+      await navigator.clipboard.writeText(waCallbackUrl);
+      setCopiatoCallback(true);
+      setTimeout(() => setCopiatoCallback(false), 2000);
+    } catch {
+      // L'API degli appunti non è disponibile (contesto non sicuro, permesso negato): il campo
+      // resta selezionabile a mano. Non si finge che la copia sia riuscita.
+      setCopiatoCallback(false);
+    }
+  };
+
+  // La dashboard Meta dove si incolla la Callback URL. Costruita dall'App ID dello studio: è
+  // l'unico uso dell'App ID, che non entra in nessuna chiamata.
+  const consoleMeta = waAppId
+    ? `https://developers.facebook.com/apps/${encodeURIComponent(waAppId)}/whatsapp-business/wa-dev-console/`
+    : 'https://developers.facebook.com/apps/';
   return (
         <form onSubmit={handleSaveCompany} className={styles.sectionBox}>
           <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -430,7 +476,9 @@ export function TabChannels({
                 </button>
               </div>
               <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 12 }}>
-                Ricezione webhook messaggi e risposte dirette da cellulare. (Primi 1.000 messaggi/mese GRATUITI).
+                In uscita: codici di firma, credenziali del portale e messaggi ai clienti. In ingresso: i messaggi
+                che i clienti scrivono al numero dello studio. Le due metà si configurano con la <strong>tua app Meta</strong>:
+                le credenziali qui sotto sono dello studio, non condivise con altri studi.
               </div>
 
               {channelTestResult['whatsapp'] && (
@@ -439,26 +487,102 @@ export function TabChannels({
                 </div>
               )}
 
+              <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text)', margin: '4px 0 8px' }}>
+                Metà in uscita — invio dei messaggi
+              </div>
               <div className={styles.grid2}>
                 <div className={styles.field}>
                   <label>WhatsApp Phone Number ID (Meta *):</label>
                   <input type="text" value={waPhoneId} onChange={e => setWaPhoneId(e.target.value)} style={{ fontSize: 12 }} />
                 </div>
                 <div className={styles.field}>
-                  <label>Webhook Verify Token (solo invii, non l'handshake):</label>
-                  <input type="password" value={waVerifyToken} onChange={e => setWaVerifyToken(e.target.value)} placeholder="••••••••••••" style={{ fontSize: 12 }} autoComplete="new-password" />
-                  <NotaSegreto impostata={segreti.waVerifyToken} />
-                  <div style={{ fontSize: 10.5, color: '#f59e0b', marginTop: 4 }}>
-                    ⚠️ Il verify token dell'handshake webhook (il controllo che Meta fa sulla GET di verifica) è uno solo per
-                    tutta la piattaforma e sta nella variabile d'ambiente WA_VERIFY_TOKEN del server: NON si configura da qui.
-                    Questo campo serve solo alle chiamate in uscita verso Meta.
+                  <label>Meta System User Access Token (Permanent *):</label>
+                  <input type="password" value={waAccessToken} onChange={e => setWaAccessToken(e.target.value)} placeholder="••••••••••••" style={{ fontSize: 12 }} autoComplete="new-password" />
+                  <NotaSegreto impostata={segreti.waAccessToken} />
+                </div>
+                <div className={styles.field}>
+                  <label>Template OTP approvato (opzionale):</label>
+                  <input type="text" value={waOtpTemplate} onChange={e => setWaOtpTemplate(e.target.value)} placeholder="es. codice_accesso" style={{ fontSize: 12 }} />
+                  <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 3 }}>
+                    Senza template il codice parte come testo libero, che WhatsApp consegna solo se il cliente
+                    ha scritto allo studio nelle ultime 24 ore. Il template va approvato <strong>nella tua app</strong>.
+                  </div>
+                </div>
+                <div className={styles.field}>
+                  <label>Lingua del template:</label>
+                  <input type="text" value={waOtpTemplateLang} onChange={e => setWaOtpTemplateLang(e.target.value)} placeholder="it" style={{ fontSize: 12 }} />
+                  <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 3 }}>
+                    Il codice della lingua con cui il template è stato approvato (es. <code>it</code>, <code>it_IT</code>, <code>en_US</code>).
                   </div>
                 </div>
               </div>
-              <div className={styles.field} style={{ marginTop: 10 }}>
-                <label>Meta System User Access Token (Permanent *):</label>
-                <input type="password" value={waAccessToken} onChange={e => setWaAccessToken(e.target.value)} placeholder="••••••••••••" style={{ fontSize: 12 }} autoComplete="new-password" />
-                <NotaSegreto impostata={segreti.waAccessToken} />
+
+              <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text)', margin: '16px 0 8px' }}>
+                Metà in ingresso — messaggi dai clienti
+              </div>
+              <div className={styles.grid2}>
+                <div className={styles.field}>
+                  <label>Meta App ID:</label>
+                  <input type="text" value={waAppId} onChange={e => setWaAppId(e.target.value)} placeholder="es. 1234567890123456" style={{ fontSize: 12 }} />
+                </div>
+                <div className={styles.field}>
+                  <label>Meta App Secret *:</label>
+                  <input type="password" value={waAppSecret} onChange={e => setWaAppSecret(e.target.value)} placeholder="••••••••••••" style={{ fontSize: 12 }} autoComplete="new-password" />
+                  <NotaSegreto impostata={segreti.waAppSecret} />
+                  <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 3 }}>
+                    È la chiave con cui il server verifica che i messaggi arrivino davvero da Meta. Senza, i messaggi
+                    in ingresso vengono rifiutati.
+                  </div>
+                </div>
+                <div className={styles.field}>
+                  <label>Webhook Verify Token (handshake Meta):</label>
+                  <input type="password" value={waVerifyToken} onChange={e => setWaVerifyToken(e.target.value)} placeholder="••••••••••••" style={{ fontSize: 12 }} autoComplete="new-password" />
+                  <NotaSegreto impostata={segreti.waVerifyToken} />
+                  <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 3 }}>
+                    La stringa che scegli tu e incolli anche in Meta. È il controllo che Meta fa quando salvi la
+                    Callback URL: se le due stringhe non coincidono, Meta non attiva il webhook.
+                  </div>
+                </div>
+              </div>
+
+              <div className={styles.field} style={{ marginTop: 12 }}>
+                <label>Callback URL da incollare in Meta (sola lettura):</label>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <input
+                    type="text"
+                    readOnly
+                    value={waCallbackUrl || 'Verrà generata al primo salvataggio di questa scheda'}
+                    onFocus={e => e.target.select()}
+                    style={{ fontSize: 12, flex: '1 1 320px', fontFamily: 'monospace' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={copiaCallback}
+                    disabled={!waCallbackUrl}
+                    style={{ background: waCallbackUrl ? '#065f46' : '#334155', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: waCallbackUrl ? 'pointer' : 'not-allowed' }}
+                  >
+                    {copiatoCallback ? '✓ Copiata' : '📋 Copia'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onRigeneraSlug}
+                    disabled={rigenerandoSlug}
+                    style={{ background: '#7c2d12', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+                  >
+                    {rigenerandoSlug ? 'Rigenerazione…' : '🔄 Rigenera'}
+                  </button>
+                </div>
+                <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 3 }}>
+                  Contiene un codice casuale che identifica il tuo studio: non condividerlo. Per attivare l'ingresso,
+                  in Meta incolla questo indirizzo in <strong>Callback URL</strong> e il Verify Token qui sopra, poi
+                  sottoscrivi il campo <code>messages</code>.{' '}
+                  <a href={consoleMeta} target="_blank" rel="noopener noreferrer" style={{ color: '#818cf8' }}>
+                    Apri la configurazione WhatsApp della tua app Meta →
+                  </a>
+                </div>
+                <div style={{ fontSize: 10, color: '#f59e0b', marginTop: 4 }}>
+                  ⚠️ «Rigenera» cambia l'indirizzo: i messaggi smettono di arrivare finché non aggiorni la Callback URL in Meta.
+                </div>
               </div>
             </div>
 

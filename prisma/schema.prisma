@@ -43,7 +43,21 @@ model Tenant {
   telefono          String?  @map("telefono")
   waPhoneId         String?  @map("wa_phone_id")
   waAccessToken     String?  @map("wa_access_token")
+  /// Token dell'handshake GET di Meta. È **per studio** perché appartiene all'app dello studio:
+  /// Meta configura Callback URL e Verify Token per applicazione, non per numero.
   waVerifyToken     String?  @map("wa_verify_token")
+  /// Identificativi dell'app Meta dello studio (App ID e App Secret): l'App Secret è la chiave
+  /// con cui si verifica la firma `X-Hub-Signature-256` dei messaggi in ingresso.
+  waAppId           String?  @map("wa_app_id")
+  waAppSecret       String?  @map("wa_app_secret")
+  /// Discriminante del path di callback (`/webhooks/communications/whatsapp/<slug>`), generato
+  /// con entropia dal database e mai versionato. Serve a dedurre lo studio dall'URL, e quindi a
+  /// leggere il suo App Secret, senza una ricerca cross-tenant sul `phone_number_id`.
+  waWebhookSlug     String?  @unique @map("wa_webhook_slug")
+  /// Nome e lingua del template di autenticazione approvato: vivono nell'app dello studio, non
+  /// in una variabile di piattaforma, perché è la sua app che li ha fatti approvare.
+  waOtpTemplate     String?  @map("wa_otp_template")
+  waOtpTemplateLang String?  @map("wa_otp_template_lang")
   tgBotToken        String?  @map("tg_bot_token")
   tgBotUsername     String?  @map("tg_bot_username")
   smtpHost          String?  @map("smtp_host")
