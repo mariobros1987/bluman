@@ -1,8 +1,8 @@
 # 🛠️ BluMan — Piano di Miglioramento e Implementazione
 
-> **Data**: 2025-07-14 (creazione) — ultimo aggiornamento al 2026-09-16
+> **Data**: 2025-07-14 (creazione) — ultimo aggiornamento al 2026-09-17
 > **Stato**: Fasi 0 e 1 completate, 6.1 CI/CD completata; Fasi 2-5 e resto Fase 6 in attesa.
-> **I lavori aperti del momento stanno nella sezione [1bis](#1bis-lavori-aperti--stato-al-16092026)** — è lì che si scrive cosa manca.
+> **I lavori aperti del momento stanno nella sezione [1bis](#1bis-lavori-aperti--stato-al-17092026)** — è lì che si scrive cosa manca.
 > **Autore**: Analisi AI completa del codebase
 > **Priorità**: 🔴 Critica (sicurezza) → 🟠 Alta → 🟡 Media → 🟢 Bassa
 
@@ -11,6 +11,7 @@
 ## 📋 Indice
 
 1. [Riepilogo Esecutivo](#1-riepilogo-esecutivo)
+1ter. [Calendario, collaboratori e compiti assegnati](#1ter-calendario-collaboratori-e-compiti-assegnati)
 2. [FASE 0 — Sicurezza Critica (immediata)](#2-fase-0--sicurezza-critica)
 3. [FASE 1 — Affidabilità e Correttezza](#3-fase-1--affidabilità-e-correttezza)
 4. [FASE 2 — Refactoring Architetturale](#4-fase-2--refactoring-architetturale)
@@ -50,7 +51,7 @@
 
 ---
 
-## 1bis. Lavori aperti — stato al 16/09/2026
+## 1bis. Lavori aperti — stato al 17/09/2026
 
 > Questa sezione è il posto dove si scrive cosa **manca**, perché il grafo (`graphify-out/`) è
 > generato e non può ospitarlo. Va tenuta corta e cancellata man mano che le voci si chiudono.
@@ -63,7 +64,30 @@ lo studio con `tipoEvento: 'messaggio_non_instradabile'`
 (`src/services/ingressoSenzaFascicolo.ts`). La scheda Telegram ha il pulsante che registra il
 webhook e il pannello che ne legge lo stato da `getWebhookInfo`.
 
-**Lezione da non perdere.** Ogni rotta di ingresso scarta il messaggio in **due** punti —
+**Fatto anche il 16-17/09/2026 — il cliente dice lui a quale pratica si riferisce.** L'euristica a
+due cancelli resta come ripiego, ma non è più l'unica strada: dalla testata della pratica il menu
+`🔗 Link Telegram` copia `t.me/<Bot>?start=<payload>` oppure lo spedisce al cliente via email o
+WhatsApp, e chi tocca il link aggancia la propria chat a **quella** pratica — non a quella dedotta
+dall'anagrafica (`src/routes/collegamentoChat.ts`, tabella `collegamento_chat_progetto`, payload
+firmato con HMAC in `src/util/webhookSecurity.ts`). Il caso «un cliente con due pratiche aperte»
+smette di essere irrisolvibile. L'invito rientra nel fascicolo come comunicazione in uscita
+(regola 3), la revoca è lo scollegamento, e il link è una **capacità**, non un segreto: contiene un
+MAC, non il token del bot, e il token continua a non uscire dal backend.
+
+**Lezione da non perdere (17/09/2026).** Il link si compone di due metà, e la seconda — lo
+`@username` del bot — era **l'id numerico del bot**: `t.me/<numero>` apre «questo utente non esiste»
+sul telefono del cliente, ed è esattamente quello che è successo. Tre buchi, tutti chiusi nello
+stesso giro: `usernameBotTelegram` accettava un valore di sole cifre, che è la forma dell'id e non
+di uno username (Telegram non ne assegna di numerici); la registrazione del webhook scriveva
+`tgBotUsername` **solo se il campo era vuoto**, quindi un valore sbagliato ci restava per sempre; e
+nessuno aveva mai confrontato il valore salvato con quello che `getMe` restituisce. **Telegram è la
+fonte, la colonna del database è la sua copia**: un valore scritto a mano che Telegram contraddice è
+un guasto da correggere, non una scelta da rispettare. Ora «Registra webhook» rilegge `getMe`,
+corregge il campo e lo dichiara (`usernameCorretto`), e il pannello riporta il valore corretto nello
+stato del modulo — senza quello, il primo «Salva» di un altro canale avrebbe riscritto il valore
+vecchio e disfatto la correzione.
+
+**Lezione da non perdere (i due punti di scarto).** Ogni rotta di ingresso scarta il messaggio in **due** punti —
 mittente non attribuibile e progetto non univoco — e la prima correzione ne aveva collegato
 uno solo per canale. WhatsApp li aveva entrambi, Telegram e Signal no: da qui un guasto che
 sembrava inspiegabile, con l'invio funzionante e la ricezione no. **Quando si tocca uno dei
@@ -73,14 +97,416 @@ due rami, si tocchi anche l'altro**, in tutti i canali.
 
 | # | Cosa | Dove | Come si chiude |
 |---|------|------|----------------|
-| 1 | **Verifica in ricezione Telegram** | produzione | Scrivere al bot `@BlueCodeStudio_Bot` e controllare che il messaggio compaia nel fascicolo, o che arrivi l'avviso «Messaggio Telegram non archiviato» |
+| 1 | **Verifica in ricezione Telegram** — in parte fatta | produzione | **Fatto il 17/09**: premuto «Registra webhook», il campo `tgBotUsername` si è corretto da solo — cioè la catena `getMe` → confronto → `update` → risposta con `usernameCorretto` funziona in produzione. **Resta da provare l'ingresso vero**, ed è il pezzo che il link esiste per servire: toccare il link di una pratica dal proprio telefono, controllare che la chat riceva la conferma, scrivere un messaggio qualsiasi e vederlo comparire nel fascicolo **di quella pratica** con una seconda pratica dello stesso cliente aperta in parallelo (è il caso che l'euristica sbaglia), poi scollegare la chat e controllare che torni l'avviso «Messaggio Telegram non archiviato» |
 | 2 | ~~**Le migrazioni non le applica nessuno**~~ **corretto il 16/09/2026: le applica il `Dockerfile`** | `Dockerfile:34`, `scripts/distribuisci.sh` | Lo script contiene zero occorrenze di `migrate` — è vero — ma il backend non gira dallo script: `railway up --service bluman-api` costruisce l'immagine, e il `CMD` dell'immagine è `npx prisma migrate deploy && npx tsx src/index.ts`. La migrazione si applica quindi **a ogni deploy del backend**, prima che il processo vada in ascolto, e se fallisce il container non parte (`&&`, non `;`). Il rischio residuo non è «non le applica nessuno» ma l'ordine fra i due deploy: il frontend su Vercel può andare online prima che l'immagine backend abbia applicato la migrazione |
-| 3 | **Migrazioni in attesa di deploy da confermare in produzione** | `prisma/migrations/` | `20260916180000_whatsapp_app_per_studio`, `20260916190000_signal_per_studio` e `20260916210000_collegamento_chat_progetto`. Le prime due sono in attesa dal 16/09; la terza nasce con il link Telegram per progetto e **non è mai stata applicata da nessuna parte**, nemmeno in locale (qui non si è mai lanciato `migrate dev`). Si applicano al prossimo deploy del backend, dove il `CMD` del `Dockerfile` lancia `migrate deploy` (voce 2): «da confermare» significa quindi **guardare l'esito di quel deploy**, non lanciare la migrazione a mano. Come si chiude: `npx prisma migrate status` contro il database di produzione, oppure un `information_schema.columns` che trovi `wa_app_id`, `signal_endpoint` e la tabella `collegamento_chat_progetto`. Se la migrazione fallisce, il container non parte e la salute del servizio lo dice subito |
+| 3 | ~~**Migrazioni in attesa di deploy da confermare in produzione**~~ **confermato il 17/09/2026: applicate** | `prisma/migrations/` | `20260916180000_whatsapp_app_per_studio`, `20260916190000_signal_per_studio` e `20260916210000_collegamento_chat_progetto` sono in produzione. La prova è il log del container all'avvio del **17/09/2026 alle 06:54 UTC**: `36 migrations found` seguito da `No pending migrations to apply.` — `migrate deploy` confronta la cartella con la tabella `_prisma_migrations`, quindi «nessuna in attesa» significa che tutte e tre risultano applicate (Prisma scrive la riga **dopo** che l'SQL è andato a buon fine). La terza era stata applicata dal deploy del 16/09 (log: `Applying migration 20260916210000_collegamento_chat_progetto`), le prime due dallo stesso giro. Quelle due righe ricompaiono a ogni avvio del container, quindi il controllo resta rifacibile: `railway logs -s bluman-api \| head`. **Resta aperto** il rischio residuo della voce 2 — l'ordine fra il deploy del frontend su Vercel e quello del backend, che può mettere online una pagina che chiama una colonna non ancora creata — non l'applicazione |
 | 4 | **Il ramo WhatsApp ha ancora uno scarto silenzioso** | `src/routes/webhooks.ts` | `if (!providerId || !fromNumber) continue;` — messaggio senza id o senza mittente. Non c'è modo di costruire una chiave di idempotenza, quindi l'avviso non si può mandare come gli altri: va deciso se registrare l'evento in altro modo o lasciarlo |
 | 5 | **La cache del grafo è versionata** | `graphify-out/cache/` | 72 file che cambiano a ogni estrazione, e a ogni aggiornamento di CLI la directory viene rinominata lasciando indietro la vecchia. Vale la pena toglierla dal versionamento (`.gitignore` + `git rm -r --cached`) |
 | 6 | **Il tetto di 5 secondi delle transazioni interattive** | `src/` ovunque ci sia `$transaction(async …)` | Prisma chiude d'ufficio una transazione interattiva dopo 5 secondi, e la query successiva fallisce con `P2028`. Su 8 transazioni in `src/`, **6 usano ancora il default**: `prismaApp.ts:213`, `prismaIstanziazionePort.ts:43`, `auth.ts:523`, `catalogo.ts:346`, `catalogo.ts:483`, `clienti.ts:386`, `progetti.ts:423`. Oggi sono probabilmente brevi, ma il tetto è invisibile finché non lo si supera — ed è già successo due volte: in `eliminaProgetto` (16/09, si presentava all'operatore come «record collegati nel database») e prima in `prismaIstanziazionePort`, dove era stato risolto solo lì. Vale la pena decidere una regola unica invece di scoprirlo una terza volta |
 | 7 | **`PrismaApp` è legato a un solo studio** | `src/index.ts:11,20` + 34 metodi di `prismaApp.ts` | L'istanza è unica per il processo ed è costruita con un tenant **cablato**, `00000000-0000-0000-0000-000000000001`, che è lo studio Bluecode: è il motivo per cui oggi tutto funziona. Ma 34 metodi su 39 filtrano con `this.tenantId`, quindi per un **secondo studio** restituirebbero vuoto. La RLS sul tenant della richiesta dovrebbe impedire di peggio (leggere dati di un altro studio), ma è una rete di sicurezza, non un progetto: **da verificare con un secondo tenant reale** prima di dire che la piattaforma è multi-studio. `eliminaProgetto` e `archiviaProgetto` ricevono già il tenant della richiesta; gli altri no |
 | 8 | **Il piano multi-studio è scritto ma non deciso** | `PIANO_MULTITENANT.md` | Il documento c'è (dati separati, chat separate, le due strade, l'onboarding, le fasi). È la voce 7 vista dall'altro lato: la 7 dice *cosa manca nel codice*, questa dice *cosa manca nella decisione*. Nulla si implementa prima di sapere **quanti studi** e **chi li crea** — perché la strada A (adattatore per richiesta, poche righe) e la strada B (`tenantId` per chiamata, il refactor dei 34 call site) costano due ordini di grandezza diversi. Da riprendere quando la domanda commerciale ha una risposta |
+| 9 | **Il link per progetto è solo Telegram, e non si può rigenerare** | `src/routes/collegamentoChat.ts`, `src/services/telegramService.ts` | Tre cose dichiarate fuori ambito quando il link è stato costruito, scritte qui perché non vengano riscoperte come difetti. (a) **Solo Telegram**: WhatsApp non ha un deep link con payload, quindi il collegamento esplicito non esiste per quel canale; la tabella ha la colonna `canale` proprio per non doverla rifare quando servirà. (b) **Nessuna rotazione del link**: la revoca è lo scollegamento (`DELETE /progetti/:id/collegamenti/:id`), ma il link resta spendibile da chi l'ha ricevuto in mano — la stessa chat può rientrare toccandolo di nuovo, ed è voluto (chi si è scollegato per sbaglio rientra da solo); se un giorno servisse invalidare un link già spedito, oggi non c'è un modo. (c) **L'avviso «messaggio non instradabile» non è cliccabile**: per renderlo utile servirebbe far aprire a `ClientsPage` la modifica dell'anagrafica di quel cliente, mentre `?client=<…>` oggi apre il modale del magic link (`frontend/src/pages/ClientsPage.tsx:174-179`) |
+| 10 | **La colonna `signal_cli_endpoint` è ancora nel database** | `prisma/migrations/20260916190000_signal_per_studio/` | Non è un difetto: è un **debito con una scadenza che è già arrivata**. La migrazione del 16/09 ha aggiunto `signal_endpoint` e ci ha **copiato** il valore invece di rinominare la vecchia colonna, perché il backend allora in esecuzione su Railway era compilato contro lo schema vecchio e le sue query su `tenant` in gran parte non hanno un `select` esplicito: una rinomina le avrebbe fatte fallire tutte per la durata del deploy. La migrazione di pulizia è **nominata nel commento ma non esiste ancora**: `20260916200000_rimuovi_signal_cli_endpoint`. Ora che il backend che legge `signal_endpoint` è in produzione (deploy del 17/09), si può scrivere e applicare — e siccome è una **DROP**, serve l'autorizzazione esplicita del titolare. Nel frattempo il database ha una colonna che nessuno legge, e lo schema Prisma non la conosce: è la sola divergenza nota fra `schema.prisma` e il database, e va tenuta a mente se si usa `prisma migrate diff` per escludere il drift |
+| 11 | ~~**La ricevuta di consegna WhatsApp non può arrivare**~~ — ✅ **RISOLTO il 17/09/2026** | `src/routes/webhooks.ts`, `src/services/whatsappService.ts`, `src/util/statoComunicazione.ts`, `src/routes/comunicazioni.ts` | Tre motivi indipendenti, tutti verificati e tutti chiusi. (a) Il webhook di stato cercava la riga con `externalId: 'whatsapp:<wamid>'`, ma le righe in uscita contengono il blob di stato: Prisma confronta per uguaglianza esatta, quindi non trovava mai nulla → ora cerca con `contains` dentro il blob, e solo fra le righe `direzione: 'uscita'` (quelle in ingresso portano lo stesso wamid e non vanno toccate). (b) **Il `wamid` non veniva conservato**: `inviaTestoWhatsapp` restituiva `{ ok: true }` e buttava via `messages[0].id` → ora `chiamaGraphWhatsapp`, `inviaTestoWhatsapp` e `inviaTemplateWhatsapp` lo propagano come `providerId`, e `registraEsitoInvio` lo deposita in `external_id` accanto allo stato. (c) Sulle righe in ingresso la chiave veniva **distrutta** dalla marcatura di lettura → ora `conStatoComunicazione` conserva la chiave di idempotenza accanto allo stato invece di sovrascriverla. In più il webhook scriveva lo stato in `allegatiJson`, che è la colonna degli allegati: una ricevuta cancellava gli allegati del messaggio → ora scrive **solo** `external_id`. Aggiunto un presidio monotono (`statoAvanza`) perché le ricevute di Meta non arrivano garantite in ordine: un `sent` in ritardo non può più riportare a `inviato` una riga già `consegnato`. **Conseguenza di prima:** su WhatsApp `consegnato` e `letto` non sono mai stati veri — il ✓✓ blu era dedotto, non ricevuto. **Prova:** `src/ricevutaWhatsapp.test.ts`, 16 test, verificati per mutazione (rimettendo `contains`→`equals` ne falliscono 7; togliendo il presidio sul regresso ne falliscono 2) |
+| 12 | **I piani dichiarano aperto ciò che è chiuso, e non nominano ciò che è rotto** | `PIANO_DI_MIGLIORAMENTO.md` §2-8, `piano-debiti-noti-fiscale-e-split.md` | Verificato voce per voce il 17/09: **5.3 TOTP è fatto** (`src/util/totp.ts`, `POST /auth/totp/attiva`), **6.2 Sentry è fatto** (`src/plugins/sentry.ts:21`, `frontend/src/utils/sentry.ts:32`), **6.3 `.env.example` esiste**, **Debito 8 `portalDocs` è chiuso** (ora arriva dall'API, `usePortalData.ts:271`), e gli split di `ClientPortal.tsx` (848 righe) e `contabilita.ts` sono già stati eseguiti. Nessuno di questi piani nominava la voce 11. Un piano che mente in due direzioni non si può usare per decidere: va riallineato al codice prima di scegliere il prossimo lavoro |
+| 13 | **Identificatori reali e link morti nei documenti** | `README.md:5-6,141`, `GUIDA_META_WHATSAPP_INTEGRAZIONE.md:69,70,149,168`, `PIANO_SVILUPPO_COMPLETO.md:112,165` | Nessun segreto è esposto — questo regge. Ma `README.md:141` stampa Phone ID e WABA reali, e **sono anche sbagliati**: il Phone ID a database è `1334566726400311` (non `1318817114639409`) e la WABA `1397431142562576` **non esiste più** (`GraphMethodException` subcode 33 — l'app è stata rifatta). La guida Meta contiene tre volte il numero personale del titolare. I quattro link `file:///Users/mariodibenedetto/…` e `file:///Volumes/Macintosh%20HD/…` puntano a un Mac che non esiste per nessun altro lettore |
+| 14 | **Il `telefono` dello studio è il numero di prova di Meta** | riga `tenant` dello studio Bluecode | A database è `+1 555-181-9633`, che è esattamente il `display_phone_number` del **Test Number** di Meta (`verified_name: "Test Number"`, `code_verification_status: NOT_VERIFIED`). Il numero vero dello studio, `+39 378 092 6461`, non è in nessuna riga. Finché resta così, ogni documento che stampa il recapito dello studio stampa un numero che non squilla |
+| 15 | **Il frontend ha 6 file di test su 176 sorgenti** (~3%) | `frontend/src/` | Il backend ha 86 file e 1052 test; il frontend ha typecheck e build in CI e quasi nessuna rete. Ogni difetto di rendering — come il ✓✓ disegnato su righe mute, che stava in due componenti con la stessa bugia in entrambi — va scoperto a occhio |
+| 16 | **Il calendario, i collaboratori e i compiti assegnati** — 🔴 aperto, piano completo in **§1ter** | `frontend/src/pages/CalendarPage.tsx`, `frontend/src/components/CalendarPreviewModal.tsx`, `src/routes/`, `prisma/schema.prisma` | **Niente di quel piano è implementato.** Il calendario mostra agosto 2026 in tutte le sue date — anno, mese, giorni e «oggi» sono costanti nel sorgente — e la scadenza di ogni progetto e di ogni fattura è inventata da un contatore. Le tre tabelle della funzione sono vuote in produzione: `evento_calendario` **0 righe**, `accesso_risorsa` **0 righe**, `microvoce_progetto.risorsa_id` **0 valorizzate** su tutti e 5 gli studi — quindi «compito assegnato» non è mai esistito a database, e `progetto.data_scadenza` è **0** su tutti i progetti mentre il calendario ne disegna una per ciascuno. Manca `src/routes/calendario.ts`. L'assegnazione manda `usr-0${operatorId}` invece dello `userId` vero, e `PUT /progetti/:id/stato-completo` non scrive mai `risorsaId`. Due archivi `localStorage` disgiunti, e la pagina che ne legge uno scrive nell'altro. Vedi §1ter per il piano in quattro fasi, la parte *chi visualizza cosa* e i criteri di accettazione |
+
+### Cosa manca, misurato il 17/09/2026
+
+Queste non sono voci da fare: sono il **punto di partenza** che rende oneste le voci sopra.
+Lette con `railway run --service bluman-api` e il ruolo amministrativo — con il ruolo
+`bluman_app` la RLS restituisce vuoto senza errore, quindi un elenco vuoto lì non significa
+«non c'è niente».
+
+**In produzione non è mai passato un cliente vero.** Ogni riga che sembra traffico è una prova
+del titolare:
+
+| Cosa | Quanti | Quali |
+|---|---|---|
+| Eventi WhatsApp in ingresso, da sempre | 2 | `wamid.TEST123`, `wamid.SIMULATE_20260917181719` — simulazioni |
+| Messaggi Telegram in ingresso | 6 | «Hahahah», «Ccccccccc», «Bbbbbnn» |
+| Avvisi `messaggio_non_instradabile` | 9 | tutti in un'ora, il 16/09 |
+
+Questo non sminuisce i difetti, ma cambia il loro peso: **nessuno ha ancora subito un danno**, e
+nessun canale è *dimostrato* funzionante con un cliente vero. Vale anche al contrario — un
+difetto d'ingresso che sembra grave non ha ancora fatto perdere niente a nessuno.
+
+**Configurazione dei canali per studio:** solo Bluecode ha credenziali WhatsApp (`waPhoneId`,
+`waAppId`, `waVerifyToken`); gli altri quattro studi hanno lo `slug` webhook ma **nessuna**
+credenziale. L'ingresso è predisposto per tutti, l'uscita per uno.
+
+**Il numero WhatsApp in uso è il Test Number di Meta**, non un numero dello studio:
+`+1 555-181-9633`, `platform_type: CLOUD_API`, `status: CONNECTED`, `code_verification_status:
+NOT_VERIFIED`. L'invio verso l'esterno funziona (è la conferma che token e Phone Number ID sono
+validi); la ricezione no.
+
+**La catena di ricezione, lato nostro, è integra.** Verificato il 17/09 con Graph:
+l'app `BluMan` (`1045995174927441`) ha la sottoscrizione attiva su
+`whatsapp_business_account` con il campo `messages`; il callback URL punta al nostro slug giusto
+(`…/webhooks/communications/whatsapp/5f719984df6792f50b35223dd33bf9bc`) e il numero ha quel
+webhook come `webhook_configuration.application`. L'App Secret salvato **è valido** — la prova è
+che `{app-id}|{app-secret}` viene accettato da Graph — quindi `verificaFirmaWhatsapp` non è la
+causa. E due eventi simulati hanno attraversato tutta la catena fino al fascicolo.
+
+**Quindi il punto è perché Meta non consegna.** L'ipotesi principale è il limite del Test
+Number: un numero di prova accetta messaggi solo dai numeri registrati come destinatari di prova
+nella dashboard dell'app. **Non è verificato** — la lettura della documentazione Meta non era
+disponibile — e va confermato con la prova che segue, non dato per buono.
+
+**La prova che chiude la domanda, in un minuto:** scrivere un messaggio WhatsApp al
+`+1 555-181-9633` da un telefono e guardare i log mentre arriva —
+`railway logs --service bluman-api`. Se compare un `POST /webhooks/communications/whatsapp/<slug>`
+allora Meta consegna ed è il nostro handler a rifiutare (e il log dice con quale codice: 401
+firma, 409 numero, 404 slug). Se non compare **niente**, Meta non consegna e nessuna correzione
+di codice può farcela: la strada è registrare il numero vero, che è la stessa cosa che l'ingresso
+aspetta da sempre.
+
+---
+
+## 1ter. Calendario, collaboratori e compiti assegnati
+
+> Origine: piano proposto dall'utente il 17/09/2026, verificato riga per riga sul codice e qui
+> ampliato. Le risposte alle due domande aperte sono registrate in §1ter.0. La parte che l'utente
+> ha chiesto di curare in modo particolare — **chi visualizza cosa** — è §1ter.3, e non è una
+> rifinitura: è il vincolo che decide la forma dell'endpoint.
+
+### 1ter.0 Le due decisioni, registrate
+
+| Domanda | Risposta | Cosa significa in pratica |
+|---|---|---|
+| Implementare il calendario per intero (backend + frontend + assegnazione reale)? | **Sì** | Le tre fasi di §1ter.4-1ter.6 si fanno tutte. Nessuna scorciatoia «solo frontend». |
+| Aggregare automaticamente scadenze fatture e fine progetti nel calendario? | **Sì** | Il calendario legge le stesse regole che il cron già applica (§1ter.4, punto 2). Non una seconda verità. |
+
+Istruzione aggiuntiva dell'utente, verbatim: *«stando attento a chi visualizza cosa»*.
+
+### 1ter.1 Cosa c'è oggi, misurato
+
+**La risposta secca, perché è la prima cosa da sapere: di questo piano non è implementato niente.**
+Non «è implementato in parte», non «manca la rifinitura»: quello che esiste nel codice è la
+**controffigura** del piano — un calendario che disegna date che nessuno ha, e un'assegnazione che
+scrive in un posto dove nessuno legge. L'unico pezzo del piano già presente è il campo
+`TeamMember.dbId` (`useTeamMembers.ts:80-82`), che porta lo `userId` vero accanto all'id numerico
+della UI: è il gancio su cui si innesta C1, e c'è già.
+
+Lo scheletro dei dati, invece, c'è dalla prima migrazione: `EventoCalendario`, `AccessoRisorsa` e
+`MicrovoceProgetto.risorsaId` sono stati **progettati** fin dall'inizio. Nessuno li ha mai
+**accesi**. La tabella in fondo a questa sezione lo misura.
+
+Il calendario è la parte dell'applicazione dove la regola 7 (il frontend non inventa dati che il
+database non ha) è violata più a fondo, perché l'invenzione è **sistematica** e non si vede: le date
+finte sono costruite con un contatore, quindi sembrano dati veri.
+
+**`frontend/src/pages/CalendarPage.tsx` (567 righe)**
+
+| Riga | Cosa c'è | Perché è un difetto |
+|---|---|---|
+| 172-173 | `const daysInMonth = 31;` | Il mese mostrato ha sempre 31 giorni, anche a febbraio. |
+| 295 | `` `2026-08-${…}` `` | L'anno e il mese sono costanti nel sorgente. |
+| 283 | `<h3>Agosto 2026</h3>` | L'intestazione non deriva da nessuna data. |
+| 297 | `const isToday = day === 14;` | «Oggi» è per sempre il 14. Il badge *Oggi* è una decorazione. |
+| 49 | `c.dataKyc ? … : '2026-08-' + (12 + idx % 15)` | Se il KYC non c'è, la data **non manca**: viene inventata dal numero d'ordine del cliente. |
+| 71 | `` `2026-08-${14 + pIdx % 12}` `` | La scadenza di consegna di ogni progetto è inventata. |
+| 91 | `` `2026-08-${18 + iIdx % 10}` `` | La scadenza di ogni fattura è inventata. |
+| 121-127 | `formData = '2026-08-18'`, `formOperatore = 'Joe Disabato'` | Valori di partenza cablati. |
+| 535-538 | 4 clienti con 4 partite IVA inventate | Un elenco di clienti che non esiste, in un `<select>` che si presenta come «dall'Anagrafica ERP». |
+| 105 vs 149-152 | legge `bluman_custom_calendar_events_tenant_<id>`, scrive `bluman_custom_calendar_events` | `getTenantStorageKey` (`utils/tenant.ts:141-144`) antepone `_tenant_<id>`: **la lettura e la scrittura usano due chiavi diverse.** Un evento creato a mano non ricompare dopo il ricaricamento. |
+| 159-164 | `handleToggleComplete` | Cambia solo lo stato React. Nessuna persistenza: «completato» svanisce al reload. |
+| — | nessuna chiamata a `EventoCalendario` | Il modello Prisma esiste da sempre e nessuno ci scrive (vedi sotto). |
+
+**`frontend/src/components/CalendarPreviewModal.tsx` (332 righe)**
+
+- riga 54: `Array.from({length: 31}, …)` — stesso mese di 31 giorni;
+- riga 115: `🗓 Agosto 2026` cablato;
+- righe 156/163/170: i preset «+3 Giorni», «+1 Settimana», «Fine Mese» sono tre date fisse
+  (`2026-08-18`, `2026-08-22`, `2026-08-31`) — non calcolano niente;
+- riga 32: `useState<number>(1)` — l'operatore preselezionato è l'id numerico 1, cioè quello che
+  `useTeamMembers` assegna per hash al primo membro;
+- riga 306: la casella dichiara *«Invia Notifica Email & Reminder SMTP all'Operatore ed al Cliente
+  (24h prima)»*. Il valore `sendEmail` viene scritto nell'oggetto salvato in `localStorage`
+  (`ProjectDetail.tsx:193`) e **nessuna email parte**: non c'è nessun consumatore di quel campo;
+- riga 105: a conferma avvenuta annuncia *«notificato all'operatore»*. È la stessa classe di
+  bugia: una notifica dichiarata senza che nessuno l'abbia inviata.
+
+**Due archivi locali che non si parlano**
+
+`ProjectDetail.tsx:193` scrive le attività pianificate in `bluman_calendar_events` (con la chiave
+del tenant). `CalendarPage.tsx` legge **solo** `bluman_custom_calendar_events`. Quindi: pianificare
+un'attività dal fascicolo non la fa comparire nel calendario. Sono due depositi disgiunti, nessuno
+dei due è una tabella.
+
+**`EventoCalendario` esiste e non ha scrittori**
+
+`prisma/schema.prisma:1160` definisce `EventoCalendario`. Chi lo usa:
+
+- `src/services/ricercaGlobaleService.ts:142` — lo **legge**;
+- `src/adapters/prisma/prismaApp.ts:509` — cancella le righe del progetto;
+
+nessuno lo **crea**. La tabella è vuota per costruzione, e la ricerca globale ha una sorgente che
+non può restituire niente. Il modello è anche troppo magro per la UI: ha solo `titolo`,
+`dataInizio`, `dataFine`, `userId`, `progettoId` — mancano categoria, stato, priorità, note,
+cliente e l'assegnatario, e non ha **nessun indice** (nessun `@@index`), quindi qualunque query per
+intervallo di date è una scansione completa.
+
+**`src/routes/calendario.ts` non esiste.** Non c'è nessuna rotta che legga o scriva un evento.
+
+**Assegnazione dell'operatore, i tre punti rotti**
+
+| Dove | Cosa c'è | Effetto |
+|---|---|---|
+| `ProjectDetail.tsx:232` | `assegnaAccessoProgettoApi(String(project.id), \`usr-0${operatorId}\`, roleLevel)` | Manda un id costruito concatenando una stringa al numero della UI (`usr-01`). Lo `userId` vero viaggia in `TeamMember.dbId` (`useTeamMembers.ts:82`) e non viene usato. La riga di `accesso_risorsa` o non si crea o punta a nessuno. |
+| `ProjectDetail.tsx:270` | `const assignedAs = mv.as \|\| mv.assegnatoId \|\| localMv?.as \|\| 1;` | Se a database non c'è un assegnatario, la micro-voce viene mostrata come assegnata all'operatore 1. Un compito non assegnato si presenta come assegnato. |
+| `src/routes/progetti.ts:595` (`PUT /progetti/:id/stato-completo`) | non scrive mai `risorsaId` | `MicrovoceProgetto.risorsaId` esiste (`schema.prisma:548-549`, relazione `RisorsaAssegnata`) e resta sempre `NULL`: l'assegnazione fatta nella UI non arriva a database. |
+| `GET /progetti/:id` | non include `risorsa` | Anche se `risorsaId` fosse scritto, la lettura non lo riporterebbe: manca il `include`. |
+
+Conseguenza complessiva: **oggi non esiste un compito assegnato a una persona.** Esiste un numero
+in una casella del browser. `AccessoRisorsa` (§19) e `MicrovoceProgetto.risorsaId` sono lo scheletro
+di una funzione che nessuno ha ancora collegato.
+
+**Le tre tabelle di questa funzione, lette in produzione il 17/09/2026**
+
+| Tabella | Righe | Cosa significa |
+|---|---|---|
+| `evento_calendario` | **0** in tutti e 5 gli studi | Nessuno ci ha mai scritto. La lettura di `ricercaGlobaleService.ts:142` interroga una tabella vuota per costruzione. |
+| `accesso_risorsa` | **0** in tutti e 5 gli studi | Nessun accesso a progetto è mai stato concesso. La rotta `assegnaAccessoProgettoApi` non ha mai scritto una riga utile. |
+| `microvoce_progetto.risorsa_id` | **0 valorizzate** su tutte le micro-voci | Nessuna micro-voce è mai stata assegnata. Il carico di lavoro (`progetti.ts:1133`) somma ore su un campo sempre `NULL`. |
+
+E le sorgenti da cui il calendario dovrà derivare, nello stesso momento:
+
+| Sorgente | Righe | Nota |
+|---|---|---|
+| `scadenza_incasso` | 2 (solo nel primo studio) | Esiste, ed è la sorgente giusta per le scadenze di incasso — non `Fattura.data`. |
+| `cliente.data_kyc` | 2 clienti (solo nel primo studio) | Valorizzato dall'anagrafica. |
+| `progetto.data_scadenza` | **0** | Nessun progetto ha una scadenza a database. La data di consegna che il calendario mostra oggi per ogni progetto è **interamente inventata**. |
+
+Quest'ultima riga è la più importante delle tre: non è che il calendario mostri una data sbagliata
+per i progetti. È che **non esiste nessuna data da mostrare**, e il calendario ne produce una per
+ogni progetto. È il caso puro della regola 7.
+
+### 1ter.2 La regola che tiene insieme il lavoro
+
+Tutto quanto segue serve una cosa sola: **che un evento del calendario sia una riga, e che la riga
+dica da dove viene.** Le date finte non sono un problema di dati, sono un problema di provenienza:
+finché un evento può nascere nel browser, non c'è modo di sapere se una scadenza è vera.
+
+Quindi: nessun evento nasce nel frontend. Il frontend chiede un intervallo di date e riceve righe.
+
+### 1ter.3 Chi visualizza cosa
+
+Questa è la parte che l'utente ha chiesto di curare. Il calendario è la superficie più delicata
+dell'applicazione perché **aggrega sorgenti di sensibilità diversa nella stessa griglia**:
+
+- un rinnovo KYC/AML riguarda l'antiriciclaggio di un cliente;
+- una scadenza di rata porta l'importo;
+- una milestone porta il nome di un progetto e di un cliente;
+- un promemoria personale non riguarda nessun altro.
+
+Metterli nella stessa risposta senza filtrare significa che chi vede il calendario vede tutto. La
+regola va applicata **nel backend, per sorgente**, mai con un flag che il client manda.
+
+**Il principio:** un evento eredita la visibilità della sua sorgente. Non esiste un permesso
+«calendario»: esiste il permesso sull'oggetto da cui l'evento deriva.
+
+| Categoria | Sorgente | Chi la vede |
+|---|---|---|
+| `promemoria` | `evento_calendario` | Solo `userId` proprietario. Un `collaboratore_esterno` vede i propri. |
+| `microvoce` | `microvoce_progetto` + `accesso_risorsa` | Chi ha una riga in `accesso_risorsa` su progetto, modulo o micro-voce; più `advisor` e `super_admin` dello studio. |
+| `kyc` | `cliente.data_kyc` | Solo ruoli interni dello studio. **Mai** il ruolo `cliente`. |
+| `fattura` | `scadenza_incasso` | Solo chi vede i dati contabili. **Mai** `collaboratore_esterno` né `cliente`: l'importo di una rata di un altro cliente non è un dato di lavoro, è un dato riservato. |
+| `contratto` | `contratto_ricorrente` / `EngagementLetter` | Ruoli interni. |
+
+**Il portale del cliente è un'altra cosa, non un filtro di questa.** `clienti`/`cliente` oggi ha una
+sessione separata (`bluman_portal_token`). Il portale deve avere un proprio feed, con dentro **solo**
+gli appuntamenti che lo riguardano: videochiamate, riunioni, scadenze di documenti che deve
+consegnare. Mai il rinnovo KYC (è una valutazione interna sul rischio del cliente), mai un importo
+di rata, mai un nome di un altro cliente, mai una nota operativa scritta per il team.
+
+**Tre presidi che rendono la regola verificabile invece che dichiarata:**
+
+1. L'endpoint **non accetta un `userId` dal corpo o dalla query** per decidere di chi sono gli
+   eventi: lo ricava dal token. Per un `collaboratore_esterno` chiedere il calendario di un altro
+   non è un 403 con un messaggio che rivela che l'altro esiste — è un insieme vuoto.
+2. Il filtro per categoria **restringe, non allarga**: se il ruolo non ha diritto a `fattura`,
+   passare `?categorie=fattura` restituisce vuoto, non i dati.
+3. Un test per ruolo × categoria, che asserisce l'assenza. La tabella qui sopra è la specifica di
+   quel test: cinque ruoli (`super_admin`, `advisor`, `collaboratore_interno`,
+   `collaboratore_esterno`, `cliente`) per cinque categorie sono venticinque asserzioni, e le
+   venticinque si scrivono in un file solo.
+
+### 1ter.4 Fase A — Il backend del calendario
+
+**A1. Estendere `EventoCalendario`** (`prisma/schema.prisma:1160`). Serve una migrazione che aggiunga:
+
+- `categoria` (enum: `promemoria`, `microvoce`, `kyc`, `fattura`, `contratto`);
+- `stato` (enum: `da-fare`, `fatto`, `annullato`);
+- `priorita` (enum: `alta`, `media`, `normale`);
+- `note String?`, `luogoUrl String?`;
+- `clienteId String?` (FK `Cliente`), `moduloProgettoId String?`, `microvoceProgettoId String?` — le
+  tre provenienze, così un evento generato sa da dove viene e può essere rigenerato o spento;
+- `assegnatoAId String` (FK `User`) — **distinto da `userId`**: `userId` è di chi è il calendario,
+  `assegnatoAId` è chi deve fare il compito. Oggi il modello ha solo il primo, e senza il secondo
+  «compito assegnato» non si può esprimere;
+- `generato Boolean @default(false)` — vero per le righe che il sistema deriva da fatture, KYC e
+  progetti. Serve a non cancellare per sbaglio un promemoria scritto a mano, e a distinguere in UI
+  ciò che una persona ha scritto da ciò che una regola ha dedotto;
+- **indici**: `@@index([tenantId, dataInizio])` (è la query del calendario) e
+  `@@index([tenantId, assegnatoAId, stato])` (è la query «i miei compiti aperti»). Oggi non ce n'è
+  nessuno.
+
+**A2. La policy RLS va verificata, non aggiunta.** `evento_calendario` **è già protetta**: misurato
+in produzione il 17/09/2026, ha `relrowsecurity = true`, `relforcerowsecurity = true` e la policy
+`isolamento_tenant`. La modifica di A1 aggiunge colonne a una tabella che ha già un `tenant_id`
+obbligatorio, quindi **non serve una nuova policy** — e va anche detto che `prisma migrate deploy`
+(`Dockerfile`) non la creerebbe comunque: la RLS di base sta in
+`supabase/migrations/20260819_rls_effettiva.sql`, che è uno script Supabase applicato una volta a
+mano e che **introspeziona** invece di elencare:
+
+```sql
+FOR t IN SELECT c.relname FROM pg_class c …
+   AND EXISTS (SELECT 1 FROM information_schema.columns col
+                WHERE col.table_name = c.relname AND col.column_name = 'tenant_id'
+                  AND col.is_nullable = 'NO')
+```
+
+quindi ogni tabella con `tenant_id` obbligatorio è coperta. La stessa interrogazione in produzione
+dà **zero tabelle con `tenant_id` obbligatorio e nessuna policy**. Il modello da copiare, se un
+giorno servisse per una tabella *nuova*, è
+`prisma/migrations/20260912120000_webhook_inbox/migration.sql`, che avvolge tutto in un
+`DO $$ … IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'bluman_app') …` così la migrazione
+resta applicabile anche dove il ruolo non esiste. **La lezione da conservare è l'ordine: prima si
+misura se la policy c'è, poi si scrive.** L'ipotesi contraria — «una tabella nuova nasce esposta» —
+è ragionevole e in questo caso è falsa.
+
+**A3. `src/routes/calendario.ts`** — cinque rotte, tutte con il filtro di §1ter.3 applicato dentro:
+
+| Rotta | Cosa fa |
+|---|---|
+| `GET /calendario/eventi?da=&a=&categorie=` | L'intervallo, filtrato per ruolo e per diritti sulle sorgenti. Restituisce anche le righe **generate**, che non sono in tabella. |
+| `POST /calendario/eventi` | Crea un promemoria. `userId` dal token, `tenantId` dal contesto. `categoria` limitata a `promemoria` e `contratto`: un evento `fattura` o `kyc` non si crea a mano, si deriva. |
+| `PUT /calendario/eventi/:id` | Modifica titolo, date, note, priorità. 404 se la riga non è del tenant. |
+| `PATCH /calendario/eventi/:id/stato` | `da-fare` ⇄ `fatto` ⇄ `annullato`. Sostituisce l'attuale `handleToggleComplete`, che non persiste. |
+| `DELETE /calendario/eventi/:id` | Solo su righe `generato = false`. Un evento derivato da una fattura non si cancella: si cancella la fattura, o si annulla la scadenza. |
+
+**A4. Le regole di derivazione — una sola implementazione, due consumatori.** Il cron
+(`src/services/cronService.ts`) già calcola, per tenant:
+
+- rinnovo KYC a `dataKyc + 1 anno − 30 giorni` (`cronService.ts:50-53`);
+- rate in `stato = 'in_attesa'` a `−7 giorni`, oggi, o scadute da 3 (`cronService.ts:69-77`);
+- fatture scadute e micro-voci in ritardo (report `runDailyNotificationCron`).
+
+Il calendario **deve leggere quelle stesse regole**, non riscriverle. Due implementazioni della
+stessa scadenza divergono, e allora il calendario e la notifica dicono due cose diverse — che è
+esattamente la classe di difetto che questa sessione sta togliendo dal resto dell'applicazione. La
+forma giusta è estrarre la parte di calcolo in un modulo puro (es.
+`src/util/scadenzeDerivate.ts`) che il cron usa per notificare e la rotta usa per mostrare.
+
+**A5. Correggere la sorgente delle scadenze di incasso.** La pagina oggi usa `inv.dataEmissione`
+(`CalendarPage.tsx:91`) — cioè la data di **emissione** della fattura, che non è una scadenza. La
+scadenza è `ScadenzaIncasso.dataScadenza`, per singola rata, con `importoCentesimi` e `stato`
+(`schema.prisma:948-961`). Una fattura a 30gg con data di emissione oggi produce un evento sbagliato
+di trenta giorni.
+
+**A6. Fine progetto da `Progetto.dataScadenza`** (`schema.prisma`, campo `dataScadenza`), non dalla
+posizione nell'elenco. Va incluso anche `stato`, perché un progetto `chiuso` non ha una scadenza
+aperta.
+
+### 1ter.5 Fase B — Il calendario diventa reale
+
+**B1. `CalendarPage.tsx` perde le costanti di tempo.** Griglia costruita da `new Date()`: primo
+giorno del mese, giorni del mese (`new Date(anno, mese + 1, 0).getDate()`), offset del giorno della
+settimana, «oggi» vero. Navigazione mese precedente/successivo. L'intestazione deriva dalla data.
+
+**B2. Spariscono le date inventate.** Le tre righe 49, 71, 91 e i loro ripieghi. Un cliente senza
+`dataKyc` non produce un rinnovo KYC: non produce niente. **Un evento che manca è un'informazione;
+un evento inventato è una bugia** — ed è la differenza che questo piano esiste per ripristinare.
+
+**B3. Sparisce l'elenco di clienti finto** (righe 535-538) e i due valori cablati (righe 121-127).
+Il `<select>` si popola da `fetchClienti()`, che la pagina già chiama alla riga 36 e poi non usa per
+il modulo.
+
+**B4. Un solo archivio.** Le due chiavi `localStorage` spariscono entrambe; eventi e attività
+pianificate passano dalla rotta. `handleToggleComplete` chiama
+`PATCH /calendario/eventi/:id/stato`.
+
+**B5. `CalendarPreviewModal.tsx` perde il mese di agosto.** Minicalendario reale (riga 54), preset
+calcolati da oggi e non tre costanti (righe 156-170), `initialDate` da chi apre il modale e non
+`'2026-08-25'` (riga 27). La casella email (riga 306) o **invia davvero**, o si toglie: al momento
+promette un reminder SMTP a 24 ore e l'unica cosa che fa è scrivere `sendEmail: true` in un oggetto
+locale. La riga 105 («notificato all'operatore») si allinea alla verità: se la notifica parte, si
+dice; se non parte, non si dice.
+
+**B6. Il modale scrive un evento vero.** Oggi `handleSaveCalendarEvent` (`ProjectDetail.tsx:148`)
+scrive in `localStorage` e chiama `salvaSuDatabase(updatedProject)`. Deve invece creare una riga in
+`evento_calendario`, con `generato = false`, `microvoceProgettoId` valorizzato (così l'evento resta
+agganciato al compito da cui è nato) e `assegnatoAId` = l'operatore scelto.
+
+### 1ter.6 Fase C — L'assegnazione dell'operatore
+
+**C1. `ProjectDetail.tsx:232`** — la correzione è di una riga ma è la più importante delle tre:
+`\`usr-0${operatorId}\`` diventa lo `userId` vero. `useTeamMembers` lo porta già in
+`TeamMember.dbId`; va reso obbligatorio, non opzionale: se `dbId` manca (il ripiego di
+`loadTeamMembersFromDb` alle righe 119-127 costruisce un membro senza), l'assegnazione **non parte**
+e lo dice, invece di mandare un id inventato.
+
+**C2. `ProjectDetail.tsx:270`** — `|| 1` sparisce. Un assegnatario assente si mostra come «non
+assegnato», e il selettore propone i membri veri. Il ripiego `localMv?.as` resta solo per le
+modifiche non ancora salvate.
+
+**C3. `PUT /progetti/:id/stato-completo`** — quando il corpo porta l'assegnatario di una micro-voce,
+la rotta scrive `risorsaId`. Il campo esiste in tabella dalla prima migrazione e non è mai stato
+scritto.
+
+**C4. `GET /progetti/:id`** — aggiungere `risorsa` all'`include`, altrimenti C3 scrive un dato che
+la lettura non riporta, e alla ricarica l'assegnazione sembra di nuovo sparita.
+
+**C5. I «compiti assegnati» diventano una vista, non un archivio.** Un compito è una micro-voce con
+`risorsaId` valorizzato e `stato != 'done'`. Non serve una tabella dei compiti: serve una query. Il
+calendario la mostra come categoria `microvoce`, filtrata per `assegnatoAId` — e per un
+`collaboratore_esterno` «il mio calendario» significa **solo** le micro-voci su cui ha
+`accesso_risorsa`. La stessa query serve la vista «i miei compiti» e il carico di lavoro, che in
+`src/routes/progetti.ts:1133` esiste già e somma ore per `risorsaId` — un altro consumatore che oggi
+lavora su un campo sempre `NULL`, e che questa fase accende.
+
+### 1ter.7 Cosa non fare
+
+- **Non** un `CalendarioEventoDto` costruito nel frontend a partire da liste già scaricate. È la
+  forma attuale (tre `fetch` completi, righe 34-38, poi filtri locali) e non regge: il browser di un
+  `collaboratore_esterno` non deve ricevere l'elenco completo dei clienti e delle fatture per
+  mostrarne tre righe. Il filtro va a database.
+- **Non** un flag `visibileA` sulla riga dell'evento, con l'endpoint che si fida di quello che il
+  client chiede. La visibilità si calcola dalla sorgente a ogni lettura (§1ter.3).
+- **Non** riusare `Notifica` come archivio del calendario. `Notifica` (`schema.prisma:1225`) è la
+  traccia di un messaggio spedito, con `canale`, `statoLettura`, `inviataAt`. Un evento è un
+  impegno, non un invio: mescolarli renderebbe impossibile rispondere a «cosa devo fare» senza
+  passare per «cosa ti ho mandato».
+- **Non** cancellare `bluman_custom_calendar_events` e `bluman_calendar_events` senza prima
+  leggerne il contenuto in produzione: sono due archivi locali che dal loro rilascio hanno
+  accumulato righe, e se una sola di quelle righe è un impegno vero, cancellarla lo perde. Vanno
+  migrati in `evento_calendario` con una lettura una volta sola, e la chiave di lettura è quella
+  giusta — cioè quella che la scrittura ha usato, non quella che la lettura cercava.
+
+### 1ter.8 Ordine dei lavori e criteri di accettazione
+
+L'ordine non è arbitrario: A4 (le regole di derivazione) precede A3 (le rotte) perché le rotte
+leggono quelle regole; A1 precede tutto perché è la tabella.
+
+| Passo | Fatto quando |
+|---|---|
+| A1 + A2 | La migrazione gira su un database vuoto **e** su uno con dati; `\d evento_calendario` mostra le colonne e gli indici; la policy RLS è presente e `bluman_app` non vede righe di un altro tenant. |
+| A4 + A5 + A6 | Il cron e la derivazione usano la stessa funzione, e un test lo dimostra: cambiando la regola in un punto cambia in entrambi. |
+| A3 | Le cinque rotte rispondono; 25 asserzioni ruolo × categoria (§1ter.3) passano; `?categorie=fattura` con ruolo `collaboratore_esterno` restituisce `[]`. |
+| B1-B4 | Aprendo il calendario a settembre 2026 la griglia è di settembre 2026; «oggi» è oggi; nessun evento ha una data che il database non contiene; un evento creato ricompare dopo il reload; una spunta resta dopo il reload. |
+| B5-B6 | Il minicalendario si apre sul mese corrente; i preset calcolano da oggi; pianificando un'attività dal fascicolo, l'evento **compare nel calendario** — che è la prova che i due archivi locali sono diventati uno. |
+| C1-C4 | Assegnando una micro-voce a un collaboratore, `SELECT risorsa_id FROM microvoce_progetto WHERE id = …` restituisce lo `userId` vero, e riaprendo il fascicolo l'assegnazione è ancora lì. |
+| C5 | Un `collaboratore_esterno` che apre il calendario vede solo i propri compiti, e la vista «i miei compiti» e il carico di lavoro concordano sullo stesso numero. |
+
+**La prova che chiude tutta la fase, in una riga:** creare un progetto con una scadenza al 3 del
+mese prossimo, una rata a 30 giorni, un cliente con KYC vecchio di un anno, assegnare una micro-voce
+a un collaboratore esterno — poi aprire il calendario con il token di quel collaboratore. Deve
+vedere il **suo** compito alla data vera, e **non** deve vedere né la rata, né il rinnovo KYC, né
+il nome dell'altro cliente.
 
 ---
 
@@ -994,5 +1420,13 @@ REDIS_URL=
 
 ---
 
-*Ultimo aggiornamento: 2026-09-11 (Completato **Fix 4**: isolamento fascicoli per ruolo cliente su `GET /progetti` e comunicazioni, separazione sessione portale con `bluman_portal_token`; completata validazione Zod su tutti gli endpoint chiave `auth`, `clienti`, `progetti`, `contabilita`, `documenti`; completata pipeline allegati multicanale per IMAP inbound e WhatsApp Cloud API con spunte di stato stile WhatsApp `✓`/`✓✓` e smart scroll con ancoraggio non letti; suite di test a **614/614 verdi in 47 file**, `npx tsc --noEmit` e `npm run typecheck` a 0 errori, deploy in produzione su Vercel e Railway completato).*
-*Prossima priorità operativa: Fase 3 Paginazione unificata sulle 5 liste pesanti (`GET /invoices`, `GET /prima-nota`, `GET /progetti`, `GET /clienti`, `GET /audit`) tramite `PaginazioneQuerySchema`, attivazione scheduler notturno in-process per il Cron scadenze e script di audit integrità progetti.*
+*Ultimo aggiornamento: 2026-09-17 (Chiuso il giro della ricevuta di consegna WhatsApp: il `wamid`
+di Meta viene conservato all'invio, la ricevuta lo ritrova dentro `external_id`, lo stato smette di
+finire in `allegati_json`, e un presidio monotono impedisce a una ricevuta in ritardo di disdire una
+consegna avvenuta — nuova suite `src/ricevutaWhatsapp.test.ts`, **86 file / 1052 test verdi**,
+`npx tsc --noEmit` a 0 errori. Aggiunta la sezione **§1ter Calendario, collaboratori e compiti
+assegnati**, con le due decisioni dell'utente registrate, la parte *chi visualizza cosa* e le
+misure di produzione del 17/09/2026. Aggiornato §1bis con l'analisi di cosa manca.)*
+*Prossima priorità operativa: la prova in un minuto sull'ingresso WhatsApp (§1bis) — scrivere al
+`+1 555-181-9633` con `railway logs --service bluman-api` aperto; poi §1ter Fase A, che è il punto
+in cui l'assegnazione dei compiti smette di essere un numero nel browser.*
