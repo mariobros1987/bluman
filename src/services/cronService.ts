@@ -4,6 +4,7 @@
 import { prisma } from '../util/prismaClient.js';
 import { notificaStudioSilenziosa } from './notificheService.js';
 import { recordAudit } from '../util/serverHelpers.js';
+import { giornoSollecitoRata, kycInAvviso, tonoRata } from '../util/scadenzeDerivate.js';
 
 export interface CronReport {
   timestamp: string;
@@ -14,6 +15,16 @@ export interface CronReport {
   notificheInviate: number;
   dettagli: string[];
 }
+
+// Il tono che il modulo di derivazione calcola, tradotto nelle parole che finiscono nel messaggio.
+// Sono tre parole diverse da quelle del modulo di proposito: là il tono è un caso, qui è un testo
+// che l'operatore legge. La corrispondenza è uno-a-uno, e il tipo del modulo la tiene tale: se un
+// giorno nascesse un quarto tono, questo oggetto smetterebbe di compilare.
+const TONO_RATA_IN_PAROLE: Record<ReturnType<typeof tonoRata>, string> = {
+  scaduta: 'scaduta',
+  oggi: 'in scadenza oggi',
+  vicina: 'in scadenza',
+};
 
 // Il cron può scattare più volte nello stesso giorno (riavvii, esecuzioni manuali):
 // una notifica identica già inviata nelle ultime 20 ore non va duplicata.
@@ -40,28 +51,28 @@ export async function runDailyNotificationCron(tenantId?: string): Promise<CronR
 
   if (!tenantId) return report;
 
-  const now = Date.now();
-  const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+  const adesso = new Date();
 
   // 1. Scansione Scadenze Clienti (UBO Registry & KYC Annual Return)
+  //
+  // La condizione non è scritta qui: sta in `scadenzeDerivate.ts`, insieme a quelle delle rate,
+  // perché è la stessa che il calendario usa per disegnare la scadenza. Se ognuno calcolasse per
+  // conto proprio, prima o poi l'operatore riceverebbe un avviso per una scadenza che nel
+  // calendario non c'è — o vedrebbe nel calendario una scadenza per cui nessuno lo ha avvisato.
   const clienti = await prisma.cliente.findMany({ where: { tenantId } });
 
   for (const c of clienti) {
-    if (c.dataKyc) {
-      const kycAge = now - new Date(c.dataKyc).getTime();
-      // Se il KYC ha quasi 1 anno (335 giorni+)
-      if (kycAge > (365 * 24 * 60 * 60 * 1000 - thirtyDaysMs)) {
-        const corpo = `[UBO-MFSA] Promemoria rinnovo UBO / Aggiornamento KYC per ${c.nome} (Ref: ${c.email || c.cellulare || 'N/D'})`;
-        report.scadenzeUboTrovate += 1;
-        report.dettagli.push(`[UBO-MFSA] Promemoria rinnovo UBO / Aggiornamento KYC inviato per ${c.nome} (Ref: ${c.email || c.cellulare || 'N/D'})`);
-        if (!(await giaNotificataOggi(tenantId, corpo))) {
-          report.notificheInviate += await notificaStudioSilenziosa(tenantId, {
-            tipoEvento: 'scadenza_imminente',
-            oggetto: 'Rinnovo KYC in scadenza',
-            corpo,
-            link: '/clients',
-          });
-        }
+    if (kycInAvviso(c.dataKyc, adesso)) {
+      const corpo = `[UBO-MFSA] Promemoria rinnovo UBO / Aggiornamento KYC per ${c.nome} (Ref: ${c.email || c.cellulare || 'N/D'})`;
+      report.scadenzeUboTrovate += 1;
+      report.dettagli.push(`[UBO-MFSA] Promemoria rinnovo UBO / Aggiornamento KYC inviato per ${c.nome} (Ref: ${c.email || c.cellulare || 'N/D'})`);
+      if (!(await giaNotificataOggi(tenantId, corpo))) {
+        report.notificheInviate += await notificaStudioSilenziosa(tenantId, {
+          tipoEvento: 'scadenza_imminente',
+          oggetto: 'Rinnovo KYC in scadenza',
+          corpo,
+          link: '/clients',
+        });
       }
     }
   }
@@ -73,20 +84,19 @@ export async function runDailyNotificationCron(tenantId?: string): Promise<CronR
   });
 
   for (const sc of scadenzeAperte) {
-    const dataScad = new Date(sc.dataScadenza).getTime();
-    const diffDays = Math.round((dataScad - now) / (1000 * 60 * 60 * 24));
-    if (diffDays === 7 || diffDays === 0 || diffDays === -3) {
+    const giorno = giornoSollecitoRata(sc.dataScadenza, adesso);
+    if (giorno !== null) {
       const clNome = sc.fattura.cliente?.nome || sc.fattura.progetto?.cliente?.nome || 'Cliente';
       const importo = (sc.importoCentesimi / 100).toLocaleString('it-IT');
       const quando = new Date(sc.dataScadenza).toLocaleDateString('it-IT');
-      const tono = diffDays === -3 ? 'scaduta' : diffDays === 0 ? 'in scadenza oggi' : 'in scadenza';
+      const tono = TONO_RATA_IN_PAROLE[tonoRata(giorno)];
       const corpo = `[INCASSI] Rata di € ${importo} ${tono} per ${clNome} (rata #${sc.numeroRata}, scadenza ${quando})`;
       report.fattureScaduteTrovate += 1;
       report.dettagli.push(`[INCASSI] Sollecito / Promemoria rata €${(sc.importoCentesimi / 100).toFixed(2)} inviato a ${clNome} (Scadenza: ${quando})`);
       if (!(await giaNotificataOggi(tenantId, corpo))) {
         report.notificheInviate += await notificaStudioSilenziosa(tenantId, {
           tipoEvento: 'scadenza_imminente',
-          oggetto: diffDays === -3 ? 'Rata scaduta' : 'Rata in scadenza',
+          oggetto: tono === 'scaduta' ? 'Rata scaduta' : 'Rata in scadenza',
           corpo,
           link: '/invoices',
         });

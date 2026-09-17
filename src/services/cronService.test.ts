@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
   mockClienteFindMany,
@@ -81,5 +81,93 @@ describe('runDailyNotificationCron', () => {
       where: { tenantId: 'tenant-2', stato: 'in_attesa' },
     }));
     expect(mockRecordAudit).toHaveBeenCalledWith(expect.objectContaining({ tenantId: 'tenant-2' }));
+  });
+});
+
+/**
+ * Il cron e il calendario devono parlare della **stessa** scadenza.
+ *
+ * Le date qui sotto non sono calcolate con le funzioni del modulo: sono scritte a mano, giorno per
+ * giorno, intorno ai confini. È il punto del test. Se il cron tornasse a calcolare per conto proprio
+ * — o se qualcuno cambiasse la regola in `scadenzeDerivate.ts` senza cambiarla qui — questi numeri
+ * smetterebbero di tornare, ed è esattamente ciò che si vuole sapere.
+ */
+describe('il cron e la derivazione delle scadenze usano la stessa regola', () => {
+  const GIORNO_MS = 24 * 60 * 60 * 1000;
+  const ADESSO = new Date('2026-09-17T10:00:00.000Z');
+
+  /** Un cliente la cui verifica KYC è stata fatta `giorniFa` giorni fa. */
+  function clienteConKyc(giorniFa: number) {
+    return {
+      nome: `Cliente ${giorniFa}`,
+      dataKyc: new Date(ADESSO.getTime() - giorniFa * GIORNO_MS),
+      email: `cliente${giorniFa}@example.test`,
+      cellulare: null,
+    };
+  }
+
+  /** Una rata aperta che scade fra `giorni` giorni. */
+  function rataFra(giorni: number) {
+    return {
+      id: `sc-${giorni}`,
+      dataScadenza: new Date(ADESSO.getTime() + giorni * GIORNO_MS),
+      importoCentesimi: 100_000,
+      numeroRata: 1,
+      fattura: { cliente: { nome: `Cliente rata ${giorni}` }, progetto: null },
+    };
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(ADESSO);
+    // Nessuna notifica identica di ieri: qui si misura quali scadenze il cron **vede**, non la
+    // deduplicazione, che ha già i suoi test.
+    mockNotificaFindFirst.mockResolvedValue(null);
+    mockNotificaStudio.mockResolvedValue(1);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('avvisa il rinnovo KYC da 29 giorni prima, non da 30', async () => {
+    // Il confine, per età del KYC: 335 giorni non basta ancora, 336 sì. È lo stesso off-by-one
+    // documentato in `scadenzeDerivate.ts` — qui si vede dal comportamento del cron, non da quello
+    // della funzione, che è il modo di sapere che il cron la usa davvero.
+    mockClienteFindMany.mockResolvedValueOnce([334, 335, 336, 337].map(clienteConKyc));
+
+    const report = await runDailyNotificationCron('tenant-1');
+
+    expect(report.scadenzeUboTrovate).toBe(2);
+    const dettagli = report.dettagli.join('\n');
+    expect(dettagli).toContain('Cliente 336');
+    expect(dettagli).toContain('Cliente 337');
+    expect(dettagli).not.toContain('Cliente 335');
+  });
+
+  it('sollecita le rate a +7, 0 e −3 giorni, e in nessun altro giorno', async () => {
+    // Il verso conta: +7 è una settimana **prima** della scadenza, −3 è tre giorni dopo. Invertito,
+    // il sollecito arriverebbe tre giorni prima della scadenza e mai dopo.
+    mockScadenzaFindMany.mockResolvedValueOnce([8, 7, 6, 1, 0, -1, -3, -4].map(rataFra));
+
+    const report = await runDailyNotificationCron('tenant-1');
+
+    expect(report.fattureScaduteTrovate).toBe(3);
+    const dettagli = report.dettagli.join('\n');
+    expect(dettagli).toContain('Cliente rata 7');
+    expect(dettagli).toContain('Cliente rata 0');
+    expect(dettagli).toContain('Cliente rata -3');
+    expect(dettagli).not.toContain('Cliente rata -1');
+  });
+
+  it('il tono del messaggio segue la distanza dalla scadenza', async () => {
+    mockScadenzaFindMany.mockResolvedValueOnce([7, 0, -3].map(rataFra));
+
+    await runDailyNotificationCron('tenant-1');
+
+    const corpi = mockNotificaStudio.mock.calls.map((c: any[]) => c[1].corpo as string);
+    expect(corpi.some((c) => c.includes('in scadenza per'))).toBe(true);
+    expect(corpi.some((c) => c.includes('in scadenza oggi per'))).toBe(true);
+    expect(corpi.some((c) => c.includes('scaduta per'))).toBe(true);
   });
 });
