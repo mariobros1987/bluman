@@ -22,6 +22,14 @@ export interface CredenzialiWhatsapp {
 export interface EsitoWhatsapp {
   ok: boolean;
   errore?: string;
+  /**
+   * Il `wamid` che Meta assegna al messaggio appena accettato (`messages[0].id`).
+   *
+   * È la sola chiave con cui il webhook di stato può ritrovare questa riga quando la ricevuta
+   * di consegna arriva: senza, `delivered` e `read` non hanno dove atterrare e lo stato resta
+   * `inviato` per sempre. Va scritta nel fascicolo, non buttata.
+   */
+  providerId?: string;
 }
 
 /**
@@ -39,7 +47,7 @@ export function numeroPerGraph(numero: string | null | undefined): string | null
 export async function chiamaGraphWhatsapp(
   cred: CredenzialiWhatsapp,
   corpo: unknown,
-): Promise<{ ok: boolean; motivo?: string }> {
+): Promise<{ ok: boolean; motivo?: string; providerId?: string }> {
   const risposta = await fetch(`https://graph.facebook.com/v21.0/${encodeURIComponent(String(cred.waPhoneId))}/messages`, {
     method: 'POST',
     headers: {
@@ -49,7 +57,14 @@ export async function chiamaGraphWhatsapp(
     body: JSON.stringify(corpo),
   });
 
-  if (risposta.ok) return { ok: true };
+  if (risposta.ok) {
+    // Meta risponde `{"messages":[{"id":"wamid.…"}]}`. Quel `id` è l'unica chiave che lega
+    // questa riga alla ricevuta di consegna che arriverà dopo, su un'altra richiesta: se non
+    // si conserva adesso, non c'è modo di ritrovarla.
+    const accettato: any = await risposta.json().catch(() => null);
+    const wamid = accettato?.messages?.[0]?.id;
+    return { ok: true, ...(typeof wamid === 'string' && wamid ? { providerId: wamid } : {}) };
+  }
 
   const dettaglio: any = await risposta.json().catch(() => null);
   // Il messaggio di Graph va riportato: "fuori dalla finestra di 24 ore" (131047), "template
@@ -96,7 +111,7 @@ export async function inviaTestoWhatsapp(
       type: 'text',
       text: { preview_url: false, body: testo },
     });
-    if (esito.ok) return { ok: true };
+    if (esito.ok) return { ok: true, ...(esito.providerId ? { providerId: esito.providerId } : {}) };
 
     const finestra = /131047/.test(esito.motivo || '')
       ? ' Il destinatario non ha scritto allo studio nelle ultime 24 ore: WhatsApp consegna solo template approvati fuori da quella finestra.'
@@ -140,7 +155,7 @@ export async function inviaTemplateWhatsapp(
           : {}),
       },
     });
-    if (esito.ok) return { ok: true };
+    if (esito.ok) return { ok: true, ...(esito.providerId ? { providerId: esito.providerId } : {}) };
     return { ok: false, errore: `Template «${nomeTemplate}» (${lingua}) rifiutato da Meta — ${esito.motivo}.` };
   } catch (err) {
     return { ok: false, errore: `WhatsApp non raggiungibile: ${err instanceof Error ? err.message : 'errore di rete'}.` };

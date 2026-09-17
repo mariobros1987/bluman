@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { fetchComunicazioniApi, inviaComunicazioneApi, segnaComunicazioniLetteApi, fetchClienti, sendWhatsAppDirectApi, sendEmailDirectApi, sendSignalDirectApi, sendTelegramDirectApi, fetchInboundImapEmailsApi, fetchInboundImapAllegatiApi, fetchTenantInfoApi, uploadFileApi, urlDocumentoAssoluto } from '../api/client';
 import { downloadGuidePdf } from '../utils/pdfGenerator';
 import { getCurrentTenantId, getTenantStorageKey, getStudioInfoForTenant, BLUECODE_TENANT_ID } from '../utils/tenant';
+import { SpunteStato } from './SpunteStato';
 import type { Cliente } from '../types';
 
 export interface MessaggioComunicazione {
@@ -13,9 +14,19 @@ export interface MessaggioComunicazione {
   testo: string;
   dataOra: string;
   allegati?: { nome: string; url: string; dimensione: string }[];
-  stato?: 'inviato' | 'consegnato' | 'letto';
+  /**
+   * Lo stato di recapito, quello vero.
+   *
+   * `null` è un valore legittimo e significa «la riga non lo dichiara». Prima non c'era: il
+   * ripiego era `'consegnato'`, quindi una riga muta diventava una consegna dichiarata, e la
+   * timeline disegnava le spunte blu su messaggi che nessun canale aveva accettato.
+   */
+  stato?: 'da-inviare' | 'inviato' | 'consegnato' | 'letto' | 'non-inviato' | null;
+  inviatoAt?: string | null;
   lettoAt?: string | null;
   consegnatoAt?: string | null;
+  /** Il motivo del rifiuto, quando `stato` è `non-inviato`. */
+  errore?: string | null;
 }
 
 export interface ComunicazioniTabProps {
@@ -243,9 +254,13 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
           ...m,
           dataOra: m.createdAt ? new Date(m.createdAt).toLocaleString('it-IT') : (m.dataOra || 'Oggi'),
           allegati: m.allegatiJson ? (typeof m.allegatiJson === 'string' ? JSON.parse(m.allegatiJson) : m.allegatiJson) : m.allegati,
-          stato: m.stato || 'consegnato',
+          // `?? null` e non `|| 'consegnato'`: una riga che non dichiara lo stato non ne riceve
+          // uno dal browser. Era questo il punto in cui la consegna veniva inventata (regola 7).
+          stato: m.stato ?? null,
+          inviatoAt: m.inviatoAt || null,
           lettoAt: m.lettoAt || null,
           consegnatoAt: m.consegnatoAt || null,
+          errore: m.errore || null,
         }));
       } else {
         const saved = localStorage.getItem(`bluman_msgs_${progettoId}`);
@@ -452,6 +467,10 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
       testo: testoDaInviare,
       dataOra: new Date().toLocaleString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
       allegati: allegatiCaricati || [],
+      // Il portale è l'unico canale che non ha un passo di consegna dopo la scrittura: il
+      // messaggio è «arrivato» nell'istante in cui compare nel portale del cliente. Per tutti gli
+      // altri la riga nasce in attesa, ed è il dispatch a dire com'è finita.
+      stato: canaleSelezionato === 'portal' ? 'consegnato' : 'da-inviare',
     };
 
     setMessaggi(prev => [...prev, nuovoMsg]);
@@ -459,9 +478,13 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
     setFileAllegato(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
 
+    // L'esito del dispatch, per il messaggio che si sta guardando: senza, l'operatore vedrebbe
+    // «in attesa» finché non ricarica il fascicolo, anche quando l'invio è già fallito.
+    let esitoInvio: { stato: 'inviato' | 'non-inviato'; errore?: string } | null = null;
+
     try {
       // 1. Persistenza su Backend Fastify / Supabase
-      await inviaComunicazioneApi(String(progettoId), {
+      const riga = await inviaComunicazioneApi(String(progettoId), {
         canale: canaleSelezionato,
         mittente,
         destinatario,
@@ -469,6 +492,10 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
         testo: testoDaInviare,
         ...(allegatiCaricati ? { allegatiJson: allegatiCaricati } : {}),
       });
+
+      // L'id della riga appena creata accompagna ogni dispatch: è ciò che permette al backend di
+      // annotare sul fascicolo com'è andata, invece di lasciarlo per sempre in attesa.
+      const comunicazioneId: string | undefined = riga?.id ? String(riga.id) : undefined;
 
       // 2. Se Email, invio reale tramite la rotta autenticata POST /comunicazioni/invia-email
       //    (§35: le credenziali SMTP le legge il backend dalla riga Tenant, il browser non le vede)
@@ -485,11 +512,15 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
         const res = await sendEmailDirectApi(
           destEmail,
           `💬 Comunicazione Studio BlueCode Advisory — Fascicolo ${nomeCliente || 'Pratica'}`,
-          testoDaInviare
+          testoDaInviare,
+          undefined,
+          comunicazioneId
         );
         if (res && res.success) {
+          esitoInvio = { stato: 'inviato' };
           setFeedback({ tipo: 'ok', testo: `✓ Email recapitata con successo alla casella ${destEmail}!` });
         } else {
+          esitoInvio = { stato: 'non-inviato', errore: res?.errore };
           setFeedback({ tipo: 'err', testo: `❌ Errore Invio Email: ${res?.errore || 'Verifica la password SMTP in Impostazioni'}` });
         }
       } else if (canaleSelezionato === 'whatsapp') {
@@ -505,10 +536,14 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
           setInviando(false);
           return;
         }
-        const res = await sendWhatsAppDirectApi(cleanPhone, testoDaInviare);
+        const res = await sendWhatsAppDirectApi(cleanPhone, testoDaInviare, undefined, comunicazioneId);
         if (res && res.success) {
-          setFeedback({ tipo: 'ok', testo: `✓ Messaggio WhatsApp recapitato a ${contactInfo.whatsapp}` });
+          esitoInvio = { stato: 'inviato' };
+          // «Accettato da Meta», non «recapitato»: la consegna al telefono la conferma il webhook
+          // di stato, ed è quello che fa comparire le due spunte. Qui Meta ha solo preso in carico.
+          setFeedback({ tipo: 'ok', testo: `✓ WhatsApp ha accettato il messaggio per ${contactInfo.whatsapp}: la consegna al telefono arriva dopo.` });
         } else {
+          esitoInvio = { stato: 'non-inviato', errore: res?.errore };
           setFeedback({ tipo: 'err', testo: `WhatsApp non ha accettato l'invio verso ${contactInfo.whatsapp}: ${res?.errore || 'motivo non riportato'}. Il messaggio resta nel registro del fascicolo.` });
         }
       } else if (canaleSelezionato === 'signal') {
@@ -534,10 +569,13 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
           destSignal,
           testoDaInviare,
           fileAllegato ? [{ nome: fileAllegato.nome, base64: fileAllegato.base64 }] : undefined,
+          comunicazioneId,
         );
         if (resSignal && resSignal.success) {
-          setFeedback({ tipo: 'ok', testo: `✓ Messaggio Signal recapitato a ${destSignal}` });
+          esitoInvio = { stato: 'inviato' };
+          setFeedback({ tipo: 'ok', testo: `✓ Il demone Signal ha accettato il messaggio per ${destSignal}.` });
         } else {
+          esitoInvio = { stato: 'non-inviato', errore: resSignal?.errore };
           setFeedback({ tipo: 'err', testo: `Signal non ha accettato l'invio verso ${destSignal}: ${resSignal?.errore || 'motivo non riportato'}. Il messaggio resta nel registro del fascicolo.` });
         }
       } else if (canaleSelezionato === 'telegram') {
@@ -555,10 +593,12 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
           setInviando(false);
           return;
         }
-        const resTelegram = await sendTelegramDirectApi(destTelegram, testoDaInviare);
+        const resTelegram = await sendTelegramDirectApi(destTelegram, testoDaInviare, comunicazioneId);
         if (resTelegram && resTelegram.success) {
-          setFeedback({ tipo: 'ok', testo: `✓ Messaggio Telegram recapitato alla chat ${destTelegram}` });
+          esitoInvio = { stato: 'inviato' };
+          setFeedback({ tipo: 'ok', testo: `✓ Telegram ha accettato il messaggio per la chat ${destTelegram}.` });
         } else {
+          esitoInvio = { stato: 'non-inviato', errore: resTelegram?.errore };
           setFeedback({ tipo: 'err', testo: `Telegram non ha accettato l'invio: ${resTelegram?.errore || 'motivo non riportato'}. Il messaggio resta nel registro del fascicolo.` });
         }
       } else if (canaleSelezionato === 'portal') {
@@ -567,6 +607,19 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
         // al cliente senza che ricarichi la pagina. Il badge del canale lo distingue dagli
         // altri nella timeline.
         setFeedback({ tipo: 'ok', testo: `✓ Messaggio inviato sul Portale Riservato di ${contactInfo.referente || nomeCliente}: visibile al cliente entro 5 secondi.` });
+      }
+
+      // L'esito vero sul messaggio che si sta guardando: senza questo la riga appena spedita
+      // resterebbe «in attesa» fino al prossimo caricamento del fascicolo.
+      if (esitoInvio) {
+        const esito = esitoInvio;
+        setMessaggi(prev =>
+          prev.map(x =>
+            x.id === nuovoMsg.id
+              ? { ...x, stato: esito.stato, errore: esito.stato === 'inviato' ? null : esito.errore || 'motivo non riportato' }
+              : x,
+          ),
+        );
       }
     } catch (err) {
       // Prima ogni errore diventava «✓ Messaggio salvato nel registro del progetto!»: il
@@ -579,8 +632,9 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
     }
   };
 
-  const getCanaleBadge = (canale: string) => {
-    switch (canale) {
+  // Il segno di recapito non si disegna qui: sta in `SpunteStato`, condiviso con il portale.
+  // Prima le due chat ne avevano una copia ciascuna, con la stessa bugia nel ramo finale.
+  const getCanaleBadge = (canale: string) => {    switch (canale) {
       case 'email': return { icon: '✉️', label: 'Email Inbound/Outbound', bg: '#1e1b4b', color: '#818cf8' };
       case 'whatsapp': return { icon: '🟢', label: 'WhatsApp Business', bg: '#064e3b', color: '#34d399' };
       case 'telegram': return { icon: '✈️', label: 'Telegram Bot Webhook', bg: '#0369a1', color: '#38bdf8' };
@@ -806,13 +860,14 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
                     <span style={{ fontSize: 10, color: 'var(--muted)', fontFamily: 'monospace', display: 'flex', alignItems: 'center', gap: 4 }}>
                       <span>{m.dataOra}</span>
                       {isUscita && (
-                        m.stato === 'letto' ? (
-                          <span title={m.lettoAt ? `Letto il ${new Date(m.lettoAt).toLocaleString('it-IT')}` : 'Letto dal destinatario'} style={{ color: '#38bdf8', fontWeight: 800, fontSize: 13, letterSpacing: -1, lineHeight: 1 }}>✓✓</span>
-                        ) : m.stato === 'inviato' ? (
-                          <span title="Inviato al server" style={{ color: 'var(--muted)', fontWeight: 700, fontSize: 13, lineHeight: 1 }}>✓</span>
-                        ) : (
-                          <span title={m.consegnatoAt ? `Consegnato il ${new Date(m.consegnatoAt).toLocaleString('it-IT')}` : 'Consegnato'} style={{ color: 'var(--muted)', fontWeight: 700, fontSize: 13, letterSpacing: -1, lineHeight: 1 }}>✓✓</span>
-                        )
+                        <SpunteStato
+                          stato={m.stato}
+                          inviatoAt={m.inviatoAt}
+                          consegnatoAt={m.consegnatoAt}
+                          lettoAt={m.lettoAt}
+                          errore={m.errore}
+                          contesto="operatore"
+                        />
                       )}
                     </span>
                   </div>

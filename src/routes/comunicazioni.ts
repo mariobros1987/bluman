@@ -24,7 +24,7 @@
  * risponde 400 con il motivo che ha dato il server di posta o Meta (regola 7).
  */
 
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyReply } from 'fastify';
 import { prisma } from '../util/prismaClient.js';
 import { inviaEmail } from '../services/emailRelay.js';
 import { credenzialiCanali } from '../services/otpDispatch.js';
@@ -35,6 +35,7 @@ import { inviaSignal, inviaSignalConAllegati, numeroSignal } from '../services/s
 import { inviaTestoTelegram } from '../services/telegramService.js';
 import { riceviMessaggiSignal } from '../services/signalInbound.js';
 import { testoInHtml } from '../util/testoInHtml.js';
+import { conStatoComunicazione } from '../util/statoComunicazione.js';
 
 /**
  * Credenziali della casella in arrivo, dalla riga Tenant.
@@ -75,6 +76,70 @@ async function credenzialiImap(tenantId: string): Promise<CredenzialiImap> {
   };
 }
 
+/**
+ * Scrive sul fascicolo l'esito di un invio appena tentato.
+ *
+ * La riga esiste già — l'ha creata `POST /progetti/:id/comunicazioni` con lo stato `da-inviare` —
+ * e fino a oggi nessuno tornava a dirle com'era andata: restava «consegnato» anche quando Meta
+ * aveva rifiutato. Qui l'esito vero prende il posto della previsione, e quando il canale rifiuta
+ * ci finisce anche il motivo tecnico, che è quello che serve per capire cosa correggere.
+ *
+ * Non solleva: un esito non registrato non deve far sembrare fallito un invio riuscito. E non
+ * tocca righe di un altro studio — la ricerca è filtrata per `tenantId`, quindi l'id di un altro
+ * tenant semplicemente non trova niente e la funzione esce senza scrivere.
+ */
+async function registraEsitoInvio(
+  tenantId: string,
+  comunicazioneId: string | undefined,
+  esito: { stato: 'inviato' | 'non-inviato'; errore?: string; providerId?: string },
+): Promise<void> {
+  if (!comunicazioneId) return;
+  try {
+    const riga = await prisma.comunicazioneProgetto.findFirst({
+      where: { id: comunicazioneId, tenantId },
+      select: { id: true, externalId: true },
+    });
+    if (!riga) return;
+    await prisma.comunicazioneProgetto.update({
+      where: { id: riga.id },
+      data: {
+        externalId: conStatoComunicazione(riga.externalId, {
+          stato: esito.stato,
+          // `errore: null` sul riuscito: se un primo tentativo era fallito e il secondo no, il
+          // motivo vecchio non deve restare appeso a un messaggio che è partito.
+          errore: esito.stato === 'inviato' ? null : esito.errore || 'motivo non riportato',
+          ...(esito.stato === 'inviato' ? { inviatoAt: new Date().toISOString() } : {}),
+          // Il `wamid` di Meta, quando il canale lo restituisce. Senza, la ricevuta di consegna
+          // che arriverà dopo non ha una chiave con cui ritrovare questa riga.
+          ...(esito.providerId ? { providerId: esito.providerId } : {}),
+        }),
+      },
+    });
+  } catch {
+    // Fascicolo non aggiornabile (riga sparita, contesto assente): l'invio resta quello che è, e
+    // l'operatore ha già davanti il riscontro. Non si trasforma in un errore di invio.
+  }
+}
+
+/**
+ * Rifiuta una richiesta di invio **e** lo annota sul fascicolo.
+ *
+ * Le tre rotte di dispatch rifiutano tutte nella stessa forma — 400 con `{ ok:false, errore }` —
+ * e il motivo è già scritto per l'operatore: qui viaggia anche verso la riga, così la chat non
+ * continua a mostrare un messaggio in attesa che non partirà mai. Il rifiuto per richiesta non
+ * valida (destinatario vuoto, numero senza prefisso) conta quanto quello del canale: la riga è
+ * già stata creata e va detto che è ferma.
+ */
+async function rifiutaInvio(
+  tenantId: string,
+  comunicazioneId: string | undefined,
+  reply: FastifyReply,
+  errore: string,
+) {
+  await registraEsitoInvio(tenantId, comunicazioneId, { stato: 'non-inviato', errore });
+  return reply.code(400).send({ ok: false, errore });
+}
+
 export async function registraRotteComunicazioni(server: FastifyInstance): Promise<void> {
   /**
    * Email al cliente con le credenziali dello studio.
@@ -83,33 +148,45 @@ export async function registraRotteComunicazioni(server: FastifyInstance): Promi
    * password li mette il server leggendo il tenant della richiesta.
    */
   server.post<{
-    Body: { to?: string; subject?: string; testo?: string; text?: string; html?: string; etichetta?: string };
+    Body: {
+      to?: string;
+      subject?: string;
+      testo?: string;
+      text?: string;
+      html?: string;
+      etichetta?: string;
+      /** Riga del fascicolo a cui l'esito va riferito: la crea il fascicolo, prima di chiamare qui. */
+      comunicazioneId?: string;
+    };
   }>('/comunicazioni/invia-email', async (req, reply) => {
     const tenantId = req.tenantId as string;
     const body = req.body || {};
+    const comunicazioneId = body.comunicazioneId;
 
     const destinatario = (body.to || '').trim();
     if (!destinatario || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(destinatario)) {
-      return reply.code(400).send({ ok: false, errore: 'Destinatario assente o non valido.' });
+      return rifiutaInvio(tenantId, comunicazioneId, reply, 'Destinatario assente o non valido.');
     }
 
     const oggetto = (body.subject || '').trim();
     if (!oggetto) {
-      return reply.code(400).send({ ok: false, errore: "L'oggetto del messaggio è obbligatorio." });
+      return rifiutaInvio(tenantId, comunicazioneId, reply, "L'oggetto del messaggio è obbligatorio.");
     }
 
     const testo = (body.testo ?? body.text ?? '').toString();
     const html = (body.html || '').trim() || (testo.trim() ? testoInHtml(testo) : '');
     if (!html) {
-      return reply.code(400).send({ ok: false, errore: 'Nessun contenuto da spedire.' });
+      return rifiutaInvio(tenantId, comunicazioneId, reply, 'Nessun contenuto da spedire.');
     }
 
     const cred = await credenzialiCanali(tenantId);
     if (!cred.smtp.host || !cred.smtp.user) {
-      return reply.code(400).send({
-        ok: false,
-        errore: 'Posta in uscita non configurata: mancano host o utenza SMTP nelle impostazioni dello studio.',
-      });
+      return rifiutaInvio(
+        tenantId,
+        comunicazioneId,
+        reply,
+        'Posta in uscita non configurata: mancano host o utenza SMTP nelle impostazioni dello studio.',
+      );
     }
 
     const esito = await inviaEmail({
@@ -125,8 +202,9 @@ export async function registraRotteComunicazioni(server: FastifyInstance): Promi
     if (!esito.ok) {
       // Il motivo tecnico va riportato: «porta bloccata dall'hosting» e «password sbagliata»
       // si correggono in due posti diversi, e un messaggio generico fa perdere ore.
-      return reply.code(400).send({ ok: false, errore: esito.errore || 'Invio non riuscito.' });
+      return rifiutaInvio(tenantId, comunicazioneId, reply, esito.errore || 'Invio non riuscito.');
     }
+    await registraEsitoInvio(tenantId, comunicazioneId, { stato: 'inviato' });
     return reply.send({ ok: true, via: esito.via });
   });
 
@@ -138,14 +216,24 @@ export async function registraRotteComunicazioni(server: FastifyInstance): Promi
    * all'operatore un successo (era il comportamento di `api/send-whatsapp.ts`).
    */
   server.post<{
-    Body: { to?: string; testo?: string; text?: string; template?: string; templateName?: string; lingua?: string; parametri?: string[] };
+    Body: {
+      to?: string;
+      testo?: string;
+      text?: string;
+      template?: string;
+      templateName?: string;
+      lingua?: string;
+      parametri?: string[];
+      comunicazioneId?: string;
+    };
   }>('/comunicazioni/invia-whatsapp', async (req, reply) => {
     const tenantId = req.tenantId as string;
     const body = req.body || {};
+    const comunicazioneId = body.comunicazioneId;
 
     const numero = (body.to || '').trim();
     if (!numero) {
-      return reply.code(400).send({ ok: false, errore: 'Numero del destinatario assente.' });
+      return rifiutaInvio(tenantId, comunicazioneId, reply, 'Numero del destinatario assente.');
     }
 
     const cred = await credenzialiCanali(tenantId);
@@ -157,8 +245,14 @@ export async function registraRotteComunicazioni(server: FastifyInstance): Promi
       : await inviaTestoWhatsapp(cred, numero, testo);
 
     if (!esito.ok) {
-      return reply.code(400).send({ ok: false, errore: esito.errore || 'Invio WhatsApp non riuscito.' });
+      // Qui passa il rifiuto di Meta — numero non registrato, finestra di 24 ore chiusa, template
+      // inesistente: è il motivo che finora non arrivava mai al fascicolo, che restava «consegnato».
+      return rifiutaInvio(tenantId, comunicazioneId, reply, esito.errore || 'Invio WhatsApp non riuscito.');
     }
+    // `inviato`, non `consegnato`: Meta ha accettato il messaggio, la consegna al telefono la
+    // dichiara solo il webhook di stato, con il suo `consegnatoAt`. Sono due cose diverse.
+    // Il `wamid` di Meta si deposita qui: è la chiave con cui quella ricevuta ritroverà la riga.
+    await registraEsitoInvio(tenantId, comunicazioneId, { stato: 'inviato', providerId: esito.providerId });
     return reply.send({ ok: true, via: template ? `template ${template}` : 'testo' });
   });
 
@@ -178,22 +272,31 @@ export async function registraRotteComunicazioni(server: FastifyInstance): Promi
    * `bodyLimit` non è una dimensione che si spedisce a un telefono.
    */
   server.post<{
-    Body: { to?: string; testo?: string; text?: string; allegati?: Array<{ nome?: string; base64?: string }> };
+    Body: {
+      to?: string;
+      testo?: string;
+      text?: string;
+      allegati?: Array<{ nome?: string; base64?: string }>;
+      comunicazioneId?: string;
+    };
   }>('/comunicazioni/invia-signal', async (req, reply) => {
     const tenantId = req.tenantId as string;
     const body = req.body || {};
+    const comunicazioneId = body.comunicazioneId;
 
     const destinatario = (body.to || '').trim();
     if (!destinatario) {
-      return reply.code(400).send({ ok: false, errore: 'Numero Signal del destinatario assente.' });
+      return rifiutaInvio(tenantId, comunicazioneId, reply, 'Numero Signal del destinatario assente.');
     }
     // Il numero si valida qui e non si normalizza in silenzio: `+3351234567` è un numero
     // francese, e un destinatario scritto senza prefisso diventerebbe quello di un estraneo.
     if (!numeroSignal(destinatario)) {
-      return reply.code(400).send({
-        ok: false,
-        errore: 'Il numero Signal del destinatario non è in forma internazionale: serve il prefisso, per esempio +393351234567.',
-      });
+      return rifiutaInvio(
+        tenantId,
+        comunicazioneId,
+        reply,
+        'Il numero Signal del destinatario non è in forma internazionale: serve il prefisso, per esempio +393351234567.',
+      );
     }
 
     const testo = (body.testo ?? body.text ?? '').toString();
@@ -202,17 +305,19 @@ export async function registraRotteComunicazioni(server: FastifyInstance): Promi
       .filter(a => a.base64.length > 0);
 
     if (!testo.trim() && allegati.length === 0) {
-      return reply.code(400).send({ ok: false, errore: 'Nessun contenuto da spedire.' });
+      return rifiutaInvio(tenantId, comunicazioneId, reply, 'Nessun contenuto da spedire.');
     }
 
     const MAX_BYTES = 15 * 1024 * 1024;
     // Il base64 gonfia di un terzo: si misura il peso decodificato, che è quello del file.
     const pesoStimato = allegati.reduce((somma, a) => somma + Math.floor((a.base64.length * 3) / 4), 0);
     if (pesoStimato > MAX_BYTES) {
-      return reply.code(400).send({
-        ok: false,
-        errore: 'Allegato troppo grande per Signal (oltre 15 MB): caricalo nel Vault del fascicolo e invia al cliente il collegamento.',
-      });
+      return rifiutaInvio(
+        tenantId,
+        comunicazioneId,
+        reply,
+        'Allegato troppo grande per Signal (oltre 15 MB): caricalo nel Vault del fascicolo e invia al cliente il collegamento.',
+      );
     }
 
     const cred = await credenzialiCanali(tenantId);
@@ -221,8 +326,9 @@ export async function registraRotteComunicazioni(server: FastifyInstance): Promi
       : await inviaSignal(cred, destinatario, testo);
 
     if (!esito.ok) {
-      return reply.code(400).send({ ok: false, errore: esito.errore || 'Invio Signal non riuscito.' });
+      return rifiutaInvio(tenantId, comunicazioneId, reply, esito.errore || 'Invio Signal non riuscito.');
     }
+    await registraEsitoInvio(tenantId, comunicazioneId, { stato: 'inviato' });
     return reply.send({ ok: true, via: allegati.length > 0 ? 'testo e allegati' : 'testo' });
   });
 
@@ -237,27 +343,29 @@ export async function registraRotteComunicazioni(server: FastifyInstance): Promi
    * accetta il nome solo per i canali pubblici, e per un cliente il valore giusto è quello che
    * il bot riceve quando la persona gli scrive. Se in anagrafica c'è altro, si dice.
    */
-  server.post<{ Body: { to?: string; testo?: string; text?: string } }>(
+  server.post<{ Body: { to?: string; testo?: string; text?: string; comunicazioneId?: string } }>(
     '/comunicazioni/invia-telegram',
     async (req, reply) => {
       const tenantId = req.tenantId as string;
       const body = req.body || {};
+      const comunicazioneId = body.comunicazioneId;
 
       const chatId = (body.to || '').trim();
       if (!chatId) {
-        return reply.code(400).send({ ok: false, errore: 'Chat Telegram del destinatario assente.' });
+        return rifiutaInvio(tenantId, comunicazioneId, reply, 'Chat Telegram del destinatario assente.');
       }
 
       const testo = (body.testo ?? body.text ?? '').toString();
       if (!testo.trim()) {
-        return reply.code(400).send({ ok: false, errore: 'Nessun contenuto da spedire.' });
+        return rifiutaInvio(tenantId, comunicazioneId, reply, 'Nessun contenuto da spedire.');
       }
 
       const cred = await credenzialiCanali(tenantId);
       const esito = await inviaTestoTelegram(cred, chatId, testo);
       if (!esito.ok) {
-        return reply.code(400).send({ ok: false, errore: esito.errore || 'Invio Telegram non riuscito.' });
+        return rifiutaInvio(tenantId, comunicazioneId, reply, esito.errore || 'Invio Telegram non riuscito.');
       }
+      await registraEsitoInvio(tenantId, comunicazioneId, { stato: 'inviato' });
       return reply.send({ ok: true, via: 'testo' });
     },
   );

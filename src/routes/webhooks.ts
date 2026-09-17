@@ -50,6 +50,7 @@ import { uploadDocumento } from '../services/storageService.js';
 import { credenzialiCanali } from '../services/otpDispatch.js';
 import { usernameBotTelegram } from '../services/telegramService.js';
 import { vietaControlli } from '../util/networkPolicy.js';
+import { conStatoComunicazione, leggiMetaComunicazione, statoAvanza } from '../util/statoComunicazione.js';
 // `isProgettoAttivo` vive nel dominio: era scritta due volte qui e, con Signal, ne serviva una
 // terza copia in `signalInbound.ts`. Il criterio di «progetto su cui instradare un messaggio» è
 // uno solo, e chi aggiunge uno stato al ciclo di vita lo cambia in un punto solo.
@@ -373,14 +374,37 @@ export async function registraRotteWebhooks(server: FastifyInstance): Promise<vo
           const wamid = typeof s?.id === 'string' ? s.id : '';
           const waStatus = typeof s?.status === 'string' ? s.status : '';
           if (!wamid || !waStatus) continue;
-          const trovato = await prisma.comunicazioneProgetto.findMany({
-            where: { tenantId, canale: 'whatsapp', externalId: idEsterno('whatsapp', wamid) },
-            take: 2,
+
+          // La riga si ritrova dal `wamid` che l'invio deposita in `external_id` accanto allo
+          // stato. Prima qui c'era l'uguaglianza esatta con `whatsapp:<wamid>`: ma quella forma
+          // ce l'hanno le righe **in entrata**, mentre le sole che ricevono uno stato sono le
+          // righe in uscita, che portano il blob JSON. Prisma confronta per uguaglianza, quindi
+          // non trovava mai niente e `consegnato`/`letto` non sono mai arrivati su WhatsApp.
+          // `contains` guarda dentro il blob invece di confrontarlo.
+          const trovata = await prisma.comunicazioneProgetto.findFirst({
+            where: { tenantId, canale: 'whatsapp', direzione: 'uscita', externalId: { contains: wamid } },
+            select: { id: true, externalId: true },
           });
-          const trovata = trovato[0];
           if (!trovata) continue;
-          const statoNorm = waStatus === 'read' ? 'letto' : waStatus === 'delivered' ? 'consegnato' : 'inviato';
-          const meta = JSON.stringify({ providerId: wamid, stato: statoNorm, ricevutaAt: new Date().toISOString() });
+
+          const adesso = new Date().toISOString();
+          const motivoMeta = Array.isArray(s?.errors) && s.errors[0]
+            ? String(s.errors[0].message || s.errors[0].title || '')
+            : '';
+          // `failed` non è una tappa del percorso: è un rifiuto, e va detto con il motivo di Meta.
+          // `sent` significa accettato, che è già `inviato` — non aggiunge nulla, ma non regredisce
+          // perché ci pensa `statoAvanza`.
+          const modifiche = waStatus === 'failed'
+            ? { stato: 'non-inviato' as const, errore: motivoMeta || 'Meta non ha consegnato il messaggio' }
+            : waStatus === 'read'
+              ? { stato: 'letto' as const, lettoAt: adesso }
+              : waStatus === 'delivered'
+                ? { stato: 'consegnato' as const, consegnatoAt: adesso }
+                : { stato: 'inviato' as const };
+
+          // Una ricevuta in ritardo non deve disdire una consegna già avvenuta.
+          if (!statoAvanza(leggiMetaComunicazione(trovata.externalId).stato, modifiche.stato)) continue;
+
           try {
             await transazioneWebhook(async (tx) => {
               await tx.webhookInbox.create({
@@ -388,7 +412,10 @@ export async function registraRotteWebhooks(server: FastifyInstance): Promise<vo
               });
               await tx.comunicazioneProgetto.update({
                 where: { id: trovata.id },
-                data: { allegatiJson: meta },
+                // Lo stato va in `external_id`, che è dove lo stato vive. Prima finiva in
+                // `allegati_json` — la colonna degli allegati del messaggio: una ricevuta di
+                // consegna cancellava gli allegati di quel messaggio.
+                data: { externalId: conStatoComunicazione(trovata.externalId, modifiche) },
               });
             });
           } catch (err) {

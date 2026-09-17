@@ -17,6 +17,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const create = vi.fn(async (_args: any) => ({ id: 'com-1' }));
 const update = vi.fn(async () => ({}));
 const findComunicazioni = vi.fn<any>(async () => []);
+// La ricevuta di consegna ritrova la riga dal `wamid` dentro `external_id`: è una `findFirst`
+// perché quel `wamid` è unico, e cercarne due sarebbe una query che non ha senso fare.
+const findComunicazioneFirst = vi.fn<any>(async () => null);
 const eventiInbox = new Set<string>();
 const webhookInboxCreate = vi.fn(async ({ data }: any) => {
   const chiave = `${data.tenantId}:${data.provider}:${data.eventId}`;
@@ -61,7 +64,7 @@ const prismaFinto: any = {
   cliente: { findMany: clienteFindMany },
   progetto: { findMany: progettoFindMany, findFirst: progettoFindFirst },
   collegamentoChatProgetto: { findUnique: collegamentoFindUnique, upsert: collegamentoUpsert },
-  comunicazioneProgetto: { findMany: findComunicazioni, create, update },
+  comunicazioneProgetto: { findMany: findComunicazioni, findFirst: findComunicazioneFirst, create, update },
   webhookInbox: { create: webhookInboxCreate },
   $executeRaw: vi.fn(async () => 1),
 };
@@ -133,6 +136,7 @@ beforeEach(() => {
   collegamentoUpsert.mockResolvedValue({});
   inviaTestoTelegram.mockResolvedValue({ ok: true });
   findComunicazioni.mockResolvedValue([]);
+  findComunicazioneFirst.mockResolvedValue(null);
   eventiInbox.clear();
   tenantUpdate.mockResolvedValue({});
 });
@@ -263,7 +267,7 @@ describe('webhook WhatsApp per studio', () => {
     } }] }] };
     const raw = JSON.stringify(ricevuta);
     const firma = firmaDi(raw, SEGRETO_STUDIO);
-    findComunicazioni.mockResolvedValue([{ id: 'com-out-1' }]);
+    findComunicazioneFirst.mockResolvedValue({ id: 'com-out-1', externalId: JSON.stringify({ stato: 'inviato', providerId: 'wamid.out.1' }) });
     const server = await app();
 
     const richiesta = () => server.inject({
