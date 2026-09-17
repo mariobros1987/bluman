@@ -184,6 +184,7 @@ model User {
 
   microvociAssegnate MicrovoceProgetto[] @relation("RisorsaAssegnata")
   eventiCreati       EventoCalendario[]
+  eventiAssegnati    EventoCalendario[]  @relation("EventiAssegnati")
   accessiRicevuti    AccessoRisorsa[]    @relation("AccessoUtente")
   accessiInvitati    AccessoRisorsa[]    @relation("AccessoInvitatoDa")
   notificheRicevute  Notifica[]
@@ -244,6 +245,7 @@ model Cliente {
   fatture      Fattura[]
   movimentiPrimaNota MovimentoPrimaNota[]
   collegamentiChat CollegamentoChatProgetto[]
+  eventiCalendario EventoCalendario[]        @relation("EventiCliente")
 
   @@index([tenantId, createdAt(sort: Desc)])
   @@index([tenantId, nome])
@@ -515,6 +517,7 @@ model ModuloProgetto {
   dipendenzeDi     ModuloProgettoDipendenza[] @relation("ModuloProgettoDaCuiDipende")
   fattureRiga      FatturaRiga[]
   accessiRisorsa   AccessoRisorsa[]           @relation("AccessoModulo")
+  eventiCalendario EventoCalendario[]         @relation("EventiModulo")
 
   @@map("modulo_progetto")
 }
@@ -552,6 +555,7 @@ model MicrovoceProgetto {
   passaggi       PassaggioProgetto[]
   documenti      Documento[]
   accessiRisorsa AccessoRisorsa[]    @relation("AccessoMicrovoce")
+  eventiCalendario EventoCalendario[] @relation("EventiMicrovoce")
 
   @@map("microvoce_progetto")
 }
@@ -1157,17 +1161,70 @@ model MovimentoPrimaNota {
 // TRASVERSALI — §19, §20, §21
 // ─────────────────────────────────────────────────────────────────
 
+enum CategoriaEvento {
+  promemoria
+  microvoce
+  kyc
+  fattura
+  contratto
+}
+
+enum StatoEvento {
+  da_fare
+  fatto
+  annullato
+}
+
+enum PrioritaEvento {
+  alta
+  media
+  normale
+}
+
 model EventoCalendario {
   id          String    @id @default(uuid())
   tenantId    String    @map("tenant_id")
+  // Di chi è il calendario: l'evento compare nella griglia di questo utente.
   userId      String    @map("user_id")
   user        User      @relation(fields: [userId], references: [id])
+  // Chi deve **fare** il compito — distinto da `userId`, che dice di chi è la riga.
+  // Un advisor apre un compito nel proprio calendario e lo assegna a un collaboratore: sono due
+  // persone diverse, e una sola colonna non le può esprimere. Nullo significa «nessuno se l'è
+  // preso», che è uno stato legittimo e non un dato mancante.
+  assegnatoAId String?  @map("assegnato_a_id")
+  // SET NULL e non CASCADE: cancellare un collaboratore non deve far sparire in silenzio i
+  // compiti che aveva in mano. Restano, senza assegnatario, e qualcuno se ne accorge.
+  assegnatoA   User?    @relation("EventiAssegnati", fields: [assegnatoAId], references: [id], onDelete: SetNull)
   progettoId  String?   @map("progetto_id")
   progetto    Progetto? @relation(fields: [progettoId], references: [id], onDelete: Cascade)
+  // Le tre provenienze di un evento derivato. Servono perché una riga generata sappia da dove
+  // viene: senza, non si può né rigenerare né spegnere, e un cambio nel sorgente lascia in giro
+  // un evento orfano che nessuno sa più giustificare.
+  // CASCADE perché un evento derivato senza la sua sorgente non ha significato — ed è anche il
+  // motivo per cui non blocca la cancellazione del cliente con un P2003.
+  clienteId           String?            @map("cliente_id")
+  cliente             Cliente?           @relation("EventiCliente", fields: [clienteId], references: [id], onDelete: Cascade)
+  moduloProgettoId    String?            @map("modulo_progetto_id")
+  moduloProgetto      ModuloProgetto?    @relation("EventiModulo", fields: [moduloProgettoId], references: [id], onDelete: Cascade)
+  microvoceProgettoId String?            @map("microvoce_progetto_id")
+  microvoceProgetto   MicrovoceProgetto? @relation("EventiMicrovoce", fields: [microvoceProgettoId], references: [id], onDelete: Cascade)
   titolo      String
   dataInizio  DateTime  @map("data_inizio")
   dataFine    DateTime  @map("data_fine")
+  categoria   CategoriaEvento @default(promemoria)
+  stato       StatoEvento     @default(da_fare)
+  priorita    PrioritaEvento  @default(normale)
+  note        String?
+  luogoUrl    String?   @map("luogo_url")
+  // Vero per le righe che il sistema deriva da fatture, KYC e progetti. Serve a due cose: non
+  // cancellare per sbaglio un promemoria scritto a mano, e poter distinguere in interfaccia ciò
+  // che una persona ha scritto da ciò che una regola ha dedotto. Senza, le due cose sono
+  // indistinguibili e l'utente non può correggere una deduzione sbagliata.
+  generato    Boolean   @default(false)
 
+  // La query del calendario, e la query «i miei compiti aperti». Prima non c'era nessun indice.
+  @@index([tenantId, dataInizio])
+  @@index([tenantId, assegnatoAId, stato])
   @@map("evento_calendario")
 }
 

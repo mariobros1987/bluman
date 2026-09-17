@@ -150,15 +150,15 @@ describe('una scadenza chiusa non è una scadenza mancata', () => {
   });
 
   it('una data futura e aperta è da fare', () => {
-    expect(statoScadenza(fraGiorni(10), false, ADESSO)).toBe('da-fare');
+    expect(statoScadenza(fraGiorni(10), false, ADESSO)).toBe('da_fare');
   });
 
   it('oggi non è ancora scaduto', () => {
-    expect(statoScadenza(fraGiorni(0), false, ADESSO)).toBe('da-fare');
+    expect(statoScadenza(fraGiorni(0), false, ADESSO)).toBe('da_fare');
   });
 
   it('una scadenza senza data resta da fare, aperta', () => {
-    expect(statoScadenza(null, false, ADESSO)).toBe('da-fare');
+    expect(statoScadenza(null, false, ADESSO)).toBe('da_fare');
     expect(statoScadenza(null, true, ADESSO)).toBe('fatta');
   });
 });

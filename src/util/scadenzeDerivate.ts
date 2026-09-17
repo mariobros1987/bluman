@@ -137,7 +137,7 @@ export function tonoRata(giorno: number): 'scaduta' | 'oggi' | 'vicina' {
 
 // ── Stato di una scadenza, per come si disegna ──────────────────────────────────
 
-export type StatoScadenza = 'da-fare' | 'scaduta' | 'fatta';
+export type StatoScadenza = 'da_fare' | 'scaduta' | 'fatta';
 
 /**
  * Come si presenta una scadenza nel calendario.
@@ -153,6 +153,6 @@ export function statoScadenza(
 ): StatoScadenza {
   if (chiusa) return 'fatta';
   const scadenza = adData(dataScadenza);
-  if (!scadenza) return 'da-fare';
-  return giorniFra(adesso, scadenza) < 0 ? 'scaduta' : 'da-fare';
+  if (!scadenza) return 'da_fare';
+  return giorniFra(adesso, scadenza) < 0 ? 'scaduta' : 'da_fare';
 }
