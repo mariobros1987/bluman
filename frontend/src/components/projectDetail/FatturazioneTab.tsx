@@ -444,24 +444,18 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
                 );
               })()}
               <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: 16, fontWeight: 800, color: '#4338ca' }}>DOCUMENTO FISCALE DI VENDITA</div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: '#4338ca' }}>Anteprima fattura — riepilogo</div>
                 <div style={{ fontSize: 13, fontWeight: 700, marginTop: 2 }}>{previewFattura.numero}</div>
-                <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>Data Emissione: {new Date().toLocaleDateString('it-IT')}</div>
+                <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 2 }}>Il PDF ufficiale (pulsante in basso) riporta ogni voce con i dati fiscali reali.</div>
               </div>
             </div>
 
-            {/* Dati Destinatario & SDI */}
-            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: 14, display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
-              <div>
-                <div style={{ fontSize: 10, color: '#64748b', textTransform: 'uppercase', fontWeight: 700 }}>Cliente Destinatario:</div>
-                <div style={{ fontSize: 13, fontWeight: 700, marginTop: 2 }}>{project.cl}</div>
-                <div style={{ fontSize: 11, color: '#475569' }}>P.IVA / Codice Fiscale: IT01234567890</div>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: 10, color: '#64748b', textTransform: 'uppercase', fontWeight: 700 }}>Tracciato SDI Comped:</div>
-                <div style={{ fontSize: 11, fontWeight: 600, color: '#166534', marginTop: 2 }}>✓ XML Inviato & Accettato</div>
-                <div style={{ fontSize: 10, fontFamily: 'monospace', color: '#64748b' }}>Codice Destinatario: SUBM70N</div>
-              </div>
+            {/* Destinatario — solo dati reali. I dati fiscali completi (P.IVA/CF, codice SDI, esito
+                del tracciato) stanno sul documento vero: qui non si cablano valori finti, che prima
+                mostravano una P.IVA e un "XML Accettato" inventati su ogni fattura. */}
+            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: 14, fontSize: 12 }}>
+              <div style={{ fontSize: 10, color: '#64748b', textTransform: 'uppercase', fontWeight: 700 }}>Cliente Destinatario:</div>
+              <div style={{ fontSize: 13, fontWeight: 700, marginTop: 2 }}>{project.cl}</div>
             </div>
 
             {/* Tabella Voci Fattura */}
@@ -511,7 +505,10 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
                   // (`previewFattura.desc`, la descrizione della prima riga) e dati cablati: il PDF
                   // non conteneva le micro-voci scelte. Ora si scarica il documento vero.
                   const idFattura = previewFattura.id != null ? String(previewFattura.id) : '';
-                  if (!idFattura) {
+                  // Deve essere un uuid di database: un id locale/seed (numerico) darebbe un 404 sul
+                  // server e un alert generico, invece del messaggio chiaro «emettila prima».
+                  const eUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idFattura);
+                  if (!eUuid) {
                     alert('Questa fattura non è ancora salvata a database: emettila prima di scaricarne il PDF.');
                     return;
                   }

@@ -472,8 +472,11 @@ export function usePortalFirma({
         otp: otpCode.length === 6 ? otpCode : undefined,
       });
 
-      await registraEsitoFirma(res.seal);
+      // Come nella firma con codice: si chiude la modale a firma avvenuta, **prima** delle riletture
+      // best-effort, così un refresh che fallisce non lascia aperto un modale su una firma riuscita.
+      setOtpModalOpen(false);
       setFileFirmato(null);
+      await registraEsitoFirma(res.seal);
       return true;
     } catch (err: any) {
       setOtpError(err?.message || 'Caricamento del documento firmato non riuscito.');
