@@ -266,5 +266,5 @@ STEP 6 (A seguire)  ➜ FASE 7: Test E2E sui flussi legali/fiscali critici
 | Database | Supabase EU-WEST-1 | PostgreSQL con RLS attiva su 34 tabelle |
 | Storage Documenti | Supabase Storage | `SUPABASE_URL` + `SUPABASE_SERVICE_KEY` configurati su Railway |
 | Posta Elettronica | SMTP per tenant (Register.it) | Connessioni TLS enforced |
-| WhatsApp Business | Meta Cloud API | Webhook ricezione: `/webhooks/communications/whatsapp` |
+| WhatsApp Business | Meta Cloud API | Webhook ricezione: `/webhooks/communications/whatsapp/<slug>` — lo **slug è dello studio** e il valore esatto lo compone **Impostazioni Studio → Canali**. Il dominio è quello del **backend** (Railway), non quello del sito: i ponti su Vercel sono stati rimossi il 16/09/2026 |
 | Telegram Bot | Bot API | Webhook ricezione: `/webhooks/communications/telegram` |

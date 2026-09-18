@@ -350,6 +350,8 @@ al posto del dato mancante, rendendo l'inventato indistinguibile dal reale.
 - [x] **Webhook Ricezione Telegram Bot Reale (`/webhooks/communications/telegram`)**:
   - Serverless Function e ricezione messaggi da Telegram Webhook API.
   - Matching anagrafica cliente ERP e ingestion automatica delle comunicazioni nella timeline del progetto.
+  - ⚠️ **La Serverless Function su Vercel non c'è più** (`api/webhooks/communications/telegram.ts`, rimossa il 16/09/2026): inoltrava a Railway **scartando `x-telegram-bot-api-secret-token`**, che per Telegram è l'unica autenticazione della rotta, e rispondeva comunque `200`, quindi Telegram non ritentava mai e i messaggi dei clienti sparivano senza traccia. Ora il webhook è registrato sul dominio del **backend**.
+  - **Il cliente può anche agganciare da sé la sua chat a una pratica** (16/09/2026): il menu `🔗 Link Telegram` nella testata della pratica compone `t.me/<Bot>?start=<payload firmato>` e lo può spedire via email o WhatsApp. Serve perché il matching in anagrafica è un'euristica a due cancelli — un solo cliente con quel contatto **e** un solo progetto aperto — che si arrende davanti a un cliente con due pratiche aperte. I dettagli in `README.md` e `PIANO_DI_MIGLIORAMENTO.md` §1bis.
 - [x] **Connettore SDI Diretto 1-Click (`src/services/sdiService.ts` & `InvoicesPage.tsx`)**:
   - Trasmissione web service delle fatture elettroniche XML al Sistema di Interscambio (SdI - Agenzia delle Entrate) con generazione identificativo SdI e audit trail.
 - [x] **Modulo di Sicurezza & Sanitizzazione Upload KYC (`src/services/securityScanner.ts`)**:

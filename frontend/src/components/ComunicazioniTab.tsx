@@ -526,9 +526,9 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
       } else if (canaleSelezionato === 'whatsapp') {
         // 3. Se WhatsApp, dispatch tramite POST /comunicazioni/invia-whatsapp: il token Meta
         // e il phone id sono quelli dello studio corrente, non variabili d'ambiente condivise.
-        // Il numero era `|| '393335936278'`: senza cellulare in anagrafica il messaggio del
-        // cliente partiva verso un numero scritto nel codice. E quando l'invio falliva, il
-        // ripiego spediva il template di esempio `hello_world` e annunciava «Notifica
+        // Il numero era `|| '<un numero scritto nel codice>'`: senza cellulare in anagrafica il
+        // messaggio del cliente partiva verso il telefono personale del titolare. E quando l'invio
+        // falliva, il ripiego spediva il template di esempio `hello_world` e annunciava «Notifica
         // consegnata»: al destinatario arrivava «Hello World», all'operatore un successo.
         const cleanPhone = (contactInfo.whatsapp || '').replace(/\D/g, '');
         if (!cleanPhone) {

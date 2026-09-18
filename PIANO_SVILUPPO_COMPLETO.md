@@ -109,7 +109,7 @@ Con la crescita dello studio, il payload JSON e il consumo di RAM crescono linea
 ### 1.2 Implementazione Tecnica
 
 #### Schema di Validazione
-Utilizzare lo schema già pronto `PaginazioneQuerySchema` in [`src/schemas/paginazione.schema.ts`](file:///Volumes/Macintosh%20HD/Users/mariodibenedetto/Downloads/bluman-api/src/schemas/paginazione.schema.ts):
+Utilizzare lo schema già pronto `PaginazioneQuerySchema` in [`src/schemas/paginazione.schema.ts`](src/schemas/paginazione.schema.ts):
 ```typescript
 export const PaginazioneQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1).optional(),
@@ -162,7 +162,7 @@ Le allowlist reali dipendono dalla rotta: per le fatture, per esempio, sono amme
 ## FASE 2 — Background Jobs: Automazione Notturna Cron & Resilienza Dispatcher
 
 ### 2.1 Motivazione e Problema
-La business logic per l'analisi delle scadenze è già completata in [`src/services/cronService.ts`](file:///Volumes/Macintosh%20HD/Users/mariodibenedetto/Downloads/bluman-api/src/services/cronService.ts) (`runDailyNotificationCron` per KYC annuali, UBO/MFSA e rate insolute). Tuttavia, attualmente viene innescata **solo** tramite richiesta HTTP esplicita su `POST /cron/esegui-notifiche-scadenze`. Se nessun servizio esterno effettua un webhook quotidiano, le notifiche di scadenza non partono.
+La business logic per l'analisi delle scadenze è già completata in [`src/services/cronService.ts`](src/services/cronService.ts) (`runDailyNotificationCron` per KYC annuali, UBO/MFSA e rate insolute). Tuttavia, attualmente viene innescata **solo** tramite richiesta HTTP esplicita su `POST /cron/esegui-notifiche-scadenze`. Se nessun servizio esterno effettua un webhook quotidiano, le notifiche di scadenza non partono.
 
 ### 2.2 Implementazione Tecnica
 

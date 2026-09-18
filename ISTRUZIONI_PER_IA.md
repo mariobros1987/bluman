@@ -67,6 +67,49 @@ della Dashboard scrive le sue righe.
 STATO ATTUALE:
 Abbiamo completato l'autenticazione JWT RBAC, il Portale Cliente con Firma Elettronica Semplice (OTP verificata · art. 20 CAD; 6 Tab con Profilo & Sicurezza Password, e selezione dinamica dei progetti con moduli/micro-voci attivi aggiornati in tempo reale), l'Anagrafica ERP Clienti con modale progetti attivi integrato, la Fatturazione/NC con tracciato XML SDI, il Connettore SDI 1-Click, il Document Studio Word-like con Smart Tags, il Grafo Dipendenze Moduli nel progetto, il Calendario Condiviso con Scadenzario Attività Studio (/calendar), il Cron Worker Scadenze UBO/Marchi ed il Cambio Password Obbligatorio al Primo Accesso per tutti gli utenti dello studio e clienti con reset rapido da parte del Super Admin e Lead Advisor.
 
+Completato il 16-17 settembre 2026 (il cliente aggancia la sua chat a una pratica):
+- **Il link per progetto** — `t.me/<Bot>?start=<payload>`. Chiude il caso che l'euristica a due
+  cancelli non sapeva risolvere: un cliente con **due pratiche aperte** non aveva modo di dire a
+  quale si riferiva, e il suo messaggio finiva nell'avviso «non archiviato». Nella testata della
+  pratica il menu `🔗 Link Telegram ▾` copia il link o lo spedisce via email/WhatsApp. Il payload è
+  `<uuid compatto>_<MAC>`, HMAC-SHA256 su `tenantId` **e** `progettoId` troncato a 16 byte in
+  base64url: **55 caratteri**, sotto il tetto di 64 che Telegram impone a `?start=`. Nuovi file:
+  `src/routes/collegamentoChat.ts`, `src/services/collegamentoChat.ts`,
+  `frontend/src/components/projectDetail/LinkTelegramProgetto.tsx`, tabella
+  `collegamento_chat_progetto` (migrazione `20260916210000`, con la **sua** policy RLS dentro la
+  migrazione). L'invito spedito rientra nel fascicolo come comunicazione in uscita (regola 3), e un
+  invio fallito **non** lascia la riga (regola 7). La revoca è lo scollegamento.
+- **Il guasto che ha aperto il 17/09, e le sue tre cause**: il campo *Bot Username* dello studio
+  conteneva l'**id numerico** del bot invece del suo username, e `t.me/<numero>` apriva «questo
+  utente non esiste» sul telefono del cliente. Tre buchi, tutti chiusi: `usernameBotTelegram`
+  accettava un valore di sole cifre (che è la forma dell'id — la prima metà del token — e non di uno
+  username, che Telegram non assegna mai numerico); la registrazione del webhook scriveva
+  `tgBotUsername` **solo se il campo era vuoto**, quindi un valore sbagliato ci restava per sempre;
+  e nessuno confrontava mai il campo con quello che `getMe` restituisce. **Telegram è la fonte, la
+  colonna è la sua copia**: ora la registrazione rilegge `getMe`, corregge il campo e lo dichiara
+  (`usernameCorretto`), e il pannello riporta il valore corretto nello stato del modulo — senza
+  quello, il primo «Salva» di un altro canale avrebbe riscritto il valore vecchio. I tre modi di non
+  farcela hanno **tre messaggi diversi**, perché i rimedi sono diversi.
+- **Nessun ponte su Vercel**: `api/webhooks/communications/telegram.ts` e `.../whatsapp.ts` rimossi
+  il 16/09. Inoltravano a Railway scartando `x-telegram-bot-api-secret-token` e
+  `x-hub-signature-256` — le sole intestazioni che provano l'autenticità dell'evento — e
+  rispondevano `200` al provider anche quando l'inoltro falliva, quindi Telegram non ritentava mai e
+  i messaggi sparivano senza traccia. L'ingestione termina sul backend.
+- **WhatsApp e Signal per studio**: `wa_app_id`/`wa_app_secret` con slug di callback per studio
+  (migrazioni `20260916180000_whatsapp_app_per_studio`, `20260916190000_signal_per_studio`).
+
+Verifiche: `npx tsc --noEmit` in radice e `npm run typecheck` in `frontend/` verdi, `npx vitest run`
+verde (**83 file, 1005 test**). Deploy eseguito; il log di avvio del container del 17/09 alle 06:54
+UTC dice `36 migrations found` / `No pending migrations to apply.`, cioè le tre migrazioni del 16/09
+sono applicate in produzione (vedi `PIANO_DI_MIGLIORAMENTO.md` §1bis voce 3, ora chiusa).
+
+⚠️ **Resta da provare a mano**, ed è il pezzo che il link esiste per servire: aprire il link di una
+pratica dal proprio telefono, controllare che la chat riceva la conferma, scrivere un messaggio e
+vederlo comparire nel fascicolo **di quella pratica** con una seconda pratica dello stesso cliente
+aperta in parallelo, poi scollegare e controllare che torni l'avviso «non archiviato». Il 17/09 è
+stato verificato solo il primo passo (premendo il pulsante del webhook il campo si è corretto da
+solo): vedi la voce 1 di `PIANO_DI_MIGLIORAMENTO.md` §1bis.
+
 Completato il 2 Settembre 2026 (Ciclo Passivo, Fornitori ERP, LIPE, Solleciti e Validazione Zod):
 1. **Fornitori ERP & Ciclo Passivo (OpenSTAManager-grade)**:
    - Modello Prisma `Fornitore` e `FatturaRicevuta` con isolamento multi-tenant (`tenantId`) e indici.

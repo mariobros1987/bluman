@@ -412,9 +412,13 @@ async function main() {
       referentiJson: {
         referente: 'Ing. Roberto Rossi (CEO)',
         email: 'client@holdingbeta.advisory',
-        cellulare: '+39 333 5936278',
+        // Numeri di comodo, e non è una svista: qui c'era il numero personale del titolare in due
+        // forme. Un seed è il posto da cui i numeri veri entrano nei dati di prova — e da lì, con
+        // un invio, nel telefono di qualcuno. Un recapito di esempio si scrive in modo che non
+        // possa squillare: vedi anche `PIANO_DI_MIGLIORAMENTO.md` voce 13.
+        cellulare: '+39 000 0000000',
         telefono: '+39 02 889900',
-        whatsapp: '+393335936278',
+        whatsapp: '+390000000000',
       },
     },
     {

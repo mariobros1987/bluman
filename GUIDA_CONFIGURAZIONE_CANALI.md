@@ -28,18 +28,35 @@ Questa guida fornisce le istruzioni passo-passo per configurare le credenziali A
 
 ### B. Configurare il Webhook di Ricezione Messaggi
 1. Nella dashboard WhatsApp di Meta Developers, vai su **Configuration** → **Webhook**.
-2. Imposta l'**URL Callback**: `https://api.tuostudio.com/webhooks/communications/whatsapp`.
-3. Genera un **Verify Token** casuale e incolla lo stesso valore in due punti: qui su Meta e
-   nella variabile d'ambiente `WA_VERIFY_TOKEN` del backend (su Railway). È un segreto: non va
-   scritto in un file versionato, e se ci è finito una volta va rigenerato. Per generarlo:
+2. Imposta l'**URL Callback**, che porta lo **slug dello studio**:
+   `https://<dominio-del-backend>/webhooks/communications/whatsapp/<slug>`. Non inventarlo:
+   **Impostazioni Studio → Canali** lo mostra già composto, perché non è un dato dello studio ma una
+   conseguenza del suo slug e dell'indirizzo del backend.
+   - Il dominio è quello di **Railway** (`RAILWAY_PUBLIC_DOMAIN`), non quello del sito: l'ingestione
+     termina sul backend Fastify, ed è lì che si verifica la firma. Fino al 16/09/2026 esisteva anche
+     un ponte su Vercel (`api/webhooks/communications/whatsapp.ts`), ed è stato rimosso — inoltrava a
+     Railway **scartando `x-hub-signature-256`**, cioè l'unica intestazione che prova l'autenticità
+     dell'evento, e rispondeva `200` a Meta anche quando l'inoltro falliva.
+3. Genera un **Verify Token** casuale e incollalo in **due punti**: qui su Meta e nel campo
+   *Webhook Verify Token* di **Impostazioni Studio → Canali**. Per generarlo:
    ```bash
    node -e "console.log(require('crypto').randomBytes(24).toString('base64url'))"
    ```
-   > Il campo *Webhook Verify Token* che vedi in **Impostazioni Studio → Canali** oggi viene
-   > salvato ma **non** viene letto dall'handshake: quello confronta con `WA_VERIFY_TOKEN`.
-   > La divergenza è annotata in `GUIDA_META_WHATSAPP_INTEGRAZIONE.md` §2 e attende una
-   > decisione; fino ad allora è la variabile d'ambiente a contare.
+   > **Il token è dello studio, e da qui viene.** L'handshake risolve lo studio dallo slug nel path e
+   > confronta con il **suo** `wa_verify_token`; uno studio che non ne ha uno non può essere
+   > sottoscritto da nessuno (risponde 503). Serve perché Meta configura il verify token per
+   > **applicazione**, non per numero: non esiste un token di piattaforma con cui rispondere a un
+   > handshake che non nomina lo studio. Fino al 16/09/2026 era il contrario — l'handshake
+   > confrontava la variabile d'ambiente `WA_VERIFY_TOKEN`, e il campo in Impostazioni veniva
+   > salvato senza essere mai letto.
+   > La variabile d'ambiente **c'è ancora, ma non è più l'handshake a leggerla**: la usa il solo
+   > `prisma/seed.ts` per **popolare** `wa_verify_token` di uno studio già esistente. Il valore che
+   > conta è quello in Impostazioni → Canali (che il browser non vede mai: torna come stringa vuota
+   > più `waVerifyTokenImpostata: true`).
 4. Spunta gli eventi: `messages`.
+   > ⚠️ Lo slug dello studio si può **ruotare** (`POST /tenant/whatsapp-slug`, con `conferma: true`),
+   > ma ruotarlo **smette di ricevere** i messaggi WhatsApp finché la Callback URL non viene
+   > aggiornata su Meta. È una rotazione da fare con la dashboard aperta, non da premere per curiosità.
 
 ### C. Associazione Automatica al Progetto Cliente
 - Quando il cliente scrive dal suo cellulare (es. `+39 335 1234567`), BluMan cerca il numero nell'anagrafica **Clienti ERP**.
@@ -51,17 +68,61 @@ Questa guida fornisce le istruzioni passo-passo per configurare le credenziali A
 
 ### A. Creare il Bot dello Studio con @BotFather
 1. Apri Telegram e cerca l'utente ufficiale **`@BotFather`**.
-2. Invia il comando `/newbot` e segui le istruzioni per impostare il nome (es: `BluMan Advisory Bot`) e lo username (es: `@BluManStudioBot`).
+2. Invia il comando `/newbot` e segui le istruzioni per impostare il nome (es: `BluMan Advisory Bot`) e lo username, che è quello che BotFather assegna nella forma `@qualcosa_bot` (es: `@StudioDiProvaBot`).
 3. Copia l'**HTTP API Access Token** fornito da BotFather: ha la forma `<id numerico>:<stringa
    casuale>`. È un segreto — si incolla solo nel campo di BluMan, mai in un file del repository.
+   > **Lo `<id numerico>` in testa al token non è il destinatario dei messaggi, e non è lo
+   > username.** È l'identificativo interno del bot. Nella prima metà del token si legge senza
+   > chiedere niente a Telegram, e in **Impostazioni Studio → Canali** compare due volte: come
+   > destinatario di una chat (sbagliato: un bot non può scrivere a se stesso, e Telegram risponde
+   > «the bot can't send messages to the bot») e nel campo *Bot Username* (sbagliato due volte:
+   > `t.me/<numero>` apre «questo utente non esiste»). Se ti serve sapere qual è, il campo non
+   > serve: lo cambia la registrazione del webhook, che lo rilegge da Telegram.
 
 ### B. Registrazione Automatica Webhook
 1. Vai in BluMan in `Impostazioni` → `💬 Integratore Canali Omnichannel`.
-2. Incolla lo username ed il Token del Bot e clicca su **Salva Credenziali**.
-3. BluMan registrerà automaticamente il Webhook eseguendo l'handshake con le API di Telegram.
+2. Incolla il **Token** del Bot e clicca su **Salva Credenziali**.
+3. Premi il pulsante del webhook — si chiama **🔗 Registra Webhook** finché nessun webhook è
+   registrato, poi **🔄 Aggiorna Webhook**: è lo stesso pulsante, cambia solo l'etichetta. BluMan
+   esegue l'handshake con le API di Telegram, registra il webhook sul dominio del backend e
+   **rilegge lo username con `getMe`**, salvandolo nel campo *Bot Username*. Non serve compilarlo a
+   mano.
+   - Se il campo conteneva un valore diverso da quello vero, la registrazione lo **corregge** e la
+     pagina te lo dice: è il caso dell'id numerico copiato al posto dello username, che componeva un
+     link che apriva «questo utente non esiste» sul telefono del cliente (capitato il 17/09/2026).
+     Telegram è la fonte, il campo è la sua copia: un valore scritto a mano che Telegram contraddice
+     viene riallineato, non rispettato.
+   - Il campo *Bot Username* è un'alternativa manuale, e serve solo se il pulsante non è utilizzabile.
+     Il valore giusto è quello nella forma `@qualcosa_bot`: **5-32 caratteri fra lettere, cifre e
+     `_`**, e non di sole cifre.
 
 ### C. Associazione Automatica al Progetto
-- Il cliente viene identificato tramite l'**Handle Telegram** registrato in anagrafica (es: `@RobertoRossi`) oppure inserendo il codice dell'incarico nel primo messaggio (es: `[INC-2026-089]`).
+BluMan associa i messaggi in ingresso al progetto in **tre** modi, dal più esplicito al più
+dedotto. Il primo è quello che funziona sempre; gli altri due sono ripieghi, e hanno dei limiti
+che conviene conoscere.
+
+1. **Il link della pratica — il cliente dice lui a quale pratica si riferisce.** Nella testata di
+   una pratica, il menu **`🔗 Link Telegram ▾`** copia un indirizzo del tipo
+   `t.me/<Bot>?start=<codice firmato>`, oppure lo spedisce al cliente via **email** o **WhatsApp**.
+   Chi apre quel link e preme *Avvio* aggancia la propria chat a **quella** pratica, e da quel
+   momento i suoi messaggi entrano in quel fascicolo senza che debba indicare niente.
+   - È l'unico metodo che regge i due casi in cui gli altri due si arrendono: un cliente con **due
+     pratiche aperte**, e una persona che scrive **per due clienti diversi**.
+   - L'invito spedito rientra nel fascicolo come comunicazione in uscita: chi apre la pratica domani
+     vede che quel link è stato mandato, a chi e quando.
+   - Le chat collegate sono elencate sotto lo stesso menu, con **scollega**. Il link resta valido
+     dopo lo scollegamento (chi si è scollegato per sbaglio rientra da solo toccandolo di nuovo).
+   - Su WhatsApp il testo libero parte solo entro **24 ore** dall'ultimo messaggio del cliente: fuori
+     da quella finestra Meta rifiuta, e BluMan riporta il rifiuto invece di dire «inviato». Per
+     email non c'è questo limite, e il link resta comunque copiabile a mano.
+2. **L'Handle Telegram in anagrafica** (es: `@RobertoRossi`), se il cliente è uno solo con quel
+   contatto e ha **un solo** progetto aperto.
+3. **Il codice dell'incarico nel primo messaggio** (es: `[INC-2026-089]`).
+
+Quando nessuno dei tre si applica — nessun link toccato, mittente non attribuibile o progetto non
+univoco — il messaggio **non viene archiviato in un fascicolo a caso**: lo studio riceve l'avviso
+«Messaggio Telegram non archiviato», e da lì la via d'uscita è mandare al cliente il link della
+pratica giusta.
 
 ---
 

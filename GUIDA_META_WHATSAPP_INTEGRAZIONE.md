@@ -1,6 +1,6 @@
 # 🟢 BluMan — Guida Ufficiale Integrazione WhatsApp Business API & Meta MCP
 
-Questa guida documenta in modo completo e definitivo l'architettura, i parametri ufficiali, le procedure di configurazione dei Webhook e le modalità operative per l'integrazione di **WhatsApp Business Cloud API** di Meta e del server **Remote MCP Meta DevTools** nella piattaforma **BluMan Advisory**.
+Questa guida documenta in modo completo e definitivo l'architettura, **dove stanno** i parametri del canale, le procedure di configurazione dei Webhook e le modalità operative per l'integrazione di **WhatsApp Business Cloud API** di Meta e del server **Remote MCP Meta DevTools** nella piattaforma **BluMan Advisory**.
 
 ---
 
@@ -19,22 +19,29 @@ Questa guida documenta in modo completo e definitivo l'architettura, i parametri
                ┌─────────────────────────────────────────────────────────────────┐
                │                     BluMan Cloud Infrastructure                 │
                │                                                                 │
-               │  ▲ Vercel Serverless Function (solo INGRESSO)                   │
-               │    /api/webhooks/communications/whatsapp.ts                     │
-               │                                                                 │
-               │  🚂 Railway Docker Container (Fastify Backend)                  │
-               │    POST /webhooks/communications/whatsapp   (ingresso)          │
+               │  🚂 Railway Docker Container (Fastify Backend) — unico ingresso     │
+               │    GET  /webhooks/communications/whatsapp/<slug>  (handshake Meta)  │
+               │    POST /webhooks/communications/whatsapp/<slug>  (ingresso)        │
                │    POST /comunicazioni/invia-whatsapp       (uscita, §35)       │
                │    POST /progetti/:id/comunicazioni         (riga in archivio)  │
                │                                                                 │
                │  🗄 Supabase PostgreSQL Database                                │
                │    • Credenziali del canale sulla riga Tenant (waPhoneId,       │
                │      waAccessToken) — mai nel browser                           │
-               │      Verify token del webhook: variabile WA_VERIFY_TOKEN (§2)   │
+               │      Verify token dell'handshake: colonna `wa_verify_token`     │
+               │      dello studio, risolto dallo slug nel path (§2)             │
                │    • Match Automatico Numero Mittente (Anagrafica ERP)          │
                │    • Indicizzazione Live nel Vault Progetto                     │
                └─────────────────────────────────────────────────────────────────┘
 ```
+
+> **Il ponte su Vercel non esiste più (16/09/2026).** In alto in questo schema c'era una Vercel
+> Serverless Function (`api/webhooks/communications/whatsapp.ts`) che inoltrava a Railway gli eventi
+> di Meta. È stata rimossa, e con lei il `rewrite` in `vercel.json`: inoltrava **scartando
+> `x-hub-signature-256`**, cioè l'unica intestazione che prova che l'evento viene davvero da Meta, e
+> rispondeva `200` a Meta anche quando l'inoltro falliva — quindi Meta non ritentava mai e i
+> messaggi si perdevano in silenzio. Va detto chiaramente perché non è una preferenza di stile:
+> **l'ingestione deve terminare sul backend**, dove la firma si può verificare.
 
 > **§35 — l'uscita passa dal backend.** Fino ad agosto 2026 il browser spediva i messaggi
 > da sé, chiamando una funzione serverless `api/send-whatsapp.ts` senza autenticazione e con
@@ -49,20 +56,25 @@ Questa guida documenta in modo completo e definitivo l'architettura, i parametri
 
 ---
 
-## 🔑 2. Parametri Ufficiali di Produzione
+## 🔑 2. I parametri del canale — dove stanno i valori
 
-Gli identificativi qui sotto non sono segreti: si leggono dalla console Meta e servono per
-riconoscere le risorse giuste. **I segreti non stanno in questa tabella e non stanno in nessun
-file del repository** (regola 6): access token, verify token e password vivono sulla riga
-Tenant del database e si inseriscono da **Impostazioni Studio → Canali**.
+Gli identificativi qui sotto **appartengono allo studio, non alla piattaforma**: ogni studio ha
+la sua app Meta, il suo numero e il suo webhook. Si leggono dalla console Meta del suo titolare e
+si inseriscono da **Impostazioni Studio → Canali**; qui restano come **segnaposto**, non come
+valori, perché un valore vero in un documento invecchia — e quello che questo file riportava fino
+al 18/09/2026 era già vecchio: era di un'app **rifatta**, e la WABA che nominava non esiste più
+(`GraphMethodException`, subcode 33). **I segreti non stanno in questa tabella e non stanno in
+nessun file del repository** (regola 6): access token, verify token e App Secret vivono sulla riga
+Tenant del database.
 
-| Parametro | Valore Ufficiale | Descrizione / Utilizzo |
+| Parametro | Dove sta il valore | Descrizione / Utilizzo |
 | :--- | :--- | :--- |
-| **Meta App ID** | `28073663662286834` | App ufficiale **`bluman`** su Meta Developers |
-| **WhatsApp Phone Number ID** | `1318817114639409` | ID univoco del numero per l'invio messaggi |
-| **WhatsApp Business Account ID** | `1397431142562576` | ID dell'account aziendale WABA |
-| **Numero di Prova (Sandbox)** | `+1 (555) 663-5565` | Numero mittente di test certificato Meta |
-| **Webhook Verify Token** | *(variabile `WA_VERIFY_TOKEN` su Railway)* | Lo si genera a caso e si incolla in due posti: la variabile d'ambiente del backend e la console Meta. Non si scrive qui. |
+| **Meta App ID** | `<APP_ID>` — colonna `wa_app_id` | L'app dello studio su Meta Developers |
+| **WhatsApp Phone Number ID** | `<PHONE_NUMBER_ID>` — colonna `wa_phone_id` | ID univoco del numero che spedisce |
+| **WhatsApp Business Account ID** | `<WABA_ID>` — solo console Meta | WABA dell'app. **Non c'è una colonna**: il backend non ne ha mai avuto bisogno, quindi non si inventa un posto dove metterla |
+| **Numero di Prova (Sandbox)** | `<NUMERO_DI_PROVA>` — console Meta | Il numero che Meta assegna alla app di prova per spedire senza un numero approvato. **Attenzione a non usarlo come recapito dello studio**: al 18/09/2026 la riga `tenant` di Bluecode ha in `telefono` un numero di prova Meta (`verified_name: "Test Number"`, `code_verification_status: NOT_VERIFIED`), e ogni documento che stampa il recapito dello studio stampa un numero che non squilla — vedi `PIANO_DI_MIGLIORAMENTO.md` voce 14 |
+| **App Secret** | *(colonna `wa_app_secret` sulla riga Tenant)* | Verifica `X-Hub-Signature-256` dei messaggi in ingresso. Non si scrive qui |
+| **Webhook Verify Token** | *(colonna `wa_verify_token` sulla riga Tenant)* | Lo si genera a caso e si incolla in due posti: il campo *Webhook Verify Token* in **Impostazioni Studio → Canali** e la console Meta. Non si scrive qui. |
 | **Access Token** | *(campo `waAccessToken` sulla riga Tenant)* | Token `SYSTEM_USER` permanente (`expires_at: 0`), per studio |
 | **Tipo di Token** | `SYSTEM_USER (Permanente)` | Token con validità illimitata (`expires_at: 0`) |
 | **Permessi Attivi (Scopes)** | `whatsapp_business_messaging`<br>`whatsapp_business_management`<br>`business_management` | Invio/ricezione chat, gestione risorse e webhook |
@@ -72,18 +84,26 @@ Tenant del database e si inseriscono da **Impostazioni Studio → Canali**.
 > cronologia di git non si dimentica, e chi legge il repository può superare l'handshake del
 > webhook al posto nostro.
 
-> **Attenzione, divergenza da sanare.** Il verify token è l'unica credenziale del canale che
-> **non** viene letta dalla riga Tenant: `src/routes/webhooks.ts:37` confronta ciò che Meta
-> manda con la variabile d'ambiente `WA_VERIFY_TOKEN`, perché l'handshake è una GET pubblica,
-> senza JWT e quindi senza contesto tenant, e risolvere lo studio richiederebbe una lettura
-> che scavalca RLS (vietata fuori da script e bootstrap, regola 1). Nel frattempo
-> **Impostazioni Studio → Canali** mostra un campo *Webhook Verify Token* che viene salvato ma
-> non usato da nessuno: chi lo compila crede di aver configurato l'handshake e non l'ha fatto.
-> Le due strade sono: togliere il campo dall'interfaccia, oppure dare a ogni studio il proprio
-> URL di callback così che il tenant sia deducibile dal path. Serve una decisione del titolare.
+> **La divergenza è sanata, il 16/09/2026 — e la strada scelta è la seconda.** Il verify token era
+> l'unica credenziale del canale che **non** veniva letta dalla riga Tenant: l'handshake confrontava
+> la variabile d'ambiente `WA_VERIFY_TOKEN`, perché è una GET pubblica — senza JWT, quindi senza
+> contesto tenant — e risolvere lo studio avrebbe richiesto una lettura che scavalca RLS. Il campo
+> *Webhook Verify Token* in Impostazioni veniva salvato e **non usato da nessuno**: chi lo compilava
+> credeva di aver configurato l'handshake e non l'aveva fatto. Le due strade erano togliere il campo
+> dall'interfaccia, oppure **dare a ogni studio il proprio URL di callback** così che il tenant fosse
+> deducibile dal path. È stata presa la seconda: la rotta è `…/whatsapp/<slug>` (dove `<slug>` è
+> `wa_webhook_slug`, `@unique` e generato con entropia dal database), lo studio si risolve dallo
+> slug **senza nessuna ricerca cross-tenant**, e l'handshake confronta con il token di **quello**
+> studio. Uno studio senza verify token non può essere sottoscritto da nessuno: risponde `503`.
+> La variabile d'ambiente è rimasta solo come **ingresso del seed** (`prisma/seed.ts` la usa per
+> popolare `wa_verify_token`), non come ciò che l'handshake legge.
 
-Un token nuovo si genera così, e il valore va incollato solo nei due punti (variabile su
-Railway e campo su Meta):
+> ⚠️ Lo slug si può **ruotare** (`POST /tenant/whatsapp-slug`, con `conferma: true` obbligatorio),
+> ma ruotarlo **smette di ricevere** i messaggi WhatsApp finché la Callback URL non viene aggiornata
+> su Meta: va fatto con la dashboard Meta aperta davanti.
+
+Un token nuovo si genera così, e il valore va incollato solo nei due punti (campo in
+Impostazioni Studio → Canali e console Meta):
 
 ```bash
 node -e "console.log(require('crypto').randomBytes(24).toString('base64url'))"
@@ -95,23 +115,29 @@ node -e "console.log(require('crypto').randomBytes(24).toString('base64url'))"
 
 Per ricevere i messaggi inviati dai clienti su WhatsApp direttamente dentro BluMan:
 
-1. Accedi al portale **[Meta for Developers](https://developers.facebook.com/apps/28073663662286834/whatsapp-business/wa-dev-console/)**.
+1. Accedi al portale **[Meta for Developers](https://developers.facebook.com/apps/)** e apri **l'app dello studio** — il link diretto è `https://developers.facebook.com/apps/<APP_ID>/whatsapp-business/wa-dev-console/`, con l'App ID che si legge da *Impostazioni Studio → Canali*.
 2. Nel menu laterale, seleziona **WhatsApp ➔ Configurazione** (*Configuration*).
 3. Nella sezione **Webhook**, clicca su **Modifica** (*Edit*):
-   - **URL di callback**:
+   - **URL di callback** — porta lo **slug dello studio**, e il valore esatto lo mostra
+     **Impostazioni Studio → Canali** già composto (non si inventa):
      ```text
-     https://bluman.vercel.app/webhooks/communications/whatsapp
+     https://bluman-api-production.up.railway.app/webhooks/communications/whatsapp/<slug>
      ```
-     *(oppure `https://bluman-api-production.up.railway.app/webhooks/communications/whatsapp`)*
-   - **Verifica il token**: lo stesso valore impostato in `WA_VERIFY_TOKEN` su Railway. Se la
-     variabile non c'è, l'handshake risponde `503 WA_VERIFY_TOKEN non configurato` — è voluto:
-     meglio un webhook da riconfigurare di uno che accetta chiunque conosca una stringa
-     pubblicata.
+     ⚠️ Il dominio è quello del **backend su Railway**, non quello di Vercel. Fino al 16/09/2026
+     questo passo indicava `https://bluman.vercel.app/webhooks/communications/whatsapp`, che oggi
+     non esiste più: il ponte su Vercel è stato rimosso, e la firma `x-hub-signature-256` si può
+     verificare solo sul backend.
+   - **Verifica il token**: lo stesso valore che hai messo nel campo *Webhook Verify Token* di
+     **Impostazioni Studio → Canali**. Se quello studio non ne ha uno, l'handshake risponde `503` —
+     è voluto: meglio un webhook da riconfigurare di uno che accetta chiunque.
 4. Clicca su **Verifica e salva** (*Verify and save*).
 5. Sotto **Campi Webhook** (*Webhook fields*), clicca su **Gestisci** (*Manage*) e attiva la spunta su **`messages`**.
 
-Presidio dell'handshake: `src/services/communications.test.ts` — token giusto → 200 con la
-challenge, token sbagliato → 403, variabile assente → 503.
+Presidio dell'handshake: `src/webhooksSicurezza.test.ts` — token dello studio giusto → 200 con la
+challenge, token inventato o di piattaforma → 403, studio **senza** verify token → 503. In
+`src/services/communications.test.ts` resta la parte che non dipende dal database: uno **slug che
+non risolve nessuno studio** risponde 404 a chiunque, e la vecchia variabile d'ambiente
+`WA_VERIFY_TOKEN` non apre l'handshake nemmeno quando è impostata.
 
 ---
 
@@ -125,12 +151,12 @@ che è autenticata e usa le credenziali dello studio che chiede.
 ### A. Invio Template Standard Ufficiale (`hello_world`)
 ```bash
 curl -i -X POST \
-     "https://graph.facebook.com/v21.0/1318817114639409/messages" \
+     "https://graph.facebook.com/v21.0/<PHONE_NUMBER_ID>/messages" \
      -H "Authorization: Bearer <TUO_TOKEN_PERMANENTE>" \
      -H "Content-Type: application/json" \
      -d '{
        "messaging_product": "whatsapp",
-       "to": "393335936278",
+       "to": "<NUMERO_DESTINATARIO>",
        "type": "template",
        "template": {
          "name": "hello_world",
@@ -144,13 +170,13 @@ curl -i -X POST \
 ### B. Invio Messaggio Testuale Diretto (Sessione 24h)
 ```bash
 curl -i -X POST \
-     "https://graph.facebook.com/v21.0/1318817114639409/messages" \
+     "https://graph.facebook.com/v21.0/<PHONE_NUMBER_ID>/messages" \
      -H "Authorization: Bearer <TUO_TOKEN_PERMANENTE>" \
      -H "Content-Type: application/json" \
      -d '{
        "messaging_product": "whatsapp",
        "recipient_type": "individual",
-       "to": "393335936278",
+       "to": "<NUMERO_DESTINATARIO>",
        "type": "text",
        "text": {
          "preview_url": false,
@@ -174,7 +200,7 @@ curl -i -X POST \
      -H "Authorization: Bearer <JWT_DELL_OPERATORE>" \
      -H "Content-Type: application/json" \
      -d '{
-       "numero": "+39 333 593 6278",
+       "numero": "+39 000 000 0000",
        "testo": "Gentile Cliente, la documentazione per l'\''incarico è pronta."
      }'
 ```
@@ -216,7 +242,7 @@ Nel file di configurazione globale `~/.gemini/config/mcp_config.json`:
 ## 🔄 6. Flusso di Binding Automatico all'Anagrafica ERP
 
 Quando un cliente risponde su WhatsApp:
-1. Meta invia una notifica `POST` all'endpoint Webhook con il campo `from` (es. `393335936278`).
+1. Meta invia una notifica `POST` all'endpoint Webhook con il campo `from` (es. `390000000000`).
 2. Il server Fastify normalizza il numero telefonico e cerca corrispondenze in **Supabase** nell'anagrafica `Cliente` (`telefono` o `referentiJson.cellulare` / `whatsapp`).
 3. Il messaggio viene automaticamente salvato nella tabella `ComunicazioneProgetto` del progetto aperto del cliente.
 4. L'Advisor visualizza la conversazione live nella scheda **💬 Comunicazioni & Ingestion** del progetto (`/projects/:id`).

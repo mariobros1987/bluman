@@ -5,6 +5,12 @@
 > voce 8 della scaletta in `PIANO_DI_MIGLIORAMENTO.md` §1bis, ed è la voce 7 vista dall'altro lato:
 > la 7 dice cosa manca nel codice, questa dice cosa manca nella decisione.
 >
+> **Ultimo aggiornamento: 17/09/2026.** Il §3 ha ora un pezzo che codice lo è davvero — il
+> collegamento chat → pratica, in produzione dal 16/09 — ed è l'unica parte di questo documento che
+> descrive qualcosa di già costruito. Serve a una cosa sola: è la prima tabella nata **dopo** che
+> questo piano ha scritto la regola «ogni tabella porta la sua policy nella sua migrazione», quindi
+> vale come prova che la regola si possa seguire.
+>
 > **Nessuna credenziale in questo file**, nemmeno come esempio. I punti non ancora verificati sono
 > marcati **«da verificare»** invece di essere affermati.
 >
@@ -141,9 +147,23 @@ non per scelta.
   `signal-cli-rest-api`, uno per studio, dietro un reverse proxy che impone il token (`signal-cli`
   non ha autenticazione propria). *(Da verificare: chi avvia e ospita il demone dei nuovi studi —
   oggi è documentato come «dello studio», quindi presuppone che lo studio lo abbia.)*
-- **Il collegamento chat → pratica** (`CollegamentoChatProgetto`) nasce già `tenant_id`-scoped, con
-  la chiave unica su `(tenantId, canale, chatId)`: la stessa chat fisica può essere collegata a due
-  studi diversi senza che i due si vedano.
+- **Il collegamento chat → pratica** (`CollegamentoChatProgetto`) è `tenant_id`-scoped, con la chiave
+  unica su `(tenantId, canale, chatId)`: la stessa chat fisica può essere collegata a due studi
+  diversi senza che i due si vedano. **Non è più un progetto: è in produzione dal 16/09/2026**
+  (`prisma/migrations/20260916210000_collegamento_chat_progetto`, applicata dal `migrate deploy` del
+  `Dockerfile` — vedi `PIANO_DI_MIGLIORAMENTO.md` §1bis voce 3). La policy `isolamento_tenant` sta
+  **dentro la migrazione**, come per ogni tabella nuova, perché `migrate deploy` gira senza nessuno
+  davanti a ogni deploy: una tabella che si affidasse a una policy aggiunta a mano dopo resterebbe
+  senza isolamento esattamente nel momento in cui nasce. È anche la prima tabella nata **dopo** che
+  questo documento ha scritto la regola, quindi vale come verifica che la regola si possa seguire.
+
+  Un dettaglio che riguarda la separazione: la chat si aggancia a una **pratica**, e il payload
+  firmato che il cliente tocca copre `tenantId` **e** `progettoId`
+  (`creaPayloadCollegamento`, `src/util/webhookSecurity.ts`). Il link di uno studio non è quindi
+  spendibile su un altro nemmeno se i due condividono il master secret — che è l'unica cosa che
+  `TELEGRAM_WEBHOOK_SECRET` è, essendo una variabile d'ambiente della piattaforma e non una riga
+  `Tenant`. Per un secondo studio questo va rivisto: o un master secret per studio, o lo si accetta
+  consapevolmente come segreto di piattaforma, visto che il MAC copre il tenant.
 
 **Cosa NON vuol dire «chat separate».** Non vuol dire una chat interna fra studi: non esiste e non
 serve. Vuol dire che un operatore dello studio A non vede **mai** una conversazione dello studio B —
@@ -220,7 +240,13 @@ verifica per la strada A: sono i punti in cui un secondo studio si rompe.
    approvato, e la registrazione del webhook su Meta.
 5. **Telegram**: token del bot, poi `setWebhook` **con il segreto derivato** — il pulsante «Registra
    webhook» della scheda; è anche il momento in cui `tg_bot_username` viene letto da `getMe` e
-   salvato, senza cui il link per progetto non si compone.
+   salvato, senza cui il link per progetto non si compone. **Non compilare `tg_bot_username` a mano:
+   lascia che lo scriva la registrazione.** Il 17/09/2026 è successo l'opposto su questo studio —
+   nel campo c'era l'**id numerico** del bot (che è anche la prima metà del token), `t.me/<numero>`
+   apriva «questo utente non esiste» sul telefono del cliente, e la registrazione del webhook non
+   correggeva niente perché scriveva **solo se il campo era vuoto**. Ora rilegge `getMe`, confronta e
+   corregge, quindi il guasto si sana da solo; ma la lezione per l'onboarding di un secondo studio è
+   che il campo non va compilato a mano, e che `getMe` è la fonte mentre la colonna è la sua copia.
 6. **Signal**: demone dello studio, endpoint e token. *(Da verificare: chi lo ospita.)*
 7. **Libreria di articoli e moduli** — ✅ **già per studio**: `Articolo` e `ModuloTemplate` hanno
    `tenant_id` e la chiave unica `(tenantId, nome, versione)`. Uno studio nuovo parte **vuoto**, non

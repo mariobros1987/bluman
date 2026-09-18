@@ -567,7 +567,7 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
               <div style={{ display: 'flex', gap: 12 }}>
                 <div style={{ flex: 1 }}>
                   <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>🔒 Numero Signal (col prefisso)</label>
-                  <input value={signal} onChange={e => setSignal(e.target.value)} placeholder="+393335936278" />
+                  <input value={signal} onChange={e => setSignal(e.target.value)} placeholder="+39 000 0000000" />
                   <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 3 }}>
                     Deve essere un numero registrato su Signal e va scritto in forma internazionale:
                     un cellulare che non ha Signal non riceve niente, e senza <code>+39</code> il
