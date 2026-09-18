@@ -39,31 +39,49 @@ export interface SmoothSignatureOptions {
 }
 
 export function getCanvasCoordinates(
-  e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement> | MouseEvent | TouchEvent,
+  e:
+    | React.MouseEvent<HTMLCanvasElement>
+    | React.TouchEvent<HTMLCanvasElement>
+    | React.PointerEvent<HTMLCanvasElement>
+    | MouseEvent
+    | TouchEvent
+    | PointerEvent,
   canvas: HTMLCanvasElement
-): { x: number; y: number } {
+): { x: number; y: number; pressure?: number } {
   const rect = canvas.getBoundingClientRect();
   const scaleX = rect.width > 0 ? canvas.width / rect.width : 1;
   const scaleY = rect.height > 0 ? canvas.height / rect.height : 1;
 
   let clientX = 0;
   let clientY = 0;
+  let pressure: number | undefined = undefined;
 
   if ('touches' in e && e.touches && e.touches.length > 0) {
     clientX = e.touches[0].clientX;
     clientY = e.touches[0].clientY;
+    const touch = e.touches[0] as unknown as { force?: number };
+    if (typeof touch.force === 'number' && touch.force > 0) {
+      pressure = touch.force;
+    }
   } else if ('changedTouches' in e && e.changedTouches && e.changedTouches.length > 0) {
     clientX = e.changedTouches[0].clientX;
     clientY = e.changedTouches[0].clientY;
+    const touch = e.changedTouches[0] as unknown as { force?: number };
+    if (typeof touch.force === 'number' && touch.force > 0) {
+      pressure = touch.force;
+    }
   } else if ('clientX' in e) {
     clientX = (e as MouseEvent | React.MouseEvent<HTMLCanvasElement>).clientX;
     clientY = (e as MouseEvent | React.MouseEvent<HTMLCanvasElement>).clientY;
+    if ('pressure' in e && typeof (e as PointerEvent).pressure === 'number' && (e as PointerEvent).pressure > 0) {
+      pressure = (e as PointerEvent).pressure;
+    }
   }
 
   const x = (clientX - rect.left) * scaleX;
   const y = (clientY - rect.top) * scaleY;
 
-  return { x, y };
+  return { x, y, pressure };
 }
 
 export class SmoothStrokeTracker {
@@ -95,7 +113,8 @@ export class SmoothStrokeTracker {
     x: number,
     y: number,
     ctx: CanvasRenderingContext2D,
-    time: number = Date.now()
+    time: number = Date.now(),
+    pressure?: number
   ): boolean {
     if (this.points.length === 0) {
       this.start(x, y, time);
@@ -112,11 +131,16 @@ export class SmoothStrokeTracker {
     const dt = Math.max(1, curr.time - last.time);
     const velocity = dist / dt;
 
-    // Modula dolcemente lo spessore del tratto in base alla velocità (stile inchiostro naturale)
-    const targetWidth = Math.max(
-      this.minLineWidth,
-      Math.min(this.maxLineWidth, this.baseLineWidth + (1.0 - Math.min(2.5, velocity)) * 0.4)
-    );
+    // Modula dolcemente lo spessore del tratto in base alla pressione (Apple Pencil / stilo) o alla velocità
+    let targetWidth: number;
+    if (typeof pressure === 'number' && pressure > 0 && pressure <= 1) {
+      targetWidth = this.minLineWidth + (this.maxLineWidth - this.minLineWidth) * pressure;
+    } else {
+      targetWidth = Math.max(
+        this.minLineWidth,
+        Math.min(this.maxLineWidth, this.baseLineWidth + (1.0 - Math.min(2.5, velocity)) * 0.4)
+      );
+    }
     this.currentWidth = this.currentWidth * 0.65 + targetWidth * 0.35;
 
     ctx.save();

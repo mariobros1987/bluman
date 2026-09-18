@@ -98,4 +98,30 @@ describe('SmoothStrokeTracker — Tratto fluido naturale per firme', () => {
     expect(coords.x).toBe(200);
     expect(coords.y).toBe(100);
   });
+
+  it('getCanvasCoordinates estrae la pressione da touch.force o pointer.pressure', () => {
+    const canvas = {
+      width: 400,
+      height: 100,
+      getBoundingClientRect: () => ({ left: 0, top: 0, width: 400, height: 100 }),
+    } as unknown as HTMLCanvasElement;
+
+    const touchEvent = {
+      touches: [{ clientX: 10, clientY: 20, force: 0.85 }],
+    } as any;
+
+    const coords = getCanvasCoordinates(touchEvent, canvas);
+    expect(coords.x).toBe(10);
+    expect(coords.y).toBe(20);
+    expect(coords.pressure).toBe(0.85);
+  });
+
+  it('supporta variazione di tratto con pressione dello stilo', () => {
+    const tracker = new SmoothStrokeTracker({ minLineWidth: 1.5, maxLineWidth: 4.0 });
+    const ctx = createMockCtx();
+
+    tracker.start(0, 0, 1000);
+    tracker.move(20, 20, ctx, 1050, 0.9); // Forte pressione stilo
+    expect(ctx.lineWidth).toBeGreaterThan(2.5);
+  });
 });

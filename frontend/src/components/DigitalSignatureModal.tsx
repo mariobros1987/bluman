@@ -63,8 +63,8 @@ export function DigitalSignatureModal({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const { x, y } = getCanvasCoordinates(e, canvas);
-    trackerRef.current.move(x, y, ctx);
+    const { x, y, pressure } = getCanvasCoordinates(e, canvas);
+    trackerRef.current.move(x, y, ctx, Date.now(), pressure);
   };
 
   const clearCanvas = () => {
