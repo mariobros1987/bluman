@@ -133,6 +133,34 @@ describe('l\'aliquota viene dal regime del cliente, non da un 22 fisso', () => {
   });
 });
 
+describe('le guardie di emissione: niente fattura sbagliata o vuota', () => {
+  it('rifiuta un elenco di righe vuoto invece di bruciare un progressivo FT', async () => {
+    const { prisma } = fintoPrisma(CLIENTE_STANDARD);
+    const app = new PrismaApp(prisma, TENANT);
+    await expect(app.emettiFattura(corpo([]))).rejects.toThrow(/nessuna riga/i);
+  });
+
+  it('se il progetto non ha un cliente collegato, si ferma invece di intestare a un cliente a caso', async () => {
+    // Prima ripiegava sul «primo cliente dello studio»: una fattura intestata alla persona
+    // sbagliata. Ora deve fallire con un errore chiaro, senza toccare `cliente.findFirst`.
+    let findFirstChiamato = false;
+    const prisma: any = {
+      progetto: {
+        findUnique: async () => ({ id: 'prg-x', clienteId: null, cliente: null, moduli: [{ id: 'mod-1' }] }),
+        findFirst: async () => null,
+      },
+      cliente: {
+        findFirst: async () => { findFirstChiamato = true; return { id: 'cli-a-caso' }; },
+        findUnique: async () => null,
+      },
+      fattura: { findFirst: async () => null, create: async () => ({ id: 'x' }) },
+    };
+    const app = new PrismaApp(prisma, TENANT);
+    await expect(app.emettiFattura(corpo([{ importo: 10000 }]))).rejects.toThrow(/cliente/i);
+    expect(findFirstChiamato).toBe(false); // niente ripiego sul primo cliente
+  });
+});
+
 describe('senza regime registrato, il ripiego dipende dal tipo di documento', () => {
   it('cliente senza aliquota + tipo estero → 0%', async () => {
     const { prisma, catturato } = fintoPrisma(CLIENTE_SENZA_REGIME);

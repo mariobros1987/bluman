@@ -40,8 +40,26 @@ export interface TotaliFattura {
 /**
  * Da imponibile e aliquota ai tre numeri della fattura. L'IVA si **somma sopra** l'imponibile: è
  * l'imponibile che l'utente ha scelto, non un lordo da scorporare.
+ *
+ * Valida per una **riga sola**. Per una fattura di più righe usa `calcolaTotaliFatturaRighe`: il
+ * backend arrotonda l'IVA per riga, quindi sommare gli imponibili e arrotondare una volta sola qui
+ * produrrebbe un totale che diverge dal documento salvato di un centesimo (era proprio il difetto).
  */
 export function calcolaTotaliFattura(imponibile: number, aliquotaPct: number): TotaliFattura {
-  const iva = Math.round(imponibile * (aliquotaPct / 100) * 100) / 100;
-  return { imponibile, iva, totale: imponibile + iva };
+  return calcolaTotaliFatturaRighe([imponibile], aliquotaPct);
+}
+
+/**
+ * I totali di una fattura a più righe, **con lo stesso arrotondamento del backend**
+ * (`emettiFattura`): ogni riga in centesimi interi, IVA arrotondata **per riga**, poi somma. È
+ * l'unico modo perché l'anteprima e il documento salvato mostrino lo stesso totale al centesimo.
+ */
+export function calcolaTotaliFatturaRighe(imponibiliEuro: number[], aliquotaPct: number): TotaliFattura {
+  const imponibileCent = imponibiliEuro.reduce((acc, e) => acc + Math.round(e * 100), 0);
+  const ivaCent = imponibiliEuro.reduce((acc, e) => acc + Math.round((Math.round(e * 100) * aliquotaPct) / 100), 0);
+  return {
+    imponibile: imponibileCent / 100,
+    iva: ivaCent / 100,
+    totale: (imponibileCent + ivaCent) / 100,
+  };
 }

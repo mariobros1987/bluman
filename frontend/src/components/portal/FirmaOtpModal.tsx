@@ -20,6 +20,9 @@ export interface FirmaOtpModalProps {
    * spedisce solo dopo averlo scelto — che era il difetto segnalato.
    */
   canaliFirma: CanaleFirma[];
+  /** Falso durante il caricamento dell'elenco: in quel momento i pulsanti restano attivi. Una volta
+   * `true`, un elenco vuoto significa fetch fallita → i canali si disabilitano invece di offrirli. */
+  canaliCaricati: boolean;
   nomeCanale: Record<CanaleOtp, string>;
   otpLoading: boolean;
   otpTarget: string;
@@ -51,6 +54,7 @@ export function FirmaOtpModal({
   otpCanale,
   setOtpCanale,
   canaliFirma,
+  canaliCaricati,
   nomeCanale,
   otpLoading,
   otpTarget,
@@ -228,10 +232,13 @@ export function FirmaOtpModal({
             ].map((c) => {
               const isSelected = otpCanale === c.id;
               const info = canaliFirma.find((x) => x.canale === c.id);
-              // Finché l'elenco non è arrivato non si blocca nulla; una volta arrivato, un canale che
-              // non c'è o che il backend marca `disponibile: false` non è cliccabile — e il perché si
-              // legge, invece di far scegliere un canale che poi non spedisce.
-              const disponibile = canaliFirma.length === 0 ? true : info?.disponibile === true;
+              // Finché l'elenco non è **arrivato** (`!canaliCaricati`) non si blocca nulla; una volta
+              // arrivato, un canale che non c'è o che il backend marca `disponibile: false` non è
+              // cliccabile — e il perché si legge. Se la fetch è fallita l'elenco è vuoto ma
+              // `canaliCaricati` è `true`, quindi qui i pulsanti si disabilitano invece di offrire
+              // canali di cui non sappiamo nulla (era la lacuna: `length === 0` trattava «errore»
+              // come «in caricamento» e li lasciava tutti attivi).
+              const disponibile = !canaliCaricati ? true : info?.disponibile === true;
               const bloccato = otpLoading || !disponibile;
               return (
                 <button

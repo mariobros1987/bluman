@@ -459,6 +459,11 @@ export async function registraRotteClienti(server: FastifyInstance, app: AppPort
   });
 
   server.delete<{ Params: { id: string } }>('/clienti/:id', async (req, reply) => {
+    // Eliminare un cliente è distruttivo: lo possono fare solo advisor e super_admin, come per
+    // magic-link e reset-password. Senza questo guard, con la matrice `clients` a default permissivo,
+    // un collaboratore poteva cancellare qualunque cliente dello studio (la RLS ferma solo il
+    // cross-tenant, non l'autorizzazione dentro lo studio).
+    if (!richiediRuolo(req, reply, ['advisor', 'super_admin'])) return reply;
     const { id } = req.params;
     try {
       await prisma.cliente.delete({ where: { id } });

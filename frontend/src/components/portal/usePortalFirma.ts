@@ -66,6 +66,8 @@ export function usePortalFirma({
   otpCanale: CanaleOtp;
   setOtpCanale: React.Dispatch<React.SetStateAction<CanaleOtp>>;
   canaliFirma: CanaleFirma[];
+  /** Falso finché l'elenco canali non è arrivato (o fallito): il selettore lo usa per non disabilitare durante il caricamento. */
+  canaliCaricati: boolean;
   botTelegram: string | null;
   usaRecapitoDiverso: boolean;
   setUsaRecapitoDiverso: React.Dispatch<React.SetStateAction<boolean>>;
@@ -122,6 +124,10 @@ export function usePortalFirma({
   const [otpCode, setOtpCode] = useState('');
   const [otpCanale, setOtpCanale] = useState<CanaleOtp>('whatsapp');
   const [canaliFirma, setCanaliFirma] = useState<CanaleFirma[]>([]);
+  // Distingue «elenco non ancora arrivato» da «arrivato (o fallito) ed è vuoto». Serve al selettore
+  // della modale: durante il caricamento i pulsanti restano attivi, ma se la fetch fallisce e
+  // l'elenco resta vuoto vanno **disabilitati** — non si offrono canali di cui non si sa nulla.
+  const [canaliCaricati, setCanaliCaricati] = useState(false);
   const [botTelegram, setBotTelegram] = useState<string | null>(null);
   const [usaRecapitoDiverso, setUsaRecapitoDiverso] = useState(false);
   const [recapitoDichiarato, setRecapitoDichiarato] = useState('');
@@ -209,6 +215,10 @@ export function usePortalFirma({
         // Nessun ripiego inventato: senza elenco i pulsanti restano disabilitati e il
         // messaggio lo dice, invece di offrire canali di cui non sappiamo nulla.
         if (!annullato) setCanaliFirma([]);
+      } finally {
+        // Da qui in poi l'elenco è «arrivato»: se è vuoto, è vuoto per davvero (errore), non
+        // perché stiamo ancora caricando. Il selettore disabilita in questo caso.
+        if (!annullato) setCanaliCaricati(true);
       }
     })();
 
@@ -582,6 +592,7 @@ export function usePortalFirma({
     otpCanale,
     setOtpCanale,
     canaliFirma,
+    canaliCaricati,
     botTelegram,
     usaRecapitoDiverso,
     setUsaRecapitoDiverso,

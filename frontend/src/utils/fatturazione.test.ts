@@ -7,7 +7,7 @@
  * qualcuno cambia la regola di qui e non quella del backend, o viceversa, il test lo veda.
  */
 import { describe, it, expect } from 'vitest';
-import { risolviAliquotaIva, calcolaTotaliFattura } from './fatturazione';
+import { risolviAliquotaIva, calcolaTotaliFattura, calcolaTotaliFatturaRighe } from './fatturazione';
 
 describe('risolviAliquotaIva — il regime del cliente vince, con ripiego per tipo documento', () => {
   it('usa l\'aliquota registrata sul cliente quando c\'è', () => {
@@ -48,5 +48,34 @@ describe('calcolaTotaliFattura — l\'IVA si somma sopra l\'imponibile', () => {
     const t = calcolaTotaliFattura(1000, 22);
     expect(t.totale).toBeGreaterThan(t.imponibile);
     expect(t.totale).toBeCloseTo(1220, 2);
+  });
+});
+
+describe('calcolaTotaliFatturaRighe — arrotonda l\'IVA per riga come il backend', () => {
+  it('due righe da 3,33 € al 22%: 73c per riga = 1,46 €, NON 1,47 € dell\'aggregato', () => {
+    // È il caso che la revisione ha usato: arrotondare una volta sola sull'imponibile aggregato
+    // (round(6,66·0,22)=1,47) diverge dal backend, che arrotonda per riga (2×round(3,33·0,22)=2×0,73
+    // =1,46). L'anteprima deve dire 1,46, come il documento salvato.
+    const t = calcolaTotaliFatturaRighe([3.33, 3.33], 22);
+    expect(t.iva).toBeCloseTo(1.46, 2);
+    expect(t.imponibile).toBeCloseTo(6.66, 2);
+    expect(t.totale).toBeCloseTo(8.12, 2);
+  });
+
+  it('riga singola: coincide con calcolaTotaliFattura', () => {
+    const a = calcolaTotaliFatturaRighe([120], 22);
+    const b = calcolaTotaliFattura(120, 22);
+    expect(a).toEqual(b);
+  });
+
+  it('al 0% l\'IVA è zero su qualunque numero di righe', () => {
+    const t = calcolaTotaliFatturaRighe([100, 250, 33.33], 0);
+    expect(t.iva).toBe(0);
+    expect(t.totale).toBeCloseTo(383.33, 2);
+  });
+
+  it('elenco vuoto → tutti zero, senza NaN', () => {
+    const t = calcolaTotaliFatturaRighe([], 22);
+    expect(t).toEqual({ imponibile: 0, iva: 0, totale: 0 });
   });
 });

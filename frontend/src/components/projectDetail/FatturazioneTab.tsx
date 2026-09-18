@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { fmt, getFormattedLogoUrl } from '../../utils';
 import { emettiFatturaApi } from '../../api/client';
 import { downloadFatturaPdfServerApi } from '../../api/fatturazione';
-import { risolviAliquotaIva, calcolaTotaliFattura } from '../../utils/fatturazione';
+import { risolviAliquotaIva, calcolaTotaliFatturaRighe } from '../../utils/fatturazione';
 import { getTenantStorageKey, getStudioInfoForTenant, getCurrentTenantId, BLUECODE_TENANT_ID } from '../../utils/tenant';
 import type { Progetto } from '../../types';
 import styles from '../../pages/ProjectDetail.module.css';
@@ -37,9 +37,6 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
   const [submitting, setSubmitting] = useState(false);
 
   const [previewFattura, setPreviewFattura] = useState<any | null>(null);
-
-  const [tipoDocFiscale, setTipoDocFiscale] = useState<'fattura' | 'nota_credito'>('fattura');
-  const [causaNc, setCausaNc] = useState('Storno parziale per rettifica importi concordati');
 
   const [vociFatturabili, setVociFatturabili] = useState<VoceFatturabile[]>([]);
 
@@ -129,13 +126,15 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
   };
 
   const vociSelezionate = vociFatturabili.filter(v => v.selezionato);
-  const totaleImponibile = vociSelezionate.reduce((acc, v) => acc + (Number(v.importo) || 0), 0);
+  // Gli imponibili riga per riga: servono al calcolo dell'IVA **per riga**, come fa il backend.
+  const imponibiliVoci = vociSelezionate.map(v => Number(v.importo) || 0);
+  const totaleImponibile = imponibiliVoci.reduce((acc, e) => acc + e, 0);
   // L'aliquota e i totali dell'anteprima vengono dalla regola pura in `utils/fatturazione`, la
   // **stessa** che rispecchia il backend (`emettiFattura`): estratta lì per poterla collaudare
-  // senza montare questo componente, e per tenerla in un posto solo. Se anteprima e backend si
-  // allontanano, il totale mostrato non è quello salvato — il difetto appena corretto.
+  // senza montare questo componente. `calcolaTotaliFatturaRighe` arrotonda l'IVA per riga come il
+  // backend, così su fatture multi-riga il totale mostrato coincide con quello salvato al centesimo.
   const aliquotaPct = risolviAliquotaIva(rawDbProject?.cliente?.aliquotaIvaDefault, tipoFiscale);
-  const { iva: totaleIva, totale: totaleDocumento } = calcolaTotaliFattura(totaleImponibile, aliquotaPct);
+  const { iva: totaleIva, totale: totaleDocumento } = calcolaTotaliFatturaRighe(imponibiliVoci, aliquotaPct);
 
   const selezionaSoloCompletate = () => {
     setVociFatturabili(prev => prev.map(v => ({ ...v, selezionato: !v.giaFatturata && v.stato === 'done' })));
@@ -182,10 +181,8 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
       const righe = vociSelezionate.map(v => ({
         tipo: 'modulo_completo' as const,
         moduloProgettoId: v.moduloId.startsWith('mod-') ? v.moduloId.replace('mod-', '') : v.moduloId,
-        importo: (tipoDocFiscale === 'nota_credito' ? -1 : 1) * Math.abs(Number(v.importo)) * 100, // centesimi
-        descrizione: tipoDocFiscale === 'nota_credito'
-          ? `[NOTA DI CREDITO] [${v.moduloNome}] ${v.titolo} — ${causaNc}`
-          : `[${v.moduloNome}] ${v.titolo}`,
+        importo: Math.abs(Number(v.importo)) * 100, // centesimi, imponibile di riga
+        descrizione: `[${v.moduloNome}] ${v.titolo}`,
       }));
 
       const resFattura: any = await emettiFatturaApi({
@@ -552,48 +549,15 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
               </button>
             </div>
 
-            {/* Tipologia Documento: Fattura vs Nota di Credito */}
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button
-                type="button"
-                onClick={() => setTipoDocFiscale('fattura')}
-                style={{
-                  flex: 1, padding: '8px', borderRadius: 8,
-                  border: `1px solid ${tipoDocFiscale === 'fattura' ? 'var(--indigo-l)' : 'var(--border)'}`,
-                  background: tipoDocFiscale === 'fattura' ? '#1a1f3d' : 'var(--card2)',
-                  color: tipoDocFiscale === 'fattura' ? 'var(--indigo-l)' : 'var(--muted)',
-                  fontSize: 12, fontWeight: 700, cursor: 'pointer',
-                }}
-              >
-                📄 Fattura Fiscale (Serie FT)
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setTipoDocFiscale('nota_credito')}
-                style={{
-                  flex: 1, padding: '8px', borderRadius: 8,
-                  border: `1px solid ${tipoDocFiscale === 'nota_credito' ? '#a78bfa' : 'var(--border)'}`,
-                  background: tipoDocFiscale === 'nota_credito' ? '#200f40' : 'var(--card2)',
-                  color: tipoDocFiscale === 'nota_credito' ? '#a78bfa' : 'var(--muted)',
-                  fontSize: 12, fontWeight: 700, cursor: 'pointer',
-                }}
-              >
-                📑 Nota di Credito (Serie NC)
-              </button>
+            {/* Da qui si emette solo la Fattura (Serie FT). La Nota di Credito NON sta qui: una NC
+                deve riferirsi a una fattura già emessa (TD04, art. 26 DPR 633/72), e si emette dal
+                Registro Fatture con il pulsante «Nota di Credito» sulla fattura da stornare. Prima
+                questo compositore emetteva una finta NC che finiva a database come **fattura FT
+                positiva**, aumentando il fatturato invece di stornarlo. */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#1a1f3d', border: '1px solid var(--indigo-l)', borderRadius: 8, padding: '8px 12px' }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--indigo-l)' }}>📄 Fattura Fiscale (Serie FT)</span>
+              <span style={{ fontSize: 10.5, color: 'var(--muted)' }}>— per una Nota di Credito usa il Registro Fatture sulla fattura da stornare</span>
             </div>
-
-            {tipoDocFiscale === 'nota_credito' && (
-              <div style={{ background: '#200f40', border: '1px solid #3c1e70', borderRadius: 10, padding: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <div style={{ fontSize: 11, color: '#a78bfa', fontWeight: 700 }}>
-                  ℹ️ Verrà generata una Nota di Credito stornando le voci selezionate.
-                </div>
-                <div>
-                  <label style={{ fontSize: 10, color: 'var(--muted)', display: 'block', marginBottom: 2 }}>Causale Nota di Credito *</label>
-                  <input value={causaNc} onChange={e => setCausaNc(e.target.value)} style={{ fontSize: 11, width: '100%', padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)' }} required />
-                </div>
-              </div>
-            )}
 
             {/* Toolbar di Selezione Rapida */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--card2)', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)' }}>
@@ -834,7 +798,7 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
                   type="submit"
                   disabled={submitting || vociSelezionate.length === 0}
                   style={{
-                    background: tipoDocFiscale === 'nota_credito' ? '#7c3aed' : 'var(--indigo)',
+                    background: 'var(--indigo)',
                     color: '#fff',
                     border: 'none',
                     padding: '8px 20px',
@@ -845,7 +809,7 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
                     opacity: vociSelezionate.length === 0 ? 0.5 : 1,
                   }}
                 >
-                  {submitting ? 'Emissione...' : tipoDocFiscale === 'nota_credito' ? '✓ Emetti Nota di Credito (Serie NC)' : '🚀 Emetti Fattura Fiscale (Serie FT)'}
+                  {submitting ? 'Emissione...' : '🚀 Emetti Fattura Fiscale (Serie FT)'}
                 </button>
               </div>
             </div>

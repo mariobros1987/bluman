@@ -655,6 +655,14 @@ export class PrismaApp implements AppPort {
       descrizione: string;
     }>;
   }) {
+    // Nessuna riga = niente da fatturare. Senza questa guardia si creava comunque una fattura
+    // con totali 0 che **consumava un progressivo fiscale** (come faceva notare la revisione): il
+    // numero FT è una risorsa che non si recupera. Il frontend già lo blocca; l'API deve farlo
+    // anche da sola, come `creaPreventivo`.
+    if (!input.righe || input.righe.length === 0) {
+      throw new Error('Nessuna riga da fatturare: seleziona almeno una voce.');
+    }
+
     let prog = await this.prisma.progetto.findUnique({ where: { id: input.progettoId }, include: { cliente: true, moduli: true } });
     if (!prog) {
       prog = await this.prisma.progetto.findFirst({
@@ -662,12 +670,11 @@ export class PrismaApp implements AppPort {
         include: { cliente: true, moduli: true },
       });
     }
-    let clienteId = prog?.clienteId || '';
-    if (!clienteId) {
-      const primoCliente = await this.prisma.cliente.findFirst({ where: { tenantId: this.tenantId } });
-      clienteId = primoCliente?.id || '';
-    }
-    if (!clienteId) throw new Error('Cliente del progetto non trovato');
+    // Niente ripiego sul «primo cliente dello studio»: intestava la fattura a una persona a caso
+    // quando il progetto non aveva un cliente collegato. Meglio fermarsi con un errore chiaro che
+    // emettere un documento fiscale intestato al cliente sbagliato.
+    const clienteId = prog?.clienteId || '';
+    if (!clienteId) throw new Error('Il progetto non ha un cliente collegato: impossibile emettere la fattura.');
 
     // Il cliente decide l'aliquota, non una costante. `prog.cliente` c'è quasi sempre (è incluso
     // nella query), ma quando l'id è arrivato dal ripiego «primo cliente dello studio» va riletto.

@@ -410,6 +410,7 @@ export function ClientPortal() {
     otpCanale,
     setOtpCanale,
     canaliFirma,
+    canaliCaricati,
     botTelegram,
     usaRecapitoDiverso,
     setUsaRecapitoDiverso,
@@ -717,6 +718,7 @@ export function ClientPortal() {
           otpCanale={otpCanale}
           setOtpCanale={setOtpCanale}
           canaliFirma={canaliFirma}
+          canaliCaricati={canaliCaricati}
           nomeCanale={nomeCanale}
           otpLoading={otpLoading}
           otpTarget={otpTarget}
