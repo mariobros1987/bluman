@@ -34,16 +34,20 @@ describe('TabSicurezza — accesso per ruolo', () => {
     vi.clearAllMocks();
   });
 
-  it('il super_admin vede il pannello', () => {
+  it('il super_admin vede il pannello', async () => {
     mockStato.mockResolvedValue({ totpAbilitato: false, ipFidatiCount: 0 });
     render(<TabSicurezza ruolo="super_admin" />);
+    // Il pannello lo si vede subito, ma il componente lancia `statoTotpApi()` in un effetto:
+    // va atteso, se no la risoluzione della promessa aggiorna lo stato **dopo** la fine del test,
+    // fuori da `act()`, e quell'aggiornamento tardivo cade dentro un altro test rendendolo instabile.
     expect(screen.queryByText(/riservate a Super Admin e Advisor/i)).toBeNull();
+    await waitFor(() => expect(mockStato).toHaveBeenCalled());
   });
 
-  it("l'advisor vede il pannello (estensione settembre 2026)", () => {
+  it("l'advisor vede il pannello (estensione settembre 2026)", async () => {
     mockStato.mockResolvedValue({ totpAbilitato: false, ipFidatiCount: 0 });
     render(<TabSicurezza ruolo="advisor" />);
-    expect(mockStato).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(mockStato).toHaveBeenCalledTimes(1));
     expect(screen.queryByText(/riservate a Super Admin e Advisor/i)).toBeNull();
   });
 

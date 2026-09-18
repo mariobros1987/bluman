@@ -413,12 +413,18 @@ export function usePortalFirma({
         docRiconoscimentoTipo: docRiconoscimentoTipo ?? undefined,
       });
 
-      await registraEsitoFirma(res.seal);
+      // Il codice è stato accettato e la firma è già a database: il modale del codice ha finito il
+      // suo lavoro e si chiude subito. Prima la chiusura stava **dopo** `registraEsitoFirma`, e se
+      // uno dei refresh di vista lì dentro falliva (una rilettura di rete che va giù) l'eccezione
+      // finiva nel catch e il modale del codice restava aperto con un errore — su una firma andata
+      // a buon fine. Chiudere prima rende gli aggiornamenti quello che sono: un rinfresco, non un
+      // passaggio che può annullare visivamente una firma già apposta.
       setOtpModalOpen(false);
       setOtpCode('');
       // Il documento di riconoscimento è una tantum: consumato dalla firma, non
       // resta in memoria per quella successiva.
       onRimuoviDocRiconoscimento();
+      await registraEsitoFirma(res.seal);
       return true;
     } catch (err: any) {
       setOtpError(err?.message || 'Convalida del codice non riuscita.');
@@ -476,25 +482,32 @@ export function usePortalFirma({
    */
   const registraEsitoFirma = async (seal: any) => {
     setSuccessSealModal(seal);
-    if (bersaglioFirma.ambito === 'documento_vault') {
-      await caricaDocumenti(clientObj?.id);
-      setSelectedViewerDoc(null);
-      return;
-    }
-    if (bersaglioFirma.ambito === 'modulo_completato') {
-      // La firma sta a database: si rilegge l'elenco delle conclusioni per mostrarla, senza
-      // scrivere in localStorage — non arriverebbe allo studio né agli altri dispositivi.
-      await caricaFirmeModuli(clientObj?.id);
-      return;
-    }
+    // Gli aggiornamenti qui sotto sono **riletture di sola vista**: la firma è già a database. Un
+    // loro fallimento (rete) non deve propagarsi, se no chi chiama lo scambia per una firma fallita
+    // e — prima della correzione — teneva aperto il modale del codice. Lo stato si riconcilia
+    // comunque al prossimo accesso (`loadPortalData`); qui, al più, si logga.
+    try {
+      if (bersaglioFirma.ambito === 'documento_vault') {
+        await caricaDocumenti(clientObj?.id);
+        setSelectedViewerDoc(null);
+        return;
+      }
+      if (bersaglioFirma.ambito === 'modulo_completato') {
+        // La firma sta a database: si rilegge l'elenco delle conclusioni per mostrarla, senza
+        // scrivere in localStorage — non arriverebbe allo studio né agli altri dispositivi.
+        await caricaFirmeModuli(clientObj?.id);
+        return;
+      }
 
-    // La riga `FirmaElettronica` con sigillo, hash e IP l'ha già scritta il backend: qui si aggiorna
-    // solo la vista. Lo stato si riconcilia dal database al prossimo accesso (`loadPortalData`),
-    // come documenti e addendum — niente `localStorage`, che non arriva agli altri dispositivi né
-    // allo studio.
-    setEidasSeal(seal);
-    setSigned(true);
-    await ricaricaDopoFirma();
+      // La riga `FirmaElettronica` con sigillo, hash e IP l'ha già scritta il backend: qui si
+      // aggiorna solo la vista. `setEidasSeal`/`setSigned` stanno prima dell'await, quindi valgono
+      // anche se la rilettura fallisce.
+      setEidasSeal(seal);
+      setSigned(true);
+      await ricaricaDopoFirma();
+    } catch (err) {
+      console.warn('Aggiornamento vista post-firma non riuscito (la firma è comunque registrata):', err);
+    }
   };
 
   /**

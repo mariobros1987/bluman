@@ -716,6 +716,7 @@ export function ClientPortal() {
         <FirmaOtpModal
           otpCanale={otpCanale}
           setOtpCanale={setOtpCanale}
+          canaliFirma={canaliFirma}
           nomeCanale={nomeCanale}
           otpLoading={otpLoading}
           otpTarget={otpTarget}

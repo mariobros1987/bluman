@@ -1,4 +1,5 @@
 import type { CanaleOtp } from '../../api/client';
+import type { CanaleFirma } from '../../api/firma';
 import type { BersaglioFirma } from './types';
 import { ETICHETTA_LIVELLO } from './livelloFirma';
 
@@ -12,6 +13,13 @@ export interface FirmaOtpModalProps {
   livelloFirma: 'ses' | 'fea';
   otpCanale: CanaleOtp;
   setOtpCanale: (canale: CanaleOtp) => void;
+  /**
+   * La disponibilità reale dei canali, come la calcola il backend (`canaliFirmaApi`): un canale
+   * spento o senza recapito arriva con `disponibile: false` e il `motivo`. Il selettore la rispetta,
+   * invece di mostrare quattro pulsanti tutti attivi e far scoprire al cliente che Telegram non
+   * spedisce solo dopo averlo scelto — che era il difetto segnalato.
+   */
+  canaliFirma: CanaleFirma[];
   nomeCanale: Record<CanaleOtp, string>;
   otpLoading: boolean;
   otpTarget: string;
@@ -42,6 +50,7 @@ export function FirmaOtpModal({
   livelloFirma,
   otpCanale,
   setOtpCanale,
+  canaliFirma,
   nomeCanale,
   otpLoading,
   otpTarget,
@@ -218,11 +227,18 @@ export function FirmaOtpModal({
               { id: 'signal' as const, label: '🔒 Signal' },
             ].map((c) => {
               const isSelected = otpCanale === c.id;
+              const info = canaliFirma.find((x) => x.canale === c.id);
+              // Finché l'elenco non è arrivato non si blocca nulla; una volta arrivato, un canale che
+              // non c'è o che il backend marca `disponibile: false` non è cliccabile — e il perché si
+              // legge, invece di far scegliere un canale che poi non spedisce.
+              const disponibile = canaliFirma.length === 0 ? true : info?.disponibile === true;
+              const bloccato = otpLoading || !disponibile;
               return (
                 <button
                   key={c.id}
                   type="button"
-                  disabled={otpLoading}
+                  disabled={bloccato}
+                  title={!disponibile && info?.motivo ? info.motivo : undefined}
                   onClick={async () => {
                     setOtpCanale(c.id);
                     setOtpError(null);
@@ -236,7 +252,8 @@ export function FirmaOtpModal({
                     color: isSelected ? '#fff' : 'var(--muted)',
                     border: isSelected ? '1.5px solid #818cf8' : '1px solid var(--border)',
                     borderRadius: 8,
-                    cursor: otpLoading ? 'not-allowed' : 'pointer',
+                    cursor: bloccato ? 'not-allowed' : 'pointer',
+                    opacity: !disponibile ? 0.45 : 1,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -249,6 +266,19 @@ export function FirmaOtpModal({
               );
             })}
           </div>
+          {(() => {
+            // Il motivo del canale scelto, quando non è disponibile: è la riga che prima mancava, e
+            // senza la quale scegliere Telegram e non ricevere niente sembrava un guasto muto.
+            const sel = canaliFirma.find((x) => x.canale === otpCanale);
+            if (sel && sel.disponibile === false) {
+              return (
+                <div style={{ fontSize: 10.5, color: '#f59e0b', marginTop: 2 }}>
+                  ⚠️ {nomeCanale[otpCanale]} non disponibile{sel.motivo ? `: ${sel.motivo}` : '. Scegli un altro canale.'}
+                </div>
+              );
+            }
+            return null;
+          })()}
         </div>
 
         {/* Info Canale — validità e recapito sono quelli che ha detto il backend */}
