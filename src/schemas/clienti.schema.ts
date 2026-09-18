@@ -25,6 +25,11 @@ export const CreaClienteSchema = z.object({
   sede: z.string().max(255).optional().nullable(),
   sdiCode: z.string().max(20).optional().nullable(),
   codiceSdi: z.string().max(20).optional().nullable(),
+  // Regime IVA: l'aliquota di default del cliente (0..100), e la natura di esenzione (N1..N7)
+  // che la accompagna quando è 0. Validati qui perché finiscono in colonna e guidano il calcolo
+  // dell'IVA in fattura: un'aliquota fuori scala o non numerica non deve entrare in banca dati.
+  aliquotaIvaDefault: z.number().int().min(0).max(100).optional().nullable(),
+  naturaEsenzioneDefault: z.string().max(10).optional().nullable(),
   iban: z.string().max(50).optional().nullable(),
   rischioAml: z.string().max(50).optional().nullable(),
   ubo: z.string().optional().nullable(),

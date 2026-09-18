@@ -1,0 +1,25 @@
+-- Il regime IVA del cliente: due colonne, e il perché stanno sul cliente e non sulla fattura.
+--
+-- Fino a qui l'aliquota di una fattura emessa dal progetto era **22 fisso**, scritta nel codice di
+-- `emettiFattura`, e il `tipoClienteFiscale` scelto nel modale (privato/business/estero) veniva
+-- salvato ma **non** usato per decidere l'IVA. Conseguenza: un cliente estero, che nel modale
+-- appare come «0% Art.7-ter», finiva fatturato al 22% in banca dati. L'aliquota è una proprietà del
+-- cliente — del suo regime fiscale — non una costante del programma, e questa migrazione le dà un
+-- posto dove stare.
+--
+-- Perché sul cliente e non sulla riga di fattura. La riga ha già `aliquota_iva` e
+-- `natura_esenzione` (è lì che finisce il calcolo), ma quella è la **conseguenza**, non la regola:
+-- dice quanto è stata l'IVA di quella riga, non quanto deve essere per questo cliente. La regola sta
+-- sul cliente, così l'operatore la imposta una volta in anagrafica e ogni fattura la eredita, invece
+-- di riscegliere il regime a ogni emissione e sbagliarlo la volta che si distrae.
+--
+-- Additiva e nullable di proposito. `aliquota_iva_default` NULL non significa «0%»: significa
+-- «nessun regime registrato», e in quel caso il codice si ripiega sul comportamento di prima (estero
+-- = 0, altrimenti 22). Così i clienti già in banca dati non cambiano di colpo aliquota il giorno
+-- della migrazione — cambiano quando qualcuno apre la loro scheda e dichiara il regime.
+--
+-- `natura_esenzione_default` è il codice (N1..N7) da riportare quando l'aliquota è 0. Resta NULL
+-- finché non lo si compila: un cliente esente senza codice è un dato da completare, non una natura
+-- da inventare in automatico.
+ALTER TABLE "cliente" ADD COLUMN "aliquota_iva_default" INTEGER;
+ALTER TABLE "cliente" ADD COLUMN "natura_esenzione_default" TEXT;

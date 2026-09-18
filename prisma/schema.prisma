@@ -224,6 +224,13 @@ model Cliente {
   giurisdizione   String?  @map("giurisdizione")
   sedeLegale      String?  @map("sede_legale")
   sdiCode         String?  @map("sdi_code")
+  // Regime IVA del cliente: guida l'aliquota della fattura invece del 22% fisso di prima.
+  // `aliquotaIvaDefault` null = nessun regime registrato → si ripiega sul tipo del documento
+  // (estero = 0). `naturaEsenzioneDefault` è il codice (N1..N7) da riportare in fattura quando
+  // l'aliquota è 0 — un cliente esente senza codice resta un dato da completare in anagrafica,
+  // non una natura inventata qui.
+  aliquotaIvaDefault     Int?    @map("aliquota_iva_default")
+  naturaEsenzioneDefault String? @map("natura_esenzione_default")
   iban            String?  @map("iban")
   rischioAml      String?  @map("rischio_aml")
   ubo             String?  @map("ubo")

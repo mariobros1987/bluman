@@ -176,7 +176,16 @@ export interface FatturaRiga {
   id?: string | number;
   numero?: string;
   desc?: string;
+  /** Il totale del documento (imponibile + IVA), in euro. */
   importo: number;
+  /**
+   * La scomposizione fiscale, quando la fattura viene dal database. Opzionali perché i progetti
+   * seed/locali non ce l'hanno: chi mostra l'anteprima ripiega su `importo` quando mancano, invece
+   * di inventare un'aliquota. `aliquotaIva` è la percentuale (0..100) letta dalla riga salvata.
+   */
+  imponibile?: number;
+  iva?: number;
+  aliquotaIva?: number;
   data?: string;
   stato: 'bozza' | 'emessa' | 'incassata';
 }

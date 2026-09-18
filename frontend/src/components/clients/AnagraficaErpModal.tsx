@@ -117,6 +117,15 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
   // Tab 3: SDI & Fatturazione
   const [sdiCode, setSdiCode] = useState(client.sdiCode || (client as any).codiceSdi || refJson.sdiCode || '0000000');
   const [regimeFiscale, setRegimeFiscale] = useState((client as any).regimeFiscale || refJson.regimeFiscale || 'RF01 - Ordinario');
+  // Regime IVA che guida l'aliquota della fattura. Stringa vuota = «non dichiarato»: la fattura
+  // ripiega sul comportamento di prima (estero 0, altrimenti 22). 0 è un'aliquota valida (esente),
+  // quindi lo stato è una stringa e non un numero, per distinguere «0» da «vuoto».
+  const [aliquotaIvaDefault, setAliquotaIvaDefault] = useState<string>(
+    (client as any).aliquotaIvaDefault !== undefined && (client as any).aliquotaIvaDefault !== null
+      ? String((client as any).aliquotaIvaDefault)
+      : '',
+  );
+  const [naturaEsenzioneDefault, setNaturaEsenzioneDefault] = useState((client as any).naturaEsenzioneDefault || '');
   const [iban, setIban] = useState(client.iban || refJson.iban || '');
 
   // Tab 4: Compliance & KYC
@@ -193,6 +202,10 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
       cap,
       nazione,
       regimeFiscale,
+      // Regime IVA in colonna: vuoto → null (non dichiarato), altrimenti l'intero. Il backend lo usa
+      // per calcolare l'IVA in fattura invece del 22% fisso.
+      aliquotaIvaDefault: aliquotaIvaDefault === '' ? null : Number(aliquotaIvaDefault),
+      naturaEsenzioneDefault: naturaEsenzioneDefault || null,
       referentiJson: referentiObj,
     };
 
@@ -594,6 +607,36 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
               <div style={{ flex: 2 }}>
                 <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Regime Fiscale *</label>
                 <input value={regimeFiscale} onChange={e => setRegimeFiscale(e.target.value)} required />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 12 }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Aliquota IVA di default (%)</label>
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  step={1}
+                  value={aliquotaIvaDefault}
+                  onChange={e => setAliquotaIvaDefault(e.target.value)}
+                  placeholder="es. 22 — vuoto = non dichiarata"
+                />
+                <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 4 }}>
+                  Guida l'IVA delle fatture di questo cliente. Vuoto: si applica il default (estero 0%, altrimenti 22%). 0 = esente.
+                </div>
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Natura esenzione (se aliquota 0)</label>
+                <input
+                  value={naturaEsenzioneDefault}
+                  onChange={e => setNaturaEsenzioneDefault(e.target.value)}
+                  placeholder="es. N2.2, N3.1, N6.9"
+                  style={{ fontFamily: 'monospace', fontSize: 12.5 }}
+                />
+                <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 4 }}>
+                  Codice riportato in fattura quando l'IVA è 0. Obbligatorio per lo SDI su operazioni esenti/non imponibili.
+                </div>
               </div>
             </div>
 

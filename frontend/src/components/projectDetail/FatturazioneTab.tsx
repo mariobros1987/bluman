@@ -129,7 +129,15 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
 
   const vociSelezionate = vociFatturabili.filter(v => v.selezionato);
   const totaleImponibile = vociSelezionate.reduce((acc, v) => acc + (Number(v.importo) || 0), 0);
-  const aliquotaIva = tipoFiscale === 'estero' ? 0 : 0.22;
+  // L'aliquota la decide il regime IVA del cliente, **con la stessa regola del backend**: se il
+  // cliente ha un'aliquota registrata vince quella, altrimenti si ripiega sul tipo documento
+  // (estero 0, altrimenti 22). Deve combaciare con `emettiFattura`, se no l'anteprima mostra un
+  // totale che il database poi non conferma — che è il difetto appena corretto.
+  const aliquotaClientePct = rawDbProject?.cliente?.aliquotaIvaDefault;
+  const aliquotaPct = (aliquotaClientePct === undefined || aliquotaClientePct === null)
+    ? (tipoFiscale === 'estero' ? 0 : 22)
+    : Number(aliquotaClientePct);
+  const aliquotaIva = aliquotaPct / 100;
   const totaleIva = Math.round(totaleImponibile * aliquotaIva * 100) / 100;
   const totaleDocumento = totaleImponibile + totaleIva;
 
@@ -479,8 +487,8 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
                     <strong>{previewFattura.desc}</strong>
                     <div style={{ fontSize: 10, color: '#64748b' }}>Riferimento Progetto: {project.n}</div>
                   </td>
-                  <td style={{ padding: '10px', textAlign: 'right' }}>{fmt(previewFattura.importo)}</td>
-                  <td style={{ padding: '10px', textAlign: 'right' }}>22%</td>
+                  <td style={{ padding: '10px', textAlign: 'right' }}>{fmt(previewFattura.imponibile ?? previewFattura.importo)}</td>
+                  <td style={{ padding: '10px', textAlign: 'right' }}>{previewFattura.aliquotaIva ?? 0}%</td>
                   <td style={{ padding: '10px', textAlign: 'right', fontWeight: 700 }}>{fmt(previewFattura.importo)}</td>
                 </tr>
               </tbody>
@@ -547,8 +555,14 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
                       </tbody>
                     </table>
                     <div style="display:flex;justify-content:space-between;border-top:2px solid #0f172a;padding-top:15px;margin-top:30px;">
-                      <div style="font-size:10px;color:#64748b;">Esente IVA / Ritenuta d'acconto ai sensi delle vigenti disposizioni fiscali UE.</div>
-                      <div style="text-align:right;"><div style="font-size:11px;color:#64748b;">Totale Documento:</div><div style="font-size:22px;font-weight:800;color:#4338ca;">${fmt(previewFattura.importo)}</div></div>
+                      <div style="font-size:10px;color:#64748b;max-width:300px;">${(previewFattura.aliquotaIva ?? 0) > 0
+                        ? 'Documento fiscale di vendita. Pagamento a mezzo bonifico su IBAN in anagrafica.'
+                        : "Operazione senza applicazione dell'IVA secondo il regime fiscale del cliente."}</div>
+                      <div style="text-align:right;">
+                        ${previewFattura.imponibile !== undefined ? `<div style="font-size:11px;color:#64748b;">Imponibile: ${fmt(previewFattura.imponibile)}</div>` : ''}
+                        ${(previewFattura.aliquotaIva ?? 0) > 0 ? `<div style="font-size:11px;color:#64748b;">IVA ${previewFattura.aliquotaIva}%: ${fmt(previewFattura.iva ?? 0)}</div>` : ''}
+                        <div style="font-size:11px;color:#64748b;margin-top:4px;">Totale Documento:</div><div style="font-size:22px;font-weight:800;color:#4338ca;">${fmt(previewFattura.importo)}</div>
+                      </div>
                     </div>
                   `;
                   await downloadRealPdf(`BluMan_Fattura_${previewFattura.numero}`, htmlContent);
@@ -823,7 +837,7 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
             <div style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: 10, padding: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <div style={{ fontSize: 11, color: '#94a3b8' }}>Voci selezionate: <strong>{vociSelezionate.length}</strong> su {vociFatturabili.length}</div>
-                <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>Imponibile: {fmt(totaleImponibile)} · IVA ({tipoFiscale === 'estero' ? '0%' : '22%'}): {fmt(totaleIva)}</div>
+                <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>Imponibile: {fmt(totaleImponibile)} · IVA ({aliquotaPct}%): {fmt(totaleIva)}</div>
               </div>
               <div style={{ textAlign: 'right' }}>
                 <div style={{ fontSize: 11, color: '#818cf8', fontWeight: 600 }}>TOTALE DOCUMENTO</div>

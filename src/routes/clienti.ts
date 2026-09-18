@@ -256,6 +256,10 @@ export async function registraRotteClienti(server: FastifyInstance, app: AppPort
           giurisdizione: b.giurisdizione || null,
           sedeLegale: b.sedeLegale || b.sede || null,
           sdiCode: b.sdiCode || b.codiceSdi || null,
+          // Regime IVA in colonna, non nel blob referentiJson: qui lo legge `emettiFattura`.
+          // `?? null` e non `|| null`, perché 0 è un'aliquota valida (esente) e `||` la scarterebbe.
+          aliquotaIvaDefault: b.aliquotaIvaDefault ?? null,
+          naturaEsenzioneDefault: b.naturaEsenzioneDefault || null,
           iban: b.iban || null,
           rischioAml: b.rischioAml || 'medio',
           ubo: b.ubo || null,
@@ -347,6 +351,10 @@ export async function registraRotteClienti(server: FastifyInstance, app: AppPort
           giurisdizione: b.giurisdizione !== undefined ? b.giurisdizione : undefined,
           sedeLegale: b.sedeLegale !== undefined ? b.sedeLegale : (b.sede !== undefined ? b.sede : undefined),
           sdiCode: b.sdiCode !== undefined ? b.sdiCode : (b.codiceSdi !== undefined ? b.codiceSdi : undefined),
+          // Aggiornamento parziale: si tocca il regime IVA solo se il corpo ne parla. `undefined`
+          // lascia il valore com'è, così un salvataggio che non riguarda l'IVA non la azzera.
+          aliquotaIvaDefault: b.aliquotaIvaDefault !== undefined ? b.aliquotaIvaDefault : undefined,
+          naturaEsenzioneDefault: b.naturaEsenzioneDefault !== undefined ? b.naturaEsenzioneDefault : undefined,
           iban: b.iban !== undefined ? b.iban : undefined,
           rischioAml: b.rischioAml !== undefined ? b.rischioAml : undefined,
           ubo: b.ubo !== undefined ? b.ubo : undefined,

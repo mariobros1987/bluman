@@ -669,6 +669,20 @@ export class PrismaApp implements AppPort {
     }
     if (!clienteId) throw new Error('Cliente del progetto non trovato');
 
+    // Il cliente decide l'aliquota, non una costante. `prog.cliente` c'è quasi sempre (è incluso
+    // nella query), ma quando l'id è arrivato dal ripiego «primo cliente dello studio» va riletto.
+    const cliente = prog?.cliente?.id === clienteId
+      ? prog.cliente
+      : await this.prisma.cliente.findUnique({ where: { id: clienteId } });
+
+    // Regime IVA: l'aliquota registrata sul cliente vince. Se il cliente non ne ha una — è NULL,
+    // non 0 — si ripiega sul comportamento di prima: estero = 0, altrimenti 22. Così un cliente non
+    // ancora classificato non cambia aliquota da solo il giorno in cui questa riga è entrata.
+    const aliquota = cliente?.aliquotaIvaDefault ?? (input.tipoClienteFiscale === 'estero' ? 0 : 22);
+    // La natura di esenzione si riporta solo quando l'IVA è 0, e solo se il cliente la dichiara:
+    // un esente senza codice resta un dato da completare in anagrafica, non un codice inventato qui.
+    const naturaEsenzione = aliquota === 0 ? (cliente?.naturaEsenzioneDefault ?? null) : null;
+
     const validModuliIds = new Set((prog?.moduli || []).map(m => m.id));
 
     const dataEmissione = new Date();
@@ -680,11 +694,17 @@ export class PrismaApp implements AppPort {
     const nextProgressivo = (lastFattura?.numeroProgressivoSerie || 0) + 1;
     const numeroUfficiale = `FT-${anno}/${nextProgressivo.toString().padStart(3, '0')}`;
 
-    // Calcolo righe e scorporo IVA 22%
+    // L'importo di riga è l'IMPONIBILE, e l'IVA si somma sopra.
+    //
+    // Prima qui si faceva il contrario: si trattava l'importo come lordo e si scorporava il 22%
+    // (`imp = tot/1.22`). Ma il modale manda l'imponibile — mostra all'utente «imponibile + IVA =
+    // totale» — quindi lo scorporo produceva a database un imponibile più basso di quello approvato
+    // e un totale pari all'imponibile mostrato. Ora le due parti coincidono: l'importo ricevuto è
+    // l'imponibile, l'IVA è calcolata sopra con l'aliquota del cliente, e il totale è la somma.
     const righeCalcolate = input.righe.map((r, idx) => {
-      const totRiga = Math.abs(r.importo);
-      const impRiga = Math.round(totRiga / 1.22);
-      const ivaRiga = totRiga - impRiga;
+      const imponibileRiga = Math.abs(r.importo);
+      const ivaRiga = Math.round((imponibileRiga * aliquota) / 100);
+      const totRiga = imponibileRiga + ivaRiga;
       const safeModuloId = (r.moduloProgettoId && validModuliIds.has(r.moduloProgettoId)) ? r.moduloProgettoId : null;
       return {
         tenantId: this.tenantId,
@@ -695,14 +715,14 @@ export class PrismaApp implements AppPort {
         descrizione: r.descrizione,
         quantita: 1,
         unitaMisura: 'forfait',
-        prezzoUnitarioCent: impRiga,
+        prezzoUnitarioCent: imponibileRiga,
         scontoPercentuale: 0,
-        aliquotaIva: 22,
-        naturaEsenzione: null,
+        aliquotaIva: aliquota,
+        naturaEsenzione,
         applicaCassa: false,
         applicaRitenuta: false,
         applicaBollo: false,
-        imponibileCentesimi: impRiga,
+        imponibileCentesimi: imponibileRiga,
         ivaCentesimi: ivaRiga,
         totaleRigaCentesimi: totRiga,
         ordine: idx + 1,

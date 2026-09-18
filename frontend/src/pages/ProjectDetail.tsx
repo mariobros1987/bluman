@@ -472,6 +472,11 @@ export function ProjectDetail() {
             numero: f.numero,
             desc: f.righe?.[0]?.descrizione || 'Fattura Progetto',
             importo: f.righe?.reduce((a: number, r: any) => a + r.importo, 0) / 100 || 0,
+            // La scomposizione fiscale reale, dai totali salvati: così l'anteprima mostra l'IVA
+            // effettiva del documento invece di un 22% cablato. `aliquotaIva` dalla prima riga.
+            imponibile: f.totaleImponibileCentesimi !== undefined ? f.totaleImponibileCentesimi / 100 : undefined,
+            iva: f.totaleIvaCentesimi !== undefined ? f.totaleIvaCentesimi / 100 : undefined,
+            aliquotaIva: f.righe?.[0]?.aliquotaIva,
             data: f.data,
             stato: f.stato === 'incassata' ? 'incassata' : 'emessa',
           })),
