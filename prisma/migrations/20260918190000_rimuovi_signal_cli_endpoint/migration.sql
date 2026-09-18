@@ -1,0 +1,16 @@
+-- Rimozione della colonna legacy `signal_cli_endpoint` (voce 10 / voce 17e del piano).
+--
+-- Storia. La migrazione `20260916190000_signal_per_studio` aveva **aggiunto** `signal_endpoint` e ci
+-- aveva copiato dentro il valore, invece di rinominare `signal_cli_endpoint`, perché il backend
+-- allora in esecuzione era compilato contro lo schema vecchio e molte sue query su `tenant` non
+-- hanno un `select` esplicito: rinominare avrebbe fatto fallire quelle query per la durata del
+-- deploy. Da allora il database ha una colonna che **nessuno legge** e che lo schema Prisma non
+-- conosce più (il modello ha solo `signalEndpoint`).
+--
+-- Ora il backend che legge `signal_endpoint` è in produzione da giorni, quindi il debito è saldabile.
+-- È una DROP, quindi richiede l'autorizzazione esplicita del titolare: concessa il 18/09/2026
+-- («per le migrazioni puoi procedere»). Una DROP COLUMN non è bloccata dai dati — non fallisce se la
+-- colonna contiene valori — quindi è sicura da applicare a prescindere dal contenuto.
+--
+-- `IF EXISTS` per idempotenza: se un ambiente l'avesse già rimossa, la migrazione non fallisce.
+ALTER TABLE "tenant" DROP COLUMN IF EXISTS "signal_cli_endpoint";

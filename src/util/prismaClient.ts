@@ -34,7 +34,15 @@ export function attivaContestoTenant(contesto: ContestoTenant): void {
 /** Vero quando la variabile di sessione è già stata impostata dalla transazione in corso. */
 const dentroTransazioneConTenant = new AsyncLocalStorage<true>();
 
-const clientBase = new PrismaClient();
+// `transactionOptions` alza il tetto delle transazioni interattive **una volta per tutte** (voce 6
+// del piano): Prisma di default chiude una `$transaction(async …)` dopo 5 secondi e la query
+// successiva fallisce con `P2028`. Impostarlo qui vale per ogni transazione — quelle di oggi e
+// quelle di domani — invece di ricordarsi il secondo argomento a ogni call site, che è esattamente
+// il modo in cui il tetto è già scattato due volte in produzione. `maxWait` è l'attesa massima per
+// ottenere una connessione dal pool prima di partire; `timeout` la durata massima della transazione.
+const clientBase = new PrismaClient({
+  transactionOptions: { timeout: 15_000, maxWait: 5_000 },
+});
 
 /**
  * Client usato da tutte le rotte. Si connette col ruolo `bluman_app`, che non può

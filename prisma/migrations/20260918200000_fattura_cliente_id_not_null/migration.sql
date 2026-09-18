@@ -1,0 +1,14 @@
+-- `fattura.cliente_id` diventa NOT NULL, per far combaciare il database con il modello (voce 17a).
+--
+-- Era l'unica divergenza davvero pericolosa fra schema e database: la colonna era **nullable** nel
+-- database ma **obbligatoria** nel datamodel Prisma. Conseguenza: il database accettava una fattura
+-- senza cliente, TypeScript la leggeva come `string` garantito, e il primo `.cliente.nome` su quella
+-- riga sarebbe stato un errore a runtime in una pagina che non c'entra nulla. Il codice che emette
+-- (`emettiFattura`) rifiuta già una fattura senza cliente, quindi la colonna *deve* essere il suo
+-- contratto reale: NOT NULL.
+--
+-- Sicurezza verificata prima di scrivere questa migrazione: misurato in produzione il 18/09/2026
+-- (sola lettura) — 4 fatture totali, **0 con `cliente_id` NULL**. Nessuna riga blocca il vincolo,
+-- quindi `SET NOT NULL` non fallisce e non serve alcuna pulizia dati. Autorizzazione alle migrazioni
+-- concessa dal titolare lo stesso giorno.
+ALTER TABLE "fattura" ALTER COLUMN "cliente_id" SET NOT NULL;
