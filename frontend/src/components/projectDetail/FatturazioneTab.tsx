@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fmt, getFormattedLogoUrl } from '../../utils';
-import { downloadRealPdf } from '../../utils/pdfGenerator';
 import { emettiFatturaApi } from '../../api/client';
+import { downloadFatturaPdfServerApi } from '../../api/fatturazione';
+import { risolviAliquotaIva, calcolaTotaliFattura } from '../../utils/fatturazione';
 import { getTenantStorageKey, getStudioInfoForTenant, getCurrentTenantId, BLUECODE_TENANT_ID } from '../../utils/tenant';
 import type { Progetto } from '../../types';
 import styles from '../../pages/ProjectDetail.module.css';
@@ -129,17 +130,12 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
 
   const vociSelezionate = vociFatturabili.filter(v => v.selezionato);
   const totaleImponibile = vociSelezionate.reduce((acc, v) => acc + (Number(v.importo) || 0), 0);
-  // L'aliquota la decide il regime IVA del cliente, **con la stessa regola del backend**: se il
-  // cliente ha un'aliquota registrata vince quella, altrimenti si ripiega sul tipo documento
-  // (estero 0, altrimenti 22). Deve combaciare con `emettiFattura`, se no l'anteprima mostra un
-  // totale che il database poi non conferma — che è il difetto appena corretto.
-  const aliquotaClientePct = rawDbProject?.cliente?.aliquotaIvaDefault;
-  const aliquotaPct = (aliquotaClientePct === undefined || aliquotaClientePct === null)
-    ? (tipoFiscale === 'estero' ? 0 : 22)
-    : Number(aliquotaClientePct);
-  const aliquotaIva = aliquotaPct / 100;
-  const totaleIva = Math.round(totaleImponibile * aliquotaIva * 100) / 100;
-  const totaleDocumento = totaleImponibile + totaleIva;
+  // L'aliquota e i totali dell'anteprima vengono dalla regola pura in `utils/fatturazione`, la
+  // **stessa** che rispecchia il backend (`emettiFattura`): estratta lì per poterla collaudare
+  // senza montare questo componente, e per tenerla in un posto solo. Se anteprima e backend si
+  // allontanano, il totale mostrato non è quello salvato — il difetto appena corretto.
+  const aliquotaPct = risolviAliquotaIva(rawDbProject?.cliente?.aliquotaIvaDefault, tipoFiscale);
+  const { iva: totaleIva, totale: totaleDocumento } = calcolaTotaliFattura(totaleImponibile, aliquotaPct);
 
   const selezionaSoloCompletate = () => {
     setVociFatturabili(prev => prev.map(v => ({ ...v, selezionato: !v.giaFatturata && v.stato === 'done' })));
@@ -512,60 +508,17 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
               </button>
               <button
                 onClick={async () => {
-                  const studio = getStudioInfoForTenant();
-                  const isBC = getCurrentTenantId() === BLUECODE_TENANT_ID;
-                  const rawLogoUrl = localStorage.getItem(getTenantStorageKey('bluman_logo_url')) || (isBC ? '/logo.png' : '');
-                  const logoUrl = rawLogoUrl ? getFormattedLogoUrl(rawLogoUrl) : '';
-                  const logoHtml = logoUrl
-                    ? `<img src="${logoUrl}" style="max-height:60px;max-width:220px;object-fit:contain;margin-bottom:8px;display:block;" />`
-                    : `<div style="font-size:18px;font-weight:800;color:#1e1b4b;margin-bottom:8px;">🏛 ${studio.ragioneSociale.toUpperCase()}</div>`;
-                  const htmlContent = `
-                    <div style="border-bottom:2px solid #0f172a;padding-bottom:15px;display:flex;justify-content:space-between;align-items:flex-start;">
-                      <div>
-                        ${logoHtml}
-                        <div style="font-size:20px;font-weight:800;color:#1e1b4b;">${studio.ragioneSociale}</div>
-                        <div style="font-size:11px;color:#475569;margin-top:2px;">${studio.sedeLegale}${studio.sedeLegale ? '<br/>' : ''}${studio.piva ? `VAT: ${studio.piva}` : ''}${studio.iban ? ` · IBAN: ${studio.iban}` : ''}</div>
-                      </div>
-                      <div style="text-align:right;">
-                        <div style="font-size:16px;font-weight:800;color:#4338ca;">DOCUMENTO FISCALE DI VENDITA</div>
-                        <div style="font-size:13px;font-weight:700;margin-top:2px;">${previewFattura.numero}</div>
-                        <div style="font-size:11px;color:#64748b;margin-top:2px;">Data Emissione: ${new Date().toLocaleDateString('it-IT')}</div>
-                      </div>
-                    </div>
-                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px;display:flex;justify-content:space-between;margin-top:20px;">
-                      <div>
-                        <div style="font-size:10px;color:#64748b;text-transform:uppercase;font-weight:700;">Cliente Destinatario:</div>
-                        <div style="font-size:13px;font-weight:700;margin-top:2px;">${project.cl}</div>
-                        <div style="font-size:11px;color:#475569;">P.IVA / CF: IT01234567890</div>
-                      </div>
-                      <div style="text-align:right;">
-                        <div style="font-size:10px;color:#64748b;text-transform:uppercase;font-weight:700;">Canale SDI Comped:</div>
-                        <div style="font-size:11px;font-weight:600;color:#166534;margin-top:2px;">✓ Tracciato XML Accettato</div>
-                      </div>
-                    </div>
-                    <table style="width:100%;margin-top:20px;border-collapse:collapse;">
-                      <thead>
-                        <tr style="background:#f1f5f9;border-bottom:1px solid #cbd5e1;text-align:left;">
-                          <th style="padding:8px 10px;">Descrizione Prestazione</th>
-                          <th style="padding:8px 10px;text-align:right;">Totale €</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr><td style="padding:10px;"><strong>${previewFattura.desc}</strong><br/><small style="color:#64748b">Riferimento Incarico: ${project.n}</small></td><td style="text-align:right;font-weight:700;padding:10px;">${fmt(previewFattura.importo)}</td></tr>
-                      </tbody>
-                    </table>
-                    <div style="display:flex;justify-content:space-between;border-top:2px solid #0f172a;padding-top:15px;margin-top:30px;">
-                      <div style="font-size:10px;color:#64748b;max-width:300px;">${(previewFattura.aliquotaIva ?? 0) > 0
-                        ? 'Documento fiscale di vendita. Pagamento a mezzo bonifico su IBAN in anagrafica.'
-                        : "Operazione senza applicazione dell'IVA secondo il regime fiscale del cliente."}</div>
-                      <div style="text-align:right;">
-                        ${previewFattura.imponibile !== undefined ? `<div style="font-size:11px;color:#64748b;">Imponibile: ${fmt(previewFattura.imponibile)}</div>` : ''}
-                        ${(previewFattura.aliquotaIva ?? 0) > 0 ? `<div style="font-size:11px;color:#64748b;">IVA ${previewFattura.aliquotaIva}%: ${fmt(previewFattura.iva ?? 0)}</div>` : ''}
-                        <div style="font-size:11px;color:#64748b;margin-top:4px;">Totale Documento:</div><div style="font-size:22px;font-weight:800;color:#4338ca;">${fmt(previewFattura.importo)}</div>
-                      </div>
-                    </div>
-                  `;
-                  await downloadRealPdf(`BluMan_Fattura_${previewFattura.numero}`, htmlContent);
+                  // Il PDF ufficiale lo genera il **server** (`/invoices/:id/pdf`), che legge le
+                  // righe salvate — una per micro-voce selezionata — con imponibile, IVA e totali
+                  // giusti. Prima qui si costruiva a mano un HTML con **una riga sola**
+                  // (`previewFattura.desc`, la descrizione della prima riga) e dati cablati: il PDF
+                  // non conteneva le micro-voci scelte. Ora si scarica il documento vero.
+                  const idFattura = previewFattura.id != null ? String(previewFattura.id) : '';
+                  if (!idFattura) {
+                    alert('Questa fattura non è ancora salvata a database: emettila prima di scaricarne il PDF.');
+                    return;
+                  }
+                  await downloadFatturaPdfServerApi(idFattura, previewFattura.numero);
                 }}
                 style={{ background: '#4338ca', color: '#fff', border: 'none', padding: '8px 20px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 12px rgba(67,56,202,.3)' }}
               >
