@@ -137,10 +137,14 @@ export function ModaleConfigFirma({
                         </button>
                       ))}
                     </div>
-                    {configFirmaModal.livelloFirmaRichiesto !== 'ses' && (
+                    {configFirmaModal.livelloFirmaRichiesto === 'fea' && (
+                      <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: '#6366f118', border: '1px solid #6366f150', fontSize: 10, color: 'var(--text)', lineHeight: 1.4 }}>
+                        ℹ️ Con livello <strong>FEA (Avanzata)</strong> il cliente firmerà dal Portale con il flusso certificato completo: verifica OTP, firma grafica obbligatoria, firmatario verificato in anagrafica e documento d'identità (eIDAS art. 26 · art. 25 CAD).
+                      </div>
+                    )}
+                    {configFirmaModal.livelloFirmaRichiesto === 'feq' && (
                       <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: '#f59e0b18', border: '1px solid #f59e0b50', fontSize: 10, color: 'var(--muted)', lineHeight: 1.4 }}>
-                        ⚠️ Con livello {configFirmaModal.livelloFirmaRichiesto === 'fea' ? 'FEA' : 'FEQ'} il server <strong>blocca</strong> il flusso OTP:
-                        {' '}il cliente riceverà un avviso esplicito e dovrà usare il percorso {configFirmaModal.livelloFirmaRichiesto === 'fea' ? 'riservato alla Fase 3 (al momento non disponibile in portale)' : 'con provider di firma digitale qualificata (caricamento del file firmato)'}.
+                        ⚠️ Con livello <strong>FEQ (Qualificata)</strong> il server blocca il flusso OTP: il cliente dovrà firmare con il proprio provider di firma digitale qualificata (es. Aruba, InfoCert, Namirial, SPID/CIE) e caricare il file firmato.
                       </div>
                     )}
                   </div>
