@@ -25,6 +25,7 @@ import { STATI_MICROVOCE, STATI_PROGETTO, recordAudit, clienteDellaRichiesta } f
 import { livelloFirmaValido } from '../services/livelloFirmaService.js';
 import { CreaProgettoSchema, ConsuntivaOreSchema } from '../schemas/progetti.schema.js';
 import { campoOrdinamento, creaMetaPaginazione, leggiPaginazione } from '../util/paginazione.js';
+import { conStatoComunicazione, leggiMetaComunicazione } from '../util/statoComunicazione.js';
 
 // ─── PROGETTI, COMUNICAZIONI, TIMESHEET, CHECKLIST & ESECUZIONE ─────
 export async function registraRotteProgetti(server: FastifyInstance, app: AppPort): Promise<void> {
@@ -42,21 +43,27 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
       orderBy: { createdAt: 'asc' },
     });
     return msgs.map((m) => {
-      let meta: any = {};
-      if (m.externalId) {
-        try {
-          meta = typeof m.externalId === 'string' && m.externalId.startsWith('{')
-            ? JSON.parse(m.externalId)
-            : { stato: m.externalId };
-        } catch {
-          meta = { stato: m.externalId };
-        }
-      }
+      const meta = leggiMetaComunicazione(m.externalId);
+      // `null` quando la riga non dichiara uno stato — e non `'consegnato'`, che era il ripiego
+      // di prima: la UI disegnava ✓✓ «consegnato» su qualunque riga senza stato, comprese le
+      // sei del 17/09/2026 che Meta aveva rifiutato. Stessa cosa per `consegnatoAt`, che
+      // ripiegava su `createdAt`: la data di creazione spacciata per data di consegna.
+      //
+      // Le righe **in entrata** scritte dai webhook fanno eccezione, e non per indulgenza: lì
+      // `external_id` porta la chiave di idempotenza del provider (`whatsapp:<wamid>`) e non c'è
+      // spazio per uno stato, quindi la colonna tace per costruzione. Ma la direzione è il fatto:
+      // una riga in entrata sta nel fascicolo perché il messaggio è arrivato, e per una riga in
+      // entrata `createdAt` **è** il momento dell'arrivo. In uscita non si deduce niente: lì
+      // `createdAt` è quando l'operatore ha scritto, e la consegna deve ancora avvenire.
+      const inEntrata = m.direzione === 'entrata' || m.direzione === 'ingresso';
+      const stato = meta.stato ?? (inEntrata ? 'consegnato' : null);
       return {
         ...m,
-        stato: meta.stato || 'consegnato',
-        lettoAt: meta.lettoAt || null,
-        consegnatoAt: meta.consegnatoAt || m.createdAt,
+        stato,
+        inviatoAt: meta.inviatoAt,
+        lettoAt: meta.lettoAt,
+        consegnatoAt: meta.consegnatoAt ?? (stato === 'consegnato' && inEntrata ? m.createdAt : null),
+        errore: meta.errore,
       };
     });
   });
@@ -89,29 +96,26 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
 
     let aggiornati = 0;
     for (const m of daAggiornare) {
-      let meta: any = {};
-      if (m.externalId) {
-        try {
-          meta = typeof m.externalId === 'string' && m.externalId.startsWith('{')
-            ? JSON.parse(m.externalId)
-            : { stato: m.externalId };
-        } catch {
-          meta = { stato: m.externalId };
-        }
-      }
-      if (meta.stato !== 'letto') {
-        const nuovoMeta = {
-          ...meta,
-          stato: 'letto',
-          lettoAt: adesso,
-          consegnatoAt: meta.consegnatoAt || m.createdAt.toISOString(),
-        };
-        await prisma.comunicazioneProgetto.update({
-          where: { id: m.id },
-          data: { externalId: JSON.stringify(nuovoMeta) },
-        });
-        aggiornati++;
-      }
+      const meta = leggiMetaComunicazione(m.externalId);
+      if (meta.stato === 'letto') continue;
+
+      // Una lettura nel portale non riscrive lo stato di un messaggio che non è mai partito: il
+      // cliente può aver aperto la riga nel fascicolo, ma `letto` con le spunte blu direbbe che
+      // WhatsApp gliel'ha recapitata. La lettura si registra, il guasto resta scritto.
+      const maiPartito = meta.stato === 'da-inviare' || meta.stato === 'non-inviato';
+      if (maiPartito && meta.lettoAt) continue;
+
+      // E non si inventa una data di consegna: qui c'era `meta.consegnatoAt || m.createdAt`, che
+      // scriveva la data di creazione dell'operatore come se fosse la conferma di Meta.
+      await prisma.comunicazioneProgetto.update({
+        where: { id: m.id },
+        data: {
+          externalId: maiPartito
+            ? conStatoComunicazione(m.externalId, { lettoAt: adesso })
+            : conStatoComunicazione(m.externalId, { stato: 'letto', lettoAt: adesso }),
+        },
+      });
+      aggiornati++;
     }
 
     return reply.send({ ok: true, aggiornati });
@@ -149,6 +153,20 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
         destinatario = 'Studio';
         direzione = 'entrata';
       }
+      // La riga nasce **prima** che il canale venga contattato — la consegna si chiede dopo, a
+      // `POST /comunicazioni/invia-*`. Dichiararla `consegnato` qui era una consegna inventata, e
+      // restava tale per sempre perché nessuno tornava a correggerla. Un messaggio in entrata
+      // invece è nel fascicolo perché è arrivato: lì `consegnato` è il fatto, non una previsione.
+      //
+      // Il portale è l'altro caso senza previsione: non ha un passo di consegna dopo la scrittura,
+      // il messaggio è visibile al cliente nell'istante in cui la riga esiste e per lui non
+      // esiste altro modo di riceverlo. Gli altri quattro canali nascono in attesa.
+      const inEntrata = direzione === 'entrata' || direzione === 'ingresso';
+      const senzaDispatch = inEntrata || canale === 'portal';
+      const statoIniziale = senzaDispatch
+        ? { stato: 'consegnato', consegnatoAt: new Date().toISOString() }
+        : { stato: 'da-inviare' };
+
       const msg = await prisma.comunicazioneProgetto.create({
         data: {
           tenantId,
@@ -159,10 +177,7 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
           direzione,
           testo,
           allegatiJson: body.allegatiJson ? (typeof body.allegatiJson === 'string' ? body.allegatiJson : JSON.stringify(body.allegatiJson)) : null,
-          externalId: JSON.stringify({
-            stato: 'consegnato',
-            consegnatoAt: new Date().toISOString(),
-          }),
+          externalId: JSON.stringify(statoIniziale),
         },
       });
       // Blocco 3 — messaggio in arrivo dal cliente: lo studio viene avvisato subito.

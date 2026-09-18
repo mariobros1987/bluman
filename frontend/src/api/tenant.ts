@@ -418,12 +418,17 @@ export async function fetchWebhookInfoTelegramApi(): Promise<{ ok: boolean; info
  * anche quando il ripiego su `hello_world` falliva. Ora la consegna la fa
  * `POST /comunicazioni/invia-whatsapp`, che legge le credenziali della riga Tenant.
  */
-export async function sendWhatsAppDirectApi(to: string, text: string, templateName?: string) {
+export async function sendWhatsAppDirectApi(
+  to: string,
+  text: string,
+  templateName?: string,
+  comunicazioneId?: string,
+) {
   try {
     const res = await apiFetch(`${API_BASE}/comunicazioni/invia-whatsapp`, {
       method: 'POST',
       headers: getAuthHeaders(),
-      body: JSON.stringify({ to, testo: text, template: templateName }),
+      body: JSON.stringify({ to, testo: text, template: templateName, comunicazioneId }),
     });
     const data = await res.json().catch(() => null);
     if (res.ok && data?.ok) return { success: true, via: data.via };
@@ -444,7 +449,13 @@ export async function sendWhatsAppDirectApi(to: string, text: string, templateNa
  * chiave era vuota — un altro computer, una cache pulita — partiva un invio senza password che
  * non arrivava a nessuno. Le credenziali ora non lasciano il server.
  */
-export async function sendEmailDirectApi(to: string, subject: string, text: string, html?: string) {
+export async function sendEmailDirectApi(
+  to: string,
+  subject: string,
+  text: string,
+  html?: string,
+  comunicazioneId?: string,
+) {
   try {
     // Venti secondi: un invio SMTP che deve provare più porte non sta dentro i sei di prima,
     // e il timeout scaduto veniva mostrato come errore di invio anche quando l'email partiva.
@@ -453,7 +464,7 @@ export async function sendEmailDirectApi(to: string, subject: string, text: stri
     const res = await apiFetch(`${API_BASE}/comunicazioni/invia-email`, {
       method: 'POST',
       headers: getAuthHeaders(),
-      body: JSON.stringify({ to, subject, testo: text, html }),
+      body: JSON.stringify({ to, subject, testo: text, html, comunicazioneId }),
       signal: controller.signal,
     });
     clearTimeout(timer);
@@ -559,6 +570,7 @@ export async function sendSignalDirectApi(
   to: string,
   text: string,
   allegati?: Array<{ nome: string; base64: string }>,
+  comunicazioneId?: string,
 ) {
   try {
     const controller = new AbortController();
@@ -568,7 +580,7 @@ export async function sendSignalDirectApi(
     const res = await apiFetch(`${API_BASE}/comunicazioni/invia-signal`, {
       method: 'POST',
       headers: getAuthHeaders(),
-      body: JSON.stringify({ to, testo: text, ...(allegati && allegati.length > 0 ? { allegati } : {}) }),
+      body: JSON.stringify({ to, testo: text, ...(allegati && allegati.length > 0 ? { allegati } : {}), comunicazioneId }),
       signal: controller.signal,
     });
     clearTimeout(timer);
@@ -599,14 +611,14 @@ export async function sendSignalDirectApi(
  * Il destinatario è l'identificativo numerico della chat (`telegramChatId` in anagrafica), non
  * uno `@username`: Telegram accetta il nome solo per i canali pubblici.
  */
-export async function sendTelegramDirectApi(to: string, text: string) {
+export async function sendTelegramDirectApi(to: string, text: string, comunicazioneId?: string) {
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 25000);
     const res = await apiFetch(`${API_BASE}/comunicazioni/invia-telegram`, {
       method: 'POST',
       headers: getAuthHeaders(),
-      body: JSON.stringify({ to, testo: text }),
+      body: JSON.stringify({ to, testo: text, comunicazioneId }),
       signal: controller.signal,
     });
     clearTimeout(timer);

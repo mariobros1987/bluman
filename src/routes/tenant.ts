@@ -114,13 +114,25 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
    * registrato e risponde». Si legge la configurazione dello studio, che è ciò da cui dipende
    * l'ingresso, e si nominano i pezzi mancanti — un «ingresso non configurato» senza motivo
    * costringerebbe l'operatore a indovinare quale dei tre campi manca.
+   *
+   * Il **Phone Number ID** non è fra i campi che bloccano l'ingresso, e infatti non finisce in
+   * `mancanti`. Ma è la condizione da cui `webhooks.ts` fa dipendere la guardia sul numero: se è
+   * vuoto, il controllo non scatta e l'ingresso accetta i messaggi di **qualunque** numero
+   * dell'app, registrandoli su questo studio. Perciò va detto sempre — che ci sia o che manchi —
+   * perché è la differenza fra un ingresso che sa di chi è il messaggio e uno che non lo sa.
    */
   async function statoIngressoWhatsapp(tenantId: string): Promise<string> {
-    let t: { waAppId?: string | null; waAppSecret?: string | null; waVerifyToken?: string | null; waWebhookSlug?: string | null } | null = null;
+    let t: {
+      waAppId?: string | null;
+      waAppSecret?: string | null;
+      waVerifyToken?: string | null;
+      waWebhookSlug?: string | null;
+      waPhoneId?: string | null;
+    } | null = null;
     try {
       t = await prisma.tenant.findUnique({
         where: { id: tenantId },
-        select: { waAppId: true, waAppSecret: true, waVerifyToken: true, waWebhookSlug: true },
+        select: { waAppId: true, waAppSecret: true, waVerifyToken: true, waWebhookSlug: true, waPhoneId: true },
       });
     } catch {
       t = null;
@@ -134,7 +146,15 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
 
     // L'App ID non serve a nessuna chiamata: è il riferimento con cui l'operatore ritrova la sua
     // app nella dashboard Meta. Mancante non blocca l'ingresso, quindi si segnala e basta.
-    return t?.waAppId ? 'configurato' : 'configurato (App ID non indicato: serve solo per la guida Meta)';
+    const note: string[] = [];
+    if (!t?.waAppId) note.push('App ID non indicato: serve solo per la guida Meta');
+    note.push(
+      t?.waPhoneId
+        ? `ingresso limitato al Phone Number ID ${t.waPhoneId}`
+        : "Phone Number ID assente: la guardia sul numero è spenta, l'ingresso accetta i messaggi di qualunque numero dell'app",
+    );
+
+    return `configurato (${note.join('; ')})`;
   }
 
   server.get('/tenant/info', async (req) => {
@@ -1033,7 +1053,11 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
 
       if (canale === 'whatsapp') {
         if (!waPhoneId || !waAccessToken) {
-          return esito(false, 'Phone Number ID o Access Token di WhatsApp non impostati.');
+          return esito(
+            false,
+            'Phone Number ID o Access Token di WhatsApp non impostati. ' +
+              `Ingresso (messaggi dai clienti): ${await statoIngressoWhatsapp(tenantId)}.`,
+          );
         }
         const r = await fetchConTimeout(
           `https://graph.facebook.com/v21.0/${encodeURIComponent(waPhoneId)}?fields=display_phone_number,verified_name,quality_rating`,
@@ -1041,17 +1065,32 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
         );
         const dati: any = await r.json().catch(() => ({}));
         if (!r.ok) {
-          return esito(false, `Meta ha rifiutato le credenziali (HTTP ${r.status}): ${dati?.error?.message || 'errore non specificato'}`);
+          // Il rifiuto di Graph riguarda la metà in uscita, ma chi legge sta guardando lo stato
+          // del canale: tacere sull'ingresso qui lascerebbe credere che il canale sia rotto
+          // tutto intero quando magari è rotta solo una delle due metà — o viceversa.
+          return esito(
+            false,
+            `Meta ha rifiutato le credenziali (HTTP ${r.status}): ${dati?.error?.message || 'errore non specificato'}. ` +
+              `Ingresso (messaggi dai clienti): ${await statoIngressoWhatsapp(tenantId)}.`,
+          );
         }
         // La prova di Graph copre solo la metà in uscita. Dire «WhatsApp attivo» dopo aver
         // verificato solo quella era la bugia che ha lasciato credere per mesi che i messaggi
         // dei clienti arrivassero: l'ingresso dipende da App Secret, Verify Token e Callback
         // URL, che Graph non conferma e che si leggono dalla configurazione dello studio.
+        //
+        // Le credenziali nel corpo servono a provarle **prima** di salvarle, quindi la prova può
+        // riguardare un numero diverso da quello in colonna. Vale la pena dirlo: fino al salvataggio
+        // le due metà del canale guardano due numeri diversi, e l'ingresso resta quello salvato.
+        const numeroProvatoDiverso = Boolean(cred.waPhoneId && waPhoneId && cred.waPhoneId !== waPhoneId);
         return esito(
           true,
           `Invio attivo sul numero ${dati.display_phone_number || waPhoneId}` +
             `${dati.verified_name ? ` — ${dati.verified_name}` : ''}` +
             `${dati.quality_rating ? ` (qualità: ${dati.quality_rating})` : ''}. ` +
+            (numeroProvatoDiverso
+              ? `Attenzione: la prova ha usato il Phone Number ID ${waPhoneId}, mentre lo studio ne ha salvato un altro (${cred.waPhoneId}): gli invii e l'ingresso usano quello salvato finché non salvi. `
+              : '') +
             `Ingresso (messaggi dai clienti): ${await statoIngressoWhatsapp(tenantId)}.`,
         );
       }

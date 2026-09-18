@@ -86,7 +86,13 @@ async function testTenantAllFields() {
     imapPollInterval: '5m',
     emailSignatureHtml: '<b>Studio di Prova</b>',
     emailInboundParseUrl: 'https://example.invalid/api/webhooks/inbound-email',
-    signalCliEndpoint: 'http://localhost:8080/v1/receive',
+    // `signalEndpoint` e non `signalCliEndpoint`: la colonna vecchia è stata sostituita dalla
+    // migrazione `20260916190000_signal_per_studio` (16/09/2026), che copia il valore sulla nuova
+    // e lascia la vecchia in piedi solo per il backend già in esecuzione. Qui il nome vecchio
+    // faceva fallire l'`upsert` con `PrismaClientValidationError: Unknown argument
+    // signalCliEndpoint` — e `tsc` non lo vedeva, perché il controllo delle proprietà in eccesso
+    // non si applica a un oggetto passato attraverso una variabile.
+    signalEndpoint: 'http://localhost:8080/v1/receive',
     leadAdvisorNome: 'Responsabile di Prova',
     leadAdvisorEmail: 'responsabile@example.invalid',
     // Nessun `leadAdvisorPassword`: la colonna è stata eliminata dalla migrazione

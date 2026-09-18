@@ -3,6 +3,7 @@ import { inviaComunicazioneApi, fetchComunicazioniApi, segnaComunicazioniLetteAp
 import { uploadFileApi, urlDocumentoAssoluto } from '../../api/documenti';
 import type { ContattiStudio } from '../../api/client';
 import { getStudioInfoForTenant } from '../../utils/tenant';
+import { SpunteStato } from '../SpunteStato';
 import { docBoxStyle } from './styles';
 
 export interface TabContattiProps {
@@ -63,9 +64,13 @@ export function TabContatti({
               allegati: m.allegatiJson
                 ? (typeof m.allegatiJson === 'string' ? (() => { try { return JSON.parse(m.allegatiJson); } catch { return []; } })() : m.allegatiJson)
                 : (m.allegati || []),
-              stato: m.stato || 'consegnato',
+              // `?? null` e non `|| 'consegnato'`: qui il portale dichiarava consegnato ciò che
+              // nessuno aveva dichiarato, e ci disegnava sopra le due spunte (regola 7).
+              stato: m.stato ?? null,
+              inviatoAt: m.inviatoAt || null,
               lettoAt: m.lettoAt || null,
               consegnatoAt: m.consegnatoAt || null,
+              errore: m.errore || null,
             }));
             setMessaggiRef.current(() => normalizzati);
 
@@ -196,14 +201,19 @@ export function TabContatti({
                       </span>
                       <span style={{ fontSize: 9.5, color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
                         <span>{m.createdAt ? new Date(m.createdAt).toLocaleString('it-IT') : (m.dataOra || 'Oggi')}</span>
+                        {/* Le spunte di un messaggio che il cliente ha scritto riguardano lo
+                            Studio: «arrivato» e «letto» qui non parlano di WhatsApp né di Meta.
+                            Il segno arriva da `SpunteStato`, lo stesso che usa la chat
+                            dell'operatore, così i due non possono più divergere. */}
                         {isCliente && (
-                          m.stato === 'letto' ? (
-                            <span title={m.lettoAt ? `Letto dall'Advisor il ${new Date(m.lettoAt).toLocaleString('it-IT')}` : 'Letto dall\'Advisor'} style={{ color: '#38bdf8', fontWeight: 800, fontSize: 13, letterSpacing: -1, lineHeight: 1 }}>✓✓</span>
-                          ) : m.stato === 'inviato' ? (
-                            <span title="Inviato" style={{ color: 'var(--muted)', fontWeight: 700, fontSize: 13, lineHeight: 1 }}>✓</span>
-                          ) : (
-                            <span title={m.consegnatoAt ? `Consegnato allo Studio il ${new Date(m.consegnatoAt).toLocaleString('it-IT')}` : 'Consegnato allo Studio'} style={{ color: 'var(--muted)', fontWeight: 700, fontSize: 13, letterSpacing: -1, lineHeight: 1 }}>✓✓</span>
-                          )
+                          <SpunteStato
+                            stato={m.stato}
+                            inviatoAt={m.inviatoAt}
+                            consegnatoAt={m.consegnatoAt}
+                            lettoAt={m.lettoAt}
+                            errore={m.errore}
+                            contesto="portale"
+                          />
                         )}
                       </span>
                     </div>
