@@ -36,7 +36,7 @@ import {
 import type { Ruolo } from '../util/authorization.js';
 
 /**
- * Le categorie che si possono **scrivere a mano**, e perché sono solo due.
+ * Le categorie che si possono **scrivere a mano**, e perché sono queste tre.
  *
  * `kyc`, `fattura` e `progetto` derivano da una riga che esiste altrove — `cliente.data_kyc`, una
  * rata, `progetto.data_scadenza`. Scriverne una a mano significherebbe creare un evento che
@@ -44,15 +44,31 @@ import type { Ruolo } from '../util/authorization.js';
  * direbbe il 15 marzo e il progetto direbbe il 20, e nessuno saprebbe quale delle due è il piano.
  * Chi vuole spostare la scadenza di un progetto la sposta **nel progetto**, che è dove va spostata.
  *
- * `contratto` è l'eccezione, ed è deliberata. La sua sorgente è `contratto_ricorrente`, ma non ogni
- * scadenza contrattuale è un contratto ricorrente: una lettera d'incarico da rinnovare, un rinnovo
- * verso un fornitore, un termine che si conosce prima che qualcuno abbia inserito il contratto in
- * anagrafica. Vietando `contratto` quelle scadenze finirebbero scritte come `promemoria` — dove sono
- * visibili **solo a chi le ha scritte**, che per una scadenza contrattuale è il posto sbagliato per
- * un motivo preciso: è la stessa ragione per cui la categoria `progetto` è stata aggiunta invece di
- * riusare `promemoria`.
+ * `contratto` è la prima eccezione, ed è deliberata. La sua sorgente è `contratto_ricorrente`, ma non
+ * ogni scadenza contrattuale è un contratto ricorrente: una lettera d'incarico da rinnovare, un
+ * rinnovo verso un fornitore, un termine che si conosce prima che qualcuno abbia inserito il
+ * contratto in anagrafica. Vietando `contratto` quelle scadenze finirebbero scritte come
+ * `promemoria` — dove sono visibili **solo a chi le ha scritte**, che per una scadenza contrattuale è
+ * il posto sbagliato per un motivo preciso: è la stessa ragione per cui la categoria `progetto` è
+ * stata aggiunta invece di riusare `promemoria`.
+ *
+ * **`microvoce` è la seconda eccezione, ed è stata aggiunta in §1ter.5 (B6) — perché mancava.**
+ * La prima stesura di questo elenco conteneva due categorie e il commento ne elencava tre come
+ * derivate (`kyc`, `fattura`, `progetto`): `microvoce` non compariva in nessuna delle due liste. Non
+ * è una svista di scrittura, è un buco, e si vede dalla parte dell'utente: **nessun generatore
+ * produce un evento `microvoce`** — le sorgenti derivate sono rate, KYC, progetti e contratti — e la
+ * rotta lo rifiutava in scrittura, quindi la scheda «⚡ Microvoci Progetto» del calendario non poteva
+ * ricevere niente da nessuno. Un filtro che si può selezionare e non restituisce mai niente è la
+ * promessa non mantenuta che il resto di questo file evita con cura.
+ *
+ * La differenza fra `microvoce` e le tre categorie derivate è che un compito **non ha una sorgente
+ * da cui dedurre una data**: la scadenza di una micro-voce non esiste in `microvoce_progetto`, che
+ * non ha una colonna di scadenza. La fissa una persona, ed è per questo che è scrivibile. Ma è
+ * scrivibile **solo insieme al compito a cui appartiene** — vedi il controllo più sotto: un evento
+ * `microvoce` senza `microvoceProgettoId` sarebbe un compito di niente, e il legame resterebbe
+ * affidato al titolo, che si perde alla prima rinomina.
  */
-const CATEGORIE_SCRIVIBILI = ['promemoria', 'contratto'] as const;
+const CATEGORIE_SCRIVIBILI = ['promemoria', 'contratto', 'microvoce'] as const;
 type CategoriaScrivibile = (typeof CATEGORIE_SCRIVIBILI)[number];
 
 /**
@@ -248,6 +264,22 @@ export async function registraRotteCalendario(server: FastifyInstance): Promise<
     const categorie = categorieChieste(req.query as Record<string, unknown>, permesse);
     if (!categorie.ok) return rifiuta(reply, 400, categorie.errore);
 
+    /**
+     * Filtro per progetto, per lo scadenzario dentro il fascicolo.
+     *
+     * Senza, la scheda di un progetto dovrebbe chiedere la griglia di **tutto lo studio** su una
+     * finestra scelta a naso e poi scartarne la maggior parte nel browser: una finestra arbitraria
+     * che, se il progetto dura più a lungo, perde le scadenze in silenzio. Qui è una condizione in
+     * più nella query, e la scheda chiede esattamente quello che mostra.
+     *
+     * L'appartenenza allo studio è già garantita dal `tenantId` che `eventiDelCalendario` filtra
+     * sempre: un id di un altro studio non allarga la lettura, la restringe a zero righe.
+     */
+    const grezzoProgetto = (req.query as Record<string, unknown>)['progettoId'];
+    const progettoId = typeof grezzoProgetto === 'string' && grezzoProgetto.trim() !== ''
+      ? grezzoProgetto.trim()
+      : null;
+
     const eventi = await eventiDelCalendario({
       tenantId: req.tenantId,
       userId,
@@ -256,6 +288,7 @@ export async function registraRotteCalendario(server: FastifyInstance): Promise<
       a: intervallo.a,
       categorie: categorie.categorie,
       soloAssegnatiAMe: grezzoAssegnati === 'me',
+      progettoId,
       adesso,
     });
 
@@ -296,13 +329,42 @@ export async function registraRotteCalendario(server: FastifyInstance): Promise<
     if (!fine) return rifiuta(reply, 400, '«dataFine» non valida.');
     if (fine < inizio) return rifiuta(reply, 400, '«dataFine» precede «dataInizio».');
 
+    /**
+     * Il compito da cui l'evento nasce, letto **prima** della categoria.
+     *
+     * L'ordine conta: `microvoce` è scrivibile solo insieme a questo riferimento, quindi la
+     * decisione sulla categoria non si può prendere senza averlo già in mano.
+     */
+    const microvoceProgettoId =
+      typeof corpo['microvoceProgettoId'] === 'string' && corpo['microvoceProgettoId'].trim() !== ''
+        ? corpo['microvoceProgettoId']
+        : null;
+
     const grezzaCategoria = corpo['categoria'];
     const categoria = grezzaCategoria === undefined ? 'promemoria' : grezzaCategoria;
     if (!categoriaScrivibile(categoria)) {
+      // Le categorie sono diventate tre con B6: `join(' e ')` produceva «promemoria e contratto e
+      // microvoce», che si legge male. L'elenco semplice è anche quello che un messaggio d'errore
+      // deve essere.
       return rifiuta(
         reply,
         400,
-        `Categoria non scrivibile a mano: si possono creare ${CATEGORIE_SCRIVIBILI.join(' e ')}. Le altre derivano da una sorgente — si cambia quella, e il calendario si aggiorna.`,
+        `Categoria non scrivibile a mano: si possono creare ${CATEGORIE_SCRIVIBILI.join(', ')}. Le altre derivano da una sorgente — si cambia quella, e il calendario si aggiorna.`,
+      );
+    }
+
+    /**
+     * Un compito senza il compito a cui appartiene non è un compito.
+     *
+     * `microvoce` è l'unica categoria scrivibile che non ha una sorgente da cui dedurre la data —
+     * la scadenza la fissa una persona — e il riferimento è ciò che la tiene ancorata al
+     * fascicolo. Senza, resterebbe il solo titolo a dire di che cosa si tratta, e il titolo cambia.
+     */
+    if (categoria === 'microvoce' && !microvoceProgettoId) {
+      return rifiuta(
+        reply,
+        400,
+        'Un evento «microvoce» deve indicare il compito a cui appartiene («microvoceProgettoId»): senza quel riferimento il legame col fascicolo resterebbe affidato al solo titolo.',
       );
     }
 
@@ -334,6 +396,27 @@ export async function registraRotteCalendario(server: FastifyInstance): Promise<
       if (!esiste) return rifiuta(reply, 404, 'Progetto non trovato in questo studio.');
     }
 
+    /**
+     * §1ter.5 (B6) — il compito da cui l'evento nasce.
+     *
+     * Il modale di pianificazione del fascicolo scrive un promemoria **a partire da una
+     * micro-voce**: è quella che l'operatore ha davanti quando decide la data. Senza questa
+     * colonna il legame esiste solo nella testata dell'evento — «📄 Scadenza Presentazione
+     * Documento / Atto» e il nome del compito dentro il titolo — e si perde alla prima modifica
+     * del nome: la scadenza resta, orfana, e nessuno sa più a cosa si riferiva.
+     *
+     * La verifica di studio è la stessa degli altri riferimenti, e per la stessa ragione: senza,
+     * l'uuid di un compito di un altro studio verrebbe scritto e poi reso invisibile dalla RLS —
+     * la riga esisterebbe, non si vedrebbe, e nessuno capirebbe perché è sparita.
+     */
+    if (microvoceProgettoId) {
+      const microvoce = await prisma.microvoceProgetto.findFirst({
+        where: { id: microvoceProgettoId, tenantId: req.tenantId },
+        select: { id: true },
+      });
+      if (!microvoce) return rifiuta(reply, 404, 'Compito non trovato in questo studio.');
+    }
+
     const assegnatoAId = typeof corpo['assegnatoAId'] === 'string' ? corpo['assegnatoAId'] : null;
     if (assegnatoAId) {
       // `tenantId` nullable nel datamodel perché un super_admin non appartiene a uno studio: la
@@ -355,6 +438,7 @@ export async function registraRotteCalendario(server: FastifyInstance): Promise<
         assegnatoAId,
         progettoId,
         clienteId,
+        microvoceProgettoId,
         titolo,
         dataInizio: inizio,
         dataFine: fine,

@@ -201,6 +201,16 @@ export interface ChiediEventi {
   categorie: readonly CategoriaEventoCalendario[];
   /** `true` per «solo i compiti assegnati a me»: filtra sull'assegnatario, non sul proprietario. */
   soloAssegnatiAMe: boolean;
+  /**
+   * Restringe a un solo progetto: è il filtro dello scadenzario dentro il fascicolo.
+   *
+   * Vale solo per le righe di `evento_calendario` — le uniche che hanno un `progettoId` scritto.
+   * Le rate in attesa e i rinnovi KYC derivano da sorgenti che il progetto non lo nominano, e
+   * quando si chiede un progetto si chiede la sua agenda, non quella dello studio: vengono
+   * quindi escluse invece di essere incluse «per sicurezza», che riempirebbe la scheda di
+   * scadenze che non le appartengono.
+   */
+  progettoId?: string | null;
   adesso: Date;
 }
 
@@ -314,19 +324,39 @@ function eventoDaRiga(riga: RigaConContesto): EventoVista {
  * serve rende quell'omissione impossibile invece che improbabile.
  */
 export async function eventiDelCalendario(chiedi: ChiediEventi): Promise<EventoVista[]> {
-  const { tenantId, userId, ruolo, da, a, categorie, adesso } = chiedi;
+  const { tenantId, userId, ruolo, da, a, categorie, progettoId = null, adesso } = chiedi;
   const chieste = new Set<string>(categorie);
   const eventi: EventoVista[] = [];
 
   // `null` significa «vede tutto per ruolo» e salta il controllo di appartenenza; vedi `accessiDi`.
   const accessi = vedeTuttiIProgetti(ruolo) ? null : await accessiDi(tenantId, userId);
 
+  /**
+   * Un evento appartiene a un progetto per **tre** strade diverse, e il filtro le copre tutte.
+   *
+   * `progettoId` è quella diretta. Le altre due esistono perché un evento può nascere da un modulo
+   * o da una micro-voce senza che chi lo ha creato riempia anche la colonna del progetto — e
+   * chiedere il progetto della scheda deve restituire l'agenda di quel progetto, non l'agenda di
+   * chi ha compilato tutti i campi. Un filtro sull'unica colonna diretta avrebbe mostrato una
+   * scheda vuota per le attività pianificate dal fascicolo, che sono esattamente quelle che la
+   * scheda esiste per mostrare.
+   */
+  const delProgetto = progettoId
+    ? {
+        OR: [
+          { progettoId },
+          { moduloProgetto: { progettoId } },
+          { microvoceProgetto: { moduloProgetto: { progettoId } } },
+        ],
+      }
+    : {};
+
   // ── 1. Le righe scritte da qualcuno: promemoria, e ciò che la fase C materializzerà ──────────
   if (chieste.size > 0) {
     const righe = await prisma.eventoCalendario.findMany({
       // Sovrapposizione, non contenimento: un evento di tre giorni che comincia il 30 settembre
       // appartiene anche alla griglia di ottobre, e un filtro `dataInizio fra da e a` lo perderebbe.
-      where: { tenantId, dataInizio: { lte: a }, dataFine: { gte: da } },
+      where: { tenantId, dataInizio: { lte: a }, dataFine: { gte: da }, ...delProgetto },
       select: {
         id: true, titolo: true, dataInizio: true, dataFine: true, categoria: true, stato: true,
         priorita: true, note: true, luogoUrl: true, generato: true, userId: true,
@@ -348,9 +378,17 @@ export async function eventiDelCalendario(chiedi: ChiediEventi): Promise<EventoV
   // Il difetto che questo sostituisce: la pagina leggeva `fattura.dataEmissione`, che è il giorno in
   // cui la fattura è stata emessa. Una fattura a 30 giorni produceva quindi un evento sbagliato di
   // trenta giorni — e nessuno se ne accorgeva, perché una data c'era.
+  //
+  // Il filtro di progetto passa dalla fattura, che è l'unica a sapere per quale incarico è stata
+  // emessa: una rata di una fattura di questo progetto è una scadenza di questo progetto.
   if (chieste.has('fattura')) {
     const rate = await prisma.scadenzaIncasso.findMany({
-      where: { tenantId, stato: 'in_attesa', dataScadenza: { gte: da, lte: a } },
+      where: {
+        tenantId,
+        stato: 'in_attesa',
+        dataScadenza: { gte: da, lte: a },
+        ...(progettoId ? { fattura: { progettoId } } : {}),
+      },
       select: {
         id: true, numeroRata: true, importoCentesimi: true, dataScadenza: true,
         fattura: {
@@ -403,7 +441,11 @@ export async function eventiDelCalendario(chiedi: ChiediEventi): Promise<EventoV
   // sotto è la seconda rete. **Due guardie indipendenti**, non una: è la ragione per cui questo
   // caso non ha prodotto un rinnovo KYC per ogni cliente che non l'ha mai fatto. Il test in
   // `src/calendario.test.ts` fissa il comportamento, così che allentare una delle due si veda.
-  if (chieste.has('kyc')) {
+  //
+  // Il filtro di progetto esclude questa sorgente del tutto, ed è una scelta: la verifica KYC è del
+  // **cliente**, non dell'incarico. Un cliente con tre progetti aperti non ha tre rinnovi, ne ha
+  // uno — e mostrarlo in tutte e tre le schede lo moltiplicherebbe invece di riportarlo.
+  if (chieste.has('kyc') && !progettoId) {
     const clienti = await prisma.cliente.findMany({
       where: { tenantId, dataKyc: { not: null } },
       select: { id: true, nome: true, dataKyc: true },
@@ -448,6 +490,7 @@ export async function eventiDelCalendario(chiedi: ChiediEventi): Promise<EventoV
         tenantId,
         dataScadenza: { gte: da, lte: a },
         stato: { in: ['pre_project', 'in_progress'] },
+        ...(progettoId ? { id: progettoId } : {}),
       },
       select: {
         id: true, nome: true, dataScadenza: true, clienteId: true,
@@ -482,9 +525,16 @@ export async function eventiDelCalendario(chiedi: ChiediEventi): Promise<EventoV
   }
 
   // ── 5. Il prossimo rinnovo di un contratto ricorrente ────────────────────────────────────────
+  // Un contratto può non essere legato a un progetto (`progettoId` è facoltativo): quando si chiede
+  // un progetto, i contratti senza progetto restano fuori, perché non sono di quell'incarico.
   if (chieste.has('contratto')) {
     const contratti = await prisma.contrattoRicorrente.findMany({
-      where: { tenantId, stato: 'attivo', prossimaFatturazione: { gte: da, lte: a } },
+      where: {
+        tenantId,
+        stato: 'attivo',
+        prossimaFatturazione: { gte: da, lte: a },
+        ...(progettoId ? { progettoId } : {}),
+      },
       select: {
         id: true, titolo: true, prossimaFatturazione: true, clienteId: true, progettoId: true,
         cliente: { select: { nome: true } },

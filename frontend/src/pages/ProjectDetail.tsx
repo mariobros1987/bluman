@@ -4,7 +4,7 @@ import { PassaggioModal } from '../components/PassaggioModal';
 import { progressColor } from '../utils';
 import { ComunicazioniTab } from '../components/ComunicazioniTab';
 import { AssignOperatorModal } from '../components/AssignOperatorModal';
-import { CalendarPreviewModal } from '../components/CalendarPreviewModal';
+import { CalendarPreviewModal, etichettaTipoAttivita, type PianificazioneScadenza } from '../components/CalendarPreviewModal';
 import { ConfirmDeleteModal } from '../components/ConfirmDeleteModal';
 import { ModuliTab } from '../components/projectDetail/ModuliTab';
 import { FatturazioneTab } from '../components/projectDetail/FatturazioneTab';
@@ -18,6 +18,8 @@ import { ModalAccessiProgetto } from '../components/projectDetail/ModalAccessiPr
 import { fetchProgettoDettaglio, assegnaAccessoProgettoApi, salvaProgettoDettaglioApi, archiviaProgettoApi, eliminaProgettoApi, eliminaModuloApi, inviaComunicazioneApi, ricalcolaProgettoApi, creaPreventivoEAccettaApi } from '../api/client';
 import { useTeamMembers } from '../hooks/useTeamMembers';
 import { getCurrentTenantId, getTenantStorageKey, BLUECODE_TENANT_ID } from '../utils/tenant';
+import { istanteDaGiornoEOra, eGiornoIso } from '../utils/calendarioDate';
+import { creaEventoCalendario } from '../api/calendario';
 import type { Progetto, ModuloProgetto, MicroVoce, CategoriaModulo, StatoProgetto, StatoModulo, Cliente, TeamMember } from '../types';
 import styles from './ProjectDetail.module.css';
 
@@ -88,9 +90,17 @@ export function ProjectDetail() {
     modId: number;
     mvIdx?: number;
     name: string;
-    currentDueDate?: string;
-    operatorName?: string;
-    operatorId?: number;
+    /**
+     * §1ter.5 (B6) — `microvoce_progetto.id`, cioè la riga a database del compito.
+     *
+     * È quello che l'evento creato porta in `microvoce_progetto_id`, ed è l'unico modo perché il
+     * legame col fascicolo sopravviva a una rinomina. Assente sulle micro-voci che vivono solo nel
+     * browser: lì il server non ha una riga da indicare, e il modale lo dice invece di mandare un
+     * id inventato che tornerebbe indietro come 404.
+     */
+    microvoceDbId?: string;
+    /** L'operatore già assegnato al compito, proposto come predefinito nel modale. */
+    assegnatoAId?: string | null;
   } | null>(null);
 
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -147,31 +157,71 @@ export function ProjectDetail() {
     }
   };
 
-  const handleSaveCalendarEvent = (
-    date: string,
-    time: string,
-    operatorId: number,
-    typeIcon: string,
-    priority: string,
-    sendEmail: boolean,
-    notes: string,
-    locationUrl?: string
-  ) => {
+  /**
+   * §1ter.5 (B6) — pianificare un'attività del fascicolo **nel calendario dello studio**.
+   *
+   * ## Cosa faceva prima
+   *
+   * Scriveva un oggetto in `localStorage`, sotto la chiave `bluman_calendar_events`. Il calendario
+   * dello studio leggeva da un'altra chiave — `bluman_calendar_events` vs la sua, con un nome
+   * diverso — quindi quelle attività **non sono mai comparse nel calendario**: restavano in un
+   * archivio del browser che nessuna schermata mostrava e nessun salvataggio propagava. Chi
+   * pianificava una scadenza dal fascicolo la ritrovava come «pianificata» solo tornando in quel
+   * fascicolo, sullo stesso browser, nella stessa scheda.
+   *
+   * Il resto era coerente con quello: il titolo conteneva il codice del tipo (`doc`) invece
+   * dell'etichetta, l'operatore finiva in `opId` come id numerico della UI — che non è una riga di
+   * `bluman_user` — e la casella «invia email» veniva salvata in un campo che nessuno leggeva.
+   *
+   * ## Cosa fa adesso
+   *
+   * Una `POST /calendario/eventi` con `categoria: 'microvoce'` e `microvoceProgettoId`, che è il
+   * filo verso il fascicolo: l'evento compare nel calendario **e** resta agganciato al compito da
+   * cui è nato, anche se il compito viene rinominato. `assegnatoAId` è l'uuid scelto nel modale.
+   *
+   * La promessa torna al modale, che aspetta: se il server rifiuta, il modale resta aperto e
+   * mostra il motivo. Prima il modale dichiarava il successo per conto proprio, mentre la
+   * scrittura non era ancora avvenuta — e su una `localStorage` piena poteva non avvenire affatto.
+   */
+  const handleSaveCalendarEvent = async (p: PianificazioneScadenza) => {
     if (!project || !calendarModalTarget) return;
 
-    const newMods = project.mods.map(m => {
-      if (m.id === calendarModalTarget.modId) {
-        if (calendarModalTarget.mvIdx !== undefined) {
-          const newV = m.v.map((mv, idx) => {
-            if (idx === calendarModalTarget.mvIdx) {
-              return { ...mv, due: date, as: operatorId };
-            }
-            return mv;
-          });
-          return { ...m, v: newV };
-        }
-      }
-      return m;
+    // Il legame col fascicolo passa da un id di database. Una micro-voce che esiste solo nel
+    // browser non ne ha uno, e inventarlo porterebbe a un 404 o — peggio — a un evento agganciato
+    // al compito di qualcun altro. Meglio rifiutare qui, dicendo quale compito e perché.
+    const microvoceProgettoId = calendarModalTarget.microvoceDbId;
+    if (!microvoceProgettoId) {
+      throw new Error(
+        `Il compito «${calendarModalTarget.name}» non è ancora salvato a database: senza la sua riga l'attività non può essere agganciata al fascicolo. Salva il progetto e riprova.`,
+      );
+    }
+
+    const titolo = `${etichettaTipoAttivita(p.tipoAttivita)} — ${calendarModalTarget.name} (${project.cl})`;
+
+    await creaEventoCalendario({
+      titolo,
+      dataInizio: istanteDaGiornoEOra(p.giorno, p.ora),
+      categoria: 'microvoce',
+      microvoceProgettoId,
+      assegnatoAId: p.assegnatoAId,
+      priorita: p.priorita,
+      note: p.note,
+      luogoUrl: p.luogoUrl,
+    });
+
+    // La copia locale del progetto tiene la data e l'operatore sulla micro-voce, così il modulo
+    // mostra subito quando è prevista. `risorsaId` e non `as`: il primo è l'uuid che il server
+    // conosce, il secondo l'id numerico con cui la UI disegna l'avatar.
+    const newMods = project.mods.map((m) => {
+      if (m.id !== calendarModalTarget.modId || calendarModalTarget.mvIdx === undefined) return m;
+      return {
+        ...m,
+        v: m.v.map((mv, idx) =>
+          idx === calendarModalTarget.mvIdx
+            ? { ...mv, due: p.giorno, risorsaId: p.assegnatoAId ?? null }
+            : mv,
+        ),
+      };
     });
 
     const updatedProject = { ...project, mods: newMods };
@@ -179,23 +229,8 @@ export function ProjectDetail() {
 
     const savedStr = localStorage.getItem(getTenantStorageKey('bluman_custom_projects'));
     const savedArr: Progetto[] = savedStr ? JSON.parse(savedStr) : [];
-    const updatedArr = [updatedProject, ...savedArr.filter(p => String(p.id) !== String(project.id))];
+    const updatedArr = [updatedProject, ...savedArr.filter((pr) => String(pr.id) !== String(project.id))];
     localStorage.setItem(getTenantStorageKey('bluman_custom_projects'), JSON.stringify(updatedArr));
-
-    const eventsStr = localStorage.getItem(getTenantStorageKey('bluman_calendar_events'));
-    const eventsArr = eventsStr ? JSON.parse(eventsStr) : [];
-    const newEvent = {
-      id: `ev-${Date.now()}`,
-      title: `${typeIcon} - ${calendarModalTarget.name} (${project.cl})`,
-      date,
-      time,
-      opId: operatorId,
-      priority,
-      sendEmail,
-      notes,
-      locationUrl,
-    };
-    localStorage.setItem(getTenantStorageKey('bluman_calendar_events'), JSON.stringify([newEvent, ...eventsArr]));
 
     void salvaSuDatabase(updatedProject);
   };
@@ -804,7 +839,16 @@ export function ProjectDetail() {
             onToggleMv={handleToggleMicrovoce}
             onOpenAssignMod={(mod) => setAssignModalTarget({ modId: mod.id, name: `Modulo: ${mod.n}`, currentAssigned: mod.team || [], categoria: mod.cat })}
             onOpenAssignMv={(mod, vidx) => setAssignModalTarget({ modId: mod.id, mvIdx: vidx, name: `Microvoce: ${mod.v[vidx]?.n || 'Microvoce'}`, currentAssigned: mod.v[vidx]?.as != null ? [mod.v[vidx]!.as!] : [], categoria: mod.cat })}
-            onOpenCalendarMv={(mod, vidx) => setCalendarModalTarget({ modId: mod.id, mvIdx: vidx, name: mod.v[vidx]?.n || 'Microvoce' })}
+            onOpenCalendarMv={(mod, vidx) => setCalendarModalTarget({
+              modId: mod.id,
+              mvIdx: vidx,
+              name: mod.v[vidx]?.n || 'Microvoce',
+              // §1ter.5 (B6) — le due cose che servono perché l'evento nasca agganciato:
+              // la riga a database del compito (il filo verso il fascicolo) e l'operatore
+              // già assegnato (il valore predefinito che l'operatore si aspetta di vedere).
+              microvoceDbId: mod.v[vidx]?.dbId,
+              assegnatoAId: mod.v[vidx]?.risorsaId ?? null,
+            })}
             onDeleteMod={handleEliminaModulo}
           />
         )}
@@ -910,14 +954,25 @@ export function ProjectDetail() {
       {calendarModalTarget && (
         <CalendarPreviewModal
           isOpen={!!calendarModalTarget}
-          onClose={() => setCalendarModalTarget(null)}
+          onChiudi={() => setCalendarModalTarget(null)}
           microvoceName={calendarModalTarget.name}
           projectName={project.n}
-          onSchedule={(dt, opId, prio, sendE, actType, tm, nts, loc) => {
-            // onSchedule arriva in ordine (data, operatore, priorità, email, tipo, ora, note, luogo);
-            // handleSaveCalendarEvent li vuole in ordine diverso (data, ora, operatore, tipo, priorità, email, note, luogo).
-            handleSaveCalendarEvent(dt, tm ?? '', opId, actType ?? 'doc', prio, sendE, nts ?? '', loc);
-          }}
+          // §1ter.5 (B5) — il modale non indovina più il giorno da una costante: glielo si dice.
+          // E glielo si dice solo se è un giorno: `due` su una micro-voce arriva da una copia
+          // locale del progetto, quindi da dati che nessun tipo ha validato. Un `18/09/2026` o un
+          // `'30 giorni'` messo lì da una versione precedente produrrebbe un `dataInizio` non
+          // valido, e il server lo rifiuterebbe parlando di date invece che del campo sbagliato:
+          // meglio ricadere su oggi, che è ciò che il modale fa quando non riceve niente.
+          initialDate={(() => {
+            if (calendarModalTarget.mvIdx === undefined) return undefined;
+            const giorno = project.mods.find((m) => m.id === calendarModalTarget.modId)
+              ?.v[calendarModalTarget.mvIdx]?.due;
+            return eGiornoIso(giorno) ? giorno : undefined;
+          })()}
+          // §1ter.5 (B6) — un oggetto invece di otto parametri posizionali: la vecchia firma ne
+          // aveva due ordini diversi tra chi chiamava e chi riceveva, e il commento accanto
+          // spiegava come rimapparli. Un ordine solo non ha bisogno di commento.
+          onSchedule={handleSaveCalendarEvent}
         />
       )}
 

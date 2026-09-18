@@ -33,6 +33,8 @@ interface StatoFinto {
   progetti: any[];
   contratti: any[];
   permessi: any[];
+  /** Le micro-voci esistenti, per la validazione di `microvoceProgettoId` in creazione. */
+  microvoci: any[];
   // Registri: cosa il server ha scritto davvero.
   creati: any[];
   aggiornati: any[];
@@ -41,14 +43,32 @@ interface StatoFinto {
 }
 
 const stato: StatoFinto = {
-  eventi: [], accessi: [], rate: [], clienti: [], progetti: [], contratti: [], permessi: [],
+  eventi: [], accessi: [], rate: [], clienti: [], progetti: [], contratti: [], permessi: [], microvoci: [],
   creati: [], aggiornati: [], cancellati: [], intervalliChiesti: [],
 };
 
-/** Applica un `where` minimale ma fedele: uguaglianza, `in`, `not`, e i confronti sulle date. */
+/**
+ * Applica un `where` minimale ma fedele: uguaglianza, `in`, `not`, i confronti sulle date, gli
+ * alberi `OR`/`AND`/`NOT` e i `where` annidati sulle relazioni.
+ *
+ * Gli ultimi due servono dal §1ter.5 (B5): il filtro per progetto cerca un evento per tre strade —
+ * `progettoId`, `moduloProgetto.progettoId`, `microvoceProgetto.moduloProgetto.progettoId` — e sono
+ * un `OR` di tre condizioni, due delle quali annidate. Un finto che le ignorasse risponderebbe
+ * «nessuna riga» a tutte e tre, e il test del filtro passerebbe per il motivo sbagliato: non
+ * perché il filtro è giusto, ma perché il finto non sa leggere un `where` che non conosce.
+ */
 function corrisponde(riga: any, where: any): boolean {
   if (!where) return true;
+
+  // Gli operatori che una condizione può portare. Serve a distinguere `{ progettoId: 'x' }` — un
+  // `where` annidato sulla relazione — da `{ gte: data }`, che è un confronto sul campo stesso.
+  const OPERATORI = ['in', 'not', 'gte', 'lte', 'lt', 'gt', 'equals', 'contains', 'startsWith', 'mode'];
+
   return Object.entries(where).every(([campo, condizione]) => {
+    if (campo === 'OR') return (condizione as any[]).some((c) => corrisponde(riga, c));
+    if (campo === 'AND') return (condizione as any[]).every((c) => corrisponde(riga, c));
+    if (campo === 'NOT') return !corrisponde(riga, condizione);
+
     const valore = riga[campo];
     if (condizione === null) return valore === null;
     if (typeof condizione !== 'object' || condizione instanceof Date) return valore === condizione;
@@ -59,7 +79,12 @@ function corrisponde(riga: any, where: any): boolean {
     if ('lte' in c && !(valore <= c.lte)) return false;
     if ('lt' in c && !(valore < c.lt)) return false;
     if ('gt' in c && !(valore > c.gt)) return false;
-    return true;
+    if (Object.keys(c).some((k) => OPERATORI.includes(k))) return true;
+
+    // Nessun operatore: è un `where` su una relazione. Una relazione assente non soddisfa nessuna
+    // condizione — è il caso di un evento senza modulo, che non appartiene a nessun progetto.
+    if (valore === null || valore === undefined) return false;
+    return corrisponde(valore, c);
   });
 }
 
@@ -121,6 +146,13 @@ vi.mock('./util/prismaClient.js', async (importOriginal) => {
         proietta(stato.clienti.find((c) => corrisponde(c, args?.where)) ?? null, args.select),
       findMany: async (args: any) =>
         stato.clienti.filter((c) => corrisponde(c, args?.where)).map((c) => proietta(c, args.select)),
+    },
+    // Le micro-voci: servono solo a validare il compito da cui nasce un evento (§1ter.5 B6).
+    // `microvoce_progetto` porta il `tenant_id` in colonna, quindi il `where` è un confronto
+    // diretto e `corrisponde` lo applica già.
+    microvoceProgetto: {
+      findFirst: async (args: any) =>
+        proietta(stato.microvoci.find((m) => corrisponde(m, args?.where)) ?? null, args.select),
     },
     eventoCalendario: {
       findMany: async (args: any) => {
@@ -245,6 +277,7 @@ function evento(overrides: Record<string, unknown> = {}) {
     moduloProgettoId: null,
     microvoceProgettoId: null,
     moduloProgetto: null,
+    microvoceProgetto: null,
     titolo: 'Chiamata con il cliente',
     dataInizio: new Date('2026-09-15T09:00:00.000Z'),
     dataFine: new Date('2026-09-15T10:00:00.000Z'),
@@ -290,6 +323,7 @@ beforeEach(() => {
   stato.progetti = [];
   stato.contratti = [];
   stato.permessi = [];
+  stato.microvoci = [{ id: 'mv-1', tenantId: TENANT }, { id: 'mv-altro', tenantId: ALTRO_TENANT }];
   stato.creati = [];
   stato.aggiornati = [];
   stato.cancellati = [];
@@ -394,6 +428,157 @@ describe('le rate: chi le vede, e da quale data', () => {
 
     expect(res.json().eventi).toEqual([]);
     expect(res.json().categorie).not.toContain('fattura');
+  });
+});
+
+describe('il filtro per progetto: lo scadenzario dentro il fascicolo', () => {
+  it('un evento del progetto si vede, uno di un altro progetto no', async () => {
+    stato.eventi = [
+      evento({ id: 'ev-mio', titolo: 'Deposito statuto', progettoId: 'prg-1' }),
+      evento({ id: 'ev-altrui', titolo: 'Pratica di un altro incarico', progettoId: 'prg-2' }),
+    ];
+    const server = await serverCon(tokenPer('usr-advisor'));
+    const res = await server.inject({ method: 'GET', url: '/calendario/eventi?progettoId=prg-1' });
+
+    expect(res.json().eventi.map((e: any) => e.id)).toEqual(['ev-mio']);
+  });
+
+  it('un evento agganciato a un modulo del progetto appartiene al progetto', async () => {
+    // La strada indiretta. Un evento creato dal modulo può non avere `progettoId` in colonna: se il
+    // filtro guardasse solo quella, la scheda del fascicolo mostrerebbe un elenco vuoto proprio per
+    // le attività pianificate dal fascicolo — che sono quelle che la scheda esiste per mostrare.
+    //
+    // L'esca è l'evento del modulo di un **altro** progetto: senza di essa il test passerebbe anche
+    // con il filtro rimosso, perché l'evento cercato sarebbe restituito comunque.
+    stato.eventi = [
+      evento({ id: 'ev-modulo', progettoId: null, moduloProgettoId: 'mod-1', moduloProgetto: { progettoId: 'prg-1' } }),
+      evento({ id: 'ev-modulo-altrui', progettoId: null, moduloProgettoId: 'mod-9', moduloProgetto: { progettoId: 'prg-9' } }),
+    ];
+    const server = await serverCon(tokenPer('usr-advisor'));
+    const res = await server.inject({ method: 'GET', url: '/calendario/eventi?progettoId=prg-1' });
+
+    expect(res.json().eventi.map((e: any) => e.id)).toEqual(['ev-modulo']);
+  });
+
+  it('un evento agganciato a una micro-voce del progetto appartiene al progetto', async () => {
+    // La terza strada, ed è quella che percorre il pulsante «programma scadenza» del fascicolo:
+    // manda `microvoceProgettoId` e nient'altro, quindi né `progettoId` né `moduloProgettoId`
+    // sono valorizzati.
+    stato.eventi = [
+      evento({
+        id: 'ev-microvoce',
+        progettoId: null,
+        moduloProgettoId: null,
+        microvoceProgettoId: 'mv-1',
+        microvoceProgetto: { moduloProgetto: { progettoId: 'prg-1' } },
+      }),
+      evento({
+        id: 'ev-microvoce-altrui',
+        progettoId: null,
+        moduloProgettoId: null,
+        microvoceProgettoId: 'mv-9',
+        microvoceProgetto: { moduloProgetto: { progettoId: 'prg-9' } },
+      }),
+    ];
+    const server = await serverCon(tokenPer('usr-advisor'));
+    const res = await server.inject({ method: 'GET', url: '/calendario/eventi?progettoId=prg-1' });
+
+    expect(res.json().eventi.map((e: any) => e.id)).toEqual(['ev-microvoce']);
+  });
+
+  it('un evento senza progetto non entra nello scadenzario di un progetto', async () => {
+    // Il caso che rende il filtro una restrizione e non un permesso: un promemoria di studio senza
+    // riferimenti non appartiene a nessun incarico, e mostrarlo in ognuno lo moltiplicherebbe.
+    stato.eventi = [evento({ id: 'ev-sciolto', progettoId: null, titolo: 'Riunione di studio' })];
+    const server = await serverCon(tokenPer('usr-advisor'));
+    const res = await server.inject({ method: 'GET', url: '/calendario/eventi?progettoId=prg-1' });
+
+    expect(res.json().eventi).toEqual([]);
+  });
+
+  it('senza il parametro si vede tutto: il filtro restringe, non è un permesso', async () => {
+    stato.eventi = [
+      evento({ id: 'ev-1', progettoId: 'prg-1' }),
+      evento({ id: 'ev-2', progettoId: 'prg-2' }),
+      evento({ id: 'ev-3', progettoId: null }),
+    ];
+    const server = await serverCon(tokenPer('usr-advisor'));
+    const res = await server.inject({ method: 'GET', url: '/calendario/eventi' });
+
+    expect(res.json().eventi.map((e: any) => e.id).sort()).toEqual(['ev-1', 'ev-2', 'ev-3']);
+  });
+
+  it('la rata di una fattura del progetto è una scadenza del progetto, quella di un\'altra no', async () => {
+    stato.rate = [
+      rata({ id: 'rat-mia', fattura: { ...rata().fattura, progettoId: 'prg-1' } }),
+      rata({ id: 'rat-altrui', fattura: { ...rata().fattura, id: 'fat-2', progettoId: 'prg-2' } }),
+    ];
+    const server = await serverCon(tokenPer('usr-advisor'));
+    const res = await server.inject({ method: 'GET', url: '/calendario/eventi?categorie=fattura&progettoId=prg-1' });
+
+    expect(res.json().eventi.map((e: any) => e.origineId)).toEqual(['rat-mia']);
+  });
+
+  it('il rinnovo KYC resta fuori dallo scadenzario di un incarico', async () => {
+    // Il KYC è del **cliente**, non del progetto: un cliente con tre incarichi aperti ha un solo
+    // rinnovo, e mostrarlo in tutte e tre le schede lo moltiplicherebbe invece di riportarlo.
+    stato.clienti = [{ id: 'cli-1', tenantId: TENANT, nome: 'Holding Beta S.r.l.', dataKyc: '2025-09-20' }];
+    // Un evento del progetto c'è, così il test non si accontenta di un elenco vuoto che potrebbe
+    // venire da un filtro rotto che scarta tutto. E c'è la riga di accesso, perché un
+    // collaboratore interno non vede i progetti per ruolo: senza, l'evento sarebbe invisibile per
+    // la visibilità e il test proverebbe quella invece del filtro.
+    // `userId` è quello di chi chiede: un promemoria è di chi l'ha scritto, e un collaboratore
+    // interno non vede quello di un collega. Senza, l'evento sarebbe invisibile per la proprietà e
+    // il test proverebbe quella invece del filtro di progetto.
+    stato.eventi = [evento({ id: 'ev-mio', userId: 'usr-interno', progettoId: 'prg-1', titolo: 'Deposito statuto' })];
+    stato.accessi = [{ id: 'acc-1', tenantId: TENANT, userId: 'usr-interno', progettoId: 'prg-1', moduloProgettoId: null, microvoceProgettoId: null, moduloProgetto: null, microvoceProgetto: null }];
+    const server = await serverCon(tokenPer('usr-interno'));
+
+    const senzaFiltro = await server.inject({ method: 'GET', url: '/calendario/eventi?categorie=kyc,promemoria' });
+    expect(senzaFiltro.json().eventi.map((e: any) => e.categoria).sort()).toEqual(['kyc', 'promemoria']);
+
+    const conFiltro = await server.inject({ method: 'GET', url: '/calendario/eventi?categorie=kyc,promemoria&progettoId=prg-1' });
+    expect(conFiltro.json().eventi.map((e: any) => e.id)).toEqual(['ev-mio']);
+  });
+
+  it('il progetto di un altro studio non fa vedere niente', async () => {
+    // L'appartenenza allo studio la filtra già il `tenantId`, che il servizio applica sempre: qui si
+    // verifica che il filtro di progetto non sia una porta che scavalca quella condizione.
+    stato.eventi = [evento({ id: 'ev-altro-studio', tenantId: ALTRO_TENANT, progettoId: 'prg-1' })];
+    const server = await serverCon(tokenPer('usr-advisor'));
+    const res = await server.inject({ method: 'GET', url: '/calendario/eventi?progettoId=prg-1' });
+
+    expect(res.json().eventi).toEqual([]);
+  });
+
+  it('delle scadenze di fine progetto resta solo quella dell\'incarico chiesto', async () => {
+    // Le sorgenti derivate hanno il loro filtro, e va provato separatamente: sono quattro query
+    // diverse, e il `progettoId` non passa per la stessa riga di codice in tutte.
+    stato.clienti = [{ id: 'cli-1', tenantId: TENANT, nome: 'Holding Beta S.r.l.' }];
+    stato.progetti = [
+      { id: 'prg-1', tenantId: TENANT, nome: 'Ristrutturazione Beta', clienteId: 'cli-1', stato: 'in_progress', dataScadenza: new Date('2026-09-30T00:00:00.000Z') },
+      { id: 'prg-2', tenantId: TENANT, nome: 'Un altro incarico', clienteId: 'cli-1', stato: 'in_progress', dataScadenza: new Date('2026-09-28T00:00:00.000Z') },
+    ];
+    const server = await serverCon(tokenPer('usr-advisor'));
+    const res = await server.inject({ method: 'GET', url: '/calendario/eventi?categorie=progetto&progettoId=prg-1' });
+
+    expect(res.json().eventi.map((e: any) => e.origineId)).toEqual(['prg-1']);
+  });
+
+  it('dei rinnovi contrattuali resta solo quello legato all\'incarico chiesto', async () => {
+    // `contratto_ricorrente.progetto_id` è facoltativo: un contratto senza progetto non è di nessun
+    // incarico, e con il filtro attivo non deve comparire in ognuno.
+    stato.clienti = [{ id: 'cli-1', tenantId: TENANT, nome: 'Holding Beta S.r.l.' }];
+    const comune = { tenantId: TENANT, stato: 'attivo', clienteId: 'cli-1', prossimaFatturazione: new Date('2026-09-26T00:00:00.000Z') };
+    stato.contratti = [
+      { id: 'ctr-1', titolo: 'Contabilità annuale', progettoId: 'prg-1', ...comune },
+      { id: 'ctr-2', titolo: 'Di un altro incarico', progettoId: 'prg-2', ...comune },
+      { id: 'ctr-3', titolo: 'Senza progetto', progettoId: null, ...comune },
+    ];
+    const server = await serverCon(tokenPer('usr-advisor'));
+    const res = await server.inject({ method: 'GET', url: '/calendario/eventi?categorie=contratto&progettoId=prg-1' });
+
+    expect(res.json().eventi.map((e: any) => e.origineId)).toEqual(['ctr-1']);
   });
 });
 
@@ -560,7 +745,11 @@ describe('la creazione di un evento', () => {
 
   it('un evento derivato non si crea a mano', async () => {
     const server = await serverCon(tokenPer('usr-advisor'));
-    for (const categoria of ['fattura', 'kyc', 'progetto', 'microvoce']) {
+    // Tre categorie, non quattro: `microvoce` è uscita da questo elenco in §1ter.5 (B6) perché
+    // **nessun generatore la produce** — le sorgenti derivate sono rate, KYC, progetti e
+    // contratti — e un compito non ha una data da dedurre: la fissa una persona. Vedi
+    // `CATEGORIE_SCRIVIBILI` e il test successivo, che ne fissa la condizione.
+    for (const categoria of ['fattura', 'kyc', 'progetto']) {
       const res = await server.inject({
         method: 'POST',
         url: '/calendario/eventi',
@@ -569,6 +758,36 @@ describe('la creazione di un evento', () => {
       expect(res.statusCode, `categoria ${categoria}`).toBe(400);
     }
     expect(stato.creati).toHaveLength(0);
+  });
+
+  it('un evento «microvoce» si crea solo insieme al compito a cui appartiene', async () => {
+    // Il caso che prima non esisteva: la scheda «⚡ Microvoci Progetto» del calendario non poteva
+    // ricevere niente da nessuno. Ora può — ma non un compito di niente.
+    const server = await serverCon(tokenPer('usr-advisor'));
+
+    const senzaCompito = await server.inject({
+      method: 'POST',
+      url: '/calendario/eventi',
+      payload: { titolo: 'Compito orfano', dataInizio: '2026-09-20', categoria: 'microvoce' },
+    });
+    expect(senzaCompito.statusCode).toBe(400);
+    expect(senzaCompito.json().errore).toContain('microvoceProgettoId');
+    expect(stato.creati).toHaveLength(0);
+
+    const conCompito = await server.inject({
+      method: 'POST',
+      url: '/calendario/eventi',
+      payload: {
+        titolo: 'Presentare il documento',
+        dataInizio: '2026-09-20T10:30:00.000Z',
+        categoria: 'microvoce',
+        microvoceProgettoId: 'mv-1',
+      },
+    });
+    expect(conCompito.statusCode).toBe(201);
+    expect(stato.creati[0].data.categoria).toBe('microvoce');
+    expect(stato.creati[0].data.microvoceProgettoId).toBe('mv-1');
+    expect(stato.creati[0].data.generato).toBe(false);
   });
 
   it('un evento «contratto» invece si crea: non ogni scadenza contrattuale è un contratto ricorrente', async () => {
@@ -606,6 +825,49 @@ describe('la creazione di un evento', () => {
     // `usr-super` è un super_admin: `tenantId` null, quindi non appartiene a questo studio.
     expect(res.statusCode).toBe(404);
     expect(stato.creati).toHaveLength(0);
+  });
+
+  /**
+   * §1ter.5 (B6) — il compito da cui l'evento nasce.
+   *
+   * Il modale di pianificazione del fascicolo scrive un promemoria a partire da una micro-voce.
+   * Senza la colonna, il legame resta solo dentro il titolo («📄 … — Raccolta documenti») e si
+   * perde alla prima rinomina, lasciando in giro una scadenza orfana che nessuno sa giustificare.
+   */
+  it('il compito di origine viene scritto nella riga', async () => {
+    const server = await serverCon(tokenPer('usr-advisor'));
+    const res = await server.inject({
+      method: 'POST',
+      url: '/calendario/eventi',
+      payload: { titolo: 'Preparare il fascicolo', dataInizio: '2026-09-20', microvoceProgettoId: 'mv-1' },
+    });
+
+    expect(res.statusCode).toBe(201);
+    expect(stato.creati[0].data.microvoceProgettoId).toBe('mv-1');
+  });
+
+  it('un compito di un altro studio viene rifiutato, e non scritto', async () => {
+    // La stessa ragione degli altri due riferimenti: senza il controllo l'uuid verrebbe scritto,
+    // la RLS renderebbe la riga invisibile, e nessuno capirebbe perché è sparita.
+    const server = await serverCon(tokenPer('usr-advisor'));
+    const res = await server.inject({
+      method: 'POST',
+      url: '/calendario/eventi',
+      payload: { titolo: 'X', dataInizio: '2026-09-20', microvoceProgettoId: 'mv-altro' },
+    });
+
+    expect(res.statusCode).toBe(404);
+    expect(stato.creati).toHaveLength(0);
+  });
+
+  it('un compito inesistente viene rifiutato', async () => {
+    const server = await serverCon(tokenPer('usr-advisor'));
+    const res = await server.inject({
+      method: 'POST',
+      url: '/calendario/eventi',
+      payload: { titolo: 'X', dataInizio: '2026-09-20', microvoceProgettoId: 'mv-inventato' },
+    });
+    expect(res.statusCode).toBe(404);
   });
 });
 
