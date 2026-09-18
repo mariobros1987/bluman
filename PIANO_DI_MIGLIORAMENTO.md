@@ -272,7 +272,7 @@ di una funzione che nessuno ha ancora collegato.
 |---|---|---|
 | `evento_calendario` | **0** in tutti e 5 gli studi | Nessuno ci ha mai scritto. La lettura di `ricercaGlobaleService.ts:142` interroga una tabella vuota per costruzione. |
 | `accesso_risorsa` | **0** in tutti e 5 gli studi | Nessun accesso a progetto è mai stato concesso. La rotta `assegnaAccessoProgettoApi` non ha mai scritto una riga utile. |
-| `microvoce_progetto.risorsa_id` | **0 valorizzate** su tutte le micro-voci | Nessuna micro-voce è mai stata assegnata. Il carico di lavoro (`progetti.ts:1133`) somma ore su un campo sempre `NULL`. |
+| `microvoce_progetto.risorsa_id` | **0 valorizzate** su tutte le micro-voci | Nessuna micro-voce è mai stata assegnata. Il carico di lavoro (`progetti.ts:1199`, via `caricoPerRisorse`) somma ore su un campo sempre `NULL`. |
 
 E le sorgenti da cui il calendario dovrà derivare, nello stesso momento:
 
@@ -503,8 +503,9 @@ la lettura non riporta, e alla ricarica l'assegnazione sembra di nuovo sparita.
 calendario la mostra come categoria `microvoce`, filtrata per `assegnatoAId` — e per un
 `collaboratore_esterno` «il mio calendario» significa **solo** le micro-voci su cui ha
 `accesso_risorsa`. La stessa query serve la vista «i miei compiti» e il carico di lavoro, che in
-`src/routes/progetti.ts:1133` esiste già e somma ore per `risorsaId` — un altro consumatore che oggi
-lavora su un campo sempre `NULL`, e che questa fase accende.
+`src/routes/progetti.ts` esiste già e somma ore per `risorsaId` — un altro consumatore che oggi
+lavora su un campo sempre `NULL`, e che questa fase accende. *(Chiuso il 18/09/2026: quel calcolo ora
+passa da `caricoPerRisorse` in `src/services/compitiAssegnati.ts`, chiamato a `progetti.ts:1199`.)*
 
 #### C1 era incompleto: il seed dimostrativo entrava ancora nel menu
 
