@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTeamMembers, extractInitialsFromName } from '../../hooks/useTeamMembers';
-import type { TeamMember } from '../../types';
+import type { PersonaVisualizzata } from '../../types';
 
 interface AvatarProps {
   id: number | string;
@@ -17,9 +17,22 @@ export function Avatar({ id, size = 24, showTooltip = true }: AvatarProps) {
   const idStr = String(id || '').trim().toLowerCase();
   const idNum = typeof id === 'number' ? id : parseInt(idStr.replace(/\D/g, ''), 10);
 
-  const m: TeamMember = teamList.find(t => 
-    String(t.id) === idStr || 
+  // §1ter.6 (C1) — il tipo qui è `PersonaVisualizzata`, non `TeamMember`: questo ripiego
+  // disegna qualcuno che **non è** un membro dello studio (un id che non risolve più, un
+  // assegnatario storico, un progetto vecchio). Chiedergli un `dbId` costringerebbe a
+  // inventarne uno, cioè a rifare l'errore da cui viene questa correzione. Un avatar non
+  // assegna lavoro, quindi non gli serve un identificativo di database.
+  const m: PersonaVisualizzata = teamList.find(t =>
+    String(t.id) === idStr ||
     (idNum && t.id === idNum) ||
+    // §1ter.6 (C1) — anche l'uuid. L'API restituisce l'assegnatario di una micro-voce come
+    // `risorsa.id` (l'uuid di `bluman_user`), non come id numerico della UI: senza questa
+    // riga l'avatar di un compito assegnato non si risolverebbe e mostrerebbe il segnaposto.
+    // Cercare qui l'uuid invece di tradurlo a monte è ciò che rende il disegno indipendente
+    // dall'ordine di caricamento: questo componente ha un suo `useTeamMembers`, quindi si
+    // ri-renderizza quando la squadra arriva, mentre la pagina che ha tradotto l'id una
+    // volta sola resterebbe ferma su un valore calcolato prima.
+    t.dbId === idStr ||
     t.n.toLowerCase() === idStr ||
     (idStr.includes('mario') && t.n.toLowerCase().includes('mario'))
   ) || {

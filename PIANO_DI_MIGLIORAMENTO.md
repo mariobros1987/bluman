@@ -312,11 +312,27 @@ regola va applicata **nel backend, per sorgente**, mai con un flag che il client
 
 | Categoria | Sorgente | Chi la vede |
 |---|---|---|
-| `promemoria` | `evento_calendario` | Solo `userId` proprietario. Un `collaboratore_esterno` vede i propri. |
+| `promemoria` | `evento_calendario` | Solo `userId` proprietario, più l'`assegnatoAId` se il compito è stato affidato a qualcuno. Un `collaboratore_esterno` vede i propri. |
 | `microvoce` | `microvoce_progetto` + `accesso_risorsa` | Chi ha una riga in `accesso_risorsa` su progetto, modulo o micro-voce; più `advisor` e `super_admin` dello studio. |
 | `kyc` | `cliente.data_kyc` | Solo ruoli interni dello studio. **Mai** il ruolo `cliente`. |
 | `fattura` | `scadenza_incasso` | Solo chi vede i dati contabili. **Mai** `collaboratore_esterno` né `cliente`: l'importo di una rata di un altro cliente non è un dato di lavoro, è un dato riservato. |
 | `contratto` | `contratto_ricorrente` / `EngagementLetter` | Ruoli interni. |
+| `progetto` | `progetto.data_scadenza` | Chi ha accesso a quel progetto (`accesso_risorsa`, risalendo da modulo e micro-voce), più `advisor` e `super_admin`. |
+
+**La sesta categoria è stata aggiunta il 17/09/2026, ed è una deviazione dal piano.** La tabella qui
+sopra ne prevedeva cinque e nessuna per la **fine di un progetto** — che è una delle due cose che
+l'utente ha chiesto di aggregare automaticamente nel calendario. Non è stata mappata su `promemoria`
+per la ragione che rende quella categoria inadatta: `promemoria` è la riga di **una persona**,
+visibile solo a chi l'ha scritta, mentre la scadenza di un progetto la devono vedere tutti quelli che
+sono sul progetto. Mapparla lì l'avrebbe resa invisibile a chi deve rispettarla. Le asserzioni
+ruolo × categoria sono quindi **trenta**, non venticinque.
+
+**L'assegnazione concede la lettura, e non solo la scrittura.** Assegnare un compito a qualcuno che
+non può vederlo è un'assegnazione che non esiste, quindi una riga è leggibile dal suo proprietario
+**e** dal suo assegnatario — le stesse due persone che `PATCH /:id/stato` autorizza a cambiare lo
+stato. Il piano non lo diceva, e la prima stesura di questo codice non era coerente con sé stessa:
+la lettura ammetteva il solo proprietario, la scrittura anche l'assegnatario. Un test ha reso la
+contraddizione visibile, ed è la ragione per cui è scritta qui.
 
 **Il portale del cliente è un'altra cosa, non un filtro di questa.** `clienti`/`cliente` oggi ha una
 sessione separata (`bluman_portal_token`). Il portale deve avere un proprio feed, con dentro **solo**
@@ -333,8 +349,17 @@ di rata, mai un nome di un altro cliente, mai una nota operativa scritta per il 
    passare `?categorie=fattura` restituisce vuoto, non i dati.
 3. Un test per ruolo × categoria, che asserisce l'assenza. La tabella qui sopra è la specifica di
    quel test: cinque ruoli (`super_admin`, `advisor`, `collaboratore_interno`,
-   `collaboratore_esterno`, `cliente`) per cinque categorie sono venticinque asserzioni, e le
-   venticinque si scrivono in un file solo.
+   `collaboratore_esterno`, `cliente`) per le categorie della tabella — trenta asserzioni con la
+   sesta categoria, e le trenta stanno in un file solo (`src/util/calendarioVisibilita.test.ts`).
+   La matrice è scritta **una volta** e i test la percorrono: trenta `it` separati avrebbero
+   prodotto trenta posti in cui correggere una cella invece di uno.
+
+4. La categoria non è la sola cosa che filtra: la **matrice permessi** può togliere una categoria
+   che il ruolo vedrebbe. Un `collaboratore_interno` con `scadenzario: denied` non vede le rate,
+   perché `/calendario` non è in `ROTTE_MODULO` e il guard globale non lo tocca: senza questa
+   lettura, il calendario diventerebbe la porta di servizio da cui quell'utente vede gli importi
+   che gli sono stati esplicitamente tolti. Vale per `fattura` soltanto, che è l'unica categoria
+   la cui sorgente ha un modulo nella matrice.
 
 ### 1ter.4 Fase A — Il backend del calendario
 
@@ -481,6 +506,56 @@ calendario la mostra come categoria `microvoce`, filtrata per `assegnatoAId` —
 `src/routes/progetti.ts:1133` esiste già e somma ore per `risorsaId` — un altro consumatore che oggi
 lavora su un campo sempre `NULL`, e che questa fase accende.
 
+#### C1 era incompleto: il seed dimostrativo entrava ancora nel menu
+
+Trovato il 18/09/2026 chiudendo il blocco 4, e **corretto qui**.
+
+La guardia di C1 chiedeva che l'id fosse una **stringa non vuota**. Non basta. `DEFAULT_TEAM_USERS`
+in `frontend/src/api/tenant.ts:7` usa `usr-01`…`usr-05`: stringhe non vuote, e non id di database.
+Passavano la guardia, ricevevano `dbId: 'usr-01'`, e il menu tornava a offrire cinque persone che
+`risorsa_id` avrebbe rifiutato — cioè esattamente il difetto che C1 esiste per chiudere.
+
+Non è un caso di laboratorio, ed è questo che lo rende grave: `fetchUtentiTenant` restituisce
+`DEFAULT_TEAM_USERS` per il tenant demo **ogni volta che l'API non risponde**, e lo fa *senza
+sollevare eccezioni* — il ripiego è dentro di essa (`tenant.ts:57`). Quindi il ramo di ripiego di
+`loadTeamMembersFromDb` non scattava mai, e nel frattempo l'elenco arrivava pieno di id inassegnabili
+invece che vuoto. Il caso «API irraggiungibile» era precisamente quello che la guardia doveva
+coprire, ed era l'unico che non copriva.
+
+La correzione è una riga: l'id deve avere la forma di un uuid, perché `User.id` è
+`String @id @default(uuid())` (`prisma/schema.prisma:164`) e `risorsaId` è una chiave esterna verso
+di esso. **Verificato prima di applicarla** che non togliesse dal menu nessuna persona reale: in
+produzione `bluman_user` ha 7 righe, 0 fuori forma.
+
+**Verificato per mutazione:** ripristinando la guardia debole (`!u.id`) i test che cadono sono due, e
+il messaggio è il difetto stesso — `expected [ { id: 16539, dbId: 'usr-01', …(4) } ] to deeply equal []`.
+Il test sta in `frontend/src/hooks/useTeamMembers.test.ts`, che è anche il primo test del frontend su
+questo hook: prima non ne esisteva nessuno, ed è il motivo per cui la lacuna è passata.
+
+#### Due difetti trovati eseguendo C1-C4, e non corretti qui
+
+Sono sulla stessa via di `usr-0${operatorId}` e si vedono solo percorrendola fino in fondo. Nessuno
+dei due è nel piano, e nessuno dei due è stato toccato: il primo perché è una decisione di merito,
+il secondo perché è un cambio di firma in un'interfaccia condivisa, e vale la pena discuterli prima.
+
+1. **`invitatoDaUser` registra l'invitato, non chi invita.** In
+   `src/adapters/prisma/prismaApp.ts:342` la creazione di un accesso connette lo stesso `userId` sia
+   come titolare dell'accesso sia come `invitatoDaUser`. La conseguenza è che la traccia dice che
+   ognuno ha invitato sé stesso: alla domanda «chi ha dato a questa persona l'accesso a questa
+   pratica?» il database risponde con il nome della persona che l'ha ricevuto. È una colonna di
+   audit che oggi non è utilizzabile, e la correzione richiede di far arrivare `req.userId` fino
+   all'adattatore, cioè di cambiare la firma di `assegnaAccessoProgetto` nel port e in entrambi gli
+   adattatori.
+
+2. **`RedditivitaTab.tsx:35` ripete `|| 1` e aggiunge una tabella di tariffe cablata.** La riga è
+   `const opId = mv.as || (m.team && m.team[0]) || 1;`, seguita da
+   `OPERATOR_RATES[opId]?.rate || 95`. Cioè: l'operatore numero 1, con una tariffa di 95 €/h scritta
+   nel sorgente del browser, applicata alle ore di ogni micro-voce non assegnata. Il pannello
+   «Redditività» somma quindi costi veri su tariffe inventate — e con C3 appena chiuso gli
+   assegnatari cominciano a esistere davvero, quindi il numero smetterà di essere sbagliato *solo*
+   sulle voci assegnate, rendendo la differenza meno visibile invece che più. Va deciso dove vivono
+   le tariffe: se in `bluman_user` (una colonna) o in una tabella dedicata.
+
 ### 1ter.7 Cosa non fare
 
 - **Non** un `CalendarioEventoDto` costruito nel frontend a partire da liste già scaricate. È la
@@ -508,11 +583,11 @@ leggono quelle regole; A1 precede tutto perché è la tabella.
 |---|---|---|
 | A4 | ✅ **fatto** il 17/09/2026 (`2bbf310`) | Il cron e la derivazione usano la stessa funzione, e un test lo dimostra: cambiando la regola in un punto cambia in entrambi. **Verificato per mutazione**: `>` → `>=` in `kycInAvviso` porta il cron da 2 a 3 clienti avvisati, l'inversione del segno di `GIORNI_SOLLECITO_RATA` lo porta da 3 rate a 1. |
 | A1 + A2 | ✅ **fatto** il 17/09/2026 — migrazione applicata su Supabase | La migrazione gira su un database vuoto **e** su uno con dati; `\d evento_calendario` mostra le colonne e gli indici; la policy RLS è presente e `bluman_app` non vede righe di un altro tenant. **Verificato**: `prisma migrate diff` dà **deriva zero** su `evento_calendario`; la RLS era già attiva (`relrowsecurity`, `relforcerowsecurity`, 1 policy) e non è stata toccata. Il criterio «gira anche su un database con dati» non è stato provato con righe dentro: la tabella è vuota in produzione, e i default `NOT NULL` sono lì per quello. |
-| A5 + A6 | ⬜ da fare (blocco 3) | La scadenza di una rata viene da `ScadenzaIncasso.dataScadenza`, la fine di un progetto da `Progetto.dataScadenza`: nessun evento porta una data che il database non contiene. |
-| A3 | ⬜ da fare (blocco 3) | Le cinque rotte rispondono; 25 asserzioni ruolo × categoria (§1ter.3) passano; `?categorie=fattura` con ruolo `collaboratore_esterno` restituisce `[]`. |
+| A5 + A6 | ✅ **fatto** il 17/09/2026 (blocco 3) | La scadenza di una rata viene da `ScadenzaIncasso.dataScadenza`, la fine di un progetto da `Progetto.dataScadenza`: nessun evento porta una data che il database non contiene. **Verificato per mutazione**: facendo leggere alla derivazione `fattura.dataEmissione` invece di `rata.dataScadenza`, il test della rata fallisce con `expected '2026-09-10' to be '2026-09-25'` — cioè l'errore esatto che la pagina commetteva, riprodotto e catturato. |
+| A3 | ✅ **fatto** il 17/09/2026 (blocco 3) | Le cinque rotte rispondono; le asserzioni ruolo × categoria passano; `?categorie=fattura` con ruolo `collaboratore_esterno` restituisce `[]`. **Verificato per mutazione**: rendendo pubblico un `promemoria` (`case 'promemoria': return true`), due test falliscono e mostrano la riga di un altro comparire nell'elenco. **Le asserzioni sono 30 e non 25**: le categorie sono sei, non cinque — vedi la sesta categoria qui sotto. |
 | B1-B4 | ⬜ da fare (blocco 5) | Aprendo il calendario a settembre 2026 la griglia è di settembre 2026; «oggi» è oggi; nessun evento ha una data che il database non contiene; un evento creato ricompare dopo il reload; una spunta resta dopo il reload. |
 | B5-B6 | ⬜ da fare (blocco 5) | Il minicalendario si apre sul mese corrente; i preset calcolano da oggi; pianificando un'attività dal fascicolo, l'evento **compare nel calendario** — che è la prova che i due archivi locali sono diventati uno. |
-| C1-C4 | ⬜ da fare (blocco 4) | Assegnando una micro-voce a un collaboratore, `SELECT risorsa_id FROM microvoce_progetto WHERE id = …` restituisce lo `userId` vero, e riaprendo il fascicolo l'assegnazione è ancora lì. |
+| C1-C4 | ✅ **fatto** il 17/09/2026 (blocco 4), **esteso il 18/09** | L'assegnazione scrive `risorsa_id` con lo `userId` vero, e riaprendo il fascicolo l'assegnazione è ancora lì — `GET /progetti/:id` include `risorsa`. **Verificato per mutazione**, tre volte: (1) disattivando il controllo dello studio (`const valida = true`) falliscono i tre test che provano a scrivere l'utente di un altro tenant, del super_admin e di un id inesistente; (2) trattando il campo `risorsaId` **assente** come un valore da esaminare (`if (true)`) fallisce il test del campo assente, con `expected [ Array(1) ] to deeply equal []` — cioè l'avviso di errore falso che quella modifica produce su un salvataggio riuscito; (3) ripristinando la guardia debole dell'id (`!u.id`), falliscono i due test del seed dimostrativo con `expected [ { id: 16539, dbId: 'usr-01', …(4) } ] to deeply equal []`. Il punto (3) è una **correzione a C1 stesso**, che era incompleto: vedi «C1 era incompleto» qui sopra. Il frontend passa da 44 a 50 test. |
 | C5 | ⬜ da fare | Un `collaboratore_esterno` che apre il calendario vede solo i propri compiti, e la vista «i miei compiti» e il carico di lavoro concordano sullo stesso numero. |
 
 **Le due deviazioni da A1, e perché.** Il piano prevedeva `assegnatoAId String` **obbligatorio** e

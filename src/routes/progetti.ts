@@ -589,7 +589,7 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
           select: {
             id: true,
             nome: true,
-            microvoci: { select: { id: true, nome: true, ordine: true, stato: true, causaNota: true } },
+            microvoci: { select: { id: true, nome: true, ordine: true, stato: true, causaNota: true, risorsaId: true } },
           },
         },
       },
@@ -607,6 +607,35 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
     const nonSalvate: string[] = [];
     let moduliSalvati = 0;
     let microvociSalvate = 0;
+
+    /**
+     * §1ter.6 (C3) — gli id utente già verificati come appartenenti a questo studio.
+     *
+     * La verifica è obbligatoria, non una formalità. `risorsaId` è una chiave esterna verso
+     * `user`, che è una tabella **globale**: la RLS della scrittura guarda il `tenant_id`
+     * della micro-voce, che è quello giusto, e non dice niente su chi finisce dentro la
+     * colonna. Scrivendo l'uuid di un utente di un altro studio, quella persona comparirebbe
+     * come assegnataria in questo fascicolo, il suo nome verrebbe restituito da
+     * `GET /progetti/:id` e le sue ore entrerebbero nel carico di lavoro — un travaso fra
+     * studi per una via che nessun altro controllo copre.
+     *
+     * La cache serve a non pagare una query per micro-voce: un progetto con trenta compiti
+     * assegnati alla stessa persona ne fa una sola.
+     */
+    const risorseVerificate = new Map<string, boolean>();
+    const risorsaDelloStudio = async (userId: string): Promise<boolean> => {
+      const gia = risorseVerificate.get(userId);
+      if (gia !== undefined) return gia;
+      // `super_admin` ha `tenant_id` NULL (§2bis): non è una risorsa di nessuno studio, e
+      // il confronto lo esclude da solo, senza doverlo nominare qui.
+      const utente = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { tenantId: true },
+      });
+      const valida = utente !== null && utente.tenantId === tenantId;
+      risorseVerificate.set(userId, valida);
+      return valida;
+    };
 
     const modsRichiesti: any[] = Array.isArray(body.mods) ? body.mods : [];
 
@@ -666,6 +695,37 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
 
         const causa = typeof mv.vn === 'string' && mv.vn.trim() ? mv.vn.trim() : null;
         if (causa !== rigaMv.causaNota) datiMv.causaNota = causa;
+
+        // §1ter.6 (C3) — l'assegnatario della micro-voce.
+        //
+        // `risorsa_id` esiste in tabella dalla prima migrazione e **non è mai stato scritto**:
+        // la colonna era sempre NULL, quindi il carico di lavoro per operatore sommava ore su
+        // nessuno. Ora si scrive, e i tre esiti sono distinti perché significano cose diverse:
+        //
+        //  - campo **assente** → non si tocca. Un salvataggio che non parla di assegnazione
+        //    non deve cancellarla: è il caso di ogni salvataggio che viene da una schermata
+        //    dove l'assegnatario non si vede.
+        //  - campo **null** (o stringa vuota) → si azzera. È un'azione esplicita: «non
+        //    assegnato» è uno stato, non l'assenza di un'informazione.
+        //  - campo **stringa** → si verifica che l'utente sia dello stesso studio, poi si scrive.
+        if ('risorsaId' in mv) {
+          const richiesta = mv.risorsaId;
+          if (richiesta === null || richiesta === '') {
+            if (rigaMv.risorsaId !== null) datiMv.risorsaId = null;
+          } else if (typeof richiesta !== 'string') {
+            nonSalvate.push(
+              `micro-voce «${rigaMv.nome}»: l'assegnatario non è un identificativo valido, l'assegnazione non è stata registrata`,
+            );
+          } else if (richiesta !== rigaMv.risorsaId) {
+            if (await risorsaDelloStudio(richiesta)) {
+              datiMv.risorsaId = richiesta;
+            } else {
+              nonSalvate.push(
+                `micro-voce «${rigaMv.nome}»: l'utente indicato come assegnatario non appartiene a questo studio, l'assegnazione non è stata registrata`,
+              );
+            }
+          }
+        }
 
         if (typeof mv.s === 'string' && STATI_MICROVOCE.includes(mv.s) && mv.s !== rigaMv.stato) {
           // §7bis — «in ritardo» e «bloccata» senza causa non sono uno stato, sono un buco nel

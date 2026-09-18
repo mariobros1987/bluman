@@ -18,7 +18,7 @@ import { ModalAccessiProgetto } from '../components/projectDetail/ModalAccessiPr
 import { fetchProgettoDettaglio, assegnaAccessoProgettoApi, salvaProgettoDettaglioApi, archiviaProgettoApi, eliminaProgettoApi, eliminaModuloApi, inviaComunicazioneApi, ricalcolaProgettoApi, creaPreventivoEAccettaApi } from '../api/client';
 import { useTeamMembers } from '../hooks/useTeamMembers';
 import { getCurrentTenantId, getTenantStorageKey, BLUECODE_TENANT_ID } from '../utils/tenant';
-import type { Progetto, ModuloProgetto, MicroVoce, CategoriaModulo, StatoProgetto, StatoModulo, Cliente } from '../types';
+import type { Progetto, ModuloProgetto, MicroVoce, CategoriaModulo, StatoProgetto, StatoModulo, Cliente, TeamMember } from '../types';
 import styles from './ProjectDetail.module.css';
 
 type Tab = 'moduli' | 'grafo' | 'fatturazione' | 'redditivita' | 'storico' | 'comunicazioni' | 'documenti' | 'calendario';
@@ -63,7 +63,9 @@ export function ProjectDetail() {
   const [selectedUser, setSelectedUser] = useState('');
   // §Blocco 7 (fix) — la selezione viaggia sull'id reale del membro (dbId),
   // non sul nome: è quello che l'API di assegnazione accessi si aspetta.
-  const idMembro = (u: (typeof teamList)[number]) => u.dbId || String(u.id);
+  // §1ter.6 (C1) — non serve più un ripiego: `TeamMember.dbId` è obbligatorio, quindi ogni
+  // membro in elenco ha un id vero e questo accessor non può produrne uno inventato.
+  const idMembro = (u: TeamMember) => u.dbId;
   // Il primo collaboratore disponibile viene preselezionato solo quando la squadra
   // arriva (dal database): prima c'era un nome fisso preso dall'elenco mock.
   useEffect(() => {
@@ -198,23 +200,50 @@ export function ProjectDetail() {
     void salvaSuDatabase(updatedProject);
   };
 
-  const handleAssignOperatorConfirm = (operatorId: number, roleLevel: string) => {
-    if (!project || !assignModalTarget) return;
+  /**
+   * §1ter.6 (C1) — l'assegnazione di un operatore a un modulo o a una micro-voce.
+   *
+   * Le tre cose che questa funzione deve fare, e che prima non faceva:
+   *
+   *  1. **Mandare l'uuid vero.** Prima era `` `usr-0${operatorId}` `` — l'id numerico della
+   *     UI travestito da identificativo. `accesso_risorsa.user_id` è una chiave esterna
+   *     verso `bluman_user`, quindi la riga veniva rifiutata a **ogni** chiamata: il
+   *     pulsante non ha mai funzionato. Ora l'uuid arriva dal membro scelto, che lo porta
+   *     in `dbId` per costruzione (`TeamMember` non ammette membri senza).
+   *
+   *  2. **Attendere l'esito e propagarlo.** Prima la chiamata era seguita da
+   *     `.catch(() => {})` e nessuno aspettava niente: l'errore spariva e il modale diceva
+   *     «assegnato con successo». Ora l'errore risale e il modale lo scrive.
+   *
+   *  3. **Scrivere anche `risorsa_id`.** L'accesso al progetto e l'assegnatario della
+   *     micro-voce sono due cose diverse: il primo decide chi *può aprire* la pratica, il
+   *     secondo chi *ci sta lavorando*, ed è quello che il calendario mostra e che il carico
+   *     di lavoro somma. Prima si scriveva solo il primo, e la colonna `risorsa_id` restava
+   *     NULL da sempre.
+   */
+  const handleAssignOperatorConfirm = async (membro: TeamMember, roleLevel: string) => {
+    if (!project || !assignModalTarget) {
+      // Non si esce in silenzio: il modale mostra l'esito, e «niente da fare» non è
+      // «fatto». Un `return` muto qui produrrebbe il messaggio di successo per un
+      // assegnazione che non è stata nemmeno tentata.
+      throw new Error('Assegnazione non possibile: il progetto non è caricato.');
+    }
 
     const newMods = project.mods.map(m => {
       if (m.id === assignModalTarget.modId) {
         if (assignModalTarget.mvIdx !== undefined) {
           const newV = m.v.map((mv, idx) => {
             if (idx === assignModalTarget.mvIdx) {
-              return { ...mv, as: operatorId };
+              // `as` per disegnare (id numerico interno), `risorsaId` per il database.
+              return { ...mv, as: membro.id, risorsaId: membro.dbId };
             }
             return mv;
           });
           const teamSet = new Set(m.team || []);
-          teamSet.add(operatorId);
+          teamSet.add(membro.id);
           return { ...m, v: newV, team: Array.from(teamSet) };
         } else {
-          return { ...m, team: [operatorId] };
+          return { ...m, team: [membro.id] };
         }
       }
       return m;
@@ -228,8 +257,22 @@ export function ProjectDetail() {
     const updatedArr = [updatedProject, ...savedArr.filter(p => String(p.id) !== String(project.id))];
     localStorage.setItem(getTenantStorageKey('bluman_custom_projects'), JSON.stringify(updatedArr));
 
-    void salvaSuDatabase(updatedProject);
-    assegnaAccessoProgettoApi(String(project.id), `usr-0${operatorId}`, roleLevel).catch(() => {});
+    // L'ordine conta: prima l'accesso al progetto, poi il salvataggio che scrive
+    // `risorsa_id`. Se il primo fallisce si solleva subito — il modale lo dice — invece di
+    // registrare un assegnatario su una pratica a cui non è stato dato accesso.
+    await assegnaAccessoProgettoApi(String(project.id), membro.dbId, roleLevel);
+
+    // `salvaSuDatabase` **ritorna** `false` sui salvataggi parziali invece di sollevare —
+    // riporta quante righe il database ha registrato e quali no. Ignorare quel valore
+    // significherebbe mostrare «assegnato» sopra un salvataggio che non ha scritto nulla:
+    // è la stessa affermazione falsa di prima, per una via diversa.
+    const salvato = await salvaSuDatabase(updatedProject);
+    if (!salvato) {
+      throw new Error(
+        'Accesso al progetto registrato, ma l\'assegnatario non è stato salvato sulla micro-voce. ' +
+          'Il dettaglio è nel messaggio di errore in cima alla pagina.',
+      );
+    }
   };
 
   const [rawDbProject, setRawDbProject] = useState<any>(null);
@@ -267,7 +310,14 @@ export function ProjectDetail() {
               }
             }
             const localMv = localMod?.v?.[vIdx];
-            const assignedAs = mv.as || mv.assegnatoId || localMv?.as || 1;
+            // §1ter.6 (C2) — niente `|| 1`. Un assegnatario assente non è l'operatore numero
+            // 1: è «non assegnato», e disegnare l'avatar di una persona che non c'entra è
+            // peggio che non disegnare niente, perché afferma un fatto che non esiste.
+            const assignedAs = mv.as ?? mv.assegnatoId ?? localMv?.as ?? undefined;
+            // §1ter.6 (C3/C4) — l'uuid dell'assegnatario, che è la cosa che il database
+            // conosce. Arriva da `risorsa` (l'include di `GET /progetti/:id`); il ripiego
+            // sulla copia locale serve alle modifiche non ancora salvate.
+            const risorsaId = mv.risorsa?.id ?? mv.risorsaId ?? localMv?.risorsaId ?? null;
 
             return {
               // L'identificativo di database, che serve al salvataggio per sapere quale riga
@@ -279,6 +329,7 @@ export function ProjectDetail() {
               hA: mv.oreConsuntivate || 0,
               s: mv.stato || 'pending',
               as: assignedAs,
+              risorsaId,
               d: mv.passaggi?.length || 0,
               vn: mv.causaNota || undefined,
               proc: mv.proc || (mv.passaggi?.length ? mv.passaggi.map((p: any) => ({
@@ -675,8 +726,12 @@ export function ProjectDetail() {
         alert('⚠️ Progetto non ancora salvato sul database: impossibile assegnare accessi.');
         return;
       }
-      if (!membro?.dbId) {
-        alert('⚠️ Seleziona un collaboratore caricato dal database dello studio.');
+      // §1ter.6 (C1) — con `TeamMember.dbId` obbligatorio, «membro senza id di database» non
+      // è più uno stato rappresentabile: l'unico caso rimasto è che non sia selezionato
+      // nessuno. Il messaggio dice quello, invece di descrivere una possibilità che il tipo
+      // non ammette più.
+      if (!membro) {
+        alert('⚠️ Seleziona un collaboratore dello studio.');
         return;
       }
       await assegnaAccessoProgettoApi(rawDbProject.id, membro.dbId, livello);
@@ -843,9 +898,12 @@ export function ProjectDetail() {
           targetName={assignModalTarget.name}
           categoria={assignModalTarget.categoria}
           currentAssignedIds={assignModalTarget.currentAssigned}
-          onAssign={(opId, roleLvl) => {
-            handleAssignOperatorConfirm(opId, roleLvl);
-          }}
+          // §1ter.6 (C1) — la promessa si passa di mano, non si scarta.
+          // Prima qui c'era `(opId, roleLvl) => { handleAssignOperatorConfirm(opId, roleLvl); }`:
+          // le graffe buttavano via il valore di ritorno, quindi il modale non poteva sapere
+          // com'era andata e mostrava comunque «assegnato con successo». Passando la funzione
+          // stessa, l'esito risale fino al messaggio.
+          onAssign={handleAssignOperatorConfirm}
         />
       )}
 

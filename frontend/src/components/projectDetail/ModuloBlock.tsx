@@ -147,6 +147,17 @@ export function ModuloBlock({ mod, open, onToggle, onOpenProc, rawDbModulo, onRe
                   const rawMv = rawDbModulo?.microvoci?.[i];
                   const isDelay = v.s === 'delayed';
                   const isBlock = v.s === 'blocked';
+                  // §1ter.6 (C2) — chi lavora a questa micro-voce, o niente.
+                  //
+                  // Prima l'assegnatario assente diventava l'operatore numero 1 (`|| 1` alla
+                  // lettura), quindi ogni voce non assegnata mostrava l'avatar di una persona
+                  // precisa: un'affermazione su chi sta facendo il lavoro, falsa e invisibile,
+                  // perché un avatar disegnato non si distingue da un avatar giusto.
+                  //
+                  // Si preferisce l'uuid (`risorsaId`) perché è quello che il database sa e
+                  // che sopravvive a un ricaricamento della pagina; `Avatar` lo risolve da sé
+                  // cercando anche per `dbId`, quindi l'ordine di caricamento non conta.
+                  const assegnatario = v.risorsaId ?? v.as ?? null;
                   return (
                     <tr
                       key={i}
@@ -162,8 +173,13 @@ export function ModuloBlock({ mod, open, onToggle, onOpenProc, rawDbModulo, onRe
                         )}
                       </td>
                       <td onClick={e => { e.stopPropagation(); onOpenAssignMv(i); }} style={{ cursor: 'pointer' }} title="Clicca per riassegnare l'operatore di studio">
-                        {/* `as` è opzionale (voci seed non assegnate): Avatar gestisce l'id vuoto. */}
-                        <Avatar id={v.as ?? ''} size={22} />
+                        {assegnatario !== null ? (
+                          <Avatar id={assegnatario} size={22} />
+                        ) : (
+                          <span style={{ fontSize: 10, color: 'var(--hint, #64748b)', fontStyle: 'italic' }}>
+                            non assegnato
+                          </span>
+                        )}
                       </td>
                       <td><span style={{ color: 'var(--muted)' }}>{v.hE}h</span></td>
                       <td>

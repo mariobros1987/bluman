@@ -274,7 +274,18 @@ export async function assegnaAccessoProgettoApi(progettoId: string, userId: stri
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ userId, livello }),
   });
-  if (!res.ok) throw new Error('Errore assegnazione accesso');
+  if (!res.ok) {
+    // §1ter.6 (C1) — il motivo del server, non un messaggio generico.
+    //
+    // Prima qui c'era solo `throw new Error('Errore assegnazione accesso')`, e non
+    // importava: il chiamante avvolgeva la promessa in `.catch(() => {})`, quindi quel
+    // messaggio non lo leggeva nessuno. Ora arriva fino al modale, che è il posto dove
+    // serve capire **perché** l'assegnazione non è riuscita — utente di un altro studio,
+    // progetto inesistente, sessione scaduta. Un «non riuscito» senza motivo riporta
+    // l'utente allo stesso punto di prima: sa che non ha funzionato e non sa cosa fare.
+    const dettaglio = await res.json().catch(() => null);
+    throw new Error(dettaglio?.errore || `Assegnazione accesso non riuscita (HTTP ${res.status}).`);
+  }
   return await res.json();
 }
 

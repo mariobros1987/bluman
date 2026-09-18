@@ -44,19 +44,37 @@ export interface Cliente {
   isAttivo?: boolean;
 }
 
-export interface TeamMember {
+/**
+ * I campi che bastano a **disegnare** una persona: id numerico per le chiavi React,
+ * iniziali, colore, nome, ruolo.
+ *
+ * Non bastano ad assegnarle un lavoro. Un avatar si disegna anche per un id che non
+ * risolve più — un assegnatario storico, un utente disattivato, un id arrivato da un
+ * progetto vecchio — e in quel caso un identificativo di database non esiste. Tenere
+ * questo caso e quello del membro vero nello stesso tipo è il modo in cui
+ * `` `usr-0${operatorId}` `` è potuto sembrare un identificativo: il tipo diceva che
+ * `dbId` poteva mancare, quindi costruirne uno a mano non sembrava sbagliato.
+ */
+export interface PersonaVisualizzata {
   id: number;
-  /**
-   * Identificativo reale a database dell'utente (UUID), quando il membro
-   * proviene dall'API del tenant. Assente sui membri costruiti localmente.
-   * Serve alle chiamate che richiedono lo userId vero (es. assegnazione
-   * accessi progetto §19): `id` è numerico e serve solo alla UI/avatar.
-   */
-  dbId?: string;
   n: string;
   r: string;
   i: string;
   c: string;
+}
+
+/**
+ * Un membro dello studio che **esiste a database**: è l'unico assegnabile.
+ *
+ * `dbId` è obbligatorio perché è la ragione per cui questo tipo esiste. Era opzionale, e
+ * il primo consumatore che ha dovuto mandarlo al server ha ripiegato su un id costruito a
+ * mano che nessuna riga soddisfaceva: la chiave esterna lo rifiutava a ogni chiamata, e la
+ * chiamata stava dentro un `.catch(() => {})`, quindi il pulsante «assegna operatore» non
+ * ha mai funzionato e non l'ha mai detto. Con il campo obbligatorio quel ripiego non
+ * compila, e il caso «non c'è un id vero» si vede mentre si scrive invece che in produzione.
+ */
+export interface TeamMember extends PersonaVisualizzata {
+  dbId: string;
 }
 
 export interface MicroVoce {
@@ -74,8 +92,21 @@ export interface MicroVoce {
   hE: number; // ore estimate
   hA: number; // ore actual
   s: StatoMicrovoce;
-  /** Assignee id. Opzionale: i dati seed non lo valorizzano. */
+  /**
+   * Assegnatario, **id numerico della UI**: serve a scegliere il nome, le iniziali e il
+   * colore dell'avatar, e non esiste in nessuna tabella. Per dire al server chi lavora alla
+   * micro-voce si usa `risorsaId`.
+   */
   as?: number;
+  /**
+   * §1ter.6 (C3) — l'uuid dell'utente assegnato (`microvoce_progetto.risorsa_id`).
+   *
+   * È il campo che il salvataggio manda al server. Sta accanto ad `as` e non al suo posto
+   * perché i due non sono la stessa cosa: `as` è l'id interno con cui il browser disegna,
+   * `risorsaId` è la riga di `bluman_user`. Tenerli distinti è ciò che permette di
+   * mandare il secondo senza dover tradurre il primo al confine.
+   */
+  risorsaId?: string | null;
   /** Numero documenti. Opzionale: i dati seed non lo valorizzano. */
   d?: number;
   /** Nome operatore in forma testuale (dati seed/legacy). */

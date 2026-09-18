@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTeamMembers } from '../hooks/useTeamMembers';
 import { fetchOperatoriSuggeriti, type OperatoreSuggeritoApi } from '../api/client';
 import { Avatar } from './ui/Avatar';
+import type { TeamMember } from '../types';
 
 interface AssignOperatorModalProps {
   isOpen: boolean;
@@ -10,7 +11,20 @@ interface AssignOperatorModalProps {
   /** Categoria del lavoro da assegnare (es. 'Societario', 'Trust'): usata per il suggerimento §6.2. */
   categoria?: string;
   currentAssignedIds?: number[];
-  onAssign: (operatorId: number, roleLevel: string) => void;
+  /**
+   * §1ter.6 (C1) — passa il **membro**, non il suo id numerico.
+   *
+   * Il numero è l'id della UI: serve a evidenziare la riga e a personalizzare l'avatar, e
+   * non esiste in nessuna tabella. L'assegnazione ha bisogno dell'uuid di `bluman_user`, e
+   * il chiamante che riceveva solo il numero lo costruiva a mano (`` `usr-0${operatorId}` ``):
+   * la chiave esterna lo rifiutava a ogni chiamata, dentro un `.catch(() => {})`, quindi il
+   * pulsante non ha mai funzionato e l'interfaccia diceva che era andato tutto bene.
+   * Passando l'oggetto, l'uuid c'è per costruzione e nessuno deve inventarlo.
+   *
+   * Restituisce una promessa perché il messaggio di esito deve descrivere quello che è
+   * successo davvero: prima compariva dopo 1200 ms fissi, a chiamata ancora in volo.
+   */
+  onAssign: (membro: TeamMember, roleLevel: string) => Promise<void>;
 }
 
 export function AssignOperatorModal({
@@ -18,13 +32,17 @@ export function AssignOperatorModal({
   onClose,
   targetName,
   categoria,
-  currentAssignedIds = [1],
+  currentAssignedIds = [],
   onAssign,
 }: AssignOperatorModalProps) {
   const { team: teamList, loading } = useTeamMembers();
-  const [selectedOpId, setSelectedOpId] = useState<number>(currentAssignedIds[0] || 1);
+  // `null` è uno stato legittimo — «nessuno selezionato» — e va distinto da un id
+  // inventato: prima il valore di partenza era `currentAssignedIds[0] || 1`, cioè
+  // l'operatore numero 1 anche quando non esisteva.
+  const [selectedOpId, setSelectedOpId] = useState<number | null>(currentAssignedIds[0] ?? null);
   const [roleLevel, setRoleLevel] = useState<string>('write');
-  const [notif, setNotif] = useState(false);
+  const [esito, setEsito] = useState<{ tipo: 'ok' | 'errore'; testo: string } | null>(null);
+  const [inCorso, setInCorso] = useState(false);
 
   // §6.2 — suggerimento operatore: prima la specializzazione (match con la
   // categoria del lavoro), poi il minor carico di lavoro. L'ordinamento e il
@@ -51,8 +69,8 @@ export function AssignOperatorModal({
   // carico; chi non è nel database dello studio resta in coda.
   const teamOrdinati = useMemo(() => {
     if (suggeriti.length === 0) return teamList;
-    const punteggio = (op: (typeof teamList)[number]) => {
-      const s = op.dbId ? suggerimentoPerDbId.get(op.dbId) : undefined;
+    const punteggio = (op: TeamMember) => {
+      const s = suggerimentoPerDbId.get(op.dbId);
       if (!s) return { priorita: 2, carico: Number.POSITIVE_INFINITY };
       return { priorita: s.corrisponde ? 0 : 1, carico: s.caricoOre };
     };
@@ -76,13 +94,40 @@ export function AssignOperatorModal({
 
   if (!isOpen) return null;
 
-  const handleConfirm = () => {
-    onAssign(selectedOpId, roleLevel);
-    setNotif(true);
-    setTimeout(() => {
-      setNotif(false);
-      onClose();
-    }, 1200);
+  /**
+   * §1ter.6 (C1) — l'esito si scrive **dopo** la chiamata, e descrive quello che è successo.
+   *
+   * Prima questa funzione chiamava `onAssign` senza attenderla, mostrava «✓ Operatore
+   * assegnato con successo ed aggiornato nel registro studio!» e chiudeva dopo 1200 ms
+   * fissi. Il messaggio era vero quanto il timer: la chiamata vera falliva a ogni giro —
+   * mandava un id che nessuna riga soddisfaceva — e nessuno lo vedeva, perché l'errore
+   * finiva in un `.catch(() => {})` dall'altra parte. Un'interfaccia che dice «fatto»
+   * mentre la scrittura non è ancora partita non è un'omissione: è un'affermazione falsa
+   * su dati dello studio, ed è la classe di difetto che questo progetto tratta per prima.
+   */
+  const handleConfirm = async () => {
+    const membro = teamOrdinati.find((o) => o.id === selectedOpId);
+    if (!membro) {
+      setEsito({ tipo: 'errore', testo: 'Nessun operatore selezionato.' });
+      return;
+    }
+
+    setInCorso(true);
+    setEsito(null);
+    try {
+      await onAssign(membro, roleLevel);
+      setEsito({ tipo: 'ok', testo: `Operatore assegnato: ${membro.n}.` });
+      // La chiusura automatica resta solo sul successo: su un errore il modale si ferma,
+      // perché il messaggio va letto e la scelta va rifatta.
+      setTimeout(() => {
+        setEsito(null);
+        onClose();
+      }, 1200);
+    } catch (err: any) {
+      setEsito({ tipo: 'errore', testo: err?.message || 'Assegnazione non riuscita.' });
+    } finally {
+      setInCorso(false);
+    }
   };
 
   return (
@@ -126,10 +171,17 @@ export function AssignOperatorModal({
           </button>
         </div>
 
-        {/* Notifica Confirm */}
-        {notif && (
-          <div style={{ background: '#0d2d22', border: '1px solid #1a5c3c', color: '#34d399', padding: '10px 14px', borderRadius: 8, fontSize: 11, fontWeight: 600, marginBottom: 14 }}>
-            ✓ Operatore assegnato con successo ed aggiornato nel registro studio!
+        {/* Esito dell'assegnazione — scritto dopo la risposta del server, non prima. */}
+        {esito && (
+          <div
+            style={
+              esito.tipo === 'ok'
+                ? { background: '#0d2d22', border: '1px solid #1a5c3c', color: '#34d399', padding: '10px 14px', borderRadius: 8, fontSize: 11, fontWeight: 600, marginBottom: 14 }
+                : { background: '#2d1414', border: '1px solid #7f1d1d', color: '#fca5a5', padding: '10px 14px', borderRadius: 8, fontSize: 11, fontWeight: 600, marginBottom: 14 }
+            }
+          >
+            {esito.tipo === 'ok' ? '✓ ' : '⚠ '}
+            {esito.testo}
           </div>
         )}
 
@@ -146,10 +198,23 @@ export function AssignOperatorModal({
           </div>
         )}
 
+        {/* §1ter.6 (C1) — nessuna squadra: prima questo stato non esisteva, perché il
+            caricamento finiva sempre con almeno una riga costruita in locale. Quella riga
+            però non era assegnabile — non aveva un id di database — quindi riempiva il
+            selettore di una scelta che non poteva riuscire. Adesso lo stato vuoto si vede
+            e dice il motivo, invece di nascondersi dietro un nome. */}
+        {!loading && teamOrdinati.length === 0 && (
+          <div style={{ fontSize: 11, color: 'var(--amber)', background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.25)', borderRadius: 8, padding: '10px 12px', marginBottom: 16 }}>
+            ⚠ Nessun collaboratore assegnabile: l'anagrafica dello studio non risponde e questo
+            browser non ha collaboratori salvati. Senza un utente a database non è possibile
+            assegnare — riprova quando la connessione è disponibile.
+          </div>
+        )}
+
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 320, overflowY: 'auto', marginBottom: 20 }}>
           {teamOrdinati.map(op => {
             const isSelected = selectedOpId === op.id;
-            const suggerimento = op.dbId ? suggerimentoPerDbId.get(op.dbId) : undefined;
+            const suggerimento = suggerimentoPerDbId.get(op.dbId);
             return (
               <div
                 key={op.id}
@@ -237,9 +302,20 @@ export function AssignOperatorModal({
           </button>
           <button
             onClick={handleConfirm}
-            style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '8px 20px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 14px rgba(99,102,241,0.4)' }}
+            disabled={inCorso || selectedOpId === null}
+            style={{
+              background: inCorso || selectedOpId === null ? 'var(--card2)' : 'var(--indigo)',
+              color: inCorso || selectedOpId === null ? 'var(--muted)' : '#fff',
+              border: 'none',
+              padding: '8px 20px',
+              borderRadius: 8,
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: inCorso || selectedOpId === null ? 'not-allowed' : 'pointer',
+              boxShadow: inCorso || selectedOpId === null ? 'none' : '0 4px 14px rgba(99,102,241,0.4)',
+            }}
           >
-            ✓ Conferma Assegnazione
+            {inCorso ? '⏳ Assegnazione in corso…' : '✓ Conferma Assegnazione'}
           </button>
         </div>
       </div>

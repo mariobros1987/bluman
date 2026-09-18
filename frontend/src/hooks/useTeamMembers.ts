@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { fetchUtentiTenant } from '../api/client';
 import { extractInitialsFromName } from '../utils';
-import { getCurrentTenantId, getTenantStorageKey, getStudioInfoForTenant } from '../utils/tenant';
+import { getCurrentTenantId, getTenantStorageKey } from '../utils/tenant';
 import type { TeamMember } from '../types';
 
 export { extractInitialsFromName };
@@ -51,14 +51,49 @@ function disambiguaId(membri: TeamMember[]): TeamMember[] {
   });
 }
 
-function apiUserToTeamMember(u: any, idx: number): TeamMember {
-  const emailKey = (u.email || '').toLowerCase().trim();
-  const chiaveStabile = (typeof u.id === 'string' && u.id) || emailKey || `membro-${idx}`;
+/**
+ * §1ter.6 (C1) — la forma dell'identificativo di un utente a database.
+ *
+ * `User.id` è `String @id @default(uuid())` (prisma/schema.prisma:164) e `risorsa_id` è una
+ * chiave esterna verso di esso: solo un uuid può stare in quella colonna.
+ *
+ * Non basta che l'id sia una stringa non vuota. `DEFAULT_TEAM_USERS` in `api/tenant.ts` usa
+ * `usr-01`…`usr-05`: sono stringhe non vuote, e non sono uuid. Controllando solo il tipo
+ * quelle passavano la guardia, e con esse tornava il difetto che questa guardia esiste per
+ * chiudere — il menu offriva cinque persone che il database rifiuta. Non è un caso di
+ * laboratorio: `fetchUtentiTenant` restituisce `DEFAULT_TEAM_USERS` per il tenant demo ogni
+ * volta che l'API non risponde, e lo fa **senza sollevare eccezioni** (il ripiego è dentro di
+ * essa, riga 57), quindi il ramo di ripiego qui sotto non scattava mai e l'elenco arrivava
+ * pieno di id inassegnabili invece che vuoto.
+ *
+ * Gli id in produzione hanno tutti questa forma (verificato il 18/09/2026 su `bluman_user`:
+ * 7 utenti, 0 fuori forma), quindi la guardia non toglie dal menu nessuna persona reale.
+ */
+const ID_DATABASE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function apiUserToTeamMember(u: any, idx: number): TeamMember | null {
+  // §1ter.6 (C1) — senza un id di database questo non è un membro dello studio, è una
+  // riga di provenienza locale (i `bluman_custom_team_users` salvati prima che l'anagrafica
+  // passasse dall'API) o una voce del seed dimostrativo. Non si può assegnare loro niente:
+  // `risorsa_id` e `accesso_risorsa` sono chiavi esterne verso `bluman_user`, e un id che
+  // non esiste lì viene rifiutato dal database. Tenerli in elenco significava offrire una
+  // scelta che non poteva riuscire — ed è esattamente ciò che è successo per mesi, in
+  // silenzio. Si scartano, e lo si dice.
+  if (typeof u.id !== 'string' || !ID_DATABASE.test(u.id)) {
+    console.warn(
+      `useTeamMembers: scartato «${u.nome || u.email || idx}» — l'identificativo ` +
+        `«${u.id}» non è un id di database, quindi non è assegnabile a un progetto.`,
+    );
+    return null;
+  }
 
   const name = u.nome || u.name || u.n || u.email || 'Operatore Studio';
   const role = u.specializzazione || u.ruolo || u.role || u.r || 'Collaboratore Studio';
 
-  const memberId = typeof u.id === 'number' ? u.id : idNumericoStabile(chiaveStabile);
+  // La guardia in testa alla funzione ha già stabilito che `u.id` è una stringa con la forma
+  // di un uuid: la chiave stabile **è** l'uuid, e i ripieghi su email e indice non sono più
+  // raggiungibili. Erano lì per le righe senza id, che ora non arrivano fin qui.
+  const memberId = idNumericoStabile(u.id);
 
   let initials = u.iniziali || u.i;
   if (!initials) {
@@ -69,7 +104,7 @@ function apiUserToTeamMember(u: any, idx: number): TeamMember {
     if (customInitials) initials = customInitials;
   } catch {}
 
-  let color = u.colore || u.c || ROLE_COLORS[u.ruolo] || ROLE_COLORS[u.role] || coloreDaChiave(chiaveStabile);
+  let color = u.colore || u.c || ROLE_COLORS[u.ruolo] || ROLE_COLORS[u.role] || coloreDaChiave(u.id);
   try {
     const customColor = localStorage.getItem(`bluman_avatar_color_${memberId}`);
     if (customColor) color = customColor;
@@ -79,7 +114,9 @@ function apiUserToTeamMember(u: any, idx: number): TeamMember {
     id: memberId,
     // §Blocco 7 (fix) — l'id reale a database viaggia accanto a quello UI:
     // le API che richiedono lo userId vero (accessi progetto §19) usano questo.
-    dbId: typeof u.id === 'string' ? u.id : undefined,
+    // §1ter.6 (C1) — non è più opzionale: la guardia in testa alla funzione ha già escluso
+    // le righe che non hanno un id di database, quindi qui la stringa c'è.
+    dbId: u.id as string,
     n: name,
     r: role,
     i: initials,
@@ -89,7 +126,10 @@ function apiUserToTeamMember(u: any, idx: number): TeamMember {
 
 export async function loadTeamMembersFromDb(): Promise<TeamMember[]> {
   const currentTenantId = getCurrentTenantId();
-  const studioInfo = getStudioInfoForTenant(currentTenantId);
+
+  /** Scarta i `null` di `apiUserToTeamMember`: le righe senza id di database non sono membri. */
+  const soloAssegnabili = (righe: any[]): TeamMember[] =>
+    disambiguaId(righe.map(apiUserToTeamMember).filter((m): m is TeamMember => m !== null));
 
   // 1. Prova a caricare da API tenant
   try {
@@ -97,7 +137,7 @@ export async function loadTeamMembersFromDb(): Promise<TeamMember[]> {
     if (Array.isArray(apiUsers) && apiUsers.length > 0) {
       const filtered = apiUsers.filter((u: any) => u.tenantId === currentTenantId);
       if (filtered.length > 0) {
-        return disambiguaId(filtered.map(apiUserToTeamMember));
+        return soloAssegnabili(filtered);
       }
     }
   } catch (err) {
@@ -110,21 +150,19 @@ export async function loadTeamMembersFromDb(): Promise<TeamMember[]> {
   const customUsers: any[] = customStr ? JSON.parse(customStr) : [];
 
   if (customUsers.length > 0) {
-    return disambiguaId(customUsers.map(apiUserToTeamMember));
+    return soloAssegnabili(customUsers);
   }
 
-  // 3. Fallback per tenant: niente squadra finta precostituita. Se l'API non risponde e
-  // non ci sono collaboratori salvati in locale, si mostra solo il lead advisor del tenant,
-  // costruito dai dati dello studio — mai un elenco di persone inventate nel sorgente.
-  return [
-    {
-      id: 1,
-      n: studioInfo.leadAdvisor || 'Lead Senior Advisor',
-      r: `Managing Partner — ${studioInfo.ragioneSociale}`,
-      i: extractInitialsFromName(studioInfo.leadAdvisor || 'Lead Advisor'),
-      c: '#3b82f6',
-    }
-  ];
+  // 3. Nessuna squadra. Ed è la risposta giusta, non una resa.
+  //
+  // §1ter.6 (C1) — qui c'era una riga costruita con i dati dello studio (il lead advisor,
+  // `id: 1`, nessun id di database) che serviva a non mostrare un elenco vuoto. Ma un elenco
+  // pieno di una persona che non si può scegliere è peggio di un elenco vuoto: il selettore
+  // sembrava funzionante, la scelta sembrava riuscita, e l'unica chiamata che partiva
+  // portava un id che il database rifiutava. Se l'API non risponde e non c'è nulla di
+  // salvato in locale, le persone di questo studio non sono note a questo browser: il
+  // selettore lo dice, invece di riempirsi di un nome che non può assegnare.
+  return [];
 }
 
 export function useTeamMembers(): { team: TeamMember[]; loading: boolean; reload: () => void } {

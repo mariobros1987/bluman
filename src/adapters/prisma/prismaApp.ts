@@ -316,6 +316,13 @@ export class PrismaApp implements AppPort {
             microvoci: {
               include: {
                 passaggi: true,
+                // §1ter.6 (C4) — l'assegnatario della micro-voce.
+                //
+                // Senza questa riga `PUT /progetti/:id/stato-completo` scriverebbe un dato che
+                // la lettura non riporta: si assegna un compito, si ricarica il fascicolo, e
+                // l'assegnazione sembra di nuovo sparita. Un salvataggio che non si rilegge è
+                // indistinguibile da un salvataggio fallito.
+                risorsa: { select: { id: true, nome: true, email: true, ruolo: true } },
               },
             },
           },
