@@ -23,11 +23,13 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { prisma } from '../util/prismaClient.js';
 import { recordAudit } from '../util/serverHelpers.js';
 import {
+  assegnatarioDiEvento,
   categorieVisibili,
   eventiDelCalendario,
   fineGiornoUtc,
   inizioGiornoUtc,
 } from '../services/calendarioEventi.js';
+import { compitiDiUtente } from '../services/compitiAssegnati.js';
 import {
   CATEGORIE_EVENTO,
   categoriaValida,
@@ -301,6 +303,41 @@ export async function registraRotteCalendario(server: FastifyInstance): Promise<
   });
 
   /**
+   * §1ter.6 (C5) — «i miei compiti», cioè le micro-voci che ho addosso.
+   *
+   * **Perché una rotta e non un filtro di `/calendario/eventi`.** Un compito e un evento non sono la
+   * stessa cosa, e la differenza si vede proprio qui: un compito esiste anche **senza una data**,
+   * perché la data di una micro-voce non sta in `microvoce_progetto` — quella tabella non ha una
+   * colonna di scadenza — sta nell'evento che qualcuno ha scritto per lui. Un compito mai
+   * pianificato non comparirebbe in nessuna griglia, e sarebbe invisibile proprio a chi deve farlo.
+   * Questa rotta lo elenca lo stesso, con `scadenza: null`, che è la verità: non è ancora stato
+   * deciso quando.
+   *
+   * **L'assegnazione è ciò che lo rende mio**, e non serve un secondo controllo di accesso: chi ha
+   * un compito lo vede, perché assegnarlo a qualcuno che non può vederlo è un'assegnazione che non
+   * esiste (§1ter.3). Il titolare della riga non c'entra — `userId` qui è **l'assegnatario**, e non
+   * si accetta dalla query: è il token, come in tutte le rotte di questo file.
+   *
+   * **Nessun filtro per ruolo**: un `collaboratore_esterno` ha i suoi compiti come un `advisor`. Il
+   * ruolo decide *quali categorie* vede nel calendario (§1ter.3), non se il proprio lavoro esiste.
+   *
+   * Il numero che questa rotta restituisce — `totale`, cioè la lunghezza dell'elenco — è **lo stesso
+   * numero** che `caricoPerRisorse` conta per la stessa persona: sono la stessa clausola `where` di
+   * `src/services/compitiAssegnati.ts`, una elencata e una contata. È il criterio di accettazione di
+   * C5, ed è verificato in `src/compitiAssegnati.test.ts`.
+   */
+  server.get('/calendario/compiti', async (req: FastifyRequest, reply: FastifyReply) => {
+    const ruolo = req.ruolo as Ruolo | undefined;
+    const userId = req.user?.userId;
+    if (!ruolo || !userId) return rifiuta(reply, 401, 'Non autenticato.');
+    if (ruolo === 'cliente') return rifiuta(reply, 403, 'Non disponibile per questo ruolo.');
+
+    const compiti = await compitiDiUtente(req.tenantId, userId);
+
+    return reply.send({ ok: true, compiti, totale: compiti.length });
+  });
+
+  /**
    * Crea un promemoria (o una scadenza contrattuale, vedi `CATEGORIE_SCRIVIBILI`).
    *
    * `generato` è `false` e non è un parametro: una riga scritta da una persona non è derivata, e
@@ -428,6 +465,34 @@ export async function registraRotteCalendario(server: FastifyInstance): Promise<
       if (!assegnatario) return rifiuta(reply, 404, 'Collaboratore non trovato in questo studio.');
     }
 
+    /**
+     * §1ter.6 (C5) — l'assegnatario di un compito lo porta il **compito**, non l'evento.
+     *
+     * Fino a qui questa rotta scriveva `evento_calendario.assegnato_a_id`, mentre l'assegnazione del
+     * fascicolo (`PUT /progetti/:id/stato-completo`, C3) scrive `microvoce_progetto.risorsa_id`, e il
+     * carico di lavoro conta quella. Due schermate, due colonne, un solo concetto di «chi lo fa»: il
+     * giorno in cui le due scelte divergono, il compito risulta assegnato a due persone diverse a
+     * seconda di dove lo si guarda — e nessuna delle due schermate ha torto in modo dimostrabile.
+     *
+     * Quindi la persona si scrive **sulla micro-voce**, e la colonna dell'evento resta `null`. Non è
+     * una rinuncia a un dato: è che quel dato non è dell'evento. La data è dell'evento, la persona è
+     * del compito, e `assegnatarioDiEvento` ricompone le due cose in lettura — la stessa funzione che
+     * usa la lettura del calendario e l'autorizzazione di `PATCH /:id/stato`.
+     *
+     * **Cosa questo non fa**: non *toglie* un'assegnazione. Un corpo senza `assegnatoAId` (o con
+     * `null`) non azzera `risorsa_id`, perché `null` non distingue «non assegnare» da «non parlarne»
+     * e indovinare cancellerebbe un'assegnazione fatta dal fascicolo. Si toglie da dove si mette:
+     * `PUT /progetti/:id/stato-completo`.
+     */
+    let assegnatoAIdEvento = assegnatoAId;
+    if (categoria === 'microvoce' && microvoceProgettoId && assegnatoAId) {
+      await prisma.microvoceProgetto.updateMany({
+        where: { id: microvoceProgettoId, tenantId: req.tenantId },
+        data: { risorsaId: assegnatoAId },
+      });
+      assegnatoAIdEvento = null;
+    }
+
     const note = typeof corpo['note'] === 'string' && corpo['note'].trim() !== '' ? corpo['note'] : null;
     const luogoUrl = typeof corpo['luogoUrl'] === 'string' && corpo['luogoUrl'].trim() !== '' ? corpo['luogoUrl'] : null;
 
@@ -435,7 +500,7 @@ export async function registraRotteCalendario(server: FastifyInstance): Promise<
       data: {
         tenantId: req.tenantId,
         userId,
-        assegnatoAId,
+        assegnatoAId: assegnatoAIdEvento,
         progettoId,
         clienteId,
         microvoceProgettoId,
@@ -458,7 +523,12 @@ export async function registraRotteCalendario(server: FastifyInstance): Promise<
       ruolo: req.ruolo as string | undefined,
       azione: 'EVENTO_CALENDARIO_CREATO',
       entita: 'EventoCalendario',
-      dettagli: `Evento ${creato.id} «${titolo}» (${categoria}) il ${inizio.toISOString()}`,
+      dettagli: `Evento ${creato.id} «${titolo}» (${categoria}) il ${inizio.toISOString()}` +
+        // L'assegnazione di un compito è una scrittura su un'altra tabella: senza questa riga,
+        // l'audit direbbe che è stato creato un evento e non che è stato assegnato un compito.
+        (categoria === 'microvoce' && assegnatoAId && microvoceProgettoId
+          ? ` — compito ${microvoceProgettoId} assegnato a ${assegnatoAId}`
+          : ''),
       ipAddress: req.ip,
     });
 
@@ -597,9 +667,18 @@ export async function registraRotteCalendario(server: FastifyInstance): Promise<
 
     const esistente = await prisma.eventoCalendario.findFirst({
       where: { id, tenantId: req.tenantId },
-      select: { id: true, userId: true, assegnatoAId: true, stato: true },
+      select: {
+        id: true, userId: true, assegnatoAId: true, stato: true, categoria: true,
+        // C5 (§1ter.6): per un compito l'assegnatario sta sulla micro-voce. La scrittura deve
+        // leggere la stessa colonna della lettura, altrimenti l'assegnatario vede un compito che
+        // non può spuntare — la contraddizione che §1ter.3 racconta di aver già trovato una volta.
+        microvoceProgetto: { select: { risorsaId: true } },
+      },
     });
-    if (!esistente || (esistente.userId !== userId && esistente.assegnatoAId !== userId)) {
+    if (!esistente) return rifiuta(reply, 404, 'Evento non trovato.');
+
+    const assegnatario = assegnatarioDiEvento(esistente);
+    if (esistente.userId !== userId && assegnatario !== userId) {
       return rifiuta(reply, 404, 'Evento non trovato.');
     }
 

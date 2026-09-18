@@ -40,11 +40,13 @@ interface StatoFinto {
   aggiornati: any[];
   cancellati: any[];
   intervalliChiesti: any[];
+  /** Le scritture su `microvoce_progetto`: l'assegnazione di un compito pianificato (C5). */
+  aggiornamentiMicrovoce: any[];
 }
 
 const stato: StatoFinto = {
   eventi: [], accessi: [], rate: [], clienti: [], progetti: [], contratti: [], permessi: [], microvoci: [],
-  creati: [], aggiornati: [], cancellati: [], intervalliChiesti: [],
+  creati: [], aggiornati: [], cancellati: [], intervalliChiesti: [], aggiornamentiMicrovoce: [],
 };
 
 /**
@@ -107,6 +109,45 @@ function proietta(riga: any, select: any): any {
   return fuori;
 }
 
+/**
+ * Il compito da cui un evento nasce, con la sua `risorsa` risolta come farebbe Prisma.
+ *
+ * Serve dal 18/09/2026 (C5 di §1ter.6): l'assegnatario di un evento `microvoce` non si legge più
+ * dalla colonna dell'evento ma da `microvoce_progetto.risorsa_id`, quindi il finto deve saper
+ * annidare la relazione — se restasse `null`, `assegnatarioDiEvento` risponderebbe `null` per ogni
+ * compito e i test della nuova regola passerebbero per il motivo sbagliato.
+ */
+function compitoDi(id: string | null, select: any): any {
+  if (!id) return null;
+  const mv = stato.microvoci.find((m) => m.id === id);
+  if (!mv) return null;
+  const fuori = proietta(mv, select) ?? {};
+  if (select?.risorsa) {
+    fuori.risorsa = proietta(IDENTITA[mv.risorsaId] ?? null, select.risorsa.select);
+  }
+  return fuori;
+}
+
+/**
+ * Una riga di `evento_calendario` con le relazioni che il `select` ha chiesto, come farebbe Prisma.
+ *
+ * Una funzione sola per `findMany` e `findFirst`: erano due, e la seconda risolveva solo le colonne.
+ * Finché la differenza non si vedeva andava bene; da C5 `PATCH /:id/stato` legge una relazione con
+ * un `findFirst`, e due implementazioni della stessa cosa sono esattamente il difetto che C5 chiude.
+ */
+function conRelazioni(r: any, select: any): any {
+  return {
+    ...proietta(r, select),
+    ...(select?.assegnatoA ? { assegnatoA: proietta(IDENTITA[r.assegnatoAId] ?? null, select.assegnatoA.select) } : {}),
+    ...(select?.cliente ? { cliente: proietta(stato.clienti.find((c) => c.id === r.clienteId) ?? null, select.cliente.select) } : {}),
+    ...(select?.moduloProgetto ? { moduloProgetto: r.moduloProgetto ?? null } : {}),
+    // Il compito, per l'assegnatario: vedi `compitoDi` e `assegnatarioDiEvento`.
+    ...(select?.microvoceProgetto
+      ? { microvoceProgetto: compitoDi(r.microvoceProgettoId, select.microvoceProgetto.select) }
+      : {}),
+  };
+}
+
 /** Le identità che il finto riconosce: la stessa forma usata dagli altri test di rotta. */
 const IDENTITA: Record<string, any> = {
   'usr-advisor': { id: 'usr-advisor', tenantId: TENANT, ruolo: 'advisor', stato: 'attivo', sessionVersion: 0, nome: 'Anna Advisor', email: 'anna@studio.example' },
@@ -153,19 +194,27 @@ vi.mock('./util/prismaClient.js', async (importOriginal) => {
     microvoceProgetto: {
       findFirst: async (args: any) =>
         proietta(stato.microvoci.find((m) => corrisponde(m, args?.where)) ?? null, args.select),
+      // C5 (§1ter.6): pianificare un compito dal calendario ne scrive l'assegnatario sulla
+      // micro-voce. Il finto registra la scrittura, così il test può leggerla.
+      updateMany: async (args: any) => {
+        stato.aggiornamentiMicrovoce.push(args);
+        const toccate = stato.microvoci.filter((m) => corrisponde(m, args?.where));
+        for (const m of toccate) Object.assign(m, args.data);
+        return { count: toccate.length };
+      },
     },
     eventoCalendario: {
-      findMany: async (args: any) => {
-        const righe = stato.eventi.filter((e) => corrisponde(e, args?.where));
-        return righe.map((r) => ({
-          ...proietta(r, args?.select),
-          // Le relazioni: il finto le risolve dal `select`, come farebbe Prisma.
-          ...(args?.select?.assegnatoA ? { assegnatoA: proietta(IDENTITA[r.assegnatoAId] ?? null, args.select.assegnatoA.select) } : {}),
-          ...(args?.select?.cliente ? { cliente: proietta(stato.clienti.find((c) => c.id === r.clienteId) ?? null, args.select.cliente.select) } : {}),
-          ...(args?.select?.moduloProgetto ? { moduloProgetto: r.moduloProgetto ?? null } : {}),
-        }));
+      findMany: async (args: any) =>
+        stato.eventi.filter((e) => corrisponde(e, args?.where)).map((r) => conRelazioni(r, args?.select)),
+      // `findFirst` risolve le stesse relazioni di `findMany`, e da C5 è obbligatorio che lo
+      // faccia: l'autorizzazione di `PATCH /:id/stato` chiede `microvoceProgetto.risorsaId` con un
+      // `findFirst`, quindi un finto che annidasse la relazione solo in `findMany` farebbe
+      // rispondere 404 a un assegnatario legittimo — cioè il test fallirebbe per il motivo per cui
+      // esiste, ma indicando la funzione sbagliata.
+      findFirst: async (args: any) => {
+        const riga = stato.eventi.find((e) => corrisponde(e, args?.where));
+        return riga ? conRelazioni(riga, args?.select) : null;
       },
-      findFirst: async (args: any) => proietta(stato.eventi.find((e) => corrisponde(e, args?.where)) ?? null, args.select),
       create: async (args: any) => {
         const riga = { id: `ev-nuovo-${stato.eventi.length + 1}`, ...args.data };
         stato.creati.push(args);
@@ -328,6 +377,7 @@ beforeEach(() => {
   stato.aggiornati = [];
   stato.cancellati = [];
   stato.intervalliChiesti = [];
+  stato.aggiornamentiMicrovoce = [];
   // Solo `Date`, non tutti i timer. `vi.useFakeTimers()` da solo sostituisce anche `setTimeout` e
   // `setInterval`, e Fastify ne usa: il server si costruisce dentro il test, e con i timer finti la
   // prima `inject` non torna più. Qui serve una cosa sola — che `new Date()` dentro la rotta dia
@@ -1045,5 +1095,121 @@ describe('l\'assegnatario', () => {
     const res = await server.inject({ method: 'GET', url: '/calendario/eventi?assegnatiA=usr-advisor' });
     expect(res.statusCode).toBe(400);
     expect(res.json().errore).toContain('me');
+  });
+});
+
+/**
+ * C5 di §1ter.6 — l'assegnatario di un compito lo porta **la micro-voce**, non l'evento.
+ *
+ * Prima di questa correzione il calendario rispondeva a «è assegnato a me?» leggendo
+ * `evento_calendario.assegnato_a_id`, mentre il fascicolo scriveva e il carico di lavoro contava
+ * `microvoce_progetto.risorsa_id`. Due colonne per un solo concetto, scritte da due schermate
+ * diverse: la prima volta che divergono, lo stesso compito risulta assegnato a due persone a
+ * seconda di dove lo si guarda.
+ *
+ * **Il modo in cui questi test lo dimostrano è il contro-caso**, non il caso d'uso: l'evento di
+ * prova porta un `assegnatoAId` **diverso** dall'assegnatario del compito. Se una delle tre
+ * risposte (chi vede, chi può spuntare, che nome si mostra) tornasse a leggere la colonna
+ * dell'evento, il test mostrerebbe il compito alla persona sbagliata invece di fallire in modo
+ * ambiguo — ed è esattamente il difetto che C5 chiude.
+ */
+describe('un compito assegnato: la persona sta sulla micro-voce (C5)', () => {
+  /** Un evento `microvoce` il cui compito è assegnato a `risorsaId`. */
+  function conCompito(risorsaId: string | null, assegnatoAIdEvento: string | null = 'usr-interno') {
+    stato.microvoci = [{ id: 'mv-1', tenantId: TENANT, risorsaId, stato: 'pending' }];
+    stato.eventi = [
+      evento({
+        id: 'ev-compito',
+        userId: 'usr-advisor',
+        categoria: 'microvoce',
+        microvoceProgettoId: 'mv-1',
+        assegnatoAId: assegnatoAIdEvento,
+      }),
+    ];
+  }
+
+  it('compare in «assegnati a me» per chi ha il compito, non per l\'assegnatario dell\'evento', async () => {
+    conCompito('usr-esterno');
+
+    const perChiLoFa = await (await serverCon(tokenPer('usr-esterno')))
+      .inject({ method: 'GET', url: '/calendario/eventi?categorie=microvoce&assegnatiA=me' });
+    const perLaColonnaVecchia = await (await serverCon(tokenPer('usr-interno')))
+      .inject({ method: 'GET', url: '/calendario/eventi?categorie=microvoce&assegnatiA=me' });
+
+    expect(perChiLoFa.json().eventi.map((e: any) => e.id)).toEqual(['ev-compito']);
+    expect(perLaColonnaVecchia.json().eventi).toEqual([]);
+  });
+
+  it('l\'assegnatario del compito lo vede e può spuntarlo; l\'altro no', async () => {
+    // La lettura e la scrittura devono rispondere la stessa cosa: se la lettura ammettesse
+    // l'assegnatario del compito e `PATCH` l'assegnatario dell'evento, uno vedrebbe un compito
+    // che non può chiudere — la contraddizione che §1ter.3 racconta di aver già trovato una volta.
+    conCompito('usr-esterno');
+    const patchSuo = await (await serverCon(tokenPer('usr-esterno')))
+      .inject({ method: 'PATCH', url: '/calendario/eventi/ev-compito/stato', payload: { stato: 'fatto' } });
+    expect(patchSuo.statusCode).toBe(200);
+
+    conCompito('usr-esterno');
+    const patchAltrui = await (await serverCon(tokenPer('usr-interno')))
+      .inject({ method: 'PATCH', url: '/calendario/eventi/ev-compito/stato', payload: { stato: 'fatto' } });
+    expect(patchAltrui.statusCode).toBe(404);
+  });
+
+  it('il nome mostrato è quello dell\'assegnatario del compito', async () => {
+    conCompito('usr-esterno');
+    const res = await (await serverCon(tokenPer('usr-advisor')))
+      .inject({ method: 'GET', url: '/calendario/eventi?categorie=microvoce' });
+
+    const ev = res.json().eventi[0];
+    expect(ev.assegnatoAId).toBe('usr-esterno');
+    expect(ev.assegnatoANome).toBe('Elsa Esterna');
+  });
+
+  it('un compito senza assegnatario non è assegnato all\'assegnatario dell\'evento', async () => {
+    // Il caso che rende la regola una regola e non una preferenza: la colonna dell'evento c'è,
+    // ma il compito non è di nessuno. Rispondere con la colonna vecchia direbbe che è di qualcuno.
+    conCompito(null);
+    const res = await (await serverCon(tokenPer('usr-interno')))
+      .inject({ method: 'GET', url: '/calendario/eventi?categorie=microvoce&assegnatiA=me' });
+    expect(res.json().eventi).toEqual([]);
+  });
+
+  it('pianificare un compito con un assegnatario scrive la micro-voce, e non l\'evento', async () => {
+    // La seconda metà della regola, quella che impedisce alla divergenza di ricominciare: la
+    // rotta di creazione smette di scrivere la colonna dell'evento per un compito e scrive il
+    // compito. Senza questo, il modale di pianificazione e il fascicolo riaprirebbero le due verità.
+    stato.microvoci = [{ id: 'mv-1', tenantId: TENANT, risorsaId: null, stato: 'pending' }];
+    const server = await serverCon(tokenPer('usr-advisor'));
+    const res = await server.inject({
+      method: 'POST',
+      url: '/calendario/eventi',
+      payload: {
+        titolo: 'Presentazione documento',
+        dataInizio: '2026-09-20',
+        categoria: 'microvoce',
+        microvoceProgettoId: 'mv-1',
+        assegnatoAId: 'usr-esterno',
+      },
+    });
+
+    expect(res.statusCode).toBe(201);
+    expect(stato.aggiornamentiMicrovoce).toHaveLength(1);
+    expect(stato.aggiornamentiMicrovoce[0].data).toMatchObject({ risorsaId: 'usr-esterno' });
+    expect(stato.creati[0].data.assegnatoAId).toBeNull();
+  });
+
+  it('un promemoria assegnato resta sulla colonna dell\'evento', async () => {
+    // Il contro-caso, senza il quale la correzione potrebbe essere «la micro-voce vince sempre»
+    // e un promemoria affidato a qualcuno non sarebbe più di nessuno.
+    const server = await serverCon(tokenPer('usr-advisor'));
+    const res = await server.inject({
+      method: 'POST',
+      url: '/calendario/eventi',
+      payload: { titolo: 'Richiamare il cliente', dataInizio: '2026-09-20', assegnatoAId: 'usr-esterno' },
+    });
+
+    expect(res.statusCode).toBe(201);
+    expect(stato.aggiornamentiMicrovoce).toHaveLength(0);
+    expect(stato.creati[0].data.assegnatoAId).toBe('usr-esterno');
   });
 });

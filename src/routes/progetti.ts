@@ -23,6 +23,7 @@ import { arricchisciProgetti, calcolaAvanzamento, ricalcolaProgetto } from '../s
 import { ricercaGlobale } from '../services/ricercaGlobaleService.js';
 import { STATI_MICROVOCE, STATI_PROGETTO, recordAudit, clienteDellaRichiesta } from '../util/serverHelpers.js';
 import { livelloFirmaValido } from '../services/livelloFirmaService.js';
+import { caricoPerRisorse } from '../services/compitiAssegnati.js';
 import { CreaProgettoSchema, ConsuntivaOreSchema } from '../schemas/progetti.schema.js';
 import { campoOrdinamento, creaMetaPaginazione, leggiPaginazione } from '../util/paginazione.js';
 import { conStatoComunicazione, leggiMetaComunicazione } from '../util/statoComunicazione.js';
@@ -1184,20 +1185,20 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
 
       // Carico: ore già registrate questa settimana (tutti gli stati — il lavoro
       // è comunque fatto) + ore da fare sulle voci aperte assegnate.
+      //
+      // Le voci aperte arrivano da `caricoPerRisorse`, che è la **stessa** definizione di compito
+      // che serve la vista «i miei compiti» (§1ter.6, C5). Prima era una `groupBy` scritta qui: la
+      // clausola era la stessa, ma scritta in due posti, e due copie della stessa regola restano
+      // uguali finché qualcuno ne cambia una. Il numero che questo endpoint usa per ordinare i
+      // suggerimenti e quello che l'operatore legge nei propri compiti ora non possono divergere.
       const registrazioniSettimana = await prisma.oraTimesheet.groupBy({
         by: ['userId'],
         where: { tenantId, userId: { in: ids }, ...(fine ? { giorno: { gte: inizio!, lt: fine } } : {}) },
         _sum: { minuti: true },
       });
-      const vociAperte = await prisma.microvoceProgetto.groupBy({
-        by: ['risorsaId'],
-        where: { tenantId, risorsaId: { in: ids }, stato: { not: 'done' } },
-        _sum: { orePreventivate: true, oreConsuntivate: true },
-      });
+      const carico = await caricoPerRisorse(tenantId, ids);
       const oreSettimanaPerUtente = new Map(registrazioniSettimana.map((r) => [r.userId, (r._sum.minuti ?? 0) / 60]));
-      const residuePerUtente = new Map(
-        vociAperte.map((v) => [v.risorsaId ?? '', Math.max(0, (v._sum.orePreventivate ?? 0) - (v._sum.oreConsuntivate ?? 0))]),
-      );
+      const residuePerUtente = new Map([...carico].map(([id, c]) => [id, c.oreResidue]));
 
       const righe = utenti.map((u) => {
         const specializzazione = (u.specializzazione || '').trim().toLowerCase();

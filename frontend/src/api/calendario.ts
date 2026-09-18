@@ -190,6 +190,48 @@ export async function eliminaEventoCalendario(id: string): Promise<void> {
 }
 
 /**
+ * §1ter.6 (C5) — un compito assegnato: una micro-voce che ho addosso.
+ *
+ * `scadenza` è `null` quando il compito non è stato ancora pianificato: la data non sta
+ * nella micro-voce, sta nell'evento di calendario che qualcuno ha scritto per lui. Un
+ * compito senza data compare ugualmente nella lista, perché «da fare» è un fatto a
+ * prescindere da quando.
+ */
+export interface CompitoAssegnato {
+  id: string;
+  nome: string;
+  stato: string;
+  orePreventivate: number;
+  oreConsuntivate: number;
+  oreResidue: number;
+  progettoId: string;
+  progettoNome: string;
+  moduloProgettoId: string;
+  moduloNome: string;
+  clienteId: string;
+  clienteNome: string;
+  /** `YYYY-MM-DD` o `null` se nessuno ha pianificato una data per questo compito. */
+  scadenza: string | null;
+  eventoId: string | null;
+}
+
+/**
+ * I compiti assegnati all'utente corrente, dal più urgente.
+ *
+ * Non accetta un id: è sempre e solo il token che decide di chi sono i compiti,
+ * come tutte le rotte di `/calendario`. Un collaboratore non può chiedere i compiti
+ * di un altro; un advisor vede solo i propri.
+ */
+export async function fetchCompitiAssegnati(): Promise<CompitoAssegnato[]> {
+  const res = await apiFetch(`${API_BASE}/calendario/compiti`, {
+    headers: intestazioni(),
+  });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Lettura dei compiti non riuscita'));
+  const corpo = await res.json();
+  return Array.isArray(corpo?.compiti) ? corpo.compiti : [];
+}
+
+/**
  * Le intestazioni della richiesta.
  *
  * `apiFetch` non le aggiunge da solo — non è un interceptor — e ogni funzione di questo file le

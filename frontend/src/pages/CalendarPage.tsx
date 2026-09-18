@@ -38,7 +38,9 @@ import {
   aggiornaStatoEvento,
   eliminaEventoCalendario,
   fetchEventiCalendario,
+  fetchCompitiAssegnati,
   type CategoriaCalendario,
+  type CompitoAssegnato,
   type EventoCalendario,
 } from '../api/calendario';
 import { useTeamMembers } from '../hooks/useTeamMembers';
@@ -69,6 +71,11 @@ export function CalendarPage() {
   const [clienti, setClienti] = useState<ClienteSemplice[]>([]);
   const [caricamento, setCaricamento] = useState(true);
   const [errore, setErrore] = useState<string | null>(null);
+
+  // §1ter.6 (C5) — i compiti assegnati all'utente corrente.
+  const [compiti, setCompiti] = useState<CompitoAssegnato[]>([]);
+  const [compitiAperti, setCompitiAperti] = useState(true);
+  const [compitiErrore, setCompitiErrore] = useState<string | null>(null);
 
   const [selezionato, setSelezionato] = useState<EventoCalendario | null>(null);
   /** Il giorno da cui apre il modale di creazione: oggi, o la casella su cui si è cliccato. */
@@ -129,6 +136,21 @@ export function CalendarPage() {
         );
       } catch {
         // Silenzio deliberato: l'elenco vuoto è già un'informazione, e il modale la mostra.
+      }
+    })();
+    return () => { annullato = true; };
+  }, []);
+
+  // §1ter.6 (C5): lettura dei compiti. Una volta sola al mount — non dipende dall'intervallo
+  // mensile, i compiti esistono a prescindere da quale mese si sta guardando.
+  useEffect(() => {
+    let annullato = false;
+    void (async () => {
+      try {
+        const lista = await fetchCompitiAssegnati();
+        if (!annullato) { setCompiti(lista); setCompitiErrore(null); }
+      } catch (err: any) {
+        if (!annullato) setCompitiErrore(err?.message || 'Lettura dei compiti non riuscita.');
       }
     })();
     return () => { annullato = true; };
@@ -251,6 +273,77 @@ export function CalendarPage() {
           onCreato={carica}
         />
       )}
+
+      {/* §1ter.6 (C5) — I miei compiti */}
+      <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 16, overflow: 'hidden' }}>
+        <button
+          onClick={() => setCompitiAperti((v) => !v)}
+          style={{
+            width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '14px 20px', background: 'transparent', border: 'none', cursor: 'pointer',
+            color: 'var(--text)', fontWeight: 700, fontSize: 14,
+          }}
+        >
+          <span>📋 I miei compiti{compiti.length > 0 ? ` (${compiti.length})` : ''}</span>
+          <span style={{ fontSize: 10, color: 'var(--muted)' }}>{compitiAperti ? '▲' : '▼'}</span>
+        </button>
+
+        {compitiAperti && (
+          <div style={{ padding: '0 16px 16px' }}>
+            {compitiErrore && (
+              <div style={{ background: '#450a0a', border: '1px solid #b91c1c', color: '#fecaca', padding: '10px 14px', borderRadius: 8, fontSize: 12, marginBottom: 12 }}>
+                ⚠️ {compitiErrore}
+              </div>
+            )}
+            {compiti.length === 0 && !compitiErrore ? (
+              <p style={{ color: 'var(--muted)', fontSize: 12, margin: 0, padding: '4px 0 8px' }}>
+                Nessun compito assegnato al momento.
+              </p>
+            ) : (
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--border)', color: 'var(--muted)', textAlign: 'left' }}>
+                    <th style={{ padding: '6px 8px', fontWeight: 600 }}>Compito</th>
+                    <th style={{ padding: '6px 8px', fontWeight: 600 }}>Progetto</th>
+                    <th style={{ padding: '6px 8px', fontWeight: 600 }}>Scadenza</th>
+                    <th style={{ padding: '6px 8px', fontWeight: 600, textAlign: 'right' }}>Ore residue</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {compiti.map((c) => {
+                    const oggi_str = oggi();
+                    const scaduta = c.scadenza !== null && c.scadenza < oggi_str;
+                    return (
+                      <tr key={c.id} style={{ borderBottom: '1px solid var(--border)', opacity: c.stato === 'done' ? 0.5 : 1 }}>
+                        <td style={{ padding: '8px', color: 'var(--text)', verticalAlign: 'middle' }}>
+                          <div style={{ fontWeight: 600 }}>{c.nome}</div>
+                          <div style={{ color: 'var(--muted)', fontSize: 11, marginTop: 2 }}>{c.moduloNome}</div>
+                        </td>
+                        <td style={{ padding: '8px', color: 'var(--muted)', verticalAlign: 'middle' }}>
+                          <div>{c.progettoNome}</div>
+                          <div style={{ fontSize: 11, marginTop: 1 }}>{c.clienteNome}</div>
+                        </td>
+                        <td style={{ padding: '8px', verticalAlign: 'middle' }}>
+                          {c.scadenza ? (
+                            <span style={{ color: scaduta ? '#f87171' : 'var(--text)', fontWeight: scaduta ? 700 : 400 }}>
+                              {scaduta && '⚠️ '}{new Date(c.scadenza + 'T00:00:00').toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' })}
+                            </span>
+                          ) : (
+                            <span style={{ color: 'var(--muted)', fontStyle: 'italic' }}>non pianificato</span>
+                          )}
+                        </td>
+                        <td style={{ padding: '8px', textAlign: 'right', verticalAlign: 'middle', color: c.oreResidue > 0 ? 'var(--text)' : 'var(--muted)' }}>
+                          {c.oreResidue > 0 ? `${c.oreResidue.toFixed(1)} h` : '—'}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

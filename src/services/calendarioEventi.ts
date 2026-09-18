@@ -233,19 +233,72 @@ interface RigaConContesto {
   moduloProgettoId: string | null;
   microvoceProgettoId: string | null;
   moduloProgetto: { progettoId: string } | null;
+  /**
+   * Il compito da cui l'evento nasce, quando ne ha uno.
+   *
+   * Esiste per una ragione sola, ed è C5 di §1ter.6: **l'assegnatario di un compito è la
+   * micro-voce, non l'evento.** L'evento porta una data; chi deve fare il lavoro sta su
+   * `microvoce_progetto.risorsa_id`, che è la stessa colonna che il carico di lavoro somma e che
+   * `PUT /progetti/:id/stato-completo` scrive (C3). Finché questa relazione non era selezionata, il
+   * calendario rispondeva alla domanda «è assegnato a me?» leggendo `evento_calendario.assegnato_a_id`
+   * — una colonna **diversa**, scritta da un'altra schermata — e le due risposte potevano
+   * contraddirsi senza che nessuna delle due fosse dimostrabilmente sbagliata.
+   */
+  microvoceProgetto: {
+    risorsaId: string | null;
+    stato: string;
+    risorsa: { nome: string | null; email: string } | null;
+  } | null;
   clienteId: string | null;
   cliente: { nome: string } | null;
+}
+
+/**
+ * Chi deve fare questa riga — **la definizione unica**, usata dalla lettura e dalla scrittura.
+ *
+ * Per un evento `microvoce` la risposta è l'assegnatario del **compito** (`microvoce_progetto.
+ * risorsa_id`): un compito è una micro-voce con una risorsa, e la data è un attributo che qualcuno
+ * gli ha messo sopra. Per le altre categorie la risposta è `assegnato_a_id`, che è l'assegnazione
+ * dell'evento — un promemoria affidato a qualcuno non ha un compito sotto di sé.
+ *
+ * **Perché una funzione e non due righe ripetute.** Questa stessa domanda si fa in tre posti: chi
+ * può *vedere* la riga (`rigaVisibile`), chi può *cambiarla* (`PATCH /calendario/eventi/:id/stato`)
+ * e cosa si *mostra* all'utente (`eventoDaRiga`). Se i tre non rispondessero allo stesso modo, un
+ * assegnatario vedrebbe un compito e non potrebbe spuntarlo — la contraddizione che §1ter.3
+ * racconta di aver già trovato una volta fra lettura e scrittura, quando la lettura ammetteva il
+ * solo proprietario e la scrittura anche l'assegnatario.
+ */
+export function assegnatarioDiEvento(riga: {
+  categoria: CategoriaEventoCalendario;
+  assegnatoAId: string | null;
+  microvoceProgetto?: { risorsaId: string | null } | null;
+}): string | null {
+  if (riga.categoria === 'microvoce') return riga.microvoceProgetto?.risorsaId ?? null;
+  return riga.assegnatoAId;
+}
+
+/** Il nome da mostrare per l'assegnatario, quando c'è. */
+function nomeAssegnatario(riga: RigaConContesto): string | null {
+  if (riga.categoria === 'microvoce') {
+    const r = riga.microvoceProgetto?.risorsa;
+    return r ? r.nome ?? r.email : null;
+  }
+  return riga.assegnatoA?.nome ?? riga.assegnatoA?.email ?? null;
 }
 
 /**
  * Se una riga di `evento_calendario` va mostrata a chi sta chiedendo.
  *
  * **Prima i due assi dell'identità, poi la categoria.** La riga appartiene a `userId` — è nel suo
- * calendario — e può essere affidata a `assegnatoAId` — è lui che deve farla. Entrambi devono
+ * calendario — e può essere affidata a un assegnatario — è lui che deve farla. Entrambi devono
  * vederla, e non è una concessione: assegnare un compito a qualcuno che non può vederlo è
  * un'assegnazione che non esiste. Che sia un secondo cancello e non il primo conta, perché la
  * scrittura (`PATCH /:id/stato`) ammette esattamente queste due persone: se la lettura ne
  * ammettesse una sola, l'assegnatario potrebbe cambiare lo stato di una riga che non vede.
+ *
+ * **L'assegnatario lo dice `assegnatarioDiEvento`, e non è un dettaglio di stile** (C5, §1ter.6):
+ * per un compito è la micro-voce a portare la persona, non l'evento. Chiamare qui la stessa funzione
+ * che chiama la scrittura è ciò che rende impossibile la contraddizione descritta sopra.
  *
  * Il secondo cancello, per le categorie che appartengono a una sorgente, è l'appartenenza:
  *
@@ -264,10 +317,12 @@ function rigaVisibile(
   chiedi: ChiediEventi,
   accessi: AccessiUtente | null,
 ): boolean {
-  if (chiedi.soloAssegnatiAMe && riga.assegnatoAId !== chiedi.userId) return false;
+  const assegnatario = assegnatarioDiEvento(riga);
+
+  if (chiedi.soloAssegnatiAMe && assegnatario !== chiedi.userId) return false;
 
   if (riga.userId === chiedi.userId) return true;
-  if (riga.assegnatoAId !== null && riga.assegnatoAId === chiedi.userId) return true;
+  if (assegnatario !== null && assegnatario === chiedi.userId) return true;
 
   switch (riga.categoria) {
     case 'promemoria':
@@ -305,8 +360,8 @@ function eventoDaRiga(riga: RigaConContesto): EventoVista {
     note: riga.note,
     luogoUrl: riga.luogoUrl,
     generato: riga.generato,
-    assegnatoAId: riga.assegnatoAId,
-    assegnatoANome: riga.assegnatoA?.nome ?? riga.assegnatoA?.email ?? null,
+    assegnatoAId: assegnatarioDiEvento(riga),
+    assegnatoANome: nomeAssegnatario(riga),
     progettoId: riga.progettoId,
     clienteId: riga.clienteId,
     clienteNome: riga.cliente?.nome ?? null,
@@ -363,6 +418,16 @@ export async function eventiDelCalendario(chiedi: ChiediEventi): Promise<EventoV
         assegnatoAId: true, assegnatoA: { select: { nome: true, email: true } },
         progettoId: true, moduloProgettoId: true, microvoceProgettoId: true,
         moduloProgetto: { select: { progettoId: true } },
+        // Il compito, per sapere chi deve farlo: vedi `assegnatarioDiEvento`. La `risorsa` è
+        // selezionata per il nome da mostrare, perché l'assegnatario di un compito non ha una
+        // colonna `assegnato_a` da cui leggerlo.
+        microvoceProgetto: {
+          select: {
+            risorsaId: true,
+            stato: true,
+            risorsa: { select: { nome: true, email: true } },
+          },
+        },
         clienteId: true, cliente: { select: { nome: true } },
       },
     });
