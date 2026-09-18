@@ -1,5 +1,6 @@
 import React, { useRef, useState, useMemo } from 'react';
 import { firmaStudioDocumentoApi, richiediOtpStudioApi, type FirmaStudioPayload, type DocumentoProgetto } from '../../api/documenti';
+import { SmoothStrokeTracker, getCanvasCoordinates } from '../../utils/smoothSignature';
 
 interface FirmaStudioModalProps {
   doc: DocumentoProgetto;
@@ -44,18 +45,28 @@ export function FirmaStudioModal({ doc, onClose, onSigned }: FirmaStudioModalPro
   const [loading, setLoading] = useState(false);
   const [errore, setErrore] = useState<string | null>(null);
 
-  // Disegno su Canvas
+  // Tracciamento fluido della firma
+  const trackerRef = useRef<SmoothStrokeTracker>(
+    new SmoothStrokeTracker({ strokeColor: '#1e1b4b', baseLineWidth: 2.5, minLineWidth: 1.6, maxLineWidth: 3.4 })
+  );
+
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
     setIsDrawing(true);
-    draw(e);
+    const { x, y } = getCanvasCoordinates(e, canvas);
+    trackerRef.current.start(x, y);
   };
 
   const stopDrawing = () => {
+    if (!isDrawing) return;
     setIsDrawing(false);
     const canvas = canvasRef.current;
     if (canvas) {
       const ctx = canvas.getContext('2d');
-      if (ctx) ctx.beginPath();
+      if (ctx) {
+        trackerRef.current.end(ctx);
+      }
     }
   };
 
@@ -66,21 +77,8 @@ export function FirmaStudioModal({ doc, onClose, onSigned }: FirmaStudioModalPro
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const rect = canvas.getBoundingClientRect();
-    const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
-    const clientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
-
-    const x = clientX - rect.left;
-    const y = clientY - rect.top;
-
-    ctx.lineWidth = 2.5;
-    ctx.lineCap = 'round';
-    ctx.strokeStyle = '#1e1b4b';
-
-    ctx.lineTo(x, y);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(x, y);
+    const { x, y } = getCanvasCoordinates(e, canvas);
+    trackerRef.current.move(x, y, ctx);
   };
 
   const clearCanvas = () => {
@@ -89,6 +87,7 @@ export function FirmaStudioModal({ doc, onClose, onSigned }: FirmaStudioModalPro
       const ctx = canvas.getContext('2d');
       if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
     }
+    trackerRef.current.reset();
   };
 
   const ottieniImmagineFirma = (): string => {

@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react';
 import type { SignatureData } from '../utils/pdfGenerator';
+import { SmoothStrokeTracker, getCanvasCoordinates } from '../utils/smoothSignature';
 
 interface DigitalSignatureModalProps {
   documentTitle: string;
@@ -31,17 +32,27 @@ export function DigitalSignatureModal({
   const [typedSignature, setTypedSignature] = useState(signerName);
   const [signatureMode, setSignatureMode] = useState<'draw' | 'type'>('draw');
 
+  const trackerRef = useRef<SmoothStrokeTracker>(
+    new SmoothStrokeTracker({ strokeColor: '#1e1b4b', baseLineWidth: 2.5, minLineWidth: 1.6, maxLineWidth: 3.4 })
+  );
+
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
     setIsDrawing(true);
-    draw(e);
+    const { x, y } = getCanvasCoordinates(e, canvas);
+    trackerRef.current.start(x, y);
   };
 
   const stopDrawing = () => {
+    if (!isDrawing) return;
     setIsDrawing(false);
     const canvas = canvasRef.current;
     if (canvas) {
       const ctx = canvas.getContext('2d');
-      if (ctx) ctx.beginPath();
+      if (ctx) {
+        trackerRef.current.end(ctx);
+      }
     }
   };
 
@@ -52,21 +63,8 @@ export function DigitalSignatureModal({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const rect = canvas.getBoundingClientRect();
-    const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
-    const clientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
-
-    const x = clientX - rect.left;
-    const y = clientY - rect.top;
-
-    ctx.lineWidth = 2.5;
-    ctx.lineCap = 'round';
-    ctx.strokeStyle = '#1e1b4b';
-
-    ctx.lineTo(x, y);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(x, y);
+    const { x, y } = getCanvasCoordinates(e, canvas);
+    trackerRef.current.move(x, y, ctx);
   };
 
   const clearCanvas = () => {
@@ -77,6 +75,7 @@ export function DigitalSignatureModal({
         ctx.clearRect(0, 0, canvas.width, canvas.height);
       }
     }
+    trackerRef.current.reset();
   };
 
   const handleConfirmSignature = () => {
