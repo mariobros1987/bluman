@@ -1,0 +1,21 @@
+-- La sesta categoria: la fine di un progetto.
+--
+-- Perché serve una migrazione a sé. Il piano (§1ter.4, A1) prevedeva cinque categorie —
+-- `promemoria`, `microvoce`, `kyc`, `fattura`, `contratto` — e nessuna per la **data di scadenza di
+-- un progetto**. Ma la scadenza di progetto è una delle due cose che l'utente ha chiesto di
+-- aggregare automaticamente nel calendario (l'altra sono le scadenze delle rate), e oggi il
+-- frontend la inventa con un contatore. Per smettere di inventarla deve poterla **chiedere**, e per
+-- chiederla deve avere una categoria: senza, `?categorie=progetto` non avrebbe senso e la scadenza
+-- resterebbe fuori dalla risposta.
+--
+-- Non è un ripiego su una categoria esistente. `promemoria` è la riga di **una persona** — la vede
+-- solo il suo proprietario — mentre la scadenza di un progetto la devono vedere tutti quelli che
+-- sono sul progetto: mapparla su `promemoria` l'avrebbe resa invisibile a chi deve rispettarla.
+--
+-- `ADD VALUE IF NOT EXISTS` e non un `DO $$`: PostgreSQL lo supporta dalla 12, e da lì in avanti
+-- `ALTER TYPE … ADD VALUE` può stare dentro una transazione (Prisma avvolge ogni migrazione in una
+-- transazione) a una condizione: il valore aggiunto non deve essere **usato** nella stessa
+-- transazione. Qui non viene usato — questa migrazione aggiunge solo il valore, e chi lo userà è il
+-- codice, in un'altra transazione. È la ragione per cui questa migrazione è separata da quella che
+-- ha creato l'enum invece di essere stata scritta insieme.
+ALTER TYPE "CategoriaEvento" ADD VALUE IF NOT EXISTS 'progetto';

@@ -1167,6 +1167,11 @@ enum CategoriaEvento {
   kyc
   fattura
   contratto
+  // Aggiunta il 17/09/2026: il piano prevedeva cinque categorie e nessuna per la **fine di un
+  // progetto**, che è una delle due cose che l'utente ha chiesto di aggregare automaticamente nel
+  // calendario. Senza questo valore la scadenza di un progetto non avrebbe avuto una categoria con
+  // cui essere chiesta, e il frontend non avrebbe potuto smettere di inventarla.
+  progetto
 }
 
 enum StatoEvento {

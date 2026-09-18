@@ -96,6 +96,10 @@ import { registraRotteComunicazioni } from './routes/comunicazioni.js';
 // Il link che collega la chat di un cliente alla sua pratica. Registrato dentro il
 // wrapper register di buildServer, accanto alle rotte progetti: richiede un JWT.
 import { registraRotteCollegamentoChat } from './routes/collegamentoChat.js';
+// Il calendario: la griglia del mese, i promemoria, e le scadenze derivate (rate, KYC, fine
+// progetto, contratti). Fuori da ROTTE_MODULO di proposito — non c'è un permesso «calendario», la
+// visibilità si eredita dalla sorgente di ogni evento (§1ter.3). Vedi src/routes/calendario.ts.
+import { registraRotteCalendario } from './routes/calendario.js';
 import { registraSwagger } from './plugins/swagger.js';
 // Voce 6.2 — error tracking. No-op senza SENTRY_DSN: attivarlo è una variabile d'ambiente.
 import { registraSentry } from './plugins/sentry.js';
@@ -683,6 +687,13 @@ export function buildServer(app: AppPort): FastifyInstance {
   // di un cliente a una pratica, l'invio dell'invito via email/WhatsApp, l'elenco
   // delle chat collegate e la revoca. Stessa registrazione, dentro questo wrapper.
   await registraRotteCollegamentoChat(server);
+
+  // ─── CALENDARIO ───────────────────────────────────────────────────
+  // La griglia del mese con dentro le scadenze che il database ha davvero: le rate di
+  // scadenza_incasso, i rinnovi KYC, le fini dei progetti, i rinnovi dei contratti.
+  // Gli eventi derivati non sono righe e non si materializzano: si calcolano a ogni
+  // lettura dalle stesse regole che usa il cron (src/util/scadenzeDerivate.ts).
+  await registraRotteCalendario(server);
 
   // ─── FATTURE & CONTABILITÀ (ex blocchi F1-F10) ────────────────────
   // Rotte contabilità (emissione fatture, incassi/scadenzario/prima nota,

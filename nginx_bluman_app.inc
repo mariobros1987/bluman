@@ -16,7 +16,7 @@ add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 # file di src/routes/. Presidio: src/infrastrutturaDeploy.test.ts.
 # `/uploads/` è qui e non servito staticamente: l'autorizzazione la fa la rotta.
 # ─────────────────────────────────────────────────────────────────────
-location ~ ^/(addendum|admin|articoli|audit-logs|auth|checklist|clienti|comunicazioni|contabilita|conti-bancari|contratti-ricorrenti|cron|documenti|documenti-template|fatture|fatture-ricevute|firme|fornitori|giurisdizioni|health|invoices|liquidazione-iva|microvoci|moduli|moduli-template|notifiche|operatori-suggeriti|passaggi|portal|preventivi|prima-nota|progetti|proposte-dati|reports|search|stream|tenant|timesheet|upload|uploads|webhooks)(/|$) {
+location ~ ^/(addendum|admin|articoli|audit-logs|auth|calendario|checklist|clienti|comunicazioni|contabilita|conti-bancari|contratti-ricorrenti|cron|documenti|documenti-template|fatture|fatture-ricevute|firme|fornitori|giurisdizioni|health|invoices|liquidazione-iva|microvoci|moduli|moduli-template|notifiche|operatori-suggeriti|passaggi|portal|preventivi|prima-nota|progetti|proposte-dati|reports|search|stream|tenant|timesheet|upload|uploads|webhooks)(/|$) {
     proxy_pass http://api:3000;
     proxy_http_version 1.1;
     proxy_set_header Upgrade $http_upgrade;
