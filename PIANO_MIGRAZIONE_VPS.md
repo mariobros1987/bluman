@@ -76,6 +76,11 @@ Browser ──► Vercel (frontend React)  ──► Railway (backend Fastify) �
 
 > Configurazione consigliata per il primo giro: **backend + PostgreSQL sul VPS (co-locati), storage su Supabase (Opzione A), frontend su Vercel.** È il minimo che ti dà il guadagno di velocità (query su socket locale) col minor rischio.
 
+> **DECISIONE PRESA (19/09/2026): "tutto su VPS" → Opzione B.** Database + backend + **storage** vanno tutti sul VPS. Questo attiva le fasi extra:
+> - **Storage (§6.3 obbligatoria):** migrare il bucket `bluman-documents` su MinIO (S3-compatibile) o disco locale + fallback `storageService.ts`; adattare gli URL firmati; aggiungere i file ai backup (§8).
+> - **Frontend:** "tutto su VPS" preso alla lettera includerebbe anche il frontend, ma servirlo da una sola macchina fa perdere la CDN edge di Vercel (che **non** è il collo di bottiglia delle letture). Raccomandazione: **lasciare il frontend su Vercel**. Da confermare con l'utente; se confermato "anche frontend sul VPS", aggiungere reverse proxy per i file statici della build Vite + `Cache-Control`.
+> - Con l'Opzione B **non servono più** `SUPABASE_URL`/`SUPABASE_SERVICE_KEY`: vengono sostituite dalle credenziali MinIO/S3 locali.
+
 ---
 
 ## 4. Prerequisiti (da avere pronti prima della finestra di migrazione)
