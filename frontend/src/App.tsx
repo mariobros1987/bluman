@@ -29,6 +29,7 @@ import { getUserPermission } from './utils/rbac';
 import { fetchMeApi } from './api/client';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import './styles/tokens.css';
+import { watchSystemTheme } from './utils/theme';
 
 function ProtectedModule({ user, moduleKey, element }: { user: any; moduleKey: string; element: React.ReactElement }) {
   const perm = getUserPermission(user, moduleKey);
@@ -189,6 +190,7 @@ function AppContent() {
 }
 
 export default function App() {
+  useEffect(() => watchSystemTheme(), []);
   return (
     <ErrorBoundary>
       <BrowserRouter>

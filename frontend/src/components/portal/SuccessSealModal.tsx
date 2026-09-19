@@ -106,7 +106,7 @@ export function SuccessSealModal({
 
             {/* Se è stata apposta la firma grafometrica visiva */}
             {successSealModal.firmaGrafometricaPng && (
-              <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 6, background: '#ffffff', padding: 12, borderRadius: 8, border: '1px solid var(--pill-slate-fg)' }}>
+              <div data-theme="light" style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 6, background: '#ffffff', padding: 12, borderRadius: 8, border: '1px solid var(--pill-slate-fg)' }}>
                 <span style={{ fontSize: 10, fontWeight: 800, color: 'var(--pill-indigo-fg)', textTransform: 'uppercase' }}>
                   Tratto Grafometrico Sottoscritto:
                 </span>

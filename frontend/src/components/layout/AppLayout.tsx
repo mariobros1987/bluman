@@ -7,6 +7,7 @@ import { UserProfileModal } from '../UserProfileModal';
 import { MustChangePasswordModal } from '../MustChangePasswordModal';
 import { fetchNotificheApi, markNotificheReadApi, apriStreamNotifiche, type NotificaStreamEvent } from '../../api/client';
 import { QuickTimeTracker } from '../QuickTimeTracker';
+import { ThemeToggle } from './ThemeToggle';
 import { getCurrentTenantId, getAllAvailableTenants, setActiveTenantId } from '../../utils/tenant';
 import styles from './AppLayout.module.css';
 
@@ -220,6 +221,7 @@ export function AppLayout({ children, alertCount: _alertCount = 0, user, onLogou
             })()}
 
             <QuickTimeTracker user={currentUser} />
+            <ThemeToggle />
             {currentUser && (
               <button
                 onClick={() => setProfileModalOpen(true)}

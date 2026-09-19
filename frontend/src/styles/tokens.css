@@ -88,6 +88,110 @@
   --t: .15s ease;
 }
 
+/* ─── TEMA CHIARO esplicito ──────────────────────────────────────
+   Riafferma i valori chiari quando un elemento (o un suo antenato) porta
+   data-theme="light". Serve a due cose:
+   1) forzare il chiaro anche se l'app è in scuro (es. le "carte" bianche
+      come il foglio A4 o le anteprime documento/fattura, che devono
+      restare chiare come su carta stampata);
+   2) permettere all'utente di scegliere esplicitamente il tema chiaro. */
+:root[data-theme="light"], [data-theme="light"] {
+  color-scheme: light;
+  --bg:        #f3f6fc;
+  --sidebar:   #ffffff;
+  --card:      #ffffff;
+  --card2:     #eef2fb;
+  --border:    #dde3f0;
+  --text:      #16203a;
+  --muted:     #5a6178;
+  --hint:      #949cb2;
+  --indigo:    #2563eb;  --indigo-d: #1d4ed8;  --indigo-l: #3b82f6;
+  --green:     #059669;  --amber: #d97706;  --red: #dc2626;  --purple: #7c3aed;
+  --cat-analisi: #2563eb; --cat-societario: #0284c7; --cat-trust: #7c3aed;
+  --cat-banking: #059669; --cat-fiscale: #d97706; --cat-legale: #475569;
+  --cat-ip: #db2777; --cat-compliance: #ea580c;
+  --primary: #2563eb; --accent: #2563eb; --fg: #16203a; --text-muted: #5a6178; --bg-secondary: #eef2fb;
+  --surface-1: #f8fafc; --surface-2: #eef2fb; --surface-3: #e3e9f5; --on-accent: #ffffff;
+  --pill-indigo-bg: #eef2ff;  --pill-indigo-fg: #1d4ed8;  --pill-indigo-bd: #c7d2fe;
+  --pill-blue-bg:   #eff6ff;  --pill-blue-fg:   #1d4ed8;  --pill-blue-bd:   #bfdbfe;
+  --pill-sky-bg:    #e0f2fe;  --pill-sky-fg:    #0369a1;  --pill-sky-bd:    #bae6fd;
+  --pill-green-bg:  #ecfdf5;  --pill-green-fg:  #047857;  --pill-green-bd:  #a7f3d0;
+  --pill-red-bg:    #fef2f2;  --pill-red-fg:    #b91c1c;  --pill-red-bd:    #fecaca;
+  --pill-amber-bg:  #fffbeb;  --pill-amber-fg:  #b45309;  --pill-amber-bd:  #fde68a;
+  --pill-purple-bg: #f5f3ff;  --pill-purple-fg: #6d28d9;  --pill-purple-bd: #ddd6fe;
+  --pill-pink-bg:   #fdf2f8;  --pill-pink-fg:   #be185d;  --pill-pink-bd:   #fbcfe8;
+  --pill-slate-bg:  #f1f5f9;  --pill-slate-fg:  #475569;  --pill-slate-bd:  #cbd5e1;
+  --shadow-sm: 0 1px 3px rgba(22,32,58,.08);
+  --shadow:    0 4px 16px rgba(22,32,58,.10);
+  --shadow-lg: 0 24px 60px rgba(22,32,58,.16);
+}
+
+/* ─── TEMA SCURO — grigio-blu con accento azzurro ────────────────
+   Stessi nomi di token del chiaro: tutto ciò che usa var(--...) segue.
+   Fondi grigio-ardesia (non nero puro), testo chiaro freddo, accento
+   azzurro. Le pill hanno fondo scuro tinto + testo chiaro saturo. */
+:root[data-theme="dark"], [data-theme="dark"] {
+  color-scheme: dark;
+
+  /* Backgrounds — grigio-blu profondo, a strati */
+  --bg:        #0f141c;   /* pagina */
+  --sidebar:   #141b26;
+  --card:      #1a222e;
+  --card2:     #212b39;   /* superficie secondaria */
+
+  --border:    #2c3745;
+  --text:      #e7edf5;   /* bianco freddo */
+  --muted:     #98a3b5;
+  --hint:      #6b7688;
+
+  /* Brand — AZZURRO (più luminoso, per staccare sul fondo scuro) */
+  --indigo:    #3b82f6;   /* blue-500 */
+  --indigo-d:  #2563eb;   /* blue-600, hover */
+  --indigo-l:  #60a5fa;   /* blue-400, accento */
+
+  --green:     #34d399;
+  --amber:     #fbbf24;
+  --red:       #f87171;
+  --purple:    #a78bfa;
+
+  --cat-analisi:     #60a5fa;
+  --cat-societario:  #38bdf8;
+  --cat-trust:       #a78bfa;
+  --cat-banking:     #34d399;
+  --cat-fiscale:     #fbbf24;
+  --cat-legale:      #94a3b8;
+  --cat-ip:          #f472b6;
+  --cat-compliance:  #fb923c;
+
+  --primary:      #3b82f6;
+  --accent:       #3b82f6;
+  --fg:           #e7edf5;
+  --text-muted:   #98a3b5;
+  --bg-secondary: #212b39;
+
+  /* Superfici elevate — grigi bluastri */
+  --surface-1:   #1a222e;
+  --surface-2:   #212b39;
+  --surface-3:   #2c3745;
+  --on-accent:   #ffffff;   /* testo su fondo colorato pieno */
+
+  /* Pill: fondo scuro tinto (-bg), testo chiaro saturo (-fg), bordo tenue (-bd) */
+  --pill-indigo-bg: #1e2b4a;  --pill-indigo-fg: #93b4fc;  --pill-indigo-bd: #33477a;
+  --pill-blue-bg:   #16294a;  --pill-blue-fg:   #93c5fd;  --pill-blue-bd:   #2b4372;
+  --pill-sky-bg:    #0c3049;  --pill-sky-fg:    #7dd3fc;  --pill-sky-bd:    #14567a;
+  --pill-green-bg:  #0b3b2e;  --pill-green-fg:  #6ee7b7;  --pill-green-bd:  #14624a;
+  --pill-red-bg:    #431a1a;  --pill-red-fg:    #fca5a5;  --pill-red-bd:    #7a2e2e;
+  --pill-amber-bg:  #422f10;  --pill-amber-fg:  #fcd34d;  --pill-amber-bd:  #74531a;
+  --pill-purple-bg: #2b1f4a;  --pill-purple-fg: #c4b5fd;  --pill-purple-bd: #4a3579;
+  --pill-pink-bg:   #431a34;  --pill-pink-fg:   #f9a8d4;  --pill-pink-bd:   #7a2e5f;
+  --pill-slate-bg:  #1f2733;  --pill-slate-fg:  #cbd5e1;  --pill-slate-bd:  #3a4757;
+
+  /* Ombre — più marcate su fondo scuro */
+  --shadow-sm: 0 1px 3px rgba(0,0,0,.4);
+  --shadow:    0 4px 16px rgba(0,0,0,.5);
+  --shadow-lg: 0 24px 60px rgba(0,0,0,.6);
+}
+
 /* ─── Reset ──────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 

@@ -176,6 +176,7 @@ export function FoglioA4({ children, intestazione, piede, sfondo = 'var(--pill-s
     >
       <div style={{ position: 'relative', height: altezzaFoglio * scala }}>
         <div
+          data-theme="light"
           style={{
             position: 'absolute',
             top: 0,

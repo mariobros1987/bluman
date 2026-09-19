@@ -783,7 +783,7 @@ SHA-256 del documento.
                 </FoglioA4>
               ) : selectedPreviewDoc.dbDoc && selectedPreviewDoc.url && selectedPreviewDoc.url !== '#' ? (
                 // Gli URL archivio sono attachment: niente iframe nel contesto autenticato.
-                <div style={{ fontFamily: 'sans-serif', background: '#fff', color: 'var(--text)', borderRadius: 8, padding: 28, textAlign: 'center' }}>
+                <div data-theme="light" style={{ fontFamily: 'sans-serif', background: '#fff', color: 'var(--text)', borderRadius: 8, padding: 28, textAlign: 'center' }}>
                   <strong>Anteprima incorporata disabilitata per sicurezza.</strong>
                   <div style={{ marginTop: 8, fontSize: 12 }}>Scarica il file per aprirlo con l'applicazione associata.</div>
                   <div style={{ marginTop: 12, fontSize: 12 }}>
@@ -793,7 +793,7 @@ SHA-256 del documento.
               ) : (
                 // Niente HTML e niente file: si dice, invece di riempire il foglio con un testo
                 // di circostanza che sembrava il contenuto del documento.
-                <div style={{ background: '#fff', color: 'var(--text)', borderRadius: 8, padding: 28, fontSize: 12.5, lineHeight: 1.6, fontFamily: 'sans-serif' }}>
+                <div data-theme="light" style={{ background: '#fff', color: 'var(--text)', borderRadius: 8, padding: 28, fontSize: 12.5, lineHeight: 1.6, fontFamily: 'sans-serif' }}>
                   <strong>Nessun contenuto da mostrare.</strong> Di questo documento l'archivio non conserva né il testo
                   né il file: c'è solo la scheda. Aprilo in Document Studio per comporne il testo, oppure ricarica il
                   file originale dalla scheda del passaggio.
