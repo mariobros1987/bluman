@@ -65,9 +65,9 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  background: #2d1a12;
-  border: 1px solid #5a3020;
-  color: var(--amber);
+  background: var(--pill-amber-bg);
+  border: 1px solid var(--pill-amber-bd);
+  color: var(--pill-amber-fg);
   padding: 4px 10px;
   border-radius: 20px;
   font-size: 11px;

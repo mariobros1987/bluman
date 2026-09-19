@@ -137,7 +137,7 @@
 }
 
 .statoErrore {
-  color: #f87171;
+  color: var(--red);
 }
 
 @media (max-width: 900px) {

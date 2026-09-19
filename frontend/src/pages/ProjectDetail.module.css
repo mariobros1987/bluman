@@ -87,7 +87,7 @@
 /* Micro-voci table */
 .vt { width: 100%; border-collapse: collapse; min-width: 600px; }
 .vt th {
-  background: #14162b; font-size: 10px; font-weight: 600;
+  background: var(--surface-2); font-size: 10px; font-weight: 600;
   color: var(--muted); padding: 8px 16px;
   text-align: left; border-top: 1px solid var(--border);
 }
@@ -99,8 +99,8 @@
 }
 .vt td:not(:first-child) { text-align: center; }
 .vt tfoot td { padding: 0; }
-.vt tr.rowDelay { background: #1a1008; }
-.vt tr.rowBlock { background: #1a0808; }
+.vt tr.rowDelay { background: var(--pill-amber-bg); }
+.vt tr.rowBlock { background: var(--pill-red-bg); }
 .vt tbody tr:hover { background: var(--card2); }
 
 .vn { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
@@ -110,13 +110,15 @@
 
 /* Fatturazione */
 .summaryBox {
-  background: linear-gradient(135deg,#1a1f3d,#1e2045);
-  border: 1px solid #2d3260;
+  background: linear-gradient(135deg, var(--indigo-d), var(--indigo));
+  border: 1px solid var(--indigo-d);
   border-radius: 12px;
   padding: 16px 20px;
+  color: var(--on-accent);
   display: flex; justify-content: space-between; align-items: center;
   flex-wrap: wrap; gap: 12px;
 }
+.summaryBox > div > div { color: rgba(255,255,255,0.85) !important; }
 
 .fatturaRow {
   background: var(--card);

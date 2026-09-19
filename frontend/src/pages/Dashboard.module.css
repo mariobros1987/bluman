@@ -27,8 +27,8 @@
 .kpiSub   { font-size: 11px; color: var(--hint);  margin-top: 3px; }
 
 .alertBanner {
-  background: #1e1510;
-  border: 1px solid #4a2a0a;
+  background: var(--pill-amber-bg);
+  border: 1px solid var(--pill-amber-bd);
   border-radius: 12px;
   padding: 14px 16px;
   margin-bottom: 20px;
@@ -43,7 +43,7 @@
 
 .alertRow {
   display: flex; align-items: flex-start; gap: 8px;
-  font-size: 12px; color: #d4883a;
+  font-size: 12px; color: var(--pill-amber-fg);
   margin-top: 6px; line-height: 1.5;
 }
 

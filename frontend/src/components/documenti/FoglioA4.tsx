@@ -185,7 +185,7 @@ export function FoglioA4({ children, intestazione, piede, sfondo = 'var(--pill-s
             transform: `translateX(-50%) scale(${scala})`,
             transformOrigin: 'top center',
             background: '#ffffff',
-            color: 'var(--surface-2)',
+            color: 'var(--text)',
             boxShadow: '0 10px 30px rgba(0,0,0,0.4)',
           }}
         >

@@ -244,7 +244,7 @@ export function FirmaStudioModal({ doc, onClose, onSigned }: FirmaStudioModalPro
               <span>🏛️ Sottoscrizione Documento — Studio BluMan</span>
             </div>
             <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 2 }}>
-              Firmatario: <strong style={{ color: 'var(--border)' }}>{user?.nome || 'Operatore di Studio'}</strong> ({user?.email})
+              Firmatario: <strong style={{ color: 'var(--text)' }}>{user?.nome || 'Operatore di Studio'}</strong> ({user?.email})
             </div>
           </div>
           <button

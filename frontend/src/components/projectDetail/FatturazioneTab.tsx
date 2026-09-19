@@ -289,7 +289,7 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
           <div style={{ fontSize: 11, color: totFatturato === 0 ? 'var(--muted)' : totFatturato >= project.val ? 'var(--green)' : 'var(--pill-amber-fg)', fontWeight: 600, textTransform: 'uppercase' }}>
             Stato Saldo & Incassi Progetto
           </div>
-          <div style={{ fontSize: 13, fontWeight: 700, color: 'white', marginTop: 2 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginTop: 2 }}>
             {totFatturato === 0
               ? `⏳ Incassato Effettivo: € 0 / ${fmt(project.val)} (Da Fatturare & Incassare)`
               : totFatturato >= project.val
@@ -429,11 +429,11 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
                         }}
                       />
                     ) : (
-                      <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--pill-indigo-bg)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--indigo-d)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
                         🏛 {studio.ragioneSociale.toUpperCase()}
                       </div>
                     )}
-                    <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--pill-indigo-bg)' }}>
+                    <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--indigo-d)' }}>
                       {studio.ragioneSociale}
                     </div>
                     <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
@@ -453,7 +453,7 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
             {/* Destinatario — solo dati reali. I dati fiscali completi (P.IVA/CF, codice SDI, esito
                 del tracciato) stanno sul documento vero: qui non si cablano valori finti, che prima
                 mostravano una P.IVA e un "XML Accettato" inventati su ogni fattura. */}
-            <div style={{ background: 'var(--pill-sky-fg)', border: '1px solid var(--border)', borderRadius: 10, padding: 14, fontSize: 12 }}>
+            <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 10, padding: 14, fontSize: 12 }}>
               <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 700 }}>Cliente Destinatario:</div>
               <div style={{ fontSize: 13, fontWeight: 700, marginTop: 2 }}>{project.cl}</div>
             </div>

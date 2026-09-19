@@ -74,7 +74,7 @@
   transition: all var(--t);
 }
 .filterBtn:hover { color: var(--text); border-color: var(--indigo); }
-.filterBtnActive { background: '#1a1f3d' !important; color: var(--indigo-l) !important; border-color: var(--indigo) !important; }
+.filterBtnActive { background: var(--pill-indigo-bg) !important; color: var(--indigo-d) !important; border-color: var(--indigo) !important; }
 
 .clientGrid {
   display: grid;
@@ -165,6 +165,6 @@
 }
 .btnAction:hover {
   border-color: var(--indigo);
-  color: var(--indigo-l);
-  background: #1a1f3d;
+  color: var(--indigo-d);
+  background: var(--pill-indigo-bg);
 }

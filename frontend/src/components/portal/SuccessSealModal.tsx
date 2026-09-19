@@ -31,7 +31,7 @@ export function SuccessSealModal({
               ✓
             </div>
             <div>
-              <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--pill-green-bg)' }}>
+              <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--pill-green-fg)' }}>
                 Documento Sottoscritto con Successo
               </div>
               <div style={{ fontSize: 11, color: 'var(--pill-green-fg)', fontWeight: 600, marginTop: 2 }}>
@@ -107,7 +107,7 @@ export function SuccessSealModal({
             {/* Se è stata apposta la firma grafometrica visiva */}
             {successSealModal.firmaGrafometricaPng && (
               <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 6, background: '#ffffff', padding: 12, borderRadius: 8, border: '1px solid var(--pill-slate-fg)' }}>
-                <span style={{ fontSize: 10, fontWeight: 800, color: 'var(--pill-indigo-bg)', textTransform: 'uppercase' }}>
+                <span style={{ fontSize: 10, fontWeight: 800, color: 'var(--pill-indigo-fg)', textTransform: 'uppercase' }}>
                   Tratto Grafometrico Sottoscritto:
                 </span>
                 <img

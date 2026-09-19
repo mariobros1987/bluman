@@ -97,7 +97,7 @@ export function PannelloRecordDns({ smtpFromEmail, imapUser, smtpHost }: Props) 
       </div>
 
       <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11, textAlign: 'left', color: 'var(--border)' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11, textAlign: 'left', color: 'var(--text)' }}>
           <thead>
             <tr style={{ background: 'var(--surface-1)', borderBottom: '1px solid var(--border)' }}>
               <th style={{ padding: '8px 10px' }}>Tipo Record</th>

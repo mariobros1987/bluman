@@ -50,7 +50,7 @@ export function InvoicePreviewModal({
             </div>
 
             {/* Dati Cliente */}
-            <div style={{ background: 'var(--pill-sky-fg)', border: '1px solid var(--border)', borderRadius: 10, padding: 14, display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+            <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 10, padding: 14, display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
               <div>
                 <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 700 }}>Cliente Destinatario:</div>
                 <div style={{ fontSize: 13, fontWeight: 700, marginTop: 2 }}>Holding Beta S.r.l.</div>
@@ -59,7 +59,7 @@ export function InvoicePreviewModal({
               {mostraSdi && (
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 700 }}>Canale SDI (invio manuale):</div>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--pill-green-bd)', marginTop: 2 }}>Codice destinatario SUBM70N</div>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--pill-green-fg)', marginTop: 2 }}>Codice destinatario SUBM70N</div>
                 </div>
               )}
             </div>
