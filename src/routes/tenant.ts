@@ -17,7 +17,8 @@ import { provaPostaInUscita, provaPostaInArrivo, sendInvitoCollaboratoreEmail } 
 import { credenzialiCanali } from '../services/otpDispatch.js';
 import { numeroSignal, statoSignal } from '../services/signalService.js';
 import { usernameBotTelegram } from '../services/telegramService.js';
-import { inMemoryTenantStore, recordAudit, senzaHash } from '../util/serverHelpers.js';
+import { inMemoryTenantStore, recordAudit, senzaHash, TENANT_DEFAULT } from '../util/serverHelpers.js';
+import { eliminaTenantCompleto } from '../services/eliminazioneTenant.js';
 import { urlWebhookWhatsapp } from '../util/urlPubblica.js';
 import { campoOrdinamento, creaMetaPaginazione, leggiPaginazione } from '../util/paginazione.js';
 import {
@@ -951,8 +952,31 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
     if (!soloSuperAdmin(req, reply)) return reply;
     const { id } = req.params;
     try {
-      await prisma.tenant.delete({ where: { id } });
-      return reply.send({ ok: true, id });
+      // L'eliminazione è irreversibile e cancella TUTTI i dati dello studio: è ammessa solo
+      // dopo l'archiviazione, che è il passaggio reversibile e la doppia sicurezza contro la
+      // cancellazione accidentale di uno studio ancora attivo (scelta 19/09/2026).
+      const tenant = await prisma.tenant.findUnique({ where: { id } });
+      if (!tenant) return reply.code(404).send({ errore: 'Studio non trovato' });
+      if (tenant.stato !== 'archiviato') {
+        return reply.code(409).send({
+          errore: "Lo studio va prima archiviato: l'eliminazione definitiva è ammessa solo su uno studio archiviato.",
+        });
+      }
+
+      const conteggi = await eliminaTenantCompleto(id);
+
+      // L'audit dell'eliminazione NON può restare nel tenant appena cancellato: lo si registra
+      // a livello di piattaforma (tenant di default), come atto del super_admin.
+      await recordAudit({
+        tenantId: TENANT_DEFAULT,
+        ruolo: 'super_admin',
+        azione: 'TENANT_ELIMINATO',
+        entita: tenant.ragioneSociale,
+        dettagli: `Studio "${tenant.ragioneSociale}" (${id}) eliminato definitivamente. Righe rimosse: ${JSON.stringify(conteggi)}`,
+        ipAddress: req.ip,
+      });
+
+      return reply.send({ ok: true, id, conteggi });
     } catch (err: any) {
       return reply.code(500).send({ errore: err.message || 'Errore eliminazione tenant' });
     }

@@ -97,6 +97,27 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
     // Per il super_admin Ã¨ null: sceglie il tenant corrente via header x-tenant-id.
     const userTenantId = utente.tenantId || '';
 
+    // Uno studio sospeso o archiviato non fa entrare i suoi utenti: il blocco è sul tenant,
+    // non sul singolo account (finora la sospensione cambiava solo l'aspetto nella console
+    // super_admin senza impedire davvero l'accesso). Il super_admin (tenantId null) è esente:
+    // sovrintende la piattaforma e deve poter aprire uno studio archiviato per consultarlo
+    // prima di eliminarlo (§21). Lettura dal client amministrativo, come il resto del login.
+    if (userTenantId) {
+      let tenantUtente: { stato: string } | null = null;
+      try {
+        tenantUtente = await prismaAmministrativo().tenant.findUnique({
+          where: { id: userTenantId },
+          select: { stato: true },
+        });
+      } catch { /* se la lettura fallisce non si irrigidisce il login oltre i controlli utente */ }
+      if (tenantUtente?.stato === 'sospeso') {
+        return reply.code(403).send({ errore: 'Studio sospeso. Contatta il gestore della piattaforma.' });
+      }
+      if (tenantUtente?.stato === 'archiviato') {
+        return reply.code(403).send({ errore: 'Studio archiviato: accesso non disponibile.' });
+      }
+    }
+
     // Â§14 â€” l'hook onRequest ha impostato il tenant di default (questa richiesta non
     // portava ancora un token): ora il tenant Ã¨ noto, e va attivato prima delle query
     // di questa richiesta. Senza questa riga le letture vincolate a RLS verrebbero

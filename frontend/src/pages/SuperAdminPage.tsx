@@ -11,7 +11,7 @@ interface TenantStudio {
   leadAdvisorNome: string;
   leadAdvisorEmail: string;
   piano: 'enterprise' | 'pro' | 'trial';
-  stato: 'attivo' | 'sospeso' | 'scaduto';
+  stato: 'attivo' | 'sospeso' | 'scaduto' | 'archiviato';
   durataMesi: number;
   dataAttivazione: string;
   dataScadenza: string;
@@ -209,10 +209,33 @@ export function SuperAdminPage() {
     }
   };
 
+  // Archiviazione / Ripristino Tenant — stato reversibile che nasconde lo studio dall'elenco
+  // attivo e ne blocca l'accesso agli utenti (il super_admin lo apre comunque via «Entra»).
+  // È il passaggio obbligato prima dell'eliminazione definitiva.
+  const handleArchive = async (tenant: TenantStudio) => {
+    const archiviare = tenant.stato !== 'archiviato';
+    const messaggio = archiviare
+      ? `Archiviare lo studio "${tenant.ragioneSociale}"?\n\nGli utenti dello studio non potranno più accedere. I dati restano intatti e lo studio si può ripristinare. Solo uno studio archiviato può poi essere eliminato definitivamente.`
+      : `Ripristinare lo studio "${tenant.ragioneSociale}"?\n\nTornerà attivo e i suoi utenti potranno accedere di nuovo.`;
+    if (!confirm(messaggio)) return;
+    const nuovoStato: 'archiviato' | 'attivo' = archiviare ? 'archiviato' : 'attivo';
+    try {
+      await updateAdminTenantApi(tenant.id, { stato: nuovoStato });
+      setTenants(prev => prev.map(t => t.id === tenant.id ? { ...t, stato: nuovoStato } : t));
+      alert(archiviare
+        ? `✓ Studio "${tenant.ragioneSociale}" archiviato. Ora puoi eliminarlo definitivamente, oppure ripristinarlo.`
+        : `✓ Studio "${tenant.ragioneSociale}" ripristinato e riattivato.`);
+    } catch (err: any) {
+      alert(`⚠️ Operazione NON riuscita: ${err?.message || 'errore di rete'}. Lo stato dello studio resta ${tenant.stato.toUpperCase()} sul server.`);
+    }
+  };
+
   // Eliminazione Definitiva Tenant
   const handleDeleteTenant = async (tenant: TenantStudio) => {
     // §3.3 — eliminazione distruttiva: si toglie dalla lista solo a conferma avvenuta.
     // Prima il tenant spariva dall'interfaccia anche se la DELETE non era mai partita.
+    // §21 — il server rifiuta (409) se lo studio non è archiviato: la guardia è di là,
+    // qui si dà solo un messaggio chiaro.
     try {
       await deleteAdminTenantApi(tenant.id);
       setTenants(prev => prev.filter(t => t.id !== tenant.id));
@@ -348,7 +371,7 @@ export function SuperAdminPage() {
           <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 700 }}>🏢 Studi / Tenant Registrati</div>
           <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--indigo-l)', marginTop: 6 }}>{tenants.length}</div>
           <div style={{ fontSize: 10, color: '#34d399', marginTop: 4 }}>
-            ✓ {tenants.filter(t => t.stato === 'attivo').length} Attivi · {tenants.filter(t => t.stato === 'sospeso').length} Sospesi
+            ✓ {tenants.filter(t => t.stato === 'attivo').length} Attivi · {tenants.filter(t => t.stato === 'sospeso').length} Sospesi · {tenants.filter(t => t.stato === 'archiviato').length} Archiviati
           </div>
         </div>
 
@@ -392,13 +415,13 @@ export function SuperAdminPage() {
               </tr>
             </thead>
             <tbody>
-              {tenants.map(t => {
+              {tenants.filter(t => t.stato !== 'archiviato').map(t => {
                 const daysLeft = calculateDaysRemaining(t.dataScadenza);
                 const isExpired = daysLeft <= 0;
                 const isWarning = daysLeft > 0 && daysLeft <= 15;
 
                 return (
-                  <tr key={t.id} style={{ borderBottom: '1px solid var(--border)', opacity: t.stato === 'sospeso' ? 0.7 : 1 }}>
+                  <tr key={t.id} style={{ borderBottom: '1px solid var(--border)', opacity: t.stato === 'sospeso' ? 0.7 : t.stato === 'archiviato' ? 0.55 : 1 }}>
                     <td style={{ padding: '10px 8px', fontWeight: 700, color: 'var(--text)' }}>
                       <div style={{ fontSize: 13 }}>{t.ragioneSociale}</div>
                       <div style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 400 }}>P.IVA: {t.pIva} · ID: {t.id.substring(0, 8)}...</div>
@@ -420,7 +443,11 @@ export function SuperAdminPage() {
                       </div>
                     </td>
                     <td style={{ padding: '10px 8px' }}>
-                      {t.stato === 'sospeso' ? (
+                      {t.stato === 'archiviato' ? (
+                        <span style={{ fontSize: 10, fontWeight: 800, padding: '3px 8px', borderRadius: 8, background: '#1c1917', color: '#d6d3d1', border: '1px solid #57534e' }}>
+                          🗄 ARCHIVIATO
+                        </span>
+                      ) : t.stato === 'sospeso' ? (
                         <span style={{ fontSize: 10, fontWeight: 800, padding: '3px 8px', borderRadius: 8, background: '#450a0a', color: '#fca5a5', border: '1px solid #7f1d1d' }}>
                           ⏸ SOSPESO
                         </span>
@@ -484,14 +511,25 @@ export function SuperAdminPage() {
                           {t.stato === 'attivo' ? '⏸ Sospendi' : '▶️ Riattiva'}
                         </button>
 
-                        {/* Elimina Tenant */}
+                        {/* Archivia / Ripristina — passaggio reversibile, obbligatorio prima dell'eliminazione */}
                         <button
-                          onClick={() => setDeleteModalTenant(t)}
-                          title="Elimina Definitivamente il Tenant"
-                          style={{ background: '#450a0a', border: '1px solid #7f1d1d', color: '#fca5a5', padding: '5px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer' }}
+                          onClick={() => handleArchive(t)}
+                          title={t.stato === 'archiviato' ? 'Ripristina lo studio archiviato' : 'Archivia lo studio (reversibile, blocca l’accesso)'}
+                          style={{ background: t.stato === 'archiviato' ? '#064e3b' : '#1c1917', border: `1px solid ${t.stato === 'archiviato' ? '#10b981' : '#57534e'}`, color: t.stato === 'archiviato' ? '#6ee7b7' : '#d6d3d1', padding: '5px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
                         >
-                          🗑
+                          {t.stato === 'archiviato' ? '♻️ Ripristina' : '🗄 Archivia'}
                         </button>
+
+                        {/* Elimina Tenant — solo se archiviato (il server rifiuta comunque con 409) */}
+                        {t.stato === 'archiviato' && (
+                          <button
+                            onClick={() => setDeleteModalTenant(t)}
+                            title="Elimina Definitivamente il Tenant (irreversibile)"
+                            style={{ background: '#450a0a', border: '1px solid #7f1d1d', color: '#fca5a5', padding: '5px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer' }}
+                          >
+                            🗑
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -501,6 +539,50 @@ export function SuperAdminPage() {
           </table>
         </div>
       </div>
+
+      {/* 🗄 STUDI ARCHIVIATI — nascosti dall'elenco attivo; accesso bloccato agli utenti dello
+          studio, ma il super_admin può ancora entrarci per consultarli. Da qui si ripristina
+          o si elimina definitivamente (unico punto da cui è ammessa l'eliminazione). */}
+      {tenants.some(t => t.stato === 'archiviato') && (
+        <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 16, padding: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: 'var(--muted)' }}>
+            🗄 Studi Archiviati <span style={{ fontSize: 11, fontWeight: 500 }}>({tenants.filter(t => t.stato === 'archiviato').length}) — accesso bloccato, dati conservati</span>
+          </h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {tenants.filter(t => t.stato === 'archiviato').map(t => (
+              <div key={t.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '10px 12px', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10, flexWrap: 'wrap' }}>
+                <div style={{ minWidth: 200 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{t.ragioneSociale}</div>
+                  <div style={{ fontSize: 10, color: 'var(--muted)' }}>P.IVA: {t.pIva} · {t.leadAdvisorEmail} · ID: {t.id.substring(0, 8)}...</div>
+                </div>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                  <button
+                    onClick={() => { setActiveTenantId(t.id); window.location.href = '/documents'; }}
+                    title={`Entra in "${t.ragioneSociale}" per consultarne i dati (super admin)`}
+                    style={{ background: '#1e293b', border: '1px solid #475569', color: '#cbd5e1', padding: '5px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+                  >
+                    🔍 Consulta
+                  </button>
+                  <button
+                    onClick={() => handleArchive(t)}
+                    title="Ripristina lo studio: torna attivo e i suoi utenti possono accedere"
+                    style={{ background: '#064e3b', border: '1px solid #10b981', color: '#6ee7b7', padding: '5px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+                  >
+                    ♻️ Ripristina
+                  </button>
+                  <button
+                    onClick={() => setDeleteModalTenant(t)}
+                    title="Elimina definitivamente lo studio e TUTTI i suoi dati (irreversibile)"
+                    style={{ background: '#450a0a', border: '1px solid #7f1d1d', color: '#fca5a5', padding: '5px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+                  >
+                    🗑 Elimina definitivamente
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* 🔑 MODALE CREDENZIALI & LINK DI ACCESSO NUOVO GESTORE */}
       {credentialsModalTenant && (
@@ -718,7 +800,7 @@ export function SuperAdminPage() {
             <div style={{ fontSize: 12.5, color: 'var(--text)', lineHeight: 1.6 }}>
               Sei sicuro di voler eliminare definitivamente lo Studio <strong>"{deleteModalTenant.ragioneSociale}"</strong>?
               <div style={{ marginTop: 8, color: '#fca5a5', fontSize: 11.5, background: '#450a0a', padding: 10, borderRadius: 8, border: '1px solid #7f1d1d' }}>
-                Questa azione revocherà tutte le licenze staff, bloccherà l'accesso al gestore e disattiverà il tenant dal database isolato.
+                <strong>Irreversibile.</strong> Vengono cancellati per sempre TUTTI i dati dello studio: utenti, clienti, progetti, fatture, documenti e archivi. Non è un recupero: lo studio e il suo contenuto spariscono dal database. Se vuoi solo sospenderlo, usa «Ripristina» invece di eliminare.
               </div>
             </div>
 
