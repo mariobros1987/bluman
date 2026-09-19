@@ -216,12 +216,12 @@ export function OperatorDetailModal({
             <div>
               <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 10 }}>
                 <span>{operator.nome || operator.name}</span>
-                <span style={{ fontSize: 11, background: '#1a1f3d', color: '#818cf8', padding: '3px 10px', borderRadius: 12, border: '1px solid #3730a3', fontWeight: 600 }}>
+                <span style={{ fontSize: 11, background: 'var(--surface-1)', color: 'var(--indigo-l)', padding: '3px 10px', borderRadius: 12, border: '1px solid var(--indigo-d)', fontWeight: 600 }}>
                   {operator.ruolo || operator.role || 'Collaboratore'}
                 </span>
               </div>
               <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
-                📧 {operator.email} · Stato: <span style={{ color: '#34d399', fontWeight: 700 }}>● Attivo</span>
+                📧 {operator.email} · Stato: <span style={{ color: 'var(--green)', fontWeight: 700 }}>● Attivo</span>
               </div>
             </div>
           </div>
@@ -247,7 +247,7 @@ export function OperatorDetailModal({
 
         {activeSubTab === 'permissions' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div style={{ background: '#1e1b4b', border: '1px solid #4338ca', padding: 12, borderRadius: 10, fontSize: 12, color: '#a5b4fc' }}>
+            <div style={{ background: 'var(--pill-indigo-bg)', border: '1px solid var(--indigo-d)', padding: 12, borderRadius: 10, fontSize: 12, color: 'var(--pill-indigo-fg)' }}>
               🛡 <strong>Controllo Accessi RBAC (Stile OpenSTAManager)</strong>: Configura il livello di autorizzazione per ciascuna sezione del gestionale. Le sezioni disabilitate (<em>Denied</em>) verranno nascoste dal menu e bloccate a livello API.
             </div>
 
@@ -269,9 +269,9 @@ export function OperatorDetailModal({
                           style={{
                             padding: '6px 12px',
                             borderRadius: 6,
-                            border: `1px solid ${currentVal === lvl ? (lvl === 'denied' ? '#ef4444' : lvl === 'read' ? '#f59e0b' : '#10b981') : 'var(--border)'}`,
-                            background: currentVal === lvl ? (lvl === 'denied' ? '#451a1a' : lvl === 'read' ? '#452a1a' : '#1a452a') : 'transparent',
-                            color: currentVal === lvl ? (lvl === 'denied' ? '#fca5a5' : lvl === 'read' ? '#fcd34d' : '#6ee7b7') : 'var(--muted)',
+                            border: `1px solid ${currentVal === lvl ? (lvl === 'denied' ? 'var(--red)' : lvl === 'read' ? 'var(--amber)' : 'var(--green)') : 'var(--border)'}`,
+                            background: currentVal === lvl ? (lvl === 'denied' ? 'var(--pill-red-bg)' : lvl === 'read' ? 'var(--pill-amber-bg)' : 'var(--pill-green-bg)') : 'transparent',
+                            color: currentVal === lvl ? (lvl === 'denied' ? 'var(--pill-red-fg)' : lvl === 'read' ? 'var(--pill-amber-fg)' : 'var(--pill-green-fg)') : 'var(--muted)',
                             fontSize: 11,
                             fontWeight: 700,
                             cursor: 'pointer',
@@ -291,7 +291,7 @@ export function OperatorDetailModal({
               <button
                 onClick={handleSavePermessi}
                 disabled={savingPermessi}
-                style={{ background: '#059669', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
+                style={{ background: 'var(--green)', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
               >
                 {savingPermessi ? 'Salvataggio...' : '💾 Salva Matrice Permessi Operatore'}
               </button>
@@ -305,13 +305,13 @@ export function OperatorDetailModal({
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
               <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 14 }}>
                 <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 700 }}>⏱ Ore Svolte Registrate</div>
-                <div style={{ fontSize: 22, fontWeight: 800, color: '#818cf8', marginTop: 4 }}>{totOre}h</div>
-                <div style={{ fontSize: 10, color: '#34d399', marginTop: 2 }}>✓ Consuntivate a DB</div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--indigo-l)', marginTop: 4 }}>{totOre}h</div>
+                <div style={{ fontSize: 10, color: 'var(--green)', marginTop: 2 }}>✓ Consuntivate a DB</div>
               </div>
 
               <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 14 }}>
                 <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 700 }}>📁 Incarichi in Gestione</div>
-            <div style={{ fontSize: 10, color: '#34d399', marginTop: 2 }}>✓ Consuntivate a DB</div>
+            <div style={{ fontSize: 10, color: 'var(--green)', marginTop: 2 }}>✓ Consuntivate a DB</div>
           </div>
 
           <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 14 }}>
@@ -322,13 +322,13 @@ export function OperatorDetailModal({
 
           <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 14 }}>
             <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 700 }}>🎯 Microvoci Ultimate</div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: '#34d399', marginTop: 4 }}>{totTasksCompleted} Task</div>
-            <div style={{ fontSize: 10, color: '#34d399', marginTop: 2 }}>✓ Passaggi completati</div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--green)', marginTop: 4 }}>{totTasksCompleted} Task</div>
+            <div style={{ fontSize: 10, color: 'var(--green)', marginTop: 2 }}>✓ Passaggi completati</div>
           </div>
 
           <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 14 }}>
             <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 700 }}>⚡ Tasso Efficienza Stime</div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: '#fbbf24', marginTop: 4 }}>96.2%</div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--amber)', marginTop: 4 }}>96.2%</div>
             <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>Consuntivo vs Distinta</div>
           </div>
         </div>
@@ -348,8 +348,8 @@ export function OperatorDetailModal({
                     <div style={{ fontSize: 10.5, color: 'var(--muted)' }}>Cliente: <strong>{p.cliente}</strong> · Valore: {fmt(p.valore)}</div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: 12, fontWeight: 800, color: '#818cf8' }}>{p.oreConsuntivate}h lavorate</div>
-                    <div style={{ fontSize: 10, color: '#34d399' }}>{p.tasksUltimati}/{p.tasksTotali} microvoci</div>
+                    <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--indigo-l)' }}>{p.oreConsuntivate}h lavorate</div>
+                    <div style={{ fontSize: 10, color: 'var(--green)' }}>{p.tasksUltimati}/{p.tasksTotali} microvoci</div>
                   </div>
                 </div>
 
@@ -358,7 +358,7 @@ export function OperatorDetailModal({
                     <span>Avanzamento Incarico</span>
                     <span>{p.pct}%</span>
                   </div>
-                  <ProgressBar value={p.pct} color="#818cf8" height={4} />
+                  <ProgressBar value={p.pct} color="var(--indigo-l)" height={4} />
                 </div>
               </div>
             ))}
@@ -390,14 +390,14 @@ export function OperatorDetailModal({
                       <div style={{ fontSize: 10, color: 'var(--muted)' }}>{log.clienteNome}</div>
                     </td>
                     <td style={{ padding: '10px' }}>
-                      <div style={{ color: '#818cf8', fontWeight: 600 }}>{log.moduloNome}</div>
+                      <div style={{ color: 'var(--indigo-l)', fontWeight: 600 }}>{log.moduloNome}</div>
                       <div style={{ color: 'var(--text)' }}>{log.taskNome}</div>
                     </td>
-                    <td style={{ padding: '10px', fontWeight: 700, color: '#34d399' }}>
+                    <td style={{ padding: '10px', fontWeight: 700, color: 'var(--green)' }}>
                       ⏱ {log.oreSvolte}h
                     </td>
                     <td style={{ padding: '10px' }}>
-                      <span style={{ fontSize: 10, background: log.stato === 'done' ? '#0d2d22' : '#2d1a05', color: log.stato === 'done' ? '#34d399' : '#f59e0b', padding: '2px 8px', borderRadius: 10, border: `1px solid ${log.stato === 'done' ? '#059669' : '#d97706'}` }}>
+                      <span style={{ fontSize: 10, background: log.stato === 'done' ? 'var(--pill-green-bg)' : 'var(--pill-amber-bg)', color: log.stato === 'done' ? 'var(--green)' : 'var(--amber)', padding: '2px 8px', borderRadius: 10, border: `1px solid ${log.stato === 'done' ? 'var(--green)' : 'var(--amber)'}` }}>
                         {log.stato === 'done' ? '✓ Ultimato' : '⏳ In Corso'}
                       </span>
                     </td>

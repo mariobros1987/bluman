@@ -232,7 +232,7 @@ export function NewProjectWizard({ onClose, onProjectCreated }: NewProjectWizard
   return (
     <>
       {notif && (
-        <div style={{ position: 'fixed', top: 20, right: 20, background: '#0d2d22', border: '1px solid #1a5c3c', color: '#34d399', padding: '12px 16px', borderRadius: 10, fontSize: 12, fontWeight: 500, zIndex: 200, display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ position: 'fixed', top: 20, right: 20, background: 'var(--pill-green-bg)', border: '1px solid var(--pill-green-bg)', color: 'var(--green)', padding: '12px 16px', borderRadius: 10, fontSize: 12, fontWeight: 500, zIndex: 200, display: 'flex', alignItems: 'center', gap: 8 }}>
           ✓ Progetto istanziato e collegato su Supabase DB!
         </div>
       )}
@@ -250,7 +250,7 @@ export function NewProjectWizard({ onClose, onProjectCreated }: NewProjectWizard
                     {i < 3 && <div style={{ width: 28, height: 2, borderRadius: 1, background: n < step ? 'var(--green)' : 'var(--border)' }} />}
                   </React.Fragment>
                 ))}
-                <span style={{ fontSize: 10, color: '#818cf8', marginLeft: 8, fontWeight: 600 }}>
+                <span style={{ fontSize: 10, color: 'var(--indigo-l)', marginLeft: 8, fontWeight: 600 }}>
                   {['Giurisdizione', 'Cliente & Progetto', 'Libreria Moduli', 'Riepilogo'][step]}
                 </span>
               </div>
@@ -263,7 +263,7 @@ export function NewProjectWizard({ onClose, onProjectCreated }: NewProjectWizard
             {/* STEP 0: Giurisdizione Target */}
             {step === 0 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                <div style={{ fontSize: 13, color: '#94a3b8', lineHeight: 1.4 }}>
+                <div style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.4 }}>
                   Seleziona la giurisdizione o piazza finanziaria di riferimento. La libreria dei moduli verrà filtrata a cascata privilegiando le soluzioni specifiche per il paese scelto.
                 </div>
 
@@ -280,16 +280,16 @@ export function NewProjectWizard({ onClose, onProjectCreated }: NewProjectWizard
                           padding: 12,
                           borderRadius: 10,
                           border: `1.5px solid ${sel ? 'var(--indigo-l)' : 'var(--border)'}`,
-                          background: sel ? '#1a1f3d' : 'var(--card)',
+                          background: sel ? 'var(--surface-1)' : 'var(--card)',
                           cursor: 'pointer',
                           transition: 'all .15s',
                         }}
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                          <span style={{ fontWeight: 600, fontSize: 13, color: sel ? '#fff' : '#cbd5e1' }}>
+                          <span style={{ fontWeight: 600, fontSize: 13, color: sel ? '#fff' : 'var(--pill-slate-fg)' }}>
                             {flag} {g.nome}
                           </span>
-                          <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 10, background: g.tipo === 'ue' ? '#0d2d22' : '#2d1a05', color: g.tipo === 'ue' ? '#34d399' : '#f59e0b', textTransform: 'uppercase', fontWeight: 700 }}>
+                          <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 10, background: g.tipo === 'ue' ? 'var(--pill-green-bg)' : 'var(--pill-amber-bg)', color: g.tipo === 'ue' ? 'var(--green)' : 'var(--amber)', textTransform: 'uppercase', fontWeight: 700 }}>
                             {g.tipo}
                           </span>
                         </div>
@@ -305,11 +305,11 @@ export function NewProjectWizard({ onClose, onProjectCreated }: NewProjectWizard
                       padding: 12,
                       borderRadius: 10,
                       border: `1.5px solid ${selectedGiurId === '' ? 'var(--indigo-l)' : 'var(--border)'}`,
-                      background: selectedGiurId === '' ? '#1a1f3d' : 'var(--card)',
+                      background: selectedGiurId === '' ? 'var(--surface-1)' : 'var(--card)',
                       cursor: 'pointer',
                     }}
                   >
-                    <div style={{ fontWeight: 600, fontSize: 13, color: selectedGiurId === '' ? '#fff' : '#cbd5e1', marginBottom: 4 }}>
+                    <div style={{ fontWeight: 600, fontSize: 13, color: selectedGiurId === '' ? '#fff' : 'var(--pill-slate-fg)', marginBottom: 4 }}>
                       🌐 Multi-giurisdizione / Generica
                     </div>
                     <div style={{ fontSize: 10, color: 'var(--muted)' }}>Mostra l intero catalogo senza filtri geografici preliminari</div>
@@ -322,7 +322,7 @@ export function NewProjectWizard({ onClose, onProjectCreated }: NewProjectWizard
             {step === 1 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 {selectedGiurObj && (
-                  <div style={{ background: '#1e1b4b', border: '1px solid #4338ca', padding: '8px 12px', borderRadius: 8, fontSize: 11, color: '#a5b4fc', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ background: 'var(--pill-indigo-bg)', border: '1px solid var(--indigo-d)', padding: '8px 12px', borderRadius: 8, fontSize: 11, color: 'var(--pill-indigo-fg)', display: 'flex', alignItems: 'center', gap: 8 }}>
                     📍 Giurisdizione selezionata: <strong>{selectedGiurObj.nome} ({selectedGiurObj.codice})</strong>
                   </div>
                 )}
@@ -336,7 +336,7 @@ export function NewProjectWizard({ onClose, onProjectCreated }: NewProjectWizard
                       style={{
                         flex: 1, padding: 8, borderRadius: 8,
                         border: `1px solid ${clientMode === 'existing' ? 'var(--indigo)' : 'var(--border)'}`,
-                        background: clientMode === 'existing' ? '#1a1f3d' : 'var(--card)',
+                        background: clientMode === 'existing' ? 'var(--surface-1)' : 'var(--card)',
                         color: clientMode === 'existing' ? 'var(--indigo-l)' : 'var(--muted)',
                         fontSize: 12, fontWeight: 500, cursor: 'pointer',
                       }}
@@ -349,7 +349,7 @@ export function NewProjectWizard({ onClose, onProjectCreated }: NewProjectWizard
                       style={{
                         flex: 1, padding: 8, borderRadius: 8,
                         border: `1px solid ${clientMode === 'new' ? 'var(--indigo)' : 'var(--border)'}`,
-                        background: clientMode === 'new' ? '#1a1f3d' : 'var(--card)',
+                        background: clientMode === 'new' ? 'var(--surface-1)' : 'var(--card)',
                         color: clientMode === 'new' ? 'var(--indigo-l)' : 'var(--muted)',
                         fontSize: 12, fontWeight: 500, cursor: 'pointer',
                       }}
@@ -386,7 +386,7 @@ export function NewProjectWizard({ onClose, onProjectCreated }: NewProjectWizard
                         <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Tipo Cliente *</label>
                         <div style={{ display: 'flex', gap: 8 }}>
                           {(['individual', 'company'] as const).map(t => (
-                            <button key={t} type="button" onClick={() => setClientType(t)} style={{ flex: 1, padding: 7, borderRadius: 8, border: `1px solid ${clientType === t ? 'var(--indigo)' : 'var(--border)'}`, background: clientType === t ? '#1a1f3d' : 'var(--card)', color: clientType === t ? 'var(--indigo-l)' : 'var(--muted)', fontSize: 11, fontWeight: 500, cursor: 'pointer' }}>
+                            <button key={t} type="button" onClick={() => setClientType(t)} style={{ flex: 1, padding: 7, borderRadius: 8, border: `1px solid ${clientType === t ? 'var(--indigo)' : 'var(--border)'}`, background: clientType === t ? 'var(--surface-1)' : 'var(--card)', color: clientType === t ? 'var(--indigo-l)' : 'var(--muted)', fontSize: 11, fontWeight: 500, cursor: 'pointer' }}>
                               {t === 'individual' ? '👤 Persona fisica' : '🏢 Società'}
                             </button>
                           ))}
@@ -409,9 +409,9 @@ export function NewProjectWizard({ onClose, onProjectCreated }: NewProjectWizard
                 {/* 1. Moduli specifici giurisdizione */}
                 {selectedGiurObj && (
                   <div>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: '#818cf8', letterSpacing: '.5px', textTransform: 'uppercase', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--indigo-l)', letterSpacing: '.5px', textTransform: 'uppercase', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span>⭐ Moduli Specifici {selectedGiurObj.nome}</span>
-                      <span style={{ fontSize: 10, background: '#312e81', color: '#c7d2fe', padding: '1px 6px', borderRadius: 10 }}>In evidenza</span>
+                      <span style={{ fontSize: 10, background: 'var(--pill-indigo-bg)', color: 'var(--pill-indigo-fg)', padding: '1px 6px', borderRadius: 10 }}>In evidenza</span>
                     </div>
                     {specificMods.length === 0 ? (
                       <div style={{ padding: 10, background: 'var(--card)', borderRadius: 8, fontSize: 11, color: 'var(--muted)' }}>
@@ -421,15 +421,15 @@ export function NewProjectWizard({ onClose, onProjectCreated }: NewProjectWizard
                       specificMods.map(m => {
                         const sel = selectedMods.has(m.id);
                         return (
-                          <div key={m.id} onClick={() => toggleMod(m.id)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 8, border: `1.5px solid ${sel ? 'var(--indigo)' : '#312e81'}`, background: sel ? '#1a1f3d' : '#0f172a', cursor: 'pointer', marginBottom: 6 }}>
-                            <div style={{ width: 18, height: 18, borderRadius: 5, border: `2px solid ${sel ? 'var(--indigo)' : '#475569'}`, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: sel ? 'var(--indigo)' : 'transparent' }}>
+                          <div key={m.id} onClick={() => toggleMod(m.id)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 8, border: `1.5px solid ${sel ? 'var(--indigo)' : 'var(--pill-indigo-bg)'}`, background: sel ? 'var(--surface-1)' : 'var(--surface-2)', cursor: 'pointer', marginBottom: 6 }}>
+                            <div style={{ width: 18, height: 18, borderRadius: 5, border: `2px solid ${sel ? 'var(--indigo)' : 'var(--muted)'}`, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: sel ? 'var(--indigo)' : 'transparent' }}>
                               {sel && <span style={{ color: '#fff', fontSize: 10 }}>✓</span>}
                             </div>
                             <div style={{ flex: 1 }}>
                               <div style={{ fontSize: 12, fontWeight: 600, color: '#fff' }}>{m.n}</div>
-                              <div style={{ fontSize: 10, color: '#94a3b8' }}>{m.righe.length} articoli · {moduloH(m)}h</div>
+                              <div style={{ fontSize: 10, color: 'var(--muted)' }}>{m.righe.length} articoli · {moduloH(m)}h</div>
                             </div>
-                            <div style={{ fontSize: 12, fontWeight: 700, color: '#38bdf8' }}>{fmt(moduloP(m))}</div>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--cat-societario)' }}>{fmt(moduloP(m))}</div>
                           </div>
                         );
                       })
@@ -445,7 +445,7 @@ export function NewProjectWizard({ onClose, onProjectCreated }: NewProjectWizard
                   {genericMods.map(m => {
                     const sel = selectedMods.has(m.id);
                     return (
-                      <div key={m.id} onClick={() => toggleMod(m.id)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 8, border: `1px solid ${sel ? 'var(--indigo)' : 'var(--border)'}`, background: sel ? '#1a1f3d' : 'var(--card)', cursor: 'pointer', marginBottom: 6 }}>
+                      <div key={m.id} onClick={() => toggleMod(m.id)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 8, border: `1px solid ${sel ? 'var(--indigo)' : 'var(--border)'}`, background: sel ? 'var(--surface-1)' : 'var(--card)', cursor: 'pointer', marginBottom: 6 }}>
                         <div style={{ width: 18, height: 18, borderRadius: 5, border: `2px solid ${sel ? 'var(--indigo)' : 'var(--hint)'}`, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: sel ? 'var(--indigo)' : 'transparent' }}>
                           {sel && <span style={{ color: '#fff', fontSize: 10 }}>✓</span>}
                         </div>
@@ -466,17 +466,17 @@ export function NewProjectWizard({ onClose, onProjectCreated }: NewProjectWizard
                     <button
                       type="button"
                       onClick={() => setShowOtherGiurMods(!showOtherGiurMods)}
-                      style={{ background: 'transparent', border: 'none', color: '#818cf8', fontSize: 11, cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}
+                      style={{ background: 'transparent', border: 'none', color: 'var(--indigo-l)', fontSize: 11, cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}
                     >
                       {showOtherGiurMods ? '▲ Nascondi altre giurisdizioni' : '▼ Mostra anche moduli di altre giurisdizioni (Scenari multi-giurisdizionali)'}
                     </button>
 
                     {showOtherGiurMods && (
-                      <div style={{ marginTop: 10, paddingLeft: 10, borderLeft: '2px solid #334155' }}>
+                      <div style={{ marginTop: 10, paddingLeft: 10, borderLeft: '2px solid var(--pill-slate-bd)' }}>
                         {otherGiurMods.map(m => {
                           const sel = selectedMods.has(m.id);
                           return (
-                            <div key={m.id} onClick={() => toggleMod(m.id)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 8, border: `1px solid ${sel ? 'var(--indigo)' : 'var(--border)'}`, background: sel ? '#1a1f3d' : 'var(--card)', cursor: 'pointer', marginBottom: 6 }}>
+                            <div key={m.id} onClick={() => toggleMod(m.id)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 8, border: `1px solid ${sel ? 'var(--indigo)' : 'var(--border)'}`, background: sel ? 'var(--surface-1)' : 'var(--card)', cursor: 'pointer', marginBottom: 6 }}>
                               <div style={{ width: 16, height: 16, borderRadius: 4, border: `2px solid ${sel ? 'var(--indigo)' : 'var(--hint)'}`, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: sel ? 'var(--indigo)' : 'transparent' }}>
                                 {sel && <span style={{ color: '#fff', fontSize: 9 }}>✓</span>}
                               </div>
@@ -526,10 +526,10 @@ export function NewProjectWizard({ onClose, onProjectCreated }: NewProjectWizard
                   </div>
                 ))}
 
-                <div style={{ background: 'linear-gradient(135deg,#1a1f3d,#1e2045)', border: '1px solid #2d3260', borderRadius: 12, padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
+                <div style={{ background: 'linear-gradient(135deg,var(--surface-1),var(--surface-1))', border: '1px solid var(--card2)', borderRadius: 12, padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
                   <div>
-                    <div style={{ fontSize: 11, color: '#818cf8', opacity: 0.8 }}>Valore totale progetto</div>
-                    <div style={{ fontSize: 11, color: '#818cf8', opacity: 0.6, marginTop: 2 }}>{totalH}h · {selModules.length} moduli</div>
+                    <div style={{ fontSize: 11, color: 'var(--indigo-l)', opacity: 0.8 }}>Valore totale progetto</div>
+                    <div style={{ fontSize: 11, color: 'var(--indigo-l)', opacity: 0.6, marginTop: 2 }}>{totalH}h · {selModules.length} moduli</div>
                   </div>
                   <div style={{ fontSize: 24, fontWeight: 800 }}>{fmt(totalP)}</div>
                 </div>
@@ -541,7 +541,7 @@ export function NewProjectWizard({ onClose, onProjectCreated }: NewProjectWizard
               progetto non è stato creato la finestra resta aperta con i dati inseriti, così si
               può riprovare senza ricompilare tutto. Il testo è quello del server. */}
           {errore && (
-            <div style={{ margin: '0 20px 4px', background: '#2d0d0d', border: '1px solid #7f1d1d', color: '#fca5a5', padding: '10px 12px', borderRadius: 10, fontSize: 12, lineHeight: 1.5 }}>
+            <div style={{ margin: '0 20px 4px', background: 'var(--pill-red-bg)', border: '1px solid var(--pill-red-bg)', color: 'var(--pill-red-fg)', padding: '10px 12px', borderRadius: 10, fontSize: 12, lineHeight: 1.5 }}>
               <div style={{ fontWeight: 600, marginBottom: 2 }}>Progetto non creato</div>
               {errore}
             </div>

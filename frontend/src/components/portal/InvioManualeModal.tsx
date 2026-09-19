@@ -63,14 +63,14 @@ export function InvioManualeModal({
           </select>
         </label>
         {livelloRichiesto === 'feq' && (
-          <div style={{ background: '#2e1065', border: '1px solid #7c3aed', color: '#c4b5fd', borderRadius: 10, padding: 10, fontSize: 11, lineHeight: 1.5 }}>
+          <div style={{ background: 'var(--pill-purple-bg)', border: '1px solid var(--purple)', color: 'var(--pill-purple-fg)', borderRadius: 10, padding: 10, fontSize: 11, lineHeight: 1.5 }}>
             🔐 Questo documento esige Firma Elettronica Qualificata: la sottoscrizione scansionata
             non è ammessa, quindi la modalità è fissata su firma digitale con provider qualificato.
           </div>
         )}
 
         {otpError && (
-          <div style={{ background: '#3b1219', border: '1px solid #7f1d1d', color: '#fecaca', borderRadius: 10, padding: 12, fontSize: 11.5 }}>
+          <div style={{ background: 'var(--pill-red-bg)', border: '1px solid var(--pill-red-bg)', color: 'var(--pill-red-fg)', borderRadius: 10, padding: 12, fontSize: 11.5 }}>
             {otpError}
           </div>
         )}

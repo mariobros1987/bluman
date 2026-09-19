@@ -49,7 +49,7 @@ export function TabPassaggi({
                     style={{
                       flex: 1, padding: '7px', borderRadius: 8,
                       border: `1px solid ${view === v ? 'var(--indigo)' : 'var(--border)'}`,
-                      background: view === v ? '#1a1f3d' : 'var(--card)',
+                      background: view === v ? 'var(--surface-1)' : 'var(--card)',
                       color: view === v ? 'var(--indigo-l)' : 'var(--muted)',
                       fontSize: 11.5, fontWeight: 600, cursor: 'pointer',
                     }}
@@ -115,7 +115,7 @@ export function TabPassaggi({
                             <button
                               onClick={() => handleDeleteStep(s.id)}
                               title="Elimina passaggio"
-                              style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 12, opacity: 0.7 }}
+                              style={{ background: 'none', border: 'none', color: 'var(--red)', cursor: 'pointer', fontSize: 12, opacity: 0.7 }}
                             >
                               ✕
                             </button>
@@ -128,7 +128,7 @@ export function TabPassaggi({
                     {s.type === 'form' && (
                       <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px dashed var(--border)', display: 'flex', flexDirection: 'column', gap: 8 }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: 10.5, fontWeight: 700, color: '#a78bfa' }}>📋 Dati da raccogliere dal cliente:</span>
+                          <span style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--purple)' }}>📋 Dati da raccogliere dal cliente:</span>
                           <button
                             type="button"
                             onClick={() => {
@@ -176,7 +176,7 @@ export function TabPassaggi({
                             </div>
 
                             <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                              <span style={{ fontSize: 9.5, fontWeight: 700, padding: '2px 7px', borderRadius: 10, background: s.stato === 'done' ? '#0d2d22' : '#2d1a05', color: s.stato === 'done' ? '#34d399' : '#f59e0b', border: `1px solid ${s.stato === 'done' ? '#1a5c3c' : '#78350f'}` }}>
+                              <span style={{ fontSize: 9.5, fontWeight: 700, padding: '2px 7px', borderRadius: 10, background: s.stato === 'done' ? 'var(--pill-green-bg)' : 'var(--pill-amber-bg)', color: s.stato === 'done' ? 'var(--green)' : 'var(--amber)', border: `1px solid ${s.stato === 'done' ? 'var(--pill-green-bg)' : 'var(--pill-amber-bg)'}` }}>
                                 {s.stato === 'done' ? '🔒 FIRMATO' : '✍️ DA FIRMARE'}
                               </span>
 
@@ -208,9 +208,9 @@ export function TabPassaggi({
                             </div>
                           </div>
                         ) : (
-                          <div style={{ background: '#1e1b4b20', border: '1px dashed #6366f1', borderRadius: 8, padding: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                          <div style={{ background: '#1e1b4b20', border: '1px dashed var(--indigo)', borderRadius: 8, padding: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
                             <div>
-                              <div style={{ fontSize: 11, fontWeight: 700, color: '#818cf8' }}>
+                              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--indigo-l)' }}>
                                 📁 Nessun documento collegato a questo passaggio
                               </div>
                               <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>

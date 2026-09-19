@@ -27,7 +27,7 @@ export function TabNote({
                 style={{ width: '100%', padding: '10px 12px', fontSize: 12, borderRadius: 8, background: 'var(--card)', color: 'var(--text)', border: '1px solid var(--border)' }}
               />
               <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                <button type="submit" style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: 8, fontSize: 11.5, fontWeight: 600, cursor: 'pointer' }}>
+                <button type="submit" style={{ background: 'var(--indigo)', color: 'var(--on-accent)', border: 'none', padding: '6px 14px', borderRadius: 8, fontSize: 11.5, fontWeight: 600, cursor: 'pointer' }}>
                   + Registra Nota
                 </button>
               </div>

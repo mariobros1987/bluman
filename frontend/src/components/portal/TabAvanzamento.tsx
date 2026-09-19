@@ -38,7 +38,7 @@ export function TabAvanzamento({
             style={{
               width: `${percentualeProgetto}%`,
               height: '100%',
-              background: 'linear-gradient(90deg, var(--indigo), #34d399)',
+              background: 'linear-gradient(90deg, var(--indigo), var(--green))',
               borderRadius: 10,
               transition: 'width .3s ease',
             }}
@@ -73,8 +73,8 @@ export function TabAvanzamento({
               key={m.id || idx}
               onClick={() => setSelectedModule(m)}
               style={{
-                background: isSigned ? '#0d2d22' : 'var(--card2)',
-                border: isSigned ? '1.5px solid #10b981' : isDone ? '1.5px solid #6366f1' : '1px solid var(--border)',
+                background: isSigned ? 'var(--pill-green-bg)' : 'var(--card2)',
+                border: isSigned ? '1.5px solid var(--green)' : isDone ? '1.5px solid var(--indigo)' : '1px solid var(--border)',
                 borderRadius: 14,
                 padding: 18,
                 cursor: 'pointer',
@@ -92,8 +92,8 @@ export function TabAvanzamento({
                       width: 32,
                       height: 32,
                       borderRadius: '50%',
-                      background: isSigned ? '#10b981' : isDone ? '#4338ca' : 'var(--card)',
-                      color: isSigned ? '#064e3b' : '#fff',
+                      background: isSigned ? 'var(--green)' : isDone ? 'var(--indigo-d)' : 'var(--card)',
+                      color: isSigned ? 'var(--pill-green-bg)' : '#fff',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -119,7 +119,7 @@ export function TabAvanzamento({
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   {isSigned ? (
-                    <span style={{ background: '#10b981', color: '#064e3b', fontSize: 10.5, fontWeight: 800, padding: '4px 10px', borderRadius: 12 }}>
+                    <span style={{ background: 'var(--green)', color: 'var(--pill-green-bg)', fontSize: 10.5, fontWeight: 800, padding: '4px 10px', borderRadius: 12 }}>
                       ✓ CONCLUSO & VALIDATO
                     </span>
                   ) : isDone ? (
@@ -127,7 +127,7 @@ export function TabAvanzamento({
                       ✍️ ATTIVITÀ CONCLUSE (DA FIRMARE)
                     </span>
                   ) : (
-                    <span style={{ background: '#200f40', color: '#a78bfa', fontSize: 10.5, fontWeight: 700, padding: '4px 10px', borderRadius: 12 }}>
+                    <span style={{ background: 'var(--pill-indigo-bg)', color: 'var(--purple)', fontSize: 10.5, fontWeight: 700, padding: '4px 10px', borderRadius: 12 }}>
                       ⏱ IN LAVORAZIONE ({m.percentuale ?? 0}%)
                     </span>
                   )}
@@ -139,10 +139,10 @@ export function TabAvanzamento({
               <div style={{ background: 'rgba(0,0,0,0.25)', borderRadius: 10, padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, fontSize: 11 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                   <span style={{ color: 'var(--muted)' }}>
-                    Progressione operativa: <strong style={{ color: '#34d399' }}>{passaggiCompletati}/{passaggi.length} micro-fasi</strong>
+                    Progressione operativa: <strong style={{ color: 'var(--green)' }}>{passaggiCompletati}/{passaggi.length} micro-fasi</strong>
                   </span>
                   {m.deliverables && m.deliverables.length > 0 && (
-                    <span style={{ background: '#1e1b4b', border: '1px solid #4338ca', color: '#c7d2fe', padding: '2px 8px', borderRadius: 6, fontWeight: 700, fontSize: 10 }}>
+                    <span style={{ background: 'var(--pill-indigo-bg)', border: '1px solid var(--indigo-d)', color: 'var(--pill-indigo-fg)', padding: '2px 8px', borderRadius: 6, fontWeight: 700, fontSize: 10 }}>
                       📄 {m.deliverables.length} atto/i pubblicato/i
                     </span>
                   )}

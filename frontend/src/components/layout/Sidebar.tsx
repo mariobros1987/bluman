@@ -61,7 +61,7 @@ export function Sidebar({ alertCount = 0, user, onLogout, onOpenProfile }: Sideb
   return (
     <aside className={styles.sidebar}>
       {/* Logo & Tenant Studio Badge */}
-      <div className={styles.logo} style={{ background: '#0f172a', padding: '10px 14px', borderRadius: 10, border: '1px solid #1e293b', marginBottom: 16 }}>
+      <div className={styles.logo} style={{ background: 'var(--surface-2)', padding: '10px 14px', borderRadius: 10, border: '1px solid var(--pill-slate-bg)', marginBottom: 16 }}>
         {effectiveLogo ? (
           <img
             src={getFormattedLogoUrl(effectiveLogo)}
@@ -73,15 +73,15 @@ export function Sidebar({ alertCount = 0, user, onLogout, onOpenProfile }: Sideb
           />
         ) : (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0' }}>
-            <div style={{ width: 28, height: 28, borderRadius: 6, background: '#1e293b', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, color: '#38bdf8', border: '1px solid #334155' }}>
+            <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--pill-slate-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, color: 'var(--cat-societario)', border: '1px solid var(--border)' }}>
               🏛
             </div>
-            <div style={{ fontWeight: 800, fontSize: 13.5, color: '#f8fafc', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 125 }}>
+            <div style={{ fontWeight: 800, fontSize: 13.5, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 125 }}>
               {studioInfo.nomeBreve || 'Studio'}
             </div>
           </div>
         )}
-        <div style={{ marginTop: 6, fontSize: 11, fontWeight: 600, color: '#38bdf8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        <div style={{ marginTop: 6, fontSize: 11, fontWeight: 600, color: 'var(--cat-societario)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           🏛 {studioInfo.nomeBreve || studioInfo.ragioneSociale || 'Studio Professionale'}
         </div>
       </div>
@@ -113,7 +113,7 @@ export function Sidebar({ alertCount = 0, user, onLogout, onOpenProfile }: Sideb
           title="👤 Clicca per aprire il tuo Profilo & Sicurezza Password"
           style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, cursor: onOpenProfile ? 'pointer' : 'default', flex: 1 }}
         >
-          <div className={styles.avatar} style={{ background: '#6366f1' }}>{initials}</div>
+          <div className={styles.avatar} style={{ background: 'var(--indigo)' }}>{initials}</div>
           <div style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>
             <div className={styles.userName} style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{userName}</div>
             <div className={styles.userRole} style={{ fontSize: 10, color: 'var(--muted)' }}>{user?.ruolo || 'advisor'} {onOpenProfile ? '· Profilo ⚙️' : ''}</div>

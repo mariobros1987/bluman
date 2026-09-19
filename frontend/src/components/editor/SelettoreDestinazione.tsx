@@ -107,11 +107,11 @@ export function SelettoreDestinazione({
                   ? (microvoci.find(m => m.id === selectedMicrovoceId)?.modulo ?? 'Modulo') + ' › ' + (microvoci.find(m => m.id === selectedMicrovoceId)?.nome ?? 'Micro-voce')
                   : 'fascicolo progetto'}
                 {' › '}
-                <span style={{ color: '#a1a1aa' }}>bozza interna</span>
+                <span style={{ color: 'var(--muted)' }}>bozza interna</span>
                 {' → '}
-                <span style={{ color: '#60a5fa' }}>pubblicazione dalla micro-voce</span>
+                <span style={{ color: 'var(--cat-societario)' }}>pubblicazione dalla micro-voce</span>
                 {' → '}
-                <span style={{ color: '#34d399' }}>firma del cliente nel portale</span>
+                <span style={{ color: 'var(--green)' }}>firma del cliente nel portale</span>
               </>
             : 'nessun progetto selezionato — il salvataggio sul server è sospeso'}
         </span>

@@ -50,24 +50,24 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'var(--bg, #0b0e1a)',
+        background: 'var(--bg, var(--surface-2))',
         padding: 24,
         boxSizing: 'border-box',
       }}>
         <div style={{
           maxWidth: 560,
           width: '100%',
-          background: 'var(--card, #141928)',
-          border: '1px solid #7f1d1d',
+          background: 'var(--card, var(--surface-1))',
+          border: '1px solid var(--pill-red-bg)',
           borderRadius: 16,
           padding: 32,
           textAlign: 'center',
         }}>
           <div style={{ fontSize: 48, marginBottom: 16 }}>⚠️</div>
-          <h1 style={{ color: '#f87171', fontSize: 20, margin: '0 0 12px 0' }}>
+          <h1 style={{ color: 'var(--pill-red-fg)', fontSize: 20, margin: '0 0 12px 0' }}>
             Si è verificato un errore imprevisto
           </h1>
-          <p style={{ color: 'var(--muted, #9ca3af)', fontSize: 13, lineHeight: 1.6, margin: '0 0 16px 0' }}>
+          <p style={{ color: 'var(--muted, var(--muted))', fontSize: 13, lineHeight: 1.6, margin: '0 0 16px 0' }}>
             La pagina ha smesso di funzionare per un errore interno. La sessione è salva:
             ricaricando si torna al punto di partenza. Se l'errore si ripete, comunica
             anche il dettaglio qui sotto.
@@ -77,7 +77,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
             background: 'rgba(127,29,29,.15)',
             border: '1px solid rgba(127,29,29,.4)',
             borderRadius: 8,
-            color: '#fca5a5',
+            color: 'var(--pill-red-fg)',
             fontSize: 11,
             padding: '10px 12px',
             overflow: 'auto',
@@ -91,7 +91,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
             <button
               onClick={() => window.location.reload()}
               style={{
-                background: '#4f46e5',
+                background: 'var(--indigo-d)',
                 color: '#fff',
                 border: 'none',
                 padding: '10px 22px',
@@ -107,8 +107,8 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
               onClick={() => this.setState({ errore: null })}
               style={{
                 background: 'transparent',
-                color: 'var(--muted, #9ca3af)',
-                border: '1px solid var(--border, #2a3049)',
+                color: 'var(--muted, var(--muted))',
+                border: '1px solid var(--border, var(--surface-1))',
                 padding: '10px 22px',
                 borderRadius: 8,
                 fontSize: 12,

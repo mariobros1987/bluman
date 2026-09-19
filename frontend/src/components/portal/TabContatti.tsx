@@ -176,26 +176,26 @@ export function TabContatti({
                 <div key={m.id || idx} style={{ display: 'flex', flexDirection: 'column' }}>
                   {isFirstUnread && (
                     <div ref={unreadMarkerRef} style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '8px 0', opacity: 0.95 }}>
-                      <div style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, transparent, #6366f1)' }} />
-                      <span style={{ fontSize: 10, fontWeight: 700, color: '#a5b4fc', background: '#1e1b4b', border: '1px solid #4338ca', padding: '2px 10px', borderRadius: 12, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      <div style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, transparent, var(--indigo))' }} />
+                      <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--pill-indigo-fg)', background: 'var(--pill-indigo-bg)', border: '1px solid var(--indigo-d)', padding: '2px 10px', borderRadius: 12, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                         <span>🔔</span>
                         <span>Nuovi messaggi dallo Studio</span>
                       </span>
-                      <div style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, #6366f1, transparent)' }} />
+                      <div style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, var(--indigo), transparent)' }} />
                     </div>
                   )}
                   <div
                     style={{
                       alignSelf: isCliente ? 'flex-end' : 'flex-start',
                       maxWidth: '85%',
-                      background: isCliente ? '#1e1b4b' : 'var(--card2)',
-                      border: `1px solid ${isCliente ? '#4338ca' : 'var(--border)'}`,
+                      background: isCliente ? 'var(--pill-indigo-bg)' : 'var(--card2)',
+                      border: `1px solid ${isCliente ? 'var(--indigo-d)' : 'var(--border)'}`,
                       borderRadius: 12,
                       padding: '10px 14px',
                     }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 4 }}>
-                      <span style={{ fontSize: 10, fontWeight: 700, color: isCliente ? '#a5b4fc' : 'var(--indigo-l)' }}>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: isCliente ? 'var(--pill-indigo-fg)' : 'var(--indigo-l)' }}>
                         {/* §2.6: il mittente dello studio prende il nome vero se c'è, senza inventare una persona. */}
                         {isCliente ? 'Tu (Cliente)' : (m.mittente || contattiStudio?.advisorNome || 'Studio (Advisor)')}
                       </span>
@@ -224,7 +224,7 @@ export function TabContatti({
                     {/* Allegati allegati al messaggio */}
                     {m.allegati && m.allegati.length > 0 && (
                       <div style={{ marginTop: 8, borderTop: `1px solid ${isCliente ? 'rgba(255,255,255,0.15)' : 'var(--border)'}`, paddingTop: 6, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                        <div style={{ fontSize: 9.5, color: isCliente ? '#c7d2fe' : 'var(--muted)', fontWeight: 700, textTransform: 'uppercase' }}>
+                        <div style={{ fontSize: 9.5, color: isCliente ? 'var(--pill-indigo-fg)' : 'var(--muted)', fontWeight: 700, textTransform: 'uppercase' }}>
                           📎 Allegati ({m.allegati.length}):
                         </div>
                         {m.allegati.map((att: any, attIdx: number) => {
@@ -235,7 +235,7 @@ export function TabContatti({
                                 <span>📄</span>
                                 <div style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                   <div style={{ fontWeight: 600, fontSize: 11, color: isCliente ? '#fff' : 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis' }}>{att.nome}</div>
-                                  {att.dimensione && <div style={{ fontSize: 9, color: isCliente ? '#a5b4fc' : 'var(--muted)' }}>{att.dimensione}</div>}
+                                  {att.dimensione && <div style={{ fontSize: 9, color: isCliente ? 'var(--pill-indigo-fg)' : 'var(--muted)' }}>{att.dimensione}</div>}
                                 </div>
                               </div>
                               <a
@@ -244,7 +244,7 @@ export function TabContatti({
                                 rel="noreferrer"
                                 download={att.nome}
                                 style={{
-                                  background: isCliente ? '#4f46e5' : 'var(--card2)',
+                                  background: isCliente ? 'var(--indigo-d)' : 'var(--muted)',
                                   color: '#fff',
                                   border: '1px solid rgba(255,255,255,0.2)',
                                   padding: '3px 8px',
@@ -295,7 +295,7 @@ export function TabContatti({
           >
             <span>⬇️ Scorri all'ultimo</span>
             {nuoviNonLettiCount > 0 && (
-              <span style={{ background: '#ef4444', color: '#fff', borderRadius: '50%', fontSize: 9, padding: '1px 5px', fontWeight: 800 }}>
+              <span style={{ background: 'var(--red)', color: '#fff', borderRadius: '50%', fontSize: 9, padding: '1px 5px', fontWeight: 800 }}>
                 {nuoviNonLettiCount}
               </span>
             )}
@@ -399,7 +399,7 @@ export function TabContatti({
 
         {/* Chip file allegato in anteprima */}
         {fileAllegato && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#1e1b4b', border: '1px solid #4338ca', borderRadius: 8, padding: '6px 12px', fontSize: 11, color: '#c7d2fe', width: 'fit-content' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--pill-indigo-bg)', border: '1px solid var(--indigo-d)', borderRadius: 8, padding: '6px 12px', fontSize: 11, color: 'var(--pill-indigo-fg)', width: 'fit-content' }}>
             <span>📎 {fileAllegato.nome}</span>
             <span style={{ fontSize: 9.5, opacity: 0.8 }}>({fileAllegato.sizeStr})</span>
             <button
@@ -408,7 +408,7 @@ export function TabContatti({
                 setFileAllegato(null);
                 if (fileInputRef.current) fileInputRef.current.value = '';
               }}
-              style={{ background: 'transparent', border: 'none', color: '#f87171', cursor: 'pointer', fontWeight: 700, padding: '0 4px', fontSize: 12 }}
+              style={{ background: 'transparent', border: 'none', color: 'var(--pill-red-fg)', cursor: 'pointer', fontWeight: 700, padding: '0 4px', fontSize: 12 }}
             >
               ✕
             </button>

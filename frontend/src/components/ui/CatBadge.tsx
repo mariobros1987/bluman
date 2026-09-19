@@ -9,14 +9,14 @@ interface CatBadgeProps {
 export function CatBadge({ cat }: CatBadgeProps) {
   const cls = catCls(cat);
   const styles: Record<string, React.CSSProperties> = {
-    cA: { background: '#1a1f3d', color: '#818cf8' },
-    cS: { background: '#0d2233', color: '#60b8f4' },
-    cT: { background: '#200f40', color: '#a78bfa' },
-    cB: { background: '#0d2d22', color: '#34d399' },
-    cF: { background: '#2d2000', color: '#f59e0b' },
-    cL: { background: '#1e2030', color: '#94a3b8' },
-    cI: { background: '#2d0d25', color: '#f472b6' },
-    cC: { background: '#1a1208', color: '#fb923c' },
+    cA: { background: 'var(--surface-1)', color: 'var(--indigo-l)' },
+    cS: { background: 'var(--surface-1)', color: 'var(--cat-societario)' },
+    cT: { background: 'var(--pill-indigo-bg)', color: 'var(--purple)' },
+    cB: { background: 'var(--pill-green-bg)', color: 'var(--pill-green-fg)' },
+    cF: { background: 'var(--pill-amber-bg)', color: 'var(--amber)' },
+    cL: { background: 'var(--card)', color: 'var(--muted)' },
+    cI: { background: 'var(--pill-purple-bg)', color: 'var(--cat-ip)' },
+    cC: { background: 'var(--pill-amber-bg)', color: 'var(--cat-compliance)' },
   };
   return (
     <span style={{

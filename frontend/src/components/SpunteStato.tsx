@@ -49,7 +49,7 @@ export function SpunteStato({ stato, inviatoAt, consegnatoAt, lettoAt, errore, c
               ? `Letto dal destinatario${quando(lettoAt)}`
               : `Letto dallo Studio${quando(lettoAt)}`
           }
-          style={{ ...BASE, color: '#38bdf8', fontWeight: 800, letterSpacing: -1 }}
+          style={{ ...BASE, color: 'var(--cat-societario)', fontWeight: 800, letterSpacing: -1 }}
         >
           ✓✓
         </span>
@@ -90,7 +90,7 @@ export function SpunteStato({ stato, inviatoAt, consegnatoAt, lettoAt, errore, c
 
     case 'non-inviato':
       return (
-        <span title={`Non inviato — ${errore || 'motivo non riportato'}`} style={{ ...BASE, fontSize: 12, color: '#f87171' }}>
+        <span title={`Non inviato — ${errore || 'motivo non riportato'}`} style={{ ...BASE, fontSize: 12, color: 'var(--pill-red-fg)' }}>
           ✗
         </span>
       );

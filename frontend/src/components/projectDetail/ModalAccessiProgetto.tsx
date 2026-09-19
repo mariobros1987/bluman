@@ -32,7 +32,7 @@ export function ModalAccessiProgetto({
             {teamList.slice(0, 2).map((u, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11.5 }}>
                 <span>👤 <strong>{u.n || (u as any).name}</strong> ({u.r || (u as any).role})</span>
-                <span style={{ background: '#0d2d22', color: '#34d399', padding: '2px 8px', borderRadius: 12, fontSize: 10, fontWeight: 600 }}>Permesso: Operativo (Scrittura)</span>
+                <span style={{ background: 'var(--pill-green-bg)', color: 'var(--pill-green-fg)', padding: '2px 8px', borderRadius: 12, fontSize: 10, fontWeight: 600 }}>Permesso: Operativo (Scrittura)</span>
               </div>
             ))}
           </div>
@@ -60,7 +60,7 @@ export function ModalAccessiProgetto({
           <button onClick={onChiudi} style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '7px 14px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}>Chiudi</button>
           <button
             onClick={onAssegna}
-            style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer' }}
+            style={{ background: 'var(--indigo)', color: 'var(--on-accent)', border: 'none', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer' }}
           >
             + Assegna Accesso Progetto
           </button>

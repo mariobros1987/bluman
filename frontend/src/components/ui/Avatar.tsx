@@ -38,7 +38,7 @@ export function Avatar({ id, size = 24, showTooltip = true }: AvatarProps) {
   ) || {
     id: idNum || 1,
     i: idStr.includes('mario') ? 'MD' : extractInitialsFromName(idStr),
-    c: idStr.includes('mario') ? '#3b82f6' : '#6366f1',
+    c: idStr.includes('mario') ? 'var(--indigo-l)' : 'var(--indigo)',
     n: idStr.includes('mario') ? 'Avv. Mario Dibenedetto' : `Operatore Studio #${id || 1}`,
     r: idStr.includes('mario') ? 'Legal Counsel & Partner' : 'Studio Advisor',
   };
@@ -46,7 +46,7 @@ export function Avatar({ id, size = 24, showTooltip = true }: AvatarProps) {
   const displayName = m.n || 'Operatore Studio';
   const displayRole = m.r || 'Studio Advisor';
   const displayInitials = m.i || extractInitialsFromName(displayName);
-  const displayColor = m.c || '#6366f1';
+  const displayColor = m.c || 'var(--indigo)';
 
   return (
     <div
@@ -67,7 +67,7 @@ export function Avatar({ id, size = 24, showTooltip = true }: AvatarProps) {
           fontWeight: 700,
           color: '#fff',
           flexShrink: 0,
-          border: '2px solid var(--card, #1e293b)',
+          border: '2px solid var(--card, var(--pill-slate-bg))',
           boxShadow: hovered ? `0 0 12px ${displayColor}bb` : '0 2px 4px rgba(0,0,0,0.2)',
           cursor: 'pointer',
           transition: 'all .18s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -107,11 +107,11 @@ export function Avatar({ id, size = 24, showTooltip = true }: AvatarProps) {
         >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
             <span style={{ width: 7, height: 7, borderRadius: '50%', background: displayColor, flexShrink: 0, boxShadow: `0 0 6px ${displayColor}` }} />
-            <span style={{ fontSize: 12, fontWeight: 700, color: '#f8fafc' }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--pill-sky-fg)' }}>
               {displayName}
             </span>
           </div>
-          <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 500 }}>
+          <div style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 500 }}>
             {displayRole}
           </div>
           {/* Arrow */}

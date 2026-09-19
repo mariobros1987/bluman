@@ -3,40 +3,72 @@
 
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap');
 
-/* ─── Tokens ─────────────────────────────────────────────────── */
+/* ─── Tokens ─────────────────────────────────────────────────────
+   TEMA UNICO CHIARO — toni di blu. Nessun toggle: questi valori sono
+   la fonte unica di verità. Tutto ciò che usa var(--...) è già a tema.
+   I colori esadecimali cablati negli style inline vengono convertiti a
+   questi token in modo incrementale (Fase 2). */
 :root {
-  /* Backgrounds */
-  --bg:        #0f1117;
-  --sidebar:   #161822;
-  --card:      #1e2030;
-  --card2:     #252840;
+  color-scheme: light;
+
+  /* Backgrounds — chiaro con una punta di blu */
+  --bg:        #f3f6fc;   /* sfondo pagina, azzurrino tenue */
+  --sidebar:   #ffffff;
+  --card:      #ffffff;
+  --card2:     #eef2fb;   /* superficie secondaria */
 
   /* Borders & text */
-  --border:    #2a2d3e;
-  --text:      #e2e4f0;
-  --muted:     #7b7f9e;
-  --hint:      #4a4d64;
+  --border:    #dde3f0;
+  --text:      #16203a;   /* blu-notte, alto contrasto su chiaro */
+  --muted:     #5a6178;
+  --hint:      #949cb2;
 
-  /* Brand */
-  --indigo:    #6366f1;
-  --indigo-d:  #4f52d3;
-  --indigo-l:  #818cf8;
+  /* Brand — BLU (primario dell'app) */
+  --indigo:    #2563eb;   /* blue-600 */
+  --indigo-d:  #1d4ed8;   /* blue-700, hover */
+  --indigo-l:  #3b82f6;   /* blue-500, accento */
 
   /* Status */
-  --green:     #10b981;
-  --amber:     #f59e0b;
-  --red:       #ef4444;
-  --purple:    #a78bfa;
+  --green:     #059669;
+  --amber:     #d97706;
+  --red:       #dc2626;
+  --purple:    #7c3aed;
 
-  /* Category colors */
-  --cat-analisi:     #818cf8;
-  --cat-societario:  #60b8f4;
-  --cat-trust:       #a78bfa;
-  --cat-banking:     #34d399;
-  --cat-fiscale:     #f59e0b;
-  --cat-legale:      #94a3b8;
-  --cat-ip:          #f472b6;
-  --cat-compliance:  #fb923c;
+  /* Category colors — sature, leggibili su chiaro */
+  --cat-analisi:     #2563eb;
+  --cat-societario:  #0284c7;
+  --cat-trust:       #7c3aed;
+  --cat-banking:     #059669;
+  --cat-fiscale:     #d97706;
+  --cat-legale:      #475569;
+  --cat-ip:          #db2777;
+  --cat-compliance:  #ea580c;
+
+  /* Alias di compatibilità (nomi usati in alcuni componenti) */
+  --primary:      #2563eb;
+  --accent:       #2563eb;
+  --fg:           #16203a;
+  --text-muted:   #5a6178;
+  --bg-secondary: #eef2fb;
+
+  /* ─── Token semantici per badge / pill / riquadri tinti ──────────
+     Ogni famiglia: -bg (fondo pallido), -fg (testo scuro saturo), -bd (bordo tenue). */
+
+  /* Superfici elevate — grigi/azzurri tenui, mai scuri */
+  --surface-1:   #f8fafc;
+  --surface-2:   #eef2fb;
+  --surface-3:   #e3e9f5;
+  --on-accent:   #ffffff;   /* testo su fondo colorato pieno (bottone blu, verde, ecc.) */
+
+  --pill-indigo-bg: #eef2ff;  --pill-indigo-fg: #1d4ed8;  --pill-indigo-bd: #c7d2fe;
+  --pill-blue-bg:   #eff6ff;  --pill-blue-fg:   #1d4ed8;  --pill-blue-bd:   #bfdbfe;
+  --pill-sky-bg:    #e0f2fe;  --pill-sky-fg:    #0369a1;  --pill-sky-bd:    #bae6fd;
+  --pill-green-bg:  #ecfdf5;  --pill-green-fg:  #047857;  --pill-green-bd:  #a7f3d0;
+  --pill-red-bg:    #fef2f2;  --pill-red-fg:    #b91c1c;  --pill-red-bd:    #fecaca;
+  --pill-amber-bg:  #fffbeb;  --pill-amber-fg:  #b45309;  --pill-amber-bd:  #fde68a;
+  --pill-purple-bg: #f5f3ff;  --pill-purple-fg: #6d28d9;  --pill-purple-bd: #ddd6fe;
+  --pill-pink-bg:   #fdf2f8;  --pill-pink-fg:   #be185d;  --pill-pink-bd:   #fbcfe8;
+  --pill-slate-bg:  #f1f5f9;  --pill-slate-fg:  #475569;  --pill-slate-bd:  #cbd5e1;
 
   /* Typography */
   --font: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -47,10 +79,10 @@
   --radius-lg: 12px;
   --radius-xl: 16px;
 
-  /* Shadows */
-  --shadow-sm:  0 1px 3px rgba(0,0,0,.4);
-  --shadow:     0 4px 16px rgba(0,0,0,.5);
-  --shadow-lg:  0 24px 60px rgba(0,0,0,.6);
+  /* Shadows — tenui su fondo chiaro */
+  --shadow-sm:  0 1px 3px rgba(22,32,58,.08);
+  --shadow:     0 4px 16px rgba(22,32,58,.10);
+  --shadow-lg:  0 24px 60px rgba(22,32,58,.16);
 
   /* Transitions */
   --t: .15s ease;
@@ -133,15 +165,15 @@ input:focus, textarea:focus, select:focus { border-color: var(--indigo); }
 
 .btn-primary {
   background: var(--indigo);
-  color: #ffffff !important;
+  color: var(--on-accent) !important;
   border-color: var(--indigo);
-  box-shadow: 0 1px 3px rgba(99, 102, 241, 0.25);
+  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.25);
 }
 .btn-primary:hover:not(:disabled) {
   background: var(--indigo-d);
   border-color: var(--indigo-d);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
 }
 
 .btn-secondary {
@@ -150,16 +182,16 @@ input:focus, textarea:focus, select:focus { border-color: var(--indigo); }
   border-color: var(--border);
 }
 .btn-secondary:hover:not(:disabled) {
-  background: var(--border);
+  background: var(--surface-3);
   border-color: var(--hint);
-  color: #ffffff !important;
+  color: var(--text) !important;
   transform: translateY(-1px);
 }
 
 .btn-success {
-  background: #059669;
-  color: #ffffff !important;
-  border-color: #059669;
+  background: var(--green);
+  color: var(--on-accent) !important;
+  border-color: var(--green);
   box-shadow: 0 1px 3px rgba(5, 150, 105, 0.25);
 }
 .btn-success:hover:not(:disabled) {
@@ -170,14 +202,14 @@ input:focus, textarea:focus, select:focus { border-color: var(--indigo); }
 }
 
 .btn-danger {
-  background: rgba(239, 68, 68, 0.15);
-  color: #ef4444 !important;
-  border-color: rgba(239, 68, 68, 0.3);
+  background: var(--pill-red-bg);
+  color: var(--red) !important;
+  border-color: var(--pill-red-bd);
 }
 .btn-danger:hover:not(:disabled) {
-  background: #ef4444;
-  color: #ffffff !important;
-  border-color: #ef4444;
+  background: var(--red);
+  color: var(--on-accent) !important;
+  border-color: var(--red);
   transform: translateY(-1px);
 }
 

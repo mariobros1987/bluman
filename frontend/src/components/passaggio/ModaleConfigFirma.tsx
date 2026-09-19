@@ -53,13 +53,13 @@ export function ModaleConfigFirma({
                       type="button"
                       onClick={() => setConfigFirmaModal({ ...configFirmaModal, richiedeFirma: true })}
                       style={{
-                        background: configFirmaModal.richiedeFirma ? '#1e1b4b' : 'var(--card)',
+                        background: configFirmaModal.richiedeFirma ? 'var(--pill-indigo-bg)' : 'var(--card)',
                         border: `1.5px solid ${configFirmaModal.richiedeFirma ? 'var(--indigo)' : 'var(--border)'}`,
                         borderRadius: 10, padding: '10px 12px', textAlign: 'left', cursor: 'pointer',
                         display: 'flex', flexDirection: 'column', gap: 3
                       }}
                     >
-                      <div style={{ fontSize: 12, fontWeight: 700, color: configFirmaModal.richiedeFirma ? '#a5b4fc' : 'var(--text)' }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: configFirmaModal.richiedeFirma ? 'var(--pill-indigo-fg)' : 'var(--text)' }}>
                         ✍️ Richiede Firma
                       </div>
                       <div style={{ fontSize: 10, color: 'var(--muted)', lineHeight: 1.3 }}>
@@ -71,13 +71,13 @@ export function ModaleConfigFirma({
                       type="button"
                       onClick={() => setConfigFirmaModal({ ...configFirmaModal, richiedeFirma: false })}
                       style={{
-                        background: !configFirmaModal.richiedeFirma ? '#1e1b4b' : 'var(--card)',
+                        background: !configFirmaModal.richiedeFirma ? 'var(--pill-indigo-bg)' : 'var(--card)',
                         border: `1.5px solid ${!configFirmaModal.richiedeFirma ? 'var(--indigo)' : 'var(--border)'}`,
                         borderRadius: 10, padding: '10px 12px', textAlign: 'left', cursor: 'pointer',
                         display: 'flex', flexDirection: 'column', gap: 3
                       }}
                     >
-                      <div style={{ fontSize: 12, fontWeight: 700, color: !configFirmaModal.richiedeFirma ? '#a5b4fc' : 'var(--text)' }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: !configFirmaModal.richiedeFirma ? 'var(--pill-indigo-fg)' : 'var(--text)' }}>
                         📄 Sola Consultazione
                       </div>
                       <div style={{ fontSize: 10, color: 'var(--muted)', lineHeight: 1.3 }}>
@@ -100,21 +100,21 @@ export function ModaleConfigFirma({
                           icon: '📱',
                           titolo: 'SES — Semplice',
                           desc: 'Firma elettronica semplice (art. 20 CAD / eIDAS art. 3 n. 10). Il flusso OTP attuale.',
-                          tagColor: '#34d399',
+                          tagColor: 'var(--green)',
                         },
                         {
                           id: 'fea' as const,
                           icon: '🧠',
                           titolo: 'FEA — Avanzata',
                           desc: 'Firma elettronica avanzata (eIDAS art. 26): richiede misure aggiuntive in Fase 3; per ora il portale la rifiuta.',
-                          tagColor: '#f59e0b',
+                          tagColor: 'var(--amber)',
                         },
                         {
                           id: 'feq' as const,
                           icon: '🔐',
                           titolo: 'FEQ — Qualificata',
                           desc: 'Firma elettronica qualificata (eIDAS art. 25): solo tramite provider esterno del cliente (file .p7m).',
-                          tagColor: '#818cf8',
+                          tagColor: 'var(--indigo-l)',
                         },
                       ]).map((l) => (
                         <button
@@ -122,13 +122,13 @@ export function ModaleConfigFirma({
                           type="button"
                           onClick={() => setConfigFirmaModal({ ...configFirmaModal, livelloFirmaRichiesto: l.id })}
                           style={{
-                            background: configFirmaModal.livelloFirmaRichiesto === l.id ? '#1e1b4b' : 'var(--card)',
+                            background: configFirmaModal.livelloFirmaRichiesto === l.id ? 'var(--pill-indigo-bg)' : 'var(--card)',
                             border: `1.5px solid ${configFirmaModal.livelloFirmaRichiesto === l.id ? 'var(--indigo)' : 'var(--border)'}`,
                             borderRadius: 10, padding: '9px 10px', textAlign: 'left', cursor: 'pointer',
                             display: 'flex', flexDirection: 'column', gap: 3
                           }}
                         >
-                          <div style={{ fontSize: 11, fontWeight: 700, color: configFirmaModal.livelloFirmaRichiesto === l.id ? '#a5b4fc' : 'var(--text)', display: 'flex', alignItems: 'center', gap: 5 }}>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: configFirmaModal.livelloFirmaRichiesto === l.id ? 'var(--pill-indigo-fg)' : 'var(--text)', display: 'flex', alignItems: 'center', gap: 5 }}>
                             <span>{l.icon}</span> {l.titolo}
                           </div>
                           <div style={{ fontSize: 9.5, color: 'var(--muted)', lineHeight: 1.3 }}>
@@ -164,7 +164,7 @@ export function ModaleConfigFirma({
                           titolo: 'Firma Elettronica Semplice (OTP + Pad grafometrico)',
                           desc: 'Codice OTP via SMS/Email/WhatsApp + Firma Grafometrica ai sensi dell\'art. 20 del CAD. Istantanea e guidata.',
                           tag: 'CONSIGLIATO',
-                          tagColor: '#34d399',
+                          tagColor: 'var(--green)',
                         },
                         {
                           id: 'manuale_scansionata' as const,
@@ -172,7 +172,7 @@ export function ModaleConfigFirma({
                           titolo: 'Firma Olografa Tradizionale (Scarica, Firma e Ricarica)',
                           desc: 'Il cliente scarica il PDF generato, lo stampa, lo firma a penna e ricarica la scansione o foto nel portale.',
                           tag: 'TRADIZIONALE',
-                          tagColor: '#94a3b8',
+                          tagColor: 'var(--muted)',
                         },
                         {
                           id: 'qualificata_esterna' as const,
@@ -180,7 +180,7 @@ export function ModaleConfigFirma({
                           titolo: 'Firma Digitale Qualificata (QES / Token SmartCard / SPID)',
                           desc: 'Il cliente appone la propria firma qualificata tramite dispositivo personale (Aruba, InfoCert, Namirial, SPID) e carica il file .p7m.',
                           tag: 'ALTA SICUREZZA',
-                          tagColor: '#818cf8',
+                          tagColor: 'var(--indigo-l)',
                         },
                         {
                           id: 'tutte' as const,
@@ -188,14 +188,14 @@ export function ModaleConfigFirma({
                           titolo: 'Tutte le modalità abilitate (Scelta libera del Cliente)',
                           desc: 'Il cliente potrà scegliere in autonomia la modalità di sottoscrizione preferita direttamente dal Portale.',
                           tag: 'FLESSIBILE',
-                          tagColor: '#f59e0b',
+                          tagColor: 'var(--amber)',
                         },
                       ].map((m) => (
                         <div
                           key={m.id}
                           onClick={() => setConfigFirmaModal({ ...configFirmaModal, metodoFirma: m.id })}
                           style={{
-                            background: configFirmaModal.metodoFirma === m.id ? '#1e1b4b' : 'var(--card)',
+                            background: configFirmaModal.metodoFirma === m.id ? 'var(--pill-indigo-bg)' : 'var(--card)',
                             border: `1.5px solid ${configFirmaModal.metodoFirma === m.id ? 'var(--indigo)' : 'var(--border)'}`,
                             borderRadius: 10, padding: '10px 14px', cursor: 'pointer', display: 'flex', alignItems: 'flex-start', gap: 12,
                             transition: 'all 0.15s ease'
@@ -204,7 +204,7 @@ export function ModaleConfigFirma({
                           <span style={{ fontSize: 20 }}>{m.icon}</span>
                           <div style={{ flex: 1 }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <span style={{ fontSize: 12, fontWeight: 700, color: configFirmaModal.metodoFirma === m.id ? '#c7d2fe' : 'var(--text)' }}>
+                              <span style={{ fontSize: 12, fontWeight: 700, color: configFirmaModal.metodoFirma === m.id ? 'var(--pill-indigo-fg)' : 'var(--text)' }}>
                                 {m.titolo}
                               </span>
                               <span style={{ fontSize: 9, fontWeight: 800, padding: '2px 6px', borderRadius: 6, background: '#00000040', color: m.tagColor, border: `1px solid ${m.tagColor}40` }}>
@@ -231,13 +231,13 @@ export function ModaleConfigFirma({
                       type="button"
                       onClick={() => setConfigFirmaModal({ ...configFirmaModal, statoDoc: 'bozza' })}
                       style={{
-                        background: configFirmaModal.statoDoc === 'bozza' ? '#2d1a05' : 'var(--card)',
-                        border: `1.5px solid ${configFirmaModal.statoDoc === 'bozza' ? '#f59e0b' : 'var(--border)'}`,
+                        background: configFirmaModal.statoDoc === 'bozza' ? 'var(--pill-amber-bg)' : 'var(--card)',
+                        border: `1.5px solid ${configFirmaModal.statoDoc === 'bozza' ? 'var(--amber)' : 'var(--border)'}`,
                         borderRadius: 10, padding: '10px 12px', textAlign: 'left', cursor: 'pointer',
                         display: 'flex', flexDirection: 'column', gap: 3
                       }}
                     >
-                      <div style={{ fontSize: 12, fontWeight: 700, color: configFirmaModal.statoDoc === 'bozza' ? '#fcd34d' : 'var(--text)' }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: configFirmaModal.statoDoc === 'bozza' ? 'var(--pill-amber-fg)' : 'var(--text)' }}>
                         🔒 Bozza Interna
                       </div>
                       <div style={{ fontSize: 10, color: 'var(--muted)', lineHeight: 1.3 }}>
@@ -249,13 +249,13 @@ export function ModaleConfigFirma({
                       type="button"
                       onClick={() => setConfigFirmaModal({ ...configFirmaModal, statoDoc: 'pubblicato' })}
                       style={{
-                        background: configFirmaModal.statoDoc === 'pubblicato' ? '#064e3b' : 'var(--card)',
-                        border: `1.5px solid ${configFirmaModal.statoDoc === 'pubblicato' ? '#10b981' : 'var(--border)'}`,
+                        background: configFirmaModal.statoDoc === 'pubblicato' ? 'var(--pill-green-bg)' : 'var(--card)',
+                        border: `1.5px solid ${configFirmaModal.statoDoc === 'pubblicato' ? 'var(--green)' : 'var(--border)'}`,
                         borderRadius: 10, padding: '10px 12px', textAlign: 'left', cursor: 'pointer',
                         display: 'flex', flexDirection: 'column', gap: 3
                       }}
                     >
-                      <div style={{ fontSize: 12, fontWeight: 700, color: configFirmaModal.statoDoc === 'pubblicato' ? '#6ee7b7' : 'var(--text)' }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: configFirmaModal.statoDoc === 'pubblicato' ? 'var(--pill-green-fg)' : 'var(--text)' }}>
                         🚀 Pubblica Subito
                       </div>
                       <div style={{ fontSize: 10, color: 'var(--muted)', lineHeight: 1.3 }}>

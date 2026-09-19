@@ -699,7 +699,7 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
             </div>
 
             {/* Viewer iframe o messaggio */}
-            <div style={{ flex: 1, overflow: 'hidden', padding: 16, background: '#0f172a', display: 'flex', justifyContent: 'center', minHeight: 460 }}>
+            <div style={{ flex: 1, overflow: 'hidden', padding: 16, background: 'var(--surface-2)', display: 'flex', justifyContent: 'center', minHeight: 460 }}>
               {(() => {
                 const url = urlFileArchivio(selectedDocPreview.fileUrl);
                 if (!url) {
@@ -727,7 +727,7 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
                     <button
                       type="button"
                       onClick={() => scaricaDocumentoClient(selectedDocPreview.fileFirmatoUrl || selectedDocPreview.filePdfUrl || selectedDocPreview.fileUrl, selectedDocPreview.nome)}
-                      style={{ background: '#0d2d22', border: '1px solid #059669', color: '#34d399', padding: '7px 14px', borderRadius: 8, fontSize: 11.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+                      style={{ background: 'var(--pill-green-bg)', border: '1px solid var(--green)', color: 'var(--green)', padding: '7px 14px', borderRadius: 8, fontSize: 11.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
                     >
                       {selectedDocPreview.firmato ? '📥 Scarica PDF Firmato' : '📥 Scarica PDF A4'}
                     </button>
@@ -736,7 +736,7 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
                       onClick={() => (selectedDocPreview.fileDocxUrl
                         ? scaricaDocumentoClient(selectedDocPreview.fileDocxUrl, selectedDocPreview.nome.replace(/\.(pdf|docx?)$/i, '') + '.docx')
                         : scaricaDocumentoWordClient(selectedDocPreview.fileUrl, selectedDocPreview.nome))}
-                      style={{ background: '#1e1b4b', border: '1px solid #3b82f6', color: '#93c5fd', padding: '7px 14px', borderRadius: 8, fontSize: 11.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+                      style={{ background: 'var(--pill-indigo-bg)', border: '1px solid var(--indigo-l)', color: 'var(--pill-blue-fg)', padding: '7px 14px', borderRadius: 8, fontSize: 11.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
                     >
                       📝 Scarica Word (.doc)
                     </button>

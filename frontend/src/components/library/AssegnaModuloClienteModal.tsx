@@ -208,11 +208,11 @@ export function AssegnaModuloClienteModal({
 
         {/* Controllo Anti-Duplicazione Live */}
         {selectedProjectId !== 'new' && (
-          <div style={{ background: hasDuplicates ? '#2d1a05' : '#0d2d22', border: `1px solid ${hasDuplicates ? '#f59e0b' : '#1a5c3c'}`, borderRadius: 10, padding: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <div style={{ fontSize: 11.5, fontWeight: 700, color: hasDuplicates ? '#f59e0b' : '#34d399' }}>
+          <div style={{ background: hasDuplicates ? 'var(--pill-amber-bg)' : 'var(--pill-green-bg)', border: `1px solid ${hasDuplicates ? 'var(--amber)' : 'var(--pill-green-bg)'}`, borderRadius: 10, padding: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div style={{ fontSize: 11.5, fontWeight: 700, color: hasDuplicates ? 'var(--amber)' : 'var(--green)' }}>
               {hasDuplicates ? '⚠️ Controllo Anti-Duplicazione: Rilevati Articoli Già Lavorati' : '✓ Nessun Doppione Rilevato'}
             </div>
-            <div style={{ fontSize: 11, color: hasDuplicates ? '#fef3c7' : '#a7f3d0', lineHeight: 1.4 }}>
+            <div style={{ fontSize: 11, color: hasDuplicates ? 'var(--pill-amber-bg)' : 'var(--pill-green-fg)', lineHeight: 1.4 }}>
               {hasDuplicates
                 ? 'Gli articoli già ultimati nel progetto non verranno duplicati. Saranno segnati come già validati a 0 ore per evitare di far rifare il lavoro.'
                 : 'Tutti gli articoli della distinta base verranno integrati nel nuovo modulo del cliente.'}
@@ -221,7 +221,7 @@ export function AssegnaModuloClienteModal({
             {duplicationReport.length > 0 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4 }}>
                 {duplicationReport.map((d, idx) => (
-                  <div key={idx} style={{ fontSize: 10.5, display: 'flex', justifyContent: 'space-between', color: d.isDuplicate ? '#fde68a' : '#d1fae5' }}>
+                  <div key={idx} style={{ fontSize: 10.5, display: 'flex', justifyContent: 'space-between', color: d.isDuplicate ? 'var(--pill-amber-fg)' : 'var(--pill-green-bg)' }}>
                     <span>• {d.name}</span>
                     <span style={{ fontWeight: 700 }}>{d.isDuplicate ? `✓ Già lavorato (${d.status})` : '➕ Nuovo'}</span>
                   </div>

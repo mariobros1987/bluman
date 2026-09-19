@@ -74,9 +74,9 @@ export function RedditivitaTab({
   // Semaforo Alert
   const semaforoStato = marginePercentuale >= 50 ? 'green' : marginePercentuale >= 20 ? 'yellow' : 'red';
   const semaforoText = semaforoStato === 'green' ? '🟢 Margine Ottimale (>50%)' : semaforoStato === 'yellow' ? '🟡 Margine in Linea (20% - 50%)' : '🔴 Attenzione: Sforamento Budget';
-  const semaforoBg = semaforoStato === 'green' ? '#0d2d22' : semaforoStato === 'yellow' ? '#2d1a05' : '#3b1c1c';
-  const semaforoBorder = semaforoStato === 'green' ? '#059669' : semaforoStato === 'yellow' ? '#d97706' : '#ef4444';
-  const semaforoColor = semaforoStato === 'green' ? '#34d399' : semaforoStato === 'yellow' ? '#f59e0b' : '#f87171';
+  const semaforoBg = semaforoStato === 'green' ? 'var(--pill-green-bg)' : semaforoStato === 'yellow' ? 'var(--pill-amber-bg)' : 'var(--pill-red-bg)';
+  const semaforoBorder = semaforoStato === 'green' ? 'var(--green)' : semaforoStato === 'yellow' ? 'var(--amber)' : 'var(--red)';
+  const semaforoColor = semaforoStato === 'green' ? 'var(--green)' : semaforoStato === 'yellow' ? 'var(--amber)' : 'var(--pill-red-fg)';
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -136,20 +136,20 @@ export function RedditivitaTab({
         <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 14, padding: 16 }}>
           <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 700 }}>💶 Valore Incarico Forfait</div>
           <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--text)', marginTop: 4 }}>{fmt(valoreTotale)}</div>
-          <div style={{ fontSize: 10, color: '#34d399', marginTop: 2 }}>✓ Concordato a contrattazione</div>
+          <div style={{ fontSize: 10, color: 'var(--green)', marginTop: 2 }}>✓ Concordato a contrattazione</div>
         </div>
 
         <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 14, padding: 16 }}>
           <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 700 }}>⏱ Ore Consuntivate / Stimate</div>
-          <div style={{ fontSize: 22, fontWeight: 800, color: '#818cf8', marginTop: 4 }}>{oreConsuntivateTot.toFixed(1)}h <span style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 500 }}>/ {oreStimateTot}h</span></div>
-          <div style={{ fontSize: 10, color: oreConsuntivateTot <= oreStimateTot ? '#34d399' : '#f59e0b', marginTop: 2 }}>
+          <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--indigo-l)', marginTop: 4 }}>{oreConsuntivateTot.toFixed(1)}h <span style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 500 }}>/ {oreStimateTot}h</span></div>
+          <div style={{ fontSize: 10, color: oreConsuntivateTot <= oreStimateTot ? 'var(--green)' : 'var(--amber)', marginTop: 2 }}>
             {oreConsuntivateTot <= oreStimateTot ? '✓ In linea con la stima' : '⚠️ Sforamento monte ore'}
           </div>
         </div>
 
         <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 14, padding: 16 }}>
           <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 700 }}>🏦 Margine Lordo Commessa</div>
-          <div style={{ fontSize: 22, fontWeight: 800, color: margineLordo >= 0 ? '#34d399' : '#ef4444', marginTop: 4 }}>
+          <div style={{ fontSize: 22, fontWeight: 800, color: margineLordo >= 0 ? 'var(--green)' : 'var(--red)', marginTop: 4 }}>
             {fmt(margineLordo)} <span style={{ fontSize: 13, fontWeight: 600 }}>({marginePercentuale.toFixed(1)}%)</span>
           </div>
           <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>Costo Lavoro Studio: {fmt(costoOperativoStudioReale)}</div>
@@ -157,8 +157,8 @@ export function RedditivitaTab({
 
         <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 14, padding: 16 }}>
           <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 700 }}>⚡ Resa Oraria Effettiva</div>
-          <div style={{ fontSize: 22, fontWeight: 800, color: '#fbbf24', marginTop: 4 }}>{fmt(resaOrariaStudio)} / h</div>
-          <div style={{ fontSize: 10, color: '#34d399', marginTop: 2 }}>Target Studio: € 200 / h</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--amber)', marginTop: 4 }}>{fmt(resaOrariaStudio)} / h</div>
+          <div style={{ fontSize: 10, color: 'var(--green)', marginTop: 2 }}>Target Studio: € 200 / h</div>
         </div>
       </div>
 
@@ -204,10 +204,10 @@ export function RedditivitaTab({
                     <td style={{ padding: '10px 12px', fontWeight: 600 }}>
                       € {info.rate},00 / h
                     </td>
-                    <td style={{ padding: '10px 12px', fontWeight: 700, color: '#818cf8' }}>
+                    <td style={{ padding: '10px 12px', fontWeight: 700, color: 'var(--indigo-l)' }}>
                       {data.hours.toFixed(1)} h
                     </td>
-                    <td style={{ padding: '10px 12px', fontWeight: 700, color: '#34d399' }}>
+                    <td style={{ padding: '10px 12px', fontWeight: 700, color: 'var(--green)' }}>
                       € {data.cost.toFixed(2)}
                     </td>
                   </tr>
@@ -272,16 +272,16 @@ export function RedditivitaTab({
                       {fmt(modP)}
                     </td>
                     <td style={{ padding: '12px' }}>
-                      <span style={{ fontWeight: 700, color: '#818cf8' }}>{modH_Reali.toFixed(1)}h</span>
+                      <span style={{ fontWeight: 700, color: 'var(--indigo-l)' }}>{modH_Reali.toFixed(1)}h</span>
                       <span style={{ color: 'var(--muted)', fontSize: 10 }}> / {modH_Stima}h</span>
                     </td>
                     <td style={{ padding: '12px', color: 'var(--muted)' }}>
                       {fmt(modCostoStudio)}
                     </td>
-                    <td style={{ padding: '12px', fontWeight: 700, color: modMargine >= 0 ? '#34d399' : '#ef4444' }}>
+                    <td style={{ padding: '12px', fontWeight: 700, color: modMargine >= 0 ? 'var(--green)' : 'var(--red)' }}>
                       {calcolabile ? fmt(modMargine) : '—'}
                     </td>
-                    <td style={{ padding: '12px', fontWeight: 800, color: '#fbbf24' }}>
+                    <td style={{ padding: '12px', fontWeight: 800, color: 'var(--amber)' }}>
                       {modResa !== null ? `${fmt(modResa)} / h` : '—'}
                     </td>
                     <td style={{ padding: '12px' }}>
@@ -290,7 +290,7 @@ export function RedditivitaTab({
                           ⚪ Nessuna ora consuntivata
                         </span>
                       ) : (
-                        <span style={{ fontSize: 9.5, background: isProfit ? '#0d2d22' : '#2d1a05', color: isProfit ? '#34d399' : '#f59e0b', border: `1px solid ${isProfit ? '#059669' : '#d97706'}`, padding: '2px 8px', borderRadius: 12, fontWeight: 700 }}>
+                        <span style={{ fontSize: 9.5, background: isProfit ? 'var(--pill-green-bg)' : 'var(--pill-amber-bg)', color: isProfit ? 'var(--green)' : 'var(--amber)', border: `1px solid ${isProfit ? 'var(--green)' : 'var(--amber)'}`, padding: '2px 8px', borderRadius: 12, fontWeight: 700 }}>
                           {isProfit ? '🟢 In Utile Extra' : '🟡 In Target'}
                         </span>
                       )}

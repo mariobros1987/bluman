@@ -154,11 +154,11 @@ export const FornitoriPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="card" style={{ padding: '18px 20px', borderLeft: '4px solid #10b981' }}>
+        <div className="card" style={{ padding: '18px 20px', borderLeft: '4px solid var(--green)' }}>
           <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
             IVA a Credito Detraibile
           </div>
-          <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#10b981', marginTop: '4px' }}>
+          <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--green)', marginTop: '4px' }}>
             €{(totaleIvaDetraibileCent / 100).toLocaleString('it-IT', { minimumFractionDigits: 2 })}
           </div>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>
@@ -166,11 +166,11 @@ export const FornitoriPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="card" style={{ padding: '18px 20px', borderLeft: '4px solid #ef4444' }}>
+        <div className="card" style={{ padding: '18px 20px', borderLeft: '4px solid var(--red)' }}>
           <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
             Fatture da Saldare (Aperte)
           </div>
-          <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#ef4444', marginTop: '4px' }}>
+          <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--red)', marginTop: '4px' }}>
             €{(totaleApertoCent / 100).toLocaleString('it-IT', { minimumFractionDigits: 2 })}
           </div>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>
@@ -178,11 +178,11 @@ export const FornitoriPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="card" style={{ padding: '18px 20px', borderLeft: '4px solid #6366f1' }}>
+        <div className="card" style={{ padding: '18px 20px', borderLeft: '4px solid var(--indigo)' }}>
           <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
             Fornitori in Anagrafica
           </div>
-          <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#6366f1', marginTop: '4px' }}>
+          <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--indigo)', marginTop: '4px' }}>
             {fornitori.length}
           </div>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>
@@ -308,7 +308,7 @@ export const FornitoriPage: React.FC = () => {
                         <td style={{ padding: '12px 14px', textAlign: 'right' }}>
                           €{(f.imponibileCentesimi / 100).toLocaleString('it-IT', { minimumFractionDigits: 2 })}
                         </td>
-                        <td style={{ padding: '12px 14px', textAlign: 'right', color: '#10b981', fontWeight: 600 }}>
+                        <td style={{ padding: '12px 14px', textAlign: 'right', color: 'var(--green)', fontWeight: 600 }}>
                           €{(f.ivaCentesimi / 100).toLocaleString('it-IT', { minimumFractionDigits: 2 })}
                         </td>
                         <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: 800, fontSize: '1rem' }}>
@@ -321,7 +321,7 @@ export const FornitoriPage: React.FC = () => {
                                 padding: '4px 10px',
                                 borderRadius: '6px',
                                 background: 'rgba(16, 185, 129, 0.15)',
-                                color: '#10b981',
+                                color: 'var(--green)',
                                 fontWeight: 700,
                                 fontSize: '0.8rem',
                               }}
@@ -334,7 +334,7 @@ export const FornitoriPage: React.FC = () => {
                                 padding: '4px 10px',
                                 borderRadius: '6px',
                                 background: 'rgba(239, 68, 68, 0.15)',
-                                color: '#ef4444',
+                                color: 'var(--red)',
                                 fontWeight: 700,
                                 fontSize: '0.8rem',
                               }}
@@ -445,7 +445,7 @@ export const FornitoriPage: React.FC = () => {
                               type="button"
                               className="btn btn-sm"
                               onClick={() => handleEliminaFornitore(forn.id, forn.ragioneSociale)}
-                              style={{ color: '#ef4444', background: 'transparent', border: 'none', cursor: 'pointer' }}
+                              style={{ color: 'var(--red)', background: 'transparent', border: 'none', cursor: 'pointer' }}
                               title="Elimina Fornitore"
                             >
                               🗑️

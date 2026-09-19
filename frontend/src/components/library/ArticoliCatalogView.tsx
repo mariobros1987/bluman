@@ -42,9 +42,9 @@ export function ArticoliCatalogView({ articoliList, onOpenNew, onDisattiva }: { 
       categoria: (editingArt?.cat.toLowerCase() as any) || 'societario',
       descrizione: `Modello Word personalizzato creato per la prestazione "${editName}".`,
       contenutoHtml: `
-<h1 style="text-align: center; color: #1e1b4b; font-size: 18px; margin-bottom: 20px;">${title.trim().toUpperCase()}</h1>
-<p style="text-align: right; color: #64748b; font-size: 11px;"><strong>Data:</strong> {{data_odierna}} | <strong>Pratica:</strong> {{progetto.titolo}}</p>
-<div style="background: #f8fafc; border-left: 4px solid #4338ca; padding: 12px; margin: 20px 0; font-size: 11.5px;">
+<h1 style="text-align: center; color: var(--pill-indigo-bg); font-size: 18px; margin-bottom: 20px;">${title.trim().toUpperCase()}</h1>
+<p style="text-align: right; color: var(--muted); font-size: 11px;"><strong>Data:</strong> {{data_odierna}} | <strong>Pratica:</strong> {{progetto.titolo}}</p>
+<div style="background: var(--pill-sky-fg); border-left: 4px solid var(--indigo-d); padding: 12px; margin: 20px 0; font-size: 11.5px;">
   <strong>Cliente:</strong> {{cliente.ragione_sociale}} (P.IVA {{cliente.partita_iva}})<br/>
   <strong>Studio:</strong> {{studio.ragione_sociale}}
 </div>
@@ -161,7 +161,7 @@ export function ArticoliCatalogView({ articoliList, onOpenNew, onDisattiva }: { 
       {/* Bar KPI & Toolbar */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
         <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 14, padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 14, boxShadow: '0 4px 20px rgba(0,0,0,.2)' }}>
-          <div style={{ width: 42, height: 42, borderRadius: 12, background: '#1a1f3d', color: '#818cf8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>🧩</div>
+          <div style={{ width: 42, height: 42, borderRadius: 12, background: 'var(--pill-indigo-bg)', color: 'var(--pill-indigo-fg)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>🧩</div>
           <div>
             <div style={{ fontSize: 11, color: 'var(--muted)' }}>Totale Articoli in Libreria</div>
             <div style={{ fontSize: 18, fontWeight: 800, marginTop: 2 }}>{articoliList.length} Prestazioni</div>
@@ -169,7 +169,7 @@ export function ArticoliCatalogView({ articoliList, onOpenNew, onDisattiva }: { 
         </div>
 
         <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 14, padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 14, boxShadow: '0 4px 20px rgba(0,0,0,.2)' }}>
-          <div style={{ width: 42, height: 42, borderRadius: 12, background: '#200f40', color: '#a78bfa', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>⏱</div>
+          <div style={{ width: 42, height: 42, borderRadius: 12, background: 'var(--pill-indigo-bg)', color: 'var(--purple)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>⏱</div>
           <div>
             <div style={{ fontSize: 11, color: 'var(--muted)' }}>Monte Ore operative stimate</div>
             <div style={{ fontSize: 18, fontWeight: 800, marginTop: 2 }}>{totalOre}h Complessive</div>
@@ -177,7 +177,7 @@ export function ArticoliCatalogView({ articoliList, onOpenNew, onDisattiva }: { 
         </div>
 
         <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 14, padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 14, boxShadow: '0 4px 20px rgba(0,0,0,.2)' }}>
-          <div style={{ width: 42, height: 42, borderRadius: 12, background: '#0d2d22', color: '#34d399', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>💶</div>
+          <div style={{ width: 42, height: 42, borderRadius: 12, background: 'var(--pill-green-bg)', color: 'var(--pill-green-fg)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>💶</div>
           <div>
             <div style={{ fontSize: 11, color: 'var(--muted)' }}>Valore Medio Prestazione</div>
             <div style={{ fontSize: 18, fontWeight: 800, marginTop: 2 }}>{fmt(avgPrezzo)}</div>
@@ -195,7 +195,7 @@ export function ArticoliCatalogView({ articoliList, onOpenNew, onDisattiva }: { 
               onClick={() => setSelectedCat(c)}
               style={{
                 background: selectedCat === c ? 'var(--indigo)' : 'var(--card2)',
-                color: selectedCat === c ? '#fff' : 'var(--muted)',
+                color: selectedCat === c ? 'var(--on-accent)' : 'var(--muted)',
                 border: `1px solid ${selectedCat === c ? 'var(--indigo-l)' : 'var(--border)'}`,
                 padding: '6px 12px',
                 borderRadius: 20,
@@ -252,18 +252,18 @@ export function ArticoliCatalogView({ articoliList, onOpenNew, onDisattiva }: { 
                   <button
                     onClick={() => handleStartEdit(a)}
                     title="Modifica Prezzo, Ore e Documenti Allacciati"
-                    style={{ background: '#1a1f3d', border: '1px solid #2d3260', color: '#818cf8', padding: '3px 9px', borderRadius: 6, fontSize: 11, cursor: 'pointer', fontWeight: 700 }}
+                    style={{ background: 'var(--surface-1)', border: '1px solid var(--card2)', color: 'var(--indigo-l)', padding: '3px 9px', borderRadius: 6, fontSize: 11, cursor: 'pointer', fontWeight: 700 }}
                   >
                     ✏️ Modifica
                   </button>
                   <button
                     onClick={() => onDisattiva(a.id, a.n)}
                     title="§30 — Disattivazione: sparisce dal catalogo, distinte e progetti esistenti restano validi"
-                    style={{ background: '#2a1218', border: '1px solid #5b2130', color: '#f87171', padding: '3px 9px', borderRadius: 6, fontSize: 11, cursor: 'pointer', fontWeight: 700 }}
+                    style={{ background: 'var(--pill-red-bg)', border: '1px solid var(--pill-red-bg)', color: 'var(--pill-red-fg)', padding: '3px 9px', borderRadius: 6, fontSize: 11, cursor: 'pointer', fontWeight: 700 }}
                   >
                     🗑
                   </button>
-                  <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--indigo-l)', background: '#1a1f3d', border: '1px solid #2d3260', padding: '2px 8px', borderRadius: 20 }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--indigo-l)', background: 'var(--surface-1)', border: '1px solid var(--card2)', padding: '2px 8px', borderRadius: 20 }}>
                     v{a.ver || 1}.0
                   </span>
                 </div>
@@ -278,7 +278,7 @@ export function ArticoliCatalogView({ articoliList, onOpenNew, onDisattiva }: { 
                         key={mId}
                         onClick={() => navigate(`/documents?tmplId=${mId}`)}
                         title="Clicca per aprire in Document Studio (Word)"
-                        style={{ background: '#1a1f3d', color: '#818cf8', padding: '2px 7px', borderRadius: 6, fontSize: 9.5, fontWeight: 700, border: '1px solid #3730a3', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                        style={{ background: 'var(--surface-1)', color: 'var(--indigo-l)', padding: '2px 7px', borderRadius: 6, fontSize: 9.5, fontWeight: 700, border: '1px solid var(--indigo-d)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
                       >
                         <span>📎 {resolveTemplateName(mId)}</span>
                         <span style={{ fontSize: 8.5, opacity: 0.8 }}>↗</span>
@@ -292,7 +292,7 @@ export function ArticoliCatalogView({ articoliList, onOpenNew, onDisattiva }: { 
                 <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                   <span style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 600 }}>📋 Form Cliente:</span>
                   {a.formMasterId ? (
-                    <span style={{ background: '#200f40', color: '#a78bfa', padding: '2px 6px', borderRadius: 6, fontSize: 9.5, fontWeight: 700, border: '1px solid #581c87' }}>
+                    <span style={{ background: 'var(--pill-indigo-bg)', color: 'var(--purple)', padding: '2px 6px', borderRadius: 6, fontSize: 9.5, fontWeight: 700, border: '1px solid var(--pill-purple-bg)' }}>
                       {a.formMasterId === 'f1' ? 'Form Dati Societari' : a.formMasterId === 'f2' ? 'Form UBO & Controllo' : 'Form Dati Bancari & KYC'}
                     </span>
                   ) : (
@@ -332,7 +332,7 @@ export function ArticoliCatalogView({ articoliList, onOpenNew, onDisattiva }: { 
             <div style={{ display: 'flex', gap: 12 }}>
               <div style={{ flex: 1 }}>
                 <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Prezzo Listino (€) *</label>
-                <input type="number" value={editPrice} onChange={e => setEditPrice(Number(e.target.value))} min={0} step={50} required style={{ fontSize: 13, fontWeight: 700, color: '#34d399' }} />
+                <input type="number" value={editPrice} onChange={e => setEditPrice(Number(e.target.value))} min={0} step={50} required style={{ fontSize: 13, fontWeight: 700, color: 'var(--green)' }} />
               </div>
               <div style={{ flex: 1 }}>
                 <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Ore Stimate (h) *</label>
@@ -367,7 +367,7 @@ export function ArticoliCatalogView({ articoliList, onOpenNew, onDisattiva }: { 
                   <button
                     type="button"
                     onClick={() => editArtFileImportRef.current?.click()}
-                    style={{ background: '#1e1b4b', color: '#818cf8', border: '1px solid #4338ca', padding: '4px 8px', borderRadius: 6, fontSize: 10.5, fontWeight: 700, cursor: 'pointer' }}
+                    style={{ background: 'var(--pill-indigo-bg)', color: 'var(--indigo-l)', border: '1px solid var(--indigo-d)', padding: '4px 8px', borderRadius: 6, fontSize: 10.5, fontWeight: 700, cursor: 'pointer' }}
                     title="Importa file .docx, .pdf, .html o .json dal tuo computer"
                   >
                     📁 Importa da PC
@@ -389,7 +389,7 @@ export function ArticoliCatalogView({ articoliList, onOpenNew, onDisattiva }: { 
                 {/* §41 — se la lettura dal server non è riuscita l'elenco può essere incompleto:
                     si dice, invece di far passare i modelli di serie per la libreria dello studio. */}
                 {cartella.erroreLettura && (
-                  <div style={{ fontSize: 10, color: '#fca5a5', background: '#2a1218', border: '1px solid #5b2130', borderRadius: 6, padding: '4px 6px' }}>
+                  <div style={{ fontSize: 10, color: 'var(--pill-red-fg)', background: 'var(--pill-red-bg)', border: '1px solid var(--pill-red-bg)', borderRadius: 6, padding: '4px 6px' }}>
                     ⚠️ Elenco possibilmente incompleto: {cartella.erroreLettura}
                   </div>
                 )}
@@ -410,7 +410,7 @@ export function ArticoliCatalogView({ articoliList, onOpenNew, onDisattiva }: { 
                         padding: '4px 6px',
                         borderRadius: 6,
                         background: checked ? 'rgba(99, 102, 241, 0.12)' : 'transparent',
-                        color: checked ? '#a5b4fc' : 'var(--text)',
+                        color: checked ? 'var(--pill-indigo-fg)' : 'var(--text)',
                       }}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden' }}>

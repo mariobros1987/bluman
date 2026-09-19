@@ -308,7 +308,7 @@ export function QuickTimeTracker({ user }: TimeTrackerProps) {
   };
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--card2)', border: `1.5px solid ${isRunning ? '#6366f1' : 'var(--border)'}`, borderRadius: 24, padding: '3px 8px', boxShadow: isRunning ? '0 0 14px rgba(99,102,241,0.3)' : 'none', transition: 'all 0.2s ease' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--card2)', border: `1.5px solid ${isRunning ? 'var(--indigo)' : 'var(--border)'}`, borderRadius: 24, padding: '3px 8px', boxShadow: isRunning ? '0 0 14px rgba(99,102,241,0.3)' : 'none', transition: 'all 0.2s ease' }}>
       {/* Indicatore Stopwatch */}
       <span style={{ fontSize: 13, display: 'flex', alignItems: 'center' }}>
         {isRunning ? '⏱️' : '⏳'}
@@ -362,7 +362,7 @@ export function QuickTimeTracker({ user }: TimeTrackerProps) {
       )}
 
       {/* Display Tempo Digitale */}
-      <div style={{ fontFamily: 'monospace', fontSize: 12, fontWeight: 800, color: isRunning ? '#818cf8' : 'var(--text)', letterSpacing: 0.5, minWidth: 55, textAlign: 'center' }}>
+      <div style={{ fontFamily: 'monospace', fontSize: 12, fontWeight: 800, color: isRunning ? 'var(--indigo-l)' : 'var(--text)', letterSpacing: 0.5, minWidth: 55, textAlign: 'center' }}>
         {formatTime(seconds)}
       </div>
 
@@ -371,7 +371,7 @@ export function QuickTimeTracker({ user }: TimeTrackerProps) {
         <button
           type="button"
           onClick={handleStart}
-          style={{ background: '#059669', color: '#fff', border: 'none', borderRadius: '50%', width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, cursor: 'pointer' }}
+          style={{ background: 'var(--green)', color: '#fff', border: 'none', borderRadius: '50%', width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, cursor: 'pointer' }}
           title="Avvia Time Tracker"
         >
           ▶
@@ -380,7 +380,7 @@ export function QuickTimeTracker({ user }: TimeTrackerProps) {
         <button
           type="button"
           onClick={handlePause}
-          style={{ background: '#f59e0b', color: '#fff', border: 'none', borderRadius: '50%', width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, cursor: 'pointer' }}
+          style={{ background: 'var(--amber)', color: '#fff', border: 'none', borderRadius: '50%', width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, cursor: 'pointer' }}
           title="Pausa Timer"
         >
           ⏸
@@ -391,7 +391,7 @@ export function QuickTimeTracker({ user }: TimeTrackerProps) {
         <button
           type="button"
           onClick={handleStop}
-          style={{ background: '#ef4444', color: '#fff', border: 'none', borderRadius: '50%', width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, cursor: 'pointer' }}
+          style={{ background: 'var(--red)', color: '#fff', border: 'none', borderRadius: '50%', width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, cursor: 'pointer' }}
           title="Ferma e Registra Ore"
         >
           ⏹
@@ -411,13 +411,13 @@ export function QuickTimeTracker({ user }: TimeTrackerProps) {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, fontSize: 12 }}>
                 <div>
                   <div style={{ color: 'var(--muted)', fontSize: 10 }}>TEMPO REGISTRATO</div>
-                  <div style={{ fontSize: 18, fontWeight: 800, color: '#818cf8', marginTop: 2 }}>{formatTime(seconds)} <span style={{ fontSize: 11, fontWeight: 500 }}>({hoursSpentDecimal}h)</span></div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--indigo-l)', marginTop: 2 }}>{formatTime(seconds)} <span style={{ fontSize: 11, fontWeight: 500 }}>({hoursSpentDecimal}h)</span></div>
                 </div>
                 <div>
                   <div style={{ color: 'var(--muted)', fontSize: 10 }}>COSTO LAVORO</div>
                   {/* Regola 7: nessun costo calcolato con tariffe inventate per id operatore;
                       il server non espone una tariffa oraria, quindi il dato è dichiarato n/d. */}
-                  <div style={{ fontSize: 18, fontWeight: 800, color: '#34d399', marginTop: 2 }}>n/d</div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--green)', marginTop: 2 }}>n/d</div>
                 </div>
               </div>
               <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 8 }}>
@@ -443,7 +443,7 @@ export function QuickTimeTracker({ user }: TimeTrackerProps) {
                     ))}
                   </select>
                 ) : (
-                  <div style={{ fontSize: 11, color: '#ef4444' }}>Nessuna pratica presente</div>
+                  <div style={{ fontSize: 11, color: 'var(--red)' }}>Nessuna pratica presente</div>
                 )}
               </div>
 

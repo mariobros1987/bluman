@@ -276,7 +276,7 @@ export function Projects() {
           <div>
             <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 10 }}>
               <span>📁 Registro Pratiche & Fascicoli Studio</span>
-              <span style={{ fontSize: 11, background: '#1e1b4b', color: '#818cf8', padding: '3px 8px', borderRadius: 6, fontWeight: 700 }}>
+              <span style={{ fontSize: 11, background: 'var(--pill-indigo-bg)', color: 'var(--pill-indigo-fg)', padding: '3px 8px', borderRadius: 6, fontWeight: 700 }}>
                 OPERATOR HUB
               </span>
             </div>
@@ -295,7 +295,7 @@ export function Projects() {
             <button
               id="btn-nuovo-progetto"
               onClick={() => setWizardOpen(true)}
-              style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '8px 18px', borderRadius: 8, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 14px rgba(99,102,241,.3)', display: 'flex', alignItems: 'center', gap: 6 }}
+              style={{ background: 'var(--indigo)', color: 'var(--on-accent)', border: 'none', padding: '8px 18px', borderRadius: 8, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 14px rgba(99,102,241,.3)', display: 'flex', alignItems: 'center', gap: 6 }}
             >
               <span>+ Nuovo Progetto Incarico</span>
             </button>
@@ -313,14 +313,14 @@ export function Projects() {
 
           <div style={{ background: 'var(--card2)', padding: '12px 14px', borderRadius: 10, border: '1px solid var(--border)' }}>
             <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>⏱ Consuntivo Ore (pagina corrente)</div>
-            <div style={{ fontSize: 18, fontWeight: 800, color: '#818cf8', marginTop: 4 }}>
+            <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--indigo-l)', marginTop: 4 }}>
               {totalOreConsuntivate.toFixed(1)}h <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 500 }}>/ {totalOrePreventivate}h stimate</span>
             </div>
           </div>
 
           <div style={{ background: 'var(--card2)', padding: '12px 14px', borderRadius: 10, border: '1px solid var(--border)' }}>
             <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>📋 Checklist Microvoci (pagina corrente)</div>
-            <div style={{ fontSize: 18, fontWeight: 800, color: '#34d399', marginTop: 4 }}>
+            <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--green)', marginTop: 4 }}>
               {totalMicrovociDone} <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 500 }}>/ {totalMicrovociCount} step eseguiti</span>
             </div>
           </div>
@@ -332,9 +332,9 @@ export function Projects() {
             </div>
           </div>
 
-          <div style={{ background: delayedProjects > 0 ? 'rgba(239, 68, 68, 0.1)' : 'var(--card2)', padding: '12px 14px', borderRadius: 10, border: `1px solid ${delayedProjects > 0 ? '#ef4444' : 'var(--border)'}` }}>
-            <div style={{ fontSize: 11, color: delayedProjects > 0 ? '#f87171' : 'var(--muted)', fontWeight: 600 }}>⚠️ Alert Ritardi (pagina corrente)</div>
-            <div style={{ fontSize: 18, fontWeight: 800, color: delayedProjects > 0 ? '#f87171' : 'var(--text)', marginTop: 4 }}>
+          <div style={{ background: delayedProjects > 0 ? 'rgba(239, 68, 68, 0.1)' : 'var(--card2)', padding: '12px 14px', borderRadius: 10, border: `1px solid ${delayedProjects > 0 ? 'var(--red)' : 'var(--border)'}` }}>
+            <div style={{ fontSize: 11, color: delayedProjects > 0 ? 'var(--red)' : 'var(--muted)', fontWeight: 600 }}>⚠️ Alert Ritardi (pagina corrente)</div>
+            <div style={{ fontSize: 18, fontWeight: 800, color: delayedProjects > 0 ? 'var(--red)' : 'var(--text)', marginTop: 4 }}>
               {delayedProjects} pratiche critiche
             </div>
           </div>
@@ -358,7 +358,7 @@ export function Projects() {
                 onClick={() => setStatusFilter(tab.id as FilterStatus)}
                 style={{
                   background: statusFilter === tab.id ? 'var(--indigo)' : 'var(--card2)',
-                  color: statusFilter === tab.id ? '#fff' : 'var(--muted)',
+                  color: statusFilter === tab.id ? 'var(--on-accent)' : 'var(--muted)',
                   border: `1px solid ${statusFilter === tab.id ? 'var(--indigo-l)' : 'var(--border)'}`,
                   padding: '5px 12px',
                   borderRadius: 20,
@@ -378,8 +378,8 @@ export function Projects() {
               type="button"
               onClick={() => setViewMode('cards')}
               style={{
-                background: viewMode === 'cards' ? '#1e1b4b' : 'transparent',
-                color: viewMode === 'cards' ? '#818cf8' : 'var(--muted)',
+                background: viewMode === 'cards' ? 'var(--pill-indigo-bg)' : 'transparent',
+                color: viewMode === 'cards' ? 'var(--pill-indigo-fg)' : 'var(--muted)',
                 border: 'none',
                 padding: '6px 12px',
                 fontSize: 11.5,
@@ -397,8 +397,8 @@ export function Projects() {
               type="button"
               onClick={() => setViewMode('table')}
               style={{
-                background: viewMode === 'table' ? '#1e1b4b' : 'transparent',
-                color: viewMode === 'table' ? '#818cf8' : 'var(--muted)',
+                background: viewMode === 'table' ? 'var(--pill-indigo-bg)' : 'transparent',
+                color: viewMode === 'table' ? 'var(--pill-indigo-fg)' : 'var(--muted)',
                 border: 'none',
                 padding: '6px 12px',
                 fontSize: 11.5,
@@ -416,8 +416,8 @@ export function Projects() {
               type="button"
               onClick={() => setViewMode('kanban')}
               style={{
-                background: viewMode === 'kanban' ? '#1e1b4b' : 'transparent',
-                color: viewMode === 'kanban' ? '#818cf8' : 'var(--muted)',
+                background: viewMode === 'kanban' ? 'var(--pill-indigo-bg)' : 'transparent',
+                color: viewMode === 'kanban' ? 'var(--pill-indigo-fg)' : 'var(--muted)',
                 border: 'none',
                 padding: '6px 12px',
                 fontSize: 11.5,
@@ -493,7 +493,7 @@ export function Projects() {
       </div>
 
       {/* ── 3. Contenuto Principale: Visualizzazione Selezionata ─────────── */}
-      {errore && <div style={{ padding: 12, borderRadius: 8, background: '#7f1d1d', color: '#fecaca' }}>{errore}</div>}
+      {errore && <div style={{ padding: 12, borderRadius: 8, background: 'var(--pill-red-bg)', color: 'var(--pill-red-fg)' }}>{errore}</div>}
       {filteredProjects.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '60px 20px', background: 'var(--card)', borderRadius: 16, border: '1px solid var(--border)', color: 'var(--muted)' }}>
           <div style={{ fontSize: 44, marginBottom: 12 }}>📁</div>
@@ -501,7 +501,7 @@ export function Projects() {
           <div style={{ fontSize: 12.5, marginBottom: 18 }}>Prova a modificare la ricerca o seleziona un'altra categoria.</div>
           <button
             onClick={() => { setSearchTerm(''); setStatusFilter('all'); setCatFilter('ALL'); setSelectedAdvisorId('ALL'); }}
-            style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+            style={{ background: 'var(--indigo)', color: 'var(--on-accent)', border: 'none', padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
           >
             Reset Filtri
           </button>
@@ -538,7 +538,7 @@ export function Projects() {
                 key={p.id}
                 style={{
                   background: 'var(--card)',
-                  border: `1px solid ${p.delay ? '#ef4444' : 'var(--border)'}`,
+                  border: `1px solid ${p.delay ? 'var(--red)' : 'var(--border)'}`,
                   borderRadius: 14,
                   padding: 18,
                   display: 'flex',
@@ -553,7 +553,7 @@ export function Projects() {
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, marginBottom: 8 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: 10, fontWeight: 800, background: '#1e1b4b', color: '#818cf8', padding: '2px 6px', borderRadius: 4 }}>
+                      <span style={{ fontSize: 10, fontWeight: 800, background: 'var(--pill-indigo-bg)', color: 'var(--pill-indigo-fg)', padding: '2px 6px', borderRadius: 4 }}>
                         #{p.id}
                       </span>
                       <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -563,7 +563,7 @@ export function Projects() {
 
                     <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                       {p.delay && (
-                        <span style={{ fontSize: 10, fontWeight: 700, background: '#7f1d1d', color: '#fca5a5', padding: '2px 6px', borderRadius: 4, display: 'flex', alignItems: 'center', gap: 3 }}>
+                        <span style={{ fontSize: 10, fontWeight: 700, background: 'var(--pill-red-bg)', color: 'var(--pill-red-fg)', padding: '2px 6px', borderRadius: 4, display: 'flex', alignItems: 'center', gap: 3 }}>
                           <span>⚠️</span> In Ritardo
                         </span>
                       )}
@@ -599,9 +599,9 @@ export function Projects() {
                           fontWeight: 600,
                           padding: '2px 6px',
                           borderRadius: 4,
-                          background: m.st === 'done' ? '#064e3b' : m.st === 'in_progress' ? '#1e1b4b' : 'rgba(255,255,255,0.05)',
-                          color: m.st === 'done' ? '#34d399' : m.st === 'in_progress' ? '#a5b4fc' : 'var(--muted)',
-                          border: `1px solid ${m.st === 'done' ? '#059669' : m.st === 'in_progress' ? '#4338ca' : 'transparent'}`,
+                          background: m.st === 'done' ? 'var(--pill-green-bg)' : m.st === 'in_progress' ? 'var(--pill-indigo-bg)' : 'rgba(255,255,255,0.05)',
+                          color: m.st === 'done' ? 'var(--pill-green-fg)' : m.st === 'in_progress' ? 'var(--pill-indigo-fg)' : 'var(--muted)',
+                          border: `1px solid ${m.st === 'done' ? 'var(--pill-green-bd)' : m.st === 'in_progress' ? 'var(--pill-indigo-bd)' : 'transparent'}`,
                         }}
                       >
                         {m.n.length > 22 ? m.n.substring(0, 20) + '...' : m.n} ({m.pct}%)
@@ -619,14 +619,14 @@ export function Projects() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 11.5 }}>
                   <div style={{ background: 'var(--card2)', padding: 8, borderRadius: 8, border: '1px solid var(--border)' }}>
                     <div style={{ fontSize: 10, color: 'var(--muted)' }}>⏱ Consuntivo Ore</div>
-                    <div style={{ fontWeight: 700, marginTop: 2, color: orePct > 90 ? '#f87171' : 'var(--text)' }}>
+                    <div style={{ fontWeight: 700, marginTop: 2, color: orePct > 90 ? 'var(--red)' : 'var(--text)' }}>
                       {oreCons.toFixed(1)}h <span style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 500 }}>/ {orePrev}h ({orePct}%)</span>
                     </div>
                   </div>
 
                   <div style={{ background: 'var(--card2)', padding: 8, borderRadius: 8, border: '1px solid var(--border)' }}>
                     <div style={{ fontSize: 10, color: 'var(--muted)' }}>📋 Microvoci</div>
-                    <div style={{ fontWeight: 700, marginTop: 2, color: '#34d399' }}>
+                    <div style={{ fontWeight: 700, marginTop: 2, color: 'var(--green)' }}>
                       {microDone} / {microTotal} step
                     </div>
                   </div>
@@ -636,7 +636,7 @@ export function Projects() {
                     <div style={{ fontWeight: 800, color: 'var(--indigo-l)', marginTop: 2 }}>
                       {fmt(p.val)}
                       {incassato > 0 && (
-                        <span style={{ fontSize: 9.5, color: '#34d399', fontWeight: 600, display: 'block' }}>
+                        <span style={{ fontSize: 9.5, color: 'var(--green)', fontWeight: 600, display: 'block' }}>
                           ✓ Incassati {fmt(incassato)}
                         </span>
                       )}
@@ -645,10 +645,10 @@ export function Projects() {
 
                   <div style={{ background: 'var(--card2)', padding: 8, borderRadius: 8, border: '1px solid var(--border)' }}>
                     <div style={{ fontSize: 10, color: 'var(--muted)' }}>📅 Target Scadenza</div>
-                    <div style={{ fontWeight: 700, marginTop: 2, color: daysRemaining !== null && daysRemaining < 7 ? '#f87171' : 'var(--text)' }}>
+                    <div style={{ fontWeight: 700, marginTop: 2, color: daysRemaining !== null && daysRemaining < 7 ? 'var(--red)' : 'var(--text)' }}>
                       {p.due || 'In corso'}
                       {daysRemaining !== null && (
-                        <span style={{ fontSize: 9.5, display: 'block', color: daysRemaining < 0 ? '#f87171' : daysRemaining < 10 ? '#f59e0b' : 'var(--muted)' }}>
+                        <span style={{ fontSize: 9.5, display: 'block', color: daysRemaining < 0 ? 'var(--red)' : daysRemaining < 10 ? 'var(--amber)' : 'var(--muted)' }}>
                           {daysRemaining < 0 ? `Scaduto da ${Math.abs(daysRemaining)} gg` : `${daysRemaining} gg rimanenti`}
                         </span>
                       )}
@@ -669,7 +669,7 @@ export function Projects() {
                     <button
                       type="button"
                       onClick={() => navigate(`/documents?projId=${p.id}`)}
-                      style={{ background: '#1e1b4b', border: '1px solid #4338ca', color: '#818cf8', padding: '4px 8px', borderRadius: 6, fontSize: 10.5, fontWeight: 700, cursor: 'pointer' }}
+                      style={{ background: 'var(--pill-indigo-bg)', border: '1px solid var(--pill-indigo-bd)', color: 'var(--pill-indigo-fg)', padding: '4px 8px', borderRadius: 6, fontSize: 10.5, fontWeight: 700, cursor: 'pointer' }}
                       title="Genera documento Word per questa pratica"
                     >
                       📝 Doc
@@ -677,7 +677,7 @@ export function Projects() {
                     <button
                       type="button"
                       onClick={() => navigate(`/projects/${p.id}`)}
-                      style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '4px 12px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+                      style={{ background: 'var(--indigo)', color: 'var(--on-accent)', border: 'none', padding: '4px 12px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
                     >
                       Apri Fascicolo ➔
                     </button>
@@ -718,7 +718,7 @@ export function Projects() {
                     >
                       <td style={{ padding: '12px 14px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <span style={{ fontSize: 9.5, fontWeight: 800, background: '#1e1b4b', color: '#818cf8', padding: '1px 5px', borderRadius: 4 }}>
+                          <span style={{ fontSize: 9.5, fontWeight: 800, background: 'var(--pill-indigo-bg)', color: 'var(--pill-indigo-fg)', padding: '1px 5px', borderRadius: 4 }}>
                             #{p.id}
                           </span>
                           <span
@@ -739,7 +739,7 @@ export function Projects() {
                       <td style={{ padding: '12px 14px' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                           <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                            {p.delay && <span style={{ fontSize: 9, background: '#7f1d1d', color: '#fca5a5', padding: '1px 4px', borderRadius: 4, fontWeight: 700 }}>⚠ Ritardo</span>}
+                            {p.delay && <span style={{ fontSize: 9, background: 'var(--pill-red-bg)', color: 'var(--pill-red-fg)', padding: '1px 4px', borderRadius: 4, fontWeight: 700 }}>⚠ Ritardo</span>}
                             <Badge stato={p.st} />
                           </div>
                           <span style={{ fontSize: 10.5, color: 'var(--muted)' }}>📅 {p.due || 'In corso'}</span>
@@ -774,7 +774,7 @@ export function Projects() {
                           <button
                             type="button"
                             onClick={() => navigate(`/documents?projId=${p.id}`)}
-                            style={{ background: '#1e1b4b', border: '1px solid #4338ca', color: '#818cf8', padding: '4px 8px', borderRadius: 6, fontSize: 10.5, fontWeight: 700, cursor: 'pointer' }}
+                            style={{ background: 'var(--pill-indigo-bg)', border: '1px solid var(--pill-indigo-bd)', color: 'var(--pill-indigo-fg)', padding: '4px 8px', borderRadius: 6, fontSize: 10.5, fontWeight: 700, cursor: 'pointer' }}
                             title="Genera documento Word"
                           >
                             📝 Doc
@@ -819,7 +819,7 @@ export function Projects() {
                     onClick={() => navigate(`/projects/${p.id}`)}
                     style={{
                       background: 'var(--card2)',
-                      border: `1px solid ${p.delay ? '#ef4444' : 'var(--border)'}`,
+                      border: `1px solid ${p.delay ? 'var(--red)' : 'var(--border)'}`,
                       borderRadius: 10,
                       padding: 12,
                       cursor: 'pointer',
@@ -829,7 +829,7 @@ export function Projects() {
                     }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <span style={{ fontSize: 10, fontWeight: 800, color: '#818cf8' }}>#{p.id}</span>
+                      <span style={{ fontSize: 10, fontWeight: 800, color: 'var(--indigo-l)' }}>#{p.id}</span>
                       <span style={{ fontSize: 10, color: 'var(--muted)' }}>{p.due || 'In corso'}</span>
                     </div>
 

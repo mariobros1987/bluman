@@ -16,19 +16,19 @@ export function PortalStudioPreviewBanner({
   handleSelectPreviewClient,
 }: PortalStudioPreviewBannerProps) {
   return (
-    <div style={{ margin: '0 0 12px', background: '#2a1f0d', border: '1px solid #b45309', borderRadius: 10, padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-      <div style={{ color: '#fcd34d', fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
+    <div style={{ margin: '0 0 12px', background: 'var(--pill-amber-bg)', border: '1px solid var(--pill-amber-bd)', borderRadius: 10, padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+      <div style={{ color: 'var(--pill-amber-fg)', fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
         👁 ANTEPRIMA STUDIO — Stai visualizzando il portale di <strong>{clientName}</strong>. Nessuna modifica è reale.
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span style={{ color: '#fcd34d', fontSize: 11 }}>Cliente:</span>
+        <span style={{ color: 'var(--pill-amber-fg)', fontSize: 11 }}>Cliente:</span>
         <select
           value={clientObj?.id || ''}
           onChange={(e) => handleSelectPreviewClient(e.target.value)}
-          style={{ background: '#1c1608', color: '#fde68a', border: '1px solid #b45309', borderRadius: 8, padding: '5px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+          style={{ background: 'var(--pill-amber-bg)', color: 'var(--pill-amber-fg)', border: '1px solid var(--pill-amber-bd)', borderRadius: 8, padding: '5px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
         >
           {elencoClienti.map((c: any) => (
-            <option key={c.id} value={c.id} style={{ background: '#1c1608', color: '#fde68a' }}>{c.nome}</option>
+            <option key={c.id} value={c.id} style={{ background: 'var(--pill-amber-bg)', color: 'var(--pill-amber-fg)' }}>{c.nome}</option>
           ))}
         </select>
       </div>

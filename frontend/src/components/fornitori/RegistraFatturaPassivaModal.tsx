@@ -251,8 +251,8 @@ export const RegistraFatturaPassivaModal: React.FC<RegistraFatturaPassivaModalPr
                 style={{
                   padding: '12px 16px',
                   background: 'rgba(239, 68, 68, 0.1)',
-                  border: '1px solid #ef4444',
-                  color: '#ef4444',
+                  border: '1px solid var(--red)',
+                  color: 'var(--red)',
                   borderRadius: '8px',
                   marginBottom: '20px',
                   fontSize: '0.9rem',
@@ -441,7 +441,7 @@ export const RegistraFatturaPassivaModal: React.FC<RegistraFatturaPassivaModalPr
                                 <button
                                   type="button"
                                   onClick={() => handleRimuoviRiga(r.id)}
-                                  style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '1rem' }}
+                                  style={{ background: 'transparent', border: 'none', color: 'var(--red)', cursor: 'pointer', fontSize: '1rem' }}
                                   title="Elimina riga"
                                 >
                                   ✕

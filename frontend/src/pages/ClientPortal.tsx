@@ -350,9 +350,9 @@ export function ClientPortal() {
     const baseHtml = tmpl ? tmpl.contenutoHtml : '';
 
     const modulesTableHtml = `
-      <div style="margin: 16px 0; border: 1px solid #cbd5e1; border-radius: 8px; overflow: hidden;">
+      <div style="margin: 16px 0; border: 1px solid var(--pill-slate-fg); border-radius: 8px; overflow: hidden;">
         <table style="width: 100%; border-collapse: collapse; font-size: 10pt; text-align: left;">
-          <thead style="background: #f1f5f9; color: #1e1b4b; font-weight: 700; border-bottom: 1px solid #cbd5e1;">
+          <thead style="background: var(--surface-1); color: var(--pill-indigo-bg); font-weight: 700; border-bottom: 1px solid var(--pill-slate-fg);">
             <tr>
               <th style="padding: 8px 12px;">Modulo Specialistico</th>
               <th style="padding: 8px 12px;">Categoria</th>
@@ -362,16 +362,16 @@ export function ClientPortal() {
           </thead>
           <tbody>
             ${moduliProposti.map(m => `
-              <tr style="border-bottom: 1px solid #f1f5f9;">
-                <td style="padding: 8px 12px; font-weight: 600; color: #0f172a;">${m.nome}</td>
-                <td style="padding: 8px 12px; color: #475569;">${m.cat}</td>
-                <td style="padding: 8px 12px; text-align: center; color: #475569;">${m.ore}h</td>
-                <td style="padding: 8px 12px; text-align: right; font-weight: 700; color: #1e1b4b;">${fmt(m.prezzo)}</td>
+              <tr style="border-bottom: 1px solid var(--surface-1);">
+                <td style="padding: 8px 12px; font-weight: 600; color: var(--surface-2);">${m.nome}</td>
+                <td style="padding: 8px 12px; color: var(--muted);">${m.cat}</td>
+                <td style="padding: 8px 12px; text-align: center; color: var(--muted);">${m.ore}h</td>
+                <td style="padding: 8px 12px; text-align: right; font-weight: 700; color: var(--pill-indigo-bg);">${fmt(m.prezzo)}</td>
               </tr>
             `).join('')}
-            <tr style="background: #f8fafc; font-weight: 800;">
-              <td colspan="3" style="padding: 10px 12px; text-align: right; color: #1e1b4b;">TOTALE COMPLESSIVO MANDATO:</td>
-              <td style="padding: 10px 12px; text-align: right; color: #4338ca; font-size: 11pt;">${fmt(totalValue)}</td>
+            <tr style="background: var(--pill-sky-fg); font-weight: 800;">
+              <td colspan="3" style="padding: 10px 12px; text-align: right; color: var(--pill-indigo-bg);">TOTALE COMPLESSIVO MANDATO:</td>
+              <td style="padding: 10px 12px; text-align: right; color: var(--indigo-d); font-size: 11pt;">${fmt(totalValue)}</td>
             </tr>
           </tbody>
         </table>
@@ -537,11 +537,11 @@ export function ClientPortal() {
       />
 
       {erroreRicarica && (
-        <div style={{ margin: '0 0 12px', background: '#2d0d0d', border: '1px solid #7f1d1d', color: '#fca5a5', padding: '10px 14px', borderRadius: 10, fontSize: 12, lineHeight: 1.5, display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
+        <div style={{ margin: '0 0 12px', background: 'var(--pill-red-bg)', border: '1px solid var(--pill-red-bg)', color: 'var(--pill-red-fg)', padding: '10px 14px', borderRadius: 10, fontSize: 12, lineHeight: 1.5, display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
           <span>{erroreRicarica}</span>
           <button
             onClick={() => setErroreRicarica(null)}
-            style={{ background: 'transparent', border: 'none', color: '#fca5a5', cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: 0 }}
+            style={{ background: 'transparent', border: 'none', color: 'var(--pill-red-fg)', cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: 0 }}
             title="Chiudi"
           >
             ✕

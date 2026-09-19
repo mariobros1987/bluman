@@ -225,7 +225,7 @@ export function CartellaModelliPage() {
 
       {/* §41 — regola 7: se il server non ha risposto, l'elenco può essere incompleto e si dice. */}
       {cartella.erroreLettura && (
-        <div style={{ background: '#2a1218', border: '1px solid #5b2130', borderRadius: 12, padding: '12px 14px', fontSize: 12.5, color: '#fca5a5', lineHeight: 1.6 }}>
+        <div style={{ background: 'var(--pill-red-bg)', border: '1px solid var(--pill-red-bg)', borderRadius: 12, padding: '12px 14px', fontSize: 12.5, color: 'var(--pill-red-fg)', lineHeight: 1.6 }}>
           ⚠️ <strong>Elenco possibilmente incompleto.</strong> La lettura dei modelli dello studio non è
           riuscita ({cartella.erroreLettura}). Quello che si vede sotto potrebbe non essere tutto quello
           che lo studio ha: prima di dire che un modello «non c'è», premere <strong>Ricarica</strong>.
@@ -234,8 +234,8 @@ export function CartellaModelliPage() {
 
       {/* Modelli rimasti nel solo browser: si portano a database, non si cancellano in silenzio. */}
       {residuiLocali.length > 0 && (
-        <div style={{ background: '#2d2000', border: '1px solid #713f12', borderRadius: 12, padding: '12px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-          <div style={{ fontSize: 12.5, color: '#fcd34d', lineHeight: 1.6, maxWidth: 660 }}>
+        <div style={{ background: 'var(--pill-amber-bg)', border: '1px solid var(--pill-amber-bd)', borderRadius: 12, padding: '12px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <div style={{ fontSize: 12.5, color: 'var(--pill-amber-fg)', lineHeight: 1.6, maxWidth: 660 }}>
             📌 <strong>{residuiLocali.length} modelli sono rimasti soltanto in questo browser.</strong> Erano
             stati importati quando la libreria non passava dal server: non hanno una riga nell'archivio
             dello studio, quindi nessun collega li vede. Portandoli nell'archivio diventano modelli
@@ -245,7 +245,7 @@ export function CartellaModelliPage() {
             type="button"
             onClick={() => void esegui('recupero', cartella.recuperaModelliLocali)}
             disabled={occupato === 'recupero'}
-            style={{ ...bottoneTesta, background: '#78350f', border: '1px solid #b45309', color: '#fde68a' }}
+            style={{ ...bottoneTesta, background: 'var(--pill-amber-bg)', border: '1px solid var(--pill-amber-bd)', color: 'var(--pill-amber-fg)' }}
           >
             {occupato === 'recupero' ? '⏳ In corso…' : '⬆ Porta nell\'archivio dello studio'}
           </button>
@@ -255,9 +255,9 @@ export function CartellaModelliPage() {
       {messaggio && (
         <div
           style={{
-            background: messaggio.ok ? '#0d2d22' : '#2a1218',
-            border: `1px solid ${messaggio.ok ? '#14532d' : '#5b2130'}`,
-            color: messaggio.ok ? '#6ee7b7' : '#fca5a5',
+            background: messaggio.ok ? 'var(--pill-green-bg)' : 'var(--pill-red-bg)',
+            border: `1px solid ${messaggio.ok ? 'var(--pill-green-bg)' : 'var(--pill-red-bg)'}`,
+            color: messaggio.ok ? 'var(--pill-green-fg)' : 'var(--pill-red-fg)',
             borderRadius: 12,
             padding: '10px 14px',
             fontSize: 12.5,
@@ -276,12 +276,12 @@ export function CartellaModelliPage() {
 
       {/* Riquadri di sintesi: contano righe, non stime */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
-        <Riquadro etichetta="Modelli attivi" valore={String(conteggi.attivi)} sfondo="#1a1f3d" bordo="#2d3260" colore="#a5b4fc" />
-        <Riquadro etichetta="Approvati" valore={String(conteggi.approvati)} sfondo="#0d2d22" bordo="#14532d" colore="#6ee7b7" />
-        <Riquadro etichetta="In revisione" valore={String(conteggi.inRevisione)} sfondo="#2d2000" bordo="#713f12" colore="#fcd34d" />
-        <Riquadro etichetta="Bozze" valore={String(conteggi.bozze)} sfondo="#1e2030" bordo="#334155" colore="#94a3b8" />
-        <Riquadro etichetta="Di serie, mai adottati" valore={String(conteggi.diSerie)} sfondo="#0d2233" bordo="#1e3a5f" colore="#60b8f4" />
-        <Riquadro etichetta="Archiviati" valore={String(conteggi.archiviati)} sfondo="#27272a" bordo="#3f3f46" colore="#a1a1aa" />
+        <Riquadro etichetta="Modelli attivi" valore={String(conteggi.attivi)} sfondo="var(--surface-1)" bordo="var(--card2)" colore="var(--pill-indigo-fg)" />
+        <Riquadro etichetta="Approvati" valore={String(conteggi.approvati)} sfondo="var(--pill-green-bg)" bordo="var(--pill-green-bg)" colore="var(--pill-green-fg)" />
+        <Riquadro etichetta="In revisione" valore={String(conteggi.inRevisione)} sfondo="var(--pill-amber-bg)" bordo="var(--pill-amber-bd)" colore="var(--pill-amber-fg)" />
+        <Riquadro etichetta="Bozze" valore={String(conteggi.bozze)} sfondo="var(--card)" bordo="var(--pill-slate-bd)" colore="var(--muted)" />
+        <Riquadro etichetta="Di serie, mai adottati" valore={String(conteggi.diSerie)} sfondo="var(--surface-1)" bordo="var(--pill-blue-bg)" colore="var(--cat-societario)" />
+        <Riquadro etichetta="Archiviati" valore={String(conteggi.archiviati)} sfondo="var(--pill-slate-bg)" bordo="var(--border)" colore="var(--muted)" />
       </div>
 
       {/* Filtri */}

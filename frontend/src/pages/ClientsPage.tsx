@@ -239,17 +239,17 @@ export function ClientsPage() {
       {/* KPI Cards */}
       <div className={styles.kpiGrid}>
         <div className={styles.kpiCard}>
-          <div className={styles.kpiIcon} style={{ background: '#1a1f3d' }}>👥</div>
+          <div className={styles.kpiIcon} style={{ background: 'var(--surface-1)' }}>👥</div>
           <div className={styles.kpiValue}>{meta.totale}</div>
           <div className={styles.kpiLabel}>Totale Clienti in Anagrafica</div>
         </div>
         <div className={styles.kpiCard}>
-          <div className={styles.kpiIcon} style={{ background: '#200f40' }}>🏢</div>
+          <div className={styles.kpiIcon} style={{ background: 'var(--pill-indigo-bg)' }}>🏢</div>
           <div className={styles.kpiValue}>{totalCompanies}</div>
           <div className={styles.kpiLabel}>Società & Entities</div>
         </div>
         <div className={styles.kpiCard}>
-          <div className={styles.kpiIcon} style={{ background: '#0d2d22' }}>👤</div>
+          <div className={styles.kpiIcon} style={{ background: 'var(--pill-green-bg)' }}>👤</div>
           <div className={styles.kpiValue}>{totalIndividuals}</div>
           <div className={styles.kpiLabel}>Persone Fisiche / UBO</div>
         </div>
@@ -299,7 +299,7 @@ export function ClientsPage() {
       </div>
 
       {/* Client Cards Grid */}
-      {errore && <div style={{ padding: 12, borderRadius: 8, background: '#7f1d1d', color: '#fecaca' }}>{errore}</div>}
+      {errore && <div style={{ padding: 12, borderRadius: 8, background: 'var(--pill-red-bg)', color: 'var(--pill-red-fg)' }}>{errore}</div>}
       {loading ? (
         <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)', fontSize: 12 }}>Caricamento anagrafica clienti...</div>
       ) : filtered.length === 0 ? (
@@ -323,12 +323,12 @@ export function ClientsPage() {
             >
               <div>
                 <div className={styles.clientHeader}>
-                  <div className={styles.avatarBox} style={{ background: c.tipo === 'company' ? '#200f40' : '#1a1f3d', color: c.tipo === 'company' ? '#a78bfa' : '#818cf8' }}>
+                  <div className={styles.avatarBox} style={{ background: c.tipo === 'company' ? 'var(--pill-indigo-bg)' : 'var(--surface-1)', color: c.tipo === 'company' ? 'var(--purple)' : 'var(--indigo-l)' }}>
                     {c.tipo === 'company' ? '🏢' : '👤'}
                   </div>
                   <div>
                     <div className={styles.clientName} style={{ color: 'var(--indigo-l)' }}>{c.nome}</div>
-                    <span className={styles.clientTypeBadge} style={{ background: c.tipo === 'company' ? '#200f40' : '#1a1f3d', color: c.tipo === 'company' ? '#a78bfa' : '#818cf8' }}>
+                    <span className={styles.clientTypeBadge} style={{ background: c.tipo === 'company' ? 'var(--pill-indigo-bg)' : 'var(--surface-1)', color: c.tipo === 'company' ? 'var(--purple)' : 'var(--indigo-l)' }}>
                       {c.tipo === 'company' ? 'Società / Entity' : 'Persona Fisica'}
                     </span>
                   </div>
@@ -341,7 +341,7 @@ export function ClientsPage() {
                   </div>
                   <div className={styles.metaRow}>
                     <span>Accesso Portale:</span>
-                    <span style={{ color: (c as any).hasPassword ? '#34d399' : 'var(--amber)', fontWeight: 600, fontSize: 11 }}>
+                    <span style={{ color: (c as any).hasPassword ? 'var(--green)' : 'var(--amber)', fontWeight: 600, fontSize: 11 }}>
                       {(c as any).hasPassword ? '🟢 Password Attiva' : '⚪ Da Assegnare'}
                     </span>
                   </div>
@@ -349,7 +349,7 @@ export function ClientsPage() {
               </div>
 
               <div className={styles.clientActions} onClick={e => e.stopPropagation()}>
-                <button className={styles.btnAction} onClick={() => openEditModal(c)} style={{ background: '#1e1b4b', borderColor: '#4338ca', color: '#c7d2fe', fontWeight: 700 }} title="Apri Fascicolo Anagrafica & Commesse">
+                <button className={styles.btnAction} onClick={() => openEditModal(c)} style={{ background: 'var(--pill-indigo-bg)', borderColor: 'var(--indigo-d)', color: 'var(--pill-indigo-fg)', fontWeight: 700 }} title="Apri Fascicolo Anagrafica & Commesse">
                   📂 Apri
                 </button>
                 <button
@@ -389,7 +389,7 @@ export function ClientsPage() {
               <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Tipo Cliente *</label>
               <div style={{ display: 'flex', gap: 8 }}>
                 {(['individual', 'company'] as const).map(t => (
-                  <button key={t} type="button" onClick={() => setTipo(t)} style={{ flex: 1, padding: 8, borderRadius: 8, border: `1px solid ${tipo === t ? 'var(--indigo)' : 'var(--border)'}`, background: tipo === t ? '#1a1f3d' : 'var(--card)', color: tipo === t ? 'var(--indigo-l)' : 'var(--muted)', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>
+                  <button key={t} type="button" onClick={() => setTipo(t)} style={{ flex: 1, padding: 8, borderRadius: 8, border: `1px solid ${tipo === t ? 'var(--indigo)' : 'var(--border)'}`, background: tipo === t ? 'var(--surface-1)' : 'var(--card)', color: tipo === t ? 'var(--indigo-l)' : 'var(--muted)', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>
                     {t === 'individual' ? '👤 Persona fisica' : '🏢 Società'}
                   </button>
                 ))}

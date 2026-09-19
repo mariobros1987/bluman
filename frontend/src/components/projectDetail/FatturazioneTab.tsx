@@ -269,15 +269,15 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
     <div>
       <div className={styles.summaryBox}>
         <div>
-          <div style={{ fontSize: 11, color: '#818cf8', opacity: 0.8 }}>Valore totale progetto</div>
-          <div style={{ fontSize: 11, color: '#818cf8', opacity: 0.6, marginTop: 2 }}>Fatturato: {fmt(totFatturato)} · Residuo: {fmt(residuo)}</div>
+          <div style={{ fontSize: 11, color: 'var(--indigo-l)', opacity: 0.8 }}>Valore totale progetto</div>
+          <div style={{ fontSize: 11, color: 'var(--indigo-l)', opacity: 0.6, marginTop: 2 }}>Fatturato: {fmt(totFatturato)} · Residuo: {fmt(residuo)}</div>
         </div>
         <div style={{ fontSize: 24, fontWeight: 800 }}>{fmt(project.val)}</div>
       </div>
 
       <div style={{
-        background: totFatturato === 0 ? '#1e293b' : totFatturato >= project.val ? '#042f2e' : '#78350f',
-        border: `1px solid ${totFatturato === 0 ? '#334155' : totFatturato >= project.val ? '#0d9488' : '#b45309'}`,
+        background: totFatturato === 0 ? 'var(--pill-slate-bg)' : totFatturato >= project.val ? 'var(--pill-green-bg)' : 'var(--pill-amber-bg)',
+        border: `1px solid ${totFatturato === 0 ? 'var(--pill-slate-bd)' : totFatturato >= project.val ? 'var(--green)' : 'var(--pill-amber-bd)'}`,
         borderRadius: 10,
         padding: 14,
         marginTop: 14,
@@ -286,7 +286,7 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
         alignItems: 'center',
       }}>
         <div>
-          <div style={{ fontSize: 11, color: totFatturato === 0 ? '#94a3b8' : totFatturato >= project.val ? '#2dd4bf' : '#fcd34d', fontWeight: 600, textTransform: 'uppercase' }}>
+          <div style={{ fontSize: 11, color: totFatturato === 0 ? 'var(--muted)' : totFatturato >= project.val ? 'var(--green)' : 'var(--pill-amber-fg)', fontWeight: 600, textTransform: 'uppercase' }}>
             Stato Saldo & Incassi Progetto
           </div>
           <div style={{ fontSize: 13, fontWeight: 700, color: 'white', marginTop: 2 }}>
@@ -299,7 +299,7 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
         </div>
         <button
           onClick={() => alert('✓ Stato Incassi Progetto sincronizzato con lo Scadenzario e Prima Nota')}
-          style={{ background: totFatturato === 0 ? '#334155' : totFatturato >= project.val ? '#0d9488' : '#b45309', border: 'none', color: 'white', padding: '6px 12px', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+          style={{ background: totFatturato === 0 ? 'var(--pill-slate-bd)' : totFatturato >= project.val ? 'var(--green)' : 'var(--pill-amber-bd)', border: 'none', color: 'white', padding: '6px 12px', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
         >
           💳 Registro Incassi Progetto
         </button>
@@ -309,7 +309,7 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
       {vociDaFatturareCount > 0 && (
         <div style={{
           background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(6, 78, 59, 0.2))',
-          border: '1px solid #10b981',
+          border: '1px solid var(--green)',
           borderRadius: 10,
           padding: 14,
           marginTop: 14,
@@ -318,10 +318,10 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
           alignItems: 'center',
         }}>
           <div>
-            <div style={{ fontSize: 11, color: '#34d399', fontWeight: 700, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ fontSize: 11, color: 'var(--green)', fontWeight: 700, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 6 }}>
               ✨ Deliverable & Micro-voci Completate da Fatturare
             </div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#ffffff', marginTop: 2 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginTop: 2 }}>
               {vociDaFatturareCount} voci pronte per un valore stimato di {fmt(importoDaFatturareTotale)}
             </div>
             <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
@@ -331,8 +331,8 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
           <button
             onClick={handleOpenModal}
             style={{
-              background: '#059669',
-              color: '#ffffff',
+              background: 'var(--green)',
+              color: 'var(--on-accent)',
               border: 'none',
               padding: '8px 16px',
               borderRadius: 8,
@@ -366,7 +366,7 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   <button
                     onClick={() => setPreviewFattura({ ...f, numero: `FT-2026-00${i + 1}` })}
-                    style={{ background: '#1a1f3d', border: '1px solid #2d3260', color: '#818cf8', padding: '4px 10px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+                    style={{ background: 'var(--surface-1)', border: '1px solid var(--card2)', color: 'var(--indigo-l)', padding: '4px 10px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
                   >
                     🖨 Anteprima PDF / Stampa
                   </button>
@@ -409,9 +409,9 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
       {/* Modal Anteprima Stampa / PDF Fattura */}
       {previewFattura && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 110, padding: 16 }}>
-          <div style={{ background: '#fff', color: '#0f172a', borderRadius: 16, padding: 32, width: '100%', maxWidth: 640, maxHeight: '90vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 20, boxShadow: '0 24px 60px rgba(0,0,0,.6)' }}>
+          <div style={{ background: '#fff', color: 'var(--surface-2)', borderRadius: 16, padding: 32, width: '100%', maxWidth: 640, maxHeight: '90vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 20, boxShadow: '0 24px 60px rgba(0,0,0,.6)' }}>
             {/* Header Documento Stampa */}
-            <div style={{ borderBottom: '2px solid #0f172a', paddingBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div style={{ borderBottom: '2px solid var(--surface-2)', paddingBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               {(() => {
                 const studio = getStudioInfoForTenant();
                 const isBC = getCurrentTenantId() === BLUECODE_TENANT_ID;
@@ -429,14 +429,14 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
                         }}
                       />
                     ) : (
-                      <div style={{ fontSize: 18, fontWeight: 800, color: '#1e1b4b', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--pill-indigo-bg)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
                         🏛 {studio.ragioneSociale.toUpperCase()}
                       </div>
                     )}
-                    <div style={{ fontSize: 20, fontWeight: 800, color: '#1e1b4b' }}>
+                    <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--pill-indigo-bg)' }}>
                       {studio.ragioneSociale}
                     </div>
-                    <div style={{ fontSize: 11, color: '#475569', marginTop: 2 }}>
+                    <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
                       {studio.sedeLegale}{studio.sedeLegale ? <br /> : null}
                       {studio.piva ? `P.IVA/VAT: ${studio.piva}` : ''}{studio.iban ? ` · IBAN: ${studio.iban}` : ''}
                     </div>
@@ -444,24 +444,24 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
                 );
               })()}
               <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: 16, fontWeight: 800, color: '#4338ca' }}>Anteprima fattura — riepilogo</div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--indigo-d)' }}>Anteprima fattura — riepilogo</div>
                 <div style={{ fontSize: 13, fontWeight: 700, marginTop: 2 }}>{previewFattura.numero}</div>
-                <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 2 }}>Il PDF ufficiale (pulsante in basso) riporta ogni voce con i dati fiscali reali.</div>
+                <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>Il PDF ufficiale (pulsante in basso) riporta ogni voce con i dati fiscali reali.</div>
               </div>
             </div>
 
             {/* Destinatario — solo dati reali. I dati fiscali completi (P.IVA/CF, codice SDI, esito
                 del tracciato) stanno sul documento vero: qui non si cablano valori finti, che prima
                 mostravano una P.IVA e un "XML Accettato" inventati su ogni fattura. */}
-            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: 14, fontSize: 12 }}>
-              <div style={{ fontSize: 10, color: '#64748b', textTransform: 'uppercase', fontWeight: 700 }}>Cliente Destinatario:</div>
+            <div style={{ background: 'var(--pill-sky-fg)', border: '1px solid var(--border)', borderRadius: 10, padding: 14, fontSize: 12 }}>
+              <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 700 }}>Cliente Destinatario:</div>
               <div style={{ fontSize: 13, fontWeight: 700, marginTop: 2 }}>{project.cl}</div>
             </div>
 
             {/* Tabella Voci Fattura */}
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
               <thead>
-                <tr style={{ background: '#f1f5f9', borderBottom: '1px solid #cbd5e1', textAlign: 'left' }}>
+                <tr style={{ background: 'var(--surface-1)', borderBottom: '1px solid var(--pill-slate-fg)', textAlign: 'left' }}>
                   <th style={{ padding: '8px 10px' }}>Descrizione Prestazione</th>
                   <th style={{ padding: '8px 10px', textAlign: 'right' }}>Imponibile</th>
                   <th style={{ padding: '8px 10px', textAlign: 'right' }}>IVA %</th>
@@ -469,10 +469,10 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
                 </tr>
               </thead>
               <tbody>
-                <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+                <tr style={{ borderBottom: '1px solid var(--border)' }}>
                   <td style={{ padding: '10px' }}>
                     <strong>{previewFattura.desc}</strong>
-                    <div style={{ fontSize: 10, color: '#64748b' }}>Riferimento Progetto: {project.n}</div>
+                    <div style={{ fontSize: 10, color: 'var(--muted)' }}>Riferimento Progetto: {project.n}</div>
                   </td>
                   <td style={{ padding: '10px', textAlign: 'right' }}>{fmt(previewFattura.imponibile ?? previewFattura.importo)}</td>
                   <td style={{ padding: '10px', textAlign: 'right' }}>{previewFattura.aliquotaIva ?? 0}%</td>
@@ -482,19 +482,19 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
             </table>
 
             {/* Totali & Note */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderTop: '2px solid #0f172a', paddingTop: 14 }}>
-              <div style={{ fontSize: 10, color: '#64748b', maxWidth: 300 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderTop: '2px solid var(--surface-2)', paddingTop: 14 }}>
+              <div style={{ fontSize: 10, color: 'var(--muted)', maxWidth: 300 }}>
                 Fattura emessa ai sensi delle vigenti disposizioni fiscali UE. Pagamento a mezzo bonifico bancario su IBAN indicato in anagrafica.
               </div>
               <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: 11, color: '#64748b' }}>Totale Documento:</div>
-                <div style={{ fontSize: 22, fontWeight: 800, color: '#4338ca' }}>{fmt(previewFattura.importo)}</div>
+                <div style={{ fontSize: 11, color: 'var(--muted)' }}>Totale Documento:</div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--indigo-d)' }}>{fmt(previewFattura.importo)}</div>
               </div>
             </div>
 
             {/* Footer Azioni Stampa */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 10, borderTop: '1px solid #e2e8f0', paddingTop: 14 }}>
-              <button onClick={() => setPreviewFattura(null)} style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569', padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 10, borderTop: '1px solid var(--border)', paddingTop: 14 }}>
+              <button onClick={() => setPreviewFattura(null)} style={{ background: 'var(--surface-1)', border: '1px solid var(--pill-slate-fg)', color: 'var(--muted)', padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
                 Chiudi
               </button>
               <button
@@ -514,7 +514,7 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
                   }
                   await downloadFatturaPdfServerApi(idFattura, previewFattura.numero);
                 }}
-                style={{ background: '#4338ca', color: '#fff', border: 'none', padding: '8px 20px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 12px rgba(67,56,202,.3)' }}
+                style={{ background: 'var(--indigo-d)', color: '#fff', border: 'none', padding: '8px 20px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 12px rgba(67,56,202,.3)' }}
               >
                 📥 Esporta Documento PDF Ufficiale (A4)
               </button>
@@ -551,7 +551,7 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
                 Registro Fatture con il pulsante «Nota di Credito» sulla fattura da stornare. Prima
                 questo compositore emetteva una finta NC che finiva a database come **fattura FT
                 positiva**, aumentando il fatturato invece di stornarlo. */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#1a1f3d', border: '1px solid var(--indigo-l)', borderRadius: 8, padding: '8px 12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--surface-1)', border: '1px solid var(--indigo-l)', borderRadius: 8, padding: '8px 12px' }}>
               <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--indigo-l)' }}>📄 Fattura Fiscale (Serie FT)</span>
               <span style={{ fontSize: 10.5, color: 'var(--muted)' }}>— per una Nota di Credito usa il Registro Fatture sulla fattura da stornare</span>
             </div>
@@ -560,16 +560,16 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--card2)', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11 }}>
                 <span style={{ fontWeight: 600, color: 'var(--muted)' }}>Filtri:</span>
-                <span style={{ color: '#34d399', fontWeight: 600 }}>🟢 {vociFatturabili.filter(v => !v.giaFatturata).length} da fatturare</span>
+                <span style={{ color: 'var(--green)', fontWeight: 600 }}>🟢 {vociFatturabili.filter(v => !v.giaFatturata).length} da fatturare</span>
                 {vociFatturabili.filter(v => v.giaFatturata).length > 0 && (
-                  <span style={{ color: '#38bdf8', fontWeight: 600 }}>· 🔒 {vociFatturabili.filter(v => v.giaFatturata).length} già fatturate</span>
+                  <span style={{ color: 'var(--cat-societario)', fontWeight: 600 }}>· 🔒 {vociFatturabili.filter(v => v.giaFatturata).length} già fatturate</span>
                 )}
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button
                   type="button"
                   onClick={selezionaSoloCompletate}
-                  style={{ background: '#064e3b', border: '1px solid #059669', color: '#6ee7b7', padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+                  style={{ background: 'var(--pill-green-bg)', border: '1px solid var(--pill-green-bd)', color: 'var(--pill-green-fg)', padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
                   title="Seleziona solo le microvoci completate che NON sono ancora state fatturate"
                 >
                   ✨ Solo Completate (Done)
@@ -617,7 +617,7 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
                           <button
                             type="button"
                             onClick={() => toggleModulo(modNome)}
-                            style={{ background: 'transparent', border: 'none', color: tutteSel ? '#f87171' : 'var(--indigo-l)', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}
+                            style={{ background: 'transparent', border: 'none', color: tutteSel ? 'var(--red)' : 'var(--indigo-l)', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}
                           >
                             {tutteSel ? 'Deseleziona Modulo' : 'Seleziona Tutto il Modulo'}
                           </button>
@@ -660,8 +660,8 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
                                       padding: '2px 6px',
                                       borderRadius: 4,
                                       fontWeight: 600,
-                                      background: isDone ? '#064e3b' : isInProg ? '#1e3a8a' : '#334155',
-                                      color: isDone ? '#6ee7b7' : isInProg ? '#93c5fd' : '#94a3b8',
+                                      background: isDone ? 'var(--pill-green-bg)' : isInProg ? 'var(--pill-blue-bg)' : 'var(--pill-slate-bd)',
+                                      color: isDone ? 'var(--pill-green-fg)' : isInProg ? 'var(--pill-blue-fg)' : 'var(--muted)',
                                     }}
                                   >
                                     {isDone ? '✓ Fatto' : isInProg ? '⏳ In Corso' : '⚪ Da Fare'}
@@ -674,9 +674,9 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
                                         padding: '2px 6px',
                                         borderRadius: 4,
                                         fontWeight: 700,
-                                        background: '#0c4a6e',
-                                        color: '#38bdf8',
-                                        border: '1px solid #0284c7',
+                                        background: 'var(--pill-sky-bg)',
+                                        color: 'var(--pill-sky-fg)',
+                                        border: '1px solid var(--pill-sky-bd)',
                                       }}
                                       title={`Già presente nel documento ${v.dettaglioFattura?.numero || ''}`}
                                     >
@@ -685,7 +685,7 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
                                   )}
 
                                   {v.oreConsuntivate > 0 && (
-                                    <span style={{ fontSize: 10, color: '#f59e0b', fontWeight: 600 }}>
+                                    <span style={{ fontSize: 10, color: 'var(--amber)', fontWeight: 600 }}>
                                       ⏱️ {v.oreConsuntivate}h
                                     </span>
                                   )}
@@ -714,7 +714,7 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
                               </div>
 
                               {v.giaFatturata && v.selezionato && (
-                                <div style={{ fontSize: 10, color: '#f59e0b', paddingLeft: 26, paddingTop: 2 }}>
+                                <div style={{ fontSize: 10, color: 'var(--amber)', paddingLeft: 26, paddingTop: 2 }}>
                                   ⚠️ Voce già presente nella fattura {v.dettaglioFattura?.numero}. Verrà inclusa come fatturazione aggiuntiva/integrazione.
                                 </div>
                               )}
@@ -748,14 +748,14 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
             </div>
 
             {/* Riepilogo Finanziario Live */}
-            <div style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: 10, padding: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ background: 'var(--surface-2)', border: '1px solid var(--pill-slate-bg)', borderRadius: 10, padding: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <div style={{ fontSize: 11, color: '#94a3b8' }}>Voci selezionate: <strong>{vociSelezionate.length}</strong> su {vociFatturabili.length}</div>
-                <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>Imponibile: {fmt(totaleImponibile)} · IVA ({aliquotaPct}%): {fmt(totaleIva)}</div>
+                <div style={{ fontSize: 11, color: 'var(--muted)' }}>Voci selezionate: <strong>{vociSelezionate.length}</strong> su {vociFatturabili.length}</div>
+                <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>Imponibile: {fmt(totaleImponibile)} · IVA ({aliquotaPct}%): {fmt(totaleIva)}</div>
               </div>
               <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: 11, color: '#818cf8', fontWeight: 600 }}>TOTALE DOCUMENTO</div>
-                <div style={{ fontSize: 20, fontWeight: 800, color: '#38bdf8' }}>{fmt(totaleDocumento)}</div>
+                <div style={{ fontSize: 11, color: 'var(--indigo-l)', fontWeight: 600 }}>TOTALE DOCUMENTO</div>
+                <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--cat-societario)' }}>{fmt(totaleDocumento)}</div>
               </div>
             </div>
 

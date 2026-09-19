@@ -223,16 +223,16 @@ export function PrimaNotaPage() {
 
       {/* KPI STRIP */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginBottom: '2rem' }}>
-        <div style={{ background: '#064e3b', padding: 20, borderRadius: 12 }}>
-          <div style={{ fontSize: 13, color: '#6ee7b7', textTransform: 'uppercase', fontWeight: 600 }}>Totale Incassi (Entrate)</div>
+        <div style={{ background: 'var(--pill-green-bg)', padding: 20, borderRadius: 12 }}>
+          <div style={{ fontSize: 13, color: 'var(--pill-green-fg)', textTransform: 'uppercase', fontWeight: 600 }}>Totale Incassi (Entrate)</div>
           <div style={{ fontSize: 24, fontWeight: 700, color: 'white', marginTop: 8 }}>+ {fmt(totalEntrateCent / 100)}</div>
         </div>
-        <div style={{ background: '#7f1d1d', padding: 20, borderRadius: 12 }}>
-          <div style={{ fontSize: 13, color: '#fca5a5', textTransform: 'uppercase', fontWeight: 600 }}>Totale Spese / Uscite</div>
+        <div style={{ background: 'var(--pill-red-bg)', padding: 20, borderRadius: 12 }}>
+          <div style={{ fontSize: 13, color: 'var(--pill-red-fg)', textTransform: 'uppercase', fontWeight: 600 }}>Totale Spese / Uscite</div>
           <div style={{ fontSize: 24, fontWeight: 700, color: 'white', marginTop: 8 }}>- {fmt(totalUsciteCent / 100)}</div>
         </div>
-        <div style={{ background: saldoPeriodoCent >= 0 ? '#1e3a8a' : '#451a03', padding: 20, borderRadius: 12 }}>
-          <div style={{ fontSize: 13, color: saldoPeriodoCent >= 0 ? '#93c5fd' : '#fcd34d', textTransform: 'uppercase', fontWeight: 600 }}>Saldo Netto Periodo</div>
+        <div style={{ background: saldoPeriodoCent >= 0 ? 'var(--pill-blue-bg)' : 'var(--pill-amber-bg)', padding: 20, borderRadius: 12 }}>
+          <div style={{ fontSize: 13, color: saldoPeriodoCent >= 0 ? 'var(--pill-blue-fg)' : 'var(--pill-amber-fg)', textTransform: 'uppercase', fontWeight: 600 }}>Saldo Netto Periodo</div>
           <div style={{ fontSize: 24, fontWeight: 700, color: 'white', marginTop: 8 }}>💶 {fmt(saldoPeriodoCent / 100)}</div>
         </div>
         <div style={{ background: 'var(--card)', padding: 20, borderRadius: 12, border: '1px solid var(--border)' }}>
@@ -273,7 +273,7 @@ export function PrimaNotaPage() {
           </select>
         </div>
 
-        {errore && <div style={{ padding: 12, marginBottom: 12, borderRadius: 8, background: '#7f1d1d', color: '#fecaca' }}>{errore}</div>}
+        {errore && <div style={{ padding: 12, marginBottom: 12, borderRadius: 8, background: 'var(--pill-red-bg)', color: 'var(--pill-red-fg)' }}>{errore}</div>}
         {loading ? (
           <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted)' }}>Caricamento Prima Nota a database...</div>
         ) : (
@@ -314,8 +314,8 @@ export function PrimaNotaPage() {
                             borderRadius: 6,
                             fontSize: 11,
                             fontWeight: 700,
-                            background: isEntrata ? '#064e3b' : '#7f1d1d',
-                            color: isEntrata ? '#6ee7b7' : '#fca5a5',
+                            background: isEntrata ? 'var(--pill-green-bg)' : 'var(--pill-red-bg)',
+                            color: isEntrata ? 'var(--pill-green-fg)' : 'var(--pill-red-fg)',
                           }}
                         >
                           {isEntrata ? 'ENTRATA' : 'USCITA'}
@@ -324,7 +324,7 @@ export function PrimaNotaPage() {
                       <td style={{ padding: '14px 8px', fontWeight: 600 }}>
                         {m.descrizione}
                         {m.fattura?.numero && (
-                          <span style={{ marginLeft: 6, fontSize: 11, color: 'var(--primary)', background: '#1e3a8a', padding: '2px 6px', borderRadius: 4 }}>
+                          <span style={{ marginLeft: 6, fontSize: 11, color: 'var(--primary)', background: 'var(--pill-blue-bg)', padding: '2px 6px', borderRadius: 4 }}>
                             {m.fattura.numero}
                           </span>
                         )}
@@ -337,7 +337,7 @@ export function PrimaNotaPage() {
                       <td style={{ padding: '14px 8px', fontFamily: 'monospace', fontSize: 12, color: 'var(--muted)' }}>
                         {m.riferimentoTransazione || '—'}
                       </td>
-                      <td style={{ padding: '14px 8px', textAlign: 'right', fontWeight: 700, color: isEntrata ? '#34d399' : '#f87171' }}>
+                      <td style={{ padding: '14px 8px', textAlign: 'right', fontWeight: 700, color: isEntrata ? 'var(--green)' : 'var(--pill-red-fg)' }}>
                         {isEntrata ? '+' : '-'} {fmt((m.importoCentesimi || 0) / 100)}
                       </td>
                       <td style={{ padding: '14px 8px', textAlign: 'center' }}>
@@ -347,7 +347,7 @@ export function PrimaNotaPage() {
                             background: 'transparent',
                             border: 'none',
                             cursor: 'pointer',
-                            color: '#ef4444',
+                            color: 'var(--red)',
                             fontSize: 14,
                           }}
                           title="Elimina movimento"

@@ -64,7 +64,7 @@ export function ModaleRevisioneModello({ modello, onSalva, onChiudi }: Props) {
         </div>
 
         {modello.diSerie && (
-          <div style={{ fontSize: 11.5, color: '#93c5fd', background: '#0d2233', border: '1px solid #1e3a5f', borderRadius: 8, padding: '8px 10px', lineHeight: 1.5 }}>
+          <div style={{ fontSize: 11.5, color: 'var(--pill-blue-fg)', background: 'var(--surface-1)', border: '1px solid var(--pill-blue-bg)', borderRadius: 8, padding: '8px 10px', lineHeight: 1.5 }}>
             Questo modello arriva col programma e nessuno in questo studio lo ha ancora adottato.
             Registrando la revisione viene creata la copia dello studio: da lì in avanti è una carta
             vostra, e le modifiche non toccano gli altri studi.
@@ -103,7 +103,7 @@ export function ModaleRevisioneModello({ modello, onSalva, onChiudi }: Props) {
         ) : null}
 
         {errore && (
-          <div style={{ fontSize: 12, color: '#fca5a5', background: '#2a1218', border: '1px solid #5b2130', borderRadius: 8, padding: '8px 10px' }}>
+          <div style={{ fontSize: 12, color: 'var(--pill-red-fg)', background: 'var(--pill-red-bg)', border: '1px solid var(--pill-red-bg)', borderRadius: 8, padding: '8px 10px' }}>
             ⚠️ {errore}
           </div>
         )}

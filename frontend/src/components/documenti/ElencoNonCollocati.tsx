@@ -52,7 +52,7 @@ export function ElencoNonCollocati({ progetti, onArchivioCambiato }: Props) {
 
   if (errore) {
     return (
-      <div style={{ padding: '1.25rem', borderRadius: 10, background: 'rgba(239,68,68,0.08)', border: '1px solid #b91c1c', color: '#fca5a5', fontSize: 13 }}>
+      <div style={{ padding: '1.25rem', borderRadius: 10, background: 'rgba(239,68,68,0.08)', border: '1px solid var(--pill-red-bd)', color: 'var(--pill-red-fg)', fontSize: 13 }}>
         ⚠️ {errore}
       </div>
     );
@@ -82,7 +82,7 @@ export function ElencoNonCollocati({ progetti, onArchivioCambiato }: Props) {
         />
       )}
 
-      <div style={{ padding: '10px 14px', borderRadius: 10, background: 'rgba(251,191,36,0.08)', border: '1px solid #b45309', color: '#fcd34d', fontSize: 12.5, marginBottom: 16 }}>
+      <div style={{ padding: '10px 14px', borderRadius: 10, background: 'rgba(251,191,36,0.08)', border: '1px solid var(--pill-amber-bd)', color: 'var(--pill-amber-fg)', fontSize: 12.5, marginBottom: 16 }}>
         Il progetto a cui erano agganciati è stato eliminato: il file e le eventuali firme restano
         conservati a database. Scegliendo una cartella il documento torna visibile nel fascicolo, e
         lo spostamento resta scritto nel giornale di audit.

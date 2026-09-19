@@ -91,7 +91,7 @@ export function Testata({ periodo, setPeriodo, vista, setVista, nelMeseCorrente,
             style={{
               padding: '6px 14px', borderRadius: 8, border: 'none',
               background: vista === 'mese' ? 'var(--indigo)' : 'transparent',
-              color: vista === 'mese' ? '#fff' : 'var(--muted)',
+              color: vista === 'mese' ? 'var(--on-accent)' : 'var(--muted)',
               fontSize: 12, fontWeight: 600, cursor: 'pointer',
             }}
           >
@@ -124,7 +124,7 @@ export function Testata({ periodo, setPeriodo, vista, setVista, nelMeseCorrente,
               alert(`⚠️ Scansione cron NON eseguita: ${err?.message || 'errore di rete'}. Le notifiche di scadenza NON sono state inviate.`);
             }
           }}
-          style={{ background: '#1e1b4b', color: '#a5b4fc', border: '1px solid #4338ca', padding: '8px 14px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+          style={{ background: 'var(--pill-indigo-bg)', color: 'var(--pill-indigo-fg)', border: '1px solid var(--pill-indigo-bd)', padding: '8px 14px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
         >
           ⏰ Esegui Cron Notifiche
         </button>

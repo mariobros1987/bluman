@@ -97,8 +97,8 @@ export function BanksPage() {
 
       {/* KPI Liquidità Totale */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16, marginBottom: '2rem' }}>
-        <div style={{ background: '#1e3a8a', padding: 20, borderRadius: 12 }}>
-          <div style={{ fontSize: 13, color: '#93c5fd', textTransform: 'uppercase', fontWeight: 600 }}>Liquidità Complessiva Studio</div>
+        <div style={{ background: 'var(--pill-blue-bg)', padding: 20, borderRadius: 12 }}>
+          <div style={{ fontSize: 13, color: 'var(--pill-blue-fg)', textTransform: 'uppercase', fontWeight: 600 }}>Liquidità Complessiva Studio</div>
           <div style={{ fontSize: 28, fontWeight: 800, color: 'white', marginTop: 8 }}>💶 {fmt(totalLiquiditaCentesimi / 100)}</div>
         </div>
         <div style={{ background: 'var(--card)', padding: 20, borderRadius: 12, border: '1px solid var(--border)' }}>
@@ -146,7 +146,7 @@ export function BanksPage() {
                     <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>{c.banca}</div>
                   </div>
                   {c.isDefault && (
-                    <span style={{ padding: '3px 8px', borderRadius: 6, background: '#1e3a8a', color: '#93c5fd', fontSize: 11, fontWeight: 700 }}>
+                    <span style={{ padding: '3px 8px', borderRadius: 6, background: 'var(--pill-blue-bg)', color: 'var(--pill-blue-fg)', fontSize: 11, fontWeight: 700 }}>
                       PREDEFINITO
                     </span>
                   )}
@@ -167,7 +167,7 @@ export function BanksPage() {
 
               <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12, marginTop: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: 12, color: 'var(--muted)' }}>Saldo Attuale:</span>
-                <span style={{ fontSize: 18, fontWeight: 800, color: (c.saldoAttuale || 0) >= 0 ? '#34d399' : '#f87171' }}>
+                <span style={{ fontSize: 18, fontWeight: 800, color: (c.saldoAttuale || 0) >= 0 ? 'var(--green)' : 'var(--pill-red-fg)' }}>
                   {fmt((c.saldoAttuale || 0) / 100)}
                 </span>
               </div>

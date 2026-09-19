@@ -36,8 +36,8 @@ export function ResetPasswordModal({
         >
           <div
             style={{
-              backgroundColor: 'var(--sidebar, #111827)',
-              border: '1px solid var(--border, #374151)',
+              backgroundColor: 'var(--sidebar, var(--surface-2))',
+              border: '1px solid var(--border, var(--border))',
               borderRadius: 18,
               width: '100%',
               maxWidth: 480,
@@ -50,11 +50,11 @@ export function ResetPasswordModal({
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{ width: 40, height: 40, borderRadius: 10, background: '#1e1b4b', color: '#818cf8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>
+                <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--pill-indigo-bg)', color: 'var(--indigo-l)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>
                   🔄
                 </div>
                 <div>
-                  <div style={{ fontSize: 16, fontWeight: 700, color: '#f8fafc' }}>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--pill-sky-fg)' }}>
                     Reset Password Utente
                   </div>
                   <div style={{ fontSize: 11, color: 'var(--muted)' }}>
@@ -71,7 +71,7 @@ export function ResetPasswordModal({
             </div>
 
             {resetError && (
-              <div style={{ background: '#450a0a', border: '1px solid #dc2626', color: '#fca5a5', padding: '10px 14px', borderRadius: 8, fontSize: 12 }}>
+              <div style={{ background: 'var(--pill-red-bg)', border: '1px solid var(--red)', color: 'var(--pill-red-fg)', padding: '10px 14px', borderRadius: 8, fontSize: 12 }}>
                 ⚠️ {resetError}
               </div>
             )}
@@ -96,7 +96,7 @@ export function ResetPasswordModal({
                     onClick={handleResetUserPassword}
                     disabled={resettingPassword}
                     style={{
-                      background: 'linear-gradient(135deg, #4f46e5 0%, #4338ca 100%)',
+                      background: 'linear-gradient(135deg, var(--indigo-d) 0%, var(--indigo-d) 100%)',
                       color: '#fff',
                       border: 'none',
                       padding: '8px 18px',
@@ -114,15 +114,15 @@ export function ResetPasswordModal({
               </>
             ) : (
               <>
-                <div style={{ background: '#0d2d22', border: '1px solid #059669', borderRadius: 12, padding: 16 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: '#34d399', marginBottom: 6 }}>
+                <div style={{ background: 'var(--pill-green-bg)', border: '1px solid var(--green)', borderRadius: 12, padding: 16 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--green)', marginBottom: 6 }}>
                     ✓ Password Temporanea Generata con Successo
                   </div>
-                  <div style={{ fontSize: 11, color: '#a7f3d0', lineHeight: 1.4 }}>
+                  <div style={{ fontSize: 11, color: 'var(--pill-green-fg)', lineHeight: 1.4 }}>
                     Consegna questa password a <strong>{resetResult.nome}</strong>. Al primo accesso gli verrà richiesto obbligatoriamente di impostarne una nuova.
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, background: 'rgba(0,0,0,0.3)', padding: '10px 14px', borderRadius: 8, border: '1px solid #10b981' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, background: 'rgba(0,0,0,0.3)', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--green)' }}>
                     <code style={{ fontSize: 14, fontWeight: 800, color: '#fff', letterSpacing: '0.05em', flex: 1, fontFamily: 'monospace' }}>
                       {resetResult.passwordTemporanea}
                     </code>
@@ -134,9 +134,9 @@ export function ResetPasswordModal({
                         setTimeout(() => setCopiedResetPass(false), 3000);
                       }}
                       style={{
-                        background: copiedResetPass ? '#059669' : '#1e1b4b',
+                        background: copiedResetPass ? 'var(--green)' : 'var(--indigo)',
                         color: '#fff',
-                        border: '1px solid #4338ca',
+                        border: '1px solid var(--indigo-d)',
                         padding: '6px 12px',
                         borderRadius: 6,
                         fontSize: 11,

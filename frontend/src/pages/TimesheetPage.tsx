@@ -76,9 +76,9 @@ const STILE_TD: React.CSSProperties = {
 };
 
 const COLORI_STATO: Record<string, { colore: string; sfondo: string; bordo: string; icona: string }> = {
-  bozza: { colore: '#fbbf24', sfondo: 'rgba(251,191,36,0.08)', bordo: 'rgba(251,191,36,0.35)', icona: '⏳' },
-  approvato: { colore: '#34d399', sfondo: 'rgba(52,211,153,0.08)', bordo: 'rgba(52,211,153,0.35)', icona: '✓' },
-  rifiutato: { colore: '#f87171', sfondo: 'rgba(248,113,113,0.08)', bordo: 'rgba(248,113,113,0.35)', icona: '✕' },
+  bozza: { colore: 'var(--amber)', sfondo: 'rgba(251,191,36,0.08)', bordo: 'rgba(251,191,36,0.35)', icona: '⏳' },
+  approvato: { colore: 'var(--green)', sfondo: 'rgba(52,211,153,0.08)', bordo: 'rgba(52,211,153,0.35)', icona: '✓' },
+  rifiutato: { colore: 'var(--red)', sfondo: 'rgba(248,113,113,0.08)', bordo: 'rgba(248,113,113,0.35)', icona: '✕' },
 };
 
 export function TimesheetPage() {
@@ -178,7 +178,7 @@ export function TimesheetPage() {
         <div>
           <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: 'var(--text)' }}>⏱️ Timesheet Settimanale</h1>
           <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>
-            Registrazione ore del team · le ore <strong style={{ color: '#34d399' }}>approvate</strong> alimentano il report «Ore per Operatore»
+            Registrazione ore del team · le ore <strong style={{ color: 'var(--green)' }}>approvate</strong> alimentano il report «Ore per Operatore»
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -193,17 +193,17 @@ export function TimesheetPage() {
 
       {/* Legenda + riepilogo */}
       <div style={{ display: 'flex', gap: 16, alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', fontSize: 11, color: 'var(--muted)' }}>
-        <span><span style={{ color: '#fbbf24' }}>⏳</span> Bozza</span>
-        <span><span style={{ color: '#34d399' }}>✓</span> Approvato</span>
-        <span><span style={{ color: '#f87171' }}>✕</span> Rifiutato</span>
+        <span><span style={{ color: 'var(--amber)' }}>⏳</span> Bozza</span>
+        <span><span style={{ color: 'var(--green)' }}>✓</span> Approvato</span>
+        <span><span style={{ color: 'var(--red)' }}>✕</span> Rifiutato</span>
         <span style={{ marginLeft: 'auto' }}>
           Totale settimana: <strong style={{ color: 'var(--text)' }}>{fmtOre(totaleSettimana)} h</strong>
-          {bozzeSettimana > 0 && <> · in attesa di approvazione: <strong style={{ color: '#fbbf24' }}>{bozzeSettimana}</strong></>}
+          {bozzeSettimana > 0 && <> · in attesa di approvazione: <strong style={{ color: 'var(--amber)' }}>{bozzeSettimana}</strong></>}
         </span>
       </div>
 
       {errore && (
-        <div style={{ background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.35)', color: '#f87171', padding: '12px 16px', borderRadius: 10, fontSize: 12, marginBottom: 14 }}>
+        <div style={{ background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.35)', color: 'var(--red)', padding: '12px 16px', borderRadius: 10, fontSize: 12, marginBottom: 14 }}>
           ⚠️ {errore}
         </div>
       )}
@@ -220,7 +220,7 @@ export function TimesheetPage() {
                   const d = parseIso(g);
                   const oggi = toIso(new Date()) === g;
                   return (
-                    <th key={g} style={{ ...STILE_TH, textAlign: 'center', color: oggi ? 'var(--indigo-l, #818cf8)' : STILE_TH.color, background: oggi ? 'rgba(99,102,241,0.07)' : undefined }}>
+                    <th key={g} style={{ ...STILE_TH, textAlign: 'center', color: oggi ? 'var(--indigo-l, var(--indigo-l))' : STILE_TH.color, background: oggi ? 'rgba(99,102,241,0.07)' : undefined }}>
                       {NOMI_GIORNI[i]}<br />
                       <span style={{ fontWeight: 600, fontSize: 10 }}>{d.getDate()}/{d.getMonth() + 1}</span>
                     </th>
@@ -290,7 +290,7 @@ export function TimesheetPage() {
                           style={{
                             background: 'rgba(52,211,153,0.12)',
                             border: '1px solid rgba(52,211,153,0.4)',
-                            color: '#34d399',
+                            color: 'var(--green)',
                             fontSize: 10,
                             fontWeight: 700,
                             padding: '6px 10px',
@@ -331,7 +331,7 @@ export function TimesheetPage() {
                         style={{
                           background: 'var(--indigo)',
                           border: 'none',
-                          color: '#fff',
+                          color: 'var(--on-accent)',
                           fontSize: 10,
                           fontWeight: 700,
                           padding: '6px 10px',
@@ -458,7 +458,7 @@ function EditorCella({
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
           <div>
-            <div style={{ fontSize: 10, textTransform: 'uppercase', color: 'var(--indigo-l, #818cf8)', fontWeight: 800, letterSpacing: '.5px' }}>
+            <div style={{ fontSize: 10, textTransform: 'uppercase', color: 'var(--indigo-l, var(--indigo-l))', fontWeight: 800, letterSpacing: '.5px' }}>
               ⏱️ Registrazione ore
             </div>
             <h3 style={{ fontSize: 15, fontWeight: 700, margin: '4px 0 0 0' }}>{membro?.nome || 'Membro'}</h3>
@@ -490,14 +490,14 @@ function EditorCella({
               value={ore}
               onChange={(e) => setOre(e.target.value)}
               placeholder="es. 7.5"
-              style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg, #0b1220)', color: 'var(--text)', fontSize: 14, fontWeight: 700, marginBottom: 12 }}
+              style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg, var(--surface-2))', color: 'var(--text)', fontSize: 14, fontWeight: 700, marginBottom: 12 }}
             />
 
             <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--muted)', marginBottom: 6 }}>PROGETTO (OPZIONALE)</label>
             <select
               value={progettoId}
               onChange={(e) => setProgettoId(e.target.value)}
-              style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg, #0b1220)', color: 'var(--text)', fontSize: 12, marginBottom: 12 }}
+              style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg, var(--surface-2))', color: 'var(--text)', fontSize: 12, marginBottom: 12 }}
             >
               <option value="">— Nessun progetto specifico —</option>
               {settimana.progetti.map((p) => (
@@ -512,7 +512,7 @@ function EditorCella({
               rows={2}
               maxLength={500}
               placeholder="Attività svolta…"
-              style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg, #0b1220)', color: 'var(--text)', fontSize: 12, resize: 'vertical', marginBottom: 16 }}
+              style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg, var(--surface-2))', color: 'var(--text)', fontSize: 12, resize: 'vertical', marginBottom: 16 }}
             />
 
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
@@ -520,7 +520,7 @@ function EditorCella({
                 <button
                   onClick={() => salva(0)}
                   disabled={salvataggio}
-                  style={{ background: 'transparent', border: '1px solid rgba(248,113,113,0.4)', color: '#f87171', fontSize: 11, fontWeight: 700, padding: '9px 14px', borderRadius: 8, cursor: 'pointer' }}
+                  style={{ background: 'transparent', border: '1px solid rgba(248,113,113,0.4)', color: 'var(--red)', fontSize: 11, fontWeight: 700, padding: '9px 14px', borderRadius: 8, cursor: 'pointer' }}
                 >
                   Svuota cella
                 </button>
@@ -535,7 +535,7 @@ function EditorCella({
                   salva(Math.round(valore * 60));
                 }}
                 disabled={salvataggio || ore.trim() === ''}
-                style={{ background: 'var(--indigo)', border: 'none', color: '#fff', fontSize: 11, fontWeight: 700, padding: '9px 18px', borderRadius: 8, cursor: salvataggio ? 'wait' : 'pointer', opacity: salvataggio || ore.trim() === '' ? 0.6 : 1 }}
+                style={{ background: 'var(--indigo)', border: 'none', color: 'var(--on-accent)', fontSize: 11, fontWeight: 700, padding: '9px 18px', borderRadius: 8, cursor: salvataggio ? 'wait' : 'pointer', opacity: salvataggio || ore.trim() === '' ? 0.6 : 1 }}
               >
                 {salvataggio ? 'Salvataggio…' : 'Salva bozza'}
               </button>
@@ -563,14 +563,14 @@ function EditorCella({
             <button
               onClick={approva}
               disabled={salvataggio}
-              style={{ flex: 1, background: 'rgba(52,211,153,0.12)', border: '1px solid rgba(52,211,153,0.4)', color: '#34d399', fontSize: 11, fontWeight: 700, padding: '9px 0', borderRadius: 8, cursor: 'pointer' }}
+              style={{ flex: 1, background: 'rgba(52,211,153,0.12)', border: '1px solid rgba(52,211,153,0.4)', color: 'var(--green)', fontSize: 11, fontWeight: 700, padding: '9px 0', borderRadius: 8, cursor: 'pointer' }}
             >
               ✓ Approva ore
             </button>
             <button
               onClick={rifiuta}
               disabled={salvataggio}
-              style={{ flex: 1, background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.4)', color: '#f87171', fontSize: 11, fontWeight: 700, padding: '9px 0', borderRadius: 8, cursor: 'pointer' }}
+              style={{ flex: 1, background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.4)', color: 'var(--red)', fontSize: 11, fontWeight: 700, padding: '9px 0', borderRadius: 8, cursor: 'pointer' }}
             >
               ✕ Rifiuta
             </button>

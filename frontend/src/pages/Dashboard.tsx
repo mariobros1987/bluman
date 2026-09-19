@@ -233,7 +233,7 @@ export function Dashboard() {
               onClick={loadProjects}
               style={{
                 padding: '8px 20px', borderRadius: 8, border: 'none',
-                background: 'var(--accent)', color: '#fff', cursor: 'pointer',
+                background: 'var(--accent)', color: 'var(--on-accent)', cursor: 'pointer',
                 fontSize: 13, fontWeight: 600
               }}
             >
@@ -260,18 +260,18 @@ export function Dashboard() {
     <>
       {/* DB Connection Indicator */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-        <div style={{ fontSize: 11, color: '#34d399', display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#10b981' }} />
+        <div style={{ fontSize: 11, color: 'var(--green)', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--green)' }} />
           🟢 Enterprise Cloud Database Collegato
         </div>
       </div>
 
       {/* KPI */}
       <div className={styles.kpiGrid}>
-        <KpiCard icon="📁" iconBg="#1a1f3d" value={projectList.length} label="Progetti attivi" sub={`${active} in lavorazione`} />
-        <KpiCard icon="⚠️" iconBg="#2d1a05" value={alerts} label="Ritardi attivi" sub="Richiedono attenzione" valueColor={alerts > 0 ? 'var(--amber)' : undefined} />
-        <KpiCard icon="💶" iconBg="#0d2d22" value={fmt(totalVal)} label="Valore portafoglio" sub="Progetti in corso" />
-        <KpiCard icon="📈" iconBg="#1a1f3d" value={`${avgPct}%`} label="Avanzamento medio" sub="Tutti i progetti" />
+        <KpiCard icon="📁" iconBg="var(--pill-indigo-bg)" value={projectList.length} label="Progetti attivi" sub={`${active} in lavorazione`} />
+        <KpiCard icon="⚠️" iconBg="var(--pill-amber-bg)" value={alerts} label="Ritardi attivi" sub="Richiedono attenzione" valueColor={alerts > 0 ? 'var(--amber)' : undefined} />
+        <KpiCard icon="💶" iconBg="var(--pill-green-bg)" value={fmt(totalVal)} label="Valore portafoglio" sub="Progetti in corso" />
+        <KpiCard icon="📈" iconBg="var(--pill-indigo-bg)" value={`${avgPct}%`} label="Avanzamento medio" sub="Tutti i progetti" />
       </div>
 
       {/* Alert banner */}

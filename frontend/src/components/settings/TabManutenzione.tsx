@@ -47,7 +47,7 @@ export function TabManutenzione({
           </div>
 
           {chiaviRimosse && (
-            <div style={{ background: '#0d2d22', border: '1px solid #1a5c3c', color: '#34d399', padding: '12px 16px', borderRadius: 10, fontSize: 12, marginTop: 14 }}>
+            <div style={{ background: 'var(--pill-green-bg)', border: '1px solid var(--pill-green-bg)', color: 'var(--green)', padding: '12px 16px', borderRadius: 10, fontSize: 12, marginTop: 14 }}>
               ✓ Rimosse {chiaviRimosse.length} voci. Ricarica la pagina per vedere l'elenco pulito.
             </div>
           )}
@@ -66,13 +66,13 @@ export function TabManutenzione({
                 type="button"
                 disabled={chiaviLocali.length === 0}
                 onClick={() => setConfermaSvuota(true)}
-                style={{ background: chiaviLocali.length === 0 ? 'var(--card2)' : '#7f1d1d', border: '1px solid #dc2626', color: chiaviLocali.length === 0 ? 'var(--muted)' : '#fecaca', padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: chiaviLocali.length === 0 ? 'default' : 'pointer' }}
+                style={{ background: chiaviLocali.length === 0 ? 'var(--card2)' : 'var(--pill-red-bg)', border: '1px solid var(--red)', color: chiaviLocali.length === 0 ? 'var(--muted)' : 'var(--pill-red-fg)', padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: chiaviLocali.length === 0 ? 'default' : 'pointer' }}
               >
                 🧹 Svuota i dati locali di questo browser
               </button>
             ) : (
               <>
-                <span style={{ fontSize: 12, color: '#fca5a5' }}>
+                <span style={{ fontSize: 12, color: 'var(--pill-red-fg)' }}>
                   ⚠️ L'operazione non si annulla: quello che sta solo qui va perso. Confermi?
                 </span>
                 <button
@@ -85,7 +85,7 @@ export function TabManutenzione({
                 <button
                   type="button"
                   onClick={() => { const rimosse = svuotaDatiLocali(); setChiaviRimosse(rimosse); setChiaviLocali(chiaviDatiLocali()); setConfermaSvuota(false); }}
-                  style={{ background: '#dc2626', border: 'none', color: '#fff', padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+                  style={{ background: 'var(--red)', border: 'none', color: '#fff', padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
                 >
                   Sì, svuota
                 </button>

@@ -125,9 +125,9 @@ export function LinkTelegramProgetto({ progettoId }: { progettoId: string }) {
   };
 
   const bottone = (extra: React.CSSProperties): React.CSSProperties => ({
-    background: '#1a1f3d',
-    border: '1px solid #2d3260',
-    color: '#818cf8',
+    background: 'var(--surface-1)',
+    border: '1px solid var(--card2)',
+    color: 'var(--indigo-l)',
     padding: '4px 10px',
     borderRadius: 8,
     fontSize: 11,
@@ -158,13 +158,13 @@ export function LinkTelegramProgetto({ progettoId }: { progettoId: string }) {
             maxWidth: '90vw',
             padding: 12,
             borderRadius: 10,
-            background: '#0c1a2e',
-            border: '1px solid #1e3a5f',
+            background: 'var(--surface-1)',
+            border: '1px solid var(--pill-blue-bg)',
             boxShadow: '0 10px 30px rgba(0,0,0,.45)',
             textAlign: 'left',
           }}
         >
-          <div style={{ fontSize: 11.5, fontWeight: 700, color: '#38bdf8', marginBottom: 6 }}>
+          <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--cat-societario)', marginBottom: 6 }}>
             Collega la chat Telegram del cliente a questa pratica
           </div>
           <div style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.5, marginBottom: 8 }}>
@@ -178,9 +178,9 @@ export function LinkTelegramProgetto({ progettoId }: { progettoId: string }) {
             <div
               style={{
                 fontSize: 10.5,
-                color: '#93c5fd',
-                background: '#0b1220',
-                border: '1px solid #1e3a5f',
+                color: 'var(--pill-blue-fg)',
+                background: 'var(--surface-2)',
+                border: '1px solid var(--pill-blue-bg)',
                 borderRadius: 6,
                 padding: '6px 8px',
                 marginBottom: 8,
@@ -194,14 +194,14 @@ export function LinkTelegramProgetto({ progettoId }: { progettoId: string }) {
           )}
 
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            <button type="button" onClick={copia} style={bottone({ background: '#1e3a5f', color: '#93c5fd', border: '1px solid #2d4a6b' })}>
+            <button type="button" onClick={copia} style={bottone({ background: 'var(--pill-blue-bg)', color: 'var(--pill-blue-fg)', border: '1px solid var(--pill-blue-bg)' })}>
               {copiato ? '✅ Copiato' : '📋 Copia link'}
             </button>
             <button
               type="button"
               disabled={inviando !== null}
               onClick={() => invia('email')}
-              style={bottone({ background: '#1e3a5f', color: '#93c5fd', border: '1px solid #2d4a6b', opacity: inviando ? 0.6 : 1 })}
+              style={bottone({ background: 'var(--pill-blue-bg)', color: 'var(--pill-blue-fg)', border: '1px solid var(--pill-blue-bg)', opacity: inviando ? 0.6 : 1 })}
             >
               {inviando === 'email' ? '⏳ Invio…' : '✉️ Invia via email'}
             </button>
@@ -209,7 +209,7 @@ export function LinkTelegramProgetto({ progettoId }: { progettoId: string }) {
               type="button"
               disabled={inviando !== null}
               onClick={() => invia('whatsapp')}
-              style={bottone({ background: '#1e3a5f', color: '#93c5fd', border: '1px solid #2d4a6b', opacity: inviando ? 0.6 : 1 })}
+              style={bottone({ background: 'var(--pill-blue-bg)', color: 'var(--pill-blue-fg)', border: '1px solid var(--pill-blue-bg)', opacity: inviando ? 0.6 : 1 })}
             >
               {inviando === 'whatsapp' ? '⏳ Invio…' : '💬 Invia via WhatsApp'}
             </button>
@@ -222,20 +222,20 @@ export function LinkTelegramProgetto({ progettoId }: { progettoId: string }) {
                 padding: '6px 10px',
                 borderRadius: 6,
                 fontSize: 11,
-                background: esito.ok ? '#052e16' : '#450a0a',
-                color: esito.ok ? '#34d399' : '#fca5a5',
-                border: `1px solid ${esito.ok ? '#166534' : '#991b1b'}`,
+                background: esito.ok ? 'var(--pill-green-bg)' : 'var(--pill-red-bg)',
+                color: esito.ok ? 'var(--green)' : 'var(--pill-red-fg)',
+                border: `1px solid ${esito.ok ? 'var(--pill-green-bd)' : 'var(--pill-red-bd)'}`,
               }}
             >
               {esito.testo}
             </div>
           )}
 
-          <div style={{ marginTop: 10, borderTop: '1px solid #1e3a5f', paddingTop: 8 }}>
+          <div style={{ marginTop: 10, borderTop: '1px solid var(--pill-blue-bg)', paddingTop: 8 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>
               Chat collegate {collegamenti.length > 0 && `(${collegamenti.length})`}
             </div>
-            {erroreElenco && <div style={{ fontSize: 10.5, color: '#fbbf24' }}>{erroreElenco}</div>}
+            {erroreElenco && <div style={{ fontSize: 10.5, color: 'var(--amber)' }}>{erroreElenco}</div>}
             {!erroreElenco && collegamenti.length === 0 && (
               <div style={{ fontSize: 10.5, color: 'var(--muted)' }}>
                 Nessuna chat ancora collegata: l'elenco si popola quando il cliente apre il link.
@@ -246,7 +246,7 @@ export function LinkTelegramProgetto({ progettoId }: { progettoId: string }) {
                 key={c.id}
                 style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 10.5, padding: '3px 0' }}
               >
-                <span style={{ color: '#93c5fd' }}>
+                <span style={{ color: 'var(--pill-blue-fg)' }}>
                   {c.canale === 'telegram' ? '✈️' : '💬'} {c.chatId}
                 </span>
                 <span style={{ color: 'var(--muted)' }}>
@@ -257,7 +257,7 @@ export function LinkTelegramProgetto({ progettoId }: { progettoId: string }) {
                   type="button"
                   onClick={() => revoca(c.id)}
                   title="Scollega: quella chat non scriverà più in questa pratica"
-                  style={bottone({ marginLeft: 'auto', background: '#7f1d1d', border: '1px solid #991b1b', color: '#fca5a5' })}
+                  style={bottone({ marginLeft: 'auto', background: 'var(--pill-red-bg)', border: '1px solid var(--pill-red-bd)', color: 'var(--pill-red-fg)' })}
                 >
                   Scollega
                 </button>

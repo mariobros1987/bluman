@@ -37,7 +37,7 @@ export function TabFatture({
       </div>
 
       {fattureErrore && (
-        <div style={{ background: '#3b1219', border: '1px solid #7f1d1d', color: '#fecaca', borderRadius: 12, padding: 14, fontSize: 12, marginBottom: 14 }}>
+        <div style={{ background: 'var(--pill-red-bg)', border: '1px solid var(--pill-red-bd)', color: 'var(--pill-red-fg)', borderRadius: 12, padding: 14, fontSize: 12, marginBottom: 14 }}>
           <strong>Non riesco a leggere le fatture.</strong> {fattureErrore}
         </div>
       )}
@@ -61,8 +61,8 @@ export function TabFatture({
           <div
             key={f.id}
             style={{
-              background: f.pagata ? '#0d2d22' : 'var(--card2)',
-              border: `1px solid ${f.pagata ? '#1a5c3c' : 'var(--border)'}`,
+              background: f.pagata ? 'var(--pill-green-bg)' : 'var(--card2)',
+              border: `1px solid ${f.pagata ? 'var(--pill-green-bd)' : 'var(--border)'}`,
               borderRadius: 12,
               padding: '14px 16px',
               display: 'flex',
@@ -83,7 +83,7 @@ export function TabFatture({
                     <span style={{ fontSize: 10, background: 'var(--card)', padding: '2px 6px', borderRadius: 6, color: 'var(--muted)', fontWeight: 600 }}>{f.progetto}</span>
                   )}
                 </div>
-                <div style={{ fontSize: 10.5, color: f.pagata ? '#a7f3d0' : 'var(--muted)', marginTop: 3 }}>
+                <div style={{ fontSize: 10.5, color: f.pagata ? 'var(--pill-green-fg)' : 'var(--muted)', marginTop: 3 }}>
                   {f.data ? `Emessa il ${new Date(f.data).toLocaleDateString('it-IT')}` : 'Data non indicata'}
                   {f.pagata
                     ? ' · ✓ Pagata'
@@ -96,7 +96,7 @@ export function TabFatture({
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <span
                 style={{
-                  background: f.pagata ? '#10b981' : 'var(--amber)',
+                  background: f.pagata ? 'var(--green)' : 'var(--amber)',
                   color: '#000',
                   fontSize: 10.5,
                   fontWeight: 800,

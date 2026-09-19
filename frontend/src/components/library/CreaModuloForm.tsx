@@ -168,7 +168,7 @@ export function CreaModuloForm({ articoliList, giurList, moduloInModifica, onCre
                 <div
                   key={a.id}
                   style={{
-                    background: isSel ? 'linear-gradient(135deg,#1a1f3d,#1e2045)' : 'var(--card2)',
+                    background: isSel ? 'linear-gradient(135deg,var(--surface-1),var(--card2))' : 'var(--card2)',
                     border: `1px solid ${isSel ? 'var(--indigo-l)' : 'var(--border)'}`,
                     borderRadius: 10,
                     padding: '10px 12px',
@@ -182,7 +182,7 @@ export function CreaModuloForm({ articoliList, giurList, moduloInModifica, onCre
                     <input type="checkbox" checked={isSel} readOnly style={{ cursor: 'pointer', transform: 'scale(1.1)' }} />
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 12.5, fontWeight: 600, color: isSel ? '#fff' : 'var(--text)' }}>{a.n}</div>
-                      <div style={{ fontSize: 10, color: isSel ? '#a5b4fc' : 'var(--muted)', marginTop: 2 }}>
+                      <div style={{ fontSize: 10, color: isSel ? 'var(--indigo-l)' : 'var(--muted)', marginTop: 2 }}>
                         {a.cat} · ⏱ {a.h}h stimate · Listino: {fmt(a.p)}
                       </div>
                     </div>
@@ -203,12 +203,12 @@ export function CreaModuloForm({ articoliList, giurList, moduloInModifica, onCre
 
                       {/* EDIT PREZZO PERSONALIZZATO */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span style={{ fontSize: 10, color: '#34d399', fontWeight: 600 }}>€ Prezzo unitario:</span>
+                        <span style={{ fontSize: 10, color: 'var(--green)', fontWeight: 600 }}>€ Prezzo unitario:</span>
                         <input
                           type="number"
                           value={currentPrice}
                           onChange={e => updateCustomPrice(a.id, Number(e.target.value))}
-                          style={{ width: 80, padding: '3px 6px', fontSize: 11, fontWeight: 700, textAlign: 'right', color: '#34d399', background: '#0d2d22', borderColor: '#1a5c3c' }}
+                          style={{ width: 80, padding: '3px 6px', fontSize: 11, fontWeight: 700, textAlign: 'right', color: 'var(--pill-green-fg)', background: 'var(--pill-green-bg)', borderColor: 'var(--pill-green-bd)' }}
                           min={0}
                           step={50}
                         />
@@ -264,20 +264,20 @@ export function CreaModuloForm({ articoliList, giurList, moduloInModifica, onCre
             </div>
 
             {/* Riepilogo Economico & Forfait */}
-            <div style={{ background: 'linear-gradient(135deg,#1a1f3d,#1e2045)', border: '1px solid #2d3260', borderRadius: 12, padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ background: 'linear-gradient(135deg,var(--surface-1),var(--card2))', border: '1px solid var(--card2)', borderRadius: 12, padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12 }}>
-                <span style={{ color: '#818cf8' }}>Somma Singoli Articoli:</span>
+                <span style={{ color: 'var(--indigo-l)' }}>Somma Singoli Articoli:</span>
                 <span style={{ fontWeight: 700, color: '#fff' }}>{fmt(totalCalculated)}</span>
               </div>
 
               <div>
-                <label style={{ fontSize: 11, color: '#a5b4fc', display: 'block', marginBottom: 4 }}>Prezzo Forfait Modulo (€ opzionale) *</label>
+                <label style={{ fontSize: 11, color: 'var(--indigo-l)', display: 'block', marginBottom: 4 }}>Prezzo Forfait Modulo (€ opzionale) *</label>
                 <input
                   type="number"
                   value={prezzoPkg}
                   onChange={e => setPrezzoPkg(e.target.value === '' ? '' : Number(e.target.value))}
                   placeholder={`Prezzo Pacchetto € (Default ${fmt(totalCalculated)})`}
-                  style={{ fontSize: 13, fontWeight: 700, background: '#0f172a', borderColor: '#334155' }}
+                  style={{ fontSize: 13, fontWeight: 700, background: 'var(--surface-2)', borderColor: 'var(--border)' }}
                 />
               </div>
             </div>
@@ -288,7 +288,7 @@ export function CreaModuloForm({ articoliList, giurList, moduloInModifica, onCre
               style={{
                 width: '100%',
                 background: 'var(--indigo)',
-                color: '#fff',
+                color: 'var(--on-accent)',
                 border: 'none',
                 padding: '12px',
                 borderRadius: 10,

@@ -102,28 +102,28 @@ export function TabProposta({
       {signed ? (
         <div>
           {/* 🔒 CONTRATTO BASE STIPULATO & CONGELATO (v1.0) */}
-          <div style={{ background: '#0d2d22', border: '1px solid #1a5c3c', borderRadius: 14, padding: 20, marginBottom: 24 }}>
+          <div style={{ background: 'var(--pill-green-bg)', border: '1px solid var(--pill-green-bg)', borderRadius: 14, padding: 20, marginBottom: 24 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12, marginBottom: 14 }}>
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                  <span style={{ background: '#34d399', color: '#064e3b', fontSize: 10, fontWeight: 800, padding: '3px 8px', borderRadius: 12, textTransform: 'uppercase' }}>
+                  <span style={{ background: 'var(--green)', color: 'var(--pill-green-bg)', fontSize: 10, fontWeight: 800, padding: '3px 8px', borderRadius: 12, textTransform: 'uppercase' }}>
                     🔒 FIRMATO & CONGELATO (v1.0)
                   </span>
                   {/* Repertorio e marca temporale vengono dal sigillo di firma emesso dal server
                       (/portal/verify-otp-and-sign). Prima erano cablati: mostravano data, ora e
                       IP di una firma che non era quella del cliente collegato. */}
                   {eidasSeal?.signatureId && (
-                    <span style={{ fontSize: 11, color: '#34d399', fontFamily: 'monospace' }}>{eidasSeal.signatureId}</span>
+                    <span style={{ fontSize: 11, color: 'var(--green)', fontFamily: 'monospace' }}>{eidasSeal.signatureId}</span>
                   )}
                 </div>
                 <h3 style={{ fontSize: 17, fontWeight: 700, color: '#fff', margin: 0 }}>Engagement Letter & Proposta d'Ordine Iniziale (v1.0)</h3>
                 {eidasSeal?.timestampIso ? (
-                  <div style={{ fontSize: 11, color: '#a7f3d0', marginTop: 4 }}>
+                  <div style={{ fontSize: 11, color: 'var(--pill-green-fg)', marginTop: 4 }}>
                     Stipulato il: <strong>{new Date(eidasSeal.timestampIso).toLocaleString('it-IT')}</strong>
                     {eidasSeal.sha256Digest && <> · Impronta SHA-256: <span style={{ fontFamily: 'monospace' }}>{String(eidasSeal.sha256Digest).slice(0, 16)}…</span></>}
                   </div>
                 ) : (
-                  <div style={{ fontSize: 11, color: '#fbbf24', marginTop: 4 }}>
+                  <div style={{ fontSize: 11, color: 'var(--amber)', marginTop: 4 }}>
                     Firma registrata su questo dispositivo, ma il sigillo di firma non è disponibile:
                     non possiamo mostrarne marca temporale né impronta. Richiedi allo studio la copia con evidenza di firma.
                   </div>
@@ -137,18 +137,18 @@ export function TabProposta({
                     const rawLogo = localStorage.getItem(getTenantStorageKey('bluman_logo_url')) || (isBC ? `${window.location.origin}/logo.png` : '');
                     const logoHtml = rawLogo
                       ? `<img src="${rawLogo}" style="max-height:55px;max-width:220px;object-fit:contain;margin-bottom:8px;display:block;" />`
-                      : `<div style="font-size:20px;font-weight:800;color:#1e1b4b;margin-bottom:8px;">🏛 ${studio.ragioneSociale.toUpperCase()}</div>`;
+                      : `<div style="font-size:20px;font-weight:800;color:var(--pill-indigo-bg);margin-bottom:8px;">🏛 ${studio.ragioneSociale.toUpperCase()}</div>`;
                     const htmlContent = `
-                      <div style="border-bottom:2px solid #0f172a;padding-bottom:15px;display:flex;justify-content:space-between;align-items:flex-start;">
+                      <div style="border-bottom:2px solid var(--surface-2);padding-bottom:15px;display:flex;justify-content:space-between;align-items:flex-start;">
                         <div>
                           ${logoHtml}
-                          <div style="font-size:20px;font-weight:800;color:#1e1b4b;">${studio.ragioneSociale.toUpperCase()} — ADVISORY</div>
-                          <div style="font-size:11px;color:#475569;margin-top:2px;">${studio.sedeLegale}</div>
+                          <div style="font-size:20px;font-weight:800;color:var(--pill-indigo-bg);">${studio.ragioneSociale.toUpperCase()} — ADVISORY</div>
+                          <div style="font-size:11px;color:var(--muted);margin-top:2px;">${studio.sedeLegale}</div>
                         </div>
                         <div style="text-align:right;">
-                          <div style="font-size:16px;font-weight:800;color:#4338ca;">ENGAGEMENT LETTER v1.0 (CONGELATO)</div>
+                          <div style="font-size:16px;font-weight:800;color:var(--indigo-d);">ENGAGEMENT LETTER v1.0 (CONGELATO)</div>
                           <div style="font-size:12px;font-weight:700;margin-top:2px;">Cliente: ${clientName}</div>
-                          <div style="font-size:10px;color:#166534;margin-top:2px;">✓ FIRMATO DIGITALMENTE E CONGELATO</div>
+                          <div style="font-size:10px;color:var(--pill-green-bd);margin-top:2px;">✓ FIRMATO DIGITALMENTE E CONGELATO</div>
                         </div>
                       </div>
                       <p style="margin-top:20px;line-height:1.6;">Si attesta la stipula ed il congelamento immutabile dell'Engagement Letter professionale per l'avvio delle attività di consulenza patrimoniale.</p>
@@ -168,14 +168,14 @@ export function TabProposta({
                       : [];
                     await downloadRealPdf(`Engagement_Letter_v1.0_${clientName.replace(/\s+/g, '_')}`, htmlContent, evidenzeFirma);
                   }}
-                  style={{ background: '#166534', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+                  style={{ background: 'var(--green)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
                 >
                   📥 Scarica PDF Contratto Congelato v1.0
                 </button>
               </div>
             </div>
 
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#6ee7b7', textTransform: 'uppercase', marginBottom: 8 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--pill-green-fg)', textTransform: 'uppercase', marginBottom: 8 }}>
               Moduli Inclusi nel Contratto Base (Stipula Iniziale):
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
@@ -191,7 +191,7 @@ export function TabProposta({
                 </div>
               ))}
             </div>
-            <div style={{ fontSize: 13, fontWeight: 800, color: '#34d399', textAlign: 'right' }}>
+            <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--green)', textAlign: 'right' }}>
               Valore Base Congelato: {fmt(totalValue)}
             </div>
           </div>
@@ -206,7 +206,7 @@ export function TabProposta({
             </div>
 
             {addendumErrore && (
-              <div style={{ background: '#2d1516', border: '1px solid #7f1d1d', color: '#fca5a5', borderRadius: 10, padding: 10, fontSize: 11, marginBottom: 14 }}>
+              <div style={{ background: 'var(--pill-red-bg)', border: '1px solid var(--pill-red-bg)', color: 'var(--pill-red-fg)', borderRadius: 10, padding: 10, fontSize: 11, marginBottom: 14 }}>
                 ⚠️ {addendumErrore}
               </div>
             )}
@@ -232,7 +232,7 @@ export function TabProposta({
                 </button>
               </div>
               {addendumMsg && (
-                <div style={{ fontSize: 11, marginTop: 8, fontWeight: 600, color: addendumMsg.type === 'success' ? '#34d399' : '#fca5a5' }}>
+                <div style={{ fontSize: 11, marginTop: 8, fontWeight: 600, color: addendumMsg.type === 'success' ? 'var(--green)' : 'var(--pill-red-fg)' }}>
                   {addendumMsg.text}
                 </div>
               )}
@@ -248,12 +248,12 @@ export function TabProposta({
                   const badgeStato: Record<string, { testo: string; colore: string; sfondo: string }> = {
                     richiesta: { testo: '📨 INVIATA — IN ATTESA', colore: '#000', sfondo: 'var(--amber)' },
                     in_preparazione: { testo: '⚙️ IN PREPARAZIONE', colore: '#fff', sfondo: 'var(--indigo)' },
-                    pronta: { testo: '✅ PRONTA', colore: '#000', sfondo: '#34d399' },
-                    rifiutata: { testo: '⛔ RIFIUTATA', colore: '#fff', sfondo: '#b91c1c' },
+                    pronta: { testo: '✅ PRONTA', colore: '#000', sfondo: 'var(--green)' },
+                    rifiutata: { testo: '⛔ RIFIUTATA', colore: '#fff', sfondo: 'var(--pill-red-bd)' },
                   };
                   const badge = badgeStato[add.stato] ?? badgeStato.richiesta;
                   return (
-                    <div key={add.id} style={{ background: add.stato === 'pronta' ? '#0d2d22' : 'var(--card2)', border: `1px solid ${add.stato === 'pronta' ? '#1a5c3c' : 'var(--border)'}`, borderRadius: 12, padding: 16 }}>
+                    <div key={add.id} style={{ background: add.stato === 'pronta' ? 'var(--pill-green-bg)' : 'var(--card2)', border: `1px solid ${add.stato === 'pronta' ? 'var(--pill-green-bg)' : 'var(--border)'}`, borderRadius: 12, padding: 16 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
                         <span style={{ background: badge.sfondo, color: badge.colore, fontSize: 9, fontWeight: 800, padding: '2px 6px', borderRadius: 10 }}>
                           {badge.testo}
@@ -286,21 +286,21 @@ export function TabProposta({
       ) : (
         <div>
           {/* 🛡️ GUIDA STEP-BY-STEP PER IL CLIENTE NELLE FIRME */}
-          <div style={{ background: 'linear-gradient(135deg, rgba(30, 27, 75, 0.7), rgba(49, 46, 129, 0.45))', border: '1px solid #4338ca', borderRadius: 14, padding: 18, marginBottom: 22 }}>
-            <div style={{ fontSize: 11, color: '#a5b4fc', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 12 }}>
+          <div style={{ background: 'linear-gradient(135deg, rgba(30, 27, 75, 0.7), rgba(49, 46, 129, 0.45))', border: '1px solid var(--indigo-d)', borderRadius: 14, padding: 18, marginBottom: 22 }}>
+            <div style={{ fontSize: 11, color: 'var(--pill-indigo-fg)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 12 }}>
               📋 Guida Rapida alla Sottoscrizione Digitale (3 Semplici Passaggi)
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
               <div style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '12px 14px' }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: '#c7d2fe', marginBottom: 4 }}>1️⃣ Revisione Condizioni</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--pill-indigo-fg)', marginBottom: 4 }}>1️⃣ Revisione Condizioni</div>
                 <div style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.4 }}>Esamina i moduli inclusi, le tariffe trasparenti e le clausole dell'incarico.</div>
               </div>
               <div style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '12px 14px' }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: '#c7d2fe', marginBottom: 4 }}>2️⃣ Verifica OTP Sicuro</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--pill-indigo-fg)', marginBottom: 4 }}>2️⃣ Verifica OTP Sicuro</div>
                 <div style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.4 }}>Ricevi un codice temporaneo a 6 cifre via WhatsApp o Email certificata.</div>
               </div>
               <div style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '12px 14px' }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: '#34d399', marginBottom: 4 }}>3️⃣ Firma con OTP verificata</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--green)', marginBottom: 4 }}>3️⃣ Firma con OTP verificata</div>
                 <div style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.4 }}>Apponi la firma elettronica semplice (OTP verificata · art. 20 CAD) e scarica l'attestazione PDF.</div>
               </div>
             </div>
@@ -348,8 +348,8 @@ export function TabProposta({
                   key={m.id || idx}
                   onClick={() => setSelectedModule(m)}
                   style={{
-                    background: isSigned ? '#0d2d22' : 'var(--card2)',
-                    border: isSigned ? '1.5px solid #10b981' : isDone ? '1.5px solid #6366f1' : '1px solid var(--border)',
+                    background: isSigned ? 'var(--pill-green-bg)' : 'var(--card2)',
+                    border: isSigned ? '1.5px solid var(--green)' : isDone ? '1.5px solid var(--indigo)' : '1px solid var(--border)',
                     borderRadius: 12,
                     padding: '16px 18px',
                     cursor: 'pointer',
@@ -367,7 +367,7 @@ export function TabProposta({
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                       {isSigned ? (
-                        <span style={{ background: '#10b981', color: '#064e3b', fontSize: 10.5, fontWeight: 800, padding: '3px 8px', borderRadius: 12 }}>
+                        <span style={{ background: 'var(--green)', color: 'var(--pill-green-bg)', fontSize: 10.5, fontWeight: 800, padding: '3px 8px', borderRadius: 12 }}>
                           ✓ CONCLUSO & FIRMATO
                         </span>
                       ) : isDone ? (
@@ -375,7 +375,7 @@ export function TabProposta({
                           ✍️ CONCLUSO (DA FIRMARE)
                         </span>
                       ) : (
-                        <span style={{ background: '#200f40', color: '#a78bfa', fontSize: 10.5, fontWeight: 700, padding: '3px 8px', borderRadius: 12 }}>
+                        <span style={{ background: 'var(--pill-indigo-bg)', color: 'var(--purple)', fontSize: 10.5, fontWeight: 700, padding: '3px 8px', borderRadius: 12 }}>
                           ⏱ IN LAVORAZIONE ({m.percentuale ?? 0}%)
                         </span>
                       )}
@@ -397,10 +397,10 @@ export function TabProposta({
             })}
           </div>
 
-          <div style={{ background: 'linear-gradient(135deg,#1a1f3d,#1e2045)', border: '1px solid #2d3260', borderRadius: 14, padding: '18px 22px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
+          <div style={{ background: 'linear-gradient(135deg,var(--surface-1),var(--surface-1))', border: '1px solid var(--card2)', borderRadius: 14, padding: '18px 22px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
             <div>
-              <div style={{ fontSize: 12, color: '#818cf8', fontWeight: 600 }}>Valore Totale Complessivo Proposta d'Ordine</div>
-              <div style={{ fontSize: 11, color: '#818cf8', opacity: 0.8, marginTop: 2 }}>Nessun costo nascosto. Include assistenza fino al completamento.</div>
+              <div style={{ fontSize: 12, color: 'var(--indigo-l)', fontWeight: 600 }}>Valore Totale Complessivo Proposta d'Ordine</div>
+              <div style={{ fontSize: 11, color: 'var(--indigo-l)', opacity: 0.8, marginTop: 2 }}>Nessun costo nascosto. Include assistenza fino al completamento.</div>
             </div>
             <div style={{ fontSize: 26, fontWeight: 800 }}>{fmt(totalValue)}</div>
           </div>
@@ -422,9 +422,9 @@ export function TabProposta({
                   await downloadRealPdf(`Engagement_Letter_Bozza_${clientName.replace(/\s+/g, '_')}`, getResolvedEngagementHtml());
                 }}
                 style={{
-                  background: '#1a1f3d',
-                  border: '1px solid #4338ca',
-                  color: '#c7d2fe',
+                  background: 'var(--surface-1)',
+                  border: '1px solid var(--indigo-d)',
+                  color: 'var(--pill-indigo-fg)',
                   padding: '8px 16px',
                   borderRadius: 8,
                   fontSize: 11,
@@ -482,8 +482,8 @@ export function TabProposta({
                     type="button"
                     onClick={() => { setModalitaFirma(m.id); setOtpError(null); }}
                     style={{
-                      background: modalitaFirma === m.id ? '#1e1b4b' : 'var(--card)',
-                      border: `1.5px solid ${modalitaFirma === m.id ? '#6366f1' : 'var(--border)'}`,
+                      background: modalitaFirma === m.id ? 'var(--pill-indigo-bg)' : 'var(--card)',
+                      border: `1.5px solid ${modalitaFirma === m.id ? 'var(--indigo)' : 'var(--border)'}`,
                       borderRadius: 10,
                       padding: '10px 14px',
                       textAlign: 'left',
@@ -495,7 +495,7 @@ export function TabProposta({
                   >
                     <span style={{ fontSize: 20 }}>{m.icona}</span>
                     <div>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: modalitaFirma === m.id ? '#a5b4fc' : 'var(--text)' }}>{m.titolo}</div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: modalitaFirma === m.id ? 'var(--pill-indigo-fg)' : 'var(--text)' }}>{m.titolo}</div>
                       <div style={{ fontSize: 10, color: 'var(--muted)' }}>{m.nota}</div>
                     </div>
                   </button>
@@ -515,17 +515,17 @@ export function TabProposta({
                   </div>
 
                   {canaliFirma.length === 0 ? (
-                    <div style={{ fontSize: 11.5, color: '#fbbf24', background: 'rgba(251,191,36,.08)', border: '1px solid rgba(251,191,36,.3)', borderRadius: 8, padding: 10 }}>
+                    <div style={{ fontSize: 11.5, color: 'var(--amber)', background: 'rgba(251,191,36,.08)', border: '1px solid rgba(251,191,36,.3)', borderRadius: 8, padding: 10 }}>
                       ⚠️ Non è stato possibile leggere i canali di invio disponibili. Ricarica la pagina o contatta lo Studio: senza un canale attivo il codice non può essere spedito.
                     </div>
                   ) : (
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10, marginBottom: 14 }}>
                       {canaliFirma.map((c) => {
                         const stile: Record<CanaleOtp, { icona: string; sfondo: string; bordo: string; testo: string }> = {
-                          whatsapp: { icona: '🟢', sfondo: '#0d2d22', bordo: '#059669', testo: '#34d399' },
-                          email: { icona: '✉️', sfondo: '#1e1b4b', bordo: '#6366f1', testo: '#818cf8' },
-                          telegram: { icona: '✈️', sfondo: '#0c2b3f', bordo: '#0ea5e9', testo: '#38bdf8' },
-                          signal: { icona: '🔒', sfondo: '#1e1b4b', bordo: '#4338ca', testo: '#a5b4fc' },
+                          whatsapp: { icona: '🟢', sfondo: 'var(--pill-green-bg)', bordo: 'var(--green)', testo: 'var(--green)' },
+                          email: { icona: '✉️', sfondo: 'var(--pill-indigo-bg)', bordo: 'var(--indigo)', testo: 'var(--indigo-l)' },
+                          telegram: { icona: '✈️', sfondo: 'var(--surface-1)', bordo: 'var(--cat-societario)', testo: 'var(--cat-societario)' },
+                          signal: { icona: '🔒', sfondo: 'var(--pill-indigo-bg)', bordo: 'var(--indigo-d)', testo: 'var(--pill-indigo-fg)' },
                         };
                         const s = stile[c.canale];
                         const scelto = otpCanale === c.canale;
@@ -589,7 +589,7 @@ export function TabProposta({
                             placeholder={otpCanale === 'email' ? 'nome@dominio.it' : '+39 ...'}
                             style={{ fontSize: 12, padding: '8px 12px', borderRadius: 8, background: 'var(--card)', color: 'var(--text)', border: '1px solid var(--border)', minWidth: 260 }}
                           />
-                          <div style={{ fontSize: 10, color: '#fbbf24', marginTop: 6, lineHeight: 1.4 }}>
+                          <div style={{ fontSize: 10, color: 'var(--amber)', marginTop: 6, lineHeight: 1.4 }}>
                             Il recapito che indichi qui viene registrato nel verbale di firma come dichiarato da te
                             e diverso da quello della tua scheda anagrafica.
                           </div>
@@ -602,7 +602,7 @@ export function TabProposta({
                   {otpCanale === 'telegram' && !canaleCorrente?.disponibile && botTelegram && (
                     <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
                       Per usare questo canale scrivi una volta a{' '}
-                      <a href={`https://t.me/${botTelegram}`} target="_blank" rel="noreferrer" style={{ color: '#38bdf8', fontWeight: 700 }}>
+                      <a href={`https://t.me/${botTelegram}`} target="_blank" rel="noreferrer" style={{ color: 'var(--cat-societario)', fontWeight: 700 }}>
                         @{botTelegram}
                       </a>{' '}
                       e poi ricarica la pagina.
@@ -611,7 +611,7 @@ export function TabProposta({
                 </div>
 
                 {otpError && !otpModalOpen && (
-                  <div style={{ fontSize: 11.5, color: '#f87171', background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 8, padding: 10, marginBottom: 12 }}>
+                  <div style={{ fontSize: 11.5, color: 'var(--pill-red-fg)', background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 8, padding: 10, marginBottom: 12 }}>
                     ⚠️ {otpError}
                   </div>
                 )}
@@ -671,7 +671,7 @@ export function TabProposta({
                       onClick={async () => {
                         await downloadRealPdf(`Mandato_${clientName.replace(/\s+/g, '_')}`, getResolvedEngagementHtml());
                       }}
-                      style={{ background: '#1a1f3d', border: '1px solid #4338ca', color: '#c7d2fe', padding: '10px 18px', borderRadius: 8, fontSize: 11.5, fontWeight: 700, cursor: 'pointer' }}
+                      style={{ background: 'var(--surface-1)', border: '1px solid var(--indigo-d)', color: 'var(--pill-indigo-fg)', padding: '10px 18px', borderRadius: 8, fontSize: 11.5, fontWeight: 700, cursor: 'pointer' }}
                     >
                       📥 Scarica il PDF da firmare
                     </button>
@@ -690,7 +690,7 @@ export function TabProposta({
                     </label>
 
                     {fileFirmato && (
-                      <span style={{ fontSize: 11, color: '#34d399', fontWeight: 700 }}>✓ {fileFirmato.nome}</span>
+                      <span style={{ fontSize: 11, color: 'var(--green)', fontWeight: 700 }}>✓ {fileFirmato.nome}</span>
                     )}
                   </div>
 
@@ -707,7 +707,7 @@ export function TabProposta({
                 </div>
 
                 {otpError && (
-                  <div style={{ fontSize: 11.5, color: '#f87171', background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 8, padding: 10, marginBottom: 12 }}>
+                  <div style={{ fontSize: 11.5, color: 'var(--pill-red-fg)', background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 8, padding: 10, marginBottom: 12 }}>
                     ⚠️ {otpError}
                   </div>
                 )}

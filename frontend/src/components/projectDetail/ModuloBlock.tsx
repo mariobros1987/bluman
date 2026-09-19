@@ -100,7 +100,7 @@ export function ModuloBlock({ mod, open, onToggle, onOpenProc, rawDbModulo, onRe
                   onDeleteMod();
                 }}
                 title="Elimina modulo dal progetto (0 ore espletate)"
-                style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)', color: '#f87171', padding: '2px 6px', borderRadius: 6, fontSize: 10, cursor: 'pointer', fontWeight: 600 }}
+                style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)', color: 'var(--red)', padding: '2px 6px', borderRadius: 6, fontSize: 10, cursor: 'pointer', fontWeight: 600 }}
               >
                 🗑 Elimina
               </button>
@@ -176,7 +176,7 @@ export function ModuloBlock({ mod, open, onToggle, onOpenProc, rawDbModulo, onRe
                         {assegnatario !== null ? (
                           <Avatar id={assegnatario} size={22} />
                         ) : (
-                          <span style={{ fontSize: 10, color: 'var(--hint, #64748b)', fontStyle: 'italic' }}>
+                          <span style={{ fontSize: 10, color: 'var(--hint, var(--muted))', fontStyle: 'italic' }}>
                             non assegnato
                           </span>
                         )}
@@ -195,9 +195,9 @@ export function ModuloBlock({ mod, open, onToggle, onOpenProc, rawDbModulo, onRe
                               onToggleMv(i);
                             }}
                             style={{
-                              background: v.s === 'done' ? '#0d2d22' : 'var(--card2)',
-                              border: `1px solid ${v.s === 'done' ? '#1a5c3c' : 'var(--border)'}`,
-                              color: v.s === 'done' ? '#34d399' : 'var(--text)',
+                              background: v.s === 'done' ? 'var(--pill-green-bg)' : 'var(--card2)',
+                              border: `1px solid ${v.s === 'done' ? 'var(--pill-green-bd)' : 'var(--border)'}`,
+                              color: v.s === 'done' ? 'var(--pill-green-fg)' : 'var(--text)',
                               padding: '3px 8px',
                               borderRadius: 6,
                               fontSize: 10,
@@ -214,7 +214,7 @@ export function ModuloBlock({ mod, open, onToggle, onOpenProc, rawDbModulo, onRe
                           {rawMv && (
                             <button
                               onClick={e => { e.stopPropagation(); setConsuntivaMv(rawMv); }}
-                              style={{ background: '#1a1f3d', border: '1px solid #2d3260', color: '#818cf8', padding: '3px 8px', borderRadius: 6, fontSize: 10, fontWeight: 600, cursor: 'pointer' }}
+                              style={{ background: 'var(--surface-1)', border: '1px solid var(--card2)', color: 'var(--indigo-l)', padding: '3px 8px', borderRadius: 6, fontSize: 10, fontWeight: 600, cursor: 'pointer' }}
                             >
                               ⏱ Consuntiva
                             </button>
@@ -255,7 +255,7 @@ export function ModuloBlock({ mod, open, onToggle, onOpenProc, rawDbModulo, onRe
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 16 }}>
           <form onSubmit={handleConsuntivaSubmit} style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, padding: 20, width: '100%', maxWidth: 420, display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div style={{ fontSize: 14, fontWeight: 600 }}>Registra Ore Consuntivate</div>
-            <div style={{ fontSize: 12, color: '#818cf8' }}>{consuntivaMv.nome}</div>
+            <div style={{ fontSize: 12, color: 'var(--indigo-l)' }}>{consuntivaMv.nome}</div>
 
             <div>
               <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Ore lavorate da aggiungere *</label>
@@ -271,7 +271,7 @@ export function ModuloBlock({ mod, open, onToggle, onOpenProc, rawDbModulo, onRe
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
               <button type="button" onClick={() => setConsuntivaMv(null)} style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '7px 14px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}>Annulla</button>
-              <button type="submit" disabled={submitting} style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>{submitting ? 'Salvataggio...' : '✓ Salva Modifiche'}</button>
+              <button type="submit" disabled={submitting} style={{ background: 'var(--indigo)', color: 'var(--on-accent)', border: 'none', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>{submitting ? 'Salvataggio...' : '✓ Salva Modifiche'}</button>
             </div>
           </form>
         </div>

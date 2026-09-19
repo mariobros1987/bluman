@@ -92,10 +92,10 @@ export function UserProfileModal({ user, onClose, onUserUpdated }: UserProfileMo
     if (/[A-Z]/.test(pass) && /[a-z]/.test(pass)) score++;
     if (/[^A-Za-z0-9]/.test(pass)) score++;
 
-    if (score <= 2) return { score: 25, label: 'Semplice (consigliati simboli o 8+ char)', color: '#f87171' };
-    if (score <= 3) return { score: 65, label: 'Media', color: '#fbbf24' };
-    if (score <= 4) return { score: 85, label: 'Buona / Sicura', color: '#60a5fa' };
-    return { score: 100, label: 'Molto Forte & Conforme ISO/IEC 27001', color: '#34d399' };
+    if (score <= 2) return { score: 25, label: 'Semplice (consigliati simboli o 8+ char)', color: 'var(--red)' };
+    if (score <= 3) return { score: 65, label: 'Media', color: 'var(--amber)' };
+    if (score <= 4) return { score: 85, label: 'Buona / Sicura', color: 'var(--cat-societario)' };
+    return { score: 100, label: 'Molto Forte & Conforme ISO/IEC 27001', color: 'var(--green)' };
   };
 
   const passStrength = getPasswordStrength(newPassword);
@@ -105,13 +105,13 @@ export function UserProfileModal({ user, onClose, onUserUpdated }: UserProfileMo
   const getRoleBadge = (ruolo: string) => {
     switch (ruolo) {
       case 'super_admin':
-        return { label: '👑 Super Admin Piattaforma', bg: '#311042', color: '#e879f9', border: '#86198f' };
+        return { label: '👑 Super Admin Piattaforma', bg: 'var(--pill-purple-bg)', color: 'var(--cat-ip)', border: 'var(--pill-purple-bd)' };
       case 'advisor':
-        return { label: '👨‍💼 Lead Advisor / Titolare Studio', bg: '#1e1b4b', color: '#818cf8', border: '#4338ca' };
+        return { label: '👨‍💼 Lead Advisor / Titolare Studio', bg: 'var(--pill-indigo-bg)', color: 'var(--indigo-l)', border: 'var(--indigo-d)' };
       case 'collaboratore_interno':
-        return { label: '👷 Collaboratore Interno / Senior Partner', bg: '#0d2d22', color: '#34d399', border: '#059669' };
+        return { label: '👷 Collaboratore Interno / Senior Partner', bg: 'var(--pill-green-bg)', color: 'var(--pill-green-fg)', border: 'var(--pill-green-bd)' };
       case 'collaboratore_esterno':
-        return { label: '🤝 Collaboratore Esterno', bg: '#2d1f0d', color: '#fbbf24', border: '#d97706' };
+        return { label: '🤝 Collaboratore Esterno', bg: 'var(--pill-amber-bg)', color: 'var(--amber)', border: 'var(--amber)' };
       default:
         return { label: `👤 ${ruolo || 'Operatore'}`, bg: 'var(--card)', color: 'var(--text)', border: 'var(--border)' };
     }
@@ -175,8 +175,8 @@ export function UserProfileModal({ user, onClose, onUserUpdated }: UserProfileMo
                 width: 48,
                 height: 48,
                 borderRadius: '50%',
-                background: 'linear-gradient(135deg, #4338ca, #6366f1)',
-                color: '#fff',
+                background: 'linear-gradient(135deg, var(--indigo-d), var(--indigo))',
+                color: 'var(--on-accent)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -303,9 +303,9 @@ export function UserProfileModal({ user, onClose, onUserUpdated }: UserProfileMo
                     padding: '10px 14px',
                     borderRadius: 8,
                     fontSize: 12,
-                    background: profileMsg.type === 'success' ? '#0d2d22' : '#3b1c1c',
-                    color: profileMsg.type === 'success' ? '#34d399' : '#f87171',
-                    border: `1px solid ${profileMsg.type === 'success' ? '#059669' : '#ef4444'}`,
+                    background: profileMsg.type === 'success' ? 'var(--pill-green-bg)' : 'var(--pill-red-bg)',
+                    color: profileMsg.type === 'success' ? 'var(--green)' : 'var(--pill-red-fg)',
+                    border: `1px solid ${profileMsg.type === 'success' ? 'var(--green)' : 'var(--red)'}`,
                   }}
                 >
                   {profileMsg.text}
@@ -403,7 +403,7 @@ export function UserProfileModal({ user, onClose, onUserUpdated }: UserProfileMo
                   disabled={savingProfile}
                   style={{
                     background: 'var(--indigo)',
-                    color: '#fff',
+                    color: 'var(--on-accent)',
                     border: 'none',
                     padding: '8px 18px',
                     borderRadius: 8,
@@ -428,9 +428,9 @@ export function UserProfileModal({ user, onClose, onUserUpdated }: UserProfileMo
                     padding: '10px 14px',
                     borderRadius: 8,
                     fontSize: 12,
-                    background: passMsg.type === 'success' ? '#0d2d22' : '#3b1c1c',
-                    color: passMsg.type === 'success' ? '#34d399' : '#f87171',
-                    border: `1px solid ${passMsg.type === 'success' ? '#059669' : '#ef4444'}`,
+                    background: passMsg.type === 'success' ? 'var(--pill-green-bg)' : 'var(--pill-red-bg)',
+                    color: passMsg.type === 'success' ? 'var(--green)' : 'var(--pill-red-fg)',
+                    border: `1px solid ${passMsg.type === 'success' ? 'var(--green)' : 'var(--red)'}`,
                   }}
                 >
                   {passMsg.text}
@@ -527,13 +527,13 @@ export function UserProfileModal({ user, onClose, onUserUpdated }: UserProfileMo
                   }}
                 />
                 {confirmPassword && newPassword !== confirmPassword && (
-                  <span style={{ fontSize: 10, color: '#f87171', marginTop: 4, display: 'block' }}>
+                  <span style={{ fontSize: 10, color: 'var(--red)', marginTop: 4, display: 'block' }}>
                     ⚠ Le due password non coincidono.
                   </span>
                 )}
               </div>
 
-              <div style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid #312e81', borderRadius: 8, padding: '10px 12px', fontSize: 11, color: '#a5b4fc', lineHeight: 1.4 }}>
+              <div style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid var(--pill-indigo-bg)', borderRadius: 8, padding: '10px 12px', fontSize: 11, color: 'var(--pill-indigo-fg)', lineHeight: 1.4 }}>
                 ℹ️ La nuova password verrà cifrata con algoritmo crittografico sicuro <strong>scrypt</strong> e sarà attiva immediatamente per i successivi accessi.
               </div>
 
@@ -558,7 +558,7 @@ export function UserProfileModal({ user, onClose, onUserUpdated }: UserProfileMo
                   disabled={savingPass || !newPassword || newPassword !== confirmPassword}
                   style={{
                     background: 'var(--indigo)',
-                    color: '#fff',
+                    color: 'var(--on-accent)',
                     border: 'none',
                     padding: '8px 18px',
                     borderRadius: 8,

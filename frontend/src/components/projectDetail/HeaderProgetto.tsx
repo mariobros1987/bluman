@@ -66,7 +66,7 @@ export function HeaderProgetto({
           <Badge stato={project.st} />
           <button
             onClick={onApriAccessi}
-            style={{ background: '#1a1f3d', border: '1px solid #2d3260', color: '#818cf8', padding: '4px 10px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer', marginLeft: 8 }}
+            style={{ background: 'var(--surface-1)', border: '1px solid var(--card2)', color: 'var(--indigo-l)', padding: '4px 10px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer', marginLeft: 8 }}
           >
             👥 Accessi Progetto
           </button>
@@ -79,14 +79,14 @@ export function HeaderProgetto({
               disabled={ricalcolando}
               onClick={onRicalcola}
               title="Persiste a database gli stati calcolati dal motore §16, solo dove divergono"
-              style={{ background: '#1a2e1f', border: '1px solid #2f5d3a', color: '#6ee7a0', padding: '4px 10px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: ricalcolando ? 'wait' : 'pointer', marginLeft: 8, opacity: ricalcolando ? 0.6 : 1 }}
+              style={{ background: 'var(--pill-green-bg)', border: '1px solid var(--pill-green-bd)', color: 'var(--pill-green-fg)', padding: '4px 10px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: ricalcolando ? 'wait' : 'pointer', marginLeft: 8, opacity: ricalcolando ? 0.6 : 1 }}
             >
               {ricalcolando ? '⏳ Ricalcolo…' : '🔄 Ricalcola avanzamento'}
             </button>
           )}
           <button
             onClick={onArchivia}
-            style={{ background: '#2d3748', border: '1px solid #4a5568', color: '#fff', padding: '4px 10px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer', marginLeft: 8 }}
+            style={{ background: 'var(--card2)', border: '1px solid var(--muted)', color: 'var(--text)', padding: '4px 10px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer', marginLeft: 8 }}
           >
             {project.st === 'archived' ? '↩️ Ripristina' : '📁 Archivia'}
           </button>
@@ -96,7 +96,7 @@ export function HeaderProgetto({
           <LinkTelegramProgetto progettoId={String(project.id)} />
           <button
             onClick={onElimina}
-            style={{ background: '#7f1d1d', border: '1px solid #991b1b', color: '#fca5a5', padding: '4px 10px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer', marginLeft: 8 }}
+            style={{ background: 'var(--pill-red-bg)', border: '1px solid var(--pill-red-bd)', color: 'var(--pill-red-fg)', padding: '4px 10px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer', marginLeft: 8 }}
           >
             🗑 Elimina
           </button>

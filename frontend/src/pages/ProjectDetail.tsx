@@ -789,7 +789,7 @@ export function ProjectDetail() {
       {/* Salvataggio non riuscito: resta in cima finché il successivo non va a buon fine, perché
           quello che si vede sotto è la copia locale e non quello che il database contiene. */}
       {erroreSalvataggio && (
-        <div style={{ background: '#2d0d0d', border: '1px solid #7f1d1d', color: '#fca5a5', padding: '10px 14px', borderRadius: 10, fontSize: 12, lineHeight: 1.5, marginBottom: 12, display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+        <div style={{ background: 'var(--pill-red-bg)', border: '1px solid var(--pill-red-bg)', color: 'var(--pill-red-fg)', padding: '10px 14px', borderRadius: 10, fontSize: 12, lineHeight: 1.5, marginBottom: 12, display: 'flex', alignItems: 'flex-start', gap: 10 }}>
           <span style={{ fontSize: 14 }}>⚠</span>
           <div style={{ flex: 1 }}>
             <div style={{ fontWeight: 600, marginBottom: 2 }}>Modifiche non salvate a database</div>
@@ -797,7 +797,7 @@ export function ProjectDetail() {
           </div>
           <button
             onClick={() => setErroreSalvataggio(null)}
-            style={{ background: 'transparent', border: 'none', color: '#fca5a5', cursor: 'pointer', fontSize: 14 }}
+            style={{ background: 'transparent', border: 'none', color: 'var(--pill-red-fg)', cursor: 'pointer', fontSize: 14 }}
             title="Chiudi"
           >
             ✕

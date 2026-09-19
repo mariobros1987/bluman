@@ -119,7 +119,7 @@ interface TabChannelsProps {
 /** Testo sotto un campo credenziale: dice se ce n'è già una salvata sul server. */
 function NotaSegreto({ impostata }: { impostata?: boolean }) {
   return (
-    <div style={{ fontSize: 10, color: impostata ? '#34d399' : 'var(--muted)', marginTop: 3 }}>
+    <div style={{ fontSize: 10, color: impostata ? 'var(--green)' : 'var(--muted)', marginTop: 3 }}>
       {impostata
         ? '✓ Già salvata sul server. Lascia vuoto per non modificarla.'
         : 'Nessuna credenziale salvata: il canale non può funzionare finché non la inserisci.'}
@@ -239,11 +239,11 @@ export function TabChannels({
           </div>
 
           {/* BOX GUIDA INTERATTIVA PASSO-PASSO */}
-          <div style={{ background: '#1a1f3d', border: '1px solid #2d3260', borderRadius: 12, padding: 16, marginTop: 14 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#818cf8', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ background: 'var(--surface-1)', border: '1px solid var(--card2)', borderRadius: 12, padding: 16, marginTop: 14 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--indigo-l)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
               <span>📖 Guida Passo-Passo: Come Funziona l'Associazione Automatica ai Progetti</span>
             </div>
-            <div style={{ fontSize: 11.5, color: '#cbd5e1', lineHeight: 1.6 }}>
+            <div style={{ fontSize: 11.5, color: 'var(--pill-slate-fg)', lineHeight: 1.6 }}>
               <strong>1. Associazione per Numero di Telefono (WhatsApp / Signal):</strong><br />
               Quando il cliente invia un messaggio o un file da cellulare (es. <code>+39 335 1234567</code>), BluMan cerca il numero nell'anagrafica <strong>Clienti ERP</strong> ed associa la chat al Progetto in corso. Per Signal il numero va indicato fra i referenti del cliente, in forma internazionale.<br /><br />
               <strong>2. Associazione per Indirizzo Email (Email Inbound):</strong><br />
@@ -258,13 +258,13 @@ export function TabChannels({
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20, marginTop: 16 }}>
             {/* 📧 SERVER EMAIL SMTP TRANSAZIONALE & NOTIFICHE */}
             <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 16 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#818cf8', marginBottom: 4, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--indigo-l)', marginBottom: 4, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>📧 Server Email SMTP Transazionale & Notifiche Studio</span>
                 <button
                   type="button"
                   onClick={handleTestSmtp}
                   disabled={testingSmtp}
-                  style={{ background: '#3730a3', color: '#fff', border: 'none', padding: '5px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+                  style={{ background: 'var(--indigo-d)', color: 'var(--on-accent)', border: 'none', padding: '5px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
                 >
                   {testingSmtp ? 'Testing SMTP...' : '🧪 Test Connessione SMTP'}
                 </button>
@@ -280,9 +280,9 @@ export function TabChannels({
                   fontSize: 12,
                   marginBottom: 12,
                   fontWeight: 500,
-                  background: (smtpTestResult.includes('✓') || smtpTestResult.includes('successo') || smtpTestResult.includes('CONNESSO')) ? '#0d2d22' : '#2d0d0d',
-                  color: (smtpTestResult.includes('✓') || smtpTestResult.includes('successo') || smtpTestResult.includes('CONNESSO')) ? '#34d399' : '#f87171',
-                  border: `1px solid ${(smtpTestResult.includes('✓') || smtpTestResult.includes('successo') || smtpTestResult.includes('CONNESSO')) ? '#059669' : '#dc2626'}`
+                  background: (smtpTestResult.includes('✓') || smtpTestResult.includes('successo') || smtpTestResult.includes('CONNESSO')) ? 'var(--pill-green-bg)' : 'var(--pill-red-bg)',
+                  color: (smtpTestResult.includes('✓') || smtpTestResult.includes('successo') || smtpTestResult.includes('CONNESSO')) ? 'var(--pill-green-fg)' : 'var(--pill-red-fg)',
+                  border: `1px solid ${(smtpTestResult.includes('✓') || smtpTestResult.includes('successo') || smtpTestResult.includes('CONNESSO')) ? 'var(--pill-green-bd)' : 'var(--pill-red-bd)'}`
                 }}>
                   {smtpTestResult}
                 </div>
@@ -353,13 +353,13 @@ export function TabChannels({
 
             {/* 📥 SERVER EMAIL IMAP / POP3 (POSTA IN ENTRATA & INGESTION FASCICOLI) */}
             <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 16 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#38bdf8', marginBottom: 4, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--cat-societario)', marginBottom: 4, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>📥 Server Email IMAP / POP3 (Posta in Entrata & Ingestion Fascicoli)</span>
                 <button
                   type="button"
                   onClick={handleTestImap}
                   disabled={testingImap}
-                  style={{ background: '#0369a1', color: '#fff', border: 'none', padding: '5px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+                  style={{ background: 'var(--cat-societario)', color: '#fff', border: 'none', padding: '5px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
                 >
                   {testingImap ? 'Testing IMAP...' : '🧪 Test Connessione IMAP'}
                 </button>
@@ -380,9 +380,9 @@ export function TabChannels({
                   fontSize: 12,
                   marginBottom: 12,
                   fontWeight: 500,
-                  background: (imapTestResult.includes('✓') || imapTestResult.includes('successo') || imapTestResult.includes('CONNESSO') || imapTestResult.includes('verificata')) ? '#0d2d22' : '#2d0d0d',
-                  color: (imapTestResult.includes('✓') || imapTestResult.includes('successo') || imapTestResult.includes('CONNESSO') || imapTestResult.includes('verificata')) ? '#34d399' : '#f87171',
-                  border: `1px solid ${(imapTestResult.includes('✓') || imapTestResult.includes('successo') || imapTestResult.includes('CONNESSO') || imapTestResult.includes('verificata')) ? '#059669' : '#dc2626'}`
+                  background: (imapTestResult.includes('✓') || imapTestResult.includes('successo') || imapTestResult.includes('CONNESSO') || imapTestResult.includes('verificata')) ? 'var(--pill-green-bg)' : 'var(--pill-red-bg)',
+                  color: (imapTestResult.includes('✓') || imapTestResult.includes('successo') || imapTestResult.includes('CONNESSO') || imapTestResult.includes('verificata')) ? 'var(--pill-green-fg)' : 'var(--pill-red-fg)',
+                  border: `1px solid ${(imapTestResult.includes('✓') || imapTestResult.includes('successo') || imapTestResult.includes('CONNESSO') || imapTestResult.includes('verificata')) ? 'var(--pill-green-bd)' : 'var(--pill-red-bd)'}`
                 }}>
                   {imapTestResult}
                 </div>
@@ -456,7 +456,7 @@ export function TabChannels({
 
             {/* 🖋️ FIRMA AUTOMATICA & DISCLAIMER PRIVACY EMAIL STUDIO */}
             <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 16 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#f59e0b', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--amber)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span>🖋️ Firma Automatica & Disclaimer Privacy GDPR Studio</span>
               </div>
               <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 10 }}>
@@ -478,13 +478,13 @@ export function TabChannels({
 
             {/* 🟢 WHATSAPP BUSINESS API */}
             <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 16 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#34d399', marginBottom: 4, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--green)', marginBottom: 4, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>🟢 WhatsApp Business API (Meta Cloud Official Integration)</span>
                 <button
                   type="button"
                   onClick={() => handleTestChannel('whatsapp')}
                   disabled={testingChannel === 'whatsapp'}
-                  style={{ background: '#065f46', color: '#fff', border: 'none', padding: '5px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+                  style={{ background: 'var(--green)', color: '#fff', border: 'none', padding: '5px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
                 >
                   {testingChannel === 'whatsapp' ? 'Testing...' : '🧪 Test WhatsApp API'}
                 </button>
@@ -496,7 +496,7 @@ export function TabChannels({
               </div>
 
               {channelTestResult['whatsapp'] && (
-                <div style={{ padding: 10, borderRadius: 8, fontSize: 11.5, marginBottom: 12, background: '#0d2d22', color: '#34d399', border: '1px solid #059669' }}>
+                <div style={{ padding: 10, borderRadius: 8, fontSize: 11.5, marginBottom: 12, background: 'var(--pill-green-bg)', color: 'var(--pill-green-fg)', border: '1px solid var(--pill-green-bd)' }}>
                   {channelTestResult['whatsapp']}
                 </div>
               )}
@@ -573,7 +573,7 @@ export function TabChannels({
                     type="button"
                     onClick={copiaCallback}
                     disabled={!waCallbackUrl}
-                    style={{ background: waCallbackUrl ? '#065f46' : '#334155', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: waCallbackUrl ? 'pointer' : 'not-allowed' }}
+                    style={{ background: waCallbackUrl ? 'var(--green)' : 'var(--muted)', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: waCallbackUrl ? 'pointer' : 'not-allowed' }}
                   >
                     {copiatoCallback ? '✓ Copiata' : '📋 Copia'}
                   </button>
@@ -581,7 +581,7 @@ export function TabChannels({
                     type="button"
                     onClick={onRigeneraSlug}
                     disabled={rigenerandoSlug}
-                    style={{ background: '#7c2d12', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+                    style={{ background: 'var(--amber)', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
                   >
                     {rigenerandoSlug ? 'Rigenerazione…' : '🔄 Rigenera'}
                   </button>
@@ -590,11 +590,11 @@ export function TabChannels({
                   Contiene un codice casuale che identifica il tuo studio: non condividerlo. Per attivare l'ingresso,
                   in Meta incolla questo indirizzo in <strong>Callback URL</strong> e il Verify Token qui sopra, poi
                   sottoscrivi il campo <code>messages</code>.{' '}
-                  <a href={consoleMeta} target="_blank" rel="noopener noreferrer" style={{ color: '#818cf8' }}>
+                  <a href={consoleMeta} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--indigo-l)' }}>
                     Apri la configurazione WhatsApp della tua app Meta →
                   </a>
                 </div>
-                <div style={{ fontSize: 10, color: '#f59e0b', marginTop: 4 }}>
+                <div style={{ fontSize: 10, color: 'var(--amber)', marginTop: 4 }}>
                   ⚠️ «Rigenera» cambia l'indirizzo: i messaggi smettono di arrivare finché non aggiorni la Callback URL in Meta.
                 </div>
               </div>
@@ -602,14 +602,14 @@ export function TabChannels({
 
             {/* ✈️ TELEGRAM BOT API */}
             <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 16 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#38bdf8', marginBottom: 4, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--cat-societario)', marginBottom: 4, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>✈️ Telegram Bot API (100% GRATUITO)</span>
                 <div style={{ display: 'flex', gap: 6 }}>
                   <button
                     type="button"
                     onClick={() => handleTestChannel('telegram')}
                     disabled={testingChannel === 'telegram'}
-                    style={{ background: '#075985', color: '#fff', border: 'none', padding: '5px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+                    style={{ background: 'var(--cat-societario)', color: '#fff', border: 'none', padding: '5px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
                   >
                     {testingChannel === 'telegram' ? 'Testing...' : '🧪 Test Bot'}
                   </button>
@@ -623,7 +623,7 @@ export function TabChannels({
               </div>
 
               {channelTestResult['telegram'] && (
-                <div style={{ padding: 10, borderRadius: 8, fontSize: 11.5, marginBottom: 12, background: '#0c2a3a', color: '#38bdf8', border: '1px solid #0284c7' }}>
+                <div style={{ padding: 10, borderRadius: 8, fontSize: 11.5, marginBottom: 12, background: 'var(--pill-sky-bg)', color: 'var(--cat-societario)', border: '1px solid var(--cat-societario)' }}>
                   {channelTestResult['telegram']}
                 </div>
               )}
@@ -652,13 +652,13 @@ export function TabChannels({
 
             {/* 🔒 SIGNAL — IL DEMONE È DELLO STUDIO */}
             <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 16 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#a5b4fc', marginBottom: 4, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--indigo-l)', marginBottom: 4, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>🔒 Signal (demone dello studio)</span>
                 <button
                   type="button"
                   onClick={() => handleTestChannel('signal')}
                   disabled={testingChannel === 'signal'}
-                  style={{ background: '#312e81', color: '#fff', border: 'none', padding: '5px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+                  style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '5px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
                 >
                   {testingChannel === 'signal' ? 'Testing...' : '🧪 Test Signal'}
                 </button>
@@ -671,7 +671,7 @@ export function TabChannels({
               </div>
 
               {channelTestResult['signal'] && (
-                <div style={{ padding: 10, borderRadius: 8, fontSize: 11.5, marginBottom: 12, background: '#1e1b4b', color: '#a5b4fc', border: '1px solid #4338ca' }}>
+                <div style={{ padding: 10, borderRadius: 8, fontSize: 11.5, marginBottom: 12, background: 'var(--pill-indigo-bg)', color: 'var(--pill-indigo-fg)', border: '1px solid var(--pill-indigo-bd)' }}>
                   {channelTestResult['signal']}
                 </div>
               )}
@@ -719,9 +719,9 @@ export function TabChannels({
 
             {/* 🌐 CANALE INTERNO DELL'APP (Portale Riservato) */}
             <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 16 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#6366f1', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--indigo)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span>🌐 Canale interno dell'app (Portale Riservato)</span>
-                <span style={{ fontSize: 10, fontWeight: 600, color: '#34d399', background: '#0d2d22', border: '1px solid #059669', borderRadius: 20, padding: '2px 8px' }}>
+                <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--pill-green-fg)', background: 'var(--pill-green-bg)', border: '1px solid var(--pill-green-bd)', borderRadius: 20, padding: '2px 8px' }}>
                   sempre attivo
                 </span>
               </div>

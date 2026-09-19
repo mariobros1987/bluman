@@ -77,8 +77,8 @@ function CartellaCard({
       </div>
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', fontSize: 11.5, color: 'var(--muted)' }}>
         <span>📄 {contatori.documenti} doc.</span>
-        {contatori.firmati > 0 && <span style={{ color: '#6ee7b7' }}>✓ {contatori.firmati} firmati</span>}
-        {contatori.daFirmare > 0 && <span style={{ color: '#fcd34d' }}>⏳ {contatori.daFirmare} da firmare</span>}
+        {contatori.firmati > 0 && <span style={{ color: 'var(--pill-green-fg)' }}>✓ {contatori.firmati} firmati</span>}
+        {contatori.daFirmare > 0 && <span style={{ color: 'var(--pill-amber-fg)' }}>⏳ {contatori.daFirmare} da firmare</span>}
         {contatori.archiviati > 0 && <span>🗄 {contatori.archiviati}</span>}
       </div>
       <div style={{ fontSize: 11, color: 'var(--muted)' }}>Ultimo caricamento: {dataBreve(contatori.ultimoCaricamento)}</div>
@@ -173,7 +173,7 @@ export function ArchivioDocumentiPage() {
             setProgettoId(null);
             setVistaNonCollocati(false);
           }}
-          style={{ background: 'transparent', border: 'none', color: clienteId || vistaNonCollocati ? '#60a5fa' : 'var(--text)', fontWeight: 700, cursor: 'pointer', padding: 0, fontSize: 13 }}
+          style={{ background: 'transparent', border: 'none', color: clienteId || vistaNonCollocati ? 'var(--indigo-l)' : 'var(--text)', fontWeight: 700, cursor: 'pointer', padding: 0, fontSize: 13 }}
         >
           Archivio
         </button>
@@ -188,7 +188,7 @@ export function ArchivioDocumentiPage() {
             <span style={{ color: 'var(--muted)' }}>/</span>
             <button
               onClick={() => setProgettoId(null)}
-              style={{ background: 'transparent', border: 'none', color: progetto ? '#60a5fa' : 'var(--text)', fontWeight: 700, cursor: 'pointer', padding: 0, fontSize: 13 }}
+              style={{ background: 'transparent', border: 'none', color: progetto ? 'var(--indigo-l)' : 'var(--text)', fontWeight: 700, cursor: 'pointer', padding: 0, fontSize: 13 }}
             >
               {cliente.nome}
             </button>
@@ -203,7 +203,7 @@ export function ArchivioDocumentiPage() {
       </div>
 
       {errore && (
-        <div style={{ padding: '1.25rem', borderRadius: 10, background: 'rgba(239,68,68,0.08)', border: '1px solid #b91c1c', color: '#fca5a5', fontSize: 13, marginBottom: '1.25rem' }}>
+        <div style={{ padding: '1.25rem', borderRadius: 10, background: 'rgba(239,68,68,0.08)', border: '1px solid var(--pill-red-bd)', color: 'var(--pill-red-fg)', fontSize: 13, marginBottom: '1.25rem' }}>
           ⚠️ {errore}
           <div style={{ color: 'var(--muted)', marginTop: 6, fontSize: 12 }}>
             L'archivio si legge solo dal database: finché la lettura non riesce, questa pagina non mostra numeri.
@@ -213,15 +213,15 @@ export function ArchivioDocumentiPage() {
 
       {totali && !progetto && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '1rem', marginBottom: '1.75rem' }}>
-          <Riquadro etichetta="Documenti a database" valore={String(totali.documenti)} sfondo="#1e293b" bordo="#334155" colore="#94a3b8" />
-          <Riquadro etichetta="Firmati dal cliente" valore={String(totali.firmati)} sfondo="#064e3b" bordo="#047857" colore="#6ee7b7" />
-          <Riquadro etichetta="Pubblicati da firmare" valore={String(totali.daFirmare)} sfondo="#78350f" bordo="#b45309" colore="#fcd34d" />
-          <Riquadro etichetta="Archiviati" valore={String(totali.archiviati)} sfondo="#312e81" bordo="#4338ca" colore="#a5b4fc" />
+          <Riquadro etichetta="Documenti a database" valore={String(totali.documenti)} sfondo="var(--pill-slate-bg)" bordo="var(--pill-slate-bd)" colore="var(--muted)" />
+          <Riquadro etichetta="Firmati dal cliente" valore={String(totali.firmati)} sfondo="var(--pill-green-bg)" bordo="var(--pill-green-bd)" colore="var(--pill-green-fg)" />
+          <Riquadro etichetta="Pubblicati da firmare" valore={String(totali.daFirmare)} sfondo="var(--pill-amber-bg)" bordo="var(--pill-amber-bd)" colore="var(--pill-amber-fg)" />
+          <Riquadro etichetta="Archiviati" valore={String(totali.archiviati)} sfondo="var(--pill-indigo-bg)" bordo="var(--indigo-d)" colore="var(--pill-indigo-fg)" />
         </div>
       )}
 
       {totali && totali.nonCollocati > 0 && !vistaNonCollocati && (
-        <div style={{ padding: '10px 14px', borderRadius: 10, background: 'rgba(251,191,36,0.08)', border: '1px solid #b45309', color: '#fcd34d', fontSize: 12.5, marginBottom: '1.25rem', display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ padding: '10px 14px', borderRadius: 10, background: 'rgba(251,191,36,0.08)', border: '1px solid var(--pill-amber-bd)', color: 'var(--pill-amber-fg)', fontSize: 12.5, marginBottom: '1.25rem', display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
           <span style={{ flex: 1, minWidth: 240 }}>
             🗂 {totali.nonCollocati} document{totali.nonCollocati === 1 ? 'o' : 'i'} non compare in nessuna cartella: il progetto a cui era
             agganciato è stato eliminato. Il file e le firme restano conservati a database.
@@ -233,7 +233,7 @@ export function ArchivioDocumentiPage() {
               setClienteId(null);
               setProgettoId(null);
             }}
-            style={{ background: '#b45309', border: 'none', color: '#fff', padding: '7px 13px', borderRadius: 7, cursor: 'pointer', fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap' }}
+            style={{ background: 'var(--amber)', border: 'none', color: '#fff', padding: '7px 13px', borderRadius: 7, cursor: 'pointer', fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap' }}
           >
             Ricollocali →
           </button>

@@ -163,7 +163,7 @@ export function CalendarioProgettoTab({ project }: Props) {
           <button
             type="button"
             onClick={() => { setErroreModale(null); setModaleAperto(true); }}
-            style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: 10, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+            style={{ background: 'var(--indigo)', color: 'var(--on-accent)', border: 'none', padding: '8px 16px', borderRadius: 10, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
           >
             + Programma nuova scadenza
           </button>
@@ -171,7 +171,7 @@ export function CalendarioProgettoTab({ project }: Props) {
       </div>
 
       {errore && (
-        <div role="alert" style={{ background: '#450a0a', border: '1px solid #b91c1c', color: '#fecaca', padding: '10px 14px', borderRadius: 10, fontSize: 11, fontWeight: 600 }}>
+        <div role="alert" style={{ background: 'var(--pill-red-bg)', border: '1px solid var(--pill-red-bd)', color: 'var(--pill-red-fg)', padding: '10px 14px', borderRadius: 10, fontSize: 11, fontWeight: 600 }}>
           ⚠️ {errore}
         </div>
       )}
@@ -240,7 +240,7 @@ export function CalendarioProgettoTab({ project }: Props) {
             </div>
 
             {erroreModale && (
-              <div role="alert" style={{ background: '#450a0a', border: '1px solid #b91c1c', color: '#fecaca', padding: '10px 14px', borderRadius: 10, fontSize: 11, fontWeight: 600 }}>
+              <div role="alert" style={{ background: 'var(--pill-red-bg)', border: '1px solid var(--pill-red-bd)', color: 'var(--pill-red-fg)', padding: '10px 14px', borderRadius: 10, fontSize: 11, fontWeight: 600 }}>
                 ⚠️ {erroreModale}
               </div>
             )}
@@ -291,7 +291,7 @@ export function CalendarioProgettoTab({ project }: Props) {
               <button type="button" onClick={() => setModaleAperto(false)} style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '7px 14px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}>
                 Annulla
               </button>
-              <button type="submit" disabled={inCorso} style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '7px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: inCorso ? 'wait' : 'pointer', opacity: inCorso ? 0.7 : 1 }}>
+              <button type="submit" disabled={inCorso} style={{ background: 'var(--indigo)', color: 'var(--on-accent)', border: 'none', padding: '7px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: inCorso ? 'wait' : 'pointer', opacity: inCorso ? 0.7 : 1 }}>
                 {inCorso ? 'Salvataggio…' : '✓ Salva scadenza'}
               </button>
             </div>

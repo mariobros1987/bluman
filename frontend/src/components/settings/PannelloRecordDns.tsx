@@ -48,28 +48,28 @@ export function PannelloRecordDns({ smtpFromEmail, imapUser, smtpHost }: Props) 
   const righe: Array<{ tipo: string; colore: string; nome: string; valore: string; nota: string }> = [
     {
       tipo: 'TXT (SPF)',
-      colore: '#38bdf8',
+      colore: 'var(--cat-societario)',
       nome: dominio ? `@ (cioè ${dominio})` : '@ (la radice del dominio)',
       valore: 'v=spf1 include:<valore indicato dal provider> ~all',
       nota: `Autorizza i server che spediscono per il dominio. La parte «include:» va chiesta a ${provider}: sbagliarla peggiora la consegna invece di migliorarla.`,
     },
     {
       tipo: 'TXT (DKIM)',
-      colore: '#34d399',
+      colore: 'var(--green)',
       nome: '<selettore indicato dal provider>._domainkey',
       valore: '<chiave pubblica fornita dal provider>',
       nota: 'Selettore e chiave li genera il provider quando si attiva la firma DKIM sulla casella: non esiste un valore valido in generale.',
     },
     {
       tipo: 'TXT (DMARC)',
-      colore: '#a78bfa',
+      colore: 'var(--purple)',
       nome: '_dmarc',
       valore: `v=DMARC1; p=none; rua=mailto:${mittente || '<indirizzo dello studio>'}`,
       nota: 'Dice ai destinatari cosa fare quando SPF e DKIM non tornano, e dove mandare i rapporti. «p=none» osserva senza scartare: si irrigidisce dopo aver letto i rapporti.',
     },
     {
       tipo: 'MX (Mail)',
-      colore: '#fbbf24',
+      colore: 'var(--amber)',
       nome: '@',
       valore: '<server di posta indicato dal provider> (priorità 10)',
       nota: `Riguarda la posta in arrivo. Il nome è quello che pubblica ${provider}: se il dominio è ospitato altrove, questo record punta lì e non alla casella configurata qui sopra.`,
@@ -77,11 +77,11 @@ export function PannelloRecordDns({ smtpFromEmail, imapUser, smtpHost }: Props) 
   ];
 
   return (
-    <div style={{ background: '#0b132b', border: '1px solid #1c2541', borderRadius: 12, padding: 16 }}>
-      <div style={{ fontSize: 13, fontWeight: 700, color: '#60a5fa', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+    <div style={{ background: 'var(--surface-3)', border: '1px solid var(--surface-1)', borderRadius: 12, padding: 16 }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--cat-societario)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
         <span>🛡️ Record DNS del dominio (SPF, DKIM, DMARC, MX) — anti-spam e recapito</span>
       </div>
-      <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 12 }}>
+      <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 12 }}>
         {dominio ? (
           <>
             Perché le email spedite da <code>{mittente}</code> arrivino nella posta in arrivo dei clienti e non
@@ -97,9 +97,9 @@ export function PannelloRecordDns({ smtpFromEmail, imapUser, smtpHost }: Props) 
       </div>
 
       <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11, textAlign: 'left', color: '#e2e8f0' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11, textAlign: 'left', color: 'var(--border)' }}>
           <thead>
-            <tr style={{ background: '#1c2541', borderBottom: '1px solid #334155' }}>
+            <tr style={{ background: 'var(--surface-1)', borderBottom: '1px solid var(--border)' }}>
               <th style={{ padding: '8px 10px' }}>Tipo Record</th>
               <th style={{ padding: '8px 10px' }}>Nome / Host</th>
               <th style={{ padding: '8px 10px' }}>Forma del valore</th>
@@ -108,11 +108,11 @@ export function PannelloRecordDns({ smtpFromEmail, imapUser, smtpHost }: Props) 
           </thead>
           <tbody>
             {righe.map(riga => (
-              <tr key={riga.tipo} style={{ borderBottom: '1px solid #1e293b' }}>
+              <tr key={riga.tipo} style={{ borderBottom: '1px solid var(--pill-slate-bg)' }}>
                 <td style={{ ...CELLA, fontWeight: 700, color: riga.colore }}>{riga.tipo}</td>
                 <td style={MONO}>{riga.nome}</td>
                 <td style={MONO}>{riga.valore}</td>
-                <td style={{ ...CELLA, color: '#94a3b8' }}>{riga.nota}</td>
+                <td style={{ ...CELLA, color: 'var(--muted)' }}>{riga.nota}</td>
               </tr>
             ))}
           </tbody>
@@ -120,7 +120,7 @@ export function PannelloRecordDns({ smtpFromEmail, imapUser, smtpHost }: Props) 
       </div>
 
       {/* Regola 7 — dove finiva la colonna «Stato Deliverability» con le tre spunte verdi. */}
-      <div style={{ fontSize: 10.5, color: '#94a3b8', marginTop: 10, lineHeight: 1.5 }}>
+      <div style={{ fontSize: 10.5, color: 'var(--muted)', marginTop: 10, lineHeight: 1.5 }}>
         BluMan non legge il DNS del dominio: qui non c'è nessuno stato «conforme», perché non è stato verificato
         niente. Lo stato vero si vede nel pannello del dominio, oppure con un controllo esterno dei record.
       </div>

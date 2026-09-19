@@ -109,7 +109,7 @@ export function InviaSollecitoModal({
         <form onSubmit={handleInvia} style={{ display: 'flex', flexDirection: 'column', overflowY: 'auto', flex: 1 }}>
           <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
             {errore && (
-              <div style={{ padding: '10px 14px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid #ef4444', color: '#ef4444', borderRadius: '6px', fontSize: '0.85rem' }}>
+              <div style={{ padding: '10px 14px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid var(--red)', color: 'var(--red)', borderRadius: '6px', fontSize: '0.85rem' }}>
                 ⚠️ {errore}
               </div>
             )}
@@ -251,7 +251,7 @@ export function InviaSollecitoModal({
                   </div>
                   <div>
                     <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>Totale Dovuto:</span>
-                    <div style={{ color: '#ef4444', fontWeight: 700 }}>€ {(anteprima.sollecito.calcoloMora.totaleDovutoCent / 100).toFixed(2)}</div>
+                    <div style={{ color: 'var(--red)', fontWeight: 700 }}>€ {(anteprima.sollecito.calcoloMora.totaleDovutoCent / 100).toFixed(2)}</div>
                   </div>
                 </div>
               </div>

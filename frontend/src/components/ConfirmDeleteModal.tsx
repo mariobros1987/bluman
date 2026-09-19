@@ -47,7 +47,7 @@ export const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({
 
         <div style={contentStyle}>
           {hasInvoices ? (
-            <div style={{ backgroundColor: '#fff3cd', color: '#856404', padding: '1rem', borderRadius: '4px', border: '1px solid #ffeeba' }}>
+            <div style={{ backgroundColor: 'var(--pill-amber-bg)', color: 'var(--pill-amber-bd)', padding: '1rem', borderRadius: '4px', border: '1px solid var(--pill-amber-fg)' }}>
               <strong>⚠️ Attenzione (Blocco Fiscale):</strong> Impossibile eliminare direttamente questo progetto perché contiene Fatture o Note di Credito emesse. 
               Per legge i documenti contabili non possono essere rimossi. Ti suggeriamo di <strong>Archiviare</strong> il progetto invece di eliminarlo.
             </div>
@@ -65,7 +65,7 @@ export const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
                   placeholder={projectName}
-                  style={{ marginTop: '0.5rem', padding: '0.5rem', width: '100%', border: '1px solid #ccc', borderRadius: '4px' }}
+                  style={{ marginTop: '0.5rem', padding: '0.5rem', width: '100%', border: '1px solid var(--muted)', borderRadius: '4px' }}
                 />
               </div>
             </>
@@ -80,7 +80,7 @@ export const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({
           </button>
           {!hasInvoices && (
             <button 
-              style={{ ...primaryBtnStyle, backgroundColor: isMatch ? '#dc3545' : '#ccc', cursor: isMatch ? 'pointer' : 'not-allowed' }}
+              style={{ ...primaryBtnStyle, backgroundColor: isMatch ? 'var(--red)' : 'var(--muted)', cursor: isMatch ? 'pointer' : 'not-allowed' }}
               disabled={!isMatch || isDeleting}
               onClick={handleConfirm}
             >

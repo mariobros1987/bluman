@@ -134,8 +134,8 @@ export function RetainersPage() {
 
       {/* KPI Run-Rate */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16, marginBottom: '2rem' }}>
-        <div style={{ background: '#1e3a8a', padding: 20, borderRadius: 12 }}>
-          <div style={{ fontSize: 13, color: '#93c5fd', textTransform: 'uppercase', fontWeight: 600 }}>Monthly Recurring Revenue (MRR)</div>
+        <div style={{ background: 'var(--pill-blue-bg)', padding: 20, borderRadius: 12 }}>
+          <div style={{ fontSize: 13, color: 'var(--pill-blue-fg)', textTransform: 'uppercase', fontWeight: 600 }}>Monthly Recurring Revenue (MRR)</div>
           <div style={{ fontSize: 28, fontWeight: 800, color: 'white', marginTop: 8 }}>💶 {fmt(totalMonthlyRunRateCentesimi / 100)} / mese</div>
         </div>
         <div style={{ background: 'var(--card)', padding: 20, borderRadius: 12, border: '1px solid var(--border)' }}>
@@ -188,8 +188,8 @@ export function RetainersPage() {
                     style={{
                       padding: '3px 8px',
                       borderRadius: 6,
-                      background: '#064e3b',
-                      color: '#6ee7b7',
+                      background: 'var(--pill-green-bg)',
+                      color: 'var(--pill-green-fg)',
                       fontSize: 11,
                       fontWeight: 700,
                       textTransform: 'uppercase',
@@ -212,7 +212,7 @@ export function RetainersPage() {
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ fontSize: 12, color: 'var(--muted)' }}>Prossima Fattura:</span>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: '#fcd34d' }}>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--pill-amber-fg)' }}>
                       {c.prossimaFatturazione ? new Date(c.prossimaFatturazione).toLocaleDateString('it-IT') : '—'}
                     </span>
                   </div>
@@ -227,7 +227,7 @@ export function RetainersPage() {
                     padding: '8px 14px',
                     borderRadius: 8,
                     border: 'none',
-                    background: '#059669',
+                    background: 'var(--green)',
                     color: 'white',
                     fontWeight: 700,
                     fontSize: 12,

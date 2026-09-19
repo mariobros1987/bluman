@@ -370,26 +370,26 @@ export function SuperAdminPage() {
         <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 14, padding: 16 }}>
           <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 700 }}>🏢 Studi / Tenant Registrati</div>
           <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--indigo-l)', marginTop: 6 }}>{tenants.length}</div>
-          <div style={{ fontSize: 10, color: '#34d399', marginTop: 4 }}>
+          <div style={{ fontSize: 10, color: 'var(--green)', marginTop: 4 }}>
             ✓ {tenants.filter(t => t.stato === 'attivo').length} Attivi · {tenants.filter(t => t.stato === 'sospeso').length} Sospesi · {tenants.filter(t => t.stato === 'archiviato').length} Archiviati
           </div>
         </div>
 
         <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 14, padding: 16 }}>
           <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 700 }}>💶 Fatturato Mensile Gestito</div>
-          <div style={{ fontSize: 24, fontWeight: 800, color: '#34d399', marginTop: 6 }}>{fmt(totalFatturato)}</div>
+          <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--green)', marginTop: 6 }}>{fmt(totalFatturato)}</div>
           <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 4 }}>Volume d'affari complessivo studi</div>
         </div>
 
         <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 14, padding: 16 }}>
           <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 700 }}>📂 Fascicoli e Incarichi Attivi</div>
-          <div style={{ fontSize: 24, fontWeight: 800, color: '#818cf8', marginTop: 6 }}>{totalProgetti}</div>
+          <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--indigo-l)', marginTop: 6 }}>{totalProgetti}</div>
           <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 4 }}>Pratiche di consulenza in corso</div>
         </div>
 
         <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 14, padding: 16 }}>
           <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 700 }}>👤 Utenti Staff Totali</div>
-          <div style={{ fontSize: 24, fontWeight: 800, color: '#f59e0b', marginTop: 6 }}>{totalUtenti}</div>
+          <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--amber)', marginTop: 6 }}>{totalUtenti}</div>
           <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 4 }}>Professionisti ed operatori accreditati</div>
         </div>
       </div>
@@ -432,31 +432,31 @@ export function SuperAdminPage() {
                       <div style={{ fontSize: 10.5, color: 'var(--indigo-l)' }}>{t.leadAdvisorEmail}</div>
                     </td>
                     <td style={{ padding: '10px 8px' }}>
-                      <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 8, background: t.piano === 'enterprise' ? '#312e81' : t.piano === 'pro' ? '#064e3b' : '#3b2505', color: t.piano === 'enterprise' ? '#a5b4fc' : t.piano === 'pro' ? '#a7f3d0' : '#fde047' }}>
+                      <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 8, background: t.piano === 'enterprise' ? 'var(--pill-indigo-bg)' : t.piano === 'pro' ? 'var(--pill-green-bg)' : 'var(--pill-amber-bg)', color: t.piano === 'enterprise' ? 'var(--pill-indigo-fg)' : t.piano === 'pro' ? 'var(--pill-green-fg)' : 'var(--pill-amber-fg)' }}>
                         {t.piano.toUpperCase()}
                       </span>
                     </td>
                     <td style={{ padding: '10px 8px' }}>
                       <div style={{ fontWeight: 600, fontSize: 11.5 }}>{t.dataScadenza}</div>
-                      <div style={{ fontSize: 10, marginTop: 2, fontWeight: 700, color: isExpired ? '#ef4444' : isWarning ? '#eab308' : '#10b981' }}>
+                      <div style={{ fontSize: 10, marginTop: 2, fontWeight: 700, color: isExpired ? 'var(--red)' : isWarning ? 'var(--amber)' : 'var(--green)' }}>
                         {isExpired ? '🔴 Scaduto' : isWarning ? `🟡 In Scadenza (${daysLeft} gg)` : `🟢 ${daysLeft} gg rimanenti`}
                       </div>
                     </td>
                     <td style={{ padding: '10px 8px' }}>
                       {t.stato === 'archiviato' ? (
-                        <span style={{ fontSize: 10, fontWeight: 800, padding: '3px 8px', borderRadius: 8, background: '#1c1917', color: '#d6d3d1', border: '1px solid #57534e' }}>
+                        <span style={{ fontSize: 10, fontWeight: 800, padding: '3px 8px', borderRadius: 8, background: 'var(--surface-2)', color: 'var(--border)', border: '1px solid var(--hint)' }}>
                           🗄 ARCHIVIATO
                         </span>
                       ) : t.stato === 'sospeso' ? (
-                        <span style={{ fontSize: 10, fontWeight: 800, padding: '3px 8px', borderRadius: 8, background: '#450a0a', color: '#fca5a5', border: '1px solid #7f1d1d' }}>
+                        <span style={{ fontSize: 10, fontWeight: 800, padding: '3px 8px', borderRadius: 8, background: 'var(--pill-red-bg)', color: 'var(--pill-red-fg)', border: '1px solid var(--pill-red-bg)' }}>
                           ⏸ SOSPESO
                         </span>
                       ) : isExpired ? (
-                        <span style={{ fontSize: 10, fontWeight: 800, padding: '3px 8px', borderRadius: 8, background: '#450a0a', color: '#fca5a5', border: '1px solid #7f1d1d' }}>
+                        <span style={{ fontSize: 10, fontWeight: 800, padding: '3px 8px', borderRadius: 8, background: 'var(--pill-red-bg)', color: 'var(--pill-red-fg)', border: '1px solid var(--pill-red-bg)' }}>
                           🔴 SCADUTO
                         </span>
                       ) : (
-                        <span style={{ fontSize: 10, fontWeight: 800, padding: '3px 8px', borderRadius: 8, background: '#064e3b', color: '#34d399', border: '1px solid #059669' }}>
+                        <span style={{ fontSize: 10, fontWeight: 800, padding: '3px 8px', borderRadius: 8, background: 'var(--pill-green-bg)', color: 'var(--green)', border: '1px solid var(--green)' }}>
                           ✓ ATTIVO
                         </span>
                       )}
@@ -470,7 +470,7 @@ export function SuperAdminPage() {
                             window.location.href = '/documents';
                           }}
                           title={`Imposta "${t.ragioneSociale}" come Studio Attivo e apri Document Studio`}
-                          style={{ background: '#047857', border: '1px solid #10b981', color: '#ecfdf5', padding: '5px 10px', borderRadius: 6, fontSize: 11, fontWeight: 800, cursor: 'pointer' }}
+                          style={{ background: 'var(--pill-green-bd)', border: '1px solid var(--green)', color: 'var(--pill-green-bg)', padding: '5px 10px', borderRadius: 6, fontSize: 11, fontWeight: 800, cursor: 'pointer' }}
                         >
                           🚀 Entra
                         </button>
@@ -479,7 +479,7 @@ export function SuperAdminPage() {
                         <button
                           onClick={() => { setPasswordEmessa(null); setCredentialsModalTenant(t); }}
                           title="Visualizza Link di Accesso e Credenziali Gestore"
-                          style={{ background: '#1e1b4b', border: '1px solid #4338ca', color: '#a5b4fc', padding: '5px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+                          style={{ background: 'var(--pill-indigo-bg)', border: '1px solid var(--indigo-d)', color: 'var(--pill-indigo-fg)', padding: '5px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
                         >
                           🔑 Link & Password
                         </button>
@@ -488,7 +488,7 @@ export function SuperAdminPage() {
                         <button
                           onClick={() => setDurationModalTenant(t)}
                           title="Imposta o Prolunga il Tempo della Licenza"
-                          style={{ background: '#1c1917', border: '1px solid #44403c', color: '#f59e0b', padding: '5px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+                          style={{ background: 'var(--surface-2)', border: '1px solid var(--hint)', color: 'var(--amber)', padding: '5px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
                         >
                           ⏱ Tempo
                         </button>
@@ -498,9 +498,9 @@ export function SuperAdminPage() {
                           onClick={() => handleToggleSuspend(t)}
                           title={t.stato === 'attivo' ? 'Sospendi Accesso Studio' : 'Riattiva Accesso Studio'}
                           style={{
-                            background: t.stato === 'attivo' ? '#27272a' : '#064e3b',
-                            border: `1px solid ${t.stato === 'attivo' ? '#52525b' : '#10b981'}`,
-                            color: t.stato === 'attivo' ? '#e4e4e7' : '#6ee7b7',
+                            background: t.stato === 'attivo' ? 'var(--pill-slate-bg)' : 'var(--pill-green-bg)',
+                            border: `1px solid ${t.stato === 'attivo' ? 'var(--hint)' : 'var(--green)'}`,
+                            color: t.stato === 'attivo' ? 'var(--border)' : 'var(--pill-green-fg)',
                             padding: '5px 10px',
                             borderRadius: 6,
                             fontSize: 11,
@@ -515,7 +515,7 @@ export function SuperAdminPage() {
                         <button
                           onClick={() => handleArchive(t)}
                           title={t.stato === 'archiviato' ? 'Ripristina lo studio archiviato' : 'Archivia lo studio (reversibile, blocca l’accesso)'}
-                          style={{ background: t.stato === 'archiviato' ? '#064e3b' : '#1c1917', border: `1px solid ${t.stato === 'archiviato' ? '#10b981' : '#57534e'}`, color: t.stato === 'archiviato' ? '#6ee7b7' : '#d6d3d1', padding: '5px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+                          style={{ background: t.stato === 'archiviato' ? 'var(--pill-green-bg)' : 'var(--surface-2)', border: `1px solid ${t.stato === 'archiviato' ? 'var(--green)' : 'var(--hint)'}`, color: t.stato === 'archiviato' ? 'var(--pill-green-fg)' : 'var(--border)', padding: '5px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
                         >
                           {t.stato === 'archiviato' ? '♻️ Ripristina' : '🗄 Archivia'}
                         </button>
@@ -525,7 +525,7 @@ export function SuperAdminPage() {
                           <button
                             onClick={() => setDeleteModalTenant(t)}
                             title="Elimina Definitivamente il Tenant (irreversibile)"
-                            style={{ background: '#450a0a', border: '1px solid #7f1d1d', color: '#fca5a5', padding: '5px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer' }}
+                            style={{ background: 'var(--pill-red-bg)', border: '1px solid var(--pill-red-bg)', color: 'var(--pill-red-fg)', padding: '5px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer' }}
                           >
                             🗑
                           </button>
@@ -559,21 +559,21 @@ export function SuperAdminPage() {
                   <button
                     onClick={() => { setActiveTenantId(t.id); window.location.href = '/documents'; }}
                     title={`Entra in "${t.ragioneSociale}" per consultarne i dati (super admin)`}
-                    style={{ background: '#1e293b', border: '1px solid #475569', color: '#cbd5e1', padding: '5px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+                    style={{ background: 'var(--pill-slate-bg)', border: '1px solid var(--muted)', color: 'var(--pill-slate-fg)', padding: '5px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
                   >
                     🔍 Consulta
                   </button>
                   <button
                     onClick={() => handleArchive(t)}
                     title="Ripristina lo studio: torna attivo e i suoi utenti possono accedere"
-                    style={{ background: '#064e3b', border: '1px solid #10b981', color: '#6ee7b7', padding: '5px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+                    style={{ background: 'var(--pill-green-bg)', border: '1px solid var(--green)', color: 'var(--pill-green-fg)', padding: '5px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
                   >
                     ♻️ Ripristina
                   </button>
                   <button
                     onClick={() => setDeleteModalTenant(t)}
                     title="Elimina definitivamente lo studio e TUTTI i suoi dati (irreversibile)"
-                    style={{ background: '#450a0a', border: '1px solid #7f1d1d', color: '#fca5a5', padding: '5px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+                    style={{ background: 'var(--pill-red-bg)', border: '1px solid var(--pill-red-bg)', color: 'var(--pill-red-fg)', padding: '5px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
                   >
                     🗑 Elimina definitivamente
                   </button>
@@ -639,7 +639,7 @@ export function SuperAdminPage() {
                 {passwordEmessa ? (
                   <>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
-                      <code style={{ fontSize: 13, fontWeight: 800, color: '#34d399', letterSpacing: '1px' }}>{passwordEmessa}</code>
+                      <code style={{ fontSize: 13, fontWeight: 800, color: 'var(--green)', letterSpacing: '1px' }}>{passwordEmessa}</code>
                       <button
                         onClick={() => {
                           navigator.clipboard.writeText(passwordEmessa);
@@ -650,7 +650,7 @@ export function SuperAdminPage() {
                         📋 Copia Password
                       </button>
                     </div>
-                    <div style={{ fontSize: 10, color: '#fbbf24', marginTop: 6 }}>
+                    <div style={{ fontSize: 10, color: 'var(--amber)', marginTop: 6 }}>
                       ⚠️ Visibile solo ora: il database ne conserva soltanto l'hash. Copiala prima di chiudere.
                     </div>
                   </>
@@ -671,7 +671,7 @@ export function SuperAdminPage() {
               </div>
             </div>
 
-            <div style={{ background: '#0d2d22', border: '1px solid #1a5c3c', borderRadius: 10, padding: 12, fontSize: 11, color: '#a7f3d0' }}>
+            <div style={{ background: 'var(--pill-green-bg)', border: '1px solid var(--pill-green-bg)', borderRadius: 10, padding: 12, fontSize: 11, color: 'var(--pill-green-fg)' }}>
               ✓ Al primo accesso il gestore potrà personalizzare logo, anagrafica studio, matrice permessi RBAC e invitare i propri collaboratori da <strong>Impostazioni Studio (/settings)</strong>.
             </div>
 
@@ -750,7 +750,7 @@ export function SuperAdminPage() {
                 <button
                   type="button"
                   onClick={() => handleExtendDuration(durationModalTenant, 365)}
-                  style={{ background: '#1e1b4b', border: '1px solid #4338ca', color: '#c7d2fe', padding: '10px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', textAlign: 'center' }}
+                  style={{ background: 'var(--pill-indigo-bg)', border: '1px solid var(--indigo-d)', color: 'var(--pill-indigo-fg)', padding: '10px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', textAlign: 'center' }}
                 >
                   +365 Giorni (1 Anno)
                 </button>
@@ -792,14 +792,14 @@ export function SuperAdminPage() {
       {/* 🗑 MODALE CONFERMA ELIMINAZIONE TENANT */}
       {deleteModalTenant && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 120, padding: 16 }}>
-          <div style={{ background: 'var(--sidebar)', border: '1px solid #7f1d1d', borderRadius: 16, padding: 24, width: '100%', maxWidth: 460, display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div style={{ fontSize: 16, fontWeight: 800, color: '#f87171', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ background: 'var(--sidebar)', border: '1px solid var(--pill-red-bg)', borderRadius: 16, padding: 24, width: '100%', maxWidth: 460, display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--pill-red-fg)', display: 'flex', alignItems: 'center', gap: 8 }}>
               <span>⚠️ Conferma Eliminazione Tenant Studio</span>
             </div>
 
             <div style={{ fontSize: 12.5, color: 'var(--text)', lineHeight: 1.6 }}>
               Sei sicuro di voler eliminare definitivamente lo Studio <strong>"{deleteModalTenant.ragioneSociale}"</strong>?
-              <div style={{ marginTop: 8, color: '#fca5a5', fontSize: 11.5, background: '#450a0a', padding: 10, borderRadius: 8, border: '1px solid #7f1d1d' }}>
+              <div style={{ marginTop: 8, color: 'var(--pill-red-fg)', fontSize: 11.5, background: 'var(--pill-red-bg)', padding: 10, borderRadius: 8, border: '1px solid var(--pill-red-bg)' }}>
                 <strong>Irreversibile.</strong> Vengono cancellati per sempre TUTTI i dati dello studio: utenti, clienti, progetti, fatture, documenti e archivi. Non è un recupero: lo studio e il suo contenuto spariscono dal database. Se vuoi solo sospenderlo, usa «Ripristina» invece di eliminare.
               </div>
             </div>
@@ -815,7 +815,7 @@ export function SuperAdminPage() {
               <button
                 type="button"
                 onClick={() => handleDeleteTenant(deleteModalTenant)}
-                style={{ background: '#dc2626', color: '#fff', border: 'none', padding: '8px 18px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+                style={{ background: 'var(--red)', color: '#fff', border: 'none', padding: '8px 18px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
               >
                 ✓ Elimina Definitivamente
               </button>

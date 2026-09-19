@@ -24,11 +24,11 @@ export interface DatiRevisione {
 }
 
 const COLORI: Record<string, React.CSSProperties> = {
-  approvato: { background: '#0d2d22', color: '#34d399', border: '1px solid #14532d' },
-  in_revisione: { background: '#2d2000', color: '#f59e0b', border: '1px solid #713f12' },
-  bozza: { background: '#1e2030', color: '#94a3b8', border: '1px solid #334155' },
-  serie: { background: '#0d2233', color: '#60b8f4', border: '1px solid #1e3a5f' },
-  ignoto: { background: '#1e2030', color: '#64748b', border: '1px solid #334155' },
+  approvato: { background: 'var(--pill-green-bg)', color: 'var(--green)', border: '1px solid var(--pill-green-bg)' },
+  in_revisione: { background: 'var(--pill-amber-bg)', color: 'var(--amber)', border: '1px solid var(--pill-amber-bd)' },
+  bozza: { background: 'var(--card)', color: 'var(--muted)', border: '1px solid var(--pill-slate-bd)' },
+  serie: { background: 'var(--surface-1)', color: 'var(--cat-societario)', border: '1px solid var(--pill-blue-bg)' },
+  ignoto: { background: 'var(--card)', color: 'var(--muted)', border: '1px solid var(--pill-slate-bd)' },
 };
 
 /** Testo del tooltip: chi ha deciso e quando, se il modello lo dice. */

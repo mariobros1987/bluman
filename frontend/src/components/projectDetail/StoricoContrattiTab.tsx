@@ -17,8 +17,8 @@ export function StoricoContrattiTab({
 
       {/* Baseline Contratto Iniziale */}
       <div style={{
-        background: project.st === 'pre_project' ? 'rgba(217, 119, 6, 0.08)' : '#0d2d22',
-        border: `1px solid ${project.st === 'pre_project' ? '#f59e0b' : '#1a5c3c'}`,
+        background: project.st === 'pre_project' ? 'rgba(217, 119, 6, 0.08)' : 'var(--pill-green-bg)',
+        border: `1px solid ${project.st === 'pre_project' ? 'var(--amber)' : 'var(--pill-green-bg)'}`,
         borderRadius: 12,
         padding: 16,
         marginBottom: 16
@@ -26,8 +26,8 @@ export function StoricoContrattiTab({
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', gap: 8 }}>
           <div>
             <span style={{
-              background: project.st === 'pre_project' ? '#f59e0b' : '#34d399',
-              color: project.st === 'pre_project' ? '#451a03' : '#064e3b',
+              background: project.st === 'pre_project' ? 'var(--amber)' : 'var(--green)',
+              color: project.st === 'pre_project' ? 'var(--pill-amber-bg)' : 'var(--pill-green-bg)',
               fontSize: 10,
               fontWeight: 800,
               padding: '2px 8px',
@@ -39,17 +39,17 @@ export function StoricoContrattiTab({
             <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', marginTop: 4 }}>
               Engagement Letter — {project.n}
             </div>
-            <div style={{ fontSize: 10, color: project.st === 'pre_project' ? '#fde68a' : '#a7f3d0' }}>
+            <div style={{ fontSize: 10, color: project.st === 'pre_project' ? 'var(--pill-amber-fg)' : 'var(--pill-green-fg)' }}>
               {project.st === 'pre_project'
                 ? `Generata in data ${project.start} · In attesa di validazione e firma del cliente (OTP)`
                 : `Stipula: ${project.start} · Firma con OTP verificata`}
             </div>
           </div>
-          <div style={{ fontSize: 16, fontWeight: 800, color: project.st === 'pre_project' ? '#f59e0b' : '#34d399' }}>
+          <div style={{ fontSize: 16, fontWeight: 800, color: project.st === 'pre_project' ? 'var(--amber)' : 'var(--green)' }}>
             {fmt(project.val)}
           </div>
         </div>
-        <div style={{ fontSize: 11, color: project.st === 'pre_project' ? '#fde68a' : '#6ee7b7' }}>
+        <div style={{ fontSize: 11, color: project.st === 'pre_project' ? 'var(--pill-amber-fg)' : 'var(--pill-green-fg)' }}>
           • Moduli Iniziali Incorporati: {project.mods && project.mods.length > 0 ? project.mods.map(m => m.n).join(', ') : 'Nessun modulo ancora incorporato'}
         </div>
       </div>

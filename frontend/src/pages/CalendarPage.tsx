@@ -226,7 +226,7 @@ export function CalendarPage() {
       {errore && (
         <div
           role="alert"
-          style={{ background: '#450a0a', border: '1px solid #b91c1c', color: '#fecaca', padding: '12px 16px', borderRadius: 12, fontSize: 12, fontWeight: 600 }}
+          style={{ background: 'var(--pill-red-bg)', border: '1px solid var(--pill-red-bd)', color: 'var(--pill-red-fg)', padding: '12px 16px', borderRadius: 12, fontSize: 12, fontWeight: 600 }}
         >
           ⚠️ {errore} — quello che vedi qui sotto può essere incompleto.
         </div>
@@ -291,7 +291,7 @@ export function CalendarPage() {
         {compitiAperti && (
           <div style={{ padding: '0 16px 16px' }}>
             {compitiErrore && (
-              <div style={{ background: '#450a0a', border: '1px solid #b91c1c', color: '#fecaca', padding: '10px 14px', borderRadius: 8, fontSize: 12, marginBottom: 12 }}>
+              <div style={{ background: 'var(--pill-red-bg)', border: '1px solid var(--pill-red-bd)', color: 'var(--pill-red-fg)', padding: '10px 14px', borderRadius: 8, fontSize: 12, marginBottom: 12 }}>
                 ⚠️ {compitiErrore}
               </div>
             )}
@@ -325,7 +325,7 @@ export function CalendarPage() {
                         </td>
                         <td style={{ padding: '8px', verticalAlign: 'middle' }}>
                           {c.scadenza ? (
-                            <span style={{ color: scaduta ? '#f87171' : 'var(--text)', fontWeight: scaduta ? 700 : 400 }}>
+                            <span style={{ color: scaduta ? 'var(--red)' : 'var(--text)', fontWeight: scaduta ? 700 : 400 }}>
                               {scaduta && '⚠️ '}{new Date(c.scadenza + 'T00:00:00').toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' })}
                             </span>
                           ) : (

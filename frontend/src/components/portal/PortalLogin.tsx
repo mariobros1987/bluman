@@ -41,7 +41,7 @@ export function PortalLogin({
       <div style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 20, padding: 32, width: '100%', maxWidth: 460, display: 'flex', flexDirection: 'column', gap: 20, boxShadow: '0 24px 60px rgba(0,0,0,.6)' }}>
         {/* Header */}
         <div style={{ textAlign: 'center' }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 54, height: 54, borderRadius: 16, background: 'var(--indigo)', color: '#fff', fontSize: 26, marginBottom: 12 }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 54, height: 54, borderRadius: 16, background: 'var(--indigo)', color: 'var(--on-accent)', fontSize: 26, marginBottom: 12 }}>
             🛡
           </div>
           <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--text)', margin: 0 }}>
@@ -63,7 +63,7 @@ export function PortalLogin({
               borderRadius: 8,
               border: 'none',
               background: authMode === 'credentials' ? 'var(--indigo)' : 'transparent',
-              color: authMode === 'credentials' ? '#fff' : 'var(--muted)',
+              color: authMode === 'credentials' ? 'var(--on-accent)' : 'var(--muted)',
               fontWeight: 700,
               fontSize: 12,
               cursor: 'pointer',
@@ -81,7 +81,7 @@ export function PortalLogin({
               borderRadius: 8,
               border: 'none',
               background: authMode === 'magic' ? 'var(--indigo)' : 'transparent',
-              color: authMode === 'magic' ? '#fff' : 'var(--muted)',
+              color: authMode === 'magic' ? 'var(--on-accent)' : 'var(--muted)',
               fontWeight: 700,
               fontSize: 12,
               cursor: 'pointer',
@@ -93,13 +93,13 @@ export function PortalLogin({
         </div>
 
         {accessoNegato && (
-          <div style={{ background: '#3b1414', border: '1px solid #7f1d1d', color: '#fca5a5', padding: '10px 14px', borderRadius: 8, fontSize: 12 }}>
+          <div style={{ background: 'var(--pill-red-bg)', border: '1px solid var(--pill-red-bd)', color: 'var(--pill-red-fg)', padding: '10px 14px', borderRadius: 8, fontSize: 12 }}>
             ⚠️ {accessoNegato}
           </div>
         )}
 
         {loginError && (
-          <div style={{ background: '#3b1414', border: '1px solid #7f1d1d', color: '#fca5a5', padding: '10px 14px', borderRadius: 8, fontSize: 12 }}>
+          <div style={{ background: 'var(--pill-red-bg)', border: '1px solid var(--pill-red-bd)', color: 'var(--pill-red-fg)', padding: '10px 14px', borderRadius: 8, fontSize: 12 }}>
             ⚠️ {loginError}
           </div>
         )}
@@ -136,7 +136,7 @@ export function PortalLogin({
               disabled={loginLoading}
               style={{
                 background: 'var(--indigo)',
-                color: '#fff',
+                color: 'var(--on-accent)',
                 border: 'none',
                 padding: '12px 20px',
                 borderRadius: 10,
@@ -173,7 +173,7 @@ export function PortalLogin({
               disabled={loginLoading}
               style={{
                 background: 'var(--indigo)',
-                color: '#fff',
+                color: 'var(--on-accent)',
                 border: 'none',
                 padding: '12px 20px',
                 borderRadius: 10,

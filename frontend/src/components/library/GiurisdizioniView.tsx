@@ -86,8 +86,8 @@ export function GiurisdizioniView({
                       fontWeight: 700,
                       padding: '2px 8px',
                       borderRadius: 12,
-                      background: g.tipo === 'ue' ? '#0d2d22' : g.tipo === 'stato_usa' ? '#1e1b4b' : '#2d1a05',
-                      color: g.tipo === 'ue' ? '#34d399' : g.tipo === 'stato_usa' ? '#a5b4fc' : '#f59e0b',
+                      background: g.tipo === 'ue' ? 'var(--pill-green-bg)' : g.tipo === 'stato_usa' ? 'var(--pill-indigo-bg)' : 'var(--pill-amber-bg)',
+                      color: g.tipo === 'ue' ? 'var(--green)' : g.tipo === 'stato_usa' ? 'var(--pill-indigo-fg)' : 'var(--amber)',
                       textTransform: 'uppercase',
                     }}
                   >
@@ -101,7 +101,7 @@ export function GiurisdizioniView({
               </div>
 
               <div style={{ marginTop: 14, paddingTop: 10, borderTop: '1px dashed var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: 11, color: '#818cf8', fontWeight: 600 }}>
+                <span style={{ fontSize: 11, color: 'var(--indigo-l)', fontWeight: 600 }}>
                   🧩 {linkedMods.length} Moduli Specifici
                 </span>
                 <span style={{ fontSize: 11, color: 'var(--indigo-l)', fontWeight: 600 }}>

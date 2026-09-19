@@ -35,7 +35,7 @@ export function TabUsers({
               <button
                 type="button"
                 onClick={() => setProfileModalOpen(true)}
-                style={{ background: 'var(--card2)', color: 'var(--indigo-l)', border: '1px solid #4338ca', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+                style={{ background: 'var(--card2)', color: 'var(--indigo-l)', border: '1px solid var(--indigo-d)', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
               >
                 <span>👤</span> Il Mio Profilo & Password
               </button>
@@ -60,7 +60,7 @@ export function TabUsers({
                   style={{ cursor: 'pointer', transition: 'all .2s', display: 'flex', alignItems: 'center', gap: 12 }}
                   title="Clicca per aprire la scheda dettagliata di performance ed ore lavorate"
                 >
-                  <div style={{ width: 42, height: 42, borderRadius: '50%', background: (u.ruolo || '').includes('super') ? '#4f46e5' : (u.specializzazione || '').toLowerCase().includes('legal') || (u.nome || '').toLowerCase().includes('avv') ? '#059669' : (u.specializzazione || '').toLowerCase().includes('tax') || (u.specializzazione || '').toLowerCase().includes('fiscale') ? '#d97706' : '#ec4899', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 14, flexShrink: 0 }}>
+                  <div style={{ width: 42, height: 42, borderRadius: '50%', background: (u.ruolo || '').includes('super') ? 'var(--indigo-d)' : (u.specializzazione || '').toLowerCase().includes('legal') || (u.nome || '').toLowerCase().includes('avv') ? 'var(--green)' : (u.specializzazione || '').toLowerCase().includes('tax') || (u.specializzazione || '').toLowerCase().includes('fiscale') ? 'var(--amber)' : 'var(--cat-ip)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 14, flexShrink: 0 }}>
                     {(u.nome || u.name || 'U').substring(0, 2).toUpperCase()}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -68,11 +68,11 @@ export function TabUsers({
                       <span>{u.nome || u.name}</span>
                       <span style={{ fontSize: 10, color: 'var(--indigo-l)' }}>🔍</span>
                     </div>
-                    <div style={{ fontSize: 11, color: '#818cf8', fontWeight: 600, marginTop: 1 }}>{u.specializzazione || (u.ruolo === 'super_admin' ? 'Senior Partner & Lead Advisor' : 'Collaboratore')}</div>
+                    <div style={{ fontSize: 11, color: 'var(--indigo-l)', fontWeight: 600, marginTop: 1 }}>{u.specializzazione || (u.ruolo === 'super_admin' ? 'Senior Partner & Lead Advisor' : 'Collaboratore')}</div>
                     <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>{u.email}</div>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0 }}>
-                    <span className={styles.roleBadge} style={{ background: (u.ruolo || u.role || '').includes('super') ? '#200f40' : '#1a1f3d', color: (u.ruolo || u.role || '').includes('super') ? '#a78bfa' : '#818cf8', whiteSpace: 'nowrap' }}>
+                    <span className={styles.roleBadge} style={{ background: (u.ruolo || u.role || '').includes('super') ? 'var(--pill-indigo-bg)' : 'var(--surface-1)', color: (u.ruolo || u.role || '').includes('super') ? 'var(--purple)' : 'var(--indigo-l)', whiteSpace: 'nowrap' }}>
                       {u.ruolo === 'super_admin' ? '👑 Super Admin' : u.ruolo === 'advisor' ? '👨‍💼 Advisor' : '👷 Operatore'}
                     </span>
                     <button
@@ -87,7 +87,7 @@ export function TabUsers({
                       style={{
                         background: 'rgba(99, 102, 241, 0.12)',
                         border: '1px solid rgba(99, 102, 241, 0.35)',
-                        color: 'var(--indigo-l, #818cf8)',
+                        color: 'var(--indigo-l, var(--indigo-l))',
                         borderRadius: 6,
                         padding: '3px 8px',
                         fontSize: 10.5,

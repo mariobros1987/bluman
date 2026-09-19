@@ -49,8 +49,8 @@ export function RichiesteAddendumTab({ progettoId }: { progettoId: string }) {
   const badge: Record<RichiestaAddendum['stato'], { testo: string; sfondo: string; colore: string }> = {
     richiesta: { testo: '📨 RICEVUTA', sfondo: 'var(--amber)', colore: '#000' },
     in_preparazione: { testo: '⚙️ IN PREPARAZIONE', sfondo: 'var(--indigo)', colore: '#fff' },
-    pronta: { testo: '✅ PRONTA PER LA FIRMA', sfondo: '#34d399', colore: '#000' },
-    rifiutata: { testo: '⛔ RIFIUTATA', sfondo: '#b91c1c', colore: '#fff' },
+    pronta: { testo: '✅ PRONTA PER LA FIRMA', sfondo: 'var(--green)', colore: '#000' },
+    rifiutata: { testo: '⛔ RIFIUTATA', sfondo: 'var(--pill-red-bd)', colore: '#fff' },
   };
 
   if (caricamento) {
@@ -60,7 +60,7 @@ export function RichiesteAddendumTab({ progettoId }: { progettoId: string }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       {errore && (
-        <div style={{ background: '#2d1516', border: '1px solid #7f1d1d', color: '#fca5a5', borderRadius: 8, padding: 10, fontSize: 11 }}>
+        <div style={{ background: 'var(--pill-red-bg)', border: '1px solid var(--pill-red-bg)', color: 'var(--pill-red-fg)', borderRadius: 8, padding: 10, fontSize: 11 }}>
           ⚠️ {errore}
         </div>
       )}
@@ -107,7 +107,7 @@ export function RichiesteAddendumTab({ progettoId }: { progettoId: string }) {
                         <button
                           onClick={() => void aggiornaStato(r, 'rifiutata')}
                           disabled={inAzione === r.id}
-                          style={{ background: '#450a0a', border: '1px solid #b91c1c', color: '#fecaca', padding: '6px 14px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: inAzione === r.id ? 'default' : 'pointer' }}
+                          style={{ background: 'var(--pill-red-bg)', border: '1px solid var(--pill-red-bd)', color: 'var(--pill-red-fg)', padding: '6px 14px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: inAzione === r.id ? 'default' : 'pointer' }}
                         >
                           ⛔ Rifiuta
                         </button>
@@ -117,7 +117,7 @@ export function RichiesteAddendumTab({ progettoId }: { progettoId: string }) {
                       <button
                         onClick={() => void aggiornaStato(r, 'pronta')}
                         disabled={inAzione === r.id}
-                        style={{ background: '#14532d', border: '1px solid #16a34a', color: '#bbf7d0', padding: '6px 14px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: inAzione === r.id ? 'default' : 'pointer' }}
+                        style={{ background: 'var(--pill-green-bg)', border: '1px solid var(--green)', color: 'var(--pill-green-fg)', padding: '6px 14px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: inAzione === r.id ? 'default' : 'pointer' }}
                       >
                         ✅ Addendum pronto (avvisa il cliente)
                       </button>

@@ -47,7 +47,7 @@ export function FirmaStudioModal({ doc, onClose, onSigned }: FirmaStudioModalPro
 
   // Tracciamento fluido della firma
   const trackerRef = useRef<SmoothStrokeTracker>(
-    new SmoothStrokeTracker({ strokeColor: '#1e1b4b', baseLineWidth: 2.5, minLineWidth: 1.6, maxLineWidth: 3.4 })
+    new SmoothStrokeTracker({ strokeColor: 'var(--pill-indigo-bg)', baseLineWidth: 2.5, minLineWidth: 1.6, maxLineWidth: 3.4 })
   );
 
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
@@ -101,7 +101,7 @@ export function FirmaStudioModal({ doc, onClose, onSigned }: FirmaStudioModalPro
       const ctx = tempCanvas.getContext('2d');
       if (ctx) {
         ctx.font = '30px "Brush Script MT", cursive, sans-serif';
-        ctx.fillStyle = '#1e1b4b';
+        ctx.fillStyle = 'var(--pill-indigo-bg)';
         ctx.fillText(typedSignature || user?.nome || 'Firma', 20, 60);
         return tempCanvas.toDataURL('image/png');
       }
@@ -215,8 +215,8 @@ export function FirmaStudioModal({ doc, onClose, onSigned }: FirmaStudioModalPro
     >
       <div
         style={{
-          background: '#0f172a',
-          border: '1px solid #334155',
+          background: 'var(--surface-2)',
+          border: '1px solid var(--pill-slate-bd)',
           borderRadius: 16,
           width: '100%',
           maxWidth: 620,
@@ -225,14 +225,14 @@ export function FirmaStudioModal({ doc, onClose, onSigned }: FirmaStudioModalPro
           flexDirection: 'column',
           boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7)',
           overflow: 'hidden',
-          color: '#f8fafc',
+          color: 'var(--text)',
         }}
       >
         {/* Header */}
         <div
           style={{
             padding: '16px 20px',
-            borderBottom: '1px solid #1e293b',
+            borderBottom: '1px solid var(--pill-slate-bg)',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
@@ -240,11 +240,11 @@ export function FirmaStudioModal({ doc, onClose, onSigned }: FirmaStudioModalPro
           }}
         >
           <div>
-            <div style={{ fontSize: 16, fontWeight: 800, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--pill-sky-fg)', display: 'flex', alignItems: 'center', gap: 8 }}>
               <span>🏛️ Sottoscrizione Documento — Studio BluMan</span>
             </div>
-            <div style={{ fontSize: 11.5, color: '#94a3b8', marginTop: 2 }}>
-              Firmatario: <strong style={{ color: '#e2e8f0' }}>{user?.nome || 'Operatore di Studio'}</strong> ({user?.email})
+            <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 2 }}>
+              Firmatario: <strong style={{ color: 'var(--border)' }}>{user?.nome || 'Operatore di Studio'}</strong> ({user?.email})
             </div>
           </div>
           <button
@@ -253,7 +253,7 @@ export function FirmaStudioModal({ doc, onClose, onSigned }: FirmaStudioModalPro
             style={{
               background: 'transparent',
               border: 'none',
-              color: '#94a3b8',
+              color: 'var(--muted)',
               fontSize: 20,
               cursor: 'pointer',
               lineHeight: 1,
@@ -266,7 +266,7 @@ export function FirmaStudioModal({ doc, onClose, onSigned }: FirmaStudioModalPro
         {/* Modal Body */}
         <div style={{ padding: 20, overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: 16 }}>
           {/* Selettore Modalità */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, background: '#1e293b', padding: 4, borderRadius: 10 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, background: 'var(--pill-slate-bg)', padding: 4, borderRadius: 10 }}>
             <button
               type="button"
               onClick={() => setModalita('grafometrica')}
@@ -274,8 +274,8 @@ export function FirmaStudioModal({ doc, onClose, onSigned }: FirmaStudioModalPro
                 padding: '8px 4px',
                 borderRadius: 8,
                 border: 'none',
-                background: modalita === 'grafometrica' ? '#3b82f6' : 'transparent',
-                color: modalita === 'grafometrica' ? '#fff' : '#94a3b8',
+                background: modalita === 'grafometrica' ? 'var(--indigo-l)' : 'transparent',
+                color: modalita === 'grafometrica' ? '#fff' : 'var(--muted)',
                 fontSize: 11,
                 fontWeight: 700,
                 cursor: 'pointer',
@@ -291,8 +291,8 @@ export function FirmaStudioModal({ doc, onClose, onSigned }: FirmaStudioModalPro
                 padding: '8px 4px',
                 borderRadius: 8,
                 border: 'none',
-                background: modalita === 'fea_otp' ? '#6366f1' : 'transparent',
-                color: modalita === 'fea_otp' ? '#fff' : '#94a3b8',
+                background: modalita === 'fea_otp' ? 'var(--indigo)' : 'transparent',
+                color: modalita === 'fea_otp' ? '#fff' : 'var(--muted)',
                 fontSize: 11,
                 fontWeight: 700,
                 cursor: 'pointer',
@@ -308,8 +308,8 @@ export function FirmaStudioModal({ doc, onClose, onSigned }: FirmaStudioModalPro
                 padding: '8px 4px',
                 borderRadius: 8,
                 border: 'none',
-                background: modalita === 'qualificata_esterna' ? '#10b981' : 'transparent',
-                color: modalita === 'qualificata_esterna' ? '#fff' : '#94a3b8',
+                background: modalita === 'qualificata_esterna' ? 'var(--green)' : 'transparent',
+                color: modalita === 'qualificata_esterna' ? '#fff' : 'var(--muted)',
                 fontSize: 11,
                 fontWeight: 700,
                 cursor: 'pointer',
@@ -325,8 +325,8 @@ export function FirmaStudioModal({ doc, onClose, onSigned }: FirmaStudioModalPro
                 padding: '8px 4px',
                 borderRadius: 8,
                 border: 'none',
-                background: modalita === 'manuale_scansionata' ? '#f59e0b' : 'transparent',
-                color: modalita === 'manuale_scansionata' ? '#fff' : '#94a3b8',
+                background: modalita === 'manuale_scansionata' ? 'var(--amber)' : 'transparent',
+                color: modalita === 'manuale_scansionata' ? '#fff' : 'var(--muted)',
                 fontSize: 11,
                 fontWeight: 700,
                 cursor: 'pointer',
@@ -339,7 +339,7 @@ export function FirmaStudioModal({ doc, onClose, onSigned }: FirmaStudioModalPro
 
           {/* Qualifica / Ruolo firmatario */}
           <div>
-            <label style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.5px', display: 'block', marginBottom: 6 }}>
+            <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.5px', display: 'block', marginBottom: 6 }}>
               Titolo / Ruolo del Firmatario
             </label>
             <input
@@ -350,10 +350,10 @@ export function FirmaStudioModal({ doc, onClose, onSigned }: FirmaStudioModalPro
               style={{
                 width: '100%',
                 padding: '8px 12px',
-                background: '#1e293b',
-                border: '1px solid #334155',
+                background: 'var(--pill-slate-bg)',
+                border: '1px solid var(--pill-slate-bd)',
                 borderRadius: 8,
-                color: '#fff',
+                color: 'var(--text)',
                 fontSize: 12.5,
               }}
             />
@@ -364,15 +364,15 @@ export function FirmaStudioModal({ doc, onClose, onSigned }: FirmaStudioModalPro
             <div>
               {/* Opzioni FEA OTP */}
               {modalita === 'fea_otp' && (
-                <div style={{ background: '#1e1b4b40', border: '1px solid #4338ca', borderRadius: 10, padding: 14, marginBottom: 14 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: '#a5b4fc', marginBottom: 8 }}>
+                <div style={{ background: '#1e1b4b40', border: '1px solid var(--indigo-d)', borderRadius: 10, padding: 14, marginBottom: 14 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--pill-indigo-fg)', marginBottom: 8 }}>
                     📲 Autenticazione a 2 Fattori (OTP Verificato):
                   </div>
                   <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
                     <select
                       value={canaleOtp}
                       onChange={(e) => setCanaleOtp(e.target.value as 'email' | 'whatsapp')}
-                      style={{ padding: '6px 10px', background: '#0f172a', border: '1px solid #4338ca', borderRadius: 6, color: '#fff', fontSize: 12 }}
+                      style={{ padding: '6px 10px', background: 'var(--surface-2)', border: '1px solid var(--indigo-d)', borderRadius: 6, color: 'var(--text)', fontSize: 12 }}
                     >
                       <option value="email">Email ({user?.email})</option>
                       <option value="whatsapp">WhatsApp Business</option>
@@ -384,7 +384,7 @@ export function FirmaStudioModal({ doc, onClose, onSigned }: FirmaStudioModalPro
                         value={cellulareWhatsapp}
                         onChange={(e) => setCellulareWhatsapp(e.target.value)}
                         placeholder="+39 333..."
-                        style={{ padding: '6px 10px', background: '#0f172a', border: '1px solid #4338ca', borderRadius: 6, color: '#fff', fontSize: 12, width: 140 }}
+                        style={{ padding: '6px 10px', background: 'var(--surface-2)', border: '1px solid var(--indigo-d)', borderRadius: 6, color: 'var(--text)', fontSize: 12, width: 140 }}
                       />
                     )}
 
@@ -394,7 +394,7 @@ export function FirmaStudioModal({ doc, onClose, onSigned }: FirmaStudioModalPro
                       disabled={invioOtpInCorso}
                       style={{
                         padding: '6px 14px',
-                        background: '#6366f1',
+                        background: 'var(--indigo)',
                         color: '#fff',
                         border: 'none',
                         borderRadius: 6,
@@ -409,7 +409,7 @@ export function FirmaStudioModal({ doc, onClose, onSigned }: FirmaStudioModalPro
 
                   {otpInviato && (
                     <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <span style={{ fontSize: 11, color: '#86efac' }}>
+                      <span style={{ fontSize: 11, color: 'var(--pill-green-fg)' }}>
                         ✓ Codice inviato a {recapitoMascherato}
                       </span>
                       <input
@@ -420,10 +420,10 @@ export function FirmaStudioModal({ doc, onClose, onSigned }: FirmaStudioModalPro
                         placeholder="Inserisci OTP a 6 cifre"
                         style={{
                           padding: '6px 10px',
-                          background: '#0f172a',
-                          border: '1.5px solid #10b981',
+                          background: 'var(--surface-2)',
+                          border: '1.5px solid var(--green)',
                           borderRadius: 6,
-                          color: '#fff',
+                          color: 'var(--text)',
                           fontSize: 13,
                           fontWeight: 800,
                           letterSpacing: '2px',
@@ -438,7 +438,7 @@ export function FirmaStudioModal({ doc, onClose, onSigned }: FirmaStudioModalPro
 
               {/* Toggle Disegna / Digita */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase' }}>
                   Firma Grafica
                 </span>
                 <div style={{ display: 'flex', gap: 6 }}>
@@ -449,8 +449,8 @@ export function FirmaStudioModal({ doc, onClose, onSigned }: FirmaStudioModalPro
                       padding: '3px 8px',
                       borderRadius: 4,
                       border: 'none',
-                      background: signatureMode === 'draw' ? '#3b82f6' : '#1e293b',
-                      color: signatureMode === 'draw' ? '#fff' : '#94a3b8',
+                      background: signatureMode === 'draw' ? 'var(--indigo-l)' : 'var(--pill-slate-bg)',
+                      color: signatureMode === 'draw' ? '#fff' : 'var(--muted)',
                       fontSize: 10,
                       cursor: 'pointer',
                     }}
@@ -464,8 +464,8 @@ export function FirmaStudioModal({ doc, onClose, onSigned }: FirmaStudioModalPro
                       padding: '3px 8px',
                       borderRadius: 4,
                       border: 'none',
-                      background: signatureMode === 'type' ? '#3b82f6' : '#1e293b',
-                      color: signatureMode === 'type' ? '#fff' : '#94a3b8',
+                      background: signatureMode === 'type' ? 'var(--indigo-l)' : 'var(--pill-slate-bg)',
+                      color: signatureMode === 'type' ? '#fff' : 'var(--muted)',
                       fontSize: 10,
                       cursor: 'pointer',
                     }}
@@ -497,12 +497,12 @@ export function FirmaStudioModal({ doc, onClose, onSigned }: FirmaStudioModalPro
                       position: 'absolute',
                       right: 8,
                       bottom: 8,
-                      background: '#e2e8f0',
-                      border: '1px solid #cbd5e1',
+                      background: 'var(--border)',
+                      border: '1px solid var(--pill-slate-fg)',
                       borderRadius: 4,
                       padding: '2px 8px',
                       fontSize: 10,
-                      color: '#475569',
+                      color: 'var(--muted)',
                       cursor: 'pointer',
                     }}
                   >
@@ -510,7 +510,7 @@ export function FirmaStudioModal({ doc, onClose, onSigned }: FirmaStudioModalPro
                   </button>
                 </div>
               ) : (
-                <div style={{ background: '#1e293b', padding: 12, borderRadius: 8 }}>
+                <div style={{ background: 'var(--pill-slate-bg)', padding: 12, borderRadius: 8 }}>
                   <input
                     type="text"
                     value={typedSignature}
@@ -519,10 +519,10 @@ export function FirmaStudioModal({ doc, onClose, onSigned }: FirmaStudioModalPro
                     style={{
                       width: '100%',
                       padding: 8,
-                      background: '#0f172a',
-                      border: '1px solid #334155',
+                      background: 'var(--surface-2)',
+                      border: '1px solid var(--pill-slate-bd)',
                       borderRadius: 6,
-                      color: '#fff',
+                      color: 'var(--text)',
                       fontSize: 14,
                       fontFamily: '"Brush Script MT", cursive, sans-serif',
                     }}
@@ -534,11 +534,11 @@ export function FirmaStudioModal({ doc, onClose, onSigned }: FirmaStudioModalPro
 
           {/* Sezione per FEQ QUALIFICATA ESTERNA */}
           {modalita === 'qualificata_esterna' && (
-            <div style={{ background: '#064e3b25', border: '1px solid #059669', borderRadius: 10, padding: 16 }}>
-              <div style={{ fontSize: 12.5, fontWeight: 700, color: '#34d399', marginBottom: 6 }}>
+            <div style={{ background: '#064e3b25', border: '1px solid var(--green)', borderRadius: 10, padding: 16 }}>
+              <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--green)', marginBottom: 6 }}>
                 📁 Firma Elettronica Qualificata (FEQ · CAdES / PAdES)
               </div>
-              <div style={{ fontSize: 11, color: '#94a3b8', lineHeight: 1.5, marginBottom: 12 }}>
+              <div style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.5, marginBottom: 12 }}>
                 Hai firmato l'atto all'esterno utilizzando una SmartCard, Token USB o Firma Remota con certificato qualificato?
                 Carica il file firmato con estensione <code>.p7m</code> o <code>.pdf</code>.
               </div>
@@ -546,10 +546,10 @@ export function FirmaStudioModal({ doc, onClose, onSigned }: FirmaStudioModalPro
                 type="file"
                 accept=".p7m,.pdf"
                 onChange={handleFileUpload}
-                style={{ fontSize: 12, color: '#94a3b8' }}
+                style={{ fontSize: 12, color: 'var(--muted)' }}
               />
               {uploadedFile && (
-                <div style={{ marginTop: 8, fontSize: 11.5, color: '#10b981', fontWeight: 700 }}>
+                <div style={{ marginTop: 8, fontSize: 11.5, color: 'var(--green)', fontWeight: 700 }}>
                   ✓ File pronto: {uploadedFile.filename}
                 </div>
               )}
@@ -558,11 +558,11 @@ export function FirmaStudioModal({ doc, onClose, onSigned }: FirmaStudioModalPro
 
           {/* Sezione per SCANSIONE CARTACEA */}
           {modalita === 'manuale_scansionata' && (
-            <div style={{ background: '#78350f25', border: '1px solid #b45309', borderRadius: 10, padding: 16 }}>
-              <div style={{ fontSize: 12.5, fontWeight: 700, color: '#fbbf24', marginBottom: 6 }}>
+            <div style={{ background: '#78350f25', border: '1px solid var(--pill-amber-bd)', borderRadius: 10, padding: 16 }}>
+              <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--amber)', marginBottom: 6 }}>
                 🖨️ Copia Cartacea Stampata e Controfirmata (SES)
               </div>
-              <div style={{ fontSize: 11, color: '#94a3b8', lineHeight: 1.5, marginBottom: 12 }}>
+              <div style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.5, marginBottom: 12 }}>
                 Hai stampato il documento e apposto la firma autografa tradizionale?
                 Carica la scansione leggibile in formato PDF o immagine (JPEG/PNG).
               </div>
@@ -570,10 +570,10 @@ export function FirmaStudioModal({ doc, onClose, onSigned }: FirmaStudioModalPro
                 type="file"
                 accept=".pdf,.jpg,.jpeg,.png"
                 onChange={handleFileUpload}
-                style={{ fontSize: 12, color: '#94a3b8' }}
+                style={{ fontSize: 12, color: 'var(--muted)' }}
               />
               {uploadedFile && (
-                <div style={{ marginTop: 8, fontSize: 11.5, color: '#f59e0b', fontWeight: 700 }}>
+                <div style={{ marginTop: 8, fontSize: 11.5, color: 'var(--amber)', fontWeight: 700 }}>
                   ✓ Scansione pronta: {uploadedFile.filename}
                 </div>
               )}
@@ -582,7 +582,7 @@ export function FirmaStudioModal({ doc, onClose, onSigned }: FirmaStudioModalPro
 
           {/* Alert Errore */}
           {errore && (
-            <div style={{ background: '#7f1d1d40', border: '1px solid #ef4444', color: '#fca5a5', padding: '10px 14px', borderRadius: 8, fontSize: 11.5 }}>
+            <div style={{ background: '#7f1d1d40', border: '1px solid var(--red)', color: 'var(--pill-red-fg)', padding: '10px 14px', borderRadius: 8, fontSize: 11.5 }}>
               ⚠️ {errore}
             </div>
           )}
@@ -592,7 +592,7 @@ export function FirmaStudioModal({ doc, onClose, onSigned }: FirmaStudioModalPro
         <div
           style={{
             padding: '14px 20px',
-            borderTop: '1px solid #1e293b',
+            borderTop: '1px solid var(--pill-slate-bg)',
             display: 'flex',
             justifyContent: 'flex-end',
             alignItems: 'center',
@@ -605,10 +605,10 @@ export function FirmaStudioModal({ doc, onClose, onSigned }: FirmaStudioModalPro
             onClick={onClose}
             style={{
               padding: '8px 16px',
-              background: '#334155',
+              background: 'var(--pill-slate-bd)',
               border: 'none',
               borderRadius: 8,
-              color: '#cbd5e1',
+              color: 'var(--pill-slate-fg)',
               fontSize: 12,
               fontWeight: 600,
               cursor: 'pointer',
@@ -622,7 +622,7 @@ export function FirmaStudioModal({ doc, onClose, onSigned }: FirmaStudioModalPro
             disabled={loading}
             style={{
               padding: '8px 20px',
-              background: '#3b82f6',
+              background: 'var(--indigo-l)',
               border: 'none',
               borderRadius: 8,
               color: '#fff',

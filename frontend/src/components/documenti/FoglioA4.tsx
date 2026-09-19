@@ -72,7 +72,7 @@ function BloccoSbloccabile({ blocco, avvisoSotto }: { blocco: BloccoBloccabile; 
         onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); riblocca(); } }}
         title={!modificabile ? blocco.etichetta : aperto ? `${blocco.etichetta}: modifica in corso` : `${blocco.etichetta}: doppio clic per modificare`}
         style={{
-          outline: aperto ? '2px dashed #4338ca' : sopra ? '1px dashed #94a3b8' : '1px dashed transparent',
+          outline: aperto ? '2px dashed var(--indigo-d)' : sopra ? '1px dashed var(--muted)' : '1px dashed transparent',
           outlineOffset: 4,
           borderRadius: 4,
           background: aperto ? 'rgba(67, 56, 202, 0.045)' : 'transparent',
@@ -88,7 +88,7 @@ function BloccoSbloccabile({ blocco, avvisoSotto }: { blocco: BloccoBloccabile; 
             fontSize: 8.5,
             fontWeight: 700,
             letterSpacing: 0.2,
-            color: aperto ? '#4338ca' : '#94a3b8',
+            color: aperto ? 'var(--indigo-d)' : 'var(--muted)',
             whiteSpace: 'nowrap',
             pointerEvents: 'none',
           }}
@@ -118,7 +118,7 @@ export interface ProprietaFoglioA4 {
  * e deve essere identica a quella della stampa. Per stare in una colonna più stretta si riduce con
  * una `scale`, che non cambia dove vanno a capo le righe — restringere il foglio, invece, sì.
  */
-export function FoglioA4({ children, intestazione, piede, sfondo = '#334155' }: ProprietaFoglioA4) {
+export function FoglioA4({ children, intestazione, piede, sfondo = 'var(--pill-slate-bd)' }: ProprietaFoglioA4) {
   const contenitore = useRef<HTMLDivElement | null>(null);
   const flusso = useRef<HTMLDivElement | null>(null);
   const zonaPiede = useRef<HTMLDivElement | null>(null);
@@ -185,7 +185,7 @@ export function FoglioA4({ children, intestazione, piede, sfondo = '#334155' }: 
             transform: `translateX(-50%) scale(${scala})`,
             transformOrigin: 'top center',
             background: '#ffffff',
-            color: '#0f172a',
+            color: 'var(--surface-2)',
             boxShadow: '0 10px 30px rgba(0,0,0,0.4)',
           }}
         >
@@ -206,7 +206,7 @@ export function FoglioA4({ children, intestazione, piede, sfondo = '#334155' }: 
                   borderTop: '1px dashed rgba(239, 68, 68, 0.75)',
                 }}
               >
-                <span style={{ position: 'absolute', right: 4, top: 2, fontSize: 8.5, fontWeight: 700, color: '#ef4444' }}>
+                <span style={{ position: 'absolute', right: 4, top: 2, fontSize: 8.5, fontWeight: 700, color: 'var(--red)' }}>
                   fine foglio {k + 1} (indicativo)
                 </span>
               </div>

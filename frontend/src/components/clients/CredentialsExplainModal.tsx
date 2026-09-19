@@ -48,21 +48,21 @@ Password: ${data.passwordChiaro}`;
     setEmailStatus(null);
     try {
       const emailHtml = `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; color: #1e293b;">
-          <div style="background-color: #0f172a; padding: 24px; text-align: center; color: #ffffff;">
-            <h2 style="margin: 0; color: #818cf8;">BluMan Advisory Platform</h2>
-            <p style="margin: 4px 0 0 0; font-size: 12px; color: #94a3b8;">Portale Riservato Cliente</p>
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; color: var(--pill-slate-bg);">
+          <div style="background-color: var(--surface-2); padding: 24px; text-align: center; color: #ffffff;">
+            <h2 style="margin: 0; color: var(--indigo-l);">BluMan Advisory Platform</h2>
+            <p style="margin: 4px 0 0 0; font-size: 12px; color: var(--muted);">Portale Riservato Cliente</p>
           </div>
           <div style="padding: 28px 24px;">
-            <h3 style="margin-top: 0; color: #0f172a;">Gentile ${data.cliente.nome},</h3>
-            <p style="color: #475569; line-height: 1.6;">Sono state generate le credenziali per il tuo accesso al Portale Riservato:</p>
-            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin: 20px 0;">
-              <p style="margin: 0 0 8px 0; font-size: 13px;"><strong>Indirizzo Portale:</strong> <a href="${portalUrl}" style="color: #6366f1;">${portalUrl}</a></p>
+            <h3 style="margin-top: 0; color: var(--surface-2);">Gentile ${data.cliente.nome},</h3>
+            <p style="color: var(--muted); line-height: 1.6;">Sono state generate le credenziali per il tuo accesso al Portale Riservato:</p>
+            <div style="background: var(--pill-sky-fg); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin: 20px 0;">
+              <p style="margin: 0 0 8px 0; font-size: 13px;"><strong>Indirizzo Portale:</strong> <a href="${portalUrl}" style="color: var(--indigo);">${portalUrl}</a></p>
               <p style="margin: 0 0 8px 0; font-size: 13px;"><strong>Email (Username):</strong> <code>${destEmail}</code></p>
-              <p style="margin: 0; font-size: 14px;"><strong>Password Riservata:</strong> <span style="font-family: monospace; font-weight: bold; color: #4338ca; font-size: 16px;">${data.passwordChiaro}</span></p>
+              <p style="margin: 0; font-size: 14px;"><strong>Password Riservata:</strong> <span style="font-family: monospace; font-weight: bold; color: var(--indigo-d); font-size: 16px;">${data.passwordChiaro}</span></p>
             </div>
             <div style="text-align: center; margin: 24px 0;">
-              <a href="${portalUrl}" style="background: #6366f1; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: 700; display: inline-block;">Accedi al Portale Cliente ➔</a>
+              <a href="${portalUrl}" style="background: var(--indigo); color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: 700; display: inline-block;">Accedi al Portale Cliente ➔</a>
             </div>
           </div>
         </div>
@@ -137,18 +137,18 @@ Password: ${data.passwordChiaro}`;
 
         {/* Status Invio Email */}
         {emailStatus ? (
-          <div style={{ background: emailStatus.startsWith('✓') ? '#0d2d22' : '#2d1a0d', border: `1px solid ${emailStatus.startsWith('✓') ? '#1a5c3c' : '#5c3c1a'}`, borderRadius: 10, padding: '10px 14px', fontSize: 12, color: emailStatus.startsWith('✓') ? '#34d399' : '#fbbf24', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ background: emailStatus.startsWith('✓') ? 'var(--pill-green-bg)' : 'var(--pill-amber-bg)', border: `1px solid ${emailStatus.startsWith('✓') ? 'var(--pill-green-bg)' : 'var(--pill-amber-bg)'}`, borderRadius: 10, padding: '10px 14px', fontSize: 12, color: emailStatus.startsWith('✓') ? 'var(--green)' : 'var(--amber)', display: 'flex', alignItems: 'center', gap: 8 }}>
             <span>{emailStatus.startsWith('✓') ? '✓' : '⚠️'}</span> {emailStatus}
           </div>
         ) : (
-          <div style={{ background: '#2d1a0d', border: '1px solid #5c3c1a', borderRadius: 10, padding: '10px 14px', fontSize: 12, color: '#fbbf24', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ background: 'var(--pill-amber-bg)', border: '1px solid var(--pill-amber-bg)', borderRadius: 10, padding: '10px 14px', fontSize: 12, color: 'var(--amber)', display: 'flex', alignItems: 'center', gap: 8 }}>
             <span>ℹ️</span> {destEmail ? `Clicca su "Invia per Email" per recapitare le credenziali a ${destEmail}.` : `Nessuna email registrata per il cliente: inseriscila sotto per l'invio.`}
           </div>
         )}
 
         {/* Status Invio WhatsApp */}
         {whatsappStatus && (
-          <div style={{ background: '#0d2d22', border: '1px solid #1a5c3c', borderRadius: 10, padding: '10px 14px', fontSize: 12, color: '#34d399', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ background: 'var(--pill-green-bg)', border: '1px solid var(--pill-green-bg)', borderRadius: 10, padding: '10px 14px', fontSize: 12, color: 'var(--green)', display: 'flex', alignItems: 'center', gap: 8 }}>
             <span>✓</span> {whatsappStatus}
           </div>
         )}
@@ -174,7 +174,7 @@ Password: ${data.passwordChiaro}`;
                 onClick={handleSendEmail}
                 disabled={sendingEmail || !destEmail}
                 style={{
-                  background: '#059669',
+                  background: 'var(--green)',
                   color: '#fff',
                   border: 'none',
                   padding: '8px 14px',
@@ -193,7 +193,7 @@ Password: ${data.passwordChiaro}`;
           <div>
             <span style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '.5px' }}>Password di Accesso Riservata</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4 }}>
-              <div style={{ background: '#1e1b4b', border: '1px solid #4338ca', color: '#c7d2fe', padding: '8px 14px', borderRadius: 8, fontSize: 16, fontWeight: 800, fontFamily: 'monospace', letterSpacing: '1px', flex: 1 }}>
+              <div style={{ background: 'var(--pill-indigo-bg)', border: '1px solid var(--indigo-d)', color: 'var(--pill-indigo-fg)', padding: '8px 14px', borderRadius: 8, fontSize: 16, fontWeight: 800, fontFamily: 'monospace', letterSpacing: '1px', flex: 1 }}>
                 {data.passwordChiaro}
               </div>
               <button

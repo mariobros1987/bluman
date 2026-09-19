@@ -97,20 +97,20 @@ export function AuditLogPage() {
 
   const getRuoloBadge = (ruolo: string) => {
     switch (ruolo) {
-      case 'super_admin': return { bg: '#312e81', color: '#a5b4fc', text: '👑 Super Admin' };
-      case 'advisor': return { bg: '#1e1b4b', color: '#818cf8', text: '👨‍💼 Advisor Senior' };
-      case 'collaboratore_interno': return { bg: '#064e3b', color: '#a7f3d0', text: '👷 Operatore Studio' };
-      case 'cliente': return { bg: '#451a03', color: '#fde68a', text: '🔑 Cliente' };
+      case 'super_admin': return { bg: 'var(--pill-indigo-bg)', color: 'var(--pill-indigo-fg)', text: '👑 Super Admin' };
+      case 'advisor': return { bg: 'var(--pill-indigo-bg)', color: 'var(--indigo-l)', text: '👨‍💼 Advisor Senior' };
+      case 'collaboratore_interno': return { bg: 'var(--pill-green-bg)', color: 'var(--pill-green-fg)', text: '👷 Operatore Studio' };
+      case 'cliente': return { bg: 'var(--pill-amber-bg)', color: 'var(--pill-amber-fg)', text: '🔑 Cliente' };
       default: return { bg: 'var(--card2)', color: 'var(--muted)', text: ruolo };
     }
   };
 
   const getCatBadge = (cat: string) => {
     switch (cat) {
-      case 'DOCUMENTI': return { bg: '#1a1f3d', color: '#818cf8' };
-      case 'FATTURAZIONE': return { bg: '#0d2d22', color: '#34d399' };
-      case 'PROGETTO': return { bg: '#200f40', color: '#a78bfa' };
-      case 'TENANT': return { bg: '#312e81', color: '#a5b4fc' };
+      case 'DOCUMENTI': return { bg: 'var(--surface-1)', color: 'var(--indigo-l)' };
+      case 'FATTURAZIONE': return { bg: 'var(--pill-green-bg)', color: 'var(--green)' };
+      case 'PROGETTO': return { bg: 'var(--pill-indigo-bg)', color: 'var(--purple)' };
+      case 'TENANT': return { bg: 'var(--pill-indigo-bg)', color: 'var(--pill-indigo-fg)' };
       default: return { bg: 'var(--card2)', color: 'var(--muted)' };
     }
   };
@@ -129,7 +129,7 @@ export function AuditLogPage() {
           </div>
         </div>
 
-        <div style={{ fontSize: 11, background: '#0d2d22', border: '1px solid #1a5c3c', color: '#34d399', padding: '6px 14px', borderRadius: 20, fontWeight: 600 }}>
+        <div style={{ fontSize: 11, background: 'var(--pill-green-bg)', border: '1px solid var(--pill-green-bg)', color: 'var(--green)', padding: '6px 14px', borderRadius: 20, fontWeight: 600 }}>
           ✓ Log Inalterabile & Isolato tramite RLS PostgreSQL
         </div>
       </div>
@@ -169,7 +169,7 @@ export function AuditLogPage() {
 
       {/* Log Table */}
       <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 16, padding: 20 }}>
-        {errore && <div style={{ padding: 12, marginBottom: 12, borderRadius: 8, background: '#7f1d1d', color: '#fecaca' }}>{errore}</div>}
+        {errore && <div style={{ padding: 12, marginBottom: 12, borderRadius: 8, background: 'var(--pill-red-bg)', color: 'var(--pill-red-fg)' }}>{errore}</div>}
         {loading ? (
           <div style={{ padding: 24, textAlign: 'center', color: 'var(--muted)' }}>Caricamento registro audit...</div>
         ) : <div style={{ overflowX: 'auto' }}>
@@ -226,7 +226,7 @@ export function AuditLogPage() {
                         {log.ipAddress}
                       </td>
                       {isSuperAdmin && (
-                        <td style={{ padding: 10, fontSize: 11, fontWeight: 600, color: '#34d399' }}>
+                        <td style={{ padding: 10, fontSize: 11, fontWeight: 600, color: 'var(--green)' }}>
                           {log.tenantName}
                         </td>
                       )}

@@ -70,7 +70,7 @@ export function EditorCanvas({
             minHeight: 520,
             fontSize: 13,
             lineHeight: 1.6,
-            color: '#0f172a',
+            color: 'var(--surface-2)',
           }}
         />
       </FoglioA4>

@@ -71,7 +71,7 @@ export function LibreriaTemplate({
                   <button
                     type="button"
                     onClick={() => fileImportRef.current?.click()}
-                    style={{ background: '#1e1b4b', color: '#818cf8', border: '1px solid #4338ca', padding: '4px 8px', borderRadius: 6, fontSize: 10.5, fontWeight: 700, cursor: 'pointer' }}
+                    style={{ background: 'var(--pill-indigo-bg)', color: 'var(--indigo-l)', border: '1px solid var(--indigo-d)', padding: '4px 8px', borderRadius: 6, fontSize: 10.5, fontWeight: 700, cursor: 'pointer' }}
                     title="Importa Modello Master da file JSON o HTML"
                   >
                     📥
@@ -89,7 +89,7 @@ export function LibreriaTemplate({
 
               {/* §41 / regola 7 — un guasto di lettura non si traveste da «lo studio ha solo questi». */}
               {erroreLettura && (
-                <div style={{ fontSize: 10, color: '#fca5a5', background: '#2a1218', border: '1px solid #5b2130', borderRadius: 6, padding: '5px 7px', lineHeight: 1.4 }}>
+                <div style={{ fontSize: 10, color: 'var(--pill-red-fg)', background: 'var(--pill-red-bg)', border: '1px solid var(--pill-red-bg)', borderRadius: 6, padding: '5px 7px', lineHeight: 1.4 }}>
                   ⚠️ Elenco possibilmente incompleto: {erroreLettura}
                 </div>
               )}
@@ -105,7 +105,7 @@ export function LibreriaTemplate({
               <button
                 type="button"
                 onClick={handleSaveCurrentAsMasterTemplate}
-                style={{ width: '100%', background: 'rgba(99, 102, 241, 0.1)', border: '1px dashed #6366f1', color: '#818cf8', padding: '6px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+                style={{ width: '100%', background: 'rgba(99, 102, 241, 0.1)', border: '1px dashed var(--indigo)', color: 'var(--indigo-l)', padding: '6px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
                 title="Salva l'attuale bozza dell'editor come nuovo modello master riutilizzabile"
               >
                 💾 Salva Bozza Attuale come Master
@@ -127,8 +127,8 @@ export function LibreriaTemplate({
                     onClick={() => setTmplStatusSidebar('attivi')}
                     style={{
                       flex: 1,
-                      background: tmplStatusSidebar === 'attivi' ? '#1e1b4b' : 'transparent',
-                      color: tmplStatusSidebar === 'attivi' ? '#818cf8' : 'var(--muted)',
+                      background: tmplStatusSidebar === 'attivi' ? 'var(--pill-indigo-bg)' : 'transparent',
+                      color: tmplStatusSidebar === 'attivi' ? 'var(--indigo-l)' : 'var(--muted)',
                       border: 'none',
                       padding: '3px 0',
                       borderRadius: 4,
@@ -144,8 +144,8 @@ export function LibreriaTemplate({
                     onClick={() => setTmplStatusSidebar('archiviati')}
                     style={{
                       flex: 1,
-                      background: tmplStatusSidebar === 'archiviati' ? '#1e1b4b' : 'transparent',
-                      color: tmplStatusSidebar === 'archiviati' ? '#818cf8' : 'var(--muted)',
+                      background: tmplStatusSidebar === 'archiviati' ? 'var(--pill-indigo-bg)' : 'transparent',
+                      color: tmplStatusSidebar === 'archiviati' ? 'var(--indigo-l)' : 'var(--muted)',
                       border: 'none',
                       padding: '3px 0',
                       borderRadius: 4,
@@ -161,8 +161,8 @@ export function LibreriaTemplate({
                     onClick={() => setTmplStatusSidebar('tutti')}
                     style={{
                       flex: 1,
-                      background: tmplStatusSidebar === 'tutti' ? '#1e1b4b' : 'transparent',
-                      color: tmplStatusSidebar === 'tutti' ? '#818cf8' : 'var(--muted)',
+                      background: tmplStatusSidebar === 'tutti' ? 'var(--pill-indigo-bg)' : 'transparent',
+                      color: tmplStatusSidebar === 'tutti' ? 'var(--indigo-l)' : 'var(--muted)',
                       border: 'none',
                       padding: '3px 0',
                       borderRadius: 4,
@@ -194,8 +194,8 @@ export function LibreriaTemplate({
                       key={t.id}
                       onClick={() => handleSelectTemplate(t)}
                       style={{
-                        background: isSelected ? '#1e1b4b' : 'var(--card2)',
-                        border: `1px solid ${isSelected ? '#6366f1' : t.archiviato ? '#4338ca' : 'var(--border)'}`,
+                        background: isSelected ? 'var(--pill-indigo-bg)' : 'var(--card2)',
+                        border: `1px solid ${isSelected ? 'var(--indigo)' : t.archiviato ? 'var(--indigo-d)' : 'var(--border)'}`,
                         padding: '8px 10px',
                         borderRadius: 8,
                         cursor: 'pointer',
@@ -208,11 +208,11 @@ export function LibreriaTemplate({
                     >
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <span style={{ fontWeight: 700, fontSize: 11, color: isSelected ? '#a5b4fc' : 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          <span style={{ fontWeight: 700, fontSize: 11, color: isSelected ? 'var(--pill-indigo-fg)' : 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                             {t.titolo}
                           </span>
                           {t.archiviato && (
-                            <span style={{ fontSize: 8.5, background: '#312e81', color: '#c7d2fe', padding: '1px 4px', borderRadius: 4, fontWeight: 700 }}>
+                            <span style={{ fontSize: 8.5, background: 'var(--pill-indigo-bg)', color: 'var(--pill-indigo-fg)', padding: '1px 4px', borderRadius: 4, fontWeight: 700 }}>
                               📦
                             </span>
                           )}
@@ -222,7 +222,7 @@ export function LibreriaTemplate({
                           <BadgeRevisione modello={t} compatto />
                           {soloLocale && (
                             <span
-                              style={{ fontSize: 8.5, background: '#2d2000', color: '#f59e0b', padding: '1px 4px', borderRadius: 4, fontWeight: 700 }}
+                              style={{ fontSize: 8.5, background: 'var(--pill-amber-bg)', color: 'var(--amber)', padding: '1px 4px', borderRadius: 4, fontWeight: 700 }}
                               title="Questo modello è rimasto solo in questo browser: dalla Cartella Modelli lo puoi portare nell'archivio dello studio."
                             >
                               ⚠ Locale
@@ -239,7 +239,7 @@ export function LibreriaTemplate({
                           <button
                             type="button"
                             onClick={(e) => { e.stopPropagation(); onApriCartella(); }}
-                            style={{ background: '#2d2000', border: '1px solid #713f12', color: '#f59e0b', fontSize: 10, cursor: 'pointer', padding: '3px 6px', borderRadius: 4, fontWeight: 700 }}
+                            style={{ background: 'var(--pill-amber-bg)', border: '1px solid var(--pill-amber-bd)', color: 'var(--amber)', fontSize: 10, cursor: 'pointer', padding: '3px 6px', borderRadius: 4, fontWeight: 700 }}
                             title="Portalo nell'archivio dello studio dalla Cartella Modelli"
                           >
                             🗂 Recupera
@@ -248,7 +248,7 @@ export function LibreriaTemplate({
                           <button
                             type="button"
                             onClick={(e) => handleRestoreTemplate(t.id, t.titolo, e)}
-                            style={{ background: '#064e3b', border: '1px solid #059669', color: '#34d399', fontSize: 10, cursor: 'pointer', padding: '3px 6px', borderRadius: 4, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 2 }}
+                            style={{ background: 'var(--pill-green-bg)', border: '1px solid var(--green)', color: 'var(--green)', fontSize: 10, cursor: 'pointer', padding: '3px 6px', borderRadius: 4, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 2 }}
                             title="Ripristina modello tra gli attivi"
                           >
                             <span>♻️</span>
@@ -273,7 +273,7 @@ export function LibreriaTemplate({
                           <button
                             type="button"
                             onClick={(e) => handleDeleteTemplate(t.id, t.titolo, e)}
-                            style={{ background: 'rgba(239, 68, 68, 0.15)', border: '1px solid #ef4444', color: '#f87171', fontSize: 10, cursor: 'pointer', padding: '3px 6px', borderRadius: 4, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 2 }}
+                            style={{ background: 'rgba(239, 68, 68, 0.15)', border: '1px solid var(--red)', color: 'var(--pill-red-fg)', fontSize: 10, cursor: 'pointer', padding: '3px 6px', borderRadius: 4, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 2 }}
                             title="Elimina definitivamente modello master"
                           >
                             <span>🗑️</span>

@@ -127,7 +127,7 @@ export function ModaleCollegaDocumento({ documento, progetti, progettoBloccato =
             </option>
           ))}
         </select>
-        <div style={{ fontSize: 11, color: erroreMicrovoci ? '#fca5a5' : 'var(--muted)', marginTop: 6 }}>
+        <div style={{ fontSize: 11, color: erroreMicrovoci ? 'var(--pill-red-fg)' : 'var(--muted)', marginTop: 6 }}>
           {!progettoId
             ? 'Scegli prima il progetto.'
             : caricoMicrovoci
@@ -140,7 +140,7 @@ export function ModaleCollegaDocumento({ documento, progetti, progettoBloccato =
         </div>
 
         {errore && (
-          <div style={{ marginTop: '1.1rem', padding: '10px 12px', borderRadius: 8, background: 'rgba(239,68,68,0.08)', border: '1px solid #b91c1c', color: '#fca5a5', fontSize: 12.5 }}>
+          <div style={{ marginTop: '1.1rem', padding: '10px 12px', borderRadius: 8, background: 'rgba(239,68,68,0.08)', border: '1px solid var(--pill-red-bd)', color: 'var(--pill-red-fg)', fontSize: 12.5 }}>
             ⚠️ {errore}
           </div>
         )}

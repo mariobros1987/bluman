@@ -233,8 +233,8 @@ export const AnagraficaFornitoreErpModal: React.FC<AnagraficaFornitoreErpModalPr
                 style={{
                   padding: '12px 16px',
                   background: 'rgba(239, 68, 68, 0.1)',
-                  border: '1px solid #ef4444',
-                  color: '#ef4444',
+                  border: '1px solid var(--red)',
+                  color: 'var(--red)',
                   borderRadius: '8px',
                   marginBottom: '20px',
                   fontSize: '0.9rem',
@@ -442,13 +442,13 @@ export const AnagraficaFornitoreErpModal: React.FC<AnagraficaFornitoreErpModalPr
                   </div>
                   <div className="card" style={{ padding: '14px', background: 'var(--bg-secondary)' }}>
                     <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Fatture Saldate</div>
-                    <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#10b981', marginTop: '4px' }}>
+                    <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--green)', marginTop: '4px' }}>
                       €{(totalePagatoCent / 100).toFixed(2)}
                     </div>
                   </div>
                   <div className="card" style={{ padding: '14px', background: 'var(--bg-secondary)' }}>
                     <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Da Saldare</div>
-                    <div style={{ fontSize: '1.25rem', fontWeight: 800, color: totaleDaSaldareCent > 0 ? '#ef4444' : '#10b981', marginTop: '4px' }}>
+                    <div style={{ fontSize: '1.25rem', fontWeight: 800, color: totaleDaSaldareCent > 0 ? 'var(--red)' : 'var(--green)', marginTop: '4px' }}>
                       €{(totaleDaSaldareCent / 100).toFixed(2)}
                     </div>
                   </div>
@@ -487,11 +487,11 @@ export const AnagraficaFornitoreErpModal: React.FC<AnagraficaFornitoreErpModalPr
                             </td>
                             <td style={{ padding: '8px 10px', textAlign: 'center' }}>
                               {f.pagata ? (
-                                <span style={{ padding: '2px 6px', borderRadius: '4px', background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', fontWeight: 600 }}>
+                                <span style={{ padding: '2px 6px', borderRadius: '4px', background: 'rgba(16, 185, 129, 0.15)', color: 'var(--green)', fontWeight: 600 }}>
                                   ✓ Saldata
                                 </span>
                               ) : (
-                                <span style={{ padding: '2px 6px', borderRadius: '4px', background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', fontWeight: 600 }}>
+                                <span style={{ padding: '2px 6px', borderRadius: '4px', background: 'rgba(239, 68, 68, 0.15)', color: 'var(--red)', fontWeight: 600 }}>
                                   ⏳ Aperta
                                 </span>
                               )}

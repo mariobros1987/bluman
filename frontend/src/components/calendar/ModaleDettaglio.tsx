@@ -75,7 +75,7 @@ export function ModaleDettaglio({ evento, onChiudi, onCambiaStato, onCancella }:
         </div>
 
         {evento.generato && (
-          <div style={{ background: '#1e1b4b', border: '1px solid #4338ca', color: '#c7d2fe', padding: '10px 14px', borderRadius: 10, fontSize: 11, lineHeight: 1.5 }}>
+          <div style={{ background: 'var(--pill-indigo-bg)', border: '1px solid var(--indigo-d)', color: 'var(--pill-indigo-fg)', padding: '10px 14px', borderRadius: 10, fontSize: 11, lineHeight: 1.5 }}>
             ↻ Questa è una <strong>scadenza calcolata dal sistema</strong>, non un evento scritto a
             mano: non si modifica e non si cancella da qui. Si cambia {SORGENTE[evento.categoria] ?? 'la sua origine'},
             e il calendario la mostra aggiornata alla prossima lettura.
@@ -88,7 +88,7 @@ export function ModaleDettaglio({ evento, onChiudi, onCambiaStato, onCancella }:
               type="button"
               onClick={() => onCambiaStato(evento)}
               style={{
-                background: fatto ? 'var(--card2)' : '#059669',
+                background: fatto ? 'var(--card2)' : 'var(--green)',
                 color: fatto ? 'var(--text)' : '#fff',
                 border: 'none', padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer',
               }}
@@ -106,7 +106,7 @@ export function ModaleDettaglio({ evento, onChiudi, onCambiaStato, onCancella }:
               <button
                 type="button"
                 onClick={() => onCancella(evento)}
-                style={{ background: 'transparent', border: '1px solid #b91c1c', color: '#fca5a5', padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+                style={{ background: 'transparent', border: '1px solid var(--pill-red-bd)', color: 'var(--pill-red-fg)', padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
               >
                 🗑 Cancella
               </button>

@@ -53,10 +53,10 @@ export function PortalTopNav({
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         {/* 📁 SELETTORE MULTI-PROGETTO CLIENTE */}
         {clientProjects.length > 0 && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--card2)', padding: '4px 12px', borderRadius: 10, border: '1px solid #4338ca' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--card2)', padding: '4px 12px', borderRadius: 10, border: '1px solid var(--indigo-d)' }}>
             <span style={{ fontSize: 14 }}>📁</span>
             <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <span style={{ fontSize: 9, color: '#a5b4fc', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '.3px' }}>
+              <span style={{ fontSize: 9, color: 'var(--pill-indigo-fg)', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '.3px' }}>
                 Progetto Attivo ({clientProjects.length} disponibili)
               </span>
               <select
@@ -88,7 +88,7 @@ export function PortalTopNav({
                     typeof pct === 'number' ? `${pct}%` : null,
                   ].filter(Boolean).join(' · ');
                   return (
-                    <option key={p.id} value={p.id} style={{ background: '#161822', color: '#fff' }}>
+                    <option key={p.id} value={p.id} style={{ background: 'var(--surface-1)', color: 'var(--text)' }}>
                       {p.nome} — {dettaglio}
                     </option>
                   );
@@ -120,7 +120,7 @@ export function PortalTopNav({
                   position: 'absolute',
                   top: -5,
                   right: -5,
-                  background: '#ef4444',
+                  background: 'var(--red)',
                   color: '#fff',
                   fontSize: 9,
                   fontWeight: 800,
@@ -146,33 +146,33 @@ export function PortalTopNav({
                 right: 0,
                 width: 340,
                 maxWidth: '90vw',
-                background: '#0f172a',
-                border: '1px solid #334155',
+                background: 'var(--surface-2)',
+                border: '1px solid var(--pill-slate-bd)',
                 borderRadius: 12,
                 boxShadow: '0 20px 25px -5px rgba(0,0,0,0.5)',
                 zIndex: 1200,
                 overflow: 'hidden',
               }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: '#1e293b', borderBottom: '1px solid #334155' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: 'var(--pill-slate-bg)', borderBottom: '1px solid var(--pill-slate-bd)' }}>
                 <span style={{ fontWeight: 700, fontSize: 12 }}>🔔 Le mie notifiche</span>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                   {notificheNonLette > 0 && (
                     <button
                       onClick={handleSegnaNotificheLette}
-                      style={{ background: 'transparent', border: 'none', color: '#818cf8', fontSize: 10.5, cursor: 'pointer', textDecoration: 'underline' }}
+                      style={{ background: 'transparent', border: 'none', color: 'var(--indigo-l)', fontSize: 10.5, cursor: 'pointer', textDecoration: 'underline' }}
                     >
                       ✓ Segna lette
                     </button>
                   )}
-                  <button onClick={() => setNotifPortaleOpen(false)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', fontSize: 14, cursor: 'pointer' }}>
+                  <button onClick={() => setNotifPortaleOpen(false)} style={{ background: 'transparent', border: 'none', color: 'var(--muted)', fontSize: 14, cursor: 'pointer' }}>
                     ✕
                   </button>
                 </div>
               </div>
               <div style={{ maxHeight: 300, overflowY: 'auto', padding: 6 }}>
                 {notifichePortale.length === 0 ? (
-                  <div style={{ padding: 22, textAlign: 'center', color: '#94a3b8', fontSize: 11.5 }}>
+                  <div style={{ padding: 22, textAlign: 'center', color: 'var(--muted)', fontSize: 11.5 }}>
                     <div style={{ fontSize: 20, marginBottom: 4 }}>📭</div>
                     Nessuna notifica
                   </div>
@@ -193,20 +193,20 @@ export function PortalTopNav({
                           padding: 10,
                           borderRadius: 8,
                           marginBottom: 5,
-                          background: n.letto ? '#1e293b40' : '#1e293b',
-                          borderLeft: n.letto ? '3px solid #334155' : '3px solid #6366f1',
+                          background: n.letto ? '#1e293b40' : 'var(--pill-slate-bg)',
+                          borderLeft: n.letto ? '3px solid var(--pill-slate-bd)' : '3px solid var(--indigo)',
                           cursor: 'pointer',
                         }}
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3, gap: 8 }}>
-                          <span style={{ fontWeight: 600, fontSize: 11.5, color: n.letto ? '#94a3b8' : '#f8fafc' }}>
+                          <span style={{ fontWeight: 600, fontSize: 11.5, color: n.letto ? 'var(--muted)' : 'var(--pill-sky-fg)' }}>
                             {icona} {n.oggetto}
                           </span>
                           {ts > 0 && (
-                            <span style={{ fontSize: 9.5, color: '#64748b', whiteSpace: 'nowrap' }}>{tempoRelativo(ts)}</span>
+                            <span style={{ fontSize: 9.5, color: 'var(--muted)', whiteSpace: 'nowrap' }}>{tempoRelativo(ts)}</span>
                           )}
                         </div>
-                        <div style={{ fontSize: 10.5, color: '#cbd5e1', lineHeight: 1.4 }}>{n.corpo}</div>
+                        <div style={{ fontSize: 10.5, color: 'var(--pill-slate-fg)', lineHeight: 1.4 }}>{n.corpo}</div>
                       </div>
                     );
                   })
@@ -216,7 +216,7 @@ export function PortalTopNav({
           )}
         </div>
 
-        <div style={{ background: '#0d2d22', border: '1px solid #1a5c3c', color: '#34d399', fontSize: 11, padding: '5px 12px', borderRadius: 20, fontWeight: 600 }}>
+        <div style={{ background: 'var(--pill-green-bg)', border: '1px solid var(--pill-green-bg)', color: 'var(--green)', fontSize: 11, padding: '5px 12px', borderRadius: 20, fontWeight: 600 }}>
           🔒 Accesso Riservato Cliente
         </div>
         <button
@@ -224,7 +224,7 @@ export function PortalTopNav({
           style={{
             background: 'var(--card2)',
             border: '1px solid var(--border)',
-            color: '#f87171',
+            color: 'var(--pill-red-fg)',
             padding: '5px 12px',
             borderRadius: 8,
             fontSize: 11,

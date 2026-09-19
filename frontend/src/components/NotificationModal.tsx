@@ -37,10 +37,10 @@ export function etichettaGiorno(timestamp: number): string {
 }
 
 const STILE_TIPO: Record<NotificationItem['type'], { icona: string; colore: string }> = {
-  blocked: { icona: '🚫', colore: '#ef4444' },
-  delay: { icona: '⚠️', colore: '#f59e0b' },
-  signature: { icona: '✍️', colore: '#8b5cf6' },
-  system: { icona: 'ℹ️', colore: '#6366f1' },
+  blocked: { icona: '🚫', colore: 'var(--red)' },
+  delay: { icona: '⚠️', colore: 'var(--amber)' },
+  signature: { icona: '✍️', colore: 'var(--purple)' },
+  system: { icona: 'ℹ️', colore: 'var(--indigo)' },
 };
 
 interface NotificationModalProps {
@@ -101,22 +101,22 @@ export function NotificationModal({ notifications, onClose, onMarkAllRead, onSel
         right: 20,
         width: 390,
         maxWidth: '92vw',
-        background: '#0f172a',
-        border: '1px solid #334155',
+        background: 'var(--surface-2)',
+        border: '1px solid var(--pill-slate-bd)',
         borderRadius: 14,
         boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5)',
         zIndex: 9999,
-        color: '#f8fafc',
+        color: 'var(--pill-sky-fg)',
         overflow: 'hidden',
       }}
     >
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', background: '#1e293b', borderBottom: '1px solid #334155' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', background: 'var(--pill-slate-bg)', borderBottom: '1px solid var(--pill-slate-bd)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontSize: 16 }}>🔔</span>
           <span style={{ fontWeight: 600, fontSize: 13 }}>Centro Notifiche Studio</span>
           {unreadCount > 0 && (
-            <span style={{ background: '#ef4444', color: '#fff', fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 10 }}>
+            <span style={{ background: 'var(--red)', color: '#fff', fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 10 }}>
               {unreadCount} nuove
             </span>
           )}
@@ -125,20 +125,20 @@ export function NotificationModal({ notifications, onClose, onMarkAllRead, onSel
           {unreadCount > 0 && (
             <button
               onClick={onMarkAllRead}
-              style={{ background: 'transparent', border: 'none', color: '#818cf8', fontSize: 11, cursor: 'pointer', textDecoration: 'underline' }}
+              style={{ background: 'transparent', border: 'none', color: 'var(--indigo-l)', fontSize: 11, cursor: 'pointer', textDecoration: 'underline' }}
             >
               ✓ Segna lette
             </button>
           )}
-          <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: '#94a3b8', fontSize: 16, cursor: 'pointer' }}>
+          <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: 'var(--muted)', fontSize: 16, cursor: 'pointer' }}>
             ✕
           </button>
         </div>
       </div>
 
       {/* Push Notification Banner */}
-      <div style={{ background: '#172554', borderBottom: '1px solid #1e3a8a', padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, fontSize: 11 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#93c5fd' }}>
+      <div style={{ background: 'var(--pill-blue-bg)', borderBottom: '1px solid var(--pill-blue-bg)', padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, fontSize: 11 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--pill-blue-fg)' }}>
           <span>📲</span>
           <span>
             {pushPermission === 'granted' ? 'Notifiche Push Browser: Attive' : 'Ricevi avvisi desktop istantanei'}
@@ -148,7 +148,7 @@ export function NotificationModal({ notifications, onClose, onMarkAllRead, onSel
           <button
             type="button"
             onClick={handleSendTestPush}
-            style={{ background: '#2563eb', color: '#fff', border: 'none', padding: '3px 8px', borderRadius: 6, fontSize: 10, fontWeight: 600, cursor: 'pointer' }}
+            style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '3px 8px', borderRadius: 6, fontSize: 10, fontWeight: 600, cursor: 'pointer' }}
           >
             Invia Test
           </button>
@@ -156,7 +156,7 @@ export function NotificationModal({ notifications, onClose, onMarkAllRead, onSel
           <button
             type="button"
             onClick={handleRequestPushPermission}
-            style={{ background: '#22c55e', color: '#0f172a', border: 'none', padding: '3px 8px', borderRadius: 6, fontSize: 10, fontWeight: 700, cursor: 'pointer' }}
+            style={{ background: 'var(--green)', color: 'var(--surface-2)', border: 'none', padding: '3px 8px', borderRadius: 6, fontSize: 10, fontWeight: 700, cursor: 'pointer' }}
           >
             Attiva Push
           </button>
@@ -166,7 +166,7 @@ export function NotificationModal({ notifications, onClose, onMarkAllRead, onSel
       {/* Notifiche List — timeline raggruppata per giorno */}
       <div style={{ maxHeight: 360, overflowY: 'auto', padding: 8 }}>
         {notifications.length === 0 ? (
-          <div style={{ padding: 28, textAlign: 'center', color: '#94a3b8', fontSize: 12 }}>
+          <div style={{ padding: 28, textAlign: 'center', color: 'var(--muted)', fontSize: 12 }}>
             <div style={{ fontSize: 24, marginBottom: 6 }}>📭</div>
             Nessuna notifica in sospeso
           </div>
@@ -187,7 +187,7 @@ export function NotificationModal({ notifications, onClose, onMarkAllRead, onSel
               return (
                 <div key={n.id}>
                   {separatore && (
-                    <div style={{ fontSize: 9.5, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '.5px', padding: '8px 4px 4px' }}>
+                    <div style={{ fontSize: 9.5, fontWeight: 800, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.5px', padding: '8px 4px 4px' }}>
                       {separatore}
                     </div>
                   )}
@@ -197,21 +197,21 @@ export function NotificationModal({ notifications, onClose, onMarkAllRead, onSel
                       padding: 12,
                       borderRadius: 8,
                       marginBottom: 6,
-                      background: n.read ? '#1e293b40' : '#1e293b',
+                      background: n.read ? '#1e293b40' : 'var(--pill-slate-bg)',
                       borderLeft: `3px solid ${stile.colore}`,
                       cursor: 'pointer',
                       transition: 'all .15s',
                     }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                      <span style={{ fontWeight: 600, fontSize: 12, color: n.read ? '#94a3b8' : '#f8fafc' }}>
+                      <span style={{ fontWeight: 600, fontSize: 12, color: n.read ? 'var(--muted)' : 'var(--pill-sky-fg)' }}>
                         {stile.icona} {n.title}
                       </span>
-                      <span style={{ fontSize: 10, color: '#64748b', whiteSpace: 'nowrap', marginLeft: 8 }}>
+                      <span style={{ fontSize: 10, color: 'var(--muted)', whiteSpace: 'nowrap', marginLeft: 8 }}>
                         {n.timestamp ? tempoRelativo(n.timestamp) : n.time}
                       </span>
                     </div>
-                    <div style={{ fontSize: 11, color: '#cbd5e1', lineHeight: 1.4 }}>{n.body}</div>
+                    <div style={{ fontSize: 11, color: 'var(--pill-slate-fg)', lineHeight: 1.4 }}>{n.body}</div>
                   </div>
                 </div>
               );

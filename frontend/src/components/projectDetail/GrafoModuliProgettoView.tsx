@@ -112,11 +112,11 @@ export function GrafoModuliProgettoView({
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <div style={{ fontSize: 11, background: 'var(--card2)', border: '1px solid var(--border)', padding: '6px 12px', borderRadius: 20, fontWeight: 600 }}>
-            📊 Moduli Ultimati: <span style={{ color: '#34d399' }}>{completedModsCount} / {project.mods.length}</span>
+            📊 Moduli Ultimati: <span style={{ color: 'var(--green)' }}>{completedModsCount} / {project.mods.length}</span>
           </div>
           <button
             onClick={() => setAddModalOpen(true)}
-            style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: 10, fontSize: 12, fontWeight: 600, cursor: 'pointer', boxShadow: '0 4px 14px rgba(99,102,241,.3)' }}
+            style={{ background: 'var(--indigo)', color: 'var(--on-accent)', border: 'none', padding: '8px 16px', borderRadius: 10, fontSize: 12, fontWeight: 600, cursor: 'pointer', boxShadow: '0 4px 14px rgba(99,102,241,.3)' }}
           >
             + Aggiungi Modulo da Libreria
           </button>
@@ -138,7 +138,7 @@ export function GrafoModuliProgettoView({
             const prevMod = idx > 0 ? project.mods[idx - 1] : null;
             const isLocked = prevMod ? (prevMod.st !== 'done' && prevMod.pct < 100) : false;
 
-            const statusColor = isDone ? '#34d399' : isLocked ? '#f59e0b' : isInProgress ? '#818cf8' : '#64748b';
+            const statusColor = isDone ? 'var(--green)' : isLocked ? 'var(--amber)' : isInProgress ? 'var(--indigo-l)' : 'var(--muted)';
             const lockBadgeText = isDone ? '✓ Ultimato' : isLocked ? `🔒 Bloccato da ${prevMod?.n.substring(0, 14)}...` : isInProgress ? '⚡ In Lavorazione' : '🔓 Sbloccato & Eseguibile';
 
             return (
@@ -150,7 +150,7 @@ export function GrafoModuliProgettoView({
                     minWidth: 270,
                     maxWidth: 290,
                     background: isLocked ? 'rgba(217, 119, 6, 0.05)' : 'var(--card)',
-                    border: `1.5px solid ${isDone ? '#059669' : isLocked ? '#d97706' : isInProgress ? 'var(--indigo)' : 'var(--border)'}`,
+                    border: `1.5px solid ${isDone ? 'var(--green)' : isLocked ? 'var(--amber)' : isInProgress ? 'var(--indigo)' : 'var(--border)'}`,
                     borderRadius: 14,
                     padding: 16,
                     display: 'flex',
@@ -165,7 +165,7 @@ export function GrafoModuliProgettoView({
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6 }}>
                     <CatBadge cat={m.cat} />
-                    <span style={{ fontSize: 9.5, fontWeight: 700, color: statusColor, background: isLocked ? '#2d1a05' : 'var(--card2)', border: `1px solid ${isLocked ? '#d97706' : 'var(--border)'}`, padding: '2px 8px', borderRadius: 12 }}>
+                    <span style={{ fontSize: 9.5, fontWeight: 700, color: statusColor, background: isLocked ? 'var(--pill-amber-bg)' : 'var(--card2)', border: `1px solid ${isLocked ? 'var(--pill-amber-bd)' : 'var(--border)'}`, padding: '2px 8px', borderRadius: 12 }}>
                       {lockBadgeText}
                     </span>
                   </div>
@@ -198,7 +198,7 @@ export function GrafoModuliProgettoView({
                         e.stopPropagation();
                         alert(`✉️ Notifica Sblocco inviata con successo al cliente per la fase successiva: ${project.mods[idx + 1].n}!`);
                       }}
-                      style={{ background: '#0d2d22', border: '1px solid #059669', color: '#34d399', padding: '5px 8px', borderRadius: 8, fontSize: 10, fontWeight: 600, cursor: 'pointer', marginTop: 2 }}
+                      style={{ background: 'var(--pill-green-bg)', border: '1px solid var(--pill-green-bd)', color: 'var(--pill-green-fg)', padding: '5px 8px', borderRadius: 8, fontSize: 10, fontWeight: 600, cursor: 'pointer', marginTop: 2 }}
                     >
                       ✉️ Notifica Sblocco al Cliente
                     </button>
@@ -207,7 +207,7 @@ export function GrafoModuliProgettoView({
 
                 {/* Arrow Connector */}
                 {idx < project.mods.length - 1 && (
-                  <div style={{ display: 'flex', flexShrink: 0, flexDirection: 'column', alignItems: 'center', gap: 4, color: isDone ? '#34d399' : isLocked ? '#d97706' : 'var(--muted)' }}>
+                  <div style={{ display: 'flex', flexShrink: 0, flexDirection: 'column', alignItems: 'center', gap: 4, color: isDone ? 'var(--green)' : isLocked ? 'var(--amber)' : 'var(--muted)' }}>
                     <div style={{ fontSize: 20, fontWeight: 800 }}>{isDone ? '🔓 ➔' : '🔒 ➔'}</div>
                     <span style={{ fontSize: 9, fontWeight: 600 }}>{isDone ? 'Sbloccato' : 'In attesa'}</span>
                   </div>
@@ -226,7 +226,7 @@ export function GrafoModuliProgettoView({
             <div style={{ fontSize: 11, color: 'var(--muted)' }}>Seleziona una prestazione o modulo aggiuntivo dal catalogo della libreria da associare al cliente</div>
 
             {erroreLibreria && (
-              <div style={{ background: '#2d0d0d', border: '1px solid #7f1d1d', color: '#fca5a5', padding: '9px 12px', borderRadius: 10, fontSize: 11, lineHeight: 1.5 }}>
+              <div style={{ background: 'var(--pill-red-bg)', border: '1px solid var(--pill-red-bd)', color: 'var(--pill-red-fg)', padding: '9px 12px', borderRadius: 10, fontSize: 11, lineHeight: 1.5 }}>
                 {erroreLibreria}
               </div>
             )}
@@ -249,7 +249,7 @@ export function GrafoModuliProgettoView({
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
               <button type="button" onClick={() => setAddModalOpen(false)} style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '7px 14px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}>Annulla</button>
-              <button type="submit" disabled={!selectedTemplate} style={{ background: selectedTemplate ? 'var(--indigo)' : 'var(--card2)', color: selectedTemplate ? '#fff' : 'var(--hint)', border: 'none', padding: '7px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: selectedTemplate ? 'pointer' : 'not-allowed' }}>✓ Aggiungi al Progetto</button>
+              <button type="submit" disabled={!selectedTemplate} style={{ background: selectedTemplate ? 'var(--indigo)' : 'var(--card2)', color: selectedTemplate ? 'var(--on-accent)' : 'var(--hint)', border: 'none', padding: '7px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: selectedTemplate ? 'pointer' : 'not-allowed' }}>✓ Aggiungi al Progetto</button>
             </div>
           </form>
         </div>

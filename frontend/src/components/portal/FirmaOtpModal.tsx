@@ -106,14 +106,14 @@ export function FirmaOtpModal({
         {/* Header Modale */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 40, height: 40, borderRadius: 10, background: '#1e1b4b', color: '#818cf8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>
+            <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--pill-indigo-bg)', color: 'var(--indigo-l)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>
               {ETICHETTA_LIVELLO[livelloFirma].icona}
             </div>
             <div>
               <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: 'var(--text)' }}>
                 {isFea ? 'Firma Elettronica Avanzata (OTP verificata)' : 'Firma Elettronica Semplice (OTP verificata)'}
               </h3>
-              <span style={{ fontSize: 11, color: isFea ? '#fbbf24' : '#34d399', fontWeight: 600 }}>
+              <span style={{ fontSize: 11, color: isFea ? 'var(--amber)' : 'var(--green)', fontWeight: 600 }}>
                 {isFea ? 'Art. 25 CAD — eIDAS UE 910/2014 art. 26' : 'Art. 20 CAD — validità del documento informatico'}
               </span>
             </div>
@@ -158,7 +158,7 @@ export function FirmaOtpModal({
         ) : firmatariAmmessi.length === 1 && (
           <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
             <span style={{ fontSize: 11.5, color: 'var(--muted)', fontWeight: 700 }}>Firmatario:</span>
-            <span style={{ fontSize: 13, fontWeight: 800, color: '#a5b4fc' }}>{firmatarioSelezionato || firmatariAmmessi[0]}</span>
+            <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--pill-indigo-fg)' }}>{firmatarioSelezionato || firmatariAmmessi[0]}</span>
           </div>
         )}
 
@@ -179,7 +179,7 @@ export function FirmaOtpModal({
                 <button
                   type="button"
                   onClick={onRimuoviDocRiconoscimento}
-                  style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: 11, fontWeight: 700, cursor: 'pointer', textDecoration: 'underline', whiteSpace: 'nowrap' }}
+                  style={{ background: 'none', border: 'none', color: 'var(--red)', fontSize: 11, fontWeight: 700, cursor: 'pointer', textDecoration: 'underline', whiteSpace: 'nowrap' }}
                 >
                   Rimuovi
                 </button>
@@ -221,7 +221,7 @@ export function FirmaOtpModal({
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span>Scegli o cambia il canale di ricezione codice:</span>
-            <span style={{ color: '#818cf8', fontWeight: 800 }}>{nomeCanale[otpCanale]}</span>
+            <span style={{ color: 'var(--indigo-l)', fontWeight: 800 }}>{nomeCanale[otpCanale]}</span>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
             {[
@@ -257,7 +257,7 @@ export function FirmaOtpModal({
                     fontWeight: isSelected ? 800 : 600,
                     background: isSelected ? 'var(--indigo)' : 'var(--card)',
                     color: isSelected ? '#fff' : 'var(--muted)',
-                    border: isSelected ? '1.5px solid #818cf8' : '1px solid var(--border)',
+                    border: isSelected ? '1.5px solid var(--indigo-l)' : '1px solid var(--border)',
                     borderRadius: 8,
                     cursor: bloccato ? 'not-allowed' : 'pointer',
                     opacity: !disponibile ? 0.45 : 1,
@@ -279,7 +279,7 @@ export function FirmaOtpModal({
             const sel = canaliFirma.find((x) => x.canale === otpCanale);
             if (sel && sel.disponibile === false) {
               return (
-                <div style={{ fontSize: 10.5, color: '#f59e0b', marginTop: 2 }}>
+                <div style={{ fontSize: 10.5, color: 'var(--amber)', marginTop: 2 }}>
                   ⚠️ {nomeCanale[otpCanale]} non disponibile{sel.motivo ? `: ${sel.motivo}` : '. Scegli un altro canale.'}
                 </div>
               );
@@ -302,7 +302,7 @@ export function FirmaOtpModal({
                     </strong>
                   </>
                 ) : (
-                  <> · <strong style={{ color: '#fbbf24' }}>scaduto</strong>, richiedine uno nuovo</>
+                  <> · <strong style={{ color: 'var(--amber)' }}>scaduto</strong>, richiedine uno nuovo</>
                 )}
               </>
             ) : (
@@ -310,13 +310,13 @@ export function FirmaOtpModal({
             )}
           </div>
           {otpTarget && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12, fontWeight: 700, color: '#a5b4fc', gap: 10 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12, fontWeight: 700, color: 'var(--pill-indigo-fg)', gap: 10 }}>
               <span>{otpCanale === 'email' ? '📬 Inviato a:' : otpCanale === 'telegram' ? '✈️ Inviato a:' : otpCanale === 'signal' ? '🔒 Inviato a:' : '📱 Inviato a:'}</span>
               <span>{otpTarget}</span>
             </div>
           )}
           {otpTargetDichiarato && (
-            <div style={{ fontSize: 10.5, color: '#fbbf24', marginTop: 8, lineHeight: 1.4 }}>
+            <div style={{ fontSize: 10.5, color: 'var(--amber)', marginTop: 8, lineHeight: 1.4 }}>
               Recapito dichiarato da te in fase di firma, diverso da quello in anagrafica: la circostanza
               viene registrata nel verbale.
             </div>
@@ -347,12 +347,12 @@ export function FirmaOtpModal({
               borderRadius: 10,
               background: 'var(--card)',
               color: 'var(--indigo-l)',
-              border: `2px solid ${otpError ? '#ef4444' : 'var(--indigo)'}`,
+              border: `2px solid ${otpError ? 'var(--red)' : 'var(--indigo)'}`,
               outline: 'none',
             }}
           />
           {otpError && (
-            <div style={{ fontSize: 11, color: '#ef4444', marginTop: 4, fontWeight: 600 }}>
+            <div style={{ fontSize: 11, color: 'var(--red)', marginTop: 4, fontWeight: 600 }}>
               ⚠️ {otpError}
             </div>
           )}

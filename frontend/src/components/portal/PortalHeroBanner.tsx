@@ -28,7 +28,7 @@ export function PortalHeroBanner({
       </div>
       <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, padding: '10px 16px', textAlign: 'right' }}>
         <div style={{ fontSize: 10, color: 'var(--muted)' }}>Stato Incarico</div>
-        <div style={{ fontSize: 13, fontWeight: 700, color: signed ? '#34d399' : 'var(--amber)', marginTop: 2 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: signed ? 'var(--green)' : 'var(--amber)', marginTop: 2 }}>
           {signed ? '✓ Progetto Attivo (In Lavorazione)' : '✍️ In Attesa di Accettazione'}
         </div>
       </div>

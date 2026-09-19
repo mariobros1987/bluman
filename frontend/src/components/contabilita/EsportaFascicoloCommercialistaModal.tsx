@@ -102,7 +102,7 @@ export function EsportaFascicoloCommercialistaModal({ isOpen, onClose }: Props) 
         {/* Body */}
         <div style={{ padding: 22, display: 'flex', flexDirection: 'column', gap: 18 }}>
           {error && (
-            <div style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', fontSize: 12.5, border: '1px solid rgba(239, 68, 68, 0.3)' }}>
+            <div style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(239, 68, 68, 0.15)', color: 'var(--red)', fontSize: 12.5, border: '1px solid rgba(239, 68, 68, 0.3)' }}>
               ⚠️ {error}
             </div>
           )}
@@ -219,7 +219,7 @@ export function EsportaFascicoloCommercialistaModal({ isOpen, onClose }: Props) 
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', paddingBottom: 6 }}>
                   <span>📊 <b>03_Liquidazione_IVA_LIPE</b> (F24 CSV + TXT)</span>
-                  <span style={{ fontWeight: 700, color: anteprima.saldoIvaEuro >= 0 ? '#f87171' : '#34d399' }}>
+                  <span style={{ fontWeight: 700, color: anteprima.saldoIvaEuro >= 0 ? 'var(--red)' : 'var(--green)' }}>
                     {anteprima.saldoIvaEuro >= 0 ? `Debito F24: € ${anteprima.saldoIvaEuro.toFixed(2)}` : `Credito: € ${Math.abs(anteprima.saldoIvaEuro).toFixed(2)}`}
                   </span>
                 </div>

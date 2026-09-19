@@ -54,7 +54,7 @@ export function ModificaDocModal({
             <button
               type="submit"
               disabled={modificaDocInviando || !modificaDocTesto.trim()}
-              style={{ background: '#2563eb', color: '#fff', border: 'none', padding: '7px 18px', borderRadius: 8, fontSize: 11.5, fontWeight: 700, cursor: modificaDocInviando || !modificaDocTesto.trim() ? 'not-allowed' : 'pointer' }}
+              style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '7px 18px', borderRadius: 8, fontSize: 11.5, fontWeight: 700, cursor: modificaDocInviando || !modificaDocTesto.trim() ? 'not-allowed' : 'pointer' }}
             >
               {modificaDocInviando ? 'Invio in corso…' : 'Invia Richiesta allo Studio'}
             </button>

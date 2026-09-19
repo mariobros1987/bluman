@@ -133,13 +133,13 @@ export function ModaleNuovoTemplate({
                       type="button"
                       onClick={() => setNewTmplLivello(l.id)}
                       style={{
-                        background: newTmplLivello === l.id ? '#1e1b4b' : 'var(--card)',
+                        background: newTmplLivello === l.id ? 'var(--pill-indigo-bg)' : 'var(--card)',
                         border: `1.5px solid ${newTmplLivello === l.id ? 'var(--indigo)' : 'var(--border)'}`,
                         borderRadius: 10, padding: '9px 10px', textAlign: 'left', cursor: 'pointer',
                         display: 'flex', flexDirection: 'column', gap: 3
                       }}
                     >
-                      <div style={{ fontSize: 11, fontWeight: 700, color: newTmplLivello === l.id ? '#a5b4fc' : 'var(--text)', display: 'flex', alignItems: 'center', gap: 5 }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: newTmplLivello === l.id ? 'var(--pill-indigo-fg)' : 'var(--text)', display: 'flex', alignItems: 'center', gap: 5 }}>
                         <span>{l.icon}</span> {l.titolo}
                       </div>
                       <div style={{ fontSize: 9.5, color: 'var(--muted)', lineHeight: 1.3 }}>{l.desc}</div>

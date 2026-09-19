@@ -39,11 +39,11 @@ function Pillola({ testo, sfondo, colore }: { testo: string; sfondo: string; col
 }
 
 function statoPillola(d: DocumentoProgetto) {
-  if (d.isArchiviato) return <Pillola testo="🗄 Archiviato" sfondo="#334155" colore="#cbd5e1" />;
-  if (d.firmato) return <Pillola testo="✓ Firmato" sfondo="#064e3b" colore="#6ee7b7" />;
-  if (d.statoDoc === 'pubblicato') return <Pillola testo="📤 Pubblicato" sfondo="#1e3a8a" colore="#93c5fd" />;
-  if (d.statoDoc === 'in_revisione') return <Pillola testo="✏️ In revisione" sfondo="#78350f" colore="#fcd34d" />;
-  return <Pillola testo="Bozza" sfondo="#1f2937" colore="#9ca3af" />;
+  if (d.isArchiviato) return <Pillola testo="🗄 Archiviato" sfondo="var(--pill-slate-bd)" colore="var(--pill-slate-fg)" />;
+  if (d.firmato) return <Pillola testo="✓ Firmato" sfondo="var(--pill-green-bg)" colore="var(--pill-green-fg)" />;
+  if (d.statoDoc === 'pubblicato') return <Pillola testo="📤 Pubblicato" sfondo="var(--pill-blue-bg)" colore="var(--pill-blue-fg)" />;
+  if (d.statoDoc === 'in_revisione') return <Pillola testo="✏️ In revisione" sfondo="var(--pill-amber-bg)" colore="var(--pill-amber-fg)" />;
+  return <Pillola testo="Bozza" sfondo="var(--surface-1)" colore="var(--muted)" />;
 }
 
 interface Props {
@@ -145,7 +145,7 @@ export function ElencoDocumentiCartella({ progettoId, nomeProgetto, progetti, in
 
   if (errore) {
     return (
-      <div style={{ padding: '1.25rem', borderRadius: 10, background: 'rgba(239,68,68,0.08)', border: '1px solid #b91c1c', color: '#fca5a5', fontSize: 13 }}>
+      <div style={{ padding: '1.25rem', borderRadius: 10, background: 'rgba(239,68,68,0.08)', border: '1px solid var(--pill-red-bd)', color: 'var(--pill-red-fg)', fontSize: 13 }}>
         ⚠️ {errore}
       </div>
     );
@@ -204,7 +204,7 @@ export function ElencoDocumentiCartella({ progettoId, nomeProgetto, progetti, in
                   <div style={{ fontWeight: 600, fontSize: 13.5, display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span>{d.tipo === 'verbale_firma' ? '🧾' : d.firmato ? '🔐' : '📄'}</span>
                     <span style={{ wordBreak: 'break-all' }}>{nome}</span>
-                    {d.versione > 1 && <Pillola testo={`v${d.versione}`} sfondo="#1f2937" colore="#9ca3af" />}
+                    {d.versione > 1 && <Pillola testo={`v${d.versione}`} sfondo="var(--surface-1)" colore="var(--muted)" />}
                   </div>
                   <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 3 }}>
                     {d.categoriaDoc && d.categoriaDoc !== 'generico' ? d.categoriaDoc : 'Fascicolo progetto'}
@@ -235,7 +235,7 @@ export function ElencoDocumentiCartella({ progettoId, nomeProgetto, progetti, in
                     {urlPdf && (
                       <button
                         onClick={() => scaricaDocumentoClient(urlAttoFirmato || d.filePdfUrl || d.fileUrl, d.firmato && !nome.toLowerCase().includes('firmato') ? `${nome.replace(/\.[^/.]+$/, '')}_firmato.pdf` : nome)}
-                        style={{ background: d.firmato ? '#064e3b' : 'var(--card2)', border: d.firmato ? '1px solid #10b981' : '1px solid var(--border)', color: d.firmato ? '#6ee7b7' : 'var(--text)', padding: '6px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer' }}
+                        style={{ background: d.firmato ? 'var(--pill-green-bg)' : 'var(--card2)', border: d.firmato ? '1px solid var(--green)' : '1px solid var(--border)', color: d.firmato ? 'var(--pill-green-fg)' : 'var(--text)', padding: '6px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer' }}
                       >
                         {d.firmato ? '⬇ PDF Firmato' : '⬇ PDF'}
                       </button>
@@ -251,7 +251,7 @@ export function ElencoDocumentiCartella({ progettoId, nomeProgetto, progetti, in
                           void scaricaDocumentoClient(urlAttoFirmato, estensione ? `${nomeBase}_firmato.${estensione}` : `${nomeBase}_firmato`);
                         }}
                         title="L'atto come sottoscritto (file firmato), distinto dal PDF master e dal verbale di firma"
-                        style={{ background: '#059669', border: 'none', color: '#fff', padding: '6px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+                        style={{ background: 'var(--green)', border: 'none', color: '#fff', padding: '6px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
                       >
                         ✍️ Atto firmato
                       </button>

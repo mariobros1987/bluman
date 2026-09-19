@@ -4,7 +4,7 @@ interface ProgressBarProps {
   height?: number;
 }
 
-export function ProgressBar({ value, color = '#6366f1', height = 4 }: ProgressBarProps) {
+export function ProgressBar({ value, color = 'var(--indigo)', height = 4 }: ProgressBarProps) {
   return (
     <div style={{ height, background: 'var(--border)', borderRadius: 2 }}>
       <div style={{

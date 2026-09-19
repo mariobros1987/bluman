@@ -117,11 +117,11 @@ export function DocumentiTab({ project }: { project: Progetto }) {
   const buildDocumentHtml = (doc: any) => {
     const studio = getStudioInfoForTenant();
     const rawContent = sanitizzaHtmlDocumento(doc.contenutoHtml || `
-      <div style="font-family: 'Segoe UI', Arial, sans-serif; color: #0f172a; line-height: 1.6; font-size: 11pt; padding: 10px;">
-        <h1 style="color: #1e1b4b; text-align: center; text-transform: uppercase; font-size: 18pt; border-bottom: 2px solid #4338ca; padding-bottom: 10px; margin-bottom: 20px;">
+      <div style="font-family: 'Segoe UI', Arial, sans-serif; color: var(--surface-2); line-height: 1.6; font-size: 11pt; padding: 10px;">
+        <h1 style="color: var(--pill-indigo-bg); text-align: center; text-transform: uppercase; font-size: 18pt; border-bottom: 2px solid var(--indigo-d); padding-bottom: 10px; margin-bottom: 20px;">
           ${escapeHtmlTesto(doc.titolo || doc.nome)}
         </h1>
-        <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-size: 10pt;">
+        <div style="background: var(--pill-sky-fg); border: 1px solid var(--border); padding: 15px; border-radius: 8px; margin-bottom: 20px; font-size: 10pt;">
           <strong>Studio Professionale:</strong> ${escapeHtmlTesto(studio.ragioneSociale)}<br/>
           <strong>Cliente Committente:</strong> ${escapeHtmlTesto(project.cl)} (${escapeHtmlTesto(project.n)})<br/>
           <strong>Categoria Vault:</strong> ${escapeHtmlTesto(doc.cat || doc.categoria || 'Generale')}<br/>
@@ -131,18 +131,18 @@ export function DocumentiTab({ project }: { project: Progetto }) {
     `);
 
     return sanitizzaHtmlDocumento(`
-      <div style="font-family: 'Segoe UI', Arial, sans-serif; color: #0f172a; line-height: 1.6; padding: 20px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #4338ca; padding-bottom: 14px; margin-bottom: 24px;">
+      <div style="font-family: 'Segoe UI', Arial, sans-serif; color: var(--surface-2); line-height: 1.6; padding: 20px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--indigo-d); padding-bottom: 14px; margin-bottom: 24px;">
           <div>
-            <div style="font-size: 16pt; font-weight: 800; color: #1e1b4b;">${escapeHtmlTesto(studio.ragioneSociale.toUpperCase())} — ADVISORY SERVICES</div>
-            <div style="font-size: 9pt; color: #64748b;">${escapeHtmlTesto(studio.sedeLegale)} · P.IVA ${escapeHtmlTesto(studio.piva)}</div>
+            <div style="font-size: 16pt; font-weight: 800; color: var(--pill-indigo-bg);">${escapeHtmlTesto(studio.ragioneSociale.toUpperCase())} — ADVISORY SERVICES</div>
+            <div style="font-size: 9pt; color: var(--muted);">${escapeHtmlTesto(studio.sedeLegale)} · P.IVA ${escapeHtmlTesto(studio.piva)}</div>
           </div>
-          <div style="text-align: right; font-size: 8.5pt; color: #64748b;">
+          <div style="text-align: right; font-size: 8.5pt; color: var(--muted);">
             Rif. Incarico: #${escapeHtmlTesto(project.id)}<br/>Data: ${escapeHtmlTesto(doc.data || doc.dataCaricamento || '2026')}
           </div>
         </div>
         <div>${rawContent}</div>
-        <div style="margin-top: 40px; border-top: 1px solid #e2e8f0; padding-top: 10px; display: flex; justify-content: space-between; font-size: 8.5pt; color: #94a3b8;">
+        <div style="margin-top: 40px; border-top: 1px solid var(--border); padding-top: 10px; display: flex; justify-content: space-between; font-size: 8.5pt; color: var(--muted);">
           <span>${escapeHtmlTesto(studio.ragioneSociale)} • Pratica: ${escapeHtmlTesto(project.n)}</span>
           <span>Firma Elettronica Semplice • art. 20 CAD</span>
         </div>
@@ -325,7 +325,7 @@ export function DocumentiTab({ project }: { project: Progetto }) {
         <div>
           <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 10 }}>
             <span>📁 Google Drive & Cloud Vault Documenti</span>
-            <span style={{ fontSize: 10, background: '#1e1b4b', color: '#818cf8', padding: '3px 8px', borderRadius: 6, fontWeight: 700, textTransform: 'uppercase' }}>
+            <span style={{ fontSize: 10, background: 'var(--pill-indigo-bg)', color: 'var(--pill-indigo-fg)', padding: '3px 8px', borderRadius: 6, fontWeight: 700, textTransform: 'uppercase' }}>
               Word Studio + PDF Vault
             </span>
           </div>
@@ -388,9 +388,9 @@ SHA-256 del documento.
               zip.download(`Fascicolo_Completo_${safeProjName}_${safeClientName}.zip`);
             }}
             style={{
-              background: '#059669',
-              color: '#fff',
-              border: '1px solid #10b981',
+              background: 'var(--green)',
+              color: 'var(--on-accent)',
+              border: '1px solid var(--green)',
               padding: '8px 16px',
               borderRadius: 10,
               fontSize: 12,
@@ -410,9 +410,9 @@ SHA-256 del documento.
             type="button"
             onClick={() => navigate(`/documents?projId=${project.id}`)}
             style={{
-              background: 'linear-gradient(135deg, #4338ca 0%, #312e81 100%)',
-              color: '#fff',
-              border: '1px solid #6366f1',
+              background: 'linear-gradient(135deg, var(--indigo-d) 0%, var(--pill-indigo-bg) 100%)',
+              color: 'var(--on-accent)',
+              border: '1px solid var(--indigo)',
               padding: '8px 16px',
               borderRadius: 10,
               fontSize: 12,
@@ -451,9 +451,9 @@ SHA-256 del documento.
               onClick={() => setDocCategory(cat.id)}
               style={{
                 padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer',
-                background: docCategory === cat.id ? '#1e1b4b' : 'var(--card)',
-                color: docCategory === cat.id ? '#818cf8' : 'var(--muted)',
-                border: `1px solid ${docCategory === cat.id ? '#4338ca' : 'var(--border)'}`,
+                background: docCategory === cat.id ? 'var(--pill-indigo-bg)' : 'var(--card)',
+                color: docCategory === cat.id ? 'var(--pill-indigo-fg)' : 'var(--muted)',
+                border: `1px solid ${docCategory === cat.id ? 'var(--pill-indigo-bd)' : 'var(--border)'}`,
               }}
             >
               {cat.label}
@@ -474,14 +474,14 @@ SHA-256 del documento.
           <div style={{ display: 'flex', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
             <button
               onClick={() => setViewMode('grid')}
-              style={{ padding: '6px 10px', background: viewMode === 'grid' ? '#1e1b4b' : 'transparent', color: viewMode === 'grid' ? '#818cf8' : 'var(--muted)', border: 'none', cursor: 'pointer', fontSize: 12 }}
+              style={{ padding: '6px 10px', background: viewMode === 'grid' ? 'var(--pill-indigo-bg)' : 'transparent', color: viewMode === 'grid' ? 'var(--pill-indigo-fg)' : 'var(--muted)', border: 'none', cursor: 'pointer', fontSize: 12 }}
               title="Vista Griglia Schede"
             >
               ⊞ Griglia
             </button>
             <button
               onClick={() => setViewMode('list')}
-              style={{ padding: '6px 10px', background: viewMode === 'list' ? '#1e1b4b' : 'transparent', color: viewMode === 'list' ? '#818cf8' : 'var(--muted)', border: 'none', cursor: 'pointer', fontSize: 12 }}
+              style={{ padding: '6px 10px', background: viewMode === 'list' ? 'var(--pill-indigo-bg)' : 'transparent', color: viewMode === 'list' ? 'var(--pill-indigo-fg)' : 'var(--muted)', border: 'none', cursor: 'pointer', fontSize: 12 }}
               title="Vista Elenco Tabellare"
             >
               ☰ Elenco
@@ -518,17 +518,17 @@ SHA-256 del documento.
                     </div>
                     <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                       {doc.firmato && (
-                        <span style={{ fontSize: 9.5, background: '#0d2d22', color: '#34d399', border: '1px solid #059669', padding: '2px 6px', borderRadius: 8, fontWeight: 700 }}>
+                        <span style={{ fontSize: 9.5, background: 'var(--pill-green-bg)', color: 'var(--pill-green-fg)', border: '1px solid var(--pill-green-bd)', padding: '2px 6px', borderRadius: 8, fontWeight: 700 }}>
                           🔒 Firmato
                         </span>
                       )}
                       {doc.dbDoc?.firmatoDaStudio && (
-                        <span style={{ fontSize: 9.5, background: '#1e1b4b', color: '#818cf8', border: '1px solid #6366f1', padding: '2px 6px', borderRadius: 8, fontWeight: 700 }}>
+                        <span style={{ fontSize: 9.5, background: 'var(--pill-indigo-bg)', color: 'var(--pill-indigo-fg)', border: '1px solid var(--pill-indigo-bd)', padding: '2px 6px', borderRadius: 8, fontWeight: 700 }}>
                           🏛️ Studio
                         </span>
                       )}
                       {!doc.firmato && !doc.dbDoc?.firmatoDaStudio && (
-                        <span style={{ fontSize: 9.5, background: '#1e1b4b', color: '#818cf8', border: '1px solid #4338ca', padding: '2px 8px', borderRadius: 8, fontWeight: 700 }}>
+                        <span style={{ fontSize: 9.5, background: 'var(--pill-indigo-bg)', color: 'var(--pill-indigo-fg)', border: '1px solid var(--pill-indigo-bd)', padding: '2px 8px', borderRadius: 8, fontWeight: 700 }}>
                           {isWord ? 'DOCX Word' : 'PDF'}
                         </span>
                       )}
@@ -562,7 +562,7 @@ SHA-256 del documento.
                   <button
                     type="button"
                     onClick={() => navigate(`/documents?projId=${project.id}&docId=${doc.id}`)}
-                    style={{ background: '#1e1b4b', border: '1px solid #4338ca', color: '#818cf8', padding: '5px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+                    style={{ background: 'var(--pill-indigo-bg)', border: '1px solid var(--pill-indigo-bd)', color: 'var(--pill-indigo-fg)', padding: '5px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
                     title="Apri e Modifica con Word Studio"
                   >
                     ✏️ Studio
@@ -572,7 +572,7 @@ SHA-256 del documento.
                     <button
                       type="button"
                       onClick={() => setDocPerFirmaStudio(doc.dbDoc)}
-                      style={{ background: '#312e81', border: '1px solid #6366f1', color: '#c7d2fe', padding: '5px 7px', borderRadius: 6, fontSize: 10.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}
+                      style={{ background: 'var(--pill-indigo-bg)', border: '1px solid var(--pill-indigo-bd)', color: 'var(--pill-indigo-fg)', padding: '5px 7px', borderRadius: 6, fontSize: 10.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}
                       title="Apponi la firma dello studio / professionista incaricato sul documento"
                     >
                       ✍️ Firma Studio
@@ -582,7 +582,7 @@ SHA-256 del documento.
                   <button
                     type="button"
                     onClick={() => handleDownloadDocumentPdf(doc)}
-                    style={{ background: '#0d2d22', border: '1px solid #059669', color: '#34d399', padding: '5px 7px', borderRadius: 6, fontSize: 10.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}
+                    style={{ background: 'var(--pill-green-bg)', border: '1px solid var(--pill-green-bd)', color: 'var(--pill-green-fg)', padding: '5px 7px', borderRadius: 6, fontSize: 10.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}
                     title="Scarica in formato PDF A4"
                   >
                     📥 PDF
@@ -592,7 +592,7 @@ SHA-256 del documento.
                     <button
                       type="button"
                       onClick={() => handleDownloadAttoFirmato(doc)}
-                      style={{ background: '#059669', border: '1px solid #10b981', color: '#fff', padding: '5px 7px', borderRadius: 6, fontSize: 10.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}
+                      style={{ background: 'var(--green)', border: '1px solid var(--green)', color: 'var(--on-accent)', padding: '5px 7px', borderRadius: 6, fontSize: 10.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}
                       title="Scarica l'atto come sottoscritto (file firmato), distinto dal PDF master e dal verbale di firma"
                     >
                       ✍️ Firmato
@@ -602,7 +602,7 @@ SHA-256 del documento.
                   <button
                     type="button"
                     onClick={() => handleDownloadDocumentWord(doc)}
-                    style={{ background: '#1e1b4b', border: '1px solid #3b82f6', color: '#93c5fd', padding: '5px 7px', borderRadius: 6, fontSize: 10.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}
+                    style={{ background: 'var(--pill-indigo-bg)', border: '1px solid var(--indigo-l)', color: 'var(--pill-blue-fg)', padding: '5px 7px', borderRadius: 6, fontSize: 10.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}
                     title="Scarica in formato Microsoft Word (.doc)"
                   >
                     📝 Word
@@ -611,7 +611,7 @@ SHA-256 del documento.
                   <button
                     type="button"
                     onClick={() => handleDeleteDoc(doc.id)}
-                    style={{ background: '#2d1515', border: '1px solid #7f1d1d', color: '#f87171', padding: '5px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer' }}
+                    style={{ background: 'var(--pill-red-bg)', border: '1px solid var(--pill-red-bd)', color: 'var(--pill-red-fg)', padding: '5px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer' }}
                     title="Elimina Documento dal Drive"
                   >
                     🗑
@@ -648,7 +648,7 @@ SHA-256 del documento.
                         <span>{doc.titolo || doc.nome}</span>
                       </td>
                       <td style={{ padding: '12px' }}>
-                        <span style={{ fontSize: 10, background: '#1a1f3d', color: '#818cf8', padding: '2px 8px', borderRadius: 10, border: '1px solid #3730a3' }}>
+                        <span style={{ fontSize: 10, background: 'var(--pill-indigo-bg)', color: 'var(--pill-indigo-fg)', padding: '2px 8px', borderRadius: 10, border: '1px solid var(--pill-indigo-bd)' }}>
                           {doc.cat || doc.categoria || 'Generale'}
                         </span>
                       </td>
@@ -656,11 +656,11 @@ SHA-256 del documento.
                       <td style={{ padding: '12px', color: 'var(--muted)' }}>{doc.data || doc.dataCaricamento || '15/08/2026'}</td>
                       <td style={{ padding: '12px' }}>
                         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                          <span style={{ fontSize: 9.5, background: doc.firmato ? '#0d2d22' : '#2d1a05', color: doc.firmato ? '#34d399' : '#f59e0b', border: `1px solid ${doc.firmato ? '#059669' : '#d97706'}`, padding: '2px 8px', borderRadius: 10, fontWeight: 700 }}>
+                          <span style={{ fontSize: 9.5, background: doc.firmato ? 'var(--pill-green-bg)' : 'var(--pill-amber-bg)', color: doc.firmato ? 'var(--pill-green-fg)' : 'var(--pill-amber-fg)', border: `1px solid ${doc.firmato ? 'var(--pill-green-bd)' : 'var(--pill-amber-bd)'}`, padding: '2px 8px', borderRadius: 10, fontWeight: 700 }}>
                             {doc.firmato ? '🔒 OTP verificata' : '⏳ In attesa di firma'}
                           </span>
                           {doc.dbDoc?.firmatoDaStudio && (
-                            <span style={{ fontSize: 9.5, background: '#1e1b4b', color: '#818cf8', border: '1px solid #6366f1', padding: '2px 8px', borderRadius: 10, fontWeight: 700 }}>
+                            <span style={{ fontSize: 9.5, background: 'var(--pill-indigo-bg)', color: 'var(--pill-indigo-fg)', border: '1px solid var(--pill-indigo-bd)', padding: '2px 8px', borderRadius: 10, fontWeight: 700 }}>
                               🏛️ Studio
                             </span>
                           )}
@@ -672,7 +672,7 @@ SHA-256 del documento.
                             <button
                               type="button"
                               onClick={() => setDocPerFirmaStudio(doc.dbDoc)}
-                              style={{ background: '#312e81', border: '1px solid #6366f1', color: '#c7d2fe', padding: '4px 8px', borderRadius: 6, fontSize: 10.5, cursor: 'pointer', fontWeight: 700 }}
+                              style={{ background: 'var(--pill-indigo-bg)', border: '1px solid var(--pill-indigo-bd)', color: 'var(--pill-indigo-fg)', padding: '4px 8px', borderRadius: 6, fontSize: 10.5, cursor: 'pointer', fontWeight: 700 }}
                               title="Apponi la firma dello studio / professionista incaricato sul documento"
                             >
                               ✍️ Firma Studio
@@ -688,14 +688,14 @@ SHA-256 del documento.
                           <button
                             type="button"
                             onClick={() => navigate(`/documents?projId=${project.id}&docId=${doc.id}`)}
-                            style={{ background: '#1e1b4b', border: '1px solid #4338ca', color: '#818cf8', padding: '4px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer', fontWeight: 600 }}
+                            style={{ background: 'var(--pill-indigo-bg)', border: '1px solid var(--pill-indigo-bd)', color: 'var(--pill-indigo-fg)', padding: '4px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer', fontWeight: 600 }}
                           >
                             ✏️ Word Studio
                           </button>
                           <button
                             type="button"
                             onClick={() => handleDownloadDocumentPdf(doc)}
-                            style={{ background: '#0d2d22', border: '1px solid #059669', color: '#34d399', padding: '4px 8px', borderRadius: 6, fontSize: 10.5, cursor: 'pointer', fontWeight: 700 }}
+                            style={{ background: 'var(--pill-green-bg)', border: '1px solid var(--pill-green-bd)', color: 'var(--pill-green-fg)', padding: '4px 8px', borderRadius: 6, fontSize: 10.5, cursor: 'pointer', fontWeight: 700 }}
                             title="Scarica in formato PDF A4"
                           >
                             📥 PDF
@@ -704,7 +704,7 @@ SHA-256 del documento.
                             <button
                               type="button"
                               onClick={() => handleDownloadAttoFirmato(doc)}
-                              style={{ background: '#059669', border: '1px solid #10b981', color: '#fff', padding: '4px 8px', borderRadius: 6, fontSize: 10.5, cursor: 'pointer', fontWeight: 700 }}
+                              style={{ background: 'var(--green)', border: '1px solid var(--green)', color: 'var(--on-accent)', padding: '4px 8px', borderRadius: 6, fontSize: 10.5, cursor: 'pointer', fontWeight: 700 }}
                               title="Scarica l'atto come sottoscritto (file firmato), distinto dal PDF master e dal verbale di firma"
                             >
                               ✍️ Firmato
@@ -713,7 +713,7 @@ SHA-256 del documento.
                           <button
                             type="button"
                             onClick={() => handleDownloadDocumentWord(doc)}
-                            style={{ background: '#1e1b4b', border: '1px solid #3b82f6', color: '#93c5fd', padding: '4px 8px', borderRadius: 6, fontSize: 10.5, cursor: 'pointer', fontWeight: 700 }}
+                            style={{ background: 'var(--pill-indigo-bg)', border: '1px solid var(--indigo-l)', color: 'var(--pill-blue-fg)', padding: '4px 8px', borderRadius: 6, fontSize: 10.5, cursor: 'pointer', fontWeight: 700 }}
                             title="Scarica in formato Microsoft Word (.doc)"
                           >
                             📝 Word
@@ -721,7 +721,7 @@ SHA-256 del documento.
                           <button
                             type="button"
                             onClick={() => handleDeleteDoc(doc.id)}
-                            style={{ background: 'transparent', border: '1px solid #7f1d1d', color: '#f87171', padding: '4px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer' }}
+                            style={{ background: 'transparent', border: '1px solid var(--pill-red-bd)', color: 'var(--pill-red-fg)', padding: '4px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer' }}
                           >
                             🗑
                           </button>
@@ -744,7 +744,7 @@ SHA-256 del documento.
               <div>
                 <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span>📄 {selectedPreviewDoc.titolo || selectedPreviewDoc.nome}</span>
-                  <span style={{ fontSize: 10, background: selectedPreviewDoc.firmato ? '#0d2d22' : '#200f40', color: selectedPreviewDoc.firmato ? '#34d399' : '#a78bfa', padding: '2px 8px', borderRadius: 10, border: '1px solid #3730a3' }}>
+                  <span style={{ fontSize: 10, background: selectedPreviewDoc.firmato ? 'var(--pill-green-bg)' : 'var(--pill-indigo-bg)', color: selectedPreviewDoc.firmato ? 'var(--green)' : 'var(--purple)', padding: '2px 8px', borderRadius: 10, border: '1px solid var(--indigo-d)' }}>
                     {selectedPreviewDoc.firmato ? '🔒 Firmato (OTP verificata)' : 'Bozza Legale Studio'}
                   </span>
                 </div>
@@ -772,10 +772,10 @@ SHA-256 del documento.
               documento porta con sé — quella che l'operatore ha bloccato o modificato in Document
               Studio — e se non ne porta nessuna non se ne inventa una.
             */}
-            <div style={{ flex: 1, padding: 18, overflowY: 'auto', background: '#0a0d14' }}>
+            <div style={{ flex: 1, padding: 18, overflowY: 'auto', background: 'var(--surface-2)' }}>
               {partiAnteprima ? (
                 <FoglioA4
-                  sfondo="#0a0d14"
+                  sfondo="var(--surface-2)"
                   intestazione={partiAnteprima.intestazione ? { html: partiAnteprima.intestazione, etichetta: 'Intestazione' } : undefined}
                   piede={partiAnteprima.piede ? { html: partiAnteprima.piede, etichetta: 'Piè di pagina' } : undefined}
                 >
@@ -783,17 +783,17 @@ SHA-256 del documento.
                 </FoglioA4>
               ) : selectedPreviewDoc.dbDoc && selectedPreviewDoc.url && selectedPreviewDoc.url !== '#' ? (
                 // Gli URL archivio sono attachment: niente iframe nel contesto autenticato.
-                <div style={{ fontFamily: 'sans-serif', background: '#fff', color: '#334155', borderRadius: 8, padding: 28, textAlign: 'center' }}>
+                <div style={{ fontFamily: 'sans-serif', background: '#fff', color: 'var(--pill-slate-bd)', borderRadius: 8, padding: 28, textAlign: 'center' }}>
                   <strong>Anteprima incorporata disabilitata per sicurezza.</strong>
                   <div style={{ marginTop: 8, fontSize: 12 }}>Scarica il file per aprirlo con l'applicazione associata.</div>
                   <div style={{ marginTop: 12, fontSize: 12 }}>
-                    <a href={selectedPreviewDoc.url} download style={{ color: '#0284c7', fontWeight: 700 }}>Scarica il file originale</a>
+                    <a href={selectedPreviewDoc.url} download style={{ color: 'var(--cat-societario)', fontWeight: 700 }}>Scarica il file originale</a>
                   </div>
                 </div>
               ) : (
                 // Niente HTML e niente file: si dice, invece di riempire il foglio con un testo
                 // di circostanza che sembrava il contenuto del documento.
-                <div style={{ background: '#fff', color: '#334155', borderRadius: 8, padding: 28, fontSize: 12.5, lineHeight: 1.6, fontFamily: 'sans-serif' }}>
+                <div style={{ background: '#fff', color: 'var(--pill-slate-bd)', borderRadius: 8, padding: 28, fontSize: 12.5, lineHeight: 1.6, fontFamily: 'sans-serif' }}>
                   <strong>Nessun contenuto da mostrare.</strong> Di questo documento l'archivio non conserva né il testo
                   né il file: c'è solo la scheda. Aprilo in Document Studio per comporne il testo, oppure ricarica il
                   file originale dalla scheda del passaggio.
@@ -807,14 +807,14 @@ SHA-256 del documento.
                 <button
                   type="button"
                   onClick={() => handleDownloadDocumentPdf(selectedPreviewDoc)}
-                  style={{ background: '#0d2d22', border: '1px solid #059669', color: '#34d399', padding: '8px 14px', borderRadius: 8, fontSize: 11.5, cursor: 'pointer', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}
+                  style={{ background: 'var(--pill-green-bg)', border: '1px solid var(--pill-green-bd)', color: 'var(--pill-green-fg)', padding: '8px 14px', borderRadius: 8, fontSize: 11.5, cursor: 'pointer', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}
                 >
                   📥 Scarica PDF A4
                 </button>
                 <button
                   type="button"
                   onClick={() => handleDownloadDocumentWord(selectedPreviewDoc)}
-                  style={{ background: '#1e1b4b', border: '1px solid #3b82f6', color: '#93c5fd', padding: '8px 14px', borderRadius: 8, fontSize: 11.5, cursor: 'pointer', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}
+                  style={{ background: 'var(--pill-indigo-bg)', border: '1px solid var(--indigo-l)', color: 'var(--pill-blue-fg)', padding: '8px 14px', borderRadius: 8, fontSize: 11.5, cursor: 'pointer', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}
                 >
                   📝 Scarica Word (.doc)
                 </button>
@@ -825,7 +825,7 @@ SHA-256 del documento.
                   <button
                     type="button"
                     onClick={() => handleDownloadAttoFirmato(selectedPreviewDoc)}
-                    style={{ background: '#059669', border: '1px solid #10b981', color: '#fff', padding: '8px 14px', borderRadius: 8, fontSize: 11.5, cursor: 'pointer', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}
+                    style={{ background: 'var(--green)', border: '1px solid var(--green)', color: 'var(--on-accent)', padding: '8px 14px', borderRadius: 8, fontSize: 11.5, cursor: 'pointer', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}
                     title="L'atto come sottoscritto (file firmato), distinto dal PDF master e dal verbale di firma"
                   >
                     ✍️ Scarica atto firmato
@@ -839,7 +839,7 @@ SHA-256 del documento.
                   onClick={() => {
                     navigate(`/documents?projId=${project.id}&docId=${selectedPreviewDoc.id}`);
                   }}
-                  style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+                  style={{ background: 'var(--indigo)', color: 'var(--on-accent)', border: 'none', padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
                 >
                   📝 Modifica in Document Studio
                 </button>

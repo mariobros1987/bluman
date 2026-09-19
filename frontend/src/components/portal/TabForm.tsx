@@ -53,13 +53,13 @@ export function TabForm({
       <div style={{ height: 14 }} />
 
       {formSaved && (
-        <div style={{ background: '#0d2d22', border: '1px solid #1a5c3c', color: '#34d399', padding: '10px 14px', borderRadius: 10, fontSize: 12, fontWeight: 600, marginBottom: 16 }}>
+        <div style={{ background: 'var(--pill-green-bg)', border: '1px solid var(--pill-green-bg)', color: 'var(--green)', padding: '10px 14px', borderRadius: 10, fontSize: 12, fontWeight: 600, marginBottom: 16 }}>
           ✓ Proposta inviata allo studio!
         </div>
       )}
 
       {propostaMsg && (
-        <div style={{ background: propostaMsg.type === 'success' ? '#0d2d22' : '#2d1516', border: `1px solid ${propostaMsg.type === 'success' ? '#1a5c3c' : '#7f1d1d'}`, color: propostaMsg.type === 'success' ? '#34d399' : '#fca5a5', padding: '10px 14px', borderRadius: 10, fontSize: 12, fontWeight: 600, marginBottom: 16 }}>
+        <div style={{ background: propostaMsg.type === 'success' ? 'var(--pill-green-bg)' : 'var(--pill-red-bg)', border: `1px solid ${propostaMsg.type === 'success' ? 'var(--pill-green-bg)' : 'var(--pill-red-bg)'}`, color: propostaMsg.type === 'success' ? 'var(--green)' : 'var(--pill-red-fg)', padding: '10px 14px', borderRadius: 10, fontSize: 12, fontWeight: 600, marginBottom: 16 }}>
           {propostaMsg.text}
         </div>
       )}

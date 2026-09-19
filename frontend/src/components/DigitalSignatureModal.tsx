@@ -33,7 +33,7 @@ export function DigitalSignatureModal({
   const [signatureMode, setSignatureMode] = useState<'draw' | 'type'>('draw');
 
   const trackerRef = useRef<SmoothStrokeTracker>(
-    new SmoothStrokeTracker({ strokeColor: '#1e1b4b', baseLineWidth: 2.5, minLineWidth: 1.6, maxLineWidth: 3.4 })
+    new SmoothStrokeTracker({ strokeColor: 'var(--pill-indigo-bg)', baseLineWidth: 2.5, minLineWidth: 1.6, maxLineWidth: 3.4 })
   );
 
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
@@ -94,7 +94,7 @@ export function DigitalSignatureModal({
       const ctx = tempCanvas.getContext('2d');
       if (ctx) {
         ctx.font = '30px "Brush Script MT", cursive, sans-serif';
-        ctx.fillStyle = '#1e1b4b';
+        ctx.fillStyle = 'var(--pill-indigo-bg)';
         ctx.fillText(typedSignature || signerName, 20, 60);
         signatureImgBase64 = tempCanvas.toDataURL('image/png');
       }
@@ -135,7 +135,7 @@ export function DigitalSignatureModal({
             onClick={() => setSignatureMode('draw')}
             style={{
               flex: 1, padding: 8, borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer',
-              background: signatureMode === 'draw' ? '#1a1f3d' : 'var(--card2)',
+              background: signatureMode === 'draw' ? 'var(--surface-1)' : 'var(--card2)',
               border: `1px solid ${signatureMode === 'draw' ? 'var(--indigo-l)' : 'var(--border)'}`,
               color: signatureMode === 'draw' ? 'var(--indigo-l)' : 'var(--muted)',
             }}
@@ -147,7 +147,7 @@ export function DigitalSignatureModal({
             onClick={() => setSignatureMode('type')}
             style={{
               flex: 1, padding: 8, borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer',
-              background: signatureMode === 'type' ? '#1a1f3d' : 'var(--card2)',
+              background: signatureMode === 'type' ? 'var(--surface-1)' : 'var(--card2)',
               border: `1px solid ${signatureMode === 'type' ? 'var(--indigo-l)' : 'var(--border)'}`,
               color: signatureMode === 'type' ? 'var(--indigo-l)' : 'var(--muted)',
             }}
@@ -198,7 +198,7 @@ export function DigitalSignatureModal({
           che registra altro (per esempio la firma SES, dove il codice è già stato convalidato)
           passa la nota giusta con `notaRegistrazione`.
         */}
-        <div style={{ background: '#0d2d22', border: '1px solid #1a5c3c', borderRadius: 8, padding: 10, fontSize: 11, color: '#34d399', lineHeight: 1.45 }}>
+        <div style={{ background: 'var(--pill-green-bg)', border: '1px solid var(--pill-green-bd)', borderRadius: 8, padding: 10, fontSize: 11, color: 'var(--pill-green-fg)', lineHeight: 1.45 }}>
           {notaRegistrazione ??
             '✓ Il tratto grafico viene allegato al documento insieme alla data e ora di apposizione. Da solo non identifica il firmatario: vale come elemento a corredo della verifica già effettuata.'}
         </div>
@@ -208,7 +208,7 @@ export function DigitalSignatureModal({
           <button type="button" onClick={onClose} style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '8px 16px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}>
             Annulla
           </button>
-          <button type="button" onClick={handleConfirmSignature} style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '8px 20px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 14px rgba(99,102,241,.3)' }}>
+          <button type="button" onClick={handleConfirmSignature} style={{ background: 'var(--indigo)', color: 'var(--on-accent)', border: 'none', padding: '8px 20px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 14px rgba(99,102,241,.3)' }}>
             ✓ Apponi Firma & Conferma
           </button>
         </div>

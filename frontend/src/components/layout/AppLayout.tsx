@@ -181,8 +181,8 @@ export function AppLayout({ children, alertCount: _alertCount = 0, user, onLogou
                       display: 'flex',
                       alignItems: 'center',
                       gap: 6,
-                      background: '#111827',
-                      border: '1px solid #374151',
+                      background: 'var(--surface-2)',
+                      border: '1px solid var(--border)',
                       borderRadius: 20,
                       padding: '4px 12px',
                       boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
@@ -190,7 +190,7 @@ export function AppLayout({ children, alertCount: _alertCount = 0, user, onLogou
                     title={`Studio Professionale Assegnato: ${currentTenantObj.ragioneSociale}`}
                   >
                     <span style={{ fontSize: 13 }}>🏛</span>
-                    <span style={{ color: '#93c5fd', fontSize: 11.5, fontWeight: 700, whiteSpace: 'nowrap', maxWidth: 190, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    <span style={{ color: 'var(--cat-societario)', fontSize: 11.5, fontWeight: 700, whiteSpace: 'nowrap', maxWidth: 190, overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {currentTenantObj.ragioneSociale}
                     </span>
                   </div>
@@ -198,7 +198,7 @@ export function AppLayout({ children, alertCount: _alertCount = 0, user, onLogou
               }
 
               return (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#1e1b4b', border: '1px solid #4338ca', borderRadius: 20, padding: '3px 10px', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--pill-indigo-bg)', border: '1px solid var(--pill-indigo-bd)', borderRadius: 20, padding: '3px 10px', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' }}>
                   <span style={{ fontSize: 13 }} title="👑 Super Admin Multi-Tenant Switcher">🏛</span>
                   <select
                     value={currentTid}
@@ -206,11 +206,11 @@ export function AppLayout({ children, alertCount: _alertCount = 0, user, onLogou
                       setActiveTenantId(e.target.value);
                       window.location.reload();
                     }}
-                    style={{ background: 'transparent', border: 'none', color: '#c7d2fe', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', outline: 'none', maxWidth: 190 }}
+                    style={{ background: 'transparent', border: 'none', color: 'var(--pill-indigo-fg)', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', outline: 'none', maxWidth: 190 }}
                     title="👑 Cambia Studio Professionale Attivo (Super Admin)"
                   >
                     {allTenants.map(t => (
-                      <option key={t.id} value={t.id} style={{ background: '#0f172a', color: '#f8fafc' }}>
+                      <option key={t.id} value={t.id} style={{ background: 'var(--surface-2)', color: 'var(--text)' }}>
                         {t.ragioneSociale}
                       </option>
                     ))}
@@ -230,7 +230,7 @@ export function AppLayout({ children, alertCount: _alertCount = 0, user, onLogou
                   background: 'var(--card2)',
                   padding: '4px 12px',
                   borderRadius: 20,
-                  border: '1px solid #4338ca',
+                  border: '1px solid var(--indigo-d)',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
@@ -241,7 +241,7 @@ export function AppLayout({ children, alertCount: _alertCount = 0, user, onLogou
                 <span>👤</span>
                 <span style={{ fontWeight: 700, color: 'var(--indigo-l)' }}>{currentUser.nome || currentUser.name}</span>
                 <span style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'capitalize' }}>({currentUser.ruolo || 'advisor'})</span>
-                <span style={{ fontSize: 10, color: '#a5b4fc', marginLeft: 2 }}>⚙️</span>
+                <span style={{ fontSize: 10, color: 'var(--indigo-l)', marginLeft: 2 }}>⚙️</span>
               </button>
             )}
             {onLogout && (
@@ -251,7 +251,7 @@ export function AppLayout({ children, alertCount: _alertCount = 0, user, onLogou
                 style={{
                   background: 'var(--card)',
                   border: '1px solid var(--border)',
-                  color: '#f87171',
+                  color: 'var(--red)',
                   borderRadius: 20,
                   padding: '4px 10px',
                   fontSize: 11,
@@ -279,7 +279,7 @@ export function AppLayout({ children, alertCount: _alertCount = 0, user, onLogou
             >
               🔔
               {unreadCount > 0 && (
-                <span style={{ position: 'absolute', top: 2, right: 2, width: 8, height: 8, borderRadius: '50%', background: '#ef4444' }} />
+                <span style={{ position: 'absolute', top: 2, right: 2, width: 8, height: 8, borderRadius: '50%', background: 'var(--red)' }} />
               )}
             </button>
           </div>

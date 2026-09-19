@@ -226,19 +226,19 @@ export function LibreriaDocumentiEForm() {
     const studio = getStudioInfoForTenant();
     const tmpl = cartella.modelli.find(t => t.id === m.templateId || t.id === m.id) || PREBUILT_TEMPLATES[0];
     const htmlContent = `
-      <div style="font-family: 'Segoe UI', Arial, sans-serif; padding: 20px; color: #0f172a;">
-        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #4338ca; padding-bottom: 14px; margin-bottom: 24px;">
+      <div style="font-family: 'Segoe UI', Arial, sans-serif; padding: 20px; color: var(--surface-2);">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--indigo-d); padding-bottom: 14px; margin-bottom: 24px;">
           <div>
-            <div style="font-size: 16pt; font-weight: 800; color: #1e1b4b;">${studio.ragioneSociale.toUpperCase()} — ADVISORY SERVICES</div>
-            <div style="font-size: 9pt; color: #64748b;">${studio.sedeLegale} · P.IVA ${studio.piva}</div>
+            <div style="font-size: 16pt; font-weight: 800; color: var(--pill-indigo-bg);">${studio.ragioneSociale.toUpperCase()} — ADVISORY SERVICES</div>
+            <div style="font-size: 9pt; color: var(--muted);">${studio.sedeLegale} · P.IVA ${studio.piva}</div>
           </div>
-          <div style="text-align: right; font-size: 8.5pt; color: #64748b;">
+          <div style="text-align: right; font-size: 8.5pt; color: var(--muted);">
             Modello: #${m.cat}<br />
             Data: ${new Date().toLocaleDateString('it-IT')}
           </div>
         </div>
         <div>${tmpl.contenutoHtml}</div>
-        <div style="margin-top: 40px; border-top: 1px solid #e2e8f0; padding-top: 10px; display: flex; justify-content: space-between; font-size: 8.5pt; color: #94a3b8;">
+        <div style="margin-top: 40px; border-top: 1px solid var(--border); padding-top: 10px; display: flex; justify-content: space-between; font-size: 8.5pt; color: var(--muted);">
           <span>${studio.ragioneSociale} • Modello Ufficiale Studio</span>
           <span>Firma Elettronica Semplice • art. 20 CAD</span>
         </div>
@@ -293,7 +293,7 @@ export function LibreriaDocumentiEForm() {
             />
             <button
               onClick={() => libImportFileRef.current?.click()}
-              style={{ background: '#1e1b4b', color: '#818cf8', border: '1px solid #4338ca', padding: '7px 12px', borderRadius: 8, fontSize: 11.5, fontWeight: 700, cursor: 'pointer' }}
+              style={{ background: 'var(--pill-indigo-bg)', color: 'var(--pill-indigo-fg)', border: '1px solid var(--pill-indigo-bd)', padding: '7px 12px', borderRadius: 8, fontSize: 11.5, fontWeight: 700, cursor: 'pointer' }}
             >
               📥 Importa Modello / Bundle
             </button>
@@ -305,13 +305,13 @@ export function LibreriaDocumentiEForm() {
             </button>
             <button
               onClick={() => navigate('/documents')}
-              style={{ background: '#312e81', color: '#c7d2fe', border: '1px solid #4f46e5', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+              style={{ background: 'var(--pill-indigo-bg)', color: 'var(--pill-indigo-fg)', border: '1px solid var(--pill-indigo-bd)', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
             >
               📝 Apri Document Studio
             </button>
             <button
               onClick={() => setNewDocOpen(true)}
-              style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+              style={{ background: 'var(--indigo)', color: 'var(--on-accent)', border: 'none', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
             >
               + Nuovo Modello Master
             </button>
@@ -319,7 +319,7 @@ export function LibreriaDocumentiEForm() {
         </div>
 
         {/* 🛡️ Banner Immutabilità Documenti Progetto */}
-        <div style={{ background: '#0d221c', border: '1px solid #059669', borderRadius: 10, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10, fontSize: 11.5, color: '#34d399' }}>
+        <div style={{ background: 'var(--pill-green-bg)', border: '1px solid var(--pill-green-bd)', borderRadius: 10, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10, fontSize: 11.5, color: 'var(--pill-green-fg)' }}>
           <span style={{ fontSize: 16 }}>🛡️</span>
           <div>
             <strong>Garanzia di Immutabilità Fascicoli & Progetti:</strong> L'archiviazione o l'eliminazione dei modelli master riguarda esclusivamente i nuovi utilizzi. I documenti già generati, firmati con firma elettronica semplice (OTP verificata) e archiviati all'interno dei singoli Progetti del Cliente <strong>rimangono conservati e congelati alla data di firma</strong>.
@@ -337,7 +337,7 @@ export function LibreriaDocumentiEForm() {
                 onClick={() => setSelectedCatFilter(cat)}
                 style={{
                   background: selectedCatFilter === cat ? 'var(--indigo)' : 'var(--card)',
-                  color: selectedCatFilter === cat ? '#fff' : 'var(--muted)',
+                  color: selectedCatFilter === cat ? 'var(--on-accent)' : 'var(--muted)',
                   border: `1px solid ${selectedCatFilter === cat ? 'var(--indigo-l)' : 'var(--border)'}`,
                   padding: '4px 10px',
                   borderRadius: 16,
@@ -358,8 +358,8 @@ export function LibreriaDocumentiEForm() {
                 type="button"
                 onClick={() => setStatusFilter('attivi')}
                 style={{
-                  background: statusFilter === 'attivi' ? '#1e1b4b' : 'transparent',
-                  color: statusFilter === 'attivi' ? '#818cf8' : 'var(--muted)',
+                  background: statusFilter === 'attivi' ? 'var(--pill-indigo-bg)' : 'transparent',
+                  color: statusFilter === 'attivi' ? 'var(--pill-indigo-fg)' : 'var(--muted)',
                   border: 'none',
                   padding: '4px 10px',
                   fontSize: 11,
@@ -373,8 +373,8 @@ export function LibreriaDocumentiEForm() {
                 type="button"
                 onClick={() => setStatusFilter('archiviati')}
                 style={{
-                  background: statusFilter === 'archiviati' ? '#1e1b4b' : 'transparent',
-                  color: statusFilter === 'archiviati' ? '#818cf8' : 'var(--muted)',
+                  background: statusFilter === 'archiviati' ? 'var(--pill-indigo-bg)' : 'transparent',
+                  color: statusFilter === 'archiviati' ? 'var(--pill-indigo-fg)' : 'var(--muted)',
                   border: 'none',
                   padding: '4px 10px',
                   fontSize: 11,
@@ -388,8 +388,8 @@ export function LibreriaDocumentiEForm() {
                 type="button"
                 onClick={() => setStatusFilter('tutti')}
                 style={{
-                  background: statusFilter === 'tutti' ? '#1e1b4b' : 'transparent',
-                  color: statusFilter === 'tutti' ? '#818cf8' : 'var(--muted)',
+                  background: statusFilter === 'tutti' ? 'var(--pill-indigo-bg)' : 'transparent',
+                  color: statusFilter === 'tutti' ? 'var(--pill-indigo-fg)' : 'var(--muted)',
                   border: 'none',
                   padding: '4px 10px',
                   fontSize: 11,
@@ -418,7 +418,7 @@ export function LibreriaDocumentiEForm() {
               key={m.id}
               style={{
                 background: m.archiviato ? 'rgba(30, 27, 75, 0.25)' : 'var(--card2)',
-                border: `1px solid ${m.archiviato ? '#4338ca' : 'var(--border)'}`,
+                border: `1px solid ${m.archiviato ? 'var(--indigo-d)' : 'var(--border)'}`,
                 borderRadius: 12,
                 padding: 14,
                 display: 'flex',
@@ -433,7 +433,7 @@ export function LibreriaDocumentiEForm() {
                   <div style={{ fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
                     <span>{m.nome}</span>
                     {m.archiviato && (
-                      <span style={{ fontSize: 9, background: '#312e81', color: '#c7d2fe', padding: '1px 5px', borderRadius: 4, fontWeight: 700 }}>
+                      <span style={{ fontSize: 9, background: 'var(--pill-indigo-bg)', color: 'var(--pill-indigo-fg)', padding: '1px 5px', borderRadius: 4, fontWeight: 700 }}>
                         📦 Archiviato
                       </span>
                     )}
@@ -444,7 +444,7 @@ export function LibreriaDocumentiEForm() {
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border)', paddingTop: 10, marginTop: 4, flexWrap: 'wrap', gap: 6 }}>
-                <span style={{ fontSize: 10, color: m.firma ? '#a78bfa' : 'var(--muted)', fontWeight: 600 }}>
+                <span style={{ fontSize: 10, color: m.firma ? 'var(--purple)' : 'var(--muted)', fontWeight: 600 }}>
                   {m.firma ? '✍️ Firma semplice (OTP)' : 'ℹ️ Informativo'}
                 </span>
                 
@@ -454,7 +454,7 @@ export function LibreriaDocumentiEForm() {
                     <button
                       type="button"
                       onClick={() => handleRestoreDoc(m.id, m.nome)}
-                      style={{ background: '#064e3b', border: '1px solid #059669', color: '#34d399', padding: '5px 10px', borderRadius: 6, fontSize: 10.5, cursor: 'pointer', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}
+                      style={{ background: 'var(--pill-green-bg)', border: '1px solid var(--pill-green-bd)', color: 'var(--pill-green-fg)', padding: '5px 10px', borderRadius: 6, fontSize: 10.5, cursor: 'pointer', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}
                       title="Ripristina modello tra quelli attivi"
                     >
                       <span>♻️</span>
@@ -476,7 +476,7 @@ export function LibreriaDocumentiEForm() {
                   <button
                     type="button"
                     onClick={() => handleDeleteDoc(m.id, m.nome)}
-                    style={{ background: 'rgba(239, 68, 68, 0.15)', border: '1px solid #ef4444', color: '#f87171', padding: '5px 10px', borderRadius: 6, fontSize: 10.5, cursor: 'pointer', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}
+                    style={{ background: 'rgba(239, 68, 68, 0.15)', border: '1px solid var(--red)', color: 'var(--pill-red-fg)', padding: '5px 10px', borderRadius: 6, fontSize: 10.5, cursor: 'pointer', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}
                     title="Elimina definitivamente modello master dalla libreria"
                   >
                     <span>🗑️</span>
@@ -486,7 +486,7 @@ export function LibreriaDocumentiEForm() {
                   <button
                     type="button"
                     onClick={() => navigate(`/documents?tmplId=${m.templateId || m.id}`)}
-                    style={{ background: '#1e1b4b', border: '1px solid #4338ca', color: '#818cf8', padding: '5px 10px', borderRadius: 6, fontSize: 10.5, cursor: 'pointer', fontWeight: 700 }}
+                    style={{ background: 'var(--pill-indigo-bg)', border: '1px solid var(--indigo-d)', color: 'var(--indigo-l)', padding: '5px 10px', borderRadius: 6, fontSize: 10.5, cursor: 'pointer', fontWeight: 700 }}
                   >
                     ✏️ Studio
                   </button>
@@ -503,7 +503,7 @@ export function LibreriaDocumentiEForm() {
                       setLinkingDocModel(m);
                       setClientModalSearch('');
                     }}
-                    style={{ background: '#1a1f3d', border: '1px solid #2d3260', color: '#818cf8', padding: '5px 10px', borderRadius: 6, fontSize: 10.5, cursor: 'pointer', fontWeight: 600 }}
+                    style={{ background: 'var(--surface-1)', border: '1px solid var(--card2)', color: 'var(--indigo-l)', padding: '5px 10px', borderRadius: 6, fontSize: 10.5, cursor: 'pointer', fontWeight: 600 }}
                   >
                     🔗 Collega
                   </button>
@@ -542,7 +542,7 @@ export function LibreriaDocumentiEForm() {
                         setFormMasters(formMasters.filter(x => x.id !== f.id));
                       }
                     }}
-                    style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid #ef4444', color: '#f87171', padding: '3px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 3 }}
+                    style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid var(--red)', color: 'var(--pill-red-fg)', padding: '3px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 3 }}
                     title="Elimina Form Master"
                   >
                     <span>🗑️</span>
@@ -552,7 +552,7 @@ export function LibreriaDocumentiEForm() {
                 <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 8 }}>Campi di raccolta dati incorporati ({f.campi.length}):</div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                   {f.campi.map((c, i) => (
-                    <span key={i} style={{ background: '#200f40', color: '#a78bfa', padding: '2px 8px', borderRadius: 6, fontSize: 10, fontWeight: 600 }}>
+                    <span key={i} style={{ background: 'var(--pill-indigo-bg)', color: 'var(--purple)', padding: '2px 8px', borderRadius: 6, fontSize: 10, fontWeight: 600 }}>
                       {c}
                     </span>
                   ))}
@@ -652,7 +652,7 @@ export function LibreriaDocumentiEForm() {
             </div>
 
             {linkingSuccessMsg ? (
-              <div style={{ background: '#0d2d22', border: '1px solid #1a5c3c', color: '#34d399', padding: 14, borderRadius: 10, fontSize: 12, fontWeight: 600, textAlign: 'center' }}>
+              <div style={{ background: 'var(--pill-green-bg)', border: '1px solid var(--pill-green-bg)', color: 'var(--green)', padding: 14, borderRadius: 10, fontSize: 12, fontWeight: 600, textAlign: 'center' }}>
                 {linkingSuccessMsg}
               </div>
             ) : (

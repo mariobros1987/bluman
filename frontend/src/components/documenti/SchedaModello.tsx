@@ -42,7 +42,7 @@ export function SchedaModello({ modello, occupato = false, onApri, onRevisiona, 
     <div
       style={{
         background: 'var(--card2)',
-        border: `1px solid ${archiviato ? '#3f3f46' : 'var(--border)'}`,
+        border: `1px solid ${archiviato ? 'var(--border)' : 'var(--border)'}`,
         borderRadius: 12,
         padding: 14,
         display: 'flex',
@@ -61,14 +61,14 @@ export function SchedaModello({ modello, occupato = false, onApri, onRevisiona, 
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 5, flexShrink: 0 }}>
           <BadgeRevisione modello={modello} />
           {archiviato && (
-            <span style={{ fontSize: 9, fontWeight: 700, color: '#a1a1aa', background: '#27272a', border: '1px solid #3f3f46', padding: '1px 6px', borderRadius: 20 }}>
+            <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--muted)', background: 'var(--pill-slate-bg)', border: '1px solid var(--border)', padding: '1px 6px', borderRadius: 20 }}>
               🗄 Archiviato
             </span>
           )}
           {modello.soloLocale && (
             <span
               title="Questo modello esiste solo in questo browser: non ha una riga nell'archivio dello studio."
-              style={{ fontSize: 9, fontWeight: 700, color: '#fcd34d', background: '#2d2000', border: '1px solid #713f12', padding: '1px 6px', borderRadius: 20 }}
+              style={{ fontSize: 9, fontWeight: 700, color: 'var(--pill-amber-fg)', background: 'var(--pill-amber-bg)', border: '1px solid var(--pill-amber-bd)', padding: '1px 6px', borderRadius: 20 }}
             >
               ⚠ Solo su questo computer
             </span>
@@ -83,7 +83,7 @@ export function SchedaModello({ modello, occupato = false, onApri, onRevisiona, 
       )}
 
       {modello.noteRevisione ? (
-        <div style={{ fontSize: 11, color: '#cbd5e1', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 8px', lineHeight: 1.5 }}>
+        <div style={{ fontSize: 11, color: 'var(--pill-slate-fg)', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 8px', lineHeight: 1.5 }}>
           <strong style={{ color: 'var(--muted)' }}>Nota di revisione:</strong> {modello.noteRevisione}
         </div>
       ) : null}
@@ -125,7 +125,7 @@ export function SchedaModello({ modello, occupato = false, onApri, onRevisiona, 
             type="button"
             onClick={onElimina}
             disabled={occupato}
-            style={{ ...bottone, background: '#2a1218', border: '1px solid #5b2130', color: '#f87171' }}
+            style={{ ...bottone, background: 'var(--pill-red-bg)', border: '1px solid var(--pill-red-bg)', color: 'var(--pill-red-fg)' }}
             title="Elimina la riga del modello. I documenti già generati nei progetti restano invariati."
           >
             🗑 Elimina

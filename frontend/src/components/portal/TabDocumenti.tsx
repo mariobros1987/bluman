@@ -71,9 +71,9 @@ export function TabDocumenti({
 
       {/* Un errore di lettura non si traveste da fascicolo vuoto. */}
       {portalDocsErrore && (
-        <div style={{ background: '#3b1219', border: '1px solid #7f1d1d', color: '#fecaca', borderRadius: 12, padding: 14, fontSize: 12, marginBottom: 14 }}>
+        <div style={{ background: 'var(--pill-red-bg)', border: '1px solid var(--pill-red-bd)', color: 'var(--pill-red-fg)', borderRadius: 12, padding: 14, fontSize: 12, marginBottom: 14 }}>
           <strong>Non riesco a leggere i tuoi documenti.</strong> {portalDocsErrore}
-          <div style={{ marginTop: 6, color: '#fca5a5', fontSize: 11 }}>
+          <div style={{ marginTop: 6, color: 'var(--pill-red-fg)', fontSize: 11 }}>
             Non significa che il fascicolo sia vuoto: riprova con «Aggiorna elenco» o avvisa lo studio.
           </div>
         </div>
@@ -104,8 +104,8 @@ export function TabDocumenti({
           <div
             key={doc.id}
             style={{
-              background: doc.firmato ? '#0d2d22' : 'var(--card2)',
-              border: `1px solid ${doc.firmato ? '#1a5c3c' : 'var(--border)'}`,
+              background: doc.firmato ? 'var(--pill-green-bg)' : 'var(--card2)',
+              border: `1px solid ${doc.firmato ? 'var(--pill-green-bd)' : 'var(--border)'}`,
               borderRadius: 14,
               padding: 16,
               display: 'flex',
@@ -127,7 +127,7 @@ export function TabDocumenti({
                   {doc.firmatoDaStudio && (
                     <span
                       title={`Documento controfirmato dallo Studio: ${doc.firmaStudio?.firmatarioNome || 'Advisor'} (${doc.firmaStudio?.valoreLegale?.toUpperCase() || 'SES'})`}
-                      style={{ fontSize: 10, background: '#0c4a6e', border: '1px solid #0284c7', padding: '2px 8px', borderRadius: 6, color: '#38bdf8', fontWeight: 700 }}
+                      style={{ fontSize: 10, background: 'var(--pill-sky-bg)', border: '1px solid var(--pill-sky-bd)', padding: '2px 8px', borderRadius: 6, color: 'var(--pill-sky-fg)', fontWeight: 700 }}
                     >
                       🏛️ Controfirmato Studio
                     </span>
@@ -137,7 +137,7 @@ export function TabDocumenti({
                   {livelloDoc !== 'ses' && (
                     <span
                       title={`Livello di firma richiesto da questo documento: ${ETICHETTA_LIVELLO[livelloDoc].nome}`}
-                      style={{ fontSize: 10, padding: '2px 8px', borderRadius: 6, fontWeight: 700, border: `1px solid ${livelloDoc === 'fea' ? '#f59e0b66' : '#7c3aed66'}`, color: livelloDoc === 'fea' ? '#fbbf24' : '#c4b5fd', background: livelloDoc === 'fea' ? '#f59e0b14' : '#7c3aed14' }}
+                      style={{ fontSize: 10, padding: '2px 8px', borderRadius: 6, fontWeight: 700, border: `1px solid ${livelloDoc === 'fea' ? '#f59e0b66' : '#7c3aed66'}`, color: livelloDoc === 'fea' ? 'var(--amber)' : 'var(--pill-purple-fg)', background: livelloDoc === 'fea' ? '#f59e0b14' : '#7c3aed14' }}
                     >
                       {ETICHETTA_LIVELLO[livelloDoc].icona} {ETICHETTA_LIVELLO[livelloDoc].nome} richiesto
                     </span>
@@ -148,7 +148,7 @@ export function TabDocumenti({
                         type="button"
                         onClick={() => setStoricoVersioniAperto(storicoVersioniAperto === doc.id ? null : doc.id)}
                         title="Mostra o nascondi le versioni precedenti di questo documento"
-                        style={{ fontSize: 10, background: 'var(--card)', padding: '2px 8px', borderRadius: 6, color: '#818cf8', fontWeight: 700, border: '1px solid #4338ca55', cursor: 'pointer' }}
+                        style={{ fontSize: 10, background: 'var(--card)', padding: '2px 8px', borderRadius: 6, color: 'var(--indigo-l)', fontWeight: 700, border: '1px solid #4338ca55', cursor: 'pointer' }}
                       >
                         🕘 v{doc.versione} · {doc.versioniPrecedenti.length} precedent{doc.versioniPrecedenti.length === 1 ? 'e' : 'i'}
                       </button>
@@ -164,7 +164,7 @@ export function TabDocumenti({
                     {doc.modulo}{doc.progetto ? ` · ${doc.progetto}` : ''}
                   </div>
                 )}
-                <div style={{ fontSize: 10.5, color: doc.firmato ? '#a7f3d0' : 'var(--muted)', marginTop: 3 }}>
+                <div style={{ fontSize: 10.5, color: doc.firmato ? 'var(--green)' : 'var(--muted)', marginTop: 3 }}>
                   {doc.firmato
                     ? `✓ Firmato da te${doc.dataFirma ? ` il ${dataOraLeggibile(doc.dataFirma)}` : ''}${doc.canaleVerificato ? ` · ${doc.canaleVerificato}` : ''}`
                     : doc.tipo === 'verbale_firma'
@@ -178,7 +178,7 @@ export function TabDocumenti({
                             : 'In attesa di lettura e sottoscrizione'}
                 </div>
                 {doc.firmatoDaStudio && (
-                  <div style={{ fontSize: 10.5, color: '#38bdf8', marginTop: 3, display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <div style={{ fontSize: 10.5, color: 'var(--cat-societario)', marginTop: 3, display: 'flex', alignItems: 'center', gap: 5 }}>
                     <span>🏛️</span>
                     <span>
                       <strong>Firmato dallo Studio:</strong> {doc.firmaStudio?.firmatarioNome || 'Professionista Studio'}
@@ -188,7 +188,7 @@ export function TabDocumenti({
                   </div>
                 )}
                 {doc.documentoNonPiuDisponibile && (
-                  <div style={{ fontSize: 10.5, color: '#fbbf24', marginTop: 3 }}>
+                  <div style={{ fontSize: 10.5, color: 'var(--amber)', marginTop: 3 }}>
                     Firma registrata: il file a cui si riferisce non è più nel fascicolo.
                   </div>
                 )}
@@ -210,9 +210,9 @@ export function TabDocumenti({
                 }
                 onClick={() => setSelectedViewerDoc(doc)}
                 style={{
-                  background: '#1a1f3d',
-                  border: '1px solid #4338ca',
-                  color: doc.scaricabile && doc.fileUrl ? '#c7d2fe' : '#6b7280',
+                  background: 'var(--pill-indigo-bg)',
+                  border: '1px solid var(--pill-indigo-bd)',
+                  color: doc.scaricabile && doc.fileUrl ? 'var(--pill-indigo-fg)' : 'var(--muted)',
                   padding: '7px 14px',
                   borderRadius: 8,
                   fontSize: 11,
@@ -231,7 +231,7 @@ export function TabDocumenti({
                   <button
                     type="button"
                     onClick={() => scaricaDocumentoPortaleApi(doc.id, doc.firmato ? 'firmato' : 'pdf', clientObj?.id)}
-                    style={{ background: doc.firmato ? '#064e3b' : '#1a1f3d', border: doc.firmato ? '1px solid #10b981' : '1px solid #4338ca', color: doc.firmato ? '#6ee7b7' : '#c7d2fe', padding: '6px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                    style={{ background: doc.firmato ? 'var(--pill-green-bg)' : 'var(--pill-indigo-bg)', border: doc.firmato ? '1px solid var(--pill-green-bd)' : '1px solid var(--pill-indigo-bd)', color: doc.firmato ? 'var(--pill-green-fg)' : 'var(--pill-indigo-fg)', padding: '6px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
                     title={doc.firmato ? "Scarica l'atto con la firma del cliente" : "Scarica il PDF master generato dal motore (lo stesso file su cui è fissata l'impronta di firma)"}
                   >
                     {doc.firmato ? '📥 PDF Firmato' : '📥 PDF'}
@@ -240,7 +240,7 @@ export function TabDocumenti({
                     <button
                       type="button"
                       onClick={() => scaricaDocumentoPortaleApi(doc.id, 'docx', clientObj?.id)}
-                      style={{ background: '#1e1b4b', border: '1px solid #3b82f6', color: '#93c5fd', padding: '6px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                      style={{ background: 'var(--pill-indigo-bg)', border: '1px solid var(--indigo-l)', color: 'var(--pill-blue-fg)', padding: '6px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
                       title="Scarica la copia Word (.docx) generata dal motore server-side"
                     >
                       📝 Word
@@ -251,7 +251,7 @@ export function TabDocumenti({
 
               {doc.firmato ? (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ background: '#064e3b', border: '1px solid #10b981', color: '#6ee7b7', padding: '5px 12px', borderRadius: 8, fontSize: 11, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span style={{ background: 'var(--pill-green-bg)', border: '1px solid var(--pill-green-bd)', color: 'var(--pill-green-fg)', padding: '5px 12px', borderRadius: 8, fontSize: 11, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 4 }}>
                     <span>🔒</span> FIRMATO{doc.dataFirma ? ` IL ${new Date(doc.dataFirma).toLocaleDateString('it-IT')}` : ''}
                   </span>
                   {/* Fix firma — l'atto sottoscritto, distinto dal PDF master: la rotta
@@ -263,7 +263,7 @@ export function TabDocumenti({
                     <button
                       type="button"
                       onClick={() => scaricaDocumentoPortaleApi(doc.id, 'firmato', clientObj?.id)}
-                      style={{ background: '#059669', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                      style={{ background: 'var(--green)', color: 'var(--on-accent)', border: 'none', padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
                       title="Scarica l'atto come sottoscritto (file firmato caricato oppure copia con la firma incastonata), distinto dal PDF master e dalla ricevuta di firma"
                     >
                       ✍️ Atto firmato
@@ -292,7 +292,7 @@ export function TabDocumenti({
                         clienteId: clientObj?.id,
                       });
                     }}
-                    style={{ background: '#1e1b4b', border: '1px solid #6366f1', color: '#c7d2fe', padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                    style={{ background: 'var(--pill-indigo-bg)', border: '1px solid var(--pill-indigo-bd)', color: 'var(--pill-indigo-fg)', padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
                   >
                     📜 Ricevuta di firma
                   </button>
@@ -300,7 +300,7 @@ export function TabDocumenti({
               ) : doc.tipo === 'verbale_firma' ? (
                 /* Punto 2 piano gap — il verbale è un atto certificativo generato dal
                     sistema: si legge e si scarica, ma non si firma e non si manda in revisione. */
-                <div style={{ fontSize: 11, color: '#a5b4fc', fontWeight: 700, background: '#1e1b4b', border: '1px solid #4338ca', padding: '7px 14px', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ fontSize: 11, color: 'var(--pill-indigo-fg)', fontWeight: 700, background: 'var(--pill-indigo-bg)', border: '1px solid var(--pill-indigo-bd)', padding: '7px 14px', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
                   📜 Verbale di firma · atto certificativo della sottoscrizione
                 </div>
               ) : (
@@ -312,7 +312,7 @@ export function TabDocumenti({
                       setModificaDocTarget(doc);
                       setModificaDocTesto('');
                     }}
-                    style={{ background: '#27272a', border: '1px solid #52525b', color: '#fbbf24', padding: '7px 14px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+                    style={{ background: 'var(--pill-slate-bg)', border: '1px solid var(--hint)', color: 'var(--amber)', padding: '7px 14px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
                     title="Invia note o chiedi modifiche allo studio prima di firmare"
                   >
                     📝 Richiedi Modifiche
@@ -332,21 +332,21 @@ export function TabDocumenti({
                       disabled={!doc.richiedeFirma || otpLoading}
                       title={doc.richiedeFirma ? undefined : 'Documento non firmabile in questo momento'}
                       onClick={() => avviaFirmaDocumento(doc)}
-                      style={{ background: doc.richiedeFirma ? 'var(--indigo)' : 'var(--card)', color: doc.richiedeFirma ? '#fff' : 'var(--muted)', border: 'none', padding: '7px 16px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: doc.richiedeFirma && !otpLoading ? 'pointer' : 'default', boxShadow: doc.richiedeFirma ? '0 2px 10px rgba(99,102,241,.3)' : 'none', display: 'flex', alignItems: 'center', gap: 6 }}
+                      style={{ background: doc.richiedeFirma ? 'var(--indigo)' : 'var(--card)', color: doc.richiedeFirma ? 'var(--on-accent)' : 'var(--muted)', border: 'none', padding: '7px 16px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: doc.richiedeFirma && !otpLoading ? 'pointer' : 'default', boxShadow: doc.richiedeFirma ? '0 2px 10px rgba(99,102,241,.3)' : 'none', display: 'flex', alignItems: 'center', gap: 6 }}
                     >
                       ✍️ Firma con codice
                     </button>
                   ) : (
                     <span
                       title={`Firma ${ETICHETTA_LIVELLO[livelloDoc].nome} richiesta dal documento`}
-                      style={{ fontSize: 10.5, lineHeight: 1.45, maxWidth: 340, color: '#c4b5fd', border: '1px solid #7c3aed50', background: '#7c3aed12', padding: '7px 12px', borderRadius: 8, display: 'inline-block' }}
+                      style={{ fontSize: 10.5, lineHeight: 1.45, maxWidth: 340, color: 'var(--pill-purple-fg)', border: '1px solid #7c3aed50', background: '#7c3aed12', padding: '7px 12px', borderRadius: 8, display: 'inline-block' }}
                     >
                       {AVVISO_LIVELLO[livelloDoc]}
                     </span>
                   )}
 
                   {livelloDoc === 'ses' && (
-                    <label style={{ background: '#1a1f3d', border: '1px solid #2d3260', color: '#818cf8', padding: '6px 14px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    <label style={{ background: 'var(--pill-indigo-bg)', border: '1px solid var(--card2)', color: 'var(--pill-indigo-fg)', padding: '6px 14px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                       <span>{caricamentoFirmato ? '⏳ Carico…' : '📤 Ricarica Firmato a Mano'}</span>
                       <input
                         type="file"
@@ -372,7 +372,7 @@ export function TabDocumenti({
                       sottoscrizione scansionata non basta per nessuna delle due e verrebbe
                       respinta con 409, quindi qui non viene offerta. */}
                   {livelloDoc !== 'ses' && (
-                    <label style={{ background: '#2e1065', border: '1px solid #7c3aed', color: '#c4b5fd', padding: '6px 14px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4, boxShadow: '0 2px 10px rgba(124,58,237,.25)' }}>
+                    <label style={{ background: 'var(--pill-purple-bg)', border: '1px solid var(--pill-purple-bd)', color: 'var(--pill-purple-fg)', padding: '6px 14px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4, boxShadow: '0 2px 10px rgba(124,58,237,.25)' }}>
                       <span>{caricamentoFirmato ? '⏳ Carico…' : '🔐 Carica File Firmato Digitalmente'}</span>
                       <input
                         type="file"
@@ -396,8 +396,8 @@ export function TabDocumenti({
 
             {/* Storico Richieste di Modifica inviate per questo Documento */}
             {doc.richiesteModifica && doc.richiesteModifica.length > 0 && (
-              <div style={{ width: '100%', background: '#18181b', border: '1px solid #3f3f46', borderRadius: 10, padding: 12, marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: '#fbbf24', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{ width: '100%', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 10, padding: 12, marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--amber)', display: 'flex', alignItems: 'center', gap: 6 }}>
                   <span>💬 Le tue note e richieste di modifica per questo atto:</span>
                 </div>
                 {doc.richiesteModifica.map((rm) => (
@@ -405,12 +405,12 @@ export function TabDocumenti({
                     <div style={{ color: 'var(--text)', fontStyle: 'italic' }}>«{rm.commento}»</div>
                     <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
                       <span>Inviata il {new Date(rm.creatoAt).toLocaleString('it-IT')}</span>
-                      <span style={{ fontWeight: 700, color: rm.stato === 'risolta' ? '#34d399' : '#fbbf24' }}>
+                      <span style={{ fontWeight: 700, color: rm.stato === 'risolta' ? 'var(--green)' : 'var(--amber)' }}>
                         {rm.stato === 'risolta' ? '✓ Risolta dallo studio' : '⏳ In esame dallo studio'}
                       </span>
                     </div>
                     {rm.rispostaStudio && (
-                      <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px dashed var(--border)', color: '#93c5fd', fontSize: 10.5 }}>
+                      <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px dashed var(--border)', color: 'var(--cat-societario)', fontSize: 10.5 }}>
                         <strong>Riscontro Advisor:</strong> {rm.rispostaStudio}
                       </div>
                     )}
@@ -425,14 +425,14 @@ export function TabDocumenti({
                 qui non viene inventato niente. */}
             {doc.versioniPrecedenti && doc.versioniPrecedenti.length > 0 && storicoVersioniAperto === doc.id && (
               <div style={{ width: '100%', background: 'var(--card)', border: '1px dashed #4338ca66', borderRadius: 10, padding: 12, marginTop: 10 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: '#818cf8', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--indigo-l)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
                   🕘 Cronologia versioni — percorso del documento a ritroso
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   <div style={{ background: 'var(--card2)', padding: '7px 12px', borderRadius: 8, border: '1px solid var(--border)', fontSize: 11, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                     <strong style={{ color: 'var(--text)' }}>v{doc.versione}</strong>
                     <span style={{ color: 'var(--muted)' }}>versione attuale{doc.caricatoIl ? ` · caricata il ${dataOraLeggibile(doc.caricatoIl)}` : ''}</span>
-                    <span style={{ fontWeight: 700, color: doc.firmato ? '#34d399' : '#93c5fd' }}>
+                    <span style={{ fontWeight: 700, color: doc.firmato ? 'var(--green)' : 'var(--cat-societario)' }}>
                       {doc.firmato
                         ? `✍️ Firmata${doc.dataFirma ? ` il ${dataOraLeggibile(doc.dataFirma)}` : ''}`
                         : 'In attesa di firma'}
@@ -440,13 +440,13 @@ export function TabDocumenti({
                   </div>
                   {doc.versioniPrecedenti.map((v) => (
                     <div key={v.id} style={{ background: 'transparent', padding: '5px 12px 5px 22px', fontSize: 11, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', color: 'var(--muted)' }}>
-                      <span style={{ color: '#4338ca' }}>↳</span>
+                      <span style={{ color: 'var(--indigo-d)' }}>↳</span>
                       <strong style={{ color: 'var(--muted)' }}>v{v.versione}</strong>
                       <span>{v.caricatoIl ? `caricata il ${dataOraLeggibile(v.caricatoIl)}` : 'data di caricamento non disponibile'}</span>
                       {v.firmatoAt ? (
-                        <span style={{ fontWeight: 700, color: '#34d399' }}>✍️ Firmata il {dataOraLeggibile(v.firmatoAt)}</span>
+                        <span style={{ fontWeight: 700, color: 'var(--green)' }}>✍️ Firmata il {dataOraLeggibile(v.firmatoAt)}</span>
                       ) : (
-                        <span style={{ color: '#71717a' }}>nessuna firma registrata su questa versione</span>
+                        <span style={{ color: 'var(--hint)' }}>nessuna firma registrata su questa versione</span>
                       )}
                     </div>
                   ))}

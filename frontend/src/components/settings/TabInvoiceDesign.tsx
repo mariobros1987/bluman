@@ -64,7 +64,7 @@ export function TabInvoiceDesign({
                 style={{ background: 'var(--card)', padding: 8, borderRadius: 8, fontSize: 11, border: '1px solid var(--border)' }}
               />
               {uploadingLogo && <div style={{ fontSize: 10, color: 'var(--muted)' }}>Upload logo in corso...</div>}
-              <div style={{ marginTop: 6, background: '#0f172a', padding: 12, borderRadius: 8, textAlign: 'center', border: '1px solid #1e293b' }}>
+              <div style={{ marginTop: 6, background: 'var(--surface-2)', padding: 12, borderRadius: 8, textAlign: 'center', border: '1px solid var(--pill-slate-bg)' }}>
                 <img
                   src={getFormattedLogoUrl(logoUrl)}
                   alt="Logo Studio"
@@ -81,10 +81,10 @@ export function TabInvoiceDesign({
               <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text)' }}>🎨 Colore Primario Layout Stampa</label>
               <div style={{ display: 'flex', gap: 8 }}>
                 {[
-                  { name: 'Indigo', hex: '#4338ca' },
-                  { name: 'Emerald', hex: '#059669' },
-                  { name: 'Navy', hex: '#0f172a' },
-                  { name: 'Purple', hex: '#7c3aed' },
+                  { name: 'Indigo', hex: 'var(--indigo-d)' },
+                  { name: 'Emerald', hex: 'var(--green)' },
+                  { name: 'Navy', hex: 'var(--surface-2)' },
+                  { name: 'Purple', hex: 'var(--purple)' },
                 ].map(c => (
                   <button
                     key={c.hex}

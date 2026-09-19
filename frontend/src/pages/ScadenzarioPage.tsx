@@ -100,16 +100,16 @@ export function ScadenzarioPage() {
 
       {/* KPI STRIP */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginBottom: '2rem' }}>
-        <div style={{ background: '#78350f', padding: 20, borderRadius: 12 }}>
-          <div style={{ fontSize: 13, color: '#fcd34d', textTransform: 'uppercase', fontWeight: 600 }}>In Sospeso / Da Incassare</div>
+        <div style={{ background: 'var(--pill-amber-bg)', padding: 20, borderRadius: 12 }}>
+          <div style={{ fontSize: 13, color: 'var(--pill-amber-fg)', textTransform: 'uppercase', fontWeight: 600 }}>In Sospeso / Da Incassare</div>
           <div style={{ fontSize: 24, fontWeight: 700, color: 'white', marginTop: 8 }}>⏳ {fmt(totalSospeso / 100)}</div>
         </div>
-        <div style={{ background: '#7f1d1d', padding: 20, borderRadius: 12 }}>
-          <div style={{ fontSize: 13, color: '#fca5a5', textTransform: 'uppercase', fontWeight: 600 }}>Rate Scadute (In Ritardo)</div>
+        <div style={{ background: 'var(--pill-red-bg)', padding: 20, borderRadius: 12 }}>
+          <div style={{ fontSize: 13, color: 'var(--pill-red-fg)', textTransform: 'uppercase', fontWeight: 600 }}>Rate Scadute (In Ritardo)</div>
           <div style={{ fontSize: 24, fontWeight: 700, color: 'white', marginTop: 8 }}>⚠️ {fmt(totalScaduto / 100)}</div>
         </div>
-        <div style={{ background: '#064e3b', padding: 20, borderRadius: 12 }}>
-          <div style={{ fontSize: 13, color: '#6ee7b7', textTransform: 'uppercase', fontWeight: 600 }}>Incassato Saldate</div>
+        <div style={{ background: 'var(--pill-green-bg)', padding: 20, borderRadius: 12 }}>
+          <div style={{ fontSize: 13, color: 'var(--pill-green-fg)', textTransform: 'uppercase', fontWeight: 600 }}>Incassato Saldate</div>
           <div style={{ fontSize: 24, fontWeight: 700, color: 'white', marginTop: 8 }}>✓ {fmt(totalIncassato / 100)}</div>
         </div>
         <div style={{ background: 'var(--card)', padding: 20, borderRadius: 12, border: '1px solid var(--border)' }}>
@@ -182,9 +182,9 @@ export function ScadenzarioPage() {
 
                   return (
                     <tr key={s.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                      <td style={{ padding: '14px 8px', fontWeight: 600, color: isScaduta ? '#f87171' : 'var(--text)' }}>
+                      <td style={{ padding: '14px 8px', fontWeight: 600, color: isScaduta ? 'var(--pill-red-fg)' : 'var(--text)' }}>
                         {new Date(s.dataScadenza).toLocaleDateString('it-IT')}
-                        {isScaduta && <span style={{ marginLeft: 6, fontSize: 11, color: '#f87171' }}>⚠️ SCADUTA</span>}
+                        {isScaduta && <span style={{ marginLeft: 6, fontSize: 11, color: 'var(--pill-red-fg)' }}>⚠️ SCADUTA</span>}
                       </td>
                       <td style={{ padding: '14px 8px', fontWeight: 600, color: 'var(--primary)' }}>
                         {s.fattura?.numero || 'Fattura'}
@@ -208,8 +208,8 @@ export function ScadenzarioPage() {
                             borderRadius: 6,
                             fontSize: 11,
                             fontWeight: 700,
-                            background: isIncassata ? '#064e3b' : isScaduta ? '#7f1d1d' : '#78350f',
-                            color: isIncassata ? '#6ee7b7' : isScaduta ? '#fca5a5' : '#fcd34d',
+                            background: isIncassata ? 'var(--pill-green-bg)' : isScaduta ? 'var(--pill-red-bg)' : 'var(--pill-amber-bg)',
+                            color: isIncassata ? 'var(--pill-green-fg)' : isScaduta ? 'var(--pill-red-fg)' : 'var(--pill-amber-fg)',
                           }}
                         >
                           {isIncassata ? 'SALDATA' : isScaduta ? 'SCADUTA' : 'IN ATTESA'}

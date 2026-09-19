@@ -95,7 +95,7 @@ export function TabCompany({
           </div>
 
           <div className={styles.field}>
-            <label style={{ color: '#a78bfa', fontWeight: 700 }}>🏢 Indirizzo Sede Operativa / Rappresentanza *</label>
+            <label style={{ color: 'var(--purple)', fontWeight: 700 }}>🏢 Indirizzo Sede Operativa / Rappresentanza *</label>
             <input value={sedeOperativa} onChange={e => setSedeOperativa(e.target.value)} placeholder="Indirizzo uffici operativi..." required />
           </div>
 

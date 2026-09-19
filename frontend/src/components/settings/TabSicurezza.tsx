@@ -152,7 +152,7 @@ export function TabSicurezza({ ruolo }: TabSicurezzaProps) {
     gap: 6,
     background: 'rgba(52,211,153,.12)',
     border: '1px solid rgba(52,211,153,.3)',
-    color: '#34d399',
+    color: 'var(--green)',
     borderRadius: 8,
     padding: '4px 12px',
     fontSize: 12,
@@ -187,12 +187,12 @@ export function TabSicurezza({ ruolo }: TabSicurezzaProps) {
 
       {/* Messaggi di esito */}
       {errore && (
-        <div style={{ background: '#3b1414', border: '1px solid #7f1d1d', color: '#fca5a5', padding: '10px 14px', borderRadius: 8, fontSize: 12 }}>
+        <div style={{ background: 'var(--pill-red-bg)', border: '1px solid var(--pill-red-bg)', color: 'var(--pill-red-fg)', padding: '10px 14px', borderRadius: 8, fontSize: 12 }}>
           ⚠️ {errore}
         </div>
       )}
       {successo && (
-        <div style={{ background: '#0d2d22', border: '1px solid #1a5c3c', color: '#34d399', padding: '10px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600 }}>
+        <div style={{ background: 'var(--pill-green-bg)', border: '1px solid var(--pill-green-bg)', color: 'var(--green)', padding: '10px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600 }}>
           {successo}
         </div>
       )}
@@ -219,7 +219,7 @@ export function TabSicurezza({ ruolo }: TabSicurezzaProps) {
             totpAbilitato ? (
               <button
                 onClick={avviaDisabilitazione}
-                style={{ background: '#7f1d1d', border: '1px solid #b91c1c', color: '#fca5a5', padding: '9px 18px', borderRadius: 9, fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
+                style={{ background: 'var(--pill-red-bg)', border: '1px solid var(--pill-red-bd)', color: 'var(--pill-red-fg)', padding: '9px 18px', borderRadius: 9, fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
               >
                 🔓 Disabilita 2FA
               </button>
@@ -248,7 +248,7 @@ export function TabSicurezza({ ruolo }: TabSicurezzaProps) {
                   {qrUrl ? (
                     <img src={qrUrl} alt="QR Code 2FA TOTP BluMan" width={160} height={160} style={{ display: 'block' }} />
                   ) : (
-                    <div style={{ width: 160, height: 160, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f3f4f6', fontSize: 28 }}>
+                    <div style={{ width: 160, height: 160, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--surface-1)', fontSize: 28 }}>
                       📱
                     </div>
                   )}
@@ -340,7 +340,7 @@ export function TabSicurezza({ ruolo }: TabSicurezzaProps) {
         {faseAttivazione === 'backup_codes' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div style={{ background: 'rgba(251,191,36,.08)', border: '1px solid rgba(251,191,36,.3)', borderRadius: 10, padding: 16 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, fontWeight: 700, color: '#fbbf24' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, fontWeight: 700, color: 'var(--amber)' }}>
                 ⚠️ Salva questi codici di recupero — non li vedrai più!
               </div>
               <p style={{ fontSize: 12, color: 'var(--muted)', margin: '0 0 14px', lineHeight: 1.6 }}>
@@ -358,7 +358,7 @@ export function TabSicurezza({ ruolo }: TabSicurezzaProps) {
               <button
                 type="button"
                 onClick={copiaBackupCodes}
-                style={{ background: backupCopiati ? 'rgba(52,211,153,.15)' : 'var(--bg)', border: '1px solid var(--border)', color: backupCopiati ? '#34d399' : 'var(--muted)', padding: '8px 16px', borderRadius: 8, fontSize: 12, cursor: 'pointer', fontWeight: 600 }}
+                style={{ background: backupCopiati ? 'rgba(52,211,153,.15)' : 'var(--bg)', border: '1px solid var(--border)', color: backupCopiati ? 'var(--green)' : 'var(--muted)', padding: '8px 16px', borderRadius: 8, fontSize: 12, cursor: 'pointer', fontWeight: 600 }}
               >
                 {backupCopiati ? '✓ Copiati!' : '📋 Copia tutti i codici'}
               </button>
@@ -368,7 +368,7 @@ export function TabSicurezza({ ruolo }: TabSicurezzaProps) {
               type="button"
               onClick={completaAttivazione}
               style={{
-                background: '#0d2d22', border: '1px solid #1a5c3c', color: '#34d399',
+                background: 'var(--pill-green-bg)', border: '1px solid var(--pill-green-bg)', color: 'var(--green)',
                 padding: '12px 20px', borderRadius: 9, fontSize: 13, fontWeight: 700, cursor: 'pointer',
               }}
             >
@@ -408,7 +408,7 @@ export function TabSicurezza({ ruolo }: TabSicurezzaProps) {
                 style={{
                   background: 'rgba(239,68,68,.12)',
                   border: '1px solid rgba(239,68,68,.3)',
-                  color: '#f87171',
+                  color: 'var(--pill-red-fg)',
                   padding: '8px 14px',
                   borderRadius: 8,
                   fontSize: 12,
@@ -429,7 +429,7 @@ export function TabSicurezza({ ruolo }: TabSicurezzaProps) {
       {totpAbilitato && faseAttivazione === 'idle' && (
         <div style={{ ...sCard, background: 'rgba(52,211,153,.04)', border: '1px solid rgba(52,211,153,.15)' }}>
           <div style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.8 }}>
-            <div style={{ fontWeight: 600, color: '#34d399', marginBottom: 6 }}>🛡️ Dettagli Sicurezza 2FA Attiva</div>
+            <div style={{ fontWeight: 600, color: 'var(--green)', marginBottom: 6 }}>🛡️ Dettagli Sicurezza 2FA Attiva</div>
             <ul style={{ margin: 0, paddingLeft: 18 }}>
               <li><strong>Compatibilità Apple Passwords:</strong> Puoi salvare l'account direttamente nel Portachiavi iCloud di iPhone, iPad e Mac per la compilazione automatica con Face ID / Touch ID.</li>
               <li><strong>Ricorda IP:</strong> Chi effettua il login dallo stesso IP autenticato accede direttamente con password senza dover ridigitare il TOTP ad ogni sessione.</li>
@@ -454,7 +454,7 @@ export function TabSicurezza({ ruolo }: TabSicurezzaProps) {
             </div>
 
             {errore && (
-              <div style={{ background: '#3b1414', border: '1px solid #7f1d1d', color: '#fca5a5', padding: '8px 12px', borderRadius: 8, fontSize: 12 }}>
+              <div style={{ background: 'var(--pill-red-bg)', border: '1px solid var(--pill-red-bg)', color: 'var(--pill-red-fg)', padding: '8px 12px', borderRadius: 8, fontSize: 12 }}>
                 ⚠️ {errore}
               </div>
             )}
@@ -483,7 +483,7 @@ export function TabSicurezza({ ruolo }: TabSicurezzaProps) {
                 <button
                   type="submit"
                   disabled={disabilitando || !passwordDisabilita}
-                  style={{ flex: 1, background: '#7f1d1d', border: '1px solid #b91c1c', color: '#fca5a5', padding: '10px', borderRadius: 9, fontSize: 13, fontWeight: 700, cursor: 'pointer', opacity: (disabilitando || !passwordDisabilita) ? 0.6 : 1 }}
+                  style={{ flex: 1, background: 'var(--pill-red-bg)', border: '1px solid var(--pill-red-bd)', color: 'var(--pill-red-fg)', padding: '10px', borderRadius: 9, fontSize: 13, fontWeight: 700, cursor: 'pointer', opacity: (disabilitando || !passwordDisabilita) ? 0.6 : 1 }}
                 >
                   {disabilitando ? 'Disabilitazione...' : '🔓 Disabilita 2FA'}
                 </button>

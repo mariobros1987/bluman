@@ -250,8 +250,8 @@ export const LiquidazioneIvaPage: React.FC = () => {
           style={{
             padding: '12px 16px',
             background: 'rgba(239, 68, 68, 0.1)',
-            border: '1px solid #ef4444',
-            color: '#ef4444',
+            border: '1px solid var(--red)',
+            color: 'var(--red)',
             borderRadius: '8px',
             marginBottom: '16px',
             fontSize: '0.9rem',
@@ -266,8 +266,8 @@ export const LiquidazioneIvaPage: React.FC = () => {
           style={{
             padding: '12px 16px',
             background: 'rgba(16, 185, 129, 0.1)',
-            border: '1px solid #10b981',
-            color: '#10b981',
+            border: '1px solid var(--green)',
+            color: 'var(--green)',
             borderRadius: '8px',
             marginBottom: '16px',
             fontSize: '0.9rem',
@@ -282,7 +282,7 @@ export const LiquidazioneIvaPage: React.FC = () => {
       {calcolo && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px', marginBottom: '28px' }}>
           {/* Vendite / Debito */}
-          <div className="card" style={{ padding: '20px 24px', borderLeft: '4px solid #3b82f6' }}>
+          <div className="card" style={{ padding: '20px 24px', borderLeft: '4px solid var(--cat-societario)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
               <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
                 Fatture Attive (Vendite)
@@ -292,7 +292,7 @@ export const LiquidazioneIvaPage: React.FC = () => {
             <div style={{ fontSize: '1.1rem', color: 'var(--text-muted)' }}>
               Imponibile: €{(calcolo.totaleImponibileVenditeCent / 100).toLocaleString('it-IT', { minimumFractionDigits: 2 })}
             </div>
-            <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#3b82f6', marginTop: '6px' }}>
+            <div style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--cat-societario)', marginTop: '6px' }}>
               €{(calcolo.ivaDebitoCent / 100).toLocaleString('it-IT', { minimumFractionDigits: 2 })}
             </div>
             <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px' }}>
@@ -301,7 +301,7 @@ export const LiquidazioneIvaPage: React.FC = () => {
           </div>
 
           {/* Acquisti / Credito */}
-          <div className="card" style={{ padding: '20px 24px', borderLeft: '4px solid #10b981' }}>
+          <div className="card" style={{ padding: '20px 24px', borderLeft: '4px solid var(--green)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
               <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
                 Fatture Passive (Acquisti)
@@ -311,7 +311,7 @@ export const LiquidazioneIvaPage: React.FC = () => {
             <div style={{ fontSize: '1.1rem', color: 'var(--text-muted)' }}>
               Imponibile: €{(calcolo.totaleImponibileAcquistiCent / 100).toLocaleString('it-IT', { minimumFractionDigits: 2 })}
             </div>
-            <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#10b981', marginTop: '6px' }}>
+            <div style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--green)', marginTop: '6px' }}>
               €{(calcolo.ivaCreditoCent / 100).toLocaleString('it-IT', { minimumFractionDigits: 2 })}
             </div>
             <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px' }}>
@@ -324,7 +324,7 @@ export const LiquidazioneIvaPage: React.FC = () => {
             className="card"
             style={{
               padding: '20px 24px',
-              borderLeft: `4px solid ${calcolo.stato === 'debito' ? '#ef4444' : calcolo.stato === 'credito' ? '#10b981' : '#6b7280'}`,
+              borderLeft: `4px solid ${calcolo.stato === 'debito' ? 'var(--red)' : calcolo.stato === 'credito' ? 'var(--green)' : 'var(--muted)'}`,
               background: calcolo.stato === 'debito' ? 'rgba(239, 68, 68, 0.03)' : 'var(--card)',
             }}
           >
@@ -341,7 +341,7 @@ export const LiquidazioneIvaPage: React.FC = () => {
               style={{
                 fontSize: '1.8rem',
                 fontWeight: 800,
-                color: calcolo.stato === 'debito' ? '#ef4444' : calcolo.stato === 'credito' ? '#10b981' : 'var(--text)',
+                color: calcolo.stato === 'debito' ? 'var(--red)' : calcolo.stato === 'credito' ? 'var(--green)' : 'var(--text)',
                 marginTop: '6px',
               }}
             >
@@ -365,7 +365,7 @@ export const LiquidazioneIvaPage: React.FC = () => {
                     padding: '4px 10px',
                     borderRadius: '6px',
                     background: 'rgba(16, 185, 129, 0.15)',
-                    color: '#10b981',
+                    color: 'var(--green)',
                     fontSize: '0.85rem',
                     fontWeight: 700,
                   }}
@@ -426,7 +426,7 @@ export const LiquidazioneIvaPage: React.FC = () => {
                     </td>
                     <td style={{ padding: '12px 14px' }}>{r.annoRiferimento}</td>
                     <td style={{ padding: '12px 14px' }}>{r.descrizione}</td>
-                    <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: 800, color: '#ef4444', fontSize: '1.05rem' }}>
+                    <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: 800, color: 'var(--red)', fontSize: '1.05rem' }}>
                       €{(r.importoDebitoCent / 100).toLocaleString('it-IT', { minimumFractionDigits: 2 })}
                     </td>
                   </tr>
@@ -472,18 +472,18 @@ export const LiquidazioneIvaPage: React.FC = () => {
                         padding: '12px 14px',
                         textAlign: 'right',
                         fontWeight: 800,
-                        color: s.saldoCentesimi > 0 ? '#ef4444' : '#10b981',
+                        color: s.saldoCentesimi > 0 ? 'var(--red)' : 'var(--green)',
                       }}
                     >
                       €{(s.saldoCentesimi / 100).toFixed(2)}
                     </td>
                     <td style={{ padding: '12px 14px', textAlign: 'center' }}>
                       {s.versata ? (
-                        <span style={{ padding: '3px 8px', borderRadius: '6px', background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', fontWeight: 600, fontSize: '0.8rem' }}>
+                        <span style={{ padding: '3px 8px', borderRadius: '6px', background: 'rgba(16, 185, 129, 0.15)', color: 'var(--green)', fontWeight: 600, fontSize: '0.8rem' }}>
                           ✓ Versata ({s.dataVersamento ? new Date(s.dataVersamento).toLocaleDateString('it-IT') : ''})
                         </span>
                       ) : (
-                        <span style={{ padding: '3px 8px', borderRadius: '6px', background: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b', fontWeight: 600, fontSize: '0.8rem' }}>
+                        <span style={{ padding: '3px 8px', borderRadius: '6px', background: 'rgba(245, 158, 11, 0.15)', color: 'var(--amber)', fontWeight: 600, fontSize: '0.8rem' }}>
                           ⏳ Da Versare
                         </span>
                       )}
@@ -521,7 +521,7 @@ export const LiquidazioneIvaPage: React.FC = () => {
                 }}
               >
                 <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Periodo di Riferimento: {periodoCodice}</div>
-                <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#ef4444', marginTop: '4px' }}>
+                <div style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--red)', marginTop: '4px' }}>
                   Importo da Versare: €{((calcolo?.importoDaVersareCent || 0) / 100).toFixed(2)}
                 </div>
               </div>

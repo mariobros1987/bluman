@@ -55,7 +55,7 @@ export function ModaleCatalogo({
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text)' }}>📄 {t.titolo}</span>
-                        <span style={{ fontSize: 9.5, padding: '2px 6px', borderRadius: 8, background: '#312e81', color: '#c7d2fe', textTransform: 'uppercase', fontWeight: 700 }}>
+                        <span style={{ fontSize: 9.5, padding: '2px 6px', borderRadius: 8, background: 'var(--pill-indigo-bg)', color: 'var(--pill-indigo-fg)', textTransform: 'uppercase', fontWeight: 700 }}>
                           {t.categoria}
                         </span>
                       </div>

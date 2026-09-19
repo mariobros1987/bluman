@@ -46,7 +46,7 @@ export function MagicLinkExplainModal({ client, onClose }: { client: Cliente; on
           <button onClick={onClose} style={{ background: 'var(--card2)', border: 'none', width: 26, height: 26, borderRadius: 6, color: 'var(--muted)', cursor: 'pointer' }}>✕</button>
         </div>
 
-        <div style={{ background: '#1a1f3d', border: '1px solid #2d3260', borderRadius: 10, padding: 14, fontSize: 11.5, color: '#818cf8', lineHeight: 1.5 }}>
+        <div style={{ background: 'var(--surface-1)', border: '1px solid var(--card2)', borderRadius: 10, padding: 14, fontSize: 11.5, color: 'var(--indigo-l)', lineHeight: 1.5 }}>
           ℹ️ <strong>Come avviene l'accettazione del cliente (§15, §23):</strong>
           <ul style={{ paddingLeft: 18, marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
             <li>Il cliente <strong>non usa password</strong>: accede tramite un <strong>Magic Link sicuro</strong> univoco.</li>
@@ -77,7 +77,7 @@ export function MagicLinkExplainModal({ client, onClose }: { client: Cliente; on
         </div>
 
         {errore && (
-          <div style={{ background: '#3d1a1f', border: '1px solid #602d32', borderRadius: 10, padding: 12, fontSize: 11.5, color: '#f87171' }}>
+          <div style={{ background: 'var(--pill-red-bg)', border: '1px solid var(--pill-red-bg)', borderRadius: 10, padding: 12, fontSize: 11.5, color: 'var(--pill-red-fg)' }}>
             ⚠️ {errore}
           </div>
         )}
@@ -106,7 +106,7 @@ export function MagicLinkExplainModal({ client, onClose }: { client: Cliente; on
                 controllare impostazioni che possono essere già corrette, mentre il testo del
                 server dice se è la porta bloccata o la password rifiutata. */}
             {!risultato.sent && risultato.erroreInvio && (
-              <div style={{ background: '#3d1a1f', border: '1px solid #602d32', borderRadius: 10, padding: 10, fontSize: 10.5, color: '#f87171', marginTop: 8 }}>
+              <div style={{ background: 'var(--pill-red-bg)', border: '1px solid var(--pill-red-bg)', borderRadius: 10, padding: 10, fontSize: 10.5, color: 'var(--pill-red-fg)', marginTop: 8 }}>
                 Motivo tecnico dell'invio mancato: {risultato.erroreInvio}
               </div>
             )}

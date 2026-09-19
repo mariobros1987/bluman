@@ -280,8 +280,8 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {/* §2.3 — proposte di modifica inviate dal cliente dal portale */}
             {proposteInAttesa.length > 0 && (
-              <div style={{ background: '#2b2410', border: '1px solid #8a6d1a', borderRadius: 10, padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: '#fcd34d' }}>
+              <div style={{ background: 'var(--pill-amber-bg)', border: '1px solid var(--pill-amber-bd)', borderRadius: 10, padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--pill-amber-fg)' }}>
                   📨 Proposte di modifica inviate dal cliente ({proposteInAttesa.length})
                 </div>
                 {proposteInAttesa.map((p) => (
@@ -292,7 +292,7 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
                         <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
                           Attuale: <b style={{ color: 'var(--text)' }}>{p.valoreAttuale || '—'}</b>
                           {'  →  '}
-                          Proposto: <b style={{ color: '#fcd34d' }}>{p.valoreProposto}</b>
+                          Proposto: <b style={{ color: 'var(--pill-amber-fg)' }}>{p.valoreProposto}</b>
                         </div>
                         {p.notaCliente && (
                           <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>Nota del cliente: {p.notaCliente}</div>
@@ -303,7 +303,7 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
                           type="button"
                           disabled={propostaInAzione === p.id}
                           onClick={() => { void confermaProposta(p); }}
-                          style={{ background: '#14532d', border: '1px solid #16a34a', color: '#bbf7d0', padding: '5px 12px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: propostaInAzione === p.id ? 'default' : 'pointer' }}
+                          style={{ background: 'var(--pill-green-bg)', border: '1px solid var(--green)', color: 'var(--pill-green-fg)', padding: '5px 12px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: propostaInAzione === p.id ? 'default' : 'pointer' }}
                         >
                           ✓ Conferma
                         </button>
@@ -311,7 +311,7 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
                           type="button"
                           disabled={propostaInAzione === p.id}
                           onClick={() => { setRifiutoId(rifiutoId === p.id ? null : p.id); setNotaRifiuto(''); }}
-                          style={{ background: '#450a0a', border: '1px solid #b91c1c', color: '#fecaca', padding: '5px 12px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: propostaInAzione === p.id ? 'default' : 'pointer' }}
+                          style={{ background: 'var(--pill-red-bg)', border: '1px solid var(--pill-red-bd)', color: 'var(--pill-red-fg)', padding: '5px 12px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: propostaInAzione === p.id ? 'default' : 'pointer' }}
                         >
                           ⛔ Rifiuta
                         </button>
@@ -329,7 +329,7 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
                           type="button"
                           disabled={propostaInAzione === p.id}
                           onClick={() => { void rifiutaProposta(p); }}
-                          style={{ background: '#b91c1c', border: 'none', color: '#fff', padding: '6px 14px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: propostaInAzione === p.id ? 'default' : 'pointer' }}
+                          style={{ background: 'var(--red)', border: 'none', color: '#fff', padding: '6px 14px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: propostaInAzione === p.id ? 'default' : 'pointer' }}
                         >
                           {propostaInAzione === p.id ? 'Invio…' : 'Conferma rifiuto'}
                         </button>
@@ -398,9 +398,9 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
               <a
                 href="/projects"
                 style={{
-                  background: '#1e1b4b',
-                  border: '1px solid #4338ca',
-                  color: '#c7d2fe',
+                  background: 'var(--pill-indigo-bg)',
+                  border: '1px solid var(--indigo-d)',
+                  color: 'var(--pill-indigo-fg)',
                   padding: '5px 12px',
                   borderRadius: 6,
                   fontSize: 11,
@@ -449,9 +449,9 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
                             fontWeight: 800,
                             padding: '3px 8px',
                             borderRadius: 6,
-                            background: isDone ? '#0d2d22' : '#1e1b4b',
-                            color: isDone ? '#34d399' : '#a5b4fc',
-                            border: `1px solid ${isDone ? '#10b981' : '#4338ca'}`,
+                            background: isDone ? 'var(--pill-green-bg)' : 'var(--pill-indigo-bg)',
+                            color: isDone ? 'var(--green)' : 'var(--pill-indigo-fg)',
+                            border: `1px solid ${isDone ? 'var(--green)' : 'var(--indigo-d)'}`,
                           }}
                         >
                           {isDone ? '✓ Completato' : p.stato === 'in_progress' ? '⏱ In Lavorazione' : '📋 Pre-Project'}
@@ -465,7 +465,7 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
                           <strong style={{ color: 'var(--text)' }}>{perc}%</strong>
                         </div>
                         <div style={{ height: 6, width: '100%', background: 'var(--card2)', borderRadius: 3, overflow: 'hidden' }}>
-                          <div style={{ height: '100%', width: `${perc}%`, background: isDone ? '#10b981' : 'var(--indigo)', borderRadius: 3 }} />
+                          <div style={{ height: '100%', width: `${perc}%`, background: isDone ? 'var(--green)' : 'var(--indigo)', borderRadius: 3 }} />
                         </div>
                       </div>
 
@@ -645,7 +645,7 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
               <input value={iban} onChange={e => setIban(e.target.value)} style={{ fontFamily: 'monospace', fontSize: 12.5 }} required />
             </div>
 
-            <div style={{ background: '#0d2d22', border: '1px solid #1a5c3c', borderRadius: 10, padding: 12, fontSize: 11, color: '#34d399' }}>
+            <div style={{ background: 'var(--pill-green-bg)', border: '1px solid var(--pill-green-bg)', borderRadius: 10, padding: 12, fontSize: 11, color: 'var(--green)' }}>
               ✓ Collegato al nodo di trasmissione <strong>Comped Servizi FPA (SDI)</strong>.
             </div>
           </div>
@@ -694,7 +694,7 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
 }
 
 const tabBtn = (active: boolean): React.CSSProperties => ({
-  background: active ? '#1a1f3d' : 'transparent',
+  background: active ? 'var(--surface-1)' : 'transparent',
   border: 'none',
   borderBottom: active ? '2px solid var(--indigo-l)' : '2px solid transparent',
   color: active ? 'var(--indigo-l)' : 'var(--muted)',

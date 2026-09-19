@@ -23,18 +23,18 @@ export function SuccessSealModal({
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 12000, padding: 16 }}>
-      <div style={{ background: 'var(--sidebar)', border: '1.5px solid #10b981', borderRadius: 20, width: '100%', maxWidth: 580, maxHeight: '90vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', boxShadow: '0 25px 70px rgba(16,185,129,0.25)' }}>
+      <div style={{ background: 'var(--sidebar)', border: '1.5px solid var(--green)', borderRadius: 20, width: '100%', maxWidth: 580, maxHeight: '90vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', boxShadow: '0 25px 70px rgba(16,185,129,0.25)' }}>
         {/* Header Sigillo */}
-        <div style={{ background: 'linear-gradient(135deg, #064e3b 0%, #022c22 100%)', padding: '20px 24px', borderBottom: '1px solid #059669', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div style={{ background: 'linear-gradient(135deg, var(--pill-green-bg) 0%, var(--pill-green-bg) 100%)', padding: '20px 24px', borderBottom: '1px solid var(--green)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ width: 44, height: 44, borderRadius: 12, background: '#10b981', color: '#064e3b', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, fontWeight: 900, boxShadow: '0 4px 14px rgba(16,185,129,0.4)' }}>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: 'var(--green)', color: 'var(--pill-green-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, fontWeight: 900, boxShadow: '0 4px 14px rgba(16,185,129,0.4)' }}>
               ✓
             </div>
             <div>
-              <div style={{ fontSize: 16, fontWeight: 800, color: '#ecfdf5' }}>
+              <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--pill-green-bg)' }}>
                 Documento Sottoscritto con Successo
               </div>
-              <div style={{ fontSize: 11, color: '#6ee7b7', fontWeight: 600, marginTop: 2 }}>
+              <div style={{ fontSize: 11, color: 'var(--pill-green-fg)', fontWeight: 600, marginTop: 2 }}>
                 {SOTTOTITOLO_RICEVUTA[livello]}
               </div>
             </div>
@@ -42,7 +42,7 @@ export function SuccessSealModal({
           <button
             type="button"
             onClick={() => setSuccessSealModal(null)}
-            style={{ background: 'transparent', border: 'none', color: '#a7f3d0', fontSize: 18, cursor: 'pointer', padding: 4 }}
+            style={{ background: 'transparent', border: 'none', color: 'var(--pill-green-fg)', fontSize: 18, cursor: 'pointer', padding: 4 }}
           >
             ✕
           </button>
@@ -60,7 +60,7 @@ export function SuccessSealModal({
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>
               <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>Firmatario:</span>
-              <span style={{ fontSize: 12, fontWeight: 700, color: '#c7d2fe' }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--pill-indigo-fg)' }}>
                 👤 {successSealModal.signerName || clientName}
               </span>
             </div>
@@ -74,7 +74,7 @@ export function SuccessSealModal({
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>
               <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>Signature ID / Sigillo Univoco:</span>
-              <span style={{ fontSize: 11.5, fontFamily: 'monospace', fontWeight: 800, color: '#34d399', background: '#064e3b', padding: '2px 8px', borderRadius: 6 }}>
+              <span style={{ fontSize: 11.5, fontFamily: 'monospace', fontWeight: 800, color: 'var(--green)', background: 'var(--pill-green-bg)', padding: '2px 8px', borderRadius: 6 }}>
                 🔑 {successSealModal.signatureId}
               </span>
             </div>
@@ -98,7 +98,7 @@ export function SuccessSealModal({
             {successSealModal.documentoHash && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 <span style={{ fontSize: 10.5, color: 'var(--muted)', fontWeight: 600 }}>Impronta Crittografica SHA-256 (Integrità Documento):</span>
-                <span style={{ fontSize: 10, fontFamily: 'monospace', color: '#94a3b8', background: '#090d16', padding: '6px 8px', borderRadius: 6, wordBreak: 'break-all' }}>
+                <span style={{ fontSize: 10, fontFamily: 'monospace', color: 'var(--muted)', background: 'var(--surface-2)', padding: '6px 8px', borderRadius: 6, wordBreak: 'break-all' }}>
                   {successSealModal.documentoHash}
                 </span>
               </div>
@@ -106,8 +106,8 @@ export function SuccessSealModal({
 
             {/* Se è stata apposta la firma grafometrica visiva */}
             {successSealModal.firmaGrafometricaPng && (
-              <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 6, background: '#ffffff', padding: 12, borderRadius: 8, border: '1px solid #cbd5e1' }}>
-                <span style={{ fontSize: 10, fontWeight: 800, color: '#1e1b4b', textTransform: 'uppercase' }}>
+              <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 6, background: '#ffffff', padding: 12, borderRadius: 8, border: '1px solid var(--pill-slate-fg)' }}>
+                <span style={{ fontSize: 10, fontWeight: 800, color: 'var(--pill-indigo-bg)', textTransform: 'uppercase' }}>
                   Tratto Grafometrico Sottoscritto:
                 </span>
                 <img
@@ -147,7 +147,7 @@ export function SuccessSealModal({
                   const nomeBase = (successSealModal.documentoTitolo || 'Documento_Firmato').replace(/[^a-zA-Z0-9_-]/g, '_');
                   await scaricaDocumentoClient(successSealModal.fileUrl, estensione ? `${nomeBase}.${estensione}` : `${nomeBase}_firmato`);
                 }}
-                style={{ background: '#059669', color: '#fff', border: 'none', padding: '9px 16px', borderRadius: 10, fontSize: 11.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+                style={{ background: 'var(--green)', color: '#fff', border: 'none', padding: '9px 16px', borderRadius: 10, fontSize: 11.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
               >
                 ✍️ Atto firmato
               </button>
@@ -157,7 +157,7 @@ export function SuccessSealModal({
                 <button
                   type="button"
                   onClick={() => scaricaDocumentoPortaleApi(successSealModal.documentoId, 'docx', clienteId || successSealModal.clienteId)}
-                  style={{ background: '#1e1b4b', border: '1px solid #3b82f6', color: '#93c5fd', padding: '9px 16px', borderRadius: 10, fontSize: 11.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+                  style={{ background: 'var(--pill-indigo-bg)', border: '1px solid var(--indigo-l)', color: 'var(--pill-blue-fg)', padding: '9px 16px', borderRadius: 10, fontSize: 11.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
                 >
                   📝 Copia Word (.docx)
                 </button>

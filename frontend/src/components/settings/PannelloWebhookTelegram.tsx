@@ -77,7 +77,7 @@ export function PannelloWebhookTelegram({
         onClick={aggiorna}
         disabled={loading || senzaToken}
         title={senzaToken ? 'Salva prima il Bot Token' : 'Leggi stato ricezione da Telegram'}
-        style={{ background: '#0e4d78', color: '#fff', border: 'none', padding: '5px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+        style={{ background: 'var(--cat-societario)', color: '#fff', border: 'none', padding: '5px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
       >
         {loading ? '⏳' : '📡 Stato Webhook'}
       </button>
@@ -86,33 +86,33 @@ export function PannelloWebhookTelegram({
         onClick={registra}
         disabled={registrando || senzaToken}
         title={senzaToken ? 'Salva prima il Bot Token' : 'Registra (o aggiorna) il webhook presso Telegram'}
-        style={{ background: webhookAttivo ? '#065f46' : '#7c2d12', color: '#fff', border: 'none', padding: '5px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+        style={{ background: webhookAttivo ? 'var(--green)' : 'var(--amber)', color: '#fff', border: 'none', padding: '5px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
       >
         {registrando ? 'Registrando...' : webhookAttivo ? '🔄 Aggiorna Webhook' : '🔗 Registra Webhook'}
       </button>
 
       {esito && (
-        <div style={{ marginTop: 8, padding: '8px 12px', borderRadius: 8, fontSize: 11.5, background: esito.ok ? '#052e16' : '#450a0a', color: esito.ok ? '#34d399' : '#fca5a5', border: `1px solid ${esito.ok ? '#166534' : '#991b1b'}` }}>
+        <div style={{ marginTop: 8, padding: '8px 12px', borderRadius: 8, fontSize: 11.5, background: esito.ok ? 'var(--pill-green-bg)' : 'var(--pill-red-bg)', color: esito.ok ? 'var(--green)' : 'var(--pill-red-fg)', border: `1px solid ${esito.ok ? 'var(--pill-green-bd)' : 'var(--pill-red-bd)'}` }}>
           {esito.testo}
         </div>
       )}
 
       {info && (
-        <div style={{ marginTop: 8, padding: '10px 12px', borderRadius: 8, fontSize: 11, background: '#0c1a2e', border: '1px solid #1e3a5f' }}>
-          <div style={{ marginBottom: 4, fontWeight: 700, color: '#38bdf8' }}>Stato webhook Telegram</div>
+        <div style={{ marginTop: 8, padding: '10px 12px', borderRadius: 8, fontSize: 11, background: 'var(--surface-1)', border: '1px solid var(--pill-blue-bg)' }}>
+          <div style={{ marginBottom: 4, fontWeight: 700, color: 'var(--cat-societario)' }}>Stato webhook Telegram</div>
           <div>
             <span style={{ color: 'var(--muted)' }}>URL registrato: </span>
             {info.webhookUrl
-              ? <span style={{ color: '#34d399' }}>✅ {info.webhookUrl}</span>
-              : <span style={{ color: '#f87171' }}>❌ Non registrato — i messaggi non arriveranno</span>}
+              ? <span style={{ color: 'var(--green)' }}>✅ {info.webhookUrl}</span>
+              : <span style={{ color: 'var(--pill-red-fg)' }}>❌ Non registrato — i messaggi non arriveranno</span>}
           </div>
           <div>
             <span style={{ color: 'var(--muted)' }}>Messaggi in coda: </span>
-            <span style={{ color: info.pendingUpdateCount > 0 ? '#fbbf24' : '#34d399' }}>{info.pendingUpdateCount}</span>
-            {info.pendingUpdateCount > 0 && <span style={{ color: '#fbbf24' }}> — Telegram li consegnerà al prossimo aggiornamento</span>}
+            <span style={{ color: info.pendingUpdateCount > 0 ? 'var(--amber)' : 'var(--green)' }}>{info.pendingUpdateCount}</span>
+            {info.pendingUpdateCount > 0 && <span style={{ color: 'var(--amber)' }}> — Telegram li consegnerà al prossimo aggiornamento</span>}
           </div>
           {info.lastErrorMessage && (
-            <div style={{ marginTop: 4, color: '#f87171' }}>
+            <div style={{ marginTop: 4, color: 'var(--pill-red-fg)' }}>
               ⚠️ Ultimo errore: {info.lastErrorMessage}
               {info.lastErrorDate && <span style={{ color: 'var(--muted)', marginLeft: 4 }}>({new Date(info.lastErrorDate * 1000).toLocaleString('it-IT')})</span>}
             </div>

@@ -51,7 +51,7 @@ export function DocumentViewerModal({
 
         {/* Il file dell'archivio, mostrato per quello che è.
             Se firmato, mostra la copia sottoscritta con la firma incastonata. */}
-        <div style={{ flex: 1, overflow: 'hidden', padding: 16, background: '#0f172a', display: 'flex', justifyContent: 'center' }}>
+        <div style={{ flex: 1, overflow: 'hidden', padding: 16, background: 'var(--surface-2)', display: 'flex', justifyContent: 'center' }}>
           {(() => {
             const url = urlFileArchivio(selectedViewerDoc.fileFirmatoUrl || selectedViewerDoc.filePdfUrl || selectedViewerDoc.fileUrl);
 
@@ -83,7 +83,7 @@ export function DocumentViewerModal({
                 <button
                   type="button"
                   onClick={() => scaricaDocumentoPortaleApi(selectedViewerDoc.id, selectedViewerDoc.firmato ? 'firmato' : 'pdf', clienteId)}
-                  style={{ background: selectedViewerDoc.firmato ? '#064e3b' : '#1a1f3d', border: selectedViewerDoc.firmato ? '1px solid #10b981' : '1px solid #4338ca', color: selectedViewerDoc.firmato ? '#6ee7b7' : '#c7d2fe', padding: '8px 14px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+                  style={{ background: selectedViewerDoc.firmato ? 'var(--pill-green-bg)' : 'var(--surface-1)', border: selectedViewerDoc.firmato ? '1px solid var(--green)' : '1px solid var(--indigo-d)', color: selectedViewerDoc.firmato ? 'var(--pill-green-fg)' : 'var(--pill-indigo-fg)', padding: '8px 14px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
                   title={selectedViewerDoc.firmato ? "Scarica l'atto sottoscritto con la firma del cliente" : "Scarica il PDF master generato dal motore"}
                 >
                   {selectedViewerDoc.firmato ? '📥 Scarica Atto Firmato (PDF)' : '📥 Scarica PDF A4'}
@@ -92,7 +92,7 @@ export function DocumentViewerModal({
                   <button
                     type="button"
                     onClick={() => scaricaDocumentoPortaleApi(selectedViewerDoc.id, 'docx', clienteId)}
-                    style={{ background: '#1e1b4b', border: '1px solid #3b82f6', color: '#93c5fd', padding: '8px 14px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+                    style={{ background: 'var(--pill-indigo-bg)', border: '1px solid var(--indigo-l)', color: 'var(--pill-blue-fg)', padding: '8px 14px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
                     title="Scarica la copia Word (.docx) generata dal motore server-side"
                   >
                     📝 Scarica Word (.docx)
@@ -110,7 +110,7 @@ export function DocumentViewerModal({
                   setModificaDocTarget(selectedViewerDoc);
                   setModificaDocTesto('');
                 }}
-                style={{ background: '#27272a', border: '1px solid #52525b', color: '#fbbf24', padding: '8px 16px', borderRadius: 8, fontSize: 11.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+                style={{ background: 'var(--pill-slate-bg)', border: '1px solid var(--hint)', color: 'var(--amber)', padding: '8px 16px', borderRadius: 8, fontSize: 11.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
                 title="Invia note o chiedi modifiche allo studio prima di firmare"
               >
                 📝 Richiedi Modifiche
@@ -128,14 +128,14 @@ export function DocumentViewerModal({
             </button>
 
             {selectedViewerDoc.firmatoDaStudio && (
-              <div style={{ background: '#0c4a6e', border: '1px solid #0284c7', color: '#38bdf8', padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{ background: 'var(--pill-sky-bg)', border: '1px solid var(--cat-societario)', color: 'var(--cat-societario)', padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
                 🏛️ Firmato dallo Studio: {selectedViewerDoc.firmaStudio?.firmatarioNome || 'Advisor'}
               </div>
             )}
 
             {selectedViewerDoc.firmato ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <div style={{ background: '#0d2d22', border: '1px solid #1a5c3c', color: '#34d399', padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 700 }}>
+                <div style={{ background: 'var(--pill-green-bg)', border: '1px solid var(--pill-green-bg)', color: 'var(--green)', padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 700 }}>
                   ✓ Documento già sottoscritto{selectedViewerDoc.dataFirma ? ` il ${dataOraLeggibile(selectedViewerDoc.dataFirma)}` : ''}
                 </div>
                 {/* Fix firma — l'atto sottoscritto, distinto dal PDF master: la rotta
@@ -146,7 +146,7 @@ export function DocumentViewerModal({
                   <button
                     type="button"
                     onClick={() => scaricaDocumentoPortaleApi(selectedViewerDoc.id, 'firmato', clienteId)}
-                    style={{ background: '#059669', color: '#fff', border: 'none', padding: '8px 14px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                    style={{ background: 'var(--green)', color: '#fff', border: 'none', padding: '8px 14px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
                     title="Scarica l'atto come sottoscritto (file firmato caricato oppure copia con la firma incastonata), distinto dal PDF master e dalla ricevuta di firma"
                   >
                     ✍️ Atto firmato
@@ -175,14 +175,14 @@ export function DocumentViewerModal({
                       clienteId: clienteId,
                     });
                   }}
-                  style={{ background: '#1e1b4b', border: '1px solid #6366f1', color: '#c7d2fe', padding: '8px 14px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                  style={{ background: 'var(--pill-indigo-bg)', border: '1px solid var(--indigo)', color: 'var(--pill-indigo-fg)', padding: '8px 14px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
                 >
                   📜 Ricevuta di firma
                 </button>
               </div>
             ) : selectedViewerDoc.tipo === 'verbale_firma' ? (
               /* Punto 2 piano gap — il verbale non si firma: attesta una firma già apposta. */
-              <div style={{ background: '#1e1b4b', border: '1px solid #4338ca', color: '#a5b4fc', padding: '8px 16px', borderRadius: 8, fontSize: 11.5, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{ background: 'var(--pill-indigo-bg)', border: '1px solid var(--indigo-d)', color: 'var(--pill-indigo-fg)', padding: '8px 16px', borderRadius: 8, fontSize: 11.5, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
                 📜 Atto certificativo · si consulta e si scarica
               </div>
             ) : (

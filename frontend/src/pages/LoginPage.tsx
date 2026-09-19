@@ -143,7 +143,7 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
         */}
 
         {error && (
-          <div style={{ background: '#3b1414', border: '1px solid #7f1d1d', color: '#fca5a5', padding: '10px 14px', borderRadius: 8, fontSize: 12 }}>
+          <div style={{ background: 'var(--pill-red-bg)', border: '1px solid var(--pill-red-bg)', color: 'var(--pill-red-fg)', padding: '10px 14px', borderRadius: 8, fontSize: 12 }}>
             ⚠️ {error}
           </div>
         )}
@@ -221,9 +221,9 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
             </div>
 
             {/* Countdown */}
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, fontSize: 12, color: secondiRimanenti < 30 ? '#f87171' : 'var(--muted)' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, fontSize: 12, color: secondiRimanenti < 30 ? 'var(--pill-red-fg)' : 'var(--muted)' }}>
               <span>⏱ Sessione temporanea scade tra:</span>
-              <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 14, color: secondiRimanenti < 30 ? '#f87171' : 'var(--text)' }}>{mm}:{ss}</span>
+              <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 14, color: secondiRimanenti < 30 ? 'var(--pill-red-fg)' : 'var(--text)' }}>{mm}:{ss}</span>
             </div>
 
             <div>

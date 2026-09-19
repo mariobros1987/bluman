@@ -36,13 +36,13 @@ function ProtectedModule({ user, moduleKey, element }: { user: any; moduleKey: s
     return (
       <div style={{ padding: '60px 24px', textAlign: 'center', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, margin: 24 }}>
         <div style={{ fontSize: 56, marginBottom: 16 }}>🚫</div>
-        <h2 style={{ color: '#f87171', margin: '0 0 10px 0', fontSize: 20 }}>Modulo Bloccato per questo Utente</h2>
+        <h2 style={{ color: 'var(--red)', margin: '0 0 10px 0', fontSize: 20 }}>Modulo Bloccato per questo Utente</h2>
         <p style={{ color: 'var(--muted)', fontSize: 13, maxWidth: 520, margin: '0 auto 24px auto', lineHeight: 1.6 }}>
-          Il tuo profilo (<strong>{user?.nome || user?.email}</strong>) non dispone dei permessi di accesso per visualizzare la sezione <code>{moduleKey}</code> (impostata su <span style={{ color: '#ef4444', fontWeight: 700 }}>BLOCCATO</span> nella Matrice Permessi RBAC dello studio).
+          Il tuo profilo (<strong>{user?.nome || user?.email}</strong>) non dispone dei permessi di accesso per visualizzare la sezione <code>{moduleKey}</code> (impostata su <span style={{ color: 'var(--red)', fontWeight: 700 }}>BLOCCATO</span> nella Matrice Permessi RBAC dello studio).
         </p>
         <button
           onClick={() => window.history.back()}
-          style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '10px 22px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+          style={{ background: 'var(--indigo)', color: 'var(--on-accent)', border: 'none', padding: '10px 22px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
         >
           ← Torna alla Sezione Precedente
         </button>

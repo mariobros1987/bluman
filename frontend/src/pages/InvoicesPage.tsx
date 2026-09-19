@@ -434,9 +434,9 @@ export function InvoicesPage() {
             style={{
               padding: '10px 16px',
               borderRadius: 8,
-              border: '1px solid #1e40af',
-              background: '#1e3a8a',
-              color: '#93c5fd',
+              border: '1px solid var(--pill-blue-bd)',
+              background: 'var(--pill-blue-bg)',
+              color: 'var(--pill-blue-fg)',
               fontWeight: 700,
               cursor: 'pointer',
               display: 'flex',
@@ -478,20 +478,20 @@ export function InvoicesPage() {
 
       {/* KPI STRIP */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginBottom: '2rem' }}>
-        <div style={{ background: '#1e3a8a', padding: 20, borderRadius: 12 }}>
-          <div style={{ fontSize: 13, color: '#93c5fd', textTransform: 'uppercase', fontWeight: 600 }}>Totale Fatturato Emesso</div>
+        <div style={{ background: 'var(--pill-blue-bg)', padding: 20, borderRadius: 12 }}>
+          <div style={{ fontSize: 13, color: 'var(--pill-blue-fg)', textTransform: 'uppercase', fontWeight: 600 }}>Totale Fatturato Emesso</div>
           <div style={{ fontSize: 24, fontWeight: 700, color: 'white', marginTop: 8 }}>💶 {fmt(totalEmessoCent / 100)}</div>
         </div>
-        <div style={{ background: '#064e3b', padding: 20, borderRadius: 12 }}>
-          <div style={{ fontSize: 13, color: '#6ee7b7', textTransform: 'uppercase', fontWeight: 600 }}>Incassato Saldate</div>
+        <div style={{ background: 'var(--pill-green-bg)', padding: 20, borderRadius: 12 }}>
+          <div style={{ fontSize: 13, color: 'var(--pill-green-fg)', textTransform: 'uppercase', fontWeight: 600 }}>Incassato Saldate</div>
           <div style={{ fontSize: 24, fontWeight: 700, color: 'white', marginTop: 8 }}>✓ {fmt(totalIncassatoCent / 100)}</div>
         </div>
-        <div style={{ background: '#78350f', padding: 20, borderRadius: 12 }}>
-          <div style={{ fontSize: 13, color: '#fcd34d', textTransform: 'uppercase', fontWeight: 600 }}>In Sospeso / Da Incassare</div>
+        <div style={{ background: 'var(--pill-amber-bg)', padding: 20, borderRadius: 12 }}>
+          <div style={{ fontSize: 13, color: 'var(--pill-amber-fg)', textTransform: 'uppercase', fontWeight: 600 }}>In Sospeso / Da Incassare</div>
           <div style={{ fontSize: 24, fontWeight: 700, color: 'white', marginTop: 8 }}>⏳ {fmt(totalSospesoCent / 100)}</div>
         </div>
-        <div style={{ background: '#451a03', padding: 20, borderRadius: 12 }}>
-          <div style={{ fontSize: 13, color: '#fca5a5', textTransform: 'uppercase', fontWeight: 600 }}>Note di Credito Emesse</div>
+        <div style={{ background: 'var(--pill-amber-bg)', padding: 20, borderRadius: 12 }}>
+          <div style={{ fontSize: 13, color: 'var(--pill-red-fg)', textTransform: 'uppercase', fontWeight: 600 }}>Note di Credito Emesse</div>
           <div style={{ fontSize: 24, fontWeight: 700, color: 'white', marginTop: 8 }}>📉 {fmt(totalNcCent / 100)}</div>
         </div>
       </div>
@@ -519,7 +519,7 @@ export function InvoicesPage() {
           </select>
         </div>
 
-        {errore && <div style={{ padding: 12, marginBottom: 12, borderRadius: 8, background: '#7f1d1d', color: '#fecaca' }}>{errore}</div>}
+        {errore && <div style={{ padding: 12, marginBottom: 12, borderRadius: 8, background: 'var(--pill-red-bg)', color: 'var(--pill-red-fg)' }}>{errore}</div>}
         {loading ? (
           <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted)' }}>Caricamento registro fatture dal database...</div>
         ) : (
@@ -551,17 +551,17 @@ export function InvoicesPage() {
                   const isIncassata = inv.stato === 'incassata';
 
                   const badgeColor = isBozza
-                    ? { bg: '#374151', text: '#d1d5db', label: 'BOZZA' }
+                    ? { bg: 'var(--border)', text: 'var(--border)', label: 'BOZZA' }
                     : isEmessa
-                    ? { bg: '#78350f', text: '#fcd34d', label: 'DA INCASSARE' }
+                    ? { bg: 'var(--pill-amber-bg)', text: 'var(--pill-amber-fg)', label: 'DA INCASSARE' }
                     : isIncassata
-                    ? { bg: '#064e3b', text: '#6ee7b7', label: 'SALDATA' }
-                    : { bg: '#7f1d1d', text: '#fca5a5', label: 'ANNULLATA' };
+                    ? { bg: 'var(--pill-green-bg)', text: 'var(--pill-green-fg)', label: 'SALDATA' }
+                    : { bg: 'var(--pill-red-bg)', text: 'var(--pill-red-fg)', label: 'ANNULLATA' };
 
                   return (
                     <tr key={inv.id} style={{ borderBottom: '1px solid var(--border)' }}>
                       <td style={{ padding: '14px 8px', fontWeight: 600 }}>
-                        <div style={{ display: 'inline-block', padding: '2px 6px', borderRadius: 4, background: isNote ? '#7f1d1d' : '#1e3a8a', color: 'white', fontSize: 11, marginRight: 8 }}>
+                        <div style={{ display: 'inline-block', padding: '2px 6px', borderRadius: 4, background: isNote ? 'var(--pill-red-bg)' : 'var(--pill-blue-bg)', color: 'white', fontSize: 11, marginRight: 8 }}>
                           {isNote ? 'NC' : 'FT'}
                         </div>
                         {inv.numero || `FT-${inv.numeroProgressivoSerie}`}
@@ -579,7 +579,7 @@ export function InvoicesPage() {
                       <td style={{ padding: '14px 8px', fontWeight: 600 }}>
                         {fmt((inv.totaleDocumentoCentesimi || 0) / 100)}
                       </td>
-                      <td style={{ padding: '14px 8px', fontWeight: 700, color: isNote ? '#fca5a5' : '#34d399' }}>
+                      <td style={{ padding: '14px 8px', fontWeight: 700, color: isNote ? 'var(--pill-red-fg)' : 'var(--green)' }}>
                         {isNote ? '-' : ''} {fmt((inv.nettoAPagareCentesimi || inv.totaleDocumentoCentesimi || 0) / 100)}
                       </td>
                       <td style={{ padding: '14px 8px' }}>
@@ -601,7 +601,7 @@ export function InvoicesPage() {
                           {/* Scarica XML SDI */}
                           <button
                             onClick={() => downloadFatturaXmlApi(inv.id, inv.numero)}
-                            style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid #1e40af', background: '#1e3a8a', color: '#93c5fd', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
+                            style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid var(--pill-blue-bd)', background: 'var(--pill-blue-bg)', color: 'var(--pill-blue-fg)', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
                             title="Scarica tracciato XML FatturaPA 1.2 conforme"
                           >
                             📦 XML SDI
@@ -635,14 +635,14 @@ export function InvoicesPage() {
                             <>
                               <button
                                 onClick={() => handleEmettiDefinitivo(inv)}
-                                style={{ padding: '4px 8px', borderRadius: 6, border: 'none', background: '#059669', color: 'white', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}
+                                style={{ padding: '4px 8px', borderRadius: 6, border: 'none', background: 'var(--green)', color: 'white', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}
                                 title="Emetti definitivamente e genera scadenze"
                               >
                                 🚀 Emetti
                               </button>
                               <button
                                 onClick={() => handleEliminaBozza(inv.id)}
-                                style={{ padding: '4px 8px', borderRadius: 6, border: 'none', background: '#7f1d1d', color: '#fca5a5', cursor: 'pointer', fontSize: 12 }}
+                                style={{ padding: '4px 8px', borderRadius: 6, border: 'none', background: 'var(--pill-red-bg)', color: 'var(--pill-red-fg)', cursor: 'pointer', fontSize: 12 }}
                                 title="Elimina bozza"
                               >
                                 🗑️
@@ -662,7 +662,7 @@ export function InvoicesPage() {
                                     setImportoIncassoEur(((scadAperta.importoCentesimi || 0) / 100).toFixed(2));
                                     setShowIncassoModal(true);
                                   }}
-                                  style={{ padding: '4px 8px', borderRadius: 6, border: 'none', background: '#047857', color: 'white', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}
+                                  style={{ padding: '4px 8px', borderRadius: 6, border: 'none', background: 'var(--pill-green-bd)', color: 'white', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}
                                   title="Registra incasso rata"
                                 >
                                   📥 Incasso
@@ -673,7 +673,7 @@ export function InvoicesPage() {
                                   setSelectedInvoice(inv);
                                   setShowNcModal(true);
                                 }}
-                                style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid #dc2626', background: '#7f1d1d', color: '#fca5a5', cursor: 'pointer', fontSize: 12 }}
+                                style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid var(--red)', background: 'var(--pill-red-bg)', color: 'var(--pill-red-fg)', cursor: 'pointer', fontSize: 12 }}
                                 title="Emetti Nota di Credito TD04"
                               >
                                 🔄 NC
@@ -747,14 +747,14 @@ export function InvoicesPage() {
                 <button
                   type="button"
                   onClick={handleImportDaProgetto}
-                  style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid var(--primary)', background: '#1e3a8a', color: '#93c5fd', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+                  style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid var(--primary)', background: 'var(--pill-blue-bg)', color: 'var(--pill-blue-fg)', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
                 >
                   📥 Importa Moduli Progetto
                 </button>
                 <button
                   type="button"
                   onClick={handleImportDaTimesheet}
-                  style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid var(--primary)', background: '#1e3a8a', color: '#93c5fd', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+                  style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid var(--primary)', background: 'var(--pill-blue-bg)', color: 'var(--pill-blue-fg)', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
                 >
                   ⏱️ Importa Ore Timesheet
                 </button>
@@ -819,7 +819,7 @@ export function InvoicesPage() {
                     <button
                       type="button"
                       onClick={() => handleRimuoviRiga(idx)}
-                      style={{ background: 'transparent', border: 'none', color: '#ef4444', fontSize: 16, cursor: 'pointer' }}
+                      style={{ background: 'transparent', border: 'none', color: 'var(--red)', fontSize: 16, cursor: 'pointer' }}
                     >
                       ✕
                     </button>
@@ -934,36 +934,36 @@ export function InvoicesPage() {
             </div>
 
             {/* BREAKDOWN FINANZIARIO */}
-            <div style={{ background: '#0f172a', padding: '1.25rem', borderRadius: 10, marginBottom: '1.5rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 12, border: '1px solid #1e293b' }}>
+            <div style={{ background: 'var(--surface-2)', padding: '1.25rem', borderRadius: 10, marginBottom: '1.5rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 12, border: '1px solid var(--pill-slate-bg)' }}>
               <div>
-                <div style={{ fontSize: 11, color: '#94a3b8' }}>Imponibile</div>
+                <div style={{ fontSize: 11, color: 'var(--muted)' }}>Imponibile</div>
                 <div style={{ fontSize: 16, fontWeight: 700, color: 'white' }}>{fmt(totaliForm.totImponibileCent / 100)}</div>
               </div>
               {totaliForm.cassaCent > 0 && (
                 <div>
-                  <div style={{ fontSize: 11, color: '#94a3b8' }}>Cassa Prev. (4%)</div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)' }}>Cassa Prev. (4%)</div>
                   <div style={{ fontSize: 16, fontWeight: 700, color: 'white' }}>+ {fmt(totaliForm.cassaCent / 100)}</div>
                 </div>
               )}
               <div>
-                <div style={{ fontSize: 11, color: '#94a3b8' }}>IVA</div>
+                <div style={{ fontSize: 11, color: 'var(--muted)' }}>IVA</div>
                 <div style={{ fontSize: 16, fontWeight: 700, color: 'white' }}>+ {fmt(totaliForm.totIvaCent / 100)}</div>
               </div>
               {totaliForm.ritenutaCent > 0 && (
                 <div>
-                  <div style={{ fontSize: 11, color: '#f87171' }}>Ritenuta (20%)</div>
-                  <div style={{ fontSize: 16, fontWeight: 700, color: '#f87171' }}>- {fmt(totaliForm.ritenutaCent / 100)}</div>
+                  <div style={{ fontSize: 11, color: 'var(--pill-red-fg)' }}>Ritenuta (20%)</div>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--pill-red-fg)' }}>- {fmt(totaliForm.ritenutaCent / 100)}</div>
                 </div>
               )}
               {totaliForm.bolloCent > 0 && (
                 <div>
-                  <div style={{ fontSize: 11, color: '#fcd34d' }}>Bollo Virtuale</div>
-                  <div style={{ fontSize: 16, fontWeight: 700, color: '#fcd34d' }}>+ € 2,00</div>
+                  <div style={{ fontSize: 11, color: 'var(--pill-amber-fg)' }}>Bollo Virtuale</div>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--pill-amber-fg)' }}>+ € 2,00</div>
                 </div>
               )}
-              <div style={{ borderLeft: '2px solid #334155', paddingLeft: 12 }}>
-                <div style={{ fontSize: 11, color: '#34d399', fontWeight: 700 }}>NETTO A PAGARE</div>
-                <div style={{ fontSize: 20, fontWeight: 800, color: '#34d399' }}>{fmt(totaliForm.nettoAPagareCent / 100)}</div>
+              <div style={{ borderLeft: '2px solid var(--pill-slate-bd)', paddingLeft: 12 }}>
+                <div style={{ fontSize: 11, color: 'var(--green)', fontWeight: 700 }}>NETTO A PAGARE</div>
+                <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--green)' }}>{fmt(totaliForm.nettoAPagareCent / 100)}</div>
               </div>
             </div>
 
@@ -1066,7 +1066,7 @@ export function InvoicesPage() {
                 <button
                   type="submit"
                   disabled={submitting}
-                  style={{ padding: '8px 18px', borderRadius: 8, border: 'none', background: '#059669', color: 'white', fontWeight: 700, cursor: 'pointer' }}
+                  style={{ padding: '8px 18px', borderRadius: 8, border: 'none', background: 'var(--green)', color: 'white', fontWeight: 700, cursor: 'pointer' }}
                 >
                   {submitting ? 'Registrazione...' : 'Conferma Incasso & Scrivi in Prima Nota'}
                 </button>
@@ -1122,7 +1122,7 @@ export function InvoicesPage() {
                 <button
                   type="submit"
                   disabled={submitting}
-                  style={{ padding: '8px 18px', borderRadius: 8, border: 'none', background: '#dc2626', color: 'white', fontWeight: 700, cursor: 'pointer' }}
+                  style={{ padding: '8px 18px', borderRadius: 8, border: 'none', background: 'var(--red)', color: 'white', fontWeight: 700, cursor: 'pointer' }}
                 >
                   {submitting ? 'Emissione...' : 'Emetti Nota di Credito Ufficiale'}
                 </button>

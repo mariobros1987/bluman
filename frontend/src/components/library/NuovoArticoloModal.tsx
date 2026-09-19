@@ -34,9 +34,9 @@ export function NuovoArticoloModal({ giurList, onClose, onCreated }: { giurList:
       categoria: (cat.toLowerCase() as any) || 'societario',
       descrizione: `Modello Word personalizzato per la nuova prestazione "${nome}".`,
       contenutoHtml: `
-<h1 style="text-align: center; color: #1e1b4b; font-size: 18px; margin-bottom: 20px;">${title.trim().toUpperCase()}</h1>
-<p style="text-align: right; color: #64748b; font-size: 11px;"><strong>Data:</strong> {{data_odierna}} | <strong>Pratica:</strong> {{progetto.titolo}}</p>
-<div style="background: #f8fafc; border-left: 4px solid #4338ca; padding: 12px; margin: 20px 0; font-size: 11.5px;">
+<h1 style="text-align: center; color: var(--pill-indigo-bg); font-size: 18px; margin-bottom: 20px;">${title.trim().toUpperCase()}</h1>
+<p style="text-align: right; color: var(--muted); font-size: 11px;"><strong>Data:</strong> {{data_odierna}} | <strong>Pratica:</strong> {{progetto.titolo}}</p>
+<div style="background: var(--pill-sky-fg); border-left: 4px solid var(--indigo-d); padding: 12px; margin: 20px 0; font-size: 11.5px;">
   <strong>Cliente:</strong> {{cliente.ragione_sociale}} (P.IVA {{cliente.partita_iva}})<br/>
   <strong>Studio:</strong> {{studio.ragione_sociale}}
 </div>
@@ -209,7 +209,7 @@ export function NuovoArticoloModal({ giurList, onClose, onCreated }: { giurList:
               <button
                 type="button"
                 onClick={handleCreateNewWordForNewArt}
-                style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: 6, fontSize: 10.5, fontWeight: 700, cursor: 'pointer' }}
+                style={{ background: 'var(--indigo)', color: 'var(--on-accent)', border: 'none', padding: '4px 8px', borderRadius: 6, fontSize: 10.5, fontWeight: 700, cursor: 'pointer' }}
                 title="Crea un nuovo modello Word dedicato a questa prestazione"
               >
                 ➕ Nuovo Word
@@ -217,7 +217,7 @@ export function NuovoArticoloModal({ giurList, onClose, onCreated }: { giurList:
               <button
                 type="button"
                 onClick={() => fileInputNewArtRef.current?.click()}
-                style={{ background: '#1e1b4b', color: '#818cf8', border: '1px solid #4338ca', padding: '4px 8px', borderRadius: 6, fontSize: 10.5, fontWeight: 700, cursor: 'pointer' }}
+                style={{ background: 'var(--pill-indigo-bg)', color: 'var(--pill-indigo-fg)', border: '1px solid var(--pill-indigo-bd)', padding: '4px 8px', borderRadius: 6, fontSize: 10.5, fontWeight: 700, cursor: 'pointer' }}
                 title="Importa file .docx, .pdf, .html o .json dal tuo computer"
               >
                 📁 Importa da PC
@@ -238,7 +238,7 @@ export function NuovoArticoloModal({ giurList, onClose, onCreated }: { giurList:
           <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 6, maxHeight: 150, overflowY: 'auto', background: 'var(--card)', padding: 8, borderRadius: 8, border: '1px solid var(--border)' }}>
             {/* §41 — se la lettura dal server non è riuscita l'elenco può essere incompleto: si dice. */}
             {cartella.erroreLettura && (
-              <div style={{ fontSize: 10, color: '#fca5a5', background: '#2a1218', border: '1px solid #5b2130', borderRadius: 6, padding: '4px 6px' }}>
+              <div style={{ fontSize: 10, color: 'var(--pill-red-fg)', background: 'var(--pill-red-bg)', border: '1px solid var(--pill-red-bd)', borderRadius: 6, padding: '4px 6px' }}>
                 ⚠️ Elenco possibilmente incompleto: {cartella.erroreLettura}
               </div>
             )}
@@ -259,7 +259,7 @@ export function NuovoArticoloModal({ giurList, onClose, onCreated }: { giurList:
                     padding: '4px 6px',
                     borderRadius: 6,
                     background: checked ? 'rgba(99, 102, 241, 0.12)' : 'transparent',
-                    color: checked ? '#a5b4fc' : 'var(--text)',
+                    color: checked ? 'var(--indigo-l)' : 'var(--text)',
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
@@ -298,7 +298,7 @@ export function NuovoArticoloModal({ giurList, onClose, onCreated }: { giurList:
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--indigo-l)' }}>
               ⚙️ Procedura Guidata Passaggi (Form, Documenti & Firma)
             </span>
-            <button type="button" onClick={addPassaggio} style={{ background: '#1a1f3d', border: '1px solid #2d3260', color: '#818cf8', padding: '3px 8px', borderRadius: 6, fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>
+            <button type="button" onClick={addPassaggio} style={{ background: 'var(--surface-1)', border: '1px solid var(--card2)', color: 'var(--indigo-l)', padding: '3px 8px', borderRadius: 6, fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>
               + Aggiungi Passaggio
             </button>
           </div>
@@ -351,9 +351,9 @@ export function NuovoArticoloModal({ giurList, onClose, onCreated }: { giurList:
                 {/* Campi specifici per FORM */}
                 {p.tipo === 'form' && (
                   <div style={{ marginTop: 2 }}>
-                    <label style={{ fontSize: 10, color: '#a78bfa', display: 'block', marginBottom: 2 }}>📋 Campi del Form richiesti al cliente (separati da virgola):</label>
+                    <label style={{ fontSize: 10, color: 'var(--purple)', display: 'block', marginBottom: 2 }}>📋 Campi del Form richiesti al cliente (separati da virgola):</label>
                     <input
-                      style={{ fontSize: 11, background: '#200f40', borderColor: '#4c1d95' }}
+                      style={{ fontSize: 11, background: 'var(--pill-indigo-bg)', borderColor: 'var(--pill-purple-bg)' }}
                       value={p.campiFormText || ''}
                       onChange={e => {
                         const updated = [...passaggi];
@@ -368,9 +368,9 @@ export function NuovoArticoloModal({ giurList, onClose, onCreated }: { giurList:
                 {/* Campi specifici per DOCUMENTO */}
                 {p.tipo === 'documento' && (
                   <div style={{ marginTop: 2 }}>
-                    <label style={{ fontSize: 10, color: '#818cf8', display: 'block', marginBottom: 2 }}>📎 Nome File PDF da caricare per Firma Cliente:</label>
+                    <label style={{ fontSize: 10, color: 'var(--indigo-l)', display: 'block', marginBottom: 2 }}>📎 Nome File PDF da caricare per Firma Cliente:</label>
                     <input
-                      style={{ fontSize: 11, background: '#1a1f3d', borderColor: '#2d3260' }}
+                      style={{ fontSize: 11, background: 'var(--surface-1)', borderColor: 'var(--card2)' }}
                       value={p.fileNome || ''}
                       onChange={e => {
                         const updated = [...passaggi];
@@ -388,7 +388,7 @@ export function NuovoArticoloModal({ giurList, onClose, onCreated }: { giurList:
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
           <button type="button" onClick={onClose} style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '7px 14px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}>Annulla</button>
-          <button type="submit" disabled={loading} style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{loading ? 'Salvataggio...' : '✓ Salva Articolo & Procedura'}</button>
+          <button type="submit" disabled={loading} style={{ background: 'var(--indigo)', color: 'var(--on-accent)', border: 'none', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{loading ? 'Salvataggio...' : '✓ Salva Articolo & Procedura'}</button>
         </div>
       </form>
     </div>

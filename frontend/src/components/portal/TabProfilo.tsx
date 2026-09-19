@@ -69,11 +69,11 @@ export function TabProfilo({
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               <div style={{ background: 'var(--bg)', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--border)' }}>
                 <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 700 }}>Giurisdizione Incarico</div>
-                <div style={{ fontSize: 12, fontWeight: 700, color: '#818cf8', marginTop: 2 }}>{clientObj?.giurisdizione || 'Malta'}</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--indigo-l)', marginTop: 2 }}>{clientObj?.giurisdizione || 'Malta'}</div>
               </div>
               <div style={{ background: 'var(--bg)', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--border)' }}>
                 <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 700 }}>Stato Accesso Portale</div>
-                <div style={{ fontSize: 11.5, fontWeight: 700, color: clientObj?.hasPassword ? '#34d399' : 'var(--amber)', marginTop: 2 }}>
+                <div style={{ fontSize: 11.5, fontWeight: 700, color: clientObj?.hasPassword ? 'var(--green)' : 'var(--amber)', marginTop: 2 }}>
                   {clientObj?.hasPassword ? '🟢 Password Attiva' : '⚪ Solo Magic Link'}
                 </div>
               </div>
@@ -102,9 +102,9 @@ export function TabProfilo({
                   padding: '10px 14px',
                   borderRadius: 8,
                   fontSize: 12,
-                  background: clientPassMsg.type === 'success' ? '#0d2d22' : '#3b1c1c',
-                  color: clientPassMsg.type === 'success' ? '#34d399' : '#f87171',
-                  border: `1px solid ${clientPassMsg.type === 'success' ? '#059669' : '#ef4444'}`,
+                  background: clientPassMsg.type === 'success' ? 'var(--pill-green-bg)' : 'var(--pill-red-bg)',
+                  color: clientPassMsg.type === 'success' ? 'var(--green)' : 'var(--pill-red-fg)',
+                  border: `1px solid ${clientPassMsg.type === 'success' ? 'var(--green)' : 'var(--red)'}`,
                 }}
               >
                 {clientPassMsg.text}
@@ -189,7 +189,7 @@ export function TabProfilo({
                 }}
               />
               {clientPassConfirm && clientPassNew !== clientPassConfirm && (
-                <span style={{ fontSize: 10, color: '#f87171', marginTop: 4, display: 'block' }}>
+                <span style={{ fontSize: 10, color: 'var(--pill-red-fg)', marginTop: 4, display: 'block' }}>
                   ⚠ Le due password non coincidono.
                 </span>
               )}

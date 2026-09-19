@@ -143,10 +143,10 @@ export function Library() {
     svg.innerHTML = `
       <defs>
         <marker id="arrow-inactive" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-          <path d="M 0 1 L 10 5 L 0 9 z" fill="#474b68" />
+          <path d="M 0 1 L 10 5 L 0 9 z" fill="var(--card2)" />
         </marker>
         <marker id="arrow-active" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-          <path d="M 0 1 L 10 5 L 0 9 z" fill="#818cf8" />
+          <path d="M 0 1 L 10 5 L 0 9 z" fill="var(--indigo-l)" />
         </marker>
       </defs>
     `;
@@ -166,7 +166,7 @@ export function Library() {
         const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
         path.setAttribute('d', `M ${x1} ${y1} C ${cx} ${y1}, ${cx} ${y2}, ${x2} ${y2}`);
         path.setAttribute('fill', 'none');
-        path.setAttribute('stroke', isActive ? '#818cf8' : '#474b68');
+        path.setAttribute('stroke', isActive ? 'var(--indigo-l)' : 'var(--card2)');
         path.setAttribute('stroke-width', isActive ? '2.5' : '1.8');
         path.setAttribute('marker-end', isActive ? 'url(#arrow-active)' : 'url(#arrow-inactive)');
         svg.appendChild(path);
@@ -258,7 +258,7 @@ export function Library() {
                 Badge Giurisdizione
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <div style={{ width: 14, height: 2, background: '#818cf8' }} />
+                <div style={{ width: 14, height: 2, background: 'var(--indigo-l)' }} />
                 Frecce Dipendenza ➔
               </div>
               <div>Clic su un modulo per espandere distinta base</div>
@@ -304,15 +304,15 @@ export function Library() {
                               title={`Giurisdizione: ${gLabel}`}
                               style={{
                                 fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 12,
-                                background: m.giurisdizioneId ? '#1a1f3d' : 'var(--card2)',
-                                border: `1px solid ${m.giurisdizioneId ? '#2d3260' : 'var(--border)'}`,
-                                color: m.giurisdizioneId ? '#a5b4fc' : 'var(--muted)',
+                                background: m.giurisdizioneId ? 'var(--surface-1)' : 'var(--card2)',
+                                border: `1px solid ${m.giurisdizioneId ? 'var(--card2)' : 'var(--border)'}`,
+                                color: m.giurisdizioneId ? 'var(--pill-indigo-fg)' : 'var(--muted)',
                               }}
                             >
                               {gFlag} {gLabel}
                             </span>
                           </div>
-                          <span style={{ fontSize: 9, fontWeight: 700, color: dn.length ? '#f59e0b' : '#34d399', background: dn.length ? '#2d1a05' : '#0d2d22', border: `1px solid ${dn.length ? '#d97706' : '#059669'}`, padding: '1px 8px', borderRadius: 20 }}>
+                          <span style={{ fontSize: 9, fontWeight: 700, color: dn.length ? 'var(--amber)' : 'var(--green)', background: dn.length ? 'var(--pill-amber-bg)' : 'var(--pill-green-bg)', border: `1px solid ${dn.length ? 'var(--amber)' : 'var(--green)'}`, padding: '1px 8px', borderRadius: 20 }}>
                             {dn.length ? `🔒 Dipende da ${dn[0]}` : '🔓 Partenza'}
                           </span>
                         </div>
@@ -331,7 +331,7 @@ export function Library() {
                               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--muted)' }}>
                                 <span style={{ width: 4, height: 4, borderRadius: '50%', background: 'var(--hint)', flexShrink: 0 }} />
                                 {r.art.n}
-                                {r.qty > 1 && <span style={{ color: '#818cf8' }}>×{r.qty}</span>}
+                                {r.qty > 1 && <span style={{ color: 'var(--indigo-l)' }}>×{r.qty}</span>}
                               </div>
                             ))}
                             <button
@@ -351,7 +351,7 @@ export function Library() {
                                   setSubTab('crea_modulo');
                                 }}
                                 title="Riapri nel costruttore per modificare nome, giurisdizione, prezzo e distinta base"
-                                style={{ flex: 1, background: '#1a1f3d', border: '1px solid #2d3260', color: '#818cf8', padding: '6px 10px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+                                style={{ flex: 1, background: 'var(--surface-1)', border: '1px solid var(--card2)', color: 'var(--indigo-l)', padding: '6px 10px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
                               >
                                 ✏️ Modifica
                               </button>
@@ -361,7 +361,7 @@ export function Library() {
                                   handleDisattivaModulo(m);
                                 }}
                                 title="§30 — Disattivazione: il modulo sparisce dalla libreria, i progetti esistenti restano validi"
-                                style={{ flex: 1, background: 'var(--card2)', border: '1px solid #5b2130', color: '#f87171', padding: '6px 10px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+                                style={{ flex: 1, background: 'var(--card2)', border: '1px solid var(--pill-red-bg)', color: 'var(--pill-red-fg)', padding: '6px 10px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
                               >
                                 🗑 Disattiva
                               </button>

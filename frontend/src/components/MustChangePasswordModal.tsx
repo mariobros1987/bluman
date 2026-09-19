@@ -28,10 +28,10 @@ export function MustChangePasswordModal({ user, onSuccess }: MustChangePasswordM
     if (/[0-9]/.test(pwd)) score += 1;
     if (/[^A-Za-z0-9]/.test(pwd)) score += 1;
 
-    if (score <= 2) return { score: 1, text: "Debole (richiesti 8+ caratteri, maiuscole e numeri)", color: "#ef4444" };
-    if (score <= 3) return { score: 2, text: "Media", color: "#f59e0b" };
-    if (score <= 4) return { score: 3, text: "Robusta (ISO/IEC 27001)", color: "#10b981" };
-    return { score: 4, text: "Eccellente (Crittograficamente Sicura)", color: "#059669" };
+    if (score <= 2) return { score: 1, text: "Debole (richiesti 8+ caratteri, maiuscole e numeri)", color: "var(--red)" };
+    if (score <= 3) return { score: 2, text: "Media", color: "var(--amber)" };
+    if (score <= 4) return { score: 3, text: "Robusta (ISO/IEC 27001)", color: "var(--green)" };
+    return { score: 4, text: "Eccellente (Crittograficamente Sicura)", color: "var(--green)" };
   };
 
   const strength = getPasswordStrength(newPassword);
@@ -95,8 +95,8 @@ export function MustChangePasswordModal({ user, onSuccess }: MustChangePasswordM
     >
       <div
         style={{
-          backgroundColor: "var(--sidebar, #111827)",
-          border: "1px solid #4338ca",
+          backgroundColor: "var(--sidebar, var(--surface-2))",
+          border: "1px solid var(--indigo-d)",
           borderRadius: 20,
           width: "100%",
           maxWidth: 520,
@@ -110,7 +110,7 @@ export function MustChangePasswordModal({ user, onSuccess }: MustChangePasswordM
           style={{
             padding: "24px 28px",
             background: "linear-gradient(135deg, rgba(30, 27, 75, 0.8) 0%, rgba(17, 24, 39, 0.9) 100%)",
-            borderBottom: "1px solid var(--border, #1f2937)",
+            borderBottom: "1px solid var(--border, var(--surface-1))",
             display: "flex",
             alignItems: "center",
             gap: 16,
@@ -121,7 +121,7 @@ export function MustChangePasswordModal({ user, onSuccess }: MustChangePasswordM
               width: 52,
               height: 52,
               borderRadius: 14,
-              background: "linear-gradient(135deg, #4f46e5 0%, #4338ca 100%)",
+              background: "linear-gradient(135deg, var(--indigo-d) 0%, var(--indigo-d) 100%)",
               color: "#fff",
               display: "flex",
               alignItems: "center",
@@ -134,10 +134,10 @@ export function MustChangePasswordModal({ user, onSuccess }: MustChangePasswordM
             🔐
           </div>
           <div>
-            <div style={{ fontSize: 18, fontWeight: 800, color: "#f8fafc", letterSpacing: "-0.02em" }}>
+            <div style={{ fontSize: 18, fontWeight: 800, color: "var(--pill-sky-fg)", letterSpacing: "-0.02em" }}>
               Primo Accesso: Imposta Nuova Password
             </div>
-            <div style={{ fontSize: 12, color: "var(--muted, #94a3b8)", marginTop: 3 }}>
+            <div style={{ fontSize: 12, color: "var(--muted, var(--muted))", marginTop: 3 }}>
               Benvenuto in BluMan Advisory Platform, <strong>{user?.nome || user?.email || "Collaboratore"}</strong>
             </div>
           </div>
@@ -146,12 +146,12 @@ export function MustChangePasswordModal({ user, onSuccess }: MustChangePasswordM
         <div style={{ padding: "24px 28px" }}>
           <div
             style={{
-              background: "#1e1b4b",
-              border: "1px solid #4338ca",
+              background: "var(--pill-indigo-bg)",
+              border: "1px solid var(--indigo-d)",
               borderRadius: 12,
               padding: "12px 16px",
               fontSize: 12,
-              color: "#c7d2fe",
+              color: "var(--pill-indigo-fg)",
               lineHeight: 1.5,
               marginBottom: 20,
               display: "flex",
@@ -170,9 +170,9 @@ export function MustChangePasswordModal({ user, onSuccess }: MustChangePasswordM
             {error && (
               <div
                 style={{
-                  background: "#450a0a",
-                  border: "1px solid #dc2626",
-                  color: "#fca5a5",
+                  background: "var(--pill-red-bg)",
+                  border: "1px solid var(--red)",
+                  color: "var(--pill-red-fg)",
                   padding: "10px 14px",
                   borderRadius: 10,
                   fontSize: 12,
@@ -187,7 +187,7 @@ export function MustChangePasswordModal({ user, onSuccess }: MustChangePasswordM
             )}
 
             <div>
-              <label style={{ fontSize: 11, fontWeight: 700, color: "var(--muted, #94a3b8)", display: "block", marginBottom: 6 }}>
+              <label style={{ fontSize: 11, fontWeight: 700, color: "var(--muted, var(--muted))", display: "block", marginBottom: 6 }}>
                 Password Temporanea Ricevuta *
               </label>
               <input
@@ -198,8 +198,8 @@ export function MustChangePasswordModal({ user, onSuccess }: MustChangePasswordM
                 required
                 style={{
                   width: "100%",
-                  background: "var(--bg, #0b0f19)",
-                  border: "1px solid var(--border, #374151)",
+                  background: "var(--bg, var(--surface-2))",
+                  border: "1px solid var(--border, var(--border))",
                   borderRadius: 10,
                   padding: "11px 14px",
                   color: "#fff",
@@ -212,7 +212,7 @@ export function MustChangePasswordModal({ user, onSuccess }: MustChangePasswordM
 
             <div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                <label style={{ fontSize: 11, fontWeight: 700, color: "var(--muted, #94a3b8)" }}>
+                <label style={{ fontSize: 11, fontWeight: 700, color: "var(--muted, var(--muted))" }}>
                   Nuova Password Personale * (min. 8 caratteri)
                 </label>
                 <button
@@ -221,7 +221,7 @@ export function MustChangePasswordModal({ user, onSuccess }: MustChangePasswordM
                   style={{
                     background: "none",
                     border: "none",
-                    color: "var(--indigo-l, #818cf8)",
+                    color: "var(--indigo-l, var(--indigo-l))",
                     fontSize: 11,
                     cursor: "pointer",
                     padding: 0,
@@ -239,8 +239,8 @@ export function MustChangePasswordModal({ user, onSuccess }: MustChangePasswordM
                 required
                 style={{
                   width: "100%",
-                  background: "var(--bg, #0b0f19)",
-                  border: "1px solid var(--border, #374151)",
+                  background: "var(--bg, var(--surface-2))",
+                  border: "1px solid var(--border, var(--border))",
                   borderRadius: 10,
                   padding: "11px 14px",
                   color: "#fff",
@@ -252,7 +252,7 @@ export function MustChangePasswordModal({ user, onSuccess }: MustChangePasswordM
 
               {newPassword && (
                 <div style={{ marginTop: 8 }}>
-                  <div style={{ display: "flex", gap: 4, height: 4, borderRadius: 2, overflow: "hidden", background: "#1f2937" }}>
+                  <div style={{ display: "flex", gap: 4, height: 4, borderRadius: 2, overflow: "hidden", background: "var(--surface-1)" }}>
                     <div style={{ flex: 1, background: strength.score >= 1 ? strength.color : "transparent" }} />
                     <div style={{ flex: 1, background: strength.score >= 2 ? strength.color : "transparent" }} />
                     <div style={{ flex: 1, background: strength.score >= 3 ? strength.color : "transparent" }} />
@@ -266,7 +266,7 @@ export function MustChangePasswordModal({ user, onSuccess }: MustChangePasswordM
             </div>
 
             <div>
-              <label style={{ fontSize: 11, fontWeight: 700, color: "var(--muted, #94a3b8)", display: "block", marginBottom: 6 }}>
+              <label style={{ fontSize: 11, fontWeight: 700, color: "var(--muted, var(--muted))", display: "block", marginBottom: 6 }}>
                 Conferma Nuova Password *
               </label>
               <input
@@ -277,8 +277,8 @@ export function MustChangePasswordModal({ user, onSuccess }: MustChangePasswordM
                 required
                 style={{
                   width: "100%",
-                  background: "var(--bg, #0b0f19)",
-                  border: "1px solid var(--border, #374151)",
+                  background: "var(--bg, var(--surface-2))",
+                  border: "1px solid var(--border, var(--border))",
                   borderRadius: 10,
                   padding: "11px 14px",
                   color: "#fff",
@@ -288,7 +288,7 @@ export function MustChangePasswordModal({ user, onSuccess }: MustChangePasswordM
                 }}
               />
               {confirmPassword && newPassword !== confirmPassword && (
-                <span style={{ fontSize: 11, color: "#f87171", marginTop: 4, display: "block" }}>
+                <span style={{ fontSize: 11, color: "var(--pill-red-fg)", marginTop: 4, display: "block" }}>
                   ⚠ Le due password non coincidono.
                 </span>
               )}
@@ -298,7 +298,7 @@ export function MustChangePasswordModal({ user, onSuccess }: MustChangePasswordM
               type="submit"
               disabled={loading || !currentPassword || newPassword.length < 8 || newPassword !== confirmPassword}
               style={{
-                background: "linear-gradient(135deg, #4f46e5 0%, #4338ca 100%)",
+                background: "linear-gradient(135deg, var(--indigo-d) 0%, var(--indigo-d) 100%)",
                 color: "#fff",
                 border: "none",
                 padding: "13px 20px",

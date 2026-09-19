@@ -63,8 +63,8 @@ export const PagaFatturaPassivaModal: React.FC<PagaFatturaPassivaModalProps> = (
               style={{
                 padding: '10px 14px',
                 background: 'rgba(239, 68, 68, 0.1)',
-                border: '1px solid #ef4444',
-                color: '#ef4444',
+                border: '1px solid var(--red)',
+                color: 'var(--red)',
                 borderRadius: '8px',
                 marginBottom: '16px',
                 fontSize: '0.9rem',

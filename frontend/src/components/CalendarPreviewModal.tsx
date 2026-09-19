@@ -189,7 +189,7 @@ export function CalendarPreviewModal({
         </div>
 
         {errore && (
-          <div role="alert" style={{ background: '#450a0a', border: '1px solid #b91c1c', color: '#fecaca', padding: '10px 14px', borderRadius: 10, fontSize: 11, fontWeight: 600, marginBottom: 16 }}>
+          <div role="alert" style={{ background: 'var(--pill-red-bg)', border: '1px solid var(--pill-red-bd)', color: 'var(--pill-red-fg)', padding: '10px 14px', borderRadius: 10, fontSize: 11, fontWeight: 600, marginBottom: 16 }}>
             ⚠️ {errore}
           </div>
         )}

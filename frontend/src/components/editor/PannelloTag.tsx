@@ -46,11 +46,11 @@ export function PannelloTag({
                   title={`Inserisci ${item.tag}`}
                 >
                   <span style={{ fontWeight: 600 }}>{item.label}</span>
-                  <code style={{ fontSize: 9.5, color: '#818cf8', background: '#1e1b4b', padding: '1px 5px', borderRadius: 4 }}>+ Tag</code>
+                  <code style={{ fontSize: 9.5, color: 'var(--indigo-l)', background: 'var(--pill-indigo-bg)', padding: '1px 5px', borderRadius: 4 }}>+ Tag</code>
                 </button>
               ))}
 
-              <span style={{ fontSize: 10, fontWeight: 800, color: '#34d399', textTransform: 'uppercase', marginTop: 10 }}>Dati Progetto:</span>
+              <span style={{ fontSize: 10, fontWeight: 800, color: 'var(--green)', textTransform: 'uppercase', marginTop: 10 }}>Dati Progetto:</span>
               {[
                 { tag: '{{progetto.titolo}}', label: 'Titolo Pratica' },
                 { tag: '{{progetto.importo_totale}}', label: 'Compenso Totale (€)' },
@@ -75,11 +75,11 @@ export function PannelloTag({
                   }}
                 >
                   <span style={{ fontWeight: 600 }}>{item.label}</span>
-                  <code style={{ fontSize: 9.5, color: '#34d399', background: '#064e3b', padding: '1px 5px', borderRadius: 4 }}>+ Tag</code>
+                  <code style={{ fontSize: 9.5, color: 'var(--green)', background: 'var(--pill-green-bg)', padding: '1px 5px', borderRadius: 4 }}>+ Tag</code>
                 </button>
               ))}
 
-              <span style={{ fontSize: 10, fontWeight: 800, color: '#f59e0b', textTransform: 'uppercase', marginTop: 10 }}>Dati Studio:</span>
+              <span style={{ fontSize: 10, fontWeight: 800, color: 'var(--amber)', textTransform: 'uppercase', marginTop: 10 }}>Dati Studio:</span>
               {[
                 { tag: '{{studio.ragione_sociale}}', label: 'Nome Studio' },
                 { tag: '{{studio.piva}}', label: 'P.IVA / TIN Studio' },
@@ -105,7 +105,7 @@ export function PannelloTag({
                   }}
                 >
                   <span style={{ fontWeight: 600 }}>{item.label}</span>
-                  <code style={{ fontSize: 9.5, color: '#f59e0b', background: '#451a03', padding: '1px 5px', borderRadius: 4 }}>+ Tag</code>
+                  <code style={{ fontSize: 9.5, color: 'var(--amber)', background: 'var(--pill-amber-bg)', padding: '1px 5px', borderRadius: 4 }}>+ Tag</code>
                 </button>
               ))}
 
@@ -113,7 +113,7 @@ export function PannelloTag({
                   documento, va disegnata la firma quando il cliente sottoscrive dal
                   portale. Senza `{{firma_cliente}}` la firma resta fuori dal testo (nel
                   sigillo e nel verbale), esattamente come prima. */}
-              <span style={{ fontSize: 10, fontWeight: 800, color: '#38bdf8', textTransform: 'uppercase', marginTop: 10 }}>Aree Firma:</span>
+              <span style={{ fontSize: 10, fontWeight: 800, color: 'var(--cat-societario)', textTransform: 'uppercase', marginTop: 10 }}>Aree Firma:</span>
               <div style={{ fontSize: 9.5, color: 'var(--muted)', lineHeight: 1.5, marginBottom: 2 }}>
                 Dove inserisci il tag comparirà lo spazio per la firma. Alla sottoscrizione dal
                 portale il server ricompone il documento con la firma del cliente dentro
@@ -143,7 +143,7 @@ export function PannelloTag({
                   title={`Inserisci ${item.tag}`}
                 >
                   <span style={{ fontWeight: 600 }}>{item.label}</span>
-                  <code style={{ fontSize: 9.5, color: '#38bdf8', background: '#082f49', padding: '1px 5px', borderRadius: 4 }}>+ Firma</code>
+                  <code style={{ fontSize: 9.5, color: 'var(--cat-societario)', background: 'var(--pill-sky-bg)', padding: '1px 5px', borderRadius: 4 }}>+ Firma</code>
                 </button>
               ))}
             </div>

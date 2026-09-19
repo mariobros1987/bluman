@@ -98,16 +98,16 @@ export function PaymentsPage() {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
-        <div style={{ background: '#064e3b', padding: 20, borderRadius: 12, border: '1px solid #047857' }}>
-          <div style={{ fontSize: 12, color: '#6ee7b7', textTransform: 'uppercase', fontWeight: 600 }}>Incassato Effettivo</div>
+        <div style={{ background: 'var(--pill-green-bg)', padding: 20, borderRadius: 12, border: '1px solid var(--pill-green-bd)' }}>
+          <div style={{ fontSize: 12, color: 'var(--pill-green-fg)', textTransform: 'uppercase', fontWeight: 600 }}>Incassato Effettivo</div>
           <div style={{ fontSize: 24, fontWeight: 700, color: 'white', marginTop: 8 }}>✓ {fmt(totalIncassato / 100)}</div>
         </div>
-        <div style={{ background: '#78350f', padding: 20, borderRadius: 12, border: '1px solid #b45309' }}>
-          <div style={{ fontSize: 12, color: '#fcd34d', textTransform: 'uppercase', fontWeight: 600 }}>Partite Aperte in Scadenza</div>
+        <div style={{ background: 'var(--pill-amber-bg)', padding: 20, borderRadius: 12, border: '1px solid var(--pill-amber-bd)' }}>
+          <div style={{ fontSize: 12, color: 'var(--pill-amber-fg)', textTransform: 'uppercase', fontWeight: 600 }}>Partite Aperte in Scadenza</div>
           <div style={{ fontSize: 24, fontWeight: 700, color: 'white', marginTop: 8 }}>⏳ {fmt(totalSospeso / 100)}</div>
         </div>
-        <div style={{ background: '#7f1d1d', padding: 20, borderRadius: 12, border: '1px solid #b91c1c' }}>
-          <div style={{ fontSize: 12, color: '#fca5a5', textTransform: 'uppercase', fontWeight: 600 }}>Incassi Scaduti (In Ritardo)</div>
+        <div style={{ background: 'var(--pill-red-bg)', padding: 20, borderRadius: 12, border: '1px solid var(--pill-red-bd)' }}>
+          <div style={{ fontSize: 12, color: 'var(--pill-red-fg)', textTransform: 'uppercase', fontWeight: 600 }}>Incassi Scaduti (In Ritardo)</div>
           <div style={{ fontSize: 24, fontWeight: 700, color: 'white', marginTop: 8 }}>⚠️ {fmt(totalScaduto / 100)}</div>
         </div>
       </div>
@@ -175,7 +175,7 @@ export function PaymentsPage() {
                     <tr key={scad.id} style={{ borderBottom: '1px solid var(--border)', background: isLate ? 'rgba(239, 68, 68, 0.05)' : 'transparent' }}>
                       <td style={{ padding: '16px 8px', fontWeight: 600 }}>
                         📅 Rata #{scad.numeroRata} - {new Date(scad.dataScadenza).toLocaleDateString()}
-                        {isLate && <span style={{ marginLeft: 8, fontSize: 11, color: '#fca5a5', fontWeight: 700 }}>⚠️ In Ritardo</span>}
+                        {isLate && <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--pill-red-fg)', fontWeight: 700 }}>⚠️ In Ritardo</span>}
                       </td>
                       <td style={{ padding: '16px 8px', fontWeight: 600, color: 'var(--indigo-l)' }}>
                         {scad.fattura?.numero || 'Fattura'}
@@ -188,9 +188,9 @@ export function PaymentsPage() {
                         💶 {fmt(importoRata)}
                       </td>
                       <td style={{ padding: '16px 8px' }}>
-                        {scad.stato === 'incassato' && <span style={{ padding: '4px 8px', borderRadius: 12, fontSize: 11, fontWeight: 600, background: '#064e3b', color: '#6ee7b7' }}>✓ Saldata</span>}
-                        {scad.stato === 'parziale' && <span style={{ padding: '4px 8px', borderRadius: 12, fontSize: 11, fontWeight: 600, background: '#1e3a8a', color: '#93c5fd' }}>🔹 Parziale</span>}
-                        {scad.stato === 'in_attesa' && <span style={{ padding: '4px 8px', borderRadius: 12, fontSize: 11, fontWeight: 600, background: '#78350f', color: '#fcd34d' }}>⏳ In Attesa</span>}
+                        {scad.stato === 'incassato' && <span style={{ padding: '4px 8px', borderRadius: 12, fontSize: 11, fontWeight: 600, background: 'var(--pill-green-bg)', color: 'var(--pill-green-fg)' }}>✓ Saldata</span>}
+                        {scad.stato === 'parziale' && <span style={{ padding: '4px 8px', borderRadius: 12, fontSize: 11, fontWeight: 600, background: 'var(--pill-blue-bg)', color: 'var(--pill-blue-fg)' }}>🔹 Parziale</span>}
+                        {scad.stato === 'in_attesa' && <span style={{ padding: '4px 8px', borderRadius: 12, fontSize: 11, fontWeight: 600, background: 'var(--pill-amber-bg)', color: 'var(--pill-amber-fg)' }}>⏳ In Attesa</span>}
                       </td>
                       <td style={{ padding: '16px 8px', textAlign: 'right' }}>
                         {scad.stato !== 'incassato' ? (
@@ -212,7 +212,7 @@ export function PaymentsPage() {
                             </button>
                           </div>
                         ) : (
-                          <span style={{ fontSize: 12, color: '#6ee7b7', fontWeight: 600 }}>✓ Incassato in Prima Nota</span>
+                          <span style={{ fontSize: 12, color: 'var(--pill-green-fg)', fontWeight: 600 }}>✓ Incassato in Prima Nota</span>
                         )}
                       </td>
                     </tr>

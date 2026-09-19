@@ -42,7 +42,7 @@ export function HeaderEditor({
           <div>
             <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 10 }}>
               <span>📝 Studio Document Studio & Contract Builder</span>
-              <span style={{ fontSize: 10, background: '#1e1b4b', color: '#818cf8', padding: '3px 8px', borderRadius: 6, fontWeight: 700, textTransform: 'uppercase' }}>
+              <span style={{ fontSize: 10, background: 'var(--pill-indigo-bg)', color: 'var(--indigo-l)', padding: '3px 8px', borderRadius: 6, fontWeight: 700, textTransform: 'uppercase' }}>
                 Word WYSIWYG + Smart Tags ERP
               </span>
             </div>
@@ -58,8 +58,8 @@ export function HeaderEditor({
             <button
               onClick={() => setTagDisplayMode('highlight')}
               style={{
-                background: tagDisplayMode === 'highlight' ? '#1e1b4b' : 'transparent',
-                color: tagDisplayMode === 'highlight' ? '#818cf8' : 'var(--muted)',
+                background: tagDisplayMode === 'highlight' ? 'var(--pill-indigo-bg)' : 'transparent',
+                color: tagDisplayMode === 'highlight' ? 'var(--indigo-l)' : 'var(--muted)',
                 border: 'none',
                 padding: '6px 12px',
                 fontSize: 11.5,
@@ -73,8 +73,8 @@ export function HeaderEditor({
             <button
               onClick={() => setTagDisplayMode('plain')}
               style={{
-                background: tagDisplayMode === 'plain' ? '#1e1b4b' : 'transparent',
-                color: tagDisplayMode === 'plain' ? '#818cf8' : 'var(--muted)',
+                background: tagDisplayMode === 'plain' ? 'var(--pill-indigo-bg)' : 'transparent',
+                color: tagDisplayMode === 'plain' ? 'var(--indigo-l)' : 'var(--muted)',
                 border: 'none',
                 padding: '6px 12px',
                 fontSize: 11.5,
@@ -88,8 +88,8 @@ export function HeaderEditor({
             <button
               onClick={() => setTagDisplayMode('raw')}
               style={{
-                background: tagDisplayMode === 'raw' ? '#1e1b4b' : 'transparent',
-                color: tagDisplayMode === 'raw' ? '#818cf8' : 'var(--muted)',
+                background: tagDisplayMode === 'raw' ? 'var(--pill-indigo-bg)' : 'transparent',
+                color: tagDisplayMode === 'raw' ? 'var(--indigo-l)' : 'var(--muted)',
                 border: 'none',
                 padding: '6px 12px',
                 fontSize: 11.5,
@@ -104,7 +104,7 @@ export function HeaderEditor({
 
           <button
             onClick={handleExportPdf}
-            style={{ background: '#0d2d22', color: '#34d399', border: '1px solid #059669', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+            style={{ background: 'var(--pill-green-bg)', color: 'var(--green)', border: '1px solid var(--green)', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
             title="Esporta in formato PDF A4 vettoriale"
           >
             <span>📥 Esporta PDF A4</span>
@@ -112,7 +112,7 @@ export function HeaderEditor({
 
           <button
             onClick={handleExportWord}
-            style={{ background: '#1e1b4b', color: '#93c5fd', border: '1px solid #3b82f6', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+            style={{ background: 'var(--pill-indigo-bg)', color: 'var(--pill-blue-fg)', border: '1px solid var(--indigo-l)', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
             title="Esporta in formato Microsoft Word (.doc) apribile"
           >
             <span>📝 Esporta Word (.doc)</span>
@@ -120,7 +120,7 @@ export function HeaderEditor({
 
           <button
             onClick={(e) => handleDeleteTemplate(selectedTemplateId, titoloDocumento, e)}
-            style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#f87171', border: '1px solid #ef4444', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+            style={{ background: 'rgba(239, 68, 68, 0.15)', color: 'var(--pill-red-fg)', border: '1px solid var(--red)', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
             title="Elimina questo modello master dalla libreria"
           >
             <span>🗑️ Elimina Modello Master</span>
@@ -137,7 +137,7 @@ export function HeaderEditor({
       </div>
 
       {feedback && (
-        <div style={{ padding: '12px 16px', borderRadius: 10, fontSize: 12.5, fontWeight: 600, background: '#0d2d22', color: '#34d399', border: '1px solid #059669', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ padding: '12px 16px', borderRadius: 10, fontSize: 12.5, fontWeight: 600, background: 'var(--pill-green-bg)', color: 'var(--green)', border: '1px solid var(--green)', display: 'flex', alignItems: 'center', gap: 10 }}>
           <span>{feedback}</span>
         </div>
       )}

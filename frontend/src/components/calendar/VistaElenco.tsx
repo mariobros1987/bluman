@@ -45,7 +45,7 @@ export function VistaElenco({ eventi, onApri, onCambiaStato }: Props) {
             key={ev.id}
             style={{
               background: 'var(--card)',
-              border: `1px solid ${fatto ? '#059669' : annullato ? 'var(--muted)' : 'var(--border)'}`,
+              border: `1px solid ${fatto ? 'var(--green)' : annullato ? 'var(--muted)' : 'var(--border)'}`,
               borderRadius: 14,
               padding: 16,
               display: 'flex',
@@ -71,8 +71,8 @@ export function VistaElenco({ eventi, onApri, onCambiaStato }: Props) {
                   height: 24,
                   flexShrink: 0,
                   borderRadius: '50%',
-                  border: `2px solid ${fatto ? '#34d399' : 'var(--muted)'}`,
-                  background: fatto ? '#34d399' : 'transparent',
+                  border: `2px solid ${fatto ? 'var(--green)' : 'var(--muted)'}`,
+                  background: fatto ? 'var(--green)' : 'transparent',
                   color: '#fff',
                   fontSize: 12,
                   cursor: spunta ? 'pointer' : 'not-allowed',

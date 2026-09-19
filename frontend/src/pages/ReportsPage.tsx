@@ -109,7 +109,7 @@ export function ReportsPage() {
             disabled={loading || Boolean(errore) || exporting !== ''}
             style={{
               background: exporting === 'pdf' ? 'var(--card2)' : 'var(--red)',
-              color: '#fff', border: 'none', padding: '9px 18px', borderRadius: 8,
+              color: 'var(--on-accent)', border: 'none', padding: '9px 18px', borderRadius: 8,
               fontSize: 12.5, fontWeight: 700, cursor: loading || exporting !== '' ? 'not-allowed' : 'pointer',
               opacity: loading || Boolean(errore) || exporting !== '' ? 0.6 : 1, transition: 'all .15s',
               display: 'flex', alignItems: 'center', gap: 6,
@@ -122,7 +122,7 @@ export function ReportsPage() {
             disabled={loading || Boolean(errore) || exporting !== ''}
             style={{
               background: exporting === 'xlsx' ? 'var(--card2)' : 'var(--green)',
-              color: '#fff', border: 'none', padding: '9px 18px', borderRadius: 8,
+              color: 'var(--on-accent)', border: 'none', padding: '9px 18px', borderRadius: 8,
               fontSize: 12.5, fontWeight: 700, cursor: loading || exporting !== '' ? 'not-allowed' : 'pointer',
               opacity: loading || Boolean(errore) || exporting !== '' ? 0.6 : 1, transition: 'all .15s',
               display: 'flex', alignItems: 'center', gap: 6,
@@ -150,7 +150,7 @@ export function ReportsPage() {
                 cursor: 'pointer',
                 border: attivo ? '1px solid var(--indigo)' : '1px solid var(--border)',
                 background: attivo ? 'var(--indigo)' : 'var(--card)',
-                color: attivo ? '#fff' : 'var(--text)',
+                color: attivo ? 'var(--on-accent)' : 'var(--text)',
                 transition: 'all .15s',
                 display: 'flex',
                 alignItems: 'center',
@@ -191,11 +191,11 @@ export function ReportsPage() {
       {!loading && errore && (
         <div style={{ background: 'var(--card)', border: '1px solid var(--red)', borderRadius: 12, padding: 32, textAlign: 'center' }}>
           <div style={{ fontSize: 32, marginBottom: 10 }}>⚠️</div>
-          <div style={{ color: '#f87171', fontSize: 14, fontWeight: 700, marginBottom: 8 }}>Errore nel caricamento del report</div>
+          <div style={{ color: 'var(--red)', fontSize: 14, fontWeight: 700, marginBottom: 8 }}>Errore nel caricamento del report</div>
           <div style={{ color: 'var(--muted)', fontSize: 12, marginBottom: 18 }}>{errore}</div>
           <button
             onClick={caricaReport}
-            style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '9px 20px', borderRadius: 8, fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}
+            style={{ background: 'var(--indigo)', color: 'var(--on-accent)', border: 'none', padding: '9px 20px', borderRadius: 8, fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}
           >
             ↻ Riprova
           </button>

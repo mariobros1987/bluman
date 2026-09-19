@@ -53,18 +53,18 @@ export function TabDocumenti({
   return (
           <div style={{ flex: 1, overflowY: 'auto', padding: 20, display: 'flex', flexDirection: 'column', gap: 18 }}>
             {/* Box Pre-screening & Suggerimento Modello Intelligente */}
-            <div style={{ background: '#1e1b4b30', border: '1.5px solid #6366f1', borderRadius: 12, padding: 16 }}>
+            <div style={{ background: '#1e1b4b30', border: '1.5px solid var(--indigo)', borderRadius: 12, padding: 16 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#818cf8', fontWeight: 700, fontSize: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--indigo-l)', fontWeight: 700, fontSize: 12 }}>
                   <span>💡 Pre-screening AI Studio & Modello Consigliato</span>
-                  <span style={{ fontSize: 10, background: '#312e81', color: '#c7d2fe', padding: '2px 8px', borderRadius: 10, fontWeight: 700 }}>
+                  <span style={{ fontSize: 10, background: 'var(--pill-indigo-bg)', color: 'var(--pill-indigo-fg)', padding: '2px 8px', borderRadius: 10, fontWeight: 700 }}>
                     {recommendation.confidence === 'high' ? '🎯 ALTA AFFINITÀ' : '💡 SUGGERIMENTO'}
                   </span>
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowCatalogModal(true)}
-                  style={{ background: 'transparent', border: 'none', color: '#818cf8', fontSize: 11, cursor: 'pointer', textDecoration: 'underline', fontWeight: 600 }}
+                  style={{ background: 'transparent', border: 'none', color: 'var(--indigo-l)', fontSize: 11, cursor: 'pointer', textDecoration: 'underline', fontWeight: 600 }}
                 >
                   Sfoglia tutti i 30 modelli ↗
                 </button>
@@ -72,17 +72,17 @@ export function TabDocumenti({
 
               {recommendation.template ? (
                 <div style={{ marginTop: 10 }}>
-                  <div style={{ fontSize: 13.5, fontWeight: 800, color: '#f8fafc' }}>
+                  <div style={{ fontSize: 13.5, fontWeight: 800, color: 'var(--text)' }}>
                     📄 {recommendation.template.titolo}
                   </div>
-                  <div style={{ fontSize: 11, color: '#cbd5e1', marginTop: 4, lineHeight: 1.4 }}>
+                  <div style={{ fontSize: 11, color: 'var(--pill-slate-fg)', marginTop: 4, lineHeight: 1.4 }}>
                     {recommendation.reason}
                   </div>
                   <div style={{ display: 'flex', gap: 10, marginTop: 12, flexWrap: 'wrap' }}>
                     <button
                       type="button"
                       onClick={() => handleApplyTemplate(recommendation.template!)}
-                      style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '7px 16px', borderRadius: 8, fontSize: 11.5, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 12px rgba(99,102,241,0.3)' }}
+                      style={{ background: 'var(--indigo)', color: 'var(--on-accent)', border: 'none', padding: '7px 16px', borderRadius: 8, fontSize: 11.5, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 12px rgba(99,102,241,0.3)' }}
                     >
                       ⚡ Collega Modello Consigliato (1-Click)
                     </button>
@@ -136,7 +136,7 @@ export function TabDocumenti({
                         key={d.id}
                         style={{
                           background: 'var(--card)',
-                          border: st === 'in_revisione' || hasAperte ? '1.5px solid #f59e0b' : (st === 'pubblicato' ? '1.5px solid #3b82f6' : (st === 'firmato' ? '1.5px solid #10b981' : '1px solid var(--border)')),
+                          border: st === 'in_revisione' || hasAperte ? '1.5px solid var(--amber)' : (st === 'pubblicato' ? '1.5px solid var(--cat-societario)' : (st === 'firmato' ? '1.5px solid var(--green)' : '1px solid var(--border)')),
                           borderRadius: 10,
                           padding: 14,
                           display: 'flex',
@@ -169,22 +169,22 @@ export function TabDocumenti({
                           {/* Stato Workflow Badge */}
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                             {st === 'bozza' && (
-                              <span style={{ background: '#27272a', color: '#a1a1aa', border: '1px solid #3f3f46', padding: '3px 8px', borderRadius: 12, fontSize: 10, fontWeight: 700 }}>
+                              <span style={{ background: 'var(--pill-slate-bg)', color: 'var(--muted)', border: '1px solid var(--border)', padding: '3px 8px', borderRadius: 12, fontSize: 10, fontWeight: 700 }}>
                                 🔒 BOZZA (Cliente non vede)
                               </span>
                             )}
                             {st === 'pubblicato' && (
-                              <span style={{ background: '#1e3a8a30', color: '#60a5fa', border: '1px solid #1d4ed8', padding: '3px 8px', borderRadius: 12, fontSize: 10, fontWeight: 700 }}>
+                              <span style={{ background: '#1e3a8a30', color: 'var(--indigo-l)', border: '1px solid var(--indigo-d)', padding: '3px 8px', borderRadius: 12, fontSize: 10, fontWeight: 700 }}>
                                 🚀 PUBBLICATO (In attesa di firma)
                               </span>
                             )}
                             {st === 'in_revisione' && (
-                              <span style={{ background: '#451a0330', color: '#fbbf24', border: '1px solid #b45309', padding: '3px 8px', borderRadius: 12, fontSize: 10, fontWeight: 700 }}>
+                              <span style={{ background: '#451a0330', color: 'var(--amber)', border: '1px solid var(--pill-amber-bd)', padding: '3px 8px', borderRadius: 12, fontSize: 10, fontWeight: 700 }}>
                                 ⚠️ IN REVISIONE (Modifica richiesta)
                               </span>
                             )}
                             {st === 'firmato' && (
-                              <span style={{ background: '#064e3b30', color: '#34d399', border: '1px solid #059669', padding: '3px 8px', borderRadius: 12, fontSize: 10, fontWeight: 700 }}>
+                              <span style={{ background: '#064e3b30', color: 'var(--green)', border: '1px solid var(--green)', padding: '3px 8px', borderRadius: 12, fontSize: 10, fontWeight: 700 }}>
                                 {/* §WF-DOC / regola 7 — l'etichetta dice il tipo di firma che c'è stato
                                     davvero: prima diceva "CON OTP" anche su una firma qualificata
                                     esterna o su un cartaceo scansionato, promettendo più del vero. */}
@@ -192,7 +192,7 @@ export function TabDocumenti({
                               </span>
                             )}
                             {d.firmatoDaStudio && (
-                              <span style={{ background: '#1e1b4b50', color: '#818cf8', border: '1px solid #4f46e5', padding: '3px 8px', borderRadius: 12, fontSize: 10, fontWeight: 700 }}>
+                              <span style={{ background: '#1e1b4b50', color: 'var(--indigo-l)', border: '1px solid var(--indigo-d)', padding: '3px 8px', borderRadius: 12, fontSize: 10, fontWeight: 700 }}>
                                 🏛️ FIRMATO STUDIO ({d.firmaStudio?.firmatarioNome || 'Professionista'})
                               </span>
                             )}
@@ -201,8 +201,8 @@ export function TabDocumenti({
 
                         {/* §WF-DOC — sigillo di firma cliente */}
                         {st === 'firmato' && (
-                          <div style={{ background: '#064e3b25', border: '1px solid #059669', borderRadius: 8, padding: '9px 12px', display: 'flex', flexDirection: 'column', gap: 3 }}>
-                            <div style={{ fontSize: 11.5, fontWeight: 700, color: '#34d399' }}>
+                          <div style={{ background: '#064e3b25', border: '1px solid var(--green)', borderRadius: 8, padding: '9px 12px', display: 'flex', flexDirection: 'column', gap: 3 }}>
+                            <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--green)' }}>
                               🔒 Documento sottoscritto dal cliente
                               {d.firma?.firmatoAt ? ` il ${new Date(d.firma.firmatoAt).toLocaleString('it-IT')}` : ''}
                             </div>
@@ -220,8 +220,8 @@ export function TabDocumenti({
 
                         {/* Sigillo di firma Studio / Professionista */}
                         {d.firmatoDaStudio && (
-                          <div style={{ background: '#1e1b4b30', border: '1px solid #6366f1', borderRadius: 8, padding: '9px 12px', display: 'flex', flexDirection: 'column', gap: 3 }}>
-                            <div style={{ fontSize: 11.5, fontWeight: 700, color: '#a5b4fc' }}>
+                          <div style={{ background: '#1e1b4b30', border: '1px solid var(--indigo)', borderRadius: 8, padding: '9px 12px', display: 'flex', flexDirection: 'column', gap: 3 }}>
+                            <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--indigo-l)' }}>
                               🏛️ Sottoscritto dallo Studio: {d.firmaStudio?.firmatarioNome} {d.firmaStudio?.firmatarioRuolo ? `(${d.firmaStudio.firmatarioRuolo})` : ''}
                               {d.firmaStudio?.firmatoAt ? ` il ${new Date(d.firmaStudio.firmatoAt).toLocaleString('it-IT')}` : ''}
                             </div>
@@ -235,8 +235,8 @@ export function TabDocumenti({
 
                         {/* Note / Richieste di Modifica del Cliente */}
                         {d.richiesteModifica && d.richiesteModifica.length > 0 && (
-                          <div style={{ background: '#27180430', border: '1px solid #78350f', borderRadius: 8, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                            <div style={{ fontSize: 11, fontWeight: 700, color: '#f59e0b', display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <div style={{ background: '#27180430', border: '1px solid var(--pill-amber-bg)', borderRadius: 8, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--amber)', display: 'flex', alignItems: 'center', gap: 4 }}>
                               <span>💬 Richieste di Modifica del Cliente ({d.richiesteModifica.length}):</span>
                             </div>
                             {d.richiesteModifica.map(rm => (
@@ -245,7 +245,7 @@ export function TabDocumenti({
                                   <div style={{ color: 'var(--text)', fontStyle: 'italic' }}>«{rm.commento}»</div>
                                   <div style={{ fontSize: 9.5, color: 'var(--muted)', marginTop: 2 }}>
                                     Inviato da {rm.cliente?.nome || 'Cliente'} il {new Date(rm.creatoAt).toLocaleString('it-IT')}
-                                    {rm.rispostaStudio && <span style={{ color: '#60a5fa' }}> · Risposta studio: {rm.rispostaStudio}</span>}
+                                    {rm.rispostaStudio && <span style={{ color: 'var(--cat-societario)' }}> · Risposta studio: {rm.rispostaStudio}</span>}
                                   </div>
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -253,12 +253,12 @@ export function TabDocumenti({
                                     <button
                                       type="button"
                                       onClick={() => handleRisolviRichiesta(rm.id)}
-                                      style={{ background: '#059669', color: '#fff', border: 'none', padding: '3px 8px', borderRadius: 6, fontSize: 9.5, fontWeight: 700, cursor: 'pointer' }}
+                                      style={{ background: 'var(--green)', color: 'var(--on-accent)', border: 'none', padding: '3px 8px', borderRadius: 6, fontSize: 9.5, fontWeight: 700, cursor: 'pointer' }}
                                     >
                                       ✓ Segna Risolta
                                     </button>
                                   ) : (
-                                    <span style={{ fontSize: 9.5, color: '#10b981', fontWeight: 700 }}>✓ Risolta</span>
+                                    <span style={{ fontSize: 9.5, color: 'var(--green)', fontWeight: 700 }}>✓ Risolta</span>
                                   )}
                                 </div>
                               </div>
@@ -273,7 +273,7 @@ export function TabDocumenti({
                             <button
                               type="button"
                               onClick={() => handlePubblicaDocumento(d.id)}
-                              style={{ background: '#2563eb', color: '#fff', border: 'none', padding: '5px 12px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                              style={{ background: 'var(--cat-societario)', color: 'var(--on-accent)', border: 'none', padding: '5px 12px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
                               title="Pubblica questo documento nel portale cliente per consentirne la visione e la firma"
                             >
                               🚀 Pubblica al Cliente
@@ -285,7 +285,7 @@ export function TabDocumenti({
                             <button
                               type="button"
                               onClick={() => setDocPerFirmaStudio(d)}
-                              style={{ background: '#312e81', border: '1px solid #6366f1', color: '#c7d2fe', padding: '5px 10px', borderRadius: 6, fontSize: 10.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                              style={{ background: 'var(--pill-indigo-bg)', border: '1px solid var(--pill-indigo-bd)', color: 'var(--pill-indigo-fg)', padding: '5px 10px', borderRadius: 6, fontSize: 10.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
                               title="Apponi la firma dello studio / professionista incaricato sul documento"
                             >
                               ✍️ Firma Studio
@@ -326,7 +326,7 @@ export function TabDocumenti({
                               <button
                                 type="button"
                                 onClick={() => scaricaDocumentoClient(d.fileFirmatoUrl || d.filePdfUrl || d.fileUrl, d.nome)}
-                                style={{ background: st === 'firmato' || d.firmato ? '#064e3b' : '#0d2d22', border: st === 'firmato' || d.firmato ? '1px solid #10b981' : '1px solid #059669', color: '#34d399', padding: '5px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 3 }}
+                                style={{ background: 'var(--pill-green-bg)', border: '1px solid var(--pill-green-bd)', color: 'var(--pill-green-fg)', padding: '5px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 3 }}
                                 title={st === 'firmato' || d.firmato ? "Scarica l'atto con la firma del cliente" : "Scarica in formato PDF A4"}
                               >
                                 {st === 'firmato' || d.firmato ? '📥 PDF Firmato' : '📥 PDF'}
@@ -336,7 +336,7 @@ export function TabDocumenti({
                                 onClick={() => (d.fileDocxUrl
                                   ? scaricaDocumentoClient(d.fileDocxUrl, d.nome.replace(/\.(pdf|docx?)$/i, '') + '.docx')
                                   : scaricaDocumentoWordClient(d.fileUrl, d.nome))}
-                                style={{ background: '#1e1b4b', border: '1px solid #3b82f6', color: '#93c5fd', padding: '5px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 3 }}
+                                style={{ background: 'var(--pill-indigo-bg)', border: '1px solid var(--indigo-l)', color: 'var(--pill-blue-fg)', padding: '5px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 3 }}
                                 title="Scarica in formato Microsoft Word (.doc)"
                               >
                                 📝 Word
@@ -347,7 +347,7 @@ export function TabDocumenti({
                           <button
                             type="button"
                             onClick={() => setSelectedDocPreview(d)}
-                            style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '5px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer', fontWeight: 600 }}
+                            style={{ background: 'var(--indigo)', color: 'var(--on-accent)', border: 'none', padding: '5px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer', fontWeight: 600 }}
                           >
                             👁 Visualizza
                           </button>
@@ -395,7 +395,7 @@ export function TabDocumenti({
                                 <button
                                   type="button"
                                   onClick={() => handleSbloccaDocumento(d.id, d.nome)}
-                                  style={{ background: '#3f1d1d', border: '1px solid #b91c1c', color: '#fca5a5', padding: '5px 10px', borderRadius: 6, fontSize: 10.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                                  style={{ background: 'var(--pill-red-bg)', border: '1px solid var(--pill-red-bd)', color: 'var(--pill-red-fg)', padding: '5px 10px', borderRadius: 6, fontSize: 10.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
                                   title="Riapri in bozza questo documento firmato: la motivazione viene registrata nell'audit e il cliente ne viene informato"
                                 >
                                   🔓 Sblocca per modifiche (admin)
@@ -423,7 +423,7 @@ export function TabDocumenti({
                                         );
                                       }
                                     }}
-                                    style={{ background: '#1e1b4b', border: '1px solid #4338ca', color: '#a5b4fc', padding: '5px 10px', borderRadius: 6, fontSize: 10.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                                    style={{ background: 'var(--pill-indigo-bg)', border: '1px solid var(--pill-indigo-bd)', color: 'var(--pill-indigo-fg)', padding: '5px 10px', borderRadius: 6, fontSize: 10.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
                                     title="Nascondi questo documento firmato dalle liste operative: il file e la firma restano conservati nello storico"
                                   >
                                     🗄 Archivia
@@ -456,7 +456,7 @@ export function TabDocumenti({
                 💡 Il documento viene salvato in <strong>Bozza Interna</strong>: sarai tu a cliccare <strong>"🚀 Pubblica al Cliente"</strong> quando è pronto per la firma.
               </div>
               {!effProgettoId && (
-                <div style={{ fontSize: 10.5, color: '#f59e0b', background: '#2d1a0530', border: '1px solid #78350f', borderRadius: 6, padding: '6px 10px' }}>
+                <div style={{ fontSize: 10.5, color: 'var(--amber)', background: '#2d1a0530', border: '1px solid var(--pill-amber-bg)', borderRadius: 6, padding: '6px 10px' }}>
                   ⚠️ Progetto non ancora a database: il documento verrà salvato solo localmente e non sarà visibile al cliente.
                 </div>
               )}

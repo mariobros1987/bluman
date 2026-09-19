@@ -635,11 +635,11 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
   // Il segno di recapito non si disegna qui: sta in `SpunteStato`, condiviso con il portale.
   // Prima le due chat ne avevano una copia ciascuna, con la stessa bugia nel ramo finale.
   const getCanaleBadge = (canale: string) => {    switch (canale) {
-      case 'email': return { icon: '✉️', label: 'Email Inbound/Outbound', bg: '#1e1b4b', color: '#818cf8' };
-      case 'whatsapp': return { icon: '🟢', label: 'WhatsApp Business', bg: '#064e3b', color: '#34d399' };
-      case 'telegram': return { icon: '✈️', label: 'Telegram Bot Webhook', bg: '#0369a1', color: '#38bdf8' };
-      case 'signal': return { icon: '🔒', label: 'Signal End-to-End Cifrato', bg: '#312e81', color: '#a5b4fc' };
-      case 'portal': return { icon: '🌐', label: 'Portale Riservato', bg: '#1a2744', color: '#6366f1' };
+      case 'email': return { icon: '✉️', label: 'Email Inbound/Outbound', bg: 'var(--pill-indigo-bg)', color: 'var(--indigo-l)' };
+      case 'whatsapp': return { icon: '🟢', label: 'WhatsApp Business', bg: 'var(--pill-green-bg)', color: 'var(--pill-green-fg)' };
+      case 'telegram': return { icon: '✈️', label: 'Telegram Bot Webhook', bg: 'var(--pill-sky-bd)', color: 'var(--cat-societario)' };
+      case 'signal': return { icon: '🔒', label: 'Signal End-to-End Cifrato', bg: 'var(--pill-indigo-bg)', color: 'var(--pill-indigo-fg)' };
+      case 'portal': return { icon: '🌐', label: 'Portale Riservato', bg: 'var(--surface-1)', color: 'var(--indigo)' };
       default: return { icon: '💬', label: canale, bg: 'var(--card2)', color: 'var(--muted)' };
     }
   };
@@ -652,8 +652,8 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
           title: 'Destinatario WhatsApp',
           val: contactInfo.whatsapp,
           desc: `Cellulare registrato per ${contactInfo.referente}`,
-          color: '#34d399',
-          bg: '#064e3b',
+          color: 'var(--pill-green-fg)',
+          bg: 'var(--pill-green-bg)',
         };
       case 'email':
         return {
@@ -661,8 +661,8 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
           title: 'Destinatario Email',
           val: contactInfo.email,
           desc: `Email ufficiale registrata in anagrafica`,
-          color: '#818cf8',
-          bg: '#1e1b4b',
+          color: 'var(--indigo-l)',
+          bg: 'var(--pill-indigo-bg)',
         };
       case 'telegram':
         return {
@@ -670,8 +670,8 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
           title: 'Destinatario Telegram',
           val: contactInfo.telegram,
           desc: `Account Telegram collegato a ${contactInfo.referente}`,
-          color: '#38bdf8',
-          bg: '#0369a1',
+          color: 'var(--cat-societario)',
+          bg: 'var(--pill-sky-bd)',
         };
       case 'signal':
         return {
@@ -679,8 +679,8 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
           title: 'Destinatario Signal',
           val: contactInfo.signal,
           desc: `Numero Signal cifrato di ${contactInfo.referente}`,
-          color: '#a5b4fc',
-          bg: '#312e81',
+          color: 'var(--pill-indigo-fg)',
+          bg: 'var(--pill-indigo-bg)',
         };
       case 'portal':
         return {
@@ -688,8 +688,8 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
           title: 'Portale Riservato Studio (portal)',
           val: contactInfo.referente || 'portal',
           desc: `Messaggio diretto sul Portale Cliente sicuro (portal)`,
-          color: '#6366f1',
-          bg: '#1a2744',
+          color: 'var(--indigo)',
+          bg: 'var(--surface-1)',
         };
     }
   };
@@ -776,7 +776,7 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
             title="Scarica gli allegati email via IMAP e li associa al fascicolo"
             style={{
               background: 'var(--card2)',
-              color: '#38bdf8',
+              color: 'var(--cat-societario)',
               border: '1px solid var(--border)',
               padding: '5px 12px',
               borderRadius: 20,
@@ -791,7 +791,7 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
       </div>
 
       {/* Info Banner Regole di Associazione Automatica con Dati Anagrafici Reali */}
-      <div style={{ background: '#0d2d22', border: '1px solid #1a5c3c', borderRadius: 12, padding: 14, fontSize: 11.5, color: '#34d399', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+      <div style={{ background: 'var(--pill-green-bg)', border: '1px solid var(--pill-green-bg)', borderRadius: 12, padding: 14, fontSize: 11.5, color: 'var(--green)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
         <div style={{ flex: 1, minWidth: 280 }}>
           <strong>🔗 Associazione Automatica Attiva:</strong> I messaggi scambiati via Portale Riservato (<code>portal</code>), Email <code>{contactInfo.email}</code>, WhatsApp <code>{contactInfo.whatsapp}</code> e Telegram <code>{contactInfo.telegram}</code> (dati anagrafici di <strong>{nomeCliente}</strong>) confluiscono automaticamente in questo fascicolo e gli allegati vengono archiviati nel Vault.
         </div>
@@ -799,8 +799,8 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
           onClick={() => downloadGuidePdf()}
           style={{
             background: 'rgba(52, 211, 153, 0.15)',
-            border: '1px solid #34d399',
-            color: '#34d399',
+            border: '1px solid var(--green)',
+            color: 'var(--green)',
             padding: '6px 14px',
             borderRadius: 8,
             fontSize: 11,
@@ -828,19 +828,19 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
               <React.Fragment key={m.id}>
                 {isFirstUnread && (
                   <div ref={unreadMarkerRef} style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '8px 0', opacity: 0.95 }}>
-                    <div style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, transparent, #6366f1)' }} />
-                    <span style={{ fontSize: 10.5, fontWeight: 700, color: '#a5b4fc', background: '#1e1b4b', border: '1px solid #4338ca', padding: '3px 12px', borderRadius: 12, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <div style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, transparent, var(--indigo))' }} />
+                    <span style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--pill-indigo-fg)', background: 'var(--pill-indigo-bg)', border: '1px solid var(--indigo-d)', padding: '3px 12px', borderRadius: 12, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                       <span>🔔</span>
                       <span>Nuovi messaggi non letti</span>
                     </span>
-                    <div style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, #6366f1, transparent)' }} />
+                    <div style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, var(--indigo), transparent)' }} />
                   </div>
                 )}
                 <div
                   style={{
                     alignSelf: isUscita ? 'flex-end' : 'flex-start',
                     maxWidth: '82%',
-                    background: isUscita ? '#1e1b4b' : 'var(--card)',
+                    background: isUscita ? 'var(--pill-indigo-bg)' : 'var(--card)',
                     border: `1px solid ${isUscita ? 'var(--indigo)' : 'var(--border)'}`,
                     borderRadius: 14,
                     padding: 14,
@@ -917,7 +917,7 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
                             localStorage.setItem(vaultKey, JSON.stringify(existing));
                             alert(`✓ Documento "${att.nome}" archiviato ed indicizzato con successo nel Vault Legale del Fascicolo!`);
                           }}
-                          style={{ background: '#0d2d22', border: '1px solid #1a5c3c', color: '#34d399', padding: '4px 10px', borderRadius: 6, fontSize: 10.5, fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                          style={{ background: 'var(--pill-green-bg)', border: '1px solid var(--pill-green-bg)', color: 'var(--green)', padding: '4px 10px', borderRadius: 6, fontSize: 10.5, fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}
                         >
                           📁 Archivia in Vault Progetto
                         </button>
@@ -958,7 +958,7 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
           >
             <span>⬇️ Scorri all'ultimo</span>
             {nuoviNonLettiCount > 0 && (
-              <span style={{ background: '#ef4444', color: '#fff', borderRadius: '50%', fontSize: 9.5, padding: '1px 6px', fontWeight: 800 }}>
+              <span style={{ background: 'var(--red)', color: '#fff', borderRadius: '50%', fontSize: 9.5, padding: '1px 6px', fontWeight: 800 }}>
                 {nuoviNonLettiCount}
               </span>
             )}
@@ -1062,9 +1062,9 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
                   setTimeout(() => setFeedback(null), 4000);
                 }}
                 style={{
-                  background: '#065f46',
+                  background: 'var(--green)',
                   color: '#fff',
-                  border: '1px solid #10b981',
+                  border: '1px solid var(--green)',
                   padding: '5px 12px',
                   borderRadius: 8,
                   fontSize: 11,
@@ -1084,9 +1084,9 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
             borderRadius: 8,
             fontSize: 11.5,
             fontWeight: 600,
-            background: '#3b2a11',
-            color: '#fbbf24',
-            border: '1px solid #b45309',
+            background: 'var(--pill-amber-bg)',
+            color: 'var(--amber)',
+            border: '1px solid var(--pill-amber-bd)',
           }}>
             ⚠️ Posta in arrivo non leggibile: {erroreImap} Le risposte del cliente potrebbero non comparire in questo registro finché la casella IMAP non è configurata in Impostazioni Studio.
           </div>
@@ -1098,9 +1098,9 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
             borderRadius: 8,
             fontSize: 12,
             fontWeight: 600,
-            background: feedback.tipo === 'ok' ? '#0d2d22' : '#3b1111',
-            color: feedback.tipo === 'ok' ? '#34d399' : '#f87171',
-            border: `1px solid ${feedback.tipo === 'ok' ? '#059669' : '#dc2626'}`,
+            background: feedback.tipo === 'ok' ? 'var(--pill-green-bg)' : 'var(--pill-red-bg)',
+            color: feedback.tipo === 'ok' ? 'var(--green)' : 'var(--pill-red-fg)',
+            border: `1px solid ${feedback.tipo === 'ok' ? 'var(--green)' : 'var(--red)'}`,
             display: 'flex',
             alignItems: 'center',
             gap: 8,
@@ -1110,7 +1110,7 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
         )}
 
         {fileAllegato && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#1e1b4b', border: '1px solid #4338ca', borderRadius: 8, padding: '6px 12px', fontSize: 11, color: '#c7d2fe', width: 'fit-content' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--pill-indigo-bg)', border: '1px solid var(--indigo-d)', borderRadius: 8, padding: '6px 12px', fontSize: 11, color: 'var(--pill-indigo-fg)', width: 'fit-content' }}>
             <span>📎 {fileAllegato.nome}</span>
             <span style={{ fontSize: 9.5, opacity: 0.8 }}>({fileAllegato.sizeStr})</span>
             <button
@@ -1119,7 +1119,7 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
                 setFileAllegato(null);
                 if (fileInputRef.current) fileInputRef.current.value = '';
               }}
-              style={{ background: 'transparent', border: 'none', color: '#f87171', cursor: 'pointer', fontWeight: 700, padding: '0 4px', fontSize: 12 }}
+              style={{ background: 'transparent', border: 'none', color: 'var(--pill-red-fg)', cursor: 'pointer', fontWeight: 700, padding: '0 4px', fontSize: 12 }}
             >
               ✕
             </button>
@@ -1186,7 +1186,7 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
             type="submit"
             disabled={inviando || caricandoFile || (!nuovoTesto.trim() && !fileAllegato)}
             style={{
-              background: inviando || caricandoFile ? '#4338ca' : 'var(--indigo)',
+              background: inviando || caricandoFile ? 'var(--indigo-d)' : 'var(--indigo)',
               color: '#fff',
               border: 'none',
               padding: '0 24px',

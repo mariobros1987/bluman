@@ -126,7 +126,7 @@ export function SettingsPage() {
 
   // Personalizzazione Layout Fattura & PDF
   const [logoUrl, setLogoUrl] = useState('');
-  const [coloreTemaFattura, setColoreTemaFattura] = useState('#4338ca');
+  const [coloreTemaFattura, setColoreTemaFattura] = useState('var(--indigo-d)');
   const [titoloIntestazione, setTitoloIntestazione] = useState('');
   const [notePieDiPagina, setNotePieDiPagina] = useState('');
   const [mostraSdi, setMostraSdi] = useState(true);
@@ -191,7 +191,7 @@ export function SettingsPage() {
       setTelefono(tData.telefono || '');
       setIban(tData.iban || '');
       setLogoUrl(tData.logoUrl || localStorage.getItem(getTenantStorageKey('bluman_logo_url', currentTenantId)) || '');
-      setColoreTemaFattura(tData.coloreTemaFattura || '#4338ca');
+      setColoreTemaFattura(tData.coloreTemaFattura || 'var(--indigo-d)');
       setNotePieDiPagina(tData.notePieFattura || tData.notePieDiPagina || '');
       setTitoloIntestazione(tData.titoloIntestazione || '');
       setWaPhoneId(tData.waPhoneId || '');
@@ -578,7 +578,7 @@ export function SettingsPage() {
       </div>
 
       {saved && (
-        <div style={{ background: '#0d2d22', border: '1px solid #1a5c3c', color: '#34d399', padding: '12px 16px', borderRadius: 10, fontSize: 12, fontWeight: 500 }}>
+        <div style={{ background: 'var(--pill-green-bg)', border: '1px solid var(--pill-green-bg)', color: 'var(--green)', padding: '12px 16px', borderRadius: 10, fontSize: 12, fontWeight: 500 }}>
           ✓ Impostazioni studio e layout fattura aggiornati con successo!
         </div>
       )}

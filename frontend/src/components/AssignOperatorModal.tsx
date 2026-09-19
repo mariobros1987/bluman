@@ -176,8 +176,8 @@ export function AssignOperatorModal({
           <div
             style={
               esito.tipo === 'ok'
-                ? { background: '#0d2d22', border: '1px solid #1a5c3c', color: '#34d399', padding: '10px 14px', borderRadius: 8, fontSize: 11, fontWeight: 600, marginBottom: 14 }
-                : { background: '#2d1414', border: '1px solid #7f1d1d', color: '#fca5a5', padding: '10px 14px', borderRadius: 8, fontSize: 11, fontWeight: 600, marginBottom: 14 }
+                ? { background: 'var(--pill-green-bg)', border: '1px solid var(--pill-green-bg)', color: 'var(--green)', padding: '10px 14px', borderRadius: 8, fontSize: 11, fontWeight: 600, marginBottom: 14 }
+                : { background: 'var(--pill-red-bg)', border: '1px solid var(--pill-red-bg)', color: 'var(--pill-red-fg)', padding: '10px 14px', borderRadius: 8, fontSize: 11, fontWeight: 600, marginBottom: 14 }
             }
           >
             {esito.tipo === 'ok' ? '✓ ' : '⚠ '}
@@ -237,13 +237,13 @@ export function AssignOperatorModal({
                     <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>
                       {op.n}
                       {suggerimento?.corrisponde && (
-                        <span style={{ marginLeft: 8, fontSize: 9, fontWeight: 800, color: '#fbbf24' }}>⭐ SPECIALIZZAZIONE ✓</span>
+                        <span style={{ marginLeft: 8, fontSize: 9, fontWeight: 800, color: 'var(--amber)' }}>⭐ SPECIALIZZAZIONE ✓</span>
                       )}
                     </div>
                     <div style={{ fontSize: 10, color: 'var(--muted)' }}>
                       {op.r}
                       {suggerimento && (
-                        <span style={{ marginLeft: 6, color: 'var(--indigo-l, #818cf8)' }}>
+                        <span style={{ marginLeft: 6, color: 'var(--indigo-l, var(--indigo-l))' }}>
                           · carico {suggerimento.caricoOre.toLocaleString('it-IT', { maximumFractionDigits: 1 })} h
                         </span>
                       )}
