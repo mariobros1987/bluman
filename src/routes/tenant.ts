@@ -800,7 +800,11 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
                 tenantId: tenant.id,
                 specializzazione: `Lead Partner — ${tenant.ragioneSociale}`,
                 passwordHash: hashPassword(pwd),
-                stato: 'attivo',
+                // 'invitato' come ogni altro utente creato con password temporanea (POST /tenant/utenti,
+                // reset-password): il login accetta questo stato, ma `mustChangePassword` diventa vero e
+                // al primo accesso il responsabile del nuovo studio DEVE cambiare la password. Con 'attivo'
+                // entrava senza obbligo di cambiarla.
+                stato: 'invitato',
               },
             });
           });
