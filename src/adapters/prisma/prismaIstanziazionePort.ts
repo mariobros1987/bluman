@@ -16,7 +16,7 @@
 // campi usati qui sotto e quelli effettivi in schema.prisma (rinominati durante lo
 // sviluppo) — controlla prima lì.
 
-import { conContestoInTransazione, type PrismaConContesto } from '../../util/prismaClient.js';
+import { conContestoInTransazione, contestoTenant, type PrismaConContesto } from '../../util/prismaClient.js';
 import { notificaStudio } from '../../services/notificheService.js';
 import type {
   IstanziazionePort,
@@ -27,10 +27,24 @@ import type {
 } from '../../services/istanziazionePort.js';
 
 export class PrismaIstanziazionePort implements IstanziazionePort, EsecuzionePort {
+  private readonly tenantIdDefault: string;
+
+  /**
+   * Il tenant con cui l'istanziazione scrive: dal contesto della richiesta in corso, non fisso.
+   * Uguale al getter di PrismaApp e per lo stesso motivo — con un tenant cablato a Bluecode le
+   * scritture dell'istanziazione di ogni altro studio venivano respinte dalla `WITH CHECK` RLS.
+   * Fuori da una richiesta (script, cron) si ripiega sul default.
+   */
+  private get tenantId(): string {
+    return contestoTenant.getStore()?.tenantId ?? this.tenantIdDefault;
+  }
+
   constructor(
     private readonly prisma: PrismaConContesto,
-    private readonly tenantId: string = '00000000-0000-0000-0000-000000000001'
-  ) {}
+    tenantId: string = '00000000-0000-0000-0000-000000000001'
+  ) {
+    this.tenantIdDefault = tenantId;
+  }
 
   async eseguiInTransazione<T>(fn: (tx: IstanziazioneTransazione) => Promise<T>): Promise<T> {
     // $transaction di Prisma fornisce già l'atomicità che in fakeIstanziazionePort.ts

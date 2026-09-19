@@ -6,7 +6,7 @@
 // (rete bloccata verso binaries.prisma.sh). Verificalo sulla tua macchina — vedi
 // ISTRUZIONI_INSTALLAZIONE.md, Percorso B.
 
-import { conContestoInTransazione, type PrismaConContesto } from '../../util/prismaClient.js';
+import { conContestoInTransazione, contestoTenant, type PrismaConContesto } from '../../util/prismaClient.js';
 import { PrismaIstanziazionePort } from './prismaIstanziazionePort.js';
 import { istanziaProgetto, calcolaPrezzoModulo } from '../../services/istanziaProgetto.js';
 // La notifica di avvio progetto usa il servizio reale (righe Notifica in-app per gli
@@ -68,10 +68,29 @@ class NotificheStudioPort implements NotificationPort {
 export class PrismaApp implements AppPort {
   private readonly istanziazione: PrismaIstanziazionePort;
   private readonly notifiche: NotificationPort;
-  private readonly tenantId: string;
+
+  /**
+   * Tenant di ripiego, fissato alla costruzione (Bluecode, l'unico studio quando `index.ts`
+   * costruisce l'istanza condivisa una volta sola). Vale solo fuori da una richiesta HTTP —
+   * script, cron, bootstrap — dove non c'è un tenant corrente.
+   */
+  private readonly tenantIdDefault: string;
+
+  /**
+   * Il tenant con cui questa istanza scrive e legge. **Non** è fisso: viene dal contesto della
+   * richiesta in corso (lo stesso `app.current_tenant_id` su cui filtrano le policy RLS), così un
+   * advisor dello studio 2 scrive nello studio 2 e non in Bluecode. Prima era un campo cablato a
+   * Bluecode: le scritture di ogni studio diverso da Bluecode (`creaCliente`, `creaProgetto`,
+   * `emettiFattura`, l'istanziazione…) portavano `tenant_id = Bluecode` e la `WITH CHECK` della RLS
+   * le rifiutava — è il difetto che impediva di usare un secondo studio (voce 7 del piano). Fuori
+   * da una richiesta (nessun contesto) si ripiega sul default del costruttore.
+   */
+  private get tenantId(): string {
+    return contestoTenant.getStore()?.tenantId ?? this.tenantIdDefault;
+  }
 
   constructor(private readonly prisma: PrismaConContesto, tenantId: string) {
-    this.tenantId = tenantId;
+    this.tenantIdDefault = tenantId;
     this.istanziazione = new PrismaIstanziazionePort(prisma, tenantId);
     this.notifiche = new NotificheStudioPort(tenantId);
   }

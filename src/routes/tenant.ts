@@ -10,7 +10,7 @@
 import type { FastifyInstance } from 'fastify';
 import { randomBytes } from 'node:crypto';
 import { RuoloUtente } from '@prisma/client';
-import { prisma, prismaAmministrativo } from '../util/prismaClient.js';
+import { prisma, prismaAmministrativo, contestoTenant } from '../util/prismaClient.js';
 import { generaPasswordTemporanea, hashPassword } from '../util/password.js';
 import { rifirmaUrlUpload } from '../services/storageService.js';
 import { provaPostaInUscita, provaPostaInArrivo, sendInvitoCollaboratoreEmail } from '../services/emailService.js';
@@ -781,17 +781,28 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
       if (emailResponsabile) {
         const esistente = await prisma.user.findUnique({ where: { email: emailResponsabile } });
         if (!esistente) {
-          passwordTemporanea = generaPasswordTemporanea();
-          await prisma.user.create({
-            data: {
-              email: emailResponsabile,
-              nome: b.leadAdvisorNome || 'Lead Senior Advisor',
-              ruolo: 'advisor',
-              tenantId: tenant.id,
-              specializzazione: `Lead Partner — ${tenant.ragioneSociale}`,
-              passwordHash: hashPassword(passwordTemporanea),
-              stato: 'attivo',
-            },
+          const pwd = generaPasswordTemporanea();
+          passwordTemporanea = pwd;
+          // La `user.create` va eseguita nel contesto del tenant appena creato, non in quello
+          // della richiesta (il super_admin opera dal tenant di default). La policy RLS su `user`
+          // ammette una riga solo se `tenant_id = app.current_tenant_id` — oppure `NULL` per un
+          // super_admin. Il responsabile del nuovo studio non è né l'uno né l'altro finché il
+          // contesto resta sul default: la `WITH CHECK` respinge l'insert e lo studio nasce orfano,
+          // senza nessun utente che possa accedervi (era il "errore" alla creazione di un secondo
+          // studio). `run` (non `enterWith`) apre il contesto solo per questa scrittura e lo richiude
+          // subito dopo, senza sporcare il resto della richiesta.
+          await contestoTenant.run({ tenantId: tenant.id, ruolo: 'super_admin' }, async () => {
+            await prisma.user.create({
+              data: {
+                email: emailResponsabile,
+                nome: b.leadAdvisorNome || 'Lead Senior Advisor',
+                ruolo: 'advisor',
+                tenantId: tenant.id,
+                specializzazione: `Lead Partner — ${tenant.ragioneSociale}`,
+                passwordHash: hashPassword(pwd),
+                stato: 'attivo',
+              },
+            });
           });
         }
       }
