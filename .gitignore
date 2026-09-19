@@ -45,3 +45,6 @@ scratch/
 # Artefatti Playwright (E2E)
 test-results/
 playwright-report/
+
+# Grafo graphify: output rigenerabile a ogni estrazione (voce 5 del piano)
+graphify-out/

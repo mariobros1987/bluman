@@ -1,1 +1,0 @@
-{"nodes": [{"id": "$graphify-root$_prisma_migrations_20260824150000_indici_trigram_ricerca_globale_migration_sql", "label": "migration.sql", "file_type": "code", "source_file": "prisma/migrations/20260824150000_indici_trigram_ricerca_globale/migration.sql", "source_location": null}], "edges": []}
