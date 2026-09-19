@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { fetchClienti, fetchProgetti, fetchProgettoDettaglio, fetchTenantInfoApi, salvaDocumentoApi } from '../api/client';
 import { getFormattedLogoUrl } from '../utils';
 import { downloadRealPdf, downloadRealWordDoc } from '../utils/pdfGenerator';
-import { getCurrentTenantId, getTenantStorageKey, getStudioInfoForTenant } from '../utils/tenant';
+import { getCurrentTenantId, getTenantStorageKey, getStudioInfoForTenant, getBrandLogoFallback } from '../utils/tenant';
 import { componiDocumento, scomponiDocumento } from '../../../src/util/intestazionePiede';
 import { escapeHtmlTesto, sanitizzaHtmlDocumento } from '../../../src/util/htmlSanitizer';
 import { intestazioneStudioHtml, piedeStudioHtml } from '../utils/intestazioneStudio';
@@ -305,6 +305,7 @@ export function DocumentEditorPage() {
     piva: tenantInfo?.piva || studioCorrente.piva || '',
     telefono: tenantInfo?.telefono || studioCorrente.telefono || '',
     logo: logoFoglio,
+    logoFallback: getBrandLogoFallback(getCurrentTenantId()),
   });
   const piedeEffettivo = piedeProprio ?? piedeStudioHtml({
     ragioneSociale: ragioneSocialeFoglio,

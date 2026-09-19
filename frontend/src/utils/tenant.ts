@@ -23,6 +23,19 @@ export interface StudioInfo {
 
 export const BLUECODE_TENANT_ID = '00000000-0000-0000-0000-000000000001';
 
+/** Vero solo per il tenant Bluecode. Usato per mostrare il marchio Bluecode (`/logo.png`)
+ *  soltanto lì: gli altri studi vedono il proprio logo caricato o, se manca, il nome. */
+export function isBluecodeTenant(tenantId?: string): boolean {
+  return (tenantId || getCurrentTenantId()) === BLUECODE_TENANT_ID;
+}
+
+/** Il logo di marca `/logo.png` (asset Bluecode in frontend/public) va usato SOLO come
+ *  ripiego per il tenant Bluecode. Per ogni altro studio ritorna stringa vuota: senza
+ *  logo caricato si stampa il nome dello studio, non il marchio di un altro. */
+export function getBrandLogoFallback(tenantId?: string): string {
+  return isBluecodeTenant(tenantId) ? '/logo.png' : '';
+}
+
 export const TENANT_STUDIOS: Record<string, StudioInfo> = {
   '00000000-0000-0000-0000-000000000001': {
     id: '00000000-0000-0000-0000-000000000001',

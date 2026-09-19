@@ -18,6 +18,9 @@ export interface DatiIntestazioneStudio {
   telefono: string;
   /** URL del logo già normalizzato, o stringa vuota: senza logo si stampa il nome dello studio. */
   logo: string;
+  /** Ripiego se il logo non carica. Vuoto per default: solo Bluecode passa `/logo.png`
+   *  (il suo marchio), così un logo rotto non fa comparire il marchio Bluecode su un altro studio. */
+  logoFallback?: string;
 }
 
 /** Il livello legale che l'atto esige, in parole: la stessa etichetta nell'editor e nel PDF. */
@@ -32,17 +35,22 @@ export function intestazioneStudioHtml(dati: DatiIntestazioneStudio): string {
   // Un `logoUrl` che non carica non deve svuotare la fascia: ad agosto 2026 il tenant di
   // produzione si è ritrovato un logo con un URL che non ha mai potuto funzionare
   // (scritto dalla suite di test girata senza isolamento) e ogni documento ha perso il
-  // marchio, perché questo ramo disegnava un `<img>` vuoto senza via d'uscita. Se il logo
-  // non arriva, si torna a `/logo.png`, l'asset reale di frontend/public — e il ripiego
-  // vale per tutti e quattro i contesti §39 (canvas dell'editor, PDF, .doc, documento
-  // salvato) perché l'onerror inline scatta ovunque il browser parsi questo HTML, compresi
-  // i fogli off-screen che pdfA4 appende a document.body per misurare e impaginare.
-  // `this.onerror=null` viene PRIMA del cambio di src: se anche /logo.png mancasse, il
-  // gestore scatta una volta sola invece di loopare. Nel .doc l'attributo arriva tal
-  // quale ma è inerte — Word non esegue script — e l'immagine rotta mostra l'alt
-  // «Logo studio» esattamente come faceva prima.
+  // marchio, perché questo ramo disegnava un `<img>` vuoto senza via d'uscita. Il ripiego
+  // ora lo decide il chiamante via `logoFallback`: SOLO Bluecode passa `/logo.png` (il suo
+  // marchio in frontend/public), gli altri studi passano vuoto — un logo rotto non deve far
+  // comparire il marchio di un altro studio. Il ripiego vale per tutti e quattro i contesti
+  // §39 (canvas dell'editor, PDF, .doc, documento salvato) perché l'onerror inline scatta
+  // ovunque il browser parsi questo HTML, compresi i fogli off-screen che pdfA4 appende a
+  // document.body per misurare e impaginare. `this.onerror=null` viene PRIMA del cambio di
+  // src: se anche il ripiego mancasse, il gestore scatta una volta sola invece di loopare;
+  // senza ripiego l'immagine si nasconde. Nel .doc l'attributo arriva tal quale ma è inerte
+  // — Word non esegue script — e l'immagine rotta mostra l'alt «Logo studio».
+  const fallback = dati.logoFallback || '';
+  const onerror = fallback
+    ? `this.onerror=null; this.src='${fallback}';`
+    : `this.onerror=null; this.style.display='none';`;
   const marchio = dati.logo
-    ? `<img src="${dati.logo}" alt="Logo studio" onerror="this.onerror=null; this.src='/logo.png';" style="max-height: 45px; max-width: 180px; object-fit: contain;" />`
+    ? `<img src="${dati.logo}" alt="Logo studio" onerror="${onerror}" style="max-height: 45px; max-width: 180px; object-fit: contain;" />`
     : `<div style="font-size: 16px; font-weight: 800; color: #1e1b4b;">🏛 ${(dati.ragioneSociale || 'STUDIO PROFESSIONALE').toUpperCase()}</div>`;
 
   const righe = [

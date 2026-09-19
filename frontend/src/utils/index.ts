@@ -5,8 +5,12 @@ import type { CategoriaModulo, StatoModulo, StatoMicrovoce, StatoProgetto, Artic
 // ─── Formatters ───────────────────────────────────────────────────
 export const fmt = (n: number) => '€ ' + n.toLocaleString('it-IT');
 
+// Normalizza un URL logo già scelto. NON inventa un default: un logo mancante
+// resta vuoto, e sta al chiamante decidere il ripiego (per Bluecode `/logo.png`
+// via getBrandLogoFallback, per gli altri studi il nome). Prima qui si tornava
+// sempre `/logo.png`, il marchio Bluecode, che così trapelava su ogni tenant.
 export function getFormattedLogoUrl(url?: string | null): string {
-  if (!url || url.trim() === '') return '/logo.png';
+  if (!url || url.trim() === '') return '';
   if (url.startsWith('data:') || url.startsWith('http://') || url.startsWith('https://')) return url;
   if (url.startsWith('/uploads')) return `https://bluman-api-production.up.railway.app${url}`;
   return url;

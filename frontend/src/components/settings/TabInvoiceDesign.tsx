@@ -1,5 +1,6 @@
 import React from 'react';
 import { getFormattedLogoUrl } from '../../utils';
+import { getBrandLogoFallback } from '../../utils/tenant';
 import styles from '../../pages/Settings.module.css';
 
 interface TabInvoiceDesignProps {
@@ -65,14 +66,21 @@ export function TabInvoiceDesign({
               />
               {uploadingLogo && <div style={{ fontSize: 10, color: 'var(--muted)' }}>Upload logo in corso...</div>}
               <div style={{ marginTop: 6, background: 'var(--surface-2)', padding: 12, borderRadius: 8, textAlign: 'center', border: '1px solid var(--pill-slate-bg)' }}>
-                <img
-                  src={getFormattedLogoUrl(logoUrl)}
-                  alt="Logo Studio"
-                  style={{ maxHeight: 60, maxWidth: 220, objectFit: 'contain' }}
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = '/logo.png';
-                  }}
-                />
+                {getFormattedLogoUrl(logoUrl) || getBrandLogoFallback() ? (
+                  <img
+                    src={getFormattedLogoUrl(logoUrl) || getBrandLogoFallback()}
+                    alt="Logo Studio"
+                    style={{ maxHeight: 60, maxWidth: 220, objectFit: 'contain' }}
+                    onError={(e) => {
+                      const fb = getBrandLogoFallback();
+                      const img = e.target as HTMLImageElement;
+                      if (fb && img.src.indexOf(fb) === -1) img.src = fb;
+                      else img.style.display = 'none';
+                    }}
+                  />
+                ) : (
+                  <div style={{ fontSize: 11, color: 'var(--muted)' }}>Nessun logo caricato</div>
+                )}
               </div>
             </div>
 
