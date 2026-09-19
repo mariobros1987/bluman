@@ -478,21 +478,21 @@ export function InvoicesPage() {
 
       {/* KPI STRIP */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginBottom: '2rem' }}>
-        <div style={{ background: 'var(--pill-blue-bg)', padding: 20, borderRadius: 12 }}>
+        <div style={{ background: 'var(--pill-blue-bg)', padding: 20, borderRadius: 12, border: '1px solid var(--pill-blue-bd)' }}>
           <div style={{ fontSize: 13, color: 'var(--pill-blue-fg)', textTransform: 'uppercase', fontWeight: 600 }}>Totale Fatturato Emesso</div>
-          <div style={{ fontSize: 24, fontWeight: 700, color: 'white', marginTop: 8 }}>💶 {fmt(totalEmessoCent / 100)}</div>
+          <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--pill-blue-fg)', marginTop: 8 }}>💶 {fmt(totalEmessoCent / 100)}</div>
         </div>
-        <div style={{ background: 'var(--pill-green-bg)', padding: 20, borderRadius: 12 }}>
+        <div style={{ background: 'var(--pill-green-bg)', padding: 20, borderRadius: 12, border: '1px solid var(--pill-green-bd)' }}>
           <div style={{ fontSize: 13, color: 'var(--pill-green-fg)', textTransform: 'uppercase', fontWeight: 600 }}>Incassato Saldate</div>
-          <div style={{ fontSize: 24, fontWeight: 700, color: 'white', marginTop: 8 }}>✓ {fmt(totalIncassatoCent / 100)}</div>
+          <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--pill-green-fg)', marginTop: 8 }}>✓ {fmt(totalIncassatoCent / 100)}</div>
         </div>
-        <div style={{ background: 'var(--pill-amber-bg)', padding: 20, borderRadius: 12 }}>
+        <div style={{ background: 'var(--pill-amber-bg)', padding: 20, borderRadius: 12, border: '1px solid var(--pill-amber-bd)' }}>
           <div style={{ fontSize: 13, color: 'var(--pill-amber-fg)', textTransform: 'uppercase', fontWeight: 600 }}>In Sospeso / Da Incassare</div>
-          <div style={{ fontSize: 24, fontWeight: 700, color: 'white', marginTop: 8 }}>⏳ {fmt(totalSospesoCent / 100)}</div>
+          <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--pill-amber-fg)', marginTop: 8 }}>⏳ {fmt(totalSospesoCent / 100)}</div>
         </div>
-        <div style={{ background: 'var(--pill-amber-bg)', padding: 20, borderRadius: 12 }}>
+        <div style={{ background: 'var(--pill-red-bg)', padding: 20, borderRadius: 12, border: '1px solid var(--pill-red-bd)' }}>
           <div style={{ fontSize: 13, color: 'var(--pill-red-fg)', textTransform: 'uppercase', fontWeight: 600 }}>Note di Credito Emesse</div>
-          <div style={{ fontSize: 24, fontWeight: 700, color: 'white', marginTop: 8 }}>📉 {fmt(totalNcCent / 100)}</div>
+          <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--pill-red-fg)', marginTop: 8 }}>📉 {fmt(totalNcCent / 100)}</div>
         </div>
       </div>
 
@@ -937,17 +937,17 @@ export function InvoicesPage() {
             <div style={{ background: 'var(--surface-2)', padding: '1.25rem', borderRadius: 10, marginBottom: '1.5rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 12, border: '1px solid var(--pill-slate-bg)' }}>
               <div>
                 <div style={{ fontSize: 11, color: 'var(--muted)' }}>Imponibile</div>
-                <div style={{ fontSize: 16, fontWeight: 700, color: 'white' }}>{fmt(totaliForm.totImponibileCent / 100)}</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>{fmt(totaliForm.totImponibileCent / 100)}</div>
               </div>
               {totaliForm.cassaCent > 0 && (
                 <div>
                   <div style={{ fontSize: 11, color: 'var(--muted)' }}>Cassa Prev. (4%)</div>
-                  <div style={{ fontSize: 16, fontWeight: 700, color: 'white' }}>+ {fmt(totaliForm.cassaCent / 100)}</div>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>+ {fmt(totaliForm.cassaCent / 100)}</div>
                 </div>
               )}
               <div>
                 <div style={{ fontSize: 11, color: 'var(--muted)' }}>IVA</div>
-                <div style={{ fontSize: 16, fontWeight: 700, color: 'white' }}>+ {fmt(totaliForm.totIvaCent / 100)}</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>+ {fmt(totaliForm.totIvaCent / 100)}</div>
               </div>
               {totaliForm.ritenutaCent > 0 && (
                 <div>

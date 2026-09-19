@@ -102,15 +102,15 @@ export function ScadenzarioPage() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginBottom: '2rem' }}>
         <div style={{ background: 'var(--pill-amber-bg)', padding: 20, borderRadius: 12 }}>
           <div style={{ fontSize: 13, color: 'var(--pill-amber-fg)', textTransform: 'uppercase', fontWeight: 600 }}>In Sospeso / Da Incassare</div>
-          <div style={{ fontSize: 24, fontWeight: 700, color: 'white', marginTop: 8 }}>⏳ {fmt(totalSospeso / 100)}</div>
+          <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--pill-amber-fg)', marginTop: 8 }}>⏳ {fmt(totalSospeso / 100)}</div>
         </div>
         <div style={{ background: 'var(--pill-red-bg)', padding: 20, borderRadius: 12 }}>
           <div style={{ fontSize: 13, color: 'var(--pill-red-fg)', textTransform: 'uppercase', fontWeight: 600 }}>Rate Scadute (In Ritardo)</div>
-          <div style={{ fontSize: 24, fontWeight: 700, color: 'white', marginTop: 8 }}>⚠️ {fmt(totalScaduto / 100)}</div>
+          <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--pill-red-fg)', marginTop: 8 }}>⚠️ {fmt(totalScaduto / 100)}</div>
         </div>
         <div style={{ background: 'var(--pill-green-bg)', padding: 20, borderRadius: 12 }}>
           <div style={{ fontSize: 13, color: 'var(--pill-green-fg)', textTransform: 'uppercase', fontWeight: 600 }}>Incassato Saldate</div>
-          <div style={{ fontSize: 24, fontWeight: 700, color: 'white', marginTop: 8 }}>✓ {fmt(totalIncassato / 100)}</div>
+          <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--pill-green-fg)', marginTop: 8 }}>✓ {fmt(totalIncassato / 100)}</div>
         </div>
         <div style={{ background: 'var(--card)', padding: 20, borderRadius: 12, border: '1px solid var(--border)' }}>
           <div style={{ fontSize: 13, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 600 }}>Totale Rate Gestite</div>

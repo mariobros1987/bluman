@@ -136,7 +136,7 @@ export function RetainersPage() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16, marginBottom: '2rem' }}>
         <div style={{ background: 'var(--pill-blue-bg)', padding: 20, borderRadius: 12 }}>
           <div style={{ fontSize: 13, color: 'var(--pill-blue-fg)', textTransform: 'uppercase', fontWeight: 600 }}>Monthly Recurring Revenue (MRR)</div>
-          <div style={{ fontSize: 28, fontWeight: 800, color: 'white', marginTop: 8 }}>💶 {fmt(totalMonthlyRunRateCentesimi / 100)} / mese</div>
+          <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--pill-blue-fg)', marginTop: 8 }}>💶 {fmt(totalMonthlyRunRateCentesimi / 100)} / mese</div>
         </div>
         <div style={{ background: 'var(--card)', padding: 20, borderRadius: 12, border: '1px solid var(--border)' }}>
           <div style={{ fontSize: 13, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 600 }}>Contratti Ricorrenti Attivi</div>

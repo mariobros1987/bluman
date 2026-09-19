@@ -267,7 +267,7 @@ export function CreaModuloForm({ articoliList, giurList, moduloInModifica, onCre
             <div style={{ background: 'linear-gradient(135deg,var(--surface-1),var(--card2))', border: '1px solid var(--card2)', borderRadius: 12, padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12 }}>
                 <span style={{ color: 'var(--indigo-l)' }}>Somma Singoli Articoli:</span>
-                <span style={{ fontWeight: 700, color: '#fff' }}>{fmt(totalCalculated)}</span>
+                <span style={{ fontWeight: 700, color: 'var(--text)' }}>{fmt(totalCalculated)}</span>
               </div>
 
               <div>
