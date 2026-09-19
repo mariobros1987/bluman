@@ -409,7 +409,7 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
       {/* Modal Anteprima Stampa / PDF Fattura */}
       {previewFattura && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 110, padding: 16 }}>
-          <div style={{ background: '#fff', color: 'var(--surface-2)', borderRadius: 16, padding: 32, width: '100%', maxWidth: 640, maxHeight: '90vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 20, boxShadow: '0 24px 60px rgba(0,0,0,.6)' }}>
+          <div style={{ background: '#fff', color: 'var(--text)', borderRadius: 16, padding: 32, width: '100%', maxWidth: 640, maxHeight: '90vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 20, boxShadow: '0 24px 60px rgba(0,0,0,.6)' }}>
             {/* Header Documento Stampa */}
             <div style={{ borderBottom: '2px solid var(--surface-2)', paddingBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               {(() => {
