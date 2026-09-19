@@ -526,6 +526,9 @@ model ModuloProgetto {
   accessiRisorsa   AccessoRisorsa[]           @relation("AccessoModulo")
   eventiCalendario EventoCalendario[]         @relation("EventiModulo")
 
+  // La lista progetti fa una include annidata (progetto → moduli → microvoci): senza
+  // indice sulla FK Postgres scansiona l'intera tabella a ogni caricamento.
+  @@index([progettoId])
   @@map("modulo_progetto")
 }
 
@@ -564,6 +567,8 @@ model MicrovoceProgetto {
   accessiRisorsa AccessoRisorsa[]    @relation("AccessoMicrovoce")
   eventiCalendario EventoCalendario[] @relation("EventiMicrovoce")
 
+  // FK verso il modulo padre: risolve la include annidata della lista progetti.
+  @@index([moduloProgettoId])
   @@map("microvoce_progetto")
 }
 
@@ -593,6 +598,8 @@ model PassaggioProgetto {
   linkIstruzioni       String?          @map("link_istruzioni")
   checklistVoci        ChecklistVoce[]
 
+  // FK verso la micro-voce: i passaggi si caricano per micro-voce nell'esecuzione (§17).
+  @@index([microvoceProgettoId])
   @@map("passaggio_progetto")
 }
 
