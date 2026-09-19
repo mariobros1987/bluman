@@ -226,19 +226,19 @@ export function LibreriaDocumentiEForm() {
     const studio = getStudioInfoForTenant();
     const tmpl = cartella.modelli.find(t => t.id === m.templateId || t.id === m.id) || PREBUILT_TEMPLATES[0];
     const htmlContent = `
-      <div style="font-family: 'Segoe UI', Arial, sans-serif; padding: 20px; color: var(--surface-2);">
-        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--indigo-d); padding-bottom: 14px; margin-bottom: 24px;">
+      <div style="font-family: 'Segoe UI', Arial, sans-serif; padding: 20px; color: #0f172a;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #4338ca; padding-bottom: 14px; margin-bottom: 24px;">
           <div>
-            <div style="font-size: 16pt; font-weight: 800; color: var(--pill-indigo-bg);">${studio.ragioneSociale.toUpperCase()} — ADVISORY SERVICES</div>
-            <div style="font-size: 9pt; color: var(--muted);">${studio.sedeLegale} · P.IVA ${studio.piva}</div>
+            <div style="font-size: 16pt; font-weight: 800; color: #1e1b4b;">${studio.ragioneSociale.toUpperCase()} — ADVISORY SERVICES</div>
+            <div style="font-size: 9pt; color: #64748b;">${studio.sedeLegale} · P.IVA ${studio.piva}</div>
           </div>
-          <div style="text-align: right; font-size: 8.5pt; color: var(--muted);">
+          <div style="text-align: right; font-size: 8.5pt; color: #64748b;">
             Modello: #${m.cat}<br />
             Data: ${new Date().toLocaleDateString('it-IT')}
           </div>
         </div>
         <div>${tmpl.contenutoHtml}</div>
-        <div style="margin-top: 40px; border-top: 1px solid var(--border); padding-top: 10px; display: flex; justify-content: space-between; font-size: 8.5pt; color: var(--muted);">
+        <div style="margin-top: 40px; border-top: 1px solid #e2e8f0; padding-top: 10px; display: flex; justify-content: space-between; font-size: 8.5pt; color: #94a3b8;">
           <span>${studio.ragioneSociale} • Modello Ufficiale Studio</span>
           <span>Firma Elettronica Semplice • art. 20 CAD</span>
         </div>

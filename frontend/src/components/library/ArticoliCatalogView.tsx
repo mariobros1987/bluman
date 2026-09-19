@@ -42,9 +42,9 @@ export function ArticoliCatalogView({ articoliList, onOpenNew, onDisattiva }: { 
       categoria: (editingArt?.cat.toLowerCase() as any) || 'societario',
       descrizione: `Modello Word personalizzato creato per la prestazione "${editName}".`,
       contenutoHtml: `
-<h1 style="text-align: center; color: var(--pill-indigo-bg); font-size: 18px; margin-bottom: 20px;">${title.trim().toUpperCase()}</h1>
-<p style="text-align: right; color: var(--muted); font-size: 11px;"><strong>Data:</strong> {{data_odierna}} | <strong>Pratica:</strong> {{progetto.titolo}}</p>
-<div style="background: var(--pill-sky-fg); border-left: 4px solid var(--indigo-d); padding: 12px; margin: 20px 0; font-size: 11.5px;">
+<h1 style="text-align: center; color: #1e1b4b; font-size: 18px; margin-bottom: 20px;">${title.trim().toUpperCase()}</h1>
+<p style="text-align: right; color: #64748b; font-size: 11px;"><strong>Data:</strong> {{data_odierna}} | <strong>Pratica:</strong> {{progetto.titolo}}</p>
+<div style="background: #f8fafc; border-left: 4px solid #4338ca; padding: 12px; margin: 20px 0; font-size: 11.5px;">
   <strong>Cliente:</strong> {{cliente.ragione_sociale}} (P.IVA {{cliente.partita_iva}})<br/>
   <strong>Studio:</strong> {{studio.ragione_sociale}}
 </div>

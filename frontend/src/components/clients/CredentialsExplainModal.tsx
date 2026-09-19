@@ -48,21 +48,21 @@ Password: ${data.passwordChiaro}`;
     setEmailStatus(null);
     try {
       const emailHtml = `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; color: var(--pill-slate-bg);">
-          <div style="background-color: var(--surface-2); padding: 24px; text-align: center; color: #ffffff;">
-            <h2 style="margin: 0; color: var(--indigo-l);">BluMan Advisory Platform</h2>
-            <p style="margin: 4px 0 0 0; font-size: 12px; color: var(--muted);">Portale Riservato Cliente</p>
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; color: #1e293b;">
+          <div style="background-color: #0f172a; padding: 24px; text-align: center; color: #ffffff;">
+            <h2 style="margin: 0; color: #818cf8;">BluMan Advisory Platform</h2>
+            <p style="margin: 4px 0 0 0; font-size: 12px; color: #94a3b8;">Portale Riservato Cliente</p>
           </div>
           <div style="padding: 28px 24px;">
-            <h3 style="margin-top: 0; color: var(--surface-2);">Gentile ${data.cliente.nome},</h3>
-            <p style="color: var(--muted); line-height: 1.6;">Sono state generate le credenziali per il tuo accesso al Portale Riservato:</p>
-            <div style="background: var(--pill-sky-fg); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin: 20px 0;">
-              <p style="margin: 0 0 8px 0; font-size: 13px;"><strong>Indirizzo Portale:</strong> <a href="${portalUrl}" style="color: var(--indigo);">${portalUrl}</a></p>
+            <h3 style="margin-top: 0; color: #0f172a;">Gentile ${data.cliente.nome},</h3>
+            <p style="color: #475569; line-height: 1.6;">Sono state generate le credenziali per il tuo accesso al Portale Riservato:</p>
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin: 20px 0;">
+              <p style="margin: 0 0 8px 0; font-size: 13px;"><strong>Indirizzo Portale:</strong> <a href="${portalUrl}" style="color: #6366f1;">${portalUrl}</a></p>
               <p style="margin: 0 0 8px 0; font-size: 13px;"><strong>Email (Username):</strong> <code>${destEmail}</code></p>
-              <p style="margin: 0; font-size: 14px;"><strong>Password Riservata:</strong> <span style="font-family: monospace; font-weight: bold; color: var(--indigo-d); font-size: 16px;">${data.passwordChiaro}</span></p>
+              <p style="margin: 0; font-size: 14px;"><strong>Password Riservata:</strong> <span style="font-family: monospace; font-weight: bold; color: #4338ca; font-size: 16px;">${data.passwordChiaro}</span></p>
             </div>
             <div style="text-align: center; margin: 24px 0;">
-              <a href="${portalUrl}" style="background: var(--indigo); color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: 700; display: inline-block;">Accedi al Portale Cliente ➔</a>
+              <a href="${portalUrl}" style="background: #6366f1; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: 700; display: inline-block;">Accedi al Portale Cliente ➔</a>
             </div>
           </div>
         </div>

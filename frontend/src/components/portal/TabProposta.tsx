@@ -137,18 +137,18 @@ export function TabProposta({
                     const rawLogo = localStorage.getItem(getTenantStorageKey('bluman_logo_url')) || (isBC ? `${window.location.origin}/logo.png` : '');
                     const logoHtml = rawLogo
                       ? `<img src="${rawLogo}" style="max-height:55px;max-width:220px;object-fit:contain;margin-bottom:8px;display:block;" />`
-                      : `<div style="font-size:20px;font-weight:800;color:var(--pill-indigo-bg);margin-bottom:8px;">🏛 ${studio.ragioneSociale.toUpperCase()}</div>`;
+                      : `<div style="font-size:20px;font-weight:800;color:#1e1b4b;margin-bottom:8px;">🏛 ${studio.ragioneSociale.toUpperCase()}</div>`;
                     const htmlContent = `
-                      <div style="border-bottom:2px solid var(--surface-2);padding-bottom:15px;display:flex;justify-content:space-between;align-items:flex-start;">
+                      <div style="border-bottom:2px solid #0f172a;padding-bottom:15px;display:flex;justify-content:space-between;align-items:flex-start;">
                         <div>
                           ${logoHtml}
-                          <div style="font-size:20px;font-weight:800;color:var(--pill-indigo-bg);">${studio.ragioneSociale.toUpperCase()} — ADVISORY</div>
-                          <div style="font-size:11px;color:var(--muted);margin-top:2px;">${studio.sedeLegale}</div>
+                          <div style="font-size:20px;font-weight:800;color:#1e1b4b;">${studio.ragioneSociale.toUpperCase()} — ADVISORY</div>
+                          <div style="font-size:11px;color:#475569;margin-top:2px;">${studio.sedeLegale}</div>
                         </div>
                         <div style="text-align:right;">
-                          <div style="font-size:16px;font-weight:800;color:var(--indigo-d);">ENGAGEMENT LETTER v1.0 (CONGELATO)</div>
+                          <div style="font-size:16px;font-weight:800;color:#4338ca;">ENGAGEMENT LETTER v1.0 (CONGELATO)</div>
                           <div style="font-size:12px;font-weight:700;margin-top:2px;">Cliente: ${clientName}</div>
-                          <div style="font-size:10px;color:var(--pill-green-bd);margin-top:2px;">✓ FIRMATO DIGITALMENTE E CONGELATO</div>
+                          <div style="font-size:10px;color:#166534;margin-top:2px;">✓ FIRMATO DIGITALMENTE E CONGELATO</div>
                         </div>
                       </div>
                       <p style="margin-top:20px;line-height:1.6;">Si attesta la stipula ed il congelamento immutabile dell'Engagement Letter professionale per l'avvio delle attività di consulenza patrimoniale.</p>

@@ -393,10 +393,10 @@ export function DocumentEditorPage() {
         if (String(parsed.projId) === String(effProgettoId) && Array.isArray(parsed.rows) && parsed.rows.length > 0) {
           customTotalEur = parsed.totalEur;
           customRowsHtml = parsed.rows.map((r: any) => `
-            <tr style="border-bottom: 1px solid var(--border);">
+            <tr style="border-bottom: 1px solid #e2e8f0;">
               <td style="padding: 10px 8px;">
-                <strong style="color: var(--pill-blue-bg);">[${escapeHtmlTesto(r.moduloNome || 'Prestazione')}]</strong> ${escapeHtmlTesto(r.titolo)}
-                ${r.oreConsuntivate > 0 ? `<div style="font-size: 10px; color: var(--muted);">Consuntivo: ${Number(r.oreConsuntivate)}h</div>` : ''}
+                <strong style="color: #1e3a8a;">[${escapeHtmlTesto(r.moduloNome || 'Prestazione')}]</strong> ${escapeHtmlTesto(r.titolo)}
+                ${r.oreConsuntivate > 0 ? `<div style="font-size: 10px; color: #64748b;">Consuntivo: ${Number(r.oreConsuntivate)}h</div>` : ''}
               </td>
               <td style="padding: 10px 8px; text-align: right; font-weight: 600;">€ ${Number(r.importo).toLocaleString('it-IT', { minimumFractionDigits: 2 })}</td>
             </tr>
@@ -411,14 +411,14 @@ export function DocumentEditorPage() {
     const wrapTag = (value: string, tagCode: string) => {
       const valoreSicuro = escapeHtmlTesto(value || `[${tagCode}]`);
       if (isForPrintOrExport || tagDisplayMode === 'plain') return valoreSicuro;
-      return `<span class="bluman-smart-chip" title="Smart Tag ERP: {{${tagCode}}}" style="background: rgba(99, 102, 241, 0.14); color: var(--indigo-d); border: 1px solid rgba(99, 102, 241, 0.35); border-bottom: 2px solid var(--indigo-d); border-radius: 4px; padding: 1px 6px; font-weight: 600; cursor: help; display: inline-block; box-shadow: 0 1px 3px rgba(99,102,241,0.12);">${valoreSicuro}</span>`;
+      return `<span class="bluman-smart-chip" title="Smart Tag ERP: {{${tagCode}}}" style="background: rgba(99, 102, 241, 0.14); color: #4338ca; border: 1px solid rgba(99, 102, 241, 0.35); border-bottom: 2px solid #4f46e5; border-radius: 4px; padding: 1px 6px; font-weight: 600; cursor: help; display: inline-block; box-shadow: 0 1px 3px rgba(99,102,241,0.12);">${valoreSicuro}</span>`;
     };
 
     let out = htmlSicuro;
 
     // Se sono state iniettate microvoci specifiche dal compositore fatture, sostituisci la riga di esempio
     if (customRowsHtml) {
-      out = out.replace(/<tr style="border-bottom: 1px solid var(--border);">\s*<td style="padding: 10px 8px;">Onorari professionali per dossier <strong>\{\{progetto\.titolo\}\}<\/strong><\/td>\s*<td style="padding: 10px 8px; text-align: right; font-weight: 600;">\{\{progetto\.importo_totale\}\}<\/td>\s*<\/tr>/, customRowsHtml);
+      out = out.replace(/<tr style="border-bottom: 1px solid #e2e8f0;">\s*<td style="padding: 10px 8px;">Onorari professionali per dossier <strong>\{\{progetto\.titolo\}\}<\/strong><\/td>\s*<td style="padding: 10px 8px; text-align: right; font-weight: 600;">\{\{progetto\.importo_totale\}\}<\/td>\s*<\/tr>/, customRowsHtml);
     }
 
     out = out.replace(/\{\{data_odierna\}\}/g, wrapTag(dataOggi, 'data_odierna'));
@@ -515,29 +515,29 @@ export function DocumentEditorPage() {
       livelloFirmaRichiesto: newTmplLivello,
       descrizione: newTmplDesc.trim() || 'Modello master personalizzato salvato nello studio.',
       contenutoHtml: `
-<h1 style="text-align: center; color: var(--pill-indigo-bg); margin-bottom: 20px; font-size: 19px; text-transform: uppercase;">
+<h1 style="text-align: center; color: #1e1b4b; margin-bottom: 20px; font-size: 19px; text-transform: uppercase;">
   ${escapeHtmlTesto(newTmplTitolo.toUpperCase())}
 </h1>
 
-<p style="text-align: right; color: var(--muted); font-size: 11px; margin-bottom: 20px;">
+<p style="text-align: right; color: #64748b; font-size: 11px; margin-bottom: 20px;">
   <strong>Data:</strong> {{data_odierna}} | <strong>Rif. Pratica:</strong> {{progetto.titolo}}
 </p>
 
-<div style="background: var(--pill-sky-fg); border-left: 4px solid var(--indigo-d); padding: 12px 16px; margin-bottom: 20px; font-size: 11.5px;">
+<div style="background: #f8fafc; border-left: 4px solid #4338ca; padding: 12px 16px; margin-bottom: 20px; font-size: 11.5px;">
   <strong>Studio Professionale:</strong> {{studio.ragione_sociale}} ({{studio.sede_legale}})<br/>
   <strong>Cliente Committente:</strong> {{cliente.ragione_sociale}} (P.IVA {{cliente.partita_iva}}, Rappresentante: {{cliente.referente}})
 </div>
 
-<h3 style="color: var(--pill-indigo-bg); font-size: 13px;">1. OGGETTO E CONDIZIONI GENERALI</h3>
+<h3 style="color: #1e1b4b; font-size: 13px;">1. OGGETTO E CONDIZIONI GENERALI</h3>
 <p style="font-size: 11.5px; line-height: 1.6; text-align: justify;">
   Inserisci qui il testo normativo del contratto, statuto o accordo dello studio.
 </p>
 
 <div style="margin-top: 40px; display: flex; justify-content: space-between;">
-  <div style="width: 45%; text-align: center; border-top: 1px solid var(--pill-slate-fg); padding-top: 8px; font-size: 11px;">
+  <div style="width: 45%; text-align: center; border-top: 1px solid #cbd5e1; padding-top: 8px; font-size: 11px;">
     {{studio.ragione_sociale}}
   </div>
-  <div style="width: 45%; text-align: center; border-top: 1px solid var(--pill-slate-fg); padding-top: 8px; font-size: 11px;">
+  <div style="width: 45%; text-align: center; border-top: 1px solid #cbd5e1; padding-top: 8px; font-size: 11px;">
     {{cliente.referente}}
   </div>
 </div>
@@ -724,7 +724,7 @@ export function DocumentEditorPage() {
       // nel flusso (compare sul primo foglio, come sulla carta intestata), il piede viene ristampato
       // in fondo a ogni foglio dall'impaginatore, con il numero di pagina.
       const fullPrintHtml = sanitizzaHtmlDocumento(`
-        <div style="font-family: 'Segoe UI', Helvetica, Arial, sans-serif; color: var(--surface-2); line-height: 1.6; font-size: 11.5pt; width: 100%;">
+        <div style="font-family: 'Segoe UI', Helvetica, Arial, sans-serif; color: #0f172a; line-height: 1.6; font-size: 11.5pt; width: 100%;">
           ${intestazioneEffettiva}
           <div>${finalHtml}</div>
         </div>
@@ -735,7 +735,7 @@ export function DocumentEditorPage() {
         piede: (pagina, totale) => sanitizzaHtmlDocumento(`
           <div style="width: 100%;">
             ${piedeEffettivo}
-            <div style="text-align: right; font-size: 8pt; color: var(--muted); margin-top: 3px;">Pagina ${Number(pagina)} di ${Number(totale)}</div>
+            <div style="text-align: right; font-size: 8pt; color: #94a3b8; margin-top: 3px;">Pagina ${Number(pagina)} di ${Number(totale)}</div>
           </div>
         `),
       });
@@ -757,7 +757,7 @@ export function DocumentEditorPage() {
       // §39 — le stesse due fasce del foglio e del PDF. Word non ha un impaginatore nostro, quindi
       // il piede compare una volta in fondo: è il comportamento di sempre per il .doc.
       const fullPrintHtml = sanitizzaHtmlDocumento(`
-        <div style="font-family: 'Calibri', 'Segoe UI', Arial, sans-serif; color: var(--surface-2); line-height: 1.6; font-size: 11pt;">
+        <div style="font-family: 'Calibri', 'Segoe UI', Arial, sans-serif; color: #0f172a; line-height: 1.6; font-size: 11pt;">
           ${intestazioneEffettiva}
           <div>${finalHtml}</div>
           <div style="margin-top: 40px;">${piedeEffettivo}</div>

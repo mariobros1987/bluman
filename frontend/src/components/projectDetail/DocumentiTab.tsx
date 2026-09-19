@@ -117,11 +117,11 @@ export function DocumentiTab({ project }: { project: Progetto }) {
   const buildDocumentHtml = (doc: any) => {
     const studio = getStudioInfoForTenant();
     const rawContent = sanitizzaHtmlDocumento(doc.contenutoHtml || `
-      <div style="font-family: 'Segoe UI', Arial, sans-serif; color: var(--surface-2); line-height: 1.6; font-size: 11pt; padding: 10px;">
-        <h1 style="color: var(--pill-indigo-bg); text-align: center; text-transform: uppercase; font-size: 18pt; border-bottom: 2px solid var(--indigo-d); padding-bottom: 10px; margin-bottom: 20px;">
+      <div style="font-family: 'Segoe UI', Arial, sans-serif; color: #0f172a; line-height: 1.6; font-size: 11pt; padding: 10px;">
+        <h1 style="color: #1e1b4b; text-align: center; text-transform: uppercase; font-size: 18pt; border-bottom: 2px solid #4338ca; padding-bottom: 10px; margin-bottom: 20px;">
           ${escapeHtmlTesto(doc.titolo || doc.nome)}
         </h1>
-        <div style="background: var(--pill-sky-fg); border: 1px solid var(--border); padding: 15px; border-radius: 8px; margin-bottom: 20px; font-size: 10pt;">
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-size: 10pt;">
           <strong>Studio Professionale:</strong> ${escapeHtmlTesto(studio.ragioneSociale)}<br/>
           <strong>Cliente Committente:</strong> ${escapeHtmlTesto(project.cl)} (${escapeHtmlTesto(project.n)})<br/>
           <strong>Categoria Vault:</strong> ${escapeHtmlTesto(doc.cat || doc.categoria || 'Generale')}<br/>
@@ -131,18 +131,18 @@ export function DocumentiTab({ project }: { project: Progetto }) {
     `);
 
     return sanitizzaHtmlDocumento(`
-      <div style="font-family: 'Segoe UI', Arial, sans-serif; color: var(--surface-2); line-height: 1.6; padding: 20px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--indigo-d); padding-bottom: 14px; margin-bottom: 24px;">
+      <div style="font-family: 'Segoe UI', Arial, sans-serif; color: #0f172a; line-height: 1.6; padding: 20px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #4338ca; padding-bottom: 14px; margin-bottom: 24px;">
           <div>
-            <div style="font-size: 16pt; font-weight: 800; color: var(--pill-indigo-bg);">${escapeHtmlTesto(studio.ragioneSociale.toUpperCase())} — ADVISORY SERVICES</div>
-            <div style="font-size: 9pt; color: var(--muted);">${escapeHtmlTesto(studio.sedeLegale)} · P.IVA ${escapeHtmlTesto(studio.piva)}</div>
+            <div style="font-size: 16pt; font-weight: 800; color: #1e1b4b;">${escapeHtmlTesto(studio.ragioneSociale.toUpperCase())} — ADVISORY SERVICES</div>
+            <div style="font-size: 9pt; color: #64748b;">${escapeHtmlTesto(studio.sedeLegale)} · P.IVA ${escapeHtmlTesto(studio.piva)}</div>
           </div>
-          <div style="text-align: right; font-size: 8.5pt; color: var(--muted);">
+          <div style="text-align: right; font-size: 8.5pt; color: #64748b;">
             Rif. Incarico: #${escapeHtmlTesto(project.id)}<br/>Data: ${escapeHtmlTesto(doc.data || doc.dataCaricamento || '2026')}
           </div>
         </div>
         <div>${rawContent}</div>
-        <div style="margin-top: 40px; border-top: 1px solid var(--border); padding-top: 10px; display: flex; justify-content: space-between; font-size: 8.5pt; color: var(--muted);">
+        <div style="margin-top: 40px; border-top: 1px solid #e2e8f0; padding-top: 10px; display: flex; justify-content: space-between; font-size: 8.5pt; color: #94a3b8;">
           <span>${escapeHtmlTesto(studio.ragioneSociale)} • Pratica: ${escapeHtmlTesto(project.n)}</span>
           <span>Firma Elettronica Semplice • art. 20 CAD</span>
         </div>
