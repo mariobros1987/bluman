@@ -875,26 +875,36 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
 
       const passwordTemporanea = generaPasswordTemporanea();
       const passwordHash = hashPassword(passwordTemporanea);
-      const esistente = await prisma.user.findUnique({ where: { email: emailResponsabile } });
 
-      if (esistente) {
-        await prisma.user.update({
-          where: { id: esistente.id },
-          data: { passwordHash, stato: 'invitato', sessionVersion: { increment: 1 } },
-        });
-      } else {
-        await prisma.user.create({
-          data: {
-            email: emailResponsabile,
-            nome: tenant.leadAdvisorNome || 'Lead Senior Advisor',
-            ruolo: 'advisor',
-            tenantId: tenant.id,
-            specializzazione: `Lead Partner — ${tenant.ragioneSociale}`,
-            passwordHash,
-            stato: 'invitato',
-          },
-        });
-      }
+      // Lettura E scrittura dell'utente responsabile vanno fatte nel contesto del tenant
+      // dello studio, non in quello della richiesta (il super_admin opera dal tenant di
+      // default). Altrimenti, per uno studio diverso da quello di default, la policy RLS su
+      // `user` — che filtra `tenant_id = app.current_tenant_id` — nasconde il responsabile
+      // alla `findUnique` (`esistente` diventa `null`) e poi respinge la `create` con la sua
+      // `WITH CHECK`: la rigenerazione falliva con un 500 su ogni studio nuovo, ed era il
+      // motivo per cui non si riusciva a emettere la password. `run` apre il contesto solo
+      // per queste operazioni e lo richiude subito. Stessa correzione della creazione tenant.
+      await contestoTenant.run({ tenantId: tenant.id, ruolo: 'super_admin' }, async () => {
+        const esistente = await prisma.user.findUnique({ where: { email: emailResponsabile } });
+        if (esistente) {
+          await prisma.user.update({
+            where: { id: esistente.id },
+            data: { passwordHash, stato: 'invitato', sessionVersion: { increment: 1 } },
+          });
+        } else {
+          await prisma.user.create({
+            data: {
+              email: emailResponsabile,
+              nome: tenant.leadAdvisorNome || 'Lead Senior Advisor',
+              ruolo: 'advisor',
+              tenantId: tenant.id,
+              specializzazione: `Lead Partner — ${tenant.ragioneSociale}`,
+              passwordHash,
+              stato: 'invitato',
+            },
+          });
+        }
+      });
 
       await recordAudit({
         tenantId: id,
