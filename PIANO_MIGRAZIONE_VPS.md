@@ -1,8 +1,28 @@
 # Piano di migrazione su VPS — runbook
 
 _Redatto il 19/09/2026. Motivo dichiarato: lentezza nel caricamento di progetti e clienti; si vuole più velocità di lettura del database._
+_Aggiornato il 20/09/2026 con le misure di rete di produzione (§0-bis) e le specifiche VPS (§4-bis)._
 
 > **Questo documento è una guida operativa passo-passo.** Ogni fase ha un obiettivo, i comandi, e come verificare che sia andata a buon fine. Le fasi vanno fatte **in ordine**. Non saltare la Fase 0.
+
+---
+
+## 0-bis. Prova misurata (20/09/2026) — perché il VPS co-locato è la cura
+
+Misurato in produzione l'endpoint `/health`, che fa una `SELECT 1` **pura** (nessuna RLS, nessuna logica). Scartato il primo colpo (cold-start Railway ~1.6s), i colpi a caldo:
+
+| Componente | Tempo | Cosa misura |
+|---|---|---|
+| TCP connect (client → Railway) | ~45ms | distanza del client dal test, irrilevante |
+| TLS handshake | ~50ms | idem |
+| **Lato server (TTFB − TLS)** | **~320ms** | **Railway ⟷ Supabase, per una query VUOTA** |
+
+**Lettura:** 320ms per una query che non fa nulla = il backend Railway e il database Supabase (`eu-west-1`, Irlanda) sono **lontani in rete**. Railway non ha region esplicita (`region: null` → default non-EU). Una query reale con RLS aggiunge **~3 round-trip** (`BEGIN → set_config → query → COMMIT`), quindi il costo di rete si **moltiplica** → di qui i secondi per pagina.
+
+**Conclusione operativa:**
+- Con **app + Postgres sullo stesso VPS**, quei round-trip diventano **socket locale <1ms**: il costo RLS che oggi pesa **svanisce**. Questa è la leva più forte.
+- Verificato anche che **non** è colpa del codice: gli `include` Prisma sono ~60ms/1 round-trip; il preview `relationJoins` non dà beneficio (testato e rimosso). Gli indici FK erano il vecchio sospetto, già risolti (vedi §0).
+- Spostare solo Railway in EU aiuterebbe (round-trip ~2-5ms invece di ~150ms) ma lascia app e DB su due macchine: se la meta è il VPS co-locato, spostare Railway ora è lavoro buttato.
 
 ---
 
@@ -94,6 +114,50 @@ Browser ──► Vercel (frontend React)  ──► Railway (backend Fastify) �
 
 ---
 
+## 4-bis. Specifiche del VPS da comprare
+
+**Regione del datacenter — la scelta più importante:** prendi il VPS in **Europa** (Francoforte, Amsterdam o Irlanda). Non per essere vicino a Supabase (quello sparisce, il DB va sul VPS), ma per essere vicino ai tuoi utenti (Italia/Malta) e al frontend. Un VPS negli USA ricreerebbe lo stesso problema di distanza al contrario.
+
+**Taglia consigliata (carico attuale: 2 tenant reali, traffico di prova):**
+
+| Risorsa | Minimo | Consigliato | Perché |
+|---|---|---|---|
+| vCPU | 2 | **4** | Postgres + Node + PgBouncer sulla stessa macchina |
+| RAM | 4 GB | **8 GB** | Postgres ama la RAM per la cache; 8 GB dà margine |
+| Disco | 40 GB SSD | **80 GB NVMe** | DB piccolo oggi, ma documenti (Opzione B) + backup crescono |
+| Banda | — | illimitata/generosa | i backup off-site consumano traffico |
+| OS | — | **Ubuntu 24.04 LTS** | supporto lungo, pacchetti Postgres recenti |
+
+Provider tipici in EU: Hetzner (Germania/Finlandia, ottimo rapporto prezzo/prestazioni), OVH, Contabo, DigitalOcean (Francoforte/Amsterdam). Per questo carico un piano da ~8 GB RAM è ampiamente sufficiente e a basso costo.
+
+**Dati verificati su Supabase di produzione (20/09/2026):**
+- **Versione PostgreSQL rilevata:** `PostgreSQL 17.6 on x86_64-pc-linux-gnu` → sul VPS installare **PostgreSQL 17** (pacchetto ufficiale PGDG per Ubuntu 24.04 `postgresql-17`).
+- **Estensioni attive verificate:**
+  - `pg_trgm` (v1.6) — ricerca testuale trigram e indici GIN (fondamentale per ricerca clienti/progetti)
+  - `pgcrypto` (v1.3) — funzioni crittografiche
+  - `uuid-ossp` (v1.1) — generazione UUID
+  - `plpgsql` (v1.0) — linguaggio procedurale standard
+  - `pg_stat_statements` (v1.11) — statistiche prestazioni query
+  - *(Nota: `supabase_vault` è proprietario Supabase e non va installato sul VPS)*
+
+---
+
+## 4-ter. Ordine di esecuzione consigliato (la sequenza sicura)
+
+Nessun passo tocca la produzione finché non lo dici tu al cut-over (§7). Supabase resta il rollback vivo.
+
+1. **Compra e prepara il VPS** (§4-bis, §4): OS aggiornato, firewall, SSH a chiave.
+2. **Installa lo stack** sul VPS: PostgreSQL (major = Supabase), PgBouncer, Node/Docker, Caddy.
+3. **Ricrea ruoli + DB vuoto** (§5.3) e **le estensioni**.
+4. **Dump da Supabase** (§5.1) → **verifica il dump** (§5.2) → **restore sul VPS** (§5.4).
+5. **Grant + riverifica RLS** (§5.5) e **test isolamento** (§5.6) — se fallisce, STOP.
+6. **Configura backend + pooler** (§6) puntando al DB del VPS; storage per Opzione B (§6.3).
+7. **Backup automatico** attivo e **restore testato** PRIMA del cut-over (§8).
+8. **Cut-over** (§7): manutenzione → dump finale → switch URL/DNS → verifiche → live.
+9. **Sorveglia** qualche giorno, poi (solo dopo stabilità) valuta la dismissione di Railway/Supabase.
+
+---
+
 ## 5. Fase migrazione dati — la parte delicata
 
 > ⚠️ **Regola del progetto:** nessuna DELETE/TRUNCATE/DROP sul database di produzione senza autorizzazione esplicita. Il restore sul VPS lavora su un database **nuovo e vuoto**, non tocca Supabase. Supabase resta intatto fino al cut-over ed è il tuo rollback.
@@ -128,10 +192,12 @@ CREATE ROLE bluman_app WITH LOGIN PASSWORD '***';   -- niente SUPERUSER, niente 
 -- 3. Database vuoto di proprietà dell'owner
 CREATE DATABASE bluman OWNER postgres;
 
--- 4. Estensioni (nel DB bluman, da owner)
+-- 4. Estensioni verificate (nel DB bluman, da owner postgres)
 \c bluman
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
--- aggiungi le altre che risultano da: SELECT extname FROM pg_extension; su Supabase
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
 ```
 
 ### 5.4 Restore dei dati nel DB nuovo
@@ -241,4 +307,4 @@ Supabase resta **intatto e funzionante** durante tutta la migrazione. Rollback =
 
 ---
 
-_Nota: gli indici della gerarchia progetto (la causa più probabile della lentezza attuale) sono già stati aggiunti il 19/09/2026 con la migration `20260919160000_indici_include_progetti`, indipendentemente dal VPS. Misura la velocità dopo quel deploy prima di decidere quanto è urgente il VPS._
+_Nota: gli indici della gerarchia progetto sono già stati aggiunti il 19/09/2026 (migration `20260919160000_indici_include_progetti`), indipendentemente dal VPS. La misura del 20/09/2026 (§0-bis) mostra però che la quota di lentezza residua **online** è dominata dalla distanza di rete Railway⟷Supabase (~320ms per una query vuota, ×3 con la RLS): questa è la parte che solo la co-locazione app+DB sul VPS azzera. Decisione utente: preparare il runbook prima di eseguire._
