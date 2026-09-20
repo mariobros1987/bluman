@@ -54,40 +54,9 @@ export const TENANT_STUDIOS: Record<string, StudioInfo> = {
     codiceSdi: '',
     leadAdvisor: 'Lead Senior Advisor',
   },
-  '00000000-0000-0000-0000-000000000002': {
-    id: '00000000-0000-0000-0000-000000000002',
-    ragioneSociale: 'Advisory Italia S.r.l. (Milano)',
-    nomeBreve: 'Advisory Italia',
-    giurisdizione: 'Italia',
-    piva: '',
-    codiceFiscale: '',
-    sedeLegale: '',
-    sedeOperativa: '',
-    email: 'lorenzo.marino@bluecode.advisory',
-    telefono: '',
-    iban: '',
-    bic: '',
-    bancaNome: '',
-    codiceSdi: '',
-    leadAdvisor: 'Avv. Lorenzo Marino',
-  },
-  '00000000-0000-0000-0000-000000000003': {
-    id: '00000000-0000-0000-0000-000000000003',
-    ragioneSociale: 'Swiss Wealth Management SA (Lugano)',
-    nomeBreve: 'Swiss Wealth SA',
-    giurisdizione: 'Svizzera',
-    piva: '',
-    codiceFiscale: '',
-    sedeLegale: '',
-    sedeOperativa: '',
-    email: 'elena.russo@bluecode.advisory',
-    telefono: '',
-    iban: '',
-    bic: '',
-    bancaNome: '',
-    codiceSdi: '',
-    leadAdvisor: 'Dr. Elena Russo',
-  },
+  // Advisory Italia (…002) e Swiss Wealth (…003) erano anagrafiche mock: studi eliminati dal
+  // DB il 20/09/2026. Rimosse da qui perché un tenant non in mappa ripiega già sulla lista
+  // admin reale (localStorage) o su un segnaposto generico — nessun dato finto da conservare.
 };
 
 /**
@@ -325,10 +294,11 @@ export function getAllAvailableTenants(): { id: string; ragioneSociale: string; 
     }
   } catch {}
 
+  // Ripiego minimo quando il localStorage è vuoto: solo Bluecode, il tenant di default
+  // sempre presente. Prima c'erano anche Advisory Italia e Swiss Wealth (studi mock, poi
+  // eliminati dal DB): li si toglie perché non devono ricomparire nel selettore studi.
   return [
-    { id: '00000000-0000-0000-0000-000000000001', ragioneSociale: 'Bluecode Ltd (Malta HQ)', giurisdizione: 'Malta (UE)' },
-    { id: '00000000-0000-0000-0000-000000000002', ragioneSociale: 'Advisory Italia S.r.l. (Milano)', giurisdizione: 'Italia' },
-    { id: '00000000-0000-0000-0000-000000000003', ragioneSociale: 'Swiss Wealth Management SA (Lugano)', giurisdizione: 'Svizzera' },
+    { id: BLUECODE_TENANT_ID, ragioneSociale: 'Bluecode Advisory Malta Ltd', giurisdizione: 'Malta (UE)' },
   ];
 }
 

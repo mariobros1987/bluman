@@ -25,56 +25,11 @@ interface TenantStudio {
 // La password iniziale la genera il server e si vede una volta sola: vive in
 // `passwordEmessa` qui sotto, che è stato di componente e non viene mai persistito.
 
-const DEFAULT_TENANTS: TenantStudio[] = [
-  {
-    id: '00000000-0000-0000-0000-000000000001',
-    ragioneSociale: 'Bluecode Ltd (Malta Headquarters)',
-    giurisdizione: 'Malta (UE)',
-    pIva: 'MT28491023',
-    leadAdvisorNome: 'Joe Disabato',
-    leadAdvisorEmail: 'joe@bluecode.advisory',
-    piano: 'enterprise',
-    stato: 'attivo',
-    durataMesi: 12,
-    dataAttivazione: '10/01/2026',
-    dataScadenza: '10/01/2027',
-    utentiCount: 12,
-    progettiCount: 8,
-    fatturatoMensile: 45000,
-  },
-  {
-    id: '00000000-0000-0000-0000-000000000002',
-    ragioneSociale: 'Advisory Italia S.r.l. (Milano)',
-    giurisdizione: 'Italia',
-    pIva: 'IT01234567890',
-    leadAdvisorNome: 'Avv. Lorenzo Marino',
-    leadAdvisorEmail: 'lorenzo.marino@bluecode.advisory',
-    piano: 'pro',
-    stato: 'attivo',
-    durataMesi: 6,
-    dataAttivazione: '15/03/2026',
-    dataScadenza: '15/09/2026',
-    utentiCount: 6,
-    progettiCount: 4,
-    fatturatoMensile: 22000,
-  },
-  {
-    id: '00000000-0000-0000-0000-000000000003',
-    ragioneSociale: 'Swiss Wealth Management SA (Lugano)',
-    giurisdizione: 'Svizzera',
-    pIva: 'CHE-123.456.789',
-    leadAdvisorNome: 'Dr. Elena Russo',
-    leadAdvisorEmail: 'elena.russo@bluecode.advisory',
-    piano: 'enterprise',
-    stato: 'attivo',
-    durataMesi: 12,
-    dataAttivazione: '01/05/2026',
-    dataScadenza: '01/05/2027',
-    utentiCount: 18,
-    progettiCount: 11,
-    fatturatoMensile: 78000,
-  },
-];
+// L'elenco degli studi arriva dal server (GET /admin/tenants). Nessuno studio finto di
+// default: prima qui c'erano tre studi mock (Bluecode HQ, Advisory Italia, Swiss Wealth)
+// che comparivano quando il localStorage era vuoto e "risorgevano" anche dopo averli
+// eliminati dal database. Ora la lista parte vuota e la popola solo il DB.
+const DEFAULT_TENANTS: TenantStudio[] = [];
 
 export function SuperAdminPage() {
   const [tenants, setTenants] = useState<TenantStudio[]>(() => {
