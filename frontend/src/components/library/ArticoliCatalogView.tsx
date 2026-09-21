@@ -10,9 +10,11 @@ import { updateArticoloPrezzoApi } from '../../api/client';
 // un identificativo che a database non esisteva, e da un altro computer non si vedeva niente.
 import { useCartellaTemplate } from '../../hooks/useCartellaTemplate';
 import type { Articolo } from '../../types';
+import { useToast } from '../ui/ToastProvider';
 
 // ─── Componente Catalogo Articoli & Distinta Base ──────────────────
 export function ArticoliCatalogView({ articoliList, onOpenNew, onDisattiva }: { articoliList: Articolo[]; onOpenNew: () => void; onDisattiva: (id: string, nome: string) => void }) {
+  const toast = useToast();
   const [selectedCat, setSelectedCat] = useState<string>('TUTTI');
   const navigate = useNavigate();
   const editArtFileImportRef = useRef<HTMLInputElement>(null);
@@ -53,11 +55,11 @@ export function ArticoliCatalogView({ articoliList, onOpenNew, onDisattiva }: { 
     });
 
     if (!esito.ok || !esito.modello) {
-      alert(`⚠️ ${esito.messaggio}\n\nNessun modello è stato allacciato alla prestazione.`);
+      toast.errore(`${esito.messaggio} Nessun modello è stato allacciato alla prestazione.`);
       return;
     }
     setEditDocModels(prev => [...prev, esito.modello!.id]);
-    alert(`✓ ${esito.messaggio}\nAllacciato a questa prestazione.`);
+    toast.successo(`${esito.messaggio} Allacciato a questa prestazione.`);
   };
 
   const handleImportDocFileForArticle = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -73,7 +75,8 @@ export function ArticoliCatalogView({ articoliList, onOpenNew, onDisattiva }: { 
         const esito = await cartella.importaDaJson(content);
         const creati = esito.modelli || [];
         if (creati.length > 0) setEditDocModels(prev => [...prev, ...creati.map(m => m.id)]);
-        alert(`${esito.ok ? '✓' : '⚠️'} ${esito.messaggio}${creati.length > 0 ? `\n${creati.length} allacciati a questa prestazione.` : ''}`);
+        const dettaglio = `${esito.messaggio}${creati.length > 0 ? ` ${creati.length} allacciati a questa prestazione.` : ''}`;
+        if (esito.ok) toast.successo(dettaglio); else toast.errore(dettaglio);
         return;
       }
 
@@ -87,11 +90,11 @@ export function ArticoliCatalogView({ articoliList, onOpenNew, onDisattiva }: { 
       });
 
       if (!esito.ok || !esito.modello) {
-        alert(`⚠️ ${esito.messaggio}\n\nIl file "${file.name}" NON è stato allacciato.`);
+        toast.errore(`${esito.messaggio} Il file "${file.name}" NON è stato allacciato.`);
         return;
       }
       setEditDocModels(prev => [...prev, esito.modello!.id]);
-      alert(`✓ File "${file.name}" importato nell'archivio dello studio e allacciato alla prestazione.`);
+      toast.successo(`File "${file.name}" importato nell'archivio dello studio e allacciato alla prestazione.`);
     };
     reader.readAsText(file);
     e.target.value = '';
@@ -150,7 +153,7 @@ export function ArticoliCatalogView({ articoliList, onOpenNew, onDisattiva }: { 
       editingArt.formMasterId = editFormMasterId;
       setEditingArt(null);
     } catch (err: any) {
-      alert(`Salvataggio articolo non riuscito: ${err?.message || 'errore di rete'}. Le modifiche NON sono state applicate, riprova.`);
+      toast.errore(`Salvataggio articolo non riuscito: ${err?.message || 'errore di rete'}. Le modifiche NON sono state applicate, riprova.`);
     } finally {
       setSavingEdit(false);
     }

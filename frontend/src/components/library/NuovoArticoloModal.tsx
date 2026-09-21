@@ -3,11 +3,13 @@ import { creaArticoloApi } from '../../api/client';
 // §41 — i modelli allacciabili vengono dalla cartella dello studio (database), non da
 // `localStorage`, e l'id da allacciare è quello che risponde il server.
 import { useCartellaTemplate } from '../../hooks/useCartellaTemplate';
+import { useToast } from '../ui/ToastProvider';
 import { BadgeRevisione } from '../ui/BadgeRevisione';
 import type { CategoriaModulo, Giurisdizione } from '../../types';
 
 // ─── Componente Nuovo Articolo Modal ──────────────────────────────
 export function NuovoArticoloModal({ giurList, onClose, onCreated }: { giurList: Giurisdizione[]; onClose: () => void; onCreated: () => void }) {
+  const toast = useToast();
   const [nome, setNome] = useState('');
   const [cat, setCat] = useState<CategoriaModulo>('Analisi');
   const [giurisdizioneId, setGiurisdizioneId] = useState<string>('');
@@ -45,11 +47,11 @@ export function NuovoArticoloModal({ giurList, onClose, onCreated }: { giurList:
     });
 
     if (!esito.ok || !esito.modello) {
-      alert(`⚠️ ${esito.messaggio}\n\nNessun modello è stato collegato all'articolo.`);
+      toast.errore(`${esito.messaggio} Nessun modello è stato collegato all'articolo.`);
       return;
     }
     setSelectedDocIds(prev => [...prev, esito.modello!.id]);
-    alert(`✓ ${esito.messaggio}\nCollegato a questo articolo.`);
+    toast.successo(`${esito.messaggio} Collegato a questo articolo.`);
   };
 
   const handleImportDocFileForNewArt = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -65,7 +67,8 @@ export function NuovoArticoloModal({ giurList, onClose, onCreated }: { giurList:
         const esito = await cartella.importaDaJson(content);
         const creati = esito.modelli || [];
         if (creati.length > 0) setSelectedDocIds(prev => [...prev, ...creati.map(m => m.id)]);
-        alert(`${esito.ok ? '✓' : '⚠️'} ${esito.messaggio}${creati.length > 0 ? `\n${creati.length} collegati a questo articolo.` : ''}`);
+        const dettaglio = `${esito.messaggio}${creati.length > 0 ? ` ${creati.length} collegati a questo articolo.` : ''}`;
+        if (esito.ok) toast.successo(dettaglio); else toast.errore(dettaglio);
         return;
       }
 
@@ -79,11 +82,11 @@ export function NuovoArticoloModal({ giurList, onClose, onCreated }: { giurList:
       });
 
       if (!esito.ok || !esito.modello) {
-        alert(`⚠️ ${esito.messaggio}\n\nIl file "${file.name}" NON è stato collegato.`);
+        toast.errore(`${esito.messaggio} Il file "${file.name}" NON è stato collegato.`);
         return;
       }
       setSelectedDocIds(prev => [...prev, esito.modello!.id]);
-      alert(`✓ File "${file.name}" importato nell'archivio dello studio e collegato all'articolo.`);
+      toast.successo(`File "${file.name}" importato nell'archivio dello studio e collegato all'articolo.`);
     };
     reader.readAsText(file);
     e.target.value = '';
@@ -140,7 +143,7 @@ export function NuovoArticoloModal({ giurList, onClose, onCreated }: { giurList:
       onClose();
     } catch (err: any) {
       // §3.3 — creazione articolo fallita: va detto, non solo loggato in console.
-      alert(`Creazione prestazione non riuscita: ${err?.message || 'errore di rete'}. Riprova.`);
+      toast.errore(`Creazione prestazione non riuscita: ${err?.message || 'errore di rete'}. Riprova.`);
     } finally {
       setLoading(false);
     }

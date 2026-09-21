@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { fetchScadenzarioIncassiApi, registraIncassoApi, fetchClienti } from '../api/client';
 import { fmt } from '../utils';
 import { InviaSollecitoModal } from '../components/solleciti/InviaSollecitoModal';
+import { useToast } from '../components/ui/ToastProvider';
 
 export function ScadenzarioPage() {
+  const toast = useToast();
   const [scadenze, setScadenze] = useState<any[]>([]);
   const [clienti, setClienti] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -67,14 +69,14 @@ export function ScadenzarioPage() {
         riferimentoTransazione: riferimentoTransazione || undefined,
         noteOperatore: noteOperatore || undefined,
       });
-      alert('✓ Incasso registrato con successo e scritto automaticamente in Prima Nota!');
+      toast.successo('Incasso registrato con successo e scritto automaticamente in Prima Nota!');
       setSelectedScadenza(null);
       setImportoIncasso('');
       setRiferimentoTransazione('');
       setNoteOperatore('');
       await loadData();
     } catch (err: any) {
-      alert(`Errore registrazione incasso: ${err.message}`);
+      toast.errore(`Errore registrazione incasso: ${err.message}`);
     } finally {
       setSavingIncasso(false);
     }
@@ -330,7 +332,7 @@ export function ScadenzarioPage() {
         isOpen={!!scadenzaDaSollecitare}
         onClose={() => setScadenzaDaSollecitare(null)}
         onSuccess={(msg) => {
-          alert(`✓ ${msg}`);
+          toast.successo(msg);
           loadData();
         }}
         scadenzaId={scadenzaDaSollecitare?.id || null}

@@ -4,6 +4,7 @@ import { fmt, moduloH, moduloP, resolveRighe } from '../../utils';
 import { getTenantStorageKey } from '../../utils/tenant';
 import { fetchClienti, fetchProgetti, creaProgettoApi, salvaProgettoDettaglioApi } from '../../api/client';
 import type { Articolo, ModuloTemplate } from '../../types';
+import { useToast } from '../ui/ToastProvider';
 
 // ─── Modal Assegna Modulo a Cliente con Anti-Duplicazione ─────────
 export function AssegnaModuloClienteModal({
@@ -15,6 +16,7 @@ export function AssegnaModuloClienteModal({
   articoliList: Articolo[];
   onClose: () => void;
 }) {
+  const toast = useToast();
   const navigate = useNavigate();
   const [clienti, setClienti] = useState<any[]>([]);
   const [selectedClientId, setSelectedClientId] = useState<string>('');
@@ -157,7 +159,7 @@ export function AssegnaModuloClienteModal({
     } catch (err: any) {
       // §3.3 — prima l'errore finiva solo in console.error: l'assegnazione falliva e il
       // modal restava lì senza alcun messaggio, oppure l'utente riprovava alla cieca.
-      alert(`Assegnazione modulo non riuscita: ${err?.message || 'errore di rete'}. Il progetto NON è stato modificato.`);
+      toast.errore(`Assegnazione modulo non riuscita: ${err?.message || 'errore di rete'}. Il progetto NON è stato modificato.`);
     } finally {
       setLoading(false);
     }

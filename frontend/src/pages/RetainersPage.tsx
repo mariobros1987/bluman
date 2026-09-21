@@ -7,8 +7,10 @@ import {
   fetchProgetti,
 } from '../api/client';
 import { fmt } from '../utils';
+import { useToast } from '../components/ui/ToastProvider';
 
 export function RetainersPage() {
+  const toast = useToast();
   const [contratti, setContratti] = useState<any[]>([]);
   const [clienti, setClienti] = useState<any[]>([]);
   const [progetti, setProgetti] = useState<any[]>([]);
@@ -64,7 +66,7 @@ export function RetainersPage() {
         prossimaFatturazione,
         note: note || undefined,
       });
-      alert('✓ Contratto Ricorrente (Retainer) attivato con successo a database!');
+      toast.successo('Contratto Ricorrente (Retainer) attivato con successo a database!');
       setShowModal(false);
       setTitolo('');
       setImportoEuro('');
@@ -72,7 +74,7 @@ export function RetainersPage() {
       setNote('');
       await loadData();
     } catch (err: any) {
-      alert(`Errore creazione contratto: ${err.message}`);
+      toast.errore(`Errore creazione contratto: ${err.message}`);
     } finally {
       setSaving(false);
     }
@@ -83,10 +85,10 @@ export function RetainersPage() {
     setGeneratingId(contrattoId);
     try {
       const res = await generaFatturaRetainerApi(contrattoId);
-      alert(res.messaggio || '✓ Fattura retainer emessa e inserita nello Scadenzario Incassi!');
+      toast.successo(res.messaggio || 'Fattura retainer emessa e inserita nello Scadenzario Incassi!');
       await loadData();
     } catch (err: any) {
-      alert(`Errore generazione fattura: ${err.message}`);
+      toast.errore(`Errore generazione fattura: ${err.message}`);
     } finally {
       setGeneratingId(null);
     }

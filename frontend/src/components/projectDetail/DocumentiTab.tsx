@@ -16,10 +16,12 @@ import { escapeHtmlTesto, sanitizzaHtmlDocumento } from '../../../../src/util/ht
 import type { Progetto } from '../../types';
 import { documentoApiAVista, documentiRimossi, ricordaDocumentoRimosso } from './documentiUtils';
 import { FirmaStudioModal } from '../documenti/FirmaStudioModal';
+import { useToast } from '../ui/ToastProvider';
 
 // ─── Componente Documenti & Vault Legale Progetto ──────────────────
 // ─── Componente Documenti & Vault Legale Progetto (Google Drive / Cloud Vault) ───
 export function DocumentiTab({ project }: { project: Progetto }) {
+  const toast = useToast();
   const navigate = useNavigate();
   const [docCategory, setDocCategory] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
@@ -209,7 +211,7 @@ export function DocumentiTab({ project }: { project: Progetto }) {
     const file = e.target.files?.[0];
     if (!file) return;
     if (/\.(?:html?|xhtml|svg|xml|mhtml|js)$/i.test(file.name)) {
-      alert('Formato non ammesso: HTML, SVG, XML e contenuti web attivi non possono essere archiviati.');
+      toast.attenzione('Formato non ammesso: HTML, SVG, XML e contenuti web attivi non possono essere archiviati.');
       e.target.value = '';
       return;
     }
@@ -231,11 +233,11 @@ export function DocumentiTab({ project }: { project: Progetto }) {
       });
 
       setDocList((prev) => [documentoApiAVista(salvato, String(project.id)), ...prev]);
-      alert(`✓ File "${file.name}" archiviato nel fascicolo del progetto con successo!`);
+      toast.successo(`File "${file.name}" archiviato nel fascicolo del progetto con successo!`);
     } catch (err) {
       console.error(err);
       const motivo = err instanceof Error && err.message ? `: ${err.message}` : '';
-      alert(`Caricamento non riuscito${motivo}`);
+      toast.errore(`Caricamento non riuscito${motivo}`);
     } finally {
       setUploading(false);
       e.target.value = ''; // permette di ricaricare lo stesso file
@@ -252,7 +254,7 @@ export function DocumentiTab({ project }: { project: Progetto }) {
 
     if (firmato) {
       if (!isAdminStudio()) {
-        alert('Questo documento è firmato dal cliente: non può essere eliminato.\nSolo l\'amministratore dello studio può archiviarlo.');
+        toast.attenzione('Questo documento è firmato dal cliente: non può essere eliminato. Solo l\'amministratore dello studio può archiviarlo.');
         return;
       }
       if (!confirm(
@@ -264,7 +266,7 @@ export function DocumentiTab({ project }: { project: Progetto }) {
       } catch (err) {
         console.error(err);
         const motivo = err instanceof Error && err.message ? `: ${err.message}` : '';
-        alert(`Archiviazione non riuscita${motivo}`);
+        toast.errore(`Archiviazione non riuscita${motivo}`);
         return;
       }
     } else {
@@ -277,7 +279,7 @@ export function DocumentiTab({ project }: { project: Progetto }) {
       } catch (err) {
         console.error(err);
         const motivo = err instanceof Error && err.message ? `: ${err.message}` : '';
-        alert(`Eliminazione non riuscita${motivo}`);
+        toast.errore(`Eliminazione non riuscita${motivo}`);
         return;
       }
     }
@@ -306,9 +308,9 @@ export function DocumentiTab({ project }: { project: Progetto }) {
     if (!doc?.dbDoc) ricordaDocumentoRimosso(project.id, docId);
 
     if (selectedPreviewDoc?.id === docId) setSelectedPreviewDoc(null);
-    alert(firmato
-      ? '✓ Documento archiviato: resta nello storico con la sua firma.'
-      : '✓ Documento rimosso con successo dal Vault.');
+    toast.successo(firmato
+      ? 'Documento archiviato: resta nello storico con la sua firma.'
+      : 'Documento rimosso con successo dal Vault.');
   };
 
   // Filtraggio dinamico

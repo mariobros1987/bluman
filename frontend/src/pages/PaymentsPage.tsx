@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { fetchScadenzarioIncassiApi, registraIncassoApi, fetchClienti } from '../api/client';
 import { fmt } from '../utils';
+import { useToast } from '../components/ui/ToastProvider';
 
 export function PaymentsPage() {
+  const toast = useToast();
   const [scadenze, setScadenze] = useState<any[]>([]);
   const [clienti, setClienti] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -62,20 +64,20 @@ export function PaymentsPage() {
       });
       setSavingIncasso(false);
       if (res) {
-        alert('✓ Incasso registrato con successo in Prima Nota!');
+        toast.successo('Incasso registrato con successo in Prima Nota!');
         setSelectedScadenza(null);
         loadData();
       }
     } catch (err: any) {
       setSavingIncasso(false);
-      alert(`⚠️ Registrazione incasso NON riuscita: ${err?.message || 'errore di rete'}. La scadenza NON è stata aggiornata in Prima Nota: riprova.`);
+      toast.errore(`Registrazione incasso NON riuscita: ${err?.message || 'errore di rete'}. La scadenza NON è stata aggiornata in Prima Nota: riprova.`);
     }
   };
 
   const handleSendReminder = (scad: any) => {
     const clienteNome = scad.fattura?.progetto?.cliente?.nome || 'Cliente';
     const importo = fmt((scad.importoCentesimi || 0) / 100);
-    alert(`✉️ Sollecito inviato con successo a ${clienteNome} per la rata di ${importo}!`);
+    toast.successo(`Sollecito inviato con successo a ${clienteNome} per la rata di ${importo}!`);
   };
 
   const filteredScadenze = scadenze.filter(s => {

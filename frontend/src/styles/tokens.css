@@ -382,3 +382,82 @@ input:focus, textarea:focus, select:focus { border-color: var(--indigo); }
   border-radius: var(--radius-lg);
   transition: all var(--t);
 }
+
+/* ─── Toast (avvisi non bloccanti) ──────────────────────────────
+   Sostituiscono gli alert() nativi: appaiono in basso a destra, tematizzati
+   per tipo, e scompaiono da soli. Il bordo sinistro colorato dà il tipo a colpo
+   d'occhio senza gridare. */
+.toast-viewport {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 1100; /* sopra i modali (1050) */
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: min(420px, calc(100vw - 40px));
+  pointer-events: none; /* i click passano ai toast, non al viewport */
+}
+
+.toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--indigo);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  padding: 12px 14px;
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.45;
+  animation: toast-in .18s ease;
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.toast-success { border-left-color: var(--green); }
+.toast-error   { border-left-color: var(--red); }
+.toast-info    { border-left-color: var(--indigo); }
+.toast-warning { border-left-color: var(--amber); }
+
+.toast-icona {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--on-accent);
+}
+.toast-success .toast-icona { background: var(--green); }
+.toast-error   .toast-icona { background: var(--red); }
+.toast-info    .toast-icona { background: var(--indigo); }
+.toast-warning .toast-icona { background: var(--amber); }
+
+.toast-messaggio { flex: 1; word-break: break-word; }
+
+.toast-chiudi {
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: var(--radius-sm);
+  transition: all var(--t);
+}
+.toast-chiudi:hover { color: var(--text); background: var(--card2); }
+
+@media (prefers-reduced-motion: reduce) {
+  .toast { animation: none; }
+}

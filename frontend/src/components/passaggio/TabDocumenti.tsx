@@ -11,6 +11,7 @@ import type { DocumentoEntry } from './types';
 import type { RecommendationResult } from './catalogoModelliStudio';
 import { etichettaTipoFirma } from './passaggioUtils';
 import { FirmaStudioModal } from '../documenti/FirmaStudioModal';
+import { useToast } from '../ui/ToastProvider';
 
 // ─── Tab 3: Documenti & Pre-screening AI ───────────────────────────────
 export function TabDocumenti({
@@ -48,6 +49,7 @@ export function TabDocumenti({
   uploadingDoc: boolean;
   handleFileUploadPassaggio: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }) {
+  const toast = useToast();
   const [docPerFirmaStudio, setDocPerFirmaStudio] = useState<DocumentoEntry | null>(null);
 
   return (
@@ -369,8 +371,8 @@ export function TabDocumenti({
                                       // ricompariva. Se il server non l'ha cancellato,
                                       // l'operatore deve saperlo adesso.
                                       console.error('Eliminazione documento non riuscita:', err);
-                                      alert(
-                                        `Eliminazione non riuscita: ${err?.message || 'errore imprevisto'}.\n` +
+                                      toast.errore(
+                                        `Eliminazione non riuscita: ${err?.message || 'errore imprevisto'}. ` +
                                         'Il documento è ancora archiviato sul server e resta visibile.'
                                       );
                                       return;
@@ -417,8 +419,8 @@ export function TabDocumenti({
                                         persistDocuments(nextDocs);
                                       } catch (err: any) {
                                         console.error('Archiviazione documento non riuscita:', err);
-                                        alert(
-                                          `Archiviazione non riuscita: ${err?.message || 'errore imprevisto'}.\n` +
+                                        toast.errore(
+                                          `Archiviazione non riuscita: ${err?.message || 'errore imprevisto'}. ` +
                                           'Il documento è ancora presente sul server.'
                                         );
                                       }

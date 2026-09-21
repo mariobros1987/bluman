@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { CatBadge } from '../ui/CatBadge';
 import { creaGiurisdizioneApi } from '../../api/client';
 import type { Giurisdizione, ModuloTemplate } from '../../types';
+import { useToast } from '../ui/ToastProvider';
 
 // ─── Componente Giurisdizioni Studio ──────────────────────────────
 export function GiurisdizioniView({
@@ -17,6 +18,7 @@ export function GiurisdizioniView({
   onOpenInGraph: (giurId: string) => void;
   onLinkModulo?: (modId: string, giurId: string | null) => void;
 }) {
+  const toast = useToast();
   const [modalGiurOpen, setModalGiurOpen] = useState(false);
   const [selectedGiur, setSelectedGiur] = useState<Giurisdizione | null>(null);
   const [newGiurNome, setNewGiurNome] = useState('');
@@ -154,7 +156,7 @@ export function GiurisdizioniView({
                       onLinkModulo(selectedModToAssign, selectedGiur.id);
                     }
                     const targetMod = moduliList.find(m => m.id === selectedModToAssign);
-                    alert(`✓ Modulo "${targetMod?.n}" associato con successo alla giurisdizione ${selectedGiur.nome}!`);
+                    toast.successo(`Modulo "${targetMod?.n}" associato con successo alla giurisdizione ${selectedGiur.nome}!`);
                     setSelectedModToAssign('');
                   }}
                   style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '8px 14px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
@@ -190,7 +192,7 @@ export function GiurisdizioniView({
                             if (onLinkModulo) {
                               onLinkModulo(m.id, null);
                             }
-                            alert(`✓ Modulo "${m.n}" scollegato dalla giurisdizione ${selectedGiur.nome}. Torna ad essere generico.`);
+                            toast.successo(`Modulo "${m.n}" scollegato dalla giurisdizione ${selectedGiur.nome}. Torna ad essere generico.`);
                           }}
                           title="Scollega da questa giurisdizione"
                           style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--red)', padding: '2px 6px', borderRadius: 4, fontSize: 10, cursor: 'pointer' }}
@@ -256,7 +258,7 @@ export function GiurisdizioniView({
                   setNewGiurCodice('');
                   setNewGiurNote('');
                 } catch (err: any) {
-                  alert(`Creazione giurisdizione non riuscita: ${err?.message || 'errore di rete'}. Riprova.`);
+                  toast.errore(`Creazione giurisdizione non riuscita: ${err?.message || 'errore di rete'}. Riprova.`);
                 }
               }}
               style={{ display: 'flex', flexDirection: 'column', gap: 12 }}

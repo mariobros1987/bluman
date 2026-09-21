@@ -8,8 +8,10 @@ import {
 import { AnagraficaFornitoreErpModal } from '../components/fornitori/AnagraficaFornitoreErpModal';
 import { RegistraFatturaPassivaModal } from '../components/fornitori/RegistraFatturaPassivaModal';
 import { PagaFatturaPassivaModal } from '../components/fornitori/PagaFatturaPassivaModal';
+import { useToast } from '../components/ui/ToastProvider';
 
 export const FornitoriPage: React.FC = () => {
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState<'fatture' | 'fornitori'>('fatture');
   const [fornitori, setFornitori] = useState<Fornitore[]>([]);
   const [fatture, setFatture] = useState<FatturaRicevuta[]>([]);
@@ -52,7 +54,7 @@ export const FornitoriPage: React.FC = () => {
       await eliminaFornitoreApi(id);
       await loadData();
     } catch (err: any) {
-      alert(`Errore: ${err?.message || 'Impossibile eliminare il fornitore'}`);
+      toast.errore(`Errore: ${err?.message || 'Impossibile eliminare il fornitore'}`);
     }
   };
 

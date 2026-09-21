@@ -1,4 +1,5 @@
 import { API_BASE, apiFetch, getAuthHeaders, leggiErroreApi } from './http';
+import { toast } from '../components/ui/ToastProvider';
 import { queryPaginazione, type ParametriListaPaginata } from './paginazione';
 import { cachedQuery, invalidateCache } from './cache';
 import { getCurrentTenantId } from '../utils/tenant';
@@ -123,7 +124,7 @@ export async function downloadFatturaXmlApi(fatturaId: string, numero?: string) 
     window.URL.revokeObjectURL(url);
     return { ok: true };
   } catch (err: any) {
-    alert('Errore download XML: ' + err.message);
+    toast.errore('Errore download XML: ' + err.message);
     return null;
   }
 }
@@ -183,7 +184,7 @@ export async function downloadFatturaPdfServerApi(fatturaId: string, numero?: st
     window.URL.revokeObjectURL(url);
     return { ok: true };
   } catch (err: any) {
-    alert('Errore download PDF: ' + err.message);
+    toast.errore('Errore download PDF: ' + err.message);
     return null;
   }
 }
@@ -198,7 +199,7 @@ export async function inviaFatturaEmailApi(fatturaId: string, emailDestinatario?
     if (!res.ok) throw new Error('Errore invio email fattura');
     return await res.json();
   } catch (err: any) {
-    alert('Errore invio email: ' + err.message);
+    toast.errore('Errore invio email: ' + err.message);
     return null;
   }
 }

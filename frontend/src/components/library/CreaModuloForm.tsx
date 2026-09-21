@@ -3,9 +3,11 @@ import { CatBadge } from '../ui/CatBadge';
 import { fmt } from '../../utils';
 import { creaModuloTemplateApi, aggiornaModuloTemplateApi } from '../../api/client';
 import type { Articolo, CategoriaModulo, Giurisdizione, ModuloTemplate } from '../../types';
+import { useToast } from '../ui/ToastProvider';
 
 // ─── Componente Costruttore Modulo Template ───────────────────────
 export function CreaModuloForm({ articoliList, giurList, moduloInModifica, onCreated, onAnnullaModifica }: { articoliList: Articolo[]; giurList: Giurisdizione[]; moduloInModifica?: ModuloTemplate | null; onCreated: () => void; onAnnullaModifica?: () => void }) {
+  const toast = useToast();
   // §36 — modalità modifica: se arriva un modulo esistente, il costruttore si apre
   // pre-popolato (nome, categoria, giurisdizione, forfait e distinta base) e il
   // salvataggio passa per la PUT invece della POST di creazione.
@@ -61,7 +63,7 @@ export function CreaModuloForm({ articoliList, giurList, moduloInModifica, onCre
       onCreated();
     } catch (err: any) {
       // §3.3 — salvataggio modulo template fallito: messaggio esplicito all'utente.
-      alert(`Salvataggio modulo non riuscito: ${err?.message || 'errore di rete'}. Riprova.`);
+      toast.errore(`Salvataggio modulo non riuscito: ${err?.message || 'errore di rete'}. Riprova.`);
     } finally {
       setLoading(false);
     }

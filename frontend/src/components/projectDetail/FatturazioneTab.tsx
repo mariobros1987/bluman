@@ -7,6 +7,7 @@ import { risolviAliquotaIva, calcolaTotaliFatturaRighe } from '../../utils/fattu
 import { getTenantStorageKey, getStudioInfoForTenant, getCurrentTenantId, BLUECODE_TENANT_ID } from '../../utils/tenant';
 import type { Progetto } from '../../types';
 import styles from '../../pages/ProjectDetail.module.css';
+import { useToast } from '../ui/ToastProvider';
 
 export interface VoceFatturabile {
   key: string;
@@ -27,6 +28,7 @@ export interface VoceFatturabile {
 
 // ─── Fatturazione Tab ─────────────────────────────────────────────
 export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project: Progetto; rawDbProject?: any; onRefresh: () => void }) {
+  const toast = useToast();
   const navigate = useNavigate();
   const totFatturato = project.fatture.reduce((a, f) => a + f.importo, 0);
   const residuo = project.val - totFatturato;
@@ -172,7 +174,7 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
     e.preventDefault();
     if (!rawDbProject && !project.id) return;
     if (vociSelezionate.length === 0) {
-      alert('Seleziona almeno una micro-voce o modulo da fatturare.');
+      toast.attenzione('Seleziona almeno una micro-voce o modulo da fatturare.');
       return;
     }
     setSubmitting(true);
@@ -195,10 +197,10 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
 
       setModalOpen(false);
       onRefresh();
-      alert(`✓ Documento ${resFattura?.numero || 'fiscale'} emesso con successo a database (${righe.length} voci fatturate per ${fmt(totaleImponibile)})!`);
+      toast.successo(`Documento ${resFattura?.numero || 'fiscale'} emesso con successo a database (${righe.length} voci fatturate per ${fmt(totaleImponibile)})!`);
     } catch (err: any) {
       console.error(err);
-      alert(`Errore emissione fattura: ${err?.message || 'Impossibile completare la richiesta'}`);
+      toast.errore(`Errore emissione fattura: ${err?.message || 'Impossibile completare la richiesta'}`);
     } finally {
       setSubmitting(false);
     }
@@ -298,7 +300,7 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
           </div>
         </div>
         <button
-          onClick={() => alert('✓ Stato Incassi Progetto sincronizzato con lo Scadenzario e Prima Nota')}
+          onClick={() => toast.successo('Stato Incassi Progetto sincronizzato con lo Scadenzario e Prima Nota')}
           style={{ background: totFatturato === 0 ? 'var(--pill-slate-bd)' : totFatturato >= project.val ? 'var(--green)' : 'var(--pill-amber-bd)', border: 'none', color: 'white', padding: '6px 12px', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
         >
           💳 Registro Incassi Progetto
@@ -509,7 +511,7 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
                   // server e un alert generico, invece del messaggio chiaro «emettila prima».
                   const eUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idFattura);
                   if (!eUuid) {
-                    alert('Questa fattura non è ancora salvata a database: emettila prima di scaricarne il PDF.');
+                    toast.attenzione('Questa fattura non è ancora salvata a database: emettila prima di scaricarne il PDF.');
                     return;
                   }
                   await downloadFatturaPdfServerApi(idFattura, previewFattura.numero);

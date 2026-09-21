@@ -22,10 +22,12 @@ import { istanteDaGiornoEOra, eGiornoIso } from '../utils/calendarioDate';
 import { creaEventoCalendario } from '../api/calendario';
 import type { Progetto, ModuloProgetto, MicroVoce, CategoriaModulo, StatoProgetto, StatoModulo, Cliente, TeamMember } from '../types';
 import styles from './ProjectDetail.module.css';
+import { useToast } from '../components/ui/ToastProvider';
 
 type Tab = 'moduli' | 'grafo' | 'fatturazione' | 'redditivita' | 'storico' | 'comunicazioni' | 'documenti' | 'calendario';
 
 export function ProjectDetail() {
+  const toast = useToast();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
@@ -702,10 +704,10 @@ export function ProjectDetail() {
       // non un conteggio: si riferisce quello, senza inventare un numero di righe.
       const esito: any = await ricalcolaProgettoApi(String(project.id));
       const pctEsito = typeof esito?.percentuale === 'number' ? `${esito.percentuale}%` : 'n.d.';
-      alert(`Ricalcolo eseguito.\n\nStato progetto: ${esito?.stato ?? 'n.d.'}\nAvanzamento: ${pctEsito}\nModuli valutati: ${Array.isArray(esito?.moduli) ? esito.moduli.length : 0}`);
+      toast.successo(`Ricalcolo eseguito. Stato: ${esito?.stato ?? 'n.d.'} · Avanzamento: ${pctEsito} · Moduli valutati: ${Array.isArray(esito?.moduli) ? esito.moduli.length : 0}`);
       await loadDetail();
     } catch (e: any) {
-      alert('Ricalcolo non eseguito: ' + (e?.message || 'errore sconosciuto'));
+      toast.errore('Ricalcolo non eseguito: ' + (e?.message || 'errore sconosciuto'));
     } finally {
       setRicalcolando(false);
     }
@@ -718,7 +720,7 @@ export function ProjectDetail() {
         await archiviaProgettoApi(String(project.id), !isArchived);
         setProject({ ...project, st: isArchived ? 'in_progress' : 'archived' });
       } catch (e: any) {
-        alert('Errore archiviazione: ' + e.message);
+        toast.errore('Errore archiviazione: ' + e.message);
       }
     }
   };
@@ -731,14 +733,14 @@ export function ProjectDetail() {
     // e il modulo orfano non dovrebbe esistere (Regola 7).
     const dbModuloId = rawDbProject?.moduli?.[mIdx]?.id;
     if (!dbModuloId) {
-      alert('⚠️ Questo modulo non risulta salvato a database e non può essere eliminato. Ricrea il progetto correttamente.');
+      toast.attenzione('Questo modulo non risulta salvato a database e non può essere eliminato. Ricrea il progetto correttamente.');
       return;
     }
 
     try {
       await eliminaModuloApi(String(project.id), dbModuloId);
     } catch (err: any) {
-      alert(`❌ Eliminazione non riuscita: ${err?.message ?? 'Errore sconosciuto'}`);
+      toast.errore(`Eliminazione non riuscita: ${err?.message ?? 'Errore sconosciuto'}`);
       return;
     }
 
@@ -763,7 +765,7 @@ export function ProjectDetail() {
     try {
       const membro = teamList.find(u => idMembro(u) === selectedUser);
       if (!rawDbProject?.id) {
-        alert('⚠️ Progetto non ancora salvato sul database: impossibile assegnare accessi.');
+        toast.attenzione('Progetto non ancora salvato sul database: impossibile assegnare accessi.');
         return;
       }
       // §1ter.6 (C1) — con `TeamMember.dbId` obbligatorio, «membro senza id di database» non
@@ -771,16 +773,16 @@ export function ProjectDetail() {
       // nessuno. Il messaggio dice quello, invece di descrivere una possibilità che il tipo
       // non ammette più.
       if (!membro) {
-        alert('⚠️ Seleziona un collaboratore dello studio.');
+        toast.attenzione('Seleziona un collaboratore dello studio.');
         return;
       }
       await assegnaAccessoProgettoApi(rawDbProject.id, membro.dbId, livello);
-      alert(`✓ Accesso "${livello}" assegnato a ${membro.n} sul progetto.`);
+      toast.successo(`Accesso "${livello}" assegnato a ${membro.n} sul progetto.`);
       setAccessiModalOpen(false);
       loadDetail();
     } catch (err) {
       console.error(err);
-      alert('❌ Assegnazione accesso non riuscita. Riprova.');
+      toast.errore('Assegnazione accesso non riuscita. Riprova.');
     }
   };
 

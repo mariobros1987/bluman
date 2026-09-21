@@ -9,10 +9,12 @@ import { LibreriaDocumentiEForm } from '../components/library/LibreriaDocumentiE
 import { NuovoArticoloModal } from '../components/library/NuovoArticoloModal';
 import { CreaModuloForm } from '../components/library/CreaModuloForm';
 import { AssegnaModuloClienteModal } from '../components/library/AssegnaModuloClienteModal';
+import { useToast } from '../components/ui/ToastProvider';
 
 type SubTab = 'grafo' | 'articoli' | 'giurisdizioni' | 'crea_modulo' | 'doc_form';
 
 export function Library() {
+  const toast = useToast();
   const [subTab, setSubTab] = useState<SubTab>('grafo');
   const [open, setOpen] = useState<Set<string>>(new Set());
   const [articoliList, setArticoliList] = useState<Articolo[]>([]);
@@ -36,7 +38,7 @@ export function Library() {
       await disattivaModuloTemplateApi(m.id);
       setModuliList(prev => prev.filter(x => x.id !== m.id));
     } catch (err: any) {
-      alert(`Disattivazione non riuscita: ${err?.message || 'errore di rete'}. Il modulo NON è stato disattivato.`);
+      toast.errore(`Disattivazione non riuscita: ${err?.message || 'errore di rete'}. Il modulo NON è stato disattivato.`);
     }
   };
 
@@ -50,7 +52,7 @@ export function Library() {
       await disattivaArticoloApi(id);
       setArticoliList(prev => prev.filter(a => a.id !== id));
     } catch (err: any) {
-      alert(`Disattivazione non riuscita: ${err?.message || 'errore di rete'}. L'articolo NON è stato disattivato.`);
+      toast.errore(`Disattivazione non riuscita: ${err?.message || 'errore di rete'}. L'articolo NON è stato disattivato.`);
     }
   };
 

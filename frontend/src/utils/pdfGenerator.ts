@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import { toast } from '../components/ui/ToastProvider';
 import { A4_MM, A4_PX } from '../../../src/util/paginaA4';
 import { creaPagineA4 } from './pdfA4';
 
@@ -168,7 +169,7 @@ export async function downloadRealPdf(
     pdf.save(cleanFileName);
   } catch (error) {
     console.error('Errore generazione PDF:', error);
-    alert('⚠️ Errore durante la creazione del file PDF. Riprovare.');
+    toast.errore('Errore durante la creazione del file PDF. Riprovare.');
   } finally {
     // Pulizia dei container dal DOM
     pageDomElements.forEach((pageEl) => {

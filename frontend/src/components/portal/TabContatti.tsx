@@ -5,6 +5,7 @@ import type { ContattiStudio } from '../../api/client';
 import { getStudioInfoForTenant } from '../../utils/tenant';
 import { SpunteStato } from '../SpunteStato';
 import { docBoxStyle } from './styles';
+import { useToast } from '../ui/ToastProvider';
 
 export interface TabContattiProps {
   contattiStudio: ContattiStudio | null;
@@ -35,6 +36,7 @@ export function TabContatti({
   clientObj,
   progettoId,
 }: TabContattiProps) {
+  const toast = useToast();
   const [fileAllegato, setFileAllegato] = useState<{ nome: string; base64: string; sizeStr: string; mime: string } | null>(null);
   const [caricandoFile, setCaricandoFile] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -433,7 +435,7 @@ export function TabContatti({
               const file = e.target.files?.[0];
               if (!file) return;
               if (file.size > 15 * 1024 * 1024) {
-                alert('Il file selezionato supera il limite di 15 MB.');
+                toast.attenzione('Il file selezionato supera il limite di 15 MB.');
                 return;
               }
               const reader = new FileReader();

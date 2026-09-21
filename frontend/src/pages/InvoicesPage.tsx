@@ -20,6 +20,7 @@ import { fmt } from '../utils';
 import { EsportaFascicoloCommercialistaModal } from '../components/contabilita/EsportaFascicoloCommercialistaModal';
 import { Paginatore } from '../components/ui/Paginatore';
 import { isRispostaPaginata, type MetaPaginazione } from '../api/paginazione';
+import { useToast } from '../components/ui/ToastProvider';
 
 const META_INIZIALE: MetaPaginazione = { page: 1, limit: 50, totale: 0, pagine: 0 };
 interface RiepilogoFatture {
@@ -31,6 +32,7 @@ interface RiepilogoFatture {
 const RIEPILOGO_INIZIALE: RiepilogoFatture = { totaleEmessoCentesimi: 0, totaleIncassatoCentesimi: 0, totaleSospesoCentesimi: 0, totaleNoteCreditoCentesimi: 0 };
 
 export function InvoicesPage() {
+  const toast = useToast();
   const navigate = useNavigate();
   const [invoices, setInvoices] = useState<any[]>([]);
   const [clienti, setClienti] = useState<any[]>([]);
@@ -231,7 +233,7 @@ export function InvoicesPage() {
 
   const handleImportDaProgetto = async () => {
     if (!progettoId) {
-      alert('Seleziona prima un progetto associato');
+      toast.attenzione('Seleziona prima un progetto associato');
       return;
     }
     try {
@@ -239,36 +241,36 @@ export function InvoicesPage() {
       if (res.righeSuggerite && res.righeSuggerite.length > 0) {
         setRighe(res.righeSuggerite);
         if (res.cliente?.id) setClienteId(res.cliente.id);
-        alert(`✓ Importati ${res.righeSuggerite.length} moduli dal progetto!`);
+        toast.successo(`Importati ${res.righeSuggerite.length} moduli dal progetto!`);
       }
     } catch (err: any) {
-      alert(`Errore importazione: ${err.message}`);
+      toast.errore(`Errore importazione: ${err.message}`);
     }
   };
 
   const handleImportDaTimesheet = async () => {
     if (!progettoId) {
-      alert('Seleziona prima un progetto per importare le ore del timesheet');
+      toast.attenzione('Seleziona prima un progetto per importare le ore del timesheet');
       return;
     }
     try {
       const res = await importFromTimesheetApi(progettoId);
       if (res.righeSuggerite && res.righeSuggerite.length > 0) {
         setRighe(res.righeSuggerite);
-        alert(`✓ Importate ${res.oreConsuntivate} ore consuntivate dal timesheet!`);
+        toast.successo(`Importate ${res.oreConsuntivate} ore consuntivate dal timesheet!`);
       }
     } catch (err: any) {
-      alert(`Errore importazione: ${err.message}`);
+      toast.errore(`Errore importazione: ${err.message}`);
     }
   };
 
   const handleSalvaFattura = async (emettiSubito: boolean) => {
     if (!clienteId) {
-      alert('Seleziona il cliente committente');
+      toast.attenzione('Seleziona il cliente committente');
       return;
     }
     if (righe.length === 0) {
-      alert('Aggiungi almeno una prestazione o articolo');
+      toast.attenzione('Aggiungi almeno una prestazione o articolo');
       return;
     }
 
@@ -294,9 +296,9 @@ export function InvoicesPage() {
 
       setShowCreateModal(false);
       await loadData();
-      alert(emettiSubito ? '✓ Fattura emessa definitivamente con successo!' : '✓ Bozza salvata con successo nel registro!');
+      toast.successo(emettiSubito ? 'Fattura emessa definitivamente con successo!' : 'Bozza salvata con successo nel registro!');
     } catch (err: any) {
-      alert(`Errore salvataggio fattura: ${err.message}`);
+      toast.errore(`Errore salvataggio fattura: ${err.message}`);
     } finally {
       setSubmitting(false);
     }
@@ -307,9 +309,9 @@ export function InvoicesPage() {
     try {
       await emettiInvoiceApi(fattura.id);
       await loadData();
-      alert(`✓ Fattura emessa con successo!`);
+      toast.successo('Fattura emessa con successo!');
     } catch (err: any) {
-      alert(`Errore: ${err.message}`);
+      toast.errore(`Errore: ${err.message}`);
     }
   };
 
@@ -324,9 +326,9 @@ export function InvoicesPage() {
       });
       setShowNcModal(false);
       await loadData();
-      alert('✓ Nota di credito (TD04) emessa con successo a storno della fattura!');
+      toast.successo('Nota di credito (TD04) emessa con successo a storno della fattura!');
     } catch (err: any) {
-      alert(`Errore emissione nota di credito: ${err.message}`);
+      toast.errore(`Errore emissione nota di credito: ${err.message}`);
     } finally {
       setSubmitting(false);
     }
@@ -347,9 +349,9 @@ export function InvoicesPage() {
       });
       setShowIncassoModal(false);
       await loadData();
-      alert('✓ Incasso registrato con successo e movimento scritto automaticamente in Prima Nota!');
+      toast.successo('Incasso registrato con successo e movimento scritto automaticamente in Prima Nota!');
     } catch (err: any) {
-      alert(`Errore registrazione incasso: ${err.message}`);
+      toast.errore(`Errore registrazione incasso: ${err.message}`);
     } finally {
       setSubmitting(false);
     }
@@ -361,7 +363,7 @@ export function InvoicesPage() {
       await deleteInvoiceApi(id);
       await loadData();
     } catch (err: any) {
-      alert(`Errore eliminazione: ${err.message}`);
+      toast.errore(`Errore eliminazione: ${err.message}`);
     }
   };
 
@@ -401,7 +403,7 @@ export function InvoicesPage() {
           <button
             onClick={() => {
               if (invoices.length === 0) {
-                alert('Nessuna fattura presente nel registro da esportare.');
+                toast.attenzione('Nessuna fattura presente nel registro da esportare.');
                 return;
               }
               const headers = ['Tipo Documento', 'Numero', 'Data', 'Cliente', 'Imponibile (€)', 'IVA (€)', 'Ritenuta (€)', 'Totale Doc (€)', 'Netto a Pagare (€)', 'Stato'];

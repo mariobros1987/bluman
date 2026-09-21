@@ -11,6 +11,7 @@ import { fmt } from '../utils';
 import { EsportaFascicoloCommercialistaModal } from '../components/contabilita/EsportaFascicoloCommercialistaModal';
 import { Paginatore } from '../components/ui/Paginatore';
 import { isRispostaPaginata, type MetaPaginazione } from '../api/paginazione';
+import { useToast } from '../components/ui/ToastProvider';
 
 interface RiepilogoPrimaNota {
   totaleEntrateCentesimi: number;
@@ -20,6 +21,7 @@ interface RiepilogoPrimaNota {
 const META_INIZIALE: MetaPaginazione = { page: 1, limit: 50, totale: 0, pagine: 0 };
 
 export function PrimaNotaPage() {
+  const toast = useToast();
   const [movimenti, setMovimenti] = useState<any[]>([]);
   const [clienti, setClienti] = useState<any[]>([]);
   const [contiBancari, setContiBancari] = useState<any[]>([]);
@@ -107,9 +109,9 @@ export function PrimaNotaPage() {
       setShowCsvModal(false);
       setCsvContent('');
       await loadData();
-      alert(`✓ ${res.importati || 'Tutti i'} movimenti bancari importati e riconciliati con successo nel database!`);
+      toast.successo(`${res.importati || 'Tutti i'} movimenti bancari importati e riconciliati con successo nel database!`);
     } catch (err: any) {
-      alert(`Errore importazione CSV: ${err.message}`);
+      toast.errore(`Errore importazione CSV: ${err.message}`);
     } finally {
       setSubmitting(false);
     }
@@ -140,7 +142,7 @@ export function PrimaNotaPage() {
       setNewCro('');
       await loadData();
     } catch (err: any) {
-      alert(`Errore creazione movimento: ${err.message}`);
+      toast.errore(`Errore creazione movimento: ${err.message}`);
     } finally {
       setSubmitting(false);
     }
@@ -152,7 +154,7 @@ export function PrimaNotaPage() {
       await deletePrimaNotaApi(id);
       await loadData();
     } catch (err: any) {
-      alert(`Errore eliminazione: ${err.message}`);
+      toast.errore(`Errore eliminazione: ${err.message}`);
     }
   };
 

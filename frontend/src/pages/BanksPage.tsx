@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { fetchContiBancariApi, creaContoBancarioApi } from '../api/client';
 import { fmt } from '../utils';
+import { useToast } from '../components/ui/ToastProvider';
 
 export function BanksPage() {
+  const toast = useToast();
   const [conti, setConti] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -50,7 +52,7 @@ export function BanksPage() {
         saldoInizialeEur: saldoNum,
         isDefault,
       });
-      alert('✓ Conto Bancario / Cassa aggiunto con successo a database!');
+      toast.successo('Conto Bancario / Cassa aggiunto con successo a database!');
       setModalOpen(false);
       setNomeConto('');
       setBanca('');
@@ -60,7 +62,7 @@ export function BanksPage() {
       setIsDefault(false);
       await loadConti();
     } catch (err: any) {
-      alert(`Errore creazione conto: ${err?.message || 'errore di rete'}`);
+      toast.errore(`Errore creazione conto: ${err?.message || 'errore di rete'}`);
     } finally {
       setSubmitting(false);
     }

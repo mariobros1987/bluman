@@ -28,6 +28,7 @@ import { TimesheetPage } from './pages/TimesheetPage';
 import { getUserPermission } from './utils/rbac';
 import { fetchMeApi } from './api/client';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { ToastProvider } from './components/ui/ToastProvider';
 import './styles/tokens.css';
 import { watchSystemTheme } from './utils/theme';
 import { invalidateCache } from './api/cache';
@@ -201,9 +202,11 @@ export default function App() {
   useEffect(() => watchSystemTheme(), []);
   return (
     <ErrorBoundary>
-      <BrowserRouter>
-        <AppContent />
-      </BrowserRouter>
+      <ToastProvider>
+        <BrowserRouter>
+          <AppContent />
+        </BrowserRouter>
+      </ToastProvider>
     </ErrorBoundary>
   );
 }

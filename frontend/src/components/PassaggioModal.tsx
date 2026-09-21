@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useToast } from './ui/ToastProvider';
 import type { DocumentTemplate } from '../utils/documentTemplates';
 import {
   salvaDocumentoApi,
@@ -36,6 +37,7 @@ interface PassaggioModalProps {
 }
 
 export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, progettoDbId, microvoceDbId }: PassaggioModalProps) {
+  const toast = useToast();
   const effProgettoId = progettoDbId || (project as any)?.dbId || (project as any)?.id;
   const mod = project.mods.find(m => m.id === mid)!;
   const voce = mod.v[vidx];
@@ -172,11 +174,11 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
     // mostrava «Nessun file fisico collegato» e il portale cliente restava vuoto.
     // Ora il flusso si ferma al primo errore mostrando il motivo riferito dal backend.
     if (!effProgettoId) {
-      alert('❌ Archiviazione non riuscita: il fascicolo non ha un ID di database.\nRiapri la pratica e riprova; se succede di nuovo verifica la connessione alle API.');
+      toast.errore('Archiviazione non riuscita: il fascicolo non ha un ID di database. Riapri la pratica e riprova; se succede di nuovo verifica la connessione alle API.');
       return;
     }
     if (!tmpl && !fileBase64) {
-      alert('❌ Nessun file da archiviare: scegli un documento dal disco oppure un modello dello studio.');
+      toast.attenzione('Nessun file da archiviare: scegli un documento dal disco oppure un modello dello studio.');
       return;
     }
 
@@ -227,7 +229,7 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
     } catch (err: any) {
       // §21 — nessun documento fantasma: la finestra di configurazione resta aperta e
       // l'operatore può riprovare subito (per esempio con un file più piccolo).
-      alert(`❌ Archiviazione del documento non riuscita:\n${err?.message ?? 'Errore sconosciuto'}\n\nIl documento NON è stato collegato al fascicolo.`);
+      toast.errore(`Archiviazione del documento non riuscita: ${err?.message ?? 'Errore sconosciuto'}. Il documento NON è stato collegato al fascicolo.`);
       return;
     }
 
@@ -273,7 +275,7 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
     setShowCatalogModal(false);
 
     const metodoNome = metodoFirma === 'fea_otp' ? 'Firma semplice (OTP)' : metodoFirma === 'manuale_scansionata' ? 'Olografa Tradizionale' : metodoFirma === 'qualificata_esterna' ? 'Qualificata QES' : 'Libera';
-    alert(`✓ Documento "${formattedName}" collegato con successo!\n• Richiede Firma: ${richiedeFirma ? `Sì (${metodoNome})` : 'No (Sola lettura)'}\n• Stato: ${statoDoc === 'pubblicato' ? '🚀 Pubblicato al Cliente' : '🔒 Bozza Interna'}`);
+    toast.successo(`Documento "${formattedName}" collegato. Richiede firma: ${richiedeFirma ? `Sì (${metodoNome})` : 'No (sola lettura)'} · ${statoDoc === 'pubblicato' ? 'Pubblicato al cliente' : 'Bozza interna'}`);
 
     if (effProgettoId) await ricaricaDocumentiDb();
   };
@@ -398,10 +400,10 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
           }
         }
       }
-      alert('🚀 Documento pubblicato al cliente con successo! Ora è visibile nel portale per la firma.');
+      toast.successo('Documento pubblicato al cliente. Ora è visibile nel portale per la firma.');
       await ricaricaDocumentiDb();
     } catch (err: any) {
-      alert(`❌ Errore pubblicazione: ${err?.message ?? 'Errore sconosciuto'}`);
+      toast.errore(`Errore pubblicazione: ${err?.message ?? 'Errore sconosciuto'}`);
     }
   };
 
@@ -410,10 +412,10 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
     if (!confirm('Vuoi rimettere questo documento in bozza interna? Il cliente non lo vedrà più fino a nuova pubblicazione.')) return;
     try {
       await aggiornaStatoDocumentoApi(docId, 'bozza');
-      alert('🔒 Documento rimesso in bozza interna.');
+      toast.successo('Documento rimesso in bozza interna.');
       await ricaricaDocumentiDb();
     } catch (err: any) {
-      alert(`❌ Errore: ${err?.message ?? 'Errore sconosciuto'}`);
+      toast.errore(`Errore: ${err?.message ?? 'Errore sconosciuto'}`);
     }
   };
 
@@ -427,7 +429,7 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
   // cliente continua a vedere la firma che ha dato sulla versione precedente.
   const handleSbloccaDocumento = async (docId: string, nomeDoc: string) => {
     if (docId.startsWith('d-')) {
-      alert('Questo documento non è ancora archiviato a database: non risulta firmato e non ha bisogno di sblocco.');
+      toast.attenzione('Questo documento non è ancora archiviato a database: non risulta firmato e non ha bisogno di sblocco.');
       return;
     }
     const motivo = prompt(
@@ -439,15 +441,15 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
     );
     if (motivo === null) return;
     if (motivo.trim().length < 10) {
-      alert('Motivazione troppo breve: serve una spiegazione di almeno 10 caratteri, perché resta agli atti.');
+      toast.attenzione('Motivazione troppo breve: serve una spiegazione di almeno 10 caratteri, perché resta agli atti.');
       return;
     }
     try {
       await sbloccaDocumentoApi(docId, motivo.trim());
-      alert('🔓 Documento riaperto in bozza interna. Motivazione registrata; il cliente è stato notificato.');
+      toast.successo('Documento riaperto in bozza interna. Motivazione registrata; il cliente è stato notificato.');
       await ricaricaDocumentiDb();
     } catch (err: any) {
-      alert(`❌ Sblocco non riuscito: ${err?.message ?? 'Errore sconosciuto'}`);
+      toast.errore(`Sblocco non riuscito: ${err?.message ?? 'Errore sconosciuto'}`);
     }
   };
 
@@ -460,7 +462,7 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
     // §21 — stesso tetto dello scanner di sicurezza lato server (§28): oltre 30 MB il
     // file verrebbe comunque rifiutato, meglio non spedire ~40 MB di base64 inutilmente.
     if (file.size > 30 * 1024 * 1024) {
-      alert(`❌ "${file.name}" supera il limite massimo di 30 MB per i documenti del fascicolo.`);
+      toast.attenzione(`"${file.name}" supera il limite massimo di 30 MB per i documenti del fascicolo.`);
       return;
     }
 
@@ -479,11 +481,11 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
         contentBase64: base64,
       });
 
-      alert('✓ Nuova versione caricata con successo! Ora è in bozza: controllala e clicca "Pubblica al Cliente" quando è pronta.');
+      toast.successo('Nuova versione caricata. Ora è in bozza: controllala e clicca "Pubblica al Cliente" quando è pronta.');
       setVersionTargetDocId(null);
       await ricaricaDocumentiDb();
     } catch (err: any) {
-      alert(`❌ Errore caricamento nuova versione: ${err?.message ?? 'Errore sconosciuto'}`);
+      toast.errore(`Errore caricamento nuova versione: ${err?.message ?? 'Errore sconosciuto'}`);
     } finally {
       setUploadingDoc(false);
     }
@@ -494,10 +496,10 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
     const risposta = prompt('Inserisci un commento o nota di riscontro per il cliente (opzionale):') ?? '';
     try {
       await aggiornaRichiestaModificaDocumentoApi(rid, { stato: 'risolta', rispostaStudio: risposta });
-      alert('✓ Richiesta di modifica contrassegnata come risolta.');
+      toast.successo('Richiesta di modifica contrassegnata come risolta.');
       await ricaricaDocumentiDb();
     } catch (err: any) {
-      alert(`❌ Errore: ${err?.message ?? 'Errore sconosciuto'}`);
+      toast.errore(`Errore: ${err?.message ?? 'Errore sconosciuto'}`);
     }
   };
 
@@ -511,7 +513,7 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
     // respingerli qui evita di codificare e spedire inutilmente ~40 MB di base64
     // che il server scarterebbe comunque.
     if (file.size > 30 * 1024 * 1024) {
-      alert(`❌ "${file.name}" supera il limite massimo di 30 MB per i documenti del fascicolo.`);
+      toast.attenzione(`"${file.name}" supera il limite massimo di 30 MB per i documenti del fascicolo.`);
       return;
     }
 
@@ -535,7 +537,7 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
         dataScadenzaDoc: '',
       });
     } catch (err: any) {
-      alert(`❌ Impossibile leggere il file: ${err?.message ?? 'Errore sconosciuto'}`);
+      toast.errore(`Impossibile leggere il file: ${err?.message ?? 'Errore sconosciuto'}`);
     }
   };
 

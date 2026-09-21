@@ -4,6 +4,7 @@ import { fmt } from '../utils';
 import { DigitalSignatureModal } from '../components/DigitalSignatureModal';
 import { resolveDocumentTemplateHtml, PREBUILT_TEMPLATES } from '../utils/documentTemplates';
 import { getStudioInfoForTenant } from '../utils/tenant';
+import { useToast } from '../components/ui/ToastProvider';
 import {
   fetchComunicazioniApi,
   scaricaDocumentoClient,
@@ -46,6 +47,7 @@ import { usePortalFirma } from '../components/portal/usePortalFirma';
 import { usePortalData } from '../components/portal/usePortalData';
 
 export function ClientPortal() {
+  const toast = useToast();
   const [searchParams] = useSearchParams();
   const token = searchParams.get('magic_token') || '';
 
@@ -111,12 +113,12 @@ export function ClientPortal() {
     setModificaDocInviando(true);
     try {
       await richiediModificaDocumentoApi(modificaDocTarget.id, modificaDocTesto.trim(), clientObj?.id);
-      alert('✓ La tua richiesta di modifica è stata inviata allo studio. L\'advisor esaminerà le tue note e caricherà la versione aggiornata.');
+      toast.successo('La tua richiesta di modifica è stata inviata allo studio. L\'advisor esaminerà le tue note e caricherà la versione aggiornata.');
       setModificaDocTarget(null);
       setModificaDocTesto('');
       await caricaDocumenti(clientObj?.id);
     } catch (err: any) {
-      alert(`❌ Errore invio richiesta: ${err?.message ?? 'Errore sconosciuto'}`);
+      toast.errore(`Errore invio richiesta: ${err?.message ?? 'Errore sconosciuto'}`);
     } finally {
       setModificaDocInviando(false);
     }

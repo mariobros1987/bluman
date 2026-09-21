@@ -12,6 +12,7 @@
 import type { CSSProperties } from 'react';
 import { mesePrecedente, meseSuccessivo, etichettaMese } from '../../utils/calendarioDate';
 import { triggerCronScadenzeApi } from '../../api/client';
+import { useToast } from '../ui/ToastProvider';
 
 export interface Periodo {
   anno: number;
@@ -43,6 +44,7 @@ const BOTTONE_PICCOLO: CSSProperties = {
 };
 
 export function Testata({ periodo, setPeriodo, vista, setVista, nelMeseCorrente, onOggi, onRicarica, onNuovo }: Props) {
+  const toast = useToast();
   const cambiaMese = (n: number) => {
     setPeriodo(n > 0 ? meseSuccessivo(periodo.anno, periodo.mese) : mesePrecedente(periodo.anno, periodo.mese));
   };
@@ -118,10 +120,10 @@ export function Testata({ periodo, setPeriodo, vista, setVista, nelMeseCorrente,
             // report restituito dal server, mai con un messaggio inventato.
             try {
               const res = await triggerCronScadenzeApi();
-              alert(res?.message || '✓ Scansione cron completata con successo!');
+              toast.successo(res?.message || 'Scansione cron completata con successo!');
               await onRicarica();
             } catch (err: any) {
-              alert(`⚠️ Scansione cron NON eseguita: ${err?.message || 'errore di rete'}. Le notifiche di scadenza NON sono state inviate.`);
+              toast.errore(`Scansione cron NON eseguita: ${err?.message || 'errore di rete'}. Le notifiche di scadenza NON sono state inviate.`);
             }
           }}
           style={{ background: 'var(--pill-indigo-bg)', color: 'var(--pill-indigo-fg)', border: '1px solid var(--pill-indigo-bd)', padding: '8px 14px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}

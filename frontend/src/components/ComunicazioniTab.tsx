@@ -4,6 +4,7 @@ import { downloadGuidePdf } from '../utils/pdfGenerator';
 import { getCurrentTenantId, getTenantStorageKey, getStudioInfoForTenant, BLUECODE_TENANT_ID } from '../utils/tenant';
 import { SpunteStato } from './SpunteStato';
 import type { Cliente } from '../types';
+import { useToast } from './ui/ToastProvider';
 
 export interface MessaggioComunicazione {
   id: string;
@@ -90,6 +91,7 @@ export function cleanDisplayEmailText(raw: string): string {
 }
 
 export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, cliente }: ComunicazioniTabProps) {
+  const toast = useToast();
   const [clientData, setClientData] = useState<Cliente | null>(cliente || null);
   const [tenantSettings, setTenantSettings] = useState<any>(null);
 
@@ -919,7 +921,7 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
                             const existing = JSON.parse(localStorage.getItem(vaultKey) || '[]');
                             existing.push({ id: `doc-${Date.now()}`, nome: att.nome, url: att.url, data: new Date().toLocaleDateString('it-IT'), categoria: 'Da Comunicazione Cliente' });
                             localStorage.setItem(vaultKey, JSON.stringify(existing));
-                            alert(`✓ Documento "${att.nome}" archiviato ed indicizzato con successo nel Vault Legale del Fascicolo!`);
+                            toast.successo(`Documento "${att.nome}" archiviato ed indicizzato con successo nel Vault Legale del Fascicolo!`);
                           }}
                           style={{ background: 'var(--pill-green-bg)', border: '1px solid var(--pill-green-bg)', color: 'var(--green)', padding: '4px 10px', borderRadius: 6, fontSize: 10.5, fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}
                         >
@@ -1149,7 +1151,7 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
               const file = e.target.files?.[0];
               if (!file) return;
               if (file.size > 15 * 1024 * 1024) {
-                alert('Il file selezionato supera il limite di 15 MB.');
+                toast.attenzione('Il file selezionato supera il limite di 15 MB.');
                 return;
               }
               const reader = new FileReader();

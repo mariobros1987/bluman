@@ -1,4 +1,5 @@
 import { downloadRealPdf, downloadRealWordDoc } from '../utils/pdfGenerator';
+import { toast } from '../components/ui/ToastProvider';
 import { API_BASE, apiFetch, getAuthHeaders, leggiErroreApi, urlDocumentoAssoluto } from './http';
 import { cachedQuery, invalidateCache } from './cache';
 import { getCurrentTenantId } from '../utils/tenant';
@@ -510,7 +511,7 @@ export async function scaricaDocumentoClient(fileUrl?: string | null, nomeFile?:
     // ha senso perché il browser può ancora scaricare direttamente.
     const messaggio = err instanceof Error ? err.message : '';
     if (/^HTTP \d+$/.test(messaggio)) {
-      alert(`Errore download documento: il server ha risposto ${messaggio} per «${nomeFile || 'documento'}»`);
+      toast.errore(`Errore download documento: il server ha risposto ${messaggio} per «${nomeFile || 'documento'}»`);
       return;
     }
     // Fallback con navigazione link se la fetch diretta è bloccata

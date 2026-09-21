@@ -3,12 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { fetchProgetti, salvaProgettoDettaglioApi } from '../api/client';
 import { getCurrentTenantId, getTenantStorageKey, getTenantSeedData, BLUECODE_TENANT_ID } from '../utils/tenant';
 import type { Progetto } from '../types';
+import { useToast } from './ui/ToastProvider';
 
 interface TimeTrackerProps {
   user?: any;
 }
 
 export function QuickTimeTracker({ user }: TimeTrackerProps) {
+  const toast = useToast();
   const navigate = useNavigate();
   const [isRunning, setIsRunning] = useState(false);
   const [seconds, setSeconds] = useState(0);
@@ -206,7 +208,7 @@ export function QuickTimeTracker({ user }: TimeTrackerProps) {
 
   const handleStart = () => {
     if (projects.length === 0) {
-      alert('Non hai ancora creato alcuna pratica. Clicca su "+ Nuovo Progetto" nella pagina Progetti per avviare il timer.');
+      toast.attenzione('Non hai ancora creato alcuna pratica. Clicca su "+ Nuovo Progetto" nella pagina Progetti per avviare il timer.');
       navigate('/projects');
       return;
     }
@@ -297,9 +299,9 @@ export function QuickTimeTracker({ user }: TimeTrackerProps) {
     }
 
     if (syncOk) {
-      alert(`✓ Consuntivate con successo ${hoursSpentDecimal}h sulla pratica "${currentProject.n}"!`);
+      toast.successo(`Consuntivate con successo ${hoursSpentDecimal}h sulla pratica "${currentProject.n}"!`);
     } else {
-      alert(`⚠️ ${hoursSpentDecimal}h consuntivate in LOCALE sulla pratica "${currentProject.n}", ma NON sincronizzate col server. I dati restano disponibili su questo dispositivo: apri la scheda del progetto e salvala per ritentare la sincronizzazione.`);
+      toast.attenzione(`${hoursSpentDecimal}h consuntivate in LOCALE sulla pratica "${currentProject.n}", ma NON sincronizzate col server. I dati restano disponibili su questo dispositivo: apri la scheda del progetto e salvala per ritentare la sincronizzazione.`);
     }
     setShowStopModal(false);
     setSeconds(0);

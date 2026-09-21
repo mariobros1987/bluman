@@ -9,9 +9,11 @@ import { uploadFileApi, fetchClienti, fetchProgetti } from '../../api/client';
 // (database). Prima archiviazione ed eliminazione scrivevano in `localStorage`: valevano per
 // questo browser, e un modello archiviato dal titolare restava attivo per tutti gli altri.
 import { useCartellaTemplate } from '../../hooks/useCartellaTemplate';
+import { useToast } from '../ui/ToastProvider';
 
 // ─── Componente Libreria Documenti in Bianco & Form Master ────────
 export function LibreriaDocumentiEForm() {
+  const toast = useToast();
   const navigate = useNavigate();
   const libImportFileRef = useRef<HTMLInputElement>(null);
 
@@ -66,32 +68,32 @@ export function LibreriaDocumentiEForm() {
   const handleArchiveDoc = async (templateId: string, nome: string) => {
     const tmpl = cartella.modelli.find((t) => t.id === templateId);
     if (!tmpl) {
-      alert(`Il modello "${nome}" non è più in elenco: ricarica la libreria.`);
+      toast.attenzione(`Il modello "${nome}" non è più in elenco: ricarica la libreria.`);
       return;
     }
     // §41 — l'archiviazione va a database: vale per tutto lo studio, non per questo browser.
     const esito = await cartella.archivia(tmpl, true);
-    alert(
-      esito.ok
-        ? `📦 ${esito.messaggio} (I documenti storici già presenti nei progetti rimangono inalterati).`
-        : `⚠️ ${esito.messaggio}`,
-    );
+    if (esito.ok) {
+      toast.successo(`${esito.messaggio} (I documenti storici già presenti nei progetti rimangono inalterati).`);
+    } else {
+      toast.errore(esito.messaggio);
+    }
   };
 
   const handleRestoreDoc = async (templateId: string, nome: string) => {
     const tmpl = cartella.modelli.find((t) => t.id === templateId);
     if (!tmpl) {
-      alert(`Il modello "${nome}" non è più in elenco: ricarica la libreria.`);
+      toast.attenzione(`Il modello "${nome}" non è più in elenco: ricarica la libreria.`);
       return;
     }
     const esito = await cartella.archivia(tmpl, false);
-    alert(`${esito.ok ? '♻️' : '⚠️'} ${esito.messaggio}`);
+    if (esito.ok) toast.successo(esito.messaggio); else toast.errore(esito.messaggio);
   };
 
   const handleDeleteDoc = async (templateId: string, nome: string) => {
     const tmpl = cartella.modelli.find((t) => t.id === templateId);
     if (!tmpl) {
-      alert(`Il modello "${nome}" non è più in elenco: ricarica la libreria.`);
+      toast.attenzione(`Il modello "${nome}" non è più in elenco: ricarica la libreria.`);
       return;
     }
     if (!confirm(`Sei sicuro di voler eliminare definitivamente il modello master "${nome}"?\n\nI documenti già firmati o salvati nei progetti del cliente rimarranno comunque congelati e perfettamente integri.`)) return;
@@ -99,7 +101,7 @@ export function LibreriaDocumentiEForm() {
     // eliminazione confermata. Prima si cancellava in locale e il `catch {}` vuoto annunciava
     // comunque «eliminato», con il modello che riappariva al reload.
     const esito = await cartella.elimina(tmpl);
-    alert(`${esito.ok ? '🗑️' : '⚠️'} ${esito.messaggio}`);
+    if (esito.ok) toast.successo(esito.messaggio); else toast.errore(esito.messaggio);
   };
 
   const handleAddDoc = async (e: React.FormEvent) => {
@@ -134,10 +136,10 @@ export function LibreriaDocumentiEForm() {
         setFileToUpload(null);
         setNewDocOpen(false);
       }
-      alert(`${esito.ok ? '✓' : '⚠️'} ${esito.messaggio}`);
+      if (esito.ok) toast.successo(esito.messaggio); else toast.errore(esito.messaggio);
     } catch (err: any) {
       // Upload del file fallito: niente è stato salvato, né in locale né sul server.
-      alert(`Caricamento del documento non riuscito: ${err?.message || 'errore di rete'}. Il file NON è stato salvato.`);
+      toast.errore(`Caricamento del documento non riuscito: ${err?.message || 'errore di rete'}. Il file NON è stato salvato.`);
     } finally {
       setUploading(false);
     }
@@ -154,7 +156,7 @@ export function LibreriaDocumentiEForm() {
         // §41 — ogni modello del bundle passa dal server: il conteggio dice quanti sono
         // arrivati nell'archivio dello studio, non quanti erano nel file.
         const esito = await cartella.importaDaJson(content);
-        alert(`${esito.ok ? '✓' : '⚠️'} ${esito.messaggio}`);
+        if (esito.ok) toast.successo(esito.messaggio); else toast.errore(esito.messaggio);
       } else {
         const esito = await cartella.crea({
           titolo: file.name.replace(/\.[^/.]+$/, ""),
@@ -162,7 +164,7 @@ export function LibreriaDocumentiEForm() {
           descrizione: `Modello importato da "${file.name}"`,
           contenutoHtml: content,
         });
-        alert(`${esito.ok ? '✓' : '⚠️'} ${esito.messaggio}`);
+        if (esito.ok) toast.successo(esito.messaggio); else toast.errore(esito.messaggio);
       }
     };
     reader.readAsText(file);

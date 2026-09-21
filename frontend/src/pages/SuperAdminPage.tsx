@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { fmt } from '../utils';
 import { setActiveTenantId } from '../utils/tenant';
 import { fetchAdminTenantsApi, createAdminTenantApi, updateAdminTenantApi, deleteAdminTenantApi, resetPasswordTenantApi } from '../api/client';
+import { useToast } from '../components/ui/ToastProvider';
 
 interface TenantStudio {
   id: string;
@@ -32,6 +33,7 @@ interface TenantStudio {
 const DEFAULT_TENANTS: TenantStudio[] = [];
 
 export function SuperAdminPage() {
+  const toast = useToast();
   const [tenants, setTenants] = useState<TenantStudio[]>(() => {
     const saved = localStorage.getItem('bluman_all_tenants_admin');
     return saved ? JSON.parse(saved) : DEFAULT_TENANTS;
@@ -122,7 +124,7 @@ export function SuperAdminPage() {
     try {
       creato = await createAdminTenantApi(nuovoStudio);
     } catch (err: any) {
-      alert(`⚠️ Registrazione non riuscita: ${err.message}`);
+      toast.errore(`Registrazione non riuscita: ${err.message}`);
       return;
     }
 
@@ -158,9 +160,9 @@ export function SuperAdminPage() {
     try {
       await updateAdminTenantApi(tenant.id, { stato: nextState });
       setTenants(prev => prev.map(t => t.id === tenant.id ? { ...t, stato: nextState } : t));
-      alert(`✓ Tenant "${tenant.ragioneSociale}" impostato sullo stato: ${nextState.toUpperCase()}`);
+      toast.successo(`Tenant "${tenant.ragioneSociale}" impostato sullo stato: ${nextState.toUpperCase()}`);
     } catch (err: any) {
-      alert(`⚠️ Cambio stato NON riuscito: ${err?.message || 'errore di rete'}. Il tenant "${tenant.ragioneSociale}" resta ${tenant.stato.toUpperCase()} sul server.`);
+      toast.errore(`Cambio stato NON riuscito: ${err?.message || 'errore di rete'}. Il tenant "${tenant.ragioneSociale}" resta ${tenant.stato.toUpperCase()} sul server.`);
     }
   };
 
@@ -177,11 +179,11 @@ export function SuperAdminPage() {
     try {
       await updateAdminTenantApi(tenant.id, { stato: nuovoStato });
       setTenants(prev => prev.map(t => t.id === tenant.id ? { ...t, stato: nuovoStato } : t));
-      alert(archiviare
-        ? `✓ Studio "${tenant.ragioneSociale}" archiviato. Ora puoi eliminarlo definitivamente, oppure ripristinarlo.`
-        : `✓ Studio "${tenant.ragioneSociale}" ripristinato e riattivato.`);
+      toast.successo(archiviare
+        ? `Studio "${tenant.ragioneSociale}" archiviato. Ora puoi eliminarlo definitivamente, oppure ripristinarlo.`
+        : `Studio "${tenant.ragioneSociale}" ripristinato e riattivato.`);
     } catch (err: any) {
-      alert(`⚠️ Operazione NON riuscita: ${err?.message || 'errore di rete'}. Lo stato dello studio resta ${tenant.stato.toUpperCase()} sul server.`);
+      toast.errore(`Operazione NON riuscita: ${err?.message || 'errore di rete'}. Lo stato dello studio resta ${tenant.stato.toUpperCase()} sul server.`);
     }
   };
 
@@ -195,9 +197,9 @@ export function SuperAdminPage() {
       await deleteAdminTenantApi(tenant.id);
       setTenants(prev => prev.filter(t => t.id !== tenant.id));
       setDeleteModalTenant(null);
-      alert(`✓ Tenant "${tenant.ragioneSociale}" eliminato definitivamente dalla piattaforma.`);
+      toast.successo(`Tenant "${tenant.ragioneSociale}" eliminato definitivamente dalla piattaforma.`);
     } catch (err: any) {
-      alert(`⚠️ Eliminazione NON riuscita: ${err?.message || 'errore di rete'}. Il tenant "${tenant.ragioneSociale}" esiste ancora sul server.`);
+      toast.errore(`Eliminazione NON riuscita: ${err?.message || 'errore di rete'}. Il tenant "${tenant.ragioneSociale}" esiste ancora sul server.`);
     }
   };
 
@@ -225,9 +227,9 @@ export function SuperAdminPage() {
       if (durationModalTenant && durationModalTenant.id === tenant.id) {
         setDurationModalTenant({ ...durationModalTenant, dataScadenza: newScadenza, stato: 'attivo' });
       }
-      alert(`✓ Licenza per "${tenant.ragioneSociale}" estesa con successo fino al ${newScadenza}!`);
+      toast.successo(`Licenza per "${tenant.ragioneSociale}" estesa con successo fino al ${newScadenza}!`);
     } catch (err: any) {
-      alert(`⚠️ Estensione licenza NON riuscita: ${err?.message || 'errore di rete'}. La scadenza resta ${tenant.dataScadenza}.`);
+      toast.errore(`Estensione licenza NON riuscita: ${err?.message || 'errore di rete'}. La scadenza resta ${tenant.dataScadenza}.`);
     }
   };
 
@@ -235,7 +237,7 @@ export function SuperAdminPage() {
     if (!customExpiryInput) return;
     const parts = customExpiryInput.split('-');
     if (parts.length !== 3) {
-      alert('Inserisci una data valida');
+      toast.attenzione('Inserisci una data valida');
       return;
     }
     const formatted = `${parts[2]}/${parts[1]}/${parts[0]}`;
@@ -246,9 +248,9 @@ export function SuperAdminPage() {
       if (durationModalTenant && durationModalTenant.id === tenant.id) {
         setDurationModalTenant({ ...durationModalTenant, dataScadenza: formatted, stato: 'attivo' });
       }
-      alert(`✓ Nuova data di scadenza per "${tenant.ragioneSociale}" impostata al: ${formatted}`);
+      toast.successo(`Nuova data di scadenza per "${tenant.ragioneSociale}" impostata al: ${formatted}`);
     } catch (err: any) {
-      alert(`⚠️ Aggiornamento scadenza NON riuscito: ${err?.message || 'errore di rete'}. La data resta ${tenant.dataScadenza}.`);
+      toast.errore(`Aggiornamento scadenza NON riuscito: ${err?.message || 'errore di rete'}. La data resta ${tenant.dataScadenza}.`);
     }
   };
 
@@ -264,7 +266,7 @@ export function SuperAdminPage() {
       const res = await resetPasswordTenantApi(t.id);
       setPasswordEmessa(res.passwordTemporanea);
     } catch (err: any) {
-      alert(`⚠️ ${err.message}`);
+      toast.errore(err.message);
     } finally {
       setRigenerandoPassword(false);
     }
@@ -284,12 +286,12 @@ export function SuperAdminPage() {
       const res = await resetPasswordTenantApi(t.id, { invia: true });
       setPasswordEmessa(res.passwordTemporanea);
       if (res.invitoInviato) {
-        alert(`✓ Email di attivazione e credenziali inviata a ${res.email || t.leadAdvisorEmail}.`);
+        toast.successo(`Email di attivazione e credenziali inviata a ${res.email || t.leadAdvisorEmail}.`);
       } else {
-        alert(`⚠️ Password rigenerata ma email non inviata: ${res.invitoErrore || 'errore SMTP'}.\n\nConsegna le credenziali manualmente: ${res.passwordTemporanea}`);
+        toast.attenzione(`Password rigenerata ma email non inviata: ${res.invitoErrore || 'errore SMTP'}. Consegna le credenziali manualmente: ${res.passwordTemporanea}`, 0);
       }
     } catch (e: any) {
-      alert(`⚠️ Operazione non riuscita: ${e.message}. Nessuna password è stata emessa.`);
+      toast.errore(`Operazione non riuscita: ${e.message}. Nessuna password è stata emessa.`);
     } finally {
       setSendingInvite(false);
     }
@@ -564,7 +566,7 @@ export function SuperAdminPage() {
                   <button
                     onClick={() => {
                       navigator.clipboard.writeText(window.location.origin);
-                      alert('✓ Link di accesso copiato negli appunti!');
+                      toast.successo('Link di accesso copiato negli appunti!');
                     }}
                     style={{ background: 'var(--card)', border: '1px solid var(--border)', color: 'var(--text)', padding: '4px 10px', borderRadius: 6, fontSize: 10.5, cursor: 'pointer', fontWeight: 700 }}
                   >
@@ -580,7 +582,7 @@ export function SuperAdminPage() {
                   <button
                     onClick={() => {
                       navigator.clipboard.writeText(credentialsModalTenant.leadAdvisorEmail);
-                      alert('✓ Email copiata!');
+                      toast.successo('Email copiata!');
                     }}
                     style={{ background: 'var(--card)', border: '1px solid var(--border)', color: 'var(--text)', padding: '4px 10px', borderRadius: 6, fontSize: 10.5, cursor: 'pointer', fontWeight: 700 }}
                   >
@@ -598,7 +600,7 @@ export function SuperAdminPage() {
                       <button
                         onClick={() => {
                           navigator.clipboard.writeText(passwordEmessa);
-                          alert('✓ Password copiata!');
+                          toast.successo('Password copiata!');
                         }}
                         style={{ background: 'var(--card)', border: '1px solid var(--border)', color: 'var(--text)', padding: '4px 10px', borderRadius: 6, fontSize: 10.5, cursor: 'pointer', fontWeight: 700 }}
                       >
@@ -635,12 +637,12 @@ export function SuperAdminPage() {
                 type="button"
                 onClick={() => {
                   if (!passwordEmessa) {
-                    alert('ℹ️ Rigenera prima la password: non è leggibile dal database.');
+                    toast.info('Rigenera prima la password: non è leggibile dal database.');
                     return;
                   }
                   const summary = `Gentile ${credentialsModalTenant.leadAdvisorNome || 'Gestore'},\nÈ stato attivato il tuo Studio "${credentialsModalTenant.ragioneSociale}" su BluMan Advisory Platform.\n\nLink Accesso: ${window.location.origin}\nEmail: ${credentialsModalTenant.leadAdvisorEmail}\nPassword: ${passwordEmessa}\n\nScadenza Licenza: ${credentialsModalTenant.dataScadenza}`;
                   navigator.clipboard.writeText(summary);
-                  alert('✓ Messaggio riepilogativo completo copiato negli appunti!');
+                  toast.successo('Messaggio riepilogativo completo copiato negli appunti!');
                 }}
                 style={{ background: 'var(--card)', border: '1px solid var(--border)', color: 'var(--text)', padding: '8px 14px', borderRadius: 8, fontSize: 11.5, fontWeight: 600, cursor: 'pointer' }}
               >

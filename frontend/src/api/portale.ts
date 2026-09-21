@@ -1,5 +1,6 @@
 import type { RichiestaModificaDoc } from './documenti';
 import { urlFileArchivio } from './documenti';
+import { toast } from '../components/ui/ToastProvider';
 import { API_BASE, apiFetch, erroreDellaRisposta, fetchWithTimeout, getAuthHeaders } from './http';
 
 // ── Blocco 2: portale cliente su database ──────────────────────────────────────────────
@@ -323,7 +324,7 @@ export async function scaricaDocumentoPortaleApi(
     setTimeout(() => URL.revokeObjectURL(objectUrl), 4000);
     return { ok: true };
   } catch (err: any) {
-    alert('Errore download documento: ' + (err?.message || 'errore sconosciuto'));
+    toast.errore('Errore download documento: ' + (err?.message || 'errore sconosciuto'));
     return null;
   }
 }

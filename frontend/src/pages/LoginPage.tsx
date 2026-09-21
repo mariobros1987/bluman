@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { loginApi, verificaTotpApi } from '../api/auth';
+import { useToast } from '../components/ui/ToastProvider';
 
 interface LoginPageProps {
   onLoginSuccess: (user: any, token: string) => void;
 }
 
 export function LoginPage({ onLoginSuccess }: LoginPageProps) {
+  const toast = useToast();
   // §23 — campi vuoti. Erano precompilati con `joe@bluecode.advisory` e otto puntini:
   // i puntini venivano inviati come password letterale, quindi il campo sembrava già
   // compilato e non lo era.
@@ -180,7 +182,7 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
               <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--muted)', cursor: 'pointer' }}>
                 <input type="checkbox" defaultChecked /> Ricordami su questo dispositivo
               </label>
-              <a href="#forgot" onClick={e => { e.preventDefault(); alert('Contatta il Super Admin per il reset password.'); }} style={{ color: 'var(--indigo-l)', textDecoration: 'none' }}>
+              <a href="#forgot" onClick={e => { e.preventDefault(); toast.info('Contatta il Super Admin per il reset password.'); }} style={{ color: 'var(--indigo-l)', textDecoration: 'none' }}>
                 Password dimenticata?
               </a>
             </div>

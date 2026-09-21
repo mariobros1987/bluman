@@ -8,6 +8,7 @@ import {
   type SettimanaTimesheetApi,
   type VoceTimesheetApi,
 } from '../api/client';
+import { useToast } from '../components/ui/ToastProvider';
 
 // ─────────────────────────────────────────────────────────────────
 // BLOCCO 6.1 — TIMESHEET SETTIMANALE
@@ -82,6 +83,7 @@ const COLORI_STATO: Record<string, { colore: string; sfondo: string; bordo: stri
 };
 
 export function TimesheetPage() {
+  const toast = useToast();
   const [inizio, setInizio] = useState<string>(() => toIso(lunediDi(new Date())));
   const [settimana, setSettimana] = useState<SettimanaTimesheetApi | null>(null);
   const [loading, setLoading] = useState(true);
@@ -165,7 +167,7 @@ export function TimesheetPage() {
       await approvaSettimanaTimesheet(settimana.inizio, userId);
       await carica(settimana.inizio);
     } catch (err: any) {
-      alert(err?.message || 'Approvazione non riuscita');
+      toast.errore(err?.message || 'Approvazione non riuscita');
     } finally {
       setAzione(false);
     }
@@ -397,6 +399,7 @@ function EditorCella({
   onClose: () => void;
   onSalvato: () => void;
 }) {
+  const toast = useToast();
   const voce = settimana.voci.find((v) => v.userId === userId && v.giorno === giorno);
   const membro = settimana.membri.find((m) => m.id === userId);
   const propriaCella = Boolean(idCorrente && userId === idCorrente);
@@ -417,7 +420,7 @@ function EditorCella({
       await salvaVoceTimesheet({ giorno, minuti, nota, progettoId: progettoId || null });
       onSalvato();
     } catch (err: any) {
-      alert(err?.message || 'Salvataggio non riuscito');
+      toast.errore(err?.message || 'Salvataggio non riuscito');
       setSalvataggio(false);
     }
   };
@@ -429,7 +432,7 @@ function EditorCella({
       await approvaVoceTimesheet(voce.id);
       onSalvato();
     } catch (err: any) {
-      alert(err?.message || 'Approvazione non riuscita');
+      toast.errore(err?.message || 'Approvazione non riuscita');
       setSalvataggio(false);
     }
   };
@@ -442,7 +445,7 @@ function EditorCella({
       await rifiutaVoceTimesheet(voce.id, motivo?.trim() || undefined);
       onSalvato();
     } catch (err: any) {
-      alert(err?.message || 'Rifiuto non riuscito');
+      toast.errore(err?.message || 'Rifiuto non riuscito');
       setSalvataggio(false);
     }
   };
@@ -529,7 +532,7 @@ function EditorCella({
                 onClick={() => {
                   const valore = Number(ore.replace(',', '.'));
                   if (!Number.isFinite(valore) || valore < 0 || valore > 24) {
-                    alert('Inserisci un numero di ore tra 0 e 24');
+                    toast.attenzione('Inserisci un numero di ore tra 0 e 24');
                     return;
                   }
                   salva(Math.round(valore * 60));

@@ -12,8 +12,10 @@ import { isRispostaPaginata, type MetaPaginazione } from '../api/paginazione';
 const META_INIZIALE: MetaPaginazione = { page: 1, limit: 50, totale: 0, pagine: 0 };
 
 import { useSearchParams } from 'react-router-dom';
+import { useToast } from '../components/ui/ToastProvider';
 
 export function ClientsPage() {
+  const toast = useToast();
   const [searchParams] = useSearchParams();
   const targetClientQuery = searchParams.get('client') || '';
 
@@ -63,7 +65,7 @@ export function ClientsPage() {
         setClienti(prev => prev.map(item => item.id === c.id ? { ...item, hasPassword: true } : item));
       }
     } catch (err: any) {
-      alert(`Errore generazione credenziali: ${err.message}`);
+      toast.errore(`Errore generazione credenziali: ${err.message}`);
     } finally {
       setGeneratingCredentials(null);
     }

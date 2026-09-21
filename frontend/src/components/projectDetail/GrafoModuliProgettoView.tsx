@@ -4,6 +4,7 @@ import { ProgressBar } from '../ui/ProgressBar';
 import { fmt } from '../../utils';
 import { fetchModuliLibreria, fetchArticoli } from '../../api/client';
 import type { Progetto } from '../../types';
+import { useToast } from '../ui/ToastProvider';
 
 // ─── Componente Grafo & Dipendenze Moduli del Progetto ────────────
 export function GrafoModuliProgettoView({
@@ -20,6 +21,7 @@ export function GrafoModuliProgettoView({
   onAddModule: (modello: { id: string; versione: number; nome: string; prezzo: number }) => void;
   onSelectMod: (modId: number) => void;
 }) {
+  const toast = useToast();
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [dbModTemplates, setDbModTemplates] = useState<Array<{ id: string; ver: number; n: string; cat: string; h: number; p: number; righe: any[] }>>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<string>('');
@@ -196,7 +198,7 @@ export function GrafoModuliProgettoView({
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
-                        alert(`✉️ Notifica Sblocco inviata con successo al cliente per la fase successiva: ${project.mods[idx + 1].n}!`);
+                        toast.successo(`Notifica Sblocco inviata con successo al cliente per la fase successiva: ${project.mods[idx + 1].n}!`);
                       }}
                       style={{ background: 'var(--pill-green-bg)', border: '1px solid var(--pill-green-bd)', color: 'var(--pill-green-fg)', padding: '5px 8px', borderRadius: 8, fontSize: 10, fontWeight: 600, cursor: 'pointer', marginTop: 2 }}
                     >

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useToast } from './ui/ToastProvider';
 
 export interface NotificationItem {
   id: string;
@@ -51,6 +52,7 @@ interface NotificationModalProps {
 }
 
 export function NotificationModal({ notifications, onClose, onMarkAllRead, onSelectNotif }: NotificationModalProps) {
+  const toast = useToast();
   const unreadCount = notifications.filter(n => !n.read).length;
   const [pushPermission, setPushPermission] = useState<NotificationPermission>(() => {
     if (typeof window !== 'undefined' && 'Notification' in window) {
@@ -75,10 +77,10 @@ export function NotificationModal({ notifications, onClose, onMarkAllRead, onSel
           icon: '/favicon.ico',
         });
       } else if (perm === 'denied') {
-        alert('Le notifiche push sono state bloccate nel browser. Abilitale nelle impostazioni del sito per ricevere gli avvisi.');
+        toast.attenzione('Le notifiche push sono state bloccate nel browser. Abilitale nelle impostazioni del sito per ricevere gli avvisi.');
       }
     } else {
-      alert('Il tuo browser non supporta le notifiche push desktop.');
+      toast.attenzione('Il tuo browser non supporta le notifiche push desktop.');
     }
   };
 

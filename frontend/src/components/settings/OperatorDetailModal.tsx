@@ -3,6 +3,7 @@ import { fetchProgetti, fetchPermessiUtenteApi, salvaPermessiUtenteApi } from '.
 import { fmt } from '../../utils';
 import { getTenantStorageKey } from '../../utils/tenant';
 import { ProgressBar } from '../ui/ProgressBar';
+import { useToast } from '../ui/ToastProvider';
 
 // ─── Modal Performance Operatore & Report Ore ──────────────────────
 export function OperatorDetailModal({
@@ -12,6 +13,7 @@ export function OperatorDetailModal({
   operator: any;
   onClose: () => void;
 }) {
+  const toast = useToast();
   const [loading, setLoading] = useState(true);
   const [progettiOperatore, setProgettiOperatore] = useState<any[]>([]);
   const [timesheetLogs, setTimesheetLogs] = useState<any[]>([]);
@@ -173,14 +175,14 @@ export function OperatorDetailModal({
       try {
         await salvaPermessiUtenteApi(operator.id, payload);
         setSavingPermessi(false);
-        alert(`✓ Matrice Permessi RBAC salvata ed ATTIVA per ${operator.nome || operator.name}! I moduli bloccati (Denied) sono ora inaccessibili.`);
+        toast.successo(`Matrice Permessi RBAC salvata ed ATTIVA per ${operator.nome || operator.name}! I moduli bloccati (Denied) sono ora inaccessibili.`);
       } catch (err: any) {
         setSavingPermessi(false);
-        alert(`Salvataggio permessi RBAC NON riuscito: ${err?.message || 'errore di rete'}. La matrice mostrata NON è attiva sul server: riprova prima di fare affidamento su questi livelli di accesso.`);
+        toast.errore(`Salvataggio permessi RBAC NON riuscito: ${err?.message || 'errore di rete'}. La matrice mostrata NON è attiva sul server: riprova prima di fare affidamento su questi livelli di accesso.`);
       }
     } else {
       setSavingPermessi(false);
-      alert(`✓ Matrice Permessi RBAC salvata in locale per ${operator.nome || operator.name} (utente non ancora registrato sul server: verrà sincronizzata alla creazione).`);
+      toast.info(`Matrice Permessi RBAC salvata in locale per ${operator.nome || operator.name} (utente non ancora registrato sul server: verrà sincronizzata alla creazione).`);
     }
   };
 
@@ -420,7 +422,7 @@ export function OperatorDetailModal({
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
             <button onClick={onClose} style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '7px 14px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}>Chiudi Scheda</button>
-            <button onClick={() => alert(`Report Timesheet PDF di ${operator.nome || operator.name} scaricato con successo!`)} style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '7px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+            <button onClick={() => toast.successo(`Report Timesheet PDF di ${operator.nome || operator.name} scaricato con successo!`)} style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '7px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
               📊 Scarica Report Timesheet PDF
             </button>
           </div>

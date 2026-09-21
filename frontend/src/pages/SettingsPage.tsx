@@ -4,6 +4,7 @@ import { chiaviDatiLocali } from '../utils/datiLocali';
 import { getCurrentTenantId, getTenantStorageKey, getStudioInfoForTenant, saveTenantInfoToStorage } from '../utils/tenant';
 import { UserProfileModal } from '../components/UserProfileModal';
 import { OperatorDetailModal } from '../components/settings/OperatorDetailModal';
+import { useToast } from '../components/ui/ToastProvider';
 import { TabCompany } from '../components/settings/TabCompany';
 import { TabInvoiceDesign } from '../components/settings/TabInvoiceDesign';
 import { InvoicePreviewModal } from '../components/settings/InvoicePreviewModal';
@@ -19,6 +20,7 @@ import styles from './Settings.module.css';
 type Tab = 'company' | 'users' | 'sdi' | 'invoice_design' | 'channels' | 'manutenzione' | 'sicurezza';
 
 export function SettingsPage() {
+  const toast = useToast();
   const [tab, setTab] = useState<Tab>('company');
   // Ruolo dell'utente corrente — serve a TabSicurezza per mostrare la sezione 2FA
   const currentUser = (() => { try { return JSON.parse(localStorage.getItem('bluman_user') || '{}'); } catch { return {}; } })();
@@ -346,7 +348,7 @@ export function SettingsPage() {
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
     } catch (err: any) {
-      alert(`Salvataggio impostazioni NON riuscito: ${err?.message || 'errore di rete'}. I dati sono conservati in locale su questo dispositivo ma non sincronizzati col server: riprova.`);
+      toast.errore(`Salvataggio impostazioni NON riuscito: ${err?.message || 'errore di rete'}. I dati sono conservati in locale su questo dispositivo ma non sincronizzati col server: riprova.`);
     }
   };
 
@@ -465,11 +467,11 @@ export function SettingsPage() {
     try {
       const esito = await rigeneraSlugWhatsappApi();
       if (!esito.ok) {
-        alert(`Rotazione non riuscita: ${esito.errore || 'errore non specificato'}`);
+        toast.errore(`Rotazione non riuscita: ${esito.errore || 'errore non specificato'}`);
         return;
       }
       if (esito.waCallbackUrl) setWaCallbackUrl(esito.waCallbackUrl);
-      alert('Nuovo path generato. Aggiorna la Callback URL in Meta con l\'indirizzo mostrato qui sopra.');
+      toast.successo('Nuovo path generato. Aggiorna la Callback URL in Meta con l\'indirizzo mostrato qui sopra.');
     } finally {
       setRigenerandoSlug(false);
     }
@@ -496,11 +498,11 @@ export function SettingsPage() {
         setLogoUrl(finalLogoUrl);
         await updateTenantInfoApi({ logoUrl: finalLogoUrl });
         localStorage.setItem(getTenantStorageKey('bluman_logo_url'), finalLogoUrl);
-        alert('✓ Logo caricato e salvato permanentemente su Supabase PostgreSQL!');
+        toast.successo('Logo caricato e salvato permanentemente su Supabase PostgreSQL!');
       } catch (err: any) {
         // §3.3 — upload o salvataggio falliti: prima sparivano in console.error e il logo
         // sembrava caricato (era già in anteprima). Il localStorage viene scritto solo dopo.
-        alert(`Caricamento logo non riuscito: ${err?.message || 'errore di rete'}. Il logo NON è stato salvato sul server.`);
+        toast.errore(`Caricamento logo non riuscito: ${err?.message || 'errore di rete'}. Il logo NON è stato salvato sul server.`);
       } finally {
         setUploadingLogo(false);
       }
@@ -528,7 +530,7 @@ export function SettingsPage() {
     } catch (err: any) {
       // §3.3 — la creazione del collaboratore è una scrittura critica (account + eventuale
       // email di invito): il fallimento va mostrato, il modal resta aperto per riprovare.
-      alert(`Creazione collaboratore non riuscita: ${err?.message || 'errore di rete'}. L'utente NON è stato creato.`);
+      toast.errore(`Creazione collaboratore non riuscita: ${err?.message || 'errore di rete'}. L'utente NON è stato creato.`);
     } finally {
       setSubmittingUser(false);
     }

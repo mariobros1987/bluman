@@ -1,4 +1,5 @@
 import { API_BASE, apiFetch, getAuthHeaders } from './http';
+import { toast } from '../components/ui/ToastProvider';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // BLOCCO 5 — REPORTISTICA DIREZIONALE (JSON + export PDF/Excel)
@@ -65,7 +66,7 @@ export async function downloadReportApi(chiave: string, formato: 'pdf' | 'xlsx',
     window.URL.revokeObjectURL(url);
     return { ok: true };
   } catch (err: any) {
-    alert('Errore export report: ' + (err?.message || 'errore sconosciuto'));
+    toast.errore('Errore export report: ' + (err?.message || 'errore sconosciuto'));
     return null;
   }
 }

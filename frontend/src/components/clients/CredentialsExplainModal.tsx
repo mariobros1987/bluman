@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { sendEmailDirectApi, sendWhatsAppDirectApi } from '../../api/client';
 import type { Cliente } from '../../types';
+import { useToast } from '../ui/ToastProvider';
 
 // ─── Modal Credenziali Portale Cliente (Email + Password) ─────────
 export function CredentialsExplainModal({
@@ -10,6 +11,7 @@ export function CredentialsExplainModal({
   data: { cliente: Cliente; passwordChiaro: string; email: string; emailInviata: boolean; erroreInvioEmail?: string };
   onClose: () => void;
 }) {
+  const toast = useToast();
   const [copied, setCopied] = useState(false);
   const [sendingEmail, setSendingEmail] = useState(false);
   const [sendingWhatsapp, setSendingWhatsapp] = useState(false);
@@ -41,7 +43,7 @@ Password: ${data.passwordChiaro}`;
 
   const handleSendEmail = async () => {
     if (!destEmail.trim()) {
-      alert('Inserisci un indirizzo email per il destinatario.');
+      toast.attenzione('Inserisci un indirizzo email per il destinatario.');
       return;
     }
     setSendingEmail(true);
