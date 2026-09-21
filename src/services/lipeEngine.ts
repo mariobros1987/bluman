@@ -140,6 +140,8 @@ export function calcolaLiquidazioneIvaPeriodo(
     totaleIvaCentesimi: number;
     esigibilitaIva?: string | null;
     stato?: string;
+    /** 'fattura' | 'nota_credito': la NC storna, quindi entra con segno negativo. */
+    tipoDocumento?: string | null;
   }>,
   fatturePassive: Array<{
     imponibileCentesimi: number;
@@ -157,8 +159,14 @@ export function calcolaLiquidazioneIvaPeriodo(
     if (f.stato === 'bozza') continue; // le bozze non concorrono
     if (f.esigibilitaIva === 'split') continue; // split payment escluso dal debito IVA periodico
 
-    totaleImponibileVenditeCent += f.totaleImponibileCentesimi || 0;
-    ivaDebitoCent += f.totaleIvaCentesimi || 0;
+    // Le note di credito stornano l'operazione: entrano con segno NEGATIVO nel debito del
+    // LORO periodo di emissione (i loro totali sono memorizzati positivi, come la fattura
+    // origine). La fattura annullata NON va esclusa qui: concorre nel suo periodo, e lo
+    // storno è realizzato dalla NC nel periodo in cui è emessa — escluderla sballerebbe la
+    // liquidazione del periodo della fattura quando la NC cade in un periodo successivo.
+    const segno = f.tipoDocumento === 'nota_credito' ? -1 : 1;
+    totaleImponibileVenditeCent += segno * (f.totaleImponibileCentesimi || 0);
+    ivaDebitoCent += segno * (f.totaleIvaCentesimi || 0);
   }
 
   // 2. Somma IVA a Credito da acquisti

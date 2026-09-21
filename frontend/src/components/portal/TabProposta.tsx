@@ -116,7 +116,7 @@ export function TabProposta({
                     <span style={{ fontSize: 11, color: 'var(--green)', fontFamily: 'monospace' }}>{eidasSeal.signatureId}</span>
                   )}
                 </div>
-                <h3 style={{ fontSize: 17, fontWeight: 700, color: '#fff', margin: 0 }}>Engagement Letter & Proposta d'Ordine Iniziale (v1.0)</h3>
+                <h3 style={{ fontSize: 17, fontWeight: 700, color: 'var(--pill-green-fg)', margin: 0 }}>Engagement Letter & Proposta d'Ordine Iniziale (v1.0)</h3>
                 {eidasSeal?.timestampIso ? (
                   <div style={{ fontSize: 11, color: 'var(--pill-green-fg)', marginTop: 4 }}>
                     Stipulato il: <strong>{new Date(eidasSeal.timestampIso).toLocaleString('it-IT')}</strong>

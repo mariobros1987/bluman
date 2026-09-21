@@ -39,6 +39,7 @@ import {
 import { credenzialiCanali, canaliDisponibili, inviaCodiceOtp, recapitiCliente } from '../services/otpDispatch.js';
 import { notificaStudio, notificaCliente } from '../services/notificheService.js';
 import { scanFileBuffer } from '../services/securityScanner.js';
+import { fileContieneFirmaDigitale } from '../services/firmaFileValidazione.js';
 import { generaPdfVerbaleFirma } from '../services/verbaleFirma.js';
 import { generaCopiaFirmata, type EsitoCopiaFirmata } from '../services/copiaFirmata.js';
 import {
@@ -1772,6 +1773,17 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
       const scan = scanFileBuffer(buffer, filename);
       if (!scan.safe) {
         return reply.code(400).send({ errore: `File rifiutato: ${scan.reason}` });
+      }
+
+      // FEQ onesta (audit 21/09/2026): la firma qualificata esterna deve contenere davvero
+      // una firma digitale (PAdES o PKCS#7/CAdES), non essere un PDF qualunque marcato FEQ.
+      // Il blocco precede il consumo di OTP e l'upload. La scansione autografa
+      // (`manuale_scansionata`) resta SES e non passa di qui.
+      if (tipoFirma === 'qualificata_esterna') {
+        const esitoFirmaFile = fileContieneFirmaDigitale(buffer, filename);
+        if (!esitoFirmaFile.firmato) {
+          return reply.code(422).send({ ok: false, errore: esitoFirmaFile.motivo });
+        }
       }
 
       let codiceOtpId: string | null = null;

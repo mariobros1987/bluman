@@ -49,7 +49,16 @@ export function apriStreamNotifiche(
   const controller = new AbortController();
 
   const connetti = async () => {
-    const token = typeof localStorage !== 'undefined' ? localStorage.getItem('bluman_jwt_token') : null;
+    // Selezione token come getAuthHeaders (http.ts): nel portale cliente (/portal) il token
+    // è bluman_portal_token, altrove bluman_jwt_token. Prima si leggeva solo il jwt: per il
+    // cliente reale era null, lo stream non si connetteva mai e le notifiche live non arrivavano.
+    const isPortal = typeof window !== 'undefined' && window.location.pathname.startsWith('/portal');
+    const token =
+      typeof localStorage !== 'undefined'
+        ? isPortal
+          ? localStorage.getItem('bluman_portal_token') || localStorage.getItem('bluman_jwt_token')
+          : localStorage.getItem('bluman_jwt_token')
+        : null;
     if (!token) {
       // Senza sessione non c'è stream: si riprova più tardi nel caso arrivi un login.
       if (attivo) timer = setTimeout(connetti, 10_000);

@@ -65,7 +65,7 @@ export function PortalTopNav({
                 style={{
                   background: 'transparent',
                   border: 'none',
-                  color: '#ffffff',
+                  color: 'var(--text)',
                   fontWeight: 700,
                   fontSize: 12,
                   padding: '2px 0',

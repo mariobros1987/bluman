@@ -73,8 +73,15 @@ export function ClientsPage() {
   const [nome, setNome] = useState('');
   const [tipo, setTipo] = useState<'individual' | 'company'>('individual');
   const [submitting, setSubmitting] = useState(false);
+  // Errore mostrato DENTRO la modale di creazione: la banda `errore` di pagina resta dietro
+  // l'overlay e l'operatore non la vedrebbe. Serve a non chiudere la modale come per un
+  // successo quando la creazione a database è invece fallita.
+  const [erroreModale, setErroreModale] = useState('');
 
-  const loadClienti = async () => {
+  // `isCancelled` chiude la race: se una ricerca/pagina più recente parte prima che questa
+  // finisca, la risposta lenta precedente non deve sovrascrivere i risultati nuovi. Pattern
+  // preso da useMicrovociProgetto. Le chiamate one-shot (dopo create/azioni) non lo passano.
+  const loadClienti = async (isCancelled: () => boolean = () => false) => {
     setLoading(true);
     setErrore('');
     const currentTenantId = getCurrentTenantId();
@@ -89,6 +96,7 @@ export function ClientsPage() {
         sortOrder: 'desc',
         tipo: filterType === 'all' ? undefined : filterType,
       });
+      if (isCancelled()) return; // risposta stantia: una richiesta più recente è in corso
       if (!isRispostaPaginata<Cliente>(res)) throw new Error('Risposta clienti non valida');
       apiList = res.data.filter((c: any) => !c.tenantId || c.tenantId === currentTenantId);
       apiDisponibile = true;
@@ -96,6 +104,7 @@ export function ClientsPage() {
       if (res.meta.pagine > 0 && page > res.meta.pagine) setPage(res.meta.pagine);
       setRiepilogo((res.riepilogo as { societa: number; persone: number } | undefined) || { societa: 0, persone: 0 });
     } catch (err) {
+      if (isCancelled()) return;
       setErrore(err instanceof Error ? err.message : 'Errore caricamento clienti');
       console.warn('Errore fetch clienti DB:', err);
     }
@@ -103,7 +112,10 @@ export function ClientsPage() {
     // Estrai clienti dai progetti del tenant
     const projStorageKey = getTenantStorageKey('bluman_custom_projects', currentTenantId);
     const localProjStr = localStorage.getItem(projStorageKey);
-    const localProjs: any[] = localProjStr ? JSON.parse(localProjStr) : [];
+    // JSON.parse protetto: uno storage corrotto non deve far uscire la funzione prima di
+    // setLoading(false), lasciando lo spinner bloccato per sempre.
+    let localProjs: any[] = [];
+    try { localProjs = localProjStr ? JSON.parse(localProjStr) : []; } catch { localProjs = []; }
     const extractedClients: Cliente[] = [];
 
     localProjs.forEach((p: any) => {
@@ -134,7 +146,8 @@ export function ClientsPage() {
 
     const clientStorageKey = getTenantStorageKey('bluman_custom_clients', currentTenantId);
     const localClientsStr = localStorage.getItem(clientStorageKey);
-    const localClients: Cliente[] = localClientsStr ? JSON.parse(localClientsStr) : [];
+    let localClients: Cliente[] = [];
+    try { localClients = localClientsStr ? JSON.parse(localClientsStr) : []; } catch { localClients = []; }
 
     const mergedMap = new Map();
     // Una pagina DB valida resta una pagina DB: i fallback locali si usano solo se l'API non è disponibile.
@@ -189,13 +202,18 @@ export function ClientsPage() {
   }, [search]);
 
   useEffect(() => {
-    loadClienti();
+    let annullato = false;
+    loadClienti(() => annullato);
+    return () => {
+      annullato = true;
+    };
   }, [targetClientQuery, page, limit, searchDebounced, filterType]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!nome.trim()) return;
     setSubmitting(true);
+    setErroreModale('');
     const newClientObj: Cliente = {
       id: `cl-${Date.now()}`,
       nome: nome.trim(),
@@ -210,17 +228,32 @@ export function ClientsPage() {
       telefono: '',
       isAttivo: true,
     };
+    // La creazione DEVE andare a buon fine sul database: se la POST fallisce non si conferma
+    // nulla. Prima l'errore veniva solo loggato e la modale si chiudeva salvando in
+    // localStorage, così l'operatore credeva di aver creato un cliente che a database non
+    // esisteva (compariva solo dal fallback locale).
     try {
       const res = await creaClienteApi({ nome: nome.trim(), tipo });
       if (res && res.id) newClientObj.id = res.id;
     } catch (err) {
-      console.error('API create fallback:', err);
+      console.error('Errore creazione cliente:', err);
+      setErroreModale(
+        err instanceof Error ? err.message : 'Impossibile creare il cliente. Riprova.',
+      );
+      setSubmitting(false);
+      return; // modale aperta, nessun salvataggio locale: niente falsa conferma
     }
 
+    // Solo dopo la conferma del database: aggiorna la copia locale, chiudi e ricarica.
     const currentTenantId = getCurrentTenantId();
     const clientStorageKey = getTenantStorageKey('bluman_custom_clients', currentTenantId);
-    const savedStr = localStorage.getItem(clientStorageKey);
-    const savedArr: any[] = savedStr ? JSON.parse(savedStr) : [];
+    let savedArr: any[] = [];
+    try {
+      const savedStr = localStorage.getItem(clientStorageKey);
+      savedArr = savedStr ? JSON.parse(savedStr) : [];
+    } catch {
+      savedArr = []; // storage corrotto: non deve impedire di registrare il nuovo cliente
+    }
     localStorage.setItem(clientStorageKey, JSON.stringify([newClientObj, ...savedArr]));
 
     setNome('');
@@ -290,7 +323,7 @@ export function ClientsPage() {
           </div>
 
           <button
-            onClick={() => setModalOpen(true)}
+            onClick={() => { setErroreModale(''); setModalOpen(true); }}
             style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap' }}
           >
             + Nuovo Cliente
@@ -395,8 +428,13 @@ export function ClientsPage() {
                 ))}
               </div>
             </div>
+            {erroreModale && (
+              <div style={{ padding: 10, borderRadius: 8, background: 'var(--pill-red-bg)', color: 'var(--pill-red-fg)', fontSize: 12 }}>
+                {erroreModale}
+              </div>
+            )}
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
-              <button type="button" onClick={() => setModalOpen(false)} style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '7px 14px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}>Annulla</button>
+              <button type="button" onClick={() => { setModalOpen(false); setErroreModale(''); }} style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '7px 14px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}>Annulla</button>
               <button type="submit" disabled={submitting} style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>{submitting ? 'Salvataggio...' : '✓ Salva Cliente'}</button>
             </div>
           </form>

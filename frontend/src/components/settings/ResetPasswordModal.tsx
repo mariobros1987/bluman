@@ -122,8 +122,8 @@ export function ResetPasswordModal({
                     Consegna questa password a <strong>{resetResult.nome}</strong>. Al primo accesso gli verrà richiesto obbligatoriamente di impostarne una nuova.
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, background: 'rgba(0,0,0,0.3)', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--green)' }}>
-                    <code style={{ fontSize: 14, fontWeight: 800, color: '#fff', letterSpacing: '0.05em', flex: 1, fontFamily: 'monospace' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, background: 'var(--surface-3)', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--green)' }}>
+                    <code style={{ fontSize: 14, fontWeight: 800, color: 'var(--text)', letterSpacing: '0.05em', flex: 1, fontFamily: 'monospace' }}>
                       {resetResult.passwordTemporanea}
                     </code>
                     <button

@@ -331,9 +331,13 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
 
   useEffect(() => {
     loadComunicazioni();
+    // Polling portato da 5s a 30s (audit 21/09/2026): ogni giro è una query sulla tabella
+    // comunicazione_progetto — che ora ha un indice, ma con la RLS resta cara — moltiplicata
+    // per ogni chat aperta. 30s riduce di 6× il carico mantenendo l'aggiornamento percepito.
+    // TODO: sostituire il polling con la sottoscrizione all'SSE /stream già esposto dal backend.
     const interval = setInterval(() => {
       loadComunicazioni();
-    }, 5000);
+    }, 30000);
     return () => clearInterval(interval);
   }, [progettoId]);
 
@@ -1003,8 +1007,8 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
               color: channelDetail.color,
             }}>
               <span style={{ fontWeight: 800 }}>🎯 Destinatario Cliente:</span>
-              <span style={{ fontWeight: 700, color: '#fff', fontFamily: 'monospace' }}>{channelDetail.val}</span>
-              <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)' }}>({contactInfo.referente})</span>
+              <span style={{ fontWeight: 700, fontFamily: 'monospace' }}>{channelDetail.val}</span>
+              <span style={{ fontSize: 10, opacity: 0.7 }}>({contactInfo.referente})</span>
               <span style={{
                 background: 'rgba(255,255,255,0.15)',
                 padding: '1px 6px',

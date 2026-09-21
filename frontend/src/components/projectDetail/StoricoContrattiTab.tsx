@@ -36,7 +36,7 @@ export function StoricoContrattiTab({
             }}>
               {project.st === 'pre_project' ? '✍️ PROPOSTA D\'ORDINE IN ATTESA DI FIRMA (v1.0)' : '🔒 CONTRATTO FIRMATO & CONGELATO (v1.0)'}
             </span>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', marginTop: 4 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginTop: 4 }}>
               Engagement Letter — {project.n}
             </div>
             <div style={{ fontSize: 10, color: project.st === 'pre_project' ? 'var(--pill-amber-fg)' : 'var(--pill-green-fg)' }}>

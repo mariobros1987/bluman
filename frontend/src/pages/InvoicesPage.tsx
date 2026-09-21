@@ -561,7 +561,7 @@ export function InvoicesPage() {
                   return (
                     <tr key={inv.id} style={{ borderBottom: '1px solid var(--border)' }}>
                       <td style={{ padding: '14px 8px', fontWeight: 600 }}>
-                        <div style={{ display: 'inline-block', padding: '2px 6px', borderRadius: 4, background: isNote ? 'var(--pill-red-bg)' : 'var(--pill-blue-bg)', color: 'white', fontSize: 11, marginRight: 8 }}>
+                        <div style={{ display: 'inline-block', padding: '2px 6px', borderRadius: 4, background: isNote ? 'var(--pill-red-bg)' : 'var(--pill-blue-bg)', color: isNote ? 'var(--pill-red-fg)' : 'var(--pill-blue-fg)', fontSize: 11, marginRight: 8 }}>
                           {isNote ? 'NC' : 'FT'}
                         </div>
                         {inv.numero || `FT-${inv.numeroProgressivoSerie}`}
@@ -662,7 +662,7 @@ export function InvoicesPage() {
                                     setImportoIncassoEur(((scadAperta.importoCentesimi || 0) / 100).toFixed(2));
                                     setShowIncassoModal(true);
                                   }}
-                                  style={{ padding: '4px 8px', borderRadius: 6, border: 'none', background: 'var(--pill-green-bd)', color: 'white', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}
+                                  style={{ padding: '4px 8px', borderRadius: 6, border: 'none', background: 'var(--green)', color: 'var(--on-accent)', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}
                                   title="Registra incasso rata"
                                 >
                                   📥 Incasso

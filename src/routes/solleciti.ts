@@ -25,7 +25,9 @@ export async function registraRotteSolleciti(server: FastifyInstance): Promise<v
           tenantId,
           stato: { in: ['in_attesa', 'parziale', 'scaduto'] },
           fattura: {
-            stato: { not: 'bozza' },
+            // Escludi bozze E fatture annullate: una fattura stornata con Nota di Credito non
+            // è un insoluto e non deve ricevere solleciti/diffide (audit 21/09/2026).
+            stato: { notIn: ['bozza', 'annullata'] },
           },
         },
         include: {

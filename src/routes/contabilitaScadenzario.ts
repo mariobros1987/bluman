@@ -75,6 +75,24 @@ export async function registraRotteContabilitaScadenzario(server: FastifyInstanc
               });
               if (!scadenza) return { nonTrovata: true as const };
 
+              // Guardia (audit 21/09/2026): non si incassa su una fattura ANNULLATA (stornata
+              // con Nota di Credito). Senza questo controllo il passo 3 riportava la fattura da
+              // 'annullata' a 'emessa'/'incassata', "resuscitandola".
+              if (scadenza.fattura.stato === 'annullata') {
+                return { fatturaAnnullata: true as const };
+              }
+
+              // Tetto all'over-incasso: l'importo non può superare il residuo della rata,
+              // altrimenti si gonfia il saldo conto oltre il dovuto senza alcuna segnalazione.
+              const giaIncassatoRata = scadenza.registrazioniRegistrate.reduce(
+                (acc, r) => acc + r.importoIncassatoCentesimi,
+                0,
+              );
+              const residuoRataCent = scadenza.importoCentesimi - giaIncassatoRata;
+              if (importoIncassatoCentesimi > residuoRataCent) {
+                return { eccedeResiduo: true as const, residuoRataCent };
+              }
+
               // 1. Registra l'incasso della rata
               const registrazione = await tx.registrazioneIncasso.create({
                 data: {
@@ -89,7 +107,7 @@ export async function registraRotteContabilitaScadenzario(server: FastifyInstanc
               });
 
               // 2. Aggiorna stato della rata
-              const totaleIncassatoRata = scadenza.registrazioniRegistrate.reduce((acc, r) => acc + r.importoIncassatoCentesimi, 0) + importoIncassatoCentesimi;
+              const totaleIncassatoRata = giaIncassatoRata + importoIncassatoCentesimi;
               const nuovoStatoScadenza = totaleIncassatoRata >= scadenza.importoCentesimi ? 'incassato' : 'parziale';
 
               await tx.scadenzaIncasso.update({
@@ -152,6 +170,18 @@ export async function registraRotteContabilitaScadenzario(server: FastifyInstanc
 
       if ('nonTrovata' in esito) {
         return reply.code(404).send({ errore: 'Scadenza incasso non trovata' });
+      }
+      if ('fatturaAnnullata' in esito) {
+        return reply.code(409).send({
+          errore:
+            'La fattura è annullata (stornata con Nota di Credito): non è possibile registrare un incasso su una sua rata.',
+        });
+      }
+      if ('eccedeResiduo' in esito) {
+        const residuoCent = esito.residuoRataCent ?? 0;
+        return reply.code(400).send({
+          errore: `Importo superiore al residuo della rata (${(residuoCent / 100).toFixed(2)} €). Registra al massimo il residuo.`,
+        });
       }
 
       const { registrazione, tutteSaldate, scadenza } = esito;

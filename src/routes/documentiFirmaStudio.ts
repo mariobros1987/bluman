@@ -18,6 +18,7 @@ import type { FastifyInstance } from 'fastify';
 import { prisma } from '../util/prismaClient.js';
 import { uploadDocumento } from '../services/storageService.js';
 import { scanFileBuffer } from '../services/securityScanner.js';
+import { fileContieneFirmaDigitale } from '../services/firmaFileValidazione.js';
 import { notificaCliente } from '../services/notificheService.js';
 import { recordAudit, ipReale, normalizzaGrafometrica } from '../util/serverHelpers.js';
 import { generaCopiaFirmata } from '../services/copiaFirmata.js';
@@ -193,6 +194,16 @@ export async function registraRotteDocumentiFirmaStudio(server: FastifyInstance)
       const esitoScan = scanFileBuffer(buffer, filename);
       if (!esitoScan.safe) {
         return reply.code(400).send({ errore: esitoScan.reason ?? 'File non valido o non ammesso.' });
+      }
+
+      // FEQ onesta (audit 21/09/2026): lato studio, come lato cliente, un file caricato come
+      // firma qualificata esterna deve contenere davvero una firma digitale (PAdES o
+      // PKCS#7/CAdES), non essere un PDF qualunque marcato FEQ.
+      if (modalita === 'qualificata_esterna') {
+        const esitoFirmaFile = fileContieneFirmaDigitale(buffer, filename);
+        if (!esitoFirmaFile.firmato) {
+          return reply.code(422).send({ errore: esitoFirmaFile.motivo });
+        }
       }
 
       const fileHash = createHash('sha256').update(buffer).digest('hex');

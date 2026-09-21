@@ -140,3 +140,15 @@ Il ri-caricamento di file qualificato (`qualificata_esterna`) copre già il caso
 2. ✅ **Risposta 28/08/2026** (implicita nell'approvazione della Fase 2 con enforcement) — Il livello `feq` **blocca** il flusso OTP (409) finché il cliente non firma col proprio provider; niente degradazione silenziosa a SES.
 3. ⚠️ **Regola adottata in implementazione** — Per livelli `fea`/`feq` l'hash deve essere **server-side** (documento generato dal server, `POST /documenti/genera`); l'hash composto dal browser resta ammesso solo per documenti `ses`. Se il titolare vuole diversamente, dirlo e si cambia.
 4. ✅ **Risposta 28/08/2026** (Fase 4) — Niente integrazione diretta con provider: resta il ri-caricamento del file firmato dal cliente (`qualificata_esterna`), già funzionante e onestamente etichettato FEQ dalla Fase 1.
+
+## 7. Interventi 21/09/2026 (post-audit) e follow-up esterni
+
+Dall'audit del 21/09/2026 (vedi `ANALISI_APPROFONDITA_2026-09-21.md`), corretto lato codice:
+
+- **Sigillo con chiave.** `creaSigilloFea` (`otpService.ts`) non calcola più un SHA-256 in chiaro del payload — ricalcolabile da chiunque conosca i campi — ma un **HMAC-SHA256 con una chiave del server** (`SIGILLO_HMAC_SECRET`, ripiego su `JWT_SECRET`). L'impronta ora prova che è stata la piattaforma a sigillare (integrità + non ripudio lato piattaforma), non è più una semplice checksum. In produzione la chiave è obbligatoria (≥32 char) o l'avvio si ferma; il nome del campo resta `sha256Digest` (64 hex) per compatibilità con verbali e DB storici.
+- **FEQ onesta — verifica di PRESENZA della firma.** Un file caricato come `qualificata_esterna` ora deve contenere davvero una struttura di firma digitale (PAdES nel PDF, oppure contenitore PKCS#7/CAdES `.p7m/.p7s`), verificata da `firmaFileValidazione.ts`. Vale su **entrambi** i canali: cliente (`routes/firma.ts` `/portal/firma-con-file`) e studio (`routes/documentiFirmaStudio.ts`). Un PDF qualunque viene ora respinto con 422, chiudendo il buco "qualunque file soddisfa un requisito FEQ".
+
+**Follow-up che richiedono provider esterni (NON implementati — servono decisioni del titolare):**
+
+1. **Validazione crittografica completa del certificato.** Oggi la piattaforma verifica solo che una firma sia PRESENTE, non la valida (catena, revoca CRL/OCSP, stato "qualificato" via EU Trust List). Serve una libreria/servizio dedicato (es. DSS eIDAS). Finché non c'è, il verbale continua a dichiarare onestamente che il certificato non è validato dalla piattaforma.
+2. **Marca temporale qualificata (RFC 3161).** Il `timestampIso` del sigillo è l'orologio del server, non una data certa opponibile ai terzi. Serve un contratto con una TSA (Time Stamping Authority) qualificata e l'apposizione della marca sul digest. Decidere il provider TSA.

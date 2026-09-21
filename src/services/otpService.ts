@@ -303,12 +303,47 @@ export function descriviCanaleVerificato(record: {
   return `${base}, recapito dichiarato dal firmatario in fase di firma e diverso da quello in anagrafica (${inScheda})`;
 }
 
+/**
+ * Chiave del sigillo. Prima l'impronta era un SHA-256 in chiaro del payload: chiunque
+ * conoscesse i campi del verbale poteva ricalcolare lo stesso valore, quindi l'impronta
+ * NON provava che fosse stata la piattaforma a sigillare — era una checksum, non un
+ * sigillo. Ora è un HMAC-SHA256 con una chiave del server: solo chi possiede la chiave
+ * può produrre l'impronta, e l'integrità del verbale diventa verificabile e opponibile.
+ *
+ * Ripiega su `JWT_SECRET` per non imporre nuova configurazione in produzione. Se in
+ * produzione non c'è nessuna chiave stabile ≥32 caratteri ci si ferma: un sigillo con
+ * chiave effimera non sarebbe riverificabile dopo un restart, cioè non proverebbe nulla.
+ *
+ * NB: resta da aggiungere una marca temporale qualificata (RFC 3161, TSA esterna) per la
+ * data certa opponibile ai terzi; oggi il `timestampIso` è l'orologio del server. Richiede
+ * un provider TSA: vedi piano-firma-legale-ses-fea-feq.md.
+ */
+function risolviSegretoSigillo(): string {
+  const segreto = process.env.SIGILLO_HMAC_SECRET || process.env.JWT_SECRET;
+  if (!segreto || segreto.length < 32) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error(
+        'SIGILLO_HMAC_SECRET (o in ripiego JWT_SECRET) mancante o più corto di 32 caratteri: ' +
+          'il sigillo di firma richiede una chiave stabile per essere riverificabile.',
+      );
+    }
+    console.warn(
+      '⚠️  SIGILLO_HMAC_SECRET/JWT_SECRET non impostati: il sigillo usa una chiave casuale ' +
+        'valida solo per questo processo (i sigilli non saranno riverificabili dopo un restart).',
+    );
+    return crypto.randomBytes(32).toString('hex');
+  }
+  return segreto;
+}
+const SEGRETO_SIGILLO = risolviSegretoSigillo();
+
 export interface SigilloFea {
   signatureId: string;
   signerName: string;
   documentoTitolo: string;
   timestampIso: string;
   documentoHash: string;
+  /** HMAC-SHA256 del payload con la chiave del server (non un SHA-256 in chiaro): 64 hex. */
   sha256Digest: string;
   ipAddress: string | null;
   userAgent: string | null;
@@ -414,7 +449,7 @@ export function creaSigilloFea(params: {
     documentoTitolo: params.documentoTitolo,
     timestampIso,
     documentoHash: params.documentoHash,
-    sha256Digest: crypto.createHash('sha256').update(payload).digest('hex'),
+    sha256Digest: crypto.createHmac('sha256', SEGRETO_SIGILLO).update(payload).digest('hex'),
     ipAddress,
     userAgent: params.userAgent && params.userAgent.trim() ? params.userAgent.trim() : null,
     canaleVerificato: params.canaleVerificato,

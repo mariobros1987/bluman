@@ -97,17 +97,10 @@ export function getCurrentTenantId(user?: any): string {
       localStorage.setItem('bluman_tenant_id', currentUser.tenantId);
       return currentUser.tenantId;
     }
-    if (currentUser.email) {
-      const clean = currentUser.email.toLowerCase().trim();
-      if (clean.includes('lorenzo.marino') || clean.includes('advisory.it')) {
-        localStorage.setItem('bluman_tenant_id', '00000000-0000-0000-0000-000000000002');
-        return '00000000-0000-0000-0000-000000000002';
-      }
-      if (clean.includes('elena.russo') || clean.includes('swisswealth')) {
-        localStorage.setItem('bluman_tenant_id', '00000000-0000-0000-0000-000000000003');
-        return '00000000-0000-0000-0000-000000000003';
-      }
-    }
+    // Rimossa l'euristica email→tenant: instradava le email `advisory.it`→…002 e
+    // `swisswealth`→…003, tenant mock ELIMINATI dal DB il 20/09/2026. Un utente reale senza
+    // tenantId con quelle sottostringhe finiva agganciato a un tenant inesistente. Il tenant
+    // deve venire solo da currentUser.tenantId (lo assegna il backend).
   }
 
   const storedTenantId = localStorage.getItem('bluman_tenant_id');

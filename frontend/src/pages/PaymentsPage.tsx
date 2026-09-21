@@ -197,7 +197,7 @@ export function PaymentsPage() {
                           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                             <button
                               onClick={() => handleSendReminder(scad)}
-                              style={{ background: 'transparent', border: '1px solid var(--border)', color: 'white', padding: '6px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}
+                              style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--text)', padding: '6px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}
                             >
                               ✉️ Sollecita
                             </button>

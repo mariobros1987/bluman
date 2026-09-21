@@ -40,7 +40,7 @@ function Riquadro({ etichetta, valore, sfondo, bordo, colore }: { etichetta: str
   return (
     <div style={{ background: sfondo, padding: 14, borderRadius: 12, border: `1px solid ${bordo}` }}>
       <div style={{ fontSize: 11, color: colore, textTransform: 'uppercase', fontWeight: 600, letterSpacing: 0.3 }}>{etichetta}</div>
-      <div style={{ fontSize: 21, fontWeight: 700, color: '#fff', marginTop: 5 }}>{valore}</div>
+      <div style={{ fontSize: 21, fontWeight: 700, color: 'var(--text)', marginTop: 5 }}>{valore}</div>
     </div>
   );
 }

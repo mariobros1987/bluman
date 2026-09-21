@@ -41,7 +41,9 @@ export async function registraRotteLiquidazioneIva(server: FastifyInstance): Pro
     try {
       const periodoFiscale = determinaPeriodoFiscale(periodo);
 
-      // 1. Query fatture attive del periodo
+      // 1. Query documenti attivi del periodo: fatture E note di credito. Le NC stornano
+      //    l'IVA a debito e vanno incluse (con segno negativo, gestito dal motore), altrimenti
+      //    si versa IVA su operazioni già annullate.
       const fattureAttive = await prisma.fattura.findMany({
         where: {
           tenantId,
@@ -49,13 +51,14 @@ export async function registraRotteLiquidazioneIva(server: FastifyInstance): Pro
             gte: periodoFiscale.dataInizio,
             lte: periodoFiscale.dataFine,
           },
-          tipoDocumento: 'fattura',
+          tipoDocumento: { in: ['fattura', 'nota_credito'] },
         },
         select: {
           totaleImponibileCentesimi: true,
           totaleIvaCentesimi: true,
           esigibilitaIva: true,
           stato: true,
+          tipoDocumento: true,
         },
       });
 
@@ -116,13 +119,14 @@ export async function registraRotteLiquidazioneIva(server: FastifyInstance): Pro
             gte: periodoFiscale.dataInizio,
             lte: periodoFiscale.dataFine,
           },
-          tipoDocumento: 'fattura',
+          tipoDocumento: { in: ['fattura', 'nota_credito'] },
         },
         select: {
           totaleImponibileCentesimi: true,
           totaleIvaCentesimi: true,
           esigibilitaIva: true,
           stato: true,
+          tipoDocumento: true,
         },
       });
 

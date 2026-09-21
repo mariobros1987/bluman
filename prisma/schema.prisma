@@ -1370,6 +1370,12 @@ model ComunicazioneProgetto {
   externalId   String?  @map("external_id")
   createdAt    DateTime @default(now()) @map("created_at")
 
+  // Indici aggiunti con l'audit 21/09/2026: la tabella non ne aveva NESSUNO. La lista del
+  // fascicolo (`where progettoId order by createdAt`) faceva seq scan a ogni apertura chat, e
+  // i webhook di stato WhatsApp cercano per external_id. Con la RLS ogni query è già cara: un
+  // seq scan qui pesava molto più del previsto.
+  @@index([tenantId, progettoId, createdAt], map: "idx_comunicazione_progetto_tenant_progetto_data")
+  @@index([tenantId, externalId], map: "idx_comunicazione_progetto_tenant_external")
   @@map("comunicazione_progetto")
 }
 

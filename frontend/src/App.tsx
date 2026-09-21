@@ -30,6 +30,7 @@ import { fetchMeApi } from './api/client';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import './styles/tokens.css';
 import { watchSystemTheme } from './utils/theme';
+import { invalidateCache } from './api/cache';
 
 function ProtectedModule({ user, moduleKey, element }: { user: any; moduleKey: string; element: React.ReactElement }) {
   const perm = getUserPermission(user, moduleKey);
@@ -87,6 +88,13 @@ function AppContent() {
     localStorage.removeItem('bluman_jwt_token');
     localStorage.removeItem('bluman_token');
     localStorage.removeItem('bluman_user');
+    // Il tenant attivo va rimosso: altrimenti un super_admin che si riautentica riprende il
+    // tenant precedente. E la cache in-memory va svuotata subito, non solo sul 401 automatico:
+    // senza reload, l'utente successivo (stesso tenant) vedrebbe per ~30s liste e notifiche in
+    // cache del precedente. invalidateCache() diretto (non l'evento bluman_unauthorized, che
+    // richiamerebbe questo stesso handleLogout via listener → loop).
+    localStorage.removeItem('bluman_tenant_id');
+    invalidateCache();
     setCurrentUser(null);
     setToken(null);
     setIsLoggedOut(true);

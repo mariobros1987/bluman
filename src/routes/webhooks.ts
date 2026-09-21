@@ -424,6 +424,18 @@ export async function registraRotteWebhooks(server: FastifyInstance): Promise<vo
           }
         }
 
+        // Anagrafica caricata UNA volta per batch (audit 21/09/2026): prima stava dentro il
+        // loop dei messaggi → un batch di N messaggi rileggeva N volte tutti i clienti del
+        // tenant (full-scan ×N). È indipendente dal singolo messaggio: si carica qui fuori, e
+        // solo se ci sono messaggi in ingresso da instradare (le sole ricevute di stato non
+        // ne hanno bisogno).
+        const clienti = messages.length
+          ? await prisma.cliente.findMany({
+              where: { tenantId },
+              select: { id: true, nome: true, cellulare: true, referentiJson: true },
+            })
+          : [];
+
         for (const msg of messages) {
           const providerId = typeof msg?.id === 'string' ? msg.id : '';
           const fromNumber = normalizzaTelefono(msg?.from);
@@ -439,10 +451,6 @@ export async function registraRotteWebhooks(server: FastifyInstance): Promise<vo
           });
           if (comunicazionePreesistente.length) continue;
 
-          const clienti = await prisma.cliente.findMany({
-            where: { tenantId },
-            select: { id: true, nome: true, cellulare: true, referentiJson: true },
-          });
           const corrispondenze = clienti.filter(cliente => {
             const recapiti = [cliente.cellulare];
             if (cliente.referentiJson && typeof cliente.referentiJson === 'object') {
