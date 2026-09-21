@@ -3,13 +3,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const {
   mockClienteFindMany,
   mockScadenzaFindMany,
-  mockNotificaFindFirst,
+  mockNotificaFindMany,
   mockNotificaStudio,
   mockRecordAudit,
 } = vi.hoisted(() => ({
   mockClienteFindMany: vi.fn(),
   mockScadenzaFindMany: vi.fn(),
-  mockNotificaFindFirst: vi.fn(),
+  mockNotificaFindMany: vi.fn(),
   mockNotificaStudio: vi.fn(),
   mockRecordAudit: vi.fn(),
 }));
@@ -18,7 +18,8 @@ vi.mock('../util/prismaClient.js', () => ({
   prisma: {
     cliente: { findMany: mockClienteFindMany },
     scadenzaIncasso: { findMany: mockScadenzaFindMany },
-    notifica: { findFirst: mockNotificaFindFirst },
+    // Il cron carica UNA volta i corpi già notificati (niente più findFirst per riga).
+    notifica: { findMany: mockNotificaFindMany },
   },
 }));
 
@@ -37,6 +38,7 @@ describe('runDailyNotificationCron', () => {
     vi.clearAllMocks();
     mockClienteFindMany.mockResolvedValue([]);
     mockScadenzaFindMany.mockResolvedValue([]);
+    mockNotificaFindMany.mockResolvedValue([]);
     mockRecordAudit.mockResolvedValue(undefined);
   });
 
@@ -61,13 +63,17 @@ describe('runDailyNotificationCron', () => {
       email: 'amministrazione@example.test',
       cellulare: null,
     }]);
-    mockNotificaFindFirst.mockResolvedValueOnce({ id: 'notifica-esistente' });
+    // La finestra 20h contiene già il corpo esatto che il cron genererebbe per questo cliente:
+    // caricato una sola volta da findMany, il dedup in memoria lo riconosce e non re-invia.
+    mockNotificaFindMany.mockResolvedValueOnce([{
+      corpo: '[UBO-MFSA] Promemoria rinnovo UBO / Aggiornamento KYC per Alfa S.r.l. (Ref: amministrazione@example.test)',
+    }]);
 
     const report = await runDailyNotificationCron('tenant-3');
 
     expect(report.scadenzeUboTrovate).toBe(1);
     expect(report.notificheInviate).toBe(0);
-    expect(mockNotificaFindFirst).toHaveBeenCalledWith(expect.objectContaining({
+    expect(mockNotificaFindMany).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({ tenantId: 'tenant-3', tipoEvento: 'scadenza_imminente' }),
     }));
     expect(mockNotificaStudio).not.toHaveBeenCalled();
@@ -122,7 +128,7 @@ describe('il cron e la derivazione delle scadenze usano la stessa regola', () =>
     vi.setSystemTime(ADESSO);
     // Nessuna notifica identica di ieri: qui si misura quali scadenze il cron **vede**, non la
     // deduplicazione, che ha già i suoi test.
-    mockNotificaFindFirst.mockResolvedValue(null);
+    mockNotificaFindMany.mockResolvedValue([]);
     mockNotificaStudio.mockResolvedValue(1);
   });
 

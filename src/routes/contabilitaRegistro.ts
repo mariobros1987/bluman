@@ -4,6 +4,7 @@
 // blocco usa `app` (listaFattureTutte, emettiFattura).
 
 import type { FastifyInstance } from 'fastify';
+import type { Prisma } from '@prisma/client';
 import type { AppPort } from '../services/appPort.js';
 import { prisma } from '../util/prismaClient.js';
 import { riprovaSuConflitto } from '../util/prismaClient.js';
@@ -151,25 +152,59 @@ export async function registraRotteContabilitaRegistro(server: FastifyInstance, 
 
   server.get('/fatture', async (req, reply) => {
     const tenantId = req.tenantId;
+    const paginazione = leggiPaginazione(req.query);
+    if (paginazione.paginata && 'errore' in paginazione) {
+      return reply.code(400).send({ errore: paginazione.errore });
+    }
     try {
-      const fatture = await prisma.fattura.findMany({
-        where: { tenantId },
-        include: {
-          righe: {
-            include: { moduloProgetto: true, articolo: true },
-            orderBy: { ordine: 'asc' },
-          },
-          progetto: { include: { cliente: true } },
-          cliente: true,
-          scadenzeIncasso: {
-            include: { registrazioniRegistrate: true },
-            orderBy: { numeroRata: 'asc' },
-          },
-          contoAccredito: true,
+      const include = {
+        righe: {
+          include: { moduloProgetto: true, articolo: true },
+          orderBy: { ordine: 'asc' as const },
         },
-        orderBy: { numeroProgressivoSerie: 'desc' },
-      });
-      return reply.send(fatture);
+        progetto: { include: { cliente: true } },
+        cliente: true,
+        scadenzeIncasso: {
+          include: { registrazioniRegistrate: true },
+          orderBy: { numeroRata: 'asc' as const },
+        },
+        contoAccredito: true,
+      };
+      // Retrocompatibile: senza parametri di paginazione la rotta ritorna l'array come
+      // prima. Con ?page/?limit ritorna { data, meta }: il default limit=50 evita di
+      // spedire l'intero registro (include profondo su ogni riga) quando cresce.
+      if (!paginazione.paginata) {
+        const fatture = await prisma.fattura.findMany({
+          where: { tenantId },
+          include,
+          orderBy: { numeroProgressivoSerie: 'desc' },
+        });
+        return reply.send(fatture);
+      }
+
+      const { page, limit, skip, search, stato, tipo } = paginazione.parametri;
+      const where: Prisma.FatturaWhereInput = { tenantId };
+      // Filtri di ricerca: testo su numero documento o nome cliente, più stato e tipo
+      // documento quando indicati. Tutti opzionali: assenti = nessun vincolo aggiuntivo.
+      if (search) {
+        where.OR = [
+          { numero: { contains: search, mode: 'insensitive' } },
+          { cliente: { nome: { contains: search, mode: 'insensitive' } } },
+        ];
+      }
+      if (stato) where.stato = stato as Prisma.FatturaWhereInput['stato'];
+      if (tipo) where.tipoDocumento = tipo as Prisma.FatturaWhereInput['tipoDocumento'];
+      const [fatture, totale] = await Promise.all([
+        prisma.fattura.findMany({
+          where,
+          include,
+          orderBy: { numeroProgressivoSerie: 'desc' },
+          skip,
+          take: limit,
+        }),
+        prisma.fattura.count({ where }),
+      ]);
+      return reply.send({ data: fatture, meta: creaMetaPaginazione(page, limit, totale) });
     } catch (err: any) {
       return reply.code(500).send({ errore: err?.message || 'Errore lettura registro fatture' });
     }

@@ -27,14 +27,17 @@ const TONO_RATA_IN_PAROLE: Record<ReturnType<typeof tonoRata>, string> = {
 };
 
 // Il cron può scattare più volte nello stesso giorno (riavvii, esecuzioni manuali):
-// una notifica identica già inviata nelle ultime 20 ore non va duplicata.
-async function giaNotificataOggi(tenantId: string, corpo: string): Promise<boolean> {
+// una notifica identica già inviata nelle ultime 20 ore non va duplicata. Invece di
+// interrogare il DB per ogni cliente/rata (N+1: con la RLS ogni findFirst sono ~4
+// round-trip), si carica UNA volta l'insieme dei `corpo` già notificati nella finestra
+// e si controlla in memoria. La finestra (20h) è la stessa per tutte le righe del giro.
+async function corpiGiaNotificati(tenantId: string): Promise<Set<string>> {
   const soglia = new Date(Date.now() - 20 * 60 * 60 * 1000);
-  const esistente = await prisma.notifica.findFirst({
-    where: { tenantId, tipoEvento: 'scadenza_imminente', corpo, inviataAt: { gte: soglia } },
-    select: { id: true },
+  const recenti = await prisma.notifica.findMany({
+    where: { tenantId, tipoEvento: 'scadenza_imminente', inviataAt: { gte: soglia } },
+    select: { corpo: true },
   });
-  return esistente !== null;
+  return new Set(recenti.map((n) => n.corpo));
 }
 
 /** Worker di scansione automatica scadenze e invio notifiche proattive. */
@@ -53,6 +56,10 @@ export async function runDailyNotificationCron(tenantId?: string): Promise<CronR
 
   const adesso = new Date();
 
+  // Insieme dei corpi già notificati nelle ultime 20h, caricato una sola volta per tutto
+  // il giro (niente più una query per ogni cliente/rata).
+  const giaNotificati = await corpiGiaNotificati(tenantId);
+
   // 1. Scansione Scadenze Clienti (UBO Registry & KYC Annual Return)
   //
   // La condizione non è scritta qui: sta in `scadenzeDerivate.ts`, insieme a quelle delle rate,
@@ -66,7 +73,8 @@ export async function runDailyNotificationCron(tenantId?: string): Promise<CronR
       const corpo = `[UBO-MFSA] Promemoria rinnovo UBO / Aggiornamento KYC per ${c.nome} (Ref: ${c.email || c.cellulare || 'N/D'})`;
       report.scadenzeUboTrovate += 1;
       report.dettagli.push(`[UBO-MFSA] Promemoria rinnovo UBO / Aggiornamento KYC inviato per ${c.nome} (Ref: ${c.email || c.cellulare || 'N/D'})`);
-      if (!(await giaNotificataOggi(tenantId, corpo))) {
+      if (!giaNotificati.has(corpo)) {
+        giaNotificati.add(corpo);
         report.notificheInviate += await notificaStudioSilenziosa(tenantId, {
           tipoEvento: 'scadenza_imminente',
           oggetto: 'Rinnovo KYC in scadenza',
@@ -93,7 +101,8 @@ export async function runDailyNotificationCron(tenantId?: string): Promise<CronR
       const corpo = `[INCASSI] Rata di € ${importo} ${tono} per ${clNome} (rata #${sc.numeroRata}, scadenza ${quando})`;
       report.fattureScaduteTrovate += 1;
       report.dettagli.push(`[INCASSI] Sollecito / Promemoria rata €${(sc.importoCentesimi / 100).toFixed(2)} inviato a ${clNome} (Scadenza: ${quando})`);
-      if (!(await giaNotificataOggi(tenantId, corpo))) {
+      if (!giaNotificati.has(corpo)) {
+        giaNotificati.add(corpo);
         report.notificheInviate += await notificaStudioSilenziosa(tenantId, {
           tipoEvento: 'scadenza_imminente',
           oggetto: tono === 'scaduta' ? 'Rata scaduta' : 'Rata in scadenza',
