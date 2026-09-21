@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import type { Fornitore } from '../../api/fornitori';
 import { creaFornitoreApi, aggiornaFornitoreApi } from '../../api/fornitori';
+import { Modal } from '../ui/Modal';
 
 interface NuovoFornitoreModalProps {
   isOpen: boolean;
@@ -104,16 +105,17 @@ export const NuovoFornitoreModal: React.FC<NuovoFornitoreModalProps> = ({
   };
 
   return (
-    <div className="modal-overlay" style={{ zIndex: 1100 }}>
+    <Modal onClose={onClose} zIndex={1100} labelledBy="nuovo-fornitore-titolo">
+      {(richiediChiusura) => (
       <div className="modal-container" style={{ maxWidth: '640px', width: '90%' }}>
         <div className="modal-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{ fontSize: '1.4rem' }}>🏢</span>
-            <h3 style={{ margin: 0, fontWeight: 700 }}>
+            <h3 id="nuovo-fornitore-titolo" style={{ margin: 0, fontWeight: 700 }}>
               {fornitoreDaModificare ? 'Modifica Fornitore' : 'Nuovo Fornitore ERP'}
             </h3>
           </div>
-          <button className="btn-close" onClick={onClose} disabled={loading}>
+          <button className="btn-close" onClick={richiediChiusura} disabled={loading} aria-label="Chiudi">
             ✕
           </button>
         </div>
@@ -276,7 +278,7 @@ export const NuovoFornitoreModal: React.FC<NuovoFornitoreModalProps> = ({
               paddingTop: '16px',
             }}
           >
-            <button type="button" className="btn btn-secondary" onClick={onClose} disabled={loading}>
+            <button type="button" className="btn btn-secondary" onClick={richiediChiusura} disabled={loading}>
               Annulla
             </button>
             <button type="submit" className="btn btn-primary" disabled={loading}>
@@ -285,6 +287,7 @@ export const NuovoFornitoreModal: React.FC<NuovoFornitoreModalProps> = ({
           </div>
         </form>
       </div>
-    </div>
+      )}
+    </Modal>
   );
 };

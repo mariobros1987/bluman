@@ -4,6 +4,7 @@ import { creaArticoloApi } from '../../api/client';
 // `localStorage`, e l'id da allacciare è quello che risponde il server.
 import { useCartellaTemplate } from '../../hooks/useCartellaTemplate';
 import { useToast } from '../ui/ToastProvider';
+import { Modal } from '../ui/Modal';
 import { BadgeRevisione } from '../ui/BadgeRevisione';
 import type { CategoriaModulo, Giurisdizione } from '../../types';
 
@@ -150,9 +151,10 @@ export function NuovoArticoloModal({ giurList, onClose, onCreated }: { giurList:
   };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 16 }}>
+    <Modal onClose={onClose} labelledBy="nuovo-articolo-titolo">
+      {(richiediChiusura) => (
       <form onSubmit={handleSubmit} style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, padding: 22, width: '100%', maxWidth: 580, maxHeight: '90vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <div style={{ fontSize: 16, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div id="nuovo-articolo-titolo" style={{ fontSize: 16, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
           <span>🧩 Nuovo Articolo Prestazione con Documenti & Procedura</span>
         </div>
 
@@ -390,10 +392,11 @@ export function NuovoArticoloModal({ giurList, onClose, onCreated }: { giurList:
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
-          <button type="button" onClick={onClose} style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '7px 14px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}>Annulla</button>
+          <button type="button" onClick={richiediChiusura} style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '7px 14px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}>Annulla</button>
           <button type="submit" disabled={loading} style={{ background: 'var(--indigo)', color: 'var(--on-accent)', border: 'none', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{loading ? 'Salvataggio...' : '✓ Salva Articolo & Procedura'}</button>
         </div>
       </form>
-    </div>
+      )}
+    </Modal>
   );
 }

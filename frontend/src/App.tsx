@@ -29,6 +29,7 @@ import { getUserPermission } from './utils/rbac';
 import { fetchMeApi } from './api/client';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ToastProvider } from './components/ui/ToastProvider';
+import { ConfirmProvider } from './components/ui/ConfirmProvider';
 import './styles/tokens.css';
 import { watchSystemTheme } from './utils/theme';
 import { invalidateCache } from './api/cache';
@@ -203,9 +204,11 @@ export default function App() {
   return (
     <ErrorBoundary>
       <ToastProvider>
-        <BrowserRouter>
-          <AppContent />
-        </BrowserRouter>
+        <ConfirmProvider>
+          <BrowserRouter>
+            <AppContent />
+          </BrowserRouter>
+        </ConfirmProvider>
       </ToastProvider>
     </ErrorBoundary>
   );

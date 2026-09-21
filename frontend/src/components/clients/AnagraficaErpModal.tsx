@@ -4,6 +4,7 @@ import type { PropostaDatiFiscale } from '../../api/client';
 import { getCurrentTenantId, getTenantStorageKey } from '../../utils/tenant';
 import { fmt } from '../../utils';
 import type { Cliente } from '../../types';
+import { Modal } from '../ui/Modal';
 
 // ─── Componente Anagrafica Completa Cliente ERP ────────────────────
 export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Cliente; onClose: () => void; onSaved: () => void }) {
@@ -247,19 +248,20 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
   };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 110, padding: 16 }}>
+    <Modal onClose={onClose} overlayBackground="rgba(0,0,0,.8)" labelledBy="anagrafica-erp-titolo">
+      {(richiediChiusura) => (
       <form onSubmit={handleSubmit} style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, padding: 22, width: '100%', maxWidth: 680, maxHeight: '90vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 16, boxShadow: '0 24px 60px rgba(0,0,0,.6)' }}>
         {/* Header Modal */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid var(--border)', paddingBottom: 14 }}>
           <div>
-            <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--indigo-l)' }}>
+            <div id="anagrafica-erp-titolo" style={{ fontSize: 16, fontWeight: 700, color: 'var(--indigo-l)' }}>
               📑 Anagrafica Master Cliente ERP (§Gestionale)
             </div>
             <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
               Dati anagrafici, fiscali, recapiti multicanale (WhatsApp, Telegram, Signal) e fascicolo KYC/AML
             </div>
           </div>
-          <button type="button" onClick={onClose} style={{ background: 'var(--card2)', border: 'none', width: 28, height: 28, borderRadius: 6, color: 'var(--muted)', cursor: 'pointer' }}>✕</button>
+          <button type="button" onClick={richiediChiusura} aria-label="Chiudi" style={{ background: 'var(--card2)', border: 'none', width: 28, height: 28, borderRadius: 6, color: 'var(--muted)', cursor: 'pointer' }}>✕</button>
         </div>
 
         {/* Sub Navigation Tabs */}
@@ -683,13 +685,14 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
 
         {/* Footer Actions */}
         <div style={{ borderTop: '1px solid var(--border)', paddingTop: 14, display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-          <button type="button" onClick={onClose} style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '8px 16px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}>Annulla</button>
+          <button type="button" onClick={richiediChiusura} style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '8px 16px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}>Annulla</button>
           <button type="submit" disabled={saving} style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '8px 20px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', boxShadow: '0 4px 16px rgba(99,102,241,.4)' }}>
             {saving ? 'Salvataggio...' : '✓ Salva Anagrafica ERP Cliente'}
           </button>
         </div>
       </form>
-    </div>
+      )}
+    </Modal>
   );
 }
 

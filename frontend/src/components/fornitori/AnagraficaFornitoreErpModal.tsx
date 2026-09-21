@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import type { Fornitore, FatturaRicevuta } from '../../api/fornitori';
 import { creaFornitoreApi, aggiornaFornitoreApi, fetchFatturePassiveApi } from '../../api/fornitori';
+import { Modal } from '../ui/Modal';
 
 interface AnagraficaFornitoreErpModalProps {
   fornitore?: Fornitore | null;
@@ -95,14 +96,15 @@ export const AnagraficaFornitoreErpModal: React.FC<AnagraficaFornitoreErpModalPr
   const totaleDaSaldareCent = totaleAcquistiCent - totalePagatoCent;
 
   return (
-    <div className="modal-overlay" style={{ zIndex: 1100 }}>
+    <Modal onClose={onClose} zIndex={1100} labelledBy="anagrafica-fornitore-titolo">
+      {(richiediChiusura) => (
       <div className="modal-container" style={{ maxWidth: '840px', width: '95%', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
         {/* Header Modale */}
         <div className="modal-header" style={{ padding: '18px 24px', borderBottom: '1px solid var(--border)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <span style={{ fontSize: '1.6rem' }}>🏢</span>
             <div>
-              <h3 style={{ margin: 0, fontWeight: 800, fontSize: '1.25rem' }}>
+              <h3 id="anagrafica-fornitore-titolo" style={{ margin: 0, fontWeight: 800, fontSize: '1.25rem' }}>
                 {isEditing ? `Scheda Anagrafica Fornitore — ${fornitore?.ragioneSociale}` : 'Nuova Anagrafica Fornitore ERP'}
               </h3>
               <p style={{ margin: '2px 0 0 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
@@ -110,7 +112,7 @@ export const AnagraficaFornitoreErpModal: React.FC<AnagraficaFornitoreErpModalPr
               </p>
             </div>
           </div>
-          <button className="btn-close" onClick={onClose} disabled={saving}>
+          <button className="btn-close" onClick={richiediChiusura} disabled={saving} aria-label="Chiudi">
             ✕
           </button>
         </div>
@@ -534,7 +536,7 @@ export const AnagraficaFornitoreErpModal: React.FC<AnagraficaFornitoreErpModalPr
               background: 'var(--bg-secondary)',
             }}
           >
-            <button type="button" className="btn btn-secondary" onClick={onClose} disabled={saving}>
+            <button type="button" className="btn btn-secondary" onClick={richiediChiusura} disabled={saving}>
               Annulla
             </button>
             <button type="submit" className="btn btn-primary" disabled={saving}>
@@ -543,6 +545,7 @@ export const AnagraficaFornitoreErpModal: React.FC<AnagraficaFornitoreErpModalPr
           </div>
         </form>
       </div>
-    </div>
+      )}
+    </Modal>
   );
 };

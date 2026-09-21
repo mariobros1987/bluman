@@ -21,6 +21,7 @@ import { EsportaFascicoloCommercialistaModal } from '../components/contabilita/E
 import { Paginatore } from '../components/ui/Paginatore';
 import { isRispostaPaginata, type MetaPaginazione } from '../api/paginazione';
 import { useToast } from '../components/ui/ToastProvider';
+import { Modal } from '../components/ui/Modal';
 
 const META_INIZIALE: MetaPaginazione = { page: 1, limit: 50, totale: 0, pagine: 0 };
 interface RiepilogoFatture {
@@ -700,11 +701,12 @@ export function InvoicesPage() {
 
       {/* MODAL CREAZIONE FATTURA / BOZZA */}
       {showCreateModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
+        <Modal onClose={() => setShowCreateModal(false)} zIndex={1000} overlayBackground="rgba(0,0,0,0.7)" labelledBy="nuova-fattura-titolo">
+          {(richiediChiusura) => (
           <div style={{ background: 'var(--card)', borderRadius: 16, padding: '2rem', width: '100%', maxWidth: 900, maxHeight: '90vh', overflowY: 'auto', border: '1px solid var(--border)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-              <h3 style={{ margin: 0 }}>Nuova Fattura Professionale / Bozza</h3>
-              <button onClick={() => setShowCreateModal(false)} style={{ background: 'transparent', border: 'none', color: 'var(--muted)', fontSize: 20, cursor: 'pointer' }}>✕</button>
+              <h3 id="nuova-fattura-titolo" style={{ margin: 0 }}>Nuova Fattura Professionale / Bozza</h3>
+              <button onClick={richiediChiusura} aria-label="Chiudi" style={{ background: 'transparent', border: 'none', color: 'var(--muted)', fontSize: 20, cursor: 'pointer' }}>✕</button>
             </div>
 
             {/* SELEZIONE CLIENTE & PROGETTO */}
@@ -973,7 +975,7 @@ export function InvoicesPage() {
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
               <button
                 type="button"
-                onClick={() => setShowCreateModal(false)}
+                onClick={richiediChiusura}
                 style={{ padding: '10px 18px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)', cursor: 'pointer' }}
               >
                 Annulla
@@ -996,14 +998,16 @@ export function InvoicesPage() {
               </button>
             </div>
           </div>
-        </div>
+          )}
+        </Modal>
       )}
 
       {/* MODAL REGISTRAZIONE INCASSO RATA */}
       {showIncassoModal && selectedScadenza && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
+        <Modal onClose={() => setShowIncassoModal(false)} zIndex={1000} overlayBackground="rgba(0,0,0,0.7)" labelledBy="incasso-rata-titolo">
+          {(richiediChiusura) => (
           <div style={{ background: 'var(--card)', borderRadius: 16, padding: '2rem', width: '100%', maxWidth: 480, border: '1px solid var(--border)' }}>
-            <h3 style={{ margin: '0 0 1rem 0' }}>Registrazione Incasso Rata #{selectedScadenza.numeroRata}</h3>
+            <h3 id="incasso-rata-titolo" style={{ margin: '0 0 1rem 0' }}>Registrazione Incasso Rata #{selectedScadenza.numeroRata}</h3>
             <p style={{ fontSize: 13, color: 'var(--muted)', margin: '0 0 1.25rem 0' }}>
               Fattura: <strong>{selectedInvoice?.numero}</strong> | Cliente: <strong>{selectedInvoice?.cliente?.nome}</strong>
             </p>
@@ -1060,7 +1064,7 @@ export function InvoicesPage() {
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 10 }}>
                 <button
                   type="button"
-                  onClick={() => setShowIncassoModal(false)}
+                  onClick={richiediChiusura}
                   style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)', cursor: 'pointer' }}
                 >
                   Annulla
@@ -1075,14 +1079,16 @@ export function InvoicesPage() {
               </div>
             </form>
           </div>
-        </div>
+          )}
+        </Modal>
       )}
 
       {/* MODAL NOTA DI CREDITO */}
       {showNcModal && selectedInvoice && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
+        <Modal onClose={() => setShowNcModal(false)} zIndex={1000} overlayBackground="rgba(0,0,0,0.7)" labelledBy="nota-credito-titolo">
+          {(richiediChiusura) => (
           <div style={{ background: 'var(--card)', borderRadius: 16, padding: '2rem', width: '100%', maxWidth: 480, border: '1px solid var(--border)' }}>
-            <h3 style={{ margin: '0 0 1rem 0' }}>Emissione Nota di Credito (TD04)</h3>
+            <h3 id="nota-credito-titolo" style={{ margin: '0 0 1rem 0' }}>Emissione Nota di Credito (TD04)</h3>
             <p style={{ fontSize: 13, color: 'var(--muted)', margin: '0 0 1.25rem 0' }}>
               Storno a fronte della fattura <strong>{selectedInvoice.numero}</strong> per un importo di <strong>{fmt((selectedInvoice.totaleDocumentoCentesimi || 0) / 100)}</strong>
             </p>
@@ -1116,7 +1122,7 @@ export function InvoicesPage() {
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 10 }}>
                 <button
                   type="button"
-                  onClick={() => setShowNcModal(false)}
+                  onClick={richiediChiusura}
                   style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)', cursor: 'pointer' }}
                 >
                   Annulla
@@ -1131,7 +1137,8 @@ export function InvoicesPage() {
               </div>
             </form>
           </div>
-        </div>
+          )}
+        </Modal>
       )}
 
       {/* MODAL EXPORT FASCICOLO COMMERCIALISTA ZIP */}

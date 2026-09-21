@@ -12,6 +12,7 @@ import { EsportaFascicoloCommercialistaModal } from '../components/contabilita/E
 import { Paginatore } from '../components/ui/Paginatore';
 import { isRispostaPaginata, type MetaPaginazione } from '../api/paginazione';
 import { useToast } from '../components/ui/ToastProvider';
+import { Modal } from '../components/ui/Modal';
 
 interface RiepilogoPrimaNota {
   totaleEntrateCentesimi: number;
@@ -373,9 +374,10 @@ export function PrimaNotaPage() {
 
       {/* MODAL NUOVA REGISTRAZIONE */}
       {showAddModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
+        <Modal onClose={() => setShowAddModal(false)} zIndex={1000} overlayBackground="rgba(0,0,0,0.7)" labelledBy="prima-nota-add-titolo">
+          {(richiediChiusura) => (
           <div style={{ background: 'var(--card)', borderRadius: 16, padding: '2rem', width: '100%', maxWidth: 520, border: '1px solid var(--border)' }}>
-            <h3 style={{ margin: '0 0 1.5rem 0' }}>Nuova Registrazione Prima Nota</h3>
+            <h3 id="prima-nota-add-titolo" style={{ margin: '0 0 1.5rem 0' }}>Nuova Registrazione Prima Nota</h3>
             <form onSubmit={handleAddMovimento} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div style={{ display: 'flex', gap: 12 }}>
                 <div style={{ flex: 1 }}>
@@ -502,7 +504,7 @@ export function PrimaNotaPage() {
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 12 }}>
                 <button
                   type="button"
-                  onClick={() => setShowAddModal(false)}
+                  onClick={richiediChiusura}
                   style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)', cursor: 'pointer' }}
                 >
                   Annulla
@@ -517,14 +519,16 @@ export function PrimaNotaPage() {
               </div>
             </form>
           </div>
-        </div>
+          )}
+        </Modal>
       )}
 
       {/* MODAL IMPORT CSV */}
       {showCsvModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
+        <Modal onClose={() => setShowCsvModal(false)} zIndex={1000} overlayBackground="rgba(0,0,0,0.7)" labelledBy="prima-nota-csv-titolo">
+          {(richiediChiusura) => (
           <div style={{ background: 'var(--card)', borderRadius: 16, padding: '2rem', width: '100%', maxWidth: 600, border: '1px solid var(--border)' }}>
-            <h3 style={{ margin: '0 0 8px 0' }}>Importazione Estratto Conto Bancario (CSV)</h3>
+            <h3 id="prima-nota-csv-titolo" style={{ margin: '0 0 8px 0' }}>Importazione Estratto Conto Bancario (CSV)</h3>
             <p style={{ fontSize: 13, color: 'var(--muted)', margin: '0 0 1rem 0' }}>
               Incolla il testo del tracciato CSV bancario. Formato supportato: <code>Data;Descrizione/Causale;Importo;CRO/TRN</code>.
             </p>
@@ -561,7 +565,7 @@ export function PrimaNotaPage() {
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 12 }}>
                 <button
                   type="button"
-                  onClick={() => setShowCsvModal(false)}
+                  onClick={richiediChiusura}
                   style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)', cursor: 'pointer' }}
                 >
                   Annulla
@@ -576,7 +580,8 @@ export function PrimaNotaPage() {
               </div>
             </form>
           </div>
-        </div>
+          )}
+        </Modal>
       )}
 
       {/* MODAL EXPORT FASCICOLO COMMERICALISTA ZIP */}

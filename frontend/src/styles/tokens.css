@@ -21,7 +21,7 @@
   --border:    #dde3f0;
   --text:      #16203a;   /* blu-notte, alto contrasto su chiaro */
   --muted:     #5a6178;
-  --hint:      #949cb2;
+  --hint:      #656d85;   /* contrasto AA su chiaro (era #949cb2, ~2.8:1) */
 
   /* Brand — BLU (primario dell'app) */
   --indigo:    #2563eb;   /* blue-600 */
@@ -104,7 +104,7 @@
   --border:    #dde3f0;
   --text:      #16203a;
   --muted:     #5a6178;
-  --hint:      #949cb2;
+  --hint:      #656d85;   /* contrasto AA su chiaro (era #949cb2, ~2.8:1) */
   --indigo:    #2563eb;  --indigo-d: #1d4ed8;  --indigo-l: #3b82f6;
   --green:     #059669;  --amber: #d97706;  --red: #dc2626;  --purple: #7c3aed;
   --cat-analisi: #2563eb; --cat-societario: #0284c7; --cat-trust: #7c3aed;
@@ -142,7 +142,7 @@
   --border:    #2c3745;
   --text:      #e7edf5;   /* bianco freddo */
   --muted:     #98a3b5;
-  --hint:      #6b7688;
+  --hint:      #8b96a8;   /* contrasto AA su scuro (era #6b7688, ~3.4:1) */
 
   /* Brand — AZZURRO (più luminoso, per staccare sul fondo scuro) */
   --indigo:    #3b82f6;   /* blue-500 */
@@ -237,6 +237,16 @@ input[type="checkbox"], input[type="radio"] {
 }
 
 input:focus, textarea:focus, select:focus { border-color: var(--indigo); }
+
+/* Accessibilità: anello di focus visibile per la navigazione da tastiera, senza
+   mostrarlo sui click del mouse (:focus-visible). Copre bottoni, link e controlli. */
+:focus-visible {
+  outline: 2px solid var(--indigo);
+  outline-offset: 2px;
+}
+:focus:not(:focus-visible) {
+  outline: none;
+}
 
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -460,4 +470,83 @@ input:focus, textarea:focus, select:focus { border-color: var(--indigo); }
 
 @media (prefers-reduced-motion: reduce) {
   .toast { animation: none; }
+}
+
+/* ─── Confirm dialog (conferma accessibile) ─────────────────────
+   Sostituisce il confirm() nativo: dialog tematizzato, focus-trap, Escape/Invio.
+   Sta sopra i modali (1050) e i toast (1100). */
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1200;
+  padding: 16px;
+}
+
+.confirm-dialog {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg);
+  color: var(--text);
+  padding: 22px;
+  width: 100%;
+  max-width: 440px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  animation: toast-in .18s ease;
+}
+
+.confirm-titolo {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.confirm-messaggio {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.confirm-azioni {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.confirm-btn {
+  padding: 8px 16px;
+  border-radius: var(--radius);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all var(--t);
+}
+.confirm-btn-annulla {
+  background: transparent;
+  border-color: var(--border);
+  color: var(--muted);
+}
+.confirm-btn-annulla:hover { color: var(--text); background: var(--card2); }
+.confirm-btn-conferma {
+  background: var(--indigo);
+  color: var(--on-accent);
+}
+.confirm-btn-conferma:hover { filter: brightness(1.08); }
+.confirm-btn-pericolo {
+  background: var(--red);
+  color: var(--on-accent);
+}
+.confirm-btn-pericolo:hover { filter: brightness(1.08); }
+
+@media (prefers-reduced-motion: reduce) {
+  .confirm-dialog { animation: none; }
 }

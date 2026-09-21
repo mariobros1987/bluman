@@ -4,6 +4,7 @@ import { fmt, moduloH, moduloP, resolveRighe } from '../utils';
 import type { Cliente, Giurisdizione, ModuloTemplate, CategoriaModulo } from '../types';
 import { fetchClienti, fetchGiurisdizioniApi, fetchModuliLibreria, creaClienteApi, creaProgettoApi, creaPreventivoEAccettaApi } from '../api/client';
 import { getCurrentTenantId, getTenantStorageKey } from '../utils/tenant';
+import { Modal } from './ui/Modal';
 
 interface NewProjectWizardProps {
   onClose: () => void;
@@ -237,12 +238,13 @@ export function NewProjectWizard({ onClose, onProjectCreated }: NewProjectWizard
         </div>
       )}
 
-      <div style={overlayStyle} id="wiz-ov" onClick={e => { if ((e.target as HTMLElement).id === 'wiz-ov') onClose(); }}>
+      <Modal onClose={onClose} zIndex={100} overlayBackground="rgba(0,0,0,.7)" labelledBy="wizard-progetto-titolo">
+        {(richiediChiusura) => (
         <div style={wizStyle}>
           {/* Head */}
           <div style={{ padding: 20, borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
-              <div style={{ fontSize: 15, fontWeight: 600 }}>Nuovo progetto — Wizard di Configurazione</div>
+              <div id="wizard-progetto-titolo" style={{ fontSize: 15, fontWeight: 600 }}>Nuovo progetto — Wizard di Configurazione</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 12 }}>
                 {[0, 1, 2, 3].map((n, i) => (
                   <React.Fragment key={n}>
@@ -255,7 +257,7 @@ export function NewProjectWizard({ onClose, onProjectCreated }: NewProjectWizard
                 </span>
               </div>
             </div>
-            <button onClick={onClose} style={closeBtnStyle}>✕</button>
+            <button onClick={richiediChiusura} aria-label="Chiudi" style={closeBtnStyle}>✕</button>
           </div>
 
           {/* Body */}
@@ -549,7 +551,7 @@ export function NewProjectWizard({ onClose, onProjectCreated }: NewProjectWizard
 
           {/* Footer */}
           <div style={{ padding: '14px 20px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <button onClick={step > 0 ? () => setStep(s => s - 1) : onClose} style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '6px 12px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}>
+            <button onClick={step > 0 ? () => setStep(s => s - 1) : richiediChiusura} style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '6px 12px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}>
               {step > 0 ? '← Indietro' : 'Annulla'}
             </button>
             <button onClick={handleNext} disabled={!canNext || loading} style={{ background: canNext ? 'var(--indigo)' : 'var(--card2)', color: canNext ? '#fff' : 'var(--hint)', border: 'none', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: canNext ? 'pointer' : 'not-allowed', opacity: canNext ? 1 : 0.5 }}>
@@ -557,12 +559,12 @@ export function NewProjectWizard({ onClose, onProjectCreated }: NewProjectWizard
             </button>
           </div>
         </div>
-      </div>
+        )}
+      </Modal>
     </>
   );
 }
 
-const overlayStyle: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 16 };
 const wizStyle: React.CSSProperties = { background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, width: '100%', maxWidth: 580, maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 60px rgba(0,0,0,.6)' };
 const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: 'var(--muted)', marginBottom: 6, letterSpacing: '.5px', textTransform: 'uppercase' };
 const closeBtnStyle: React.CSSProperties = { background: 'var(--card2)', border: 'none', width: 28, height: 28, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--muted)', fontSize: 14 };
