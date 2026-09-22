@@ -310,7 +310,10 @@ export async function emettiInvoiceApi(id: string) {
   return await res.json();
 }
 
-export async function emettiNotaCreditoApi(id: string, input: { motivo: string; note?: string }) {
+export async function emettiNotaCreditoApi(
+  id: string,
+  input: { motivo: string; note?: string; righe?: Array<{ rigaId: string; quantita?: number }> },
+) {
   const res = await apiFetch(`${API_BASE}/invoices/${id}/nota-credito`, {
     method: 'POST',
     headers: getAuthHeaders(),

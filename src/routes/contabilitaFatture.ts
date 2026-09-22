@@ -18,6 +18,7 @@ import {
   generaPianoScadenze,
   assertFatturaModificabile,
   formattaNumeroDocumento,
+  ripartisciStornoScadenze,
   type RigaFatturaInput,
   type OpzioniCalcoloFattura,
 } from '../services/fatturaEngine.js';
@@ -426,6 +427,8 @@ export async function registraRotteContabilitaFatture(server: FastifyInstance, a
     Body: {
       motivo: 'errore_esposizione' | 'reso_merce' | 'sconto_post_fattura' | 'abbuono' | 'annullo_totale' | 'correzione_dati';
       note?: string;
+      // Selezione righe per una NC PARZIALE. Assente/vuota = storno totale (comportamento storico).
+      righe?: Array<{ rigaId: string; quantita?: number }>;
     };
   }>('/invoices/:id/nota-credito', async (req, reply) => {
     const tenantId = req.tenantId;
@@ -454,6 +457,83 @@ export async function registraRotteContabilitaFatture(server: FastifyInstance, a
               const progressivoNC = (lastNC?.numeroProgressivoSerie || 0) + 1;
               const numNC = formattaNumeroDocumento('NC', progressivoNC, dataEmissione);
 
+              // ── NC totale vs parziale (audit A5) ──────────────────────────
+              // Senza righe selezionate è uno storno TOTALE (comportamento storico). Con una
+              // selezione la NC storna solo quelle righe (alla quantità scelta), i totali si
+              // RICALCOLANO dalle righe stornate (cassa/ritenuta/bollo sono di documento), la
+              // fattura resta viva se non copre tutto e le rate aperte calano in proporzione.
+              const selezione = (Array.isArray(req.body.righe) ? req.body.righe : []).filter(
+                (x) => x && typeof x.rigaId === 'string',
+              );
+              const parziale = selezione.length > 0;
+              const righeStorno = parziale
+                ? selezione.map((sel) => {
+                    const orig = fatturaOrigine.righe.find((r) => r.id === sel.rigaId);
+                    if (!orig) throw new Error('Riga selezionata non appartenente alla fattura origine');
+                    const qta = sel.quantita && sel.quantita > 0 ? Math.min(sel.quantita, orig.quantita) : orig.quantita;
+                    return { orig, qta };
+                  })
+                : fatturaOrigine.righe.map((orig) => ({ orig, qta: orig.quantita }));
+              const isFull =
+                !parziale ||
+                fatturaOrigine.righe.every((or) => {
+                  const s = selezione.find((x) => x.rigaId === or.id);
+                  return Boolean(s) && (!s?.quantita || s.quantita >= or.quantita);
+                });
+              if (motivo === 'annullo_totale' && !isFull) {
+                throw new Error("Motivo 'annullo_totale' non compatibile con una nota di credito parziale");
+              }
+              const totaliNc = parziale
+                ? calcolaTotaliFattura(
+                    righeStorno.map(({ orig, qta }): RigaFatturaInput => ({
+                      descrizione: orig.descrizione,
+                      quantita: qta,
+                      prezzoUnitarioCent: orig.prezzoUnitarioCent,
+                      scontoPercentuale: orig.scontoPercentuale,
+                      aliquotaIva: orig.aliquotaIva,
+                      naturaEsenzione: orig.naturaEsenzione,
+                      applicaCassa: orig.applicaCassa,
+                      applicaRitenuta: orig.applicaRitenuta,
+                      applicaBollo: orig.applicaBollo,
+                    })),
+                    {
+                      aliquotaCassa: fatturaOrigine.aliquotaCassa,
+                      aliquotaRitenuta: fatturaOrigine.aliquotaRitenuta,
+                      esigibilitaIva: fatturaOrigine.esigibilitaIva,
+                    },
+                  )
+                : null;
+              const tot = totaliNc ?? fatturaOrigine;
+              const righeCreate = righeStorno.map(({ orig, qta }, idx) => {
+                const calc = totaliNc?.righe[idx];
+                return {
+                  tenantId,
+                  tipo: orig.tipo,
+                  moduloProgettoId: orig.moduloProgettoId,
+                  articoloId: orig.articoloId,
+                  importo: calc?.imponibileCentesimi ?? orig.importo,
+                  descrizione: `Storno: ${orig.descrizione}`,
+                  quantita: qta,
+                  unitaMisura: orig.unitaMisura,
+                  prezzoUnitarioCent: orig.prezzoUnitarioCent,
+                  scontoPercentuale: orig.scontoPercentuale,
+                  aliquotaIva: orig.aliquotaIva,
+                  naturaEsenzione: orig.naturaEsenzione,
+                  applicaCassa: orig.applicaCassa,
+                  applicaRitenuta: orig.applicaRitenuta,
+                  applicaBollo: orig.applicaBollo,
+                  imponibileCentesimi: calc?.imponibileCentesimi ?? orig.imponibileCentesimi,
+                  ivaCentesimi: calc?.ivaCentesimi ?? orig.ivaCentesimi,
+                  totaleRigaCentesimi: calc?.totaleRigaCentesimi ?? orig.totaleRigaCentesimi,
+                  ordine: idx + 1,
+                };
+              });
+              const noteNc =
+                note ||
+                (isFull
+                  ? `Storno totale della fattura ${fatturaOrigine.numero}`
+                  : `Storno parziale della fattura ${fatturaOrigine.numero}`);
+
               // Crea Nota di Credito collegata (TD04)
               const nc = await tx.fattura.create({
                 data: {
@@ -479,37 +559,15 @@ export async function registraRotteContabilitaFatture(server: FastifyInstance, a
                   aliquotaCassa: fatturaOrigine.aliquotaCassa,
                   aliquotaRitenuta: fatturaOrigine.aliquotaRitenuta,
                   esigibilitaIva: fatturaOrigine.esigibilitaIva,
-                  totaleImponibileCentesimi: fatturaOrigine.totaleImponibileCentesimi,
-                  totaleCassaCentesimi: fatturaOrigine.totaleCassaCentesimi,
-                  totaleIvaCentesimi: fatturaOrigine.totaleIvaCentesimi,
-                  totaleRitenutaCentesimi: fatturaOrigine.totaleRitenutaCentesimi,
-                  totaleBolloCentesimi: fatturaOrigine.totaleBolloCentesimi,
-                  totaleDocumentoCentesimi: fatturaOrigine.totaleDocumentoCentesimi,
-                  nettoAPagareCentesimi: fatturaOrigine.nettoAPagareCentesimi,
-                  note: note || `Storno totale a storno della fattura ${fatturaOrigine.numero}`,
-                  righe: {
-                    create: fatturaOrigine.righe.map((r, idx) => ({
-                      tenantId,
-                      tipo: r.tipo,
-                      moduloProgettoId: r.moduloProgettoId,
-                      articoloId: r.articoloId,
-                      importo: r.importo,
-                      descrizione: `Storno: ${r.descrizione}`,
-                      quantita: r.quantita,
-                      unitaMisura: r.unitaMisura,
-                      prezzoUnitarioCent: r.prezzoUnitarioCent,
-                      scontoPercentuale: r.scontoPercentuale,
-                      aliquotaIva: r.aliquotaIva,
-                      naturaEsenzione: r.naturaEsenzione,
-                      applicaCassa: r.applicaCassa,
-                      applicaRitenuta: r.applicaRitenuta,
-                      applicaBollo: r.applicaBollo,
-                      imponibileCentesimi: r.imponibileCentesimi,
-                      ivaCentesimi: r.ivaCentesimi,
-                      totaleRigaCentesimi: r.totaleRigaCentesimi,
-                      ordine: idx + 1,
-                    })),
-                  },
+                  totaleImponibileCentesimi: tot.totaleImponibileCentesimi,
+                  totaleCassaCentesimi: tot.totaleCassaCentesimi,
+                  totaleIvaCentesimi: tot.totaleIvaCentesimi,
+                  totaleRitenutaCentesimi: tot.totaleRitenutaCentesimi,
+                  totaleBolloCentesimi: tot.totaleBolloCentesimi,
+                  totaleDocumentoCentesimi: tot.totaleDocumentoCentesimi,
+                  nettoAPagareCentesimi: tot.nettoAPagareCentesimi,
+                  note: noteNc,
+                  righe: { create: righeCreate },
                   auditLogFatture: {
                     create: {
                       tenantId,
@@ -526,38 +584,64 @@ export async function registraRotteContabilitaFatture(server: FastifyInstance, a
                 include: { righe: true, cliente: true, progetto: true },
               });
 
-              // Annulla o storno le scadenze non incassate della fattura origine.
-              // Stato terminale dedicato `stornata`, NON `parziale` (che vuol dire «incassata in
-              // parte» e farebbe ricomparire la rata tra gli insoluti e i crediti «da incassare»).
-              // Copre le rate ancora dovute — non le `incassato`, il cui rimborso è già tracciato
-              // dal movimento di storno in Prima Nota qui sotto.
-              await tx.scadenzaIncasso.updateMany({
-                where: { fatturaId: fatturaOrigine.id, stato: { in: ['in_attesa', 'scaduto', 'parziale'] } },
-                data: { stato: 'stornata', note: `Stornata per emissione Nota di Credito ${numNC}` },
-              });
-
-              // Se la fattura era già stata incassata, genera un movimento di uscita storno in Prima Nota
-              const totaleIncassato = fatturaOrigine.scadenzeIncasso.flatMap((s) => s.registrazioniRegistrate).reduce((acc, r) => acc + r.importoIncassatoCentesimi, 0);
-              if (totaleIncassato > 0) {
-                await tx.movimentoPrimaNota.create({
-                  data: {
-                    tenantId,
-                    contoBancarioId: fatturaOrigine.contoAccreditoId,
-                    fatturaId: nc.id,
-                    clienteId: fatturaOrigine.clienteId,
-                    tipo: 'uscita',
-                    categoria: 'altro',
-                    descrizione: `Storno rimborso Nota di Credito ${numNC} su fattura ${fatturaOrigine.numero}`,
-                    importoCentesimi: totaleIncassato,
-                    metodoPagamento: fatturaOrigine.metodoPagamento,
-                  },
+              // ── Impatto su scadenze e fattura d'origine (audit A5) ────────
+              if (isFull) {
+                // Storno TOTALE: rate ancora dovute → `stornata` (terminale, non `parziale` che le
+                // farebbe ricomparire tra gli insoluti), fattura → `annullata`, e se era stata
+                // incassata si rimborsa in Prima Nota.
+                await tx.scadenzaIncasso.updateMany({
+                  where: { fatturaId: fatturaOrigine.id, stato: { in: ['in_attesa', 'scaduto', 'parziale'] } },
+                  data: { stato: 'stornata', note: `Stornata per emissione Nota di Credito ${numNC}` },
                 });
+                const totaleIncassato = fatturaOrigine.scadenzeIncasso
+                  .flatMap((s) => s.registrazioniRegistrate)
+                  .reduce((acc, r) => acc + r.importoIncassatoCentesimi, 0);
+                if (totaleIncassato > 0) {
+                  await tx.movimentoPrimaNota.create({
+                    data: {
+                      tenantId,
+                      contoBancarioId: fatturaOrigine.contoAccreditoId,
+                      fatturaId: nc.id,
+                      clienteId: fatturaOrigine.clienteId,
+                      tipo: 'uscita',
+                      categoria: 'altro',
+                      descrizione: `Storno rimborso Nota di Credito ${numNC} su fattura ${fatturaOrigine.numero}`,
+                      importoCentesimi: totaleIncassato,
+                      metodoPagamento: fatturaOrigine.metodoPagamento,
+                    },
+                  });
+                }
+                await tx.fattura.update({ where: { id: fatturaOrigine.id }, data: { stato: 'annullata' } });
+              } else {
+                // Storno PARZIALE: la fattura resta viva; le rate aperte calano in proporzione al
+                // netto stornato (nettoAPagare della NC). Nessun rimborso automatico dell'eventuale
+                // acconto (decisione di tesoreria manuale): si riduce solo il dovuto futuro.
+                const rateResidue = fatturaOrigine.scadenzeIncasso
+                  .filter((s) => s.stato === 'in_attesa' || s.stato === 'scaduto' || s.stato === 'parziale')
+                  .map((s) => ({
+                    id: s.id,
+                    importo: s.importoCentesimi,
+                    incassato: s.registrazioniRegistrate.reduce((a, r) => a + r.importoIncassatoCentesimi, 0),
+                  }));
+                const riduzioni = ripartisciStornoScadenze(
+                  rateResidue.map((s) => ({ id: s.id, residuoCentesimi: s.importo - s.incassato })),
+                  tot.nettoAPagareCentesimi,
+                );
+                for (const rid of riduzioni) {
+                  if (rid.riduzioneCentesimi <= 0) continue;
+                  const rata = rateResidue.find((s) => s.id === rid.id);
+                  if (!rata) continue;
+                  const nuovoStato = rid.azzerata ? (rata.incassato > 0 ? 'incassato' : 'stornata') : null;
+                  await tx.scadenzaIncasso.update({
+                    where: { id: rid.id },
+                    data: {
+                      importoCentesimi: rata.importo - rid.riduzioneCentesimi,
+                      note: `Ridotta di ${(rid.riduzioneCentesimi / 100).toFixed(2)} € per Nota di Credito parziale ${numNC}`,
+                      ...(nuovoStato ? { stato: nuovoStato } : {}),
+                    },
+                  });
+                }
               }
-
-              await tx.fattura.update({
-                where: { id: fatturaOrigine.id },
-                data: { stato: 'annullata' },
-              });
 
               return {
                 notaCredito: nc,

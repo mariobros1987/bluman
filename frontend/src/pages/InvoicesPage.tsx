@@ -96,6 +96,8 @@ export function InvoicesPage() {
   // Form Nota di Credito State
   const [motivoNc, setMotivoNc] = useState('annullo_totale');
   const [noteNc, setNoteNc] = useState('');
+  const [ncParziale, setNcParziale] = useState(false);
+  const [ncRighe, setNcRighe] = useState<Record<string, { sel: boolean; qta: number }>>({});
 
   const loadData = async () => {
     setLoading(true);
@@ -317,18 +319,35 @@ export function InvoicesPage() {
     }
   };
 
+  const apriModaleNc = (inv: any) => {
+    setSelectedInvoice(inv);
+    setMotivoNc('annullo_totale');
+    setNoteNc('');
+    setNcParziale(false);
+    const iniz: Record<string, { sel: boolean; qta: number }> = {};
+    for (const r of inv.righe || []) iniz[r.id] = { sel: true, qta: r.quantita || 1 };
+    setNcRighe(iniz);
+    setShowNcModal(true);
+  };
+
   const handleEmettiNotaCredito = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedInvoice) return;
     setSubmitting(true);
     try {
+      const righeSel = ncParziale
+        ? (selectedInvoice.righe || [])
+            .filter((r: any) => ncRighe[r.id]?.sel)
+            .map((r: any) => ({ rigaId: r.id, quantita: ncRighe[r.id]?.qta }))
+        : [];
       await emettiNotaCreditoApi(selectedInvoice.id, {
         motivo: motivoNc,
         note: noteNc || undefined,
+        righe: righeSel.length > 0 ? righeSel : undefined,
       });
       setShowNcModal(false);
       await loadData();
-      toast.successo('Nota di credito (TD04) emessa con successo a storno della fattura!');
+      toast.successo('Nota di credito (TD04) emessa con successo!');
     } catch (err: any) {
       toast.errore(`Errore emissione nota di credito: ${err.message}`);
     } finally {
@@ -673,10 +692,7 @@ export function InvoicesPage() {
                                 </button>
                               )}
                               <button
-                                onClick={() => {
-                                  setSelectedInvoice(inv);
-                                  setShowNcModal(true);
-                                }}
+                                onClick={() => apriModaleNc(inv)}
                                 style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid var(--red)', background: 'var(--pill-red-bg)', color: 'var(--pill-red-fg)', cursor: 'pointer', fontSize: 12 }}
                                 title="Emetti Nota di Credito TD04"
                               >
@@ -1102,11 +1118,49 @@ export function InvoicesPage() {
                   onChange={(e) => setMotivoNc(e.target.value)}
                   style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
                 >
-                  <option value="annullo_totale">Annullo Totale Documento</option>
+                  <option value="annullo_totale" disabled={ncParziale}>Annullo Totale Documento</option>
                   <option value="errore_esposizione">Errore Esposizione Dati Fisc/Prezzi</option>
                   <option value="reso_merce">Reso / Incarico non erogato</option>
                   <option value="sconto_post_fattura">Sconto / Abbuono post-fatturazione</option>
                 </select>
+              </div>
+
+              <div style={{ border: '1px solid var(--border)', borderRadius: 8, padding: 12 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+                  <input
+                    type="checkbox"
+                    checked={ncParziale}
+                    onChange={(e) => {
+                      const on = e.target.checked;
+                      setNcParziale(on);
+                      if (on && motivoNc === 'annullo_totale') setMotivoNc('errore_esposizione');
+                    }}
+                  />
+                  Storno parziale (seleziona le righe da stornare)
+                </label>
+                {ncParziale && (
+                  <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {(selectedInvoice.righe || []).map((r: any) => {
+                      const cfg = ncRighe[r.id] || { sel: false, qta: r.quantita || 1 };
+                      return (
+                        <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+                          <input type="checkbox" checked={cfg.sel} onChange={(ev) => setNcRighe((m) => ({ ...m, [r.id]: { ...cfg, sel: ev.target.checked } }))} />
+                          <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.descrizione}</span>
+                          <span style={{ color: 'var(--muted)' }}>{fmt((r.imponibileCentesimi || 0) / 100)}</span>
+                          <input
+                            type="number" min={0} max={r.quantita} step="any" value={cfg.qta} disabled={!cfg.sel}
+                            onChange={(ev) => setNcRighe((m) => ({ ...m, [r.id]: { ...cfg, qta: parseFloat(ev.target.value) || 0 } }))}
+                            style={{ width: 64, padding: '4px 6px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
+                            title="Quantità da stornare (max = quantità della riga)"
+                          />
+                        </div>
+                      );
+                    })}
+                    <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+                      La fattura resta valida se lo storno non copre tutto; IVA e totali della NC sono calcolati all'emissione dalle righe selezionate.
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div>
