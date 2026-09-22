@@ -26,7 +26,9 @@ Tutti verificati: `tsc` backend + `tsc -b` frontend puliti, **1239 test backend 
   - **`GET /fatture` paginato + filtri ricerca** (`contabilitaRegistro.ts`): retrocompatibile (senza parametri torna l'array come prima; con `?page/?limit` torna `{data, meta}`, default limit 50); filtri `search` (numero o nome cliente), `stato`, `tipo`.
   - ⏳ Follow-up non fatto: batch `createMany` nell'istanziazione progetto. Motivo: gli ID servono a cascata (createMany non li ritorna), l'adapter non è type-checkabile in questo ambiente, e lo spostamento in EU ha già tolto il rischio timeout che lo motivava. Basso ritorno/rischio ora.
 
-Restano aperti (media/bassa priorità, non toccati): SDI scartata senza rilavorazione; `statoSdi` non tracciato post-emissione; notifiche "documento da firmare" solo in-app; KYC/AML come gate; accessibilità (label/aria/Modal/focus); toast al posto degli `alert()`; arrotondamento IVA per-riga; irrigidimenti sicurezza (RBAC default-permissivo, file legacy cross-tenant, TTL URL firmati, CORS `*.vercel.app`).
+> **🔁 Ricontrollo 22/09/2026** (verifica read-only sul codice attuale, due audit paralleli). Dal 21/09 sono stati chiusi anche: **toast** al posto dei 166 `alert()` (`e34d6de`); **accessibilità Fasi 1-2** — Modal condiviso con `role="dialog"`/focus-trap/Escape + `ConfirmProvider` su tutti i `confirm()` (~30 modali, `c3eea01`/`bcc0653`), `:focus-visible` globale e token `--hint` portato ad AA (`tokens.css`); ulteriori correzioni di contrasto tema chiaro (`9d5143c`, `a7c0bad`). Lo stato per-finding è marcato inline qui sotto: ✅ risolto · 🟡 parziale · ⏳ aperto.
+
+**Restano aperti** (aggiornato 22/09/2026): ⏳ ciclo NC — scadenza stornata resta `parziale` senza stato terminale (A4) e NC parziali per riga impossibili (A5); ⏳ SDI scartata senza rilavorazione (W1) e nessuna segnalazione proattiva di fatture emesse-mai-trasmesse (W2); ⏳ notifiche "documento da firmare" solo in-app, senza fallback email/WhatsApp (W3); ⏳ solleciti senza macchina a stati né storia (W4); ⏳ **KYC/AML come gate** — è il modulo §5.5 di `PIANO_DI_MIGLIORAMENTO.md`, spec in `bluman-kyc-aml-spec-tecnica.md`; 🟡 token portale scaduto non forza re-login (F2) e label/`htmlFor` sui form standalone da completare (X3); ⏳ arrotondamento IVA per-riga (B1); ⏳ `createMany`/idempotenza istanziazione progetto (P6/B3); ⏳ doppio sistema bottoni (L2) e scroll orizzontale tabelle mobile (L3); ⏳ marca temporale qualificata RFC 3161 + validazione catena/revoca certificato firma (D3, follow-up esterno); ⏳ irrigidimenti sicurezza deliberati (RBAC default-permissivo, file legacy senza prefisso tenant, TTL URL firmati 7g, CORS `*.vercel.app`).
 
 ---
 
@@ -42,17 +44,17 @@ La **sicurezza è solida**: nessuna falla critica/alta sfruttabile, RLS e auth b
 
 ## 🔴 PRIORITÀ ALTA
 
-### A. Ciclo Nota di Credito / fattura annullata (fiscale + processo)
+### A. Ciclo Nota di Credito / fattura annullata (fiscale + processo) — ✅ nucleo RISOLTO · ⏳ A4/A5 aperti
 Convergenza di 5 finding da 2 audit:
-- **IVA a debito sovrastimata** — `src/routes/liquidazioneIva.ts:45-53,112-119` + `src/services/lipeEngine.ts:156-162`: la LIPE filtra `tipoDocumento:'fattura'` (esclude le NC) e non esclude lo stato `annullata`. Risultato: si calcola (e potenzialmente versa) IVA su operazioni stornate. Aggravante: **non esiste `lipeEngine.test.ts`**. Il percorso report (`reportsService.ts:288-294`) invece sottrae le NC — i due percorsi divergono.
-- **Annullate tra gli insoluti** — `src/routes/solleciti.ts:23-38`: le query solleciti/insoluti non escludono `fattura.stato='annullata'` → una fattura stornata con residuo>0 può ricevere un sollecito o una diffida legale (231/2002).
-- **Incasso "resuscita" l'annullata** — `src/routes/contabilitaScadenzario.ts:106-109`: dopo un incasso la fattura è forzata a `incassata`/`emessa` senza controllare lo stato corrente.
-- **Scadenze stornate messe a `parziale`** — `src/routes/contabilitaFatture.ts:530-533`: stato ambiguo (parziale = incassata in parte), che alimenta i tre problemi sopra.
-- **NC solo a storno totale** — la NC copia sempre tutte le righe ignorando `motivo` (sconto/abbuono/reso); NC parziali impossibili.
+- ✅ **IVA a debito sovrastimata** — `src/routes/liquidazioneIva.ts:45-53,112-119` + `src/services/lipeEngine.ts:156-162`: la LIPE filtra `tipoDocumento:'fattura'` (esclude le NC) e non esclude lo stato `annullata`. → **RISOLTO**: query estesa a `tipoDocumento in [fattura, nota_credito]` (`liquidazioneIva.ts:54,122`), NC con `segno=-1` (`lipeEngine.ts:167`), `src/lipeEngine.test.ts` creato (`60f78e5`).
+- ✅ **Annullate tra gli insoluti** — `src/routes/solleciti.ts:23-38`: le query non escludono `fattura.stato='annullata'` → possibile sollecito/diffida su fattura stornata. → **RISOLTO**: `solleciti.ts:30` esclude `stato notIn [bozza, annullata]`.
+- ✅ **Incasso "resuscita" l'annullata** — `src/routes/contabilitaScadenzario.ts:106-109`: dopo un incasso la fattura è forzata a `incassata`/`emessa` senza controllare lo stato. → **RISOLTO**: guardia 409 su fattura annullata + tetto over-incasso (`contabilitaScadenzario.ts:81,91-92`).
+- ⏳ **Scadenze stornate messe a `parziale`** — `src/routes/contabilitaFatture.ts:530-533`: stato ambiguo. → **APERTO**: `contabilitaFatture.ts:532` la scadenza stornata resta `parziale`, nessuno stato terminale dedicato (rischio mitigato da A3).
+- ⏳ **NC solo a storno totale** — la NC copia sempre tutte le righe ignorando `motivo`. → **APERTO**: emissione NC copia l'intera fattura e forza l'origine a `annullata`; `motivo` registrato ma storno sempre totale, NC parziali per riga ancora impossibili.
 
 **Fix coordinato:** introdurre uno stato terminale dedicato per la scadenza stornata (`annullata`/`stornata`), escludere `fattura.stato in [bozza,annullata]` da LIPE/solleciti/insoluti, includere le NC nel calcolo IVA, aggiungere guardia sull'incasso di fatture annullate, e coprire tutto con test (a partire da `lipeEngine`).
 
-### B. Leggibilità tema chiaro (testo bianco su fondo pallido) — bug live
+### B. Leggibilità tema chiaro (testo bianco su fondo pallido) — ✅ RISOLTO (`9d5143c`, `a7c0bad`, `60f78e5`)
 Tutti fix meccanici (`color:'#fff'` → token tematizzato):
 - Numeri KPI invisibili — `CartellaModelliPage.tsx:43`, `ArchivioDocumentiPage.tsx:37` (componente `Riquadro` duplicato → centralizzare).
 - **Portale cliente**: titolo proposta invisibile — `portal/TabProposta.tsx:119`; nome progetto in top-nav — `portal/PortalTopNav.tsx:68`.
@@ -60,58 +62,61 @@ Tutti fix meccanici (`color:'#fff'` → token tematizzato):
 - Recapito destinatario — `ComunicazioniTab.tsx:1006-1007`; storico contratti — `StoricoContrattiTab.tsx:39`.
 - (La "trappola della carta" in dark mode è invece **già risolta** correttamente.)
 
-### C. Due bug frontend che ingannano l'utente
+### C. Due bug frontend che ingannano l'utente — ✅ RISOLTO (C1 errore bloccante in ClientsPage; C2 stream portale usa `bluman_portal_token`)
 - **Creazione cliente conferma anche se il DB rifiuta** — `pages/ClientsPage.tsx:213-229`: la POST è in try/catch che fa solo console.error, poi salva in localStorage e chiude la modale come per un successo. Fix: errore bloccante, non chiudere la modale sul fallimento.
 - **Notifiche live del portale non arrivano mai** — `api/notifiche.ts:52` legge `bluman_jwt_token` ma il cliente ha solo `bluman_portal_token` → lo stream non si connette mai (retry ogni 10s a vuoto). Fix: selezionare il token come `getAuthHeaders`.
 
-### D. Compliance firma (studio trust/fiscale)
-- **FEQ scritta senza validare il certificato** — `src/routes/firma.ts:1870,1895`: `valoreLegale='feq'` sulla sola dichiarazione dell'utente; un requisito FEQ si soddisfa caricando un PDF qualunque. Fix: validare la firma qualificata (PAdES/CAdES) o declassare a "file firmato non verificato".
-- **Sigillo/verbale senza marca temporale qualificata né chiave** — `src/services/otpService.ts` `creaSigilloFea`: `new Date()` + sha256 in chiaro (non HMAC/firma, non TSA RFC 3161). Per FEA/FEQ mancano data certa opponibile e non ripudio. Fix: marca temporale qualificata + sigillo con chiave.
+### D. Compliance firma (studio trust/fiscale) — 🟡 MITIGATO code-side (D1/D2 ✅) · ⏳ D3 aperto
+- ✅ **FEQ scritta senza validare il certificato** — `src/routes/firma.ts:1870,1895`: `valoreLegale='feq'` sulla sola dichiarazione dell'utente. → **RISOLTO**: `firmaFileValidazione.ts` (`fileContieneFirmaDigitale`, PAdES/PKCS#7-CAdES) con 422 in `firma.ts:1785` e `documentiFirmaStudio.ts:205`.
+- 🟡 **Sigillo/verbale senza marca temporale qualificata né chiave** — `src/services/otpService.ts` `creaSigilloFea`: `new Date()` + sha256 in chiaro. → chiave **RISOLTA** (HMAC-SHA256 con `SIGILLO_HMAC_SECRET`, `otpService.ts:322,452`); ⏳ **APERTO** la marca temporale qualificata RFC 3161 (TSA) e la validazione catena/revoca certificato (follow-up esterno).
 
 ---
 
 ## 🟠 PRIORITÀ MEDIA
 
-### Performance (aiutano ORA e dopo la migrazione VPS)
-- **Polling 5s del fascicolo comunicazioni su tabella senza indici** — `components/ComunicazioniTab.tsx:333-336` + `routes/progetti.ts:42`. Esiste già l'SSE `/stream` ma il polling gira lo stesso; `ComunicazioneProgetto` (schema.prisma:1358) non ha nessun `@@index`. Fix: eliminare il polling + `@@index([tenantId,progettoId,createdAt])`. **Massimo rapporto beneficio/rischio.**
-- **`GET /fatture` non paginato con include profondo** — `routes/contabilitaRegistro.ts:152-172` (cresce senza limite). + tutti i rami `if(!paginazione.paginata)` di progetti/clienti/audit-logs/scadenzario/prima nota.
-- **N+1**: cron giornaliero (`cronService.ts:64-104`) e webhook WhatsApp che ricarica tutti i clienti per ogni messaggio (`webhooks.ts:442`). Ricorda: con la RLS ogni query è ~4 round-trip, quindi un N+1 è N transazioni.
-- **Istanziazione progetto**: centinaia di INSERT sequenziali in una tx da 15s (`istanziaProgetto.ts:100-171`) → rischio timeout. Fix: `createMany`.
+### Performance (aiutano ORA e dopo la migrazione VPS) — ✅ P1/P3/P4/P5 · 🟡 P2 · ⏳ P6
+- 🟡 **Polling 5s del fascicolo comunicazioni su tabella senza indici** — `components/ComunicazioniTab.tsx:333-336`; `ComunicazioneProgetto` senza `@@index`. → `@@index([tenantId,progettoId,createdAt])` **AGGIUNTO** (`schema.prisma:1377`, migrazione `20260921120000`) e polling portato a **30s**; ⏳ resta da eliminare il polling a favore dell'SSE (`ComunicazioniTab.tsx:339`).
+- ✅ **`GET /fatture` non paginato con include profondo** — `routes/contabilitaRegistro.ts:152-172`. → **RISOLTO**: paginazione retrocompatibile con filtri `search/stato/tipo` (`contabilitaRegistro.ts:92,101,140`).
+- ✅ **N+1**: cron giornaliero (`cronService.ts:64-104`) e webhook WhatsApp (`webhooks.ts:442`). → **RISOLTO**: `cronService.ts:34-40` `findMany`+`Set`; `webhooks.ts:432` clienti caricati una volta per batch.
+- ⏳ **Istanziazione progetto**: centinaia di INSERT sequenziali (`istanziaProgetto.ts:100-171`). → **APERTO**: nessun `createMany` (follow-up non fatto; rischio timeout ridotto dallo spostamento in EU).
 
-### Frontend / stato
-- **Logout manuale non pulisce cache né tenant** — `App.tsx:86-94`: l'utente B (stesso tenant) può vedere per ~30s liste/notifiche in cache di A. Fix: dispatch `bluman_unauthorized`/invalidateCache + rimuovere `bluman_tenant_id`.
-- **Portale: token scaduto a metà sessione non forza il re-login** — `http.ts:73` esclude `/portal` → il cliente resta su una UI che dà errori.
-- **Race condition + JSON.parse non protetto** in `ClientsPage.tsx` (risposte fuori ordine; spinner bloccato se storage corrotto).
-- **Mapping email→tenant hardcoded verso tenant ELIMINATI (002/003)** — `tenant.ts:100-110`: codice morto e pericoloso, da rimuovere.
+### Frontend / stato — ✅ F1/F3/F4 · 🟡 F2
+- ✅ **Logout manuale non pulisce cache né tenant** — `App.tsx:86-94`. → **RISOLTO**: `App.tsx:90-99` rimuove `bluman_tenant_id` + `invalidateCache()`; `http.ts:74` dispatcha `bluman_unauthorized` sui 401.
+- 🟡 **Portale: token scaduto a metà sessione non forza il re-login** — `http.ts:73` esclude `/portal`. → **PARZIALE**: token separati per `/portal` (`http.ts:68-69`), ma la riga 73 esclude ancora `/portal` dal dispatch → per il cliente il re-login pulito non scatta.
+- ✅ **Race condition + JSON.parse non protetto** in `ClientsPage.tsx`. → **RISOLTO**: guardia `annullato` (208-213) e `JSON.parse` in try/catch (254-259).
+- ✅ **Mapping email→tenant hardcoded verso tenant ELIMINATI (002/003)** — `tenant.ts:100-110`. → **RISOLTO**: euristica rimossa (`tenant.ts:100-101`, tenant mock eliminati il 20/09).
 
-### Workflow / procedure
-- **SDI "scartata" è un vicolo cieco** — `contabilitaWebhookSdi.ts:60-62`: nessun percorso per correggere e ritrasmettere (per legge entro 5 gg). 
-- **`statoSdi` non tracciato dopo l'emissione**: fatture emesse ma mai trasmesse passano inosservate.
-- **Notifiche "documento da firmare" solo in-app**: il cliente che non apre il portale non sa di dover firmare → incarico fermo a tempo indefinito. Fix: fallback email/WhatsApp.
-- **KYC/AML è solo un campo passivo**: nessun gate su KYC scaduto o `rischioAml='alto'`. Per uno studio soggetto al 231/2007 l'adeguata verifica è un dato editabile, non un processo.
-- **Solleciti senza macchina a stati né storia**: si può inviare una diffida come primo contatto.
+### Workflow / procedure — ⏳ tutti aperti (KYC gate = modulo §5.5 pianificato)
+- ⏳ **SDI "scartata" è un vicolo cieco** — `contabilitaWebhookSdi.ts:60-62`: nessun percorso per correggere e ritrasmettere (per legge entro 5 gg). → **APERTO** (`contabilitaWebhookSdi.ts:62` scrive solo `statoSdi='scartata'`).
+- ⏳ **`statoSdi` non tracciato dopo l'emissione**: fatture emesse ma mai trasmesse passano inosservate. → **APERTO**: campo aggiornato dal webhook, ma nessuna segnalazione proattiva.
+- ⏳ **Notifiche "documento da firmare" solo in-app**: il cliente che non apre il portale non sa di dover firmare. → **APERTO** (`documenti.ts:353,584,663` solo in-app, nessun fallback email/WhatsApp).
+- ⏳ **KYC/AML è solo un campo passivo**: nessun gate su KYC scaduto o `rischioAml='alto'`. → **APERTO → PIANIFICATO**: è il modulo **§5.5** di `PIANO_DI_MIGLIORAMENTO.md` (spec `bluman-kyc-aml-spec-tecnica.md`) che lo trasforma in processo governato con gate.
+- ⏳ **Solleciti senza macchina a stati né storia**: si può inviare una diffida come primo contatto. → **APERTO** (`solleciti.ts` `livello` libero, nessun `model Sollecito`).
 
-### Accessibilità (sistemica)
-- Input di form senza `label` associata (solo ~6 `htmlFor` in tutto il frontend).
-- Pulsanti chiudi ✕ senza `aria-label` (~11 modali); `div`/`span` cliccabili non attivabili da tastiera.
-- Modali senza `role="dialog"`/focus-trap/Escape.
-- Focus da tastiera non visibile (`tokens.css:228` outline:none, nessun `:focus-visible` globale).
-- Token `--hint` (#949cb2 ≈2.6:1) usato per testo informativo reale (sotto il minimo WCAG 4.5:1).
+### Accessibilità (sistemica) — ✅ Fasi 1-2 fatte · 🟡 label form da completare
+- 🟡 Input di form senza `label` associata (solo ~6 `htmlFor` in tutto il frontend). → **PARZIALE**: i modali migrati al Modal condiviso hanno aria/label; i form standalone restano da completare.
+- ✅ Pulsanti chiudi ✕ senza `aria-label` (~11 modali); `div`/`span` cliccabili non attivabili da tastiera. → **RISOLTO** per i ~30 modali migrati a `components/ui/Modal.tsx` (`c3eea01`/`bcc0653`).
+- ✅ Modali senza `role="dialog"`/focus-trap/Escape. → **RISOLTO**: `Modal.tsx` con `role`, aria-labelledby, Escape in cattura e focus-trap; `confirm()` nativi sostituiti da `ConfirmProvider`.
+- ✅ Focus da tastiera non visibile (`tokens.css:228` outline:none, nessun `:focus-visible` globale). → **RISOLTO**: `:focus-visible` globale + `:focus:not(:focus-visible){outline:none}` (`tokens.css:243-248`).
+- ✅ Token `--hint` (#949cb2 ≈2.6:1) usato per testo informativo reale (sotto il minimo WCAG 4.5:1). → **RISOLTO**: `--hint` → `#656d85` (AA su chiaro; `#8b96a8` in dark).
 
 ---
 
 ## 🟡 PRIORITÀ BASSA
-- **166 `alert()` nativi in 39 file** (nessun sistema di toast), incluso il portale cliente. Sostituire con un toast centralizzato dà un salto di qualità percepita.
-- **Due sistemi di bottoni** (classi `.btn` complete ma la maggioranza è inline senza hover/disabled/focus).
-- Tabelle senza wrapper scroll orizzontale → colonne tagliate su mobile.
-- Arrotondamento IVA per riga poi sommato (`fatturaEngine.ts:142-159`): possibile scarto di 1 cent nei DatiRiepilogo SdI.
-- Nessun tetto sull'importo incassato (`contabilita.schema.ts:44`).
-- Idempotenza istanziazione progetto (`istanziaProgetto.ts:177`).
-- Sicurezza (irrigidimenti, non falle): RBAC default-permissivo + fail-open; file legacy senza prefisso tenant scaricabili cross-tenant (`catalogo.ts:208-212`); URL di download firmati con TTL 7g in query string; `statoSdi` webhook non validato; CORS `*.vercel.app` in prod.
+- ✅ **166 `alert()` nativi in 39 file** (nessun sistema di toast), incluso il portale cliente. → **RISOLTO**: `ToastProvider` centralizzato, `alert()` nativi spariti dal codice app (`e34d6de`).
+- ⏳ **Due sistemi di bottoni** (classi `.btn` complete ma la maggioranza è inline senza hover/disabled/focus). → **APERTO**: bottoni ancora in larga parte con stile inline.
+- ⏳ Tabelle senza wrapper scroll orizzontale → colonne tagliate su mobile. → **APERTO** (non riscontrata soluzione).
+- ⏳ Arrotondamento IVA per riga poi sommato (`fatturaEngine.ts:142-159`): possibile scarto di 1 cent nei DatiRiepilogo SdI. → **APERTO**: metodo invariato (`fatturaEngine.ts:98`).
+- 🟡 Nessun tetto sull'importo incassato (`contabilita.schema.ts:44`). → **PARZIALE**: schema senza `max`, ma guardia runtime aggiunta (`contabilitaScadenzario.ts:92`, vedi A3).
+- ⏳ Idempotenza istanziazione progetto (`istanziaProgetto.ts:177`). → **APERTO**.
+- ⏳ Sicurezza (irrigidimenti, non falle): RBAC default-permissivo + fail-open; file legacy senza prefisso tenant scaricabili cross-tenant (`catalogo.ts:208-212`); URL di download firmati con TTL 7g in query string; `statoSdi` webhook non validato; CORS `*.vercel.app` in prod (`server.ts:246`). → **APERTO / deliberati**: invariati per scelta.
 
 ---
 
 ## Ordine d'attacco consigliato
+
+> **Aggiornato 22/09/2026**: A / B / C / D e gran parte della performance sono chiusi (vedi marcatori sopra). L'ordine residuo è: **1)** chiudere A4/A5 (stato terminale scadenza stornata + NC parziali per riga); **2)** workflow — SDI scartata, notifiche firma via email/WhatsApp, solleciti a stati; **3)** **modulo KYC/AML §5.5** (`bluman-kyc-aml-spec-tecnica.md`); **4)** completare a11y (label form) + F2 (re-login portale); **5)** D3 marca temporale qualificata quando si sceglie la TSA. L'elenco numerato qui sotto è quello originale del 21/09, conservato per memoria.
+
 1. **A** (ciclo NC/annullata) — impatto fiscale/legale reale, un intervento coordinato con test.
 2. **B + C** (leggibilità tema chiaro + i due bug che ingannano l'utente) — fix rapidi, alto impatto percepito, portale cliente prima.
 3. **Performance**: indici + stop al polling su `comunicazione_progetto`, poi paginazione di `/fatture` e rami non paginati. Aiuta subito e prepara il VPS.
