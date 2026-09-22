@@ -273,6 +273,62 @@ export function generaPianoScadenze(
 }
 
 /**
+ * Ripartizione proporzionale di uno storno parziale (Nota di Credito parziale) sulle rate ancora
+ * dovute della fattura d'origine. Lavora sui **residui** (importo rata − già incassato): una rata
+ * saldata non assorbe storno, una pagata a metà lo assorbe solo per la parte aperta. La riduzione
+ * è spalmata in proporzione al peso di ogni residuo — così nessuna rata sparisce arbitrariamente —
+ * e l'eventuale resto d'arrotondamento va alla rata col residuo maggiore, perché la somma delle
+ * riduzioni sia ESATTAMENTE lo storno (mai un centesimo perso o inventato). Se lo storno copre
+ * l'intero residuo aperto ogni rata è azzerata (chi scrive la marcherà `stornata`). Pura: non tocca
+ * database né stato, restituisce solo la matematica — testabile in isolamento.
+ */
+export interface RataDaStornare {
+  id: string;
+  residuoCentesimi: number; // importo rata − già incassato
+}
+export interface RiduzioneRata {
+  id: string;
+  riduzioneCentesimi: number;
+  nuovoResiduoCentesimi: number;
+  azzerata: boolean; // true se lo storno estingue del tutto il residuo
+}
+
+export function ripartisciStornoScadenze(
+  rate: RataDaStornare[],
+  importoStornoCentesimi: number
+): RiduzioneRata[] {
+  const aperte = rate.filter((r) => r.residuoCentesimi > 0);
+  const totaleResiduo = aperte.reduce((acc, r) => acc + r.residuoCentesimi, 0);
+  const storno = Math.max(0, Math.min(importoStornoCentesimi, totaleResiduo));
+
+  if (totaleResiduo === 0 || storno >= totaleResiduo) {
+    return aperte.map((r) => ({
+      id: r.id,
+      riduzioneCentesimi: storno >= totaleResiduo ? r.residuoCentesimi : 0,
+      nuovoResiduoCentesimi: storno >= totaleResiduo ? 0 : r.residuoCentesimi,
+      azzerata: storno >= totaleResiduo,
+    }));
+  }
+
+  const calc = aperte.map((r) => ({
+    id: r.id,
+    residuo: r.residuoCentesimi,
+    riduzione: Math.round((storno * r.residuoCentesimi) / totaleResiduo),
+  }));
+  const resto = storno - calc.reduce((acc, x) => acc + x.riduzione, 0);
+  if (resto !== 0 && calc.length > 0) {
+    // Il resto d'arrotondamento va alla rata col residuo maggiore (la piu capiente ad assorbirlo).
+    const target = calc.reduce((max, x) => (x.residuo > max.residuo ? x : max));
+    target.riduzione += resto;
+  }
+  return calc.map((x) => {
+    const riduzione = Math.max(0, Math.min(x.riduzione, x.residuo));
+    const nuovoResiduo = x.residuo - riduzione;
+    return { id: x.id, riduzioneCentesimi: riduzione, nuovoResiduoCentesimi: nuovoResiduo, azzerata: nuovoResiduo === 0 };
+  });
+}
+
+/**
  * Guard di Immutabilità Fiscale:
  * Blocca tentativi di modifica su fatture già emesse o trasmesse.
  */
