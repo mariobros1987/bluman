@@ -67,6 +67,27 @@ della Dashboard scrive le sue righe.
 STATO ATTUALE:
 Abbiamo completato l'autenticazione JWT RBAC, il Portale Cliente con Firma Elettronica Semplice (OTP verificata · art. 20 CAD; 6 Tab con Profilo & Sicurezza Password, e selezione dinamica dei progetti con moduli/micro-voci attivi aggiornati in tempo reale), l'Anagrafica ERP Clienti con modale progetti attivi integrato, la Fatturazione/NC con tracciato XML SDI, il Connettore SDI 1-Click, il Document Studio Word-like con Smart Tags, il Grafo Dipendenze Moduli nel progetto, il Calendario Condiviso con Scadenzario Attività Studio (/calendar), il Cron Worker Scadenze UBO/Marchi ed il Cambio Password Obbligatorio al Primo Accesso per tutti gli utenti dello studio e clienti con reset rapido da parte del Super Admin e Lead Advisor.
 
+Completato il 22 Settembre 2026 (audit approfondito: chiusura ciclo NC/annullata + workflow):
+- **Ciclo Nota di Credito / fattura annullata (A) — CHIUSO.** Stato terminale `stornata` per le
+  rate travolte da una NC (enum `StatoScadenzaIncasso` + migrazione additiva
+  `20260922160000_scadenza_stornata`), guardia 409 sull'incasso di una rata stornata, e **Note di
+  Credito PARZIALI per riga**: i totali NC si ricalcolano dalle righe scelte con
+  `calcolaTotaliFattura`, la fattura resta `emessa` se lo storno non copre tutto e le rate aperte
+  calano in proporzione (`ripartisciStornoScadenze`, funzione pura testata). Frontend: modale NC
+  con selezione righe. **Deployato** il 22/09.
+- **W3** — l'avviso «documento da firmare» esce anche via **email/WhatsApp** (best-effort,
+  `avvisaClienteViaCanali`), non più solo in-app: non blocca la pubblicazione e non dichiara
+  inviato ciò che non parte (regola 7).
+- **W2** — il cron giornaliero segnala le **fatture emesse ma mai trasmesse allo SdI**
+  (`statoSdi = 'n_a'` da oltre 3 giorni) allo studio.
+- **W4** — **solleciti con storia ed escalation stretta**: nuovo modello `Sollecito` (migrazione
+  `20260922170000_solleciti_storia`, con la sua policy RLS dentro la migrazione) e la regola pura
+  `puoInviareSollecito` — la diffida legale non può più essere il primo contatto.
+Verifiche: `npx tsc --noEmit` in radice e `npm run typecheck` in `frontend/` verdi, `npx vitest run`
+**98 file / 1250 test** verdi. ⚠️ **W2/W3/W4 sono committati ma NON ancora deployati** (il deploy
+applicherà `20260922170000_solleciti_storia`). Restano aperti: **W1** (SDI scartata — ritrasmissione
++ NC/riemissione, scelta «entrambe») e la validazione manuale delle NC parziali in produzione.
+
 Completato il 16-17 settembre 2026 (il cliente aggancia la sua chat a una pratica):
 - **Il link per progetto** — `t.me/<Bot>?start=<payload>`. Chiude il caso che l'euristica a due
   cancelli non sapeva risolvere: un cliente con **due pratiche aperte** non aveva modo di dire a
