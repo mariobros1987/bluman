@@ -253,6 +253,7 @@ model Cliente {
   movimentiPrimaNota MovimentoPrimaNota[]
   collegamentiChat CollegamentoChatProgetto[]
   eventiCalendario EventoCalendario[]        @relation("EventiCliente")
+  fascicoliKyc     FascicoloKyc[]
 
   @@index([tenantId, createdAt(sort: Desc)])
   @@index([tenantId, nome])
@@ -1814,3 +1815,128 @@ model OraTimesheet {
 //      applicativa, non un vincolo SQL — va implementata nel service layer
 //      prima dell'INSERT (percorso DFS sul grafo esistente + candidato).
 // ─────────────────────────────────────────────────────────────────
+
+// ═══════════════════════════════════════════════════════════════════
+// MODULO KYC/AML §5.5 — Fase 5.5.1 (modello dati). Spec: bluman-kyc-aml-spec-tecnica.md
+// FascicoloKyc e la fonte di verita del processo; i campi legacy su Cliente (rischioAml,
+// ubo, dataKyc, fontePatrimonio) restano come proiezione di sola lettura (decisione titolare).
+// Chiavi @default(uuid()) come tutto lo schema (non cuid come nella bozza della spec).
+// ═══════════════════════════════════════════════════════════════════
+
+enum StatoKyc {
+  bozza
+  in_attesa_revisione
+  approvato
+  respinto
+  scaduto
+}
+
+enum LivelloVerifica {
+  semplificata
+  ordinaria
+  rafforzata
+}
+
+enum LivelloRischio {
+  basso
+  medio
+  alto
+}
+
+enum FonteUbo {
+  registro_camerale
+  autodichiarazione
+}
+
+enum TipoDocumentoKyc {
+  documento_identita
+  documento_ubo
+  visura_camerale
+  autodichiarazione_fondi
+  esito_screening_pep
+  esito_screening_liste
+  altro
+}
+
+model FascicoloKyc {
+  id               String          @id @default(uuid())
+  tenantId         String          @map("tenant_id")
+  clienteId        String          @map("cliente_id")
+  cliente          Cliente         @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+
+  stato            StatoKyc        @default(bozza)
+  livelloVerifica  LivelloVerifica @default(ordinaria) @map("livello_verifica")
+  rischioCalcolato LivelloRischio  @default(basso) @map("rischio_calcolato")
+  punteggioRischio Int             @default(0) @map("punteggio_rischio")
+
+  pep              Boolean         @default(false)
+  paeseRischio     String?         @map("paese_rischio")
+  paeseResidenza   String?         @map("paese_residenza")
+
+  fonteVerificaUbo FonteUbo        @default(autodichiarazione) @map("fonte_verifica_ubo")
+  uboVerificatoIl  DateTime?       @map("ubo_verificato_il")
+
+  dataVerifica     DateTime?       @map("data_verifica")
+  dataScadenza     DateTime?       @map("data_scadenza")
+  approvatoDa      String?         @map("approvato_da")
+  approvatoIl      DateTime?       @map("approvato_il")
+  noteCompliance   String?         @map("note_compliance")
+
+  soglieOperazione Decimal?        @map("soglie_operazione")
+
+  createdAt        DateTime        @default(now()) @map("created_at")
+  updatedAt        DateTime        @updatedAt @map("updated_at")
+
+  documenti        DocumentoKyc[]
+  storico          StoricoFascicoloKyc[]
+  overrideLog      OverrideKyc[]
+
+  @@index([tenantId, clienteId])
+  @@index([tenantId, stato, dataScadenza])
+  @@map("fascicolo_kyc")
+}
+
+model StoricoFascicoloKyc {
+  id              String       @id @default(uuid())
+  tenantId        String       @map("tenant_id")
+  fascicoloId     String       @map("fascicolo_id")
+  fascicolo       FascicoloKyc @relation(fields: [fascicoloId], references: [id], onDelete: Cascade)
+  statoPrecedente StatoKyc?    @map("stato_precedente")
+  statoNuovo      StatoKyc     @map("stato_nuovo")
+  attoreUserId    String       @map("attore_user_id")
+  motivazione     String?
+  createdAt       DateTime     @default(now()) @map("created_at")
+
+  @@index([tenantId, fascicoloId])
+  @@map("storico_fascicolo_kyc")
+}
+
+model OverrideKyc {
+  id              String       @id @default(uuid())
+  tenantId        String       @map("tenant_id")
+  fascicoloId     String       @map("fascicolo_id")
+  fascicolo       FascicoloKyc @relation(fields: [fascicoloId], references: [id], onDelete: Cascade)
+  attoreUserId    String       @map("attore_user_id")
+  azioneSbloccata String       @map("azione_sbloccata")
+  motivazione     String
+  createdAt       DateTime     @default(now()) @map("created_at")
+
+  @@index([tenantId, fascicoloId])
+  @@map("override_kyc")
+}
+
+model DocumentoKyc {
+  id          String           @id @default(uuid())
+  tenantId    String           @map("tenant_id")
+  fascicoloId String           @map("fascicolo_id")
+  fascicolo   FascicoloKyc     @relation(fields: [fascicoloId], references: [id], onDelete: Cascade)
+  tipo        TipoDocumentoKyc
+  fonte       FonteUbo         @default(autodichiarazione)
+  urlStorage  String           @map("url_storage")
+  hashSha256  String?          @map("hash_sha256")
+  caricatoDa  String           @map("caricato_da")
+  createdAt   DateTime         @default(now()) @map("created_at")
+
+  @@index([tenantId, fascicoloId])
+  @@map("documento_kyc")
+}
