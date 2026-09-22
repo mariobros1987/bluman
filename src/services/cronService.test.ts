@@ -4,12 +4,14 @@ const {
   mockClienteFindMany,
   mockScadenzaFindMany,
   mockNotificaFindMany,
+  mockFatturaFindMany,
   mockNotificaStudio,
   mockRecordAudit,
 } = vi.hoisted(() => ({
   mockClienteFindMany: vi.fn(),
   mockScadenzaFindMany: vi.fn(),
   mockNotificaFindMany: vi.fn(),
+  mockFatturaFindMany: vi.fn(),
   mockNotificaStudio: vi.fn(),
   mockRecordAudit: vi.fn(),
 }));
@@ -20,6 +22,8 @@ vi.mock('../util/prismaClient.js', () => ({
     scadenzaIncasso: { findMany: mockScadenzaFindMany },
     // Il cron carica UNA volta i corpi già notificati (niente più findFirst per riga).
     notifica: { findMany: mockNotificaFindMany },
+    // W2: le fatture emesse ma mai trasmesse allo SdI (statoSdi n_a da >3 giorni).
+    fattura: { findMany: mockFatturaFindMany },
   },
 }));
 
@@ -39,6 +43,7 @@ describe('runDailyNotificationCron', () => {
     mockClienteFindMany.mockResolvedValue([]);
     mockScadenzaFindMany.mockResolvedValue([]);
     mockNotificaFindMany.mockResolvedValue([]);
+    mockFatturaFindMany.mockResolvedValue([]);
     mockRecordAudit.mockResolvedValue(undefined);
   });
 
@@ -87,6 +92,19 @@ describe('runDailyNotificationCron', () => {
       where: { tenantId: 'tenant-2', stato: 'in_attesa' },
     }));
     expect(mockRecordAudit).toHaveBeenCalledWith(expect.objectContaining({ tenantId: 'tenant-2' }));
+  });
+
+  it('W2 — segnala una fattura emessa da oltre 3 giorni e mai trasmessa allo SdI', async () => {
+    mockFatturaFindMany.mockResolvedValueOnce([
+      { id: 'ft-non-trasmessa-0001', numero: 'FT-2026/010', data: new Date('2026-01-01'), cliente: { nome: 'Studio Rossi' } },
+    ]);
+    mockNotificaStudio.mockResolvedValue(1);
+    const report = await runDailyNotificationCron('tenant-1');
+    expect(mockNotificaStudio).toHaveBeenCalledWith(
+      'tenant-1',
+      expect.objectContaining({ oggetto: 'Fattura non trasmessa allo SdI' }),
+    );
+    expect(report.dettagli.some((d) => d.includes('non risulta ancora trasmessa'))).toBe(true);
   });
 });
 

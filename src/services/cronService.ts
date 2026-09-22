@@ -113,6 +113,31 @@ export async function runDailyNotificationCron(tenantId?: string): Promise<CronR
     }
   }
 
+  // 3. Fatture emesse ma mai trasmesse a SdI (W2 audit): passavano inosservate finché
+  //    nessuno se ne accorgeva. Emessa da più di GIORNI_SDI_NON_TRASMESSA con statoSdi ancora
+  //    `n_a` sul canale SdI. La consegna vera la dichiara il webhook (statoSdi consegnata/…).
+  const GIORNI_SDI_NON_TRASMESSA = 3;
+  const sogliaSdi = new Date(adesso.getTime() - GIORNI_SDI_NON_TRASMESSA * 24 * 60 * 60 * 1000);
+  const fattureNonTrasmesse = await prisma.fattura.findMany({
+    where: { tenantId, stato: 'emessa', canale: 'sdi', statoSdi: 'n_a', data: { lt: sogliaSdi } },
+    include: { cliente: true },
+  });
+  for (const f of fattureNonTrasmesse) {
+    const clNome = f.cliente?.nome || 'Cliente';
+    const quando = f.data ? new Date(f.data).toLocaleDateString('it-IT') : 'N/D';
+    const corpo = `[SDI] Fattura ${f.numero || f.id.slice(0, 8)} (${clNome}) emessa il ${quando} non risulta ancora trasmessa allo SdI.`;
+    report.dettagli.push(corpo);
+    if (!giaNotificati.has(corpo)) {
+      giaNotificati.add(corpo);
+      report.notificheInviate += await notificaStudioSilenziosa(tenantId, {
+        tipoEvento: 'scadenza_imminente',
+        oggetto: 'Fattura non trasmessa allo SdI',
+        corpo,
+        link: '/invoices',
+      });
+    }
+  }
+
   // L'audit resta accessorio: recordAudit traccia autonomamente eventuali errori.
   await recordAudit({
     tenantId,
