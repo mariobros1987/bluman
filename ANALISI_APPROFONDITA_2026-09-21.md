@@ -86,11 +86,11 @@ Tutti fix meccanici (`color:'#fff'` → token tematizzato):
 - ✅ **Race condition + JSON.parse non protetto** in `ClientsPage.tsx`. → **RISOLTO**: guardia `annullato` (208-213) e `JSON.parse` in try/catch (254-259).
 - ✅ **Mapping email→tenant hardcoded verso tenant ELIMINATI (002/003)** — `tenant.ts:100-110`. → **RISOLTO**: euristica rimossa (`tenant.ts:100-101`, tenant mock eliminati il 20/09).
 
-### Workflow / procedure — ✅ W2/W3/W4 fatti (22/09) · ⏳ W1 + KYC gate (§5.5) aperti
-- ⏳ **SDI "scartata" è un vicolo cieco** — `contabilitaWebhookSdi.ts:60-62`: nessun percorso per correggere e ritrasmettere (per legge entro 5 gg). → **APERTO → PROSSIMO** (scelta «(c) entrambe»: ritrasmissione stesso doc + NC/riemissione).
+### Workflow / procedure — ✅ W1-W4 fatti (22-23/09) · ⏳ KYC gate = §5.5 (fondazione 5.5.1 fatta)
+- ✅ **SDI "scartata" è un vicolo cieco** (W1) — `contabilitaWebhookSdi.ts:60-62`. → **RISOLTO** (22-23/09, `7da5311`): il webhook salva il motivo in `esitoSdiDettagli`, `POST /invoices/:id/ripresenta-sdi` riapre lo scarto tecnico, la UI guida tecnico→ripresenta / contenuto→NC+riemetti.
 - ✅ **`statoSdi` non tracciato dopo l'emissione** (W2): fatture emesse ma mai trasmesse passavano inosservate. → **RISOLTO** (22/09, `ca23af9`): il cron segnala le fatture `emessa` con `statoSdi='n_a'` da oltre 3 giorni.
 - ✅ **Notifiche "documento da firmare" solo in-app** (W3): il cliente che non apriva il portale non sapeva di dover firmare. → **RISOLTO** (22/09, `251aa0c`): fallback best-effort email/WhatsApp (`avvisaClienteViaCanali`).
-- ⏳ **KYC/AML è solo un campo passivo**: nessun gate su KYC scaduto o `rischioAml='alto'`. → **APERTO → PIANIFICATO**: è il modulo **§5.5** di `PIANO_DI_MIGLIORAMENTO.md` (spec `bluman-kyc-aml-spec-tecnica.md`) che lo trasforma in processo governato con gate.
+- 🟡 **KYC/AML è solo un campo passivo**: nessun gate su KYC scaduto o `rischioAml='alto'`. → **FONDAZIONE FATTA** (22-23/09, §5.5.1): modello `FascicoloKyc` + motore di rischio puro + stati + badge in anagrafica + backfill. ⏳ restano le fasi successive del modulo §5.5 (integrazioni esterne, portale cliente, dashboard e **gate operativo** bloccante).
 - ✅ **Solleciti senza macchina a stati né storia** (W4): si poteva inviare una diffida come primo contatto. → **RISOLTO** (22/09, `f162389`): modello `Sollecito` (storia) + escalation stretta `puoInviareSollecito`.
 
 ### Accessibilità (sistemica) — ✅ Fasi 1-2 fatte · 🟡 label form da completare

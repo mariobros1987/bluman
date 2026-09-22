@@ -1431,9 +1431,11 @@ con modello Prisma, criteri di accettazione e punti aperti).
 
 **Scaletta di rilascio** (dettaglio nella spec §8):
 
-- [ ] **5.5.1 Motore + stati** — modello dati (`FascicoloKyc`, `StoricoFascicoloKyc`, `OverrideKyc`,
+- [x] **5.5.1 Motore + stati** — modello dati (`FascicoloKyc`, `StoricoFascicoloKyc`, `OverrideKyc`,
   `DocumentoKyc` + enum), motore di rischio a regole statiche (`livelloVerifica` calcolato, non
   scelto dall'operatore), badge stato in `AnagraficaErpModal`. Nessun blocco: prima si misura.
+  → **FATTO 22-23/09**: schema+migrazione+RLS, `src/domain/kycEngine.ts` (puro, 9 test), rotte
+  `src/routes/kyc.ts`, badge in anagrafica, script `backfillKyc.ts` (dry-run). Non ancora deployato.
 - [ ] **5.5.2 Integrazioni dati** — API Registro Imprese/visura (UBO precompilato), screening
   PEP/liste sanzionatorie automatico. Interfaccia comune `ProviderVerificaEsterna` disaccoppiata.
   Prioritaria: è ciò che abbatte di più il lavoro manuale.

@@ -88,6 +88,21 @@ Verifiche: `npx tsc --noEmit` in radice e `npm run typecheck` in `frontend/` ver
 applicherà `20260922170000_solleciti_storia`). Restano aperti: **W1** (SDI scartata — ritrasmissione
 + NC/riemissione, scelta «entrambe») e la validazione manuale delle NC parziali in produzione.
 
+Completato in nottata 22→23 Settembre 2026 (run autonomo, carta bianca):
+- **W1 — SDI scartata** (scelta «entrambe»): il webhook salva il motivo dello scarto in
+  `esitoSdiDettagli`; `POST /invoices/:id/ripresenta-sdi` riapre lo scarto TECNICO (statoSdi→`n_a`);
+  per lo scarto di CONTENUTO la via è NC (anche parziale) + riemissione; il frontend guida la scelta.
+- **KYC/AML §5.5 — Fase 5.5.1 completa** (modello + motore + stati + badge): modello dati
+  `FascicoloKyc`/`StoricoFascicoloKyc`/`OverrideKyc`/`DocumentoKyc` (migrazione
+  `20260922180000_kyc_fase1_modello_dati`, con RLS su tutte e 4 le tabelle); motore di rischio puro
+  `src/domain/kycEngine.ts` (albero §4.1, scadenze 24/12/6); rotte `src/routes/kyc.ts` (crea/rinnova
+  col motore, transizioni di stato, ruolo `cliente` escluso) + prefisso `kyc` in nginx; badge in
+  anagrafica (scheda Compliance); script `src/scripts/backfillKyc.ts` (dry-run) per i clienti esistenti.
+Verifiche: `tsc` + typecheck frontend verdi, `vitest` 99 file / 1259 test verdi (incl. 9 test del
+motore KYC). ⚠️ **W1 + KYC 5.5.1 committati, deploy della batch da eseguire** (applica
+`20260922180000_kyc_fase1_modello_dati`). Restano le fasi KYC successive (5.5.2 integrazioni esterne,
+5.5.3 portale, 5.5.4 dashboard + gate operativo, 5.5.5 automazioni) e i minori aperti dell'analisi.
+
 Completato il 16-17 settembre 2026 (il cliente aggancia la sua chat a una pratica):
 - **Il link per progetto** — `t.me/<Bot>?start=<payload>`. Chiude il caso che l'euristica a due
   cancelli non sapeva risolvere: un cliente con **due pratiche aperte** non aveva modo di dire a
