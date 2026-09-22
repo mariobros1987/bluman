@@ -10,6 +10,7 @@ import { NuovoArticoloModal } from '../components/library/NuovoArticoloModal';
 import { CreaModuloForm } from '../components/library/CreaModuloForm';
 import { AssegnaModuloClienteModal } from '../components/library/AssegnaModuloClienteModal';
 import { useToast } from '../components/ui/ToastProvider';
+import { confirm } from '../components/ui/ConfirmProvider';
 
 type SubTab = 'grafo' | 'articoli' | 'giurisdizioni' | 'crea_modulo' | 'doc_form';
 
@@ -29,10 +30,12 @@ export function Library() {
   // ModuloProgetto/Preventivo restano validi, il modulo sparisce solo dalla libreria.
   // Aggiorno lo stato locale solo DOPO la conferma del server (§3.3).
   const handleDisattivaModulo = async (m: ModuloTemplate) => {
-    const conferma = window.confirm(
-      `Disattivare il modulo template «${m.n}»?\n` +
-      'Il modulo sparirà dalla libreria, ma i progetti e i preventivi già creati continueranno a funzionare.'
-    );
+    const conferma = await confirm({
+      titolo: `Disattivare il modulo template «${m.n}»?`,
+      messaggio: 'Il modulo sparirà dalla libreria, ma i progetti e i preventivi già creati continueranno a funzionare.',
+      confermaLabel: 'Disattiva',
+      pericolo: true,
+    });
     if (!conferma) return;
     try {
       await disattivaModuloTemplateApi(m.id);
@@ -43,10 +46,12 @@ export function Library() {
   };
 
   const handleDisattivaArticolo = async (id: string, nome: string) => {
-    const conferma = window.confirm(
-      `Disattivare l'articolo «${nome}»?\n` +
-      'Sparirà dal catalogo, ma le distinte base e i progetti che già lo usano restano validi.'
-    );
+    const conferma = await confirm({
+      titolo: `Disattivare l'articolo «${nome}»?`,
+      messaggio: 'Sparirà dal catalogo, ma le distinte base e i progetti che già lo usano restano validi.',
+      confermaLabel: 'Disattiva',
+      pericolo: true,
+    });
     if (!conferma) return;
     try {
       await disattivaArticoloApi(id);

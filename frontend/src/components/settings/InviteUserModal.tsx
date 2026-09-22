@@ -1,4 +1,5 @@
 import React from 'react';
+import { Modal } from '../ui/Modal';
 
 interface InviteUserModalProps {
   handleAddUser: (e: React.FormEvent) => void;
@@ -29,9 +30,10 @@ export function InviteUserModal({
   submittingUser,
 }: InviteUserModalProps) {
   return (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 16 }}>
+        <Modal onClose={() => setModalUserOpen(false)} zIndex={100} labelledBy="invite-user-titolo">
+          {(richiediChiusura) => (
           <form onSubmit={handleAddUser} style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, padding: 22, width: '100%', maxWidth: 480, display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div style={{ fontSize: 16, fontWeight: 700 }}>+ Invita Nuovo Collaboratore Studio</div>
+            <div id="invite-user-titolo" style={{ fontSize: 16, fontWeight: 700 }}>+ Invita Nuovo Collaboratore Studio</div>
             <div style={{ fontSize: 11, color: 'var(--muted)' }}>Crea un utente operatore o professionista esterno (Avvocato, Commercialista, Back Office).</div>
 
             <div>
@@ -59,12 +61,13 @@ export function InviteUserModal({
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
-              <button type="button" onClick={() => setModalUserOpen(false)} style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '7px 14px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}>Annulla</button>
+              <button type="button" onClick={richiediChiusura} style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '7px 14px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}>Annulla</button>
               <button type="submit" disabled={submittingUser} style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '7px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
                 {submittingUser ? 'Creazione in corso...' : '✓ Invita Collaboratore'}
               </button>
             </div>
           </form>
-        </div>
+          )}
+        </Modal>
   );
 }

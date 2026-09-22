@@ -5,6 +5,7 @@ import { getTenantStorageKey } from '../../utils/tenant';
 import { fetchClienti, fetchProgetti, creaProgettoApi, salvaProgettoDettaglioApi } from '../../api/client';
 import type { Articolo, ModuloTemplate } from '../../types';
 import { useToast } from '../ui/ToastProvider';
+import { Modal } from '../ui/Modal';
 
 // ─── Modal Assegna Modulo a Cliente con Anti-Duplicazione ─────────
 export function AssegnaModuloClienteModal({
@@ -168,9 +169,10 @@ export function AssegnaModuloClienteModal({
   const hasDuplicates = duplicationReport.some(d => d.isDuplicate);
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 120, padding: 16 }}>
+    <Modal onClose={onClose} overlayBackground="rgba(0,0,0,.8)" zIndex={120} labelledBy="assegna-modulo-titolo">
+      {(richiediChiusura) => (
       <form onSubmit={handleAssignSubmit} style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, padding: 22, width: '100%', maxWidth: 520, display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--indigo-l)' }}>🚀 Assegna Modulo "{modulo.n}" a Cliente</div>
+        <div id="assegna-modulo-titolo" style={{ fontSize: 16, fontWeight: 700, color: 'var(--indigo-l)' }}>🚀 Assegna Modulo "{modulo.n}" a Cliente</div>
         <div style={{ fontSize: 11, color: 'var(--muted)' }}>Seleziona il cliente ed il progetto in cui istanziare il modulo ed il relativo workflow.</div>
 
         <div>
@@ -234,12 +236,13 @@ export function AssegnaModuloClienteModal({
         )}
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
-          <button type="button" onClick={onClose} style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '7px 14px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}>Annulla</button>
+          <button type="button" onClick={richiediChiusura} style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '7px 14px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}>Annulla</button>
           <button type="submit" disabled={loading} style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '7px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
             {loading ? 'Assegnazione in corso...' : '✓ Conferma ed Assegna a Cliente ➔'}
           </button>
         </div>
       </form>
-    </div>
+      )}
+    </Modal>
   );
 }

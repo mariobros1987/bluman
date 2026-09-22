@@ -11,6 +11,7 @@
 import { useState } from 'react';
 import type { DocumentTemplate } from '../../utils/documentTemplates';
 import type { EsitoGesto } from '../../hooks/useCartellaTemplate';
+import { Modal } from '../ui/Modal';
 
 type Stato = 'bozza' | 'in_revisione' | 'approvato';
 
@@ -56,10 +57,11 @@ export function ModaleRevisioneModello({ modello, onSalva, onChiudi }: Props) {
   };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 16 }}>
+    <Modal onClose={onChiudi} zIndex={200} labelledBy="revisione-modello-titolo">
+      {(richiediChiusura) => (
       <div style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, padding: 22, width: '100%', maxWidth: 520, display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div>
-          <div style={{ fontSize: 16, fontWeight: 700 }}>🔎 Revisione del modello</div>
+          <div id="revisione-modello-titolo" style={{ fontSize: 16, fontWeight: 700 }}>🔎 Revisione del modello</div>
           <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>{modello.titolo}</div>
         </div>
 
@@ -111,7 +113,7 @@ export function ModaleRevisioneModello({ modello, onSalva, onChiudi }: Props) {
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
           <button
             type="button"
-            onClick={onChiudi}
+            onClick={richiediChiusura}
             disabled={salvataggio}
             style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '8px 14px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}
           >
@@ -127,6 +129,7 @@ export function ModaleRevisioneModello({ modello, onSalva, onChiudi }: Props) {
           </button>
         </div>
       </div>
-    </div>
+      )}
+    </Modal>
   );
 }

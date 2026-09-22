@@ -15,6 +15,7 @@
 import { useEffect, useState } from 'react';
 import { collegaDocumentoApi } from '../../api/client';
 import { useMicrovociProgetto } from '../../hooks/useMicrovociProgetto';
+import { Modal } from '../ui/Modal';
 
 export interface ProgettoScelta {
   id: string;
@@ -82,15 +83,12 @@ export function ModaleCollegaDocumento({ documento, progetti, progettoBloccato =
   };
 
   return (
-    <div
-      onClick={onChiudi}
-      style={{ position: 'fixed', inset: 0, background: 'rgba(2,6,23,0.72)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}
-    >
+    <Modal onClose={onChiudi} overlayBackground="rgba(2,6,23,0.72)" zIndex={1000} labelledBy="collega-doc-titolo">
+      {(richiediChiusura) => (
       <div
-        onClick={(e) => e.stopPropagation()}
         style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 14, padding: '1.5rem', width: 'min(560px, 100%)', maxHeight: '90vh', overflowY: 'auto' }}
       >
-        <h3 style={{ margin: 0, fontSize: 16 }}>🔗 Collega il documento a una cartella</h3>
+        <h3 id="collega-doc-titolo" style={{ margin: 0, fontSize: 16 }}>🔗 Collega il documento a una cartella</h3>
         <p style={{ color: 'var(--muted)', fontSize: 12.5, margin: '6px 0 1.25rem 0', wordBreak: 'break-all' }}>{documento.nome}</p>
 
         <label style={{ display: 'block', fontSize: 12, color: 'var(--muted)', marginBottom: 6 }}>Progetto</label>
@@ -152,7 +150,7 @@ export function ModaleCollegaDocumento({ documento, progetti, progettoBloccato =
 
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: '1.5rem' }}>
           <button
-            onClick={onChiudi}
+            onClick={richiediChiusura}
             disabled={salvataggio}
             style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--text)', padding: '9px 16px', borderRadius: 8, cursor: 'pointer', fontSize: 12.5 }}
           >
@@ -167,6 +165,7 @@ export function ModaleCollegaDocumento({ documento, progetti, progettoBloccato =
           </button>
         </div>
       </div>
-    </div>
+      )}
+    </Modal>
   );
 }

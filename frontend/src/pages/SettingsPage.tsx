@@ -5,6 +5,7 @@ import { getCurrentTenantId, getTenantStorageKey, getStudioInfoForTenant, saveTe
 import { UserProfileModal } from '../components/UserProfileModal';
 import { OperatorDetailModal } from '../components/settings/OperatorDetailModal';
 import { useToast } from '../components/ui/ToastProvider';
+import { confirm } from '../components/ui/ConfirmProvider';
 import { TabCompany } from '../components/settings/TabCompany';
 import { TabInvoiceDesign } from '../components/settings/TabInvoiceDesign';
 import { InvoicePreviewModal } from '../components/settings/InvoicePreviewModal';
@@ -456,11 +457,14 @@ export function SettingsPage() {
    * colleghi il fatto al pulsante premuto.
    */
   const handleRigeneraSlugWhatsapp = async () => {
-    const conferma = window.confirm(
-      'Rigenerare il path di callback WhatsApp?\n\n' +
-      'I messaggi dei clienti NON verranno più ricevuti finché non aggiorni la Callback URL ' +
-      'nella dashboard Meta con il nuovo indirizzo. L\'operazione non si annulla.',
-    );
+    const conferma = await confirm({
+      titolo: 'Rigenerare il path di callback WhatsApp?',
+      messaggio:
+        'I messaggi dei clienti NON verranno più ricevuti finché non aggiorni la Callback URL ' +
+        'nella dashboard Meta con il nuovo indirizzo. L\'operazione non si annulla.',
+      confermaLabel: 'Rigenera',
+      pericolo: true,
+    });
     if (!conferma) return;
 
     setRigenerandoSlug(true);

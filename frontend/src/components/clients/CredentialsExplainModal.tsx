@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { sendEmailDirectApi, sendWhatsAppDirectApi } from '../../api/client';
 import type { Cliente } from '../../types';
 import { useToast } from '../ui/ToastProvider';
+import { Modal } from '../ui/Modal';
 
 // ─── Modal Credenziali Portale Cliente (Email + Password) ─────────
 export function CredentialsExplainModal({
@@ -123,18 +124,18 @@ Password: ${data.passwordChiaro}`;
   };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 16 }}>
+    <Modal onClose={onClose} zIndex={100} dirty={false} labelledBy="credenziali-portale-titolo">
       <div style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, padding: 24, width: '100%', maxWidth: 540, display: 'flex', flexDirection: 'column', gap: 16, boxShadow: '0 20px 50px rgba(0,0,0,.5)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
-            <div style={{ fontSize: 16, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div id="credenziali-portale-titolo" style={{ fontSize: 16, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
               <span>🔑</span> Credenziali Portale Cliente
             </div>
             <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 2 }}>
               Accesso riservato per: <strong style={{ color: 'var(--text)' }}>{data.cliente.nome}</strong>
             </div>
           </div>
-          <button onClick={onClose} style={{ background: 'var(--card2)', border: 'none', width: 28, height: 28, borderRadius: 6, color: 'var(--muted)', cursor: 'pointer' }}>✕</button>
+          <button onClick={onClose} aria-label="Chiudi" style={{ background: 'var(--card2)', border: 'none', width: 28, height: 28, borderRadius: 6, color: 'var(--muted)', cursor: 'pointer' }}>✕</button>
         </div>
 
         {/* Status Invio Email */}
@@ -249,6 +250,6 @@ Password: ${data.passwordChiaro}`;
           </button>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }

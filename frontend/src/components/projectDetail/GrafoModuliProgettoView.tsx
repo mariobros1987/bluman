@@ -5,6 +5,7 @@ import { fmt } from '../../utils';
 import { fetchModuliLibreria, fetchArticoli } from '../../api/client';
 import type { Progetto } from '../../types';
 import { useToast } from '../ui/ToastProvider';
+import { Modal } from '../ui/Modal';
 
 // ─── Componente Grafo & Dipendenze Moduli del Progetto ────────────
 export function GrafoModuliProgettoView({
@@ -222,9 +223,10 @@ export function GrafoModuliProgettoView({
 
       {/* Modal Aggiungi Modulo da Libreria */}
       {addModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 16 }}>
+        <Modal onClose={() => setAddModalOpen(false)} labelledBy="titolo-aggiungi-modulo" zIndex={100}>
+          {(richiediChiusura) => (
           <form onSubmit={handleAddModuleSubmit} style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, padding: 22, width: '100%', maxWidth: 480, display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div style={{ fontSize: 16, fontWeight: 700 }}>+ Aggiungi Modulo da Libreria al Progetto</div>
+            <div id="titolo-aggiungi-modulo" style={{ fontSize: 16, fontWeight: 700 }}>+ Aggiungi Modulo da Libreria al Progetto</div>
             <div style={{ fontSize: 11, color: 'var(--muted)' }}>Seleziona una prestazione o modulo aggiuntivo dal catalogo della libreria da associare al cliente</div>
 
             {erroreLibreria && (
@@ -250,11 +252,12 @@ export function GrafoModuliProgettoView({
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
-              <button type="button" onClick={() => setAddModalOpen(false)} style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '7px 14px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}>Annulla</button>
+              <button type="button" onClick={richiediChiusura} style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '7px 14px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}>Annulla</button>
               <button type="submit" disabled={!selectedTemplate} style={{ background: selectedTemplate ? 'var(--indigo)' : 'var(--card2)', color: selectedTemplate ? 'var(--on-accent)' : 'var(--hint)', border: 'none', padding: '7px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: selectedTemplate ? 'pointer' : 'not-allowed' }}>✓ Aggiungi al Progetto</button>
             </div>
           </form>
-        </div>
+          )}
+        </Modal>
       )}
     </div>
   );

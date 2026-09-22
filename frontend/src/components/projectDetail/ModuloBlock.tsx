@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Badge } from '../ui/Badge';
 import { CatBadge } from '../ui/CatBadge';
 import { ProgressBar } from '../ui/ProgressBar';
+import { Modal } from '../ui/Modal';
 import { AvatarGroup, Avatar } from '../ui/Avatar';
 import { fmt } from '../../utils';
 import { consuntivaMicrovoceApi } from '../../api/client';
@@ -252,9 +253,10 @@ export function ModuloBlock({ mod, open, onToggle, onOpenProc, rawDbModulo, onRe
 
       {/* Modal Consuntivazione Ore */}
       {consuntivaMv && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 16 }}>
+        <Modal onClose={() => setConsuntivaMv(null)} labelledBy="titolo-consuntiva-ore" zIndex={100}>
+          {(richiediChiusura) => (
           <form onSubmit={handleConsuntivaSubmit} style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, padding: 20, width: '100%', maxWidth: 420, display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div style={{ fontSize: 14, fontWeight: 600 }}>Registra Ore Consuntivate</div>
+            <div id="titolo-consuntiva-ore" style={{ fontSize: 14, fontWeight: 600 }}>Registra Ore Consuntivate</div>
             <div style={{ fontSize: 12, color: 'var(--indigo-l)' }}>{consuntivaMv.nome}</div>
 
             <div>
@@ -270,11 +272,12 @@ export function ModuloBlock({ mod, open, onToggle, onOpenProc, rawDbModulo, onRe
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
-              <button type="button" onClick={() => setConsuntivaMv(null)} style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '7px 14px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}>Annulla</button>
+              <button type="button" onClick={richiediChiusura} style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '7px 14px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}>Annulla</button>
               <button type="submit" disabled={submitting} style={{ background: 'var(--indigo)', color: 'var(--on-accent)', border: 'none', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>{submitting ? 'Salvataggio...' : '✓ Salva Modifiche'}</button>
             </div>
           </form>
-        </div>
+          )}
+        </Modal>
       )}
     </div>
   );

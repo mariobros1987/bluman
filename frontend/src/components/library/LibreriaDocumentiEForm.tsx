@@ -10,6 +10,7 @@ import { uploadFileApi, fetchClienti, fetchProgetti } from '../../api/client';
 // questo browser, e un modello archiviato dal titolare restava attivo per tutti gli altri.
 import { useCartellaTemplate } from '../../hooks/useCartellaTemplate';
 import { useToast } from '../ui/ToastProvider';
+import { confirm } from '../ui/ConfirmProvider';
 
 // ─── Componente Libreria Documenti in Bianco & Form Master ────────
 export function LibreriaDocumentiEForm() {
@@ -96,7 +97,7 @@ export function LibreriaDocumentiEForm() {
       toast.attenzione(`Il modello "${nome}" non è più in elenco: ricarica la libreria.`);
       return;
     }
-    if (!confirm(`Sei sicuro di voler eliminare definitivamente il modello master "${nome}"?\n\nI documenti già firmati o salvati nei progetti del cliente rimarranno comunque congelati e perfettamente integri.`)) return;
+    if (!(await confirm({ titolo: `Eliminare definitivamente il modello master "${nome}"?`, messaggio: 'I documenti già firmati o salvati nei progetti del cliente rimarranno comunque congelati e perfettamente integri.', confermaLabel: 'Elimina', pericolo: true }))) return;
     // §3.3 / §41 — prima il server, poi l'elenco: il modello sparisce dalla libreria solo a
     // eliminazione confermata. Prima si cancellava in locale e il `catch {}` vuoto annunciava
     // comunque «eliminato», con il modello che riappariva al reload.
@@ -539,8 +540,8 @@ export function LibreriaDocumentiEForm() {
                   <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--indigo-l)' }}>📋 {f.nome}</div>
                   <button
                     type="button"
-                    onClick={() => {
-                      if (confirm(`Eliminare il Form Master "${f.nome}"?`)) {
+                    onClick={async () => {
+                      if (await confirm({ messaggio: `Eliminare il Form Master "${f.nome}"?`, confermaLabel: 'Elimina', pericolo: true })) {
                         setFormMasters(formMasters.filter(x => x.id !== f.id));
                       }
                     }}

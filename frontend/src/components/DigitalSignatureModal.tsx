@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import type { SignatureData } from '../utils/pdfGenerator';
 import { SmoothStrokeTracker, getCanvasCoordinates } from '../utils/smoothSignature';
+import { Modal } from './ui/Modal';
 
 interface DigitalSignatureModalProps {
   documentTitle: string;
@@ -31,6 +32,9 @@ export function DigitalSignatureModal({
   const [isDrawing, setIsDrawing] = useState(false);
   const [typedSignature, setTypedSignature] = useState(signerName);
   const [signatureMode, setSignatureMode] = useState<'draw' | 'type'>('draw');
+  // La firma è su canvas: il tratto non genera eventi input nativi, quindi l'auto-dirty del
+  // Modal non lo vedrebbe. Teniamo noi lo stato "modificato" (disegno o digitazione).
+  const [modificato, setModificato] = useState(false);
 
   const trackerRef = useRef<SmoothStrokeTracker>(
     new SmoothStrokeTracker({ strokeColor: 'var(--pill-indigo-bg)', baseLineWidth: 2.5, minLineWidth: 1.6, maxLineWidth: 3.4 })
@@ -40,6 +44,7 @@ export function DigitalSignatureModal({
     const canvas = canvasRef.current;
     if (!canvas) return;
     setIsDrawing(true);
+    setModificato(true);
     const { x, y } = getCanvasCoordinates(e, canvas);
     trackerRef.current.start(x, y);
   };
@@ -117,10 +122,11 @@ export function DigitalSignatureModal({
   };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex, padding: 16 }}>
+    <Modal onClose={onClose} overlayBackground="rgba(0,0,0,.8)" zIndex={zIndex} dirty={modificato} labelledBy="firma-digitale-titolo">
+      {(richiediChiusura) => (
       <div style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, padding: 24, width: '100%', maxWidth: 520, display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div>
-          <div style={{ fontSize: 16, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div id="firma-digitale-titolo" style={{ fontSize: 16, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
             <span>✍️ Apponi Firma Elettronica Semplice (art. 20 CAD)</span>
           </div>
           <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
@@ -185,7 +191,7 @@ export function DigitalSignatureModal({
             <input
               type="text"
               value={typedSignature}
-              onChange={e => setTypedSignature(e.target.value)}
+              onChange={e => { setTypedSignature(e.target.value); setModificato(true); }}
               placeholder="Nome Cognome"
               style={{ width: '100%', fontSize: 16, fontFamily: '"Brush Script MT", cursive, sans-serif', padding: 12 }}
             />
@@ -205,7 +211,7 @@ export function DigitalSignatureModal({
 
         {/* Bottoni Azione */}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 4 }}>
-          <button type="button" onClick={onClose} style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '8px 16px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}>
+          <button type="button" onClick={richiediChiusura} style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '8px 16px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}>
             Annulla
           </button>
           <button type="button" onClick={handleConfirmSignature} style={{ background: 'var(--indigo)', color: 'var(--on-accent)', border: 'none', padding: '8px 20px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 14px rgba(99,102,241,.3)' }}>
@@ -213,6 +219,7 @@ export function DigitalSignatureModal({
           </button>
         </div>
       </div>
-    </div>
+      )}
+    </Modal>
   );
 }

@@ -3,6 +3,7 @@ import { fmt } from '../../utils';
 import { urlFileArchivio } from '../../api/client';
 import type { DocumentoPortale } from '../../api/client';
 import type { ModuloProposta } from './types';
+import { Modal } from '../ui/Modal';
 
 export interface DettaglioModuloModalProps {
   selectedModule: ModuloProposta;
@@ -30,7 +31,7 @@ export function DettaglioModuloModal({
   avviaFirmaModulo,
 }: DettaglioModuloModalProps) {
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000, padding: 16 }}>
+    <Modal onClose={() => setSelectedModule(null)} zIndex={10000} overlayBackground="rgba(0,0,0,.8)" dirty={false} labelledBy="dettaglio-modulo-titolo">
       <div style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, padding: 24, width: '100%', maxWidth: 640, maxHeight: '90vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 18, boxShadow: '0 25px 60px rgba(0,0,0,.6)' }}>
 
         {/* Header Modale */}
@@ -40,13 +41,14 @@ export function DettaglioModuloModal({
               <CatBadge cat={selectedModule.cat} />
               <span style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 800 }}>Fascicolo Operativo Modulo</span>
             </div>
-            <h2 style={{ fontSize: 18, fontWeight: 800, margin: 0 }}>{selectedModule.nome}</h2>
+            <h2 id="dettaglio-modulo-titolo" style={{ fontSize: 18, fontWeight: 800, margin: 0 }}>{selectedModule.nome}</h2>
             <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 4 }}>
               Valore Operazione: <strong style={{ color: 'var(--indigo-l)' }}>{fmt(selectedModule.prezzo)}</strong> · Stima Ore: <strong>{selectedModule.ore}h</strong>
             </div>
           </div>
           <button
             onClick={() => setSelectedModule(null)}
+            aria-label="Chiudi"
             style={{ background: 'var(--card2)', border: 'none', width: 32, height: 32, borderRadius: 8, color: 'var(--muted)', cursor: 'pointer', fontSize: 14, fontWeight: 700 }}
           >
             ✕
@@ -376,6 +378,6 @@ export function DettaglioModuloModal({
         </div>
 
       </div>
-    </div>
+    </Modal>
   );
 }

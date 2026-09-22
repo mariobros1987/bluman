@@ -13,6 +13,7 @@ import { Paginatore } from '../components/ui/Paginatore';
 import { isRispostaPaginata, type MetaPaginazione } from '../api/paginazione';
 import { useToast } from '../components/ui/ToastProvider';
 import { Modal } from '../components/ui/Modal';
+import { confirm } from '../components/ui/ConfirmProvider';
 
 interface RiepilogoPrimaNota {
   totaleEntrateCentesimi: number;
@@ -150,7 +151,7 @@ export function PrimaNotaPage() {
   };
 
   const handleDeleteMovimento = async (id: string) => {
-    if (!confirm('Sei sicuro di voler eliminare questa registrazione dalla Prima Nota?')) return;
+    if (!(await confirm({ messaggio: 'Sei sicuro di voler eliminare questa registrazione dalla Prima Nota?', confermaLabel: 'Elimina', pericolo: true }))) return;
     try {
       await deletePrimaNotaApi(id);
       await loadData();

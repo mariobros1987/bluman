@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { fetchScadenzarioIncassiApi, registraIncassoApi, fetchClienti } from '../api/client';
 import { fmt } from '../utils';
 import { useToast } from '../components/ui/ToastProvider';
+import { Modal } from '../components/ui/Modal';
 
 export function PaymentsPage() {
   const toast = useToast();
@@ -228,9 +229,10 @@ export function PaymentsPage() {
 
       {/* MODAL REGISTRAZIONE INCASSO PRIMA NOTA */}
       {selectedScadenza && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+        <Modal onClose={() => setSelectedScadenza(null)} overlayBackground="rgba(0,0,0,0.7)" zIndex={1000} labelledBy="titolo-incasso-pn">
+          {(richiediChiusura) => (
           <form onSubmit={handleSaveIncasso} style={{ background: 'var(--card)', padding: '2rem', borderRadius: 12, width: 450, border: '1px solid var(--border)' }}>
-            <h3 style={{ marginTop: 0 }}>Registra Incasso Prima Nota</h3>
+            <h3 id="titolo-incasso-pn" style={{ marginTop: 0 }}>Registra Incasso Prima Nota</h3>
             <p style={{ fontSize: 13, color: 'var(--muted)' }}>
               Fattura: {selectedScadenza.fattura?.numero} | Cliente: {selectedScadenza.fattura?.progetto?.cliente?.nome}
             </p>
@@ -285,7 +287,7 @@ export function PaymentsPage() {
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
               <button
                 type="button"
-                onClick={() => setSelectedScadenza(null)}
+                onClick={richiediChiusura}
                 style={{ padding: '8px 16px', borderRadius: 6, border: '1px solid var(--border)', background: 'transparent', color: 'white', cursor: 'pointer' }}
               >
                 Annulla
@@ -299,7 +301,8 @@ export function PaymentsPage() {
               </button>
             </div>
           </form>
-        </div>
+          )}
+        </Modal>
       )}
     </div>
   );

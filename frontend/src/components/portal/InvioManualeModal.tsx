@@ -1,5 +1,6 @@
 import type { DocumentoPortale } from '../../api/client';
 import type { LivelloFirmaPortale } from './livelloFirma';
+import { Modal } from '../ui/Modal';
 
 export interface InvioManualeModalProps {
   documentoDaCaricare: DocumentoPortale;
@@ -34,11 +35,13 @@ export function InvioManualeModal({
   confermaFirmaConFile,
   livelloRichiesto = 'ses',
 }: InvioManualeModalProps) {
+  const chiudi = () => { setDocumentoDaCaricare(null); setFileFirmato(null); setOtpError(null); };
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 11000, padding: 16 }}>
+    <Modal onClose={chiudi} overlayBackground="rgba(0,0,0,.8)" zIndex={11000} labelledBy="invio-manuale-titolo">
+      {(richiediChiusura) => (
       <div style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, padding: 24, width: '100%', maxWidth: 520, display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div>
-          <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 6 }}>📤 Invio del documento firmato a mano</div>
+          <div id="invio-manuale-titolo" style={{ fontSize: 15, fontWeight: 700, marginBottom: 6 }}>📤 Invio del documento firmato a mano</div>
           <div style={{ fontSize: 11.5, color: 'var(--muted)', lineHeight: 1.6 }}>
             Stai inviando allo studio il file firmato per <strong>{documentoDaCaricare.titolo || documentoDaCaricare.nome}</strong>.
             Il documento e la sua impronta vengono registrati a database: la prova della firma è il file stesso.
@@ -78,7 +81,7 @@ export function InvioManualeModal({
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
           <button
             type="button"
-            onClick={() => { setDocumentoDaCaricare(null); setFileFirmato(null); setOtpError(null); }}
+            onClick={richiediChiusura}
             style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '9px 16px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}
           >
             Annulla
@@ -98,6 +101,7 @@ export function InvioManualeModal({
           </button>
         </div>
       </div>
-    </div>
+      )}
+    </Modal>
   );
 }

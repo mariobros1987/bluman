@@ -23,6 +23,7 @@ import { creaEventoCalendario } from '../api/calendario';
 import type { Progetto, ModuloProgetto, MicroVoce, CategoriaModulo, StatoProgetto, StatoModulo, Cliente, TeamMember } from '../types';
 import styles from './ProjectDetail.module.css';
 import { useToast } from '../components/ui/ToastProvider';
+import { confirm } from '../components/ui/ConfirmProvider';
 
 type Tab = 'moduli' | 'grafo' | 'fatturazione' | 'redditivita' | 'storico' | 'comunicazioni' | 'documenti' | 'calendario';
 
@@ -697,7 +698,7 @@ export function ProjectDetail() {
   };
 
   const handleRicalcolaAvanzamento = async () => {
-    if (!confirm('Ricalcolare l\'avanzamento di questo progetto?\n\nScrive a database gli stati dei moduli e delle micro-voci che risultano divergenti da quelli calcolati (§16). Le righe già allineate non vengono toccate.')) return;
+    if (!(await confirm({ titolo: 'Ricalcolare l\'avanzamento di questo progetto?', messaggio: 'Scrive a database gli stati dei moduli e delle micro-voci che risultano divergenti da quelli calcolati (§16). Le righe già allineate non vengono toccate.', confermaLabel: 'Ricalcola' }))) return;
     setRicalcolando(true);
     try {
       // La rotta restituisce l'avanzamento ricalcolato (stato, percentuale, moduli),
@@ -715,7 +716,7 @@ export function ProjectDetail() {
 
   const handleArchiviaRipristina = async () => {
     const isArchived = project.st === 'archived';
-    if (confirm(isArchived ? 'Vuoi ripristinare questo progetto?' : 'Vuoi archiviare questo progetto?')) {
+    if (await confirm({ messaggio: isArchived ? 'Vuoi ripristinare questo progetto?' : 'Vuoi archiviare questo progetto?', confermaLabel: isArchived ? 'Ripristina' : 'Archivia', pericolo: !isArchived })) {
       try {
         await archiviaProgettoApi(String(project.id), !isArchived);
         setProject({ ...project, st: isArchived ? 'in_progress' : 'archived' });
@@ -726,7 +727,7 @@ export function ProjectDetail() {
   };
 
   const handleEliminaModulo = async (mod: ModuloProgetto, mIdx: number) => {
-    const confirmDel = window.confirm(`Sei sicuro di voler eliminare il modulo "${mod.n}" dal progetto?`);
+    const confirmDel = await confirm({ messaggio: `Sei sicuro di voler eliminare il modulo "${mod.n}" dal progetto?`, confermaLabel: 'Elimina', pericolo: true });
     if (!confirmDel) return;
 
     // Il modulo deve esistere a DB — senza dbId non c'è nulla da eliminare

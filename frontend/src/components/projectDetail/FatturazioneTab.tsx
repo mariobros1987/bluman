@@ -8,6 +8,7 @@ import { getTenantStorageKey, getStudioInfoForTenant, getCurrentTenantId, BLUECO
 import type { Progetto } from '../../types';
 import styles from '../../pages/ProjectDetail.module.css';
 import { useToast } from '../ui/ToastProvider';
+import { Modal } from '../ui/Modal';
 
 export interface VoceFatturabile {
   key: string;
@@ -410,7 +411,7 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
 
       {/* Modal Anteprima Stampa / PDF Fattura */}
       {previewFattura && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 110, padding: 16 }}>
+        <Modal onClose={() => setPreviewFattura(null)} ariaLabel="Anteprima fattura" zIndex={110} overlayBackground="rgba(0,0,0,.8)">
           <div data-theme="light" style={{ background: '#fff', color: 'var(--text)', borderRadius: 16, padding: 32, width: '100%', maxWidth: 640, maxHeight: '90vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 20, boxShadow: '0 24px 60px rgba(0,0,0,.6)' }}>
             {/* Header Documento Stampa */}
             <div style={{ borderBottom: '2px solid var(--surface-2)', paddingBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -522,17 +523,18 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
               </button>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* Modal Avanzato di Composizione Fattura & Proforma da Microvoci */}
       {modalOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 16 }}>
+        <Modal onClose={() => setModalOpen(false)} labelledBy="titolo-componi-fattura" zIndex={100}>
+          {(richiediChiusura) => (
           <form onSubmit={handleEmettiFatturaUfficiale} style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, padding: 24, width: '100%', maxWidth: 720, maxHeight: '90vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 16, boxShadow: '0 24px 60px rgba(0,0,0,.6)' }}>
             
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', paddingBottom: 12 }}>
               <div>
-                <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>
+                <div id="titolo-componi-fattura" style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>
                   ✨ Compositore Fattura & Proforma da Microvoci
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
@@ -541,7 +543,8 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
               </div>
               <button
                 type="button"
-                onClick={() => setModalOpen(false)}
+                onClick={richiediChiusura}
+                aria-label="Chiudi"
                 style={{ background: 'transparent', border: 'none', color: 'var(--muted)', fontSize: 18, cursor: 'pointer', padding: 4 }}
               >
                 ✕
@@ -765,7 +768,7 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, borderTop: '1px solid var(--border)', paddingTop: 12, flexWrap: 'wrap' }}>
               <button
                 type="button"
-                onClick={() => setModalOpen(false)}
+                onClick={richiediChiusura}
                 style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '8px 14px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}
               >
                 Annulla
@@ -813,7 +816,8 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
               </div>
             </div>
           </form>
-        </div>
+          )}
+        </Modal>
       )}
     </div>
   );

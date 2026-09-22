@@ -9,6 +9,7 @@ import {
   type VoceTimesheetApi,
 } from '../api/client';
 import { useToast } from '../components/ui/ToastProvider';
+import { Modal } from '../components/ui/Modal';
 
 // ─────────────────────────────────────────────────────────────────
 // BLOCCO 6.1 — TIMESHEET SETTIMANALE
@@ -451,10 +452,8 @@ function EditorCella({
   };
 
   return (
-    <div
-      onClick={onClose}
-      style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.75)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 16 }}
-    >
+    <Modal onClose={onClose} ariaLabel="Registrazione ore" zIndex={9999} overlayBackground="rgba(15,23,42,0.75)">
+      {(richiediChiusura) => (
       <div
         onClick={(e) => e.stopPropagation()}
         style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, maxWidth: 460, width: '100%', padding: 22, color: 'var(--text)', boxShadow: '0 20px 50px rgba(0,0,0,0.5)' }}
@@ -467,7 +466,7 @@ function EditorCella({
             <h3 style={{ fontSize: 15, fontWeight: 700, margin: '4px 0 0 0' }}>{membro?.nome || 'Membro'}</h3>
             <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2, textTransform: 'capitalize' }}>{etichettaGiorno}</div>
           </div>
-          <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: 'var(--muted)', fontSize: 18, cursor: 'pointer' }}>✕</button>
+          <button onClick={richiediChiusura} aria-label="Chiudi" style={{ background: 'transparent', border: 'none', color: 'var(--muted)', fontSize: 18, cursor: 'pointer' }}>✕</button>
         </div>
 
         {voce && (
@@ -580,6 +579,7 @@ function EditorCella({
           </div>
         )}
       </div>
-    </div>
+      )}
+    </Modal>
   );
 }

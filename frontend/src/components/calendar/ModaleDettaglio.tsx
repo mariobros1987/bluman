@@ -19,6 +19,7 @@ import type { ReactNode } from 'react';
 import type { EventoCalendario } from '../../api/calendario';
 import { etichettaGiorno, giornoDi, oraMostrata } from '../../utils/calendarioDate';
 import { CATEGORIE, ETICHETTE_STATO, coloreCategoria, euroDaCentesimi, spuntabile } from './comune';
+import { Modal } from '../ui/Modal';
 
 interface Props {
   evento: EventoCalendario;
@@ -46,16 +47,16 @@ export function ModaleDettaglio({ evento, onChiudi, onCambiaStato, onCancella }:
   );
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 16 }}>
+    <Modal onClose={onChiudi} labelledBy="titolo-dettaglio-evento" zIndex={100}>
       <div style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, padding: 24, width: '100%', maxWidth: 520, display: 'flex', flexDirection: 'column', gap: 16, maxHeight: '90vh', overflowY: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
           <div>
             <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10, background: colore.bg, color: colore.text }}>
               {CATEGORIE[evento.categoria].icona} {CATEGORIE[evento.categoria].nome.toUpperCase()}
             </span>
-            <h3 style={{ margin: '8px 0 0 0', fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>{evento.titolo}</h3>
+            <h3 id="titolo-dettaglio-evento" style={{ margin: '8px 0 0 0', fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>{evento.titolo}</h3>
           </div>
-          <button type="button" onClick={onChiudi} style={{ background: 'transparent', border: 'none', color: 'var(--muted)', fontSize: 18, cursor: 'pointer' }}>✕</button>
+          <button type="button" onClick={onChiudi} aria-label="Chiudi" style={{ background: 'transparent', border: 'none', color: 'var(--muted)', fontSize: 18, cursor: 'pointer' }}>✕</button>
         </div>
 
         <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 14, display: 'flex', flexDirection: 'column', gap: 10, fontSize: 12 }}>
@@ -121,6 +122,6 @@ export function ModaleDettaglio({ evento, onChiudi, onCambiaStato, onCancella }:
           </div>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }

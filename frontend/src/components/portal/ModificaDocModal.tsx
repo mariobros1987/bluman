@@ -1,5 +1,6 @@
 import type React from 'react';
 import type { DocumentoPortale } from '../../api/client';
+import { Modal } from '../ui/Modal';
 
 export interface ModificaDocModalProps {
   modificaDocTarget: DocumentoPortale;
@@ -19,14 +20,15 @@ export function ModificaDocModal({
   handleInviaRichiestaModifica,
 }: ModificaDocModalProps) {
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 11500, padding: 16 }}>
+    <Modal onClose={() => setModificaDocTarget(null)} overlayBackground="rgba(0,0,0,.85)" zIndex={11500} labelledBy="modifica-doc-titolo">
+      {(richiediChiusura) => (
       <div style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, width: '100%', maxWidth: 540, padding: 22, display: 'flex', flexDirection: 'column', gap: 14, boxShadow: '0 25px 60px rgba(0,0,0,.8)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>📝 Richiedi Modifiche all'Atto</div>
+            <div id="modifica-doc-titolo" style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>📝 Richiedi Modifiche all'Atto</div>
             <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{modificaDocTarget.nome}</div>
           </div>
-          <button type="button" onClick={() => setModificaDocTarget(null)} style={{ background: 'transparent', border: 'none', color: 'var(--muted)', fontSize: 16, cursor: 'pointer' }}>✕</button>
+          <button type="button" aria-label="Chiudi" onClick={richiediChiusura} style={{ background: 'transparent', border: 'none', color: 'var(--muted)', fontSize: 16, cursor: 'pointer' }}>✕</button>
         </div>
 
         <form onSubmit={handleInviaRichiestaModifica} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -46,7 +48,7 @@ export function ModificaDocModal({
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 6 }}>
             <button
               type="button"
-              onClick={() => setModificaDocTarget(null)}
+              onClick={richiediChiusura}
               style={{ background: 'var(--card2)', border: '1px solid var(--border)', color: 'var(--muted)', padding: '7px 14px', borderRadius: 8, fontSize: 11.5, fontWeight: 600, cursor: 'pointer' }}
             >
               Annulla
@@ -61,6 +63,7 @@ export function ModificaDocModal({
           </div>
         </form>
       </div>
-    </div>
+      )}
+    </Modal>
   );
 }

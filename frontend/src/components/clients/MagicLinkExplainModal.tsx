@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { generaMagicLinkApi } from '../../api/client';
 import type { Cliente } from '../../types';
+import { Modal } from '../ui/Modal';
 
 export function MagicLinkExplainModal({ client, onClose }: { client: Cliente; onClose: () => void }) {
   const [copied, setCopied] = useState(false);
@@ -34,16 +35,16 @@ export function MagicLinkExplainModal({ client, onClose }: { client: Cliente; on
   };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 16 }}>
+    <Modal onClose={onClose} zIndex={100} dirty={false} labelledBy="magic-link-titolo">
       <div style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, padding: 22, width: '100%', maxWidth: 540, display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
-            <div style={{ fontSize: 15, fontWeight: 600 }}>Accesso Cliente Passwordless & Accettazione</div>
+            <div id="magic-link-titolo" style={{ fontSize: 15, fontWeight: 600 }}>Accesso Cliente Passwordless & Accettazione</div>
             <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
               {client.nome} ({client.tipo === 'company' ? 'Società' : 'Persona Fisica'})
             </div>
           </div>
-          <button onClick={onClose} style={{ background: 'var(--card2)', border: 'none', width: 26, height: 26, borderRadius: 6, color: 'var(--muted)', cursor: 'pointer' }}>✕</button>
+          <button onClick={onClose} aria-label="Chiudi" style={{ background: 'var(--card2)', border: 'none', width: 26, height: 26, borderRadius: 6, color: 'var(--muted)', cursor: 'pointer' }}>✕</button>
         </div>
 
         <div style={{ background: 'var(--surface-1)', border: '1px solid var(--card2)', borderRadius: 10, padding: 14, fontSize: 11.5, color: 'var(--indigo-l)', lineHeight: 1.5 }}>
@@ -117,6 +118,6 @@ export function MagicLinkExplainModal({ client, onClose }: { client: Cliente; on
           <button onClick={onClose} style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--text)', padding: '7px 14px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}>Chiudi</button>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }

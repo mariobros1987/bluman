@@ -11,6 +11,7 @@ import { updateArticoloPrezzoApi } from '../../api/client';
 import { useCartellaTemplate } from '../../hooks/useCartellaTemplate';
 import type { Articolo } from '../../types';
 import { useToast } from '../ui/ToastProvider';
+import { Modal } from '../ui/Modal';
 
 // ─── Componente Catalogo Articoli & Distinta Base ──────────────────
 export function ArticoliCatalogView({ articoliList, onOpenNew, onDisattiva }: { articoliList: Articolo[]; onOpenNew: () => void; onDisattiva: (id: string, nome: string) => void }) {
@@ -321,9 +322,10 @@ export function ArticoliCatalogView({ articoliList, onOpenNew, onDisattiva }: { 
 
       {/* Modal Modifica Prezzo & Ore Articolo (§Admin) con 3 Opzioni Documento */}
       {editingArt && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 16 }}>
+        <Modal onClose={() => setEditingArt(null)} labelledBy="titolo-modifica-articolo" zIndex={100}>
+          {(richiediChiusura) => (
           <form onSubmit={handleSaveEdit} style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, padding: 22, width: '100%', maxWidth: 540, maxHeight: '92vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div style={{ fontSize: 16, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div id="titolo-modifica-articolo" style={{ fontSize: 16, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
               <span>✏️ Modifica Listino & Documenti Allacciati</span>
             </div>
 
@@ -473,11 +475,12 @@ export function ArticoliCatalogView({ articoliList, onOpenNew, onDisattiva }: { 
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
-              <button type="button" onClick={() => setEditingArt(null)} style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '7px 14px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}>Annulla</button>
+              <button type="button" onClick={richiediChiusura} style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '7px 14px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}>Annulla</button>
               <button type="submit" disabled={savingEdit} style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '7px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{savingEdit ? 'Salvataggio...' : '✓ Salva Modifiche Prestazione'}</button>
             </div>
           </form>
-        </div>
+          )}
+        </Modal>
       )}
     </div>
   );

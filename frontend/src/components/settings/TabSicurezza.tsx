@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { statoTotpApi, attivaTotpApi, confermaTotpApi, disabilitaTotpApi, dimenticaIpFidatiApi } from '../../api/auth';
+import { Modal } from '../ui/Modal';
 
 type FaseAttivazioneTotp = 'idle' | 'qr' | 'backup_codes' | 'conferma';
 
@@ -443,11 +444,12 @@ export function TabSicurezza({ ruolo }: TabSicurezzaProps) {
 
       {/* ── Modale Conferma Disabilitazione ── */}
       {modalDisabilita && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10500, padding: 20 }}>
+        <Modal onClose={() => { setModalDisabilita(false); setPasswordDisabilita(''); setErrore(null); }} labelledBy="titolo-disabilita-2fa" zIndex={10500} overlayBackground="rgba(0,0,0,.7)">
+          {(richiediChiusura) => (
           <div style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, padding: 28, width: '100%', maxWidth: 400, display: 'flex', flexDirection: 'column', gap: 18 }}>
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: 36, marginBottom: 10 }}>⚠️</div>
-              <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--text)' }}>Disabilita 2FA</div>
+              <div id="titolo-disabilita-2fa" style={{ fontSize: 16, fontWeight: 800, color: 'var(--text)' }}>Disabilita 2FA</div>
               <p style={{ fontSize: 12, color: 'var(--muted)', margin: '8px 0 0', lineHeight: 1.6 }}>
                 Questa operazione rimuove il secondo fattore di sicurezza dal tuo account. Inserisci la tua password corrente per confermare.
               </p>
@@ -475,7 +477,7 @@ export function TabSicurezza({ ruolo }: TabSicurezzaProps) {
               <div style={{ display: 'flex', gap: 10 }}>
                 <button
                   type="button"
-                  onClick={() => { setModalDisabilita(false); setPasswordDisabilita(''); setErrore(null); }}
+                  onClick={richiediChiusura}
                   style={{ flex: 1, background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--muted)', padding: '10px', borderRadius: 9, fontSize: 13, cursor: 'pointer' }}
                 >
                   Annulla
@@ -490,7 +492,8 @@ export function TabSicurezza({ ruolo }: TabSicurezzaProps) {
               </div>
             </form>
           </div>
-        </div>
+          )}
+        </Modal>
       )}
     </div>
   );

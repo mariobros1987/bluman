@@ -22,6 +22,7 @@ import { Paginatore } from '../components/ui/Paginatore';
 import { isRispostaPaginata, type MetaPaginazione } from '../api/paginazione';
 import { useToast } from '../components/ui/ToastProvider';
 import { Modal } from '../components/ui/Modal';
+import { confirm } from '../components/ui/ConfirmProvider';
 
 const META_INIZIALE: MetaPaginazione = { page: 1, limit: 50, totale: 0, pagine: 0 };
 interface RiepilogoFatture {
@@ -306,7 +307,7 @@ export function InvoicesPage() {
   };
 
   const handleEmettiDefinitivo = async (fattura: any) => {
-    if (!confirm(`Confermi l'emissione definitiva della fattura ${fattura.numero}? Verrà generato il numero ufficiale progressivo e il piano rate nello scadenzario.`)) return;
+    if (!(await confirm({ messaggio: `Confermi l'emissione definitiva della fattura ${fattura.numero}? Verrà generato il numero ufficiale progressivo e il piano rate nello scadenzario.`, confermaLabel: 'Emetti' }))) return;
     try {
       await emettiInvoiceApi(fattura.id);
       await loadData();
@@ -359,7 +360,7 @@ export function InvoicesPage() {
   };
 
   const handleEliminaBozza = async (id: string) => {
-    if (!confirm('Sei sicuro di voler eliminare questa bozza di fattura?')) return;
+    if (!(await confirm({ messaggio: 'Sei sicuro di voler eliminare questa bozza di fattura?', confermaLabel: 'Elimina', pericolo: true }))) return;
     try {
       await deleteInvoiceApi(id);
       await loadData();

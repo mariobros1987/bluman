@@ -13,6 +13,7 @@ const META_INIZIALE: MetaPaginazione = { page: 1, limit: 50, totale: 0, pagine: 
 
 import { useSearchParams } from 'react-router-dom';
 import { useToast } from '../components/ui/ToastProvider';
+import { Modal } from '../components/ui/Modal';
 
 export function ClientsPage() {
   const toast = useToast();
@@ -413,9 +414,10 @@ export function ClientsPage() {
 
       {/* Modal Nuovo Cliente */}
       {modalOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 16 }}>
+        <Modal onClose={() => { setModalOpen(false); setErroreModale(''); }} overlayBackground="rgba(0,0,0,.7)" zIndex={100} labelledBy="titolo-nuovo-cliente">
+          {(richiediChiusura) => (
           <form onSubmit={handleCreate} style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, padding: 20, width: '100%', maxWidth: 440, display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div style={{ fontSize: 15, fontWeight: 600 }}>Nuovo Cliente Anagrafica</div>
+            <div id="titolo-nuovo-cliente" style={{ fontSize: 15, fontWeight: 600 }}>Nuovo Cliente Anagrafica</div>
             <div>
               <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Nome / Ragione Sociale *</label>
               <input value={nome} onChange={e => setNome(e.target.value)} placeholder="es. Giuseppe Rossi / Acme S.r.l." required />
@@ -436,11 +438,12 @@ export function ClientsPage() {
               </div>
             )}
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
-              <button type="button" onClick={() => { setModalOpen(false); setErroreModale(''); }} style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '7px 14px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}>Annulla</button>
+              <button type="button" onClick={richiediChiusura} style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '7px 14px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}>Annulla</button>
               <button type="submit" disabled={submitting} style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>{submitting ? 'Salvataggio...' : '✓ Salva Cliente'}</button>
             </div>
           </form>
-        </div>
+          )}
+        </Modal>
       )}
 
       {/* Modal Anagrafica Completa Cliente ERP (§Gestionale) */}

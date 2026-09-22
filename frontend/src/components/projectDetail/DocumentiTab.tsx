@@ -17,6 +17,7 @@ import type { Progetto } from '../../types';
 import { documentoApiAVista, documentiRimossi, ricordaDocumentoRimosso } from './documentiUtils';
 import { FirmaStudioModal } from '../documenti/FirmaStudioModal';
 import { useToast } from '../ui/ToastProvider';
+import { confirm } from '../ui/ConfirmProvider';
 
 // ─── Componente Documenti & Vault Legale Progetto ──────────────────
 // ─── Componente Documenti & Vault Legale Progetto (Google Drive / Cloud Vault) ───
@@ -257,10 +258,11 @@ export function DocumentiTab({ project }: { project: Progetto }) {
         toast.attenzione('Questo documento è firmato dal cliente: non può essere eliminato. Solo l\'amministratore dello studio può archiviarlo.');
         return;
       }
-      if (!confirm(
-        'Questo documento è firmato dal cliente e non può essere eliminato.\n' +
-        'Vuoi archiviarlo? Scomparirà dalle liste operative ma il file e la firma restano conservati nello storico.'
-      )) return;
+      if (!(await confirm({
+        titolo: 'Questo documento è firmato dal cliente e non può essere eliminato.',
+        messaggio: 'Vuoi archiviarlo? Scomparirà dalle liste operative ma il file e la firma restano conservati nello storico.',
+        confermaLabel: 'Archivia',
+      }))) return;
       try {
         await archiviaDocumentoApi(docId);
       } catch (err) {
@@ -270,7 +272,7 @@ export function DocumentiTab({ project }: { project: Progetto }) {
         return;
       }
     } else {
-      if (!confirm('Vuoi rimuovere questo documento dal Vault del progetto?')) return;
+      if (!(await confirm({ messaggio: 'Vuoi rimuovere questo documento dal Vault del progetto?', confermaLabel: 'Rimuovi', pericolo: true }))) return;
       try {
         const isLocalTemp = docId.startsWith('doc-tmpl-') || docId.startsWith('d-') || docId.startsWith('local-');
         if (!isLocalTemp || doc?.dbDoc) {

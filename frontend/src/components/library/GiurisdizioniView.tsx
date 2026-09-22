@@ -3,6 +3,7 @@ import { CatBadge } from '../ui/CatBadge';
 import { creaGiurisdizioneApi } from '../../api/client';
 import type { Giurisdizione, ModuloTemplate } from '../../types';
 import { useToast } from '../ui/ToastProvider';
+import { Modal } from '../ui/Modal';
 
 // ─── Componente Giurisdizioni Studio ──────────────────────────────
 export function GiurisdizioniView({
@@ -117,17 +118,18 @@ export function GiurisdizioniView({
 
       {/* Modal Dettaglio & Assegnazione Moduli Giurisdizione */}
       {selectedGiur && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 16 }}>
+        <Modal onClose={() => setSelectedGiur(null)} labelledBy="titolo-giur-dettaglio" zIndex={100}>
+          {(richiediChiusura) => (
           <div style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, width: '100%', maxWidth: 560, padding: 24, boxShadow: '0 12px 40px rgba(0,0,0,.5)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <span style={{ fontSize: 26 }}>{selectedGiur.codice === 'MT' ? '🇲🇹' : selectedGiur.codice === 'GI' ? '🇬🇮' : selectedGiur.codice.startsWith('US') ? '🇺🇸' : selectedGiur.codice === 'AE' ? '🇦🇪' : '🌐'}</span>
                 <div>
-                  <div style={{ fontSize: 16, fontWeight: 800 }}>{selectedGiur.nome} ({selectedGiur.codice})</div>
+                  <div id="titolo-giur-dettaglio" style={{ fontSize: 16, fontWeight: 800 }}>{selectedGiur.nome} ({selectedGiur.codice})</div>
                   <div style={{ fontSize: 11, color: 'var(--muted)' }}>Gestione Moduli Specifici della Piazza Finanziaria</div>
                 </div>
               </div>
-              <button onClick={() => setSelectedGiur(null)} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: 18 }}>✕</button>
+              <button onClick={richiediChiusura} aria-label="Chiudi" style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: 18 }}>✕</button>
             </div>
 
             {/* Assegnazione 1-Click Nuovo Modulo */}
@@ -209,7 +211,7 @@ export function GiurisdizioniView({
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
               <button
                 type="button"
-                onClick={() => setSelectedGiur(null)}
+                onClick={richiediChiusura}
                 style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '8px 16px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}
               >
                 Chiudi
@@ -227,16 +229,18 @@ export function GiurisdizioniView({
               </button>
             </div>
           </div>
-        </div>
+          )}
+        </Modal>
       )}
 
       {/* Modal Nuova Giurisdizione */}
       {modalGiurOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 16 }}>
+        <Modal onClose={() => setModalGiurOpen(false)} labelledBy="titolo-nuova-giur" zIndex={100} overlayBackground="rgba(0,0,0,.7)">
+          {(richiediChiusura) => (
           <div style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, width: '100%', maxWidth: 440, padding: 20 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <div style={{ fontSize: 14, fontWeight: 700 }}>+ Nuova Giurisdizione Studio</div>
-              <button onClick={() => setModalGiurOpen(false)} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: 16 }}>✕</button>
+              <div id="titolo-nuova-giur" style={{ fontSize: 14, fontWeight: 700 }}>+ Nuova Giurisdizione Studio</div>
+              <button onClick={richiediChiusura} aria-label="Chiudi" style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: 16 }}>✕</button>
             </div>
             <form
               onSubmit={async (e) => {
@@ -285,12 +289,13 @@ export function GiurisdizioniView({
                 <textarea value={newGiurNote} onChange={e => setNewGiurNote(e.target.value)} placeholder="Note adempimenti o valuta" rows={2} />
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
-                <button type="button" onClick={() => setModalGiurOpen(false)} style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '6px 12px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}>Annulla</button>
+                <button type="button" onClick={richiediChiusura} style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '6px 12px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}>Annulla</button>
                 <button type="submit" style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>✓ Salva Giurisdizione</button>
               </div>
             </form>
           </div>
-        </div>
+          )}
+        </Modal>
       )}
     </div>
   );

@@ -9,6 +9,7 @@ import { AnagraficaFornitoreErpModal } from '../components/fornitori/AnagraficaF
 import { RegistraFatturaPassivaModal } from '../components/fornitori/RegistraFatturaPassivaModal';
 import { PagaFatturaPassivaModal } from '../components/fornitori/PagaFatturaPassivaModal';
 import { useToast } from '../components/ui/ToastProvider';
+import { confirm } from '../components/ui/ConfirmProvider';
 
 export const FornitoriPage: React.FC = () => {
   const toast = useToast();
@@ -49,7 +50,7 @@ export const FornitoriPage: React.FC = () => {
   }, []);
 
   const handleEliminaFornitore = async (id: string, nome: string) => {
-    if (!confirm(`Sei sicuro di voler eliminare il fornitore "${nome}"?`)) return;
+    if (!(await confirm({ messaggio: `Sei sicuro di voler eliminare il fornitore "${nome}"?`, confermaLabel: 'Elimina', pericolo: true }))) return;
     try {
       await eliminaFornitoreApi(id);
       await loadData();

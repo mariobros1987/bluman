@@ -3,6 +3,7 @@ import { fetchScadenzarioIncassiApi, registraIncassoApi, fetchClienti } from '..
 import { fmt } from '../utils';
 import { InviaSollecitoModal } from '../components/solleciti/InviaSollecitoModal';
 import { useToast } from '../components/ui/ToastProvider';
+import { Modal } from '../components/ui/Modal';
 
 export function ScadenzarioPage() {
   const toast = useToast();
@@ -251,9 +252,10 @@ export function ScadenzarioPage() {
 
       {/* MODAL REGISTRA INCASSO */}
       {selectedScadenza && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
+        <Modal onClose={() => setSelectedScadenza(null)} overlayBackground="rgba(0,0,0,0.7)" zIndex={1000} labelledBy="titolo-incasso-scadenza">
+          {(richiediChiusura) => (
           <div style={{ background: 'var(--card)', borderRadius: 16, padding: '2rem', width: '100%', maxWidth: 480, border: '1px solid var(--border)' }}>
-            <h3 style={{ margin: '0 0 1rem 0' }}>Registrazione Incasso Rata #{selectedScadenza.numeroRata}</h3>
+            <h3 id="titolo-incasso-scadenza" style={{ margin: '0 0 1rem 0' }}>Registrazione Incasso Rata #{selectedScadenza.numeroRata}</h3>
             <p style={{ fontSize: 13, color: 'var(--muted)', margin: '0 0 1.25rem 0' }}>
               Fattura: <strong>{selectedScadenza.fattura?.numero}</strong> | Importo Rata: <strong>{fmt((selectedScadenza.importoCentesimi || 0) / 100)}</strong>
             </p>
@@ -311,7 +313,7 @@ export function ScadenzarioPage() {
                 <button
                   type="button"
                   className="btn btn-secondary"
-                  onClick={() => setSelectedScadenza(null)}
+                  onClick={richiediChiusura}
                 >
                   Annulla
                 </button>
@@ -325,7 +327,8 @@ export function ScadenzarioPage() {
               </div>
             </form>
           </div>
-        </div>
+          )}
+        </Modal>
       )}
       {/* MODAL SOLLECITO */}
       <InviaSollecitoModal

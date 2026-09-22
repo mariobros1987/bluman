@@ -18,6 +18,7 @@ import {
 // tutti da qui: prima il server, poi l'elenco. Prima metà finivano in `localStorage`, quindi
 // valevano per questo browser e per nessun altro.
 import { useCartellaTemplate } from '../hooks/useCartellaTemplate';
+import { confirm } from '../components/ui/ConfirmProvider';
 import { HeaderEditor } from '../components/editor/HeaderEditor';
 import { SelettoreDestinazione } from '../components/editor/SelettoreDestinazione';
 import { PannelloTag } from '../components/editor/PannelloTag';
@@ -676,7 +677,7 @@ export function DocumentEditorPage() {
     e.stopPropagation();
     const tmpl = templatesList.find((t) => t.id === tmplId);
     if (!tmpl) return;
-    if (!confirm(`Sei sicuro di voler eliminare definitivamente il Modello Master "${tmplTitolo}"?\n\n(I documenti già salvati o firmati nei progetti rimangono perfettamente congelati e integri).`)) return;
+    if (!(await confirm({ titolo: `Eliminare definitivamente il Modello Master "${tmplTitolo}"?`, messaggio: 'I documenti già salvati o firmati nei progetti rimangono perfettamente congelati e integri.', confermaLabel: 'Elimina', pericolo: true }))) return;
     // §3.3 / §41 — prima il server, poi lo stato locale: il modello sparisce dall'elenco solo
     // se il server ha confermato l'eliminazione.
     const esito = await cartella.elimina(tmpl);

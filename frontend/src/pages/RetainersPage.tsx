@@ -8,6 +8,8 @@ import {
 } from '../api/client';
 import { fmt } from '../utils';
 import { useToast } from '../components/ui/ToastProvider';
+import { confirm } from '../components/ui/ConfirmProvider';
+import { Modal } from '../components/ui/Modal';
 
 export function RetainersPage() {
   const toast = useToast();
@@ -81,7 +83,7 @@ export function RetainersPage() {
   };
 
   const handleGeneraFattura = async (contrattoId: string) => {
-    if (!confirm('Vuoi generare subito la fattura di questo periodo per il contratto retainer?')) return;
+    if (!(await confirm({ messaggio: 'Vuoi generare subito la fattura di questo periodo per il contratto retainer?', confermaLabel: 'Genera fattura' }))) return;
     setGeneratingId(contrattoId);
     try {
       const res = await generaFatturaRetainerApi(contrattoId);
@@ -249,9 +251,10 @@ export function RetainersPage() {
 
       {/* Modal Nuovo Retainer */}
       {showModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
+        <Modal onClose={() => setShowModal(false)} overlayBackground="rgba(0,0,0,0.7)" zIndex={1000} labelledBy="titolo-nuovo-retainer">
+          {(richiediChiusura) => (
           <div style={{ background: 'var(--card)', borderRadius: 16, padding: '2rem', width: '100%', maxWidth: 520, border: '1px solid var(--border)' }}>
-            <h3 style={{ margin: '0 0 1.5rem 0' }}>Nuovo Contratto Ricorrente (Retainer)</h3>
+            <h3 id="titolo-nuovo-retainer" style={{ margin: '0 0 1.5rem 0' }}>Nuovo Contratto Ricorrente (Retainer)</h3>
             <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
                 <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Cliente Committente *</label>
@@ -352,7 +355,7 @@ export function RetainersPage() {
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 12 }}>
                 <button
                   type="button"
-                  onClick={() => setShowModal(false)}
+                  onClick={richiediChiusura}
                   style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)', cursor: 'pointer' }}
                 >
                   Annulla
@@ -367,7 +370,8 @@ export function RetainersPage() {
               </div>
             </form>
           </div>
-        </div>
+          )}
+        </Modal>
       )}
     </div>
   );

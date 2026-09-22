@@ -13,6 +13,7 @@
 import { useState } from 'react';
 import { salvaDocumentoApi } from '../../api/client';
 import { useMicrovociProgetto } from '../../hooks/useMicrovociProgetto';
+import { Modal } from '../ui/Modal';
 
 interface Props {
   progettoId: string;
@@ -85,15 +86,12 @@ export function ModaleCaricaNellArchivio({ progettoId, nomeProgetto, onChiudi, o
   };
 
   return (
-    <div
-      onClick={onChiudi}
-      style={{ position: 'fixed', inset: 0, background: 'rgba(2,6,23,0.72)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}
-    >
+    <Modal onClose={onChiudi} overlayBackground="rgba(2,6,23,0.72)" zIndex={1000} labelledBy="carica-archivio-titolo">
+      {(richiediChiusura) => (
       <div
-        onClick={(e) => e.stopPropagation()}
         style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 14, padding: '1.5rem', width: 'min(560px, 100%)', maxHeight: '90vh', overflowY: 'auto' }}
       >
-        <h3 style={{ margin: 0, fontSize: 16 }}>⬆️ Carica un documento nell'archivio</h3>
+        <h3 id="carica-archivio-titolo" style={{ margin: 0, fontSize: 16 }}>⬆️ Carica un documento nell'archivio</h3>
         <p style={{ color: 'var(--muted)', fontSize: 12.5, margin: '6px 0 1.25rem 0' }}>
           Cartella di destinazione: <strong style={{ color: 'var(--text)' }}>{nomeProgetto}</strong>
         </p>
@@ -164,7 +162,7 @@ export function ModaleCaricaNellArchivio({ progettoId, nomeProgetto, onChiudi, o
 
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: '1.5rem' }}>
           <button
-            onClick={onChiudi}
+            onClick={richiediChiusura}
             disabled={caricamento}
             style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--text)', padding: '9px 16px', borderRadius: 8, cursor: 'pointer', fontSize: 12.5 }}
           >
@@ -179,6 +177,7 @@ export function ModaleCaricaNellArchivio({ progettoId, nomeProgetto, onChiudi, o
           </button>
         </div>
       </div>
-    </div>
+      )}
+    </Modal>
   );
 }

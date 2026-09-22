@@ -41,6 +41,7 @@ import {
   oraMostrata,
 } from '../../utils/calendarioDate';
 import { CATEGORIE, ETICHETTE_STATO, coloreCategoria } from '../calendar/comune';
+import { Modal } from '../ui/Modal';
 
 interface Props {
   project: Progetto;
@@ -232,9 +233,10 @@ export function CalendarioProgettoTab({ project }: Props) {
       </div>
 
       {modaleAperto && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 110, padding: 16 }}>
+        <Modal onClose={() => setModaleAperto(false)} labelledBy="titolo-nuova-scadenza" zIndex={110}>
+          {(richiediChiusura) => (
           <form onSubmit={invia} style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, padding: 22, width: '100%', maxWidth: 440, display: 'flex', flexDirection: 'column', gap: 14, maxHeight: '90vh', overflowY: 'auto' }}>
-            <div style={{ fontSize: 16, fontWeight: 700 }}>+ Programma nuova scadenza incarico</div>
+            <div id="titolo-nuova-scadenza" style={{ fontSize: 16, fontWeight: 700 }}>+ Programma nuova scadenza incarico</div>
             <div style={{ fontSize: 11, color: 'var(--muted)' }}>
               La scadenza compare nel calendario dello studio, non solo qui.
             </div>
@@ -288,7 +290,7 @@ export function CalendarioProgettoTab({ project }: Props) {
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
-              <button type="button" onClick={() => setModaleAperto(false)} style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '7px 14px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}>
+              <button type="button" onClick={richiediChiusura} style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '7px 14px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}>
                 Annulla
               </button>
               <button type="submit" disabled={inCorso} style={{ background: 'var(--indigo)', color: 'var(--on-accent)', border: 'none', padding: '7px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: inCorso ? 'wait' : 'pointer', opacity: inCorso ? 0.7 : 1 }}>
@@ -296,7 +298,8 @@ export function CalendarioProgettoTab({ project }: Props) {
               </button>
             </div>
           </form>
-        </div>
+          )}
+        </Modal>
       )}
     </div>
   );

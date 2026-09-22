@@ -1,3 +1,5 @@
+import { Modal } from '../ui/Modal';
+
 interface InvoicePreviewModalProps {
   coloreTemaFattura: string;
   logoUrl: string;
@@ -27,7 +29,7 @@ export function InvoicePreviewModal({
   setPreviewOpen,
 }: InvoicePreviewModalProps) {
   return (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 120, padding: 16 }}>
+        <Modal onClose={() => setPreviewOpen(false)} zIndex={120} overlayBackground="rgba(0,0,0,.85)" dirty={false} ariaLabel="Anteprima fattura PDF">
           <div data-theme="light" style={{ background: '#fff', color: 'var(--text)', borderRadius: 16, padding: 32, width: '100%', maxWidth: 660, maxHeight: '90vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 20, boxShadow: '0 24px 60px rgba(0,0,0,.6)' }}>
             {/* Header Documento con Colore Personalizzato */}
             <div style={{ borderBottom: `3px solid ${coloreTemaFattura}`, paddingBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -106,6 +108,6 @@ export function InvoicePreviewModal({
               </button>
             </div>
           </div>
-        </div>
+        </Modal>
   );
 }

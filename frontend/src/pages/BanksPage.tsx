@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { fetchContiBancariApi, creaContoBancarioApi } from '../api/client';
 import { fmt } from '../utils';
 import { useToast } from '../components/ui/ToastProvider';
+import { Modal } from '../components/ui/Modal';
 
 export function BanksPage() {
   const toast = useToast();
@@ -180,9 +181,10 @@ export function BanksPage() {
 
       {/* Modal Nuovo Conto */}
       {modalOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
+        <Modal onClose={() => setModalOpen(false)} overlayBackground="rgba(0,0,0,0.7)" zIndex={1000} labelledBy="titolo-nuovo-conto">
+          {(richiediChiusura) => (
           <div style={{ background: 'var(--card)', borderRadius: 16, padding: '2rem', width: '100%', maxWidth: 500, border: '1px solid var(--border)' }}>
-            <h3 style={{ margin: '0 0 1.5rem 0' }}>Aggiungi Conto Corrente / Cassa Studio</h3>
+            <h3 id="titolo-nuovo-conto" style={{ margin: '0 0 1.5rem 0' }}>Aggiungi Conto Corrente / Cassa Studio</h3>
             <form onSubmit={handleCreateConto} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
                 <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Nome Conto *</label>
@@ -258,7 +260,7 @@ export function BanksPage() {
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 12 }}>
                 <button
                   type="button"
-                  onClick={() => setModalOpen(false)}
+                  onClick={richiediChiusura}
                   style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)', cursor: 'pointer' }}
                 >
                   Annulla
@@ -273,7 +275,8 @@ export function BanksPage() {
               </div>
             </form>
           </div>
-        </div>
+          )}
+        </Modal>
       )}
     </div>
   );

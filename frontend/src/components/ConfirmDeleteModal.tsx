@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Modal } from './ui/Modal';
 
 interface ConfirmDeleteModalProps {
   isOpen: boolean;
@@ -38,11 +39,12 @@ export const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({
   };
 
   return (
-    <div style={overlayStyle}>
+    <Modal onClose={onClose} zIndex={1000} overlayBackground="rgba(0,0,0,.7)" labelledBy="conferma-elimina-titolo">
+      {(richiediChiusura) => (
       <div style={modalStyle}>
         <div style={headerStyle}>
-          <h2>Elimina Progetto</h2>
-          <button style={closeBtnStyle} onClick={onClose}>×</button>
+          <h2 id="conferma-elimina-titolo">Elimina Progetto</h2>
+          <button style={closeBtnStyle} onClick={richiediChiusura} aria-label="Chiudi">×</button>
         </div>
 
         <div style={contentStyle}>
@@ -75,7 +77,7 @@ export const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({
         </div>
 
         <div style={footerStyle}>
-          <button style={secondaryBtnStyle} onClick={onClose} disabled={isDeleting}>
+          <button style={secondaryBtnStyle} onClick={richiediChiusura} disabled={isDeleting}>
             Annulla
           </button>
           {!hasInvoices && (
@@ -89,11 +91,11 @@ export const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({
           )}
         </div>
       </div>
-    </div>
+      )}
+    </Modal>
   );
 };
 
-const overlayStyle: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 };
 const modalStyle: React.CSSProperties = { background: 'var(--card)', borderRadius: 12, width: '100%', maxWidth: '500px', display: 'flex', flexDirection: 'column', maxHeight: '90vh', border: '1px solid var(--border)', overflow: 'hidden' };
 const headerStyle: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '1px solid var(--border)', background: 'var(--card2)' };
 const closeBtnStyle: React.CSSProperties = { background: 'transparent', border: 'none', fontSize: 24, cursor: 'pointer', color: 'var(--muted)' };

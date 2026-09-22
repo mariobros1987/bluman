@@ -3,6 +3,7 @@ import { fmt } from '../utils';
 import { setActiveTenantId } from '../utils/tenant';
 import { fetchAdminTenantsApi, createAdminTenantApi, updateAdminTenantApi, deleteAdminTenantApi, resetPasswordTenantApi } from '../api/client';
 import { useToast } from '../components/ui/ToastProvider';
+import { confirm } from '../components/ui/ConfirmProvider';
 
 interface TenantStudio {
   id: string;
@@ -171,10 +172,13 @@ export function SuperAdminPage() {
   // È il passaggio obbligato prima dell'eliminazione definitiva.
   const handleArchive = async (tenant: TenantStudio) => {
     const archiviare = tenant.stato !== 'archiviato';
+    const titolo = archiviare
+      ? `Archiviare lo studio "${tenant.ragioneSociale}"?`
+      : `Ripristinare lo studio "${tenant.ragioneSociale}"?`;
     const messaggio = archiviare
-      ? `Archiviare lo studio "${tenant.ragioneSociale}"?\n\nGli utenti dello studio non potranno più accedere. I dati restano intatti e lo studio si può ripristinare. Solo uno studio archiviato può poi essere eliminato definitivamente.`
-      : `Ripristinare lo studio "${tenant.ragioneSociale}"?\n\nTornerà attivo e i suoi utenti potranno accedere di nuovo.`;
-    if (!confirm(messaggio)) return;
+      ? 'Gli utenti dello studio non potranno più accedere. I dati restano intatti e lo studio si può ripristinare. Solo uno studio archiviato può poi essere eliminato definitivamente.'
+      : 'Tornerà attivo e i suoi utenti potranno accedere di nuovo.';
+    if (!(await confirm({ titolo, messaggio, confermaLabel: archiviare ? 'Archivia' : 'Ripristina', pericolo: archiviare }))) return;
     const nuovoStato: 'archiviato' | 'attivo' = archiviare ? 'archiviato' : 'attivo';
     try {
       await updateAdminTenantApi(tenant.id, { stato: nuovoStato });
@@ -260,7 +264,7 @@ export function SuperAdminPage() {
    * parte, quindi l'unica strada è emetterne una nuova.
    */
   const handleRigeneraPassword = async (t: TenantStudio) => {
-    if (!confirm(`Rigenerare la password di accesso per ${t.leadAdvisorEmail}?\n\nLa password attuale smetterà di funzionare immediatamente.`)) return;
+    if (!(await confirm({ titolo: `Rigenerare la password di accesso per ${t.leadAdvisorEmail}?`, messaggio: 'La password attuale smetterà di funzionare immediatamente.', confermaLabel: 'Rigenera', pericolo: true }))) return;
     setRigenerandoPassword(true);
     try {
       const res = await resetPasswordTenantApi(t.id);
@@ -280,7 +284,7 @@ export function SuperAdminPage() {
     // l'URL poteva spedire email a nome dello studio. Ora è il backend autenticato che
     // rigenera la password E la spedisce nella stessa chiamata: la password non passa mai
     // dal browser e l'esito riportato è quello vero (regola 7).
-    if (!confirm(`Inviare le credenziali di accesso a ${t.leadAdvisorEmail}?\n\nViene emessa una nuova password: quella attuale smetterà di funzionare immediatamente.`)) return;
+    if (!(await confirm({ titolo: `Inviare le credenziali di accesso a ${t.leadAdvisorEmail}?`, messaggio: 'Viene emessa una nuova password: quella attuale smetterà di funzionare immediatamente.', confermaLabel: 'Invia', pericolo: true }))) return;
     setSendingInvite(true);
     try {
       const res = await resetPasswordTenantApi(t.id, { invia: true });

@@ -1,4 +1,5 @@
 import type { TeamMember } from '../../types';
+import { Modal } from '../ui/Modal';
 
 // ─── Modal Gestione Accessi Collegati al Progetto (§19) ───────────
 export function ModalAccessiProgetto({
@@ -21,9 +22,10 @@ export function ModalAccessiProgetto({
   onAssegna: () => void;
 }) {
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 16 }}>
+    <Modal onClose={onChiudi} labelledBy="titolo-accessi-progetto" zIndex={100}>
+      {(richiediChiusura) => (
       <div style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, padding: 20, width: '100%', maxWidth: 480, display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <div style={{ fontSize: 15, fontWeight: 600 }}>Gestione Accessi Collegati al Progetto (§19)</div>
+        <div id="titolo-accessi-progetto" style={{ fontSize: 15, fontWeight: 600 }}>Gestione Accessi Collegati al Progetto (§19)</div>
         <div style={{ fontSize: 11, color: 'var(--muted)' }}>Associa collaboratori ed advisor al progetto con permessi specifici di accesso</div>
 
         <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 10, padding: 12 }}>
@@ -57,7 +59,7 @@ export function ModalAccessiProgetto({
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
-          <button onClick={onChiudi} style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '7px 14px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}>Chiudi</button>
+          <button onClick={richiediChiusura} style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '7px 14px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}>Chiudi</button>
           <button
             onClick={onAssegna}
             style={{ background: 'var(--indigo)', color: 'var(--on-accent)', border: 'none', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer' }}
@@ -66,6 +68,7 @@ export function ModalAccessiProgetto({
           </button>
         </div>
       </div>
-    </div>
+      )}
+    </Modal>
   );
 }

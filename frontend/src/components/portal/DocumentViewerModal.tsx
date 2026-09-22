@@ -1,6 +1,7 @@
 import { urlFileArchivio } from '../../api/client';
 import type { DocumentoPortale } from '../../api/client';
 import { dataOraLeggibile } from './format';
+import { Modal } from '../ui/Modal';
 
 export interface DocumentViewerModalProps {
   selectedViewerDoc: any;
@@ -28,14 +29,14 @@ export function DocumentViewerModal({
   avviaFirmaDocumento,
 }: DocumentViewerModalProps) {
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000, padding: 20 }}>
+    <Modal onClose={() => setSelectedViewerDoc(null)} zIndex={10000} overlayBackground="rgba(0,0,0,.85)" dirty={false} labelledBy="doc-viewer-titolo">
       <div style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, width: '100%', maxWidth: 880, maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,.6)' }}>
         {/* Top Modal Bar */}
         <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--card)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={{ fontSize: 22 }}>📄</span>
             <div>
-              <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>{selectedViewerDoc.titolo || selectedViewerDoc.nome}</h3>
+              <h3 id="doc-viewer-titolo" style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>{selectedViewerDoc.titolo || selectedViewerDoc.nome}</h3>
               <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
                 {selectedViewerDoc.nome} · Cliente: <strong>{clientName}</strong> · Categoria: {selectedViewerDoc.categoria}
               </div>
@@ -43,6 +44,7 @@ export function DocumentViewerModal({
           </div>
           <button
             onClick={() => setSelectedViewerDoc(null)}
+            aria-label="Chiudi"
             style={{ background: 'transparent', border: 'none', color: 'var(--muted)', fontSize: 20, cursor: 'pointer', padding: '4px 8px' }}
           >
             ✕
@@ -198,6 +200,6 @@ export function DocumentViewerModal({
           </div>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }

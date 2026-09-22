@@ -1,4 +1,5 @@
 import { livelloDaStandard, SOTTOTITOLO_RICEVUTA, NOTA_LEGALE_RICEVUTA } from './livelloFirma';
+import { Modal } from '../ui/Modal';
 
 export interface SuccessSealModalProps {
   successSealModal: any;
@@ -22,7 +23,7 @@ export function SuccessSealModal({
   const livello = livelloDaStandard(successSealModal.standard);
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 12000, padding: 16 }}>
+    <Modal onClose={() => setSuccessSealModal(null)} zIndex={12000} overlayBackground="rgba(0,0,0,0.85)" dirty={false} labelledBy="success-seal-titolo">
       <div style={{ background: 'var(--sidebar)', border: '1.5px solid var(--green)', borderRadius: 20, width: '100%', maxWidth: 580, maxHeight: '90vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', boxShadow: '0 25px 70px rgba(16,185,129,0.25)' }}>
         {/* Header Sigillo */}
         <div style={{ background: 'linear-gradient(135deg, var(--pill-green-bg) 0%, var(--pill-green-bg) 100%)', padding: '20px 24px', borderBottom: '1px solid var(--green)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -31,7 +32,7 @@ export function SuccessSealModal({
               ✓
             </div>
             <div>
-              <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--pill-green-fg)' }}>
+              <div id="success-seal-titolo" style={{ fontSize: 16, fontWeight: 800, color: 'var(--pill-green-fg)' }}>
                 Documento Sottoscritto con Successo
               </div>
               <div style={{ fontSize: 11, color: 'var(--pill-green-fg)', fontWeight: 600, marginTop: 2 }}>
@@ -42,6 +43,7 @@ export function SuccessSealModal({
           <button
             type="button"
             onClick={() => setSuccessSealModal(null)}
+            aria-label="Chiudi"
             style={{ background: 'transparent', border: 'none', color: 'var(--pill-green-fg)', fontSize: 18, cursor: 'pointer', padding: 4 }}
           >
             ✕
@@ -174,6 +176,6 @@ export function SuccessSealModal({
           </button>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }

@@ -3,6 +3,7 @@ import type { DocumentTemplate } from '../../utils/documentTemplates';
 import type { MicroVoce } from '../../types';
 import { ALL_STUDIO_TEMPLATES } from './catalogoModelliStudio';
 import { closeBtnStyle } from './passaggioStyles';
+import { Modal } from '../ui/Modal';
 
 // ─── Modale Catalogo Completo 30 Modelli Studio ────────────────────────
 export function ModaleCatalogo({
@@ -21,14 +22,15 @@ export function ModaleCatalogo({
   handleApplyTemplate: (tmpl: DocumentTemplate, stepId?: string) => void;
 }) {
   return (
-          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000, padding: 16 }}>
+          <Modal onClose={() => setShowCatalogModal(false)} overlayBackground="rgba(0,0,0,0.8)" zIndex={10000} labelledBy="catalogo-titolo">
+            {(richiediChiusura) => (
             <div style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, width: '100%', maxWidth: 740, maxHeight: '85vh', display: 'flex', flexDirection: 'column', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7)' }}>
               <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--indigo-l)' }}>📂 Catalogo Completo Modelli Studio ({ALL_STUDIO_TEMPLATES.length} Atti)</div>
+                  <div id="catalogo-titolo" style={{ fontSize: 15, fontWeight: 700, color: 'var(--indigo-l)' }}>📂 Catalogo Completo Modelli Studio ({ALL_STUDIO_TEMPLATES.length} Atti)</div>
                   <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>Seleziona l'atto societario, tributario o contrattuale da associare alla voce "{voce.n}"</div>
                 </div>
-                <button onClick={() => setShowCatalogModal(false)} style={closeBtnStyle}>✕</button>
+                <button aria-label="Chiudi" onClick={richiediChiusura} style={closeBtnStyle}>✕</button>
               </div>
 
               {/* Filtri Categoria */}
@@ -74,6 +76,7 @@ export function ModaleCatalogo({
                 ))}
               </div>
             </div>
-          </div>
+            )}
+          </Modal>
   );
 }

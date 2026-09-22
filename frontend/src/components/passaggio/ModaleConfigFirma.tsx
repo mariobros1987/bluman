@@ -1,6 +1,7 @@
 import React from 'react';
 import type { ConfigFirmaModalState } from './types';
 import { closeBtnStyle } from './passaggioStyles';
+import { Modal } from '../ui/Modal';
 
 // ─── Modale Configurazione Documento (Upload / Genera da Template) ─────
 export function ModaleConfigFirma({
@@ -13,19 +14,20 @@ export function ModaleConfigFirma({
   eseguiSalvataggioConfigurato: () => void;
 }) {
   return (
-          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 11000, padding: 16 }}>
+          <Modal onClose={() => setConfigFirmaModal(null)} overlayBackground="rgba(0,0,0,0.85)" zIndex={11000} labelledBy="config-firma-titolo">
+            {(richiediChiusura) => (
             <div style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, width: '100%', maxWidth: 580, maxHeight: '90vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', boxShadow: '0 25px 60px rgba(0,0,0,0.8)' }}>
               {/* Header */}
               <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', background: 'var(--card)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                  <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--indigo-l)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div id="config-firma-titolo" style={{ fontSize: 15, fontWeight: 800, color: 'var(--indigo-l)', display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span>✍️</span> Configurazione Documento & Metodo di Firma
                   </div>
                   <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
                     Definisci se questo atto richiede la firma del cliente e con quale modalità legale.
                   </div>
                 </div>
-                <button type="button" onClick={() => setConfigFirmaModal(null)} style={closeBtnStyle}>✕</button>
+                <button type="button" aria-label="Chiudi" onClick={richiediChiusura} style={closeBtnStyle}>✕</button>
               </div>
 
               {/* Body */}
@@ -283,7 +285,7 @@ export function ModaleConfigFirma({
               <div style={{ padding: '14px 20px', borderTop: '1px solid var(--border)', background: 'var(--card)', display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
                 <button
                   type="button"
-                  onClick={() => setConfigFirmaModal(null)}
+                  onClick={richiediChiusura}
                   style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '7px 14px', borderRadius: 8, fontSize: 11.5, cursor: 'pointer' }}
                 >
                   Annulla
@@ -297,6 +299,7 @@ export function ModaleConfigFirma({
                 </button>
               </div>
             </div>
-          </div>
+            )}
+          </Modal>
   );
 }

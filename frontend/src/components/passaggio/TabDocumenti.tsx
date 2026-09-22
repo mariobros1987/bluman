@@ -12,6 +12,7 @@ import type { RecommendationResult } from './catalogoModelliStudio';
 import { etichettaTipoFirma } from './passaggioUtils';
 import { FirmaStudioModal } from '../documenti/FirmaStudioModal';
 import { useToast } from '../ui/ToastProvider';
+import { confirm } from '../ui/ConfirmProvider';
 
 // ─── Tab 3: Documenti & Pre-screening AI ───────────────────────────────
 export function TabDocumenti({
@@ -360,7 +361,7 @@ export function TabDocumenti({
                             <button
                               type="button"
                               onClick={async () => {
-                                if (confirm(`Sei sicuro di voler eliminare il documento "${d.nome}"?`)) {
+                                if (await confirm({ messaggio: `Sei sicuro di voler eliminare il documento "${d.nome}"?`, confermaLabel: 'Elimina', pericolo: true })) {
                                   if (effProgettoId && !d.id.startsWith('d-')) {
                                     try {
                                       await eliminaDocumentoApi(d.id);
@@ -409,10 +410,11 @@ export function TabDocumenti({
                                   <button
                                     type="button"
                                     onClick={async () => {
-                                      if (!confirm(
-                                        `Il documento "${d.nome}" è firmato dal cliente: non può essere eliminato.\n` +
-                                        'Vuoi archiviarlo? Scomparirà dalle liste operative ma il file e la firma restano conservati nello storico.'
-                                      )) return;
+                                      if (!(await confirm({
+                                        titolo: `Il documento "${d.nome}" è firmato dal cliente: non può essere eliminato.`,
+                                        messaggio: 'Vuoi archiviarlo? Scomparirà dalle liste operative ma il file e la firma restano conservati nello storico.',
+                                        confermaLabel: 'Archivia',
+                                      }))) return;
                                       try {
                                         await archiviaDocumentoApi(d.id);
                                         const nextDocs = documents.filter(doc => doc.id !== d.id);

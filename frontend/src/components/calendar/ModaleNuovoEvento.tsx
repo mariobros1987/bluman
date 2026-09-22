@@ -28,6 +28,7 @@ import { useState, type CSSProperties, type FormEvent } from 'react';
 import { creaEventoCalendario } from '../../api/calendario';
 import type { TeamMember } from '../../types';
 import { istanteDaGiornoEOra, type GiornoIso } from '../../utils/calendarioDate';
+import { Modal } from '../ui/Modal';
 
 export interface ClienteSemplice {
   id: string;
@@ -96,9 +97,10 @@ export function ModaleNuovoEvento({ giornoIniziale, clienti, team, onChiudi, onC
   };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 16 }}>
+    <Modal onClose={onChiudi} labelledBy="titolo-nuovo-evento" zIndex={100}>
+      {(richiediChiusura) => (
       <form onSubmit={invia} style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, padding: 22, width: '100%', maxWidth: 480, display: 'flex', flexDirection: 'column', gap: 14, maxHeight: '90vh', overflowY: 'auto' }}>
-        <div style={{ fontSize: 16, fontWeight: 700 }}>+ Nuovo Evento / Promemoria Studio</div>
+        <div id="titolo-nuovo-evento" style={{ fontSize: 16, fontWeight: 700 }}>+ Nuovo Evento / Promemoria Studio</div>
 
         {errore && (
           <div role="alert" style={{ background: 'var(--pill-red-bg)', border: '1px solid var(--pill-red-bd)', color: 'var(--pill-red-fg)', padding: '10px 14px', borderRadius: 10, fontSize: 11, fontWeight: 600 }}>
@@ -190,7 +192,7 @@ export function ModaleNuovoEvento({ giornoIniziale, clienti, team, onChiudi, onC
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 6 }}>
-          <button type="button" onClick={onChiudi} style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '7px 14px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}>
+          <button type="button" onClick={richiediChiusura} style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '7px 14px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}>
             Annulla
           </button>
           <button type="submit" disabled={inCorso} style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '7px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: inCorso ? 'wait' : 'pointer', opacity: inCorso ? 0.7 : 1 }}>
@@ -198,6 +200,7 @@ export function ModaleNuovoEvento({ giornoIniziale, clienti, team, onChiudi, onC
           </button>
         </div>
       </form>
-    </div>
+      )}
+    </Modal>
   );
 }

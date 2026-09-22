@@ -22,6 +22,7 @@ import { useCartellaTemplate } from '../hooks/useCartellaTemplate';
 import { exportTemplatesAsJson, type DocumentTemplate } from '../utils/documentTemplates';
 import { SchedaModello } from '../components/documenti/SchedaModello';
 import { ModaleRevisioneModello } from '../components/documenti/ModaleRevisioneModello';
+import { confirm } from '../components/ui/ConfirmProvider';
 
 type FiltroStato = 'tutti' | 'approvato' | 'in_revisione' | 'bozza' | 'serie';
 
@@ -339,8 +340,8 @@ export function CartellaModelliPage() {
                   onApri={() => navigate(m.id ? `/documents?tmplId=${m.id}` : '/documents')}
                   onRevisiona={() => setInRevisione(m)}
                   onArchivia={(archiviato) => void esegui(m.id || m.titolo, () => cartella.archivia(m, archiviato))}
-                  onElimina={() => {
-                    if (!window.confirm(`Eliminare il modello «${m.titolo}»?\n\nI documenti già generati nei progetti restano invariati.`)) return;
+                  onElimina={async () => {
+                    if (!(await confirm({ messaggio: `Eliminare il modello «${m.titolo}»? I documenti già generati nei progetti restano invariati.`, confermaLabel: 'Elimina', pericolo: true }))) return;
                     void esegui(m.id || m.titolo, () => cartella.elimina(m));
                   }}
                 />

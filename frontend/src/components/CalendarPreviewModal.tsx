@@ -45,6 +45,7 @@ import {
   oggi,
   type GiornoIso,
 } from '../utils/calendarioDate';
+import { Modal } from './ui/Modal';
 
 /** Quello che il modale raccoglie. Un oggetto e non otto parametri posizionali. */
 export interface PianificazioneScadenza {
@@ -164,10 +165,8 @@ export function CalendarPreviewModal({
   };
 
   return (
-    <div style={{
-      position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.85)', backdropFilter: 'blur(6px)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 16,
-    }}>
+    <Modal onClose={onChiudi} zIndex={9999} overlayBackground="rgba(15,23,42,0.85)" labelledBy="calendario-scadenza-titolo">
+      {(richiediChiusura) => (
       <div style={{
         background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 20,
         maxWidth: 680, width: '100%', maxHeight: '92vh', overflowY: 'auto', padding: 26,
@@ -178,12 +177,12 @@ export function CalendarPreviewModal({
             <div style={{ fontSize: 10, textTransform: 'uppercase', color: 'var(--indigo-l)', fontWeight: 800, letterSpacing: '1px' }}>
               📅 Pianificazione scadenzario studio
             </div>
-            <h3 style={{ fontSize: 18, fontWeight: 800, margin: '4px 0 0 0' }}>Programma scadenza / riunione</h3>
+            <h3 id="calendario-scadenza-titolo" style={{ fontSize: 18, fontWeight: 800, margin: '4px 0 0 0' }}>Programma scadenza / riunione</h3>
             <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
               Attività: <strong style={{ color: 'var(--indigo-l)' }}>{microvoceName}</strong> ({projectName})
             </div>
           </div>
-          <button type="button" onClick={onChiudi} aria-label="Chiudi" style={{ background: 'var(--card2)', border: '1px solid var(--border)', color: 'var(--muted)', width: 32, height: 32, borderRadius: 8, cursor: 'pointer', fontSize: 16 }}>
+          <button type="button" onClick={richiediChiusura} aria-label="Chiudi" style={{ background: 'var(--card2)', border: '1px solid var(--border)', color: 'var(--muted)', width: 32, height: 32, borderRadius: 8, cursor: 'pointer', fontSize: 16 }}>
             ✕
           </button>
         </div>
@@ -334,7 +333,7 @@ export function CalendarPreviewModal({
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, borderTop: '1px solid var(--border)', paddingTop: 16 }}>
-            <button type="button" onClick={onChiudi} style={{ background: 'var(--card2)', border: '1px solid var(--border)', color: 'var(--muted)', padding: '8px 18px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+            <button type="button" onClick={richiediChiusura} style={{ background: 'var(--card2)', border: '1px solid var(--border)', color: 'var(--muted)', padding: '8px 18px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
               Annulla
             </button>
             <button
@@ -347,6 +346,7 @@ export function CalendarPreviewModal({
           </div>
         </form>
       </div>
-    </div>
+      )}
+    </Modal>
   );
 }

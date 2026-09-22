@@ -4,6 +4,7 @@ import { fetchProgetti, salvaProgettoDettaglioApi } from '../api/client';
 import { getCurrentTenantId, getTenantStorageKey, getTenantSeedData, BLUECODE_TENANT_ID } from '../utils/tenant';
 import type { Progetto } from '../types';
 import { useToast } from './ui/ToastProvider';
+import { Modal } from './ui/Modal';
 
 interface TimeTrackerProps {
   user?: any;
@@ -402,11 +403,12 @@ export function QuickTimeTracker({ user }: TimeTrackerProps) {
 
       {/* Modale Consuntivazione Fine Sessione */}
       {showStopModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 16 }}>
+        <Modal onClose={() => setShowStopModal(false)} labelledBy="titolo-consuntivazione" zIndex={9999} overlayBackground="rgba(0,0,0,0.7)">
+          {(richiediChiusura) => (
           <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, padding: 24, maxWidth: 480, width: '100%', boxShadow: '0 20px 40px rgba(0,0,0,0.5)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--indigo-l)' }}>⏱ Consuntivazione Sessione di Lavoro</div>
-              <button onClick={() => setShowStopModal(false)} style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: 18, cursor: 'pointer' }}>✕</button>
+              <div id="titolo-consuntivazione" style={{ fontSize: 16, fontWeight: 800, color: 'var(--indigo-l)' }}>⏱ Consuntivazione Sessione di Lavoro</div>
+              <button onClick={richiediChiusura} aria-label="Chiudi" style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: 18, cursor: 'pointer' }}>✕</button>
             </div>
 
             <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 14, marginBottom: 16 }}>
@@ -503,7 +505,8 @@ export function QuickTimeTracker({ user }: TimeTrackerProps) {
               </button>
             </div>
           </div>
-        </div>
+          )}
+        </Modal>
       )}
     </div>
   );

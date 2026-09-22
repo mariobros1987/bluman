@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useToast } from './ui/ToastProvider';
+import { confirm } from './ui/ConfirmProvider';
 import type { DocumentTemplate } from '../utils/documentTemplates';
 import {
   salvaDocumentoApi,
@@ -109,8 +110,8 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
     }
   };
 
-  const handleDeleteStep = (id: string) => {
-    if (!confirm('Sei sicuro di voler eliminare questo passaggio dalla checklist?')) return;
+  const handleDeleteStep = async (id: string) => {
+    if (!(await confirm({ messaggio: 'Sei sicuro di voler eliminare questo passaggio dalla checklist?', confermaLabel: 'Elimina', pericolo: true }))) return;
     const nextSteps = steps.filter(s => s.id !== id);
     setSteps(nextSteps);
     voce.proc = nextSteps;
@@ -409,7 +410,7 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
 
   // Rimetti documento in bozza interna
   const handleRimettiInBozza = async (docId: string) => {
-    if (!confirm('Vuoi rimettere questo documento in bozza interna? Il cliente non lo vedrà più fino a nuova pubblicazione.')) return;
+    if (!(await confirm({ messaggio: 'Vuoi rimettere questo documento in bozza interna? Il cliente non lo vedrà più fino a nuova pubblicazione.', confermaLabel: 'Rimetti in bozza' }))) return;
     try {
       await aggiornaStatoDocumentoApi(docId, 'bozza');
       toast.successo('Documento rimesso in bozza interna.');

@@ -4,6 +4,7 @@ import { fmt } from '../../utils';
 import { getTenantStorageKey } from '../../utils/tenant';
 import { ProgressBar } from '../ui/ProgressBar';
 import { useToast } from '../ui/ToastProvider';
+import { Modal } from '../ui/Modal';
 
 // ─── Modal Performance Operatore & Report Ore ──────────────────────
 export function OperatorDetailModal({
@@ -107,6 +108,9 @@ export function OperatorDetailModal({
     audit: 'denied',
   });
   const [savingPermessi, setSavingPermessi] = useState(false);
+  // La matrice RBAC si modifica con pulsanti, non con input nativi: l'auto-dirty del Modal
+  // non li intercetta, quindi teniamo noi lo stato "modificato" e lo passiamo come prop `dirty`.
+  const [modificato, setModificato] = useState(false);
 
   useEffect(() => {
     async function loadPermessi() {
@@ -175,6 +179,7 @@ export function OperatorDetailModal({
       try {
         await salvaPermessiUtenteApi(operator.id, payload);
         setSavingPermessi(false);
+        setModificato(false);
         toast.successo(`Matrice Permessi RBAC salvata ed ATTIVA per ${operator.nome || operator.name}! I moduli bloccati (Denied) sono ora inaccessibili.`);
       } catch (err: any) {
         setSavingPermessi(false);
@@ -205,7 +210,8 @@ export function OperatorDetailModal({
   ];
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 120, padding: 16 }}>
+    <Modal onClose={onClose} overlayBackground="rgba(0,0,0,.8)" zIndex={120} dirty={modificato} labelledBy="operator-detail-titolo">
+      {(richiediChiusura) => (
       <div style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, width: '100%', maxWidth: 820, maxHeight: '92vh', overflowY: 'auto', padding: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
         
         {loading && <div style={{ fontSize: 11, color: 'var(--muted)', textAlign: 'center' }}>⏳ Caricamento dati operatore...</div>}
@@ -216,7 +222,7 @@ export function OperatorDetailModal({
               {nameInitial}
             </div>
             <div>
-              <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div id="operator-detail-titolo" style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 10 }}>
                 <span>{operator.nome || operator.name}</span>
                 <span style={{ fontSize: 11, background: 'var(--surface-1)', color: 'var(--indigo-l)', padding: '3px 10px', borderRadius: 12, border: '1px solid var(--indigo-d)', fontWeight: 600 }}>
                   {operator.ruolo || operator.role || 'Collaboratore'}
@@ -228,7 +234,7 @@ export function OperatorDetailModal({
             </div>
           </div>
 
-          <button onClick={onClose} style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', width: 32, height: 32, borderRadius: '50%', fontSize: 16, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+          <button aria-label="Chiudi" onClick={richiediChiusura} style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', width: 32, height: 32, borderRadius: '50%', fontSize: 16, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
         </div>
 
         {/* Tab Selector */}
@@ -267,7 +273,7 @@ export function OperatorDetailModal({
                         <button
                           key={lvl}
                           type="button"
-                          onClick={() => setPermessiMap({ ...permessiMap, [m.key]: lvl })}
+                          onClick={() => { setPermessiMap({ ...permessiMap, [m.key]: lvl }); setModificato(true); }}
                           style={{
                             padding: '6px 12px',
                             borderRadius: 6,
@@ -421,7 +427,7 @@ export function OperatorDetailModal({
             ℹ️ Dati di consuntivazione sincronizzati con il Database Supabase.
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
-            <button onClick={onClose} style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '7px 14px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}>Chiudi Scheda</button>
+            <button onClick={richiediChiusura} style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '7px 14px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}>Chiudi Scheda</button>
             <button onClick={() => toast.successo(`Report Timesheet PDF di ${operator.nome || operator.name} scaricato con successo!`)} style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '7px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
               📊 Scarica Report Timesheet PDF
             </button>
@@ -429,6 +435,7 @@ export function OperatorDetailModal({
         </div>
 
       </div>
-    </div>
+      )}
+    </Modal>
   );
 }
