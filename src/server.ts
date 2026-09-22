@@ -77,6 +77,7 @@ import { registraRotteFornitori } from './routes/fornitori.js';
 import { registraRotteLiquidazioneIva } from './routes/liquidazioneIva.js';
 import { registraRotteSolleciti } from './routes/solleciti.js';
 import { registraRotteFascicoloFiscale } from './routes/fascicoloFiscale.js';
+import { registraRotteKyc } from './routes/kyc.js';
 // Rotte portale cliente (split dei monoliti): la registrazione avviene dentro
 // il wrapper register di buildServer, nello stesso punto di prima.
 import { registraRottePortale } from './routes/portale.js';
@@ -705,6 +706,7 @@ export function buildServer(app: AppPort): FastifyInstance {
   await registraRotteLiquidazioneIva(server);
   await registraRotteSolleciti(server);
   await registraRotteFascicoloFiscale(server);
+  await registraRotteKyc(server);
 
   // ── INCASSI, SCADENZARIO & PRIMA NOTA (STYLE OPENSTAMANAGER) ──────
   // Rotte estratte in src/routes/contabilita.ts, registrata nella sezione contabilità.
