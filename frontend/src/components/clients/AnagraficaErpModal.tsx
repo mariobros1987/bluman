@@ -5,6 +5,7 @@ import { getCurrentTenantId, getTenantStorageKey } from '../../utils/tenant';
 import { fmt } from '../../utils';
 import type { Cliente } from '../../types';
 import { Modal } from '../ui/Modal';
+import { fetchKycFascicoloApi, creaKycFascicoloApi, aggiornaStatoKycApi, type FascicoloKyc } from '../../api/kyc';
 
 // ─── Componente Anagrafica Completa Cliente ERP ────────────────────
 export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Cliente; onClose: () => void; onSaved: () => void }) {
@@ -134,6 +135,37 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
   const [ubo, setUbo] = useState(client.ubo || refJson.ubo || '');
   const [fontePatrimonio, setFontePatrimonio] = useState(client.fontePatrimonio || refJson.fontePatrimonio || '');
   const [dataKyc, setDataKyc] = useState(client.dataKyc || refJson.dataKyc || '');
+
+  // KYC governato §5.5: il fascicolo (fonte di verità del processo), distinto dai campi passivi qui sopra.
+  const [kycFasc, setKycFasc] = useState<FascicoloKyc | null>(null);
+  const [kycBusy, setKycBusy] = useState(false);
+  const [kycMsg, setKycMsg] = useState<string | null>(null);
+  useEffect(() => {
+    let annullato = false;
+    if (!client.id) return;
+    fetchKycFascicoloApi(client.id)
+      .then((r) => { if (!annullato) setKycFasc(r.fascicolo); })
+      .catch(() => { if (!annullato) setKycFasc(null); });
+    return () => { annullato = true; };
+  }, [client.id]);
+  const calcolaKyc = async () => {
+    if (!client.id) return;
+    setKycBusy(true); setKycMsg(null);
+    try {
+      const r = await creaKycFascicoloApi(client.id, { tipoCliente: tipo, pep: rischioAml === 'alto', paeseResidenza: nazione });
+      setKycFasc(r.fascicolo);
+      setKycMsg(`Fascicolo calcolato: ${r.fascicolo.livelloVerifica} — ${r.esito.motivazioni.join('; ')}`);
+    } catch (e: any) { setKycMsg(e?.message || 'Errore calcolo KYC'); } finally { setKycBusy(false); }
+  };
+  const cambiaStatoKyc = async (stato: string) => {
+    if (!kycFasc) return;
+    setKycBusy(true); setKycMsg(null);
+    try {
+      const r = await aggiornaStatoKycApi(kycFasc.id, stato);
+      setKycFasc(r.fascicolo);
+      setKycMsg(`Stato aggiornato: ${stato}`);
+    } catch (e: any) { setKycMsg(e?.message || 'Errore aggiornamento stato'); } finally { setKycBusy(false); }
+  };
 
   const [saving, setSaving] = useState(false);
 
@@ -680,6 +712,32 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
               <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Provenienza dei Fondi / Origine Patrimonio *</label>
               <input value={fontePatrimonio} onChange={e => setFontePatrimonio(e.target.value)} required />
             </div>
+
+            <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12, marginTop: 4 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8 }}>🛡 Fascicolo KYC governato (D.Lgs. 231/2007)</div>
+              {kycFasc ? (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', fontSize: 12 }}>
+                  <span style={badgeStatoKyc(kycFasc.stato)}>{etichettaStatoKyc(kycFasc.stato)}</span>
+                  <span style={{ color: 'var(--muted)' }}>Verifica: <strong>{kycFasc.livelloVerifica}</strong></span>
+                  <span style={{ color: 'var(--muted)' }}>Rischio: <strong>{kycFasc.rischioCalcolato}</strong> ({kycFasc.punteggioRischio})</span>
+                  {kycFasc.dataScadenza && <span style={{ color: 'var(--muted)' }}>Scad.: {new Date(kycFasc.dataScadenza).toLocaleDateString('it-IT')}</span>}
+                </div>
+              ) : (
+                <div style={{ fontSize: 12, color: 'var(--muted)' }}>Nessun fascicolo: il KYC è ancora solo un dato descrittivo. Calcolalo per aprire il processo governato.</div>
+              )}
+              <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+                <button type="button" disabled={kycBusy} onClick={calcolaKyc} className="btn btn-sm btn-secondary">
+                  {kycBusy ? '…' : (kycFasc ? '↻ Ricalcola / Rinnova' : '▶ Calcola KYC')}
+                </button>
+                {kycFasc?.stato === 'in_attesa_revisione' && (
+                  <>
+                    <button type="button" disabled={kycBusy} onClick={() => cambiaStatoKyc('approvato')} className="btn btn-sm btn-success">✓ Approva</button>
+                    <button type="button" disabled={kycBusy} onClick={() => cambiaStatoKyc('respinto')} className="btn btn-sm btn-danger">✗ Respingi</button>
+                  </>
+                )}
+              </div>
+              {kycMsg && <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6 }}>{kycMsg}</div>}
+            </div>
           </div>
         )}
 
@@ -694,6 +752,24 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
       )}
     </Modal>
   );
+}
+
+function etichettaStatoKyc(stato: string): string {
+  switch (stato) {
+    case 'approvato': return '✓ Approvato';
+    case 'respinto': return '✗ Respinto';
+    case 'scaduto': return '⚠ Scaduto';
+    case 'in_attesa_revisione': return '⏳ In attesa di revisione';
+    default: return 'Bozza';
+  }
+}
+
+function badgeStatoKyc(stato: string): React.CSSProperties {
+  const base: React.CSSProperties = { padding: '3px 8px', borderRadius: 12, fontSize: 11, fontWeight: 700 };
+  if (stato === 'approvato') return { ...base, background: 'var(--pill-green-bg)', color: 'var(--pill-green-fg)' };
+  if (stato === 'respinto' || stato === 'scaduto') return { ...base, background: 'var(--pill-red-bg)', color: 'var(--pill-red-fg)' };
+  if (stato === 'in_attesa_revisione') return { ...base, background: 'var(--pill-amber-bg)', color: 'var(--pill-amber-fg)' };
+  return { ...base, background: 'var(--surface-1)', color: 'var(--muted)' };
 }
 
 const tabBtn = (active: boolean): React.CSSProperties => ({
