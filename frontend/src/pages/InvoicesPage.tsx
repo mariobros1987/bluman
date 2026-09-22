@@ -5,6 +5,7 @@ import {
   createInvoiceApi,
   emettiInvoiceApi,
   emettiNotaCreditoApi,
+  ripresentaSdiApi,
   deleteInvoiceApi,
   registraIncassoApi,
   downloadFatturaPdfServerApi,
@@ -316,6 +317,20 @@ export function InvoicesPage() {
       toast.successo('Fattura emessa con successo!');
     } catch (err: any) {
       toast.errore(`Errore: ${err.message}`);
+    }
+  };
+
+  const handleRipresentaSdi = async (inv: any) => {
+    if (submitting) return;
+    setSubmitting(true);
+    try {
+      await ripresentaSdiApi(inv.id);
+      await loadData();
+      toast.successo('Fattura riaperta: scarica di nuovo l\'XML e ritrasmettila a SdI.');
+    } catch (err: any) {
+      toast.errore(`Errore ripresentazione: ${err.message}`);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -698,6 +713,16 @@ export function InvoicesPage() {
                               >
                                 🔄 NC
                               </button>
+                              {inv.statoSdi === 'scartata' && (
+                                <button
+                                  onClick={() => handleRipresentaSdi(inv)}
+                                  disabled={submitting}
+                                  style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid var(--amber)', background: 'var(--pill-amber-bg)', color: 'var(--pill-amber-fg)', cursor: 'pointer', fontSize: 12 }}
+                                  title={inv.esitoSdiDettagli ? `Scarto SdI: ${inv.esitoSdiDettagli} — ripresenta se è un errore TECNICO; per un errore di CONTENUTO usa 🔄 NC e riemetti la fattura corretta.` : 'Fattura scartata da SdI: ripresenta (scarto tecnico) oppure storna con NC e riemetti (scarto di contenuto).'}
+                                >
+                                  ↻ Ripresenta SdI
+                                </button>
+                              )}
                             </>
                           )}
                         </div>

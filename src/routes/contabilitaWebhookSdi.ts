@@ -59,7 +59,7 @@ export async function registraRotteContabilitaWebhookSdi(server: FastifyInstance
       try {
         const fattura = await prisma.fattura.update({
           where: { id: fatturaId },
-          data: { statoSdi },
+          data: { statoSdi, esitoSdiDettagli: note ?? null },
         });
 
         await recordAudit({

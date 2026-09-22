@@ -325,6 +325,17 @@ export async function emettiNotaCreditoApi(
   return await res.json();
 }
 
+/** W1 — riapre una fattura SdI scartata (scarto tecnico) per la ritrasmissione manuale. */
+export async function ripresentaSdiApi(id: string) {
+  const res = await apiFetch(`${API_BASE}/invoices/${id}/ripresenta-sdi`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore ripresentazione SdI'));
+  invalidateCache('fattur');
+  return await res.json();
+}
+
 export async function importFromProjectApi(progettoId: string, moduliIds?: string[], percentuale?: number) {
   const res = await apiFetch(`${API_BASE}/fatture/da-progetto`, {
     method: 'POST',

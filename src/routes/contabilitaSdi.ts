@@ -8,6 +8,7 @@ import type { AppPort } from '../services/appPort.js';
 import { prisma } from '../util/prismaClient.js';
 import { generaFatturaElettronicaXml } from '../services/sdiXmlGenerator.js';
 import { costruisciDatiFatturaSdi } from '../services/mappaturaFatturaSdi.js';
+import { recordAudit } from '../util/serverHelpers.js';
 
 export async function registraRotteContabilitaSdi(server: FastifyInstance, app: AppPort): Promise<void> {
   // ─── GENERATORE SDI XML CONFORME FATTURAPA 1.2 ────────────────────
@@ -54,6 +55,44 @@ export async function registraRotteContabilitaSdi(server: FastifyInstance, app: 
       return reply.send(xmlString);
     } catch (err: any) {
       return reply.code(500).send({ errore: err?.message || 'Errore generazione XML SDI' });
+    }
+  });
+
+  // ─── RIPRESENTAZIONE A SDI DOPO UNO SCARTO (W1 — scarto tecnico) ────
+  // SdI consente di ritrasmettere il documento corretto entro 5 giorni dallo scarto. Qui non
+  // c'è un provider collegato: si «riapre» la fattura scartata riportando statoSdi a `n_a`, così
+  // non è più un vicolo cieco — l'operatore riscarica l'XML e lo ritrasmette dal portale AdE.
+  // Per uno scarto di CONTENUTO va invece emessa una NC e riemessa la fattura corretta (l'atto
+  // emesso è immutabile): quella strada usa la rotta nota-credito + una nuova fattura.
+  server.post<{ Params: { id: string } }>('/invoices/:id/ripresenta-sdi', async (req, reply) => {
+    const tenantId = req.tenantId;
+    const { id } = req.params;
+    try {
+      const fattura = await prisma.fattura.findFirst({
+        where: { id, tenantId },
+        select: { id: true, numero: true, statoSdi: true },
+      });
+      if (!fattura) return reply.code(404).send({ errore: 'Fattura non trovata' });
+      if (fattura.statoSdi !== 'scartata') {
+        return reply.code(409).send({ errore: 'La ripresentazione a SdI vale solo per una fattura scartata.' });
+      }
+      await prisma.fattura.update({ where: { id }, data: { statoSdi: 'n_a', esitoSdiDettagli: null } });
+      await recordAudit({
+        tenantId,
+        userId: req.userId,
+        ruolo: req.ruolo,
+        azione: 'SDI_RIPRESENTAZIONE',
+        entita: `Fattura ${fattura.numero || id.slice(0, 8)}`,
+        dettagli: 'Fattura riaperta per ritrasmissione a SdI dopo scarto tecnico (riscaricare l\'XML e ritrasmettere).',
+        ipAddress: req.ip,
+      });
+      return reply.send({
+        ok: true,
+        message:
+          'Fattura pronta per la ritrasmissione: scarica di nuovo l\'XML e trasmettilo tramite il portale «Fatture & Corrispettivi» o l\'intermediario.',
+      });
+    } catch (err: any) {
+      return reply.code(500).send({ errore: err?.message || 'Errore ripresentazione SdI' });
     }
   });
 }
