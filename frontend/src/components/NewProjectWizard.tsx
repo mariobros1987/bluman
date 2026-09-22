@@ -19,6 +19,9 @@ export function NewProjectWizard({ onClose, onProjectCreated }: NewProjectWizard
   const [moduliList, setModuliList] = useState<ModuloTemplate[]>([]);
   const [selectedGiurId, setSelectedGiurId] = useState<string>('giur-mt'); // Default Malta
   const [showOtherGiurMods, setShowOtherGiurMods] = useState(false);
+  // Modulo di cui mostrare il dettaglio (articoli, ore, importo) senza selezionarlo: l'operatore
+  // apre la scheda con ℹ️, la consulta e la chiude — la selezione resta indipendente.
+  const [detailMod, setDetailMod] = useState<ModuloTemplate | null>(null);
 
   // Client selection state
   const [existingClients, setExistingClients] = useState<Cliente[]>([]);
@@ -68,6 +71,20 @@ export function NewProjectWizard({ onClose, onProjectCreated }: NewProjectWizard
             qty: r.quantita,
             oO: r.overrideOre,
             oP: r.overridePrezzo ? r.overridePrezzo / 100 : undefined,
+            // L'articolo completo dalla distinta (API: righeDistinta.articolo). Senza questo
+            // `resolveRighe` non trova l'articolo nel pool (qui vuoto) e ripiega su un nome
+            // generico «Prestazione» a 5h/€500: il dettaglio modulo mostrerebbe dati finti.
+            // Con `artObj` i nomi, le ore e i prezzi sono quelli reali del catalogo.
+            artObj: r.articolo
+              ? {
+                  id: r.articolo.id,
+                  n: r.articolo.nome,
+                  cat: r.articolo.categoria as CategoriaModulo,
+                  h: r.articolo.oreDefault ?? 0,
+                  p: r.articolo.prezzoDefault != null ? r.articolo.prezzoDefault / 100 : 0,
+                  ver: r.articolo.versione ?? 1,
+                }
+              : undefined,
           })),
         }));
         setModuliList(mappedMods);
@@ -288,7 +305,7 @@ export function NewProjectWizard({ onClose, onProjectCreated }: NewProjectWizard
                         }}
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                          <span style={{ fontWeight: 600, fontSize: 13, color: sel ? '#fff' : 'var(--pill-slate-fg)' }}>
+                          <span style={{ fontWeight: 600, fontSize: 13, color: sel ? 'var(--indigo-l)' : 'var(--text)' }}>
                             {flag} {g.nome}
                           </span>
                           <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 10, background: g.tipo === 'ue' ? 'var(--pill-green-bg)' : 'var(--pill-amber-bg)', color: g.tipo === 'ue' ? 'var(--green)' : 'var(--amber)', textTransform: 'uppercase', fontWeight: 700 }}>
@@ -311,7 +328,7 @@ export function NewProjectWizard({ onClose, onProjectCreated }: NewProjectWizard
                       cursor: 'pointer',
                     }}
                   >
-                    <div style={{ fontWeight: 600, fontSize: 13, color: selectedGiurId === '' ? '#fff' : 'var(--pill-slate-fg)', marginBottom: 4 }}>
+                    <div style={{ fontWeight: 600, fontSize: 13, color: selectedGiurId === '' ? 'var(--indigo-l)' : 'var(--text)', marginBottom: 4 }}>
                       🌐 Multi-giurisdizione / Generica
                     </div>
                     <div style={{ fontSize: 10, color: 'var(--muted)' }}>Mostra l intero catalogo senza filtri geografici preliminari</div>
@@ -428,9 +445,18 @@ export function NewProjectWizard({ onClose, onProjectCreated }: NewProjectWizard
                               {sel && <span style={{ color: '#fff', fontSize: 10 }}>✓</span>}
                             </div>
                             <div style={{ flex: 1 }}>
-                              <div style={{ fontSize: 12, fontWeight: 600, color: '#fff' }}>{m.n}</div>
+                              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{m.n}</div>
                               <div style={{ fontSize: 10, color: 'var(--muted)' }}>{m.righe.length} articoli · {moduloH(m)}h</div>
                             </div>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); setDetailMod(m); }}
+                              aria-label={`Vedi cosa contiene il modulo ${m.n}`}
+                              title="Vedi dettaglio: articoli, ore e importo"
+                              style={infoBtnStyle}
+                            >
+                              ℹ️
+                            </button>
                             <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--cat-societario)' }}>{fmt(moduloP(m))}</div>
                           </div>
                         );
@@ -456,6 +482,15 @@ export function NewProjectWizard({ onClose, onProjectCreated }: NewProjectWizard
                           <div style={{ fontSize: 10, color: 'var(--muted)' }}>{m.righe.length} articoli · {moduloH(m)}h</div>
                         </div>
                         <CatBadge cat={m.cat} />
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); setDetailMod(m); }}
+                          aria-label={`Vedi cosa contiene il modulo ${m.n}`}
+                          title="Vedi dettaglio: articoli, ore e importo"
+                          style={infoBtnStyle}
+                        >
+                          ℹ️
+                        </button>
                         <div style={{ fontSize: 12, fontWeight: 600, flexShrink: 0, marginLeft: 8 }}>{fmt(moduloP(m))}</div>
                       </div>
                     );
@@ -485,6 +520,15 @@ export function NewProjectWizard({ onClose, onProjectCreated }: NewProjectWizard
                               <div style={{ flex: 1 }}>
                                 <div style={{ fontSize: 11, fontWeight: 500 }}>{m.n}</div>
                               </div>
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); setDetailMod(m); }}
+                                aria-label={`Vedi cosa contiene il modulo ${m.n}`}
+                                title="Vedi dettaglio: articoli, ore e importo"
+                                style={infoBtnStyle}
+                              >
+                                ℹ️
+                              </button>
                               <div style={{ fontSize: 11, fontWeight: 600 }}>{fmt(moduloP(m))}</div>
                             </div>
                           );
@@ -561,6 +605,57 @@ export function NewProjectWizard({ onClose, onProjectCreated }: NewProjectWizard
         </div>
         )}
       </Modal>
+
+      {/* Dettaglio modulo: cosa contiene, così l'operatore non deve ricordarlo a memoria.
+          Sola lettura (dirty={false} → chiude subito), z-index sopra il wizard. Gli articoli,
+          le ore e gli importi sono quelli reali della distinta (via artObj in resolveRighe). */}
+      {detailMod && (
+        <Modal onClose={() => setDetailMod(null)} zIndex={120} overlayBackground="rgba(0,0,0,.75)" dirty={false} labelledBy="dettaglio-modulo-wizard-titolo">
+          <div style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, width: '100%', maxWidth: 560, maxHeight: '85vh', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 60px rgba(0,0,0,.5)' }}>
+            <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                  <CatBadge cat={detailMod.cat} />
+                  <span style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 800 }}>Contenuto del modulo</span>
+                </div>
+                <div id="dettaglio-modulo-wizard-titolo" style={{ fontSize: 16, fontWeight: 800, color: 'var(--text)' }}>{detailMod.n}</div>
+                <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 4 }}>
+                  {detailMod.giurisdizione?.nome ? `${detailMod.giurisdizione.nome} · ` : ''}{resolveRighe(detailMod).length} articoli · {moduloH(detailMod)}h totali
+                </div>
+              </div>
+              <button onClick={() => setDetailMod(null)} aria-label="Chiudi" style={closeBtnStyle}>✕</button>
+            </div>
+
+            <div style={{ flex: 1, overflowY: 'auto', padding: 20, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {resolveRighe(detailMod).length === 0 ? (
+                <div style={{ padding: 14, background: 'var(--card)', border: '1px dashed var(--border)', borderRadius: 10, fontSize: 12, color: 'var(--muted)', lineHeight: 1.5 }}>
+                  Questo modulo non ha ancora articoli in distinta. Nulla da mostrare finché non ne vengono aggiunti dalla libreria.
+                </div>
+              ) : (
+                resolveRighe(detailMod).map((r, i) => (
+                  <div key={r.art.id || i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, padding: '10px 12px', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10 }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text)' }}>
+                        {r.qty > 1 ? `${r.qty}× ` : ''}{r.art.n}
+                        {r.override && <span style={{ marginLeft: 6, fontSize: 9.5, background: 'var(--pill-amber-bg)', color: 'var(--pill-amber-fg)', padding: '1px 5px', borderRadius: 4, fontWeight: 700 }}>tariffa su misura</span>}
+                      </div>
+                      <div style={{ fontSize: 10.5, color: 'var(--muted)', marginTop: 2 }}>{r.h}h stimate</div>
+                    </div>
+                    <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text)', flexShrink: 0 }}>{fmt(r.p)}</div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div style={{ padding: '14px 20px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+                {detailMod.pkg != null ? 'Prezzo a pacchetto' : `${moduloH(detailMod)}h · ${resolveRighe(detailMod).length} articoli`}
+              </div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--indigo-l)' }}>{fmt(moduloP(detailMod))}</div>
+            </div>
+          </div>
+        </Modal>
+      )}
     </>
   );
 }
@@ -568,3 +663,5 @@ export function NewProjectWizard({ onClose, onProjectCreated }: NewProjectWizard
 const wizStyle: React.CSSProperties = { background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, width: '100%', maxWidth: 580, maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 60px rgba(0,0,0,.6)' };
 const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: 'var(--muted)', marginBottom: 6, letterSpacing: '.5px', textTransform: 'uppercase' };
 const closeBtnStyle: React.CSSProperties = { background: 'var(--card2)', border: 'none', width: 28, height: 28, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--muted)', fontSize: 14 };
+// Pulsante ℹ️ accanto a ciascun modulo: apre la scheda di dettaglio senza selezionare il modulo.
+const infoBtnStyle: React.CSSProperties = { background: 'var(--card2)', border: '1px solid var(--border)', color: 'var(--indigo-l)', width: 26, height: 26, borderRadius: 6, fontSize: 12, cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 };
