@@ -25,7 +25,7 @@ import { prisma } from '../util/prismaClient.js';
 import { uploadDocumento, rifirmaUrlUpload } from '../services/storageService.js';
 import { scanFileBuffer } from '../services/securityScanner.js';
 import { contestoTagDocumento, risolviTagDocumento, blocchiDaHtml, generaPdfDocumento, generaDocxDocumento } from '../services/generazioneDocumenti.js';
-import { notificaCliente } from '../services/notificheService.js';
+import { notificaCliente, avvisaClienteViaCanali } from '../services/notificheService.js';
 import { recordAudit, ipReale, nomeFileDaUrl, clienteDellaRichiesta, normalizzaGrafometrica } from '../util/serverHelpers.js';
 import { livelloFirmaValido, normalizzaLivelloFirma, type LivelloFirma } from '../services/livelloFirmaService.js';
 // §40 — la micro-voce indicata deve appartenere al progetto indicato: la decisione sta in un
@@ -355,6 +355,11 @@ export async function registraRotteDocumenti(server: FastifyInstance): Promise<v
           corpo: `Lo studio ha pubblicato «${filename}» sul progetto «${progetto.nome}»: accedi al portale per visionarlo e firmarlo.`,
           link: `/portal/documents`,
         }).catch(() => {});
+        // W3: fallback email/WhatsApp best-effort — il cliente che non apre il portale lo sa comunque.
+        await avvisaClienteViaCanali(tenantId, progetto.clienteId, {
+          oggetto: 'Documento da firmare',
+          corpo: `Lo studio ha pubblicato «${filename}» sul progetto «${progetto.nome}»: accedi al portale per visionarlo e firmarlo.`,
+        });
       }
 
       return reply.send({ ok: true, documento: { ...documento, firmato: false, firma: null, richiesteModifica: [] } });
@@ -586,6 +591,11 @@ export async function registraRotteDocumenti(server: FastifyInstance): Promise<v
           corpo: `Lo studio ha pubblicato «${uploadPdf.name}» sul progetto «${progetto.nome}»: accedi al portale per visionarlo e firmarlo.`,
           link: `/portal/documents`,
         }).catch(() => {});
+        // W3: fallback email/WhatsApp best-effort.
+        await avvisaClienteViaCanali(tenantId, progetto.clienteId, {
+          oggetto: 'Documento da firmare',
+          corpo: `Lo studio ha pubblicato «${uploadPdf.name}» sul progetto «${progetto.nome}»: accedi al portale per visionarlo e firmarlo.`,
+        });
       }
 
       return reply.send({ ok: true, documento: { ...documento, firmato: false, firma: null, richiesteModifica: [] } });
@@ -665,6 +675,11 @@ export async function registraRotteDocumenti(server: FastifyInstance): Promise<v
           corpo: `Lo studio ha pubblicato «${nomeDoc}» sul progetto «${doc.progetto.nome}»: accedi al portale per visionarlo e firmarlo.`,
           link: `/portal/documents`,
         }).catch(() => {});
+        // W3: fallback email/WhatsApp best-effort.
+        await avvisaClienteViaCanali(tenantId, doc.progetto.clienteId, {
+          oggetto: 'Nuovo documento da visionare/firmare',
+          corpo: `Lo studio ha pubblicato «${nomeDoc}» sul progetto «${doc.progetto.nome}»: accedi al portale per visionarlo e firmarlo.`,
+        });
       }
 
       return reply.send({ ok: true, documento: updated });

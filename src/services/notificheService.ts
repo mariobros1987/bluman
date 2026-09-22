@@ -21,6 +21,9 @@
 
 import type { FastifyReply } from 'fastify';
 import { prisma } from '../util/prismaClient.js';
+import { credenzialiCanali } from './otpDispatch.js';
+import { inviaEmail } from './emailRelay.js';
+import { inviaTestoWhatsapp } from './whatsappService.js';
 
 // I sei eventi concordati (Blocco 3, risposta utente): niente inventario
 // aperto, la campanella racconta solo questo.
@@ -216,6 +219,65 @@ export async function notificaCliente(
   for (const conn of connessioni) {
     if (destinataA(conn, riga)) inviaFrame(conn, payload);
   }
+}
+
+/**
+ * Avviso al cliente sui canali ESTERNI (email + WhatsApp), oltre alla notifica in-app.
+ *
+ * Nato per «documento da firmare» (W3 audit 21/09): un cliente che non apre il portale non
+ * sapeva di dover firmare e l'incarico restava fermo a tempo indefinito. È best-effort e non
+ * blocca mai il chiamante (la notifica in-app, fonte di verità, è già scritta prima di questa);
+ * ogni canale ha il suo esito e non dichiara «inviato» ciò che non è partito (regola 7). Nessun
+ * canale configurato → `saltato`, non un falso successo.
+ */
+export async function avvisaClienteViaCanali(
+  tenantId: string,
+  clienteId: string,
+  msg: { oggetto: string; corpo: string; link?: string },
+): Promise<{ email: 'inviata' | 'saltata' | 'errore'; whatsapp: 'inviato' | 'saltato' | 'errore' }> {
+  const esiti: { email: 'inviata' | 'saltata' | 'errore'; whatsapp: 'inviato' | 'saltato' | 'errore' } = {
+    email: 'saltata',
+    whatsapp: 'saltato',
+  };
+  try {
+    const cliente = await prisma.cliente.findFirst({
+      where: { id: clienteId, tenantId },
+      select: { email: true, cellulare: true },
+    });
+    if (!cliente) return esiti;
+    const cred = await credenzialiCanali(tenantId);
+
+    if (cliente.email && cred.smtp?.host && cred.smtp?.user) {
+      try {
+        const html = `<p>${msg.corpo}</p>${msg.link ? `<p><a href="${msg.link}">Accedi al portale</a></p>` : ''}`;
+        const r = await inviaEmail({
+          to: cliente.email,
+          subject: msg.oggetto,
+          html,
+          smtp: cred.smtp,
+          fromEmail: cred.smtpFromEmail ?? undefined,
+          fromName: cred.smtpFromName ?? undefined,
+          etichetta: 'documento_da_firmare',
+        });
+        esiti.email = r.ok ? 'inviata' : 'errore';
+      } catch {
+        esiti.email = 'errore';
+      }
+    }
+
+    if (cliente.cellulare) {
+      try {
+        const testo = msg.link ? `${msg.corpo}\n\n${msg.link}` : msg.corpo;
+        const r = await inviaTestoWhatsapp(cred, cliente.cellulare, testo);
+        esiti.whatsapp = r.ok ? 'inviato' : 'errore';
+      } catch {
+        esiti.whatsapp = 'errore';
+      }
+    }
+  } catch {
+    // best-effort: un guasto sui canali esterni non deve mai propagarsi al chiamante.
+  }
+  return esiti;
 }
 
 /**
