@@ -208,6 +208,14 @@ export interface Progetto {
   fisc: string;
   fatture: FatturaRiga[];
   mods: ModuloProgetto[];
+  /**
+   * §52 — Stato reale della firma della engagement letter, dalla relazione
+   * Preventivo → EngagementLetter (non dedotto da `st`). `'completata'` solo quando
+   * il cliente ha firmato con OTP; `'in_attesa'` finché non l'ha fatto; assente per i
+   * progetti locali/legacy o quando nessuna engagement letter è ancora stata emessa.
+   */
+  statoFirma?: 'in_attesa' | 'completata';
+  firmatoAt?: string | null;
 }
 
 export interface Articolo {

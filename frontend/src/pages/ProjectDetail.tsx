@@ -454,6 +454,20 @@ export function ProjectDetail() {
         // valore in riga — e finiva anche nella redditività.
         const calculatedVal = finalMods.reduce((acc: number, m: any) => acc + (m.p || 0), 0) || (dbRes.valoreCentesimi ? dbRes.valoreCentesimi / 100 : 0);
 
+        // §52 — Firma reale della engagement letter, dalla relazione Preventivo →
+        // EngagementLetter esposta da getProgetto. Un progetto può avere più preventivi:
+        // se anche uno solo risulta firmato (OTP), la letter è firmata; altrimenti resta in
+        // attesa. Nessuna letter esposta → campo assente (progetti locali/legacy).
+        const letters = (dbRes.preventivi || [])
+          .map((pv: any) => pv.engagementLetter)
+          .filter(Boolean);
+        const firmata = letters.find((l: any) => l.statoFirma === 'completata');
+        const statoFirma: 'in_attesa' | 'completata' | undefined =
+          letters.length === 0 ? undefined : firmata ? 'completata' : 'in_attesa';
+        const firmatoAt = firmata?.firmatoAt
+          ? new Date(firmata.firmatoAt).toLocaleDateString()
+          : null;
+
         setProject({
           id: dbRes.id,
           n: dbRes.nome,
@@ -484,6 +498,8 @@ export function ProjectDetail() {
             stato: f.stato === 'incassata' ? 'incassata' : 'emessa',
           })),
           mods: finalMods,
+          statoFirma,
+          firmatoAt,
         });
         if (finalMods.length > 0) {
           setExpanded(new Set(finalMods.map(m => m.id)));

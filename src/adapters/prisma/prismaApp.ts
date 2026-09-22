@@ -352,6 +352,22 @@ export class PrismaApp implements AppPort {
         accessiRisorsa: {
           include: { user: true },
         },
+        // §52 — Stato reale della firma della engagement letter.
+        //
+        // Lo storico contrattuale affermava «CONTRATTO FIRMATO» per ogni progetto non in
+        // pre_project, ma un progetto passa a `in_progress` solo accettando un preventivo
+        // (istanziaProgetto), senza che il cliente abbia mai firmato. La firma vera vive su
+        // EngagementLetter.statoFirma / firmatoAt (scritta solo dal flusso OTP in firma.ts).
+        // La esponiamo qui perché il fascicolo mostri lo stato effettivo, non uno dedotto.
+        preventivi: {
+          where: { engagementLetter: { isArchiviato: false } },
+          orderBy: { createdAt: 'desc' },
+          include: {
+            engagementLetter: {
+              select: { statoFirma: true, firmatoAt: true },
+            },
+          },
+        },
       },
     });
     if (!p) throw new ProgettoNonTrovatoError(`Progetto non trovato: ${id}`);
