@@ -1,0 +1,18 @@
+-- Lo stato terminale di una rata annullata da una Nota di Credito.
+--
+-- Perché serve. L'emissione di una NC (`POST /invoices/:id/nota-credito`) marcava le rate non
+-- ancora incassate della fattura d'origine con `stato = 'parziale'`. Ma `parziale` significa
+-- «incassata in parte»: una rata stornata finiva così a somigliare a una rata parzialmente pagata.
+-- La conseguenza non è estetica — lo scadenzario e i solleciti ragionano sullo stato della rata:
+-- `parziale` è tra gli stati «insoluti» (`solleciti.ts` la includeva in `in: [in_attesa, parziale,
+-- scaduto]`) e il frontend conta come «da incassare» tutto ciò che non è `incassato`. Una rata
+-- stornata poteva quindi ricomparire tra i crediti aperti e ricevere un sollecito. Per l'annullo
+-- totale il filtro a livello di fattura (`stato = 'annullata'`) la copriva, ma per una NC parziale
+-- (dove la fattura resta viva) lo stato della rata è l'unico appiglio: serve un valore terminale
+-- dedicato, distinto sia da `incassato` sia da `parziale`.
+--
+-- `ADD VALUE IF NOT EXISTS` in una migrazione a sé: da PostgreSQL 12 `ALTER TYPE … ADD VALUE` può
+-- stare dentro la transazione con cui Prisma avvolge la migrazione, a patto che il nuovo valore non
+-- venga **usato** nella stessa transazione. Qui non lo è — questa migrazione aggiunge solo il valore;
+-- chi lo scrive è il codice della rotta, in un'altra transazione a runtime.
+ALTER TYPE "StatoScadenzaIncasso" ADD VALUE IF NOT EXISTS 'stornata';

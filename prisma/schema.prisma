@@ -961,6 +961,7 @@ enum StatoScadenzaIncasso {
   incassato
   parziale
   scaduto
+  stornata
 }
 
 model ScadenzaIncasso {

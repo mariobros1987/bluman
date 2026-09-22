@@ -82,6 +82,13 @@ export async function registraRotteContabilitaScadenzario(server: FastifyInstanc
                 return { fatturaAnnullata: true as const };
               }
 
+              // Una rata già stornata da una Nota di Credito è terminale: non la si incassa.
+              // La guardia sulla fattura sopra copre l'annullo totale; questa copre la NC parziale,
+              // dove la fattura resta viva ma la singola rata è stata stornata.
+              if (scadenza.stato === 'stornata') {
+                return { scadenzaStornata: true as const };
+              }
+
               // Tetto all'over-incasso: l'importo non può superare il residuo della rata,
               // altrimenti si gonfia il saldo conto oltre il dovuto senza alcuna segnalazione.
               const giaIncassatoRata = scadenza.registrazioniRegistrate.reduce(
@@ -175,6 +182,12 @@ export async function registraRotteContabilitaScadenzario(server: FastifyInstanc
         return reply.code(409).send({
           errore:
             'La fattura è annullata (stornata con Nota di Credito): non è possibile registrare un incasso su una sua rata.',
+        });
+      }
+      if ('scadenzaStornata' in esito) {
+        return reply.code(409).send({
+          errore:
+            'La rata è stata stornata con una Nota di Credito: non è possibile registrare un incasso.',
         });
       }
       if ('eccedeResiduo' in esito) {

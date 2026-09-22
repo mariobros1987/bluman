@@ -46,11 +46,11 @@ export function ScadenzarioPage() {
   }, []);
 
   const totalSospeso = scadenze
-    .filter((s) => s.stato !== 'incassato')
+    .filter((s) => s.stato !== 'incassato' && s.stato !== 'stornata')
     .reduce((a, b) => a + (b.importoCentesimi || 0), 0);
 
   const totalScaduto = scadenze
-    .filter((s) => s.stato !== 'incassato' && new Date(s.dataScadenza) < new Date())
+    .filter((s) => s.stato !== 'incassato' && s.stato !== 'stornata' && new Date(s.dataScadenza) < new Date())
     .reduce((a, b) => a + (b.importoCentesimi || 0), 0);
 
   const totalIncassato = scadenze
@@ -179,7 +179,8 @@ export function ScadenzarioPage() {
                 </tr>
               ) : (
                 filteredScadenze.map((s) => {
-                  const isScaduta = s.stato !== 'incassato' && new Date(s.dataScadenza) < new Date();
+                  const isStornata = s.stato === 'stornata';
+                  const isScaduta = s.stato !== 'incassato' && !isStornata && new Date(s.dataScadenza) < new Date();
                   const isIncassata = s.stato === 'incassato';
                   const clNome = s.fattura?.cliente?.nome || s.fattura?.progetto?.cliente?.nome || 'Cliente';
 
@@ -211,15 +212,15 @@ export function ScadenzarioPage() {
                             borderRadius: 6,
                             fontSize: 11,
                             fontWeight: 700,
-                            background: isIncassata ? 'var(--pill-green-bg)' : isScaduta ? 'var(--pill-red-bg)' : 'var(--pill-amber-bg)',
-                            color: isIncassata ? 'var(--pill-green-fg)' : isScaduta ? 'var(--pill-red-fg)' : 'var(--pill-amber-fg)',
+                            background: isStornata ? 'var(--pill-blue-bg)' : isIncassata ? 'var(--pill-green-bg)' : isScaduta ? 'var(--pill-red-bg)' : 'var(--pill-amber-bg)',
+                            color: isStornata ? 'var(--pill-blue-fg)' : isIncassata ? 'var(--pill-green-fg)' : isScaduta ? 'var(--pill-red-fg)' : 'var(--pill-amber-fg)',
                           }}
                         >
-                          {isIncassata ? 'SALDATA' : isScaduta ? 'SCADUTA' : 'IN ATTESA'}
+                          {isStornata ? '↩︎ STORNATA' : isIncassata ? 'SALDATA' : isScaduta ? 'SCADUTA' : 'IN ATTESA'}
                         </span>
                       </td>
                       <td style={{ padding: '14px 8px', textAlign: 'right' }}>
-                        {!isIncassata && (
+                        {!isIncassata && !isStornata && (
                           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
                             <button
                               type="button"

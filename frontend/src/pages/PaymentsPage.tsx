@@ -41,11 +41,11 @@ export function PaymentsPage() {
     .reduce((a, b) => a + (b.importoCentesimi || 0), 0);
 
   const totalSospeso = scadenze
-    .filter(s => s.stato !== 'incassato')
+    .filter(s => s.stato !== 'incassato' && s.stato !== 'stornata')
     .reduce((a, b) => a + (b.importoCentesimi || 0), 0);
 
   const totalScaduto = scadenze
-    .filter(s => s.stato !== 'incassato' && new Date(s.dataScadenza) < new Date())
+    .filter(s => s.stato !== 'incassato' && s.stato !== 'stornata' && new Date(s.dataScadenza) < new Date())
     .reduce((a, b) => a + (b.importoCentesimi || 0), 0);
 
   const handleSaveIncasso = async (e: React.FormEvent) => {
@@ -171,7 +171,7 @@ export function PaymentsPage() {
                 </tr>
               ) : (
                 filteredScadenze.map((scad) => {
-                  const isLate = new Date(scad.dataScadenza) < new Date() && scad.stato !== 'incassato';
+                  const isLate = new Date(scad.dataScadenza) < new Date() && scad.stato !== 'incassato' && scad.stato !== 'stornata';
                   const importoRata = (scad.importoCentesimi || 0) / 100;
                   
                   return (
@@ -194,9 +194,10 @@ export function PaymentsPage() {
                         {scad.stato === 'incassato' && <span style={{ padding: '4px 8px', borderRadius: 12, fontSize: 11, fontWeight: 600, background: 'var(--pill-green-bg)', color: 'var(--pill-green-fg)' }}>✓ Saldata</span>}
                         {scad.stato === 'parziale' && <span style={{ padding: '4px 8px', borderRadius: 12, fontSize: 11, fontWeight: 600, background: 'var(--pill-blue-bg)', color: 'var(--pill-blue-fg)' }}>🔹 Parziale</span>}
                         {scad.stato === 'in_attesa' && <span style={{ padding: '4px 8px', borderRadius: 12, fontSize: 11, fontWeight: 600, background: 'var(--pill-amber-bg)', color: 'var(--pill-amber-fg)' }}>⏳ In Attesa</span>}
+                        {scad.stato === 'stornata' && <span style={{ padding: '4px 8px', borderRadius: 12, fontSize: 11, fontWeight: 600, background: 'var(--pill-blue-bg)', color: 'var(--pill-blue-fg)' }}>↩︎ Stornata (NC)</span>}
                       </td>
                       <td style={{ padding: '16px 8px', textAlign: 'right' }}>
-                        {scad.stato !== 'incassato' ? (
+                        {scad.stato !== 'incassato' && scad.stato !== 'stornata' ? (
                           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                             <button
                               onClick={() => handleSendReminder(scad)}

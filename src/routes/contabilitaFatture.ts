@@ -526,10 +526,14 @@ export async function registraRotteContabilitaFatture(server: FastifyInstance, a
                 include: { righe: true, cliente: true, progetto: true },
               });
 
-              // Annulla o storno le scadenze non incassate della fattura origine
+              // Annulla o storno le scadenze non incassate della fattura origine.
+              // Stato terminale dedicato `stornata`, NON `parziale` (che vuol dire «incassata in
+              // parte» e farebbe ricomparire la rata tra gli insoluti e i crediti «da incassare»).
+              // Copre le rate ancora dovute — non le `incassato`, il cui rimborso è già tracciato
+              // dal movimento di storno in Prima Nota qui sotto.
               await tx.scadenzaIncasso.updateMany({
-                where: { fatturaId: fatturaOrigine.id, stato: 'in_attesa' },
-                data: { stato: 'parziale', note: `Annullata per emissione Nota di Credito ${numNC}` },
+                where: { fatturaId: fatturaOrigine.id, stato: { in: ['in_attesa', 'scaduto', 'parziale'] } },
+                data: { stato: 'stornata', note: `Stornata per emissione Nota di Credito ${numNC}` },
               });
 
               // Se la fattura era già stata incassata, genera un movimento di uscita storno in Prima Nota
