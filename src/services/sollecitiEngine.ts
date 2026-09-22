@@ -13,6 +13,29 @@ export interface CalcoloMoraResult {
 
 export type LivelloSollecito = '1_avviso_bonario' | '2_sollecito_mora' | '3_diffida_legale';
 
+/** Ordine di escalation dei solleciti: dal più morbido alla diffida legale. */
+export const LIVELLI_SOLLECITO: readonly LivelloSollecito[] = [
+  '1_avviso_bonario',
+  '2_sollecito_mora',
+  '3_diffida_legale',
+] as const;
+
+/**
+ * Escalation stretta (W4): il livello 1 si può inviare sempre; ogni livello successivo solo se
+ * quello immediatamente precedente è già partito per la stessa rata. Impedisce la «diffida come
+ * primo contatto». Pura: decide sull'elenco dei livelli già inviati, non tocca il database.
+ */
+export function puoInviareSollecito(richiesto: LivelloSollecito, livelliGiaInviati: string[]): boolean {
+  const ordine = LIVELLI_SOLLECITO.indexOf(richiesto);
+  if (ordine < 0) return false;
+  if (ordine === 0) return true;
+  const maxInviato = livelliGiaInviati.reduce(
+    (max, l) => Math.max(max, LIVELLI_SOLLECITO.indexOf(l as LivelloSollecito)),
+    -1,
+  );
+  return maxInviato >= ordine - 1;
+}
+
 export interface DatiSollecitoInput {
   livello: LivelloSollecito;
   clienteNome: string;

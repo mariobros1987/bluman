@@ -976,9 +976,28 @@ model ScadenzaIncasso {
   note             String?
 
   registrazioniRegistrate RegistrazioneIncasso[]
+  solleciti               Sollecito[]
 
   @@index([tenantId, fatturaId])
   @@map("scadenza_incasso")
+}
+
+/// Storia dei solleciti inviati per una rata (W4 audit): prima `livello` era un
+/// parametro libero senza traccia, quindi si poteva mandare una diffida legale come
+/// primo contatto. Ogni invio riuscito lascia una riga qui; l'escalation stretta
+/// (1_avviso_bonario → 2_sollecito_mora → 3_diffida_legale) si verifica su queste righe.
+model Sollecito {
+  id                String          @id @default(uuid())
+  tenantId          String          @map("tenant_id")
+  scadenzaIncassoId String          @map("scadenza_incasso_id")
+  scadenza          ScadenzaIncasso @relation(fields: [scadenzaIncassoId], references: [id], onDelete: Cascade)
+  livello           String // 1_avviso_bonario | 2_sollecito_mora | 3_diffida_legale
+  canale            String          @default("email")
+  inviatoDa         String?         @map("inviato_da")
+  inviatoAt         DateTime        @default(now()) @map("inviato_at")
+
+  @@index([tenantId, scadenzaIncassoId])
+  @@map("sollecito")
 }
 
 enum MetodoPagamento {

@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   calcolaInteressiMora,
   generaTestoSollecito,
+  puoInviareSollecito,
   SPESE_FORFETTARIE_RECUPERO_CENT,
 } from './services/sollecitiEngine.js';
 
@@ -87,6 +88,24 @@ describe('🧪 Solleciti & Interessi di Mora ex D.Lgs. 231/2002 — Test Suite',
       expect(res.oggettoEmail).toContain('DIFFIDA FORMALE E MESSA IN MORA');
       expect(res.corpoTesto).toContain('Decreto Ingiuntivo');
       expect(res.corpoTesto).toContain('costituzione in mora');
+    });
+  });
+
+  describe('Escalation stretta (W4)', () => {
+    it('il primo avviso bonario si può sempre inviare, anche senza storia', () => {
+      expect(puoInviareSollecito('1_avviso_bonario', [])).toBe(true);
+    });
+    it('il sollecito di mora richiede un avviso bonario già inviato', () => {
+      expect(puoInviareSollecito('2_sollecito_mora', [])).toBe(false);
+      expect(puoInviareSollecito('2_sollecito_mora', ['1_avviso_bonario'])).toBe(true);
+    });
+    it('la diffida legale non può essere il primo contatto né saltare la mora', () => {
+      expect(puoInviareSollecito('3_diffida_legale', [])).toBe(false);
+      expect(puoInviareSollecito('3_diffida_legale', ['1_avviso_bonario'])).toBe(false);
+      expect(puoInviareSollecito('3_diffida_legale', ['1_avviso_bonario', '2_sollecito_mora'])).toBe(true);
+    });
+    it('un livello già raggiunto consente di re-inviare lo stesso livello', () => {
+      expect(puoInviareSollecito('2_sollecito_mora', ['2_sollecito_mora'])).toBe(true);
     });
   });
 });

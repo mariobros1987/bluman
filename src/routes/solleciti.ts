@@ -8,6 +8,7 @@ import { inviaTestoWhatsapp } from '../services/whatsappService.js';
 import {
   calcolaInteressiMora,
   generaTestoSollecito,
+  puoInviareSollecito,
   type LivelloSollecito,
 } from '../services/sollecitiEngine.js';
 import { InviaSollecitoSchema } from '../schemas/solleciti.schema.js';
@@ -166,6 +167,19 @@ export async function registraRotteSolleciti(server: FastifyInstance): Promise<v
         const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
         const destinatario = emailDestinatario || scadenza.fattura.cliente.email;
 
+        // W4: escalation stretta — non si salta a un livello senza aver inviato il precedente.
+        // Impedisce la «diffida legale come primo contatto».
+        const sollecitiPrecedenti = await prisma.sollecito.findMany({
+          where: { tenantId, scadenzaIncassoId: scadenza.id },
+          select: { livello: true },
+        });
+        if (!puoInviareSollecito(livello, sollecitiPrecedenti.map((s) => s.livello))) {
+          return reply.code(409).send({
+            errore:
+              'Escalation non consentita: invia prima il livello precedente. Una diffida legale non può essere il primo contatto.',
+          });
+        }
+
         if ((canale === 'email' || canale === 'entrambi') && !destinatario) {
           return reply.code(400).send({
             errore: "Nessun indirizzo email specificato né presente nell'anagrafica del cliente.",
@@ -249,6 +263,18 @@ export async function registraRotteSolleciti(server: FastifyInstance): Promise<v
         await prisma.scadenzaIncasso.update({
           where: { id: scadenza.id },
           data: { stato: 'scaduto' },
+        });
+
+        // W4: registra il sollecito riuscito — è la storia della rata e la base su cui
+        // l'escalation del prossimo invio decide se il livello richiesto è consentito.
+        await prisma.sollecito.create({
+          data: {
+            tenantId,
+            scadenzaIncassoId: scadenza.id,
+            livello,
+            canale: canaliInviati.join(' + ') || canale,
+            inviatoDa: req.userId ?? null,
+          },
         });
 
         const canaliStr = canaliInviati.join(' e ') || 'Canale specificato';
