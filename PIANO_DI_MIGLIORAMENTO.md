@@ -1416,6 +1416,49 @@ Lo script `src/scripts/backupDb.ts` esiste. Schedularlo:
 
 ---
 
+### 5.5 🟠 Modulo KYC/AML governato (D.Lgs. 231/2007)
+
+**Problema**: il KYC/AML è oggi *passivo* — i campi `rischioAml`, `ubo`, `dataKyc`,
+`fontePatrimonio` su `Cliente` esistono ma non guidano né bloccano alcun processo. Un incarico
+si apre, un contratto si firma e un'operazione straordinaria si avvia anche con un fascicolo KYC
+scaduto o mai iniziato. Per uno studio soggetto al D.Lgs. 231/2007 (adeguata verifica, artt.
+17-25, conservazione decennale ex art. 31) è un obbligo con sanzioni, non un campo opzionale.
+
+**Soluzione**: trasformarlo in un processo governato, proporzionato al rischio e il più
+automatizzato possibile. **Specifica tecnica completa**: [`bluman-kyc-aml-spec-tecnica.md`](bluman-kyc-aml-spec-tecnica.md)
+(5 moduli — modello dati, motore di rischio, portale cliente, dashboard studio, automazioni —
+con modello Prisma, criteri di accettazione e punti aperti).
+
+**Scaletta di rilascio** (dettaglio nella spec §8):
+
+- [ ] **5.5.1 Motore + stati** — modello dati (`FascicoloKyc`, `StoricoFascicoloKyc`, `OverrideKyc`,
+  `DocumentoKyc` + enum), motore di rischio a regole statiche (`livelloVerifica` calcolato, non
+  scelto dall'operatore), badge stato in `AnagraficaErpModal`. Nessun blocco: prima si misura.
+- [ ] **5.5.2 Integrazioni dati** — API Registro Imprese/visura (UBO precompilato), screening
+  PEP/liste sanzionatorie automatico. Interfaccia comune `ProviderVerificaEsterna` disaccoppiata.
+  Prioritaria: è ciò che abbatte di più il lavoro manuale.
+- [ ] **5.5.3 Portale Cliente** — wizard onboarding (solo livelli ordinario/rafforzato), firma
+  del modulo di adeguata verifica riusando l'infrastruttura FEA/OTP esistente.
+- [ ] **5.5.4 Dashboard e Gate selettivo** — coda di lavoro prioritizzata, approvazione massiva,
+  four-eyes sul rafforzato, KYC gate bloccante su wizard nuovo progetto e invio alla firma (con
+  override motivato e loggato in `OverrideKyc` + notifica al Responsabile Compliance). Il gate va
+  attivato **per ultimo**, dopo aver validato che il motore non generi troppi falsi positivi.
+- [ ] **5.5.5 Automazioni e rivalutazione continua** — estensione di `cronService.ts`
+  (scadenzario T-30/T-15/T-0), rivalutazione del rischio su variazione UBO/PEP/soglia (art. 18).
+
+**Note di allineamento al repo**: lo schema usa `@default(uuid())` (non `cuid()`); i quattro
+campi KYC già su `Cliente` vanno migrati nel fascicolo o tenuti come proiezione di sola lettura,
+mai come secondo stato divergente. Il calendario aggrega già le scadenze KYC (`categoria: kyc`,
+sola lettura ai ruoli interni) e il cron gestisce i rinnovi UBO: il nuovo modulo estende, non
+duplica. La conservazione decennale (art. 31) vieta la cancellazione di fascicoli/documenti/log
+entro i 10 anni, anche a fronte di richieste GDPR (anonimizzazione parziale, non cancellazione).
+
+**Punti aperti da decidere con il titolare** (spec §10): provider per screening PEP/adverse
+media/Registro Imprese (costi e SLA), soglie economiche di default per tenant, modalità di
+anonimizzazione oltre il periodo di conservazione obbligatoria.
+
+---
+
 ## 8. FASE 6 — DevOps e CI/CD
 
 > **Obiettivo**: Automatizzare test, deploy, monitoring.
@@ -1520,6 +1563,7 @@ REDIS_URL=
 - [x] 5.2 Coda notifiche con retry (FASE 2.3 — `src/services/notificationQueue.ts` con backoff esponenziale)
 - [x] 5.3 TOTP super_admin & Ricorda Postazione IP (2026-09-12/13, `src/util/totp.ts` — RFC 6238 puro crypto nativo, compatibilità 100% Apple Passwords / Google Authenticator / 1Password, cifratura AES-GCM segreto, 8 backup codes, migrazioni `20260913133000_totp_campi_user` e `20260913150000_totp_ip_fidati`, memorizzazione postazioni/IP fidati con login diretto dopo la prima verifica, rotta `/auth/totp/dimentica-ip`, 19 test unitari e di rotta HTTP green, frontend completo `TabSicurezza.tsx` e `LoginPage.tsx`)
 - [x] 5.4 Backup DB schedulato (2026-09-12, `src/scripts/runScheduledBackup.ts` — AES-256-GCM, retention 14gg, multi-tenant, script npm `backup:scheduled`, 6 test)
+- [ ] 5.5 Modulo KYC/AML governato (D.Lgs. 231/2007) — spec `bluman-kyc-aml-spec-tecnica.md`; scaletta 5.5.1 motore+stati → 5.5.2 integrazioni dati → 5.5.3 portale cliente → 5.5.4 dashboard+gate → 5.5.5 automazioni. Non ancora iniziato.
 
 ### FASE 6 — DevOps (1 settimana)
 - [x] 6.1 CI/CD GitHub Actions
@@ -1545,13 +1589,11 @@ REDIS_URL=
 
 ---
 
-*Ultimo aggiornamento: 2026-09-17 (Chiuso il giro della ricevuta di consegna WhatsApp: il `wamid`
-di Meta viene conservato all'invio, la ricevuta lo ritrova dentro `external_id`, lo stato smette di
-finire in `allegati_json`, e un presidio monotono impedisce a una ricevuta in ritardo di disdire una
-consegna avvenuta — nuova suite `src/ricevutaWhatsapp.test.ts`, **86 file / 1052 test verdi**,
-`npx tsc --noEmit` a 0 errori. Aggiunta la sezione **§1ter Calendario, collaboratori e compiti
-assegnati**, con le due decisioni dell'utente registrate, la parte *chi visualizza cosa* e le
-misure di produzione del 17/09/2026. Aggiornato §1bis con l'analisi di cosa manca.)*
+*Ultimo aggiornamento: 2026-09-22 (Aggiunta la voce **§5.5 Modulo KYC/AML governato**
+sotto FASE 5, con la scaletta di rilascio in cinque tappe e il rimando alla specifica tecnica
+`bluman-kyc-aml-spec-tecnica.md`. Il modulo trasforma il KYC/AML da campo descrittivo passivo a
+processo governato risk-based (D.Lgs. 231/2007), riusando calendario, cron rinnovi UBO e
+infrastruttura FEA/OTP esistenti. Non ancora iniziato: registrato nel piano e nella checklist.)*
 *Prossima priorità operativa: la prova in un minuto sull'ingresso WhatsApp (§1bis) — scrivere al
 `+1 555-181-9633` con `railway logs --service bluman-api` aperto; poi §1ter Fase A, che è il punto
 in cui l'assegnazione dei compiti smette di essere un numero nel browser.*
