@@ -30,6 +30,14 @@ Tutti verificati: `tsc` backend + `tsc -b` frontend puliti, **1239 test backend 
 
 **Restano aperti** (aggiornato 22/09/2026): ⏳ ciclo NC — scadenza stornata resta `parziale` senza stato terminale (A4) e NC parziali per riga impossibili (A5); ⏳ SDI scartata senza rilavorazione (W1) e nessuna segnalazione proattiva di fatture emesse-mai-trasmesse (W2); ⏳ notifiche "documento da firmare" solo in-app, senza fallback email/WhatsApp (W3); ⏳ solleciti senza macchina a stati né storia (W4); ⏳ **KYC/AML come gate** — è il modulo §5.5 di `PIANO_DI_MIGLIORAMENTO.md`, spec in `bluman-kyc-aml-spec-tecnica.md`; 🟡 token portale scaduto non forza re-login (F2) e label/`htmlFor` sui form standalone da completare (X3); ⏳ arrotondamento IVA per-riga (B1); ⏳ `createMany`/idempotenza istanziazione progetto (P6/B3); ⏳ doppio sistema bottoni (L2) e scroll orizzontale tabelle mobile (L3); ⏳ marca temporale qualificata RFC 3161 + validazione catena/revoca certificato firma (D3, follow-up esterno); ⏳ irrigidimenti sicurezza deliberati (RBAC default-permissivo, file legacy senza prefisso tenant, TTL URL firmati 7g, CORS `*.vercel.app`).
 
+> **📌 Backlog da riprendere INSIEME (aggiornato 23/09/2026).** Chiusi e deployati dal 22-23/09:
+> A4, A5, W1, W2, W3, W4, B1, L3, F2, X3 blocco Login. **Restano, da fare col titolare:**
+> **X3** a11y a blocchi mirati (anagrafica, fatture, impostazioni…) · **L2** bottoni→`.btn` con
+> review visiva · **B3** idempotenza istanziazione (delicato) · **D3** marca temporale appena
+> scelta la **TSA**. **P6** (`createMany`) scartato. Promemoria fisso: **aggiornare sempre i .md**
+> (regola 3) e **rileggere le regole** (`ISTRUZIONI_PER_IA.md`, `.agents/AGENTS.md`) prima del codice.
+> KYC: svolta **Malta v0.2** (vedi §5.5 del piano) — ma prima aggiornare moduli/documenti (cartella `template/`).
+
 ---
 
 ## Sintesi — le 3 cose che contano di più

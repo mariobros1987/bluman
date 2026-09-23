@@ -1416,7 +1416,25 @@ Lo script `src/scripts/backupDb.ts` esiste. Schedularlo:
 
 ---
 
-### 5.5 🟠 Modulo KYC/AML governato (D.Lgs. 231/2007)
+### 5.5 🟠 Modulo KYC/AML governato
+
+> **🇲🇹 SVOLTA 23/09/2026 — Malta-first (spec v0.2).** L'app parte da **Malta**: la nuova
+> [`bluman-kyc-compliance-specifica-v0.2.md`](bluman-kyc-compliance-specifica-v0.2.md) **sostituisce
+> come direzione** l'impianto italiano qui sotto (D.Lgs. 231, UIF, 10 anni, rischio a singolo albero)
+> e il primo taglio già deployato (5.5.1: `FascicoloKyc`+`kycEngine`, IT-flavored). Cambia il
+> baricentro: **FIAU + MFSA + MBR**, PMLA/PMLFTR/Implementing Procedures, canale **goAML** (prepara,
+> non invia), conservazione **5 anni**, figura **MLRO**, **rischio a 4 pilastri** (cliente/geografia/
+> prodotto/canale) versionato, fascicolo **anomalie** separato (divieto di *tipping-off*), regole **per
+> configurazione** (`jurisdictionPack` MT/IT + `regulatoryProfile` CSP_MFSA|ALTRO + feature flag).
+>
+> **Decisioni titolare (23/09):** (1) **evolvere** `FascicoloKyc` → `KycCase`+`RiskAssessment` a
+> pilastri+`TenantComplianceSettings` (non ricostruire); (2) **MLRO** nominato dalle Impostazioni;
+> (3) consulente AML maltese **da configurare** → intanto valori default `[da verificare]` in config,
+> mai cablati. **Fasi nuove K0→K10** (K0 = settings+giurisdizione+feature flag+modalità bozza).
+>
+> ⚠️ **PRIMA di K0**, priorità del titolare: **aggiornare moduli e documenti** (libreria/BOM + template)
+> leggendo i 3 file nella cartella `template/`, ed eventualmente l'**anagrafica Bluecode con dati reali**.
+> La descrizione italiana qui sotto resta come contesto storico (pacchetto `IT`, predisposto non prioritario).
 
 **Problema**: il KYC/AML è oggi *passivo* — i campi `rischioAml`, `ubo`, `dataKyc`,
 `fontePatrimonio` su `Cliente` esistono ma non guidano né bloccano alcun processo. Un incarico
