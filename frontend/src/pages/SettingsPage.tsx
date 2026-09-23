@@ -14,11 +14,12 @@ import { TabUsers } from '../components/settings/TabUsers';
 import { TabSdi } from '../components/settings/TabSdi';
 import { TabManutenzione } from '../components/settings/TabManutenzione';
 import { TabSicurezza } from '../components/settings/TabSicurezza';
+import { TabCompliance } from '../components/settings/TabCompliance';
 import { InviteUserModal } from '../components/settings/InviteUserModal';
 import { ResetPasswordModal } from '../components/settings/ResetPasswordModal';
 import styles from './Settings.module.css';
 
-type Tab = 'company' | 'users' | 'sdi' | 'invoice_design' | 'channels' | 'manutenzione' | 'sicurezza';
+type Tab = 'company' | 'users' | 'sdi' | 'invoice_design' | 'channels' | 'compliance' | 'manutenzione' | 'sicurezza';
 
 export function SettingsPage() {
   const toast = useToast();
@@ -593,6 +594,9 @@ export function SettingsPage() {
         <button className={`${styles.tab} ${tab === 'sdi' ? styles.tabActive : ''}`} onClick={() => setTab('sdi')}>
           📨 Fatturazione Elettronica (Invio Manuale)
         </button>
+        <button className={`${styles.tab} ${tab === 'compliance' ? styles.tabActive : ''}`} onClick={() => setTab('compliance')}>
+          🛡️ Compliance & Antiriciclaggio
+        </button>
         <button
           className={`${styles.tab} ${tab === 'manutenzione' ? styles.tabActive : ''}`}
           onClick={() => { setTab('manutenzione'); setChiaviLocali(chiaviDatiLocali()); setChiaviRimosse(null); setConfermaSvuota(false); }}
@@ -806,6 +810,9 @@ export function SettingsPage() {
 
       {/* TAB 4: Configurazione SDI */}
       {tab === 'sdi' && <TabSdi />}
+
+      {/* TAB Compliance/AML (KYC Malta v0.2, K0/3): impostazioni compliance + audit trail immutabile */}
+      {tab === 'compliance' && <TabCompliance ruolo={currentRuolo} />}
 
       {/* TAB 5: Manutenzione dei dati locali di questo browser
           Una parte del lavoro dello studio è ancora scritta nel browser e non a database: è la
