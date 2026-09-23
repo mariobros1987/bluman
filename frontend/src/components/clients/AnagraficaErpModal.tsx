@@ -401,12 +401,12 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
 
             <div style={{ display: 'flex', gap: 12 }}>
               <div style={{ flex: 2 }}>
-                <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Nome / Ragione Sociale *</label>
-                <input value={nome} onChange={e => setNome(e.target.value)} required style={{ fontSize: 13, fontWeight: 600 }} />
+                <label htmlFor="cli-nome" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Nome / Ragione Sociale *</label>
+                <input id="cli-nome" value={nome} onChange={e => setNome(e.target.value)} required style={{ fontSize: 13, fontWeight: 600 }} />
               </div>
               <div style={{ flex: 1 }}>
-                <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Tipologia Soggetto *</label>
-                <select value={tipo} onChange={e => setTipo(e.target.value as any)}>
+                <label htmlFor="cli-tipo" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Tipologia Soggetto *</label>
+                <select id="cli-tipo" value={tipo} onChange={e => setTipo(e.target.value as any)}>
                   <option value="company">🏢 Società / Entità (Company)</option>
                   <option value="individual">👤 Persona Fisica (Individual)</option>
                 </select>
@@ -415,27 +415,27 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
 
             <div style={{ display: 'flex', gap: 12 }}>
               <div style={{ flex: 1 }}>
-                <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Partita IVA / VAT Number *</label>
-                <input value={piva} onChange={e => setPiva(e.target.value)} placeholder="IT01234567890" />
+                <label htmlFor="cli-piva" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Partita IVA / VAT Number *</label>
+                <input id="cli-piva" value={piva} onChange={e => setPiva(e.target.value)} placeholder="IT01234567890" />
               </div>
               <div style={{ flex: 1 }}>
-                <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Codice Fiscale *</label>
-                <input value={codFisc} onChange={e => setCodFisc(e.target.value)} placeholder="Codice Fiscale..." />
+                <label htmlFor="cli-codfisc" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Codice Fiscale *</label>
+                <input id="cli-codfisc" value={codFisc} onChange={e => setCodFisc(e.target.value)} placeholder="Codice Fiscale..." />
               </div>
             </div>
 
             <div style={{ display: 'flex', gap: 12 }}>
               <div style={{ flex: 1 }}>
-                <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Giurisdizione Costituzione *</label>
-                <input value={giurisdizione} onChange={e => setGiurisdizione(e.target.value)} />
+                <label htmlFor="cli-giurisdizione" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Giurisdizione Costituzione *</label>
+                <input id="cli-giurisdizione" value={giurisdizione} onChange={e => setGiurisdizione(e.target.value)} />
               </div>
               <div style={{ flex: 1 }}>
-                <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Registro Imprese / REA *</label>
-                <input value={regImprese} onChange={e => setRegImprese(e.target.value)} />
+                <label htmlFor="cli-regimprese" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Registro Imprese / REA *</label>
+                <input id="cli-regimprese" value={regImprese} onChange={e => setRegImprese(e.target.value)} />
               </div>
               <div style={{ flex: 1 }}>
-                <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Capitale Sociale (€)</label>
-                <input type="number" value={capitale} onChange={e => setCapitale(Number(e.target.value))} />
+                <label htmlFor="cli-capitale" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Capitale Sociale (€)</label>
+                <input id="cli-capitale" type="number" value={capitale} onChange={e => setCapitale(Number(e.target.value))} />
               </div>
             </div>
           </div>
@@ -573,37 +573,37 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
         {tab === 'sede' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div>
-              <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Indirizzo Sede Legale / Domicilio *</label>
-              <input value={indirizzo} onChange={e => setIndirizzo(e.target.value)} required />
+              <label htmlFor="cli-indirizzo" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Indirizzo Sede Legale / Domicilio *</label>
+              <input id="cli-indirizzo" value={indirizzo} onChange={e => setIndirizzo(e.target.value)} required />
             </div>
 
             <div style={{ display: 'flex', gap: 12 }}>
               <div style={{ flex: 1 }}>
-                <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Città *</label>
-                <input value={citta} onChange={e => setCitta(e.target.value)} required />
+                <label htmlFor="cli-citta" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Città *</label>
+                <input id="cli-citta" value={citta} onChange={e => setCitta(e.target.value)} required />
               </div>
               <div style={{ flex: 1 }}>
-                <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>CAP *</label>
-                <input value={cap} onChange={e => setCap(e.target.value)} required />
+                <label htmlFor="cli-cap" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>CAP *</label>
+                <input id="cli-cap" value={cap} onChange={e => setCap(e.target.value)} required />
               </div>
               <div style={{ flex: 1 }}>
-                <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Nazione *</label>
-                <input value={nazione} onChange={e => setNazione(e.target.value)} required />
+                <label htmlFor="cli-nazione" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Nazione *</label>
+                <input id="cli-nazione" value={nazione} onChange={e => setNazione(e.target.value)} required />
               </div>
             </div>
 
             <div style={{ display: 'flex', gap: 12 }}>
               <div style={{ flex: 1 }}>
-                <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Email Professionale *</label>
-                <input type="email" value={email} onChange={e => setEmail(e.target.value)} required />
+                <label htmlFor="cli-email" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Email Professionale *</label>
+                <input id="cli-email" type="email" value={email} onChange={e => setEmail(e.target.value)} required />
               </div>
               <div style={{ flex: 1 }}>
-                <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Email PEC Ufficiale *</label>
-                <input type="email" value={pec} onChange={e => setPec(e.target.value)} required />
+                <label htmlFor="cli-pec" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Email PEC Ufficiale *</label>
+                <input id="cli-pec" type="email" value={pec} onChange={e => setPec(e.target.value)} required />
               </div>
               <div style={{ flex: 1 }}>
-                <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Telefono Centralino / Ufficio</label>
-                <input value={telefono} onChange={e => setTelefono(e.target.value)} />
+                <label htmlFor="cli-telefono" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Telefono Centralino / Ufficio</label>
+                <input id="cli-telefono" value={telefono} onChange={e => setTelefono(e.target.value)} />
               </div>
             </div>
 
@@ -615,12 +615,12 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
 
               <div style={{ display: 'flex', gap: 12 }}>
                 <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>🟢 Cellulare / WhatsApp Diretto *</label>
-                  <input value={cellulare} onChange={e => setCellulare(e.target.value)} placeholder="+39 333 5936278" required />
+                  <label htmlFor="cli-cellulare" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>🟢 Cellulare / WhatsApp Diretto *</label>
+                  <input id="cli-cellulare" value={cellulare} onChange={e => setCellulare(e.target.value)} placeholder="+39 333 5936278" required />
                 </div>
                 <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>✈️ Chat ID Telegram</label>
-                  <input value={telegram} onChange={e => setTelegram(e.target.value)} placeholder="es. 123456789" inputMode="numeric" />
+                  <label htmlFor="cli-telegram" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>✈️ Chat ID Telegram</label>
+                  <input id="cli-telegram" value={telegram} onChange={e => setTelegram(e.target.value)} placeholder="es. 123456789" inputMode="numeric" />
                   <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 3 }}>
                     Solo il numero: lo <code>@nomeutente</code> non funziona sui clienti. Il cliente scrive
                     una volta al bot dello studio e la chat id compare fra gli aggiornamenti ricevuti.
@@ -632,8 +632,8 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
 
               <div style={{ display: 'flex', gap: 12 }}>
                 <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>🔒 Numero Signal (col prefisso)</label>
-                  <input value={signal} onChange={e => setSignal(e.target.value)} placeholder="+39 000 0000000" />
+                  <label htmlFor="cli-signal" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>🔒 Numero Signal (col prefisso)</label>
+                  <input id="cli-signal" value={signal} onChange={e => setSignal(e.target.value)} placeholder="+39 000 0000000" />
                   <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 3 }}>
                     Deve essere un numero registrato su Signal e va scritto in forma internazionale:
                     un cellulare che non ha Signal non riceve niente, e senza <code>+39</code> il
@@ -641,8 +641,8 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
                   </div>
                 </div>
                 <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>👤 Nome Referente / Contatto Diretto</label>
-                  <input value={referenteNome} onChange={e => setReferenteNome(e.target.value)} placeholder="es. Ing. Roberto Rossi (CEO)" />
+                  <label htmlFor="cli-referente" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>👤 Nome Referente / Contatto Diretto</label>
+                  <input id="cli-referente" value={referenteNome} onChange={e => setReferenteNome(e.target.value)} placeholder="es. Ing. Roberto Rossi (CEO)" />
                 </div>
               </div>
             </div>
@@ -654,19 +654,20 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ display: 'flex', gap: 12 }}>
               <div style={{ flex: 1 }}>
-                <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Codice Destinatario SDI (7 caratteri) *</label>
-                <input value={sdiCode} onChange={e => setSdiCode(e.target.value)} style={{ fontFamily: 'monospace', fontSize: 13, fontWeight: 700 }} required />
+                <label htmlFor="cli-sdi" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Codice Destinatario SDI (7 caratteri) *</label>
+                <input id="cli-sdi" value={sdiCode} onChange={e => setSdiCode(e.target.value)} style={{ fontFamily: 'monospace', fontSize: 13, fontWeight: 700 }} required />
               </div>
               <div style={{ flex: 2 }}>
-                <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Regime Fiscale *</label>
-                <input value={regimeFiscale} onChange={e => setRegimeFiscale(e.target.value)} required />
+                <label htmlFor="cli-regime" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Regime Fiscale *</label>
+                <input id="cli-regime" value={regimeFiscale} onChange={e => setRegimeFiscale(e.target.value)} required />
               </div>
             </div>
 
             <div style={{ display: 'flex', gap: 12 }}>
               <div style={{ flex: 1 }}>
-                <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Aliquota IVA di default (%)</label>
+                <label htmlFor="cli-aliquota" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Aliquota IVA di default (%)</label>
                 <input
+                  id="cli-aliquota"
                   type="number"
                   min={0}
                   max={100}
@@ -680,8 +681,9 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
                 </div>
               </div>
               <div style={{ flex: 1 }}>
-                <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Natura esenzione (se aliquota 0)</label>
+                <label htmlFor="cli-natura" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Natura esenzione (se aliquota 0)</label>
                 <input
+                  id="cli-natura"
                   value={naturaEsenzioneDefault}
                   onChange={e => setNaturaEsenzioneDefault(e.target.value)}
                   placeholder="es. N2.2, N3.1, N6.9"
@@ -694,8 +696,8 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
             </div>
 
             <div>
-              <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>IBAN Accrediti / Addebiti del Cliente *</label>
-              <input value={iban} onChange={e => setIban(e.target.value)} style={{ fontFamily: 'monospace', fontSize: 12.5 }} required />
+              <label htmlFor="cli-iban" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>IBAN Accrediti / Addebiti del Cliente *</label>
+              <input id="cli-iban" value={iban} onChange={e => setIban(e.target.value)} style={{ fontFamily: 'monospace', fontSize: 12.5 }} required />
             </div>
 
             <div style={{ background: 'var(--pill-green-bg)', border: '1px solid var(--pill-green-bg)', borderRadius: 10, padding: 12, fontSize: 11, color: 'var(--green)' }}>
@@ -709,35 +711,35 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ display: 'flex', gap: 12 }}>
               <div style={{ flex: 1 }}>
-                <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Classe di Rischio Antiriciclaggio (AML) *</label>
-                <select value={rischioAml} onChange={e => setRischioAml(e.target.value as any)}>
+                <label htmlFor="cli-rischio" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Classe di Rischio Antiriciclaggio (AML) *</label>
+                <select id="cli-rischio" value={rischioAml} onChange={e => setRischioAml(e.target.value as any)}>
                   <option value="basso">🟢 Basso Rischio</option>
                   <option value="medio">🟡 Medio Rischio</option>
                   <option value="alto">🔴 Alto Rischio / Persona Politicamente Esposta (PEP)</option>
                 </select>
               </div>
               <div style={{ flex: 1 }}>
-                <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Data Ultimo Rinnovo KYC *</label>
-                <input value={dataKyc} onChange={e => setDataKyc(e.target.value)} required />
+                <label htmlFor="cli-datakyc" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Data Ultimo Rinnovo KYC *</label>
+                <input id="cli-datakyc" value={dataKyc} onChange={e => setDataKyc(e.target.value)} required />
               </div>
             </div>
 
             <div>
-              <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Titolare Effettivo (UBO) & Struttura di Controllo *</label>
-              <input value={ubo} onChange={e => setUbo(e.target.value)} required />
+              <label htmlFor="cli-ubo" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Titolare Effettivo (UBO) & Struttura di Controllo *</label>
+              <input id="cli-ubo" value={ubo} onChange={e => setUbo(e.target.value)} required />
             </div>
 
             <div>
-              <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Provenienza dei Fondi / Origine Patrimonio *</label>
-              <input value={fontePatrimonio} onChange={e => setFontePatrimonio(e.target.value)} required />
+              <label htmlFor="cli-fonte" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Provenienza dei Fondi / Origine Patrimonio *</label>
+              <input id="cli-fonte" value={fontePatrimonio} onChange={e => setFontePatrimonio(e.target.value)} required />
             </div>
 
             <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12, marginTop: 4 }}>
               <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8 }}>🪪 Dati anagrafici (compilano i contratti e servono al KYC)</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                 <div>
-                  <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Tipo documento</label>
-                  <select value={documentoTipo} onChange={e => setDocumentoTipo(e.target.value)} style={{ width: '100%' }}>
+                  <label htmlFor="cli-doctipo" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Tipo documento</label>
+                  <select id="cli-doctipo" value={documentoTipo} onChange={e => setDocumentoTipo(e.target.value)} style={{ width: '100%' }}>
                     <option value="">—</option>
                     <option value="carta_identita">Carta d'identità</option>
                     <option value="passaporto">Passaporto</option>
@@ -745,24 +747,24 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
                   </select>
                 </div>
                 <div>
-                  <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>N° documento / passaporto</label>
-                  <input value={documentoNumero} onChange={e => setDocumentoNumero(e.target.value)} />
+                  <label htmlFor="cli-docnum" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>N° documento / passaporto</label>
+                  <input id="cli-docnum" value={documentoNumero} onChange={e => setDocumentoNumero(e.target.value)} />
                 </div>
                 <div>
-                  <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Data di nascita</label>
-                  <input value={dataNascita} onChange={e => setDataNascita(e.target.value)} placeholder="gg/mm/aaaa" />
+                  <label htmlFor="cli-datanascita" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Data di nascita</label>
+                  <input id="cli-datanascita" value={dataNascita} onChange={e => setDataNascita(e.target.value)} placeholder="gg/mm/aaaa" />
                 </div>
                 <div>
-                  <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Luogo / Paese di nascita</label>
-                  <input value={luogoNascita} onChange={e => setLuogoNascita(e.target.value)} />
+                  <label htmlFor="cli-luogonascita" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Luogo / Paese di nascita</label>
+                  <input id="cli-luogonascita" value={luogoNascita} onChange={e => setLuogoNascita(e.target.value)} />
                 </div>
                 <div>
-                  <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Indirizzo di residenza</label>
-                  <input value={indirizzoResidenza} onChange={e => setIndirizzoResidenza(e.target.value)} />
+                  <label htmlFor="cli-indres" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Indirizzo di residenza</label>
+                  <input id="cli-indres" value={indirizzoResidenza} onChange={e => setIndirizzoResidenza(e.target.value)} />
                 </div>
                 <div>
-                  <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Indirizzo alloggio (Malta)</label>
-                  <input value={indirizzoAlloggio} onChange={e => setIndirizzoAlloggio(e.target.value)} />
+                  <label htmlFor="cli-indalloggio" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Indirizzo alloggio (Malta)</label>
+                  <input id="cli-indalloggio" value={indirizzoAlloggio} onChange={e => setIndirizzoAlloggio(e.target.value)} />
                 </div>
               </div>
             </div>
