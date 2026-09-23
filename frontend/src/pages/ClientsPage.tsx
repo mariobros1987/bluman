@@ -419,8 +419,8 @@ export function ClientsPage() {
           <form onSubmit={handleCreate} style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, padding: 20, width: '100%', maxWidth: 440, display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div id="titolo-nuovo-cliente" style={{ fontSize: 15, fontWeight: 600 }}>Nuovo Cliente Anagrafica</div>
             <div>
-              <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Nome / Ragione Sociale *</label>
-              <input value={nome} onChange={e => setNome(e.target.value)} placeholder="es. Giuseppe Rossi / Acme S.r.l." required />
+              <label htmlFor="clip-nome" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Nome / Ragione Sociale *</label>
+              <input id="clip-nome" value={nome} onChange={e => setNome(e.target.value)} placeholder="es. Giuseppe Rossi / Acme S.r.l." required />
             </div>
             <div>
               <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Tipo Cliente *</label>
