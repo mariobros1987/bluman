@@ -70,8 +70,18 @@ async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutM
       localStorage.setItem(storageKey, rinnovato);
     }
 
-    if (res.status === 401 && typeof window !== 'undefined' && !url.includes('/auth/login') && !url.includes('/auth/magic-login') && !window.location.pathname.startsWith('/portal')) {
-      window.dispatchEvent(new Event('bluman_unauthorized'));
+    if (res.status === 401 && typeof window !== 'undefined' && !url.includes('/auth/login') && !url.includes('/auth/magic-login')) {
+      const isPortal = window.location.pathname.startsWith('/portal');
+      if (!isPortal) {
+        window.dispatchEvent(new Event('bluman_unauthorized'));
+      } else {
+        // F2: sessione del PORTALE scaduta a metà uso. Distinta da un login fallito (che non ha
+        // ancora un token in storage): solo se c'era una sessione si segnala la scadenza, così il
+        // cliente torna al login pulito invece di restare su una UI che dà 401 a ogni azione.
+        let avevaSessione = false;
+        try { avevaSessione = !!localStorage.getItem('bluman_portal_token'); } catch { /* storage non disponibile */ }
+        if (avevaSessione) window.dispatchEvent(new Event('bluman_portal_unauthorized'));
+      }
     }
     return res;
   } catch (error) {

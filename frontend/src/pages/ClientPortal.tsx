@@ -192,6 +192,17 @@ export function ClientPortal() {
     loadPortalData();
   }, [token]);
 
+  // F2: se il backend risponde 401 (sessione portale scaduta a metà uso), riporta il cliente al
+  // login con un avviso, invece di lasciarlo su una UI che fallisce a ogni azione.
+  useEffect(() => {
+    const onScaduta = () => {
+      handleClientLogout();
+      setLoginError('La sessione è scaduta. Accedi di nuovo per continuare.');
+    };
+    window.addEventListener('bluman_portal_unauthorized', onScaduta);
+    return () => window.removeEventListener('bluman_portal_unauthorized', onScaduta);
+  }, [handleClientLogout, setLoginError]);
+
   // Campanella delle notifiche del portale cliente (Blocco 3): caricamento all'accesso e
   // aggiornamento in tempo reale via stream SSE, estratti in `usePortalNotifiche`.
   const {
