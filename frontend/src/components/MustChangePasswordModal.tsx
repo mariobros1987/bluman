@@ -187,10 +187,11 @@ export function MustChangePasswordModal({ user, onSuccess }: MustChangePasswordM
             )}
 
             <div>
-              <label style={{ fontSize: 11, fontWeight: 700, color: "var(--muted, var(--muted))", display: "block", marginBottom: 6 }}>
+              <label htmlFor="mcp-current" style={{ fontSize: 11, fontWeight: 700, color: "var(--muted, var(--muted))", display: "block", marginBottom: 6 }}>
                 Password Temporanea Ricevuta *
               </label>
               <input
+                id="mcp-current"
                 type={showPassword ? "text" : "password"}
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
@@ -212,7 +213,7 @@ export function MustChangePasswordModal({ user, onSuccess }: MustChangePasswordM
 
             <div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                <label style={{ fontSize: 11, fontWeight: 700, color: "var(--muted, var(--muted))" }}>
+                <label htmlFor="mcp-new" style={{ fontSize: 11, fontWeight: 700, color: "var(--muted, var(--muted))" }}>
                   Nuova Password Personale * (min. 8 caratteri)
                 </label>
                 <button
@@ -232,6 +233,7 @@ export function MustChangePasswordModal({ user, onSuccess }: MustChangePasswordM
                 </button>
               </div>
               <input
+                id="mcp-new"
                 type={showPassword ? "text" : "password"}
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
@@ -266,10 +268,11 @@ export function MustChangePasswordModal({ user, onSuccess }: MustChangePasswordM
             </div>
 
             <div>
-              <label style={{ fontSize: 11, fontWeight: 700, color: "var(--muted, var(--muted))", display: "block", marginBottom: 6 }}>
+              <label htmlFor="mcp-confirm" style={{ fontSize: 11, fontWeight: 700, color: "var(--muted, var(--muted))", display: "block", marginBottom: 6 }}>
                 Conferma Nuova Password *
               </label>
               <input
+                id="mcp-confirm"
                 type={showPassword ? "text" : "password"}
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
