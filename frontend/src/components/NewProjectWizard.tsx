@@ -3,6 +3,7 @@ import { CatBadge } from './ui/CatBadge';
 import { fmt, moduloH, moduloP, resolveRighe } from '../utils';
 import type { Cliente, Giurisdizione, ModuloTemplate, CategoriaModulo } from '../types';
 import { fetchClienti, fetchGiurisdizioniApi, fetchModuliLibreria, creaClienteApi, creaProgettoApi, creaPreventivoEAccettaApi } from '../api/client';
+import { fetchKycFascicoloApi, type FascicoloKyc } from '../api/kyc';
 import { getCurrentTenantId, getTenantStorageKey } from '../utils/tenant';
 import { Modal } from './ui/Modal';
 
@@ -35,6 +36,16 @@ export function NewProjectWizard({ onClose, onProjectCreated }: NewProjectWizard
   const [loading, setLoading] = useState(false);
   const [notif, setNotif] = useState(false);
   const [errore, setErrore] = useState<string | null>(null);
+  // Gate KYC in versione avviso (non bloccante): il fascicolo del cliente selezionato.
+  const [kycFasc, setKycFasc] = useState<FascicoloKyc | null>(null);
+  useEffect(() => {
+    if (clientMode !== 'existing' || !selectedClientId) { setKycFasc(null); return; }
+    let annullato = false;
+    fetchKycFascicoloApi(selectedClientId)
+      .then((r) => { if (!annullato) setKycFasc(r.fascicolo); })
+      .catch(() => { if (!annullato) setKycFasc(null); });
+    return () => { annullato = true; };
+  }, [selectedClientId, clientMode]);
 
   // Fetch existing clients, jurisdictions & module templates on mount
   useEffect(() => {
@@ -414,6 +425,12 @@ export function NewProjectWizard({ onClose, onProjectCreated }: NewProjectWizard
                     </div>
                   )}
                 </div>
+
+                {clientMode === 'existing' && selectedClientId && (!kycFasc || kycFasc.stato !== 'approvato') && (
+                  <div style={{ padding: '10px 12px', borderRadius: 8, background: 'var(--pill-amber-bg)', color: 'var(--pill-amber-fg)', fontSize: 12, border: '1px solid var(--amber)' }}>
+                    ⚠️ KYC {kycFasc ? `in stato «${kycFasc.stato}»` : 'non ancora avviato'} per questo cliente: puoi procedere, ma valuta di completare l'adeguata verifica nella scheda «Compliance KYC» dell'anagrafica (D.Lgs. 231/2007). Avviso non bloccante.
+                  </div>
+                )}
 
                 <div>
                   <div style={labelStyle}>Nome Progetto *</div>
