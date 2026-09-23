@@ -827,6 +827,7 @@ export function InvoicesPage() {
                   <div key={idx} style={{ display: 'grid', gridTemplateColumns: '3fr 1fr 1fr 1.5fr 1fr 40px', gap: 8, alignItems: 'center', background: 'var(--bg)', padding: 8, borderRadius: 8 }}>
                     <input
                       type="text"
+                      aria-label={`Descrizione prestazione, riga ${idx + 1}`}
                       placeholder="Descrizione prestazione..."
                       value={r.descrizione}
                       onChange={(e) => handleAggiornaRiga(idx, 'descrizione', e.target.value)}
@@ -834,6 +835,7 @@ export function InvoicesPage() {
                     />
                     <input
                       type="number"
+                      aria-label={`Quantità, riga ${idx + 1}`}
                       placeholder="Q.tà"
                       value={r.quantita}
                       onChange={(e) => handleAggiornaRiga(idx, 'quantita', parseFloat(e.target.value) || 1)}
@@ -841,6 +843,7 @@ export function InvoicesPage() {
                     />
                     <input
                       type="text"
+                      aria-label={`Unità di misura, riga ${idx + 1}`}
                       placeholder="U.M. (ore/forfait)"
                       value={r.unitaMisura}
                       onChange={(e) => handleAggiornaRiga(idx, 'unitaMisura', e.target.value)}
@@ -849,12 +852,14 @@ export function InvoicesPage() {
                     <input
                       type="number"
                       step="0.01"
+                      aria-label={`Prezzo unitario in euro, riga ${idx + 1}`}
                       placeholder="Prezzo Unit (€)"
                       value={(r.prezzoUnitarioCent / 100).toFixed(2)}
                       onChange={(e) => handleAggiornaRiga(idx, 'prezzoUnitarioCent', Math.round(parseFloat(e.target.value) * 100) || 0)}
                       style={{ padding: '6px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--card)', color: 'var(--text)' }}
                     />
                     <select
+                      aria-label={`Aliquota IVA, riga ${idx + 1}`}
                       value={r.aliquotaIva}
                       onChange={(e) => handleAggiornaRiga(idx, 'aliquotaIva', parseInt(e.target.value, 10))}
                       style={{ padding: '6px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--card)', color: 'var(--text)' }}

@@ -423,10 +423,10 @@ export function ClientsPage() {
               <input id="clip-nome" value={nome} onChange={e => setNome(e.target.value)} placeholder="es. Giuseppe Rossi / Acme S.r.l." required />
             </div>
             <div>
-              <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Tipo Cliente *</label>
-              <div style={{ display: 'flex', gap: 8 }}>
+              <label id="clip-tipo-label" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Tipo Cliente *</label>
+              <div role="group" aria-labelledby="clip-tipo-label" style={{ display: 'flex', gap: 8 }}>
                 {(['individual', 'company'] as const).map(t => (
-                  <button key={t} type="button" onClick={() => setTipo(t)} style={{ flex: 1, padding: 8, borderRadius: 8, border: `1px solid ${tipo === t ? 'var(--indigo)' : 'var(--border)'}`, background: tipo === t ? 'var(--surface-1)' : 'var(--card)', color: tipo === t ? 'var(--indigo-l)' : 'var(--muted)', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>
+                  <button key={t} type="button" aria-pressed={tipo === t} onClick={() => setTipo(t)} style={{ flex: 1, padding: 8, borderRadius: 8, border: `1px solid ${tipo === t ? 'var(--indigo)' : 'var(--border)'}`, background: tipo === t ? 'var(--surface-1)' : 'var(--card)', color: tipo === t ? 'var(--indigo-l)' : 'var(--muted)', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>
                     {t === 'individual' ? '👤 Persona fisica' : '🏢 Società'}
                   </button>
                 ))}
