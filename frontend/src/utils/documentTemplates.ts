@@ -789,6 +789,24 @@ export function getTemplateForVoce(voceTitle: string, category: string = ''): Do
   const v = voceTitle.toLowerCase();
   const c = category.toLowerCase();
 
+  // 0. Modelli Malta «trasferimento residenza / guest» (modulo mod-r01, art-r02/r03/r05).
+  //    Vanno PRIMA delle regole generiche: «Contratto di servizi al guest» sarebbe altrimenti
+  //    catturato dalla regola «contratto», e «Informativa privacy GDPR» dalla regola compliance
+  //    (che punta alla checklist KYC, non all'informativa). I default IT si allineano alla UI
+  //    dello studio; l'operatore può scegliere la versione EN a fronte dal catalogo.
+  if (v.includes('ospitalit') || v.includes('hospitality') || v.includes('posto letto')) {
+    const found = PREBUILT_TEMPLATES.find(t => t.id === 'tmpl-hospitality-agreement-it');
+    if (found) return found;
+  }
+  if (v.includes('service agreement') || v.includes('servizi al guest') || (v.includes('guest') && v.includes('serviz'))) {
+    const found = PREBUILT_TEMPLATES.find(t => t.id === 'tmpl-service-agreement-it');
+    if (found) return found;
+  }
+  if (v.includes('gdpr') || v.includes('privacy') || v.includes('informativa')) {
+    const found = PREBUILT_TEMPLATES.find(t => t.id === 'tmpl-gdpr-informativa-it');
+    if (found) return found;
+  }
+
   // 1. Modelli Specifici di Riorganizzazione Societaria
   if (v.includes('intake') || v.includes('questionario')) {
     const found = PREBUILT_TEMPLATES.find(t => t.id === 'tmpl-01-1-questionario-intake-cliente');
