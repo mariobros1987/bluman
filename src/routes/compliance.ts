@@ -2,7 +2,7 @@
 // Lettura riservata ai ruoli interni (mai `cliente`); scrittura solo advisor/super_admin.
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { prisma } from '../util/prismaClient.js';
-import { modalitaBozza, calcolaHashEvento } from '../services/complianceService.js';
+import { modalitaBozza, calcolaHashEvento, verificaCatena } from '../services/complianceService.js';
 
 const PACCHETTI = ['MT', 'IT'];
 const PROFILI = ['CSP_MFSA', 'ALTRO_SOGGETTO_OBBLIGATO'];
@@ -53,14 +53,42 @@ export async function registraRotteCompliance(server: FastifyInstance): Promise<
       create: { tenantId, ...dati },
     });
 
-    // Evento immutabile a catena hash (append-only).
+    // Evento immutabile a catena hash (append-only). `createdAt` si persiste ESPLICITAMENTE
+    // con lo stesso istante usato nel calcolo dell'hash: se lo lasciassimo al DEFAULT del DB,
+    // la marca temporale memorizzata differirebbe di qualche ms da quella firmata e la verifica
+    // della catena (GET /tenant/compliance-events) risulterebbe sempre rotta.
     const ultimo = await prisma.complianceEvent.findFirst({ where: { tenantId }, orderBy: { createdAt: 'desc' } });
     const createdAt = new Date().toISOString();
     const hash = calcolaHashEvento({ tipo: 'COMPLIANCE_SETTINGS_AGGIORNATE', payload: dati, createdAt, hashPrecedente: ultimo?.hash ?? null });
     await prisma.complianceEvent.create({
-      data: { tenantId, tipo: 'COMPLIANCE_SETTINGS_AGGIORNATE', attoreUserId: req.userId ?? null, payload: dati, hashPrecedente: ultimo?.hash ?? null, hash },
+      data: { tenantId, tipo: 'COMPLIANCE_SETTINGS_AGGIORNATE', attoreUserId: req.userId ?? null, payload: dati, hashPrecedente: ultimo?.hash ?? null, hash, createdAt: new Date(createdAt) },
     });
 
     return reply.send({ ok: true, settings: s, modalitaBozza: modalitaBozza(s) });
+  });
+
+  // Audit trail di compliance in sola lettura (spec §8). Riservato ai ruoli interni: gli eventi
+  // raccontano le scelte regolatorie dello studio, non riguardano il cliente. Ordinati dal più
+  // recente per la UI; la verifica della catena gira sull'ordine crescente e dice se e dove la
+  // sequenza è stata manomessa.
+  server.get('/tenant/compliance-events', async (req, reply) => {
+    if (vietatoAlCliente(req, reply)) return;
+    const tenantId = req.tenantId;
+    const eventi = await prisma.complianceEvent.findMany({
+      where: { tenantId },
+      orderBy: { createdAt: 'asc' },
+      take: 500,
+    });
+    const catena = verificaCatena(
+      eventi.map((e) => ({
+        tipo: e.tipo,
+        payload: e.payload,
+        createdAt: e.createdAt.toISOString(),
+        hashPrecedente: e.hashPrecedente ?? null,
+        hash: e.hash,
+      })),
+    );
+    // Alla UI il più recente in cima.
+    return reply.send({ eventi: [...eventi].reverse(), catena });
   });
 }
