@@ -162,12 +162,17 @@ export function calcolaTotaliFattura(
   let totaleIvaCentesimi = 0;
   const riepilogoIva: RiepilogoIva[] = [];
   for (const entry of mappaIva.values()) {
-    totaleIvaCentesimi += entry.iva;
+    // IVA del riepilogo calcolata sull'imponibile di GRUPPO, non come somma dei per-riga
+    // arrotondati (B1 audit): è il valore che SDI valida in DatiRiepilogo. Sommare i per-riga
+    // arrotondati produceva uno scarto fino a 1 cent (es. 2×10,15€ @22% → 2×223 = 446, mentre
+    // 2030×0,22 = 447), che SDI segnala come incoerenza fra Imponibile e Imposta.
+    const ivaGruppo = entry.aliquotaIva > 0 ? Math.round(entry.imponibile * (entry.aliquotaIva / 100)) : 0;
+    totaleIvaCentesimi += ivaGruppo;
     riepilogoIva.push({
       aliquotaIva: entry.aliquotaIva,
       naturaEsenzione: entry.natura,
       imponibileCentesimi: entry.imponibile,
-      ivaCentesimi: entry.iva,
+      ivaCentesimi: ivaGruppo,
     });
   }
 
