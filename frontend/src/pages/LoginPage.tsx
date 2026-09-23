@@ -154,8 +154,9 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
         {!totpStep && (
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div>
-              <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Email Aziendale Studio *</label>
+              <label htmlFor="login-email" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Email Aziendale Studio *</label>
               <input
+                id="login-email"
                 type="email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
@@ -167,8 +168,9 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
             </div>
 
             <div>
-              <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Password di Accesso *</label>
+              <label htmlFor="login-password" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Password di Accesso *</label>
               <input
+                id="login-password"
                 type="password"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
@@ -229,10 +231,11 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
             </div>
 
             <div>
-              <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 6 }}>
+              <label htmlFor="login-2fa" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 6 }}>
                 {useBackupCode ? 'Codice di Recupero (8 caratteri) *' : 'Codice Authenticator (6 cifre) *'}
               </label>
               <input
+                id="login-2fa"
                 type="text"
                 value={codiceTotp}
                 onChange={e => setCodiceTotp(e.target.value.replace(/\s/g, '').toUpperCase())}
