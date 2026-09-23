@@ -23,6 +23,31 @@ type Tab = 'company' | 'users' | 'sdi' | 'invoice_design' | 'channels' | 'manute
 export function SettingsPage() {
   const toast = useToast();
   const [tab, setTab] = useState<Tab>('company');
+  // Standby moduli a livello di studio (nav-only): l'admin spegne i moduli non usati.
+  const MODULI_STANDBY: Array<{ key: string; label: string }> = [
+    { key: 'projects', label: 'Progetti' }, { key: 'clients', label: 'Clienti' },
+    { key: 'calendar', label: 'Calendario' }, { key: 'invoices', label: 'Fatture & SDI' },
+    { key: 'scadenzario', label: 'Scadenzario' }, { key: 'primanota', label: 'Prima Nota' },
+    { key: 'banks', label: 'Banche' }, { key: 'retainers', label: 'Retainer' },
+    { key: 'documents', label: 'Documenti' }, { key: 'reports', label: 'Report' },
+  ];
+  const [moduliStandby, setModuliStandby] = useState<string[]>([]);
+  const [moduliMsg, setModuliMsg] = useState<string | null>(null);
+  const toggleModulo = (key: string) =>
+    setModuliStandby((cur) => (cur.includes(key) ? cur.filter((k) => k !== key) : [...cur, key]));
+  const handleSaveModuli = async () => {
+    setModuliMsg(null);
+    try {
+      const tid = getCurrentTenantId();
+      await updateTenantInfoApi({ moduliDisattivati: moduliStandby }, tid);
+      let info: any = {};
+      try { info = JSON.parse(localStorage.getItem(getTenantStorageKey('bluman_tenant_info', tid)) || '{}'); } catch { /* storage vuoto */ }
+      saveTenantInfoToStorage(tid, { ...info, moduliDisattivati: moduliStandby });
+      setModuliMsg('Salvato: i moduli in standby sono nascosti dalla navigazione per lo studio.');
+    } catch (e: any) {
+      setModuliMsg(e?.message || 'Errore nel salvataggio dei moduli');
+    }
+  };
   // Ruolo dell'utente corrente — serve a TabSicurezza per mostrare la sezione 2FA
   const currentUser = (() => { try { return JSON.parse(localStorage.getItem('bluman_user') || '{}'); } catch { return {}; } })();
   const currentRuolo: string = currentUser?.ruolo || '';
@@ -185,6 +210,7 @@ export function SettingsPage() {
 
     if (tData) {
       setRagioneSociale(tData.ragioneSociale || '');
+      setModuliStandby(Array.isArray(tData.moduliDisattivati) ? tData.moduliDisattivati : []);
       setPIva(tData.piva || '');
       setCodFisc(tData.codiceFiscale || '');
       setSedeLegale(tData.sedeLegale || '');
@@ -591,6 +617,7 @@ export function SettingsPage() {
 
       {/* TAB 1: Dati Società & Sedi */}
       {tab === 'company' && (
+        <>
         <TabCompany
           ragioneSociale={ragioneSociale}
           setRagioneSociale={setRagioneSociale}
@@ -618,6 +645,26 @@ export function SettingsPage() {
           setIban={setIban}
           handleSaveCompany={handleSaveCompany}
         />
+        <div style={{ marginTop: 16, padding: 16, border: '1px solid var(--border)', borderRadius: 12, background: 'var(--card)' }}>
+          <div style={{ fontWeight: 700, marginBottom: 4 }}>🧩 Moduli in standby</div>
+          <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}>Spegni i moduli che lo studio non usa per ora: spariscono dalla navigazione per tutti. Non è un blocco di sicurezza (per quello resta la Matrice Permessi per utente). Dashboard e Impostazioni restano sempre attive.</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 8 }}>
+            {MODULI_STANDBY.map((m) => {
+              const attivo = !moduliStandby.includes(m.key);
+              return (
+                <label key={m.key} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', padding: '6px 8px', borderRadius: 8, border: '1px solid var(--border)', background: attivo ? 'var(--card)' : 'var(--pill-amber-bg)' }}>
+                  <input type="checkbox" checked={attivo} onChange={() => toggleModulo(m.key)} />
+                  <span>{m.label}{attivo ? '' : ' — standby'}</span>
+                </label>
+              );
+            })}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12 }}>
+            <button type="button" className="btn btn-sm btn-primary" onClick={handleSaveModuli}>Salva moduli</button>
+            {moduliMsg && <span style={{ fontSize: 12, color: 'var(--muted)' }}>{moduliMsg}</span>}
+          </div>
+        </div>
+        </>
       )}
 
       {/* TAB 2: Personalizzazione Layout Fattura PDF (§Admin) */}

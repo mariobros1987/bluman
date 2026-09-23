@@ -90,6 +90,9 @@ model Tenant {
   regImprese        String?  @map("reg_imprese")
   mostraSdi         Boolean? @default(true) @map("mostra_sdi")
   mostraIva         Boolean? @default(true) @map("mostra_iva")
+  // §Standby moduli: chiavi dei moduli che lo studio ha messo «in standby» (non usa per ora).
+  // Nascosti dalla navigazione per tutto lo studio; lo decide l'admin da Impostazioni.
+  moduliDisattivati Json?    @map("moduli_disattivati")
   emailInboundParseUrl String? @map("email_inbound_parse_url")
   /// Indirizzo base del `signal-cli-rest-api` **dello studio** (es. `https://signal.studio.it`).
   /// Prima si chiamava `signal_cli_endpoint`: la migrazione `20260916190000_signal_per_studio`

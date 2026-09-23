@@ -253,6 +253,11 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
     const rawBody = (req.body || {}) as Record<string, any>;
     if (Object.keys(rawBody).some(key => CHIAVI_CANALI.has(key)) && !soloGestoriCanali(req, reply)) return reply;
 
+    // Lo standby dei moduli lo decide l'admin dello studio (advisor/super_admin), come i canali.
+    if (rawBody.moduliDisattivati !== undefined && req.ruolo !== 'advisor' && req.ruolo !== 'super_admin') {
+      return reply.code(403).send({ errore: 'Lo standby dei moduli è riservato al responsabile dello studio.' });
+    }
+
     // `logoUrl` finisce in un `<img src>` generato lato server: un valore che non punta
     // a niente svuota la fascia dell'intestazione invece di lasciar vedere il marchio.
     // Le uniche forme ammesse sono quelle che l'app produce davvero: percorso relativo
@@ -316,14 +321,18 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
       // vivono solo come hash scrypt su `user.passwordHash` (§23).
       'leadAdvisorNome', 'leadAdvisorEmail', 'giurisdizione',
       'durataMesi', 'dataAttivazione', 'dataScadenza',
-      'piano', 'stato'
+      'piano', 'stato', 'moduliDisattivati'
     ];
 
     const sanitizedData: Record<string, any> = {};
     try {
       for (const key of allowedKeys) {
         if (rawBody[key] === undefined) continue;
-        if (key === 'smtpPort' || key === 'imapPort') {
+        if (key === 'moduliDisattivati') {
+          sanitizedData[key] = Array.isArray(rawBody[key])
+            ? rawBody[key].filter((m: unknown): m is string => typeof m === 'string').slice(0, 50)
+            : [];
+        } else if (key === 'smtpPort' || key === 'imapPort') {
           sanitizedData[key] = rawBody[key] === null || rawBody[key] === '' ? null : validaPorta(rawBody[key], key);
         } else if (key === 'durataMesi') {
           sanitizedData[key] = rawBody[key] ? Number(rawBody[key]) : null;

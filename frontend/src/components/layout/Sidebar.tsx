@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import { getFormattedLogoUrl } from '../../utils';
 import { getUserPermission } from '../../utils/rbac';
-import { getCurrentTenantId, getTenantStorageKey, getStudioInfoForTenant } from '../../utils/tenant';
+import { getCurrentTenantId, getTenantStorageKey, getStudioInfoForTenant, getModuliDisattivati } from '../../utils/tenant';
 import styles from './Sidebar.module.css';
 
 const NAV = [
@@ -51,9 +51,12 @@ export function Sidebar({ alertCount = 0, user, onLogout, onOpenProfile }: Sideb
     : NAV;
 
   // Filtra i moduli bloccati per l'utente loggato in base alla Matrice Permessi RBAC
+  const disattivati = getModuliDisattivati();
   const navItems = baseItems.filter(item => {
     if (item.path === '/') return true;
     if (item.path === '/admin/tenants') return isSuperAdmin;
+    // Standby moduli deciso dallo studio (Impostazioni non si disattiva, per non chiudersi fuori).
+    if (item.moduleKey !== 'settings' && disattivati.includes(item.moduleKey)) return false;
     const perm = getUserPermission(user, item.moduleKey);
     return perm !== 'denied';
   });

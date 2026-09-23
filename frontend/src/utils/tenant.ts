@@ -233,6 +233,18 @@ export function senzaSegretiTenant<T>(data: T): T {
 /**
  * Salva i dati di configurazione del Tenant in modo persistente e isolato
  */
+/** Chiavi dei moduli che lo studio ha messo in standby (nascosti dalla navigazione). */
+export function getModuliDisattivati(tenantId?: string): string[] {
+  try {
+    const raw = localStorage.getItem(getTenantStorageKey('bluman_tenant_info', tenantId || getCurrentTenantId()));
+    if (!raw) return [];
+    const info = JSON.parse(raw);
+    return Array.isArray(info?.moduliDisattivati) ? info.moduliDisattivati.filter((m: unknown) => typeof m === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
 export function saveTenantInfoToStorage(tenantId: string, data: any) {
   try {
     const pulito = senzaSegretiTenant(data) as any;
