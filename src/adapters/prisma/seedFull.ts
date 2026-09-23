@@ -116,6 +116,13 @@ async function main() {
     { id: 'art-13', nome: 'Selezione banche idonee', cat: 'Banking', h: 3, p: 650 },
     { id: 'art-14', nome: 'Raccolta e verifica documentazione KYC', cat: 'Compliance', h: 5, p: 1150 },
     { id: 'art-15', nome: 'Apertura conto corrente singolo', cat: 'Banking', h: 4, p: 900 },
+    // Servizi trasferimento di residenza a Malta (documenti reali Bluecode)
+    { id: 'art-r01', nome: 'Onboarding e raccolta documenti guest', cat: 'Compliance', h: 2, p: 300 },
+    { id: 'art-r02', nome: 'Accordo di ospitalità (posto letto)', cat: 'Legale', h: 2, p: 300 },
+    { id: 'art-r03', nome: 'Contratto di servizi al guest', cat: 'Legale', h: 2, p: 300 },
+    { id: 'art-r04', nome: 'Registrazione Housing Authority Malta', cat: 'Legale', h: 3, p: 400 },
+    { id: 'art-r05', nome: 'Informativa privacy GDPR e consensi', cat: 'Compliance', h: 1, p: 150 },
+    { id: 'art-r06', nome: 'Assistenza pratiche amministrative residenza', cat: 'Legale', h: 4, p: 600 },
   ];
 
   const articoliMap = new Map<string, string>();
@@ -296,6 +303,32 @@ async function main() {
   });
 
   console.log('✅ Moduli Template creati con dipendenze a cascata');
+
+  // Modulo servizi di trasferimento di residenza a Malta (documenti reali Bluecode).
+  // Standalone (nessuna dipendenza dai moduli corporate): si aggancia a un incarico di relocation.
+  await prisma.moduloTemplate.upsert({
+    where: { id: 'mod-r01' },
+    update: { giurisdizioneId: 'giur-mt' },
+    create: {
+      id: 'mod-r01',
+      tenantId: TENANT_ID,
+      nome: 'Trasferimento di residenza a Malta',
+      categoria: 'Legale',
+      versione: 1,
+      giurisdizioneId: 'giur-mt',
+      righeDistinta: {
+        create: [
+          { tenantId: TENANT_ID, articoloId: 'art-r01', articoloVersione: 1, ordine: 1, quantita: 1 },
+          { tenantId: TENANT_ID, articoloId: 'art-r02', articoloVersione: 1, ordine: 2, quantita: 1 },
+          { tenantId: TENANT_ID, articoloId: 'art-r03', articoloVersione: 1, ordine: 3, quantita: 1 },
+          { tenantId: TENANT_ID, articoloId: 'art-r04', articoloVersione: 1, ordine: 4, quantita: 1 },
+          { tenantId: TENANT_ID, articoloId: 'art-r05', articoloVersione: 1, ordine: 5, quantita: 1 },
+          { tenantId: TENANT_ID, articoloId: 'art-r06', articoloVersione: 1, ordine: 6, quantita: 1 },
+        ],
+      },
+    },
+  });
+  console.log('✅ Modulo "Trasferimento di residenza a Malta" (mod-r01) creato');
 
   // Assicurati che le dipendenze siano sempre presenti su Supabase DB
   const depSeeds = [
