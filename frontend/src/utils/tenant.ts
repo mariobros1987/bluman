@@ -39,14 +39,14 @@ export function getBrandLogoFallback(tenantId?: string): string {
 export const TENANT_STUDIOS: Record<string, StudioInfo> = {
   '00000000-0000-0000-0000-000000000001': {
     id: '00000000-0000-0000-0000-000000000001',
-    ragioneSociale: 'Studio Advisory & Legal Partners',
-    nomeBreve: 'Studio Advisory',
-    giurisdizione: 'Italia',
+    ragioneSociale: 'Bluecode LTD',
+    nomeBreve: 'Bluecode',
+    giurisdizione: 'Malta',
     piva: '',
-    codiceFiscale: '',
-    sedeLegale: '',
-    sedeOperativa: '',
-    email: 'contact@studioadvisory.it',
+    codiceFiscale: 'C71668', // Malta company registration number
+    sedeLegale: 'Notabile Residence, Mdina Road, Attard ATD9036, Malta',
+    sedeOperativa: 'Notabile Residence, Mdina Road, Attard ATD9036, Malta',
+    email: 'advisor@bluegib.com',
     telefono: '',
     iban: '',
     bic: '',

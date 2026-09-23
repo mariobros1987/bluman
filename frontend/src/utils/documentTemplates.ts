@@ -497,6 +497,153 @@ export const PREBUILT_TEMPLATES: DocumentTemplate[] = [
 </div>
 `,
   },
+  {
+    id: 'tmpl-gdpr-informativa-en',
+    titolo: 'Privacy Notice GDPR (EN)',
+    categoria: 'compliance',
+    descrizione: 'English translation (first pass, to be reviewed) of the GDPR privacy notice for the residence-relocation service.',
+    livelloFirmaRichiesto: 'ses',
+    contenutoHtml: `
+<h2 style="text-align:center;">Privacy Notice (GDPR) on the Processing of Personal Data</h2>
+<p><em>Courtesy translation of the Italian original; the Italian version prevails in case of discrepancy.</em></p>
+<p>{{studio.ragione_sociale}} (the "Data Controller"), with registered office at {{studio.sede_legale}}, informs you pursuant to Article 13 of Regulation (EU) 2016/679 ("GDPR") on how your personal data are collected, used and protected.</p>
+<p><strong>Categories of data.</strong> Identification data (name, surname, date of birth, address, tax code); contact data (phone, email); identity documents (ID card, passport); contractual and tax data related to the service; other data necessary to meet contractual and legal obligations.</p>
+<p><strong>Purposes.</strong> Handling your request and providing the residence-relocation advisory service; related contractual and administrative fulfilments; compliance with legal obligations, including tax, anti-money-laundering (AML) and security; communications and updates about the service.</p>
+<p><strong>Legal basis.</strong> Performance of a contract to which you are a party; compliance with the Controller's legal obligations; your consent, where required.</p>
+<p><strong>Processing and retention.</strong> Data are processed by manual, IT and electronic means with adequate security measures, and retained for the period necessary for the stated purposes and in any case no longer than the legal terms.</p>
+<p><strong>Disclosure.</strong> Data may be disclosed to competent public authorities and administrations; advisors and collaborators involved in the service; banking and financial institutions where necessary.</p>
+<p><strong>Your rights.</strong> Access, rectification or erasure, restriction, objection, portability, withdrawal of consent (without affecting prior lawful processing) and lodging a complaint with the supervisory authority.</p>
+<p><strong>Contact.</strong> To exercise your rights, contact the Data Controller at: {{studio.email}}.</p>
+<p>Date: {{data_odierna}}</p>
+<div style="margin-top:24px; border-top:1px solid #cbd5e1; padding-top:8px; width:45%; text-align:center; font-size:11px;"><strong>Acknowledged and signed ({{cliente.ragione_sociale}})</strong><br/>{{firma_cliente}}</div>
+`,
+  },
+  {
+    id: 'tmpl-hospitality-agreement-it',
+    titolo: 'Accordo di Ospitalità con Rimborso Spese (IT) — Malta',
+    categoria: 'contratto',
+    descrizione: 'Traduzione italiana (primo passo, da rivedere) dello Hospitality Agreement — posto letto, €250/mese, contesto Malta.',
+    livelloFirmaRichiesto: 'ses',
+    contenutoHtml: `
+<h2 style="text-align:center;">ACCORDO DI OSPITALITÀ CON RIMBORSO SPESE</h2>
+<p><em>Traduzione di cortesia dell'originale inglese; in caso di discrepanza prevale la versione inglese.</em></p>
+<p><strong>Tra:</strong><br/>
+{{studio.ragione_sociale}}, con sede legale in {{studio.sede_legale}}, registrata a Malta con numero di registrazione {{studio.codice_fiscale}}, di seguito "Host";<br/>
+<strong>e</strong><br/>
+{{cliente.ragione_sociale}}, nato/a in [Paese] il [gg/mm/aaaa], residente in [indirizzo di residenza], titolare di documento/passaporto n. [__________], di seguito "Guest".</p>
+<p><strong>Premesso che</strong> l'Host ha preso in locazione un appartamento sito in [indirizzo], Malta, e intende ospitare il Guest durante il rapporto di collaborazione, fissando un rimborso spese a carico del Guest, si conviene quanto segue:</p>
+<p><strong>Articolo 1 – Finalità.</strong> L'Host concede al Guest l'uso di un posto letto e l'accesso alle aree comuni dell'appartamento sito in [indirizzo], Malta, per la durata del presente accordo.</p>
+<p><strong>Articolo 2 – Durata.</strong> Efficace dalla data di firma; durata fissa di un (1) anno, con cessazione automatica senza preavviso.</p>
+<p><strong>Articolo 3 – Rimborso spese.</strong> Il Guest corrisponde €250 (duecentocinquanta euro) al mese, entro il 5 di ogni mese, sul conto indicato dall'Host.</p>
+<p><strong>Articolo 4 – Uso e regole della casa.</strong> Il Guest si impegna a: usare l'appartamento con cura e rispettare il regolamento condominiale e le istruzioni dell'Host; non subaffittare, cedere o ospitare terzi senza consenso scritto; mantenere puliti e in ordine il posto letto e le aree comuni.</p>
+<p><strong>Articolo 5 – Registrazioni obbligatorie.</strong> L'Host registra la presenza del Guest presso le autorità competenti come richiesto dalla legge maltese (Housing Authority Malta).</p>
+<p><strong>Articolo 6 – Assicurazione e responsabilità.</strong> Il Guest riconosce che l'Host non è responsabile per danni a persone o cose non causati da colpa grave dell'Host.</p>
+<p><strong>Articolo 7 – Clausola finale.</strong> Il presente accordo non costituisce un contratto di locazione ma unicamente un accordo di ospitalità per alloggio temporaneo connesso alla collaborazione con l'Host.</p>
+<p>Letto, confermato e sottoscritto. Data: {{data_odierna}}</p>
+<div style="display:flex; justify-content:space-between; margin-top:32px;">
+  <div style="width:45%; text-align:center; border-top:1px solid #cbd5e1; padding-top:8px; font-size:11px;"><strong>L'Host (per {{studio.ragione_sociale}})</strong><br/>{{firma_studio}}</div>
+  <div style="width:45%; text-align:center; border-top:1px solid #cbd5e1; padding-top:8px; font-size:11px;"><strong>Il Guest ({{cliente.ragione_sociale}})</strong><br/>{{firma_cliente}}</div>
+</div>
+`,
+  },
+  {
+    id: 'tmpl-service-agreement-it',
+    titolo: 'Contratto di Servizi al Guest (IT) — Malta',
+    categoria: 'contratto',
+    descrizione: 'Traduzione italiana (primo passo, da rivedere) del Service Agreement — servizi al guest, €200/mese, contesto Malta.',
+    livelloFirmaRichiesto: 'ses',
+    contenutoHtml: `
+<h2 style="text-align:center;">CONTRATTO DI SERVIZI AL GUEST</h2>
+<p><em>Traduzione di cortesia dell'originale inglese; in caso di discrepanza prevale la versione inglese.</em></p>
+<p><strong>Tra:</strong><br/>
+{{studio.ragione_sociale}}, con sede legale in {{studio.sede_legale}}, registrata a Malta con numero di registrazione {{studio.codice_fiscale}}, di seguito "Host";<br/>
+<strong>e</strong><br/>
+{{cliente.ragione_sociale}}, nato/a in [Paese] il [gg/mm/aaaa], residente in [indirizzo di residenza], titolare di documento/passaporto n. [__________], di seguito "Guest".</p>
+<p><strong>Premesso che</strong> il Guest risiede nell'alloggio sito in [indirizzo], Malta, e desidera beneficiare di servizi di pulizia e assistenza nelle pratiche amministrative e burocratiche relative al soggiorno a Malta, si conviene quanto segue:</p>
+<p><strong>Articolo 1 – Oggetto.</strong> L'Host si impegna a fornire: pulizia regolare del posto letto e delle aree comuni (almeno una volta a settimana); assistenza nelle pratiche amministrative e burocratiche relative alla residenza a Malta, inclusa la registrazione presso la Housing Authority e l'orientamento sulla documentazione richiesta.</p>
+<p><strong>Articolo 2 – Corrispettivo.</strong> Il Guest corrisponde un canone mensile di €200 (duecento euro), entro il 5 di ogni mese, sul conto indicato dall'Host.</p>
+<p><strong>Articolo 3 – Durata.</strong> Efficace dalla data di firma; durata fissa di un (1) anno, con cessazione automatica senza preavviso.</p>
+<p><strong>Articolo 4 – Responsabilità.</strong> L'Host esegue i servizi con diligenza ma non è responsabile di ritardi o inadempimenti dovuti a circostanze al di fuori del suo ragionevole controllo, inclusi i ritardi delle autorità pubbliche.</p>
+<p><strong>Articolo 5 – Disposizioni finali.</strong> Il presente accordo costituisce l'intesa integrale tra le parti e sostituisce ogni accordo precedente. Le modifiche vanno fatte per iscritto e firmate da entrambe le parti.</p>
+<p>Letto, confermato e sottoscritto. Data: {{data_odierna}}</p>
+<div style="display:flex; justify-content:space-between; margin-top:32px;">
+  <div style="width:45%; text-align:center; border-top:1px solid #cbd5e1; padding-top:8px; font-size:11px;"><strong>L'Host (per {{studio.ragione_sociale}})</strong><br/>{{firma_studio}}</div>
+  <div style="width:45%; text-align:center; border-top:1px solid #cbd5e1; padding-top:8px; font-size:11px;"><strong>Il Guest ({{cliente.ragione_sociale}})</strong><br/>{{firma_cliente}}</div>
+</div>
+`,
+  },
+  {
+    id: 'tmpl-gdpr-informativa-it',
+    titolo: 'Informativa Privacy GDPR (IT)',
+    categoria: 'compliance',
+    descrizione: 'Informativa ex art. 13 GDPR per il trattamento dei dati personali (consulenza trasferimento residenza) — versione italiana originale.',
+    livelloFirmaRichiesto: 'ses',
+    contenutoHtml: `
+<h2 style="text-align:center;">Informativa Privacy (GDPR) per il Trattamento dei Dati Personali</h2>
+<p>{{studio.ragione_sociale}} (di seguito "Titolare del trattamento"), con sede in {{studio.sede_legale}}, in qualità di Titolare del trattamento dei dati personali, La informa ai sensi dell'art. 13 del Regolamento UE 2016/679 ("GDPR") sulle modalità di raccolta, utilizzo e tutela dei Suoi dati personali.</p>
+<p><strong>Tipologia di dati raccolti.</strong> Dati identificativi (nome, cognome, data di nascita, indirizzo, codice fiscale); dati di contatto (telefono, email); documenti di identità (carta d'identità, passaporto); dati contrattuali e fiscali relativi alla prestazione del servizio; altri dati necessari ad adempiere agli obblighi contrattuali e normativi.</p>
+<p><strong>Finalità del trattamento.</strong> Gestione della richiesta ed erogazione del servizio di consulenza per trasferimento di residenza; adempimenti contrattuali e amministrativi correlati; rispetto degli obblighi di legge, inclusi quelli fiscali, antiriciclaggio (AML) e di sicurezza; comunicazioni e aggiornamenti relativi al servizio.</p>
+<p><strong>Base giuridica.</strong> Esecuzione di un contratto di cui Lei è parte; rispetto di obblighi legali cui il Titolare è soggetto; il Suo consenso, ove richiesto.</p>
+<p><strong>Modalità e conservazione.</strong> I dati sono trattati con strumenti manuali, informatici e telematici, con misure di sicurezza adeguate, e conservati per il periodo necessario alle finalità indicate e comunque non oltre i termini di legge.</p>
+<p><strong>Comunicazione dei dati.</strong> I dati potranno essere comunicati a: autorità pubbliche e amministrazioni competenti; consulenti e collaboratori coinvolti nell'erogazione del servizio; istituti bancari e finanziari, se necessario.</p>
+<p><strong>Diritti dell'interessato.</strong> Accesso, rettifica o cancellazione, limitazione, opposizione, portabilità, revoca del consenso (senza pregiudicare la liceità del trattamento precedente) e reclamo all'Autorità Garante.</p>
+<p><strong>Contatti.</strong> Per esercitare i Suoi diritti può contattare il Titolare all'indirizzo: {{studio.email}}.</p>
+<p>Data: {{data_odierna}}</p>
+<div style="margin-top:24px; border-top:1px solid #cbd5e1; padding-top:8px; width:45%; text-align:center; font-size:11px;"><strong>Firma per presa visione ({{cliente.ragione_sociale}})</strong><br/>{{firma_cliente}}</div>
+`,
+  },
+  {
+    id: 'tmpl-hospitality-agreement-en',
+    titolo: 'Hospitality Agreement with Expense Reimbursement (EN) — Malta',
+    categoria: 'contratto',
+    descrizione: 'Accordo di ospitalità (posto letto) con rimborso spese, €250/mese — versione inglese originale, contesto Malta.',
+    livelloFirmaRichiesto: 'ses',
+    contenutoHtml: `
+<h2 style="text-align:center;">HOSPITALITY AGREEMENT WITH EXPENSE REIMBURSEMENT</h2>
+<p><strong>Between:</strong><br/>
+{{studio.ragione_sociale}}, with registered office at {{studio.sede_legale}}, registered in Malta with company registration number {{studio.codice_fiscale}}, hereinafter the "Host";<br/>
+<strong>and</strong><br/>
+{{cliente.ragione_sociale}}, born in [Country] on [dd/mm/yyyy], currently residing at [residential address], holder of ID/Passport no. [__________], hereinafter the "Guest".</p>
+<p><strong>Whereas</strong> the Host has leased an apartment located at [address], Malta, and intends to accommodate the Guest during the collaboration relationship, setting an expense reimbursement payable by the Guest, it is agreed as follows:</p>
+<p><strong>Article 1 – Purpose.</strong> The Host grants the Guest the use of a bed space and access to shared areas of the apartment located at [address], Malta, for the duration of this agreement.</p>
+<p><strong>Article 2 – Duration.</strong> Effective from the date of signature; fixed duration of one (1) year, terminating automatically without further notice.</p>
+<p><strong>Article 3 – Expense reimbursement.</strong> The Guest shall pay €250 (two hundred fifty euros) per month, by the 5th day of each month, to the bank account indicated by the Host.</p>
+<p><strong>Article 4 – Use and house rules.</strong> The Guest shall: use the apartment with care and comply with condominium rules and the Host's instructions; not sublet, assign or accommodate third parties without written consent; keep the bed space and shared areas clean and tidy.</p>
+<p><strong>Article 5 – Mandatory registrations.</strong> The Host shall register the Guest's presence with the competent authorities as required by Maltese law (Housing Authority Malta).</p>
+<p><strong>Article 6 – Insurance and liability.</strong> The Guest acknowledges that the Host is not liable for damage to persons or property not caused by the Host's gross negligence.</p>
+<p><strong>Article 7 – Final clause.</strong> This agreement does not constitute a lease agreement but solely an accommodation agreement for temporary housing related to the collaboration with the Host.</p>
+<p>Read, confirmed and signed. Date: {{data_odierna}}</p>
+<div style="display:flex; justify-content:space-between; margin-top:32px;">
+  <div style="width:45%; text-align:center; border-top:1px solid #cbd5e1; padding-top:8px; font-size:11px;"><strong>The Host (on behalf of {{studio.ragione_sociale}})</strong><br/>{{firma_studio}}</div>
+  <div style="width:45%; text-align:center; border-top:1px solid #cbd5e1; padding-top:8px; font-size:11px;"><strong>The Guest ({{cliente.ragione_sociale}})</strong><br/>{{firma_cliente}}</div>
+</div>
+`,
+  },
+  {
+    id: 'tmpl-service-agreement-en',
+    titolo: 'Service Agreement for Guest (EN) — Malta',
+    categoria: 'contratto',
+    descrizione: 'Contratto di servizi al guest (pulizie + assistenza burocratica), €200/mese — versione inglese originale, contesto Malta.',
+    livelloFirmaRichiesto: 'ses',
+    contenutoHtml: `
+<h2 style="text-align:center;">SERVICE AGREEMENT FOR GUEST</h2>
+<p><strong>Between:</strong><br/>
+{{studio.ragione_sociale}}, with registered office at {{studio.sede_legale}}, registered in Malta with company registration number {{studio.codice_fiscale}}, hereinafter the "Host";<br/>
+<strong>and</strong><br/>
+{{cliente.ragione_sociale}}, born in [Country] on [dd/mm/yyyy], currently residing at [residential address], holder of ID/Passport no. [__________], hereinafter the "Guest".</p>
+<p><strong>Whereas</strong> the Guest is residing in the accommodation located at [address], Malta, and wishes to benefit from cleaning services and assistance with administrative and bureaucratic tasks related to their stay in Malta, it is agreed as follows:</p>
+<p><strong>Article 1 – Subject.</strong> The Host undertakes to provide: regular cleaning of the bed space and shared areas of the apartment (at least once per week); assistance with administrative and bureaucratic tasks related to residence in Malta, including registration with the Housing Authority and guidance on required documentation.</p>
+<p><strong>Article 2 – Fee and payment.</strong> The Guest shall pay a monthly fee of €200 (two hundred euros), by the 5th day of each month, to the bank account indicated by the Host.</p>
+<p><strong>Article 3 – Duration.</strong> Effective from the date of signature; fixed duration of one (1) year, terminating automatically without further notice.</p>
+<p><strong>Article 4 – Liability.</strong> The Host shall perform the services with due diligence but shall not be liable for delays or failures caused by circumstances beyond its reasonable control, including delays from public authorities.</p>
+<p><strong>Article 5 – Final provisions.</strong> This agreement constitutes the entire understanding between the parties and supersedes any prior agreement. Amendments shall be made in writing and signed by both parties.</p>
+<p>Read, confirmed and signed. Date: {{data_odierna}}</p>
+<div style="display:flex; justify-content:space-between; margin-top:32px;">
+  <div style="width:45%; text-align:center; border-top:1px solid #cbd5e1; padding-top:8px; font-size:11px;"><strong>The Host (on behalf of {{studio.ragione_sociale}})</strong><br/>{{firma_studio}}</div>
+  <div style="width:45%; text-align:center; border-top:1px solid #cbd5e1; padding-top:8px; font-size:11px;"><strong>The Guest ({{cliente.ragione_sociale}})</strong><br/>{{firma_cliente}}</div>
+</div>
+`,
+  },
   ...REORGANIZATION_TEMPLATES,
 ];
 
