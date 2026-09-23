@@ -35,5 +35,11 @@ export const CreaClienteSchema = z.object({
   ubo: z.string().optional().nullable(),
   fontePatrimonio: z.string().optional().nullable(),
   dataKyc: z.string().optional().nullable(),
+  documentoTipo: z.string().max(40).optional().nullable(),
+  documentoNumero: z.string().max(60).optional().nullable(),
+  dataNascita: z.string().max(40).optional().nullable(),
+  luogoNascita: z.string().max(120).optional().nullable(),
+  indirizzoResidenza: z.string().max(255).optional().nullable(),
+  indirizzoAlloggio: z.string().max(255).optional().nullable(),
   referentiJson: z.any().optional(),
 }).passthrough();

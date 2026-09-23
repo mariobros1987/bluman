@@ -530,9 +530,9 @@ export const PREBUILT_TEMPLATES: DocumentTemplate[] = [
 <p><strong>Tra:</strong><br/>
 {{studio.ragione_sociale}}, con sede legale in {{studio.sede_legale}}, registrata a Malta con numero di registrazione {{studio.codice_fiscale}}, di seguito "Host";<br/>
 <strong>e</strong><br/>
-{{cliente.ragione_sociale}}, nato/a in [Paese] il [gg/mm/aaaa], residente in [indirizzo di residenza], titolare di documento/passaporto n. [__________], di seguito "Guest".</p>
-<p><strong>Premesso che</strong> l'Host ha preso in locazione un appartamento sito in [indirizzo], Malta, e intende ospitare il Guest durante il rapporto di collaborazione, fissando un rimborso spese a carico del Guest, si conviene quanto segue:</p>
-<p><strong>Articolo 1 – Finalità.</strong> L'Host concede al Guest l'uso di un posto letto e l'accesso alle aree comuni dell'appartamento sito in [indirizzo], Malta, per la durata del presente accordo.</p>
+{{cliente.ragione_sociale}}, nato/a in {{cliente.luogo_nascita}} il {{cliente.data_nascita}}, residente in {{cliente.indirizzo_residenza}}, titolare di documento/passaporto n. {{cliente.documento_numero}}, di seguito "Guest".</p>
+<p><strong>Premesso che</strong> l'Host ha preso in locazione un appartamento sito in {{cliente.indirizzo_alloggio}}, Malta, e intende ospitare il Guest durante il rapporto di collaborazione, fissando un rimborso spese a carico del Guest, si conviene quanto segue:</p>
+<p><strong>Articolo 1 – Finalità.</strong> L'Host concede al Guest l'uso di un posto letto e l'accesso alle aree comuni dell'appartamento sito in {{cliente.indirizzo_alloggio}}, Malta, per la durata del presente accordo.</p>
 <p><strong>Articolo 2 – Durata.</strong> Efficace dalla data di firma; durata fissa di un (1) anno, con cessazione automatica senza preavviso.</p>
 <p><strong>Articolo 3 – Rimborso spese.</strong> Il Guest corrisponde €250 (duecentocinquanta euro) al mese, entro il 5 di ogni mese, sul conto indicato dall'Host.</p>
 <p><strong>Articolo 4 – Uso e regole della casa.</strong> Il Guest si impegna a: usare l'appartamento con cura e rispettare il regolamento condominiale e le istruzioni dell'Host; non subaffittare, cedere o ospitare terzi senza consenso scritto; mantenere puliti e in ordine il posto letto e le aree comuni.</p>
@@ -558,8 +558,8 @@ export const PREBUILT_TEMPLATES: DocumentTemplate[] = [
 <p><strong>Tra:</strong><br/>
 {{studio.ragione_sociale}}, con sede legale in {{studio.sede_legale}}, registrata a Malta con numero di registrazione {{studio.codice_fiscale}}, di seguito "Host";<br/>
 <strong>e</strong><br/>
-{{cliente.ragione_sociale}}, nato/a in [Paese] il [gg/mm/aaaa], residente in [indirizzo di residenza], titolare di documento/passaporto n. [__________], di seguito "Guest".</p>
-<p><strong>Premesso che</strong> il Guest risiede nell'alloggio sito in [indirizzo], Malta, e desidera beneficiare di servizi di pulizia e assistenza nelle pratiche amministrative e burocratiche relative al soggiorno a Malta, si conviene quanto segue:</p>
+{{cliente.ragione_sociale}}, nato/a in {{cliente.luogo_nascita}} il {{cliente.data_nascita}}, residente in {{cliente.indirizzo_residenza}}, titolare di documento/passaporto n. {{cliente.documento_numero}}, di seguito "Guest".</p>
+<p><strong>Premesso che</strong> il Guest risiede nell'alloggio sito in {{cliente.indirizzo_alloggio}}, Malta, e desidera beneficiare di servizi di pulizia e assistenza nelle pratiche amministrative e burocratiche relative al soggiorno a Malta, si conviene quanto segue:</p>
 <p><strong>Articolo 1 – Oggetto.</strong> L'Host si impegna a fornire: pulizia regolare del posto letto e delle aree comuni (almeno una volta a settimana); assistenza nelle pratiche amministrative e burocratiche relative alla residenza a Malta, inclusa la registrazione presso la Housing Authority e l'orientamento sulla documentazione richiesta.</p>
 <p><strong>Articolo 2 – Corrispettivo.</strong> Il Guest corrisponde un canone mensile di €200 (duecento euro), entro il 5 di ogni mese, sul conto indicato dall'Host.</p>
 <p><strong>Articolo 3 – Durata.</strong> Efficace dalla data di firma; durata fissa di un (1) anno, con cessazione automatica senza preavviso.</p>
@@ -603,9 +603,9 @@ export const PREBUILT_TEMPLATES: DocumentTemplate[] = [
 <p><strong>Between:</strong><br/>
 {{studio.ragione_sociale}}, with registered office at {{studio.sede_legale}}, registered in Malta with company registration number {{studio.codice_fiscale}}, hereinafter the "Host";<br/>
 <strong>and</strong><br/>
-{{cliente.ragione_sociale}}, born in [Country] on [dd/mm/yyyy], currently residing at [residential address], holder of ID/Passport no. [__________], hereinafter the "Guest".</p>
-<p><strong>Whereas</strong> the Host has leased an apartment located at [address], Malta, and intends to accommodate the Guest during the collaboration relationship, setting an expense reimbursement payable by the Guest, it is agreed as follows:</p>
-<p><strong>Article 1 – Purpose.</strong> The Host grants the Guest the use of a bed space and access to shared areas of the apartment located at [address], Malta, for the duration of this agreement.</p>
+{{cliente.ragione_sociale}}, born in {{cliente.luogo_nascita}} on {{cliente.data_nascita}}, currently residing at {{cliente.indirizzo_residenza}}, holder of ID/Passport no. {{cliente.documento_numero}}, hereinafter the "Guest".</p>
+<p><strong>Whereas</strong> the Host has leased an apartment located at {{cliente.indirizzo_alloggio}}, Malta, and intends to accommodate the Guest during the collaboration relationship, setting an expense reimbursement payable by the Guest, it is agreed as follows:</p>
+<p><strong>Article 1 – Purpose.</strong> The Host grants the Guest the use of a bed space and access to shared areas of the apartment located at {{cliente.indirizzo_alloggio}}, Malta, for the duration of this agreement.</p>
 <p><strong>Article 2 – Duration.</strong> Effective from the date of signature; fixed duration of one (1) year, terminating automatically without further notice.</p>
 <p><strong>Article 3 – Expense reimbursement.</strong> The Guest shall pay €250 (two hundred fifty euros) per month, by the 5th day of each month, to the bank account indicated by the Host.</p>
 <p><strong>Article 4 – Use and house rules.</strong> The Guest shall: use the apartment with care and comply with condominium rules and the Host's instructions; not sublet, assign or accommodate third parties without written consent; keep the bed space and shared areas clean and tidy.</p>
@@ -630,8 +630,8 @@ export const PREBUILT_TEMPLATES: DocumentTemplate[] = [
 <p><strong>Between:</strong><br/>
 {{studio.ragione_sociale}}, with registered office at {{studio.sede_legale}}, registered in Malta with company registration number {{studio.codice_fiscale}}, hereinafter the "Host";<br/>
 <strong>and</strong><br/>
-{{cliente.ragione_sociale}}, born in [Country] on [dd/mm/yyyy], currently residing at [residential address], holder of ID/Passport no. [__________], hereinafter the "Guest".</p>
-<p><strong>Whereas</strong> the Guest is residing in the accommodation located at [address], Malta, and wishes to benefit from cleaning services and assistance with administrative and bureaucratic tasks related to their stay in Malta, it is agreed as follows:</p>
+{{cliente.ragione_sociale}}, born in {{cliente.luogo_nascita}} on {{cliente.data_nascita}}, currently residing at {{cliente.indirizzo_residenza}}, holder of ID/Passport no. {{cliente.documento_numero}}, hereinafter the "Guest".</p>
+<p><strong>Whereas</strong> the Guest is residing in the accommodation located at {{cliente.indirizzo_alloggio}}, Malta, and wishes to benefit from cleaning services and assistance with administrative and bureaucratic tasks related to their stay in Malta, it is agreed as follows:</p>
 <p><strong>Article 1 – Subject.</strong> The Host undertakes to provide: regular cleaning of the bed space and shared areas of the apartment (at least once per week); assistance with administrative and bureaucratic tasks related to residence in Malta, including registration with the Housing Authority and guidance on required documentation.</p>
 <p><strong>Article 2 – Fee and payment.</strong> The Guest shall pay a monthly fee of €200 (two hundred euros), by the 5th day of each month, to the bank account indicated by the Host.</p>
 <p><strong>Article 3 – Duration.</strong> Effective from the date of signature; fixed duration of one (1) year, terminating automatically without further notice.</p>
@@ -714,6 +714,13 @@ export function resolveDocumentTemplateHtml(
   const clientRef = targetCliente?.referenteNome || (targetCliente?.referentiJson as any)?.referente || targetCliente?.referente || 'Legale Rappresentante';
   const clientCell = targetCliente?.cellulare || '';
   const clientUbo = targetCliente?.ubo || targetCliente?.referenteNome || 'Titolare Effettivo (UBO)';
+  const clientDocNum = targetCliente?.documentoNumero || '';
+  const clientDocTipo = targetCliente?.documentoTipo || '';
+  const clientDataNasc = targetCliente?.dataNascita || '';
+  const clientLuogoNasc = targetCliente?.luogoNascita || '';
+  const clientIndRes = targetCliente?.indirizzoResidenza || '';
+  const clientIndAllog = targetCliente?.indirizzoAlloggio || '';
+  const studioCodFisc = targetStudio?.codiceFiscale || studioInfo.codiceFiscale || '';
 
   const dataOggi = new Date().toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' });
 
@@ -738,12 +745,19 @@ export function resolveDocumentTemplateHtml(
   out = out.replace(/\{\{cliente\.referente\}\}/g, wrapTag(clientRef));
   out = out.replace(/\{\{cliente\.cellulare\}\}/g, wrapTag(clientCell));
   out = out.replace(/\{\{cliente\.ubo\}\}/g, wrapTag(clientUbo));
+  out = out.replace(/\{\{cliente\.documento_numero\}\}/g, wrapTag(clientDocNum));
+  out = out.replace(/\{\{cliente\.documento_tipo\}\}/g, wrapTag(clientDocTipo));
+  out = out.replace(/\{\{cliente\.data_nascita\}\}/g, wrapTag(clientDataNasc));
+  out = out.replace(/\{\{cliente\.luogo_nascita\}\}/g, wrapTag(clientLuogoNasc));
+  out = out.replace(/\{\{cliente\.indirizzo_residenza\}\}/g, wrapTag(clientIndRes));
+  out = out.replace(/\{\{cliente\.indirizzo_alloggio\}\}/g, wrapTag(clientIndAllog));
 
   out = out.replace(/\{\{progetto\.titolo\}\}/g, wrapTag(projTitolo));
   out = out.replace(/\{\{progetto\.importo_totale\}\}/g, wrapTag(projImporto ? `€ ${Number(projImporto).toLocaleString('it-IT')},00` : '€ 0,00'));
 
   out = out.replace(/\{\{studio\.ragione_sociale\}\}/g, wrapTag(studioRagioneSociale));
   out = out.replace(/\{\{studio\.piva\}\}/g, wrapTag(studioPiva));
+  out = out.replace(/\{\{studio\.codice_fiscale\}\}/g, wrapTag(studioCodFisc));
   out = out.replace(/\{\{studio\.sede_legale\}\}/g, wrapTag(studioSede));
   out = out.replace(/\{\{studio\.iban\}\}/g, wrapTag(studioIban));
   out = out.replace(/\{\{studio\.lead_advisor\}\}/g, wrapTag(studioLeadAdvisor));

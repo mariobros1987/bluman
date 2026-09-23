@@ -135,6 +135,13 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
   const [ubo, setUbo] = useState(client.ubo || refJson.ubo || '');
   const [fontePatrimonio, setFontePatrimonio] = useState(client.fontePatrimonio || refJson.fontePatrimonio || '');
   const [dataKyc, setDataKyc] = useState(client.dataKyc || refJson.dataKyc || '');
+  // Dati anagrafici del guest (per template documenti + KYC Malta)
+  const [documentoTipo, setDocumentoTipo] = useState((client as any).documentoTipo || refJson.documentoTipo || '');
+  const [documentoNumero, setDocumentoNumero] = useState((client as any).documentoNumero || refJson.documentoNumero || '');
+  const [dataNascita, setDataNascita] = useState((client as any).dataNascita || refJson.dataNascita || '');
+  const [luogoNascita, setLuogoNascita] = useState((client as any).luogoNascita || refJson.luogoNascita || '');
+  const [indirizzoResidenza, setIndirizzoResidenza] = useState((client as any).indirizzoResidenza || refJson.indirizzoResidenza || '');
+  const [indirizzoAlloggio, setIndirizzoAlloggio] = useState((client as any).indirizzoAlloggio || refJson.indirizzoAlloggio || '');
 
   // KYC governato §5.5: il fascicolo (fonte di verità del processo), distinto dai campi passivi qui sopra.
   const [kycFasc, setKycFasc] = useState<FascicoloKyc | null>(null);
@@ -200,6 +207,12 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
       ubo,
       fontePatrimonio,
       dataKyc,
+      documentoTipo,
+      documentoNumero,
+      dataNascita,
+      luogoNascita,
+      indirizzoResidenza,
+      indirizzoAlloggio,
     };
 
     // Stessa forma che chiede creaClienteApi (`nome` obbligatorio): il generico
@@ -220,6 +233,12 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
       ubo,
       fontePatrimonio,
       dataKyc,
+      documentoTipo,
+      documentoNumero,
+      dataNascita,
+      luogoNascita,
+      indirizzoResidenza,
+      indirizzoAlloggio,
       email,
       pec,
       telefono,
@@ -711,6 +730,41 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
             <div>
               <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Provenienza dei Fondi / Origine Patrimonio *</label>
               <input value={fontePatrimonio} onChange={e => setFontePatrimonio(e.target.value)} required />
+            </div>
+
+            <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12, marginTop: 4 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8 }}>🪪 Dati anagrafici (compilano i contratti e servono al KYC)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div>
+                  <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Tipo documento</label>
+                  <select value={documentoTipo} onChange={e => setDocumentoTipo(e.target.value)} style={{ width: '100%' }}>
+                    <option value="">—</option>
+                    <option value="carta_identita">Carta d'identità</option>
+                    <option value="passaporto">Passaporto</option>
+                    <option value="altro">Altro</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>N° documento / passaporto</label>
+                  <input value={documentoNumero} onChange={e => setDocumentoNumero(e.target.value)} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Data di nascita</label>
+                  <input value={dataNascita} onChange={e => setDataNascita(e.target.value)} placeholder="gg/mm/aaaa" />
+                </div>
+                <div>
+                  <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Luogo / Paese di nascita</label>
+                  <input value={luogoNascita} onChange={e => setLuogoNascita(e.target.value)} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Indirizzo di residenza</label>
+                  <input value={indirizzoResidenza} onChange={e => setIndirizzoResidenza(e.target.value)} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Indirizzo alloggio (Malta)</label>
+                  <input value={indirizzoAlloggio} onChange={e => setIndirizzoAlloggio(e.target.value)} />
+                </div>
+              </div>
             </div>
 
             <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12, marginTop: 4 }}>

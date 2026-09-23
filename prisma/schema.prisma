@@ -239,6 +239,14 @@ model Cliente {
   ubo             String?  @map("ubo")
   fontePatrimonio String?  @map("fonte_patrimonio")
   dataKyc         String?  @map("data_kyc")
+  // Dati anagrafici del guest/persona fisica (per template documenti + KYC Malta). Stringhe
+  // libere come dataKyc: valorizzate dal form anagrafica, opzionali.
+  documentoTipo      String? @map("documento_tipo") // carta_identita | passaporto | altro
+  documentoNumero    String? @map("documento_numero")
+  dataNascita        String? @map("data_nascita")
+  luogoNascita       String? @map("luogo_nascita")
+  indirizzoResidenza String? @map("indirizzo_residenza")
+  indirizzoAlloggio  String? @map("indirizzo_alloggio")
   referentiJson   Json?    @map("referenti_json")
   createdAt       DateTime @default(now()) @map("created_at")
 

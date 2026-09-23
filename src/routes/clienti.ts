@@ -57,6 +57,12 @@ export async function registraRotteClienti(server: FastifyInstance, app: AppPort
       ubo: cliente.ubo || referenti.ubo,
       fontePatrimonio: cliente.fontePatrimonio || referenti.fontePatrimonio,
       dataKyc: cliente.dataKyc || referenti.dataKyc,
+      documentoTipo: cliente.documentoTipo || referenti.documentoTipo || null,
+      documentoNumero: cliente.documentoNumero || referenti.documentoNumero || null,
+      dataNascita: cliente.dataNascita || referenti.dataNascita || null,
+      luogoNascita: cliente.luogoNascita || referenti.luogoNascita || null,
+      indirizzoResidenza: cliente.indirizzoResidenza || referenti.indirizzoResidenza || null,
+      indirizzoAlloggio: cliente.indirizzoAlloggio || referenti.indirizzoAlloggio || null,
     };
   };
 
@@ -265,6 +271,12 @@ export async function registraRotteClienti(server: FastifyInstance, app: AppPort
           ubo: b.ubo || null,
           fontePatrimonio: b.fontePatrimonio || null,
           dataKyc: b.dataKyc || null,
+          documentoTipo: b.documentoTipo || null,
+          documentoNumero: b.documentoNumero || null,
+          dataNascita: b.dataNascita || null,
+          luogoNascita: b.luogoNascita || null,
+          indirizzoResidenza: b.indirizzoResidenza || null,
+          indirizzoAlloggio: b.indirizzoAlloggio || null,
           referentiJson: referentiObj,
         },
       });
@@ -360,6 +372,12 @@ export async function registraRotteClienti(server: FastifyInstance, app: AppPort
           ubo: b.ubo !== undefined ? b.ubo : undefined,
           fontePatrimonio: b.fontePatrimonio !== undefined ? b.fontePatrimonio : undefined,
           dataKyc: b.dataKyc !== undefined ? b.dataKyc : undefined,
+          documentoTipo: b.documentoTipo !== undefined ? b.documentoTipo : undefined,
+          documentoNumero: b.documentoNumero !== undefined ? b.documentoNumero : undefined,
+          dataNascita: b.dataNascita !== undefined ? b.dataNascita : undefined,
+          luogoNascita: b.luogoNascita !== undefined ? b.luogoNascita : undefined,
+          indirizzoResidenza: b.indirizzoResidenza !== undefined ? b.indirizzoResidenza : undefined,
+          indirizzoAlloggio: b.indirizzoAlloggio !== undefined ? b.indirizzoAlloggio : undefined,
           referentiJson: referentiObj,
         },
       });

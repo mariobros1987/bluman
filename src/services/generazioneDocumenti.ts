@@ -41,6 +41,7 @@ export interface ContestoTagDocumento {
   studio: {
     ragioneSociale: string;
     piva: string;
+    codiceFiscale: string;
     sedeLegale: string;
     iban: string;
     leadAdvisor: string;
@@ -58,6 +59,12 @@ export interface ContestoTagDocumento {
     referente: string;
     cellulare: string;
     ubo: string;
+    documentoTipo: string;
+    documentoNumero: string;
+    dataNascita: string;
+    luogoNascita: string;
+    indirizzoResidenza: string;
+    indirizzoAlloggio: string;
   };
   progetto: {
     titolo: string;
@@ -95,6 +102,7 @@ export function contestoTagDocumento(entita: {
   tenant?: {
     ragioneSociale?: string | null;
     piva?: string | null;
+    codiceFiscale?: string | null;
     sedeLegale?: string | null;
     iban?: string | null;
     leadAdvisorNome?: string | null;
@@ -110,6 +118,12 @@ export function contestoTagDocumento(entita: {
     iban?: string | null;
     cellulare?: string | null;
     ubo?: string | null;
+    documentoTipo?: string | null;
+    documentoNumero?: string | null;
+    dataNascita?: string | null;
+    luogoNascita?: string | null;
+    indirizzoResidenza?: string | null;
+    indirizzoAlloggio?: string | null;
     referentiJson?: unknown;
   } | null;
   progetto?: { nome?: string | null; valoreTotale?: number | null } | null;
@@ -130,6 +144,7 @@ export function contestoTagDocumento(entita: {
     studio: {
       ragioneSociale: tenant?.ragioneSociale || 'Studio Professionale',
       piva: tenant?.piva || '',
+      codiceFiscale: tenant?.codiceFiscale || '',
       sedeLegale: tenant?.sedeLegale || '',
       iban: tenant?.iban || '',
       leadAdvisor: tenant?.leadAdvisorNome || 'Lead Senior Advisor',
@@ -148,6 +163,12 @@ export function contestoTagDocumento(entita: {
       referente,
       cellulare: cliente?.cellulare || '',
       ubo: cliente?.ubo || referente,
+      documentoTipo: cliente?.documentoTipo || '',
+      documentoNumero: cliente?.documentoNumero || '',
+      dataNascita: cliente?.dataNascita || '',
+      luogoNascita: cliente?.luogoNascita || '',
+      indirizzoResidenza: cliente?.indirizzoResidenza || '',
+      indirizzoAlloggio: cliente?.indirizzoAlloggio || '',
     },
     progetto: {
       titolo: progetto?.nome || 'Incarico Professionale',
@@ -178,10 +199,17 @@ export function risolviTagDocumento(html: string, contesto: ContestoTagDocumento
     'cliente.referente': cliente.referente,
     'cliente.cellulare': cliente.cellulare,
     'cliente.ubo': cliente.ubo,
+    'cliente.documento_tipo': cliente.documentoTipo,
+    'cliente.documento_numero': cliente.documentoNumero,
+    'cliente.data_nascita': cliente.dataNascita,
+    'cliente.luogo_nascita': cliente.luogoNascita,
+    'cliente.indirizzo_residenza': cliente.indirizzoResidenza,
+    'cliente.indirizzo_alloggio': cliente.indirizzoAlloggio,
     'progetto.titolo': progetto.titolo,
     'progetto.importo_totale': progetto.importoTotale,
     'studio.ragione_sociale': studio.ragioneSociale,
     'studio.piva': studio.piva,
+    'studio.codice_fiscale': studio.codiceFiscale,
     'studio.sede_legale': studio.sedeLegale,
     'studio.iban': studio.iban,
     'studio.lead_advisor': studio.leadAdvisor,
