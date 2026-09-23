@@ -754,8 +754,9 @@ export function InvoicesPage() {
             {/* SELEZIONE CLIENTE & PROGETTO */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: '1rem' }}>
               <div>
-                <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Cliente Committente *</label>
+                <label htmlFor="inv-cliente" style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Cliente Committente *</label>
                 <select
+                  id="inv-cliente"
                   value={clienteId}
                   onChange={(e) => setClienteId(e.target.value)}
                   style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
@@ -770,8 +771,9 @@ export function InvoicesPage() {
               </div>
 
               <div>
-                <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Progetto / Incarico Collegato</label>
+                <label htmlFor="inv-progetto" style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Progetto / Incarico Collegato</label>
                 <select
+                  id="inv-progetto"
                   value={progettoId}
                   onChange={(e) => setProgettoId(e.target.value)}
                   style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
@@ -877,8 +879,9 @@ export function InvoicesPage() {
             {/* OPZIONI FISCALI & CONDIZIONI */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: '1.5rem', background: 'var(--bg)', padding: 12, borderRadius: 8 }}>
               <div>
-                <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Cassa Previdenziale</label>
+                <label htmlFor="inv-cassa" style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Cassa Previdenziale</label>
                 <select
+                  id="inv-cassa"
                   value={tipoCassa}
                   onChange={(e) => {
                     setTipoCassa(e.target.value);
@@ -896,8 +899,9 @@ export function InvoicesPage() {
               </div>
 
               <div>
-                <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Ritenuta d'Acconto</label>
+                <label htmlFor="inv-ritenuta" style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Ritenuta d'Acconto</label>
                 <select
+                  id="inv-ritenuta"
                   value={aliquotaRitenuta}
                   onChange={(e) => setAliquotaRitenuta(parseInt(e.target.value, 10))}
                   style={{ width: '100%', padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--card)', color: 'var(--text)' }}
@@ -909,8 +913,9 @@ export function InvoicesPage() {
               </div>
 
               <div>
-                <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Condizione Pagamento</label>
+                <label htmlFor="inv-cond-pagamento" style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Condizione Pagamento</label>
                 <select
+                  id="inv-cond-pagamento"
                   value={condizionePagamento}
                   onChange={(e) => setCondizionePagamento(e.target.value)}
                   style={{ width: '100%', padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--card)', color: 'var(--text)' }}
@@ -924,8 +929,9 @@ export function InvoicesPage() {
               </div>
 
               <div>
-                <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Metodo Pagamento</label>
+                <label htmlFor="inv-metodo-pagamento" style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Metodo Pagamento</label>
                 <select
+                  id="inv-metodo-pagamento"
                   value={metodoPagamento}
                   onChange={(e) => setMetodoPagamento(e.target.value)}
                   style={{ width: '100%', padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--card)', color: 'var(--text)' }}
@@ -939,8 +945,9 @@ export function InvoicesPage() {
               </div>
 
               <div>
-                <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Esigibilità IVA</label>
+                <label htmlFor="inv-esigibilita" style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Esigibilità IVA</label>
                 <select
+                  id="inv-esigibilita"
                   value={esigibilitaIva}
                   onChange={(e) => setEsigibilitaIva(e.target.value)}
                   style={{ width: '100%', padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--card)', color: 'var(--text)' }}
@@ -952,8 +959,9 @@ export function InvoicesPage() {
               </div>
 
               <div>
-                <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Conto Accredito IBAN</label>
+                <label htmlFor="inv-conto" style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Conto Accredito IBAN</label>
                 <select
+                  id="inv-conto"
                   value={contoAccreditoId}
                   onChange={(e) => setContoAccreditoId(e.target.value)}
                   style={{ width: '100%', padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--card)', color: 'var(--text)' }}
@@ -968,8 +976,9 @@ export function InvoicesPage() {
               </div>
 
               <div style={{ gridColumn: '1 / -1' }}>
-                <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Note in Fattura / Coordinate / Riferimenti</label>
+                <label htmlFor="inv-note" style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Note in Fattura / Coordinate / Riferimenti</label>
                 <textarea
+                  id="inv-note"
                   rows={2}
                   placeholder="Note facoltative da mostrare nel documento PDF..."
                   value={note}
@@ -1056,8 +1065,9 @@ export function InvoicesPage() {
 
             <form onSubmit={handleRegistraIncasso} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
-                <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Importo Incassato (€) *</label>
+                <label htmlFor="inv-incasso-importo" style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Importo Incassato (€) *</label>
                 <input
+                  id="inv-incasso-importo"
                   type="number"
                   step="0.01"
                   required
@@ -1068,8 +1078,9 @@ export function InvoicesPage() {
               </div>
 
               <div>
-                <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Metodo Incasso</label>
+                <label htmlFor="inv-incasso-metodo" style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Metodo Incasso</label>
                 <select
+                  id="inv-incasso-metodo"
                   value={metodoIncasso}
                   onChange={(e) => setMetodoIncasso(e.target.value)}
                   style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
@@ -1082,8 +1093,9 @@ export function InvoicesPage() {
               </div>
 
               <div>
-                <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>CRO / Riferimento Transazione Bancaria</label>
+                <label htmlFor="inv-incasso-cro" style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>CRO / Riferimento Transazione Bancaria</label>
                 <input
+                  id="inv-incasso-cro"
                   type="text"
                   placeholder="Es. CRO-123456789"
                   value={croIncasso}
@@ -1093,8 +1105,9 @@ export function InvoicesPage() {
               </div>
 
               <div>
-                <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Note Operatore (Opzionale)</label>
+                <label htmlFor="inv-incasso-note" style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Note Operatore (Opzionale)</label>
                 <input
+                  id="inv-incasso-note"
                   type="text"
                   placeholder="Es. Ricevuta bonifico verificata..."
                   value={noteIncasso}
@@ -1137,8 +1150,9 @@ export function InvoicesPage() {
 
             <form onSubmit={handleEmettiNotaCredito} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
-                <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Motivo Emissione Nota di Credito</label>
+                <label htmlFor="inv-nc-motivo" style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Motivo Emissione Nota di Credito</label>
                 <select
+                  id="inv-nc-motivo"
                   value={motivoNc}
                   onChange={(e) => setMotivoNc(e.target.value)}
                   style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
@@ -1189,8 +1203,9 @@ export function InvoicesPage() {
               </div>
 
               <div>
-                <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Note Operative / Giustificativo</label>
+                <label htmlFor="inv-nc-note" style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Note Operative / Giustificativo</label>
                 <textarea
+                  id="inv-nc-note"
                   rows={3}
                   placeholder="Es. Storno totale per rifacimento fattura con dati corretti..."
                   value={noteNc}
