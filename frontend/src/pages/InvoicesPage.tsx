@@ -561,7 +561,7 @@ export function InvoicesPage() {
         {loading ? (
           <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted)' }}>Caricamento registro fatture dal database...</div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+          <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}><table style={{ width: '100%', minWidth: 640, borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead>
               <tr style={{ borderBottom: '2px solid var(--border)', color: 'var(--muted)', fontSize: 13, textTransform: 'uppercase' }}>
                 <th style={{ padding: '12px 8px' }}>Documento</th>
@@ -732,7 +732,7 @@ export function InvoicesPage() {
                 })
               )}
             </tbody>
-          </table>
+          </table></div>
         )}
         <Paginatore
           meta={meta}

@@ -158,7 +158,7 @@ export function ScadenzarioPage() {
         {loading ? (
           <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted)' }}>Caricamento scadenze dal database...</div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+          <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}><table style={{ width: '100%', minWidth: 640, borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead>
               <tr style={{ borderBottom: '2px solid var(--border)', color: 'var(--muted)', fontSize: 13, textTransform: 'uppercase' }}>
                 <th style={{ padding: '12px 8px' }}>Scadenza</th>
@@ -247,7 +247,7 @@ export function ScadenzarioPage() {
                 })
               )}
             </tbody>
-          </table>
+          </table></div>
         )}
       </div>
 
