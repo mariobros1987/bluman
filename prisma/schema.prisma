@@ -1951,3 +1951,44 @@ model DocumentoKyc {
   @@index([tenantId, fascicoloId])
   @@map("documento_kyc")
 }
+
+// ═══════════════════════════════════════════════════════════════════
+// KYC/AML Fase K0 (Malta, spec v0.2) — la fondazione configurabile.
+// Le regole cambiano per CONFIGURAZIONE, non per codice: pacchetto giurisdizione + profilo.
+// ═══════════════════════════════════════════════════════════════════
+
+/// Impostazioni di compliance per tenant (una riga per studio). Finché regulatoryProfile o
+/// mlroUserId mancano, il tenant è in «modalità bozza» e nessun incarico passa in esecuzione.
+model TenantComplianceSettings {
+  id                   String   @id @default(uuid())
+  tenantId             String   @unique @map("tenant_id")
+  jurisdictionPack     String   @default("MT") @map("jurisdiction_pack") // MT | IT
+  regulatoryProfile    String?  @map("regulatory_profile") // CSP_MFSA | ALTRO_SOGGETTO_OBBLIGATO | null
+  otherSubjectCategory String?  @map("other_subject_category")
+  retentionYears       Int      @default(5) @map("retention_years")
+  mlroUserId           String?  @map("mlro_user_id")
+  reportingChannel     String   @default("goAML") @map("reporting_channel")
+  screeningProvider    String   @default("MANUALE") @map("screening_provider")
+  featureFlags         Json?    @map("feature_flags")
+  versione             Int      @default(1)
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  @@map("tenant_compliance_settings")
+}
+
+/// Evento di compliance immutabile e a catena hash (tamper-evident): ogni cambio di settings o
+/// di stato di un caso vi lascia una riga. Append-only lato applicativo.
+model ComplianceEvent {
+  id             String   @id @default(uuid())
+  tenantId       String   @map("tenant_id")
+  tipo           String
+  attoreUserId   String?  @map("attore_user_id")
+  payload        Json?
+  hashPrecedente String?  @map("hash_precedente")
+  hash           String
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, createdAt])
+  @@map("compliance_event")
+}
