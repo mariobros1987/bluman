@@ -41,6 +41,10 @@ model Tenant {
   email                String?  @map("email")
   pec                  String?  @map("pec")
   telefono             String?  @map("telefono")
+  /// Concessione moduli dalla PIATTAFORMA (super_admin) allo studio — il "piano": elenco di chiavi
+  /// modulo disponibili. Si combina con `moduliDisattivati` (più sotto, deciso dall'admin dello
+  /// studio): un modulo è attivo se è concesso E non disattivato. Solo `kyc` è cablato per ora.
+  moduliConcessi       Json?    @map("moduli_concessi")
   waPhoneId            String?  @map("wa_phone_id")
   waAccessToken        String?  @map("wa_access_token")
   /// Token dell'handshake GET di Meta. È **per studio** perché appartiene all'app dello studio:
