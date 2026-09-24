@@ -18,7 +18,7 @@ import type { FastifyInstance } from 'fastify';
 import type { AppPort } from '../services/appPort.js';
 import { prisma } from '../util/prismaClient.js';
 import { moduloKycAttivo } from '../util/guardiaModuli.js';
-import { kycBloccaOperativita } from '../domain/kycStateMachine.js';
+import { operativitaBloccataDaKyc } from '../services/kycGate.js';
 import { notificaStudio } from '../services/notificheService.js';
 // §16 — le percentuali e gli stati aggregati arrivano da qui, non dal frontend.
 import { arricchisciProgetti, calcolaAvanzamento, ricalcolaProgetto } from '../services/calcoloService.js';
@@ -1358,12 +1358,11 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
         .findFirst({ where: { id: req.params.id, tenantId: req.tenantId }, select: { clienteId: true } })
         .catch(() => null);
       if (prev?.clienteId) {
-        const f = await prisma.fascicoloKyc
-          .findFirst({ where: { tenantId: req.tenantId, clienteId: prev.clienteId }, orderBy: { createdAt: 'desc' }, select: { stato: true } })
-          .catch(() => null);
-        if (f && kycBloccaOperativita(f.stato)) {
+        const gate = await operativitaBloccataDaKyc(prisma, req.tenantId, prev.clienteId)
+          .catch(() => ({ bloccato: false, stato: null, sbloccatoDaOverride: false }));
+        if (gate.bloccato) {
           return reply.code(409).send({
-            errore: `Impossibile avviare l'incarico: la pratica KYC del cliente è in stato «${f.stato}», non approvata. Approvala (scheda cliente → «Compliance KYC») prima di accettare il preventivo.`,
+            errore: `Impossibile avviare l'incarico: la pratica KYC del cliente è in stato «${gate.stato}», non approvata. Approvala (scheda cliente → «Compliance KYC») o registra uno sblocco motivato prima di accettare il preventivo.`,
           });
         }
       }

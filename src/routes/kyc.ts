@@ -155,4 +155,37 @@ export async function registraRotteKyc(server: FastifyInstance): Promise<void> {
       return reply.send({ ok: true, fascicolo: esito.fascicolo });
     },
   );
+
+  // Sblocco motivato (§8, OverrideKyc): l'admin dello studio forza l'operatività a valle nonostante
+  // il KYC non approvato, lasciando una motivazione. Vale GIORNI_VALIDITA_OVERRIDE giorni (kycGate).
+  server.post<{ Params: { id: string }; Body: { motivazione?: string; azioneSbloccata?: string } }>(
+    '/kyc/:id/override',
+    async (req, reply) => {
+      if (vietatoAlCliente(req, reply)) return;
+      if (await moduloSpento(req, reply)) return;
+      if (req.ruolo !== 'advisor' && req.ruolo !== 'super_admin') {
+        return reply.code(403).send({ errore: 'Lo sblocco motivato è riservato al responsabile dello studio.' });
+      }
+      const { id } = req.params;
+      const motivazione = (req.body?.motivazione || '').trim();
+      if (motivazione.length < 10) {
+        return reply.code(400).send({ errore: 'La motivazione dello sblocco è obbligatoria (almeno 10 caratteri).' });
+      }
+      const fascicolo = await prisma.fascicoloKyc.findFirst({ where: { id, tenantId: req.tenantId }, select: { id: true } });
+      if (!fascicolo) return reply.code(404).send({ errore: 'Fascicolo non trovato' });
+      const azioneSbloccata = (req.body?.azioneSbloccata || 'operativita').slice(0, 60);
+      await prisma.overrideKyc.create({
+        data: { tenantId: req.tenantId, fascicoloId: id, attoreUserId: req.userId ?? 'sistema', azioneSbloccata, motivazione },
+      });
+      await registraComplianceEvent(prisma, {
+        tenantId: req.tenantId, tipo: 'KYC_OVERRIDE', attoreUserId: req.userId ?? null,
+        payload: { fascicoloId: id, azioneSbloccata },
+      });
+      await recordAudit({
+        tenantId: req.tenantId, userId: req.userId, ruolo: req.ruolo, azione: 'KYC_OVERRIDE',
+        entita: `Fascicolo ${id}`, dettagli: `Sblocco ${azioneSbloccata}: ${motivazione}`, ipAddress: req.ip,
+      });
+      return reply.send({ ok: true });
+    },
+  );
 }
