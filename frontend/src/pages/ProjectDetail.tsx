@@ -8,6 +8,7 @@ import { CalendarPreviewModal, etichettaTipoAttivita, type PianificazioneScadenz
 import { ConfirmDeleteModal } from '../components/ConfirmDeleteModal';
 import { ModuliTab } from '../components/projectDetail/ModuliTab';
 import { FatturazioneTab } from '../components/projectDetail/FatturazioneTab';
+import { GateKycProgetto } from '../components/kyc/GateKycProgetto';
 import { GrafoModuliProgettoView } from '../components/projectDetail/GrafoModuliProgettoView';
 import { RedditivitaTab } from '../components/projectDetail/RedditivitaTab';
 import { StoricoContrattiTab } from '../components/projectDetail/StoricoContrattiTab';
@@ -909,7 +910,12 @@ export function ProjectDetail() {
             }}
           />
         )}
-        {tab === 'fatturazione' && <FatturazioneTab project={project} rawDbProject={rawDbProject} onRefresh={() => loadDetail()} />}
+        {tab === 'fatturazione' && (
+          <>
+            <GateKycProgetto clienteId={currentClient?.id || rawDbProject?.clienteId} />
+            <FatturazioneTab project={project} rawDbProject={rawDbProject} onRefresh={() => loadDetail()} />
+          </>
+        )}
         {tab === 'redditivita' && <RedditivitaTab project={project} />}
         {tab === 'storico' && <StoricoContrattiTab project={project} />}
         {tab === 'comunicazioni' && (
