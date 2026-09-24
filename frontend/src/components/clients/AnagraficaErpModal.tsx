@@ -6,6 +6,7 @@ import { fmt } from '../../utils';
 import type { Cliente } from '../../types';
 import { Modal } from '../ui/Modal';
 import { fetchKycFascicoloApi, creaKycFascicoloApi, aggiornaStatoKycApi, fetchModuliTenant, type FascicoloKyc } from '../../api/kyc';
+import { PannelloTitolariEffettivi } from '../kyc/PannelloTitolariEffettivi';
 
 // ─── Componente Anagrafica Completa Cliente ERP ────────────────────
 export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Cliente; onClose: () => void; onSaved: () => void }) {
@@ -803,6 +804,7 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
                 ))}
               </div>
               {kycMsg && <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6 }}>{kycMsg}</div>}
+              {kycFasc && <PannelloTitolariEffettivi fascicoloId={kycFasc.id} puoModificare={true} />}
             </div>
           </div>
         )}

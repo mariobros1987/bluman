@@ -75,3 +75,36 @@ export async function sbloccaKycApi(fascicoloId: string, motivazione: string) {
   return await res.json();
 }
 
+// K2 — titolare effettivo, catena di controllo, deposito al registro.
+export interface TitolareEffettivoRiga {
+  id: string;
+  criterio: string;
+  percentuale: string | number | null;
+  fonte: string;
+  note: string | null;
+  soggetto: { id: string; denominazione: string; tipo: string; codiceFiscale: string | null };
+}
+export interface CatenaCalcolata { soggettoId: string; percentualeEffettiva: number }
+
+export async function fetchTitolareEffettivo(fascicoloId: string): Promise<{
+  titolari: TitolareEffettivoRiga[];
+  legami: Array<{ id: string; daId: string; aId: string; percentuale: string | number | null }>;
+  deposito: { stato: string; scadenza: string | null; dataDeposito: string | null; riferimento: string | null } | null;
+  catena: CatenaCalcolata[];
+  soglia: number;
+}> {
+  const res = await apiFetch(`${API_BASE}/kyc/${fascicoloId}/titolare-effettivo`, { headers: getAuthHeaders() });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore lettura titolari effettivi'));
+  return await res.json();
+}
+
+export async function aggiungiTitolareEffettivo(fascicoloId: string, body: {
+  denominazione: string; tipo?: string; codiceFiscale?: string; criterio?: string; percentuale?: number; fonte?: string; note?: string;
+}) {
+  const res = await apiFetch(`${API_BASE}/kyc/${fascicoloId}/titolare-effettivo`, {
+    method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore aggiunta titolare effettivo'));
+  return await res.json();
+}
+
