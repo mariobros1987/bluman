@@ -4,7 +4,11 @@ import { API_BASE, apiFetch, getAuthHeaders, leggiErroreApi } from './http';
 // proiezione read-only; questo e il processo vero: stato, livello di verifica, rischio, scadenza.
 export interface FascicoloKyc {
   id: string;
-  stato: 'bozza' | 'in_attesa_revisione' | 'approvato' | 'respinto' | 'scaduto';
+  // v0.2 (spec §8) — ciclo di vita completo; i primi due sono legacy v0.1 ancora leggibili sui vecchi record.
+  stato:
+    | 'bozza' | 'in_attesa_revisione' | 'scaduto'
+    | 'in_raccolta' | 'in_verifica' | 'in_attesa_approvazione'
+    | 'approvato' | 'respinto' | 'sospeso' | 'in_revisione' | 'chiuso';
   livelloVerifica: 'semplificata' | 'ordinaria' | 'rafforzata';
   rischioCalcolato: 'basso' | 'medio' | 'alto';
   punteggioRischio: number;

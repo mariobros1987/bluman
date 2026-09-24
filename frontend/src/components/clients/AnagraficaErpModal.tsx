@@ -785,12 +785,11 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
                 <button type="button" disabled={kycBusy} onClick={calcolaKyc} className="btn btn-sm btn-secondary">
                   {kycBusy ? '…' : (kycFasc ? '↻ Ricalcola / Rinnova' : '▶ Calcola KYC')}
                 </button>
-                {kycFasc?.stato === 'in_attesa_revisione' && (
-                  <>
-                    <button type="button" disabled={kycBusy} onClick={() => cambiaStatoKyc('approvato')} className="btn btn-sm btn-success">✓ Approva</button>
-                    <button type="button" disabled={kycBusy} onClick={() => cambiaStatoKyc('respinto')} className="btn btn-sm btn-danger">✗ Respingi</button>
-                  </>
-                )}
+                {kycFasc && prossimiStatiKyc(kycFasc.stato).map((t) => (
+                  <button key={t.stato} type="button" disabled={kycBusy} onClick={() => cambiaStatoKyc(t.stato)} className={`btn btn-sm ${t.variant}`}>
+                    {t.label}
+                  </button>
+                ))}
               </div>
               {kycMsg && <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6 }}>{kycMsg}</div>}
             </div>
@@ -815,7 +814,13 @@ function etichettaStatoKyc(stato: string): string {
     case 'approvato': return '✓ Approvato';
     case 'respinto': return '✗ Respinto';
     case 'scaduto': return '⚠ Scaduto';
+    case 'sospeso': return '⏸ Sospeso';
+    case 'in_raccolta': return '📥 In raccolta';
+    case 'in_verifica': return '🔎 In verifica';
+    case 'in_attesa_approvazione': return '⏳ In attesa di approvazione';
     case 'in_attesa_revisione': return '⏳ In attesa di revisione';
+    case 'in_revisione': return '↻ In revisione periodica';
+    case 'chiuso': return '🔒 Chiuso';
     default: return 'Bozza';
   }
 }
@@ -824,8 +829,31 @@ function badgeStatoKyc(stato: string): React.CSSProperties {
   const base: React.CSSProperties = { padding: '3px 8px', borderRadius: 12, fontSize: 11, fontWeight: 700 };
   if (stato === 'approvato') return { ...base, background: 'var(--pill-green-bg)', color: 'var(--pill-green-fg)' };
   if (stato === 'respinto' || stato === 'scaduto') return { ...base, background: 'var(--pill-red-bg)', color: 'var(--pill-red-fg)' };
-  if (stato === 'in_attesa_revisione') return { ...base, background: 'var(--pill-amber-bg)', color: 'var(--pill-amber-fg)' };
+  if (stato === 'sospeso') return { ...base, background: 'var(--pill-red-bg)', color: 'var(--pill-red-fg)' };
+  if (stato === 'in_attesa_revisione' || stato === 'in_attesa_approvazione' || stato === 'in_revisione') {
+    return { ...base, background: 'var(--pill-amber-bg)', color: 'var(--pill-amber-fg)' };
+  }
   return { ...base, background: 'var(--surface-1)', color: 'var(--muted)' };
+}
+
+// Mirror lato UI della macchina a stati backend (src/domain/kycStateMachine.ts): serve solo a mostrare
+// i pulsanti giusti; il backend resta l'autorità e rifiuta comunque un passo non ammesso (409/403).
+const AZIONI_KYC: Record<string, Array<{ stato: string; label: string; variant: string }>> = {
+  bozza: [{ stato: 'in_raccolta', label: '▶ Avvia raccolta', variant: 'btn-primary' }, { stato: 'chiuso', label: '🔒 Chiudi', variant: 'btn-secondary' }],
+  in_raccolta: [{ stato: 'in_verifica', label: '🔎 Passa a verifica', variant: 'btn-primary' }, { stato: 'sospeso', label: '⏸ Sospendi', variant: 'btn-secondary' }, { stato: 'chiuso', label: '🔒 Chiudi', variant: 'btn-secondary' }],
+  in_verifica: [{ stato: 'in_attesa_approvazione', label: '⏳ Manda in approvazione', variant: 'btn-primary' }, { stato: 'in_raccolta', label: '↩ Torna in raccolta', variant: 'btn-secondary' }, { stato: 'sospeso', label: '⏸ Sospendi', variant: 'btn-secondary' }],
+  in_attesa_approvazione: [{ stato: 'approvato', label: '✓ Approva', variant: 'btn-success' }, { stato: 'respinto', label: '✗ Respingi', variant: 'btn-danger' }, { stato: 'in_verifica', label: '↩ Torna in verifica', variant: 'btn-secondary' }, { stato: 'sospeso', label: '⏸ Sospendi', variant: 'btn-secondary' }],
+  approvato: [{ stato: 'in_revisione', label: '↻ Revisione periodica', variant: 'btn-secondary' }, { stato: 'sospeso', label: '⏸ Sospendi', variant: 'btn-secondary' }, { stato: 'chiuso', label: '🔒 Chiudi', variant: 'btn-secondary' }],
+  respinto: [{ stato: 'in_raccolta', label: '↩ Riapri (raccolta)', variant: 'btn-secondary' }, { stato: 'chiuso', label: '🔒 Chiudi', variant: 'btn-secondary' }],
+  sospeso: [{ stato: 'in_raccolta', label: '↩ Riprendi (raccolta)', variant: 'btn-primary' }, { stato: 'in_verifica', label: '🔎 Riprendi (verifica)', variant: 'btn-secondary' }, { stato: 'chiuso', label: '🔒 Chiudi', variant: 'btn-secondary' }],
+  in_revisione: [{ stato: 'in_attesa_approvazione', label: '⏳ Manda in approvazione', variant: 'btn-primary' }, { stato: 'approvato', label: '✓ Conferma', variant: 'btn-success' }, { stato: 'sospeso', label: '⏸ Sospendi', variant: 'btn-secondary' }, { stato: 'chiuso', label: '🔒 Chiudi', variant: 'btn-secondary' }],
+  chiuso: [],
+};
+
+function prossimiStatiKyc(stato: string): Array<{ stato: string; label: string; variant: string }> {
+  // Normalizza i legacy v0.1 come fa il backend, così anche un vecchio record mostra i pulsanti giusti.
+  const s = stato === 'in_attesa_revisione' ? 'in_attesa_approvazione' : stato === 'scaduto' ? 'sospeso' : stato;
+  return AZIONI_KYC[s] ?? [];
 }
 
 const tabBtn = (active: boolean): React.CSSProperties => ({
