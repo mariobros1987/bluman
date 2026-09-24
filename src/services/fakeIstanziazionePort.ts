@@ -22,6 +22,7 @@ import type {
   PassaggioRecord,
 } from './istanziazionePort.js';
 import type { StatoMicrovoce, StatoModulo } from '../domain/types.js';
+import { TransizioneNonValidaError } from '../adapters/appErrors.js';
 
 let contatoreId = 0;
 function nuovoId(prefix: string): string {
@@ -126,6 +127,10 @@ export class FakeIstanziazionePort implements IstanziazionePort, EsecuzionePort 
         staging.progettiStato.set(progettoId, stato);
       },
       marcaAccettatoPreventivo: async (preventivoId) => {
+        // B3 — idempotenza (mirror del compare-and-set Prisma): se già accettato, aborta.
+        if (staging.preventiviStato.get(preventivoId) === 'accettato') {
+          throw new TransizioneNonValidaError(`Preventivo ${preventivoId} già accettato: istanziazione duplicata evitata`);
+        }
         staging.preventiviStato.set(preventivoId, 'accettato');
       },
       creaModuloProgetto: async (input) => {

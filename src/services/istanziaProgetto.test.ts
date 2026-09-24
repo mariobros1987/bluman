@@ -302,4 +302,19 @@ describe('istanziaProgetto — atomicità: rollback su fallimento a metà (§15.
 
     expect(port.statoPreventivo('PREV1')).toBe('accettato');
   });
+
+  it('B3 — idempotenza: istanziare due volte lo stesso preventivo aborta senza duplicare i moduli', async () => {
+    const port = new FakeIstanziazionePort();
+    const notifiche = new FakeNotificationPort();
+    port.registraTemplate(templateSemplice());
+    const args = { progettoId: 'P1', clienteId: 'C1', preventivoId: 'PREV1', righe: [{ moduloTemplateId: 'M01', moduloTemplateVersione: 1 }] };
+
+    const primo = await istanziaProgetto(args, port, notifiche);
+    const moduliDopoPrimo = port.snapshot().moduliProgetto.size;
+
+    // Secondo tentativo (doppio-invio/race): il compare-and-set trova già 'accettato' → aborta.
+    await expect(istanziaProgetto(args, port, notifiche)).rejects.toThrow(/già accettato/i);
+    expect(port.snapshot().moduliProgetto.size).toBe(moduliDopoPrimo); // nessun modulo duplicato
+    expect(primo.moduliProgettoIds.length).toBeGreaterThan(0);
+  });
 });

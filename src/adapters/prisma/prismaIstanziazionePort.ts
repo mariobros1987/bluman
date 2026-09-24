@@ -17,6 +17,7 @@
 // sviluppo) — controlla prima lì.
 
 import { conContestoInTransazione, contestoTenant, type PrismaConContesto } from '../../util/prismaClient.js';
+import { TransizioneNonValidaError } from '../appErrors.js';
 import { notificaStudio } from '../../services/notificheService.js';
 import type {
   IstanziazionePort,
@@ -109,7 +110,16 @@ export class PrismaIstanziazionePort implements IstanziazionePort, EsecuzionePor
         // passaggio di stato del preventivo sparisce (il guasto del preventivo «accettato
         // senza moduli» che non si poteva più riprovare).
         marcaAccettatoPreventivo: async (preventivoId) => {
-          await tx.preventivo.update({ where: { id: preventivoId }, data: { stato: 'accettato' } });
+          // B3 — idempotenza: compare-and-set atomico. Solo la transazione che trova il preventivo
+          // ancora in bozza/inviato lo accetta e prosegue con l'istanziazione; un doppio-invio o una
+          // race trova 0 righe (stato già 'accettato') e ABORTA → rollback, niente moduli duplicati.
+          const res = await tx.preventivo.updateMany({
+            where: { id: preventivoId, stato: { in: ['bozza', 'inviato'] } },
+            data: { stato: 'accettato' },
+          });
+          if (res.count === 0) {
+            throw new TransizioneNonValidaError(`Preventivo ${preventivoId} già accettato: istanziazione duplicata evitata`);
+          }
         },
 
         creaModuloProgetto: async (input) => {
