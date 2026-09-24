@@ -34,17 +34,19 @@ export function SettingsPage() {
     { key: 'documents', label: 'Documenti' }, { key: 'reports', label: 'Report' },
   ];
   const [moduliStandby, setModuliStandby] = useState<string[]>([]);
-  const [moduliConcessi, setModuliConcessi] = useState<string[]>([]);
+  // null = stato dei moduli non ancora noto (o lettura fallita). In quel caso il modulo si considera
+  // ATTIVO (fail-open, come il backend e il default «studi esistenti ON»): la scheda si nasconde solo
+  // quando il server dice esplicitamente che 'kyc' non è tra i concessi.
+  const [moduliConcessi, setModuliConcessi] = useState<string[] | null>(null);
   const [moduliMsg, setModuliMsg] = useState<string | null>(null);
-  // Il modulo KYC è attivo se concesso dalla piattaforma E non messo in standby dallo studio.
-  const kycConcesso = moduliConcessi.includes('kyc');
+  const kycConcesso = moduliConcessi === null ? true : moduliConcessi.includes('kyc');
   const kycAttivo = kycConcesso && !moduliStandby.includes('kyc');
   // I moduli attivabili nello standby: quelli di navigazione + KYC solo se concesso allo studio.
   const moduliToggabili = kycConcesso
     ? [...MODULI_STANDBY, { key: 'kyc', label: '🛡 Compliance & Antiriciclaggio (KYC)' }]
     : MODULI_STANDBY;
   useEffect(() => {
-    fetchModuliTenant().then((m) => setModuliConcessi(m.concessi || [])).catch(() => setModuliConcessi([]));
+    fetchModuliTenant().then((m) => setModuliConcessi(m.concessi || [])).catch(() => setModuliConcessi(null));
   }, []);
   const toggleModulo = (key: string) =>
     setModuliStandby((cur) => (cur.includes(key) ? cur.filter((k) => k !== key) : [...cur, key]));
