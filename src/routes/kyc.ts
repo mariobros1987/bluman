@@ -6,6 +6,7 @@ import { prisma } from '../util/prismaClient.js';
 import { calcolaRischioKyc, calcolaScadenzaKyc, type LivelloVerificaKyc } from '../domain/kycEngine.js';
 import { transizioneKyc } from '../services/kycCaseService.js';
 import { registraComplianceEvent } from '../services/complianceEventLog.js';
+import { moduloKycAttivo } from '../util/guardiaModuli.js';
 import { recordAudit } from '../util/serverHelpers.js';
 
 // Soglia di default per la verifica rafforzata: €15.000 (D.Lgs. 231/2007, operazioni occasionali).
@@ -20,10 +21,19 @@ export async function registraRotteKyc(server: FastifyInstance): Promise<void> {
     }
     return false;
   };
+  // Modulo Compliance/KYC spento per lo studio → 403 (attivazione modulo per-studio).
+  const moduloSpento = async (req: FastifyRequest, reply: FastifyReply): Promise<boolean> => {
+    if (!(await moduloKycAttivo(req.tenantId))) {
+      reply.code(403).send({ errore: 'Il modulo Compliance/KYC non è attivo per questo studio.' });
+      return true;
+    }
+    return false;
+  };
 
   // Fascicolo corrente + storico + documenti + override di un cliente.
   server.get<{ Params: { clienteId: string } }>('/clienti/:clienteId/kyc', async (req, reply) => {
     if (vietatoAlCliente(req, reply)) return;
+    if (await moduloSpento(req, reply)) return;
     const fascicolo = await prisma.fascicoloKyc.findFirst({
       where: { tenantId: req.tenantId, clienteId: req.params.clienteId },
       orderBy: { createdAt: 'desc' },
@@ -45,6 +55,7 @@ export async function registraRotteKyc(server: FastifyInstance): Promise<void> {
     const tenantId = req.tenantId;
     const { clienteId } = req.params;
     const b = req.body || {};
+    if (await moduloSpento(req, reply)) return;
     const cliente = await prisma.cliente.findFirst({ where: { id: clienteId, tenantId }, select: { id: true, tipo: true } });
     if (!cliente) return reply.code(404).send({ errore: 'Cliente non trovato' });
 
@@ -106,6 +117,7 @@ export async function registraRotteKyc(server: FastifyInstance): Promise<void> {
       const tenantId = req.tenantId;
       const { id } = req.params;
       const { stato, motivazione } = req.body || {};
+      if (await moduloSpento(req, reply)) return;
       if (!STATI_V02.includes(stato)) return reply.code(400).send({ errore: 'Stato non valido' });
 
       const fascicolo = await prisma.fascicoloKyc.findFirst({ where: { id, tenantId } });

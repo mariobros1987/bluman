@@ -2,6 +2,7 @@
 // Lettura riservata ai ruoli interni (mai `cliente`); scrittura solo advisor/super_admin.
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { prisma } from '../util/prismaClient.js';
+import { moduloKycAttivo } from '../util/guardiaModuli.js';
 import { modalitaBozza, calcolaHashEvento, verificaCatena } from '../services/complianceService.js';
 
 const PACCHETTI = ['MT', 'IT'];
@@ -15,9 +16,18 @@ export async function registraRotteCompliance(server: FastifyInstance): Promise<
     }
     return false;
   };
+  // Modulo Compliance/KYC spento per lo studio → 403 (attivazione modulo per-studio).
+  const moduloSpento = async (req: FastifyRequest, reply: FastifyReply): Promise<boolean> => {
+    if (!(await moduloKycAttivo(req.tenantId))) {
+      reply.code(403).send({ errore: 'Il modulo Compliance/KYC non è attivo per questo studio.' });
+      return true;
+    }
+    return false;
+  };
 
   server.get('/tenant/compliance-settings', async (req, reply) => {
     if (vietatoAlCliente(req, reply)) return;
+    if (await moduloSpento(req, reply)) return;
     const tenantId = req.tenantId;
     let s = await prisma.tenantComplianceSettings.findUnique({ where: { tenantId } });
     if (!s) s = await prisma.tenantComplianceSettings.create({ data: { tenantId } });
@@ -28,6 +38,7 @@ export async function registraRotteCompliance(server: FastifyInstance): Promise<
     if (req.ruolo !== 'advisor' && req.ruolo !== 'super_admin') {
       return reply.code(403).send({ errore: 'Le impostazioni di compliance sono riservate al responsabile dello studio.' });
     }
+    if (await moduloSpento(req, reply)) return;
     const tenantId = req.tenantId;
     const b = (req.body || {}) as Record<string, any>;
 
@@ -73,6 +84,7 @@ export async function registraRotteCompliance(server: FastifyInstance): Promise<
   // sequenza è stata manomessa.
   server.get('/tenant/compliance-events', async (req, reply) => {
     if (vietatoAlCliente(req, reply)) return;
+    if (await moduloSpento(req, reply)) return;
     const tenantId = req.tenantId;
     const eventi = await prisma.complianceEvent.findMany({
       where: { tenantId },

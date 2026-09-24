@@ -18,6 +18,7 @@ import { credenzialiCanali } from '../services/otpDispatch.js';
 import { numeroSignal, statoSignal } from '../services/signalService.js';
 import { usernameBotTelegram } from '../services/telegramService.js';
 import { inMemoryTenantStore, recordAudit, senzaHash, TENANT_DEFAULT } from '../util/serverHelpers.js';
+import { moduloConcessoAlTenant } from '../util/moduliTenant.js';
 import { eliminaTenantCompleto } from '../services/eliminazioneTenant.js';
 import { urlWebhookWhatsapp } from '../util/urlPubblica.js';
 import { campoOrdinamento, creaMetaPaginazione, leggiPaginazione } from '../util/paginazione.js';
@@ -191,6 +192,44 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
       }
       return tenantPubblico(inMemoryTenantStore.get(tenantId));
     }
+  });
+
+  // ── Attivazione moduli per-studio (solo KYC per ora) ──────────────────────────────────
+  // Livello studio: l'admin (advisor/super_admin) accende/spegne i moduli CONCESSI dalla piattaforma.
+  const chiaviModulo = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
+
+  server.get('/tenant/moduli', async (req) => {
+    const t = await prisma.tenant.findUnique({ where: { id: req.tenantId }, select: { moduliConcessi: true, moduliDisattivati: true } }).catch(() => null);
+    const concessi = chiaviModulo(t?.moduliConcessi);
+    const disattivati = chiaviModulo(t?.moduliDisattivati);
+    return { concessi, disattivati, attivi: concessi.filter((k) => !disattivati.includes(k)) };
+  });
+
+  server.patch<{ Body: { chiave?: string; attivo?: boolean } }>('/tenant/moduli', async (req, reply) => {
+    if (req.ruolo !== 'advisor' && req.ruolo !== 'super_admin') {
+      return reply.code(403).send({ errore: 'L’attivazione dei moduli è riservata al responsabile dello studio.' });
+    }
+    const { chiave, attivo } = req.body || {};
+    if (chiave !== 'kyc') return reply.code(400).send({ errore: 'Modulo non riconosciuto.' });
+    const t = await prisma.tenant.findUnique({ where: { id: req.tenantId }, select: { moduliConcessi: true, moduliDisattivati: true } });
+    if (!moduloConcessoAlTenant(t?.moduliConcessi, chiave)) {
+      return reply.code(403).send({ errore: 'Questo modulo non è incluso nel piano dello studio: contatta l’amministratore della piattaforma.' });
+    }
+    const disattivati = new Set(chiaviModulo(t?.moduliDisattivati));
+    if (attivo) disattivati.delete(chiave); else disattivati.add(chiave);
+    const updated = await prisma.tenant.update({
+      where: { id: req.tenantId },
+      data: { moduliDisattivati: [...disattivati] },
+      select: { moduliConcessi: true, moduliDisattivati: true },
+    });
+    await recordAudit({
+      tenantId: req.tenantId, userId: req.userId, ruolo: req.ruolo,
+      azione: attivo ? 'MODULO_ATTIVATO' : 'MODULO_DISATTIVATO', entita: `Modulo ${chiave}`,
+      dettagli: `${chiave} → ${attivo ? 'attivo' : 'disattivato'}`, ipAddress: req.ip,
+    });
+    const concessi = chiaviModulo(updated.moduliConcessi);
+    const dis = chiaviModulo(updated.moduliDisattivati);
+    return reply.send({ ok: true, concessi, disattivati: dis, attivi: concessi.filter((k) => !dis.includes(k)) });
   });
 
   function soloGestoriCanali(req: any, reply: any): boolean {
@@ -783,6 +822,9 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
           durataMesi: Number(b.durataMesi) || 12,
           dataAttivazione: b.dataAttivazione,
           dataScadenza: b.dataScadenza,
+          // Default richiesto: i nuovi studi nascono SENZA moduli opzionali (KYC spento finché il
+          // super_admin non lo concede). Gli studi esistenti li ha già valorizzati la migrazione.
+          moduliConcessi: Array.isArray(b.moduliConcessi) ? b.moduliConcessi.filter((k: unknown) => k === 'kyc') : [],
         }
       });
 
@@ -851,6 +893,8 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
           ...(b.durataMesi !== undefined && { durataMesi: Number(b.durataMesi) }),
           ...(b.leadAdvisorNome && { leadAdvisorNome: b.leadAdvisorNome }),
           ...(b.leadAdvisorEmail && { leadAdvisorEmail: b.leadAdvisorEmail }),
+          // Concessione moduli per-studio (super_admin): solo la chiave 'kyc' è ammessa per ora.
+          ...(Array.isArray(b.moduliConcessi) && { moduliConcessi: b.moduliConcessi.filter((k: unknown) => k === 'kyc') }),
           // Nessuna scrittura di password qui: per rigenerarla c'è
           // POST /admin/tenants/:id/reset-password, che ne salva solo l'hash.
         }
