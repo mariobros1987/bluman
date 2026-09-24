@@ -63,3 +63,15 @@ export async function fetchModuliTenant(): Promise<{ concessi: string[]; disatti
   return await res.json();
 }
 
+// Sblocco motivato del gate KYC (K4, §8, OverrideKyc): riservato all'admin dello studio; il backend
+// rifiuta 403 gli altri ruoli e 400 una motivazione troppo corta. Vale 30 giorni.
+export async function sbloccaKycApi(fascicoloId: string, motivazione: string) {
+  const res = await apiFetch(`${API_BASE}/kyc/${fascicoloId}/override`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ motivazione }),
+  });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore sblocco KYC'));
+  return await res.json();
+}
+
