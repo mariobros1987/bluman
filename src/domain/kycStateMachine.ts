@@ -62,3 +62,19 @@ export function transizioneAmmessa(da: StatoKycV02, a: StatoKycV02): boolean {
 export function richiedeApprovazioneMlro(a: StatoKycV02, rischio: LivelloRischioKyc): boolean {
   return a === 'approvato' && rischio === 'alto';
 }
+
+/**
+ * Normalizza uno stato Prisma (che include ancora i legacy v0.1) verso il vocabolario v0.2, così la
+ * macchina a stati può validare le transizioni anche partendo da un vecchio record di prova:
+ * `in_attesa_revisione` → `in_attesa_approvazione`, `scaduto` → `sospeso`. Gli stati già v0.2
+ * restano invariati. Ritorna `null` per un valore ignoto (che il service tratterà come errore).
+ */
+export function normalizzaStatoLegacy(stato: string): StatoKycV02 | null {
+  if (stato === 'in_attesa_revisione') return 'in_attesa_approvazione';
+  if (stato === 'scaduto') return 'sospeso';
+  const v02: StatoKycV02[] = [
+    'bozza', 'in_raccolta', 'in_verifica', 'in_attesa_approvazione',
+    'approvato', 'respinto', 'sospeso', 'in_revisione', 'chiuso',
+  ];
+  return (v02 as string[]).includes(stato) ? (stato as StatoKycV02) : null;
+}

@@ -4,6 +4,8 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { prisma } from '../util/prismaClient.js';
 import { calcolaRischioKyc, calcolaScadenzaKyc, type LivelloVerificaKyc } from '../domain/kycEngine.js';
+import { transizioneKyc } from '../services/kycCaseService.js';
+import { registraComplianceEvent } from '../services/complianceEventLog.js';
 import { recordAudit } from '../util/serverHelpers.js';
 
 // Soglia di default per la verifica rafforzata: €15.000 (D.Lgs. 231/2007, operazioni occasionali).
@@ -61,7 +63,7 @@ export async function registraRotteKyc(server: FastifyInstance): Promise<void> {
       data: {
         tenantId,
         clienteId,
-        stato: 'in_attesa_revisione',
+        stato: 'in_raccolta',
         livelloVerifica: esito.livelloVerifica,
         rischioCalcolato: esito.rischioCalcolato,
         punteggioRischio: esito.punteggioRischio,
@@ -70,13 +72,20 @@ export async function registraRotteKyc(server: FastifyInstance): Promise<void> {
         storico: {
           create: {
             tenantId,
-            statoNuovo: 'in_attesa_revisione',
+            statoNuovo: 'in_raccolta',
             attoreUserId: req.userId ?? 'sistema',
             motivazione: `Creato dal motore: ${esito.livelloVerifica} — ${esito.motivazioni.join('; ')}`,
           },
         },
       },
       include: { storico: true },
+    });
+    // Apertura pratica: primo anello della catena di compliance (spec §8.10).
+    await registraComplianceEvent(prisma, {
+      tenantId,
+      tipo: 'KYC_PRATICA_APERTA',
+      attoreUserId: req.userId ?? null,
+      payload: { fascicoloId: fascicolo.id, clienteId, livelloVerifica: esito.livelloVerifica, rischio: esito.rischioCalcolato },
     });
     await recordAudit({
       tenantId, userId: req.userId, ruolo: req.ruolo, azione: 'KYC_FASCICOLO_CREATO',
@@ -87,46 +96,51 @@ export async function registraRotteKyc(server: FastifyInstance): Promise<void> {
     return reply.send({ ok: true, fascicolo, esito });
   });
 
-  // Transizione di stato (approva / respingi / rimanda in revisione) con storico immutabile.
-  server.patch<{ Params: { id: string }; Body: { stato: 'approvato' | 'respinto' | 'in_attesa_revisione'; motivazione?: string } }>(
+  // Transizione di stato (spec v0.2 §8): la macchina a stati valida il passo, il gate MLRO copre il
+  // rischio alto, e ogni cambio scrive storico + ComplianceEvent (via il service).
+  const STATI_V02 = ['bozza', 'in_raccolta', 'in_verifica', 'in_attesa_approvazione', 'approvato', 'respinto', 'sospeso', 'in_revisione', 'chiuso'];
+  server.patch<{ Params: { id: string }; Body: { stato: string; motivazione?: string } }>(
     '/kyc/:id/stato',
     async (req, reply) => {
       if (vietatoAlCliente(req, reply)) return;
       const tenantId = req.tenantId;
       const { id } = req.params;
       const { stato, motivazione } = req.body || {};
-      if (!['approvato', 'respinto', 'in_attesa_revisione'].includes(stato)) {
-        return reply.code(400).send({ errore: 'Stato non valido' });
-      }
+      if (!STATI_V02.includes(stato)) return reply.code(400).send({ errore: 'Stato non valido' });
+
       const fascicolo = await prisma.fascicoloKyc.findFirst({ where: { id, tenantId } });
       if (!fascicolo) return reply.code(404).send({ errore: 'Fascicolo non trovato' });
 
+      // Gate MLRO (§8.3): advisor/super_admin, oppure l'utente nominato MLRO nel tenant (K0).
+      const settings = await prisma.tenantComplianceSettings.findUnique({ where: { tenantId }, select: { mlroUserId: true } });
+      const puoApprovareRafforzata = req.ruolo === 'advisor' || req.ruolo === 'super_admin'
+        || (!!req.userId && req.userId === settings?.mlroUserId);
+
       const ora = new Date();
-      const approvazione = stato === 'approvato'
-        ? { dataVerifica: ora, dataScadenza: calcolaScadenzaKyc(fascicolo.livelloVerifica as LivelloVerificaKyc, ora), approvatoDa: req.userId ?? null, approvatoIl: ora }
-        : {};
-      const aggiornato = await prisma.fascicoloKyc.update({
-        where: { id },
-        data: {
-          stato,
-          ...approvazione,
-          noteCompliance: motivazione ?? fascicolo.noteCompliance,
-          storico: {
-            create: {
-              tenantId, statoPrecedente: fascicolo.stato, statoNuovo: stato,
-              attoreUserId: req.userId ?? 'sistema', motivazione: motivazione ?? null,
-            },
-          },
-        },
-        include: { storico: { orderBy: { createdAt: 'desc' } } },
+      const campiApprovazione = {
+        dataVerifica: ora,
+        dataScadenza: calcolaScadenzaKyc(fascicolo.livelloVerifica as LivelloVerificaKyc, ora),
+        approvatoDa: req.userId ?? null,
+        approvatoIl: ora,
+      };
+
+      const esito = await transizioneKyc(prisma, {
+        tenantId, fascicoloId: id, nuovoStato: stato,
+        attoreUserId: req.userId, motivazione, puoApprovareRafforzata, campiApprovazione,
       });
+
+      if (esito.esito === 'non_trovato') return reply.code(404).send({ errore: 'Fascicolo non trovato' });
+      if (esito.esito === 'stato_ignoto') return reply.code(400).send({ errore: `Stato non riconosciuto: ${esito.valore}` });
+      if (esito.esito === 'transizione_non_valida') return reply.code(409).send({ errore: `Transizione non ammessa: ${esito.da} → ${esito.a}` });
+      if (esito.esito === 'serve_mlro') return reply.code(403).send({ errore: 'Approvazione di una pratica ad alto rischio riservata all’MLRO o a un ruolo superiore.' });
+
       await recordAudit({
         tenantId, userId: req.userId, ruolo: req.ruolo, azione: 'KYC_STATO_AGGIORNATO',
         entita: `Fascicolo ${id}`,
         dettagli: `${fascicolo.stato} -> ${stato}${motivazione ? ` (${motivazione})` : ''}`,
         ipAddress: req.ip,
       });
-      return reply.send({ ok: true, fascicolo: aggiornato });
+      return reply.send({ ok: true, fascicolo: esito.fascicolo });
     },
   );
 }
