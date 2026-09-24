@@ -17,6 +17,8 @@ import type { Prisma } from '@prisma/client';
 import type { FastifyInstance } from 'fastify';
 import type { AppPort } from '../services/appPort.js';
 import { prisma } from '../util/prismaClient.js';
+import { moduloKycAttivo } from '../util/guardiaModuli.js';
+import { kycBloccaOperativita } from '../domain/kycStateMachine.js';
 import { notificaStudio } from '../services/notificheService.js';
 // §16 — le percentuali e gli stati aggregati arrivano da qui, non dal frontend.
 import { arricchisciProgetti, calcolaAvanzamento, ricalcolaProgetto } from '../services/calcoloService.js';
@@ -1345,9 +1347,27 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
     return app.inviaPreventivo(req.params.id);
   });
 
-  server.post<{ Params: { id: string } }>('/preventivi/:id/accetta', async (req) => {
+  server.post<{ Params: { id: string } }>('/preventivi/:id/accetta', async (req, reply) => {
     // §15.3 — qui avviene l'istanziazione completa: modulo_progetto, microvoce_progetto,
     // passaggio_progetto, dipendenze, il tutto dentro la transazione già testata.
+    // K4 (§8.1) — «non può passare in esecuzione senza KYC approvato»: col modulo Compliance attivo,
+    // se il cliente del preventivo ha una pratica KYC che non consente l'operatività, l'accettazione
+    // (che avvia l'incarico) è bloccata. Nessun fascicolo → nessun blocco. Fail-open su errore di lettura.
+    if (await moduloKycAttivo(req.tenantId)) {
+      const prev = await prisma.preventivo
+        .findFirst({ where: { id: req.params.id, tenantId: req.tenantId }, select: { clienteId: true } })
+        .catch(() => null);
+      if (prev?.clienteId) {
+        const f = await prisma.fascicoloKyc
+          .findFirst({ where: { tenantId: req.tenantId, clienteId: prev.clienteId }, orderBy: { createdAt: 'desc' }, select: { stato: true } })
+          .catch(() => null);
+        if (f && kycBloccaOperativita(f.stato)) {
+          return reply.code(409).send({
+            errore: `Impossibile avviare l'incarico: la pratica KYC del cliente è in stato «${f.stato}», non approvata. Approvala (scheda cliente → «Compliance KYC») prima di accettare il preventivo.`,
+          });
+        }
+      }
+    }
     return app.accettaPreventivoEIstanzia(req.params.id);
   });
 
