@@ -5,7 +5,7 @@ import { getCurrentTenantId, getTenantStorageKey } from '../../utils/tenant';
 import { fmt } from '../../utils';
 import type { Cliente } from '../../types';
 import { Modal } from '../ui/Modal';
-import { fetchKycFascicoloApi, creaKycFascicoloApi, aggiornaStatoKycApi, type FascicoloKyc } from '../../api/kyc';
+import { fetchKycFascicoloApi, creaKycFascicoloApi, aggiornaStatoKycApi, fetchModuliTenant, type FascicoloKyc } from '../../api/kyc';
 
 // ─── Componente Anagrafica Completa Cliente ERP ────────────────────
 export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Cliente; onClose: () => void; onSaved: () => void }) {
@@ -147,6 +147,15 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
   const [kycFasc, setKycFasc] = useState<FascicoloKyc | null>(null);
   const [kycBusy, setKycBusy] = useState(false);
   const [kycMsg, setKycMsg] = useState<string | null>(null);
+  // Il modulo Compliance/KYC può essere spento per lo studio: in tal caso la scheda non si mostra.
+  const [kycModuloAttivo, setKycModuloAttivo] = useState(true);
+  useEffect(() => {
+    let annullato = false;
+    fetchModuliTenant()
+      .then((m) => { if (!annullato) setKycModuloAttivo((m.attivi || []).includes('kyc')); })
+      .catch(() => { /* in caso di errore non nascondo: fail-open come il backend */ });
+    return () => { annullato = true; };
+  }, []);
   useEffect(() => {
     let annullato = false;
     if (!client.id) return;
@@ -325,7 +334,9 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
           </button>
           <button type="button" onClick={() => setTab('sede')} style={tabBtn(tab === 'sede')}>📍 3. Sede & Contatti</button>
           <button type="button" onClick={() => setTab('sdi')} style={tabBtn(tab === 'sdi')}>🧾 4. Fatturazione SDI</button>
-          <button type="button" onClick={() => setTab('compliance')} style={tabBtn(tab === 'compliance')}>🛡 5. Compliance KYC</button>
+          {kycModuloAttivo && (
+            <button type="button" onClick={() => setTab('compliance')} style={tabBtn(tab === 'compliance')}>🛡 5. Compliance KYC</button>
+          )}
         </div>
 
         {/* TAB 1: Dati Legali */}
@@ -707,7 +718,7 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
         )}
 
         {/* TAB 4: Compliance & KYC */}
-        {tab === 'compliance' && (
+        {tab === 'compliance' && kycModuloAttivo && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ display: 'flex', gap: 12 }}>
               <div style={{ flex: 1 }}>

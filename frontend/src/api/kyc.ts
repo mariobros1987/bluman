@@ -53,3 +53,13 @@ export async function aggiornaStatoKycApi(id: string, stato: string, motivazione
   if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore aggiornamento stato KYC'));
   return await res.json();
 }
+
+// Attivazione moduli per-studio: quali moduli sono concessi dalla piattaforma, quali spenti dallo
+// studio, e quali risultano attivi (concesso E non spento). Serve a nascondere le schede KYC quando
+// il modulo non è attivo. `attivi.includes('kyc')` è la condizione di visibilità del modulo KYC.
+export async function fetchModuliTenant(): Promise<{ concessi: string[]; disattivati: string[]; attivi: string[] }> {
+  const res = await apiFetch(`${API_BASE}/tenant/moduli`, { headers: getAuthHeaders() });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore lettura moduli dello studio'));
+  return await res.json();
+}
+

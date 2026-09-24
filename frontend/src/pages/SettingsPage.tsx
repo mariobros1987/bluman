@@ -15,6 +15,7 @@ import { TabSdi } from '../components/settings/TabSdi';
 import { TabManutenzione } from '../components/settings/TabManutenzione';
 import { TabSicurezza } from '../components/settings/TabSicurezza';
 import { TabCompliance } from '../components/settings/TabCompliance';
+import { fetchModuliTenant } from '../api/kyc';
 import { InviteUserModal } from '../components/settings/InviteUserModal';
 import { ResetPasswordModal } from '../components/settings/ResetPasswordModal';
 import styles from './Settings.module.css';
@@ -33,7 +34,18 @@ export function SettingsPage() {
     { key: 'documents', label: 'Documenti' }, { key: 'reports', label: 'Report' },
   ];
   const [moduliStandby, setModuliStandby] = useState<string[]>([]);
+  const [moduliConcessi, setModuliConcessi] = useState<string[]>([]);
   const [moduliMsg, setModuliMsg] = useState<string | null>(null);
+  // Il modulo KYC è attivo se concesso dalla piattaforma E non messo in standby dallo studio.
+  const kycConcesso = moduliConcessi.includes('kyc');
+  const kycAttivo = kycConcesso && !moduliStandby.includes('kyc');
+  // I moduli attivabili nello standby: quelli di navigazione + KYC solo se concesso allo studio.
+  const moduliToggabili = kycConcesso
+    ? [...MODULI_STANDBY, { key: 'kyc', label: '🛡 Compliance & Antiriciclaggio (KYC)' }]
+    : MODULI_STANDBY;
+  useEffect(() => {
+    fetchModuliTenant().then((m) => setModuliConcessi(m.concessi || [])).catch(() => setModuliConcessi([]));
+  }, []);
   const toggleModulo = (key: string) =>
     setModuliStandby((cur) => (cur.includes(key) ? cur.filter((k) => k !== key) : [...cur, key]));
   const handleSaveModuli = async () => {
@@ -594,9 +606,11 @@ export function SettingsPage() {
         <button className={`${styles.tab} ${tab === 'sdi' ? styles.tabActive : ''}`} onClick={() => setTab('sdi')}>
           📨 Fatturazione Elettronica (Invio Manuale)
         </button>
-        <button className={`${styles.tab} ${tab === 'compliance' ? styles.tabActive : ''}`} onClick={() => setTab('compliance')}>
-          🛡️ Compliance & Antiriciclaggio
-        </button>
+        {kycAttivo && (
+          <button className={`${styles.tab} ${tab === 'compliance' ? styles.tabActive : ''}`} onClick={() => setTab('compliance')}>
+            🛡️ Compliance & Antiriciclaggio
+          </button>
+        )}
         <button
           className={`${styles.tab} ${tab === 'manutenzione' ? styles.tabActive : ''}`}
           onClick={() => { setTab('manutenzione'); setChiaviLocali(chiaviDatiLocali()); setChiaviRimosse(null); setConfermaSvuota(false); }}
@@ -653,7 +667,7 @@ export function SettingsPage() {
           <div style={{ fontWeight: 700, marginBottom: 4 }}>🧩 Moduli in standby</div>
           <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}>Spegni i moduli che lo studio non usa per ora: spariscono dalla navigazione per tutti. Non è un blocco di sicurezza (per quello resta la Matrice Permessi per utente). Dashboard e Impostazioni restano sempre attive.</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 8 }}>
-            {MODULI_STANDBY.map((m) => {
+            {moduliToggabili.map((m) => {
               const attivo = !moduliStandby.includes(m.key);
               return (
                 <label key={m.key} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', padding: '6px 8px', borderRadius: 8, border: '1px solid var(--border)', background: attivo ? 'var(--card)' : 'var(--pill-amber-bg)' }}>
@@ -812,7 +826,7 @@ export function SettingsPage() {
       {tab === 'sdi' && <TabSdi />}
 
       {/* TAB Compliance/AML (KYC Malta v0.2, K0/3): impostazioni compliance + audit trail immutabile */}
-      {tab === 'compliance' && <TabCompliance ruolo={currentRuolo} />}
+      {tab === 'compliance' && kycAttivo && <TabCompliance ruolo={currentRuolo} />}
 
       {/* TAB 5: Manutenzione dei dati locali di questo browser
           Una parte del lavoro dello studio è ancora scritta nel browser e non a database: è la
