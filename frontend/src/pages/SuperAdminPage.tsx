@@ -167,6 +167,22 @@ export function SuperAdminPage() {
     }
   };
 
+  // Concessione del modulo Compliance/KYC allo studio (livello piattaforma). Toggle: aggiunge o
+  // toglie 'kyc' da moduliConcessi. Se tolto, l'admin dello studio non può più riattivarlo e le
+  // rotte /kyc + /tenant/compliance rispondono 403.
+  const handleToggleKyc = async (tenant: TenantStudio) => {
+    const concessi: string[] = Array.isArray((tenant as any).moduliConcessi) ? (tenant as any).moduliConcessi : [];
+    const haKyc = concessi.includes('kyc');
+    const nuovi = haKyc ? concessi.filter((k) => k !== 'kyc') : [...concessi, 'kyc'];
+    try {
+      await updateAdminTenantApi(tenant.id, { moduliConcessi: nuovi });
+      setTenants(prev => prev.map(t => t.id === tenant.id ? ({ ...t, moduliConcessi: nuovi } as TenantStudio) : t));
+      toast.successo(`Modulo KYC ${haKyc ? 'revocato a' : 'concesso a'} "${tenant.ragioneSociale}".`);
+    } catch (err: any) {
+      toast.errore(`Concessione modulo NON riuscita: ${err?.message || 'errore di rete'}.`);
+    }
+  };
+
   // Archiviazione / Ripristino Tenant — stato reversibile che nasconde lo studio dall'elenco
   // attivo e ne blocca l'accesso agli utenti (il super_admin lo apre comunque via «Entra»).
   // È il passaggio obbligato prima dell'eliminazione definitiva.
@@ -452,6 +468,20 @@ export function SuperAdminPage() {
                           style={{ background: 'var(--surface-2)', border: '1px solid var(--hint)', color: 'var(--amber)', padding: '5px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
                         >
                           ⏱ Tempo
+                        </button>
+
+                        {/* Concessione modulo KYC (piattaforma) */}
+                        <button
+                          onClick={() => handleToggleKyc(t)}
+                          title={(Array.isArray((t as any).moduliConcessi) && (t as any).moduliConcessi.includes('kyc')) ? 'Revoca il modulo Compliance/KYC a questo studio' : 'Concedi il modulo Compliance/KYC a questo studio'}
+                          style={{
+                            background: (Array.isArray((t as any).moduliConcessi) && (t as any).moduliConcessi.includes('kyc')) ? 'var(--pill-green-bg)' : 'var(--surface-2)',
+                            border: `1px solid ${(Array.isArray((t as any).moduliConcessi) && (t as any).moduliConcessi.includes('kyc')) ? 'var(--green)' : 'var(--hint)'}`,
+                            color: (Array.isArray((t as any).moduliConcessi) && (t as any).moduliConcessi.includes('kyc')) ? 'var(--pill-green-fg)' : 'var(--border)',
+                            padding: '5px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                          }}
+                        >
+                          🛡 KYC {(Array.isArray((t as any).moduliConcessi) && (t as any).moduliConcessi.includes('kyc')) ? 'ON' : 'OFF'}
                         </button>
 
                         {/* Sospendi / Riattiva */}
