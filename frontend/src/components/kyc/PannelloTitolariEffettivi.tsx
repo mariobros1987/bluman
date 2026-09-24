@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { fetchTitolareEffettivo, aggiungiTitolareEffettivo, type TitolareEffettivoRiga, type CatenaCalcolata } from '../../api/kyc';
+import { DocumentiSoggetto } from './DocumentiSoggetto';
 
 /**
  * K2 — pannello titolari effettivi + catena di controllo, dentro la scheda «Compliance KYC» del
@@ -63,6 +64,13 @@ export function PannelloTitolariEffettivi({ fascicoloId, puoModificare }: { fasc
           ))}</tbody>
         </table>
       )}
+
+      {titolari.map((t) => (
+        <details key={`doc-${t.id}`} style={{ fontSize: 11 }}>
+          <summary style={{ cursor: 'pointer', color: 'var(--muted)' }}>📎 Documenti di {t.soggetto.denominazione}</summary>
+          <DocumentiSoggetto soggettoId={t.soggetto.id} puoModificare={puoModificare} />
+        </details>
+      ))}
 
       <div style={{ fontSize: 11, color: 'var(--muted)' }}>
         <strong>Catena di controllo</strong> — titolari effettivi ultimi ≥ {soglia}%:{' '}

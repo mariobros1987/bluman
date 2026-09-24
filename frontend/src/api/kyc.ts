@@ -133,3 +133,25 @@ export async function salvaRischio(fascicoloId: string, body: Record<string, unk
   return await res.json();
 }
 
+// K6 — documenti d'identità del soggetto (upload sicuro + hash).
+export interface DocumentoIdentitaRiga {
+  id: string; tipo: string; numero: string | null; emittente: string | null;
+  scadenza: string | null; urlStorage: string | null; hashSha256: string | null; createdAt: string;
+}
+
+export async function fetchDocumentiSoggetto(soggettoId: string): Promise<{ documenti: DocumentoIdentitaRiga[] }> {
+  const res = await apiFetch(`${API_BASE}/kyc/soggetto/${soggettoId}/documenti`, { headers: getAuthHeaders() });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore lettura documenti'));
+  return await res.json();
+}
+
+export async function caricaDocumentoSoggetto(soggettoId: string, body: {
+  tipo: string; filename: string; contentBase64: string; numero?: string; emittente?: string; scadenza?: string;
+}) {
+  const res = await apiFetch(`${API_BASE}/kyc/soggetto/${soggettoId}/documento`, {
+    method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore caricamento documento'));
+  return await res.json();
+}
+
