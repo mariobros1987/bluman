@@ -108,3 +108,28 @@ export async function aggiungiTitolareEffettivo(fascicoloId: string, body: {
   return await res.json();
 }
 
+// K3 — valutazione del rischio a 4 pilastri.
+export type LivelloRischio3 = 'basso' | 'medio' | 'alto';
+export interface RiskAssessmentRiga {
+  id: string; versione: number; livelloComplessivo: LivelloRischio3; prossimaRevisione: string | null;
+  clienteLivello: LivelloRischio3; clienteMotivazione: string | null;
+  geografiaLivello: LivelloRischio3; geografiaMotivazione: string | null;
+  prodottoLivello: LivelloRischio3; prodottoMotivazione: string | null;
+  canaleLivello: LivelloRischio3; canaleMotivazione: string | null;
+  motivazioneComplessiva: string | null; createdAt: string;
+}
+
+export async function fetchRischio(fascicoloId: string): Promise<{ corrente: RiskAssessmentRiga | null; storico: RiskAssessmentRiga[] }> {
+  const res = await apiFetch(`${API_BASE}/kyc/${fascicoloId}/rischio`, { headers: getAuthHeaders() });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore lettura valutazione rischio'));
+  return await res.json();
+}
+
+export async function salvaRischio(fascicoloId: string, body: Record<string, unknown>) {
+  const res = await apiFetch(`${API_BASE}/kyc/${fascicoloId}/rischio`, {
+    method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore salvataggio valutazione rischio'));
+  return await res.json();
+}
+

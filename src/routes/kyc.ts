@@ -8,6 +8,7 @@ import { transizioneKyc } from '../services/kycCaseService.js';
 import { registraComplianceEvent } from '../services/complianceEventLog.js';
 import { moduloKycAttivo } from '../util/guardiaModuli.js';
 import { calcolaTitolariEffettivi, scadenzaVariazioneTe } from '../domain/catenaControllo.js';
+import { livelloComplessivo, prossimaRevisione, type LivelloRischioK3 } from '../domain/calcoloRischio.js';
 import { recordAudit } from '../util/serverHelpers.js';
 
 // Soglia di default per la verifica rafforzata: €15.000 (D.Lgs. 231/2007, operazioni occasionali).
@@ -266,5 +267,49 @@ export async function registraRotteKyc(server: FastifyInstance): Promise<void> {
       : await prisma.depositoRegistroTe.create({ data: { tenantId, fascicoloId: id, ...dati } });
     await recordAudit({ tenantId, userId: req.userId, ruolo: req.ruolo, azione: 'KYC_DEPOSITO_TE', entita: `Fascicolo ${id}`, dettagli: `stato ${dati.stato}${scadenza ? `, scad ${scadenza.toISOString().slice(0, 10)}` : ''}`, ipAddress: req.ip });
     return reply.send({ ok: true, deposito });
+  });
+
+  // ── K3 — valutazione del rischio a 4 pilastri (spec §6) ─────────────────────────────
+  server.get<{ Params: { id: string } }>('/kyc/:id/rischio', async (req, reply) => {
+    if (vietatoAlCliente(req, reply)) return;
+    if (await moduloSpento(req, reply)) return;
+    const { id } = req.params; const tenantId = req.tenantId;
+    const fasc = await prisma.fascicoloKyc.findFirst({ where: { id, tenantId }, select: { id: true } });
+    if (!fasc) return reply.code(404).send({ errore: 'Fascicolo non trovato' });
+    const valutazioni = await prisma.riskAssessment.findMany({ where: { tenantId, fascicoloId: id }, orderBy: { versione: 'desc' } });
+    return reply.send({ corrente: valutazioni[0] ?? null, storico: valutazioni });
+  });
+
+  server.post<{ Params: { id: string }; Body: Record<string, any> }>('/kyc/:id/rischio', async (req, reply) => {
+    if (vietatoAlCliente(req, reply)) return;
+    if (await moduloSpento(req, reply)) return;
+    const { id } = req.params; const tenantId = req.tenantId; const b = req.body || {};
+    const fasc = await prisma.fascicoloKyc.findFirst({ where: { id, tenantId }, select: { id: true } });
+    if (!fasc) return reply.code(404).send({ errore: 'Fascicolo non trovato' });
+    const liv = (v: unknown): LivelloRischioK3 => (v === 'medio' || v === 'alto' ? v : 'basso');
+    const pilastri = { cliente: liv(b.clienteLivello), geografia: liv(b.geografiaLivello), prodotto: liv(b.prodottoLivello), canale: liv(b.canaleLivello) };
+    const complessivo = livelloComplessivo(pilastri);
+    const ultima = await prisma.riskAssessment.findFirst({ where: { tenantId, fascicoloId: id }, orderBy: { versione: 'desc' }, select: { versione: true } });
+    const ora = new Date();
+    const assessment = await prisma.riskAssessment.create({
+      data: {
+        tenantId, fascicoloId: id,
+        clienteLivello: pilastri.cliente, clienteMotivazione: b.clienteMotivazione || null,
+        geografiaLivello: pilastri.geografia, geografiaMotivazione: b.geografiaMotivazione || null,
+        prodottoLivello: pilastri.prodotto, prodottoMotivazione: b.prodottoMotivazione || null,
+        canaleLivello: pilastri.canale, canaleMotivazione: b.canaleMotivazione || null,
+        livelloComplessivo: complessivo, motivazioneComplessiva: b.motivazioneComplessiva || null,
+        versione: (ultima?.versione ?? 0) + 1, prossimaRevisione: prossimaRevisione(ora, complessivo),
+        attoreUserId: req.userId ?? null,
+      },
+    });
+    // Riflette il rischio sul fascicolo: rischio alto → verifica rafforzata (scelta del titolare, §8.3).
+    await prisma.fascicoloKyc.update({
+      where: { id },
+      data: { rischioCalcolato: complessivo, ...(complessivo === 'alto' ? { livelloVerifica: 'rafforzata' } : {}) },
+    });
+    await registraComplianceEvent(prisma, { tenantId, tipo: 'KYC_RISCHIO_VALUTATO', attoreUserId: req.userId ?? null, payload: { fascicoloId: id, complessivo, versione: assessment.versione } });
+    await recordAudit({ tenantId, userId: req.userId, ruolo: req.ruolo, azione: 'KYC_RISCHIO_VALUTATO', entita: `Fascicolo ${id}`, dettagli: `Rischio ${complessivo} (v${assessment.versione})`, ipAddress: req.ip });
+    return reply.send({ ok: true, assessment, complessivo });
   });
 }
