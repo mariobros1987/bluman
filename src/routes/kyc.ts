@@ -7,6 +7,7 @@ import { calcolaRischioKyc, calcolaScadenzaKyc, type LivelloVerificaKyc } from '
 import { transizioneKyc } from '../services/kycCaseService.js';
 import { registraComplianceEvent } from '../services/complianceEventLog.js';
 import { moduloKycAttivo } from '../util/guardiaModuli.js';
+import { calcolaTitolariEffettivi, scadenzaVariazioneTe } from '../domain/catenaControllo.js';
 import { recordAudit } from '../util/serverHelpers.js';
 
 // Soglia di default per la verifica rafforzata: €15.000 (D.Lgs. 231/2007, operazioni occasionali).
@@ -188,4 +189,82 @@ export async function registraRotteKyc(server: FastifyInstance): Promise<void> {
       return reply.send({ ok: true });
     },
   );
+
+  // ── K2 — titolare effettivo, catena di controllo, deposito al registro ──────────────
+  server.get<{ Params: { id: string } }>('/kyc/:id/titolare-effettivo', async (req, reply) => {
+    if (vietatoAlCliente(req, reply)) return;
+    if (await moduloSpento(req, reply)) return;
+    const { id } = req.params; const tenantId = req.tenantId;
+    const fasc = await prisma.fascicoloKyc.findFirst({ where: { id, tenantId }, select: { id: true, soggettoId: true } });
+    if (!fasc) return reply.code(404).send({ errore: 'Fascicolo non trovato' });
+    const [titolari, legami, deposito, settings] = await Promise.all([
+      prisma.titolareEffettivo.findMany({ where: { tenantId, fascicoloId: id }, include: { soggetto: true } }),
+      prisma.legameControllo.findMany({ where: { tenantId, fascicoloId: id } }),
+      prisma.depositoRegistroTe.findFirst({ where: { tenantId, fascicoloId: id }, orderBy: { createdAt: 'desc' } }),
+      prisma.tenantComplianceSettings.findUnique({ where: { tenantId }, select: { sogliaTitolareEffettivo: true } }),
+    ]);
+    const soglia = settings?.sogliaTitolareEffettivo ?? 25;
+    const catena = fasc.soggettoId
+      ? calcolaTitolariEffettivi(legami.map((l) => ({ daId: l.daId, aId: l.aId, percentuale: l.percentuale == null ? null : Number(l.percentuale) })), fasc.soggettoId, soglia)
+      : [];
+    return reply.send({ titolari, legami, deposito, catena, soglia });
+  });
+
+  server.post<{ Params: { id: string }; Body: Record<string, any> }>('/kyc/:id/titolare-effettivo', async (req, reply) => {
+    if (vietatoAlCliente(req, reply)) return;
+    if (await moduloSpento(req, reply)) return;
+    const { id } = req.params; const tenantId = req.tenantId; const b = req.body || {};
+    if (!b.denominazione || String(b.denominazione).trim().length < 2) return reply.code(400).send({ errore: 'Denominazione del titolare effettivo obbligatoria.' });
+    const fasc = await prisma.fascicoloKyc.findFirst({ where: { id, tenantId }, select: { id: true } });
+    if (!fasc) return reply.code(404).send({ errore: 'Fascicolo non trovato' });
+    const soggetto = await prisma.soggettoKyc.create({
+      data: { tenantId, tipo: b.tipo === 'persona_giuridica' ? 'persona_giuridica' : 'persona_fisica', denominazione: String(b.denominazione).slice(0, 200), codiceFiscale: b.codiceFiscale || null, paeseResidenza: b.paeseResidenza || null },
+    });
+    const te = await prisma.titolareEffettivo.create({
+      data: { tenantId, fascicoloId: id, soggettoId: soggetto.id, criterio: ['proprieta', 'controllo', 'altro'].includes(b.criterio) ? b.criterio : 'proprieta', percentuale: b.percentuale != null && Number.isFinite(Number(b.percentuale)) ? Number(b.percentuale) : null, fonte: b.fonte === 'registro_camerale' ? 'registro_camerale' : 'autodichiarazione', note: b.note || null },
+      include: { soggetto: true },
+    });
+    await registraComplianceEvent(prisma, { tenantId, tipo: 'KYC_TE_AGGIUNTO', attoreUserId: req.userId ?? null, payload: { fascicoloId: id, soggettoId: soggetto.id, criterio: te.criterio } });
+    await recordAudit({ tenantId, userId: req.userId, ruolo: req.ruolo, azione: 'KYC_TE_AGGIUNTO', entita: `Fascicolo ${id}`, dettagli: `TE ${soggetto.denominazione} (${te.criterio})`, ipAddress: req.ip });
+    return reply.send({ ok: true, titolare: te });
+  });
+
+  // K2_ROUTES_PLACEHOLDER
+
+  server.post<{ Params: { id: string }; Body: { daId?: string; aId?: string; percentuale?: number; note?: string } }>('/kyc/:id/legame-controllo', async (req, reply) => {
+    if (vietatoAlCliente(req, reply)) return;
+    if (await moduloSpento(req, reply)) return;
+    const { id } = req.params; const tenantId = req.tenantId; const b = req.body || {};
+    if (!b.daId || !b.aId) return reply.code(400).send({ errore: 'daId e aId (soggetti) sono obbligatori.' });
+    const fasc = await prisma.fascicoloKyc.findFirst({ where: { id, tenantId }, select: { id: true } });
+    if (!fasc) return reply.code(404).send({ errore: 'Fascicolo non trovato' });
+    const legame = await prisma.legameControllo.create({
+      data: { tenantId, fascicoloId: id, daId: b.daId, aId: b.aId, percentuale: b.percentuale != null && Number.isFinite(Number(b.percentuale)) ? Number(b.percentuale) : null, note: b.note || null },
+    });
+    await recordAudit({ tenantId, userId: req.userId, ruolo: req.ruolo, azione: 'KYC_LEGAME_AGGIUNTO', entita: `Fascicolo ${id}`, dettagli: `${b.daId} → ${b.aId}`, ipAddress: req.ip });
+    return reply.send({ ok: true, legame });
+  });
+
+  server.put<{ Params: { id: string }; Body: Record<string, any> }>('/kyc/:id/deposito-registro', async (req, reply) => {
+    if (vietatoAlCliente(req, reply)) return;
+    if (await moduloSpento(req, reply)) return;
+    const { id } = req.params; const tenantId = req.tenantId; const b = req.body || {};
+    const fasc = await prisma.fascicoloKyc.findFirst({ where: { id, tenantId }, select: { id: true } });
+    if (!fasc) return reply.code(404).send({ errore: 'Fascicolo non trovato' });
+    // §5.2 — se lo studio segnala una variazione, la scadenza del deposito è a 14 giorni.
+    const scadenza = b.dataVariazione ? scadenzaVariazioneTe(new Date(b.dataVariazione)) : (b.scadenza ? new Date(b.scadenza) : null);
+    const dati = {
+      stato: ['da_depositare', 'depositato', 'in_ritardo'].includes(b.stato) ? b.stato : 'da_depositare',
+      dataDeposito: b.dataDeposito ? new Date(b.dataDeposito) : null,
+      scadenza,
+      riferimento: b.riferimento || null,
+      note: b.note || null,
+    };
+    const esistente = await prisma.depositoRegistroTe.findFirst({ where: { tenantId, fascicoloId: id }, orderBy: { createdAt: 'desc' }, select: { id: true } });
+    const deposito = esistente
+      ? await prisma.depositoRegistroTe.update({ where: { id: esistente.id }, data: dati })
+      : await prisma.depositoRegistroTe.create({ data: { tenantId, fascicoloId: id, ...dati } });
+    await recordAudit({ tenantId, userId: req.userId, ruolo: req.ruolo, azione: 'KYC_DEPOSITO_TE', entita: `Fascicolo ${id}`, dettagli: `stato ${dati.stato}${scadenza ? `, scad ${scadenza.toISOString().slice(0, 10)}` : ''}`, ipAddress: req.ip });
+    return reply.send({ ok: true, deposito });
+  });
 }

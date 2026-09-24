@@ -51,6 +51,10 @@ export async function registraRotteCompliance(server: FastifyInstance): Promise<
     if (b.reportingChannel !== undefined) dati.reportingChannel = String(b.reportingChannel || 'goAML').slice(0, 40);
     if (b.screeningProvider !== undefined) dati.screeningProvider = String(b.screeningProvider || 'MANUALE').slice(0, 60);
     if (b.featureFlags !== undefined && b.featureFlags && typeof b.featureFlags === 'object') dati.featureFlags = b.featureFlags;
+    // K2 — configurazione titolare effettivo (regole per configurazione, §3.2).
+    if (b.sogliaTitolareEffettivo !== undefined) dati.sogliaTitolareEffettivo = Number.isFinite(Number(b.sogliaTitolareEffettivo)) ? Math.max(0, Math.min(100, Math.round(Number(b.sogliaTitolareEffettivo)))) : 25;
+    if (b.allarmeVariazioniTe !== undefined) dati.allarmeVariazioniTe = Boolean(b.allarmeVariazioniTe);
+    if (b.gestioneRegistroTe !== undefined) dati.gestioneRegistroTe = Boolean(b.gestioneRegistroTe);
 
     // L'MLRO, se indicato, deve essere un utente dello studio (ruolo interno, non delegabile a terzi).
     if (dati.mlroUserId) {
