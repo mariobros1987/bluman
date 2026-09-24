@@ -577,3 +577,24 @@ Suite end-to-end dei tre flussi critici (login con cambio password, firma SES da
    - Il DB Supabase contiene i dati reali dello studio e dei clienti (o, in fase di collaudo, i dati di prova del titolare): `DELETE`, `TRUNCATE`, `DROP`, `db push --accept-data-loss` e reset di qualunque tipo vanno **proposti e approvati dal titolare prima dell'esecuzione**, sempre con un dry-run o un backup alle spalle.
    - Le prove e i reset automatizzati appartengono all'ambiente E2E (regola 10): se serve cancellare qualcosa su Supabase, si chiede. La scrittura di codice e migrazioni **addittive** non richiede autorizzazione preventiva.
 
+---
+
+## 🛡 KYC/AML & Compliance (Malta, spec v0.2) — mappa del modulo
+
+Riferimento: `bluman-kyc-compliance-specifica-v0.2.md`. Principio guida (§3.2): le regole cambiano **per configurazione** (pacchetto giurisdizione + profilo + flag), non nel codice; i default incerti sono marcati `[da verificare]`, mai cablati. Realizzato e deployato: K0, K1, K4; K2 in corso.
+
+### Attivazione modulo per-studio (due livelli)
+`Tenant.moduliConcessi` (concessi dalla piattaforma/super_admin via PATCH `/admin/tenants/:id`) + `Tenant.moduliDisattivati` (spenti dall'admin dello studio, sezione «Moduli in standby» in Impostazioni). **Modulo attivo = concesso E non disattivato** — motore puro `src/util/moduliTenant.ts`, guardia rotte `src/util/guardiaModuli.ts` (`moduloKycAttivo`, fail-open sull'errore di lettura, come l'hook RBAC). Chiave: `kyc`. Le rotte `/kyc` e `/tenant/compliance-*` rispondono **403** se il modulo è spento. GET/PATCH `/tenant/moduli`. Frontend: gating delle schede + toggle studio; concessione super_admin in `SuperAdminPage`.
+
+### K0 — fondazione (`src/routes/compliance.ts`, `src/services/complianceService.ts`)
+`TenantComplianceSettings` (una riga per studio): pacchetto giurisdizione, profilo regolatorio, MLRO, retention, canale, screening + config TE (soglia, allarme 14gg, gestione registro). GET/PUT `/tenant/compliance-settings`. `ComplianceEvent` append-only a **catena hash** (`src/services/complianceEventLog.ts` `registraComplianceEvent` è il **punto unico** che aggiunge un anello; `verificaCatena` in `complianceService.ts`). GET `/tenant/compliance-events`. UI: Impostazioni → «Compliance & AML» (`components/settings/TabCompliance.tsx`).
+
+### K1 — pratica, soggetti, documenti
+`FascicoloKyc` **è** il KycCase della spec (nome italiano, coerente col repo) con macchina a stati v0.2 pura `src/domain/kycStateMachine.ts` (8 stati; `transizioneAmmessa`, `richiedeApprovazioneMlro` §8.3, `kycBloccaOperativita`). Service `src/services/kycCaseService.ts` (`transizioneKyc`: valida + storico + ComplianceEvent). Entità: `SoggettoKyc` (Party), `DocumentoIdentita`, `Rappresentanza`. Rotte `/clienti/:id/kyc` (GET/POST), `/kyc/:id/stato` (PATCH). UI: scheda cliente → «🛡 Compliance KYC» in `components/clients/AnagraficaErpModal.tsx` (pulsanti di transizione contestuali, mirror di `AZIONI_KYC`).
+
+### K2 — titolare effettivo, catena di controllo, registro (in corso)
+Entità: `TitolareEffettivo` (criterio/quota/fonte), `LegameControllo` (archi della catena di controllo `da`→`a`), `DepositoRegistroTe` (deposito al Malta Business Registry, scadenza 14gg). Config nelle impostazioni compliance: `sogliaTitolareEffettivo` (default 25% `[da verificare]`), `allarmeVariazioniTe`, `gestioneRegistroTe`.
+
+### K4 — gate operativo (§8.1)
+`src/services/kycGate.ts` (`operativitaBloccataDaKyc`, punto unico): niente fatturazione (`POST /invoices`) né avvio incarico (`POST /preventivi/:id/accetta`) senza KYC approvato → **409**. Onora lo **sblocco motivato dell'admin** `OverrideKyc` (`POST /kyc/:id/override`, motivazione ≥10, valido 30 giorni). Banner frontend `components/kyc/GateKycProgetto.tsx` nella scheda Fatturazione del progetto. Design: **KYC gestito sul cliente, consumato come gate sul progetto**.
+

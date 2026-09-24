@@ -1921,6 +1921,11 @@ model FascicoloKyc {
   storico     StoricoFascicoloKyc[]
   overrideLog OverrideKyc[]
 
+  // K2 — titolare effettivo, catena di controllo, deposito al registro.
+  titolariEffettivi  TitolareEffettivo[]
+  legamiControllo    LegameControllo[]
+  depositiRegistroTe DepositoRegistroTe[]
+
   @@index([tenantId, clienteId])
   @@index([tenantId, stato, dataScadenza])
   @@map("fascicolo_kyc")
@@ -2004,6 +2009,11 @@ model SoggettoKyc {
   rappresentanzeAttive  Rappresentanza[]    @relation("rappresentante")
   rappresentanzePassive Rappresentanza[]    @relation("rappresentato")
 
+  // K2 — questo soggetto come titolare effettivo, e come nodo (owner/owned) della catena di controllo.
+  titolaritaEffettive TitolareEffettivo[]
+  controlloDa         LegameControllo[]   @relation("controllo_da")
+  controlloA          LegameControllo[]   @relation("controllo_a")
+
   @@index([tenantId, clienteId])
   @@map("soggetto_kyc")
 }
@@ -2052,19 +2062,24 @@ model Rappresentanza {
 /// Impostazioni di compliance per tenant (una riga per studio). Finché regulatoryProfile o
 /// mlroUserId mancano, il tenant è in «modalità bozza» e nessun incarico passa in esecuzione.
 model TenantComplianceSettings {
-  id                   String   @id @default(uuid())
-  tenantId             String   @unique @map("tenant_id")
-  jurisdictionPack     String   @default("MT") @map("jurisdiction_pack") // MT | IT
-  regulatoryProfile    String?  @map("regulatory_profile") // CSP_MFSA | ALTRO_SOGGETTO_OBBLIGATO | null
-  otherSubjectCategory String?  @map("other_subject_category")
-  retentionYears       Int      @default(5) @map("retention_years")
-  mlroUserId           String?  @map("mlro_user_id")
-  reportingChannel     String   @default("goAML") @map("reporting_channel")
-  screeningProvider    String   @default("MANUALE") @map("screening_provider")
-  featureFlags         Json?    @map("feature_flags")
-  versione             Int      @default(1)
-  createdAt            DateTime @default(now()) @map("created_at")
-  updatedAt            DateTime @updatedAt @map("updated_at")
+  id                      String   @id @default(uuid())
+  tenantId                String   @unique @map("tenant_id")
+  jurisdictionPack        String   @default("MT") @map("jurisdiction_pack") // MT | IT
+  regulatoryProfile       String?  @map("regulatory_profile") // CSP_MFSA | ALTRO_SOGGETTO_OBBLIGATO | null
+  otherSubjectCategory    String?  @map("other_subject_category")
+  retentionYears          Int      @default(5) @map("retention_years")
+  mlroUserId              String?  @map("mlro_user_id")
+  reportingChannel        String   @default("goAML") @map("reporting_channel")
+  screeningProvider       String   @default("MANUALE") @map("screening_provider")
+  featureFlags            Json?    @map("feature_flags")
+  // K2 — configurazione titolare effettivo (regole per configurazione, spec §3.2). Default marcati
+  // [da verificare] rispetto alle Implementing Procedures maltesi finché il titolare non li conferma.
+  sogliaTitolareEffettivo Int      @default(25) @map("soglia_titolare_effettivo") // % titolarità effettiva
+  allarmeVariazioniTe     Boolean  @default(false) @map("allarme_variazioni_te") // caso+scadenza 14gg sulle variazioni
+  gestioneRegistroTe      Boolean  @default(false) @map("gestione_registro_te") // lo studio coordina i depositi al registro TE
+  versione                Int      @default(1)
+  createdAt               DateTime @default(now()) @map("created_at")
+  updatedAt               DateTime @updatedAt @map("updated_at")
 
   @@map("tenant_compliance_settings")
 }
@@ -2083,4 +2098,68 @@ model ComplianceEvent {
 
   @@index([tenantId, createdAt])
   @@map("compliance_event")
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// KYC/AML Fase K2 (Malta, spec §7) — titolare effettivo, catena di controllo, deposito al registro.
+// ═══════════════════════════════════════════════════════════════════
+
+/// Titolare effettivo del cliente individuato in una pratica: chi è (SoggettoKyc), con quale
+/// criterio, quota e fonte. Più TE per fascicolo.
+model TitolareEffettivo {
+  id           String       @id @default(uuid())
+  tenantId     String       @map("tenant_id")
+  fascicoloId  String       @map("fascicolo_id")
+  fascicolo    FascicoloKyc @relation(fields: [fascicoloId], references: [id], onDelete: Cascade)
+  soggettoId   String       @map("soggetto_id")
+  soggetto     SoggettoKyc  @relation(fields: [soggettoId], references: [id], onDelete: Cascade)
+  criterio     String // proprieta | controllo | altro
+  percentuale  Decimal?
+  fonte        FonteUbo     @default(autodichiarazione)
+  dataVerifica DateTime?    @map("data_verifica")
+  note         String?
+  createdAt    DateTime     @default(now()) @map("created_at")
+
+  @@index([tenantId, fascicoloId])
+  @@map("titolare_effettivo")
+}
+
+/// Arco della catena di controllo: `da` possiede/controlla `a` per una quota. Ricostruisce chi
+/// controlla in cima quando ci sono holding/strutture intermedie.
+model LegameControllo {
+  id          String       @id @default(uuid())
+  tenantId    String       @map("tenant_id")
+  fascicoloId String       @map("fascicolo_id")
+  fascicolo   FascicoloKyc @relation(fields: [fascicoloId], references: [id], onDelete: Cascade)
+  daId        String       @map("da_soggetto_id")
+  da          SoggettoKyc  @relation("controllo_da", fields: [daId], references: [id], onDelete: Cascade)
+  aId         String       @map("a_soggetto_id")
+  a           SoggettoKyc  @relation("controllo_a", fields: [aId], references: [id], onDelete: Cascade)
+  percentuale Decimal?
+  note        String?
+  createdAt   DateTime     @default(now()) @map("created_at")
+
+  @@index([tenantId, fascicoloId])
+  @@map("legame_controllo")
+}
+
+// K2_DEPOSITO_PLACEHOLDER
+
+/// Stato della comunicazione al registro dei titolari effettivi (Malta Business Registry), con
+/// scadenza a 14 gg sulle variazioni. Acquisizione manuale (il registro non è ad accesso automatico).
+model DepositoRegistroTe {
+  id           String       @id @default(uuid())
+  tenantId     String       @map("tenant_id")
+  fascicoloId  String       @map("fascicolo_id")
+  fascicolo    FascicoloKyc @relation(fields: [fascicoloId], references: [id], onDelete: Cascade)
+  stato        String       @default("da_depositare") // da_depositare | depositato | in_ritardo
+  dataDeposito DateTime?    @map("data_deposito")
+  scadenza     DateTime?
+  riferimento  String?
+  note         String?
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+
+  @@index([tenantId, fascicoloId])
+  @@map("deposito_registro_te")
 }
