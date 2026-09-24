@@ -9,6 +9,7 @@ import {
   transizioneAmmessa,
   statoTerminale,
   richiedeApprovazioneMlro,
+  kycBloccaOperativita,
   type StatoKycV02,
 } from './kycStateMachine.js';
 
@@ -60,5 +61,20 @@ describe('richiedeApprovazioneMlro (§8.3)', () => {
     expect(richiedeApprovazioneMlro('approvato', 'medio')).toBe(false);
     expect(richiedeApprovazioneMlro('approvato', 'basso')).toBe(false);
     expect(richiedeApprovazioneMlro('respinto', 'alto')).toBe(false);
+  });
+});
+
+describe('kycBloccaOperativita (§8.1 gate K4)', () => {
+  it('nessun fascicolo → non blocca (dipendenza non ancora instaurata)', () => {
+    expect(kycBloccaOperativita(null)).toBe(false);
+  });
+  it('approvato e in_revisione consentono l’operatività', () => {
+    expect(kycBloccaOperativita('approvato')).toBe(false);
+    expect(kycBloccaOperativita('in_revisione')).toBe(false);
+  });
+  it('ogni altro stato blocca (incl. legacy scaduto → sospeso)', () => {
+    for (const s of ['bozza', 'in_raccolta', 'in_verifica', 'in_attesa_approvazione', 'respinto', 'sospeso', 'chiuso', 'scaduto']) {
+      expect(kycBloccaOperativita(s)).toBe(true);
+    }
   });
 });

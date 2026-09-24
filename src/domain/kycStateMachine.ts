@@ -78,3 +78,23 @@ export function normalizzaStatoLegacy(stato: string): StatoKycV02 | null {
   ];
   return (v02 as string[]).includes(stato) ? (stato as StatoKycV02) : null;
 }
+
+/**
+ * §8.1 (gate K4) — uno stato che consente l'operatività a valle (esecuzione dell'incarico,
+ * emissione fatture): la pratica è approvata, oppure approvata e in revisione periodica (resta
+ * valida durante la revisione). Ogni altro stato non consente.
+ */
+export function statoConsenteOperativita(stato: string): boolean {
+  const s = normalizzaStatoLegacy(stato);
+  return s === 'approvato' || s === 'in_revisione';
+}
+
+/**
+ * §8.1 — vero se il KYC BLOCCA l'operatività: un fascicolo ESISTE ma il suo stato non la consente.
+ * Nessun fascicolo (`null`) → nessuna dipendenza KYC ancora instaurata → non blocca (la policy più
+ * severa «ogni incarico esige KYC» resta una configurazione per una fase successiva).
+ */
+export function kycBloccaOperativita(statoFascicolo: string | null): boolean {
+  if (!statoFascicolo) return false;
+  return !statoConsenteOperativita(statoFascicolo);
+}

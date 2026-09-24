@@ -13,6 +13,8 @@ import {
   conContestoInTransazione,
   riprovaSuConflitto,
 } from '../util/prismaClient.js';
+import { moduloKycAttivo } from '../util/guardiaModuli.js';
+import { kycBloccaOperativita } from '../domain/kycStateMachine.js';
 import {
   calcolaTotaliFattura,
   generaPianoScadenze,
@@ -61,6 +63,20 @@ export async function registraRotteContabilitaFatture(server: FastifyInstance, a
         where: { id: body.clienteId, tenantId },
       });
       if (!cliente) return reply.code(404).send({ errore: 'Cliente non trovato' });
+
+      // K4 — gate KYC (§8.1): con il modulo Compliance attivo, una FATTURA (non una nota di credito,
+      // che serve a rettificare) è bloccata se il cliente ha una pratica KYC che non consente
+      // l'operatività (esiste e non è approvata/in revisione). Fail-open sul solo errore di lettura.
+      if (body.tipoDocumento !== 'nota_credito' && (await moduloKycAttivo(tenantId))) {
+        const fascicolo = await prisma.fascicoloKyc
+          .findFirst({ where: { tenantId, clienteId: cliente.id }, orderBy: { createdAt: 'desc' }, select: { stato: true } })
+          .catch(() => null);
+        if (fascicolo && kycBloccaOperativita(fascicolo.stato)) {
+          return reply.code(409).send({
+            errore: `Fatturazione bloccata dal KYC: la pratica del cliente è in stato «${fascicolo.stato}», non approvata. Approva la pratica KYC (scheda cliente → Compliance KYC) prima di emettere la fattura.`,
+          });
+        }
+      }
 
       // Calcolo fiscale completo con OpenSTAManager Engine
       const opzioni: OpzioniCalcoloFattura = {
