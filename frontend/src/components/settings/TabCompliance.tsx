@@ -46,6 +46,10 @@ export function TabCompliance({ ruolo }: TabComplianceProps) {
   const [mlroUserId, setMlroUserId] = useState('');
   const [reportingChannel, setReportingChannel] = useState('goAML');
   const [screeningProvider, setScreeningProvider] = useState('MANUALE');
+  // K2 — config titolare effettivo
+  const [sogliaTe, setSogliaTe] = useState(25);
+  const [allarmeTe, setAllarmeTe] = useState(false);
+  const [gestioneRegistroTe, setGestioneRegistroTe] = useState(false);
 
   const applica = (s: ComplianceSettings) => {
     setSettings(s);
@@ -56,6 +60,9 @@ export function TabCompliance({ ruolo }: TabComplianceProps) {
     setMlroUserId(s.mlroUserId || '');
     setReportingChannel(s.reportingChannel || 'goAML');
     setScreeningProvider(s.screeningProvider || 'MANUALE');
+    setSogliaTe(s.sogliaTitolareEffettivo ?? 25);
+    setAllarmeTe(!!s.allarmeVariazioniTe);
+    setGestioneRegistroTe(!!s.gestioneRegistroTe);
   };
 
   const caricaEventi = () => {
@@ -86,6 +93,9 @@ export function TabCompliance({ ruolo }: TabComplianceProps) {
         mlroUserId: mlroUserId || null,
         reportingChannel,
         screeningProvider,
+        sogliaTitolareEffettivo: sogliaTe,
+        allarmeVariazioniTe: allarmeTe,
+        gestioneRegistroTe,
       });
       applica(r.settings);
       setModalitaBozza(r.modalitaBozza);
@@ -195,6 +205,24 @@ export function TabCompliance({ ruolo }: TabComplianceProps) {
           <div>
             <label style={sLabel} htmlFor="cmp-screening">Provider di screening</label>
             <input id="cmp-screening" type="text" value={screeningProvider} disabled={!puoScrivere} maxLength={60} onChange={e => setScreeningProvider(e.target.value)} style={sInput} placeholder="MANUALE" />
+          </div>
+
+          <div>
+            <label style={sLabel} htmlFor="cmp-soglia-te">Soglia titolare effettivo (%)</label>
+            <input id="cmp-soglia-te" type="number" min={0} max={100} value={sogliaTe} disabled={!puoScrivere} onChange={e => setSogliaTe(Number(e.target.value))} style={sInput} />
+            <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>Default 25% (Malta) — da verificare con le Implementing Procedures.</div>
+          </div>
+
+          <div>
+            <label style={sLabel}>Registro titolari effettivi</label>
+            <label htmlFor="cmp-allarme-te" style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, cursor: puoScrivere ? 'pointer' : 'default' }}>
+              <input id="cmp-allarme-te" type="checkbox" checked={allarmeTe} disabled={!puoScrivere} onChange={e => setAllarmeTe(e.target.checked)} />
+              Allarme variazioni a 14 giorni
+            </label>
+            <label htmlFor="cmp-gest-reg" style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, marginTop: 6, cursor: puoScrivere ? 'pointer' : 'default' }}>
+              <input id="cmp-gest-reg" type="checkbox" checked={gestioneRegistroTe} disabled={!puoScrivere} onChange={e => setGestioneRegistroTe(e.target.checked)} />
+              Lo studio coordina i depositi al registro
+            </label>
           </div>
         </div>
 

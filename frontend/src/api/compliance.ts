@@ -14,6 +14,10 @@ export interface ComplianceSettings {
   reportingChannel: string;
   screeningProvider: string;
   featureFlags: Record<string, unknown> | null;
+  // K2 — configurazione titolare effettivo
+  sogliaTitolareEffettivo: number;
+  allarmeVariazioniTe: boolean;
+  gestioneRegistroTe: boolean;
   versione: number;
   createdAt: string;
   updatedAt: string;
@@ -46,7 +50,7 @@ export async function fetchComplianceSettings(): Promise<{ settings: ComplianceS
 /** Aggiorna le impostazioni (solo advisor/super_admin) e appende un evento alla catena hash. */
 export async function salvaComplianceSettings(
   body: Partial<Pick<ComplianceSettings,
-    'jurisdictionPack' | 'regulatoryProfile' | 'otherSubjectCategory' | 'retentionYears' | 'mlroUserId' | 'reportingChannel' | 'screeningProvider'>>
+    'jurisdictionPack' | 'regulatoryProfile' | 'otherSubjectCategory' | 'retentionYears' | 'mlroUserId' | 'reportingChannel' | 'screeningProvider' | 'sogliaTitolareEffettivo' | 'allarmeVariazioniTe' | 'gestioneRegistroTe'>>
     & { featureFlags?: Record<string, unknown> },
 ): Promise<{ ok: boolean; settings: ComplianceSettings; modalitaBozza: boolean }> {
   const res = await apiFetch(`${API_BASE}/tenant/compliance-settings`, {
