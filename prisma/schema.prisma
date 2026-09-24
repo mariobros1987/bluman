@@ -1925,6 +1925,7 @@ model FascicoloKyc {
   titolariEffettivi  TitolareEffettivo[]
   legamiControllo    LegameControllo[]
   depositiRegistroTe DepositoRegistroTe[]
+  riskAssessments    RiskAssessment[]
 
   @@index([tenantId, clienteId])
   @@index([tenantId, stato, dataScadenza])
@@ -2162,4 +2163,35 @@ model DepositoRegistroTe {
 
   @@index([tenantId, fascicoloId])
   @@map("deposito_registro_te")
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// KYC/AML Fase K3 (Malta, spec §6) — valutazione del rischio a 4 pilastri.
+// NON un punteggio unico: cliente/geografia/prodotto/canale, ognuno con livello e motivazione.
+// Livello complessivo = «il più alto vince» (worst-case). Versionata, mai sovrascritta.
+// ═══════════════════════════════════════════════════════════════════
+model RiskAssessment {
+  id          String       @id @default(uuid())
+  tenantId    String       @map("tenant_id")
+  fascicoloId String       @map("fascicolo_id")
+  fascicolo   FascicoloKyc @relation(fields: [fascicoloId], references: [id], onDelete: Cascade)
+
+  clienteLivello       LivelloRischio @default(basso) @map("cliente_livello")
+  clienteMotivazione   String?        @map("cliente_motivazione")
+  geografiaLivello     LivelloRischio @default(basso) @map("geografia_livello")
+  geografiaMotivazione String?        @map("geografia_motivazione")
+  prodottoLivello      LivelloRischio @default(basso) @map("prodotto_livello")
+  prodottoMotivazione  String?        @map("prodotto_motivazione")
+  canaleLivello        LivelloRischio @default(basso) @map("canale_livello")
+  canaleMotivazione    String?        @map("canale_motivazione")
+
+  livelloComplessivo     LivelloRischio @default(basso) @map("livello_complessivo")
+  motivazioneComplessiva String?        @map("motivazione_complessiva")
+  versione               Int            @default(1)
+  prossimaRevisione      DateTime?      @map("prossima_revisione")
+  attoreUserId           String?        @map("attore_user_id")
+  createdAt              DateTime       @default(now()) @map("created_at")
+
+  @@index([tenantId, fascicoloId])
+  @@map("risk_assessment")
 }
