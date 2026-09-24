@@ -9,6 +9,8 @@ import { registraComplianceEvent } from '../services/complianceEventLog.js';
 import { moduloKycAttivo } from '../util/guardiaModuli.js';
 import { calcolaTitolariEffettivi, scadenzaVariazioneTe } from '../domain/catenaControllo.js';
 import { livelloComplessivo, prossimaRevisione, type LivelloRischioK3 } from '../domain/calcoloRischio.js';
+import { uploadDocumento, rifirmaUrlUpload } from '../services/storageService.js';
+import { createHash } from 'node:crypto';
 import { recordAudit } from '../util/serverHelpers.js';
 
 // Soglia di default per la verifica rafforzata: €15.000 (D.Lgs. 231/2007, operazioni occasionali).
@@ -311,5 +313,46 @@ export async function registraRotteKyc(server: FastifyInstance): Promise<void> {
     await registraComplianceEvent(prisma, { tenantId, tipo: 'KYC_RISCHIO_VALUTATO', attoreUserId: req.userId ?? null, payload: { fascicoloId: id, complessivo, versione: assessment.versione } });
     await recordAudit({ tenantId, userId: req.userId, ruolo: req.ruolo, azione: 'KYC_RISCHIO_VALUTATO', entita: `Fascicolo ${id}`, dettagli: `Rischio ${complessivo} (v${assessment.versione})`, ipAddress: req.ip });
     return reply.send({ ok: true, assessment, complessivo });
+  });
+
+  // ── K6 — documenti d'identità del soggetto KYC (upload sicuro, cifrato/firmato in storage) ──
+  server.get<{ Params: { soggettoId: string } }>('/kyc/soggetto/:soggettoId/documenti', async (req, reply) => {
+    if (vietatoAlCliente(req, reply)) return;
+    if (await moduloSpento(req, reply)) return;
+    const { soggettoId } = req.params; const tenantId = req.tenantId;
+    const sog = await prisma.soggettoKyc.findFirst({ where: { id: soggettoId, tenantId }, select: { id: true } });
+    if (!sog) return reply.code(404).send({ errore: 'Soggetto non trovato' });
+    const documenti = await prisma.documentoIdentita.findMany({ where: { tenantId, soggettoId }, orderBy: { createdAt: 'desc' } });
+    return reply.send({ documenti: documenti.map((d) => ({ ...d, urlStorage: rifirmaUrlUpload(d.urlStorage) })) });
+  });
+
+  server.post<{ Params: { soggettoId: string }; Body: Record<string, any> }>('/kyc/soggetto/:soggettoId/documento', async (req, reply) => {
+    if (vietatoAlCliente(req, reply)) return;
+    if (await moduloSpento(req, reply)) return;
+    const { soggettoId } = req.params; const tenantId = req.tenantId; const b = req.body || {};
+    const sog = await prisma.soggettoKyc.findFirst({ where: { id: soggettoId, tenantId }, select: { id: true } });
+    if (!sog) return reply.code(404).send({ errore: 'Soggetto non trovato' });
+    if (!b.contentBase64 || !b.filename) return reply.code(400).send({ errore: 'File (contentBase64) e nome file obbligatori.' });
+    let url: string;
+    try {
+      const res = await uploadDocumento(String(b.filename), String(b.contentBase64), tenantId);
+      if (!res.ok || !res.url) return reply.code(400).send({ errore: 'Upload non riuscito.' });
+      url = res.url;
+    } catch (e: any) {
+      return reply.code(400).send({ errore: e?.message || 'File non ammesso.' });
+    }
+    const hash = createHash('sha256').update(Buffer.from(String(b.contentBase64), 'base64')).digest('hex');
+    const doc = await prisma.documentoIdentita.create({
+      data: {
+        tenantId, soggettoId,
+        tipo: ['carta_identita', 'passaporto', 'permesso_soggiorno', 'altro'].includes(b.tipo) ? b.tipo : 'altro',
+        numero: b.numero || null, emittente: b.emittente || null,
+        scadenza: b.scadenza ? new Date(b.scadenza) : null,
+        urlStorage: url, hashSha256: hash, esitoVerifica: null,
+      },
+    });
+    await registraComplianceEvent(prisma, { tenantId, tipo: 'KYC_DOCUMENTO_CARICATO', attoreUserId: req.userId ?? null, payload: { soggettoId, tipo: doc.tipo, hash } });
+    await recordAudit({ tenantId, userId: req.userId, ruolo: req.ruolo, azione: 'KYC_DOCUMENTO_CARICATO', entita: `Soggetto ${soggettoId}`, dettagli: `Documento ${doc.tipo}`, ipAddress: req.ip });
+    return reply.send({ ok: true, documento: { ...doc, urlStorage: rifirmaUrlUpload(doc.urlStorage) } });
   });
 }
