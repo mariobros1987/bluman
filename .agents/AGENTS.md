@@ -577,6 +577,26 @@ Suite end-to-end dei tre flussi critici (login con cambio password, firma SES da
    - Il DB Supabase contiene i dati reali dello studio e dei clienti (o, in fase di collaudo, i dati di prova del titolare): `DELETE`, `TRUNCATE`, `DROP`, `db push --accept-data-loss` e reset di qualunque tipo vanno **proposti e approvati dal titolare prima dell'esecuzione**, sempre con un dry-run o un backup alle spalle.
    - Le prove e i reset automatizzati appartengono all'ambiente E2E (regola 10): se serve cancellare qualcosa su Supabase, si chiede. La scrittura di codice e migrazioni **addittive** non richiede autorizzazione preventiva.
 
+12. **Ogni Scelta, Calcolo o Blocco Automatico è Spiegabile in una Frase**:
+    - Se il sistema calcola uno stato, un punteggio o blocca un flusso operativo (es. Valutazione rischio KYC/AML a 4 pilastri, scadenze automatiche, interessi di mora D.Lgs. 231/2002, gate operativo su preventivo o fattura, operatore suggerito), il motivo DEVE essere sempre esplicitato all'utente in modo chiaro (tooltip, nota o banner esplicativo).
+    - Mai punteggi opachi o "scatole nere": l'operatore deve sempre poter leggere *perché* un cliente è ad alto rischio o *perché* una funzione è bloccata.
+
+13. **Gestione Rigorosa degli Stati Limite (Empty, Loading, Error, Offline) & Nessun Vicolo Cieco**:
+    - Ogni schermata, tabella o componente deve gestire esplicitamente gli stati vuoti (`empty`), di caricamento (`loading`) e di errore (`error`).
+    - **Nessun vicolo cieco**: uno stato vuoto o un errore non deve mai lasciare l'utente bloccato davanti a una pagina morta; deve sempre offrire una via d'uscita o un'azione costruttiva (es. pulsante *"Crea primo cliente"*, *"Riprova connessione"*, *"Scarica XML per invio manuale"*).
+    - **Progressione narrata nelle attese lunghe**: per le operazioni asincrone complesse (es. export fascicolo ZIP, calcolo LIPE, backfill KYC, emissione SDI), mostrare all'utente le fasi dell'avanzamento reale invece di uno spinner generico muto.
+
+14. **L'Utente Guida, il Sistema Propone (Supervisione Umana Inviolabile)**:
+    - Nel contesto fiduciario, fiscale e legale (corporate structuring, tax planning, antiriciclaggio KYC/AML, fatturazione SDI), il software assiste, calcola e propone, ma NON compie atti vincolanti all'insaputa dell'operatore.
+    - L'approvazione finale, l'invio formale, la firma e gli override motivati spettano sempre all'advisor/operatore umano, tracciati in modo immutabile su `AuditLog` e `ComplianceEvent`.
+
+15. **Design System a Token & Zero Stili Improvvisati**:
+    - Palette, tipografia, scala di spaziatura, raggi e ombre devono provenire dai token condivisi e dai moduli CSS stabiliti. Nessun colore esadecimale o spaziatura inventati a occhio nel singolo componente.
+    - Un solo elemento focale / "momento wow" per schermata: le interfacce dello studio devono restare dense, pulite, leggibili e ad alte prestazioni senza rumore visivo.
+
+16. **Metodo Anti-Loop: Se è Rotto Due Volte, Cambia Approccio**:
+    - Non applicare toppe superficiali o workaround continui se una correzione fallisce due volte. Fermarsi, rintracciare la causa principale all'origine (schema DB, contratto API, ciclo di vita o routing) e adottare la soluzione strutturale pulita.
+
 ---
 
 ## 🛡 KYC/AML & Compliance (Malta, spec v0.2) — mappa del modulo
