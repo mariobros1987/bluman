@@ -9,6 +9,7 @@ import { registraComplianceEvent } from '../services/complianceEventLog.js';
 import { moduloKycAttivo } from '../util/guardiaModuli.js';
 import { calcolaTitolariEffettivi, scadenzaVariazioneTe } from '../domain/catenaControllo.js';
 import { livelloComplessivo, prossimaRevisione, type LivelloRischioK3 } from '../domain/calcoloRischio.js';
+import { screeningBloccaApprovazione, motivoBloccoScreening } from '../domain/screeningKyc.js';
 import { uploadDocumento, rifirmaUrlUpload } from '../services/storageService.js';
 import { createHash } from 'node:crypto';
 import { recordAudit } from '../util/serverHelpers.js';
@@ -140,15 +141,26 @@ export async function registraRotteKyc(server: FastifyInstance): Promise<void> {
         approvatoIl: ora,
       };
 
+      // §8.4 — leggo gli screening solo quando si approva (come il gate MLRO legge le settings):
+      // un match non risolto blocca l'approvazione, con motivo esplicito (regola 12).
+      const screenings = stato === 'approvato'
+        ? await prisma.screeningKyc.findMany({
+            where: { fascicoloId: id, tenantId },
+            select: { tipo: true, esito: true, dataScreening: true, createdAt: true },
+          })
+        : [];
+      const screeningBloccante = screeningBloccaApprovazione(screenings);
+
       const esito = await transizioneKyc(prisma, {
         tenantId, fascicoloId: id, nuovoStato: stato,
-        attoreUserId: req.userId, motivazione, puoApprovareRafforzata, campiApprovazione,
+        attoreUserId: req.userId, motivazione, puoApprovareRafforzata, screeningBloccante, campiApprovazione,
       });
 
       if (esito.esito === 'non_trovato') return reply.code(404).send({ errore: 'Fascicolo non trovato' });
       if (esito.esito === 'stato_ignoto') return reply.code(400).send({ errore: `Stato non riconosciuto: ${esito.valore}` });
       if (esito.esito === 'transizione_non_valida') return reply.code(409).send({ errore: `Transizione non ammessa: ${esito.da} → ${esito.a}` });
       if (esito.esito === 'serve_mlro') return reply.code(403).send({ errore: 'Approvazione di una pratica ad alto rischio riservata all’MLRO o a un ruolo superiore.' });
+      if (esito.esito === 'screening_bloccante') return reply.code(409).send({ errore: motivoBloccoScreening(screenings) });
 
       await recordAudit({
         tenantId, userId: req.userId, ruolo: req.ruolo, azione: 'KYC_STATO_AGGIORNATO',

@@ -35,7 +35,8 @@ export type EsitoTransizione =
   | { esito: 'non_trovato' }
   | { esito: 'stato_ignoto'; valore: string }
   | { esito: 'transizione_non_valida'; da: StatoKycV02; a: StatoKycV02 }
-  | { esito: 'serve_mlro' };
+  | { esito: 'serve_mlro' }
+  | { esito: 'screening_bloccante' };
 
 export async function transizioneKyc(
   store: KycStore,
@@ -47,6 +48,8 @@ export async function transizioneKyc(
     motivazione?: string | null;
     /** La rotta lo calcola: ruolo advisor/super_admin OPPURE utente === MLRO del tenant. */
     puoApprovareRafforzata: boolean;
+    /** §8.4 — la rotta lo calcola dagli screening: un match non risolto blocca l'approvazione. */
+    screeningBloccante?: boolean;
     /** Campi di approvazione (data verifica/scadenza) calcolati dalla rotta quando si approva. */
     campiApprovazione?: Record<string, unknown>;
   },
@@ -64,6 +67,10 @@ export async function transizioneKyc(
   if (!transizioneAmmessa(da, a)) return { esito: 'transizione_non_valida', da, a };
   if (richiedeApprovazioneMlro(a, fascicolo.rischioCalcolato) && !input.puoApprovareRafforzata) {
     return { esito: 'serve_mlro' };
+  }
+  // §8.4 — non si approva una pratica con uno screening (sanzioni/PEP/media) a match non risolto.
+  if (a === 'approvato' && input.screeningBloccante) {
+    return { esito: 'screening_bloccante' };
   }
 
   const aggiornato = await store.fascicoloKyc.update({
