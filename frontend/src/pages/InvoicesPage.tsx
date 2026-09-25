@@ -425,14 +425,12 @@ export function InvoicesPage() {
           <button
             onClick={() => navigate('/fornitori')}
             className="btn btn-secondary"
-            style={{ display: 'flex', alignItems: 'center', gap: 6 }}
           >
             🏢 Fatture Passive & Fornitori ↗
           </button>
           <button
             onClick={() => navigate('/liquidazione-iva')}
             className="btn btn-secondary"
-            style={{ display: 'flex', alignItems: 'center', gap: 6 }}
           >
             📑 Liquidazione IVA ↗
           </button>
@@ -469,18 +467,7 @@ export function InvoicesPage() {
               document.body.removeChild(link);
               URL.revokeObjectURL(url);
             }}
-            style={{
-              padding: '10px 16px',
-              borderRadius: 8,
-              border: '1px solid var(--pill-blue-bd)',
-              background: 'var(--pill-blue-bg)',
-              color: 'var(--pill-blue-fg)',
-              fontWeight: 700,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-            }}
+            className="btn btn-secondary"
           >
             📊 Export Commercialista (CSV / Excel)
           </button>
@@ -489,25 +476,13 @@ export function InvoicesPage() {
             type="button"
             className="btn btn-primary"
             onClick={() => setShowExportFascicoloZipModal(true)}
-            style={{ padding: '10px 18px', fontWeight: 700 }}
           >
             📦 Esporta Fascicolo Commercialista (ZIP)
           </button>
 
           <button
             onClick={() => setShowCreateModal(true)}
-            style={{
-              padding: '10px 18px',
-              borderRadius: 8,
-              border: 'none',
-              background: 'var(--primary)',
-              color: '#fff',
-              fontWeight: 700,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-            }}
+            className="btn btn-primary"
           >
             + Nuova Fattura / Bozza
           </button>
@@ -630,7 +605,7 @@ export function InvoicesPage() {
                           {/* Scarica PDF */}
                           <button
                             onClick={() => downloadFatturaPdfServerApi(inv.id, inv.numero)}
-                            style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg)', cursor: 'pointer', fontSize: 12 }}
+                            className="btn btn-secondary btn-sm"
                             title="Scarica PDF Ufficiale"
                           >
                             📄 PDF
@@ -639,7 +614,7 @@ export function InvoicesPage() {
                           {/* Scarica XML SDI */}
                           <button
                             onClick={() => downloadFatturaXmlApi(inv.id, inv.numero)}
-                            style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid var(--pill-blue-bd)', background: 'var(--pill-blue-bg)', color: 'var(--pill-blue-fg)', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
+                            className="btn btn-secondary btn-sm"
                             title="Scarica tracciato XML FatturaPA 1.2 conforme"
                           >
                             📦 XML SDI
@@ -651,7 +626,7 @@ export function InvoicesPage() {
                               const dest = prompt('Inserisci email destinatario:', inv.cliente?.email || '');
                               if (dest) inviaFatturaEmailApi(inv.id, dest);
                             }}
-                            style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg)', cursor: 'pointer', fontSize: 12 }}
+                            className="btn btn-secondary btn-sm"
                             title="Invia PDF per Email"
                           >
                             ✉️ Email
@@ -661,7 +636,7 @@ export function InvoicesPage() {
                           {inv.progettoId && (
                             <button
                               onClick={() => navigate(`/documents?projId=${inv.progettoId}&tmplId=tmpl-avviso-parcella`)}
-                              style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg)', cursor: 'pointer', fontSize: 12 }}
+                              className="btn btn-secondary btn-sm"
                               title="Apri modello Avviso di Parcella / Proforma in Document Studio per questo progetto"
                             >
                               📝 Proforma
@@ -673,14 +648,14 @@ export function InvoicesPage() {
                             <>
                               <button
                                 onClick={() => handleEmettiDefinitivo(inv)}
-                                style={{ padding: '4px 8px', borderRadius: 6, border: 'none', background: 'var(--green)', color: 'white', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}
+                                className="btn btn-success btn-sm"
                                 title="Emetti definitivamente e genera scadenze"
                               >
                                 🚀 Emetti
                               </button>
                               <button
                                 onClick={() => handleEliminaBozza(inv.id)}
-                                style={{ padding: '4px 8px', borderRadius: 6, border: 'none', background: 'var(--pill-red-bg)', color: 'var(--pill-red-fg)', cursor: 'pointer', fontSize: 12 }}
+                                className="btn btn-danger btn-sm"
                                 title="Elimina bozza"
                               >
                                 🗑️
@@ -700,7 +675,7 @@ export function InvoicesPage() {
                                     setImportoIncassoEur(((scadAperta.importoCentesimi || 0) / 100).toFixed(2));
                                     setShowIncassoModal(true);
                                   }}
-                                  style={{ padding: '4px 8px', borderRadius: 6, border: 'none', background: 'var(--green)', color: 'var(--on-accent)', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}
+                                  className="btn btn-success btn-sm"
                                   title="Registra incasso rata"
                                 >
                                   📥 Incasso
@@ -708,7 +683,7 @@ export function InvoicesPage() {
                               )}
                               <button
                                 onClick={() => apriModaleNc(inv)}
-                                style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid var(--red)', background: 'var(--pill-red-bg)', color: 'var(--pill-red-fg)', cursor: 'pointer', fontSize: 12 }}
+                                className="btn btn-danger btn-sm"
                                 title="Emetti Nota di Credito TD04"
                               >
                                 🔄 NC
@@ -748,7 +723,7 @@ export function InvoicesPage() {
           <div style={{ background: 'var(--card)', borderRadius: 16, padding: '2rem', width: '100%', maxWidth: 900, maxHeight: '90vh', overflowY: 'auto', border: '1px solid var(--border)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
               <h3 id="nuova-fattura-titolo" style={{ margin: 0 }}>Nuova Fattura Professionale / Bozza</h3>
-              <button onClick={richiediChiusura} aria-label="Chiudi" style={{ background: 'transparent', border: 'none', color: 'var(--muted)', fontSize: 20, cursor: 'pointer' }}>✕</button>
+              <button onClick={richiediChiusura} aria-label="Chiudi" className="btn-close">✕</button>
             </div>
 
             {/* SELEZIONE CLIENTE & PROGETTO */}
@@ -795,14 +770,14 @@ export function InvoicesPage() {
                 <button
                   type="button"
                   onClick={handleImportDaProgetto}
-                  style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid var(--primary)', background: 'var(--pill-blue-bg)', color: 'var(--pill-blue-fg)', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+                  className="btn btn-secondary btn-sm"
                 >
                   📥 Importa Moduli Progetto
                 </button>
                 <button
                   type="button"
                   onClick={handleImportDaTimesheet}
-                  style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid var(--primary)', background: 'var(--pill-blue-bg)', color: 'var(--pill-blue-fg)', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+                  className="btn btn-secondary btn-sm"
                 >
                   ⏱️ Importa Ore Timesheet
                 </button>
@@ -816,7 +791,7 @@ export function InvoicesPage() {
                 <button
                   type="button"
                   onClick={handleAggiungiRiga}
-                  style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', fontSize: 12, cursor: 'pointer' }}
+                  className="btn btn-secondary btn-sm"
                 >
                   + Aggiungi Riga
                 </button>
@@ -1032,7 +1007,7 @@ export function InvoicesPage() {
               <button
                 type="button"
                 onClick={richiediChiusura}
-                style={{ padding: '10px 18px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)', cursor: 'pointer' }}
+                className="btn btn-secondary"
               >
                 Annulla
               </button>
@@ -1040,7 +1015,7 @@ export function InvoicesPage() {
                 type="button"
                 disabled={submitting}
                 onClick={() => handleSalvaFattura(false)}
-                style={{ padding: '10px 18px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--card)', color: 'var(--text)', fontWeight: 600, cursor: 'pointer' }}
+                className="btn btn-secondary"
               >
                 💾 Salva Bozza
               </button>
@@ -1048,7 +1023,7 @@ export function InvoicesPage() {
                 type="button"
                 disabled={submitting}
                 onClick={() => handleSalvaFattura(true)}
-                style={{ padding: '10px 20px', borderRadius: 8, border: 'none', background: 'var(--primary)', color: 'white', fontWeight: 700, cursor: 'pointer' }}
+                className="btn btn-primary"
               >
                 🚀 Emetti Definitivamente
               </button>
@@ -1125,14 +1100,14 @@ export function InvoicesPage() {
                 <button
                   type="button"
                   onClick={richiediChiusura}
-                  style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)', cursor: 'pointer' }}
+                  className="btn btn-secondary"
                 >
                   Annulla
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  style={{ padding: '8px 18px', borderRadius: 8, border: 'none', background: 'var(--green)', color: 'white', fontWeight: 700, cursor: 'pointer' }}
+                  className="btn btn-success"
                 >
                   {submitting ? 'Registrazione...' : 'Conferma Incasso & Scrivi in Prima Nota'}
                 </button>
@@ -1223,14 +1198,14 @@ export function InvoicesPage() {
                 <button
                   type="button"
                   onClick={richiediChiusura}
-                  style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)', cursor: 'pointer' }}
+                  className="btn btn-secondary"
                 >
                   Annulla
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  style={{ padding: '8px 18px', borderRadius: 8, border: 'none', background: 'var(--red)', color: 'white', fontWeight: 700, cursor: 'pointer' }}
+                  className="btn btn-danger"
                 >
                   {submitting ? 'Emissione...' : 'Emetti Nota di Credito Ufficiale'}
                 </button>
