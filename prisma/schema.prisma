@@ -1927,6 +1927,7 @@ model FascicoloKyc {
   depositiRegistroTe DepositoRegistroTe[]
   riskAssessments    RiskAssessment[]
   screenings         ScreeningKyc[]
+  anomalie           AnomaliaKyc[]
 
   @@index([tenantId, clienteId])
   @@index([tenantId, stato, dataScadenza])
@@ -2239,4 +2240,68 @@ model ScreeningKyc {
 
   @@index([tenantId, fascicoloId])
   @@map("screening_kyc")
+}
+
+enum TipoAnomaliaKyc {
+  match_sanzioni
+  match_pep
+  operazione_sospetta
+  documento_incongruente
+  rischio_elevato
+  altro
+}
+
+enum StatoAnomaliaKyc {
+  aperta
+  in_valutazione
+  chiusa_nessuna_azione
+  monitoraggio_rafforzato
+  segnalata_fiau
+  rapporto_chiuso
+}
+
+enum DecisioneMlro {
+  nessuna_azione
+  monitoraggio_rafforzato
+  segnalazione_fiau
+  chiusura_rapporto
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// KYC/AML Fase K8a (Malta, spec §5.3) — anomalie / segnalazioni interne e decisioni dell'MLRO.
+// L'anomalia è un candidato SAR interno; la decisione MLRO è append-only (MlroDecisionLog) e ogni
+// passo emette un ComplianceEvent. L'export goAML (K8b) è una fase successiva (serve l'XSD FIAU).
+// ═══════════════════════════════════════════════════════════════════
+model AnomaliaKyc {
+  id          String           @id @default(uuid())
+  tenantId    String           @map("tenant_id")
+  fascicoloId String           @map("fascicolo_id")
+  fascicolo   FascicoloKyc     @relation(fields: [fascicoloId], references: [id], onDelete: Cascade)
+  tipo        TipoAnomaliaKyc
+  descrizione String
+  stato       StatoAnomaliaKyc @default(aperta)
+  rilevataDa  String?          @map("rilevata_da")
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+
+  decisioni MlroDecisionLog[]
+
+  @@index([tenantId, fascicoloId])
+  @@map("anomalia_kyc")
+}
+
+/// Registro append-only delle decisioni dell'MLRO su un'anomalia (spec §5.3). Non si aggiorna né si
+/// cancella: ogni decisione è un anello, la più recente determina lo stato dell'anomalia.
+model MlroDecisionLog {
+  id          String        @id @default(uuid())
+  tenantId    String        @map("tenant_id")
+  anomaliaId  String        @map("anomalia_id")
+  anomalia    AnomaliaKyc   @relation(fields: [anomaliaId], references: [id], onDelete: Cascade)
+  decisione   DecisioneMlro
+  motivazione String
+  decisaDa    String?       @map("decisa_da")
+  createdAt   DateTime      @default(now()) @map("created_at")
+
+  @@index([tenantId, anomaliaId])
+  @@map("mlro_decision_log")
 }
