@@ -795,6 +795,12 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
               ) : (
                 <div style={{ fontSize: 12, color: 'var(--muted)' }}>Nessun fascicolo: il KYC è ancora solo un dato descrittivo. Calcolalo per aprire il processo governato.</div>
               )}
+              {kycFasc && (kycFasc.stato === 'approvato' || kycFasc.stato === 'in_revisione') && kycFasc.dataScadenza
+                && (new Date(kycFasc.dataScadenza).getTime() - Date.now()) / 86400000 <= 30 && (
+                <div style={{ marginTop: 8, padding: '6px 10px', borderRadius: 8, background: 'var(--pill-amber-bg)', border: '1px solid var(--pill-amber-bd)', color: 'var(--pill-amber-fg)', fontSize: 11, fontWeight: 600 }}>
+                  ⏰ Revisione KYC dovuta (scadenza {new Date(kycFasc.dataScadenza).toLocaleDateString('it-IT')}) — usa «In revisione» per riaprire la pratica (K7, spec §5.2).
+                </div>
+              )}
               <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
                 <button type="button" disabled={kycBusy} onClick={calcolaKyc} className="btn btn-sm btn-secondary">
                   {kycBusy ? '…' : (kycFasc ? '↻ Ricalcola / Rinnova' : '▶ Calcola KYC')}
