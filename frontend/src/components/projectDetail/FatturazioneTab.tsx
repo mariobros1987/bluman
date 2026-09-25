@@ -333,17 +333,7 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
           </div>
           <button
             onClick={handleOpenModal}
-            style={{
-              background: 'var(--green)',
-              color: 'var(--on-accent)',
-              border: 'none',
-              padding: '8px 16px',
-              borderRadius: 8,
-              fontSize: 12,
-              fontWeight: 700,
-              cursor: 'pointer',
-              boxShadow: '0 4px 12px rgba(5, 150, 105, 0.3)',
-            }}
+            className="btn btn-success"
           >
             ⚡ Fattura Microvoci ({vociDaFatturareCount})
           </button>
@@ -369,7 +359,7 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   <button
                     onClick={() => setPreviewFattura({ ...f, numero: `FT-2026-00${i + 1}` })}
-                    style={{ background: 'var(--surface-1)', border: '1px solid var(--card2)', color: 'var(--indigo-l)', padding: '4px 10px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+                    className="btn btn-secondary btn-sm"
                   >
                     🖨 Anteprima PDF / Stampa
                   </button>
@@ -390,19 +380,7 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
         </button>
         <button
           onClick={handleApriInDocumentStudio}
-          style={{
-            background: 'var(--card2)',
-            border: '1px solid var(--border)',
-            color: 'var(--text)',
-            borderRadius: 10,
-            padding: '10px 16px',
-            fontSize: 12,
-            fontWeight: 700,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-          }}
+          className="btn btn-secondary"
           title="Apri in Document Studio per redigere avviso proforma o rendiconto personalizzato"
         >
           📝 Redigi Proforma in Document Studio
@@ -497,7 +475,7 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
 
             {/* Footer Azioni Stampa */}
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 10, borderTop: '1px solid var(--border)', paddingTop: 14 }}>
-              <button onClick={() => setPreviewFattura(null)} style={{ background: 'var(--surface-1)', border: '1px solid var(--pill-slate-fg)', color: 'var(--muted)', padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+              <button onClick={() => setPreviewFattura(null)} className="btn btn-secondary">
                 Chiudi
               </button>
               <button
@@ -517,7 +495,7 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
                   }
                   await downloadFatturaPdfServerApi(idFattura, previewFattura.numero);
                 }}
-                style={{ background: 'var(--indigo-d)', color: '#fff', border: 'none', padding: '8px 20px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 12px rgba(67,56,202,.3)' }}
+                className="btn btn-primary"
               >
                 📥 Esporta Documento PDF Ufficiale (A4)
               </button>
@@ -545,7 +523,7 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
                 type="button"
                 onClick={richiediChiusura}
                 aria-label="Chiudi"
-                style={{ background: 'transparent', border: 'none', color: 'var(--muted)', fontSize: 18, cursor: 'pointer', padding: 4 }}
+                className="btn-close"
               >
                 ✕
               </button>
@@ -574,7 +552,7 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
                 <button
                   type="button"
                   onClick={selezionaSoloCompletate}
-                  style={{ background: 'var(--pill-green-bg)', border: '1px solid var(--pill-green-bd)', color: 'var(--pill-green-fg)', padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+                  className="btn btn-success btn-sm"
                   title="Seleziona solo le microvoci completate che NON sono ancora state fatturate"
                 >
                   ✨ Solo Completate (Done)
@@ -582,7 +560,7 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
                 <button
                   type="button"
                   onClick={selezionaTutte}
-                  style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)', padding: '4px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer' }}
+                  className="btn btn-secondary btn-sm"
                   title="Seleziona tutte le microvoci non ancora fatturate"
                 >
                   ☑️ Tutte da Fatturare
@@ -590,7 +568,7 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
                 <button
                   type="button"
                   onClick={deselezionaTutte}
-                  style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--muted)', padding: '4px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer' }}
+                  className="btn btn-secondary btn-sm"
                 >
                   ⏹️ Deseleziona
                 </button>
@@ -769,7 +747,7 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
               <button
                 type="button"
                 onClick={richiediChiusura}
-                style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '8px 14px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}
+                className="btn btn-secondary"
               >
                 Annulla
               </button>
@@ -778,19 +756,7 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
                 <button
                   type="button"
                   onClick={handleApriInDocumentStudio}
-                  style={{
-                    background: 'var(--card2)',
-                    border: '1px solid var(--border)',
-                    color: 'var(--text)',
-                    padding: '8px 16px',
-                    borderRadius: 8,
-                    fontSize: 12,
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 6,
-                  }}
+                  className="btn btn-secondary"
                   title="Inietta le microvoci selezionate nel template Avviso di Parcella di Document Studio"
                 >
                   📝 Componi Proforma in Studio
@@ -799,17 +765,7 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
                 <button
                   type="submit"
                   disabled={submitting || vociSelezionate.length === 0}
-                  style={{
-                    background: 'var(--indigo)',
-                    color: '#fff',
-                    border: 'none',
-                    padding: '8px 20px',
-                    borderRadius: 8,
-                    fontSize: 12,
-                    fontWeight: 700,
-                    cursor: vociSelezionate.length === 0 ? 'not-allowed' : 'pointer',
-                    opacity: vociSelezionate.length === 0 ? 0.5 : 1,
-                  }}
+                  className="btn btn-primary"
                 >
                   {submitting ? 'Emissione...' : '🚀 Emetti Fattura Fiscale (Serie FT)'}
                 </button>
