@@ -5,6 +5,7 @@ const {
   mockScadenzaFindMany,
   mockNotificaFindMany,
   mockFatturaFindMany,
+  mockFascicoloFindMany,
   mockNotificaStudio,
   mockRecordAudit,
 } = vi.hoisted(() => ({
@@ -12,6 +13,7 @@ const {
   mockScadenzaFindMany: vi.fn(),
   mockNotificaFindMany: vi.fn(),
   mockFatturaFindMany: vi.fn(),
+  mockFascicoloFindMany: vi.fn(),
   mockNotificaStudio: vi.fn(),
   mockRecordAudit: vi.fn(),
 }));
@@ -24,6 +26,8 @@ vi.mock('../util/prismaClient.js', () => ({
     notifica: { findMany: mockNotificaFindMany },
     // W2: le fatture emesse ma mai trasmesse allo SdI (statoSdi n_a da >3 giorni).
     fattura: { findMany: mockFatturaFindMany },
+    // K7: le pratiche KYC da rivedere (approvato/in_revisione con revisione dovuta).
+    fascicoloKyc: { findMany: mockFascicoloFindMany },
   },
 }));
 
@@ -44,6 +48,7 @@ describe('runDailyNotificationCron', () => {
     mockScadenzaFindMany.mockResolvedValue([]);
     mockNotificaFindMany.mockResolvedValue([]);
     mockFatturaFindMany.mockResolvedValue([]);
+    mockFascicoloFindMany.mockResolvedValue([]);
     mockRecordAudit.mockResolvedValue(undefined);
   });
 
@@ -106,6 +111,28 @@ describe('runDailyNotificationCron', () => {
     );
     expect(report.dettagli.some((d) => d.includes('non risulta ancora trasmessa'))).toBe(true);
   });
+
+  it('K7 — segnala la revisione di una pratica KYC approvata con scadenza passata', async () => {
+    mockFascicoloFindMany.mockResolvedValueOnce([
+      { id: 'kyc-1', stato: 'approvato', dataScadenza: new Date('2020-01-01'), cliente: { nome: 'Beta S.p.A.' }, riskAssessments: [] },
+    ]);
+    mockNotificaStudio.mockResolvedValue(1);
+    const report = await runDailyNotificationCron('tenant-1');
+    expect(report.revisioniKycTrovate).toBe(1);
+    expect(mockNotificaStudio).toHaveBeenCalledWith(
+      'tenant-1',
+      expect.objectContaining({ oggetto: 'Revisione KYC in scadenza' }),
+    );
+    expect(report.dettagli.some((d) => d.includes('Revisione periodica dovuta') && d.includes('Beta S.p.A.'))).toBe(true);
+  });
+
+  it('K7 — una pratica con revisione ancora lontana non genera avvisi', async () => {
+    mockFascicoloFindMany.mockResolvedValueOnce([
+      { id: 'kyc-2', stato: 'approvato', dataScadenza: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), cliente: { nome: 'Gamma' }, riskAssessments: [] },
+    ]);
+    const report = await runDailyNotificationCron('tenant-1');
+    expect(report.revisioniKycTrovate).toBe(0);
+  });
 });
 
 /**
@@ -148,6 +175,7 @@ describe('il cron e la derivazione delle scadenze usano la stessa regola', () =>
     // deduplicazione, che ha già i suoi test.
     mockNotificaFindMany.mockResolvedValue([]);
     mockNotificaStudio.mockResolvedValue(1);
+    mockFascicoloFindMany.mockResolvedValue([]);
   });
 
   afterEach(() => {
