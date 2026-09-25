@@ -263,6 +263,11 @@ vi.mock('./util/prismaClient.js', async (importOriginal) => {
         return righe.map((c) => ({ ...proietta(c, args?.select), cliente: stato.clienti.find((cl) => cl.id === c.clienteId) ?? null }));
       },
     },
+    // K7: le revisioni KYC derivate leggono i fascicoli approvati/in revisione. Vuoto di default:
+    // i test del calendario non allestiscono fascicoli, quindi nessun evento `kyc-revisione`.
+    fascicoloKyc: {
+      findMany: async () => [],
+    },
     permessoModulo: {
       findUnique: async (args: any) => {
         const chiave = args?.where?.tenantId_userId_moduloChiave;

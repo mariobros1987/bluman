@@ -35,6 +35,7 @@ import {
   type CategoriaEventoCalendario,
 } from '../util/calendarioVisibilita.js';
 import { kycInAvviso, rinnovoKyc, statoScadenza } from '../util/scadenzeDerivate.js';
+import { revisioneKycDovuta, dataRevisioneKyc } from '../domain/monitoraggioKyc.js';
 import type { Ruolo } from '../util/authorization.js';
 
 /**
@@ -539,6 +540,49 @@ export async function eventiDelCalendario(chiedi: ChiediEventi): Promise<EventoV
         clienteNome: c.nome,
         importoCentesimi: null,
         origineId: c.id,
+      });
+    }
+  }
+
+  // ── 3bis. Revisione periodica del fascicolo KYC (K7, spec §5.2) ──────────────────────────────
+  //
+  // Stessa regola del cron (`monitoraggioKyc`), così l'avviso proattivo e il calendario non
+  // divergono. Come il rinnovo, la revisione è del **cliente** e non dell'incarico, quindi esclusa
+  // dal filtro di progetto. È una scadenza derivata passiva; il gate del modulo spento vale sul
+  // promemoria proattivo (cron) e sulle rotte /kyc.
+  if (chieste.has('kyc') && !progettoId) {
+    const fascicoli = await prisma.fascicoloKyc.findMany({
+      where: { tenantId, stato: { in: ['approvato', 'in_revisione'] } },
+      select: {
+        id: true, stato: true, dataScadenza: true, clienteId: true,
+        cliente: { select: { nome: true } },
+        riskAssessments: { orderBy: { versione: 'desc' }, take: 1, select: { prossimaRevisione: true } },
+      },
+    });
+    for (const f of fascicoli) {
+      const prossima = f.riskAssessments[0]?.prossimaRevisione ?? null;
+      if (!revisioneKycDovuta(f.stato, f.dataScadenza, prossima, adesso)) continue;
+      const rev = dataRevisioneKyc(f.dataScadenza, prossima);
+      if (!rev || rev < da || rev > a) continue;
+      const quando = aMezzogiornoUtc(rev);
+      eventi.push({
+        id: `kyc-revisione:${f.id}`,
+        titolo: 'Revisione KYC',
+        dataInizio: quando.toISOString(),
+        dataFine: quando.toISOString(),
+        categoria: 'kyc',
+        stato: statoScadenza(rev, false, adesso),
+        priorita: 'alta',
+        note: null,
+        luogoUrl: null,
+        generato: true,
+        assegnatoAId: null,
+        assegnatoANome: null,
+        progettoId: null,
+        clienteId: f.clienteId,
+        clienteNome: f.cliente?.nome ?? '',
+        importoCentesimi: null,
+        origineId: f.id,
       });
     }
   }
