@@ -9,6 +9,7 @@ import { fetchKycFascicoloApi, creaKycFascicoloApi, aggiornaStatoKycApi, fetchMo
 import { PannelloTitolariEffettivi } from '../kyc/PannelloTitolariEffettivi';
 import { PannelloRischio } from '../kyc/PannelloRischio';
 import { PannelloScreening } from '../kyc/PannelloScreening';
+import { PannelloAnomalie } from '../kyc/PannelloAnomalie';
 
 // ─── Componente Anagrafica Completa Cliente ERP ────────────────────
 export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Cliente; onClose: () => void; onSaved: () => void }) {
@@ -815,6 +816,7 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
               {kycFasc && <PannelloTitolariEffettivi fascicoloId={kycFasc.id} puoModificare={true} />}
               {kycFasc && <PannelloRischio fascicoloId={kycFasc.id} puoModificare={true} />}
               {kycFasc && <PannelloScreening fascicoloId={kycFasc.id} puoModificare={true} />}
+              {kycFasc && <PannelloAnomalie fascicoloId={kycFasc.id} puoModificare={true} />}
             </div>
           </div>
         )}

@@ -212,3 +212,34 @@ export async function risolviScreening(
   return await res.json();
 }
 
+// K8a — anomalie / segnalazioni interne e decisioni MLRO (spec §5.3).
+export type TipoAnomaliaKyc = 'match_sanzioni' | 'match_pep' | 'operazione_sospetta' | 'documento_incongruente' | 'rischio_elevato' | 'altro';
+export type DecisioneMlro = 'nessuna_azione' | 'monitoraggio_rafforzato' | 'segnalazione_fiau' | 'chiusura_rapporto';
+export interface MlroDecisioneRiga { id: string; decisione: DecisioneMlro; motivazione: string; decisaDa: string | null; createdAt: string; }
+export interface AnomaliaRiga {
+  id: string; tipo: TipoAnomaliaKyc; descrizione: string; stato: string; rilevataDa: string | null; createdAt: string;
+  decisioni: MlroDecisioneRiga[];
+}
+
+export async function fetchAnomalie(fascicoloId: string): Promise<{ anomalie: AnomaliaRiga[] }> {
+  const res = await apiFetch(`${API_BASE}/kyc/${fascicoloId}/anomalie`, { headers: getAuthHeaders() });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore lettura anomalie'));
+  return await res.json();
+}
+
+export async function apriAnomaliaApi(fascicoloId: string, body: { tipo: TipoAnomaliaKyc; descrizione: string }) {
+  const res = await apiFetch(`${API_BASE}/kyc/${fascicoloId}/anomalie`, {
+    method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore apertura anomalia'));
+  return await res.json();
+}
+
+export async function decidiAnomaliaApi(anomaliaId: string, decisione: DecisioneMlro, motivazione: string) {
+  const res = await apiFetch(`${API_BASE}/kyc/anomalie/${anomaliaId}/decisione`, {
+    method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({ decisione, motivazione }),
+  });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore decisione MLRO'));
+  return await res.json();
+}
+
