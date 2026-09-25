@@ -1,15 +1,26 @@
 // Infrastructure as Code Railway — sostituisce railway.json (Config as Code,
 // deprecato: smette di essere letto il 01/12/2026).
 //
-// Il progetto bluman-backend ha due servizi applicativi, entrambi deployati
-// via CLI (`railway up` — il backend NON è collegato a GitHub, regola 9 di
-// AGENTS.md), più il Redis di coda. Nessun `source` nei service(): il file
-// gestisce le impostazioni, il codice arriva da `railway up`.
+// Il progetto bluman-backend ha due servizi applicativi più il Redis di coda.
+// ⚠️ AGGIORNAMENTO 25/09/2026: `bluman-api` è ora **collegato a GitHub**
+// (repo mariobros1987/bluman, branch main, root /) dalla dashboard Railway →
+// Settings → Source. Da allora un `git push origin main` auto-deploya il
+// backend (regola 9 di AGENTS.md aggiornata). Il servizio `cron-notifiche`
+// resta su `railway up -s cron-notifiche`.
+//
+// ⚠️⚠️ PRIMA DI QUALSIASI `railway config apply`: questo file NON dichiara
+// ancora il `source` GitHub né le watch paths di `bluman-api` (lo schema
+// `source: github(...)` + branch/watchPatterns va confermato dal SDK, che qui
+// non è installato). Poiché l'apply ha semantica "omesso = cancellato" (ha già
+// cancellato bluman-cron e Postgres-14L3 il 15/09/2026), un apply da questo
+// file **staccherebbe il collegamento GitHub**. La via corretta: sulla macchina
+// col SDK installato (il Mac) `railway config pull` per importare lo stato reale
+// — source + watch paths inclusi — poi `railway config plan` e solo allora apply.
 //
 // I valori segreti restano su Railway (preserve() / riferimenti): nel repo
 // non entra nessuna credenziale (regola 6).
 //
-// Rimossi con questa migrazione (approvati dal titolare il 15/09/2026):
+// Rimossi in passato (approvati dal titolare il 15/09/2026):
 // - servizio `bluman-cron`: vecchio tentativo collegato a GitHub, mai
 //   configurato (nessuna schedule, nessuno start command, 0/1 repliche) —
 //   ogni push lo faceva rebuildare per niente;
