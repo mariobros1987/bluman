@@ -413,20 +413,7 @@ SHA-256 del documento.
           <button
             type="button"
             onClick={() => navigate(`/documents?projId=${project.id}`)}
-            style={{
-              background: 'linear-gradient(135deg, var(--indigo-d) 0%, var(--pill-indigo-bg) 100%)',
-              color: 'var(--on-accent)',
-              border: '1px solid var(--indigo)',
-              padding: '8px 16px',
-              borderRadius: 10,
-              fontSize: 12,
-              fontWeight: 700,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              boxShadow: '0 4px 14px rgba(99,102,241,.3)',
-            }}
+            className="btn btn-primary"
           >
             <span>📝 Nuovo con Word Studio</span>
           </button>
@@ -558,7 +545,7 @@ SHA-256 del documento.
                   <button
                     type="button"
                     onClick={() => setSelectedPreviewDoc(doc)}
-                    style={{ flex: 1, background: 'var(--card2)', border: '1px solid var(--border)', color: 'var(--text)', padding: '5px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}
+                    className="btn btn-secondary btn-sm" style={{ flex: 1 }}
                   >
                     👁 Anteprima
                   </button>
@@ -566,7 +553,7 @@ SHA-256 del documento.
                   <button
                     type="button"
                     onClick={() => navigate(`/documents?projId=${project.id}&docId=${doc.id}`)}
-                    style={{ background: 'var(--pill-indigo-bg)', border: '1px solid var(--pill-indigo-bd)', color: 'var(--pill-indigo-fg)', padding: '5px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+                    className="btn btn-secondary btn-sm"
                     title="Apri e Modifica con Word Studio"
                   >
                     ✏️ Studio
@@ -576,7 +563,7 @@ SHA-256 del documento.
                     <button
                       type="button"
                       onClick={() => setDocPerFirmaStudio(doc.dbDoc)}
-                      style={{ background: 'var(--pill-indigo-bg)', border: '1px solid var(--pill-indigo-bd)', color: 'var(--pill-indigo-fg)', padding: '5px 7px', borderRadius: 6, fontSize: 10.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}
+                      className="btn btn-secondary btn-sm"
                       title="Apponi la firma dello studio / professionista incaricato sul documento"
                     >
                       ✍️ Firma Studio
@@ -586,7 +573,7 @@ SHA-256 del documento.
                   <button
                     type="button"
                     onClick={() => handleDownloadDocumentPdf(doc)}
-                    style={{ background: 'var(--pill-green-bg)', border: '1px solid var(--pill-green-bd)', color: 'var(--pill-green-fg)', padding: '5px 7px', borderRadius: 6, fontSize: 10.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}
+                    className="btn btn-success btn-sm"
                     title="Scarica in formato PDF A4"
                   >
                     📥 PDF
@@ -596,7 +583,7 @@ SHA-256 del documento.
                     <button
                       type="button"
                       onClick={() => handleDownloadAttoFirmato(doc)}
-                      style={{ background: 'var(--green)', border: '1px solid var(--green)', color: 'var(--on-accent)', padding: '5px 7px', borderRadius: 6, fontSize: 10.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}
+                      className="btn btn-success btn-sm"
                       title="Scarica l'atto come sottoscritto (file firmato), distinto dal PDF master e dal verbale di firma"
                     >
                       ✍️ Firmato
@@ -606,7 +593,7 @@ SHA-256 del documento.
                   <button
                     type="button"
                     onClick={() => handleDownloadDocumentWord(doc)}
-                    style={{ background: 'var(--pill-indigo-bg)', border: '1px solid var(--indigo-l)', color: 'var(--pill-blue-fg)', padding: '5px 7px', borderRadius: 6, fontSize: 10.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}
+                    className="btn btn-secondary btn-sm"
                     title="Scarica in formato Microsoft Word (.doc)"
                   >
                     📝 Word
@@ -615,7 +602,7 @@ SHA-256 del documento.
                   <button
                     type="button"
                     onClick={() => handleDeleteDoc(doc.id)}
-                    style={{ background: 'var(--pill-red-bg)', border: '1px solid var(--pill-red-bd)', color: 'var(--pill-red-fg)', padding: '5px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer' }}
+                    className="btn btn-danger btn-sm"
                     title="Elimina Documento dal Drive"
                   >
                     🗑
@@ -676,7 +663,7 @@ SHA-256 del documento.
                             <button
                               type="button"
                               onClick={() => setDocPerFirmaStudio(doc.dbDoc)}
-                              style={{ background: 'var(--pill-indigo-bg)', border: '1px solid var(--pill-indigo-bd)', color: 'var(--pill-indigo-fg)', padding: '4px 8px', borderRadius: 6, fontSize: 10.5, cursor: 'pointer', fontWeight: 700 }}
+                              className="btn btn-secondary btn-sm"
                               title="Apponi la firma dello studio / professionista incaricato sul documento"
                             >
                               ✍️ Firma Studio
@@ -685,21 +672,21 @@ SHA-256 del documento.
                           <button
                             type="button"
                             onClick={() => setSelectedPreviewDoc(doc)}
-                            style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--indigo-l)', padding: '4px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer', fontWeight: 600 }}
+                            className="btn btn-secondary btn-sm"
                           >
                             👁 Anteprima
                           </button>
                           <button
                             type="button"
                             onClick={() => navigate(`/documents?projId=${project.id}&docId=${doc.id}`)}
-                            style={{ background: 'var(--pill-indigo-bg)', border: '1px solid var(--pill-indigo-bd)', color: 'var(--pill-indigo-fg)', padding: '4px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer', fontWeight: 600 }}
+                            className="btn btn-secondary btn-sm"
                           >
                             ✏️ Word Studio
                           </button>
                           <button
                             type="button"
                             onClick={() => handleDownloadDocumentPdf(doc)}
-                            style={{ background: 'var(--pill-green-bg)', border: '1px solid var(--pill-green-bd)', color: 'var(--pill-green-fg)', padding: '4px 8px', borderRadius: 6, fontSize: 10.5, cursor: 'pointer', fontWeight: 700 }}
+                            className="btn btn-success btn-sm"
                             title="Scarica in formato PDF A4"
                           >
                             📥 PDF
@@ -708,7 +695,7 @@ SHA-256 del documento.
                             <button
                               type="button"
                               onClick={() => handleDownloadAttoFirmato(doc)}
-                              style={{ background: 'var(--green)', border: '1px solid var(--green)', color: 'var(--on-accent)', padding: '4px 8px', borderRadius: 6, fontSize: 10.5, cursor: 'pointer', fontWeight: 700 }}
+                              className="btn btn-success btn-sm"
                               title="Scarica l'atto come sottoscritto (file firmato), distinto dal PDF master e dal verbale di firma"
                             >
                               ✍️ Firmato
@@ -717,7 +704,7 @@ SHA-256 del documento.
                           <button
                             type="button"
                             onClick={() => handleDownloadDocumentWord(doc)}
-                            style={{ background: 'var(--pill-indigo-bg)', border: '1px solid var(--indigo-l)', color: 'var(--pill-blue-fg)', padding: '4px 8px', borderRadius: 6, fontSize: 10.5, cursor: 'pointer', fontWeight: 700 }}
+                            className="btn btn-secondary btn-sm"
                             title="Scarica in formato Microsoft Word (.doc)"
                           >
                             📝 Word
@@ -725,7 +712,7 @@ SHA-256 del documento.
                           <button
                             type="button"
                             onClick={() => handleDeleteDoc(doc.id)}
-                            style={{ background: 'transparent', border: '1px solid var(--pill-red-bd)', color: 'var(--pill-red-fg)', padding: '4px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer' }}
+                            className="btn btn-danger btn-sm"
                           >
                             🗑
                           </button>
@@ -811,14 +798,14 @@ SHA-256 del documento.
                 <button
                   type="button"
                   onClick={() => handleDownloadDocumentPdf(selectedPreviewDoc)}
-                  style={{ background: 'var(--pill-green-bg)', border: '1px solid var(--pill-green-bd)', color: 'var(--pill-green-fg)', padding: '8px 14px', borderRadius: 8, fontSize: 11.5, cursor: 'pointer', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}
+                  className="btn btn-success" style={{ display: 'flex', alignItems: 'center', gap: 6 }}
                 >
                   📥 Scarica PDF A4
                 </button>
                 <button
                   type="button"
                   onClick={() => handleDownloadDocumentWord(selectedPreviewDoc)}
-                  style={{ background: 'var(--pill-indigo-bg)', border: '1px solid var(--indigo-l)', color: 'var(--pill-blue-fg)', padding: '8px 14px', borderRadius: 8, fontSize: 11.5, cursor: 'pointer', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}
+                  className="btn btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: 6 }}
                 >
                   📝 Scarica Word (.doc)
                 </button>
@@ -829,7 +816,7 @@ SHA-256 del documento.
                   <button
                     type="button"
                     onClick={() => handleDownloadAttoFirmato(selectedPreviewDoc)}
-                    style={{ background: 'var(--green)', border: '1px solid var(--green)', color: 'var(--on-accent)', padding: '8px 14px', borderRadius: 8, fontSize: 11.5, cursor: 'pointer', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}
+                    className="btn btn-success" style={{ display: 'flex', alignItems: 'center', gap: 6 }}
                     title="L'atto come sottoscritto (file firmato), distinto dal PDF master e dal verbale di firma"
                   >
                     ✍️ Scarica atto firmato
@@ -843,14 +830,14 @@ SHA-256 del documento.
                   onClick={() => {
                     navigate(`/documents?projId=${project.id}&docId=${selectedPreviewDoc.id}`);
                   }}
-                  style={{ background: 'var(--indigo)', color: 'var(--on-accent)', border: 'none', padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+                  className="btn btn-primary"
                 >
                   📝 Modifica in Document Studio
                 </button>
                 <button
                   type="button"
                   onClick={() => setSelectedPreviewDoc(null)}
-                  style={{ background: 'var(--card2)', border: '1px solid var(--border)', color: 'var(--muted)', padding: '8px 14px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}
+                  className="btn btn-secondary"
                 >
                   Chiudi
                 </button>
