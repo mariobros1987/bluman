@@ -558,14 +558,16 @@ Suite end-to-end dei tre flussi critici (login con cambio password, firma SES da
    - **Esecuzione**: un file alla volta; lo split è refactoring **meccanico** senza cambi di comportamento (nessun bugfix o rinomina mescolati); typecheck dopo ogni estrazione (`npx tsc -b` in `frontend/`, `npx tsc --noEmit` alla root); commit separati e revertibili per ogni file splittato.
    - Fa eccezione solo il codice che è intrinsecamente un blocco unico (es. lo schema Prisma, le migrazioni): in quel caso la dimensione è giustificata dal compito stesso.
 
-9. **Distribuzione Doppia Obbligatoria (Railway CLI per Backend + Git Push per Vercel)**:
-   - **Railway NON è collegato al webhook automatico di GitHub**: un semplice `git push origin main` aggiorna il frontend su Vercel ma **non aggiorna il backend** su Railway.
-   - Per rilasciare le modifiche del backend in produzione è **tassativo** lanciare il comando:
+9. **Distribuzione (Railway auto-deploy da GitHub + Vercel su push)**:
+   - **Dal 25/09/2026 Railway è collegato a GitHub (branch `main`)**: un `git push origin main` ora fa **auto-deploy del backend** su Railway (builder Dockerfile a root) **oltre** al frontend su Vercel. Non serve più il `railway up` manuale a ogni rilascio: il push aggiorna entrambe le metà.
+   - ⚠️ **Conseguenza: `main` deve restare SEMPRE deployabile.** Con l'auto-deploy un `main` rotto va dritto in produzione al primo push. La disciplina è: tenere typecheck + `vitest run` verdi come cancello prima di spingere (è ciò che fa `scripts/distribuisci.sh`).
+   - **Consigliato — Watch Paths sul servizio `bluman-api`** (dashboard Railway → Settings → Build, o IaC `.railway/railway.ts`): limitare i trigger a `src/**`, `prisma/**`, `Dockerfile`, `package.json`, `package-lock.json`. Senza, ogni push *solo-frontend* o *solo-doc* ricostruisce inutilmente il backend.
+   - **Fallback manuale** (deploy ad-hoc, o se il push non fa partire la build): il `.exe` nativo di Railway su Windows (`RAILWAY_BIN` non impostata → path pieno) oppure dal Mac:
      ```bash
-     npx --yes @railway/cli up --detach
+     railway up --service bluman-api --detach   # --service è OBBLIGATORIO
      ```
-   - In alternativa, eseguire lo script unificato `./scripts/distribuisci.sh` che esegue i controlli di integrità, il push su GitHub per il frontend e il `railway up` per il backend.
-   - Dopo ogni deploy backend, verificare sempre con una chiamata live che le nuove rotte rispondano correttamente e non con `404 Not Found`.
+   - **Frontend con webhook Vercel appeso**: se il deploy da webhook GitHub resta UNKNOWN/0ms, forzare il deploy esplicito via CLI con `./scripts/distribuisci.sh --solo-push` (fa `vercel --prod --scope fanta-ia`, che scavalca il webhook).
+   - Dopo ogni deploy backend, verificare sempre con una chiamata live che le nuove rotte rispondano (sonda §34/§414: `401` con corpo `{errore}`, **mai** `404 Not Found`).
 
 10. **I Test E2E Girano solo sull'Ambiente Usa-e-Getta, Mai su Supabase**:
    - La suite Playwright (`npm run test:e2e`) gira su container Docker locali (`bluman-e2e-pg` porta 5433, `bluman-e2e-mailpit` 1025/8025) creati da `scripts/e2e/prepara.mjs`. Il database Supabase di produzione non viene mai toccato: né query, né seed, né `migrate`.
