@@ -10,6 +10,7 @@ import { moduloKycAttivo } from '../util/guardiaModuli.js';
 import { calcolaTitolariEffettivi, scadenzaVariazioneTe } from '../domain/catenaControllo.js';
 import { livelloComplessivo, prossimaRevisione, type LivelloRischioK3 } from '../domain/calcoloRischio.js';
 import { screeningBloccaApprovazione, motivoBloccoScreening } from '../domain/screeningKyc.js';
+import { apriAnomalia, decidiAnomalia } from '../services/anomalieService.js';
 import { uploadDocumento, rifirmaUrlUpload } from '../services/storageService.js';
 import { createHash } from 'node:crypto';
 import { recordAudit } from '../util/serverHelpers.js';
@@ -437,5 +438,57 @@ export async function registraRotteKyc(server: FastifyInstance): Promise<void> {
     await registraComplianceEvent(prisma, { tenantId, tipo: 'KYC_SCREENING_MATCH_RISOLTO', attoreUserId: req.userId ?? null, payload: { fascicoloId: id, screeningId: sid, esito: aggiornato.esito } });
     await recordAudit({ tenantId, userId: req.userId, ruolo: req.ruolo, azione: 'KYC_SCREENING_MATCH_RISOLTO', entita: `Fascicolo ${id}`, dettagli: `Screening ${aggiornato.tipo} risolto: ${aggiornato.esito}`, ipAddress: req.ip });
     return reply.send({ ok: true, screening: { ...aggiornato, allegatoUrl: aggiornato.allegatoUrl ? rifirmaUrlUpload(aggiornato.allegatoUrl) : null } });
+  });
+
+  // ── K8a — anomalie / segnalazioni interne e decisioni MLRO (spec §5.3) ──────────────────
+  const TIPI_ANOMALIA = ['match_sanzioni', 'match_pep', 'operazione_sospetta', 'documento_incongruente', 'rischio_elevato', 'altro'];
+  const DECISIONI_MLRO = ['nessuna_azione', 'monitoraggio_rafforzato', 'segnalazione_fiau', 'chiusura_rapporto'];
+
+  // Gate MLRO (§8.3, come l'approvazione rafforzata): advisor/super_admin, oppure l'utente nominato
+  // MLRO nel tenant (K0). La decisione su un'anomalia è un atto riservato.
+  const puoDecidereMlro = async (req: FastifyRequest): Promise<boolean> => {
+    if (req.ruolo === 'advisor' || req.ruolo === 'super_admin') return true;
+    const s = await prisma.tenantComplianceSettings.findUnique({ where: { tenantId: req.tenantId }, select: { mlroUserId: true } });
+    return !!req.userId && req.userId === s?.mlroUserId;
+  };
+
+  server.get<{ Params: { id: string } }>('/kyc/:id/anomalie', async (req, reply) => {
+    if (vietatoAlCliente(req, reply)) return;
+    if (await moduloSpento(req, reply)) return;
+    const { id } = req.params; const tenantId = req.tenantId;
+    const fasc = await prisma.fascicoloKyc.findFirst({ where: { id, tenantId }, select: { id: true } });
+    if (!fasc) return reply.code(404).send({ errore: 'Fascicolo non trovato' });
+    const anomalie = await prisma.anomaliaKyc.findMany({
+      where: { tenantId, fascicoloId: id },
+      orderBy: { createdAt: 'desc' },
+      include: { decisioni: { orderBy: { createdAt: 'desc' } } },
+    });
+    return reply.send({ anomalie });
+  });
+
+  server.post<{ Params: { id: string }; Body: Record<string, any> }>('/kyc/:id/anomalie', async (req, reply) => {
+    if (vietatoAlCliente(req, reply)) return;
+    if (await moduloSpento(req, reply)) return;
+    const { id } = req.params; const tenantId = req.tenantId; const b = req.body || {};
+    const fasc = await prisma.fascicoloKyc.findFirst({ where: { id, tenantId }, select: { id: true } });
+    if (!fasc) return reply.code(404).send({ errore: 'Fascicolo non trovato' });
+    if (!TIPI_ANOMALIA.includes(b.tipo)) return reply.code(400).send({ errore: 'Tipo anomalia non valido.' });
+    if (!b.descrizione || String(b.descrizione).trim().length < 3) return reply.code(400).send({ errore: 'Descrizione obbligatoria.' });
+    const anomalia = await apriAnomalia(prisma, { tenantId, fascicoloId: id, tipo: b.tipo, descrizione: String(b.descrizione).trim(), rilevataDa: req.userId ?? null });
+    await recordAudit({ tenantId, userId: req.userId, ruolo: req.ruolo, azione: 'KYC_ANOMALIA_APERTA', entita: `Fascicolo ${id}`, dettagli: `Anomalia ${b.tipo}`, ipAddress: req.ip });
+    return reply.send({ ok: true, anomalia });
+  });
+
+  server.post<{ Params: { aid: string }; Body: Record<string, any> }>('/kyc/anomalie/:aid/decisione', async (req, reply) => {
+    if (vietatoAlCliente(req, reply)) return;
+    if (await moduloSpento(req, reply)) return;
+    const { aid } = req.params; const tenantId = req.tenantId; const b = req.body || {};
+    if (!DECISIONI_MLRO.includes(b.decisione)) return reply.code(400).send({ errore: 'Decisione non valida.' });
+    if (!b.motivazione || String(b.motivazione).trim().length < 10) return reply.code(400).send({ errore: 'Motivazione obbligatoria (almeno 10 caratteri).' });
+    if (!(await puoDecidereMlro(req))) return reply.code(403).send({ errore: 'La decisione su un’anomalia è riservata all’MLRO o a un ruolo superiore.' });
+    const esito = await decidiAnomalia(prisma, { tenantId, anomaliaId: aid, decisione: b.decisione, motivazione: String(b.motivazione).trim(), decisaDa: req.userId ?? null });
+    if (esito.esito === 'non_trovata') return reply.code(404).send({ errore: 'Anomalia non trovata' });
+    await recordAudit({ tenantId, userId: req.userId, ruolo: req.ruolo, azione: 'KYC_MLRO_DECISIONE', entita: `Anomalia ${aid}`, dettagli: `Decisione ${b.decisione}`, ipAddress: req.ip });
+    return reply.send({ ok: true, anomalia: esito.anomalia });
   });
 }
