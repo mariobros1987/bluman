@@ -61,6 +61,19 @@ describe('transizioneKyc', () => {
     expect(esito.esito).toBe('ok');
   });
 
+  it('blocca l’approvazione con uno screening a match non risolto (§8.4), senza scrivere', async () => {
+    const { store, updated } = fakeStore({ ...base, stato: 'in_attesa_approvazione', rischioCalcolato: 'basso' });
+    const esito = await transizioneKyc(store, { tenantId: 't1', fascicoloId: 'f1', nuovoStato: 'approvato', puoApprovareRafforzata: true, screeningBloccante: true });
+    expect(esito.esito).toBe('screening_bloccante');
+    expect(updated).toHaveLength(0);
+  });
+
+  it('screeningBloccante gate SOLO l’approvazione: una transizione diversa passa', async () => {
+    const { store } = fakeStore({ ...base, stato: 'in_verifica', rischioCalcolato: 'basso' });
+    const esito = await transizioneKyc(store, { tenantId: 't1', fascicoloId: 'f1', nuovoStato: 'sospeso', puoApprovareRafforzata: false, screeningBloccante: true });
+    expect(esito.esito).toBe('ok');
+  });
+
   it('normalizza lo stato legacy di partenza (in_attesa_revisione → in_attesa_approvazione)', async () => {
     const { store, updated } = fakeStore({ ...base, stato: 'in_attesa_revisione', rischioCalcolato: 'basso' });
     const esito = await transizioneKyc(store, { tenantId: 't1', fascicoloId: 'f1', nuovoStato: 'approvato', puoApprovareRafforzata: true });

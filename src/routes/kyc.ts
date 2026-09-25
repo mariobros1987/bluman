@@ -367,4 +367,75 @@ export async function registraRotteKyc(server: FastifyInstance): Promise<void> {
     await recordAudit({ tenantId, userId: req.userId, ruolo: req.ruolo, azione: 'KYC_DOCUMENTO_CARICATO', entita: `Soggetto ${soggettoId}`, dettagli: `Documento ${doc.tipo}`, ipAddress: req.ip });
     return reply.send({ ok: true, documento: { ...doc, urlStorage: rifirmaUrlUpload(doc.urlStorage) } });
   });
+
+  // ── K5 — screening PEP / sanzioni / media negativi (processo MANUALE, spec §5.1.5/§8.4/§10) ──
+  const TIPI_SCREENING = ['sanzioni', 'pep', 'media_negativi'];
+  const ESITI_SCREENING = ['nessun_match', 'match_da_valutare', 'match_confermato', 'falso_positivo'];
+
+  server.get<{ Params: { id: string } }>('/kyc/:id/screening', async (req, reply) => {
+    if (vietatoAlCliente(req, reply)) return;
+    if (await moduloSpento(req, reply)) return;
+    const { id } = req.params; const tenantId = req.tenantId;
+    const fasc = await prisma.fascicoloKyc.findFirst({ where: { id, tenantId }, select: { id: true } });
+    if (!fasc) return reply.code(404).send({ errore: 'Fascicolo non trovato' });
+    const screenings = await prisma.screeningKyc.findMany({ where: { tenantId, fascicoloId: id }, orderBy: { dataScreening: 'desc' } });
+    return reply.send({
+      screenings: screenings.map((s) => ({ ...s, allegatoUrl: s.allegatoUrl ? rifirmaUrlUpload(s.allegatoUrl) : null })),
+      bloccaApprovazione: screeningBloccaApprovazione(screenings),
+      motivoBlocco: motivoBloccoScreening(screenings) || null,
+    });
+  });
+
+  server.post<{ Params: { id: string }; Body: Record<string, any> }>('/kyc/:id/screening', async (req, reply) => {
+    if (vietatoAlCliente(req, reply)) return;
+    if (await moduloSpento(req, reply)) return;
+    const { id } = req.params; const tenantId = req.tenantId; const b = req.body || {};
+    const fasc = await prisma.fascicoloKyc.findFirst({ where: { id, tenantId }, select: { id: true, soggettoId: true } });
+    if (!fasc) return reply.code(404).send({ errore: 'Fascicolo non trovato' });
+    if (!TIPI_SCREENING.includes(b.tipo)) return reply.code(400).send({ errore: 'Tipo screening non valido (sanzioni | pep | media_negativi).' });
+    const esito = ESITI_SCREENING.includes(b.esito) ? b.esito : 'nessun_match';
+    // Allegato opzionale dell'esito (spec §10: processo manuale con allegato), cifrato in storage come K6.
+    let allegatoUrl: string | null = null;
+    if (b.allegatoContentBase64 && b.allegatoFilename) {
+      try {
+        const res = await uploadDocumento(String(b.allegatoFilename), String(b.allegatoContentBase64), tenantId);
+        if (!res.ok || !res.url) return reply.code(400).send({ errore: 'Upload allegato non riuscito.' });
+        allegatoUrl = res.url;
+      } catch (e: any) {
+        return reply.code(400).send({ errore: e?.message || 'Allegato non ammesso.' });
+      }
+    }
+    const screening = await prisma.screeningKyc.create({
+      data: {
+        tenantId, fascicoloId: id, soggettoId: fasc.soggettoId ?? null,
+        tipo: b.tipo, esito, fonte: b.fonte || 'manuale',
+        matchDettagli: b.matchDettagli || null, allegatoUrl, attoreUserId: req.userId ?? null,
+      },
+    });
+    await registraComplianceEvent(prisma, { tenantId, tipo: 'KYC_SCREENING_REGISTRATO', attoreUserId: req.userId ?? null, payload: { fascicoloId: id, screeningTipo: screening.tipo, esito: screening.esito } });
+    await recordAudit({ tenantId, userId: req.userId, ruolo: req.ruolo, azione: 'KYC_SCREENING_REGISTRATO', entita: `Fascicolo ${id}`, dettagli: `Screening ${screening.tipo}: ${screening.esito}`, ipAddress: req.ip });
+    return reply.send({ ok: true, screening: { ...screening, allegatoUrl: screening.allegatoUrl ? rifirmaUrlUpload(screening.allegatoUrl) : null } });
+  });
+
+  server.patch<{ Params: { id: string; sid: string }; Body: Record<string, any> }>('/kyc/:id/screening/:sid/risolvi', async (req, reply) => {
+    if (vietatoAlCliente(req, reply)) return;
+    if (await moduloSpento(req, reply)) return;
+    const { id, sid } = req.params; const tenantId = req.tenantId; const b = req.body || {};
+    // Le due chiusure di un match: falso_positivo (scartato dopo esame) o match_confermato (vero → non si approva).
+    if (b.esito !== 'falso_positivo' && b.esito !== 'match_confermato') {
+      return reply.code(400).send({ errore: "Esito di risoluzione valido: 'falso_positivo' o 'match_confermato'." });
+    }
+    if (!b.notaRisoluzione || String(b.notaRisoluzione).trim().length < 10) {
+      return reply.code(400).send({ errore: 'Motivazione della risoluzione obbligatoria (almeno 10 caratteri).' });
+    }
+    const esistente = await prisma.screeningKyc.findFirst({ where: { id: sid, tenantId, fascicoloId: id }, select: { id: true } });
+    if (!esistente) return reply.code(404).send({ errore: 'Screening non trovato' });
+    const aggiornato = await prisma.screeningKyc.update({
+      where: { id: sid },
+      data: { esito: b.esito, notaRisoluzione: String(b.notaRisoluzione).trim(), risoltoDa: req.userId ?? null, risoltoIl: new Date() },
+    });
+    await registraComplianceEvent(prisma, { tenantId, tipo: 'KYC_SCREENING_MATCH_RISOLTO', attoreUserId: req.userId ?? null, payload: { fascicoloId: id, screeningId: sid, esito: aggiornato.esito } });
+    await recordAudit({ tenantId, userId: req.userId, ruolo: req.ruolo, azione: 'KYC_SCREENING_MATCH_RISOLTO', entita: `Fascicolo ${id}`, dettagli: `Screening ${aggiornato.tipo} risolto: ${aggiornato.esito}`, ipAddress: req.ip });
+    return reply.send({ ok: true, screening: { ...aggiornato, allegatoUrl: aggiornato.allegatoUrl ? rifirmaUrlUpload(aggiornato.allegatoUrl) : null } });
+  });
 }
