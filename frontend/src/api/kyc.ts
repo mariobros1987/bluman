@@ -173,3 +173,42 @@ export async function caricaPortalKycDocumento(body: { tipo: string; filename: s
   return await res.json();
 }
 
+// K5 — screening PEP / sanzioni / media negativi (processo MANUALE, spec §5.1.5/§8.4/§10).
+export type TipoScreening = 'sanzioni' | 'pep' | 'media_negativi';
+export type EsitoScreening = 'nessun_match' | 'match_da_valutare' | 'match_confermato' | 'falso_positivo';
+export interface ScreeningRiga {
+  id: string; tipo: TipoScreening; esito: EsitoScreening; fonte: string | null;
+  dataScreening: string; matchDettagli: string | null; allegatoUrl: string | null;
+  notaRisoluzione: string | null; risoltoDa: string | null; risoltoIl: string | null; createdAt: string;
+}
+
+export async function fetchScreening(fascicoloId: string): Promise<{
+  screenings: ScreeningRiga[]; bloccaApprovazione: boolean; motivoBlocco: string | null;
+}> {
+  const res = await apiFetch(`${API_BASE}/kyc/${fascicoloId}/screening`, { headers: getAuthHeaders() });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore lettura screening'));
+  return await res.json();
+}
+
+export async function registraScreening(fascicoloId: string, body: {
+  tipo: TipoScreening; esito?: EsitoScreening; fonte?: string; matchDettagli?: string;
+  allegatoFilename?: string; allegatoContentBase64?: string;
+}) {
+  const res = await apiFetch(`${API_BASE}/kyc/${fascicoloId}/screening`, {
+    method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore registrazione screening'));
+  return await res.json();
+}
+
+export async function risolviScreening(
+  fascicoloId: string, screeningId: string,
+  esito: 'falso_positivo' | 'match_confermato', notaRisoluzione: string,
+) {
+  const res = await apiFetch(`${API_BASE}/kyc/${fascicoloId}/screening/${screeningId}/risolvi`, {
+    method: 'PATCH', headers: getAuthHeaders(), body: JSON.stringify({ esito, notaRisoluzione }),
+  });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore risoluzione match screening'));
+  return await res.json();
+}
+
