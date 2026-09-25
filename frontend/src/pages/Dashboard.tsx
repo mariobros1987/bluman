@@ -231,22 +231,13 @@ export function Dashboard() {
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
             <button
               onClick={loadProjects}
-              style={{
-                padding: '8px 20px', borderRadius: 8, border: 'none',
-                background: 'var(--accent)', color: 'var(--on-accent)', cursor: 'pointer',
-                fontSize: 13, fontWeight: 600
-              }}
+              className="btn btn-primary"
             >
               🔄 Riprova
             </button>
             <button
               onClick={() => window.open('mailto:admin@bluecode.advisory?subject=Errore%20Database%20BluMan', '_blank')}
-              style={{
-                padding: '8px 20px', borderRadius: 8,
-                border: '1px solid var(--border)',
-                background: 'transparent', color: 'var(--muted)', cursor: 'pointer',
-                fontSize: 13
-              }}
+              className="btn btn-secondary"
             >
               📧 Contatta Amministratore
             </button>
