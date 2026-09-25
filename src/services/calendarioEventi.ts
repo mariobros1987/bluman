@@ -36,6 +36,7 @@ import {
 } from '../util/calendarioVisibilita.js';
 import { kycInAvviso, rinnovoKyc, statoScadenza } from '../util/scadenzeDerivate.js';
 import { revisioneKycDovuta, dataRevisioneKyc } from '../domain/monitoraggioKyc.js';
+import { moduloKycAttivo } from '../util/guardiaModuli.js';
 import type { Ruolo } from '../util/authorization.js';
 
 /**
@@ -511,7 +512,11 @@ export async function eventiDelCalendario(chiedi: ChiediEventi): Promise<EventoV
   // Il filtro di progetto esclude questa sorgente del tutto, ed è una scelta: la verifica KYC è del
   // **cliente**, non dell'incarico. Un cliente con tre progetti aperti non ha tre rinnovi, ne ha
   // uno — e mostrarlo in tutte e tre le schede lo moltiplicherebbe invece di riportarlo.
-  if (chieste.has('kyc') && !progettoId) {
+  // K7-gate: la categoria `kyc` del calendario (rinnovo legacy E revisione del fascicolo) si spegne
+  // col modulo. Se l'admin dello studio ha disattivato il modulo KYC, nessuna scadenza KYC derivata
+  // — coerente col 403 delle rotte /kyc, col cron e con le schede nascoste. Letto una volta sola.
+  const kycModuloAttivo = chieste.has('kyc') && !progettoId ? await moduloKycAttivo(tenantId) : false;
+  if (kycModuloAttivo) {
     const clienti = await prisma.cliente.findMany({
       where: { tenantId, dataKyc: { not: null } },
       select: { id: true, nome: true, dataKyc: true },
@@ -550,7 +555,7 @@ export async function eventiDelCalendario(chiedi: ChiediEventi): Promise<EventoV
   // divergono. Come il rinnovo, la revisione è del **cliente** e non dell'incarico, quindi esclusa
   // dal filtro di progetto. È una scadenza derivata passiva; il gate del modulo spento vale sul
   // promemoria proattivo (cron) e sulle rotte /kyc.
-  if (chieste.has('kyc') && !progettoId) {
+  if (kycModuloAttivo) {
     const fascicoli = await prisma.fascicoloKyc.findMany({
       where: { tenantId, stato: { in: ['approvato', 'in_revisione'] } },
       select: {

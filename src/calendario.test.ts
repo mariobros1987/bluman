@@ -268,6 +268,11 @@ vi.mock('./util/prismaClient.js', async (importOriginal) => {
     fascicoloKyc: {
       findMany: async () => [],
     },
+    // Il gate del modulo KYC sul calendario legge il tenant: null → `moduloKycAttivo` torna true
+    // (fail-open), così i test esistenti della categoria `kyc` restano invariati.
+    tenant: {
+      findUnique: async () => null,
+    },
     permessoModulo: {
       findUnique: async (args: any) => {
         const chiave = args?.where?.tenantId_userId_moduloChiave;
