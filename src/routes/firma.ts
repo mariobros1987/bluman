@@ -55,7 +55,7 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
   // ── FIRMA ELETTRONICA SEMPLICE (SES) CON OTP: WHATSAPP / EMAIL / TELEGRAM ──
   //
   // Cosa non funzionava, e perché non erano dettagli:
-  //   · il recapito era `cellulare || email || '+39 333 5936278'`. Il numero di una persona
+  //   · il recapito era `cellulare || email || '+39 3xx xxxxxxx'`. Il numero di una persona
   //     reale, cablato nel sorgente, come destinazione predefinita del codice di firma di
   //     qualunque cliente di qualunque studio;
   //   · `clienteId` arrivava dal body e nessuno lo confrontava con la sessione, mentre il

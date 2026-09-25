@@ -630,7 +630,7 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
               <div style={{ display: 'flex', gap: 12 }}>
                 <div style={{ flex: 1 }}>
                   <label htmlFor="cli-cellulare" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>🟢 Cellulare / WhatsApp Diretto *</label>
-                  <input id="cli-cellulare" value={cellulare} onChange={e => setCellulare(e.target.value)} placeholder="+39 333 5936278" required />
+                  <input id="cli-cellulare" value={cellulare} onChange={e => setCellulare(e.target.value)} placeholder="+39 333 1234567" required />
                 </div>
                 <div style={{ flex: 1 }}>
                   <label htmlFor="cli-telegram" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>✈️ Chat ID Telegram</label>

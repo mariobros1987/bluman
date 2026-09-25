@@ -336,7 +336,7 @@ export function getTenantSeedData(tenantId?: string) {
         codiceSdi: 'SUBM70N',
         email: 'client@holdingbeta.advisory',
         telefono: '+39 02 889900',
-        cellulare: '+39 333 5936278',
+        cellulare: '+39 333 1234567',
         referenteNome: 'Ing. Roberto Rossi (CEO)',
         isAttivo: true,
         dataKyc: '15/08/2026',
@@ -344,8 +344,8 @@ export function getTenantSeedData(tenantId?: string) {
         referentiJson: {
           email: 'client@holdingbeta.advisory',
           telefono: '+39 02 889900',
-          cellulare: '+39 333 5936278',
-          whatsapp: '+39 333 5936278',
+          cellulare: '+39 333 1234567',
+          whatsapp: '+39 333 1234567',
           referenteNome: 'Ing. Roberto Rossi (CEO)',
         }
       },
