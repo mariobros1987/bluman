@@ -104,6 +104,93 @@ export function dimenticaModelloStudio(id: string): DocumentTemplate[] {
 
 export const PREBUILT_TEMPLATES: DocumentTemplate[] = [
   {
+    id: 'tmpl-cdd-persona-fisica',
+    titolo: 'Scheda CDD/KYC — Persona Fisica (Malta · FIAU IP Part I)',
+    categoria: 'compliance',
+    descrizione: 'Adeguata verifica (CDD) di persona fisica secondo le FIAU Implementing Procedures Part I: identità, verifica, rischio, PEP, sanzioni, EDD. Identità auto-compilata dal cliente; le sezioni KYC si compilano dai pannelli Compliance.',
+    livelloFirmaRichiesto: 'fea',
+    diSerie: true,
+    contenutoHtml: `
+<h1 style="text-align:center;color:#1e1b4b;font-size:18px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;">Scheda di Adeguata Verifica (CDD/KYC) — Persona Fisica</h1>
+<p style="text-align:center;font-size:11px;color:#555;margin-top:0;">Malta · FIAU Implementing Procedures Part I (PMLFTR) — Studio {{studio.ragione_sociale}} · aperta il {{data_odierna}}</p>
+<h2 style="color:#1e1b4b;font-size:13px;border-bottom:1px solid #ccc;padding-bottom:2px;margin-top:16px;">1. Relazione d'affari</h2>
+<p>Scopo e natura della relazione: ___________________________________________</p>
+<p>Canale di onboarding: ☐ Presenza fisica&nbsp;&nbsp; ☐ A distanza (non face-to-face → adeguata verifica <strong>RAFFORZATA / EDD</strong>)</p>
+<p>Referente interno / MLRO: _______________________&nbsp;&nbsp; Prossima revisione periodica: ______________</p>
+<h2 style="color:#1e1b4b;font-size:13px;border-bottom:1px solid #ccc;padding-bottom:2px;margin-top:16px;">2. Identificazione del soggetto</h2>
+<p>Nome e cognome: {{cliente.ragione_sociale}}&nbsp;&nbsp; Eventuali nomi precedenti: ________________</p>
+<p>Data e luogo di nascita: ___________________&nbsp;&nbsp; Nazionalità (anche multipla): ________________</p>
+<p>Codice fiscale / identificativo: {{cliente.codice_fiscale}}</p>
+<p>Residenza: {{cliente.sede_legale}}</p>
+<p>Recapiti: {{cliente.cellulare}}&nbsp;&nbsp; PEC/email: {{cliente.pec}}</p>
+<p>Professione / datore di lavoro (rilevante per la fonte dei fondi): ___________________________________</p>
+<h2 style="color:#1e1b4b;font-size:13px;border-bottom:1px solid #ccc;padding-bottom:2px;margin-top:16px;">3. Verifica dell'identità</h2>
+<p>Documento: ☐ Passaporto&nbsp; ☐ Carta d'identità&nbsp; ☐ Patente&nbsp;&nbsp; N. ____________ Ente __________ Scadenza __________</p>
+<p>Metodo di verifica: ☐ In presenza&nbsp; ☐ Video-ID&nbsp; ☐ Certificazione notarile&nbsp; ☐ Confronto biometrico</p>
+<p>Verifica indirizzo: ☐ Utenza&nbsp; ☐ Estratto conto&nbsp; ☐ Altro __________&nbsp;&nbsp; Verificato da ____________ il __________</p>
+<h2 style="color:#1e1b4b;font-size:13px;border-bottom:1px solid #ccc;padding-bottom:2px;margin-top:16px;">4. Valutazione del rischio</h2>
+<p>Livello di rischio: ☐ Basso&nbsp; ☐ Medio&nbsp; ☐ Alto&nbsp;&nbsp; Motivazione: _______________________________________</p>
+<p>PEP: ☐ No&nbsp; ☐ Sì (ruolo __________ giurisdizione __________)&nbsp;&nbsp; Familiari/associati stretti: ☐ No&nbsp; ☐ Sì</p>
+<p>Screening sanzioni (liste UE / OFAC / ONU): ☐ Nessun match&nbsp; ☐ Match da valutare&nbsp; ☐ Falso positivo&nbsp;&nbsp; Note: ____________</p>
+<p>Fonte dei fondi: ____________________________&nbsp;&nbsp; Fonte del patrimonio (se rischio medio/alto): ____________________________</p>
+<p>Trigger EDD: ☐ Non face-to-face&nbsp; ☐ PEP&nbsp; ☐ Giurisdizione ad alto rischio&nbsp; ☐ Struttura complessa&nbsp; ☐ Settore a rischio&nbsp;&nbsp; Note: __________</p>
+<h2 style="color:#1e1b4b;font-size:13px;border-bottom:1px solid #ccc;padding-bottom:2px;margin-top:16px;">5. Profilo soggetto obbligato <span style="font-weight:normal;font-size:10px;color:#777;">(compilare solo se profilo CSP autorizzato MFSA)</span></h2>
+<p>N. autorizzazione MFSA: ______________&nbsp;&nbsp; Servizi prestati: ____________________&nbsp;&nbsp; Rif. Certificate of Registration: ______________</p>
+<hr style="margin-top:18px;border:none;border-top:1px solid #ccc;"/>
+<p style="font-size:10px;color:#555;">Le informazioni sono raccolte e verificate ai sensi del PMLFTR e delle FIAU Implementing Procedures Part I. La scheda è conservata nel fascicolo del cliente.</p>
+<div style="display:flex;justify-content:space-between;margin-top:34px;">
+  <div style="width:45%;">{{firma_studio}}</div>
+  <div style="width:45%;">{{firma_cliente}}</div>
+</div>
+`,
+  },
+  {
+    id: 'tmpl-cdd-persona-giuridica',
+    titolo: 'Scheda CDD/KYC — Persona Giuridica & Titolari Effettivi (Malta)',
+    categoria: 'compliance',
+    descrizione: 'Adeguata verifica (CDD) di persona giuridica secondo le FIAU Implementing Procedures Part I: entità, amministratori, soci, titolari effettivi (UBO) con catena di controllo, rischio e verifica. Dati entità auto-compilati dal cliente.',
+    livelloFirmaRichiesto: 'fea',
+    diSerie: true,
+    contenutoHtml: `
+<h1 style="text-align:center;color:#1e1b4b;font-size:18px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;">Scheda di Adeguata Verifica (CDD/KYC) — Persona Giuridica</h1>
+<p style="text-align:center;font-size:11px;color:#555;margin-top:0;">Malta · FIAU Implementing Procedures Part I (PMLFTR) — Studio {{studio.ragione_sociale}} · aperta il {{data_odierna}}</p>
+<h2 style="color:#1e1b4b;font-size:13px;border-bottom:1px solid #ccc;padding-bottom:2px;margin-top:16px;">1. Relazione d'affari</h2>
+<p>Scopo e natura della relazione: ___________________________________________</p>
+<p>Canale di onboarding: ☐ Presenza fisica&nbsp;&nbsp; ☐ A distanza (non face-to-face → adeguata verifica <strong>RAFFORZATA / EDD</strong>)</p>
+<p>Referente interno / MLRO: _______________________&nbsp;&nbsp; Prossima revisione periodica: ______________</p>
+<h2 style="color:#1e1b4b;font-size:13px;border-bottom:1px solid #ccc;padding-bottom:2px;margin-top:16px;">2. Identificazione dell'entità</h2>
+<p>Denominazione sociale: {{cliente.ragione_sociale}}&nbsp;&nbsp; Forma giuridica: ________________</p>
+<p>N. registrazione: {{cliente.partita_iva}}&nbsp;&nbsp; Giurisdizione di costituzione: ________________&nbsp;&nbsp; Data costituzione: __________</p>
+<p>Sede legale: {{cliente.sede_legale}}&nbsp;&nbsp; Sede operativa (se diversa): ________________________________</p>
+<p>Oggetto sociale / attività effettiva: ___________________________________________</p>
+<p>Certificate of good standing / vigenza: ☐ Acquisito&nbsp; ☐ N/A&nbsp;&nbsp; Rif.: ______________</p>
+<h2 style="color:#1e1b4b;font-size:13px;border-bottom:1px solid #ccc;padding-bottom:2px;margin-top:16px;">3. Amministratori e soci</h2>
+<p>Amministratori (nome, data nascita, nazionalità): ___________________________________________</p>
+<p>&nbsp;&nbsp;___________________________________________________________________________________</p>
+<p>Soci / azionisti e quote (%): ______________________________________________________________</p>
+<h2 style="color:#1e1b4b;font-size:13px;border-bottom:1px solid #ccc;padding-bottom:2px;margin-top:16px;">4. Titolari effettivi (UBO) — soglia di controllo &gt;25%</h2>
+<p style="font-size:10px;color:#777;">Per ogni UBO: nome, data/luogo nascita, nazionalità, base del controllo (proprietà / diritti di voto / dirigente apicale), quota %, e catena di controllo se passa per altre entità (fino alla persona fisica finale).</p>
+<p>UBO 1: ______________________________________&nbsp; base ____________&nbsp; quota ____%&nbsp; catena ____________</p>
+<p>UBO 2: ______________________________________&nbsp; base ____________&nbsp; quota ____%&nbsp; catena ____________</p>
+<p>UBO 3: ______________________________________&nbsp; base ____________&nbsp; quota ____%&nbsp; catena ____________</p>
+<p>Documenti societari acquisiti: ☐ Atto costitutivo/statuto&nbsp; ☐ Registro amministratori/soci&nbsp; ☐ Organigramma di gruppo&nbsp; ☐ Bilanci (source of funds, rischio medio/alto)</p>
+<h2 style="color:#1e1b4b;font-size:13px;border-bottom:1px solid #ccc;padding-bottom:2px;margin-top:16px;">5. Valutazione del rischio</h2>
+<p>Livello di rischio: ☐ Basso&nbsp; ☐ Medio&nbsp; ☐ Alto&nbsp;&nbsp; Motivazione: _______________________________________</p>
+<p>PEP (fra UBO/amministratori): ☐ No&nbsp; ☐ Sì (chi/ruolo __________)&nbsp;&nbsp; Screening sanzioni (UE/OFAC/ONU): ☐ Nessun match&nbsp; ☐ Match da valutare&nbsp; ☐ Falso positivo</p>
+<p>Fonte dei fondi: ____________________________&nbsp;&nbsp; Fonte del patrimonio (se rischio medio/alto): ____________________________</p>
+<p>Trigger EDD: ☐ Non face-to-face&nbsp; ☐ PEP&nbsp; ☐ Giurisdizione ad alto rischio&nbsp; ☐ Struttura complessa&nbsp; ☐ Settore a rischio&nbsp;&nbsp; Note: __________</p>
+<h2 style="color:#1e1b4b;font-size:13px;border-bottom:1px solid #ccc;padding-bottom:2px;margin-top:16px;">6. Verifica e profilo soggetto obbligato</h2>
+<p>Fonte della verifica (companies registry ufficiale): ________________&nbsp;&nbsp; Verificato da ____________ il __________</p>
+<p><span style="font-size:10px;color:#777;">(solo se CSP autorizzato MFSA)</span> N. autorizzazione MFSA: ____________&nbsp; Servizi prestati: ______________&nbsp; Rif. Certificate of Registration: ____________</p>
+<hr style="margin-top:18px;border:none;border-top:1px solid #ccc;"/>
+<p style="font-size:10px;color:#555;">Le informazioni sono raccolte e verificate ai sensi del PMLFTR e delle FIAU Implementing Procedures Part I. La scheda è conservata nel fascicolo del cliente.</p>
+<div style="display:flex;justify-content:space-between;margin-top:34px;">
+  <div style="width:45%;">{{firma_studio}}</div>
+  <div style="width:45%;">{{firma_cliente}}</div>
+</div>
+`,
+  },
+  {
     id: 'tmpl-engagement',
     titolo: 'Lettera d\'Incarico Professionale (Engagement Letter)',
     categoria: 'engagement',

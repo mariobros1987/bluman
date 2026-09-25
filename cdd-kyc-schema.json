@@ -1,0 +1,230 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "bluman://schemas/cdd-kyc-malta.json",
+  "title": "Modulo CDD/KYC-AML (Malta - FIAU Implementing Procedures Part I)",
+  "description": "Schema dati per il modulo di Customer Due Diligence in BluMan Document Studio. Copre persona fisica, persona giuridica (con UBO ripetibile) e profilo configurabile CSP-MFSA / altro soggetto obbligato.",
+  "type": "object",
+  "required": ["subjectPersonProfile", "clientType", "relationship", "riskAssessment"],
+  "properties": {
+
+    "subjectPersonProfile": {
+      "type": "string",
+      "enum": ["CSP_MFSA_AUTHORISED", "OTHER_OBLIGED_ENTITY"],
+      "description": "Profilo configurabile: determina se mostrare i campi specifici CSP-MFSA"
+    },
+
+    "clientType": {
+      "type": "string",
+      "enum": ["NATURAL_PERSON", "LEGAL_ENTITY", "TRUST_OR_ARRANGEMENT", "OTHER"]
+    },
+
+    "relationship": {
+      "type": "object",
+      "required": ["purpose", "onboardingChannel", "openedAt"],
+      "properties": {
+        "purpose": { "type": "string", "description": "Scopo e natura della relazione d'affari" },
+        "onboardingChannel": {
+          "type": "string",
+          "enum": ["FACE_TO_FACE", "NON_FACE_TO_FACE"],
+          "description": "NON_FACE_TO_FACE attiva automaticamente i trigger EDD"
+        },
+        "openedAt": { "type": "string", "format": "date" },
+        "internalOwner": { "type": "string", "description": "Referente interno / MLRO / compliance officer" },
+        "nextReviewDueAt": { "type": "string", "format": "date" }
+      }
+    },
+
+    "riskAssessment": {
+      "type": "object",
+      "required": ["riskLevel", "rationale"],
+      "properties": {
+        "riskLevel": { "type": "string", "enum": ["LOW", "MEDIUM", "HIGH"] },
+        "rationale": { "type": "string" },
+        "pepScreening": {
+          "type": "object",
+          "properties": {
+            "isPep": { "type": "boolean" },
+            "pepRole": { "type": "string" },
+            "pepJurisdiction": { "type": "string" },
+            "familyOrCloseAssociates": { "type": "boolean" }
+          }
+        },
+        "sanctionsScreening": {
+          "type": "object",
+          "properties": {
+            "checked": { "type": "boolean" },
+            "listsChecked": {
+              "type": "array",
+              "items": { "type": "string", "enum": ["EU", "OFAC", "UN", "OTHER"] }
+            },
+            "hit": { "type": "boolean" },
+            "notes": { "type": "string" }
+          }
+        },
+        "sourceOfFunds": { "type": "string" },
+        "sourceOfWealth": { "type": "string" },
+        "eddTriggers": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["NON_FACE_TO_FACE", "PEP", "HIGH_RISK_JURISDICTION", "COMPLEX_STRUCTURE", "HIGH_RISK_SECTOR", "OTHER"]
+          }
+        },
+        "eddNotes": { "type": "string" }
+      }
+    },
+
+    "naturalPerson": {
+      "description": "Presente quando clientType = NATURAL_PERSON, oppure per ogni firmatario/UBO/amministratore all'interno di legalEntity",
+      "$ref": "#/definitions/naturalPerson"
+    },
+
+    "legalEntity": {
+      "description": "Presente quando clientType = LEGAL_ENTITY",
+      "$ref": "#/definitions/legalEntity"
+    },
+
+    "cspSpecific": {
+      "description": "Richiesto solo se subjectPersonProfile = CSP_MFSA_AUTHORISED",
+      "type": "object",
+      "properties": {
+        "mfsaAuthorisationNumber": { "type": "string" },
+        "servicesProvided": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["NOMINEE", "REGISTERED_OFFICE", "DIRECTORSHIP", "COMPANY_SECRETARY", "ADMINISTRATION", "OTHER"] }
+        },
+        "certificateOfRegistrationRef": { "type": "string" }
+      }
+    }
+  },
+
+  "definitions": {
+
+    "naturalPerson": {
+      "type": "object",
+      "required": ["fullName", "dateOfBirth", "nationality", "identification", "verification"],
+      "properties": {
+        "fullName": { "type": "string" },
+        "previousNames": { "type": "array", "items": { "type": "string" } },
+        "dateOfBirth": { "type": "string", "format": "date" },
+        "placeOfBirth": { "type": "string" },
+        "nationality": { "type": "array", "items": { "type": "string" }, "description": "Anche multipla" },
+        "taxIdentifier": { "type": "string" },
+        "residentialAddress": {
+          "type": "object",
+          "properties": {
+            "line1": { "type": "string" },
+            "city": { "type": "string" },
+            "postalCode": { "type": "string" },
+            "country": { "type": "string" }
+          }
+        },
+        "contactEmail": { "type": "string", "format": "email" },
+        "contactPhone": { "type": "string" },
+        "occupation": { "type": "string" },
+        "employer": { "type": "string" },
+
+        "identification": {
+          "type": "object",
+          "required": ["documentType", "documentNumber", "issuingAuthority", "expiryDate"],
+          "properties": {
+            "documentType": { "type": "string", "enum": ["PASSPORT", "NATIONAL_ID", "DRIVING_LICENCE"] },
+            "documentNumber": { "type": "string" },
+            "issuingAuthority": { "type": "string" },
+            "issueDate": { "type": "string", "format": "date" },
+            "expiryDate": { "type": "string", "format": "date" },
+            "documentUpload": { "type": "string", "description": "Riferimento file caricato in Document Studio" }
+          }
+        },
+
+        "verification": {
+          "type": "object",
+          "properties": {
+            "method": { "type": "string", "enum": ["NOTARIAL_CERTIFICATION", "VIDEO_ID", "BIOMETRIC_MATCH", "IN_PERSON", "OTHER"] },
+            "addressProofType": { "type": "string", "enum": ["UTILITY_BILL", "BANK_STATEMENT", "OTHER"] },
+            "addressProofUpload": { "type": "string" },
+            "verifiedAt": { "type": "string", "format": "date" },
+            "verifiedBy": { "type": "string" }
+          }
+        }
+      }
+    },
+
+    "legalEntity": {
+      "type": "object",
+      "required": ["legalName", "legalForm", "registrationNumber", "jurisdiction", "registeredAddress", "ubos"],
+      "properties": {
+        "legalName": { "type": "string" },
+        "legalForm": { "type": "string" },
+        "registrationNumber": { "type": "string" },
+        "jurisdiction": { "type": "string" },
+        "incorporationDate": { "type": "string", "format": "date" },
+        "registeredAddress": {
+          "type": "object",
+          "properties": {
+            "line1": { "type": "string" },
+            "city": { "type": "string" },
+            "postalCode": { "type": "string" },
+            "country": { "type": "string" }
+          }
+        },
+        "operatingAddress": {
+          "type": "object",
+          "description": "Se diversa dalla sede legale",
+          "properties": {
+            "line1": { "type": "string" },
+            "city": { "type": "string" },
+            "postalCode": { "type": "string" },
+            "country": { "type": "string" }
+          }
+        },
+        "businessActivity": { "type": "string" },
+        "goodStandingCertificateRef": { "type": "string" },
+
+        "directors": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/naturalPerson" }
+        },
+
+        "shareholders": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "holder": { "$ref": "#/definitions/naturalPerson" },
+              "holderIsLegalEntity": { "type": "boolean", "description": "Se true, riferirsi a un'altra istanza legalEntity nella catena di controllo" },
+              "sharePercentage": { "type": "number", "minimum": 0, "maximum": 100 }
+            }
+          }
+        },
+
+        "ubos": {
+          "type": "array",
+          "description": "Titolari effettivi, tipicamente soglia di controllo >25%",
+          "items": {
+            "type": "object",
+            "required": ["person", "controlBasis"],
+            "properties": {
+              "person": { "$ref": "#/definitions/naturalPerson" },
+              "controlBasis": { "type": "string", "enum": ["OWNERSHIP", "VOTING_RIGHTS", "SENIOR_MANAGING_OFFICIAL", "OTHER_CONTROL"] },
+              "percentage": { "type": "number", "minimum": 0, "maximum": 100 },
+              "controlChainNotes": { "type": "string", "description": "Descrizione catena di controllo se passa per altre entità" }
+            }
+          }
+        },
+
+        "groupStructureUpload": { "type": "string", "description": "Organigramma di gruppo, se applicabile" },
+        "financialStatementsUpload": { "type": "string", "description": "Bilanci recenti, richiesti per source of funds se rischio medio/alto" },
+
+        "verification": {
+          "type": "object",
+          "properties": {
+            "registrySource": { "type": "string", "description": "Registro camerale/companies registry ufficiale della giurisdizione" },
+            "verifiedAt": { "type": "string", "format": "date" },
+            "verifiedBy": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}
