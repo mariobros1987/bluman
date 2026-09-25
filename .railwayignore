@@ -24,6 +24,7 @@ frontend
 
 # Materiale di lavoro locale
 scratch/
+.terminal_backup/
 uploads/
 *.log
 openstamanager_source/
