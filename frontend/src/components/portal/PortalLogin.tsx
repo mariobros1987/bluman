@@ -134,18 +134,8 @@ export function PortalLogin({
             <button
               type="submit"
               disabled={loginLoading}
-              style={{
-                background: 'var(--indigo)',
-                color: 'var(--on-accent)',
-                border: 'none',
-                padding: '12px 20px',
-                borderRadius: 10,
-                fontSize: 13,
-                fontWeight: 700,
-                cursor: loginLoading ? 'wait' : 'pointer',
-                marginTop: 6,
-                boxShadow: '0 4px 14px rgba(99, 102, 241, 0.4)',
-              }}
+              className="btn btn-primary"
+              style={{ marginTop: 6 }}
             >
               {loginLoading ? 'Verifica credenziali in corso...' : 'Accedi al Portale Riservato ➔'}
             </button>
@@ -171,18 +161,8 @@ export function PortalLogin({
             <button
               type="submit"
               disabled={loginLoading}
-              style={{
-                background: 'var(--indigo)',
-                color: 'var(--on-accent)',
-                border: 'none',
-                padding: '12px 20px',
-                borderRadius: 10,
-                fontSize: 13,
-                fontWeight: 700,
-                cursor: loginLoading ? 'wait' : 'pointer',
-                marginTop: 6,
-                boxShadow: '0 4px 14px rgba(99, 102, 241, 0.4)',
-              }}
+              className="btn btn-primary"
+              style={{ marginTop: 6 }}
             >
               {loginLoading ? 'Verifica Magic Token...' : 'Accedi con Magic Token ➔'}
             </button>
