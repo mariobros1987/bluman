@@ -288,14 +288,14 @@ export function Projects() {
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             <button
               onClick={() => navigate('/documents')}
-              style={{ background: 'var(--card2)', color: 'var(--text)', border: '1px solid var(--border)', padding: '8px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+              className="btn btn-secondary"
             >
               <span>📝 Document Studio</span>
             </button>
             <button
               id="btn-nuovo-progetto"
               onClick={() => setWizardOpen(true)}
-              style={{ background: 'var(--indigo)', color: 'var(--on-accent)', border: 'none', padding: '8px 18px', borderRadius: 8, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 14px rgba(99,102,241,.3)', display: 'flex', alignItems: 'center', gap: 6 }}
+              className="btn btn-primary"
             >
               <span>+ Nuovo Progetto Incarico</span>
             </button>
@@ -501,7 +501,7 @@ export function Projects() {
           <div style={{ fontSize: 12.5, marginBottom: 18 }}>Prova a modificare la ricerca o seleziona un'altra categoria.</div>
           <button
             onClick={() => { setSearchTerm(''); setStatusFilter('all'); setCatFilter('ALL'); setSelectedAdvisorId('ALL'); }}
-            style={{ background: 'var(--indigo)', color: 'var(--on-accent)', border: 'none', padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+            className="btn btn-primary"
           >
             Reset Filtri
           </button>
@@ -669,7 +669,7 @@ export function Projects() {
                     <button
                       type="button"
                       onClick={() => navigate(`/documents?projId=${p.id}`)}
-                      style={{ background: 'var(--pill-indigo-bg)', border: '1px solid var(--pill-indigo-bd)', color: 'var(--pill-indigo-fg)', padding: '4px 8px', borderRadius: 6, fontSize: 10.5, fontWeight: 700, cursor: 'pointer' }}
+                      className="btn btn-secondary btn-sm"
                       title="Genera documento Word per questa pratica"
                     >
                       📝 Doc
@@ -677,7 +677,7 @@ export function Projects() {
                     <button
                       type="button"
                       onClick={() => navigate(`/projects/${p.id}`)}
-                      style={{ background: 'var(--indigo)', color: 'var(--on-accent)', border: 'none', padding: '4px 12px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+                      className="btn btn-primary btn-sm"
                     >
                       Apri Fascicolo ➔
                     </button>
@@ -774,7 +774,7 @@ export function Projects() {
                           <button
                             type="button"
                             onClick={() => navigate(`/documents?projId=${p.id}`)}
-                            style={{ background: 'var(--pill-indigo-bg)', border: '1px solid var(--pill-indigo-bd)', color: 'var(--pill-indigo-fg)', padding: '4px 8px', borderRadius: 6, fontSize: 10.5, fontWeight: 700, cursor: 'pointer' }}
+                            className="btn btn-secondary btn-sm"
                             title="Genera documento Word"
                           >
                             📝 Doc
@@ -782,7 +782,7 @@ export function Projects() {
                           <button
                             type="button"
                             onClick={() => navigate(`/projects/${p.id}`)}
-                            style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+                            className="btn btn-primary btn-sm"
                           >
                             Fascicolo ➔
                           </button>

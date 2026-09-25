@@ -327,7 +327,8 @@ export function ClientsPage() {
 
           <button
             onClick={() => { setErroreModale(''); setModalOpen(true); }}
-            style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap' }}
+            className="btn btn-primary"
+            style={{ whiteSpace: 'nowrap' }}
           >
             + Nuovo Cliente
           </button>
@@ -343,7 +344,7 @@ export function ClientsPage() {
           <div>Nessun cliente trovato con i filtri correnti ({meta.totale} totali in anagrafica).</div>
           <button
             onClick={() => { setSearch(''); setFilterType('all'); }}
-            style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', boxShadow: '0 4px 12px rgba(99,102,241,.3)' }}
+            className="btn btn-primary"
           >
             ✖ Azzera Filtro Ricerca
           </button>
@@ -438,8 +439,8 @@ export function ClientsPage() {
               </div>
             )}
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
-              <button type="button" onClick={richiediChiusura} style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '7px 14px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}>Annulla</button>
-              <button type="submit" disabled={submitting} style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>{submitting ? 'Salvataggio...' : '✓ Salva Cliente'}</button>
+              <button type="button" onClick={richiediChiusura} className="btn btn-secondary">Annulla</button>
+              <button type="submit" disabled={submitting} className="btn btn-primary">{submitting ? 'Salvataggio...' : '✓ Salva Cliente'}</button>
             </div>
           </form>
           )}
