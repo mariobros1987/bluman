@@ -956,7 +956,7 @@ export function DocumentEditorPage() {
               id: 'fea' as const,
               icon: '🧠',
               titolo: 'FEA — Avanzata',
-              desc: 'Firma elettronica avanzata (eIDAS art. 26): richiede misure aggiuntive in Fase 3; per ora il portale la rifiuta.',
+              desc: 'Firma elettronica avanzata (eIDAS art. 26): il cliente firma dal Portale con flusso certificato — OTP verificato, firma grafica obbligatoria e firmatario verificato in anagrafica.',
             },
             {
               id: 'feq' as const,
