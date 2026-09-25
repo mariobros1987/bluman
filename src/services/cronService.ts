@@ -6,6 +6,7 @@ import { notificaStudioSilenziosa } from './notificheService.js';
 import { recordAudit } from '../util/serverHelpers.js';
 import { giornoSollecitoRata, kycInAvviso, tonoRata } from '../util/scadenzeDerivate.js';
 import { revisioneKycDovuta, motivoRevisioneKyc } from '../domain/monitoraggioKyc.js';
+import { moduloKycAttivo } from '../util/guardiaModuli.js';
 
 export interface CronReport {
   timestamp: string;
@@ -141,33 +142,35 @@ export async function runDailyNotificationCron(tenantId?: string): Promise<CronR
     }
   }
 
-  // 4. Revisioni KYC periodiche (K7, spec §5.2): una pratica approvata non è "finita", va rivista
-  //    con cadenza legata al rischio. La condizione sta nel dominio puro `monitoraggioKyc`, così cron
-  //    e calendario non divergono. Detection + reminder soltanto: la transizione a `in_revisione` la
-  //    fa l'operatore (regola 14). Nessun ComplianceEvent qui, per non riempire la catena append-only
-  //    di un anello identico ogni giorno finché resta dovuta: l'evento lo scrive la transizione vera.
-  const fascicoliKyc = await prisma.fascicoloKyc.findMany({
-    where: { tenantId, stato: { in: ['approvato', 'in_revisione'] } },
-    include: {
-      cliente: { select: { nome: true } },
-      riskAssessments: { orderBy: { versione: 'desc' }, take: 1, select: { prossimaRevisione: true } },
-    },
-  });
-  for (const f of fascicoliKyc) {
-    const prossima = f.riskAssessments[0]?.prossimaRevisione ?? null;
-    if (revisioneKycDovuta(f.stato, f.dataScadenza, prossima, adesso)) {
-      const clNome = f.cliente?.nome || 'Cliente';
-      const corpo = `[KYC] Revisione periodica dovuta per ${clNome} — ${motivoRevisioneKyc(f.stato, f.dataScadenza, prossima, adesso)}`;
-      report.revisioniKycTrovate += 1;
-      report.dettagli.push(corpo);
-      if (!giaNotificati.has(corpo)) {
-        giaNotificati.add(corpo);
-        report.notificheInviate += await notificaStudioSilenziosa(tenantId, {
-          tipoEvento: 'scadenza_imminente',
-          oggetto: 'Revisione KYC in scadenza',
-          corpo,
-          link: '/clients',
-        });
+  // 4. Revisioni KYC periodiche (K7, spec §5.2) — SOLO se il modulo KYC è attivo per lo studio: se
+  //    l'admin l'ha spento, niente promemoria di revisione (coerente col 403 delle rotte /kyc).
+  //    Detection + reminder soltanto (la transizione a `in_revisione` la fa l'operatore, regola 14);
+  //    nessun ComplianceEvent per il promemoria (l'evento lo scrive la transizione vera). La
+  //    condizione di "dovuta" sta nel dominio puro `monitoraggioKyc`, così cron e calendario non divergono.
+  if (await moduloKycAttivo(tenantId)) {
+    const fascicoliKyc = await prisma.fascicoloKyc.findMany({
+      where: { tenantId, stato: { in: ['approvato', 'in_revisione'] } },
+      include: {
+        cliente: { select: { nome: true } },
+        riskAssessments: { orderBy: { versione: 'desc' }, take: 1, select: { prossimaRevisione: true } },
+      },
+    });
+    for (const f of fascicoliKyc) {
+      const prossima = f.riskAssessments[0]?.prossimaRevisione ?? null;
+      if (revisioneKycDovuta(f.stato, f.dataScadenza, prossima, adesso)) {
+        const clNome = f.cliente?.nome || 'Cliente';
+        const corpo = `[KYC] Revisione periodica dovuta per ${clNome} — ${motivoRevisioneKyc(f.stato, f.dataScadenza, prossima, adesso)}`;
+        report.revisioniKycTrovate += 1;
+        report.dettagli.push(corpo);
+        if (!giaNotificati.has(corpo)) {
+          giaNotificati.add(corpo);
+          report.notificheInviate += await notificaStudioSilenziosa(tenantId, {
+            tipoEvento: 'scadenza_imminente',
+            oggetto: 'Revisione KYC in scadenza',
+            corpo,
+            link: '/clients',
+          });
+        }
       }
     }
   }

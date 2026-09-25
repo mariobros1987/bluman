@@ -8,6 +8,7 @@ const {
   mockFascicoloFindMany,
   mockNotificaStudio,
   mockRecordAudit,
+  mockModuloKycAttivo,
 } = vi.hoisted(() => ({
   mockClienteFindMany: vi.fn(),
   mockScadenzaFindMany: vi.fn(),
@@ -16,6 +17,11 @@ const {
   mockFascicoloFindMany: vi.fn(),
   mockNotificaStudio: vi.fn(),
   mockRecordAudit: vi.fn(),
+  mockModuloKycAttivo: vi.fn(),
+}));
+
+vi.mock('../util/guardiaModuli.js', () => ({
+  moduloKycAttivo: mockModuloKycAttivo,
 }));
 
 vi.mock('../util/prismaClient.js', () => ({
@@ -50,6 +56,7 @@ describe('runDailyNotificationCron', () => {
     mockFatturaFindMany.mockResolvedValue([]);
     mockFascicoloFindMany.mockResolvedValue([]);
     mockRecordAudit.mockResolvedValue(undefined);
+    mockModuloKycAttivo.mockResolvedValue(true);
   });
 
   it('mantiene il report vuoto per il controllo legacy senza tenant', async () => {
@@ -133,6 +140,16 @@ describe('runDailyNotificationCron', () => {
     const report = await runDailyNotificationCron('tenant-1');
     expect(report.revisioniKycTrovate).toBe(0);
   });
+
+  it('K7 — se il modulo KYC è spento per lo studio, niente promemoria (né query fascicoli)', async () => {
+    mockModuloKycAttivo.mockResolvedValueOnce(false);
+    mockFascicoloFindMany.mockResolvedValueOnce([
+      { id: 'kyc-3', stato: 'approvato', dataScadenza: new Date('2020-01-01'), cliente: { nome: 'Delta' }, riskAssessments: [] },
+    ]);
+    const report = await runDailyNotificationCron('tenant-1');
+    expect(report.revisioniKycTrovate).toBe(0);
+    expect(mockFascicoloFindMany).not.toHaveBeenCalled();
+  });
 });
 
 /**
@@ -176,6 +193,7 @@ describe('il cron e la derivazione delle scadenze usano la stessa regola', () =>
     mockNotificaFindMany.mockResolvedValue([]);
     mockNotificaStudio.mockResolvedValue(1);
     mockFascicoloFindMany.mockResolvedValue([]);
+    mockModuloKycAttivo.mockResolvedValue(true);
   });
 
   afterEach(() => {
