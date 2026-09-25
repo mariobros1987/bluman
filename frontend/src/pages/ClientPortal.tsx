@@ -37,6 +37,7 @@ import { TabProposta } from '../components/portal/TabProposta';
 import { TabAvanzamento } from '../components/portal/TabAvanzamento';
 import { TabForm } from '../components/portal/TabForm';
 import { TabDocumenti } from '../components/portal/TabDocumenti';
+import { DocumentiKycPortale } from '../components/DocumentiKycPortale';
 import { TabFatture } from '../components/portal/TabFatture';
 import { TabContatti } from '../components/portal/TabContatti';
 import { TabProfilo } from '../components/portal/TabProfilo';
@@ -651,6 +652,7 @@ export function ClientPortal() {
 
         {/* TAB 4: Documenti Legali & Firme con Persistenza */}
         {activeTab === 'documenti' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <TabDocumenti
             portalDocs={portalDocs}
             portalDocsErrore={portalDocsErrore}
@@ -673,6 +675,8 @@ export function ClientPortal() {
             setModalitaFirma={setModalitaFirma}
             setDocumentoDaCaricare={setDocumentoDaCaricare}
           />
+          <DocumentiKycPortale clienteId={clientObj?.id} />
+          </div>
         )}
 
         {/* TAB 5: Fatture & Stato Pagamenti (§2.11) */}

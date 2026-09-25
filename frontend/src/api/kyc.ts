@@ -155,3 +155,21 @@ export async function caricaDocumentoSoggetto(soggettoId: string, body: {
   return await res.json();
 }
 
+// K6/3 — documenti KYC dal Portale Cliente (autenticato come cliente).
+export async function fetchPortalKycDocumenti(clienteId?: string): Promise<{
+  moduloAttivo: boolean; praticaAttiva: boolean; documenti: DocumentoIdentitaRiga[];
+}> {
+  const q = clienteId ? `?clienteId=${encodeURIComponent(clienteId)}` : '';
+  const res = await apiFetch(`${API_BASE}/portal/kyc/documenti${q}`, { headers: getAuthHeaders() });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore lettura documenti KYC'));
+  return await res.json();
+}
+
+export async function caricaPortalKycDocumento(body: { tipo: string; filename: string; contentBase64: string; clienteId?: string }) {
+  const res = await apiFetch(`${API_BASE}/portal/kyc/documento`, {
+    method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore caricamento documento'));
+  return await res.json();
+}
+

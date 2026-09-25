@@ -21,9 +21,65 @@ import { type StatoPropostaDati } from '@prisma/client';
 import { prisma } from '../util/prismaClient.js';
 import { notificaStudio, notificaCliente } from '../services/notificheService.js';
 import { recordAudit, clienteDellaRichiesta } from '../util/serverHelpers.js';
+import { uploadDocumento, rifirmaUrlUpload } from '../services/storageService.js';
+import { moduloKycAttivo } from '../util/guardiaModuli.js';
+import { registraComplianceEvent } from '../services/complianceEventLog.js';
+import { createHash } from 'node:crypto';
 
 // ─── PORTALE CLIENTE (§2.6, §2.11, §2.3, §2.5) ─────────────────────
 export async function registraRottePortale(server: FastifyInstance): Promise<void> {
+
+  // ── K6/3 — upload documenti KYC dal Portale Cliente (autenticato come `cliente`) ──────
+  // Il cliente carica sul proprio fascicolo. `soggettoKycDelCliente` risolve/crea il soggetto del
+  // cliente dal fascicolo corrente (l'upload del cliente è materiale: la verifica resta allo studio, §14).
+  const soggettoKycDelCliente = async (tenantId: string, clienteId: string, creaSeManca: boolean): Promise<string | null> => {
+    const fasc = await prisma.fascicoloKyc.findFirst({ where: { tenantId, clienteId }, orderBy: { createdAt: 'desc' }, select: { id: true, soggettoId: true } });
+    if (!fasc) return null;
+    if (fasc.soggettoId) return fasc.soggettoId;
+    if (!creaSeManca) return null;
+    const cliente = await prisma.cliente.findFirst({ where: { id: clienteId, tenantId }, select: { nome: true } });
+    const sog = await prisma.soggettoKyc.create({ data: { tenantId, clienteId, denominazione: cliente?.nome || 'Cliente', tipo: 'persona_fisica' } });
+    await prisma.fascicoloKyc.update({ where: { id: fasc.id }, data: { soggettoId: sog.id } });
+    return sog.id;
+  };
+
+  server.get<{ Querystring: { clienteId?: string } }>('/portal/kyc/documenti', async (req, reply) => {
+    const tenantId = req.tenantId;
+    const clienteId = clienteDellaRichiesta(req, req.query?.clienteId);
+    if (!clienteId) return reply.code(400).send({ errore: 'Cliente non identificato.' });
+    if (!(await moduloKycAttivo(tenantId))) return reply.send({ moduloAttivo: false, praticaAttiva: false, documenti: [] });
+    const soggettoId = await soggettoKycDelCliente(tenantId, clienteId, false);
+    if (!soggettoId) return reply.send({ moduloAttivo: true, praticaAttiva: false, documenti: [] });
+    const documenti = await prisma.documentoIdentita.findMany({ where: { tenantId, soggettoId }, orderBy: { createdAt: 'desc' } });
+    return reply.send({ moduloAttivo: true, praticaAttiva: true, documenti: documenti.map((d) => ({ id: d.id, tipo: d.tipo, scadenza: d.scadenza, createdAt: d.createdAt, urlStorage: rifirmaUrlUpload(d.urlStorage) })) });
+  });
+
+  server.post<{ Body: { clienteId?: string; tipo?: string; filename?: string; contentBase64?: string } }>('/portal/kyc/documento', async (req, reply) => {
+    const tenantId = req.tenantId;
+    const clienteId = clienteDellaRichiesta(req, req.body?.clienteId);
+    if (!clienteId) return reply.code(400).send({ errore: 'Cliente non identificato.' });
+    if (!(await moduloKycAttivo(tenantId))) return reply.code(403).send({ errore: 'Il modulo Compliance/KYC non è attivo per questo studio.' });
+    const b = req.body || {};
+    if (!b.contentBase64 || !b.filename) return reply.code(400).send({ errore: 'File e nome file obbligatori.' });
+    const soggettoId = await soggettoKycDelCliente(tenantId, clienteId, true);
+    if (!soggettoId) return reply.code(409).send({ errore: 'La pratica KYC non è ancora attiva: lo studio la sta preparando. Riprova più tardi o contatta il tuo referente.' });
+    let url: string;
+    try {
+      const res = await uploadDocumento(String(b.filename), String(b.contentBase64), tenantId);
+      if (!res.ok || !res.url) return reply.code(400).send({ errore: 'Upload non riuscito.' });
+      url = res.url;
+    } catch (e: any) {
+      return reply.code(400).send({ errore: e?.message || 'File non ammesso.' });
+    }
+    const hash = createHash('sha256').update(Buffer.from(String(b.contentBase64), 'base64')).digest('hex');
+    const doc = await prisma.documentoIdentita.create({
+      data: { tenantId, soggettoId, tipo: ['carta_identita', 'passaporto', 'permesso_soggiorno', 'altro'].includes(b.tipo || '') ? b.tipo! : 'altro', urlStorage: url, hashSha256: hash, esitoVerifica: null },
+    });
+    await registraComplianceEvent(prisma, { tenantId, tipo: 'KYC_DOCUMENTO_CARICATO_CLIENTE', attoreUserId: null, payload: { soggettoId, tipo: doc.tipo, clienteId } });
+    await recordAudit({ tenantId, userId: req.userId ?? null, ruolo: req.ruolo ?? 'cliente', azione: 'KYC_DOCUMENTO_CARICATO_CLIENTE', entita: `Soggetto ${soggettoId}`, dettagli: `Documento ${doc.tipo} (portale cliente)`, ipAddress: req.ip });
+    return reply.send({ ok: true, documento: { id: doc.id, tipo: doc.tipo } });
+  });
+
   // ────────────────────────────────────────────────────────────────
   // §2.6 — CONTATTI DEL PORTALE: il riferimento è il lead advisor del tenant.
   //
