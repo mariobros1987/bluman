@@ -1926,6 +1926,7 @@ model FascicoloKyc {
   legamiControllo    LegameControllo[]
   depositiRegistroTe DepositoRegistroTe[]
   riskAssessments    RiskAssessment[]
+  screenings         ScreeningKyc[]
 
   @@index([tenantId, clienteId])
   @@index([tenantId, stato, dataScadenza])
@@ -2194,4 +2195,48 @@ model RiskAssessment {
 
   @@index([tenantId, fascicoloId])
   @@map("risk_assessment")
+}
+
+enum TipoScreening {
+  sanzioni
+  pep
+  media_negativi
+}
+
+enum EsitoScreening {
+  nessun_match
+  match_da_valutare
+  match_confermato
+  falso_positivo
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// KYC/AML Fase K5 (Malta, spec §5.1.5 / §7 / §8.4 / §10) — screening PEP / sanzioni / media negativi.
+// Processo MANUALE (screeningProvider default "MANUALE", spec §10): l'operatore registra l'esito con
+// allegato. Un match NON risolto (match_da_valutare | match_confermato) blocca l'approvazione della
+// pratica (§8.4). Una riga per `tipo`: un match PEP si risolve indipendentemente da uno sanzioni.
+// ═══════════════════════════════════════════════════════════════════
+model ScreeningKyc {
+  id          String       @id @default(uuid())
+  tenantId    String       @map("tenant_id")
+  fascicoloId String       @map("fascicolo_id")
+  fascicolo   FascicoloKyc @relation(fields: [fascicoloId], references: [id], onDelete: Cascade)
+  soggettoId  String?      @map("soggetto_id")
+
+  tipo          TipoScreening
+  esito         EsitoScreening @default(nessun_match)
+  fonte         String?
+  dataScreening DateTime       @default(now()) @map("data_screening")
+  matchDettagli String?        @map("match_dettagli")
+  allegatoUrl   String?        @map("allegato_url")
+
+  notaRisoluzione String?   @map("nota_risoluzione")
+  risoltoDa       String?   @map("risolto_da")
+  risoltoIl       DateTime? @map("risolto_il")
+
+  attoreUserId String?  @map("attore_user_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, fascicoloId])
+  @@map("screening_kyc")
 }
