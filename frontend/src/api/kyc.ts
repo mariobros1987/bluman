@@ -243,3 +243,48 @@ export async function decidiAnomaliaApi(anomaliaId: string, decisione: Decisione
   return await res.json();
 }
 
+// K8b — segnalazione operazione sospetta (STR) / dossier goAML (spec §5.3/§10). Riservato MLRO/admin:
+// il backend risponde 403 agli altri ruoli. Il sistema prepara il dossier e registra il riferimento
+// goAML dopo l'invio manuale dell'MLRO sul portale FIAU; non trasmette.
+export type StatoSegnalazioneFiau = 'preparata' | 'trasmessa';
+export interface SegnalazioneFiauRiga {
+  id: string; anomaliaId: string; stato: StatoSegnalazioneFiau; riferimentoGoaml: string | null;
+  trasmessaAt: string | null; createdAt: string; updatedAt: string;
+  anomalia: { tipo: string; descrizione: string } | null;
+}
+
+export async function fetchSegnalazioni(fascicoloId: string): Promise<{ segnalazioni: SegnalazioneFiauRiga[] }> {
+  const res = await apiFetch(`${API_BASE}/kyc/${fascicoloId}/segnalazioni`, { headers: getAuthHeaders() });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore lettura segnalazioni FIAU'));
+  return await res.json();
+}
+
+export async function preparaSegnalazioneApi(anomaliaId: string) {
+  const res = await apiFetch(`${API_BASE}/kyc/anomalie/${anomaliaId}/segnalazione`, { method: 'POST', headers: getAuthHeaders() });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore preparazione segnalazione FIAU'));
+  return await res.json();
+}
+
+export async function registraTrasmissioneStrApi(segnalazioneId: string, riferimentoGoaml: string) {
+  const res = await apiFetch(`${API_BASE}/kyc/segnalazioni/${segnalazioneId}/trasmissione`, {
+    method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({ riferimentoGoaml }),
+  });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore registrazione invio FIAU'));
+  return await res.json();
+}
+
+/** Scarica il dossier PDF della segnalazione (documento riservato all'MLRO). */
+export async function scaricaDossierStrPdf(segnalazioneId: string): Promise<void> {
+  const res = await apiFetch(`${API_BASE}/kyc/segnalazioni/${segnalazioneId}/dossier.pdf`, { headers: getAuthHeaders() });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore download dossier STR'));
+  const blob = await res.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `STR-${segnalazioneId}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.URL.revokeObjectURL(url);
+}
+
