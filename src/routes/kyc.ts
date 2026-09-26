@@ -11,6 +11,9 @@ import { calcolaTitolariEffettivi, scadenzaVariazioneTe } from '../domain/catena
 import { livelloComplessivo, prossimaRevisione, type LivelloRischioK3 } from '../domain/calcoloRischio.js';
 import { screeningBloccaApprovazione, motivoBloccoScreening } from '../domain/screeningKyc.js';
 import { apriAnomalia, decidiAnomalia } from '../services/anomalieService.js';
+import { preparaSegnalazione, registraTrasmissione } from '../services/segnalazioneFiauService.js';
+import { generaDossierStrPdf } from '../services/segnalazioneFiauPdf.js';
+import type { DatiFascicoloPerDossier, DossierStr } from '../domain/segnalazioneFiau.js';
 import { uploadDocumento, rifirmaUrlUpload } from '../services/storageService.js';
 import { createHash } from 'node:crypto';
 import { recordAudit } from '../util/serverHelpers.js';
@@ -490,5 +493,115 @@ export async function registraRotteKyc(server: FastifyInstance): Promise<void> {
     if (esito.esito === 'non_trovata') return reply.code(404).send({ errore: 'Anomalia non trovata' });
     await recordAudit({ tenantId, userId: req.userId, ruolo: req.ruolo, azione: 'KYC_MLRO_DECISIONE', entita: `Anomalia ${aid}`, dettagli: `Decisione ${b.decisione}`, ipAddress: req.ip });
     return reply.send({ ok: true, anomalia: esito.anomalia });
+  });
+
+  // ── K8b — segnalazione operazione sospetta (STR) / dossier goAML (spec §5.3/§10) ─────────
+  // Coda naturale di un'anomalia decisa `segnalazione_fiau` (K8a). Il sistema PREPARA il dossier e
+  // REGISTRA riferimento e timestamp goAML dopo l'invio manuale dell'MLRO; NON trasmette. Tutte le
+  // rotte sono riservate all'MLRO/admin (§5.3: fascicolo anomalie con permessi separati; §8.3).
+
+  // Carica dal fascicolo i dati per il dossier (soggetto, TE, rischio corrente, screening, studio+MLRO).
+  const caricaDatiDossier = async (
+    tenantId: string,
+    anomalia: { tipo: string; descrizione: string; createdAt: Date; fascicoloId: string; decisioni: Array<{ decisione: string; motivazione: string; createdAt: Date }> },
+  ): Promise<DatiFascicoloPerDossier | null> => {
+    const fasc = await prisma.fascicoloKyc.findFirst({
+      where: { id: anomalia.fascicoloId, tenantId },
+      include: {
+        soggetto: true,
+        titolariEffettivi: { include: { soggetto: true } },
+        riskAssessments: { orderBy: { versione: 'desc' }, take: 1 },
+        screenings: { orderBy: { createdAt: 'desc' } },
+      },
+    });
+    if (!fasc) return null;
+    const [tenant, settings] = await Promise.all([
+      prisma.tenant.findUnique({ where: { id: tenantId }, select: { ragioneSociale: true, piva: true } }),
+      prisma.tenantComplianceSettings.findUnique({ where: { tenantId }, select: { mlroUserId: true } }),
+    ]);
+    const r = fasc.riskAssessments[0] ?? null;
+    const dec = anomalia.decisioni[0] ?? null;
+    return {
+      studio: { ragioneSociale: tenant?.ragioneSociale ?? null, partitaIva: tenant?.piva ?? null, mlroUserId: settings?.mlroUserId ?? null },
+      soggetto: fasc.soggetto ? { denominazione: fasc.soggetto.denominazione, tipo: fasc.soggetto.tipo, codiceFiscale: fasc.soggetto.codiceFiscale } : null,
+      fascicolo: { paeseResidenza: fasc.paeseResidenza, pep: fasc.pep },
+      titolariEffettivi: fasc.titolariEffettivi.map((t) => ({ criterio: t.criterio, percentuale: t.percentuale, fonte: t.fonte, soggetto: t.soggetto ? { denominazione: t.soggetto.denominazione } : null })),
+      rischio: r
+        ? { livelloComplessivo: r.livelloComplessivo, clienteLivello: r.clienteLivello, geografiaLivello: r.geografiaLivello, prodottoLivello: r.prodottoLivello, canaleLivello: r.canaleLivello, motivazioneComplessiva: r.motivazioneComplessiva }
+        : null,
+      screening: fasc.screenings.map((s) => ({ tipo: s.tipo, esito: s.esito, dataScreening: s.dataScreening, matchDettagli: s.matchDettagli, notaRisoluzione: s.notaRisoluzione })),
+      anomalia: { tipo: anomalia.tipo, descrizione: anomalia.descrizione, createdAt: anomalia.createdAt },
+      decisione: dec ? { decisione: dec.decisione, motivazione: dec.motivazione, createdAt: dec.createdAt } : null,
+    };
+  };
+
+  // Elenco delle segnalazioni di un fascicolo (riservato MLRO/admin).
+  server.get<{ Params: { id: string } }>('/kyc/:id/segnalazioni', async (req, reply) => {
+    if (vietatoAlCliente(req, reply)) return;
+    if (await moduloSpento(req, reply)) return;
+    if (!(await puoDecidereMlro(req))) return reply.code(403).send({ errore: 'Le segnalazioni FIAU sono riservate all’MLRO o a un ruolo superiore.' });
+    const { id } = req.params; const tenantId = req.tenantId;
+    const fasc = await prisma.fascicoloKyc.findFirst({ where: { id, tenantId }, select: { id: true } });
+    if (!fasc) return reply.code(404).send({ errore: 'Fascicolo non trovato' });
+    const segnalazioni = await prisma.segnalazioneFiau.findMany({
+      where: { tenantId, fascicoloId: id },
+      orderBy: { createdAt: 'desc' },
+      include: { anomalia: { select: { tipo: true, descrizione: true } } },
+    });
+    return reply.send({ segnalazioni });
+  });
+
+  // Prepara (o riprepara) la segnalazione da un'anomalia segnalata_fiau: congela il dossier.
+  server.post<{ Params: { aid: string } }>('/kyc/anomalie/:aid/segnalazione', async (req, reply) => {
+    if (vietatoAlCliente(req, reply)) return;
+    if (await moduloSpento(req, reply)) return;
+    if (!(await puoDecidereMlro(req))) return reply.code(403).send({ errore: 'La preparazione di una segnalazione FIAU è riservata all’MLRO o a un ruolo superiore.' });
+    const { aid } = req.params; const tenantId = req.tenantId;
+    const anomalia = await prisma.anomaliaKyc.findFirst({
+      where: { id: aid, tenantId },
+      include: { decisioni: { orderBy: { createdAt: 'desc' }, take: 1 } },
+    });
+    if (!anomalia) return reply.code(404).send({ errore: 'Anomalia non trovata' });
+    const dati = await caricaDatiDossier(tenantId, anomalia);
+    if (!dati) return reply.code(404).send({ errore: 'Fascicolo non trovato' });
+    const esito = await preparaSegnalazione(prisma, { tenantId, anomalia: { id: anomalia.id, stato: anomalia.stato, fascicoloId: anomalia.fascicoloId }, dati, preparataDa: req.userId ?? null });
+    if (esito.esito === 'non_segnalabile') return reply.code(409).send({ errore: 'L’anomalia non è in stato «segnalata FIAU»: prima l’MLRO deve deciderne la segnalazione.' });
+    if (esito.esito === 'gia_trasmessa') return reply.code(409).send({ errore: 'La segnalazione è già stata trasmessa: non si riprepara.' });
+    await recordAudit({ tenantId, userId: req.userId, ruolo: req.ruolo, azione: 'KYC_STR_PREPARATA', entita: `Anomalia ${aid}`, dettagli: `Segnalazione ${esito.segnalazione.id}`, ipAddress: req.ip });
+    return reply.send({ ok: true, segnalazione: esito.segnalazione, dossier: esito.dossier });
+  });
+
+  // Dossier PDF della segnalazione (riservato MLRO/admin): documento che l'MLRO usa sul portale FIAU.
+  server.get<{ Params: { sid: string } }>('/kyc/segnalazioni/:sid/dossier.pdf', async (req, reply) => {
+    if (vietatoAlCliente(req, reply)) return;
+    if (await moduloSpento(req, reply)) return;
+    if (!(await puoDecidereMlro(req))) return reply.code(403).send({ errore: 'Il dossier di segnalazione FIAU è riservato all’MLRO o a un ruolo superiore.' });
+    const { sid } = req.params; const tenantId = req.tenantId;
+    const s = await prisma.segnalazioneFiau.findFirst({ where: { id: sid, tenantId } });
+    if (!s) return reply.code(404).send({ errore: 'Segnalazione non trovata' });
+    const pdf = await generaDossierStrPdf(s.datiPreparatiJson as unknown as DossierStr, {
+      riferimentoGoaml: s.riferimentoGoaml,
+      trasmessaAt: s.trasmessaAt ? s.trasmessaAt.toISOString() : null,
+    });
+    await recordAudit({ tenantId, userId: req.userId, ruolo: req.ruolo, azione: 'KYC_STR_DOSSIER_SCARICATO', entita: `Segnalazione ${sid}`, dettagli: 'Export PDF', ipAddress: req.ip });
+    return reply
+      .header('Content-Type', 'application/pdf')
+      .header('Content-Disposition', `attachment; filename="STR-${sid}.pdf"`)
+      .send(pdf);
+  });
+
+  // Registra l'invio manuale: riferimento e timestamp goAML rilasciati dal portale FIAU.
+  server.post<{ Params: { sid: string }; Body: Record<string, any> }>('/kyc/segnalazioni/:sid/trasmissione', async (req, reply) => {
+    if (vietatoAlCliente(req, reply)) return;
+    if (await moduloSpento(req, reply)) return;
+    if (!(await puoDecidereMlro(req))) return reply.code(403).send({ errore: 'La registrazione dell’invio FIAU è riservata all’MLRO o a un ruolo superiore.' });
+    const { sid } = req.params; const tenantId = req.tenantId; const b = req.body || {};
+    if (!b.riferimentoGoaml || String(b.riferimentoGoaml).trim().length < 3) return reply.code(400).send({ errore: 'Riferimento goAML obbligatorio (rilasciato dal portale FIAU dopo l’invio).' });
+    const esito = await registraTrasmissione(prisma, { tenantId, segnalazioneId: sid, riferimentoGoaml: String(b.riferimentoGoaml), trasmessaDa: req.userId ?? null });
+    if (esito.esito === 'non_trovata') return reply.code(404).send({ errore: 'Segnalazione non trovata' });
+    if (esito.esito === 'gia_trasmessa') return reply.code(409).send({ errore: 'La segnalazione risulta già trasmessa.' });
+    if (esito.esito === 'riferimento_non_valido') return reply.code(400).send({ errore: 'Riferimento goAML non valido.' });
+    await recordAudit({ tenantId, userId: req.userId, ruolo: req.ruolo, azione: 'KYC_STR_TRASMESSA', entita: `Segnalazione ${sid}`, dettagli: `Riferimento ${String(b.riferimentoGoaml).trim()}`, ipAddress: req.ip });
+    return reply.send({ ok: true, segnalazione: esito.segnalazione });
   });
 }
