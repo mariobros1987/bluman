@@ -14,6 +14,8 @@ import { apriAnomalia, decidiAnomalia } from '../services/anomalieService.js';
 import { preparaSegnalazione, registraTrasmissione } from '../services/segnalazioneFiauService.js';
 import { generaDossierStrPdf } from '../services/segnalazioneFiauPdf.js';
 import type { DatiFascicoloPerDossier, DossierStr } from '../domain/segnalazioneFiau.js';
+import { dataScadenzaRetention } from '../domain/retentionKyc.js';
+import { registraEsitoRetention, prorogaRetention } from '../services/retentionService.js';
 import { uploadDocumento, rifirmaUrlUpload } from '../services/storageService.js';
 import { createHash } from 'node:crypto';
 import { recordAudit } from '../util/serverHelpers.js';
@@ -133,7 +135,7 @@ export async function registraRotteKyc(server: FastifyInstance): Promise<void> {
       if (!fascicolo) return reply.code(404).send({ errore: 'Fascicolo non trovato' });
 
       // Gate MLRO (§8.3): advisor/super_admin, oppure l'utente nominato MLRO nel tenant (K0).
-      const settings = await prisma.tenantComplianceSettings.findUnique({ where: { tenantId }, select: { mlroUserId: true } });
+      const settings = await prisma.tenantComplianceSettings.findUnique({ where: { tenantId }, select: { mlroUserId: true, retentionYears: true } });
       const puoApprovareRafforzata = req.ruolo === 'advisor' || req.ruolo === 'super_admin'
         || (!!req.userId && req.userId === settings?.mlroUserId);
 
@@ -143,6 +145,13 @@ export async function registraRotteKyc(server: FastifyInstance): Promise<void> {
         dataScadenza: calcolaScadenzaKyc(fascicolo.livelloVerifica as LivelloVerificaKyc, ora),
         approvatoDa: req.userId ?? null,
         approvatoIl: ora,
+      };
+
+      // K9 (§5.4) — alla chiusura parte la conservazione: chiusoAt = fine del rapporto, retentionScadenza
+      // = chiusoAt + retentionYears (config tenant). Additivo: se non si chiude, non si tocca nulla.
+      const campiChiusura = {
+        chiusoAt: ora,
+        retentionScadenza: dataScadenzaRetention(ora, settings?.retentionYears ?? 5),
       };
 
       // §8.4 — leggo gli screening solo quando si approva (come il gate MLRO legge le settings):
@@ -157,7 +166,7 @@ export async function registraRotteKyc(server: FastifyInstance): Promise<void> {
 
       const esito = await transizioneKyc(prisma, {
         tenantId, fascicoloId: id, nuovoStato: stato,
-        attoreUserId: req.userId, motivazione, puoApprovareRafforzata, screeningBloccante, campiApprovazione,
+        attoreUserId: req.userId, motivazione, puoApprovareRafforzata, screeningBloccante, campiApprovazione, campiChiusura,
       });
 
       if (esito.esito === 'non_trovato') return reply.code(404).send({ errore: 'Fascicolo non trovato' });
@@ -603,5 +612,41 @@ export async function registraRotteKyc(server: FastifyInstance): Promise<void> {
     if (esito.esito === 'riferimento_non_valido') return reply.code(400).send({ errore: 'Riferimento goAML non valido.' });
     await recordAudit({ tenantId, userId: req.userId, ruolo: req.ruolo, azione: 'KYC_STR_TRASMESSA', entita: `Segnalazione ${sid}`, dettagli: `Riferimento ${String(b.riferimentoGoaml).trim()}`, ipAddress: req.ip });
     return reply.send({ ok: true, segnalazione: esito.segnalazione });
+  });
+
+  // ── K9 — conservazione/retention (spec §5.4/§8.9) ──────────────────────────────────────
+  // Atti dell'MLRO a scadenza raggiunta. Riservati MLRO/admin come le altre decisioni riservate.
+  const ESITI_RETENTION = ['cancellato', 'anonimizzato'];
+
+  // Conclude la conservazione: cancellazione (etichetta) o anonimizzazione reale del PII.
+  server.post<{ Params: { id: string }; Body: Record<string, any> }>('/kyc/:id/retention/esito', async (req, reply) => {
+    if (vietatoAlCliente(req, reply)) return;
+    if (await moduloSpento(req, reply)) return;
+    if (!(await puoDecidereMlro(req))) return reply.code(403).send({ errore: 'La conclusione della conservazione è riservata all’MLRO o a un ruolo superiore.' });
+    const { id } = req.params; const tenantId = req.tenantId; const b = req.body || {};
+    if (!ESITI_RETENTION.includes(b.esito)) return reply.code(400).send({ errore: 'Esito non valido (cancellato | anonimizzato).' });
+    const esito = await registraEsitoRetention(prisma, { tenantId, fascicoloId: id, esito: b.esito, motivazione: b.motivazione ? String(b.motivazione).trim() : null, decisoDa: req.userId ?? null });
+    if (esito.esito === 'non_trovato') return reply.code(404).send({ errore: 'Fascicolo non trovato' });
+    if (esito.esito === 'gia_conclusa') return reply.code(409).send({ errore: 'La conservazione di questo fascicolo è già stata conclusa.' });
+    if (esito.esito === 'non_scaduta') return reply.code(409).send({ errore: 'La conservazione non è ancora scaduta: nessuna cancellazione o anonimizzazione prima della scadenza (§8.9).' });
+    await recordAudit({ tenantId, userId: req.userId, ruolo: req.ruolo, azione: 'KYC_RETENTION_ESITO', entita: `Fascicolo ${id}`, dettagli: `Esito ${b.esito}`, ipAddress: req.ip });
+    return reply.send({ ok: true, fascicolo: esito.fascicolo });
+  });
+
+  // Proroga la conservazione (sposta la scadenza più avanti, mai indietro).
+  server.post<{ Params: { id: string }; Body: Record<string, any> }>('/kyc/:id/retention/proroga', async (req, reply) => {
+    if (vietatoAlCliente(req, reply)) return;
+    if (await moduloSpento(req, reply)) return;
+    if (!(await puoDecidereMlro(req))) return reply.code(403).send({ errore: 'La proroga della conservazione è riservata all’MLRO o a un ruolo superiore.' });
+    const { id } = req.params; const tenantId = req.tenantId; const b = req.body || {};
+    const prorogaAl = b.prorogaAl ? new Date(String(b.prorogaAl)) : null;
+    if (!prorogaAl || Number.isNaN(prorogaAl.getTime())) return reply.code(400).send({ errore: 'Data di proroga non valida.' });
+    if (!b.motivo || String(b.motivo).trim().length < 10) return reply.code(400).send({ errore: 'Motivazione della proroga obbligatoria (almeno 10 caratteri).' });
+    const esito = await prorogaRetention(prisma, { tenantId, fascicoloId: id, prorogaAl, motivo: String(b.motivo).trim(), decisoDa: req.userId ?? null });
+    if (esito.esito === 'non_trovato') return reply.code(404).send({ errore: 'Fascicolo non trovato' });
+    if (esito.esito === 'gia_conclusa') return reply.code(409).send({ errore: 'La conservazione è già stata conclusa: non si proroga.' });
+    if (esito.esito === 'non_in_conservazione') return reply.code(409).send({ errore: 'Il fascicolo non è in conservazione (va prima chiuso).' });
+    await recordAudit({ tenantId, userId: req.userId, ruolo: req.ruolo, azione: 'KYC_RETENTION_PROROGA', entita: `Fascicolo ${id}`, dettagli: `Proroga al ${prorogaAl.toISOString().slice(0, 10)}`, ipAddress: req.ip });
+    return reply.send({ ok: true, fascicolo: esito.fascicolo });
   });
 }

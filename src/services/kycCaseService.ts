@@ -52,6 +52,8 @@ export async function transizioneKyc(
     screeningBloccante?: boolean;
     /** Campi di approvazione (data verifica/scadenza) calcolati dalla rotta quando si approva. */
     campiApprovazione?: Record<string, unknown>;
+    /** K9 — campi di chiusura (chiusoAt + retentionScadenza) calcolati dalla rotta quando si chiude. */
+    campiChiusura?: Record<string, unknown>;
   },
 ): Promise<EsitoTransizione> {
   const fascicolo = await store.fascicoloKyc.findFirst({
@@ -78,6 +80,7 @@ export async function transizioneKyc(
     data: {
       stato: a,
       ...(a === 'approvato' ? (input.campiApprovazione ?? {}) : {}),
+      ...(a === 'chiuso' ? (input.campiChiusura ?? {}) : {}),
       noteCompliance: input.motivazione ?? fascicolo.noteCompliance,
       storico: {
         create: {
