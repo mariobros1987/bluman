@@ -14,8 +14,20 @@
 # Prima del primo avvio serve un file `.env` accanto a questo (non versionato):
 #   POSTGRES_USER=…            POSTGRES_DB=…
 #   POSTGRES_PASSWORD=$(openssl rand -base64 32)
+#   APP_DB_PASSWORD=$(openssl rand -base64 32)   # password del ruolo applicativo bluman_app
 #   JWT_SECRET=$(openssl rand -hex 32)
 #   WEBHOOK_SECRET_SDI=$(openssl rand -hex 32)   # opzionale, vedi .env.example
+#
+# ── Isolamento RLS (regola 1) — perché ci sono i servizi `migrate` e `rls` ────────────────
+# L'app NON deve connettersi come proprietario dello schema: quel ruolo scavalca le policy
+# (rolbypassrls) e l'isolamento multi-tenant sparisce in silenzio. Quindi:
+#   - `POSTGRES_USER` è il proprietario: crea lo schema, esegue le migrazioni (DIRECT_URL).
+#   - `bluman_app` è il ruolo applicativo, SENZA bypassrls, soggetto alle policy: è quello con
+#     cui gira l'API (DATABASE_URL). Lo crea `supabase/migrations/20260819_rls_effettiva.sql`.
+# L'ordine di avvio è deterministico (depends_on … service_completed_successfully):
+#   postgres (healthy) → migrate (crea le tabelle) → rls (crea bluman_app + policy su TUTTE le
+#   tabelle per introspezione) → api (parte come bluman_app). Senza questo, su un DB VPS nuovo
+#   l'app girerebbe con l'isolamento RLS spento — vedi checkRls.ts per la verifica.
 #
 # Questo stack è l'alternativa «tutto su un server» al deployment corrente. La
 # distribuzione ufficiale resta quella della regola 9 di .agents/AGENTS.md — backend su
@@ -44,6 +56,49 @@ services:
     networks:
       - bluman_internal
 
+  # 1b. MIGRAZIONI SCHEMA (one-shot, come proprietario) — crea/aggiorna le tabelle prima di RLS e API.
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: bluman_migrate
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Proprietario dello schema: `prisma migrate deploy` gira su DIRECT_URL (ruolo con DDL).
+      DATABASE_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public"
+      DIRECT_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public"
+    command: ["sh", "-c", "npx prisma migrate deploy"]
+    restart: "no"
+    networks:
+      - bluman_internal
+
+  # 1c. PROVISIONING RLS (one-shot) — crea il ruolo applicativo bluman_app (SENZA bypassrls) e applica
+  # la policy isolamento_tenant su tutte le tabelle per introspezione. Gira DOPO migrate (le tabelle
+  # devono esistere) e PRIMA dell'api. Idempotente: rieseguirlo riallinea la password di bluman_app ad
+  # APP_DB_PASSWORD e ridichiara le policy. Usa l'immagine postgres perché ha `psql` (\gexec, :'pw').
+  rls:
+    image: postgres:16-alpine
+    container_name: bluman_rls
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      PGHOST: postgres
+      PGUSER: "${POSTGRES_USER:?manca POSTGRES_USER nel file .env}"
+      PGPASSWORD: "${POSTGRES_PASSWORD:?manca POSTGRES_PASSWORD nel file .env}"
+      PGDATABASE: "${POSTGRES_DB:?manca POSTGRES_DB nel file .env}"
+      APP_DB_PASSWORD: "${APP_DB_PASSWORD:?manca APP_DB_PASSWORD nel file .env — generala con openssl rand -base64 32}"
+    volumes:
+      - ./supabase/migrations/20260819_rls_effettiva.sql:/rls.sql:ro
+    # `$$` sfugge all'interpolazione di compose: la password la espande la shell nel container, così
+    # non finisce nel comando reso da `docker inspect`.
+    command: ["sh", "-c", "psql -v ON_ERROR_STOP=1 -v pw=\"$$APP_DB_PASSWORD\" -f /rls.sql"]
+    restart: "no"
+    networks:
+      - bluman_internal
+
   # 2. BACKEND FASTIFY API & MOTORE ADVISORY
   api:
     build:
@@ -54,19 +109,27 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      # Parte solo dopo che le migrazioni e il provisioning RLS sono andati a buon fine: così non
+      # esiste una finestra in cui l'API risponde su uno schema incompleto o senza policy attive.
+      rls:
+        condition: service_completed_successfully
     environment:
       NODE_ENV: production
       PORT: 3000
       HOST: 0.0.0.0
-      # `DATABASE_URL` è il ruolo applicativo soggetto a RLS, `DIRECT_URL` il proprietario
-      # dello schema che esegue `prisma migrate deploy` (vedi prisma/schema.prisma). In
-      # questo stack single-server coincidono; su Supabase sono due ruoli distinti.
-      DATABASE_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public"
+      # `DATABASE_URL` è il ruolo applicativo `bluman_app`, SOGGETTO a RLS (regola 1): è con questo
+      # che gira il runtime. `DIRECT_URL` resta il proprietario dello schema — non serve al runtime
+      # (le migrazioni le fa il servizio `migrate`), ma prisma vuole la variabile dichiarata.
+      # NON far coincidere i due: se l'app girasse come proprietario, le policy verrebbero scavalcate.
+      DATABASE_URL: "postgresql://bluman_app:${APP_DB_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public"
       DIRECT_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public"
       JWT_SECRET: "${JWT_SECRET:?manca JWT_SECRET nel file .env — generalo con openssl rand -hex 32}"
       # Vuoto = webhook SDI disattivato, e la rotta risponde 503 invece di accettare
       # chiamate non firmate (vedi .env.example).
       WEBHOOK_SECRET_SDI: "${WEBHOOK_SECRET_SDI:-}"
+    # Le migrazioni le esegue il servizio `migrate`; qui si avvia solo il server (si scavalca il CMD
+    # del Dockerfile che faceva `migrate deploy && …`, perché bluman_app non ha i privilegi DDL).
+    command: ["sh", "-c", "npx tsx src/index.ts"]
     volumes:
       - bluman_uploads:/app/uploads
     networks:
