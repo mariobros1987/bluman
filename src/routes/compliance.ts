@@ -213,4 +213,54 @@ export async function registraRotteCompliance(server: FastifyInstance): Promise<
     });
     return reply.send({ ok: true, record });
   });
+
+  // ── K9/§5.5 — questionario periodico FIAU (REQ, §5.5) ───────────────────────────────────────
+  // Una riga per anno (se applicabile). Il sistema raccoglie i dati per l'MLRO e registra il
+  // riferimento dopo l'invio manuale sul portale FIAU (come la STR). Contenuto libero: le domande
+  // esatte del REQ sono FIAU-specifiche e [da verificare], quindi non cablate.
+  server.get('/tenant/questionario-fiau', async (req, reply) => {
+    if (vietatoAlCliente(req, reply)) return;
+    if (await moduloSpento(req, reply)) return;
+    const tenantId = req.tenantId;
+    const questionari = await prisma.questionarioFiau.findMany({ where: { tenantId }, orderBy: { anno: 'desc' }, take: 50 });
+    return reply.send({ questionari });
+  });
+
+  server.post('/tenant/questionario-fiau', async (req, reply) => {
+    if (vietatoAlCliente(req, reply)) return;
+    if (await moduloSpento(req, reply)) return;
+    const tenantId = req.tenantId;
+    const settings = await prisma.tenantComplianceSettings.findUnique({ where: { tenantId }, select: { mlroUserId: true } });
+    const puo = req.ruolo === 'advisor' || req.ruolo === 'super_admin' || (!!req.userId && req.userId === settings?.mlroUserId);
+    if (!puo) return reply.code(403).send({ errore: 'Il questionario FIAU è riservato al responsabile o all’MLRO.' });
+
+    const b = (req.body || {}) as Record<string, any>;
+    const anno = Number(b.anno);
+    if (!Number.isInteger(anno) || anno < 2020 || anno > 2100) return reply.code(400).send({ errore: 'Anno non valido.' });
+    const STATI = ['bozza', 'completato', 'trasmesso'];
+    const stato = STATI.includes(b.stato) ? b.stato : 'bozza';
+    // Se si dichiara trasmesso, serve il riferimento rilasciato dal portale (regola 7: non si marca
+    // «trasmesso» senza la prova dell'invio).
+    if (stato === 'trasmesso' && (!b.riferimento || String(b.riferimento).trim().length < 3)) {
+      return reply.code(400).send({ errore: 'Per marcare «trasmesso» serve il riferimento FIAU dell’invio.' });
+    }
+    const datiComuni = {
+      stato,
+      contenutoJson: b.contenuto && typeof b.contenuto === 'object' ? b.contenuto : undefined,
+      note: b.note !== undefined ? (b.note ? String(b.note).trim().slice(0, 2000) : null) : undefined,
+      riferimento: stato === 'trasmesso' ? String(b.riferimento).trim() : (b.riferimento !== undefined ? (b.riferimento ? String(b.riferimento).trim() : null) : undefined),
+      trasmessoAt: stato === 'trasmesso' ? new Date() : undefined,
+      compilatoDa: req.userId ?? null,
+    };
+    const questionario = await prisma.questionarioFiau.upsert({
+      where: { tenantId_anno: { tenantId, anno } },
+      update: datiComuni,
+      create: { tenantId, anno, ...datiComuni },
+    });
+    await registraComplianceEvent(prisma, {
+      tenantId, tipo: 'KYC_REQ_FIAU', attoreUserId: req.userId ?? null,
+      payload: { questionarioId: questionario.id, anno, stato },
+    });
+    return reply.send({ ok: true, questionario });
+  });
 }

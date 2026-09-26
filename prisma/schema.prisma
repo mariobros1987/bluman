@@ -2148,6 +2148,28 @@ model TrainingRecord {
   @@map("training_record")
 }
 
+/// K9/§5.5 — questionario periodico FIAU (REQ). Una riga per anno (se applicabile): il sistema
+/// raccoglie i dati per l'MLRO e registra il riferimento dopo l'invio manuale sul portale FIAU (come
+/// la STR, spec §10: prepara e registra, non invia). Le domande esatte del REQ sono `[da verificare]`
+/// e specifiche FIAU, quindi il contenuto è libero (JSON) e non cablato. Tenant-scoped, policy RLS propria.
+model QuestionarioFiau {
+  id            String    @id @default(uuid())
+  tenantId      String    @map("tenant_id")
+  anno          Int
+  stato         String    @default("bozza") // bozza | completato | trasmesso
+  contenutoJson Json?     @map("contenuto_json")
+  note          String?
+  riferimento   String?
+  trasmessoAt   DateTime? @map("trasmesso_at")
+  compilatoDa   String?   @map("compilato_da")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@unique([tenantId, anno])
+  @@index([tenantId, anno])
+  @@map("questionario_fiau")
+}
+
 /// Evento di compliance immutabile e a catena hash (tamper-evident): ogni cambio di settings o
 /// di stato di un caso vi lascia una riga. Append-only lato applicativo.
 model ComplianceEvent {
