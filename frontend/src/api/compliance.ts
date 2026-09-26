@@ -107,3 +107,36 @@ export async function salvaBusinessRisk(body: {
   if (!res.ok) throw new Error(data?.errore || 'Errore salvataggio valutazione rischio studio');
   return data;
 }
+
+// K9/§5.5 — registro della formazione AML (§7 TrainingRecord). Log a livello di studio; scrittura al
+// responsabile/MLRO (il backend rifiuta 403 gli altri). Ogni riga è un evento formativo (non versionato).
+export interface TrainingRecord {
+  id: string;
+  titolo: string;
+  tipo: string;
+  data: string;
+  partecipanti: string | null;
+  oreFormazione: string | number | null;
+  ente: string | null;
+  note: string | null;
+  registratoDa: string | null;
+  createdAt: string;
+}
+
+export async function fetchFormazione(): Promise<{ record: TrainingRecord[] }> {
+  const res = await apiFetch(`${API_BASE}/tenant/formazione`, { headers: getAuthHeaders() });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(data?.errore || 'Errore lettura registro formazione');
+  return data;
+}
+
+export async function salvaFormazione(body: {
+  titolo: string; tipo: string; data: string; partecipanti?: string; oreFormazione?: number; ente?: string; note?: string;
+}): Promise<{ ok: boolean; record: TrainingRecord }> {
+  const res = await apiFetch(`${API_BASE}/tenant/formazione`, {
+    method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(data?.errore || 'Errore salvataggio formazione');
+  return data;
+}

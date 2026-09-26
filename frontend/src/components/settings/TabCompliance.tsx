@@ -9,6 +9,7 @@ import {
 } from '../../api/compliance';
 import { useTeamMembers } from '../../hooks/useTeamMembers';
 import { PannelloBusinessRisk } from './PannelloBusinessRisk';
+import { PannelloFormazione } from './PannelloFormazione';
 interface TabComplianceProps {
   /** Scrittura riservata ad advisor/super_admin; gli altri ruoli interni vedono in sola lettura. */
   ruolo?: string;
@@ -240,6 +241,9 @@ export function TabCompliance({ ruolo }: TabComplianceProps) {
 
       {/* ── K9/§5.5 — valutazione del rischio dello studio (business risk assessment) ── */}
       <PannelloBusinessRisk puoScrivere={puoScrivere} />
+
+      {/* ── K9/§5.5 — registro della formazione AML ── */}
+      <PannelloFormazione puoScrivere={puoScrivere} />
 
       {/* ── Card audit trail append-only ── */}
       <div style={sCard}>
