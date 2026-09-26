@@ -10,6 +10,7 @@ import {
 import { useTeamMembers } from '../../hooks/useTeamMembers';
 import { PannelloBusinessRisk } from './PannelloBusinessRisk';
 import { PannelloFormazione } from './PannelloFormazione';
+import { PannelloQuestionarioFiau } from './PannelloQuestionarioFiau';
 interface TabComplianceProps {
   /** Scrittura riservata ad advisor/super_admin; gli altri ruoli interni vedono in sola lettura. */
   ruolo?: string;
@@ -244,6 +245,9 @@ export function TabCompliance({ ruolo }: TabComplianceProps) {
 
       {/* ── K9/§5.5 — registro della formazione AML ── */}
       <PannelloFormazione puoScrivere={puoScrivere} />
+
+      {/* ── K9/§5.5 — questionario periodico FIAU (REQ) ── */}
+      <PannelloQuestionarioFiau puoScrivere={puoScrivere} />
 
       {/* ── Card audit trail append-only ── */}
       <div style={sCard}>

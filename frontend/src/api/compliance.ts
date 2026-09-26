@@ -140,3 +140,34 @@ export async function salvaFormazione(body: {
   if (!res.ok) throw new Error(data?.errore || 'Errore salvataggio formazione');
   return data;
 }
+
+// K9/§5.5 — questionario periodico FIAU (REQ). Una riga per anno; il sistema raccoglie i dati per
+// l'MLRO e registra il riferimento dopo l'invio manuale. Scrittura al responsabile/MLRO (403 gli altri).
+export interface QuestionarioFiau {
+  id: string;
+  anno: number;
+  stato: 'bozza' | 'completato' | 'trasmesso';
+  note: string | null;
+  riferimento: string | null;
+  trasmessoAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export async function fetchQuestionariFiau(): Promise<{ questionari: QuestionarioFiau[] }> {
+  const res = await apiFetch(`${API_BASE}/tenant/questionario-fiau`, { headers: getAuthHeaders() });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(data?.errore || 'Errore lettura questionario FIAU');
+  return data;
+}
+
+export async function salvaQuestionarioFiau(body: {
+  anno: number; stato: 'bozza' | 'completato' | 'trasmesso'; note?: string; riferimento?: string;
+}): Promise<{ ok: boolean; questionario: QuestionarioFiau }> {
+  const res = await apiFetch(`${API_BASE}/tenant/questionario-fiau`, {
+    method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(data?.errore || 'Errore salvataggio questionario FIAU');
+  return data;
+}
