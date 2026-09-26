@@ -16,6 +16,8 @@ import { generaDossierStrPdf } from '../services/segnalazioneFiauPdf.js';
 import type { DatiFascicoloPerDossier, DossierStr } from '../domain/segnalazioneFiau.js';
 import { dataScadenzaRetention } from '../domain/retentionKyc.js';
 import { registraEsitoRetention, prorogaRetention } from '../services/retentionService.js';
+import { costruisciReportFascicolo } from '../domain/reportFascicolo.js';
+import { generaReportFascicoloPdf } from '../services/fascicoloReportPdf.js';
 import { uploadDocumento, rifirmaUrlUpload } from '../services/storageService.js';
 import { createHash } from 'node:crypto';
 import { recordAudit } from '../util/serverHelpers.js';
@@ -648,5 +650,51 @@ export async function registraRotteKyc(server: FastifyInstance): Promise<void> {
     if (esito.esito === 'non_in_conservazione') return reply.code(409).send({ errore: 'Il fascicolo non è in conservazione (va prima chiuso).' });
     await recordAudit({ tenantId, userId: req.userId, ruolo: req.ruolo, azione: 'KYC_RETENTION_PROROGA', entita: `Fascicolo ${id}`, dettagli: `Proroga al ${prorogaAl.toISOString().slice(0, 10)}`, ipAddress: req.ip });
     return reply.send({ ok: true, fascicolo: esito.fascicolo });
+  });
+
+  // ── K9/§5.5 — report riassuntivo del fascicolo per ispezione (PDF) ──────────────────────────
+  // Documento interno riservato allo studio (mai al cliente): tutto lo stato di adeguata verifica di
+  // un cliente in un unico PDF da consegnare all'ispettore. Lettura ai ruoli interni.
+  server.get<{ Params: { id: string } }>('/kyc/:id/report.pdf', async (req, reply) => {
+    if (vietatoAlCliente(req, reply)) return;
+    if (await moduloSpento(req, reply)) return;
+    const { id } = req.params; const tenantId = req.tenantId;
+    const fasc = await prisma.fascicoloKyc.findFirst({
+      where: { id, tenantId },
+      include: {
+        soggetto: true,
+        titolariEffettivi: { include: { soggetto: true } },
+        riskAssessments: { orderBy: { versione: 'desc' }, take: 1 },
+        screenings: { orderBy: { createdAt: 'desc' } },
+        anomalie: { orderBy: { createdAt: 'desc' }, include: { decisioni: { orderBy: { createdAt: 'desc' }, take: 1 } } },
+        segnalazioniFiau: { orderBy: { createdAt: 'desc' } },
+        storico: { orderBy: { createdAt: 'desc' } },
+      },
+    });
+    if (!fasc) return reply.code(404).send({ errore: 'Fascicolo non trovato' });
+    const [tenant, settings] = await Promise.all([
+      prisma.tenant.findUnique({ where: { id: tenantId }, select: { ragioneSociale: true, piva: true } }),
+      prisma.tenantComplianceSettings.findUnique({ where: { tenantId }, select: { mlroUserId: true } }),
+    ]);
+    const r = fasc.riskAssessments[0] ?? null;
+    const report = costruisciReportFascicolo({
+      studio: { ragioneSociale: tenant?.ragioneSociale ?? null, partitaIva: tenant?.piva ?? null, mlroUserId: settings?.mlroUserId ?? null },
+      fascicolo: {
+        stato: fasc.stato, livelloVerifica: fasc.livelloVerifica, rischioCalcolato: fasc.rischioCalcolato,
+        dataVerifica: fasc.dataVerifica, dataScadenza: fasc.dataScadenza,
+        chiusoAt: fasc.chiusoAt, retentionScadenza: fasc.retentionScadenza, retentionEsito: fasc.retentionEsito,
+        paeseResidenza: fasc.paeseResidenza, pep: fasc.pep,
+      },
+      soggetto: fasc.soggetto ? { denominazione: fasc.soggetto.denominazione, tipo: fasc.soggetto.tipo, codiceFiscale: fasc.soggetto.codiceFiscale } : null,
+      titolariEffettivi: fasc.titolariEffettivi.map((t) => ({ criterio: t.criterio, percentuale: t.percentuale, fonte: t.fonte, soggetto: t.soggetto ? { denominazione: t.soggetto.denominazione } : null })),
+      rischio: r ? { livelloComplessivo: r.livelloComplessivo, clienteLivello: r.clienteLivello, geografiaLivello: r.geografiaLivello, prodottoLivello: r.prodottoLivello, canaleLivello: r.canaleLivello, motivazioneComplessiva: r.motivazioneComplessiva } : null,
+      screening: fasc.screenings.map((s) => ({ tipo: s.tipo, esito: s.esito, dataScreening: s.dataScreening, matchDettagli: s.matchDettagli, notaRisoluzione: s.notaRisoluzione })),
+      anomalie: fasc.anomalie.map((a) => ({ tipo: a.tipo, descrizione: a.descrizione, stato: a.stato, decisioni: a.decisioni.map((d) => ({ decisione: d.decisione, motivazione: d.motivazione })) })),
+      segnalazioni: fasc.segnalazioniFiau.map((s) => ({ stato: s.stato, riferimentoGoaml: s.riferimentoGoaml, trasmessaAt: s.trasmessaAt })),
+      storico: fasc.storico.map((s) => ({ statoPrecedente: s.statoPrecedente, statoNuovo: s.statoNuovo, motivazione: s.motivazione, createdAt: s.createdAt })),
+    }, new Date().toISOString());
+    const pdf = await generaReportFascicoloPdf(report);
+    await recordAudit({ tenantId, userId: req.userId, ruolo: req.ruolo, azione: 'KYC_REPORT_FASCICOLO', entita: `Fascicolo ${id}`, dettagli: 'Export report PDF', ipAddress: req.ip });
+    return reply.header('Content-Type', 'application/pdf').header('Content-Disposition', `attachment; filename="report-kyc-${id}.pdf"`).send(pdf);
   });
 }
