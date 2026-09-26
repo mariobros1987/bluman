@@ -6,6 +6,7 @@ import { notificaStudioSilenziosa } from './notificheService.js';
 import { recordAudit } from '../util/serverHelpers.js';
 import { giornoSollecitoRata, kycInAvviso, tonoRata } from '../util/scadenzeDerivate.js';
 import { revisioneKycDovuta, motivoRevisioneKyc } from '../domain/monitoraggioKyc.js';
+import { retentionDovuta, motivoRetention } from '../domain/retentionKyc.js';
 import { moduloKycAttivo } from '../util/guardiaModuli.js';
 
 export interface CronReport {
@@ -15,6 +16,7 @@ export interface CronReport {
   fattureScaduteTrovate: number;
   microvociInRitardoTrovate: number;
   revisioniKycTrovate: number;
+  retentionScaduteTrovate: number;
   notificheInviate: number;
   dettagli: string[];
 }
@@ -52,6 +54,7 @@ export async function runDailyNotificationCron(tenantId?: string): Promise<CronR
     fattureScaduteTrovate: 0,
     microvociInRitardoTrovate: 0,
     revisioniKycTrovate: 0,
+    retentionScaduteTrovate: 0,
     notificheInviate: 0,
     dettagli: [],
   };
@@ -173,14 +176,38 @@ export async function runDailyNotificationCron(tenantId?: string): Promise<CronR
         }
       }
     }
-  }
 
-  // L'audit resta accessorio: recordAudit traccia autonomamente eventuali errori.
+    // 5. Conservazione/retention (K9, spec §5.4/§8.9) — un fascicolo chiuso e non ancora concluso la
+    //    cui conservazione è in scadenza (o scaduta) va portato all'MLRO per la decisione di
+    //    cancellazione/anonimizzazione. Detection + reminder soltanto (la decisione la prende l'MLRO,
+    //    regola 14); la condizione di "dovuta" sta nel dominio puro `retentionKyc`.
+    const fascicoliRetention = await prisma.fascicoloKyc.findMany({
+      where: { tenantId, stato: 'chiuso', retentionEsito: null, retentionScadenza: { not: null } },
+      include: { cliente: { select: { nome: true } } },
+    });
+    for (const f of fascicoliRetention) {
+      if (retentionDovuta(f.retentionScadenza, f.retentionEsito, adesso)) {
+        const clNome = f.cliente?.nome || 'Cliente';
+        const corpo = `[KYC] Conservazione in scadenza per ${clNome} — ${motivoRetention(f.retentionScadenza, f.retentionEsito, adesso)}`;
+        report.retentionScaduteTrovate += 1;
+        report.dettagli.push(corpo);
+        if (!giaNotificati.has(corpo)) {
+          giaNotificati.add(corpo);
+          report.notificheInviate += await notificaStudioSilenziosa(tenantId, {
+            tipoEvento: 'scadenza_imminente',
+            oggetto: 'Conservazione KYC in scadenza',
+            corpo,
+            link: '/clients',
+          });
+        }
+      }
+    }
+  }
   await recordAudit({
     tenantId,
     azione: 'CRON_NOTIFICHE_SCADENZE_ESEGUITO',
     entita: 'Cron Worker Background',
-    dettagli: `Completata scansione: ${report.notificheInviate} notifiche create (${report.scadenzeUboTrovate} UBO, ${report.fattureScaduteTrovate} fatture, ${report.revisioniKycTrovate} revisioni KYC)`,
+    dettagli: `Completata scansione: ${report.notificheInviate} notifiche create (${report.scadenzeUboTrovate} UBO, ${report.fattureScaduteTrovate} fatture, ${report.revisioniKycTrovate} revisioni KYC, ${report.retentionScaduteTrovate} conservazioni)`,
   });
 
   return report;
