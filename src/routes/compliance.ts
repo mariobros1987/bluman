@@ -4,9 +4,12 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { prisma } from '../util/prismaClient.js';
 import { moduloKycAttivo } from '../util/guardiaModuli.js';
 import { modalitaBozza, calcolaHashEvento, verificaCatena } from '../services/complianceService.js';
+import { registraComplianceEvent } from '../services/complianceEventLog.js';
+import { livelloComplessivo, prossimaRevisione, assessmentCompleto, type LivelloRischioK3 } from '../domain/calcoloRischio.js';
 
 const PACCHETTI = ['MT', 'IT'];
 const PROFILI = ['CSP_MFSA', 'ALTRO_SOGGETTO_OBBLIGATO'];
+const LIVELLI_RISCHIO = ['basso', 'medio', 'alto'];
 
 export async function registraRotteCompliance(server: FastifyInstance): Promise<void> {
   const vietatoAlCliente = (req: FastifyRequest, reply: FastifyReply): boolean => {
@@ -106,5 +109,63 @@ export async function registraRotteCompliance(server: FastifyInstance): Promise<
     );
     // Alla UI il più recente in cima.
     return reply.send({ eventi: [...eventi].reverse(), catena });
+  });
+
+  // ── K9/§5.5 — valutazione del rischio dell'ATTIVITÀ (business risk assessment) ─────────────
+  // Livello di studio, versionata e mai sovrascritta (§7). Worst-case sui quattro fattori (§6, come
+  // K3). Lettura ai ruoli interni; scrittura al responsabile/MLRO. Ogni POST crea una nuova versione.
+  server.get('/tenant/business-risk', async (req, reply) => {
+    if (vietatoAlCliente(req, reply)) return;
+    if (await moduloSpento(req, reply)) return;
+    const tenantId = req.tenantId;
+    const storico = await prisma.businessRiskAssessment.findMany({ where: { tenantId }, orderBy: { versione: 'desc' }, take: 50 });
+    return reply.send({ corrente: storico[0] ?? null, storico });
+  });
+
+  server.post('/tenant/business-risk', async (req, reply) => {
+    if (vietatoAlCliente(req, reply)) return;
+    if (await moduloSpento(req, reply)) return;
+    const tenantId = req.tenantId;
+    // Scrittura riservata al responsabile dello studio o all'MLRO nominato (§9).
+    const settings = await prisma.tenantComplianceSettings.findUnique({ where: { tenantId }, select: { mlroUserId: true } });
+    const puo = req.ruolo === 'advisor' || req.ruolo === 'super_admin' || (!!req.userId && req.userId === settings?.mlroUserId);
+    if (!puo) return reply.code(403).send({ errore: 'La valutazione del rischio dello studio è riservata al responsabile o all’MLRO.' });
+
+    const b = (req.body || {}) as Record<string, any>;
+    const liv = (v: any): LivelloRischioK3 => (LIVELLI_RISCHIO.includes(v) ? v : 'basso');
+    const fattori = {
+      clientela: liv(b.clientelaLivello), servizi: liv(b.serviziLivello),
+      geografia: liv(b.geografiaLivello), canali: liv(b.canaliLivello),
+    };
+    const motiv = {
+      cliente: b.clientelaMotivazione, geografia: b.geografiaMotivazione,
+      prodotto: b.serviziMotivazione, canale: b.canaliMotivazione,
+    };
+    // §6/§14 — ogni fattore va motivato: senza le quattro motivazioni la valutazione non si chiude.
+    if (!assessmentCompleto(motiv)) return reply.code(400).send({ errore: 'Ogni fattore di rischio richiede una motivazione (§6).' });
+
+    const complessivo = livelloComplessivo({ cliente: fattori.clientela, geografia: fattori.geografia, prodotto: fattori.servizi, canale: fattori.canali });
+    const ora = new Date();
+    const ultima = await prisma.businessRiskAssessment.findFirst({ where: { tenantId }, orderBy: { versione: 'desc' }, select: { versione: true } });
+
+    const bra = await prisma.businessRiskAssessment.create({
+      data: {
+        tenantId,
+        versione: (ultima?.versione ?? 0) + 1,
+        clientelaLivello: fattori.clientela, clientelaMotivazione: String(motiv.cliente).trim(),
+        serviziLivello: fattori.servizi, serviziMotivazione: String(motiv.prodotto).trim(),
+        geografiaLivello: fattori.geografia, geografiaMotivazione: String(motiv.geografia).trim(),
+        canaliLivello: fattori.canali, canaliMotivazione: String(motiv.canale).trim(),
+        livelloComplessivo: complessivo,
+        motivazioneComplessiva: b.motivazioneComplessiva ? String(b.motivazioneComplessiva).trim() : null,
+        prossimaRevisione: prossimaRevisione(ora, complessivo),
+        redattoDa: req.userId ?? null,
+      },
+    });
+    await registraComplianceEvent(prisma, {
+      tenantId, tipo: 'KYC_BUSINESS_RISK', attoreUserId: req.userId ?? null,
+      payload: { businessRiskId: bra.id, versione: bra.versione, livelloComplessivo: complessivo },
+    });
+    return reply.send({ ok: true, corrente: bra });
   });
 }
