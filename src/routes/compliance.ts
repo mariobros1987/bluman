@@ -6,6 +6,7 @@ import { moduloKycAttivo } from '../util/guardiaModuli.js';
 import { modalitaBozza, calcolaHashEvento, verificaCatena } from '../services/complianceService.js';
 import { registraComplianceEvent } from '../services/complianceEventLog.js';
 import { livelloComplessivo, prossimaRevisione, assessmentCompleto, type LivelloRischioK3 } from '../domain/calcoloRischio.js';
+import { generaReportStudioPdf } from '../services/reportStudioPdf.js';
 
 const PACCHETTI = ['MT', 'IT'];
 const PROFILI = ['CSP_MFSA', 'ALTRO_SOGGETTO_OBBLIGATO'];
@@ -262,5 +263,46 @@ export async function registraRotteCompliance(server: FastifyInstance): Promise<
       payload: { questionarioId: questionario.id, anno, stato },
     });
     return reply.send({ ok: true, questionario });
+  });
+
+  // ── K9/§5.5 — report di studio (panoramica AML complessiva, PDF) ────────────────────────────
+  // Fotografia d'insieme del presidio: BRA corrente, formazione, questionario FIAU e conteggi
+  // aggregati delle pratiche. Lettura ai ruoli interni; documento interno per l'MLRO/ispezioni.
+  server.get('/tenant/compliance-report.pdf', async (req, reply) => {
+    if (vietatoAlCliente(req, reply)) return;
+    if (await moduloSpento(req, reply)) return;
+    const tenantId = req.tenantId;
+    const soglia60 = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000);
+    const [tenant, settings, bra, formCount, ultimaForm, questionari, fascTot, perStato, perRischio, anomTot, segnTrasmesse, conservazioni] = await Promise.all([
+      prisma.tenant.findUnique({ where: { id: tenantId }, select: { ragioneSociale: true, piva: true } }),
+      prisma.tenantComplianceSettings.findUnique({ where: { tenantId }, select: { mlroUserId: true } }),
+      prisma.businessRiskAssessment.findFirst({ where: { tenantId }, orderBy: { versione: 'desc' } }),
+      prisma.trainingRecord.count({ where: { tenantId } }),
+      prisma.trainingRecord.findFirst({ where: { tenantId }, orderBy: { data: 'desc' }, select: { data: true } }),
+      prisma.questionarioFiau.findMany({ where: { tenantId }, orderBy: { anno: 'desc' }, take: 10, select: { anno: true, stato: true, riferimento: true } }),
+      prisma.fascicoloKyc.count({ where: { tenantId } }),
+      prisma.fascicoloKyc.groupBy({ by: ['stato'], where: { tenantId }, _count: { _all: true } }),
+      prisma.fascicoloKyc.groupBy({ by: ['rischioCalcolato'], where: { tenantId }, _count: { _all: true } }),
+      prisma.anomaliaKyc.count({ where: { tenantId } }),
+      prisma.segnalazioneFiau.count({ where: { tenantId, stato: 'trasmessa' } }),
+      prisma.fascicoloKyc.count({ where: { tenantId, stato: 'chiuso', retentionEsito: null, retentionScadenza: { not: null, lte: soglia60 } } }),
+    ]);
+
+    const pdf = await generaReportStudioPdf({
+      generatoIl: new Date().toISOString(),
+      studio: { ragioneSociale: tenant?.ragioneSociale ?? null, partitaIva: tenant?.piva ?? null, mlroUserId: settings?.mlroUserId ?? null },
+      businessRisk: bra ? { versione: bra.versione, livelloComplessivo: bra.livelloComplessivo, prossimaRevisione: bra.prossimaRevisione ? bra.prossimaRevisione.toISOString() : null } : null,
+      formazione: { ultima: ultimaForm?.data ? ultimaForm.data.toISOString() : null, totale: formCount },
+      questionari: questionari.map((q) => ({ anno: q.anno, stato: q.stato, riferimento: q.riferimento })),
+      conteggi: {
+        fascicoliTotali: fascTot,
+        perStato: perStato.map((s) => ({ stato: s.stato, n: s._count._all })),
+        perRischio: perRischio.map((s) => ({ rischio: s.rischioCalcolato, n: s._count._all })),
+        anomalieTotali: anomTot,
+        segnalazioniTrasmesse: segnTrasmesse,
+        conservazioniInScadenza: conservazioni,
+      },
+    });
+    return reply.header('Content-Type', 'application/pdf').header('Content-Disposition', 'attachment; filename="report-compliance-studio.pdf"').send(pdf);
   });
 }
