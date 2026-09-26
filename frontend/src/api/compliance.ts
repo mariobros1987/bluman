@@ -171,3 +171,18 @@ export async function salvaQuestionarioFiau(body: {
   if (!res.ok) throw new Error(data?.errore || 'Errore salvataggio questionario FIAU');
   return data;
 }
+
+/** K9/§5.5 — scarica il report PDF di studio (panoramica AML complessiva, documento interno). */
+export async function scaricaReportStudioPdf(): Promise<void> {
+  const res = await apiFetch(`${API_BASE}/tenant/compliance-report.pdf`, { headers: getAuthHeaders() });
+  if (!res.ok) { const d = await res.json().catch(() => null); throw new Error(d?.errore || 'Errore download report di studio'); }
+  const blob = await res.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'report-compliance-studio.pdf';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.URL.revokeObjectURL(url);
+}

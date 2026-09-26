@@ -11,6 +11,7 @@ import { useTeamMembers } from '../../hooks/useTeamMembers';
 import { PannelloBusinessRisk } from './PannelloBusinessRisk';
 import { PannelloFormazione } from './PannelloFormazione';
 import { PannelloQuestionarioFiau } from './PannelloQuestionarioFiau';
+import { scaricaReportStudioPdf } from '../../api/compliance';
 interface TabComplianceProps {
   /** Scrittura riservata ad advisor/super_admin; gli altri ruoli interni vedono in sola lettura. */
   ruolo?: string;
@@ -248,6 +249,14 @@ export function TabCompliance({ ruolo }: TabComplianceProps) {
 
       {/* ── K9/§5.5 — questionario periodico FIAU (REQ) ── */}
       <PannelloQuestionarioFiau puoScrivere={puoScrivere} />
+
+      {/* ── K9/§5.5 — report di studio (panoramica AML) ── */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        <button type="button" className="btn btn-sm btn-secondary" onClick={() => { setErrore(null); scaricaReportStudioPdf().catch((e) => setErrore(e?.message || 'Errore report di studio')); }}>
+          📊 Scarica report compliance di studio (PDF)
+        </button>
+        <span style={{ fontSize: 11, color: 'var(--muted)' }}>Panoramica AML: rischio d’attività, formazione, questionario FIAU e conteggi pratiche.</span>
+      </div>
 
       {/* ── Card audit trail append-only ── */}
       <div style={sCard}>
