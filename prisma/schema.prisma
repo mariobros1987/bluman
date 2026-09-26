@@ -1914,6 +1914,18 @@ model FascicoloKyc {
 
   soglieOperazione Decimal? @map("soglie_operazione")
 
+  // K9 — conservazione/retention (spec §5.4/§8.9/§11). Alla chiusura il fascicolo entra in
+  // conservazione: `chiusoAt` è la fine del rapporto, `retentionScadenza` = chiusoAt + retentionYears
+  // (config tenant), salvo proroga (`retentionProrogaAl`). Allo scadere l'MLRO conferma cancellazione
+  // o anonimizzazione (`retentionEsito`): nessuna cancellazione fisica prima della scadenza (§8.9).
+  chiusoAt              DateTime?       @map("chiuso_at")
+  retentionScadenza     DateTime?       @map("retention_scadenza")
+  retentionProrogaAl    DateTime?       @map("retention_proroga_al")
+  retentionProrogaMotivo String?        @map("retention_proroga_motivo")
+  retentionEsito        EsitoRetention? @map("retention_esito")
+  retentionEsitoAt      DateTime?       @map("retention_esito_at")
+  retentionEsitoDa      String?         @map("retention_esito_da")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -2274,6 +2286,13 @@ enum DecisioneMlro {
 enum StatoSegnalazioneFiau {
   preparata
   trasmessa
+}
+
+/// K9 (spec §5.4/§8.9) — esito della conservazione allo scadere della retention: l'MLRO conferma la
+/// cancellazione dei dati oppure la loro anonimizzazione. Nullo = fascicolo ancora in conservazione.
+enum EsitoRetention {
+  cancellato
+  anonimizzato
 }
 
 // ═══════════════════════════════════════════════════════════════════
