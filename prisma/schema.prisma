@@ -1928,6 +1928,7 @@ model FascicoloKyc {
   riskAssessments    RiskAssessment[]
   screenings         ScreeningKyc[]
   anomalie           AnomaliaKyc[]
+  segnalazioniFiau   SegnalazioneFiau[]
 
   @@index([tenantId, clienteId])
   @@index([tenantId, stato, dataScadenza])
@@ -2267,6 +2268,14 @@ enum DecisioneMlro {
   chiusura_rapporto
 }
 
+/// K8b (spec §5.3/§10) — stato della segnalazione FIAU (STR). `preparata`: il dossier per l'MLRO è
+/// stato assemblato e resta consultabile/esportabile; `trasmessa`: l'MLRO ha inviato sul portale
+/// goAML/FIAU e ha registrato riferimento e timestamp. Il sistema NON trasmette: prepara e registra.
+enum StatoSegnalazioneFiau {
+  preparata
+  trasmessa
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // KYC/AML Fase K8a (Malta, spec §5.3) — anomalie / segnalazioni interne e decisioni dell'MLRO.
 // L'anomalia è un candidato SAR interno; la decisione MLRO è append-only (MlroDecisionLog) e ogni
@@ -2285,6 +2294,7 @@ model AnomaliaKyc {
   updatedAt   DateTime         @updatedAt @map("updated_at")
 
   decisioni MlroDecisionLog[]
+  segnalazione SegnalazioneFiau?
 
   @@index([tenantId, fascicoloId])
   @@map("anomalia_kyc")
@@ -2304,4 +2314,39 @@ model MlroDecisionLog {
 
   @@index([tenantId, anomaliaId])
   @@map("mlro_decision_log")
+}
+
+/// K8b (Malta, spec §5.3/§10) — la segnalazione di operazione sospetta (STR) verso la FIAU.
+/// Nasce da un'anomalia che l'MLRO ha deciso di segnalare (`segnalazione_fiau`, K8a): è la coda
+/// naturale di quella decisione. Il sistema **prepara i dati** (snapshot immutabile del fascicolo in
+/// `datiPreparatiJson`, da cui si genera il dossier PDF per l'MLRO) e **registra riferimento e
+/// timestamp goAML** dopo l'invio manuale sul portale FIAU; NON trasmette (nessuna integrazione
+/// diretta in prima fase, spec §10). Una anomalia = una segnalazione (`anomaliaId` unique): una
+/// nuova preparazione prima dell'invio aggiorna lo snapshot, dopo l'invio è chiusa.
+model SegnalazioneFiau {
+  id          String                @id @default(uuid())
+  tenantId    String                @map("tenant_id")
+  anomaliaId  String                @unique @map("anomalia_id")
+  anomalia    AnomaliaKyc           @relation(fields: [anomaliaId], references: [id], onDelete: Cascade)
+  fascicoloId String                @map("fascicolo_id")
+  fascicolo   FascicoloKyc          @relation(fields: [fascicoloId], references: [id], onDelete: Cascade)
+  stato       StatoSegnalazioneFiau @default(preparata)
+
+  // Snapshot del fascicolo all'istante della preparazione (soggetto, titolari effettivi, rischio,
+  // screening, anomalia e decisione MLRO). È la fonte del dossier PDF: si congela qui perché il
+  // fascicolo continua a evolvere e la segnalazione deve riflettere cosa si è visto quando si è deciso.
+  datiPreparatiJson Json @map("dati_preparati_json")
+
+  // Registrazione post-invio manuale sul portale FIAU/goAML (spec §5.3): riferimento rilasciato dal
+  // portale e istante dell'invio. Nulli finché la segnalazione non è `trasmessa`.
+  riferimentoGoaml String?   @map("riferimento_goaml")
+  trasmessaAt      DateTime? @map("trasmessa_at")
+
+  preparataDa String?  @map("preparata_da")
+  trasmessaDa String?  @map("trasmessa_da")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([tenantId, fascicoloId])
+  @@map("segnalazione_fiau")
 }
