@@ -15,6 +15,13 @@ export interface FascicoloKyc {
   dataScadenza?: string | null;
   dataVerifica?: string | null;
   pep?: boolean;
+  // K9 — conservazione/retention (§5.4). Popolati alla chiusura del fascicolo.
+  chiusoAt?: string | null;
+  retentionScadenza?: string | null;
+  retentionProrogaAl?: string | null;
+  retentionProrogaMotivo?: string | null;
+  retentionEsito?: 'cancellato' | 'anonimizzato' | null;
+  retentionEsitoAt?: string | null;
   storico?: Array<{ id: string; statoPrecedente?: string | null; statoNuovo: string; motivazione?: string | null; createdAt: string }>;
 }
 
@@ -286,5 +293,22 @@ export async function scaricaDossierStrPdf(segnalazioneId: string): Promise<void
   a.click();
   a.remove();
   window.URL.revokeObjectURL(url);
+}
+
+// K9 — conservazione/retention (spec §5.4/§8.9). Riservato MLRO/admin (403 agli altri ruoli).
+export async function concludiRetentionApi(fascicoloId: string, esito: 'cancellato' | 'anonimizzato', motivazione?: string) {
+  const res = await apiFetch(`${API_BASE}/kyc/${fascicoloId}/retention/esito`, {
+    method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({ esito, motivazione }),
+  });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore conclusione conservazione'));
+  return await res.json();
+}
+
+export async function prorogaRetentionApi(fascicoloId: string, prorogaAl: string, motivo: string) {
+  const res = await apiFetch(`${API_BASE}/kyc/${fascicoloId}/retention/proroga`, {
+    method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({ prorogaAl, motivo }),
+  });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore proroga conservazione'));
+  return await res.json();
 }
 

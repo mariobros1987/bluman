@@ -11,6 +11,7 @@ import { PannelloRischio } from '../kyc/PannelloRischio';
 import { PannelloScreening } from '../kyc/PannelloScreening';
 import { PannelloAnomalie } from '../kyc/PannelloAnomalie';
 import { PannelloSegnalazioniFiau } from '../kyc/PannelloSegnalazioniFiau';
+import { PannelloRetention } from '../kyc/PannelloRetention';
 
 // ─── Componente Anagrafica Completa Cliente ERP ────────────────────
 export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Cliente; onClose: () => void; onSaved: () => void }) {
@@ -819,6 +820,7 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
               {kycFasc && <PannelloScreening fascicoloId={kycFasc.id} puoModificare={true} />}
               {kycFasc && <PannelloAnomalie fascicoloId={kycFasc.id} puoModificare={true} />}
               {kycFasc && <PannelloSegnalazioniFiau fascicoloId={kycFasc.id} puoModificare={true} />}
+              {kycFasc && <PannelloRetention fascicolo={kycFasc} puoModificare={true} onAggiornato={() => fetchKycFascicoloApi(client.id).then((r) => setKycFasc(r.fascicolo)).catch(() => {})} />}
             </div>
           </div>
         )}
