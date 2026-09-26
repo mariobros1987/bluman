@@ -168,4 +168,49 @@ export async function registraRotteCompliance(server: FastifyInstance): Promise<
     });
     return reply.send({ ok: true, corrente: bra });
   });
+
+  // ── K9/§5.5 — registro della formazione AML (§7 TrainingRecord, §12 promemoria) ─────────────
+  // Log a livello di studio. Lettura ai ruoli interni; scrittura al responsabile/MLRO. Ogni riga è
+  // un evento formativo (non versionato); il cron avvisa se la cadenza è superata.
+  server.get('/tenant/formazione', async (req, reply) => {
+    if (vietatoAlCliente(req, reply)) return;
+    if (await moduloSpento(req, reply)) return;
+    const tenantId = req.tenantId;
+    const record = await prisma.trainingRecord.findMany({ where: { tenantId }, orderBy: { data: 'desc' }, take: 200 });
+    return reply.send({ record });
+  });
+
+  server.post('/tenant/formazione', async (req, reply) => {
+    if (vietatoAlCliente(req, reply)) return;
+    if (await moduloSpento(req, reply)) return;
+    const tenantId = req.tenantId;
+    const settings = await prisma.tenantComplianceSettings.findUnique({ where: { tenantId }, select: { mlroUserId: true } });
+    const puo = req.ruolo === 'advisor' || req.ruolo === 'super_admin' || (!!req.userId && req.userId === settings?.mlroUserId);
+    if (!puo) return reply.code(403).send({ errore: 'Il registro formazione è riservato al responsabile o all’MLRO.' });
+
+    const b = (req.body || {}) as Record<string, any>;
+    if (!b.titolo || String(b.titolo).trim().length < 2) return reply.code(400).send({ errore: 'Titolo obbligatorio.' });
+    const data = b.data ? new Date(String(b.data)) : null;
+    if (!data || Number.isNaN(data.getTime())) return reply.code(400).send({ errore: 'Data della formazione non valida.' });
+    const TIPI = ['mlro', 'personale', 'amministratori', 'aggiornamento', 'altro'];
+
+    const record = await prisma.trainingRecord.create({
+      data: {
+        tenantId,
+        titolo: String(b.titolo).trim().slice(0, 200),
+        tipo: TIPI.includes(b.tipo) ? b.tipo : 'personale',
+        data,
+        partecipanti: b.partecipanti ? String(b.partecipanti).trim().slice(0, 1000) : null,
+        oreFormazione: Number.isFinite(Number(b.oreFormazione)) ? Number(b.oreFormazione) : null,
+        ente: b.ente ? String(b.ente).trim().slice(0, 200) : null,
+        note: b.note ? String(b.note).trim().slice(0, 1000) : null,
+        registratoDa: req.userId ?? null,
+      },
+    });
+    await registraComplianceEvent(prisma, {
+      tenantId, tipo: 'KYC_FORMAZIONE_REGISTRATA', attoreUserId: req.userId ?? null,
+      payload: { trainingId: record.id, tipo: record.tipo, data: data.toISOString() },
+    });
+    return reply.send({ ok: true, record });
+  });
 }

@@ -34,6 +34,9 @@ vi.mock('../util/prismaClient.js', () => ({
     fattura: { findMany: mockFatturaFindMany },
     // K7: le pratiche KYC da rivedere (approvato/in_revisione con revisione dovuta).
     fascicoloKyc: { findMany: mockFascicoloFindMany },
+    // K9: la formazione AML più recente. Recente di proposito → la cadenza non è superata e il
+    // promemoria §12 non scatta, così i conteggi di notifica degli altri test restano invariati.
+    trainingRecord: { findFirst: async () => ({ data: new Date() }) },
   },
 }));
 

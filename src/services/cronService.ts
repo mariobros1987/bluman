@@ -7,6 +7,7 @@ import { recordAudit } from '../util/serverHelpers.js';
 import { giornoSollecitoRata, kycInAvviso, tonoRata } from '../util/scadenzeDerivate.js';
 import { revisioneKycDovuta, motivoRevisioneKyc } from '../domain/monitoraggioKyc.js';
 import { retentionDovuta, motivoRetention } from '../domain/retentionKyc.js';
+import { formazioneDovuta, motivoFormazione } from '../domain/formazioneKyc.js';
 import { moduloKycAttivo } from '../util/guardiaModuli.js';
 
 export interface CronReport {
@@ -17,6 +18,7 @@ export interface CronReport {
   microvociInRitardoTrovate: number;
   revisioniKycTrovate: number;
   retentionScaduteTrovate: number;
+  formazioneDaSvolgere: boolean;
   notificheInviate: number;
   dettagli: string[];
 }
@@ -55,6 +57,7 @@ export async function runDailyNotificationCron(tenantId?: string): Promise<CronR
     microvociInRitardoTrovate: 0,
     revisioniKycTrovate: 0,
     retentionScaduteTrovate: 0,
+    formazioneDaSvolgere: false,
     notificheInviate: 0,
     dettagli: [],
   };
@@ -202,12 +205,31 @@ export async function runDailyNotificationCron(tenantId?: string): Promise<CronR
         }
       }
     }
+
+    // 6. Formazione AML (K9/§5.5, §12) — un solo controllo per studio: se la formazione più recente
+    //    supera la cadenza (o non ce n'è mai stata), si avvisa l'MLRO. Detection + reminder (la
+    //    programmazione la fa l'MLRO, regola 14); la condizione di "dovuta" sta in `formazioneKyc`.
+    const ultimaFormazione = await prisma.trainingRecord.findFirst({ where: { tenantId }, orderBy: { data: 'desc' }, select: { data: true } });
+    if (formazioneDovuta(ultimaFormazione?.data ?? null, adesso)) {
+      const corpo = `[KYC] Formazione AML — ${motivoFormazione(ultimaFormazione?.data ?? null, adesso)}`;
+      report.formazioneDaSvolgere = true;
+      report.dettagli.push(corpo);
+      if (!giaNotificati.has(corpo)) {
+        giaNotificati.add(corpo);
+        report.notificheInviate += await notificaStudioSilenziosa(tenantId, {
+          tipoEvento: 'scadenza_imminente',
+          oggetto: 'Formazione AML da programmare',
+          corpo,
+          link: '/settings',
+        });
+      }
+    }
   }
   await recordAudit({
     tenantId,
     azione: 'CRON_NOTIFICHE_SCADENZE_ESEGUITO',
     entita: 'Cron Worker Background',
-    dettagli: `Completata scansione: ${report.notificheInviate} notifiche create (${report.scadenzeUboTrovate} UBO, ${report.fattureScaduteTrovate} fatture, ${report.revisioniKycTrovate} revisioni KYC, ${report.retentionScaduteTrovate} conservazioni)`,
+    dettagli: `Completata scansione: ${report.notificheInviate} notifiche create (${report.scadenzeUboTrovate} UBO, ${report.fattureScaduteTrovate} fatture, ${report.revisioniKycTrovate} revisioni KYC, ${report.retentionScaduteTrovate} conservazioni${report.formazioneDaSvolgere ? ', formazione dovuta' : ''})`,
   });
 
   return report;
