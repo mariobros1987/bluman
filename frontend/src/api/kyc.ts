@@ -312,3 +312,18 @@ export async function prorogaRetentionApi(fascicoloId: string, prorogaAl: string
   return await res.json();
 }
 
+
+/** K9/§5.5 — scarica il report PDF riassuntivo del fascicolo (documento interno per ispezione). */
+export async function scaricaReportFascicoloPdf(fascicoloId: string): Promise<void> {
+  const res = await apiFetch(`${API_BASE}/kyc/${fascicoloId}/report.pdf`, { headers: getAuthHeaders() });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore download report fascicolo'));
+  const blob = await res.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `report-kyc-${fascicoloId}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.URL.revokeObjectURL(url);
+}

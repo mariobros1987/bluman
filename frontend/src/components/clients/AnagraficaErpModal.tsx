@@ -5,7 +5,7 @@ import { getCurrentTenantId, getTenantStorageKey } from '../../utils/tenant';
 import { fmt } from '../../utils';
 import type { Cliente } from '../../types';
 import { Modal } from '../ui/Modal';
-import { fetchKycFascicoloApi, creaKycFascicoloApi, aggiornaStatoKycApi, fetchModuliTenant, type FascicoloKyc } from '../../api/kyc';
+import { fetchKycFascicoloApi, creaKycFascicoloApi, aggiornaStatoKycApi, fetchModuliTenant, scaricaReportFascicoloPdf, type FascicoloKyc } from '../../api/kyc';
 import { PannelloTitolariEffettivi } from '../kyc/PannelloTitolariEffettivi';
 import { PannelloRischio } from '../kyc/PannelloRischio';
 import { PannelloScreening } from '../kyc/PannelloScreening';
@@ -821,6 +821,13 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
               {kycFasc && <PannelloAnomalie fascicoloId={kycFasc.id} puoModificare={true} />}
               {kycFasc && <PannelloSegnalazioniFiau fascicoloId={kycFasc.id} puoModificare={true} />}
               {kycFasc && <PannelloRetention fascicolo={kycFasc} puoModificare={true} onAggiornato={() => fetchKycFascicoloApi(client.id).then((r) => setKycFasc(r.fascicolo)).catch(() => {})} />}
+              {kycFasc && (
+                <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12, marginTop: 12 }}>
+                  <button type="button" className="btn btn-sm btn-secondary" onClick={() => scaricaReportFascicoloPdf(kycFasc.id).catch((e) => setKycMsg(e?.message || 'Errore report'))}>
+                    📄 Scarica report fascicolo (PDF per ispezione)
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}
