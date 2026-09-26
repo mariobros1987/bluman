@@ -70,3 +70,40 @@ export async function fetchComplianceEvents(): Promise<{ eventi: ComplianceEvent
   if (!res.ok) throw new Error(data?.errore || 'Errore lettura audit trail di compliance');
   return data;
 }
+
+// K9/§5.5 — valutazione del rischio dell'attività (business risk assessment), a livello di studio.
+// Versionata e mai sovrascritta: ogni salvataggio crea una nuova versione. Scrittura riservata al
+// responsabile/MLRO (il backend rifiuta 403 gli altri); worst-case sui quattro fattori calcolato dal server.
+export type LivelloRischioBra = 'basso' | 'medio' | 'alto';
+export interface BusinessRiskAssessment {
+  id: string;
+  versione: number;
+  clientelaLivello: LivelloRischioBra; clientelaMotivazione: string | null;
+  serviziLivello: LivelloRischioBra; serviziMotivazione: string | null;
+  geografiaLivello: LivelloRischioBra; geografiaMotivazione: string | null;
+  canaliLivello: LivelloRischioBra; canaliMotivazione: string | null;
+  livelloComplessivo: LivelloRischioBra; motivazioneComplessiva: string | null;
+  prossimaRevisione: string | null; redattoDa: string | null; createdAt: string;
+}
+
+export async function fetchBusinessRisk(): Promise<{ corrente: BusinessRiskAssessment | null; storico: BusinessRiskAssessment[] }> {
+  const res = await apiFetch(`${API_BASE}/tenant/business-risk`, { headers: getAuthHeaders() });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(data?.errore || 'Errore lettura valutazione rischio studio');
+  return data;
+}
+
+export async function salvaBusinessRisk(body: {
+  clientelaLivello: LivelloRischioBra; clientelaMotivazione: string;
+  serviziLivello: LivelloRischioBra; serviziMotivazione: string;
+  geografiaLivello: LivelloRischioBra; geografiaMotivazione: string;
+  canaliLivello: LivelloRischioBra; canaliMotivazione: string;
+  motivazioneComplessiva?: string;
+}): Promise<{ ok: boolean; corrente: BusinessRiskAssessment }> {
+  const res = await apiFetch(`${API_BASE}/tenant/business-risk`, {
+    method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(data?.errore || 'Errore salvataggio valutazione rischio studio');
+  return data;
+}

@@ -8,7 +8,7 @@ import {
   type IntegritaCatena,
 } from '../../api/compliance';
 import { useTeamMembers } from '../../hooks/useTeamMembers';
-
+import { PannelloBusinessRisk } from './PannelloBusinessRisk';
 interface TabComplianceProps {
   /** Scrittura riservata ad advisor/super_admin; gli altri ruoli interni vedono in sola lettura. */
   ruolo?: string;
@@ -237,6 +237,9 @@ export function TabCompliance({ ruolo }: TabComplianceProps) {
           <div style={{ fontSize: 12, color: 'var(--muted)' }}>Sola lettura: la configurazione di compliance è riservata al responsabile dello studio.</div>
         )}
       </form>
+
+      {/* ── K9/§5.5 — valutazione del rischio dello studio (business risk assessment) ── */}
+      <PannelloBusinessRisk puoScrivere={puoScrivere} />
 
       {/* ── Card audit trail append-only ── */}
       <div style={sCard}>
