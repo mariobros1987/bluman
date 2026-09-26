@@ -2128,6 +2128,26 @@ model BusinessRiskAssessment {
   @@map("business_risk_assessment")
 }
 
+/// K9/§5.5 — registro della formazione AML (spec §7 TrainingRecord). Log delle attività formative di
+/// MLRO, amministratori e personale: non versionato, si aggiungono righe. Il cron avvisa l'MLRO se la
+/// formazione più recente supera la cadenza (§12). Tenant-scoped con policy RLS propria.
+model TrainingRecord {
+  id            String   @id @default(uuid())
+  tenantId      String   @map("tenant_id")
+  titolo        String
+  tipo          String   @default("personale") // mlro | personale | amministratori | aggiornamento | altro
+  data          DateTime
+  partecipanti  String?
+  oreFormazione Decimal? @map("ore_formazione")
+  ente          String?
+  note          String?
+  registratoDa  String?  @map("registrato_da")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, data])
+  @@map("training_record")
+}
+
 /// Evento di compliance immutabile e a catena hash (tamper-evident): ogni cambio di settings o
 /// di stato di un caso vi lascia una riga. Append-only lato applicativo.
 model ComplianceEvent {
