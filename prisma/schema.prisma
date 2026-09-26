@@ -2100,6 +2100,34 @@ model TenantComplianceSettings {
   @@map("tenant_compliance_settings")
 }
 
+/// K9/§5.5 — valutazione del rischio dell'ATTIVITÀ (business risk assessment), a livello di studio,
+/// versionata e mai sovrascritta (§7). Distinta dal RiskAssessment del cliente (K3): qui il soggetto è
+/// lo studio stesso. Il livello complessivo è worst-case sui quattro fattori (come K3, §6). Ogni POST
+/// crea una nuova versione; la più recente è quella corrente.
+model BusinessRiskAssessment {
+  id       String @id @default(uuid())
+  tenantId String @map("tenant_id")
+  versione Int    @default(1)
+
+  clientelaLivello     LivelloRischio @default(basso) @map("clientela_livello")
+  clientelaMotivazione String?        @map("clientela_motivazione")
+  serviziLivello       LivelloRischio @default(basso) @map("servizi_livello")
+  serviziMotivazione   String?        @map("servizi_motivazione")
+  geografiaLivello     LivelloRischio @default(basso) @map("geografia_livello")
+  geografiaMotivazione String?        @map("geografia_motivazione")
+  canaliLivello        LivelloRischio @default(basso) @map("canali_livello")
+  canaliMotivazione    String?        @map("canali_motivazione")
+
+  livelloComplessivo     LivelloRischio @default(basso) @map("livello_complessivo")
+  motivazioneComplessiva String?        @map("motivazione_complessiva")
+  prossimaRevisione      DateTime?      @map("prossima_revisione")
+  redattoDa              String?        @map("redatto_da")
+  createdAt              DateTime       @default(now()) @map("created_at")
+
+  @@index([tenantId, versione])
+  @@map("business_risk_assessment")
+}
+
 /// Evento di compliance immutabile e a catena hash (tamper-evident): ogni cambio di settings o
 /// di stato di un caso vi lascia una riga. Append-only lato applicativo.
 model ComplianceEvent {
