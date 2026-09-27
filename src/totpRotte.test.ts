@@ -196,13 +196,14 @@ describe('§6.1 — Rotte HTTP TOTP 2FA End-to-End', () => {
       payload: { codiceTotp: codiceValido },
     });
 
-    // Simula emissione preToken a 2 minuti
+    // Simula emissione preToken a 2 minuti (porta il marcatore `pre_totp`, come il login reale)
     const preToken = signJwt({
       userId: 'usr-super_admin',
       tenantId: TENANT,
       email: 'admin@studio.it',
       ruolo: 'super_admin',
       sessionVersion: 0,
+      scopo: 'pre_totp',
     }, 2);
 
     // Chiamata pubblica a /auth/totp/verifica con preToken + codice
@@ -231,6 +232,21 @@ describe('§6.1 — Rotte HTTP TOTP 2FA End-to-End', () => {
     });
     expect(resBackup.statusCode).toBe(200);
     expect(stato.utente.totpBackupCodes).toHaveLength(7); // Uno consumato
+  });
+
+  it('il preToken NON è accettato come sessione su una rotta protetta (niente bypass 2FA)', async () => {
+    // Un pre-token (scopo: pre_totp) presentato come Bearer deve essere rifiutato dall'hook onRequest:
+    // vale solo per /auth/totp/verifica, non è una sessione. Senza il marcatore era usabile come token pieno.
+    const preToken = signJwt({
+      userId: 'usr-super_admin', tenantId: TENANT, email: 'admin@studio.it', ruolo: 'super_admin', sessionVersion: 0, scopo: 'pre_totp',
+    }, 2);
+    const res = await server.inject({
+      method: 'POST',
+      url: '/auth/totp/disabilita',
+      headers: { authorization: `Bearer ${preToken}` },
+      payload: { password: 'qualsiasi' },
+    });
+    expect(res.statusCode).toBe(401);
   });
 
   it('POST /auth/totp/disabilita richiede la password corretta', async () => {

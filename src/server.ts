@@ -412,7 +412,12 @@ export function buildServer(app: AppPort): FastifyInstance {
 
     if (token) {
       const verificato = verifyJwt(token);
-      if (verificato && ruoloValido(verificato.ruolo) && Number.isInteger(verificato.sessionVersion)) {
+      // §6.1 — un pre-token della fase 2FA (`scopo: 'pre_totp'`) NON è una sessione: vale solo per
+      // completare lo step TOTP su /auth/totp/verifica. Rifiutarlo qui chiude il bypass del secondo
+      // fattore (chi ha solo la password non deve poter usare il pre-token come token pieno).
+      if (verificato && verificato.scopo === 'pre_totp') {
+        // trattato come non autenticato: cade nel 401 delle rotte protette.
+      } else if (verificato && ruoloValido(verificato.ruolo) && Number.isInteger(verificato.sessionVersion)) {
         payload = verificato;
         ruolo = verificato.ruolo;
         if (verificato.tenantId) tenantId = verificato.tenantId;

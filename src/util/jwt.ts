@@ -67,6 +67,12 @@ export interface JwtPayload {
   // restano validi. `signJwt` li propaga con lo spread del payload.
   iat?: number;
   sid?: string;
+  /**
+   * §6.1 — marcatore del pre-token della fase 2FA. `pre_totp` = token emesso dopo la sola verifica
+   * password, valido SOLO per completare lo step TOTP su `/auth/totp/verifica`. L'hook onRequest lo
+   * rifiuta come sessione: senza questo marcatore un pre-token era usabile come token pieno (bypass 2FA).
+   */
+  scopo?: 'pre_totp';
 }
 
 export function signJwt(payload: Omit<JwtPayload, 'exp'>, expiresInMinutes = 60): string {

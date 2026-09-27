@@ -143,6 +143,7 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
         email: cleanEmail,
         ruolo: utente.ruolo,
         sessionVersion: utente.sessionVersion,
+        scopo: 'pre_totp', // §6.1 — vale solo per lo step TOTP, non è una sessione (l'hook lo rifiuta)
       }, 2); // 2 minuti â€” solo per la fase TOTP
 
       await recordAudit({
@@ -816,9 +817,10 @@ export async function registraRotteAuth(server: FastifyInstance): Promise<void> 
 
     if (!preToken || !codiceTotp) return reply.code(400).send(erroreGenerico);
 
-    // Verifica il preToken (2 min, stesso meccanismo del JWT normale)
+    // Verifica il preToken (2 min). DEVE portare il marcatore `pre_totp`: un token pieno non è
+    // accettato qui (difesa in profondità, coerente col rifiuto del pre-token nell'hook onRequest).
     const payload = verifyJwt(preToken);
-    if (!payload || !ruoloAbilitatoTotp(payload.ruolo)) {
+    if (!payload || payload.scopo !== 'pre_totp' || !ruoloAbilitatoTotp(payload.ruolo)) {
       return reply.code(401).send(erroreGenerico);
     }
 
