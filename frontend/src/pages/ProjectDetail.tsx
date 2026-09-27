@@ -577,7 +577,10 @@ export function ProjectDetail() {
             const isDone = mv.s === 'done';
             return {
               ...mv,
-              s: isDone ? 'in_progress' : 'done',
+              // Stato micro-voce valido: 'active' (in corso), non 'in_progress' — quello è lo stato del
+              // MODULO. Con 'in_progress' il backend (STATI_MICROVOCE) scartava in silenzio il
+              // de-completamento e la modifica non si persisteva (rilievo audit §03). Cfr. riga ~648.
+              s: isDone ? 'active' : 'done',
               hA: isDone ? 0 : mv.hE,
             };
           }
