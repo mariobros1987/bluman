@@ -28,6 +28,7 @@ import {
   calcolaStatoModulo,
   calcolaPercentualeProgetto,
   calcolaStatoProgetto,
+  risolviDipendenze,
 } from '../domain/stateEngine.js';
 import type { StatoModulo, StatoProgetto } from '../domain/types.js';
 import { prisma } from '../util/prismaClient.js';
@@ -179,10 +180,16 @@ export function arricchisciProgetti<T extends ProgettoCalcolo>(
 export async function ricalcolaProgetto(progettoId: string): Promise<AvanzamentoProgetto> {
   const progetto = await prisma.progetto.findUnique({
     where: { id: progettoId },
-    include: { moduli: { include: { microvoci: true } } },
+    include: { moduli: { include: { microvoci: true, dipendenze: true } } },
   });
 
   if (!progetto) throw new ProgettoNonTrovatoError(`Progetto non trovato: ${progettoId}`);
+
+  // §16.5 — id dei moduli che in questo ricalcolo transitano a 'done': servono per sbloccare i
+  // moduli dipendenti (attesa_dipendenza → pending). Prima `ricalcolaProgetto` — il percorso che la
+  // UI usa davvero (checkbox/«Ricalcola») — non sbloccava mai le dipendenze, e le micro-voci dei
+  // moduli a valle restavano `attesa_dipendenza` per sempre (feature dipendenze rotta in produzione).
+  const moduliAppenaCompletati: string[] = [];
 
   for (const modulo of progetto.moduli) {
     for (const microvoce of modulo.microvoci) {
@@ -209,6 +216,7 @@ export async function ricalcolaProgetto(progettoId: string): Promise<Avanzamento
       // Blocco 3 — il ricalcolo (pulsante «Ricalcola») può chiudere un modulo tanto
       // quanto la consuntivazione: stesso evento, stesso destinatario.
       if (statoModulo === 'done' && modulo.stato !== 'done') {
+        moduliAppenaCompletati.push(modulo.id);
         await notificaStudio(progetto.tenantId, {
           tipoEvento: 'modulo_completato',
           oggetto: 'Modulo completato',
@@ -217,6 +225,40 @@ export async function ricalcolaProgetto(progettoId: string): Promise<Avanzamento
         }).catch(() => {});
       }
       (modulo as any).stato = statoModulo;
+    }
+  }
+
+  // §16.5 — sblocco dipendenze: per ogni modulo appena completato, porta a `pending` le micro-voci
+  // `attesa_dipendenza` dei moduli dipendenti le cui dipendenze sono TUTTE soddisfatte, poi ne
+  // ricalcola lo stato. Stessa logica di `esecuzione.ts`, portata sul percorso reale della UI.
+  if (moduliAppenaCompletati.length > 0) {
+    const conDipendenze = progetto.moduli.map((m) => ({
+      id: m.id,
+      stato: (m as any).stato,
+      dipendeDa: ((m as any).dipendenze ?? []).map((d: any) => d.dipendeDaModuloProgettoId),
+    }));
+    const daSbloccare = new Set<string>();
+    for (const completatoId of moduliAppenaCompletati) {
+      for (const id of risolviDipendenze(conDipendenze as any, completatoId)) daSbloccare.add(id);
+    }
+    for (const moduloId of daSbloccare) {
+      const modulo = progetto.moduli.find((m) => m.id === moduloId);
+      if (!modulo) continue;
+      let cambiato = false;
+      for (const mv of modulo.microvoci) {
+        if (mv.stato === 'attesa_dipendenza') {
+          await prisma.microvoceProgetto.update({ where: { id: mv.id }, data: { stato: 'pending' } });
+          (mv as any).stato = 'pending';
+          cambiato = true;
+        }
+      }
+      if (cambiato) {
+        const nuovoStato = calcolaStatoModulo(modulo.microvoci as any);
+        if (modulo.stato !== nuovoStato) {
+          await prisma.moduloProgetto.update({ where: { id: moduloId }, data: { stato: nuovoStato } });
+          (modulo as any).stato = nuovoStato;
+        }
+      }
     }
   }
 

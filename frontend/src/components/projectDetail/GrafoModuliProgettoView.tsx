@@ -4,7 +4,6 @@ import { ProgressBar } from '../ui/ProgressBar';
 import { fmt } from '../../utils';
 import { fetchModuliLibreria, fetchArticoli } from '../../api/client';
 import type { Progetto } from '../../types';
-import { useToast } from '../ui/ToastProvider';
 import { Modal } from '../ui/Modal';
 
 // ─── Componente Grafo & Dipendenze Moduli del Progetto ────────────
@@ -22,7 +21,6 @@ export function GrafoModuliProgettoView({
   onAddModule: (modello: { id: string; versione: number; nome: string; prezzo: number }) => void;
   onSelectMod: (modId: number) => void;
 }) {
-  const toast = useToast();
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [dbModTemplates, setDbModTemplates] = useState<Array<{ id: string; ver: number; n: string; cat: string; giur: string | null; h: number; p: number; righe: any[] }>>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<string>('');
@@ -142,12 +140,13 @@ export function GrafoModuliProgettoView({
             const isDone = m.st === 'done' || m.pct === 100;
             const isInProgress = m.st === 'in_progress' || (m.pct > 0 && m.pct < 100);
 
-            // Calcolo sblocco topologico (locked / unlocked)
-            const prevMod = idx > 0 ? project.mods[idx - 1] : null;
-            const isLocked = prevMod ? (prevMod.st !== 'done' && prevMod.pct < 100) : false;
+            // Sblocco dallo STATO REALE del modulo, non dall'adiacenza nell'array: un modulo è
+            // bloccato solo se è davvero `attesa_dipendenza` (prima il lock era posizionale e mostrava
+            // «bloccato da X / sbloccato» inventati dal modulo precedente — regola 7 sul tab dipendenze).
+            const isLocked = m.st === 'attesa_dipendenza';
 
             const statusColor = isDone ? 'var(--green)' : isLocked ? 'var(--amber)' : isInProgress ? 'var(--indigo-l)' : 'var(--muted)';
-            const lockBadgeText = isDone ? '✓ Ultimato' : isLocked ? `🔒 Bloccato da ${prevMod?.n.substring(0, 14)}...` : isInProgress ? '⚡ In Lavorazione' : '🔓 Sbloccato & Eseguibile';
+            const lockBadgeText = isDone ? '✓ Ultimato' : isLocked ? '🔒 In attesa di dipendenze' : isInProgress ? '⚡ In Lavorazione' : '🔓 Eseguibile';
 
             return (
               <React.Fragment key={m.id}>
@@ -169,7 +168,7 @@ export function GrafoModuliProgettoView({
                     transition: 'all .2s',
                     opacity: isLocked ? 0.82 : 1,
                   }}
-                  title={isLocked ? `Modulo bloccato in attesa del completamento di: ${prevMod?.n}` : "Clicca per aprire la scheda dettagliata del modulo"}
+                  title={isLocked ? 'Modulo in attesa del completamento delle dipendenze' : "Clicca per aprire la scheda dettagliata del modulo"}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6 }}>
                     <CatBadge cat={m.cat} />
@@ -197,27 +196,12 @@ export function GrafoModuliProgettoView({
                     <span>⏱ {m.a}/{m.h}h</span>
                     <span style={{ fontWeight: 700, color: 'var(--text)' }}>{fmt(m.p)}</span>
                   </div>
-
-                  {/* Pulsante Notifica Sblocco al Cliente */}
-                  {isDone && idx < project.mods.length - 1 && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toast.successo(`Notifica Sblocco inviata con successo al cliente per la fase successiva: ${project.mods[idx + 1].n}!`);
-                      }}
-                      style={{ background: 'var(--pill-green-bg)', border: '1px solid var(--pill-green-bd)', color: 'var(--pill-green-fg)', padding: '5px 8px', borderRadius: 8, fontSize: 10, fontWeight: 600, cursor: 'pointer', marginTop: 2 }}
-                    >
-                      ✉️ Notifica Sblocco al Cliente
-                    </button>
-                  )}
                 </div>
 
-                {/* Arrow Connector */}
+                {/* Connettore visivo tra i moduli (l'ordine dell'elenco, non una dipendenza reale) */}
                 {idx < project.mods.length - 1 && (
-                  <div style={{ display: 'flex', flexShrink: 0, flexDirection: 'column', alignItems: 'center', gap: 4, color: isDone ? 'var(--green)' : isLocked ? 'var(--amber)' : 'var(--muted)' }}>
-                    <div style={{ fontSize: 20, fontWeight: 800 }}>{isDone ? '🔓 ➔' : '🔒 ➔'}</div>
-                    <span style={{ fontSize: 9, fontWeight: 600 }}>{isDone ? 'Sbloccato' : 'In attesa'}</span>
+                  <div style={{ display: 'flex', flexShrink: 0, alignItems: 'center', color: 'var(--muted)' }}>
+                    <div style={{ fontSize: 20, fontWeight: 800 }}>➔</div>
                   </div>
                 )}
               </React.Fragment>

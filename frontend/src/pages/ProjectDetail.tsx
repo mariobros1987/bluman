@@ -364,7 +364,9 @@ export function ProjectDetail() {
               // nome, e su due micro-voci omonime non salva niente.
               dbId: mv.id,
               n: mv.nome,
-              hE: mv.orePreventivate || 4,
+              // `?? 0`, non `|| 4`: una micro-voce con 0 ore preventivate (override legittimo «ore
+              // incluse: 0») non deve diventare 4h — falsava la media pesata (§16) e le ore del modulo.
+              hE: mv.orePreventivate ?? 0,
               hA: mv.oreConsuntivate || 0,
               s: mv.stato || 'pending',
               as: assignedAs,
@@ -579,9 +581,10 @@ export function ProjectDetail() {
               ...mv,
               // Stato micro-voce valido: 'active' (in corso), non 'in_progress' — quello è lo stato del
               // MODULO. Con 'in_progress' il backend (STATI_MICROVOCE) scartava in silenzio il
-              // de-completamento e la modifica non si persisteva (rilievo audit §03). Cfr. riga ~648.
+              // de-completamento e la modifica non si persisteva (rilievo audit §03).
+              // NON si toccano le ore consuntivate (`hA`): completare/de-completare non deve
+              // sovrascrivere le ore reali con la stima né azzerarle (uccideva il segnale di rischio §16.1).
               s: isDone ? 'active' : 'done',
-              hA: isDone ? 0 : mv.hE,
             };
           }
           return mv;
@@ -623,15 +626,19 @@ export function ProjectDetail() {
     // Persistenza remota server DB per multi-postazione
     void salvaSuDatabase(updatedProject);
 
-    // Notifica automatica milestone completata nel fascicolo comunicazione
-    const targetMv = project.mods.find(m => m.id === modId)?.v?.[mvIdx];
-    if (targetMv && targetMv.s !== 'done') {
+    // Avviso automatico al cliente SOLO quando un intero MODULO è completato (milestone), non a ogni
+    // micro-voce spuntata (decisione titolare 27/09: prima partiva un WhatsApp a ogni spunta → spam).
+    // Niente % nel testo: la % locale è un conteggio semplice non pesato; il valore autorevole è il
+    // ricalcolo server (regola 7: non mostrare un numero preciso fuorviante).
+    const moduloPrima = project.mods.find(m => m.id === modId);
+    const moduloDopo = newMods.find(m => m.id === modId);
+    if (moduloDopo?.st === 'done' && moduloPrima?.st !== 'done') {
       inviaComunicazioneApi(String(project.id), {
         canale: 'whatsapp',
         mittente: 'BlueCode Advisor Studio',
         destinatario: project.cl,
         direzione: 'uscita',
-        testo: `🔔 Avanzamento Pratica "${project.n}": La fase "${targetMv.n}" è stata completata con successo! L'avanzamento complessivo è ora al ${globalPct}%.`,
+        testo: `🔔 Avanzamento Pratica "${project.n}": il modulo "${moduloDopo.n}" è stato completato.`,
       }).catch(() => {});
     }
   };
@@ -752,7 +759,9 @@ export function ProjectDetail() {
 
     // Il modulo deve esistere a DB — senza dbId non c'è nulla da eliminare
     // e il modulo orfano non dovrebbe esistere (Regola 7).
-    const dbModuloId = rawDbProject?.moduli?.[mIdx]?.id;
+    // Si usa l'id del modulo (`mod.dbId`), NON l'indice posizionale nell'array `rawDbProject.moduli`:
+    // con il fallback localStorage gli ordini possono divergere e si eliminava il modulo sbagliato.
+    const dbModuloId = mod.dbId ?? rawDbProject?.moduli?.[mIdx]?.id;
     if (!dbModuloId) {
       toast.attenzione('Questo modulo non risulta salvato a database e non può essere eliminato. Ricrea il progetto correttamente.');
       return;
