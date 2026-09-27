@@ -15,6 +15,10 @@ import { istanziaProgetto, calcolaPrezzoModulo } from '../../services/istanziaPr
 // Si usa la variante *silenziosa*: l'istanziazione è una transazione riuscita, e una
 // notifica che non parte non deve farla sembrare fallita. L'errore resta nel log.
 import { notificaStudioSilenziosa } from '../../services/notificheService.js';
+// §16 — consuntivaMicrovoce deve usare il motore di stato puro come fa InMemoryApp, non una logica
+// ad-hoc: lo stato del modulo eredita la precedenza blocked/delayed (mai chiudere un modulo con una
+// voce bloccata) e il segnale di rischio si calcola sulle ore. Rilievo audit §03.
+import { calcolaStatoModulo, valutaSegnaleRischio } from '../../domain/stateEngine.js';
 import {
   registraConsuntivazione,
   marcaRitardo,
@@ -842,26 +846,42 @@ export class PrismaApp implements AppPort {
   async consuntivaMicrovoce(input: { microvoceId: string; oreAggiunte: number; completa?: boolean }) {
     const mv = await this.prisma.microvoceProgetto.findUniqueOrThrow({ where: { id: input.microvoceId } });
     const nuoveOre = mv.oreConsuntivate + input.oreAggiunte;
-    const nuovoStato = input.completa ? 'done' : mv.stato === 'pending' || mv.stato === 'attesa_dipendenza' ? 'active' : mv.stato;
+    // §16 — le ore da sole promuovono solo `pending → active`. Una voce `attesa_dipendenza` NON si
+    // sblocca consuntivando ore (lo fa la risoluzione delle dipendenze); `blocked`/`delayed`/`done`
+    // non si toccano qui. Prima l'adapter promuoveva anche `attesa_dipendenza → active`, scavalcando il gate.
+    const nuovoStato = input.completa
+      ? 'done'
+      : mv.stato === 'pending'
+        ? 'active'
+        : mv.stato;
+
+    // §16.1 — segnale di rischio calcolato sulle ore (prima l'adapter non lo aggiornava affatto).
+    const { segnaleRischio } = valutaSegnaleRischio({ stato: nuovoStato, orePreventivate: mv.orePreventivate, oreConsuntivate: nuoveOre });
 
     const aggiornata = await this.prisma.microvoceProgetto.update({
       where: { id: input.microvoceId },
-      data: {
-        oreConsuntivate: nuoveOre,
-        stato: nuovoStato,
-      },
+      data: { oreConsuntivate: nuoveOre, stato: nuovoStato, segnaleRischio },
     });
 
-    // Se completata, verifica se tutte le microvoci del modulo sono done per aggiornare il modulo
-    if (input.completa) {
-      const allMv = await this.prisma.microvoceProgetto.findMany({ where: { moduloProgettoId: mv.moduloProgettoId } });
-      const allDone = allMv.every((m) => m.stato === 'done' || m.id === input.microvoceId);
-      if (allDone) {
-        await this.prisma.moduloProgetto.update({
-          where: { id: mv.moduloProgettoId },
-          data: { stato: 'done' },
-        });
-      }
+    // §16.2 — lo stato del modulo si ricava dal motore puro sull'insieme aggiornato delle micro-voci,
+    // che rispetta la precedenza blocked > delayed > done: un modulo con una voce bloccata NON diventa
+    // «done». Prima un `every(done)` naïf poteva chiudere il modulo ignorando una voce bloccata.
+    const microvoci = await this.prisma.microvoceProgetto.findMany({
+      where: { moduloProgettoId: mv.moduloProgettoId },
+      select: { stato: true },
+    });
+    const statoModulo = calcolaStatoModulo(microvoci.map((m) => ({ stato: m.stato })));
+    const modulo = await this.prisma.moduloProgetto.findUnique({
+      where: { id: mv.moduloProgettoId },
+      select: { stato: true },
+    });
+    // §16.6 — non si declassa un modulo chiuso a mano senza micro-voci; qui ci sono micro-voci, quindi
+    // si allinea sempre lo stato calcolato quando differisce da quello persistito.
+    if (modulo && modulo.stato !== statoModulo) {
+      await this.prisma.moduloProgetto.update({
+        where: { id: mv.moduloProgettoId },
+        data: { stato: statoModulo },
+      });
     }
 
     return aggiornata;
