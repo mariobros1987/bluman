@@ -24,7 +24,7 @@ export function GrafoModuliProgettoView({
 }) {
   const toast = useToast();
   const [addModalOpen, setAddModalOpen] = useState(false);
-  const [dbModTemplates, setDbModTemplates] = useState<Array<{ id: string; ver: number; n: string; cat: string; h: number; p: number; righe: any[] }>>([]);
+  const [dbModTemplates, setDbModTemplates] = useState<Array<{ id: string; ver: number; n: string; cat: string; giur: string | null; h: number; p: number; righe: any[] }>>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<string>('');
   const [erroreLibreria, setErroreLibreria] = useState<string | null>(null);
 
@@ -65,6 +65,9 @@ export function GrafoModuliProgettoView({
             ver: m.versione || 1,
             n: m.nome,
             cat: m.categoria,
+            // Conservata per distinguere nella tendina i moduli con lo stesso nome su giurisdizioni
+            // diverse (es. il gemello svizzero e quello maltese): senza, erano indistinguibili.
+            giur: m.giurisdizione?.nome ?? m.giurisdizione?.codice ?? null,
             h: righeResolved.reduce((acc: number, x: any) => acc + x.hE, 0),
             p: m.prezzoPacchetto != null
               ? m.prezzoPacchetto / 100
@@ -76,7 +79,9 @@ export function GrafoModuliProgettoView({
         });
         setDbModTemplates(mapped);
         setErroreLibreria(null);
-        if (mapped.length > 0) setSelectedTemplate(mapped[0].id);
+        // NON si auto-seleziona il primo modulo: con l'ordine arbitrario di prima poteva essere quello
+        // di un'altra giurisdizione (il gemello svizzero) e «Aggiungi» lo istanziava senza scelta
+        // consapevole. Si lascia vuoto: il bottone resta disabilitato finché l'operatore sceglie.
       } catch (err: any) {
         setErroreLibreria(`Libreria moduli non caricata: ${err?.message || 'errore di rete'}.`);
       }
@@ -238,10 +243,12 @@ export function GrafoModuliProgettoView({
             <div>
               <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Modulo Template Libreria *</label>
               <select value={selectedTemplate} onChange={e => setSelectedTemplate(e.target.value)} style={{ padding: 10, fontSize: 12 }} disabled={allAvailableTemplates.length === 0}>
-                {allAvailableTemplates.length === 0 && <option value="">— nessun modulo in libreria —</option>}
+                {allAvailableTemplates.length === 0
+                  ? <option value="">— nessun modulo in libreria —</option>
+                  : <option value="">— seleziona un modulo —</option>}
                 {allAvailableTemplates.map(t => (
                   <option key={t.id} value={t.id}>
-                    {t.n} ({t.cat}) — {t.h}h — {fmt(t.p)}
+                    {t.n} — {t.giur ?? 'Generico'} ({t.cat}) — {t.h}h — {fmt(t.p)}
                   </option>
                 ))}
               </select>

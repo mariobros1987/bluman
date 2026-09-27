@@ -123,6 +123,10 @@ export async function registraRotteCatalogo(server: FastifyInstance, app: AppPor
     return leggiDaCacheOCalcola(`moduli:${tenantId}:${giurisdizioneId || 'all'}`, () =>
       prisma.moduloTemplate.findMany({
         where: condizioneModuliPerGiurisdizione(tenantId, giurisdizioneId),
+        // Ordine deterministico: senza, l'elenco arrivava in ordine arbitrario e il default «primo
+        // modulo» nella dialog di aggiunta poteva cadere su una giurisdizione non voluta (es. il
+        // gemello svizzero). Raggruppa per giurisdizione, poi per nome.
+        orderBy: [{ giurisdizioneId: 'asc' }, { nome: 'asc' }],
         include: {
           giurisdizione: true,
           dipendenze: true,
