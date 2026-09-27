@@ -39,7 +39,7 @@ export function getUserPermission(user: any, moduleKey: string): PermissionLevel
   // 2. Permessi di Default per Ruolo (quando non è stata ancora salvata una Matrice personalizzata)
   if (user.ruolo === 'advisor') {
     // Advisor/Partner hanno accesso a tutti i moduli operativi e impostazioni di studio
-    if (['projects', 'clients', 'documents', 'calendar', 'retainers', 'invoices', 'settings', 'library', 'banks', 'primanota', 'scadenzario', 'reports'].includes(moduleKey)) {
+    if (['projects', 'clients', 'documents', 'calendar', 'retainers', 'invoices', 'settings', 'library', 'banks', 'primanota', 'scadenzario', 'reports', 'communications'].includes(moduleKey)) {
       return 'write';
     }
     if (['audit', 'admin'].includes(moduleKey)) return 'denied';
@@ -47,13 +47,15 @@ export function getUserPermission(user: any, moduleKey: string): PermissionLevel
   }
 
   if (user.ruolo === 'collaboratore_interno' || user.ruolo === 'operator') {
-    if (['projects', 'calendar', 'timesheet'].includes(moduleKey)) return 'write';
+    if (['projects', 'calendar', 'timesheet', 'communications'].includes(moduleKey)) return 'write';
     if (['clients', 'documents', 'library'].includes(moduleKey)) return 'read';
     return 'denied'; // Invoices, Banche, Prima Nota, Scadenzario, Retainers, Audit, Settings bloccati
   }
 
   if (user.ruolo === 'collaboratore_esterno') {
-    if (['projects', 'calendar', 'timesheet'].includes(moduleKey)) return 'write';
+    // `communications`: default permissivo come lato server (nessuna riga = consentito). Chi non deve
+    // spedire lo restringe l'admin dalla matrice (decisione titolare 27/09: sceglie lui, interni ed esterni).
+    if (['projects', 'calendar', 'timesheet', 'communications'].includes(moduleKey)) return 'write';
     if (['documents'].includes(moduleKey)) return 'read';
     return 'denied'; // Accesso solo ai documenti e progetti assegnati; clienti, fatture e contabilità bloccati
   }

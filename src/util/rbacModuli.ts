@@ -28,6 +28,7 @@ export type ModuloChiaveRbac =
   | 'banks'
   | 'retainers'
   | 'reports'
+  | 'communications'
   | 'audit';
 
 /**
@@ -56,6 +57,14 @@ const ROTTE_MODULO: ReadonlyArray<readonly [prefisso: string, modulo: ModuloChia
   ['/contratti-ricorrenti', 'retainers'],
   ['/prima-nota', 'primanota'],
   ['/conti-bancari', 'banks'],
+  // L'invio dai canali dello studio è governato dalla matrice: l'admin decide, per ogni
+  // collaboratore (interno o esterno), chi può spedire (write), chi solo consultare la chat
+  // (read → il POST di invio è bloccato) e chi no (denied). Nessuna riga = permesso (default).
+  // Solo le rotte di INVIO, non quelle in arrivo. La lettura fascicolo comunicazioni resta libera.
+  ['/comunicazioni/invia-email', 'communications'],
+  ['/comunicazioni/invia-whatsapp', 'communications'],
+  ['/comunicazioni/invia-signal', 'communications'],
+  ['/comunicazioni/invia-telegram', 'communications'],
   ['/reports', 'reports'],
   ['/audit-logs', 'audit'],
 ];

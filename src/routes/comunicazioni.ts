@@ -142,17 +142,11 @@ async function rifiutaInvio(
 }
 
 export async function registraRotteComunicazioni(server: FastifyInstance): Promise<void> {
-  // §06 (decisione titolare 27/09) — l'invio dai canali dello studio è riservato al responsabile
-  // (advisor/super_admin): un collaboratore non spedisce a destinatari arbitrari con l'identità dello
-  // studio. E ogni dispatch lascia una traccia in audit (mittente, canale, destinatario), così un
-  // invio con `comunicazioneId` omesso non resta senza traccia forense. Rilievi audit §06.
-  const soloGestoreCanali = (req: FastifyRequest, reply: FastifyReply): boolean => {
-    if (req.ruolo !== 'advisor' && req.ruolo !== 'super_admin') {
-      reply.code(403).send({ errore: "L'invio dai canali dello studio è riservato al responsabile (advisor/super_admin)." });
-      return true;
-    }
-    return false;
-  };
+  // §06 (decisione titolare 27/09) — chi può inviare dai canali dello studio lo decide l'admin del
+  // tenant tramite la Matrice Permessi (modulo `communications`): l'enforcement è nell'hook onRequest
+  // (rbacModuli), non qui. Un collaboratore interno o esterno con `write` invia, `read`/`denied` no,
+  // nessuna riga = permesso (default). Qui resta l'AUDIT: ogni dispatch lascia traccia (mittente,
+  // canale, destinatario), così un invio con `comunicazioneId` omesso non è senza traccia forense.
   const auditDispatch = async (req: FastifyRequest, canale: string, destinatario: string, esito: string) => {
     await recordAudit({
       tenantId: req.tenantId, userId: req.userId, ruolo: req.ruolo,
@@ -179,7 +173,6 @@ export async function registraRotteComunicazioni(server: FastifyInstance): Promi
       comunicazioneId?: string;
     };
   }>('/comunicazioni/invia-email', async (req, reply) => {
-    if (soloGestoreCanali(req, reply)) return;
     const tenantId = req.tenantId as string;
     const body = req.body || {};
     const comunicazioneId = body.comunicazioneId;
@@ -249,7 +242,6 @@ export async function registraRotteComunicazioni(server: FastifyInstance): Promi
       comunicazioneId?: string;
     };
   }>('/comunicazioni/invia-whatsapp', async (req, reply) => {
-    if (soloGestoreCanali(req, reply)) return;
     const tenantId = req.tenantId as string;
     const body = req.body || {};
     const comunicazioneId = body.comunicazioneId;
@@ -304,7 +296,6 @@ export async function registraRotteComunicazioni(server: FastifyInstance): Promi
       comunicazioneId?: string;
     };
   }>('/comunicazioni/invia-signal', async (req, reply) => {
-    if (soloGestoreCanali(req, reply)) return;
     const tenantId = req.tenantId as string;
     const body = req.body || {};
     const comunicazioneId = body.comunicazioneId;
@@ -372,7 +363,6 @@ export async function registraRotteComunicazioni(server: FastifyInstance): Promi
   server.post<{ Body: { to?: string; testo?: string; text?: string; comunicazioneId?: string } }>(
     '/comunicazioni/invia-telegram',
     async (req, reply) => {
-      if (soloGestoreCanali(req, reply)) return;
       const tenantId = req.tenantId as string;
       const body = req.body || {};
       const comunicazioneId = body.comunicazioneId;

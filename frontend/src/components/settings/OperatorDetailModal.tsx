@@ -105,6 +105,7 @@ export function OperatorDetailModal({
     banks: 'read',
     retainers: 'write',
     reports: 'write',
+    communications: 'write',
     audit: 'denied',
   });
   const [savingPermessi, setSavingPermessi] = useState(false);
@@ -205,6 +206,7 @@ export function OperatorDetailModal({
     { key: 'reports', label: '📈 Report & Analytics Direzionali', desc: 'Ore, margini, ricavi, scadenzario e redditività con export PDF/Excel' },
     { key: 'library', label: '📚 Libreria Moduli & Distinta Base', desc: 'Catalogo articoli, template e moduli studio' },
     { key: 'calendar', label: '🗓 Calendario Studio & Scadenziario', desc: 'Calendario condiviso e gestione scadenze' },
+    { key: 'communications', label: '💬 Comunicazioni & Canali Cliente', desc: 'Invio email/WhatsApp/Telegram/Signal ai clienti dai canali dello studio' },
     { key: 'audit', label: '🔍 Log Audit & Attività Operatori', desc: 'Tracciamento completo azioni operatori' },
     { key: 'settings', label: '⚙️ Impostazioni Studio & Canali', desc: 'Anagrafica studio, SMTP, IMAP e configurazioni' },
   ];
