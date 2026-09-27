@@ -22,6 +22,7 @@ export interface FascicoloKyc {
   retentionProrogaMotivo?: string | null;
   retentionEsito?: 'cancellato' | 'anonimizzato' | null;
   retentionEsitoAt?: string | null;
+  soggetto?: SoggettoKyc | null;
   storico?: Array<{ id: string; statoPrecedente?: string | null; statoNuovo: string; motivazione?: string | null; createdAt: string }>;
 }
 
@@ -326,4 +327,30 @@ export async function scaricaReportFascicoloPdf(fascicoloId: string): Promise<vo
   a.click();
   a.remove();
   window.URL.revokeObjectURL(url);
+}
+
+// SoggettoKyc (Party) del fascicolo, creabile/modificabile dallo studio (§02): senza, catena TE /
+// screening / dossier / report restano «n/d». Il soggetto principale è uno solo per fascicolo.
+export interface SoggettoKyc {
+  id: string;
+  tipo: 'persona_fisica' | 'persona_giuridica';
+  denominazione: string;
+  codiceFiscale: string | null;
+  partitaIva: string | null;
+  luogoNascita: string | null;
+  dataNascita: string | null;
+  paeseResidenza: string | null;
+  indirizzo: string | null;
+}
+
+export async function salvaSoggettoKyc(fascicoloId: string, body: {
+  tipo: 'persona_fisica' | 'persona_giuridica'; denominazione: string;
+  codiceFiscale?: string; partitaIva?: string; luogoNascita?: string; dataNascita?: string;
+  paeseResidenza?: string; indirizzo?: string;
+}): Promise<{ ok: boolean; soggetto: SoggettoKyc }> {
+  const res = await apiFetch(`${API_BASE}/kyc/${fascicoloId}/soggetto`, {
+    method: 'PUT', headers: getAuthHeaders(), body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore salvataggio soggetto KYC'));
+  return await res.json();
 }

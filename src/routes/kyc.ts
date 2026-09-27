@@ -50,9 +50,41 @@ export async function registraRotteKyc(server: FastifyInstance): Promise<void> {
     const fascicolo = await prisma.fascicoloKyc.findFirst({
       where: { tenantId: req.tenantId, clienteId: req.params.clienteId },
       orderBy: { createdAt: 'desc' },
-      include: { storico: { orderBy: { createdAt: 'desc' } }, documenti: true, overrideLog: true },
+      include: { storico: { orderBy: { createdAt: 'desc' } }, documenti: true, overrideLog: true, soggetto: true },
     });
     return reply.send({ fascicolo });
+  });
+
+  // Crea/aggiorna il SoggettoKyc (Party) del fascicolo dal lato STUDIO. Prima il soggetto principale
+  // si popolava solo se il cliente caricava dal portale (portale.ts): senza, catena TE/screening/
+  // dossier/report restavano «n/d» (rilievo audit §02). Ora l'operatore può crearlo/modificarlo.
+  const TIPI_SOGGETTO = ['persona_fisica', 'persona_giuridica'];
+  server.put<{ Params: { id: string }; Body: Record<string, any> }>('/kyc/:id/soggetto', async (req, reply) => {
+    if (vietatoAlCliente(req, reply)) return;
+    if (await moduloSpento(req, reply)) return;
+    const { id } = req.params; const tenantId = req.tenantId; const b = req.body || {};
+    const fasc = await prisma.fascicoloKyc.findFirst({ where: { id, tenantId }, select: { id: true, clienteId: true, soggettoId: true } });
+    if (!fasc) return reply.code(404).send({ errore: 'Fascicolo non trovato' });
+    if (!b.denominazione || String(b.denominazione).trim().length < 2) return reply.code(400).send({ errore: 'Denominazione del soggetto obbligatoria.' });
+    const dati = {
+      tipo: (TIPI_SOGGETTO.includes(b.tipo) ? b.tipo : 'persona_fisica') as 'persona_fisica' | 'persona_giuridica',
+      denominazione: String(b.denominazione).trim().slice(0, 200),
+      codiceFiscale: b.codiceFiscale ? String(b.codiceFiscale).trim().slice(0, 40) : null,
+      partitaIva: b.partitaIva ? String(b.partitaIva).trim().slice(0, 40) : null,
+      luogoNascita: b.luogoNascita ? String(b.luogoNascita).trim().slice(0, 120) : null,
+      dataNascita: b.dataNascita ? String(b.dataNascita).trim().slice(0, 20) : null,
+      paeseResidenza: b.paeseResidenza ? String(b.paeseResidenza).trim().slice(0, 80) : null,
+      indirizzo: b.indirizzo ? String(b.indirizzo).trim().slice(0, 300) : null,
+    };
+    let soggetto;
+    if (fasc.soggettoId) {
+      soggetto = await prisma.soggettoKyc.update({ where: { id: fasc.soggettoId }, data: dati });
+    } else {
+      soggetto = await prisma.soggettoKyc.create({ data: { tenantId, clienteId: fasc.clienteId, ...dati } });
+      await prisma.fascicoloKyc.update({ where: { id }, data: { soggettoId: soggetto.id } });
+    }
+    await recordAudit({ tenantId, userId: req.userId, ruolo: req.ruolo, azione: 'KYC_SOGGETTO_AGGIORNATO', entita: `Fascicolo ${id}`, dettagli: `Soggetto ${dati.denominazione}`, ipAddress: req.ip });
+    return reply.send({ ok: true, soggetto });
   });
 
   // Crea/rinnova un fascicolo calcolando livello, rischio e scadenza dal motore puro.

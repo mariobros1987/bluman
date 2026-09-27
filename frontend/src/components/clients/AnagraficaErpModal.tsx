@@ -7,6 +7,7 @@ import type { Cliente } from '../../types';
 import { Modal } from '../ui/Modal';
 import { fetchKycFascicoloApi, creaKycFascicoloApi, aggiornaStatoKycApi, fetchModuliTenant, scaricaReportFascicoloPdf, type FascicoloKyc } from '../../api/kyc';
 import { PannelloTitolariEffettivi } from '../kyc/PannelloTitolariEffettivi';
+import { PannelloSoggettoKyc } from '../kyc/PannelloSoggettoKyc';
 import { PannelloRischio } from '../kyc/PannelloRischio';
 import { PannelloScreening } from '../kyc/PannelloScreening';
 import { PannelloAnomalie } from '../kyc/PannelloAnomalie';
@@ -815,6 +816,7 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
                 ))}
               </div>
               {kycMsg && <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6 }}>{kycMsg}</div>}
+              {kycFasc && <PannelloSoggettoKyc fascicolo={kycFasc} puoModificare={true} onAggiornato={() => fetchKycFascicoloApi(client.id).then((r) => setKycFasc(r.fascicolo)).catch(() => {})} />}
               {kycFasc && <PannelloTitolariEffettivi fascicoloId={kycFasc.id} puoModificare={true} />}
               {kycFasc && <PannelloRischio fascicoloId={kycFasc.id} puoModificare={true} />}
               {kycFasc && <PannelloScreening fascicoloId={kycFasc.id} puoModificare={true} />}
