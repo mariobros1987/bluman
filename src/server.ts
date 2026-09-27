@@ -30,7 +30,7 @@ import {
   type Ruolo,
 } from './util/authorization.js';
 // Mappa rotta → chiave modulo per l'enforcement della Matrice Permessi (RBAC).
-import { moduloDellaRotta } from './util/rbacModuli.js';
+import { moduloDellaRotta, permessoDefaultPerRuolo, type LivelloPermesso } from './util/rbacModuli.js';
 
 // Helper condivisi (costanti di sessione, audit, recapiti, IP reale): estratti in
 // src/util/serverHelpers.ts dallo split dei monoliti — stesse identiche implementazioni.
@@ -502,9 +502,12 @@ export function buildServer(app: AppPort): FastifyInstance {
     // collaboratore con «invoices: denied» poteva emettere fatture con curl.
     // Semantica allineata al frontend (getUserPermission di rbac.ts):
     // - super_admin bypassa sempre; il cliente ha il suo guard qui sopra;
-    // - nessuna riga sulla matrice = accesso (default permissivo: così la
-    //   matrice resta un pannello di restringimento, e chi non l'ha mai
-    //   toccata non perde nulla);
+    // - se esiste una riga sulla matrice, quella comanda;
+    // - se NON esiste una riga, si applica il DEFAULT PER RUOLO (stesso di
+    //   `getUserPermission`, vedi `permessoDefaultPerRuolo`): l'advisor resta
+    //   pieno, i collaboratori partono ristretti. Prima «nessuna riga» = accesso
+    //   pieno lato API, e un collaboratore_esterno senza matrice configurata
+    //   leggeva via API IBAN/CF/UBO di tutti i clienti (rilievo audit sicurezza).
     // - «denied» blocca tutto il modulo; «read» lascia le sole letture.
     // Fail-open SOLO sull'errore di lettura della matrice: se il database non
     // risponde si lascia passare (con log) — la sessione è comunque stata
@@ -520,7 +523,7 @@ export function buildServer(app: AppPort): FastifyInstance {
     ) {
       const modulo = moduloDellaRotta(patternRotta);
       if (modulo) {
-        let livello: string | undefined;
+        let livello: LivelloPermesso | undefined;
         try {
           const permesso = await prisma.permessoModulo.findUnique({
             where: {
@@ -532,8 +535,10 @@ export function buildServer(app: AppPort): FastifyInstance {
             },
             select: { livello: true },
           });
-          livello = permesso?.livello;
+          // Nessuna riga sulla matrice → default per ruolo, non più accesso pieno.
+          livello = (permesso?.livello as LivelloPermesso | undefined) ?? permessoDefaultPerRuolo(ruolo, modulo);
         } catch (err) {
+          // Fail-open sull'errore di lettura: `livello` resta undefined e si lascia passare (con log).
           console.error('Verifica permesso modulo fallita:', err instanceof Error ? err.message : err);
         }
         if (livello === 'denied' || (livello === 'read' && req.method !== 'GET' && req.method !== 'HEAD')) {

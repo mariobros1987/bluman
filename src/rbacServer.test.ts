@@ -87,13 +87,25 @@ beforeEach(() => {
 });
 
 describe('server — enforcement della Matrice Permessi (RBAC)', () => {
-  it('senza riga sulla matrice l\'accesso resta quello di prima (default permissivo)', async () => {
+  it('senza riga sulla matrice si applica il default per ruolo, non l\'accesso pieno', async () => {
+    // collaboratore_interno NON ha invoices nel suo default (né write né read): senza riga
+    // sulla matrice l'API ora nega, come fa il frontend. Prima qui passava (buco: un
+    // collaboratore leggeva via API dati che l'UI gli nascondeva).
     const server = await serverDiTest();
     const res = await server.inject({ method: 'GET', url: '/fatture/tutte', headers: { authorization: `Bearer ${token('collaboratore_interno')}` } });
-    expect(res.statusCode).not.toBe(403);
-    expect(res.statusCode).toBe(200);
+    expect(res.statusCode).toBe(403);
+    expect(res.json().errore).toContain('invoices');
     // La matrice è stata consultata con l'identità del token.
     expect(permessiTest.viste).toEqual([{ tenantId: TENANT_TEST, userId: 'usr-collab', moduloChiave: 'invoices' }]);
+    await server.close();
+  });
+
+  it('il default per ruolo consente dove il ruolo ha accesso (advisor pieno su invoices senza riga)', async () => {
+    // advisor: default write ovunque tranne audit → invoices senza riga sulla matrice passa.
+    // (stessa via InMemoryApp `/fatture/tutte`, nessun tocco al database).
+    const server = await serverDiTest();
+    const advisor = await server.inject({ method: 'GET', url: '/fatture/tutte', headers: { authorization: `Bearer ${token('advisor')}` } });
+    expect(advisor.statusCode).toBe(200);
     await server.close();
   });
 

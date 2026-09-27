@@ -9,9 +9,11 @@
 //
 // Le chiavi sono SOLO quelle che la matrice dello studio gestisce davvero
 // (OperatorDetailModal — le stesse elencate nel commento a PermessoModulo in
-// schema.prisma, più «reports»): una chiave senza riga su database significa
-// «nessuna restrizione» (default permissivo, vedi sotto), quindi mappare una
-// rotta a una chiave che nessuno può configurare sarebbe codice morto.
+// schema.prisma, più «reports»): una chiave senza riga su database ricade sul
+// default per ruolo (`permessoDefaultPerRuolo`, allineato al frontend), non su
+// «accesso pieno», quindi mappare una rotta a una chiave che nessuno può
+// configurare non è codice morto — l'advisor passa comunque, i collaboratori
+// partono ristretti.
 // Le rotte fuori da questa mappa (auth, notifiche, documenti, portale, tenant,
 // admin, webhooks, cron, fornitori, timesheet, search…) non passano dal RBAC
 // per modulo: restano protette dall'autenticazione e dai guard di ruolo
@@ -92,4 +94,31 @@ export function moduloDellaRotta(patternRotta: string | undefined): ModuloChiave
     if (patternRotta === prefisso || patternRotta.startsWith(`${prefisso}/`)) return modulo;
   }
   return undefined;
+}
+
+export type LivelloPermesso = 'denied' | 'read' | 'write';
+
+/**
+ * Default per ruolo quando NON esiste una riga `PermessoModulo`, allineato a `getUserPermission` del
+ * frontend (`frontend/src/utils/rbac.ts`). Chiude il buco «server default permissivo ⇄ UI restrittiva
+ * per ruolo»: prima «nessuna riga» = accesso pieno lato API, e un collaboratore_esterno senza matrice
+ * configurata poteva leggere via API IBAN/CF/UBO di tutti i clienti (rilievo audit sicurezza, Alta).
+ * `super_admin` non passa di qui (bypassa a monte nell'hook); il ruolo `cliente` ha il suo guard.
+ * L'advisor resta pieno su tutto tranne l'audit.
+ */
+export function permessoDefaultPerRuolo(ruolo: string | undefined, modulo: ModuloChiaveRbac): LivelloPermesso {
+  if (ruolo === 'advisor') {
+    return modulo === 'audit' ? 'denied' : 'write';
+  }
+  if (ruolo === 'collaboratore_interno' || ruolo === 'operator') {
+    if (modulo === 'projects' || modulo === 'communications') return 'write';
+    if (modulo === 'clients' || modulo === 'documents' || modulo === 'library') return 'read';
+    return 'denied';
+  }
+  if (ruolo === 'collaboratore_esterno') {
+    if (modulo === 'projects' || modulo === 'communications') return 'write';
+    if (modulo === 'documents') return 'read';
+    return 'denied';
+  }
+  return 'denied';
 }
