@@ -34,12 +34,21 @@ describe('moduloDellaRotta — mappa pattern → chiave modulo', () => {
     expect(moduloDellaRotta('/audit-logs')).toBe('audit');
   });
 
+  it('documents, library e communications passano dalla matrice (enforcement server §01/§06)', () => {
+    expect(moduloDellaRotta('/documenti')).toBe('documents');
+    expect(moduloDellaRotta('/documenti/:id')).toBe('documents');
+    expect(moduloDellaRotta('/documenti/:id/firma-studio')).toBe('documents');
+    expect(moduloDellaRotta('/documenti-template')).toBe('documents');
+    expect(moduloDellaRotta('/moduli-template')).toBe('library');
+    expect(moduloDellaRotta('/articoli')).toBe('library');
+    expect(moduloDellaRotta('/comunicazioni/invia-email')).toBe('communications');
+    expect(moduloDellaRotta('/comunicazioni/invia-whatsapp')).toBe('communications');
+  });
+
   it('le rotte fuori dalla matrice non passano dal RBAC per modulo', () => {
     // Hanno i loro guard (autenticazione, ruolo cliente, segreti webhook):
     // mapparle a chiavi che la matrice non gestisce sarebbe codice morto.
     expect(moduloDellaRotta('/auth/me')).toBeUndefined();
-    expect(moduloDellaRotta('/documenti')).toBeUndefined();
-    expect(moduloDellaRotta('/documenti/:id')).toBeUndefined();
     expect(moduloDellaRotta('/tenant/utenti')).toBeUndefined();
     expect(moduloDellaRotta('/admin/tenants')).toBeUndefined();
     expect(moduloDellaRotta('/fornitori')).toBeUndefined();
@@ -47,6 +56,9 @@ describe('moduloDellaRotta — mappa pattern → chiave modulo', () => {
     expect(moduloDellaRotta('/timesheet')).toBeUndefined();
     expect(moduloDellaRotta('/search')).toBeUndefined();
     expect(moduloDellaRotta('/portal/fatture')).toBeUndefined();
+    // Reference-data condivise fuori mappa di proposito (servono al wizard anche a chi non ha 'library').
+    expect(moduloDellaRotta('/giurisdizioni')).toBeUndefined();
+    expect(moduloDellaRotta('/comunicazioni/email-in-arrivo')).toBeUndefined();
     expect(moduloDellaRotta(undefined)).toBeUndefined();
   });
 
