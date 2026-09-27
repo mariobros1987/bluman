@@ -6,7 +6,6 @@ import { prisma } from '../util/prismaClient.js';
 import { calcolaRischioKyc, calcolaScadenzaKyc, type LivelloVerificaKyc } from '../domain/kycEngine.js';
 import { transizioneKyc } from '../services/kycCaseService.js';
 import { registraComplianceEvent } from '../services/complianceEventLog.js';
-import { modalitaBozza } from '../services/complianceService.js';
 import { moduloKycAttivo } from '../util/guardiaModuli.js';
 import { calcolaTitolariEffettivi, scadenzaVariazioneTe } from '../domain/catenaControllo.js';
 import { livelloComplessivo, prossimaRevisione, assessmentCompleto, type LivelloRischioK3 } from '../domain/calcoloRischio.js';
@@ -140,12 +139,13 @@ export async function registraRotteKyc(server: FastifyInstance): Promise<void> {
       // Gate MLRO (§8.3): advisor/super_admin, oppure l'utente nominato MLRO nel tenant (K0).
       const settings = await prisma.tenantComplianceSettings.findUnique({ where: { tenantId }, select: { mlroUserId: true, retentionYears: true, regulatoryProfile: true } });
 
-      // §8.2/§14 — modalità bozza: senza profilo regolatorio + MLRO configurati lo studio non compie
-      // atti vincolanti. L'approvazione di una pratica è l'atto che sblocca la fatturazione, quindi è
-      // bloccata (409) finché lo studio non esce dalla bozza. Prima `modalitaBozza` era solo un badge.
-      if (stato === 'approvato' && modalitaBozza(settings)) {
+      // §8.2/§14 — per approvare una pratica serve almeno il PROFILO REGOLATORIO configurato (quali
+      // regole si applicano). L'MLRO NON è bloccante (scelta del titolare 27/09): l'advisor/super_admin
+      // è già l'autorità che approva (§8.3), quindi lo studio non resta bloccato per il solo fatto di
+      // non aver ancora nominato l'MLRO. Prima non c'era alcun blocco (modalità bozza solo badge).
+      if (stato === 'approvato' && !settings?.regulatoryProfile) {
         return reply.code(409).send({
-          errore: 'Studio in modalità bozza: configura il profilo regolatorio e nomina l’MLRO in Impostazioni → Compliance & AML prima di approvare pratiche KYC (§8.2/§14).',
+          errore: 'Per approvare una pratica KYC configura almeno il profilo regolatorio in Impostazioni → Compliance & AML (§8.2). La nomina dell’MLRO è consigliata ma non blocca.',
         });
       }
 
