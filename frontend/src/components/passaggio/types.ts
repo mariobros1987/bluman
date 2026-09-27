@@ -18,7 +18,7 @@ export interface DocumentoEntry {
   firmato: boolean;
   dataCaricamento: string;
   templateId?: string;
-  statoDoc?: 'bozza' | 'pubblicato' | 'in_revisione' | 'firmato';
+  statoDoc?: 'bozza' | 'pubblicato' | 'in_revisione' | 'parzialmente_firmato' | 'firmato';
   versione?: number;
   pubblicatoAt?: string | null;
   fileUrl?: string;

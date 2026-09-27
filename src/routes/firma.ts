@@ -41,7 +41,7 @@ import { notificaStudio, notificaCliente } from '../services/notificheService.js
 import { scanFileBuffer } from '../services/securityScanner.js';
 import { fileContieneFirmaDigitale } from '../services/firmaFileValidazione.js';
 import { generaPdfVerbaleFirma } from '../services/verbaleFirma.js';
-import { generaCopiaFirmata, type EsitoCopiaFirmata } from '../services/copiaFirmata.js';
+import { generaCopiaFirmata, blocchiSalvati, haSlotFirma, type EsitoCopiaFirmata } from '../services/copiaFirmata.js';
 import {
   verificaLivelloFirma,
   livelloPiuAlto,
@@ -950,6 +950,17 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
       return { errore: 'Il controllo antivirus su questo file non è ancora finito: riprova fra poco.', codice: 409 };
     }
 
+    // Anti ri-firma (§WF-DOC): il cliente firma una volta sola. Una seconda firma della stessa parte
+    // duplicherebbe la riga FirmaElettronica e rigenererebbe il sigillo. La controfirma dell'ALTRA
+    // parte (studio) resta ammessa: è il flusso bidirezionale. `tipoFirma !== 'studio'` = firma cliente.
+    const giaFirmataCliente = await prisma.firmaElettronica.findFirst({
+      where: { tenantId, ambito: 'documento_vault', riferimentoId: documentoId, tipoFirma: { not: 'studio' } },
+      select: { id: true },
+    });
+    if (giaFirmataCliente) {
+      return { errore: 'Questo documento risulta già firmato dal cliente: non si firma due volte.', codice: 409 };
+    }
+
     const contenuto = await leggiFileArchivio(doc.fileUrl);
     if (!contenuto || contenuto.length === 0) {
       // Non si ripiega su un'impronta calcolata altrove: un sigillo con l'impronta sbagliata è
@@ -1108,14 +1119,31 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
    */
   async function segnaDocumentoFirmato(tenantId: string, documentoId: string) {
     try {
+      // Firme multi-parte: «firmato» solo quando TUTTE le parti previste dagli slot del template
+      // ({{firma_cliente}} / {{firma_studio}}) hanno firmato; con una sola firma su due →
+      // «parzialmente_firmato». Se il template non dichiara slot (documenti pre-§36 o allegati), non
+      // c'è nozione di parti multiple e una firma = firmato, come prima.
+      const doc = await prisma.documento.findFirst({ where: { id: documentoId, tenantId }, select: { contenutoBlocchiJson: true } });
+      const blocchi = doc ? blocchiSalvati(doc.contenutoBlocchiJson) : null;
+      const richiedeCliente = blocchi ? haSlotFirma(blocchi, 'cliente') : false;
+      const richiedeStudio = blocchi ? haSlotFirma(blocchi, 'studio') : false;
+      const firme = await prisma.firmaElettronica.findMany({
+        where: { tenantId, ambito: 'documento_vault', riferimentoId: documentoId },
+        select: { tipoFirma: true },
+      });
+      const firmatoStudio = firme.some((f) => f.tipoFirma === 'studio');
+      const firmatoCliente = firme.some((f) => f.tipoFirma !== 'studio');
+      const completo = (!richiedeCliente && !richiedeStudio)
+        ? true
+        : (!richiedeCliente || firmatoCliente) && (!richiedeStudio || firmatoStudio);
       await prisma.documento.updateMany({
         where: { id: documentoId, tenantId },
-        data: { statoDoc: 'firmato' },
+        data: { statoDoc: completo ? 'firmato' : 'parzialmente_firmato' },
       });
     } catch (err) {
       // La firma è già registrata e resta valida: l'aggiornamento dello stato non deve farla
       // fallire a posteriori. Va però nei log, perché lascia il fascicolo incoerente.
-      console.error('Stato documento non aggiornato a «firmato» dopo la firma', documentoId, err);
+      console.error('Stato documento non aggiornato dopo la firma', documentoId, err);
     }
   }
 

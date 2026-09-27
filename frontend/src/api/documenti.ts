@@ -53,7 +53,7 @@ export interface DocumentoProgetto {
   dataScadenzaDoc: string | null;
   progettoId: string | null;
   microvoceProgettoId: string | null;
-  statoDoc?: 'bozza' | 'pubblicato' | 'in_revisione' | 'firmato';
+  statoDoc?: 'bozza' | 'pubblicato' | 'in_revisione' | 'parzialmente_firmato' | 'firmato';
   pubblicatoAt?: string | null;
   documentoPadreId?: string | null;
   /** Punto 3 piano gap — un documento firmato non si cancella: si archivia. Il server lo restituisce sempre. */

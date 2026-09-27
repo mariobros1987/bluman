@@ -28,7 +28,7 @@
 import { prisma } from '../util/prismaClient.js';
 import { nomeFileDaUrl } from '../util/serverHelpers.js';
 import { uploadDocumento } from './storageService.js';
-import { generaPdfDocumento, type BloccoDocumento } from './generazioneDocumenti.js';
+import { generaPdfDocumento, type BloccoDocumento, type RigaCronologiaFirma } from './generazioneDocumenti.js';
 import type { SlotFirma } from './slotFirma.js';
 
 const TIPI_BLOCCO = new Set(['titolo', 'intestazione', 'paragrafo', 'evidenza', 'firma']);
@@ -233,7 +233,30 @@ export async function generaCopiaFirmata(params: {
     if (slot === 'cliente' && !firmeDaApporre.cliente) return null;
     if (slot === 'studio' && !firmeDaApporre.studio) return null;
 
-    const pdf = await generaPdfDocumento(blocchi, firmeDaApporre);
+    // §WF-DOC — cronologia delle firme in coda al documento finale: tutte le sottoscrizioni note
+    // (dal DB) più quella in corso, con codice, data/ora e riferimenti di legge, rese dal sigillo.
+    const cronologia: RigaCronologiaFirma[] = firmeDb.map((f) => ({
+      firmatarioNome: f.firmatarioNome,
+      ruolo: (f.tipoFirma === 'studio' || f.canaleVerificato?.includes('Studio')) ? (f.firmatarioRuolo || 'Studio') : 'Cliente',
+      signatureId: f.signatureId,
+      firmatoAt: f.firmatoAt,
+      valoreLegale: f.valoreLegale ?? null,
+      standard: f.standard ?? null,
+      sigilloDigest: f.sigilloDigest ?? null,
+    }));
+    if (!cronologia.some((c) => c.signatureId === firma.signatureId)) {
+      cronologia.push({
+        firmatarioNome: firma.firmatarioNome,
+        ruolo: slot === 'studio' ? 'Studio' : 'Cliente',
+        signatureId: firma.signatureId,
+        firmatoAt: firma.firmatoAt,
+        valoreLegale: firma.valoreLegale ?? null,
+        standard: null,
+        sigilloDigest,
+      });
+    }
+
+    const pdf = await generaPdfDocumento(blocchi, firmeDaApporre, cronologia.length > 0 ? cronologia : undefined);
 
     const nome = nomeCopia(nomeFileDaUrl(originale.fileUrl), firma.signatureId);
     const caricato = await uploadDocumento(nome, pdf.toString('base64'), tenantId);

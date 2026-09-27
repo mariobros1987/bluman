@@ -40,6 +40,7 @@ function Pillola({ testo, sfondo, colore }: { testo: string; sfondo: string; col
 
 function statoPillola(d: DocumentoProgetto) {
   if (d.isArchiviato) return <Pillola testo="🗄 Archiviato" sfondo="var(--pill-slate-bd)" colore="var(--pill-slate-fg)" />;
+  if (d.statoDoc === 'parzialmente_firmato') return <Pillola testo="✍ Parzialmente firmato" sfondo="var(--pill-amber-bg)" colore="var(--pill-amber-fg)" />;
   if (d.firmato) return <Pillola testo="✓ Firmato" sfondo="var(--pill-green-bg)" colore="var(--pill-green-fg)" />;
   if (d.statoDoc === 'pubblicato') return <Pillola testo="📤 Pubblicato" sfondo="var(--pill-blue-bg)" colore="var(--pill-blue-fg)" />;
   if (d.statoDoc === 'in_revisione') return <Pillola testo="✏️ In revisione" sfondo="var(--pill-amber-bg)" colore="var(--pill-amber-fg)" />;

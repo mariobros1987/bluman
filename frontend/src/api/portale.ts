@@ -243,7 +243,7 @@ export interface DocumentoPortale {
   standard?: string | null;
   /** Piano firma §3 — valore legale effettivo della firma apposta, scritto dal server. */
   valoreLegale?: 'ses' | 'fea' | 'feq' | null;
-  statoDoc?: 'bozza' | 'pubblicato' | 'in_revisione' | 'firmato';
+  statoDoc?: 'bozza' | 'pubblicato' | 'in_revisione' | 'parzialmente_firmato' | 'firmato';
   pubblicatoAt?: string | null;
   richiesteModifica?: RichiestaModificaDoc[];
   /** §WF-DOC — id del documento che questa versione ha sostituito (catena di tracciabilità). */

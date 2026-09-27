@@ -673,6 +673,7 @@ enum StatoDocumento {
   bozza
   pubblicato
   in_revisione
+  parzialmente_firmato
   firmato
 }
 

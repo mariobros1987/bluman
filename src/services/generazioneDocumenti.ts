@@ -612,7 +612,52 @@ function renderizzaFirma(
  * che `copiaFirmata.ts` archivia come riga a sé. Il file originale non viene mai riscritto:
  * è quello su cui è fissato l'hash del sigillo.
  */
-export async function generaPdfDocumento(blocchi: BloccoDocumento[], firme?: FirmeDaApporre): Promise<Buffer> {
+/**
+ * §WF-DOC — una riga della cronologia delle firme apposta in coda al documento finale: chi ha
+ * firmato, con quale codice, quando (UTC), con quale valore legale e con quale impronta di sigillo.
+ * I dati vengono SOLO dal server (sigillo), mai dal client (regola 7).
+ */
+export interface RigaCronologiaFirma {
+  firmatarioNome: string;
+  ruolo?: string | null;
+  signatureId: string;
+  firmatoAt: Date | string;
+  valoreLegale?: string | null;
+  standard?: string | null;
+  sigilloDigest?: string | null;
+}
+
+function renderizzaCronologiaFirme(doc: PDFKit.PDFDocument, cronologia: RigaCronologiaFirma[], larghezza: number): void {
+  const etichettaValore = (v?: string | null) =>
+    v === 'feq' ? 'Firma Elettronica Qualificata (FEQ)'
+      : v === 'fea' ? 'Firma Elettronica Avanzata (FEA)'
+        : 'Firma Elettronica Semplice (SES)';
+  doc.addPage();
+  let y = doc.y;
+  doc.font('Helvetica-Bold').fontSize(12).fillColor('#0f172a').text('CRONOLOGIA DELLE FIRME', MARGINE, y, { width: larghezza });
+  y = doc.y + 2;
+  doc.font('Helvetica').fontSize(8).fillColor('#64748b').text('Elenco cronologico delle sottoscrizioni, con codice, data e ora (UTC) e riferimenti di legge. Evidenze rese dal sigillo server-side.', MARGINE, y, { width: larghezza });
+  y = doc.y + 8;
+  doc.moveTo(MARGINE, y).lineTo(MARGINE + larghezza, y).strokeColor('#cbd5e1').lineWidth(1).stroke();
+  y += 8;
+
+  const ordinata = [...cronologia].sort((a, b) => new Date(a.firmatoAt).getTime() - new Date(b.firmatoAt).getTime());
+  ordinata.forEach((f, i) => {
+    if (y > doc.page.height - 90) { doc.addPage(); y = MARGINE; }
+    const quando = new Date(f.firmatoAt);
+    const dataStr = Number.isNaN(quando.getTime()) ? '—' : quando.toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
+    doc.font('Helvetica-Bold').fontSize(9).fillColor('#0f172a').text(`${i + 1}. ${f.firmatarioNome}${f.ruolo ? ` — ${f.ruolo}` : ''}`, MARGINE, y, { width: larghezza });
+    y = doc.y + 1;
+    doc.font('Helvetica').fontSize(8).fillColor('#334155');
+    doc.text(`Codice firma: ${f.signatureId}`, MARGINE + 12, y, { width: larghezza - 12 }); y = doc.y;
+    doc.text(`Data e ora: ${dataStr}`, MARGINE + 12, y, { width: larghezza - 12 }); y = doc.y;
+    doc.text(`Valore legale: ${etichettaValore(f.valoreLegale)}${f.standard ? ` · ${f.standard}` : ''}`, MARGINE + 12, y, { width: larghezza - 12 }); y = doc.y;
+    if (f.sigilloDigest) { doc.text(`Sigillo (HMAC-SHA256): ${f.sigilloDigest}`, MARGINE + 12, y, { width: larghezza - 12 }); y = doc.y; }
+    y += 6;
+  });
+}
+
+export async function generaPdfDocumento(blocchi: BloccoDocumento[], firme?: FirmeDaApporre, cronologia?: RigaCronologiaFirma[]): Promise<Buffer> {
   if (!blocchi.length) throw new Error('Nessun contenuto da generare: il documento è vuoto.');
   const doc = new PDFDocument({ size: 'A4', margin: MARGINE, compress: false, bufferPages: true });
   const larghezzaUtile = doc.page.width - MARGINE * 2;
@@ -634,6 +679,10 @@ export async function generaPdfDocumento(blocchi: BloccoDocumento[], firme?: Fir
       default:
         renderizzaParagrafo(doc, blocco, larghezzaUtile);
     }
+  }
+  // §WF-DOC — cronologia delle firme in coda al documento finale (se fornita).
+  if (cronologia && cronologia.length > 0) {
+    renderizzaCronologiaFirme(doc, cronologia, larghezzaUtile);
   }
   return pdfDocToBuffer(doc);
 }

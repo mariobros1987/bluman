@@ -68,6 +68,16 @@ export async function registraRotteDocumentiFirmaStudio(server: FastifyInstance)
         return reply.code(400).send({ errore: 'Impossibile determinare il cliente collegato al fascicolo del documento.' });
       }
 
+      // Anti ri-firma (§WF-DOC): lo studio firma una volta sola. La controfirma del cliente resta
+      // ammessa (flusso bidirezionale); una seconda firma studio duplicherebbe la riga e il sigillo.
+      const giaFirmataStudio = await prisma.firmaElettronica.findFirst({
+        where: { tenantId, ambito: 'documento_vault', riferimentoId: id, tipoFirma: 'studio' },
+        select: { id: true },
+      });
+      if (giaFirmataStudio) {
+        return reply.code(409).send({ errore: 'Questo documento risulta già firmato dallo studio: non si firma due volte.' });
+      }
+
       const utente = await prisma.user.findUnique({
         where: { id: req.userId },
         select: { id: true, nome: true, email: true, ruolo: true },
