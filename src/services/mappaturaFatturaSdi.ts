@@ -105,7 +105,6 @@ export function calcolaRiepilogoIvaDaRighe(
       const chiave = `${aliquota}|${natura ?? ''}`;
       const corrente = gruppi.get(chiave) || { aliquotaIva: aliquota, natura, imponibileCent: 0, impostaCent: 0 };
       corrente.imponibileCent += r.imponibileCentesimi ?? r.importo ?? 0;
-      corrente.impostaCent += r.ivaCentesimi ?? 0;
       gruppi.set(chiave, corrente);
     }
 
@@ -115,7 +114,10 @@ export function calcolaRiepilogoIvaDaRighe(
         aliquotaIva: g.aliquotaIva,
         natura: g.natura,
         imponibileImporto: g.imponibileCent / 100,
-        imposta: g.impostaCent / 100,
+        // Imposta del riepilogo calcolata sull'imponibile TOTALE del gruppo (come fatturaEngine.ts),
+        // non sommando i per-riga arrotondati: sommarli produce uno scarto fino a ±1 cent fra
+        // Imponibile e Imposta che SDI rifiuta (difetto B1). DatiRiepilogo dev'essere coerente col totale.
+        imposta: (g.aliquotaIva > 0 ? Math.round(g.imponibileCent * (g.aliquotaIva / 100)) : 0) / 100,
         esigibilitaIva: esigibilita,
       }));
   }

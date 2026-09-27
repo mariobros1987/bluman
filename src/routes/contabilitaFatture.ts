@@ -232,10 +232,12 @@ export async function registraRotteContabilitaFatture(server: FastifyInstance, a
       };
       const calcolo = calcolaTotaliFattura(body.righe, opzioni);
 
-      // Elimina vecchie righe e inserisci le nuove in transazione
-      await prisma.fatturaRiga.deleteMany({ where: { fatturaId: id } });
-
-      const fatturaAggiornata = await prisma.fattura.update({
+      // Sostituzione righe + update in UNA transazione: prima erano due chiamate separate e, se
+      // l'update falliva, le righe risultavano già cancellate (bozza corrotta). Rilievo audit §04.
+      const fatturaAggiornata = await prisma.$transaction(async (tx) =>
+        conContestoInTransazione(tx, async () => {
+          await tx.fatturaRiga.deleteMany({ where: { fatturaId: id } });
+          return tx.fattura.update({
         where: { id },
         data: {
           condizionePagamento: body.condizionePagamento || fattura.condizionePagamento,
@@ -283,6 +285,8 @@ export async function registraRotteContabilitaFatture(server: FastifyInstance, a
         },
         include: { righe: true, cliente: true, progetto: true },
       });
+        }),
+      );
 
       return reply.send(fatturaAggiornata);
     } catch (err: any) {
