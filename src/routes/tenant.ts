@@ -289,6 +289,13 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
 
   server.patch<{ Body: Record<string, any> }>('/tenant/info', async (req, reply) => {
     const tenantId = req.tenantId;
+    // Le impostazioni dello studio (IBAN, dati fiscali, credenziali canali, stato, logo, standby
+    // moduli) sono riservate all'amministratore dello studio. Senza questa guardia un qualunque
+    // collaboratore poteva cambiare l'IBAN (frode incassi), i dati fiscali o sospendere lo studio
+    // (DoS). I controlli specifici più sotto (canali, moduli) restano come difesa in profondità.
+    if (req.ruolo !== 'advisor' && req.ruolo !== 'super_admin') {
+      return reply.code(403).send({ errore: 'Le impostazioni dello studio sono riservate al responsabile (advisor/super_admin).' });
+    }
     const rawBody = (req.body || {}) as Record<string, any>;
     if (Object.keys(rawBody).some(key => CHIAVI_CANALI.has(key)) && !soloGestoriCanali(req, reply)) return reply;
 
