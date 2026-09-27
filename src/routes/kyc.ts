@@ -6,9 +6,10 @@ import { prisma } from '../util/prismaClient.js';
 import { calcolaRischioKyc, calcolaScadenzaKyc, type LivelloVerificaKyc } from '../domain/kycEngine.js';
 import { transizioneKyc } from '../services/kycCaseService.js';
 import { registraComplianceEvent } from '../services/complianceEventLog.js';
+import { modalitaBozza } from '../services/complianceService.js';
 import { moduloKycAttivo } from '../util/guardiaModuli.js';
 import { calcolaTitolariEffettivi, scadenzaVariazioneTe } from '../domain/catenaControllo.js';
-import { livelloComplessivo, prossimaRevisione, type LivelloRischioK3 } from '../domain/calcoloRischio.js';
+import { livelloComplessivo, prossimaRevisione, assessmentCompleto, type LivelloRischioK3 } from '../domain/calcoloRischio.js';
 import { screeningBloccaApprovazione, motivoBloccoScreening } from '../domain/screeningKyc.js';
 import { apriAnomalia, decidiAnomalia } from '../services/anomalieService.js';
 import { preparaSegnalazione, registraTrasmissione } from '../services/segnalazioneFiauService.js';
@@ -137,7 +138,17 @@ export async function registraRotteKyc(server: FastifyInstance): Promise<void> {
       if (!fascicolo) return reply.code(404).send({ errore: 'Fascicolo non trovato' });
 
       // Gate MLRO (§8.3): advisor/super_admin, oppure l'utente nominato MLRO nel tenant (K0).
-      const settings = await prisma.tenantComplianceSettings.findUnique({ where: { tenantId }, select: { mlroUserId: true, retentionYears: true } });
+      const settings = await prisma.tenantComplianceSettings.findUnique({ where: { tenantId }, select: { mlroUserId: true, retentionYears: true, regulatoryProfile: true } });
+
+      // §8.2/§14 — modalità bozza: senza profilo regolatorio + MLRO configurati lo studio non compie
+      // atti vincolanti. L'approvazione di una pratica è l'atto che sblocca la fatturazione, quindi è
+      // bloccata (409) finché lo studio non esce dalla bozza. Prima `modalitaBozza` era solo un badge.
+      if (stato === 'approvato' && modalitaBozza(settings)) {
+        return reply.code(409).send({
+          errore: 'Studio in modalità bozza: configura il profilo regolatorio e nomina l’MLRO in Impostazioni → Compliance & AML prima di approvare pratiche KYC (§8.2/§14).',
+        });
+      }
+
       const puoApprovareRafforzata = req.ruolo === 'advisor' || req.ruolo === 'super_admin'
         || (!!req.userId && req.userId === settings?.mlroUserId);
 
@@ -315,6 +326,12 @@ export async function registraRotteKyc(server: FastifyInstance): Promise<void> {
     const { id } = req.params; const tenantId = req.tenantId; const b = req.body || {};
     const fasc = await prisma.fascicoloKyc.findFirst({ where: { id, tenantId }, select: { id: true } });
     if (!fasc) return reply.code(404).send({ errore: 'Fascicolo non trovato' });
+    // §6/§14 — ogni pilastro va motivato (dati + giudizio), come per il business risk di studio.
+    // Senza le quattro motivazioni la valutazione non si salva (prima si accettava incompleta).
+    const motivazioni = { cliente: b.clienteMotivazione, geografia: b.geografiaMotivazione, prodotto: b.prodottoMotivazione, canale: b.canaleMotivazione };
+    if (!assessmentCompleto(motivazioni)) {
+      return reply.code(400).send({ errore: 'Ogni pilastro di rischio (cliente, geografia, prodotto, canale) richiede una motivazione (§6).' });
+    }
     const liv = (v: unknown): LivelloRischioK3 => (v === 'medio' || v === 'alto' ? v : 'basso');
     const pilastri = { cliente: liv(b.clienteLivello), geografia: liv(b.geografiaLivello), prodotto: liv(b.prodottoLivello), canale: liv(b.canaleLivello) };
     const complessivo = livelloComplessivo(pilastri);
