@@ -30,6 +30,7 @@ import { fetchMeApi } from './api/client';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ToastProvider } from './components/ui/ToastProvider';
 import { ConfirmProvider } from './components/ui/ConfirmProvider';
+import { PeriodoProvider } from './context/PeriodoContext';
 import './styles/tokens.css';
 import { watchSystemTheme } from './utils/theme';
 import { invalidateCache } from './api/cache';
@@ -205,9 +206,11 @@ export default function App() {
     <ErrorBoundary>
       <ToastProvider>
         <ConfirmProvider>
-          <BrowserRouter>
-            <AppContent />
-          </BrowserRouter>
+          <PeriodoProvider>
+            <BrowserRouter>
+              <AppContent />
+            </BrowserRouter>
+          </PeriodoProvider>
         </ConfirmProvider>
       </ToastProvider>
     </ErrorBoundary>

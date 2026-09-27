@@ -11,6 +11,7 @@ import { getTenantStorageKey, getTenantSeedData, getCurrentTenantId, BLUECODE_TE
 import type { Progetto } from '../types';
 import { Paginatore } from '../components/ui/Paginatore';
 import { FiltroPeriodo } from '../components/ui/FiltroPeriodo';
+import { usePeriodo } from '../context/PeriodoContext';
 import { isRispostaPaginata, type MetaPaginazione } from '../api/paginazione';
 
 const META_INIZIALE: MetaPaginazione = { page: 1, limit: 50, totale: 0, pagine: 0 };
@@ -36,8 +37,12 @@ export function Projects() {
   const [catFilter, setCatFilter] = useState<string>('ALL');
   const [selectedAdvisorId, setSelectedAdvisorId] = useState<string>('ALL');
   // Filtro periodo (sovrapposizione con [dataInizio, dataScadenza]), applicato lato server.
-  const [dataDa, setDataDa] = useState('');
-  const [dataA, setDataA] = useState('');
+  // Inizializzato dal periodo globale (barra in alto); il filtro locale può override, ma un
+  // cambio del periodo globale lo riallinea.
+  const { dataDa: gDataDa, dataA: gDataA } = usePeriodo();
+  const [dataDa, setDataDa] = useState(gDataDa);
+  const [dataA, setDataA] = useState(gDataA);
+  useEffect(() => { setPage(1); setDataDa(gDataDa); setDataA(gDataA); }, [gDataDa, gDataA]);
   const [viewMode, setViewMode] = useState<ViewMode>('cards');
   const [sortBy, setSortBy] = useState<'due' | 'pct' | 'val' | 'name'>('due');
 

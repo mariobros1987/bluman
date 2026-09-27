@@ -5,6 +5,7 @@ import { InviaSollecitoModal } from '../components/solleciti/InviaSollecitoModal
 import { useToast } from '../components/ui/ToastProvider';
 import { Modal } from '../components/ui/Modal';
 import { FiltroPeriodo } from '../components/ui/FiltroPeriodo';
+import { usePeriodo } from '../context/PeriodoContext';
 
 export function ScadenzarioPage() {
   const toast = useToast();
@@ -14,9 +15,11 @@ export function ScadenzarioPage() {
   const [filterStato, setFilterStato] = useState('tutte');
   const [selectedCliente, setSelectedCliente] = useState('tutti');
   const [searchTerm, setSearchTerm] = useState('');
-  // Filtro periodo sulla data di scadenza (lato server).
-  const [dataDa, setDataDa] = useState('');
-  const [dataA, setDataA] = useState('');
+  // Filtro periodo sulla data di scadenza (lato server). Inizializzato dal periodo globale.
+  const { dataDa: gDataDa, dataA: gDataA } = usePeriodo();
+  const [dataDa, setDataDa] = useState(gDataDa);
+  const [dataA, setDataA] = useState(gDataA);
+  useEffect(() => { setDataDa(gDataDa); setDataA(gDataA); }, [gDataDa, gDataA]);
 
   // Modal Sollecito
   const [scadenzaDaSollecitare, setScadenzaDaSollecitare] = useState<any>(null);

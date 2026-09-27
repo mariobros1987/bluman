@@ -16,6 +16,7 @@ import { archivioDocumentiApi, type ClienteArchivio, type ProgettoArchivio, type
 import { ElencoDocumentiCartella } from '../components/documenti/ElencoDocumentiCartella';
 import { ElencoNonCollocati } from '../components/documenti/ElencoNonCollocati';
 import { FiltroPeriodo } from '../components/ui/FiltroPeriodo';
+import { usePeriodo } from '../context/PeriodoContext';
 import type { ProgettoScelta } from '../components/documenti/ModaleCollegaDocumento';
 
 const STATO_PROGETTO: Record<string, string> = {
@@ -100,8 +101,11 @@ export function ArchivioDocumentiPage() {
   const [includiArchiviati, setIncludiArchiviati] = useState(false);
   const [nascondiVuote, setNascondiVuote] = useState(true);
   // Filtro periodo sulla data documento (createdAt), applicato lato server nella cartella progetto.
-  const [dataDa, setDataDa] = useState('');
-  const [dataA, setDataA] = useState('');
+  // Inizializzato dal periodo globale (barra in alto), con override locale.
+  const { dataDa: gDataDa, dataA: gDataA } = usePeriodo();
+  const [dataDa, setDataDa] = useState(gDataDa);
+  const [dataA, setDataA] = useState(gDataA);
+  useEffect(() => { setDataDa(gDataDa); setDataA(gDataA); }, [gDataDa, gDataA]);
   // §40 — la vista dei documenti rimasti senza cartella: si apre dall'avviso in testa.
   const [vistaNonCollocati, setVistaNonCollocati] = useState(false);
 

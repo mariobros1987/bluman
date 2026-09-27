@@ -69,6 +69,8 @@ Questo file serve come indice rapido per l'IA ed i collaboratori per identificar
 - **`components/ui/Badge.tsx`**: Badge generico con stile e colore configurabili.
 - **`components/ui/CatBadge.tsx`**: Badge colorato per categoria modulo (Analisi, Societario, Trust, Banking, Fiscale, Legale, IP, Compliance).
 - **`components/ui/ProgressBar.tsx`**: Barra di progresso animata con percentuale.
+- **`components/ui/FiltroPeriodo.tsx`**: due `<input type="date">` "Da"/"A" (estremi indipendenti) per le barre filtri; serializza in `dataDa`/`dataA` verso il backend ([[src/util/intervalloData.ts]]). Usato da Progetti, Fatture, Scadenzario e Archivio Documenti.
+- **`context/PeriodoContext.tsx`** + **`components/layout/SelettorePeriodo.tsx`**: Periodo/Esercizio globale. `PeriodoProvider` (montato in `App.tsx` accanto a Toast/Confirm) tiene `dataDa`/`dataA` persistiti per-tenant (`getTenantStorageKey('bluman_periodo_attivo')`); `usePeriodo()` lo espone. `SelettorePeriodo` è il chip nella topbar (`AppLayout.tsx`, accanto allo switcher tenant): quick-pick anni + "Tutto" + intervallo personalizzato, **sempre azzerabile** (regola 7). Le quattro pagine con filtro data inizializzano il loro stato dal periodo globale e lo riallineano quando cambia (override locale consentito). NON è uno «scatolone per anno»: i record restano continui, il periodo è una lente. Escluse per scelta: Anagrafica, KYC (5 anni), Impostazioni.
 
 ### 🔧 Utilities Frontend (`utils/`)
 

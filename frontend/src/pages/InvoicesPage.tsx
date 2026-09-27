@@ -21,6 +21,7 @@ import { fmt } from '../utils';
 import { EsportaFascicoloCommercialistaModal } from '../components/contabilita/EsportaFascicoloCommercialistaModal';
 import { Paginatore } from '../components/ui/Paginatore';
 import { FiltroPeriodo } from '../components/ui/FiltroPeriodo';
+import { usePeriodo } from '../context/PeriodoContext';
 import { isRispostaPaginata, type MetaPaginazione } from '../api/paginazione';
 import { useToast } from '../components/ui/ToastProvider';
 import { Modal } from '../components/ui/Modal';
@@ -52,8 +53,11 @@ export function InvoicesPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [searchDebounced, setSearchDebounced] = useState('');
   // Filtro periodo sulla data di emissione (lato server: circoscrive anche i totali del riepilogo).
-  const [dataDa, setDataDa] = useState('');
-  const [dataA, setDataA] = useState('');
+  // Inizializzato dal periodo globale (barra in alto), con override locale.
+  const { dataDa: gDataDa, dataA: gDataA } = usePeriodo();
+  const [dataDa, setDataDa] = useState(gDataDa);
+  const [dataA, setDataA] = useState(gDataA);
+  useEffect(() => { setPage(1); setDataDa(gDataDa); setDataA(gDataA); }, [gDataDa, gDataA]);
   const [showExportFascicoloZipModal, setShowExportFascicoloZipModal] = useState(false);
 
   // Modali
