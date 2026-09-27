@@ -16,13 +16,13 @@
 import { createHash, randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import { prisma } from '../util/prismaClient.js';
-import { uploadDocumento } from '../services/storageService.js';
+import { uploadDocumento, leggiFileArchivio } from '../services/storageService.js';
 import { scanFileBuffer } from '../services/securityScanner.js';
 import { fileContieneFirmaDigitale } from '../services/firmaFileValidazione.js';
 import { notificaCliente } from '../services/notificheService.js';
 import { recordAudit, ipReale, normalizzaGrafometrica } from '../util/serverHelpers.js';
 import { generaCopiaFirmata } from '../services/copiaFirmata.js';
-import { verificaOtp } from '../services/otpService.js';
+import { verificaOtp, sigilloHmac } from '../services/otpService.js';
 
 /** L'admin del tenant (`advisor`) e il `super_admin` possono superare il blocco dei firmati. */
 function puoSbloccareDocumentoFirmato(ruolo?: string): boolean {
@@ -75,14 +75,15 @@ export async function registraRotteDocumentiFirmaStudio(server: FastifyInstance)
       const firmatarioNome = utente?.nome || utente?.email || 'Professionista Studio';
       const firmatarioRuolo = ruoloDichiarato?.trim() || (utente?.ruolo === 'advisor' ? 'Senior Legal & Tax Advisor' : 'Professionista Incaricato');
 
-      // Calcola hash del documento originale per il sigillo
+      // Impronta del documento per il sigillo: SHA-256 del CONTENUTO reale del file (come il flusso
+      // cliente, firma.ts), non della stringa dell'URL. Fail-closed come il cliente: un sigillo con
+      // l'impronta sbagliata è peggio di una firma non apposta (rilievo audit §05, regola 7).
       const docTitolo = doc.microvoceProgetto?.nome ?? doc.progetto?.nome ?? 'Documento';
-      let docHash = 'sha256-precompilato';
-      try {
-        const hash = createHash('sha256');
-        hash.update(doc.fileUrl || id);
-        docHash = hash.digest('hex');
-      } catch {}
+      const contenutoDoc = await leggiFileArchivio(doc.fileUrl);
+      if (!contenutoDoc || contenutoDoc.length === 0) {
+        return reply.code(502).send({ errore: "Il file del documento non è leggibile dall'archivio: la firma non può essere apposta." });
+      }
+      const docHash = createHash('sha256').update(contenutoDoc).digest('hex');
 
       const signatureId = `BLU-STD-${Date.now()}-${randomUUID().slice(0, 8).toUpperCase()}`;
 
@@ -110,9 +111,9 @@ export async function registraRotteDocumentiFirmaStudio(server: FastifyInstance)
         const standard = isFea ? 'eIDAS / FEA (CAD art. 20 c. 1-bis)' : 'eIDAS / SES (CAD art. 20)';
         const canaleVerificato = isFea ? 'OTP Verificato + Sessione Studio' : 'Sessione Studio Verificata (art. 20 CAD)';
 
-        const sigilloDigest = createHash('sha256')
-          .update(`${signatureId}:${docHash}:${firmatarioNome}:${new Date().toISOString()}`)
-          .digest('hex');
+        // Sigillo in HMAC-SHA256 con la chiave del server (come la firma cliente): una checksum
+        // SHA-256 in chiaro non provava che avesse sigillato la piattaforma (rilievo audit §05).
+        const sigilloDigest = sigilloHmac(`${signatureId}:${docHash}:${firmatarioNome}:${new Date().toISOString()}`);
 
         const firma = await prisma.firmaElettronica.create({
           data: {

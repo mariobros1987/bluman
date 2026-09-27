@@ -134,6 +134,9 @@ vi.mock('./services/storageService.js', async (importOriginal) => {
       return { ok: true, url: `https://storage.example/${filename}`, name: filename, size: '2 KB' };
     },
     rifirmaUrlUpload: (url: string | null) => url,
+    // La firma-studio ora calcola l'impronta del sigillo sul CONTENUTO reale del file (audit §05):
+    // il test simula un file leggibile dall'archivio, altrimenti la firma fallisce con 502 (fail-closed).
+    leggiFileArchivio: async () => Buffer.from('contenuto-documento-di-test-per-il-sigillo'),
   };
 });
 

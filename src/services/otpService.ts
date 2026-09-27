@@ -337,6 +337,16 @@ function risolviSegretoSigillo(): string {
 }
 const SEGRETO_SIGILLO = risolviSegretoSigillo();
 
+/**
+ * HMAC-SHA256 del payload con la chiave del sigillo — l'unico modo legittimo di sigillare, sia per
+ * la firma cliente (`creaSigilloFea`) sia per la firma studio. Esposto perché la firma-studio non
+ * ricalcoli una checksum SHA-256 in chiaro (che chiunque conosca i campi può riprodurre): solo chi
+ * possiede la chiave del server può produrre questo digest, quindi l'impronta prova ed è opponibile.
+ */
+export function sigilloHmac(payload: string): string {
+  return crypto.createHmac('sha256', SEGRETO_SIGILLO).update(payload).digest('hex');
+}
+
 export interface SigilloFea {
   signatureId: string;
   signerName: string;
