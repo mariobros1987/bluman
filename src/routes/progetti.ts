@@ -28,6 +28,7 @@ import { livelloFirmaValido } from '../services/livelloFirmaService.js';
 import { caricoPerRisorse } from '../services/compitiAssegnati.js';
 import { CreaProgettoSchema, ConsuntivaOreSchema } from '../schemas/progetti.schema.js';
 import { campoOrdinamento, creaMetaPaginazione, leggiPaginazione } from '../util/paginazione.js';
+import { leggiIntervalloData } from '../util/intervalloData.js';
 import { conStatoComunicazione, leggiMetaComunicazione } from '../util/statoComunicazione.js';
 
 // ─── PROGETTI, COMUNICAZIONI, TIMESHEET, CHECKLIST & ESECUZIONE ─────
@@ -248,7 +249,7 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
       return arricchisciProgetti(projs);
     }
 
-    const { page, limit, search, sortBy, sortOrder, skip } = paginazione.parametri;
+    const { page, limit, search, sortBy, sortOrder, skip, dataDa, dataA } = paginazione.parametri;
     const campo = campoOrdinamento(sortBy, ['createdAt', 'dataScadenza', 'nome', 'valoreTotale', 'stato'] as const, 'createdAt');
     if (!campo) return reply.code(400).send({ errore: 'Campo di ordinamento progetti non valido' });
     if (search) {
@@ -256,6 +257,21 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
         { nome: { contains: search, mode: 'insensitive' } },
         { cliente: { nome: { contains: search, mode: 'insensitive' } } },
       ];
+    }
+    // Filtro periodo: un progetto rientra se il suo intervallo [dataInizio, dataScadenza]
+    // (estremi nullable) si SOVRAPPONE a [dataDa, dataA]. `search` occupa già `where.OR`,
+    // quindi la sovrapposizione va in `where.AND` per non collidere.
+    const periodo = leggiIntervalloData(dataDa, dataA);
+    if (!periodo.ok) return reply.code(400).send({ errore: periodo.errore });
+    if (periodo.presente) {
+      const clausole: Prisma.ProgettoWhereInput[] = [];
+      if (periodo.intervallo.a) {
+        clausole.push({ OR: [{ dataInizio: null }, { dataInizio: { lte: periodo.intervallo.a } }] });
+      }
+      if (periodo.intervallo.da) {
+        clausole.push({ OR: [{ dataScadenza: null }, { dataScadenza: { gte: periodo.intervallo.da } }] });
+      }
+      where.AND = clausole;
     }
     const [projs, totale] = await Promise.all([
       prisma.progetto.findMany({ where, include, skip, take: limit, orderBy: { [campo]: sortOrder } }),

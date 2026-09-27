@@ -94,9 +94,9 @@ export interface DocumentoProgetto {
   richiesteModifica?: RichiestaModificaDoc[];
 }
 
-export async function listaDocumentiProgetto(progettoId: string, includiArchiviati = false, options?: { forceRefresh?: boolean }): Promise<DocumentoProgetto[]> {
+export async function listaDocumentiProgetto(progettoId: string, includiArchiviati = false, options?: { forceRefresh?: boolean; dataDa?: string; dataA?: string }): Promise<DocumentoProgetto[]> {
   const currentTenantId = getCurrentTenantId();
-  const cacheKey = `documenti_progetto_${currentTenantId}_${progettoId}_${includiArchiviati}`;
+  const cacheKey = `documenti_progetto_${currentTenantId}_${progettoId}_${includiArchiviati}_${options?.dataDa ?? ''}_${options?.dataA ?? ''}`;
 
   return cachedQuery(
     cacheKey,
@@ -105,6 +105,8 @@ export async function listaDocumentiProgetto(progettoId: string, includiArchivia
       // operative escludono gli archiviati, l'archivio dello studio li mostra su richiesta.
       const parametri = new URLSearchParams({ progettoId });
       if (includiArchiviati) parametri.set('includiArchiviati', 'true');
+      if (options?.dataDa) parametri.set('dataDa', options.dataDa);
+      if (options?.dataA) parametri.set('dataA', options.dataA);
       const res = await apiFetch(`${API_BASE}/documenti?${parametri.toString()}`, {
         headers: getAuthHeaders(),
       });

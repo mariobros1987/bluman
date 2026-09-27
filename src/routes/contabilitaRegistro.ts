@@ -10,6 +10,7 @@ import { prisma } from '../util/prismaClient.js';
 import { riprovaSuConflitto } from '../util/prismaClient.js';
 import { recordAudit } from '../util/serverHelpers.js';
 import { campoOrdinamento, creaMetaPaginazione, leggiPaginazione } from '../util/paginazione.js';
+import { leggiIntervalloData, filtroData } from '../util/intervalloData.js';
 import { moduloKycAttivo } from '../util/guardiaModuli.js';
 import { operativitaBloccataDaKyc } from '../services/kycGate.js';
 
@@ -117,16 +118,23 @@ export async function registraRotteContabilitaRegistro(server: FastifyInstance, 
         return reply.send(fatture);
       }
 
-      const { page, limit, search, sortBy, sortOrder, stato, skip } = paginazione.parametri;
+      const { page, limit, search, sortBy, sortOrder, stato, skip, dataDa, dataA } = paginazione.parametri;
       const campo = campoOrdinamento(sortBy, ['numeroProgressivoSerie', 'data', 'stato', 'totaleDocumentoCentesimi', 'createdAt'] as const, 'numeroProgressivoSerie');
       if (!campo) return reply.code(400).send({ errore: 'Campo di ordinamento fatture non valido' });
       const statiConsentiti = ['bozza', 'emessa', 'incassata', 'annullata'] as const;
       if (stato && !statiConsentiti.includes(stato as typeof statiConsentiti[number])) {
         return reply.code(400).send({ errore: 'Stato fattura non valido' });
       }
+      // Filtro periodo sulla data di emissione. Circoscrive anche i totali del `riepilogo`
+      // (gli aggregate sotto derivano da questo stesso `where`), che è il comportamento voluto
+      // per un registro filtrato per periodo.
+      const periodo = leggiIntervalloData(dataDa, dataA);
+      if (!periodo.ok) return reply.code(400).send({ errore: periodo.errore });
+      const filtroEmissione = filtroData(periodo.intervallo);
       const where = {
         tenantId,
         ...(stato ? { stato: stato as typeof statiConsentiti[number] } : {}),
+        ...(filtroEmissione ? { data: filtroEmissione } : {}),
         ...(search ? {
           OR: [
             { numero: { contains: search, mode: 'insensitive' as const } },
@@ -201,7 +209,7 @@ export async function registraRotteContabilitaRegistro(server: FastifyInstance, 
         return reply.send(fatture);
       }
 
-      const { page, limit, skip, search, stato, tipo } = paginazione.parametri;
+      const { page, limit, skip, search, stato, tipo, dataDa, dataA } = paginazione.parametri;
       const where: Prisma.FatturaWhereInput = { tenantId };
       // Filtri di ricerca: testo su numero documento o nome cliente, più stato e tipo
       // documento quando indicati. Tutti opzionali: assenti = nessun vincolo aggiuntivo.
@@ -213,6 +221,10 @@ export async function registraRotteContabilitaRegistro(server: FastifyInstance, 
       }
       if (stato) where.stato = stato as Prisma.FatturaWhereInput['stato'];
       if (tipo) where.tipoDocumento = tipo as Prisma.FatturaWhereInput['tipoDocumento'];
+      const periodo = leggiIntervalloData(dataDa, dataA);
+      if (!periodo.ok) return reply.code(400).send({ errore: periodo.errore });
+      const filtroEmissione = filtroData(periodo.intervallo);
+      if (filtroEmissione) where.data = filtroEmissione;
       const [fatture, totale] = await Promise.all([
         prisma.fattura.findMany({
           where,

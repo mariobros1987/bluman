@@ -10,6 +10,7 @@ import { NewProjectWizard } from '../components/NewProjectWizard';
 import { getTenantStorageKey, getTenantSeedData, getCurrentTenantId, BLUECODE_TENANT_ID } from '../utils/tenant';
 import type { Progetto } from '../types';
 import { Paginatore } from '../components/ui/Paginatore';
+import { FiltroPeriodo } from '../components/ui/FiltroPeriodo';
 import { isRispostaPaginata, type MetaPaginazione } from '../api/paginazione';
 
 const META_INIZIALE: MetaPaginazione = { page: 1, limit: 50, totale: 0, pagine: 0 };
@@ -34,6 +35,9 @@ export function Projects() {
   const [statusFilter, setStatusFilter] = useState<FilterStatus>('all');
   const [catFilter, setCatFilter] = useState<string>('ALL');
   const [selectedAdvisorId, setSelectedAdvisorId] = useState<string>('ALL');
+  // Filtro periodo (sovrapposizione con [dataInizio, dataScadenza]), applicato lato server.
+  const [dataDa, setDataDa] = useState('');
+  const [dataA, setDataA] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('cards');
   const [sortBy, setSortBy] = useState<'due' | 'pct' | 'val' | 'name'>('due');
 
@@ -67,7 +71,7 @@ export function Projects() {
     // si aggiornano» segnalato. Dove il dato non c'è si mostra zero: un preventivo mai fatto
     // vale zero, non 15.000 €.
     try {
-      const remote = await fetchProgetti({ page, limit, search: searchDebounced, sortBy: 'createdAt', sortOrder: 'desc' });
+      const remote = await fetchProgetti({ page, limit, search: searchDebounced, sortBy: 'createdAt', sortOrder: 'desc', dataDa: dataDa || undefined, dataA: dataA || undefined });
       if (isRispostaPaginata<any>(remote)) {
         apiDisponibile = true;
         setMeta(remote.meta);
@@ -177,7 +181,7 @@ export function Projects() {
 
   useEffect(() => {
     loadProjects();
-  }, [page, limit, searchDebounced]);
+  }, [page, limit, searchDebounced, dataDa, dataA]);
 
   // ── Statistiche KPI Operative ─────────────────────────────────────────
   const totalProjects = meta.totale || projectList.length;
@@ -474,6 +478,13 @@ export function Projects() {
                 <option key={t.id} value={t.id}>{t.n} ({t.r})</option>
               ))}
             </select>
+
+            <FiltroPeriodo
+              dataDa={dataDa}
+              dataA={dataA}
+              onDataDa={v => { setPage(1); setDataDa(v); }}
+              onDataA={v => { setPage(1); setDataA(v); }}
+            />
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -498,9 +509,9 @@ export function Projects() {
         <div style={{ textAlign: 'center', padding: '60px 20px', background: 'var(--card)', borderRadius: 16, border: '1px solid var(--border)', color: 'var(--muted)' }}>
           <div style={{ fontSize: 44, marginBottom: 12 }}>📁</div>
           <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>Nessuna pratica corrisponde ai filtri</div>
-          <div style={{ fontSize: 12.5, marginBottom: 18 }}>Prova a modificare la ricerca o seleziona un'altra categoria.</div>
+          <div style={{ fontSize: 12.5, marginBottom: 18 }}>Prova a modificare la ricerca, il periodo o seleziona un'altra categoria.</div>
           <button
-            onClick={() => { setSearchTerm(''); setStatusFilter('all'); setCatFilter('ALL'); setSelectedAdvisorId('ALL'); }}
+            onClick={() => { setPage(1); setSearchTerm(''); setStatusFilter('all'); setCatFilter('ALL'); setSelectedAdvisorId('ALL'); setDataDa(''); setDataA(''); }}
             className="btn btn-primary"
           >
             Reset Filtri

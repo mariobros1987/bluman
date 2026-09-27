@@ -187,6 +187,47 @@ describe('rotte paginate', () => {
     await server.close();
   });
 
+  it('GET /progetti col filtro periodo costruisce la sovrapposizione (nullable) in where.AND', async () => {
+    const server = await serverCon(registraRotteProgetti);
+    const res = await server.inject({ method: 'GET', url: '/progetti?page=1&dataDa=2026-01-01&dataA=2026-12-31' });
+    expect(res.statusCode).toBe(200);
+    const where = chiamate.progetto.find(c => c[0] === 'findMany')![1].where;
+    expect(where.AND).toEqual([
+      { OR: [{ dataInizio: null }, { dataInizio: { lte: new Date('2026-12-31T23:59:59.999Z') } }] },
+      { OR: [{ dataScadenza: null }, { dataScadenza: { gte: new Date('2026-01-01T00:00:00.000Z') } }] },
+    ]);
+    // findMany e count condividono lo stesso where (paginazione e conteggio allineati)
+    expect(chiamate.progetto.find(c => c[0] === 'count')![1].where.AND).toHaveLength(2);
+    await server.close();
+  });
+
+  it('GET /progetti con solo dataDa resta aperto a destra e rifiuta le date impossibili', async () => {
+    const server = await serverCon(registraRotteProgetti);
+    const res = await server.inject({ method: 'GET', url: '/progetti?page=1&dataDa=2026-06-01' });
+    expect(res.statusCode).toBe(200);
+    expect(chiamate.progetto.find(c => c[0] === 'findMany')![1].where.AND).toEqual([
+      { OR: [{ dataScadenza: null }, { dataScadenza: { gte: new Date('2026-06-01T00:00:00.000Z') } }] },
+    ]);
+    const no = await server.inject({ method: 'GET', url: '/progetti?page=1&dataDa=2026-02-30' });
+    expect(no.statusCode).toBe(400);
+    await server.close();
+  });
+
+  it('GET /invoices col filtro periodo aggiunge where.data e circoscrive anche gli aggregate', async () => {
+    const server = await serverCon(registraRotteContabilitaRegistro);
+    const res = await server.inject({ method: 'GET', url: '/invoices?page=1&dataDa=2026-01-01&dataA=2026-03-31' });
+    expect(res.statusCode).toBe(200);
+    const atteso = { gte: new Date('2026-01-01T00:00:00.000Z'), lte: new Date('2026-03-31T23:59:59.999Z') };
+    expect(chiamate.fattura.find(c => c[0] === 'findMany')![1].where.data).toEqual(atteso);
+    // ogni aggregate del riepilogo eredita lo stesso where → totali sul solo periodo
+    expect(chiamate.fattura.filter(c => c[0] === 'aggregate').every(c => {
+      return JSON.stringify(c[1].where.data) === JSON.stringify(atteso);
+    })).toBe(true);
+    const no = await server.inject({ method: 'GET', url: '/invoices?page=1&dataA=non-valida' });
+    expect(no.statusCode).toBe(400);
+    await server.close();
+  });
+
   it('GET /invoices applica il filtro stato e rifiuta valori non validi', async () => {
     const server = await serverCon(registraRotteContabilitaRegistro);
     const res = await server.inject({ method: 'GET', url: '/invoices?page=1&stato=emessa' });

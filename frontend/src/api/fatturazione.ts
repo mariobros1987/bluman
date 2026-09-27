@@ -78,13 +78,20 @@ export async function fetchTutteFattureStudioApi(parametri?: ParametriListaPagin
   );
 }
 
-export async function fetchScadenzarioIncassiApi(options?: { forceRefresh?: boolean }) {
+export async function fetchScadenzarioIncassiApi(
+  parametri?: { dataDa?: string; dataA?: string },
+  options?: { forceRefresh?: boolean },
+) {
   const currentTenantId = getCurrentTenantId();
+  const qs = new URLSearchParams();
+  if (parametri?.dataDa) qs.set('dataDa', parametri.dataDa);
+  if (parametri?.dataA) qs.set('dataA', parametri.dataA);
+  const query = qs.toString();
   return cachedQuery(
-    `scadenzario_${currentTenantId}`,
+    `scadenzario_${currentTenantId}_${query}`,
     async () => {
       try {
-        const res = await apiFetch(`${API_BASE}/invoices/scadenzario`, { headers: getAuthHeaders() });
+        const res = await apiFetch(`${API_BASE}/invoices/scadenzario${query ? `?${query}` : ''}`, { headers: getAuthHeaders() });
         if (!res.ok) throw new Error('Errore recupero scadenzario incassi');
         return await res.json();
       } catch (err) {

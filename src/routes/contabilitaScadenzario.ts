@@ -10,14 +10,22 @@ import { prisma, conContestoInTransazione, riprovaSuConflitto } from '../util/pr
 import { notificaStudio, notificaCliente } from '../services/notificheService.js';
 import { recordAudit } from '../util/serverHelpers.js';
 import { RegistraIncassoSchema } from '../schemas/contabilita.schema.js';
+import { leggiIntervalloData, filtroData } from '../util/intervalloData.js';
 
 export async function registraRotteContabilitaScadenzario(server: FastifyInstance, app: AppPort): Promise<void> {
   // ─── SCADENZARIO & REGISTRAZIONE INCASSI CON PRIMA NOTA AUTOMATICA ──
-  server.get('/invoices/scadenzario', async (req, reply) => {
+  server.get<{ Querystring: { dataDa?: string; dataA?: string } }>('/invoices/scadenzario', async (req, reply) => {
     const tenantId = req.tenantId;
+    // Filtro periodo sulla data di scadenza (campo non-nullable). Estremo malformato → 400,
+    // così un typo nel filtro non passa inosservato dietro il catch che ritorna [].
+    const periodo = leggiIntervalloData(req.query.dataDa, req.query.dataA);
+    if (!periodo.ok) return reply.code(400).send({ errore: periodo.errore });
+    const filtroScadenza = filtroData(periodo.intervallo);
     try {
+      const where: Prisma.ScadenzaIncassoWhereInput = { tenantId };
+      if (filtroScadenza) where.dataScadenza = filtroScadenza;
       const scadenze = await prisma.scadenzaIncasso.findMany({
-        where: { tenantId },
+        where,
         include: {
           fattura: {
             include: {

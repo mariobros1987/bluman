@@ -15,6 +15,7 @@ import { useNavigate } from 'react-router-dom';
 import { archivioDocumentiApi, type ClienteArchivio, type ProgettoArchivio, type TotaliArchivio } from '../api/client';
 import { ElencoDocumentiCartella } from '../components/documenti/ElencoDocumentiCartella';
 import { ElencoNonCollocati } from '../components/documenti/ElencoNonCollocati';
+import { FiltroPeriodo } from '../components/ui/FiltroPeriodo';
 import type { ProgettoScelta } from '../components/documenti/ModaleCollegaDocumento';
 
 const STATO_PROGETTO: Record<string, string> = {
@@ -98,6 +99,9 @@ export function ArchivioDocumentiPage() {
   const [ricerca, setRicerca] = useState('');
   const [includiArchiviati, setIncludiArchiviati] = useState(false);
   const [nascondiVuote, setNascondiVuote] = useState(true);
+  // Filtro periodo sulla data documento (createdAt), applicato lato server nella cartella progetto.
+  const [dataDa, setDataDa] = useState('');
+  const [dataA, setDataA] = useState('');
   // §40 — la vista dei documenti rimasti senza cartella: si apre dall'avviso in testa.
   const [vistaNonCollocati, setVistaNonCollocati] = useState(false);
 
@@ -272,6 +276,9 @@ export function ArchivioDocumentiPage() {
               </label>
             )}
             {progetto && (
+              <FiltroPeriodo dataDa={dataDa} dataA={dataA} onDataDa={setDataDa} onDataA={setDataA} />
+            )}
+            {progetto && (
               <button
                 onClick={() => navigate(`/projects/${progetto.id}`)}
                 style={{ background: 'var(--indigo)', border: 'none', color: '#fff', padding: '8px 14px', borderRadius: 8, cursor: 'pointer', fontSize: 12.5, fontWeight: 600 }}
@@ -293,6 +300,8 @@ export function ArchivioDocumentiPage() {
             progetti={progettiScelta}
             includiArchiviati={includiArchiviati}
             ricerca={filtro}
+            dataDa={dataDa}
+            dataA={dataA}
             onApriProgetto={() => navigate(`/projects/${progetto.id}`)}
             onArchivioCambiato={() => setRicaricaArchivio((n) => n + 1)}
           />

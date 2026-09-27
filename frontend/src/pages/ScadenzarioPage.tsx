@@ -4,6 +4,7 @@ import { fmt } from '../utils';
 import { InviaSollecitoModal } from '../components/solleciti/InviaSollecitoModal';
 import { useToast } from '../components/ui/ToastProvider';
 import { Modal } from '../components/ui/Modal';
+import { FiltroPeriodo } from '../components/ui/FiltroPeriodo';
 
 export function ScadenzarioPage() {
   const toast = useToast();
@@ -13,6 +14,9 @@ export function ScadenzarioPage() {
   const [filterStato, setFilterStato] = useState('tutte');
   const [selectedCliente, setSelectedCliente] = useState('tutti');
   const [searchTerm, setSearchTerm] = useState('');
+  // Filtro periodo sulla data di scadenza (lato server).
+  const [dataDa, setDataDa] = useState('');
+  const [dataA, setDataA] = useState('');
 
   // Modal Sollecito
   const [scadenzaDaSollecitare, setScadenzaDaSollecitare] = useState<any>(null);
@@ -29,7 +33,7 @@ export function ScadenzarioPage() {
     setLoading(true);
     try {
       const [scadData, clData] = await Promise.all([
-        fetchScadenzarioIncassiApi(),
+        fetchScadenzarioIncassiApi({ dataDa: dataDa || undefined, dataA: dataA || undefined }),
         fetchClienti(),
       ]);
       setScadenze(scadData || []);
@@ -43,7 +47,7 @@ export function ScadenzarioPage() {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [dataDa, dataA]);
 
   const totalSospeso = scadenze
     .filter((s) => s.stato !== 'incassato' && s.stato !== 'stornata')
@@ -153,6 +157,7 @@ export function ScadenzarioPage() {
               </option>
             ))}
           </select>
+          <FiltroPeriodo dataDa={dataDa} dataA={dataA} onDataDa={setDataDa} onDataA={setDataA} />
         </div>
 
         {loading ? (

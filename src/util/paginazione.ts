@@ -16,6 +16,8 @@ export interface ParametriPaginazione {
   stato?: string;
   tipo?: string;
   metodo?: string;
+  dataDa?: string;
+  dataA?: string;
   skip: number;
 }
 
@@ -26,7 +28,7 @@ export type EsitoPaginazione =
 
 const CHIAVI_PAGINAZIONE = [
   'page', 'limit', 'search', 'sortBy', 'sortOrder', 'stato', 'tipo',
-  'metodo',
+  'metodo', 'dataDa', 'dataA',
 ] as const;
 
 export function leggiPaginazione(query: unknown): EsitoPaginazione {
@@ -57,6 +59,8 @@ export function leggiPaginazione(query: unknown): EsitoPaginazione {
       stato: data.stato,
       tipo: data.tipo,
       metodo: data.metodo,
+      dataDa: data.dataDa,
+      dataA: data.dataA,
       skip: (page - 1) * limit,
     },
   };

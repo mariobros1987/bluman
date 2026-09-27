@@ -20,6 +20,7 @@ import {
 import { fmt } from '../utils';
 import { EsportaFascicoloCommercialistaModal } from '../components/contabilita/EsportaFascicoloCommercialistaModal';
 import { Paginatore } from '../components/ui/Paginatore';
+import { FiltroPeriodo } from '../components/ui/FiltroPeriodo';
 import { isRispostaPaginata, type MetaPaginazione } from '../api/paginazione';
 import { useToast } from '../components/ui/ToastProvider';
 import { Modal } from '../components/ui/Modal';
@@ -50,6 +51,9 @@ export function InvoicesPage() {
   const [filterStato, setFilterStato] = useState('tutte');
   const [searchTerm, setSearchTerm] = useState('');
   const [searchDebounced, setSearchDebounced] = useState('');
+  // Filtro periodo sulla data di emissione (lato server: circoscrive anche i totali del riepilogo).
+  const [dataDa, setDataDa] = useState('');
+  const [dataA, setDataA] = useState('');
   const [showExportFascicoloZipModal, setShowExportFascicoloZipModal] = useState(false);
 
   // Modali
@@ -112,6 +116,8 @@ export function InvoicesPage() {
           sortBy: 'numeroProgressivoSerie',
           sortOrder: 'desc',
           stato: filterStato === 'tutte' ? undefined : filterStato,
+          dataDa: dataDa || undefined,
+          dataA: dataA || undefined,
         }),
         fetchClienti(),
         fetchProgetti(),
@@ -144,7 +150,7 @@ export function InvoicesPage() {
 
   useEffect(() => {
     loadData();
-  }, [page, limit, searchDebounced, filterStato]);
+  }, [page, limit, searchDebounced, filterStato, dataDa, dataA]);
 
   // Calcolo Totali Real-Time nel Form
   const calcolaTotaliForm = () => {
@@ -530,6 +536,12 @@ export function InvoicesPage() {
             <option value="incassata">Incassate (Saldate)</option>
             <option value="annullata">Annullate (Stornate)</option>
           </select>
+          <FiltroPeriodo
+            dataDa={dataDa}
+            dataA={dataA}
+            onDataDa={v => { setPage(1); setDataDa(v); }}
+            onDataA={v => { setPage(1); setDataA(v); }}
+          />
         </div>
 
         {errore && <div style={{ padding: 12, marginBottom: 12, borderRadius: 8, background: 'var(--pill-red-bg)', color: 'var(--pill-red-fg)' }}>{errore}</div>}

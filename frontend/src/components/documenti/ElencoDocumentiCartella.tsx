@@ -57,12 +57,15 @@ interface Props {
   includiArchiviati: boolean;
   /** Filtro testuale già normalizzato dalla pagina; stringa vuota = nessun filtro. */
   ricerca: string;
+  /** Filtro periodo sulla data documento (createdAt), inoltrato al server. Vuoto = aperto. */
+  dataDa?: string;
+  dataA?: string;
   onApriProgetto: () => void;
   /** §40 — l'archivio ricarica i conteggi: un documento caricato o spostato li cambia. */
   onArchivioCambiato?: () => void;
 }
 
-export function ElencoDocumentiCartella({ progettoId, nomeProgetto, progetti, includiArchiviati, ricerca, onApriProgetto, onArchivioCambiato }: Props) {
+export function ElencoDocumentiCartella({ progettoId, nomeProgetto, progetti, includiArchiviati, ricerca, dataDa, dataA, onApriProgetto, onArchivioCambiato }: Props) {
   const [documenti, setDocumenti] = useState<DocumentoProgetto[]>([]);
   const [caricamento, setCaricamento] = useState(true);
   const [errore, setErrore] = useState<string | null>(null);
@@ -74,7 +77,7 @@ export function ElencoDocumentiCartella({ progettoId, nomeProgetto, progetti, in
     let annullato = false;
     setCaricamento(true);
     setErrore(null);
-    listaDocumentiProgetto(progettoId, includiArchiviati)
+    listaDocumentiProgetto(progettoId, includiArchiviati, { dataDa: dataDa || undefined, dataA: dataA || undefined })
       .then((righe) => {
         if (!annullato) setDocumenti(righe);
       })
@@ -88,7 +91,7 @@ export function ElencoDocumentiCartella({ progettoId, nomeProgetto, progetti, in
     return () => {
       annullato = true;
     };
-  }, [progettoId, includiArchiviati, ricarica]);
+  }, [progettoId, includiArchiviati, ricarica, dataDa, dataA]);
 
   /** Dopo una scrittura confermata dal server: si rilegge l'elenco e si avvisa l'archivio. */
   const dopoScrittura = () => {

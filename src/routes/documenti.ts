@@ -22,6 +22,7 @@ import { createHash } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../util/prismaClient.js';
+import { leggiIntervalloData, filtroData } from '../util/intervalloData.js';
 import { uploadDocumento, rifirmaUrlUpload } from '../services/storageService.js';
 import { scanFileBuffer } from '../services/securityScanner.js';
 import { contestoTagDocumento, risolviTagDocumento, blocchiDaHtml, generaPdfDocumento, generaDocxDocumento } from '../services/generazioneDocumenti.js';
@@ -50,14 +51,19 @@ export async function registraRotteDocumenti(server: FastifyInstance): Promise<v
   // vedeva niente, e un altro operatore dello studio non vedeva niente nemmeno lui.
   // Qui l'upload crea la riga in `documento`, agganciata al progetto (o alla micro-voce).
 
-  server.get<{ Querystring: { progettoId?: string; microvoceProgettoId?: string; includiArchiviati?: string } }>(
+  server.get<{ Querystring: { progettoId?: string; microvoceProgettoId?: string; includiArchiviati?: string; dataDa?: string; dataA?: string } }>(
     '/documenti',
     async (req, reply) => {
       const tenantId = req.tenantId;
-      const { progettoId, microvoceProgettoId, includiArchiviati } = req.query;
+      const { progettoId, microvoceProgettoId, includiArchiviati, dataDa, dataA } = req.query;
       if (!progettoId && !microvoceProgettoId) {
         return reply.code(400).send({ errore: 'Specificare progettoId o microvoceProgettoId.' });
       }
+      // Filtro periodo sulla data documento (createdAt). La data di firma vive su
+      // FirmaElettronica.firmatoAt (recuperata a parte più sotto), quindi non entra qui.
+      const periodo = leggiIntervalloData(dataDa, dataA);
+      if (!periodo.ok) return reply.code(400).send({ errore: periodo.errore });
+      const filtroCreazione = filtroData(periodo.intervallo);
 
       try {
         if (progettoId) {
@@ -76,6 +82,7 @@ export async function registraRotteDocumenti(server: FastifyInstance): Promise<v
             tenantId,
             ...(progettoId ? { progettoId } : {}),
             ...(microvoceProgettoId ? { microvoceProgettoId } : {}),
+            ...(filtroCreazione ? { createdAt: filtroCreazione } : {}),
             // Punto 3 piano gap — le liste operative escludono gli archiviati:
             // lo storico (includiArchiviati=true) li mostra solo su richiesta.
             ...(includiArchiviati === 'true' ? {} : { isArchiviato: false }),
