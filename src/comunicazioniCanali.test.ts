@@ -255,7 +255,10 @@ describe('§35 — PATCH /tenant/info: la stringa vuota non cancella la password
     expect(stato.upsert[0].update.waAccessToken).toBeNull();
   });
 
-  it('un collaboratore può aggiornare l’anagrafica ma non i canali', async () => {
+  it('un collaboratore non può modificare le impostazioni dello studio (né canali né anagrafica)', async () => {
+    // Decisione titolare 27/09/2026 (rilievo audit §01): PATCH /tenant/info è riservato ad
+    // advisor/super_admin per intero — non solo i canali. Un collaboratore non può cambiare l'IBAN,
+    // i dati fiscali né la ragione sociale (prima l'anagrafica era modificabile: rischio manomissione).
     stato.tenant = { ...TENANT_CONFIGURATO };
     const canale = await server().inject({
       method: 'PATCH', url: '/tenant/info', headers: authCollaboratore(), payload: { smtpHost: 'smtp.example.com' },
@@ -266,7 +269,8 @@ describe('§35 — PATCH /tenant/info: la stringa vuota non cancella la password
     const anagrafica = await server().inject({
       method: 'PATCH', url: '/tenant/info', headers: authCollaboratore(), payload: { ragioneSociale: 'Studio Rinominato' },
     });
-    expect(anagrafica.statusCode).toBe(200);
+    expect(anagrafica.statusCode).toBe(403);
+    expect(stato.upsert).toHaveLength(0);
   });
 
   it('rifiuta configurazioni SMTP/IMAP non valide prima del database', async () => {
