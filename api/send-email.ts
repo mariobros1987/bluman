@@ -270,8 +270,16 @@ export default async function handler(req: any, res: any) {
     return res.status(405).json({ success: false, errore: 'Metodo non consentito' });
   }
 
-  const autorizzato = relayAutorizzato(req);
-  if (SEGRETO_RELAY && !autorizzato) {
+  // Fail-closed: senza EMAIL_RELAY_SECRET configurato il relay è DISATTIVATO, non aperto. Prima il
+  // gate era `if (SEGRETO_RELAY && !autorizzato)`: con la env assente il controllo saltava e chiunque
+  // poteva usare Vercel come relay/proxy SMTP anonimo (open relay + SSRF). Rilievo audit §06.
+  if (!SEGRETO_RELAY) {
+    return res.status(503).json({
+      success: false,
+      errore: 'Relay di posta non configurato (EMAIL_RELAY_SECRET assente): endpoint disattivato.',
+    });
+  }
+  if (!relayAutorizzato(req)) {
     return res.status(401).json({
       success: false,
       errore: 'Relay non autorizzato: header x-bluman-relay assente o non corrispondente.',

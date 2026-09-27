@@ -24,8 +24,9 @@
  * risponde 400 con il motivo che ha dato il server di posta o Meta (regola 7).
  */
 
-import type { FastifyInstance, FastifyReply } from 'fastify';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { prisma } from '../util/prismaClient.js';
+import { recordAudit } from '../util/serverHelpers.js';
 import { inviaEmail } from '../services/emailRelay.js';
 import { credenzialiCanali } from '../services/otpDispatch.js';
 import { inviaTestoWhatsapp, inviaTemplateWhatsapp } from '../services/whatsappService.js';
@@ -141,6 +142,25 @@ async function rifiutaInvio(
 }
 
 export async function registraRotteComunicazioni(server: FastifyInstance): Promise<void> {
+  // §06 (decisione titolare 27/09) — l'invio dai canali dello studio è riservato al responsabile
+  // (advisor/super_admin): un collaboratore non spedisce a destinatari arbitrari con l'identità dello
+  // studio. E ogni dispatch lascia una traccia in audit (mittente, canale, destinatario), così un
+  // invio con `comunicazioneId` omesso non resta senza traccia forense. Rilievi audit §06.
+  const soloGestoreCanali = (req: FastifyRequest, reply: FastifyReply): boolean => {
+    if (req.ruolo !== 'advisor' && req.ruolo !== 'super_admin') {
+      reply.code(403).send({ errore: "L'invio dai canali dello studio è riservato al responsabile (advisor/super_admin)." });
+      return true;
+    }
+    return false;
+  };
+  const auditDispatch = async (req: FastifyRequest, canale: string, destinatario: string, esito: string) => {
+    await recordAudit({
+      tenantId: req.tenantId, userId: req.userId, ruolo: req.ruolo,
+      azione: 'COMUNICAZIONE_INVIATA', entita: `Canale ${canale}`,
+      dettagli: `${canale} → ${destinatario} · ${esito}`, ipAddress: req.ip,
+    });
+  };
+
   /**
    * Email al cliente con le credenziali dello studio.
    *
@@ -159,6 +179,7 @@ export async function registraRotteComunicazioni(server: FastifyInstance): Promi
       comunicazioneId?: string;
     };
   }>('/comunicazioni/invia-email', async (req, reply) => {
+    if (soloGestoreCanali(req, reply)) return;
     const tenantId = req.tenantId as string;
     const body = req.body || {};
     const comunicazioneId = body.comunicazioneId;
@@ -205,6 +226,7 @@ export async function registraRotteComunicazioni(server: FastifyInstance): Promi
       return rifiutaInvio(tenantId, comunicazioneId, reply, esito.errore || 'Invio non riuscito.');
     }
     await registraEsitoInvio(tenantId, comunicazioneId, { stato: 'inviato' });
+    await auditDispatch(req, 'email', destinatario, `inviato (${esito.via})`);
     return reply.send({ ok: true, via: esito.via });
   });
 
@@ -227,6 +249,7 @@ export async function registraRotteComunicazioni(server: FastifyInstance): Promi
       comunicazioneId?: string;
     };
   }>('/comunicazioni/invia-whatsapp', async (req, reply) => {
+    if (soloGestoreCanali(req, reply)) return;
     const tenantId = req.tenantId as string;
     const body = req.body || {};
     const comunicazioneId = body.comunicazioneId;
@@ -253,6 +276,7 @@ export async function registraRotteComunicazioni(server: FastifyInstance): Promi
     // dichiara solo il webhook di stato, con il suo `consegnatoAt`. Sono due cose diverse.
     // Il `wamid` di Meta si deposita qui: è la chiave con cui quella ricevuta ritroverà la riga.
     await registraEsitoInvio(tenantId, comunicazioneId, { stato: 'inviato', providerId: esito.providerId });
+    await auditDispatch(req, 'whatsapp', numero, 'inviato');
     return reply.send({ ok: true, via: template ? `template ${template}` : 'testo' });
   });
 
@@ -280,6 +304,7 @@ export async function registraRotteComunicazioni(server: FastifyInstance): Promi
       comunicazioneId?: string;
     };
   }>('/comunicazioni/invia-signal', async (req, reply) => {
+    if (soloGestoreCanali(req, reply)) return;
     const tenantId = req.tenantId as string;
     const body = req.body || {};
     const comunicazioneId = body.comunicazioneId;
@@ -329,6 +354,7 @@ export async function registraRotteComunicazioni(server: FastifyInstance): Promi
       return rifiutaInvio(tenantId, comunicazioneId, reply, esito.errore || 'Invio Signal non riuscito.');
     }
     await registraEsitoInvio(tenantId, comunicazioneId, { stato: 'inviato' });
+    await auditDispatch(req, 'signal', destinatario, 'inviato');
     return reply.send({ ok: true, via: allegati.length > 0 ? 'testo e allegati' : 'testo' });
   });
 
@@ -346,6 +372,7 @@ export async function registraRotteComunicazioni(server: FastifyInstance): Promi
   server.post<{ Body: { to?: string; testo?: string; text?: string; comunicazioneId?: string } }>(
     '/comunicazioni/invia-telegram',
     async (req, reply) => {
+      if (soloGestoreCanali(req, reply)) return;
       const tenantId = req.tenantId as string;
       const body = req.body || {};
       const comunicazioneId = body.comunicazioneId;
@@ -366,6 +393,7 @@ export async function registraRotteComunicazioni(server: FastifyInstance): Promi
         return rifiutaInvio(tenantId, comunicazioneId, reply, esito.errore || 'Invio Telegram non riuscito.');
       }
       await registraEsitoInvio(tenantId, comunicazioneId, { stato: 'inviato' });
+      await auditDispatch(req, 'telegram', chatId, 'inviato');
       return reply.send({ ok: true, via: 'testo' });
     },
   );

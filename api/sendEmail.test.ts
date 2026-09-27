@@ -154,10 +154,9 @@ describe('§35 — il segreto condiviso x-bluman-relay', () => {
 });
 
 describe('§35 — le credenziali d\'ambiente non sono a disposizione di chi passa', () => {
-  it('senza EMAIL_RELAY_SECRET configurato il ripiego su SMTP_PASS non scatta', async () => {
-    // Era il difetto: nessun segreto da presentare, e `process.env.SMTP_PASS` come ripiego.
-    // Chi conosceva l'URL spediva come lo studio. Ora una chiamata non autorizzata deve
-    // portarsi le proprie credenziali, e senza quelle riceve 400.
+  it('senza EMAIL_RELAY_SECRET configurato l\'endpoint è disattivato (fail-closed)', async () => {
+    // Audit §06: senza il segreto il relay NON processa affatto (503), invece di lasciar passare la
+    // richiesta col rischio open-relay/SSRF. A maggior ragione non ripiega su process.env.SMTP_PASS.
     process.env.SMTP_HOST = 'smtp.esempio.test';
     process.env.SMTP_USER = 'studio@esempio.test';
     process.env.SMTP_PASS = 'password-di-ambiente-di-prova';
@@ -169,8 +168,7 @@ describe('§35 — le credenziali d\'ambiente non sono a disposizione di chi pas
       res,
     );
 
-    expect(stato.codice).toBe(400);
-    expect(stato.corpo.errore).toMatch(/credenziali smtp mancanti/i);
+    expect(stato.codice).toBe(503);
   });
 
   it('senza credenziali né in richiesta né in ambiente risponde 400 col motivo', async () => {
