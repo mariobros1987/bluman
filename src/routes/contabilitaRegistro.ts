@@ -10,6 +10,8 @@ import { prisma } from '../util/prismaClient.js';
 import { riprovaSuConflitto } from '../util/prismaClient.js';
 import { recordAudit } from '../util/serverHelpers.js';
 import { campoOrdinamento, creaMetaPaginazione, leggiPaginazione } from '../util/paginazione.js';
+import { moduloKycAttivo } from '../util/guardiaModuli.js';
+import { operativitaBloccataDaKyc } from '../services/kycGate.js';
 
 export async function registraRotteContabilitaRegistro(server: FastifyInstance, app: AppPort): Promise<void> {
   // ─── COMPATIBILITÀ ROTTE PRECEDENTI ────────────────────────────────
@@ -33,6 +35,23 @@ export async function registraRotteContabilitaRegistro(server: FastifyInstance, 
       }>;
     };
   }>('/progetti/:id/fatture', async (req, reply) => {
+    // K4 — gate KYC (§8.1) anche sulla fatturazione dalla scheda progetto. La rotta /invoices lo
+    // applica già; questa passava da app.emettiFattura senza il blocco (rilievo audit §04): si poteva
+    // fatturare un cliente con KYC non approvato. Risolvo il cliente dal progetto e blocco con 409
+    // come /invoices. Le note di credito (rettifica) restano escluse; fail-open solo su errore di lettura.
+    const bodyGate: any = req.body || {};
+    if (bodyGate.tipoDocumento !== 'nota_credito' && (await moduloKycAttivo(req.tenantId))) {
+      const prog = await prisma.progetto.findFirst({ where: { id: req.params.id, tenantId: req.tenantId }, select: { clienteId: true } });
+      if (prog?.clienteId) {
+        const gate = await operativitaBloccataDaKyc(prisma, req.tenantId, prog.clienteId)
+          .catch(() => ({ bloccato: false, stato: null, sbloccatoDaOverride: false }));
+        if (gate.bloccato) {
+          return reply.code(409).send({
+            errore: `Fatturazione bloccata dal KYC: la pratica del cliente è in stato «${gate.stato}», non approvata. Approvala (scheda cliente → Compliance KYC) o registra uno sblocco motivato.`,
+          });
+        }
+      }
+    }
     try {
       // La numerazione dentro l'adapter non gira in Serializable: con due
       // emissioni concorrenti l'indice UNIQUE della numerazione può alzare
