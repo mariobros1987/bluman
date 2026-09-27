@@ -106,6 +106,8 @@ export function OperatorDetailModal({
     retainers: 'write',
     reports: 'write',
     communications: 'write',
+    documents: 'read',
+    library: 'read',
     audit: 'denied',
   });
   const [savingPermessi, setSavingPermessi] = useState(false);

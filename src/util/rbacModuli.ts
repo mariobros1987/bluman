@@ -29,6 +29,8 @@ export type ModuloChiaveRbac =
   | 'retainers'
   | 'reports'
   | 'communications'
+  | 'documents'
+  | 'library'
   | 'audit';
 
 /**
@@ -65,6 +67,15 @@ const ROTTE_MODULO: ReadonlyArray<readonly [prefisso: string, modulo: ModuloChia
   ['/comunicazioni/invia-whatsapp', 'communications'],
   ['/comunicazioni/invia-signal', 'communications'],
   ['/comunicazioni/invia-telegram', 'communications'],
+  // Vault documentale e Document Studio (§01): la matrice vale anche via API, non solo nell'UI. Un
+  // collaboratore con documents=read consulta ma non carica/firma/elimina; denied blocca; write pieno.
+  // NB: il portale cliente (/portal/documenti) NON è qui (ruolo cliente, gestito a parte).
+  ['/documenti-template', 'documents'],
+  ['/documenti', 'documents'],
+  // Libreria: catalogo articoli e moduli template (gestione). GET resta consentito con read; le
+  // reference-data condivise (giurisdizioni) restano fuori dalla mappa per non rompere il wizard.
+  ['/moduli-template', 'library'],
+  ['/articoli', 'library'],
   ['/reports', 'reports'],
   ['/audit-logs', 'audit'],
 ];
