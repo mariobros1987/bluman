@@ -53,8 +53,8 @@ Una scheda per sezione (🚧 = da scrivere, ✅ = pronta). Le facciamo una alla 
 | 07 | Prima Nota & Riconciliazione | `07-prima-nota.md` | cassa/banca, riconciliazione CSV | ✅ |
 | 08 | LIPE / IVA & F24 | `08-lipe-iva.md` | liquidazione periodica, codici tributo | ✅ |
 | 09 | Contratti ricorrenti / Retainer | `09-retainer.md` | periodicità, generazione fatture | ✅ |
-| 10 | Documenti / Vault & Studio | `10-documenti.md` | vault, Document Studio, Smart Tags, versioni | 🚧 |
-| 11 | Firma elettronica | `11-firma.md` | SES/FEA/FEQ, OTP, sigillo HMAC, multi-firma, cronologia | 🚧 |
+| 10 | Documenti / Vault & Studio | `10-documenti.md` | vault, Document Studio, Smart Tags, versioni | ✅ |
+| 11 | Firma elettronica | `11-firma.md` | SES/FEA/FEQ, OTP, sigillo HMAC, multi-firma, cronologia | ✅ |
 | 12 | Portale Cliente | `12-portale.md` | 7 tab, firma, form, documenti, chat | 🚧 |
 | 13 | KYC / AML (Malta) | `13-kyc.md` | rischio, gate, monitoraggio, MLRO, STR/goAML | 🚧 |
 | 14 | Calendario & scadenze attività | `14-calendario.md` | vista mese/agenda, cron scadenze | 🚧 |
