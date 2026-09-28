@@ -346,6 +346,9 @@ export class PrismaApp implements AppPort {
                 // l'assegnazione sembra di nuovo sparita. Un salvataggio che non si rilegge è
                 // indistinguibile da un salvataggio fallito.
                 risorsa: { select: { id: true, nome: true, email: true, ruolo: true } },
+                // Condivisioni USCENTI: in quali altri moduli questa voce è condivisa (per il
+                // pannello «voci condivise» del modulo proprietario).
+                condivisioni: { select: { moduloProgettoId: true } },
               },
             },
             // Micro-voci condivise da altri moduli: contano per l'avanzamento di questo modulo.
