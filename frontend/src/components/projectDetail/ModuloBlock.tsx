@@ -5,11 +5,11 @@ import { ProgressBar } from '../ui/ProgressBar';
 import { Modal } from '../ui/Modal';
 import { AvatarGroup, Avatar } from '../ui/Avatar';
 import { fmt } from '../../utils';
-import { consuntivaMicrovoceApi } from '../../api/client';
+import { consuntivaMicrovoceApi, impostaCondivisioneMicrovoceApi } from '../../api/client';
 import type { ModuloProgetto, MicroVoce } from '../../types';
 import styles from '../../pages/ProjectDetail.module.css';
 
-export function ModuloBlock({ mod, open, onToggle, onOpenProc, rawDbModulo, onRefresh, onToggleMv, onOpenAssignMod, onOpenAssignMv, onOpenCalendarMv, onDeleteMod }: {
+export function ModuloBlock({ mod, open, onToggle, onOpenProc, rawDbModulo, onRefresh, onToggleMv, onOpenAssignMod, onOpenAssignMv, onOpenCalendarMv, onDeleteMod, moduliProgetto = [], progettoId }: {
   mod: ModuloProgetto; open: boolean;
   onToggle: () => void; onOpenProc: (vidx: number) => void;
   rawDbModulo?: any; onRefresh: () => void;
@@ -18,6 +18,9 @@ export function ModuloBlock({ mod, open, onToggle, onOpenProc, rawDbModulo, onRe
   onOpenAssignMv: (vidx: number) => void;
   onOpenCalendarMv: (vidx: number) => void;
   onDeleteMod?: () => void;
+  /** Tutti i moduli del progetto (id uuid + nome), per scegliere dove condividere una voce. */
+  moduliProgetto?: Array<{ id: string; nome: string }>;
+  progettoId?: string;
 }) {
   const color = mod.st === 'blocked' ? 'var(--red)'
     : mod.delay ? 'var(--amber)'
@@ -28,6 +31,39 @@ export function ModuloBlock({ mod, open, onToggle, onOpenProc, rawDbModulo, onRe
   const [oreCons, setOreCons] = useState(2);
   const [completa, setCompleta] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  // Pannello «Voci condivise» (Fase 2): gestisce in quali ALTRI moduli le voci di questo modulo
+  // sono condivise. Lo stato di selezione è per micro-voce → set di id modulo di destinazione.
+  const [condivisioneOpen, setCondivisioneOpen] = useState(false);
+  const [selCondivise, setSelCondivise] = useState<Record<string, Set<string>>>({});
+  const [salvandoCond, setSalvandoCond] = useState(false);
+  const [erroreCond, setErroreCond] = useState<string | null>(null);
+
+  const altriModuli = moduliProgetto.filter((m) => m.id !== rawDbModulo?.id);
+
+  const apriCondivisione = () => {
+    // Pre-carica la selezione corrente dalle condivisioni USCENTI di ciascuna voce.
+    const iniziale: Record<string, Set<string>> = {};
+    for (const mv of (rawDbModulo?.microvoci ?? [])) {
+      iniziale[mv.id] = new Set<string>((mv.condivisioni ?? []).map((c: any) => c.moduloProgettoId));
+    }
+    setSelCondivise(iniziale);
+    setErroreCond(null);
+    setCondivisioneOpen(true);
+  };
+
+  const salvaCondivisione = async (mvId: string) => {
+    if (!progettoId) return;
+    setSalvandoCond(true);
+    setErroreCond(null);
+    try {
+      await impostaCondivisioneMicrovoceApi(progettoId, mvId, [...(selCondivise[mvId] ?? [])]);
+      onRefresh();
+    } catch (err) {
+      setErroreCond(err instanceof Error ? err.message : 'Condivisione non riuscita.');
+    } finally {
+      setSalvandoCond(false);
+    }
+  };
 
   // Micro-voci reali del modulo. Nessun ripiego: era l'ultimo fabbricatore della pagina e il
   // più insidioso, perché agiva in fase di render — anche con i dati corretti a monte, un modulo
@@ -94,6 +130,15 @@ export function ModuloBlock({ mod, open, onToggle, onOpenProc, rawDbModulo, onRe
             >
               👥 +Assegna
             </button>
+            {altriModuli.length > 0 && (rawDbModulo?.microvoci?.length ?? 0) > 0 && (
+              <button
+                onClick={e => { e.stopPropagation(); apriCondivisione(); }}
+                title="Condividi una voce di questo modulo con altri moduli (si esegue una volta, conta per entrambi)"
+                style={{ background: 'var(--card2)', border: '1px solid var(--border)', color: 'var(--muted)', padding: '2px 6px', borderRadius: 6, fontSize: 10, cursor: 'pointer' }}
+              >
+                🔗 Voci condivise
+              </button>
+            )}
             {isDeletable && onDeleteMod && (
               <button
                 onClick={e => {
@@ -169,6 +214,11 @@ export function ModuloBlock({ mod, open, onToggle, onOpenProc, rawDbModulo, onRe
                           <span className={v.s === 'done' ? styles.vnDone : ''}>{v.n}</span>
                           <span className={styles.vnOpen}>dettaglio →</span>
                         </div>
+                        {(rawMv?.condivisioni?.length ?? 0) > 0 && (
+                          <div style={{ fontSize: 10, color: 'var(--indigo-l)', marginTop: 2 }} title="Questa voce è condivisa con altri moduli: si esegue una volta e conta per entrambi.">
+                            🔗 condivisa in {rawMv.condivisioni.length} {rawMv.condivisioni.length === 1 ? 'altro modulo' : 'altri moduli'}
+                          </div>
+                        )}
                         {v.vn && (
                           <div style={{ fontSize: 10, color: isBlock ? 'var(--red)' : 'var(--amber)', marginTop: 2 }}>{v.vn}</div>
                         )}
@@ -276,6 +326,55 @@ export function ModuloBlock({ mod, open, onToggle, onOpenProc, rawDbModulo, onRe
               <button type="submit" disabled={submitting} style={{ background: 'var(--indigo)', color: 'var(--on-accent)', border: 'none', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>{submitting ? 'Salvataggio...' : '✓ Salva Modifiche'}</button>
             </div>
           </form>
+          )}
+        </Modal>
+      )}
+
+      {/* Modal «Voci condivise» (Fase 2) */}
+      {condivisioneOpen && (
+        <Modal onClose={() => setCondivisioneOpen(false)} labelledBy="titolo-condivisione" zIndex={100}>
+          {(richiediChiusura) => (
+            <div style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, padding: 20, width: '100%', maxWidth: 560, display: 'flex', flexDirection: 'column', gap: 12, maxHeight: '80vh', overflowY: 'auto' }}>
+              <div id="titolo-condivisione" style={{ fontSize: 14, fontWeight: 600 }}>Voci condivise — {mod.n}</div>
+              <div style={{ fontSize: 11.5, color: 'var(--muted)' }}>
+                Spunta i moduli in cui una voce di questo modulo deve valere <strong>anche</strong>: si esegue una volta e conta per entrambi. Una voce non può comparire due volte con lo stesso nome nello stesso modulo.
+              </div>
+              {erroreCond && <div style={{ padding: 10, borderRadius: 8, background: 'var(--pill-red-bg)', color: 'var(--pill-red-fg)', fontSize: 12 }}>{erroreCond}</div>}
+              {(rawDbModulo?.microvoci ?? []).map((mv: any) => (
+                <div key={mv.id} style={{ border: '1px solid var(--border)', borderRadius: 10, padding: 10 }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 600, marginBottom: 6 }}>{mv.nome}</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                    {altriModuli.map((am) => {
+                      const sel = selCondivise[mv.id] ?? new Set<string>();
+                      return (
+                        <label key={am.id} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, color: 'var(--text)', cursor: 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            checked={sel.has(am.id)}
+                            onChange={(e) => setSelCondivise((prev) => {
+                              const next = { ...prev };
+                              const s = new Set(next[mv.id] ?? []);
+                              if (e.target.checked) s.add(am.id); else s.delete(am.id);
+                              next[mv.id] = s;
+                              return next;
+                            })}
+                          />
+                          {am.nome}
+                        </label>
+                      );
+                    })}
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+                    <button type="button" disabled={salvandoCond} onClick={() => salvaCondivisione(mv.id)} style={{ background: 'var(--indigo)', color: 'var(--on-accent)', border: 'none', padding: '5px 12px', borderRadius: 8, fontSize: 11.5, fontWeight: 500, cursor: 'pointer' }}>
+                      {salvandoCond ? 'Salvataggio…' : 'Salva'}
+                    </button>
+                  </div>
+                </div>
+              ))}
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <button type="button" onClick={richiediChiusura} style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '7px 14px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}>Chiudi</button>
+              </div>
+            </div>
           )}
         </Modal>
       )}

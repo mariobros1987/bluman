@@ -64,6 +64,8 @@ export function ModuliTab({
             onToggle={() => onToggle(mod.id)}
             onOpenProc={(vidx) => onOpenProc(mod.id, vidx)}
             rawDbModulo={rawDbProject?.moduli?.[mIdx]}
+            moduliProgetto={(rawDbProject?.moduli ?? []).map((m: any) => ({ id: m.id, nome: m.nome }))}
+            progettoId={rawDbProject?.id}
             onRefresh={onRefresh}
             onToggleMv={(vidx) => onToggleMv(mod.id, vidx)}
             onOpenAssignMod={() => onOpenAssignMod(mod)}
