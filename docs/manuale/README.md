@@ -49,8 +49,8 @@ Una scheda per sezione (🚧 = da scrivere, ✅ = pronta). Le facciamo una alla 
 | 03 | Libreria & Catalogo | `03-libreria.md` | articoli, moduli template, distinta base, giurisdizioni | ✅ |
 | 04 | Preventivi & istanziazione | `04-preventivi.md` | dal preventivo ai moduli del progetto (§15.3) | ✅ |
 | 05 | Fatture / Note di Credito & SDI | `05-fatture-sdi.md` | numerazione, IVA, XML SDI, NC parziali/storno | ✅ |
-| 06 | Scadenzario incassi & Solleciti | `06-scadenzario-solleciti.md` | rate, incassi, mora D.Lgs. 231, escalation | 🚧 |
-| 07 | Prima Nota & Riconciliazione | `07-prima-nota.md` | cassa/banca, riconciliazione CSV | 🚧 |
+| 06 | Scadenzario incassi & Solleciti | `06-scadenzario-solleciti.md` | rate, incassi, mora D.Lgs. 231, escalation | ✅ |
+| 07 | Prima Nota & Riconciliazione | `07-prima-nota.md` | cassa/banca, riconciliazione CSV | ✅ |
 | 08 | LIPE / IVA & F24 | `08-lipe-iva.md` | liquidazione periodica, codici tributo | 🚧 |
 | 09 | Contratti ricorrenti / Retainer | `09-retainer.md` | periodicità, generazione fatture | 🚧 |
 | 10 | Documenti / Vault & Studio | `10-documenti.md` | vault, Document Studio, Smart Tags, versioni | 🚧 |
