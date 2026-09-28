@@ -400,6 +400,8 @@ export function Library() {
           giurList={giurList}
           moduliList={moduliList}
           onAddGiur={(g) => setGiurList(prev => [...prev, g])}
+          onUpdateGiur={(g) => setGiurList(prev => prev.map(x => x.id === g.id ? g : x))}
+          onDeleteGiur={(id) => setGiurList(prev => prev.filter(x => x.id !== id))}
           onOpenInGraph={(giurId) => {
             setSelectedGiurId(giurId);
             setSubTab('grafo');

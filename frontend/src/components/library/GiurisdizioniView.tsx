@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { CatBadge } from '../ui/CatBadge';
-import { creaGiurisdizioneApi } from '../../api/client';
+import { creaGiurisdizioneApi, aggiornaGiurisdizioneApi, eliminaGiurisdizioneApi } from '../../api/client';
 import type { Giurisdizione, ModuloTemplate } from '../../types';
 import { useToast } from '../ui/ToastProvider';
+import { confirm } from '../ui/ConfirmProvider';
 import { Modal } from '../ui/Modal';
 
 // ─── Componente Giurisdizioni Studio ──────────────────────────────
@@ -10,23 +11,55 @@ export function GiurisdizioniView({
   giurList,
   moduliList,
   onAddGiur,
+  onUpdateGiur,
+  onDeleteGiur,
   onOpenInGraph,
   onLinkModulo,
 }: {
   giurList: Giurisdizione[];
   moduliList: ModuloTemplate[];
   onAddGiur: (g: Giurisdizione) => void;
+  onUpdateGiur?: (g: Giurisdizione) => void;
+  onDeleteGiur?: (id: string) => void;
   onOpenInGraph: (giurId: string) => void;
   onLinkModulo?: (modId: string, giurId: string | null) => void;
 }) {
   const toast = useToast();
   const [modalGiurOpen, setModalGiurOpen] = useState(false);
+  const [giurInModifica, setGiurInModifica] = useState<Giurisdizione | null>(null);
   const [selectedGiur, setSelectedGiur] = useState<Giurisdizione | null>(null);
   const [newGiurNome, setNewGiurNome] = useState('');
   const [newGiurCodice, setNewGiurCodice] = useState('');
   const [newGiurTipo, setNewGiurTipo] = useState<'ue' | 'extra_ue' | 'stato_usa' | 'altro'>('ue');
   const [newGiurNote, setNewGiurNote] = useState('');
   const [selectedModToAssign, setSelectedModToAssign] = useState<string>('');
+
+  const apriModifica = (g: Giurisdizione) => {
+    setGiurInModifica(g);
+    setNewGiurNome(g.nome);
+    setNewGiurCodice(g.codice);
+    setNewGiurTipo((g.tipo as any) ?? 'ue');
+    setNewGiurNote((g as any).note ?? '');
+    setModalGiurOpen(true);
+  };
+
+  const eliminaGiur = async (g: Giurisdizione) => {
+    const ok = await confirm({
+      titolo: 'Eliminare la giurisdizione?',
+      messaggio: `«${g.nome} (${g.codice})» verrà eliminata. Non è possibile se è ancora usata da moduli o progetti.`,
+      confermaLabel: 'Elimina',
+      pericolo: true,
+    });
+    if (!ok) return;
+    try {
+      await eliminaGiurisdizioneApi(g.id);
+      onDeleteGiur?.(g.id);
+      if (selectedGiur?.id === g.id) setSelectedGiur(null);
+      toast.successo(`Giurisdizione «${g.nome}» eliminata.`);
+    } catch (err: any) {
+      toast.errore(err?.message || 'Eliminazione non riuscita.');
+    }
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -43,7 +76,7 @@ export function GiurisdizioniView({
         </div>
 
         <button
-          onClick={() => setModalGiurOpen(true)}
+          onClick={() => { setGiurInModifica(null); setNewGiurNome(''); setNewGiurCodice(''); setNewGiurTipo('ue'); setNewGiurNote(''); setModalGiurOpen(true); }}
           style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '8px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
         >
           + Nuova Giurisdizione
@@ -110,6 +143,23 @@ export function GiurisdizioniView({
                 <span style={{ fontSize: 11, color: 'var(--indigo-l)', fontWeight: 600 }}>
                   Gestisci & Associa ➔
                 </span>
+              </div>
+
+              <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); apriModifica(g); }}
+                  style={{ flex: 1, background: 'var(--card2)', border: '1px solid var(--border)', color: 'var(--text)', padding: '5px 8px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+                >
+                  ✏️ Modifica
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); eliminaGiur(g); }}
+                  style={{ flex: 1, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)', color: 'var(--red)', padding: '5px 8px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+                >
+                  🗑 Elimina
+                </button>
               </div>
             </div>
           );
@@ -233,36 +283,47 @@ export function GiurisdizioniView({
         </Modal>
       )}
 
-      {/* Modal Nuova Giurisdizione */}
+      {/* Modal Nuova / Modifica Giurisdizione */}
       {modalGiurOpen && (
-        <Modal onClose={() => setModalGiurOpen(false)} labelledBy="titolo-nuova-giur" zIndex={100} overlayBackground="rgba(0,0,0,.7)">
+        <Modal onClose={() => { setModalGiurOpen(false); setGiurInModifica(null); }} labelledBy="titolo-nuova-giur" zIndex={100} overlayBackground="rgba(0,0,0,.7)">
           {(richiediChiusura) => (
           <div style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, width: '100%', maxWidth: 440, padding: 20 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <div id="titolo-nuova-giur" style={{ fontSize: 14, fontWeight: 700 }}>+ Nuova Giurisdizione Studio</div>
+              <div id="titolo-nuova-giur" style={{ fontSize: 14, fontWeight: 700 }}>{giurInModifica ? `✏️ Modifica Giurisdizione` : '+ Nuova Giurisdizione Studio'}</div>
               <button onClick={richiediChiusura} aria-label="Chiudi" style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: 16 }}>✕</button>
             </div>
             <form
               onSubmit={async (e) => {
                 e.preventDefault();
                 if (!newGiurNome || !newGiurCodice) return;
-                // §3.3 — creaGiurisdizioneApi ora lancia se il server rifiuta o non risponde:
-                // la giurisdizione si aggiunge alla lista SOLO con l'oggetto restituito dal DB,
-                // mai con un id inventato dal client (succedeva: 'giur-<timestamp>').
+                // §3.3 — le API lanciano se il server rifiuta: la lista si aggiorna SOLO con
+                // l'oggetto restituito dal DB, mai con un id inventato dal client.
                 try {
-                  const res = await creaGiurisdizioneApi({
-                    nome: newGiurNome,
-                    codice: newGiurCodice.toUpperCase(),
-                    tipo: newGiurTipo,
-                    note: newGiurNote,
-                  });
-                  onAddGiur(res);
+                  if (giurInModifica) {
+                    const res = await aggiornaGiurisdizioneApi(giurInModifica.id, {
+                      nome: newGiurNome,
+                      codice: newGiurCodice.toUpperCase(),
+                      tipo: newGiurTipo,
+                      note: newGiurNote,
+                    });
+                    onUpdateGiur?.(res);
+                    toast.successo(`Giurisdizione «${res.nome}» aggiornata.`);
+                  } else {
+                    const res = await creaGiurisdizioneApi({
+                      nome: newGiurNome,
+                      codice: newGiurCodice.toUpperCase(),
+                      tipo: newGiurTipo,
+                      note: newGiurNote,
+                    });
+                    onAddGiur(res);
+                  }
                   setModalGiurOpen(false);
+                  setGiurInModifica(null);
                   setNewGiurNome('');
                   setNewGiurCodice('');
                   setNewGiurNote('');
                 } catch (err: any) {
-                  toast.errore(`Creazione giurisdizione non riuscita: ${err?.message || 'errore di rete'}. Riprova.`);
+                  toast.errore(`${giurInModifica ? 'Modifica' : 'Creazione'} giurisdizione non riuscita: ${err?.message || 'errore di rete'}. Riprova.`);
                 }
               }}
               style={{ display: 'flex', flexDirection: 'column', gap: 12 }}

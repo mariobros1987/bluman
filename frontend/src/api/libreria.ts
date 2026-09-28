@@ -52,6 +52,28 @@ export async function creaGiurisdizioneApi(input: { nome: string; codice: string
   return await res.json();
 }
 
+export async function aggiornaGiurisdizioneApi(id: string, input: { nome?: string; codice?: string; tipo?: 'ue' | 'extra_ue' | 'stato_usa' | 'altro'; note?: string }) {
+  const res = await apiFetch(`${API_BASE}/giurisdizioni/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore aggiornamento giurisdizione'));
+  invalidateCache('giurisdizioni');
+  return await res.json();
+}
+
+/** Elimina una giurisdizione. Il server risponde 409 se è ancora usata da moduli o progetti. */
+export async function eliminaGiurisdizioneApi(id: string) {
+  const res = await apiFetch(`${API_BASE}/giurisdizioni/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore eliminazione giurisdizione'));
+  invalidateCache('giurisdizioni');
+  return await res.json();
+}
+
 export async function fetchArticoli(options?: { forceRefresh?: boolean }) {
   const currentTenantId = getCurrentTenantId();
   return cachedQuery(
