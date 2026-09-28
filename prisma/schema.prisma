@@ -537,6 +537,7 @@ model ModuloProgetto {
   // salvo eccezione esplicita e tracciata (§16.6)
 
   microvoci        MicrovoceProgetto[]
+  microvociCondivise MicrovoceModuloCondiviso[] @relation("ModuloCondiviso")
   dipendenze       ModuloProgettoDipendenza[] @relation("ModuloProgettoDipendente")
   dipendenzeDi     ModuloProgettoDipendenza[] @relation("ModuloProgettoDaCuiDipende")
   fattureRiga      FatturaRiga[]
@@ -583,10 +584,30 @@ model MicrovoceProgetto {
   documenti        Documento[]
   accessiRisorsa   AccessoRisorsa[]    @relation("AccessoMicrovoce")
   eventiCalendario EventoCalendario[]  @relation("EventiMicrovoce")
+  condivisioni     MicrovoceModuloCondiviso[] @relation("MicrovoceCondivisa")
 
   // FK verso il modulo padre: risolve la include annidata della lista progetti.
   @@index([moduloProgettoId])
   @@map("microvoce_progetto")
+}
+
+// Condivisione di una micro-voce con moduli ADDIZIONALI (oltre al suo `moduloProgettoId`
+// proprietario). Serve la regola «se la stessa micro-voce vale per due moduli, si esegue una
+// volta e conta per entrambi»: la voce resta una sola riga (esecuzione, passaggi, documenti sul
+// proprietario), e questa join la fa comparire — e contare — anche nei moduli elencati qui.
+// Le ore, a livello di progetto, si contano una volta sola (dedup per micro-voce nel calcolo).
+model MicrovoceModuloCondiviso {
+  id                  String            @id @default(uuid())
+  tenantId            String            @map("tenant_id")
+  microvoceProgettoId String            @map("microvoce_progetto_id")
+  microvoceProgetto   MicrovoceProgetto @relation("MicrovoceCondivisa", fields: [microvoceProgettoId], references: [id], onDelete: Cascade)
+  moduloProgettoId    String            @map("modulo_progetto_id")
+  moduloProgetto      ModuloProgetto    @relation("ModuloCondiviso", fields: [moduloProgettoId], references: [id], onDelete: Cascade)
+  createdAt           DateTime          @default(now()) @map("created_at")
+
+  @@unique([microvoceProgettoId, moduloProgettoId])
+  @@index([tenantId, moduloProgettoId])
+  @@map("microvoce_modulo_condiviso")
 }
 
 model PassaggioProgetto {
