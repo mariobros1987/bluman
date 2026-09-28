@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useToast } from './ui/ToastProvider';
 import { confirm } from './ui/ConfirmProvider';
 import type { DocumentTemplate } from '../utils/documentTemplates';
+import { nomeFileLeggibile } from '../utils';
 import {
   salvaDocumentoApi,
   generaDocumentoApi,
@@ -298,7 +299,7 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
         if (docsMv.length > 0) {
           const mapped: DocumentoEntry[] = docsMv.map(d => ({
             id: d.id,
-            nome: d.fileUrl ? (d.fileUrl.split('/').pop()?.replace(/^\d+_/, '') || `Documento v${d.versione}`) : `Documento v${d.versione}`,
+            nome: d.fileUrl ? nomeFileLeggibile(null, d.fileUrl) : `Documento v${d.versione}`,
             dimensione: 'Fascicolo DB',
             richiedeFirma: d.tipo !== 'firmato' && d.tipo !== 'verbale_firma' && !d.firmato,
             firmato: d.firmato || d.statoDoc === 'firmato',

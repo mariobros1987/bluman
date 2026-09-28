@@ -78,6 +78,22 @@ export function resolveRighe(m: ModuloTemplate, articlesPool?: Articolo[]): Reso
   });
 }
 
+/**
+ * Nome file leggibile per l'utente: dal nome grezzo o dall'URL toglie query (`?token=…`),
+ * percorso, prefisso tenant-UUID (`00000000-…-000000000001_`) e prefisso timestamp (`1790…_`),
+ * e accorcia un eventuale UUID nudo. Un nome normale («memorandum-struttura.pdf») resta intatto.
+ * A video prima usciva l'intera stringa con tenant, timestamp e token — illeggibile.
+ */
+export function nomeFileLeggibile(nomeOrUrl?: string | null, fileUrl?: string | null): string {
+  const grezzo = (nomeOrUrl && nomeOrUrl.trim()) || fileUrl || '';
+  let base = grezzo.split('?')[0].split('/').pop() || '';
+  try { base = decodeURIComponent(base); } catch { /* lascia base com'è */ }
+  base = base.replace(/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}_/, ''); // tenant UUID
+  base = base.replace(/^\d{6,}_/, ''); // timestamp dell'upload
+  base = base.replace(/^([0-9a-f]{8})[0-9a-f-]{20,}(\.[a-z0-9]+)?$/i, 'Documento $1$2'); // UUID nudo
+  return base.trim() || 'Documento';
+}
+
 export function moduloH(m: ModuloTemplate, articlesPool?: Articolo[]): number {
   return resolveRighe(m, articlesPool).reduce((a, r) => a + r.h, 0);
 }

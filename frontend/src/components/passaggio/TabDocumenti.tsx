@@ -6,6 +6,7 @@ import {
   scaricaDocumentoWordClient,
 } from '../../api/client';
 import { isAdminStudio } from '../../utils/tenant';
+import { nomeFileLeggibile } from '../../utils';
 import type { DocumentTemplate } from '../../utils/documentTemplates';
 import type { DocumentoEntry } from './types';
 import type { RecommendationResult } from './catalogoModelliStudio';
@@ -156,7 +157,7 @@ export function TabDocumenti({
                             <div style={{ fontSize: 24 }}>📄</div>
                             <div>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--indigo-l)', textDecoration: 'underline' }}>{d.nome}</span>
+                                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--indigo-l)', textDecoration: 'underline' }}>{nomeFileLeggibile(d.nome, d.fileUrl)}</span>
                                 {d.versione && (
                                   <span style={{ fontSize: 9.5, fontWeight: 700, padding: '1px 6px', borderRadius: 6, background: 'var(--card2)', border: '1px solid var(--border)', color: 'var(--text)' }}>
                                     v{d.versione}

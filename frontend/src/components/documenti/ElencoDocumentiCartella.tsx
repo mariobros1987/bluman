@@ -12,14 +12,14 @@
 
 import { useEffect, useState } from 'react';
 import { listaDocumentiProgetto, scaricaDocumentoClient, urlFileArchivio, type DocumentoProgetto } from '../../api/client';
+import { nomeFileLeggibile } from '../../utils';
 import { ModaleCollegaDocumento, type ProgettoScelta } from './ModaleCollegaDocumento';
 import { ModaleCaricaNellArchivio } from './ModaleCaricaNellArchivio';
 
-/** Il nome leggibile del file: senza il prefisso `${Date.now()}_` dell'archivio e senza query. */
+/** Il nome leggibile del file: senza prefisso tenant/timestamp, senza query (helper condiviso). */
 export function nomeFileDocumento(d: DocumentoProgetto): string {
-  const grezzo = (d.fileUrl || '').split('?')[0].split('/').pop() || '';
-  const nome = decodeURIComponent(grezzo).replace(/^\d{13}_/, '');
-  return nome || `Documento v${d.versione}`;
+  const nome = nomeFileLeggibile(null, d.fileUrl);
+  return nome && nome !== 'Documento' ? nome : `Documento v${d.versione}`;
 }
 
 const ETICHETTA_TIPO: Record<string, string> = {
