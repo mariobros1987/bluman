@@ -242,7 +242,7 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
     const include = {
       cliente: true,
       giurisdizionePrimaria: true,
-      moduli: { include: { microvoci: true } },
+      moduli: { include: { microvoci: true, microvociCondivise: { include: { microvoceProgetto: true } } } },
     };
     if (!paginazione.paginata) {
       const projs = await prisma.progetto.findMany({ where, include, orderBy: { createdAt: 'desc' } });
@@ -451,6 +451,66 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
       });
 
       return reply.send({ ok: true, id, archiviato });
+    },
+  );
+
+  /**
+   * POST /progetti/:id/microvoci/:mvId/condivisione — condivide una micro-voce con altri moduli.
+   * Il body `moduliCondivisi` è l'elenco COMPLETO dei moduli addizionali (sostituisce l'insieme).
+   * 409 se un modulo di destinazione ha già una voce con lo stesso NOME (regola: una per nome).
+   */
+  server.post<{ Params: { id: string; mvId: string }; Body: { moduliCondivisi?: unknown } }>(
+    '/progetti/:id/microvoci/:mvId/condivisione',
+    async (req, reply) => {
+      const { id, mvId } = req.params;
+      const tenantId = req.tenantId;
+      const ruolo = req.ruolo as string | undefined;
+      if (!['super_admin', 'advisor', 'collaboratore_interno', 'operator'].includes(ruolo ?? '')) {
+        return reply.code(403).send({ errore: 'Non autorizzato a modificare i moduli del progetto.' });
+      }
+      const richiesti = Array.isArray(req.body?.moduliCondivisi) ? (req.body!.moduliCondivisi as unknown[]).map(String) : null;
+      if (!richiesti) return reply.code(400).send({ errore: 'moduliCondivisi deve essere un array di id modulo.' });
+
+      const microvoce = await prisma.microvoceProgetto.findFirst({
+        where: { id: mvId, tenantId, moduloProgetto: { progettoId: id } },
+        select: { id: true, nome: true, moduloProgettoId: true },
+      });
+      if (!microvoce) return reply.code(404).send({ errore: 'Micro-voce non trovata in questo progetto.' });
+
+      const moduli = await prisma.moduloProgetto.findMany({
+        where: { progettoId: id, tenantId },
+        select: {
+          id: true,
+          microvoci: { select: { nome: true } },
+          microvociCondivise: { select: { microvoceProgetto: { select: { id: true, nome: true } } } },
+        },
+      });
+      const moduliValidi = new Set(moduli.map((m) => m.id));
+      const nomeMv = microvoce.nome.trim().toLowerCase();
+      const destinazioni = [...new Set(richiesti)].filter((m) => m !== microvoce.moduloProgettoId);
+
+      for (const moduloId of destinazioni) {
+        if (!moduliValidi.has(moduloId)) return reply.code(400).send({ errore: `Modulo ${moduloId} non è di questo progetto.` });
+        const modulo = moduli.find((m) => m.id === moduloId)!;
+        const collisione = modulo.microvoci.some((v) => v.nome.trim().toLowerCase() === nomeMv)
+          || modulo.microvociCondivise.some((c) => c.microvoceProgetto.id !== mvId && c.microvoceProgetto.nome.trim().toLowerCase() === nomeMv);
+        if (collisione) return reply.code(409).send({ errore: `Il modulo di destinazione ha già una micro-voce «${microvoce.nome}».` });
+      }
+
+      await prisma.microvoceModuloCondiviso.deleteMany({ where: { microvoceProgettoId: mvId } });
+      if (destinazioni.length > 0) {
+        await prisma.microvoceModuloCondiviso.createMany({
+          data: destinazioni.map((moduloId) => ({ tenantId, microvoceProgettoId: mvId, moduloProgettoId: moduloId })),
+          skipDuplicates: true,
+        });
+      }
+
+      await recordAudit({
+        tenantId, userId: req.user?.userId, userEmail: req.user?.email, ruolo,
+        azione: 'MICROVOCE_CONDIVISIONE_AGGIORNATA', entita: 'MicrovoceProgetto',
+        dettagli: `Micro-voce ${mvId} condivisa con moduli [${destinazioni.join(', ')}]`, ipAddress: req.ip,
+      });
+      return reply.send({ ok: true, microvoceId: mvId, moduliCondivisi: destinazioni });
     },
   );
 

@@ -348,6 +348,8 @@ export class PrismaApp implements AppPort {
                 risorsa: { select: { id: true, nome: true, email: true, ruolo: true } },
               },
             },
+            // Micro-voci condivise da altri moduli: contano per l'avanzamento di questo modulo.
+            microvociCondivise: { include: { microvoceProgetto: { include: { passaggi: true } } } },
           },
         },
         fatture: {

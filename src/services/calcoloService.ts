@@ -50,6 +50,9 @@ export interface ModuloCalcolo {
   stato: string;
   orePreventivate: number;
   microvoci?: MicrovoceCalcolo[] | null;
+  // Micro-voci condivise da altri moduli (join MicrovoceModuloCondiviso): contano per questo
+  // modulo ma NON gli appartengono (l'esecuzione e la persistenza restano sul proprietario).
+  microvociCondivise?: { microvoceProgetto: MicrovoceCalcolo }[] | null;
 }
 
 export interface ProgettoCalcolo {
@@ -99,10 +102,19 @@ function percentualeVisibile(percentuale: number, completo: boolean): number {
 export function calcolaAvanzamento(progetto: ProgettoCalcolo): AvanzamentoProgetto {
   const moduli = progetto.moduli ?? [];
 
+  // Ore extra a livello PROGETTO: contate una volta per micro-voce, anche se condivisa fra più
+  // moduli (regola «si esegue una volta»). Il segnale di rischio è un OR, quindi idempotente.
+  const oreExtraPerMicrovoce = new Map<string, number>();
+
   const grezzi = moduli.map((m) => {
-    // Le micro-voci si passano così come sono: contengono già `stato`, `orePreventivate` e
-    // `oreConsuntivate`, cioè tutto ciò che le funzioni pure leggono.
-    const microvoci = (m.microvoci ?? []) as any[];
+    // Micro-voci EFFETTIVE del modulo = proprie + quelle condivise da altri moduli. Le funzioni
+    // pure ricevono l'unione, così una voce condivisa conta anche qui. `microvoci` passa così com'è:
+    // contiene già `stato`, `orePreventivate` e `oreConsuntivate`.
+    const proprie = (m.microvoci ?? []) as any[];
+    const condivise = ((m as any).microvociCondivise ?? [])
+      .map((c: any) => c?.microvoceProgetto)
+      .filter(Boolean) as any[];
+    const microvoci = [...proprie, ...condivise];
 
     // Modulo senza micro-voci a database: non c'è nulla da aggregare, quindi si riporta lo
     // stato che la riga già dichiara. `calcolaStatoModulo([])` risponde 'pending', che è la
@@ -127,15 +139,19 @@ export function calcolaAvanzamento(progetto: ProgettoCalcolo): AvanzamentoProget
 
     // Il segnale del modulo è l'OR dei segnali delle sue micro-voci: basta una voce che
     // sfora perché il modulo vada guardato. Le ore extra invece si sommano — è il costo.
-    const segnali = microvoci.map((mv) => valutaSegnaleRischio(mv as any));
+    const segnali = microvoci.map((mv) => ({ mv, s: valutaSegnaleRischio(mv as any) }));
+    // Registra le ore extra per id: a livello progetto una voce condivisa non pesa due volte.
+    for (const { mv, s } of segnali) {
+      if (mv?.id != null) oreExtraPerMicrovoce.set(String(mv.id), s.oreExtra);
+    }
 
     return {
       id: m.id,
       stato,
       percentuale,
       orePreventivate: m.orePreventivate,
-      segnaleRischio: segnali.some((s) => s.segnaleRischio),
-      oreExtra: segnali.reduce((a, s) => a + s.oreExtra, 0),
+      segnaleRischio: segnali.some(({ s }) => s.segnaleRischio),
+      oreExtra: segnali.reduce((a, { s }) => a + s.oreExtra, 0),
       senzaMicrovoci: false,
     };
   });
@@ -152,7 +168,8 @@ export function calcolaAvanzamento(progetto: ProgettoCalcolo): AvanzamentoProget
     percentuale: percentualeVisibile(percentualeProgetto, stato === 'completed'),
     stato,
     segnaleRischio: grezzi.some((m) => m.segnaleRischio),
-    oreExtra: grezzi.reduce((a, m) => a + m.oreExtra, 0),
+    // Somma delle ore extra per micro-voce unica: la condivisa conta una sola volta (§ regola).
+    oreExtra: [...oreExtraPerMicrovoce.values()].reduce((a, v) => a + v, 0),
     moduli: grezzi.map((m) => ({
       id: m.id,
       stato: m.stato,
@@ -180,7 +197,17 @@ export function arricchisciProgetti<T extends ProgettoCalcolo>(
 export async function ricalcolaProgetto(progettoId: string): Promise<AvanzamentoProgetto> {
   const progetto = await prisma.progetto.findUnique({
     where: { id: progettoId },
-    include: { moduli: { include: { microvoci: true, dipendenze: true } } },
+    include: {
+      moduli: {
+        include: {
+          microvoci: true,
+          dipendenze: true,
+          // Le voci condivise da altri moduli contano per lo stato di QUESTO modulo (non per la
+          // persistenza per-micro-voce, che resta sul proprietario).
+          microvociCondivise: { include: { microvoceProgetto: true } },
+        },
+      },
+    },
   });
 
   if (!progetto) throw new ProgettoNonTrovatoError(`Progetto non trovato: ${progettoId}`);
@@ -192,6 +219,9 @@ export async function ricalcolaProgetto(progettoId: string): Promise<Avanzamento
   const moduliAppenaCompletati: string[] = [];
 
   for (const modulo of progetto.moduli) {
+    // Le micro-voci proprie del modulo persistono qui il loro segnaleRischio/oreExtra. Le voci
+    // CONDIVISE da altri moduli NON si toccano qui: le aggiorna il loro modulo proprietario, così
+    // non si scrive due volte la stessa riga.
     for (const microvoce of modulo.microvoci) {
       const { segnaleRischio, oreExtra } = valutaSegnaleRischio(microvoce as any);
       if (microvoce.segnaleRischio !== segnaleRischio || microvoce.oreExtra !== oreExtra) {
@@ -204,13 +234,18 @@ export async function ricalcolaProgetto(progettoId: string): Promise<Avanzamento
       }
     }
 
-    // Un modulo senza micro-voci non ha nulla da cui derivare uno stato: la sua riga è
-    // l'unica fonte di informazione e non va sovrascritta. `calcolaStatoModulo([])` dice
-    // 'pending' e un ricalcolo cieco declasserebbe a "da iniziare" un modulo che qualcuno
-    // ha chiuso a mano — cancellando un dato che nessuna query può ricostruire.
-    if (modulo.microvoci.length === 0) continue;
+    // Stato del modulo: sulle micro-voci EFFETTIVE (proprie + condivise da altri moduli).
+    const microvociEffettive = [
+      ...modulo.microvoci,
+      ...(((modulo as any).microvociCondivise ?? []).map((c: any) => c?.microvoceProgetto).filter(Boolean)),
+    ];
 
-    const statoModulo = calcolaStatoModulo(modulo.microvoci as any);
+    // Un modulo senza micro-voci (né proprie né condivise) non ha nulla da cui derivare uno
+    // stato: la sua riga è l'unica fonte e non va sovrascritta. `calcolaStatoModulo([])` dice
+    // 'pending' e un ricalcolo cieco declasserebbe a "da iniziare" un modulo chiuso a mano.
+    if (microvociEffettive.length === 0) continue;
+
+    const statoModulo = calcolaStatoModulo(microvociEffettive as any);
     if (modulo.stato !== statoModulo) {
       await prisma.moduloProgetto.update({ where: { id: modulo.id }, data: { stato: statoModulo } });
       // Blocco 3 — il ricalcolo (pulsante «Ricalcola») può chiudere un modulo tanto

@@ -177,6 +177,39 @@ describe('calcolaAvanzamento — segnali di rischio (§16.5)', () => {
   });
 });
 
+describe('calcolaAvanzamento — micro-voce condivisa fra moduli (Fase 2)', () => {
+  it('conta in entrambi i moduli, ma le ore extra a livello progetto una volta sola', () => {
+    const condivisa = mv('active', 10, 15, 'mv-cond'); // 5 ore extra
+    const av = calcolaAvanzamento({
+      stato: 'in_progress',
+      moduli: [
+        { id: 'm1', stato: 'in_progress', orePreventivate: 10, microvoci: [condivisa] },
+        { id: 'm2', stato: 'in_progress', orePreventivate: 10, microvoci: [], microvociCondivise: [{ microvoceProgetto: condivisa }] },
+      ],
+    });
+    const m2 = av.moduli.find((m) => m.id === 'm2')!;
+    expect(m2.oreExtra).toBe(5); // il modulo condiviso vede le ore extra della voce
+    expect(m2.percentuale).toBeGreaterThan(0);
+    // A livello progetto le 5 ore extra si contano UNA volta, non due (regola «si esegue una volta»).
+    expect(av.oreExtra).toBe(5);
+    expect(av.segnaleRischio).toBe(true);
+  });
+
+  it('un modulo con SOLE voci condivise deriva lo stato da quelle, non resta «senza micro-voci»', () => {
+    const condivisa = mv('done', 10, 10, 'mv-x');
+    const av = calcolaAvanzamento({
+      stato: 'in_progress',
+      moduli: [
+        { id: 'm1', stato: 'done', orePreventivate: 10, microvoci: [condivisa] },
+        { id: 'm2', stato: 'pending', orePreventivate: 10, microvoci: [], microvociCondivise: [{ microvoceProgetto: condivisa }] },
+      ],
+    });
+    const m2 = av.moduli.find((m) => m.id === 'm2')!;
+    expect(m2.stato).toBe('done'); // dalla voce condivisa done, non 'pending' dalla riga
+    expect(m2.percentuale).toBe(100);
+  });
+});
+
 describe('arricchisciProgetti', () => {
   it('attacca l’avanzamento a ogni progetto conservando i campi originali', () => {
     const arricchiti = arricchisciProgetti([
