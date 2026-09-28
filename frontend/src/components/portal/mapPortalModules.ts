@@ -3,6 +3,21 @@ import type { CategoriaModulo } from '../../types';
 import type { ModuloDeliverable, ModuloPassaggio, ModuloProposta } from './types';
 
 /**
+ * Nome file leggibile per il cliente: toglie il prefisso timestamp dell'archivio
+ * (`1699999999999_...`) e accorcia un eventuale UUID nudo, che a video è illeggibile
+ * («tanti numeri e codici»). Un nome normale (es. «Contratto Malta.pdf») resta intatto.
+ */
+function nomeFileLeggibile(nome?: string | null, fileUrl?: string | null): string {
+  const base =
+    (nome && nome.trim()) ||
+    (fileUrl ? decodeURIComponent((fileUrl.split('?')[0].split('/').pop() || '')) : '');
+  let pulito = base.replace(/^\d{10,}_/, ''); // prefisso timestamp dell'upload
+  // UUID nudo (con o senza estensione) → etichetta breve leggibile
+  pulito = pulito.replace(/^([0-9a-f]{8})[0-9a-f-]{20,}(\.[a-z0-9]+)?$/i, 'Documento $1$2');
+  return pulito.trim() || 'Documento';
+}
+
+/**
  * Traduce i moduli REALI del progetto nella forma che il Portale Cliente mostra,
  * associando ad ogni modulo e ad ogni micro-voce i documenti pubblicati a DB.
  */
@@ -51,8 +66,8 @@ export function mapProjectToPortalModules(project: any, portalDocs: DocumentoPor
 
     const deliverables: ModuloDeliverable[] = docsDiQuestoModulo.map(d => ({
       id: d.id,
-      titolo: d.titolo || d.nome,
-      nomeFile: d.nome,
+      titolo: d.titolo || nomeFileLeggibile(d.nome, d.fileUrl),
+      nomeFile: nomeFileLeggibile(d.nome, d.fileUrl),
       data: d.caricatoIl ? new Date(d.caricatoIl).toLocaleDateString('it-IT') : new Date().toLocaleDateString('it-IT'),
       fileUrl: d.fileUrl,
       firmato: d.firmato,

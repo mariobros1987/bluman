@@ -570,7 +570,7 @@ export function Projects() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, marginBottom: 8 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <span style={{ fontSize: 10, fontWeight: 800, background: 'var(--pill-indigo-bg)', color: 'var(--pill-indigo-fg)', padding: '2px 6px', borderRadius: 4 }}>
-                        #{p.id}
+                        #{String(p.id).slice(0, 8).toUpperCase()}
                       </span>
                       <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
                         {p.ct === 'company' ? '🏢' : '👤'} {p.cl}
@@ -735,7 +735,7 @@ export function Projects() {
                       <td style={{ padding: '12px 14px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           <span style={{ fontSize: 9.5, fontWeight: 800, background: 'var(--pill-indigo-bg)', color: 'var(--pill-indigo-fg)', padding: '1px 5px', borderRadius: 4 }}>
-                            #{p.id}
+                            #{String(p.id).slice(0, 8).toUpperCase()}
                           </span>
                           <span
                             onClick={() => navigate(`/projects/${p.id}`)}
@@ -845,7 +845,7 @@ export function Projects() {
                     }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <span style={{ fontSize: 10, fontWeight: 800, color: 'var(--indigo-l)' }}>#{p.id}</span>
+                      <span style={{ fontSize: 10, fontWeight: 800, color: 'var(--indigo-l)' }}>#{String(p.id).slice(0, 8).toUpperCase()}</span>
                       <span style={{ fontSize: 10, color: 'var(--muted)' }}>{p.due || 'In corso'}</span>
                     </div>
 
