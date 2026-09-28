@@ -61,8 +61,8 @@ Una scheda per sezione (🚧 = da scrivere, ✅ = pronta). Le facciamo una alla 
 | 15 | Comunicazioni & Canali | `15-comunicazioni.md` | email/WhatsApp/Telegram/Signal, matrice invio | ✅ |
 | 16 | Impostazioni Studio | `16-impostazioni.md` | SMTP/IMAP, PDF, team, credenziali tenant | ✅ |
 | 17 | RBAC / Permessi & Ruoli | `17-rbac.md` | matrice permessi, gerarchia, default per ruolo | ✅ |
-| 18 | Filtri per data & Periodo | `18-filtri-periodo.md` | filtro da/a, selettore Esercizio globale | 🚧 |
-| 19 | Infrastruttura & Deploy | `19-infra-deploy.md` | Railway/Vercel, migrazioni, RLS, backup | 🚧 |
+| 18 | Filtri per data & Periodo | `18-filtri-periodo.md` | filtro da/a, selettore Esercizio globale | ✅ |
+| 19 | Infrastruttura & Deploy | `19-infra-deploy.md` | Railway/Vercel, migrazioni, RLS, backup | ✅ |
 
 ## Template di ogni scheda
 Ogni file `NN-*.md` segue questa struttura (così sono tutte uguali e complete):
