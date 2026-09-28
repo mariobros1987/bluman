@@ -57,8 +57,8 @@ Una scheda per sezione (🚧 = da scrivere, ✅ = pronta). Le facciamo una alla 
 | 11 | Firma elettronica | `11-firma.md` | SES/FEA/FEQ, OTP, sigillo HMAC, multi-firma, cronologia | ✅ |
 | 12 | Portale Cliente | `12-portale.md` | 7 tab, firma, form, documenti, chat | ✅ |
 | 13 | KYC / AML (Malta) | `13-kyc.md` | rischio, gate, monitoraggio, MLRO, STR/goAML | ✅ |
-| 14 | Calendario & scadenze attività | `14-calendario.md` | vista mese/agenda, cron scadenze | 🚧 |
-| 15 | Comunicazioni & Canali | `15-comunicazioni.md` | email/WhatsApp/Telegram/Signal, matrice invio | 🚧 |
+| 14 | Calendario & scadenze attività | `14-calendario.md` | vista mese/agenda, cron scadenze | ✅ |
+| 15 | Comunicazioni & Canali | `15-comunicazioni.md` | email/WhatsApp/Telegram/Signal, matrice invio | ✅ |
 | 16 | Impostazioni Studio | `16-impostazioni.md` | SMTP/IMAP, PDF, team, credenziali tenant | 🚧 |
 | 17 | RBAC / Permessi & Ruoli | `17-rbac.md` | matrice permessi, gerarchia, default per ruolo | 🚧 |
 | 18 | Filtri per data & Periodo | `18-filtri-periodo.md` | filtro da/a, selettore Esercizio globale | 🚧 |
