@@ -6,10 +6,10 @@ import type { Articolo, CategoriaModulo, Giurisdizione, ModuloTemplate } from '.
 import { useToast } from '../ui/ToastProvider';
 
 // ─── Componente Costruttore Modulo Template ───────────────────────
-export function CreaModuloForm({ articoliList, giurList, moduloInModifica, onCreated, onAnnullaModifica }: { articoliList: Articolo[]; giurList: Giurisdizione[]; moduloInModifica?: ModuloTemplate | null; onCreated: () => void; onAnnullaModifica?: () => void }) {
+export function CreaModuloForm({ articoliList, giurList, moduliList, moduloInModifica, onCreated, onAnnullaModifica }: { articoliList: Articolo[]; giurList: Giurisdizione[]; moduliList?: ModuloTemplate[]; moduloInModifica?: ModuloTemplate | null; onCreated: () => void; onAnnullaModifica?: () => void }) {
   const toast = useToast();
   // §36 — modalità modifica: se arriva un modulo esistente, il costruttore si apre
-  // pre-popolato (nome, categoria, giurisdizione, forfait e distinta base) e il
+  // pre-popolato (nome, categoria, giurisdizione, forfait, distinta base e dipendenze) e il
   // salvataggio passa per la PUT invece della POST di creazione.
   const [nome, setNome] = useState(moduloInModifica?.n ?? '');
   const [cat, setCat] = useState<CategoriaModulo>(moduloInModifica?.cat ?? 'Societario');
@@ -22,8 +22,21 @@ export function CreaModuloForm({ articoliList, giurList, moduloInModifica, onCre
       customPrice: r.oP !== undefined ? r.oP : articoliList.find(a => a.id === r.art)?.p,
     }))
   );
+  // Dipendenze: i moduli da cui questo dipende (attesa_dipendenza finché non sono `done`).
+  // Pre-caricate in modifica; il backend rifiuta i cicli (400).
+  const [selectedDeps, setSelectedDeps] = useState<Set<string>>(new Set(moduloInModifica?.deps ?? []));
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Moduli fra cui scegliere le dipendenze: tutti gli altri (mai se stesso).
+  const moduliDipendibili = (moduliList ?? []).filter(m => m.id !== moduloInModifica?.id);
+  const toggleDep = (id: string) => {
+    setSelectedDeps(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
 
   const toggleArt = (artId: string) => {
     setSelectedArts(prev => {
@@ -52,10 +65,10 @@ export function CreaModuloForm({ articoliList, giurList, moduloInModifica, onCre
         giurisdizioneId: giurisdizioneId || null,
         prezzoPacchetto: prezzoPkg !== '' ? Number(prezzoPkg) * 100 : null,
         righe: selectedArts.map(x => ({ articoloId: x.artId, quantita: x.qty })),
+        // Dipendenze del modulo: il backend sostituisce l'insieme e rifiuta i cicli (400).
+        dipendenzeDaIds: [...selectedDeps],
       };
       if (moduloInModifica) {
-        // §36 — le dipendenze non sono gestite da questo costruttore: non inviandole
-        // nella PUT, il backend conserva quelle esistenti.
         await aggiornaModuloTemplateApi(moduloInModifica.id, payload);
       } else {
         await creaModuloTemplateApi(payload);
@@ -94,8 +107,8 @@ export function CreaModuloForm({ articoliList, giurList, moduloInModifica, onCre
             <div style={{ fontSize: 16, fontWeight: 700 }}>{moduloInModifica ? `✏️ Modifica Modulo Template — ${moduloInModifica.n}` : 'Costruttore Modulo Template'}</div>
             <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
               {moduloInModifica
-                ? 'Aggiorna nome, giurisdizione, listino pacchetto e distinta base; le dipendenze esistenti vengono conservate'
-                : 'Componi la distinta base ed imposta la giurisdizione target ed il listino pacchetto'}
+                ? 'Aggiorna nome, giurisdizione, listino pacchetto, distinta base e dipendenze del modulo'
+                : 'Componi la distinta base, imposta giurisdizione, listino pacchetto e le eventuali dipendenze'}
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -144,6 +157,41 @@ export function CreaModuloForm({ articoliList, giurList, moduloInModifica, onCre
               </select>
             </div>
           </div>
+        </div>
+
+        {/* Dipendenze del modulo */}
+        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 14 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--indigo-l)', marginBottom: 4 }}>
+            🔗 Dipende da (moduli){selectedDeps.size > 0 ? ` — ${selectedDeps.size} selezionati` : ''}
+          </div>
+          <div style={{ fontSize: 10.5, color: 'var(--muted)', marginBottom: 8 }}>
+            Le micro-voci di questo modulo restano «in attesa di dipendenze» finché i moduli scelti non sono completati. Non sono ammessi cicli.
+          </div>
+          {moduliDipendibili.length === 0 ? (
+            <div style={{ fontSize: 11, color: 'var(--muted)', fontStyle: 'italic' }}>Nessun altro modulo in libreria da cui dipendere.</div>
+          ) : (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, maxHeight: 130, overflowY: 'auto' }}>
+              {moduliDipendibili.map(m => {
+                const sel = selectedDeps.has(m.id);
+                return (
+                  <button
+                    type="button"
+                    key={m.id}
+                    onClick={() => toggleDep(m.id)}
+                    title={m.giurisdizione?.nome || 'Generico'}
+                    style={{
+                      padding: '4px 10px', borderRadius: 16, fontSize: 11, cursor: 'pointer',
+                      border: `1px solid ${sel ? 'var(--indigo)' : 'var(--border)'}`,
+                      background: sel ? 'var(--pill-indigo-bg)' : 'var(--card2)',
+                      color: sel ? 'var(--pill-indigo-fg)' : 'var(--text)',
+                    }}
+                  >
+                    {sel ? '✓ ' : ''}{m.n}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Selezione Articoli Distinta Base */}

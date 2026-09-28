@@ -416,6 +416,7 @@ export function Library() {
           key={moduloInModifica?.id ?? 'nuovo'}
           articoliList={articoliList}
           giurList={giurList}
+          moduliList={moduliList}
           moduloInModifica={moduloInModifica}
           onCreated={() => {
             setModuloInModifica(null);
