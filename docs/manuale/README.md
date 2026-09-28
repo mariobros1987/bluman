@@ -45,7 +45,7 @@ Una scheda per sezione (🚧 = da scrivere, ✅ = pronta). Le facciamo una alla 
 |---|---------|------|-----------|-------|
 | 00 | Panoramica & concetti | questo file | multi-tenant, ruoli, ciclo pratica | ✅ |
 | 01 | Progetti & Motore di stato (§16) | `01-progetti-motore-stato.md` | moduli, micro-voci, condivisione, avanzamento, dipendenze | ✅ |
-| 02 | Clienti & Anagrafica ERP | `02-clienti.md` | anagrafica, magic link, progetti attivi | 🚧 |
+| 02 | Clienti & Anagrafica ERP | `02-clienti.md` | anagrafica, magic link, progetti attivi | ✅ |
 | 03 | Libreria & Catalogo | `03-libreria.md` | articoli, moduli template, distinta base, giurisdizioni | 🚧 |
 | 04 | Preventivi & istanziazione | `04-preventivi.md` | dal preventivo ai moduli del progetto (§15.3) | 🚧 |
 | 05 | Fatture / Note di Credito & SDI | `05-fatture-sdi.md` | numerazione, IVA, XML SDI, NC parziali/storno | 🚧 |
