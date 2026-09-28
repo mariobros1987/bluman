@@ -16,6 +16,17 @@ import type { ModuloTemplateConDistinta } from '../../services/istanziazionePort
 const prisma = prismaAmministrativo();
 
 async function seedModulo(tenantId: string, template: ModuloTemplateConDistinta) {
+  // Idempotenza: se il template esiste già (stesso nome+versione nel tenant) NON lo si ricrea.
+  // Prima `moduloTemplate.create` girava sempre: ri-lanciare il seed duplicava i template (e con
+  // essi le distinte), che è esattamente il difetto che ha generato micro-voci doppie in prova.
+  const esistente = await prisma.moduloTemplate.findFirst({
+    where: { tenantId, nome: template.nome, versione: template.versione },
+  });
+  if (esistente) {
+    console.log(`  seedModulo: «${template.nome}» v${template.versione} già presente, salto.`);
+    return esistente;
+  }
+
   const modulo = await prisma.moduloTemplate.create({
     data: {
       tenantId,

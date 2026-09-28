@@ -22,6 +22,19 @@ async function main() {
   });
   console.log('✅ Tenant creato:', tenant.ragioneSociale);
 
+  // Guardia anti doppio-seed: se il tenant ha già dei template di modulo, questo seed «full»
+  // (schema id art-NN) creerebbe un SECONDO set di articoli/moduli accanto a quelli già presenti
+  // — è esattamente ciò che ha generato le micro-voci doppie in prova. Si ferma, salvo forzatura
+  // esplicita (sconsigliata su un DB già popolato).
+  const moduliEsistenti = await prisma.moduloTemplate.count({ where: { tenantId: TENANT_ID } });
+  if (moduliEsistenti > 0 && process.env.SEED_FULL_FORCE !== '1') {
+    console.error(
+      `⛔ Il tenant ha già ${moduliEsistenti} template di modulo: rieseguire seedFull creerebbe doppioni ` +
+      `(articoli/distinte in uno schema di id diverso). Interrompo. Per forzare comunque: SEED_FULL_FORCE=1.`,
+    );
+    process.exit(1);
+  }
+
   // 2. Users
   //
   // §2bis — il super_admin sovrintende tutti i tenant, quindi non appartiene a nessuno:
