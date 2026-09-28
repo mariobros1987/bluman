@@ -220,6 +220,22 @@ export async function consuntivaMicrovoceApi(input: {
 }
 
 /**
+ * Condivide una micro-voce con altri moduli del progetto (regola: una voce che vale per due
+ * moduli si esegue una volta e conta per entrambi). `moduliCondivisi` è l'elenco COMPLETO dei
+ * moduli addizionali (sostituisce l'insieme). 409 se il modulo di destinazione ha già una voce
+ * con lo stesso nome — il messaggio del server arriva a chi ha premuto.
+ */
+export async function impostaCondivisioneMicrovoceApi(progettoId: string, microvoceId: string, moduliCondivisi: string[]) {
+  const res = await apiFetch(
+    `${API_BASE}/progetti/${encodeURIComponent(progettoId)}/microvoci/${encodeURIComponent(microvoceId)}/condivisione`,
+    { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({ moduliCondivisi }) },
+  );
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Condivisione micro-voce non riuscita'));
+  invalidateCache('progett');
+  return await res.json();
+}
+
+/**
  * §16 — forza il ricalcolo della cascata micro-voce → modulo → progetto sul backend e
  * restituisce l'avanzamento aggiornato. Le normali azioni (consuntivazione, completamento)
  * aggiornano già lo stato: questa serve dopo un'importazione o una correzione fatta a mano.
