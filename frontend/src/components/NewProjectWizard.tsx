@@ -136,6 +136,23 @@ export function NewProjectWizard({ onClose, onProjectCreated }: NewProjectWizard
   const totalP = selModules.reduce((a, m) => a + moduloP(m), 0);
   const totalH = selModules.reduce((a, m) => a + moduloH(m), 0);
 
+  // Rifinitura Fase 2: voci (per NOME) presenti in PIÙ moduli selezionati. Non è un errore — è
+  // l'occasione per condividerle dopo la creazione (🔗 Voci condivise nella scheda progetto), così
+  // si eseguono UNA volta e contano per entrambi invece di duplicarsi. I nomi sono reali (artObj).
+  const vociInPiuModuli: string[] = (() => {
+    const perNome = new Map<string, Set<string>>();
+    for (const m of selModules) {
+      for (const r of resolveRighe(m)) {
+        const nome = (r.art?.n || '').trim();
+        if (!nome || nome === 'Prestazione') continue;
+        const s = perNome.get(nome) ?? new Set<string>();
+        s.add(m.id);
+        perNome.set(nome, s);
+      }
+    }
+    return [...perNome.entries()].filter(([, mods]) => mods.size > 1).map(([nome]) => nome);
+  })();
+
   const toggleMod = (id: string) =>
     setSelectedMods(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
 
@@ -575,6 +592,14 @@ export function NewProjectWizard({ onClose, onProjectCreated }: NewProjectWizard
                     </div>
                   ))}
                 </div>
+
+                {vociInPiuModuli.length > 0 && (
+                  <div style={{ background: 'var(--pill-blue-bg)', color: 'var(--pill-blue-fg)', border: '1px solid var(--indigo)', borderRadius: 10, padding: '10px 14px', marginBottom: 14, fontSize: 11.5, lineHeight: 1.5 }}>
+                    ℹ️ Alcune voci compaiono in più moduli selezionati: <strong>{vociInPiuModuli.join(', ')}</strong>.
+                    Dopo la creazione puoi condividerle dalla scheda progetto (pulsante «🔗 Voci condivise» sul modulo):
+                    così si eseguono una volta sola e contano per entrambi i moduli, invece di duplicarsi.
+                  </div>
+                )}
 
                 {selModules.map(m => (
                   <div key={m.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
