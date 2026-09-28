@@ -128,6 +128,29 @@ describe('istanziaProgetto (§15.3) — caso felice', () => {
     expect(modulo?.prezzo).toBe(1800); // 900 × 2
   });
 
+  it('due righe con lo STESSO nome nel modulo generano UNA sola micro-voce (dedup per nome)', async () => {
+    // Il caso del template popolato da due seed diversi: stesso articolo (stesso nome) sotto id
+    // diversi. La regola è «una micro-voce per nome nel modulo»: si tiene la prima riga, si salta l'altra.
+    port.registraTemplate(
+      templateSemplice({
+        id: 'M04',
+        righe: [
+          { id: 'RD_ART08', articoloId: 'art-08', articoloVersione: 1, articoloNome: 'Atto costitutivo e statuto', quantita: 1, ordine: 3, oreEffettive: 3, prezzoEffettivo: 500, passaggi: [] },
+          { id: 'RD_A_ATTO', articoloId: 'A_ATTO_COST', articoloVersione: 1, articoloNome: 'Atto costitutivo e statuto', quantita: 1, ordine: 3, oreEffettive: 3, prezzoEffettivo: 500, passaggi: [] },
+        ],
+      }),
+    );
+    await istanziaProgetto(
+      { progettoId: 'P1', clienteId: 'C1', righe: [{ moduloTemplateId: 'M04', moduloTemplateVersione: 1 }] },
+      port,
+      notifiche,
+    );
+    const microvoci = [...port.snapshot().microvociProgetto.values()];
+    expect(microvoci).toHaveLength(1);
+    expect(microvoci[0]!.nome).toBe('Atto costitutivo e statuto');
+    expect(microvoci[0]!.articoloId).toBe('art-08'); // tiene la prima riga in ordine
+  });
+
   it('crea un passaggio_progetto per copia da ogni passaggio_template dell\'articolo', async () => {
     await istanziaProgetto(
       { progettoId: 'P1', clienteId: 'C1', righe: [{ moduloTemplateId: 'M01', moduloTemplateVersione: 1 }] },

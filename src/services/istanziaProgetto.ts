@@ -112,7 +112,18 @@ export async function istanziaProgetto(
 
       const microvoceIds: string[] = [];
 
+      // Una micro-voce per NOME dentro il modulo (regola titolare): due righe di distinta con lo
+      // stesso `articoloNome` — il caso tipico di un template popolato da due seed diversi, stesso
+      // articolo sotto id diversi — non devono generare due micro-voci gemelle. Si tiene la prima
+      // riga (ordine più basso) e si saltano le successive con lo stesso nome. La quantità > 1 sulla
+      // STESSA riga resta legittima: sono unità dello stesso articolo, non un duplicato di nome.
+      const nomiVisti = new Set<string>();
+
       for (const rigaDistinta of template.righe) {
+        const chiaveNome = rigaDistinta.articoloNome.trim().toLowerCase();
+        if (nomiVisti.has(chiaveNome)) continue;
+        nomiVisti.add(chiaveNome);
+
         for (let unita = 0; unita < rigaDistinta.quantita; unita++) {
           const microvoceId = await tx.creaMicrovoceProgetto({
             moduloProgettoId,
