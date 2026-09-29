@@ -24,8 +24,10 @@ o **agenda** con i compiti e le scadenze reali dal database.
 - Empty state sincero se non ci sono eventi nel periodo.
 
 ## 🔧 Nota tecnica
-- Servizi: `src/services/calendarioEventi.ts`, `src/util/calendarioVisibilita.ts`. Cron:
-  worker scadenze (servizio `cron-notifiche`). Rotte calendario/eventi.
+- Servizi: `src/services/calendarioEventi.ts`, `src/util/calendarioVisibilita.ts`. Rotte:
+  `src/routes/calendario.ts` — `GET/POST/PUT/DELETE /calendario/eventi`, `PATCH /calendario/eventi/:id/stato`,
+  `GET /calendario/compiti`. Cron: `src/routes/contabilitaCron.ts` → `POST /cron/esegui-notifiche-scadenze`
+  (eseguito dal servizio `cron-notifiche`).
 - Frontend: `pages/CalendarPage.tsx`, `components/calendar/`.
 - Schema: `EventoCalendario` (FK a progetto/modulo/micro-voce).
 - Fonti: `.agents/AGENTS.md`.

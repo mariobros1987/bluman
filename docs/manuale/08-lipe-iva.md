@@ -10,8 +10,9 @@ prospetto **F24**.
 
 ## 📐 Calcoli & logica
 - Motore deterministico `lipeEngine` conforme **DPR 633/72**: aggregazione mensile/trimestrale,
-  **scorporo** split-payment ed esigibilità differita, calcolo **debito/credito**, **interesse
-  trimestrale 1%** e associazione automatica dei **codici tributo F24** (6001–6012, 6031–6034).
+  esclusione dal debito dell'IVA in **split payment** (non incassata dallo studio) e gestione
+  dell'esigibilità, calcolo **debito/credito**, e associazione automatica dei **codici tributo F24**
+  (mensili `6001`–`6012`, trimestrali `6031`–`6034`, periodica `6099`).
 - Il calcolo è **spiegabile** (§12): ogni voce del prospetto deriva da regole esplicite, non da numeri
   cablati.
 
@@ -26,7 +27,9 @@ prospetto **F24**.
   confermare col titolare — vedi note di progetto.
 
 ## 🔧 Nota tecnica
-- Motore: `src/services/lipeEngine.ts` (+ test `lipeEngine.test.ts`). Rotte: `src/routes/liquidazioneIva.ts`.
+- Motore: `src/services/lipeEngine.ts` (+ test `lipeEngine.test.ts`). Rotte:
+  `src/routes/liquidazioneIva.ts` — `GET /liquidazione-iva`, `POST /liquidazione-iva/calcola`,
+  `POST /liquidazione-iva/salva`, `POST /liquidazione-iva/:periodo/marca-versata` (→ movimento Prima Nota).
 - Frontend: `pages/LiquidazioneIvaPage.tsx`.
 - Schema: `LiquidazioneIva`.
 - Fonti: `.agents/AGENTS.md`, `AUDIT_2026-09-27/04-contabilita-fatturazione.md`.

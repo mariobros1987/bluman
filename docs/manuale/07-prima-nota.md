@@ -27,7 +27,9 @@ entrate e uscite, con categoria e collegamento a fattura/fornitore.
 - Empty state sincero se non ci sono movimenti.
 
 ## 🔧 Nota tecnica
-- Rotte: `src/routes/contabilitaPrimaNota.ts` (movimenti, conti bancari, riconciliazione).
+- Rotte: `src/routes/contabilitaPrimaNota.ts` — `GET /prima-nota`, `POST /prima-nota` (movimento),
+  `POST /prima-nota/import-csv` (riconciliazione), `DELETE /prima-nota/:id`. I conti bancari hanno il
+  proprio prefisso `/conti-bancari`.
 - Frontend: `pages/PrimaNotaPage.tsx`.
 - Schema: `MovimentoPrimaNota` (`tipo`, `categoria`, `importoCentesimi`, FK `fattura`/`fatturaRicevuta`/
   `cliente`/`fornitore` a SetNull), `ContoBancario`.
