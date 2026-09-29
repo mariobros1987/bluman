@@ -245,6 +245,11 @@ Se senza contesto vedi righe > 0, **la RLS non è attiva**: fermati e non fare i
 ## 6. Fase pooler + backend
 
 ### 6.1 PgBouncer (transaction mode)
+> ℹ️ **Aggiornamento 29/09/2026:** se usi `docker-compose.prod.yml`, PgBouncer (transaction mode),
+> certbot/TLS e Postgres **17** sono già **servizi del compose** — non serve installarli a mano. L'`api`
+> vi passa già (`pgbouncer=true`), migrazioni/RLS restano dirette. Verificato in dry-run locale
+> (isolamento RLS ok anche attraverso il pooler). Vedi `docs/vps-primo-avvio.md`. Le istruzioni bare-metal
+> qui sotto restano valide per un'installazione **senza Docker**.
 - Installa PgBouncer, `pool_mode = transaction`, punta a `localhost:5432`.
 - `DATABASE_URL` del backend punterà al **pooler** (es. `localhost:6432`), non direttamente a Postgres.
 - ⚠️ In transaction mode Prisma richiede `pgbouncer=true` nella URL e statement cache disattivata. Le migrazioni (`DIRECT_URL`) devono puntare a Postgres **diretto** (5432), mai al pooler.
