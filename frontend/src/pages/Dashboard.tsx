@@ -7,12 +7,16 @@ import { CatBadge } from '../components/ui/CatBadge';
 import { fmt, progressColor } from '../utils';
 import { NewProjectWizard } from '../components/NewProjectWizard';
 import { fetchProgetti, isRispostaPaginata } from '../api/client';
+import { usePeriodo } from '../context/PeriodoContext';
 import { getCurrentTenantId, getTenantStorageKey, getTenantSeedData, BLUECODE_TENANT_ID } from '../utils/tenant';
 import type { Progetto } from '../types';
 import styles from './Dashboard.module.css';
 
 export function Dashboard() {
   const navigate = useNavigate();
+  // La Dashboard rispetta lo stesso «Periodo» globale della pagina Progetti, altrimenti i due
+  // conteggi divergono (Dashboard mostrava tutti i progetti, Progetti solo quelli del periodo).
+  const { dataDa: gDataDa, dataA: gDataA } = usePeriodo();
   const [wizardOpen, setWizardOpen] = useState(false);
   const [projectList, setProjectList] = useState<Progetto[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,7 +42,7 @@ export function Dashboard() {
 
     // 2. Carica progetti remoti dal backend Fastify/DB se presenti (filtrati per tenantId)
     try {
-      const remote = await fetchProgetti({ page: 1, limit: 50, sortBy: 'createdAt', sortOrder: 'desc' });
+      const remote = await fetchProgetti({ page: 1, limit: 50, sortBy: 'createdAt', sortOrder: 'desc', dataDa: gDataDa || undefined, dataA: gDataA || undefined });
       const rawList = isRispostaPaginata<any>(remote) ? remote.data : (Array.isArray(remote) ? remote : []);
       if (rawList.length > 0) {
         const dbProjs: Progetto[] = rawList
@@ -134,7 +138,7 @@ export function Dashboard() {
 
   useEffect(() => {
     loadProjects();
-  }, []);
+  }, [gDataDa, gDataA]);
 
   const currentUserStr = localStorage.getItem('bluman_user');
   const currentUser = currentUserStr ? JSON.parse(currentUserStr) : { ruolo: 'advisor' };
