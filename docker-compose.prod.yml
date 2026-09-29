@@ -99,6 +99,32 @@ services:
     networks:
       - bluman_internal
 
+  # 1d. POOLER PGBOUNCER (transaction mode) — davanti a Postgres per il RUNTIME dell'app.
+  # Sicuro con la RLS del progetto: ogni query è una transazione con `set_config(is_local=true)` + la
+  # query sulla STESSA connessione (vedi il commento su DATABASE_URL dell'api). Le migrazioni e il
+  # provisioning RLS (owner) NON passano di qui — restano diretti su Postgres 5432.
+  pgbouncer:
+    image: edoburu/pgbouncer:latest
+    container_name: bluman_pgbouncer
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rls:
+        condition: service_completed_successfully
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: "${POSTGRES_DB:?manca POSTGRES_DB nel file .env}"
+      DB_USER: bluman_app
+      DB_PASSWORD: "${APP_DB_PASSWORD:?manca APP_DB_PASSWORD nel file .env}"
+      POOL_MODE: transaction
+      AUTH_TYPE: scram-sha-256
+      MAX_CLIENT_CONN: "200"
+      DEFAULT_POOL_SIZE: "20"
+    networks:
+      - bluman_internal
+
   # 2. BACKEND FASTIFY API & MOTORE ADVISORY
   api:
     build:
@@ -113,6 +139,9 @@ services:
       # esiste una finestra in cui l'API risponde su uno schema incompleto o senza policy attive.
       rls:
         condition: service_completed_successfully
+      # Il runtime passa dal pooler: dev'essere su prima dell'API.
+      pgbouncer:
+        condition: service_started
     # Tutti gli altri secret runtime (SIGILLO_HMAC_SECRET, EMAIL_RELAY_SECRET, SMTP/IMAP, canali,
     # APP_BASE_URL, CORS_ORIGINS, storage…) arrivano dal .env accanto al compose. Le chiavi che
     # `environment` ridefinisce qui sotto (DATABASE_URL/DIRECT_URL) VINCONO sull'env_file: così
@@ -123,11 +152,14 @@ services:
       NODE_ENV: production
       PORT: 3000
       HOST: 0.0.0.0
-      # `DATABASE_URL` è il ruolo applicativo `bluman_app`, SOGGETTO a RLS (regola 1): è con questo
-      # che gira il runtime. `DIRECT_URL` resta il proprietario dello schema — non serve al runtime
-      # (le migrazioni le fa il servizio `migrate`), ma prisma vuole la variabile dichiarata.
+      # `DATABASE_URL` è il ruolo applicativo `bluman_app`, SOGGETTO a RLS (regola 1), e passa dal
+      # **pooler PgBouncer** (transaction mode). È sicuro col nostro pattern RLS: ogni query gira in
+      # una transazione che fa `set_config(..., is_local=true)` + la query INSIEME (prismaClient.ts),
+      # quindi il contesto tenant resta sulla stessa connessione del pool. `pgbouncer=true` disattiva
+      # i prepared statement, come richiede Prisma in transaction mode. `DIRECT_URL` resta il
+      # proprietario, DIRETTO su Postgres (le migrazioni le fa il servizio `migrate`, mai il pooler).
       # NON far coincidere i due: se l'app girasse come proprietario, le policy verrebbero scavalcate.
-      DATABASE_URL: "postgresql://bluman_app:${APP_DB_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public"
+      DATABASE_URL: "postgresql://bluman_app:${APP_DB_PASSWORD}@pgbouncer:5432/${POSTGRES_DB}?schema=public&pgbouncer=true"
       DIRECT_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public"
       JWT_SECRET: "${JWT_SECRET:?manca JWT_SECRET nel file .env — generalo con openssl rand -hex 32}"
       # Vuoto = webhook SDI disattivato, e la rotta risponde 503 invece di accettare
