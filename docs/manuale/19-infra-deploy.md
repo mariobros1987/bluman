@@ -36,5 +36,10 @@ si usa il **`.exe` nativo** via `RAILWAY_BIN` (lo script lo supporta).
   `prisma/migrations/` (RLS inline) + `supabase/migrations/20260819_rls_effettiva.sql`; diagnostica
   `src/scripts/checkRls.ts`, `verificaAccessi.ts`.
 - Deploy: `export RAILWAY_BIN="…/@railway/cli/bin/railway.exe" && bash scripts/distribuisci.sh`.
+- **Stack VPS «tutto su un server»** (`docker-compose.prod.yml`): `postgres:17` → `migrate`
+  (`prisma migrate deploy`) → `rls` (crea `bluman_app` senza bypassrls + policy) → `api` (gira come
+  `bluman_app`, con `env_file: .env` per i secret runtime) → `nginx` (SPA + proxy API) + `certbot`
+  (TLS Let's Encrypt, rinnovo automatico). Secret in `.env.prod.example`. Backup: `scripts/backup-vps.sh`.
+  Il flusso migrate→rls→api è stato **verificato in dry-run locale** (RLS su 70 tabelle, isolamento ok).
 - Fonti: `.agents/AGENTS.md`, `ISTRUZIONI_PER_IA.md` (regola 9), `PIANO_MIGRAZIONE_VPS.md`,
   `AUDIT_2026-09-27/07-frontend-infra.md`.

@@ -35,9 +35,9 @@
 # perché Railway non è agganciato al webhook di GitHub.
 
 services:
-  # 1. DATABASE POSTGRESQL 16 CON ISOLAMENTO RLS
+  # 1. DATABASE POSTGRESQL 17 CON ISOLAMENTO RLS (major = Supabase di produzione, §4-bis del piano VPS)
   postgres:
-    image: postgres:16-alpine
+    image: postgres:17-alpine
     container_name: bluman_postgres
     restart: unless-stopped
     environment:
@@ -79,7 +79,7 @@ services:
   # devono esistere) e PRIMA dell'api. Idempotente: rieseguirlo riallinea la password di bluman_app ad
   # APP_DB_PASSWORD e ridichiara le policy. Usa l'immagine postgres perché ha `psql` (\gexec, :'pw').
   rls:
-    image: postgres:16-alpine
+    image: postgres:17-alpine
     container_name: bluman_rls
     depends_on:
       migrate:
@@ -113,6 +113,12 @@ services:
       # esiste una finestra in cui l'API risponde su uno schema incompleto o senza policy attive.
       rls:
         condition: service_completed_successfully
+    # Tutti gli altri secret runtime (SIGILLO_HMAC_SECRET, EMAIL_RELAY_SECRET, SMTP/IMAP, canali,
+    # APP_BASE_URL, CORS_ORIGINS, storage…) arrivano dal .env accanto al compose. Le chiavi che
+    # `environment` ridefinisce qui sotto (DATABASE_URL/DIRECT_URL) VINCONO sull'env_file: così
+    # l'app gira sempre come `bluman_app` sul Postgres locale, mai col DATABASE_URL di sviluppo.
+    env_file:
+      - .env
     environment:
       NODE_ENV: production
       PORT: 3000
@@ -161,6 +167,26 @@ services:
       # proxato all'API come ogni altra rotta (vedi nginx.conf).
       - ./certbot/conf:/etc/letsencrypt:ro
       - ./certbot/www:/var/www/certbot:ro
+    networks:
+      - bluman_web
+
+  # 4. CERTBOT — rinnovo automatico del certificato TLS (Let's Encrypt).
+  # PRIMA EMISSIONE (una tantum, con nginx :80 già su e il dominio che punta al VPS):
+  #   docker compose -f docker-compose.prod.yml run --rm --entrypoint \
+  #     "certbot certonly --webroot -w /var/www/certbot -d IL.TUO.DOMINIO --email TUA@EMAIL --agree-tos --no-eff-email" certbot
+  # Poi in nginx.conf scommenta il blocco server :443 e il `return 301` su :80, sostituisci
+  # IL.TUO.DOMINIO, e ricarica: `docker compose exec nginx nginx -s reload`.
+  # Da lì in poi questo servizio rinnova da solo (Let's Encrypt scade a 90 giorni).
+  certbot:
+    image: certbot/certbot:latest
+    container_name: bluman_certbot
+    restart: unless-stopped
+    volumes:
+      # Rw (non :ro come su nginx): certbot deve SCRIVERE i certificati emessi/rinnovati.
+      - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+    # Prova il rinnovo ogni 12h; certbot rinnova davvero solo quando mancano <30 giorni.
+    entrypoint: ["sh", "-c", "trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 12h & wait $${!}; done"]
     networks:
       - bluman_web
 
