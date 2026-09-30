@@ -26,10 +26,14 @@ export function Dashboard() {
 
   const loadProjects = async () => {
     let combined: Progetto[] = [];
+    let apiDisponibile = false;
     const currentTenantId = getCurrentTenantId();
     const storageKey = getTenantStorageKey('bluman_custom_projects', currentTenantId);
 
-    // 1. Carica progetti salvati localmente per questo specifico Tenant
+    // 1. Progetti salvati localmente per questo specifico Tenant. Valgono solo come ripiego
+    // quando il backend non risponde: se l'API risponde, il suo elenco è l'intero dataset
+    // (vedi passo 2). Era questa la causa del «2 in Dashboard, 1 in Progetti»: una copia
+    // rimasta in localStorage veniva sommata ai progetti del database solo qui.
     const localStr = localStorage.getItem(storageKey);
     if (localStr) {
       try {
@@ -40,12 +44,13 @@ export function Dashboard() {
       }
     }
 
-    // 2. Carica progetti remoti dal backend Fastify/DB se presenti (filtrati per tenantId)
+    // 2. Carica progetti remoti dal backend Fastify/DB se presenti (filtrati per tenantId e
+    //    per il Periodo globale, come la pagina Progetti)
     try {
       const remote = await fetchProgetti({ page: 1, limit: 50, sortBy: 'createdAt', sortOrder: 'desc', dataDa: gDataDa || undefined, dataA: gDataA || undefined });
-      const rawList = isRispostaPaginata<any>(remote) ? remote.data : (Array.isArray(remote) ? remote : []);
-      if (rawList.length > 0) {
-        const dbProjs: Progetto[] = rawList
+      if (isRispostaPaginata<any>(remote)) {
+        apiDisponibile = true;
+        const dbProjs: Progetto[] = remote.data
           .filter((rp: any) => rp.tenantId === currentTenantId)
           .map((rp: any) => {
             // §16 — stato e percentuali arrivano calcolati dal backend (`avanzamento`), che è
@@ -117,17 +122,18 @@ export function Dashboard() {
               }),
             };
           });
-        const existingIds = new Set(combined.map(p => String(p.id)));
-        for (const dp of dbProjs) {
-          if (!existingIds.has(String(dp.id))) combined.push(dp);
-        }
+        // Una risposta paginata valida è l'intero dataset: non va fusa con le copie locali,
+        // altrimenti un progetto rimasto solo in localStorage comparirebbe qui e non in
+        // Progetti. Stessa regola della pagina Progetti.
+        combined = dbProjs;
       }
     } catch (err) {
       console.warn('Fetch DB fallback:', err);
     }
 
-    // 3. Se e solo se è il tenant demo Bluecode Ltd e non ci sono progetti salvati, carica i progetti di seed
-    if (combined.length === 0 && currentTenantId === BLUECODE_TENANT_ID) {
+    // 3. Se e solo se è il tenant demo Bluecode Ltd, l'API non ha risposto e non c'è nulla in
+    //    locale, carica i progetti di seed
+    if (!apiDisponibile && combined.length === 0 && currentTenantId === BLUECODE_TENANT_ID) {
       const seedData = getTenantSeedData(currentTenantId);
       combined.push(...seedData.projects);
     }
