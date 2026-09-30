@@ -5,6 +5,23 @@ import { getCurrentTenantId } from '../utils/tenant';
 const API_BACKEND_RAILWAY = 'https://bluman-api-production.up.railway.app';
 
 /**
+ * §36 — quando il frontend è servito dalla **stessa origine** che espone le API (nginx del VPS:
+ * serve la build Vite e proxa i prefissi API su `api:3000`), le richieste vanno fatte con
+ * percorso **relativo**, cioè con `''` come base.
+ *
+ * Non lo si deduce dal fatto che la base coincida con l'origine della pagina, perché quella
+ * stessa condizione sul dominio di Vercel è invece un ERRORE: là `vercel.json` riscrive su
+ * `/index.html` tutto ciò che non è `/api/send-email`, quindi una richiesta relativa
+ * tornerebbe una pagina HTML al posto del JSON (§34 punto 2). Le due situazioni si assomigliano
+ * e hanno esito opposto, quindi la stessa-origine si **dichiara** nella build:
+ * `VITE_API_SAME_ORIGIN=true`.
+ */
+const STESSA_ORIGINE =
+  typeof import.meta !== 'undefined' && import.meta.env
+    ? String(import.meta.env.VITE_API_SAME_ORIGIN ?? '') === 'true'
+    : false;
+
+/**
  * §34 — due modi in cui la base delle API fa sparire una rotta che esiste.
  *
  * Il guasto osservato in produzione era un 404 su `POST /documenti/genera`, con la
@@ -27,6 +44,11 @@ function normalizzaBase(valore: string): string {
 }
 
 const getApiBase = () => {
+  // Frontend e API sulla stessa origine (VPS): percorsi relativi, nginx fa da proxy. È la
+  // configurazione in cui le rotte API esistono davvero su questa origine — la verifica che
+  // manca a Vercel.
+  if (STESSA_ORIGINE) return '';
+
   const dichiarata =
     typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_API_BASE : undefined;
 
@@ -116,7 +138,7 @@ async function apiFetch(url: string, options: RequestInit = {}, timeoutMs: numbe
   const tipo = res.headers.get('content-type') || '';
   if (tipo.includes('text/html')) {
     throw new Error(
-      `La richiesta non è arrivata al backend: ${url} ha risposto con una pagina HTML (HTTP ${res.status}). Controllare VITE_API_BASE del frontend.`,
+      `La richiesta non è arrivata al backend: ${url} ha risposto con una pagina HTML (HTTP ${res.status}). Controllare VITE_API_BASE — oppure VITE_API_SAME_ORIGIN se questo frontend è servito dal VPS insieme all'API.`,
     );
   }
   return res;
