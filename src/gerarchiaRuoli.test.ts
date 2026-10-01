@@ -61,7 +61,22 @@ vi.mock('./util/prismaClient.js', async importOriginal => {
     },
   };
 
-  const finto: any = { user: utente, auditLog: { create: async () => ({}) } };
+  // La rotta che crea un utente gli apre anche il periodo di collaborazione (§2bis). Qui la
+  // cosa non è in discussione — questi test parlano di ruoli e di tenant — ma il finto deve
+  // rispondere, altrimenti la chiamata esplode e la rotta risponde 500 a un test che parla
+  // d'altro. Il comportamento vero dei periodi sta in `periodiCollaborazione.test.ts`.
+  const periodoCollaborazione = {
+    findFirst: async () => null,
+    create: async (args: any) => args.data,
+  };
+
+  const finto: any = {
+    user: utente,
+    periodoCollaborazione,
+    auditLog: { create: async () => ({}) },
+    $transaction: async (fn: any) => fn(finto),
+    $executeRaw: async () => ({}),
+  };
 
   return {
     ...reale,

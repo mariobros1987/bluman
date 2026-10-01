@@ -93,7 +93,12 @@ vi.mock('./util/prismaClient.js', async importOriginal => {
   const utente = {
     // L'hook di autenticazione e la guardia della rotta leggono la stessa tabella.
     findFirst: async ({ where }: any) => stato.utenti.get(where?.id) ?? null,
-    findUnique: async ({ where }: any) => stato.utenti.get(where?.id) ?? null,
+    // Anche per email: `POST /tenant/utenti` decide da lì se creare o aggiornare, e senza
+    // questo ramo un re-invito sembrerebbe sempre una persona nuova.
+    findUnique: async ({ where }: any) =>
+      (where?.id ? stato.utenti.get(where.id) : undefined) ??
+      [...stato.utenti.values()].find(u => u.email === where?.email) ??
+      null,
     count: async () => stato.altriAdvisor,
     update: async ({ where, data }: any) => {
       stato.scrittureUtente.push({ where, data });
@@ -104,7 +109,13 @@ vi.mock('./util/prismaClient.js', async importOriginal => {
       }
       return riga ?? { id: where.id };
     },
-    create: async ({ data }: any) => ({ id: `usr-${++stato.contatore}`, ...data }),
+    // La riga creata entra in tabella come le altre: chi crea una persona poi la archivia, e
+    // per archiviarne una la rotta deve poterla rileggere da qui.
+    create: async ({ data }: any) => {
+      const riga = { stato: 'invitato', sessionVersion: 0, ...data, id: `usr-${++stato.contatore}` };
+      stato.utenti.set(riga.id, riga);
+      return riga;
+    },
     findMany: async () => {
       // Il finto rispetta l'`include` della rotta: senza la relazione qui, il test
       // sull'elenco non direbbe niente su cosa arriva davvero al browser.
@@ -371,6 +382,24 @@ describe('archiviare un operatore — cosa scrive', () => {
     expect(stato.scrittureUtente).toEqual([]);
   });
 
+  it('entrare e uscire nello stesso giorno si può: il confronto è fra giorni, non fra istanti', async () => {
+    persona('usr-target');
+    // L'istante dell'invito, non la mezzanotte: è quello che scrive `apriPeriodoIniziale`, ed è
+    // quello che copia il backfill da `created_at`. Con `dal` = oggi alle 09:14 e `dataFine` =
+    // oggi, un confronto fra istanti risponderebbe 400 a chi viene archiviato il giorno stesso.
+    inForza('usr-target', new Date(2026, 9, 1, 9, 14));
+
+    const res = await server().inject({
+      method: 'POST',
+      url: '/tenant/utenti/usr-target/disattiva',
+      headers: { authorization: `Bearer ${token('usr-advisor', 'advisor')}` },
+      payload: { dataFine: '2026-10-01' },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(periodo(0).al).toEqual(new Date(2026, 9, 1));
+  });
+
   it('una data inesistente è respinta invece di scivolare al mese dopo', async () => {
     persona('usr-target');
     inForza('usr-target');
@@ -598,5 +627,93 @@ describe('l\'elenco del team porta con sé i periodi', () => {
     expect(target.periodiCollaborazione).toBeDefined();
     // `senzaHash` è una lista di esclusione: la relazione passa, l'hash no.
     expect(target.passwordHash).toBeUndefined();
+  });
+});
+
+describe('chi si invita nasce in forza', () => {
+  it('POST /tenant/utenti gli apre il periodo: senza, «Archivia» risponderebbe 409 per sempre', async () => {
+    const res = await server().inject({
+      method: 'POST',
+      url: '/tenant/utenti',
+      headers: { authorization: `Bearer ${token('usr-advisor', 'advisor')}` },
+      payload: { nome: 'Nuovo Collaboratore', email: 'nuovo@studio.example' },
+    });
+
+    expect(res.statusCode).toBe(201);
+    const creato = res.json();
+
+    // Il periodo aperto c'è, ed è il suo. La migrazione l'ha fatto per chi c'era già; questa
+    // rotta lo fa per chi arriva dopo, ed è il caso più comune di tutti.
+    expect(stato.periodi).toHaveLength(1);
+    expect(periodo(0).userId).toBe(creato.id);
+    expect(periodo(0).tenantId).toBe(TENANT);
+    expect(periodo(0).al).toBeNull();
+    // Chi nasce `invitato` — creato, mai entrato, con la password temporanea ancora da
+    // cambiare — deve **tornare** `invitato` se lo si archivia prima del primo accesso: al
+    // rientro, `attivo` gli darebbe un accesso pieno retto da una password che conosce un altro.
+    expect(periodo(0).statoPrecedente).toBe('invitato');
+
+    // …e la prova che conta: da qui in avanti «Archivia» funziona davvero, invece di
+    // rispondere 409 «non risulta in forza» a una persona che è appena stata assunta.
+    const archivia = await server().inject({
+      method: 'POST',
+      url: `/tenant/utenti/${creato.id}/disattiva`,
+      headers: { authorization: `Bearer ${token('usr-advisor', 'advisor')}` },
+      payload: { dataFine: '2026-10-01' },
+    });
+
+    expect(archivia.statusCode).toBe(200);
+    expect(periodo(0).al).toEqual(new Date(2026, 9, 1));
+  });
+
+  it('non ne apre un secondo su chi è già in forza: «in forza» resta una parola sola', async () => {
+    persona('usr-target');
+    inForza('usr-target');
+
+    // Stessa email: la rotta passa dal ramo `update`, non da una seconda `create`.
+    const res = await server().inject({
+      method: 'POST',
+      url: '/tenant/utenti',
+      headers: { authorization: `Bearer ${token('usr-advisor', 'advisor')}` },
+      payload: { nome: 'Target Riconfermato', email: 'usr-target@studio.example' },
+    });
+
+    expect(res.statusCode).toBe(201);
+    expect(res.json().id).toBe('usr-target');
+    // Due periodi aperti sulla stessa persona toglierebbero univocità proprio a quella parola.
+    expect(stato.periodi).toHaveLength(1);
+  });
+});
+
+describe('il reset password non riporta dentro un archiviato', () => {
+  it('risponde 409 e non scrive niente: per far rientrare qualcuno c\'è «Riattiva»', async () => {
+    persona('usr-target', { stato: 'disattivato' });
+
+    const res = await server().inject({
+      method: 'POST',
+      url: '/tenant/utenti/usr-target/reset-password',
+      headers: { authorization: `Bearer ${token('usr-advisor', 'advisor')}` },
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json().errore).toContain('archiviata');
+    // La rotta scriverebbe `stato: 'invitato'`, e su un archiviato quella riga lo riporta
+    // dentro — fra gli attivi, assegnabile ai progetti e capace di entrare — **senza** che
+    // nessun periodo sia stato aperto. L'invariante cadrebbe in silenzio.
+    expect(stato.scrittureUtente).toHaveLength(0);
+    expect(stato.audit).toHaveLength(0);
+  });
+
+  it('su una persona attiva il reset passa come prima', async () => {
+    persona('usr-target');
+
+    const res = await server().inject({
+      method: 'POST',
+      url: '/tenant/utenti/usr-target/reset-password',
+      headers: { authorization: `Bearer ${token('usr-advisor', 'advisor')}` },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(scritturaUtente(0).data.stato).toBe('invitato');
   });
 });

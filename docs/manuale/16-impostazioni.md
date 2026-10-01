@@ -27,6 +27,10 @@ romperli o azzerarli. Si **archivia**.
 - Nella scheda **Gestione Team**, ogni persona attiva ha il pulsante **`📦 Archivia`**. Si indica il
   **giorno in cui la collaborazione è finita** (precompilato a oggi, modificabile: non è per forza il
   giorno in cui ci si ricorda di archiviare) e, se serve, un motivo.
+- Chi si **invita** nasce già «in forza» dal giorno dell'invito: non c'è niente da fare perché
+  compaia con la sua data di inizio, e lo si può archiviare anche il giorno stesso. Le date sono
+  confrontate **per giorno**, non all'istante: invitare la mattina e archiviare il pomeriggio è una
+  cosa normale e non viene respinta.
 - Da quel momento l'utenza è **spenta**: la persona non accede più e **non compare più tra gli
   operatori assegnabili** ai progetti e agli eventi.
 - Chi è archiviato finisce in una sezione a parte, **«Operatori archiviati»**, con il periodo in cui
@@ -65,16 +69,34 @@ le operazioni.
   (fine prima dell'inizio, inizio prima della fine del periodo precedente) → **400** con il motivo;
   archiviare chi non è in forza o riattivare chi lo è già → **409**. In nessun caso la scrittura
   avviene a metà: periodo e stato dell'utenza cambiano insieme o non cambiano affatto.
+- **Rigenerare la password a una persona archiviata → 409**, con l'invito a **riattivarla** invece.
+  Non è un divieto formale: quella rotta rimette l'utenza in `invitato`, e su un archiviato la
+  riporterebbe dentro — fra gli attivi, assegnabile ai progetti e capace di entrare — senza che
+  nessun periodo sia stato riaperto. Per farla rientrare si usa **`↩️ Riattiva`**, che è l'unica
+  operazione che apre un periodo nuovo.
 
 ## 🔧 Nota tecnica
 - Rotte: `src/routes/tenant.ts` (`/tenant/info`, `/tenant/settings`, `/tenant/utenti`,
   `POST /tenant/utenti/:id/disattiva`, `POST /tenant/utenti/:id/riattiva`, `/tenant/moduli`).
 - **Invariante dei periodi**: `user.stato = 'disattivato'` **se e solo se** non esiste una riga di
   `periodo_collaborazione` con `al` nullo. A presidiarla è un solo punto di scrittura,
-  `src/services/periodiCollaborazione.ts` (`disattivaCollaboratore` / `riattivaCollaboratore`), che
-  chiude/apre il periodo e aggiorna `stato` (con `sessionVersion` incrementata, così la sessione
-  aperta muore subito) nella **stessa transazione**. Due scritture in due posti lascerebbero una
-  persona disattivata col periodo ancora aperto.
+  `src/services/periodiCollaborazione.ts` (`disattivaCollaboratore` / `riattivaCollaboratore` /
+  `apriPeriodoIniziale`), che chiude/apre il periodo e aggiorna `stato` (con `sessionVersion`
+  incrementata, così la sessione aperta muore subito) nella **stessa transazione**. Due scritture in
+  due posti lascerebbero una persona disattivata col periodo ancora aperto.
+- Il backfill nella migrazione è una **fotografia**, non una regola: vale per chi c'era già. Per chi
+  arriva dopo, il periodo aperto lo crea `apriPeriodoIniziale`, chiamata da `POST /tenant/utenti`
+  all'invito. Senza, un collaboratore appena invitato non avrebbe nessun periodo aperto e `Archivia`
+  gli risponderebbe 409 «non risulta in forza» **per sempre** — su un utente appena creato, cioè il
+  caso più comune di tutti. La funzione è idempotente (se un periodo aperto c'è già non fa niente),
+  quindi è chiamata anche fuori dal ramo di creazione e sistema chi entra in uno studio per la prima
+  volta passando da lì.
+- Il confronto fra `dataFine` e l'inizio del periodo è **fra giorni, non fra istanti**
+  (`inizioDelGiorno`): `dal` è l'istante dell'invito (o il `created_at` copiato dal backfill), mentre
+  la data di fine si sceglie da un calendario. Invitare alle 09:14 e archiviare lo stesso giorno
+  avrebbe `dataFine` = mezzanotte < `dal`, e un confronto fra istanti respingerebbe con 400 il caso
+  più normale. La data scritta a database resta quella scelta: si accorcia solo il termine di
+  paragone.
 - Il controllo sull'**ultimo responsabile attivo** è fatto *dentro* la transazione: due responsabili
   che si archiviano a vicenda nello stesso istante passerebbero entrambi un controllo fatto fuori.
 - Frontend: `pages/SettingsPage.tsx`, `components/settings/` (`TabCompany`, `TabChannels`, `TabSdi`,
@@ -90,5 +112,5 @@ le operazioni.
   ancora da cambiare — **torna `invitato`**, non `attivo`. Riattivarlo come `attivo` gli darebbe un
   accesso pieno retto da una password che chi l'ha creato conosce. Per tutti gli altri il ritorno è
   `attivo`, ed è anche il ripiego per le righe nate prima che la colonna esistesse.
-- Presidio: `src/periodiCollaborazione.test.ts` (19 test).
+- Presidio: `src/periodiCollaborazione.test.ts` (24 test).
 - Fonti: `.agents/AGENTS.md`, `AUDIT_2026-09-27/01-sicurezza-multitenant.md`.

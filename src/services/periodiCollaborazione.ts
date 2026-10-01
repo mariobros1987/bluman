@@ -32,6 +32,11 @@ export type EsitoPeriodo =
   | { ok: true; periodoId: string; dal: Date; al: Date | null; statoUtente?: StatoUtente }
   | { ok: false; stato: number; errore: string };
 
+/** Mezzanotte locale del giorno che contiene l'istante dato. Vedi `disattivaCollaboratore`. */
+function inizioDelGiorno(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
 export interface DatiDisattivazione {
   tenantId: string;
   userId: string;
@@ -74,7 +79,15 @@ export async function disattivaCollaboratore(dati: DatiDisattivazione): Promise<
 
       // Una fine che precede l'inizio scriverebbe un periodo a durata negativa: la storia
       // resterebbe illeggibile proprio nel punto in cui serve.
-      if (dataFine.getTime() < aperto.dal.getTime()) {
+      //
+      // Il confronto però è fra **giorni**, non fra istanti. `dal` è un istante — quello in cui
+      // la persona è stata invitata, o il `created_at` che il backfill ha copiato — mentre la
+      // data di fine si sceglie da un calendario ed è un giorno. Chi viene invitato stamattina e
+      // archiviato nel pomeriggio avrebbe `dal` = oggi alle 09:14 e `dataFine` = oggi a
+      // mezzanotte: un confronto fra istanti respingerebbe con 400 la cosa più normale del
+      // mondo, e per giunta proprio sul caso che `apriPeriodoIniziale` crea. La data scritta
+      // resta quella scelta: si accorcia solo il termine di paragone.
+      if (dataFine.getTime() < inizioDelGiorno(aperto.dal).getTime()) {
         return {
           ok: false,
           stato: 400,
@@ -135,6 +148,60 @@ export async function disattivaCollaboratore(dati: DatiDisattivazione): Promise<
       });
 
       return { ok: true, periodoId: chiuso.id, dal: chiuso.dal, al: chiuso.al } as const;
+    }),
+  );
+}
+
+/**
+ * Il periodo che si apre quando una persona entra nello studio.
+ *
+ * La migrazione fa questo per chi c'era già (il backfill in coda alla CREATE TABLE); questa
+ * funzione lo fa per chi arriva dopo. Senza, l'invariante nascerebbe falsa dal primo istante
+ * per ogni utente nuovo — `stato = 'invitato'` e nessun periodo aperto — e
+ * `disattivaCollaboratore` lo respingerebbe con un 409: il pulsante «Archivia» non avrebbe
+ * **mai** funzionato su un collaboratore appena invitato, che è il caso più comune di tutti.
+ *
+ * Idempotente: se un periodo aperto c'è già non fa niente. «Già in forza» è la risposta
+ * giusta, e un secondo periodo aperto toglierebbe univocità proprio a quella parola. È questa
+ * proprietà a renderla chiamabile anche sull'utente che esisteva già — chi entra in uno studio
+ * da qui per la prima volta, o chi fosse rimasto senza periodo, se lo ritrova.
+ *
+ * `statoPrecedente` non è un parametro: si legge dall'utente dentro la transazione. Chi è
+ * `invitato` — creato, mai entrato, con la password temporanea ancora da cambiare — deve
+ * tornare `invitato` se lo si archivia prima del primo accesso, non `attivo`.
+ */
+export async function apriPeriodoIniziale(dati: {
+  tenantId: string;
+  userId: string;
+  /** Default: adesso. */
+  dal?: Date;
+  attoreUserId: string | null;
+}): Promise<void> {
+  const { tenantId, userId, dal = new Date(), attoreUserId } = dati;
+
+  await prisma.$transaction(async (tx) =>
+    conContestoInTransazione(tx, async () => {
+      const aperto = await tx.periodoCollaborazione.findFirst({
+        where: { tenantId, userId, al: null },
+        select: { id: true },
+      });
+      if (aperto) return;
+
+      const utente = await tx.user.findUnique({
+        where: { id: userId },
+        select: { stato: true },
+      });
+
+      await tx.periodoCollaborazione.create({
+        data: {
+          tenantId,
+          userId,
+          dal,
+          al: null,
+          creatoDa: attoreUserId,
+          statoPrecedente: (utente?.stato ?? 'invitato') as StatoUtente,
+        },
+      });
     }),
   );
 }

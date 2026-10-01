@@ -20,7 +20,7 @@ import { usernameBotTelegram } from '../services/telegramService.js';
 import { inMemoryTenantStore, recordAudit, senzaHash, TENANT_DEFAULT } from '../util/serverHelpers.js';
 import { moduloConcessoAlTenant } from '../util/moduliTenant.js';
 import { eliminaTenantCompleto } from '../services/eliminazioneTenant.js';
-import { disattivaCollaboratore, riattivaCollaboratore } from '../services/periodiCollaborazione.js';
+import { disattivaCollaboratore, riattivaCollaboratore, apriPeriodoIniziale } from '../services/periodiCollaborazione.js';
 import { urlWebhookWhatsapp } from '../util/urlPubblica.js';
 import { campoOrdinamento, creaMetaPaginazione, leggiPaginazione } from '../util/paginazione.js';
 import {
@@ -637,6 +637,26 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
             },
           });
 
+      // …e il suo periodo aperto, se non ce l'ha già.
+      //
+      // L'invariante di `periodo_collaborazione` è che `stato` e periodo aperto non divergono
+      // mai, e un utente creato senza periodo la violerebbe dal primo istante: su di lui
+      // `POST /tenant/utenti/:id/disattiva` risponde 409 «non risulta in forza», quindi il
+      // pulsante «Archivia» non funzionerebbe **mai** su una persona appena invitata — che è
+      // il caso più comune di tutti. La migrazione lo ha fatto per chi c'era già; da qui in
+      // avanti lo fa la rotta che crea le persone.
+      //
+      // Fuori dal ramo `create` di proposito: la funzione non fa niente se un periodo aperto
+      // c'è già, quindi chiamarla sempre rende l'operazione idempotente e sistema anche chi
+      // entra in uno studio per la prima volta passando da qui (un super admin riassegnato).
+      if (tenantAssegnato) {
+        await apriPeriodoIniziale({
+          tenantId: tenantAssegnato,
+          userId: utente.id,
+          attoreUserId: req.userId ?? null,
+        });
+      }
+
       await recordAudit({
         tenantId: tenantCorrente,
         ruolo: ruoloRichiedente,
@@ -781,6 +801,19 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
     try {
       const utente = await utenteGestibile(req, reply, id);
       if (!utente) return reply;
+
+      // Archiviata è archiviata, e questa rotta non ha niente a che vedere con l'archiviazione —
+      // ma la riga qui sotto scrive `stato: 'invitato'`, e su una persona archiviata quella
+      // riga la riporta dentro: sparirebbe dagli archiviati, ricomparirebbe fra gli attivi,
+      // tornerebbe assegnabile ai progetti e capace di entrare — senza che nessun periodo sia
+      // stato aperto. L'invariante che regge tutta questa funzione cadrebbe in silenzio, da una
+      // rotta che sembra non c'entrare. Riattivarla è l'operazione che apre un periodo nuovo:
+      // è quella che va usata, e il messaggio lo dice.
+      if (utente.stato === 'disattivato') {
+        return reply.code(409).send({
+          errore: 'Questa persona è archiviata: riattivala prima di rigenerarle la password.',
+        });
+      }
 
       const passwordTemporanea = generaPasswordTemporanea();
       const passwordHash = hashPassword(passwordTemporanea);

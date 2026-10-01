@@ -29,7 +29,10 @@ Regola **chi può fare cosa**. Due meccanismi:
   I collaboratori ricevono **403** prima ancora di arrivare al controllo sul bersaglio.
   L'archiviazione spegne l'utenza (`stato: 'disattivato'`) e chiude il periodo di collaborazione
   aperto — vedi §16. L'utente archiviato non accede più (403 al login) e sparisce dai selettori di
-  assegnazione.
+  assegnazione. La stessa guardia protegge `POST /tenant/utenti/:id/reset-password`, che su una
+  persona **archiviata** risponde **409**: quella rotta rimette l'utenza in `invitato`, e su un
+  archiviato la riporterebbe dentro senza riaprire nessun periodo. Per farla rientrare c'è la
+  riattivazione, che è riservata agli stessi due ruoli.
 
 ## 🔗 Collegamenti
 - **Impostazioni** (§16): la matrice e il team.
@@ -39,6 +42,8 @@ Regola **chi può fare cosa**. Due meccanismi:
 - Permesso insufficiente → **403** con il modulo e il livello.
 - Modulo disattivato per lo studio → **403**.
 - Un advisor non può creare un super_admin; scritture di ruolo respinte non avvengono comunque.
+- Reset password di una persona **archiviata** → **409**: non è una questione di permesso ma di
+  significato — la riattivazione è l'unica porta di rientro (§16).
 - **Autobloccaggio dello studio** (chiuso): nessuno può archiviare **sé stesso** né l'**ultimo
   responsabile attivo** dello studio — senza un advisor, `POST /tenant/utenti` risponde 403 a
   chiunque e il team non è più gestibile né riattivabile da lì. Entrambi → **400** con il motivo,
