@@ -104,7 +104,10 @@ e `docker compose … exec nginx nginx -s reload`. Il servizio `certbot` rinnova
 - [x] **Backup in cron** (01/10/2026) — vedi «Il backup» qui sotto. Restore-test eseguito.
       Restano la **copia off-site** (rclone) e la custodia di `BACKUP_ENCRYPTION_KEY` **fuori dal
       server**.
-- [ ] Monitoraggio disco/connessioni/slow query; aggiornamenti OS+PostgreSQL; rotazione password.
+- [x] **Sorveglianza in cron** (01/10/2026) — vedi «La sorveglianza» qui sotto: sette controlli con
+      avvisi su Telegram, e il controllo che il backup non sia morto in silenzio.
+- [ ] Rotazione delle password (`bluman_app` e proprietario) e `pg_stat_statements` per le query
+      lente. Il disco è coperto dalla sorveglianza, le **connessioni** no.
 - [ ] Tieni Supabase/Railway **accesi** come rollback per qualche giorno.
 
 ### Il backup (dal 01/10/2026)
@@ -144,6 +147,59 @@ Finché il server è vivo il restore funziona; se il server muore, senza una cop
 **Il restore-test è in fondo a `scripts/backup-vps.sh`**, commentato: si esegue a mano su un
 container usa-e-getta e confronta i **conteggi** con la produzione — non basta l'exit code, un dump
 che si apre vuoto passa ogni controllo superficiale.
+
+### La sorveglianza (dal 01/10/2026)
+
+```bash
+ssh-add "$HOME/.ssh/bluman_vps"
+ssh bluman@136.144.234.118 'cd /opt/bluman && bash ./scripts/monitor-vps.sh'
+bash ./scripts/monitor-vps.sh --riepilogo     # forza il riepilogo
+bash ./scripts/monitor-vps.sh --prova         # un messaggio di prova su Telegram
+```
+
+**Sette controlli**, ogni 10 minuti dal cron di `bluman`:
+
+| Controllo | Scatta quando | Cadenza |
+|---|---|---|
+| `backup` | il set più recente in `/var/backups/bluman` ha più di **26 ore** | ogni giro |
+| `disco` | `/` supera l'**85%** | ogni giro |
+| `memoria` | memoria **disponibile** sotto il **15%**, o swap oltre il **50%** | ogni giro |
+| `container` | uno dei **5** di lunga durata non è `Running` | ogni giro |
+| `health` | `/health` non risponde `200` **con `db:ok`** | ogni giro |
+| `apt` | ci sono aggiornamenti di **sicurezza** in attesa | 1×/giorno |
+| `postgres` | il digest di `postgres:17-alpine` è superato rispetto al registro | 1×/giorno |
+
+**Avvisa solo sui cambiamenti.** Ogni controllo ha uno stato ricordato in
+`/var/lib/bluman-monitor`, e parte un messaggio solo sulla **transizione**: 🔴 quando peggiora, 🟢
+quando rientra. Niente transizione, niente messaggio. Un controllo che scrive a ogni giro manda 144
+messaggi al giorno, viene silenziato entro sera e da lì non avvisa più nemmeno quando serve — che è
+peggio di non averlo.
+
+**Il riepilogo giornaliero delle 08:00 UTC** (10:00 italiane) arriva **anche quando va tutto bene**.
+È l'unico segnale che distingue «nessun guasto» da «il monitor è morto»: se un giorno non arriva, il
+problema è nel monitor.
+
+**`unknown` è uno stato a sé, non un «ok».** Dove un comando può fallire restituendo un numero che
+*sembra* valido, si verifica che abbia davvero funzionato prima di credergli. L'esempio è `apt`: se
+l'indice è vecchio di oltre una settimana, il conteggio degli aggiornamenti di sicurezza è **zero
+perché non sa che esistono** — un numero vero e una conclusione falsa, il modo peggiore di sbagliare
+su un controllo di sicurezza. In quel caso risponde `unknown` e lo si vede nel riepilogo.
+
+**Perché non c'è un controllo sullo swap.** Questa macchina **non ha swap** (`SwapTotal: 0`), e
+segnalarlo sarebbe un avviso che non può mai rientrare — lo swap c'è o non c'è, non c'è niente da
+riparare. Un allarme permanente è il modo più rapido per far silenziare il monitor. Il fatto resta
+scritto nel dettaglio e nel riepilogo. ⚠️ Il rovescio della medaglia è che senza swap l'OOM killer è
+l'unica risposta alla pressione di memoria, e la sua vittima più probabile è il container di
+Postgres: aggiungere un file di swap da 2G è una modifica di cinque minuti, ancora da fare.
+
+**Il bot Telegram.** Gli avvisi vanno a un bot **dedicato**, non a quello degli studi: le
+credenziali di quello stanno nella riga `Tenant` (`tg_bot_token`) perché servono alle OTP dei
+firmatari, e un guasto del server non deve comparire nella chat di un cliente. Creazione (una volta
+sola): **@BotFather** → `/newbot`, poi **scrivere `/start` al bot nuovo** — senza quel passaggio
+Telegram vieta al bot di iniziare una conversazione e l'invio fallisce con `400`. Il chat id si
+ricava con `curl -s "https://api.telegram.org/bot<TOKEN>/getUpdates"`. Token e chat id stanno in
+`/etc/bluman/monitor.env` (`600`, di `bluman`) e **non** nel `.env` dell'app: quello è dichiarato in
+`env_file:` dal compose, quindi ogni sua variabile finisce **dentro** il container dell'API.
 
 ## 8. Aggiornare un VPS già in servizio (dopo ogni push)
 

@@ -36,6 +36,15 @@ si usa il **`.exe` nativo** via `RAILWAY_BIN` (lo script lo supporta).
   filesystem su quella macchina), quindi proteggono dagli errori applicativi ma **non** dalla morte
   del disco o del server — per quello serve la copia off-site, ancora da configurare. Vedi
   `docs/vps-primo-avvio.md` §7.
+- **Sorveglianza VPS**: dal 01/10/2026 `scripts/monitor-vps.sh` gira ogni **10 minuti** dal cron di
+  `bluman` e avvisa su **Telegram** (bot dedicato, non quello degli studi). Sette controlli:
+  freschezza del backup, disco, memoria, container, `/health`, aggiornamenti di sicurezza `apt` e
+  digest dell'immagine `postgres`. **Avvisa solo sulle transizioni** (🔴 guasto, 🟢 rientro), più un
+  **riepilogo giornaliero** alle 08:00 UTC che arriva anche quando va tutto bene — è ciò che
+  distingue «nessun guasto» da «il monitor è morto». Dove un dato può ingannare risponde `unknown`
+  invece di `ok`: un indice `apt` vecchio conta zero aggiornamenti di sicurezza perché *non sa* che
+  esistono. Token e chat id in `/etc/bluman/monitor.env` (`600`), **non** nel `.env` dell'app, che
+  il compose inietta dentro il container dell'API. Vedi `docs/vps-primo-avvio.md` §7.
 
 ## 🔗 Collegamenti
 - Tutti i moduli: il deploy porta in produzione backend (Railway) e frontend (Vercel) insieme.
