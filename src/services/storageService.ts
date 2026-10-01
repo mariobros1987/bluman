@@ -45,9 +45,50 @@ export function nomeFileSicuro(filename: string): string {
  * l'invariante che tiene allineate le due metà.
  */
 export function nomeFileValido(filename: string): boolean {
-  if (!filename || filename.length > 255) return false;
+  if (!filename || filename.length > LUNGHEZZA_MASSIMA_NOME) return false;
   if (filename.includes('..')) return false;
   return !CARATTERI_VIETATI.test(filename);
+}
+
+/**
+ * Il tetto di lunghezza di un nome file. È il limite di `nomeFileValido` e vale anche per
+ * la scrittura: `accorciaNomeFile` garantisce che nessun nome prodotto lo superi.
+ *
+ * Da questo dipende anche `maxParamLength` dell'istanza Fastify: un nome più lungo del
+ * tetto viene rifiutato dal router **prima** che la rotta esista, con un 414 che non dice
+ * niente a chi legge. Tenendo i due valori uguali, ogni nome che l'applicazione scrive è
+ * anche un nome che l'applicazione sa servire.
+ */
+export const LUNGHEZZA_MASSIMA_NOME = 255;
+
+/**
+ * Accorcia un nome troppo lungo conservando l'estensione.
+ *
+ * `nomeFileSicuro` sanifica i caratteri ma non la lunghezza, e il nome finale aggiunge 51
+ * caratteri di prefisso (`<tenantId>_<timestamp>_`): un nome d'origine di 300 caratteri
+ * diventava un nome di 351, scritto su disco e poi rifiutato in lettura da
+ * `nomeFileValido` — un documento «collegato» e irraggiungibile. Si taglia il gambo e non
+ * l'estensione, perché è l'estensione che dice al browser come aprire il file.
+ */
+export function accorciaNomeFile(nome: string, massimo = LUNGHEZZA_MASSIMA_NOME): string {
+  if (nome.length <= massimo) return nome;
+
+  const punto = nome.lastIndexOf('.');
+  const lunghezzaEstensione = punto > 0 ? nome.length - punto : 0;
+  // Estensione solo se è tale: un punto a 200 caratteri dalla fine fa parte del nome, e
+  // comunque non si tiene un'estensione che da sola occuperebbe tutto lo spazio.
+  const estensione =
+    lunghezzaEstensione > 0 && lunghezzaEstensione <= 16 && lunghezzaEstensione < massimo
+      ? nome.slice(punto)
+      : '';
+
+  const gambo = (estensione ? nome.slice(0, punto) : nome)
+    .slice(0, massimo - estensione.length)
+    // Il taglio può lasciare un punto in coda al gambo: unito all'estensione darebbe `..`,
+    // che `nomeFileValido` rifiuta. Si toglie qui, dov'è nato.
+    .replace(/\.+$/, '');
+
+  return `${gambo || 'file'}${estensione}`;
 }
 
 /**
@@ -123,7 +164,10 @@ export async function uploadDocumento(
   // Senza `tenantId` (chiamate senza contesto, es. alcuni script) il nome resta nella
   // forma storica e il file segue le regole di prima.
   const prefissoTenant = tenantId ? `${tenantId}_` : '';
-  const safeFilename = `${prefissoTenant}${Date.now()}_${nomeFileSicuro(filename)}`;
+  // `accorciaNomeFile` e non solo `nomeFileSicuro`: il prefisso e il timestamp aggiungono
+  // 51 caratteri, quindi un nome d'origine lungo produrrebbe un nome che la rotta di
+  // lettura rifiuta — il file resterebbe scritto e irraggiungibile.
+  const safeFilename = accorciaNomeFile(`${prefissoTenant}${Date.now()}_${nomeFileSicuro(filename)}`);
   const sizeKb = `${Math.round(buffer.length / 1024)} KB`;
 
   // 1. Supabase Storage API Integration (Se le chiavi sono configurate)

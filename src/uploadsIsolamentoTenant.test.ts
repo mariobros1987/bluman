@@ -66,7 +66,12 @@ describe('GET /uploads/:filename — il file serve solo al suo studio', () => {
   // uploadDocumento per uno studio diverso da quello del test.
   const NOME_ALTRO = `${TENANT_ALTRO}_1757777000000_riservato.pdf`;
   const NOME_STORICO = '1757777000000_logo_storico.png';
-  const percorsi = [NOME_ALTRO, NOME_STORICO].map(n => path.join(CARTELLA_UPLOADS, n));
+  // La lunghezza vera dei nomi che `uploadDocumento` produce: prefisso del tenant, timestamp
+  // e un nome d'origine realistico. Il router di Fastify ha un tetto per parametro di rotta
+  // (100 per default): senza `maxParamLength` questo nome non arrivava nemmeno alla rotta e
+  // riceveva 414 — il file era su disco, ma nessuno poteva scaricarlo.
+  const NOME_LUNGO = `${TENANT_ALTRO}_1789810593282_lettera-d-incarico-professionale-engagement-letter-mario-emirati-arabi.pdf`;
+  const percorsi = [NOME_ALTRO, NOME_STORICO, NOME_LUNGO].map(n => path.join(CARTELLA_UPLOADS, n));
 
   beforeEach(() => {
     if (!fs.existsSync(CARTELLA_UPLOADS)) fs.mkdirSync(CARTELLA_UPLOADS, { recursive: true });
@@ -74,6 +79,7 @@ describe('GET /uploads/:filename — il file serve solo al suo studio', () => {
     // scrittura, non in lettura: qui conta solo che il file esista e sia servibile).
     fs.writeFileSync(path.join(CARTELLA_UPLOADS, NOME_ALTRO), Buffer.from('%PDF-1.7\ncontenuto riservato\n%%EOF'));
     fs.writeFileSync(path.join(CARTELLA_UPLOADS, NOME_STORICO), Buffer.from('89504e470d0a1a0a', 'hex'));
+    fs.writeFileSync(path.join(CARTELLA_UPLOADS, NOME_LUNGO), Buffer.from('%PDF-1.7\nlettera di incarico\n%%EOF'));
   });
 
   afterAll(() => {
@@ -133,5 +139,32 @@ describe('GET /uploads/:filename — il file serve solo al suo studio', () => {
       headers: { authorization: `Bearer ${tokenAdvisor(TENANT_STUDIO)}` },
     });
     expect(res.statusCode).toBe(200);
+  });
+
+  it('un nome lungo quanto quelli veri arriva alla rotta invece di fermarsi al router', async () => {
+    // Il tetto per parametro di rotta di Fastify è 100 caratteri e si applica PRIMA della
+    // rotta: il sintomo era un 414 senza corpo, non un errore dell'applicazione. Il caso è
+    // reale — «lettera-d-incarico-professionale-engagement-letter.pdf» sono 51 caratteri di
+    // nome, che con i 51 del prefisso superano il tetto di default.
+    const app = server();
+    const res = await app.inject({
+      method: 'GET',
+      url: `/uploads/${NOME_LUNGO}`,
+      headers: { authorization: `Bearer ${tokenAdvisor(TENANT_ALTRO)}` },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toContain('lettera di incarico');
+  });
+
+  it('anche per un nome lungo l\'isolamento tiene: all\'altro studio resta 404', async () => {
+    // La lunghezza non deve diventare una scorciatoia per saltare il controllo del prefisso.
+    const app = server();
+    const res = await app.inject({
+      method: 'GET',
+      url: `/uploads/${NOME_LUNGO}`,
+      headers: { authorization: `Bearer ${tokenAdvisor(TENANT_STUDIO)}` },
+    });
+    expect(res.statusCode).toBe(404);
+    expect(res.body).not.toContain('lettera di incarico');
   });
 });

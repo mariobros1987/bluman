@@ -19,6 +19,9 @@ import {
 
 import { signJwt, verifyJwt } from './util/jwt.js';
 import { apriStreamSse } from './services/notificheService.js';
+// Il tetto dei nomi file: la rotta `/uploads/:filename` lo usa in lettura, il router lo usa
+// come `maxParamLength`. Un valore solo, così le due metà non possono divergere.
+import { LUNGHEZZA_MASSIMA_NOME } from './services/storageService.js';
 // §14 — non `new PrismaClient()`: questo client impone il tenant corrente a ogni query,
 // altrimenti le policy RLS non vedono nessun contesto e non restituiscono nulla.
 import { prisma, attivaContestoTenant } from './util/prismaClient.js';
@@ -164,6 +167,18 @@ export function buildServer(app: AppPort): FastifyInstance {
     // che in base64 diventano ~40 MB di corpo: 45 MiB lascia margine per l'involucro
     // JSON restando la scansione il vero limite ai file.
     bodyLimit: 45 * 1024 * 1024,
+    // I nomi dei file caricati sono `<tenantId>_<timestamp>_<nomeOriginale>`: 51 caratteri
+    // di prefisso, più il nome d'origine. Il default di Fastify per un parametro di rotta è
+    // 100, quindi `/uploads/:filename` rispondeva **414 URI Too Long** a ogni nome più lungo
+    // — prima ancora di arrivare alla rotta. Il documento restava scritto su disco e
+    // irraggiungibile: «lettera-d-incarico-professionale-engagement-letter.pdf», 51
+    // caratteri di nome, bastava a superare il tetto.
+    //
+    // Qui vale lo stesso limite di `nomeFileValido`, che è il vero guardiano della lettura:
+    // ogni nome che l'applicazione scrive è anche un nome che l'applicazione sa servire.
+    // Dentro `routerOptions` e non come opzione di primo livello: da Fastify 5 la seconda
+    // è deprecata e stampa un avviso a ogni avvio.
+    routerOptions: { maxParamLength: LUNGHEZZA_MASSIMA_NOME },
   });
 
   // Supporta body vuoti con Content-Type: application/json (es. richieste DELETE, POST senza payload)

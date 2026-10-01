@@ -3,6 +3,7 @@ import path from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   CARTELLA_UPLOADS,
+  accorciaNomeFile,
   decodificaBase64Documento,
   mimeDaEstensione,
   nomeFileSicuro,
@@ -73,11 +74,45 @@ describe('coppia scrittura/lettura dei nomi file', () => {
       'ok_.-123.txt',
       'äöüß.png',
       'a\\b\\c.zip',
+      // La dimensione che l'invariante non copriva: i campioni corti passavano mentre un
+      // nome d'origine lungo — il caso vero — produceva un nome che la lettura rifiutava.
+      'lettera-d-incarico-professionale-engagement-letter-mario-emirati-arabi.pdf',
     ];
     for (const campione of campioni) {
-      const sicuro = `${Date.now()}_${nomeFileSicuro(campione)}`;
+      const sicuro = accorciaNomeFile(`${Date.now()}_${nomeFileSicuro(campione)}`);
       expect(nomeFileValido(sicuro)).toBe(true);
     }
+  });
+
+  it('un nome d\'origine lunghissimo resta leggibile: il tetto vale anche in scrittura', () => {
+    // Senza il taglio, il prefisso del tenant (36 + 1) e il timestamp (13 + 1) porterebbero
+    // un originale di 250 caratteri a 301: scritto su disco, poi rifiutato da
+    // `nomeFileValido` — un documento collegato e irraggiungibile.
+    const originale = `${'a'.repeat(250)}.pdf`;
+    const nome = accorciaNomeFile(`00000000-0000-0000-0000-000000000001_1789810593282_${nomeFileSicuro(originale)}`);
+
+    expect(nome.length).toBeLessThanOrEqual(255);
+    expect(nomeFileValido(nome)).toBe(true);
+    // L'estensione si conserva: è quella che dice al browser come aprire il file.
+    expect(nome.endsWith('.pdf')).toBe(true);
+    expect(nome.startsWith('00000000-0000-0000-0000-000000000001_1789810593282_')).toBe(true);
+  });
+
+  it('il taglio non lascia un `..` davanti all\'estensione', () => {
+    // Tagliando il gambo subito prima di un punto si otterrebbe un gambo che finisce con
+    // `.`: unito all'estensione darebbe `..`, che la lettura rifiuta per traversal — e il
+    // file resterebbe scritto e irraggiungibile, lo stesso guasto per un'altra strada.
+    // Il punto è messo esattamente al confine del taglio: 55 caratteri di gambo, poi `.`.
+    const nome = accorciaNomeFile(`${'b'.repeat(55)}.${'c'.repeat(100)}.pdf`, 60);
+
+    expect(nome).not.toContain('..');
+    expect(nomeFileValido(nome)).toBe(true);
+    // L'estensione si conserva: è quella che dice al browser come aprire il file.
+    expect(nome.endsWith('.pdf')).toBe(true);
+  });
+
+  it('un nome già corto non viene toccato', () => {
+    expect(accorciaNomeFile('breve.pdf')).toBe('breve.pdf');
   });
 
   it('nomeFileValido rifiuta traversal, separatori e nomi vuoti o troppo lunghi', () => {
