@@ -59,7 +59,11 @@ ARTEFATTI=()
 # ── 1. DATABASE ──────────────────────────────────────────────────────
 FILE="$DEST/bluman_${TS}.dump"
 echo "[$(date -Is)] Dump di ${POSTGRES_DB}…"
-$COMPOSE exec -T postgres pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --format=custom > "$FILE"
+# `</dev/null` su ogni chiamata a docker: il container eredita lo stdin e, invocato via ssh,
+# se lo mangia — la sessione si interrompe a metà SENZA errore. È la trappola già pagata due
+# volte in questo progetto (vedi distribuisci.sh), e l'ha ripagata il primo test di questo
+# script: metà delle righe sparite e nessun messaggio.
+$COMPOSE exec -T postgres pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --format=custom > "$FILE" </dev/null
 [ -s "$FILE" ] || { echo "ERRORE: dump vuoto"; rm -f "$FILE"; exit 1; }
 ARTEFATTI+=("$FILE")
 
@@ -86,7 +90,7 @@ echo "[$(date -Is)] Archivio dei documenti dal volume ${VOLUME_UPLOADS}…"
 # interpreterebbe gli argomenti. Il volume si monta in sola lettura (:ro) di proposito:
 # un backup non deve poter scrivere nel posto che sta fotografando.
 docker run --rm --entrypoint tar -v "${VOLUME_UPLOADS}:/data:ro" postgres:17-alpine \
-  -C /data -czf - . > "$FILE"
+  -C /data -czf - . > "$FILE" </dev/null
 [ -s "$FILE" ] || { echo "ERRORE: archivio documenti vuoto"; rm -f "$FILE"; exit 1; }
 N_DOCUMENTI="$(tar -tzf "$FILE" | grep -cv '/$' || true)"
 echo "[$(date -Is)] Documenti archiviati: ${N_DOCUMENTI} (voci di file, cartelle escluse)"
