@@ -21,6 +21,11 @@ si usa il **`.exe` nativo** via `RAILWAY_BIN` (lo script lo supporta).
   (migrazioni), `ADMIN_DATABASE_URL` (manutenzione/seed/backup, scavalca RLS).
 - **Regola**: **mentre `distribuisci.sh` gira NON si modificano file tracciati** — al passo 2 controlla
   l'albero sporco ed esce con errore. Si aspetta la fine del push o si committa prima.
+- **Un `git push` su `main` applica anche le migrazioni**, non solo il codice: Railway auto-deploya da
+  GitHub (dal 25/09/2026) e il container lancia `prisma migrate deploy` all'avvio. Una migrazione
+  committata e lasciata lì **non è inerte** — parte al primo push. Se una migrazione non va ancora
+  applicata alla produzione, va tenuta **fuori dal branch** (o il push va rimandato), non semplicemente
+  non eseguita a mano: `npx prisma migrate status` dice cosa è in attesa.
 - **Backup**: rimandato alla migrazione **VPS** Register.it (per ora dati di prova).
 
 ## 🔗 Collegamenti
