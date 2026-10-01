@@ -116,6 +116,49 @@ export async function creaUtenteTenantApi(input: {
   return creato;
 }
 
+/**
+ * Archivia un operatore che non lavora più nello studio (§2bis).
+ *
+ * Non è una cancellazione: il backend chiude il periodo di collaborazione — con il giorno in
+ * cui la persona ha smesso — e spegne l'utenza. La persona resta, i progetti a cui ha lavorato
+ * restano, e se un giorno rientra si riapre un periodo nuovo senza perdere il precedente.
+ *
+ * `dataFine` è precompilata a oggi dalla schermata ma resta modificabile: serve a registrare
+ * il giorno vero in cui la collaborazione è finita, che non è per forza quello in cui
+ * qualcuno si ricorda di archiviare.
+ */
+export async function archiviaUtenteTenantApi(
+  userId: string,
+  opzioni?: { dataFine?: string; motivo?: string },
+) {
+  const res = await apiFetch(`${API_BASE}/tenant/utenti/${userId}/disattiva`, {
+    method: 'POST',
+    headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ dataFine: opzioni?.dataFine, motivo: opzioni?.motivo }),
+  });
+  if (!res.ok) {
+    throw new Error(await leggiErroreApi(res, 'Archiviazione non riuscita'));
+  }
+  // La lista del team è in cache: senza invalidarla, l'archiviato resterebbe in elenco fino
+  // al prossimo refresh e sembrerebbe che il pulsante non abbia fatto niente.
+  invalidateCache('team_utenti');
+  return await res.json() as { ok: boolean; id: string; nome: string; dataFine: string; messaggio: string };
+}
+
+/** Riporta in forza un operatore archiviato: apre un **nuovo** periodo, il vecchio resta. */
+export async function riattivaUtenteTenantApi(userId: string, opzioni?: { dataInizio?: string }) {
+  const res = await apiFetch(`${API_BASE}/tenant/utenti/${userId}/riattiva`, {
+    method: 'POST',
+    headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ dataInizio: opzioni?.dataInizio }),
+  });
+  if (!res.ok) {
+    throw new Error(await leggiErroreApi(res, 'Riattivazione non riuscita'));
+  }
+  invalidateCache('team_utenti');
+  return await res.json() as { ok: boolean; id: string; nome: string; dataInizio: string; messaggio: string };
+}
+
 // `sendInviteCollaboratoreApi` è stata rimossa: costruiva le credenziali SMTP dello studio
 // leggendole da `localStorage` e le spediva alla funzione serverless pubblica insieme alla
 // password temporanea del nuovo collaboratore. L'invito lo manda `POST /tenant/utenti`, che è

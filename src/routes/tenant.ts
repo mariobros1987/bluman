@@ -20,6 +20,7 @@ import { usernameBotTelegram } from '../services/telegramService.js';
 import { inMemoryTenantStore, recordAudit, senzaHash, TENANT_DEFAULT } from '../util/serverHelpers.js';
 import { moduloConcessoAlTenant } from '../util/moduliTenant.js';
 import { eliminaTenantCompleto } from '../services/eliminazioneTenant.js';
+import { disattivaCollaboratore, riattivaCollaboratore } from '../services/periodiCollaborazione.js';
 import { urlWebhookWhatsapp } from '../util/urlPubblica.js';
 import { campoOrdinamento, creaMetaPaginazione, leggiPaginazione } from '../util/paginazione.js';
 import {
@@ -535,6 +536,11 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
         // Il super_admin vede anche gli utenti senza tenant (gli altri super_admin);
         // per ogni altro ruolo la lista è strettamente limitata al proprio tenant.
         where: ruoloRichiedente === 'super_admin' ? { OR: [{ tenantId }, { tenantId: null }] } : { tenantId },
+        // I periodi di collaborazione servono alla schermata del team: le righe attive mostrano
+        // «in forza dal …», e la sezione degli archiviati mostra la data in cui la persona ha
+        // smesso. Sono pochi per studio e la lista è già letta tutta: una query in più qui vale
+        // meno di una seconda chiamata dal browser.
+        include: { periodiCollaborazione: { orderBy: { dal: 'asc' } } },
         orderBy: { createdAt: 'asc' },
       });
       return reply.send(utenti.map(senzaHash));
@@ -687,6 +693,83 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
   });
 
   /**
+   * Legge una data ISO (`AAAA-MM-GG`, oppure una data-ora completa) dal corpo della richiesta.
+   * Restituisce `null` se il testo c'è ma non è una data — chi chiama risponde 400.
+   *
+   * Il giorno si costruisce a **mezzanotte locale**, non con `new Date('2026-10-01')`: quella
+   * forma viene interpretata come mezzanotte UTC e in un fuso a ovest di Greenwich diventa il
+   * giorno prima. Una data di fine che si sposta di un giorno da sola è un difetto che nessuno
+   * nota finché non guarda un registro.
+   */
+  function leggiData(valore: unknown): Date | null {
+    if (typeof valore !== 'string' || !valore.trim()) return null;
+    const testo = valore.trim();
+
+    const soloGiorno = /^(\d{4})-(\d{2})-(\d{2})$/.exec(testo);
+    if (soloGiorno) {
+      const anno = Number(soloGiorno[1]);
+      const mese = Number(soloGiorno[2]);
+      const giorno = Number(soloGiorno[3]);
+      const data = new Date(anno, mese - 1, giorno);
+      // `new Date(2026, 1, 31)` non è un errore per JavaScript: scivola al 3 marzo. Se le tre
+      // parti non tornano identiche, la data scritta non esiste e va rifiutata.
+      const tornata =
+        data.getFullYear() === anno && data.getMonth() === mese - 1 && data.getDate() === giorno;
+      return tornata ? data : null;
+    }
+
+    const data = new Date(testo);
+    return Number.isNaN(data.getTime()) ? null : data;
+  }
+
+  /**
+   * La guardia comune alle rotte che agiscono su **una persona del team**: resettare la
+   * password, archiviarla, riattivarla.
+   *
+   * Erano tre controlli copiati dentro `reset-password` (ruolo ammesso, advisor limitato al
+   * proprio studio, advisor che non tocca un super admin). Con tre rotte invece di una,
+   * lasciarli duplicati significava tre occasioni di farli divergere: la rotta nuova che
+   * dimentica il terzo controllo è un advisor che disattiva il super admin della piattaforma.
+   *
+   * Restituisce l'utente, oppure `null` **dopo aver già risposto** con 403/404 — chi chiama
+   * deve solo fare `if (!utente) return reply;`.
+   */
+  async function utenteGestibile(req: any, reply: any, id: string) {
+    const ruoloRichiedente = req.ruolo as string | undefined;
+    const tenantCorrente = req.tenantId as string | undefined;
+
+    if (ruoloRichiedente !== 'super_admin' && ruoloRichiedente !== 'advisor') {
+      reply.code(403).send({
+        errore: 'Solo il super admin o il responsabile dello studio possono gestire gli utenti del team.',
+      });
+      return null;
+    }
+
+    const utente = await prisma.user.findUnique({ where: { id } });
+    if (!utente) {
+      reply.code(404).send({ errore: 'Utente non trovato' });
+      return null;
+    }
+
+    // Un advisor tocca solo il proprio studio.
+    if (ruoloRichiedente === 'advisor' && utente.tenantId !== tenantCorrente) {
+      reply.code(403).send({ errore: 'Non puoi modificare utenti appartenenti ad altri studi.' });
+      return null;
+    }
+
+    // Il ruolo guardato è quello **esistente**: un super admin con `tenant_id` valorizzato per
+    // errore supererebbe il controllo qui sopra, perché apparterrebbe allo stesso studio
+    // dell'advisor. È la stessa condizione che il vecchio auto-seed di `listaUtenti` aveva
+    // davvero creato a database.
+    if (ruoloRichiedente !== 'super_admin' && utente.ruolo === 'super_admin') {
+      reply.code(403).send({ errore: 'Non autorizzato a modificare il Super Admin.' });
+      return null;
+    }
+
+    return utente;
+  }
+
+  /**
    * Reset Password Utente / Collaboratore dello Studio
    * Riservato a Super Admin e Lead Advisor dello Studio.
    */
@@ -695,25 +778,9 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
     const tenantCorrente = req.tenantId as string;
     const { id } = req.params;
 
-    if (ruoloRichiedente !== 'super_admin' && ruoloRichiedente !== 'advisor') {
-      return reply.code(403).send({ errore: 'Solo il Super Admin o il Lead Advisor possono resettare le password degli utenti.' });
-    }
-
     try {
-      const utente = await prisma.user.findUnique({ where: { id } });
-      if (!utente) {
-        return reply.code(404).send({ errore: 'Utente non trovato' });
-      }
-
-      // Un advisor può resettare solo utenti del proprio studio
-      if (ruoloRichiedente === 'advisor' && utente.tenantId !== tenantCorrente) {
-        return reply.code(403).send({ errore: 'Non puoi resettare password di utenti appartenenti ad altri studi.' });
-      }
-
-      // Non permettere a un advisor di resettare la password di un super_admin
-      if (ruoloRichiedente !== 'super_admin' && utente.ruolo === 'super_admin') {
-        return reply.code(403).send({ errore: 'Non autorizzato a resettare la password del Super Admin.' });
-      }
+      const utente = await utenteGestibile(req, reply, id);
+      if (!utente) return reply;
 
       const passwordTemporanea = generaPasswordTemporanea();
       const passwordHash = hashPassword(passwordTemporanea);
@@ -746,6 +813,151 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
       });
     } catch (err: any) {
       return reply.code(500).send({ errore: err.message || 'Errore reset password utente' });
+    }
+  });
+
+  /**
+   * Archivia un operatore che non lavora più nello studio (§2bis).
+   *
+   * Non è una cancellazione, ed è una scelta: i progetti, le ore e i documenti puntano a questa
+   * persona con chiavi esterne, e cancellarla vorrebbe dire o romperli o azzerarli. Si chiude
+   * il periodo di collaborazione — con il giorno in cui ha smesso — e si spegne l'utenza.
+   *
+   * La data è precompilata a oggi nella UI ma resta modificabile, ed è il server a decidere
+   * cosa vale: un browser non è una fonte attendibile per una data che finisce agli atti.
+   */
+  server.post<{
+    Params: { id: string };
+    Body: { dataFine?: string; motivo?: string };
+  }>('/tenant/utenti/:id/disattiva', async (req, reply) => {
+    const { id } = req.params;
+
+    try {
+      const utente = await utenteGestibile(req, reply, id);
+      if (!utente) return reply;
+
+      // Nessuno archivia sé stesso: è il modo più veloce per restare fuori dal proprio studio
+      // senza accorgersene, e non c'è niente che lo renda desiderabile.
+      if (utente.id === req.userId) {
+        return reply.code(400).send({
+          errore: 'Non puoi archiviare la tua utenza: fatti archiviare da un altro responsabile.',
+        });
+      }
+
+      // Un super admin di piattaforma non è un operatore di questo studio: non ha periodi e
+      // non si archivia da qui. La sua disattivazione è una faccenda di piattaforma.
+      if (utente.tenantId === null) {
+        return reply.code(400).send({
+          errore: 'Un super admin della piattaforma non appartiene a uno studio e non si archivia da qui.',
+        });
+      }
+
+      const dataFine = req.body?.dataFine ? leggiData(req.body.dataFine) : new Date();
+      if (!dataFine) {
+        return reply.code(400).send({ errore: 'Data di fine non valida: usa il formato AAAA-MM-GG.' });
+      }
+
+      const esito = await disattivaCollaboratore({
+        tenantId: utente.tenantId,
+        userId: utente.id,
+        dataFine,
+        motivo: req.body?.motivo ?? null,
+        attoreUserId: req.userId ?? null,
+      });
+
+      if (!esito.ok) return reply.code(esito.stato).send({ errore: esito.errore });
+
+      // L'audit si scrive **dopo**, quando l'archiviazione è davvero avvenuta. Prima lascerebbe
+      // agli atti un'archiviazione che non c'è stata — per esempio quella dell'ultimo
+      // responsabile, che il servizio ha appena rifiutato.
+      await recordAudit({
+        tenantId: utente.tenantId,
+        userId: req.userId,
+        ruolo: req.ruolo as string | undefined,
+        azione: 'UTENTE_DISATTIVATO',
+        entita: utente.nome,
+        dettagli:
+          `Archiviato ${utente.nome} (${utente.email}) con data di fine ` +
+          `${dataFine.toLocaleDateString('it-IT')}${req.body?.motivo ? ` — motivo: ${req.body.motivo}` : ''}`,
+        ipAddress: req.ip,
+      });
+
+      return reply.send({
+        ok: true,
+        id: utente.id,
+        nome: utente.nome,
+        dataFine: esito.al,
+        messaggio: `${utente.nome} è stato archiviato. L'utenza non è più attiva e non compare più tra gli operatori assegnabili.`,
+      });
+    } catch (err: any) {
+      return reply.code(500).send({ errore: err.message || 'Errore archiviazione utente' });
+    }
+  });
+
+  /**
+   * Riporta in forza un operatore archiviato (§2bis): apre un **nuovo** periodo.
+   *
+   * Il periodo precedente non si tocca. Chi rientra dopo due anni ha due righe nella sua
+   * storia, ed è esattamente ciò che il registro deve raccontare.
+   */
+  server.post<{
+    Params: { id: string };
+    Body: { dataInizio?: string };
+  }>('/tenant/utenti/:id/riattiva', async (req, reply) => {
+    const { id } = req.params;
+
+    try {
+      const utente = await utenteGestibile(req, reply, id);
+      if (!utente) return reply;
+
+      if (utente.tenantId === null) {
+        return reply.code(400).send({
+          errore: 'Un super admin della piattaforma non appartiene a uno studio e non si riattiva da qui.',
+        });
+      }
+
+      const dataInizio = req.body?.dataInizio ? leggiData(req.body.dataInizio) : new Date();
+      if (!dataInizio) {
+        return reply.code(400).send({ errore: 'Data di inizio non valida: usa il formato AAAA-MM-GG.' });
+      }
+
+      const esito = await riattivaCollaboratore({
+        tenantId: utente.tenantId,
+        userId: utente.id,
+        dataInizio,
+        attoreUserId: req.userId ?? null,
+      });
+
+      if (!esito.ok) return reply.code(esito.stato).send({ errore: esito.errore });
+
+      await recordAudit({
+        tenantId: utente.tenantId,
+        userId: req.userId,
+        ruolo: req.ruolo as string | undefined,
+        azione: 'UTENTE_RIATTIVATO',
+        entita: utente.nome,
+        dettagli:
+          `Riattivato ${utente.nome} (${utente.email}) con data di inizio ` +
+          `${dataInizio.toLocaleDateString('it-IT')}`,
+        ipAddress: req.ip,
+      });
+
+      return reply.send({
+        ok: true,
+        id: utente.id,
+        nome: utente.nome,
+        dataInizio: esito.dal,
+        // Chi era `invitato` quando è stato archiviato torna `invitato`: non aveva mai cambiato
+        // la password temporanea, e riattivarlo come `attivo` gli darebbe un accesso pieno retto
+        // da una password che chi l'ha creato conosce.
+        stato: esito.statoUtente,
+        messaggio:
+          esito.statoUtente === 'invitato'
+            ? `${utente.nome} è di nuovo in forza, ma non aveva ancora impostato una password personale: al primo accesso gli verrà chiesto di cambiarla.`
+            : `${utente.nome} è di nuovo in forza. Può accedere e ricompare tra gli operatori assegnabili.`,
+      });
+    } catch (err: any) {
+      return reply.code(500).send({ errore: err.message || 'Errore riattivazione utente' });
     }
   });
 

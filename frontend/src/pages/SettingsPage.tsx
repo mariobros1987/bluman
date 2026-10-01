@@ -18,6 +18,7 @@ import { TabCompliance } from '../components/settings/TabCompliance';
 import { fetchModuliTenant } from '../api/kyc';
 import { InviteUserModal } from '../components/settings/InviteUserModal';
 import { ResetPasswordModal } from '../components/settings/ResetPasswordModal';
+import { ArchiviaOperatoreModal } from '../components/settings/ArchiviaOperatoreModal';
 import styles from './Settings.module.css';
 
 type Tab = 'company' | 'users' | 'sdi' | 'invoice_design' | 'channels' | 'compliance' | 'manutenzione' | 'sicurezza';
@@ -71,6 +72,8 @@ export function SettingsPage() {
 
   // Stati Reset Password Utente
   const [resetModalUser, setResetModalUser] = useState<any | null>(null);
+  // Archiviazione / riattivazione di un operatore (§2bis): la persona e il verso dell'azione.
+  const [archiviaModal, setArchiviaModal] = useState<{ persona: any; verso: 'archivia' | 'riattiva' } | null>(null);
   const [resettingPassword, setResettingPassword] = useState(false);
   const [resetResult, setResetResult] = useState<{ email: string; passwordTemporanea: string; nome: string } | null>(null);
   const [copiedResetPass, setCopiedResetPass] = useState(false);
@@ -821,6 +824,8 @@ export function SettingsPage() {
           setResetResult={setResetResult}
           setResetError={setResetError}
           setCopiedResetPass={setCopiedResetPass}
+          onArchivia={(persona, verso) => setArchiviaModal({ persona, verso })}
+          puoGestire={currentRuolo === 'super_admin' || currentRuolo === 'advisor'}
         />
       )}
 
@@ -892,6 +897,16 @@ export function SettingsPage() {
           handleResetUserPassword={handleResetUserPassword}
           copiedResetPass={copiedResetPass}
           setCopiedResetPass={setCopiedResetPass}
+        />
+      )}
+
+      {/* Modal Archiviazione / Riattivazione Operatore (§2bis) */}
+      {archiviaModal && (
+        <ArchiviaOperatoreModal
+          persona={archiviaModal.persona}
+          verso={archiviaModal.verso}
+          onClose={() => setArchiviaModal(null)}
+          onFatto={loadTenantData}
         />
       )}
     </div>

@@ -126,6 +126,9 @@ model Tenant {
   createdAt            DateTime @default(now()) @map("created_at")
 
   users               User[]
+  /// I periodi di collaborazione delle persone dello studio: chi è in forza, da quando,
+  /// e quando ha smesso. Vedi `PeriodoCollaborazione`.
+  periodiCollaborazione PeriodoCollaborazione[]
   clienti             Cliente[]
   articoli            Articolo[]
   moduli              ModuloTemplate[]
@@ -201,8 +204,48 @@ model User {
   oreRegistrate      OraTimesheet[]      @relation("TimesheetUtente")
   oreApprovate       OraTimesheet[]      @relation("TimesheetApprovatore")
   oreRifiutate       OraTimesheet[]      @relation("TimesheetRifiutante")
+  /// Storia dei periodi in cui questa persona ha lavorato per lo studio: uno solo aperto
+  /// (`al` nullo) quando è in forza, uno chiuso per ogni stagione conclusa.
+  periodiCollaborazione PeriodoCollaborazione[]
 
   @@map("user")
+}
+
+/// §2bis — il tempo di una persona nello studio, non il suo stato di accesso.
+///
+/// `User.stato` dice se l'utenza funziona **adesso**; questa tabella dice **da quando a
+/// quando** la persona ha lavorato qui. Le due cose non possono divergere: chi scrive l'una
+/// scrive l'altra, e lo fa solo da `src/services/periodiCollaborazione.ts`.
+///
+/// Serve una tabella e non due colonne su `user` perché le stagioni possono essere più d'una:
+/// una persona se ne va e rientra, e con `dataAssunzione`/`dataCessazione` il secondo periodo
+/// cancellerebbe il primo. Qui restano tutti.
+model PeriodoCollaborazione {
+  id       String    @id @default(uuid())
+  /// Sempre valorizzato: un periodo appartiene a uno studio. Il super admin di piattaforma
+  /// (`tenant_id` nullo su `user`) non è un operatore di nessuno studio e non ne ha.
+  tenantId String    @map("tenant_id")
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId   String    @map("user_id")
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dal      DateTime
+  /// Nullo finché il periodo è aperto, cioè finché la persona è in forza.
+  al       DateTime?
+  /// Lo `stato` che l'utenza aveva **prima** di essere archiviata.
+  ///
+  /// Serve al rientro. Chi era `invitato` — creato ma mai entrato, con una password temporanea
+  /// che doveva essere cambiata al primo accesso — non deve diventare `attivo` per il solo fatto
+  /// di essere stato archiviato e riattivato: si ritroverebbe con un accesso pieno retto da una
+  /// password che chiunque l'abbia creata conosce. Ripristinando lo stato di prima, l'obbligo di
+  /// cambiare password resta dov'era.
+  statoPrecedente StatoUtente? @map("stato_precedente")
+  motivo   String?
+  /// Chi ha archiviato o riattivato: `user.id` di chi ha premuto il pulsante.
+  creatoDa String?   @map("creato_da")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, userId])
+  @@map("periodo_collaborazione")
 }
 
 model Cliente {

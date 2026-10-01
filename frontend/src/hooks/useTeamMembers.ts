@@ -135,7 +135,14 @@ export async function loadTeamMembersFromDb(): Promise<TeamMember[]> {
   try {
     const apiUsers = await fetchUtentiTenant();
     if (Array.isArray(apiUsers) && apiUsers.length > 0) {
-      const filtered = apiUsers.filter((u: any) => u.tenantId === currentTenantId);
+      // §2bis — gli archiviati restano a database (i progetti a cui hanno lavorato li citano)
+      // ma non sono più persone dello studio: offrirli in un selettore di assegnazione
+      // significherebbe assegnare lavoro a chi non c'è. Il filtro sta qui, in un punto solo,
+      // perché è da qui che passano tutti i selettori della app: `AssignOperatorModal`,
+      // `ModaleNuovoEvento`, `CalendarioProgettoTab`, `CalendarPage`, `TabCompliance`, `Avatar`.
+      const filtered = apiUsers.filter(
+        (u: any) => u.tenantId === currentTenantId && u.stato !== 'disattivato',
+      );
       if (filtered.length > 0) {
         return soloAssegnabili(filtered);
       }
@@ -150,7 +157,8 @@ export async function loadTeamMembersFromDb(): Promise<TeamMember[]> {
   const customUsers: any[] = customStr ? JSON.parse(customStr) : [];
 
   if (customUsers.length > 0) {
-    return soloAssegnabili(customUsers);
+    // Stesso filtro del ramo API: anche la copia locale non deve riproporre un archiviato.
+    return soloAssegnabili(customUsers.filter((u: any) => u.stato !== 'disattivato'));
   }
 
   // 3. Nessuna squadra. Ed è la risposta giusta, non una resa.
