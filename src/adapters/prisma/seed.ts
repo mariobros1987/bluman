@@ -100,9 +100,21 @@ async function main() {
   const m02 = await seedModulo(tenant.id, moduloCorporateStructuring);
 
   // dipendenza M02 -> M01 (§7ter), coerente con moduloCorporateStructuring.dipendenzeDa
-  await prisma.moduloDipendenzaTemplate.create({
-    data: { tenantId: tenant.id, moduloTemplateId: m02.id, dipendeDaModuloTemplateId: m01.id },
+  // Idempotente come seedModulo: `modulo_dipendenza_template` non ha un vincolo di unicità,
+  // quindi un `create` nudo duplicava la dipendenza a ogni rilancio — la stessa classe di
+  // difetto che ha prodotto le micro-voci doppie in prova (vedi il commento in seedModulo).
+  const dipendenzaEsistente = await prisma.moduloDipendenzaTemplate.findFirst({
+    where: {
+      tenantId: tenant.id,
+      moduloTemplateId: m02.id,
+      dipendeDaModuloTemplateId: m01.id,
+    },
   });
+  if (!dipendenzaEsistente) {
+    await prisma.moduloDipendenzaTemplate.create({
+      data: { tenantId: tenant.id, moduloTemplateId: m02.id, dipendeDaModuloTemplateId: m01.id },
+    });
+  }
 
   // ── Creazione Progetti Istituzionali nel DB PostgreSQL ───────────────
   let clienteDemo = await prisma.cliente.findFirst({ where: { tenantId: tenant.id, nome: 'Holding Beta S.r.l.' } });
@@ -112,10 +124,10 @@ async function main() {
         tenantId: tenant.id,
         nome: 'Holding Beta S.r.l.',
         tipo: 'company',
-        partitaIva: 'IT09876543210',
+        piva: 'IT09876543210',
         codiceFiscale: 'BLUCD90A01H501X',
         sedeLegale: 'Via Montenapoleone 8, Milano',
-        codiceSdi: 'SUBM70N',
+        sdiCode: 'SUBM70N',
         email: 'client@holdingbeta.advisory',
       },
     });

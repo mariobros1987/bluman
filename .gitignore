@@ -40,6 +40,10 @@ scratch/
 # Configurazione locale dell'assistente CLI
 .claude/
 
+# Bundle e file della migrazione da Bluecode (esportaDaBluecode.ts → importaInBluecode.ts):
+# contengono documenti e anagrafiche di clienti reali, mai nel repo
+.tmp-migrazione/
+
 # Relitti del vecchio backend Python: mai più nel repo
 
 # Artefatti Playwright (E2E)

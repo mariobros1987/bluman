@@ -24,7 +24,9 @@ dist
 build
 frontend/dist
 
-# Il frontend non gira in questo container: lo serve Vercel
+# Il frontend non gira in questo container: è una SPA servita da fuori. Sul VPS la serve
+# nginx dalla build su disco (`frontend/dist`, montata dal compose); nel deployment Vercel
+# la serve la CDN. In nessuno dei due casi entra nell'immagine dell'API.
 frontend
 
 # Materiale di lavoro locale

@@ -14,14 +14,44 @@ import { PrismaClient } from '@prisma/client';
 // `tsx` non legge `.env` da sé.
 dotenv.config();
 
-// `ADMIN_DATABASE_URL` e non `DATABASE_URL`: la domanda riguarda tutti i tenant, quindi
-// serve il ruolo che scavalca RLS. È uno degli usi ammessi dalla regola 1 (script di
-// manutenzione), non una scorciatoia dentro una rotta HTTP.
+// `ADMIN_DATABASE_URL`, in mancanza `DIRECT_URL` (il proprietario dello schema: la stessa
+// risoluzione di `prismaAmministrativo`), e solo per ultimo `DATABASE_URL` — che in sviluppo
+// locale è spesso già un ruolo con tutti i privilegi. La domanda riguarda TUTTI i tenant,
+// quindi serve un ruolo che scavalchi la RLS: con `bluman_app` le policy filtrano e la
+// risposta diventa «0 utenti» — senza errore, e per questo credibile.
+// È uno degli usi ammessi dalla regola 1 (script di manutenzione), non una scorciatoia
+// dentro una rotta HTTP.
 const prisma = new PrismaClient({
-  datasources: { db: { url: process.env.ADMIN_DATABASE_URL || process.env.DATABASE_URL } },
+  datasources: {
+    db: {
+      url: process.env.ADMIN_DATABASE_URL || process.env.DIRECT_URL || process.env.DATABASE_URL,
+    },
+  },
 });
 
 async function main() {
+  // Prima di dare un verdetto, accerta di poterlo dare. Con un ruolo che non scavalca la RLS
+  // le policy filtrano le righe, e il conteggio qui sotto non è «zero utenti»: è «zero utenti
+  // VISIBILI A QUESTO RUOLO». Il verdetto che ne uscirebbe — «nessun super_admin, dopo il
+  // rilascio nessuno entra» — è falso, e questo script serve proprio a decidere se rilasciare.
+  const [ruolo] = await prisma.$queryRaw<
+    Array<{ utente: string; superuser: boolean; bypassrls: boolean }>
+  >`SELECT current_user AS utente, rolsuper AS superuser, rolbypassrls AS bypassrls
+      FROM pg_roles
+     WHERE rolname = current_user`;
+
+  if (!ruolo || (!ruolo.superuser && !ruolo.bypassrls)) {
+    console.error(`\n❌ Ruolo connesso: «${ruolo?.utente ?? 'sconosciuto'}».`);
+    console.error(
+      '   Non scavalca la RLS (rolsuper=false, rolbypassrls=false), quindi le policy filtrano',
+    );
+    console.error('   le righe: qualunque conteggio sarebbe «0», e sarebbe falso.');
+    console.error('   Nessun verdetto. Imposta ADMIN_DATABASE_URL (o DIRECT_URL) e riprova.');
+    await prisma.$disconnect();
+    process.exitCode = 1;
+    return;
+  }
+
   const utenti = await prisma.user.findMany({
     select: { email: true, ruolo: true, tenantId: true, passwordHash: true, stato: true },
     orderBy: [{ ruolo: 'asc' }, { email: 'asc' }],

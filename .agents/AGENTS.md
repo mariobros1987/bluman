@@ -578,6 +578,10 @@ Suite end-to-end dei tre flussi critici (login con cambio password, firma SES da
      ```
    - **Frontend con webhook Vercel appeso**: se il deploy da webhook GitHub resta UNKNOWN/0ms, forzare il deploy esplicito via CLI con `./scripts/distribuisci.sh --solo-push` (fa `vercel --prod --scope fanta-ia`, che scavalca il webhook).
    - Dopo ogni deploy backend, verificare sempre con una chiamata live che le nuove rotte rispondano (sonda §34/§414: `401` con corpo `{errore}`, **mai** `404 Not Found`).
+   - **Migrazione al VPS Register.it (avviata il 30/09/2026)** — secondo bersaglio di deploy, accanto a Railway+Vercel e non ancora in servizio. Le decisioni prese cambiano due cose che il codice già contiene, quindi vanno sapute:
+     - **Ripartenza pulita**: nessun travaso da Supabase. Il database nasce vuoto e si popola con `bootstrap` + seed; la §5 di `PIANO_MIGRAZIONE_VPS.md` (dump/restore) non si applica.
+     - **Frontend servito dal VPS**, stessa origine dell'API. Qui c'è la trappola: la build **deve** essere fatta con `VITE_API_SAME_ORIGIN=true` (`cd frontend && VITE_API_SAME_ORIGIN=true npm run build`). Senza, `frontend/src/api/http.ts` rifiuta la base perché coincide con l'origine della pagina — la stessa condizione che su Vercel è un errore — e **ricade sul backend Railway in silenzio**: l'app funziona e parla con l'ambiente sbagliato. Il flag non va in `.env.production`, che Vite caricherebbe anche nella build di Vercel.
+     - Storage documenti su disco locale (niente `SUPABASE_URL`/`SUPABASE_SERVICE_KEY`). Sequenza completa in `PIANO_MIGRAZIONE_VPS.md` §3-bis e `docs/vps-primo-avvio.md`.
 
 10. **I Test E2E Girano solo sull'Ambiente Usa-e-Getta, Mai su Supabase**:
    - La suite Playwright (`npm run test:e2e`) gira su container Docker locali (`bluman-e2e-pg` porta 5433, `bluman-e2e-mailpit` 1025/8025) creati da `scripts/e2e/prepara.mjs`. Il database Supabase di produzione non viene mai toccato: né query, né seed, né `migrate`.

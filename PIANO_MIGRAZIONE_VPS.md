@@ -2,6 +2,7 @@
 
 _Redatto il 19/09/2026. Motivo dichiarato: lentezza nel caricamento di progetti e clienti; si vuole più velocità di lettura del database._
 _Aggiornato il 20/09/2026 con le misure di rete di produzione (§0-bis) e le specifiche VPS (§4-bis)._
+_Aggiornato il 30/09/2026 con le decisioni effettivamente prese e il VPS reale — §3-bis._
 
 > **Questo documento è una guida operativa passo-passo.** Ogni fase ha un obiettivo, i comandi, e come verificare che sia andata a buon fine. Le fasi vanno fatte **in ordine**. Non saltare la Fase 0.
 
@@ -100,6 +101,28 @@ Browser ──► Vercel (frontend React)  ──► Railway (backend Fastify) �
 > - **Storage (§6.3 obbligatoria):** migrare il bucket `bluman-documents` su MinIO (S3-compatibile) o disco locale + fallback `storageService.ts`; adattare gli URL firmati; aggiungere i file ai backup (§8).
 > - **Frontend:** "tutto su VPS" preso alla lettera includerebbe anche il frontend, ma servirlo da una sola macchina fa perdere la CDN edge di Vercel (che **non** è il collo di bottiglia delle letture). Raccomandazione: **lasciare il frontend su Vercel**. Da confermare con l'utente; se confermato "anche frontend sul VPS", aggiungere reverse proxy per i file statici della build Vite + `Cache-Control`.
 > - Con l'Opzione B **non servono più** `SUPABASE_URL`/`SUPABASE_SERVICE_KEY`: vengono sostituite dalle credenziali MinIO/S3 locali.
+
+---
+
+## 3-bis. Decisioni prese (30/09/2026) — cosa cambia in questo piano
+
+Le domande di §3 sono state chiuse dal titolare. Alcune fasi qui sotto **non valgono più** per questa
+migrazione: vanno lette sapendo cosa è stato deciso.
+
+| Decisione | Effetto su questo documento |
+|---|---|
+| **Riparto pulito.** Nessun travaso da Supabase: il database nasce vuoto e si popola con `bootstrap` + seed. | **La §5 (fase migrazione dati) non si applica.** Niente dump, niente restore, niente verifica del dump. La §5.5 e la §5.6 restano utili come *controllo* della RLS su un database nuovo, ma i dati di partenza sono di prova, non di produzione. |
+| **Storage sul VPS** (Opzione B, confermata) | La §6.3 vale in pieno: spariscono `SUPABASE_URL` e `SUPABASE_SERVICE_KEY`, i documenti vanno su disco. Il volume dei documenti **non** è montato in nginx, di proposito: li serve l'API, così i controlli di accesso restano in un posto solo. |
+| **Frontend sul VPS** (Vercel abbandonato) | nginx serve la build Vite e proxa le API sulla **stessa origine**. La build deve dichiararlo con `VITE_API_SAME_ORIGIN=true`, altrimenti `frontend/src/api/http.ts` rifiuta la base e ricade sul backend Railway **senza dirlo**. La §7 non prevede più di aggiornare Vercel. |
+| **Ubuntu 24.04 LTS** | Il VPS è arrivato con la **22.04.5**; portato alla 24.04 sul posto, prima di installare Docker. La §4-bis era già corretta. |
+| **Docker, non bare-metal** | Dove il piano dice «oppure Docker, riusando il Dockerfile», la risposta è Docker: `docker-compose.prod.yml`, con Postgres 17, PgBouncer, la catena migrate→rls→api e nginx+certbot. Le sezioni bare-metal restano per riferimento. |
+
+**La macchina reale** (Register.it, 4 vCPU, **3.8 GB utilizzabili**, 146 GB di disco) sta sotto sia agli
+8 GB consigliati sia ai 4 GB minimi della tabella in §4-bis, anche se di poco — sono quasi certamente
+4 GB nominali con una parte riservata al kernel. Si procede lo stesso: il carico di oggi è un solo
+studio con traffico di prova, e il collo di bottiglia misurato in §0-bis era la rete, non la memoria.
+Ma è il parametro da alzare per primo quando il database cresce — PostgreSQL senza RAM per la cache
+lavora su disco, e da lì la lentezza torna.
 
 ---
 
@@ -260,7 +283,8 @@ Se senza contesto vedi righe > 0, **la RLS non è attiva**: fermati e non fare i
   - `DATABASE_URL` → `bluman_app` via pooler.
   - `DIRECT_URL` → owner, Postgres diretto.
   - `ADMIN_DATABASE_URL` → owner.
-  - `SUPABASE_URL` / `SUPABASE_SERVICE_KEY` → invariate se Opzione A.
+  - `SUPABASE_URL` / `SUPABASE_SERVICE_KEY` → **non servono**: lo storage è sul VPS (§3-bis, Opzione B),
+    quindi i documenti passano dal disco e non da Supabase.
 - Avvia dietro reverse proxy (Caddy consigliato: TLS automatico).
 
 ### 6.3 Storage (solo se Opzione B)
@@ -274,13 +298,16 @@ Se senza contesto vedi righe > 0, **la RLS non è attiva**: fermati e non fare i
 
 1. Metti l'app in manutenzione (o sola lettura) — evita scritture perse tra dump e switch.
 2. Rifai un **dump incrementale finale** se sono passate ore dal 5.1 (o accetta la finestra).
-3. Punta il DNS dell'API al VPS (o aggiorna l'URL backend su Vercel).
+3. Punta il DNS del dominio al VPS: da lì si servono **sia l'app sia l'API**, sulla stessa origine
+   (non più «il DNS dell'API» da un lato e Vercel dall'altro).
 4. Verifica health check dell'API sul VPS.
 5. Login reale + apri lista progetti e lista clienti + apri un documento.
 6. Esegui il **test di isolamento** (6 del §5.6) anche via API con due studi diversi.
 7. Togli la manutenzione.
 
-**Vercel:** aggiorna la variabile con l'URL del nuovo backend e redeploy del frontend.
+**Vercel:** non è più in gioco — il frontend si serve dal VPS. Se il vecchio deploy resta acceso come
+rete di sicurezza, va **lasciato com'è**, puntato al backend Railway: toccarlo per fargli puntare il
+VPS lo renderebbe un rollback inutile, perché condividerebbe il guasto che si sta cercando di coprire.
 
 ---
 

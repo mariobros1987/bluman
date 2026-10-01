@@ -1,14 +1,55 @@
 # VPS — checklist «primo avvio» (dopo aver comprato il server)
 
 Runbook essenziale per accendere lo stack `docker-compose.prod.yml` su un VPS **nuovo**. Presuppone
-VPS pronto (Ubuntu, Docker, firewall 22/80/443, Postgres non esposto) e il dettaglio in
+VPS pronto (**Ubuntu 24.04 LTS**, Docker, firewall 22/80/443, Postgres non esposto) e il dettaglio in
 `PIANO_MIGRAZIONE_VPS.md`. La catena migrate→rls→api è stata verificata in dry-run locale (PG17).
+
+## 0. Predisporre il server (una volta sola)
+
+Due trappole già incontrate su Register.it, entrambe **silenziose** — non danno errore, danno un
+comportamento diverso da quello atteso:
+
+- **`sudo` senza password non funziona anche se la regola c'è.** Le immagini cloud creano
+  `/etc/sudoers.d/90-cloud-init-users` con `utente ALL=(ALL) ALL`. `sudo` applica **l'ultima** regola
+  che legge, e i file di `sudoers.d` si leggono in ordine alfabetico: se la regola `NOPASSWD` si
+  chiama `90-…`, il file di cloud-init viene letto dopo e vince quello con password. Va nominata
+  `99-…`. Verifica con `sudo -n whoami` in una sessione **nuova**: in una sessione dove la password è
+  già stata digitata da poco sudo la tiene in memoria per ~15 minuti, e il test passerebbe comunque.
+- **`do-release-upgrade` rifiuta di partire** finché restano pacchetti arretrati («Please install all
+  available updates for your release before upgrading»). Prima allineare la release installata
+  (`apt-get update && apt-get upgrade -y && apt-get dist-upgrade -y`), poi lanciare l'upgrade di
+  release **dentro `tmux`**: dura decine di minuti e in quel tempo `sshd` resta irraggiungibile a
+  tratti (si aggiornano `systemd` e `dbus`), quindi una disconnessione non deve poterlo interrompere.
 
 ## 1. Prima di `up`
 - [ ] Copia `.env.prod.example` → `.env` accanto al compose e **riempi tutti i segreti**
       (genera con i comandi indicati; `DATABASE_URL`/`DIRECT_URL` le mette il compose, non tu).
-- [ ] Se nginx serve anche il frontend: builda il frontend (`cd frontend && npm run build`) — nginx
-      monta `frontend/dist`. (Consigliato invece tenere il frontend su Vercel e puntarlo all'API del VPS.)
+- [ ] **Le due password del database in esadecimale, non base64** (`openssl rand -hex 32`). Il compose
+      le *interpola* dentro l'URL di connessione (`postgresql://utente:PASSWORD@postgres:5432/db`) e il
+      base64 contiene anche `/`, che in un URL separa il percorso: la password viene tagliata lì e il
+      resto finisce letto come host e porta. L'errore che ne esce è
+      `P1013: The provided database string is invalid. invalid port number in database URL` — sembra
+      una porta sbagliata o una rete che non risponde, e invece è un carattere di troppo nella
+      password. Verifica dopo aver scritto il file, deve stampare `2`:
+      `grep -cE '^(POSTGRES_PASSWORD|APP_DB_PASSWORD)=[0-9a-f]{64}$' .env`
+      Il `.env` si scrive con `>` (sovrascrive); con `>>` una riesecuzione accoda un secondo set di
+      variabili e resta sotto, invisibile, metà configurazione vecchia.
+- [ ] Frontend: si serve **dal VPS**, sulla stessa origine dell'API (decisione del 30/09/2026). La
+      build va fatta **dichiarando** la stessa origine — senza quel flag `frontend/src/api/http.ts`
+      rifiuta la base e ricade su Railway **in silenzio**, quindi l'app funzionerebbe parlando però
+      col backend vecchio:
+      `cd frontend && VITE_API_SAME_ORIGIN=true npm run build` — nginx monta `frontend/dist`.
+      Sul VPS non serve Node installato: la build si fa in un container usa-e-getta, **montando il
+      repo intero e non solo `frontend/`**. Il frontend importa dalla radice
+      (`src/util/paginaA4.ts`, `intestazionePiede.ts`, `htmlSanitizer.ts`, `dominioMittente.ts`):
+      montando solo `frontend/` quei percorsi escono dal volume e la build muore con
+      `TS2307 Cannot find module '../../../src/util/…'`, che sembra un errore di codice e invece è
+      il volume sbagliato.
+      ```bash
+      docker run --rm -u "$(id -u):$(id -g)" -e HOME=/tmp -e npm_config_cache=/tmp/.npm \
+        -e VITE_API_SAME_ORIGIN=true -v /opt/bluman:/app -w /app/frontend \
+        node:22 sh -c "npm ci --no-audit --no-fund && npm run build"
+      ```
 - [ ] DNS del dominio API → IP del VPS.
 
 ## 2. Primo avvio (ancora in HTTP, TLS dopo)
@@ -22,10 +63,20 @@ docker compose -f docker-compose.prod.yml ps -a   # atteso: migrate/rls Exited(0
 docker compose -f docker-compose.prod.yml exec api npx tsx src/scripts/checkRls.ts
 #   atteso: RLS attivo su tutte le tabelle (0 spente); tenant inesistente → 0 righe.
 docker compose -f docker-compose.prod.yml exec api npx tsx src/scripts/verificaAccessi.ts
-#   atteso: i super_admin come «tutti i tenant».
+#   atteso: il ruolo amministrativo riconosciuto, poi i super_admin come «tutti i tenant».
 ```
 Se `checkRls` mostra `bluman_app` con `bypassrls=true` o righe > 0 col tenant finto → **STOP**: gli
 studi si vedrebbero a vicenda.
+
+`verificaAccessi` ha bisogno di una connessione che **scavalchi la RLS** (usa `ADMIN_DATABASE_URL`,
+in mancanza `DIRECT_URL`). Con il ruolo dell'app le policy filtrano e lei vedrebbe «0 utenti» — un
+numero vero e una conclusione falsa, che su uno script di pre-rilascio è il guasto peggiore. Per
+questo ora **verifica il ruolo prima di dare il verdetto** e, se non è amministrativo, si ferma
+dicendolo invece di rispondere «nessuno entra».
+
+Se lanci questi comandi **da uno script** e non a mano, aggiungi `-T` e `< /dev/null`: `docker
+compose exec` eredita lo stdin, e con un heredoc se lo mangia — lo script si interrompe a metà senza
+errore visibile.
 
 ## 4. Dati
 - **Fresh** (consigliato, dati di prova): `docker compose … exec api npm run bootstrap` (primo
@@ -33,7 +84,11 @@ studi si vedrebbero a vicenda.
 - **Restore** da Supabase: segui §5 di `PIANO_MIGRAZIONE_VPS.md` (dump→restore→grant→riverifica RLS).
 
 ## 5. Smoke test
-- [ ] Health: `{"stato":"ok","db":"ok"}`.
+Da **fuori** (o dal server su `127.0.0.1`) passando da nginx: l'API non pubblica la 3000 sull'host,
+quindi `curl http://127.0.0.1:3000/health` **non risponde** e non significa che l'API sia giù.
+L'unica porta pubblicata è nginx (80/443), che proxa i prefissi API di `nginx_bluman_app.inc`.
+- [ ] Health: `curl -s http://IP/health` → `{"stato":"ok","db":"ok"}`.
+- [ ] Frontend servito: `curl -s -o /dev/null -w '%{http_code}\n' http://IP/` → `200`.
 - [ ] Login reale → lista progetti + lista clienti + apri un documento.
 - [ ] Isolamento via API con due studi diversi (non solo via SQL).
 
