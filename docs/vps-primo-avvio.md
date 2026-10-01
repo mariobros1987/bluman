@@ -104,3 +104,42 @@ e `docker compose … exec nginx nginx -s reload`. Il servizio `certbot` rinnova
 - [ ] Backup in cron: `scripts/backup-vps.sh` (+ `BACKUP_ENCRYPTION_KEY` e copia off-site) e **restore-test**.
 - [ ] Monitoraggio disco/connessioni/slow query; aggiornamenti OS+PostgreSQL; rotazione password.
 - [ ] Tieni Supabase/Railway **accesi** come rollback per qualche giorno.
+
+## 8. Aggiornare un VPS già in servizio (dopo ogni push)
+
+`./scripts/distribuisci.sh` fa anche questo: dopo il push aggiorna il VPS. Per aggiornarlo **da
+solo** (il commit dev'essere già su GitHub): `./scripts/distribuisci.sh --solo-vps`.
+
+Sono **quattro** cose, e saltarne una lascia l'ambiente incoerente in un modo che non si vede:
+
+| Passo | Comando | Cosa succede se si salta |
+|---|---|---|
+| Codice | `cd /opt/bluman && git pull --ff-only` | l'immagine si costruisce dal codice vecchio |
+| Frontend | build `node:22` usa-e-getta con `VITE_API_SAME_ORIGIN=true` | l'app parla col backend di Railway **in silenzio** |
+| Database | `compose build api migrate` → `run --rm -T migrate` → `run --rm -T rls` | schema vecchio; e senza `rls` la tabella nuova resta **scoperta** |
+| Backend | `compose up -d` | il container continua a girare con l'immagine precedente |
+
+```bash
+ssh-add "$HOME/.ssh/bluman_vps"        # la chiave dev'essere nell'agente
+./scripts/distribuisci.sh --solo-vps   # fa i quattro passi e verifica
+```
+
+**`rls` non è ridondante dopo `migrate`.** La migrazione crea la policy della tabella nuova solo
+se il ruolo `bluman_app` **e** la funzione `app_tenant_corrente` esistono già; il servizio `rls`
+è invece il punto che riapplica le policy a **tutte** le tabelle per introspezione, ed è
+idempotente (`DROP POLICY IF EXISTS` prima di ogni `CREATE`). È la rete di sicurezza contro lo
+stato peggiore possibile — due studi che si vedono a vicenda — quindi si esegue sempre.
+
+Lo script verifica in coda quattro cose e **si ferma** se una non torna: `/health`, il `200` sulla
+radice (nginx serve il frontend nuovo), la sonda rotta (`POST /documenti/genera` senza token deve
+dare **401**, mai 404: un 404 significa che il container è rimasto indietro) e `checkRls`
+(atteso «spento su 0»).
+
+Il passo VPS **non si salta in silenzio**: se il server non risponde lo script esce dicendolo,
+perché due ambienti con codice diverso sono esattamente il guasto che `distribuisci.sh` esiste per
+evitare. Per distribuire senza toccare il VPS: `--no-vps`.
+
+⚠️ **`docker compose run/exec` eredita lo stdin.** In un'invocazione `ssh` lo stdin è quello del
+terminale e il container se lo mangia: la sessione si interrompe **a metà senza errore**. Nello
+script tutte le chiamate passano da `ssh_vps`, che mette `</dev/null` e non manda mai script sullo
+stdin. Vale anche a mano: aggiungi `-T` e `< /dev/null`.

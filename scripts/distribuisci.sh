@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 #
-# Distribuzione completa da riga di comando: frontend su Vercel (push + CLI) e backend su Railway.
+# Distribuzione completa da riga di comando: frontend su Vercel (push + CLI), backend su Railway,
+# e — se raggiungibile — anche il VPS Register.it (codice, frontend, database, backend).
 #
 # Regole & Sicurezza:
 # - Autore/Committer Git: l'ultimo commit deve avere l'identità attesa da Vercel. La verifica
@@ -12,12 +13,23 @@
 #   Vitest (100% verdi).
 # - Railway up per il backend e Vercel deploy per il frontend, con verifica post-deploy
 #   dell'health e della sonda rotta sul dominio di produzione.
+# - VPS: il passo gira DOPO il push, perché il server prende il codice da GitHub (`git pull`).
+#   Aggiorna quattro cose distinte e tutte e quattro servono: il **codice** (`git pull`), il
+#   **frontend** (build con `VITE_API_SAME_ORIGIN=true` in un container usa-e-getta), il
+#   **database** (i one-shot `migrate` e `rls`) e il **backend** (immagine ricostruita + `up -d`).
+#   Saltare `rls` lascerebbe le tabelle nuove **scoperte**: la migrazione crea la policy solo se
+#   il ruolo esiste già, e comunque è `rls` che riapplica le policy a tutte le tabelle.
 #
 # Uso:
-#   ./scripts/distribuisci.sh              # verifica, push, vercel deploy, railway up
-#   ./scripts/distribuisci.sh --solo-push  # solo il frontend (push + vercel)
-#   ./scripts/distribuisci.sh --solo-api   # solo il backend (railway up)
+#   ./scripts/distribuisci.sh              # verifica, push, vercel deploy, railway up, aggiorna il VPS
+#   ./scripts/distribuisci.sh --solo-push  # solo il frontend (push + vercel + VPS)
+#   ./scripts/distribuisci.sh --solo-api   # solo il backend (railway up), VPS escluso
+#   ./scripts/distribuisci.sh --solo-vps   # solo il VPS (il commit dev'essere già su GitHub)
+#   ./scripts/distribuisci.sh --no-vps     # tutto tranne il VPS
 #
+# Il VPS si aggiorna per default. Se non risponde, lo script si FERMA dicendolo: un salto
+# silenzioso lascerebbe due ambienti con codice diverso, che è il guasto che questo script
+# esiste per evitare. Per distribuire senza, `--no-vps` è una scelta esplicita.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -27,15 +39,32 @@ API_BASE="${API_BASE:-https://bluman-api-production.up.railway.app}"
 REQUIRED_GIT_EMAIL="mario.dibenedetto87@gmail.com"
 REQUIRED_GIT_NAME="Mario Dibenedetto"
 
+# Il VPS Register.it. Sovrascrivibili per puntare altrove senza toccare lo script.
+VPS_HOST="${VPS_HOST:-bluman@136.144.234.118}"
+VPS_BASE="${VPS_BASE:-http://136.144.234.118}"
+VPS_DIR="${VPS_DIR:-/opt/bluman}"
+COMPOSE_PROD="docker compose -f docker-compose.prod.yml"
+
 SOLO_PUSH=0
 SOLO_API=0
+SOLO_VPS=0
+VPS=1
 for arg in "$@"; do
   case "$arg" in
     --solo-push) SOLO_PUSH=1 ;;
     --solo-api) SOLO_API=1 ;;
+    --solo-vps) SOLO_VPS=1 ;;
+    --no-vps) VPS=0 ;;
     *) echo "Argomento non riconosciuto: $arg" >&2; exit 2 ;;
   esac
 done
+
+# `--solo-vps` è «solo il VPS»: gli altri tre passi si spengono, e il VPS resta acceso.
+if [ "$SOLO_VPS" -eq 1 ]; then
+  SOLO_PUSH=1
+  SOLO_API=1
+  VPS=1
+fi
 
 titolo() { printf '\n\033[1;34m== %s\033[0m\n' "$1"; }
 successo() { printf '\033[1;32m✔ %s\033[0m\n' "$1"; }
@@ -204,6 +233,134 @@ if [ "$SOLO_PUSH" -eq 0 ]; then
   fi
 fi
 
+# 6. VPS Register.it — codice, frontend, database, backend
+#
+# Va DOPO il push: il VPS è un checkout di git e prende il codice da GitHub, non da questa
+# macchina. Aggiorna quattro cose distinte, e saltarne una lascia l'ambiente incoerente:
+# il codice senza l'immagine ricostruita (backend vecchio), l'immagine senza `migrate` (schema
+# vecchio), la migrazione senza `rls` (tabella nuova scoperta), il frontend senza il flag
+# (app che parla col backend di Railway in silenzio).
+if [ "$VPS" -eq 1 ]; then
+  titolo "6. VPS — codice, frontend, database, backend"
+
+  # `</dev/null` SEMPRE. `docker compose run/exec` eredita lo stdin, e in un'invocazione ssh lo
+  # stdin è quello del terminale: il container se lo mangia e la sessione si interrompe a metà
+  # **senza errore**. È la trappola già pagata due volte (`.secrets/VPS_ACCESSO.md`, diario
+  # 30/09/2026), e la ragione per cui questa funzione non manda mai script sullo stdin.
+  ssh_vps() {
+    ssh -o BatchMode=yes -o ConnectTimeout=20 -o ServerAliveInterval=30 "$VPS_HOST" "$@" </dev/null
+  }
+
+  if ! ssh_vps 'echo ok' >/dev/null 2>&1; then
+    echo "ERRORE: il VPS $VPS_HOST non risponde in modalità non interattiva." >&2
+    echo "  La chiave dev'essere caricata nell'agente:   ssh-add \"\$HOME/.ssh/bluman_vps\"" >&2
+    echo "  Il VPS non si aggiorna, quindi ci si ferma: un salto silenzioso lascerebbe due" >&2
+    echo "  ambienti con codice diverso. Per distribuire senza:    $0 --no-vps" >&2
+    exit 1
+  fi
+  successo "VPS raggiungibile: $VPS_HOST"
+
+  # a) Codice — e la verifica che sia PROPRIO il commit appena distribuito. Il pull può non
+  #    arrivare all'HEAD atteso (commit non spinto, main divergente, pull respinto) e in quel
+  #    caso aggiornare l'immagine metterebbe in servizio un commit diverso da quello provato.
+  ATTESO=$(git rev-parse HEAD)
+  echo "• Codice: git pull --ff-only in $VPS_DIR..."
+  ssh_vps "cd $VPS_DIR && git pull --ff-only" >/dev/null
+  SU_VPS=$(ssh_vps "cd $VPS_DIR && git rev-parse HEAD")
+  if [ "$SU_VPS" != "$ATTESO" ]; then
+    echo "ERRORE: il VPS è su $SU_VPS, atteso $ATTESO." >&2
+    echo "  Il VPS prende il codice da GitHub: se il commit non è stato spinto, il pull non può" >&2
+    echo "  arrivarci. Spingi prima, oppure lancia lo script senza --solo-vps." >&2
+    exit 1
+  fi
+  successo "VPS allineato al commit ${ATTESO:0:8}."
+
+  # b) Frontend — build DICHIARANDO la stessa origine. Senza `VITE_API_SAME_ORIGIN=true`,
+  #    `frontend/src/api/http.ts` rifiuta una base che coincide con l'origine della pagina — la
+  #    stessa condizione che su Vercel è un errore — e ricade su Railway **in silenzio**: l'app
+  #    funziona e parla col backend sbagliato. Si costruisce in un container usa-e-getta
+  #    montando il repo INTERO e non solo `frontend/`: il frontend importa da `src/util/`, e con
+  #    il volume sbagliato la build muore con `TS2307 Cannot find module '../../../src/util/…'`,
+  #    che sembra un errore di codice.
+  echo "• Frontend: build con VITE_API_SAME_ORIGIN=true (nginx monta frontend/dist)..."
+  ssh_vps "cd $VPS_DIR && docker run --rm -u \"\$(id -u):\$(id -g)\" -e HOME=/tmp -e npm_config_cache=/tmp/.npm -e VITE_API_SAME_ORIGIN=true -v $VPS_DIR:/app -w /app/frontend node:22 sh -c 'npm ci --no-audit --no-fund && npm run build'" >/dev/null
+  successo "Frontend costruito."
+
+  # c) Database — due one-shot, in quest'ordine. `migrate` applica le migrazioni versionate;
+  #    `rls` riapplica le policy a TUTTE le tabelle per introspezione, ed è idempotente
+  #    (`DROP POLICY IF EXISTS` prima di ogni `CREATE`). Il secondo non è ridondante: la
+  #    migrazione crea la policy solo se il ruolo `bluman_app` **e** la funzione
+  #    `app_tenant_corrente` esistono già, e comunque è `rls` il punto che garantisce che
+  #    nessuna tabella resti scoperta. Senza, due studi si vedrebbero a vicenda.
+  echo "• Database: immagini, migrate, rls..."
+  ssh_vps "cd $VPS_DIR && $COMPOSE_PROD build api migrate" >/dev/null
+  ssh_vps "cd $VPS_DIR && $COMPOSE_PROD run --rm -T migrate"
+  ssh_vps "cd $VPS_DIR && $COMPOSE_PROD run --rm -T rls" >/dev/null
+  successo "Migrazioni applicate e RLS riapplicata."
+
+  # d) Backend — ricrea `bluman_api` con l'immagine nuova. L'ordine migrate → rls → api non si
+  #    ricostruisce qui: è nel compose (`depends_on … service_completed_successfully`), così non
+  #    esiste una finestra in cui l'API risponde su uno schema incompleto.
+  echo "• Backend: ricreazione dei container..."
+  ssh_vps "cd $VPS_DIR && $COMPOSE_PROD up -d" >/dev/null
+  successo "Container aggiornati."
+
+  # e) Verifica. Tre controlli, ognuno coglie un guasto diverso: l'health dice se l'API è viva,
+  #    il 200 sulla radice se nginx serve il frontend, la sonda rotta se l'immagine in esecuzione
+  #    è quella appena costruita (un 404 significa che il container è rimasto indietro).
+  titolo "7. Verifica post-deploy su $VPS_BASE"
+  echo "• In attesa dell'health (max 2 minuti)..."
+  VPS_OK=0
+  for i in $(seq 1 12); do
+    if curl -fsS --max-time 10 "$VPS_BASE/health" >/dev/null 2>&1; then VPS_OK=1; break; fi
+    sleep 10
+  done
+  if [ "$VPS_OK" -eq 1 ]; then
+    successo "Health del VPS raggiungibile."
+  else
+    echo "ERRORE: $VPS_BASE/health non risponde dopo 2 minuti." >&2
+    echo "  Log: ssh $VPS_HOST 'cd $VPS_DIR && $COMPOSE_PROD logs --tail 50 api'" >&2
+    exit 1
+  fi
+
+  echo "• Frontend servito..."
+  CODICE_FE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$VPS_BASE/" || echo "000")
+  if [ "$CODICE_FE" = "200" ]; then
+    successo "Frontend: 200."
+  else
+    echo "ERRORE: $VPS_BASE/ ha risposto $CODICE_FE (atteso 200)." >&2
+    exit 1
+  fi
+
+  echo "• Sonda rotta: POST /documenti/genera senza token deve dare 401, non 404..."
+  CODICE_VPS=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 -X POST "$VPS_BASE/documenti/genera" -H 'Content-Type: application/json' -d '{}' || echo "000")
+  if [ "$CODICE_VPS" = "401" ]; then
+    successo "Sonda rotta: 401 come atteso."
+  else
+    echo "ERRORE: la sonda ha risposto $CODICE_VPS (atteso 401): se 404, l'immagine sul VPS è vecchia." >&2
+    exit 1
+  fi
+
+  # f) L'isolamento è la sola cosa che non si verifica «a occhio» dopo un deploy: una migrazione
+  #    può aver creato una tabella, e `rls` è ciò che la copre. `checkRls` le introspeziona tutte
+  #    e prova le policy con un tenant inesistente (atteso: 0 righe). Un fallimento qui non
+  #    annulla il deploy — è già avvenuto — ma va saputo subito, non al primo cliente.
+  echo "• Isolamento RLS (checkRls)..."
+  RLS_OUT=$(ssh_vps "cd $VPS_DIR && $COMPOSE_PROD exec -T api npx tsx src/scripts/checkRls.ts" 2>&1 || true)
+  if echo "$RLS_OUT" | grep -qE 'spento su 0'; then
+    successo "RLS attivo su tutte le tabelle."
+  else
+    echo "ERRORE: checkRls non conferma l'isolamento. Output:" >&2
+    echo "$RLS_OUT" | tail -20 >&2
+    exit 1
+  fi
+fi
+
 titolo "🎉 Distribuzione Completata con Successo!"
 echo "🌐 Frontend: https://bluman.vercel.app"
 echo "⚙️ Backend API: $API_BASE"
+if [ "$VPS" -eq 1 ]; then
+  echo "🖥️  VPS: $VPS_BASE"
+else
+  avviso "VPS non aggiornato (--no-vps): gira ancora il commit precedente."
+fi
