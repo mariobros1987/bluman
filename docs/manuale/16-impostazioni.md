@@ -17,6 +17,12 @@ Le **Impostazioni** (`/settings`) configurano lo studio (tenant):
 - `PATCH /tenant/info` (impostazioni studio) è **riservato ad advisor/super_admin** — non passa dalla
   matrice permessi (è funzione da titolare, decisione 27/09).
 - I segreti (SMTP/IMAP pass, token canali) non vengono mai restituiti in chiaro alle letture.
+- **La Callback URL mostrata nei Canali è l'indirizzo di *questo* backend**, non di Railway: si compone
+  in `src/util/urlPubblica.ts` (`RAILWAY_PUBLIC_DOMAIN` → `APP_BASE_URL` → dominio di produzione). È il
+  valore che lo studio incolla nella dashboard di Meta, quindi un errore qui **non si vede come errore**:
+  si vede come clienti che scrivono e nessuno che riceve. Su un VPS senza `RAILWAY_PUBLIC_DOMAIN` la
+  sorgente è `APP_BASE_URL`, letta **con il suo schema** (prima del TLS è `http://`, ed è corretto).
+  Dettaglio in §15; presidio `src/urlPubblica.test.ts`.
 
 ### 📦 Archiviare un operatore che non lavora più nello studio
 

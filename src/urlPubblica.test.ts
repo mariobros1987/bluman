@@ -15,9 +15,18 @@ import {
  * Il caso concreto da impedire è quello che ha motivato il file: lo stesso indirizzo era scritto
  * in tre punti con convenzioni diverse, e il primo che avesse dimenticato `RAILWAY_PUBLIC_DOMAIN`
  * avrebbe mostrato allo studio un indirizzo che non esiste più.
+ *
+ * E il caso che ha motivato la **seconda** sorgente (`APP_BASE_URL`, 01/10/2026): `Railway` non è
+ * l'unico ambiente. Sul VPS quella variabile non esiste, quindi il dominio di produzione restava
+ * l'unica risposta e i webhook si componevano su Railway — un altro backend, un altro database.
+ * Nessun errore visibile, solo clienti che scrivono e nessuno che riceve.
  */
 
-const AMBIENTE = ['RAILWAY_PUBLIC_DOMAIN'] as const;
+// Entrambe vanno svuotate. `APP_BASE_URL` è impostata anche nel `.env` di sviluppo
+// (`http://localhost:5173`): senza toglierla, il ripiego sul dominio di produzione non sarebbe
+// mai raggiunto e i test osserverebbero l'ambiente di questa macchina invece di quello che
+// credono di provare.
+const AMBIENTE = ['RAILWAY_PUBLIC_DOMAIN', 'APP_BASE_URL'] as const;
 const ambienteOriginale = new Map<string, string | undefined>();
 for (const chiave of AMBIENTE) ambienteOriginale.set(chiave, process.env[chiave]);
 
@@ -54,6 +63,45 @@ describe('urlPubblicaBackend', () => {
   it('una variabile vuota o di soli spazi vale come assente', () => {
     for (const valore of ['', '   ', 'https://']) {
       process.env.RAILWAY_PUBLIC_DOMAIN = valore;
+      expect(urlPubblicaBackend()).toBe('https://bluman-api-production.up.railway.app');
+    }
+  });
+
+  it('fuori da Railway decide APP_BASE_URL: il callback non può puntare a Railway', () => {
+    // Il caso che ha motivato questa sorgente. Sul VPS `RAILWAY_PUBLIC_DOMAIN` non esiste —
+    // l'abbiamo verificato: la variabile è vuota — e `APP_BASE_URL` è l'unica cosa che sa dove
+    // vive il backend. Prima della correzione il webhook si componeva su
+    // `bluman-api-production.up.railway.app`, cioè **un altro backend con un altro database**:
+    // uno studio che avesse configurato Meta da lì avrebbe mandato i messaggi dei suoi clienti
+    // all'ambiente sbagliato.
+    process.env.APP_BASE_URL = 'http://136.144.234.118';
+    const url = urlWebhookTelegram();
+    expect(url).toBe('http://136.144.234.118/webhooks/communications/telegram');
+    expect(url).not.toContain('railway.app');
+  });
+
+  it('conserva lo schema di APP_BASE_URL: prima del TLS è legittimamente http', () => {
+    process.env.APP_BASE_URL = 'http://136.144.234.118';
+    expect(urlPubblicaBackend()).toBe('http://136.144.234.118');
+  });
+
+  it('toglie la barra finale e aggiunge https quando lo schema manca', () => {
+    process.env.APP_BASE_URL = 'studio.esempio/';
+    expect(urlPubblicaBackend()).toBe('https://studio.esempio');
+  });
+
+  it('dove Railway espone il proprio dominio, quello vince su APP_BASE_URL', () => {
+    // Su Railway esiste **anche** `APP_BASE_URL`, e lì vale l'indirizzo del frontend: se
+    // vincesse lei, i webhook si comporrebbero sul dominio sbagliato proprio nell'ambiente dove
+    // oggi funzionano. L'ordine è la regola, e questo test lo fissa.
+    process.env.RAILWAY_PUBLIC_DOMAIN = 'bluman-api.up.railway.app';
+    process.env.APP_BASE_URL = 'https://bluman.vercel.app';
+    expect(urlPubblicaBackend()).toBe('https://bluman-api.up.railway.app');
+  });
+
+  it('un APP_BASE_URL senza host vale come assente, non produce `https://https:`', () => {
+    for (const valore of ['', '   ', 'https://', 'http://']) {
+      process.env.APP_BASE_URL = valore;
       expect(urlPubblicaBackend()).toBe('https://bluman-api-production.up.railway.app');
     }
   });

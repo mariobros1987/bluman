@@ -17,6 +17,11 @@ Le comunicazioni con il cliente sono **omnichannel** e finiscono nel **fascicolo
   relay); il segreto è condiviso fra backend (Railway) e la funzione serverless (Vercel).
 - **Ingestione solo sul backend**: niente «ponte» su Vercel che scartava le intestazioni di autenticità
   (`x-telegram-bot-api-secret-token`, `x-hub-signature-256`) — si perdevano messaggi.
+- **L'indirizzo che si copia in Meta e in Telegram è quello di *questo* backend.** La Callback URL di
+  WhatsApp e l'endpoint di Telegram si compongono da `src/util/urlPubblica.ts`, che risolve
+  `RAILWAY_PUBLIC_DOMAIN` → `APP_BASE_URL` → dominio di produzione. Un errore qui **non produce un
+  errore**: produce un webhook che punta a un altro backend, con un altro database — e ce ne si accorge
+  solo quando un cliente scrive e non riceve risposta.
 - **Regola 7**: un invio fallito **non** lascia la riga «inviato»; il collegamento chat è unico per
   pratica (un secondo `/start` **sposta** il collegamento).
 
@@ -36,5 +41,13 @@ Le comunicazioni con il cliente sono **omnichannel** e finiscono nel **fascicolo
   `collegamentoChat.ts`.
 - Frontend: `components/ComunicazioniTab.tsx`, `components/settings/TabChannels.tsx`,
   `components/projectDetail/LinkTelegramProgetto.tsx`.
+- **L'indirizzo pubblico del backend**: `src/util/urlPubblica.ts` — `urlPubblicaBackend()`,
+  `urlWebhookWhatsapp(slug)`, `urlWebhookTelegram()`, `slugValido()`. Fino al **01/10/2026** il modulo
+  leggeva solo `RAILWAY_PUBLIC_DOMAIN`: sul VPS quella variabile **non esiste**, quindi i callback si
+  componevano su `bluman-api-production.up.railway.app` — **un altro backend, con un altro database**.
+  Ora la seconda sorgente è `APP_BASE_URL` (la convenzione del progetto per «dove vive questo
+  deployment»), e il suo **schema si conserva**: sul VPS, prima del TLS, l'indirizzo è legittimamente
+  `http://` e imporgli `https://` comporrebbe un callback che non risponde. Presidio:
+  `src/urlPubblica.test.ts` (18 test).
 - Schema: `ComunicazioneProgetto`, `CollegamentoChatProgetto`.
 - Fonti: `.agents/AGENTS.md`, `AUDIT_2026-09-27/06-comunicazioni-canali.md`, `GUIDA_CONFIGURAZIONE_CANALI.md`.
