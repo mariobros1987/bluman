@@ -83,7 +83,9 @@ MAX_ORE_BACKUP="${BLUMAN_MONITOR_BACKUP_MAX_ORE:-26}"
 SOGLIA_DISCO="${BLUMAN_MONITOR_DISCO_PCT:-85}"
 SOGLIA_MEM="${BLUMAN_MONITOR_MEM_PCT:-15}"
 SOGLIA_SWAP="${BLUMAN_MONITOR_SWAP_PCT:-50}"
-ORA_RIEPILOGO="${BLUMAN_MONITOR_RIEPILOGO_ORA:-8}"
+# Ora del riepilogo, normalizzata: `date +%-H` non ha lo zero iniziale, quindi un
+# ORA_RIEPILOGO=08 non corrisponderebbe mai a «8».
+ORA_RIEPILOGO="$((10#${BLUMAN_MONITOR_RIEPILOGO_ORA:-8}))"
 MAX_ORE_LISTE_APT="${BLUMAN_MONITOR_APT_MAX_ORE:-168}"
 HEALTH_URL="${BLUMAN_MONITOR_HEALTH_URL:-http://127.0.0.1/health}"
 DIR_BACKUP="${BLUMAN_BACKUP_DIR:-/var/backups/bluman}"
@@ -339,6 +341,18 @@ cadenza_scaduta() {
   [ "$eta" -ge "$ore" ]
 }
 
+# Vero se il riepilogo di oggi è già partito. Serve un timbro e non basta l'ora:
+# il cron gira ogni 10 minuti, quindi `date +%H` resterebbe uguale per SEI giri di
+# fila e il riepilogo arriverebbe sei volte in un'ora.
+riepilogo_gia_mandato() {
+  local stamp eta
+  stamp="$STATO_DIR/.ultimo-riepilogo"
+  [ -z "$STATO_DIR" ] && return 1
+  [ -f "$stamp" ] || return 1
+  eta=$(( ( $(date +%s) - $(stat -c %Y "$stamp") ) / 3600 ))
+  [ "$eta" -lt 20 ]
+}
+
 # ── TELEGRAM ─────────────────────────────────────────────────────────────────
 invia_telegram() {
   local testo="$1" codice
@@ -461,8 +475,20 @@ $(elenco "${rientri[@]}")"
 
   # Il riepilogo va mandato SEMPRE, anche quando va tutto bene: è l'unico segnale che
   # distingue «nessun guasto» da «il monitor non gira più».
-  if [ "$forza_riepilogo" = "riepilogo" ] || [ "$(date -u +%-H)" = "$ORA_RIEPILOGO" ]; then
+  #
+  # Il momento si riconosce dal TIMBRO, non dall'ora: il cron gira ogni 10 minuti,
+  # quindi `date +%H` resterebbe uguale per sei giri di fila e il riepilogo arriverebbe
+  # sei volte in un'ora. Con il timbro arriva una volta al giorno, e se il giro delle
+  # 08:00 salta (per esempio per il lock) lo manda il primo giro successivo. La finestra
+  # sui primi 10 minuti è solo una rete di sicurezza per quando la directory di stato
+  # non è scrivibile e il timbro non si può mettere.
+  if [ "$forza_riepilogo" = "riepilogo" ]; then
     riepilogo "$sintesi"
+  elif [ "$(date -u +%-H)" = "$ORA_RIEPILOGO" ] \
+    && [ "$(date -u +%-M)" -lt 10 ] \
+    && ! riepilogo_gia_mandato; then
+    riepilogo "$sintesi"
+    [ -n "$STATO_DIR" ] && touch "$STATO_DIR/.ultimo-riepilogo" 2>/dev/null
   fi
 }
 
