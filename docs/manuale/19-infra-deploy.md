@@ -26,7 +26,16 @@ si usa il **`.exe` nativo** via `RAILWAY_BIN` (lo script lo supporta).
   committata e lasciata lì **non è inerte** — parte al primo push. Se una migrazione non va ancora
   applicata alla produzione, va tenuta **fuori dal branch** (o il push va rimandato), non semplicemente
   non eseguita a mano: `npx prisma migrate status` dice cosa è in attesa.
-- **Backup**: rimandato alla migrazione **VPS** Register.it (per ora dati di prova).
+- **Backup VPS**: dal 01/10/2026 c'è un backup **notturno automatico** (`scripts/backup-vps.sh`,
+  cron `17 3 * * *`; il server è in UTC). Copre **tre** cose, perché per ripartire servono tutte e
+  tre — il **database**, i **documenti** (volume `bluman_uploads`) e il **`.env`** (l'unico pezzo
+  non ricostruibile da GitHub). Ogni artefatto è cifrato AES-256 e ruota a 14 set, in
+  `/var/backups/bluman`: fuori da `/opt/bluman` (un deploy andato storto non lo tocca) e fuori dai
+  volumi Docker (`docker compose down -v` non lo tocca). Restore-test eseguito e superato.
+  **Resta un buco dichiarato**: i backup stanno sullo **stesso disco** del database (un solo
+  filesystem su quella macchina), quindi proteggono dagli errori applicativi ma **non** dalla morte
+  del disco o del server — per quello serve la copia off-site, ancora da configurare. Vedi
+  `docs/vps-primo-avvio.md` §7.
 
 ## 🔗 Collegamenti
 - Tutti i moduli: il deploy porta in produzione backend (Railway) e frontend (Vercel) insieme.

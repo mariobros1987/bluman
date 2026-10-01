@@ -313,7 +313,9 @@ VPS lo renderebbe un rollback inutile, perché condividerebbe il guasto che si s
 
 ## 8. Dopo il cut-over — quello che prima faceva Supabase e ora fai tu
 
-- [ ] **Backup automatici**: cron giornaliero `pg_dump` + copia off-site (altro provider/bucket). Testa un restore, un backup mai ripristinato non è un backup.
+- [x] **Backup automatici** — **fatto il 01/10/2026** (cron `17 3 * * *`, UTC). Copre database, documenti (`bluman_uploads`) e `.env`, cifrati AES-256, in `/var/backups/bluman` (fuori da `/opt/bluman` e fuori dai volumi Docker). Restore-test eseguito: conteggi identici alla produzione su 10 tabelle, 27 documenti su 27 presenti nell'archivio, `.env` riapribile e identico.
+  - [ ] **Resta la copia off-site** (`rclone` + `BLUMAN_BACKUP_RCLONE_REMOTE`): finché non c'è, i backup stanno sullo **stesso disco** del database — un solo filesystem su quella macchina — quindi proteggono dagli errori applicativi ma non dalla perdita del server.
+  - [ ] **Custodia di `BACKUP_ENCRYPTION_KEY` fuori dal server** (gestore di password): sta dentro il `.env` che cifra con sé stessa, quindi da sola non sopravvive al server.
 - [ ] **Monitoraggio**: spazio disco, connessioni attive, slow query log.
 - [ ] **Aggiornamenti di sicurezza** di PostgreSQL e OS.
 - [ ] **Rotazione password** `bluman_app` e owner.
@@ -334,7 +336,7 @@ Supabase resta **intatto e funzionante** durante tutta la migrazione. Rollback =
 - [ ] Test di isolamento passato con due studi diversi (§5.6, §7.6).
 - [ ] `DIRECT_URL` punta a Postgres diretto, non al pooler (§6.1).
 - [ ] Major version PostgreSQL uguale a Supabase (§4).
-- [ ] Backup automatico configurato **e** restore testato (§8).
+- [x] Backup automatico configurato **e** restore testato (§8) — locale; la copia off-site resta aperta.
 - [ ] Documenti scaricabili dopo lo switch (§6.3, §7.5).
 
 ---

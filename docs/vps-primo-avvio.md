@@ -101,9 +101,49 @@ Poi in `nginx.conf` scommenta il blocco `server :443` e il `return 301` su :80, 
 e `docker compose … exec nginx nginx -s reload`. Il servizio `certbot` rinnova poi da solo.
 
 ## 7. Dopo il cut-over
-- [ ] Backup in cron: `scripts/backup-vps.sh` (+ `BACKUP_ENCRYPTION_KEY` e copia off-site) e **restore-test**.
+- [x] **Backup in cron** (01/10/2026) — vedi «Il backup» qui sotto. Restore-test eseguito.
+      Restano la **copia off-site** (rclone) e la custodia di `BACKUP_ENCRYPTION_KEY` **fuori dal
+      server**.
 - [ ] Monitoraggio disco/connessioni/slow query; aggiornamenti OS+PostgreSQL; rotazione password.
 - [ ] Tieni Supabase/Railway **accesi** come rollback per qualche giorno.
+
+### Il backup (dal 01/10/2026)
+
+```bash
+# gira da solo ogni notte alle 03:17 UTC; a mano:
+ssh-add "$HOME/.ssh/bluman_vps"
+ssh bluman@136.144.234.118 'cd /opt/bluman && bash ./scripts/backup-vps.sh'
+```
+
+**Dove.** `/var/backups/bluman`, permessi `700` di `bluman`. La posizione è scelta, non casuale:
+sta **fuori da `/opt/bluman`** (un deploy andato storto, un `git clean -xfd` o un `rm` nella
+cartella dell'app non portano via i backup) e **fuori da `/var/lib/docker/volumes`** (`docker
+compose down -v` distrugge i volumi, non questa directory).
+
+**Cosa.** Tre artefatti per esecuzione, tutti cifrati AES-256 con `BACKUP_ENCRYPTION_KEY` e ruotati
+agli ultimi 14 set:
+
+| File | Cos'è | Perché serve |
+|---|---|---|
+| `bluman_<ts>.dump.enc` | `pg_dump --format=custom` | i dati |
+| `bluman_<ts>_uploads.tar.gz.enc` | archivio del volume `bluman_uploads` | i **documenti**: il database contiene i loro *percorsi*, non i file |
+| `bluman_<ts>_env.tar.gz.enc` | il file `.env` | `JWT_SECRET`, `SIGILLO_HMAC_SECRET`, SMTP e i token dei canali: **non sono in git**, senza questi l'app non riparte |
+
+**Perché anche documenti e `.env`.** Un restore del solo database dà un archivio pieno di link che
+non portano a niente — la forma del caso «20 documenti, 8 senza il loro file» del 01/10/2026.
+
+**⚠️ Il buco che resta.** I backup stanno **sullo stesso disco** del database: su questa macchina
+c'è un solo filesystem (`/dev/vda1`). Proteggono dagli errori applicativi, **non** dalla morte del
+disco o del server. L'unica copia che sopravvive al server è quella off-site, da configurare
+(`rclone` + `BLUMAN_BACKUP_RCLONE_REMOTE`).
+
+**⚠️ La chiave.** `BACKUP_ENCRYPTION_KEY` sta **dentro** il `.env` che viene cifrato con sé stessa.
+Finché il server è vivo il restore funziona; se il server muore, senza una copia della chiave
+**fuori dal server** (gestore di password) i backup cifrati non si aprono più.
+
+**Il restore-test è in fondo a `scripts/backup-vps.sh`**, commentato: si esegue a mano su un
+container usa-e-getta e confronta i **conteggi** con la produzione — non basta l'exit code, un dump
+che si apre vuoto passa ogni controllo superficiale.
 
 ## 8. Aggiornare un VPS già in servizio (dopo ogni push)
 
