@@ -16,9 +16,11 @@ import { livelloFirmaEffettivo, AVVISO_LIVELLO } from './livelloFirma';
  * OTP disponibili, l'invio e la convalida del codice, la firma con file caricato e i tre
  * avvii — lettera d'incarico, documento del fascicolo, conclusione di un modulo.
  *
- * Il sigillo della lettera d'incarico (`eidasSeal`) resta nell'orchestratore: lo scrive
- * `loadPortalData` quando ripristina la sessione e lo legge il render, quindi qui arriva
- * solo il suo setter, per `registraEsitoFirma`.
+ * Il sigillo della lettera d'incarico NON vive più qui né come booleano: lo stato di firma si
+ * **rilegge** dal database (`caricaFirmeLettera`) e il portale lo ricava dal progetto che sta
+ * guardando. Un booleano «il cliente ha firmato» non sapeva dire *quale* incarico, e il
+ * 02/10/2026 sul VPS «prova server» — creato quel giorno — risultava firmato da una firma del
+ * 08/09/2026. Vedi `usePortalData`.
  */
 
 interface UsePortalFirmaArgs {
@@ -30,10 +32,11 @@ interface UsePortalFirmaArgs {
   clientName: string;
   /** Loader globale del portale, acceso durante la convalida del codice. */
   setLoading: (valore: boolean) => void;
-  /** Sblocca il portale quando la lettera d'incarico viene firmata. */
-  setSigned: (valore: boolean) => void;
-  /** Pubblica il sigillo della lettera d'incarico nello stato dell'orchestratore. */
-  setEidasSeal: (valore: any) => void;
+  /**
+   * Rilegge le firme della lettera d'incarico dal database. È l'unico modo di sapere che una
+   * lettera è firmata: la riga l'ha scritta il backend, con il progetto a cui si riferisce.
+   */
+  caricaFirmeLettera: (clienteId?: string) => Promise<void>;
   /** Chiude la vista del documento dopo la firma di un documento del fascicolo. */
   setSelectedViewerDoc: (valore: any | null) => void;
   /** Rilegge i documenti del fascicolo dopo la firma di uno di essi. */
@@ -51,8 +54,7 @@ export function usePortalFirma({
   clientObj,
   clientName,
   setLoading,
-  setSigned,
-  setEidasSeal,
+  caricaFirmeLettera,
   setSelectedViewerDoc,
   caricaDocumenti,
   caricaFirmeModuli,
@@ -434,7 +436,7 @@ export function usePortalFirma({
       // Il documento di riconoscimento è una tantum: consumato dalla firma, non
       // resta in memoria per quella successiva.
       onRimuoviDocRiconoscimento();
-      await registraEsitoFirma(res.seal);
+      await registraEsitoFirma(res.seal, bersaglioFirma);
       return true;
     } catch (err: any) {
       setOtpError(err?.message || 'Convalida del codice non riuscita.');
@@ -447,8 +449,15 @@ export function usePortalFirma({
   /**
    * Firma a penna o con provider esterno (§1.3): il documento scaricato torna come file, e
    * la prova è il file stesso. L'OTP, se c'è un codice digitato, viene citato nel sigillo.
+   *
+   * Accetta un `bersaglio` come `inviaCodiceFirma`: chi avvia la firma sa cosa sta firmando
+   * — la lettera d'incarico con il suo progetto, un documento del fascicolo — e lasciarlo
+   * allo stato vorrebbe dire firmare l'atto precedente. Il mandato lo passa sempre, perché
+   * senza `riferimentoId` il backend lo rifiuta.
    */
-  const confermaFirmaConFile = async () => {
+  const confermaFirmaConFile = async (opzioni: { bersaglio?: BersaglioFirma } = {}) => {
+    const bersaglio = opzioni.bersaglio ?? bersaglioFirma;
+    if (opzioni.bersaglio) setBersaglioFirma(opzioni.bersaglio);
     if (!fileFirmato) {
       setOtpError('Carica prima il documento firmato.');
       return false;
@@ -459,12 +468,12 @@ export function usePortalFirma({
     try {
       const res = await firmaConFileApi({
         tipoFirma: modalitaFirma === 'qualificata_esterna' ? 'qualificata_esterna' : 'manuale_scansionata',
-        documentoHash: await improntaDelBersaglio(bersaglioFirma),
+        documentoHash: await improntaDelBersaglio(bersaglio),
         filename: fileFirmato.nome,
         contentBase64: fileFirmato.base64,
-        ambito: bersaglioFirma.ambito,
-        riferimentoId: bersaglioFirma.riferimentoId,
-        documentoTitolo: bersaglioFirma.titolo,
+        ambito: bersaglio.ambito,
+        riferimentoId: bersaglio.riferimentoId,
+        documentoTitolo: bersaglio.titolo,
         // Fase 3 FEA (misura 1): anche nel canale file il firmatario è quello scelto
         // nell'elenco chiuso, non il generico nome del cliente.
         signerName: firmatarioSelezionato || clientName,
@@ -476,7 +485,7 @@ export function usePortalFirma({
       // best-effort, così un refresh che fallisce non lascia aperto un modale su una firma riuscita.
       setOtpModalOpen(false);
       setFileFirmato(null);
-      await registraEsitoFirma(res.seal);
+      await registraEsitoFirma(res.seal, bersaglio);
       return true;
     } catch (err: any) {
       setOtpError(err?.message || 'Caricamento del documento firmato non riuscito.');
@@ -492,31 +501,36 @@ export function usePortalFirma({
    * Cambia con l'ambito: la lettera d'incarico sblocca il portale e attiva il progetto, un
    * documento del fascicolo va semplicemente riletto — il suo stato di firma sta a database e non
    * si deduce dal fatto che il pulsante è stato premuto.
+   *
+   * `bersaglio` è quello con cui la firma è stata apposta: nel canale file arriva dall'opzione
+   * (il mandato lo dichiara), nel flusso OTP coincide con lo stato. Non si legge lo stato e
+   * basta perché `setBersaglioFirma` è asincrono: subito dopo la firma il valore vecchio è
+   * ancora quello del render, e la lettera finirebbe registrata come un documento.
    */
-  const registraEsitoFirma = async (seal: any) => {
+  const registraEsitoFirma = async (seal: any, bersaglio: BersaglioFirma = bersaglioFirma) => {
     setSuccessSealModal(seal);
     // Gli aggiornamenti qui sotto sono **riletture di sola vista**: la firma è già a database. Un
     // loro fallimento (rete) non deve propagarsi, se no chi chiama lo scambia per una firma fallita
     // e — prima della correzione — teneva aperto il modale del codice. Lo stato si riconcilia
     // comunque al prossimo accesso (`loadPortalData`); qui, al più, si logga.
     try {
-      if (bersaglioFirma.ambito === 'documento_vault') {
+      if (bersaglio.ambito === 'documento_vault') {
         await caricaDocumenti(clientObj?.id);
         setSelectedViewerDoc(null);
         return;
       }
-      if (bersaglioFirma.ambito === 'modulo_completato') {
+      if (bersaglio.ambito === 'modulo_completato') {
         // La firma sta a database: si rilegge l'elenco delle conclusioni per mostrarla, senza
         // scrivere in localStorage — non arriverebbe allo studio né agli altri dispositivi.
         await caricaFirmeModuli(clientObj?.id);
         return;
       }
 
-      // La riga `FirmaElettronica` con sigillo, hash e IP l'ha già scritta il backend: qui si
-      // aggiorna solo la vista. `setEidasSeal`/`setSigned` stanno prima dell'await, quindi valgono
-      // anche se la rilettura fallisce.
-      setEidasSeal(seal);
-      setSigned(true);
+      // La riga `FirmaElettronica` con sigillo, hash, IP e **il progetto** l'ha già scritta il
+      // backend: qui si rilegge, invece di dedurre «firmato» da un booleano. Dedurlo era il
+      // difetto: `signed` era per cliente, quindi una firma vecchia marcava come firmato ogni
+      // progetto successivo. Rileggendo, la verità è una sola e sta a database.
+      await caricaFirmeLettera(clientObj?.id);
       await ricaricaDopoFirma();
     } catch (err) {
       console.warn('Aggiornamento vista post-firma non riuscito (la firma è comunque registrata):', err);

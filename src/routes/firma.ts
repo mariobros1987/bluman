@@ -52,6 +52,13 @@ import { ipReale, normalizzaGrafometrica, nomeFileDaUrl, clienteDellaRichiesta, 
 
 // ─── FIRMA ELETTRONICA SEMPLICE (SES · art. 20 CAD) & FIRMA DOCUMENTI ─────────────
 export async function registraRotteFirma(server: FastifyInstance): Promise<void> {
+  /**
+   * Il rifiuto della lettera d'incarico senza progetto, in un posto solo: i punti d'ingresso
+   * che lo pronunciano sono tre (`request-otp`, `verify-otp-and-sign`, `firma-con-file`) e tre
+   * copie dello stesso testo sono tre occasioni di dire cose diverse sullo stesso fatto.
+   */
+  const ERRORE_PROGETTO_MANCANTE =
+    "Manca il progetto da incaricare: la lettera d'incarico si firma dopo la creazione del progetto.";
   // ── FIRMA ELETTRONICA SEMPLICE (SES) CON OTP: WHATSAPP / EMAIL / TELEGRAM ──
   //
   // Cosa non funzionava, e perché non erano dettagli:
@@ -761,6 +768,15 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
     if (!ambitoValido(ambito)) {
       return reply.code(400).send({ errore: 'Ambito di firma non valido.' });
     }
+    // Il progetto si pretende PRIMA di generare e inviare il codice: la sessione OTP è
+    // intestata anche al riferimento (`otpService.sessioneAperta` cerca per `riferimentoId`),
+    // quindi una richiesta senza progetto produrrebbe un codice che `verify-otp-and-sign` non
+    // potrebbe mai trovare — un invio sprecato e, al momento della firma, un errore
+    // incomprensibile («Nessun codice in attesa di verifica») al posto di «manca il progetto».
+    // Il controllo sta fuori dal `try` perché non serve leggere niente: il progetto manca e basta.
+    if (ambito === 'engagement_letter' && !riferimentoId) {
+      return reply.code(400).send({ errore: ERRORE_PROGETTO_MANCANTE });
+    }
 
     try {
       const cliente = await prisma.cliente.findFirst({
@@ -768,6 +784,13 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
         select: { nome: true, email: true, cellulare: true, telegramChatId: true, referentiJson: true },
       });
       if (!cliente) return reply.code(404).send({ errore: 'Cliente non trovato.' });
+
+      // Il progetto deve essere di questo cliente e di questo studio: l'id arriva dal browser.
+      // La sua presenza l'ha già pretesa il guard qui sopra, prima di toccare il database.
+      if (ambito === 'engagement_letter') {
+        const esito = await progettoDaIncaricare(tenantId, clienteId, riferimentoId);
+        if ('errore' in esito) return reply.code(esito.codice).send({ errore: esito.errore });
+      }
 
       // Anche qui i recapiti arrivano dalle colonne o dal `referentiJson` (vedi
       // `recapitiCliente`): era il punto esatto in cui la richiesta di codice via email si
@@ -1108,6 +1131,44 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
   }
 
   /**
+   * La lettera d'incarico si firma **su un progetto**, non «presso un cliente».
+   *
+   * Fino al 02/10/2026 non era così: per questo ambito `riferimento_id` restava nullo, e il
+   * portale decideva se una lettera era firmata guardando le firme del **cliente**. Sul VPS il
+   * progetto «prova server», creato il 02/10/2026, risultava già firmato da una firma del
+   * 08/09/2026 che non lo riguardava — e la firma, non dicendo su cosa fosse stata apposta,
+   * non poteva che essere letta così.
+   *
+   * Qui il progetto si pretende, e si verifica che sia **di questo cliente e di questo
+   * studio**: l'id arriva dal browser, quindi senza il controllo un portale potrebbe firmare
+   * la lettera di un incarico altrui. È la stessa catena di proprietà che usano
+   * `improntaDocumentoDelFascicolo` e `improntaModuloCompletato`.
+   */
+  async function progettoDaIncaricare(
+    tenantId: string,
+    clienteId: string,
+    riferimentoId: string | null | undefined,
+  ): Promise<
+    | { id: string; nome: string; numeroContratto: string | null; stato: string }
+    | { errore: string; codice: number }
+  > {
+    if (!riferimentoId) {
+      return { errore: ERRORE_PROGETTO_MANCANTE, codice: 400 };
+    }
+    const progetto = await prisma.progetto.findFirst({
+      where: { id: riferimentoId, tenantId, clienteId },
+      select: { id: true, nome: true, numeroContratto: true, stato: true },
+    });
+    if (!progetto) {
+      return {
+        errore: 'Il progetto da incaricare non è presente fra quelli di questo cliente.',
+        codice: 404,
+      };
+    }
+    return progetto;
+  }
+
+  /**
    * §WF-DOC — lo schema dichiara `firmato` «stato terminale positivo», ma nessuna delle due
    * rotte di firma lo scriveva: il documento restava `pubblicato` (o `in_revisione`) per
    * sempre. Portale e scheda dello studio derivano «firmato» dall'esistenza della riga
@@ -1250,8 +1311,9 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
     try {
       // 1. Collocazione nel fascicolo: il verbale segue il documento che certifica. Per il
       //    Vault copia progetto/microvoce dall'originale; per un modulo risale al progetto;
-      //    altrimenti (engagement_letter, addendum, o riferimento mancante) va nell'ultimo
-      //    progetto del cliente. Il null è l'extrema ratio: il verbale esiste comunque.
+      //    per la lettera d'incarico il riferimento È il progetto incaricato; altrimenti
+      //    (addendum, o riferimento mancante) va nell'ultimo progetto del cliente. Il null è
+      //    l'extrema ratio: il verbale esiste comunque.
       let progettoId: string | null = null;
       let microvoceProgettoId: string | null = null;
       if (ambito === 'documento_vault' && riferimentoId) {
@@ -1267,6 +1329,16 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
           select: { progettoId: true },
         });
         progettoId = modulo?.progettoId ?? null;
+      } else if (ambito === 'engagement_letter' && riferimentoId) {
+        // Il riferimento della lettera È il progetto incaricato: il verbale va lì, senza
+        // passare dal ripiego qui sotto. Quel ripiego («l'ultimo progetto del cliente») è
+        // ciò che il 02/10/2026 faceva risultare firmato «prova server», ed è il motivo per
+        // cui ora la lettera non si firma più senza sapere su quale incarico.
+        const incaricato = await prisma.progetto.findFirst({
+          where: { id: riferimentoId, tenantId },
+          select: { id: true },
+        });
+        progettoId = incaricato?.id ?? null;
       }
       if (!progettoId && !microvoceProgettoId) {
         const progetto = await prisma.progetto.findFirst({
@@ -1433,6 +1505,12 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
     if (moduloCompletato && !riferimentoId) {
       return reply.code(400).send({ errore: 'Manca il modulo da confermare.' });
     }
+    // La lettera d'incarico si firma SU un progetto. Fino al 02/10/2026 questo riferimento non
+    // era preteso da nessuno, quindi restava nullo e la firma non diceva su cosa fosse stata
+    // apposta — vedi `progettoDaIncaricare`, che più sotto ne verifica anche la proprietà.
+    if (ambito === 'engagement_letter' && !riferimentoId) {
+      return reply.code(400).send({ errore: ERRORE_PROGETTO_MANCANTE });
+    }
 
     try {
       const cliente = await prisma.cliente.findFirst({
@@ -1461,6 +1539,18 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
         improntaFinale = esito.hash;
         titoloDalFascicolo = esito.titolo;
         livelloRichiesto = esito.livello;
+      }
+      // La lettera d'incarico ha un riferimento come gli altri due ambiti — il progetto su cui
+      // si firma — e come loro lo si verifica PRIMA di consumare il codice monouso. Il valore
+      // risolto serve anche più sotto, all'attivazione: prima il progetto lo si indovinava
+      // («l'ultimo creato per questo cliente»), e con più incarichi aperti si attivava quello
+      // sbagliato.
+      let progettoIncaricato: { id: string; nome: string; numeroContratto: string | null; stato: string } | null =
+        null;
+      if (ambito === 'engagement_letter') {
+        const esito = await progettoDaIncaricare(tenantId, clienteId, riferimentoId);
+        if ('errore' in esito) return reply.code(esito.codice).send({ errore: esito.errore });
+        progettoIncaricato = esito;
       }
 
       // Enforcement §3.2 ribadito al momento della firma, non solo alla richiesta del
@@ -1679,26 +1769,24 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
 
       // L'attivazione del progetto riguarda solo la lettera d'incarico: prima avveniva a
       // ogni firma, quindi anche prendere visione di un documento faceva scattare un
-      // progetto in lavorazione.
+      // progetto in lavorazione. E avviene sul progetto **firmato**, non sull'ultimo creato:
+      // la lettera nomina un incarico, e quello si apre.
       let progettoAttivato: string | null = null;
-      if (ambito === 'engagement_letter') {
+      if (progettoIncaricato && progettoIncaricato.stato !== 'in_progress') {
         try {
-          const prj = await prisma.progetto.findFirst({
-            where: { clienteId },
-            orderBy: { createdAt: 'desc' },
+          await prisma.progetto.update({
+            where: { id: progettoIncaricato.id },
+            data: { stato: 'in_progress' },
           });
-          if (prj && prj.stato !== 'in_progress') {
-            await prisma.progetto.update({ where: { id: prj.id }, data: { stato: 'in_progress' } });
-            progettoAttivato = prj.id;
-          }
+          progettoAttivato = progettoIncaricato.id;
         } catch {
           // L'attivazione è un effetto collaterale: se salta, la firma resta valida.
         }
       }
 
-      // Punto 2 piano gap — il verbale si genera DOPO l'attivazione del progetto: per
-      // l'engagement_letter il collegamento al fascicolo cerca l'ultimo progetto del
-      // cliente, che a questo punto è già in lavorazione.
+      // Punto 2 piano gap — il verbale si genera DOPO l'attivazione del progetto, e il suo
+      // collegamento al fascicolo segue il riferimento della firma (`generaVerbaleDiFirma`),
+      // che per la lettera d'incarico è il progetto appena attivato.
       await generaVerbaleDiFirma({
         tenantId,
         clienteId,
@@ -1785,6 +1873,10 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
     if (moduloCompletato && !riferimentoId) {
       return reply.code(400).send({ errore: 'Manca il modulo a cui si riferisce la firma.' });
     }
+    // Stesso vincolo di `/portal/verify-otp-and-sign`: la lettera si firma su un progetto.
+    if (ambito === 'engagement_letter' && !riferimentoId) {
+      return reply.code(400).send({ errore: ERRORE_PROGETTO_MANCANTE });
+    }
 
     try {
       const cliente = await prisma.cliente.findFirst({
@@ -1835,6 +1927,13 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
         improntaFinale = esito.hash;
         titoloDalFascicolo = esito.titolo;
         livelloRichiesto = esito.livello;
+      }
+      // Anche da questo canale la lettera d'incarico si firma su un progetto: senza il
+      // riferimento la firma non direbbe su cosa è stata apposta, ed è il difetto che ha
+      // fatto risultare firmato «prova server» il 02/10/2026 (vedi `progettoDaIncaricare`).
+      if (ambito === 'engagement_letter') {
+        const esito = await progettoDaIncaricare(tenantId, clienteId, riferimentoId);
+        if ('errore' in esito) return reply.code(esito.codice).send({ errore: esito.errore });
       }
 
       // Enforcement §3.2 — canale `file`: chi firma con il proprio provider di firma

@@ -73,7 +73,7 @@ export function ClientPortal() {
   const {
     clientObj, setClientObj, clientName, clientProjects, selectedProjectId, setSelectedProjectId,
     progettoId, setProgettoId, moduliProposti, setModuliProposti, messaggi, setMessaggi,
-    moduleSignatures, signed, setSigned, eidasSeal, setEidasSeal, addendums, addendumErrore,
+    moduleSignatures, signed, eidasSeal, caricaFirmeLettera, addendums, addendumErrore,
     pageLoading, portalDocs, portalDocsErrore, portalDocsCaricamento, formData, bozzaDati,
     setBozzaDati, proposteDati, contattiStudio, fatturePortale, fattureCaricamento,
     fattureErrore, isStudioPreview, elencoClienti, caricaDocumenti, caricaFirmeModuli,
@@ -469,8 +469,7 @@ export function ClientPortal() {
     clientObj,
     clientName,
     setLoading,
-    setSigned,
-    setEidasSeal,
+    caricaFirmeLettera,
     setSelectedViewerDoc,
     caricaDocumenti,
     caricaFirmeModuli,

@@ -23,6 +23,7 @@ import type {
 import type { ModuloProposta } from './types';
 import { mapProjectToPortalModules } from './mapPortalModules';
 import { dataOraLeggibile } from './format';
+import { statoFirmaLettera } from './firmaLettera';
 
 // Chiamata magic-login in corso per un certo token: chi ne fa un'altra con lo
 // stesso token mentre la prima è in volo riceve la STESSA promise, non una
@@ -70,10 +71,16 @@ export function usePortalData({ token, setIsAuthenticated, setAccessoNegato }: U
   messaggi: any[];
   setMessaggi: React.Dispatch<React.SetStateAction<any[]>>;
   moduleSignatures: Record<string, { firmato: boolean; dataFirma: string; signerName: string }>;
+  /**
+   * Se il progetto attualmente selezionato ha una lettera d'incarico firmata — non se il
+   * cliente ne ha firmata una in passato. È derivato, non uno stato: c'è un solo posto dove
+   * si decide, e cambia da solo quando il cliente passa a un altro incarico.
+   */
   signed: boolean;
-  setSigned: React.Dispatch<React.SetStateAction<boolean>>;
+  /** Sigillo della firma del progetto selezionato, ricostruito dalla riga a database. */
   eidasSeal: any;
-  setEidasSeal: React.Dispatch<React.SetStateAction<any>>;
+  /** Rilegge le firme della lettera d'incarico dal database (dopo una firma). */
+  caricaFirmeLettera: (clienteId?: string | null) => Promise<void>;
   addendums: RichiestaAddendum[];
   addendumErrore: string | null;
   pageLoading: boolean;
@@ -105,10 +112,23 @@ export function usePortalData({ token, setIsAuthenticated, setAccessoNegato }: U
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
   const [moduliProposti, setModuliProposti] = useState<ModuloProposta[]>([]);
   const [moduleSignatures, setModuleSignatures] = useState<Record<string, { firmato: boolean; dataFirma: string; signerName: string }>>({});
-  // Lo stato di firma NON si inizializza da una chiave cablata: la chiave conteneva il nome di un
-  // cliente specifico, quindi un browser in cui quel cliente aveva firmato mostrava "firmato" a
-  // qualunque altro cliente. Si risolve in `loadPortalData` sul nome del cliente autenticato.
-  const [signed, setSigned] = useState<boolean>(false);
+  // Lo stato di firma della lettera d'incarico non è un booleano e non è per cliente.
+  //
+  // Qui c'era `signed`, «questo cliente ha firmato una lettera?», riempito da una chiave
+  // `localStorage` e poi da una lettura delle firme del cliente. Entrambe sbagliavano la stessa
+  // domanda: la lettera si firma **su un progetto**, e con più incarichi aperti una firma vecchia
+  // marcava come firmati anche quelli nati dopo. Sul VPS, il 02/10/2026, «prova server» — creato
+  // quel giorno — risultava già firmato da una firma dell'08/09/2026.
+  //
+  // Ora si tengono le righe, e `signed`/`eidasSeal` si ricavano dal progetto che si sta guardando
+  // (`riferimentoId === selectedProjectId`). Una firma senza riferimento — le righe scritte prima
+  // del 02/10/2026 — non firma nessun progetto: è la verità, allora non si sapeva su quale fosse
+  // stata apposta.
+  const [firmeLettera, setFirmeLettera] = useState<any[]>([]);
+
+  // Firmata o no lo decide il progetto che il cliente sta guardando, non il fatto che il
+  // cliente abbia firmato in passato: la logica sta in `statoFirmaLettera`, con il suo test.
+  const { signed, eidasSeal } = statoFirmaLettera(firmeLettera, selectedProjectId, clientName);
 
   // Le richieste di integrazione dell'incarico (§2.5) vivono a database, agganciate al
   // progetto, e lo studio le vede. Prima stavano in `localStorage` sotto una chiave col nome
@@ -131,9 +151,9 @@ export function usePortalData({ token, setIsAuthenticated, setAccessoNegato }: U
   const [portalDocsErrore, setPortalDocsErrore] = useState<string | null>(null);
   const [portalDocsCaricamento, setPortalDocsCaricamento] = useState(false);
 
-  // Stesso motivo del flag `signed`: il sigillo di firma è di un cliente preciso e non va letto da
-  // una chiave cablata. Viene caricato in `loadPortalData` per il cliente autenticato.
-  const [eidasSeal, setEidasSeal] = useState<any>(null);
+  // Lo stato di firma dei documenti del fascicolo e dei moduli si legge dalle rispettive
+  // collezioni; il sigillo della lettera d'incarico si ricava da `firmeLettera` (sotto), perché
+  // dipende da quale progetto si sta guardando.
 
   // Form Cliente State — vuoto per definizione. Qui c'erano ragione sociale, partita IVA, codice
   // fiscale, IBAN e legale rappresentante di un cliente reale come valori iniziali: siccome nulla
@@ -303,6 +323,26 @@ export function usePortalData({ token, setIsAuthenticated, setAccessoNegato }: U
       setModuleSignatures(mappa);
     } catch {
       setModuleSignatures({});
+    }
+  };
+
+  /**
+   * Le firme della lettera d'incarico, con il progetto a cui si riferiscono.
+   *
+   * È la stessa lettura di `caricaFirmeModuli`, e per lo stesso motivo: `signed` era un booleano
+   * per cliente, quindi una firma vecchia marcava come firmato ogni progetto successivo. Qui le
+   * righe si tengono intere — è il render a ricavarne `signed`/`eidasSeal` per il progetto attivo.
+   *
+   * Un errore di lettura lascia l'elenco com'era, invece di svuotarlo: «non riesco a leggere» non
+   * è «non è firmata», e quest'ultima è la lettura peggiore da dare per sbaglio a un cliente —
+   * rifarebbe la firma su un incarico già firmato.
+   */
+  const caricaFirmeLettera = async (clienteIdSessione?: string | null) => {
+    try {
+      const res = await elencoFirmeApi({ clienteId: clienteIdSessione ?? undefined, ambito: 'engagement_letter' });
+      setFirmeLettera(Array.isArray(res?.firme) ? res.firme : []);
+    } catch (err) {
+      console.warn('Errore recupero firme lettera d\'incarico:', err);
     }
   };
 
@@ -501,42 +541,13 @@ export function usePortalData({ token, setIsAuthenticated, setAccessoNegato }: U
 
       // Lo stato di firma della lettera d'incarico si rilegge da database, come documenti (§2.9) e
       // addendum (§2.5): la firma è una riga `FirmaElettronica` emessa da `/portal/verify-otp-and-sign`,
-      // con sigillo, hash e IP. Prima viveva in `bluman_portal_signed_<cliente>`/`bluman_seal_<cliente>`:
-      // firmata su un browser voleva dire da firmare su un altro, e lo studio non ne vedeva traccia.
-      try {
-        const resFirme = await elencoFirmeApi({ clienteId: clienteIdRisolto ?? undefined, ambito: 'engagement_letter' });
-        const firmeEl = Array.isArray(resFirme?.firme) ? resFirme.firme : [];
-        // L'elenco arriva già ordinato dal più recente: la prima riga dell'ambito è quella buona.
-        // Il filtro sul cliente è difensivo — per le sessioni cliente lo impone già il server —
-        // e in anteprima studio evita di mostrare la lettera d'un altro come firmata.
-        const firmaEl = firmeEl.find((f) => !clienteIdRisolto || f.cliente?.id === clienteIdRisolto);
-        if (firmaEl) {
-          setSigned(true);
-          setEidasSeal({
-            id: firmaEl.id,
-            signatureId: firmaEl.signatureId,
-            tipoFirma: firmaEl.tipoFirma,
-            signerName: firmaEl.firmatarioNome || resolvedClientName,
-            documentoTitolo: firmaEl.documentoTitolo,
-            timestampIso: firmaEl.firmatoAt,
-            documentoHash: firmaEl.documentoHash,
-            sha256Digest: firmaEl.fileFirmatoHash ?? firmaEl.documentoHash,
-            ipAddress: firmaEl.ipAddress ?? null,
-            // Il GET /firme non espone lo user-agent: non lo si ricostruisce a caso (regola 7).
-            userAgent: null,
-            canaleVerificato: firmaEl.canaleVerificato,
-            standard: firmaEl.standard,
-            fileFirmatoUrl: firmaEl.fileFirmatoUrl,
-          });
-        } else {
-          setSigned(false);
-          setEidasSeal(null);
-        }
-      } catch (err) {
-        // «Non riesco a leggere» non è «non c'è»: l'errore si vede in console, lo stato resta
-        // quello di partenza e la lettura successiva ci riprova.
-        console.warn('Errore recupero firma lettera d\'incarico:', err);
-      }
+      // con sigillo, hash, IP e il progetto su cui è stata apposta. Prima viveva in
+      // `bluman_portal_signed_<cliente>`/`bluman_seal_<cliente>`: firmata su un browser voleva dire da
+      // firmare su un altro, e lo studio non ne vedeva traccia.
+      //
+      // Si leggono le righe, non un «sì/no»: quale lettera risulti firmata lo decide il render,
+      // confrontando il riferimento della firma con il progetto selezionato.
+      await caricaFirmeLettera(clienteIdRisolto);
 
       // §2.5 — le richieste di integrazione dell'incarico si rileggono da database, non più da
       // `localStorage`: lo studio le vede e non vanno perse al cambio dispositivo.
@@ -584,9 +595,8 @@ export function usePortalData({ token, setIsAuthenticated, setAccessoNegato }: U
     setMessaggi,
     moduleSignatures,
     signed,
-    setSigned,
     eidasSeal,
-    setEidasSeal,
+    caricaFirmeLettera,
     addendums,
     addendumErrore,
     pageLoading,

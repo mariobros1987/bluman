@@ -47,7 +47,7 @@ export interface TabPropostaProps {
   otpLoading: boolean;
   fileFirmato: { nome: string; base64: string } | null;
   leggiFileFirmato: (file: File) => Promise<void>;
-  confermaFirmaConFile: () => Promise<boolean>;
+  confermaFirmaConFile: (opzioni?: { bersaglio?: BersaglioFirma }) => Promise<boolean>;
   caricamentoFirmato: boolean;
 }
 
@@ -96,6 +96,22 @@ export function TabProposta({
   // dentro il documento al momento del salvataggio: qui si rimettono al loro posto sul foglio.
   // Un mandato salvato prima di §39 non li ha: torna tutto come corpo, come si vedeva prima.
   const partiProposta = scomponiDocumento(getResolvedEngagementHtml());
+
+  /**
+   * Il bersaglio della firma del mandato: ambito, titolo **e il progetto**.
+   *
+   * Il progetto è la parte che prima non c'era. Senza, il backend registrava la firma con
+   * `riferimento_id` nullo e il portale non poteva più rispondere a «quale incarico ho
+   * firmato?» — infatti rispondeva «il cliente ha firmato», e ogni progetto successivo
+   * risultava firmato da quella firma vecchia (VPS, 02/10/2026: «prova server» nato quel
+   * giorno, firma dell'08/09/2026).
+   */
+  const idProgettoAttivo = progettoAttivo?.id ? String(progettoAttivo.id) : undefined;
+  const bersaglioMandato: BersaglioFirma = {
+    ambito: 'engagement_letter',
+    titolo: TITOLO_MANDATO,
+    riferimentoId: idProgettoAttivo,
+  };
 
   return (
     <div style={docBoxStyle}>
@@ -503,6 +519,17 @@ export function TabProposta({
               </div>
             </div>
 
+            {/* Senza incarico la lettera non si firma: il backend rifiuta il riferimento
+                mancante (400), e un pulsante che porta a un rifiuto è peggio di un pulsante
+                spento. Succede quando lo studio non ha ancora creato il progetto, o mentre
+                l'elenco dei progetti sta ancora arrivando. */}
+            {!idProgettoAttivo && (
+              <div style={{ fontSize: 11.5, color: 'var(--amber)', background: 'rgba(251,191,36,.08)', border: '1px solid rgba(251,191,36,.3)', borderRadius: 8, padding: 10, marginBottom: 14 }}>
+                ⚠️ La lettera d'incarico si firma su un incarico: qui non risulta ancora nessun
+                progetto aperto per te. Se ne aspettavi uno, ricarica fra poco o scrivi allo Studio.
+              </div>
+            )}
+
             {modalitaFirma === 'otp' ? (
               <>
                 {/* 📲 SCELTA CANALE DI RICEZIONE DEL CODICE (§1.1, §1.4) */}
@@ -621,8 +648,12 @@ export function TabProposta({
                   // dopo aver firmato un documento del fascicolo `bersaglioFirma` punta
                   // ancora a quel documento, e il mandato finirebbe registrato con
                   // l'ambito e il riferimento di un altro atto.
-                  onClick={() => inviaCodiceFirma({ bersaglio: { ambito: 'engagement_letter', titolo: TITOLO_MANDATO } })}
-                  disabled={loading || otpLoading || !canaleCorrente?.disponibile || (usaRecapitoDiverso && !recapitoDichiarato.trim())}
+                  // E porta il PROGETTO, non solo l'ambito: la lettera si firma su un
+                  // incarico, e senza `riferimentoId` il portale non saprebbe più dire
+                  // quale — che è il difetto per cui «prova server» risultava firmato il
+                  // 02/10/2026 da una firma che non lo riguardava.
+                  onClick={() => inviaCodiceFirma({ bersaglio: bersaglioMandato })}
+                  disabled={!idProgettoAttivo || loading || otpLoading || !canaleCorrente?.disponibile || (usaRecapitoDiverso && !recapitoDichiarato.trim())}
                   style={{
                     background: canaleCorrente?.disponibile ? 'var(--indigo)' : 'var(--card)',
                     color: canaleCorrente?.disponibile ? '#fff' : 'var(--muted)',
@@ -713,8 +744,8 @@ export function TabProposta({
                 )}
 
                 <button
-                  onClick={() => confermaFirmaConFile()}
-                  disabled={!fileFirmato || caricamentoFirmato}
+                  onClick={() => confermaFirmaConFile({ bersaglio: bersaglioMandato })}
+                  disabled={!idProgettoAttivo || !fileFirmato || caricamentoFirmato}
                   style={{
                     background: fileFirmato ? 'var(--indigo)' : 'var(--card)',
                     color: fileFirmato ? '#fff' : 'var(--muted)',

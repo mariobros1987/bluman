@@ -32,6 +32,8 @@ const stato = {
   uploadContenuti: [] as string[],
   firmeCreate: [] as any[],
   firmeAggiornate: [] as any[],
+  /** Le `update` sul progetto: servono a provare QUALE incarico viene attivato. */
+  progettiAggiornati: [] as any[],
   documentiCreati: [] as any[],
   otpAggiornati: [] as any[],
   richiesteModificaCreate: [] as any[],
@@ -62,7 +64,10 @@ vi.mock('./util/prismaClient.js', async importOriginal => {
     moduloProgetto: { findFirst: async () => stato.modulo },
     progetto: {
       findFirst: async () => stato.progetto,
-      update: async (args: any) => ({ ...stato.progetto, ...args.data }),
+      update: async (args: any) => {
+        stato.progettiAggiornati.push(args);
+        return { ...stato.progetto, ...args.data };
+      },
     },
     codiceOtp: {
       findFirst: async () => stato.otp,
@@ -261,6 +266,7 @@ beforeEach(() => {
   stato.uploadContenuti = [];
   stato.firmeCreate = [];
   stato.firmeAggiornate = [];
+  stato.progettiAggiornati = [];
   stato.documentiCreati = [];
   stato.otpAggiornati = [];
   stato.richiesteModificaCreate = [];
@@ -530,7 +536,11 @@ describe('Punto 2 — verify-otp-and-sign genera il verbale di firma', () => {
     }
   });
 
-  it('engagement letter senza progetto agganciato: il verbale va nell\'ultimo progetto del cliente', async () => {
+  it('lettera d\'incarico senza progetto: la firma è rifiutata, nessun verbale', async () => {
+    // Il comportamento fino al 02/10/2026: la firma passava e il verbale andava «nell'ultimo
+    // progetto del cliente». Quel ripiego è il difetto — sul VPS «prova server», creato il
+    // 02/10/2026, risultava firmato da una firma dell'08/09/2026, perché la firma non diceva
+    // su quale incarico fosse stata apposta e la lettura non poteva che indovinare.
     stato.cliente = { nome: 'Rossi Costruzioni SRL' };
     stato.progetto = { id: 'proj-fallback', stato: 'in_progress', createdAt: new Date() };
     stato.otp = otpAperto('engagement_letter', null);
@@ -540,10 +550,43 @@ describe('Punto 2 — verify-otp-and-sign genera il verbale di firma', () => {
       url: '/portal/verify-otp-and-sign',
       payload: { otp: CODICE_OTP, ambito: 'engagement_letter', documentoHash: 'ab'.repeat(32) },
     });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().errore).toMatch(/Manca il progetto da incaricare/);
+    // Il rifiuto arriva PRIMA di consumare il codice: il cliente riprova senza rifare il giro.
+    expect(stato.otpAggiornati).toHaveLength(0);
+    expect(stato.firmeCreate).toHaveLength(0);
+    expect(stato.documentiCreati).toHaveLength(0);
+  });
+
+  it('lettera d\'incarico su un progetto: la firma lo porta con sé, e il verbale va lì', async () => {
+    stato.cliente = { nome: 'Rossi Costruzioni SRL' };
+    stato.progetto = { id: 'proj-1', stato: 'pre_project', createdAt: new Date() };
+    stato.otp = otpAperto('engagement_letter', 'proj-1');
+    const server = serverConToken(tokenCliente());
+    const res = await server.inject({
+      method: 'POST',
+      url: '/portal/verify-otp-and-sign',
+      payload: {
+        otp: CODICE_OTP,
+        ambito: 'engagement_letter',
+        riferimentoId: 'proj-1',
+        documentoHash: 'ab'.repeat(32),
+      },
+    });
     expect(res.statusCode).toBe(200);
+
+    // La firma dice su cosa è stata apposta: è la riga che il portale legge per sapere se
+    // QUEL progetto è firmato.
+    expect(stato.firmeCreate).toHaveLength(1);
+    expect(stato.firmeCreate[0].riferimentoId).toBe('proj-1');
+
+    // E il progetto si apre — quello firmato, non l'ultimo creato per il cliente.
+    expect(stato.progettiAggiornati.map((a: any) => a.where.id)).toEqual(['proj-1']);
+    expect(stato.progettiAggiornati[0].data.stato).toBe('in_progress');
+
     expect(stato.documentiCreati).toHaveLength(1);
     expect(stato.documentiCreati[0].tipo).toBe('verbale_firma');
-    expect(stato.documentiCreati[0].progettoId).toBe('proj-fallback');
+    expect(stato.documentiCreati[0].progettoId).toBe('proj-1');
   });
 
   it('se il generatione del verbale fallisce (storage giù) la firma resta valida', async () => {
