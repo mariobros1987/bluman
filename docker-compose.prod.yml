@@ -46,6 +46,13 @@ services:
       POSTGRES_USER: "${POSTGRES_USER:?manca POSTGRES_USER nel file .env}"
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?manca POSTGRES_PASSWORD nel file .env — generala con openssl rand -base64 32}"
       POSTGRES_DB: "${POSTGRES_DB:?manca POSTGRES_DB nel file .env}"
+    # pg_stat_statements (dal 02/10/2026): rende visibili le query lente. La libreria si può
+    # precaricare solo all'avvio del server, quindi non basta `CREATE EXTENSION`. Dichiarato
+    # qui per RIPRODUCIBILITÀ: su un VPS il cui volume esiste già il container non rilegge
+    # questa riga, e la si imposta con `ALTER SYSTEM SET shared_preload_libraries=…` (che
+    # persiste in postgresql.auto.conf, dentro il volume). I due valori coincidono, e la riga
+    # di comando vince sull'auto.conf: restano allineati invece di contraddirsi.
+    command: ["postgres", "-c", "shared_preload_libraries=pg_stat_statements"]
     volumes:
       - bluman_pgdata:/var/lib/postgresql/data
     healthcheck:

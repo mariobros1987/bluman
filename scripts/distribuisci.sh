@@ -305,6 +305,29 @@ if [ "$VPS" -eq 1 ]; then
   ssh_vps "cd $VPS_DIR && $COMPOSE_PROD up -d" >/dev/null
   successo "Container aggiornati."
 
+  # d-bis) nginx va RICARICATO a mano, e saltarlo rompe l'API in modo silenzioso.
+  #    `nginx_bluman_app.inc` fa `proxy_pass http://api:3000;` e non ha nessuna direttiva
+  #    `resolver`: nginx risolve il nome `api` **una volta sola, all'avvio**, e tiene quell'IP.
+  #    Ricreando il container l'IP cambia — e nginx continua a bussare a quello vecchio, quindi
+  #    risponde **502 su tutte le rotte API mentre l'API è viva e risponde**. Il sintomo manda a
+  #    cercare il guasto dalla parte sbagliata.
+  #    Non è ipotetico: il log di nginx mostra `/health` → 502 l'01/10/2026 alle 11:53, 13:35 e
+  #    15:05, cioè durante i deploy di quel giorno. Il 02/10 non si è ripetuto solo perché Docker
+  #    ha riassegnato all'API **lo stesso** IP dopo la ricreazione. Succede quando non lo riusa.
+  echo "• Reverse proxy: ricarica di nginx (l'IP di api è cambiato)..."
+  #    `-t` per primo: se il file di configurazione non è valido, il reload non fa niente e resta
+  #    in piedi la configurazione VECCHIA — cioè l'IP vecchio, cioè il 502 che si voleva evitare.
+  #    Fallirebbe in silenzio, quindi si controlla prima di provarci. L'output di `-t` è tenuto da
+  #    parte e mostrato solo se c'è un errore: altrimenti sporcherebbe le righe «• / ✅» del deploy.
+  if RICARICA="$(ssh_vps "cd $VPS_DIR && $COMPOSE_PROD exec -T nginx nginx -t" 2>&1)" \
+     && ssh_vps "cd $VPS_DIR && $COMPOSE_PROD exec -T nginx nginx -s reload" >/dev/null 2>&1; then
+    successo "nginx ricaricato."
+  else
+    echo "ERRORE: nginx non è stato ricaricato. Il proxy resta sull'IP vecchio di api e le rotte API risponderanno 502 a API viva." >&2
+    printf '%s\n' "$RICARICA" >&2
+    exit 1
+  fi
+
   # e) Verifica. Tre controlli, ognuno coglie un guasto diverso: l'health dice se l'API è viva,
   #    il 200 sulla radice se nginx serve il frontend, la sonda rotta se l'immagine in esecuzione
   #    è quella appena costruita (un 404 significa che il container è rimasto indietro).

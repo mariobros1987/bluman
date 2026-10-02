@@ -106,9 +106,44 @@ e `docker compose … exec nginx nginx -s reload`. Il servizio `certbot` rinnova
       server**.
 - [x] **Sorveglianza in cron** (01/10/2026) — vedi «La sorveglianza» qui sotto: sette controlli con
       avvisi su Telegram, e il controllo che il backup non sia morto in silenzio.
-- [ ] Rotazione delle password (`bluman_app` e proprietario) e `pg_stat_statements` per le query
-      lente. Il disco è coperto dalla sorveglianza, le **connessioni** no.
+- [x] **Rotazione delle password** (`bluman_app` e proprietario) — 02/10/2026, vedi «La rotazione
+      delle password» qui sotto.
+- [x] **`pg_stat_statements`** — 02/10/2026. Rende visibili le query lente, che prima erano
+      invisibili. Dichiarato anche in `docker-compose.prod.yml` per riproducibilità.
+- [ ] **Connessioni al database.** ⚠️ **Non** si controlla `pg_stat_activity`: con PgBouncer davanti
+      l'app non apre connessioni verso Postgres, le prende dal pool — Postgres ne vede **una**, e un
+      allarme su `max_connections` non suonerebbe mai, nemmeno con l'app in ginocchio. La metrica che
+      conta è la **coda di PgBouncer** (`cl_waiting` dal suo database di amministrazione), che è un
+      controllo da progettare a parte.
 - [ ] Tieni Supabase/Railway **accesi** come rollback per qualche giorno.
+
+### La rotazione delle password (02/10/2026)
+
+Ruotate entrambe — `bluman_app` e il proprietario dello schema — perché erano state generate prima
+del passaggio al VPS e non si sapeva più chi le avesse viste.
+
+**Il formato non è un dettaglio.** `openssl rand -hex 32`, **mai** base64: le password finiscono
+**dentro un URL** (`postgresql://utente:PASSWORD@host/db`) e l'alfabeto base64 contiene `/`, che in un
+URL tronca la stringa. L'errore che ne esce è `P1013: … invalid port number in database URL`, che
+sembra una porta sbagliata o una rete che non risponde.
+
+**L'ordine conta, e un test l'ha dimostrato.** Ruotare `bluman_app` ha **subito** un effetto visibile
+perché a valle c'è il pooler: PgBouncer si autentica su Postgres con quella password, quindi va
+riavviato insieme all'API — se si ruota solo il ruolo, il pooler resta con la vecchia e ogni query
+muore. Il proprietario invece **non** rompe niente finché non lo si usa: le migrazioni le fa il
+servizio `migrate`, che la rilegge dal `.env` a ogni esecuzione.
+
+**Verificare, non dedurre.** Un test che sembrava ovvio era **falso**: provare la vecchia password
+connettendosi a `127.0.0.1` **da dentro** il container di Postgres. `pg_hba.conf` dell'immagine
+ufficiale ha `host all all 127.0.0.1/32 trust` — da lì **nessuna password viene controllata**, quindi
+il test rispondeva «funziona ancora» qualunque cosa si scrivesse. La verifica buona passa dalla
+rete (dall'API, o da `pgbouncer`), che è l'unico percorso dove `scram-sha-256` si applica davvero.
+Il verdetto finale: nuova → connessa, vecchia → rifiutata, inventata → rifiutata.
+
+⚠️ Restano sul server **tre `.env`** con le password vecchie (`.env.pre-rotazione-20261002_132246`,
+`.env.pre-rotazione-owner-20261002_133350` e il `.env` vivo): cancellarli appena la stabilità è
+confermata, perché un file di riserva con le credenziali dismesse è solo una copia in più da
+proteggere.
 
 ### Il backup (dal 01/10/2026)
 
@@ -237,7 +272,7 @@ lascerebbe lo stato reale segnato `fail` e al giro successivo il cron manderebbe
 `./scripts/distribuisci.sh` fa anche questo: dopo il push aggiorna il VPS. Per aggiornarlo **da
 solo** (il commit dev'essere già su GitHub): `./scripts/distribuisci.sh --solo-vps`.
 
-Sono **quattro** cose, e saltarne una lascia l'ambiente incoerente in un modo che non si vede:
+Sono **cinque** cose, e saltarne una lascia l'ambiente incoerente in un modo che non si vede:
 
 | Passo | Comando | Cosa succede se si salta |
 |---|---|---|
@@ -245,6 +280,7 @@ Sono **quattro** cose, e saltarne una lascia l'ambiente incoerente in un modo ch
 | Frontend | build `node:22` usa-e-getta con `VITE_API_SAME_ORIGIN=true` | l'app parla col backend di Railway **in silenzio** |
 | Database | `compose build api migrate` → `run --rm -T migrate` → `run --rm -T rls` | schema vecchio; e senza `rls` la tabella nuova resta **scoperta** |
 | Backend | `compose up -d` | il container continua a girare con l'immagine precedente |
+| nginx | `compose exec -T nginx nginx -s reload` | **502 su tutte le rotte API** con l'API perfettamente viva (vedi sotto) |
 
 ```bash
 ssh-add "$HOME/.ssh/bluman_vps"        # la chiave dev'essere nell'agente
@@ -270,3 +306,29 @@ evitare. Per distribuire senza toccare il VPS: `--no-vps`.
 terminale e il container se lo mangia: la sessione si interrompe **a metà senza errore**. Nello
 script tutte le chiamate passano da `ssh_vps`, che mette `</dev/null` e non manda mai script sullo
 stdin. Vale anche a mano: aggiungi `-T` e `< /dev/null`.
+
+⚠️ **Ricreare `api` obbliga a ricaricare nginx.** `nginx_bluman_app.inc` fa `proxy_pass
+http://api:3000;` e **non c'è nessuna direttiva `resolver`**: nginx risolve il nome del servizio
+**una volta sola, all'avvio**, e poi tiene quell'indirizzo IP finché non glielo si fa rileggere.
+Ricreando il container `api` il suo IP cambia, e nginx continua a bussare all'indirizzo vecchio:
+risponde **502** su tutte le rotte API mentre l'API è perfettamente viva. Il sintomo (API sana,
+sito rotto) manda a cercare il guasto dalla parte sbagliata. Dopo ogni ricreazione:
+
+```bash
+docker compose -f docker-compose.prod.yml exec -T nginx nginx -s reload
+```
+
+La soluzione strutturale sarebbe un `resolver 127.0.0.11 valid=10s;` con `proxy_pass` su una
+variabile; finché non c'è, la ricarica è obbligatoria — e **`distribuisci.sh --solo-vps` la fa da
+sé** dal 02/10/2026 (passo *d-bis*).
+
+**Non è ipotetico.** Il log di nginx mostra `/health` → **502** l'**01/10/2026** alle 11:53, 13:35 e
+15:05, dall'IP di casa del titolare: sono i deploy di quel giorno. Il 02/10 non si è ripetuto solo
+perché Docker ha riassegnato all'API **lo stesso** indirizzo dopo la ricreazione. Succede quando non
+lo riusa, quindi il guasto è **intermittente**: si presenta un deploy sì e uno no, che è il modo
+peggiore di presentarsi.
+
+⚠️ **Il nome della rete lo decide compose, non il file.** `docker-compose.prod.yml` dichiara
+`bluman_internal`, ma Docker la crea come **`bluman_bluman_internal`**: compose antepone il nome del
+progetto. Un `docker run --network bluman_internal` muore con «network not found», che sembra un
+problema di rete e invece è solo il prefisso. L'elenco vero è in `docker network ls`.

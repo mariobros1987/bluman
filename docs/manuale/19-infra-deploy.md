@@ -65,5 +65,14 @@ si usa il **`.exe` nativo** via `RAILWAY_BIN` (lo script lo supporta).
   `bluman_app`, con `env_file: .env` per i secret runtime) → `nginx` (SPA + proxy API) + `certbot`
   (TLS Let's Encrypt, rinnovo automatico). Secret in `.env.prod.example`. Backup: `scripts/backup-vps.sh`.
   Il flusso migrate→rls→api è stato **verificato in dry-run locale** (RLS su 70 tabelle, isolamento ok).
+- **Aggiornare il VPS sono cinque passi**, non quattro: codice, frontend, database, backend e
+  **ricarica di nginx**. L'ultimo è invisibile e si paga caro: nginx risolve il nome `api` una volta
+  sola all'avvio (nessun `resolver` nel config), quindi ricreando il container l'API cambia IP e nginx
+  continua a bussare al vecchio → **502 su tutte le rotte API mentre l'API è viva** (successo davvero
+  il 01/10/2026). Dal 02/10/2026 lo fa `distribuisci.sh --solo-vps` da sé.
+- **`pg_stat_statements`** (dal 02/10/2026): dichiarato nel compose sul servizio `postgres`, rende
+  visibili le query lente. Precaricabile solo all'avvio del server, quindi non basta `CREATE EXTENSION`.
+- **Le connessioni al database non si controllano con `pg_stat_activity`**: con PgBouncer davanti
+  Postgres ne vede una sola e l'allarme non suonerebbe mai. La metrica utile è la coda di PgBouncer.
 - Fonti: `.agents/AGENTS.md`, `ISTRUZIONI_PER_IA.md` (regola 9), `PIANO_MIGRAZIONE_VPS.md`,
   `AUDIT_2026-09-27/07-frontend-infra.md`.
