@@ -185,12 +185,18 @@ l'indice è vecchio di oltre una settimana, il conteggio degli aggiornamenti di 
 perché non sa che esistono** — un numero vero e una conclusione falsa, il modo peggiore di sbagliare
 su un controllo di sicurezza. In quel caso risponde `unknown` e lo si vede nel riepilogo.
 
-**Perché non c'è un controllo sullo swap.** Questa macchina **non ha swap** (`SwapTotal: 0`), e
-segnalarlo sarebbe un avviso che non può mai rientrare — lo swap c'è o non c'è, non c'è niente da
-riparare. Un allarme permanente è il modo più rapido per far silenziare il monitor. Il fatto resta
-scritto nel dettaglio e nel riepilogo. ⚠️ Il rovescio della medaglia è che senza swap l'OOM killer è
-l'unica risposta alla pressione di memoria, e la sua vittima più probabile è il container di
-Postgres: aggiungere un file di swap da 2G è una modifica di cinque minuti, ancora da fare.
+**Perché lo swap non è un guasto.** L'**assenza** di swap non si segnala: sarebbe un avviso che non
+può mai rientrare — lo swap c'è o non c'è, e al giro dopo non c'è niente di diverso da riparare. Un
+allarme permanente è il modo più rapido per far silenziare il monitor. Il **consumo** invece sì: si
+controlla solo **se lo swap esiste**, oltre il 50%. Su una macchina senza swap il controllo tace, e il
+fatto resta scritto nel dettaglio e nel riepilogo.
+
+⚠️ Fino al 02/10/2026 questa macchina **non aveva swap** (`SwapTotal: 0`), e l'OOM killer era l'unica
+risposta alla pressione di memoria — con il container di Postgres come vittima più probabile. Ora c'è
+un file di swap da **2G** (`/swapfile`), persistito in `/etc/fstab` e **validato con `findmnt --verify`
+prima** di farci dipendere un riavvio, con **`vm.swappiness=10`** invece del default 60: su un server
+con Postgres, 60 tende a scambiare pagine calde del database e a trasformare la pressione di memoria
+in picchi di latenza. A 10 lo swap resta la rete di sicurezza che deve essere, non memoria di lavoro.
 
 **Il bot Telegram.** Gli avvisi vanno a un bot **dedicato**, non a quello degli studi: le
 credenziali di quello stanno nella riga `Tenant` (`tg_bot_token`) perché servono alle OTP dei
@@ -200,6 +206,31 @@ Telegram vieta al bot di iniziare una conversazione e l'invio fallisce con `400`
 ricava con `curl -s "https://api.telegram.org/bot<TOKEN>/getUpdates"`. Token e chat id stanno in
 `/etc/bluman/monitor.env` (`600`, di `bluman`) e **non** nel `.env` dell'app: quello è dichiarato in
 `env_file:` dal compose, quindi ogni sua variabile finisce **dentro** il container dell'API.
+
+**Configurato e verificato il 02/10/2026** (bot `@Avvisibluman_bot`, chat privata del titolare). La
+verifica va **rifatta dopo qualunque modifica**, perché un `200` da Telegram dice che il messaggio è
+stato *accettato*, non *consegnato*: l'unica prova è guardare il telefono.
+
+```bash
+# 1. il token è valido? «Messaggio di prova inviato» significa http 200 (401 = token, 400 = manca /start)
+bash ./scripts/monitor-vps.sh --prova
+
+# 2. un guasto VERO, con la logica vera, senza toccare la produzione e senza sporcare lo stato reale:
+#    le soglie si sovrascrivono via ambiente, lo stato si dirotta in una cartella usa-e-getta.
+D=$(mktemp -d)
+BLUMAN_MONITOR_STATO=$D BLUMAN_MONITOR_DISCO_PCT=1  bash ./scripts/monitor-vps.sh   # 🔴 avviso
+BLUMAN_MONITOR_STATO=$D BLUMAN_MONITOR_DISCO_PCT=1  bash ./scripts/monitor-vps.sh   # silenzio
+BLUMAN_MONITOR_STATO=$D BLUMAN_MONITOR_DISCO_PCT=85 bash ./scripts/monitor-vps.sh   # 🟢 rientro
+rm -rf $D
+
+# 3. il battito — non tocca il timbro, quindi non salta quello delle 08:00 del giorno dopo
+bash ./scripts/monitor-vps.sh --riepilogo
+```
+
+Sul telefono devono arrivare **quattro** messaggi (prova, guasto, rientro, riepilogo) e **niente fra
+il secondo e il terzo**: quel messaggio che non c'è è la prova che il monitor non tempesta. Il test
+del punto 2 **non** va fatto dal cron e **non** senza dirottare `BLUMAN_MONITOR_STATO` — altrimenti
+lascerebbe lo stato reale segnato `fail` e al giro successivo il cron manderebbe un rientro falso.
 
 ## 8. Aggiornare un VPS già in servizio (dopo ogni push)
 

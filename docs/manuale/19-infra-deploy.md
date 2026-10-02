@@ -37,7 +37,8 @@ si usa il **`.exe` nativo** via `RAILWAY_BIN` (lo script lo supporta).
   del disco o del server — per quello serve la copia off-site, ancora da configurare. Vedi
   `docs/vps-primo-avvio.md` §7.
 - **Sorveglianza VPS**: dal 01/10/2026 `scripts/monitor-vps.sh` gira ogni **10 minuti** dal cron di
-  `bluman` e avvisa su **Telegram** (bot dedicato, non quello degli studi). Sette controlli:
+  `bluman` e avvisa su **Telegram** (bot dedicato `@Avvisibluman_bot`, non quello degli studi;
+  configurato e **verificato end-to-end il 02/10/2026**). Sette controlli:
   freschezza del backup, disco, memoria, container, `/health`, aggiornamenti di sicurezza `apt` e
   digest dell'immagine `postgres`. **Avvisa solo sulle transizioni** (🔴 guasto, 🟢 rientro), più un
   **riepilogo giornaliero** alle 08:00 UTC che arriva anche quando va tutto bene — è ciò che
