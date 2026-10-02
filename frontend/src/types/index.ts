@@ -42,6 +42,12 @@ export interface Cliente {
   referenteNome?: string;
   referentiJson?: any;
   isAttivo?: boolean;
+  /**
+   * Non è una colonna: lo ricava `serializzaCliente` da `passwordHash`, che non esce mai dal
+   * server (regola 5). Dice se al cliente è già stata assegnata la password del portale, ed è
+   * la stessa cosa su cui filtra `?portale=con|senza`.
+   */
+  hasPassword?: boolean;
 }
 
 /**

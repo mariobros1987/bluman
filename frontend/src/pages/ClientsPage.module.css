@@ -29,6 +29,18 @@
 .kpiValue { font-size: 20px; font-weight: 700; }
 .kpiLabel { font-size: 11px; color: var(--muted); margin-top: 2px; }
 
+/* Il riquadro «Senza accesso al portale» è cliccabile, quindi è un <button>: qui si azzerano
+   gli stili nativi che altrimenti lo farebbero sembrare diverso dagli altri tre. */
+.kpiCardBtn {
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  width: 100%;
+  cursor: pointer;
+}
+.kpiCardBtn:focus-visible { outline: 2px solid var(--indigo); outline-offset: 2px; }
+.kpiCardAttivo { border-color: var(--indigo); background: var(--pill-indigo-bg); }
+
 .toolbar {
   display: flex;
   justify-content: space-between;
@@ -76,6 +88,34 @@
 .filterBtn:hover { color: var(--text); border-color: var(--indigo); }
 .filterBtnActive { background: var(--pill-indigo-bg) !important; color: var(--indigo-d) !important; border-color: var(--indigo) !important; }
 
+/* Interruttore elenco/schede. Non usa .filterBtn perché non filtra: cambia solo come si guarda
+   la stessa lista, e i due stati devono leggersi come un interruttore, non come un filtro. */
+.viewToggle {
+  display: flex;
+  gap: 2px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 3px;
+}
+.viewBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--t);
+}
+.viewBtn:hover { color: var(--text); }
+.viewBtn:focus-visible { outline: 2px solid var(--indigo); outline-offset: 1px; }
+.viewBtnAttivo { background: var(--pill-indigo-bg); color: var(--indigo-d); }
+
 .clientGrid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
@@ -105,6 +145,10 @@
   margin-bottom: 12px;
 }
 
+/* Il blocco nome + tipo prende lo spazio che resta, così la pastiglia del portale può stare
+   a destra senza essere spinta fuori dalla scheda da un nome lungo. */
+.clientHeaderMain { flex: 1; min-width: 0; }
+
 .avatarBox {
   width: 42px; height: 42px;
   border-radius: 12px;
@@ -116,6 +160,9 @@
   font-size: 14px;
   font-weight: 600;
   margin-bottom: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .clientTypeBadge {
@@ -140,9 +187,18 @@
   margin-bottom: 12px;
 }
 
-.metaRow {
+/* Riga informativa della scheda: icona + valore. Il valore tronca invece di allargare la
+   scheda, perché un'email lunga o una sede intera non devono rompere la griglia. */
+.metaItem {
   display: flex;
-  justify-content: space-between;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+.metaItem > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .clientActions {
@@ -167,4 +223,118 @@
   border-color: var(--indigo);
   color: var(--indigo-d);
   background: var(--pill-indigo-bg);
+}
+.btnAction:disabled { opacity: .55; cursor: default; }
+
+/* ─── Vista a elenco ─────────────────────────────────────────────────────── */
+
+/* Con scorrimento orizzontale: sotto una certa larghezza le colonne non ci stanno tutte, e
+   far scorrere la tabella è meglio che comprimere le celle fino a renderle illeggibili. */
+.tableView {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+.table thead tr {
+  background: var(--surface-1);
+  text-align: left;
+}
+
+.th {
+  padding: 10px 14px;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .03em;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.thAzioni { text-align: right; }
+
+/* Intestazione ordinabile: il <button> dentro il <th> va spogliato degli stili nativi ma deve
+   restare leggibile da tastiera, quindi il focus è esplicito invece che assente. */
+.thBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  color: var(--muted);
+  cursor: pointer;
+}
+.thBtn:hover { color: var(--text); }
+.thBtn:focus-visible { outline: 2px solid var(--indigo); outline-offset: 2px; border-radius: 3px; }
+.thBtnAttivo { color: var(--indigo-d); }
+.freccia { font-size: 9px; }
+
+.tableRow {
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background var(--t);
+}
+.tableRow:last-child { border-bottom: none; }
+.tableRow:hover { background: var(--card2); }
+
+.td { padding: 11px 14px; vertical-align: middle; }
+
+.cellNomeBox { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.cellNome { font-weight: 600; color: var(--indigo-l); }
+
+.miniAvatar {
+  width: 26px; height: 26px;
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; flex-shrink: 0;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+.pillOn { background: var(--pill-green-bg); color: var(--pill-green-fg); }
+.pillOff { background: var(--surface-1); color: var(--muted); }
+.pillCompany { background: var(--pill-indigo-bg); color: var(--purple); }
+.pillIndividual { background: var(--surface-1); color: var(--indigo-l); }
+
+.mono { font-family: monospace; font-size: 11px; }
+.secondario { font-size: 10.5px; color: var(--hint); }
+.vuoto { color: var(--hint); }
+
+.rowActions { display: flex; justify-content: flex-end; gap: 4px; }
+.iconBtn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  width: 28px; height: 28px;
+  border-radius: 7px;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  transition: all var(--t);
+}
+.iconBtn:hover { border-color: var(--indigo); color: var(--indigo-d); background: var(--pill-indigo-bg); }
+.iconBtn:disabled { opacity: .5; cursor: default; }
+
+/* Sotto questa larghezza la sede è la prima cosa che si può perdere: la tabella scorrerebbe
+   comunque, e nasconderla tiene in vista le colonne su cui si cerca. */
+@media (max-width: 1100px) {
+  .colSede { display: none; }
 }

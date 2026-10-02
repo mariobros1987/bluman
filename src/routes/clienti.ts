@@ -149,7 +149,7 @@ export async function registraRotteClienti(server: FastifyInstance, app: AppPort
         scadenza: scadenza.toISOString(),
       };
     } catch (err: any) {
-      req.log.error({ tenantId: req.tenantId, err: err instanceof Error ? err.message : err }, 'GET /clienti — errore generazione magic link');
+      req.log.error({ tenantId: req.tenantId, err: err instanceof Error ? err.message : err }, 'POST /clienti/:id/magic-link — errore generazione magic link');
       return reply.code(500).send({ errore: err.message || 'Errore generazione Magic Link' });
     }
   });
@@ -168,7 +168,7 @@ export async function registraRotteClienti(server: FastifyInstance, app: AppPort
         return clienti.map(serializzaCliente);
       }
 
-      const { page, limit, search, sortBy, sortOrder, tipo, skip } = paginazione.parametri;
+      const { page, limit, search, sortBy, sortOrder, tipo, portale, skip } = paginazione.parametri;
       const campo = campoOrdinamento(sortBy, ['createdAt', 'nome', 'tipo', 'rischioAml'] as const, 'createdAt');
       if (!campo) return reply.code(400).send({ errore: 'Campo di ordinamento clienti non valido' });
       const tipiConsentiti = ['company', 'individual'] as const;
@@ -178,6 +178,10 @@ export async function registraRotteClienti(server: FastifyInstance, app: AppPort
       const where = {
         tenantId,
         ...(tipo ? { tipo: tipo as typeof tipiConsentiti[number] } : {}),
+        // `passwordHash` è la stessa colonna da cui `serializzaCliente` ricava `hasPassword`,
+        // quindi il filtro e la pastiglia che l'operatore vede non possono divergere.
+        ...(portale === 'con' ? { passwordHash: { not: null } } : {}),
+        ...(portale === 'senza' ? { passwordHash: null } : {}),
         ...(search ? {
           OR: [
             { nome: { contains: search, mode: 'insensitive' as const } },
@@ -187,16 +191,19 @@ export async function registraRotteClienti(server: FastifyInstance, app: AppPort
           ],
         } : {}),
       };
-      const [clienti, totale, societa, persone] = await Promise.all([
+      const [clienti, totale, societa, persone, senzaPortale] = await Promise.all([
         prisma.cliente.findMany({ where, skip, take: limit, orderBy: { [campo]: sortOrder } }),
         prisma.cliente.count({ where }),
         prisma.cliente.count({ where: { ...where, tipo: 'company' } }),
         prisma.cliente.count({ where: { ...where, tipo: 'individual' } }),
+        // Come gli altri due, contato DENTRO i filtri attivi: i quattro riquadri in alto restano
+        // coerenti fra loro invece di mescolare «tutti» e «quelli filtrati».
+        prisma.cliente.count({ where: { ...where, passwordHash: null } }),
       ]);
       return reply.send({
         data: clienti.map(serializzaCliente),
         meta: creaMetaPaginazione(page, limit, totale),
-        riepilogo: { societa, persone },
+        riepilogo: { societa, persone, senzaPortale },
       });
     } catch (err: any) {
       if (paginazione.paginata) {

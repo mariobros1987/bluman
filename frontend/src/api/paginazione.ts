@@ -7,6 +7,8 @@ export interface ParametriListaPaginata {
   stato?: string;
   tipo?: string;
   metodo?: string;
+  /** Accesso al portale: `con` = ha già una password, `senza` = non ce l'ha ancora. */
+  portale?: string;
   /** Filtro per intervallo di data (YYYY-MM-DD), estremi indipendenti. */
   dataDa?: string;
   dataA?: string;
@@ -36,6 +38,7 @@ export function queryPaginazione(parametri?: ParametriListaPaginata): string {
   if (parametri.stato) query.set('stato', parametri.stato);
   if (parametri.tipo) query.set('tipo', parametri.tipo);
   if (parametri.metodo) query.set('metodo', parametri.metodo);
+  if (parametri.portale) query.set('portale', parametri.portale);
   if (parametri.dataDa) query.set('dataDa', parametri.dataDa);
   if (parametri.dataA) query.set('dataA', parametri.dataA);
   const serializzata = query.toString();

@@ -11,13 +11,21 @@ L'anagrafica dei clienti dello studio (persone fisiche o società), pagina **Cli
   5. **Compliance KYC** (solo se il modulo KYC è attivo per lo studio) — badge e rimando al fascicolo.
 - **Accesso del cliente al Portale**: **senza password**. Dall'anagrafica si **genera/invia il Magic
   Link** via email; il cliente entra dal link (vedi §12). Il ruolo `cliente` non ha password.
-- **Riepilogo**: l'elenco mostra quante **società** e quante **persone**.
+- **Due viste, e si sceglie**: **Elenco** (predefinita) o **Schede**, con l'interruttore in alto a
+  destra. La scelta è ricordata nel browser, e le schede mostrano i contatti solo quando ci sono.
+- **Riepilogo**: quattro riquadri — totale, **società**, **persone** e **senza accesso al portale**.
+  Il quarto è **cliccabile** e applica il filtro: dice quanto lavoro resta sulle credenziali.
 
 ## 📐 Calcoli & logica
 - Qui **non** si calcolano stati: il rischio AML e la due diligence vivono nel modulo **KYC** (§13);
   in anagrafica c'è solo la scheda/badge **Compliance**.
-- **Elenco paginato lato server**: ricerca testuale, filtro **tipo** (`company`/`individual`) e
-  riepilogo società/persone calcolato dal backend.
+- **Elenco paginato lato server**: ricerca testuale (nome, email, P.IVA, codice fiscale), filtro
+  **tipo** (`company`/`individual`) e filtro **accesso al portale** (`con`/`senza`). I conteggi del
+  riepilogo sono calcolati dal backend **dentro i filtri attivi**, così i quattro riquadri restano
+  coerenti fra loro. L'elenco si ordina cliccando le intestazioni «Cliente» e «Tipo».
+- **I filtri stanno nel backend, non nella pagina**: filtrare le sole righe già caricate darebbe
+  risultati falsi, perché con 50 clienti per pagina «senza accesso» mostrerebbe solo quelli assenti
+  *da quella pagina*. Un valore di `portale` inventato è un **400**, non un filtro ignorato.
 - **Segreti mai esposti**: `passwordHash` e le password dentro `referentiJson` vengono **rimossi** in
   lettura e non sono persistibili dal client (regola 5).
 
@@ -36,11 +44,16 @@ L'anagrafica dei clienti dello studio (persone fisiche o società), pagina **Cli
 - Nessun cliente → empty state sincero, non una lista di ripiego.
 
 ## 🔧 Nota tecnica
-- **Frontend**: `pages/ClientsPage.tsx`; modale `components/clients/AnagraficaErpModal.tsx` (tab
-  `generale · progetti · sede · sdi · compliance`).
-- **Rotte** (`src/routes/clienti.ts`): `GET /clienti` (paginato: `search`, `tipo`, `riepilogo`
-  società/persone), `POST /clienti`, `PUT /clienti/:id`, `POST /clienti/:id/magic-link`; login del
-  cliente `POST /auth/magic-login` (`src/routes/auth.ts`).
+- **Frontend**: `pages/ClientsPage.tsx` (due viste: elenco/tabelle e schede; preferenza in
+  `localStorage` alla chiave `bluman_clienti_vista`); modale `components/clients/AnagraficaErpModal.tsx`
+  (tab `generale · progetti · sede · sdi · compliance`).
+- **Rotte** (`src/routes/clienti.ts`): `GET /clienti` (paginato: `search`, `tipo`, `portale`,
+  `sortBy`/`sortOrder` fra `createdAt`·`nome`·`tipo`·`rischioAml`, `riepilogo`
+  società/persone/`senzaPortale`), `POST /clienti`, `PUT /clienti/:id`,
+  `POST /clienti/:id/magic-link`; login del cliente `POST /auth/magic-login` (`src/routes/auth.ts`).
+- **Il filtro del portale legge `passwordHash`**, la stessa colonna da cui `serializzaCliente` ricava
+  `hasPassword`: filtro e pastiglia che l'operatore vede non possono divergere. `hasPassword` non è
+  una colonna, è calcolato in lettura.
 - **Magic Link** (`MagicLink`): in riga solo lo **SHA-256** del token (mai il token), con `scadenza`,
   `email`, `usatoAt`; **riutilizzabile** fino a scadenza (il cliente riapre il link più volte), la
   **revoca** è la cancellazione della riga.

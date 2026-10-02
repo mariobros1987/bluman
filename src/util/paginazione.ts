@@ -16,6 +16,8 @@ export interface ParametriPaginazione {
   stato?: string;
   tipo?: string;
   metodo?: string;
+  /** Accesso al portale: `con` = ha una password, `senza` = non ce l'ha. Lo legge solo /clienti. */
+  portale?: string;
   dataDa?: string;
   dataA?: string;
   skip: number;
@@ -28,7 +30,7 @@ export type EsitoPaginazione =
 
 const CHIAVI_PAGINAZIONE = [
   'page', 'limit', 'search', 'sortBy', 'sortOrder', 'stato', 'tipo',
-  'metodo', 'dataDa', 'dataA',
+  'metodo', 'portale', 'dataDa', 'dataA',
 ] as const;
 
 export function leggiPaginazione(query: unknown): EsitoPaginazione {
@@ -59,6 +61,7 @@ export function leggiPaginazione(query: unknown): EsitoPaginazione {
       stato: data.stato,
       tipo: data.tipo,
       metodo: data.metodo,
+      portale: data.portale,
       dataDa: data.dataDa,
       dataA: data.dataA,
       skip: (page - 1) * limit,

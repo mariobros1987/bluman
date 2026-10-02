@@ -15,6 +15,34 @@ import { useSearchParams } from 'react-router-dom';
 import { useToast } from '../components/ui/ToastProvider';
 import { Modal } from '../components/ui/Modal';
 
+// ─── Preferenza di vista (elenco / schede) ────────────────────────────────────
+// Stesso schema di `utils/theme.ts`: chiave semplice in localStorage, lettura difensiva.
+// È una preferenza **per browser**, non per account: su una postazione condivisa due operatori
+// la condividono, esattamente come già accade per il tema. Se servisse per account basterebbe
+// aggiungere l'id utente alla chiave.
+const CHIAVE_VISTA = 'bluman_clienti_vista';
+type Vista = 'elenco' | 'schede';
+
+function leggiVistaSalvata(): Vista {
+  // L'elenco è la vista predefinita: serve proprio quando i clienti diventano tanti, che è la
+  // ragione per cui l'interruttore esiste. Un valore assente o corrotto ricade qui.
+  if (typeof localStorage === 'undefined') return 'elenco';
+  try {
+    return localStorage.getItem(CHIAVE_VISTA) === 'schede' ? 'schede' : 'elenco';
+  } catch {
+    return 'elenco';
+  }
+}
+
+function salvaVista(v: Vista) {
+  try {
+    if (typeof localStorage !== 'undefined') localStorage.setItem(CHIAVE_VISTA, v);
+  } catch {
+    // Storage non disponibile (navigazione privata, quota): la vista resta quella scelta in
+    // memoria e semplicemente non si ricorda al prossimo accesso. Non è un motivo per rompere.
+  }
+}
+
 export function ClientsPage() {
   const toast = useToast();
   const [searchParams] = useSearchParams();
@@ -26,10 +54,16 @@ export function ClientsPage() {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(50);
   const [meta, setMeta] = useState<MetaPaginazione>(META_INIZIALE);
-  const [riepilogo, setRiepilogo] = useState({ societa: 0, persone: 0 });
+  const [riepilogo, setRiepilogo] = useState({ societa: 0, persone: 0, senzaPortale: 0 });
   const [search, setSearch] = useState(targetClientQuery);
   const [searchDebounced, setSearchDebounced] = useState(targetClientQuery);
   const [filterType, setFilterType] = useState<'all' | 'individual' | 'company'>('all');
+  const [filterPortale, setFilterPortale] = useState<'all' | 'con' | 'senza'>('all');
+  const [vista, setVista] = useState<Vista>(leggiVistaSalvata);
+  // `createdAt desc` è l'ordine che la pagina aveva cablato: resta il predefinito, così chi non
+  // tocca le intestazioni vede esattamente quello di prima.
+  const [sortBy, setSortBy] = useState<'createdAt' | 'nome' | 'tipo'>('createdAt');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [editClientModal, setEditClientModal] = useState<Cliente | null>(null);
   const [, setEditClientName] = useState('');
   const [, setEditClientType] = useState<'individual' | 'company'>('company');
@@ -59,7 +93,7 @@ export function ClientsPage() {
         setCredentialsModal({
           cliente: c,
           passwordChiaro: res.passwordChiaro,
-          email: res.email || (c as any).email || '',
+          email: res.email || c.email || '',
           emailInviata: res.emailInviata,
           erroreInvioEmail: res.erroreInvioEmail,
         });
@@ -81,6 +115,19 @@ export function ClientsPage() {
   // successo quando la creazione a database è invece fallita.
   const [erroreModale, setErroreModale] = useState('');
 
+  const cambiaVista = (v: Vista) => {
+    setVista(v);
+    salvaVista(v);
+  };
+
+  // Click su una colonna nuova → crescente; un secondo click sulla stessa → inverte. Si torna a
+  // pagina 1 perché restando a pagina 3 si guarderebbe un insieme diverso da quello ordinato.
+  const ordinaPer = (campo: 'nome' | 'tipo') => {
+    if (sortBy === campo) setSortOrder(o => (o === 'asc' ? 'desc' : 'asc'));
+    else { setSortBy(campo); setSortOrder('asc'); }
+    setPage(1);
+  };
+
   // `isCancelled` chiude la race: se una ricerca/pagina più recente parte prima che questa
   // finisca, la risposta lenta precedente non deve sovrascrivere i risultati nuovi. Pattern
   // preso da useMicrovociProgetto. Le chiamate one-shot (dopo create/azioni) non lo passano.
@@ -95,9 +142,10 @@ export function ClientsPage() {
         page,
         limit,
         search: searchDebounced,
-        sortBy: 'createdAt',
-        sortOrder: 'desc',
+        sortBy,
+        sortOrder,
         tipo: filterType === 'all' ? undefined : filterType,
+        portale: filterPortale === 'all' ? undefined : filterPortale,
       });
       if (isCancelled()) return; // risposta stantia: una richiesta più recente è in corso
       if (!isRispostaPaginata<Cliente>(res)) throw new Error('Risposta clienti non valida');
@@ -105,7 +153,7 @@ export function ClientsPage() {
       apiDisponibile = true;
       setMeta(res.meta);
       if (res.meta.pagine > 0 && page > res.meta.pagine) setPage(res.meta.pagine);
-      setRiepilogo((res.riepilogo as { societa: number; persone: number } | undefined) || { societa: 0, persone: 0 });
+      setRiepilogo((res.riepilogo as { societa: number; persone: number; senzaPortale: number } | undefined) || { societa: 0, persone: 0, senzaPortale: 0 });
     } catch (err) {
       if (isCancelled()) return;
       setErrore(err instanceof Error ? err.message : 'Errore caricamento clienti');
@@ -182,6 +230,7 @@ export function ClientsPage() {
       setRiepilogo({
         societa: visibleClients.filter(c => c.tipo === 'company').length,
         persone: visibleClients.filter(c => c.tipo === 'individual').length,
+        senzaPortale: visibleClients.filter(c => !c.hasPassword).length,
       });
       visibleClients = visibleClients.slice((paginaEffettiva - 1) * limit, paginaEffettiva * limit);
     }
@@ -210,7 +259,7 @@ export function ClientsPage() {
     return () => {
       annullato = true;
     };
-  }, [targetClientQuery, page, limit, searchDebounced, filterType]);
+  }, [targetClientQuery, page, limit, searchDebounced, filterType, filterPortale, sortBy, sortOrder]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -289,6 +338,20 @@ export function ClientsPage() {
           <div className={styles.kpiValue}>{totalIndividuals}</div>
           <div className={styles.kpiLabel}>Persone Fisiche / UBO</div>
         </div>
+        {/* Cliccabile: è il modo più diretto per arrivare al filtro nuovo, e dice subito quanto
+            lavoro resta sulle credenziali. È un <button> e non un <div> perché chi usa la
+            tastiera deve poterlo attivare come tutti gli altri comandi. */}
+        <button
+          type="button"
+          className={`${styles.kpiCard} ${styles.kpiCardBtn} ${filterPortale === 'senza' ? styles.kpiCardAttivo : ''}`}
+          onClick={() => { setFilterPortale(p => (p === 'senza' ? 'all' : 'senza')); setPage(1); }}
+          aria-pressed={filterPortale === 'senza'}
+          title="Mostra solo i clienti a cui non è ancora stata assegnata una password del portale"
+        >
+          <div className={styles.kpiIcon} style={{ background: 'var(--surface-1)' }}>🔑</div>
+          <div className={styles.kpiValue} style={{ color: 'var(--amber)' }}>{riepilogo.senzaPortale}</div>
+          <div className={styles.kpiLabel}>Senza accesso al portale</div>
+        </button>
       </div>
 
       {/* Toolbar & Search */}
@@ -303,7 +366,7 @@ export function ClientsPage() {
           />
         </div>
 
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
           <div className={styles.filterGroup}>
             <button
               className={`${styles.filterBtn} ${filterType === 'all' ? styles.filterBtnActive : ''}`}
@@ -325,6 +388,48 @@ export function ClientsPage() {
             </button>
           </div>
 
+          {/* La prima etichetta porta il nome del gruppo: senza, un secondo «Tutti» accanto a
+              quello dei tipi non direbbe a cosa si riferisce. */}
+          <div className={styles.filterGroup}>
+            <button
+              className={`${styles.filterBtn} ${filterPortale === 'all' ? styles.filterBtnActive : ''}`}
+              onClick={() => { setFilterPortale('all'); setPage(1); }}
+            >
+              Portale: tutti
+            </button>
+            <button
+              className={`${styles.filterBtn} ${filterPortale === 'con' ? styles.filterBtnActive : ''}`}
+              onClick={() => { setFilterPortale('con'); setPage(1); }}
+            >
+              🟢 Con accesso
+            </button>
+            <button
+              className={`${styles.filterBtn} ${filterPortale === 'senza' ? styles.filterBtnActive : ''}`}
+              onClick={() => { setFilterPortale('senza'); setPage(1); }}
+            >
+              ⚪ Senza accesso
+            </button>
+          </div>
+
+          <div className={styles.viewToggle} role="group" aria-label="Come mostrare i clienti">
+            <button
+              type="button"
+              className={`${styles.viewBtn} ${vista === 'elenco' ? styles.viewBtnAttivo : ''}`}
+              aria-pressed={vista === 'elenco'}
+              onClick={() => cambiaVista('elenco')}
+            >
+              ☰ Elenco
+            </button>
+            <button
+              type="button"
+              className={`${styles.viewBtn} ${vista === 'schede' ? styles.viewBtnAttivo : ''}`}
+              aria-pressed={vista === 'schede'}
+              onClick={() => cambiaVista('schede')}
+            >
+              ▦ Schede
+            </button>
+          </div>
+
           <button
             onClick={() => { setErroreModale(''); setModalOpen(true); }}
             className="btn btn-primary"
@@ -335,7 +440,7 @@ export function ClientsPage() {
         </div>
       </div>
 
-      {/* Client Cards Grid */}
+      {/* Elenco clienti — due viste sulla stessa lista, la scelta è dell'operatore */}
       {errore && <div style={{ padding: 12, borderRadius: 8, background: 'var(--pill-red-bg)', color: 'var(--pill-red-fg)' }}>{errore}</div>}
       {loading ? (
         <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)', fontSize: 12 }}>Caricamento anagrafica clienti...</div>
@@ -343,11 +448,123 @@ export function ClientsPage() {
         <div style={{ padding: 40, textAlign: 'center', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, color: 'var(--muted)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
           <div>Nessun cliente trovato con i filtri correnti ({meta.totale} totali in anagrafica).</div>
           <button
-            onClick={() => { setSearch(''); setFilterType('all'); }}
+            onClick={() => { setSearch(''); setFilterType('all'); setFilterPortale('all'); }}
             className="btn btn-primary"
           >
             ✖ Azzera Filtro Ricerca
           </button>
+        </div>
+      ) : vista === 'elenco' ? (
+        <div className={styles.tableView}>
+          <table className={styles.table} aria-label="Elenco clienti">
+            <thead>
+              <tr>
+                <th
+                  className={styles.th}
+                  aria-sort={sortBy === 'nome' ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'}
+                >
+                  <button
+                    type="button"
+                    className={`${styles.thBtn} ${sortBy === 'nome' ? styles.thBtnAttivo : ''}`}
+                    onClick={() => ordinaPer('nome')}
+                  >
+                    Cliente <span className={styles.freccia}>{sortBy === 'nome' ? (sortOrder === 'asc' ? '▲' : '▼') : '↕'}</span>
+                  </button>
+                </th>
+                <th
+                  className={styles.th}
+                  aria-sort={sortBy === 'tipo' ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'}
+                >
+                  <button
+                    type="button"
+                    className={`${styles.thBtn} ${sortBy === 'tipo' ? styles.thBtnAttivo : ''}`}
+                    onClick={() => ordinaPer('tipo')}
+                  >
+                    Tipo <span className={styles.freccia}>{sortBy === 'tipo' ? (sortOrder === 'asc' ? '▲' : '▼') : '↕'}</span>
+                  </button>
+                </th>
+                <th className={styles.th}>Accesso Portale</th>
+                <th className={styles.th}>Email</th>
+                <th className={styles.th}>Telefono</th>
+                <th className={styles.th}>P.IVA / C.F.</th>
+                <th className={`${styles.th} ${styles.colSede}`}>Sede</th>
+                <th className={`${styles.th} ${styles.thAzioni}`}>Azioni</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(c => {
+                // `cellulare` è la colonna a database, ma `serializzaCliente` distende anche
+                // `referentiJson`: il recapito può arrivare da lì, come `telefono`.
+                const telefono = c.cellulare || c.telefono || '';
+                const piva = c.piva || c.partitaIva || '';
+                return (
+                  <tr
+                    key={c.id}
+                    className={styles.tableRow}
+                    onClick={() => openEditModal(c)}
+                    title="Apri l'anagrafica del cliente"
+                  >
+                    <td className={styles.td}>
+                      <div className={styles.cellNomeBox}>
+                        <div className={styles.miniAvatar} style={{ background: c.tipo === 'company' ? 'var(--pill-indigo-bg)' : 'var(--surface-1)', color: c.tipo === 'company' ? 'var(--purple)' : 'var(--indigo-l)' }}>
+                          {c.tipo === 'company' ? '🏢' : '👤'}
+                        </div>
+                        <span className={styles.cellNome}>{c.nome}</span>
+                      </div>
+                    </td>
+                    <td className={styles.td}>
+                      <span className={`${styles.pill} ${c.tipo === 'company' ? styles.pillCompany : styles.pillIndividual}`}>
+                        {c.tipo === 'company' ? 'Società' : 'Persona'}
+                      </span>
+                    </td>
+                    <td className={styles.td}>
+                      {c.hasPassword
+                        ? <span className={`${styles.pill} ${styles.pillOn}`}>🟢 Attivo</span>
+                        : <span className={`${styles.pill} ${styles.pillOff}`}>⚪ Da assegnare</span>}
+                    </td>
+                    <td className={styles.td}>{c.email || <span className={styles.vuoto}>—</span>}</td>
+                    <td className={styles.td}>{telefono || <span className={styles.vuoto}>—</span>}</td>
+                    <td className={styles.td}>
+                      {piva || c.codiceFiscale ? (
+                        <>
+                          <div className={styles.mono}>{piva || '—'}</div>
+                          {c.codiceFiscale && c.codiceFiscale !== piva && (
+                            <div className={`${styles.mono} ${styles.secondario}`}>{c.codiceFiscale}</div>
+                          )}
+                        </>
+                      ) : <span className={styles.vuoto}>—</span>}
+                    </td>
+                    <td className={`${styles.td} ${styles.colSede}`}>{c.sedeLegale || <span className={styles.vuoto}>—</span>}</td>
+                    {/* Un click qui non deve aprire l'anagrafica: è lo stesso stopPropagation che
+                        le schede usavano già. */}
+                    <td className={styles.td} onClick={e => e.stopPropagation()}>
+                      <div className={styles.rowActions}>
+                        <button
+                          type="button"
+                          className={styles.iconBtn}
+                          onClick={() => handleGenerateCredentials(c)}
+                          disabled={generatingCredentials === c.id}
+                          title="Genera username e password per il portale cliente"
+                          aria-label={`Genera le credenziali del portale per ${c.nome}`}
+                        >
+                          {generatingCredentials === c.id ? '⏳' : '🔑'}
+                        </button>
+                        <button
+                          type="button"
+                          className={styles.iconBtn}
+                          onClick={() => setMagicLinkModal(c)}
+                          title="Genera un Magic Link di accesso"
+                          aria-label={`Genera un Magic Link per ${c.nome}`}
+                        >
+                          🔗
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       ) : (
         <div className={styles.clientGrid}>
@@ -363,26 +580,35 @@ export function ClientsPage() {
                   <div className={styles.avatarBox} style={{ background: c.tipo === 'company' ? 'var(--pill-indigo-bg)' : 'var(--surface-1)', color: c.tipo === 'company' ? 'var(--purple)' : 'var(--indigo-l)' }}>
                     {c.tipo === 'company' ? '🏢' : '👤'}
                   </div>
-                  <div>
-                    <div className={styles.clientName} style={{ color: 'var(--indigo-l)' }}>{c.nome}</div>
+                  <div className={styles.clientHeaderMain}>
+                    <div className={styles.clientName} style={{ color: 'var(--indigo-l)' }} title={c.nome}>{c.nome}</div>
                     <span className={styles.clientTypeBadge} style={{ background: c.tipo === 'company' ? 'var(--pill-indigo-bg)' : 'var(--surface-1)', color: c.tipo === 'company' ? 'var(--purple)' : 'var(--indigo-l)' }}>
                       {c.tipo === 'company' ? 'Società / Entity' : 'Persona Fisica'}
                     </span>
                   </div>
+                  {/* Era una riga dentro un riquadro bordato, con sopra l'UUID del cliente. Qui sta
+                      in alto a destra e porta anche il TESTO, così si legge senza dover
+                      distinguere i colori. */}
+                  <span className={`${styles.pill} ${c.hasPassword ? styles.pillOn : styles.pillOff}`}>
+                    {c.hasPassword ? '🟢 Attivo' : '⚪ Da assegnare'}
+                  </span>
                 </div>
 
-                <div className={styles.clientMeta}>
-                  <div className={styles.metaRow}>
-                    <span>ID Cliente:</span>
-                    <span style={{ fontSize: 10, fontFamily: 'monospace', color: 'var(--hint)' }}>{c.id.substring(0, 13)}...</span>
+                {/* Solo i dati che ci sono: una scheda con tre trattini è peggio di una scheda più
+                    corta. L'UUID del cliente non compare: a un operatore non serve a niente. */}
+                {(c.email || c.cellulare || c.telefono || c.piva || c.partitaIva) && (
+                  <div className={styles.clientMeta}>
+                    {c.email && (
+                      <div className={styles.metaItem}><span>✉️</span><span title={c.email}>{c.email}</span></div>
+                    )}
+                    {(c.cellulare || c.telefono) && (
+                      <div className={styles.metaItem}><span>☎</span><span>{c.cellulare || c.telefono}</span></div>
+                    )}
+                    {(c.piva || c.partitaIva) && (
+                      <div className={styles.metaItem}><span>P.IVA</span><span className={styles.mono}>{c.piva || c.partitaIva}</span></div>
+                    )}
                   </div>
-                  <div className={styles.metaRow}>
-                    <span>Accesso Portale:</span>
-                    <span style={{ color: (c as any).hasPassword ? 'var(--green)' : 'var(--amber)', fontWeight: 600, fontSize: 11 }}>
-                      {(c as any).hasPassword ? '🟢 Password Attiva' : '⚪ Da Assegnare'}
-                    </span>
-                  </div>
-                </div>
+                )}
               </div>
 
               <div className={styles.clientActions} onClick={e => e.stopPropagation()}>
@@ -396,10 +622,10 @@ export function ClientsPage() {
                   style={{ background: 'var(--card)', borderColor: 'var(--border)', color: 'var(--text)' }}
                   title="Genera username e password per il portale cliente"
                 >
-                  {generatingCredentials === c.id ? '⏳ Generazione...' : '🔑 Credenziali Portale'}
+                  {generatingCredentials === c.id ? '⏳ ...' : '🔑 Portale'}
                 </button>
-                <button className={styles.btnAction} onClick={() => setMagicLinkModal(c)}>
-                  🔗 Magic Link
+                <button className={styles.btnAction} onClick={() => setMagicLinkModal(c)} title="Genera un Magic Link di accesso">
+                  🔗 Link
                 </button>
               </div>
             </div>

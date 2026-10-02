@@ -36,12 +36,32 @@ describe('leggiPaginazione', () => {
     });
   });
 
+  it('porta nei parametri il filtro «accesso al portale»', () => {
+    expect(leggiPaginazione({ page: '1', portale: 'senza' })).toMatchObject({
+      paginata: true,
+      parametri: { portale: 'senza' },
+    });
+    expect(leggiPaginazione({ page: '1', portale: 'con' })).toMatchObject({
+      paginata: true,
+      parametri: { portale: 'con' },
+    });
+  });
+
+  it('riconosce la modalità paginata anche col solo filtro del portale', () => {
+    // Se `portale` non fosse in CHIAVI_PAGINAZIONE la richiesta cadrebbe nel ramo «array legacy»,
+    // che non applica alcun filtro e restituisce tutto: il filtro sembrerebbe attivo e non
+    // filtrerebbe niente.
+    expect(leggiPaginazione({ portale: 'senza' })).toMatchObject({ paginata: true });
+  });
+
   it.each([
     { page: '0' },
     { page: '1.5' },
     { limit: '0' },
     { limit: '201' },
     { sortOrder: 'casuale' },
+    // `portale` è un enum: un valore inventato deve diventare un errore, non un filtro ignorato.
+    { portale: 'forse' },
   ])('restituisce un errore per query non valida: %o', (query) => {
     const esito = leggiPaginazione(query);
     expect(esito.paginata).toBe(true);
