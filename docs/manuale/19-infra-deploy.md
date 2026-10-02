@@ -7,7 +7,8 @@ BluMan è distribuito in due metà:
 
 Il deploy si fa con **`scripts/distribuisci.sh`** (regola 9): verifica (typecheck backend+frontend,
 lint, build, `vitest run`), controlla l'autore Git richiesto da Vercel, poi push → Vercel e
-`railway up` → Railway. Dopo il deploy verifica health e sonda rotta (401, non 404).
+`railway up` → Railway. Dopo il deploy verifica health, **che ogni pagina della SPA torni HTML**
+(non il JSON dell'API) e la sonda rotta (401, non 404).
 
 Sulla **postazione Windows** del titolare il comando `railway` (wrapper npm) ingoia stdout/exit:
 si usa il **`.exe` nativo** via `RAILWAY_BIN` (lo script lo supporta).
@@ -70,6 +71,20 @@ si usa il **`.exe` nativo** via `RAILWAY_BIN` (lo script lo supporta).
   sola all'avvio (nessun `resolver` nel config), quindi ricreando il container l'API cambia IP e nginx
   continua a bussare al vecchio → **502 su tutte le rotte API mentre l'API è viva** (successo davvero
   il 01/10/2026). Dal 02/10/2026 lo fa `distribuisci.sh --solo-vps` da sé.
+- **Sul VPS le API stanno sotto `/api`**, e nginx toglie il prefisso prima di consegnare la richiesta
+  a Fastify (`nginx_bluman_app.inc`: `proxy_pass http://api:3000/`). Non è un gusto: senza prefisso
+  una pagina e una rotta possono avere lo stesso percorso (`/invoices` è la pagina Fatture **e** la
+  rotta che ne restituisce i dati) e nginx non può servire tutte e due. Fino al **02/10/2026** si
+  usava la stessa origine senza prefisso più un **elenco di 45 prefissi**: sette pagine — `/portal`,
+  `/reports`, `/invoices`, `/fornitori`, `/timesheet`, `/liquidazione-iva`, `/admin/tenants` —
+  rispondevano `404`/`401` in JSON a chi le ricaricava. Non si vedeva perché la navigazione dentro
+  l'app è client-side e non ripassa da nginx, e perché si usava `bluman.vercel.app`, dove frontend e
+  API sono **origini diverse** e il conflitto non esiste. Restano in radice solo **tre eccezioni**,
+  ognuna con un motivo esterno al repo: `/webhooks/` (l'indirizzo è già in mano a Meta e Telegram),
+  `/uploads/` (gli URL sono salvati a database e dentro email spedite) e `/health` (lo interroga il
+  monitor). Il presidio è `src/infrastrutturaDeploy.test.ts`, che confronta le rotte della SPA con i
+  percorsi serviti in radice: **è il confronto che mancava**, e la sua assenza è la ragione per cui il
+  guasto è vissuto per giorni.
 - **`pg_stat_statements`** (dal 02/10/2026): dichiarato nel compose sul servizio `postgres`, rende
   visibili le query lente. Precaricabile solo all'avvio del server, quindi non basta `CREATE EXTENSION`.
 - **Le connessioni al database non si controllano con `pg_stat_activity`**: con PgBouncer davanti

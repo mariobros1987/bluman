@@ -113,7 +113,7 @@ migrazione: vanno lette sapendo cosa è stato deciso.
 |---|---|
 | **Riparto pulito.** Nessun travaso da Supabase: il database nasce vuoto e si popola con `bootstrap` + seed. | **La §5 (fase migrazione dati) non si applica.** Niente dump, niente restore, niente verifica del dump. La §5.5 e la §5.6 restano utili come *controllo* della RLS su un database nuovo, ma i dati di partenza sono di prova, non di produzione. |
 | **Storage sul VPS** (Opzione B, confermata) | La §6.3 vale in pieno: spariscono `SUPABASE_URL` e `SUPABASE_SERVICE_KEY`, i documenti vanno su disco. Il volume dei documenti **non** è montato in nginx, di proposito: li serve l'API, così i controlli di accesso restano in un posto solo. |
-| **Frontend sul VPS** (Vercel abbandonato) | nginx serve la build Vite e proxa le API sulla **stessa origine**. La build deve dichiararlo con `VITE_API_SAME_ORIGIN=true`, altrimenti `frontend/src/api/http.ts` rifiuta la base e ricade sul backend Railway **senza dirlo**. La §7 non prevede più di aggiornare Vercel. |
+| **Frontend sul VPS** (Vercel abbandonato) | nginx serve la build Vite e proxa le API **sotto `/api`**, togliendo il prefisso. La build deve dichiararlo con `VITE_API_BASE=/api`, altrimenti `frontend/src/api/http.ts` ricade sul backend Railway **senza dirlo**. Il prefisso — e non la stessa origine senza — è ciò che impedisce a una pagina di chiamarsi come una rotta: `/invoices` è la pagina, `/api/invoices` è l'API. La §7 non prevede più di aggiornare Vercel. |
 | **Ubuntu 24.04 LTS** | Il VPS è arrivato con la **22.04.5**; portato alla 24.04 sul posto, prima di installare Docker. La §4-bis era già corretta. |
 | **Docker, non bare-metal** | Dove il piano dice «oppure Docker, riusando il Dockerfile», la risposta è Docker: `docker-compose.prod.yml`, con Postgres 17, PgBouncer, la catena migrate→rls→api e nginx+certbot. Le sezioni bare-metal restano per riferimento. |
 
@@ -299,11 +299,15 @@ Se senza contesto vedi righe > 0, **la RLS non è attiva**: fermati e non fare i
 1. Metti l'app in manutenzione (o sola lettura) — evita scritture perse tra dump e switch.
 2. Rifai un **dump incrementale finale** se sono passate ore dal 5.1 (o accetta la finestra).
 3. Punta il DNS del dominio al VPS: da lì si servono **sia l'app sia l'API**, sulla stessa origine
-   (non più «il DNS dell'API» da un lato e Vercel dall'altro).
-4. Verifica health check dell'API sul VPS.
+   (non più «il DNS dell'API» da un lato e Vercel dall'altro) ma su **due percorsi distinti**: le
+   pagine in radice, le API sotto `/api`. Il prefisso è ciò che permette a `/invoices` di essere la
+   pagina Fatture senza rubare la rotta che ne restituisce i dati.
+4. Verifica health check dell'API sul VPS — **entrambe** le forme, `/health` e `/api/health`.
 5. Login reale + apri lista progetti e lista clienti + apri un documento.
-6. Esegui il **test di isolamento** (6 del §5.6) anche via API con due studi diversi.
-7. Togli la manutenzione.
+6. **Ricarica una pagina, non solo la radice** (`/portal`, `/invoices`): deve tornare HTML. Fino al
+   02/10/2026 sette pagine tornavano il JSON dell'API a chi le ricaricava.
+7. Esegui il **test di isolamento** (6 del §5.6) anche via API con due studi diversi.
+8. Togli la manutenzione.
 
 **Vercel:** non è più in gioco — il frontend si serve dal VPS. Se il vecchio deploy resta acceso come
 rete di sicurezza, va **lasciato com'è**, puntato al backend Railway: toccarlo per fargli puntare il

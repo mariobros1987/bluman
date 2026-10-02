@@ -1,13 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
 /**
  * Presidio dell'infrastruttura di deployment (`docker-compose.prod.yml`, `nginx.conf`,
- * `nginx_bluman_app.inc`).
+ * `nginx_bluman_app.inc`, `nginx_bluman_proxy.inc`, `scripts/distribuisci.sh`).
  *
  * Nasce da due difetti che nessun test copriva, perché i presidi esistenti guardano solo
- * `.ts`/`.tsx` (vedi `CARTELLE_DA_ISPEZIONARE` in src/credenziali.test.ts):
+ * `.ts`/`.tsx` (vedi `CARTELLE_DA_ISPEZIONARE` in `src/credenziali.test.ts`):
  *
  * 1. L'elenco dei prefissi proxati a Fastify era stato scritto a mano dai *nomi dei file*
  *    di `src/routes/`, non dai percorsi reali delle rotte. Le rotte fuori elenco non
@@ -20,112 +20,165 @@ import path from 'node:path';
  *    (regola 6). Con un `JWT_SECRET` noto si firma un token per qualsiasi tenant e
  *    qualsiasi ruolo, e l'isolamento RLS cade con lui perché `app_tenant_corrente()` si
  *    fida del tenant che sta nel token.
+ *
+ * Il 02/10/2026 l'elenco dei prefissi — che il punto 1 aveva solo reso *corretto* — si è
+ * rivelato anche la cosa sbagliata da costruire. Sette percorsi della SPA (`/portal`,
+ * `/invoices`, `/fornitori`, `/timesheet`, `/liquidazione-iva`, `/reports`, `/admin/tenants`)
+ * si chiamano come rotte dell'API, e la regex se li prendeva: chi ricaricava una di quelle
+ * pagine riceveva il 404 dell'API, o un 401, al posto dell'applicazione.
+ *
+ * Non lo si è visto per giorni perché **ogni test qui dentro guardava nella stessa direzione**:
+ * dalle rotte del backend ai prefissi di nginx. Nessuno confrontava le rotte della SPA con
+ * quello che nginx serve in radice — ed è esattamente da lì che è passato il guasto. Quel
+ * confronto ora c'è, e da allora le API vivono sotto `/api`, così la collisione non è più
+ * possibile per costruzione invece che per diligenza.
  */
 
 const RADICE = path.resolve(import.meta.dirname, '..');
-const METODI_HTTP = 'get|post|put|patch|delete|head|options|all';
 
-/** Toglie commenti di riga e di blocco, così un esempio in un commento non conta come rotta. */
-function soloCodice(sorgente: string): string {
-  return sorgente.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
-}
+const leggi = (...pezzi: string[]) => readFileSync(path.join(RADICE, ...pezzi), 'utf8');
 
 /**
- * Primo segmento di ogni percorso registrato su Fastify.
- *
- * La ricerca non pretende che il literal stia sulla stessa riga di `server.get`: con i
- * generici (`server.get<{ Querystring: … }>(`) il percorso finisce spesso due righe sotto,
- * ed è esattamente così che `comunicazioni` e `uploads` erano stati dimenticati.
+ * I percorsi serviti in radice dall'API, cioè NON sotto `/api`. Ognuno è un'eccezione con un
+ * motivo che non dipende da questo repository: `/webhooks/` lo consegna il backend a Meta e
+ * Telegram, `/uploads/` è salvato a database e dentro email già spedite, `/health` lo interroga
+ * il monitor del VPS. Sono tre perché devono restare tre: ognuna è un percorso che qualcun
+ * altro ha già in mano, e spostarla è una migrazione, non una modifica di configurazione.
  */
-function prefissiRotteDaSorgente(sorgente: string): Set<string> {
-  const codice = soloCodice(sorgente);
-  const prefissi = new Set<string>();
-  const registrazioni = new RegExp(`\\b(?:server|app|fastify)\\s*\\.\\s*(?:${METODI_HTTP})\\b`, 'g');
+const PERCORSI_IN_RADICE = ['/api', '/webhooks', '/uploads', '/health'] as const;
 
-  for (const occorrenza of codice.matchAll(registrazioni)) {
-    const finestra = codice.slice(occorrenza.index, occorrenza.index + 600);
-    const literal = finestra.match(/(['"`])(\/[A-Za-z0-9_\-/:.]*)\1/);
-    const percorso = literal?.[2];
-    if (!percorso) continue;
-    const segmento = percorso.split('/')[1] || '';
-    // `/:id` come primo segmento sarebbe un percorso parametrico in radice: non esiste in
-    // questo backend, e in nginx non sarebbe esprimibile come prefisso.
-    if (!segmento || segmento.startsWith(':')) continue;
-    prefissi.add(segmento);
-  }
-  return prefissi;
+/** I percorsi delle pagine, letti dal router: sono l'altra metà del confronto. */
+function rotteDellaSpa(): string[] {
+  const app = leggi('frontend', 'src', 'App.tsx');
+  return [...app.matchAll(/path="([^"]*)"/g)]
+    .map((m) => m[1]!)
+    .filter((p) => p !== '*'); // il catch-all non è un percorso, è il ripiego
 }
 
-function prefissiRotteDelBackend(): Set<string> {
-  const cartellaRotte = path.join(RADICE, 'src', 'routes');
-  const files = readdirSync(cartellaRotte)
-    .filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'))
-    .map((f) => path.join(cartellaRotte, f));
-  // `src/server.ts` registra in proprio /health e le rotte di autenticazione.
-  files.push(path.join(RADICE, 'src', 'server.ts'));
+describe('🚦 nginx — API sotto /api, pagine in radice', () => {
+  const sorgente = () => leggi('nginx_bluman_app.inc');
 
-  const prefissi = new Set<string>();
-  for (const file of files) {
-    for (const p of prefissiRotteDaSorgente(readFileSync(file, 'utf8'))) prefissi.add(p);
-  }
-  return prefissi;
-}
-
-function prefissiDichiaratiInNginx(): Set<string> {
-  const inc = readFileSync(path.join(RADICE, 'nginx_bluman_app.inc'), 'utf8');
-  const location = inc.match(/location\s+~\s+\^\/\(([^)]+)\)/);
-  expect(location, 'nginx_bluman_app.inc deve contenere il location regex dei prefissi API').toBeTruthy();
-  return new Set((location?.[1] || '').split('|').map((s) => s.trim()).filter(Boolean));
-}
-
-describe('🚦 nginx — instradamento delle rotte API', () => {
-  it('proxa a Fastify ogni prefisso realmente registrato dal backend', () => {
-    const backend = prefissiRotteDelBackend();
-    const nginx = prefissiDichiaratiInNginx();
-
-    expect(backend.size).toBeGreaterThan(20);
-    const mancanti = [...backend].filter((p) => !nginx.has(p)).sort();
-    // Un prefisso mancante non dà 404: dà 200 con l'index.html della SPA.
-    expect(mancanti, `prefissi registrati su Fastify ma non proxati da nginx: ${mancanti.join(', ')}`).toEqual([]);
+  it('proxa le API sotto /api togliendo il prefisso', () => {
+    // `proxy_pass` CON uri in un location di prefisso sostituisce il prefisso: `/api/invoices`
+    // arriva a Fastify come `/invoices`. Un `proxy_pass` senza uri manderebbe `/api/invoices`
+    // e l'API risponderebbe 404.
+    expect(sorgente()).toMatch(/location\s+\^~\s+\/api\/\s*\{[\s\S]*?proxy_pass\s+http:\/\/api:3000\/;/);
   });
 
-  it('non dichiara prefissi che non corrispondono a nessuna rotta', () => {
-    const backend = prefissiRotteDelBackend();
-    const nginx = prefissiDichiaratiInNginx();
-    const orfani = [...nginx].filter((p) => !backend.has(p)).sort();
-    expect(orfani, `prefissi in nginx senza rotta corrispondente: ${orfani.join(', ')}`).toEqual([]);
+  it('non tiene più nessun elenco di prefissi API', () => {
+    // È il punto dell'intera modifica: con il prefisso una rotta nuova nasce già coperta, e non
+    // c'è nessun elenco da aggiornare. Se questo test diventa rosso, qualcuno sta reintroducendo
+    // la regex — e con lei il modo di sbagliare che ha rotto sette pagine.
+    expect(sorgente()).not.toMatch(/location\s+~\s+\^\/\(/);
   });
 
-  it('tiene i prefissi in un solo file, incluso da entrambi i server block', () => {
-    const conf = readFileSync(path.join(RADICE, 'nginx.conf'), 'utf8');
-    // Due copie dell'elenco divergono: la prima modifica ne aggiorna una sola.
-    expect(conf).not.toMatch(/location\s+~\s+\^\/\(/);
+  it('lascia in radice solo le tre eccezioni, e passandogli il percorso invariato', () => {
+    for (const eccezione of ['/webhooks/', '/uploads/']) {
+      expect(sorgente(), `${eccezione} deve restare proxata in radice`).toMatch(
+        new RegExp(`location\\s+\\^~\\s+${eccezione.replace(/\//g, '\\/')}\\s*\\{[\\s\\S]*?proxy_pass\\s+http:\\/\\/api:3000;`),
+      );
+    }
+    expect(sorgente()).toMatch(/location\s+=\s+\/health\s*\{[\s\S]*?proxy_pass\s+http:\/\/api:3000\/health;/);
+  });
+
+  it('scrive accanto a ogni eccezione il motivo per cui resta', () => {
+    // Le eccezioni non sono dimenticanze, e fra sei mesi nessuno se lo ricorderà: il commento
+    // deve nominare le cose vere — chi consegna quell'URL, dove è salvato, chi lo interroga.
+    const inc = sorgente();
+    expect(inc).toContain('urlPubblicaBackend');
+    expect(inc).toContain('BLUMAN_MONITOR_HEALTH_URL');
+    expect(inc).toContain('catalogo.ts');
+  });
+
+  it('nessuna rotta della SPA collide con un percorso servito in radice', () => {
+    // Il test che mancava. Il 02/10/2026 `path="/portal"` in App.tsx e `portal` fra i prefissi
+    // di nginx erano la stessa URL, e nessuno confrontava le due liste.
+    const rotte = rotteDellaSpa();
+    // Soglia bassa di proposito: serve solo a distinguere «letto zero percorsi» (regex rotta,
+    // file spostato) da «letto i percorsi». Oggi sono 23, quindi un numero alto qui
+    // diventerebbe un falso allarme alla prima pagina che si toglie.
+    expect(rotte.length, 'App.tsx deve avere delle rotte: il test non sta leggendo niente').toBeGreaterThan(10);
+
+    const collisioni = rotte
+      .map((rotta) => ({
+        rotta,
+        conflitto: PERCORSI_IN_RADICE.find((p) => rotta === p || rotta.startsWith(`${p}/`)),
+      }))
+      .filter((c) => c.conflitto);
+
+    expect(
+      collisioni.map((c) => `${c.rotta} ↔ ${c.conflitto}`),
+      'una pagina che si chiama come un percorso dell API è irraggiungibile quando la si ricarica',
+    ).toEqual([]);
+  });
+
+  it('manda le direttive di proxy da un file solo, incluso da tutti i location', () => {
+    // Gli header sono la prova che l'audit registra (regola 7). Quattro copie sono quattro
+    // occasioni di dimenticarne uno, in un punto che nessuno guarda finché non è tardi.
+    const inc = sorgente();
+    const inclusioni = inc.match(/include \/etc\/nginx\/conf\.d\/bluman_proxy\.inc;/g) ?? [];
+    expect(inclusioni.length, 'i quattro location che parlano con l API devono includere il file condiviso').toBe(4);
+
+    const proxy = leggi('nginx_bluman_proxy.inc');
+    expect(proxy).not.toMatch(/^\s*location\s/m); // viene incluso DENTRO un blocco
+    expect(proxy).toContain('proxy_set_header X-Real-IP $remote_addr;');
+    expect(proxy).toContain('proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;');
+    expect(proxy).toContain('proxy_set_header X-Forwarded-Proto $scheme;');
+    // Server-Sent Events (/stream): con il buffering le notifiche non arrivano.
+    expect(proxy).toContain('proxy_buffering off;');
+  });
+
+  it('tiene l instradamento in un solo file, incluso da entrambi i server block', () => {
+    const conf = leggi('nginx.conf');
+    expect(conf).not.toMatch(/location\s+\^~\s+\/api\//);
     expect(conf).toContain('include /etc/nginx/conf.d/bluman_app.inc;');
   });
 
+  it('monta in nginx entrambi i file inclusi', () => {
+    // Un `include` che punta a un file non montato fa fallire l'avvio di nginx. Il sintomo è il
+    // VPS intero giù con un errore che parla di un percorso nel container, non del compose.
+    const compose = leggi('docker-compose.prod.yml');
+    expect(compose).toContain('./nginx_bluman_app.inc:/etc/nginx/conf.d/bluman_app.inc:ro');
+    expect(compose).toContain('./nginx_bluman_proxy.inc:/etc/nginx/conf.d/bluman_proxy.inc:ro');
+  });
+
   it('proxa /uploads/ all API invece di servirlo come file statico', () => {
-    const inc = readFileSync(path.join(RADICE, 'nginx_bluman_app.inc'), 'utf8');
-    const compose = readFileSync(path.join(RADICE, 'docker-compose.prod.yml'), 'utf8');
+    const inc = sorgente();
+    const compose = leggi('docker-compose.prod.yml');
 
     // L'autorizzazione dei documenti del vault la fa la rotta (Bearer oppure firma HMAC a
     // scadenza, vedi src/routes/catalogo.ts): serviti da nginx sarebbero scaricabili da
     // chiunque conoscesse il nome del file.
-    expect(prefissiDichiaratiInNginx().has('uploads')).toBe(true);
+    expect(inc).toMatch(/location\s+\^~\s+\/uploads\/\s*\{/);
     expect(inc).not.toMatch(/location\s+\/uploads/);
 
     const montaggiNginx = compose.slice(compose.indexOf('nginx:'));
     expect(montaggiNginx).not.toMatch(/bluman_uploads:\s*\/usr\/share\/nginx/);
   });
+});
 
-  it('conserva gli header che l audit usa come prova (IP e schema del chiamante)', () => {
-    const inc = readFileSync(path.join(RADICE, 'nginx_bluman_app.inc'), 'utf8');
-    // Regola 7: il sigillo di firma registra l'IP del firmatario. Senza questi header
-    // l'audit registrerebbe l'indirizzo del container nginx come prova legale.
-    expect(inc).toContain('proxy_set_header X-Real-IP $remote_addr;');
-    expect(inc).toContain('proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;');
-    expect(inc).toContain('proxy_set_header X-Forwarded-Proto $scheme;');
-    // Server-Sent Events (/stream): con il buffering le notifiche non arrivano.
-    expect(inc).toContain('proxy_buffering off;');
+describe('🚀 distribuisci.sh — la build del VPS e il frontend devono concordare', () => {
+  const script = leggi('scripts', 'distribuisci.sh');
+
+  it('compila il frontend dichiarando il prefisso delle API', () => {
+    // Se lo script smettesse di passarlo, `getApiBase()` ricadrebbe sull'indirizzo di Railway
+    // **in silenzio**: l'app del VPS funzionerebbe parlando con l'altro database, e nessuno se
+    // ne accorgerebbe finché non si notasse un cliente che non c'è.
+    expect(script).toContain('VITE_API_BASE=/api');
+  });
+
+  it('non compila più il frontend con la vecchia stessa-origine senza prefisso', () => {
+    expect(script).not.toContain('VITE_API_SAME_ORIGIN');
+  });
+
+  it('sonda una pagina, non solo l API: è il controllo che mancava', () => {
+    // Il deploy del 02/10/2026 era verde mentre sette pagine rispondevano 404 in JSON, perché
+    // ogni sonda guardava l'API e nessuna guardava una pagina.
+    expect(script).toMatch(/Pagine della SPA/);
+    expect(script).toContain('text/html*');
+    // L'elenco deve comprendere almeno una pagina che è stata davvero rotta: una lista che non
+    // contiene nessuna delle sette passerebbe senza provare niente.
+    expect(script).toMatch(/for PAGINA in [^\n]*\/portal/);
   });
 });
 

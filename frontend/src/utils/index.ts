@@ -16,12 +16,12 @@ export function getFormattedLogoUrl(url?: string | null): string {
   // `API_BASE` e non l'indirizzo di Railway scritto a mano. Il backend salva i loghi del
   // ripiego locale come percorsi **relativi** (`/uploads/<nome>?firma=…`, da
   // `storageService.urlUploadFirmato`), e il commento lì accanto dice che a risolverli è
-  // proprio questa funzione. Con l'indirizzo fisso, sul VPS — dove `API_BASE` è `''` perché
-  // frontend e API sono sulla stessa origine — il logo veniva chiesto a Railway, che è
-  // **un altro database con un altro volume**: il logo spariva. Su Vercel l'indirizzo fisso
-  // coincide con `API_BASE` ed è corretto per caso, ed è il motivo per cui il difetto non si
-  // era mai visto. Stessa risoluzione di `urlFileArchivio` e `urlDocumentoAssoluto`: una
-  // sola regola in un solo posto.
+  // proprio questa funzione. Con l'indirizzo fisso, sul VPS — dove `API_BASE` è `/api`, il
+  // prefisso che nginx toglie prima di consegnare la richiesta all'API — il logo veniva
+  // chiesto a Railway, che è **un altro database con un altro volume**: il logo spariva.
+  // Su Vercel l'indirizzo fisso coincide con `API_BASE` ed è corretto per caso, ed è il
+  // motivo per cui il difetto non si era mai visto. Stessa risoluzione di `urlFileArchivio`
+  // e `urlDocumentoAssoluto`: una sola regola in un solo posto.
   if (url.startsWith('/uploads')) return `${API_BASE}${url}`;
   return url;
 }

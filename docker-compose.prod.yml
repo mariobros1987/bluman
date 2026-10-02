@@ -197,6 +197,9 @@ services:
       # nginx carica da solo tutti i `*.conf` di conf.d/, e un secondo `.conf` con un
       # `location` fuori da un `server` farebbe fallire l'avvio.
       - ./nginx_bluman_app.inc:/etc/nginx/conf.d/bluman_app.inc:ro
+      # Direttive di proxy condivise dai quattro location che parlano con l'API (`/api/`,
+      # `/webhooks/`, `/uploads/`, `/health`). Stesso motivo dell'estensione `.inc` qui sopra.
+      - ./nginx_bluman_proxy.inc:/etc/nginx/conf.d/bluman_proxy.inc:ro
       - ./frontend/dist:/usr/share/nginx/html:ro
       # Il volume `bluman_uploads` NON si monta qui. Serviti da nginx come file statici, i
       # documenti del vault sarebbero scaricabili da chiunque conoscesse il nome del file:

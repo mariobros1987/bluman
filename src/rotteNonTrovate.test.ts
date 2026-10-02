@@ -69,11 +69,18 @@ describe('rotte inesistenti rispondono 404 anche senza token', () => {
  * nella configurazione, non nella logica: perché quella distinzione si possa
  * fare da fuori con un `curl`, serve che la risposta della rotta *presente*
  * senza token sia diversa — nel numero e nel corpo — da quella della rotta
- * *assente*. Questi test fissano le due forme, così il controllo sul dominio
- * Railway resta leggibile: 401 `{errore}` ⇒ l'immagine ha la rotta; 404
- * `{error: 'Not Found'}` ⇒ l'immagine è vecchia; qualunque HTML ⇒ la richiesta
- * non è mai arrivata al backend (VITE_API_BASE punta al dominio del frontend,
- * dove il rewrite `/(.*)` di vercel.json serve index.html).
+ * *assente*. Questi test fissano le due forme, così il controllo resta
+ * leggibile: 401 `{errore}` ⇒ l'immagine ha la rotta; 404 `{error: 'Not Found'}`
+ * ⇒ l'immagine è vecchia; qualunque HTML ⇒ la richiesta non è mai arrivata al
+ * backend. L'ultimo caso ha due cause, ed è bene tenerle distinte: su Railway è
+ * `VITE_API_BASE` che punta al dominio del frontend, dove il rewrite `/(.*)` di
+ * vercel.json serve index.html; sul VPS è una pagina che ha lo stesso percorso
+ * di una rotta, servita da nginx al posto suo.
+ *
+ * La sonda dello script di deploy interroga `POST /api/documenti/genera`
+ * (`scripts/distribuisci.sh`), e le due risposte sono quelle fissate qui: il
+ * prefisso `/api` lo toglie nginx, che è esattamente ciò che il presidio in
+ * `infrastrutturaDeploy.test.ts` verifica.
  */
 describe('§34 — POST /documenti/genera distingue «rotta assente» da «non autenticato»', () => {
   it('senza token → 401 con corpo JSON dello studio, mai 404', async () => {

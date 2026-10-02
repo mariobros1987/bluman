@@ -111,8 +111,9 @@ le operazioni.
 - **Il logo dello studio** si carica con `POST /upload` e finisce in `tenant.logo_url`. Quando lo
   storage in uso è il **ripiego locale**, il backend ne restituisce un percorso **relativo**
   (`/uploads/<nome>?firma=…`, da `storageService.urlUploadFirmato`) ed è il frontend a risolverlo:
-  `getFormattedLogoUrl` (`utils/index.ts`) antepone **`API_BASE`**, che vale `''` quando il frontend è
-  servito insieme all'API (VPS, `VITE_API_SAME_ORIGIN=true`). ⚠️ Con l'indirizzo del backend
+  `getFormattedLogoUrl` (`utils/index.ts`) antepone **`API_BASE`**, che sul VPS vale **`/api`** (il
+  prefisso che nginx toglie prima di consegnare la richiesta all'API) e su Vercel l'indirizzo di
+  Railway. ⚠️ Con l'indirizzo del backend
   **fissato nel codice** il logo veniva chiesto a Railway — un altro database e un altro volume — e
   sul VPS spariva; corretto il 01/10/2026. Su un VPS senza Supabase Storage il ripiego locale è la
   **norma**, non l'eccezione (20 documenti su 20 con `file_url` = `/uploads`), quindi `logoUrl` e

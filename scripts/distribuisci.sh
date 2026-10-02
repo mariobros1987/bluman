@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # Distribuzione completa da riga di comando: frontend su Vercel (push + CLI), backend su Railway,
-# e — se raggiungibile — anche il VPS Register.it (codice, frontend, database, backend).
+# e — se raggiungibile — anche il VPS Register.it (codice, frontend, database, backend, nginx).
 #
 # Regole & Sicurezza:
 # - Autore/Committer Git: l'ultimo commit deve avere l'identità attesa da Vercel. La verifica
@@ -14,9 +14,11 @@
 # - Railway up per il backend e Vercel deploy per il frontend, con verifica post-deploy
 #   dell'health e della sonda rotta sul dominio di produzione.
 # - VPS: il passo gira DOPO il push, perché il server prende il codice da GitHub (`git pull`).
-#   Aggiorna quattro cose distinte e tutte e quattro servono: il **codice** (`git pull`), il
-#   **frontend** (build con `VITE_API_SAME_ORIGIN=true` in un container usa-e-getta), il
-#   **database** (i one-shot `migrate` e `rls`) e il **backend** (immagine ricostruita + `up -d`).
+#   Aggiorna cinque cose distinte e tutte e cinque servono: il **codice** (`git pull`), il
+#   **frontend** (build con `VITE_API_BASE=/api` in un container usa-e-getta), il
+#   **database** (i one-shot `migrate` e `rls`), il **backend** (immagine ricostruita + `up -d`)
+#   e la **ricarica di nginx** (l'API cambia IP quando il container viene ricreato, e senza
+#   `reload` nginx continua a bussare al vecchio: 502 su tutte le rotte API con l'API viva).
 #   Saltare `rls` lascerebbe le tabelle nuove **scoperte**: la migrazione crea la policy solo se
 #   il ruolo esiste già, e comunque è `rls` che riapplica le policy a tutte le tabelle.
 #
@@ -275,15 +277,15 @@ if [ "$VPS" -eq 1 ]; then
   fi
   successo "VPS allineato al commit ${ATTESO:0:8}."
 
-  # b) Frontend — build DICHIARANDO la stessa origine. Senza `VITE_API_SAME_ORIGIN=true`,
-  #    `frontend/src/api/http.ts` rifiuta una base che coincide con l'origine della pagina — la
-  #    stessa condizione che su Vercel è un errore — e ricade su Railway **in silenzio**: l'app
-  #    funziona e parla col backend sbagliato. Si costruisce in un container usa-e-getta
-  #    montando il repo INTERO e non solo `frontend/`: il frontend importa da `src/util/`, e con
-  #    il volume sbagliato la build muore con `TS2307 Cannot find module '../../../src/util/…'`,
-  #    che sembra un errore di codice.
-  echo "• Frontend: build con VITE_API_SAME_ORIGIN=true (nginx monta frontend/dist)..."
-  ssh_vps "cd $VPS_DIR && docker run --rm -u \"\$(id -u):\$(id -g)\" -e HOME=/tmp -e npm_config_cache=/tmp/.npm -e VITE_API_SAME_ORIGIN=true -v $VPS_DIR:/app -w /app/frontend node:22 sh -c 'npm ci --no-audit --no-fund && npm run build'" >/dev/null
+  # b) Frontend — build dichiarando il prefisso delle API. `VITE_API_BASE=/api` non è un
+  #    dettaglio: è ciò che distingue una chiamata all'API da una pagina. Senza, `getApiBase()`
+  #    ricade sull'indirizzo di Railway **in silenzio** e l'app del VPS parla col backend
+  #    sbagliato — l'altro database, gli altri clienti. Si costruisce in un container
+  #    usa-e-getta montando il repo INTERO e non solo `frontend/`: il frontend importa da
+  #    `src/util/`, e con il volume sbagliato la build muore con `TS2307 Cannot find module
+  #    '../../../src/util/…'`, che sembra un errore di codice.
+  echo "• Frontend: build con VITE_API_BASE=/api (nginx monta frontend/dist)..."
+  ssh_vps "cd $VPS_DIR && docker run --rm -u \"\$(id -u):\$(id -g)\" -e HOME=/tmp -e npm_config_cache=/tmp/.npm -e VITE_API_BASE=/api -v $VPS_DIR:/app -w /app/frontend node:22 sh -c 'npm ci --no-audit --no-fund && npm run build'" >/dev/null
   successo "Frontend costruito."
 
   # c) Database — due one-shot, in quest'ordine. `migrate` applica le migrazioni versionate;
@@ -328,9 +330,10 @@ if [ "$VPS" -eq 1 ]; then
     exit 1
   fi
 
-  # e) Verifica. Tre controlli, ognuno coglie un guasto diverso: l'health dice se l'API è viva,
-  #    il 200 sulla radice se nginx serve il frontend, la sonda rotta se l'immagine in esecuzione
-  #    è quella appena costruita (un 404 significa che il container è rimasto indietro).
+  # e) Verifica. Quattro controlli, ognuno coglie un guasto diverso: l'health dice se l'API è
+  #    viva, il 200 sulla radice se nginx serve il frontend, la sonda rotta se l'immagine in
+  #    esecuzione è quella appena costruita (un 404 significa che il container è rimasto
+  #    indietro), e la sonda sulle PAGINE se il proxy si sta mangiando il frontend.
   titolo "7. Verifica post-deploy su $VPS_BASE"
   echo "• In attesa dell'health (max 2 minuti)..."
   VPS_OK=0
@@ -355,12 +358,31 @@ if [ "$VPS" -eq 1 ]; then
     exit 1
   fi
 
-  echo "• Sonda rotta: POST /documenti/genera senza token deve dare 401, non 404..."
-  CODICE_VPS=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 -X POST "$VPS_BASE/documenti/genera" -H 'Content-Type: application/json' -d '{}' || echo "000")
+  #    Questa sonda è quella che mancava, ed è la lezione del 02/10/2026. Sette percorsi della
+  #    SPA — /portal, /invoices, /fornitori, /timesheet, /liquidazione-iva, /reports e
+  #    /admin/tenants — si chiamano come rotte dell'API, e il vecchio elenco di prefissi se li
+  #    prendeva: chi ricaricava una di quelle pagine riceveva un 404 in JSON o un 401 al posto
+  #    dell'applicazione. Il deploy era verde, perché ogni sonda guardava l'API e nessuna
+  #    guardava le pagine. Ora le API stanno sotto /api e queste devono tornare HTML.
+  echo "• Pagine della SPA: devono tornare HTML, non il JSON dell'API..."
+  for PAGINA in /portal /invoices /fornitori /timesheet /liquidazione-iva /reports /admin/tenants; do
+    TIPO=$(curl -s -o /dev/null -w '%{content_type}' --max-time 10 "$VPS_BASE$PAGINA" || echo "000")
+    case "$TIPO" in
+      text/html*) ;;
+      *)
+        echo "ERRORE: $VPS_BASE$PAGINA ha risposto «$TIPO» invece di HTML: la richiesta è finita all'API invece che al frontend. Il location /api/ di nginx_bluman_app.inc è quello giusto?" >&2
+        exit 1
+        ;;
+    esac
+  done
+  successo "Pagine della SPA: tutte HTML."
+
+  echo "• Sonda rotta: POST /api/documenti/genera senza token deve dare 401, non 404..."
+  CODICE_VPS=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 -X POST "$VPS_BASE/api/documenti/genera" -H 'Content-Type: application/json' -d '{}' || echo "000")
   if [ "$CODICE_VPS" = "401" ]; then
     successo "Sonda rotta: 401 come atteso."
   else
-    echo "ERRORE: la sonda ha risposto $CODICE_VPS (atteso 401): se 404, l'immagine sul VPS è vecchia." >&2
+    echo "ERRORE: la sonda ha risposto $CODICE_VPS (atteso 401): se 404, l'immagine sul VPS è vecchia oppure il prefisso /api non arriva all'API." >&2
     exit 1
   fi
 

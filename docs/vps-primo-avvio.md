@@ -34,11 +34,16 @@ comportamento diverso da quello atteso:
       `grep -cE '^(POSTGRES_PASSWORD|APP_DB_PASSWORD)=[0-9a-f]{64}$' .env`
       Il `.env` si scrive con `>` (sovrascrive); con `>>` una riesecuzione accoda un secondo set di
       variabili e resta sotto, invisibile, metà configurazione vecchia.
-- [ ] Frontend: si serve **dal VPS**, sulla stessa origine dell'API (decisione del 30/09/2026). La
-      build va fatta **dichiarando** la stessa origine — senza quel flag `frontend/src/api/http.ts`
-      rifiuta la base e ricade su Railway **in silenzio**, quindi l'app funzionerebbe parlando però
-      col backend vecchio:
-      `cd frontend && VITE_API_SAME_ORIGIN=true npm run build` — nginx monta `frontend/dist`.
+- [ ] Frontend: si serve **dal VPS**, e nginx proxa le API sotto **`/api`** (decisione del
+      30/09/2026, prefisso dal 02/10/2026). La build va fatta **dichiarando quel prefisso** — senza,
+      `frontend/src/api/http.ts` ricade su Railway **in silenzio**, quindi l'app funzionerebbe
+      parlando però col backend vecchio:
+      `cd frontend && VITE_API_BASE=/api npm run build` — nginx monta `frontend/dist`.
+      Il prefisso non è un dettaglio di stile: senza, `/invoices` è sia la pagina Fatture sia la
+      rotta che ne restituisce i dati, e nginx non può servire tutte e due. Fino al 02/10/2026 sette
+      pagine (`/portal`, `/reports`, `/invoices`, `/fornitori`, `/timesheet`, `/liquidazione-iva`,
+      `/admin/tenants`) si rompevano così: si aprivano dall'app — la navigazione interna non ripassa
+      da nginx — e rispondevano `404` o `401` in JSON a chi le ricaricava.
       Sul VPS non serve Node installato: la build si fa in un container usa-e-getta, **montando il
       repo intero e non solo `frontend/`**. Il frontend importa dalla radice
       (`src/util/paginaA4.ts`, `intestazionePiede.ts`, `htmlSanitizer.ts`, `dominioMittente.ts`):
@@ -47,7 +52,7 @@ comportamento diverso da quello atteso:
       il volume sbagliato.
       ```bash
       docker run --rm -u "$(id -u):$(id -g)" -e HOME=/tmp -e npm_config_cache=/tmp/.npm \
-        -e VITE_API_SAME_ORIGIN=true -v /opt/bluman:/app -w /app/frontend \
+        -e VITE_API_BASE=/api -v /opt/bluman:/app -w /app/frontend \
         node:22 sh -c "npm ci --no-audit --no-fund && npm run build"
       ```
 - [ ] DNS del dominio API → IP del VPS.
@@ -86,9 +91,18 @@ errore visibile.
 ## 5. Smoke test
 Da **fuori** (o dal server su `127.0.0.1`) passando da nginx: l'API non pubblica la 3000 sull'host,
 quindi `curl http://127.0.0.1:3000/health` **non risponde** e non significa che l'API sia giù.
-L'unica porta pubblicata è nginx (80/443), che proxa i prefissi API di `nginx_bluman_app.inc`.
-- [ ] Health: `curl -s http://IP/health` → `{"stato":"ok","db":"ok"}`.
+L'unica porta pubblicata è nginx (80/443), che proxa le API **sotto `/api`** e toglie il prefisso
+prima di consegnare la richiesta a Fastify (`nginx_bluman_app.inc`). Restano in radice solo tre
+eccezioni con un motivo che non dipende da questo repository: `/webhooks/` (l'indirizzo è già in
+mano a Meta e Telegram), `/uploads/` (gli URL sono salvati a database e dentro email spedite) e
+`/health` (lo interroga il monitor del VPS, `scripts/monitor-vps.sh`).
+
+- [ ] Health: `curl -s http://IP/health` → `{"stato":"ok","db":"ok"}`; e
+      `curl -s http://IP/api/health` → lo stesso corpo (le due forme devono valere entrambe).
 - [ ] Frontend servito: `curl -s -o /dev/null -w '%{http_code}\n' http://IP/` → `200`.
+- [ ] **Una pagina ricaricata, non solo la radice**: `curl -s -o /dev/null -w '%{content_type}\n'
+      http://IP/portal` → `text/html`. È il controllo che mancava: il deploy del 02/10/2026 era
+      verde mentre questa rispondeva `application/json` con un 404 dell'API dentro.
 - [ ] Login reale → lista progetti + lista clienti + apri un documento.
 - [ ] Isolamento via API con due studi diversi (non solo via SQL).
 
@@ -355,14 +369,14 @@ Sono **cinque** cose, e saltarne una lascia l'ambiente incoerente in un modo che
 | Passo | Comando | Cosa succede se si salta |
 |---|---|---|
 | Codice | `cd /opt/bluman && git pull --ff-only` | l'immagine si costruisce dal codice vecchio |
-| Frontend | build `node:22` usa-e-getta con `VITE_API_SAME_ORIGIN=true` | l'app parla col backend di Railway **in silenzio** |
+| Frontend | build `node:22` usa-e-getta con `VITE_API_BASE=/api` | l'app parla col backend di Railway **in silenzio** |
 | Database | `compose build api migrate` → `run --rm -T migrate` → `run --rm -T rls` | schema vecchio; e senza `rls` la tabella nuova resta **scoperta** |
 | Backend | `compose up -d` | il container continua a girare con l'immagine precedente |
 | nginx | `compose exec -T nginx nginx -s reload` | **502 su tutte le rotte API** con l'API perfettamente viva (vedi sotto) |
 
 ```bash
 ssh-add "$HOME/.ssh/bluman_vps"        # la chiave dev'essere nell'agente
-./scripts/distribuisci.sh --solo-vps   # fa i quattro passi e verifica
+./scripts/distribuisci.sh --solo-vps   # fa i cinque passi e verifica
 ```
 
 **`rls` non è ridondante dopo `migrate`.** La migrazione crea la policy della tabella nuova solo
@@ -371,10 +385,15 @@ se il ruolo `bluman_app` **e** la funzione `app_tenant_corrente` esistono già; 
 idempotente (`DROP POLICY IF EXISTS` prima di ogni `CREATE`). È la rete di sicurezza contro lo
 stato peggiore possibile — due studi che si vedono a vicenda — quindi si esegue sempre.
 
-Lo script verifica in coda quattro cose e **si ferma** se una non torna: `/health`, il `200` sulla
-radice (nginx serve il frontend nuovo), la sonda rotta (`POST /documenti/genera` senza token deve
-dare **401**, mai 404: un 404 significa che il container è rimasto indietro) e `checkRls`
-(atteso «spento su 0»).
+Lo script verifica in coda **quattro** cose e **si ferma** se una non torna: `/health`, il `200` su
+ogni pagina della SPA (nginx serve il frontend nuovo, non l'API), la sonda rotta
+(`POST /api/documenti/genera` senza token deve dare **401**, mai 404: un 404 significa che il
+container è rimasto indietro) e `checkRls` (atteso «spento su 0»).
+
+Il controllo sulle **pagine** è quello che è mancato fino al 02/10/2026, e la sua assenza è il
+motivo per cui il guasto delle sette pagine è vissuto per giorni: ogni sonda guardava l'API e
+nessuna guardava una pagina. Una pagina che risponde `application/json` è una pagina rotta anche
+quando lo script è verde.
 
 Il passo VPS **non si salta in silenzio**: se il server non risponde lo script esce dicendolo,
 perché due ambienti con codice diverso sono esattamente il guasto che `distribuisci.sh` esiste per
