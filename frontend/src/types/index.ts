@@ -215,13 +215,41 @@ export interface Progetto {
   fatture: FatturaRiga[];
   mods: ModuloProgetto[];
   /**
-   * §52 — Stato reale della firma della engagement letter, dalla relazione
-   * Preventivo → EngagementLetter (non dedotto da `st`). `'completata'` solo quando
-   * il cliente ha firmato con OTP; `'in_attesa'` finché non l'ha fatto; assente per i
-   * progetti locali/legacy o quando nessuna engagement letter è ancora stata emessa.
+   * §52 — Stato della firma della lettera d'incarico **di questo progetto**.
+   *
+   * `'completata'` quando esiste la riga `firma_elettronica` (ambito `engagement_letter`) che
+   * riferisce questo progetto — la stessa che legge il portale; `'in_attesa'` altrimenti.
+   * Assente solo per i progetti locali/legacy, che non passano dal backend: lì la firma non è
+   * tracciata e non si afferma niente.
    */
   statoFirma?: 'in_attesa' | 'completata';
   firmatoAt?: string | null;
+  /** La firma che rende `statoFirma` «completata», con la sua evidenza. Nulla se non firmata. */
+  firmaLettera?: FirmaLetteraProgetto | null;
+}
+
+/**
+ * §52 — La firma elettronica della lettera d'incarico di un progetto, come la espone
+ * `getProgetto`. È la riga `FirmaElettronica` (ambito `engagement_letter`, `riferimentoId` = il
+ * progetto) scritta dalle rotte di firma: lo studio la legge dalla stessa fonte del portale.
+ *
+ * L'IP e il file caricato sono evidenza che esiste solo per certi canali di firma: restano
+ * `null` quando il canale non li produce, e il render non li inventa (regola 7).
+ */
+export interface FirmaLetteraProgetto {
+  id: string;
+  signatureId: string;
+  tipoFirma: string;
+  valoreLegale: string;
+  firmatarioNome: string;
+  firmatarioRuolo: string | null;
+  documentoTitolo: string;
+  documentoHash: string;
+  canaleVerificato: string | null;
+  ipAddress: string | null;
+  fileFirmatoUrl: string | null;
+  standard: string;
+  firmatoAt: string;
 }
 
 export interface Articolo {

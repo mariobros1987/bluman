@@ -16,19 +16,23 @@ export function StoricoContrattiTab({
       </div>
 
       {/* Baseline Contratto Iniziale.
-          §52 — Fase B: lo stato mostrato viene dal dato REALE di firma
-          (EngagementLetter.statoFirma / firmatoAt, esposto dal backend via `project.statoFirma`),
-          non più dedotto da `project.st`. Un progetto passa a `in_progress` anche solo accettando
-          un preventivo, SENZA che il cliente abbia mai firmato: firma verificata (OTP) e avvio
-          del progetto sono due fatti distinti. Tre stati distinti, senza mai affermare una firma
-          non provata:
-            • firmata      (statoFirma === 'completata') → verde, con la data reale di firma;
-            • in attesa    (pre_project, oppure statoFirma === 'in_attesa') → ambra;
-            • non tracciata (statoFirma assente: progetti locali/legacy o nessuna letter emessa)
-                            → neutro, «emessa», con nota esplicita che la firma non è tracciata qui. */}
+          §52 — Lo stato mostrato viene dalla firma REALE: la riga `firma_elettronica`
+          (ambito `engagement_letter`, riferimento = questo progetto) che il backend espone
+          come `project.firmaLettera` — la stessa riga che legge il portale cliente.
+          Prima qui si leggeva `engagement_letter.stato_firma`, che nessuna rotta scrive
+          (zero righe in produzione): la scheda diceva «IN ATTESA» anche su una lettera
+          firmata, mentre il portale la dava per firmata. Due letture dello stesso fatto.
+          Tre stati distinti, senza mai affermare una firma non provata:
+            • firmata      (firmaLettera presente) → verde, con chi ha firmato, come è stato
+                            verificato, la data e il valore legale che stanno nel sigillo;
+            • in attesa    (nessuna firma su questo progetto, o progetto in pre_project) → ambra;
+            • non tracciata (statoFirma assente: progetti locali/legacy, che non passano dal
+                            backend) → neutro, «emessa», con nota esplicita che qui non è
+                            tracciata. */}
       {(() => {
-        const firmata = project.statoFirma === 'completata';
-        const inAttesa = project.st === 'pre_project' || project.statoFirma === 'in_attesa';
+        const firma = project.firmaLettera ?? null;
+        const firmata = project.statoFirma === 'completata' && firma !== null;
+        const inAttesa = !firmata && (project.st === 'pre_project' || project.statoFirma === 'in_attesa');
         const bordo = firmata ? 'var(--green)' : inAttesa ? 'var(--amber)' : 'var(--border)';
         const sfondo = firmata ? 'rgba(22, 163, 74, 0.08)' : inAttesa ? 'rgba(217, 119, 6, 0.08)' : 'var(--surface-1)';
         const testoColore = firmata ? 'var(--pill-green-fg)' : inAttesa ? 'var(--pill-amber-fg)' : 'var(--muted)';
@@ -39,8 +43,15 @@ export function StoricoContrattiTab({
             : '📄 ENGAGEMENT LETTER EMESSA (v1.0)';
         const badgeSfondo = firmata ? 'var(--green)' : inAttesa ? 'var(--amber)' : 'var(--pill-slate-bg)';
         const badgeTesto = firmata || inAttesa ? 'var(--on-accent)' : 'var(--muted)';
+        // La riga cita solo ciò che il sigillo porta davvero: il canale di verifica può mancare
+        // (firma con file caricato) e allora non si scrive «OTP verificata» a vuoto.
         const riga = firmata
-          ? `Firmata dal cliente con OTP verificata${project.firmatoAt ? ` il ${project.firmatoAt}` : ''} · Contratto congelato (v1.0)`
+          ? [
+              `Firmata da ${firma?.firmatarioNome || 'cliente'}`,
+              firma?.canaleVerificato || null,
+              project.firmatoAt ? `il ${project.firmatoAt}` : null,
+              'Contratto congelato (v1.0)',
+            ].filter(Boolean).join(' · ')
           : inAttesa
             ? `Generata in data ${project.start} · In attesa di validazione e firma del cliente (OTP)`
             : `Emessa il ${project.start} · Progetto avviato. Lo stato della firma elettronica non è tracciato per questo incarico.`;
@@ -71,6 +82,14 @@ export function StoricoContrattiTab({
                 <div style={{ fontSize: 10, color: testoColore }}>
                   {riga}
                 </div>
+                {/* L'identificativo della firma e il valore legale stanno nel sigillo: si mostrano
+                    solo quando la firma c'è (regola 7), non come caselle vuote da riempire. */}
+                {firmata && firma && (
+                  <div style={{ fontSize: 10, color: testoColore, marginTop: 2 }}>
+                    Valore legale {firma.valoreLegale?.toUpperCase() || 'SES'} · firma{' '}
+                    <code style={{ fontSize: 9.5 }}>{firma.signatureId}</code>
+                  </div>
+                )}
               </div>
               <div style={{ fontSize: 16, fontWeight: 800, color: firmata ? 'var(--green)' : inAttesa ? 'var(--amber)' : 'var(--text)' }}>
                 {fmt(project.val)}

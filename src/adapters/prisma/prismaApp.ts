@@ -361,26 +361,45 @@ export class PrismaApp implements AppPort {
         accessiRisorsa: {
           include: { user: true },
         },
-        // §52 — Stato reale della firma della engagement letter.
-        //
-        // Lo storico contrattuale affermava «CONTRATTO FIRMATO» per ogni progetto non in
-        // pre_project, ma un progetto passa a `in_progress` solo accettando un preventivo
-        // (istanziaProgetto), senza che il cliente abbia mai firmato. La firma vera vive su
-        // EngagementLetter.statoFirma / firmatoAt (scritta solo dal flusso OTP in firma.ts).
-        // La esponiamo qui perché il fascicolo mostri lo stato effettivo, non uno dedotto.
-        preventivi: {
-          where: { engagementLetter: { isArchiviato: false } },
-          orderBy: { createdAt: 'desc' },
-          include: {
-            engagementLetter: {
-              select: { statoFirma: true, firmatoAt: true },
-            },
-          },
-        },
       },
     });
     if (!p) throw new ProgettoNonTrovatoError(`Progetto non trovato: ${id}`);
-    return p;
+
+    // §52 — Lo stato della lettera d'incarico si legge dalla firma **vera**, non da una tabella
+    // che nessuno scrive.
+    //
+    // Qui c'era `preventivi: { include: { engagementLetter: { select: { statoFirma, firmatoAt } } } }`,
+    // col commento che quella tabella è «scritta solo dal flusso OTP in firma.ts». Il commento era
+    // falso: `engagement_letter` non la scrive nessuna rotta — in produzione ha zero righe — quindi
+    // `statoFirma` restava `in_attesa` per sempre e il fascicolo diceva «IN ATTESA» anche su una
+    // lettera firmata, mentre il portale, che legge `firma_elettronica`, la dava per firmata. Due
+    // letture dello stesso fatto che si contraddicono: qui si allineano leggendo la stessa riga.
+    //
+    // Il legame è il **progetto**, come per il portale (`components/portal/firmaLettera.ts`): la
+    // firma porta il progetto su cui è stata apposta. Una firma senza riferimento — quelle del
+    // 08/09/2026 e precedenti — non firma nessun progetto, perché non dice su quale sia stata
+    // apposta. Non si indovina: si dichiara non firmato, che è la verità.
+    const firmaLettera = await this.prisma.firmaElettronica.findFirst({
+      where: { tenantId: this.tenantId, ambito: 'engagement_letter', riferimentoId: id },
+      orderBy: { firmatoAt: 'desc' },
+      select: {
+        id: true,
+        signatureId: true,
+        tipoFirma: true,
+        valoreLegale: true,
+        firmatarioNome: true,
+        firmatarioRuolo: true,
+        documentoTitolo: true,
+        documentoHash: true,
+        canaleVerificato: true,
+        ipAddress: true,
+        fileFirmatoUrl: true,
+        standard: true,
+        firmatoAt: true,
+      },
+    });
+
+    return { ...p, firmaLettera };
   }
 
   async listaAccessiProgetto(progettoId: string) {

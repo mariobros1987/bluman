@@ -18,6 +18,10 @@ Link** ricevuto via email (§02). Ha **7 schede**:
 - La **conclusione di un modulo** dal portale è una **firma FEA** (§11): impronta dal server, IP dal
   sigillo; niente scritture solo in `localStorage`.
 - I documenti mostrano evidenza di firma solo se **esiste** un sigillo (regola 7).
+- La **lettera d'incarico** risulta firmata **per il progetto che si sta guardando**, non perché il
+  cliente ne abbia firmata una in passato (§11). Aprendo un incarico nuovo la lettera è da firmare,
+  anche se il cliente ha già firmato altri mandati. Senza nessun progetto aperto il pulsante di
+  firma resta spento e il portale dice perché.
 
 ## 🔗 Collegamenti
 - **Clienti** (§02): accesso via Magic Link.

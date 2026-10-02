@@ -22,6 +22,11 @@ Un **progetto** è una pratica per un cliente. Dentro ha **moduli** (le prestazi
 - **Stato modulo** = da `calcolaStatoModulo(micro-voci)`; **stato progetto** = da
   `calcolaStatoProgetto(moduli)`. Le **percentuali** derivano da stato + ore prev./cons. e **non si
   salvano** (nessuna colonna: così non possono divergere dai loro ingredienti).
+- **Attivazione del progetto**: scatta quando il cliente firma la **lettera d'incarico di quel
+  progetto** (§11) — non accettando il preventivo, e non «l'ultimo progetto del cliente». Prima
+  avveniva a ogni firma del portale (anche solo prendere visione di un documento faceva partire un
+  progetto in lavorazione) e sceglieva il progetto più recente: con più incarichi aperti se ne apriva
+  uno che nessuno aveva firmato.
 - **Tetto 99%** finché lo stato non è `done`/`completed`: un modulo che dice «100%» mentre è ancora
   aperto è l'inganno che §16.1 evita — il 100 lo concede solo lo stato, non l'aritmetica.
 - **Segnale di rischio (ore sforate)**: per micro-voce `valutaSegnaleRischio`; sul modulo è l'**OR**

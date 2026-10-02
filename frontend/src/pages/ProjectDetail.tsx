@@ -457,18 +457,20 @@ export function ProjectDetail() {
         // valore in riga — e finiva anche nella redditività.
         const calculatedVal = finalMods.reduce((acc: number, m: any) => acc + (m.p || 0), 0) || (dbRes.valoreCentesimi ? dbRes.valoreCentesimi / 100 : 0);
 
-        // §52 — Firma reale della engagement letter, dalla relazione Preventivo →
-        // EngagementLetter esposta da getProgetto. Un progetto può avere più preventivi:
-        // se anche uno solo risulta firmato (OTP), la letter è firmata; altrimenti resta in
-        // attesa. Nessuna letter esposta → campo assente (progetti locali/legacy).
-        const letters = (dbRes.preventivi || [])
-          .map((pv: any) => pv.engagementLetter)
-          .filter(Boolean);
-        const firmata = letters.find((l: any) => l.statoFirma === 'completata');
-        const statoFirma: 'in_attesa' | 'completata' | undefined =
-          letters.length === 0 ? undefined : firmata ? 'completata' : 'in_attesa';
-        const firmatoAt = firmata?.firmatoAt
-          ? new Date(firmata.firmatoAt).toLocaleDateString()
+        // §52 — La firma della lettera d'incarico, la **stessa riga** che legge il portale:
+        // `firma_elettronica`, ambito `engagement_letter`, con `riferimentoId` = questo progetto
+        // (`getProgetto` la espone come `firmaLettera`). Prima lo studio leggeva
+        // `engagement_letter.stato_firma`, che nessuna rotta scrive — in produzione ha zero righe —
+        // quindi il fascicolo diceva «IN ATTESA» anche su lettere firmate, mentre il portale le
+        // dava per firmate. Due letture dello stesso fatto che si contraddicevano.
+        //
+        // `firmaLettera` nulla è una risposta, non un'assenza: la lettera di QUESTO progetto non è
+        // firmata. Un progetto con più preventivi non cambia niente — la firma è del progetto, e
+        // una firma senza riferimento (quelle anteriori al 02/10/2026) non ne firma nessuno.
+        const firmaLettera = dbRes.firmaLettera ?? null;
+        const statoFirma: 'in_attesa' | 'completata' = firmaLettera ? 'completata' : 'in_attesa';
+        const firmatoAt = firmaLettera?.firmatoAt
+          ? new Date(firmaLettera.firmatoAt).toLocaleDateString()
           : null;
 
         setProject({
@@ -503,6 +505,7 @@ export function ProjectDetail() {
           mods: finalMods,
           statoFirma,
           firmatoAt,
+          firmaLettera,
         });
         if (finalMods.length > 0) {
           setExpanded(new Set(finalMods.map(m => m.id)));
