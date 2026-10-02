@@ -655,15 +655,25 @@ describe('chi si invita nasce in forza', () => {
 
     // …e la prova che conta: da qui in avanti «Archivia» funziona davvero, invece di
     // rispondere 409 «non risulta in forza» a una persona che è appena stata assunta.
+    //
+    // La data di fine è **domani**, e si calcola invece di scriverla: qui il periodo si apre
+    // adesso, quindi una data cablata scade da sola. Il 02/10/2026 questo test è diventato
+    // rosso senza che nessuno avesse toccato niente — chiedeva di archiviare con `2026-10-01`,
+    // che il giorno prima era «oggi» e ormai era «ieri», e il servizio rispondeva 400
+    // **giustamente**. Il rosso accusava il prodotto, mentre il difetto era la data nel test.
+    const domani = new Date();
+    domani.setDate(domani.getDate() + 1);
+    const fine = `${domani.getFullYear()}-${String(domani.getMonth() + 1).padStart(2, '0')}-${String(domani.getDate()).padStart(2, '0')}`;
+
     const archivia = await server().inject({
       method: 'POST',
       url: `/tenant/utenti/${creato.id}/disattiva`,
       headers: { authorization: `Bearer ${token('usr-advisor', 'advisor')}` },
-      payload: { dataFine: '2026-10-01' },
+      payload: { dataFine: fine },
     });
 
     expect(archivia.statusCode).toBe(200);
-    expect(periodo(0).al).toEqual(new Date(2026, 9, 1));
+    expect(periodo(0).al).toEqual(new Date(domani.getFullYear(), domani.getMonth(), domani.getDate()));
   });
 
   it('non ne apre un secondo su chi è già in forza: «in forza» resta una parola sola', async () => {
