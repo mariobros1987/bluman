@@ -100,24 +100,99 @@ docker compose -f docker-compose.prod.yml run --rm --entrypoint \
 Poi in `nginx.conf` scommenta il blocco `server :443` e il `return 301` su :80, sostituisci il dominio,
 e `docker compose … exec nginx nginx -s reload`. Il servizio `certbot` rinnova poi da solo.
 
+### Telegram: un bot, un webhook — e il VPS **non** può prenderlo (02/10/2026)
+
+Da leggere **prima** di toccare «Registra Webhook» in *Impostazioni → Canali* sul VPS.
+
+- **Lo stesso bot è configurato nei due ambienti.** `@BlueCodeStudio_Bot` (id `8973080750`) è il bot
+  del tenant sia su Railway/Supabase sia nel database del VPS. Non sono due bot: è **uno**.
+- **Telegram ammette un solo webhook per bot.** Oggi quello slot è occupato da Railway
+  (`https://bluman-api-production.up.railway.app/webhooks/communications/telegram`) e Telegram
+  consegna lì: `pending_update_count = 0`, nessun `last_error_message`.
+- **Sul VPS la registrazione non può riuscire.** `urlPubblicaBackend()` legge `RAILWAY_PUBLIC_DOMAIN`
+  (che qui non esiste) e poi `APP_BASE_URL`, che nel container è `http://136.144.234.118`: la rotta
+  rifiuta con **400 «Il webhook deve essere un URL HTTPS senza credenziali incorporate»**.
+  ⚠️ **Quel 400 sta proteggendo la produzione, non è un guasto.** Se passasse, il webhook verrebbe
+  **spostato via da Railway** e i messaggi dei clienti smetterebbero di arrivare all'ambiente vivo,
+  in silenzio.
+- **Il pannello inganna, ed è bene saperlo.** «URL registrato: ✅ https://…railway.app/…» è lo stato
+  **globale di Telegram per quel bot**, letto con `getWebhookInfo`: è identico sui due ambienti e non
+  dice nulla su dove sia configurato *questo* server. Un ✅ sul VPS non significa che il VPS riceve.
+- **Mancano altri due pezzi, oltre al TLS.** `TELEGRAM_WEBHOOK_SECRET` è **assente** dal container del
+  VPS: la rotta in ingresso risponderebbe **503 «TELEGRAM_WEBHOOK_SECRET non configurato»**
+  (`src/routes/webhooks.ts:579`). E il segreto è **legato all'ambiente**: sia il secret del webhook sia
+  il MAC del payload del link si firmano con il master secret di chi li genera, quindi un link creato
+  su Railway **non è valido** sul VPS, e viceversa. Non è un caso da aggirare: è ciò che impedisce a
+  un link di uno studio di valere su un altro.
+- **Conferma dai dati**: nel database del VPS `webhook_inbox` ha **0 righe** — da lì non è mai entrato
+  un update.
+
+**Cosa fare, quando servirà Telegram anche sul VPS.** Non riusare il bot di produzione: serve un
+**secondo bot** (BotFather), con il suo token nel tenant del VPS. Il bot di produzione si sposta sul
+VPS **solo** al cut-over vero, e in quel momento si registra il webhook lì e **si smette** di
+farlo su Railway — mai entrambi. Finché il DNS non punta al VPS e il TLS non c'è, Telegram resta su
+Railway e sul VPS non si preme quel pulsante.
+
 ## 7. Dopo il cut-over
 - [x] **Backup in cron** (01/10/2026) — vedi «Il backup» qui sotto. Restore-test eseguito.
-      Restano la **copia off-site** (rclone) e la custodia di `BACKUP_ENCRYPTION_KEY` **fuori dal
-      server**.
 - [x] **Sorveglianza in cron** (01/10/2026) — vedi «La sorveglianza» qui sotto: sette controlli con
       avvisi su Telegram, e il controllo che il backup non sia morto in silenzio.
 - [x] **Rotazione delle password** (`bluman_app` e proprietario) — 02/10/2026, vedi «La rotazione
       delle password» qui sotto.
 - [x] **`pg_stat_statements`** — 02/10/2026. Rende visibili le query lente, che prima erano
       invisibili. Dichiarato anche in `docker-compose.prod.yml` per riproducibilità.
-- [x] **Connessioni al database** — deciso il 02/10/2026 di **non** aggiungere un controllo, e la
-      ragione va scritta perché la tentazione di aggiungerlo tornerà. ⚠️ **Non** si controlla
-      `pg_stat_activity`: con PgBouncer davanti l'app non apre connessioni verso Postgres, le prende
-      dal pool — Postgres ne vede **una**, e un allarme su `max_connections` non suonerebbe mai,
-      nemmeno con l'app in ginocchio. La metrica che avrebbe senso è la **coda di PgBouncer**
+- [x] **Connessioni al database** — deciso il 02/10/2026 di **non** aggiungere un controllo. ⚠️ **Non**
+      si controlla `pg_stat_activity`: con PgBouncer davanti l'app non apre connessioni verso Postgres,
+      le prende dal pool — Postgres ne vede **una**, e un allarme su `max_connections` non suonerebbe
+      mai, nemmeno con l'app in ginocchio. La metrica che avrebbe senso è la **coda di PgBouncer**
       (`cl_waiting`), ma `/health` passa dal pool anche lui: quando la saturazione diventa un problema
       vero, il controllo health che c'è già la vede. Un preavviso su una coda che si svuota da sola
       farebbe falsi allarmi, che è il modo in cui si insegna a ignorare il monitor.
+
+### Cose da fare
+
+Aperte al 02/10/2026, in ordine di quanto farebbero male. La prima non è un miglioramento: senza,
+il backup che c'è non è un backup.
+
+- [ ] **La chiave del backup, su carta, in cassaforte.** `BACKUP_ENCRYPTION_KEY` sta **dentro** il
+      `.env`, che viene cifrato **con sé stessa**. Finché il server vive il restore funziona; se il
+      server muore, senza una copia della chiave **fuori dal server** i backup non si aprono più —
+      cioè non esistono. È l'unico punto in cui «abbiamo i backup» e «possiamo ripristinare» sono due
+      frasi diverse.
+      **Come si chiude:** leggere il valore dal server, copiarlo **a mano** su un foglio con la data e
+      il nome della variabile, metterlo in cassaforte. Poi **verificarlo**: riscrivere la chiave
+      partendo dal foglio e aprire un backup vero con il blocco RESTORE-TEST in fondo a
+      `scripts/backup-vps.sh`. Un foglio non verificato è una speranza, non una chiave.
+      ```bash
+      ssh-add "$HOME/.ssh/bluman_vps"
+      ssh bluman@136.144.234.118 'grep ^BACKUP_ENCRYPTION_KEY /opt/bluman/.env'
+      ```
+
+- [ ] **La copia off-site.** Oggi i backup stanno sullo **stesso disco** del database — su quella
+      macchina c'è un solo filesystem, quindi «un'area diversa» può essere solo una directory diversa.
+      Proteggono dagli errori applicativi, **non** dalla morte del disco o del server.
+      **Come si chiude:** `rclone` sul VPS + `BLUMAN_BACKUP_RCLONE_REMOTE` nel `.env`, verso uno spazio
+      cloud che il titolare **già paga** — ⚠️ da dire **quale** (Drive, OneDrive o Dropbox). Attenzione
+      al modo, non al fine: con Google Drive rclone va riautenticato periodicamente, e **se scade in
+      silenzio la copia smette senza che nessuno se ne accorga**. Va quindi aggiunto anche un controllo
+      sulla **freschezza della copia off-site**, o si sostituisce un buco con un buco più silenzioso.
+
+- [ ] **`healthchecks.io`, o un cane da guardia fuori dal VPS.** I sette controlli girano **sul VPS**:
+      se il VPS muore del tutto, il monitor muore con lui e non avvisa nessuno — l'unico segnale che
+      resta è il riepilogo delle 08:00 che **non arriva**, e «non arriva» è indistinguibile da «non
+      c'era niente da dire» per chi non lo sta aspettando. È l'ultimo buco di una sorveglianza che si
+      fida di sé stessa.
+      **Come si chiude:** ⚠️ primo passo a carico del titolare — creare l'account e passare l'URL di
+      ping; poi il monitor lo chiama in coda a ogni giro e chiama `/fail` quando un controllo è rosso,
+      così il servizio esterno avvisa quando i ping **smettono** di arrivare.
+
+- [ ] **Cancellare i `.env` con le password vecchie.** Sul server restano
+      `.env.pre-rotazione-20261002_132246`, `.env.pre-rotazione-owner-20261002_133350` (più il `.env`
+      vivo, che resta): un file di riserva con credenziali dismesse è solo una copia in più da
+      proteggere, e nessuno la difenderà mai come difenderebbe quella vera.
+      **Come si chiude:** quando la rotazione del 02/10 avrà qualche giorno senza sorprese,
+      `rm /opt/bluman/.env.pre-rotazione-*`.
+
 - [ ] Tieni Supabase/Railway **accesi** come rollback per qualche giorno.
 
 ### La rotazione delle password (02/10/2026)
