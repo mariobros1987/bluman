@@ -110,11 +110,14 @@ e `docker compose … exec nginx nginx -s reload`. Il servizio `certbot` rinnova
       delle password» qui sotto.
 - [x] **`pg_stat_statements`** — 02/10/2026. Rende visibili le query lente, che prima erano
       invisibili. Dichiarato anche in `docker-compose.prod.yml` per riproducibilità.
-- [ ] **Connessioni al database.** ⚠️ **Non** si controlla `pg_stat_activity`: con PgBouncer davanti
-      l'app non apre connessioni verso Postgres, le prende dal pool — Postgres ne vede **una**, e un
-      allarme su `max_connections` non suonerebbe mai, nemmeno con l'app in ginocchio. La metrica che
-      conta è la **coda di PgBouncer** (`cl_waiting` dal suo database di amministrazione), che è un
-      controllo da progettare a parte.
+- [x] **Connessioni al database** — deciso il 02/10/2026 di **non** aggiungere un controllo, e la
+      ragione va scritta perché la tentazione di aggiungerlo tornerà. ⚠️ **Non** si controlla
+      `pg_stat_activity`: con PgBouncer davanti l'app non apre connessioni verso Postgres, le prende
+      dal pool — Postgres ne vede **una**, e un allarme su `max_connections` non suonerebbe mai,
+      nemmeno con l'app in ginocchio. La metrica che avrebbe senso è la **coda di PgBouncer**
+      (`cl_waiting`), ma `/health` passa dal pool anche lui: quando la saturazione diventa un problema
+      vero, il controllo health che c'è già la vede. Un preavviso su una coda che si svuota da sola
+      farebbe falsi allarmi, che è il modo in cui si insegna a ignorare il monitor.
 - [ ] Tieni Supabase/Railway **accesi** come rollback per qualche giorno.
 
 ### La rotazione delle password (02/10/2026)

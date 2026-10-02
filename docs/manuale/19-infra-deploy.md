@@ -73,6 +73,9 @@ si usa il **`.exe` nativo** via `RAILWAY_BIN` (lo script lo supporta).
 - **`pg_stat_statements`** (dal 02/10/2026): dichiarato nel compose sul servizio `postgres`, rende
   visibili le query lente. Precaricabile solo all'avvio del server, quindi non basta `CREATE EXTENSION`.
 - **Le connessioni al database non si controllano con `pg_stat_activity`**: con PgBouncer davanti
-  Postgres ne vede una sola e l'allarme non suonerebbe mai. La metrica utile è la coda di PgBouncer.
+  Postgres ne vede una sola e l'allarme non suonerebbe mai. Deciso il 02/10/2026 di **non** aggiungere
+  il controllo: la metrica utile sarebbe la coda di PgBouncer, ma `/health` passa dal pool anche lui,
+  quindi la saturazione vera il controllo health la vede già — un preavviso su una coda che si svuota
+  da sola sarebbero solo falsi allarmi.
 - Fonti: `.agents/AGENTS.md`, `ISTRUZIONI_PER_IA.md` (regola 9), `PIANO_MIGRAZIONE_VPS.md`,
   `AUDIT_2026-09-27/07-frontend-infra.md`.
