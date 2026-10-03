@@ -84,6 +84,13 @@ export function descrizioneTipoFirma(tipoFirma: string, valoreLegale?: string | 
       return 'Sottoscrizione autografa su carta, scansionata e ricaricata dal firmatario';
     case 'qualificata_esterna':
       return 'Firma Elettronica Qualificata (QES) apposta con provider esterno';
+    // La firma dello studio (§8.2/§8.3 del piano firma, dal 03/10/2026): il meccanismo è
+    // grafometrica o OTP, ma il record la marca `studio` perché è la *parte* che conta qui —
+    // senza questo caso il verbale stampava la parola nuda «studio» nel campo Tipo di firma.
+    case 'studio':
+      return valoreLegale === 'fea'
+        ? 'Sottoscrizione dello studio · Firma Elettronica Avanzata (FEA) · art. 20 c. 1-bis CAD'
+        : 'Sottoscrizione dello studio · Firma Elettronica Semplice (SES) · art. 20 CAD';
     default:
       return tipoFirma;
   }

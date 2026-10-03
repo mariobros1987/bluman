@@ -292,6 +292,15 @@ describe('Punto 2 — descrizioneTipoFirma', () => {
   it('un tipo sconosciuto passa invariato: nessuna etichetta inventata', () => {
     expect(descrizioneTipoFirma('tipo_misterioso')).toBe('tipo_misterioso');
   });
+
+  it('la firma dello studio si legge come sottoscrizione dello studio, non come la parola «studio»', () => {
+    expect(descrizioneTipoFirma('studio', 'ses')).toBe(
+      'Sottoscrizione dello studio · Firma Elettronica Semplice (SES) · art. 20 CAD',
+    );
+    expect(descrizioneTipoFirma('studio', 'fea')).toBe(
+      'Sottoscrizione dello studio · Firma Elettronica Avanzata (FEA) · art. 20 c. 1-bis CAD',
+    );
+  });
 });
 
 describe('Punto 2 — generaPdfVerbaleFirma (contenuto certificativo)', () => {
