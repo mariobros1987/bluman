@@ -37,12 +37,16 @@ export async function segnaDocumentoFirmato(tenantId: string, documentoId: strin
     const blocchi = doc ? blocchiSalvati(doc.contenutoBlocchiJson) : null;
     const richiedeCliente = blocchi ? haSlotFirma(blocchi, 'cliente') : false;
     const richiedeStudio = blocchi ? haSlotFirma(blocchi, 'studio') : false;
+    // La parte si legge dal dato (§8.1). Con `tipoFirma === 'studio'` la firma dello studio via
+    // file — che scrive `tipoFirma: modalita` — contava come firma del CLIENTE: su un template
+    // che chiede entrambe le parti il documento risultava «firmato» con la sola firma dello
+    // studio, cioè uno stato falso su un atto che aspetta ancora il cliente.
     const firme = await prisma.firmaElettronica.findMany({
       where: { tenantId, ambito: 'documento_vault', riferimentoId: documentoId },
-      select: { tipoFirma: true },
+      select: { parte: true },
     });
-    const firmatoStudio = firme.some((f) => f.tipoFirma === 'studio');
-    const firmatoCliente = firme.some((f) => f.tipoFirma !== 'studio');
+    const firmatoStudio = firme.some((f) => f.parte === 'studio');
+    const firmatoCliente = firme.some((f) => f.parte !== 'studio');
     const completo = (!richiedeCliente && !richiedeStudio)
       ? true
       : (!richiedeCliente || firmatoCliente) && (!richiedeStudio || firmatoStudio);

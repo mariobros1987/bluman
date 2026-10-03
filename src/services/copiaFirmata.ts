@@ -73,7 +73,14 @@ export function righeAttestazione(params: {
   valoreLegale?: string | null;
   signatureId: string;
   firmatoAt: Date;
-  sigilloDigest: string;
+  /**
+   * L'impronta HMAC del sigillo di QUESTA firma, riletta dalla riga `FirmaElettronica`.
+   * `null` per le firme anteriori al 03/10/2026, quando il digest non era persistito: si scrive
+   * «non registrato», come per un IP mancante nel verbale. Il ripiego sul sigillo dell'evento in
+   * corso — che è quello che faceva questo codice — stampava sotto il nome di una parte
+   * l'impronta dell'altra: un'attestazione falsa su un documento che fa fede.
+   */
+  sigilloDigest: string | null;
 }): string[] {
   const { firmatarioNome, valoreLegale, signatureId, firmatoAt, sigilloDigest } = params;
   const etichettaValore =
@@ -87,7 +94,7 @@ export function righeAttestazione(params: {
     `Firmato elettronicamente da ${firmatarioNome}`,
     `${etichettaValore} · ${quando} UTC`,
     `ID firma ${signatureId}`,
-    `Sigillo SHA-256 ${sigilloDigest}`,
+    `Sigillo SHA-256 ${sigilloDigest ?? 'non registrato'}`,
   ];
 }
 
@@ -156,12 +163,25 @@ export async function generaCopiaFirmata(params: {
     const hasStudioSlot = haSlotFirma(blocchi, 'studio');
     if (!hasClienteSlot && !hasStudioSlot) return null;
 
-    // Recupera eventuali altre firme già apposte sul documento (es. controfirma)
+    // Recupera eventuali altre firme già apposte sul documento (es. controfirma). Il select è
+    // esplicito: sono esattamente le colonne che servono a ricomporre la riga della controparte,
+    // e leggerle per nome evita che una colonna rinominata torni `undefined` in silenzio.
     let firmeDb: any[] = [];
     try {
       if (prisma.firmaElettronica?.findMany) {
         firmeDb = await prisma.firmaElettronica.findMany({
           where: { tenantId, ambito: 'documento_vault', riferimentoId: documentoId },
+          select: {
+            parte: true,
+            signatureId: true,
+            firmatarioNome: true,
+            firmatarioRuolo: true,
+            valoreLegale: true,
+            standard: true,
+            firmatoAt: true,
+            firmaGrafometricaPng: true,
+            sigilloDigest: true,
+          },
           orderBy: { firmatoAt: 'desc' },
         });
       }
@@ -183,7 +203,8 @@ export async function generaCopiaFirmata(params: {
           }),
         };
       } else {
-        const firmaStudioDb = firmeDb.find((f) => f.tipoFirma === 'studio' || f.canaleVerificato?.includes('Studio'));
+        // La parte sta nella sua colonna (§8.1): si legge `parte`, non si annusa la stringa.
+        const firmaStudioDb = firmeDb.find((f) => f.parte === 'studio');
         if (firmaStudioDb) {
           firmeDaApporre.studio = {
             immaginePng: firmaStudioDb.firmaGrafometricaPng ?? null,
@@ -192,7 +213,7 @@ export async function generaCopiaFirmata(params: {
               valoreLegale: firmaStudioDb.valoreLegale ?? null,
               signatureId: firmaStudioDb.signatureId,
               firmatoAt: firmaStudioDb.firmatoAt,
-              sigilloDigest: firmaStudioDb.sigilloDigest || sigilloDigest,
+              sigilloDigest: firmaStudioDb.sigilloDigest ?? null,
             }),
           };
         }
@@ -213,7 +234,7 @@ export async function generaCopiaFirmata(params: {
           }),
         };
       } else {
-        const firmaClienteDb = firmeDb.find((f) => f.tipoFirma !== 'studio' && !f.canaleVerificato?.includes('Studio'));
+        const firmaClienteDb = firmeDb.find((f) => f.parte === 'cliente');
         if (firmaClienteDb) {
           firmeDaApporre.cliente = {
             immaginePng: firmaClienteDb.firmaGrafometricaPng ?? null,
@@ -222,7 +243,9 @@ export async function generaCopiaFirmata(params: {
               valoreLegale: firmaClienteDb.valoreLegale ?? null,
               signatureId: firmaClienteDb.signatureId,
               firmatoAt: firmaClienteDb.firmatoAt,
-              sigilloDigest: firmaClienteDb.sigilloDigest || sigilloDigest,
+              // Il sigillo della PRIMA firma, non quello dell'evento in corso che la sta
+              // ricomponendo: è la differenza fra un'attestazione e una dichiarazione falsa.
+              sigilloDigest: firmaClienteDb.sigilloDigest ?? null,
             }),
           };
         }
@@ -237,7 +260,7 @@ export async function generaCopiaFirmata(params: {
     // (dal DB) più quella in corso, con codice, data/ora e riferimenti di legge, rese dal sigillo.
     const cronologia: RigaCronologiaFirma[] = firmeDb.map((f) => ({
       firmatarioNome: f.firmatarioNome,
-      ruolo: (f.tipoFirma === 'studio' || f.canaleVerificato?.includes('Studio')) ? (f.firmatarioRuolo || 'Studio') : 'Cliente',
+      ruolo: f.parte === 'studio' ? (f.firmatarioRuolo || 'Studio') : 'Cliente',
       signatureId: f.signatureId,
       firmatoAt: f.firmatoAt,
       valoreLegale: f.valoreLegale ?? null,

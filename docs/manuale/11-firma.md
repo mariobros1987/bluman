@@ -11,9 +11,13 @@ La firma trasforma un documento (o la **conclusione di un modulo**) in un atto c
   né un documento con una richiesta di modifica aperta), e come per il cliente ne nasce il
   **verbale di firma**.
 - **Multi-firma**: un documento con più parti (`{{firma_cliente}}`/`{{firma_studio}}`) diventa
-  `firmato` solo quando **tutte** hanno firmato; prima è `parzialmente_firmato`.
+  `firmato` solo quando **tutte** hanno firmato; prima è `parzialmente_firmato`. Ogni parte è
+  scritta nel dato (`cliente`/`studio`) e non si deduce dal tipo di firma: la firma dello studio
+  con un file caricato resta una firma **dello studio** anche se il meccanismo è «file caricato».
 - La **copia firmata** (PDF) porta in coda la **Cronologia delle firme** (codice, data/ora UTC, valore
-  legale, impronta del sigillo).
+  legale, impronta del sigillo). Sotto il nome di ciascuna parte compare **il sigillo di quella
+  firma**, riletto dalla sua riga: per le firme anteriori al 03/10/2026 l'impronta non è
+  ricostruibile e la riga dice `Sigillo SHA-256 non registrato`, che è la verità.
 
 ## 📐 Calcoli & logica
 - **L'impronta la calcola il server** dai dati canonici (documento o modulo), **mai** il browser;
@@ -22,7 +26,8 @@ La firma trasforma un documento (o la **conclusione di un modulo**) in un atto c
 - **Sigillo HMAC**: sia la firma cliente sia la firma studio usano l'impronta sul **contenuto** del
   file + sigillo **HMAC** (`sigilloHmac`).
 - **Anti ri-firma**: una parte firma **una volta sola** (409 su tentativo doppio); la controfirma
-  dell'altra parte resta ammessa.
+  dell'altra parte resta ammessa. La guardia riconosce la parte dal dato scritto in firma, non dal
+  tipo di firma: anche la firma dello studio arrivata da un file caricato è protetta.
 - **Ambiti**: `documento`, `modulo_completato` (concludere un modulo dal portale è una firma FEA),
   `engagement_letter`.
 - **La lettera d'incarico si firma su un incarico.** La firma porta il **progetto** su cui è stata
@@ -70,5 +75,9 @@ La firma trasforma un documento (o la **conclusione di un modulo**) in un atto c
   `src/firmaLetteraStudio.test.ts` tiene allineate le due letture.
 - Schema: `FirmaElettronica` (`firmatoAt`, `ip_address`, hash, sigillo, **`riferimentoId`** = il
   progetto per la lettera d'incarico, il documento per il vault, il modulo per la conclusione),
-  enum stato firma su `Documento`.
+  enum stato firma su `Documento`. Dal 03/10/2026 porta anche **`parte`** (`cliente`|`studio` —
+  chi ha firmato, che non si deduce dal meccanismo) e **`sigilloDigest`** (l'impronta HMAC di
+  quella firma, persistita perché la copia firmata ricomposta dopo la controfirma deve rileggere
+  il sigillo della prima parte invece di prendere in prestito quello dell'evento in corso;
+  migrazione `20261003120000_firma_parte_e_sigillo`).
 - Fonti: `.agents/AGENTS.md`, `AUDIT_2026-09-27/05-documenti-firma.md`, `piano-firma-legale-ses-fea-feq.md`.

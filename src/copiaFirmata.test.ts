@@ -20,6 +20,8 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 const stato = {
   documento: null as any,
+  /** Le firme già apposte sul documento, come le restituisce `firmaElettronica.findMany`. */
+  firmeDb: [] as any[],
   upload: [] as { filename: string; buffer: Buffer }[],
   creati: [] as any[],
   uploadFails: false,
@@ -35,6 +37,7 @@ vi.mock('./util/prismaClient.js', async importOriginal => {
         return { ...args.data, id: 'doc-firmato-1' };
       },
     },
+    firmaElettronica: { findMany: async () => stato.firmeDb },
     auditLog: { create: async () => ({}) },
   };
   return { ...reale, prisma: finto, prismaAmministrativo: () => finto };
@@ -107,6 +110,7 @@ function firmaFinta(overrides: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   stato.documento = null;
+  stato.firmeDb.length = 0;
   stato.upload.length = 0;
   stato.creati.length = 0;
   stato.uploadFails = false;
@@ -226,6 +230,18 @@ describe('blocchiSalvati / haSlotFirma / righeAttestazione', () => {
       sigilloDigest: 'd'.repeat(64),
     });
     expect(senzaValore[1]).toContain('Firma Elettronica Semplice');
+  });
+
+  // §8.1 — per le firme anteriori al 03/10/2026 il sigillo non era persistito: la riga lo dice
+  // invece di stampare l'impronta di un'altra firma (che è ciò che faceva `|| sigilloDigest`).
+  it('dichiara «non registrato» il sigillo di una firma precedente alla persistenza', () => {
+    const righe = righeAttestazione({
+      firmatarioNome: 'Luigi Bianchi',
+      signatureId: 'BLU-3',
+      firmatoAt: new Date('2026-01-02T03:04:05.000Z'),
+      sigilloDigest: null,
+    });
+    expect(righe[3]).toBe('Sigillo SHA-256 non registrato');
   });
 });
 
@@ -391,5 +407,78 @@ describe('generaCopiaFirmata', () => {
     expect(copia.caricatoDa).toBe('usr-advisor-1');
     const testo = testoPdf(stato.upload[0]!.buffer);
     expect(testo).toContain('Avv. Mario Rossi (Studio BluMan)');
+  });
+
+  // §8.1 — la firma della controparte si ricompone con il SUO sigillo, riletto dalla riga
+  // `FirmaElettronica`, non con quello dell'evento che sta ricomponendo il PDF. Prima il campo
+  // non esisteva nello schema: la lettura dava `undefined` e il ripiego stampava sotto il nome
+  // della prima parte l'impronta della seconda — un'attestazione falsa su un documento che fa fede.
+  it('stampa il sigillo della prima firma, non quello dell\'evento che la ricompone', async () => {
+    stato.documento = originaleConBlocchi();
+    stato.firmeDb = [
+      {
+        parte: 'cliente',
+        signatureId: 'BLU-SES-CLIENTE-1',
+        firmatarioNome: 'Luigi Bianchi',
+        firmatarioRuolo: null,
+        valoreLegale: 'ses',
+        standard: 'eIDAS / SES (CAD art. 20)',
+        firmatoAt: new Date('2026-08-29T18:04:06.000Z'),
+        firmaGrafometricaPng: PNG_1X1,
+        sigilloDigest: 'a'.repeat(64),
+      },
+    ];
+
+    await generaCopiaFirmata({
+      tenantId: TENANT,
+      documentoId: 'doc-orig-1',
+      firma: firmaFinta({ firmatarioNome: 'Avv. Mario Rossi', firmaGrafometricaPng: null }),
+      sigilloDigest: 's'.repeat(64),
+      slot: 'studio',
+      userId: 'usr-advisor-1',
+    });
+
+    const testo = testoPdf(stato.upload[0]!.buffer);
+    // La riga della prima parte porta il sigillo della PRIMA firma...
+    expect(testo).toContain('Firmato elettronicamente da Luigi Bianchi');
+    expect(testo).toContain('a'.repeat(64));
+    // ...e quella dello studio il proprio: due sigilli distinti nello stesso PDF.
+    expect(testo).toContain('Firmato elettronicamente da Avv. Mario Rossi');
+    expect(testo).toContain('s'.repeat(64));
+  });
+
+  // §8.1 — la parte si legge dal dato. La firma dello studio via file scrive il MECCANISMO in
+  // `tipoFirma` ('qualificata_esterna') e un canale che non contiene la parola «Studio»: la
+  // deduzione dalla stringa la classificava come firma del cliente, e la cronologia sul PDF
+  // finale diceva «Cliente» sotto il nome del professionista.
+  it('riconosce come studio la firma via file nella cronologia, senza annusare la stringa', async () => {
+    stato.documento = originaleConBlocchi();
+    stato.firmeDb = [
+      {
+        parte: 'studio',
+        signatureId: 'BLU-STD-FILE-1',
+        firmatarioNome: 'Avv. Mario Rossi',
+        firmatarioRuolo: 'Senior Tax Advisor',
+        valoreLegale: 'feq',
+        standard: 'eIDAS / FEQ (CAdES/PAdES)',
+        firmatoAt: new Date('2026-08-29T09:00:00.000Z'),
+        firmaGrafometricaPng: null,
+        sigilloDigest: 'f'.repeat(64),
+      },
+    ];
+
+    await generaCopiaFirmata({
+      tenantId: TENANT,
+      documentoId: 'doc-orig-1',
+      firma: firmaFinta(),
+      sigilloDigest: 'e'.repeat(64),
+      slot: 'cliente',
+    });
+
+    const testo = testoPdf(stato.upload[0]!.buffer);
+    expect(testo).toContain('CRONOLOGIA DELLE FIRME');
+    // Il ruolo dichiarato dallo studio compare solo se la riga è letta come firma dello studio:
+    // con la deduzione dalla stringa sarebbe stato «Cliente», e questo testo non esisterebbe.
+    expect(testo).toContain('Senior Tax Advisor');
   });
 });

@@ -186,6 +186,9 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
           riferimentoId: true,
           documentoTitolo: true,
           tipoFirma: true,
+          // §8.1 — la parte scritta nel dato: distingue la firma dello studio da quella del
+          // cliente senza dedurla dalla stringa del meccanismo.
+          parte: true,
           firmatoAt: true,
           canaleVerificato: true,
           // Evidenze del sigillo mostrate nel certificato di firma del portale: fuori dal
@@ -211,7 +214,7 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
       const firmaStudioPerDocumento = new Map<string, (typeof firme)[number]>();
       for (const f of firme) {
         if (f.riferimentoId) {
-          if (f.tipoFirma === 'studio') {
+          if (f.parte === 'studio') {
             if (!firmaStudioPerDocumento.has(f.riferimentoId)) firmaStudioPerDocumento.set(f.riferimentoId, f);
           } else {
             if (!firmaClientePerDocumento.has(f.riferimentoId)) firmaClientePerDocumento.set(f.riferimentoId, f);
@@ -387,7 +390,7 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
       // vista perché il file a cui puntava non c'è più.
       const idPresenti = new Set(documenti.map((d) => d.id));
       const orfane = firme
-        .filter((f) => f.tipoFirma !== 'studio' && (!f.riferimentoId || !idPresenti.has(f.riferimentoId)))
+        .filter((f) => f.parte !== 'studio' && (!f.riferimentoId || !idPresenti.has(f.riferimentoId)))
         .map((f) => ({
           id: `firma-${f.signatureId}`,
           nome: f.documentoTitolo,
@@ -975,9 +978,11 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
 
     // Anti ri-firma (§WF-DOC): il cliente firma una volta sola. Una seconda firma della stessa parte
     // duplicherebbe la riga FirmaElettronica e rigenererebbe il sigillo. La controfirma dell'ALTRA
-    // parte (studio) resta ammessa: è il flusso bidirezionale. `tipoFirma !== 'studio'` = firma cliente.
+    // parte (studio) resta ammessa: è il flusso bidirezionale. Si legge la PARTE (§8.1): con
+    // `tipoFirma !== 'studio'` la firma dello studio via file — che scrive `tipoFirma: modalita` —
+    // passava per firma del cliente e bloccava la controfirma.
     const giaFirmataCliente = await prisma.firmaElettronica.findFirst({
-      where: { tenantId, ambito: 'documento_vault', riferimentoId: documentoId, tipoFirma: { not: 'studio' } },
+      where: { tenantId, ambito: 'documento_vault', riferimentoId: documentoId, parte: 'cliente' },
       select: { id: true },
     });
     if (giaFirmataCliente) {
@@ -1440,6 +1445,11 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
           clienteId,
           signatureId: sigillo.signatureId,
           tipoFirma: 'fea_otp',
+          // La parte e il sigillo di QUESTA firma (§8.1): scritti nel dato perché la copia
+          // firmata, ricomposta dopo la controfirma, deve rileggere l'impronta della prima
+          // firma invece di prendere in prestito quella dell'evento in corso.
+          parte: 'cliente',
+          sigilloDigest: sigillo.sha256Digest,
           ambito,
           riferimentoId: riferimentoId ?? null,
           documentoTitolo,
@@ -1783,6 +1793,9 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
           clienteId,
           signatureId: sigillo.signatureId,
           tipoFirma,
+          // Parte e sigillo come nel canale OTP (§8.1).
+          parte: 'cliente',
+          sigilloDigest: sigillo.sha256Digest,
           ambito,
           riferimentoId: riferimentoId ?? null,
           documentoTitolo,

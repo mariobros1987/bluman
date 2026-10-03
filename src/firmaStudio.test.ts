@@ -468,6 +468,7 @@ describe('🏛️ Firma Studio & Professionista — Route Tests', () => {
       clienteId: CLIENTE_ID,
       signatureId: 'BLU-STD-2026-TEST',
       tipoFirma: 'studio',
+      parte: 'studio',
       ambito: 'documento_vault',
       riferimentoId: DOC_ID,
       firmatarioNome: 'Avv. Mario Rossi',
@@ -492,5 +493,58 @@ describe('🏛️ Firma Studio & Professionista — Route Tests', () => {
     expect(doc.firmaStudio).toBeTruthy();
     expect(doc.firmaStudio.signatureId).toBe('BLU-STD-2026-TEST');
     expect(doc.firmaStudio.firmatarioNome).toBe('Avv. Mario Rossi');
+  });
+
+  // §8.1 — la firma dello studio via FILE scrive `tipoFirma: modalita` (il meccanismo, che il
+  // verbale deve dichiarare) e un canale che non contiene la parola «Studio». Fino al 03/10/2026
+  // la parte si deduceva dalla stringa, quindi questa firma passava per firma del CLIENTE: lo
+  // studio la vedeva elencata come «firmato dal cliente» e poteva apporne una seconda.
+  it('riconosce come studio anche la firma via file, che il meccanismo non dichiara', async () => {
+    stato.firmeCreate.push({
+      id: 'f-studio-file-1',
+      tenantId: TENANT_STUDIO,
+      clienteId: CLIENTE_ID,
+      signatureId: 'BLU-STD-2026-FILE',
+      tipoFirma: 'qualificata_esterna',
+      parte: 'studio',
+      ambito: 'documento_vault',
+      riferimentoId: DOC_ID,
+      firmatarioNome: 'Avv. Mario Rossi',
+      firmatarioRuolo: 'Senior Tax Advisor',
+      firmatoAt: new Date(),
+      valoreLegale: 'feq',
+      standard: 'eIDAS / FEQ (CAdES/PAdES)',
+      canaleVerificato: 'Firma Digitale Qualificata Esterna',
+    });
+
+    const server = serverConToken(tokenAdvisor());
+    const res = await server.inject({ method: 'GET', url: `/documenti?progettoId=proj-1` });
+
+    expect(res.statusCode).toBe(200);
+    const doc = res.json().documenti[0];
+    expect(doc.firmatoDaStudio).toBe(true);
+    expect(doc.firmatoDaCliente).toBe(false);
+    expect(doc.firmaStudio?.signatureId).toBe('BLU-STD-2026-FILE');
+  });
+
+  // §8.1 — l'anti-ri-firma dello studio legge la parte: la seconda firma dello studio è 409,
+  // anche quando la prima è arrivata da un file caricato.
+  it('rifiuta la seconda firma dello studio con 409, anche se la prima era via file', async () => {
+    stato.firmeCreate.push({
+      id: 'f-studio-file-1',
+      tipoFirma: 'qualificata_esterna',
+      parte: 'studio',
+      ambito: 'documento_vault',
+      riferimentoId: DOC_ID,
+    });
+
+    const server = serverConToken(tokenAdvisor());
+    const res = await server.inject({
+      method: 'POST',
+      url: `/documenti/${DOC_ID}/firma-studio`,
+      payload: { modalita: 'grafometrica', firmaGrafometricaPng: GRAFOMETRICA },
+    });
+
+    expect(res.statusCode).toBe(409);
   });
 });

@@ -135,6 +135,8 @@ export async function registraRotteDocumenti(server: FastifyInstance): Promise<v
             firmatoAt: true,
             signatureId: true,
             tipoFirma: true,
+            // §8.1 — la parte scritta nel dato, non dedotta dalla stringa.
+            parte: true,
             firmatarioNome: true,
             firmatarioRuolo: true,
             canaleVerificato: true,
@@ -149,7 +151,7 @@ export async function registraRotteDocumenti(server: FastifyInstance): Promise<v
         const firmaClientePerDocumento = new Map<string, (typeof firme)[number]>();
         for (const f of firme) {
           if (!f.riferimentoId) continue;
-          const isStudio = f.tipoFirma === 'studio' || f.canaleVerificato?.includes('Studio');
+          const isStudio = f.parte === 'studio';
           if (isStudio && !firmaStudioPerDocumento.has(f.riferimentoId)) {
             firmaStudioPerDocumento.set(f.riferimentoId, f);
           } else if (!isStudio && !firmaClientePerDocumento.has(f.riferimentoId)) {

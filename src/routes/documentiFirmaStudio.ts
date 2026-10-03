@@ -117,8 +117,11 @@ export async function registraRotteDocumentiFirmaStudio(server: FastifyInstance)
 
       // Anti ri-firma (§WF-DOC): lo studio firma una volta sola. La controfirma del cliente resta
       // ammessa (flusso bidirezionale); una seconda firma studio duplicherebbe la riga e il sigillo.
+      // La guardia legge la PARTE e non `tipoFirma` (§8.1): con `tipoFirma: 'studio'` la firma
+      // dello studio via file — che scrive `tipoFirma: modalita` — non veniva vista, e se ne
+      // poteva apporre una seconda.
       const giaFirmataStudio = await prisma.firmaElettronica.findFirst({
-        where: { tenantId, ambito: 'documento_vault', riferimentoId: id, tipoFirma: 'studio' },
+        where: { tenantId, ambito: 'documento_vault', riferimentoId: id, parte: 'studio' },
         select: { id: true },
       });
       if (giaFirmataStudio) {
@@ -182,6 +185,10 @@ export async function registraRotteDocumentiFirmaStudio(server: FastifyInstance)
             clienteId,
             signatureId,
             tipoFirma: 'studio',
+            // La parte, scritta nel dato (§8.1): da qui in poi chi legge non la deduce più
+            // dalla stringa del meccanismo, che per la firma via file direbbe «cliente».
+            parte: 'studio',
+            sigilloDigest,
             ambito: 'documento_vault',
             riferimentoId: id,
             documentoTitolo: docTitolo,
@@ -304,6 +311,12 @@ export async function registraRotteDocumentiFirmaStudio(server: FastifyInstance)
           clienteId,
           signatureId,
           tipoFirma: modalita,
+          // Qui `tipoFirma` resta il MECCANISMO (è quello che il verbale deve dichiarare) e la
+          // parte va nella sua colonna: era proprio questa riga — canale «Firma Digitale
+          // Qualificata Esterna», senza la parola «Studio» — a far classificare la firma dello
+          // studio come firma del cliente nella copia firmata (§8.1).
+          parte: 'studio',
+          sigilloDigest,
           ambito: 'documento_vault',
           riferimentoId: id,
           documentoTitolo: docTitolo,

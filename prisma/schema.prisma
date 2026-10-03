@@ -1706,6 +1706,16 @@ model FirmaElettronica {
   // qualificata_esterna    → firmato con provider di firma digitale del cliente (§1.3)
   // Il tipo non è cosmetico: cambia il valore probatorio, e va scritto accanto alla firma.
   tipoFirma             String     @map("tipo_firma")
+  // Piano firma §8.1 (03/10/2026) — QUALE parte ha firmato: `cliente` o `studio`. È un dato a
+  // sé e non si deduce dal meccanismo, perché i due non coincidono: la firma dello studio su
+  // file caricato ha `tipoFirma: 'manuale_scansionata'` (il meccanismo, che è quello che il
+  // verbale deve dichiarare) ed è comunque una firma dello STUDIO. Fino a questa colonna la
+  // parte si indovinava dalla stringa (`tipoFirma === 'studio' || canaleVerificato.includes
+  // ('Studio')`) e la firma studio via file — il cui canale è «Firma Digitale Qualificata
+  // Esterna», senza la parola «Studio» — finiva classificata come firma del cliente: nel PDF
+  // finale portava l'etichetta «Cliente», e l'anti-ri-firma dello studio non la vedeva.
+  // La deduzione resta solo nel backfill della migrazione, una volta sola e in chiaro.
+  parte                 String     @default("cliente") @map("parte")
   // Piano firma §3.1 (Fase 2) — valore legale EFFETTIVO della firma apposta (ses|fea|feq).
   // `tipoFirma` dice il meccanismo, questo dice la legge: lo scrivono le rotte di firma al
   // momento dell'apposizione. Le righe già registrate non si toccano: è un atto probatorio.
@@ -1744,6 +1754,14 @@ model FirmaElettronica {
   // Per i due tipi non-FEA: il file caricato dal cliente e la sua impronta.
   fileFirmatoUrl        String?    @map("file_firmato_url")
   fileFirmatoHash       String?    @map("file_firmato_hash")
+  // Piano firma §8.1 (03/10/2026) — l'impronta HMAC del sigillo DI QUESTA firma, persistita.
+  // Prima esisteva solo in memoria e nel PDF generato: chi ricomponeva la copia firmata dopo la
+  // controfirma non poteva rileggerla e ripiegava sul sigillo dell'evento in corso, stampando
+  // sotto il nome della prima parte l'impronta della seconda — un'attestazione falsa su un
+  // documento che fa fede. Nullable e senza backfill: per le firme anteriori al 03/10/2026
+  // quell'impronta non è ricostruibile, e inventarla sarebbe peggio che dichiararla assente
+  // (`righeAttestazione` scrive «non registrato», come per l'IP mancante).
+  sigilloDigest         String?    @map("sigillo_digest")
   standard              String     @map("standard")
   firmatoAt             DateTime   @default(now()) @map("firmato_at")
   createdAt             DateTime   @default(now()) @map("created_at")
@@ -1754,6 +1772,9 @@ model FirmaElettronica {
   verbaleDocumento      Documento? @relation(fields: [verbaleDocumentoId], references: [id])
 
   @@index([clienteId, ambito])
+  // Le letture per parte su un documento del Vault (copia firmata, cronologia, anti-ri-firma)
+  // filtrano tutte per tenant + ambito + riferimento: senza indice erano scansioni di tabella.
+  @@index([tenantId, ambito, riferimentoId, parte])
   @@map("firma_elettronica")
 }
 
