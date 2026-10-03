@@ -152,3 +152,38 @@ Dall'audit del 21/09/2026 (vedi `ANALISI_APPROFONDITA_2026-09-21.md`), corretto 
 
 1. **Validazione crittografica completa del certificato.** Oggi la piattaforma verifica solo che una firma sia PRESENTE, non la valida (catena, revoca CRL/OCSP, stato "qualificato" via EU Trust List). Serve una libreria/servizio dedicato (es. DSS eIDAS). Finché non c'è, il verbale continua a dichiarare onestamente che il certificato non è validato dalla piattaforma.
 2. **Marca temporale qualificata (RFC 3161).** Il `timestampIso` del sigillo è l'orologio del server, non una data certa opponibile ai terzi. Serve un contratto con una TSA (Time Stamping Authority) qualificata e l'apposizione della marca sul digest. Decidere il provider TSA.
+
+---
+
+## 8. Decisioni del titolare — 3 ottobre 2026
+
+Chiudono le domande del §6.3 e i follow-up del §7, e fissano cosa fare sulla firma dello studio. Da qui in poi queste scelte **non si riaprono** senza una ragione nuova.
+
+### 8.1 Controfirma bidirezionale: sì, ma solo sulla lettera d'incarico
+La controfirma (studio **e** cliente sullo stesso documento, con la cronologia di entrambe le firme sul PDF finale) resta, **limitata all'ambito `engagement_letter`**. È il caso classico: il cliente firma per accettazione, lo studio controfirma.
+
+Conseguenze sul codice (oggi tre difetti aperti in `src/services/copiaFirmata.ts`):
+- **Provenienza scritta nel dato, non dedotta.** Oggi `copiaFirmata.ts:186,216,240` riconoscono lo studio annusando la stringa (`tipoFirma === 'studio' || canaleVerificato.includes('Studio')`). La firma studio via file scrive `tipoFirma: modalita` con canale «Firma Digitale Qualificata Esterna» / «Copia Cartacea Controfirmata» (`documentiFirmaStudio.ts:230,237`) → **non contiene "Studio"** → viene classificata come *cliente*. Serve un campo esplicito di parte (`cliente`/`studio`) su `FirmaElettronica`.
+- **Sigillo persistito per parte.** `copiaFirmata.ts:195,225` leggono `firmaStudioDb.sigilloDigest`, campo **che nello schema non esiste** (`prisma/schema.prisma`): la riga di attestazione della prima parte stampa il sigillo dell'evento corrente. Va persistito il digest di ciascuna firma.
+- **Anti-ri-firma per parte corretto.** Oggi `documentiFirmaStudio.ts:74` filtra `tipoFirma: 'studio'`: una firma studio via file non è vista, quindi se ne può fare una seconda. Con il campo di parte la guardia diventa affidabile.
+
+### 8.2 Chi firma a nome dello studio
+Solo **advisor e super_admin**. Firmare per lo studio impegna lo studio: è funzione da titolare, non un permesso documenti generico. Oggi la rotta blocca solo `req.ruolo === 'cliente'` (`documentiFirmaStudio.ts:45`), quindi basta che un admin conceda `documents:write` in matrice perché un collaboratore firmi a nome dello studio. La guardia va cablata nella rotta.
+
+### 8.3 Il percorso studio si allinea a quello cliente
+La firma dello studio deve comportarsi come quella del cliente su tre punti, oggi mancanti in `src/routes/documentiFirmaStudio.ts`:
+- **guardia `statoDoc === 'bozza'`** (il percorso cliente la ha: `firma.ts:955`, 409 «non è firmabile finché non viene pubblicato»);
+- **aggiornamento dello `statoDoc` del documento padre** (il percorso cliente chiama `segnaDocumentoFirmato`, `firma.ts:1200`);
+- **verbale di firma** (il percorso cliente chiama `generaVerbaleDiFirma`, `firma.ts:1275`). Con la controfirma limitata alla lettera d'incarico (§8.1), il verbale a due parti resta **uno solo**, aggiornato dalla seconda firma.
+
+### 8.4 L'hash della lettera d'incarico lo calcola il server
+Chiude la deroga del §6.3. L'hash della lettera d'incarico — l'atto che fa partire il progetto — **non** arriva più dal browser: il server rilegge il file e calcola il digest. Oggi lo dichiara il client (`firma.ts:1494-1501`). La regola del §6.3 (server-side per `fea`/`feq`, browser ammesso per `ses`) **non si applica più alla lettera**: per questo documento è sempre server-side, a qualsiasi livello.
+
+### 8.5 Marca temporale qualificata (RFC 3161) — rinviata
+Il follow-up §7.2 **resta rinviato**: in produzione c'è solo traffico di prova e nessun cliente reale, quindi il tempo resta l'orologio del server finché non serve davvero. Si attiverà scegliendo allora il provider TSA. Il rilievo D3 resta aperto **con motivo scritto**, non dimenticato.
+
+### 8.6 Validazione dei certificati FEQ — per ora no
+Il follow-up §7.1 **non si implementa ora**: si continua a verificare la **presenza** della firma (`firmaFileValidazione.ts`) e il verbale dichiara che il certificato non è validato dalla piattaforma. La validazione piena (catena, CRL/OCSP, EU Trust List, es. EU DSS) si farà quando le firme qualificate esterne diventeranno frequenti.
+
+### 8.7 Le due firme di prova senza progetto — lasciate «IN ATTESA»
+Le due firme di lettera d'incarico con `riferimento_id` NULL (24/08 e 08/09/2026, dati di prova, precedenti al 02/10) **restano come sono**: non firmano nessun progetto, e la lettura «IN ATTESA» è quella veritiera. Nessun backfill (ricostruirebbe un fatto che non è avvenuto) e nessuna cancellazione (operazione distruttiva su dati di produzione).

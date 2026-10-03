@@ -61,6 +61,9 @@
 > Consolidata il **03/10/2026** rileggendo il codice, non i documenti: ogni voce qui sotto è stata
 > riverificata sul sorgente in quel giorno. **Niente di questa lista blocca il go-live** — in
 > produzione c'è solo traffico di prova (vedi «Cosa manca, misurato il 17/09/2026», più in basso).
+> **Le voci di firma (2 e 3) e la marca temporale (14) sono state decise dal titolare il
+> 03/10/2026: le decisioni stanno in `piano-firma-legale-ses-fea-feq.md` §8** — restano da
+> implementare, ma la direzione non è più in discussione.
 > Le tabelle che seguono in questa sezione sono il **registro storico** dal 17/09: molte voci sono
 > ✅ e restano come traccia di *come* si sono chiuse, non come lavoro da fare.
 >
@@ -73,8 +76,8 @@
 | # | Cosa | Dove | Come si chiude |
 |---|------|------|----------------|
 | 1 | **`PATCH /tenant/info` accetta i campi di piattaforma da un advisor** — `piano`, `stato`, `dataAttivazione`, `dataScadenza` sono in `allowedKeys` mentre la rotta è già ristretta ad advisor/super_admin. Il **responsabile dello studio** può quindi scriversi da solo piano, stato dell'abbonamento e scadenza, che sono materia di `/admin/tenants/:id`. **Verificato il 03/10/2026:** la UI dello studio non manda mai quei campi (`SettingsPage.tsx` non li nomina), quindi è raggiungibile solo con una chiamata costruita a mano da un advisor autenticato — ma la rotta non lo impedisce. I campi *legittimi* (`moduliDisattivati`, `iban`, i canali) restano suoi | `src/routes/tenant.ts:354-372` | Toglierli da `allowedKeys` e lasciarli solo alla rotta `/admin/tenants/:id`; test che una PATCH con `piano` da un advisor non lo cambia |
-| 2 | **La firma-studio non rifiuta un documento `bozza`** — il percorso **cliente** ha la guardia (`statoDoc === 'bozza'` → 409, «non è firmabile finché non viene pubblicato»), quello **studio** no. Lo studio può firmare un testo che non ha mai pubblicato. Asimmetria fra i due percorsi, non una scelta | `src/routes/documentiFirmaStudio.ts:43` vs `src/routes/firma.ts:955-974` | Portare nella firma-studio le stesse guardie della firma cliente (`bozza`, `in_revisione`, `statoScansione`) |
-| 3 | **La firma-studio non aggiorna `statoDoc` del documento padre e non genera il verbale** — il percorso cliente fa entrambe le cose (`segnaDocumentoFirmato` + `generaVerbaleDiFirma` in `firma.ts`); quello studio crea solo la copia firmata. Effetto: `stato_doc` dice il falso su un documento firmato dallo studio, e di quell'atto non esiste il verbale umano-leggibile che l'atto del cliente ha | `src/routes/documentiFirmaStudio.ts:255-283` | Riusare gli stessi due effetti collaterali del percorso cliente (sono già funzioni, non logica nuova) |
+| 2 | **Firma-studio: guardie e permessi** — **deciso il 03/10/2026**: si porta il percorso studio a quello cliente sulle guardie (`statoDoc === 'bozza'` → 409, `in_revisione`, `statoScansione`, come in `firma.ts:955-974`) e si limita la firma a **advisor/super_admin**. Oggi la rotta non rifiuta le bozze e blocca solo `req.ruolo === 'cliente'`: chiunque abbia `documents:write` in matrice firmerebbe a nome dello studio | `src/routes/documentiFirmaStudio.ts:43-45` vs `src/routes/firma.ts:955-974` | Guardie del percorso cliente + controllo `advisor`/`super_admin` **cablato nella rotta** (non delegato alla matrice `documents:write`) |
+| 3 | **Lettera d'incarico: `statoDoc`, verbale e integrità della controfirma** — **deciso il 03/10/2026**: (a) il percorso studio riusa `segnaDocumentoFirmato` + `generaVerbaleDiFirma`, come il cliente; (b) la controfirma bidirezionale resta **solo** sulla lettera d'incarico e va resa integra — provenienza scritta **nel dato** e non dedotta dalla stringa (`copiaFirmata.ts:186,216,240` classificano come «cliente» la firma studio via file), sigillo **per parte** persistito (`copiaFirmata.ts:195,225` leggono un campo che nello schema non esiste), anti-ri-firma per parte (`documentiFirmaStudio.ts:74` filtra `tipoFirma: 'studio'`); (c) l'hash della lettera passa a **server-side** (oggi lo dichiara il browser, `firma.ts:1494-1501`) | `src/routes/documentiFirmaStudio.ts:255-283`, `src/services/copiaFirmata.ts`, `src/routes/firma.ts:1494` | Riuso degli effetti collaterali del percorso cliente; campo esplicito di parte + `sigilloDigest` persistito su `FirmaElettronica`; hash ricalcolato dal server |
 
 #### 🟡 Da decidere col titolare — non per forza da correggere
 
@@ -100,7 +103,7 @@
 
 | # | Cosa | Cosa manca |
 |---|------|------------|
-| 14 | **D3 — marca temporale qualificata RFC 3161** sulle firme | La scelta di una **TSA**. Finché non c'è, non si implementa |
+| 14 | **D3 — marca temporale qualificata RFC 3161** sulle firme | La scelta di una **TSA**. **Rinviata il 03/10/2026 con motivo**: in produzione c'è solo traffico di prova e nessun cliente reale; si attiva scegliendo allora il provider |
 | 15 | **KYC K8b completo (XML goAML)** — la fase-1 (dossier STR + registrazione del riferimento) è deployata | L'**XSD della FIAU** (la spec §10 esclude l'integrazione diretta in prima fase) |
 | 16 | **KYC K5 — screening** (PEP/sanzioni/mezzi di informazione) | Un **provider**. Il ciclo K0–K9 per il resto è completo e deployato |
 | 17 | **Email maltese della GDPR** — l'unico residuo Gibilterra è `advisor@bluegib.com`; l'utente ha scelto «allinea Malta» | **L'indirizzo dal titolare**. Non inventarlo. Poi il **consulente AML maltese** da configurare e i parametri `[da verificare]` da confermare |
