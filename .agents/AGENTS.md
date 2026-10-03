@@ -540,6 +540,7 @@ Suite end-to-end dei tre flussi critici (login con cambio password, firma SES da
 
 4. **Aggiornamento Documentazione Markdown (`.md`)**:
    - Dopo ogni modifica importante, refactoring o cambio codice, tutti i file di documentazione (`README.md`, `BluMan_piano_di_sviluppo.md`, `ISTRUZIONI_INSTALLAZIONE.md`, `.agents/AGENTS.md`) **DEVONO essere tassativamente aggiornati ed allineati**.
+   - **Cosa manca si scrive in `PIANO_DI_MIGLIORAMENTO.md` §1bis** («Lavori aperti»), che è il posto designato: il grafo (`graphify-out/`) è generato e non può ospitarlo. La **scaletta consolidata** sta in cima alla sezione (aggiornata al 03/10/2026); le tabelle sotto sono il **registro storico** dal 17/09. Il materiale di partenza dell'audit è in `AUDIT_2026-09-27/` (versionato dal 03/10/2026). Le schede del manuale per modulo stanno in `docs/manuale/` e vanno aggiornate **quando cambia il modulo**.
 
 5. **Aggiornamento Mappa Grafo (Graphify)**:
    - Dopo modifiche strutturali ai moduli o ai servizi, eseguire `graphify extract . --code-only` e `graphify cluster-only .` per mantenere la mappa delle dipendenze di codice e la documentazione architetturale sempre sincronizzate.

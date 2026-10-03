@@ -51,10 +51,72 @@
 
 ---
 
-## 1bis. Lavori aperti — stato al 17/09/2026
+## 1bis. Lavori aperti — scaletta al 03/10/2026, registro dal 17/09/2026
 
 > Questa sezione è il posto dove si scrive cosa **manca**, perché il grafo (`graphify-out/`) è
 > generato e non può ospitarlo. Va tenuta corta e cancellata man mano che le voci si chiudono.
+
+### Scaletta di cosa manca — stato al 03/10/2026
+
+> Consolidata il **03/10/2026** rileggendo il codice, non i documenti: ogni voce qui sotto è stata
+> riverificata sul sorgente in quel giorno. **Niente di questa lista blocca il go-live** — in
+> produzione c'è solo traffico di prova (vedi «Cosa manca, misurato il 17/09/2026», più in basso).
+> Le tabelle che seguono in questa sezione sono il **registro storico** dal 17/09: molte voci sono
+> ✅ e restano come traccia di *come* si sono chiuse, non come lavoro da fare.
+>
+> Il materiale di partenza è in **`AUDIT_2026-09-27/`** (ora versionato, commit `752e9c63`): la
+> sintesi `00-AUDIT_COMPLETO.md`, le sette sezioni e la revisione avversariale `08`. La
+> remediation è deployata; quello che resta è qui sotto.
+
+#### 🔴 Aperto — sicurezza (residuo dell'audit)
+
+| # | Cosa | Dove | Come si chiude |
+|---|------|------|----------------|
+| 1 | **`PATCH /tenant/info` accetta i campi di piattaforma da un advisor** — `piano`, `stato`, `dataAttivazione`, `dataScadenza` sono in `allowedKeys` mentre la rotta è già ristretta ad advisor/super_admin. Il **responsabile dello studio** può quindi scriversi da solo piano, stato dell'abbonamento e scadenza, che sono materia di `/admin/tenants/:id`. **Verificato il 03/10/2026:** la UI dello studio non manda mai quei campi (`SettingsPage.tsx` non li nomina), quindi è raggiungibile solo con una chiamata costruita a mano da un advisor autenticato — ma la rotta non lo impedisce. I campi *legittimi* (`moduliDisattivati`, `iban`, i canali) restano suoi | `src/routes/tenant.ts:354-372` | Toglierli da `allowedKeys` e lasciarli solo alla rotta `/admin/tenants/:id`; test che una PATCH con `piano` da un advisor non lo cambia |
+| 2 | **La firma-studio non rifiuta un documento `bozza`** — il percorso **cliente** ha la guardia (`statoDoc === 'bozza'` → 409, «non è firmabile finché non viene pubblicato»), quello **studio** no. Lo studio può firmare un testo che non ha mai pubblicato. Asimmetria fra i due percorsi, non una scelta | `src/routes/documentiFirmaStudio.ts:43` vs `src/routes/firma.ts:955-974` | Portare nella firma-studio le stesse guardie della firma cliente (`bozza`, `in_revisione`, `statoScansione`) |
+| 3 | **La firma-studio non aggiorna `statoDoc` del documento padre e non genera il verbale** — il percorso cliente fa entrambe le cose (`segnaDocumentoFirmato` + `generaVerbaleDiFirma` in `firma.ts`); quello studio crea solo la copia firmata. Effetto: `stato_doc` dice il falso su un documento firmato dallo studio, e di quell'atto non esiste il verbale umano-leggibile che l'atto del cliente ha | `src/routes/documentiFirmaStudio.ts:255-283` | Riusare gli stessi due effetti collaterali del percorso cliente (sono già funzioni, non logica nuova) |
+
+#### 🟡 Da decidere col titolare — non per forza da correggere
+
+| # | Cosa | Dove | La domanda |
+|---|------|------|------------|
+| 4 | **La posta in ingresso non è governata dalla matrice permessi** — `ROTTE_MODULO` mappa solo le rotte di **invio** `/comunicazioni/invia-*`; il commento dice che è deliberato («la lettura fascicolo comunicazioni resta libera»). Ma un collaboratore con `communications = denied` legge comunque la posta in arrivo | `src/util/rbacModuli.ts:64-71` | La lettura della posta in ingresso dev'essere governata come l'invio? |
+| 5 | **Fail-open sulla lettura della matrice RBAC** — se la query della matrice fallisce si passa, e quell'error-path è ora **più permissivo** del default per ruolo (il default per ruolo è stato chiuso il 27/09 con `permessoDefaultPerRuolo`). Il design è deliberato (la sessione è già verificata sullo stesso DB) | `src/util/rbacModuli.ts:109-119`, `server.ts` | Rivalutare: l'errore di lettura deve ricadere sul default per ruolo invece di lasciar passare? |
+| 6 | **L'avviso «messaggio non instradabile» non porta da nessuna parte** — la campanella dice che il messaggio esiste ma il `link` è `null`. Conseguenza: `comunicazione_progetto` è vuota, nessun messaggio è mai stato archiviato da nessun canale d'ingresso | `src/services/ingressoSenzaFascicolo.ts:57` | Renderlo cliccabile (aprire l'anagrafica di quel cliente) e: il messaggio di un cliente **senza pratiche aperte** deve restare solo in campanella? (vedi anche la voce 9(c) qui sotto) |
+
+#### ⚙️ Configurazione esterna — non è codice, è lavoro sul pannello / sul server
+
+| # | Cosa | Dove si chiude | Stato al 03/10/2026 |
+|---|------|----------------|---------------------|
+| 7 | **CI come cancello di deploy** — decisione già presa («sì») | dashboard Railway/Vercel («wait for CI») | Meno urgente di prima: `distribuisci.sh` valida (typecheck BE/FE, lint, build, suite intera) **prima** di pushare, ed è bloccante |
+| 8 | **Backup off-site** — il VPS ha **un solo filesystem**: un backup in un'altra directory protegge dagli errori applicativi, non dalla morte del disco | `rclone` + `BLUMAN_BACKUP_RCLONE_REMOTE` | Decisione presa (spazio cloud già pagato, non Backblaze); **manca quale** (Drive/OneDrive/Dropbox) e un **controllo di freschezza** — con Drive l'auth scade in silenzio e la copia smette senza avvisare |
+| 9 | **Custodia di `BACKUP_ENCRYPTION_KEY`** — la chiave sta dentro il `.env` che viene cifrato con sé stessa: se il server muore, senza una copia **fuori dal server** i backup non si aprono più | foglio a mano in cassaforte (data + nome della variabile) | Decisione presa; va **verificata** riscrivendo la chiave dal foglio e aprendo un backup vero |
+| 10 | **TLS sul VPS** | `docs/vps-primo-avvio.md` §6 | Quando il DNS punterà al server |
+| 11 | **Telegram sul VPS** — `TELEGRAM_WEBHOOK_SECRET` è assente dal container, e Telegram ammette **un solo webhook per bot** (occupato da Railway). Oggi il 400 sul VPS **protegge la produzione**: se passasse, il webhook si sposterebbe via da Railway in silenzio | secondo bot da BotFather; `docs/vps-primo-avvio.md` §6 | Al cut-over. Il bot di produzione si sposta **solo** allora, e mai su entrambi insieme |
+| 12 | **Il `telefono` dello studio è il Test Number di Meta** (`+1 555-181-9633`), non un numero che squilla. Ogni documento che stampa il recapito dello studio stampa quel numero | riga `tenant` di Bluecode | Voce 14, misurata il 17/09 — **da riconfermare** |
+| 13 | **La ricezione WhatsApp non è mai stata dimostrata con un cliente vero** (il numero è il Test Number) | la prova in un minuto: scrivere al numero e guardare i log | Voce 11 di questa sezione — la prova non è stata rifatta dal 17/09 |
+
+#### ⏸ Bloccate su una scelta o su un fornitore esterno
+
+| # | Cosa | Cosa manca |
+|---|------|------------|
+| 14 | **D3 — marca temporale qualificata RFC 3161** sulle firme | La scelta di una **TSA**. Finché non c'è, non si implementa |
+| 15 | **KYC K8b completo (XML goAML)** — la fase-1 (dossier STR + registrazione del riferimento) è deployata | L'**XSD della FIAU** (la spec §10 esclude l'integrazione diretta in prima fase) |
+| 16 | **KYC K5 — screening** (PEP/sanzioni/mezzi di informazione) | Un **provider**. Il ciclo K0–K9 per il resto è completo e deployato |
+| 17 | **Email maltese della GDPR** — l'unico residuo Gibilterra è `advisor@bluegib.com`; l'utente ha scelto «allinea Malta» | **L'indirizzo dal titolare**. Non inventarlo. Poi il **consulente AML maltese** da configurare e i parametri `[da verificare]` da confermare |
+| 18 | **Secondo studio reale** — la voce 7 (tenant dinamico) è risolta, quindi è **sbloccato**: è anche la prova end-to-end che manca (creare un secondo studio in produzione) e il presupposto di `PIANO_MULTITENANT.md`, che resta una **decisione** (quanti studi, chi li crea) prima di scrivere codice |
+
+#### 🧹 Debito tecnico e igiene del repository
+
+| # | Cosa | Dove | Note |
+|---|------|------|------|
+| 19 | **L2 — bottoni inline → classi `.btn`** | `frontend/src/styles/tokens.css` + le pagine | In pausa dal 25/09. La coda è **estetica** e in parte **non va convertita** (tab-bar, segmented control, icone, azioni-link, bottoni a colore dinamico): convertirli rompe l'evidenza dell'attivo. Ripresa: un file per commit + `npm --prefix frontend run typecheck`, e alla fine `distribuisci.sh --solo-push` |
+| 20 | **Il frontend ha 6 file di test su 176 sorgenti (~3%)** | `frontend/src/` | Ogni difetto di rendering va scoperto a occhio (è così che il ✓✓ disegnato su righe mute stava in due componenti con la stessa bugia in entrambi) |
+| 21 | **`graphify-out/cache/` è versionata** | `.gitignore` + `git rm -r --cached` | 72 file che cambiano a ogni estrazione (voce 5) |
+| 22 | **Deriva fra `schema.prisma` e il database** — indici scritti a mano, indici trigram che Prisma non sa esprimere, default su `fattura`/`fattura_riga` | voci 17 (b), (c), (d) | **Non è da «riconciliare»**: `prisma migrate dev` o `db push` proverebbero a farlo in modo distruttivo (dropperebbe `idx_evento_titolo_trgm`, che serve alla ricerca del calendario). La regola che ne esce: **su Supabase solo `migrate deploy`** |
+| 23 | **Un documento cita un `.docx` che non esiste** (il suo PDF invece c'è) | `afffbee4-952e-4139-9c65-64029b0a3a41` | 404 se lo si scarica. Noto e innocuo; il comando per ricontrollare è in `docs/` / nella diagnostica del backup. Va distinto dagli 8 file legacy recuperati il 01/10: quelli erano file assenti, qui manca il **gemello editabile** |
+| 24 | **File non versionati che restano tali da mesi** | radice del repo | 27 `.tmp-*` (diagnostica usa-e-getta), `.terminal_backup/` (⚠️ **trascrizioni complete di terminale: non vanno committate** — e contiene l'unica anteprima dei bottoni L2, `anteprima_bottoni_l2.html`), `template/` (i 3 `.docx` Malta, ormai trascritti nell'app), `src/scripts/esportaDaBluecode.ts` + `importaInBluecode.ts`, `RECAP_SESSIONE_TERMINALE.md`, `PROPOSTA_K1_KYC.md` (superata: K1 è deployato). Decidere per ciascuno: cancellare, versionare o `.gitignore` |
+| 25 | **Il manuale per modulo (19 schede in `docs/manuale/`)** | `docs/manuale/` | Non è un lavoro con una fine: va aggiornato **quando cambia un modulo** (regola 4). Un documento stale inganna più di un documento assente |
 
 ### Canali di comunicazione per studio
 
