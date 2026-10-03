@@ -63,8 +63,9 @@
 > produzione c'è solo traffico di prova (vedi «Cosa manca, misurato il 17/09/2026», più in basso).
 > **Le voci di firma (2 e 3) e la marca temporale (14) sono state decise dal titolare il
 > 03/10/2026: le decisioni stanno in `piano-firma-legale-ses-fea-feq.md` §8**. La 2 è chiusa e
-> la 3 è chiusa in tutti e tre i punti (a/b/c); della 3 resta aperta **solo la nota di §8.1**
-> sulla controfirma; per il resto la direzione non è più in discussione.
+> la 3 è chiusa in tutti e tre i punti (a/b/c). La nota di §8.1 sulla controfirma è stata
+> **chiarita il 03/10/2026**: la controfirma resta sui documenti del Vault (non sulla lettera,
+> che non è un documento), e il verbale è **uno per firma**. Non resta niente da decidere.
 > Le tabelle che seguono in questa sezione sono il **registro storico** dal 17/09: molte voci sono
 > ✅ e restano come traccia di *come* si sono chiuse, non come lavoro da fare.
 >

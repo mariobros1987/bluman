@@ -10,10 +10,12 @@ La firma trasforma un documento (o la **conclusione di un modulo**) in un atto c
   può, anche se ha i permessi sui documenti. Si firma solo un documento **pubblicato** (né una bozza
   né un documento con una richiesta di modifica aperta), e come per il cliente ne nasce il
   **verbale di firma**.
-- **Multi-firma**: un documento con più parti (`{{firma_cliente}}`/`{{firma_studio}}`) diventa
+- **Multi-firma**: un documento **del fascicolo** con più parti (`{{firma_cliente}}`/`{{firma_studio}}`) diventa
   `firmato` solo quando **tutte** hanno firmato; prima è `parzialmente_firmato`. Ogni parte è
   scritta nel dato (`cliente`/`studio`) e non si deduce dal tipo di firma: la firma dello studio
   con un file caricato resta una firma **dello studio** anche se il meccanismo è «file caricato».
+  È qui che vive la controfirma, e solo qui: la **lettera d'incarico non è un documento** (non ha
+  aree firma, il testo lo compone il portale) e si firma dal cliente, senza seconda firma.
 - La **copia firmata** (PDF) porta in coda la **Cronologia delle firme** (codice, data/ora UTC, valore
   legale, impronta del sigillo). Sotto il nome di ciascuna parte compare **il sigillo di quella
   firma**, riletto dalla sua riga: per le firme anteriori al 03/10/2026 l'impronta non è
