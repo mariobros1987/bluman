@@ -22,10 +22,22 @@ import { fileContieneFirmaDigitale } from '../services/firmaFileValidazione.js';
 import { notificaCliente } from '../services/notificheService.js';
 import { recordAudit, ipReale, normalizzaGrafometrica } from '../util/serverHelpers.js';
 import { generaCopiaFirmata } from '../services/copiaFirmata.js';
+import { segnaDocumentoFirmato, generaVerbaleDiFirma } from '../services/effettiFirma.js';
 import { verificaOtp, sigilloHmac } from '../services/otpService.js';
 
 /** L'admin del tenant (`advisor`) e il `super_admin` possono superare il blocco dei firmati. */
 function puoSbloccareDocumentoFirmato(ruolo?: string): boolean {
+  return ruolo === 'advisor' || ruolo === 'super_admin';
+}
+
+/**
+ * Firmare a nome dello studio impegna lo studio: è funzione da titolare, non un permesso
+ * documenti generico. Oggi l'insieme coincide con quello di `puoSbloccareDocumentoFirmato`,
+ * ma sono due decisioni distinte (sbloccare un atto firmato / impegnare lo studio) e restano
+ * due funzioni distinte: se domani una delle due cambia, l'altra non deve seguirla per caso.
+ * Decisione del titolare del 03/10/2026 — `piano-firma-legale-ses-fea-feq.md` §8.2.
+ */
+function puoFirmarePerLoStudio(ruolo?: string): boolean {
   return ruolo === 'advisor' || ruolo === 'super_admin';
 }
 
@@ -42,7 +54,12 @@ export async function registraRotteDocumentiFirmaStudio(server: FastifyInstance)
     };
   }>('/documenti/:id/firma-studio', async (req, reply) => {
     const tenantId = req.tenantId;
-    if (req.ruolo === 'cliente') return reply.code(403).send({ errore: 'Non autorizzato.' });
+    // Firmare a nome dello studio impegna lo studio. Fino al 03/10/2026 qui si bloccava solo il
+    // ruolo `cliente`: bastava che un admin concedesse `documents:write` in matrice perché un
+    // collaboratore firmasse a nome dello studio (piano firma §8.2).
+    if (!puoFirmarePerLoStudio(req.ruolo)) {
+      return reply.code(403).send({ errore: "Solo l'amministratore dello studio può firmare a nome dello studio." });
+    }
 
     const { id } = req.params;
     const { modalita, firmaGrafometricaPng, otp, ruoloDichiarato, filename, contentBase64 } = req.body || {};
@@ -67,6 +84,36 @@ export async function registraRotteDocumentiFirmaStudio(server: FastifyInstance)
       if (!clienteId) {
         return reply.code(400).send({ errore: 'Impossibile determinare il cliente collegato al fascicolo del documento.' });
       }
+
+      // §WF-DOC — le stesse guardie del percorso cliente (`routes/firma.ts`,
+      // `improntaDocumentoDelFascicolo`): il documento si firma quando è pubblicato, non mentre
+      // lo studio lo sta ancora scrivendo. Senza queste, lo studio poteva apporre la propria
+      // firma su una bozza mai pubblicata — e il sigillo che ne usciva sarebbe stato autentico,
+      // quindi peggio di una firma mancante: avrebbe attestato il consenso su un testo in
+      // lavorazione (piano firma §8.3).
+      if (doc.statoDoc === 'bozza') {
+        return reply.code(409).send({ errore: 'Il documento è ancora una bozza: non è firmabile finché non viene pubblicato.' });
+      }
+      if (doc.statoDoc === 'in_revisione') {
+        return reply.code(409).send({
+          errore:
+            'Per questo documento è aperta una richiesta di modifica: la firma si potrà apporre sulla nuova versione, ' +
+            'quando lo studio la pubblica.',
+        });
+      }
+      if (doc.statoScansione === 'infetto') {
+        return reply.code(400).send({ errore: 'Il controllo antivirus ha bloccato questo file: non è firmabile.' });
+      }
+      if (doc.statoScansione === 'in_corso') {
+        return reply.code(409).send({ errore: 'Il controllo antivirus su questo file non è ancora finito: riprova fra poco.' });
+      }
+
+      // Il nome del cliente serve al verbale di firma (è l'atto che dice chi ha firmato cosa).
+      const clienteAnagrafica = await prisma.cliente.findFirst({
+        where: { id: clienteId, tenantId },
+        select: { nome: true },
+      });
+      const clienteNome = clienteAnagrafica?.nome ?? '';
 
       // Anti ri-firma (§WF-DOC): lo studio firma una volta sola. La controfirma del cliente resta
       // ammessa (flusso bidirezionale); una seconda firma studio duplicherebbe la riga e il sigillo.
@@ -96,6 +143,10 @@ export async function registraRotteDocumentiFirmaStudio(server: FastifyInstance)
       const docHash = createHash('sha256').update(contenutoDoc).digest('hex');
 
       const signatureId = `BLU-STD-${Date.now()}-${randomUUID().slice(0, 8).toUpperCase()}`;
+      // Un solo istante per tutta la firma: è quello che entra nel sigillo E quello che finisce
+      // a database. Prima il digest e il record della firma si prendevano due `new Date()`
+      // distinti, quindi il sigillo citava un istante diverso da quello che il verbale stampa.
+      const firmatoAt = new Date();
 
       if (modalita === 'grafometrica' || modalita === 'fea_otp') {
         const grafometrica = normalizzaGrafometrica(firmaGrafometricaPng);
@@ -123,7 +174,7 @@ export async function registraRotteDocumentiFirmaStudio(server: FastifyInstance)
 
         // Sigillo in HMAC-SHA256 con la chiave del server (come la firma cliente): una checksum
         // SHA-256 in chiaro non provava che avesse sigillato la piattaforma (rilievo audit §05).
-        const sigilloDigest = sigilloHmac(`${signatureId}:${docHash}:${firmatarioNome}:${new Date().toISOString()}`);
+        const sigilloDigest = sigilloHmac(`${signatureId}:${docHash}:${firmatarioNome}:${firmatoAt.toISOString()}`);
 
         const firma = await prisma.firmaElettronica.create({
           data: {
@@ -144,7 +195,7 @@ export async function registraRotteDocumentiFirmaStudio(server: FastifyInstance)
             firmaGrafometricaPng: grafometrica,
             standard,
             valoreLegale,
-            firmatoAt: new Date(),
+            firmatoAt,
           },
         });
 
@@ -180,6 +231,20 @@ export async function registraRotteDocumentiFirmaStudio(server: FastifyInstance)
           entita: id,
           dettagli: `Firma studio (${valoreLegale.toUpperCase()}) ${signatureId} apposta da ${firmatarioNome} (${firmatarioRuolo}) su «${docTitolo}»`,
           ipAddress: ipReale(req),
+        });
+
+        // Gli stessi due effetti collaterali del percorso cliente (piano firma §8.3): senza,
+        // `stato_doc` dichiarava il falso su un documento firmato dallo studio e di quell'atto
+        // non esisteva il verbale umano-leggibile che l'atto del cliente ha.
+        await segnaDocumentoFirmato(tenantId, id);
+        await generaVerbaleDiFirma({
+          tenantId,
+          clienteId,
+          clienteNome,
+          firma,
+          sigilloDigest,
+          ambito: 'documento_vault',
+          riferimentoId: id,
         });
 
         return reply.send({
@@ -218,6 +283,10 @@ export async function registraRotteDocumentiFirmaStudio(server: FastifyInstance)
       }
 
       const fileHash = createHash('sha256').update(buffer).digest('hex');
+      // Sigillo anche sul canale file: il verbale cita l'impronta che lega fra loro gli elementi
+      // della firma, e senza di essa uscirebbe con un digest vuoto. Stessa costruzione del
+      // canale grafometrico, con l'impronta del file caricato al posto di quella del documento.
+      const sigilloDigest = sigilloHmac(`${signatureId}:${fileHash}:${firmatarioNome}:${firmatoAt.toISOString()}`);
       const slug = filename.replace(/[^a-zA-Z0-9._-]/g, '_');
       const caricato = await uploadDocumento(slug, buffer.toString('base64'), tenantId);
       if (!caricato.ok) {
@@ -248,7 +317,7 @@ export async function registraRotteDocumentiFirmaStudio(server: FastifyInstance)
           userAgent: req.headers['user-agent'] || null,
           standard,
           valoreLegale,
-          firmatoAt: new Date(),
+          firmatoAt,
         },
       });
 
@@ -291,6 +360,18 @@ export async function registraRotteDocumentiFirmaStudio(server: FastifyInstance)
         entita: id,
         dettagli: `Firma studio (${valoreLegale.toUpperCase()}) ${signatureId} con file ${filename} caricato da ${firmatarioNome}`,
         ipAddress: ipReale(req),
+      });
+
+      // Come il canale grafometrico: stato del documento e verbale (piano firma §8.3).
+      await segnaDocumentoFirmato(tenantId, id);
+      await generaVerbaleDiFirma({
+        tenantId,
+        clienteId,
+        clienteNome,
+        firma,
+        sigilloDigest,
+        ambito: 'documento_vault',
+        riferimentoId: id,
       });
 
       return reply.send({

@@ -39,6 +39,15 @@ const stato = {
     stato: 'attivo',
     sessionVersion: 0,
   },
+  userCollaboratore: {
+    id: 'usr-collaboratore',
+    tenantId: TENANT_STUDIO,
+    nome: 'Dott.ssa Anna Bianchi',
+    email: 'anna.bianchi@studiobluman.it',
+    ruolo: 'collaboratore_interno',
+    stato: 'attivo',
+    sessionVersion: 0,
+  },
 };
 
 vi.mock('./util/prismaClient.js', async (importOriginal) => {
@@ -73,20 +82,27 @@ vi.mock('./util/prismaClient.js', async (importOriginal) => {
         stato.documentiAggiornati.push(args);
         return { ...stato.documento, ...args.data };
       },
+      // serve a `segnaDocumentoFirmato` (services/effettiFirma.ts) per scrivere lo stato del padre
+      updateMany: async (args: any) => {
+        stato.documentiAggiornati.push(args);
+        return { count: 1 };
+      },
     },
     user: {
       findUnique: async (args: any) => {
         if (args?.where?.id === 'usr-advisor') return stato.userAdvisor;
+        if (args?.where?.id === 'usr-collaboratore') return stato.userCollaboratore;
         return null;
       },
       findFirst: async (args: any) => {
         if (args?.where?.id === 'usr-advisor') return stato.userAdvisor;
+        if (args?.where?.id === 'usr-collaboratore') return stato.userCollaboratore;
         return null;
       },
     },
     cliente: {
-      findUnique: async (args: any) => ({ id: CLIENTE_ID, sessionVersion: 0 }),
-      findFirst: async (args: any) => ({ id: CLIENTE_ID, sessionVersion: 0 }),
+      findUnique: async (args: any) => ({ id: CLIENTE_ID, nome: 'Committente S.p.A.', sessionVersion: 0 }),
+      findFirst: async (args: any) => ({ id: CLIENTE_ID, nome: 'Committente S.p.A.', sessionVersion: 0 }),
     },
     codiceOtp: {
       findFirst: async () => stato.otp,
@@ -169,6 +185,16 @@ function tokenCliente() {
     tenantId: TENANT_STUDIO,
     email: 'cliente@committente.it',
     ruolo: 'cliente',
+    sessionVersion: 0,
+  });
+}
+
+function tokenCollaboratore() {
+  return signJwt({
+    userId: 'usr-collaboratore',
+    tenantId: TENANT_STUDIO,
+    email: 'anna.bianchi@studiobluman.it',
+    ruolo: 'collaboratore_interno',
     sessionVersion: 0,
   });
 }
@@ -279,8 +305,54 @@ describe('🏛️ Firma Studio & Professionista — Route Tests', () => {
 
     expect(stato.firmeCreate).toHaveLength(1);
     expect(stato.firmeCreate[0].tipoFirma).toBe('studio');
-    expect(stato.audit).toHaveLength(1);
-    expect(stato.audit[0].azione).toBe('DOCUMENTO_FIRMATO_STUDIO');
+    expect(stato.audit.some((a) => a.azione === 'DOCUMENTO_FIRMATO_STUDIO')).toBe(true);
+  });
+
+  it('aggiorna lo stato del padre e genera il verbale, come il percorso cliente', async () => {
+    const server = serverConToken(tokenAdvisor());
+    const res = await server.inject({
+      method: 'POST',
+      url: `/documenti/${DOC_ID}/firma-studio`,
+      payload: { modalita: 'grafometrica', firmaGrafometricaPng: GRAFOMETRICA },
+    });
+
+    expect(res.statusCode).toBe(200);
+
+    // §WF-DOC — il padre non resta `pubblicato` per sempre: con la firma dello studio e lo slot
+    // cliente ancora vuoto lo stato è `parzialmente_firmato` (firme multi-parte).
+    const aggiornamentoStato = stato.documentiAggiornati.find((a) => a.data?.statoDoc);
+    expect(aggiornamentoStato).toBeTruthy();
+    expect(aggiornamentoStato.data.statoDoc).toBe('parzialmente_firmato');
+
+    // Il verbale di firma esiste: è l'atto umano-leggibile che prima c'era solo per il cliente.
+    expect(stato.documentiCreati.some((d) => d.tipo === 'verbale_firma')).toBe(true);
+    expect(stato.audit.some((a) => a.azione === 'VERBALE_FIRMA_GENERATO')).toBe(true);
+  });
+
+  it('rifiuta la firma su una bozza con 409, come il percorso cliente', async () => {
+    stato.documento.statoDoc = 'bozza';
+    const server = serverConToken(tokenAdvisor());
+    const res = await server.inject({
+      method: 'POST',
+      url: `/documenti/${DOC_ID}/firma-studio`,
+      payload: { modalita: 'grafometrica', firmaGrafometricaPng: GRAFOMETRICA },
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json().errore).toContain('bozza');
+    expect(stato.firmeCreate).toHaveLength(0);
+  });
+
+  it('rifiuta la firma da un collaboratore: a nome dello studio firma solo l’amministratore', async () => {
+    const server = serverConToken(tokenCollaboratore());
+    const res = await server.inject({
+      method: 'POST',
+      url: `/documenti/${DOC_ID}/firma-studio`,
+      payload: { modalita: 'grafometrica', firmaGrafometricaPng: GRAFOMETRICA },
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(stato.firmeCreate).toHaveLength(0);
   });
 
   it('appone la firma FEA con verifica codice OTP valido', async () => {

@@ -5,7 +5,11 @@ La firma trasforma un documento (o la **conclusione di un modulo**) in un atto c
 - **Firma del cliente** (dal Portale, §12): riceve un **OTP** via email/WhatsApp, lo inserisce e firma
   — è una **Firma Elettronica Semplice (OTP verificata) · art. 20 CAD**. Può firmare anche caricando un
   file firmato (`.p7m`) o via provider qualificati (Aruba/InfoCert/Namirial/SPID) per FEQ.
-- **Firma dello studio**: dalla scheda documento (`FirmaStudioModal`), con OTP e sigillo.
+- **Firma dello studio**: dalla scheda documento (`FirmaStudioModal`), con OTP e sigillo. Firmare a
+  nome dello studio è funzione dell'**amministratore** (advisor/super_admin): un collaboratore non
+  può, anche se ha i permessi sui documenti. Si firma solo un documento **pubblicato** (né una bozza
+  né un documento con una richiesta di modifica aperta), e come per il cliente ne nasce il
+  **verbale di firma**.
 - **Multi-firma**: un documento con più parti (`{{firma_cliente}}`/`{{firma_studio}}`) diventa
   `firmato` solo quando **tutte** hanno firmato; prima è `parzialmente_firmato`.
 - La **copia firmata** (PDF) porta in coda la **Cronologia delle firme** (codice, data/ora UTC, valore
@@ -35,6 +39,9 @@ La firma trasforma un documento (o la **conclusione di un modulo**) in un atto c
 
 ## ⚠️ Stati limite & errori
 - Ri-firma della stessa parte → **409**; firmare un modulo non `done` o non proprio → **409**.
+- **Firma dello studio**: su un documento `bozza` o `in_revisione` → **409**; da un ruolo diverso da
+  advisor/super_admin → **403**; se il file è stato bloccato dall'antivirus → **400**. Sono le
+  stesse guardie della firma cliente, portate qui il 03/10/2026.
 - Firmare la lettera d'incarico **senza un progetto** → **400** su tutti e tre i punti d'ingresso
   (richiesta del codice, firma col codice, firma col file): il codice non viene nemmeno inviato.
   Nel portale i pulsanti restano spenti e il motivo è scritto accanto.
@@ -50,9 +57,12 @@ La firma trasforma un documento (o la **conclusione di un modulo**) in un atto c
   dirà «IN ATTESA» — è la lettura onesta, non un guasto da segnalare come nuovo.
 
 ## 🔧 Nota tecnica
-- Rotte: `src/routes/firma.ts` (`segnaDocumentoFirmato`, `progettoDaIncaricare`, elenco firme),
-  `portale.ts` (`/portal/verify-otp-and-sign`, `/portal/firma-con-file`). Servizi: `otpService`
-  (`sigilloHmac`, `generateEidasSignatureSeal`), `copiaFirmata.ts`, `generaPdfDocumento`.
+- Rotte: `src/routes/firma.ts` (`progettoDaIncaricare`, elenco firme),
+  `portale.ts` (`/portal/verify-otp-and-sign`, `/portal/firma-con-file`),
+  `documentiFirmaStudio.ts` (`/documenti/:id/firma-studio`). Servizi: `otpService`
+  (`sigilloHmac`, `generateEidasSignatureSeal`), `copiaFirmata.ts`, `generaPdfDocumento`,
+  **`effettiFirma.ts`** (`segnaDocumentoFirmato`, `generaVerbaleDiFirma` — gli effetti collaterali
+  di una firma, condivisi da cliente e studio dopo l'estrazione dal monolite del 03/10/2026).
 - Frontend: `components/documenti/FirmaStudioModal.tsx`, `components/portal/FirmaOtpModal.tsx`,
   `SuccessSealModal.tsx`, `components/portal/firmaLettera.ts` (quale progetto risulta firmato),
   `components/projectDetail/StoricoContrattiTab.tsx` (lo storico contrattuale dello studio).
