@@ -290,14 +290,17 @@ export function usePortalFirma({
    * Per un documento del fascicolo non si manda niente: l'impronta la calcola il server dal file
    * che ha in archivio. Lo stesso vale per la conclusione di un'operazione: il server firma i dati
    * canonici del modulo (nome, categoria, prezzo, microvoci) che ha lui, non una scelta del
-   * browser. È l'unico modo perché voglia dire qualcosa — chi firma è anche chi manda la
-   * richiesta, e un'impronta scelta dal browser descrive il documento che vuole il firmatario,
-   * non quello che ha firmato. Per la lettera d'incarico resta questa, perché il testo del mandato
-   * è ancora composto qui e il server non ce l'ha.
+   * browser. E dal 03/10/2026 vale anche per la lettera d'incarico (§8.4): la calcola il server
+   * dai dati dell'incarico — parti, progetto, moduli — più la versione delle clausole del mandato.
+   * Il testo del mandato è ancora composto qui, ma non è più una ragione per farsene dichiarare
+   * l'impronta da chi firma: chi firma è anche chi manda la richiesta, e un'impronta scelta dal
+   * firmatario descrive il documento che vuole lui, non quello che ha firmato.
    */
   const improntaDelBersaglio = async (bersaglio: BersaglioFirma): Promise<string | undefined> => {
     if (
-      (bersaglio.ambito === 'documento_vault' || bersaglio.ambito === 'modulo_completato') &&
+      (bersaglio.ambito === 'documento_vault' ||
+        bersaglio.ambito === 'modulo_completato' ||
+        bersaglio.ambito === 'engagement_letter') &&
       bersaglio.riferimentoId
     ) {
       return undefined;

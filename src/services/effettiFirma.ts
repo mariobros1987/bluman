@@ -187,6 +187,9 @@ export async function generaVerbaleDiFirma(params: {
       valoreLegale: firma.valoreLegale ?? null,
       documentoTitolo: firma.documentoTitolo,
       documentoHash: firma.documentoHash,
+      // §8.4 — l'ambito dice al verbale cosa copre l'impronta: per la lettera d'incarico non è
+      // l'impronta di un file, perché la lettera non è archiviata.
+      ambito,
       firmatarioNome: firma.firmatarioNome,
       firmatarioRuolo: firma.firmatarioRuolo,
       clienteNome,

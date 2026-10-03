@@ -5,9 +5,9 @@
  *
  *  - l'impronta NON arriva dal browser: il server la calcola dai dati del modulo
  *    (`improntaModuloCompletato`), quindi la richiesta senza `documentoHash` non viene
- *    respinta dal guard dell'impronta come per la lettera d'incarico;
+ *    respinta dal guard dell'impronta come per l'addendum;
  *  - il `riferimentoId` (l'id del modulo) è obbligatorio: senza, niente firma;
- *  - gli ambiti storici restano sotto il guard dell'impronta SHA-256.
+ *  - l'addendum, che non ha una sorgente server-side, resta sotto il guard dell'impronta.
  *
  * In ambiente di test il database è irraggiungibile (vitest.setup): le richieste che superano
  * le validazioni si fermano sulla prima lettura Prisma con un 500 — ed è proprio questo che
@@ -74,12 +74,16 @@ describe('§2.9 POST /portal/verify-otp-and-sign — ambito modulo_completato', 
     expect(res.json().errore).not.toMatch(/Impronta SHA-256/);
   });
 
-  it('la lettera d\'incarico resta sotto il guard dell\'impronta SHA-256 (contrapposizione)', async () => {
+  it('l\'addendum resta sotto il guard dell\'impronta SHA-256 (contrapposizione)', async () => {
+    // Dal 03/10/2026 nemmeno la lettera d'incarico è più in questo novero (§8.4: l'impronta la
+    // calcola il server dai dati dell'incarico e dalla versione delle clausole — vedi
+    // `firmaLetteraIncarico.test.ts`). L'unico ambito che la riceve ancora dal browser è
+    // l'addendum, che non ha una sorgente server-side da cui ricalcolarla.
     const server = nuovoServer();
     const res = await server.inject({
       method: 'POST',
       url: '/portal/verify-otp-and-sign',
-      payload: { otp: '123456', ambito: 'engagement_letter' },
+      payload: { otp: '123456', ambito: 'addendum' },
     });
     expect(res.statusCode).toBe(400);
     expect(res.json().errore).toMatch(/Impronta SHA-256 del documento mancante o non valida/);

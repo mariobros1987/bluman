@@ -42,6 +42,7 @@ import { scanFileBuffer } from '../services/securityScanner.js';
 import { fileContieneFirmaDigitale } from '../services/firmaFileValidazione.js';
 import { generaCopiaFirmata, type EsitoCopiaFirmata } from '../services/copiaFirmata.js';
 import { segnaDocumentoFirmato, generaVerbaleDiFirma } from '../services/effettiFirma.js';
+import { LETTERA_INCARICO_TESTO_SHA256 } from '../services/letteraIncarico.js';
 import {
   verificaLivelloFirma,
   livelloPiuAlto,
@@ -1093,6 +1094,123 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
   }
 
   /**
+   * Piano firma §8.4 — impronta SHA-256 della lettera d'incarico, calcolata dal server.
+   *
+   * La lettera è l'unico atto firmabile che non esiste come file: il testo delle clausole è un
+   * template del portale che il browser riempie con i dati dell'incarico, quindi non c'è niente
+   * da rileggere in archivio. Fino al 03/10/2026 l'impronta la dichiarava il browser — e chi
+   * firma è anche chi manda la richiesta, quindi il sigillo certificava la volontà su
+   * un'impronta che il firmatario aveva scelto: un atto legalmente vuoto, che diceva di
+   * garantire un collegamento al testo firmato che non garantiva.
+   *
+   * Qui il server calcola l'impronta da ciò che possiede davvero: le parti (cliente e studio),
+   * il progetto e i suoi moduli con i corrispettivi — gli stessi dati che compongono il mandato —
+   * più l'impronta del **testo delle clausole**, che è una costante di piattaforma
+   * (`LETTERA_INCARICO_TESTO_SHA256`, `src/services/letteraIncarico.ts`). Così l'impronta cambia
+   * quando cambia un dato dell'incarico *e* quando cambia una clausola del mandato.
+   *
+   * Perché non si ricompone l'HTML del browser: la resa della lettera (tabella dei moduli,
+   * formati, ripieghi sui dati mancanti) è logica del frontend, e una seconda resa scritta qui
+   * potrebbe divergere dalla prima in silenzio — un'impronta che dice di coprire un testo che il
+   * cliente non ha visto è peggio di un'impronta che dichiara il proprio perimetro. Il perimetro
+   * (dati + versione delle clausole) è quello che questa funzione copre, ed è scritto nel
+   * verbale.
+   *
+   * L'ordine dei moduli è deterministico (per nome): l'impronta non deve dipendere dall'ordine
+   * di lettura del database. Il totale entra esplicito perché è la cifra che il cliente
+   * sottoscrive.
+   *
+   * Ritorna anche il progetto: la stessa lettura serve all'attivazione dell'incarico in
+   * `verify-otp-and-sign`, e leggerlo due volte sarebbe leggere due volte lo stesso fatto.
+   */
+  async function improntaLetteraIncarico(
+    tenantId: string,
+    clienteId: string,
+    riferimentoId: string | null | undefined,
+  ): Promise<
+    | {
+        hash: string;
+        titolo: string;
+        livello: LivelloFirma;
+        progetto: { id: string; nome: string; numeroContratto: string | null; stato: string };
+      }
+    | { errore: string; codice: number }
+  > {
+    if (!riferimentoId) return { errore: ERRORE_PROGETTO_MANCANTE, codice: 400 };
+
+    const progetto = await prisma.progetto.findFirst({
+      where: { id: riferimentoId, tenantId, clienteId },
+      select: {
+        id: true,
+        nome: true,
+        numeroContratto: true,
+        stato: true,
+        cliente: {
+          select: { nome: true, piva: true, codiceFiscale: true, sedeLegale: true, sdiCode: true, referentiJson: true },
+        },
+        moduli: { select: { nome: true, categoria: true, prezzo: true, orePreventivate: true } },
+      },
+    });
+    if (!progetto) {
+      return {
+        errore: 'Il progetto da incaricare non è presente fra quelli di questo cliente.',
+        codice: 404,
+      };
+    }
+
+    const studio = await prisma.tenant.findFirst({
+      where: { id: tenantId },
+      select: { ragioneSociale: true, piva: true, sedeLegale: true, iban: true, leadAdvisorNome: true },
+    });
+
+    const referenti = progetto.cliente.referentiJson && typeof progetto.cliente.referentiJson === 'object'
+      ? (progetto.cliente.referentiJson as Record<string, unknown>)
+      : null;
+    const legaleRappresentante =
+      typeof referenti?.legaleRappresentante === 'string' ? referenti.legaleRappresentante : null;
+
+    const moduli = [...progetto.moduli].sort((a, b) => a.nome.localeCompare(b.nome));
+    const contenuto = JSON.stringify({
+      tipo: 'lettera_incarico',
+      // L'impronta del testo delle clausole: cambia quando cambia il mandato, non quando cambia
+      // l'incarico. Non è una lettura del database — è la versione del documento firmato.
+      clausole: LETTERA_INCARICO_TESTO_SHA256,
+      progetto: { id: progetto.id, nome: progetto.nome, numeroContratto: progetto.numeroContratto },
+      cliente: {
+        nome: progetto.cliente.nome,
+        piva: progetto.cliente.piva,
+        codiceFiscale: progetto.cliente.codiceFiscale,
+        sedeLegale: progetto.cliente.sedeLegale,
+        sdi: progetto.cliente.sdiCode,
+        legaleRappresentante,
+      },
+      studio: {
+        ragioneSociale: studio?.ragioneSociale ?? null,
+        piva: studio?.piva ?? null,
+        sedeLegale: studio?.sedeLegale ?? null,
+        iban: studio?.iban ?? null,
+        leadAdvisor: studio?.leadAdvisorNome ?? null,
+      },
+      moduli: moduli.map((m) => ({ nome: m.nome, categoria: m.categoria, prezzo: m.prezzo, ore: m.orePreventivate })),
+      totale: moduli.reduce((acc, m) => acc + m.prezzo, 0),
+    });
+
+    return {
+      hash: crypto.createHash('sha256').update(contenuto).digest('hex'),
+      titolo: progetto.nome,
+      // La lettera non ha una colonna di livello nel database: resta SES, come dichiara
+      // `livelloRichiestoPerFirma`. Il campo c'è perché i tre ambiti si leggano allo stesso modo.
+      livello: 'ses',
+      progetto: {
+        id: progetto.id,
+        nome: progetto.nome,
+        numeroContratto: progetto.numeroContratto,
+        stato: progetto.stato,
+      },
+    };
+  }
+
+  /**
    * Enforcement §3.2 — SOLO il livello richiesto, senza leggere i file dall'archivio.
    * `request-otp` deve bloccare il flusso PRIMA di consumare codici OTP e invii, ma in
    * quel punto l'impronta non serve ancora: l'hash viene calcolato in
@@ -1147,7 +1265,12 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
    * Qui il progetto si pretende, e si verifica che sia **di questo cliente e di questo
    * studio**: l'id arriva dal browser, quindi senza il controllo un portale potrebbe firmare
    * la lettera di un incarico altrui. È la stessa catena di proprietà che usano
-   * `improntaDocumentoDelFascicolo` e `improntaModuloCompletato`.
+   * `improntaDocumentoDelFascicolo`, `improntaModuloCompletato` e `improntaLetteraIncarico`.
+   *
+   * Dopo il §8.4 (l'impronta della lettera la calcola il server) questa resta la guardia di
+   * `request-otp`, dove il progetto va preteso prima di generare e inviare il codice; i due
+   * punti di firma risolvono la stessa catena dentro `improntaLetteraIncarico`, che ne ha
+   * bisogno anche per calcolare l'impronta.
    */
   async function progettoDaIncaricare(
     tenantId: string,
@@ -1260,14 +1383,16 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
     // uno finto ('DOC_ORIGINAL_HASH'): un verbale che certifica la volontà su un documento
     // qualunque. Senza impronta la firma non si appone.
     //
-    // Per un documento del fascicolo l'impronta la calcola il server dal file in archivio, e
-    // quella eventualmente mandata dal browser viene ignorata: vedi
-    // `improntaDocumentoDelFascicolo`. Per la conferma di un modulo completato la calcola
-    // sempre il server, dai dati del modulo: vedi `improntaModuloCompletato`. Per la lettera
-    // d'incarico resta quella del browser, perché il testo è ancora composto lì.
+    // Per un documento del fascicolo l'impronta la calcola il server dal file in archivio, per
+    // la conferma di un modulo completato dai dati del modulo, e per la lettera d'incarico dai
+    // dati dell'incarico più la versione delle clausole: vedi `improntaDocumentoDelFascicolo`,
+    // `improntaModuloCompletato` e `improntaLetteraIncarico`. Quella eventualmente mandata dal
+    // browser viene ignorata: l'unico ambito che la riceve ancora è `addendum`, che non ha una
+    // sorgente server-side da cui ricalcolarla.
     const vault = ambito === 'documento_vault' && riferimentoId;
     const moduloCompletato = ambito === 'modulo_completato';
-    if (!vault && !moduloCompletato && (!documentoHash || !HASH_SHA256.test(documentoHash.trim()))) {
+    const letteraIncarico = ambito === 'engagement_letter';
+    if (!vault && !moduloCompletato && !letteraIncarico && (!documentoHash || !HASH_SHA256.test(documentoHash.trim()))) {
       return reply
         .code(400)
         .send({ errore: 'Impronta SHA-256 del documento mancante o non valida: la firma non può essere apposta.' });
@@ -1314,16 +1439,19 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
         livelloRichiesto = esito.livello;
       }
       // La lettera d'incarico ha un riferimento come gli altri due ambiti — il progetto su cui
-      // si firma — e come loro lo si verifica PRIMA di consumare il codice monouso. Il valore
-      // risolto serve anche più sotto, all'attivazione: prima il progetto lo si indovinava
-      // («l'ultimo creato per questo cliente»), e con più incarichi aperti si attivava quello
-      // sbagliato.
+      // si firma — e come loro lo si risolve PRIMA di consumare il codice monouso. La stessa
+      // lettura dà l'impronta (§8.4) e il progetto, che serve più sotto all'attivazione: prima
+      // il progetto lo si indovinava («l'ultimo creato per questo cliente»), e con più incarichi
+      // aperti si attivava quello sbagliato.
       let progettoIncaricato: { id: string; nome: string; numeroContratto: string | null; stato: string } | null =
         null;
-      if (ambito === 'engagement_letter') {
-        const esito = await progettoDaIncaricare(tenantId, clienteId, riferimentoId);
+      if (letteraIncarico) {
+        const esito = await improntaLetteraIncarico(tenantId, clienteId, riferimentoId);
         if ('errore' in esito) return reply.code(esito.codice).send({ errore: esito.errore });
-        progettoIncaricato = esito;
+        improntaFinale = esito.hash;
+        titoloDalFascicolo = esito.titolo;
+        livelloRichiesto = esito.livello;
+        progettoIncaricato = esito.progetto;
       }
 
       // Enforcement §3.2 ribadito al momento della firma, non solo alla richiesta del
@@ -1635,12 +1763,13 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
     if (!filename || !contentBase64) {
       return reply.code(400).send({ errore: 'File firmato mancante.' });
     }
-    // Come nella firma con codice: per un documento del fascicolo l'impronta dell'originale la
-    // calcola il server dal file in archivio, e per un modulo completato dai dati del modulo —
-    // mai il browser.
+    // Come nella firma con codice: l'impronta la calcola il server — dal file in archivio per un
+    // documento del fascicolo, dai dati del modulo per una conferma, dai dati dell'incarico e
+    // dalla versione delle clausole per la lettera d'incarico (§8.4) — mai il browser.
     const vault = ambito === 'documento_vault' && riferimentoId;
     const moduloCompletato = ambito === 'modulo_completato';
-    if (!vault && !moduloCompletato && (!documentoHash || !HASH_SHA256.test(documentoHash.trim()))) {
+    const letteraIncarico = ambito === 'engagement_letter';
+    if (!vault && !moduloCompletato && !letteraIncarico && (!documentoHash || !HASH_SHA256.test(documentoHash.trim()))) {
       return reply
         .code(400)
         .send({ errore: 'Impronta SHA-256 del documento originale mancante o non valida.' });
@@ -1708,10 +1837,14 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
       }
       // Anche da questo canale la lettera d'incarico si firma su un progetto: senza il
       // riferimento la firma non direbbe su cosa è stata apposta, ed è il difetto che ha
-      // fatto risultare firmato «prova server» il 02/10/2026 (vedi `progettoDaIncaricare`).
-      if (ambito === 'engagement_letter') {
-        const esito = await progettoDaIncaricare(tenantId, clienteId, riferimentoId);
+      // fatto risultare firmato «prova server» il 02/10/2026. L'impronta la dà il server
+      // (§8.4): da qui il progetto serve solo a calcolarla e a rifiutare l'incarico altrui.
+      if (letteraIncarico) {
+        const esito = await improntaLetteraIncarico(tenantId, clienteId, riferimentoId);
         if ('errore' in esito) return reply.code(esito.codice).send({ errore: esito.errore });
+        improntaFinale = esito.hash;
+        titoloDalFascicolo = esito.titolo;
+        livelloRichiesto = esito.livello;
       }
 
       // Enforcement §3.2 — canale `file`: chi firma con il proprio provider di firma

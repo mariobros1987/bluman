@@ -31,6 +31,12 @@ export interface DatiVerbaleFirma {
   documentoTitolo: string;
   /** SHA-256 del contenuto firmato: è l'impronta su cui si fissa il valore probatorio. */
   documentoHash: string;
+  /**
+   * Ambito della firma: serve a dire **cosa copre** l'impronta. Per la lettera d'incarico non
+   * è l'impronta di un file — la lettera non è archiviata — ma dei dati dell'incarico e della
+   * versione delle clausole del mandato (§8.4): dirlo è parte del valore del verbale.
+   */
+  ambito?: string | null;
   firmatarioNome: string;
   firmatarioRuolo: string | null;
   /** Nome del cliente (scheda anagrafica) a cui appartiene il firmatario. */
@@ -181,6 +187,16 @@ export function generaPdfVerbaleFirma(dati: DatiVerbaleFirma): Promise<Buffer> {
   sezione(doc, 'Documento sottoscritto');
   riga(doc, 'Titolo', dati.documentoTitolo);
   riga(doc, 'Impronta SHA-256', dati.documentoHash.toLowerCase());
+  if (dati.ambito === 'engagement_letter') {
+    // La lettera d'incarico è l'unico atto firmabile che non esiste come file: il testo è
+    // composto dal portale. L'etichetta generica qui sopra farebbe credere all'impronta di un
+    // documento archiviato, che per la lettera non c'è: si dichiara il perimetro reale.
+    riga(
+      doc,
+      "Cosa copre l'impronta",
+      "I dati dell'incarico (parti, progetto e moduli con i corrispettivi) e la versione delle clausole del mandato. La lettera è composta dal portale e non è archiviata come file: non esiste un documento di cui questa sia l'impronta.",
+    );
+  }
   if (dati.fileFirmatoHash) {
     riga(doc, 'Impronta SHA-256 del file ricaricato', dati.fileFirmatoHash.toLowerCase());
   }

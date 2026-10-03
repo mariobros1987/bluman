@@ -20,9 +20,20 @@ La firma trasforma un documento (o la **conclusione di un modulo**) in un atto c
   ricostruibile e la riga dice `Sigillo SHA-256 non registrato`, che è la verità.
 
 ## 📐 Calcoli & logica
-- **L'impronta la calcola il server** dai dati canonici (documento o modulo), **mai** il browser;
-  l'**IP** e la marca temporale si prendono solo dal **sigillo** emesso da
-  `/portal/verify-otp-and-sign` (regola 7 — una firma che nessuno ha apposto non si disegna).
+- **L'impronta la calcola il server**, **mai** il browser. Per i documenti del fascicolo e per i
+  moduli è l'impronta dei dati canonici (il file in archivio, i dati del modulo); per la **lettera
+  d'incarico** — che non è un file e non è archiviata: il testo è un template del portale riempito
+  nel browser — è l'impronta dei **dati dell'incarico** (parti, studio, progetto, moduli e
+  corrispettivi) **più la versione delle clausole del mandato** (una costante di piattaforma,
+  `LETTERA_INCARICO_TESTO_SHA256`), tenuta onesta da `src/firmaLetteraIncarico.test.ts`: chi cambia
+  una clausola e non aggiorna la costante ha il test rosso. L'**IP** e la marca temporale si
+  prendono solo dal **sigillo** emesso da `/portal/verify-otp-and-sign` (regola 7 — una firma che
+  nessuno ha apposto non si disegna). ⚠️ Per la lettera il verbale scrive una riga **«Cosa copre
+  l'impronta»**: il digest copre i dati e la *versione* delle clausole, **non** il testo reso al
+  cliente riga per riga (ricomporlo nel server sarebbe una seconda resa, che può divergere in
+  silenzio da quella che il cliente legge). Detto, invece che sottinteso.
+- L'**unico** ambito che riceve ancora l'impronta dal browser è l'`addendum`, che non ha una
+  sorgente server-side da cui ricalcolarla. La lettera non è più in quel novero (03/10/2026).
 - **Sigillo HMAC**: sia la firma cliente sia la firma studio usano l'impronta sul **contenuto** del
   file + sigillo **HMAC** (`sigilloHmac`).
 - **Anti ri-firma**: una parte firma **una volta sola** (409 su tentativo doppio); la controfirma
@@ -62,10 +73,12 @@ La firma trasforma un documento (o la **conclusione di un modulo**) in un atto c
   dirà «IN ATTESA» — è la lettura onesta, non un guasto da segnalare come nuovo.
 
 ## 🔧 Nota tecnica
-- Rotte: `src/routes/firma.ts` (`progettoDaIncaricare`, elenco firme),
+- Rotte: `src/routes/firma.ts` (`progettoDaIncaricare`, `improntaLetteraIncarico`, elenco firme),
   `portale.ts` (`/portal/verify-otp-and-sign`, `/portal/firma-con-file`),
   `documentiFirmaStudio.ts` (`/documenti/:id/firma-studio`). Servizi: `otpService`
   (`sigilloHmac`, `generateEidasSignatureSeal`), `copiaFirmata.ts`, `generaPdfDocumento`,
+  **`letteraIncarico.ts`** (il testo della lettera come costante di piattaforma: l'estrazione dal
+  sorgente del frontend e la sua impronta),
   **`effettiFirma.ts`** (`segnaDocumentoFirmato`, `generaVerbaleDiFirma` — gli effetti collaterali
   di una firma, condivisi da cliente e studio dopo l'estrazione dal monolite del 03/10/2026).
 - Frontend: `components/documenti/FirmaStudioModal.tsx`, `components/portal/FirmaOtpModal.tsx`,

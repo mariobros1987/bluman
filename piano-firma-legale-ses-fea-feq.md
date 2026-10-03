@@ -138,7 +138,7 @@ Il ri-caricamento di file qualificato (`qualificata_esterna`) copre già il caso
 
 1. ✅ **Risposta 28/08/2026** — Sì: lo studio vuole offrire firme FEA "vere". La Fase 3 è entrata nel piano di lavoro ed è stata **completata il 29/08/2026** (vedi sopra).
 2. ✅ **Risposta 28/08/2026** (implicita nell'approvazione della Fase 2 con enforcement) — Il livello `feq` **blocca** il flusso OTP (409) finché il cliente non firma col proprio provider; niente degradazione silenziosa a SES.
-3. ⚠️ **Regola adottata in implementazione** — Per livelli `fea`/`feq` l'hash deve essere **server-side** (documento generato dal server, `POST /documenti/genera`); l'hash composto dal browser resta ammesso solo per documenti `ses`. Se il titolare vuole diversamente, dirlo e si cambia.
+3. ⚠️ **Regola adottata in implementazione** — Per livelli `fea`/`feq` l'hash deve essere **server-side** (documento generato dal server, `POST /documenti/genera`); l'hash composto dal browser resta ammesso solo per documenti `ses`. Se il titolare vuole diversamente, dirlo e si cambia. → **Derogata per la lettera d'incarico dal §8.4 (03/10/2026): lì il server calcola sempre, a qualunque livello.**
 4. ✅ **Risposta 28/08/2026** (Fase 4) — Niente integrazione diretta con provider: resta il ri-caricamento del file firmato dal cliente (`qualificata_esterna`), già funzionante e onestamente etichettato FEQ dalla Fase 1.
 
 ## 7. Interventi 21/09/2026 (post-audit) e follow-up esterni
@@ -178,8 +178,18 @@ La firma dello studio deve comportarsi come quella del cliente su tre punti, ogg
 - **aggiornamento dello `statoDoc` del documento padre** (il percorso cliente chiama `segnaDocumentoFirmato`, `firma.ts:1200`);
 - **verbale di firma** (il percorso cliente chiama `generaVerbaleDiFirma`, `firma.ts:1275`). Con la controfirma limitata alla lettera d'incarico (§8.1), il verbale a due parti resta **uno solo**, aggiornato dalla seconda firma.
 
-### 8.4 L'hash della lettera d'incarico lo calcola il server
-Chiude la deroga del §6.3. L'hash della lettera d'incarico — l'atto che fa partire il progetto — **non** arriva più dal browser: il server rilegge il file e calcola il digest. Oggi lo dichiara il client (`firma.ts:1494-1501`). La regola del §6.3 (server-side per `fea`/`feq`, browser ammesso per `ses`) **non si applica più alla lettera**: per questo documento è sempre server-side, a qualsiasi livello.
+### 8.4 L'hash della lettera d'incarico lo calcola il server — **fatto il 03/10/2026**
+Chiude la deroga del §6.3. L'hash della lettera d'incarico — l'atto che fa partire il progetto — **non** arriva più dal browser: lo dichiarava il client (`firma.ts:1494-1501`) e ora lo calcola il server. La regola del §6.3 (server-side per `fea`/`feq`, browser ammesso per `ses`) **non si applica più alla lettera**: per questo documento è sempre server-side, a qualsiasi livello.
+
+**La premessa qui sopra era falsa, e va corretta perché non inganni chi legge dopo.** Diceva «il server rilegge il file»: **la lettera d'incarico non è un file**. Non esiste una rotta che la generi e nessuna riga `Documento` la contiene — il testo delle clausole è un template del portale (`frontend/src/utils/documentTemplates.ts`, voce `tmpl-engagement`) che il browser riempie con i dati dell'incarico (`ClientPortal.tsx`, `getResolvedEngagementHtml`). Il server non aveva niente da rileggere in archivio.
+
+**Come è stato fatto, allora** (decisione del titolare, 03/10/2026, fra tre opzioni): `improntaLetteraIncarico` (`src/routes/firma.ts`) calcola il digest dai **dati dell'incarico che il server possiede** — parti (cliente e il suo legale rappresentante), studio, progetto, moduli con i corrispettivi e totale, in ordine deterministico — **più la versione delle clausole del mandato**: `LETTERA_INCARICO_TESTO_SHA256` (`src/services/letteraIncarico.ts`), impronta SHA-256 del testo del template a fine riga normalizzati. Vale su **entrambi** i canali (`verify-otp-and-sign` e `firma-con-file`); il browser non manda più nulla, e `usePortalFirma.ts` non lo calcola più.
+
+**Il presidio.** `src/firmaLetteraIncarico.test.ts` legge il sorgente del frontend e pretende che la costante sia ancora l'impronta di quel testo: chi cambia una clausola e non aggiorna la costante ha il test rosso, con scritto cosa fare. Da lì in avanti ogni firma porta un'impronta diversa; le firme già registrate restano con la loro, che è la verità di ciò che è stato firmato allora.
+
+**Il limite, dichiarato invece che nascosto.** Il digest copre i dati e la *versione* delle clausole, non il testo reso al cliente riga per riga. Ricomporre l'HTML nel server è stato **scartato di proposito**: sarebbe una seconda resa che può divergere in silenzio da quella che il cliente legge davvero. Per la stessa ragione il verbale di firma, per l'ambito `engagement_letter`, scrive una riga **«Cosa copre l'impronta»** che dice che la lettera è composta dal portale e non è archiviata come file — così nessuno legge «Impronta SHA-256» e crede a un documento che non esiste.
+
+**Effetto collaterale dichiarato:** `addendum` resta l'**unico** ambito che riceve ancora l'impronta dal browser (non ha una sorgente server-side da cui ricalcolarla), e `firmaModuloCompletato.test.ts` lo inchioda come contrapposizione.
 
 ### 8.5 Marca temporale qualificata (RFC 3161) — rinviata
 Il follow-up §7.2 **resta rinviato**: in produzione c'è solo traffico di prova e nessun cliente reale, quindi il tempo resta l'orologio del server finché non serve davvero. Si attiverà scegliendo allora il provider TSA. Il rilievo D3 resta aperto **con motivo scritto**, non dimenticato.

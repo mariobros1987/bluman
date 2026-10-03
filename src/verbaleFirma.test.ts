@@ -24,6 +24,8 @@ const stato = {
   firmaEsistente: null as any,
   progetto: null as any,
   documento: null as any,
+  /** Lo studio (riga `tenant`): entra nell'impronta della lettera d'incarico (§8.4). */
+  tenant: null as any,
   uploadFails: false,
   /** §36 — byte del file in archivio: servono a `improntaDocumentoDelFascicolo`. */
   fileArchivio: null as Buffer | null,
@@ -62,6 +64,8 @@ vi.mock('./util/prismaClient.js', async importOriginal => {
       delete: async () => stato.documento,
     },
     moduloProgetto: { findFirst: async () => stato.modulo },
+    // Lo studio: entra nell'impronta della lettera d'incarico, che il server calcola da sé (§8.4).
+    tenant: { findFirst: async () => stato.tenant },
     progetto: {
       findFirst: async () => stato.progetto,
       update: async (args: any) => {
@@ -260,6 +264,7 @@ beforeEach(() => {
   stato.firmaEsistente = null;
   stato.progetto = null;
   stato.documento = null;
+  stato.tenant = null;
   stato.uploadFails = false;
   stato.fileArchivio = null;
   stato.upload = [];
@@ -569,7 +574,31 @@ describe('Punto 2 — verify-otp-and-sign genera il verbale di firma', () => {
 
   it('lettera d\'incarico su un progetto: la firma lo porta con sé, e il verbale va lì', async () => {
     stato.cliente = { nome: 'Rossi Costruzioni SRL' };
-    stato.progetto = { id: 'proj-1', stato: 'pre_project', createdAt: new Date() };
+    stato.tenant = {
+      ragioneSociale: 'Studio Blu SRL',
+      piva: 'IT09876543210',
+      sedeLegale: 'Via Verdi 2, Milano',
+      iban: 'IT60X0542811101000000123456',
+      leadAdvisorNome: 'Mario Rossi',
+    };
+    // L'incarico come lo legge `improntaLetteraIncarico`: parti, progetto e moduli con i
+    // corrispettivi sono i dati di cui la firma è impronta (§8.4).
+    stato.progetto = {
+      id: 'proj-1',
+      nome: 'Consulenza 2026',
+      numeroContratto: 'C-2026-01',
+      stato: 'pre_project',
+      createdAt: new Date(),
+      cliente: {
+        nome: 'Rossi Costruzioni SRL',
+        piva: 'IT01234567890',
+        codiceFiscale: '01234567890',
+        sedeLegale: 'Via Roma 1, Bari',
+        sdiCode: 'ABC1234',
+        referentiJson: { legaleRappresentante: 'Giulia Rossi' },
+      },
+      moduli: [{ nome: 'Contabilità', categoria: 'contabilita', prezzo: 1200, orePreventivate: 40 }],
+    };
     stato.otp = otpAperto('engagement_letter', 'proj-1');
     const server = serverConToken(tokenCliente());
     const res = await server.inject({
@@ -589,6 +618,13 @@ describe('Punto 2 — verify-otp-and-sign genera il verbale di firma', () => {
     expect(stato.firmeCreate).toHaveLength(1);
     expect(stato.firmeCreate[0].riferimentoId).toBe('proj-1');
 
+    // §8.4 — il browser dichiarava un'impronta che non poteva garantire: ora la calcola il
+    // server dai dati dell'incarico e dalla versione delle clausole. Il valore mandato qui
+    // («abab…») viene ignorato: se finisse nella riga, il calcolo server-side non sarebbe
+    // avvenuto.
+    expect(stato.firmeCreate[0].documentoHash).toMatch(/^[0-9a-f]{64}$/);
+    expect(stato.firmeCreate[0].documentoHash).not.toBe('ab'.repeat(32));
+
     // E il progetto si apre — quello firmato, non l'ultimo creato per il cliente.
     expect(stato.progettiAggiornati.map((a: any) => a.where.id)).toEqual(['proj-1']);
     expect(stato.progettiAggiornati[0].data.stato).toBe('in_progress');
@@ -596,6 +632,12 @@ describe('Punto 2 — verify-otp-and-sign genera il verbale di firma', () => {
     expect(stato.documentiCreati).toHaveLength(1);
     expect(stato.documentiCreati[0].tipo).toBe('verbale_firma');
     expect(stato.documentiCreati[0].progettoId).toBe('proj-1');
+
+    // Il verbale dichiara il perimetro di quell'impronta: la lettera non è archiviata come
+    // file, e una riga «Impronta SHA-256» senza qualificazione lascerebbe credere a un
+    // documento che non esiste.
+    const testo = testoPdf(Buffer.from(stato.uploadContenuti[0] ?? '', 'base64'));
+    expect(testo).toContain("Cosa copre l'impronta");
   });
 
   it('se il generatione del verbale fallisce (storage giù) la firma resta valida', async () => {
